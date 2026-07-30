@@ -18,7 +18,11 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-func newTestCA(t *testing.T, keyType nokkuv1.CertificateKeyType, keyBits int32) *db.CertificateAuthority {
+func newTestCA(
+	t *testing.T,
+	keyType nokkuv1.CertificateKeyType,
+	keyBits int32,
+) *db.CertificateAuthority {
 	t.Helper()
 
 	info, err := NewCA(keyType, keyBits, 8760*time.Hour)

@@ -45,7 +45,11 @@ func (s *TargetService) CreateTarget(
 ) (*nokkuv1.CreateTargetResponse, error) {
 	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
 
-	if err := s.cfg.Entitlements.Check(ctx, req.GetWorkspaceId(), entitlement.ResourceTargets); err != nil {
+	if err := s.cfg.Entitlements.Check(
+		ctx,
+		req.GetWorkspaceId(),
+		entitlement.ResourceTargets,
+	); err != nil {
 		return nil, err
 	}
 
@@ -96,7 +100,11 @@ func (s *TargetService) UpdateTarget(
 		}
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		// Disable updates if over quota
-		if err := s.cfg.Entitlements.Check(ctx, result.WorkspaceID, entitlement.ResourceTargets); err != nil {
+		if err := s.cfg.Entitlements.Check(
+			ctx,
+			result.WorkspaceID,
+			entitlement.ResourceTargets,
+		); err != nil {
 			return err
 		}
 		return nil

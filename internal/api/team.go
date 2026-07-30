@@ -42,7 +42,11 @@ func (s *TeamService) CreateTeam(
 	ctx context.Context,
 	req *nokkuv1.CreateTeamRequest,
 ) (*nokkuv1.CreateTeamResponse, error) {
-	if err := s.cfg.Entitlements.Check(ctx, req.GetWorkspaceId(), entitlement.ResourceTeams); err != nil {
+	if err := s.cfg.Entitlements.Check(
+		ctx,
+		req.GetWorkspaceId(),
+		entitlement.ResourceTeams,
+	); err != nil {
 		return nil, err
 	}
 

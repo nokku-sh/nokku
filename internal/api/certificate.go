@@ -6,6 +6,8 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/entitlement"
@@ -14,7 +16,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/pki"
 	"github.com/nokku-sh/nokku/internal/ssh"
 	"github.com/nokku-sh/nokku/internal/util"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type CertificateService struct {
@@ -31,7 +32,11 @@ func (s *CertificateService) CreateCertificateAuthority(
 ) (*nokkuv1.CreateCertificateAuthorityResponse, error) {
 	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
 
-	if err := s.cfg.Entitlements.Check(ctx, req.GetWorkspaceId(), entitlement.ResourceCas); err != nil {
+	if err := s.cfg.Entitlements.Check(
+		ctx,
+		req.GetWorkspaceId(),
+		entitlement.ResourceCas,
+	); err != nil {
 		return nil, err
 	}
 
