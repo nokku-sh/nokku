@@ -1,0 +1,99 @@
+-- name: InsertAuditLog :exec
+INSERT INTO
+  audit.audit_logs (workspace_id, action, actor_id, actor_type, ip_address, user_agent, status_code)
+VALUES
+  (
+    sqlc.narg('workspace_id')::UUID,
+    sqlc.arg('action'),
+    sqlc.arg('actor_id')::UUID,
+    sqlc.arg('actor_type'),
+    sqlc.narg('ip_address'),
+    sqlc.narg('user_agent'),
+    sqlc.narg('status_code')
+  );
+
+-- name: ListAuditLogs :many
+SELECT
+  *
+FROM
+  audit.audit_logs
+WHERE
+  (
+    (
+      NULLIF(sqlc.arg('workspace_id')::TEXT, '')::UUID IS NULL
+      AND workspace_id IS NULL
+    )
+    OR workspace_id = NULLIF(sqlc.arg('workspace_id')::TEXT, '')::UUID
+  )
+  AND (
+    sqlc.narg('actor_ids')::UUID[] IS NULL
+    OR actor_id = ANY (sqlc.narg('actor_ids')::UUID[])
+  )
+  AND (
+    sqlc.narg('actions')::TEXT[] IS NULL
+    OR action = ANY (sqlc.narg('actions')::TEXT[])
+  )
+  AND (
+    sqlc.narg('start_date')::timestamptz IS NULL
+    OR timestamp >= sqlc.narg('start_date')
+  )
+  AND (
+    sqlc.narg('end_date')::timestamptz IS NULL
+    OR timestamp <= sqlc.narg('end_date')
+  )
+ORDER BY
+  timestamp DESC
+LIMIT
+  sqlc.arg('limit')
+OFFSET
+  sqlc.arg('offset');
+
+-- name: CountAuditLogs :one
+SELECT
+  COUNT(*)::INTEGER
+FROM
+  audit.audit_logs
+WHERE
+  (
+    (
+      NULLIF(sqlc.arg('workspace_id')::TEXT, '')::UUID IS NULL
+      AND workspace_id IS NULL
+    )
+    OR workspace_id = NULLIF(sqlc.arg('workspace_id')::TEXT, '')::UUID
+  )
+  AND (
+    sqlc.narg('actor_ids')::UUID[] IS NULL
+    OR actor_id = ANY (sqlc.narg('actor_ids')::UUID[])
+  )
+  AND (
+    sqlc.narg('actions')::TEXT[] IS NULL
+    OR action = ANY (sqlc.narg('actions')::TEXT[])
+  )
+  AND (
+    sqlc.narg('start_date')::timestamptz IS NULL
+    OR timestamp >= sqlc.narg('start_date')
+  )
+  AND (
+    sqlc.narg('end_date')::timestamptz IS NULL
+    OR timestamp <= sqlc.narg('end_date')
+  );
+
+-- name: ListWorkspaceAuditLogWorkspaceIDs :many
+SELECT DISTINCT
+  workspace_id
+FROM
+  audit.audit_logs
+WHERE
+  workspace_id IS NOT NULL;
+
+-- name: DeleteWorkspaceAuditLogs :execrows
+DELETE FROM audit.audit_logs
+WHERE
+  workspace_id = @workspace_id
+  AND timestamp < @cutoff; 
+
+-- name: DeleteOrphanAuditLogs :execrows
+DELETE FROM audit.audit_logs
+WHERE
+  workspace_id IS NULL
+  AND timestamp < @cutoff;

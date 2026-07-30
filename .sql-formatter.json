@@ -1,0 +1,10 @@
+{
+  "language": "postgresql",
+  "dialect": "postgresql",
+  "keywordCase": "upper",
+  "expressionWidth": 80,
+  "tabWidth": 2,
+  "paramTypes": {
+    "custom": [{ "regex": "sqlc\\.\\w+\\(.*?\\)" }, { "regex": "@\\w+" }]
+  }
+}

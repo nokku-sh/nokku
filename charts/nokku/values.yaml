@@ -1,0 +1,130 @@
+# Replica count when autoscaling is disabled.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/nokku-sh/nokku
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 80
+
+container:
+  port: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: nokku.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+httpRoute:
+  enabled: false
+  annotations: {}
+  parentRefs:
+    - name: gateway
+      sectionName: http
+  hostnames:
+    - nokku.local
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+
+resources: {}
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 20
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+volumes: []
+volumeMounts: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 8Gi
+  mountPath: /var/lib/nokku
+
+app:
+  baseUrl: http://localhost
+  debug: false
+  otlpEndpoint: ""
+  otlpApiKey: ""
+  otlpTrustRemote: false
+  database:
+    host: ""
+    port: "5432"
+    name: nokku
+    user: postgres
+    sslMode: disable
+    autoMigrate: true
+  localStoragePath: data
+  extraEnv: []
+  extraEnvFrom: []
+
+secrets:
+  # Set existingSecret to re-use an already managed secret.
+  existingSecret: ""
+  # 32-byte key used for Secretbox encryption in self-hosted mode.
+  secret: "0123456789abcdefghijklmnopqrstuv"
+  # Used only when bundled PostgreSQL is disabled or custom credentials are needed.
+  databasePassword: ""
+  # Optional but recommended to keep auth sessions stable across restarts.
+  sessionSeed: ""
+
+postgresql:
+  enabled: true
+  auth:
+    username: postgres
+    password: postgres
+    database: nokku
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi

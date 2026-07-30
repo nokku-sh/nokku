@@ -1,0 +1,110 @@
+version: "3"
+
+env:
+  CGO_ENABLED: 0
+  IMAGE: ghcr.io/nokku-sh/nokku
+  DB_URL: postgres://postgres:postgres@localhost:5432/nokku?sslmode=disable
+
+tasks:
+  dev:
+    output: prefixed
+    desc: Run backend and frontend concurrently
+    deps: [backend, frontend]
+
+  backend:
+    desc: Run backend
+    cmds:
+      - go run .
+
+  frontend:
+    desc: Run frontend
+    cmds:
+      - pnpm run dev
+    dir: web/ui
+
+  docs:
+    desc: Run docs
+    cmds:
+      - pnpm run dev
+    dir: web/docs
+
+  email:
+    desc: Run email
+    cmds:
+      - pnpm run dev
+    dir: web/email
+
+  update:
+    desc: Update dependencies
+    cmds:
+      - go get -u ./...
+      - cd web/ui && pnpm update --latest
+      - cd web/docs && pnpm update --latest
+      - cd web/email && pnpm update --latest
+
+  gen:
+    desc: Generate sqlc and buf
+    cmds:
+      - buf generate
+      - sqlc generate
+
+  build:server:
+    desc: Build binary
+    cmds:
+      - go build -ldflags="-s -w" -trimpath -o bin/nokku
+
+  build:web:
+    desc: Build frontends
+    dir: web
+    cmds:
+      - cd ui; pnpm install; pnpm build
+      - cd docs; pnpm install; pnpm build
+      - cd email; pnpm install; pnpm export
+
+  lint:
+    desc: Run go vet & lint
+    ignore_error: true
+    cmds:
+      - go mod tidy
+      - go fmt ./...
+      - go vet ./...
+      - govulncheck ./...
+      - go test -cover ./...
+      - golangci-lint run
+      - cd web/ui; pnpm fmt; pnpm lint
+
+  debug:
+    desc: Run profiler
+    cmds:
+      - go tool pprof -http=:8081 http://127.0.0.1:3000/debug/pprof/profile\?seconds\=10
+
+  snapshot:
+    desc: Build snapshot
+    cmds:
+      - goreleaser --snapshot --clean --skip=validate,sign,sbom,archive
+      - docker tag goreleaser.ko.local:latest $IMAGE:nightly
+      - grype $IMAGE:nightly
+
+  snapshot:push:
+    desc: Build and push snapshot to registry
+    deps: [snapshot]
+    cmds:
+      - docker push $IMAGE:nightly
+
+  deploy:installer:
+    desc: Deploy installer
+    cmds:
+      - npx wrangler deploy --config web/worker/wrangler.jsonc
+
+  migrate:plan:
+    desc: Generate migration plan
+    dir: ./internal/db/
+    cmd: pg-schema-diff plan --from-dsn $DB_URL --to-dir ./schema/
+
+  migrate:apply:
+    desc: Apply schema changes
+    dir: ./internal/db/
+    cmd: |
+      pg-schema-diff apply --from-dsn $DB_URL --to-dir ./schema/ \
+      --allow-hazards AUTHZ_UPDATE,DELETES_DATA,INDEX_BUILD,HAS_UNTRACKABLE_DEPENDENCIES \
+      --skip-confirm-prompt --disable-plan-validation
