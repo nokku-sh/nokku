@@ -23,16 +23,6 @@ plugins:
     out: web/ui/src/lib/gen
     opt: target=ts
     include_imports: true
-  - local: protoc-gen-connect-openapi
-    out: web/docs/public/api
-    strategy: all
-    opt:
-      - features=connectrpc;google.api.http;protovalidate
-      - allow-get
-      - with-streaming
-      - format=json
-      - path=openapi.json
-      - base=openapi.yaml
 
 inputs:
   - git_repo: https://github.com/nokku-sh/protos.git
