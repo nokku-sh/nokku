@@ -1,0 +1,41 @@
+<script lang="ts">
+	import { util } from '$lib/api/workspaces.svelte';
+	import ModeSwitch from '$lib/components/utils/ModeSwitch.svelte';
+
+	const version = $derived(util.getVersion());
+	const currentYear = new Date().getFullYear();
+</script>
+
+<footer
+	class="flex flex-col items-center justify-between gap-4 rounded-b-xl border-t bg-background/95 px-4 py-2 shadow-[0_-1px_2px_rgba(0,0,0,0.05)] backdrop-blur supports-backdrop-filter:bg-background/80 sm:flex-row"
+>
+	<div class="flex flex-col items-center gap-2 sm:flex-row sm:gap-4">
+		<p class="text-xs text-muted-foreground">
+			&copy; {currentYear} MizuchiLabs. All rights reserved.
+		</p>
+
+		<div class="hidden h-4 w-px bg-border sm:block"></div>
+
+		<nav class="flex items-center gap-4 text-xs text-muted-foreground">
+			<a href="/terms" class="transition-colors hover:text-foreground">Terms of Service</a>
+			<a href="/privacy" class="transition-colors hover:text-foreground">Privacy Policy</a>
+			<a href="/impressum" class="transition-colors hover:text-foreground">Legal Notice</a>
+		</nav>
+	</div>
+
+	<div class="flex items-center gap-2">
+		<div
+			class="flex h-8 items-center gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground sm:px-3"
+		>
+			<span class="italic opacity-70">
+				{#if version.data && version.data !== 'dev'}
+					v{version.data}
+				{:else}
+					dev build
+				{/if}
+			</span>
+		</div>
+
+		<ModeSwitch />
+	</div>
+</footer>

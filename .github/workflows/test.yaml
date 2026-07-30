@@ -1,0 +1,79 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/*.ts"
+      - "**/*.svelte"
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+  pull_request:
+    branches: [main]
+    paths:
+      - "**/*.ts"
+      - "**/*.svelte"
+      - "**/*.go"
+      - "**/package.json"
+      - "**/pnpm-lock.yaml"
+      - "go.mod"
+      - "go.sum"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: latest
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: "go.mod"
+
+      - name: Build frontend
+        working-directory: web/ui
+        run: pnpm install && pnpm build
+
+      - name: Build email templates
+        working-directory: web/email
+        run: pnpm install && pnpm export
+
+      - name: Lint and test
+        run: |
+          go mod tidy
+          go mod verify
+          go fmt ./...
+          go vet ./...
+          go test -race -count=1 ./...
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          args: --timeout=10m
+
+      - name: Build
+        run: go build -ldflags="-s -w" -o bin/
+
+      - uses: ko-build/setup-ko@v0.10
+
+      - name: Publish Nightly Container
+        run: ko build --bare --tags=nightly
+      - name: Clean up old nightly releases
+
+        uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          delete-tags: "nightly"
+          keep-n-tagged: 2
+          delete-untagged: true
+          delete-ghost-images: true
+          delete-partial-images: true
+          delete-orphaned-images: true

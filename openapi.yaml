@@ -1,0 +1,143 @@
+openapi: 3.1.0
+info:
+  title: Nokku API
+  description: |
+    The Nokku API provides access to core platform functionality via Connect RPC over HTTP.
+
+    ## Authentication
+
+    Authentication is supported via two methods:
+    - **Cookie-based** (recommended for web applications): Session cookie automatically sent by browsers
+    - **Bearer token** (for API clients): Include token in the `Authorization` header
+
+    Tokens use PASETO (Platform-Agnostic Security Tokens) for enhanced security.
+
+    ## Rate Limiting
+
+    API requests are rate-limited per authenticated user. Check response headers for current limits:
+    - `X-RateLimit-Limit`: Maximum requests per window
+    - `X-RateLimit-Remaining`: Remaining requests in current window
+    - `X-RateLimit-Reset`: Unix timestamp when the limit resets
+
+    ## Error Handling
+
+    Errors follow the standard Connect RPC error format.
+  version: 1.0.0
+  contact:
+    name: Nokku Support
+    email: support@mizuchi.dev
+
+servers:
+  - url: https://app.nokku.sh
+    description: Production
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: PASETO
+      description: |
+        PASETO token authentication. Include the token in the Authorization header:
+        `Authorization: Bearer <token>`
+
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: |
+        Cookie-based authentication (recommended for web applications).
+        The session cookie is automatically sent by browsers after login.
+
+  schemas:
+    Error:
+      type: object
+      description: Standard Connect RPC error response
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Connect error code (e.g., 16 = UNAUTHENTICATED, 7 = PERMISSION_DENIED)
+          example: 16
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Authentication required"
+        details:
+          type: array
+          description: Additional error details and metadata
+          items:
+            type: object
+            additionalProperties: true
+
+  responses:
+    Unauthorized:
+      description: Authentication credentials are missing or invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            code: 16
+            message: "Authentication required"
+
+    Forbidden:
+      description: Authenticated user lacks permission to access this resource
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            code: 7
+            message: "Permission denied"
+
+    NotFound:
+      description: The requested resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            code: 5
+            message: "Resource not found"
+
+    RateLimitExceeded:
+      description: Rate limit exceeded - too many requests
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            code: 8
+            message: "Rate limit exceeded"
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Maximum requests per window
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests in current window
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Unix timestamp when limit resets
+
+  parameters:
+    Timeout:
+      name: Connect-Timeout-Ms
+      in: header
+      description: Request timeout in milliseconds
+      required: false
+      schema:
+        type: integer
+        format: int64
+        example: 30000
+
+security:
+  - BearerAuth: []
+  - CookieAuth: []

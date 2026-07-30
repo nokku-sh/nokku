@@ -1,0 +1,133 @@
+// Package kms implements envelope encryption backed by an external KMS.
+//
+// A single local keyset of data-encryption keys (DEKs, managed by Tink)
+// performs all encrypt/decrypt operations locally. The keyset itself is
+// wrapped (encrypted) by a key-encryption key (KEK) that never leaves the
+// KMS, and the wrapped keyset is stored in the database as ciphertext:
+//
+//   - the KMS only ever sees wrapped key material, never plaintext secrets
+//   - the database only ever holds ciphertext (wrapped keyset, encrypted rows)
+//
+// KEK rotation is the KMS's job: it keeps old key versions decryptable, so a
+// stored wrapped keyset stays readable across KEK rotations. A periodic
+// background rewrap migrates the stored blob to the current KEK version.
+//
+// There is deliberately no automatic DEK rotation: every intermediate state
+// (first boot, rewrap in flight, crash at any point) leaves all data
+// decryptable. Switching ciphers (secretbox <-> KMS, between KMS providers,
+// or rotating the keyset itself) is an explicit operator action via the
+// rotate-secrets command, which re-encrypts every secret and swaps the
+// keyset atomically in a single transaction.
+//
+// Files: client.go (KMS providers), keyset.go (persistence), rewrap.go
+// (background maintenance), tink.go (the encryptor itself).
+package kms
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/caarlos0/env/v11"
+	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/tink-crypto/tink-go/v2/aead"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/tink"
+)
+
+// TinkEncryptor implements envelope encryption using Google Tink: local DEKs
+// wrapped by a KMS KEK, with the wrapped keyset persisted in the database.
+type TinkEncryptor struct {
+	mu        sync.RWMutex // guards kekAEAD (swapped on rewrap)
+	client    registry.KMSClient
+	kekAEAD   tink.AEAD
+	db        *db.Connection
+	handle    *keyset.Handle // set once at construction, never mutated afterwards
+	primitive tink.AEAD
+
+	KMSURI          string        `env:"KMS_URI"`
+	VaultToken      string        `env:"VAULT_TOKEN"`
+	VaultSkipVerify bool          `env:"VAULT_SKIP_VERIFY"      envDefault:"false"`
+	RewrapInterval  time.Duration `env:"KEYSET_REWRAP_INTERVAL" envDefault:"12h"`
+}
+
+// New creates a KMS-backed encryptor: it connects to the KMS, loads the
+// wrapped keyset from the database, or creates and persists one on first
+// boot. It registers no globals and starts no background jobs (see Start).
+func New(ctx context.Context, db *db.Connection) (*TinkEncryptor, error) {
+	t, err := newEncryptor(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	t.db = db
+	handle, err := t.loadOrCreateKeyset(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return t.withHandle(handle)
+}
+
+// NewForRotation creates a KMS encryptor with a FRESH keyset that is not
+// persisted anywhere: use it as the target of a secret rotation and persist
+// WrappedKeyset atomically within the rotation transaction (see the
+// rotate-secrets command). kmsURI overrides KMS_URI from the environment.
+func NewForRotation(ctx context.Context, kmsURI string) (*TinkEncryptor, error) {
+	t, err := newEncryptor(ctx, kmsURI)
+	if err != nil {
+		return nil, err
+	}
+	handle, err := keyset.NewHandle(aead.AES256GCMKeyTemplate())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create keyset: %w", err)
+	}
+	return t.withHandle(handle)
+}
+
+// newEncryptor parses the env config, applies an optional KMS URI override,
+// and connects to the KMS.
+func newEncryptor(ctx context.Context, kmsURI string) (*TinkEncryptor, error) {
+	t, err := env.ParseAs[TinkEncryptor]()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse KMS config: %w", err)
+	}
+	if kmsURI != "" {
+		t.KMSURI = kmsURI
+	}
+	if t.KMSURI == "" {
+		return nil, errors.New("KMS_URI is required")
+	}
+	if err := t.setupClient(ctx); err != nil {
+		return nil, fmt.Errorf("failed to set up KMS client: %w", err)
+	}
+	return &t, nil
+}
+
+// withHandle derives the AEAD primitive from a keyset handle.
+func (t *TinkEncryptor) withHandle(handle *keyset.Handle) (*TinkEncryptor, error) {
+	primitive, err := aead.New(handle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AEAD primitive: %w", err)
+	}
+	t.handle = handle
+	t.primitive = primitive
+	return t, nil
+}
+
+// Encrypt encrypts plaintext using the local DEK keyset (no KMS round-trip).
+func (t *TinkEncryptor) Encrypt(plaintext []byte) ([]byte, error) {
+	if len(plaintext) == 0 {
+		return nil, nil
+	}
+	return t.primitive.Encrypt(plaintext, nil)
+}
+
+// Decrypt decrypts ciphertext using the local DEK keyset (no KMS round-trip).
+func (t *TinkEncryptor) Decrypt(ciphertext []byte) ([]byte, error) {
+	if len(ciphertext) == 0 {
+		return nil, nil
+	}
+	return t.primitive.Decrypt(ciphertext, nil)
+}
