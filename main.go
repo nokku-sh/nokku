@@ -10,13 +10,14 @@ import (
 	"github.com/mizuchilabs/kata/buildinfo"
 	"github.com/mizuchilabs/kata/logx"
 	"github.com/mizuchilabs/kata/sigx"
+	"github.com/urfave/cli/v3"
+
 	"github.com/nokku-sh/nokku/internal/api"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/testutil"
-	"github.com/urfave/cli/v3"
 )
 
 func main() {

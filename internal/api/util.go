@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/mizuchilabs/kata/buildinfo"
+
 	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/config"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"

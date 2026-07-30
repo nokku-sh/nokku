@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"golang.org/x/crypto/ssh"
 )
 
 func newTestCA(t *testing.T) *db.CertificateAuthority {

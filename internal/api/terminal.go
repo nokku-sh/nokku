@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/coder/websocket"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/daemon"
 )

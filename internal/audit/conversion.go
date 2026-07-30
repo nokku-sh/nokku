@@ -1,8 +1,9 @@
 package audit
 
 import (
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
 func (e *Event) ToProto() *nokkuv1.EventLog {

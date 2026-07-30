@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"connectrpc.com/connect"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"

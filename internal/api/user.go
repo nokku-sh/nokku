@@ -6,13 +6,14 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/nokku-sh/nokku/internal/authn"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/storage"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type UserService struct {

@@ -17,10 +17,11 @@ import (
 	"connectrpc.com/grpcreflect"
 	"connectrpc.com/validate"
 	"connectrpc.com/vanguard"
+	"github.com/vearutop/statigz"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/web"
-	"github.com/vearutop/statigz"
 )
 
 type Server struct {

@@ -9,6 +9,7 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/google/uuid"
 	"github.com/mergestat/timediff"
+
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
