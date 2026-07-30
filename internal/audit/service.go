@@ -9,21 +9,14 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
 const (
-	// OrphanLogRetentionDays is the compliance hard cap for user-level
-	// (non-workspace) audit logs. All such logs older than this are purged.
-	OrphanLogRetentionDays = 365
-
-	// defaultRetentionDays is the fallback when a workspace has no subscription
-	// or the plan doesn't define a retention policy.
 	defaultRetentionDays = 7
-
-	// maxRetentionDays is the absolute ceiling for any workspace.
-	maxRetentionDays = 365
+	maxRetentionDays     = 365
 )
 
 type Service struct {
@@ -72,18 +65,18 @@ func (s *Service) ensurePartitions(ctx context.Context) error {
 		return nil
 	}
 
-	// Create for current month
+	// current month
 	if err := s.createPartitionForMonth(ctx, tx, currentMonth); err != nil {
 		return err
 	}
 
-	// Create for next month
+	// next month
 	nextMonth := currentMonth.AddDate(0, 1, 0)
 	if err := s.createPartitionForMonth(ctx, tx, nextMonth); err != nil {
 		return err
 	}
 
-	// Drop old partitions (older than 6 months)
+	// drop old partitions (older than 6 months)
 	sixMonthsAgo := currentMonth.AddDate(0, -6, 0)
 	if err := s.dropPartitionsBefore(ctx, tx, sixMonthsAgo); err != nil {
 		return err
@@ -235,9 +228,9 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 		}
 	}
 
-	// --- Orphan (non-workspace) audit log cleanup ---
+	// Orphan (non-workspace) audit log cleanup
 
-	orphanCutoff := now.AddDate(0, 0, -OrphanLogRetentionDays)
+	orphanCutoff := now.AddDate(0, 0, -maxRetentionDays)
 	deleted, err := q.DeleteOrphanAuditLogs(ctx, orphanCutoff)
 	if err != nil {
 		slog.Error("Retention: failed to delete orphan audit logs", "error", err)
