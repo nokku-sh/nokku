@@ -31,21 +31,20 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/tink"
+
+	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// TinkEncryptor implements envelope encryption using Google Tink: local DEKs
-// wrapped by a KMS KEK, with the wrapped keyset persisted in the database.
 type TinkEncryptor struct {
-	mu        sync.RWMutex // guards kekAEAD (swapped on rewrap)
+	mu        sync.RWMutex
 	client    registry.KMSClient
 	kekAEAD   tink.AEAD
 	db        *db.Connection
-	handle    *keyset.Handle // set once at construction, never mutated afterwards
+	handle    *keyset.Handle
 	primitive tink.AEAD
 
 	KMSURI          string        `env:"KMS_URI"`
@@ -54,9 +53,6 @@ type TinkEncryptor struct {
 	RewrapInterval  time.Duration `env:"KEYSET_REWRAP_INTERVAL" envDefault:"12h"`
 }
 
-// New creates a KMS-backed encryptor: it connects to the KMS, loads the
-// wrapped keyset from the database, or creates and persists one on first
-// boot. It registers no globals and starts no background jobs (see Start).
 func New(ctx context.Context, db *db.Connection) (*TinkEncryptor, error) {
 	t, err := newEncryptor(ctx, "")
 	if err != nil {
@@ -70,10 +66,7 @@ func New(ctx context.Context, db *db.Connection) (*TinkEncryptor, error) {
 	return t.withHandle(handle)
 }
 
-// NewForRotation creates a KMS encryptor with a FRESH keyset that is not
-// persisted anywhere: use it as the target of a secret rotation and persist
-// WrappedKeyset atomically within the rotation transaction (see the
-// rotate-secrets command). kmsURI overrides KMS_URI from the environment.
+// NewForRotation creates a KMS encryptor with a FRESH keyset that is not persisted anywhere.
 func NewForRotation(ctx context.Context, kmsURI string) (*TinkEncryptor, error) {
 	t, err := newEncryptor(ctx, kmsURI)
 	if err != nil {
@@ -116,7 +109,6 @@ func (t *TinkEncryptor) withHandle(handle *keyset.Handle) (*TinkEncryptor, error
 	return t, nil
 }
 
-// Encrypt encrypts plaintext using the local DEK keyset (no KMS round-trip).
 func (t *TinkEncryptor) Encrypt(plaintext []byte) ([]byte, error) {
 	if len(plaintext) == 0 {
 		return nil, nil
@@ -124,7 +116,6 @@ func (t *TinkEncryptor) Encrypt(plaintext []byte) ([]byte, error) {
 	return t.primitive.Encrypt(plaintext, nil)
 }
 
-// Decrypt decrypts ciphertext using the local DEK keyset (no KMS round-trip).
 func (t *TinkEncryptor) Decrypt(ciphertext []byte) ([]byte, error) {
 	if len(ciphertext) == 0 {
 		return nil, nil

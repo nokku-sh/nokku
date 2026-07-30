@@ -49,7 +49,11 @@ func (s *ServiceAccountService) CreateServiceAccount(
 ) (*nokkuv1.CreateServiceAccountResponse, error) {
 	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
 
-	if err := s.cfg.Entitlements.Check(ctx, req.GetWorkspaceId(), entitlement.ResourceServiceAccounts); err != nil {
+	if err := s.cfg.Entitlements.Check(
+		ctx,
+		req.GetWorkspaceId(),
+		entitlement.ResourceServiceAccounts,
+	); err != nil {
 		return nil, err
 	}
 
