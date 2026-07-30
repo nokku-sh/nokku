@@ -32,5 +32,3 @@ bin/
 dist/
 data/
 artifacts/
-.wrangler/
-*.mmdb

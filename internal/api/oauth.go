@@ -13,15 +13,16 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/github"
+	"golang.org/x/sync/singleflight"
+
 	"github.com/nokku-sh/nokku/internal/authn"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/email"
 	"github.com/nokku-sh/nokku/internal/util"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/github"
-	"golang.org/x/sync/singleflight"
 )
 
 type UnifiedUser struct {
