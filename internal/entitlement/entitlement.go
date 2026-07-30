@@ -10,6 +10,7 @@ import (
 	"maps"
 
 	"connectrpc.com/connect"
+
 	"github.com/nokku-sh/nokku/internal/db"
 )
 

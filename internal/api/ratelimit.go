@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"golang.org/x/time/rate"
+
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/util"
-	"golang.org/x/time/rate"
 )
 
 const (

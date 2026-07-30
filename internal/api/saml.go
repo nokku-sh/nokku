@@ -18,11 +18,12 @@ import (
 
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
+	dsig "github.com/russellhaering/goxmldsig"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/util"
-	dsig "github.com/russellhaering/goxmldsig"
 )
 
 type SAMLHandler struct {

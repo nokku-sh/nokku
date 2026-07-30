@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/entitlement"
-	"github.com/nokku-sh/nokku/internal/meta"
 	polargo "github.com/polarsource/polar-go"
 	"github.com/polarsource/polar-go/models/components"
 	"github.com/polarsource/polar-go/models/operations"
+
+	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/entitlement"
+	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 // Polar implements Provider for polar.sh.
