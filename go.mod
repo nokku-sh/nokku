@@ -25,10 +25,10 @@ require (
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/vault/api v1.23.0
+	github.com/iplocate/go-iplocate v1.0.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/mergestat/timediff v0.0.4
 	github.com/mizuchilabs/kata v0.1.1
-	github.com/oschwald/geoip2-golang v1.13.0
 	github.com/polarsource/polar-go v0.16.0
 	github.com/rs/cors v1.11.1
 	github.com/russellhaering/goxmldsig v1.6.0
@@ -142,7 +142,6 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/oschwald/maxminddb-golang v1.13.1 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect

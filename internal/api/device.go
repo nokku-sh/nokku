@@ -73,7 +73,7 @@ func syncWebDevice(
 			user.Email,
 			token.ID,
 			name,
-			cfg.GeoDB.GetLocation(ipStr),
+			cfg.Geo.Lookup(ipStr),
 		); err != nil {
 			slog.Debug("failed to send device added email", "error", err)
 		}

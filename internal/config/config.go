@@ -7,6 +7,8 @@ import (
 	"net/url"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/urfave/cli/v3"
+
 	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/authn"
 	"github.com/nokku-sh/nokku/internal/billing"
@@ -17,9 +19,8 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/email"
 	"github.com/nokku-sh/nokku/internal/entitlement"
-	"github.com/nokku-sh/nokku/internal/location"
+	"github.com/nokku-sh/nokku/internal/geo"
 	"github.com/nokku-sh/nokku/internal/storage"
-	"github.com/urfave/cli/v3"
 )
 
 type EnvConfig struct {
@@ -47,7 +48,7 @@ type Config struct {
 	Cache        cache.Cache
 	Entitlements *entitlement.Service
 	Billing      billing.Provider
-	GeoDB        *location.Service
+	Geo          *geo.Service
 }
 
 func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
@@ -89,7 +90,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.GeoDB = location.New()
+	cfg.Geo = geo.New()
 
 	if err := crypto.InitDefaultHashers(); err != nil {
 		return nil, err

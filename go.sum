@@ -227,6 +227,8 @@ github.com/hashicorp/vault/api v1.23.0 h1:gXgluBsSECfRWTSW9niY2jwg2e9mMJc4WoHNv4
 github.com/hashicorp/vault/api v1.23.0/go.mod h1:zransKiB9ftp+kgY8ydjnvCU7Wk8i9L0DYWpXeMj9ko=
 github.com/hbollon/go-edlib v1.7.0 h1:Jt3AtZ+AdgtJhzkrCFvkbdbNL3KCqZlGioLnUfwsxeU=
 github.com/hbollon/go-edlib v1.7.0/go.mod h1:wnt6o6EIVEzUfgbUZY7BerzQ2uvzp354qmS2xaLkrhM=
+github.com/iplocate/go-iplocate v1.0.0 h1:5IpZNYlXyDmo2Ov9VUL0wj5mfplsS1is6jio9HoLrNk=
+github.com/iplocate/go-iplocate v1.0.0/go.mod h1:VNeruu6qP/duzGdCaWGLcYaRn1ZiEOLvmkg5mqzykcA=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
 github.com/jackc/chunkreader/v2 v2.0.0/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
 github.com/jackc/chunkreader/v2 v2.0.1 h1:i+RDz65UE+mmpjTfyz0MoVTnzeYxroil2G82ki7MGG8=
@@ -324,10 +326,6 @@ github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyua
 github.com/mitchellh/mapstructure v1.5.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/mizuchilabs/kata v0.1.1 h1:nqx6P4sdRqjJgu9HM8gAZ5AiIwX8t6V9cmm4hejDDN8=
 github.com/mizuchilabs/kata v0.1.1/go.mod h1:GblzmdOc9+y1gsX2Lihjz9Dhw/NbtuKgG8Hr3kjEGf8=
-github.com/oschwald/geoip2-golang v1.13.0 h1:Q44/Ldc703pasJeP5V9+aFSZFmBN7DKHbNsSFzQATJI=
-github.com/oschwald/geoip2-golang v1.13.0/go.mod h1:P9zG+54KPEFOliZ29i7SeYZ/GM6tfEL+rgSn03hYuUo=
-github.com/oschwald/maxminddb-golang v1.13.1 h1:G3wwjdN9JmIK2o/ermkHM+98oX5fS+k5MbwsmL4MRQE=
-github.com/oschwald/maxminddb-golang v1.13.1/go.mod h1:K4pgV9N/GcK694KSTmVSDTODk4IsCNThNdTmnaBZ/F8=
 github.com/philhofer/fwd v1.2.0 h1:e6DnBTl7vGY+Gz322/ASL4Gyp1FspeMvx1RNDoToZuM=
 github.com/philhofer/fwd v1.2.0/go.mod h1:RqIHx9QI14HlwKwm98g9Re5prTQ6LdeRQn+gXJFxsJM=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=

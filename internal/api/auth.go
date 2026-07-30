@@ -11,6 +11,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
+
 	"github.com/nokku-sh/nokku/internal/authn"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
@@ -509,7 +510,7 @@ func (s *AuthService) VerifyCLILogin(
 				user.Email,
 				token.ID,
 				name,
-				s.cfg.GeoDB.GetLocation(ipStr),
+				s.cfg.Geo.Lookup(ipStr),
 			); err != nil {
 				slog.Debug("failed to send device added email", "error", err)
 			}
