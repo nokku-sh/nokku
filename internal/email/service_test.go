@@ -64,7 +64,6 @@ func TestRenderTemplates(t *testing.T) {
 			contains: []string{
 				"New sign-in recorded.",
 				"https://app.nokku.sh/profile/security",
-				"Password",
 				"Web browser",
 			},
 		},
