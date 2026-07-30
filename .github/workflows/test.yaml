@@ -21,11 +21,17 @@ on:
       - "go.sum"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
@@ -66,8 +72,8 @@ jobs:
 
       - name: Publish Nightly Container
         run: ko build --bare --tags=nightly
-      - name: Clean up old nightly releases
 
+      - name: Clean up old nightly releases
         uses: dataaxiom/ghcr-cleanup-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
