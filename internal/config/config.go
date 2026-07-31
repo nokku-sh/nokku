@@ -21,6 +21,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/entitlement"
 	"github.com/nokku-sh/nokku/internal/geo"
 	"github.com/nokku-sh/nokku/internal/storage"
+	"github.com/nokku-sh/nokku/internal/util"
 )
 
 type EnvConfig struct {
@@ -28,6 +29,12 @@ type EnvConfig struct {
 	Port    string `env:"NOKKU_PORT"     envDefault:"3000"`
 	Secret  string `env:"NOKKU_SECRET"`
 	Debug   bool
+
+	// TrustedProxies lists the reverse proxies (Traefik, k8s ingress, ...)
+	// that may forward client IP headers. Entries are IPs or CIDRs. Client
+	// IPs derived from headers are only trusted when the direct peer matches
+	// one of these; with no entries the socket peer address is used.
+	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
 
 	// OAuth configuration
 	GoogleClientID     string `env:"GOOGLE_CLIENT_ID"`
@@ -59,6 +66,10 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 
 	if cmd != nil {
 		cfg.Debug = cmd.Bool("debug")
+	}
+
+	if err := util.SetTrustedProxies(cfg.TrustedProxies); err != nil {
+		return nil, err
 	}
 
 	cfg.Conn, err = db.NewConnection(ctx)
