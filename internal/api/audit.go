@@ -38,8 +38,9 @@ func (a *AuditInterceptor) WrapStreamingHandler(
 ) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		ctx = meta.WithAuditState(ctx, &meta.AuditState{UserID: meta.UserIDFromContext(ctx)})
-		go a.audit.LogStreamingAction(context.WithoutCancel(ctx), conn, nil)
-		return next(ctx, conn)
+		err := next(ctx, conn)
+		go a.audit.LogStreamingAction(context.WithoutCancel(ctx), conn, err)
+		return err
 	}
 }
 

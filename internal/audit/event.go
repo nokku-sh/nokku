@@ -20,6 +20,7 @@ type Event struct {
 	Action      string    `json:"action"`
 	ActorID     string    `json:"actor_id"`
 	ActorType   string    `json:"actor_type"`
+	ActorEmail  string    `json:"actor_email,omitempty"`
 	IPAddress   string    `json:"ip_address"`
 	UserAgent   string    `json:"user_agent"`
 	StatusCode  string    `json:"status_code"`
@@ -47,9 +48,12 @@ const (
 
 // Append writes a single event.
 func (s *Service) Append(ctx context.Context, event *Event) error {
-	var workspaceID *string
+	var workspaceID, email *string
 	if event.WorkspaceID != "" {
 		workspaceID = &event.WorkspaceID
+	}
+	if event.ActorEmail != "" {
+		email = &event.ActorEmail
 	}
 
 	return s.conn.Q.InsertAuditLog(ctx, &db.InsertAuditLogParams{
@@ -57,6 +61,7 @@ func (s *Service) Append(ctx context.Context, event *Event) error {
 		Action:      event.Action,
 		ActorID:     event.ActorID,
 		ActorType:   event.ActorType,
+		ActorEmail:  email,
 		IpAddress:   &event.IPAddress,
 		UserAgent:   &event.UserAgent,
 		StatusCode:  &event.StatusCode,
@@ -109,6 +114,10 @@ func (s *Service) List(
 			workspaceID = *row.WorkspaceID
 		}
 
+		email := ""
+		if row.ActorEmail != nil {
+			email = *row.ActorEmail
+		}
 		ip := ""
 		if row.IpAddress != nil {
 			ip = *row.IpAddress
@@ -129,6 +138,7 @@ func (s *Service) List(
 			Action:      row.Action,
 			ActorID:     row.ActorID,
 			ActorType:   row.ActorType,
+			ActorEmail:  email,
 			IPAddress:   ip,
 			UserAgent:   ua,
 			StatusCode:  sc,
@@ -207,7 +217,7 @@ func (s *Service) Export(
 
 		header := []string{
 			"id", "timestamp",
-			"actor_id", "actor_type",
+			"actor_id", "actor_type", "actor_email",
 			"action", "workspace_id",
 			"ip_address", "user_agent", "status_code",
 		}
@@ -221,6 +231,7 @@ func (s *Service) Export(
 				event.Timestamp.Format(time.RFC3339Nano),
 				event.ActorID,
 				event.ActorType,
+				event.ActorEmail,
 				event.Action,
 				event.WorkspaceID,
 				event.IPAddress,

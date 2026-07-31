@@ -28,6 +28,7 @@ type Actor struct {
 type AuditState struct {
 	WorkspaceID string
 	UserID      string
+	Email       string
 }
 
 func WithAuditState(ctx context.Context, state *AuditState) context.Context {
@@ -50,6 +51,24 @@ func WorkspaceIDFromContext(ctx context.Context) string {
 func SetAuditWorkspaceID(ctx context.Context, workspaceID string) {
 	if a := AuditStateFromContext(ctx); a != nil {
 		a.WorkspaceID = workspaceID
+	}
+}
+
+// SetAuditEmail records the account identifier attempted by the current
+// request on the audit state. Used by auth handlers so failed login/register
+// attempts still carry the email that was tried.
+func SetAuditEmail(ctx context.Context, email string) {
+	if a := AuditStateFromContext(ctx); a != nil {
+		a.Email = email
+	}
+}
+
+// SetAuditUserID records the actor that completed the current request on the
+// audit state. Used by auth handlers to attribute successful logins when the
+// actor was only known after authentication completed.
+func SetAuditUserID(ctx context.Context, userID string) {
+	if a := AuditStateFromContext(ctx); a != nil {
+		a.UserID = userID
 	}
 }
 

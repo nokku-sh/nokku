@@ -99,7 +99,7 @@ func (q *Queries) DeleteWorkspaceAuditLogs(ctx context.Context, arg *DeleteWorks
 
 const insertAuditLog = `-- name: InsertAuditLog :exec
 INSERT INTO
-  audit.audit_logs (workspace_id, action, actor_id, actor_type, ip_address, user_agent, status_code)
+  audit.audit_logs (workspace_id, action, actor_id, actor_type, actor_email, ip_address, user_agent, status_code)
 VALUES
   (
     $1::UUID,
@@ -108,7 +108,8 @@ VALUES
     $4,
     $5,
     $6,
-    $7
+    $7,
+    $8
   )
 `
 
@@ -117,6 +118,7 @@ type InsertAuditLogParams struct {
 	Action      string  `json:"action"`
 	ActorID     string  `json:"actorId"`
 	ActorType   string  `json:"actorType"`
+	ActorEmail  *string `json:"actorEmail"`
 	IpAddress   *string `json:"ipAddress"`
 	UserAgent   *string `json:"userAgent"`
 	StatusCode  *string `json:"statusCode"`
@@ -128,6 +130,7 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams)
 		arg.Action,
 		arg.ActorID,
 		arg.ActorType,
+		arg.ActorEmail,
 		arg.IpAddress,
 		arg.UserAgent,
 		arg.StatusCode,
@@ -137,7 +140,7 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams)
 
 const listAuditLogs = `-- name: ListAuditLogs :many
 SELECT
-  id, timestamp, workspace_id, action, actor_id, actor_type, ip_address, user_agent, status_code
+  id, timestamp, workspace_id, action, actor_id, actor_type, actor_email, ip_address, user_agent, status_code
 FROM
   audit.audit_logs
 WHERE
@@ -206,6 +209,7 @@ func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) (
 			&i.Action,
 			&i.ActorID,
 			&i.ActorType,
+			&i.ActorEmail,
 			&i.IpAddress,
 			&i.UserAgent,
 			&i.StatusCode,

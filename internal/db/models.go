@@ -18,6 +18,7 @@ type AuditAuditLog struct {
 	Action      string    `json:"action"`
 	ActorID     string    `json:"actorId"`
 	ActorType   string    `json:"actorType"`
+	ActorEmail  *string   `json:"actorEmail"`
 	IpAddress   *string   `json:"ipAddress"`
 	UserAgent   *string   `json:"userAgent"`
 	StatusCode  *string   `json:"statusCode"`
