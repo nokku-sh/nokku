@@ -11,7 +11,7 @@ import (
 var schemaSQL string
 
 func (s *Service) Migrate(ctx context.Context) error {
-	slog.Debug("Migrating audit schema...")
+	slog.Debug("migrating audit schema")
 
 	if _, err := s.conn.Pool.Exec(ctx, schemaSQL); err != nil {
 		return fmt.Errorf("applying audit schema: %w", err)

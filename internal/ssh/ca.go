@@ -64,7 +64,7 @@ func GenerateKey(
 			curve = elliptic.P521()
 		default:
 			if keyBits != 0 && keyBits != 256 {
-				slog.Warn("invalid ECDSA key bits, falling back to P-256", "bits", keyBits)
+				slog.Warn("invalid ecdsa key bits, using P-256", "bits", keyBits)
 			}
 			keyBits = 256
 			curve = elliptic.P256()

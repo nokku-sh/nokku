@@ -143,9 +143,7 @@ func main() {
 						return fmt.Errorf("failed to rotate secrets: %w", err)
 					}
 
-					slog.Info(
-						"Successfully rotated secrets, update the environment and restart the app",
-					)
+					slog.Info("secrets rotated, update the environment and restart")
 					return nil
 				},
 			},

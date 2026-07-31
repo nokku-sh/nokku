@@ -80,7 +80,7 @@ func (p *Polar) Sync(ctx context.Context, workspaceID string) {
 		Status:      string(entitlement.StatusInactive),
 		Metadata:    map[string]any{},
 	}); err != nil {
-		slog.Debug("failed to clear subscription", "err", err)
+		slog.Warn("failed to clear subscription", "error", err)
 	}
 }
 
@@ -94,7 +94,7 @@ func (p *Polar) SyncAll(ctx context.Context) error {
 		p.Sync(ctx, sub.WorkspaceID)
 	}
 	if len(subs) > 0 {
-		slog.Info("reconciled subscriptions with Polar", "count", len(subs))
+		slog.Info("reconciled subscriptions", "count", len(subs))
 	}
 	return nil
 }
@@ -123,7 +123,7 @@ func (p *Polar) upsertSubscription(
 		CurrentPeriodEnd:  &event.CurrentPeriodEnd,
 		CancelAtPeriodEnd: event.CancelAtPeriodEnd,
 	}); err != nil {
-		slog.Debug("failed to upsert synced subscription", "err", err)
+		slog.Warn("failed to upsert synced subscription", "error", err)
 	}
 }
 
@@ -282,7 +282,7 @@ func (p *Polar) planForProduct(productID string) string {
 	case p.FlexPlanID:
 		return entitlement.PlanFlex
 	default:
-		slog.Warn("unknown Polar product, falling back to community plan", "product_id", productID)
+		slog.Warn("unknown polar product, using community plan", "product_id", productID)
 		return entitlement.PlanCommunity
 	}
 }

@@ -80,7 +80,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	serverErr := make(chan error, 1)
 	go func() {
-		slog.Info("Server listening on", "address", "http://127.0.0.1:"+s.cfg.Port)
+		slog.Info("server listening", "address", "http://127.0.0.1:"+s.cfg.Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			serverErr <- err
 		}
@@ -88,7 +88,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		slog.Info("Shutting down server...")
+		slog.Info("shutting down server")
 		graceCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		return server.Shutdown(graceCtx)
@@ -143,13 +143,13 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 		connect.WithRecover(
 			func(ctx context.Context, spec connect.Spec, _ http.Header, p any) error {
 				attrs := []slog.Attr{
-					slog.String("method", spec.Procedure),
+					slog.String("procedure", spec.Procedure),
 					slog.Any("panic", p),
 				}
 				if s.cfg.Debug {
 					attrs = append(attrs, slog.String("stack", string(debug.Stack())))
 				}
-				slog.LogAttrs(ctx, slog.LevelError, "panic recovered in RPC call", attrs...)
+				slog.LogAttrs(ctx, slog.LevelError, "rpc panic recovered", attrs...)
 				return ErrInternal
 			},
 		),

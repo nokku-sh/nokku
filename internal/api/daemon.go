@@ -284,7 +284,7 @@ func (s *DaemonService) EnrollDaemon(
 ) (*nokkuv1.EnrollDaemonResponse, error) {
 	enrollToken, err := crypto.Parse(req.GetToken())
 	if err != nil {
-		slog.Error("invalid token", "error", err)
+		slog.Error("failed to parse enroll token", "error", err)
 		return nil, NewError(connect.CodeInvalidArgument, "invalid token")
 	}
 	workspaceID := enrollToken.ID

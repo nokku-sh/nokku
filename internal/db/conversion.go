@@ -334,12 +334,12 @@ func (r *CertificateAuthority) ToProto() *nokkuv1.CertificateAuthority {
 
 	extensions, err := util.ParseExtensionsMap(r.UserExtensions)
 	if err != nil {
-		slog.Warn("failed to parse extensions", "err", err)
+		slog.Warn("failed to parse extensions", "error", err)
 		extensions = nil
 	}
 	criticalOptions, err := util.ParseCriticalOptionsMap(r.UserCriticalOptions)
 	if err != nil {
-		slog.Warn("failed to parse critical options", "err", err)
+		slog.Warn("failed to parse critical options", "error", err)
 		criticalOptions = nil
 	}
 

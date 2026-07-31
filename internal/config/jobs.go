@@ -65,10 +65,10 @@ func (c *Config) runBillingJobs(ctx context.Context) {
 
 func (c *Config) syncBilling(ctx context.Context) {
 	if err := c.Billing.SyncAll(ctx); err != nil {
-		slog.Error("Failed to reconcile subscriptions", "error", err)
+		slog.Error("failed to reconcile subscriptions", "error", err)
 	}
 	if err := c.Billing.SyncUsage(ctx); err != nil {
-		slog.Error("Failed to report usage", "error", err)
+		slog.Error("failed to report usage", "error", err)
 	}
 }
 
@@ -77,7 +77,7 @@ func (c *Config) cleanupUnverifiedUsers(ctx context.Context) {
 		return q.DeleteUnverifiedUsers(ctx)
 	})
 	if err != nil {
-		slog.Error("Failed to cleanup unverified users", "error", err)
+		slog.Error("failed to cleanup unverified users", "error", err)
 	}
 }
 
@@ -125,7 +125,7 @@ func (c *Config) rotateCerts(ctx context.Context) {
 		return err
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		slog.Error("CA rotation failed", "error", err)
+		slog.Error("ca rotation failed", "error", err)
 	}
 }
 
@@ -151,6 +151,6 @@ func (c *Config) rotateSAMLCerts(ctx context.Context) {
 		return err
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		slog.Error("SAML cert rotation failed", "error", err)
+		slog.Error("saml cert rotation failed", "error", err)
 	}
 }

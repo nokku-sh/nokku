@@ -86,7 +86,7 @@ func (s *Storage) initS3(ctx context.Context) error {
 		return fmt.Errorf("open s3 bucket: %w", err)
 	}
 
-	slog.Debug("Using S3 bucket", "bucket", s.Bucket, "endpoint", s.Endpoint)
+	slog.Debug("using s3 bucket", "bucket", s.Bucket, "endpoint", s.Endpoint)
 	return nil
 }
 
@@ -104,7 +104,7 @@ func (s *Storage) initLocal() error {
 		return fmt.Errorf("open local bucket: %w", err)
 	}
 
-	slog.Debug("Using local filesystem", "path", absPath)
+	slog.Debug("using local filesystem", "path", absPath)
 	return nil
 }
 

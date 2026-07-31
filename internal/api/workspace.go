@@ -380,9 +380,9 @@ func (s *WorkspaceService) initializeWorkspace(
 		}
 		return nil
 	}); err != nil {
-		slog.Debug("failed to create workspace", "error", err)
+		slog.Error("failed to create workspace", "error", err)
 		if err := s.cfg.Conn.Q.DeleteWorkspace(ctx, workspace.ID); err != nil {
-			slog.Debug("failed to delete workspace", "error", err)
+			slog.Error("failed to delete workspace", "error", err)
 			return nil, ErrInternal
 		}
 		return nil, err

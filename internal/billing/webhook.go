@@ -26,7 +26,7 @@ func (p *Polar) WebhookHandler() http.Handler {
 
 func (p *Polar) webhook(w http.ResponseWriter, r *http.Request) {
 	if p.WebhookSecret == "" {
-		slog.Error("polar webhook received but POLAR_WEBHOOK_SECRET is not set")
+		slog.Error("polar webhook received but secret is not configured")
 		http.Error(w, "webhook is not configured", http.StatusInternalServerError)
 		return
 	}
@@ -38,7 +38,7 @@ func (p *Polar) webhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := verifySignature(p.WebhookSecret, r.Header, body, time.Now()); err != nil {
-		slog.Warn("polar webhook signature verification failed", "err", err)
+		slog.Warn("polar webhook signature verification failed", "error", err)
 		http.Error(w, "invalid signature", http.StatusUnauthorized)
 		return
 	}
@@ -71,7 +71,7 @@ func (p *Polar) webhook(w http.ResponseWriter, r *http.Request) {
 		p.upsertSubscription(r.Context(), *sub.Customer.ExternalID, sub)
 
 	default:
-		slog.Debug("ignoring unhandled polar webhook event", "type", event.Type)
+		slog.Debug("ignoring unhandled polar webhook event", "event_type", event.Type)
 	}
 
 	w.WriteHeader(http.StatusOK)
