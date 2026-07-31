@@ -164,7 +164,7 @@ func SeedWorkspace(ctx context.Context, conn *db.Connection) error {
 					TeamID: team.ID,
 					UserID: shuffledUsers[j].ID,
 				}); err != nil {
-					slog.Error("failed to add team member", "err", err)
+					slog.Error("failed to add team member", "error", err)
 				}
 			}
 		}

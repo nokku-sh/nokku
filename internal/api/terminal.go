@@ -41,7 +41,7 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 		OriginPatterns: []string{t.cfg.FullURL()},
 	})
 	if err != nil {
-		slog.Error("WebSocket upgrade failed", "error", err)
+		slog.Error("websocket upgrade failed", "error", err)
 		return
 	}
 	defer func() { _ = conn.CloseNow() }()
@@ -60,7 +60,7 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 	replay, live := sess.SnapshotForAttach()
 	if len(replay) > 0 {
 		if err := conn.Write(ctx, websocket.MessageBinary, replay); err != nil {
-			logger.Debug("Replay write failed", "error", err)
+			logger.Debug("replay write failed", "error", err)
 		}
 	}
 
@@ -119,7 +119,7 @@ func (t *TerminalHandler) handleControlMessage(
 		Rows uint32 `json:"rows"`
 	}
 	if err := json.Unmarshal(data, &msg); err != nil {
-		logger.Debug("Invalid control message", "error", err)
+		logger.Debug("invalid control message", "error", err)
 		return
 	}
 	if msg.Type == "resize" {

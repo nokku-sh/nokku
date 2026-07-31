@@ -201,7 +201,7 @@ func (p *Pool) sendToDaemon(daemonID string, msg *nokkuv1.ConnectResponse) {
 	select {
 	case c.send <- msg:
 	default:
-		slog.Warn("daemon send buffer full, dropping message", "daemon_id", daemonID)
+		slog.Warn("daemon send buffer full", "daemon_id", daemonID)
 	}
 }
 

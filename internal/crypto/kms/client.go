@@ -17,7 +17,7 @@ import (
 // setupClient creates the KMS client for the configured URI scheme and
 // caches the KEK AEAD used to wrap/unwrap the stored keyset.
 func (t *TinkEncryptor) setupClient(ctx context.Context) (err error) {
-	slog.Debug("setting up KMS client", "uri", t.KMSURI)
+	slog.Debug("setting up kms client", "uri", t.KMSURI)
 	switch {
 	case strings.HasPrefix(t.KMSURI, "aws-kms://"):
 		t.client, err = awskms.NewClientWithOptions(ctx, t.KMSURI)

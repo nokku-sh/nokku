@@ -42,7 +42,7 @@ func RotateSecrets(
 			return fmt.Errorf("failed to get SAML providers: %w", err)
 		}
 		slog.Debug(
-			"Fetched encrypted secrets",
+			"fetched encrypted secrets",
 			"cas",
 			len(cas),
 			"oidc",
@@ -93,7 +93,7 @@ func RotateSecrets(
 			return err
 		}
 
-		slog.Info("Re-encryption complete",
+		slog.Info("re-encryption complete",
 			"cas", len(cas), "oidc", len(oidc),
 			"saml", len(saml))
 		return nil

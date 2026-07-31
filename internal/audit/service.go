@@ -61,7 +61,7 @@ func (s *Service) ensurePartitions(ctx context.Context) error {
 		return fmt.Errorf("failed to query advisory lock: %w", err)
 	}
 	if !locked {
-		slog.Debug("Another instance is managing partitions, skipping.")
+		slog.Debug("partition management skipped, another instance running")
 		return nil
 	}
 
@@ -99,7 +99,7 @@ func (s *Service) createPartitionForMonth(ctx context.Context, tx pgx.Tx, t time
 
 	_, err := tx.Exec(ctx, query)
 	if err != nil {
-		slog.Error("Failed to create partition", "table", tableName, "error", err)
+		slog.Error("failed to create partition", "table", tableName, "error", err)
 		return err
 	}
 	return nil
@@ -138,7 +138,7 @@ func (s *Service) dropPartitionsBefore(ctx context.Context, tx pgx.Tx, t time.Ti
 			dropQuery := `DROP TABLE IF EXISTS ` + partitionName + `;`
 
 			if _, err := tx.Exec(ctx, dropQuery); err != nil {
-				slog.Error("Failed to drop old partition", "table", partitionName, "error", err)
+				slog.Error("failed to drop partition", "table", partitionName, "error", err)
 				return err
 			}
 		}
@@ -156,7 +156,7 @@ func (s *Service) runBackgroundJobs(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := s.ensurePartitions(ctx); err != nil {
-				slog.Error("Partition manager failed", "error", err)
+				slog.Error("audit partition job failed", "error", err)
 			}
 			s.retentionCleanup(ctx)
 		}
@@ -168,7 +168,7 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 
 	tx, err := s.conn.Pool.Begin(ctx)
 	if err != nil {
-		slog.Error("Retention: failed to begin transaction", "error", err)
+		slog.Error("audit retention failed to begin transaction", "error", err)
 		return
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
@@ -177,11 +177,11 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 	err = tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock(hashtext('audit-retention'))`).
 		Scan(&locked)
 	if err != nil {
-		slog.Error("Retention: failed to query advisory lock", "error", err)
+		slog.Error("audit retention failed to acquire lock", "error", err)
 		return
 	}
 	if !locked {
-		slog.Debug("Retention: another instance is running cleanup, skipping.")
+		slog.Debug("audit retention skipped, another instance running")
 		return
 	}
 
@@ -191,7 +191,7 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 
 	workspaceIDs, err := q.ListWorkspaceAuditLogWorkspaceIDs(ctx)
 	if err != nil {
-		slog.Error("Retention: failed to list workspace IDs", "error", err)
+		slog.Error("audit retention failed to list workspaces", "error", err)
 		return
 	}
 
@@ -217,12 +217,12 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 			Cutoff:      cutoff,
 		})
 		if err != nil {
-			slog.Error("Retention: failed to delete old audit logs",
+			slog.Error("audit retention failed to delete logs",
 				"workspace_id", wsID, "error", err)
 			continue
 		}
 		if deleted > 0 {
-			slog.Debug("Retention: cleaned up workspace audit logs",
+			slog.Debug("audit retention cleaned logs",
 				"workspace_id", wsID, "deleted", deleted,
 				"retention_days", retentionDays)
 		}
@@ -233,14 +233,14 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 	orphanCutoff := now.AddDate(0, 0, -maxRetentionDays)
 	deleted, err := q.DeleteOrphanAuditLogs(ctx, orphanCutoff)
 	if err != nil {
-		slog.Error("Retention: failed to delete orphan audit logs", "error", err)
+		slog.Error("audit retention failed to delete orphan logs", "error", err)
 		return
 	}
 	if deleted > 0 {
-		slog.Debug("Retention: cleaned up orphan audit logs", "deleted", deleted)
+		slog.Debug("audit retention cleaned orphan logs", "deleted", deleted)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		slog.Error("Retention: failed to commit", "error", err)
+		slog.Error("audit retention failed to commit", "error", err)
 	}
 }

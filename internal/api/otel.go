@@ -28,15 +28,15 @@ func NewOTLPInterceptor(ctx context.Context) *otelconnect.Interceptor {
 	// Reads OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_EXPORTER_OTLP_HEADERS from environment
 	traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithCompressor("gzip"))
 	if err != nil {
-		slog.Error("failed to init trace exporter", "error", err)
+		slog.Error("failed to init otlp exporter", "exporter", "trace", "error", err)
 	}
 	metricExporter, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithCompressor("gzip"))
 	if err != nil {
-		slog.Error("failed to init metric exporter", "error", err)
+		slog.Error("failed to init otlp exporter", "exporter", "metric", "error", err)
 	}
 	logExporter, err := otlploggrpc.New(ctx, otlploggrpc.WithCompressor("gzip"))
 	if err != nil {
-		slog.Error("failed to init log exporter", "error", err)
+		slog.Error("failed to init otlp exporter", "exporter", "log", "error", err)
 	}
 
 	res, err := resource.New(
@@ -53,7 +53,6 @@ func NewOTLPInterceptor(ctx context.Context) *otelconnect.Interceptor {
 		slog.Warn("failed to create otel resource", "error", err)
 		return nil
 	}
-
 	tp := trace.NewTracerProvider(
 		trace.WithBatcher(traceExporter),
 		trace.WithResource(res),

@@ -9,6 +9,10 @@ import (
 	"connectrpc.com/connect"
 )
 
+// LogInterceptor logs every RPC at a level that matches its outcome:
+// server-side failures at Error, everything else at Debug so production
+// (debug off) only sees actionable entries. Keys are snake_case and stable
+// across messages so the output is directly consumable by SIEM pipelines.
 type LogInterceptor struct {
 	debug bool
 }
@@ -23,12 +27,7 @@ func (l *LogInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		res, err := next(ctx, req)
 		duration := time.Since(start)
 
-		attrs := []slog.Attr{
-			slog.String("procedure", req.Spec().Procedure),
-			slog.String("protocol", req.Peer().Protocol),
-			slog.Duration("duration", duration),
-		}
-
+		attrs := rpcAttrs(req.Peer(), req.Spec().Procedure, duration)
 		if err != nil {
 			attrs = append(
 				attrs,
@@ -36,7 +35,7 @@ func (l *LogInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 				slog.String("error", err.Error()),
 			)
 			if isServerError(connect.CodeOf(err)) {
-				slog.LogAttrs(ctx, slog.LevelError, "rpc", attrs...)
+				slog.LogAttrs(ctx, slog.LevelError, "rpc failed", attrs...)
 			} else {
 				slog.LogAttrs(ctx, slog.LevelDebug, "rpc", attrs...)
 			}
@@ -62,12 +61,7 @@ func (l *LogInterceptor) WrapStreamingHandler(
 		err := next(ctx, conn)
 		duration := time.Since(start)
 
-		attrs := []slog.Attr{
-			slog.String("procedure", conn.Spec().Procedure),
-			slog.String("protocol", conn.Peer().Protocol),
-			slog.Duration("duration", duration),
-		}
-
+		attrs := rpcAttrs(conn.Peer(), conn.Spec().Procedure, duration)
 		if err != nil {
 			attrs = append(
 				attrs,
@@ -75,7 +69,7 @@ func (l *LogInterceptor) WrapStreamingHandler(
 				slog.String("error", err.Error()),
 			)
 			if isServerError(connect.CodeOf(err)) {
-				slog.LogAttrs(ctx, slog.LevelError, "stream", attrs...)
+				slog.LogAttrs(ctx, slog.LevelError, "stream failed", attrs...)
 			} else {
 				slog.LogAttrs(ctx, slog.LevelDebug, "stream", attrs...)
 			}
@@ -85,6 +79,19 @@ func (l *LogInterceptor) WrapStreamingHandler(
 
 		return err
 	}
+}
+
+// rpcAttrs builds the common attribute set shared by unary and streaming logs.
+func rpcAttrs(peer connect.Peer, procedure string, duration time.Duration) []slog.Attr {
+	attrs := []slog.Attr{
+		slog.String("procedure", procedure),
+		slog.String("protocol", peer.Protocol),
+		slog.Duration("duration", duration),
+	}
+	if peer.Addr != "" {
+		attrs = append(attrs, slog.String("peer", peer.Addr))
+	}
+	return attrs
 }
 
 // responseWriter wraps [http.ResponseWriter] to capture the status code.
@@ -122,10 +129,13 @@ func (s *Server) WithLogger(next http.Handler) http.Handler {
 			slog.Int("status", rw.statusCode),
 			slog.Duration("duration", duration),
 		}
+		if r.RemoteAddr != "" {
+			attrs = append(attrs, slog.String("peer", r.RemoteAddr))
+		}
 
 		switch {
 		case rw.statusCode >= 500:
-			slog.LogAttrs(r.Context(), slog.LevelError, "http", attrs...)
+			slog.LogAttrs(r.Context(), slog.LevelError, "http failed", attrs...)
 		case s.cfg.Debug:
 			slog.LogAttrs(r.Context(), slog.LevelDebug, "http", attrs...)
 		}

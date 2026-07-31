@@ -99,7 +99,7 @@ func (s *BillingService) CreateCustomerPortal(
 	}
 	url, err := s.cfg.Billing.Portal(ctx, req.GetWorkspaceId())
 	if err != nil {
-		slog.Error("failed to create customer portal", "err", err)
+		slog.Error("failed to create customer portal", "error", err)
 		return nil, ErrInternal
 	}
 	return &nokkuv1.CreateCustomerPortalResponse{
@@ -120,7 +120,7 @@ func (s *BillingService) CancelSubscription(
 		req.GetImmediate(),
 		req.GetReason(),
 	); err != nil {
-		slog.Error("failed to cancel subscription", "err", err)
+		slog.Error("failed to cancel subscription", "error", err)
 		return nil, ErrInternal
 	}
 	return &nokkuv1.CancelSubscriptionResponse{}, nil

@@ -21,7 +21,7 @@ import (
 var schemaFS embed.FS
 
 func (c *Connection) Migrate(ctx context.Context) error {
-	slog.Debug("Migrating database schema...")
+	slog.Debug("migrating database schema")
 
 	schemaDDL, rlsDDL, err := loadSQLFiles(schemaFS)
 	if err != nil {
@@ -36,7 +36,7 @@ func (c *Connection) Migrate(ctx context.Context) error {
 	}
 
 	if len(rlsDDL) > 0 {
-		slog.Debug("Migrating RLS policies...")
+		slog.Debug("migrating RLS policies")
 
 		// Send full DDL (tables + RLS) so the temp database has all tables
 		// when CREATE POLICY statements are applied. Only policy changes will

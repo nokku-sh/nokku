@@ -164,9 +164,9 @@ func (s *Service) Check(ctx context.Context, workspaceID string, r Resource) err
 
 	stats, err := s.q.GetWorkspaceStats(ctx, workspaceID)
 	if err != nil {
-		slog.Debug(
-			"entitlement: stats lookup failed, allowing",
-			"err", err,
+		slog.Warn(
+			"entitlement stats lookup failed, failing open",
+			"error", err,
 			"workspace_id", workspaceID,
 		)
 		return nil
@@ -198,7 +198,7 @@ func resolvePlan(name string, ov *Overrides) Plan {
 	base, ok := catalog[name]
 	if !ok {
 		if name != "" {
-			slog.Debug("entitlement: unknown plan, using community", "plan", name)
+			slog.Debug("unknown plan, using community", "plan", name)
 		}
 		base = catalog[PlanCommunity]
 	}
@@ -236,7 +236,7 @@ func parseOverrides(m map[string]any) *Overrides {
 	}
 	var ov Overrides
 	if err := json.Unmarshal(raw, &ov); err != nil {
-		slog.Debug("entitlement: ignoring malformed overrides", "err", err)
+		slog.Debug("ignoring malformed plan overrides", "error", err)
 		return nil
 	}
 	return &ov
