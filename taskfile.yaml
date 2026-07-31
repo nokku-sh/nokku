@@ -22,12 +22,6 @@ tasks:
       - pnpm run dev
     dir: web/ui
 
-  docs:
-    desc: Run docs
-    cmds:
-      - pnpm run dev
-    dir: web/docs
-
   email:
     desc: Run email
     cmds:
@@ -39,7 +33,6 @@ tasks:
     cmds:
       - go get -u ./...
       - cd web/ui && pnpm update --latest
-      - cd web/docs && pnpm update --latest
       - cd web/email && pnpm update --latest
 
   gen:
@@ -58,7 +51,6 @@ tasks:
     dir: web
     cmds:
       - cd ui; pnpm install; pnpm build
-      - cd docs; pnpm install; pnpm build
       - cd email; pnpm install; pnpm export
 
   lint:
