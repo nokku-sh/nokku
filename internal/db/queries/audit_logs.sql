@@ -1,12 +1,13 @@
 -- name: InsertAuditLog :exec
 INSERT INTO
-  audit.audit_logs (workspace_id, action, actor_id, actor_type, ip_address, user_agent, status_code)
+  audit.audit_logs (workspace_id, action, actor_id, actor_type, actor_email, ip_address, user_agent, status_code)
 VALUES
   (
     sqlc.narg('workspace_id')::UUID,
     sqlc.arg('action'),
     sqlc.arg('actor_id')::UUID,
     sqlc.arg('actor_type'),
+    sqlc.narg('actor_email'),
     sqlc.narg('ip_address'),
     sqlc.narg('user_agent'),
     sqlc.narg('status_code')
