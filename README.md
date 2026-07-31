@@ -45,16 +45,15 @@ The backend also uses the integrations configured for the selected environment, 
 
 The backend reads configuration from environment variables. Common settings include:
 
-| Variable                                    | Purpose                     |
-| ------------------------------------------- | --------------------------- |
-| `API_URL`                                   | Public API URL              |
-| `APP_URL`                                   | Public web application URL  |
-| `SECRET`                                    | 32-byte encryption secret   |
-| `KMS_URI`                                   | External key-management URI |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OIDC                 |
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OIDC                 |
-
-See [`web/docs`](./web/docs) for product setup and [`web/docs/src/content/docs/reference/configuration.mdx`](./web/docs/src/content/docs/reference/configuration.mdx) for the documented core settings.
+| Variable                                    | Purpose                                                                                              |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `NOKKU_BASE_URL`                            | Public base URL                                                                                     |
+| `NOKKU_PORT`                                | Port the backend listens on                                                                         |
+| `NOKKU_SECRET`                              | 32-byte encryption secret                                                                           |
+| `KMS_URI`                                   | External key-management URI                                                                         |
+| `NOKKU_TRUSTED_PROXIES`                     | Comma-separated reverse-proxy IPs/CIDRs (e.g. Traefik) whose forwarded client IP headers are honored |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OIDC                                                                                          |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OIDC                                                                                          |
 
 ## Secret rotation
 

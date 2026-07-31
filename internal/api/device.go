@@ -27,6 +27,7 @@ func syncWebDevice(
 	ctx context.Context,
 	cfg *config.Config,
 	reqHeader, resHeader http.Header,
+	peerAddr string,
 	user *db.User,
 ) {
 	if raw := authn.GetDeviceToken(reqHeader); raw != "" {
@@ -62,7 +63,7 @@ func syncWebDevice(
 	}
 
 	authn.SetDeviceCookie(resHeader, token.Plaintext)
-	ipStr := util.GetRemoteIP(reqHeader, "")
+	ipStr := util.GetRemoteIP(reqHeader, peerAddr)
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
