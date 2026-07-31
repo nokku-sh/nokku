@@ -106,14 +106,14 @@ func (u WebAuthnUser) WebAuthnCredentials() []webauthn.Credential {
 		// Decode the base64url-encoded credential ID
 		credentialID, err := base64.RawURLEncoding.DecodeString(dbCred.ID)
 		if err != nil {
-			slog.Error("Failed to decode credential ID", "err", err, "id", dbCred.ID)
+			slog.Error("failed to decode credential id", "error", err, "id", dbCred.ID)
 			continue
 		}
 
 		// Validate sign count before conversion
 		var signCount uint32
 		if dbCred.SignCount < 0 || dbCred.SignCount > int64(^uint32(0)) {
-			slog.Warn("Sign count out of range, capping to max uint32", "value", dbCred.SignCount)
+			slog.Warn("sign count out of range, capping", "value", dbCred.SignCount)
 			signCount = ^uint32(0)
 		} else {
 			signCount = uint32(dbCred.SignCount)
@@ -193,7 +193,7 @@ func (s *PasskeyService) BeginRegistration(w http.ResponseWriter, r *http.Reques
 	}
 	credentials, err := s.cfg.Conn.Q.GetPasskeysByUserID(ctx, user.ID)
 	if err != nil {
-		slog.Error("Failed to get credentials", "err", err)
+		slog.Error("failed to get passkeys", "error", err)
 		credentials = []*db.Passkey{}
 	}
 
@@ -455,7 +455,7 @@ func (s *PasskeyService) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 	if err != nil {
-		slog.Error("Failed to update sign count", "err", err)
+		slog.Warn("failed to update passkey sign count", "error", err)
 	}
 
 	// Update last used timestamp
@@ -468,13 +468,14 @@ func (s *PasskeyService) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 	if err != nil {
-		slog.Error("Failed to update last used", "err", err)
+		slog.Warn("failed to update passkey last used", "error", err)
 	}
 
 	// Set cookies
 	s.cfg.Authn.AccessCookie(r.Context(), w.Header(), user)
 	s.cfg.Authn.RefreshCookie(r.Context(), w.Header(), user)
-	syncWebDevice(r.Context(), s.cfg, r.Header, w.Header(), user)
+	syncWebDevice(r.Context(), s.cfg, r.Header, w.Header(), r.RemoteAddr, user)
+	meta.SetAuditUserID(r.Context(), user.ID)
 
 	w.WriteHeader(http.StatusOK)
 }

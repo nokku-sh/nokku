@@ -73,14 +73,6 @@ var (
 		connect.CodeInvalidArgument,
 		errors.New("incorrect email or password"),
 	)
-	ErrAccountInactive = connect.NewError(
-		connect.CodePermissionDenied,
-		errors.New("your account has been deactivated"),
-	)
-	ErrEmailNotVerified = connect.NewError(
-		connect.CodePermissionDenied,
-		errors.New("please verify your email to continue"),
-	)
 	ErrSSORequired = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("single sign-on is required for your account"),

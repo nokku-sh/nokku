@@ -139,7 +139,7 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Stop tracking the request
 	if err := middleware.RequestTracker.StopTrackingRequest(w, r, assertion.ID); err != nil {
-		slog.Warn("Failed to stop tracking request", "error", err)
+		slog.Warn("failed to stop tracking request", "error", err)
 	}
 	for _, req := range trackedRequests {
 		if err := middleware.RequestTracker.StopTrackingRequest(
@@ -147,7 +147,7 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 			r,
 			req.SAMLRequestID,
 		); err != nil {
-			slog.Debug("Failed to stop tracking request", "error", err)
+			slog.Debug("failed to stop tracking request", "error", err)
 		}
 	}
 
@@ -187,7 +187,7 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	// Create tokens and set cookies
 	s.cfg.Authn.AccessCookie(ctx, w.Header(), user)
 	s.cfg.Authn.RefreshCookie(ctx, w.Header(), user)
-	syncWebDevice(ctx, s.cfg, r.Header, w.Header(), user)
+	syncWebDevice(ctx, s.cfg, r.Header, w.Header(), r.RemoteAddr, user)
 
 	http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
 }
@@ -210,7 +210,7 @@ func (s *SAMLHandler) MetadataHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	if _, err := w.Write(buf); err != nil { // #nosec G705
-		slog.Error("Failed to write metadata", "error", err)
+		slog.Error("failed to write metadata", "error", err)
 	}
 }
 

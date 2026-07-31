@@ -46,6 +46,7 @@ func (s *AuthService) Register(
 	ctx context.Context,
 	req *nokkuv1.RegisterRequest,
 ) (*nokkuv1.RegisterResponse, error) {
+	meta.SetAuditEmail(ctx, req.GetEmail())
 	if req.GetUsername() == "" || req.GetEmail() == "" || req.GetPassword() == "" {
 		return nil, ErrFieldMissing
 	}
@@ -109,6 +110,7 @@ func (s *AuthService) Register(
 		// Even if email fails, user is registered
 		slog.Error("failed to send welcome email", "error", err)
 	}
+	meta.SetAuditUserID(ctx, newUser.ID)
 	return &nokkuv1.RegisterResponse{}, nil
 }
 
@@ -116,6 +118,7 @@ func (s *AuthService) Login(
 	ctx context.Context,
 	req *nokkuv1.LoginRequest,
 ) (*nokkuv1.LoginResponse, error) {
+	meta.SetAuditEmail(ctx, req.GetEmail())
 	var user *db.User
 	var err error
 
@@ -124,13 +127,9 @@ func (s *AuthService) Login(
 		return nil, ErrBadCredentials
 	}
 
-	if !user.IsActive {
-		return nil, ErrAccountInactive
-	}
-	if !user.EmailVerified {
-		return nil, ErrEmailNotVerified
-	}
-	if user.PasswordHash.IsZero() {
+	// Fail generically on account state so the response never reveals
+	// whether an account exists, is deactivated or unverified.
+	if !user.IsActive || !user.EmailVerified || user.PasswordHash.IsZero() {
 		return nil, ErrBadCredentials
 	}
 
@@ -148,7 +147,8 @@ func (s *AuthService) Login(
 	}
 	accessToken := s.cfg.Authn.AccessCookie(ctx, ci.ResponseHeader(), user)
 	refreshToken := s.cfg.Authn.RefreshCookie(ctx, ci.ResponseHeader(), user)
-	syncWebDevice(ctx, s.cfg, ci.RequestHeader(), ci.ResponseHeader(), user)
+	syncWebDevice(ctx, s.cfg, ci.RequestHeader(), ci.ResponseHeader(), ci.Peer().Addr, user)
+	meta.SetAuditUserID(ctx, user.ID)
 
 	return &nokkuv1.LoginResponse{
 		AccessToken:  &accessToken,
@@ -160,16 +160,16 @@ func (s *AuthService) LoginWithBackupCode(
 	ctx context.Context,
 	req *nokkuv1.LoginWithBackupCodeRequest,
 ) (*nokkuv1.LoginWithBackupCodeResponse, error) {
+	meta.SetAuditEmail(ctx, req.GetEmail())
 	user, err := s.cfg.Conn.Q.GetUserByEmail(ctx, req.GetEmail())
 	if err != nil || user == nil {
 		return nil, ErrBadCredentials
 	}
 
-	if !user.IsActive {
-		return nil, ErrAccountInactive
-	}
-	if !user.EmailVerified {
-		return nil, ErrEmailNotVerified
+	// Fail generically on account state so the response never reveals
+	// whether an account exists, is deactivated or unverified.
+	if !user.IsActive || !user.EmailVerified {
+		return nil, ErrBadCredentials
 	}
 
 	// Check if SSO is enforced - backup codes should NOT work if SSO is enforced
@@ -202,7 +202,8 @@ func (s *AuthService) LoginWithBackupCode(
 
 	accessToken := s.cfg.Authn.AccessCookie(ctx, ci.ResponseHeader(), user)
 	refreshToken := s.cfg.Authn.RefreshCookie(ctx, ci.ResponseHeader(), user)
-	syncWebDevice(ctx, s.cfg, ci.RequestHeader(), ci.ResponseHeader(), user)
+	syncWebDevice(ctx, s.cfg, ci.RequestHeader(), ci.ResponseHeader(), ci.Peer().Addr, user)
+	meta.SetAuditUserID(ctx, user.ID)
 
 	return &nokkuv1.LoginWithBackupCodeResponse{
 		AccessToken:  &accessToken,
@@ -238,16 +239,13 @@ func (s *AuthService) RefreshToken(
 
 	// Get user info by ID
 	user, err := s.cfg.Conn.Q.GetUserByID(ctx, claims.UserID)
-	if err != nil {
+	if err != nil || user == nil || !user.IsActive {
 		authn.ClearCookies(ci.ResponseHeader())
-		return nil, ErrNotFound
-	}
-	if !user.IsActive {
-		authn.ClearCookies(ci.ResponseHeader())
-		return nil, ErrAccountInactive
+		return nil, ErrSessionExpired
 	}
 
 	accessToken := s.cfg.Authn.AccessCookie(ctx, ci.ResponseHeader(), user)
+	meta.SetAuditUserID(ctx, user.ID)
 	return &nokkuv1.RefreshTokenResponse{
 		AccessToken: &accessToken,
 	}, nil
@@ -257,9 +255,11 @@ func (s *AuthService) ForgotPassword(
 	ctx context.Context,
 	req *nokkuv1.ForgotPasswordRequest,
 ) (*nokkuv1.ForgotPasswordResponse, error) {
+	meta.SetAuditEmail(ctx, req.GetEmail())
 	user, err := s.cfg.Conn.Q.GetUserByEmail(ctx, req.GetEmail())
 	if err != nil {
-		return nil, err
+		slog.Error("failed to look up user for password reset", "error", err)
+		return nil, ErrInternal
 	}
 	if user == nil {
 		return &nokkuv1.ForgotPasswordResponse{}, nil
@@ -298,6 +298,7 @@ func (s *AuthService) ResendVerification(
 	ctx context.Context,
 	req *nokkuv1.ResendVerificationRequest,
 ) (*nokkuv1.ResendVerificationResponse, error) {
+	meta.SetAuditEmail(ctx, req.GetEmail())
 	user, err := s.cfg.Conn.Q.GetUserByEmail(ctx, req.GetEmail())
 	if err != nil {
 		return nil, ErrInternal
@@ -334,7 +335,7 @@ func (s *AuthService) ResendVerification(
 			verifyURL,
 			authn.GetExpiry(authn.VerifyToken),
 		); err != nil {
-			slog.Debug("cannot send verification email at this time", "err", err)
+			slog.Debug("failed to send verification email", "error", err)
 			return
 		}
 	}(ctx)
@@ -363,6 +364,8 @@ func (s *AuthService) VerifyEmail(
 	}); err != nil {
 		return nil, ErrInternal
 	}
+	meta.SetAuditUserID(ctx, claims.UserID)
+	meta.SetAuditEmail(ctx, claims.Email)
 
 	return &nokkuv1.VerifyEmailResponse{}, nil
 }
@@ -395,6 +398,8 @@ func (s *AuthService) ResetPassword(
 	if err != nil {
 		return nil, ErrInternal
 	}
+	meta.SetAuditUserID(ctx, claims.UserID)
+	meta.SetAuditEmail(ctx, claims.Email)
 
 	return &nokkuv1.ResetPasswordResponse{}, nil
 }
@@ -493,6 +498,7 @@ func (s *AuthService) VerifyCLILogin(
 	if err != nil {
 		return nil, ErrInternal
 	}
+	meta.SetAuditUserID(ctx, user.ID)
 
 	ci, ok := connect.CallInfoForHandlerContext(ctx)
 	if !ok {
