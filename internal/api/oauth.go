@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
-	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -262,10 +262,13 @@ func (o *OAuthHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 
 	dbUser, err := o.handleOAuthUser(r.Context(), user, dbOidc, session.LinkUserID)
 	if err != nil {
+		// Never leak backend details into the redirect URL; the frontend
+		// only needs a generic failure indicator.
+		slog.Debug("oauth login failed", "error", err, "provider", session.ProviderID)
 		http.Redirect(
 			w,
 			r,
-			redirect+"?error="+url.QueryEscape(err.Error()),
+			redirect+"?error=user_failed",
 			http.StatusTemporaryRedirect,
 		)
 		return
@@ -273,7 +276,7 @@ func (o *OAuthHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 
 	o.cfg.Authn.AccessCookie(r.Context(), w.Header(), dbUser)
 	o.cfg.Authn.RefreshCookie(r.Context(), w.Header(), dbUser)
-	syncWebDevice(r.Context(), o.cfg, r.Header, w.Header(), dbUser)
+	syncWebDevice(r.Context(), o.cfg, r.Header, w.Header(), r.RemoteAddr, dbUser)
 	http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
 }
 
