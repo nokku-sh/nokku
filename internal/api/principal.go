@@ -3,6 +3,9 @@ package api
 import (
 	"context"
 	"errors"
+	"log/slog"
+
+	"connectrpc.com/connect"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -101,14 +104,25 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 				return err
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
-			return errors.New("invalid principal type")
+			return connect.NewError(
+				connect.CodeInvalidArgument,
+				errors.New("invalid principal type"),
+			)
 		default:
-			return errors.New("invalid principal type")
+			return connect.NewError(
+				connect.CodeInvalidArgument,
+				errors.New("invalid principal type"),
+			)
 		}
 
 		return nil
 	}); err != nil {
-		return nil, err
+		var cerr *connect.Error
+		if errors.As(err, &cerr) {
+			return nil, err
+		}
+		slog.Error("failed to add subjects to principal", "error", err)
+		return nil, ErrInternal
 	}
 
 	go s.cfg.Pool.Broadcast(workspaceID, &nokkuv1.Notification{
@@ -155,14 +169,25 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 				return err
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
-			return errors.New("invalid principal type")
+			return connect.NewError(
+				connect.CodeInvalidArgument,
+				errors.New("invalid principal type"),
+			)
 		default:
-			return errors.New("invalid principal type")
+			return connect.NewError(
+				connect.CodeInvalidArgument,
+				errors.New("invalid principal type"),
+			)
 		}
 
 		return nil
 	}); err != nil {
-		return nil, err
+		var cerr *connect.Error
+		if errors.As(err, &cerr) {
+			return nil, err
+		}
+		slog.Error("failed to remove subjects from principal", "error", err)
+		return nil, ErrInternal
 	}
 
 	go s.cfg.Pool.Broadcast(workspaceID, &nokkuv1.Notification{
@@ -204,13 +229,24 @@ func (s *PrincipalService) RevokeAllAccess(
 				return err
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
-			return errors.New("invalid subject type")
+			return connect.NewError(
+				connect.CodeInvalidArgument,
+				errors.New("invalid subject type"),
+			)
 		default:
-			return errors.New("invalid subject type")
+			return connect.NewError(
+				connect.CodeInvalidArgument,
+				errors.New("invalid subject type"),
+			)
 		}
 		return nil
 	}); err != nil {
-		return nil, err
+		var cerr *connect.Error
+		if errors.As(err, &cerr) {
+			return nil, err
+		}
+		slog.Error("failed to revoke access", "error", err)
+		return nil, ErrInternal
 	}
 
 	go s.cfg.Pool.Broadcast(req.GetWorkspaceId(), &nokkuv1.Notification{
