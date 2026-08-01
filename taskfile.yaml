@@ -84,11 +84,6 @@ tasks:
     cmds:
       - docker push $IMAGE:nightly
 
-  deploy:installer:
-    desc: Deploy installer
-    cmds:
-      - npx wrangler deploy --config web/worker/wrangler.jsonc
-
   migrate:plan:
     desc: Generate migration plan
     dir: ./internal/db/
