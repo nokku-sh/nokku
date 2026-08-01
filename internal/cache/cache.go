@@ -44,13 +44,16 @@ func (c *MemoryCache) Get(_ context.Context, key string) ([]byte, error) {
 		c.mu.Unlock()
 		return nil, ErrNotFound
 	}
-	return e.value, nil
+	// Return a copy so callers can't mutate the cached bytes for all readers.
+	return append([]byte(nil), e.value...), nil
 }
 
 func (c *MemoryCache) Set(_ context.Context, key string, value []byte, ttl time.Duration) error {
 	c.mu.Lock()
 	c.entries[key] = &entry{
-		value:   value,
+		// Store a copy so later mutation of the caller's slice can't corrupt
+		// the cached entry through the shared backing array.
+		value:   append([]byte(nil), value...),
 		expires: time.Now().Add(ttl),
 	}
 	c.mu.Unlock()
