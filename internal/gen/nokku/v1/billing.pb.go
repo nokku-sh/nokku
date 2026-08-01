@@ -158,16 +158,13 @@ type GetBillingResponse struct {
 	ProductId         *string                `protobuf:"bytes,2,opt,name=product_id,json=productId" json:"product_id,omitempty"`
 	ProductName       *string                `protobuf:"bytes,3,opt,name=product_name,json=productName" json:"product_name,omitempty"`
 	Status            *string                `protobuf:"bytes,4,opt,name=status" json:"status,omitempty"`
-	CancelAtPeriodEnd *bool                  `protobuf:"varint,5,opt,name=cancel_at_period_end,json=cancelAtPeriodEnd" json:"cancel_at_period_end,omitempty"`
-	Metadata          map[string]string      `protobuf:"bytes,6,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Counts            *WorkspaceCounts       `protobuf:"bytes,7,opt,name=counts" json:"counts,omitempty"`
-	CurrentPeriodEnd  *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=current_period_end,json=currentPeriodEnd" json:"current_period_end,omitempty"`
-	// billing_enabled is true when the server is wired up to a billing
-	// provider (SaaS). When false the instance is self-hosted and only
-	// on-premise license activation applies.
-	BillingEnabled *bool `protobuf:"varint,9,opt,name=billing_enabled,json=billingEnabled" json:"billing_enabled,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	BillingEnabled    *bool                  `protobuf:"varint,5,opt,name=billing_enabled,json=billingEnabled" json:"billing_enabled,omitempty"`
+	CancelAtPeriodEnd *bool                  `protobuf:"varint,6,opt,name=cancel_at_period_end,json=cancelAtPeriodEnd" json:"cancel_at_period_end,omitempty"`
+	Metadata          map[string]string      `protobuf:"bytes,7,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Counts            *WorkspaceCounts       `protobuf:"bytes,8,opt,name=counts" json:"counts,omitempty"`
+	CurrentPeriodEnd  *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=current_period_end,json=currentPeriodEnd" json:"current_period_end,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *GetBillingResponse) Reset() {
@@ -228,6 +225,13 @@ func (x *GetBillingResponse) GetStatus() string {
 	return ""
 }
 
+func (x *GetBillingResponse) GetBillingEnabled() bool {
+	if x != nil && x.BillingEnabled != nil {
+		return *x.BillingEnabled
+	}
+	return false
+}
+
 func (x *GetBillingResponse) GetCancelAtPeriodEnd() bool {
 	if x != nil && x.CancelAtPeriodEnd != nil {
 		return *x.CancelAtPeriodEnd
@@ -256,34 +260,27 @@ func (x *GetBillingResponse) GetCurrentPeriodEnd() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *GetBillingResponse) GetBillingEnabled() bool {
-	if x != nil && x.BillingEnabled != nil {
-		return *x.BillingEnabled
-	}
-	return false
-}
-
-type CreateCustomerPortalRequest struct {
+type CreatePortalRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateCustomerPortalRequest) Reset() {
-	*x = CreateCustomerPortalRequest{}
+func (x *CreatePortalRequest) Reset() {
+	*x = CreatePortalRequest{}
 	mi := &file_nokku_v1_billing_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateCustomerPortalRequest) String() string {
+func (x *CreatePortalRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateCustomerPortalRequest) ProtoMessage() {}
+func (*CreatePortalRequest) ProtoMessage() {}
 
-func (x *CreateCustomerPortalRequest) ProtoReflect() protoreflect.Message {
+func (x *CreatePortalRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_nokku_v1_billing_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -295,39 +292,39 @@ func (x *CreateCustomerPortalRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateCustomerPortalRequest.ProtoReflect.Descriptor instead.
-func (*CreateCustomerPortalRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreatePortalRequest.ProtoReflect.Descriptor instead.
+func (*CreatePortalRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_billing_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *CreateCustomerPortalRequest) GetWorkspaceId() string {
+func (x *CreatePortalRequest) GetWorkspaceId() string {
 	if x != nil && x.WorkspaceId != nil {
 		return *x.WorkspaceId
 	}
 	return ""
 }
 
-type CreateCustomerPortalResponse struct {
+type CreatePortalResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Url           *string                `protobuf:"bytes,1,opt,name=url" json:"url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateCustomerPortalResponse) Reset() {
-	*x = CreateCustomerPortalResponse{}
+func (x *CreatePortalResponse) Reset() {
+	*x = CreatePortalResponse{}
 	mi := &file_nokku_v1_billing_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateCustomerPortalResponse) String() string {
+func (x *CreatePortalResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateCustomerPortalResponse) ProtoMessage() {}
+func (*CreatePortalResponse) ProtoMessage() {}
 
-func (x *CreateCustomerPortalResponse) ProtoReflect() protoreflect.Message {
+func (x *CreatePortalResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_nokku_v1_billing_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -339,12 +336,12 @@ func (x *CreateCustomerPortalResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateCustomerPortalResponse.ProtoReflect.Descriptor instead.
-func (*CreateCustomerPortalResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreatePortalResponse.ProtoReflect.Descriptor instead.
+func (*CreatePortalResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_billing_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *CreateCustomerPortalResponse) GetUrl() string {
+func (x *CreatePortalResponse) GetUrl() string {
 	if x != nil && x.Url != nil {
 		return *x.Url
 	}
@@ -354,7 +351,6 @@ func (x *CreateCustomerPortalResponse) GetUrl() string {
 type CreateCheckoutRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	ProductId     *string                `protobuf:"bytes,2,opt,name=product_id,json=productId" json:"product_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -392,13 +388,6 @@ func (*CreateCheckoutRequest) Descriptor() ([]byte, []int) {
 func (x *CreateCheckoutRequest) GetWorkspaceId() string {
 	if x != nil && x.WorkspaceId != nil {
 		return *x.WorkspaceId
-	}
-	return ""
-}
-
-func (x *CreateCheckoutRequest) GetProductId() string {
-	if x != nil && x.ProductId != nil {
-		return *x.ProductId
 	}
 	return ""
 }
@@ -448,13 +437,12 @@ func (x *CreateCheckoutResponse) GetUrl() string {
 }
 
 type CancelSubscriptionRequest struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId       *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	Immediate         *bool                  `protobuf:"varint,2,opt,name=immediate" json:"immediate,omitempty"`
-	CancelAtPeriodEnd *bool                  `protobuf:"varint,3,opt,name=cancel_at_period_end,json=cancelAtPeriodEnd" json:"cancel_at_period_end,omitempty"`
-	Reason            *string                `protobuf:"bytes,4,opt,name=reason" json:"reason,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Immediate     *bool                  `protobuf:"varint,2,opt,name=immediate" json:"immediate,omitempty"`
+	Reason        *string                `protobuf:"bytes,3,opt,name=reason" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CancelSubscriptionRequest) Reset() {
@@ -497,13 +485,6 @@ func (x *CancelSubscriptionRequest) GetWorkspaceId() string {
 func (x *CancelSubscriptionRequest) GetImmediate() bool {
 	if x != nil && x.Immediate != nil {
 		return *x.Immediate
-	}
-	return false
-}
-
-func (x *CancelSubscriptionRequest) GetCancelAtPeriodEnd() bool {
-	if x != nil && x.CancelAtPeriodEnd != nil {
-		return *x.CancelAtPeriodEnd
 	}
 	return false
 }
@@ -571,35 +552,32 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\n" +
 	"product_id\x18\x02 \x01(\tR\tproductId\x12!\n" +
 	"\fproduct_name\x18\x03 \x01(\tR\vproductName\x12\x16\n" +
-	"\x06status\x18\x04 \x01(\tR\x06status\x12/\n" +
-	"\x14cancel_at_period_end\x18\x05 \x01(\bR\x11cancelAtPeriodEnd\x12F\n" +
-	"\bmetadata\x18\x06 \x03(\v2*.nokku.v1.GetBillingResponse.MetadataEntryR\bmetadata\x121\n" +
-	"\x06counts\x18\a \x01(\v2\x19.nokku.v1.WorkspaceCountsR\x06counts\x12H\n" +
-	"\x12current_period_end\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x10currentPeriodEnd\x12'\n" +
-	"\x0fbilling_enabled\x18\t \x01(\bR\x0ebillingEnabled\x1a;\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12'\n" +
+	"\x0fbilling_enabled\x18\x05 \x01(\bR\x0ebillingEnabled\x12/\n" +
+	"\x14cancel_at_period_end\x18\x06 \x01(\bR\x11cancelAtPeriodEnd\x12F\n" +
+	"\bmetadata\x18\a \x03(\v2*.nokku.v1.GetBillingResponse.MetadataEntryR\bmetadata\x121\n" +
+	"\x06counts\x18\b \x01(\v2\x19.nokku.v1.WorkspaceCountsR\x06counts\x12H\n" +
+	"\x12current_period_end\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\x10currentPeriodEnd\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"J\n" +
-	"\x1bCreateCustomerPortalRequest\x12+\n" +
-	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"0\n" +
-	"\x1cCreateCustomerPortalResponse\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url\"c\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"B\n" +
+	"\x13CreatePortalRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"(\n" +
+	"\x14CreatePortalResponse\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\"D\n" +
 	"\x15CreateCheckoutRequest\x12+\n" +
-	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1d\n" +
-	"\n" +
-	"product_id\x18\x02 \x01(\tR\tproductId\"*\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"*\n" +
 	"\x16CreateCheckoutResponse\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url\"\xb9\x01\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\"\x88\x01\n" +
 	"\x19CancelSubscriptionRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1c\n" +
-	"\timmediate\x18\x02 \x01(\bR\timmediate\x12/\n" +
-	"\x14cancel_at_period_end\x18\x03 \x01(\bR\x11cancelAtPeriodEnd\x12 \n" +
-	"\x06reason\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\x06reason\"\x1c\n" +
-	"\x1aCancelSubscriptionResponse2\x83\x04\n" +
+	"\timmediate\x18\x02 \x01(\bR\timmediate\x12 \n" +
+	"\x06reason\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\x06reason\"\x1c\n" +
+	"\x1aCancelSubscriptionResponse2\xea\x03\n" +
 	"\x0eBillingService\x12l\n" +
 	"\n" +
-	"GetBilling\x12\x1b.nokku.v1.GetBillingRequest\x1a\x1c.nokku.v1.GetBillingResponse\"#\x82\xd3\xe4\x93\x02\x1a\x12\x18/v1/billing/subscription\x90\x02\x01\x12\x81\x01\n" +
-	"\x14CreateCustomerPortal\x12%.nokku.v1.CreateCustomerPortalRequest\x1a&.nokku.v1.CreateCustomerPortalResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\"\x12/v1/billing/portal\x12q\n" +
+	"GetBilling\x12\x1b.nokku.v1.GetBillingRequest\x1a\x1c.nokku.v1.GetBillingResponse\"#\x82\xd3\xe4\x93\x02\x1a\x12\x18/v1/billing/subscription\x90\x02\x01\x12i\n" +
+	"\fCreatePortal\x12\x1d.nokku.v1.CreatePortalRequest\x1a\x1e.nokku.v1.CreatePortalResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\"\x12/v1/billing/portal\x12q\n" +
 	"\x0eCreateCheckout\x12\x1f.nokku.v1.CreateCheckoutRequest\x1a .nokku.v1.CreateCheckoutResponse\"\x1c\x82\xd3\xe4\x93\x02\x16\"\x14/v1/billing/checkout\x12\x8b\x01\n" +
 	"\x12CancelSubscription\x12#.nokku.v1.CancelSubscriptionRequest\x1a$.nokku.v1.CancelSubscriptionResponse\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/billing/subscription/cancelB\x96\x01\n" +
 	"\fcom.nokku.v1B\fBillingProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
@@ -618,28 +596,28 @@ func file_nokku_v1_billing_proto_rawDescGZIP() []byte {
 
 var file_nokku_v1_billing_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_nokku_v1_billing_proto_goTypes = []any{
-	(*WorkspaceCounts)(nil),              // 0: nokku.v1.WorkspaceCounts
-	(*GetBillingRequest)(nil),            // 1: nokku.v1.GetBillingRequest
-	(*GetBillingResponse)(nil),           // 2: nokku.v1.GetBillingResponse
-	(*CreateCustomerPortalRequest)(nil),  // 3: nokku.v1.CreateCustomerPortalRequest
-	(*CreateCustomerPortalResponse)(nil), // 4: nokku.v1.CreateCustomerPortalResponse
-	(*CreateCheckoutRequest)(nil),        // 5: nokku.v1.CreateCheckoutRequest
-	(*CreateCheckoutResponse)(nil),       // 6: nokku.v1.CreateCheckoutResponse
-	(*CancelSubscriptionRequest)(nil),    // 7: nokku.v1.CancelSubscriptionRequest
-	(*CancelSubscriptionResponse)(nil),   // 8: nokku.v1.CancelSubscriptionResponse
-	nil,                                  // 9: nokku.v1.GetBillingResponse.MetadataEntry
-	(*timestamppb.Timestamp)(nil),        // 10: google.protobuf.Timestamp
+	(*WorkspaceCounts)(nil),            // 0: nokku.v1.WorkspaceCounts
+	(*GetBillingRequest)(nil),          // 1: nokku.v1.GetBillingRequest
+	(*GetBillingResponse)(nil),         // 2: nokku.v1.GetBillingResponse
+	(*CreatePortalRequest)(nil),        // 3: nokku.v1.CreatePortalRequest
+	(*CreatePortalResponse)(nil),       // 4: nokku.v1.CreatePortalResponse
+	(*CreateCheckoutRequest)(nil),      // 5: nokku.v1.CreateCheckoutRequest
+	(*CreateCheckoutResponse)(nil),     // 6: nokku.v1.CreateCheckoutResponse
+	(*CancelSubscriptionRequest)(nil),  // 7: nokku.v1.CancelSubscriptionRequest
+	(*CancelSubscriptionResponse)(nil), // 8: nokku.v1.CancelSubscriptionResponse
+	nil,                                // 9: nokku.v1.GetBillingResponse.MetadataEntry
+	(*timestamppb.Timestamp)(nil),      // 10: google.protobuf.Timestamp
 }
 var file_nokku_v1_billing_proto_depIdxs = []int32{
 	9,  // 0: nokku.v1.GetBillingResponse.metadata:type_name -> nokku.v1.GetBillingResponse.MetadataEntry
 	0,  // 1: nokku.v1.GetBillingResponse.counts:type_name -> nokku.v1.WorkspaceCounts
 	10, // 2: nokku.v1.GetBillingResponse.current_period_end:type_name -> google.protobuf.Timestamp
 	1,  // 3: nokku.v1.BillingService.GetBilling:input_type -> nokku.v1.GetBillingRequest
-	3,  // 4: nokku.v1.BillingService.CreateCustomerPortal:input_type -> nokku.v1.CreateCustomerPortalRequest
+	3,  // 4: nokku.v1.BillingService.CreatePortal:input_type -> nokku.v1.CreatePortalRequest
 	5,  // 5: nokku.v1.BillingService.CreateCheckout:input_type -> nokku.v1.CreateCheckoutRequest
 	7,  // 6: nokku.v1.BillingService.CancelSubscription:input_type -> nokku.v1.CancelSubscriptionRequest
 	2,  // 7: nokku.v1.BillingService.GetBilling:output_type -> nokku.v1.GetBillingResponse
-	4,  // 8: nokku.v1.BillingService.CreateCustomerPortal:output_type -> nokku.v1.CreateCustomerPortalResponse
+	4,  // 8: nokku.v1.BillingService.CreatePortal:output_type -> nokku.v1.CreatePortalResponse
 	6,  // 9: nokku.v1.BillingService.CreateCheckout:output_type -> nokku.v1.CreateCheckoutResponse
 	8,  // 10: nokku.v1.BillingService.CancelSubscription:output_type -> nokku.v1.CancelSubscriptionResponse
 	7,  // [7:11] is the sub-list for method output_type
