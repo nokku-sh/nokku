@@ -3,9 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"log/slog"
-
-	"connectrpc.com/connect"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -104,28 +101,17 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 				return err
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
-			return connect.NewError(
-				connect.CodeInvalidArgument,
-				errors.New("invalid principal type"),
-			)
+			return errors.New("invalid principal type")
 		default:
-			return connect.NewError(
-				connect.CodeInvalidArgument,
-				errors.New("invalid principal type"),
-			)
+			return errors.New("invalid principal type")
 		}
 
 		return nil
 	}); err != nil {
-		var cerr *connect.Error
-		if errors.As(err, &cerr) {
-			return nil, err
-		}
-		slog.Error("failed to add subjects to principal", "error", err)
 		return nil, ErrInternal
 	}
 
-	go s.cfg.Pool.Broadcast(workspaceID, &nokkuv1.Notification{
+	s.cfg.Pool.Broadcast(workspaceID, &nokkuv1.Notification{
 		EventType: nokkuv1.Notification_EVENT_TYPE_PRINCIPALS.Enum(),
 	})
 	return &nokkuv1.AddSubjectsToPrincipalResponse{}, nil
@@ -169,28 +155,17 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 				return err
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
-			return connect.NewError(
-				connect.CodeInvalidArgument,
-				errors.New("invalid principal type"),
-			)
+			return errors.New("invalid principal type")
 		default:
-			return connect.NewError(
-				connect.CodeInvalidArgument,
-				errors.New("invalid principal type"),
-			)
+			return errors.New("invalid principal type")
 		}
 
 		return nil
 	}); err != nil {
-		var cerr *connect.Error
-		if errors.As(err, &cerr) {
-			return nil, err
-		}
-		slog.Error("failed to remove subjects from principal", "error", err)
 		return nil, ErrInternal
 	}
 
-	go s.cfg.Pool.Broadcast(workspaceID, &nokkuv1.Notification{
+	s.cfg.Pool.Broadcast(workspaceID, &nokkuv1.Notification{
 		EventType: nokkuv1.Notification_EVENT_TYPE_PRINCIPALS.Enum(),
 	})
 	return &nokkuv1.RemoveSubjectsFromPrincipalResponse{}, nil
@@ -229,27 +204,16 @@ func (s *PrincipalService) RevokeAllAccess(
 				return err
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
-			return connect.NewError(
-				connect.CodeInvalidArgument,
-				errors.New("invalid subject type"),
-			)
+			return errors.New("invalid principal type")
 		default:
-			return connect.NewError(
-				connect.CodeInvalidArgument,
-				errors.New("invalid subject type"),
-			)
+			return errors.New("invalid principal type")
 		}
 		return nil
 	}); err != nil {
-		var cerr *connect.Error
-		if errors.As(err, &cerr) {
-			return nil, err
-		}
-		slog.Error("failed to revoke access", "error", err)
 		return nil, ErrInternal
 	}
 
-	go s.cfg.Pool.Broadcast(req.GetWorkspaceId(), &nokkuv1.Notification{
+	s.cfg.Pool.Broadcast(req.GetWorkspaceId(), &nokkuv1.Notification{
 		EventType: nokkuv1.Notification_EVENT_TYPE_PRINCIPALS.Enum(),
 	})
 	return &nokkuv1.RevokeAllAccessResponse{}, nil
