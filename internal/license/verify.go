@@ -11,7 +11,7 @@ import (
 
 // DefaultPublicKey is the vendor's license-signing public key; the private
 // key lives only in the license worker's environment.
-const DefaultPublicKey = "ECTF4j4N89VQ61yA2QBUAu7JJL93Ib9CVqM6KuBcKrs="
+const DefaultPublicKey = "Y1wP9BXsRVzKt+VEJ/6RWtNuXL88L3+hx+3ouLGdCjA="
 
 // Verifier validates license keys offline with an Ed25519 public key.
 type Verifier struct {
