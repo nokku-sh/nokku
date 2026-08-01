@@ -74,10 +74,6 @@ func (w *Workspace) ToProto() *nokkuv1.Workspace {
 	}
 }
 
-func WorkspacesToProto(ws []*Workspace) []*nokkuv1.Workspace {
-	return MapSlice(ws, func(w *Workspace) *nokkuv1.Workspace { return w.ToProto() })
-}
-
 func (w *GetWorkspaceRow) ToProto() *nokkuv1.Workspace {
 	if w == nil {
 		return nil
@@ -268,10 +264,6 @@ func (p *Principal) ToProto() *nokkuv1.Principal {
 		Username:  &p.Username,
 		CreatedAt: SafeTimestamp(&p.CreatedAt),
 	}
-}
-
-func PrincipalsToProto(ps []*Principal) []*nokkuv1.Principal {
-	return MapSlice(ps, func(p *Principal) *nokkuv1.Principal { return p.ToProto() })
 }
 
 func (p *GetPrincipalsByTargetIDsRow) ToProto() *nokkuv1.Principal {

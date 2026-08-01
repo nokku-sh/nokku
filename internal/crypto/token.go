@@ -50,12 +50,6 @@ func WithID(id string) TokenOption {
 	}
 }
 
-func WithNewID() TokenOption {
-	return func(c *tokenConfig) {
-		c.withID = true
-	}
-}
-
 func NewToken(opts ...TokenOption) (*Token, error) {
 	cfg := &tokenConfig{}
 	for _, o := range opts {

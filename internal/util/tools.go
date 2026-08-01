@@ -3,20 +3,10 @@ package util
 
 import (
 	"math"
-	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
 )
-
-func IsTesting() bool {
-	for _, arg := range os.Args {
-		if strings.HasPrefix(arg, "-test.") {
-			return true
-		}
-	}
-	return false
-}
 
 func SanitizeUTF8(s string) string {
 	if utf8.ValidString(s) {
