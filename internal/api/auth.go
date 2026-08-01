@@ -517,9 +517,16 @@ func (s *AuthService) VerifyCLILogin(
 	ch, exists := s.loginWaiters[req.GetLoginCode()]
 	s.mu.RUnlock()
 	if exists {
-		ch <- &CLISession{
+		// Non-blocking send: the waiter entry may be stale (the streaming
+		// handler already returned/timeout while its deferred map-delete
+		// hadn't run, or a double-submit raced the single buffered slot).
+		// A blocking send would hang this request forever.
+		select {
+		case ch <- &CLISession{
 			User:  user.ToProto(),
 			Token: token.Plaintext,
+		}:
+		default:
 		}
 	}
 	return &nokkuv1.VerifyCLILoginResponse{}, nil
