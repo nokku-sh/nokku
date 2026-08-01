@@ -1,120 +1,108 @@
 package billing
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
+	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"net/http"
-	"strconv"
-	"strings"
-	"time"
 
-	"github.com/polarsource/polar-go/models/components"
+	stripe "github.com/stripe/stripe-go/v86"
+	"github.com/stripe/stripe-go/v86/webhook"
+
+	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
-const webhookTolerance = 5 * time.Minute
-
-func (p *Polar) WebhookHandler() http.Handler {
-	return http.HandlerFunc(p.webhook)
+func (s *Stripe) WebhookHandler() http.Handler {
+	return http.HandlerFunc(s.webhook)
 }
 
-func (p *Polar) webhook(w http.ResponseWriter, r *http.Request) {
-	if p.WebhookSecret == "" {
-		slog.Error("polar webhook received but secret is not configured")
-		http.Error(w, "webhook is not configured", http.StatusInternalServerError)
-		return
-	}
-
+func (s *Stripe) webhook(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "failed to read body", http.StatusBadRequest)
 		return
 	}
 
-	if err := verifySignature(p.WebhookSecret, r.Header, body, time.Now()); err != nil {
-		slog.Warn("polar webhook signature verification failed", "error", err)
+	event, err := webhook.ConstructEvent(body, r.Header.Get("Stripe-Signature"), s.WebhookSecret)
+	if err != nil {
+		slog.Warn("Stripe webhook signature verification failed", "error", err)
 		http.Error(w, "invalid signature", http.StatusUnauthorized)
 		return
 	}
 
-	var event struct {
-		Type string          `json:"type"`
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(body, &event); err != nil {
-		http.Error(w, "invalid payload format", http.StatusBadRequest)
-		return
-	}
-
-	switch event.Type {
-	case "subscription.created",
-		"subscription.updated",
-		"subscription.active",
-		"subscription.canceled",
-		"subscription.uncanceled",
-		"subscription.revoked":
-		var sub components.Subscription
-		if err := json.Unmarshal(event.Data, &sub); err != nil {
-			http.Error(w, "invalid payload data", http.StatusBadRequest)
+	ctx := r.Context()
+	switch string(event.Type) {
+	case "customer.subscription.created",
+		"customer.subscription.updated",
+		"customer.subscription.deleted":
+		var sub stripe.Subscription
+		if err := json.Unmarshal(event.Data.Raw, &sub); err != nil {
+			http.Error(w, "invalid payload", http.StatusBadRequest)
 			return
 		}
-		if sub.Customer.ExternalID == nil {
-			http.Error(w, "invalid payload data", http.StatusBadRequest)
-			return
-		}
-		p.upsertSubscription(r.Context(), *sub.Customer.ExternalID, sub)
+		s.handleSubscription(ctx, &sub)
 
 	default:
-		slog.Debug("ignoring unhandled polar webhook event", "event_type", event.Type)
+		slog.Debug("ignoring unhandled Stripe webhook event", "event_type", event.Type)
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-// verifySignature checks a Standard Webhooks v1 signature.
-func verifySignature(secret string, h http.Header, body []byte, now time.Time) error {
-	id := h.Get("Webhook-Id")
-	timestamp := h.Get("Webhook-Timestamp")
-	signatures := h.Get("Webhook-Signature")
-	if id == "" || timestamp == "" || signatures == "" {
-		return errors.New("missing webhook headers")
+// handleSubscription reconciles the local workspace subscription. License
+// subscriptions carry no workspace_id (they are bought via the license
+// Payment Link) and are ignored here — the license worker owns them.
+func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscription) {
+	workspaceID := sub.Metadata["workspace_id"]
+	if workspaceID == "" {
+		return
 	}
 
-	ts, err := strconv.ParseInt(timestamp, 10, 64)
-	if err != nil {
-		return fmt.Errorf("invalid webhook timestamp: %w", err)
-	}
-	if math.Abs(now.Sub(time.Unix(ts, 0)).Seconds()) > webhookTolerance.Seconds() {
-		return errors.New("webhook timestamp outside tolerance")
+	if sub.Status == stripe.SubscriptionStatusCanceled {
+		s.clearSubscription(ctx, workspaceID, sub)
+		return
 	}
 
-	key, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(secret, "whsec_"))
-	if err != nil {
-		return fmt.Errorf("invalid webhook secret: %w", err)
-	}
-
-	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte(id + "." + timestamp + "." + string(body)))
-	expected := mac.Sum(nil)
-
-	for part := range strings.FieldsSeq(signatures) {
-		version, encoded, ok := strings.Cut(part, ",")
-		if !ok || version != "v1" {
-			continue
+	// Backstop for the one-subscription-per-workspace rule: if the workspace
+	// already holds a different active subscription, cancel the newcomer so a
+	// tenant never ends up with two paid subscriptions (the Checkout gate
+	// prevents this, but races and retries can slip past it).
+	if existing, err := s.db.Q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
+		WorkspaceID: workspaceID,
+		Statuses:    entitlement.ActiveStatuses,
+		Sources:     stripeSources,
+	}); err == nil && existing.SubscriptionID != "" && existing.SubscriptionID != sub.ID {
+		slog.Warn("cancelling duplicate subscription",
+			"workspace_id", workspaceID, "keep", existing.SubscriptionID, "duplicate", sub.ID)
+		if _, err := s.client.V1Subscriptions.Cancel(ctx, sub.ID, nil); err != nil {
+			slog.Warn("failed to cancel duplicate subscription", "error", err,
+				"workspace_id", workspaceID, "subscription_id", sub.ID)
 		}
-		sig, err := base64.StdEncoding.DecodeString(encoded)
-		if err != nil {
-			continue
-		}
-		if hmac.Equal(sig, expected) {
-			return nil
-		}
+		return
 	}
-	return errors.New("no matching signature")
+
+	s.upsertSubscription(ctx, workspaceID, sub)
+}
+
+// clearSubscription marks a workspace subscription inactive when the Stripe
+// subscription is canceled, so entitlements fall back to the community plan.
+func (s *Stripe) clearSubscription(
+	ctx context.Context,
+	workspaceID string,
+	sub *stripe.Subscription,
+) {
+	if err := s.db.Q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
+		WorkspaceID:       workspaceID,
+		Source:            "stripe",
+		Plan:              "",
+		Status:            string(entitlement.StatusInactive),
+		CustomerID:        sub.Customer.ID,
+		SubscriptionID:    sub.ID,
+		CurrentPeriodEnd:  periodEnd(sub),
+		CancelAtPeriodEnd: sub.CancelAtPeriodEnd,
+	}); err != nil {
+		slog.Warn("failed to clear subscription", "error", err, "workspace_id", workspaceID)
+	}
 }

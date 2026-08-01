@@ -37,9 +37,8 @@ func (c *Config) startBackgroundJobs(ctx context.Context) {
 	}
 }
 
-// runBillingJobs reconciles subscription state and reports usage to
-// the billing provider. It waits a few minutes after startup so boot
-// stays fast and the DB is warm, then runs twice a day.
+// runBillingJobs reconciles subscription state and reports usage to the
+// billing provider.
 func (c *Config) runBillingJobs(ctx context.Context) {
 	timer := time.NewTimer(5 * time.Minute)
 	defer timer.Stop()
@@ -64,6 +63,9 @@ func (c *Config) runBillingJobs(ctx context.Context) {
 }
 
 func (c *Config) syncBilling(ctx context.Context) {
+	if c.Billing == nil {
+		return
+	}
 	if err := c.Billing.SyncAll(ctx); err != nil {
 		slog.Error("failed to reconcile subscriptions", "error", err)
 	}

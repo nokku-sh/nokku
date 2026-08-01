@@ -16,8 +16,25 @@ WHERE
   AND status = ANY (@statuses::TEXT[])
   AND source = ANY (@sources::TEXT[]);
 
+-- name: SetSubscriptionCustomer :exec
+-- Records which Stripe customer a workspace maps to, so checkout always reuses
+-- the same customer. Status stays inactive so this row never grants
+-- entitlements on its own; the webhook promotes it to a real subscription.
+INSERT INTO
+  workspace_subscriptions (workspace_id, source, status, customer_id)
+VALUES
+  ($1, 'stripe', 'inactive', $2)
+ON CONFLICT (workspace_id) DO UPDATE
+SET
+  source = 'stripe',
+  status = 'inactive',
+  customer_id = EXCLUDED.customer_id
+WHERE
+  workspace_subscriptions.source IN ('stripe', '');
+
 -- name: UpsertSubscription :exec
--- Note: overrides is intentionally NOT updated on conflict, manual overrides survive provider syncs.
+-- Note: source is only overwritten when the row is provider-managed ('stripe')
+-- or empty, so manual subscriptions survive provider syncs.
 INSERT INTO
   workspace_subscriptions (
     workspace_id,
@@ -26,14 +43,11 @@ INSERT INTO
     status,
     customer_id,
     subscription_id,
-    product_id,
-    product_name,
-    metadata,
     current_period_end,
     cancel_at_period_end
   )
 VALUES
-  ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+  ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (workspace_id) DO UPDATE
 SET
   source = EXCLUDED.source,
@@ -41,20 +55,10 @@ SET
   status = EXCLUDED.status,
   customer_id = EXCLUDED.customer_id,
   subscription_id = EXCLUDED.subscription_id,
-  product_id = EXCLUDED.product_id,
-  product_name = EXCLUDED.product_name,
-  metadata = EXCLUDED.metadata,
   current_period_end = EXCLUDED.current_period_end,
   cancel_at_period_end = EXCLUDED.cancel_at_period_end
 WHERE
-  workspace_subscriptions.source IN ('polar', '');
-
--- name: UpdateSubscriptionOverrides :exec
-UPDATE workspace_subscriptions
-SET
-  overrides = @overrides
-WHERE
-  workspace_id = @workspace_id;
+  workspace_subscriptions.source IN ('stripe', '');
 
 -- name: ListActiveSubscriptions :many
 SELECT

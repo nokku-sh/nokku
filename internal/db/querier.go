@@ -154,6 +154,10 @@ type Querier interface {
 	SetDaemonsOffline(ctx context.Context) error
 	// Clears existing default and sets new one atomically
 	SetDefaultCA(ctx context.Context, arg *SetDefaultCAParams) error
+	// Records which Stripe customer a workspace maps to, so checkout always reuses
+	// the same customer. Status stays inactive so this row never grants
+	// entitlements on its own; the webhook promotes it to a real subscription.
+	SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error
 	SyncPrincipals(ctx context.Context, arg *SyncPrincipalsParams) error
 	TrySecretRotationLock(ctx context.Context) (bool, error)
 	UpdateCA(ctx context.Context, arg *UpdateCAParams) (*CertificateAuthority, error)
@@ -173,7 +177,6 @@ type Querier interface {
 	UpdateSAMLProvider(ctx context.Context, arg *UpdateSAMLProviderParams) (*SamlProvider, error)
 	UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (*ServiceAccount, error)
 	UpdateServiceAccountUsage(ctx context.Context, serviceAccountID string) error
-	UpdateSubscriptionOverrides(ctx context.Context, arg *UpdateSubscriptionOverridesParams) error
 	UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*Target, error)
 	UpdateTargetCA(ctx context.Context, arg *UpdateTargetCAParams) (*Target, error)
 	UpdateTeam(ctx context.Context, arg *UpdateTeamParams) (*Team, error)
@@ -188,7 +191,8 @@ type Querier interface {
 	// atomically within the rotation transaction. Never used on the boot path.
 	UpsertKeysetWrappedData(ctx context.Context, data []byte) error
 	UpsertOAuthIdentity(ctx context.Context, arg *UpsertOAuthIdentityParams) (*OauthIdentity, error)
-	// Note: overrides is intentionally NOT updated on conflict, manual overrides survive provider syncs.
+	// Note: source is only overwritten when the row is provider-managed ('stripe')
+	// or empty, so manual subscriptions survive provider syncs.
 	UpsertSubscription(ctx context.Context, arg *UpsertSubscriptionParams) error
 	UseBackupCode(ctx context.Context, arg *UseBackupCodeParams) (string, error)
 	UserWorkspaceMember(ctx context.Context, arg *UserWorkspaceMemberParams) (bool, error)

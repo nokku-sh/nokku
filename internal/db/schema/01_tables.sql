@@ -84,15 +84,11 @@ CREATE TABLE IF NOT EXISTS workspace_members (
 
 CREATE TABLE IF NOT EXISTS workspace_subscriptions (
   workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
-  source TEXT NOT NULL DEFAULT '', -- polar, stripe, license,...
+  source TEXT NOT NULL DEFAULT '', -- stripe, manual, ...
   plan TEXT NOT NULL DEFAULT '', -- community, flex, enterprise
   status TEXT NOT NULL DEFAULT '',
-  customer_id TEXT NOT NULL DEFAULT '', -- Opaque provider references, never interpreted by core logic
-  subscription_id TEXT NOT NULL DEFAULT '',
-  product_id TEXT NOT NULL DEFAULT '',
-  product_name TEXT NOT NULL DEFAULT '',
-  metadata JSONB NOT NULL DEFAULT '{}', -- for display/debugging only
-  overrides JSONB NOT NULL DEFAULT '{}', -- entitlement overrides (enterprise)
+  customer_id TEXT NOT NULL DEFAULT '', -- Stripe customer id, opaque
+  subscription_id TEXT NOT NULL DEFAULT '', -- Stripe subscription id, opaque
   current_period_end TIMESTAMPTZ,
   cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

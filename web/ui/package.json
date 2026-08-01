@@ -28,7 +28,6 @@
 		"@connectrpc/connect-web": "^2.1.2",
 		"@internationalized/date": "^3.12.2",
 		"@lucide/svelte": "^1.27.0",
-		"@polar-sh/sveltekit": "^0.7.6",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.70.1",
 		"@sveltejs/vite-plugin-svelte": "^7.2.0",

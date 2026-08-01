@@ -29,12 +29,12 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/mergestat/timediff v0.0.4
 	github.com/mizuchilabs/kata v0.1.1
-	github.com/polarsource/polar-go v0.16.0
 	github.com/rs/cors v1.11.1
 	github.com/russellhaering/goxmldsig v1.6.0
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.36
 	github.com/scaleway/tink-go-scwkms v0.1.2
 	github.com/stripe/pg-schema-diff v1.0.8
+	github.com/stripe/stripe-go/v86 v86.2.0
 	github.com/tink-crypto/tink-go-awskms/v3 v3.0.0
 	github.com/tink-crypto/tink-go-gcpkms/v2 v2.3.0
 	github.com/tink-crypto/tink-go-hcvault/v2 v2.5.0
@@ -146,7 +146,6 @@ require (
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
-	github.com/spyzhov/ajson v0.9.6 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect

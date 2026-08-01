@@ -93,8 +93,6 @@ var (
 )
 
 // WithRateLimit applies a per-IP rate limit at the HTTP layer.
-// Only active API routes are rate-limited; static assets and other
-// public files pass through without being counted.
 func (s *Server) WithRateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !isAPIRoute(r.URL.Path) {
@@ -112,8 +110,7 @@ func (s *Server) WithRateLimit(next http.Handler) http.Handler {
 }
 
 // NewRateLimitInterceptor applies tighter rate limits on sensitive auth
-// procedures (register, login, forgot password, etc.). The general per-IP
-// limit is already enforced at the HTTP layer by WithRateLimit.
+// procedures (register, login, forgot password, etc.).
 func NewRateLimitInterceptor() connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
@@ -136,9 +133,8 @@ func NewRateLimitInterceptor() connect.UnaryInterceptorFunc {
 
 // isAPIRoute returns true for paths that target active backend endpoints.
 // Everything else (static assets, index.html, etc.) passes without rate limiting.
-// When adding a new route, include its prefix here so it gets rate-limited.
 func isAPIRoute(path string) bool {
-	// Streaming endpoints establish long-lived connections — rate limiting
+	// Streaming endpoints establish long-lived connections, rate limiting
 	// their initial HTTP request would block legitimate reconnect storms.
 	if strings.HasPrefix(path, "/nokku.v1.DaemonControlService/") ||
 		strings.HasPrefix(path, "/nokku.v1.DaemonSessionService/") {
@@ -152,7 +148,7 @@ func isAPIRoute(path string) bool {
 		strings.HasPrefix(path, "/avatars/") ||
 		strings.HasPrefix(path, "/upload/") ||
 		strings.HasPrefix(path, "/terminal/") ||
-		strings.HasPrefix(path, "/polar/") ||
+		strings.HasPrefix(path, "/stripe/") ||
 		strings.HasPrefix(path, "/healthz") ||
 		strings.HasPrefix(path, "/debug/") ||
 		strings.HasPrefix(path, "/v1/")

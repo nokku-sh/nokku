@@ -4,7 +4,6 @@ package entitlement
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -24,7 +23,7 @@ const (
 	ResourceServiceAccounts Resource = "service_accounts"
 )
 
-// Feature and value keys that appear in catalog plans and DB overrides.
+// Feature and value keys that appear in catalog plans.
 const (
 	FeatureEnforceSSO       = "enforce_sso"
 	ValueAuditRetentionDays = "audit_log_retention_days"
@@ -57,8 +56,8 @@ var ActiveStatuses = []string{
 // GrantsAccess is true for active, trialing and past_due (grace period).
 func (s Status) GrantsAccess() bool { return s != StatusInactive }
 
-// Quota for one resource: Soft is included in base price (overage
-// starts above it), Hard is the enforcement cap (-1 = unlimited).
+// Quota for one resource: Soft is included in the base price (overage starts
+// above it), Hard is the enforced cap (-1 = unlimited).
 type Quota struct {
 	Soft int64 `json:"soft"`
 	Hard int64 `json:"hard"`
@@ -70,16 +69,8 @@ type Plan struct {
 	Values   map[string]int64
 }
 
-// Overrides customize a catalog plan. Stored as JSONB in
-// workspace_subscriptions.overrides.
-type Overrides struct {
-	Features map[string]bool  `json:"features,omitempty"`
-	Limits   map[string]Quota `json:"limits,omitempty"`
-	Values   map[string]int64 `json:"values,omitempty"`
-}
-
-// catalog defines plans in code so enforcement limits never drift.
-// soft limits are included in the base price, hard limits are enforced.
+// catalog defines plans in code so enforcement limits never drift. Soft
+// quotas must match the Stripe price tiers; hard quotas are enforced locally.
 var catalog = map[string]Plan{
 	PlanCommunity: {
 		Features: map[string]bool{},
@@ -99,11 +90,13 @@ var catalog = map[string]Plan{
 			FeatureEnforceSSO: true,
 		},
 		Limits: map[Resource]Quota{
-			ResourceMembers:         {Soft: 10, Hard: 5000},
-			ResourceServiceAccounts: {Soft: 5, Hard: 5000},
-			ResourceTargets:         {Soft: 50, Hard: 10000},
-			ResourceTeams:           {Soft: 500, Hard: 500},
-			ResourceCas:             {Soft: 100, Hard: 100},
+			// Metered resources: soft = included, hard = unlimited (billed).
+			ResourceMembers:         {Soft: 10, Hard: -1},
+			ResourceServiceAccounts: {Soft: 5, Hard: -1},
+			ResourceTargets:         {Soft: 50, Hard: -1},
+			// Not metered: enforced caps.
+			ResourceTeams: {Soft: 500, Hard: 500},
+			ResourceCas:   {Soft: 100, Hard: 100},
 		},
 		Values: map[string]int64{
 			ValueAuditRetentionDays: 90,
@@ -136,25 +129,36 @@ func (e *QuotaError) Error() string {
 	return fmt.Sprintf("%s limit (%d) reached for your current plan", e.Resource, e.Limit)
 }
 
+// licenseState reports whether the instance is licensed (on-premise); when
+// active, every workspace resolves to Enterprise.
+type licenseState interface {
+	Active() bool
+}
+
 type Service struct {
-	q *db.Queries
+	q       *db.Queries
+	license licenseState
 }
 
-func New(q *db.Queries) *Service {
-	return &Service{q: q}
+func New(q *db.Queries, lc licenseState) *Service {
+	return &Service{q: q, license: lc}
 }
 
-// Resolve returns the effective plan for a workspace (falls back to Community).
+// Resolve returns the effective plan for a workspace. An active instance
+// license overrides the subscription with Enterprise.
 func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
+	if s.license != nil && s.license.Active() {
+		return resolvePlan(PlanEnterprise)
+	}
 	sub, err := s.q.GetSubscription(ctx, workspaceID)
 	if err != nil || !Status(sub.Status).GrantsAccess() {
-		return resolvePlan(PlanCommunity, nil)
+		return resolvePlan(PlanCommunity)
 	}
-	return resolvePlan(sub.Plan, parseOverrides(sub.Overrides))
+	return resolvePlan(sub.Plan)
 }
 
-// Check returns ResourceExhausted if creating one more of r would
-// exceed the hard cap. Fails open on DB errors.
+// Check returns ResourceExhausted if creating one more of r would exceed the
+// hard cap. Fails open on DB errors.
 func (s *Service) Check(ctx context.Context, workspaceID string, r Resource) error {
 	plan := s.Resolve(ctx, workspaceID)
 	quota, ok := plan.Limits[r]
@@ -194,7 +198,7 @@ func (s *Service) Int(ctx context.Context, workspaceID, key string, fallback int
 	return fallback
 }
 
-func resolvePlan(name string, ov *Overrides) Plan {
+func resolvePlan(name string) Plan {
 	base, ok := catalog[name]
 	if !ok {
 		if name != "" {
@@ -202,44 +206,11 @@ func resolvePlan(name string, ov *Overrides) Plan {
 		}
 		base = catalog[PlanCommunity]
 	}
-	return base.apply(ov)
-}
-
-// apply returns a copy of p with overrides merged in.
-func (p Plan) apply(ov *Overrides) Plan {
-	if ov == nil {
-		return p
+	return Plan{
+		Features: maps.Clone(base.Features),
+		Limits:   maps.Clone(base.Limits),
+		Values:   maps.Clone(base.Values),
 	}
-	out := Plan{
-		Features: make(map[string]bool, len(p.Features)+len(ov.Features)),
-		Limits:   make(map[Resource]Quota, len(p.Limits)+len(ov.Limits)),
-		Values:   make(map[string]int64, len(p.Values)+len(ov.Values)),
-	}
-	maps.Copy(out.Features, p.Features)
-	maps.Copy(out.Features, ov.Features)
-	maps.Copy(out.Limits, p.Limits)
-	for r, q := range ov.Limits {
-		out.Limits[Resource(r)] = q
-	}
-	maps.Copy(out.Values, p.Values)
-	maps.Copy(out.Values, ov.Values)
-	return out
-}
-
-func parseOverrides(m map[string]any) *Overrides {
-	if len(m) == 0 {
-		return nil
-	}
-	raw, err := json.Marshal(m)
-	if err != nil {
-		return nil
-	}
-	var ov Overrides
-	if err := json.Unmarshal(raw, &ov); err != nil {
-		slog.Debug("ignoring malformed plan overrides", "error", err)
-		return nil
-	}
-	return &ov
 }
 
 func currentCount(stats *db.GetWorkspaceStatsRow, r Resource) int64 {

@@ -285,17 +285,13 @@ type WorkspaceSetting struct {
 }
 
 type WorkspaceSubscription struct {
-	WorkspaceID       string         `json:"workspaceId"`
-	Source            string         `json:"source"`
-	Plan              string         `json:"plan"`
-	Status            string         `json:"status"`
-	CustomerID        string         `json:"customerId"`
-	SubscriptionID    string         `json:"subscriptionId"`
-	ProductID         string         `json:"productId"`
-	ProductName       string         `json:"productName"`
-	Metadata          map[string]any `json:"metadata"`
-	Overrides         map[string]any `json:"overrides"`
-	CurrentPeriodEnd  *time.Time     `json:"currentPeriodEnd"`
-	CancelAtPeriodEnd bool           `json:"cancelAtPeriodEnd"`
-	UpdatedAt         time.Time      `json:"updatedAt"`
+	WorkspaceID       string     `json:"workspaceId"`
+	Source            string     `json:"source"`
+	Plan              string     `json:"plan"`
+	Status            string     `json:"status"`
+	CustomerID        string     `json:"customerId"`
+	SubscriptionID    string     `json:"subscriptionId"`
+	CurrentPeriodEnd  *time.Time `json:"currentPeriodEnd"`
+	CancelAtPeriodEnd bool       `json:"cancelAtPeriodEnd"`
+	UpdatedAt         time.Time  `json:"updatedAt"`
 }

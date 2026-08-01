@@ -16,7 +16,7 @@ Nokku is an SSH access management control plane that handles user authentication
 - You are fully responsible for all activities that occur under your account and associated infrastructure. We are not liable for any unauthorized access resulting from your failure to secure your credentials.
 
 **4. Payments and Billing**
-Billing, subscription management, and payment processing are handled by our Merchant of Record, Polar.sh. By subscribing to a paid tier of Nokku, you agree to Polar.sh's terms and conditions regarding payment, taxes, and invoicing. We reserve the right to suspend or terminate access to the Service for accounts with overdue payments.
+Billing, subscription management, and payment processing are handled by our Merchant of Record, Stripe, Inc. By subscribing to a paid tier of Nokku, you agree to Stripe's terms and conditions regarding payment, taxes, and invoicing. We reserve the right to suspend or terminate access to the Service for accounts with overdue payments.
 
 **5. Availability and Service Level ("As Is")**
 The Service is provided on an "AS IS" and "AS AVAILABLE" basis. While we strive to maintain high uptime and availability, we do not guarantee that the Service will be uninterrupted, error-free, or entirely secure. We may occasionally perform scheduled maintenance, which will be communicated in advance when possible.
