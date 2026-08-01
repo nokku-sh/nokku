@@ -31,7 +31,6 @@ func (s *CredentialService) UpdatePassword(
 		return nil, ErrNotFound
 	}
 
-	// Check if SSO is enforced
 	if err := checkSSOEnforced(ctx, s.cfg, user.Email); err != nil {
 		return nil, err
 	}
@@ -64,7 +63,6 @@ func (s *CredentialService) DeletePassword(
 		return nil, ErrNotFound
 	}
 
-	// Check if SSO is enforced
 	if err := checkSSOEnforced(ctx, s.cfg, user.Email); err != nil {
 		return nil, err
 	}
@@ -90,7 +88,6 @@ func (s *CredentialService) DeletePassword(
 		}
 	}
 
-	// Set password to NULL
 	if err = s.cfg.Conn.Q.DeleteUserPassword(ctx, user.ID); err != nil {
 		return nil, ErrInternal
 	}
@@ -102,7 +99,6 @@ func (s *CredentialService) UpdatePasskey(
 	ctx context.Context,
 	req *nokkuv1.UpdatePasskeyRequest,
 ) (*nokkuv1.UpdatePasskeyResponse, error) {
-	// Verify the credential belongs to the user
 	credential, err := s.cfg.Conn.Q.GetPasskey(ctx, req.GetId())
 	if err != nil {
 		return nil, ErrNotFound
@@ -120,7 +116,6 @@ func (s *CredentialService) UpdatePasskey(
 		return nil, ErrInternal
 	}
 
-	// Get updated credential
 	credential, err = s.cfg.Conn.Q.GetPasskey(ctx, req.GetId())
 	if err != nil {
 		return nil, ErrInternal
@@ -145,7 +140,6 @@ func (s *CredentialService) ListPasskeys(
 		return nil, ErrInternal
 	}
 
-	// Convert to proto (you'll need to add this proto definition)
 	passkeys := make([]*nokkuv1.Passkey, len(credentials))
 	for i, cred := range credentials {
 		passkeys[i] = &nokkuv1.Passkey{
@@ -165,7 +159,6 @@ func (s *CredentialService) DeletePasskey(
 	ctx context.Context,
 	req *nokkuv1.DeletePasskeyRequest,
 ) (*nokkuv1.DeletePasskeyResponse, error) {
-	// Verify the credential belongs to the user
 	credential, err := s.cfg.Conn.Q.GetPasskey(ctx, req.GetId())
 	if err != nil {
 		return nil, ErrNotFound
@@ -208,7 +201,6 @@ func (s *CredentialService) CreateBackupCodes(
 		return nil, ErrInternal
 	}
 
-	// Check if SSO is enforced for user's domain
 	if err := checkSSOEnforced(ctx, s.cfg, user.Email); err != nil {
 		return nil, err
 	}

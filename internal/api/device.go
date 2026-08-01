@@ -81,7 +81,6 @@ func syncWebDevice(
 	}()
 }
 
-// deviceNameFromUA derives a coarse "Chrome on macOS"-style name from a User-Agent header.
 func deviceNameFromUA(ua string) string {
 	if ua == "" {
 		return "Unknown device"

@@ -18,10 +18,9 @@ import (
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
-// NewCA generates a self-signed X.509 root certificate authority.
-// It returns ssh.CAInfo so X.509 and SSH authorities share the same
-// storage and rotation code paths; Certificate holds the PEM root cert
-// (empty for SSH authorities).
+// NewCA generates a self-signed X.509 root certificate authority. Returns
+// ssh.CAInfo so X.509 and SSH authorities share storage and rotation code
+// paths; Certificate holds the PEM root cert (empty for SSH authorities).
 func NewCA(
 	keyType nokkuv1.CertificateKeyType,
 	keyBits int32,

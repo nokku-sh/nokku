@@ -46,14 +46,12 @@ func (s *SAMLHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get SAML middleware
 	middleware, err := s.getSAMLMiddleware(r.Context(), providerID)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "Provider configuration failed")
 		return
 	}
 
-	// Create state with provider ID
 	state := SAMLState{ProviderID: providerID}
 
 	stateJSON, err := json.Marshal(state)
@@ -63,7 +61,6 @@ func (s *SAMLHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	relayState := base64.StdEncoding.EncodeToString(stateJSON)
 
-	// Build authentication request
 	authReq, err := middleware.ServiceProvider.MakeAuthenticationRequest(
 		middleware.ServiceProvider.GetSSOBindingLocation(saml.HTTPRedirectBinding),
 		saml.HTTPRedirectBinding,
@@ -80,7 +77,6 @@ func (s *SAMLHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Redirect to IdP with RelayState
 	redirectURL, err := authReq.Redirect(relayState, &middleware.ServiceProvider)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "Failed to build redirect URL")
@@ -90,19 +86,16 @@ func (s *SAMLHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirectURL.String(), http.StatusTemporaryRedirect)
 }
 
-// CallbackHandler processes SAML assertions.
 func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	redirect := s.cfg.FullURL()
 
-	// Parse form to get RelayState
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB
 	if err := r.ParseForm(); err != nil {
 		http.Redirect(w, r, redirect+"?error=invalid_request", http.StatusTemporaryRedirect)
 		return
 	}
 
-	// Decode state from RelayState
 	var state SAMLState
 	if relayState := r.FormValue("RelayState"); relayState != "" {
 		stateJSON, err := base64.StdEncoding.DecodeString(relayState)
@@ -116,28 +109,24 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get SAML middleware
 	middleware, err := s.getSAMLMiddleware(ctx, state.ProviderID)
 	if err != nil {
 		http.Redirect(w, r, redirect+"?error=provider_config_failed", http.StatusTemporaryRedirect)
 		return
 	}
 
-	// Get possible request IDs from tracker
 	var possibleRequestIDs []string
 	trackedRequests := middleware.RequestTracker.GetTrackedRequests(r)
 	for _, req := range trackedRequests {
 		possibleRequestIDs = append(possibleRequestIDs, req.SAMLRequestID)
 	}
 
-	// Parse and validate SAML response
 	assertion, err := middleware.ServiceProvider.ParseResponse(r, possibleRequestIDs)
 	if err != nil {
 		http.Redirect(w, r, redirect+"?error=invalid_assertion", http.StatusTemporaryRedirect)
 		return
 	}
 
-	// Stop tracking the request
 	if err := middleware.RequestTracker.StopTrackingRequest(w, r, assertion.ID); err != nil {
 		slog.Warn("failed to stop tracking request", "error", err)
 	}
@@ -158,14 +147,12 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract user attributes
 	userAttr, err := s.extractAttributes(ctx, assertion, dbConfig)
 	if err != nil {
 		http.Redirect(w, r, redirect+"?error=invalid_attributes", http.StatusTemporaryRedirect)
 		return
 	}
 
-	// Get NameID
 	if assertion.Subject == nil || assertion.Subject.NameID == nil ||
 		assertion.Subject.NameID.Value == "" {
 		http.Redirect(w, r, redirect+"?error=missing_name_id", http.StatusTemporaryRedirect)
@@ -173,7 +160,6 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	nameID := assertion.Subject.NameID.Value
 
-	// Handle user (create or update)
 	user, err := s.handleSAMLUser(ctx, userAttr, dbConfig, nameID)
 	if err != nil {
 		http.Redirect(w, r, redirect+"?error=user_failed", http.StatusTemporaryRedirect)
@@ -184,7 +170,6 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		a.UserID = user.ID
 	}
 
-	// Create tokens and set cookies
 	s.cfg.Authn.AccessCookie(ctx, w.Header(), user)
 	s.cfg.Authn.RefreshCookie(ctx, w.Header(), user)
 	syncWebDevice(ctx, s.cfg, r.Header, w.Header(), r.RemoteAddr, user)
@@ -192,7 +177,6 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
 }
 
-// MetadataHandler returns SP metadata.
 func (s *SAMLHandler) MetadataHandler(w http.ResponseWriter, r *http.Request) {
 	middleware, err := s.getSAMLMiddleware(r.Context(), r.PathValue("id"))
 	if err != nil {
@@ -214,23 +198,19 @@ func (s *SAMLHandler) MetadataHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleSAMLUser creates or updates user from SAML assertion.
 func (s *SAMLHandler) handleSAMLUser(
 	ctx context.Context,
 	user *db.User,
 	saml *db.SamlProvider,
 	nameID string,
 ) (*db.User, error) {
-	// Check if user exists by email
 	existingUser, err := s.cfg.Conn.Q.GetUserByEmail(ctx, user.Email)
 
 	// User exists, update and return
 	if err == nil {
 		var updatedUser *db.User
 		err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
-			// If enforce_sso is enabled, verify user came from SAML
 			if saml.EnforceSso {
-				// Check if user has SAML identity linked
 				identity, err := q.GetOAuthIdentity(
 					ctx,
 					&db.GetOAuthIdentityParams{
@@ -238,13 +218,12 @@ func (s *SAMLHandler) handleSAMLUser(
 						Provider:   saml.WorkspaceID,
 					},
 				)
-				// If identity doesn't exist, this is first SAML login - allow it
+				// First SAML login: no identity yet, so allow it.
 				if err == nil && identity.UserID != existingUser.ID {
 					return fmt.Errorf("enforce_sso: user must login via SAML")
 				}
 			}
 
-			// Update user info
 			updatedUser, err = q.UpdateUser(ctx, &db.UpdateUserParams{
 				UserID:   existingUser.ID,
 				Username: &user.Username,
@@ -255,7 +234,6 @@ func (s *SAMLHandler) handleSAMLUser(
 				return fmt.Errorf("failed to update user: %w", err)
 			}
 
-			// Verify user email
 			if err := q.VerifyUserEmail(ctx, &db.VerifyUserEmailParams{
 				UserID: existingUser.ID,
 				Email:  user.Email,
@@ -263,7 +241,6 @@ func (s *SAMLHandler) handleSAMLUser(
 				return fmt.Errorf("failed to verify user email: %w", err)
 			}
 
-			// Upsert identity to link SAML to existing user
 			_, err = q.UpsertOAuthIdentity(ctx, &db.UpsertOAuthIdentityParams{
 				ProviderID:       nameID,
 				Provider:         saml.WorkspaceID,
@@ -288,14 +265,12 @@ func (s *SAMLHandler) handleSAMLUser(
 		return updatedUser, err
 	}
 
-	// JIT provisioning check
 	if !saml.AllowJitProvisioning {
 		return nil, fmt.Errorf("user not found and JIT provisioning is disabled")
 	}
 
 	var newUser *db.User
 	err = s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
-		// Create new user
 		newUser, err = q.CreateUser(ctx, &db.CreateUserParams{
 			Name:     user.Name,
 			Username: user.Username,
@@ -306,7 +281,6 @@ func (s *SAMLHandler) handleSAMLUser(
 			return fmt.Errorf("failed to create user: %w", err)
 		}
 
-		// Verify email immediately
 		if err := q.VerifyUserEmail(ctx, &db.VerifyUserEmailParams{
 			UserID: newUser.ID,
 			Email:  newUser.Email,
@@ -338,13 +312,11 @@ func (s *SAMLHandler) handleSAMLUser(
 	return newUser, err
 }
 
-// extractAttributes converts SAML attributes to db.User using custom mappings.
 func (s *SAMLHandler) extractAttributes(
 	ctx context.Context,
 	assertion *saml.Assertion,
 	saml *db.SamlProvider,
 ) (*db.User, error) {
-	// Helper to get attribute value
 	getAttr := func(name string) string {
 		for _, stmt := range assertion.AttributeStatements {
 			for _, attr := range stmt.Attributes {
@@ -368,7 +340,6 @@ func (s *SAMLHandler) extractAttributes(
 		picture = getAttr(*saml.PictureAttribute)
 	}
 
-	// Generate username
 	username, err := util.GenerateUsername(
 		email,
 		getAttr(saml.UsernameAttribute),
@@ -378,7 +349,6 @@ func (s *SAMLHandler) extractAttributes(
 		return nil, fmt.Errorf("failed to generate username: %w", err)
 	}
 
-	// Verify domain
 	domain := strings.Split(email, "@")
 	if len(domain) != 2 {
 		return nil, fmt.Errorf("invalid email format")
@@ -397,7 +367,6 @@ func (s *SAMLHandler) extractAttributes(
 	}, nil
 }
 
-// getSAMLMiddleware retrieves or creates SAML middleware for a provider.
 func (s *SAMLHandler) getSAMLMiddleware(
 	ctx context.Context,
 	id string,
@@ -419,7 +388,6 @@ func (s *SAMLHandler) getSAMLMiddleware(
 	}
 
 	cacheKey := fmt.Sprintf("saml.idp_metadata.%s.%d", id, provider.UpdatedAt.Unix())
-	// Try to get IdP metadata from cache
 	var idpMetadata *saml.EntityDescriptor
 	if cached, ok := s.metadataCache.Load(cacheKey); ok {
 		idpMetadata, ok = cached.(*saml.EntityDescriptor)
@@ -440,14 +408,12 @@ func (s *SAMLHandler) getSAMLMiddleware(
 			return nil, fmt.Errorf("failed to fetch IdP metadata: %w", err)
 		}
 
-		// Cache the metadata as XML
 		if metadataXML, err := xml.Marshal(idpMetadata); err == nil {
 			_ = s.cfg.Cache.Set(ctx, cacheKey, metadataXML, 1*time.Hour)
 		}
 		s.metadataCache.Store(cacheKey, idpMetadata)
 	}
 
-	// Parse SP certificate
 	certBlock, _ := pem.Decode([]byte(*provider.SpCertificate))
 	if certBlock == nil {
 		return nil, fmt.Errorf("failed to parse sp certificate")
@@ -458,7 +424,6 @@ func (s *SAMLHandler) getSAMLMiddleware(
 		return nil, fmt.Errorf("failed to parse SP certificate: %w", err)
 	}
 
-	// Parse SP private key
 	keyBlock, _ := pem.Decode(provider.SpPrivateKey.Bytes())
 	if keyBlock == nil {
 		return nil, fmt.Errorf("failed to parse sp private key")
@@ -474,13 +439,11 @@ func (s *SAMLHandler) getSAMLMiddleware(
 		return nil, fmt.Errorf("private key must be RSA")
 	}
 
-	// Build root URL
 	rootURL, err := url.Parse(s.cfg.FullURL())
 	if err != nil {
 		return nil, fmt.Errorf("invalid base URL: %w", err)
 	}
 
-	// Create middleware with all options
 	middleware, err := samlsp.New(samlsp.Options{
 		EntityID:          s.cfg.FullURL() + "/saml/metadata/" + id,
 		URL:               *rootURL,
@@ -494,7 +457,6 @@ func (s *SAMLHandler) getSAMLMiddleware(
 		return nil, fmt.Errorf("failed to create SAML middleware: %w", err)
 	}
 
-	// Set signature method
 	middleware.ServiceProvider.SignatureMethod = dsig.RSASHA256SignatureMethod
 
 	// Override ACS URL to match our routing

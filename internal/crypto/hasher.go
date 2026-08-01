@@ -17,11 +17,10 @@ import (
 type Algorithm string
 
 const (
-	// Argon2ID uses Argon2id for password hashing.
 	Argon2ID Algorithm = "argon2"
 	SHA256   Algorithm = "sha256"
 
-	// Argon2id parameters — targets ~250ms on modern hardware.
+	// Argon2id parameters, targeted at ~250ms on modern hardware.
 	// Memory is in KiB per the argon2 spec.
 	argon2MemKiB  = 64 * 1024 // 64 MiB
 	argon2Iter    = 2
@@ -54,7 +53,6 @@ func (a Algorithm) ok() bool {
 	return false
 }
 
-// Digest hashes the input string using the configured algorithm.
 func (h *Hasher) Digest(secret string) (string, error) {
 	switch h.algo {
 	case SHA256:
@@ -66,7 +64,6 @@ func (h *Hasher) Digest(secret string) (string, error) {
 	}
 }
 
-// Verify verifies the secret string against the hash.
 func (h *Hasher) Verify(secret, digest string) bool {
 	switch h.algo {
 	case SHA256:
@@ -150,7 +147,6 @@ func (h *Hasher) verifyArgon2(secret, encoded string) bool {
 		return false
 	}
 
-	// Compute hash with same parameters
 	computedHash := argon2.IDKey(
 		[]byte(secret),
 		salt,

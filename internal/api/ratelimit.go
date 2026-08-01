@@ -28,7 +28,7 @@ const (
 	entryTTL        = 10 * time.Minute
 )
 
-// sensitiveProcs are ConnectRPC procedures that need tighter per-IP rate limits.
+// sensitiveProcs are ConnectRPC procedures needing tighter per-IP limits.
 var sensitiveProcs = map[string]struct{}{
 	nokkuv1connect.AuthServiceRegisterProcedure:            {},
 	nokkuv1connect.AuthServiceLoginProcedure:               {},
@@ -92,7 +92,6 @@ var (
 	sensitiveStore = newRateLimiterStore(sensitiveRPS, sensitiveBurst)
 )
 
-// WithRateLimit applies a per-IP rate limit at the HTTP layer.
 func (s *Server) WithRateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !isAPIRoute(r.URL.Path) {
@@ -109,8 +108,6 @@ func (s *Server) WithRateLimit(next http.Handler) http.Handler {
 	})
 }
 
-// NewRateLimitInterceptor applies tighter rate limits on sensitive auth
-// procedures (register, login, forgot password, etc.).
 func NewRateLimitInterceptor() connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
@@ -131,8 +128,7 @@ func NewRateLimitInterceptor() connect.UnaryInterceptorFunc {
 	}
 }
 
-// isAPIRoute returns true for paths that target active backend endpoints.
-// Everything else (static assets, index.html, etc.) passes without rate limiting.
+// isAPIRoute returns true for backend endpoints; static assets skip rate limiting.
 func isAPIRoute(path string) bool {
 	// Streaming endpoints establish long-lived connections, rate limiting
 	// their initial HTTP request would block legitimate reconnect storms.

@@ -52,11 +52,9 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 
 	logger := slog.With("session_id", sessionID, "daemon_id", daemonID)
 
-	// Snapshot replay and live channel atomically. We do NOT clear the screen
-	// first — cursor-relative sequences in the replay assume the default (1,1)
-	// cursor position of a fresh terminal, so a clear would break them. The
-	// snapshot drains any chunks already queued on the live channel (they are
-	// already in the replay), so the client never renders the same bytes twice.
+	// Snapshot replay and live channel atomically. No screen clear: replay
+	// sequences assume the default (1,1) cursor. The snapshot drains chunks
+	// already queued on the live channel, so nothing renders twice.
 	replay, live := sess.SnapshotForAttach()
 	if len(replay) > 0 {
 		if err := conn.Write(ctx, websocket.MessageBinary, replay); err != nil {
@@ -82,8 +80,8 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 		}
 	}()
 
-	// Goroutine: session exit -> close WebSocket. Exited is closed exactly once
-	// by the session handler (or by UnregisterAgent) when the session is over.
+	// Session exit -> close WebSocket. Exited is closed exactly once by the
+	// session handler (or UnregisterAgent).
 	go func() {
 		select {
 		case <-ctx.Done():

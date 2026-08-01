@@ -40,7 +40,6 @@ func (s *InvitationService) GetInvitation(
 		return nil, ErrBadCredentials
 	}
 
-	// Check if user is already in the workspace
 	if _, err := s.cfg.Conn.Q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
 		WorkspaceID: workspaceID,
 		UserID:      actor.ID,
@@ -80,7 +79,6 @@ func (s *InvitationService) AcceptInvitation(
 		return nil, ErrBadCredentials
 	}
 
-	// Check if user is already in the workspace
 	if _, err := s.cfg.Conn.Q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
 		WorkspaceID: workspaceID,
 		UserID:      userID,
@@ -108,7 +106,6 @@ func (s *InvitationService) AcceptInvitation(
 		return nil, ErrBadCredentials
 	}
 
-	// Add User to Workspace members
 	if err = s.cfg.Conn.Q.AddWorkspaceMember(ctx, &db.AddWorkspaceMemberParams{
 		WorkspaceID: workspaceID,
 		UserID:      user.ID,

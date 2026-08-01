@@ -16,11 +16,10 @@ import (
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
-// SignCertificate signs pubKey with the certificate authority and
-// returns an SSH user or host certificate. Host certificates follow the
-// authority's host TTLs, user certificates the user TTLs plus its
-// configured extensions and critical options. Unspecified certificate
-// types produce user certificates.
+// SignCertificate signs pubKey with the certificate authority and returns an
+// SSH user or host certificate. Host certs follow host TTLs, user certs user
+// TTLs plus configured extensions and critical options. Unspecified types
+// produce user certificates.
 func SignCertificate(
 	ca *db.CertificateAuthority,
 	pubKey, principal, keyID string,
@@ -116,7 +115,7 @@ func isAllowedKeyType(
 		)
 	}
 
-	// If it's an RSA key, ensure it is at least 2048 bits
+	// RSA keys must be at least 2048 bits
 	if keyType == nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA {
 		if cryptoKey, ok := publicKey.(ssh.CryptoPublicKey); ok {
 			if rsaKey, ok := cryptoKey.CryptoPublicKey().(*rsa.PublicKey); ok {
@@ -148,7 +147,7 @@ func getKeyType(publicKey ssh.PublicKey) (nokkuv1.CertificateKeyType, error) {
 		return nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, nil
 
 	default:
-		// Automatically drops DSA ("ssh-dss") and any weird experimental types
+		// Default drops DSA ("ssh-dss") and experimental types
 		return nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_UNSPECIFIED,
 			fmt.Errorf("unsupported public key type %q", publicKey.Type())
 	}

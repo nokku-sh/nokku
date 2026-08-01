@@ -1,4 +1,4 @@
-// Package authn package implements the authentication service
+// Package authn implements the authentication service
 package authn
 
 import (
@@ -112,7 +112,7 @@ func (s *Service) VerifyToken(tokenString string) (*TokenParams, error) {
 	return claims, nil
 }
 
-// GetExpiry returns the expiry for a given token type as a nice human-readable string.
+// GetExpiry returns the human-readable expiry for a given token type.
 func GetExpiry(tokenType string) string {
 	duration, ok := defaultExpiry[tokenType]
 	if !ok {

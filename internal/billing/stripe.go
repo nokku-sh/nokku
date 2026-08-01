@@ -102,9 +102,8 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (strin
 	return session.URL, nil
 }
 
-// customerFor returns the workspace's Stripe customer, reusing the one recorded
-// on the subscription row or creating a new one tagged with the workspace id so
-// customers can be reconciled by workspace.
+// customerFor returns the workspace's Stripe customer, reusing the one on the
+// subscription row or creating one tagged with the workspace id.
 func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (string, error) {
 	if sub, err := s.db.Q.GetSubscription(ctx, workspaceID); err == nil && sub.CustomerID != "" {
 		return sub.CustomerID, nil
@@ -131,7 +130,6 @@ func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (st
 	return customer.ID, nil
 }
 
-// Portal creates a Stripe Customer Portal session for the workspace's customer.
 func (s *Stripe) Portal(ctx context.Context, workspaceID string) (string, error) {
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")

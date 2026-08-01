@@ -1,23 +1,17 @@
 // Package kms implements envelope encryption backed by an external KMS.
 //
-// A single local keyset of data-encryption keys (DEKs, managed by Tink)
-// performs all encrypt/decrypt operations locally. The keyset itself is
-// wrapped (encrypted) by a key-encryption key (KEK) that never leaves the
-// KMS, and the wrapped keyset is stored in the database as ciphertext:
+// A single local Tink keyset of DEKs does all encrypt/decrypt work. The
+// keyset is wrapped by a KEK that never leaves the KMS and stored wrapped in
+// the database; the KMS sees no plaintext secrets and the database holds only
+// ciphertext.
 //
-//   - the KMS only ever sees wrapped key material, never plaintext secrets
-//   - the database only ever holds ciphertext (wrapped keyset, encrypted rows)
-//
-// KEK rotation is the KMS's job: it keeps old key versions decryptable, so a
-// stored wrapped keyset stays readable across KEK rotations. A periodic
-// background rewrap migrates the stored blob to the current KEK version.
-//
-// There is deliberately no automatic DEK rotation: every intermediate state
-// (first boot, rewrap in flight, crash at any point) leaves all data
-// decryptable. Switching ciphers (secretbox <-> KMS, between KMS providers,
-// or rotating the keyset itself) is an explicit operator action via the
-// rotate-secrets command, which re-encrypts every secret and swaps the
-// keyset atomically in a single transaction.
+// KEK rotation is the KMS's job: it keeps old key versions decryptable, so
+// the stored keyset stays readable across rotations. A periodic background
+// rewrap migrates it to the current KEK version. There is deliberately no
+// automatic DEK rotation: every intermediate state leaves all data
+// decryptable. Switching ciphers or rotating the keyset is an explicit
+// operator action via the rotate-secrets command, which re-encrypts every
+// secret and swaps the keyset atomically in a single transaction.
 //
 // Files: client.go (KMS providers), keyset.go (persistence), rewrap.go
 // (background maintenance), tink.go (the encryptor itself).
@@ -79,8 +73,6 @@ func NewForRotation(ctx context.Context, kmsURI string) (*TinkEncryptor, error) 
 	return t.withHandle(handle)
 }
 
-// newEncryptor parses the env config, applies an optional KMS URI override,
-// and connects to the KMS.
 func newEncryptor(ctx context.Context, kmsURI string) (*TinkEncryptor, error) {
 	t, err := env.ParseAs[TinkEncryptor]()
 	if err != nil {
@@ -98,7 +90,6 @@ func newEncryptor(ctx context.Context, kmsURI string) (*TinkEncryptor, error) {
 	return &t, nil
 }
 
-// withHandle derives the AEAD primitive from a keyset handle.
 func (t *TinkEncryptor) withHandle(handle *keyset.Handle) (*TinkEncryptor, error) {
 	primitive, err := aead.New(handle)
 	if err != nil {

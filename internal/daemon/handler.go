@@ -81,7 +81,6 @@ func (p *Pool) Session(
 		)
 	}
 
-	// First message must be SessionReady with session_id.
 	msg, err := stream.Receive()
 	if err != nil {
 		return err
@@ -99,8 +98,8 @@ func (p *Pool) Session(
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("session_id required"))
 	}
 
-	// A cancelled session context stops the outbound goroutine; cancelling on
-	// return guarantees both directions unwind even on a send/receive error.
+	// Cancelling on return guarantees both directions unwind even on a
+	// send/receive error.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -113,7 +112,7 @@ func (p *Pool) Session(
 	defer p.UnregisterSession(sessionID)
 	defer sess.shutdown()
 
-	// Outbound: forward SessionToDaemon (stdin/resize/close) from browsers to the daemon stream
+	// Outbound: stdin/resize/close from browsers to the daemon stream
 	go func() {
 		defer cancel()
 		for {

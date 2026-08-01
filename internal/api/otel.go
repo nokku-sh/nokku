@@ -71,14 +71,12 @@ func NewOTLPInterceptor(ctx context.Context) *otelconnect.Interceptor {
 		sdklog.WithResource(res),
 	)
 
-	// Combine the existing one with the new OTel one
 	otelLogger := slog.New(slog.NewMultiHandler(
 		slog.Default().Handler(),
 		otelslog.NewHandler("nokku-logger", otelslog.WithLoggerProvider(lp)),
 	))
 	slog.SetDefault(otelLogger) // Override global
 
-	// Use composite propagator for better compatibility
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},

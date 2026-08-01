@@ -59,7 +59,6 @@ func (s *AuthService) Register(
 		return nil, NewError(connect.CodeInvalidArgument, "invalid email address")
 	}
 
-	// Check if user already exists
 	found, err := s.cfg.Conn.Q.EmailExists(ctx, req.GetEmail())
 	if err != nil {
 		return nil, ErrInternal
@@ -68,7 +67,6 @@ func (s *AuthService) Register(
 		return nil, ErrEmailTaken
 	}
 
-	// Check if SSO is enforced
 	if err := checkSSOEnforced(ctx, s.cfg, req.GetEmail()); err != nil {
 		return nil, err
 	}
@@ -77,7 +75,6 @@ func (s *AuthService) Register(
 		return nil, ErrInternal
 	}
 
-	// Create user
 	newUser, err := s.cfg.Conn.Q.CreateUser(ctx, &db.CreateUserParams{
 		Name:         req.GetName(),
 		Username:     req.GetUsername(),
@@ -133,7 +130,6 @@ func (s *AuthService) Login(
 		return nil, ErrBadCredentials
 	}
 
-	// Check if SSO is required
 	if err := checkSSOEnforced(ctx, s.cfg, req.GetEmail()); err != nil {
 		return nil, err
 	}
@@ -172,7 +168,7 @@ func (s *AuthService) LoginWithBackupCode(
 		return nil, ErrBadCredentials
 	}
 
-	// Check if SSO is enforced - backup codes should NOT work if SSO is enforced
+	// Backup codes must not work when SSO is enforced.
 	if err := checkSSOEnforced(ctx, s.cfg, req.GetEmail()); err != nil {
 		return nil, err
 	}
@@ -183,7 +179,6 @@ func (s *AuthService) LoginWithBackupCode(
 		return nil, ErrInternal
 	}
 
-	// Verify and mark backup code as used
 	_, err = s.cfg.Conn.Q.UseBackupCode(ctx, &db.UseBackupCodeParams{
 		UserID:   user.ID,
 		CodeHash: hash,
@@ -226,7 +221,6 @@ func (s *AuthService) RefreshToken(
 	}
 
 	if token == "" {
-		// No usable refresh token – clear cookies and signal auth failure
 		authn.ClearCookies(ci.ResponseHeader())
 		return nil, NewError(connect.CodeUnauthenticated, "session expired")
 	}
@@ -237,7 +231,6 @@ func (s *AuthService) RefreshToken(
 		return nil, NewError(connect.CodeUnauthenticated, "session expired")
 	}
 
-	// Get user info by ID
 	user, err := s.cfg.Conn.Q.GetUserByID(ctx, claims.UserID)
 	if err != nil || user == nil || !user.IsActive {
 		authn.ClearCookies(ci.ResponseHeader())
@@ -357,7 +350,6 @@ func (s *AuthService) VerifyEmail(
 		return nil, ErrTokenInvalid
 	}
 
-	// Update user as verified
 	if err = s.cfg.Conn.Q.VerifyUserEmail(ctx, &db.VerifyUserEmailParams{
 		UserID: claims.UserID,
 		Email:  claims.Email,
@@ -384,13 +376,11 @@ func (s *AuthService) ResetPassword(
 		return nil, ErrTokenInvalid
 	}
 
-	// Hash new password
 	hash, err := crypto.HashPassword(req.GetNewPassword())
 	if err != nil {
 		return nil, ErrInternal
 	}
 
-	// Update password
 	err = s.cfg.Conn.Q.UpdateUserPassword(ctx, &db.UpdateUserPasswordParams{
 		UserID:       claims.UserID,
 		PasswordHash: hash,
@@ -446,7 +436,6 @@ func (s *AuthService) StreamCLILogin(
 		s.mu.Unlock()
 	}()
 
-	// Send URL immediately so CLI can display it
 	verificationURL := fmt.Sprintf("%s/login?token=%s", s.cfg.FullURL(), loginCode)
 	if err := stream.Send(&nokkuv1.StreamCLILoginResponse{
 		VerificationUrl: &verificationURL,

@@ -33,7 +33,6 @@ func encodeKey(payload, sig []byte) string {
 	return b.String()
 }
 
-// decodeKey reverses encodeKey, returning the payload and signature.
 func decodeKey(key string) (payload, sig []byte, err error) {
 	enc, ok := strings.CutPrefix(key, prefix)
 	if !ok {

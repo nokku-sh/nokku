@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// Start runs the periodic rewrap loop in the background.
 func (t *TinkEncryptor) Start(ctx context.Context) {
 	interval := max(t.RewrapInterval, time.Hour)
 	go func() {

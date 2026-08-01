@@ -49,7 +49,6 @@ func (s *WorkspaceService) CreateWorkspace(
 		return nil, ErrBadCredentials
 	}
 
-	// Check if the user has reached the maximum number of workspaces
 	count, err := s.cfg.Conn.Q.CountWorkspacesByOwner(ctx, user.ID)
 	if err != nil {
 		return nil, ErrInternal

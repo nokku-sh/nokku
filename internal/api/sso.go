@@ -13,7 +13,6 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-// SSOService handles SSO provider management.
 type SSOService struct {
 	cfg *config.Config
 }
@@ -250,8 +249,7 @@ func (s *SSOService) CheckSSO(
 	}, nil
 }
 
-// checkSSOEnforced checks if SSO is enforced for the given email's domain.
-// Returns nil if SSO is not enforced, or ErrSSORequired / ErrInternal on failure.
+// checkSSOEnforced returns ErrSSORequired when SSO is enforced for the email's domain.
 func checkSSOEnforced(ctx context.Context, cfg *config.Config, addr string) error {
 	domain, err := email.GetDomain(addr)
 	if err != nil {

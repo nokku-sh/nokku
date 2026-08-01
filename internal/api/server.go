@@ -28,10 +28,8 @@ type Server struct {
 	mux *http.ServeMux
 	cfg *config.Config
 
-	// rootCtx is the process root context (canceled on SIGINT/SIGTERM). It is
-	// set in Start and consumed by WithShutdownSignal so that long-lived
-	// streaming handlers exit promptly on shutdown instead of blocking
-	// http.Server.Shutdown until its deadline.
+	// Process root context, canceled on SIGINT/SIGTERM. Consumed by
+	// WithShutdownSignal so long-lived streams exit before Shutdown's deadline.
 	rootCtx context.Context
 }
 
@@ -91,16 +89,18 @@ func (s *Server) Start(ctx context.Context) error {
 		slog.Info("shutting down server")
 		graceCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		return server.Shutdown(graceCtx)
+		if err := server.Shutdown(graceCtx); err != nil {
+			return err
+		}
+		return nil
 
 	case err := <-serverErr:
 		return fmt.Errorf("server error: %w", err)
 	}
 }
 
-// WithShutdownSignal derives each request's context from the request's own
-// context but cancels it the moment the server's root ctx (canceled on
-// SIGINT/SIGTERM) is done.
+// WithShutdownSignal cancels each request's context when the root ctx
+// (SIGINT/SIGTERM) is done.
 func (s *Server) WithShutdownSignal(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		root := s.rootCtx
@@ -236,7 +236,8 @@ func (s *Server) getServiceRegistrations(ctx context.Context) []ServiceRegistrat
 			Handler: func() (string, http.Handler) {
 				return nokkuv1connect.NewInvitationServiceHandler(
 					NewInvitationService(s.cfg),
-					opts...)
+					opts...,
+				)
 			},
 		},
 		{
@@ -314,7 +315,6 @@ func (s *Server) registerServices(ctx context.Context) error {
 	}
 	s.registerHealthAndReflection(serviceNames)
 
-	// Initialize the Vanguard transcoder.
 	transcoder, err := vanguard.NewTranscoder(services)
 	if err != nil {
 		return err
@@ -340,7 +340,6 @@ func (s *Server) registerServices(ctx context.Context) error {
 		staticHandler.ServeHTTP(w, r)
 	})
 
-	// Use http wrapper of interceptors
 	auth := NewAuthNInterceptor(s.cfg)
 	audit := NewAuditInterceptor(s.cfg.Audit)
 
@@ -374,7 +373,7 @@ func (s *Server) registerServices(ctx context.Context) error {
 	s.mux.Handle("POST /passkey/login/begin", pubChain.ThenFunc(passkeyHandler.BeginLogin))
 	s.mux.Handle("POST /passkey/login/finish", pubChain.ThenFunc(passkeyHandler.FinishLogin))
 
-	// Passkey signup (public — no auth required, creates new users)
+	// Passkey signup (public, no auth, creates new users)
 	s.mux.Handle("POST /passkey/signup/begin", pubChain.ThenFunc(passkeyHandler.BeginSignup))
 	s.mux.Handle("POST /passkey/signup/finish", pubChain.ThenFunc(passkeyHandler.FinishSignup))
 

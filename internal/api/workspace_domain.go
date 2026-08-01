@@ -110,14 +110,12 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 		return nil, NewError(connect.CodePermissionDenied, "workspace domain already verified")
 	}
 
-	// Look up TXT records
 	dnsQuery := fmt.Sprintf("_nokku-verify.%s", domain.Domain)
 	txtRecords, err := net.DefaultResolver.LookupTXT(ctx, dnsQuery)
 	if err != nil || len(txtRecords) == 0 {
 		return nil, NewError(connect.CodeNotFound, "no TXT records found")
 	}
 
-	// Check if TXT record matches the verification token
 	found := slices.Contains(txtRecords, domain.VerificationToken)
 	if !found {
 		return nil, NewError(
@@ -126,7 +124,6 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 		)
 	}
 
-	// Verify workspace domain
 	result, err := s.cfg.Conn.Q.VerifyWorkspaceDomain(
 		ctx,
 		&db.VerifyWorkspaceDomainParams{

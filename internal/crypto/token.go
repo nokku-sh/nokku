@@ -133,11 +133,9 @@ func Parse(raw string) (*ParsedToken, error) {
 
 	switch len(parts) {
 	case 1:
-		// "secret"
 		return &ParsedToken{Secret: raw}, nil
 
 	case 2:
-		// Could be "uuid_secret" try parsing first part as UUID
 		if _, err := uuid.Parse(parts[0]); err == nil {
 			return &ParsedToken{ID: parts[0], Secret: parts[1]}, nil
 		}
@@ -145,8 +143,7 @@ func Parse(raw string) (*ParsedToken, error) {
 		return &ParsedToken{Secret: raw}, nil
 
 	default:
-		// 3+ segments: try "prefix_uuid_rest"
-		// Rejoin everything after the second underscore as the secret
+		// 3+ segments: try "prefix_uuid_rest" first
 		if _, err := uuid.Parse(parts[1]); err == nil {
 			return &ParsedToken{
 				Prefix: parts[0],

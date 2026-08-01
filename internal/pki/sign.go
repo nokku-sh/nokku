@@ -17,13 +17,10 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-// SignCertificate signs a PEM-encoded PKCS#10 CSR with an X.509
-// certificate authority and returns the PEM-encoded leaf certificate
-// and its expiry time.
-//
-// TTL bounds follow the authority's usage: client certificates use the
-// user TTLs, server certificates use the host TTLs. SANs and the subject
-// are honored from the CSR; key usage is derived from the requested
+// SignCertificate signs a PEM-encoded PKCS#10 CSR with an X.509 certificate
+// authority and returns the PEM-encoded leaf certificate and its expiry.
+// TTL bounds follow the authority's usage: client certs use user TTLs, server
+// certs host TTLs. SANs and subject come from the CSR; key usage derives from
 // X509Usage and the leaf key type.
 func SignCertificate(
 	ca *db.CertificateAuthority,
@@ -79,8 +76,6 @@ func SignCertificate(
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER}), notAfter, nil
 }
 
-// boundTTL clamps the requested TTL to the authority's policy. Client
-// certificates follow the user TTLs, server certificates the host TTLs.
 func boundTTL(
 	ca *db.CertificateAuthority,
 	usage nokkuv1.SignX509CertificateRequest_X509Usage,
@@ -97,8 +92,8 @@ func boundTTL(
 }
 
 // extKeyUsageFor maps the requested usage to X.509 extended key usage.
-// Unspecified defaults to client authentication, the most common case
-// (mTLS clients, kubectl, database clients).
+// Unspecified defaults to client auth, the most common case (mTLS, kubectl,
+// database clients).
 func extKeyUsageFor(
 	usage nokkuv1.SignX509CertificateRequest_X509Usage,
 ) []x509.ExtKeyUsage {
@@ -116,8 +111,8 @@ func extKeyUsageFor(
 	}
 }
 
-// keyUsageFor returns the key usage for a leaf certificate. RSA keys
-// additionally get key encipherment for legacy TLS key transport.
+// keyUsageFor returns the leaf key usage; RSA additionally gets key
+// encipherment for legacy TLS key transport.
 func keyUsageFor(pub any) x509.KeyUsage {
 	usage := x509.KeyUsageDigitalSignature
 	if _, ok := pub.(*rsa.PublicKey); ok {

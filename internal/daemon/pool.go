@@ -19,8 +19,7 @@ const (
 	sendBufferSize        = 64
 	pendingSessionTimeout = 10 * time.Second
 	replayBufferSize      = 64 * 1024
-	// replayTrimScan caps how far we scan when trimming the replay to a safe
-	// sequence boundary, keeping the cost bounded.
+	// Caps how far the replay trim scans for a safe boundary.
 	replayTrimScan = 256
 )
 
@@ -94,8 +93,8 @@ func New(ctx context.Context, conn *db.Connection) *Pool {
 }
 
 // Shutdown cancels all daemon connections and signals the shutdown context so
-// that long-lived handlers (SubscribeWorkspaceEvents, StreamCLILogin, etc.)
-// return promptly. Idempotent and safe to call from any goroutine.
+// long-lived handlers (SubscribeWorkspaceEvents, StreamCLILogin, etc.) return.
+// Idempotent, safe from any goroutine.
 func (p *Pool) Shutdown() {
 	p.shutdownCancel()
 	p.mu.Lock()
@@ -151,9 +150,8 @@ func (p *Pool) UnregisterDaemon(daemonID string) {
 			delete(p.byWksp, wksp)
 		}
 	}
-	// Tear down every live session of this daemon immediately, even if the
-	// session's StreamSession handler hasn't noticed the control stream drop
-	// yet. shutdown() is idempotent: the handler's own defer will no-op.
+	// Tear down this daemon's sessions even if the StreamSession handler
+	// hasn't noticed the control stream drop yet; shutdown() is idempotent.
 	var sessions []*Session
 	for _, s := range p.sessions {
 		if s.daemonID == daemonID {
@@ -283,9 +281,8 @@ func (p *Pool) RegisterSession(sessionID, daemonID, username, userID string) *Se
 	return s
 }
 
-// UnregisterSession removes a session from the pool map. The caller is
-// responsible for invoking s.shutdown() to close Exited; this is done by the
-// StreamSession handler defer and is idempotent.
+// UnregisterSession removes a session from the pool map. The caller must call
+// s.shutdown() (done by the StreamSession handler defer); it is idempotent.
 func (p *Pool) UnregisterSession(sessionID string) {
 	p.mu.Lock()
 	delete(p.sessions, sessionID)
@@ -417,9 +414,8 @@ func (s *Session) SendResize(width, height uint32) {
 }
 
 // AppendStdout records a PTY output chunk in the replay buffer and forwards it
-// to the live Stdout channel. The two operations are atomic w.r.t.
-// SnapshotForAttach so that an attaching WebSocket never receives the same
-// chunk twice (once in the replay and once on the channel).
+// to Stdout, atomic w.r.t. SnapshotForAttach so an attaching WebSocket never
+// receives the same chunk twice.
 func (s *Session) AppendStdout(data []byte) {
 	s.replayMu.Lock()
 	s.replayBuf = append(s.replayBuf, data...)
@@ -434,18 +430,16 @@ func (s *Session) AppendStdout(data []byte) {
 	}
 }
 
-// SnapshotForAttach returns the replay buffer to send to a freshly attached
-// WebSocket, and a drain channel that will receive only chunks that arrived
-// after this snapshot (older buffered-but-unsent chunks are consumed and
-// discarded here). Callers must send the replay first, then forward from the
-// returned channel.
+// SnapshotForAttach returns the replay buffer and a channel with only chunks
+// that arrived after this snapshot; older buffered-but-unsent chunks are
+// consumed and discarded here. Callers send the replay first, then forward
+// from the returned channel.
 func (s *Session) SnapshotForAttach() (replay []byte, live <-chan []byte) {
 	s.replayMu.Lock()
 	replay = append([]byte(nil), s.replayBuf...)
-	// Drain any chunks already queued on Stdout: they are already in `replay`
+	// Drain chunks already queued on Stdout: they are already in `replay`
 	// (AppendStdout appends before sending), so a new attach would otherwise
-	// render them a second time. New chunks appended after this point land in
-	// the channel and are forwarded as live output.
+	// render them twice. New chunks land in the channel and forward as live.
 drain:
 	for {
 		select {
@@ -469,21 +463,21 @@ func (s *Session) ReplayBuffer() []byte {
 	if len(clean) <= replayBufferSize {
 		return clean
 	}
-	// Take the last replayBufferSize bytes, then advance past any leading
-	// bytes until we hit a safe boundary (an escape start or a printable
-	// char) so we never begin mid-way through a cut escape sequence.
+	// Take the last replayBufferSize bytes, then advance past leading bytes to
+	// a safe boundary (escape start or printable char) so the replay never
+	// begins mid-way through a cut escape sequence.
 	clean = clean[len(clean)-replayBufferSize:]
 	for i := 0; i < len(clean) && i < replayTrimScan; i++ {
 		b := clean[i]
 		if b == 0x1b {
-			// Start of a complete escape sequence — begin here.
+			// Complete escape sequence: begin here.
 			if i > 0 {
 				clean = clean[i:]
 			}
 			break
 		}
 		if b >= 0x20 && b != 0x7f {
-			// Printable character — accept the cut line from here; xterm
+			// Printable character: accept the cut line from here; xterm
 			// tolerates a partial leading line. Avoid trimming further so we
 			// don't drop real output.
 			if i > 0 {
@@ -492,7 +486,7 @@ func (s *Session) ReplayBuffer() []byte {
 			break
 		}
 		// Control/non-printable byte that isn't ESC: likely a trailing byte
-		// of a cut sequence — keep scanning.
+		// of a cut sequence; keep scanning.
 	}
 	return clean
 }

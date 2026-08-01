@@ -7,16 +7,15 @@ import (
 	"strings"
 )
 
-// trustedProxies holds the CIDRs/IPs of reverse proxies in front of the
-// service (e.g. Traefik). Forwarded-client headers are only honored when
-// the direct peer matches one of these; otherwise the socket peer address
-// is used. Configured once at startup via [SetTrustedProxies].
+// trustedProxies holds reverse proxy CIDRs/IPs. Client IP headers are
+// honored only when the direct peer matches one of these, otherwise the
+// socket peer address is used. Configured via [SetTrustedProxies].
 var trustedProxies []*net.IPNet
 
-// SetTrustedProxies configures the reverse proxies that are allowed to
-// forward client IP headers (True-Client-Ip, X-Real-IP, X-Forwarded-For).
-// Each entry is an IP or CIDR. With no entries, forwarding headers are
-// ignored entirely — this is the secure default.
+// SetTrustedProxies configures the reverse proxies allowed to forward
+// client IP headers (True-Client-Ip, X-Real-IP, X-Forwarded-For). Each
+// entry is an IP or CIDR. With no entries, forwarding headers are ignored,
+// the secure default.
 func SetTrustedProxies(proxies []string) error {
 	trustedProxies = nil
 	for _, raw := range proxies {
@@ -48,8 +47,6 @@ func parseProxy(entry string) (*net.IPNet, error) {
 	return ipNet, nil
 }
 
-// isTrustedProxy reports whether the direct peer address belongs to a
-// configured reverse proxy.
 func isTrustedProxy(remoteAddr string) bool {
 	if len(trustedProxies) == 0 {
 		return false

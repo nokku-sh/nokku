@@ -19,9 +19,8 @@ import (
 // actor_id.
 const anonActorID = "00000000-0000-0000-0000-000000000000"
 
-// authProcedures are procedures that are always audited, even when the
-// request fails before any actor is known. Authentication events are the
-// core of a security audit trail.
+// authProcedures are always audited, even when the request fails before
+// any actor is known; auth events are the core of a security audit trail.
 var authProcedures = map[string]struct{}{
 	nokkuv1connect.AuthServiceLoginProcedure:               {},
 	nokkuv1connect.AuthServiceLoginWithBackupCodeProcedure: {},
@@ -49,7 +48,13 @@ func (s *Service) LogStreamingAction(
 	conn connect.StreamingHandlerConn,
 	reqErr error,
 ) {
-	s.logAudit(ctx, conn.Spec().Procedure, conn.RequestHeader(), conn.Peer().Addr, statusCodeOf(reqErr))
+	s.logAudit(
+		ctx,
+		conn.Spec().Procedure,
+		conn.RequestHeader(),
+		conn.Peer().Addr,
+		statusCodeOf(reqErr),
+	)
 }
 
 func (s *Service) LogHTTPAction(ctx context.Context, r *http.Request, statusCode int) {
