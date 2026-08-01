@@ -135,10 +135,16 @@ func (p *Pool) RegisterDaemon(ctx context.Context, daemonID, workspaceID string)
 	return c
 }
 
-func (p *Pool) UnregisterDaemon(daemonID string) {
+func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 	p.mu.Lock()
-	c, ok := p.byID[daemonID]
+	cur, ok := p.byID[daemonID]
 	if !ok {
+		p.mu.Unlock()
+		return
+	}
+	// If the map entry no longer points at the connection this handler owns, a
+	// reconnect replaced it.
+	if cur != c {
 		p.mu.Unlock()
 		return
 	}
@@ -179,10 +185,16 @@ func (p *Pool) UnregisterDaemon(daemonID string) {
 }
 
 func (p *Pool) Broadcast(workspaceID string, n *nokkuv1.Notification) {
+	// Snapshot the daemon set under the read lock
 	p.mu.RLock()
 	daemons := p.byWksp[workspaceID]
-	p.mu.RUnlock()
+	daemonIDs := make([]string, 0, len(daemons))
 	for daemonID := range daemons {
+		daemonIDs = append(daemonIDs, daemonID)
+	}
+	p.mu.RUnlock()
+
+	for _, daemonID := range daemonIDs {
 		p.sendToDaemon(daemonID, &nokkuv1.ConnectResponse{
 			Msg: &nokkuv1.ConnectResponse_Notification{Notification: n},
 		})
@@ -275,6 +287,9 @@ func (p *Pool) RegisterSession(sessionID, daemonID, username, userID string) *Se
 	p.mu.Lock()
 	p.sessions[sessionID] = s
 	if ch, ok := p.pending[sessionID]; ok {
+		// Remove under the same lock so a concurrent duplicate RegisterSession
+		// can't observe the entry and close an already-closed channel.
+		delete(p.pending, sessionID)
 		close(ch)
 	}
 	p.mu.Unlock()
@@ -374,7 +389,8 @@ func (p *Pool) PublishWorkspaceEvent(workspaceID, eventType, payloadJSON string)
 		CreatedAt:   timestamppb.Now(),
 	}
 	p.mu.RLock()
-	subs := p.events[workspaceID]
+	// Snapshot so UnsubscribeEvents' in-place append can't race the iteration.
+	subs := slices.Clone(p.events[workspaceID])
 	p.mu.RUnlock()
 	for _, sub := range subs {
 		if len(sub.types) == 0 {
@@ -422,12 +438,14 @@ func (s *Session) AppendStdout(data []byte) {
 	if len(s.replayBuf) > replayBufferSize*2 {
 		s.trimReplayLocked()
 	}
-	s.replayMu.Unlock()
-
+	// Send while holding replayMu so SnapshotForAttach's drain sees a snapshot
+	// and channel that are mutually consistent: a chunk already captured in the
+	// replay copy is not also queued on Stdout (which would render it twice).
 	select {
 	case s.Stdout <- data:
 	default:
 	}
+	s.replayMu.Unlock()
 }
 
 // SnapshotForAttach returns the replay buffer and a channel with only chunks
