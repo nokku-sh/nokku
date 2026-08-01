@@ -6,6 +6,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card';
+	import CopyButton from '$lib/components/ui/copy-button/copy-button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import Label from '$lib/components/ui/label/label.svelte';
 	import { Switch } from '$lib/components/ui/switch';
@@ -350,97 +351,126 @@
 	{:else}
 		<!-- On-Premise License (self-hosted deployments only) -->
 		{#if isLicensed}
-			<Card.Root class="relative overflow-hidden rounded-xl border shadow-sm">
+			<!-- Enterprise Card -->
+			<Card.Root
+				class="relative overflow-hidden rounded-xl border border-primary/20 bg-linear-to-b from-background to-muted/20 shadow-lg shadow-primary/5"
+			>
 				<div
-					class="pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full bg-primary/5 blur-3xl"
+					class="pointer-events-none absolute -top-24 -right-24 h-48 w-48 rounded-full bg-primary/10 blur-[3rem]"
 				></div>
-				<Card.Header class="pb-4">
+				<div
+					class="pointer-events-none absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-primary/5 blur-[2rem]"
+				></div>
+
+				<Card.Header class="pb-5">
 					<div class="flex items-center justify-between">
 						<Card.Title
-							class="relative z-10 flex items-center gap-2 text-2xl font-semibold tracking-tighter"
+							class="relative z-10 flex items-center gap-2.5 text-2xl font-semibold tracking-tight"
 						>
-							<BadgeCheck size={20} class="text-primary" />
-							Enterprise
+							<!-- Added fill-primary/10 for a subtle two-tone icon effect -->
+							<BadgeCheck size={24} class="fill-primary/10 text-primary" />
+							<span
+								class="bg-linear-to-br from-foreground to-foreground/70 bg-clip-text text-transparent"
+							>
+								Enterprise
+							</span>
 						</Card.Title>
 						<Badge
 							variant="secondary"
-							class="z-10 border-primary/20 bg-primary/10 font-medium text-primary"
+							class="z-10 border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-primary shadow-sm"
 						>
 							Active
 						</Badge>
 					</div>
-					<Card.Description class="relative z-10 mt-1">
-						Your instance is licensed and runs the full Enterprise plan.
+					<Card.Description class="relative z-10 mt-2 text-sm">
+						Your instance is fully licensed and running the Enterprise plan.
 					</Card.Description>
 				</Card.Header>
 
-				<Card.Content class="relative z-10 space-y-2">
+				<Card.Content class="relative z-10 space-y-3">
 					{#if licenseData.data?.key}
+						<!-- Stacked layout for the long key to prevent layout breakage -->
 						<div
-							class="flex items-center justify-between gap-4 rounded-lg border bg-muted/40 px-3 py-2 text-sm"
+							class="flex flex-col gap-2 rounded-lg border border-primary/10 bg-primary/5 px-4 py-3 shadow-inner"
 						>
-							<span class="text-muted-foreground">License key</span>
-							<span class="truncate font-mono text-xs">{licenseData.data.key}</span>
+							<span class="text-xs font-semibold tracking-wider text-primary/70 uppercase">
+								License Key
+							</span>
+							<div class="rounded-md border border-primary/10 bg-background/50 px-2.5 py-2">
+								<CopyButton text={licenseData.data.key} class="w-full min-w-0">
+									<span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground/80">
+										{licenseData.data.key}
+									</span>
+								</CopyButton>
+							</div>
 						</div>
 					{/if}
 					{#if licenseData.data?.expiresAt}
 						<div
-							class="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2 text-sm"
+							class="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 px-4 py-3 text-sm"
 						>
-							<span class="text-muted-foreground">Expires</span>
-							<span class="font-medium tabular-nums">{formatTs(licenseData.data.expiresAt)}</span>
+							<span class="font-medium text-muted-foreground">Valid until</span>
+							<span class="font-semibold text-foreground tabular-nums">
+								{formatTs(licenseData.data.expiresAt)}
+							</span>
 						</div>
 					{/if}
 				</Card.Content>
 			</Card.Root>
 		{:else}
-			<Card.Root class="relative overflow-hidden rounded-xl border shadow-sm">
+			<!-- Community Card: Clean, subtle, with a strong CTA to upgrade -->
+			<Card.Root
+				class="relative overflow-hidden rounded-xl border bg-background shadow-sm transition-all hover:shadow-md"
+			>
 				<div
-					class="pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full bg-primary/5 blur-3xl"
+					class="pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full bg-muted-foreground/5 blur-3xl"
 				></div>
-				<Card.Header class="pb-4">
+
+				<Card.Header class="pb-5">
 					<div class="flex items-center justify-between">
 						<Card.Title
-							class="relative z-10 flex items-center gap-2 text-3xl font-semibold tracking-tighter"
+							class="relative z-10 flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-foreground/90"
 						>
-							<KeyRound size={24} class="text-primary" />
+							<KeyRound size={22} class="text-muted-foreground" />
 							Community
 						</Card.Title>
 						<Badge
 							variant="outline"
-							class="z-10 border-primary/20 bg-primary/10 font-medium text-primary"
+							class="z-10 bg-muted/50 px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
 						>
 							Free
 						</Badge>
 					</div>
-					<Card.Description class="relative z-10 mt-1">
-						Unlock the full platform for on-premise deployments.
+					<Card.Description class="relative z-10 mt-2 text-sm">
+						Unlock the full platform capabilities for on-premise deployments.
 					</Card.Description>
 				</Card.Header>
 
-				<Card.Content class="relative z-10 mb-4">
-					<ul class="space-y-2.5">
+				<Card.Content class="relative z-10 mb-2">
+					<ul class="space-y-3">
 						{#each licenseBenefits as b (b)}
-							<li class="flex items-center gap-2 text-sm">
-								<Check size={15} class="text-primary" />
-								<span>{b}</span>
+							<li class="flex items-start gap-2.5 text-sm text-muted-foreground">
+								<Check size={16} strokeWidth={2.5} class="mt-0.5 shrink-0 text-primary/70" />
+								<span class="leading-snug">{b}</span>
 							</li>
 						{/each}
 					</ul>
 				</Card.Content>
 
-				<Card.Footer class="relative z-10 flex flex-col gap-2 border-t">
+				<Card.Footer class="relative z-10 flex flex-col gap-4 border-t bg-muted/10 px-6 py-5">
 					<Button
 						variant="default"
-						class="w-full shadow-md"
+						class="w-full bg-linear-to-b from-primary to-primary/90 shadow-md transition-all hover:shadow-lg"
 						onclick={() => window.open(LicensePurchaseURL, '_blank', 'noopener')}
 					>
-						<ExternalLink size={15} />
-						Buy a license
+						Buy an Enterprise License
+						<ExternalLink size={14} class="ml-1 opacity-70" />
 					</Button>
-					<p class="text-center text-xs text-muted-foreground">
-						Set <code class="font-mono text-xs">NOKKU_LICENSE_KEY</code> on the server and restart to
-						activate.
+					<p class="text-center text-[11px] leading-relaxed text-muted-foreground">
+						Set <code
+							class="rounded border bg-muted px-1 py-0.5 font-mono text-[10px] text-foreground/80"
+							>NOKKU_LICENSE_KEY</code
+						> on your server and restart to activate.
 					</p>
 				</Card.Footer>
 			</Card.Root>

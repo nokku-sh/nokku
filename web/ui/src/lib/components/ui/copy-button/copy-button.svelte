@@ -27,25 +27,25 @@
 
 <button
 	onclick={() => clipboard.copy(text)}
-	class={cn('flex items-center gap-2', className)}
+	class={cn('flex items-center gap-2 outline-none', className)}
 	{...restProps}
 >
 	{@render children?.()}
 
 	{#if clipboard.status === 'success'}
 		<div in:scale={{ duration: animationDuration, start: 0.85 }}>
-			<CheckIcon size={16} tabindex={-1} />
+			<CheckIcon size={16} tabindex={-1} class="text-muted-foreground" />
 			<span class="sr-only">Copied</span>
 		</div>
 	{:else if clipboard.status === 'failure'}
 		<div in:scale={{ duration: animationDuration, start: 0.85 }}>
-			<XIcon size={16} tabindex={-1} />
+			<XIcon size={16} tabindex={-1} class="text-destructive" />
 			<span class="sr-only">Failed to copy</span>
 		</div>
 	{:else}
 		<div in:scale={{ duration: animationDuration, start: 0.85 }}>
 			{#if icon}
-				<CopyIcon size={16} tabindex={-1} />
+				<CopyIcon size={16} tabindex={-1} class="text-muted-foreground" />
 			{/if}
 			<span class="sr-only">Copy</span>
 		</div>
