@@ -62,10 +62,9 @@ func (*GetLicenseRequest) Descriptor() ([]byte, []int) {
 type GetLicenseResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Plan          *string                `protobuf:"bytes,1,opt,name=plan" json:"plan,omitempty"`
-	Status        *string                `protobuf:"bytes,2,opt,name=status" json:"status,omitempty"`
-	Source        *string                `protobuf:"bytes,3,opt,name=source" json:"source,omitempty"`
-	Key           *string                `protobuf:"bytes,4,opt,name=key" json:"key,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	Key           *string                `protobuf:"bytes,2,opt,name=key" json:"key,omitempty"`
+	Active        *bool                  `protobuf:"varint,3,opt,name=active" json:"active,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -107,25 +106,18 @@ func (x *GetLicenseResponse) GetPlan() string {
 	return ""
 }
 
-func (x *GetLicenseResponse) GetStatus() string {
-	if x != nil && x.Status != nil {
-		return *x.Status
-	}
-	return ""
-}
-
-func (x *GetLicenseResponse) GetSource() string {
-	if x != nil && x.Source != nil {
-		return *x.Source
-	}
-	return ""
-}
-
 func (x *GetLicenseResponse) GetKey() string {
 	if x != nil && x.Key != nil {
 		return *x.Key
 	}
 	return ""
+}
+
+func (x *GetLicenseResponse) GetActive() bool {
+	if x != nil && x.Active != nil {
+		return *x.Active
+	}
+	return false
 }
 
 func (x *GetLicenseResponse) GetExpiresAt() *timestamppb.Timestamp {
@@ -140,14 +132,13 @@ var File_nokku_v1_license_proto protoreflect.FileDescriptor
 const file_nokku_v1_license_proto_rawDesc = "" +
 	"\n" +
 	"\x16nokku/v1/license.proto\x12\bnokku.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x13\n" +
-	"\x11GetLicenseRequest\"\xa5\x01\n" +
+	"\x11GetLicenseRequest\"\x8d\x01\n" +
 	"\x12GetLicenseResponse\x12\x12\n" +
-	"\x04plan\x18\x01 \x01(\tR\x04plan\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\x12\x16\n" +
-	"\x06source\x18\x03 \x01(\tR\x06source\x12\x10\n" +
-	"\x03key\x18\x04 \x01(\tR\x03key\x129\n" +
+	"\x04plan\x18\x01 \x01(\tR\x04plan\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\x12\x16\n" +
+	"\x06active\x18\x03 \x01(\bR\x06active\x129\n" +
 	"\n" +
-	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2q\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2q\n" +
 	"\x0eLicenseService\x12_\n" +
 	"\n" +
 	"GetLicense\x12\x1b.nokku.v1.GetLicenseRequest\x1a\x1c.nokku.v1.GetLicenseResponse\"\x16\x82\xd3\xe4\x93\x02\r\x12\v/v1/license\x90\x02\x01B\x96\x01\n" +

@@ -36,9 +36,9 @@ const (
 	// BillingServiceGetBillingProcedure is the fully-qualified name of the BillingService's GetBilling
 	// RPC.
 	BillingServiceGetBillingProcedure = "/nokku.v1.BillingService/GetBilling"
-	// BillingServiceCreateCustomerPortalProcedure is the fully-qualified name of the BillingService's
-	// CreateCustomerPortal RPC.
-	BillingServiceCreateCustomerPortalProcedure = "/nokku.v1.BillingService/CreateCustomerPortal"
+	// BillingServiceCreatePortalProcedure is the fully-qualified name of the BillingService's
+	// CreatePortal RPC.
+	BillingServiceCreatePortalProcedure = "/nokku.v1.BillingService/CreatePortal"
 	// BillingServiceCreateCheckoutProcedure is the fully-qualified name of the BillingService's
 	// CreateCheckout RPC.
 	BillingServiceCreateCheckoutProcedure = "/nokku.v1.BillingService/CreateCheckout"
@@ -50,7 +50,7 @@ const (
 // BillingServiceClient is a client for the nokku.v1.BillingService service.
 type BillingServiceClient interface {
 	GetBilling(context.Context, *v1.GetBillingRequest) (*v1.GetBillingResponse, error)
-	CreateCustomerPortal(context.Context, *v1.CreateCustomerPortalRequest) (*v1.CreateCustomerPortalResponse, error)
+	CreatePortal(context.Context, *v1.CreatePortalRequest) (*v1.CreatePortalResponse, error)
 	CreateCheckout(context.Context, *v1.CreateCheckoutRequest) (*v1.CreateCheckoutResponse, error)
 	CancelSubscription(context.Context, *v1.CancelSubscriptionRequest) (*v1.CancelSubscriptionResponse, error)
 }
@@ -73,10 +73,10 @@ func NewBillingServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
-		createCustomerPortal: connect.NewClient[v1.CreateCustomerPortalRequest, v1.CreateCustomerPortalResponse](
+		createPortal: connect.NewClient[v1.CreatePortalRequest, v1.CreatePortalResponse](
 			httpClient,
-			baseURL+BillingServiceCreateCustomerPortalProcedure,
-			connect.WithSchema(billingServiceMethods.ByName("CreateCustomerPortal")),
+			baseURL+BillingServiceCreatePortalProcedure,
+			connect.WithSchema(billingServiceMethods.ByName("CreatePortal")),
 			connect.WithClientOptions(opts...),
 		),
 		createCheckout: connect.NewClient[v1.CreateCheckoutRequest, v1.CreateCheckoutResponse](
@@ -96,10 +96,10 @@ func NewBillingServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 
 // billingServiceClient implements BillingServiceClient.
 type billingServiceClient struct {
-	getBilling           *connect.Client[v1.GetBillingRequest, v1.GetBillingResponse]
-	createCustomerPortal *connect.Client[v1.CreateCustomerPortalRequest, v1.CreateCustomerPortalResponse]
-	createCheckout       *connect.Client[v1.CreateCheckoutRequest, v1.CreateCheckoutResponse]
-	cancelSubscription   *connect.Client[v1.CancelSubscriptionRequest, v1.CancelSubscriptionResponse]
+	getBilling         *connect.Client[v1.GetBillingRequest, v1.GetBillingResponse]
+	createPortal       *connect.Client[v1.CreatePortalRequest, v1.CreatePortalResponse]
+	createCheckout     *connect.Client[v1.CreateCheckoutRequest, v1.CreateCheckoutResponse]
+	cancelSubscription *connect.Client[v1.CancelSubscriptionRequest, v1.CancelSubscriptionResponse]
 }
 
 // GetBilling calls nokku.v1.BillingService.GetBilling.
@@ -111,9 +111,9 @@ func (c *billingServiceClient) GetBilling(ctx context.Context, req *v1.GetBillin
 	return nil, err
 }
 
-// CreateCustomerPortal calls nokku.v1.BillingService.CreateCustomerPortal.
-func (c *billingServiceClient) CreateCustomerPortal(ctx context.Context, req *v1.CreateCustomerPortalRequest) (*v1.CreateCustomerPortalResponse, error) {
-	response, err := c.createCustomerPortal.CallUnary(ctx, connect.NewRequest(req))
+// CreatePortal calls nokku.v1.BillingService.CreatePortal.
+func (c *billingServiceClient) CreatePortal(ctx context.Context, req *v1.CreatePortalRequest) (*v1.CreatePortalResponse, error) {
+	response, err := c.createPortal.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
@@ -141,7 +141,7 @@ func (c *billingServiceClient) CancelSubscription(ctx context.Context, req *v1.C
 // BillingServiceHandler is an implementation of the nokku.v1.BillingService service.
 type BillingServiceHandler interface {
 	GetBilling(context.Context, *v1.GetBillingRequest) (*v1.GetBillingResponse, error)
-	CreateCustomerPortal(context.Context, *v1.CreateCustomerPortalRequest) (*v1.CreateCustomerPortalResponse, error)
+	CreatePortal(context.Context, *v1.CreatePortalRequest) (*v1.CreatePortalResponse, error)
 	CreateCheckout(context.Context, *v1.CreateCheckoutRequest) (*v1.CreateCheckoutResponse, error)
 	CancelSubscription(context.Context, *v1.CancelSubscriptionRequest) (*v1.CancelSubscriptionResponse, error)
 }
@@ -160,10 +160,10 @@ func NewBillingServiceHandler(svc BillingServiceHandler, opts ...connect.Handler
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
-	billingServiceCreateCustomerPortalHandler := connect.NewUnaryHandlerSimple(
-		BillingServiceCreateCustomerPortalProcedure,
-		svc.CreateCustomerPortal,
-		connect.WithSchema(billingServiceMethods.ByName("CreateCustomerPortal")),
+	billingServiceCreatePortalHandler := connect.NewUnaryHandlerSimple(
+		BillingServiceCreatePortalProcedure,
+		svc.CreatePortal,
+		connect.WithSchema(billingServiceMethods.ByName("CreatePortal")),
 		connect.WithHandlerOptions(opts...),
 	)
 	billingServiceCreateCheckoutHandler := connect.NewUnaryHandlerSimple(
@@ -182,8 +182,8 @@ func NewBillingServiceHandler(svc BillingServiceHandler, opts ...connect.Handler
 		switch r.URL.Path {
 		case BillingServiceGetBillingProcedure:
 			billingServiceGetBillingHandler.ServeHTTP(w, r)
-		case BillingServiceCreateCustomerPortalProcedure:
-			billingServiceCreateCustomerPortalHandler.ServeHTTP(w, r)
+		case BillingServiceCreatePortalProcedure:
+			billingServiceCreatePortalHandler.ServeHTTP(w, r)
 		case BillingServiceCreateCheckoutProcedure:
 			billingServiceCreateCheckoutHandler.ServeHTTP(w, r)
 		case BillingServiceCancelSubscriptionProcedure:
@@ -201,8 +201,8 @@ func (UnimplementedBillingServiceHandler) GetBilling(context.Context, *v1.GetBil
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.BillingService.GetBilling is not implemented"))
 }
 
-func (UnimplementedBillingServiceHandler) CreateCustomerPortal(context.Context, *v1.CreateCustomerPortalRequest) (*v1.CreateCustomerPortalResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.BillingService.CreateCustomerPortal is not implemented"))
+func (UnimplementedBillingServiceHandler) CreatePortal(context.Context, *v1.CreatePortalRequest) (*v1.CreatePortalResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.BillingService.CreatePortal is not implemented"))
 }
 
 func (UnimplementedBillingServiceHandler) CreateCheckout(context.Context, *v1.CreateCheckoutRequest) (*v1.CreateCheckoutResponse, error) {
