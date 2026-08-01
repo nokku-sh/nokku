@@ -3,12 +3,20 @@ package api
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"connectrpc.com/connect"
 
 	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/meta"
 )
+
+// auditDetach bounds the audit write so a stalled DB connection can't pin an
+// async goroutine forever. The detached (non-cancellable) context preserves
+// audit integrity for completed requests.
+func auditDetach(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+}
 
 type AuditInterceptor struct {
 	audit *audit.Service
@@ -22,7 +30,11 @@ func (a *AuditInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		ctx = meta.WithAuditState(ctx, &meta.AuditState{UserID: meta.UserIDFromContext(ctx)})
 		resp, err := next(ctx, req)
-		go a.audit.LogAction(context.WithoutCancel(ctx), req, err)
+		go func() {
+			actx, cancel := auditDetach(ctx)
+			defer cancel()
+			a.audit.LogAction(actx, req, err)
+		}()
 		return resp, err
 	}
 }
@@ -39,7 +51,11 @@ func (a *AuditInterceptor) WrapStreamingHandler(
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		ctx = meta.WithAuditState(ctx, &meta.AuditState{UserID: meta.UserIDFromContext(ctx)})
 		err := next(ctx, conn)
-		go a.audit.LogStreamingAction(context.WithoutCancel(ctx), conn, err)
+		go func() {
+			actx, cancel := auditDetach(ctx)
+			defer cancel()
+			a.audit.LogStreamingAction(actx, conn, err)
+		}()
 		return err
 	}
 }
@@ -69,6 +85,10 @@ func (a *AuditInterceptor) WithAudit(next http.Handler) http.Handler {
 		)
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r.WithContext(ctx))
-		go a.audit.LogHTTPAction(context.WithoutCancel(ctx), r, sw.status)
+		go func() {
+			actx, cancel := auditDetach(ctx)
+			defer cancel()
+			a.audit.LogHTTPAction(actx, r, sw.status)
+		}()
 	})
 }

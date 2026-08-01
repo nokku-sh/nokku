@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/coder/websocket"
 
@@ -50,6 +51,10 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
+	// Bound each read/write so a half-dead client that stops reading and
+	// sending can't pin the handler or its pump goroutine forever.
+	wsTimeout := 15 * time.Second
+
 	logger := slog.With("session_id", sessionID, "daemon_id", daemonID)
 
 	// Snapshot replay and live channel atomically. No screen clear: replay
@@ -57,7 +62,10 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 	// already queued on the live channel, so nothing renders twice.
 	replay, live := sess.SnapshotForAttach()
 	if len(replay) > 0 {
-		if err := conn.Write(ctx, websocket.MessageBinary, replay); err != nil {
+		wctx, wcancel := context.WithTimeout(ctx, wsTimeout)
+		err := conn.Write(wctx, websocket.MessageBinary, replay)
+		wcancel()
+		if err != nil {
 			logger.Debug("replay write failed", "error", err)
 		}
 	}
@@ -73,7 +81,10 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 					_ = conn.Close(websocket.StatusNormalClosure, "session ended")
 					return
 				}
-				if err := conn.Write(ctx, websocket.MessageBinary, data); err != nil {
+				wctx, wcancel := context.WithTimeout(ctx, wsTimeout)
+				err := conn.Write(wctx, websocket.MessageBinary, data)
+				wcancel()
+				if err != nil {
 					return
 				}
 			}
@@ -92,7 +103,9 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 
 	// Read loop: WebSocket -> session stdin/resize.
 	for {
-		typ, data, err := conn.Read(ctx)
+		rctx, rcancel := context.WithTimeout(ctx, wsTimeout)
+		typ, data, err := conn.Read(rctx)
+		rcancel()
 		if err != nil {
 			break
 		}
