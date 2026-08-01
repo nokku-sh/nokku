@@ -33,27 +33,25 @@ type Key struct {
 	ExpiresAt *time.Time
 }
 
+// New returns the validated instance license from the environment, or a
+// zero-value Key when absent/invalid so callers can rely on Valid() == false
+// without nil checks. It never returns a nil-key/nil-error pair.
 func New() (*Key, error) {
 	verifier, err := DefaultVerifier()
 	if err != nil {
 		return nil, err
 	}
-	return newFromEnv(verifier)
-}
 
-// newFromEnv reads and validates the instance license from the environment.
-func newFromEnv(verifier *Verifier) (*Key, error) {
-	var licenseKey *Key
 	key, ok := os.LookupEnv("NOKKU_LICENSE_KEY")
-	if ok {
-		validated, err := verifier.Verify(key)
-		if err == nil {
-			licenseKey = validated
-		} else {
-			slog.Warn("instance license is not valid", "error", err)
-		}
+	if !ok {
+		return &Key{}, nil
 	}
-	return licenseKey, nil
+	validated, err := verifier.Verify(key)
+	if err != nil {
+		slog.Warn("instance license is not valid", "error", err)
+		return &Key{}, nil
+	}
+	return validated, nil
 }
 
 // Valid reports whether the key currently grants access.
