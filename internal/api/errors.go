@@ -161,7 +161,6 @@ var (
 	)
 )
 
-// NewError creates a connect error with a specific code and message.
 func NewError(code connect.Code, msg string) error {
 	return connect.NewError(code, errors.New(msg))
 }

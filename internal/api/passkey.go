@@ -103,14 +103,13 @@ func (u WebAuthnUser) WebAuthnCredentials() []webauthn.Credential {
 			transports[j] = protocol.AuthenticatorTransport(t)
 		}
 
-		// Decode the base64url-encoded credential ID
 		credentialID, err := base64.RawURLEncoding.DecodeString(dbCred.ID)
 		if err != nil {
 			slog.Error("failed to decode credential id", "error", err, "id", dbCred.ID)
 			continue
 		}
 
-		// Validate sign count before conversion
+		// Cap sign count to uint32 max before conversion.
 		var signCount uint32
 		if dbCred.SignCount < 0 || dbCred.SignCount > int64(^uint32(0)) {
 			slog.Warn("sign count out of range, capping", "value", dbCred.SignCount)
@@ -182,7 +181,6 @@ func (s *PasskeyService) BeginRegistration(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Check if SSO is required
 	if err := checkSSOEnforced(ctx, s.cfg, user.Email); err != nil {
 		if errors.Is(err, ErrSSORequired) {
 			writeJSONError(w, http.StatusForbidden, "Single sign-on is required")
@@ -208,7 +206,6 @@ func (s *PasskeyService) BeginRegistration(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Store session in cache
 	sessionData, err := json.Marshal(session)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "Failed to store session")
@@ -236,7 +233,6 @@ func (s *PasskeyService) FinishRegistration(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Parse the request to extract name and credential data
 	type RegistrationRequest struct {
 		Name string `json:"name"`
 	}
@@ -252,7 +248,6 @@ func (s *PasskeyService) FinishRegistration(w http.ResponseWriter, r *http.Reque
 
 	r.Body = io.NopCloser(bytes.NewBuffer(body)) // Reset body for webauthn parsing
 
-	// Get existing credentials
 	credentials, err := s.cfg.Conn.Q.GetPasskeysByUserID(ctx, user.ID)
 	if err != nil {
 		credentials = []*db.Passkey{}
@@ -263,7 +258,6 @@ func (s *PasskeyService) FinishRegistration(w http.ResponseWriter, r *http.Reque
 		credentials: credentials,
 	}
 
-	// Retrieve session from cache
 	sessionKey := fmt.Sprintf("passkey_session.%s", user.ID)
 	data, err := s.cfg.Cache.Get(ctx, sessionKey)
 	if err != nil || data == nil {
@@ -284,12 +278,10 @@ func (s *PasskeyService) FinishRegistration(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Generate name if not provided
 	if reqBody.Name == "" {
 		reqBody.Name = s.detectAuthenticatorName(credential)
 	}
 
-	// Convert transports from []protocol.AuthenticatorTransport to []string
 	transports := make([]string, len(credential.Transport))
 	for i, t := range credential.Transport {
 		transports[i] = string(t)
@@ -321,11 +313,9 @@ func (s *PasskeyService) BeginLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate a temporary session ID
 	sessionID := uuid.New().String()
 	sessionKey := fmt.Sprintf("passkey_login.%s", sessionID)
 
-	// Store session in cache
 	sessionData, err := json.Marshal(session)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "Failed to store session")
@@ -333,7 +323,6 @@ func (s *PasskeyService) BeginLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = s.cfg.Cache.Set(r.Context(), sessionKey, sessionData, 5*time.Minute)
 
-	// Return session ID along with options
 	response := map[string]any{
 		"options":   options,
 		"sessionId": sessionID,
@@ -352,14 +341,12 @@ func (s *PasskeyService) BeginLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *PasskeyService) FinishLogin(w http.ResponseWriter, r *http.Request) {
-	// Parse the credential response
 	parsedResponse, err := protocol.ParseCredentialRequestResponseBody(r.Body)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, "Failed to parse response")
 		return
 	}
 
-	// Get session ID from request
 	req := struct {
 		SessionID string `json:"sessionId"`
 	}{
@@ -385,7 +372,6 @@ func (s *PasskeyService) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find the credential in database
 	credentialID := base64.RawURLEncoding.EncodeToString(parsedResponse.RawID)
 	credential, err := s.cfg.Conn.Q.GetPasskey(r.Context(), credentialID)
 	if err != nil {
@@ -393,14 +379,12 @@ func (s *PasskeyService) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user and their credentials
 	user, err := s.cfg.Conn.Q.GetUserByID(r.Context(), credential.UserID)
 	if err != nil {
 		writeJSONError(w, http.StatusUnauthorized, "User not found")
 		return
 	}
 
-	// Check if SSO is required
 	if err := checkSSOEnforced(r.Context(), s.cfg, user.Email); err != nil {
 		if errors.Is(err, ErrSSORequired) {
 			writeJSONError(w, http.StatusForbidden, "Single sign-on is required")
@@ -426,7 +410,6 @@ func (s *PasskeyService) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		credentials: credentials,
 	}
 
-	// Verify the credential
 	cred, err := s.webauthn.ValidateDiscoverableLogin(
 		func(_, _ []byte) (webauthn.User, error) {
 			return webauthnUser, nil
@@ -446,7 +429,6 @@ func (s *PasskeyService) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update sign count
 	err = s.cfg.Conn.Q.UpdatePasskeySignCount(
 		r.Context(),
 		&db.UpdatePasskeySignCountParams{
@@ -458,7 +440,6 @@ func (s *PasskeyService) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("failed to update passkey sign count", "error", err)
 	}
 
-	// Update last used timestamp
 	now := time.Now()
 	err = s.cfg.Conn.Q.UpdatePasskeyLastUsed(
 		r.Context(),
@@ -471,7 +452,6 @@ func (s *PasskeyService) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("failed to update passkey last used", "error", err)
 	}
 
-	// Set cookies
 	s.cfg.Authn.AccessCookie(r.Context(), w.Header(), user)
 	s.cfg.Authn.RefreshCookie(r.Context(), w.Header(), user)
 	syncWebDevice(r.Context(), s.cfg, r.Header, w.Header(), r.RemoteAddr, user)
@@ -673,11 +653,9 @@ func (s *PasskeyService) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// detectAuthenticatorName attempts to determine a friendly name for the authenticator.
 func (s *PasskeyService) detectAuthenticatorName(credential *webauthn.Credential) string {
 	var parts []string
 
-	// Try AAGUID lookup
 	if len(credential.Authenticator.AAGUID) == 16 {
 		aaguid := uuid.UUID{}
 		copy(aaguid[:], credential.Authenticator.AAGUID)
@@ -705,7 +683,6 @@ func (s *PasskeyService) detectAuthenticatorName(credential *webauthn.Credential
 		}
 	}
 
-	// If we got a name, return it
 	if len(parts) > 0 {
 		return strings.Join(parts, " - ")
 	}

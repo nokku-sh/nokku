@@ -53,7 +53,8 @@ func (s *Service) ensurePartitions(ctx context.Context) error {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	// Try to acquire the transaction-level lock
+	// Acquire the transaction-level advisory lock so only one instance
+	// manages partitions.
 	var locked bool
 	err = tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock(hashtext('audit-partitions'))`).
 		Scan(&locked)
@@ -106,7 +107,6 @@ func (s *Service) createPartitionForMonth(ctx context.Context, tx pgx.Tx, t time
 }
 
 func (s *Service) dropPartitionsBefore(ctx context.Context, tx pgx.Tx, t time.Time) error {
-	// Query to find all partitions of audit.audit_logs
 	query := `
 		SELECT inhrelid::regclass::text 
 		FROM pg_inherits 
@@ -130,10 +130,11 @@ func (s *Service) dropPartitionsBefore(ctx context.Context, tx pgx.Tx, t time.Ti
 		parts := strings.Split(partitionName, ".")
 		shortName := parts[len(parts)-1]
 
-		// REMOVE any double quotes injected by Postgres regclass
+		// Remove double quotes injected by Postgres regclass.
 		shortName = strings.Trim(shortName, "\"")
 
-		// Simple string comparison e.g., "audit_logs_y2025m01" < "audit_logs_y2025m10"
+		// Partition names are zero-padded, so string comparison works:
+		// y2025m01 < y2025m10.
 		if shortName < thresholdName {
 			dropQuery := `DROP TABLE IF EXISTS ` + partitionName + `;`
 

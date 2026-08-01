@@ -51,7 +51,6 @@ func (s *Stripe) webhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleSubscription reconciles the local workspace subscription.
 func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscription) {
 	workspaceID := sub.Metadata["workspace_id"]
 	if workspaceID == "" {
@@ -74,9 +73,9 @@ func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscriptio
 		return
 	}
 
-	// Backstop for the one-subscription-per-workspace rule: if the workspace
-	// already holds a different active subscription, cancel the newcomer so a
-	// tenant never ends up with two paid subscriptions.
+	// Backstop for the one-subscription-per-workspace rule: cancel a newcomer
+	// if the workspace already holds a different active subscription, so a
+	// tenant never ends up with two.
 	if existing, err := s.db.Q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
 		WorkspaceID: workspaceID,
 		Statuses:    entitlement.ActiveStatuses,

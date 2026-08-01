@@ -62,7 +62,6 @@ func ValidateExtensionsJSON(b []byte) error {
 	return nil
 }
 
-// ValidateCriticalOptionsJSON validates that JSON contains only allowed critical options.
 func ValidateCriticalOptionsJSON(b []byte) error {
 	if len(b) == 0 {
 		return nil
@@ -77,8 +76,8 @@ func ValidateCriticalOptionsJSON(b []byte) error {
 		if _, ok := allowedCriticalOptions[CriticalOption(k)]; !ok {
 			return fmt.Errorf("invalid ssh critical option: %q", k)
 		}
-		// Note: force-command and source-address actually DO need values
-		// Only validate the key here; value validation should happen at cert creation time
+		// force-command, source-address and verify-required carry values;
+		// only keys are validated here, values are checked at cert creation time.
 		if v != "" && k != string(COForceCommand) && k != string(COSourceAddress) &&
 			k != string(COVerifyRequired) {
 			return fmt.Errorf("extension critical option %q must have empty value", k)
@@ -112,8 +111,8 @@ func ValidateCriticalOptions(m map[string]string) ([]byte, error) {
 		if _, ok := allowedCriticalOptions[CriticalOption(k)]; !ok {
 			return nil, fmt.Errorf("invalid ssh critical option: %q", k)
 		}
-		// Note: force-command and source-address actually DO need values
-		// Only validate the key here; value validation should happen at cert creation time
+		// force-command, source-address and verify-required carry values;
+		// only keys are validated here, values are checked at cert creation time.
 		if v != "" && k != string(COForceCommand) && k != string(COSourceAddress) &&
 			k != string(COVerifyRequired) {
 			return nil, fmt.Errorf("extension critical option %q must have empty value", k)
@@ -122,7 +121,6 @@ func ValidateCriticalOptions(m map[string]string) ([]byte, error) {
 	return json.Marshal(m)
 }
 
-// BuildExtensions creates JSON from extension list.
 func BuildExtensions(exts ...Extension) ([]byte, error) {
 	if len(exts) == 0 {
 		return []byte("{}"), nil
@@ -139,7 +137,6 @@ func BuildExtensions(exts ...Extension) ([]byte, error) {
 	return json.Marshal(m)
 }
 
-// BuildCriticalOptions creates JSON from critical options with optional values.
 func BuildCriticalOptions(opts map[CriticalOption]string) ([]byte, error) {
 	if len(opts) == 0 {
 		return []byte("{}"), nil
@@ -186,7 +183,6 @@ func ParseCriticalOptionsMap(b []byte) (map[string]string, error) {
 	return m, nil
 }
 
-// ParseExtensions extracts extension list from JSON.
 func ParseExtensions(b []byte) ([]Extension, error) {
 	if len(b) == 0 || string(b) == "{}" {
 		return nil, nil
@@ -209,7 +205,6 @@ func ParseExtensions(b []byte) ([]Extension, error) {
 	return exts, nil
 }
 
-// ParseCriticalOptions extracts critical options map from JSON.
 func ParseCriticalOptions(b []byte) (map[CriticalOption]string, error) {
 	if len(b) == 0 || string(b) == "{}" {
 		return nil, nil
@@ -232,7 +227,6 @@ func ParseCriticalOptions(b []byte) (map[CriticalOption]string, error) {
 	return opts, nil
 }
 
-// HasExtension checks if specific extension is present in JSON.
 func HasExtension(b []byte, ext Extension) (bool, error) {
 	if len(b) == 0 {
 		return false, nil

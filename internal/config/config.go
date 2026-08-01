@@ -26,15 +26,10 @@ import (
 )
 
 type EnvConfig struct {
-	BaseURL string `env:"NOKKU_BASE_URL" envDefault:"http://localhost"`
-	Port    string `env:"NOKKU_PORT"     envDefault:"3000"`
-	Secret  string `env:"NOKKU_SECRET"`
-	Debug   bool
-
-	// TrustedProxies lists the reverse proxies (Traefik, k8s ingress, ...)
-	// that may forward client IP headers. Entries are IPs or CIDRs. Client
-	// IPs derived from headers are only trusted when the direct peer matches
-	// one of these; with no entries the socket peer address is used.
+	BaseURL        string `env:"NOKKU_BASE_URL"        envDefault:"http://localhost"`
+	Port           string `env:"NOKKU_PORT"            envDefault:"3000"`
+	Secret         string `env:"NOKKU_SECRET"`
+	Debug          bool
 	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
 
 	// OAuth configuration
@@ -51,8 +46,8 @@ type Config struct {
 	Authn        *authn.Service
 	Audit        *audit.Service
 	Email        *email.Service
-	Storage      storage.Store
 	Pool         *daemon.Pool
+	Storage      storage.Store
 	Cache        cache.Cache
 	Entitlements *entitlement.Service
 	Billing      billing.Provider
@@ -93,7 +88,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	cfg.Billing, err = billing.NewStripe(cfg.Conn, cfg.FullURL())
 	if err != nil {
 		return nil, err
@@ -102,7 +96,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	cfg.Entitlements = entitlement.New(cfg.Conn.Q, cfg.License)
 
 	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Entitlements)

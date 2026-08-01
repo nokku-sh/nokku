@@ -290,7 +290,6 @@ func (s *DaemonService) EnrollDaemon(
 	workspaceID := enrollToken.ID
 	meta.SetAuditWorkspaceID(ctx, workspaceID)
 
-	// Check entitlement by targets
 	if err := s.cfg.Entitlements.Check(ctx, workspaceID, entitlement.ResourceTargets); err != nil {
 		return nil, err
 	}
@@ -322,7 +321,6 @@ func (s *DaemonService) EnrollDaemon(
 	hostname := getHeader(ctx, "Nokku-Daemon-Hostname")
 	metadata := daemonMetadata(ctx)
 
-	// Create a unique name
 	if strings.TrimSpace(hostname) == "" {
 		hostname = "daemon"
 	}
@@ -355,7 +353,6 @@ func (s *DaemonService) EnrollDaemon(
 		return nil, ErrInternal
 	}
 
-	// If custom CA name is provided, update the target CA
 	tp := &db.UpdateTargetCAParams{DaemonID: &daemon.ID}
 	if req.GetCaId() != "" {
 		tp.CaID = req.CaId

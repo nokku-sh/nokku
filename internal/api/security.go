@@ -41,14 +41,12 @@ func (s *Server) WithCSRF(h http.Handler) http.Handler {
 			return
 		}
 
-		// Apply CSRF protection for other routes
 		cop.Handler(h).ServeHTTP(w, r)
 	})
 }
 
 func (s *Server) WithHeaders(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Add security headers
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")

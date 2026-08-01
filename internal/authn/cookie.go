@@ -41,13 +41,13 @@ func (s *Service) RefreshCookie(_ context.Context, res http.Header, user *db.Use
 // 6 months of inactivity (sliding).
 const deviceCookieMaxAge = 365 * 24 * time.Hour
 
-// SetDeviceCookie persists the remembered-device token. The token grants no
-// access; it only marks the browser as a known device for security alerts.
+// SetDeviceCookie marks the browser as a known device for security alerts.
+// The token grants no access.
 //
 // SameSite=None is required: SAML ACS arrives as a cross-site POST from the
-// IdP, where Lax cookies are withheld — every SAML login would otherwise look
-// like a new device. This is safe because the cookie authorizes nothing and
-// is only ever sent to our own domain.
+// IdP, where Lax cookies are withheld, so every SAML login would look like a
+// new device. Safe because the cookie authorizes nothing and is only sent to
+// our own domain.
 func SetDeviceCookie(res http.Header, token string) {
 	// #nosec G124 -- SameSite=None is intentional (see above): the cookie is
 	// HttpOnly+Secure, authorizes nothing, and must survive the SAML ACS

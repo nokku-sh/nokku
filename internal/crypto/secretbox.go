@@ -19,11 +19,9 @@ type Secretbox struct {
 	key []byte
 }
 
-// NewSecretbox creates a Secretbox cipher from a raw key or an arbitrary-length
-// secret. When given exactly 32 bytes it uses them directly. For any other
-// length it derives a 32-byte key via HKDF-SHA256 with a fixed salt and
-// application-specific info, so users can safely provide passphrases or
-// shorter/longer secrets without changing behavior.
+// NewSecretbox builds a Secretbox cipher. A 32-byte secret is used directly;
+// any other length is derived to 32 bytes via HKDF-SHA256 with a fixed salt,
+// so passphrases and shorter/longer secrets work unchanged.
 func NewSecretbox(secret []byte) (*Secretbox, error) {
 	if len(secret) == 0 {
 		return nil, errors.New("secret must not be empty")
@@ -38,7 +36,6 @@ func NewSecretbox(secret []byte) (*Secretbox, error) {
 	return &Secretbox{key: key}, nil
 }
 
-// deriveKey derives a 32-byte key from an arbitrary-length secret using HKDF-SHA256.
 func deriveKey(secret []byte, outputKeyLen int) ([]byte, error) {
 	return hkdf.Key(
 		sha256.New,

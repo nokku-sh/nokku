@@ -9,10 +9,9 @@ import (
 	"connectrpc.com/connect"
 )
 
-// LogInterceptor logs every RPC at a level that matches its outcome:
-// server-side failures at Error, everything else at Debug so production
-// (debug off) only sees actionable entries. Keys are snake_case and stable
-// across messages so the output is directly consumable by SIEM pipelines.
+// LogInterceptor logs RPCs at a level matching their outcome: server-side
+// failures at Error, everything else at Debug so production only sees
+// actionable entries. Keys are stable snake_case for SIEM pipelines.
 type LogInterceptor struct {
 	debug bool
 }
@@ -81,7 +80,6 @@ func (l *LogInterceptor) WrapStreamingHandler(
 	}
 }
 
-// rpcAttrs builds the common attribute set shared by unary and streaming logs.
 func rpcAttrs(peer connect.Peer, procedure string, duration time.Duration) []slog.Attr {
 	attrs := []slog.Attr{
 		slog.String("procedure", procedure),
@@ -142,7 +140,6 @@ func (s *Server) WithLogger(next http.Handler) http.Handler {
 	})
 }
 
-// isServerError returns true for error codes that indicate a server-side problem.
 func isServerError(code connect.Code) bool {
 	switch code {
 	case connect.CodeInternal, connect.CodeUnknown, connect.CodeUnavailable,

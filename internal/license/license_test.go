@@ -11,9 +11,9 @@ import (
 	"time"
 )
 
-// newTestVerifier returns a fresh test keypair's private key and a verifier
-// for its public key. License issuance lives in the license worker, not the
-// backend, so tests sign keys inline with the test keypair.
+// newTestVerifier returns a fresh test private key and a verifier for its
+// public key. License issuance lives in the license worker, not the backend,
+// so tests sign inline.
 func newTestVerifier(t *testing.T) (ed25519.PrivateKey, *Verifier) {
 	t.Helper()
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
@@ -32,7 +32,7 @@ func newTestVerifier(t *testing.T) (ed25519.PrivateKey, *Verifier) {
 }
 
 // issue signs claims with a test private key, mirroring the worker's
-// license.Sign, so verification can be exercised against freshly issued keys.
+// license.Sign.
 func issue(t *testing.T, priv ed25519.PrivateKey, email string, expiresAt time.Time) string {
 	t.Helper()
 	payload, err := json.Marshal(Claims{

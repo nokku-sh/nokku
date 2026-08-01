@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// DefaultPublicKey is the vendor's license-signing public key
+// DefaultPublicKey is the vendor's license-signing public key.
 const DefaultPublicKey = "Y1wP9BXsRVzKt+VEJ/6RWtNuXL88L3+hx+3ouLGdCjA="
 
 type Verifier struct {

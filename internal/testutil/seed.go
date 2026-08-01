@@ -111,7 +111,7 @@ func SeedWorkspace(ctx context.Context, conn *db.Connection) error {
 			return err
 		}
 
-		// Create additional users — use index-suffixed email/username to avoid UNIQUE violations
+		// Create additional users; index-suffixed email/username avoids UNIQUE violations
 		users := make([]*db.User, cfg.NumUsers-1)
 		for i := range cfg.NumUsers - 1 {
 			user, err := q.CreateUser(ctx, &db.CreateUserParams{
@@ -141,7 +141,7 @@ func SeedWorkspace(ctx context.Context, conn *db.Connection) error {
 			}
 		}
 
-		// Create teams — use index-suffixed name to avoid UNIQUE (workspace_id, name) violations
+		// Create teams; index-suffixed names avoid UNIQUE (workspace_id, name) violations
 		teams := make([]*db.Team, cfg.NumTeams)
 		for i := range cfg.NumTeams {
 			team, err := q.CreateTeam(ctx, &db.CreateTeamParams{
@@ -169,7 +169,7 @@ func SeedWorkspace(ctx context.Context, conn *db.Connection) error {
 			}
 		}
 
-		// Create service accounts — use index-suffixed name to avoid UNIQUE (workspace_id, name) violations
+		// Create service accounts; index-suffixed names avoid UNIQUE (workspace_id, name) violations
 		sa := make([]*db.ServiceAccount, cfg.NumServiceAccounts)
 		for i := range cfg.NumServiceAccounts {
 			token, err := crypto.NewServiceAccountToken()

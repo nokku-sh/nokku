@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	codeBytes  = 10 // 10 bytes = 80 bits of entropy
+	codeBytes  = 10 // 80 bits of entropy
 	codeCount  = 10
-	codeLength = 16 // 10 bytes Base32 encoded = 16 characters
+	codeLength = 16 // 10 bytes Base32-encoded = 16 characters
 )
 
 var backupEncoding = base32.NewEncoding("ABCDEFGHJKLMNPQRSTUVWXYZ23456789").
@@ -27,7 +27,6 @@ func GenerateBackupCodes() ([]string, error) {
 		offset := i * codeBytes
 		raw := backupEncoding.EncodeToString(b[offset : offset+codeBytes])
 
-		// Format as XXXX-XXXX-XXXX-XXXX
 		codes[i] = raw[0:4] + "-" + raw[4:8] + "-" + raw[8:12] + "-" + raw[12:16]
 	}
 
@@ -40,9 +39,7 @@ func NormalizeBackupCode(code string) string {
 	code = strings.ReplaceAll(code, "-", "")
 	code = strings.ReplaceAll(code, " ", "")
 
-	// Map common lookalike characters to valid alphabet characters
-	// If the user typed '1' or 'I', they almost certainly meant 'L'.
-	// If they typed '0' or 'O', they might have meant 'Q'.
+	// Correct lookalike typos: 1/I -> L, 0/O -> Q.
 	replacements := strings.NewReplacer(
 		"1", "L",
 		"I", "L",
@@ -51,7 +48,6 @@ func NormalizeBackupCode(code string) string {
 	)
 	code = replacements.Replace(code)
 
-	// If it's the correct length, format it nicely
 	if len(code) == codeLength {
 		return code[0:4] + "-" + code[4:8] + "-" + code[8:12] + "-" + code[12:16]
 	}

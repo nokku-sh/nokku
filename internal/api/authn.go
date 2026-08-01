@@ -30,7 +30,6 @@ func NewAuthNInterceptor(cfg *config.Config) *AuthNInterceptor {
 
 func (a *AuthNInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		// Skip authentication for public endpoints
 		if isPublicEndpoint(req.Spec().Procedure) {
 			return next(ctx, req)
 		}
@@ -54,7 +53,6 @@ func (a *AuthNInterceptor) WrapStreamingHandler(
 	next connect.StreamingHandlerFunc,
 ) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		// Skip authentication for public endpoints
 		if isPublicEndpoint(conn.Spec().Procedure) {
 			return next(ctx, conn)
 		}
@@ -79,14 +77,12 @@ func (a *AuthNInterceptor) WithAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// Continue with authenticated context
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 // Authentication logic -------------------------------------------------------
 
-// authenticate routes to the appropriate authentication method.
 func (a *AuthNInterceptor) authenticate(
 	ctx context.Context,
 	header http.Header,
@@ -97,7 +93,6 @@ func (a *AuthNInterceptor) authenticate(
 		return a.authenticateUser(ctx, header)
 	}
 
-	// Route based on token prefix
 	switch parsed.Prefix {
 	case crypto.PrefixCLI:
 		return a.authenticateCLI(ctx, parsed.ID, bearer)
@@ -110,7 +105,6 @@ func (a *AuthNInterceptor) authenticate(
 	}
 }
 
-// Authentication middleware for user endpoints.
 func (a *AuthNInterceptor) authenticateUser(
 	ctx context.Context,
 	header http.Header,
@@ -135,7 +129,6 @@ func (a *AuthNInterceptor) authenticateUser(
 	return meta.WithActor(ctx, actor), nil
 }
 
-// Authentication middleware for CLI endpoints.
 func (a *AuthNInterceptor) authenticateCLI(
 	ctx context.Context,
 	cliID, bearer string,
@@ -158,7 +151,6 @@ func (a *AuthNInterceptor) authenticateCLI(
 	return meta.WithActor(ctx, actor), nil
 }
 
-// Authentication middleware for daemon endpoints.
 func (a *AuthNInterceptor) authenticateDaemon(
 	ctx context.Context,
 	daemonID, bearer string,

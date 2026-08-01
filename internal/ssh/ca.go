@@ -1,4 +1,4 @@
-// Package ssh provides various functions for managing SSH certificates
+// Package ssh manages SSH certificates.
 package ssh
 
 import (
@@ -80,7 +80,6 @@ func GenerateKey(
 	case nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_UNSPECIFIED:
 		fallthrough
 	default:
-		// ED25519, UNSPECIFIED and unknown values default to ED25519
 		pub, priv, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
 			return nil, err

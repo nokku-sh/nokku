@@ -10,7 +10,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// GetSigner creates a signer from private key bytes.
 func GetSigner(privDER []byte) (ssh.Signer, error) {
 	key, err := parsePrivateKey(privDER)
 	if err != nil {

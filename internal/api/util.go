@@ -37,11 +37,9 @@ func (s *UtilService) ListAuditLogs(
 	actor := meta.ActorFromContext(ctx)
 	var workspaceID string
 
-	// Check if user is workspace member
 	if req.GetWorkspaceId() != "" {
 		workspaceID = req.GetWorkspaceId()
 	} else {
-		// Otherwise filter by current user if not filtering by workspace
 		req.ActorIds = []string{actor.ID}
 	}
 	if workspaceID == "" && req.ActorIds == nil {
@@ -105,7 +103,6 @@ func (s *UtilService) ExportAuditLogs(
 		query.StartDate = query.EndDate.AddDate(0, 0, -14)
 	}
 
-	// Filter by current user if not filtering by workspace
 	if workspaceID == "" {
 		query.ActorIDs = []string{actor.ID}
 	}

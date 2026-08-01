@@ -119,7 +119,6 @@ func (o *OAuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		authURL = config.oauth2Config.AuthCodeURL(state, authCodeOptions...)
 	}
 
-	// Save session to cache
 	b, err := json.Marshal(session)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "Internal error")
@@ -152,7 +151,6 @@ func (o *OAuthHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Clear the cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth_state",
 		MaxAge:   -1,
@@ -179,7 +177,6 @@ func (o *OAuthHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	var user UnifiedUser
 	var dbOidc *db.OidcProvider
 
-	// Extract User based on Provider Type
 	if session.ProviderID == "github" {
 		conf := &oauth2.Config{
 			ClientID:     o.cfg.GitHubClientID,
@@ -352,7 +349,6 @@ func (o *OAuthHandler) getOIDCProvider(
 			}
 		}
 
-		// Cache in memory for subsequent requests
 		o.providerCache.Store(providerID, providerConf)
 		return providerConf, nil
 	})
@@ -372,7 +368,6 @@ func fetchGitHubUser(ctx context.Context, token *oauth2.Token) (UnifiedUser, err
 	var user UnifiedUser
 	user.Provider = "github"
 
-	// Fetch base profile
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user", nil)
 	if err != nil {
 		return user, err
@@ -393,7 +388,6 @@ func fetchGitHubUser(ctx context.Context, token *oauth2.Token) (UnifiedUser, err
 		return user, err
 	}
 
-	// Fetch emails
 	reqEmails, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
@@ -450,7 +444,6 @@ func (o *OAuthHandler) handleOAuthUser(
 		return nil, fmt.Errorf("invalid email format")
 	}
 
-	// Either static oauth provider or oidc uuid
 	providerName := unified.Provider
 
 	// For OIDC, use email domain to find workspace
@@ -462,7 +455,6 @@ func (o *OAuthHandler) handleOAuthUser(
 		providerName = oidcConfig.WorkspaceID
 	}
 
-	// Generate username
 	username, err := util.GenerateUsername(
 		unified.Email,
 		unified.Username,
@@ -492,7 +484,6 @@ func (o *OAuthHandler) handleOAuthUser(
 			}
 			user = existingUser
 		} else {
-			// Check if this OAuth identity is already linked to a user
 			existing, err := q.GetOAuthIdentity(ctx, &db.GetOAuthIdentityParams{
 				ProviderID: unified.ProviderID,
 				Provider:   providerName,
@@ -524,7 +515,6 @@ func (o *OAuthHandler) handleOAuthUser(
 					return fmt.Errorf("JIT provisioning disabled for this workspace")
 				}
 
-				// Create new user
 				user, err = q.CreateUser(ctx, &db.CreateUserParams{
 					Username: username,
 					Email:    unified.Email,
@@ -555,7 +545,6 @@ func (o *OAuthHandler) handleOAuthUser(
 			}
 		}
 
-		// Upsert OAuth identity (link if new, update if exists)
 		if _, err = q.UpsertOAuthIdentity(ctx, &db.UpsertOAuthIdentityParams{
 			ProviderID:       unified.ProviderID,
 			Provider:         providerName,
@@ -575,7 +564,6 @@ func (o *OAuthHandler) handleOAuthUser(
 			updateParams.Name = &unified.Name
 		}
 
-		// Update user profile with latest OAuth data
 		if _, err = q.UpdateUser(ctx, updateParams); err != nil {
 			return fmt.Errorf("update user: %w", err)
 		}
@@ -593,7 +581,6 @@ func extractOIDCClaims(idToken *oidc.IDToken, oidcConfig *db.OidcProvider) (Unif
 		return UnifiedUser{}, fmt.Errorf("failed to extract claims: %w", err)
 	}
 
-	// Helper to get string claim
 	getStringClaim := func(claimName string) string {
 		if val, ok := allClaims[claimName]; ok {
 			if str, ok := val.(string); ok {
@@ -603,7 +590,6 @@ func extractOIDCClaims(idToken *oidc.IDToken, oidcConfig *db.OidcProvider) (Unif
 		return ""
 	}
 
-	// Helper to get bool claim
 	getBoolClaim := func(claimName string) bool {
 		if val, ok := allClaims[claimName]; ok {
 			if b, ok := val.(bool); ok {
@@ -613,7 +599,7 @@ func extractOIDCClaims(idToken *oidc.IDToken, oidcConfig *db.OidcProvider) (Unif
 		return false
 	}
 
-	// Set default claims (for Google), override if custom OIDC config exists
+	// Defaults are Google claims; custom OIDC configs override them.
 	emailClaim, nameClaim, usernameClaim, pictureClaim := "email", "name", "preferred_username", "picture"
 	if oidcConfig != nil {
 		emailClaim = oidcConfig.EmailClaim
@@ -622,13 +608,11 @@ func extractOIDCClaims(idToken *oidc.IDToken, oidcConfig *db.OidcProvider) (Unif
 		pictureClaim = oidcConfig.PictureClaim
 	}
 
-	// Extract using determined mappings
 	email := getStringClaim(emailClaim)
 	name := getStringClaim(nameClaim)
 	username := getStringClaim(usernameClaim)
 	picture := getStringClaim(pictureClaim)
 
-	// Email verification logic
 	emailVerified := getBoolClaim("email_verified")
 	if oidcConfig != nil {
 		emailVerified = emailVerified || getBoolClaim(oidcConfig.EmailClaim+"_verified")

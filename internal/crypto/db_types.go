@@ -5,10 +5,8 @@ import (
 	"fmt"
 )
 
-// EncryptedBytes automatically encrypts/decrypts byte slices -----------------
-//
-// Type alias on []byte so Go implicitly converts raw bytes, eliminating
-// the need for NewEncryptedBytes() wrappers at call sites.
+// EncryptedBytes automatically encrypts/decrypts byte slices.
+// Alias on []byte so raw bytes convert implicitly, no wrapper constructors.
 //
 //nolint:recvcheck // Scan requires pointer receiver for sql.Scanner
 type EncryptedBytes []byte
@@ -71,7 +69,7 @@ func (e EncryptedBytes) MarshalJSON() ([]byte, error) {
 	return []byte(`""`), nil
 }
 
-// HashedPassword for user passwords - uses slow hashing ----------------------
+// HashedPassword for user passwords - uses slow hashing.
 //
 //nolint:recvcheck // Scan requires pointer receiver for sql.Scanner
 type HashedPassword string
@@ -136,7 +134,7 @@ func (h HashedPassword) MarshalJSON() ([]byte, error) {
 	return []byte(`""`), nil
 }
 
-// HashedToken for API tokens - uses fast hashing -----------------------------
+// HashedToken for API tokens - uses fast hashing.
 //
 //nolint:recvcheck // Scan requires pointer receiver for sql.Scanner
 type HashedToken string

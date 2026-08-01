@@ -46,7 +46,6 @@ const (
 	MaxExportRows = 10_000_000 // Safety limit
 )
 
-// Append writes a single event.
 func (s *Service) Append(ctx context.Context, event *Event) error {
 	var workspaceID, email *string
 	if event.WorkspaceID != "" {
@@ -175,13 +174,11 @@ func (s *Service) Count(ctx context.Context, opts QueryOptions) (int32, error) {
 	return count, err
 }
 
-// Export retrieves and formats events for export.
 func (s *Service) Export(
 	ctx context.Context,
 	opts QueryOptions,
 	format nokkuv1.ExportAuditLogsRequest_Format,
 ) ([]byte, error) {
-	// Validate time range
 	if opts.StartDate.IsZero() || opts.EndDate.IsZero() {
 		return nil, fmt.Errorf("start_date and end_date are required for export")
 	}
@@ -191,7 +188,6 @@ func (s *Service) Export(
 		return nil, fmt.Errorf("export time range exceeds maximum of %d days", MaxExportDays)
 	}
 
-	// Check estimated count before export
 	count, err := s.Count(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -256,7 +252,6 @@ func (s *Service) Export(
 		return nil, fmt.Errorf("unsupported export format: %s", format)
 	}
 
-	// Compress with gzip
 	var compressed bytes.Buffer
 	gzWriter := gzip.NewWriter(&compressed)
 	if _, err := gzWriter.Write(data); err != nil {

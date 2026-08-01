@@ -1,4 +1,3 @@
-// Package crypto provides functions for generating cryptographic keys
 package crypto
 
 import (
@@ -12,7 +11,6 @@ import (
 
 var ErrGenerateRandom = errors.New("failed to generate random bytes")
 
-// RandomBytes returns a random byte array of the specified size.
 func RandomBytes(size int) ([]byte, error) {
 	bytes := make([]byte, size)
 	if _, err := rand.Read(bytes); err != nil {
@@ -21,7 +19,6 @@ func RandomBytes(size int) ([]byte, error) {
 	return bytes, nil
 }
 
-// RandomString returns a random string of the specified size.
 func RandomString(size int) (string, error) {
 	bytes, err := RandomBytes(size)
 	if err != nil {

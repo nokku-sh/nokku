@@ -54,18 +54,16 @@ func SetAuditWorkspaceID(ctx context.Context, workspaceID string) {
 	}
 }
 
-// SetAuditEmail records the account identifier attempted by the current
-// request on the audit state. Used by auth handlers so failed login/register
-// attempts still carry the email that was tried.
+// SetAuditEmail records the email the current request attempted, so failed
+// login/register attempts still carry it on the audit state.
 func SetAuditEmail(ctx context.Context, email string) {
 	if a := AuditStateFromContext(ctx); a != nil {
 		a.Email = email
 	}
 }
 
-// SetAuditUserID records the actor that completed the current request on the
-// audit state. Used by auth handlers to attribute successful logins when the
-// actor was only known after authentication completed.
+// SetAuditUserID records the actor that completed the current request, for
+// logins where the actor is only known after authentication completes.
 func SetAuditUserID(ctx context.Context, userID string) {
 	if a := AuditStateFromContext(ctx); a != nil {
 		a.UserID = userID
