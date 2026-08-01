@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -21,23 +22,29 @@ import (
 	"gocloud.dev/gcerrors"
 )
 
+const (
+	ModeLocal = "local"
+	ModeS3    = "s3"
+)
+
 type Storage struct {
+	Mode            string `env:"NOKKU_STORAGE"              envDefault:"local"`
 	Endpoint        string `env:"NOKKU_S3_ENDPOINT"`
 	AccessKeyID     string `env:"NOKKU_S3_ACCESS_KEY_ID"`
 	SecretAccessKey string `env:"NOKKU_S3_SECRET_ACCESS_KEY"`
 	Bucket          string `env:"NOKKU_S3_BUCKET"            envDefault:"cdn"`
 	Region          string `env:"NOKKU_S3_REGION"            envDefault:"auto"`
 	UsePathStyle    bool   `env:"NOKKU_S3_USE_PATH_STYLE"    envDefault:"false"`
-	PublicURL       string `env:"NOKKU_S3_PUBLIC_URL"`
+	CDNURL          string `env:"NOKKU_S3_PUBLIC_URL"`
 	LocalPath       string `env:"NOKKU_LOCAL_STORAGE_PATH"   envDefault:"data"`
 	BaseURL         string
 
 	bucket *blob.Bucket
 }
 
-// New creates a storage backend.
-//   - If NOKKU_S3_ACCESS_KEY_ID and NOKKU_S3_SECRET_ACCESS_KEY are set → S3-compatible (R2, MinIO, AWS)
-//   - Otherwise → local filesystem at NOKKU_LOCAL_STORAGE_PATH
+// New creates a storage backend. The backend is selected explicitly:
+//   - NOKKU_STORAGE=s3 - S3-compatible object storage (Scaleway, R2, MinIO, AWS)
+//   - NOKKU_STORAGE=local (default) - local filesystem at NOKKU_LOCAL_STORAGE_PATH
 func New(ctx context.Context, baseURL string) (*Storage, error) {
 	var s Storage
 	if err := env.Parse(&s); err != nil {
@@ -45,24 +52,47 @@ func New(ctx context.Context, baseURL string) (*Storage, error) {
 	}
 	s.BaseURL = baseURL
 
-	if s.isS3() {
+	switch s.Mode {
+	case ModeS3:
 		if err := s.initS3(ctx); err != nil {
 			return nil, err
 		}
-	} else {
+	case ModeLocal:
 		if err := s.initLocal(); err != nil {
 			return nil, err
 		}
+	default:
+		return nil, fmt.Errorf(
+			"invalid NOKKU_STORAGE mode %q (must be %q or %q)",
+			s.Mode,
+			ModeLocal,
+			ModeS3,
+		)
 	}
 
+	// Handle shutdown
+	go func() {
+		<-ctx.Done()
+		if s.bucket != nil {
+			_ = s.bucket.Close()
+		}
+	}()
 	return &s, nil
 }
 
-func (s *Storage) isS3() bool {
-	return s.AccessKeyID != "" && s.SecretAccessKey != ""
-}
-
 func (s *Storage) initS3(ctx context.Context) error {
+	if s.Endpoint == "" {
+		return errors.New("NOKKU_S3_ENDPOINT is required in s3 mode")
+	}
+	if s.AccessKeyID == "" || s.SecretAccessKey == "" {
+		return errors.New(
+			"NOKKU_S3_ACCESS_KEY_ID and NOKKU_S3_SECRET_ACCESS_KEY are required in s3 mode",
+		)
+	}
+	if s.Bucket == "" {
+		return errors.New("NOKKU_S3_BUCKET is required in s3 mode")
+	}
+
 	awsCfg, err := config.LoadDefaultConfig(
 		ctx,
 		config.WithRegion(s.Region),
@@ -75,9 +105,7 @@ func (s *Storage) initS3(ctx context.Context) error {
 	}
 
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		if s.Endpoint != "" {
-			o.BaseEndpoint = aws.String(s.Endpoint)
-		}
+		o.BaseEndpoint = aws.String(s.Endpoint)
 		o.UsePathStyle = s.UsePathStyle
 	})
 
@@ -86,7 +114,16 @@ func (s *Storage) initS3(ctx context.Context) error {
 		return fmt.Errorf("open s3 bucket: %w", err)
 	}
 
-	slog.Debug("using s3 bucket", "bucket", s.Bucket, "endpoint", s.Endpoint)
+	// Fail fast: verify credentials and bucket access at startup so a
+	// misconfigured deployment surfaces on boot, not on the first upload.
+	if _, err := s.bucket.Attributes(ctx, ".nokku-probe"); err != nil {
+		if code := gcerrors.Code(err); code != gcerrors.NotFound {
+			_ = s.bucket.Close()
+			return fmt.Errorf("s3 bucket unreachable: %w", err)
+		}
+	}
+
+	slog.Debug("using s3 bucket", "bucket", s.Bucket, "endpoint", s.Endpoint, "region", s.Region)
 	return nil
 }
 
@@ -106,36 +143,6 @@ func (s *Storage) initLocal() error {
 
 	slog.Debug("using local filesystem", "path", absPath)
 	return nil
-}
-
-func (s *Storage) Get(ctx context.Context, name string) (*FileInfo, error) {
-	attrs, err := s.bucket.Attributes(ctx, name)
-	if err != nil {
-		return nil, fmt.Errorf("get attributes: %w", err)
-	}
-
-	return &FileInfo{
-		Name:         name,
-		URL:          s.getURL(name),
-		Size:         attrs.Size,
-		ContentType:  attrs.ContentType,
-		LastModified: attrs.ModTime,
-		Metadata:     attrs.Metadata,
-	}, nil
-}
-
-func (s *Storage) Read(ctx context.Context, name string) ([]byte, error) {
-	r, err := s.Reader(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = r.Close() }()
-
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("read data: %w", err)
-	}
-	return data, nil
 }
 
 func (s *Storage) Reader(ctx context.Context, name string) (io.ReadCloser, error) {
@@ -167,31 +174,18 @@ func (s *Storage) Store(
 	return &url, nil
 }
 
-func (s *Storage) List(ctx context.Context, prefix string) ([]string, error) {
-	var files []string
-	iter := s.bucket.List(&blob.ListOptions{Prefix: prefix})
-
-	for {
-		obj, err := iter.Next(ctx)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("list objects: %w", err)
-		}
-		if !obj.IsDir {
-			files = append(files, obj.Key)
-		}
-	}
-
-	return files, nil
-}
-
 func (s *Storage) Delete(ctx context.Context, name string) error {
 	if name == "" {
-		return fmt.Errorf("filename is empty")
+		return errors.New("filename is empty")
 	}
-	return s.bucket.Delete(ctx, name)
+	err := s.bucket.Delete(ctx, name)
+	if gcerrors.Code(err) == gcerrors.NotFound {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("delete object: %w", err)
+	}
+	return nil
 }
 
 func (s *Storage) Exists(ctx context.Context, name string) (bool, error) {
@@ -205,12 +199,30 @@ func (s *Storage) Exists(ctx context.Context, name string) (bool, error) {
 	return true, nil
 }
 
+// PublicURL returns the public URL for name when the backend serves objects
+// directly (S3 + PublicURL) and false otherwise (local storage is proxied
+// through the application server).
+func (s *Storage) PublicURL(name string) (string, bool) {
+	if s.CDNURL == "" {
+		return "", false
+	}
+	return s.getURL(name), true
+}
+
 func (s *Storage) getURL(name string) string {
-	if s.PublicURL != "" {
-		return fmt.Sprintf("%s/%s", s.PublicURL, name)
+	if s.CDNURL != "" {
+		return joinURL(s.CDNURL, name)
 	}
 	if s.BaseURL != "" {
-		return fmt.Sprintf("%s/%s", s.BaseURL, name)
+		return joinURL(s.BaseURL, name)
 	}
 	return name
+}
+
+func joinURL(base, name string) string {
+	u, err := url.JoinPath(base, name)
+	if err != nil {
+		return base + "/" + name
+	}
+	return u
 }
