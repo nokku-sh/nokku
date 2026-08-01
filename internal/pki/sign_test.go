@@ -7,124 +7,152 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"net"
-	"net/url"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-func newTestCA(
-	t *testing.T,
-	keyType nokkuv1.CertificateKeyType,
-	keyBits int32,
-) *db.CertificateAuthority {
-	t.Helper()
+func TestSignCertificate_WeakRSA(t *testing.T) {
+	ca := newTestCA(t, nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA, 2048)
 
-	info, err := NewCA(keyType, keyBits, 8760*time.Hour)
+	priv, err := rsa.GenerateKey(rand.Reader, 1024)
 	if err != nil {
-		t.Fatalf("NewCA failed: %v", err)
+		t.Fatal(err)
 	}
-	if len(info.Certificate) == 0 {
-		t.Fatal("expected PEM root certificate in CAInfo.Certificate")
-	}
-
-	return &db.CertificateAuthority{
-		Certificate:     string(info.Certificate),
-		PrivateKey:      info.PrivateKey,
-		KeyType:         info.KeyType,
-		UserDefaultTtl:  24 * time.Hour,
-		UserMaxTtl:      168 * time.Hour,
-		HostDefaultTtl:  2160 * time.Hour,
-		HostMaxTtl:      4320 * time.Hour,
-		AllowedKeyTypes: []nokkuv1.CertificateKeyType{1, 2, 3},
+	if _, _, err := SignCertificate(ca, newTestCSR(t, priv, "weak"), 0, 0); err == nil {
+		t.Error("expected 1024-bit RSA key to be rejected")
 	}
 }
 
-func newTestCSR(t *testing.T, priv any, cn string) string {
-	t.Helper()
+func TestSignCertificate_BadCA(t *testing.T) {
+	ca := newTestCA(t, nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0)
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	csr := newTestCSR(t, priv, "x")
 
-	uri, err := url.Parse("spiffe://nokku.local/ns/default/sa/test")
-	if err != nil {
-		t.Fatalf("failed to parse URI SAN: %v", err)
+	badCert := *ca
+	badCert.Certificate = "not pem"
+
+	badKey := *ca
+	badKey.PrivateKey = crypto.EncryptedBytes([]byte("garbage"))
+
+	tests := []struct {
+		name    string
+		ca      *db.CertificateAuthority
+		wantErr string
+	}{
+		{"bad CA certificate", &badCert, "CA certificate"},
+		{"bad CA private key", &badKey, "CA private key"},
 	}
-	tmpl := &x509.CertificateRequest{
-		Subject:     pkix.Name{CommonName: cn, Organization: []string{"acme"}},
-		DNSNames:    []string{"svc.internal", "localhost"},
-		IPAddresses: []net.IP{net.ParseIP("10.0.0.1")},
-		URIs:        []*url.URL{uri},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, _, err := SignCertificate(tt.ca, csr, 0, 0); err == nil ||
+				!strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error = %v, want containing %q", err, tt.wantErr)
+			}
+		})
 	}
-	csrDER, err := x509.CreateCertificateRequest(rand.Reader, tmpl, priv)
-	if err != nil {
-		t.Fatalf("failed to create CSR: %v", err)
-	}
-	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER}))
 }
 
-func verifyLeaf(t *testing.T, ca *db.CertificateAuthority, certPEM []byte) *x509.Certificate {
-	t.Helper()
+func TestBoundTTL_PKI(t *testing.T) {
+	ca := newTestCA(t, nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0)
 
-	block, _ := pem.Decode(certPEM)
-	if block == nil {
-		t.Fatal("signed certificate is not valid PEM")
-	}
-	leaf, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		t.Fatalf("failed to parse signed certificate: %v", err)
-	}
+	client := nokkuv1.SignX509CertificateRequest_X509_USAGE_CLIENT_AUTH
+	server := nokkuv1.SignX509CertificateRequest_X509_USAGE_SERVER_AUTH
 
-	caBlock, _ := pem.Decode([]byte(ca.Certificate))
-	caCert, err := x509.ParseCertificate(caBlock.Bytes)
-	if err != nil {
-		t.Fatalf("failed to parse CA certificate: %v", err)
+	if got := boundTTL(ca, client, 0); got != ca.UserDefaultTtl {
+		t.Errorf("client zero TTL = %v, want user default %v", got, ca.UserDefaultTtl)
 	}
-
-	if _, err := leaf.Verify(x509.VerifyOptions{
-		Roots:     x509.NewCertPool(),
-		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-	}); err == nil {
-		t.Fatal("leaf verified against empty root pool, expected failure")
+	if got := boundTTL(ca, client, 200*time.Hour); got != ca.UserDefaultTtl {
+		t.Errorf("client over-max TTL = %v, want user default", got)
 	}
-
-	pool := x509.NewCertPool()
-	pool.AddCert(caCert)
-	if _, err := leaf.Verify(x509.VerifyOptions{
-		Roots:     pool,
-		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-	}); err != nil {
-		t.Fatalf("leaf failed verification against CA: %v", err)
+	if got := boundTTL(ca, client, 2*time.Hour); got != 2*time.Hour {
+		t.Errorf("client in-range TTL = %v, want 2h", got)
 	}
-	return leaf
+	if got := boundTTL(ca, server, 0); got != ca.HostDefaultTtl {
+		t.Errorf("server zero TTL = %v, want host default %v", got, ca.HostDefaultTtl)
+	}
+	if got := boundTTL(ca, server, 5000*time.Hour); got != ca.HostDefaultTtl {
+		t.Errorf("server over-max TTL = %v, want host default", got)
+	}
 }
 
-func TestNewCASelfSigned(t *testing.T) {
-	for _, kt := range []nokkuv1.CertificateKeyType{1, 2, 3} {
-		info, err := NewCA(kt, 0, 8760*time.Hour)
-		if err != nil {
-			t.Fatalf("NewCA(%v) failed: %v", kt, err)
-		}
+func TestExtKeyUsageFor(t *testing.T) {
+	client := x509.ExtKeyUsageClientAuth
+	server := x509.ExtKeyUsageServerAuth
 
-		block, _ := pem.Decode(info.Certificate)
-		cert, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			t.Fatalf("failed to parse CA cert: %v", err)
-		}
-		if !cert.IsCA {
-			t.Error("CA cert is not a CA")
-		}
-		if cert.KeyUsage&x509.KeyUsageCertSign == 0 {
-			t.Error("CA cert missing cert-sign key usage")
-		}
-		if err := cert.CheckSignatureFrom(cert); err != nil {
-			t.Errorf("CA cert self-signature invalid: %v", err)
-		}
-		if info.KeyType != kt {
-			t.Errorf("expected key type %v, got %v", kt, info.KeyType)
-		}
+	tests := []struct {
+		name  string
+		usage nokkuv1.SignX509CertificateRequest_X509Usage
+		want  []x509.ExtKeyUsage
+	}{
+		{
+			"unspecified",
+			nokkuv1.SignX509CertificateRequest_X509_USAGE_UNSPECIFIED,
+			[]x509.ExtKeyUsage{client},
+		},
+		{
+			"client",
+			nokkuv1.SignX509CertificateRequest_X509_USAGE_CLIENT_AUTH,
+			[]x509.ExtKeyUsage{client},
+		},
+		{
+			"server",
+			nokkuv1.SignX509CertificateRequest_X509_USAGE_SERVER_AUTH,
+			[]x509.ExtKeyUsage{server},
+		},
+		{
+			"both",
+			nokkuv1.SignX509CertificateRequest_X509_USAGE_CLIENT_AND_SERVER,
+			[]x509.ExtKeyUsage{client, server},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extKeyUsageFor(tt.usage)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("got %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+func TestKeyUsageFor(t *testing.T) {
+	rsaPub, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := keyUsageFor(&rsaPub.PublicKey); got&x509.KeyUsageKeyEncipherment == 0 {
+		t.Error("RSA key missing key-encipherment usage")
+	}
+
+	_, edPub, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := keyUsageFor(edPub); got != x509.KeyUsageDigitalSignature {
+		t.Errorf("ed25519 usage = %v, want digital-signature only", got)
+	}
+
+	ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := keyUsageFor(&ecKey.PublicKey); got != x509.KeyUsageDigitalSignature {
+		t.Errorf("ecdsa usage = %v, want digital-signature only", got)
 	}
 }
 
