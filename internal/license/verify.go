@@ -5,17 +5,19 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"os"
 	"time"
 )
 
-// DefaultPublicKey is the vendor's license-signing public key; the private
-// key lives only in the license worker's environment.
+// DefaultPublicKey is the vendor's license-signing public key
 const DefaultPublicKey = "Y1wP9BXsRVzKt+VEJ/6RWtNuXL88L3+hx+3ouLGdCjA="
 
-// Verifier validates license keys offline with an Ed25519 public key.
 type Verifier struct {
 	pub ed25519.PublicKey
+}
+
+// DefaultVerifier uses the compiled-in vendor public key.
+func DefaultVerifier() (*Verifier, error) {
+	return NewVerifier(DefaultPublicKey)
 }
 
 // NewVerifier returns a verifier for the given base64-encoded public key.
@@ -25,15 +27,6 @@ func NewVerifier(b64 string) (*Verifier, error) {
 		return nil, errors.New("invalid Ed25519 public key")
 	}
 	return &Verifier{pub: ed25519.PublicKey(raw)}, nil
-}
-
-// DefaultVerifier uses the compiled-in vendor public key, overridable via
-// NOKKU_LICENSE_PUBLIC_KEY (e.g. key rotation or tests).
-func DefaultVerifier() (*Verifier, error) {
-	if b64 := os.Getenv("NOKKU_LICENSE_PUBLIC_KEY"); b64 != "" {
-		return NewVerifier(b64)
-	}
-	return NewVerifier(DefaultPublicKey)
 }
 
 // Verify parses and validates a license key. A valid but expired key returns

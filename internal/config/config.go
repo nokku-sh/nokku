@@ -3,7 +3,6 @@ package config
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/url"
 
@@ -57,7 +56,7 @@ type Config struct {
 	Cache        cache.Cache
 	Entitlements *entitlement.Service
 	Billing      billing.Provider
-	License      *license.Manager
+	License      *license.Key
 	Geo          *geo.Service
 }
 
@@ -79,6 +78,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	cfg.Geo = geo.New()
 	cfg.Cache = cache.NewMemory()
 	cfg.Pool = daemon.New(ctx, cfg.Conn)
 	cfg.Authn, err = authn.New(cfg.Conn)
@@ -98,12 +98,9 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.License, err = license.NewManager()
+	cfg.License, err = license.New()
 	if err != nil {
 		return nil, err
-	}
-	if err := cfg.License.Validate(ctx); err != nil {
-		slog.Warn("instance license is not valid", "error", err)
 	}
 
 	cfg.Entitlements = entitlement.New(cfg.Conn.Q, cfg.License)
@@ -112,7 +109,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Geo = geo.New()
 
 	if err := crypto.InitDefaultHashers(); err != nil {
 		return nil, err

@@ -132,7 +132,7 @@ func (e *QuotaError) Error() string {
 // licenseState reports whether the instance is licensed (on-premise); when
 // active, every workspace resolves to Enterprise.
 type licenseState interface {
-	Active() bool
+	Valid() bool
 }
 
 type Service struct {
@@ -147,7 +147,7 @@ func New(q *db.Queries, lc licenseState) *Service {
 // Resolve returns the effective plan for a workspace. An active instance
 // license overrides the subscription with Enterprise.
 func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
-	if s.license != nil && s.license.Active() {
+	if s.license != nil && s.license.Valid() {
 		return resolvePlan(PlanEnterprise)
 	}
 	sub, err := s.q.GetSubscription(ctx, workspaceID)

@@ -8,7 +8,10 @@ package license
 
 import (
 	"errors"
+	"os"
 	"time"
+
+	"golang.org/x/exp/slog"
 )
 
 var (
@@ -16,10 +19,6 @@ var (
 	ErrExpired = errors.New("license key expired")
 )
 
-// Claims is the signed payload carried by a license key. Everything else
-// (features, limits) is derived from Plan by the entitlement catalog, so a
-// key never drifts from the code that enforces it. Field order must match
-// the worker's license.Claims: the JSON bytes are part of the signed payload.
 type Claims struct {
 	Version   int    `json:"v"`
 	Plan      string `json:"plan"`
@@ -27,12 +26,30 @@ type Claims struct {
 	ExpiresAt int64  `json:"exp"`
 }
 
-// Key is the validated state of a license key.
 type Key struct {
 	Key       string
 	Plan      string
 	Email     string
 	ExpiresAt *time.Time
+}
+
+func New() (*Key, error) {
+	verifier, err := DefaultVerifier()
+	if err != nil {
+		return nil, err
+	}
+
+	var licenseKey *Key
+	key, ok := os.LookupEnv("NOKKU_LICENSE_KEY")
+	if ok {
+		validated, err := verifier.Verify(key)
+		if err == nil {
+			licenseKey = validated
+		} else {
+			slog.Warn("instance license is not valid", "error", err)
+		}
+	}
+	return licenseKey, nil
 }
 
 // Valid reports whether the key currently grants access.
@@ -44,9 +61,4 @@ func (k *Key) Valid() bool {
 		return false
 	}
 	return true
-}
-
-// State reports whether the instance is currently licensed.
-type State interface {
-	Active() bool
 }
