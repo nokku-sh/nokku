@@ -14,7 +14,7 @@ export const billing = {
 			transform: (variables) => ({ workspaceId: workspaceID.current, ...variables })
 		}),
 	portal: () =>
-		useMutation(BillingService.method.createCustomerPortal, {
+		useMutation(BillingService.method.createPortal, {
 			onSuccess: (data) => (window.location.href = data.url),
 			transform: (variables) => ({ workspaceId: workspaceID.current, ...variables })
 		}),
