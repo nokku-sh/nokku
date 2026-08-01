@@ -29,14 +29,17 @@ func NewOTLPInterceptor(ctx context.Context) *otelconnect.Interceptor {
 	traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithCompressor("gzip"))
 	if err != nil {
 		slog.Error("failed to init otlp exporter", "exporter", "trace", "error", err)
+		return nil
 	}
 	metricExporter, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithCompressor("gzip"))
 	if err != nil {
 		slog.Error("failed to init otlp exporter", "exporter", "metric", "error", err)
+		return nil
 	}
 	logExporter, err := otlploggrpc.New(ctx, otlploggrpc.WithCompressor("gzip"))
 	if err != nil {
 		slog.Error("failed to init otlp exporter", "exporter", "log", "error", err)
+		return nil
 	}
 
 	res, err := resource.New(
