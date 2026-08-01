@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/url"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/email"
 	"github.com/nokku-sh/nokku/internal/entitlement"
 	"github.com/nokku-sh/nokku/internal/geo"
+	"github.com/nokku-sh/nokku/internal/license"
 	"github.com/nokku-sh/nokku/internal/storage"
 	"github.com/nokku-sh/nokku/internal/util"
 )
@@ -55,6 +57,7 @@ type Config struct {
 	Cache        cache.Cache
 	Entitlements *entitlement.Service
 	Billing      billing.Provider
+	License      *license.Manager
 	Geo          *geo.Service
 }
 
@@ -91,11 +94,19 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	cfg.Entitlements = entitlement.New(cfg.Conn.Q)
-	cfg.Billing, err = billing.NewPolar(cfg.Conn, cfg.FullURL())
+	cfg.Billing, err = billing.NewStripe(cfg.Conn, cfg.FullURL())
 	if err != nil {
 		return nil, err
 	}
+	cfg.License, err = license.NewManager()
+	if err != nil {
+		return nil, err
+	}
+	if err := cfg.License.Validate(ctx); err != nil {
+		slog.Warn("instance license is not valid", "error", err)
+	}
+
+	cfg.Entitlements = entitlement.New(cfg.Conn.Q, cfg.License)
 
 	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Entitlements)
 	if err != nil {
