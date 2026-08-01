@@ -38,7 +38,11 @@ func New() (*Key, error) {
 	if err != nil {
 		return nil, err
 	}
+	return newFromEnv(verifier)
+}
 
+// newFromEnv reads and validates the instance license from the environment.
+func newFromEnv(verifier *Verifier) (*Key, error) {
 	var licenseKey *Key
 	key, ok := os.LookupEnv("NOKKU_LICENSE_KEY")
 	if ok {
