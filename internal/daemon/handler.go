@@ -31,7 +31,7 @@ func (p *Pool) Connect(
 	}
 
 	conn := p.RegisterDaemon(ctx, daemonID, daemon.WorkspaceID)
-	defer p.UnregisterDaemon(daemonID)
+	defer p.UnregisterDaemon(daemonID, conn)
 
 	// Outbound: drain the daemon's send channel to the stream
 	go func() {
