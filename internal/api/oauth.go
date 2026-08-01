@@ -325,6 +325,9 @@ func (o *OAuthHandler) getOIDCProvider(
 			}
 		} else {
 			// Handle custom DB providers using the already fetched dbConfig
+			if dbConfig.IssuerURL == nil || dbConfig.ClientID == nil {
+				return nil, fmt.Errorf("oidc provider is missing issuer_url or client_id")
+			}
 			provider, err := oidc.NewProvider(ctx, strings.TrimSpace(*dbConfig.IssuerURL))
 			if err != nil {
 				return nil, fmt.Errorf("failed to discover oidc provider: %w", err)
