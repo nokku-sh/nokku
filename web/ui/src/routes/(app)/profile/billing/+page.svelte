@@ -40,8 +40,6 @@
 	const counts = $derived(customerData.data?.counts);
 
 	const licenseData = $derived(license.get());
-	const isLicensed = $derived(licenseData.data?.source === 'license');
-
 	const billingEnabled = $derived(customerData.data?.billingEnabled === true);
 
 	const licenseBenefits = [
@@ -130,7 +128,6 @@
 	function handleCancel() {
 		cancel.mutate({
 			immediate: cancelImmediately,
-			cancelAtPeriodEnd: !cancelImmediately,
 			reason: cancelReason
 		});
 		showCancelDialog = false;
@@ -211,7 +208,7 @@
 	</Alert.Root>
 {/if}
 
-<div class="mx-auto max-w-xl">
+<div class="mx-auto mt-8 max-w-xl">
 	{#if billingEnabled}
 		<!-- Active Plan Overview -->
 		<Card.Root class="relative overflow-hidden rounded-xl border shadow-sm">
@@ -350,7 +347,7 @@
 		</Card.Root>
 	{:else}
 		<!-- On-Premise License (self-hosted deployments only) -->
-		{#if isLicensed}
+		{#if licenseData.data?.active}
 			<!-- Enterprise Card -->
 			<Card.Root
 				class="relative overflow-hidden rounded-xl border border-primary/20 bg-linear-to-b from-background to-muted/20 shadow-lg shadow-primary/5"
@@ -418,7 +415,7 @@
 				</Card.Content>
 			</Card.Root>
 		{:else}
-			<!-- Community Card: Clean, subtle, with a strong CTA to upgrade -->
+			<!-- Community Card -->
 			<Card.Root
 				class="relative overflow-hidden rounded-xl border bg-background shadow-sm transition-all hover:shadow-md"
 			>
