@@ -40,14 +40,6 @@ func AuditStateFromContext(ctx context.Context) *AuditState {
 	return val
 }
 
-func WorkspaceIDFromContext(ctx context.Context) string {
-	a := AuditStateFromContext(ctx)
-	if a == nil {
-		return ""
-	}
-	return a.WorkspaceID
-}
-
 func SetAuditWorkspaceID(ctx context.Context, workspaceID string) {
 	if a := AuditStateFromContext(ctx); a != nil {
 		a.WorkspaceID = workspaceID
@@ -80,22 +72,6 @@ func ActorFromContext(ctx context.Context) *Actor {
 		return &Actor{}
 	}
 	return val
-}
-
-func ActorIDFromContext(ctx context.Context) string {
-	return ActorFromContext(ctx).ID
-}
-
-func IsUser(ctx context.Context) bool {
-	return ActorFromContext(ctx).Type == ActorTypeUser
-}
-
-func IsServiceAccount(ctx context.Context) bool {
-	return ActorFromContext(ctx).Type == ActorTypeServiceAccount
-}
-
-func IsDaemon(ctx context.Context) bool {
-	return ActorFromContext(ctx).Type == ActorTypeDaemon
 }
 
 func UserIDFromContext(ctx context.Context) string {
