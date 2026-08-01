@@ -69,7 +69,8 @@ func TestRoundTrip(t *testing.T) {
 	if !validated.Valid() {
 		t.Fatal("key should be valid")
 	}
-	if validated.ExpiresAt == nil || validated.ExpiresAt.Truncate(time.Second) != expires.Truncate(time.Second) {
+	if validated.ExpiresAt == nil ||
+		validated.ExpiresAt.Truncate(time.Second) != expires.Truncate(time.Second) {
 		t.Fatalf("unexpected expiry: %v", validated.ExpiresAt)
 	}
 }
@@ -97,26 +98,5 @@ func TestTampered(t *testing.T) {
 	key := issue(t, other, "a@b.io", time.Now().Add(time.Hour))
 	if _, err := verifier.Verify(key); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("expected ErrInvalid for foreign signature, got %v", err)
-	}
-}
-
-func TestManager(t *testing.T) {
-	priv, verifier := newTestVerifier(t)
-	key := issue(t, priv, "a@b.io", time.Now().Add(time.Hour))
-
-	m := &Manager{verifier: verifier, key: key}
-	if err := m.Validate(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	if !m.Configured() || !m.Active() {
-		t.Fatal("manager should be active")
-	}
-
-	empty := &Manager{verifier: verifier, key: ""}
-	if err := empty.Validate(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	if empty.Active() {
-		t.Fatal("empty key must be inactive")
 	}
 }

@@ -21,22 +21,15 @@ func (s *LicenseService) GetLicense(
 	_ context.Context,
 	_ *nokkuv1.GetLicenseRequest,
 ) (*nokkuv1.GetLicenseResponse, error) {
-	m := s.cfg.License
-
-	resp := &nokkuv1.GetLicenseResponse{
-		Plan:   new(entitlement.PlanCommunity),
-		Status: new(string(entitlement.StatusInactive)),
-	}
-	if !m.Configured() {
-		return resp, nil
+	plan := entitlement.PlanCommunity
+	if s.cfg.License.Valid() {
+		plan = entitlement.PlanEnterprise
 	}
 
-	if m.Active() {
-		resp.Plan = new(entitlement.PlanEnterprise)
-		resp.Status = new(string(entitlement.StatusActive))
-	}
-	resp.Source = new("license")
-	resp.Key = new(m.Key())
-	resp.ExpiresAt = db.SafeTimestamp(m.ExpiresAt())
-	return resp, nil
+	return &nokkuv1.GetLicenseResponse{
+		Plan:      new(plan),
+		Active:    new(s.cfg.License.Valid()),
+		Key:       new(s.cfg.License.Key),
+		ExpiresAt: db.SafeTimestamp(s.cfg.License.ExpiresAt),
+	}, nil
 }
