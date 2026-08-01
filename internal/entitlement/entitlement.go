@@ -53,8 +53,17 @@ var ActiveStatuses = []string{
 	string(StatusPastDue),
 }
 
-// GrantsAccess is true for active, trialing and past_due (grace period).
-func (s Status) GrantsAccess() bool { return s != StatusInactive }
+// GrantsAccess is true only for active, trialing and past_due (grace
+// period). Unknown or corrupted statuses fail closed.
+func (s Status) GrantsAccess() bool {
+	switch s {
+	case StatusActive, StatusTrialing, StatusPastDue:
+		return true
+	case StatusInactive:
+		return false
+	}
+	return false
+}
 
 // Quota for one resource: Soft is included in the base price (overage starts
 // above it), Hard is the enforced cap (-1 = unlimited).
@@ -135,12 +144,19 @@ type licenseState interface {
 	Valid() bool
 }
 
+// querier is the minimal DB surface entitlement needs; *db.Queries
+// implements it.
+type querier interface {
+	GetSubscription(ctx context.Context, workspaceID string) (*db.WorkspaceSubscription, error)
+	GetWorkspaceStats(ctx context.Context, workspaceID string) (*db.GetWorkspaceStatsRow, error)
+}
+
 type Service struct {
-	q       *db.Queries
+	q       querier
 	license licenseState
 }
 
-func New(q *db.Queries, lc licenseState) *Service {
+func New(q querier, lc licenseState) *Service {
 	return &Service{q: q, license: lc}
 }
 
@@ -151,7 +167,7 @@ func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
 		return resolvePlan(PlanEnterprise)
 	}
 	sub, err := s.q.GetSubscription(ctx, workspaceID)
-	if err != nil || !Status(sub.Status).GrantsAccess() {
+	if err != nil || sub == nil || !Status(sub.Status).GrantsAccess() {
 		return resolvePlan(PlanCommunity)
 	}
 	return resolvePlan(sub.Plan)
