@@ -12,7 +12,6 @@ import (
 	"github.com/caarlos0/env/v11"
 
 	"github.com/nokku-sh/nokku/internal/cache"
-	"github.com/nokku-sh/nokku/internal/util"
 	"github.com/nokku-sh/nokku/web"
 )
 
@@ -195,10 +194,8 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 		Headers:  map[string]string{"X-Nokku-Template": req.template},
 	}
 
-	if !util.IsTesting() {
-		if err := s.sender.Send(ctx, msg); err != nil {
-			return err
-		}
+	if err := s.sender.Send(ctx, msg); err != nil {
+		return err
 	}
 
 	if err := s.cache.Set(ctx, cacheKey, nil, s.Cooldown); err != nil {
