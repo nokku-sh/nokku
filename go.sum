@@ -337,8 +337,6 @@ github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10/go.mod h1
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/polarsource/polar-go v0.16.0 h1:0YB4+DB0vsuvdxNVOvJpju5yKkMCHt6vmBRp9W2sKeo=
-github.com/polarsource/polar-go v0.16.0/go.mod h1:FB11Q4m2n3wIk6l/POOkz0MVOUx1o0Yt4Y97MnQfe0c=
 github.com/rodaine/protogofakeit v0.1.1 h1:ZKouljuRM3A+TArppfBqnH8tGZHOwM/pjvtXe9DaXH8=
 github.com/rodaine/protogofakeit v0.1.1/go.mod h1:pXn/AstBYMaSfc1/RqH3N82pBuxtWgejz1AlYpY1mI0=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
@@ -367,8 +365,6 @@ github.com/sirupsen/logrus v1.4.1/go.mod h1:ni0Sbl8bgC9z8RoU9G6nDWqqs/fq4eDPysMB
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
 github.com/spiffe/go-spiffe/v2 v2.7.0 h1:uXe1MflJoHw58wAUvxVlcM7WpKtijWG7I1UidcGh6g4=
 github.com/spiffe/go-spiffe/v2 v2.7.0/go.mod h1:47Q0Q9/AqGha8QLHp+kxpH4Wca7X7EnOtlIJy3mxZ3U=
-github.com/spyzhov/ajson v0.9.6 h1:iJRDaLa+GjhCDAt1yFtU/LKMtLtsNVKkxqlpvrHHlpQ=
-github.com/spyzhov/ajson v0.9.6/go.mod h1:a6oSw0MMb7Z5aD2tPoPO+jq11ETKgXUr2XktHdT8Wt8=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.2.0/go.mod h1:qt09Ya8vawLte6SNmTgCsAVtYtaKzEcn8ATUoHMkEqE=
@@ -387,6 +383,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/stripe/pg-schema-diff v1.0.8 h1:37WUa2S2VqBT/xU7bDPCvA6egPn2iBTdtybqVFljl7Q=
 github.com/stripe/pg-schema-diff v1.0.8/go.mod h1:3IctPaAqm+0LtWw/GiwyRoRlU1/N/+00+eXVk0KZIHs=
+github.com/stripe/stripe-go/v86 v86.2.0 h1:d6yW7JDnk03DEVGqct82j0rys8nPPCE3+RDPsIvUcrY=
+github.com/stripe/stripe-go/v86 v86.2.0/go.mod h1:Co7QRXCKGNOPTugAdvjgRo+KcMtd9hxy+pZMN0yThsQ=
 github.com/tink-crypto/tink-go-awskms/v3 v3.0.0 h1:XSohRhCkXAVI0iaCnWB/GS05TEmpnKurQmzaY1jzt3Y=
 github.com/tink-crypto/tink-go-awskms/v3 v3.0.0/go.mod h1:+7MXsShLzVbSQ6dI0Pe4JuZM52jD1jQ1itAygd/MDsA=
 github.com/tink-crypto/tink-go-gcpkms/v2 v2.3.0 h1:3s6YMgMOBZRU8qG6ybpKSF2Sau+y3sMvxR911M59SwA=

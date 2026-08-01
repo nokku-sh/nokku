@@ -28,7 +28,7 @@ To provide the Service, we utilize trusted third-party service providers located
 - **Aiven (EU Region):** Managed PostgreSQL database and backups.
 - **Google Cloud (EU Region):** Key Management Service (KMS) for encrypting Root CAs.
 - **Resend (EU):** Transactional email delivery (e.g., verification, passwordless logins).
-- **Polar.sh:** Our Merchant of Record for processing payments and subscriptions.
+- **Stripe (EU/global):** Our Merchant of Record for processing payments and subscriptions.
 
 **5. Data Retention**
 

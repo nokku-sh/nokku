@@ -12,7 +12,7 @@ import (
 
 const getActiveSubscription = `-- name: GetActiveSubscription :one
 SELECT
-  workspace_id, source, plan, status, customer_id, subscription_id, product_id, product_name, metadata, overrides, current_period_end, cancel_at_period_end, updated_at
+  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, updated_at
 FROM
   workspace_subscriptions
 WHERE
@@ -37,10 +37,6 @@ func (q *Queries) GetActiveSubscription(ctx context.Context, arg *GetActiveSubsc
 		&i.Status,
 		&i.CustomerID,
 		&i.SubscriptionID,
-		&i.ProductID,
-		&i.ProductName,
-		&i.Metadata,
-		&i.Overrides,
 		&i.CurrentPeriodEnd,
 		&i.CancelAtPeriodEnd,
 		&i.UpdatedAt,
@@ -50,7 +46,7 @@ func (q *Queries) GetActiveSubscription(ctx context.Context, arg *GetActiveSubsc
 
 const getSubscription = `-- name: GetSubscription :one
 SELECT
-  workspace_id, source, plan, status, customer_id, subscription_id, product_id, product_name, metadata, overrides, current_period_end, cancel_at_period_end, updated_at
+  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, updated_at
 FROM
   workspace_subscriptions
 WHERE
@@ -67,10 +63,6 @@ func (q *Queries) GetSubscription(ctx context.Context, workspaceID string) (*Wor
 		&i.Status,
 		&i.CustomerID,
 		&i.SubscriptionID,
-		&i.ProductID,
-		&i.ProductName,
-		&i.Metadata,
-		&i.Overrides,
 		&i.CurrentPeriodEnd,
 		&i.CancelAtPeriodEnd,
 		&i.UpdatedAt,
@@ -155,7 +147,7 @@ func (q *Queries) GetWorkspaceStats(ctx context.Context, workspaceID string) (*G
 
 const listActiveSubscriptions = `-- name: ListActiveSubscriptions :many
 SELECT
-  workspace_id, source, plan, status, customer_id, subscription_id, product_id, product_name, metadata, overrides, current_period_end, cancel_at_period_end, updated_at
+  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, updated_at
 FROM
   workspace_subscriptions
 WHERE
@@ -184,10 +176,6 @@ func (q *Queries) ListActiveSubscriptions(ctx context.Context, arg *ListActiveSu
 			&i.Status,
 			&i.CustomerID,
 			&i.SubscriptionID,
-			&i.ProductID,
-			&i.ProductName,
-			&i.Metadata,
-			&i.Overrides,
 			&i.CurrentPeriodEnd,
 			&i.CancelAtPeriodEnd,
 			&i.UpdatedAt,
@@ -204,7 +192,7 @@ func (q *Queries) ListActiveSubscriptions(ctx context.Context, arg *ListActiveSu
 
 const listProviderSubscriptions = `-- name: ListProviderSubscriptions :many
 SELECT
-  workspace_id, source, plan, status, customer_id, subscription_id, product_id, product_name, metadata, overrides, current_period_end, cancel_at_period_end, updated_at
+  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, updated_at
 FROM
   workspace_subscriptions
 WHERE
@@ -227,10 +215,6 @@ func (q *Queries) ListProviderSubscriptions(ctx context.Context, sources []strin
 			&i.Status,
 			&i.CustomerID,
 			&i.SubscriptionID,
-			&i.ProductID,
-			&i.ProductName,
-			&i.Metadata,
-			&i.Overrides,
 			&i.CurrentPeriodEnd,
 			&i.CancelAtPeriodEnd,
 			&i.UpdatedAt,
@@ -245,21 +229,30 @@ func (q *Queries) ListProviderSubscriptions(ctx context.Context, sources []strin
 	return items, nil
 }
 
-const updateSubscriptionOverrides = `-- name: UpdateSubscriptionOverrides :exec
-UPDATE workspace_subscriptions
+const setSubscriptionCustomer = `-- name: SetSubscriptionCustomer :exec
+INSERT INTO
+  workspace_subscriptions (workspace_id, source, status, customer_id)
+VALUES
+  ($1, 'stripe', 'inactive', $2)
+ON CONFLICT (workspace_id) DO UPDATE
 SET
-  overrides = $1
+  source = 'stripe',
+  status = 'inactive',
+  customer_id = EXCLUDED.customer_id
 WHERE
-  workspace_id = $2
+  workspace_subscriptions.source IN ('stripe', '')
 `
 
-type UpdateSubscriptionOverridesParams struct {
-	Overrides   map[string]any `json:"overrides"`
-	WorkspaceID string         `json:"workspaceId"`
+type SetSubscriptionCustomerParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	CustomerID  string `json:"customerId"`
 }
 
-func (q *Queries) UpdateSubscriptionOverrides(ctx context.Context, arg *UpdateSubscriptionOverridesParams) error {
-	_, err := q.db.Exec(ctx, updateSubscriptionOverrides, arg.Overrides, arg.WorkspaceID)
+// Records which Stripe customer a workspace maps to, so checkout always reuses
+// the same customer. Status stays inactive so this row never grants
+// entitlements on its own; the webhook promotes it to a real subscription.
+func (q *Queries) SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error {
+	_, err := q.db.Exec(ctx, setSubscriptionCustomer, arg.WorkspaceID, arg.CustomerID)
 	return err
 }
 
@@ -272,14 +265,11 @@ INSERT INTO
     status,
     customer_id,
     subscription_id,
-    product_id,
-    product_name,
-    metadata,
     current_period_end,
     cancel_at_period_end
   )
 VALUES
-  ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+  ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (workspace_id) DO UPDATE
 SET
   source = EXCLUDED.source,
@@ -287,30 +277,25 @@ SET
   status = EXCLUDED.status,
   customer_id = EXCLUDED.customer_id,
   subscription_id = EXCLUDED.subscription_id,
-  product_id = EXCLUDED.product_id,
-  product_name = EXCLUDED.product_name,
-  metadata = EXCLUDED.metadata,
   current_period_end = EXCLUDED.current_period_end,
   cancel_at_period_end = EXCLUDED.cancel_at_period_end
 WHERE
-  workspace_subscriptions.source IN ('polar', '')
+  workspace_subscriptions.source IN ('stripe', '')
 `
 
 type UpsertSubscriptionParams struct {
-	WorkspaceID       string         `json:"workspaceId"`
-	Source            string         `json:"source"`
-	Plan              string         `json:"plan"`
-	Status            string         `json:"status"`
-	CustomerID        string         `json:"customerId"`
-	SubscriptionID    string         `json:"subscriptionId"`
-	ProductID         string         `json:"productId"`
-	ProductName       string         `json:"productName"`
-	Metadata          map[string]any `json:"metadata"`
-	CurrentPeriodEnd  *time.Time     `json:"currentPeriodEnd"`
-	CancelAtPeriodEnd bool           `json:"cancelAtPeriodEnd"`
+	WorkspaceID       string     `json:"workspaceId"`
+	Source            string     `json:"source"`
+	Plan              string     `json:"plan"`
+	Status            string     `json:"status"`
+	CustomerID        string     `json:"customerId"`
+	SubscriptionID    string     `json:"subscriptionId"`
+	CurrentPeriodEnd  *time.Time `json:"currentPeriodEnd"`
+	CancelAtPeriodEnd bool       `json:"cancelAtPeriodEnd"`
 }
 
-// Note: overrides is intentionally NOT updated on conflict, manual overrides survive provider syncs.
+// Note: source is only overwritten when the row is provider-managed ('stripe')
+// or empty, so manual subscriptions survive provider syncs.
 func (q *Queries) UpsertSubscription(ctx context.Context, arg *UpsertSubscriptionParams) error {
 	_, err := q.db.Exec(ctx, upsertSubscription,
 		arg.WorkspaceID,
@@ -319,9 +304,6 @@ func (q *Queries) UpsertSubscription(ctx context.Context, arg *UpsertSubscriptio
 		arg.Status,
 		arg.CustomerID,
 		arg.SubscriptionID,
-		arg.ProductID,
-		arg.ProductName,
-		arg.Metadata,
 		arg.CurrentPeriodEnd,
 		arg.CancelAtPeriodEnd,
 	)

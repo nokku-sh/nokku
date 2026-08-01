@@ -73,12 +73,6 @@ sql:
               type: "DaemonStatus"
 
           # JSON overrides
-          - column: "workspace_subscriptions.metadata"
-            go_type:
-              type: "map[string]any"
-          - column: "workspace_subscriptions.overrides"
-            go_type:
-              type: "map[string]any"
           - column: "daemons.config"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/gen/nokku/v1"

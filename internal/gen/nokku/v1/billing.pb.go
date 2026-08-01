@@ -7,15 +7,14 @@
 package nokkuv1
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -163,8 +162,12 @@ type GetBillingResponse struct {
 	Metadata          map[string]string      `protobuf:"bytes,6,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Counts            *WorkspaceCounts       `protobuf:"bytes,7,opt,name=counts" json:"counts,omitempty"`
 	CurrentPeriodEnd  *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=current_period_end,json=currentPeriodEnd" json:"current_period_end,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// billing_enabled is true when the server is wired up to a billing
+	// provider (SaaS). When false the instance is self-hosted and only
+	// on-premise license activation applies.
+	BillingEnabled *bool `protobuf:"varint,9,opt,name=billing_enabled,json=billingEnabled" json:"billing_enabled,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetBillingResponse) Reset() {
@@ -251,6 +254,13 @@ func (x *GetBillingResponse) GetCurrentPeriodEnd() *timestamppb.Timestamp {
 		return x.CurrentPeriodEnd
 	}
 	return nil
+}
+
+func (x *GetBillingResponse) GetBillingEnabled() bool {
+	if x != nil && x.BillingEnabled != nil {
+		return *x.BillingEnabled
+	}
+	return false
 }
 
 type CreateCustomerPortalRequest struct {
@@ -554,7 +564,7 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\atargets\x18\x05 \x01(\x03R\atargets\x12\x10\n" +
 	"\x03cas\x18\x06 \x01(\x03R\x03cas\"@\n" +
 	"\x11GetBillingRequest\x12+\n" +
-	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"\xc2\x03\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"\xeb\x03\n" +
 	"\x12GetBillingResponse\x12\x1f\n" +
 	"\vcustomer_id\x18\x01 \x01(\tR\n" +
 	"customerId\x12\x1d\n" +
@@ -565,7 +575,8 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\x14cancel_at_period_end\x18\x05 \x01(\bR\x11cancelAtPeriodEnd\x12F\n" +
 	"\bmetadata\x18\x06 \x03(\v2*.nokku.v1.GetBillingResponse.MetadataEntryR\bmetadata\x121\n" +
 	"\x06counts\x18\a \x01(\v2\x19.nokku.v1.WorkspaceCountsR\x06counts\x12H\n" +
-	"\x12current_period_end\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x10currentPeriodEnd\x1a;\n" +
+	"\x12current_period_end\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x10currentPeriodEnd\x12'\n" +
+	"\x0fbilling_enabled\x18\t \x01(\bR\x0ebillingEnabled\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"J\n" +
