@@ -17,7 +17,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/testutil"
 )
 
 func main() {
@@ -39,18 +38,6 @@ func main() {
 			return api.New(cfg).Start(ctx)
 		},
 		Commands: []*cli.Command{
-			{
-				Name:   "seed",
-				Usage:  "Seed the database with test data",
-				Hidden: true,
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					cfg, err := config.New(ctx, cmd)
-					if err != nil {
-						return fmt.Errorf("failed to load configuration: %w", err)
-					}
-					return testutil.SeedWorkspace(ctx, cfg.Conn)
-				},
-			},
 			{
 				Name:  "rotate-secrets",
 				Usage: "Re-encrypt all DB secrets onto a new cipher",
