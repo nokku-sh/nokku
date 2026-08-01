@@ -69,20 +69,19 @@ func (s *DaemonService) UpdateDaemon(
 		return nil, ErrInternal
 	}
 
-	go s.cfg.Pool.Broadcast(result.WorkspaceID, &nokkuv1.Notification{
+	s.cfg.Pool.Broadcast(result.WorkspaceID, &nokkuv1.Notification{
 		EventType: nokkuv1.Notification_EVENT_TYPE_STATUS.Enum(),
 		DaemonId:  &result.ID,
 		Status:    &result.Status,
 	})
 
 	if req.GetStatus() == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
-		go s.cfg.Pool.PublishWorkspaceEvent(
+		s.cfg.Pool.PublishWorkspaceEvent(
 			result.WorkspaceID,
 			"daemon.accepted",
 			fmt.Sprintf(`{"daemon_id":%q,"daemon_name":%q}`, result.ID, result.Name),
 		)
 	}
-
 	return &nokkuv1.UpdateDaemonResponse{}, nil
 }
 
@@ -152,13 +151,13 @@ func (s *DaemonService) DeleteDaemon(
 	}
 
 	status := nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED
-	go s.cfg.Pool.Broadcast(result.WorkspaceID, &nokkuv1.Notification{
+	s.cfg.Pool.Broadcast(result.WorkspaceID, &nokkuv1.Notification{
 		EventType: nokkuv1.Notification_EVENT_TYPE_STATUS.Enum(),
 		DaemonId:  &result.ID,
 		Status:    &status,
 	})
 
-	go s.cfg.Pool.PublishWorkspaceEvent(
+	s.cfg.Pool.PublishWorkspaceEvent(
 		result.WorkspaceID,
 		"daemon.removed",
 		fmt.Sprintf(`{"daemon_id":%q,"daemon_name":%q}`, result.ID, result.Name),
@@ -366,7 +365,7 @@ func (s *DaemonService) EnrollDaemon(
 	if status == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
 		eventType = "daemon.accepted"
 	}
-	go s.cfg.Pool.PublishWorkspaceEvent(
+	s.cfg.Pool.PublishWorkspaceEvent(
 		daemon.WorkspaceID,
 		eventType,
 		fmt.Sprintf(`{"daemon_id":%q,"daemon_name":%q}`, daemon.ID, daemon.Name),

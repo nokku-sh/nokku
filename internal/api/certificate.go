@@ -284,7 +284,7 @@ func (s *CertificateService) RolloverCertificateAuthority(
 		return &nokkuv1.RolloverCertificateAuthorityResponse{}, nil
 	}
 
-	go s.cfg.Pool.Broadcast(result.WorkspaceID, &nokkuv1.Notification{
+	s.cfg.Pool.Broadcast(result.WorkspaceID, &nokkuv1.Notification{
 		EventType: nokkuv1.Notification_EVENT_TYPE_CERTIFICATES.Enum(),
 	})
 	return &nokkuv1.RolloverCertificateAuthorityResponse{
