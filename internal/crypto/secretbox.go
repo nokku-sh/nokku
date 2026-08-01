@@ -27,7 +27,7 @@ func NewSecretbox(secret []byte) (*Secretbox, error) {
 		return nil, errors.New("secret must not be empty")
 	}
 	if len(secret) == 32 {
-		return &Secretbox{key: secret}, nil
+		return &Secretbox{key: append([]byte(nil), secret...)}, nil
 	}
 	key, err := deriveKey(secret, 32)
 	if err != nil {
