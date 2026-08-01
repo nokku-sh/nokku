@@ -14,7 +14,7 @@ tasks:
   backend:
     desc: Run backend
     cmds:
-      - go run .
+      - go run ./cmd/nokku
 
   frontend:
     desc: Run frontend
@@ -44,7 +44,12 @@ tasks:
   build:server:
     desc: Build binary
     cmds:
-      - go build -ldflags="-s -w" -trimpath -o bin/nokku
+      - go build -ldflags="-s -w" -trimpath -o bin/nokku ./cmd/nokku
+
+  seed:
+    desc: Seed the database with demo data (separate binary, not shipped)
+    cmds:
+      - go run ./cmd/seed {{.CLI_ARGS}}
 
   build:web:
     desc: Build frontends
@@ -60,7 +65,7 @@ tasks:
       - go mod tidy
       - go fmt ./...
       - go vet ./...
-      - golines -w internal
+      - golines -w internal pkg cmd
       - govulncheck ./...
       - go test -cover ./...
       - golangci-lint run

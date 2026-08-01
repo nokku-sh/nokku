@@ -12,6 +12,7 @@ before:
 
 builds:
   - binary: "{{ .ProjectName }}"
+    main: ./cmd/nokku
     env: [CGO_ENABLED=0]
     flags:
       - -trimpath
@@ -35,6 +36,7 @@ upx:
 
 kos:
   - repositories: [ghcr.io/nokku-sh/nokku]
+    main: ./cmd/nokku
     bare: true
     preserve_import_paths: false
     sbom: none
