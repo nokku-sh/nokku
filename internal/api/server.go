@@ -100,10 +100,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 // WithShutdownSignal derives each request's context from the request's own
 // context but cancels it the moment the server's root ctx (canceled on
-// SIGINT/SIGTERM) is done. This makes long-lived handlers — event subscribers,
-// CLI-login streams, PTY WebSockets, bidi daemon streams — exit promptly on
-// shutdown, instead of blocking [http.Server.Shutdown] until its deadline (the
-// old ~3s hang on Ctrl+C). The watcher goroutine exits via ctx.Done().
+// SIGINT/SIGTERM) is done.
 func (s *Server) WithShutdownSignal(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		root := s.rootCtx
@@ -239,14 +236,19 @@ func (s *Server) getServiceRegistrations(ctx context.Context) []ServiceRegistrat
 			Handler: func() (string, http.Handler) {
 				return nokkuv1connect.NewInvitationServiceHandler(
 					NewInvitationService(s.cfg),
-					opts...,
-				)
+					opts...)
 			},
 		},
 		{
 			Name: nokkuv1connect.BillingServiceName,
 			Handler: func() (string, http.Handler) {
 				return nokkuv1connect.NewBillingServiceHandler(NewBillingService(s.cfg), opts...)
+			},
+		},
+		{
+			Name: nokkuv1connect.LicenseServiceName,
+			Handler: func() (string, http.Handler) {
+				return nokkuv1connect.NewLicenseServiceHandler(NewLicenseService(s.cfg), opts...)
 			},
 		},
 		{
@@ -386,7 +388,7 @@ func (s *Server) registerServices(ctx context.Context) error {
 
 	// Billing provider webhook
 	if s.cfg.Billing != nil {
-		s.mux.Handle("POST /webhooks/polar", s.cfg.Billing.WebhookHandler())
+		s.mux.Handle("POST /webhooks/stripe", s.cfg.Billing.WebhookHandler())
 	}
 
 	// Debug

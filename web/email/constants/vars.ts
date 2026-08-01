@@ -43,6 +43,11 @@ export const CONSTANTS = {
   OLD_ROLE: "{{ .OldRole }}",
   NEW_ROLE: "{{ .NewRole }}",
   CHANGED_BY: "{{ .ChangedBy }}",
+
+  // License key email
+  LICENSE_KEY: "{{ .Key }}",
+  CUSTOMER_EMAIL: "{{ .Email }}",
+  LICENSE_EXPIRES: "{{ .ExpiresAt }}",
 } as const;
 
 /**

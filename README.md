@@ -37,6 +37,18 @@ The other components are:
 
 The backend also uses the integrations configured for the selected environment, such as email, OIDC, KMS, and billing.
 
+## Plans and licensing
+
+Nokku ships with three plans:
+
+- **Community** — free, unlimited usage with fixed caps (members, targets, CAs, teams, service accounts) and 7-day audit retention. This is the default for every workspace, no key required.
+- **Flex** — SaaS subscription with inclusive quotas and average-cost overage billing.
+- **Enterprise** — unlimited quotas, SSO enforcement, and 365-day audit retention. On-premise Enterprise is activated with a license key.
+
+Self-hosted instances work out of the box on the Community plan. To activate Enterprise, purchase an Enterprise license key and set it via the `NOKKU_LICENSE_KEY` environment variable on the server, then restart. License keys are Ed25519-signed and verified offline against a public key compiled into the binary, so activation works fully air-gapped; while valid they unlock the whole instance (unlimited quotas, SSO enforcement, 365-day audit retention, no per-workspace limits). When a key expires or is revoked, the instance falls back to the Community plan automatically.
+
+Keys are issued by a Go serverless worker (a separate repo, deployed to Scaleway Functions) when an Enterprise license subscription is purchased or renewed on Stripe: it signs the key and emails it to the buyer via Scaleway TEM. The backend never issues keys, it only verifies them. Generate the signing keypair with the worker's keygen and configure it as `LICENSE_PRIVATE_KEY` (self-hosted instances verify against `NOKKU_LICENSE_PUBLIC_KEY` or the built-in default in `internal/license/verify.go`).
+
 ## Build and run
 
 ```bash
@@ -47,10 +59,10 @@ The backend reads configuration from environment variables. Common settings incl
 
 | Variable                                    | Purpose                                                                                              |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `NOKKU_BASE_URL`                            | Public base URL                                                                                     |
-| `NOKKU_PORT`                                | Port the backend listens on                                                                         |
-| `NOKKU_SECRET`                              | 32-byte encryption secret                                                                           |
-| `KMS_URI`                                   | External key-management URI                                                                         |
+| `NOKKU_BASE_URL`                            | Public base URL                                                                                      |
+| `NOKKU_PORT`                                | Port the backend listens on                                                                          |
+| `NOKKU_SECRET`                              | 32-byte encryption secret                                                                            |
+| `KMS_URI`                                   | External key-management URI                                                                          |
 | `NOKKU_TRUSTED_PROXIES`                     | Comma-separated reverse-proxy IPs/CIDRs (e.g. Traefik) whose forwarded client IP headers are honored |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OIDC                                                                                          |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OIDC                                                                                          |
