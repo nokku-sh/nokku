@@ -95,7 +95,6 @@ func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		// Reset the reader back
 		if _, err = file.Seek(0, io.SeekStart); err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "invalid file")
 			return
@@ -107,7 +106,6 @@ func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		// Compress with jpeg and resize to 256x256
 		var buf bytes.Buffer
 		if err = jpeg.Encode(&buf, resizePicture(img), &jpeg.Options{Quality: 90}); err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "failed to encode image")
@@ -144,7 +142,7 @@ func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 
 func ServeAvatar(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract user ID from path (e.g., /avatars/{id}), remove extensions
+		// Strip extension from /avatars/{id}
 		userID, _, ok := strings.Cut(r.PathValue("id"), ".")
 		if userID == "" || !ok {
 			writeJSONError(w, http.StatusBadRequest, "missing user ID")
@@ -155,6 +153,11 @@ func ServeAvatar(cfg *config.Config) http.HandlerFunc {
 		exists, err := cfg.Storage.Exists(r.Context(), avatarPath)
 		if err != nil || !exists {
 			writeJSONError(w, http.StatusNotFound, "file not found")
+			return
+		}
+
+		if url, ok := cfg.Storage.PublicURL(avatarPath); ok {
+			http.Redirect(w, r, url, http.StatusFound) // #nosec G710 -- host is the fixed CDNURL
 			return
 		}
 
