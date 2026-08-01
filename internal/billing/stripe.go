@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -14,15 +13,10 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/entitlement"
-	"github.com/nokku-sh/nokku/internal/meta"
 )
 
-// stripeSources are the local rows managed by the Stripe provider.
 var stripeSources = []string{"stripe"}
 
-// ErrActiveSubscription is returned when a workspace already has an active
-// subscription. Stripe does not enforce one subscription per tenant, so the
-// Checkout gate and a webhook backstop together enforce it.
 var ErrActiveSubscription = errors.New("workspace already has an active subscription")
 
 // Stripe implements Provider on top of Stripe Billing (Managed Payments).
@@ -31,14 +25,10 @@ type Stripe struct {
 	db        *db.Connection
 	returnURL string
 
-	// FlexPriceIDs are the price IDs that make up the Flex plan.
-	FlexPriceIDs string `env:"STRIPE_FLEX_PRICE_IDS"`
-	// LicensePriceID is the yearly price for the Enterprise license key.
+	FlexPriceID    string `env:"STRIPE_FLEX_PRICE_ID"`
 	LicensePriceID string `env:"STRIPE_LICENSE_PRICE_ID"`
-	// SecretKey is the Stripe secret key. Never ship it in self-hosted builds.
-	SecretKey string `env:"STRIPE_SECRET_KEY"`
-	// WebhookSecret is the signing secret for /webhooks/stripe.
-	WebhookSecret string `env:"STRIPE_WEBHOOK_SECRET"`
+	SecretKey      string `env:"STRIPE_SECRET_KEY"`
+	WebhookSecret  string `env:"STRIPE_WEBHOOK_SECRET"`
 }
 
 // billableMeters lists resources billed on overage. Each event name must
@@ -59,7 +49,7 @@ func NewStripe(conn *db.Connection, returnURL string) (Provider, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.SecretKey == "" || s.WebhookSecret == "" || s.FlexPriceIDs == "" {
+	if s.SecretKey == "" || s.WebhookSecret == "" || s.FlexPriceID == "" {
 		return nil, nil // billing disabled
 	}
 
@@ -69,18 +59,10 @@ func NewStripe(conn *db.Connection, returnURL string) (Provider, error) {
 	return &s, nil
 }
 
-// Checkout creates a Checkout Session for the workspace Flex subscription,
-// carrying the workspace id in subscription metadata so webhooks can map it
-// back. Each workspace may hold at most one active subscription, so a checkout
-// is refused while one exists.
-func (s *Stripe) Checkout(ctx context.Context, workspaceID, productID string) (string, error) {
+// Checkout creates a Checkout Session for the workspace Flex subscription.
+func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (string, error) {
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")
-	}
-	// Only Flex is a workspace-scoped subscription. The Enterprise license is
-	// bought via the license worker's Payment Link, never through this endpoint.
-	if productID != "" && productID != entitlement.PlanFlex {
-		return "", errors.New("unsupported product")
 	}
 
 	// One subscription per workspace: block a new checkout while one is active.
@@ -92,35 +74,22 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, productID string) (s
 		return "", ErrActiveSubscription
 	}
 
-	lineItems := make([]*stripe.CheckoutSessionCreateLineItemParams, 0, 1)
-	for _, id := range s.flexPrices() {
-		lineItems = append(lineItems, &stripe.CheckoutSessionCreateLineItemParams{
-			Price:    stripe.String(id),
-			Quantity: stripe.Int64(1),
-		})
-	}
-	if len(lineItems) == 0 {
-		return "", errors.New("unsupported product")
-	}
-
-	email := ""
-	if userID := meta.UserIDFromContext(ctx); userID != "" {
-		if user, err := s.db.Q.GetUserByID(ctx, userID); err == nil {
-			email = user.Email
-		}
-	}
 	customerID, err := s.customerFor(ctx, workspaceID, email)
 	if err != nil {
 		return "", err
 	}
 
 	params := &stripe.CheckoutSessionCreateParams{
-		Mode:              stripe.String(stripe.CheckoutSessionModeSubscription),
-		LineItems:         lineItems,
+		Mode: stripe.String(stripe.CheckoutSessionModeSubscription),
+		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{{
+			Price:    stripe.String(s.FlexPriceID),
+			Quantity: stripe.Int64(1),
+		}},
 		SuccessURL:        stripe.String(s.returnURL + "/profile/billing"),
 		CancelURL:         stripe.String(s.returnURL + "/profile/billing"),
 		ClientReferenceID: stripe.String(workspaceID),
 		Customer:          stripe.String(customerID),
+		CustomerEmail:     stripe.String(email),
 		SubscriptionData: &stripe.CheckoutSessionCreateSubscriptionDataParams{
 			Metadata: map[string]string{"workspace_id": workspaceID},
 		},
@@ -152,8 +121,7 @@ func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (st
 		return "", fmt.Errorf("create customer: %w", err)
 	}
 
-	// Record the mapping so later checkouts reuse the same customer even if
-	// this one is abandoned before the subscription exists.
+	// Record the mapping so later checkouts reuse the same customer.
 	if err := s.db.Q.SetSubscriptionCustomer(ctx, &db.SetSubscriptionCustomerParams{
 		WorkspaceID: workspaceID,
 		CustomerID:  customer.ID,
@@ -240,7 +208,18 @@ func (s *Stripe) Sync(ctx context.Context, workspaceID string) {
 		slog.Warn("failed to fetch Stripe subscription", "error", err, "workspace_id", workspaceID)
 		return
 	}
-	s.upsertSubscription(ctx, workspaceID, remote)
+	if err := s.db.Q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
+		WorkspaceID:       workspaceID,
+		Source:            "stripe",
+		Plan:              entitlement.PlanFlex,
+		Status:            string(mapStatus(remote.Status)),
+		CustomerID:        remote.Customer.ID,
+		SubscriptionID:    remote.ID,
+		CurrentPeriodEnd:  periodEnd(remote),
+		CancelAtPeriodEnd: sub.CancelAtPeriodEnd,
+	}); err != nil {
+		slog.Warn("failed to upsert subscription", "error", err, "workspace_id", workspaceID)
+	}
 }
 
 // SyncAll reconciles every Stripe-managed row. Runs at startup.
@@ -307,36 +286,6 @@ func (s *Stripe) SyncUsage(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-// flexPrices returns the configured Flex plan price IDs, trimmed of whitespace.
-func (s *Stripe) flexPrices() []string {
-	var out []string
-	for id := range strings.SplitSeq(s.FlexPriceIDs, ",") {
-		if id = strings.TrimSpace(id); id != "" {
-			out = append(out, id)
-		}
-	}
-	return out
-}
-
-func (s *Stripe) upsertSubscription(
-	ctx context.Context,
-	workspaceID string,
-	sub *stripe.Subscription,
-) {
-	if err := s.db.Q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
-		WorkspaceID:       workspaceID,
-		Source:            "stripe",
-		Plan:              entitlement.PlanFlex,
-		Status:            string(mapStatus(sub.Status)),
-		CustomerID:        sub.Customer.ID,
-		SubscriptionID:    sub.ID,
-		CurrentPeriodEnd:  periodEnd(sub),
-		CancelAtPeriodEnd: sub.CancelAtPeriodEnd,
-	}); err != nil {
-		slog.Warn("failed to upsert subscription", "error", err, "workspace_id", workspaceID)
-	}
 }
 
 // periodEnd returns the current period end for a single-item subscription.

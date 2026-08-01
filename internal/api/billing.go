@@ -13,6 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/entitlement"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 type BillingService struct {
@@ -74,7 +75,17 @@ func (s *BillingService) CreateCheckout(
 	if s.cfg.Billing == nil {
 		return nil, ErrBillingDisabled
 	}
-	url, err := s.cfg.Billing.Checkout(ctx, req.GetWorkspaceId(), req.GetProductId())
+	userID := meta.UserIDFromContext(ctx)
+	if userID == "" {
+		return nil, ErrUnauthorized
+	}
+
+	user, err := s.cfg.Conn.Q.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, ErrInternal
+	}
+
+	url, err := s.cfg.Billing.Checkout(ctx, req.GetWorkspaceId(), user.Email)
 	if errors.Is(err, billing.ErrActiveSubscription) {
 		return nil, NewError(
 			connect.CodeFailedPrecondition,
@@ -90,10 +101,10 @@ func (s *BillingService) CreateCheckout(
 	}, nil
 }
 
-func (s *BillingService) CreateCustomerPortal(
+func (s *BillingService) CreatePortal(
 	ctx context.Context,
-	req *nokkuv1.CreateCustomerPortalRequest,
-) (*nokkuv1.CreateCustomerPortalResponse, error) {
+	req *nokkuv1.CreatePortalRequest,
+) (*nokkuv1.CreatePortalResponse, error) {
 	if s.cfg.Billing == nil {
 		return nil, ErrBillingDisabled
 	}
@@ -102,7 +113,7 @@ func (s *BillingService) CreateCustomerPortal(
 		slog.Error("failed to create customer portal", "error", err)
 		return nil, ErrInternal
 	}
-	return &nokkuv1.CreateCustomerPortalResponse{
+	return &nokkuv1.CreatePortalResponse{
 		Url: &url,
 	}, nil
 }

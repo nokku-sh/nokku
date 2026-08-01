@@ -51,9 +51,7 @@ func (s *Stripe) webhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleSubscription reconciles the local workspace subscription. License
-// subscriptions carry no workspace_id (they are bought via the license
-// Payment Link) and are ignored here — the license worker owns them.
+// handleSubscription reconciles the local workspace subscription.
 func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscription) {
 	workspaceID := sub.Metadata["workspace_id"]
 	if workspaceID == "" {
@@ -61,14 +59,24 @@ func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscriptio
 	}
 
 	if sub.Status == stripe.SubscriptionStatusCanceled {
-		s.clearSubscription(ctx, workspaceID, sub)
+		if err := s.db.Q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
+			WorkspaceID:       workspaceID,
+			Source:            "stripe",
+			Plan:              "",
+			Status:            string(entitlement.StatusInactive),
+			CustomerID:        sub.Customer.ID,
+			SubscriptionID:    sub.ID,
+			CurrentPeriodEnd:  periodEnd(sub),
+			CancelAtPeriodEnd: sub.CancelAtPeriodEnd,
+		}); err != nil {
+			slog.Warn("failed to clear subscription", "error", err, "workspace_id", workspaceID)
+		}
 		return
 	}
 
 	// Backstop for the one-subscription-per-workspace rule: if the workspace
 	// already holds a different active subscription, cancel the newcomer so a
-	// tenant never ends up with two paid subscriptions (the Checkout gate
-	// prevents this, but races and retries can slip past it).
+	// tenant never ends up with two paid subscriptions.
 	if existing, err := s.db.Q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
 		WorkspaceID: workspaceID,
 		Statuses:    entitlement.ActiveStatuses,
@@ -83,26 +91,16 @@ func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscriptio
 		return
 	}
 
-	s.upsertSubscription(ctx, workspaceID, sub)
-}
-
-// clearSubscription marks a workspace subscription inactive when the Stripe
-// subscription is canceled, so entitlements fall back to the community plan.
-func (s *Stripe) clearSubscription(
-	ctx context.Context,
-	workspaceID string,
-	sub *stripe.Subscription,
-) {
 	if err := s.db.Q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
 		WorkspaceID:       workspaceID,
 		Source:            "stripe",
-		Plan:              "",
-		Status:            string(entitlement.StatusInactive),
+		Plan:              entitlement.PlanFlex,
+		Status:            string(mapStatus(sub.Status)),
 		CustomerID:        sub.Customer.ID,
 		SubscriptionID:    sub.ID,
 		CurrentPeriodEnd:  periodEnd(sub),
 		CancelAtPeriodEnd: sub.CancelAtPeriodEnd,
 	}); err != nil {
-		slog.Warn("failed to clear subscription", "error", err, "workspace_id", workspaceID)
+		slog.Warn("failed to upsert subscription", "error", err, "workspace_id", workspaceID)
 	}
 }
