@@ -7,7 +7,9 @@ export const CLIURL = env.PUBLIC_DOCS_URL || 'https://nokku.sh/docs/cli';
 
 // Stripe Payment Link for the Enterprise license (Managed Payments).
 export const LicensePurchaseURL =
-	env.PUBLIC_LICENSE_PURCHASE_URL || 'https://buy.stripe.com/test_aFadR8fE38Vr03g9A5d7q00';
+	env.PUBLIC_LICENSE_PURCHASE_URL || 'https://buy.stripe.com/test_fZu00i4Zpc7DbLY27Dd7q01';
+// export const LicensePurchaseURL =
+// 	env.PUBLIC_LICENSE_PURCHASE_URL || 'https://buy.stripe.com/test_aFadR8fE38Vr03g9A5d7q00';
 
 export const APP_NAME = 'Nokku';
 export const DEFAULT_LANGUAGE = 'en';
