@@ -536,7 +536,10 @@ func (s *PasskeyService) BeginSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var response map[string]any
-	_ = json.Unmarshal(creationJSON, &response)
+	if err := json.Unmarshal(creationJSON, &response); err != nil || response == nil {
+		writeJSONError(w, http.StatusInternalServerError, "Failed to encode response")
+		return
+	}
 	response["userId"] = user.ID
 
 	w.Header().Set("Content-Type", "application/json")
