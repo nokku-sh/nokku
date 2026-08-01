@@ -1,4 +1,4 @@
-package testutil
+package seed
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
-	"github.com/google/uuid"
 
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -22,7 +21,7 @@ func uniqueName(base string, i int) string {
 	return fmt.Sprintf("%s-%d", base, i)
 }
 
-type SeedConfig struct {
+type Config struct {
 	NumUsers           int
 	NumTeams           int
 	NumTargets         int
@@ -31,8 +30,8 @@ type SeedConfig struct {
 	NumServiceAccounts int
 }
 
-func DefaultSeedConfig() SeedConfig {
-	return SeedConfig{
+func DefaultConfig() Config {
+	return Config{
 		NumUsers:           10,
 		NumTeams:           5,
 		NumTargets:         10,
@@ -42,17 +41,8 @@ func DefaultSeedConfig() SeedConfig {
 	}
 }
 
-type SeededData struct {
-	WorkspaceID uuid.UUID
-	UserIDs     []uuid.UUID
-	TeamIDs     []uuid.UUID
-	TargetIDs   []uuid.UUID
-	CAIDs       []uuid.UUID
-}
-
-func SeedWorkspace(ctx context.Context, conn *db.Connection) error {
+func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 	_ = gofakeit.Seed(time.Now().UnixNano())
-	cfg := DefaultSeedConfig()
 
 	// Create owner user
 	email := os.Getenv("NOKKU_ADMIN_EMAIL")
@@ -190,29 +180,33 @@ func SeedWorkspace(ctx context.Context, conn *db.Connection) error {
 			sa[i] = s
 		}
 
-		// Create CA
-		ca, err := ssh.NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0, 0)
-		if err != nil {
-			slog.Debug("failed to create CA", "error", err)
-			return err
-		}
-		newCA, err := q.CreateCA(ctx, &db.CreateCAParams{
-			WorkspaceID:  workspace.ID,
-			Name:         `Default CA`,
-			Description:  new(gofakeit.Sentence()),
-			Certificate:  string(ca.Certificate),
-			PrivateKey:   ca.PrivateKey,
-			PublicKey:    ca.PublicKey,
-			SerialNumber: ca.SerialNumber,
-			Subject:      ca.Subject,
-			IsDefault:    true,
-			NotBefore:    ca.NotBefore,
-			NotAfter:     ca.NotAfter,
-			KeyType:      ca.KeyType,
-			KeyBits:      ca.KeyBits,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to insert CA: %w", err)
+		// Create CAs; the first one is the workspace default
+		cas := make([]*db.CertificateAuthority, cfg.NumCAs)
+		for i := range cfg.NumCAs {
+			ca, err := ssh.NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0, 0)
+			if err != nil {
+				slog.Debug("failed to create CA", "error", err)
+				return err
+			}
+			newCA, err := q.CreateCA(ctx, &db.CreateCAParams{
+				WorkspaceID:  workspace.ID,
+				Name:         uniqueName("CA", i),
+				Description:  new(gofakeit.Sentence()),
+				Certificate:  string(ca.Certificate),
+				PrivateKey:   ca.PrivateKey,
+				PublicKey:    ca.PublicKey,
+				SerialNumber: ca.SerialNumber,
+				Subject:      ca.Subject,
+				IsDefault:    i == 0,
+				NotBefore:    ca.NotBefore,
+				NotAfter:     ca.NotAfter,
+				KeyType:      ca.KeyType,
+				KeyBits:      ca.KeyBits,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to insert CA: %w", err)
+			}
+			cas[i] = newCA
 		}
 
 		tags := []string{
@@ -241,7 +235,7 @@ func SeedWorkspace(ctx context.Context, conn *db.Connection) error {
 				Description: &desc,
 				Endpoints:   endpoints,
 				Tags:        selectedTags,
-				CaID:        &newCA.ID,
+				CaID:        &cas[0].ID,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to create target %d: %w", i, err)
