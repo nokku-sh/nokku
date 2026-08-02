@@ -193,7 +193,7 @@ WITH
   )
 UPDATE workspace_domains wd
 SET
-  wd.verified_at = NOW()
+  verified_at = NOW()
 WHERE
   wd.domain = $1
   AND wd.workspace_id = $2

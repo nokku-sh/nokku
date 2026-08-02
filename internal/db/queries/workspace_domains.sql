@@ -54,7 +54,7 @@ WITH
   )
 UPDATE workspace_domains wd
 SET
-  wd.verified_at = NOW()
+  verified_at = NOW()
 WHERE
   wd.domain = @domain
   AND wd.workspace_id = @workspace_id
