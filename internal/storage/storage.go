@@ -32,7 +32,7 @@ type Storage struct {
 	Endpoint        string `env:"NOKKU_S3_ENDPOINT"`
 	AccessKeyID     string `env:"NOKKU_S3_ACCESS_KEY_ID"`
 	SecretAccessKey string `env:"NOKKU_S3_SECRET_ACCESS_KEY"`
-	Bucket          string `env:"NOKKU_S3_BUCKET"            envDefault:"cdn"`
+	Bucket          string `env:"NOKKU_S3_BUCKET"            envDefault:"nokku-assets"`
 	Region          string `env:"NOKKU_S3_REGION"            envDefault:"auto"`
 	UsePathStyle    bool   `env:"NOKKU_S3_USE_PATH_STYLE"    envDefault:"false"`
 	CDNURL          string `env:"NOKKU_S3_PUBLIC_URL"`
@@ -46,9 +46,9 @@ type Storage struct {
 //   - NOKKU_STORAGE=s3 - S3-compatible object storage (Scaleway, R2, MinIO, AWS)
 //   - NOKKU_STORAGE=local (default) - local filesystem at NOKKU_LOCAL_STORAGE_PATH
 func New(ctx context.Context, baseURL string) (*Storage, error) {
-	var s Storage
-	if err := env.Parse(&s); err != nil {
-		return nil, fmt.Errorf("parse storage config: %w", err)
+	s, err := env.ParseAs[Storage]()
+	if err != nil {
+		return nil, err
 	}
 	s.BaseURL = baseURL
 
