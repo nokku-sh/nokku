@@ -38,9 +38,6 @@ func NewConnection(ctx context.Context) (*Connection, error) {
 	if err := c.createPool(ctx); err != nil {
 		return nil, err
 	}
-	if err := c.seed(ctx); err != nil {
-		return nil, err
-	}
 	return &c, nil
 }
 
@@ -69,6 +66,9 @@ func (c *Connection) createPool(ctx context.Context) error {
 
 	if c.AutoMigrate {
 		if err := c.Migrate(ctx); err != nil {
+			return err
+		}
+		if err := c.seed(ctx); err != nil {
 			return err
 		}
 	}
