@@ -25,11 +25,11 @@ CREATE TABLE IF NOT EXISTS user_devices (
 );
 
 CREATE TABLE IF NOT EXISTS oauth_identities (
-  provider_id TEXT NOT NULL, -- The ID from the OAuth provider
+  provider_id TEXT NOT NULL, -- ID from the OAuth provider
   provider TEXT NOT NULL, -- 'google', 'github', 'oidc' etc.
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  provider_email TEXT, -- Email from provider (can be different from user email)
-  provider_username TEXT, -- Username from provider
+  provider_email TEXT, -- email from provider (can be different from user email)
+  provider_username TEXT, -- username from provider
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (provider_id, provider)
@@ -39,9 +39,9 @@ CREATE TABLE IF NOT EXISTS passkeys (
   id TEXT PRIMARY KEY, -- base64-encoded credential ID
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   name TEXT, -- e.g. "IPhone 13"
-  public_key BYTEA NOT NULL, -- the user's public key
+  public_key BYTEA NOT NULL,
   attestation_type TEXT NOT NULL, -- e.g. "none", "basic", "self"
-  aaguid BYTEA, -- authenticator's unique ID (for metadata/analytics)
+  aaguid BYTEA, -- authenticator's unique ID
   sign_count BIGINT NOT NULL DEFAULT 0, -- protects against cloned authenticators
   transports TEXT[], -- ["usb", "ble", "nfc", "internal"]
   backup_eligible BOOLEAN NOT NULL DEFAULT FALSE,
@@ -87,8 +87,8 @@ CREATE TABLE IF NOT EXISTS workspace_subscriptions (
   source TEXT NOT NULL DEFAULT '', -- stripe, manual, ...
   plan TEXT NOT NULL DEFAULT '', -- community, flex, enterprise
   status TEXT NOT NULL DEFAULT '',
-  customer_id TEXT NOT NULL DEFAULT '', -- Stripe customer id, opaque
-  subscription_id TEXT NOT NULL DEFAULT '', -- Stripe subscription id, opaque
+  customer_id TEXT NOT NULL DEFAULT '', -- stripe customer id, opaque
+  subscription_id TEXT NOT NULL DEFAULT '', -- stripe subscription id, opaque
   current_period_end TIMESTAMPTZ,
   cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -137,7 +137,7 @@ CREATE TABLE IF NOT EXISTS oidc_providers (
 
 CREATE TABLE IF NOT EXISTS saml_providers (
   workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
-  name TEXT NOT NULL DEFAULT 'SAML', -- Display name, e.g., "Okta SAML", "Azure AD SAML"
+  name TEXT NOT NULL DEFAULT 'SAML', -- Display name
   -- Identity Provider metadata URL 
   metadata_url TEXT, -- e.g., http://localhost:8080/realms/master/protocol/saml/descriptor
   -- Attribute mappings (SAML sends user data as attributes)
