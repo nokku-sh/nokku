@@ -12,6 +12,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
+	"github.com/nokku-sh/nokku/internal/util"
 )
 
 type WorkspaceDomainService struct {
@@ -111,7 +112,11 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 	}
 
 	dnsQuery := fmt.Sprintf("_nokku-verify.%s", domain.Domain)
-	txtRecords, err := net.DefaultResolver.LookupTXT(ctx, dnsQuery)
+	txtRecords, err := util.LookupTXTDOH(ctx, dnsQuery, "https://cloudflare-dns.com/dns-query")
+	if err != nil {
+		// Fall back to the OS resolver; DoH may be unreachable (offline, blocked).
+		txtRecords, err = net.DefaultResolver.LookupTXT(ctx, dnsQuery)
+	}
 	if err != nil || len(txtRecords) == 0 {
 		return nil, NewError(connect.CodeNotFound, "no TXT records found")
 	}
