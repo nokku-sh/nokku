@@ -13,7 +13,6 @@
 	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
 	import type { ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
 	import { createModalState } from '$lib/hooks';
-	import { pageIndex, pageSize } from '$lib/store.svelte';
 	import type { BulkAction } from '$lib/components/tables/types';
 	import { PencilIcon, PlusIcon, Trash2, Waypoints } from '@lucide/svelte';
 	import type { ColumnDef, Table } from '@tanstack/table-core';
@@ -26,8 +25,6 @@
 
 	const saData = $derived(
 		serviceAccount.list(() => ({
-			limit: pageSize.current,
-			offset: pageIndex.current * pageSize.current,
 			query: debounced.current
 		}))
 	);

@@ -1,7 +1,7 @@
 import { TargetService } from '$lib/gen/nokku/v1/target_pb';
 import { toast } from 'svelte-sonner';
 import { useMutation, useQuery } from '$lib/query';
-import { workspaceID } from '$lib/store.svelte';
+import { pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
 
 export const target = {
 	// Queries
@@ -13,8 +13,6 @@ export const target = {
 		),
 	list: (
 		opts?: () => {
-			limit?: number;
-			offset?: number;
 			query?: string;
 			daemonId?: string;
 			caId?: string;
@@ -24,7 +22,12 @@ export const target = {
 	) =>
 		useQuery(
 			TargetService.method.listTargets,
-			() => ({ workspaceId: workspaceID.current, ...opts?.() }),
+			() => ({
+				workspaceId: workspaceID.current,
+				limit: pageSize.current,
+				offset: pageIndex.current,
+				...opts?.()
+			}),
 			{
 				enabled: !!workspaceID.current,
 				refetchInterval: 15000

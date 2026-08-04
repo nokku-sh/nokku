@@ -69,7 +69,7 @@
 	}: DataTableProps<TData, TValue> = $props();
 
 	// Pagination
-	const pageSizeOptions = [10, 15, 20, 30, 50];
+	const pageSizeOptions = [2, 10, 15, 20, 30, 50];
 	let pagination = $state<PaginationState>({
 		pageIndex: 0,
 		pageSize: pageSize.current

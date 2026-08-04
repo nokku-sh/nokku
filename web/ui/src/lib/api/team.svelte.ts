@@ -1,7 +1,7 @@
 import { TeamService } from '$lib/gen/nokku/v1/team_pb';
 import { toast } from 'svelte-sonner';
 import { useMutation, useQuery } from '$lib/query';
-import { workspaceID } from '$lib/store.svelte';
+import { pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
 
 export const team = {
 	// Queries
@@ -11,10 +11,15 @@ export const team = {
 			{ id },
 			{ enabled: !!workspaceID.current && !!id, select: (res) => res.team }
 		),
-	list: (opts?: () => { limit?: number; offset?: number; query?: string }) =>
+	list: (opts?: () => { query?: string }) =>
 		useQuery(
 			TeamService.method.listTeams,
-			() => ({ workspaceId: workspaceID.current, ...opts?.() }),
+			() => ({
+				workspaceId: workspaceID.current,
+				limit: pageSize.current,
+				offset: pageIndex.current,
+				...opts?.()
+			}),
 			{ enabled: !!workspaceID.current }
 		),
 
