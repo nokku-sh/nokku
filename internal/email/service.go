@@ -21,14 +21,14 @@ type Service struct {
 	sender Sender
 	cache  cache.Cache
 
-	AppURL   string
+	appURL   string
 	Driver   string        `env:"NOKKU_EMAIL_DRIVER"   envDefault:"noop"`
 	Sender   string        `env:"NOKKU_EMAIL_SENDER"   envDefault:"noreply@system.nokku.sh"`
 	Timeout  time.Duration `env:"NOKKU_EMAIL_TIMEOUT"  envDefault:"10s"`
 	Cooldown time.Duration `env:"NOKKU_EMAIL_COOLDOWN" envDefault:"15m"`
 
-	SMTPHost     string `env:"NOKKU_SMTP_HOST"`
 	SMTPPort     int    `env:"NOKKU_SMTP_PORT"     envDefault:"587"`
+	SMTPHost     string `env:"NOKKU_SMTP_HOST"`
 	SMTPUsername string `env:"NOKKU_SMTP_USERNAME"`
 	SMTPPassword string `env:"NOKKU_SMTP_PASSWORD"`
 }
@@ -50,7 +50,7 @@ func New(appURL string, cache cache.Cache) (*Service, error) {
 		return nil, errors.New("email app url is required")
 	}
 
-	svc.AppURL = appURL
+	svc.appURL = appURL
 	svc.cache = cache
 
 	sender, err := svc.buildSender()
@@ -155,7 +155,7 @@ func (s *Service) SendNewLoginEmail(
 		subject:  "New sign-in to your account",
 		template: "new-login",
 		data: NewLoginTemplateData{
-			ProfileURL: s.AppURL + "/profile/security",
+			ProfileURL: s.appURL + "/profile/security",
 			DeviceID:   deviceID,
 			DeviceName: deviceName,
 			Location:   location,

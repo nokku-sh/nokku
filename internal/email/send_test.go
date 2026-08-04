@@ -194,7 +194,7 @@ func TestSendTemplate_NilService(t *testing.T) {
 func TestSendTemplate_MessageAndData(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
-	svc.AppURL = "https://app.nokku.sh"
+	svc.appURL = "https://app.nokku.sh"
 
 	err := svc.SendNewLoginEmail(
 		context.Background(),
