@@ -42,8 +42,6 @@ export const workspace = {
 		),
 	listMembers: (
 		opts?: () => {
-			limit?: number;
-			offset?: number;
 			query?: string;
 			roleName?: string;
 			teamIds?: string[];
@@ -51,7 +49,12 @@ export const workspace = {
 	) =>
 		useQuery(
 			WorkspaceService.method.listWorkspaceMembers,
-			() => ({ workspaceId: workspaceID.current, ...opts?.() }),
+			() => ({
+				workspaceId: workspaceID.current,
+				limit: pageSize.current,
+				offset: pageIndex.current,
+				...opts?.()
+			}),
 			{ enabled: !!workspaceID.current }
 		),
 

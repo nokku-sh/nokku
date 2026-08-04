@@ -14,7 +14,6 @@
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { DaemonStatus, type Daemon } from '$lib/gen/nokku/v1/daemon_pb';
 	import { createModalState } from '$lib/hooks';
-	import { pageIndex, pageSize } from '$lib/store.svelte';
 	import { enumLabel } from '$lib/utils';
 	import {
 		Bot,
@@ -48,8 +47,6 @@
 
 	const daemons = $derived(
 		daemon.list(() => ({
-			limit: pageSize.current,
-			offset: pageIndex.current * pageSize.current,
 			query: debounced.current,
 			status: page.url.searchParams.get('status')
 				? Number(page.url.searchParams.get('status'))

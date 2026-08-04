@@ -1,6 +1,6 @@
 import { ServiceAccountService } from '$lib/gen/nokku/v1/service_account_pb';
 import { useQuery, useMutation } from '$lib/query';
-import { workspaceID } from '$lib/store.svelte';
+import { pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
 import { toast } from 'svelte-sonner';
 
 export const serviceAccount = {
@@ -11,10 +11,15 @@ export const serviceAccount = {
 			{ id },
 			{ enabled: !!workspaceID.current && !!id, select: (res) => res.serviceAccount }
 		),
-	list: (opts?: () => { limit?: number; offset?: number; query?: string }) =>
+	list: (opts?: () => { query?: string }) =>
 		useQuery(
 			ServiceAccountService.method.listServiceAccounts,
-			() => ({ workspaceId: workspaceID.current, ...opts?.() }),
+			() => ({
+				workspaceId: workspaceID.current,
+				limit: pageSize.current,
+				offset: pageIndex.current,
+				...opts?.()
+			}),
 			{ enabled: !!workspaceID.current }
 		),
 

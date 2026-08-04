@@ -1,7 +1,7 @@
 import { PrincipalService, PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
 import { toast } from 'svelte-sonner';
 import { useMutation, useQuery } from '$lib/query';
-import { workspaceID } from '$lib/store.svelte';
+import { pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
 
 export const principal = {
 	// Queries
@@ -18,10 +18,10 @@ export const principal = {
 			PrincipalService.method.listPrincipals,
 			() => ({
 				targetId: opts().targetId || '',
-				limit: opts().limit,
-				offset: opts().offset,
 				query: opts().query,
 				type: opts().type,
+				limit: pageSize.current,
+				offset: pageIndex.current,
 				workspaceId: workspaceID.current
 			}),
 			() => ({

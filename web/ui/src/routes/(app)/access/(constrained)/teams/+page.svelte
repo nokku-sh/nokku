@@ -13,7 +13,6 @@
 	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
 	import type { Team } from '$lib/gen/nokku/v1/team_pb';
 	import { createModalState } from '$lib/hooks';
-	import { pageIndex, pageSize } from '$lib/store.svelte';
 	import type { BulkAction } from '$lib/components/tables/types';
 	import { PencilIcon, PlusIcon, Trash2, Users, UsersIcon } from '@lucide/svelte';
 	import type { ColumnDef, Table } from '@tanstack/table-core';
@@ -29,8 +28,6 @@
 
 	const teams = $derived(
 		team.list(() => ({
-			limit: pageSize.current,
-			offset: pageIndex.current * pageSize.current,
 			query: debounced.current
 		}))
 	);

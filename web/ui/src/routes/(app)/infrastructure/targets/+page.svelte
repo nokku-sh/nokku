@@ -16,7 +16,6 @@
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { type Target } from '$lib/gen/nokku/v1/target_pb';
 	import { createModalState } from '$lib/hooks';
-	import { pageIndex, pageSize } from '$lib/store.svelte';
 	import { PencilIcon, Plus, Server, TagIcon, Trash2, UserIcon, IdCard } from '@lucide/svelte';
 	import type { ColumnDef, Table } from '@tanstack/table-core';
 	import { Debounced } from 'runed';
@@ -31,8 +30,6 @@
 
 	const targets = $derived(
 		target.list(() => ({
-			limit: pageSize.current,
-			offset: pageIndex.current * pageSize.current,
 			query: debounced.current,
 			caId: page.url.searchParams.get('ca') || undefined,
 			tags: page.url.searchParams.get('tags')?.split(','),

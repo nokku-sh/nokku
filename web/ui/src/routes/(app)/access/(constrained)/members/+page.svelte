@@ -19,7 +19,6 @@
 	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
 	import { type WorkspaceMember } from '$lib/gen/nokku/v1/workspace_pb';
 	import { createModalState } from '$lib/hooks';
-	import { pageIndex, pageSize } from '$lib/store.svelte';
 	import {
 		CircleUser,
 		CircleUserIcon,
@@ -43,8 +42,6 @@
 
 	const members = $derived(
 		workspace.listMembers(() => ({
-			limit: pageSize.current,
-			offset: pageIndex.current * pageSize.current,
 			query: debounced.current,
 			roleName: page.url.searchParams.get('role') || undefined
 		}))

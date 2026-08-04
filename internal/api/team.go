@@ -130,6 +130,7 @@ func (s *TeamService) ListTeams(
 		if err != nil {
 			return err
 		}
+
 		teams, err := q.ListTeams(ctx, &db.ListTeamsParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			Query:       req.Query,
