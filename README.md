@@ -47,8 +47,6 @@ Nokku ships with three plans:
 
 Self-hosted instances work out of the box on the Community plan. To activate Enterprise, purchase an Enterprise license key and set it via the `NOKKU_LICENSE_KEY` environment variable on the server, then restart. License keys are Ed25519-signed and verified offline against a public key compiled into the binary, so activation works fully air-gapped; while valid they unlock the whole instance (unlimited quotas, SSO enforcement, 365-day audit retention, no per-workspace limits). When a key expires or is revoked, the instance falls back to the Community plan automatically.
 
-Keys are issued by a Go serverless worker (a separate repo, deployed to Scaleway Functions) when an Enterprise license subscription is purchased or renewed on Stripe: it signs the key and emails it to the buyer via Scaleway TEM. The backend never issues keys, it only verifies them. Generate the signing keypair with the worker's keygen and configure it as `LICENSE_PRIVATE_KEY` (self-hosted instances verify against `NOKKU_LICENSE_PUBLIC_KEY` or the built-in default in `internal/license/verify.go`).
-
 ## Build and run
 
 ```bash
