@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/internal/config"
@@ -39,7 +37,7 @@ func (s *DaemonService) GetDaemon(
 		result, err = q.GetDaemon(ctx, req.GetId())
 		return err
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 	if result == nil {
 		return nil, ErrNotFound
@@ -66,7 +64,7 @@ func (s *DaemonService) UpdateDaemon(
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	s.cfg.Pool.Broadcast(result.WorkspaceID, &nokkuv1.Notification{
@@ -115,7 +113,7 @@ func (s *DaemonService) ListDaemons(
 		})
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.ListDaemonsResponse{
@@ -141,13 +139,12 @@ func (s *DaemonService) DeleteDaemon(
 				return err
 			}
 		}
-		if result == nil {
-			return ErrNotFound
+		if result != nil {
+			meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		}
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 
 	status := nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED
@@ -186,7 +183,7 @@ func (s *DaemonService) RefreshEnrollToken(
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.RefreshEnrollTokenResponse{
@@ -211,7 +208,7 @@ func (s *DaemonService) RevokeEnrollToken(
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	return &nokkuv1.RevokeEnrollTokenResponse{}, nil
 }
@@ -225,10 +222,13 @@ func (s *DaemonService) CreateSession(
 	var daemon *db.Daemon
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		daemon, err = q.GetDaemon(ctx, req.GetDaemonId())
+		if err != nil {
+			return err
+		}
 		meta.SetAuditWorkspaceID(ctx, daemon.WorkspaceID)
-		return err
+		return nil
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 
 	sessionID := uuid.New().String()
@@ -257,7 +257,7 @@ func (s *DaemonService) ListSessions(
 		daemon, err = q.GetDaemon(ctx, req.GetDaemonId())
 		return err
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 
 	sessions := s.cfg.Pool.ListSessions(daemon.ID)
@@ -283,7 +283,6 @@ func (s *DaemonService) EnrollDaemon(
 ) (*nokkuv1.EnrollDaemonResponse, error) {
 	enrollToken, err := crypto.Parse(req.GetToken())
 	if err != nil {
-		slog.Error("failed to parse enroll token", "error", err)
 		return nil, NewError(connect.CodeInvalidArgument, "invalid token")
 	}
 	workspaceID := enrollToken.ID
@@ -295,7 +294,7 @@ func (s *DaemonService) EnrollDaemon(
 
 	settings, err := s.cfg.Conn.Q.GetWorkspaceSettings(ctx, workspaceID)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	if settings.EnrollExpiresAt != nil && settings.EnrollExpiresAt.Before(time.Now()) {
 		return nil, NewError(connect.CodeFailedPrecondition, "enrollment token has expired")
@@ -312,7 +311,6 @@ func (s *DaemonService) EnrollDaemon(
 	// Create permanent token
 	token, err := crypto.NewDaemonToken()
 	if err != nil {
-		slog.Error("failed to create daemon token", "error", err)
 		return nil, ErrInternal
 	}
 
@@ -342,14 +340,7 @@ func (s *DaemonService) EnrollDaemon(
 		TokenHash:   token.Hash,
 	})
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return nil, NewError(
-				connect.CodeAlreadyExists,
-				"a daemon with this name already exists in the workspace",
-			)
-		}
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	tp := &db.UpdateTargetCAParams{DaemonID: &daemon.ID}
@@ -384,8 +375,6 @@ func (s *DaemonService) SyncDaemon(
 	ctx context.Context,
 	req *nokkuv1.SyncDaemonRequest,
 ) (*nokkuv1.SyncDaemonResponse, error) {
-	var connectError error
-
 	metadata := daemonMetadata(ctx)
 
 	var status *nokkuv1.DaemonStatus
@@ -394,7 +383,6 @@ func (s *DaemonService) SyncDaemon(
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		daemon, err := q.GetDaemon(ctx, meta.DaemonIDFromContext(ctx))
 		if err != nil {
-			connectError = ErrNotFound
 			return err
 		}
 		// Stop heartbeat if over quota and on free plan
@@ -410,7 +398,6 @@ func (s *DaemonService) SyncDaemon(
 		config = daemon.Config
 
 		if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
-			connectError = NewError(connect.CodePermissionDenied, "daemon is not enrolled")
 			return errors.New("denied")
 		}
 
@@ -423,7 +410,6 @@ func (s *DaemonService) SyncDaemon(
 
 		target, err := q.GetTargetByDaemon(ctx, &daemon.ID)
 		if err != nil {
-			connectError = ErrNotFound
 			return err
 		}
 
@@ -461,10 +447,7 @@ func (s *DaemonService) SyncDaemon(
 
 		return nil
 	}); err != nil {
-		if connectError != nil {
-			return nil, connectError
-		}
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.SyncDaemonResponse{

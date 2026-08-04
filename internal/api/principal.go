@@ -28,7 +28,7 @@ func (s *PrincipalService) SetPrincipals(
 			Usernames: req.GetUsernames(),
 		})
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	return &nokkuv1.SetPrincipalsResponse{}, nil
 }
@@ -54,7 +54,7 @@ func (s *PrincipalService) ListPrincipals(
 		})
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.ListPrincipalsResponse{
@@ -108,7 +108,7 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	s.cfg.Pool.Broadcast(workspaceID, &nokkuv1.Notification{
@@ -162,7 +162,7 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	s.cfg.Pool.Broadcast(workspaceID, &nokkuv1.Notification{
@@ -210,7 +210,7 @@ func (s *PrincipalService) RevokeAllAccess(
 		}
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	s.cfg.Pool.Broadcast(req.GetWorkspaceId(), &nokkuv1.Notification{

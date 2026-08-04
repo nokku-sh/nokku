@@ -32,7 +32,7 @@ func (s *ServiceAccountService) GetServiceAccount(
 		result, err = q.GetServiceAccount(ctx, saID)
 		return err
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 	if result == nil {
 		return nil, ErrNotFound
@@ -81,7 +81,7 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		result, err = q.CreateServiceAccount(ctx, params)
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.CreateServiceAccountResponse{
@@ -107,7 +107,7 @@ func (s *ServiceAccountService) UpdateServiceAccount(
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	if result == nil {
 		return nil, ErrNotFound
@@ -147,7 +147,7 @@ func (s *ServiceAccountService) ListServiceAccounts(
 		result = db.ServiceAccountsToProto(sas)
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.ListServiceAccountsResponse{
@@ -165,7 +165,7 @@ func (s *ServiceAccountService) DeleteServiceAccount(
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.DeleteServiceAccountResponse{}, nil

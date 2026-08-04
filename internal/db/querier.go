@@ -145,7 +145,7 @@ type Querier interface {
 	RemoveTeamMember(ctx context.Context, arg *RemoveTeamMemberParams) error
 	RemoveTeamsFromPrincipal(ctx context.Context, arg *RemoveTeamsFromPrincipalParams) error
 	RemoveUsersFromPrincipal(ctx context.Context, arg *RemoveUsersFromPrincipalParams) error
-	RemoveWorkspaceMember(ctx context.Context, arg *RemoveWorkspaceMemberParams) (int64, error)
+	RemoveWorkspaceMember(ctx context.Context, arg *RemoveWorkspaceMemberParams) error
 	ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*CertificateAuthority, error)
 	RevokeServiceAccountAccessInWorkspace(ctx context.Context, arg *RevokeServiceAccountAccessInWorkspaceParams) error
 	RevokeTeamAccessInWorkspace(ctx context.Context, arg *RevokeTeamAccessInWorkspaceParams) error

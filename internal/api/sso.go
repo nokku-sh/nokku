@@ -30,7 +30,7 @@ func (s *SSOService) GetOIDCProvider(
 		result, err = q.GetOIDCProvider(ctx, req.GetWorkspaceId())
 		return err
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 	if result == nil {
 		return nil, ErrNotFound
@@ -71,7 +71,7 @@ func (s *SSOService) UpdateOIDCProvider(
 			count, err = q.CountVerifiedWorkspaceDomains(ctx, req.GetWorkspaceId())
 			return err
 		}); err != nil {
-			return nil, ErrInternal
+			return nil, DBError(err)
 		}
 
 		if count == 0 {
@@ -101,7 +101,7 @@ func (s *SSOService) UpdateOIDCProvider(
 		result, err = q.UpdateOIDCProvider(ctx, params)
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	if result == nil {
 		return nil, ErrNotFound
@@ -121,7 +121,7 @@ func (s *SSOService) GetSAMLProvider(
 		result, err = q.GetSAMLProvider(ctx, req.GetWorkspaceId())
 		return err
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 	if result == nil {
 		return nil, ErrNotFound
@@ -155,7 +155,7 @@ func (s *SSOService) UpdateSAMLProvider(
 			count, err = q.CountVerifiedWorkspaceDomains(ctx, req.GetWorkspaceId())
 			return err
 		}); err != nil {
-			return nil, ErrInternal
+			return nil, DBError(err)
 		}
 
 		if count == 0 {
@@ -185,7 +185,7 @@ func (s *SSOService) UpdateSAMLProvider(
 		result, err = q.UpdateSAMLProvider(ctx, params)
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	if result == nil {
 		return nil, ErrNotFound

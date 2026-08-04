@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -28,7 +27,7 @@ func (s *TeamService) GetTeam(
 		result, err = q.GetTeam(ctx, req.GetId())
 		return err
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 	if result == nil {
 		return nil, ErrNotFound
@@ -64,8 +63,7 @@ func (s *TeamService) CreateTeam(
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
-		slog.Error("failed to create team", "error", err)
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.CreateTeamResponse{
@@ -91,7 +89,7 @@ func (s *TeamService) UpdateTeam(
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.UpdateTeamResponse{
@@ -111,7 +109,7 @@ func (s *TeamService) DeleteTeam(
 		meta.SetAuditWorkspaceID(ctx, team.WorkspaceID)
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	return &nokkuv1.DeleteTeamResponse{}, nil
 }
@@ -153,7 +151,7 @@ func (s *TeamService) ListTeams(
 		}
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.ListTeamsResponse{
@@ -172,7 +170,7 @@ func (s *TeamService) AddTeamMember(
 			UserID: req.GetUserId(),
 		})
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.AddTeamMemberResponse{}, nil
@@ -188,7 +186,7 @@ func (s *TeamService) RemoveTeamMember(
 			UserID: req.GetUserId(),
 		})
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.RemoveTeamMemberResponse{}, nil

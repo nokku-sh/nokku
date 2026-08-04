@@ -1,11 +1,15 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 
 	"connectrpc.com/connect"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Generic errors
@@ -29,11 +33,7 @@ var (
 	)
 	ErrRateLimited = connect.NewError(
 		connect.CodeResourceExhausted,
-		errors.New("too many requests, please slow down"),
-	)
-	ErrQuotaExceeded = connect.NewError(
-		connect.CodeResourceExhausted,
-		errors.New("you've reached your plan limit"),
+		errors.New("too many requests, please try again later"),
 	)
 	ErrPermissionDenied = connect.NewError(
 		connect.CodePermissionDenied,
@@ -163,6 +163,90 @@ var (
 
 func NewError(code connect.Code, msg string) error {
 	return connect.NewError(code, errors.New(msg))
+}
+
+// DBError maps a pgx or postgres error to a connect error with a message that
+// fits the underlying failure. It returns nil only when err is nil.
+func DBError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return ErrNotFound
+	case errors.Is(err, context.Canceled):
+		return NewError(connect.CodeCanceled, "the request was canceled")
+	case errors.Is(err, context.DeadlineExceeded):
+		return ErrTimeout
+	}
+
+	pgConnErr, ok := errors.AsType[*pgconn.PgError](err)
+	if !ok {
+		return ErrInternal
+	}
+
+	switch pgConnErr.Code {
+	case pgerrcode.UniqueViolation, pgerrcode.ExclusionViolation:
+		return NewError(connect.CodeAlreadyExists, "a record with this value already exists")
+	case pgerrcode.ForeignKeyViolation, pgerrcode.RestrictViolation:
+		return NewError(
+			connect.CodeFailedPrecondition,
+			"a related record is missing or still in use",
+		)
+	case pgerrcode.NotNullViolation, pgerrcode.CheckViolation:
+		return NewError(
+			connect.CodeInvalidArgument,
+			"a required field is missing or contains invalid data",
+		)
+	case pgerrcode.StringDataRightTruncationDataException:
+		return NewError(connect.CodeInvalidArgument, "a provided value is too long")
+	case pgerrcode.InvalidTextRepresentation,
+		pgerrcode.NumericValueOutOfRange,
+		pgerrcode.InvalidParameterValue:
+		return NewError(connect.CodeInvalidArgument, "a provided identifier or value is not valid")
+	case pgerrcode.SerializationFailure,
+		pgerrcode.DeadlockDetected,
+		pgerrcode.InvalidTransactionState,
+		pgerrcode.InFailedSQLTransaction,
+		pgerrcode.ActiveSQLTransaction:
+		return NewError(connect.CodeAborted, "the operation conflicted with another, please retry")
+	case pgerrcode.QueryCanceled:
+		return NewError(connect.CodeCanceled, "the request was canceled")
+	case pgerrcode.LockNotAvailable,
+		pgerrcode.ObjectInUse,
+		pgerrcode.ObjectNotInPrerequisiteState,
+		pgerrcode.CantChangeRuntimeParam:
+		return NewError(
+			connect.CodeFailedPrecondition,
+			"the resource is not available in its current state",
+		)
+	case pgerrcode.TooManyConnections:
+		return NewError(
+			connect.CodeResourceExhausted,
+			"the database is busy, please try again later",
+		)
+	case pgerrcode.InsufficientResources,
+		pgerrcode.DiskFull,
+		pgerrcode.OutOfMemory,
+		pgerrcode.ProgramLimitExceeded:
+		return NewError(
+			connect.CodeResourceExhausted,
+			"the database ran out of resources, please try again later",
+		)
+	case pgerrcode.ConnectionException,
+		pgerrcode.ConnectionDoesNotExist,
+		pgerrcode.ConnectionFailure,
+		pgerrcode.AdminShutdown,
+		pgerrcode.CrashShutdown,
+		pgerrcode.CannotConnectNow:
+		return NewError(
+			connect.CodeUnavailable,
+			"the service is temporarily unavailable, please try again",
+		)
+	default:
+		return ErrInternal
+	}
 }
 
 // Http errors

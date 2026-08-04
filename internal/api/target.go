@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -28,7 +27,7 @@ func (s *TargetService) GetTarget(
 		target, err = q.GetTarget(ctx, req.GetId())
 		return err
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 	if target == nil {
 		return nil, ErrNotFound
@@ -73,8 +72,7 @@ func (s *TargetService) CreateTarget(
 			Usernames: []string{"root"},
 		})
 	}); err != nil {
-		slog.Error("failed to create target", "error", err)
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	return &nokkuv1.CreateTargetResponse{
 		Target: result.ToProto(),
@@ -99,17 +97,9 @@ func (s *TargetService) UpdateTarget(
 			return err
 		}
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
-		// Disable updates if over quota
-		if err := s.cfg.Entitlements.Check(
-			ctx,
-			result.WorkspaceID,
-			entitlement.ResourceTargets,
-		); err != nil {
-			return err
-		}
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.UpdateTargetResponse{
@@ -126,7 +116,7 @@ func (s *TargetService) DeleteTarget(
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	return &nokkuv1.DeleteTargetResponse{}, nil
 }
@@ -161,7 +151,7 @@ func (s *TargetService) ListTargets(
 		})
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.ListTargetsResponse{
@@ -262,7 +252,7 @@ func (s *TargetService) GetSubjectAccess(
 		}
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.GetSubjectAccessResponse{
@@ -288,7 +278,7 @@ func (s *TargetService) GetTargetFilters(
 		principals, err = q.GetWorkspacePrincipals(ctx, req.GetWorkspaceId())
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.GetTargetFiltersResponse{

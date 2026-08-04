@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"log/slog"
 
 	"connectrpc.com/connect"
 
@@ -33,7 +32,7 @@ func (s *WorkspaceService) GetWorkspace(
 		workspace, err = q.GetWorkspace(ctx, req.GetWorkspaceId())
 		return err
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 	return &nokkuv1.GetWorkspaceResponse{
 		Workspace: workspace.ToProto(),
@@ -62,7 +61,10 @@ func (s *WorkspaceService) CreateWorkspace(
 		Description: req.Description,
 		CreatedBy:   user.ID,
 	})
-	if err != nil || workspace == nil {
+	if err != nil {
+		return nil, DBError(err)
+	}
+	if workspace == nil {
 		return nil, ErrInternal
 	}
 
@@ -86,7 +88,7 @@ func (s *WorkspaceService) UpdateWorkspace(
 		})
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	if workspace == nil {
 		return nil, ErrNotFound
@@ -111,9 +113,8 @@ func (s *WorkspaceService) DeleteWorkspace(
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		return q.DeleteWorkspace(ctx, req.GetWorkspaceId())
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
-
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
 }
 
@@ -129,7 +130,7 @@ func (s *WorkspaceService) ListWorkspaces(
 		if errors.Is(err, db.ErrNoWorkspaces) {
 			return &nokkuv1.ListWorkspacesResponse{}, nil
 		}
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.ListWorkspacesResponse{
@@ -153,7 +154,7 @@ func (s *WorkspaceService) UpdateWorkspaceSettings(
 		settings, err = q.UpdateWorkspaceSettings(ctx, params)
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.UpdateWorkspaceSettingsResponse{
@@ -177,7 +178,7 @@ func (s *WorkspaceService) GetWorkspaceMember(
 		})
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.GetWorkspaceMemberResponse{
@@ -198,7 +199,7 @@ func (s *WorkspaceService) UpdateWorkspaceMember(
 			RoleName:    req.GetRoleName(),
 		})
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.UpdateWorkspaceMemberResponse{}, nil
@@ -228,7 +229,7 @@ func (s *WorkspaceService) ListWorkspaceMembers(
 		})
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.ListWorkspaceMembersResponse{
@@ -244,19 +245,12 @@ func (s *WorkspaceService) RemoveWorkspaceMember(
 	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
 
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		rows, err := q.RemoveWorkspaceMember(ctx, &db.RemoveWorkspaceMemberParams{
+		return q.RemoveWorkspaceMember(ctx, &db.RemoveWorkspaceMemberParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			UserID:      req.GetUserId(),
 		})
-		if err != nil {
-			return ErrNotFound
-		}
-		if rows == 0 {
-			return ErrNotFound
-		}
-		return nil
 	}); err != nil {
-		return nil, err
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.RemoveWorkspaceMemberResponse{}, nil
@@ -287,7 +281,7 @@ func (s *WorkspaceService) UpdateWorkspaceOwner(
 		if errors.Is(err, ErrPermissionDenied) {
 			return nil, ErrPermissionDenied
 		}
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.UpdateWorkspaceOwnerResponse{}, nil
@@ -331,7 +325,7 @@ func (s *WorkspaceService) initializeWorkspace(
 ) (*nokkuv1.Workspace, error) {
 	workspace, err := s.cfg.Conn.Q.CreateWorkspace(ctx, params)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, err
 	}
 
 	// Create a unscoped transaction
@@ -379,10 +373,8 @@ func (s *WorkspaceService) initializeWorkspace(
 		}
 		return nil
 	}); err != nil {
-		slog.Error("failed to create workspace", "error", err)
 		if err := s.cfg.Conn.Q.DeleteWorkspace(ctx, workspace.ID); err != nil {
-			slog.Error("failed to delete workspace", "error", err)
-			return nil, ErrInternal
+			return nil, err
 		}
 		return nil, err
 	}
