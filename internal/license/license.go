@@ -8,10 +8,9 @@ package license
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 	"time"
-
-	"golang.org/x/exp/slog"
 )
 
 var (
