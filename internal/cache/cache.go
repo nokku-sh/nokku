@@ -3,8 +3,9 @@ package cache
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
+
+	"github.com/caarlos0/env/v11"
 )
 
 var ErrNotFound = errors.New("cache: key not found or expired")
@@ -17,52 +18,26 @@ type Cache interface {
 	Delete(ctx context.Context, key string) error
 }
 
-type entry struct {
-	value   []byte
-	expires time.Time
+// Config configures the cache backend from environment variables.
+type Config struct {
+	Backend       string `env:"NOKKU_CACHE"          envDefault:"memory"`
+	RedisAddr     string `env:"NOKKU_REDIS_ADDR"     envDefault:"localhost:6379"`
+	RedisPassword string `env:"NOKKU_REDIS_PASSWORD"`
+	RedisDB       int    `env:"NOKKU_REDIS_DB"       envDefault:"0"`
 }
 
-type MemoryCache struct {
-	mu      sync.RWMutex
-	entries map[string]*entry
-}
-
-func NewMemory() *MemoryCache {
-	return &MemoryCache{entries: make(map[string]*entry)}
-}
-
-func (c *MemoryCache) Get(_ context.Context, key string) ([]byte, error) {
-	c.mu.RLock()
-	e, ok := c.entries[key]
-	c.mu.RUnlock()
-	if !ok {
-		return nil, ErrNotFound
+// New parses the cache environment configuration and returns the selected
+// backend. Unknown or empty backends fall back to the in-memory cache.
+func New(ctx context.Context) (Cache, error) {
+	cfg, err := env.ParseAs[Config]()
+	if err != nil {
+		return nil, err
 	}
-	if time.Now().After(e.expires) {
-		c.mu.Lock()
-		delete(c.entries, key)
-		c.mu.Unlock()
-		return nil, ErrNotFound
-	}
-	// Return a copy so callers can't mutate the cached bytes for all readers.
-	return append([]byte(nil), e.value...), nil
-}
 
-func (c *MemoryCache) Set(_ context.Context, key string, value []byte, ttl time.Duration) error {
-	c.mu.Lock()
-	c.entries[key] = &entry{
-		// Store a copy so later mutation of the caller's slice can't corrupt
-		// the cached entry through the shared backing array.
-		value:   append([]byte(nil), value...),
-		expires: time.Now().Add(ttl),
+	switch cfg.Backend {
+	case "redis":
+		return NewRedis(ctx, cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB)
+	default:
+		return NewMemory(), nil
 	}
-	c.mu.Unlock()
-	return nil
-}
-
-func (c *MemoryCache) Delete(_ context.Context, key string) error {
-	c.mu.Lock()
-	delete(c.entries, key)
-	c.mu.Unlock()
-	return nil
 }
