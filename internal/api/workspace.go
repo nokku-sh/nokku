@@ -45,12 +45,12 @@ func (s *WorkspaceService) CreateWorkspace(
 ) (*nokkuv1.CreateWorkspaceResponse, error) {
 	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
 	if err != nil {
-		return nil, ErrBadCredentials
+		return nil, DBError(err)
 	}
 
 	count, err := s.cfg.Conn.Q.CountWorkspacesByOwner(ctx, user.ID)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	if count >= 5 {
 		return nil, NewError(connect.CodeResourceExhausted, "maximum number of workspaces reached")

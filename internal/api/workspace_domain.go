@@ -138,7 +138,7 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 		},
 	)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.VerifyWorkspaceDomainResponse{

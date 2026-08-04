@@ -349,7 +349,7 @@ func (s *DaemonService) EnrollDaemon(
 	}
 	target, err := s.cfg.Conn.Q.UpdateTargetCA(ctx, tp)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	eventType := "daemon.pending"
