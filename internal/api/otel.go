@@ -7,18 +7,17 @@ import (
 
 	"connectrpc.com/otelconnect"
 	"github.com/mizuchilabs/kata/buildinfo"
-	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
-	sdklog "go.opentelemetry.io/otel/sdk/log"
+	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 )
 
 func NewOTLPInterceptor(ctx context.Context) *otelconnect.Interceptor {
@@ -69,16 +68,16 @@ func NewOTLPInterceptor(ctx context.Context) *otelconnect.Interceptor {
 	)
 	otel.SetMeterProvider(mp)
 
-	lp := sdklog.NewLoggerProvider(
-		sdklog.WithProcessor(sdklog.NewBatchProcessor(logExporter)),
-		sdklog.WithResource(res),
+	lp := log.NewLoggerProvider(
+		log.WithProcessor(log.NewBatchProcessor(logExporter)),
+		log.WithResource(res),
 	)
 
-	otelLogger := slog.New(slog.NewMultiHandler(
-		slog.Default().Handler(),
-		otelslog.NewHandler("nokku-logger", otelslog.WithLoggerProvider(lp)),
-	))
-	slog.SetDefault(otelLogger) // Override global
+	// otelLogger := slog.New(slog.NewMultiHandler(
+	// 	slog.Default().Handler(),
+	// 	otelslog.NewLogger("nokku-api", otelslog.WithLoggerProvider(lp)).Handler(),
+	// ))
+	// slog.SetDefault(otelLogger)
 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
