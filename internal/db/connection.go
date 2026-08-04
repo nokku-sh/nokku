@@ -23,7 +23,7 @@ type Connection struct {
 	User        string `env:"NOKKU_DB_USER"        envDefault:"postgres"`
 	Password    string `env:"NOKKU_DB_PASSWORD"    envDefault:"postgres"`
 	SSLMode     string `env:"NOKKU_DB_SSL_MODE"    envDefault:"disable"`
-	AutoMigrate bool   `env:"NOKKU_DB_AUTOMIGRATE" envDefault:"false"`
+	AutoMigrate bool   `env:"NOKKU_DB_AUTOMIGRATE" envDefault:"true"`
 
 	Pool *pgxpool.Pool
 	Q    *Queries
