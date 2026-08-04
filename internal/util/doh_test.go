@@ -13,7 +13,11 @@ func TestLookupTXTDOH(t *testing.T) {
 			t.Errorf("unexpected query: %v", r.URL.RawQuery)
 		}
 		w.Header().Set("Content-Type", "application/dns-json")
-		_, _ = w.Write([]byte(`{"Status":0,"Answer":[{"name":"example.com","type":16,"TTL":60,"data":"\"tok123\""}]}`))
+		_, _ = w.Write(
+			[]byte(
+				`{"Status":0,"Answer":[{"name":"example.com","type":16,"TTL":60,"data":"\"tok123\""}]}`,
+			),
+		)
 	}))
 	defer srv.Close()
 
@@ -27,7 +31,7 @@ func TestLookupTXTDOH(t *testing.T) {
 }
 
 func TestLookupTXTDOHMissing(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"Status":0,"Answer":[]}`))
 	}))
 	defer srv.Close()
