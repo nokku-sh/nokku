@@ -61,6 +61,11 @@
 
 	const columns: ColumnDef<EventLog>[] = [
 		{
+			header: 'Status',
+			accessorKey: 'status_code',
+			cell: ({ row }) => renderComponent(CheckCell, { checked: row.original.statusCode === '' })
+		},
+		{
 			header: 'Action',
 			accessorKey: 'action',
 			cell: ({ row }) => {
@@ -71,11 +76,6 @@
 					class: `${getActionColor(row.original.action)} text-xs text-primary-foreground`
 				});
 			}
-		},
-		{
-			header: 'Status',
-			accessorKey: 'status_code',
-			cell: ({ row }) => renderComponent(CheckCell, { checked: row.original.statusCode === '' })
 		},
 		{
 			header: 'Actor',
