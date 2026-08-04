@@ -34,7 +34,7 @@ func (s *BillingService) GetBilling(
 
 	stats, err := s.cfg.Conn.Q.GetWorkspaceStats(ctx, req.GetWorkspaceId())
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	// Pull the latest state from the provider (self-heals missed webhooks).
@@ -59,7 +59,7 @@ func (s *BillingService) GetBilling(
 	if sub, err := s.cfg.Conn.Q.GetSubscription(ctx, req.GetWorkspaceId()); err == nil {
 		resp.CustomerId = &sub.CustomerID
 		resp.ProductId = &sub.Plan
-		resp.ProductName = new(planName(sub.Plan))
+		resp.ProductName = new(sub.Plan)
 		resp.Status = &sub.Status
 		resp.CancelAtPeriodEnd = &sub.CancelAtPeriodEnd
 		resp.CurrentPeriodEnd = db.SafeTimestamp(sub.CurrentPeriodEnd)
@@ -75,14 +75,9 @@ func (s *BillingService) CreateCheckout(
 	if s.cfg.Billing == nil {
 		return nil, ErrBillingDisabled
 	}
-	userID := meta.UserIDFromContext(ctx)
-	if userID == "" {
-		return nil, ErrUnauthorized
-	}
-
-	user, err := s.cfg.Conn.Q.GetUserByID(ctx, userID)
+	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	url, err := s.cfg.Billing.Checkout(ctx, req.GetWorkspaceId(), user.Email)
@@ -110,7 +105,6 @@ func (s *BillingService) CreatePortal(
 	}
 	url, err := s.cfg.Billing.Portal(ctx, req.GetWorkspaceId())
 	if err != nil {
-		slog.Error("failed to create customer portal", "error", err)
 		return nil, ErrInternal
 	}
 	return &nokkuv1.CreatePortalResponse{
@@ -131,22 +125,9 @@ func (s *BillingService) CancelSubscription(
 		req.GetImmediate(),
 		req.GetReason(),
 	); err != nil {
-		slog.Error("failed to cancel subscription", "error", err)
 		return nil, ErrInternal
 	}
 	return &nokkuv1.CancelSubscriptionResponse{}, nil
-}
-
-// planName maps a plan key to the display name shown in the UI.
-func planName(plan string) string {
-	switch plan {
-	case entitlement.PlanFlex:
-		return "Nokku - Flex"
-	case entitlement.PlanEnterprise:
-		return "Nokku - Enterprise"
-	default:
-		return "Nokku - Community"
-	}
 }
 
 // planMetadata exposes the resolved plan's quotas to the UI:
