@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { util } from '$lib/api/workspaces.svelte';
 	import ModeSwitch from '$lib/components/utils/ModeSwitch.svelte';
+	import { ImprintURL, PrivacyURL, ToSURL } from '$lib/config';
 
 	const version = $derived(util.getVersion());
 	const currentYear = new Date().getFullYear();
@@ -17,9 +18,9 @@
 		<div class="hidden h-4 w-px bg-border sm:block"></div>
 
 		<nav class="flex items-center gap-4 text-xs text-muted-foreground">
-			<a href="/terms" class="transition-colors hover:text-foreground">Terms of Service</a>
-			<a href="/privacy" class="transition-colors hover:text-foreground">Privacy Policy</a>
-			<a href="/impressum" class="transition-colors hover:text-foreground">Legal Notice</a>
+			<a href={ToSURL} class="transition-colors hover:text-foreground">Terms of Service</a>
+			<a href={PrivacyURL} class="transition-colors hover:text-foreground">Privacy Policy</a>
+			<a href={ImprintURL} class="transition-colors hover:text-foreground">Legal Notice</a>
 		</nav>
 	</div>
 

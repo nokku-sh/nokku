@@ -4,6 +4,9 @@ export const SupportEmail = env.PUBLIC_SUPPORT_EMAIL || 'mailto:support@mizuchi.
 export const DocsURL = env.PUBLIC_DOCS_URL || 'https://nokku.sh/docs';
 export const DaemonURL = env.PUBLIC_DOCS_URL || 'https://nokku.sh/docs/daemon';
 export const CLIURL = env.PUBLIC_DOCS_URL || 'https://nokku.sh/docs/cli';
+export const ToSURL = env.PUBLIC_DOCS_URL || 'https://nokku.sh/legal/terms';
+export const PrivacyURL = env.PUBLIC_DOCS_URL || 'https://nokku.sh/legal/privacy';
+export const ImprintURL = env.PUBLIC_DOCS_URL || 'https://nokku.sh/legal/imprint';
 
 // Stripe Payment Link for the Enterprise license (Managed Payments).
 export const LicensePurchaseURL =
