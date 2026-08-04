@@ -158,7 +158,7 @@ func (s *UserService) ListLinkedAccounts(
 ) (*nokkuv1.ListLinkedAccountsResponse, error) {
 	identities, err := s.cfg.Conn.Q.GetOAuthIdentitiesByUserID(ctx, meta.UserIDFromContext(ctx))
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	accounts := make([]*nokkuv1.OAuthIdentity, 0, len(identities))
