@@ -74,7 +74,10 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 	cfg.Geo = geo.New()
-	cfg.Cache = cache.NewMemory()
+	cfg.Cache, err = cache.New(ctx)
+	if err != nil {
+		return nil, err
+	}
 	cfg.Pool = daemon.New(ctx, cfg.Conn)
 	cfg.Authn, err = authn.New(cfg.Conn)
 	if err != nil {
