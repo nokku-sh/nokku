@@ -3,6 +3,7 @@ package authn
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"aidanwoods.dev/go-paseto"
@@ -35,6 +36,7 @@ func New(conn *db.Connection) (*Service, error) {
 	p.conn = conn
 
 	if p.SessionSeed == "" {
+		slog.Warn("no session seed provided, using random secret key")
 		p.secret = paseto.NewV4AsymmetricSecretKey()
 	} else {
 		if len(p.SessionSeed) != 64 {
