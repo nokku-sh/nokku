@@ -9,9 +9,6 @@ import (
 	"connectrpc.com/connect"
 )
 
-// LogInterceptor logs RPCs at a level matching their outcome: server-side
-// failures at Error, everything else at Debug so production only sees
-// actionable entries. Keys are stable snake_case for SIEM pipelines.
 type LogInterceptor struct {
 	debug bool
 }
