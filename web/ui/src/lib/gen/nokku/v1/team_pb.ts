@@ -2,446 +2,425 @@
 // @generated from file nokku/v1/team.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
-import { fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
-import { file_buf_validate_validate } from '../../buf/validate/validate_pb';
-import { file_google_api_annotations } from '../../google/api/annotations_pb';
-import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import { file_google_protobuf_timestamp } from '@bufbuild/protobuf/wkt';
-import type { WorkspaceMember } from './workspace_pb';
-import { file_nokku_v1_workspace } from './workspace_pb';
-import type { Message } from '@bufbuild/protobuf';
+import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
+import { file_google_api_annotations } from "../../google/api/annotations_pb";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { WorkspaceMember } from "./workspace_pb";
+import { file_nokku_v1_workspace } from "./workspace_pb";
+import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file nokku/v1/team.proto.
  */
-export const file_nokku_v1_team: GenFile /*@__PURE__*/ = fileDesc(
-	'ChNub2trdS92MS90ZWFtLnByb3RvEghub2trdS52MSLlAQoEVGVhbRIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRITCgtkZXNjcmlwdGlvbhgEIAEoCRIMCgR0YWdzGAUgAygJEioKB21lbWJlcnMYBiADKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VNZW1iZXISLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiJgoOR2V0VGVhbVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIi8KD0dldFRlYW1SZXNwb25zZRIcCgR0ZWFtGAEgASgLMg4ubm9ra3UudjEuVGVhbSJ6ChFDcmVhdGVUZWFtUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISHQoLZGVzY3JpcHRpb24YAyABKAlCCLpIBXIDGOgHEgwKBHRhZ3MYBCADKAkiMgoSQ3JlYXRlVGVhbVJlc3BvbnNlEhwKBHRlYW0YASABKAsyDi5ub2trdS52MS5UZWFtInAKEVVwZGF0ZVRlYW1SZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARIYCgRuYW1lGAIgASgJQgq6SAdyBRABGIACEh0KC2Rlc2NyaXB0aW9uGAMgASgJQgi6SAVyAxjoBxIMCgR0YWdzGAQgAygJIjIKElVwZGF0ZVRlYW1SZXNwb25zZRIcCgR0ZWFtGAEgASgLMg4ubm9ra3UudjEuVGVhbSIpChFEZWxldGVUZWFtUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiFAoSRGVsZXRlVGVhbVJlc3BvbnNlInkKEExpc3RUZWFtc1JlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIYCgVsaW1pdBgCIAEoBUIJukgGGgQYZCgBEg4KBm9mZnNldBgDIAEoBRINCgVxdWVyeRgEIAEoCRIMCgR0YWdzGAUgAygJIkEKEUxpc3RUZWFtc1Jlc3BvbnNlEh0KBXRlYW1zGAEgAygLMg4ubm9ra3UudjEuVGVhbRINCgV0b3RhbBgCIAEoBSJMChRBZGRUZWFtTWVtYmVyUmVxdWVzdBIZCgd0ZWFtX2lkGAEgASgJQgi6SAVyA7ABARIZCgd1c2VyX2lkGAIgASgJQgi6SAVyA7ABASIXChVBZGRUZWFtTWVtYmVyUmVzcG9uc2UiTwoXUmVtb3ZlVGVhbU1lbWJlclJlcXVlc3QSGQoHdGVhbV9pZBgBIAEoCUIIukgFcgOwAQESGQoHdXNlcl9pZBgCIAEoCUIIukgFcgOwAQEiGgoYUmVtb3ZlVGVhbU1lbWJlclJlc3BvbnNlMqgGCgtUZWFtU2VydmljZRJZCgdHZXRUZWFtEhgubm9ra3UudjEuR2V0VGVhbVJlcXVlc3QaGS5ub2trdS52MS5HZXRUZWFtUmVzcG9uc2UiGZACAYLT5JMCEBIOL3YxL3RlYW1zL3tpZH0SdAoJTGlzdFRlYW1zEhoubm9ra3UudjEuTGlzdFRlYW1zUmVxdWVzdBobLm5va2t1LnYxLkxpc3RUZWFtc1Jlc3BvbnNlIi6QAgGC0+STAiUSIy92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3RlYW1zEncKCkNyZWF0ZVRlYW0SGy5ub2trdS52MS5DcmVhdGVUZWFtUmVxdWVzdBocLm5va2t1LnYxLkNyZWF0ZVRlYW1SZXNwb25zZSIugtPkkwIoOgEqIiMvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS90ZWFtcxJiCgpVcGRhdGVUZWFtEhsubm9ra3UudjEuVXBkYXRlVGVhbVJlcXVlc3QaHC5ub2trdS52MS5VcGRhdGVUZWFtUmVzcG9uc2UiGYLT5JMCEzoBKjIOL3YxL3RlYW1zL3tpZH0SXwoKRGVsZXRlVGVhbRIbLm5va2t1LnYxLkRlbGV0ZVRlYW1SZXF1ZXN0Ghwubm9ra3UudjEuRGVsZXRlVGVhbVJlc3BvbnNlIhaC0+STAhAqDi92MS90ZWFtcy97aWR9En8KDUFkZFRlYW1NZW1iZXISHi5ub2trdS52MS5BZGRUZWFtTWVtYmVyUmVxdWVzdBofLm5va2t1LnYxLkFkZFRlYW1NZW1iZXJSZXNwb25zZSItgtPkkwInIiUvdjEvdGVhbXMve3RlYW1faWR9L21lbWJlcnMve3VzZXJfaWR9EogBChBSZW1vdmVUZWFtTWVtYmVyEiEubm9ra3UudjEuUmVtb3ZlVGVhbU1lbWJlclJlcXVlc3QaIi5ub2trdS52MS5SZW1vdmVUZWFtTWVtYmVyUmVzcG9uc2UiLYLT5JMCJyolL3YxL3RlYW1zL3t0ZWFtX2lkfS9tZW1iZXJzL3t1c2VyX2lkfUKTAQoMY29tLm5va2t1LnYxQglUZWFtUHJvdG9QAVo3Z2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9pbnRlcm5hbC9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac',
-	[
-		file_buf_validate_validate,
-		file_google_api_annotations,
-		file_google_protobuf_timestamp,
-		file_nokku_v1_workspace
-	]
-);
+export const file_nokku_v1_team: GenFile = /*@__PURE__*/
+  fileDesc("ChNub2trdS92MS90ZWFtLnByb3RvEghub2trdS52MSLlAQoEVGVhbRIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRITCgtkZXNjcmlwdGlvbhgEIAEoCRIMCgR0YWdzGAUgAygJEioKB21lbWJlcnMYBiADKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VNZW1iZXISLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiJgoOR2V0VGVhbVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIi8KD0dldFRlYW1SZXNwb25zZRIcCgR0ZWFtGAEgASgLMg4ubm9ra3UudjEuVGVhbSJ6ChFDcmVhdGVUZWFtUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISHQoLZGVzY3JpcHRpb24YAyABKAlCCLpIBXIDGOgHEgwKBHRhZ3MYBCADKAkiMgoSQ3JlYXRlVGVhbVJlc3BvbnNlEhwKBHRlYW0YASABKAsyDi5ub2trdS52MS5UZWFtInAKEVVwZGF0ZVRlYW1SZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARIYCgRuYW1lGAIgASgJQgq6SAdyBRABGIACEh0KC2Rlc2NyaXB0aW9uGAMgASgJQgi6SAVyAxjoBxIMCgR0YWdzGAQgAygJIjIKElVwZGF0ZVRlYW1SZXNwb25zZRIcCgR0ZWFtGAEgASgLMg4ubm9ra3UudjEuVGVhbSIpChFEZWxldGVUZWFtUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiFAoSRGVsZXRlVGVhbVJlc3BvbnNlIoIBChBMaXN0VGVhbXNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAiABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAyABKAVCB7pIBBoCKAASDQoFcXVlcnkYBCABKAkSDAoEdGFncxgFIAMoCSJBChFMaXN0VGVhbXNSZXNwb25zZRIdCgV0ZWFtcxgBIAMoCzIOLm5va2t1LnYxLlRlYW0SDQoFdG90YWwYAiABKAUiTAoUQWRkVGVhbU1lbWJlclJlcXVlc3QSGQoHdGVhbV9pZBgBIAEoCUIIukgFcgOwAQESGQoHdXNlcl9pZBgCIAEoCUIIukgFcgOwAQEiFwoVQWRkVGVhbU1lbWJlclJlc3BvbnNlIk8KF1JlbW92ZVRlYW1NZW1iZXJSZXF1ZXN0EhkKB3RlYW1faWQYASABKAlCCLpIBXIDsAEBEhkKB3VzZXJfaWQYAiABKAlCCLpIBXIDsAEBIhoKGFJlbW92ZVRlYW1NZW1iZXJSZXNwb25zZTKoBgoLVGVhbVNlcnZpY2USWQoHR2V0VGVhbRIYLm5va2t1LnYxLkdldFRlYW1SZXF1ZXN0Ghkubm9ra3UudjEuR2V0VGVhbVJlc3BvbnNlIhmQAgGC0+STAhASDi92MS90ZWFtcy97aWR9EnQKCUxpc3RUZWFtcxIaLm5va2t1LnYxLkxpc3RUZWFtc1JlcXVlc3QaGy5ub2trdS52MS5MaXN0VGVhbXNSZXNwb25zZSIukAIBgtPkkwIlEiMvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS90ZWFtcxJ3CgpDcmVhdGVUZWFtEhsubm9ra3UudjEuQ3JlYXRlVGVhbVJlcXVlc3QaHC5ub2trdS52MS5DcmVhdGVUZWFtUmVzcG9uc2UiLoLT5JMCKDoBKiIjL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMSYgoKVXBkYXRlVGVhbRIbLm5va2t1LnYxLlVwZGF0ZVRlYW1SZXF1ZXN0Ghwubm9ra3UudjEuVXBkYXRlVGVhbVJlc3BvbnNlIhmC0+STAhM6ASoyDi92MS90ZWFtcy97aWR9El8KCkRlbGV0ZVRlYW0SGy5ub2trdS52MS5EZWxldGVUZWFtUmVxdWVzdBocLm5va2t1LnYxLkRlbGV0ZVRlYW1SZXNwb25zZSIWgtPkkwIQKg4vdjEvdGVhbXMve2lkfRJ/Cg1BZGRUZWFtTWVtYmVyEh4ubm9ra3UudjEuQWRkVGVhbU1lbWJlclJlcXVlc3QaHy5ub2trdS52MS5BZGRUZWFtTWVtYmVyUmVzcG9uc2UiLYLT5JMCJyIlL3YxL3RlYW1zL3t0ZWFtX2lkfS9tZW1iZXJzL3t1c2VyX2lkfRKIAQoQUmVtb3ZlVGVhbU1lbWJlchIhLm5va2t1LnYxLlJlbW92ZVRlYW1NZW1iZXJSZXF1ZXN0GiIubm9ra3UudjEuUmVtb3ZlVGVhbU1lbWJlclJlc3BvbnNlIi2C0+STAicqJS92MS90ZWFtcy97dGVhbV9pZH0vbWVtYmVycy97dXNlcl9pZH1CkwEKDGNvbS5ub2trdS52MUIJVGVhbVByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp, file_nokku_v1_workspace]);
 
 /**
  * @generated from message nokku.v1.Team
  */
-export type Team = Message<'nokku.v1.Team'> & {
-	/**
-	 * @generated from field: string id = 1;
-	 */
-	id: string;
+export type Team = Message<"nokku.v1.Team"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
 
-	/**
-	 * @generated from field: string workspace_id = 2;
-	 */
-	workspaceId: string;
+  /**
+   * @generated from field: string workspace_id = 2;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: string name = 3;
-	 */
-	name: string;
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
 
-	/**
-	 * @generated from field: string description = 4;
-	 */
-	description: string;
+  /**
+   * @generated from field: string description = 4;
+   */
+  description: string;
 
-	/**
-	 * @generated from field: repeated string tags = 5;
-	 */
-	tags: string[];
+  /**
+   * @generated from field: repeated string tags = 5;
+   */
+  tags: string[];
 
-	/**
-	 * @generated from field: repeated nokku.v1.WorkspaceMember members = 6;
-	 */
-	members: WorkspaceMember[];
+  /**
+   * @generated from field: repeated nokku.v1.WorkspaceMember members = 6;
+   */
+  members: WorkspaceMember[];
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp created_at = 7;
-	 */
-	createdAt?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 7;
+   */
+  createdAt?: Timestamp | undefined;
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp updated_at = 8;
-	 */
-	updatedAt?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 8;
+   */
+  updatedAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.Team.
  * Use `create(TeamSchema)` to create a new message.
  */
-export const TeamSchema: GenMessage<Team> /*@__PURE__*/ = messageDesc(file_nokku_v1_team, 0);
+export const TeamSchema: GenMessage<Team> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 0);
 
 /**
  * @generated from message nokku.v1.GetTeamRequest
  */
-export type GetTeamRequest = Message<'nokku.v1.GetTeamRequest'> & {
-	/**
-	 * @generated from field: string id = 1;
-	 */
-	id: string;
+export type GetTeamRequest = Message<"nokku.v1.GetTeamRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
 };
 
 /**
  * Describes the message nokku.v1.GetTeamRequest.
  * Use `create(GetTeamRequestSchema)` to create a new message.
  */
-export const GetTeamRequestSchema: GenMessage<GetTeamRequest> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_team,
-	1
-);
+export const GetTeamRequestSchema: GenMessage<GetTeamRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 1);
 
 /**
  * @generated from message nokku.v1.GetTeamResponse
  */
-export type GetTeamResponse = Message<'nokku.v1.GetTeamResponse'> & {
-	/**
-	 * @generated from field: nokku.v1.Team team = 1;
-	 */
-	team?: Team | undefined;
+export type GetTeamResponse = Message<"nokku.v1.GetTeamResponse"> & {
+  /**
+   * @generated from field: nokku.v1.Team team = 1;
+   */
+  team?: Team | undefined;
 };
 
 /**
  * Describes the message nokku.v1.GetTeamResponse.
  * Use `create(GetTeamResponseSchema)` to create a new message.
  */
-export const GetTeamResponseSchema: GenMessage<GetTeamResponse> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_team,
-	2
-);
+export const GetTeamResponseSchema: GenMessage<GetTeamResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 2);
 
 /**
  * @generated from message nokku.v1.CreateTeamRequest
  */
-export type CreateTeamRequest = Message<'nokku.v1.CreateTeamRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
+export type CreateTeamRequest = Message<"nokku.v1.CreateTeamRequest"> & {
+  /**
+   * @generated from field: string workspace_id = 1;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: string name = 2;
-	 */
-	name: string;
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
 
-	/**
-	 * @generated from field: string description = 3;
-	 */
-	description: string;
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
 
-	/**
-	 * @generated from field: repeated string tags = 4;
-	 */
-	tags: string[];
+  /**
+   * @generated from field: repeated string tags = 4;
+   */
+  tags: string[];
 };
 
 /**
  * Describes the message nokku.v1.CreateTeamRequest.
  * Use `create(CreateTeamRequestSchema)` to create a new message.
  */
-export const CreateTeamRequestSchema: GenMessage<CreateTeamRequest> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_team,
-	3
-);
+export const CreateTeamRequestSchema: GenMessage<CreateTeamRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 3);
 
 /**
  * @generated from message nokku.v1.CreateTeamResponse
  */
-export type CreateTeamResponse = Message<'nokku.v1.CreateTeamResponse'> & {
-	/**
-	 * @generated from field: nokku.v1.Team team = 1;
-	 */
-	team?: Team | undefined;
+export type CreateTeamResponse = Message<"nokku.v1.CreateTeamResponse"> & {
+  /**
+   * @generated from field: nokku.v1.Team team = 1;
+   */
+  team?: Team | undefined;
 };
 
 /**
  * Describes the message nokku.v1.CreateTeamResponse.
  * Use `create(CreateTeamResponseSchema)` to create a new message.
  */
-export const CreateTeamResponseSchema: GenMessage<CreateTeamResponse> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_team,
-	4
-);
+export const CreateTeamResponseSchema: GenMessage<CreateTeamResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 4);
 
 /**
  * @generated from message nokku.v1.UpdateTeamRequest
  */
-export type UpdateTeamRequest = Message<'nokku.v1.UpdateTeamRequest'> & {
-	/**
-	 * @generated from field: string id = 1;
-	 */
-	id: string;
+export type UpdateTeamRequest = Message<"nokku.v1.UpdateTeamRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
 
-	/**
-	 * @generated from field: string name = 2;
-	 */
-	name: string;
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
 
-	/**
-	 * @generated from field: string description = 3;
-	 */
-	description: string;
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
 
-	/**
-	 * @generated from field: repeated string tags = 4;
-	 */
-	tags: string[];
+  /**
+   * @generated from field: repeated string tags = 4;
+   */
+  tags: string[];
 };
 
 /**
  * Describes the message nokku.v1.UpdateTeamRequest.
  * Use `create(UpdateTeamRequestSchema)` to create a new message.
  */
-export const UpdateTeamRequestSchema: GenMessage<UpdateTeamRequest> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_team,
-	5
-);
+export const UpdateTeamRequestSchema: GenMessage<UpdateTeamRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 5);
 
 /**
  * @generated from message nokku.v1.UpdateTeamResponse
  */
-export type UpdateTeamResponse = Message<'nokku.v1.UpdateTeamResponse'> & {
-	/**
-	 * @generated from field: nokku.v1.Team team = 1;
-	 */
-	team?: Team | undefined;
+export type UpdateTeamResponse = Message<"nokku.v1.UpdateTeamResponse"> & {
+  /**
+   * @generated from field: nokku.v1.Team team = 1;
+   */
+  team?: Team | undefined;
 };
 
 /**
  * Describes the message nokku.v1.UpdateTeamResponse.
  * Use `create(UpdateTeamResponseSchema)` to create a new message.
  */
-export const UpdateTeamResponseSchema: GenMessage<UpdateTeamResponse> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_team,
-	6
-);
+export const UpdateTeamResponseSchema: GenMessage<UpdateTeamResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 6);
 
 /**
  * @generated from message nokku.v1.DeleteTeamRequest
  */
-export type DeleteTeamRequest = Message<'nokku.v1.DeleteTeamRequest'> & {
-	/**
-	 * @generated from field: string id = 1;
-	 */
-	id: string;
+export type DeleteTeamRequest = Message<"nokku.v1.DeleteTeamRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
 };
 
 /**
  * Describes the message nokku.v1.DeleteTeamRequest.
  * Use `create(DeleteTeamRequestSchema)` to create a new message.
  */
-export const DeleteTeamRequestSchema: GenMessage<DeleteTeamRequest> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_team,
-	7
-);
+export const DeleteTeamRequestSchema: GenMessage<DeleteTeamRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 7);
 
 /**
  * @generated from message nokku.v1.DeleteTeamResponse
  */
-export type DeleteTeamResponse = Message<'nokku.v1.DeleteTeamResponse'> & {};
+export type DeleteTeamResponse = Message<"nokku.v1.DeleteTeamResponse"> & {
+};
 
 /**
  * Describes the message nokku.v1.DeleteTeamResponse.
  * Use `create(DeleteTeamResponseSchema)` to create a new message.
  */
-export const DeleteTeamResponseSchema: GenMessage<DeleteTeamResponse> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_team,
-	8
-);
+export const DeleteTeamResponseSchema: GenMessage<DeleteTeamResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 8);
 
 /**
  * @generated from message nokku.v1.ListTeamsRequest
  */
-export type ListTeamsRequest = Message<'nokku.v1.ListTeamsRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
+export type ListTeamsRequest = Message<"nokku.v1.ListTeamsRequest"> & {
+  /**
+   * @generated from field: string workspace_id = 1;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: int32 limit = 2;
-	 */
-	limit: number;
+  /**
+   * @generated from field: int32 limit = 2;
+   */
+  limit: number;
 
-	/**
-	 * @generated from field: int32 offset = 3;
-	 */
-	offset: number;
+  /**
+   * @generated from field: int32 offset = 3;
+   */
+  offset: number;
 
-	/**
-	 * @generated from field: string query = 4;
-	 */
-	query: string;
+  /**
+   * @generated from field: string query = 4;
+   */
+  query: string;
 
-	/**
-	 * @generated from field: repeated string tags = 5;
-	 */
-	tags: string[];
+  /**
+   * @generated from field: repeated string tags = 5;
+   */
+  tags: string[];
 };
 
 /**
  * Describes the message nokku.v1.ListTeamsRequest.
  * Use `create(ListTeamsRequestSchema)` to create a new message.
  */
-export const ListTeamsRequestSchema: GenMessage<ListTeamsRequest> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_team,
-	9
-);
+export const ListTeamsRequestSchema: GenMessage<ListTeamsRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 9);
 
 /**
  * @generated from message nokku.v1.ListTeamsResponse
  */
-export type ListTeamsResponse = Message<'nokku.v1.ListTeamsResponse'> & {
-	/**
-	 * @generated from field: repeated nokku.v1.Team teams = 1;
-	 */
-	teams: Team[];
+export type ListTeamsResponse = Message<"nokku.v1.ListTeamsResponse"> & {
+  /**
+   * @generated from field: repeated nokku.v1.Team teams = 1;
+   */
+  teams: Team[];
 
-	/**
-	 * @generated from field: int32 total = 2;
-	 */
-	total: number;
+  /**
+   * @generated from field: int32 total = 2;
+   */
+  total: number;
 };
 
 /**
  * Describes the message nokku.v1.ListTeamsResponse.
  * Use `create(ListTeamsResponseSchema)` to create a new message.
  */
-export const ListTeamsResponseSchema: GenMessage<ListTeamsResponse> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_team,
-	10
-);
+export const ListTeamsResponseSchema: GenMessage<ListTeamsResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 10);
 
 /**
  * @generated from message nokku.v1.AddTeamMemberRequest
  */
-export type AddTeamMemberRequest = Message<'nokku.v1.AddTeamMemberRequest'> & {
-	/**
-	 * @generated from field: string team_id = 1;
-	 */
-	teamId: string;
+export type AddTeamMemberRequest = Message<"nokku.v1.AddTeamMemberRequest"> & {
+  /**
+   * @generated from field: string team_id = 1;
+   */
+  teamId: string;
 
-	/**
-	 * @generated from field: string user_id = 2;
-	 */
-	userId: string;
+  /**
+   * @generated from field: string user_id = 2;
+   */
+  userId: string;
 };
 
 /**
  * Describes the message nokku.v1.AddTeamMemberRequest.
  * Use `create(AddTeamMemberRequestSchema)` to create a new message.
  */
-export const AddTeamMemberRequestSchema: GenMessage<AddTeamMemberRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_team, 11);
+export const AddTeamMemberRequestSchema: GenMessage<AddTeamMemberRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 11);
 
 /**
  * @generated from message nokku.v1.AddTeamMemberResponse
  */
-export type AddTeamMemberResponse = Message<'nokku.v1.AddTeamMemberResponse'> & {};
+export type AddTeamMemberResponse = Message<"nokku.v1.AddTeamMemberResponse"> & {
+};
 
 /**
  * Describes the message nokku.v1.AddTeamMemberResponse.
  * Use `create(AddTeamMemberResponseSchema)` to create a new message.
  */
-export const AddTeamMemberResponseSchema: GenMessage<AddTeamMemberResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_team, 12);
+export const AddTeamMemberResponseSchema: GenMessage<AddTeamMemberResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 12);
 
 /**
  * @generated from message nokku.v1.RemoveTeamMemberRequest
  */
-export type RemoveTeamMemberRequest = Message<'nokku.v1.RemoveTeamMemberRequest'> & {
-	/**
-	 * @generated from field: string team_id = 1;
-	 */
-	teamId: string;
+export type RemoveTeamMemberRequest = Message<"nokku.v1.RemoveTeamMemberRequest"> & {
+  /**
+   * @generated from field: string team_id = 1;
+   */
+  teamId: string;
 
-	/**
-	 * @generated from field: string user_id = 2;
-	 */
-	userId: string;
+  /**
+   * @generated from field: string user_id = 2;
+   */
+  userId: string;
 };
 
 /**
  * Describes the message nokku.v1.RemoveTeamMemberRequest.
  * Use `create(RemoveTeamMemberRequestSchema)` to create a new message.
  */
-export const RemoveTeamMemberRequestSchema: GenMessage<RemoveTeamMemberRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_team, 13);
+export const RemoveTeamMemberRequestSchema: GenMessage<RemoveTeamMemberRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 13);
 
 /**
  * @generated from message nokku.v1.RemoveTeamMemberResponse
  */
-export type RemoveTeamMemberResponse = Message<'nokku.v1.RemoveTeamMemberResponse'> & {};
+export type RemoveTeamMemberResponse = Message<"nokku.v1.RemoveTeamMemberResponse"> & {
+};
 
 /**
  * Describes the message nokku.v1.RemoveTeamMemberResponse.
  * Use `create(RemoveTeamMemberResponseSchema)` to create a new message.
  */
-export const RemoveTeamMemberResponseSchema: GenMessage<RemoveTeamMemberResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_team, 14);
+export const RemoveTeamMemberResponseSchema: GenMessage<RemoveTeamMemberResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 14);
 
 /**
  * @generated from service nokku.v1.TeamService
  */
 export const TeamService: GenService<{
-	/**
-	 * @generated from rpc nokku.v1.TeamService.GetTeam
-	 */
-	getTeam: {
-		methodKind: 'unary';
-		input: typeof GetTeamRequestSchema;
-		output: typeof GetTeamResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.TeamService.ListTeams
-	 */
-	listTeams: {
-		methodKind: 'unary';
-		input: typeof ListTeamsRequestSchema;
-		output: typeof ListTeamsResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.TeamService.CreateTeam
-	 */
-	createTeam: {
-		methodKind: 'unary';
-		input: typeof CreateTeamRequestSchema;
-		output: typeof CreateTeamResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.TeamService.UpdateTeam
-	 */
-	updateTeam: {
-		methodKind: 'unary';
-		input: typeof UpdateTeamRequestSchema;
-		output: typeof UpdateTeamResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.TeamService.DeleteTeam
-	 */
-	deleteTeam: {
-		methodKind: 'unary';
-		input: typeof DeleteTeamRequestSchema;
-		output: typeof DeleteTeamResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.TeamService.AddTeamMember
-	 */
-	addTeamMember: {
-		methodKind: 'unary';
-		input: typeof AddTeamMemberRequestSchema;
-		output: typeof AddTeamMemberResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.TeamService.RemoveTeamMember
-	 */
-	removeTeamMember: {
-		methodKind: 'unary';
-		input: typeof RemoveTeamMemberRequestSchema;
-		output: typeof RemoveTeamMemberResponseSchema;
-	};
-}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_team, 0);
+  /**
+   * @generated from rpc nokku.v1.TeamService.GetTeam
+   */
+  getTeam: {
+    methodKind: "unary";
+    input: typeof GetTeamRequestSchema;
+    output: typeof GetTeamResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.TeamService.ListTeams
+   */
+  listTeams: {
+    methodKind: "unary";
+    input: typeof ListTeamsRequestSchema;
+    output: typeof ListTeamsResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.TeamService.CreateTeam
+   */
+  createTeam: {
+    methodKind: "unary";
+    input: typeof CreateTeamRequestSchema;
+    output: typeof CreateTeamResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.TeamService.UpdateTeam
+   */
+  updateTeam: {
+    methodKind: "unary";
+    input: typeof UpdateTeamRequestSchema;
+    output: typeof UpdateTeamResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.TeamService.DeleteTeam
+   */
+  deleteTeam: {
+    methodKind: "unary";
+    input: typeof DeleteTeamRequestSchema;
+    output: typeof DeleteTeamResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.TeamService.AddTeamMember
+   */
+  addTeamMember: {
+    methodKind: "unary";
+    input: typeof AddTeamMemberRequestSchema;
+    output: typeof AddTeamMemberResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.TeamService.RemoveTeamMember
+   */
+  removeTeamMember: {
+    methodKind: "unary";
+    input: typeof RemoveTeamMemberRequestSchema;
+    output: typeof RemoveTeamMemberResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_nokku_v1_team, 0);
+

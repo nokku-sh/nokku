@@ -264,7 +264,7 @@ func (x *EventLog) GetTimestamp() *timestamppb.Timestamp {
 type ListAuditLogsRequest struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	Limit       *int32                 `protobuf:"varint,2,opt,name=limit" json:"limit,omitempty"` // Max 100
+	Limit       *int32                 `protobuf:"varint,2,opt,name=limit" json:"limit,omitempty"`
 	Offset      *int32                 `protobuf:"varint,3,opt,name=offset" json:"offset,omitempty"`
 	// Filters (optional)
 	Search        *string                `protobuf:"bytes,4,opt,name=search" json:"search,omitempty"`
@@ -571,11 +571,11 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"user_agent\x18\a \x01(\tR\tuserAgent\x12\x1f\n" +
 	"\vstatus_code\x18\b \x01(\tR\n" +
 	"statusCode\x128\n" +
-	"\ttimestamp\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\xed\x02\n" +
+	"\ttimestamp\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\xf6\x02\n" +
 	"\x14ListAuditLogsRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1f\n" +
-	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x03 \x01(\x05R\x06offset\x12\x16\n" +
+	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
+	"\x06offset\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12\x16\n" +
 	"\x06search\x18\x04 \x01(\tR\x06search\x12*\n" +
 	"\tactor_ids\x18\x05 \x03(\tB\r\xbaH\n" +
 	"\x92\x01\a\"\x05r\x03\xb0\x01\x01R\bactorIds\x12\x1f\n" +
