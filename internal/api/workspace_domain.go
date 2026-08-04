@@ -33,7 +33,7 @@ func (s *WorkspaceDomainService) GetWorkspaceDomain(
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return err
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.GetWorkspaceDomainResponse{
@@ -55,7 +55,7 @@ func (s *WorkspaceDomainService) CreateWorkspaceDomain(
 		})
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.CreateWorkspaceDomainResponse{
@@ -72,7 +72,7 @@ func (s *WorkspaceDomainService) ListWorkspaceDomains(
 		result, err = q.ListWorkspaceDomains(ctx, req.GetWorkspaceId())
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.ListWorkspaceDomainsResponse{
@@ -89,7 +89,7 @@ func (s *WorkspaceDomainService) DeleteWorkspaceDomain(
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	return &nokkuv1.DeleteWorkspaceDomainResponse{}, nil
 }
@@ -104,7 +104,7 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 		meta.SetAuditWorkspaceID(ctx, domain.WorkspaceID)
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	if domain.VerifiedAt != nil {
@@ -156,7 +156,7 @@ func (s *WorkspaceDomainService) RegenerateWorkspaceDomainToken(
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.RegenerateWorkspaceDomainTokenResponse{

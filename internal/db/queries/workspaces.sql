@@ -130,10 +130,10 @@ WHERE
 UNION
 SELECT
   workspace_id
-  FROM
-    daemons
-  WHERE
-    id = @actor_id
+FROM
+  daemons
+WHERE
+  id = @actor_id
 UNION
 SELECT
   workspace_id
@@ -261,7 +261,7 @@ VALUES
   (@workspace_id, @user_id, 'member')
 ON CONFLICT (workspace_id, user_id) DO NOTHING;
 
--- name: RemoveWorkspaceMember :execrows
+-- name: RemoveWorkspaceMember :exec
 DELETE FROM workspace_members wm USING workspaces w
 WHERE
   wm.workspace_id = w.id

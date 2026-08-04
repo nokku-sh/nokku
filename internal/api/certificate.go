@@ -112,8 +112,7 @@ func (s *CertificateService) CreateCertificateAuthority(
 		result, err = q.CreateCA(ctx, params)
 		return err
 	}); err != nil {
-		slog.Error("failed to create CA", "error", err)
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.CreateCertificateAuthorityResponse{
@@ -143,7 +142,7 @@ func (s *CertificateService) GetCertificateAuthority(
 		}
 		return nil
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.GetCertificateAuthorityResponse{
@@ -160,7 +159,7 @@ func (s *CertificateService) ListCertificateAuthorities(
 		result, err = q.ListCAs(ctx, &db.ListCAsParams{WorkspaceID: req.GetWorkspaceId()})
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.ListCertificateAuthoritiesResponse{
@@ -207,7 +206,7 @@ func (s *CertificateService) UpdateCertificateAuthority(
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.UpdateCertificateAuthorityResponse{
@@ -221,10 +220,13 @@ func (s *CertificateService) DeleteCertificateAuthority(
 ) (*nokkuv1.DeleteCertificateAuthorityResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		ca, err := q.DeleteCA(ctx, req.GetId())
+		if err != nil {
+			return err
+		}
 		meta.SetAuditWorkspaceID(ctx, ca.WorkspaceID)
-		return err
+		return nil
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.DeleteCertificateAuthorityResponse{}, nil
@@ -273,10 +275,14 @@ func (s *CertificateService) RolloverCertificateAuthority(
 			KeyType:      newCA.KeyType,
 			KeyBits:      newCA.KeyBits,
 		})
+		if err != nil {
+			return err
+		}
+
 		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
-		return err
+		return nil
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 
 	// Skip notification if no rollover
@@ -298,8 +304,8 @@ func (s *CertificateService) SignSSHCertificate(
 ) (*nokkuv1.SignSSHCertificateResponse, error) {
 	// By default id of the actor is the principal for user certificates
 	actor := meta.ActorFromContext(ctx)
-	principal := actor.ID
 	keyID := fmt.Sprintf("nokku:login:%s:%s:%s", actor.Type, actor.Name, actor.ID)
+	principal := actor.ID
 
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
@@ -366,7 +372,7 @@ func (s *CertificateService) SignSSHCertificate(
 		}
 		return nil
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	if ca == nil {
 		return nil, ErrNotFound
@@ -417,7 +423,7 @@ func (s *CertificateService) SignX509Certificate(
 		meta.SetAuditWorkspaceID(ctx, ca.WorkspaceID)
 		return nil
 	}); err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 
 	if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_X509 {

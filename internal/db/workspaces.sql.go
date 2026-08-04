@@ -225,10 +225,10 @@ WHERE
 UNION
 SELECT
   workspace_id
-  FROM
-    daemons
-  WHERE
-    id = $1
+FROM
+  daemons
+WHERE
+  id = $1
 UNION
 SELECT
   workspace_id
@@ -602,7 +602,7 @@ func (q *Queries) ListWorkspaces(ctx context.Context) ([]*ListWorkspacesRow, err
 	return items, nil
 }
 
-const removeWorkspaceMember = `-- name: RemoveWorkspaceMember :execrows
+const removeWorkspaceMember = `-- name: RemoveWorkspaceMember :exec
 DELETE FROM workspace_members wm USING workspaces w
 WHERE
   wm.workspace_id = w.id
@@ -616,12 +616,9 @@ type RemoveWorkspaceMemberParams struct {
 	UserID      string `json:"userId"`
 }
 
-func (q *Queries) RemoveWorkspaceMember(ctx context.Context, arg *RemoveWorkspaceMemberParams) (int64, error) {
-	result, err := q.db.Exec(ctx, removeWorkspaceMember, arg.WorkspaceID, arg.UserID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+func (q *Queries) RemoveWorkspaceMember(ctx context.Context, arg *RemoveWorkspaceMemberParams) error {
+	_, err := q.db.Exec(ctx, removeWorkspaceMember, arg.WorkspaceID, arg.UserID)
+	return err
 }
 
 const updateWorkspace = `-- name: UpdateWorkspace :one

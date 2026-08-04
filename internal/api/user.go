@@ -30,7 +30,7 @@ func (s *UserService) Whoami(
 ) (*nokkuv1.WhoamiResponse, error) {
 	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
 	if err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 	return &nokkuv1.WhoamiResponse{
 		User: user.ToProto(),
@@ -43,7 +43,7 @@ func (s *UserService) UpdateProfile(
 ) (*nokkuv1.UpdateProfileResponse, error) {
 	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
 	if err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 
 	if user.Picture != nil && req.GetPicture() == "" {
@@ -70,7 +70,7 @@ func (s *UserService) UpdateProfile(
 			TokenType: authn.VerifyToken,
 		})
 		if err != nil {
-			return nil, ErrInternal
+			return nil, DBError(err)
 		}
 		verifyURL := fmt.Sprintf("%s/verify?token=%s", s.cfg.FullURL(), token)
 
@@ -81,10 +81,7 @@ func (s *UserService) UpdateProfile(
 			verifyURL,
 			authn.GetExpiry(authn.VerifyToken),
 		); err != nil {
-			return nil, NewError(
-				connect.CodeResourceExhausted,
-				"too many requests, please try again later",
-			)
+			return nil, ErrRateLimited
 		}
 		return &nokkuv1.UpdateProfileResponse{EmailSent: new(true)}, nil
 	}
@@ -96,7 +93,7 @@ func (s *UserService) UpdateProfile(
 		Picture:  req.Picture,
 	})
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.UpdateProfileResponse{
@@ -110,7 +107,7 @@ func (s *UserService) DeleteAccount(
 ) (*nokkuv1.DeleteAccountResponse, error) {
 	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	avatarPath := storage.AvatarPath(user.ID)
@@ -136,7 +133,7 @@ func (s *UserService) DeleteAccount(
 		}
 		return q.DeleteUser(ctx, user.ID)
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.DeleteAccountResponse{}, nil
@@ -148,7 +145,7 @@ func (s *UserService) ListUserDevices(
 ) (*nokkuv1.ListUserDevicesResponse, error) {
 	devices, err := s.cfg.Conn.Q.ListUserDevices(ctx, meta.UserIDFromContext(ctx))
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	return &nokkuv1.ListUserDevicesResponse{
 		Devices: db.UserDevicesToProto(devices),
@@ -185,12 +182,12 @@ func (s *UserService) UnlinkAccount(
 
 	user, err := s.cfg.Conn.Q.GetUserByID(ctx, userID)
 	if err != nil {
-		return nil, ErrNotFound
+		return nil, DBError(err)
 	}
 
 	identities, err := s.cfg.Conn.Q.GetOAuthIdentitiesByUserID(ctx, userID)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	// Prevent losing the last login method
@@ -208,7 +205,7 @@ func (s *UserService) UnlinkAccount(
 		UserID:   userID,
 		Provider: req.GetProvider(),
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.UnlinkAccountResponse{}, nil
@@ -222,7 +219,7 @@ func (s *UserService) SetEmailRecovery(
 		UserID:              meta.UserIDFromContext(ctx),
 		EnableEmailRecovery: req.GetEnable(),
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	return &nokkuv1.SetEmailRecoveryResponse{}, nil
 }
@@ -235,7 +232,7 @@ func (s *UserService) DeleteUserDevice(
 		ID:     req.GetId(),
 		UserID: meta.UserIDFromContext(ctx),
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	return &nokkuv1.DeleteUserDeviceResponse{}, nil
 }

@@ -30,7 +30,7 @@ func (s *InvitationService) GetInvitation(
 ) (*nokkuv1.GetInvitationResponse, error) {
 	token, err := crypto.Parse(req.GetToken())
 	if err != nil {
-		return nil, NewError(connect.CodeInvalidArgument, "invalid token")
+		return nil, ErrInvalidInput
 	}
 	workspaceID := token.ID
 	meta.SetAuditWorkspaceID(ctx, workspaceID)
@@ -49,7 +49,7 @@ func (s *InvitationService) GetInvitation(
 
 	row, err := s.cfg.Conn.Q.GetWorkspace(ctx, workspaceID)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	if !row.WorkspaceSetting.InviteTokenHash.Verify(req.GetToken()) {
@@ -88,7 +88,7 @@ func (s *InvitationService) AcceptInvitation(
 
 	settings, err := s.cfg.Conn.Q.GetWorkspaceSettings(ctx, workspaceID)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 	if settings.InviteExpiresAt != nil && settings.InviteExpiresAt.Before(time.Now()) {
 		return nil, NewError(connect.CodeFailedPrecondition, "invitation has expired")
@@ -110,7 +110,7 @@ func (s *InvitationService) AcceptInvitation(
 		WorkspaceID: workspaceID,
 		UserID:      user.ID,
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.AcceptInvitationResponse{
@@ -138,7 +138,7 @@ func (s *InvitationService) RefreshInviteToken(
 		})
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	link := fmt.Sprintf("%s?invite=%s", s.cfg.FullURL(), token.Plaintext)
@@ -153,7 +153,6 @@ func (s *InvitationService) RevokeInviteToken(
 	req *nokkuv1.RevokeInviteTokenRequest,
 ) (*nokkuv1.RevokeInviteTokenResponse, error) {
 	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
-
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		_, err := q.UpdateWorkspaceSettings(ctx, &db.UpdateWorkspaceSettingsParams{
 			WorkspaceID:     req.GetWorkspaceId(),
@@ -162,7 +161,7 @@ func (s *InvitationService) RevokeInviteToken(
 		})
 		return err
 	}); err != nil {
-		return nil, ErrInternal
+		return nil, DBError(err)
 	}
 
 	return &nokkuv1.RevokeInviteTokenResponse{}, nil
