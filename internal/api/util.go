@@ -11,6 +11,7 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/config"
+	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 )
@@ -28,6 +29,28 @@ func (s *UtilService) GetVersion(
 	_ *nokkuv1.GetVersionRequest,
 ) (*nokkuv1.GetVersionResponse, error) {
 	return &nokkuv1.GetVersionResponse{Version: &buildinfo.Version}, nil
+}
+
+func (s *UtilService) ListRoles(
+	_ context.Context,
+	_ *nokkuv1.ListRolesRequest,
+) (*nokkuv1.ListRolesResponse, error) {
+	infos := db.UserFacingRoles()
+	roles := make([]*nokkuv1.Role, 0, len(infos))
+	for _, r := range infos {
+		permissions := make([]string, len(r.Permissions))
+		for i, p := range r.Permissions {
+			permissions[i] = string(p)
+		}
+		roles = append(roles, &nokkuv1.Role{
+			Name:                        &r.Name,
+			Description:                 &r.Description,
+			Permissions:                 permissions,
+			AssignableToUsers:           &r.AssignableToUsers,
+			AssignableToServiceAccounts: &r.AssignableToServiceAccounts,
+		})
+	}
+	return &nokkuv1.ListRolesResponse{Roles: roles}, nil
 }
 
 func (s *UtilService) ListAuditLogs(

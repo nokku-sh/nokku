@@ -35,6 +35,8 @@ const (
 const (
 	// UtilServiceGetVersionProcedure is the fully-qualified name of the UtilService's GetVersion RPC.
 	UtilServiceGetVersionProcedure = "/nokku.v1.UtilService/GetVersion"
+	// UtilServiceListRolesProcedure is the fully-qualified name of the UtilService's ListRoles RPC.
+	UtilServiceListRolesProcedure = "/nokku.v1.UtilService/ListRoles"
 	// UtilServiceListAuditLogsProcedure is the fully-qualified name of the UtilService's ListAuditLogs
 	// RPC.
 	UtilServiceListAuditLogsProcedure = "/nokku.v1.UtilService/ListAuditLogs"
@@ -46,6 +48,7 @@ const (
 // UtilServiceClient is a client for the nokku.v1.UtilService service.
 type UtilServiceClient interface {
 	GetVersion(context.Context, *v1.GetVersionRequest) (*v1.GetVersionResponse, error)
+	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error)
 	ExportAuditLogs(context.Context, *v1.ExportAuditLogsRequest) (*v1.ExportAuditLogsResponse, error)
 }
@@ -68,6 +71,13 @@ func NewUtilServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		listRoles: connect.NewClient[v1.ListRolesRequest, v1.ListRolesResponse](
+			httpClient,
+			baseURL+UtilServiceListRolesProcedure,
+			connect.WithSchema(utilServiceMethods.ByName("ListRoles")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 		listAuditLogs: connect.NewClient[v1.ListAuditLogsRequest, v1.ListAuditLogsResponse](
 			httpClient,
 			baseURL+UtilServiceListAuditLogsProcedure,
@@ -87,6 +97,7 @@ func NewUtilServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 // utilServiceClient implements UtilServiceClient.
 type utilServiceClient struct {
 	getVersion      *connect.Client[v1.GetVersionRequest, v1.GetVersionResponse]
+	listRoles       *connect.Client[v1.ListRolesRequest, v1.ListRolesResponse]
 	listAuditLogs   *connect.Client[v1.ListAuditLogsRequest, v1.ListAuditLogsResponse]
 	exportAuditLogs *connect.Client[v1.ExportAuditLogsRequest, v1.ExportAuditLogsResponse]
 }
@@ -94,6 +105,15 @@ type utilServiceClient struct {
 // GetVersion calls nokku.v1.UtilService.GetVersion.
 func (c *utilServiceClient) GetVersion(ctx context.Context, req *v1.GetVersionRequest) (*v1.GetVersionResponse, error) {
 	response, err := c.getVersion.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// ListRoles calls nokku.v1.UtilService.ListRoles.
+func (c *utilServiceClient) ListRoles(ctx context.Context, req *v1.ListRolesRequest) (*v1.ListRolesResponse, error) {
+	response, err := c.listRoles.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
@@ -121,6 +141,7 @@ func (c *utilServiceClient) ExportAuditLogs(ctx context.Context, req *v1.ExportA
 // UtilServiceHandler is an implementation of the nokku.v1.UtilService service.
 type UtilServiceHandler interface {
 	GetVersion(context.Context, *v1.GetVersionRequest) (*v1.GetVersionResponse, error)
+	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error)
 	ExportAuditLogs(context.Context, *v1.ExportAuditLogsRequest) (*v1.ExportAuditLogsResponse, error)
 }
@@ -136,6 +157,13 @@ func NewUtilServiceHandler(svc UtilServiceHandler, opts ...connect.HandlerOption
 		UtilServiceGetVersionProcedure,
 		svc.GetVersion,
 		connect.WithSchema(utilServiceMethods.ByName("GetVersion")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	utilServiceListRolesHandler := connect.NewUnaryHandlerSimple(
+		UtilServiceListRolesProcedure,
+		svc.ListRoles,
+		connect.WithSchema(utilServiceMethods.ByName("ListRoles")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
@@ -156,6 +184,8 @@ func NewUtilServiceHandler(svc UtilServiceHandler, opts ...connect.HandlerOption
 		switch r.URL.Path {
 		case UtilServiceGetVersionProcedure:
 			utilServiceGetVersionHandler.ServeHTTP(w, r)
+		case UtilServiceListRolesProcedure:
+			utilServiceListRolesHandler.ServeHTTP(w, r)
 		case UtilServiceListAuditLogsProcedure:
 			utilServiceListAuditLogsHandler.ServeHTTP(w, r)
 		case UtilServiceExportAuditLogsProcedure:
@@ -171,6 +201,10 @@ type UnimplementedUtilServiceHandler struct{}
 
 func (UnimplementedUtilServiceHandler) GetVersion(context.Context, *v1.GetVersionRequest) (*v1.GetVersionResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.UtilService.GetVersion is not implemented"))
+}
+
+func (UnimplementedUtilServiceHandler) ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.UtilService.ListRoles is not implemented"))
 }
 
 func (UnimplementedUtilServiceHandler) ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error) {
