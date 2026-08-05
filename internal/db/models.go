@@ -184,6 +184,7 @@ type ServiceAccount struct {
 	Name        string             `json:"name"`
 	Description *string            `json:"description"`
 	TokenHash   crypto.HashedToken `json:"tokenHash"`
+	RoleName    string             `json:"roleName"`
 	LastUsedAt  *time.Time         `json:"lastUsedAt"`
 	ExpiresAt   *time.Time         `json:"expiresAt"`
 	Tags        []string           `json:"tags"`
