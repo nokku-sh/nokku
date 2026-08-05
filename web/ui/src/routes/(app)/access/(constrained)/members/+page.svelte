@@ -3,6 +3,8 @@
 	import { page } from '$app/state';
 	import { team } from '$lib/api/team.svelte';
 	import { workspace } from '$lib/api/workspaces.svelte';
+	import { roles } from '$lib/api/roles.svelte';
+	import { roleIcon, roleLabel } from '$lib/roles';
 	import InviteModal from '$lib/components/modals/InviteModal.svelte';
 	import MemberModal from '$lib/components/modals/MemberModal.svelte';
 	import TransferOwnerModal from '$lib/components/modals/TransferOwnerModal.svelte';
@@ -25,9 +27,7 @@
 		CrownIcon,
 		InfoIcon,
 		PlusIcon,
-		ShieldCheck,
-		Trash2,
-		User
+		Trash2
 	} from '@lucide/svelte';
 	import type { ColumnDef, Table } from '@tanstack/table-core';
 	import { Debounced } from 'runed';
@@ -50,6 +50,7 @@
 	let table = $state<Table<WorkspaceMember>>();
 
 	const removeMember = workspace.removeMember();
+	const updateMember = workspace.updateMember();
 
 	const bulkActions: BulkAction<WorkspaceMember>[] = [
 		{
@@ -61,11 +62,14 @@
 		}
 	];
 
-	const roleOptions = [
-		{ label: 'Owner', value: 'owner', icon: CrownIcon },
-		{ label: 'Admin', value: 'admin', icon: ShieldCheck },
-		{ label: 'Member', value: 'member', icon: User }
-	];
+	const rolesQuery = $derived(roles.list());
+	const roleOptions = $derived(
+		(rolesQuery.data ?? []).map((r) => ({
+			label: roleLabel(r.name),
+			value: r.name,
+			icon: roleIcon(r.name)
+		}))
+	);
 
 	// Columns
 	const columns: ColumnDef<WorkspaceMember>[] = [
@@ -86,7 +90,12 @@
 			header: 'Role',
 			accessorKey: 'roleName',
 			enableColumnFilter: true,
-			cell: ({ row }) => renderComponent(RoleCell, { user: row.original })
+			cell: ({ row }) =>
+				renderComponent(RoleCell, {
+					roleName: row.original.roleName,
+					update: (roleName) => updateMember.mutateAsync({ userId: row.original.id, roleName }),
+					scope: 'users'
+				})
 		},
 		{
 			header: 'Teams',
