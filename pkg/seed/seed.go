@@ -41,6 +41,7 @@ func DefaultConfig() Config {
 	}
 }
 
+//nolint:cyclop // just for testing
 func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 	_ = gofakeit.Seed(time.Now().UnixNano())
 
