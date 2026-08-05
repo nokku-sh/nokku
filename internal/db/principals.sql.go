@@ -94,22 +94,6 @@ func (q *Queries) AddUsersToPrincipal(ctx context.Context, arg *AddUsersToPrinci
 	return err
 }
 
-const countTargetPrincipals = `-- name: CountTargetPrincipals :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  principals
-WHERE
-  target_id = $1
-`
-
-func (q *Queries) CountTargetPrincipals(ctx context.Context, targetID string) (int32, error) {
-	row := q.db.QueryRow(ctx, countTargetPrincipals, targetID)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const createPrincipal = `-- name: CreatePrincipal :one
 INSERT INTO
   principals (workspace_id, target_id, username)
@@ -329,9 +313,10 @@ func (q *Queries) GetTargetUsernames(ctx context.Context, targetID string) ([]st
 
 const listPrincipals = `-- name: ListPrincipals :many
 WITH
-  paginated_principals AS (
+  filtered AS (
     SELECT
-      p.id
+      p.id,
+      p.username
     FROM
       principals p
     WHERE
@@ -340,8 +325,14 @@ WITH
         $2::TEXT IS NULL
         OR p.username ILIKE '%' || $2 || '%'
       )
+  ),
+  paginated_principals AS (
+    SELECT
+      id
+    FROM
+      filtered
     ORDER BY
-      p.username ASC
+      username ASC
     LIMIT
       $4
     OFFSET
@@ -360,7 +351,11 @@ SELECT
   COALESCE(
     array_agg(DISTINCT psa.service_account_id) FILTER (WHERE psa.service_account_id IS NOT NULL),
     '{}'
-  )::UUID[] AS "serviceAccountIds"
+  )::UUID[] AS "serviceAccountIds",
+  (SELECT
+    COUNT(*)::INTEGER
+  FROM
+    filtered) AS total_count
 FROM
   principals p
   JOIN paginated_principals pp ON pp.id = p.id
@@ -389,6 +384,7 @@ type ListPrincipalsRow struct {
 	UserIds           []string  `json:"userIds"`
 	TeamIds           []string  `json:"teamIds"`
 	ServiceAccountIds []string  `json:"serviceAccountIds"`
+	TotalCount        int32     `json:"totalCount"`
 }
 
 func (q *Queries) ListPrincipals(ctx context.Context, arg *ListPrincipalsParams) ([]*ListPrincipalsRow, error) {
@@ -414,6 +410,7 @@ func (q *Queries) ListPrincipals(ctx context.Context, arg *ListPrincipalsParams)
 			&i.UserIds,
 			&i.TeamIds,
 			&i.ServiceAccountIds,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

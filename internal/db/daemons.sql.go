@@ -13,31 +13,6 @@ import (
 	nokku "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-const countDaemons = `-- name: CountDaemons :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  daemons
-WHERE
-  workspace_id = $1
-  AND (
-    $2::TEXT IS NULL
-    OR name ILIKE '%' || $2 || '%'
-  )
-`
-
-type CountDaemonsParams struct {
-	WorkspaceID string  `json:"workspaceId"`
-	Query       *string `json:"query"`
-}
-
-func (q *Queries) CountDaemons(ctx context.Context, arg *CountDaemonsParams) (int32, error) {
-	row := q.db.QueryRow(ctx, countDaemons, arg.WorkspaceID, arg.Query)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const createDaemon = `-- name: CreateDaemon :one
 WITH
   new_daemon AS (
@@ -246,25 +221,26 @@ func (q *Queries) GetTargetByDaemon(ctx context.Context, daemonID *string) (*Tar
 
 const listDaemons = `-- name: ListDaemons :many
 SELECT
-  id, workspace_id, name, token_hash, status, online, config, metadata, last_used_at, updated_at, created_at
+  d.id, d.workspace_id, d.name, d.token_hash, d.status, d.online, d.config, d.metadata, d.last_used_at, d.updated_at, d.created_at,
+  COUNT(*) OVER ()::INTEGER AS total_count
 FROM
-  daemons
+  daemons d
 WHERE
-  workspace_id = $1
+  d.workspace_id = $1
   AND (
     $2::TEXT IS NULL
-    OR name ILIKE '%' || $2 || '%'
+    OR d.name ILIKE '%' || $2 || '%'
   )
   AND (
     $3::INTEGER IS NULL
-    OR status = $3::INTEGER
+    OR d.status = $3::INTEGER
   )
   AND (
     $4::BOOLEAN IS NULL
-    OR online = $4
+    OR d.online = $4
   )
 ORDER BY
-  id ASC
+  d.id ASC
 LIMIT
   $6
 OFFSET
@@ -280,7 +256,22 @@ type ListDaemonsParams struct {
 	Limit       *int32  `json:"limit"`
 }
 
-func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*Daemon, error) {
+type ListDaemonsRow struct {
+	ID          string              `json:"id"`
+	WorkspaceID string              `json:"workspaceId"`
+	Name        string              `json:"name"`
+	TokenHash   crypto.HashedToken  `json:"tokenHash"`
+	Status      nokku.DaemonStatus  `json:"status"`
+	Online      bool                `json:"online"`
+	Config      *nokku.DaemonConfig `json:"config"`
+	Metadata    []byte              `json:"metadata"`
+	LastUsedAt  *time.Time          `json:"lastUsedAt"`
+	UpdatedAt   time.Time           `json:"updatedAt"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	TotalCount  int32               `json:"totalCount"`
+}
+
+func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*ListDaemonsRow, error) {
 	rows, err := q.db.Query(ctx, listDaemons,
 		arg.WorkspaceID,
 		arg.Query,
@@ -293,9 +284,9 @@ func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*D
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*Daemon
+	var items []*ListDaemonsRow
 	for rows.Next() {
-		var i Daemon
+		var i ListDaemonsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
@@ -308,6 +299,7 @@ func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*D
 			&i.LastUsedAt,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

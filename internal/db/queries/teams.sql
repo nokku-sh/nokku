@@ -16,37 +16,24 @@ WHERE
 
 -- name: ListTeams :many
 SELECT
-  *
+  te.*,
+  COUNT(*) OVER ()::INTEGER AS total_count
 FROM
-  teams
+  teams te
 WHERE
-  workspace_id = @workspace_id
+  te.workspace_id = @workspace_id
   AND (
     sqlc.narg('query')::TEXT IS NULL
-    OR name ILIKE '%' || sqlc.narg('query') || '%'
-    OR COALESCE(description, '') ILIKE '%' || sqlc.narg('query') || '%'
+    OR te.name ILIKE '%' || sqlc.narg('query') || '%'
+    OR COALESCE(te.description, '') ILIKE '%' || sqlc.narg('query') || '%'
   )
-  AND tags @> COALESCE(@tags, '{}'::TEXT[])
+  AND te.tags @> COALESCE(sqlc.narg('tags'), '{}'::TEXT[])
 ORDER BY
-  id ASC
+  te.id ASC
 LIMIT
   sqlc.narg('limit')
 OFFSET
   sqlc.narg('offset');
-
--- name: CountTeams :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  teams
-WHERE
-  workspace_id = @workspace_id
-  AND (
-    sqlc.narg('query')::TEXT IS NULL
-    OR name ILIKE '%' || sqlc.narg('query') || '%'
-    OR COALESCE(description, '') ILIKE '%' || sqlc.narg('query') || '%'
-  )
-  AND tags @> COALESCE(@tags, '{}'::TEXT[]);
 
 -- name: UpdateTeam :one
 UPDATE teams

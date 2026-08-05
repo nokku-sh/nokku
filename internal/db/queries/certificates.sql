@@ -160,14 +160,6 @@ LIMIT
 OFFSET
   sqlc.narg('offset');
 
--- name: CountCAs :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  certificate_authorities
-WHERE
-  workspace_id = @workspace_id;
-
 -- name: UpdateCA :one
 UPDATE certificate_authorities
 SET

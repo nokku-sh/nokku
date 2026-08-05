@@ -12,34 +12,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
-const countServiceAccounts = `-- name: CountServiceAccounts :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  service_accounts
-WHERE
-  workspace_id = $1
-  AND (
-    $2::TEXT IS NULL
-    OR name ILIKE '%' || $2 || '%'
-    OR COALESCE(description, '') ILIKE '%' || $2 || '%'
-  )
-  AND tags @> COALESCE($3, '{}'::TEXT[])
-`
-
-type CountServiceAccountsParams struct {
-	WorkspaceID string   `json:"workspaceId"`
-	Query       *string  `json:"query"`
-	Tags        []string `json:"tags"`
-}
-
-func (q *Queries) CountServiceAccounts(ctx context.Context, arg *CountServiceAccountsParams) (int32, error) {
-	row := q.db.QueryRow(ctx, countServiceAccounts, arg.WorkspaceID, arg.Query, arg.Tags)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const createServiceAccount = `-- name: CreateServiceAccount :one
 INSERT INTO
   service_accounts (id, workspace_id, name, description, token_hash, expires_at, tags)
@@ -164,34 +136,35 @@ func (q *Queries) GetServiceAccountWorkspaceID(ctx context.Context, serviceAccou
 
 const listServiceAccounts = `-- name: ListServiceAccounts :many
 SELECT
-  id, workspace_id, name, description, token_hash, last_used_at, expires_at, tags, created_at, updated_at
+  sa.id, sa.workspace_id, sa.name, sa.description, sa.token_hash, sa.last_used_at, sa.expires_at, sa.tags, sa.created_at, sa.updated_at,
+  COUNT(*) OVER ()::INTEGER AS total_count
 FROM
-  service_accounts
+  service_accounts sa
 WHERE
-  workspace_id = $1
+  sa.workspace_id = $1
   AND (
     $2::TEXT IS NULL
-    OR name ILIKE '%' || $2 || '%'
-    OR COALESCE(description, '') ILIKE '%' || $2 || '%'
+    OR sa.name ILIKE '%' || $2 || '%'
+    OR COALESCE(sa.description, '') ILIKE '%' || $2 || '%'
   )
-  AND tags @> COALESCE($3, '{}'::TEXT[])
+  AND sa.tags @> COALESCE($3, '{}'::TEXT[])
   AND (
     $4::BOOLEAN IS NULL
     OR (
       $4 = TRUE
       AND (
-        expires_at IS NULL
-        OR expires_at > NOW()
+        sa.expires_at IS NULL
+        OR sa.expires_at > NOW()
       )
     )
     OR (
       $4 = FALSE
-      AND expires_at IS NOT NULL
-      AND expires_at <= NOW()
+      AND sa.expires_at IS NOT NULL
+      AND sa.expires_at <= NOW()
     )
   )
 ORDER BY
-  id ASC
+  sa.id ASC
 LIMIT
   $6
 OFFSET
@@ -207,7 +180,21 @@ type ListServiceAccountsParams struct {
 	Limit       *int32   `json:"limit"`
 }
 
-func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccountsParams) ([]*ServiceAccount, error) {
+type ListServiceAccountsRow struct {
+	ID          string             `json:"id"`
+	WorkspaceID string             `json:"workspaceId"`
+	Name        string             `json:"name"`
+	Description *string            `json:"description"`
+	TokenHash   crypto.HashedToken `json:"tokenHash"`
+	LastUsedAt  *time.Time         `json:"lastUsedAt"`
+	ExpiresAt   *time.Time         `json:"expiresAt"`
+	Tags        []string           `json:"tags"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	UpdatedAt   time.Time          `json:"updatedAt"`
+	TotalCount  int32              `json:"totalCount"`
+}
+
+func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccountsParams) ([]*ListServiceAccountsRow, error) {
 	rows, err := q.db.Query(ctx, listServiceAccounts,
 		arg.WorkspaceID,
 		arg.Query,
@@ -220,9 +207,9 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*ServiceAccount
+	var items []*ListServiceAccountsRow
 	for rows.Next() {
-		var i ServiceAccount
+		var i ListServiceAccountsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
@@ -234,6 +221,7 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 			&i.Tags,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

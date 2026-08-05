@@ -180,8 +180,23 @@ func (t *Team) ToProto() *nokkuv1.Team {
 	}
 }
 
-func TeamsToProto(ts []*Team) []*nokkuv1.Team {
-	return MapSlice(ts, func(t *Team) *nokkuv1.Team { return t.ToProto() })
+func (r *ListTeamsRow) ToProto() *nokkuv1.Team {
+	if r == nil {
+		return nil
+	}
+	return (&Team{
+		ID:          r.ID,
+		WorkspaceID: r.WorkspaceID,
+		Name:        r.Name,
+		Description: r.Description,
+		Tags:        r.Tags,
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
+	}).ToProto()
+}
+
+func TeamsToProto(rows []*ListTeamsRow) []*nokkuv1.Team {
+	return MapSlice(rows, func(r *ListTeamsRow) *nokkuv1.Team { return r.ToProto() })
 }
 
 func (t *ListTeamMembersRow) ToProto() *nokkuv1.WorkspaceMember {
@@ -224,8 +239,29 @@ func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
 	}
 }
 
-func ServiceAccountsToProto(sas []*ServiceAccount) []*nokkuv1.ServiceAccount {
-	return MapSlice(sas, func(sa *ServiceAccount) *nokkuv1.ServiceAccount { return sa.ToProto() })
+func (r *ListServiceAccountsRow) ToProto() *nokkuv1.ServiceAccount {
+	if r == nil {
+		return nil
+	}
+	return (&ServiceAccount{
+		ID:          r.ID,
+		WorkspaceID: r.WorkspaceID,
+		Name:        r.Name,
+		Description: r.Description,
+		TokenHash:   r.TokenHash,
+		LastUsedAt:  r.LastUsedAt,
+		ExpiresAt:   r.ExpiresAt,
+		Tags:        r.Tags,
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
+	}).ToProto()
+}
+
+func ServiceAccountsToProto(rows []*ListServiceAccountsRow) []*nokkuv1.ServiceAccount {
+	return MapSlice(
+		rows,
+		func(r *ListServiceAccountsRow) *nokkuv1.ServiceAccount { return r.ToProto() },
+	)
 }
 
 func (t *Target) ToProto() *nokkuv1.Target {
@@ -250,8 +286,27 @@ func (t *Target) ToProto() *nokkuv1.Target {
 	}
 }
 
-func ListTargetsToProto(ts []*Target) []*nokkuv1.Target {
-	return MapSlice(ts, func(t *Target) *nokkuv1.Target { return t.ToProto() })
+func (r *ListTargetsRow) ToProto() *nokkuv1.Target {
+	if r == nil {
+		return nil
+	}
+	return (&Target{
+		ID:          r.ID,
+		WorkspaceID: r.WorkspaceID,
+		CaID:        r.CaID,
+		DaemonID:    r.DaemonID,
+		Name:        r.Name,
+		Description: r.Description,
+		Endpoints:   r.Endpoints,
+		Tags:        r.Tags,
+		Metadata:    r.Metadata,
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
+	}).ToProto()
+}
+
+func ListTargetsToProto(rows []*ListTargetsRow) []*nokkuv1.Target {
+	return MapSlice(rows, func(r *ListTargetsRow) *nokkuv1.Target { return r.ToProto() })
 }
 
 func (p *Principal) ToProto() *nokkuv1.Principal {
@@ -315,8 +370,27 @@ func (d *Daemon) ToProto() *nokkuv1.Daemon {
 	}
 }
 
-func DaemonsToProto(ds []*Daemon) []*nokkuv1.Daemon {
-	return MapSlice(ds, func(d *Daemon) *nokkuv1.Daemon { return d.ToProto() })
+func (r *ListDaemonsRow) ToProto() *nokkuv1.Daemon {
+	if r == nil {
+		return nil
+	}
+	return (&Daemon{
+		ID:          r.ID,
+		WorkspaceID: r.WorkspaceID,
+		Name:        r.Name,
+		TokenHash:   r.TokenHash,
+		Status:      r.Status,
+		Online:      r.Online,
+		Config:      r.Config,
+		Metadata:    r.Metadata,
+		LastUsedAt:  r.LastUsedAt,
+		UpdatedAt:   r.UpdatedAt,
+		CreatedAt:   r.CreatedAt,
+	}).ToProto()
+}
+
+func DaemonsToProto(rows []*ListDaemonsRow) []*nokkuv1.Daemon {
+	return MapSlice(rows, func(r *ListDaemonsRow) *nokkuv1.Daemon { return r.ToProto() })
 }
 
 func (r *CertificateAuthority) ToProto() *nokkuv1.CertificateAuthority {

@@ -122,18 +122,9 @@ func (s *ServiceAccountService) ListServiceAccounts(
 	ctx context.Context,
 	req *nokkuv1.ListServiceAccountsRequest,
 ) (*nokkuv1.ListServiceAccountsResponse, error) {
-	var result []*nokkuv1.ServiceAccount
-	var count int32
+	var result []*db.ListServiceAccountsRow
+	count := int32(0)
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		var err error
-		count, err = q.CountServiceAccounts(ctx, &db.CountServiceAccountsParams{
-			WorkspaceID: req.GetWorkspaceId(),
-			Query:       req.Query,
-			Tags:        req.GetTags(),
-		})
-		if err != nil {
-			return err
-		}
 		sas, err := q.ListServiceAccounts(ctx, &db.ListServiceAccountsParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			Query:       req.Query,
@@ -144,14 +135,17 @@ func (s *ServiceAccountService) ListServiceAccounts(
 		if err != nil {
 			return err
 		}
-		result = db.ServiceAccountsToProto(sas)
+		result = sas
+		if len(sas) > 0 {
+			count = sas[0].TotalCount
+		}
 		return nil
 	}); err != nil {
 		return nil, DBError(err)
 	}
 
 	return &nokkuv1.ListServiceAccountsResponse{
-		ServiceAccounts: result,
+		ServiceAccounts: db.ServiceAccountsToProto(result),
 		Total:           &count,
 	}, nil
 }

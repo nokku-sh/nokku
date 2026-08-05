@@ -125,20 +125,9 @@ func (s *TargetService) ListTargets(
 	ctx context.Context,
 	req *nokkuv1.ListTargetsRequest,
 ) (*nokkuv1.ListTargetsResponse, error) {
-	var targets []*db.Target
-	var count int32
+	var targets []*db.ListTargetsRow
+	count := int32(0)
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		count, err = q.CountTargets(ctx, &db.CountTargetsParams{
-			WorkspaceID: req.GetWorkspaceId(),
-			Query:       req.Query,
-			DaemonID:    req.DaemonId,
-			CaID:        req.CaId,
-			Principals:  req.GetPrincipals(),
-			Tags:        req.GetTags(),
-		})
-		if err != nil {
-			return err
-		}
 		targets, err = q.ListTargets(ctx, &db.ListTargetsParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			Query:       req.Query,
@@ -152,6 +141,9 @@ func (s *TargetService) ListTargets(
 		return err
 	}); err != nil {
 		return nil, DBError(err)
+	}
+	if len(targets) > 0 {
+		count = targets[0].TotalCount
 	}
 
 	return &nokkuv1.ListTargetsResponse{

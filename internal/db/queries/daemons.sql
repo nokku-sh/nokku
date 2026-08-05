@@ -96,41 +96,30 @@ WHERE
 
 -- name: ListDaemons :many
 SELECT
-  *
+  d.*,
+  COUNT(*) OVER ()::INTEGER AS total_count
 FROM
-  daemons
+  daemons d
 WHERE
-  workspace_id = @workspace_id
+  d.workspace_id = @workspace_id
   AND (
     sqlc.narg('query')::TEXT IS NULL
-    OR name ILIKE '%' || sqlc.narg('query') || '%'
+    OR d.name ILIKE '%' || sqlc.narg('query') || '%'
   )
   AND (
     sqlc.narg('status')::INTEGER IS NULL
-    OR status = sqlc.narg('status')::INTEGER
+    OR d.status = sqlc.narg('status')::INTEGER
   )
   AND (
     sqlc.narg('online')::BOOLEAN IS NULL
-    OR online = sqlc.narg('online')
+    OR d.online = sqlc.narg('online')
   )
 ORDER BY
-  id ASC
+  d.id ASC
 LIMIT
   sqlc.narg('limit')
 OFFSET
   sqlc.narg('offset');
-
--- name: CountDaemons :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  daemons
-WHERE
-  workspace_id = @workspace_id
-  AND (
-    sqlc.narg('query')::TEXT IS NULL
-    OR name ILIKE '%' || sqlc.narg('query') || '%'
-  );
 
 -- name: DeleteDaemon :one
 DELETE FROM daemons

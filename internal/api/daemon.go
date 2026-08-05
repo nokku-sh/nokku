@@ -87,20 +87,12 @@ func (s *DaemonService) ListDaemons(
 	ctx context.Context,
 	req *nokkuv1.ListDaemonsRequest,
 ) (*nokkuv1.ListDaemonsResponse, error) {
-	var result []*db.Daemon
-	var count int32
+	var result []*db.ListDaemonsRow
+	count := int32(0)
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		count, err = q.CountDaemons(ctx, &db.CountDaemonsParams{
-			WorkspaceID: req.GetWorkspaceId(),
-			Query:       req.Query,
-		})
-		if err != nil {
-			return err
-		}
 		var status *int32
 		if req.GetStatus() != 0 {
-			val := int32(req.GetStatus())
-			status = &val
+			status = new(int32(req.GetStatus()))
 		}
 
 		result, err = q.ListDaemons(ctx, &db.ListDaemonsParams{
@@ -114,6 +106,9 @@ func (s *DaemonService) ListDaemons(
 		return err
 	}); err != nil {
 		return nil, DBError(err)
+	}
+	if len(result) > 0 {
+		count = result[0].TotalCount
 	}
 
 	return &nokkuv1.ListDaemonsResponse{
