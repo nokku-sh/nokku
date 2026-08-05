@@ -258,7 +258,7 @@ WHERE
 INSERT INTO
   workspace_members (workspace_id, user_id, role_name)
 VALUES
-  (@workspace_id, @user_id, 'member')
+  (@workspace_id, @user_id, 'viewer')
 ON CONFLICT (workspace_id, user_id) DO NOTHING;
 
 -- name: RemoveWorkspaceMember :exec
@@ -290,7 +290,7 @@ WITH
   update_old_owner AS (
     UPDATE workspace_members
     SET
-      role_name = 'member'
+      role_name = 'viewer'
     FROM
       old_owner
     WHERE

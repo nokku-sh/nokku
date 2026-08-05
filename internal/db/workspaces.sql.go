@@ -16,7 +16,7 @@ const addWorkspaceMember = `-- name: AddWorkspaceMember :exec
 INSERT INTO
   workspace_members (workspace_id, user_id, role_name)
 VALUES
-  ($1, $2, 'member')
+  ($1, $2, 'viewer')
 ON CONFLICT (workspace_id, user_id) DO NOTHING
 `
 
@@ -685,7 +685,7 @@ WITH
   update_old_owner AS (
     UPDATE workspace_members
     SET
-      role_name = 'member'
+      role_name = 'viewer'
     FROM
       old_owner
     WHERE
