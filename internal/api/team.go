@@ -119,18 +119,8 @@ func (s *TeamService) ListTeams(
 	req *nokkuv1.ListTeamsRequest,
 ) (*nokkuv1.ListTeamsResponse, error) {
 	var result []*nokkuv1.Team
-	var count int32
+	count := int32(0)
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		var err error
-		count, err = q.CountTeams(ctx, &db.CountTeamsParams{
-			WorkspaceID: req.GetWorkspaceId(),
-			Query:       req.Query,
-			Tags:        req.GetTags(),
-		})
-		if err != nil {
-			return err
-		}
-
 		teams, err := q.ListTeams(ctx, &db.ListTeamsParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			Query:       req.Query,
@@ -142,6 +132,9 @@ func (s *TeamService) ListTeams(
 			return err
 		}
 
+		if len(teams) > 0 {
+			count = teams[0].TotalCount
+		}
 		result = db.TeamsToProto(teams)
 		for i, team := range teams {
 			members, err := q.ListTeamMembers(ctx, team.ID)

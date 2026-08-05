@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 )
 
 const checkTargetAccess = `-- name: CheckTargetAccess :one
@@ -53,64 +54,6 @@ func (q *Queries) CheckTargetAccess(ctx context.Context, arg *CheckTargetAccessP
 		&i.UpdatedAt,
 	)
 	return &i, err
-}
-
-const countTargets = `-- name: CountTargets :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  targets t
-WHERE
-  t.workspace_id = $1
-  AND (
-    $2::TEXT IS NULL
-    OR t.name ILIKE '%' || $2 || '%'
-    OR COALESCE(t.description, '') ILIKE '%' || $2 || '%'
-  )
-  AND (
-    $3::UUID IS NULL
-    OR t.daemon_id = $3::UUID
-  )
-  AND (
-    $4::UUID IS NULL
-    OR t.ca_id = $4::UUID
-  )
-  AND (
-    $5::TEXT[] IS NULL
-    OR EXISTS (
-      SELECT
-        1
-      FROM
-        principals p
-      WHERE
-        p.target_id = t.id
-        AND p.username = ANY ($5::TEXT[])
-    )
-  )
-  AND t.tags @> COALESCE($6, '{}'::TEXT[])
-`
-
-type CountTargetsParams struct {
-	WorkspaceID string   `json:"workspaceId"`
-	Query       *string  `json:"query"`
-	DaemonID    *string  `json:"daemonId"`
-	CaID        *string  `json:"caId"`
-	Principals  []string `json:"principals"`
-	Tags        []string `json:"tags"`
-}
-
-func (q *Queries) CountTargets(ctx context.Context, arg *CountTargetsParams) (int32, error) {
-	row := q.db.QueryRow(ctx, countTargets,
-		arg.WorkspaceID,
-		arg.Query,
-		arg.DaemonID,
-		arg.CaID,
-		arg.Principals,
-		arg.Tags,
-	)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
 }
 
 const createTarget = `-- name: CreateTarget :one
@@ -337,7 +280,8 @@ func (q *Queries) GetWorkspaceTags(ctx context.Context, workspaceID string) ([]s
 
 const listTargets = `-- name: ListTargets :many
 SELECT
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, tags, metadata, created_at, updated_at
+  t.id, t.workspace_id, t.ca_id, t.daemon_id, t.name, t.description, t.endpoints, t.tags, t.metadata, t.created_at, t.updated_at,
+  COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   targets t
 WHERE
@@ -390,7 +334,22 @@ type ListTargetsParams struct {
 	Limit       *int32   `json:"limit"`
 }
 
-func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*Target, error) {
+type ListTargetsRow struct {
+	ID          string    `json:"id"`
+	WorkspaceID string    `json:"workspaceId"`
+	CaID        *string   `json:"caId"`
+	DaemonID    *string   `json:"daemonId"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description"`
+	Endpoints   []string  `json:"endpoints"`
+	Tags        []string  `json:"tags"`
+	Metadata    []byte    `json:"metadata"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	TotalCount  int32     `json:"totalCount"`
+}
+
+func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*ListTargetsRow, error) {
 	rows, err := q.db.Query(ctx, listTargets,
 		arg.WorkspaceID,
 		arg.Query,
@@ -405,9 +364,9 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*T
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*Target
+	var items []*ListTargetsRow
 	for rows.Next() {
-		var i Target
+		var i ListTargetsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
@@ -420,6 +379,7 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*T
 			&i.Metadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

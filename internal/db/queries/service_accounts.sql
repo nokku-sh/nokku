@@ -32,52 +32,39 @@ WHERE
 
 -- name: ListServiceAccounts :many
 SELECT
-  *
+  sa.*,
+  COUNT(*) OVER ()::INTEGER AS total_count
 FROM
-  service_accounts
+  service_accounts sa
 WHERE
-  workspace_id = @workspace_id
+  sa.workspace_id = @workspace_id
   AND (
     sqlc.narg('query')::TEXT IS NULL
-    OR name ILIKE '%' || sqlc.narg('query') || '%'
-    OR COALESCE(description, '') ILIKE '%' || sqlc.narg('query') || '%'
+    OR sa.name ILIKE '%' || sqlc.narg('query') || '%'
+    OR COALESCE(sa.description, '') ILIKE '%' || sqlc.narg('query') || '%'
   )
-  AND tags @> COALESCE(@tags, '{}'::TEXT[])
+  AND sa.tags @> COALESCE(sqlc.narg('tags'), '{}'::TEXT[])
   AND (
     sqlc.narg('is_active')::BOOLEAN IS NULL
     OR (
       sqlc.narg('is_active') = TRUE
       AND (
-        expires_at IS NULL
-        OR expires_at > NOW()
+        sa.expires_at IS NULL
+        OR sa.expires_at > NOW()
       )
     )
     OR (
       sqlc.narg('is_active') = FALSE
-      AND expires_at IS NOT NULL
-      AND expires_at <= NOW()
+      AND sa.expires_at IS NOT NULL
+      AND sa.expires_at <= NOW()
     )
   )
 ORDER BY
-  id ASC
+  sa.id ASC
 LIMIT
   sqlc.narg('limit')
 OFFSET
   sqlc.narg('offset');
-
--- name: CountServiceAccounts :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  service_accounts
-WHERE
-  workspace_id = @workspace_id
-  AND (
-    sqlc.narg('query')::TEXT IS NULL
-    OR name ILIKE '%' || sqlc.narg('query') || '%'
-    OR COALESCE(description, '') ILIKE '%' || sqlc.narg('query') || '%'
-  )
-  AND tags @> COALESCE(@tags, '{}'::TEXT[]);
 
 -- name: UpdateServiceAccount :one
 UPDATE service_accounts

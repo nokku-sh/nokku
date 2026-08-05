@@ -13,22 +13,6 @@ import (
 	nokku "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-const countCAs = `-- name: CountCAs :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  certificate_authorities
-WHERE
-  workspace_id = $1
-`
-
-func (q *Queries) CountCAs(ctx context.Context, workspaceID string) (int32, error) {
-	row := q.db.QueryRow(ctx, countCAs, workspaceID)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const createCA = `-- name: CreateCA :one
 INSERT INTO
   certificate_authorities (

@@ -34,34 +34,6 @@ func (q *Queries) AddTeamMember(ctx context.Context, arg *AddTeamMemberParams) e
 	return err
 }
 
-const countTeams = `-- name: CountTeams :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  teams
-WHERE
-  workspace_id = $1
-  AND (
-    $2::TEXT IS NULL
-    OR name ILIKE '%' || $2 || '%'
-    OR COALESCE(description, '') ILIKE '%' || $2 || '%'
-  )
-  AND tags @> COALESCE($3, '{}'::TEXT[])
-`
-
-type CountTeamsParams struct {
-	WorkspaceID string   `json:"workspaceId"`
-	Query       *string  `json:"query"`
-	Tags        []string `json:"tags"`
-}
-
-func (q *Queries) CountTeams(ctx context.Context, arg *CountTeamsParams) (int32, error) {
-	row := q.db.QueryRow(ctx, countTeams, arg.WorkspaceID, arg.Query, arg.Tags)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const createTeam = `-- name: CreateTeam :one
 INSERT INTO
   teams (workspace_id, name, description, tags)
@@ -210,19 +182,20 @@ func (q *Queries) ListTeamMembers(ctx context.Context, teamID string) ([]*ListTe
 
 const listTeams = `-- name: ListTeams :many
 SELECT
-  id, workspace_id, name, description, tags, created_at, updated_at
+  te.id, te.workspace_id, te.name, te.description, te.tags, te.created_at, te.updated_at,
+  COUNT(*) OVER ()::INTEGER AS total_count
 FROM
-  teams
+  teams te
 WHERE
-  workspace_id = $1
+  te.workspace_id = $1
   AND (
     $2::TEXT IS NULL
-    OR name ILIKE '%' || $2 || '%'
-    OR COALESCE(description, '') ILIKE '%' || $2 || '%'
+    OR te.name ILIKE '%' || $2 || '%'
+    OR COALESCE(te.description, '') ILIKE '%' || $2 || '%'
   )
-  AND tags @> COALESCE($3, '{}'::TEXT[])
+  AND te.tags @> COALESCE($3, '{}'::TEXT[])
 ORDER BY
-  id ASC
+  te.id ASC
 LIMIT
   $5
 OFFSET
@@ -237,7 +210,18 @@ type ListTeamsParams struct {
 	Limit       *int32   `json:"limit"`
 }
 
-func (q *Queries) ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*Team, error) {
+type ListTeamsRow struct {
+	ID          string    `json:"id"`
+	WorkspaceID string    `json:"workspaceId"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description"`
+	Tags        []string  `json:"tags"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	TotalCount  int32     `json:"totalCount"`
+}
+
+func (q *Queries) ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*ListTeamsRow, error) {
 	rows, err := q.db.Query(ctx, listTeams,
 		arg.WorkspaceID,
 		arg.Query,
@@ -249,9 +233,9 @@ func (q *Queries) ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*Team,
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*Team
+	var items []*ListTeamsRow
 	for rows.Next() {
-		var i Team
+		var i ListTeamsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
@@ -260,6 +244,7 @@ func (q *Queries) ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*Team,
 			&i.Tags,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

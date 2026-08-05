@@ -38,14 +38,9 @@ func (s *PrincipalService) ListPrincipals(
 	req *nokkuv1.ListPrincipalsRequest,
 ) (*nokkuv1.ListPrincipalsResponse, error) {
 	var principals []*db.ListPrincipalsRow
-	var count int32
+	count := int32(0)
 
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		count, err = q.CountTargetPrincipals(ctx, req.GetTargetId())
-		if err != nil {
-			return err
-		}
-
 		principals, err = q.ListPrincipals(ctx, &db.ListPrincipalsParams{
 			TargetID: req.GetTargetId(),
 			Query:    req.Query,
@@ -55,6 +50,9 @@ func (s *PrincipalService) ListPrincipals(
 		return err
 	}); err != nil {
 		return nil, DBError(err)
+	}
+	if len(principals) > 0 {
+		count = principals[0].TotalCount
 	}
 
 	return &nokkuv1.ListPrincipalsResponse{

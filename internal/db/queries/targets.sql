@@ -24,7 +24,8 @@ WHERE
 
 -- name: ListTargets :many
 SELECT
-  *
+  t.*,
+  COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   targets t
 WHERE
@@ -64,40 +65,6 @@ LIMIT
   sqlc.narg('limit')
 OFFSET
   sqlc.narg('offset');
-
--- name: CountTargets :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  targets t
-WHERE
-  t.workspace_id = @workspace_id
-  AND (
-    sqlc.narg('query')::TEXT IS NULL
-    OR t.name ILIKE '%' || sqlc.narg('query') || '%'
-    OR COALESCE(t.description, '') ILIKE '%' || sqlc.narg('query') || '%'
-  )
-  AND (
-    sqlc.narg('daemon_id')::UUID IS NULL
-    OR t.daemon_id = sqlc.narg('daemon_id')::UUID
-  )
-  AND (
-    sqlc.narg('ca_id')::UUID IS NULL
-    OR t.ca_id = sqlc.narg('ca_id')::UUID
-  )
-  AND (
-    sqlc.narg('principals')::TEXT[] IS NULL
-    OR EXISTS (
-      SELECT
-        1
-      FROM
-        principals p
-      WHERE
-        p.target_id = t.id
-        AND p.username = ANY (sqlc.narg('principals')::TEXT[])
-    )
-  )
-  AND t.tags @> COALESCE(sqlc.narg('tags'), '{}'::TEXT[]);
 
 -- name: UpdateTarget :one
 UPDATE targets

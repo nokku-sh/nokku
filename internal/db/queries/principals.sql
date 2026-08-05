@@ -42,13 +42,61 @@ WHERE
 GROUP BY
   p.id;
 
--- name: CountTargetPrincipals :one
+-- name: ListPrincipals :many
+WITH
+  filtered AS (
+    SELECT
+      p.id,
+      p.username
+    FROM
+      principals p
+    WHERE
+      p.target_id = @target_id
+      AND (
+        sqlc.narg('query')::TEXT IS NULL
+        OR p.username ILIKE '%' || sqlc.narg('query') || '%'
+      )
+  ),
+  paginated_principals AS (
+    SELECT
+      id
+    FROM
+      filtered
+    ORDER BY
+      username ASC
+    LIMIT
+      sqlc.narg('limit')
+    OFFSET
+      sqlc.narg('offset')
+  )
 SELECT
-  COUNT(*)::INTEGER
+  p.*,
+  COALESCE(
+    array_agg(DISTINCT pu.user_id) FILTER (WHERE pu.user_id IS NOT NULL),
+    '{}'
+  )::UUID[] AS "userIds",
+  COALESCE(
+    array_agg(DISTINCT pt.team_id) FILTER (WHERE pt.team_id IS NOT NULL),
+    '{}'
+  )::UUID[] AS "teamIds",
+  COALESCE(
+    array_agg(DISTINCT psa.service_account_id) FILTER (WHERE psa.service_account_id IS NOT NULL),
+    '{}'
+  )::UUID[] AS "serviceAccountIds",
+  (SELECT
+    COUNT(*)::INTEGER
+  FROM
+    filtered) AS total_count
 FROM
-  principals
-WHERE
-  target_id = @target_id;
+  principals p
+  JOIN paginated_principals pp ON pp.id = p.id
+  LEFT JOIN principal_users pu ON pu.principal_id = p.id
+  LEFT JOIN principal_teams pt ON pt.principal_id = p.id
+  LEFT JOIN principal_service_accounts psa ON psa.principal_id = p.id
+GROUP BY
+  p.id
+ORDER BY
+  p.username ASC;
 
 -- name: GetTargetUsernames :many
 SELECT
@@ -252,49 +300,4 @@ WHERE
   p.target_id = ANY (@target_ids::UUID[])
 GROUP BY
   p.id;
-
--- name: ListPrincipals :many
-WITH
-  paginated_principals AS (
-    SELECT
-      p.id
-    FROM
-      principals p
-    WHERE
-      p.target_id = @target_id
-      AND (
-        sqlc.narg('query')::TEXT IS NULL
-        OR p.username ILIKE '%' || sqlc.narg('query') || '%'
-      )
-    ORDER BY
-      p.username ASC
-    LIMIT
-      sqlc.narg('limit')
-    OFFSET
-      sqlc.narg('offset')
-  )
-SELECT
-  p.*,
-  COALESCE(
-    array_agg(DISTINCT pu.user_id) FILTER (WHERE pu.user_id IS NOT NULL),
-    '{}'
-  )::UUID[] AS "userIds",
-  COALESCE(
-    array_agg(DISTINCT pt.team_id) FILTER (WHERE pt.team_id IS NOT NULL),
-    '{}'
-  )::UUID[] AS "teamIds",
-  COALESCE(
-    array_agg(DISTINCT psa.service_account_id) FILTER (WHERE psa.service_account_id IS NOT NULL),
-    '{}'
-  )::UUID[] AS "serviceAccountIds"
-FROM
-  principals p
-  JOIN paginated_principals pp ON pp.id = p.id
-  LEFT JOIN principal_users pu ON pu.principal_id = p.id
-  LEFT JOIN principal_teams pt ON pt.principal_id = p.id
-  LEFT JOIN principal_service_accounts psa ON psa.principal_id = p.id
-GROUP BY
-  p.id
-ORDER BY
-  p.username ASC;
 
