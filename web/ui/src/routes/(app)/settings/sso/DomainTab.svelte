@@ -75,7 +75,7 @@
 			{#each domains.data || [] as d (d.domain)}
 				<Collapsible.Root class="rounded-xl">
 					<Collapsible.Trigger
-						class="group relative z-10 flex w-full items-center justify-between gap-2 rounded-xl bg-card p-3 shadow-md transition-colors"
+						class="group relative z-10 flex w-full items-center justify-between gap-2 rounded-xl bg-muted p-3 shadow-md transition-colors"
 					>
 						<div class="flex items-center gap-2">
 							<ChevronRight
@@ -131,10 +131,10 @@
 					</Collapsible.Trigger>
 
 					<Collapsible.Content
-						class="relative -mt-2 space-y-4 overflow-hidden rounded-b-xl bg-card px-6 py-4 transition-all duration-300"
+						class="relative -mt-6 space-y-4 overflow-hidden rounded-b-xl bg-card px-6 py-4 transition-all duration-300"
 					>
 						{#if !d.verifiedAt}
-							<div class="mt-2 space-y-2">
+							<div class="mt-6 space-y-2">
 								<Label>Verification Token</Label>
 								<InputGroupVariants
 									variant="copy-input"
