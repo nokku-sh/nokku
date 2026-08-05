@@ -96,11 +96,14 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_SERVICE_ACCOUNT:
 			for _, subjectID := range req.GetSubjectIds() {
-				if err := q.AddServiceAccountToPrincipal(ctx, &db.AddServiceAccountToPrincipalParams{
-					ServiceAccountID: subjectID,
-					PrincipalID:      req.GetId(),
-					WorkspaceID:      workspaceID,
-				}); err != nil {
+				if err := q.AddServiceAccountToPrincipal(
+					ctx,
+					&db.AddServiceAccountToPrincipalParams{
+						ServiceAccountID: subjectID,
+						PrincipalID:      req.GetId(),
+						WorkspaceID:      workspaceID,
+					},
+				); err != nil {
 					return err
 				}
 			}
@@ -154,10 +157,13 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_SERVICE_ACCOUNT:
 			for _, subjectID := range req.GetSubjectIds() {
-				if err := q.RemoveServiceAccountFromPrincipal(ctx, &db.RemoveServiceAccountFromPrincipalParams{
-					ServiceAccountID: subjectID,
-					PrincipalID:      req.GetId(),
-				}); err != nil {
+				if err := q.RemoveServiceAccountFromPrincipal(
+					ctx,
+					&db.RemoveServiceAccountFromPrincipalParams{
+						ServiceAccountID: subjectID,
+						PrincipalID:      req.GetId(),
+					},
+				); err != nil {
 					return err
 				}
 			}

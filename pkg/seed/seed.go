@@ -320,7 +320,10 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 								ServiceAccountID: saID,
 							},
 						); err != nil {
-							return fmt.Errorf("failed to assign principal service accounts: %w", err)
+							return fmt.Errorf(
+								"failed to assign principal service accounts: %w",
+								err,
+							)
 						}
 					}
 				}
