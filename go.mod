@@ -13,6 +13,7 @@ require (
 	connectrpc.com/validate v0.6.0
 	connectrpc.com/vanguard v0.4.0
 	github.com/AfterShip/email-verifier v1.4.1
+	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/aws/aws-sdk-go-v2 v1.43.3
 	github.com/aws/aws-sdk-go-v2/config v1.32.34
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.33
@@ -24,12 +25,14 @@ require (
 	github.com/crewjam/saml v0.5.1
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/google/uuid v1.6.0
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/vault/api v1.23.0
 	github.com/iplocate/go-iplocate v1.0.0
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/mergestat/timediff v0.0.4
 	github.com/mizuchilabs/kata v0.1.1
+	github.com/redis/go-redis/v9 v9.22.0
 	github.com/rs/cors v1.11.1
 	github.com/russellhaering/goxmldsig v1.6.0
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.37
@@ -73,7 +76,6 @@ require (
 	cloud.google.com/go/kms v1.33.0 // indirect
 	cloud.google.com/go/longrunning v1.2.0 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
-	github.com/alicebob/miniredis/v2 v2.38.0 // indirect
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.16 // indirect
@@ -121,7 +123,6 @@ require (
 	github.com/hashicorp/go-secure-stdlib/parseutil v0.2.0 // indirect
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
-	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.1-vault-7 // indirect
 	github.com/hbollon/go-edlib v1.7.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
@@ -145,7 +146,6 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
-	github.com/redis/go-redis/v9 v9.22.0 // indirect
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
