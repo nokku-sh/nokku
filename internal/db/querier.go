@@ -10,12 +10,18 @@ import (
 )
 
 type Querier interface {
-	AddServiceAccountsToPrincipal(ctx context.Context, arg *AddServiceAccountsToPrincipalParams) error
+	AddServiceAccountToPrincipal(ctx context.Context, arg *AddServiceAccountToPrincipalParams) error
 	AddTeamMember(ctx context.Context, arg *AddTeamMemberParams) error
-	AddTeamsToPrincipal(ctx context.Context, arg *AddTeamsToPrincipalParams) error
-	AddUsersToPrincipal(ctx context.Context, arg *AddUsersToPrincipalParams) error
+	AddTeamToPrincipal(ctx context.Context, arg *AddTeamToPrincipalParams) error
+	// Insert-only grant/revoke primitives used by AddSubjectsToPrincipal /
+	// RemoveSubjectsFromPrincipal. They add or remove a single subject without
+	// touching other subjects already granted on the principal (unlike the
+	// diff-sync AddUsersToPrincipal & co used by the old membership-setting flow).
+	AddUserToPrincipal(ctx context.Context, arg *AddUserToPrincipalParams) error
 	AddWorkspaceMember(ctx context.Context, arg *AddWorkspaceMemberParams) error
 	CheckDomainSSOEnforcement(ctx context.Context, domain string) (bool, error)
+	// Whether a subject can reach a specific target. See GetTargetsBySubject for
+	// the definition of a subject and team membership expansion.
 	CheckTargetAccess(ctx context.Context, arg *CheckTargetAccessParams) (*Target, error)
 	CountAuditLogs(ctx context.Context, arg *CountAuditLogsParams) (int32, error)
 	CountMembers(ctx context.Context, arg *CountMembersParams) (int32, error)
@@ -98,6 +104,9 @@ type Querier interface {
 	GetTarget(ctx context.Context, targetID string) (*Target, error)
 	GetTargetByDaemon(ctx context.Context, daemonID *string) (*Target, error)
 	GetTargetUsernames(ctx context.Context, targetID string) ([]string, error)
+	// Returns every target a subject can reach. A subject is a user, a team, or a
+	// service account, all identified by their UUID. For a user, access granted to
+	// any of their teams is also included (via team_members).
 	GetTargetsBySubject(ctx context.Context, subjectID string) ([]*Target, error)
 	GetTeam(ctx context.Context, teamID string) (*Team, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
@@ -135,10 +144,10 @@ type Querier interface {
 	ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error)
 	ListWorkspaces(ctx context.Context) ([]*ListWorkspacesRow, error)
 	RegenerateVerificationToken(ctx context.Context, domain string) (*WorkspaceDomain, error)
-	RemoveServiceAccountsFromPrincipal(ctx context.Context, arg *RemoveServiceAccountsFromPrincipalParams) error
+	RemoveServiceAccountFromPrincipal(ctx context.Context, arg *RemoveServiceAccountFromPrincipalParams) error
+	RemoveTeamFromPrincipal(ctx context.Context, arg *RemoveTeamFromPrincipalParams) error
 	RemoveTeamMember(ctx context.Context, arg *RemoveTeamMemberParams) error
-	RemoveTeamsFromPrincipal(ctx context.Context, arg *RemoveTeamsFromPrincipalParams) error
-	RemoveUsersFromPrincipal(ctx context.Context, arg *RemoveUsersFromPrincipalParams) error
+	RemoveUserFromPrincipal(ctx context.Context, arg *RemoveUserFromPrincipalParams) error
 	RemoveWorkspaceMember(ctx context.Context, arg *RemoveWorkspaceMemberParams) error
 	ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*CertificateAuthority, error)
 	RevokeServiceAccountAccessInWorkspace(ctx context.Context, arg *RevokeServiceAccountAccessInWorkspaceParams) error

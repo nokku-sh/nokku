@@ -275,12 +275,14 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 					userIDs[k] = shuffledUsers[k].ID
 				}
 
-				if err := q.AddUsersToPrincipal(ctx, &db.AddUsersToPrincipalParams{
-					WorkspaceID: principal.WorkspaceID,
-					PrincipalID: principal.ID,
-					UserIds:     userIDs,
-				}); err != nil {
-					return fmt.Errorf("failed to assign principal users: %w", err)
+				for _, userID := range userIDs {
+					if err := q.AddUserToPrincipal(ctx, &db.AddUserToPrincipalParams{
+						WorkspaceID: principal.WorkspaceID,
+						PrincipalID: principal.ID,
+						UserID:      userID,
+					}); err != nil {
+						return fmt.Errorf("failed to assign principal users: %w", err)
+					}
 				}
 
 				shuffledTeams := make([]*db.Team, len(teams))
@@ -293,12 +295,14 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 					teamIDs[k] = shuffledTeams[k].ID
 				}
 
-				if err := q.AddTeamsToPrincipal(ctx, &db.AddTeamsToPrincipalParams{
-					WorkspaceID: principal.WorkspaceID,
-					PrincipalID: principal.ID,
-					TeamIds:     teamIDs,
-				}); err != nil {
-					return fmt.Errorf("failed to assign principal teams: %w", err)
+				for _, teamID := range teamIDs {
+					if err := q.AddTeamToPrincipal(ctx, &db.AddTeamToPrincipalParams{
+						WorkspaceID: principal.WorkspaceID,
+						PrincipalID: principal.ID,
+						TeamID:      teamID,
+					}); err != nil {
+						return fmt.Errorf("failed to assign principal teams: %w", err)
+					}
 				}
 
 				numSA := gofakeit.IntRange(0, min(2, len(sa)))
@@ -307,15 +311,17 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 					for k := range saIDs {
 						saIDs[k] = sa[k].ID
 					}
-					if err := q.AddServiceAccountsToPrincipal(
-						ctx,
-						&db.AddServiceAccountsToPrincipalParams{
-							WorkspaceID:       principal.WorkspaceID,
-							PrincipalID:       principal.ID,
-							ServiceAccountIds: saIDs,
-						},
-					); err != nil {
-						return fmt.Errorf("failed to assign principal service accounts: %w", err)
+					for _, saID := range saIDs {
+						if err := q.AddServiceAccountToPrincipal(
+							ctx,
+							&db.AddServiceAccountToPrincipalParams{
+								WorkspaceID:      principal.WorkspaceID,
+								PrincipalID:      principal.ID,
+								ServiceAccountID: saID,
+							},
+						); err != nil {
+							return fmt.Errorf("failed to assign principal service accounts: %w", err)
+						}
 					}
 				}
 			}
