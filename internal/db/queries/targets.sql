@@ -110,42 +110,125 @@ RETURNING
   *;
 
 -- name: GetTargetsBySubject :many
+-- Returns every target a subject can reach. A subject is a user, a team, or a
+-- service account, all identified by their UUID. For a user, access granted to
+-- any of their teams is also included (via team_members).
 SELECT DISTINCT
   t.*
 FROM
   targets t
-  LEFT JOIN principals p ON p.target_id = t.id
-  LEFT JOIN principal_users pu ON pu.principal_id = p.id
-  AND pu.user_id = sqlc.arg('subject_id')::UUID
-  LEFT JOIN principal_teams pt ON pt.principal_id = p.id
-  AND pt.team_id = sqlc.arg('subject_id')::UUID
-  LEFT JOIN principal_service_accounts psa ON psa.principal_id = p.id
-  AND psa.service_account_id = sqlc.arg('subject_id')::UUID
 WHERE
-    t.daemon_id = sqlc.arg('subject_id')::UUID
-  OR pu.user_id IS NOT NULL
-  OR pt.team_id IS NOT NULL
-  OR psa.service_account_id IS NOT NULL;
+  t.daemon_id = sqlc.arg('subject_id')::UUID
+  OR EXISTS (
+    SELECT
+      1
+    FROM
+      principals p
+    WHERE
+      p.target_id = t.id
+      AND (
+        -- Direct user grant
+        EXISTS (
+          SELECT
+            1
+          FROM
+            principal_users pu
+          WHERE
+            pu.principal_id = p.id
+            AND pu.user_id = sqlc.arg('subject_id')::UUID
+        )
+        -- Subject is a team with a direct grant
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            principal_teams pt
+          WHERE
+            pt.principal_id = p.id
+            AND pt.team_id = sqlc.arg('subject_id')::UUID
+        )
+        -- Subject is a service account with a direct grant
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            principal_service_accounts psa
+          WHERE
+            psa.principal_id = p.id
+            AND psa.service_account_id = sqlc.arg('subject_id')::UUID
+        )
+        -- Subject is a user who belongs to a team granted access
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            principal_teams granted_team
+            JOIN team_members tm ON tm.team_id = granted_team.team_id
+          WHERE
+            granted_team.principal_id = p.id
+            AND tm.user_id = sqlc.arg('subject_id')::UUID
+        )
+      )
+  );
 
 -- name: CheckTargetAccess :one
-SELECT DISTINCT
+-- Whether a subject can reach a specific target. See GetTargetsBySubject for
+-- the definition of a subject and team membership expansion.
+SELECT
   t.*
 FROM
   targets t
-  LEFT JOIN principals p ON p.target_id = t.id
-  LEFT JOIN principal_users pu ON pu.principal_id = p.id
-  AND pu.user_id = sqlc.arg('subject_id')::UUID
-  LEFT JOIN principal_teams pt ON pt.principal_id = p.id
-  AND pt.team_id = sqlc.arg('subject_id')::UUID
-  LEFT JOIN principal_service_accounts psa ON psa.principal_id = p.id
-  AND psa.service_account_id = sqlc.arg('subject_id')::UUID
 WHERE
   t.id = sqlc.arg('target_id')::UUID
   AND (
     t.daemon_id = sqlc.arg('subject_id')::UUID
-    OR pu.user_id IS NOT NULL
-    OR pt.team_id IS NOT NULL
-    OR psa.service_account_id IS NOT NULL
+    OR EXISTS (
+      SELECT
+        1
+      FROM
+        principals p
+      WHERE
+        p.target_id = t.id
+        AND (
+          EXISTS (
+            SELECT
+              1
+            FROM
+              principal_users pu
+            WHERE
+              pu.principal_id = p.id
+              AND pu.user_id = sqlc.arg('subject_id')::UUID
+          )
+          OR EXISTS (
+            SELECT
+              1
+            FROM
+              principal_teams pt
+            WHERE
+              pt.principal_id = p.id
+              AND pt.team_id = sqlc.arg('subject_id')::UUID
+          )
+          OR EXISTS (
+            SELECT
+              1
+            FROM
+              principal_service_accounts psa
+            WHERE
+              psa.principal_id = p.id
+              AND psa.service_account_id = sqlc.arg('subject_id')::UUID
+          )
+          OR EXISTS (
+            SELECT
+              1
+            FROM
+              principal_teams granted_team
+              JOIN team_members tm ON tm.team_id = granted_team.team_id
+            WHERE
+              granted_team.principal_id = p.id
+              AND tm.user_id = sqlc.arg('subject_id')::UUID
+          )
+        )
+    )
   );
 
 -- name: GetWorkspaceTags :many
