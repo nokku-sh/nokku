@@ -11,6 +11,7 @@
 	import { Switch } from '$lib/components/ui/switch';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { PrincipalType, type Principal } from '$lib/gen/nokku/v1/principal_pb';
+	import type { Target } from '$lib/gen/nokku/v1/target_pb';
 	import {
 		ChevronLeft,
 		CircleAlert,
@@ -18,7 +19,8 @@
 		ShieldCheck,
 		ShieldX,
 		Terminal,
-		UserX
+		UserX,
+		Users
 	} from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
@@ -48,21 +50,20 @@
 
 	let openRevokeAllModal = $state(false);
 	let selectedTargetId = $state<string>('');
+	// Optimistic per-principal assignment toggles (principalId -> desired assigned).
+	// Lets a switch flip immediately while the mutation is in flight; the server
+	// refetch (global connect-query invalidation) becomes the source of truth.
+	let pendingAssign = $state(new Map<string, boolean>());
 	let targetPrincipals = principal.list(() => ({ targetId: selectedTargetId }));
 
 	const displayedTargets = $derived(targets.data?.targets || []);
 	const selectedTarget = $derived(displayedTargets.find((t) => t.id === selectedTargetId) || null);
 
 	const accessibleTargetIds = $derived(new Set(access.data?.targets?.map((t) => t.id) || []));
-
-	const assignedPrincipalIDs = $derived(
-		subjectID && selectedTargetId
-			? new Set(
-					(targetPrincipals.data?.principals || [])
-						.filter((p) => getSubjectIds(p, subjectType).includes(subjectID))
-						.map((p) => p.id)
-				)
-			: new Set()
+	// access.data.targets carry each target's principals, so we can tell whether
+	// this subject is directly assigned or only reaches the target via a team.
+	const accessTargetsById = $derived(
+		new Map<string, Target>((access.data?.targets || []).map((t) => [t.id, t]))
 	);
 
 	const totalPages = $derived(Math.ceil((targets.data?.total || 0) / limit));
@@ -104,42 +105,53 @@
 		subjectType === PrincipalType.SERVICE_ACCOUNT ? 'service accounts' : `${subjectTypeLower}s`
 	);
 
-	function togglePrincipal(principal: Principal, isAssigned: boolean) {
-		if (isAssigned) {
-			removeFromPrincipal.mutate({ id: principal.id, subjectIds: [subjectID], type: subjectType });
-		} else {
-			addToPrincipal.mutate({ id: principal.id, subjectIds: [subjectID], type: subjectType });
-		}
+	// Effective assignment of this subject to a principal, honoring any
+	// optimistic toggle still in flight.
+	function isAssignedNow(p: Principal): boolean {
+		const serverAssigned = getSubjectIds(p, subjectType).includes(subjectID);
+		const pending = pendingAssign.get(p.id);
+		return pending === undefined ? serverAssigned : pending;
 	}
 
-	async function grantAllInTarget() {
-		const principals = targetPrincipals.data?.principals || [];
-		if (principals.length === 0 || !subjectID) return;
-
-		const promises = principals
-			.filter((p) => !assignedPrincipalIDs.has(p.id))
-			.map((p) =>
-				addToPrincipal.mutateAsync({ id: p.id, subjectIds: [subjectID], type: subjectType })
-			);
-
-		if (promises.length > 0) {
-			await Promise.all(promises);
-		}
+	// Per-target access for the sidebar: whether the subject reaches the target
+	// and whether that's via a direct assignment or only through team membership.
+	function getTargetAccess(t: Target): { accessible: boolean; direct: boolean } {
+		const at = accessTargetsById.get(t.id);
+		if (!at) return { accessible: false, direct: false };
+		const direct = (at.principals || []).some((p) =>
+			getSubjectIds(p, subjectType).includes(subjectID)
+		);
+		return { accessible: true, direct };
 	}
 
-	async function revokeAllInTarget() {
+	// Set this subject's assignment to a principal optimistically, then persist
+	// it via the matching mutation. The pending entry is cleared once the
+	// mutation settles and the server refetch reconciles.
+	function setAssignment(p: Principal, assigned: boolean) {
+		if (subjectID) pendingAssign.set(p.id, assigned);
+		const mutate = assigned ? addToPrincipal : removeFromPrincipal;
+		mutate.mutate(
+			{ id: p.id, subjectIds: [subjectID], type: subjectType },
+			{ onSettled: () => pendingAssign.delete(p.id) }
+		);
+	}
+
+	function togglePrincipal(p: Principal) {
+		setAssignment(p, !isAssignedNow(p));
+	}
+
+	function grantAllInTarget() {
 		const principals = targetPrincipals.data?.principals || [];
-		if (principals.length === 0 || !subjectID) return;
+		principals.forEach((p) => {
+			if (!isAssignedNow(p)) setAssignment(p, true);
+		});
+	}
 
-		const promises = principals
-			.filter((p) => assignedPrincipalIDs.has(p.id))
-			.map((p) =>
-				removeFromPrincipal.mutateAsync({ id: p.id, subjectIds: [subjectID], type: subjectType })
-			);
-
-		if (promises.length > 0) {
-			await Promise.all(promises);
-		}
+	function revokeAllInTarget() {
+		const principals = targetPrincipals.data?.principals || [];
+		principals.forEach((p) => {
+			if (isAssignedNow(p)) setAssignment(p, false);
+		});
 	}
 
 	function goBack() {
@@ -191,21 +203,24 @@
 				</div>
 			{:else}
 				{#each displayedTargets as tgt (tgt.id)}
-					{@const hasAccess = accessibleTargetIds.has(tgt.id)}
+					{@const { accessible, direct } = getTargetAccess(tgt)}
 					{@const isSelected = selectedTargetId === tgt.id}
 
 					<button
 						class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-muted/50 {isSelected
 							? 'bg-primary/10 text-primary'
 							: 'text-foreground'}"
-						onclick={() => (selectedTargetId = tgt.id)}
+						onclick={() => {
+							selectedTargetId = tgt.id;
+							pendingAssign.clear();
+						}}
 					>
 						<div
 							class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border bg-background shadow-sm {isSelected
 								? 'border-primary/30'
 								: ''}"
 						>
-							<ServerIcon size={14} class={hasAccess ? 'text-primary' : 'text-muted-foreground'} />
+							<ServerIcon size={14} class={accessible ? 'text-primary' : 'text-muted-foreground'} />
 						</div>
 						<div class="flex-1 overflow-hidden">
 							<div class="truncate font-medium">{tgt.name}</div>
@@ -219,14 +234,13 @@
 								</div>
 							{/if}
 						</div>
-						<Badge
-							variant={hasAccess ? 'default' : 'secondary'}
-							class="h-5 shrink-0 px-1.5 text-[10px] {isSelected && !hasAccess
-								? 'bg-background'
-								: ''}"
-						>
-							{hasAccess ? 'Access' : 'No Access'}
-						</Badge>
+						{#if !accessible}
+							<Badge variant="secondary" class="h-5 shrink-0 px-1.5 text-[10px]">No Access</Badge>
+						{:else if direct}
+							<Badge variant="default" class="h-5 shrink-0 px-1.5 text-[10px]">Access</Badge>
+						{:else}
+							<Badge variant="outline" class="h-5 shrink-0 px-1.5 text-[10px]">Via Team</Badge>
+						{/if}
 					</button>
 				{/each}
 			{/if}
@@ -302,9 +316,10 @@
 				</Empty.Root>
 			{:else}
 				{@const allPrincipals = targetPrincipals.data?.principals || []}
-				{@const assignedPrincipals = allPrincipals.filter((p) => assignedPrincipalIDs.has(p.id))}
+				{@const assignedPrincipals = allPrincipals.filter((p) => isAssignedNow(p))}
 				{@const allAssigned =
 					assignedPrincipals.length === allPrincipals.length && allPrincipals.length > 0}
+				{@const targetAccess = getTargetAccess(selectedTarget)}
 
 				<!-- Details of selected target -->
 				<div class="mx-auto max-w-5xl">
@@ -313,6 +328,13 @@
 						<h2 class="text-3xl font-bold tracking-tight">{selectedTarget.name}</h2>
 						{#if selectedTarget.description}
 							<p class="mt-2 text-lg text-muted-foreground">{selectedTarget.description}</p>
+						{/if}
+						{#if targetAccess.accessible && !targetAccess.direct}
+							<p class="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+								<Users size={16} class="shrink-0" />
+								{subjectName} reaches this target through a team, so no direct assignments are shown here.
+								Toggle switches to grant access directly.
+							</p>
 						{/if}
 					</div>
 
@@ -401,7 +423,7 @@
 							</Empty.Root>
 						{:else}
 							{#each targetPrincipals.data?.principals as principal (principal.id)}
-								{@const isAssigned = getSubjectIds(principal, subjectType).includes(subjectID)}
+								{@const isAssigned = isAssignedNow(principal)}
 								{@const subjectCount = getSubjectCount(principal, subjectType)}
 
 								<div
@@ -445,10 +467,7 @@
 										</div>
 									</div>
 
-									<Switch
-										checked={isAssigned}
-										onCheckedChange={() => togglePrincipal(principal, isAssigned)}
-									/>
+									<Switch checked={isAssigned} onCheckedChange={() => togglePrincipal(principal)} />
 								</div>
 							{/each}
 						{/if}
