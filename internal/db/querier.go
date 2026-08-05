@@ -194,6 +194,7 @@ type Querier interface {
 	// atomically within the rotation transaction. Never used on the boot path.
 	UpsertKeysetWrappedData(ctx context.Context, data []byte) error
 	UpsertOAuthIdentity(ctx context.Context, arg *UpsertOAuthIdentityParams) (*OauthIdentity, error)
+	UpsertRole(ctx context.Context, arg *UpsertRoleParams) error
 	// Note: source is only overwritten when the row is provider-managed ('stripe')
 	// or empty, so manual subscriptions survive provider syncs.
 	UpsertSubscription(ctx context.Context, arg *UpsertSubscriptionParams) error

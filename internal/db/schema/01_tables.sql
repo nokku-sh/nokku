@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS service_accounts (
   name TEXT NOT NULL, -- e.g., "github-actions-deploy", "ansible-prod"
   description TEXT,
   token_hash TEXT,
+  role_name TEXT NOT NULL DEFAULT 'member' REFERENCES roles (name),
   last_used_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ, -- Optional expiration for temporary access
   tags TEXT[] NOT NULL DEFAULT '{}',
