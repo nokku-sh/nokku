@@ -18,11 +18,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
--- Single permission check 
+-- Single permission check
 CREATE OR REPLACE FUNCTION has_permission (ws_id UUID, perm_code TEXT) RETURNS BOOLEAN AS $$
 DECLARE
   actor_type TEXT;
-  user_id_text TEXT;
+  actor_id_text TEXT;
+  actor_id UUID;
 BEGIN
   -- Always require workspace context membership first.
   IF NOT (ws_id = ANY (current_workspace_ids ())) THEN
@@ -31,43 +32,44 @@ BEGIN
 
   actor_type := current_actor_type ();
 
-  -- Service accounts can manage operational workspace resources,
-  -- but cannot change critical control-plane settings.
-  IF actor_type = 'service_account' THEN
-    RETURN perm_code NOT IN (
-      'workspace.edit',
-      'workspace.delete',
-      'members.edit',
-      'settings.edit',
-      'domains.edit',
-      'sso.edit'
-    );
-  END IF;
-
-  -- Daemons are limited to daemon/target/principal operations.
+  -- Daemons always use the fixed "daemon" role, defined in Go
+  -- (internal/db/roles.go) and seeded by EnsureRoles on startup.
   IF actor_type = 'daemon' THEN
-    RETURN perm_code IN (
-      'daemons.view',
-      'daemons.edit',
-      'targets.view',
-      'targets.edit',
-      'principals.view',
-      'principals.edit',
-      'cas.view'
+    RETURN EXISTS (
+      SELECT 1
+      FROM roles r
+      WHERE r.name = 'daemon'
+        AND perm_code = ANY(r.permissions)
     );
   END IF;
 
-  user_id_text := current_setting('nokku.user_id', true);
-  IF user_id_text IS NULL OR user_id_text = '' THEN
+  -- The remaining actor types (user, service_account) are role-driven.
+  actor_id_text := current_setting('nokku.user_id', true);
+  IF actor_id_text IS NULL OR actor_id_text = '' THEN
     RETURN FALSE;
   END IF;
+  actor_id := actor_id_text::UUID;
 
+  -- Service accounts are scoped by their role, like workspace members.
+  -- Only "member" and "admin" are assignable to service accounts.
+  IF actor_type = 'service_account' THEN
+    RETURN EXISTS (
+      SELECT 1
+      FROM service_accounts sa
+      JOIN roles r ON r.name = sa.role_name
+      WHERE sa.workspace_id = ws_id
+        AND sa.id = actor_id
+        AND perm_code = ANY(r.permissions)
+    );
+  END IF;
+
+  -- Workspace member (user).
   RETURN EXISTS (
     SELECT 1
     FROM workspace_members wm
     JOIN roles r ON r.name = wm.role_name
     WHERE wm.workspace_id = ws_id
-      AND wm.user_id = user_id_text::UUID
+      AND wm.user_id = actor_id
       AND perm_code = ANY(r.permissions)
   );
 END;

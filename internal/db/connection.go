@@ -68,7 +68,7 @@ func (c *Connection) createPool(ctx context.Context) error {
 		if err := c.Migrate(ctx); err != nil {
 			return err
 		}
-		if err := c.seed(ctx); err != nil {
+		if err := c.EnsureRoles(ctx); err != nil {
 			return err
 		}
 	}

@@ -139,10 +139,6 @@ func loadSQLFiles(fsys embed.FS) (schemaDDL, rlsDDL []string, _ error) {
 		if d.IsDir() || !strings.HasSuffix(filePath, ".sql") {
 			return nil
 		}
-		// Seed data is DML (INSERT), not schema DDL — skip it
-		if strings.HasPrefix(filePath, "schema/seed/") {
-			return nil
-		}
 
 		content, err := fsys.ReadFile(filePath)
 		if err != nil {
