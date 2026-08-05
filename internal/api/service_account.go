@@ -64,6 +64,14 @@ func (s *ServiceAccountService) CreateServiceAccount(
 
 	var result *db.ServiceAccount
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		roleName := req.GetRoleName()
+		if roleName == "" {
+			roleName = "viewer"
+		}
+		if !db.IsServiceAccountRole(roleName) {
+			return ErrInvalidInput
+		}
+
 		params := &db.CreateServiceAccountParams{
 			ID:          token.ID,
 			WorkspaceID: req.GetWorkspaceId(),
@@ -71,6 +79,7 @@ func (s *ServiceAccountService) CreateServiceAccount(
 			Description: req.Description,
 			Tags:        req.GetTags(),
 			TokenHash:   token.Hash,
+			RoleName:    &roleName,
 		}
 
 		if req.GetExpiresAt() != nil && !req.GetExpiresAt().AsTime().IsZero() {
@@ -94,12 +103,17 @@ func (s *ServiceAccountService) UpdateServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.UpdateServiceAccountRequest,
 ) (*nokkuv1.UpdateServiceAccountResponse, error) {
+	if req.RoleName != nil && !db.IsServiceAccountRole(req.GetRoleName()) {
+		return nil, ErrInvalidInput
+	}
+
 	var result *db.ServiceAccount
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.UpdateServiceAccount(ctx, &db.UpdateServiceAccountParams{
 			ServiceAccountID: req.GetId(),
 			Name:             req.Name,
 			Description:      req.Description,
+			RoleName:         req.RoleName,
 		})
 		if err != nil {
 			return err
@@ -129,6 +143,7 @@ func (s *ServiceAccountService) ListServiceAccounts(
 			WorkspaceID: req.GetWorkspaceId(),
 			Query:       req.Query,
 			Tags:        req.GetTags(),
+			RoleName:    req.RoleName,
 			Limit:       req.Limit,
 			Offset:      req.Offset,
 		})

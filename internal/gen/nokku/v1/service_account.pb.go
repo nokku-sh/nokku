@@ -30,11 +30,12 @@ type ServiceAccount struct {
 	WorkspaceId   *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
 	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
 	Description   *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
-	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
-	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	RoleName      *string                `protobuf:"bytes,5,opt,name=role_name,json=roleName" json:"role_name,omitempty"`
+	Tags          []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -93,6 +94,13 @@ func (x *ServiceAccount) GetName() string {
 func (x *ServiceAccount) GetDescription() string {
 	if x != nil && x.Description != nil {
 		return *x.Description
+	}
+	return ""
+}
+
+func (x *ServiceAccount) GetRoleName() string {
+	if x != nil && x.RoleName != nil {
+		return *x.RoleName
 	}
 	return ""
 }
@@ -225,8 +233,9 @@ type CreateServiceAccountRequest struct {
 	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
 	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
 	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	Tags          []string               `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	RoleName      *string                `protobuf:"bytes,4,opt,name=role_name,json=roleName" json:"role_name,omitempty"`
+	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -278,6 +287,13 @@ func (x *CreateServiceAccountRequest) GetName() string {
 func (x *CreateServiceAccountRequest) GetDescription() string {
 	if x != nil && x.Description != nil {
 		return *x.Description
+	}
+	return ""
+}
+
+func (x *CreateServiceAccountRequest) GetRoleName() string {
+	if x != nil && x.RoleName != nil {
+		return *x.RoleName
 	}
 	return ""
 }
@@ -353,7 +369,8 @@ type UpdateServiceAccountRequest struct {
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
 	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	Tags          []string               `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
+	RoleName      *string                `protobuf:"bytes,4,opt,name=role_name,json=roleName" json:"role_name,omitempty"`
+	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -405,6 +422,13 @@ func (x *UpdateServiceAccountRequest) GetName() string {
 func (x *UpdateServiceAccountRequest) GetDescription() string {
 	if x != nil && x.Description != nil {
 		return *x.Description
+	}
+	return ""
+}
+
+func (x *UpdateServiceAccountRequest) GetRoleName() string {
+	if x != nil && x.RoleName != nil {
+		return *x.RoleName
 	}
 	return ""
 }
@@ -546,7 +570,8 @@ type ListServiceAccountsRequest struct {
 	Limit         *int32                 `protobuf:"varint,2,opt,name=limit" json:"limit,omitempty"`
 	Offset        *int32                 `protobuf:"varint,3,opt,name=offset" json:"offset,omitempty"`
 	Query         *string                `protobuf:"bytes,4,opt,name=query" json:"query,omitempty"`
-	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
+	RoleName      *string                `protobuf:"bytes,5,opt,name=role_name,json=roleName" json:"role_name,omitempty"`
+	Tags          []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -605,6 +630,13 @@ func (x *ListServiceAccountsRequest) GetOffset() int32 {
 func (x *ListServiceAccountsRequest) GetQuery() string {
 	if x != nil && x.Query != nil {
 		return *x.Query
+	}
+	return ""
+}
+
+func (x *ListServiceAccountsRequest) GetRoleName() string {
+	if x != nil && x.RoleName != nil {
+		return *x.RoleName
 	}
 	return ""
 }
@@ -672,51 +704,56 @@ var File_nokku_v1_service_account_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_service_account_proto_rawDesc = "" +
 	"\n" +
-	"\x1enokku/v1/service_account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfc\x02\n" +
+	"\x1enokku/v1/service_account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x99\x03\n" +
 	"\x0eServiceAccount\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x12\n" +
-	"\x04tags\x18\x05 \x03(\tR\x04tags\x129\n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x1b\n" +
+	"\trole_name\x18\x05 \x01(\tR\broleName\x12\x12\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\x129\n" +
 	"\n" +
-	"expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12<\n" +
-	"\flast_used_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12<\n" +
+	"\flast_used_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"lastUsedAt\x129\n" +
 	"\n" +
-	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"4\n" +
+	"updated_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"4\n" +
 	"\x18GetServiceAccountRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"^\n" +
 	"\x19GetServiceAccountResponse\x12A\n" +
-	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"\x82\x02\n" +
+	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"\xba\x02\n" +
 	"\x1bCreateServiceAccountRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12;\n" +
 	"\x04name\x18\x02 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
-	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
-	"\x04tags\x18\x04 \x03(\tR\x04tags\x129\n" +
+	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x126\n" +
+	"\trole_name\x18\x04 \x01(\tB\x19\xbaH\x16r\x142\x12^(viewer|editor)?$R\broleName\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\x129\n" +
 	"\n" +
-	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"w\n" +
+	"expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"w\n" +
 	"\x1cCreateServiceAccountResponse\x12A\n" +
 	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\x12\x14\n" +
-	"\x05token\x18\x02 \x01(\tR\x05token\"\xb4\x01\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\"\xec\x01\n" +
 	"\x1bUpdateServiceAccountRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12;\n" +
 	"\x04name\x18\x02 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
-	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
-	"\x04tags\x18\x04 \x03(\tR\x04tags\"a\n" +
+	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x126\n" +
+	"\trole_name\x18\x04 \x01(\tB\x19\xbaH\x16r\x142\x12^(viewer|editor)?$R\broleName\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\"a\n" +
 	"\x1cUpdateServiceAccountResponse\x12A\n" +
 	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"7\n" +
 	"\x1bDeleteServiceAccountRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x1e\n" +
-	"\x1cDeleteServiceAccountResponse\"\xb5\x01\n" +
+	"\x1cDeleteServiceAccountResponse\"\xd2\x01\n" +
 	"\x1aListServiceAccountsRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1f\n" +
 	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
 	"\x06offset\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12\x14\n" +
-	"\x05query\x18\x04 \x01(\tR\x05query\x12\x12\n" +
-	"\x04tags\x18\x05 \x03(\tR\x04tags\"x\n" +
+	"\x05query\x18\x04 \x01(\tR\x05query\x12\x1b\n" +
+	"\trole_name\x18\x05 \x01(\tR\broleName\x12\x12\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\"x\n" +
 	"\x1bListServiceAccountsResponse\x12C\n" +
 	"\x10service_accounts\x18\x01 \x03(\v2\x18.nokku.v1.ServiceAccountR\x0fserviceAccounts\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total2\xf8\x05\n" +

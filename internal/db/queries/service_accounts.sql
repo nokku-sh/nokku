@@ -1,6 +1,6 @@
 -- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (id, workspace_id, name, description, token_hash, expires_at, tags)
+  service_accounts (id, workspace_id, name, description, token_hash, role_name, expires_at, tags)
 VALUES
   (
     @id,
@@ -8,6 +8,7 @@ VALUES
     @name,
     @description,
     @token_hash,
+    COALESCE(sqlc.narg('role_name')::TEXT, 'viewer'),
     @expires_at,
     COALESCE(@tags, '{}'::TEXT[])
   )
@@ -59,6 +60,10 @@ WHERE
       AND sa.expires_at <= NOW()
     )
   )
+  AND (
+    sqlc.narg('role_name')::TEXT IS NULL
+    OR sa.role_name = sqlc.narg('role_name')::TEXT
+  )
 ORDER BY
   sa.id ASC
 LIMIT
@@ -71,6 +76,7 @@ UPDATE service_accounts
 SET
   name = COALESCE(sqlc.narg('name'), name),
   description = COALESCE(sqlc.narg('description'), description),
+  role_name = COALESCE(sqlc.narg('role_name'), role_name),
   tags = COALESCE(sqlc.narg('tags'), tags)
 WHERE
   id = @service_account_id

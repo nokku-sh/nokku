@@ -14,7 +14,7 @@ import (
 
 const createServiceAccount = `-- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (id, workspace_id, name, description, token_hash, expires_at, tags)
+  service_accounts (id, workspace_id, name, description, token_hash, role_name, expires_at, tags)
 VALUES
   (
     $1,
@@ -22,11 +22,12 @@ VALUES
     $3,
     $4,
     $5,
-    $6,
-    COALESCE($7, '{}'::TEXT[])
+    COALESCE($6::TEXT, 'viewer'),
+    $7,
+    COALESCE($8, '{}'::TEXT[])
   )
 RETURNING
-  id, workspace_id, name, description, token_hash, last_used_at, expires_at, tags, created_at, updated_at
+  id, workspace_id, name, description, token_hash, role_name, last_used_at, expires_at, tags, created_at, updated_at
 `
 
 type CreateServiceAccountParams struct {
@@ -35,6 +36,7 @@ type CreateServiceAccountParams struct {
 	Name        string             `json:"name"`
 	Description *string            `json:"description"`
 	TokenHash   crypto.HashedToken `json:"tokenHash"`
+	RoleName    *string            `json:"roleName"`
 	ExpiresAt   *time.Time         `json:"expiresAt"`
 	Tags        interface{}        `json:"tags"`
 }
@@ -46,6 +48,7 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAc
 		arg.Name,
 		arg.Description,
 		arg.TokenHash,
+		arg.RoleName,
 		arg.ExpiresAt,
 		arg.Tags,
 	)
@@ -56,6 +59,7 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAc
 		&i.Name,
 		&i.Description,
 		&i.TokenHash,
+		&i.RoleName,
 		&i.LastUsedAt,
 		&i.ExpiresAt,
 		&i.Tags,
@@ -70,7 +74,7 @@ DELETE FROM service_accounts
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, name, description, token_hash, last_used_at, expires_at, tags, created_at, updated_at
+  id, workspace_id, name, description, token_hash, role_name, last_used_at, expires_at, tags, created_at, updated_at
 `
 
 func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID string) (*ServiceAccount, error) {
@@ -82,6 +86,7 @@ func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID str
 		&i.Name,
 		&i.Description,
 		&i.TokenHash,
+		&i.RoleName,
 		&i.LastUsedAt,
 		&i.ExpiresAt,
 		&i.Tags,
@@ -93,7 +98,7 @@ func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID str
 
 const getServiceAccount = `-- name: GetServiceAccount :one
 SELECT
-  id, workspace_id, name, description, token_hash, last_used_at, expires_at, tags, created_at, updated_at
+  id, workspace_id, name, description, token_hash, role_name, last_used_at, expires_at, tags, created_at, updated_at
 FROM
   service_accounts
 WHERE
@@ -109,6 +114,7 @@ func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string
 		&i.Name,
 		&i.Description,
 		&i.TokenHash,
+		&i.RoleName,
 		&i.LastUsedAt,
 		&i.ExpiresAt,
 		&i.Tags,
@@ -136,7 +142,7 @@ func (q *Queries) GetServiceAccountWorkspaceID(ctx context.Context, serviceAccou
 
 const listServiceAccounts = `-- name: ListServiceAccounts :many
 SELECT
-  sa.id, sa.workspace_id, sa.name, sa.description, sa.token_hash, sa.last_used_at, sa.expires_at, sa.tags, sa.created_at, sa.updated_at,
+  sa.id, sa.workspace_id, sa.name, sa.description, sa.token_hash, sa.role_name, sa.last_used_at, sa.expires_at, sa.tags, sa.created_at, sa.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa
@@ -163,12 +169,16 @@ WHERE
       AND sa.expires_at <= NOW()
     )
   )
+  AND (
+    $5::TEXT IS NULL
+    OR sa.role_name = $5::TEXT
+  )
 ORDER BY
   sa.id ASC
 LIMIT
-  $6
+  $7
 OFFSET
-  $5
+  $6
 `
 
 type ListServiceAccountsParams struct {
@@ -176,6 +186,7 @@ type ListServiceAccountsParams struct {
 	Query       *string  `json:"query"`
 	Tags        []string `json:"tags"`
 	IsActive    *bool    `json:"isActive"`
+	RoleName    *string  `json:"roleName"`
 	Offset      *int32   `json:"offset"`
 	Limit       *int32   `json:"limit"`
 }
@@ -186,6 +197,7 @@ type ListServiceAccountsRow struct {
 	Name        string             `json:"name"`
 	Description *string            `json:"description"`
 	TokenHash   crypto.HashedToken `json:"tokenHash"`
+	RoleName    string             `json:"roleName"`
 	LastUsedAt  *time.Time         `json:"lastUsedAt"`
 	ExpiresAt   *time.Time         `json:"expiresAt"`
 	Tags        []string           `json:"tags"`
@@ -200,6 +212,7 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 		arg.Query,
 		arg.Tags,
 		arg.IsActive,
+		arg.RoleName,
 		arg.Offset,
 		arg.Limit,
 	)
@@ -216,6 +229,7 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 			&i.Name,
 			&i.Description,
 			&i.TokenHash,
+			&i.RoleName,
 			&i.LastUsedAt,
 			&i.ExpiresAt,
 			&i.Tags,
@@ -238,16 +252,18 @@ UPDATE service_accounts
 SET
   name = COALESCE($1, name),
   description = COALESCE($2, description),
-  tags = COALESCE($3, tags)
+  role_name = COALESCE($3, role_name),
+  tags = COALESCE($4, tags)
 WHERE
-  id = $4
+  id = $5
 RETURNING
-  id, workspace_id, name, description, token_hash, last_used_at, expires_at, tags, created_at, updated_at
+  id, workspace_id, name, description, token_hash, role_name, last_used_at, expires_at, tags, created_at, updated_at
 `
 
 type UpdateServiceAccountParams struct {
 	Name             *string  `json:"name"`
 	Description      *string  `json:"description"`
+	RoleName         *string  `json:"roleName"`
 	Tags             []string `json:"tags"`
 	ServiceAccountID string   `json:"serviceAccountId"`
 }
@@ -256,6 +272,7 @@ func (q *Queries) UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAc
 	row := q.db.QueryRow(ctx, updateServiceAccount,
 		arg.Name,
 		arg.Description,
+		arg.RoleName,
 		arg.Tags,
 		arg.ServiceAccountID,
 	)
@@ -266,6 +283,7 @@ func (q *Queries) UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAc
 		&i.Name,
 		&i.Description,
 		&i.TokenHash,
+		&i.RoleName,
 		&i.LastUsedAt,
 		&i.ExpiresAt,
 		&i.Tags,
