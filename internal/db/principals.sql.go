@@ -10,87 +10,64 @@ import (
 	"time"
 )
 
-const addServiceAccountsToPrincipal = `-- name: AddServiceAccountsToPrincipal :exec
-WITH
-  deletions AS (
-    DELETE FROM principal_service_accounts
-    WHERE
-      principal_id = $1::uuid
-      AND service_account_id != ALL ($3::UUID[])
-  )
+const addServiceAccountToPrincipal = `-- name: AddServiceAccountToPrincipal :exec
 INSERT INTO
   principal_service_accounts (principal_id, workspace_id, service_account_id)
-SELECT
-  $1::uuid,
-  $2::uuid,
-  UNNEST($3::UUID[])
-ON CONFLICT DO NOTHING
+VALUES
+  ($1, $2, $3)
+ON CONFLICT (principal_id, service_account_id) DO NOTHING
 `
 
-type AddServiceAccountsToPrincipalParams struct {
-	PrincipalID       string   `json:"principalId"`
-	WorkspaceID       string   `json:"workspaceId"`
-	ServiceAccountIds []string `json:"serviceAccountIds"`
+type AddServiceAccountToPrincipalParams struct {
+	PrincipalID      string `json:"principalId"`
+	WorkspaceID      string `json:"workspaceId"`
+	ServiceAccountID string `json:"serviceAccountId"`
 }
 
-func (q *Queries) AddServiceAccountsToPrincipal(ctx context.Context, arg *AddServiceAccountsToPrincipalParams) error {
-	_, err := q.db.Exec(ctx, addServiceAccountsToPrincipal, arg.PrincipalID, arg.WorkspaceID, arg.ServiceAccountIds)
+func (q *Queries) AddServiceAccountToPrincipal(ctx context.Context, arg *AddServiceAccountToPrincipalParams) error {
+	_, err := q.db.Exec(ctx, addServiceAccountToPrincipal, arg.PrincipalID, arg.WorkspaceID, arg.ServiceAccountID)
 	return err
 }
 
-const addTeamsToPrincipal = `-- name: AddTeamsToPrincipal :exec
-WITH
-  deletions AS (
-    DELETE FROM principal_teams
-    WHERE
-      principal_id = $1::uuid
-      AND team_id != ALL ($3::UUID[])
-  )
+const addTeamToPrincipal = `-- name: AddTeamToPrincipal :exec
 INSERT INTO
   principal_teams (principal_id, workspace_id, team_id)
-SELECT
-  $1::uuid,
-  $2::uuid,
-  UNNEST($3::UUID[])
-ON CONFLICT DO NOTHING
+VALUES
+  ($1, $2, $3)
+ON CONFLICT (principal_id, team_id) DO NOTHING
 `
 
-type AddTeamsToPrincipalParams struct {
-	PrincipalID string   `json:"principalId"`
-	WorkspaceID string   `json:"workspaceId"`
-	TeamIds     []string `json:"teamIds"`
+type AddTeamToPrincipalParams struct {
+	PrincipalID string `json:"principalId"`
+	WorkspaceID string `json:"workspaceId"`
+	TeamID      string `json:"teamId"`
 }
 
-func (q *Queries) AddTeamsToPrincipal(ctx context.Context, arg *AddTeamsToPrincipalParams) error {
-	_, err := q.db.Exec(ctx, addTeamsToPrincipal, arg.PrincipalID, arg.WorkspaceID, arg.TeamIds)
+func (q *Queries) AddTeamToPrincipal(ctx context.Context, arg *AddTeamToPrincipalParams) error {
+	_, err := q.db.Exec(ctx, addTeamToPrincipal, arg.PrincipalID, arg.WorkspaceID, arg.TeamID)
 	return err
 }
 
-const addUsersToPrincipal = `-- name: AddUsersToPrincipal :exec
-WITH
-  deletions AS (
-    DELETE FROM principal_users
-    WHERE
-      principal_id = $1::uuid
-      AND user_id != ALL ($3::UUID[])
-  )
+const addUserToPrincipal = `-- name: AddUserToPrincipal :exec
 INSERT INTO
   principal_users (principal_id, workspace_id, user_id)
-SELECT
-  $1::uuid,
-  $2::uuid,
-  UNNEST($3::UUID[])
-ON CONFLICT DO NOTHING
+VALUES
+  ($1, $2, $3)
+ON CONFLICT (principal_id, user_id) DO NOTHING
 `
 
-type AddUsersToPrincipalParams struct {
-	PrincipalID string   `json:"principalId"`
-	WorkspaceID string   `json:"workspaceId"`
-	UserIds     []string `json:"userIds"`
+type AddUserToPrincipalParams struct {
+	PrincipalID string `json:"principalId"`
+	WorkspaceID string `json:"workspaceId"`
+	UserID      string `json:"userId"`
 }
 
-func (q *Queries) AddUsersToPrincipal(ctx context.Context, arg *AddUsersToPrincipalParams) error {
-	_, err := q.db.Exec(ctx, addUsersToPrincipal, arg.PrincipalID, arg.WorkspaceID, arg.UserIds)
+// Insert-only grant/revoke primitives used by AddSubjectsToPrincipal /
+// RemoveSubjectsFromPrincipal. They add or remove a single subject without
+// touching other subjects already granted on the principal (unlike the
+// diff-sync AddUsersToPrincipal & co used by the old membership-setting flow).
+func (q *Queries) AddUserToPrincipal(ctx context.Context, arg *AddUserToPrincipalParams) error {
+	_, err := q.db.Exec(ctx, addUserToPrincipal, arg.PrincipalID, arg.WorkspaceID, arg.UserID)
 	return err
 }
 
@@ -491,54 +468,54 @@ func (q *Queries) ListPrincipalsForDaemon(ctx context.Context, daemonID *string)
 	return items, nil
 }
 
-const removeServiceAccountsFromPrincipal = `-- name: RemoveServiceAccountsFromPrincipal :exec
+const removeServiceAccountFromPrincipal = `-- name: RemoveServiceAccountFromPrincipal :exec
 DELETE FROM principal_service_accounts
 WHERE
-  principal_id = $1::uuid
-  AND service_account_id = ANY ($2::UUID[])
+  principal_id = $1
+  AND service_account_id = $2
 `
 
-type RemoveServiceAccountsFromPrincipalParams struct {
-	PrincipalID       string   `json:"principalId"`
-	ServiceAccountIds []string `json:"serviceAccountIds"`
+type RemoveServiceAccountFromPrincipalParams struct {
+	PrincipalID      string `json:"principalId"`
+	ServiceAccountID string `json:"serviceAccountId"`
 }
 
-func (q *Queries) RemoveServiceAccountsFromPrincipal(ctx context.Context, arg *RemoveServiceAccountsFromPrincipalParams) error {
-	_, err := q.db.Exec(ctx, removeServiceAccountsFromPrincipal, arg.PrincipalID, arg.ServiceAccountIds)
+func (q *Queries) RemoveServiceAccountFromPrincipal(ctx context.Context, arg *RemoveServiceAccountFromPrincipalParams) error {
+	_, err := q.db.Exec(ctx, removeServiceAccountFromPrincipal, arg.PrincipalID, arg.ServiceAccountID)
 	return err
 }
 
-const removeTeamsFromPrincipal = `-- name: RemoveTeamsFromPrincipal :exec
+const removeTeamFromPrincipal = `-- name: RemoveTeamFromPrincipal :exec
 DELETE FROM principal_teams
 WHERE
-  principal_id = $1::uuid
-  AND team_id = ANY ($2::UUID[])
+  principal_id = $1
+  AND team_id = $2
 `
 
-type RemoveTeamsFromPrincipalParams struct {
-	PrincipalID string   `json:"principalId"`
-	TeamIds     []string `json:"teamIds"`
+type RemoveTeamFromPrincipalParams struct {
+	PrincipalID string `json:"principalId"`
+	TeamID      string `json:"teamId"`
 }
 
-func (q *Queries) RemoveTeamsFromPrincipal(ctx context.Context, arg *RemoveTeamsFromPrincipalParams) error {
-	_, err := q.db.Exec(ctx, removeTeamsFromPrincipal, arg.PrincipalID, arg.TeamIds)
+func (q *Queries) RemoveTeamFromPrincipal(ctx context.Context, arg *RemoveTeamFromPrincipalParams) error {
+	_, err := q.db.Exec(ctx, removeTeamFromPrincipal, arg.PrincipalID, arg.TeamID)
 	return err
 }
 
-const removeUsersFromPrincipal = `-- name: RemoveUsersFromPrincipal :exec
+const removeUserFromPrincipal = `-- name: RemoveUserFromPrincipal :exec
 DELETE FROM principal_users
 WHERE
-  principal_id = $1::uuid
-  AND user_id = ANY ($2::UUID[])
+  principal_id = $1
+  AND user_id = $2
 `
 
-type RemoveUsersFromPrincipalParams struct {
-	PrincipalID string   `json:"principalId"`
-	UserIds     []string `json:"userIds"`
+type RemoveUserFromPrincipalParams struct {
+	PrincipalID string `json:"principalId"`
+	UserID      string `json:"userId"`
 }
 
-func (q *Queries) RemoveUsersFromPrincipal(ctx context.Context, arg *RemoveUsersFromPrincipalParams) error {
-	_, err := q.db.Exec(ctx, removeUsersFromPrincipal, arg.PrincipalID, arg.UserIds)
+func (q *Queries) RemoveUserFromPrincipal(ctx context.Context, arg *RemoveUserFromPrincipalParams) error {
+	_, err := q.db.Exec(ctx, removeUserFromPrincipal, arg.PrincipalID, arg.UserID)
 	return err
 }
 

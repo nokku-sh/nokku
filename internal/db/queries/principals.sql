@@ -149,71 +149,48 @@ FROM
 WHERE
   p.id = @principal_id;
 
--- name: AddUsersToPrincipal :exec
-WITH
-  deletions AS (
-    DELETE FROM principal_users
-    WHERE
-      principal_id = @principal_id::uuid
-      AND user_id != ALL (@user_ids::UUID[])
-  )
+-- Insert-only grant/revoke primitives used by AddSubjectsToPrincipal /
+-- RemoveSubjectsFromPrincipal. They add or remove a single subject without
+-- touching other subjects already granted on the principal (unlike the
+-- diff-sync AddUsersToPrincipal & co used by the old membership-setting flow).
+-- name: AddUserToPrincipal :exec
 INSERT INTO
   principal_users (principal_id, workspace_id, user_id)
-SELECT
-  @principal_id::uuid,
-  @workspace_id::uuid,
-  UNNEST(@user_ids::UUID[])
-ON CONFLICT DO NOTHING;
+VALUES
+  (@principal_id, @workspace_id, @user_id)
+ON CONFLICT (principal_id, user_id) DO NOTHING;
 
--- name: RemoveUsersFromPrincipal :exec
-DELETE FROM principal_users
-WHERE
-  principal_id = @principal_id::uuid
-  AND user_id = ANY (@user_ids::UUID[]);
-
--- name: AddTeamsToPrincipal :exec
-WITH
-  deletions AS (
-    DELETE FROM principal_teams
-    WHERE
-      principal_id = @principal_id::uuid
-      AND team_id != ALL (@team_ids::UUID[])
-  )
+-- name: AddTeamToPrincipal :exec
 INSERT INTO
   principal_teams (principal_id, workspace_id, team_id)
-SELECT
-  @principal_id::uuid,
-  @workspace_id::uuid,
-  UNNEST(@team_ids::UUID[])
-ON CONFLICT DO NOTHING;
+VALUES
+  (@principal_id, @workspace_id, @team_id)
+ON CONFLICT (principal_id, team_id) DO NOTHING;
 
--- name: RemoveTeamsFromPrincipal :exec
-DELETE FROM principal_teams
-WHERE
-  principal_id = @principal_id::uuid
-  AND team_id = ANY (@team_ids::UUID[]);
-
--- name: AddServiceAccountsToPrincipal :exec
-WITH
-  deletions AS (
-    DELETE FROM principal_service_accounts
-    WHERE
-      principal_id = @principal_id::uuid
-      AND service_account_id != ALL (@service_account_ids::UUID[])
-  )
+-- name: AddServiceAccountToPrincipal :exec
 INSERT INTO
   principal_service_accounts (principal_id, workspace_id, service_account_id)
-SELECT
-  @principal_id::uuid,
-  @workspace_id::uuid,
-  UNNEST(@service_account_ids::UUID[])
-ON CONFLICT DO NOTHING;
+VALUES
+  (@principal_id, @workspace_id, @service_account_id)
+ON CONFLICT (principal_id, service_account_id) DO NOTHING;
 
--- name: RemoveServiceAccountsFromPrincipal :exec
+-- name: RemoveUserFromPrincipal :exec
+DELETE FROM principal_users
+WHERE
+  principal_id = @principal_id
+  AND user_id = @user_id;
+
+-- name: RemoveTeamFromPrincipal :exec
+DELETE FROM principal_teams
+WHERE
+  principal_id = @principal_id
+  AND team_id = @team_id;
+
+-- name: RemoveServiceAccountFromPrincipal :exec
 DELETE FROM principal_service_accounts
 WHERE
-  principal_id = @principal_id::uuid
-  AND service_account_id = ANY (@service_account_ids::UUID[]);
+  principal_id = @principal_id
+  AND service_account_id = @service_account_id;
 
 -- name: RevokeUserAccessInWorkspace :exec
 DELETE FROM principal_users

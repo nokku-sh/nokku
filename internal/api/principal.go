@@ -75,28 +75,34 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 
 		switch req.GetType() {
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_USER:
-			if err := q.AddUsersToPrincipal(ctx, &db.AddUsersToPrincipalParams{
-				UserIds:     req.GetSubjectIds(),
-				PrincipalID: req.GetId(),
-				WorkspaceID: workspaceID,
-			}); err != nil {
-				return err
+			for _, subjectID := range req.GetSubjectIds() {
+				if err := q.AddUserToPrincipal(ctx, &db.AddUserToPrincipalParams{
+					UserID:      subjectID,
+					PrincipalID: req.GetId(),
+					WorkspaceID: workspaceID,
+				}); err != nil {
+					return err
+				}
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_TEAM:
-			if err := q.AddTeamsToPrincipal(ctx, &db.AddTeamsToPrincipalParams{
-				TeamIds:     req.GetSubjectIds(),
-				PrincipalID: req.GetId(),
-				WorkspaceID: workspaceID,
-			}); err != nil {
-				return err
+			for _, subjectID := range req.GetSubjectIds() {
+				if err := q.AddTeamToPrincipal(ctx, &db.AddTeamToPrincipalParams{
+					TeamID:      subjectID,
+					PrincipalID: req.GetId(),
+					WorkspaceID: workspaceID,
+				}); err != nil {
+					return err
+				}
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_SERVICE_ACCOUNT:
-			if err := q.AddServiceAccountsToPrincipal(ctx, &db.AddServiceAccountsToPrincipalParams{
-				ServiceAccountIds: req.GetSubjectIds(),
-				PrincipalID:       req.GetId(),
-				WorkspaceID:       workspaceID,
-			}); err != nil {
-				return err
+			for _, subjectID := range req.GetSubjectIds() {
+				if err := q.AddServiceAccountToPrincipal(ctx, &db.AddServiceAccountToPrincipalParams{
+					ServiceAccountID: subjectID,
+					PrincipalID:      req.GetId(),
+					WorkspaceID:      workspaceID,
+				}); err != nil {
+					return err
+				}
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
 			return errors.New("invalid principal type")
@@ -129,28 +135,31 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 
 		switch req.GetType() {
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_USER:
-			if err := q.RemoveUsersFromPrincipal(ctx, &db.RemoveUsersFromPrincipalParams{
-				UserIds:     req.GetSubjectIds(),
-				PrincipalID: req.GetId(),
-			}); err != nil {
-				return err
+			for _, subjectID := range req.GetSubjectIds() {
+				if err := q.RemoveUserFromPrincipal(ctx, &db.RemoveUserFromPrincipalParams{
+					UserID:      subjectID,
+					PrincipalID: req.GetId(),
+				}); err != nil {
+					return err
+				}
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_TEAM:
-			if err := q.RemoveTeamsFromPrincipal(ctx, &db.RemoveTeamsFromPrincipalParams{
-				TeamIds:     req.GetSubjectIds(),
-				PrincipalID: req.GetId(),
-			}); err != nil {
-				return err
+			for _, subjectID := range req.GetSubjectIds() {
+				if err := q.RemoveTeamFromPrincipal(ctx, &db.RemoveTeamFromPrincipalParams{
+					TeamID:      subjectID,
+					PrincipalID: req.GetId(),
+				}); err != nil {
+					return err
+				}
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_SERVICE_ACCOUNT:
-			if err := q.RemoveServiceAccountsFromPrincipal(
-				ctx,
-				&db.RemoveServiceAccountsFromPrincipalParams{
-					ServiceAccountIds: req.GetSubjectIds(),
-					PrincipalID:       req.GetId(),
-				},
-			); err != nil {
-				return err
+			for _, subjectID := range req.GetSubjectIds() {
+				if err := q.RemoveServiceAccountFromPrincipal(ctx, &db.RemoveServiceAccountFromPrincipalParams{
+					ServiceAccountID: subjectID,
+					PrincipalID:      req.GetId(),
+				}); err != nil {
+					return err
+				}
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
 			return errors.New("invalid principal type")
