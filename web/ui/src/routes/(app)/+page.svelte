@@ -46,7 +46,7 @@
 	const cas = $derived(ca.list());
 
 	const isAdmin = $derived(
-		currentMember.data?.roleName === 'admin' || currentMember.data?.roleName === 'owner'
+		currentMember.data?.roleName === 'editor' || currentMember.data?.roleName === 'owner'
 	);
 
 	const access = $derived(target.access(currentUser.data?.id));

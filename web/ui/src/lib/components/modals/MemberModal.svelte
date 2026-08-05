@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { team } from '$lib/api/team.svelte';
+	import { roles as rolesApi } from '$lib/api/roles.svelte';
+	import { assignableRoles, roleIcon, roleLabel } from '$lib/roles';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Item from '$lib/components/ui/item';
 	import * as Select from '$lib/components/ui/select';
@@ -8,7 +10,7 @@
 	import UserAvatar from '$lib/components/utils/UserAvatar.svelte';
 	import { type WorkspaceMember } from '$lib/gen/nokku/v1/workspace_pb';
 	import { workspace } from '$lib/api/workspaces.svelte';
-	import { BadgeCheck, BadgeX, Crown, Pencil, Eye } from '@lucide/svelte';
+	import { BadgeCheck, BadgeX, Crown } from '@lucide/svelte';
 	import { CopyButton } from '../ui/copy-button';
 
 	interface Props {
@@ -17,11 +19,15 @@
 	}
 	let { data = $bindable({} as WorkspaceMember), open = $bindable(false) }: Props = $props();
 
-	const roles = [
-		{ value: 'owner', label: 'Owner', description: 'Manage all resources', icon: Crown },
-		{ value: 'admin', label: 'Admin', description: 'Manage resources and members', icon: Pencil },
-		{ value: 'member', label: 'Member', description: 'View resources with limited edit', icon: Eye }
-	];
+	const rolesQuery = $derived(rolesApi.list());
+	const roleOptions = $derived(
+		assignableRoles(rolesQuery.data ?? [], 'users').map((r) => ({
+			value: r.name,
+			label: roleLabel(r.name),
+			description: r.description,
+			icon: roleIcon(r.name)
+		}))
+	);
 
 	const teams = $derived(team.list());
 	const userTeams = $derived(
@@ -91,17 +97,18 @@
 						{#if data.roleName === 'owner'}
 							<Badge variant="destructive" class="h-6 gap-1 text-xs">
 								<Crown size={12} />
-								Owner
+								{roleLabel(data.roleName)}
 							</Badge>
 						{:else}
 							<Select.Root type="single" value={data.roleName} onValueChange={handleRoleChange}>
 								<Select.Trigger
 									class="h-auto! w-fit justify-center gap-1 rounded-full border border-input bg-transparent px-2 py-0.5 text-xs font-medium text-foreground shadow-none transition-all hover:bg-muted/50 focus:ring-0 [&>svg:last-child]:hidden"
 								>
-									{roles.find((r) => r.value === data?.roleName)?.label ?? data.roleName}
+									{roleOptions.find((r) => r.value === data?.roleName)?.label ??
+										roleLabel(data.roleName)}
 								</Select.Trigger>
 								<Select.Content>
-									{#each roles as role}
+									{#each roleOptions as role (role.value)}
 										<Select.Item
 											value={role.value}
 											label={role.label}

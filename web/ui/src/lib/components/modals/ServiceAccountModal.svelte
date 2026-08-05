@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { serviceAccount } from '$lib/api/service_account.svelte';
+	import { roles as rolesApi } from '$lib/api/roles.svelte';
+	import { assignableRoles, roleIcon, roleLabel } from '$lib/roles';
 	import * as Alert from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button';
 	import { Calendar } from '$lib/components/ui/calendar';
@@ -8,6 +10,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import InputGroupVariants from '$lib/components/ui/input-group/input-group-variants.svelte';
 	import * as Popover from '$lib/components/ui/popover';
+	import * as Select from '$lib/components/ui/select';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 	import type { ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
 	import { cn, DateValueFormat, formatTs } from '$lib/utils';
@@ -24,8 +27,19 @@
 
 	let saData = $state({} as ServiceAccount);
 	$effect(() => {
-		if (data) saData = { ...data };
+		if (data) saData = { ...data, roleName: data.roleName || 'viewer' };
 	});
+
+	const rolesQuery = $derived(rolesApi.list());
+	const roleOptions = $derived(
+		assignableRoles(rolesQuery.data ?? [], 'serviceAccounts').map((r) => ({
+			value: r.name,
+			label: roleLabel(r.name),
+			description: r.description,
+			icon: roleIcon(r.name)
+		}))
+	);
+	const selectedRole = $derived(roleOptions.find((r) => r.value === saData.roleName));
 
 	let expiry = $state<DateValue>();
 	let calendarOpen = $state(false);
@@ -111,6 +125,43 @@
 				class="min-h-20 resize-none"
 				rows={3}
 			/>
+		</Field.Content>
+	</Field.Field>
+
+	<Field.Field>
+		<Field.Label for="role">Role</Field.Label>
+		<Field.Content>
+			<Select.Root type="single" bind:value={saData.roleName}>
+				<Select.Trigger class="w-full" id="role">
+					{#if selectedRole}
+						<selectedRole.icon class="size-4 text-foreground/70" />
+						<span>{selectedRole.label}</span>
+					{:else}
+						<span class="text-muted-foreground">Select a role</span>
+					{/if}
+				</Select.Trigger>
+				<Select.Content class="max-w-80">
+					<Select.Group>
+						{#each roleOptions as role (role.value)}
+							<Select.Item
+								value={role.value}
+								label={role.label}
+								class="cursor-pointer items-center gap-3 py-2.5"
+							>
+								<role.icon size={16} class="mt-0.5 text-foreground/70" />
+								<div class="flex flex-col gap-1 text-left">
+									<span class="text-sm leading-none font-medium">{role.label}</span>
+									<span class="text-xs leading-snug text-muted-foreground">{role.description}</span>
+								</div>
+							</Select.Item>
+						{/each}
+					</Select.Group>
+				</Select.Content>
+			</Select.Root>
+			<Field.Description>
+				Viewer can view workspace resources; Editor can also manage operational resources and
+				certificate authorities.
+			</Field.Description>
 		</Field.Content>
 	</Field.Field>
 

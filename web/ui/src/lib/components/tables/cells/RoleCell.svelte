@@ -1,79 +1,82 @@
 <script lang="ts">
-	import { workspace } from '$lib/api/workspaces.svelte';
+	import { roles as rolesApi } from '$lib/api/roles.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Select from '$lib/components/ui/select';
-	import type { WorkspaceMember } from '$lib/gen/nokku/v1/workspace_pb';
-	import { Crown, LoaderCircle, ShieldCheck, ShieldIcon, User } from '@lucide/svelte';
+	import { assignableRoles, roleColor, roleIcon, roleLabel } from '$lib/roles';
+	import { Crown, LoaderCircle } from '@lucide/svelte';
 
-	interface Props {
-		user: WorkspaceMember;
-	}
-	let { user = $bindable() }: Props = $props();
+	type Props = {
+		roleName?: string;
+		/** Persist a role change. If omitted, the role is shown as a badge. */
+		update?: (roleName: string) => Promise<unknown> | unknown;
+		/** Which actor types this cell assigns roles to. */
+		scope?: 'users' | 'serviceAccounts';
+	};
+	let { roleName = '', update, scope = 'users' }: Props = $props();
 
-	let currentRole = $state(user.roleName);
+	/** Pending optimistic value while a change is being saved. */
+	let optimistic = $state<string>();
+	const currentRole = $derived(optimistic ?? roleName);
 
-	const roles = [
-		{
-			value: 'member',
-			label: 'Member',
-			description: 'View workspace resources',
-			icon: User,
-			color: 'text-blue-500'
-		},
-		{
-			value: 'admin',
-			label: 'Admin',
-			description: 'Manage operational resources',
-			icon: ShieldCheck,
-			color: 'text-indigo-500'
+	const rolesQuery = $derived(rolesApi.list());
+	const roleOptions = $derived(
+		assignableRoles(rolesQuery.data ?? [], scope).map((r) => ({
+			value: r.name,
+			label: roleLabel(r.name),
+			description: r.description,
+			icon: roleIcon(r.name),
+			color: roleColor(r.name)
+		}))
+	);
+	const selectedRole = $derived(roleOptions.find((r) => r.value === currentRole));
+
+	let saving = $state(false);
+	async function handleRoleChange(val: string) {
+		if (val === currentRole || !update) return;
+
+		optimistic = val; // Optimistically update the UI
+		saving = true;
+		try {
+			await update(val);
+		} catch {
+			optimistic = undefined; // Revert to the server value
+		} finally {
+			saving = false;
 		}
-	];
-
-	const updateMember = workspace.updateMember();
-	function handleRoleChange(val: string) {
-		if (val === currentRole) return;
-
-		const previousRole = currentRole;
-		currentRole = val; // Instantly update the UI
-
-		updateMember.mutate(
-			{ userId: user.id, roleName: val },
-			{ onError: () => (currentRole = previousRole) }
-		);
 	}
-
-	let selectedRole = $derived(roles.find((r) => r.value === currentRole));
 </script>
 
-{#if user.roleName === 'owner'}
+{#if rolesQuery.isPending}
+	<LoaderCircle class="size-3 animate-spin text-muted-foreground"></LoaderCircle>
+{:else if !update || !selectedRole}
+	<!-- Fixed role (e.g. owner) or read-only: shown as a badge -->
 	<Badge
 		variant="outline"
 		class="gap-1.5 border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/10"
 	>
-		<Crown />
-		<span>Owner</span>
+		{#if roleName === 'owner'}
+			<Crown />
+		{/if}
+		<span>{roleLabel(currentRole)}</span>
 	</Badge>
 {:else}
 	<Select.Root type="single" value={currentRole} onValueChange={handleRoleChange}>
 		<Select.Trigger
-			disabled={updateMember.isPending}
+			disabled={saving}
 			class="h-auto! w-fit justify-center gap-1.5 rounded-full border border-input bg-transparent px-2 py-0.5 text-xs font-medium text-foreground shadow-none transition-all hover:bg-muted/50 focus:ring-0 disabled:opacity-70 [&>svg:last-child]:hidden"
 		>
-			{#if updateMember.isPending}
-				<LoaderCircle class="size-3 animate-spin text-muted-foreground" />
+			{#if saving}
+				<LoaderCircle class="size-3 animate-spin text-muted-foreground"></LoaderCircle>
 				<span class="text-muted-foreground">Saving...</span>
-			{:else if selectedRole}
-				<selectedRole.icon class="size-3 {selectedRole.color}" />
-				<span>{selectedRole.label}</span>
 			{:else}
-				<ShieldIcon class="size-3 text-muted-foreground" />
-				<span class="capitalize">{currentRole}</span>
+				<selectedRole.icon class="size-3 {selectedRole.color}"></selectedRole.icon>
+				<span>{selectedRole.label}</span>
 			{/if}
 		</Select.Trigger>
 
 		<Select.Content class="max-w-80">
 			<Select.Group>
-				{#each roles as role}
+				{#each roleOptions as role (role.value)}
 					<Select.Item
 						value={role.value}
 						label={role.label}
@@ -82,7 +85,7 @@
 						<div
 							class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-muted/50"
 						>
-							<role.icon class="size-4 {role.color}" />
+							<role.icon class="size-4 {role.color}"></role.icon>
 						</div>
 						<div class="flex flex-col gap-1 text-left">
 							<span class="text-sm leading-none font-medium">{role.label}</span>

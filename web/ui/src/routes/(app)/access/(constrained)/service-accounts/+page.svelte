@@ -4,6 +4,7 @@
 	import { serviceAccount } from '$lib/api/service_account.svelte';
 	import ServiceAccountModal from '$lib/components/modals/ServiceAccountModal.svelte';
 	import ActionCell from '$lib/components/tables/cells/ActionCell.svelte';
+	import RoleCell from '$lib/components/tables/cells/RoleCell.svelte';
 	import TimeCell from '$lib/components/tables/cells/TimeCell.svelte';
 	import DataTable from '$lib/components/tables/DataTable.svelte';
 	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
@@ -18,6 +19,8 @@
 	import type { ColumnDef, Table } from '@tanstack/table-core';
 	import { Debounced } from 'runed';
 	import AvatarCell from '$lib/components/tables/cells/AvatarCell.svelte';
+	import { roles } from '$lib/api/roles.svelte';
+	import { roleIcon, roleLabel } from '$lib/roles';
 
 	const modal = createModalState<ServiceAccount>({} as ServiceAccount);
 
@@ -25,11 +28,13 @@
 
 	const saData = $derived(
 		serviceAccount.list(() => ({
-			query: debounced.current
+			query: debounced.current,
+			roleName: page.url.searchParams.get('role') || undefined
 		}))
 	);
 
 	const deleteSA = serviceAccount.delete();
+	const updateSA = serviceAccount.update();
 
 	const bulkActions: BulkAction<ServiceAccount>[] = [
 		{
@@ -41,6 +46,15 @@
 		}
 	];
 
+	const rolesQuery = $derived(roles.list());
+	const roleOptions = $derived(
+		(rolesQuery.data ?? []).map((r) => ({
+			label: roleLabel(r.name),
+			value: r.name,
+			icon: roleIcon(r.name)
+		}))
+	);
+
 	const columns: ColumnDef<ServiceAccount>[] = [
 		{
 			header: 'Name',
@@ -50,6 +64,16 @@
 					id: row.original.id,
 					name: row.original.name,
 					description: row.original.description
+				})
+		},
+		{
+			header: 'Role',
+			accessorKey: 'roleName',
+			cell: ({ row }) =>
+				renderComponent(RoleCell, {
+					roleName: row.original.roleName,
+					update: (roleName) => updateSA.mutateAsync({ id: row.original.id, roleName }),
+					scope: 'serviceAccounts'
 				})
 		},
 		{
@@ -116,7 +140,19 @@
 
 <ServiceAccountModal bind:open={modal.open} data={modal.selected} />
 
-<TableToolbar {table} search searchResultCount={saData.data?.total} />
+<TableToolbar
+	{table}
+	search
+	searchResultCount={saData.data?.total}
+	filters={[
+		{
+			title: 'Role',
+			options: roleOptions,
+			param: 'role',
+			mode: 'single'
+		}
+	]}
+/>
 
 <DataTable
 	data={saData.data?.serviceAccounts ?? []}
