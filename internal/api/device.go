@@ -50,13 +50,15 @@ func syncWebDevice(
 		return
 	}
 	name := deviceNameFromUA(reqHeader.Get("User-Agent"))
+	tokenHash := token.Hash
 
 	if err := cfg.Conn.Q.CreateUserDevice(ctx, &db.CreateUserDeviceParams{
-		ID:        token.ID,
-		UserID:    user.ID,
-		Name:      name,
-		Kind:      deviceKindWeb,
-		TokenHash: token.Hash,
+		ID:         token.ID,
+		UserID:     user.ID,
+		Name:       name,
+		Kind:       deviceKindWeb,
+		AuthMethod: "token",
+		TokenHash:  &tokenHash,
 	}); err != nil {
 		slog.Error("failed to register device", "error", err)
 		return

@@ -2,14 +2,15 @@
 WITH
   new_daemon AS (
     INSERT INTO
-      daemons (id, workspace_id, name, status, token_hash, config, metadata)
+      daemons (id, workspace_id, name, status, auth_method, auth_pubkey, config, metadata)
     VALUES
       (
         @id,
         @workspace_id,
         @name,
         @status,
-        @token_hash,
+        @auth_method,
+        @auth_pubkey,
         COALESCE(@config, '{}'::jsonb),
         COALESCE(@metadata, '{}'::jsonb)
       )

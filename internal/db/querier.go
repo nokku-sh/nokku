@@ -111,6 +111,7 @@ type Querier interface {
 	GetTeam(ctx context.Context, teamID string) (*Team, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	GetUserByID(ctx context.Context, userID string) (*User, error)
+	GetUserDevice(ctx context.Context, id string) (*UserDevice, error)
 	GetUserWebDevice(ctx context.Context, arg *GetUserWebDeviceParams) (*GetUserWebDeviceRow, error)
 	GetUserWorkspaceIDs(ctx context.Context, userID string) ([]string, error)
 	GetWorkspace(ctx context.Context, workspaceID string) (*GetWorkspaceRow, error)
@@ -201,7 +202,6 @@ type Querier interface {
 	UseBackupCode(ctx context.Context, arg *UseBackupCodeParams) (string, error)
 	UserWorkspaceMember(ctx context.Context, arg *UserWorkspaceMemberParams) (bool, error)
 	VerifiedDomainExists(ctx context.Context, domain string) (bool, error)
-	VerifyUserDevice(ctx context.Context, id string) (*VerifyUserDeviceRow, error)
 	VerifyUserEmail(ctx context.Context, arg *VerifyUserEmailParams) error
 	VerifyWorkspaceDomain(ctx context.Context, arg *VerifyWorkspaceDomainParams) (*WorkspaceDomain, error)
 }

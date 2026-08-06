@@ -1140,9 +1140,13 @@ func (*CloseSessionResponse) Descriptor() ([]byte, []int) {
 }
 
 type EnrollDaemonRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         *string                `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
-	CaId          *string                `protobuf:"bytes,2,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Token *string                `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
+	CaId  *string                `protobuf:"bytes,2,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
+	// Signing method used by the daemon after enrollment: "tpm" or "soft".
+	AuthMethod *string `protobuf:"bytes,3,opt,name=auth_method,json=authMethod" json:"auth_method,omitempty"`
+	// PEM-encoded PKIX public key the daemon uses to authenticate requests.
+	AuthPubkey    *string `protobuf:"bytes,4,opt,name=auth_pubkey,json=authPubkey" json:"auth_pubkey,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1191,12 +1195,25 @@ func (x *EnrollDaemonRequest) GetCaId() string {
 	return ""
 }
 
+func (x *EnrollDaemonRequest) GetAuthMethod() string {
+	if x != nil && x.AuthMethod != nil {
+		return *x.AuthMethod
+	}
+	return ""
+}
+
+func (x *EnrollDaemonRequest) GetAuthPubkey() string {
+	if x != nil && x.AuthPubkey != nil {
+		return *x.AuthPubkey
+	}
+	return ""
+}
+
 type EnrollDaemonResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	WorkspaceId   *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
 	TargetId      *string                `protobuf:"bytes,3,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
-	Token         *string                `protobuf:"bytes,4,opt,name=token" json:"token,omitempty"`
 	Status        *DaemonStatus          `protobuf:"varint,5,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
 	Config        *DaemonConfig          `protobuf:"bytes,6,opt,name=config" json:"config,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1250,13 +1267,6 @@ func (x *EnrollDaemonResponse) GetWorkspaceId() string {
 func (x *EnrollDaemonResponse) GetTargetId() string {
 	if x != nil && x.TargetId != nil {
 		return *x.TargetId
-	}
-	return ""
-}
-
-func (x *EnrollDaemonResponse) GetToken() string {
-	if x != nil && x.Token != nil {
-		return *x.Token
 	}
 	return ""
 }
@@ -2361,17 +2371,20 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\tdaemon_id\x18\x01 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\bdaemonId\x12*\n" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\tsessionId\"\x16\n" +
-	"\x14CloseSessionResponse\"I\n" +
+	"\x14CloseSessionResponse\"\x8b\x01\n" +
 	"\x13EnrollDaemonRequest\x12\x1d\n" +
 	"\x05token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05token\x12\x13\n" +
-	"\x05ca_id\x18\x02 \x01(\tR\x04caId\"\xdc\x01\n" +
+	"\x05ca_id\x18\x02 \x01(\tR\x04caId\x12\x1f\n" +
+	"\vauth_method\x18\x03 \x01(\tR\n" +
+	"authMethod\x12\x1f\n" +
+	"\vauth_pubkey\x18\x04 \x01(\tR\n" +
+	"authPubkey\"\xcc\x01\n" +
 	"\x14EnrollDaemonResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x1b\n" +
-	"\ttarget_id\x18\x03 \x01(\tR\btargetId\x12\x14\n" +
-	"\x05token\x18\x04 \x01(\tR\x05token\x12.\n" +
+	"\ttarget_id\x18\x03 \x01(\tR\btargetId\x12.\n" +
 	"\x06status\x18\x05 \x01(\x0e2\x16.nokku.v1.DaemonStatusR\x06status\x12.\n" +
-	"\x06config\x18\x06 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\">\n" +
+	"\x06config\x18\x06 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06configJ\x04\b\x04\x10\x05\">\n" +
 	"\x0ePrincipalUsers\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x10\n" +
 	"\x03ids\x18\x02 \x03(\tR\x03ids\"\xce\x01\n" +

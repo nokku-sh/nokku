@@ -112,9 +112,7 @@ func TestNewToken_ConvenienceConstructors(t *testing.T) {
 		got    *Token
 		prefix string
 	}{
-		{"daemon", mustNewToken(NewDaemonToken()), PrefixDaemon},
 		{"service account", mustNewToken(NewServiceAccountToken()), PrefixSA},
-		{"cli", mustNewToken(NewCLIToken()), PrefixCLI},
 		{"device", mustNewToken(NewDeviceToken()), PrefixDevice},
 	}
 	for _, tt := range tests {

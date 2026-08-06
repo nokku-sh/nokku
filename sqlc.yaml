@@ -88,11 +88,8 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"
+              pointer: true
           - column: "backup_codes.code_hash"
-            go_type:
-              import: "github.com/nokku-sh/nokku/internal/crypto"
-              type: "HashedToken"
-          - column: "daemons.token_hash"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"

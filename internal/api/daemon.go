@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/nokku-sh/nokku/internal/authn"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -303,10 +304,19 @@ func (s *DaemonService) EnrollDaemon(
 		status = nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
 	}
 
-	// Create permanent token
-	token, err := crypto.NewDaemonToken()
-	if err != nil {
-		return nil, ErrInternal
+	// Every daemon authenticates with signed request challenges against
+	// its registered public key, so nothing secret is stored on the
+	// machine.
+	authMethod := req.GetAuthMethod()
+	authPubkey := req.GetAuthPubkey()
+	if authPubkey == "" {
+		return nil, NewError(connect.CodeInvalidArgument, "auth_pubkey required")
+	}
+	if authMethod != "tpm" && authMethod != "soft" {
+		return nil, NewError(connect.CodeInvalidArgument, "unsupported auth_method")
+	}
+	if _, err := authn.ParseAuthPubkey([]byte(authPubkey)); err != nil {
+		return nil, NewError(connect.CodeInvalidArgument, "invalid auth_pubkey")
 	}
 
 	fingerprint := getHeader(ctx, "Nokku-Daemon-Fingerprint")
@@ -326,13 +336,14 @@ func (s *DaemonService) EnrollDaemon(
 
 	uniqueName := fmt.Sprintf("%s-%s", hostname, suffix)
 	daemon, err := s.cfg.Conn.Q.CreateDaemon(ctx, &db.CreateDaemonParams{
-		ID:          token.ID,
+		ID:          uuid.New().String(),
 		WorkspaceID: workspaceID,
 		Name:        uniqueName,
 		Metadata:    metadata,
 		Status:      status,
 		Config:      &nokkuv1.DaemonConfig{RecordSessions: new(true)},
-		TokenHash:   token.Hash,
+		AuthMethod:  authMethod,
+		AuthPubkey:  authPubkey,
 	})
 	if err != nil {
 		return nil, DBError(err)
@@ -361,7 +372,6 @@ func (s *DaemonService) EnrollDaemon(
 		Id:          &daemon.ID,
 		WorkspaceId: &daemon.WorkspaceID,
 		TargetId:    &target.ID,
-		Token:       &token.Plaintext,
 		Status:      &status,
 	}, nil
 }

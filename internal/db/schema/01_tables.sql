@@ -17,7 +17,12 @@ CREATE TABLE IF NOT EXISTS user_devices (
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   kind TEXT NOT NULL DEFAULT 'cli', -- 'cli' | 'web'
-  token_hash TEXT NOT NULL,
+  -- Signing method used for request authentication: 'tpm' or 'soft' for
+  -- CLI devices, 'token' for web devices.
+  auth_method TEXT NOT NULL DEFAULT 'token',
+  -- PEM-encoded ECDSA public key used to verify signed request challenges.
+  auth_pubkey TEXT,
+  token_hash TEXT,
   expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '6 months'),
   last_used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -176,7 +181,10 @@ CREATE TABLE IF NOT EXISTS daemons (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  token_hash TEXT,
+  -- Signing method used for request authentication: 'tpm' or 'soft'.
+  auth_method TEXT NOT NULL,
+  -- PEM-encoded ECDSA public key used to verify signed request challenges.
+  auth_pubkey TEXT NOT NULL,
   status INTEGER NOT NULL DEFAULT 1, -- 1=pending, 2=accepted, 3=rejected
   online BOOLEAN NOT NULL DEFAULT FALSE,
   config JSONB NOT NULL DEFAULT '{}',
