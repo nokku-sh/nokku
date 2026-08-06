@@ -98,35 +98,19 @@ WHERE
 -- User Device Tokens ---------------------------------------------------------
 -- name: CreateUserDevice :exec
 INSERT INTO
-  user_devices (id, user_id, name, kind, token_hash)
+  user_devices (id, user_id, name, kind, auth_method, auth_pubkey, token_hash)
 VALUES
-  (@id, @user_id, @name, @kind, @token_hash)
+  (@id, @user_id, @name, @kind, @auth_method, @auth_pubkey, sqlc.narg('token_hash'))
 RETURNING
   *;
 
--- name: VerifyUserDevice :one
+-- name: GetUserDevice :one
 SELECT
-  t.user_id,
-  t.token_hash,
-  t.name,
-  COALESCE(
-    array_agg(w.workspace_id) FILTER (
-      WHERE
-        w.workspace_id IS NOT NULL
-    ),
-    '{}'
-  )::UUID[] AS workspace_ids
+  *
 FROM
-  user_devices t
-  LEFT JOIN workspace_members w ON t.user_id = w.user_id
+  user_devices
 WHERE
-  t.id = $1
-  AND t.kind = 'cli'
-GROUP BY
-  t.id,
-  t.user_id,
-  t.token_hash,
-  t.name;
+  id = @id;
 
 -- name: GetUserWebDevice :one
 SELECT
@@ -142,7 +126,9 @@ WHERE
 -- name: RotateUserDevice :one
 UPDATE user_devices
 SET
-  token_hash = @token_hash,
+  auth_method = @auth_method,
+  auth_pubkey = @auth_pubkey,
+  token_hash = NULL,
   name = @name,
   expires_at = NOW() + INTERVAL '6 months'
 WHERE

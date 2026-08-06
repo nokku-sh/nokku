@@ -97,16 +97,8 @@ func NewToken(opts ...TokenOption) (*Token, error) {
 
 // Convenience constructors
 
-func NewDaemonToken() (*Token, error) {
-	return NewToken(WithPrefix(PrefixDaemon))
-}
-
 func NewServiceAccountToken() (*Token, error) {
 	return NewToken(WithPrefix(PrefixSA))
-}
-
-func NewCLIToken() (*Token, error) {
-	return NewToken(WithPrefix(PrefixCLI))
 }
 
 func NewDeviceToken() (*Token, error) {

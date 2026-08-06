@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
+	"github.com/google/uuid"
 
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -337,16 +338,11 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 				status = nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING
 			}
 
-			token, err := crypto.NewDaemonToken()
-			if err != nil {
-				return fmt.Errorf("failed to generate daemon token: %w", err)
-			}
 			_, err = q.CreateDaemon(ctx, &db.CreateDaemonParams{
-				ID:          token.ID,
+				ID:          uuid.New().String(),
 				WorkspaceID: workspace.ID,
 				Name:        uniqueName(gofakeit.AppName(), i),
 				Status:      status,
-				TokenHash:   token.Hash,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to create daemon %d: %w", i, err)

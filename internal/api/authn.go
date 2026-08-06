@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/nokku-sh/nokku/internal/authn"
+	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
@@ -34,7 +35,7 @@ func (a *AuthNInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 			return next(ctx, req)
 		}
 
-		ctx, err := a.authenticate(ctx, req.Header())
+		ctx, err := a.authenticate(ctx, req.Header(), req.Spec().Procedure)
 		if err != nil {
 			return nil, ErrUnauthorized
 		}
@@ -57,7 +58,7 @@ func (a *AuthNInterceptor) WrapStreamingHandler(
 			return next(ctx, conn)
 		}
 
-		ctx, err := a.authenticate(ctx, conn.RequestHeader())
+		ctx, err := a.authenticate(ctx, conn.RequestHeader(), conn.Spec().Procedure)
 		if err != nil {
 			return ErrUnauthorized
 		}
@@ -70,8 +71,10 @@ func (a *AuthNInterceptor) WrapStreamingHandler(
 
 func (a *AuthNInterceptor) WithAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Authenticate user using the same logic as Connect-RPC
-		ctx, err := a.authenticate(r.Context(), r.Header)
+		// Authenticate user using the same logic as Connect-RPC. No
+		// procedure is available here, so daemon challenges (which are
+		// bound to a procedure) cannot be used on these routes.
+		ctx, err := a.authenticate(r.Context(), r.Header, "")
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -86,7 +89,12 @@ func (a *AuthNInterceptor) WithAuth(next http.Handler) http.Handler {
 func (a *AuthNInterceptor) authenticate(
 	ctx context.Context,
 	header http.Header,
+	procedure string,
 ) (context.Context, error) {
+	if challenge := authn.GetChallenge(header); challenge != "" {
+		return a.authenticateChallenge(ctx, challenge, procedure)
+	}
+
 	bearer := authn.GetBearerToken(header)
 	parsed, err := crypto.Parse(bearer)
 	if err != nil {
@@ -94,10 +102,6 @@ func (a *AuthNInterceptor) authenticate(
 	}
 
 	switch parsed.Prefix {
-	case crypto.PrefixCLI:
-		return a.authenticateCLI(ctx, parsed.ID, bearer)
-	case crypto.PrefixDaemon:
-		return a.authenticateDaemon(ctx, parsed.ID, bearer)
 	case crypto.PrefixSA:
 		return a.authenticateServiceAccount(ctx, parsed.ID, bearer)
 	default:
@@ -129,48 +133,87 @@ func (a *AuthNInterceptor) authenticateUser(
 	return meta.WithActor(ctx, actor), nil
 }
 
-func (a *AuthNInterceptor) authenticateCLI(
+// authenticateChallenge verifies a signed request challenge against the
+// identity's registered public key. The challenge is bound to the exact
+// procedure being invoked, must be fresh (within ChallengeMaxSkew) and its
+// nonce must not have been seen before. Daemons and CLI user devices both
+// authenticate this way; service accounts keep bearer tokens.
+func (a *AuthNInterceptor) authenticateChallenge(
 	ctx context.Context,
-	cliID, bearer string,
+	challenge, procedure string,
 ) (context.Context, error) {
-	cli, err := a.cfg.Conn.Q.VerifyUserDevice(ctx, cliID)
+	chal, err := authn.ParseChallenge(challenge)
 	if err != nil {
-		return nil, errors.New("unauthorized")
+		return nil, err
+	}
+	if procedure == "" || chal.Procedure != procedure {
+		return nil, errors.New("challenge bound to a different procedure")
 	}
 
-	if ok := cli.TokenHash.Verify(bearer); !ok {
-		return nil, errors.New("unauthorized")
+	age := time.Since(time.Unix(chal.Timestamp, 0))
+	if age < -authn.ChallengeMaxSkew || age > authn.ChallengeMaxSkew {
+		return nil, errors.New("stale challenge")
 	}
 
-	actor := &meta.Actor{
-		ID:   cli.UserID,
-		Name: cli.Name,
-		Type: meta.ActorTypeUser,
+	daemon, err := a.cfg.Conn.Q.GetDaemon(ctx, chal.DaemonID)
+	if err == nil {
+		if daemon.AuthPubkey == "" {
+			return nil, errors.New("daemon does not use challenge authentication")
+		}
+		if err := a.verifyChallenge(ctx, chal, daemon.AuthPubkey); err != nil {
+			return nil, err
+		}
+		actor := &meta.Actor{
+			ID:   daemon.ID,
+			Name: daemon.Name,
+			Type: meta.ActorTypeDaemon,
+		}
+		a.reportUsage(crypto.PrefixDaemon, daemon.ID)
+		return meta.WithActor(ctx, actor), nil
 	}
-	a.reportUsage(crypto.PrefixCLI, cliID)
-	return meta.WithActor(ctx, actor), nil
+
+	device, err := a.cfg.Conn.Q.GetUserDevice(ctx, chal.DaemonID)
+	if err == nil {
+		if device.Kind != "cli" || device.AuthPubkey == nil {
+			return nil, errors.New("device does not use challenge authentication")
+		}
+		if err := a.verifyChallenge(ctx, chal, *device.AuthPubkey); err != nil {
+			return nil, err
+		}
+		actor := &meta.Actor{
+			ID:   device.UserID,
+			Name: device.Name,
+			Type: meta.ActorTypeUser,
+		}
+		a.reportUsage(crypto.PrefixCLI, device.ID)
+		return meta.WithActor(ctx, actor), nil
+	}
+
+	return nil, errors.New("unknown identity")
 }
 
-func (a *AuthNInterceptor) authenticateDaemon(
+// verifyChallenge checks the challenge signature and enforces one-time use
+// of its nonce. The signature is verified before touching the replay cache
+// so invalid challenges cannot fill it.
+func (a *AuthNInterceptor) verifyChallenge(
 	ctx context.Context,
-	daemonID, bearer string,
-) (context.Context, error) {
-	daemon, err := a.cfg.Conn.Q.GetDaemon(ctx, daemonID)
-	if err != nil {
-		return nil, errors.New("daemon not found")
+	chal *authn.Challenge,
+	pubkey string,
+) error {
+	if err := chal.Verify([]byte(pubkey)); err != nil {
+		return err
 	}
 
-	if ok := daemon.TokenHash.Verify(bearer); !ok {
-		return nil, errors.New("unauthorized")
+	nonceKey := "challenge:" + chal.DaemonID + ":" + chal.Nonce
+	if _, err := a.cfg.Cache.Get(ctx, nonceKey); err == nil {
+		return errors.New("replayed challenge")
+	} else if !errors.Is(err, cache.ErrNotFound) {
+		return errors.New("challenge cache unavailable")
 	}
-
-	actor := &meta.Actor{
-		ID:   daemon.ID,
-		Name: daemon.Name,
-		Type: meta.ActorTypeDaemon,
+	if err := a.cfg.Cache.Set(ctx, nonceKey, []byte("seen"), authn.ChallengeMaxSkew); err != nil {
+		return errors.New("challenge cache unavailable")
 	}
-	a.reportUsage(crypto.PrefixDaemon, daemonID)
-	return meta.WithActor(ctx, actor), nil
+	return nil
 }
 
 func (a *AuthNInterceptor) authenticateServiceAccount(

@@ -81,19 +81,21 @@ func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User,
 
 const createUserDevice = `-- name: CreateUserDevice :exec
 INSERT INTO
-  user_devices (id, user_id, name, kind, token_hash)
+  user_devices (id, user_id, name, kind, auth_method, auth_pubkey, token_hash)
 VALUES
-  ($1, $2, $3, $4, $5)
+  ($1, $2, $3, $4, $5, $6, $7)
 RETURNING
-  id, user_id, name, kind, token_hash, expires_at, last_used_at, created_at, updated_at
+  id, user_id, name, kind, auth_method, auth_pubkey, token_hash, expires_at, last_used_at, created_at, updated_at
 `
 
 type CreateUserDeviceParams struct {
-	ID        string             `json:"id"`
-	UserID    string             `json:"userId"`
-	Name      string             `json:"name"`
-	Kind      string             `json:"kind"`
-	TokenHash crypto.HashedToken `json:"tokenHash"`
+	ID         string              `json:"id"`
+	UserID     string              `json:"userId"`
+	Name       string              `json:"name"`
+	Kind       string              `json:"kind"`
+	AuthMethod string              `json:"authMethod"`
+	AuthPubkey *string             `json:"authPubkey"`
+	TokenHash  *crypto.HashedToken `json:"tokenHash"`
 }
 
 // User Device Tokens ---------------------------------------------------------
@@ -103,6 +105,8 @@ func (q *Queries) CreateUserDevice(ctx context.Context, arg *CreateUserDevicePar
 		arg.UserID,
 		arg.Name,
 		arg.Kind,
+		arg.AuthMethod,
+		arg.AuthPubkey,
 		arg.TokenHash,
 	)
 	return err
@@ -259,6 +263,34 @@ func (q *Queries) GetUserByID(ctx context.Context, userID string) (*User, error)
 	return &i, err
 }
 
+const getUserDevice = `-- name: GetUserDevice :one
+SELECT
+  id, user_id, name, kind, auth_method, auth_pubkey, token_hash, expires_at, last_used_at, created_at, updated_at
+FROM
+  user_devices
+WHERE
+  id = $1
+`
+
+func (q *Queries) GetUserDevice(ctx context.Context, id string) (*UserDevice, error) {
+	row := q.db.QueryRow(ctx, getUserDevice, id)
+	var i UserDevice
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Kind,
+		&i.AuthMethod,
+		&i.AuthPubkey,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.LastUsedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
 const getUserWebDevice = `-- name: GetUserWebDevice :one
 SELECT
   token_hash,
@@ -277,8 +309,8 @@ type GetUserWebDeviceParams struct {
 }
 
 type GetUserWebDeviceRow struct {
-	TokenHash crypto.HashedToken `json:"tokenHash"`
-	Name      string             `json:"name"`
+	TokenHash *crypto.HashedToken `json:"tokenHash"`
+	Name      string              `json:"name"`
 }
 
 func (q *Queries) GetUserWebDevice(ctx context.Context, arg *GetUserWebDeviceParams) (*GetUserWebDeviceRow, error) {
@@ -398,27 +430,31 @@ func (q *Queries) ListUserDevices(ctx context.Context, userID string) ([]*ListUs
 const rotateUserDevice = `-- name: RotateUserDevice :one
 UPDATE user_devices
 SET
-  token_hash = $1,
-  name = $2,
+  auth_method = $1,
+  auth_pubkey = $2,
+  token_hash = NULL,
+  name = $3,
   expires_at = NOW() + INTERVAL '6 months'
 WHERE
-  id = $3
-  AND user_id = $4
+  id = $4
+  AND user_id = $5
   AND kind = 'cli'
 RETURNING
   id
 `
 
 type RotateUserDeviceParams struct {
-	TokenHash crypto.HashedToken `json:"tokenHash"`
-	Name      string             `json:"name"`
-	ID        string             `json:"id"`
-	UserID    string             `json:"userId"`
+	AuthMethod string  `json:"authMethod"`
+	AuthPubkey *string `json:"authPubkey"`
+	Name       string  `json:"name"`
+	ID         string  `json:"id"`
+	UserID     string  `json:"userId"`
 }
 
 func (q *Queries) RotateUserDevice(ctx context.Context, arg *RotateUserDeviceParams) (string, error) {
 	row := q.db.QueryRow(ctx, rotateUserDevice,
-		arg.TokenHash,
+		arg.AuthMethod,
+		arg.AuthPubkey,
 		arg.Name,
 		arg.ID,
 		arg.UserID,
@@ -547,50 +583,6 @@ func (q *Queries) UseBackupCode(ctx context.Context, arg *UseBackupCodeParams) (
 	var id string
 	err := row.Scan(&id)
 	return id, err
-}
-
-const verifyUserDevice = `-- name: VerifyUserDevice :one
-SELECT
-  t.user_id,
-  t.token_hash,
-  t.name,
-  COALESCE(
-    array_agg(w.workspace_id) FILTER (
-      WHERE
-        w.workspace_id IS NOT NULL
-    ),
-    '{}'
-  )::UUID[] AS workspace_ids
-FROM
-  user_devices t
-  LEFT JOIN workspace_members w ON t.user_id = w.user_id
-WHERE
-  t.id = $1
-  AND t.kind = 'cli'
-GROUP BY
-  t.id,
-  t.user_id,
-  t.token_hash,
-  t.name
-`
-
-type VerifyUserDeviceRow struct {
-	UserID       string             `json:"userId"`
-	TokenHash    crypto.HashedToken `json:"tokenHash"`
-	Name         string             `json:"name"`
-	WorkspaceIds []string           `json:"workspaceIds"`
-}
-
-func (q *Queries) VerifyUserDevice(ctx context.Context, id string) (*VerifyUserDeviceRow, error) {
-	row := q.db.QueryRow(ctx, verifyUserDevice, id)
-	var i VerifyUserDeviceRow
-	err := row.Scan(
-		&i.UserID,
-		&i.TokenHash,
-		&i.Name,
-		&i.WorkspaceIds,
-	)
-	return &i, err
 }
 
 const verifyUserEmail = `-- name: VerifyUserEmail :exec

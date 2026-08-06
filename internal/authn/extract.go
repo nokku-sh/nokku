@@ -36,6 +36,18 @@ func GetBearerToken(header http.Header) string {
 	return auth[len(prefix):]
 }
 
+// GetChallenge returns the "Nokku" scheme challenge value, used by daemons
+// that authenticate with signed request challenges instead of a bearer
+// token.
+func GetChallenge(header http.Header) string {
+	const prefix = "Nokku "
+	auth := header.Get("Authorization")
+	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
+		return ""
+	}
+	return auth[len(prefix):]
+}
+
 func GetCookieToken(header http.Header, name string) string {
 	cookieHeader := header.Get("Cookie")
 	if cookieHeader == "" {

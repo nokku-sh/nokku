@@ -65,7 +65,8 @@ type Daemon struct {
 	ID          string              `json:"id"`
 	WorkspaceID string              `json:"workspaceId"`
 	Name        string              `json:"name"`
-	TokenHash   crypto.HashedToken  `json:"tokenHash"`
+	AuthMethod  string              `json:"authMethod"`
+	AuthPubkey  string              `json:"authPubkey"`
 	Status      nokku.DaemonStatus  `json:"status"`
 	Online      bool                `json:"online"`
 	Config      *nokku.DaemonConfig `json:"config"`
@@ -238,15 +239,17 @@ type User struct {
 }
 
 type UserDevice struct {
-	ID         string             `json:"id"`
-	UserID     string             `json:"userId"`
-	Name       string             `json:"name"`
-	Kind       string             `json:"kind"`
-	TokenHash  crypto.HashedToken `json:"tokenHash"`
-	ExpiresAt  *time.Time         `json:"expiresAt"`
-	LastUsedAt *time.Time         `json:"lastUsedAt"`
-	CreatedAt  *time.Time         `json:"createdAt"`
-	UpdatedAt  *time.Time         `json:"updatedAt"`
+	ID         string              `json:"id"`
+	UserID     string              `json:"userId"`
+	Name       string              `json:"name"`
+	Kind       string              `json:"kind"`
+	AuthMethod string              `json:"authMethod"`
+	AuthPubkey *string             `json:"authPubkey"`
+	TokenHash  *crypto.HashedToken `json:"tokenHash"`
+	ExpiresAt  *time.Time          `json:"expiresAt"`
+	LastUsedAt *time.Time          `json:"lastUsedAt"`
+	CreatedAt  *time.Time          `json:"createdAt"`
+	UpdatedAt  *time.Time          `json:"updatedAt"`
 }
 
 type Workspace struct {

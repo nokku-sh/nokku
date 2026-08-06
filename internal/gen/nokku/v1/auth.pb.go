@@ -826,8 +826,12 @@ func (*ResendVerificationResponse) Descriptor() ([]byte, []int) {
 
 // CLI login flow -------------------------------------------------------------
 type StreamCLILoginRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	LoginCode     *string                `protobuf:"bytes,1,opt,name=login_code,json=loginCode" json:"login_code,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	LoginCode *string                `protobuf:"bytes,1,opt,name=login_code,json=loginCode" json:"login_code,omitempty"`
+	// Signing method used by the CLI device after login: "tpm" or "soft".
+	AuthMethod *string `protobuf:"bytes,2,opt,name=auth_method,json=authMethod" json:"auth_method,omitempty"`
+	// PEM-encoded PKIX public key the device uses to authenticate requests.
+	AuthPubkey    *string `protobuf:"bytes,3,opt,name=auth_pubkey,json=authPubkey" json:"auth_pubkey,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -869,10 +873,23 @@ func (x *StreamCLILoginRequest) GetLoginCode() string {
 	return ""
 }
 
+func (x *StreamCLILoginRequest) GetAuthMethod() string {
+	if x != nil && x.AuthMethod != nil {
+		return *x.AuthMethod
+	}
+	return ""
+}
+
+func (x *StreamCLILoginRequest) GetAuthPubkey() string {
+	if x != nil && x.AuthPubkey != nil {
+		return *x.AuthPubkey
+	}
+	return ""
+}
+
 type StreamCLILoginResponse struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	User            *User                  `protobuf:"bytes,1,opt,name=user" json:"user,omitempty"` // sent after success
-	Token           *string                `protobuf:"bytes,2,opt,name=token" json:"token,omitempty"`
+	User            *User                  `protobuf:"bytes,1,opt,name=user" json:"user,omitempty"`                                              // sent after success
 	VerificationUrl *string                `protobuf:"bytes,3,opt,name=verification_url,json=verificationUrl" json:"verification_url,omitempty"` // sent first
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -913,13 +930,6 @@ func (x *StreamCLILoginResponse) GetUser() *User {
 		return x.User
 	}
 	return nil
-}
-
-func (x *StreamCLILoginResponse) GetToken() string {
-	if x != nil && x.Token != nil {
-		return *x.Token
-	}
-	return ""
 }
 
 func (x *StreamCLILoginResponse) GetVerificationUrl() string {
@@ -1055,14 +1065,17 @@ const file_nokku_v1_auth_proto_rawDesc = "" +
 	"\x19ResendVerificationRequest\x12 \n" +
 	"\x05email\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x18\x80\x02`\x01R\x05email\"\x1c\n" +
-	"\x1aResendVerificationResponse\"6\n" +
+	"\x1aResendVerificationResponse\"x\n" +
 	"\x15StreamCLILoginRequest\x12\x1d\n" +
 	"\n" +
-	"login_code\x18\x01 \x01(\tR\tloginCode\"}\n" +
+	"login_code\x18\x01 \x01(\tR\tloginCode\x12\x1f\n" +
+	"\vauth_method\x18\x02 \x01(\tR\n" +
+	"authMethod\x12\x1f\n" +
+	"\vauth_pubkey\x18\x03 \x01(\tR\n" +
+	"authPubkey\"m\n" +
 	"\x16StreamCLILoginResponse\x12\"\n" +
-	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\x12\x14\n" +
-	"\x05token\x18\x02 \x01(\tR\x05token\x12)\n" +
-	"\x10verification_url\x18\x03 \x01(\tR\x0fverificationUrl\"?\n" +
+	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\x12)\n" +
+	"\x10verification_url\x18\x03 \x01(\tR\x0fverificationUrlJ\x04\b\x02\x10\x03\"?\n" +
 	"\x15VerifyCLILoginRequest\x12&\n" +
 	"\n" +
 	"login_code\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\tloginCode\"\x18\n" +

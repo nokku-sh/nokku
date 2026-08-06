@@ -23,10 +23,11 @@ import (
 )
 
 type CLISession struct {
-	User     *nokkuv1.User `json:"user,omitempty"`
-	Token    string        `json:"token,omitempty"`
-	Hostname string        `json:"hostname,omitempty"`
-	DeviceID string        `json:"device_id,omitempty"`
+	User       *nokkuv1.User `json:"user,omitempty"`
+	Hostname   string        `json:"hostname,omitempty"`
+	DeviceID   string        `json:"device_id,omitempty"`
+	AuthMethod string        `json:"auth_method,omitempty"`
+	AuthPubkey string        `json:"auth_pubkey,omitempty"`
 }
 
 type AuthService struct {
@@ -407,7 +408,7 @@ func (s *AuthService) Logout(
 
 func (s *AuthService) StreamCLILogin(
 	ctx context.Context,
-	_ *nokkuv1.StreamCLILoginRequest,
+	req *nokkuv1.StreamCLILoginRequest,
 	stream *connect.ServerStream[nokkuv1.StreamCLILoginResponse],
 ) error {
 	loginCode, err := s.cfg.Authn.CreateToken(&authn.TokenParams{TokenType: authn.CLIToken})
@@ -417,7 +418,12 @@ func (s *AuthService) StreamCLILogin(
 
 	hostname := getHeader(ctx, "nokku-client-hostname")
 	deviceID := getHeader(ctx, "nokku-client-device-id")
-	sessionData, err := json.Marshal(&CLISession{Hostname: hostname, DeviceID: deviceID})
+	sessionData, err := json.Marshal(&CLISession{
+		Hostname:   hostname,
+		DeviceID:   deviceID,
+		AuthMethod: req.GetAuthMethod(),
+		AuthPubkey: req.GetAuthPubkey(),
+	})
 	if err != nil {
 		return ErrInternal
 	}
@@ -451,8 +457,7 @@ func (s *AuthService) StreamCLILogin(
 		return ErrTimeout
 	case session := <-ch:
 		return stream.Send(&nokkuv1.StreamCLILoginResponse{
-			User:  session.User,
-			Token: &session.Token,
+			User: session.User,
 		})
 	}
 }
@@ -483,9 +488,9 @@ func (s *AuthService) VerifyCLILogin(
 		name = "CLI device"
 	}
 
-	token, isNew, err := s.rotateOrCreateDevice(ctx, user, &session, name)
+	isNew, err := s.registerCLIDevice(ctx, user, &session, name)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, err
 	}
 	meta.SetAuditUserID(ctx, user.ID)
 
@@ -503,7 +508,7 @@ func (s *AuthService) VerifyCLILogin(
 				ctx,
 				user.ID,
 				user.Email,
-				token.ID,
+				session.DeviceID,
 				name,
 				s.cfg.Geo.Lookup(ipStr),
 			); err != nil {
@@ -523,8 +528,7 @@ func (s *AuthService) VerifyCLILogin(
 		// A blocking send would hang this request forever.
 		select {
 		case ch <- &CLISession{
-			User:  user.ToProto(),
-			Token: token.Plaintext,
+			User: user.ToProto(),
 		}:
 		default:
 		}
@@ -532,46 +536,54 @@ func (s *AuthService) VerifyCLILogin(
 	return &nokkuv1.VerifyCLILoginResponse{}, nil
 }
 
-// rotateOrCreateDevice issues a CLI token for the device in the session. When
-// the CLI presents a device ID it already owns, the existing row's credential
-// is rotated (no duplicate device); otherwise a new device is registered.
-func (s *AuthService) rotateOrCreateDevice(
+// registerCLIDevice registers the CLI device's signing key from the login
+// session. When the CLI presents a device ID it already owns, the existing
+// row's credential is updated (no duplicate device); otherwise a new device
+// is registered. Returns whether the device is new.
+func (s *AuthService) registerCLIDevice(
 	ctx context.Context,
 	user *db.User,
 	session *CLISession,
 	name string,
-) (token *crypto.Token, isNew bool, err error) {
+) (bool, error) {
+	authMethod := session.AuthMethod
+	authPubkey := session.AuthPubkey
+	if authPubkey == "" {
+		return false, NewError(connect.CodeInvalidArgument, "auth_pubkey required")
+	}
+	if authMethod != "tpm" && authMethod != "soft" {
+		return false, NewError(connect.CodeInvalidArgument, "unsupported auth_method")
+	}
+	if _, err := authn.ParseAuthPubkey([]byte(authPubkey)); err != nil {
+		return false, NewError(connect.CodeInvalidArgument, "invalid auth_pubkey")
+	}
+
 	if session.DeviceID != "" {
-		token, err = crypto.NewToken(
-			crypto.WithPrefix(crypto.PrefixCLI),
-			crypto.WithID(session.DeviceID),
-		)
-		if err != nil {
-			return nil, false, err
-		}
-		if _, err = s.cfg.Conn.Q.RotateUserDevice(ctx, &db.RotateUserDeviceParams{
-			ID:        session.DeviceID,
-			UserID:    user.ID,
-			Name:      name,
-			TokenHash: token.Hash,
+		if _, err := s.cfg.Conn.Q.RotateUserDevice(ctx, &db.RotateUserDeviceParams{
+			ID:         session.DeviceID,
+			UserID:     user.ID,
+			Name:       name,
+			AuthMethod: authMethod,
+			AuthPubkey: &authPubkey,
 		}); err == nil {
-			return token, false, nil
+			return false, nil
 		}
 		// Unknown/revoked device: fall through and register a fresh one.
 	}
 
-	token, err = crypto.NewCLIToken()
-	if err != nil {
-		return nil, false, err
+	id := session.DeviceID
+	if id == "" {
+		return false, NewError(connect.CodeInvalidArgument, "device id required")
 	}
-	if err = s.cfg.Conn.Q.CreateUserDevice(ctx, &db.CreateUserDeviceParams{
-		ID:        token.ID,
-		UserID:    user.ID,
-		Name:      name,
-		Kind:      deviceKindCLI,
-		TokenHash: token.Hash,
+	if err := s.cfg.Conn.Q.CreateUserDevice(ctx, &db.CreateUserDeviceParams{
+		ID:         id,
+		UserID:     user.ID,
+		Name:       name,
+		Kind:       deviceKindCLI,
+		AuthMethod: authMethod,
+		AuthPubkey: &authPubkey,
 	}); err != nil {
-		return nil, false, err
+		return false, err
 	}
-	return token, true, nil
+	return true, nil
 }
