@@ -146,7 +146,7 @@ func NewPasskeyService(cfg *config.Config) (*PasskeyService, error) {
 
 	wconfig := &webauthn.Config{
 		RPDisplayName:         "Nokku",
-		RPID:                  cfg.Hostname(),
+		RPID:                  cfg.AppURL().Hostname(),
 		RPOrigins:             rpOrigins,
 		AttestationPreference: protocol.PreferNoAttestation,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{

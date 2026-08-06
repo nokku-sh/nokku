@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/url"
 
@@ -31,6 +30,10 @@ type EnvConfig struct {
 	Secret         string `env:"NOKKU_SECRET"`
 	Debug          bool
 	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
+	// AllowedOrigins are additional origins allowed to open websocket
+	// connections (e.g. a dev server on another port). The configured app
+	// URL is always allowed.
+	AllowedOrigins []string `env:"NOKKU_ALLOWED_ORIGINS"`
 
 	// OAuth configuration
 	GoogleClientID     string `env:"GOOGLE_CLIENT_ID"`
@@ -147,18 +150,38 @@ func (c *Config) AppURL() *url.URL {
 
 func (c *Config) FullURL() string {
 	u := c.AppURL()
-	if u.Host == "" {
-		return fmt.Sprintf("http://localhost:%s", c.Port)
+
+	scheme := u.Scheme
+	if scheme == "" {
+		scheme = "http"
 	}
-	if _, _, err := net.SplitHostPort(u.Host); err == nil {
-		return c.BaseURL
+
+	host := u.Host
+	if host == "" {
+		host = "localhost"
 	}
-	if c.Debug {
-		return fmt.Sprintf("%s://%s:%s", u.Scheme, u.Host, c.Port)
+
+	if _, _, err := net.SplitHostPort(host); err != nil {
+		if port := c.Port; port != "" && port != defaultPort(scheme) {
+			host = net.JoinHostPort(host, port)
+		}
 	}
-	return c.BaseURL
+
+	return scheme + "://" + host
 }
 
-func (c *Config) Hostname() string {
-	return c.AppURL().Hostname()
+func defaultPort(scheme string) string {
+	if scheme == "https" {
+		return "443"
+	}
+	return "80"
+}
+
+// WSOrigins returns the origin patterns allowed to open websocket
+// connections: the app URL itself plus any configured extra origins (e.g.
+// a frontend dev server on a different port).
+func (c *Config) WSOrigins() []string {
+	origins := make([]string, 0, len(c.AllowedOrigins)+1)
+	origins = append(origins, c.FullURL())
+	return append(origins, c.AllowedOrigins...)
 }
