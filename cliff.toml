@@ -42,7 +42,6 @@ filter_unconventional = true
 require_conventional = false
 split_commits = false
 
-
 protect_breaking_commits = true
 
 commit_parsers = [
@@ -63,7 +62,7 @@ commit_parsers = [
   { message = ".*", group = "<!-- 10 -->Other" },
 ]
 
-filter_commits = false
+filter_commits = true
 fail_on_unmatched_commit = false
 use_branch_tags = false
 topo_order = false
