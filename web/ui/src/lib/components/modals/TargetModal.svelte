@@ -23,7 +23,6 @@
 		Plus,
 		Server,
 		Settings2,
-		Terminal,
 		Users,
 		UsersIcon,
 		X
@@ -37,13 +36,6 @@
 		open?: boolean;
 	}
 	let { data = $bindable({} as Target), open = $bindable(false) }: Props = $props();
-
-	let sshPorts = $derived(
-		JSON.parse(data.metadata['ssh-ports'] ?? '[]') as Array<{
-			port: string;
-			listening: boolean;
-		}>
-	);
 
 	const principalsQuery = $derived(
 		data?.id ? principal.list(() => ({ targetId: data.id, limit: 100 })) : undefined
@@ -306,71 +298,6 @@
 						</div>
 					</Card.Content>
 				</Card.Root>
-
-				{#if data.metadata['ssh-version'] || data.metadata['ssh-ports']?.length}
-					<Card.Root>
-						<Card.Header>
-							<Card.Title class="flex items-center gap-2 text-base">
-								<Terminal size={16} />
-								SSH Details
-							</Card.Title>
-						</Card.Header>
-						<Card.Content class="space-y-3">
-							{#if data.metadata['ssh-version']}
-								<div class="flex items-center justify-between">
-									<span class="text-sm font-medium">Version</span>
-									<Badge variant="secondary" class="font-mono text-xs">
-										{data.metadata['ssh-version']}
-									</Badge>
-								</div>
-							{/if}
-							{#if sshPorts.length > 0}
-								<div class="flex items-center justify-between">
-									<span class="text-sm font-medium">Ports</span>
-									<div class="flex flex-wrap gap-1">
-										{#each sshPorts as p (p.port)}
-											<Badge
-												variant={p.listening ? 'secondary' : 'destructive'}
-												class="font-mono text-xs"
-											>
-												{p.port}
-											</Badge>
-										{/each}
-									</div>
-								</div>
-							{/if}
-							{#if data.metadata['ssh-root-login']}
-								{@const allowed = data.metadata['ssh-root-login'] === 'yes'}
-								<div class="flex items-center justify-between">
-									<span class="text-sm font-medium">Root Login</span>
-									<Badge variant={allowed ? 'destructive' : 'secondary'} class="font-mono text-xs">
-										{allowed ? 'Allowed' : 'Not Allowed'}
-									</Badge>
-								</div>
-							{/if}
-							{#if data.metadata['ssh-auth-methods']}
-								<div class="flex items-center justify-between">
-									<span class="text-sm font-medium">Auth Methods</span>
-									<div class="flex flex-wrap gap-1">
-										{#each data.metadata['ssh-auth-methods']?.split(',') as method (method)}
-											<Badge variant="secondary" class="font-mono text-xs">{method}</Badge>
-										{/each}
-									</div>
-								</div>
-							{/if}
-							{#if data.metadata['ssh-host-key-types']}
-								<div class="flex items-center justify-between">
-									<span class="text-sm font-medium">Host Key Types</span>
-									<div class="flex flex-wrap gap-1">
-										{#each data.metadata['ssh-host-key-types']?.split(',') as type (type)}
-											<Badge variant="secondary" class="font-mono text-xs">{type}</Badge>
-										{/each}
-									</div>
-								</div>
-							{/if}
-						</Card.Content>
-					</Card.Root>
-				{/if}
 			{:else}
 				<Card.Root>
 					<Card.Content class="flex flex-col items-center justify-center py-8 text-center">
