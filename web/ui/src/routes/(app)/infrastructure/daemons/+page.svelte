@@ -69,6 +69,14 @@
 				})
 		},
 		{
+			header: 'Recording',
+			accessorKey: 'config.recordSession',
+			cell: ({ row }) =>
+				renderComponent(StatusCell, {
+					status: row.original.config?.recordSessions ? 'enabled' : 'disabled'
+				})
+		},
+		{
 			header: 'Status',
 			accessorKey: 'status',
 			cell: ({ row }) =>
