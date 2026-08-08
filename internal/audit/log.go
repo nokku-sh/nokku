@@ -94,6 +94,10 @@ func (s *Service) logAudit(
 
 	state := meta.AuditStateFromContext(ctx)
 	actor := meta.ActorFromContext(ctx)
+	workspaceID, _ := meta.WorkspaceIDFromContext(ctx)
+	if workspaceID == "" && state != nil {
+		workspaceID = state.WorkspaceID
+	}
 
 	actorID := actor.ID
 	actorType := string(actor.Type)
@@ -113,7 +117,7 @@ func (s *Service) logAudit(
 	}
 
 	log := &Event{
-		WorkspaceID: workspaceID(state),
+		WorkspaceID: workspaceID,
 		ActorID:     actorID,
 		ActorType:   actorType,
 		ActorEmail:  email,
@@ -126,13 +130,6 @@ func (s *Service) logAudit(
 	if err := s.Append(ctx, log); err != nil {
 		slog.Warn("failed to write audit log", "error_type", fmt.Sprintf("%T", err))
 	}
-}
-
-func workspaceID(state *meta.AuditState) string {
-	if state == nil {
-		return ""
-	}
-	return state.WorkspaceID
 }
 
 // shouldAudit reports whether a procedure produces an audit record:
