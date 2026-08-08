@@ -176,7 +176,7 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 
 	cacheKey := "email_cooldown:" + req.userID + ":" + req.template
 	if _, err := s.cache.Get(ctx, cacheKey); err == nil {
-		slog.Debug("email cooldown active", "key", cacheKey)
+		slog.Debug("email cooldown active", "template", req.template)
 		return ErrCooldown
 	}
 
