@@ -126,7 +126,8 @@ func (x *Team) GetUpdatedAt() *timestamppb.Timestamp {
 
 type GetTeamRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -159,6 +160,13 @@ func (x *GetTeamRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetTeamRequest.ProtoReflect.Descriptor instead.
 func (*GetTeamRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_team_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GetTeamRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *GetTeamRequest) GetId() string {
@@ -326,10 +334,11 @@ func (x *CreateTeamResponse) GetTeam() *Team {
 
 type UpdateTeamRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	Tags          []string               `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
+	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
+	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -362,6 +371,13 @@ func (x *UpdateTeamRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use UpdateTeamRequest.ProtoReflect.Descriptor instead.
 func (*UpdateTeamRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_team_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *UpdateTeamRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *UpdateTeamRequest) GetId() string {
@@ -438,7 +454,8 @@ func (x *UpdateTeamResponse) GetTeam() *Team {
 
 type DeleteTeamRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -471,6 +488,13 @@ func (x *DeleteTeamRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DeleteTeamRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTeamRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_team_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *DeleteTeamRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *DeleteTeamRequest) GetId() string {
@@ -646,8 +670,9 @@ func (x *ListTeamsResponse) GetTotal() int32 {
 
 type AddTeamMemberRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TeamId        *string                `protobuf:"bytes,1,opt,name=team_id,json=teamId" json:"team_id,omitempty"`
-	UserId        *string                `protobuf:"bytes,2,opt,name=user_id,json=userId" json:"user_id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	TeamId        *string                `protobuf:"bytes,2,opt,name=team_id,json=teamId" json:"team_id,omitempty"`
+	UserId        *string                `protobuf:"bytes,3,opt,name=user_id,json=userId" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -680,6 +705,13 @@ func (x *AddTeamMemberRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use AddTeamMemberRequest.ProtoReflect.Descriptor instead.
 func (*AddTeamMemberRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_team_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AddTeamMemberRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *AddTeamMemberRequest) GetTeamId() string {
@@ -734,8 +766,9 @@ func (*AddTeamMemberResponse) Descriptor() ([]byte, []int) {
 
 type RemoveTeamMemberRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TeamId        *string                `protobuf:"bytes,1,opt,name=team_id,json=teamId" json:"team_id,omitempty"`
-	UserId        *string                `protobuf:"bytes,2,opt,name=user_id,json=userId" json:"user_id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	TeamId        *string                `protobuf:"bytes,2,opt,name=team_id,json=teamId" json:"team_id,omitempty"`
+	UserId        *string                `protobuf:"bytes,3,opt,name=user_id,json=userId" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -768,6 +801,13 @@ func (x *RemoveTeamMemberRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use RemoveTeamMemberRequest.ProtoReflect.Descriptor instead.
 func (*RemoveTeamMemberRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_team_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *RemoveTeamMemberRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *RemoveTeamMemberRequest) GetTeamId() string {
@@ -835,9 +875,10 @@ const file_nokku_v1_team_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"*\n" +
-	"\x0eGetTeamRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"5\n" +
+	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"W\n" +
+	"\x0eGetTeamRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"5\n" +
 	"\x0fGetTeamResponse\x12\"\n" +
 	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"\xa0\x01\n" +
 	"\x11CreateTeamRequest\x12+\n" +
@@ -847,17 +888,19 @@ const file_nokku_v1_team_proto_rawDesc = "" +
 	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
 	"\x04tags\x18\x04 \x03(\tR\x04tags\"8\n" +
 	"\x12CreateTeamResponse\x12\"\n" +
-	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"\x8d\x01\n" +
-	"\x11UpdateTeamRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12\x1e\n" +
-	"\x04name\x18\x02 \x01(\tB\n" +
+	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"\xba\x01\n" +
+	"\x11UpdateTeamRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12\x1e\n" +
+	"\x04name\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x04name\x12*\n" +
-	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
-	"\x04tags\x18\x04 \x03(\tR\x04tags\"8\n" +
+	"\vdescription\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\"8\n" +
 	"\x12UpdateTeamResponse\x12\"\n" +
-	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"-\n" +
-	"\x11DeleteTeamRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x14\n" +
+	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"Z\n" +
+	"\x11DeleteTeamRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x14\n" +
 	"\x12DeleteTeamResponse\"\xab\x01\n" +
 	"\x10ListTeamsRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1f\n" +
@@ -867,26 +910,28 @@ const file_nokku_v1_team_proto_rawDesc = "" +
 	"\x04tags\x18\x05 \x03(\tR\x04tags\"O\n" +
 	"\x11ListTeamsResponse\x12$\n" +
 	"\x05teams\x18\x01 \x03(\v2\x0e.nokku.v1.TeamR\x05teams\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"\\\n" +
-	"\x14AddTeamMemberRequest\x12!\n" +
-	"\ateam_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06teamId\x12!\n" +
-	"\auser_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x17\n" +
-	"\x15AddTeamMemberResponse\"_\n" +
-	"\x17RemoveTeamMemberRequest\x12!\n" +
-	"\ateam_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06teamId\x12!\n" +
-	"\auser_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x1a\n" +
-	"\x18RemoveTeamMemberResponse2\xa8\x06\n" +
-	"\vTeamService\x12Y\n" +
-	"\aGetTeam\x12\x18.nokku.v1.GetTeamRequest\x1a\x19.nokku.v1.GetTeamResponse\"\x19\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/teams/{id}\x90\x02\x01\x12t\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\x89\x01\n" +
+	"\x14AddTeamMemberRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12!\n" +
+	"\ateam_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06teamId\x12!\n" +
+	"\auser_id\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x17\n" +
+	"\x15AddTeamMemberResponse\"\x8c\x01\n" +
+	"\x17RemoveTeamMemberRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12!\n" +
+	"\ateam_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06teamId\x12!\n" +
+	"\auser_id\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x1a\n" +
+	"\x18RemoveTeamMemberResponse2\xab\a\n" +
+	"\vTeamService\x12s\n" +
+	"\aGetTeam\x12\x18.nokku.v1.GetTeamRequest\x1a\x19.nokku.v1.GetTeamResponse\"3\x82\xd3\xe4\x93\x02*\x12(/v1/workspaces/{workspace_id}/teams/{id}\x90\x02\x01\x12t\n" +
 	"\tListTeams\x12\x1a.nokku.v1.ListTeamsRequest\x1a\x1b.nokku.v1.ListTeamsResponse\".\x82\xd3\xe4\x93\x02%\x12#/v1/workspaces/{workspace_id}/teams\x90\x02\x01\x12w\n" +
 	"\n" +
-	"CreateTeam\x12\x1b.nokku.v1.CreateTeamRequest\x1a\x1c.nokku.v1.CreateTeamResponse\".\x82\xd3\xe4\x93\x02(:\x01*\"#/v1/workspaces/{workspace_id}/teams\x12b\n" +
+	"CreateTeam\x12\x1b.nokku.v1.CreateTeamRequest\x1a\x1c.nokku.v1.CreateTeamResponse\".\x82\xd3\xe4\x93\x02(:\x01*\"#/v1/workspaces/{workspace_id}/teams\x12|\n" +
 	"\n" +
-	"UpdateTeam\x12\x1b.nokku.v1.UpdateTeamRequest\x1a\x1c.nokku.v1.UpdateTeamResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*2\x0e/v1/teams/{id}\x12_\n" +
+	"UpdateTeam\x12\x1b.nokku.v1.UpdateTeamRequest\x1a\x1c.nokku.v1.UpdateTeamResponse\"3\x82\xd3\xe4\x93\x02-:\x01*2(/v1/workspaces/{workspace_id}/teams/{id}\x12y\n" +
 	"\n" +
-	"DeleteTeam\x12\x1b.nokku.v1.DeleteTeamRequest\x1a\x1c.nokku.v1.DeleteTeamResponse\"\x16\x82\xd3\xe4\x93\x02\x10*\x0e/v1/teams/{id}\x12\x7f\n" +
-	"\rAddTeamMember\x12\x1e.nokku.v1.AddTeamMemberRequest\x1a\x1f.nokku.v1.AddTeamMemberResponse\"-\x82\xd3\xe4\x93\x02'\"%/v1/teams/{team_id}/members/{user_id}\x12\x88\x01\n" +
-	"\x10RemoveTeamMember\x12!.nokku.v1.RemoveTeamMemberRequest\x1a\".nokku.v1.RemoveTeamMemberResponse\"-\x82\xd3\xe4\x93\x02'*%/v1/teams/{team_id}/members/{user_id}B\x93\x01\n" +
+	"DeleteTeam\x12\x1b.nokku.v1.DeleteTeamRequest\x1a\x1c.nokku.v1.DeleteTeamResponse\"0\x82\xd3\xe4\x93\x02**(/v1/workspaces/{workspace_id}/teams/{id}\x12\x99\x01\n" +
+	"\rAddTeamMember\x12\x1e.nokku.v1.AddTeamMemberRequest\x1a\x1f.nokku.v1.AddTeamMemberResponse\"G\x82\xd3\xe4\x93\x02A\"?/v1/workspaces/{workspace_id}/teams/{team_id}/members/{user_id}\x12\xa2\x01\n" +
+	"\x10RemoveTeamMember\x12!.nokku.v1.RemoveTeamMemberRequest\x1a\".nokku.v1.RemoveTeamMemberResponse\"G\x82\xd3\xe4\x93\x02A*?/v1/workspaces/{workspace_id}/teams/{team_id}/members/{user_id}B\x93\x01\n" +
 	"\fcom.nokku.v1B\tTeamProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

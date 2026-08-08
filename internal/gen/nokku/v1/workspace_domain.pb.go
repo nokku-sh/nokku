@@ -110,7 +110,8 @@ func (x *WorkspaceDomain) GetUpdatedAt() *timestamppb.Timestamp {
 
 type GetWorkspaceDomainRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Domain        *string                `protobuf:"bytes,1,opt,name=domain" json:"domain,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Domain        *string                `protobuf:"bytes,2,opt,name=domain" json:"domain,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -143,6 +144,13 @@ func (x *GetWorkspaceDomainRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetWorkspaceDomainRequest.ProtoReflect.Descriptor instead.
 func (*GetWorkspaceDomainRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_workspace_domain_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GetWorkspaceDomainRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *GetWorkspaceDomainRequest) GetDomain() string {
@@ -382,7 +390,8 @@ func (x *ListWorkspaceDomainsResponse) GetDomains() []*WorkspaceDomain {
 
 type DeleteWorkspaceDomainRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Domain        *string                `protobuf:"bytes,1,opt,name=domain" json:"domain,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Domain        *string                `protobuf:"bytes,2,opt,name=domain" json:"domain,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -415,6 +424,13 @@ func (x *DeleteWorkspaceDomainRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DeleteWorkspaceDomainRequest.ProtoReflect.Descriptor instead.
 func (*DeleteWorkspaceDomainRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_workspace_domain_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *DeleteWorkspaceDomainRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *DeleteWorkspaceDomainRequest) GetDomain() string {
@@ -462,7 +478,8 @@ func (*DeleteWorkspaceDomainResponse) Descriptor() ([]byte, []int) {
 
 type VerifyWorkspaceDomainRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Domain        *string                `protobuf:"bytes,1,opt,name=domain" json:"domain,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Domain        *string                `protobuf:"bytes,2,opt,name=domain" json:"domain,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -495,6 +512,13 @@ func (x *VerifyWorkspaceDomainRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use VerifyWorkspaceDomainRequest.ProtoReflect.Descriptor instead.
 func (*VerifyWorkspaceDomainRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_workspace_domain_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *VerifyWorkspaceDomainRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *VerifyWorkspaceDomainRequest) GetDomain() string {
@@ -550,7 +574,8 @@ func (x *VerifyWorkspaceDomainResponse) GetDomain() *WorkspaceDomain {
 
 type RegenerateWorkspaceDomainTokenRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Domain        *string                `protobuf:"bytes,1,opt,name=domain" json:"domain,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Domain        *string                `protobuf:"bytes,2,opt,name=domain" json:"domain,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -583,6 +608,13 @@ func (x *RegenerateWorkspaceDomainTokenRequest) ProtoReflect() protoreflect.Mess
 // Deprecated: Use RegenerateWorkspaceDomainTokenRequest.ProtoReflect.Descriptor instead.
 func (*RegenerateWorkspaceDomainTokenRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_workspace_domain_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *RegenerateWorkspaceDomainTokenRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *RegenerateWorkspaceDomainTokenRequest) GetDomain() string {
@@ -650,9 +682,10 @@ const file_nokku_v1_workspace_domain_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"<\n" +
-	"\x19GetWorkspaceDomainRequest\x12\x1f\n" +
-	"\x06domain\x18\x01 \x01(\tB\a\xbaH\x04r\x02h\x01R\x06domain\"O\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"i\n" +
+	"\x19GetWorkspaceDomainRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1f\n" +
+	"\x06domain\x18\x02 \x01(\tB\a\xbaH\x04r\x02h\x01R\x06domain\"O\n" +
 	"\x1aGetWorkspaceDomainResponse\x121\n" +
 	"\x06domain\x18\x01 \x01(\v2\x19.nokku.v1.WorkspaceDomainR\x06domain\"\x99\x01\n" +
 	"\x1cCreateWorkspaceDomainRequest\x12+\n" +
@@ -663,25 +696,28 @@ const file_nokku_v1_workspace_domain_proto_rawDesc = "" +
 	"\x1bListWorkspaceDomainsRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"S\n" +
 	"\x1cListWorkspaceDomainsResponse\x123\n" +
-	"\adomains\x18\x01 \x03(\v2\x19.nokku.v1.WorkspaceDomainR\adomains\"?\n" +
-	"\x1cDeleteWorkspaceDomainRequest\x12\x1f\n" +
-	"\x06domain\x18\x01 \x01(\tB\a\xbaH\x04r\x02h\x01R\x06domain\"\x1f\n" +
-	"\x1dDeleteWorkspaceDomainResponse\"?\n" +
-	"\x1cVerifyWorkspaceDomainRequest\x12\x1f\n" +
-	"\x06domain\x18\x01 \x01(\tB\a\xbaH\x04r\x02h\x01R\x06domain\"R\n" +
+	"\adomains\x18\x01 \x03(\v2\x19.nokku.v1.WorkspaceDomainR\adomains\"l\n" +
+	"\x1cDeleteWorkspaceDomainRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1f\n" +
+	"\x06domain\x18\x02 \x01(\tB\a\xbaH\x04r\x02h\x01R\x06domain\"\x1f\n" +
+	"\x1dDeleteWorkspaceDomainResponse\"l\n" +
+	"\x1cVerifyWorkspaceDomainRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1f\n" +
+	"\x06domain\x18\x02 \x01(\tB\a\xbaH\x04r\x02h\x01R\x06domain\"R\n" +
 	"\x1dVerifyWorkspaceDomainResponse\x121\n" +
-	"\x06domain\x18\x01 \x01(\v2\x19.nokku.v1.WorkspaceDomainR\x06domain\"H\n" +
-	"%RegenerateWorkspaceDomainTokenRequest\x12\x1f\n" +
-	"\x06domain\x18\x01 \x01(\tB\a\xbaH\x04r\x02h\x01R\x06domain\"[\n" +
+	"\x06domain\x18\x01 \x01(\v2\x19.nokku.v1.WorkspaceDomainR\x06domain\"u\n" +
+	"%RegenerateWorkspaceDomainTokenRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1f\n" +
+	"\x06domain\x18\x02 \x01(\tB\a\xbaH\x04r\x02h\x01R\x06domain\"[\n" +
 	"&RegenerateWorkspaceDomainTokenResponse\x121\n" +
-	"\x06domain\x18\x01 \x01(\v2\x19.nokku.v1.WorkspaceDomainR\x06domain2\x98\a\n" +
-	"\x16WorkspaceDomainService\x12\x80\x01\n" +
-	"\x12GetWorkspaceDomain\x12#.nokku.v1.GetWorkspaceDomainRequest\x1a$.nokku.v1.GetWorkspaceDomainResponse\"\x1f\x82\xd3\xe4\x93\x02\x16\x12\x14/v1/domains/{domain}\x90\x02\x01\x12\x97\x01\n" +
+	"\x06domain\x18\x01 \x01(\v2\x19.nokku.v1.WorkspaceDomainR\x06domain2\x80\b\n" +
+	"\x16WorkspaceDomainService\x12\x9a\x01\n" +
+	"\x12GetWorkspaceDomain\x12#.nokku.v1.GetWorkspaceDomainRequest\x1a$.nokku.v1.GetWorkspaceDomainResponse\"9\x82\xd3\xe4\x93\x020\x12./v1/workspaces/{workspace_id}/domains/{domain}\x90\x02\x01\x12\x97\x01\n" +
 	"\x14ListWorkspaceDomains\x12%.nokku.v1.ListWorkspaceDomainsRequest\x1a&.nokku.v1.ListWorkspaceDomainsResponse\"0\x82\xd3\xe4\x93\x02'\x12%/v1/workspaces/{workspace_id}/domains\x90\x02\x01\x12\x9a\x01\n" +
-	"\x15CreateWorkspaceDomain\x12&.nokku.v1.CreateWorkspaceDomainRequest\x1a'.nokku.v1.CreateWorkspaceDomainResponse\"0\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/workspaces/{workspace_id}/domains\x12\x86\x01\n" +
-	"\x15DeleteWorkspaceDomain\x12&.nokku.v1.DeleteWorkspaceDomainRequest\x1a'.nokku.v1.DeleteWorkspaceDomainResponse\"\x1c\x82\xd3\xe4\x93\x02\x16*\x14/v1/domains/{domain}\x12\x8d\x01\n" +
-	"\x15VerifyWorkspaceDomain\x12&.nokku.v1.VerifyWorkspaceDomainRequest\x1a'.nokku.v1.VerifyWorkspaceDomainResponse\"#\x82\xd3\xe4\x93\x02\x1d\"\x1b/v1/domains/{domain}:verify\x12\xaa\x01\n" +
-	"\x1eRegenerateWorkspaceDomainToken\x12/.nokku.v1.RegenerateWorkspaceDomainTokenRequest\x1a0.nokku.v1.RegenerateWorkspaceDomainTokenResponse\"%\x82\xd3\xe4\x93\x02\x1f\"\x1d/v1/domains/{domain}:generateB\x9e\x01\n" +
+	"\x15CreateWorkspaceDomain\x12&.nokku.v1.CreateWorkspaceDomainRequest\x1a'.nokku.v1.CreateWorkspaceDomainResponse\"0\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/workspaces/{workspace_id}/domains\x12\xa0\x01\n" +
+	"\x15DeleteWorkspaceDomain\x12&.nokku.v1.DeleteWorkspaceDomainRequest\x1a'.nokku.v1.DeleteWorkspaceDomainResponse\"6\x82\xd3\xe4\x93\x020*./v1/workspaces/{workspace_id}/domains/{domain}\x12\xa7\x01\n" +
+	"\x15VerifyWorkspaceDomain\x12&.nokku.v1.VerifyWorkspaceDomainRequest\x1a'.nokku.v1.VerifyWorkspaceDomainResponse\"=\x82\xd3\xe4\x93\x027\"5/v1/workspaces/{workspace_id}/domains/{domain}:verify\x12\xc4\x01\n" +
+	"\x1eRegenerateWorkspaceDomainToken\x12/.nokku.v1.RegenerateWorkspaceDomainTokenRequest\x1a0.nokku.v1.RegenerateWorkspaceDomainTokenResponse\"?\x82\xd3\xe4\x93\x029\"7/v1/workspaces/{workspace_id}/domains/{domain}:generateB\x9e\x01\n" +
 	"\fcom.nokku.v1B\x14WorkspaceDomainProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

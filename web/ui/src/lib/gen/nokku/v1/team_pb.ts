@@ -16,7 +16,7 @@ import type { Message } from '@bufbuild/protobuf';
  * Describes the file nokku/v1/team.proto.
  */
 export const file_nokku_v1_team: GenFile /*@__PURE__*/ = fileDesc(
-	'ChNub2trdS92MS90ZWFtLnByb3RvEghub2trdS52MSLlAQoEVGVhbRIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRITCgtkZXNjcmlwdGlvbhgEIAEoCRIMCgR0YWdzGAUgAygJEioKB21lbWJlcnMYBiADKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VNZW1iZXISLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiJgoOR2V0VGVhbVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIi8KD0dldFRlYW1SZXNwb25zZRIcCgR0ZWFtGAEgASgLMg4ubm9ra3UudjEuVGVhbSJ6ChFDcmVhdGVUZWFtUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISHQoLZGVzY3JpcHRpb24YAyABKAlCCLpIBXIDGOgHEgwKBHRhZ3MYBCADKAkiMgoSQ3JlYXRlVGVhbVJlc3BvbnNlEhwKBHRlYW0YASABKAsyDi5ub2trdS52MS5UZWFtInAKEVVwZGF0ZVRlYW1SZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARIYCgRuYW1lGAIgASgJQgq6SAdyBRABGIACEh0KC2Rlc2NyaXB0aW9uGAMgASgJQgi6SAVyAxjoBxIMCgR0YWdzGAQgAygJIjIKElVwZGF0ZVRlYW1SZXNwb25zZRIcCgR0ZWFtGAEgASgLMg4ubm9ra3UudjEuVGVhbSIpChFEZWxldGVUZWFtUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiFAoSRGVsZXRlVGVhbVJlc3BvbnNlIoIBChBMaXN0VGVhbXNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAiABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAyABKAVCB7pIBBoCKAASDQoFcXVlcnkYBCABKAkSDAoEdGFncxgFIAMoCSJBChFMaXN0VGVhbXNSZXNwb25zZRIdCgV0ZWFtcxgBIAMoCzIOLm5va2t1LnYxLlRlYW0SDQoFdG90YWwYAiABKAUiTAoUQWRkVGVhbU1lbWJlclJlcXVlc3QSGQoHdGVhbV9pZBgBIAEoCUIIukgFcgOwAQESGQoHdXNlcl9pZBgCIAEoCUIIukgFcgOwAQEiFwoVQWRkVGVhbU1lbWJlclJlc3BvbnNlIk8KF1JlbW92ZVRlYW1NZW1iZXJSZXF1ZXN0EhkKB3RlYW1faWQYASABKAlCCLpIBXIDsAEBEhkKB3VzZXJfaWQYAiABKAlCCLpIBXIDsAEBIhoKGFJlbW92ZVRlYW1NZW1iZXJSZXNwb25zZTKoBgoLVGVhbVNlcnZpY2USWQoHR2V0VGVhbRIYLm5va2t1LnYxLkdldFRlYW1SZXF1ZXN0Ghkubm9ra3UudjEuR2V0VGVhbVJlc3BvbnNlIhmQAgGC0+STAhASDi92MS90ZWFtcy97aWR9EnQKCUxpc3RUZWFtcxIaLm5va2t1LnYxLkxpc3RUZWFtc1JlcXVlc3QaGy5ub2trdS52MS5MaXN0VGVhbXNSZXNwb25zZSIukAIBgtPkkwIlEiMvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS90ZWFtcxJ3CgpDcmVhdGVUZWFtEhsubm9ra3UudjEuQ3JlYXRlVGVhbVJlcXVlc3QaHC5ub2trdS52MS5DcmVhdGVUZWFtUmVzcG9uc2UiLoLT5JMCKDoBKiIjL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMSYgoKVXBkYXRlVGVhbRIbLm5va2t1LnYxLlVwZGF0ZVRlYW1SZXF1ZXN0Ghwubm9ra3UudjEuVXBkYXRlVGVhbVJlc3BvbnNlIhmC0+STAhM6ASoyDi92MS90ZWFtcy97aWR9El8KCkRlbGV0ZVRlYW0SGy5ub2trdS52MS5EZWxldGVUZWFtUmVxdWVzdBocLm5va2t1LnYxLkRlbGV0ZVRlYW1SZXNwb25zZSIWgtPkkwIQKg4vdjEvdGVhbXMve2lkfRJ/Cg1BZGRUZWFtTWVtYmVyEh4ubm9ra3UudjEuQWRkVGVhbU1lbWJlclJlcXVlc3QaHy5ub2trdS52MS5BZGRUZWFtTWVtYmVyUmVzcG9uc2UiLYLT5JMCJyIlL3YxL3RlYW1zL3t0ZWFtX2lkfS9tZW1iZXJzL3t1c2VyX2lkfRKIAQoQUmVtb3ZlVGVhbU1lbWJlchIhLm5va2t1LnYxLlJlbW92ZVRlYW1NZW1iZXJSZXF1ZXN0GiIubm9ra3UudjEuUmVtb3ZlVGVhbU1lbWJlclJlc3BvbnNlIi2C0+STAicqJS92MS90ZWFtcy97dGVhbV9pZH0vbWVtYmVycy97dXNlcl9pZH1CkwEKDGNvbS5ub2trdS52MUIJVGVhbVByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
+	'ChNub2trdS92MS90ZWFtLnByb3RvEghub2trdS52MSLlAQoEVGVhbRIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRITCgtkZXNjcmlwdGlvbhgEIAEoCRIMCgR0YWdzGAUgAygJEioKB21lbWJlcnMYBiADKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VNZW1iZXISLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiRgoOR2V0VGVhbVJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIUCgJpZBgCIAEoCUIIukgFcgOwAQEiLwoPR2V0VGVhbVJlc3BvbnNlEhwKBHRlYW0YASABKAsyDi5ub2trdS52MS5UZWFtInoKEUNyZWF0ZVRlYW1SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGAoEbmFtZRgCIAEoCUIKukgHcgUQARiAAhIdCgtkZXNjcmlwdGlvbhgDIAEoCUIIukgFcgMY6AcSDAoEdGFncxgEIAMoCSIyChJDcmVhdGVUZWFtUmVzcG9uc2USHAoEdGVhbRgBIAEoCzIOLm5va2t1LnYxLlRlYW0ikAEKEVVwZGF0ZVRlYW1SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAyABKAlCCrpIB3IFEAEYgAISHQoLZGVzY3JpcHRpb24YBCABKAlCCLpIBXIDGOgHEgwKBHRhZ3MYBSADKAkiMgoSVXBkYXRlVGVhbVJlc3BvbnNlEhwKBHRlYW0YASABKAsyDi5ub2trdS52MS5UZWFtIkkKEURlbGV0ZVRlYW1SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBIhQKEkRlbGV0ZVRlYW1SZXNwb25zZSKCAQoQTGlzdFRlYW1zUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAIgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAMgASgFQge6SAQaAigAEg0KBXF1ZXJ5GAQgASgJEgwKBHRhZ3MYBSADKAkiQQoRTGlzdFRlYW1zUmVzcG9uc2USHQoFdGVhbXMYASADKAsyDi5ub2trdS52MS5UZWFtEg0KBXRvdGFsGAIgASgFImwKFEFkZFRlYW1NZW1iZXJSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGQoHdGVhbV9pZBgCIAEoCUIIukgFcgOwAQESGQoHdXNlcl9pZBgDIAEoCUIIukgFcgOwAQEiFwoVQWRkVGVhbU1lbWJlclJlc3BvbnNlIm8KF1JlbW92ZVRlYW1NZW1iZXJSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGQoHdGVhbV9pZBgCIAEoCUIIukgFcgOwAQESGQoHdXNlcl9pZBgDIAEoCUIIukgFcgOwAQEiGgoYUmVtb3ZlVGVhbU1lbWJlclJlc3BvbnNlMqsHCgtUZWFtU2VydmljZRJzCgdHZXRUZWFtEhgubm9ra3UudjEuR2V0VGVhbVJlcXVlc3QaGS5ub2trdS52MS5HZXRUZWFtUmVzcG9uc2UiM5ACAYLT5JMCKhIoL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMve2lkfRJ0CglMaXN0VGVhbXMSGi5ub2trdS52MS5MaXN0VGVhbXNSZXF1ZXN0Ghsubm9ra3UudjEuTGlzdFRlYW1zUmVzcG9uc2UiLpACAYLT5JMCJRIjL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMSdwoKQ3JlYXRlVGVhbRIbLm5va2t1LnYxLkNyZWF0ZVRlYW1SZXF1ZXN0Ghwubm9ra3UudjEuQ3JlYXRlVGVhbVJlc3BvbnNlIi6C0+STAig6ASoiIy92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3RlYW1zEnwKClVwZGF0ZVRlYW0SGy5ub2trdS52MS5VcGRhdGVUZWFtUmVxdWVzdBocLm5va2t1LnYxLlVwZGF0ZVRlYW1SZXNwb25zZSIzgtPkkwItOgEqMigvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS90ZWFtcy97aWR9EnkKCkRlbGV0ZVRlYW0SGy5ub2trdS52MS5EZWxldGVUZWFtUmVxdWVzdBocLm5va2t1LnYxLkRlbGV0ZVRlYW1SZXNwb25zZSIwgtPkkwIqKigvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS90ZWFtcy97aWR9EpkBCg1BZGRUZWFtTWVtYmVyEh4ubm9ra3UudjEuQWRkVGVhbU1lbWJlclJlcXVlc3QaHy5ub2trdS52MS5BZGRUZWFtTWVtYmVyUmVzcG9uc2UiR4LT5JMCQSI/L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMve3RlYW1faWR9L21lbWJlcnMve3VzZXJfaWR9EqIBChBSZW1vdmVUZWFtTWVtYmVyEiEubm9ra3UudjEuUmVtb3ZlVGVhbU1lbWJlclJlcXVlc3QaIi5ub2trdS52MS5SZW1vdmVUZWFtTWVtYmVyUmVzcG9uc2UiR4LT5JMCQSo/L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMve3RlYW1faWR9L21lbWJlcnMve3VzZXJfaWR9QpMBCgxjb20ubm9ra3UudjFCCVRlYW1Qcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
 	[
 		file_buf_validate_validate,
 		file_google_api_annotations,
@@ -81,7 +81,12 @@ export const TeamSchema: GenMessage<Team> /*@__PURE__*/ = messageDesc(file_nokku
  */
 export type GetTeamRequest = Message<'nokku.v1.GetTeamRequest'> & {
 	/**
-	 * @generated from field: string id = 1;
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
+
+	/**
+	 * @generated from field: string id = 2;
 	 */
 	id: string;
 };
@@ -172,22 +177,27 @@ export const CreateTeamResponseSchema: GenMessage<CreateTeamResponse> /*@__PURE_
  */
 export type UpdateTeamRequest = Message<'nokku.v1.UpdateTeamRequest'> & {
 	/**
-	 * @generated from field: string id = 1;
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
+
+	/**
+	 * @generated from field: string id = 2;
 	 */
 	id: string;
 
 	/**
-	 * @generated from field: string name = 2;
+	 * @generated from field: string name = 3;
 	 */
 	name: string;
 
 	/**
-	 * @generated from field: string description = 3;
+	 * @generated from field: string description = 4;
 	 */
 	description: string;
 
 	/**
-	 * @generated from field: repeated string tags = 4;
+	 * @generated from field: repeated string tags = 5;
 	 */
 	tags: string[];
 };
@@ -225,7 +235,12 @@ export const UpdateTeamResponseSchema: GenMessage<UpdateTeamResponse> /*@__PURE_
  */
 export type DeleteTeamRequest = Message<'nokku.v1.DeleteTeamRequest'> & {
 	/**
-	 * @generated from field: string id = 1;
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
+
+	/**
+	 * @generated from field: string id = 2;
 	 */
 	id: string;
 };
@@ -321,12 +336,17 @@ export const ListTeamsResponseSchema: GenMessage<ListTeamsResponse> /*@__PURE__*
  */
 export type AddTeamMemberRequest = Message<'nokku.v1.AddTeamMemberRequest'> & {
 	/**
-	 * @generated from field: string team_id = 1;
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
+
+	/**
+	 * @generated from field: string team_id = 2;
 	 */
 	teamId: string;
 
 	/**
-	 * @generated from field: string user_id = 2;
+	 * @generated from field: string user_id = 3;
 	 */
 	userId: string;
 };
@@ -355,12 +375,17 @@ export const AddTeamMemberResponseSchema: GenMessage<AddTeamMemberResponse> /*@_
  */
 export type RemoveTeamMemberRequest = Message<'nokku.v1.RemoveTeamMemberRequest'> & {
 	/**
-	 * @generated from field: string team_id = 1;
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
+
+	/**
+	 * @generated from field: string team_id = 2;
 	 */
 	teamId: string;
 
 	/**
-	 * @generated from field: string user_id = 2;
+	 * @generated from field: string user_id = 3;
 	 */
 	userId: string;
 };
