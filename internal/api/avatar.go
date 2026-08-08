@@ -150,12 +150,6 @@ func ServeAvatar(cfg *config.Config) http.HandlerFunc {
 		}
 
 		avatarPath := storage.AvatarPath(userID)
-		exists, err := cfg.Storage.Exists(r.Context(), avatarPath)
-		if err != nil || !exists {
-			writeJSONError(w, http.StatusNotFound, "file not found")
-			return
-		}
-
 		if url, ok := cfg.Storage.PublicURL(avatarPath); ok {
 			http.Redirect(w, r, url, http.StatusFound) // #nosec G710 -- host is the fixed CDNURL
 			return
