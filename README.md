@@ -12,40 +12,34 @@
   <a href="https://github.com/nokku-sh/nokku/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nokku-sh/nokku?label=License" alt="License"></a>
 </p>
 
-# Nokku
+# Nokku: Decentralized Identity & Access Engine
 
-Nokku is the backend and web application for certificate-based access to SSH targets and X.509 workloads.
+Nokku is the control plane for certificate-based access to SSH targets and X.509 workloads. Unlike traditional access tools that funnel all traffic through a central proxy, Nokku utilizes a decentralized architecture. You define the policies here, and the daemons cache and enforce them at the edge—meaning if the backend goes down, your infrastructure remains fully accessible as long as certificates are valid.
 
-The backend is the control plane for:
+## The Nokku Ecosystem
 
-- Users, workspaces, teams, and service accounts
-- Targets, Linux principals, and access assignments
-- SSH and X.509 certificate authorities
-- SSH certificate signing and X.509 CSR signing
-- Daemon enrollment and synchronization
-- Browser authentication and terminal sessions
+| Component  | Repository                                     | Purpose                                                         |
+| ---------- | ---------------------------------------------- | --------------------------------------------------------------- |
+| **Core**   | `nokku`                                        | Control plane for users, policies, CA management, and SSO/OIDC. |
+| **Daemon** | [`nokkud`](https://github.com/nokku-sh/nokkud) | Server agent for SSH configuration and host certificates.       |
+| **CLI**    | [`nk`](https://github.com/nokku-sh/nk)         | Workstation CLI for authentication and local SSH configuration. |
 
-The other components are:
+## Architecture Topology
 
-- [`nk`](https://github.com/nokku-sh/nk): workstation CLI for authentication, SSH certificates, SSH configuration, and X.509 issuance
-- [`nokkud`](https://github.com/nokku-sh/nokkud): target-server daemon for SSH configuration, host certificates, and principal synchronization
+```text
+[ Developer Machine ]                    [ Nokku Backend ]                    [ Target Server ]
+      (nk CLI)       ---- HTTPS/OIDC ---> (Control Plane) <--- gRPC/HTTPS ---- (nokkud Daemon)
+         |                                       |                                    |
+         +------------- Direct P2P SSH (Port 4022) - Bypasses Backend ----------------+
 
-## Development requirements
+```
 
-- Go
-- PostgreSQL
+## Editions & Licensing
 
-The backend also uses the integrations configured for the selected environment, such as email, OIDC, KMS, and billing.
+Self-hosted instances default to the **Community** plan.
+For unlimited quotas, external KMS, SAML, and SSO enforcement, we offer an **Enterprise** plan. Enterprise license keys are Ed25519-signed and verified offline against a public key compiled directly into the binary, ensuring fully air-gapped activation.
 
-## Plans and licensing
-
-Nokku ships with three plans:
-
-- **Community** — free with fixed caps (members, targets, CAs, teams, service accounts) and 7-day audit retention. This is the default for every workspace, no key required.
-- **Flex** — hosted SaaS subscription with inclusive member and target quotas, overage billing, SAML, SSO enforcement, and audit export. Service accounts remain available with a finite workspace cap.
-- **Enterprise** — unlimited quotas, SAML, SSO enforcement, external KMS, audit export, and 365-day audit retention. On-premise Enterprise is activated with a license key.
-
-Self-hosted instances work out of the box on the Community plan. To activate Enterprise, purchase an Enterprise license key and set it via the `NOKKU_LICENSE_KEY` environment variable on the server, then restart. License keys are Ed25519-signed and verified offline against a public key compiled into the binary, so activation works fully air-gapped; while valid they unlock the Enterprise policy for every workspace. When a key expires or is revoked, the instance falls back to the Community plan automatically.
+> **For in-depth documentation, advanced configuration, and production deployment guides, please visit our [Official Documentation (Link)](https://nokku.sh/docs)**
 
 ## Build and run
 
@@ -55,15 +49,13 @@ Self-hosted instances work out of the box on the Community plan. To activate Ent
 
 The backend reads configuration from environment variables. Common settings include:
 
-| Variable                                    | Purpose                                                                                              |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `NOKKU_BASE_URL`                            | Public base URL                                                                                      |
-| `NOKKU_PORT`                                | Port the backend listens on                                                                          |
-| `NOKKU_SECRET`                              | 32-byte encryption secret                                                                            |
-| `KMS_URI`                                   | External key-management URI                                                                          |
-| `NOKKU_TRUSTED_PROXIES`                     | Comma-separated reverse-proxy IPs/CIDRs (e.g. Traefik) whose forwarded client IP headers are honored |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OIDC                                                                                          |
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OIDC                                                                                          |
+| Variable                | Purpose                                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| `NOKKU_BASE_URL`        | Public base URL                                                                                      |
+| `NOKKU_PORT`            | Port the backend listens on                                                                          |
+| `NOKKU_SECRET`          | 32-byte encryption secret                                                                            |
+| `KMS_URI`               | External key-management URI                                                                          |
+| `NOKKU_TRUSTED_PROXIES` | Comma-separated reverse-proxy IPs/CIDRs (e.g. Traefik) whose forwarded client IP headers are honored |
 
 ## Secret rotation
 
@@ -73,10 +65,4 @@ Stop the backend before rotating encrypted data:
 ./nokku rotate-secrets --new secret:NEW_SECRET
 ```
 
-The command also supports `kms:<URI>` destinations. Update the runtime environment after a successful rotation.
-
-## Development
-
-```bash
-go test ./...
-```
+The command also supports `kms:<URI>` destinations in the enterprise variant. Update the runtime environment after a successful rotation.
