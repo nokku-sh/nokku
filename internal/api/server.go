@@ -78,7 +78,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	serverErr := make(chan error, 1)
 	go func() {
-		slog.Info("server listening", "address", "http://127.0.0.1:"+s.cfg.Port)
+		slog.Info("server listening", "bind_address", server.Addr, "public_url", s.cfg.FullURL())
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			serverErr <- err
 		}
@@ -141,7 +141,7 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 			func(ctx context.Context, spec connect.Spec, _ http.Header, p any) error {
 				attrs := []slog.Attr{
 					slog.String("procedure", spec.Procedure),
-					slog.Any("panic", p),
+					slog.String("panic_type", fmt.Sprintf("%T", p)),
 				}
 				if s.cfg.Debug {
 					attrs = append(attrs, slog.String("stack", string(debug.Stack())))

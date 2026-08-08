@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -23,12 +24,12 @@ func (l *LogInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		res, err := next(ctx, req)
 		duration := time.Since(start)
 
-		attrs := rpcAttrs(req.Peer(), req.Spec().Procedure, duration)
+		attrs := rpcAttrs(req.Peer().Protocol, req.Spec().Procedure, duration)
 		if err != nil {
 			attrs = append(
 				attrs,
 				slog.String("code", connect.CodeOf(err).String()),
-				slog.String("error", err.Error()),
+				slog.String("error_type", fmt.Sprintf("%T", err)),
 			)
 			if isServerError(connect.CodeOf(err)) {
 				slog.LogAttrs(ctx, slog.LevelError, "rpc failed", attrs...)
@@ -57,12 +58,12 @@ func (l *LogInterceptor) WrapStreamingHandler(
 		err := next(ctx, conn)
 		duration := time.Since(start)
 
-		attrs := rpcAttrs(conn.Peer(), conn.Spec().Procedure, duration)
+		attrs := rpcAttrs(conn.Peer().Protocol, conn.Spec().Procedure, duration)
 		if err != nil {
 			attrs = append(
 				attrs,
 				slog.String("code", connect.CodeOf(err).String()),
-				slog.String("error", err.Error()),
+				slog.String("error_type", fmt.Sprintf("%T", err)),
 			)
 			if isServerError(connect.CodeOf(err)) {
 				slog.LogAttrs(ctx, slog.LevelError, "stream failed", attrs...)
@@ -77,14 +78,11 @@ func (l *LogInterceptor) WrapStreamingHandler(
 	}
 }
 
-func rpcAttrs(peer connect.Peer, procedure string, duration time.Duration) []slog.Attr {
+func rpcAttrs(protocol, procedure string, duration time.Duration) []slog.Attr {
 	attrs := []slog.Attr{
 		slog.String("procedure", procedure),
-		slog.String("protocol", peer.Protocol),
+		slog.String("protocol", protocol),
 		slog.Duration("duration", duration),
-	}
-	if peer.Addr != "" {
-		attrs = append(attrs, slog.String("peer", peer.Addr))
 	}
 	return attrs
 }
@@ -124,10 +122,6 @@ func (s *Server) WithLogger(next http.Handler) http.Handler {
 			slog.Int("status", rw.statusCode),
 			slog.Duration("duration", duration),
 		}
-		if r.RemoteAddr != "" {
-			attrs = append(attrs, slog.String("peer", r.RemoteAddr))
-		}
-
 		switch {
 		case rw.statusCode >= 500:
 			slog.LogAttrs(r.Context(), slog.LevelError, "http failed", attrs...)

@@ -26,7 +26,8 @@ func (s *Server) WithCSRF(h http.Handler) http.Handler {
 	if err := cop.AddTrustedOrigin(s.cfg.FullURL()); err != nil {
 		panic(err)
 	}
-	cop.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	cop.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		slog.Warn("csrf validation failed", "method", r.Method)
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("CSRF check failed"))
 	}))
