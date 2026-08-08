@@ -8,7 +8,7 @@ export const target = {
 	get: (id?: string) =>
 		useQuery(
 			TargetService.method.getTarget,
-			{ id },
+			{ workspaceId: workspaceID.current, id },
 			{ enabled: !!workspaceID.current && !!id, select: (res) => res.target }
 		),
 	list: (
@@ -47,16 +47,11 @@ export const target = {
 	// Mutations
 	create: () =>
 		useMutation(TargetService.method.createTarget, {
-			onSuccess: () => toast.success('Target created!'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Target created!')
 		}),
-	update: () =>
-		useMutation(TargetService.method.updateTarget, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		}),
+	update: () => useMutation(TargetService.method.updateTarget),
 	delete: () =>
 		useMutation(TargetService.method.deleteTarget, {
-			onSuccess: () => toast.success('Target deleted'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Target deleted')
 		})
 };

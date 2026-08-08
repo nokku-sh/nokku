@@ -12,7 +12,6 @@ export const sign = {
 			onSuccess: () => toast.success('Certificate signed'),
 			transform: (variables) => ({
 				...variables,
-				workspaceId: workspaceID.current,
 				type: SignSSHCertificateRequest_CertificateType.USER
 			})
 		}),
@@ -21,17 +20,12 @@ export const sign = {
 			onSuccess: () => toast.success('Host certificate signed'),
 			transform: (variables) => ({
 				...variables,
-				workspaceId: workspaceID.current,
 				type: SignSSHCertificateRequest_CertificateType.HOST
 			})
 		}),
 	x509: () =>
 		useMutation(CertificateService.method.signX509Certificate, {
-			onSuccess: () => toast.success('Certificate signed'),
-			transform: (variables) => ({
-				...variables,
-				workspaceId: workspaceID.current
-			})
+			onSuccess: () => toast.success('Certificate signed')
 		})
 };
 
@@ -40,7 +34,7 @@ export const ca = {
 	get: (id?: string) =>
 		useQuery(
 			CertificateService.method.getCertificateAuthority,
-			{ id },
+			{ workspaceId: workspaceID.current, id },
 			{ enabled: !!workspaceID.current && !!id, select: (res) => res.certificateAuthority }
 		),
 	list: () =>
@@ -53,17 +47,10 @@ export const ca = {
 	// Mutations
 	create: () =>
 		useMutation(CertificateService.method.createCertificateAuthority, {
-			onSuccess: () => toast.success('Certificate Authority created!'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Certificate Authority created!')
 		}),
-	update: () =>
-		useMutation(CertificateService.method.updateCertificateAuthority, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		}),
-	delete: () =>
-		useMutation(CertificateService.method.deleteCertificateAuthority, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		}),
+	update: () => useMutation(CertificateService.method.updateCertificateAuthority),
+	delete: () => useMutation(CertificateService.method.deleteCertificateAuthority),
 	rollover: () =>
 		useMutation(CertificateService.method.rolloverCertificateAuthority, {
 			onSuccess: (data) => {
@@ -72,7 +59,6 @@ export const ca = {
 					return;
 				}
 				toast.success('Certificate Authority rolled over');
-			},
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			}
 		})
 };

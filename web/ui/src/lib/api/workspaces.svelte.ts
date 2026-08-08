@@ -66,10 +66,7 @@ export const workspace = {
 				toast.success('Workspace created!');
 			}
 		}),
-	update: () =>
-		useMutation(WorkspaceService.method.updateWorkspace, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		}),
+	update: () => useMutation(WorkspaceService.method.updateWorkspace),
 	delete: () =>
 		useMutation(WorkspaceService.method.deleteWorkspace, {
 			onSuccess: (_, variables) => {
@@ -79,23 +76,15 @@ export const workspace = {
 				toast.success('Workspace deleted');
 			}
 		}),
-	updateMember: () =>
-		useMutation(WorkspaceService.method.updateWorkspaceMember, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		}),
+	updateMember: () => useMutation(WorkspaceService.method.updateWorkspaceMember),
 	removeMember: () =>
 		useMutation(WorkspaceService.method.removeWorkspaceMember, {
-			onSuccess: () => toast.success('Member removed'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Member removed')
 		}),
-	updateSettings: () =>
-		useMutation(WorkspaceService.method.updateWorkspaceSettings, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		}),
+	updateSettings: () => useMutation(WorkspaceService.method.updateWorkspaceSettings),
 	updateOwner: () =>
 		useMutation(WorkspaceService.method.updateWorkspaceOwner, {
-			onSuccess: () => toast.success('Owner updated'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Owner updated')
 		})
 };
 
@@ -122,16 +111,14 @@ export const invite = {
 		}),
 	refresh: () =>
 		useMutation(InvitationService.method.refreshInviteToken, {
-			onSuccess: () => toast.success('Invitation token refreshed!'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Invitation token refreshed!')
 		}),
 	revoke: () =>
 		useMutation(InvitationService.method.revokeInviteToken, {
 			onSuccess: () => {
 				inviteToken.current = '';
 				return toast.success('Invitation revoked!');
-			},
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			}
 		})
 };
 
@@ -189,10 +176,6 @@ export const util = {
 			},
 			onError: (error) => {
 				toast.error(`Export failed: ${error.message}`);
-			},
-			transform: (variables) => ({
-				...variables,
-				workspaceId: workspaceID.current
-			})
+			}
 		})
 };

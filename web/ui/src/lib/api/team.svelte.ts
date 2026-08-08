@@ -8,7 +8,7 @@ export const team = {
 	get: (id?: string) =>
 		useQuery(
 			TeamService.method.getTeam,
-			{ id },
+			{ workspaceId: workspaceID.current, id },
 			{ enabled: !!workspaceID.current && !!id, select: (res) => res.team }
 		),
 	list: (opts?: () => { query?: string }) =>
@@ -26,26 +26,19 @@ export const team = {
 	// Mutations
 	create: () =>
 		useMutation(TeamService.method.createTeam, {
-			onSuccess: () => toast.success('Team created!'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Team created!')
 		}),
-	update: () =>
-		useMutation(TeamService.method.updateTeam, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		}),
+	update: () => useMutation(TeamService.method.updateTeam),
 	delete: () =>
 		useMutation(TeamService.method.deleteTeam, {
-			onSuccess: () => toast.success('Team deleted'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Team deleted')
 		}),
 	removeMember: () =>
 		useMutation(TeamService.method.removeTeamMember, {
-			onSuccess: () => toast.success('Member removed'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Member removed')
 		}),
 	addMember: () =>
 		useMutation(TeamService.method.addTeamMember, {
-			onSuccess: () => toast.success('Member added'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Member added')
 		})
 };

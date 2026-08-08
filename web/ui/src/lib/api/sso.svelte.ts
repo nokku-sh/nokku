@@ -22,13 +22,11 @@ export const sso = {
 	// Mutations
 	updateOIDC: () =>
 		useMutation(SSOService.method.updateOIDCProvider, {
-			onSuccess: () => toast.success('OIDC provider updated'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('OIDC provider updated')
 		}),
 	updateSAML: () =>
 		useMutation(SSOService.method.updateSAMLProvider, {
-			onSuccess: () => toast.success('SAML provider updated'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('SAML provider updated')
 		}),
 	check: () => useMutation(SSOService.method.checkSSO)
 };
@@ -45,22 +43,18 @@ export const domain = {
 	// Mutations
 	create: () =>
 		useMutation(WorkspaceDomainService.method.createWorkspaceDomain, {
-			onSuccess: () => toast.success('Domain created'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Domain created')
 		}),
 	delete: () =>
 		useMutation(WorkspaceDomainService.method.deleteWorkspaceDomain, {
-			onSuccess: () => toast.success('Domain deleted'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Domain deleted')
 		}),
 	verify: () =>
 		useMutation(WorkspaceDomainService.method.verifyWorkspaceDomain, {
-			onSuccess: () => toast.success('Domain verified'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Domain verified')
 		}),
 	regenerate: () =>
 		useMutation(WorkspaceDomainService.method.regenerateWorkspaceDomainToken, {
-			onSuccess: () => toast.success('New token generated'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('New token generated')
 		})
 };

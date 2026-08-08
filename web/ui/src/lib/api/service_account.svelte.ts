@@ -8,7 +8,7 @@ export const serviceAccount = {
 	get: (id?: string) =>
 		useQuery(
 			ServiceAccountService.method.getServiceAccount,
-			{ id },
+			{ workspaceId: workspaceID.current, id },
 			{ enabled: !!workspaceID.current && !!id, select: (res) => res.serviceAccount }
 		),
 	list: (opts?: () => { query?: string }) =>
@@ -26,15 +26,8 @@ export const serviceAccount = {
 	// Mutations
 	create: () =>
 		useMutation(ServiceAccountService.method.createServiceAccount, {
-			onSuccess: () => toast.success('Service account created!'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Service account created!')
 		}),
-	update: () =>
-		useMutation(ServiceAccountService.method.updateServiceAccount, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		}),
-	delete: () =>
-		useMutation(ServiceAccountService.method.deleteServiceAccount, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		})
+	update: () => useMutation(ServiceAccountService.method.updateServiceAccount),
+	delete: () => useMutation(ServiceAccountService.method.deleteServiceAccount)
 };
