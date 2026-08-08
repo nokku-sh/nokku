@@ -10,17 +10,14 @@ export const billing = {
 	// Mutations
 	checkout: () =>
 		useMutation(BillingService.method.createCheckout, {
-			onSuccess: (data) => (window.location.href = data.url),
-			transform: (variables) => ({ workspaceId: workspaceID.current, ...variables })
+			onSuccess: (data) => (window.location.href = data.url)
 		}),
 	portal: () =>
 		useMutation(BillingService.method.createPortal, {
-			onSuccess: (data) => (window.location.href = data.url),
-			transform: (variables) => ({ workspaceId: workspaceID.current, ...variables })
+			onSuccess: (data) => (window.location.href = data.url)
 		}),
 	cancelSubscription: () =>
 		useMutation(BillingService.method.cancelSubscription, {
-			onSuccess: () => toast.success('Subscription cancelled'),
-			transform: (variables) => ({ workspaceId: workspaceID.current, ...variables })
+			onSuccess: () => toast.success('Subscription cancelled')
 		})
 };

@@ -8,13 +8,14 @@ import {
 import { createConnectTransport } from '@connectrpc/connect-web';
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/svelte-query';
 import { browser } from '$app/environment';
-import { Code, ConnectError, type Interceptor } from '@connectrpc/connect';
+import { Code, ConnectError, type Interceptor, type UnaryRequest } from '@connectrpc/connect';
 import { AuthService } from '$lib/gen/nokku/v1/auth_pb';
 import { toast } from 'svelte-sonner';
 import { formatConnectError, parseHTTPError } from './error-formatter';
 import { goto } from '$app/navigation';
 import { SSOService } from '$lib/gen/nokku/v1/sso_pb';
 import { UtilService } from '$lib/gen/nokku/v1/util_pb';
+import { workspaceID } from '$lib/store.svelte';
 
 export const queryClient = new QueryClient({
 	defaultOptions: {
@@ -103,19 +104,46 @@ export const authInterceptor: Interceptor = (next) => async (req) => {
 	}
 };
 
+// Workspace-scoped protobuf requests all use the conventional workspace_id field.
+export const workspaceInterceptor: Interceptor = (next) => async (req) => {
+	if (req.stream || !browser || !workspaceID.current) {
+		return await next(req);
+	}
+
+	const unaryRequest = req as UnaryRequest;
+	const hasWorkspaceField = unaryRequest.method.input.fields.some(
+		(field) => field.localName === 'workspaceId'
+	);
+	if (!hasWorkspaceField) {
+		return await next(req);
+	}
+
+	const message = unaryRequest.message as Record<string, unknown>;
+	if (message.workspaceId) {
+		return await next(req);
+	}
+
+	const updatedRequest: UnaryRequest = {
+		...unaryRequest,
+		message: { ...message, workspaceId: workspaceID.current } as unknown as UnaryRequest['message']
+	};
+	return await next(updatedRequest);
+};
+
 export const authTransport = createConnectTransport({
 	baseUrl: '/',
 	useHttpGet: true,
 	fetch: (input, init) => fetch(input, { ...init, credentials: 'include' }),
 	jsonOptions: { ignoreUnknownFields: true },
-	interceptors: [authInterceptor]
+	interceptors: [workspaceInterceptor, authInterceptor]
 });
 
 const transport = createConnectTransport({
 	baseUrl: '/',
 	useHttpGet: true,
 	fetch: (input, init) => fetch(input, { ...init, credentials: 'include' }),
-	jsonOptions: { ignoreUnknownFields: true }
+	jsonOptions: { ignoreUnknownFields: true },
+	interceptors: [workspaceInterceptor]
 });
 
 export interface CallUnaryOptions {

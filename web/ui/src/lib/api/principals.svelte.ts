@@ -30,18 +30,9 @@ export const principal = {
 		),
 
 	// Mutations
-	set: () =>
-		useMutation(PrincipalService.method.setPrincipals, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		}),
-	addSubjects: () =>
-		useMutation(PrincipalService.method.addSubjectsToPrincipal, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		}),
-	removeSubjects: () =>
-		useMutation(PrincipalService.method.removeSubjectsFromPrincipal, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		}),
+	set: () => useMutation(PrincipalService.method.setPrincipals),
+	addSubjects: () => useMutation(PrincipalService.method.addSubjectsToPrincipal),
+	removeSubjects: () => useMutation(PrincipalService.method.removeSubjectsFromPrincipal),
 	revokeSubject: () =>
 		useMutation(PrincipalService.method.revokeAllAccess, {
 			onSuccess: (_, variables) => {
@@ -56,7 +47,6 @@ export const principal = {
 						toast.success('Service account access revoked');
 						break;
 				}
-			},
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			}
 		})
 };

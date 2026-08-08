@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '$lib/query';
 import { queryClient } from './client';
 import { UtilService } from '$lib/gen/nokku/v1/util_pb';
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import { pageIndex, pageSize } from '$lib/store.svelte';
+import { pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
 
 export const user = {
 	// Queries
@@ -26,6 +26,7 @@ export const user = {
 		return useQuery(
 			UtilService.method.listAuditLogs,
 			{
+				workspaceId: workspaceID.current,
 				actorIds: [filters.userID],
 				limit: pageSize.current,
 				offset: pageIndex.current,

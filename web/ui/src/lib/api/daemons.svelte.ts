@@ -7,7 +7,11 @@ import { activeSessionID, pageIndex, pageSize, workspaceID } from '$lib/store.sv
 export const daemon = {
 	// Queries
 	get: (id?: string) =>
-		useQuery(DaemonService.method.getDaemon, { id }, { enabled: !!workspaceID.current && !!id }),
+		useQuery(
+			DaemonService.method.getDaemon,
+			{ workspaceId: workspaceID.current, id },
+			{ enabled: !!workspaceID.current && !!id }
+		),
 	list: (
 		opts?: () => {
 			query?: string;
@@ -28,7 +32,7 @@ export const daemon = {
 	listSessions: (daemonId?: string) =>
 		useQuery(
 			DaemonService.method.listSessions,
-			{ daemonId },
+			{ workspaceId: workspaceID.current, daemonId },
 			{
 				enabled: !!workspaceID.current && !!daemonId,
 				select: (res) => {
@@ -68,20 +72,12 @@ export const daemon = {
 		}),
 	refreshToken: () =>
 		useMutation(DaemonService.method.refreshEnrollToken, {
-			onSuccess: () => toast.success('Enroll token refreshed!'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Enroll token refreshed!')
 		}),
 	revokeToken: () =>
 		useMutation(DaemonService.method.revokeEnrollToken, {
-			onSuccess: () => toast.success('Enroll token revoked!'),
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
+			onSuccess: () => toast.success('Enroll token revoked!')
 		}),
-	update: () =>
-		useMutation(DaemonService.method.updateDaemon, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		}),
-	delete: () =>
-		useMutation(DaemonService.method.deleteDaemon, {
-			transform: (variables) => ({ ...variables, workspaceId: workspaceID.current })
-		})
+	update: () => useMutation(DaemonService.method.updateDaemon),
+	delete: () => useMutation(DaemonService.method.deleteDaemon)
 };
