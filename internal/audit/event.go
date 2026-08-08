@@ -192,6 +192,9 @@ func (s *Service) Export(
 	if err != nil {
 		return nil, err
 	}
+	if count > MaxExportRows {
+		return nil, fmt.Errorf("export contains %d rows, maximum is %d", count, MaxExportRows)
+	}
 
 	opts.Limit = count
 	events, err := s.List(ctx, opts)
