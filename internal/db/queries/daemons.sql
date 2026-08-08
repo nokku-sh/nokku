@@ -59,13 +59,16 @@ FROM
 WHERE
   id = ANY (sqlc.arg('daemon_ids')::UUID[]);
 
--- name: UpdateDaemon :exec
+-- name: UpdateDaemon :one
 UPDATE daemons
 SET
+  status = COALESCE(sqlc.narg('status'), status),
   config = COALESCE(sqlc.narg('config'), config),
   metadata = COALESCE(sqlc.narg('metadata'), metadata)
 WHERE
-  id = @daemon_id;
+  id = @daemon_id
+RETURNING
+  *;
 
 -- name: UpdateDaemonStatus :one
 UPDATE daemons

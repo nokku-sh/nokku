@@ -55,14 +55,12 @@ func (s *DaemonService) UpdateDaemon(
 ) (*nokkuv1.UpdateDaemonResponse, error) {
 	var result *db.Daemon
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.UpdateDaemonStatus(ctx, &db.UpdateDaemonStatusParams{
+		result, err = q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
 			DaemonID: req.GetId(),
 			Status:   req.GetStatus(),
+			Config:   req.GetConfig(),
 		})
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -399,7 +397,7 @@ func (s *DaemonService) SyncDaemon(
 			return errors.New("denied")
 		}
 
-		if err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
+		if _, err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
 			DaemonID: daemon.ID,
 			Metadata: metadata,
 		}); err != nil {
