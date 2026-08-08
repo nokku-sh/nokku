@@ -93,7 +93,7 @@
 	title="{data?.id ? 'Edit' : 'Create'} Target"
 	description="Configure your target settings"
 	submitLabel={data.id ? 'Update' : 'Create'}
-	classModal="sm:max-w-[600px]"
+	classModal="sm:max-w-125"
 	{onSubmit}
 	{isLoading}
 >

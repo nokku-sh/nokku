@@ -28,7 +28,7 @@
 </script>
 
 <div
-	class="flex flex-col gap-1"
+	class="flex flex-col"
 	class:items-start={align === 'left'}
 	class:items-end={align === 'right'}
 	class:text-right={align === 'right'}
@@ -38,13 +38,13 @@
 		<span class="text-sm text-muted-foreground">{fallback}</span>
 	{:else}
 		<!-- Primary Label -->
-		<span class="truncate text-sm leading-none font-medium text-foreground" title={secondaryText}>
+		<span class="truncate text-xs font-medium text-foreground" title={secondaryText}>
 			{primaryText}
 		</span>
 
 		<!-- Secondary Label -->
 		{#if secondaryText}
-			<span class="truncate text-[11px] leading-none text-muted-foreground" title={primaryText}>
+			<span class="truncate text-[11px] text-muted-foreground" title={primaryText}>
 				{secondaryText}
 			</span>
 		{/if}

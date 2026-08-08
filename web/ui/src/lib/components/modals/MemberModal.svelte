@@ -117,9 +117,9 @@
 											<role.icon size={16} class="mt-0.5 text-foreground/70" />
 											<div class="flex flex-col gap-1 text-left">
 												<span class="text-[12px] leading-none font-medium">{role.label}</span>
-												<span class="text-[10px] leading-none text-muted-foreground"
-													>{role.description}</span
-												>
+												<span class="text-[10px] leading-none text-muted-foreground">
+													{role.description}
+												</span>
 											</div>
 										</Select.Item>
 									{/each}

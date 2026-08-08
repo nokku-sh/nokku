@@ -133,35 +133,27 @@
 		<Field.Content>
 			<Select.Root type="single" bind:value={saData.roleName}>
 				<Select.Trigger class="w-full" id="role">
-					{#if selectedRole}
-						<selectedRole.icon class="size-4 text-foreground/70" />
-						<span>{selectedRole.label}</span>
-					{:else}
-						<span class="text-muted-foreground">Select a role</span>
-					{/if}
+					<div class="flex items-center gap-2">
+						{#if selectedRole}
+							<selectedRole.icon class="size-4 text-foreground/70" />
+							<span>{selectedRole.label}</span>
+						{:else}
+							<span class="text-muted-foreground">Select a role</span>
+						{/if}
+					</div>
 				</Select.Trigger>
-				<Select.Content class="max-w-80">
-					<Select.Group>
-						{#each roleOptions as role (role.value)}
-							<Select.Item
-								value={role.value}
-								label={role.label}
-								class="cursor-pointer items-center gap-3 py-2.5"
-							>
-								<role.icon size={16} class="mt-0.5 text-foreground/70" />
-								<div class="flex flex-col gap-1 text-left">
-									<span class="text-sm leading-none font-medium">{role.label}</span>
-									<span class="text-xs leading-snug text-muted-foreground">{role.description}</span>
-								</div>
-							</Select.Item>
-						{/each}
-					</Select.Group>
+				<Select.Content class="max-w-88" side="bottom" align="start">
+					{#each roleOptions as role (role.value)}
+						<Select.Item value={role.value} label={role.label}>
+							<role.icon size={16} class="text-foreground/70" />
+							<div class="flex flex-col gap-1 text-left">
+								<span class="text-sm font-medium">{role.label}</span>
+								<span class="text-xs text-muted-foreground">{role.description}</span>
+							</div>
+						</Select.Item>
+					{/each}
 				</Select.Content>
 			</Select.Root>
-			<Field.Description>
-				Viewer can view workspace resources; Editor can also manage operational resources and
-				certificate authorities.
-			</Field.Description>
 		</Field.Content>
 	</Field.Field>
 
