@@ -12,9 +12,6 @@
 // decryptable. Switching ciphers or rotating the keyset is an explicit
 // operator action via the rotate-secrets command, which re-encrypts every
 // secret and swaps the keyset atomically in a single transaction.
-//
-// Files: client.go (KMS providers), keyset.go (persistence), rewrap.go
-// (background maintenance), tink.go (the encryptor itself).
 package kms
 
 import (
