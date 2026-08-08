@@ -14,7 +14,7 @@ import type { Message } from '@bufbuild/protobuf';
  * Describes the file nokku/v1/principal.proto.
  */
 export const file_nokku_v1_principal: GenFile /*@__PURE__*/ = fileDesc(
-	'Chhub2trdS92MS9wcmluY2lwYWwucHJvdG8SCG5va2t1LnYxIq0BCglQcmluY2lwYWwSCgoCaWQYASABKAkSEQoJdGFyZ2V0X2lkGAIgASgJEhAKCHVzZXJuYW1lGAMgASgJEhAKCHVzZXJfaWRzGAQgAygJEhAKCHRlYW1faWRzGAUgAygJEhsKE3NlcnZpY2VfYWNjb3VudF9pZHMYBiADKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAibgoUU2V0UHJpbmNpcGFsc1JlcXVlc3QSGwoJdGFyZ2V0X2lkGAEgASgJQgi6SAVyA7ABARI5Cgl1c2VybmFtZXMYAiADKAlCJrpII5IBICIechwQARggMhZeW2Etel9dW2EtejAtOS1fXSpcJD8kIhcKFVNldFByaW5jaXBhbHNSZXNwb25zZSKpAQoVTGlzdFByaW5jaXBhbHNSZXF1ZXN0EhsKCXRhcmdldF9pZBgBIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAiABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAyABKAVCB7pIBBoCKAASDQoFcXVlcnkYBCABKAkSMQoEdHlwZRgFIAEoDjIXLm5va2t1LnYxLlByaW5jaXBhbFR5cGVCCrpIB4IBBBABIAAiUAoWTGlzdFByaW5jaXBhbHNSZXNwb25zZRInCgpwcmluY2lwYWxzGAEgAygLMhMubm9ra3UudjEuUHJpbmNpcGFsEg0KBXRvdGFsGAIgASgFIpABCh1BZGRTdWJqZWN0c1RvUHJpbmNpcGFsUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQESJgoLc3ViamVjdF9pZHMYAiADKAlCEbpIDpIBCwgBEDIiBXIDsAEBEjEKBHR5cGUYAyABKA4yFy5ub2trdS52MS5QcmluY2lwYWxUeXBlQgq6SAeCAQQQASAAIiAKHkFkZFN1YmplY3RzVG9QcmluY2lwYWxSZXNwb25zZSKVAQoiUmVtb3ZlU3ViamVjdHNGcm9tUHJpbmNpcGFsUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQESJgoLc3ViamVjdF9pZHMYAiADKAlCEbpIDpIBCwgBEDIiBXIDsAEBEjEKBHR5cGUYAyABKA4yFy5ub2trdS52MS5QcmluY2lwYWxUeXBlQgq6SAeCAQQQASAAIiUKI1JlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbFJlc3BvbnNlIokBChZSZXZva2VBbGxBY2Nlc3NSZXF1ZXN0EhwKCnN1YmplY3RfaWQYASABKAlCCLpIBXIDsAEBEh4KDHdvcmtzcGFjZV9pZBgCIAEoCUIIukgFcgOwAQESMQoEdHlwZRgDIAEoDjIXLm5va2t1LnYxLlByaW5jaXBhbFR5cGVCCrpIB4IBBBABIAAiGQoXUmV2b2tlQWxsQWNjZXNzUmVzcG9uc2UqhQEKDVByaW5jaXBhbFR5cGUSHgoaUFJJTkNJUEFMX1RZUEVfVU5TUEVDSUZJRUQQABIXChNQUklOQ0lQQUxfVFlQRV9VU0VSEAESFwoTUFJJTkNJUEFMX1RZUEVfVEVBTRACEiIKHlBSSU5DSVBBTF9UWVBFX1NFUlZJQ0VfQUNDT1VOVBADMpUFChBQcmluY2lwYWxTZXJ2aWNlEmsKDVNldFByaW5jaXBhbHMSHi5ub2trdS52MS5TZXRQcmluY2lwYWxzUmVxdWVzdBofLm5va2t1LnYxLlNldFByaW5jaXBhbHNSZXNwb25zZSIZgtPkkwITOgEqIg4vdjEvcHJpbmNpcGFscxJuCg5MaXN0UHJpbmNpcGFscxIfLm5va2t1LnYxLkxpc3RQcmluY2lwYWxzUmVxdWVzdBogLm5va2t1LnYxLkxpc3RQcmluY2lwYWxzUmVzcG9uc2UiGZACAYLT5JMCEBIOL3YxL3ByaW5jaXBhbHMSigEKFkFkZFN1YmplY3RzVG9QcmluY2lwYWwSJy5ub2trdS52MS5BZGRTdWJqZWN0c1RvUHJpbmNpcGFsUmVxdWVzdBooLm5va2t1LnYxLkFkZFN1YmplY3RzVG9QcmluY2lwYWxSZXNwb25zZSIdgtPkkwIXOgEqIhIvdjEvcHJpbmNpcGFscy9hZGQSnAEKG1JlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbBIsLm5va2t1LnYxLlJlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbFJlcXVlc3QaLS5ub2trdS52MS5SZW1vdmVTdWJqZWN0c0Zyb21QcmluY2lwYWxSZXNwb25zZSIggtPkkwIaOgEqIhUvdjEvcHJpbmNpcGFscy9yZW1vdmUSeAoPUmV2b2tlQWxsQWNjZXNzEiAubm9ra3UudjEuUmV2b2tlQWxsQWNjZXNzUmVxdWVzdBohLm5va2t1LnYxLlJldm9rZUFsbEFjY2Vzc1Jlc3BvbnNlIiCC0+STAho6ASoiFS92MS9wcmluY2lwYWxzL3Jldm9rZUKYAQoMY29tLm5va2t1LnYxQg5QcmluY2lwYWxQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
+	'Chhub2trdS92MS9wcmluY2lwYWwucHJvdG8SCG5va2t1LnYxIq0BCglQcmluY2lwYWwSCgoCaWQYASABKAkSEQoJdGFyZ2V0X2lkGAIgASgJEhAKCHVzZXJuYW1lGAMgASgJEhAKCHVzZXJfaWRzGAQgAygJEhAKCHRlYW1faWRzGAUgAygJEhsKE3NlcnZpY2VfYWNjb3VudF9pZHMYBiADKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAijgEKFFNldFByaW5jaXBhbHNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJdGFyZ2V0X2lkGAIgASgJQgi6SAVyA7ABARI5Cgl1c2VybmFtZXMYAyADKAlCJrpII5IBICIechwQARggMhZeW2Etel9dW2EtejAtOS1fXSpcJD8kIhcKFVNldFByaW5jaXBhbHNSZXNwb25zZSLJAQoVTGlzdFByaW5jaXBhbHNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJdGFyZ2V0X2lkGAIgASgJQgi6SAVyA7ABARIYCgVsaW1pdBgDIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgEIAEoBUIHukgEGgIoABINCgVxdWVyeRgFIAEoCRIxCgR0eXBlGAYgASgOMhcubm9ra3UudjEuUHJpbmNpcGFsVHlwZUIKukgHggEEEAEgACJQChZMaXN0UHJpbmNpcGFsc1Jlc3BvbnNlEicKCnByaW5jaXBhbHMYASADKAsyEy5ub2trdS52MS5QcmluY2lwYWwSDQoFdG90YWwYAiABKAUisAEKHUFkZFN1YmplY3RzVG9QcmluY2lwYWxSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBEiYKC3N1YmplY3RfaWRzGAMgAygJQhG6SA6SAQsIARAyIgVyA7ABARIxCgR0eXBlGAQgASgOMhcubm9ra3UudjEuUHJpbmNpcGFsVHlwZUIKukgHggEEEAEgACIgCh5BZGRTdWJqZWN0c1RvUHJpbmNpcGFsUmVzcG9uc2UitQEKIlJlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbFJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIUCgJpZBgCIAEoCUIIukgFcgOwAQESJgoLc3ViamVjdF9pZHMYAyADKAlCEbpIDpIBCwgBEDIiBXIDsAEBEjEKBHR5cGUYBCABKA4yFy5ub2trdS52MS5QcmluY2lwYWxUeXBlQgq6SAeCAQQQASAAIiUKI1JlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbFJlc3BvbnNlIokBChZSZXZva2VBbGxBY2Nlc3NSZXF1ZXN0EhwKCnN1YmplY3RfaWQYASABKAlCCLpIBXIDsAEBEh4KDHdvcmtzcGFjZV9pZBgCIAEoCUIIukgFcgOwAQESMQoEdHlwZRgDIAEoDjIXLm5va2t1LnYxLlByaW5jaXBhbFR5cGVCCrpIB4IBBBABIAAiGQoXUmV2b2tlQWxsQWNjZXNzUmVzcG9uc2UqhQEKDVByaW5jaXBhbFR5cGUSHgoaUFJJTkNJUEFMX1RZUEVfVU5TUEVDSUZJRUQQABIXChNQUklOQ0lQQUxfVFlQRV9VU0VSEAESFwoTUFJJTkNJUEFMX1RZUEVfVEVBTRACEiIKHlBSSU5DSVBBTF9UWVBFX1NFUlZJQ0VfQUNDT1VOVBADMpoGChBQcmluY2lwYWxTZXJ2aWNlEoUBCg1TZXRQcmluY2lwYWxzEh4ubm9ra3UudjEuU2V0UHJpbmNpcGFsc1JlcXVlc3QaHy5ub2trdS52MS5TZXRQcmluY2lwYWxzUmVzcG9uc2UiM4LT5JMCLToBKiIoL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcHJpbmNpcGFscxKIAQoOTGlzdFByaW5jaXBhbHMSHy5ub2trdS52MS5MaXN0UHJpbmNpcGFsc1JlcXVlc3QaIC5ub2trdS52MS5MaXN0UHJpbmNpcGFsc1Jlc3BvbnNlIjOQAgGC0+STAioSKC92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3ByaW5jaXBhbHMSpAEKFkFkZFN1YmplY3RzVG9QcmluY2lwYWwSJy5ub2trdS52MS5BZGRTdWJqZWN0c1RvUHJpbmNpcGFsUmVxdWVzdBooLm5va2t1LnYxLkFkZFN1YmplY3RzVG9QcmluY2lwYWxSZXNwb25zZSI3gtPkkwIxOgEqIiwvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9wcmluY2lwYWxzOmFkZBK2AQobUmVtb3ZlU3ViamVjdHNGcm9tUHJpbmNpcGFsEiwubm9ra3UudjEuUmVtb3ZlU3ViamVjdHNGcm9tUHJpbmNpcGFsUmVxdWVzdBotLm5va2t1LnYxLlJlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbFJlc3BvbnNlIjqC0+STAjQ6ASoiLy92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3ByaW5jaXBhbHM6cmVtb3ZlEpIBCg9SZXZva2VBbGxBY2Nlc3MSIC5ub2trdS52MS5SZXZva2VBbGxBY2Nlc3NSZXF1ZXN0GiEubm9ra3UudjEuUmV2b2tlQWxsQWNjZXNzUmVzcG9uc2UiOoLT5JMCNDoBKiIvL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcHJpbmNpcGFsczpyZXZva2VCmAEKDGNvbS5ub2trdS52MUIOUHJpbmNpcGFsUHJvdG9QAVo3Z2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9pbnRlcm5hbC9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac',
 	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
 );
 
@@ -72,12 +72,17 @@ export const PrincipalSchema: GenMessage<Principal> /*@__PURE__*/ = messageDesc(
  */
 export type SetPrincipalsRequest = Message<'nokku.v1.SetPrincipalsRequest'> & {
 	/**
-	 * @generated from field: string target_id = 1;
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
+
+	/**
+	 * @generated from field: string target_id = 2;
 	 */
 	targetId: string;
 
 	/**
-	 * @generated from field: repeated string usernames = 2;
+	 * @generated from field: repeated string usernames = 3;
 	 */
 	usernames: string[];
 };
@@ -106,27 +111,32 @@ export const SetPrincipalsResponseSchema: GenMessage<SetPrincipalsResponse> /*@_
  */
 export type ListPrincipalsRequest = Message<'nokku.v1.ListPrincipalsRequest'> & {
 	/**
-	 * @generated from field: string target_id = 1;
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
+
+	/**
+	 * @generated from field: string target_id = 2;
 	 */
 	targetId: string;
 
 	/**
-	 * @generated from field: int32 limit = 2;
+	 * @generated from field: int32 limit = 3;
 	 */
 	limit: number;
 
 	/**
-	 * @generated from field: int32 offset = 3;
+	 * @generated from field: int32 offset = 4;
 	 */
 	offset: number;
 
 	/**
-	 * @generated from field: string query = 4;
+	 * @generated from field: string query = 5;
 	 */
 	query: string;
 
 	/**
-	 * @generated from field: nokku.v1.PrincipalType type = 5;
+	 * @generated from field: nokku.v1.PrincipalType type = 6;
 	 */
 	type: PrincipalType;
 };
@@ -165,17 +175,22 @@ export const ListPrincipalsResponseSchema: GenMessage<ListPrincipalsResponse> /*
  */
 export type AddSubjectsToPrincipalRequest = Message<'nokku.v1.AddSubjectsToPrincipalRequest'> & {
 	/**
-	 * @generated from field: string id = 1;
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
+
+	/**
+	 * @generated from field: string id = 2;
 	 */
 	id: string;
 
 	/**
-	 * @generated from field: repeated string subject_ids = 2;
+	 * @generated from field: repeated string subject_ids = 3;
 	 */
 	subjectIds: string[];
 
 	/**
-	 * @generated from field: nokku.v1.PrincipalType type = 3;
+	 * @generated from field: nokku.v1.PrincipalType type = 4;
 	 */
 	type: PrincipalType;
 };
@@ -206,17 +221,22 @@ export const AddSubjectsToPrincipalResponseSchema: GenMessage<AddSubjectsToPrinc
 export type RemoveSubjectsFromPrincipalRequest =
 	Message<'nokku.v1.RemoveSubjectsFromPrincipalRequest'> & {
 		/**
-		 * @generated from field: string id = 1;
+		 * @generated from field: string workspace_id = 1;
+		 */
+		workspaceId: string;
+
+		/**
+		 * @generated from field: string id = 2;
 		 */
 		id: string;
 
 		/**
-		 * @generated from field: repeated string subject_ids = 2;
+		 * @generated from field: repeated string subject_ids = 3;
 		 */
 		subjectIds: string[];
 
 		/**
-		 * @generated from field: nokku.v1.PrincipalType type = 3;
+		 * @generated from field: nokku.v1.PrincipalType type = 4;
 		 */
 		type: PrincipalType;
 	};

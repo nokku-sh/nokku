@@ -158,7 +158,8 @@ func (x *Target) GetUpdatedAt() *timestamppb.Timestamp {
 
 type GetTargetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -191,6 +192,13 @@ func (x *GetTargetRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetTargetRequest.ProtoReflect.Descriptor instead.
 func (*GetTargetRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_target_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GetTargetRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *GetTargetRequest) GetId() string {
@@ -374,12 +382,13 @@ func (x *CreateTargetResponse) GetTarget() *Target {
 
 type UpdateTargetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	CaId          *string                `protobuf:"bytes,2,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
-	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
-	Description   *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
-	Endpoints     []string               `protobuf:"bytes,5,rep,name=endpoints" json:"endpoints,omitempty"`
-	Tags          []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
+	CaId          *string                `protobuf:"bytes,3,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
+	Name          *string                `protobuf:"bytes,4,opt,name=name" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,5,opt,name=description" json:"description,omitempty"`
+	Endpoints     []string               `protobuf:"bytes,6,rep,name=endpoints" json:"endpoints,omitempty"`
+	Tags          []string               `protobuf:"bytes,7,rep,name=tags" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -412,6 +421,13 @@ func (x *UpdateTargetRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use UpdateTargetRequest.ProtoReflect.Descriptor instead.
 func (*UpdateTargetRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_target_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *UpdateTargetRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *UpdateTargetRequest) GetId() string {
@@ -502,7 +518,8 @@ func (x *UpdateTargetResponse) GetTarget() *Target {
 
 type DeleteTargetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -535,6 +552,13 @@ func (x *DeleteTargetRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DeleteTargetRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTargetRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_target_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *DeleteTargetRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *DeleteTargetRequest) GetId() string {
@@ -944,7 +968,7 @@ var File_nokku_v1_target_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_target_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/target.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/daemon.proto\x1a\x1bnokku/v1/certificates.proto\x1a\x18nokku/v1/principal.proto\"\xf9\x03\n" +
+	"\x15nokku/v1/target.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bnokku/v1/certificates.proto\x1a\x15nokku/v1/daemon.proto\x1a\x18nokku/v1/principal.proto\"\xf9\x03\n" +
 	"\x06Target\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x13\n" +
@@ -965,9 +989,10 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\",\n" +
-	"\x10GetTargetRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"=\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"Y\n" +
+	"\x10GetTargetRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"=\n" +
 	"\x11GetTargetResponse\x12(\n" +
 	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xfc\x01\n" +
 	"\x13CreateTargetRequest\x12+\n" +
@@ -978,18 +1003,20 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\tendpoints\x18\x05 \x03(\tR\tendpoints\x12\x12\n" +
 	"\x04tags\x18\x06 \x03(\tR\x04tags\"@\n" +
 	"\x14CreateTargetResponse\x12(\n" +
-	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xe9\x01\n" +
-	"\x13UpdateTargetRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12\x1d\n" +
-	"\x05ca_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x04caId\x12;\n" +
-	"\x04name\x18\x03 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
-	"\vdescription\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x1c\n" +
-	"\tendpoints\x18\x05 \x03(\tR\tendpoints\x12\x12\n" +
-	"\x04tags\x18\x06 \x03(\tR\x04tags\"@\n" +
+	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\x96\x02\n" +
+	"\x13UpdateTargetRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12\x1d\n" +
+	"\x05ca_id\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x04caId\x12;\n" +
+	"\x04name\x18\x04 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
+	"\vdescription\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x1c\n" +
+	"\tendpoints\x18\x06 \x03(\tR\tendpoints\x12\x12\n" +
+	"\x04tags\x18\a \x03(\tR\x04tags\"@\n" +
 	"\x14UpdateTargetResponse\x12(\n" +
-	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"/\n" +
-	"\x13DeleteTargetRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x16\n" +
+	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\\\n" +
+	"\x13DeleteTargetRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x16\n" +
 	"\x14DeleteTargetResponse\"\xff\x01\n" +
 	"\x12ListTargetsRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1f\n" +
@@ -1019,13 +1046,13 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\x04tags\x18\x01 \x03(\tR\x04tags\x12\x1e\n" +
 	"\n" +
 	"principals\x18\x02 \x03(\tR\n" +
-	"principals2\xf1\x06\n" +
-	"\rTargetService\x12a\n" +
-	"\tGetTarget\x12\x1a.nokku.v1.GetTargetRequest\x1a\x1b.nokku.v1.GetTargetResponse\"\x1b\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/targets/{id}\x90\x02\x01\x12|\n" +
+	"principals2\xc1\a\n" +
+	"\rTargetService\x12{\n" +
+	"\tGetTarget\x12\x1a.nokku.v1.GetTargetRequest\x1a\x1b.nokku.v1.GetTargetResponse\"5\x82\xd3\xe4\x93\x02,\x12*/v1/workspaces/{workspace_id}/targets/{id}\x90\x02\x01\x12|\n" +
 	"\vListTargets\x12\x1c.nokku.v1.ListTargetsRequest\x1a\x1d.nokku.v1.ListTargetsResponse\"0\x82\xd3\xe4\x93\x02'\x12%/v1/workspaces/{workspace_id}/targets\x90\x02\x01\x12\x7f\n" +
-	"\fCreateTarget\x12\x1d.nokku.v1.CreateTargetRequest\x1a\x1e.nokku.v1.CreateTargetResponse\"0\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/workspaces/{workspace_id}/targets\x12j\n" +
-	"\fUpdateTarget\x12\x1d.nokku.v1.UpdateTargetRequest\x1a\x1e.nokku.v1.UpdateTargetResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*2\x10/v1/targets/{id}\x12g\n" +
-	"\fDeleteTarget\x12\x1d.nokku.v1.DeleteTargetRequest\x1a\x1e.nokku.v1.DeleteTargetResponse\"\x18\x82\xd3\xe4\x93\x02\x12*\x10/v1/targets/{id}\x12\x92\x01\n" +
+	"\fCreateTarget\x12\x1d.nokku.v1.CreateTargetRequest\x1a\x1e.nokku.v1.CreateTargetResponse\"0\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/workspaces/{workspace_id}/targets\x12\x84\x01\n" +
+	"\fUpdateTarget\x12\x1d.nokku.v1.UpdateTargetRequest\x1a\x1e.nokku.v1.UpdateTargetResponse\"5\x82\xd3\xe4\x93\x02/:\x01*2*/v1/workspaces/{workspace_id}/targets/{id}\x12\x81\x01\n" +
+	"\fDeleteTarget\x12\x1d.nokku.v1.DeleteTargetRequest\x1a\x1e.nokku.v1.DeleteTargetResponse\"2\x82\xd3\xe4\x93\x02,**/v1/workspaces/{workspace_id}/targets/{id}\x12\x92\x01\n" +
 	"\x10GetSubjectAccess\x12!.nokku.v1.GetSubjectAccessRequest\x1a\".nokku.v1.GetSubjectAccessResponse\"7\x82\xd3\xe4\x93\x021:\x01*\",/v1/workspaces/{workspace_id}/targets/access\x12\x93\x01\n" +
 	"\x10GetTargetFilters\x12!.nokku.v1.GetTargetFiltersRequest\x1a\".nokku.v1.GetTargetFiltersResponse\"8\x82\xd3\xe4\x93\x02/\x12-/v1/workspaces/{workspace_id}/targets/filters\x90\x02\x01B\x95\x01\n" +
 	"\fcom.nokku.v1B\vTargetProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
@@ -1103,8 +1130,8 @@ func file_nokku_v1_target_proto_init() {
 	if File_nokku_v1_target_proto != nil {
 		return
 	}
-	file_nokku_v1_daemon_proto_init()
 	file_nokku_v1_certificates_proto_init()
+	file_nokku_v1_daemon_proto_init()
 	file_nokku_v1_principal_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{

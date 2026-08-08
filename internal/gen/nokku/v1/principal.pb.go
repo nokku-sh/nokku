@@ -170,8 +170,9 @@ func (x *Principal) GetCreatedAt() *timestamppb.Timestamp {
 
 type SetPrincipalsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TargetId      *string                `protobuf:"bytes,1,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
-	Usernames     []string               `protobuf:"bytes,2,rep,name=usernames" json:"usernames,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	TargetId      *string                `protobuf:"bytes,2,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
+	Usernames     []string               `protobuf:"bytes,3,rep,name=usernames" json:"usernames,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -204,6 +205,13 @@ func (x *SetPrincipalsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use SetPrincipalsRequest.ProtoReflect.Descriptor instead.
 func (*SetPrincipalsRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_principal_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *SetPrincipalsRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *SetPrincipalsRequest) GetTargetId() string {
@@ -258,11 +266,12 @@ func (*SetPrincipalsResponse) Descriptor() ([]byte, []int) {
 
 type ListPrincipalsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TargetId      *string                `protobuf:"bytes,1,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
-	Limit         *int32                 `protobuf:"varint,2,opt,name=limit" json:"limit,omitempty"`
-	Offset        *int32                 `protobuf:"varint,3,opt,name=offset" json:"offset,omitempty"`
-	Query         *string                `protobuf:"bytes,4,opt,name=query" json:"query,omitempty"`
-	Type          *PrincipalType         `protobuf:"varint,5,opt,name=type,enum=nokku.v1.PrincipalType" json:"type,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	TargetId      *string                `protobuf:"bytes,2,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
+	Limit         *int32                 `protobuf:"varint,3,opt,name=limit" json:"limit,omitempty"`
+	Offset        *int32                 `protobuf:"varint,4,opt,name=offset" json:"offset,omitempty"`
+	Query         *string                `protobuf:"bytes,5,opt,name=query" json:"query,omitempty"`
+	Type          *PrincipalType         `protobuf:"varint,6,opt,name=type,enum=nokku.v1.PrincipalType" json:"type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -295,6 +304,13 @@ func (x *ListPrincipalsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListPrincipalsRequest.ProtoReflect.Descriptor instead.
 func (*ListPrincipalsRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_principal_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ListPrincipalsRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *ListPrincipalsRequest) GetTargetId() string {
@@ -386,9 +402,10 @@ func (x *ListPrincipalsResponse) GetTotal() int32 {
 
 type AddSubjectsToPrincipalRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	SubjectIds    []string               `protobuf:"bytes,2,rep,name=subject_ids,json=subjectIds" json:"subject_ids,omitempty"`
-	Type          *PrincipalType         `protobuf:"varint,3,opt,name=type,enum=nokku.v1.PrincipalType" json:"type,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
+	SubjectIds    []string               `protobuf:"bytes,3,rep,name=subject_ids,json=subjectIds" json:"subject_ids,omitempty"`
+	Type          *PrincipalType         `protobuf:"varint,4,opt,name=type,enum=nokku.v1.PrincipalType" json:"type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -421,6 +438,13 @@ func (x *AddSubjectsToPrincipalRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use AddSubjectsToPrincipalRequest.ProtoReflect.Descriptor instead.
 func (*AddSubjectsToPrincipalRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_principal_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *AddSubjectsToPrincipalRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *AddSubjectsToPrincipalRequest) GetId() string {
@@ -482,9 +506,10 @@ func (*AddSubjectsToPrincipalResponse) Descriptor() ([]byte, []int) {
 
 type RemoveSubjectsFromPrincipalRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	SubjectIds    []string               `protobuf:"bytes,2,rep,name=subject_ids,json=subjectIds" json:"subject_ids,omitempty"`
-	Type          *PrincipalType         `protobuf:"varint,3,opt,name=type,enum=nokku.v1.PrincipalType" json:"type,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
+	SubjectIds    []string               `protobuf:"bytes,3,rep,name=subject_ids,json=subjectIds" json:"subject_ids,omitempty"`
+	Type          *PrincipalType         `protobuf:"varint,4,opt,name=type,enum=nokku.v1.PrincipalType" json:"type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -517,6 +542,13 @@ func (x *RemoveSubjectsFromPrincipalRequest) ProtoReflect() protoreflect.Message
 // Deprecated: Use RemoveSubjectsFromPrincipalRequest.ProtoReflect.Descriptor instead.
 func (*RemoveSubjectsFromPrincipalRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_principal_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *RemoveSubjectsFromPrincipalRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *RemoveSubjectsFromPrincipalRequest) GetId() string {
@@ -685,35 +717,39 @@ const file_nokku_v1_principal_proto_rawDesc = "" +
 	"\bteam_ids\x18\x05 \x03(\tR\ateamIds\x12.\n" +
 	"\x13service_account_ids\x18\x06 \x03(\tR\x11serviceAccountIds\x129\n" +
 	"\n" +
-	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x83\x01\n" +
-	"\x14SetPrincipalsRequest\x12%\n" +
-	"\ttarget_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\btargetId\x12D\n" +
-	"\tusernames\x18\x02 \x03(\tB&\xbaH#\x92\x01 \"\x1er\x1c\x10\x01\x18 2\x16^[a-z_][a-z0-9-_]*\\$?$R\tusernames\"\x17\n" +
-	"\x15SetPrincipalsResponse\"\xcf\x01\n" +
-	"\x15ListPrincipalsRequest\x12%\n" +
-	"\ttarget_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\btargetId\x12\x1f\n" +
-	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
-	"\x06offset\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12\x14\n" +
-	"\x05query\x18\x04 \x01(\tR\x05query\x127\n" +
-	"\x04type\x18\x05 \x01(\x0e2\x17.nokku.v1.PrincipalTypeB\n" +
+	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xb0\x01\n" +
+	"\x14SetPrincipalsRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12%\n" +
+	"\ttarget_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\btargetId\x12D\n" +
+	"\tusernames\x18\x03 \x03(\tB&\xbaH#\x92\x01 \"\x1er\x1c\x10\x01\x18 2\x16^[a-z_][a-z0-9-_]*\\$?$R\tusernames\"\x17\n" +
+	"\x15SetPrincipalsResponse\"\xfc\x01\n" +
+	"\x15ListPrincipalsRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12%\n" +
+	"\ttarget_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\btargetId\x12\x1f\n" +
+	"\x05limit\x18\x03 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
+	"\x06offset\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12\x14\n" +
+	"\x05query\x18\x05 \x01(\tR\x05query\x127\n" +
+	"\x04type\x18\x06 \x01(\x0e2\x17.nokku.v1.PrincipalTypeB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04type\"c\n" +
 	"\x16ListPrincipalsResponse\x123\n" +
 	"\n" +
 	"principals\x18\x01 \x03(\v2\x13.nokku.v1.PrincipalR\n" +
 	"principals\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"\xa6\x01\n" +
-	"\x1dAddSubjectsToPrincipalRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x122\n" +
-	"\vsubject_ids\x18\x02 \x03(\tB\x11\xbaH\x0e\x92\x01\v\b\x01\x102\"\x05r\x03\xb0\x01\x01R\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\xd3\x01\n" +
+	"\x1dAddSubjectsToPrincipalRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x122\n" +
+	"\vsubject_ids\x18\x03 \x03(\tB\x11\xbaH\x0e\x92\x01\v\b\x01\x102\"\x05r\x03\xb0\x01\x01R\n" +
 	"subjectIds\x127\n" +
-	"\x04type\x18\x03 \x01(\x0e2\x17.nokku.v1.PrincipalTypeB\n" +
+	"\x04type\x18\x04 \x01(\x0e2\x17.nokku.v1.PrincipalTypeB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04type\" \n" +
-	"\x1eAddSubjectsToPrincipalResponse\"\xab\x01\n" +
-	"\"RemoveSubjectsFromPrincipalRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x122\n" +
-	"\vsubject_ids\x18\x02 \x03(\tB\x11\xbaH\x0e\x92\x01\v\b\x01\x102\"\x05r\x03\xb0\x01\x01R\n" +
+	"\x1eAddSubjectsToPrincipalResponse\"\xd8\x01\n" +
+	"\"RemoveSubjectsFromPrincipalRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x122\n" +
+	"\vsubject_ids\x18\x03 \x03(\tB\x11\xbaH\x0e\x92\x01\v\b\x01\x102\"\x05r\x03\xb0\x01\x01R\n" +
 	"subjectIds\x127\n" +
-	"\x04type\x18\x03 \x01(\x0e2\x17.nokku.v1.PrincipalTypeB\n" +
+	"\x04type\x18\x04 \x01(\x0e2\x17.nokku.v1.PrincipalTypeB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04type\"%\n" +
 	"#RemoveSubjectsFromPrincipalResponse\"\xa7\x01\n" +
 	"\x16RevokeAllAccessRequest\x12'\n" +
@@ -727,13 +763,13 @@ const file_nokku_v1_principal_proto_rawDesc = "" +
 	"\x1aPRINCIPAL_TYPE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13PRINCIPAL_TYPE_USER\x10\x01\x12\x17\n" +
 	"\x13PRINCIPAL_TYPE_TEAM\x10\x02\x12\"\n" +
-	"\x1ePRINCIPAL_TYPE_SERVICE_ACCOUNT\x10\x032\x95\x05\n" +
-	"\x10PrincipalService\x12k\n" +
-	"\rSetPrincipals\x12\x1e.nokku.v1.SetPrincipalsRequest\x1a\x1f.nokku.v1.SetPrincipalsResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/principals\x12n\n" +
-	"\x0eListPrincipals\x12\x1f.nokku.v1.ListPrincipalsRequest\x1a .nokku.v1.ListPrincipalsResponse\"\x19\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/principals\x90\x02\x01\x12\x8a\x01\n" +
-	"\x16AddSubjectsToPrincipal\x12'.nokku.v1.AddSubjectsToPrincipalRequest\x1a(.nokku.v1.AddSubjectsToPrincipalResponse\"\x1d\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/principals/add\x12\x9c\x01\n" +
-	"\x1bRemoveSubjectsFromPrincipal\x12,.nokku.v1.RemoveSubjectsFromPrincipalRequest\x1a-.nokku.v1.RemoveSubjectsFromPrincipalResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/v1/principals/remove\x12x\n" +
-	"\x0fRevokeAllAccess\x12 .nokku.v1.RevokeAllAccessRequest\x1a!.nokku.v1.RevokeAllAccessResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/v1/principals/revokeB\x98\x01\n" +
+	"\x1ePRINCIPAL_TYPE_SERVICE_ACCOUNT\x10\x032\x9a\x06\n" +
+	"\x10PrincipalService\x12\x85\x01\n" +
+	"\rSetPrincipals\x12\x1e.nokku.v1.SetPrincipalsRequest\x1a\x1f.nokku.v1.SetPrincipalsResponse\"3\x82\xd3\xe4\x93\x02-:\x01*\"(/v1/workspaces/{workspace_id}/principals\x12\x88\x01\n" +
+	"\x0eListPrincipals\x12\x1f.nokku.v1.ListPrincipalsRequest\x1a .nokku.v1.ListPrincipalsResponse\"3\x82\xd3\xe4\x93\x02*\x12(/v1/workspaces/{workspace_id}/principals\x90\x02\x01\x12\xa4\x01\n" +
+	"\x16AddSubjectsToPrincipal\x12'.nokku.v1.AddSubjectsToPrincipalRequest\x1a(.nokku.v1.AddSubjectsToPrincipalResponse\"7\x82\xd3\xe4\x93\x021:\x01*\",/v1/workspaces/{workspace_id}/principals:add\x12\xb6\x01\n" +
+	"\x1bRemoveSubjectsFromPrincipal\x12,.nokku.v1.RemoveSubjectsFromPrincipalRequest\x1a-.nokku.v1.RemoveSubjectsFromPrincipalResponse\":\x82\xd3\xe4\x93\x024:\x01*\"//v1/workspaces/{workspace_id}/principals:remove\x12\x92\x01\n" +
+	"\x0fRevokeAllAccess\x12 .nokku.v1.RevokeAllAccessRequest\x1a!.nokku.v1.RevokeAllAccessResponse\":\x82\xd3\xe4\x93\x024:\x01*\"//v1/workspaces/{workspace_id}/principals:revokeB\x98\x01\n" +
 	"\fcom.nokku.v1B\x0ePrincipalProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

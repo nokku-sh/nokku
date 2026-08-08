@@ -285,7 +285,8 @@ func (x *DaemonConfig) GetRecordSessions() bool {
 
 type GetDaemonRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -318,6 +319,13 @@ func (x *GetDaemonRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetDaemonRequest.ProtoReflect.Descriptor instead.
 func (*GetDaemonRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_daemon_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetDaemonRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *GetDaemonRequest) GetId() string {
@@ -373,8 +381,9 @@ func (x *GetDaemonResponse) GetDaemon() *Daemon {
 
 type UpdateDaemonRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Status        *DaemonStatus          `protobuf:"varint,2,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
+	Status        *DaemonStatus          `protobuf:"varint,3,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -407,6 +416,13 @@ func (x *UpdateDaemonRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use UpdateDaemonRequest.ProtoReflect.Descriptor instead.
 func (*UpdateDaemonRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_daemon_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *UpdateDaemonRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *UpdateDaemonRequest) GetId() string {
@@ -461,7 +477,8 @@ func (*UpdateDaemonResponse) Descriptor() ([]byte, []int) {
 
 type DeleteDaemonRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -494,6 +511,13 @@ func (x *DeleteDaemonRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DeleteDaemonRequest.ProtoReflect.Descriptor instead.
 func (*DeleteDaemonRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_daemon_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *DeleteDaemonRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *DeleteDaemonRequest) GetId() string {
@@ -853,8 +877,9 @@ func (*RevokeEnrollTokenResponse) Descriptor() ([]byte, []int) {
 
 type CreateSessionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	DaemonId      *string                `protobuf:"bytes,1,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
-	Username      *string                `protobuf:"bytes,2,opt,name=username" json:"username,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	DaemonId      *string                `protobuf:"bytes,2,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
+	Username      *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -887,6 +912,13 @@ func (x *CreateSessionRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CreateSessionRequest.ProtoReflect.Descriptor instead.
 func (*CreateSessionRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_daemon_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *CreateSessionRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *CreateSessionRequest) GetDaemonId() string {
@@ -957,7 +989,8 @@ func (x *CreateSessionResponse) GetDaemonName() string {
 
 type ListSessionsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	DaemonId      *string                `protobuf:"bytes,1,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	DaemonId      *string                `protobuf:"bytes,2,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -990,6 +1023,13 @@ func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
 func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_daemon_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ListSessionsRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *ListSessionsRequest) GetDaemonId() string {
@@ -1053,8 +1093,9 @@ func (x *ListSessionsResponse) GetDaemonName() string {
 
 type CloseSessionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	DaemonId      *string                `protobuf:"bytes,1,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
-	SessionId     *string                `protobuf:"bytes,2,opt,name=session_id,json=sessionId" json:"session_id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	DaemonId      *string                `protobuf:"bytes,2,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
+	SessionId     *string                `protobuf:"bytes,3,opt,name=session_id,json=sessionId" json:"session_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1087,6 +1128,13 @@ func (x *CloseSessionRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CloseSessionRequest.ProtoReflect.Descriptor instead.
 func (*CloseSessionRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_daemon_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *CloseSessionRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
 }
 
 func (x *CloseSessionRequest) GetDaemonId() string {
@@ -1140,13 +1188,11 @@ func (*CloseSessionResponse) Descriptor() ([]byte, []int) {
 }
 
 type EnrollDaemonRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Token *string                `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
-	CaId  *string                `protobuf:"bytes,2,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
-	// Signing method used by the daemon after enrollment: "tpm" or "soft".
-	AuthMethod *string `protobuf:"bytes,3,opt,name=auth_method,json=authMethod" json:"auth_method,omitempty"`
-	// PEM-encoded PKIX public key the daemon uses to authenticate requests.
-	AuthPubkey    *string `protobuf:"bytes,4,opt,name=auth_pubkey,json=authPubkey" json:"auth_pubkey,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         *string                `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
+	CaId          *string                `protobuf:"bytes,2,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
+	AuthMethod    *string                `protobuf:"bytes,3,opt,name=auth_method,json=authMethod" json:"auth_method,omitempty"`
+	AuthPubkey    *string                `protobuf:"bytes,4,opt,name=auth_pubkey,json=authPubkey" json:"auth_pubkey,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2322,18 +2368,21 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"7\n" +
 	"\fDaemonConfig\x12'\n" +
-	"\x0frecord_sessions\x18\x01 \x01(\bR\x0erecordSessions\",\n" +
-	"\x10GetDaemonRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"=\n" +
+	"\x0frecord_sessions\x18\x01 \x01(\bR\x0erecordSessions\"Y\n" +
+	"\x10GetDaemonRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"=\n" +
 	"\x11GetDaemonResponse\x12(\n" +
-	"\x06daemon\x18\x01 \x01(\v2\x10.nokku.v1.DaemonR\x06daemon\"k\n" +
-	"\x13UpdateDaemonRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12:\n" +
-	"\x06status\x18\x02 \x01(\x0e2\x16.nokku.v1.DaemonStatusB\n" +
+	"\x06daemon\x18\x01 \x01(\v2\x10.nokku.v1.DaemonR\x06daemon\"\x98\x01\n" +
+	"\x13UpdateDaemonRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12:\n" +
+	"\x06status\x18\x03 \x01(\x0e2\x16.nokku.v1.DaemonStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\"\x16\n" +
-	"\x14UpdateDaemonResponse\"/\n" +
-	"\x13DeleteDaemonRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x16\n" +
+	"\x14UpdateDaemonResponse\"\\\n" +
+	"\x13DeleteDaemonRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x16\n" +
 	"\x14DeleteDaemonResponse\"\xe1\x01\n" +
 	"\x12ListDaemonsRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1f\n" +
@@ -2353,24 +2402,27 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"G\n" +
 	"\x18RevokeEnrollTokenRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"\x1b\n" +
-	"\x19RevokeEnrollTokenResponse\"\x7f\n" +
-	"\x14CreateSessionRequest\x12(\n" +
-	"\tdaemon_id\x18\x01 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\bdaemonId\x12=\n" +
-	"\busername\x18\x02 \x01(\tB!\xbaH\x1er\x1c\x10\x01\x18 2\x16^[a-z_][a-z0-9-_]*\\$?$R\busername\"e\n" +
+	"\x19RevokeEnrollTokenResponse\"\xac\x01\n" +
+	"\x14CreateSessionRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12(\n" +
+	"\tdaemon_id\x18\x02 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\bdaemonId\x12=\n" +
+	"\busername\x18\x03 \x01(\tB!\xbaH\x1er\x1c\x10\x01\x18 2\x16^[a-z_][a-z0-9-_]*\\$?$R\busername\"e\n" +
 	"\x15CreateSessionResponse\x12+\n" +
 	"\asession\x18\x01 \x01(\v2\x11.nokku.v1.SessionR\asession\x12\x1f\n" +
 	"\vdaemon_name\x18\x02 \x01(\tR\n" +
-	"daemonName\"?\n" +
-	"\x13ListSessionsRequest\x12(\n" +
-	"\tdaemon_id\x18\x01 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\bdaemonId\"f\n" +
+	"daemonName\"l\n" +
+	"\x13ListSessionsRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12(\n" +
+	"\tdaemon_id\x18\x02 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\bdaemonId\"f\n" +
 	"\x14ListSessionsResponse\x12-\n" +
 	"\bsessions\x18\x01 \x03(\v2\x11.nokku.v1.SessionR\bsessions\x12\x1f\n" +
 	"\vdaemon_name\x18\x02 \x01(\tR\n" +
-	"daemonName\"k\n" +
-	"\x13CloseSessionRequest\x12(\n" +
-	"\tdaemon_id\x18\x01 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\bdaemonId\x12*\n" +
+	"daemonName\"\x98\x01\n" +
+	"\x13CloseSessionRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12(\n" +
+	"\tdaemon_id\x18\x02 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\bdaemonId\x12*\n" +
 	"\n" +
-	"session_id\x18\x02 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\tsessionId\"\x16\n" +
+	"session_id\x18\x03 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\tsessionId\"\x16\n" +
 	"\x14CloseSessionResponse\"\x8b\x01\n" +
 	"\x13EnrollDaemonRequest\x12\x1d\n" +
 	"\x05token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05token\x12\x13\n" +
@@ -2466,18 +2518,17 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\x19DAEMON_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15DAEMON_STATUS_PENDING\x10\x01\x12\x1a\n" +
 	"\x16DAEMON_STATUS_ACCEPTED\x10\x02\x12\x1a\n" +
-	"\x16DAEMON_STATUS_REJECTED\x10\x032\x85\n" +
-	"\n" +
-	"\rDaemonService\x12a\n" +
-	"\tGetDaemon\x12\x1a.nokku.v1.GetDaemonRequest\x1a\x1b.nokku.v1.GetDaemonResponse\"\x1b\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/daemons/{id}\x90\x02\x01\x12g\n" +
-	"\fUpdateDaemon\x12\x1d.nokku.v1.UpdateDaemonRequest\x1a\x1e.nokku.v1.UpdateDaemonResponse\"\x18\x82\xd3\xe4\x93\x02\x122\x10/v1/daemons/{id}\x12g\n" +
-	"\fDeleteDaemon\x12\x1d.nokku.v1.DeleteDaemonRequest\x1a\x1e.nokku.v1.DeleteDaemonResponse\"\x18\x82\xd3\xe4\x93\x02\x12*\x10/v1/daemons/{id}\x12|\n" +
+	"\x16DAEMON_STATUS_REJECTED\x10\x032\xab\v\n" +
+	"\rDaemonService\x12{\n" +
+	"\tGetDaemon\x12\x1a.nokku.v1.GetDaemonRequest\x1a\x1b.nokku.v1.GetDaemonResponse\"5\x82\xd3\xe4\x93\x02,\x12*/v1/workspaces/{workspace_id}/daemons/{id}\x90\x02\x01\x12\x84\x01\n" +
+	"\fUpdateDaemon\x12\x1d.nokku.v1.UpdateDaemonRequest\x1a\x1e.nokku.v1.UpdateDaemonResponse\"5\x82\xd3\xe4\x93\x02/:\x01*2*/v1/workspaces/{workspace_id}/daemons/{id}\x12\x81\x01\n" +
+	"\fDeleteDaemon\x12\x1d.nokku.v1.DeleteDaemonRequest\x1a\x1e.nokku.v1.DeleteDaemonResponse\"2\x82\xd3\xe4\x93\x02,**/v1/workspaces/{workspace_id}/daemons/{id}\x12|\n" +
 	"\vListDaemons\x12\x1c.nokku.v1.ListDaemonsRequest\x1a\x1d.nokku.v1.ListDaemonsResponse\"0\x82\xd3\xe4\x93\x02'\x12%/v1/workspaces/{workspace_id}/daemons\x90\x02\x01\x12\x95\x01\n" +
 	"\x12RefreshEnrollToken\x12#.nokku.v1.RefreshEnrollTokenRequest\x1a$.nokku.v1.RefreshEnrollTokenResponse\"4\x82\xd3\xe4\x93\x02.\",/v1/workspaces/{workspace_id}/enroll:refresh\x12\x91\x01\n" +
-	"\x11RevokeEnrollToken\x12\".nokku.v1.RevokeEnrollTokenRequest\x1a#.nokku.v1.RevokeEnrollTokenResponse\"3\x82\xd3\xe4\x93\x02-*+/v1/workspaces/{workspace_id}/enroll:revoke\x12z\n" +
-	"\fListSessions\x12\x1d.nokku.v1.ListSessionsRequest\x1a\x1e.nokku.v1.ListSessionsResponse\"+\x82\xd3\xe4\x93\x02\"\x12 /v1/daemons/{daemon_id}/sessions\x90\x02\x01\x12z\n" +
-	"\rCreateSession\x12\x1e.nokku.v1.CreateSessionRequest\x1a\x1f.nokku.v1.CreateSessionResponse\"(\x82\xd3\xe4\x93\x02\"\" /v1/daemons/{daemon_id}/sessions\x12\x84\x01\n" +
-	"\fCloseSession\x12\x1d.nokku.v1.CloseSessionRequest\x1a\x1e.nokku.v1.CloseSessionResponse\"5\x82\xd3\xe4\x93\x02/*-/v1/daemons/{daemon_id}/sessions/{session_id}\x12M\n" +
+	"\x11RevokeEnrollToken\x12\".nokku.v1.RevokeEnrollTokenRequest\x1a#.nokku.v1.RevokeEnrollTokenResponse\"3\x82\xd3\xe4\x93\x02-*+/v1/workspaces/{workspace_id}/enroll:revoke\x12\x94\x01\n" +
+	"\fListSessions\x12\x1d.nokku.v1.ListSessionsRequest\x1a\x1e.nokku.v1.ListSessionsResponse\"E\x82\xd3\xe4\x93\x02<\x12:/v1/workspaces/{workspace_id}/daemons/{daemon_id}/sessions\x90\x02\x01\x12\x97\x01\n" +
+	"\rCreateSession\x12\x1e.nokku.v1.CreateSessionRequest\x1a\x1f.nokku.v1.CreateSessionResponse\"E\x82\xd3\xe4\x93\x02?:\x01*\":/v1/workspaces/{workspace_id}/daemons/{daemon_id}/sessions\x12\x9e\x01\n" +
+	"\fCloseSession\x12\x1d.nokku.v1.CloseSessionRequest\x1a\x1e.nokku.v1.CloseSessionResponse\"O\x82\xd3\xe4\x93\x02I*G/v1/workspaces/{workspace_id}/daemons/{daemon_id}/sessions/{session_id}\x12M\n" +
 	"\fEnrollDaemon\x12\x1d.nokku.v1.EnrollDaemonRequest\x1a\x1e.nokku.v1.EnrollDaemonResponse\x12G\n" +
 	"\n" +
 	"SyncDaemon\x12\x1b.nokku.v1.SyncDaemonRequest\x1a\x1c.nokku.v1.SyncDaemonResponse2Z\n" +
