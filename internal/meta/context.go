@@ -13,6 +13,7 @@ type (
 const (
 	ActorKey      ctxKey = "actor"
 	AuditStateKey ctxKey = "audit"
+	WorkspaceKey  ctxKey = "workspace"
 	// ActorTypeUser identifies a human user actor.
 	ActorTypeUser           ActorType = "user"
 	ActorTypeDaemon         ActorType = "daemon"
@@ -31,6 +32,17 @@ type AuditState struct {
 	Email       string
 }
 
+// WithWorkspaceID records the workspace selected for the current request.
+// The value is consumed by database scoping and audit logging.
+func WithWorkspaceID(ctx context.Context, workspaceID string) context.Context {
+	return context.WithValue(ctx, WorkspaceKey, workspaceID)
+}
+
+func WorkspaceIDFromContext(ctx context.Context) (string, bool) {
+	workspaceID, ok := ctx.Value(WorkspaceKey).(string)
+	return workspaceID, ok && workspaceID != ""
+}
+
 func WithAuditState(ctx context.Context, state *AuditState) context.Context {
 	return context.WithValue(ctx, AuditStateKey, state)
 }
@@ -40,6 +52,9 @@ func AuditStateFromContext(ctx context.Context) *AuditState {
 	return val
 }
 
+// SetAuditWorkspaceID is reserved for streaming handlers whose request
+// message is received inside the business method and therefore cannot be
+// inspected by the unary request interceptor.
 func SetAuditWorkspaceID(ctx context.Context, workspaceID string) {
 	if a := AuditStateFromContext(ctx); a != nil {
 		a.WorkspaceID = workspaceID
