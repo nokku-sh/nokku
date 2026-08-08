@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/nokku-sh/nokku/internal/db"
 )
 
 // Generic errors
@@ -173,6 +174,8 @@ func DBError(err error) error {
 	}
 
 	switch {
+	case errors.Is(err, db.ErrWorkspaceNotAccessible):
+		return ErrPermissionDenied
 	case errors.Is(err, pgx.ErrNoRows):
 		return ErrNotFound
 	case errors.Is(err, context.Canceled):

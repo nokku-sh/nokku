@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/nokku-sh/nokku/internal/authn"
 	"github.com/nokku-sh/nokku/internal/cache"
@@ -31,6 +33,7 @@ func NewAuthNInterceptor(cfg *config.Config) *AuthNInterceptor {
 
 func (a *AuthNInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+		ctx = withRequestWorkspace(ctx, req.Any())
 		if isPublicEndpoint(req.Spec().Procedure) {
 			return next(ctx, req)
 		}
@@ -249,6 +252,28 @@ func (a *AuthNInterceptor) reportUsage(prefix, id string) {
 			_ = a.cfg.Conn.Q.UpdateServiceAccountUsage(bgCtx, id)
 		}
 	}()
+}
+
+// withRequestWorkspace promotes the conventional workspace_id protobuf field
+// into request context before authentication and business logic run. Requests
+// without that field are intentionally left global/user-scoped.
+func withRequestWorkspace(ctx context.Context, request any) context.Context {
+	message, ok := request.(proto.Message)
+	if !ok {
+		return ctx
+	}
+
+	fields := message.ProtoReflect().Descriptor().Fields()
+	field := fields.ByName("workspace_id")
+	if field == nil || field.Kind() != protoreflect.StringKind {
+		return ctx
+	}
+
+	workspaceID := message.ProtoReflect().Get(field).String()
+	if workspaceID == "" {
+		return ctx
+	}
+	return meta.WithWorkspaceID(ctx, workspaceID)
 }
 
 // Endpoint routing sets ------------------------------------------------------

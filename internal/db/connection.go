@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 )
 
 var ErrNoWorkspaces = errors.New("actor has no assigned workspaces")
+var ErrWorkspaceNotAccessible = errors.New("workspace is not accessible to actor")
 
 type Connection struct {
 	Host        string `env:"NOKKU_DB_HOST"        envDefault:"localhost"`
@@ -141,6 +143,15 @@ func (c *Connection) WithWorkspace(ctx context.Context, fn func(*Queries) error)
 	if len(wsIDs) == 0 {
 		_ = tx.Rollback(ctx)
 		return ErrNoWorkspaces
+	}
+
+	if workspaceID, ok := meta.WorkspaceIDFromContext(ctx); ok {
+		accessible := slices.Contains(wsIDs, workspaceID)
+		if !accessible {
+			_ = tx.Rollback(ctx)
+			return ErrWorkspaceNotAccessible
+		}
+		wsIDs = []string{workspaceID}
 	}
 
 	if _, err = tx.Exec(
