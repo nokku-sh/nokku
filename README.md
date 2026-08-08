@@ -41,11 +41,11 @@ The backend also uses the integrations configured for the selected environment, 
 
 Nokku ships with three plans:
 
-- **Community** — free, unlimited usage with fixed caps (members, targets, CAs, teams, service accounts) and 7-day audit retention. This is the default for every workspace, no key required.
-- **Flex** — SaaS subscription with inclusive quotas and average-cost overage billing.
-- **Enterprise** — unlimited quotas, SSO enforcement, and 365-day audit retention. On-premise Enterprise is activated with a license key.
+- **Community** — free with fixed caps (members, targets, CAs, teams, service accounts) and 7-day audit retention. This is the default for every workspace, no key required.
+- **Flex** — hosted SaaS subscription with inclusive member and target quotas, overage billing, SAML, SSO enforcement, and audit export. Service accounts remain available with a finite workspace cap.
+- **Enterprise** — unlimited quotas, SAML, SSO enforcement, external KMS, audit export, and 365-day audit retention. On-premise Enterprise is activated with a license key.
 
-Self-hosted instances work out of the box on the Community plan. To activate Enterprise, purchase an Enterprise license key and set it via the `NOKKU_LICENSE_KEY` environment variable on the server, then restart. License keys are Ed25519-signed and verified offline against a public key compiled into the binary, so activation works fully air-gapped; while valid they unlock the whole instance (unlimited quotas, SSO enforcement, 365-day audit retention, no per-workspace limits). When a key expires or is revoked, the instance falls back to the Community plan automatically.
+Self-hosted instances work out of the box on the Community plan. To activate Enterprise, purchase an Enterprise license key and set it via the `NOKKU_LICENSE_KEY` environment variable on the server, then restart. License keys are Ed25519-signed and verified offline against a public key compiled into the binary, so activation works fully air-gapped; while valid they unlock the Enterprise policy for every workspace. When a key expires or is revoked, the instance falls back to the Community plan automatically.
 
 ## Build and run
 

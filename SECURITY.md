@@ -75,6 +75,7 @@ that governs access to every target.
   different keys.
 - Self-hosted instances default to the Community plan; Enterprise licensing is
   verified offline via Ed25519-signed license keys and falls back to Community
-  when a key expires or is revoked.
+  when a key expires or is revoked. External KMS configuration is an Enterprise
+  feature; Community deployments use `NOKKU_SECRET`.
 - Releases are built via GoReleaser and signed/checksummed — verify downloads
   against the published checksums and signatures.
