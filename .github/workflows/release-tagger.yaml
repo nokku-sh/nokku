@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      count: ${{ steps.check.outputs.count }}
+      bump: ${{ steps.version.outputs.bump }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -59,7 +59,7 @@ jobs:
 
   release:
     needs: tag
-    if: steps.version.outputs.bump == 'true'
+    if: needs.tag.outputs.bump == 'true'
     uses: ./.github/workflows/release.yaml
     with:
       tag: v${{ needs.tag.outputs.version }}
