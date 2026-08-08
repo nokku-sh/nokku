@@ -298,39 +298,24 @@ func (s *CertificateService) SignSSHCertificate(
 	actor := meta.ActorFromContext(ctx)
 	keyID := fmt.Sprintf("nokku:login:%s:%s:%s", actor.Type, actor.Name, actor.ID)
 	principal := actor.ID
+	daemonID := meta.DaemonIDFromContext(ctx)
 
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		// Fallback for CA
+		//nolint:gocritic // false positive
 		if req.GetCaId() != "" {
 			ca, err = q.GetCA(ctx, req.GetCaId())
 			if err != nil {
 				return err
 			}
+		} else if daemonID != "" {
+			// Daemons get automatically the correct CA
+			ca, err = q.GetCAByDaemonID(ctx, &daemonID)
+			if err != nil {
+				return err
+			}
 		} else if req.GetWorkspaceId() != "" {
 			ca, err = q.GetDefaultCA(ctx, req.GetWorkspaceId())
-			if err != nil {
-				return err
-			}
-		}
-
-		// Fallback for service account
-		saID := meta.ServiceAccountIDFromContext(ctx)
-		if saID != "" {
-			saWSID, err := q.GetServiceAccountWorkspaceID(ctx, saID)
-			if err != nil {
-				return err
-			}
-			ca, err = q.GetDefaultCA(ctx, saWSID)
-			if err != nil {
-				return err
-			}
-		}
-
-		// Daemons get automatically the correct CA
-		daemonID := meta.DaemonIDFromContext(ctx)
-		if daemonID != "" {
-			ca, err = q.GetCAByDaemonID(ctx, &daemonID)
 			if err != nil {
 				return err
 			}
@@ -407,10 +392,7 @@ func (s *CertificateService) SignX509Certificate(
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		ca, err = q.GetCA(ctx, req.GetCaId())
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
