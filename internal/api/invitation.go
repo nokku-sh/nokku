@@ -122,8 +122,6 @@ func (s *InvitationService) RefreshInviteToken(
 	ctx context.Context,
 	req *nokkuv1.RefreshInviteTokenRequest,
 ) (*nokkuv1.RefreshInviteTokenResponse, error) {
-	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
-
 	token, err := crypto.NewToken(crypto.WithID(req.GetWorkspaceId()))
 	if err != nil {
 		return nil, ErrInternal
@@ -152,7 +150,6 @@ func (s *InvitationService) RevokeInviteToken(
 	ctx context.Context,
 	req *nokkuv1.RevokeInviteTokenRequest,
 ) (*nokkuv1.RevokeInviteTokenResponse, error) {
-	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		_, err := q.UpdateWorkspaceSettings(ctx, &db.UpdateWorkspaceSettingsParams{
 			WorkspaceID:     req.GetWorkspaceId(),

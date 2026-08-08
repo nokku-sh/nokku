@@ -11,7 +11,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
@@ -30,7 +29,6 @@ func (s *WorkspaceDomainService) GetWorkspaceDomain(
 	var result *db.WorkspaceDomain
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.GetWorkspaceDomain(ctx, req.GetDomain())
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return err
 	}); err != nil {
 		return nil, DBError(err)
@@ -45,8 +43,6 @@ func (s *WorkspaceDomainService) CreateWorkspaceDomain(
 	ctx context.Context,
 	req *nokkuv1.CreateWorkspaceDomainRequest,
 ) (*nokkuv1.CreateWorkspaceDomainResponse, error) {
-	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
-
 	var result *db.WorkspaceDomain
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.CreateWorkspaceDomain(ctx, &db.CreateWorkspaceDomainParams{
@@ -85,8 +81,7 @@ func (s *WorkspaceDomainService) DeleteWorkspaceDomain(
 	req *nokkuv1.DeleteWorkspaceDomainRequest,
 ) (*nokkuv1.DeleteWorkspaceDomainResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		result, err := q.DeleteWorkspaceDomain(ctx, req.GetDomain())
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
+		_, err := q.DeleteWorkspaceDomain(ctx, req.GetDomain())
 		return err
 	}); err != nil {
 		return nil, DBError(err)
@@ -101,7 +96,6 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 	var domain *db.WorkspaceDomain
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		domain, err = q.GetWorkspaceDomain(ctx, req.GetDomain())
-		meta.SetAuditWorkspaceID(ctx, domain.WorkspaceID)
 		return err
 	}); err != nil {
 		return nil, DBError(err)
@@ -153,7 +147,6 @@ func (s *WorkspaceDomainService) RegenerateWorkspaceDomainToken(
 	var result *db.WorkspaceDomain
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.RegenerateVerificationToken(ctx, req.GetDomain())
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return err
 	}); err != nil {
 		return nil, DBError(err)
