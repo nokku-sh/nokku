@@ -6,13 +6,13 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card';
-	import CopyButton from '$lib/components/ui/copy-button/copy-button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import Label from '$lib/components/ui/label/label.svelte';
 	import { Switch } from '$lib/components/ui/switch';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { LicensePurchaseURL } from '$lib/config';
+	import { parseBillingCapabilities } from '$lib/billing-capabilities';
 	import { formatTs } from '$lib/utils';
 	import {
 		CircleUserIcon,
@@ -38,6 +38,7 @@
 	const customerData = $derived(billing.get());
 	const subscription = $derived(customerData.data);
 	const counts = $derived(customerData.data?.counts);
+	const capabilities = $derived(parseBillingCapabilities(customerData.data?.metadata));
 
 	const licenseData = $derived(license.get());
 	const billingEnabled = $derived(customerData.data?.billingEnabled === true);
@@ -49,15 +50,6 @@
 		'No per-workspace limits'
 	];
 
-	function metaInt(key: string, fallback: number): number {
-		const m = (customerData.data as any)?.metadata;
-		if (m?.[key] !== undefined) {
-			const n = parseInt(m[key], 10);
-			if (!isNaN(n)) return n;
-		}
-		return fallback;
-	}
-
 	let ws = $derived(workspace.get());
 
 	const isActive = $derived(
@@ -67,7 +59,11 @@
 	const cancel = billing.cancelSubscription();
 
 	const planDisplayName = $derived(
-		(subscription?.productName || 'Free').replace(/^Nokku\s*-\s*/i, '')
+		(capabilities.plan || subscription?.productName || 'Free')
+			.replace(/^Nokku\s*-\s*/i, '')
+			.replace(/^community$/i, 'Free')
+			.replace(/^flex$/i, 'Flex')
+			.replace(/^enterprise$/i, 'Enterprise')
 	);
 
 	const checkout = billing.checkout();
@@ -81,8 +77,8 @@
 		{
 			key: 'members',
 			label: 'Members',
-			limit: metaInt('max_members', -1),
-			credited: metaInt('credit_members', 0),
+			limit: capabilities.limit('members')?.hard ?? -1,
+			credited: capabilities.limit('members')?.included ?? 0,
 			used: Number(counts?.members ?? 0),
 			icon: CircleUserIcon,
 			overage: overageAllowed
@@ -90,8 +86,8 @@
 		{
 			key: 'teams',
 			label: 'Teams',
-			limit: metaInt('max_teams', -1),
-			credited: metaInt('credit_teams', 0),
+			limit: capabilities.limit('teams')?.hard ?? -1,
+			credited: capabilities.limit('teams')?.included ?? 0,
 			used: Number(counts?.teams ?? 0),
 			icon: UsersIcon,
 			overage: false
@@ -99,17 +95,17 @@
 		{
 			key: 'service_accounts',
 			label: 'Service Accounts',
-			limit: metaInt('max_service_accounts', -1),
-			credited: metaInt('credit_service_accounts', 0),
+			limit: capabilities.limit('service_accounts')?.hard ?? -1,
+			credited: capabilities.limit('service_accounts')?.included ?? 0,
 			used: Number(counts?.serviceAccounts ?? 0),
 			icon: WaypointsIcon,
-			overage: overageAllowed
+			overage: false
 		},
 		{
 			key: 'targets',
 			label: 'Targets',
-			limit: metaInt('max_targets', -1),
-			credited: metaInt('credit_targets', 0),
+			limit: capabilities.limit('targets')?.hard ?? -1,
+			credited: capabilities.limit('targets')?.included ?? 0,
 			used: Number(counts?.targets ?? 0),
 			icon: ServerIcon,
 			overage: overageAllowed
@@ -117,8 +113,8 @@
 		{
 			key: 'cas',
 			label: 'Certificate Authorities',
-			limit: metaInt('max_cas', -1),
-			credited: metaInt('credit_cas', 0),
+			limit: capabilities.limit('cas')?.hard ?? -1,
+			credited: capabilities.limit('cas')?.included ?? 0,
 			used: Number(counts?.cas ?? 0),
 			icon: IdCardIcon,
 			overage: false
@@ -257,7 +253,7 @@
 						{@const effectiveMax = r.limit > 0 ? r.limit : r.credited > 0 ? r.credited * 3 : -1}
 						{@const pct =
 							effectiveMax > 0 ? Math.min(Math.round((r.used / effectiveMax) * 100), 100) : 0}
-						{@const inOverage = r.credited > 0 && r.used >= r.credited}
+						{@const inOverage = r.overage && r.credited > 0 && r.used >= r.credited}
 						{@const nearLimit = effectiveMax > 0 && !inOverage && pct >= 90}
 						<div class="flex items-center justify-between gap-4 text-sm">
 							<div class="flex items-center gap-2">
@@ -384,30 +380,13 @@
 					</Card.Description>
 				</Card.Header>
 
-				<Card.Content class="relative z-10 space-y-3">
-					{#if licenseData.data?.key}
-						<!-- Stacked layout for the long key to prevent layout breakage -->
-						<div
-							class="flex flex-col gap-2 rounded-lg border border-primary/10 bg-primary/5 px-4 py-3 shadow-inner"
-						>
-							<span class="text-xs font-semibold tracking-wider text-primary/70 uppercase">
-								License Key
-							</span>
-							<div class="rounded-md border border-primary/10 bg-background/50 px-2.5 py-2">
-								<CopyButton text={licenseData.data.key} class="w-full min-w-0">
-									<span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground/80">
-										{licenseData.data.key}
-									</span>
-								</CopyButton>
-							</div>
-						</div>
-					{/if}
+				<Card.Content>
 					{#if licenseData.data?.expiresAt}
 						<div
-							class="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 px-4 py-3 text-sm"
+							class="flex items-center justify-between rounded-lg border border-primary/10 bg-primary/5 px-4 py-3 text-sm"
 						>
 							<span class="font-medium text-muted-foreground">Valid until</span>
-							<span class="font-semibold text-foreground tabular-nums">
+							<span class="text-foreground tabular-nums">
 								{formatTs(licenseData.data.expiresAt)}
 							</span>
 						</div>
