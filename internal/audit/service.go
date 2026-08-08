@@ -10,8 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
 const (
@@ -21,10 +21,10 @@ const (
 
 type Service struct {
 	conn         *db.Connection
-	entitlements *entitlement.Service
+	entitlements *billing.PolicyService
 }
 
-func New(ctx context.Context, conn *db.Connection, ent *entitlement.Service) (*Service, error) {
+func New(ctx context.Context, conn *db.Connection, ent *billing.PolicyService) (*Service, error) {
 	s := &Service{conn: conn, entitlements: ent}
 
 	// Ensure the base audit schema and partitions exist
@@ -77,9 +77,10 @@ func (s *Service) ensurePartitions(ctx context.Context) error {
 		return err
 	}
 
-	// drop old partitions (older than 6 months)
-	sixMonthsAgo := currentMonth.AddDate(0, -6, 0)
-	if err := s.dropPartitionsBefore(ctx, tx, sixMonthsAgo); err != nil {
+	// Keep enough partitions for the Enterprise 365-day retention policy,
+	// including the current partial month and a safety margin.
+	retentionFloor := currentMonth.AddDate(0, -14, 0)
+	if err := s.dropPartitionsBefore(ctx, tx, retentionFloor); err != nil {
 		return err
 	}
 
@@ -203,7 +204,7 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 		retentionDays := int64(defaultRetentionDays)
 		hardcap := int64(maxRetentionDays)
 
-		if v := s.entitlements.Int(ctx, *wsID, entitlement.ValueAuditRetentionDays, 0); v > 0 {
+		if v := s.entitlements.Int(ctx, *wsID, billing.ValueAuditRetentionDays, 0); v > 0 {
 			retentionDays = v
 		}
 

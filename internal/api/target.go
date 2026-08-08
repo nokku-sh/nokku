@@ -3,9 +3,9 @@ package api
 import (
 	"context"
 
+	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 )
@@ -44,10 +44,10 @@ func (s *TargetService) CreateTarget(
 ) (*nokkuv1.CreateTargetResponse, error) {
 	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
 
-	if err := s.cfg.Entitlements.Check(
+	if err := s.cfg.Billing.Check(
 		ctx,
 		req.GetWorkspaceId(),
-		entitlement.ResourceTargets,
+		billing.ResourceTargets,
 	); err != nil {
 		return nil, err
 	}

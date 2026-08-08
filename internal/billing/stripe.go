@@ -12,10 +12,7 @@ import (
 	stripe "github.com/stripe/stripe-go/v86"
 
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 )
-
-var stripeSources = []string{"stripe"}
 
 var ErrActiveSubscription = errors.New("workspace already has an active subscription")
 
@@ -34,12 +31,11 @@ type Stripe struct {
 // billableMeters lists resources billed on overage. Each event name must
 // match a Stripe Billing Meter with "last" aggregation.
 var billableMeters = []struct {
-	resource entitlement.Resource
+	resource Resource
 	event    string
 }{
-	{entitlement.ResourceMembers, "nokku_members"},
-	{entitlement.ResourceServiceAccounts, "nokku_service_accounts"},
-	{entitlement.ResourceTargets, "nokku_targets"},
+	{ResourceMembers, "nokku_members"},
+	{ResourceTargets, "nokku_targets"},
 }
 
 // NewStripe returns nil (billing disabled) when a required Stripe env var is
@@ -68,8 +64,8 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (strin
 	// One subscription per workspace: block a new checkout while one is active.
 	if _, err := s.db.Q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
 		WorkspaceID: workspaceID,
-		Statuses:    entitlement.ActiveStatuses,
-		Sources:     stripeSources,
+		Statuses:    ActiveStatuses,
+		Sources:     []string{"stripe"},
 	}); err == nil {
 		return "", ErrActiveSubscription
 	}
@@ -164,8 +160,8 @@ func (s *Stripe) Cancel(
 	}
 	sub, err := s.db.Q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
 		WorkspaceID: workspaceID,
-		Statuses:    entitlement.ActiveStatuses,
-		Sources:     stripeSources,
+		Statuses:    ActiveStatuses,
+		Sources:     []string{"stripe"},
 	})
 	if err != nil {
 		return fmt.Errorf("get active subscription: %w", err)
@@ -209,7 +205,7 @@ func (s *Stripe) Sync(ctx context.Context, workspaceID string) {
 	if err := s.db.Q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
 		WorkspaceID:       workspaceID,
 		Source:            "stripe",
-		Plan:              entitlement.PlanFlex,
+		Plan:              PlanFlex,
 		Status:            string(mapStatus(remote.Status)),
 		CustomerID:        remote.Customer.ID,
 		SubscriptionID:    remote.ID,
@@ -222,7 +218,7 @@ func (s *Stripe) Sync(ctx context.Context, workspaceID string) {
 
 // SyncAll reconciles every Stripe-managed row. Runs at startup.
 func (s *Stripe) SyncAll(ctx context.Context) error {
-	subs, err := s.db.Q.ListProviderSubscriptions(ctx, stripeSources)
+	subs, err := s.db.Q.ListProviderSubscriptions(ctx, []string{"stripe"})
 	if err != nil {
 		return err
 	}
@@ -239,8 +235,8 @@ func (s *Stripe) SyncAll(ctx context.Context) error {
 // re-reporting the same day idempotent.
 func (s *Stripe) SyncUsage(ctx context.Context) error {
 	subs, err := s.db.Q.ListActiveSubscriptions(ctx, &db.ListActiveSubscriptionsParams{
-		Statuses: entitlement.ActiveStatuses,
-		Sources:  stripeSources,
+		Statuses: ActiveStatuses,
+		Sources:  []string{"stripe"},
 	})
 	if err != nil {
 		return err
@@ -299,35 +295,35 @@ func periodEnd(sub *stripe.Subscription) *time.Time {
 	return &t
 }
 
-func mapStatus(s stripe.SubscriptionStatus) entitlement.Status {
+func mapStatus(s stripe.SubscriptionStatus) Status {
 	switch s {
 	case stripe.SubscriptionStatusActive:
-		return entitlement.StatusActive
+		return StatusActive
 	case stripe.SubscriptionStatusTrialing:
-		return entitlement.StatusTrialing
+		return StatusTrialing
 	case stripe.SubscriptionStatusPastDue:
-		return entitlement.StatusPastDue
+		return StatusPastDue
 	case stripe.SubscriptionStatusCanceled,
 		stripe.SubscriptionStatusIncomplete,
 		stripe.SubscriptionStatusIncompleteExpired,
 		stripe.SubscriptionStatusPaused,
 		stripe.SubscriptionStatusUnpaid:
-		return entitlement.StatusInactive
+		return StatusInactive
 	}
-	return entitlement.StatusInactive
+	return StatusInactive
 }
 
-func usageFor(stats *db.GetWorkspaceStatsRow, r entitlement.Resource) int64 {
+func usageFor(stats *db.GetWorkspaceStatsRow, r Resource) int64 {
 	switch r {
-	case entitlement.ResourceMembers:
+	case ResourceMembers:
 		return stats.MemberCount
-	case entitlement.ResourceServiceAccounts:
+	case ResourceServiceAccounts:
 		return stats.ServiceAccountCount
-	case entitlement.ResourceTargets:
+	case ResourceTargets:
 		return stats.TargetCount
-	case entitlement.ResourceTeams:
+	case ResourceTeams:
 		return stats.TeamCount
-	case entitlement.ResourceCas:
+	case ResourceCas:
 		return stats.CaCount
 	}
 	return -1

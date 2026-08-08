@@ -107,14 +107,6 @@ SELECT
     SELECT
       COUNT(*)
     FROM
-      daemons d
-    WHERE
-      d.workspace_id = @workspace_id
-  ) AS daemon_count,
-  (
-    SELECT
-      COUNT(*)
-    FROM
       certificate_authorities ca
     WHERE
       ca.workspace_id = @workspace_id

@@ -100,14 +100,6 @@ SELECT
     SELECT
       COUNT(*)
     FROM
-      daemons d
-    WHERE
-      d.workspace_id = $1
-  ) AS daemon_count,
-  (
-    SELECT
-      COUNT(*)
-    FROM
       certificate_authorities ca
     WHERE
       ca.workspace_id = $1
@@ -126,7 +118,6 @@ type GetWorkspaceStatsRow struct {
 	MemberCount         int64 `json:"memberCount"`
 	TeamCount           int64 `json:"teamCount"`
 	TargetCount         int64 `json:"targetCount"`
-	DaemonCount         int64 `json:"daemonCount"`
 	CaCount             int64 `json:"caCount"`
 	ServiceAccountCount int64 `json:"serviceAccountCount"`
 }
@@ -138,7 +129,6 @@ func (q *Queries) GetWorkspaceStats(ctx context.Context, workspaceID string) (*G
 		&i.MemberCount,
 		&i.TeamCount,
 		&i.TargetCount,
-		&i.DaemonCount,
 		&i.CaCount,
 		&i.ServiceAccountCount,
 	)

@@ -71,9 +71,6 @@ func (a *AuthNInterceptor) WrapStreamingHandler(
 
 func (a *AuthNInterceptor) WithAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Authenticate user using the same logic as Connect-RPC. No
-		// procedure is available here, so daemon challenges (which are
-		// bound to a procedure) cannot be used on these routes.
 		ctx, err := a.authenticate(r.Context(), r.Header, "")
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)

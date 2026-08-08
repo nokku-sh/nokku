@@ -20,6 +20,7 @@ import (
 	"github.com/crewjam/saml/samlsp"
 	dsig "github.com/russellhaering/goxmldsig"
 
+	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/meta"
@@ -375,6 +376,9 @@ func (s *SAMLHandler) getSAMLMiddleware(
 	provider, err := s.cfg.Conn.Q.GetSAMLProviderByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get SAML provider: %w", err)
+	}
+	if !s.cfg.Billing.Has(ctx, provider.WorkspaceID, billing.FeatureSAML) {
+		return nil, fmt.Errorf("SAML requires an Enterprise plan")
 	}
 
 	if provider.MetadataURL == nil {

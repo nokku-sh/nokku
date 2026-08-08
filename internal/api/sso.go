@@ -5,11 +5,11 @@ import (
 
 	"connectrpc.com/connect"
 
+	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/email"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
@@ -88,7 +88,7 @@ func (s *SSOService) UpdateOIDCProvider(
 		)
 	}
 	if req.GetEnforceSso() {
-		if !s.cfg.Entitlements.Has(ctx, req.GetWorkspaceId(), entitlement.FeatureEnforceSSO) {
+		if !s.cfg.Billing.Has(ctx, req.GetWorkspaceId(), billing.FeatureEnforceSSO) {
 			return nil, NewError(
 				connect.CodeFailedPrecondition,
 				"SSO enforcement requires an upgraded plan",
@@ -136,6 +136,14 @@ func (s *SSOService) UpdateSAMLProvider(
 	ctx context.Context,
 	req *nokkuv1.UpdateSAMLProviderRequest,
 ) (*nokkuv1.UpdateSAMLProviderResponse, error) {
+	if (req.GetIsActive() || req.GetEnforceSso()) &&
+		!s.cfg.Billing.Has(ctx, req.GetWorkspaceId(), billing.FeatureSAML) {
+		return nil, NewError(
+			connect.CodeFailedPrecondition,
+			"SAML requires an Enterprise plan",
+		)
+	}
+
 	params := &db.UpdateSAMLProviderParams{
 		WorkspaceID:          req.GetWorkspaceId(),
 		Name:                 req.Name,
@@ -172,7 +180,7 @@ func (s *SSOService) UpdateSAMLProvider(
 		)
 	}
 	if req.GetEnforceSso() {
-		if !s.cfg.Entitlements.Has(ctx, req.GetWorkspaceId(), entitlement.FeatureEnforceSSO) {
+		if !s.cfg.Billing.Has(ctx, req.GetWorkspaceId(), billing.FeatureEnforceSSO) {
 			return nil, NewError(
 				connect.CodeFailedPrecondition,
 				"SSO enforcement requires an upgraded plan",

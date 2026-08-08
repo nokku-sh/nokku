@@ -386,7 +386,7 @@ func (s *Server) registerServices(ctx context.Context) error {
 	s.mux.Handle("GET /terminal/ws", privChain.ThenFunc(terminal.HandleWebSocket))
 
 	// Billing provider webhook
-	if s.cfg.Billing != nil {
+	if s.cfg.Billing.Enabled() {
 		s.mux.Handle("POST /webhooks/stripe", s.cfg.Billing.WebhookHandler())
 	}
 

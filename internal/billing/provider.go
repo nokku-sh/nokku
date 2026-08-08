@@ -1,4 +1,3 @@
-// Package billing contains the billing provider port.
 package billing
 
 import (

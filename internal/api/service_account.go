@@ -3,10 +3,10 @@ package api
 import (
 	"context"
 
+	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 )
@@ -49,10 +49,10 @@ func (s *ServiceAccountService) CreateServiceAccount(
 ) (*nokkuv1.CreateServiceAccountResponse, error) {
 	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
 
-	if err := s.cfg.Entitlements.Check(
+	if err := s.cfg.Billing.Check(
 		ctx,
 		req.GetWorkspaceId(),
-		entitlement.ResourceServiceAccounts,
+		billing.ResourceServiceAccounts,
 	); err != nil {
 		return nil, err
 	}

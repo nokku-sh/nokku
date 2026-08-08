@@ -13,10 +13,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/internal/authn"
+	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 )
@@ -284,7 +284,7 @@ func (s *DaemonService) EnrollDaemon(
 	workspaceID := enrollToken.ID
 	meta.SetAuditWorkspaceID(ctx, workspaceID)
 
-	if err := s.cfg.Entitlements.Check(ctx, workspaceID, entitlement.ResourceTargets); err != nil {
+	if err := s.cfg.Billing.Check(ctx, workspaceID, billing.ResourceTargets); err != nil {
 		return nil, err
 	}
 
@@ -391,10 +391,10 @@ func (s *DaemonService) SyncDaemon(
 			return err
 		}
 		// Stop heartbeat if over quota and on free plan
-		if err := s.cfg.Entitlements.Check(
+		if err := s.cfg.Billing.Check(
 			ctx,
 			daemon.WorkspaceID,
-			entitlement.ResourceTargets,
+			billing.ResourceTargets,
 		); err != nil {
 			return err
 		}

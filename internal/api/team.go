@@ -3,9 +3,9 @@ package api
 import (
 	"context"
 
+	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 )
@@ -41,10 +41,10 @@ func (s *TeamService) CreateTeam(
 	ctx context.Context,
 	req *nokkuv1.CreateTeamRequest,
 ) (*nokkuv1.CreateTeamResponse, error) {
-	if err := s.cfg.Entitlements.Check(
+	if err := s.cfg.Billing.Check(
 		ctx,
 		req.GetWorkspaceId(),
-		entitlement.ResourceTeams,
+		billing.ResourceTeams,
 	); err != nil {
 		return nil, err
 	}

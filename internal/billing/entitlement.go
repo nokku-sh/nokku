@@ -1,9 +1,8 @@
-// Package entitlement resolves plan limits, feature flags and values
-// from local state only (in-code catalog + DB row per workspace).
-package entitlement
+package billing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -23,10 +22,20 @@ const (
 	ResourceServiceAccounts Resource = "service_accounts"
 )
 
-// Feature and value keys that appear in catalog plans.
 const (
+	FeatureOIDC             = "oidc"
 	FeatureEnforceSSO       = "enforce_sso"
+	FeatureSAML             = "saml"
+	FeatureAuditExport      = "audit_export"
+	FeatureExternalKMS      = "external_kms"
 	ValueAuditRetentionDays = "audit_log_retention_days"
+)
+
+type Mode string
+
+const (
+	ModeSelfHosted Mode = "self_hosted"
+	ModeSaaS       Mode = "saas"
 )
 
 // Plan names stored in workspace_subscriptions.plan.
@@ -73,6 +82,7 @@ type Quota struct {
 }
 
 type Plan struct {
+	Name     string
 	Features map[string]bool
 	Limits   map[Resource]Quota
 	Values   map[string]int64
@@ -82,7 +92,9 @@ type Plan struct {
 // quotas must match the Stripe price tiers; hard quotas are enforced locally.
 var catalog = map[string]Plan{
 	PlanCommunity: {
-		Features: map[string]bool{},
+		Features: map[string]bool{
+			FeatureOIDC: true,
+		},
 		Limits: map[Resource]Quota{
 			ResourceMembers:         {Soft: 5, Hard: 5},
 			ResourceServiceAccounts: {Soft: 2, Hard: 2},
@@ -96,12 +108,17 @@ var catalog = map[string]Plan{
 	},
 	PlanFlex: {
 		Features: map[string]bool{
-			FeatureEnforceSSO: true,
+			FeatureOIDC:        true,
+			FeatureEnforceSSO:  true,
+			FeatureSAML:        true,
+			FeatureAuditExport: true,
 		},
 		Limits: map[Resource]Quota{
 			// Metered resources: soft = included, hard = unlimited (billed).
-			ResourceMembers:         {Soft: 10, Hard: -1},
-			ResourceServiceAccounts: {Soft: 5, Hard: -1},
+			ResourceMembers: {Soft: 10, Hard: -1},
+			// Keep the same finite cap so service accounts cannot bypass member
+			// pricing. They are not metered separately.
+			ResourceServiceAccounts: {Soft: 10, Hard: 10},
 			ResourceTargets:         {Soft: 50, Hard: -1},
 			// Not metered: enforced caps.
 			ResourceTeams: {Soft: 500, Hard: 500},
@@ -113,7 +130,11 @@ var catalog = map[string]Plan{
 	},
 	PlanEnterprise: {
 		Features: map[string]bool{
-			FeatureEnforceSSO: true,
+			FeatureOIDC:        true,
+			FeatureEnforceSSO:  true,
+			FeatureSAML:        true,
+			FeatureAuditExport: true,
+			FeatureExternalKMS: true,
 		},
 		Limits: map[Resource]Quota{
 			ResourceMembers:         {Soft: -1, Hard: -1},
@@ -151,19 +172,28 @@ type querier interface {
 	GetWorkspaceStats(ctx context.Context, workspaceID string) (*db.GetWorkspaceStatsRow, error)
 }
 
-type Service struct {
+type PolicyService struct {
 	q       querier
 	license licenseState
+	mode    Mode
 }
 
-func New(q querier, lc licenseState) *Service {
-	return &Service{q: q, license: lc}
+func NewPolicyService(q querier, lc licenseState, modes ...Mode) *PolicyService {
+	mode := ModeSelfHosted
+	if len(modes) > 0 {
+		mode = modes[0]
+	}
+	return &PolicyService{q: q, license: lc, mode: mode}
+}
+
+func (s *PolicyService) Mode() Mode {
+	return s.mode
 }
 
 // Resolve returns the effective plan for a workspace. An active instance
-// license overrides the subscription with Enterprise.
-func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
-	if s.license != nil && s.license.Valid() {
+// license overrides subscriptions only in self-hosted mode.
+func (s *PolicyService) Resolve(ctx context.Context, workspaceID string) Plan {
+	if s.mode == ModeSelfHosted && s.license != nil && s.license.Valid() {
 		return resolvePlan(PlanEnterprise)
 	}
 	sub, err := s.q.GetSubscription(ctx, workspaceID)
@@ -175,7 +205,7 @@ func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
 
 // Check returns ResourceExhausted if creating one more of r would exceed the
 // hard cap. Fails open on DB errors.
-func (s *Service) Check(ctx context.Context, workspaceID string, r Resource) error {
+func (s *PolicyService) Check(ctx context.Context, workspaceID string, r Resource) error {
 	plan := s.Resolve(ctx, workspaceID)
 	quota, ok := plan.Limits[r]
 	if !ok || quota.Hard < 0 {
@@ -185,11 +215,11 @@ func (s *Service) Check(ctx context.Context, workspaceID string, r Resource) err
 	stats, err := s.q.GetWorkspaceStats(ctx, workspaceID)
 	if err != nil {
 		slog.Warn(
-			"entitlement stats lookup failed, failing open",
+			"entitlement stats lookup failed",
 			"error", err,
 			"workspace_id", workspaceID,
 		)
-		return nil
+		return connect.NewError(connect.CodeUnavailable, errors.New("quota check unavailable"))
 	}
 
 	if currentCount(stats, r) >= quota.Hard {
@@ -202,12 +232,12 @@ func (s *Service) Check(ctx context.Context, workspaceID string, r Resource) err
 }
 
 // Has reports whether a feature flag is enabled for the workspace.
-func (s *Service) Has(ctx context.Context, workspaceID, feature string) bool {
+func (s *PolicyService) Has(ctx context.Context, workspaceID, feature string) bool {
 	return s.Resolve(ctx, workspaceID).Features[feature]
 }
 
 // Int returns a numeric plan value (e.g. retention days) or fallback.
-func (s *Service) Int(ctx context.Context, workspaceID, key string, fallback int64) int64 {
+func (s *PolicyService) Int(ctx context.Context, workspaceID, key string, fallback int64) int64 {
 	if v, ok := s.Resolve(ctx, workspaceID).Values[key]; ok {
 		return v
 	}
@@ -221,8 +251,10 @@ func resolvePlan(name string) Plan {
 			slog.Debug("unknown plan, using community", "plan", name)
 		}
 		base = catalog[PlanCommunity]
+		name = PlanCommunity
 	}
 	return Plan{
+		Name:     name,
 		Features: maps.Clone(base.Features),
 		Limits:   maps.Clone(base.Limits),
 		Values:   maps.Clone(base.Values),
