@@ -13,14 +13,17 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
+const maxWebhookBody = 2 << 20
+
 func (s *Stripe) WebhookHandler() http.Handler {
 	return http.HandlerFunc(s.webhook)
 }
 
 func (s *Stripe) webhook(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxWebhookBody)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "failed to read body", http.StatusBadRequest)
+		http.Error(w, "invalid request body", http.StatusRequestEntityTooLarge)
 		return
 	}
 
