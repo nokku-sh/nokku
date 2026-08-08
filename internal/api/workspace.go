@@ -104,7 +104,7 @@ func (s *WorkspaceService) DeleteWorkspace(
 	req *nokkuv1.DeleteWorkspaceRequest,
 ) (*nokkuv1.DeleteWorkspaceResponse, error) {
 	// Revoke subscription
-	if s.cfg.Billing != nil {
+	if s.cfg.Billing.Enabled() {
 		if err := s.cfg.Billing.Cancel(ctx, req.GetWorkspaceId(), true, ""); err != nil {
 			return nil, ErrInternal
 		}

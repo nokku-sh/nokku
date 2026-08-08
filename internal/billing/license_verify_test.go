@@ -1,4 +1,4 @@
-package license
+package billing
 
 import (
 	"crypto/ed25519"
@@ -199,15 +199,15 @@ func TestVerify_TruncatedKey(t *testing.T) {
 
 func TestNew_FromEnv(t *testing.T) {
 	// The positive path (valid key -> validated Key) can't be exercised here:
-	// New() verifies against the compiled-in vendor public key, whose private
+	// NewLicense() verifies against the compiled-in vendor public key, whose private
 	// key we don't hold. Key validation itself is covered by TestVerify_*.
-	// These cases assert New()'s env wiring and nil-safety contract.
+	// These cases assert NewLicense()'s env wiring and nil-safety contract.
 
 	// Garbage keys are ignored, not fatal.
 	t.Setenv("NOKKU_LICENSE_KEY", "NOKKU-BOGUS")
-	key, err := New()
+	key, err := NewLicense()
 	if err != nil {
-		t.Fatalf("New() with garbage key: %v", err)
+		t.Fatalf("NewLicense() with garbage key: %v", err)
 	}
 	if key == nil || key.Valid() {
 		t.Error("expected invalid, non-nil license for garbage key")
@@ -215,9 +215,9 @@ func TestNew_FromEnv(t *testing.T) {
 
 	// Empty env value behaves like absence.
 	t.Setenv("NOKKU_LICENSE_KEY", "")
-	key, err = New()
+	key, err = NewLicense()
 	if err != nil {
-		t.Fatalf("New() without env: %v", err)
+		t.Fatalf("NewLicense() without env: %v", err)
 	}
 	if key == nil || key.Valid() {
 		t.Error("expected invalid, non-nil license without env")

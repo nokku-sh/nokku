@@ -8,9 +8,9 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/pki"
@@ -32,10 +32,10 @@ func (s *CertificateService) CreateCertificateAuthority(
 ) (*nokkuv1.CreateCertificateAuthorityResponse, error) {
 	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
 
-	if err := s.cfg.Entitlements.Check(
+	if err := s.cfg.Billing.Check(
 		ctx,
 		req.GetWorkspaceId(),
-		entitlement.ResourceCas,
+		billing.ResourceCas,
 	); err != nil {
 		return nil, err
 	}

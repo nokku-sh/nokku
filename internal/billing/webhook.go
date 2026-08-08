@@ -11,7 +11,6 @@ import (
 	"github.com/stripe/stripe-go/v86/webhook"
 
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
 func (s *Stripe) WebhookHandler() http.Handler {
@@ -62,7 +61,7 @@ func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscriptio
 			WorkspaceID:       workspaceID,
 			Source:            "stripe",
 			Plan:              "",
-			Status:            string(entitlement.StatusInactive),
+			Status:            string(StatusInactive),
 			CustomerID:        sub.Customer.ID,
 			SubscriptionID:    sub.ID,
 			CurrentPeriodEnd:  periodEnd(sub),
@@ -78,8 +77,8 @@ func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscriptio
 	// tenant never ends up with two.
 	if existing, err := s.db.Q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
 		WorkspaceID: workspaceID,
-		Statuses:    entitlement.ActiveStatuses,
-		Sources:     stripeSources,
+		Statuses:    ActiveStatuses,
+		Sources:     []string{"stripe"},
 	}); err == nil && existing.SubscriptionID != "" && existing.SubscriptionID != sub.ID {
 		slog.Warn("cancelling duplicate subscription",
 			"workspace_id", workspaceID, "keep", existing.SubscriptionID, "duplicate", sub.ID)
@@ -93,7 +92,7 @@ func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscriptio
 	if err := s.db.Q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
 		WorkspaceID:       workspaceID,
 		Source:            "stripe",
-		Plan:              entitlement.PlanFlex,
+		Plan:              PlanFlex,
 		Status:            string(mapStatus(sub.Status)),
 		CustomerID:        sub.Customer.ID,
 		SubscriptionID:    sub.ID,

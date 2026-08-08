@@ -11,7 +11,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 )
@@ -37,23 +36,20 @@ func (s *BillingService) GetBilling(
 		return nil, DBError(err)
 	}
 
-	// Pull the latest state from the provider (self-heals missed webhooks).
-	if s.cfg.Billing != nil {
-		s.cfg.Billing.Sync(ctx, req.GetWorkspaceId())
-	}
-
-	billingEnabled := s.cfg.Billing != nil
+	billingEnabled := s.cfg.Billing.Enabled()
 	resp := &nokkuv1.GetBillingResponse{
 		BillingEnabled: &billingEnabled,
 		Counts: &nokkuv1.WorkspaceCounts{
 			Members:         &stats.MemberCount,
 			Teams:           &stats.TeamCount,
 			ServiceAccounts: &stats.ServiceAccountCount,
-			Daemons:         &stats.DaemonCount,
 			Targets:         &stats.TargetCount,
 			Cas:             &stats.CaCount,
 		},
-		Metadata: planMetadata(s.cfg.Entitlements.Resolve(ctx, req.GetWorkspaceId())),
+		Metadata: planMetadata(
+			s.cfg.Billing.Resolve(ctx, req.GetWorkspaceId()),
+			s.cfg.Billing.Mode(),
+		),
 	}
 
 	if sub, err := s.cfg.Conn.Q.GetSubscription(ctx, req.GetWorkspaceId()); err == nil {
@@ -72,8 +68,11 @@ func (s *BillingService) CreateCheckout(
 	ctx context.Context,
 	req *nokkuv1.CreateCheckoutRequest,
 ) (*nokkuv1.CreateCheckoutResponse, error) {
-	if s.cfg.Billing == nil {
+	if !s.cfg.Billing.Enabled() {
 		return nil, ErrBillingDisabled
+	}
+	if err := s.requireWorkspaceOwner(ctx, req.GetWorkspaceId()); err != nil {
+		return nil, err
 	}
 	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
 	if err != nil {
@@ -100,8 +99,11 @@ func (s *BillingService) CreatePortal(
 	ctx context.Context,
 	req *nokkuv1.CreatePortalRequest,
 ) (*nokkuv1.CreatePortalResponse, error) {
-	if s.cfg.Billing == nil {
+	if !s.cfg.Billing.Enabled() {
 		return nil, ErrBillingDisabled
+	}
+	if err := s.requireWorkspaceOwner(ctx, req.GetWorkspaceId()); err != nil {
+		return nil, err
 	}
 	url, err := s.cfg.Billing.Portal(ctx, req.GetWorkspaceId())
 	if err != nil {
@@ -116,8 +118,11 @@ func (s *BillingService) CancelSubscription(
 	ctx context.Context,
 	req *nokkuv1.CancelSubscriptionRequest,
 ) (*nokkuv1.CancelSubscriptionResponse, error) {
-	if s.cfg.Billing == nil {
+	if !s.cfg.Billing.Enabled() {
 		return nil, ErrBillingDisabled
+	}
+	if err := s.requireWorkspaceOwner(ctx, req.GetWorkspaceId()); err != nil {
+		return nil, err
 	}
 	if err := s.cfg.Billing.Cancel(
 		ctx,
@@ -130,18 +135,46 @@ func (s *BillingService) CancelSubscription(
 	return &nokkuv1.CancelSubscriptionResponse{}, nil
 }
 
-// planMetadata exposes the resolved plan's quotas to the UI:
-// credit_<resource> = included quota, max_<resource> = cap, -1 = unlimited.
-func planMetadata(p entitlement.Plan) map[string]string {
-	out := make(map[string]string, len(p.Limits)+len(p.Values))
+func (s *BillingService) requireWorkspaceOwner(ctx context.Context, workspaceID string) error {
+	ownerID, err := s.cfg.Conn.Q.GetWorkspaceOwner(ctx, workspaceID)
+	if err != nil {
+		return DBError(err)
+	}
+	if ownerID != meta.UserIDFromContext(ctx) {
+		return connect.NewError(
+			connect.CodePermissionDenied,
+			errors.New("workspace owner required"),
+		)
+	}
+	return nil
+}
+
+// planMetadata is the stable frontend capability contract. The legacy
+// credit_/max_ keys remain for older clients; new clients should use
+// plan, billing_mode, feature.<name>, and limit.<resource>.<field>.
+func planMetadata(p billing.Plan, mode billing.Mode) map[string]string {
+	out := make(map[string]string, len(p.Limits)*4+len(p.Features)+len(p.Values)+2)
+	out["plan"] = p.Name
+	out["billing_mode"] = string(mode)
 	for r, q := range p.Limits {
 		key := string(r)
+		out["limit."+key+".included"] = strconv.FormatInt(q.Soft, 10)
+		out["limit."+key+".hard"] = strconv.FormatInt(q.Hard, 10)
 		if q.Soft > 0 {
 			out["credit_"+key] = strconv.FormatInt(q.Soft, 10)
 		}
 		if q.Hard >= 0 {
 			out["max_"+key] = strconv.FormatInt(q.Hard, 10)
 		}
+	}
+	for _, k := range []string{
+		billing.FeatureOIDC,
+		billing.FeatureEnforceSSO,
+		billing.FeatureSAML,
+		billing.FeatureAuditExport,
+		billing.FeatureExternalKMS,
+	} {
+		out["feature."+k] = strconv.FormatBool(p.Features[k])
 	}
 	for k, v := range p.Values {
 		out[k] = strconv.FormatInt(v, 10)

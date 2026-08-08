@@ -10,6 +10,7 @@ import (
 	"github.com/mizuchilabs/kata/buildinfo"
 
 	"github.com/nokku-sh/nokku/internal/audit"
+	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -112,6 +113,12 @@ func (s *UtilService) ExportAuditLogs(
 ) (*nokkuv1.ExportAuditLogsResponse, error) {
 	actor := meta.ActorFromContext(ctx)
 	workspaceID := req.GetWorkspaceId()
+	if workspaceID != "" && !s.cfg.Billing.Has(ctx, workspaceID, billing.FeatureAuditExport) {
+		return nil, NewError(
+			connect.CodeFailedPrecondition,
+			"audit export requires an Enterprise plan",
+		)
+	}
 
 	query := audit.QueryOptions{WorkspaceID: req.GetWorkspaceId()}
 	if req.GetStartDate() != nil {

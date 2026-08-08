@@ -121,7 +121,7 @@ func (s *UserService) DeleteAccount(
 			return err
 		}
 		for _, workspaceID := range workspaceIDs {
-			if s.cfg.Billing == nil {
+			if !s.cfg.Billing.Enabled() {
 				break
 			}
 			if err := s.cfg.Billing.Cancel(ctx, workspaceID, true, ""); err != nil {

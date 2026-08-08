@@ -1,4 +1,4 @@
-package license
+package billing
 
 import (
 	"crypto/ed25519"

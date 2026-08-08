@@ -1,4 +1,4 @@
-package entitlement
+package billing
 
 import (
 	"context"
@@ -154,7 +154,7 @@ func TestCurrentCount(t *testing.T) {
 }
 
 func TestService_Resolve_ActiveLicenseOverrides(t *testing.T) {
-	svc := New(&stubQuerier{}, fakeLicenser{valid: true})
+	svc := NewPolicyService(&stubQuerier{}, fakeLicenser{valid: true})
 
 	plan := svc.Resolve(context.Background(), "ws-1")
 	if plan.Limits[ResourceMembers].Hard != -1 {
@@ -165,6 +165,15 @@ func TestService_Resolve_ActiveLicenseOverrides(t *testing.T) {
 	}
 	if !plan.Features[FeatureEnforceSSO] {
 		t.Error("enterprise should have enforce_sso")
+	}
+}
+
+func TestService_Resolve_SaaSDoesNotUseInstanceLicense(t *testing.T) {
+	svc := NewPolicyService(&stubQuerier{}, fakeLicenser{valid: true}, ModeSaaS)
+
+	plan := svc.Resolve(context.Background(), "ws-1")
+	if plan.Name != PlanCommunity {
+		t.Errorf("SaaS instance license should be ignored, got plan %q", plan.Name)
 	}
 }
 
@@ -217,7 +226,10 @@ func TestService_Resolve_SubscriptionStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := New(&stubQuerier{sub: tt.sub, err: tt.dbErr}, fakeLicenser{valid: false})
+			svc := NewPolicyService(
+				&stubQuerier{sub: tt.sub, err: tt.dbErr},
+				fakeLicenser{valid: false},
+			)
 
 			plan := svc.Resolve(context.Background(), "ws-1")
 			if got := plan.Limits[ResourceMembers]; got != catalog[tt.want].Limits[ResourceMembers] {
@@ -232,8 +244,21 @@ func TestService_Resolve_SubscriptionStatus(t *testing.T) {
 	}
 }
 
+func TestFlexIncludesSSOFeatures(t *testing.T) {
+	svc := NewPolicyService(&stubQuerier{
+		sub: &db.WorkspaceSubscription{Plan: PlanFlex, Status: string(StatusActive)},
+	}, fakeLicenser{valid: false})
+
+	ctx := context.Background()
+	for _, feature := range []string{FeatureOIDC, FeatureSAML, FeatureEnforceSSO} {
+		if !svc.Has(ctx, "ws-1", feature) {
+			t.Errorf("Flex should include %s", feature)
+		}
+	}
+}
+
 func TestService_Has_And_Int(t *testing.T) {
-	svc := New(&stubQuerier{}, fakeLicenser{valid: false})
+	svc := NewPolicyService(&stubQuerier{}, fakeLicenser{valid: false})
 	ctx := context.Background()
 
 	// No subscription row => community plan.
@@ -249,14 +274,14 @@ func TestService_Has_And_Int(t *testing.T) {
 }
 
 func TestService_Has_OnLicensedInstance(t *testing.T) {
-	svc := New(&stubQuerier{}, fakeLicenser{valid: true})
+	svc := NewPolicyService(&stubQuerier{}, fakeLicenser{valid: true})
 	if !svc.Has(context.Background(), "ws-1", FeatureEnforceSSO) {
 		t.Error("licensed instance must have enforce_sso")
 	}
 }
 
 func TestService_Check_QuotaExceeded(t *testing.T) {
-	svc := New(&stubQuerier{
+	svc := NewPolicyService(&stubQuerier{
 		sub:   &db.WorkspaceSubscription{Plan: PlanCommunity, Status: string(StatusActive)},
 		stats: &db.GetWorkspaceStatsRow{MemberCount: 5}, // community hard cap: 5
 	}, fakeLicenser{valid: false})
@@ -278,7 +303,7 @@ func TestService_Check_QuotaExceeded(t *testing.T) {
 }
 
 func TestService_Check_UnderQuota(t *testing.T) {
-	svc := New(&stubQuerier{
+	svc := NewPolicyService(&stubQuerier{
 		sub:   &db.WorkspaceSubscription{Plan: PlanCommunity, Status: string(StatusActive)},
 		stats: &db.GetWorkspaceStatsRow{MemberCount: 4},
 	}, fakeLicenser{valid: false})
@@ -288,10 +313,11 @@ func TestService_Check_UnderQuota(t *testing.T) {
 	}
 }
 
-func TestService_Check_FailsOpen(t *testing.T) {
+func TestService_Check_FailsClosedOnStatsError(t *testing.T) {
 	tests := []struct {
-		name string
-		q    *stubQuerier
+		name    string
+		q       *stubQuerier
+		wantErr bool
 	}{
 		{
 			"stats db error",
@@ -299,6 +325,7 @@ func TestService_Check_FailsOpen(t *testing.T) {
 				sub: &db.WorkspaceSubscription{Plan: PlanCommunity, Status: string(StatusActive)},
 				err: errors.New("db down"),
 			},
+			true,
 		},
 		{
 			"unlimited plan",
@@ -306,6 +333,7 @@ func TestService_Check_FailsOpen(t *testing.T) {
 				sub:   &db.WorkspaceSubscription{Plan: PlanFlex, Status: string(StatusActive)},
 				stats: &db.GetWorkspaceStatsRow{MemberCount: 999},
 			},
+			false,
 		},
 		{
 			"unknown resource",
@@ -313,14 +341,16 @@ func TestService_Check_FailsOpen(t *testing.T) {
 				sub:   &db.WorkspaceSubscription{Plan: PlanCommunity, Status: string(StatusActive)},
 				stats: &db.GetWorkspaceStatsRow{},
 			},
+			false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := New(tt.q, fakeLicenser{valid: false})
-			if err := svc.Check(context.Background(), "ws-1", ResourceMembers); err != nil {
-				t.Errorf("Check() = %v, want nil (fail open)", err)
+			svc := NewPolicyService(tt.q, fakeLicenser{valid: false})
+			err := svc.Check(context.Background(), "ws-1", ResourceMembers)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Check() = %v, wantErr %t", err, tt.wantErr)
 			}
 		})
 	}

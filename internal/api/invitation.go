@@ -8,10 +8,10 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 )
@@ -97,7 +97,7 @@ func (s *InvitationService) AcceptInvitation(
 		return nil, NewError(connect.CodeFailedPrecondition, "invalid invitation token")
 	}
 
-	if err := s.cfg.Entitlements.Check(ctx, workspaceID, entitlement.ResourceMembers); err != nil {
+	if err := s.cfg.Billing.Check(ctx, workspaceID, billing.ResourceMembers); err != nil {
 		return nil, err
 	}
 

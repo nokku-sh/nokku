@@ -32,7 +32,7 @@ func (c *Config) startBackgroundJobs(ctx context.Context) {
 		}
 	}()
 
-	if c.Billing != nil {
+	if c.Billing.Enabled() {
 		go c.runBillingJobs(ctx)
 	}
 }
@@ -63,7 +63,7 @@ func (c *Config) runBillingJobs(ctx context.Context) {
 }
 
 func (c *Config) syncBilling(ctx context.Context) {
-	if c.Billing == nil {
+	if !c.Billing.Enabled() {
 		return
 	}
 	if err := c.Billing.SyncAll(ctx); err != nil {
