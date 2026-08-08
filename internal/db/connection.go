@@ -24,6 +24,8 @@ type Connection struct {
 	Password    string `env:"NOKKU_DB_PASSWORD"    envDefault:"postgres"`
 	SSLMode     string `env:"NOKKU_DB_SSL_MODE"    envDefault:"disable"`
 	AutoMigrate bool   `env:"NOKKU_DB_AUTOMIGRATE" envDefault:"true"`
+	MaxConns    int32  `env:"NOKKU_DB_MAX_CONNS"   envDefault:"10"`
+	MinConns    int32  `env:"NOKKU_DB_MIN_CONNS"   envDefault:"0"`
 
 	Pool *pgxpool.Pool
 	Q    *Queries
@@ -51,8 +53,14 @@ func (c *Connection) createPool(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("parsing pool config: %w", err)
 	}
-	config.MaxConns = 10
-	config.MinConns = 0
+	if c.MaxConns < 1 {
+		return fmt.Errorf("NOKKU_DB_MAX_CONNS must be greater than zero")
+	}
+	if c.MinConns < 0 || c.MinConns > c.MaxConns {
+		return fmt.Errorf("NOKKU_DB_MIN_CONNS must be between zero and NOKKU_DB_MAX_CONNS")
+	}
+	config.MaxConns = c.MaxConns
+	config.MinConns = c.MinConns
 	config.MaxConnLifetime = 30 * time.Minute
 	config.MaxConnIdleTime = 5 * time.Minute
 	config.HealthCheckPeriod = time.Minute
