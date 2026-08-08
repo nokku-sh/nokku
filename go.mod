@@ -31,7 +31,7 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/mergestat/timediff v0.0.4
-	github.com/mizuchilabs/kata v0.1.1
+	github.com/mizuchilabs/kata v0.1.2
 	github.com/open-feature/go-sdk v1.17.2
 	github.com/open-feature/go-sdk-contrib/providers/go-feature-flag v1.1.1
 	github.com/redis/go-redis/v9 v9.22.0

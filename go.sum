@@ -395,6 +395,8 @@ github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyua
 github.com/mitchellh/mapstructure v1.5.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/mizuchilabs/kata v0.1.1 h1:nqx6P4sdRqjJgu9HM8gAZ5AiIwX8t6V9cmm4hejDDN8=
 github.com/mizuchilabs/kata v0.1.1/go.mod h1:GblzmdOc9+y1gsX2Lihjz9Dhw/NbtuKgG8Hr3kjEGf8=
+github.com/mizuchilabs/kata v0.1.2 h1:P7ZCYKrOg/HQ6ZoJRTLc0KX76U7HoxX/z0M5sniCaeo=
+github.com/mizuchilabs/kata v0.1.2/go.mod h1:GblzmdOc9+y1gsX2Lihjz9Dhw/NbtuKgG8Hr3kjEGf8=
 github.com/nikunjy/rules v1.5.0 h1:KJDSLOsFhwt7kcXUyZqwkgrQg5YoUwj+TVu6ItCQShw=
 github.com/nikunjy/rules v1.5.0/go.mod h1:TlZtZdBChrkqi8Lr2AXocme8Z7EsbxtFdDoKeI6neBQ=
 github.com/open-feature/go-sdk v1.17.2 h1:pTdeNks/hgnPrlqdgtFwltnIron1oOxqg4FmLlirJlY=
