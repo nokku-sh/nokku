@@ -17,7 +17,7 @@ import (
 // setupClient creates the KMS client for the configured URI scheme and
 // caches the KEK AEAD used to wrap/unwrap the stored keyset.
 func (t *TinkEncryptor) setupClient(ctx context.Context) (err error) {
-	slog.Debug("setting up kms client", "uri", t.KMSURI)
+	slog.Debug("setting up kms client", "provider", kmsProvider(t.KMSURI))
 	switch {
 	case strings.HasPrefix(t.KMSURI, "aws-kms://"):
 		t.client, err = awskms.NewClientWithOptions(ctx, t.KMSURI)
@@ -52,7 +52,7 @@ func (t *TinkEncryptor) setupClient(ctx context.Context) (err error) {
 		rest := strings.TrimPrefix(t.KMSURI, "scw-kms://regions/")
 		region, _, ok := strings.Cut(rest, "/keys/")
 		if !ok || region == "" {
-			return fmt.Errorf("invalid scw-kms URI: %s", t.KMSURI)
+			return fmt.Errorf("invalid scw-kms URI")
 		}
 
 		prefix := "scw-kms://regions/" + region + "/keys/"
@@ -61,7 +61,7 @@ func (t *TinkEncryptor) setupClient(ctx context.Context) (err error) {
 			return err
 		}
 	default:
-		return fmt.Errorf("unsupported KMS URI: %s", t.KMSURI)
+		return fmt.Errorf("unsupported KMS provider")
 	}
 	if err != nil {
 		return err
@@ -69,4 +69,12 @@ func (t *TinkEncryptor) setupClient(ctx context.Context) (err error) {
 
 	t.kekAEAD, err = t.client.GetAEAD(t.KMSURI)
 	return err
+}
+
+func kmsProvider(uri string) string {
+	provider, _, ok := strings.Cut(uri, "://")
+	if !ok || provider == "" {
+		return "unknown"
+	}
+	return provider
 }
