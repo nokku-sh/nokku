@@ -47,8 +47,6 @@ func (s *ServiceAccountService) CreateServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.CreateServiceAccountRequest,
 ) (*nokkuv1.CreateServiceAccountResponse, error) {
-	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
-
 	if err := s.cfg.Billing.Check(
 		ctx,
 		req.GetWorkspaceId(),
@@ -118,7 +116,6 @@ func (s *ServiceAccountService) UpdateServiceAccount(
 		if err != nil {
 			return err
 		}
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
 		return nil, DBError(err)
@@ -170,8 +167,7 @@ func (s *ServiceAccountService) DeleteServiceAccount(
 	req *nokkuv1.DeleteServiceAccountRequest,
 ) (*nokkuv1.DeleteServiceAccountResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		result, err := q.DeleteServiceAccount(ctx, req.GetId())
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
+		_, err := q.DeleteServiceAccount(ctx, req.GetId())
 		return err
 	}); err != nil {
 		return nil, DBError(err)

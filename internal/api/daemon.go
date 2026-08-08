@@ -62,7 +62,6 @@ func (s *DaemonService) UpdateDaemon(
 		if err != nil {
 			return err
 		}
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
 		return nil, DBError(err)
@@ -135,9 +134,6 @@ func (s *DaemonService) DeleteDaemon(
 				return err
 			}
 		}
-		if result != nil {
-			meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
-		}
 		return nil
 	}); err != nil {
 		return nil, DBError(err)
@@ -168,7 +164,7 @@ func (s *DaemonService) RefreshEnrollToken(
 	}
 	expiresAt := time.Now().Add(24 * time.Hour)
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		result, err := q.UpdateWorkspaceSettings(ctx, &db.UpdateWorkspaceSettingsParams{
+		_, err := q.UpdateWorkspaceSettings(ctx, &db.UpdateWorkspaceSettingsParams{
 			WorkspaceID:     req.GetWorkspaceId(),
 			EnrollTokenHash: token.Hash,
 			EnrollExpiresAt: &expiresAt,
@@ -176,7 +172,6 @@ func (s *DaemonService) RefreshEnrollToken(
 		if err != nil {
 			return err
 		}
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
 		return nil, DBError(err)
@@ -193,7 +188,7 @@ func (s *DaemonService) RevokeEnrollToken(
 	req *nokkuv1.RevokeEnrollTokenRequest,
 ) (*nokkuv1.RevokeEnrollTokenResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		result, err := q.UpdateWorkspaceSettings(ctx, &db.UpdateWorkspaceSettingsParams{
+		_, err := q.UpdateWorkspaceSettings(ctx, &db.UpdateWorkspaceSettingsParams{
 			WorkspaceID:     req.GetWorkspaceId(),
 			EnrollTokenHash: "",
 			EnrollExpiresAt: &time.Time{},
@@ -201,7 +196,6 @@ func (s *DaemonService) RevokeEnrollToken(
 		if err != nil {
 			return err
 		}
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
 		return nil, DBError(err)
@@ -221,7 +215,6 @@ func (s *DaemonService) CreateSession(
 		if err != nil {
 			return err
 		}
-		meta.SetAuditWorkspaceID(ctx, daemon.WorkspaceID)
 		return nil
 	}); err != nil {
 		return nil, DBError(err)

@@ -30,8 +30,6 @@ func (s *CertificateService) CreateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.CreateCertificateAuthorityRequest,
 ) (*nokkuv1.CreateCertificateAuthorityResponse, error) {
-	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
-
 	if err := s.cfg.Billing.Check(
 		ctx,
 		req.GetWorkspaceId(),
@@ -203,7 +201,6 @@ func (s *CertificateService) UpdateCertificateAuthority(
 		if err != nil {
 			return err
 		}
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
 		return nil, DBError(err)
@@ -219,12 +216,8 @@ func (s *CertificateService) DeleteCertificateAuthority(
 	req *nokkuv1.DeleteCertificateAuthorityRequest,
 ) (*nokkuv1.DeleteCertificateAuthorityResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		ca, err := q.DeleteCA(ctx, req.GetId())
-		if err != nil {
-			return err
-		}
-		meta.SetAuditWorkspaceID(ctx, ca.WorkspaceID)
-		return nil
+		_, err := q.DeleteCA(ctx, req.GetId())
+		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -279,7 +272,6 @@ func (s *CertificateService) RolloverCertificateAuthority(
 			return err
 		}
 
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
 		return nil, DBError(err)
@@ -343,8 +335,6 @@ func (s *CertificateService) SignSSHCertificate(
 				return err
 			}
 		}
-
-		meta.SetAuditWorkspaceID(ctx, ca.WorkspaceID)
 
 		// Override principal if a host certificate was requested
 		if req.GetType() == nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST {
@@ -420,7 +410,6 @@ func (s *CertificateService) SignX509Certificate(
 		if err != nil {
 			return err
 		}
-		meta.SetAuditWorkspaceID(ctx, ca.WorkspaceID)
 		return nil
 	}); err != nil {
 		return nil, DBError(err)

@@ -7,7 +7,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 type PrincipalService struct {
@@ -71,7 +70,6 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 		if err != nil {
 			return err
 		}
-		meta.SetAuditWorkspaceID(ctx, workspaceID)
 
 		switch req.GetType() {
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_USER:
@@ -134,7 +132,6 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 		if err != nil {
 			return err
 		}
-		meta.SetAuditWorkspaceID(ctx, workspaceID)
 
 		switch req.GetType() {
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_USER:
@@ -188,8 +185,6 @@ func (s *PrincipalService) RevokeAllAccess(
 	ctx context.Context,
 	req *nokkuv1.RevokeAllAccessRequest,
 ) (*nokkuv1.RevokeAllAccessResponse, error) {
-	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
-
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		switch req.GetType() {
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_USER:

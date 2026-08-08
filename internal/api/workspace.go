@@ -77,8 +77,6 @@ func (s *WorkspaceService) UpdateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.UpdateWorkspaceRequest,
 ) (*nokkuv1.UpdateWorkspaceResponse, error) {
-	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
-
 	var workspace *db.Workspace
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		workspace, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
@@ -142,8 +140,6 @@ func (s *WorkspaceService) UpdateWorkspaceSettings(
 	ctx context.Context,
 	req *nokkuv1.UpdateWorkspaceSettingsRequest,
 ) (*nokkuv1.UpdateWorkspaceSettingsResponse, error) {
-	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
-
 	var settings *db.WorkspaceSetting
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		params := &db.UpdateWorkspaceSettingsParams{WorkspaceID: req.GetWorkspaceId()}
@@ -190,8 +186,6 @@ func (s *WorkspaceService) UpdateWorkspaceMember(
 	ctx context.Context,
 	req *nokkuv1.UpdateWorkspaceMemberRequest,
 ) (*nokkuv1.UpdateWorkspaceMemberResponse, error) {
-	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
-
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		return q.UpdateWorkspaceMember(ctx, &db.UpdateWorkspaceMemberParams{
 			WorkspaceID: req.GetWorkspaceId(),
@@ -242,8 +236,6 @@ func (s *WorkspaceService) RemoveWorkspaceMember(
 	ctx context.Context,
 	req *nokkuv1.RemoveWorkspaceMemberRequest,
 ) (*nokkuv1.RemoveWorkspaceMemberResponse, error) {
-	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
-
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		return q.RemoveWorkspaceMember(ctx, &db.RemoveWorkspaceMemberParams{
 			WorkspaceID: req.GetWorkspaceId(),
@@ -260,8 +252,6 @@ func (s *WorkspaceService) UpdateWorkspaceOwner(
 	ctx context.Context,
 	req *nokkuv1.UpdateWorkspaceOwnerRequest,
 ) (*nokkuv1.UpdateWorkspaceOwnerResponse, error) {
-	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
-
 	var ownerID string
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		var err error

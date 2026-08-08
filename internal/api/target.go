@@ -7,7 +7,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 type TargetService struct {
@@ -42,8 +41,6 @@ func (s *TargetService) CreateTarget(
 	ctx context.Context,
 	req *nokkuv1.CreateTargetRequest,
 ) (*nokkuv1.CreateTargetResponse, error) {
-	meta.SetAuditWorkspaceID(ctx, req.GetWorkspaceId())
-
 	if err := s.cfg.Billing.Check(
 		ctx,
 		req.GetWorkspaceId(),
@@ -96,7 +93,6 @@ func (s *TargetService) UpdateTarget(
 		if err != nil {
 			return err
 		}
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
 		return nil
 	}); err != nil {
 		return nil, DBError(err)
@@ -112,8 +108,7 @@ func (s *TargetService) DeleteTarget(
 	req *nokkuv1.DeleteTargetRequest,
 ) (*nokkuv1.DeleteTargetResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		result, err := q.DeleteTarget(ctx, req.GetId())
-		meta.SetAuditWorkspaceID(ctx, result.WorkspaceID)
+		_, err := q.DeleteTarget(ctx, req.GetId())
 		return err
 	}); err != nil {
 		return nil, DBError(err)
