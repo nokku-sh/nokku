@@ -26,7 +26,11 @@
 </script>
 
 <button
-	onclick={() => clipboard.copy(text)}
+	onclick={(e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		clipboard.copy(text);
+	}}
 	class={cn('flex items-center gap-2 outline-none', className)}
 	{...restProps}
 >
