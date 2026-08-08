@@ -1214,8 +1214,8 @@ type EnrollDaemonResponse struct {
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	WorkspaceId   *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
 	TargetId      *string                `protobuf:"bytes,3,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
-	Status        *DaemonStatus          `protobuf:"varint,5,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
-	Config        *DaemonConfig          `protobuf:"bytes,6,opt,name=config" json:"config,omitempty"`
+	Status        *DaemonStatus          `protobuf:"varint,4,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
+	Config        *DaemonConfig          `protobuf:"bytes,5,opt,name=config" json:"config,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2378,13 +2378,13 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\vauth_method\x18\x03 \x01(\tR\n" +
 	"authMethod\x12\x1f\n" +
 	"\vauth_pubkey\x18\x04 \x01(\tR\n" +
-	"authPubkey\"\xcc\x01\n" +
+	"authPubkey\"\xc6\x01\n" +
 	"\x14EnrollDaemonResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x1b\n" +
 	"\ttarget_id\x18\x03 \x01(\tR\btargetId\x12.\n" +
-	"\x06status\x18\x05 \x01(\x0e2\x16.nokku.v1.DaemonStatusR\x06status\x12.\n" +
-	"\x06config\x18\x06 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06configJ\x04\b\x04\x10\x05\">\n" +
+	"\x06status\x18\x04 \x01(\x0e2\x16.nokku.v1.DaemonStatusR\x06status\x12.\n" +
+	"\x06config\x18\x05 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\">\n" +
 	"\x0ePrincipalUsers\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x10\n" +
 	"\x03ids\x18\x02 \x03(\tR\x03ids\"\xce\x01\n" +
