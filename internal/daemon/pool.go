@@ -119,12 +119,34 @@ func (p *Pool) RegisterDaemon(ctx context.Context, daemonID, workspaceID string)
 		cancel:      cancel,
 	}
 	p.mu.Lock()
+	previous := p.byID[daemonID]
+	var staleSessions []*Session
+	for sessionID, session := range p.sessions {
+		if session.daemonID == daemonID {
+			delete(p.sessions, sessionID)
+			staleSessions = append(staleSessions, session)
+		}
+	}
+	if previous != nil && previous.workspaceID != workspaceID {
+		if daemons := p.byWksp[previous.workspaceID]; daemons != nil {
+			delete(daemons, daemonID)
+			if len(daemons) == 0 {
+				delete(p.byWksp, previous.workspaceID)
+			}
+		}
+	}
 	p.byID[daemonID] = c
 	if _, ok := p.byWksp[workspaceID]; !ok {
 		p.byWksp[workspaceID] = make(map[string]struct{})
 	}
 	p.byWksp[workspaceID][daemonID] = struct{}{}
 	p.mu.Unlock()
+	if previous != nil {
+		previous.cancel()
+	}
+	for _, session := range staleSessions {
+		session.shutdown()
+	}
 
 	if err := p.conn.Q.UpdateDaemonOnlineStatus(ctx, &db.UpdateDaemonOnlineStatusParams{
 		DaemonID: daemonID,
@@ -339,6 +361,7 @@ func (p *Pool) CloseSession(sessionID string) {
 	// Remove from map immediately so ListSessions stops returning it.
 	delete(p.sessions, sessionID)
 	p.mu.Unlock()
+	s.shutdown()
 
 	reason := "closed by user"
 	select {
