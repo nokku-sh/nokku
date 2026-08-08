@@ -2,17 +2,22 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Dialog from '$lib/components/ui/dialog/';
 	import * as Item from '$lib/components/ui/item';
-	import type { Daemon } from '$lib/gen/nokku/v1/daemon_pb';
+	import Switch from '$lib/components/ui/switch/switch.svelte';
+	import type { Daemon, DaemonConfig } from '$lib/gen/nokku/v1/daemon_pb';
 	import { formatTs } from '$lib/utils';
 	import { CalendarIcon, ClockIcon } from '@lucide/svelte';
 	import { CopyButton } from '../ui/copy-button';
 	import Avatar from '../utils/Avatar.svelte';
+	import { daemon } from '$lib/api/daemons.svelte';
+	import { toast } from 'svelte-sonner';
 
 	interface Props {
 		data: Daemon;
 		open?: boolean;
 	}
 	let { data = $bindable({} as Daemon), open = $bindable(false) }: Props = $props();
+
+	let update = daemon.update();
 </script>
 
 <Dialog.Root bind:open>
@@ -56,6 +61,27 @@
 			</Item.Content>
 			<Item.Actions>
 				<CopyButton text={data.metadata.fingerprint}>Copy</CopyButton>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="muted" size="sm">
+			<Item.Content>
+				<Item.Title>Recording</Item.Title>
+			</Item.Content>
+			<Item.Actions>
+				<Switch
+					checked={data.config?.recordSessions}
+					onCheckedChange={(value) => {
+						if (!data.config) data.config = {} as DaemonConfig;
+						data.config.recordSessions = value;
+						update.mutate({ ...data });
+						toast.success(
+							data.config.recordSessions
+								? 'Session recording enabled'
+								: 'Session recording disabled'
+						);
+					}}
+				/>
 			</Item.Actions>
 		</Item.Root>
 

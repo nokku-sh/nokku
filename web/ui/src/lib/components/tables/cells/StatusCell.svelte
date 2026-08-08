@@ -9,8 +9,8 @@
 	// Map common status strings to shadcn variants
 	let variant = $derived.by(() => {
 		const s = status.toLowerCase();
-		if (['active', 'online', 'success', 'completed'].includes(s)) return 'default';
-		if (['error', 'failed', 'offline', 'inactive'].includes(s)) return 'destructive';
+		if (['active', 'online', 'success', 'completed', 'enabled'].includes(s)) return 'default';
+		if (['error', 'failed', 'offline', 'inactive', 'disabled'].includes(s)) return 'destructive';
 		if (['warning', 'flagged', 'pending'].includes(s)) return 'outline';
 		return 'secondary'; // pending, inactive, draft, etc.
 	}) as BadgeVariant;
