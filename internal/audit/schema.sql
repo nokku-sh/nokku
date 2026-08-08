@@ -3,7 +3,7 @@ CREATE SCHEMA IF NOT EXISTS audit;
 CREATE TABLE IF NOT EXISTS audit.audit_logs (
   id UUID NOT NULL DEFAULT uuidv7(),
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  workspace_id UUID REFERENCES public.workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID REFERENCES public.workspaces (id) ON DELETE SET NULL,
   action TEXT NOT NULL,
   actor_id UUID NOT NULL,
   actor_type TEXT NOT NULL,
