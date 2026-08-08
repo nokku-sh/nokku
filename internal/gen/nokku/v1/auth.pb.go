@@ -890,7 +890,7 @@ func (x *StreamCLILoginRequest) GetAuthPubkey() string {
 type StreamCLILoginResponse struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	User            *User                  `protobuf:"bytes,1,opt,name=user" json:"user,omitempty"`                                              // sent after success
-	VerificationUrl *string                `protobuf:"bytes,3,opt,name=verification_url,json=verificationUrl" json:"verification_url,omitempty"` // sent first
+	VerificationUrl *string                `protobuf:"bytes,2,opt,name=verification_url,json=verificationUrl" json:"verification_url,omitempty"` // sent first
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1072,10 +1072,10 @@ const file_nokku_v1_auth_proto_rawDesc = "" +
 	"\vauth_method\x18\x02 \x01(\tR\n" +
 	"authMethod\x12\x1f\n" +
 	"\vauth_pubkey\x18\x03 \x01(\tR\n" +
-	"authPubkey\"m\n" +
+	"authPubkey\"g\n" +
 	"\x16StreamCLILoginResponse\x12\"\n" +
 	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\x12)\n" +
-	"\x10verification_url\x18\x03 \x01(\tR\x0fverificationUrlJ\x04\b\x02\x10\x03\"?\n" +
+	"\x10verification_url\x18\x02 \x01(\tR\x0fverificationUrl\"?\n" +
 	"\x15VerifyCLILoginRequest\x12&\n" +
 	"\n" +
 	"login_code\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\tloginCode\"\x18\n" +

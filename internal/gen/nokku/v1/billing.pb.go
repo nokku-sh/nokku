@@ -29,9 +29,8 @@ type WorkspaceCounts struct {
 	Members         *int64                 `protobuf:"varint,1,opt,name=members" json:"members,omitempty"`
 	Teams           *int64                 `protobuf:"varint,2,opt,name=teams" json:"teams,omitempty"`
 	ServiceAccounts *int64                 `protobuf:"varint,3,opt,name=service_accounts,json=serviceAccounts" json:"service_accounts,omitempty"`
-	Daemons         *int64                 `protobuf:"varint,4,opt,name=daemons" json:"daemons,omitempty"`
-	Targets         *int64                 `protobuf:"varint,5,opt,name=targets" json:"targets,omitempty"`
-	Cas             *int64                 `protobuf:"varint,6,opt,name=cas" json:"cas,omitempty"`
+	Targets         *int64                 `protobuf:"varint,4,opt,name=targets" json:"targets,omitempty"`
+	Cas             *int64                 `protobuf:"varint,5,opt,name=cas" json:"cas,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -83,13 +82,6 @@ func (x *WorkspaceCounts) GetTeams() int64 {
 func (x *WorkspaceCounts) GetServiceAccounts() int64 {
 	if x != nil && x.ServiceAccounts != nil {
 		return *x.ServiceAccounts
-	}
-	return 0
-}
-
-func (x *WorkspaceCounts) GetDaemons() int64 {
-	if x != nil && x.Daemons != nil {
-		return *x.Daemons
 	}
 	return 0
 }
@@ -536,14 +528,13 @@ var File_nokku_v1_billing_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\n" +
-	"\x16nokku/v1/billing.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb2\x01\n" +
+	"\x16nokku/v1/billing.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x98\x01\n" +
 	"\x0fWorkspaceCounts\x12\x18\n" +
 	"\amembers\x18\x01 \x01(\x03R\amembers\x12\x14\n" +
 	"\x05teams\x18\x02 \x01(\x03R\x05teams\x12)\n" +
 	"\x10service_accounts\x18\x03 \x01(\x03R\x0fserviceAccounts\x12\x18\n" +
-	"\adaemons\x18\x04 \x01(\x03R\adaemons\x12\x18\n" +
-	"\atargets\x18\x05 \x01(\x03R\atargets\x12\x10\n" +
-	"\x03cas\x18\x06 \x01(\x03R\x03cas\"@\n" +
+	"\atargets\x18\x04 \x01(\x03R\atargets\x12\x10\n" +
+	"\x03cas\x18\x05 \x01(\x03R\x03cas\"@\n" +
 	"\x11GetBillingRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"\xeb\x03\n" +
 	"\x12GetBillingResponse\x12\x1f\n" +
