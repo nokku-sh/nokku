@@ -166,7 +166,7 @@ type Querier interface {
 	TrySecretRotationLock(ctx context.Context) (bool, error)
 	UpdateCA(ctx context.Context, arg *UpdateCAParams) (*CertificateAuthority, error)
 	UpdateCAPrivateKey(ctx context.Context, arg *UpdateCAPrivateKeyParams) error
-	UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) error
+	UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) (*Daemon, error)
 	UpdateDaemonOnlineStatus(ctx context.Context, arg *UpdateDaemonOnlineStatusParams) error
 	UpdateDaemonStatus(ctx context.Context, arg *UpdateDaemonStatusParams) (*Daemon, error)
 	UpdateDaemonUsage(ctx context.Context, daemonID string) error

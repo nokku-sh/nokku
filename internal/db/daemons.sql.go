@@ -332,24 +332,48 @@ func (q *Queries) SetDaemonsOffline(ctx context.Context) error {
 	return err
 }
 
-const updateDaemon = `-- name: UpdateDaemon :exec
+const updateDaemon = `-- name: UpdateDaemon :one
 UPDATE daemons
 SET
-  config = COALESCE($1, config),
-  metadata = COALESCE($2, metadata)
+  status = COALESCE($1, status),
+  config = COALESCE($2, config),
+  metadata = COALESCE($3, metadata)
 WHERE
-  id = $3
+  id = $4
+RETURNING
+  id, workspace_id, name, auth_method, auth_pubkey, status, online, config, metadata, last_used_at, updated_at, created_at
 `
 
 type UpdateDaemonParams struct {
+	Status   nokku.DaemonStatus  `json:"status"`
 	Config   *nokku.DaemonConfig `json:"config"`
 	Metadata []byte              `json:"metadata"`
 	DaemonID string              `json:"daemonId"`
 }
 
-func (q *Queries) UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) error {
-	_, err := q.db.Exec(ctx, updateDaemon, arg.Config, arg.Metadata, arg.DaemonID)
-	return err
+func (q *Queries) UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) (*Daemon, error) {
+	row := q.db.QueryRow(ctx, updateDaemon,
+		arg.Status,
+		arg.Config,
+		arg.Metadata,
+		arg.DaemonID,
+	)
+	var i Daemon
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.AuthMethod,
+		&i.AuthPubkey,
+		&i.Status,
+		&i.Online,
+		&i.Config,
+		&i.Metadata,
+		&i.LastUsedAt,
+		&i.UpdatedAt,
+		&i.CreatedAt,
+	)
+	return &i, err
 }
 
 const updateDaemonOnlineStatus = `-- name: UpdateDaemonOnlineStatus :exec
