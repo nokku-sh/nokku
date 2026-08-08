@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -33,6 +34,9 @@ var authProcedures = map[string]struct{}{
 	nokkuv1connect.AuthServiceResendVerificationProcedure:  {},
 	nokkuv1connect.AuthServiceStreamCLILoginProcedure:      {},
 	nokkuv1connect.AuthServiceVerifyCLILoginProcedure:      {},
+	"GET /oauth/callback":                                  {},
+	"GET /oauth/login":                                     {},
+	"GET /saml/login":                                      {},
 }
 
 func (s *Service) LogAction(
@@ -80,7 +84,7 @@ func (s *Service) logAudit(
 ) {
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Debug("panic while writing audit log", "panic", r)
+			slog.Debug("panic while writing audit log", "panic_type", fmt.Sprintf("%T", r))
 		}
 	}()
 
@@ -120,7 +124,7 @@ func (s *Service) logAudit(
 	}
 
 	if err := s.Append(ctx, log); err != nil {
-		slog.Warn("failed to write audit log", "error", err)
+		slog.Warn("failed to write audit log", "error_type", fmt.Sprintf("%T", err))
 	}
 }
 
@@ -142,6 +146,13 @@ func shouldAudit(procedure string) bool {
 }
 
 func isMutatingProcedure(procedure string) bool {
+	if method, _, ok := strings.Cut(procedure, " "); ok {
+		switch method {
+		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+			return true
+		}
+	}
+
 	_, method, ok := strings.Cut(strings.TrimPrefix(procedure, "/"), "/")
 	if !ok {
 		return false
