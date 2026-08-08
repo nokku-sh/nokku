@@ -63,7 +63,7 @@
 	<Select.Root type="single" value={currentRole} onValueChange={handleRoleChange}>
 		<Select.Trigger
 			disabled={saving}
-			class="h-auto! w-fit justify-center gap-1.5 rounded-full border border-input bg-transparent px-2 py-0.5 text-xs font-medium text-foreground shadow-none transition-all hover:bg-muted/50 focus:ring-0 disabled:opacity-70 [&>svg:last-child]:hidden"
+			class="h-auto! w-fit cursor-pointer justify-center gap-1.5  rounded-full border border-input bg-transparent px-2 py-0.5 text-xs font-medium text-foreground shadow-none transition-all hover:bg-muted/50 focus:ring-0 disabled:opacity-70 [&>svg:last-child]:hidden"
 		>
 			{#if saving}
 				<LoaderCircle class="size-3 animate-spin text-muted-foreground"></LoaderCircle>

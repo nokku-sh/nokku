@@ -29,7 +29,7 @@
 >
 	<Select.Trigger
 		disabled={updateCA.isPending}
-		class="h-auto! w-fit justify-center gap-1.5 rounded-full border-none bg-transparent! px-2.5 py-0.5 text-xs font-medium shadow-none transition-all focus:ring-0 disabled:opacity-70 [&>svg:last-child]:hidden"
+		class="h-auto! w-fit cursor-pointer justify-center gap-1.5  rounded-full border-none bg-transparent! px-2.5 py-0.5 text-xs font-medium shadow-none transition-all focus:ring-0 disabled:opacity-70 [&>svg:last-child]:hidden"
 	>
 		{#if updateCA.isPending}
 			<LoaderCircle class="size-3 animate-spin text-muted-foreground" />
