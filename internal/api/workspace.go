@@ -125,9 +125,6 @@ func (s *WorkspaceService) ListWorkspaces(
 		workspaces, err = q.ListWorkspaces(ctx)
 		return err
 	}); err != nil {
-		if errors.Is(err, db.ErrNoWorkspaces) {
-			return &nokkuv1.ListWorkspacesResponse{}, nil
-		}
 		return nil, DBError(err)
 	}
 
@@ -146,7 +143,6 @@ func (s *WorkspaceService) UpdateWorkspaceSettings(
 		if req.EnrollAutoApprove != nil {
 			params.EnrollAutoApprove = req.EnrollAutoApprove
 		}
-
 		settings, err = q.UpdateWorkspaceSettings(ctx, params)
 		return err
 	}); err != nil {
