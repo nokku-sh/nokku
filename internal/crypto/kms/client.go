@@ -10,7 +10,6 @@ import (
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"github.com/scaleway/tink-go-scwkms/integration/scwkms"
 	"github.com/tink-crypto/tink-go-awskms/v3/integration/awskms"
-	"github.com/tink-crypto/tink-go-gcpkms/v2/integration/gcpkms"
 	"github.com/tink-crypto/tink-go-hcvault/v2/integration/hcvault"
 )
 
@@ -21,8 +20,9 @@ func (t *TinkEncryptor) setupClient(ctx context.Context) (err error) {
 	switch {
 	case strings.HasPrefix(t.KMSURI, "aws-kms://"):
 		t.client, err = awskms.NewClientWithOptions(ctx, t.KMSURI)
-	case strings.HasPrefix(t.KMSURI, "gcp-kms://"):
-		t.client, err = gcpkms.NewClient(ctx, t.KMSURI)
+	// TODO: Enable when genproto/googleapis are fixed
+	// case strings.HasPrefix(t.KMSURI, "gcp-kms://"):
+	// 	t.client, err = gcpkms.NewClient(ctx, t.KMSURI)
 	case strings.HasPrefix(t.KMSURI, "hcvault://"):
 		if t.VaultToken == "" {
 			return fmt.Errorf("VAULT_TOKEN required for hcvault")
