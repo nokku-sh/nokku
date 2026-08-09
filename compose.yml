@@ -1,41 +1,51 @@
-# Services needed for dev environment (ephemeral)
+# Minimal deployment for Nokku: just the backend and Postgres.
+#
+#   cp .env.prod.example .env   # fill in your values
+#   docker compose -f compose.min.yml up -d
+#
+# No reverse proxy, no shared cache (NOKKU_CACHE defaults to memory).
+# The app is published directly on host port 3000.
+name: nokku
+
+volumes:
+  pgdata:
+  nokku-data:
+
 services:
   postgres:
     image: docker.io/postgres:18-alpine
-    container_name: postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: nokku
-      PGDATA: /inmemory-db
+      POSTGRES_USER: ${POSTGRES_USER:-nokku}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-nokku}
     volumes:
-      - type: tmpfs
-        target: /inmemory-db
-    ports:
-      - 5432:5432
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     restart: unless-stopped
 
-  # keycloak:
-  #   image: quay.io/keycloak/keycloak:latest
-  #   container_name: keycloak
-  #   command: start-dev
-  #   environment:
-  #     KEYCLOAK_ADMIN: admin
-  #     KEYCLOAK_ADMIN_PASSWORD: admin
-  #   ports:
-  #     - "8080:8080"
-  #   restart: unless-stopped
-
-  # vault:
-  #   image: docker.io/hashicorp/vault:latest
-  #   container_name: vault
-  #   command: ["server", "-dev"]
-  #   environment:
-  #     VAULT_DEV_ROOT_TOKEN_ID: "root"
-  #     VAULT_ADDR: "http://0.0.0.0:8200"
-  #     VAULT_API_ADDR: "http://0.0.0.0:8200"
-  #   cap_add:
-  #     - IPC_LOCK
-  #   ports:
-  #     - 8200:8200
-  #   restart: unless-stopped
+  nokku:
+    image: ${NOKKU_IMAGE:-ghcr.io/nokku-sh/nokku:latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    # Schema migrations run automatically on boot (NOKKU_DB_AUTOMIGRATE=true).
+    environment:
+      NOKKU_DB_HOST: postgres
+      NOKKU_DB_PORT: "5432"
+      NOKKU_DB_NAME: ${POSTGRES_DB:-nokku}
+      NOKKU_DB_USER: ${POSTGRES_USER:-nokku}
+      NOKKU_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
+      NOKKU_DB_SSL_MODE: disable
+      NOKKU_STORAGE: local
+      NOKKU_LOCAL_STORAGE_PATH: /data
+    volumes:
+      - nokku-data:/data
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
