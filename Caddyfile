@@ -1,0 +1,15 @@
+# Reverse proxy for Nokku. SITE_ADDRESS is injected by compose from
+# NOKKU_BASE_URL (see compose.prod.yml).
+#
+# A real domain triggers automatic HTTPS via Let's Encrypt (expose ports
+# 80/443). localhost and bare IP addresses serve plain HTTP.
+{$SITE_ADDRESS} {
+	# The backend serves the SPA over HTTP/1.1 and Connect/gRPC over
+	# unencrypted HTTP/2 (h2c), so advertise both to the upstream.
+	# WebSockets (/terminal/ws) are proxied transparently.
+	reverse_proxy nokku:3000 {
+		transport http {
+			versions h2c 1.1
+		}
+	}
+}
