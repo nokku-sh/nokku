@@ -24,12 +24,12 @@ func TestChallengeRoundTrip(t *testing.T) {
 	pubPEM := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDER})
 
 	const (
-		daemonID  = "123e4567-e89b-12d3-a456-426614174000"
-		ts        = "1700000000"
-		nonce     = "deadbeefcafebabe"
-		procedure = "/nokku.v1.DaemonService/SyncDaemon"
+		identityID = "123e4567-e89b-12d3-a456-426614174000"
+		ts         = "1700000000"
+		nonce      = "deadbeefcafebabe"
+		procedure  = "/nokku.v1.DaemonService/SyncDaemon"
 	)
-	payload := daemonID + ":" + ts + ":" + nonce + ":" + procedure
+	payload := identityID + ":" + ts + ":" + nonce + ":" + procedure
 	digest := sha256.Sum256([]byte(payload))
 	sig, err := ecdsa.SignASN1(rand.Reader, priv, digest[:])
 	if err != nil {
@@ -41,7 +41,7 @@ func TestChallengeRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	if chal.DaemonID != daemonID || chal.Procedure != procedure || chal.Nonce != nonce {
+	if chal.IdentityID != identityID || chal.Procedure != procedure || chal.Nonce != nonce {
 		t.Fatalf("parsed challenge mismatch: %+v", chal)
 	}
 	if got := strconv.FormatInt(chal.Timestamp, 10); got != ts {

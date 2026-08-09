@@ -155,7 +155,7 @@ func (a *AuthNInterceptor) authenticateChallenge(
 		return nil, errors.New("stale challenge")
 	}
 
-	daemon, err := a.cfg.Conn.Q.GetDaemon(ctx, chal.DaemonID)
+	daemon, err := a.cfg.Conn.Q.GetDaemon(ctx, chal.IdentityID)
 	if err == nil {
 		if daemon.AuthPubkey == "" {
 			return nil, errors.New("daemon does not use challenge authentication")
@@ -172,7 +172,7 @@ func (a *AuthNInterceptor) authenticateChallenge(
 		return meta.WithActor(ctx, actor), nil
 	}
 
-	device, err := a.cfg.Conn.Q.GetUserDevice(ctx, chal.DaemonID)
+	device, err := a.cfg.Conn.Q.GetUserDevice(ctx, chal.IdentityID)
 	if err == nil {
 		if device.Kind != "cli" || device.AuthPubkey == nil {
 			return nil, errors.New("device does not use challenge authentication")
@@ -204,7 +204,7 @@ func (a *AuthNInterceptor) verifyChallenge(
 		return err
 	}
 
-	nonceKey := "challenge:" + chal.DaemonID + ":" + chal.Nonce
+	nonceKey := "challenge:" + chal.IdentityID + ":" + chal.Nonce
 	if _, err := a.cfg.Cache.Get(ctx, nonceKey); err == nil {
 		return errors.New("replayed challenge")
 	} else if !errors.Is(err, cache.ErrNotFound) {

@@ -14,24 +14,24 @@ import (
 	"github.com/google/uuid"
 )
 
-// ChallengeMaxSkew is the maximum allowed age of a signed daemon challenge.
-// The daemon signs with its current Unix timestamp; anything older (or from
+// ChallengeMaxSkew is the maximum allowed age of a signed request challenge.
+// The identity signs with its current Unix timestamp; anything older (or from
 // the future) than this window is rejected.
 const ChallengeMaxSkew = 5 * time.Minute
 
-// Challenge is a signed daemon request challenge of the form
+// Challenge is a signed request challenge of the form
 //
-//	<daemonID>:<unixSeconds>:<nonce>:<procedure>:<base64url(signature)>
+//	<identityID>:<unixSeconds>:<nonce>:<procedure>:<base64url(signature)>
 //
 // The signature covers everything before the final colon, binding the
-// challenge to the daemon, a point in time, a fresh nonce and the exact RPC
-// it was created for.
+// challenge to the identity (a daemon or a CLI device), a point in time, a
+// fresh nonce and the exact RPC it was created for.
 type Challenge struct {
-	DaemonID  string
-	Timestamp int64
-	Nonce     string
-	Procedure string
-	Signature []byte
+	IdentityID string
+	Timestamp  int64
+	Nonce      string
+	Procedure  string
+	Signature  []byte
 }
 
 // ParseChallenge parses a raw "Nokku" scheme challenge value.
@@ -51,7 +51,7 @@ func ParseChallenge(challenge string) (*Challenge, error) {
 		return nil, errors.New("malformed challenge payload")
 	}
 	if _, err := uuid.Parse(parts[0]); err != nil {
-		return nil, errors.New("malformed challenge daemon id")
+		return nil, errors.New("malformed challenge identity id")
 	}
 	ts, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
@@ -65,17 +65,17 @@ func ParseChallenge(challenge string) (*Challenge, error) {
 	}
 
 	return &Challenge{
-		DaemonID:  parts[0],
-		Timestamp: ts,
-		Nonce:     parts[2],
-		Procedure: parts[3],
-		Signature: sig,
+		IdentityID: parts[0],
+		Timestamp:  ts,
+		Nonce:      parts[2],
+		Procedure:  parts[3],
+		Signature:  sig,
 	}, nil
 }
 
-// SignedPayload returns the exact bytes the daemon signed.
+// SignedPayload returns the exact bytes the identity signed.
 func (c *Challenge) SignedPayload() string {
-	return c.DaemonID + ":" + strconv.FormatInt(c.Timestamp, 10) + ":" + c.Nonce + ":" + c.Procedure
+	return c.IdentityID + ":" + strconv.FormatInt(c.Timestamp, 10) + ":" + c.Nonce + ":" + c.Procedure
 }
 
 // Verify checks the challenge signature against a PEM-encoded ECDSA public
