@@ -7,6 +7,7 @@ import (
 
 	"connectrpc.com/otelconnect"
 	"github.com/mizuchilabs/kata/buildinfo"
+	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
@@ -73,11 +74,11 @@ func NewOTLPInterceptor(ctx context.Context) *otelconnect.Interceptor {
 		log.WithResource(res),
 	)
 
-	// otelLogger := slog.New(slog.NewMultiHandler(
-	// 	slog.Default().Handler(),
-	// 	otelslog.NewLogger("nokku-api", otelslog.WithLoggerProvider(lp)).Handler(),
-	// ))
-	// slog.SetDefault(otelLogger)
+	otelLogger := slog.New(slog.NewMultiHandler(
+		slog.Default().Handler(),
+		otelslog.NewLogger("nokku-api", otelslog.WithLoggerProvider(lp)).Handler(),
+	))
+	slog.SetDefault(otelLogger)
 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
