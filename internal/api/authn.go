@@ -138,6 +138,10 @@ func (a *AuthNInterceptor) authenticateUser(
 // procedure being invoked, must be fresh (within ChallengeMaxSkew) and its
 // nonce must not have been seen before. Daemons and CLI user devices both
 // authenticate this way; service accounts keep bearer tokens.
+//
+// TODO: GetDaemon/GetUserDevice here is a primary-key read per authenticated
+// RPC. Fine today, but when daemon+CLI traffic grows, add a short-TTL
+// read-through cache for {auth_pubkey, kind} and invalidate on delete/rotate.
 func (a *AuthNInterceptor) authenticateChallenge(
 	ctx context.Context,
 	challenge, procedure string,

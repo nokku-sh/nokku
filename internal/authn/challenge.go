@@ -75,7 +75,10 @@ func ParseChallenge(challenge string) (*Challenge, error) {
 
 // SignedPayload returns the exact bytes the identity signed.
 func (c *Challenge) SignedPayload() string {
-	return c.IdentityID + ":" + strconv.FormatInt(c.Timestamp, 10) + ":" + c.Nonce + ":" + c.Procedure
+	return c.IdentityID + ":" + strconv.FormatInt(
+		c.Timestamp,
+		10,
+	) + ":" + c.Nonce + ":" + c.Procedure
 }
 
 // Verify checks the challenge signature against a PEM-encoded ECDSA public
