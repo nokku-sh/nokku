@@ -31,7 +31,10 @@ func syncWebDevice(
 	user *db.User,
 ) {
 	if raw := authn.GetDeviceToken(reqHeader); raw != "" {
-		if parsed, err := crypto.Parse(raw); err == nil && parsed.ID != "" && parsed.Prefix == crypto.PrefixDevice {
+		if parsed, err := crypto.Parse(
+			raw,
+		); err == nil && parsed.ID != "" &&
+			parsed.Prefix == crypto.PrefixDevice {
 			device, err := cfg.Conn.Q.GetUserWebDevice(ctx, &db.GetUserWebDeviceParams{
 				ID:     parsed.ID,
 				UserID: user.ID,
