@@ -17,3 +17,8 @@ var defaultExpiry = map[string]time.Duration{
 	VerifyToken:  15 * time.Minute,
 	CLIToken:     10 * time.Minute,
 }
+
+// GetTokenTTL returns the configured expiry duration for a token type.
+func GetTokenTTL(tokenType string) time.Duration {
+	return defaultExpiry[tokenType]
+}

@@ -20,6 +20,7 @@ type TokenParams struct {
 	Email       string `json:"email"`
 	Username    string `json:"username"`
 	TokenType   string `json:"token_type"`
+	Jti         string `json:"jti"` // populated on verify; ignored on create
 }
 
 type Service struct {
@@ -106,6 +107,7 @@ func (s *Service) VerifyToken(tokenString string) (*TokenParams, error) {
 		return nil, err
 	}
 
+	claims.Jti, _ = token.GetJti()
 	claims.UserID, _ = token.GetString("user_id")
 	claims.WorkspaceID, _ = token.GetString("workspace_id")
 	claims.Email, _ = token.GetString("email")

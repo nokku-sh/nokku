@@ -8,6 +8,11 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
+// deviceCookieMaxAge is how long a browser is remembered as a known device.
+// Independent of the session cookies, the server-side row expires after
+// 6 months of inactivity (sliding).
+const deviceCookieMaxAge = 365 * 24 * time.Hour
+
 func (s *Service) AccessCookie(_ context.Context, res http.Header, user *db.User) string {
 	accessToken, err := s.CreateToken(&TokenParams{
 		UserID:    user.ID,
@@ -36,20 +41,16 @@ func (s *Service) RefreshCookie(_ context.Context, res http.Header, user *db.Use
 	return refreshToken
 }
 
-// deviceCookieMaxAge is how long a browser is remembered as a known device.
-// Independent of the session cookies; the server-side row expires after
-// 6 months of inactivity (sliding).
-const deviceCookieMaxAge = 365 * 24 * time.Hour
+// SetRefreshCookie writes an existing refresh token to the refresh cookie.
+// Used when rotating the token on refresh.
+func SetRefreshCookie(res http.Header, token string) {
+	setCookie(res, RefreshTokenCookie, token, defaultExpiry[RefreshToken])
+}
 
 // SetDeviceCookie marks the browser as a known device for security alerts.
 // The token grants no access.
-//
-// SameSite=None is required: SAML ACS arrives as a cross-site POST from the
-// IdP, where Lax cookies are withheld, so every SAML login would look like a
-// new device. Safe because the cookie authorizes nothing and is only sent to
-// our own domain.
 func SetDeviceCookie(res http.Header, token string) {
-	// #nosec G124 -- SameSite=None is intentional (see above): the cookie is
+	// #nosec G124 -- SameSite=None is intentional: the cookie is
 	// HttpOnly+Secure, authorizes nothing, and must survive the SAML ACS
 	// cross-site POST to mark the browser as a known device.
 	cookie := http.Cookie{
