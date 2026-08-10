@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -31,16 +30,11 @@ type CLISession struct {
 }
 
 type AuthService struct {
-	cfg          *config.Config
-	loginWaiters map[string]chan *CLISession
-	mu           sync.RWMutex
+	cfg *config.Config
 }
 
 func NewAuthService(cfg *config.Config) *AuthService {
-	return &AuthService{
-		cfg:          cfg,
-		loginWaiters: make(map[string]chan *CLISession),
-	}
+	return &AuthService{cfg: cfg}
 }
 
 func (s *AuthService) Register(
@@ -238,7 +232,58 @@ func (s *AuthService) RefreshToken(
 		return nil, ErrSessionExpired
 	}
 
+	// Refreshing requires a known web device. Deleting a device row revokes
+	// its sessions: without a matching device the refresh is denied and the
+	// browser is logged out once its access token expires.
+	deviceID, ok := verifyWebDevice(ctx, s.cfg, ci.RequestHeader(), user.ID)
+	if !ok {
+		authn.ClearCookies(ci.ResponseHeader())
+		return nil, NewError(connect.CodeUnauthenticated, "session expired")
+	}
+	// A refresh counts as device activity, keeping the sliding 6-month
+	// device expiry honest for sessions that never do a full re-login.
+	_ = s.cfg.Conn.Q.UpdateUserDeviceUsage(ctx, deviceID)
+
+	// Reuse detection: remember the current refresh token's jti per device.
+	// A valid but stale jti means a previously rotated refresh token was
+	// replayed, assume theft, revoke the device and log the session out.
+	stateKey := "refresh:" + deviceID
+	if current, err := s.cfg.Cache.Get(
+		ctx,
+		stateKey,
+	); err == nil && len(current) > 0 &&
+		string(current) != claims.Jti {
+		_ = s.cfg.Cache.Delete(ctx, stateKey)
+		_ = s.cfg.Conn.Q.DeleteUserDevice(
+			ctx,
+			&db.DeleteUserDeviceParams{ID: deviceID, UserID: user.ID},
+		)
+		authn.ClearCookies(ci.ResponseHeader())
+		return nil, NewError(connect.CodeUnauthenticated, "session expired")
+	}
+
 	accessToken := s.cfg.Authn.AccessCookie(ctx, ci.ResponseHeader(), user)
+
+	// Rotate the refresh token: every refresh issues a fresh token whose jti
+	// becomes the expected value for this device. If the cache entry evicted
+	// (24h sweep on the memory backend), reuse detection simply resets until
+	// the next refresh writes it again.
+	newRefresh, err := s.cfg.Authn.CreateToken(&authn.TokenParams{
+		UserID:    user.ID,
+		Email:     user.Email,
+		Username:  user.Username,
+		TokenType: authn.RefreshToken,
+	})
+	if err != nil {
+		return nil, ErrInternal
+	}
+	newClaims, err := s.cfg.Authn.VerifyToken(newRefresh)
+	if err != nil {
+		return nil, ErrInternal
+	}
+	authn.SetRefreshCookie(ci.ResponseHeader(), newRefresh)
+	_ = s.cfg.Cache.Set(ctx, stateKey, []byte(newClaims.Jti), authn.GetTokenTTL(authn.RefreshToken))
+
 	meta.SetAuditUserID(ctx, user.ID)
 	return &nokkuv1.RefreshTokenResponse{
 		AccessToken: &accessToken,
@@ -431,17 +476,6 @@ func (s *AuthService) StreamCLILogin(
 
 	defer func() { _ = s.cfg.Cache.Delete(ctx, loginCode) }()
 
-	// Register waiter channel before sending URL to avoid race
-	ch := make(chan *CLISession, 1)
-	s.mu.Lock()
-	s.loginWaiters[loginCode] = ch
-	s.mu.Unlock()
-	defer func() {
-		s.mu.Lock()
-		delete(s.loginWaiters, loginCode)
-		s.mu.Unlock()
-	}()
-
 	verificationURL := fmt.Sprintf("%s/login?token=%s", s.cfg.FullURL(), loginCode)
 	if err := stream.Send(&nokkuv1.StreamCLILoginResponse{
 		VerificationUrl: &verificationURL,
@@ -449,16 +483,31 @@ func (s *AuthService) StreamCLILogin(
 		return err
 	}
 
+	// Poll the cache for the verified session. VerifyCLILogin (running on the
+	// user's authenticated web session) writes the user into the same cache
+	// entry when it approves the login.
 	timeout := time.After(5 * time.Minute)
-	select {
-	case <-ctx.Done():
-		return nil
-	case <-timeout:
-		return ErrTimeout
-	case session := <-ch:
-		return stream.Send(&nokkuv1.StreamCLILoginResponse{
-			User: session.User,
-		})
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-timeout:
+			return ErrTimeout
+		case <-ticker.C:
+			data, err := s.cfg.Cache.Get(ctx, loginCode)
+			if err != nil {
+				continue
+			}
+			var session CLISession
+			if err := json.Unmarshal(data, &session); err != nil || session.User == nil {
+				continue
+			}
+			return stream.Send(&nokkuv1.StreamCLILoginResponse{
+				User: session.User,
+			})
+		}
 	}
 }
 
@@ -517,21 +566,15 @@ func (s *AuthService) VerifyCLILogin(
 		}()
 	}
 
-	// Notify the waiter channel instead of cache update
-	s.mu.RLock()
-	ch, exists := s.loginWaiters[req.GetLoginCode()]
-	s.mu.RUnlock()
-	if exists {
-		// Non-blocking send: the waiter entry may be stale (the streaming
-		// handler already returned/timeout while its deferred map-delete
-		// hadn't run, or a double-submit raced the single buffered slot).
-		// A blocking send would hang this request forever.
-		select {
-		case ch <- &CLISession{
-			User: user.ToProto(),
-		}:
-		default:
-		}
+	// Publish the verified session so the waiting StreamCLILogin poll picks
+	// it up. Overwriting is idempotent, so double-submissions are safe.
+	session.User = user.ToProto()
+	approved, err := json.Marshal(session)
+	if err != nil {
+		return nil, ErrInternal
+	}
+	if err := s.cfg.Cache.Set(ctx, req.GetLoginCode(), approved, 5*time.Minute); err != nil {
+		return nil, ErrInternal
 	}
 	return &nokkuv1.VerifyCLILoginResponse{}, nil
 }

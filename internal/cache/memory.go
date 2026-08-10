@@ -14,8 +14,10 @@ const maxMemoryEntries = 10_000
 
 // memorySweepTTL bounds how long an entry may sit in the memory cache before
 // the library's janitor reclaims it. Per-key TTLs are enforced separately, so
-// keep per-key TTLs below this bound.
-const memorySweepTTL = 24 * time.Hour
+// this only needs to exceed the longest per-key TTL the cache is asked to
+// hold. Refresh-token reuse state lives for the 7-day refresh lifetime, hence
+// 8 days.
+const memorySweepTTL = 8 * 24 * time.Hour
 
 type entry struct {
 	value   []byte

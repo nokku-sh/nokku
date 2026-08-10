@@ -31,7 +31,7 @@ func syncWebDevice(
 	user *db.User,
 ) {
 	if raw := authn.GetDeviceToken(reqHeader); raw != "" {
-		if parsed, err := crypto.Parse(raw); err == nil && parsed.ID != "" {
+		if parsed, err := crypto.Parse(raw); err == nil && parsed.ID != "" && parsed.Prefix == crypto.PrefixDevice {
 			device, err := cfg.Conn.Q.GetUserWebDevice(ctx, &db.GetUserWebDeviceParams{
 				ID:     parsed.ID,
 				UserID: user.ID,
@@ -81,6 +81,34 @@ func syncWebDevice(
 			slog.Debug("failed to send device added email", "error", err)
 		}
 	}()
+}
+
+// verifyWebDevice reports whether the browser's remembered-device cookie
+// still maps to a known web device for the user, returning its device ID.
+// Web sessions depend on it at refresh time: deleting a device row revokes
+// its sessions, forcing a re-login once the access token expires.
+func verifyWebDevice(
+	ctx context.Context,
+	cfg *config.Config,
+	header http.Header,
+	userID string,
+) (string, bool) {
+	raw := authn.GetDeviceToken(header)
+	if raw == "" {
+		return "", false
+	}
+	parsed, err := crypto.Parse(raw)
+	if err != nil || parsed.Prefix != crypto.PrefixDevice || parsed.ID == "" {
+		return "", false
+	}
+	device, err := cfg.Conn.Q.GetUserWebDevice(ctx, &db.GetUserWebDeviceParams{
+		ID:     parsed.ID,
+		UserID: userID,
+	})
+	if err != nil || !device.TokenHash.Verify(raw) {
+		return "", false
+	}
+	return parsed.ID, true
 }
 
 func deviceNameFromUA(ua string) string {
