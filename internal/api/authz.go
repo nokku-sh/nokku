@@ -146,7 +146,7 @@ func (a *AuthorizationInterceptor) authorize(
 ) error {
 	actor := meta.ActorFromContext(ctx)
 	if actor.ID == "" {
-		return errors.New("no actor in context")
+		return db.ErrNoActor
 	}
 
 	role := "daemon"
