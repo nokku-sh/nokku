@@ -37,6 +37,49 @@ func (q *Queries) CreateBackupCodes(ctx context.Context, arg *CreateBackupCodesP
 	return err
 }
 
+const createOAuthUser = `-- name: CreateOAuthUser :one
+INSERT INTO
+  users (name, username, password_hash, picture, email, email_verified)
+VALUES
+  ($1, $2, $3, $4, $5, FALSE)
+ON CONFLICT (email) DO NOTHING
+RETURNING
+  id, name, username, email, email_verified, password_hash, picture, is_active, enable_email_recovery, created_at, updated_at
+`
+
+type CreateOAuthUserParams struct {
+	Name         string                `json:"name"`
+	Username     string                `json:"username"`
+	PasswordHash crypto.HashedPassword `json:"passwordHash"`
+	Picture      *string               `json:"picture"`
+	Email        string                `json:"email"`
+}
+
+func (q *Queries) CreateOAuthUser(ctx context.Context, arg *CreateOAuthUserParams) (*User, error) {
+	row := q.db.QueryRow(ctx, createOAuthUser,
+		arg.Name,
+		arg.Username,
+		arg.PasswordHash,
+		arg.Picture,
+		arg.Email,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Username,
+		&i.Email,
+		&i.EmailVerified,
+		&i.PasswordHash,
+		&i.Picture,
+		&i.IsActive,
+		&i.EnableEmailRecovery,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO
   users (name, username, password_hash, picture, email, email_verified)

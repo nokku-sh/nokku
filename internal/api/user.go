@@ -156,7 +156,7 @@ func (s *UserService) ListLinkedAccounts(
 	ctx context.Context,
 	_ *nokkuv1.ListLinkedAccountsRequest,
 ) (*nokkuv1.ListLinkedAccountsResponse, error) {
-	identities, err := s.cfg.Conn.Q.GetOAuthIdentitiesByUserID(ctx, meta.UserIDFromContext(ctx))
+	identities, err := s.cfg.Conn.Q.GetUserIdentitiesByUserID(ctx, meta.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -165,6 +165,8 @@ func (s *UserService) ListLinkedAccounts(
 	for _, id := range identities {
 		accounts = append(accounts, &nokkuv1.OAuthIdentity{
 			Provider:         new(id.Provider),
+			ProviderId:       new(id.ProviderID),
+			Protocol:         new(id.Protocol),
 			ProviderEmail:    id.ProviderEmail,
 			ProviderUsername: id.ProviderUsername,
 			CreatedAt:        timestamppb.New(id.CreatedAt),
@@ -180,12 +182,21 @@ func (s *UserService) UnlinkAccount(
 ) (*nokkuv1.UnlinkAccountResponse, error) {
 	userID := meta.UserIDFromContext(ctx)
 
+	// Workspace identities (enterprise OIDC/SAML) are owned by the
+	// organization and cannot be unlinked by the user.
+	if req.GetProvider() != "github" && req.GetProvider() != "google" {
+		return nil, NewError(
+			connect.CodePermissionDenied,
+			"workspace identities cannot be unlinked",
+		)
+	}
+
 	user, err := s.cfg.Conn.Q.GetUserByID(ctx, userID)
 	if err != nil {
 		return nil, DBError(err)
 	}
 
-	identities, err := s.cfg.Conn.Q.GetOAuthIdentitiesByUserID(ctx, userID)
+	identities, err := s.cfg.Conn.Q.GetUserIdentitiesByUserID(ctx, userID)
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -201,7 +212,7 @@ func (s *UserService) UnlinkAccount(
 		}
 	}
 
-	if err := s.cfg.Conn.Q.DeleteOAuthIdentityByUser(ctx, &db.DeleteOAuthIdentityByUserParams{
+	if err := s.cfg.Conn.Q.DeleteUserIdentityByUser(ctx, &db.DeleteUserIdentityByUserParams{
 		UserID:   userID,
 		Provider: req.GetProvider(),
 	}); err != nil {

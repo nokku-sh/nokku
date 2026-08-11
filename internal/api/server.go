@@ -126,6 +126,7 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 		NewLogInterceptor(s.cfg.Debug),
 		NewTimeoutInterceptor(),
 		NewAuthNInterceptor(s.cfg),
+		NewAuthZInterceptor(s.cfg),
 		NewRateLimitInterceptor(),
 		NewAuditInterceptor(s.cfg.Audit),
 		validate.NewInterceptor(),
@@ -346,16 +347,22 @@ func (s *Server) registerServices(ctx context.Context) error {
 	pubChain := NewChain(audit.WithAudit)                 // Public chain (audit only, no auth)
 	privChain := NewChain(audit.WithAudit, auth.WithAuth) // Private chain (audit + auth)
 
-	// OAuth handlers (public)
+	// OAuth handler (public, OAuth2: github)
 	oauthHandler := NewOAuthHandler(s.cfg)
 	s.mux.Handle("/oauth/login", pubChain.ThenFunc(oauthHandler.LoginHandler))
 	s.mux.Handle("/oauth/callback", pubChain.ThenFunc(oauthHandler.CallbackHandler))
+
+	// OIDC handler (public, OpenID Connect: google + enterprise)
+	oidcHandler := NewOIDCHandler(s.cfg)
+	s.mux.Handle("/oidc/login", pubChain.ThenFunc(oidcHandler.LoginHandler))
+	s.mux.Handle("/oidc/callback", pubChain.ThenFunc(oidcHandler.CallbackHandler))
 
 	// SAML handlers (public)
 	samlHandler := NewSAMLHandler(s.cfg)
 	s.mux.Handle("/saml/login", pubChain.ThenFunc(samlHandler.LoginHandler))
 	s.mux.Handle("POST /saml/acs", pubChain.ThenFunc(samlHandler.CallbackHandler))
 	s.mux.HandleFunc("/saml/metadata/{id}", samlHandler.MetadataHandler)
+	s.mux.HandleFunc("/saml/certificate/{id}", samlHandler.CertificateHandler)
 
 	// Passkey handlers
 	passkeyHandler, err := NewPasskeyService(s.cfg)

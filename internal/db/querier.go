@@ -32,6 +32,7 @@ type Querier interface {
 	CreateBackupCodes(ctx context.Context, arg *CreateBackupCodesParams) error
 	CreateCA(ctx context.Context, arg *CreateCAParams) (*CertificateAuthority, error)
 	CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*CreateDaemonRow, error)
+	CreateOAuthUser(ctx context.Context, arg *CreateOAuthUserParams) (*User, error)
 	// Passkeys -------------------------------------------------------------------
 	CreatePasskey(ctx context.Context, arg *CreatePasskeyParams) error
 	CreatePrincipal(ctx context.Context, arg *CreatePrincipalParams) (*Principal, error)
@@ -49,16 +50,18 @@ type Querier interface {
 	DeleteExpiredUserDevices(ctx context.Context) error
 	// Rotation-only: remove the keyset when rotating to a non-KMS cipher.
 	DeleteKeyset(ctx context.Context) error
-	DeleteOAuthIdentity(ctx context.Context, arg *DeleteOAuthIdentityParams) error
-	DeleteOAuthIdentityByUser(ctx context.Context, arg *DeleteOAuthIdentityByUserParams) error
 	DeleteOrphanAuditLogs(ctx context.Context, cutoff time.Time) (int64, error)
 	DeletePasskey(ctx context.Context, passkeyID string) error
-	DeleteServiceAccount(ctx context.Context, serviceAccountID string) (*ServiceAccount, error)
+	DeleteServiceAccount(ctx context.Context, serviceAccountID string) error
 	DeleteTarget(ctx context.Context, targetID string) (*Target, error)
 	DeleteTeam(ctx context.Context, teamID string) (*Team, error)
 	DeleteUnverifiedUsers(ctx context.Context) error
 	DeleteUser(ctx context.Context, userID string) error
 	DeleteUserDevice(ctx context.Context, arg *DeleteUserDeviceParams) error
+	DeleteUserIdentitiesByProvider(ctx context.Context, provider string) error
+	DeleteUserIdentitiesByUserAndProtocol(ctx context.Context, arg *DeleteUserIdentitiesByUserAndProtocolParams) error
+	DeleteUserIdentity(ctx context.Context, arg *DeleteUserIdentityParams) error
+	DeleteUserIdentityByUser(ctx context.Context, arg *DeleteUserIdentityByUserParams) error
 	DeleteUserPassword(ctx context.Context, userID string) error
 	DeleteWorkspace(ctx context.Context, workspaceID string) error
 	DeleteWorkspaceAuditLogs(ctx context.Context, arg *DeleteWorkspaceAuditLogsParams) (int64, error)
@@ -81,10 +84,6 @@ type Querier interface {
 	GetExpiringCAForUpdate(ctx context.Context) (*CertificateAuthority, error)
 	GetExpiringSAMLProviderForUpdate(ctx context.Context) (*SamlProvider, error)
 	GetKeysetData(ctx context.Context) ([]byte, error)
-	GetOAuthIdentitiesByProvider(ctx context.Context, provider string) ([]*GetOAuthIdentitiesByProviderRow, error)
-	GetOAuthIdentitiesByUserID(ctx context.Context, userID string) ([]*OauthIdentity, error)
-	// OAuth Identities -----------------------------------------------------------
-	GetOAuthIdentity(ctx context.Context, arg *GetOAuthIdentityParams) (*OauthIdentity, error)
 	// OIDC Providers -------------------------------------------------------------
 	GetOIDCProvider(ctx context.Context, workspaceID string) (*OidcProvider, error)
 	GetOIDCProviderByDomain(ctx context.Context, domain string) (*OidcProvider, error)
@@ -112,6 +111,10 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	GetUserByID(ctx context.Context, userID string) (*User, error)
 	GetUserDevice(ctx context.Context, id string) (*UserDevice, error)
+	GetUserIdentitiesByProvider(ctx context.Context, provider string) ([]*GetUserIdentitiesByProviderRow, error)
+	GetUserIdentitiesByUserID(ctx context.Context, userID string) ([]*UserIdentity, error)
+	// User Identities -----------------------------------------------------------
+	GetUserIdentity(ctx context.Context, arg *GetUserIdentityParams) (*UserIdentity, error)
 	GetUserWebDevice(ctx context.Context, arg *GetUserWebDeviceParams) (*GetUserWebDeviceRow, error)
 	GetUserWorkspaceIDs(ctx context.Context, userID string) ([]string, error)
 	GetWorkspace(ctx context.Context, workspaceID string) (*GetWorkspaceRow, error)
@@ -194,16 +197,17 @@ type Querier interface {
 	// Rotation-only (rotate-secrets command): persist the target keyset
 	// atomically within the rotation transaction. Never used on the boot path.
 	UpsertKeysetWrappedData(ctx context.Context, data []byte) error
-	UpsertOAuthIdentity(ctx context.Context, arg *UpsertOAuthIdentityParams) (*OauthIdentity, error)
 	UpsertRole(ctx context.Context, arg *UpsertRoleParams) error
 	// Note: source is only overwritten when the row is provider-managed ('stripe')
 	// or empty, so manual subscriptions survive provider syncs.
 	UpsertSubscription(ctx context.Context, arg *UpsertSubscriptionParams) error
+	UpsertUserIdentity(ctx context.Context, arg *UpsertUserIdentityParams) (*UserIdentity, error)
 	UseBackupCode(ctx context.Context, arg *UseBackupCodeParams) (string, error)
 	UserWorkspaceMember(ctx context.Context, arg *UserWorkspaceMemberParams) (bool, error)
 	VerifiedDomainExists(ctx context.Context, domain string) (bool, error)
 	VerifyUserEmail(ctx context.Context, arg *VerifyUserEmailParams) error
 	VerifyWorkspaceDomain(ctx context.Context, arg *VerifyWorkspaceDomainParams) (*WorkspaceDomain, error)
+	WorkspaceOwnsVerifiedDomain(ctx context.Context, arg *WorkspaceOwnsVerifiedDomainParams) (bool, error)
 }
 
 var _ Querier = (*Queries)(nil)

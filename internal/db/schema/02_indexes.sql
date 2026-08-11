@@ -1,7 +1,7 @@
 -- Foreign key indexes (required for efficient CASCADE deletes and JOINs)
-CREATE INDEX idx_oauth_identities_user_id ON oauth_identities (user_id);
+CREATE INDEX idx_user_identities_user_id ON user_identities (user_id);
 
-CREATE INDEX idx_oauth_identities_provider_email ON oauth_identities (provider_email);
+CREATE INDEX idx_user_identities_provider_email ON user_identities (provider_email);
 
 CREATE INDEX idx_user_devices_user_id ON user_devices (user_id);
 

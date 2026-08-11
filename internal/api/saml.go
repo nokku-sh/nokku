@@ -91,9 +91,16 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	redirect := s.cfg.FullURL()
 
+	fail := func(code string, err error) {
+		if err != nil {
+			slog.Debug("saml callback failed", "error_code", code, "error", err)
+		}
+		authErrorRedirect(w, r, redirect, code)
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, redirect+"?error=invalid_request", http.StatusTemporaryRedirect)
+		fail("invalid_request", err)
 		return
 	}
 
@@ -101,18 +108,18 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	if relayState := r.FormValue("RelayState"); relayState != "" {
 		stateJSON, err := base64.StdEncoding.DecodeString(relayState)
 		if err != nil {
-			http.Redirect(w, r, redirect+"?error=invalid_state", http.StatusTemporaryRedirect)
+			fail("invalid_state", err)
 			return
 		}
 		if err := json.Unmarshal(stateJSON, &state); err != nil {
-			http.Redirect(w, r, redirect+"?error=invalid_state", http.StatusTemporaryRedirect)
+			fail("invalid_state", err)
 			return
 		}
 	}
 
 	middleware, err := s.getSAMLMiddleware(ctx, state.ProviderID)
 	if err != nil {
-		http.Redirect(w, r, redirect+"?error=provider_config_failed", http.StatusTemporaryRedirect)
+		fail("provider_config_failed", err)
 		return
 	}
 
@@ -124,7 +131,7 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 
 	assertion, err := middleware.ServiceProvider.ParseResponse(r, possibleRequestIDs)
 	if err != nil {
-		http.Redirect(w, r, redirect+"?error=invalid_assertion", http.StatusTemporaryRedirect)
+		fail("invalid_assertion", err)
 		return
 	}
 
@@ -141,29 +148,33 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get provider config for attribute mappings
-	dbConfig, err := s.cfg.Conn.Q.GetSAMLProviderByID(ctx, state.ProviderID)
-	if err != nil {
-		http.Redirect(w, r, redirect+"?error=provider_config_failed", http.StatusTemporaryRedirect)
+	// Get provider config for attribute mappings. Pre-authentication SSO
+	// callback: resolved by provider ID, running as a system transaction.
+	var dbConfig *db.SamlProvider
+	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		dbConfig, err = q.GetSAMLProviderByID(ctx, state.ProviderID)
+		return err
+	}); err != nil {
+		fail("provider_config_failed", err)
 		return
 	}
 
 	userAttr, err := s.extractAttributes(ctx, assertion, dbConfig)
 	if err != nil {
-		http.Redirect(w, r, redirect+"?error=invalid_attributes", http.StatusTemporaryRedirect)
+		fail("invalid_attributes", err)
 		return
 	}
 
 	if assertion.Subject == nil || assertion.Subject.NameID == nil ||
 		assertion.Subject.NameID.Value == "" {
-		http.Redirect(w, r, redirect+"?error=missing_name_id", http.StatusTemporaryRedirect)
+		fail("missing_name_id", nil)
 		return
 	}
 	nameID := assertion.Subject.NameID.Value
 
 	user, err := s.handleSAMLUser(ctx, userAttr, dbConfig, nameID)
 	if err != nil {
-		http.Redirect(w, r, redirect+"?error=user_failed", http.StatusTemporaryRedirect)
+		fail("user_failed", err)
 		return
 	}
 
@@ -175,7 +186,7 @@ func (s *SAMLHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	s.cfg.Authn.RefreshCookie(ctx, w.Header(), user)
 	syncWebDevice(ctx, s.cfg, r.Header, w.Header(), r.RemoteAddr, user)
 
-	http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
+	authRedirect(w, r, redirect)
 }
 
 func (s *SAMLHandler) MetadataHandler(w http.ResponseWriter, r *http.Request) {
@@ -199,6 +210,29 @@ func (s *SAMLHandler) MetadataHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *SAMLHandler) CertificateHandler(w http.ResponseWriter, r *http.Request) {
+	var provider *db.SamlProvider
+	if err := s.cfg.Conn.WithTx(r.Context(), func(q *db.Queries) (err error) {
+		provider, err = q.GetSAMLProviderByID(r.Context(), r.PathValue("id"))
+		return err
+	}); err != nil || provider == nil {
+		writeJSONError(w, http.StatusNotFound, "Provider not found")
+		return
+	}
+	if provider.SpCertificate == nil {
+		writeJSONError(w, http.StatusNotFound, "Certificate not found")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-pem-file")
+	w.Header().Set("Content-Disposition", `attachment; filename="nokku-sp.pem"`)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
+	if _, err := w.Write([]byte(*provider.SpCertificate)); err != nil {
+		slog.Error("failed to write certificate", "error", err)
+	}
+}
+
 func (s *SAMLHandler) handleSAMLUser(
 	ctx context.Context,
 	user *db.User,
@@ -212,9 +246,9 @@ func (s *SAMLHandler) handleSAMLUser(
 		var updatedUser *db.User
 		err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
 			if saml.EnforceSso {
-				identity, err := q.GetOAuthIdentity(
+				identity, err := q.GetUserIdentity(
 					ctx,
-					&db.GetOAuthIdentityParams{
+					&db.GetUserIdentityParams{
 						ProviderID: nameID,
 						Provider:   saml.WorkspaceID,
 					},
@@ -242,12 +276,28 @@ func (s *SAMLHandler) handleSAMLUser(
 				return fmt.Errorf("failed to verify user email: %w", err)
 			}
 
-			_, err = q.UpsertOAuthIdentity(ctx, &db.UpsertOAuthIdentityParams{
+			// Transient NameIDs change on every login, so stale rows would
+			// accumulate: keep at most one SAML identity per user. The
+			// protocol filter leaves OIDC mappings for the same workspace
+			// provider untouched.
+			if err := q.DeleteUserIdentitiesByUserAndProtocol(
+				ctx,
+				&db.DeleteUserIdentitiesByUserAndProtocolParams{
+					UserID:   existingUser.ID,
+					Provider: saml.WorkspaceID,
+					Protocol: "saml",
+				},
+			); err != nil {
+				return fmt.Errorf("failed to clear stale SAML identity: %w", err)
+			}
+
+			_, err = q.UpsertUserIdentity(ctx, &db.UpsertUserIdentityParams{
 				ProviderID:       nameID,
 				Provider:         saml.WorkspaceID,
 				UserID:           existingUser.ID,
 				ProviderEmail:    &user.Email,
 				ProviderUsername: &user.Username,
+				Protocol:         "saml",
 			})
 			if err != nil {
 				return fmt.Errorf("failed to link SAML identity: %w", err)
@@ -289,16 +339,17 @@ func (s *SAMLHandler) handleSAMLUser(
 			return fmt.Errorf("failed to verify user email: %w", err)
 		}
 
-		// Link OAuth identity (using SAML provider ID as the provider identifier)
-		_, err = q.UpsertOAuthIdentity(ctx, &db.UpsertOAuthIdentityParams{
+		// Link the SAML identity (using the NameID as the provider identifier)
+		_, err = q.UpsertUserIdentity(ctx, &db.UpsertUserIdentityParams{
 			ProviderID:       nameID,
 			Provider:         saml.WorkspaceID,
 			UserID:           newUser.ID,
 			ProviderEmail:    &newUser.Email,
 			ProviderUsername: &newUser.Username,
+			Protocol:         "saml",
 		})
 		if err != nil {
-			return fmt.Errorf("failed to create OAuth identity: %w", err)
+			return fmt.Errorf("failed to create SAML identity: %w", err)
 		}
 
 		if err = q.AddWorkspaceMember(ctx, &db.AddWorkspaceMemberParams{
@@ -321,7 +372,8 @@ func (s *SAMLHandler) extractAttributes(
 	getAttr := func(name string) string {
 		for _, stmt := range assertion.AttributeStatements {
 			for _, attr := range stmt.Attributes {
-				if attr.Name == name && len(attr.Values) > 0 {
+				if len(attr.Values) > 0 &&
+					(attr.Name == name || attr.FriendlyName == name) {
 					return attr.Values[0].Value
 				}
 			}
@@ -329,16 +381,34 @@ func (s *SAMLHandler) extractAttributes(
 		return ""
 	}
 
+	attributeNames := func() []string {
+		var names []string
+		for _, stmt := range assertion.AttributeStatements {
+			for _, attr := range stmt.Attributes {
+				names = append(names, attr.Name)
+			}
+		}
+		return names
+	}
+
 	email := getAttr(saml.EmailAttribute)
 	if email == "" {
-		return nil, fmt.Errorf("email attribute '%s' not found", saml.EmailAttribute)
+		return nil, fmt.Errorf(
+			"email attribute '%s' not found; received attributes: %v",
+			saml.EmailAttribute,
+			attributeNames(),
+		)
 	}
 
 	name := getAttr(saml.NameAttribute)
 
-	var picture string
+	// A nil picture keeps the stored one: not every IdP sends a picture
+	// attribute, and an empty value would wipe it on every login.
+	var picture *string
 	if saml.PictureAttribute != nil {
-		picture = getAttr(*saml.PictureAttribute)
+		if p := getAttr(*saml.PictureAttribute); p != "" {
+			picture = &p
+		}
 	}
 
 	username, err := util.GenerateUsername(
@@ -355,16 +425,19 @@ func (s *SAMLHandler) extractAttributes(
 		return nil, fmt.Errorf("invalid email format")
 	}
 
-	ok, err := s.cfg.Conn.Q.VerifiedDomainExists(ctx, domain[1])
-	if err != nil || !ok {
-		return nil, fmt.Errorf("domain not verified for SSO: %w", err)
+	var ok bool
+	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		ok, err = q.VerifiedDomainExists(ctx, domain[1])
+		return err
+	}); err != nil || !ok {
+		return nil, fmt.Errorf("domain %q not verified for SSO: %w", domain[1], err)
 	}
 
 	return &db.User{
 		Email:    email,
 		Name:     name,
 		Username: username,
-		Picture:  &picture,
+		Picture:  picture,
 	}, nil
 }
 
@@ -372,9 +445,13 @@ func (s *SAMLHandler) getSAMLMiddleware(
 	ctx context.Context,
 	id string,
 ) (*samlsp.Middleware, error) {
-	// Get provider config (always needed for SP cert/key)
-	provider, err := s.cfg.Conn.Q.GetSAMLProviderByID(ctx, id)
-	if err != nil {
+	// Get provider config (always needed for SP cert/key). Pre-auth lookup
+	// by provider ID, running as a system transaction.
+	var provider *db.SamlProvider
+	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		provider, err = q.GetSAMLProviderByID(ctx, id)
+		return err
+	}); err != nil {
 		return nil, fmt.Errorf("failed to get SAML provider: %w", err)
 	}
 	if !s.cfg.Billing.Has(ctx, provider.WorkspaceID, billing.FeatureSAML) {

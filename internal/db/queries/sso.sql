@@ -1,60 +1,68 @@
--- OAuth Identities -----------------------------------------------------------
--- name: GetOAuthIdentity :one
+-- User Identities -----------------------------------------------------------
+-- name: GetUserIdentity :one
 SELECT
   *
 FROM
-  oauth_identities
+  user_identities
 WHERE
   provider_id = @provider_id
   AND provider = @provider;
 
--- name: GetOAuthIdentitiesByProvider :many
+-- name: GetUserIdentitiesByProvider :many
 SELECT
   o.*,
   u.email,
   u.username,
   u.name
 FROM
-  oauth_identities o
+  user_identities o
   JOIN users u ON u.id = o.user_id
 WHERE
   o.provider = @provider
 ORDER BY
   o.created_at DESC;
 
--- name: UpsertOAuthIdentity :one
+-- name: UpsertUserIdentity :one
 INSERT INTO
-  oauth_identities (provider_id, provider, user_id, provider_email, provider_username)
+  user_identities (provider_id, provider, user_id, provider_email, provider_username, protocol)
 VALUES
-  (@provider_id, @provider, @user_id, @provider_email, @provider_username)
+  (@provider_id, @provider, @user_id, @provider_email, @provider_username, @protocol)
 ON CONFLICT (provider_id, provider) DO UPDATE
 SET
   provider_email = EXCLUDED.provider_email,
-  provider_username = EXCLUDED.provider_username
+  provider_username = EXCLUDED.provider_username,
+  protocol = EXCLUDED.protocol
 RETURNING
   *;
 
--- name: GetOAuthIdentitiesByUserID :many
+-- name: GetUserIdentitiesByUserID :many
 SELECT
   *
 FROM
-  oauth_identities
+  user_identities
 WHERE
   user_id = @user_id
 ORDER BY
   created_at DESC;
 
--- name: DeleteOAuthIdentity :exec
-DELETE FROM oauth_identities
+-- name: DeleteUserIdentity :exec
+DELETE FROM user_identities
 WHERE
   provider_id = @provider_id
   AND provider = @provider;
 
--- name: DeleteOAuthIdentityByUser :exec
-DELETE FROM oauth_identities
+-- name: DeleteUserIdentityByUser :exec
+DELETE FROM user_identities
 WHERE
   user_id = @user_id
   AND provider = @provider;
+
+-- name: DeleteUserIdentitiesByUserAndProtocol :exec
+DELETE FROM user_identities
+WHERE
+  user_id = @user_id
+  AND provider = @provider
+  AND protocol = @protocol;
 
 -- Passkeys -------------------------------------------------------------------
 -- name: CreatePasskey :exec
@@ -157,6 +165,23 @@ WHERE
   wd.domain = @domain
   AND p.is_active = TRUE
   AND wd.verified_at IS NOT NULL;
+
+-- name: WorkspaceOwnsVerifiedDomain :one
+SELECT EXISTS (
+  SELECT
+    1
+  FROM
+    workspace_domains
+  WHERE
+    workspace_id = @workspace_id
+    AND domain = @domain
+    AND verified_at IS NOT NULL
+)::BOOLEAN AS owns_domain;
+
+-- name: DeleteUserIdentitiesByProvider :exec
+DELETE FROM user_identities
+WHERE
+  provider = @provider;
 
 -- name: UpdateOIDCProvider :one
 UPDATE oidc_providers

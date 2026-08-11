@@ -163,7 +163,7 @@
 			<Button
 				type="button"
 				variant="secondary"
-				onclick={() => (window.location.href = '/oauth/login?provider=google')}
+				onclick={() => (window.location.href = '/oidc/login?provider=google')}
 				disabled={register.isPending || isPasskeySignup}
 			>
 				<GoogleIcon class="size-5" />
@@ -172,7 +172,7 @@
 			<Button
 				type="button"
 				variant="secondary"
-				onclick={() => (window.location.href = '/oauth/login?provider=github')}
+				onclick={() => (window.location.href = '/oauth/login')}
 				disabled={register.isPending || isPasskeySignup}
 			>
 				<GitHubIcon class="size-5" />

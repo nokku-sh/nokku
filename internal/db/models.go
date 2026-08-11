@@ -82,16 +82,6 @@ type Keyset struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-type OauthIdentity struct {
-	ProviderID       string    `json:"providerId"`
-	Provider         string    `json:"provider"`
-	UserID           string    `json:"userId"`
-	ProviderEmail    *string   `json:"providerEmail"`
-	ProviderUsername *string   `json:"providerUsername"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
-}
-
 type OidcProvider struct {
 	WorkspaceID          string                `json:"workspaceId"`
 	Name                 string                `json:"name"`
@@ -250,6 +240,17 @@ type UserDevice struct {
 	LastUsedAt *time.Time          `json:"lastUsedAt"`
 	CreatedAt  *time.Time          `json:"createdAt"`
 	UpdatedAt  *time.Time          `json:"updatedAt"`
+}
+
+type UserIdentity struct {
+	ProviderID       string    `json:"providerId"`
+	Provider         string    `json:"provider"`
+	UserID           string    `json:"userId"`
+	ProviderEmail    *string   `json:"providerEmail"`
+	ProviderUsername *string   `json:"providerUsername"`
+	Protocol         string    `json:"protocol"`
+	CreatedAt        time.Time `json:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
 type Workspace struct {

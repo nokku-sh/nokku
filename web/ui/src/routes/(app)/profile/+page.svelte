@@ -1,31 +1,32 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import * as Card from '$lib/components/ui/card';
-	import * as Field from '$lib/components/ui/field';
-	import * as ImageCropper from '$lib/components/ui/image-cropper';
-	import * as Item from '$lib/components/ui/item';
-	import * as Empty from '$lib/components/ui/empty';
-	import {
-		BadgeCheck,
-		Send,
-		User,
-		Trash2,
-		Save,
-		TriangleAlert,
-		Link,
-		Unlink
-	} from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { auth } from '$lib/api/auth.svelte';
 	import { httpFetch } from '$lib/api/client';
 	import { user } from '$lib/api/user.svelte';
-	import { UserSchema } from '$lib/gen/nokku/v1/user_pb';
-	import { create } from '@bufbuild/protobuf';
-	import { auth } from '$lib/api/auth.svelte';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
-	import { GoogleIcon, GitHubIcon, OIDCIcon } from '$lib/assets';
+	import { GitHubIcon, GoogleIcon, OIDCIcon, SAMLIcon } from '$lib/assets';
 	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
+	import Badge from '$lib/components/ui/badge/badge.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import * as Card from '$lib/components/ui/card';
+	import * as Empty from '$lib/components/ui/empty';
+	import * as Field from '$lib/components/ui/field';
+	import * as ImageCropper from '$lib/components/ui/image-cropper';
+	import { Input } from '$lib/components/ui/input';
+	import * as Item from '$lib/components/ui/item';
+	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
+	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import { UserSchema, type OAuthIdentity } from '$lib/gen/nokku/v1/user_pb';
+	import { create } from '@bufbuild/protobuf';
+	import {
+		BadgeCheck,
+		Link,
+		Save,
+		Send,
+		Trash2,
+		TriangleAlert,
+		Unlink,
+		User
+	} from '@lucide/svelte';
+	import { toast } from 'svelte-sonner';
 
 	const userData = $derived.by(() => user.self());
 	let currentUser = $state(create(UserSchema));
@@ -43,30 +44,32 @@
 	let unlinkProvider = $state('');
 	let unlinkOpen = $state(false);
 
-	function providerName(provider: string): string {
-		switch (provider) {
+	function providerName(account: OAuthIdentity): string {
+		switch (account.provider) {
 			case 'github':
 				return 'GitHub';
 			case 'google':
 				return 'Google';
 			default:
-				return 'OIDC';
+				return account.protocol === 'saml' ? 'SAML' : 'OIDC';
 		}
 	}
 
-	function providerIcon(provider: string) {
-		switch (provider) {
+	function providerIcon(account: OAuthIdentity) {
+		switch (account.provider) {
 			case 'github':
 				return GitHubIcon;
 			case 'google':
 				return GoogleIcon;
 			default:
-				return OIDCIcon;
+				return account.protocol === 'saml' ? SAMLIcon : OIDCIcon;
 		}
 	}
 
 	function linkAccount(provider: string) {
-		window.location.href = `/oauth/login?provider=${provider}&link=true`;
+		const endpoint = provider === 'github' ? '/oauth/login' : '/oidc/login';
+		const query = provider === 'github' ? 'link=true' : `provider=${provider}&link=true`;
+		window.location.href = `${endpoint}?${query}`;
 	}
 </script>
 
@@ -227,12 +230,12 @@
 	<Card.Content>
 		{#if linkedAccounts.isSuccess && linkedAccounts.data.length > 0}
 			<Item.Group class="border-border bg-transparent">
-				{#each linkedAccounts.data as account (account.provider)}
-					{@const Icon = providerIcon(account.provider)}
+				{#each linkedAccounts.data as account (account.provider + ':' + account.providerId)}
+					{@const Icon = providerIcon(account)}
 					<Item.Root variant="muted">
 						<Item.Media variant="icon"><Icon /></Item.Media>
 						<Item.Content>
-							<Item.Title>{providerName(account.provider)}</Item.Title>
+							<Item.Title>{providerName(account)}</Item.Title>
 							<Item.Description
 								>{account.providerEmail ||
 									account.providerUsername ||
@@ -240,16 +243,20 @@
 							>
 						</Item.Content>
 						<Item.Actions>
-							<Button
-								variant="ghost"
-								size="sm"
-								onclick={() => {
-									unlinkProvider = account.provider;
-									unlinkOpen = true;
-								}}
-							>
-								<Unlink class="size-4" />
-							</Button>
+							{#if account.provider === 'github' || account.provider === 'google'}
+								<Button
+									variant="ghost"
+									size="sm"
+									onclick={() => {
+										unlinkProvider = account.provider;
+										unlinkOpen = true;
+									}}
+								>
+									<Unlink class="size-4" />
+								</Button>
+							{:else}
+								<Badge variant="default">managed</Badge>
+							{/if}
 						</Item.Actions>
 					</Item.Root>
 				{/each}
@@ -265,7 +272,7 @@
 	</Card.Content>
 
 	<Card.Footer class="flex items-center justify-between">
-		<p class="text-sm text-muted-foreground">You can link up to one account per provider.</p>
+		<p class="text-sm text-muted-foreground">You can link one account per provider.</p>
 		<div class="flex gap-2">
 			{#if linkedAccounts.isSuccess}
 				<Button
