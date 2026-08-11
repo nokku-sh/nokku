@@ -94,9 +94,7 @@ WHERE
     OR last_used_at < NOW() - INTERVAL '5 minutes'
   );
 
--- name: DeleteServiceAccount :one
+-- name: DeleteServiceAccount :exec
 DELETE FROM service_accounts
 WHERE
-  id = @service_account_id
-RETURNING
-  *;
+  id = @service_account_id;

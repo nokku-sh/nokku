@@ -6,6 +6,7 @@ import (
 
 	"connectrpc.com/connect"
 
+	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 )
@@ -22,8 +23,13 @@ func (p *Pool) Connect(
 		)
 	}
 
-	daemon, err := p.conn.Q.GetDaemon(ctx, daemonID)
-	if err != nil {
+	// The workspace is unknown until the daemon is looked up, so this
+	// cross-tenant read runs as a system transaction (bypassing RLS).
+	var daemon *db.Daemon
+	if err := p.conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		daemon, err = q.GetDaemon(ctx, daemonID)
+		return err
+	}); err != nil {
 		return connect.NewError(connect.CodeNotFound, errors.New("daemon not found"))
 	}
 	if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {

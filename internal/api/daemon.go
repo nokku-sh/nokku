@@ -279,8 +279,14 @@ func (s *DaemonService) EnrollDaemon(
 		return nil, err
 	}
 
-	settings, err := s.cfg.Conn.Q.GetWorkspaceSettings(ctx, workspaceID)
-	if err != nil {
+	// The enrollment token (verified below against its stored hash)
+	// authorizes this otherwise unauthenticated request, so the daemon
+	// provisioning runs as a system transaction without an actor.
+	var settings *db.WorkspaceSetting
+	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		settings, err = q.GetWorkspaceSettings(ctx, workspaceID)
+		return err
+	}); err != nil {
 		return nil, DBError(err)
 	}
 	if settings.EnrollExpiresAt != nil && settings.EnrollExpiresAt.Before(time.Now()) {
@@ -326,26 +332,30 @@ func (s *DaemonService) EnrollDaemon(
 	}
 
 	uniqueName := fmt.Sprintf("%s-%s", hostname, suffix)
-	daemon, err := s.cfg.Conn.Q.CreateDaemon(ctx, &db.CreateDaemonParams{
-		ID:          uuid.New().String(),
-		WorkspaceID: workspaceID,
-		Name:        uniqueName,
-		Metadata:    metadata,
-		Status:      status,
-		Config:      &nokkuv1.DaemonConfig{RecordSessions: new(true)},
-		AuthMethod:  authMethod,
-		AuthPubkey:  authPubkey,
-	})
-	if err != nil {
-		return nil, DBError(err)
-	}
+	var daemon *db.CreateDaemonRow
+	var target *db.Target
+	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		daemon, err = q.CreateDaemon(ctx, &db.CreateDaemonParams{
+			ID:          uuid.New().String(),
+			WorkspaceID: workspaceID,
+			Name:        uniqueName,
+			Metadata:    metadata,
+			Status:      status,
+			Config:      &nokkuv1.DaemonConfig{RecordSessions: new(true)},
+			AuthMethod:  authMethod,
+			AuthPubkey:  authPubkey,
+		})
+		if err != nil {
+			return err
+		}
 
-	tp := &db.UpdateTargetCAParams{DaemonID: &daemon.ID}
-	if req.GetCaId() != "" {
-		tp.CaID = req.CaId
-	}
-	target, err := s.cfg.Conn.Q.UpdateTargetCA(ctx, tp)
-	if err != nil {
+		tp := &db.UpdateTargetCAParams{DaemonID: &daemon.ID}
+		if req.GetCaId() != "" {
+			tp.CaID = req.CaId
+		}
+		target, err = q.UpdateTargetCA(ctx, tp)
+		return err
+	}); err != nil {
 		return nil, DBError(err)
 	}
 

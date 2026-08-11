@@ -55,16 +55,37 @@ func (s *Service) Append(ctx context.Context, event *Event) error {
 		email = &event.ActorEmail
 	}
 
-	return s.conn.Q.InsertAuditLog(ctx, &db.InsertAuditLogParams{
-		WorkspaceID: workspaceID,
-		Action:      event.Action,
-		ActorID:     event.ActorID,
-		ActorType:   event.ActorType,
-		ActorEmail:  email,
-		IpAddress:   &event.IPAddress,
-		UserAgent:   &event.UserAgent,
-		StatusCode:  &event.StatusCode,
+	// Audit writes are server-derived and happen inside arbitrary request
+	// flows (including pre-auth and system operations), so they always run
+	// as a system transaction.
+	return s.conn.WithTx(ctx, func(q *db.Queries) error {
+		return q.InsertAuditLog(ctx, &db.InsertAuditLogParams{
+			WorkspaceID: workspaceID,
+			Action:      event.Action,
+			ActorID:     event.ActorID,
+			ActorType:   event.ActorType,
+			ActorEmail:  email,
+			IpAddress:   &event.IPAddress,
+			UserAgent:   &event.UserAgent,
+			StatusCode:  &event.StatusCode,
+		})
 	})
+}
+
+// query runs fn with a querier appropriate for the requested scope. A
+// workspace-scoped read goes through the RLS-constrained, membership-checked
+// tenant transaction. A read without a workspace only ever matches
+// non-workspace (global) events by query construction, which the tenant role
+// may never see, so it runs as a system transaction.
+func (s *Service) query(
+	ctx context.Context,
+	opts QueryOptions,
+	fn func(q *db.Queries) error,
+) error {
+	if opts.WorkspaceID == "" {
+		return s.conn.WithTx(ctx, fn)
+	}
+	return s.conn.WithWorkspace(ctx, fn)
 }
 
 // List retrieves events with filtering and pagination.
@@ -93,16 +114,19 @@ func (s *Service) List(
 		actions = opts.Actions
 	}
 
-	rows, err := s.conn.Q.ListAuditLogs(ctx, &db.ListAuditLogsParams{
-		WorkspaceID: opts.WorkspaceID,
-		ActorIds:    actorIDs,
-		Actions:     actions,
-		StartDate:   startDate,
-		EndDate:     endDate,
-		Limit:       limit,
-		Offset:      opts.Offset,
-	})
-	if err != nil {
+	var rows []*db.AuditAuditLog
+	if err := s.query(ctx, opts, func(q *db.Queries) (err error) {
+		rows, err = q.ListAuditLogs(ctx, &db.ListAuditLogsParams{
+			WorkspaceID: opts.WorkspaceID,
+			ActorIds:    actorIDs,
+			Actions:     actions,
+			StartDate:   startDate,
+			EndDate:     endDate,
+			Limit:       limit,
+			Offset:      opts.Offset,
+		})
+		return err
+	}); err != nil {
 		return nil, fmt.Errorf("failed to query events: %w", err)
 	}
 
@@ -164,12 +188,16 @@ func (s *Service) Count(ctx context.Context, opts QueryOptions) (int32, error) {
 		actions = opts.Actions
 	}
 
-	count, err := s.conn.Q.CountAuditLogs(ctx, &db.CountAuditLogsParams{
-		WorkspaceID: opts.WorkspaceID,
-		ActorIds:    actorIDs,
-		Actions:     actions,
-		StartDate:   startDate,
-		EndDate:     endDate,
+	var count int32
+	err := s.query(ctx, opts, func(q *db.Queries) (err error) {
+		count, err = q.CountAuditLogs(ctx, &db.CountAuditLogsParams{
+			WorkspaceID: opts.WorkspaceID,
+			ActorIds:    actorIDs,
+			Actions:     actions,
+			StartDate:   startDate,
+			EndDate:     endDate,
+		})
+		return err
 	})
 	return count, err
 }

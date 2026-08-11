@@ -30,9 +30,6 @@ type EnvConfig struct {
 	Secret         string `env:"NOKKU_SECRET"`
 	Debug          bool
 	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
-	// AllowedOrigins are additional origins allowed to open websocket
-	// connections (e.g. a dev server on another port). The configured app
-	// URL is always allowed.
 	AllowedOrigins []string `env:"NOKKU_ALLOWED_ORIGINS"`
 
 	// OAuth configuration
@@ -106,13 +103,13 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if provider != nil {
 		mode = billing.ModeSaaS
 	}
-	cfg.Billing = billing.NewService(cfg.Conn.Q, cfg.License, provider, mode)
+	cfg.Billing = billing.NewService(cfg.Conn, cfg.License, provider, mode)
 
 	if mode == billing.ModeSelfHosted && os.Getenv("KMS_URI") != "" && !cfg.License.Valid() {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
 
-	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Billing.Entitlements)
+	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Billing)
 	if err != nil {
 		return nil, err
 	}

@@ -3,9 +3,13 @@ package billing
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -13,21 +17,6 @@ import (
 type fakeLicenser struct{ valid bool }
 
 func (f fakeLicenser) Valid() bool { return f.valid }
-
-type stubQuerier struct {
-	sub *db.WorkspaceSubscription
-	err error
-
-	stats *db.GetWorkspaceStatsRow
-}
-
-func (s *stubQuerier) GetSubscription(context.Context, string) (*db.WorkspaceSubscription, error) {
-	return s.sub, s.err
-}
-
-func (s *stubQuerier) GetWorkspaceStats(context.Context, string) (*db.GetWorkspaceStatsRow, error) {
-	return s.stats, s.err
-}
 
 func TestStatus_GrantsAccess(t *testing.T) {
 	tests := []struct {
@@ -153,8 +142,135 @@ func TestCurrentCount(t *testing.T) {
 	}
 }
 
+// The tests below exercise PolicyService against a real, fully migrated
+// database (see testConnection). They are skipped when the development
+// PostgreSQL container (compose.test.yml) is not running.
+
+func testConnection(t *testing.T) *db.Connection {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+
+	admin, err := pgx.Connect(
+		ctx,
+		"postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
+	)
+	if err != nil {
+		t.Skipf("test database not available (%v); start compose.test.yml", err)
+	}
+
+	dbName := fmt.Sprintf("nokku_billing_test_%d", time.Now().UnixNano())
+	if _, err := admin.Exec(ctx, "CREATE DATABASE "+dbName); err != nil {
+		t.Fatalf("creating test database: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		_, _ = admin.Exec(cleanupCtx, "DROP DATABASE IF EXISTS "+dbName+" WITH (FORCE)")
+		_ = admin.Close(cleanupCtx)
+	})
+
+	t.Setenv("NOKKU_DB_HOST", "localhost")
+	t.Setenv("NOKKU_DB_PORT", "5432")
+	t.Setenv("NOKKU_DB_NAME", dbName)
+	t.Setenv("NOKKU_DB_USER", "postgres")
+	t.Setenv("NOKKU_DB_PASSWORD", "postgres")
+
+	conn, err := db.NewConnection(ctx)
+	if err != nil {
+		t.Fatalf("NewConnection: %v", err)
+	}
+	return conn
+}
+
+// seedSeq guarantees unique users (email/username are UNIQUE) when seeding
+// multiple workspaces into the same test database.
+var seedSeq int
+
+func nextSeedSeq() int {
+	seedSeq++
+	return seedSeq
+}
+
+// seedWorkspace creates a user, a workspace (which also adds the owner as a
+// member) and optionally a manual subscription row. It returns the workspace
+// ID. Runs in system transactions, so no actor context is needed.
+func seedWorkspace(t *testing.T, conn *db.Connection, sub *db.WorkspaceSubscription) string {
+	t.Helper()
+
+	n := nextSeedSeq()
+	ctx := context.Background()
+	var wsID string
+	err := conn.WithTx(ctx, func(q *db.Queries) error {
+		owner, err := q.CreateUser(ctx, &db.CreateUserParams{
+			Name:     "Owner",
+			Username: fmt.Sprintf("owner%d", n),
+			Email:    fmt.Sprintf("owner%d@example.com", n),
+		})
+		if err != nil {
+			return err
+		}
+		ws, err := q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
+			Name:      "Test WS",
+			CreatedBy: owner.ID,
+		})
+		if err != nil {
+			return err
+		}
+		wsID = ws.ID
+
+		if sub != nil {
+			if err := q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
+				WorkspaceID: ws.ID,
+				Source:      "manual",
+				Plan:        sub.Plan,
+				Status:      sub.Status,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("seeding workspace: %v", err)
+	}
+	return wsID
+}
+
+// addMembers creates n additional users and adds them to the workspace,
+// on top of the owner that seedWorkspace already added.
+func addMembers(t *testing.T, conn *db.Connection, wsID string, n int) {
+	t.Helper()
+
+	ctx := context.Background()
+	err := conn.WithTx(ctx, func(q *db.Queries) error {
+		for i := range n {
+			seq := nextSeedSeq()
+			u, err := q.CreateUser(ctx, &db.CreateUserParams{
+				Name:     fmt.Sprintf("Member %d", i),
+				Username: fmt.Sprintf("member%d", seq),
+				Email:    fmt.Sprintf("member%d@example.com", seq),
+			})
+			if err != nil {
+				return err
+			}
+			if err := q.AddWorkspaceMember(ctx, &db.AddWorkspaceMemberParams{
+				WorkspaceID: wsID,
+				UserID:      u.ID,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("adding members: %v", err)
+	}
+}
+
 func TestService_Resolve_ActiveLicenseOverrides(t *testing.T) {
-	svc := NewPolicyService(&stubQuerier{}, fakeLicenser{valid: true})
+	svc := NewPolicyService(testConnection(t), fakeLicenser{valid: true})
 
 	plan := svc.Resolve(context.Background(), "ws-1")
 	if plan.Limits[ResourceMembers].Hard != -1 {
@@ -169,69 +285,67 @@ func TestService_Resolve_ActiveLicenseOverrides(t *testing.T) {
 }
 
 func TestService_Resolve_SaaSDoesNotUseInstanceLicense(t *testing.T) {
-	svc := NewPolicyService(&stubQuerier{}, fakeLicenser{valid: true}, ModeSaaS)
+	conn := testConnection(t)
+	wsID := seedWorkspace(t, conn, nil)
+	svc := NewPolicyService(conn, fakeLicenser{valid: true}, ModeSaaS)
 
-	plan := svc.Resolve(context.Background(), "ws-1")
+	plan := svc.Resolve(context.Background(), wsID)
 	if plan.Name != PlanCommunity {
 		t.Errorf("SaaS instance license should be ignored, got plan %q", plan.Name)
 	}
 }
 
 func TestService_Resolve_SubscriptionStatus(t *testing.T) {
+	conn := testConnection(t)
+
 	tests := []struct {
-		name  string
-		sub   *db.WorkspaceSubscription
-		dbErr error
-		want  string
+		name string
+		sub  *db.WorkspaceSubscription
+		want string
 	}{
 		{
 			"active flex",
 			&db.WorkspaceSubscription{Plan: PlanFlex, Status: string(StatusActive)},
-			nil,
 			PlanFlex,
 		},
 		{
 			"trialing community",
 			&db.WorkspaceSubscription{Plan: PlanCommunity, Status: string(StatusTrialing)},
-			nil,
 			PlanCommunity,
 		},
 		{
 			"past due keeps plan",
 			&db.WorkspaceSubscription{Plan: PlanEnterprise, Status: string(StatusPastDue)},
-			nil,
 			PlanEnterprise,
 		},
 		{
 			"inactive falls back to community",
 			&db.WorkspaceSubscription{Plan: PlanEnterprise, Status: string(StatusInactive)},
-			nil,
 			PlanCommunity,
 		},
 		{
 			"unknown status fails closed",
 			&db.WorkspaceSubscription{Plan: PlanFlex, Status: "weird"},
-			nil,
 			PlanCommunity,
 		},
 		{
 			"empty status fails closed",
 			&db.WorkspaceSubscription{Plan: PlanFlex, Status: ""},
+			PlanCommunity,
+		},
+		{
+			"missing subscription falls back to community",
 			nil,
 			PlanCommunity,
 		},
-		{"db error falls back to community", nil, errors.New("db down"), PlanCommunity},
-		{"missing subscription falls back to community", nil, nil, PlanCommunity},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := NewPolicyService(
-				&stubQuerier{sub: tt.sub, err: tt.dbErr},
-				fakeLicenser{valid: false},
-			)
+			wsID := seedWorkspace(t, conn, tt.sub)
+			svc := NewPolicyService(conn, fakeLicenser{valid: false})
 
-			plan := svc.Resolve(context.Background(), "ws-1")
+			plan := svc.Resolve(context.Background(), wsID)
 			if got := plan.Limits[ResourceMembers]; got != catalog[tt.want].Limits[ResourceMembers] {
 				t.Errorf(
 					"Resolve() members quota = %+v, want %+v (plan %s)",
@@ -244,49 +358,73 @@ func TestService_Resolve_SubscriptionStatus(t *testing.T) {
 	}
 }
 
+func TestService_Resolve_FailsClosedOnDBError(t *testing.T) {
+	conn := testConnection(t)
+	wsID := seedWorkspace(t, conn, &db.WorkspaceSubscription{
+		Plan: PlanFlex, Status: string(StatusActive),
+	})
+	svc := NewPolicyService(conn, fakeLicenser{valid: false})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	plan := svc.Resolve(ctx, wsID)
+	if plan.Name != PlanCommunity {
+		t.Errorf("Resolve() on DB error = %q, want community", plan.Name)
+	}
+}
+
 func TestFlexIncludesSSOFeatures(t *testing.T) {
-	svc := NewPolicyService(&stubQuerier{
-		sub: &db.WorkspaceSubscription{Plan: PlanFlex, Status: string(StatusActive)},
-	}, fakeLicenser{valid: false})
+	conn := testConnection(t)
+	wsID := seedWorkspace(t, conn, &db.WorkspaceSubscription{
+		Plan: PlanFlex, Status: string(StatusActive),
+	})
+	svc := NewPolicyService(conn, fakeLicenser{valid: false})
 
 	ctx := context.Background()
 	for _, feature := range []string{FeatureOIDC, FeatureSAML, FeatureEnforceSSO} {
-		if !svc.Has(ctx, "ws-1", feature) {
+		if !svc.Has(ctx, wsID, feature) {
 			t.Errorf("Flex should include %s", feature)
 		}
 	}
 }
 
 func TestService_Has_And_Int(t *testing.T) {
-	svc := NewPolicyService(&stubQuerier{}, fakeLicenser{valid: false})
+	conn := testConnection(t)
+	wsID := seedWorkspace(t, conn, nil)
+	svc := NewPolicyService(conn, fakeLicenser{valid: false})
 	ctx := context.Background()
 
 	// No subscription row => community plan.
-	if svc.Has(ctx, "ws-1", FeatureEnforceSSO) {
+	if svc.Has(ctx, wsID, FeatureEnforceSSO) {
 		t.Error("community must not have enforce_sso")
 	}
-	if got := svc.Int(ctx, "ws-1", ValueAuditRetentionDays, 999); got != 7 {
+	if got := svc.Int(ctx, wsID, ValueAuditRetentionDays, 999); got != 7 {
 		t.Errorf("community retention = %d, want 7", got)
 	}
-	if got := svc.Int(ctx, "ws-1", "unknown_key", 42); got != 42 {
+	if got := svc.Int(ctx, wsID, "unknown_key", 42); got != 42 {
 		t.Errorf("unknown value fallback = %d, want 42", got)
 	}
 }
 
 func TestService_Has_OnLicensedInstance(t *testing.T) {
-	svc := NewPolicyService(&stubQuerier{}, fakeLicenser{valid: true})
+	svc := NewPolicyService(testConnection(t), fakeLicenser{valid: true})
 	if !svc.Has(context.Background(), "ws-1", FeatureEnforceSSO) {
 		t.Error("licensed instance must have enforce_sso")
 	}
 }
 
 func TestService_Check_QuotaExceeded(t *testing.T) {
-	svc := NewPolicyService(&stubQuerier{
-		sub:   &db.WorkspaceSubscription{Plan: PlanCommunity, Status: string(StatusActive)},
-		stats: &db.GetWorkspaceStatsRow{MemberCount: 5}, // community hard cap: 5
-	}, fakeLicenser{valid: false})
+	conn := testConnection(t)
+	// CreateWorkspace already adds the owner, so four extra members reach the
+	// community hard cap of five.
+	wsID := seedWorkspace(t, conn, &db.WorkspaceSubscription{
+		Plan: PlanCommunity, Status: string(StatusActive),
+	})
+	addMembers(t, conn, wsID, 4)
+	svc := NewPolicyService(conn, fakeLicenser{valid: false})
 
-	err := svc.Check(context.Background(), "ws-1", ResourceMembers)
+	err := svc.Check(context.Background(), wsID, ResourceMembers)
 	if err == nil {
 		t.Fatal("Check() at cap: want error")
 	}
@@ -303,52 +441,64 @@ func TestService_Check_QuotaExceeded(t *testing.T) {
 }
 
 func TestService_Check_UnderQuota(t *testing.T) {
-	svc := NewPolicyService(&stubQuerier{
-		sub:   &db.WorkspaceSubscription{Plan: PlanCommunity, Status: string(StatusActive)},
-		stats: &db.GetWorkspaceStatsRow{MemberCount: 4},
-	}, fakeLicenser{valid: false})
+	conn := testConnection(t)
+	wsID := seedWorkspace(t, conn, &db.WorkspaceSubscription{
+		Plan: PlanCommunity, Status: string(StatusActive),
+	})
+	addMembers(t, conn, wsID, 3)
+	svc := NewPolicyService(conn, fakeLicenser{valid: false})
 
-	if err := svc.Check(context.Background(), "ws-1", ResourceMembers); err != nil {
+	if err := svc.Check(context.Background(), wsID, ResourceMembers); err != nil {
 		t.Errorf("Check() under cap: %v", err)
 	}
 }
 
 func TestService_Check_FailsClosedOnStatsError(t *testing.T) {
+	conn := testConnection(t)
+
 	tests := []struct {
-		name    string
-		q       *stubQuerier
-		wantErr bool
+		name     string
+		sub      *db.WorkspaceSubscription
+		resource Resource
+		cancel   bool
+		wantErr  bool
 	}{
 		{
 			"stats db error",
-			&stubQuerier{
-				sub: &db.WorkspaceSubscription{Plan: PlanCommunity, Status: string(StatusActive)},
-				err: errors.New("db down"),
-			},
+			&db.WorkspaceSubscription{Plan: PlanCommunity, Status: string(StatusActive)},
+			ResourceMembers,
+			true,
 			true,
 		},
 		{
 			"unlimited plan",
-			&stubQuerier{
-				sub:   &db.WorkspaceSubscription{Plan: PlanFlex, Status: string(StatusActive)},
-				stats: &db.GetWorkspaceStatsRow{MemberCount: 999},
-			},
+			&db.WorkspaceSubscription{Plan: PlanFlex, Status: string(StatusActive)},
+			ResourceMembers,
+			false,
 			false,
 		},
 		{
 			"unknown resource",
-			&stubQuerier{
-				sub:   &db.WorkspaceSubscription{Plan: PlanCommunity, Status: string(StatusActive)},
-				stats: &db.GetWorkspaceStatsRow{},
-			},
+			&db.WorkspaceSubscription{Plan: PlanCommunity, Status: string(StatusActive)},
+			Resource("bogus"),
+			false,
 			false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := NewPolicyService(tt.q, fakeLicenser{valid: false})
-			err := svc.Check(context.Background(), "ws-1", ResourceMembers)
+			wsID := seedWorkspace(t, conn, tt.sub)
+			svc := NewPolicyService(conn, fakeLicenser{valid: false})
+
+			ctx := context.Background()
+			if tt.cancel {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			err := svc.Check(ctx, wsID, tt.resource)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Check() = %v, wantErr %t", err, tt.wantErr)
 			}

@@ -18,14 +18,14 @@ type Service struct {
 }
 
 func NewService(
-	q *db.Queries,
+	conn *db.Connection,
 	license interface{ Valid() bool },
 	provider Provider,
 	mode Mode,
 ) *Service {
 	return &Service{
 		provider:     provider,
-		Entitlements: NewPolicyService(q, license, mode),
+		Entitlements: NewPolicyService(conn, license, mode),
 	}
 }
 

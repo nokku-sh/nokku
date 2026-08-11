@@ -8,9 +8,10 @@ import (
 
 // Permission is a single action a role may perform on a resource.
 //
-// Codes are stored in roles.permissions and evaluated by has_permission() in
-// schema/rls/01_policies.sql. Keep the two in sync when changing the
-// vocabulary.
+// Codes are stored in roles.permissions and evaluated in Go by
+// HasPermission, which the API's authorization interceptor consults before
+// running any query. RLS policies enforce tenant isolation only and never
+// inspect permission codes.
 type Permission string
 
 // Permission codes. Access levels are view < edit < delete and "edit" always
@@ -204,11 +205,24 @@ func IsServiceAccountRole(roleName string) bool {
 	return false
 }
 
-// EnsureRoles converges the built-in roles onto the definitions above.
+// HasPermission reports whether the named role grants the permission.
+// Unknown roles have no permissions; this is the single point where
+// permission codes are evaluated, and it replaces the SQL-side
+// has_permission() that previously ran inside RLS policies.
+func HasPermission(roleName string, p Permission) bool {
+	for _, r := range builtinRoles {
+		if r.name == roleName {
+			return slices.Contains(r.permissions, p)
+		}
+	}
+	return false
+}
+
+// setupRBACRoles converges the built-in roles onto the definitions above.
 // Safe to run on every startup: adding, adjusting, or removing
 // permissions here is applied automatically on the next boot.
-func (c *Connection) EnsureRoles(ctx context.Context) error {
-	tx, err := c.Pool.Begin(ctx)
+func (c *Connection) setupRBACRoles(ctx context.Context) error {
+	tx, err := c.AdminPool.Begin(ctx)
 	if err != nil {
 		return err
 	}

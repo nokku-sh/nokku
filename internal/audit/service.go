@@ -3,6 +3,7 @@ package audit
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -14,22 +15,25 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
+//go:embed schema.sql
+var schemaSQL string
+
 const (
 	defaultRetentionDays = 7
 	maxRetentionDays     = 365
 )
 
 type Service struct {
-	conn         *db.Connection
-	entitlements *billing.PolicyService
+	conn    *db.Connection
+	billing *billing.Service
 }
 
-func New(ctx context.Context, conn *db.Connection, ent *billing.PolicyService) (*Service, error) {
-	s := &Service{conn: conn, entitlements: ent}
+func New(ctx context.Context, conn *db.Connection, b *billing.Service) (*Service, error) {
+	s := &Service{conn: conn, billing: b}
 
 	// Ensure the base audit schema and partitions exist
-	if err := s.Migrate(ctx); err != nil {
-		return nil, err
+	if _, err := s.conn.AdminPool.Exec(ctx, schemaSQL); err != nil {
+		return nil, fmt.Errorf("applying audit schema: %w", err)
 	}
 	if err := s.ensurePartitions(ctx); err != nil {
 		return nil, err
@@ -47,7 +51,8 @@ func (s *Service) ensurePartitions(ctx context.Context) error {
 	// Normalize to the 1st of the current month to prevent AddDate wraparound issues
 	currentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 
-	tx, err := s.conn.Pool.Begin(ctx)
+	// Partition management is DDL and requires the table owner.
+	tx, err := s.conn.AdminPool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -168,7 +173,8 @@ func (s *Service) runBackgroundJobs(ctx context.Context) {
 func (s *Service) retentionCleanup(ctx context.Context) {
 	now := time.Now()
 
-	tx, err := s.conn.Pool.Begin(ctx)
+	// Retention deletes across every workspace: system transaction (BYPASSRLS).
+	tx, err := s.conn.AdminPool.Begin(ctx)
 	if err != nil {
 		slog.Error("audit retention failed to begin transaction", "error", err)
 		return
@@ -204,7 +210,7 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 		retentionDays := int64(defaultRetentionDays)
 		hardcap := int64(maxRetentionDays)
 
-		if v := s.entitlements.Int(ctx, *wsID, billing.ValueAuditRetentionDays, 0); v > 0 {
+		if v := s.billing.Int(ctx, *wsID, billing.ValueAuditRetentionDays, 0); v > 0 {
 			retentionDays = v
 		}
 

@@ -8,7 +8,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 type ServiceAccountService struct {
@@ -25,11 +24,7 @@ func (s *ServiceAccountService) GetServiceAccount(
 ) (*nokkuv1.GetServiceAccountResponse, error) {
 	var result *db.ServiceAccount
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		saID := req.GetId()
-		if saID == "" {
-			saID = meta.ServiceAccountIDFromContext(ctx) // actor might be service account
-		}
-		result, err = q.GetServiceAccount(ctx, saID)
+		result, err = q.GetServiceAccount(ctx, req.GetId())
 		return err
 	}); err != nil {
 		return nil, DBError(err)
@@ -167,11 +162,9 @@ func (s *ServiceAccountService) DeleteServiceAccount(
 	req *nokkuv1.DeleteServiceAccountRequest,
 ) (*nokkuv1.DeleteServiceAccountResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		_, err := q.DeleteServiceAccount(ctx, req.GetId())
-		return err
+		return q.DeleteServiceAccount(ctx, req.GetId())
 	}); err != nil {
 		return nil, DBError(err)
 	}
-
 	return &nokkuv1.DeleteServiceAccountResponse{}, nil
 }

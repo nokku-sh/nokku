@@ -20,7 +20,7 @@ import (
 //go:embed schema
 var schemaFS embed.FS
 
-func (c *Connection) Migrate(ctx context.Context) error {
+func (c *Connection) migrate(ctx context.Context) error {
 	slog.Debug("migrating database schema")
 
 	schemaDDL, rlsDDL, err := loadSQLFiles(schemaFS)
@@ -58,7 +58,7 @@ func (c *Connection) applyDDL(ctx context.Context, ddl []string) error {
 		return nil
 	}
 
-	connConfig := c.Pool.Config().ConnConfig.Copy()
+	connConfig := c.AdminPool.Config().ConnConfig.Copy()
 
 	tempDBFactory, err := tempdb.NewOnInstanceFactory(
 		ctx,
@@ -73,7 +73,7 @@ func (c *Connection) applyDDL(ctx context.Context, ddl []string) error {
 	}
 	defer func() { _ = tempDBFactory.Close() }()
 
-	db := stdlib.OpenDBFromPool(c.Pool)
+	db := stdlib.OpenDBFromPool(c.AdminPool)
 	defer func() { _ = db.Close() }()
 
 	plan, err := diff.Generate(
@@ -92,7 +92,7 @@ func (c *Connection) applyDDL(ctx context.Context, ddl []string) error {
 		return nil
 	}
 
-	conn, err := c.Pool.Acquire(ctx)
+	conn, err := c.AdminPool.Acquire(ctx)
 	if err != nil {
 		return fmt.Errorf("acquiring connection: %w", err)
 	}

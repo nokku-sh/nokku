@@ -60,7 +60,7 @@ func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscriptio
 	}
 
 	if sub.Status == stripe.SubscriptionStatusCanceled {
-		if err := s.db.Q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
+		if err := s.upsertSubscription(ctx, &db.UpsertSubscriptionParams{
 			WorkspaceID:       workspaceID,
 			Source:            "stripe",
 			Plan:              "",
@@ -78,11 +78,8 @@ func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscriptio
 	// Backstop for the one-subscription-per-workspace rule: cancel a newcomer
 	// if the workspace already holds a different active subscription, so a
 	// tenant never ends up with two.
-	if existing, err := s.db.Q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
-		WorkspaceID: workspaceID,
-		Statuses:    ActiveStatuses,
-		Sources:     []string{"stripe"},
-	}); err == nil && existing.SubscriptionID != "" && existing.SubscriptionID != sub.ID {
+	if existing, err := s.activeSubscription(ctx, workspaceID); err == nil &&
+		existing.SubscriptionID != "" && existing.SubscriptionID != sub.ID {
 		slog.Warn("cancelling duplicate subscription",
 			"workspace_id", workspaceID, "keep", existing.SubscriptionID, "duplicate", sub.ID)
 		if _, err := s.client.V1Subscriptions.Cancel(ctx, sub.ID, nil); err != nil {
@@ -92,7 +89,7 @@ func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscriptio
 		return
 	}
 
-	if err := s.db.Q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
+	if err := s.upsertSubscription(ctx, &db.UpsertSubscriptionParams{
 		WorkspaceID:       workspaceID,
 		Source:            "stripe",
 		Plan:              PlanFlex,

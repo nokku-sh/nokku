@@ -123,14 +123,7 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 		)
 	}
 
-	result, err := s.cfg.Conn.Q.VerifyWorkspaceDomain(
-		ctx,
-		&db.VerifyWorkspaceDomainParams{
-			Domain:      domain.Domain,
-			Token:       domain.VerificationToken,
-			WorkspaceID: domain.WorkspaceID,
-		},
-	)
+	result, err := s.verifyWorkspaceDomain(ctx, domain)
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -138,6 +131,26 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 	return &nokkuv1.VerifyWorkspaceDomainResponse{
 		Domain: result.ToProto(),
 	}, nil
+}
+
+// verifyWorkspaceDomain persists the verification in its own scoped
+// transaction, after the (potentially slow) external DNS lookups completed.
+func (s *WorkspaceDomainService) verifyWorkspaceDomain(
+	ctx context.Context,
+	domain *db.WorkspaceDomain,
+) (*db.WorkspaceDomain, error) {
+	var result *db.WorkspaceDomain
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		result, err = q.VerifyWorkspaceDomain(ctx, &db.VerifyWorkspaceDomainParams{
+			Domain:      domain.Domain,
+			Token:       domain.VerificationToken,
+			WorkspaceID: domain.WorkspaceID,
+		})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (s *WorkspaceDomainService) RegenerateWorkspaceDomainToken(
