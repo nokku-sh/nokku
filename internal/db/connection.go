@@ -16,6 +16,7 @@ import (
 )
 
 var (
+	ErrNoActor                = errors.New("no actor in context")
 	ErrWorkspaceNotAccessible = errors.New("workspace is not accessible to actor")
 	ErrPermissionDenied       = errors.New("missing required permission")
 	ErrWorkspaceNotPinned     = errors.New("operation requires a workspace context")
@@ -194,7 +195,7 @@ func (c *Connection) WithWorkspace(
 ) error {
 	actor := meta.ActorFromContext(ctx)
 	if actor.ID == "" {
-		return errors.New("no actor in context")
+		return ErrNoActor
 	}
 
 	tx, err := c.Pool.Begin(ctx)
