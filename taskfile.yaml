@@ -4,7 +4,6 @@ env:
   CGO_ENABLED: 0
   GOEXPERIMENT: goroutineleakprofile
   IMAGE: ghcr.io/nokku-sh/nokku
-  DB_URL: postgres://postgres:postgres@localhost:5432/nokku?sslmode=disable
 
 tasks:
   dev:
@@ -90,15 +89,30 @@ tasks:
     cmds:
       - docker push $IMAGE:nightly
 
-  migrate:plan:
-    desc: Generate migration plan
-    dir: ./internal/db/
-    cmd: pg-schema-diff plan --from-dsn $DB_URL --to-dir ./schema/
+  migrate:new:
+    desc: Create a new migration file (pass a name, e.g. "add_users_last_login")
+    cmds:
+      - tern new {{.CLI_ARGS}} --migrations internal/db/migrations
 
-  migrate:apply:
-    desc: Apply schema changes
-    dir: ./internal/db/
-    cmd: |
-      pg-schema-diff apply --from-dsn $DB_URL --to-dir ./schema/ \
-      --allow-hazards AUTHZ_UPDATE,DELETES_DATA,INDEX_BUILD,HAS_UNTRACKABLE_DEPENDENCIES \
-      --skip-confirm-prompt --disable-plan-validation
+  migrate:status:
+    desc: Show applied migrations
+    cmds:
+      - tern status --migrations internal/db/migrations
+
+  migrate:up:
+    desc: Apply pending migrations (dev only; production auto-migrates on boot)
+    cmds:
+      - tern migrate --migrations internal/db/migrations
+
+  migrate:down:
+    desc: Revert last migration
+    cmds:
+      - tern migrate --migrations internal/db/migrations --destination -1
+
+  migrate:dump:
+    desc: Dump the current schema from a migrated database (for squashing)
+    cmds:
+      - pg_dump --schema-only --no-owner --no-privileges --no-comments --no-security-labels --no-publications --no-subscriptions --no-tablespaces -h 127.0.0.1 -p 5432 -U postgres -d nokku > new-001_base.sql
+      - echo "Dumped to new-001_base.sql. To squash, prepend the role creation block from the top of 001_base.sql, replace internal/db/migrations/001_base.sql with the dump, delete the old migrations, and boot once to stamp the version."
+    env:
+      PGPASSWORD: "{{ .NOKKU_DB_PASSWORD }}"
