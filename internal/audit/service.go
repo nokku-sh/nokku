@@ -3,7 +3,6 @@ package audit
 
 import (
 	"context"
-	_ "embed"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -14,9 +13,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/db"
 )
-
-//go:embed schema.sql
-var schemaSQL string
 
 const (
 	defaultRetentionDays = 7
@@ -31,21 +27,15 @@ type Service struct {
 func New(ctx context.Context, conn *db.Connection, b *billing.Service) (*Service, error) {
 	s := &Service{conn: conn, billing: b}
 
-	// Ensure the base audit schema and partitions exist
-	if _, err := s.conn.AdminPool.Exec(ctx, schemaSQL); err != nil {
-		return nil, fmt.Errorf("applying audit schema: %w", err)
-	}
-	if err := s.ensurePartitions(ctx); err != nil {
+	if err := s.setupPartitions(ctx); err != nil {
 		return nil, err
 	}
-	// Run retention cleanup on startup too, not just on the ticker
-	s.retentionCleanup(ctx)
 
 	go s.runBackgroundJobs(ctx)
 	return s, nil
 }
 
-func (s *Service) ensurePartitions(ctx context.Context) error {
+func (s *Service) setupPartitions(ctx context.Context) error {
 	now := time.Now()
 
 	// Normalize to the 1st of the current month to prevent AddDate wraparound issues
@@ -157,12 +147,14 @@ func (s *Service) runBackgroundJobs(ctx context.Context) {
 	ticker := time.NewTicker(12 * time.Hour)
 	defer ticker.Stop()
 
+	s.retentionCleanup(ctx) // initial cleanup
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := s.ensurePartitions(ctx); err != nil {
+			if err := s.setupPartitions(ctx); err != nil {
 				slog.Error("audit partition job failed", "error", err)
 			}
 			s.retentionCleanup(ctx)
@@ -195,7 +187,7 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 
 	q := db.New(tx)
 
-	// --- Per-workspace audit log cleanup ---
+	// per-workspace audit log cleanup
 
 	workspaceIDs, err := q.ListWorkspaceAuditLogWorkspaceIDs(ctx)
 	if err != nil {
