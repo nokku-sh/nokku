@@ -2,578 +2,581 @@
 // @generated from file nokku/v1/sso.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
-import { file_google_api_annotations } from "../../google/api/annotations_pb";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { Message } from "@bufbuild/protobuf";
+import type { GenEnum, GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
+import { file_buf_validate_validate } from '../../buf/validate/validate_pb';
+import { file_google_api_annotations } from '../../google/api/annotations_pb';
+import type { Timestamp } from '@bufbuild/protobuf/wkt';
+import { file_google_protobuf_timestamp } from '@bufbuild/protobuf/wkt';
+import type { Message } from '@bufbuild/protobuf';
 
 /**
  * Describes the file nokku/v1/sso.proto.
  */
-export const file_nokku_v1_sso: GenFile = /*@__PURE__*/
-  fileDesc("ChJub2trdS92MS9zc28ucHJvdG8SCG5va2t1LnYxIocDCgxPSURDUHJvdmlkZXISCgoCaWQYASABKAkSFAoMd29ya3NwYWNlX2lkGAIgASgJEgwKBG5hbWUYAyABKAkSEgoKaXNzdWVyX3VybBgEIAEoCRIRCgljbGllbnRfaWQYBSABKAkSDgoGc2NvcGVzGAYgAygJEhMKC2VtYWlsX2NsYWltGAcgASgJEhIKCm5hbWVfY2xhaW0YCCABKAkSFgoOdXNlcm5hbWVfY2xhaW0YCSABKAkSFQoNcGljdHVyZV9jbGFpbRgKIAEoCRITCgtlbmZvcmNlX3NzbxgLIAEoCBIeChZhbGxvd19qaXRfcHJvdmlzaW9uaW5nGAwgASgIEhAKCHVzZV9wa2NlGA0gASgIEhEKCWlzX2FjdGl2ZRgOIAEoCBIuCgpjcmVhdGVkX2F0GA8gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GBAgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI4ChZHZXRPSURDUHJvdmlkZXJSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQEiSAoXR2V0T0lEQ1Byb3ZpZGVyUmVzcG9uc2USLQoNb2lkY19wcm92aWRlchgBIAEoCzIWLm5va2t1LnYxLk9JRENQcm92aWRlciKLAwoZVXBkYXRlT0lEQ1Byb3ZpZGVyUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISHAoKaXNzdWVyX3VybBgDIAEoCUIIukgFcgOIAQESHQoJY2xpZW50X2lkGAQgASgJQgq6SAdyBRABGPQDEiEKDWNsaWVudF9zZWNyZXQYBSABKAlCCrpIB3IFEAEY6AcSIgoGc2NvcGVzGAYgAygJQhK6SA+SAQwIARAUIgZyBBABGGQSEwoLZW1haWxfY2xhaW0YByABKAkSEgoKbmFtZV9jbGFpbRgIIAEoCRIWCg51c2VybmFtZV9jbGFpbRgJIAEoCRIVCg1waWN0dXJlX2NsYWltGAogASgJEhMKC2VuZm9yY2Vfc3NvGAsgASgIEh4KFmFsbG93X2ppdF9wcm92aXNpb25pbmcYDCABKAgSEAoIdXNlX3BrY2UYDSABKAgSEQoJaXNfYWN0aXZlGA4gASgIIksKGlVwZGF0ZU9JRENQcm92aWRlclJlc3BvbnNlEi0KDW9pZGNfcHJvdmlkZXIYASABKAsyFi5ub2trdS52MS5PSURDUHJvdmlkZXIi5AIKDFNBTUxQcm92aWRlchIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRIUCgxtZXRhZGF0YV91cmwYBCABKAkSFwoPZW1haWxfYXR0cmlidXRlGAUgASgJEhYKDm5hbWVfYXR0cmlidXRlGAYgASgJEhoKEnVzZXJuYW1lX2F0dHJpYnV0ZRgHIAEoCRIZChFwaWN0dXJlX2F0dHJpYnV0ZRgIIAEoCRITCgtlbmZvcmNlX3NzbxgJIAEoCBIeChZhbGxvd19qaXRfcHJvdmlzaW9uaW5nGAogASgIEhEKCWlzX2FjdGl2ZRgLIAEoCBIuCgpjcmVhdGVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI4ChZHZXRTQU1MUHJvdmlkZXJSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQEiSAoXR2V0U0FNTFByb3ZpZGVyUmVzcG9uc2USLQoNc2FtbF9wcm92aWRlchgBIAEoCzIWLm5va2t1LnYxLlNBTUxQcm92aWRlciKlAgoZVXBkYXRlU0FNTFByb3ZpZGVyUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISHgoMbWV0YWRhdGFfdXJsGAMgASgJQgi6SAVyA4gBARIXCg9lbWFpbF9hdHRyaWJ1dGUYBCABKAkSFgoObmFtZV9hdHRyaWJ1dGUYBSABKAkSGgoSdXNlcm5hbWVfYXR0cmlidXRlGAYgASgJEhkKEXBpY3R1cmVfYXR0cmlidXRlGAcgASgJEhMKC2VuZm9yY2Vfc3NvGAggASgIEh4KFmFsbG93X2ppdF9wcm92aXNpb25pbmcYCSABKAgSEQoJaXNfYWN0aXZlGAogASgIIksKGlVwZGF0ZVNBTUxQcm92aWRlclJlc3BvbnNlEi0KDXNhbWxfcHJvdmlkZXIYASABKAsyFi5ub2trdS52MS5TQU1MUHJvdmlkZXIijQEKC1NTT1Byb3ZpZGVyEigKBHR5cGUYASABKA4yGi5ub2trdS52MS5TU09Qcm92aWRlci5UeXBlEgoKAmlkGAIgASgJEgwKBG5hbWUYAyABKAkiOgoEVHlwZRIUChBUWVBFX1VOU1BFQ0lGSUVEEAASDQoJVFlQRV9PSURDEAESDQoJVFlQRV9TQU1MEAIiLAoPQ2hlY2tTU09SZXF1ZXN0EhkKBWVtYWlsGAEgASgJQgq6SAdyBRiAAmABImIKEENoZWNrU1NPUmVzcG9uc2USDwoHaGFzX3NzbxgBIAEoCBITCgtlbmZvcmNlX3NzbxgCIAEoCBIoCglwcm92aWRlcnMYAyADKAsyFS5ub2trdS52MS5TU09Qcm92aWRlcjKaBQoKU1NPU2VydmljZRKFAQoPR2V0T0lEQ1Byb3ZpZGVyEiAubm9ra3UudjEuR2V0T0lEQ1Byb3ZpZGVyUmVxdWVzdBohLm5va2t1LnYxLkdldE9JRENQcm92aWRlclJlc3BvbnNlIi2QAgGC0+STAiQSIi92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L29pZGMSjgEKElVwZGF0ZU9JRENQcm92aWRlchIjLm5va2t1LnYxLlVwZGF0ZU9JRENQcm92aWRlclJlcXVlc3QaJC5ub2trdS52MS5VcGRhdGVPSURDUHJvdmlkZXJSZXNwb25zZSItgtPkkwInOgEqMiIvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9vaWRjEoUBCg9HZXRTQU1MUHJvdmlkZXISIC5ub2trdS52MS5HZXRTQU1MUHJvdmlkZXJSZXF1ZXN0GiEubm9ra3UudjEuR2V0U0FNTFByb3ZpZGVyUmVzcG9uc2UiLZACAYLT5JMCJBIiL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vc2FtbBKOAQoSVXBkYXRlU0FNTFByb3ZpZGVyEiMubm9ra3UudjEuVXBkYXRlU0FNTFByb3ZpZGVyUmVxdWVzdBokLm5va2t1LnYxLlVwZGF0ZVNBTUxQcm92aWRlclJlc3BvbnNlIi2C0+STAic6ASoyIi92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3NhbWwSWgoIQ2hlY2tTU08SGS5ub2trdS52MS5DaGVja1NTT1JlcXVlc3QaGi5ub2trdS52MS5DaGVja1NTT1Jlc3BvbnNlIheC0+STAhESDy92MS9zc28ve2VtYWlsfUKSAQoMY29tLm5va2t1LnYxQghTc29Qcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]);
+export const file_nokku_v1_sso: GenFile /*@__PURE__*/ = fileDesc(
+	'ChJub2trdS92MS9zc28ucHJvdG8SCG5va2t1LnYxIvsCCgxPSURDUHJvdmlkZXISFAoMd29ya3NwYWNlX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSEgoKaXNzdWVyX3VybBgDIAEoCRIRCgljbGllbnRfaWQYBCABKAkSDgoGc2NvcGVzGAUgAygJEhMKC2VtYWlsX2NsYWltGAYgASgJEhIKCm5hbWVfY2xhaW0YByABKAkSFgoOdXNlcm5hbWVfY2xhaW0YCCABKAkSFQoNcGljdHVyZV9jbGFpbRgJIAEoCRITCgtlbmZvcmNlX3NzbxgKIAEoCBIeChZhbGxvd19qaXRfcHJvdmlzaW9uaW5nGAsgASgIEhAKCHVzZV9wa2NlGAwgASgIEhEKCWlzX2FjdGl2ZRgNIAEoCBIuCgpjcmVhdGVkX2F0GA4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GA8gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI4ChZHZXRPSURDUHJvdmlkZXJSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQEiSAoXR2V0T0lEQ1Byb3ZpZGVyUmVzcG9uc2USLQoNb2lkY19wcm92aWRlchgBIAEoCzIWLm5va2t1LnYxLk9JRENQcm92aWRlciKLAwoZVXBkYXRlT0lEQ1Byb3ZpZGVyUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISHAoKaXNzdWVyX3VybBgDIAEoCUIIukgFcgOIAQESHQoJY2xpZW50X2lkGAQgASgJQgq6SAdyBRABGPQDEiEKDWNsaWVudF9zZWNyZXQYBSABKAlCCrpIB3IFEAEY6AcSIgoGc2NvcGVzGAYgAygJQhK6SA+SAQwIARAUIgZyBBABGGQSEwoLZW1haWxfY2xhaW0YByABKAkSEgoKbmFtZV9jbGFpbRgIIAEoCRIWCg51c2VybmFtZV9jbGFpbRgJIAEoCRIVCg1waWN0dXJlX2NsYWltGAogASgJEhMKC2VuZm9yY2Vfc3NvGAsgASgIEh4KFmFsbG93X2ppdF9wcm92aXNpb25pbmcYDCABKAgSEAoIdXNlX3BrY2UYDSABKAgSEQoJaXNfYWN0aXZlGA4gASgIIksKGlVwZGF0ZU9JRENQcm92aWRlclJlc3BvbnNlEi0KDW9pZGNfcHJvdmlkZXIYASABKAsyFi5ub2trdS52MS5PSURDUHJvdmlkZXIi2AIKDFNBTUxQcm92aWRlchIUCgx3b3Jrc3BhY2VfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIUCgxtZXRhZGF0YV91cmwYAyABKAkSFwoPZW1haWxfYXR0cmlidXRlGAQgASgJEhYKDm5hbWVfYXR0cmlidXRlGAUgASgJEhoKEnVzZXJuYW1lX2F0dHJpYnV0ZRgGIAEoCRIZChFwaWN0dXJlX2F0dHJpYnV0ZRgHIAEoCRITCgtlbmZvcmNlX3NzbxgIIAEoCBIeChZhbGxvd19qaXRfcHJvdmlzaW9uaW5nGAkgASgIEhEKCWlzX2FjdGl2ZRgKIAEoCBIuCgpjcmVhdGVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI4ChZHZXRTQU1MUHJvdmlkZXJSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQEiSAoXR2V0U0FNTFByb3ZpZGVyUmVzcG9uc2USLQoNc2FtbF9wcm92aWRlchgBIAEoCzIWLm5va2t1LnYxLlNBTUxQcm92aWRlciKlAgoZVXBkYXRlU0FNTFByb3ZpZGVyUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISHgoMbWV0YWRhdGFfdXJsGAMgASgJQgi6SAVyA4gBARIXCg9lbWFpbF9hdHRyaWJ1dGUYBCABKAkSFgoObmFtZV9hdHRyaWJ1dGUYBSABKAkSGgoSdXNlcm5hbWVfYXR0cmlidXRlGAYgASgJEhkKEXBpY3R1cmVfYXR0cmlidXRlGAcgASgJEhMKC2VuZm9yY2Vfc3NvGAggASgIEh4KFmFsbG93X2ppdF9wcm92aXNpb25pbmcYCSABKAgSEQoJaXNfYWN0aXZlGAogASgIIksKGlVwZGF0ZVNBTUxQcm92aWRlclJlc3BvbnNlEi0KDXNhbWxfcHJvdmlkZXIYASABKAsyFi5ub2trdS52MS5TQU1MUHJvdmlkZXIijQEKC1NTT1Byb3ZpZGVyEigKBHR5cGUYASABKA4yGi5ub2trdS52MS5TU09Qcm92aWRlci5UeXBlEgoKAmlkGAIgASgJEgwKBG5hbWUYAyABKAkiOgoEVHlwZRIUChBUWVBFX1VOU1BFQ0lGSUVEEAASDQoJVFlQRV9PSURDEAESDQoJVFlQRV9TQU1MEAIiLAoPQ2hlY2tTU09SZXF1ZXN0EhkKBWVtYWlsGAEgASgJQgq6SAdyBRiAAmABImIKEENoZWNrU1NPUmVzcG9uc2USDwoHaGFzX3NzbxgBIAEoCBITCgtlbmZvcmNlX3NzbxgCIAEoCBIoCglwcm92aWRlcnMYAyADKAsyFS5ub2trdS52MS5TU09Qcm92aWRlcjKaBQoKU1NPU2VydmljZRKFAQoPR2V0T0lEQ1Byb3ZpZGVyEiAubm9ra3UudjEuR2V0T0lEQ1Byb3ZpZGVyUmVxdWVzdBohLm5va2t1LnYxLkdldE9JRENQcm92aWRlclJlc3BvbnNlIi2QAgGC0+STAiQSIi92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L29pZGMSjgEKElVwZGF0ZU9JRENQcm92aWRlchIjLm5va2t1LnYxLlVwZGF0ZU9JRENQcm92aWRlclJlcXVlc3QaJC5ub2trdS52MS5VcGRhdGVPSURDUHJvdmlkZXJSZXNwb25zZSItgtPkkwInOgEqMiIvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9vaWRjEoUBCg9HZXRTQU1MUHJvdmlkZXISIC5ub2trdS52MS5HZXRTQU1MUHJvdmlkZXJSZXF1ZXN0GiEubm9ra3UudjEuR2V0U0FNTFByb3ZpZGVyUmVzcG9uc2UiLZACAYLT5JMCJBIiL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vc2FtbBKOAQoSVXBkYXRlU0FNTFByb3ZpZGVyEiMubm9ra3UudjEuVXBkYXRlU0FNTFByb3ZpZGVyUmVxdWVzdBokLm5va2t1LnYxLlVwZGF0ZVNBTUxQcm92aWRlclJlc3BvbnNlIi2C0+STAic6ASoyIi92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3NhbWwSWgoIQ2hlY2tTU08SGS5ub2trdS52MS5DaGVja1NTT1JlcXVlc3QaGi5ub2trdS52MS5DaGVja1NTT1Jlc3BvbnNlIheC0+STAhESDy92MS9zc28ve2VtYWlsfUKSAQoMY29tLm5va2t1LnYxQghTc29Qcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
+	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
+);
 
 /**
  * @generated from message nokku.v1.OIDCProvider
  */
-export type OIDCProvider = Message<"nokku.v1.OIDCProvider"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
+export type OIDCProvider = Message<'nokku.v1.OIDCProvider'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string workspace_id = 2;
-   */
-  workspaceId: string;
+	/**
+	 * @generated from field: string name = 2;
+	 */
+	name: string;
 
-  /**
-   * @generated from field: string name = 3;
-   */
-  name: string;
+	/**
+	 * @generated from field: string issuer_url = 3;
+	 */
+	issuerUrl: string;
 
-  /**
-   * @generated from field: string issuer_url = 4;
-   */
-  issuerUrl: string;
+	/**
+	 * @generated from field: string client_id = 4;
+	 */
+	clientId: string;
 
-  /**
-   * @generated from field: string client_id = 5;
-   */
-  clientId: string;
+	/**
+	 * @generated from field: repeated string scopes = 5;
+	 */
+	scopes: string[];
 
-  /**
-   * @generated from field: repeated string scopes = 6;
-   */
-  scopes: string[];
+	/**
+	 * @generated from field: string email_claim = 6;
+	 */
+	emailClaim: string;
 
-  /**
-   * @generated from field: string email_claim = 7;
-   */
-  emailClaim: string;
+	/**
+	 * @generated from field: string name_claim = 7;
+	 */
+	nameClaim: string;
 
-  /**
-   * @generated from field: string name_claim = 8;
-   */
-  nameClaim: string;
+	/**
+	 * @generated from field: string username_claim = 8;
+	 */
+	usernameClaim: string;
 
-  /**
-   * @generated from field: string username_claim = 9;
-   */
-  usernameClaim: string;
+	/**
+	 * @generated from field: string picture_claim = 9;
+	 */
+	pictureClaim: string;
 
-  /**
-   * @generated from field: string picture_claim = 10;
-   */
-  pictureClaim: string;
+	/**
+	 * @generated from field: bool enforce_sso = 10;
+	 */
+	enforceSso: boolean;
 
-  /**
-   * @generated from field: bool enforce_sso = 11;
-   */
-  enforceSso: boolean;
+	/**
+	 * @generated from field: bool allow_jit_provisioning = 11;
+	 */
+	allowJitProvisioning: boolean;
 
-  /**
-   * @generated from field: bool allow_jit_provisioning = 12;
-   */
-  allowJitProvisioning: boolean;
+	/**
+	 * @generated from field: bool use_pkce = 12;
+	 */
+	usePkce: boolean;
 
-  /**
-   * @generated from field: bool use_pkce = 13;
-   */
-  usePkce: boolean;
+	/**
+	 * @generated from field: bool is_active = 13;
+	 */
+	isActive: boolean;
 
-  /**
-   * @generated from field: bool is_active = 14;
-   */
-  isActive: boolean;
+	/**
+	 * @generated from field: google.protobuf.Timestamp created_at = 14;
+	 */
+	createdAt?: Timestamp | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 15;
-   */
-  createdAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 16;
-   */
-  updatedAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp updated_at = 15;
+	 */
+	updatedAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.OIDCProvider.
  * Use `create(OIDCProviderSchema)` to create a new message.
  */
-export const OIDCProviderSchema: GenMessage<OIDCProvider> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 0);
+export const OIDCProviderSchema: GenMessage<OIDCProvider> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_sso,
+	0
+);
 
 /**
  * @generated from message nokku.v1.GetOIDCProviderRequest
  */
-export type GetOIDCProviderRequest = Message<"nokku.v1.GetOIDCProviderRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type GetOIDCProviderRequest = Message<'nokku.v1.GetOIDCProviderRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 };
 
 /**
  * Describes the message nokku.v1.GetOIDCProviderRequest.
  * Use `create(GetOIDCProviderRequestSchema)` to create a new message.
  */
-export const GetOIDCProviderRequestSchema: GenMessage<GetOIDCProviderRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 1);
+export const GetOIDCProviderRequestSchema: GenMessage<GetOIDCProviderRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_sso, 1);
 
 /**
  * @generated from message nokku.v1.GetOIDCProviderResponse
  */
-export type GetOIDCProviderResponse = Message<"nokku.v1.GetOIDCProviderResponse"> & {
-  /**
-   * @generated from field: nokku.v1.OIDCProvider oidc_provider = 1;
-   */
-  oidcProvider?: OIDCProvider | undefined;
+export type GetOIDCProviderResponse = Message<'nokku.v1.GetOIDCProviderResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.OIDCProvider oidc_provider = 1;
+	 */
+	oidcProvider?: OIDCProvider | undefined;
 };
 
 /**
  * Describes the message nokku.v1.GetOIDCProviderResponse.
  * Use `create(GetOIDCProviderResponseSchema)` to create a new message.
  */
-export const GetOIDCProviderResponseSchema: GenMessage<GetOIDCProviderResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 2);
+export const GetOIDCProviderResponseSchema: GenMessage<GetOIDCProviderResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_sso, 2);
 
 /**
  * @generated from message nokku.v1.UpdateOIDCProviderRequest
  */
-export type UpdateOIDCProviderRequest = Message<"nokku.v1.UpdateOIDCProviderRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type UpdateOIDCProviderRequest = Message<'nokku.v1.UpdateOIDCProviderRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string name = 2;
-   */
-  name: string;
+	/**
+	 * @generated from field: string name = 2;
+	 */
+	name: string;
 
-  /**
-   * @generated from field: string issuer_url = 3;
-   */
-  issuerUrl: string;
+	/**
+	 * @generated from field: string issuer_url = 3;
+	 */
+	issuerUrl: string;
 
-  /**
-   * @generated from field: string client_id = 4;
-   */
-  clientId: string;
+	/**
+	 * @generated from field: string client_id = 4;
+	 */
+	clientId: string;
 
-  /**
-   * @generated from field: string client_secret = 5;
-   */
-  clientSecret: string;
+	/**
+	 * @generated from field: string client_secret = 5;
+	 */
+	clientSecret: string;
 
-  /**
-   * @generated from field: repeated string scopes = 6;
-   */
-  scopes: string[];
+	/**
+	 * @generated from field: repeated string scopes = 6;
+	 */
+	scopes: string[];
 
-  /**
-   * @generated from field: string email_claim = 7;
-   */
-  emailClaim: string;
+	/**
+	 * @generated from field: string email_claim = 7;
+	 */
+	emailClaim: string;
 
-  /**
-   * @generated from field: string name_claim = 8;
-   */
-  nameClaim: string;
+	/**
+	 * @generated from field: string name_claim = 8;
+	 */
+	nameClaim: string;
 
-  /**
-   * @generated from field: string username_claim = 9;
-   */
-  usernameClaim: string;
+	/**
+	 * @generated from field: string username_claim = 9;
+	 */
+	usernameClaim: string;
 
-  /**
-   * @generated from field: string picture_claim = 10;
-   */
-  pictureClaim: string;
+	/**
+	 * @generated from field: string picture_claim = 10;
+	 */
+	pictureClaim: string;
 
-  /**
-   * @generated from field: bool enforce_sso = 11;
-   */
-  enforceSso: boolean;
+	/**
+	 * @generated from field: bool enforce_sso = 11;
+	 */
+	enforceSso: boolean;
 
-  /**
-   * @generated from field: bool allow_jit_provisioning = 12;
-   */
-  allowJitProvisioning: boolean;
+	/**
+	 * @generated from field: bool allow_jit_provisioning = 12;
+	 */
+	allowJitProvisioning: boolean;
 
-  /**
-   * @generated from field: bool use_pkce = 13;
-   */
-  usePkce: boolean;
+	/**
+	 * @generated from field: bool use_pkce = 13;
+	 */
+	usePkce: boolean;
 
-  /**
-   * @generated from field: bool is_active = 14;
-   */
-  isActive: boolean;
+	/**
+	 * @generated from field: bool is_active = 14;
+	 */
+	isActive: boolean;
 };
 
 /**
  * Describes the message nokku.v1.UpdateOIDCProviderRequest.
  * Use `create(UpdateOIDCProviderRequestSchema)` to create a new message.
  */
-export const UpdateOIDCProviderRequestSchema: GenMessage<UpdateOIDCProviderRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 3);
+export const UpdateOIDCProviderRequestSchema: GenMessage<UpdateOIDCProviderRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_sso, 3);
 
 /**
  * @generated from message nokku.v1.UpdateOIDCProviderResponse
  */
-export type UpdateOIDCProviderResponse = Message<"nokku.v1.UpdateOIDCProviderResponse"> & {
-  /**
-   * @generated from field: nokku.v1.OIDCProvider oidc_provider = 1;
-   */
-  oidcProvider?: OIDCProvider | undefined;
+export type UpdateOIDCProviderResponse = Message<'nokku.v1.UpdateOIDCProviderResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.OIDCProvider oidc_provider = 1;
+	 */
+	oidcProvider?: OIDCProvider | undefined;
 };
 
 /**
  * Describes the message nokku.v1.UpdateOIDCProviderResponse.
  * Use `create(UpdateOIDCProviderResponseSchema)` to create a new message.
  */
-export const UpdateOIDCProviderResponseSchema: GenMessage<UpdateOIDCProviderResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 4);
+export const UpdateOIDCProviderResponseSchema: GenMessage<UpdateOIDCProviderResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_sso, 4);
 
 /**
  * @generated from message nokku.v1.SAMLProvider
  */
-export type SAMLProvider = Message<"nokku.v1.SAMLProvider"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
+export type SAMLProvider = Message<'nokku.v1.SAMLProvider'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string workspace_id = 2;
-   */
-  workspaceId: string;
+	/**
+	 * @generated from field: string name = 2;
+	 */
+	name: string;
 
-  /**
-   * @generated from field: string name = 3;
-   */
-  name: string;
+	/**
+	 * @generated from field: string metadata_url = 3;
+	 */
+	metadataUrl: string;
 
-  /**
-   * @generated from field: string metadata_url = 4;
-   */
-  metadataUrl: string;
+	/**
+	 * @generated from field: string email_attribute = 4;
+	 */
+	emailAttribute: string;
 
-  /**
-   * @generated from field: string email_attribute = 5;
-   */
-  emailAttribute: string;
+	/**
+	 * @generated from field: string name_attribute = 5;
+	 */
+	nameAttribute: string;
 
-  /**
-   * @generated from field: string name_attribute = 6;
-   */
-  nameAttribute: string;
+	/**
+	 * @generated from field: string username_attribute = 6;
+	 */
+	usernameAttribute: string;
 
-  /**
-   * @generated from field: string username_attribute = 7;
-   */
-  usernameAttribute: string;
+	/**
+	 * @generated from field: string picture_attribute = 7;
+	 */
+	pictureAttribute: string;
 
-  /**
-   * @generated from field: string picture_attribute = 8;
-   */
-  pictureAttribute: string;
+	/**
+	 * @generated from field: bool enforce_sso = 8;
+	 */
+	enforceSso: boolean;
 
-  /**
-   * @generated from field: bool enforce_sso = 9;
-   */
-  enforceSso: boolean;
+	/**
+	 * @generated from field: bool allow_jit_provisioning = 9;
+	 */
+	allowJitProvisioning: boolean;
 
-  /**
-   * @generated from field: bool allow_jit_provisioning = 10;
-   */
-  allowJitProvisioning: boolean;
+	/**
+	 * @generated from field: bool is_active = 10;
+	 */
+	isActive: boolean;
 
-  /**
-   * @generated from field: bool is_active = 11;
-   */
-  isActive: boolean;
+	/**
+	 * @generated from field: google.protobuf.Timestamp created_at = 11;
+	 */
+	createdAt?: Timestamp | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 12;
-   */
-  createdAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 13;
-   */
-  updatedAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp updated_at = 12;
+	 */
+	updatedAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.SAMLProvider.
  * Use `create(SAMLProviderSchema)` to create a new message.
  */
-export const SAMLProviderSchema: GenMessage<SAMLProvider> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 5);
+export const SAMLProviderSchema: GenMessage<SAMLProvider> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_sso,
+	5
+);
 
 /**
  * @generated from message nokku.v1.GetSAMLProviderRequest
  */
-export type GetSAMLProviderRequest = Message<"nokku.v1.GetSAMLProviderRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type GetSAMLProviderRequest = Message<'nokku.v1.GetSAMLProviderRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 };
 
 /**
  * Describes the message nokku.v1.GetSAMLProviderRequest.
  * Use `create(GetSAMLProviderRequestSchema)` to create a new message.
  */
-export const GetSAMLProviderRequestSchema: GenMessage<GetSAMLProviderRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 6);
+export const GetSAMLProviderRequestSchema: GenMessage<GetSAMLProviderRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_sso, 6);
 
 /**
  * @generated from message nokku.v1.GetSAMLProviderResponse
  */
-export type GetSAMLProviderResponse = Message<"nokku.v1.GetSAMLProviderResponse"> & {
-  /**
-   * @generated from field: nokku.v1.SAMLProvider saml_provider = 1;
-   */
-  samlProvider?: SAMLProvider | undefined;
+export type GetSAMLProviderResponse = Message<'nokku.v1.GetSAMLProviderResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.SAMLProvider saml_provider = 1;
+	 */
+	samlProvider?: SAMLProvider | undefined;
 };
 
 /**
  * Describes the message nokku.v1.GetSAMLProviderResponse.
  * Use `create(GetSAMLProviderResponseSchema)` to create a new message.
  */
-export const GetSAMLProviderResponseSchema: GenMessage<GetSAMLProviderResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 7);
+export const GetSAMLProviderResponseSchema: GenMessage<GetSAMLProviderResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_sso, 7);
 
 /**
  * @generated from message nokku.v1.UpdateSAMLProviderRequest
  */
-export type UpdateSAMLProviderRequest = Message<"nokku.v1.UpdateSAMLProviderRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type UpdateSAMLProviderRequest = Message<'nokku.v1.UpdateSAMLProviderRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string name = 2;
-   */
-  name: string;
+	/**
+	 * @generated from field: string name = 2;
+	 */
+	name: string;
 
-  /**
-   * @generated from field: string metadata_url = 3;
-   */
-  metadataUrl: string;
+	/**
+	 * @generated from field: string metadata_url = 3;
+	 */
+	metadataUrl: string;
 
-  /**
-   * @generated from field: string email_attribute = 4;
-   */
-  emailAttribute: string;
+	/**
+	 * @generated from field: string email_attribute = 4;
+	 */
+	emailAttribute: string;
 
-  /**
-   * @generated from field: string name_attribute = 5;
-   */
-  nameAttribute: string;
+	/**
+	 * @generated from field: string name_attribute = 5;
+	 */
+	nameAttribute: string;
 
-  /**
-   * @generated from field: string username_attribute = 6;
-   */
-  usernameAttribute: string;
+	/**
+	 * @generated from field: string username_attribute = 6;
+	 */
+	usernameAttribute: string;
 
-  /**
-   * @generated from field: string picture_attribute = 7;
-   */
-  pictureAttribute: string;
+	/**
+	 * @generated from field: string picture_attribute = 7;
+	 */
+	pictureAttribute: string;
 
-  /**
-   * @generated from field: bool enforce_sso = 8;
-   */
-  enforceSso: boolean;
+	/**
+	 * @generated from field: bool enforce_sso = 8;
+	 */
+	enforceSso: boolean;
 
-  /**
-   * @generated from field: bool allow_jit_provisioning = 9;
-   */
-  allowJitProvisioning: boolean;
+	/**
+	 * @generated from field: bool allow_jit_provisioning = 9;
+	 */
+	allowJitProvisioning: boolean;
 
-  /**
-   * @generated from field: bool is_active = 10;
-   */
-  isActive: boolean;
+	/**
+	 * @generated from field: bool is_active = 10;
+	 */
+	isActive: boolean;
 };
 
 /**
  * Describes the message nokku.v1.UpdateSAMLProviderRequest.
  * Use `create(UpdateSAMLProviderRequestSchema)` to create a new message.
  */
-export const UpdateSAMLProviderRequestSchema: GenMessage<UpdateSAMLProviderRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 8);
+export const UpdateSAMLProviderRequestSchema: GenMessage<UpdateSAMLProviderRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_sso, 8);
 
 /**
  * @generated from message nokku.v1.UpdateSAMLProviderResponse
  */
-export type UpdateSAMLProviderResponse = Message<"nokku.v1.UpdateSAMLProviderResponse"> & {
-  /**
-   * @generated from field: nokku.v1.SAMLProvider saml_provider = 1;
-   */
-  samlProvider?: SAMLProvider | undefined;
+export type UpdateSAMLProviderResponse = Message<'nokku.v1.UpdateSAMLProviderResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.SAMLProvider saml_provider = 1;
+	 */
+	samlProvider?: SAMLProvider | undefined;
 };
 
 /**
  * Describes the message nokku.v1.UpdateSAMLProviderResponse.
  * Use `create(UpdateSAMLProviderResponseSchema)` to create a new message.
  */
-export const UpdateSAMLProviderResponseSchema: GenMessage<UpdateSAMLProviderResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 9);
+export const UpdateSAMLProviderResponseSchema: GenMessage<UpdateSAMLProviderResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_sso, 9);
 
 /**
  * @generated from message nokku.v1.SSOProvider
  */
-export type SSOProvider = Message<"nokku.v1.SSOProvider"> & {
-  /**
-   * @generated from field: nokku.v1.SSOProvider.Type type = 1;
-   */
-  type: SSOProvider_Type;
+export type SSOProvider = Message<'nokku.v1.SSOProvider'> & {
+	/**
+	 * @generated from field: nokku.v1.SSOProvider.Type type = 1;
+	 */
+	type: SSOProvider_Type;
 
-  /**
-   * @generated from field: string id = 2;
-   */
-  id: string;
+	/**
+	 * @generated from field: string id = 2;
+	 */
+	id: string;
 
-  /**
-   * @generated from field: string name = 3;
-   */
-  name: string;
+	/**
+	 * @generated from field: string name = 3;
+	 */
+	name: string;
 };
 
 /**
  * Describes the message nokku.v1.SSOProvider.
  * Use `create(SSOProviderSchema)` to create a new message.
  */
-export const SSOProviderSchema: GenMessage<SSOProvider> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 10);
+export const SSOProviderSchema: GenMessage<SSOProvider> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_sso,
+	10
+);
 
 /**
  * @generated from enum nokku.v1.SSOProvider.Type
  */
 export enum SSOProvider_Type {
-  /**
-   * @generated from enum value: TYPE_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
+	/**
+	 * @generated from enum value: TYPE_UNSPECIFIED = 0;
+	 */
+	UNSPECIFIED = 0,
 
-  /**
-   * @generated from enum value: TYPE_OIDC = 1;
-   */
-  OIDC = 1,
+	/**
+	 * @generated from enum value: TYPE_OIDC = 1;
+	 */
+	OIDC = 1,
 
-  /**
-   * @generated from enum value: TYPE_SAML = 2;
-   */
-  SAML = 2,
+	/**
+	 * @generated from enum value: TYPE_SAML = 2;
+	 */
+	SAML = 2
 }
 
 /**
  * Describes the enum nokku.v1.SSOProvider.Type.
  */
-export const SSOProvider_TypeSchema: GenEnum<SSOProvider_Type> = /*@__PURE__*/
-  enumDesc(file_nokku_v1_sso, 10, 0);
+export const SSOProvider_TypeSchema: GenEnum<SSOProvider_Type> /*@__PURE__*/ = enumDesc(
+	file_nokku_v1_sso,
+	10,
+	0
+);
 
 /**
  * @generated from message nokku.v1.CheckSSORequest
  */
-export type CheckSSORequest = Message<"nokku.v1.CheckSSORequest"> & {
-  /**
-   * @generated from field: string email = 1;
-   */
-  email: string;
+export type CheckSSORequest = Message<'nokku.v1.CheckSSORequest'> & {
+	/**
+	 * @generated from field: string email = 1;
+	 */
+	email: string;
 };
 
 /**
  * Describes the message nokku.v1.CheckSSORequest.
  * Use `create(CheckSSORequestSchema)` to create a new message.
  */
-export const CheckSSORequestSchema: GenMessage<CheckSSORequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 11);
+export const CheckSSORequestSchema: GenMessage<CheckSSORequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_sso,
+	11
+);
 
 /**
  * @generated from message nokku.v1.CheckSSOResponse
  */
-export type CheckSSOResponse = Message<"nokku.v1.CheckSSOResponse"> & {
-  /**
-   * @generated from field: bool has_sso = 1;
-   */
-  hasSso: boolean;
+export type CheckSSOResponse = Message<'nokku.v1.CheckSSOResponse'> & {
+	/**
+	 * @generated from field: bool has_sso = 1;
+	 */
+	hasSso: boolean;
 
-  /**
-   * @generated from field: bool enforce_sso = 2;
-   */
-  enforceSso: boolean;
+	/**
+	 * @generated from field: bool enforce_sso = 2;
+	 */
+	enforceSso: boolean;
 
-  /**
-   * @generated from field: repeated nokku.v1.SSOProvider providers = 3;
-   */
-  providers: SSOProvider[];
+	/**
+	 * @generated from field: repeated nokku.v1.SSOProvider providers = 3;
+	 */
+	providers: SSOProvider[];
 };
 
 /**
  * Describes the message nokku.v1.CheckSSOResponse.
  * Use `create(CheckSSOResponseSchema)` to create a new message.
  */
-export const CheckSSOResponseSchema: GenMessage<CheckSSOResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 12);
+export const CheckSSOResponseSchema: GenMessage<CheckSSOResponse> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_sso,
+	12
+);
 
 /**
  * @generated from service nokku.v1.SSOService
  */
 export const SSOService: GenService<{
-  /**
-   * @generated from rpc nokku.v1.SSOService.GetOIDCProvider
-   */
-  getOIDCProvider: {
-    methodKind: "unary";
-    input: typeof GetOIDCProviderRequestSchema;
-    output: typeof GetOIDCProviderResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.SSOService.UpdateOIDCProvider
-   */
-  updateOIDCProvider: {
-    methodKind: "unary";
-    input: typeof UpdateOIDCProviderRequestSchema;
-    output: typeof UpdateOIDCProviderResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.SSOService.GetSAMLProvider
-   */
-  getSAMLProvider: {
-    methodKind: "unary";
-    input: typeof GetSAMLProviderRequestSchema;
-    output: typeof GetSAMLProviderResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.SSOService.UpdateSAMLProvider
-   */
-  updateSAMLProvider: {
-    methodKind: "unary";
-    input: typeof UpdateSAMLProviderRequestSchema;
-    output: typeof UpdateSAMLProviderResponseSchema;
-  },
-  /**
-   * Public endpoint
-   *
-   * @generated from rpc nokku.v1.SSOService.CheckSSO
-   */
-  checkSSO: {
-    methodKind: "unary";
-    input: typeof CheckSSORequestSchema;
-    output: typeof CheckSSOResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_nokku_v1_sso, 0);
-
+	/**
+	 * @generated from rpc nokku.v1.SSOService.GetOIDCProvider
+	 */
+	getOIDCProvider: {
+		methodKind: 'unary';
+		input: typeof GetOIDCProviderRequestSchema;
+		output: typeof GetOIDCProviderResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.SSOService.UpdateOIDCProvider
+	 */
+	updateOIDCProvider: {
+		methodKind: 'unary';
+		input: typeof UpdateOIDCProviderRequestSchema;
+		output: typeof UpdateOIDCProviderResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.SSOService.GetSAMLProvider
+	 */
+	getSAMLProvider: {
+		methodKind: 'unary';
+		input: typeof GetSAMLProviderRequestSchema;
+		output: typeof GetSAMLProviderResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.SSOService.UpdateSAMLProvider
+	 */
+	updateSAMLProvider: {
+		methodKind: 'unary';
+		input: typeof UpdateSAMLProviderRequestSchema;
+		output: typeof UpdateSAMLProviderResponseSchema;
+	};
+	/**
+	 * Public endpoint
+	 *
+	 * @generated from rpc nokku.v1.SSOService.CheckSSO
+	 */
+	checkSSO: {
+		methodKind: 'unary';
+		input: typeof CheckSSORequestSchema;
+		output: typeof CheckSSOResponseSchema;
+	};
+}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_sso, 0);

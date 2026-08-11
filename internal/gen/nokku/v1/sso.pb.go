@@ -75,22 +75,21 @@ func (SSOProvider_Type) EnumDescriptor() ([]byte, []int) {
 
 type OIDCProvider struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
-	Id                   *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	WorkspaceId          *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	Name                 *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
-	IssuerUrl            *string                `protobuf:"bytes,4,opt,name=issuer_url,json=issuerUrl" json:"issuer_url,omitempty"`
-	ClientId             *string                `protobuf:"bytes,5,opt,name=client_id,json=clientId" json:"client_id,omitempty"`
-	Scopes               []string               `protobuf:"bytes,6,rep,name=scopes" json:"scopes,omitempty"`
-	EmailClaim           *string                `protobuf:"bytes,7,opt,name=email_claim,json=emailClaim" json:"email_claim,omitempty"`
-	NameClaim            *string                `protobuf:"bytes,8,opt,name=name_claim,json=nameClaim" json:"name_claim,omitempty"`
-	UsernameClaim        *string                `protobuf:"bytes,9,opt,name=username_claim,json=usernameClaim" json:"username_claim,omitempty"`
-	PictureClaim         *string                `protobuf:"bytes,10,opt,name=picture_claim,json=pictureClaim" json:"picture_claim,omitempty"`
-	EnforceSso           *bool                  `protobuf:"varint,11,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
-	AllowJitProvisioning *bool                  `protobuf:"varint,12,opt,name=allow_jit_provisioning,json=allowJitProvisioning" json:"allow_jit_provisioning,omitempty"`
-	UsePkce              *bool                  `protobuf:"varint,13,opt,name=use_pkce,json=usePkce" json:"use_pkce,omitempty"`
-	IsActive             *bool                  `protobuf:"varint,14,opt,name=is_active,json=isActive" json:"is_active,omitempty"`
-	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	WorkspaceId          *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Name                 *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	IssuerUrl            *string                `protobuf:"bytes,3,opt,name=issuer_url,json=issuerUrl" json:"issuer_url,omitempty"`
+	ClientId             *string                `protobuf:"bytes,4,opt,name=client_id,json=clientId" json:"client_id,omitempty"`
+	Scopes               []string               `protobuf:"bytes,5,rep,name=scopes" json:"scopes,omitempty"`
+	EmailClaim           *string                `protobuf:"bytes,6,opt,name=email_claim,json=emailClaim" json:"email_claim,omitempty"`
+	NameClaim            *string                `protobuf:"bytes,7,opt,name=name_claim,json=nameClaim" json:"name_claim,omitempty"`
+	UsernameClaim        *string                `protobuf:"bytes,8,opt,name=username_claim,json=usernameClaim" json:"username_claim,omitempty"`
+	PictureClaim         *string                `protobuf:"bytes,9,opt,name=picture_claim,json=pictureClaim" json:"picture_claim,omitempty"`
+	EnforceSso           *bool                  `protobuf:"varint,10,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
+	AllowJitProvisioning *bool                  `protobuf:"varint,11,opt,name=allow_jit_provisioning,json=allowJitProvisioning" json:"allow_jit_provisioning,omitempty"`
+	UsePkce              *bool                  `protobuf:"varint,12,opt,name=use_pkce,json=usePkce" json:"use_pkce,omitempty"`
+	IsActive             *bool                  `protobuf:"varint,13,opt,name=is_active,json=isActive" json:"is_active,omitempty"`
+	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -123,13 +122,6 @@ func (x *OIDCProvider) ProtoReflect() protoreflect.Message {
 // Deprecated: Use OIDCProvider.ProtoReflect.Descriptor instead.
 func (*OIDCProvider) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *OIDCProvider) GetId() string {
-	if x != nil && x.Id != nil {
-		return *x.Id
-	}
-	return ""
 }
 
 func (x *OIDCProvider) GetWorkspaceId() string {
@@ -519,19 +511,18 @@ func (x *UpdateOIDCProviderResponse) GetOidcProvider() *OIDCProvider {
 
 type SAMLProvider struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
-	Id                   *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	WorkspaceId          *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	Name                 *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
-	MetadataUrl          *string                `protobuf:"bytes,4,opt,name=metadata_url,json=metadataUrl" json:"metadata_url,omitempty"`
-	EmailAttribute       *string                `protobuf:"bytes,5,opt,name=email_attribute,json=emailAttribute" json:"email_attribute,omitempty"`
-	NameAttribute        *string                `protobuf:"bytes,6,opt,name=name_attribute,json=nameAttribute" json:"name_attribute,omitempty"`
-	UsernameAttribute    *string                `protobuf:"bytes,7,opt,name=username_attribute,json=usernameAttribute" json:"username_attribute,omitempty"`
-	PictureAttribute     *string                `protobuf:"bytes,8,opt,name=picture_attribute,json=pictureAttribute" json:"picture_attribute,omitempty"`
-	EnforceSso           *bool                  `protobuf:"varint,9,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
-	AllowJitProvisioning *bool                  `protobuf:"varint,10,opt,name=allow_jit_provisioning,json=allowJitProvisioning" json:"allow_jit_provisioning,omitempty"`
-	IsActive             *bool                  `protobuf:"varint,11,opt,name=is_active,json=isActive" json:"is_active,omitempty"`
-	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	WorkspaceId          *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Name                 *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	MetadataUrl          *string                `protobuf:"bytes,3,opt,name=metadata_url,json=metadataUrl" json:"metadata_url,omitempty"`
+	EmailAttribute       *string                `protobuf:"bytes,4,opt,name=email_attribute,json=emailAttribute" json:"email_attribute,omitempty"`
+	NameAttribute        *string                `protobuf:"bytes,5,opt,name=name_attribute,json=nameAttribute" json:"name_attribute,omitempty"`
+	UsernameAttribute    *string                `protobuf:"bytes,6,opt,name=username_attribute,json=usernameAttribute" json:"username_attribute,omitempty"`
+	PictureAttribute     *string                `protobuf:"bytes,7,opt,name=picture_attribute,json=pictureAttribute" json:"picture_attribute,omitempty"`
+	EnforceSso           *bool                  `protobuf:"varint,8,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
+	AllowJitProvisioning *bool                  `protobuf:"varint,9,opt,name=allow_jit_provisioning,json=allowJitProvisioning" json:"allow_jit_provisioning,omitempty"`
+	IsActive             *bool                  `protobuf:"varint,10,opt,name=is_active,json=isActive" json:"is_active,omitempty"`
+	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -564,13 +555,6 @@ func (x *SAMLProvider) ProtoReflect() protoreflect.Message {
 // Deprecated: Use SAMLProvider.ProtoReflect.Descriptor instead.
 func (*SAMLProvider) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *SAMLProvider) GetId() string {
-	if x != nil && x.Id != nil {
-		return *x.Id
-	}
-	return ""
 }
 
 func (x *SAMLProvider) GetWorkspaceId() string {
@@ -1073,31 +1057,30 @@ var File_nokku_v1_sso_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_sso_proto_rawDesc = "" +
 	"\n" +
-	"\x12nokku/v1/sso.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xba\x04\n" +
-	"\fOIDCProvider\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
-	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\x12\x1d\n" +
+	"\x12nokku/v1/sso.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaa\x04\n" +
+	"\fOIDCProvider\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
-	"issuer_url\x18\x04 \x01(\tR\tissuerUrl\x12\x1b\n" +
-	"\tclient_id\x18\x05 \x01(\tR\bclientId\x12\x16\n" +
-	"\x06scopes\x18\x06 \x03(\tR\x06scopes\x12\x1f\n" +
-	"\vemail_claim\x18\a \x01(\tR\n" +
+	"issuer_url\x18\x03 \x01(\tR\tissuerUrl\x12\x1b\n" +
+	"\tclient_id\x18\x04 \x01(\tR\bclientId\x12\x16\n" +
+	"\x06scopes\x18\x05 \x03(\tR\x06scopes\x12\x1f\n" +
+	"\vemail_claim\x18\x06 \x01(\tR\n" +
 	"emailClaim\x12\x1d\n" +
 	"\n" +
-	"name_claim\x18\b \x01(\tR\tnameClaim\x12%\n" +
-	"\x0eusername_claim\x18\t \x01(\tR\rusernameClaim\x12#\n" +
-	"\rpicture_claim\x18\n" +
-	" \x01(\tR\fpictureClaim\x12\x1f\n" +
-	"\venforce_sso\x18\v \x01(\bR\n" +
+	"name_claim\x18\a \x01(\tR\tnameClaim\x12%\n" +
+	"\x0eusername_claim\x18\b \x01(\tR\rusernameClaim\x12#\n" +
+	"\rpicture_claim\x18\t \x01(\tR\fpictureClaim\x12\x1f\n" +
+	"\venforce_sso\x18\n" +
+	" \x01(\bR\n" +
 	"enforceSso\x124\n" +
-	"\x16allow_jit_provisioning\x18\f \x01(\bR\x14allowJitProvisioning\x12\x19\n" +
-	"\buse_pkce\x18\r \x01(\bR\ausePkce\x12\x1b\n" +
-	"\tis_active\x18\x0e \x01(\bR\bisActive\x129\n" +
+	"\x16allow_jit_provisioning\x18\v \x01(\bR\x14allowJitProvisioning\x12\x19\n" +
+	"\buse_pkce\x18\f \x01(\bR\ausePkce\x12\x1b\n" +
+	"\tis_active\x18\r \x01(\bR\bisActive\x129\n" +
 	"\n" +
-	"created_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"E\n" +
+	"updated_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"E\n" +
 	"\x16GetOIDCProviderRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"V\n" +
 	"\x17GetOIDCProviderResponse\x12;\n" +
@@ -1126,25 +1109,24 @@ const file_nokku_v1_sso_proto_rawDesc = "" +
 	"\buse_pkce\x18\r \x01(\bR\ausePkce\x12\x1b\n" +
 	"\tis_active\x18\x0e \x01(\bR\bisActive\"Y\n" +
 	"\x1aUpdateOIDCProviderResponse\x12;\n" +
-	"\roidc_provider\x18\x01 \x01(\v2\x16.nokku.v1.OIDCProviderR\foidcProvider\"\x8e\x04\n" +
-	"\fSAMLProvider\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
-	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\x12!\n" +
-	"\fmetadata_url\x18\x04 \x01(\tR\vmetadataUrl\x12'\n" +
-	"\x0femail_attribute\x18\x05 \x01(\tR\x0eemailAttribute\x12%\n" +
-	"\x0ename_attribute\x18\x06 \x01(\tR\rnameAttribute\x12-\n" +
-	"\x12username_attribute\x18\a \x01(\tR\x11usernameAttribute\x12+\n" +
-	"\x11picture_attribute\x18\b \x01(\tR\x10pictureAttribute\x12\x1f\n" +
-	"\venforce_sso\x18\t \x01(\bR\n" +
+	"\roidc_provider\x18\x01 \x01(\v2\x16.nokku.v1.OIDCProviderR\foidcProvider\"\xfe\x03\n" +
+	"\fSAMLProvider\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
+	"\fmetadata_url\x18\x03 \x01(\tR\vmetadataUrl\x12'\n" +
+	"\x0femail_attribute\x18\x04 \x01(\tR\x0eemailAttribute\x12%\n" +
+	"\x0ename_attribute\x18\x05 \x01(\tR\rnameAttribute\x12-\n" +
+	"\x12username_attribute\x18\x06 \x01(\tR\x11usernameAttribute\x12+\n" +
+	"\x11picture_attribute\x18\a \x01(\tR\x10pictureAttribute\x12\x1f\n" +
+	"\venforce_sso\x18\b \x01(\bR\n" +
 	"enforceSso\x124\n" +
-	"\x16allow_jit_provisioning\x18\n" +
-	" \x01(\bR\x14allowJitProvisioning\x12\x1b\n" +
-	"\tis_active\x18\v \x01(\bR\bisActive\x129\n" +
+	"\x16allow_jit_provisioning\x18\t \x01(\bR\x14allowJitProvisioning\x12\x1b\n" +
+	"\tis_active\x18\n" +
+	" \x01(\bR\bisActive\x129\n" +
 	"\n" +
-	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"E\n" +
+	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"E\n" +
 	"\x16GetSAMLProviderRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"V\n" +
 	"\x17GetSAMLProviderResponse\x12;\n" +
