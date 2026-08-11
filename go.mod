@@ -32,7 +32,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/jackc/tern/v2 v2.4.2
 	github.com/mergestat/timediff v0.0.4
-	github.com/mizuchilabs/kata v0.1.2
+	github.com/mizuchilabs/kata v0.1.3
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/rs/cors v1.11.1
 	github.com/russellhaering/goxmldsig v1.6.1
