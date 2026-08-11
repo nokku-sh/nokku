@@ -1,9 +1,6 @@
--- name: UpsertRole :exec
+-- name: EnsureRole :exec
 INSERT INTO
-  roles (name, description, permissions)
+  roles (name, description)
 VALUES
-  (@name, @description, @permissions)
-ON CONFLICT (name) DO UPDATE
-SET
-  description = EXCLUDED.description,
-  permissions = EXCLUDED.permissions;
+  (@name, @description)
+ON CONFLICT (name) DO NOTHING;

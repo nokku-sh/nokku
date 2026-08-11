@@ -8,10 +8,10 @@ import (
 
 // Permission is a single action a role may perform on a resource.
 //
-// Codes are stored in roles.permissions and evaluated in Go by
-// HasPermission, which the API's authorization interceptor consults before
-// running any query. RLS policies enforce tenant isolation only and never
-// inspect permission codes.
+// Codes exist only in Go and are evaluated by HasPermission, which the API's
+// authorization interceptor consults before running any query. The roles
+// table stores names for referential integrity only. RLS policies enforce
+// tenant isolation and never inspect permission codes.
 type Permission string
 
 // Permission codes. Access levels are view < edit < delete and "edit" always
@@ -94,7 +94,7 @@ type builtinRole struct {
 }
 
 // builtinRoles is the source of truth for the authorization model.
-// EnsureRoles converges the database onto it on startup.
+// setupRBACRoles seeds the database with their names on startup.
 var builtinRoles = []builtinRole{
 	{
 		// "owner" is granted via workspace creation and ownership transfer,
@@ -152,8 +152,7 @@ var builtinRoles = []builtinRole{
 		),
 	},
 	{
-		// "daemon" is a system role, not assignable to users or service
-		// accounts. Daemon agents always operate with this fixed set.
+		// "daemon" is a system role, not assignable to users or service accounts.
 		name:        "daemon",
 		description: "Fixed permissions for daemon agents",
 		system:      true,
@@ -206,9 +205,6 @@ func IsServiceAccountRole(roleName string) bool {
 }
 
 // HasPermission reports whether the named role grants the permission.
-// Unknown roles have no permissions; this is the single point where
-// permission codes are evaluated, and it replaces the SQL-side
-// has_permission() that previously ran inside RLS policies.
 func HasPermission(roleName string, p Permission) bool {
 	for _, r := range builtinRoles {
 		if r.name == roleName {
@@ -218,9 +214,8 @@ func HasPermission(roleName string, p Permission) bool {
 	return false
 }
 
-// setupRBACRoles converges the built-in roles onto the definitions above.
-// Safe to run on every startup: adding, adjusting, or removing
-// permissions here is applied automatically on the next boot.
+// setupRBACRoles seeds the built-in role names so workspace_members and
+// service_accounts can reference them via foreign keys.
 func (c *Connection) setupRBACRoles(ctx context.Context) error {
 	tx, err := c.AdminPool.Begin(ctx)
 	if err != nil {
@@ -230,15 +225,9 @@ func (c *Connection) setupRBACRoles(ctx context.Context) error {
 
 	q := New(tx)
 	for _, r := range builtinRoles {
-		permissions := make([]string, len(r.permissions))
-		for i, p := range r.permissions {
-			permissions[i] = string(p)
-		}
-
-		if err := q.UpsertRole(ctx, &UpsertRoleParams{
+		if err := q.EnsureRole(ctx, &EnsureRoleParams{
 			Name:        r.name,
 			Description: r.description,
-			Permissions: permissions,
 		}); err != nil {
 			return fmt.Errorf("ensuring role %q: %w", r.name, err)
 		}

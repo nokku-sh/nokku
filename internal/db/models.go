@@ -146,9 +146,8 @@ type PrincipalUser struct {
 }
 
 type Role struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Permissions []string `json:"permissions"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 type SamlProvider struct {

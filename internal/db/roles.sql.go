@@ -9,24 +9,20 @@ import (
 	"context"
 )
 
-const upsertRole = `-- name: UpsertRole :exec
+const ensureRole = `-- name: EnsureRole :exec
 INSERT INTO
-  roles (name, description, permissions)
+  roles (name, description)
 VALUES
-  ($1, $2, $3)
-ON CONFLICT (name) DO UPDATE
-SET
-  description = EXCLUDED.description,
-  permissions = EXCLUDED.permissions
+  ($1, $2)
+ON CONFLICT (name) DO NOTHING
 `
 
-type UpsertRoleParams struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Permissions []string `json:"permissions"`
+type EnsureRoleParams struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
-func (q *Queries) UpsertRole(ctx context.Context, arg *UpsertRoleParams) error {
-	_, err := q.db.Exec(ctx, upsertRole, arg.Name, arg.Description, arg.Permissions)
+func (q *Queries) EnsureRole(ctx context.Context, arg *EnsureRoleParams) error {
+	_, err := q.db.Exec(ctx, ensureRole, arg.Name, arg.Description)
 	return err
 }
