@@ -101,13 +101,15 @@ func (c *Connection) createPools(ctx context.Context) error {
 	}
 
 	if c.AutoMigrate {
-		if err := c.migrate(ctx); err != nil {
-			return err
-		}
-		if err := c.setupAppRole(ctx); err != nil {
-			return err
-		}
-		if err := c.setupRBACRoles(ctx); err != nil {
+		if err := c.withSchemaLock(ctx, func() error {
+			if err := c.migrate(ctx); err != nil {
+				return err
+			}
+			if err := c.setupAppRole(ctx); err != nil {
+				return err
+			}
+			return c.setupRBACRoles(ctx)
+		}); err != nil {
 			return err
 		}
 	}
@@ -129,6 +131,23 @@ func (c *Connection) createPools(ctx context.Context) error {
 		c.AdminPool.Close()
 	}()
 	return nil
+}
+
+// withSchemaLock serializes the full auto-migrate sequence across processes:
+// parallel `go test` packages and multiple instances booting at once.
+func (c *Connection) withSchemaLock(ctx context.Context, fn func() error) error {
+	conn, err := c.AdminPool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("acquiring schema lock connection: %w", err)
+	}
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock(hashtext('nokku_schema'))"); err != nil {
+		return fmt.Errorf("acquiring schema lock: %w", err)
+	}
+	defer func() {
+		_, _ = conn.Exec(ctx, "SELECT pg_advisory_unlock(hashtext('nokku_schema'))")
+	}()
+	return fn()
 }
 
 // setupAppRole grants the runtime role login rights and sets its password.
