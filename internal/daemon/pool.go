@@ -58,6 +58,12 @@ type eventSubscriber struct {
 	types []string
 }
 
+// connection is the subset of db.Connection the pool needs, so tests can
+// stub it without a running Postgres.
+type connection interface {
+	WithTx(ctx context.Context, fn func(*db.Queries) error) error
+}
+
 type Pool struct {
 	mu       sync.RWMutex
 	byID     map[string]*Conn
@@ -65,13 +71,13 @@ type Pool struct {
 	sessions map[string]*Session
 	pending  map[string]chan struct{}
 	events   map[string][]*eventSubscriber
-	conn     *db.Connection
+	conn     connection
 
 	shutdownCtx    context.Context
 	shutdownCancel context.CancelFunc
 }
 
-func New(ctx context.Context, conn *db.Connection) *Pool {
+func New(ctx context.Context, conn connection) *Pool {
 	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	p := &Pool{
 		byID:           make(map[string]*Conn),
@@ -277,7 +283,11 @@ func (p *Pool) RequestSession(
 	p.mu.Unlock()
 	defer func() {
 		p.mu.Lock()
-		delete(p.pending, sessionID)
+		// Only remove our own entry: a newer RequestSession for the same
+		// sessionID may have replaced it while we were waiting.
+		if p.pending[sessionID] == pending {
+			delete(p.pending, sessionID)
+		}
 		p.mu.Unlock()
 	}()
 
@@ -406,6 +416,11 @@ func (p *Pool) UnsubscribeEvents(
 			p.events[workspaceID] = append(subs[:i], subs[i+1:]...)
 			break
 		}
+	}
+	// Drop the workspace key once the last subscriber leaves, so the map
+	// doesn't accumulate an entry for every workspace that ever subscribed.
+	if len(p.events[workspaceID]) == 0 {
+		delete(p.events, workspaceID)
 	}
 	p.mu.Unlock()
 }
