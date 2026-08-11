@@ -2,6 +2,7 @@ version: "3"
 
 env:
   CGO_ENABLED: 0
+  GOEXPERIMENT: goroutineleakprofile
   IMAGE: ghcr.io/nokku-sh/nokku
   DB_URL: postgres://postgres:postgres@localhost:5432/nokku?sslmode=disable
 
