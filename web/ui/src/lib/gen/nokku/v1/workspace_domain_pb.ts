@@ -2,339 +2,342 @@
 // @generated from file nokku/v1/workspace_domain.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
-import { file_google_api_annotations } from "../../google/api/annotations_pb";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { Message } from "@bufbuild/protobuf";
+import type { GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
+import { fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
+import { file_buf_validate_validate } from '../../buf/validate/validate_pb';
+import { file_google_api_annotations } from '../../google/api/annotations_pb';
+import type { Timestamp } from '@bufbuild/protobuf/wkt';
+import { file_google_protobuf_timestamp } from '@bufbuild/protobuf/wkt';
+import type { Message } from '@bufbuild/protobuf';
 
 /**
  * Describes the file nokku/v1/workspace_domain.proto.
  */
-export const file_nokku_v1_workspace_domain: GenFile = /*@__PURE__*/
-  fileDesc("Ch9ub2trdS92MS93b3Jrc3BhY2VfZG9tYWluLnByb3RvEghub2trdS52MSLkAQoPV29ya3NwYWNlRG9tYWluEg4KBmRvbWFpbhgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSGgoSdmVyaWZpY2F0aW9uX3Rva2VuGAMgASgJEi8KC3ZlcmlmaWVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJUChlHZXRXb3Jrc3BhY2VEb21haW5SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFwoGZG9tYWluGAIgASgJQge6SARyAmgBIkcKGkdldFdvcmtzcGFjZURvbWFpblJlc3BvbnNlEikKBmRvbWFpbhgBIAEoCzIZLm5va2t1LnYxLldvcmtzcGFjZURvbWFpbiKEAQocQ3JlYXRlV29ya3NwYWNlRG9tYWluUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEkQKBmRvbWFpbhgCIAEoCUI0ukgxci8QBBj9ATImXihbYS16MC05XSsoLVthLXowLTldKykqXC4pK1thLXpdezIsfSRoASJKCh1DcmVhdGVXb3Jrc3BhY2VEb21haW5SZXNwb25zZRIpCgZkb21haW4YASABKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VEb21haW4iPQobTGlzdFdvcmtzcGFjZURvbWFpbnNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQEiSgocTGlzdFdvcmtzcGFjZURvbWFpbnNSZXNwb25zZRIqCgdkb21haW5zGAEgAygLMhkubm9ra3UudjEuV29ya3NwYWNlRG9tYWluIlcKHERlbGV0ZVdvcmtzcGFjZURvbWFpblJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIXCgZkb21haW4YAiABKAlCB7pIBHICaAEiHwodRGVsZXRlV29ya3NwYWNlRG9tYWluUmVzcG9uc2UiVwocVmVyaWZ5V29ya3NwYWNlRG9tYWluUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhcKBmRvbWFpbhgCIAEoCUIHukgEcgJoASJKCh1WZXJpZnlXb3Jrc3BhY2VEb21haW5SZXNwb25zZRIpCgZkb21haW4YASABKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VEb21haW4iYAolUmVnZW5lcmF0ZVdvcmtzcGFjZURvbWFpblRva2VuUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhcKBmRvbWFpbhgCIAEoCUIHukgEcgJoASJTCiZSZWdlbmVyYXRlV29ya3NwYWNlRG9tYWluVG9rZW5SZXNwb25zZRIpCgZkb21haW4YASABKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VEb21haW4ygAgKFldvcmtzcGFjZURvbWFpblNlcnZpY2USmgEKEkdldFdvcmtzcGFjZURvbWFpbhIjLm5va2t1LnYxLkdldFdvcmtzcGFjZURvbWFpblJlcXVlc3QaJC5ub2trdS52MS5HZXRXb3Jrc3BhY2VEb21haW5SZXNwb25zZSI5kAIBgtPkkwIwEi4vdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9kb21haW5zL3tkb21haW59EpcBChRMaXN0V29ya3NwYWNlRG9tYWlucxIlLm5va2t1LnYxLkxpc3RXb3Jrc3BhY2VEb21haW5zUmVxdWVzdBomLm5va2t1LnYxLkxpc3RXb3Jrc3BhY2VEb21haW5zUmVzcG9uc2UiMJACAYLT5JMCJxIlL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZG9tYWlucxKaAQoVQ3JlYXRlV29ya3NwYWNlRG9tYWluEiYubm9ra3UudjEuQ3JlYXRlV29ya3NwYWNlRG9tYWluUmVxdWVzdBonLm5va2t1LnYxLkNyZWF0ZVdvcmtzcGFjZURvbWFpblJlc3BvbnNlIjCC0+STAio6ASoiJS92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L2RvbWFpbnMSoAEKFURlbGV0ZVdvcmtzcGFjZURvbWFpbhImLm5va2t1LnYxLkRlbGV0ZVdvcmtzcGFjZURvbWFpblJlcXVlc3QaJy5ub2trdS52MS5EZWxldGVXb3Jrc3BhY2VEb21haW5SZXNwb25zZSI2gtPkkwIwKi4vdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9kb21haW5zL3tkb21haW59EqcBChVWZXJpZnlXb3Jrc3BhY2VEb21haW4SJi5ub2trdS52MS5WZXJpZnlXb3Jrc3BhY2VEb21haW5SZXF1ZXN0Gicubm9ra3UudjEuVmVyaWZ5V29ya3NwYWNlRG9tYWluUmVzcG9uc2UiPYLT5JMCNyI1L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZG9tYWlucy97ZG9tYWlufTp2ZXJpZnkSxAEKHlJlZ2VuZXJhdGVXb3Jrc3BhY2VEb21haW5Ub2tlbhIvLm5va2t1LnYxLlJlZ2VuZXJhdGVXb3Jrc3BhY2VEb21haW5Ub2tlblJlcXVlc3QaMC5ub2trdS52MS5SZWdlbmVyYXRlV29ya3NwYWNlRG9tYWluVG9rZW5SZXNwb25zZSI/gtPkkwI5IjcvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9kb21haW5zL3tkb21haW59OmdlbmVyYXRlQp4BCgxjb20ubm9ra3UudjFCFFdvcmtzcGFjZURvbWFpblByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]);
+export const file_nokku_v1_workspace_domain: GenFile /*@__PURE__*/ = fileDesc(
+	'Ch9ub2trdS92MS93b3Jrc3BhY2VfZG9tYWluLnByb3RvEghub2trdS52MSLkAQoPV29ya3NwYWNlRG9tYWluEg4KBmRvbWFpbhgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSGgoSdmVyaWZpY2F0aW9uX3Rva2VuGAMgASgJEi8KC3ZlcmlmaWVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJUChlHZXRXb3Jrc3BhY2VEb21haW5SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFwoGZG9tYWluGAIgASgJQge6SARyAmgBIkcKGkdldFdvcmtzcGFjZURvbWFpblJlc3BvbnNlEikKBmRvbWFpbhgBIAEoCzIZLm5va2t1LnYxLldvcmtzcGFjZURvbWFpbiKEAQocQ3JlYXRlV29ya3NwYWNlRG9tYWluUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEkQKBmRvbWFpbhgCIAEoCUI0ukgxci8QBBj9ATImXihbYS16MC05XSsoLVthLXowLTldKykqXC4pK1thLXpdezIsfSRoASJKCh1DcmVhdGVXb3Jrc3BhY2VEb21haW5SZXNwb25zZRIpCgZkb21haW4YASABKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VEb21haW4iPQobTGlzdFdvcmtzcGFjZURvbWFpbnNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQEiSgocTGlzdFdvcmtzcGFjZURvbWFpbnNSZXNwb25zZRIqCgdkb21haW5zGAEgAygLMhkubm9ra3UudjEuV29ya3NwYWNlRG9tYWluIlcKHERlbGV0ZVdvcmtzcGFjZURvbWFpblJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIXCgZkb21haW4YAiABKAlCB7pIBHICaAEiHwodRGVsZXRlV29ya3NwYWNlRG9tYWluUmVzcG9uc2UiVwocVmVyaWZ5V29ya3NwYWNlRG9tYWluUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhcKBmRvbWFpbhgCIAEoCUIHukgEcgJoASJKCh1WZXJpZnlXb3Jrc3BhY2VEb21haW5SZXNwb25zZRIpCgZkb21haW4YASABKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VEb21haW4iYAolUmVnZW5lcmF0ZVdvcmtzcGFjZURvbWFpblRva2VuUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhcKBmRvbWFpbhgCIAEoCUIHukgEcgJoASJTCiZSZWdlbmVyYXRlV29ya3NwYWNlRG9tYWluVG9rZW5SZXNwb25zZRIpCgZkb21haW4YASABKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VEb21haW4ygAgKFldvcmtzcGFjZURvbWFpblNlcnZpY2USmgEKEkdldFdvcmtzcGFjZURvbWFpbhIjLm5va2t1LnYxLkdldFdvcmtzcGFjZURvbWFpblJlcXVlc3QaJC5ub2trdS52MS5HZXRXb3Jrc3BhY2VEb21haW5SZXNwb25zZSI5kAIBgtPkkwIwEi4vdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9kb21haW5zL3tkb21haW59EpcBChRMaXN0V29ya3NwYWNlRG9tYWlucxIlLm5va2t1LnYxLkxpc3RXb3Jrc3BhY2VEb21haW5zUmVxdWVzdBomLm5va2t1LnYxLkxpc3RXb3Jrc3BhY2VEb21haW5zUmVzcG9uc2UiMJACAYLT5JMCJxIlL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZG9tYWlucxKaAQoVQ3JlYXRlV29ya3NwYWNlRG9tYWluEiYubm9ra3UudjEuQ3JlYXRlV29ya3NwYWNlRG9tYWluUmVxdWVzdBonLm5va2t1LnYxLkNyZWF0ZVdvcmtzcGFjZURvbWFpblJlc3BvbnNlIjCC0+STAio6ASoiJS92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L2RvbWFpbnMSoAEKFURlbGV0ZVdvcmtzcGFjZURvbWFpbhImLm5va2t1LnYxLkRlbGV0ZVdvcmtzcGFjZURvbWFpblJlcXVlc3QaJy5ub2trdS52MS5EZWxldGVXb3Jrc3BhY2VEb21haW5SZXNwb25zZSI2gtPkkwIwKi4vdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9kb21haW5zL3tkb21haW59EqcBChVWZXJpZnlXb3Jrc3BhY2VEb21haW4SJi5ub2trdS52MS5WZXJpZnlXb3Jrc3BhY2VEb21haW5SZXF1ZXN0Gicubm9ra3UudjEuVmVyaWZ5V29ya3NwYWNlRG9tYWluUmVzcG9uc2UiPYLT5JMCNyI1L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZG9tYWlucy97ZG9tYWlufTp2ZXJpZnkSxAEKHlJlZ2VuZXJhdGVXb3Jrc3BhY2VEb21haW5Ub2tlbhIvLm5va2t1LnYxLlJlZ2VuZXJhdGVXb3Jrc3BhY2VEb21haW5Ub2tlblJlcXVlc3QaMC5ub2trdS52MS5SZWdlbmVyYXRlV29ya3NwYWNlRG9tYWluVG9rZW5SZXNwb25zZSI/gtPkkwI5IjcvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9kb21haW5zL3tkb21haW59OmdlbmVyYXRlQp4BCgxjb20ubm9ra3UudjFCFFdvcmtzcGFjZURvbWFpblByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
+	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
+);
 
 /**
  * @generated from message nokku.v1.WorkspaceDomain
  */
-export type WorkspaceDomain = Message<"nokku.v1.WorkspaceDomain"> & {
-  /**
-   * @generated from field: string domain = 1;
-   */
-  domain: string;
+export type WorkspaceDomain = Message<'nokku.v1.WorkspaceDomain'> & {
+	/**
+	 * @generated from field: string domain = 1;
+	 */
+	domain: string;
 
-  /**
-   * @generated from field: string workspace_id = 2;
-   */
-  workspaceId: string;
+	/**
+	 * @generated from field: string workspace_id = 2;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string verification_token = 3;
-   */
-  verificationToken: string;
+	/**
+	 * @generated from field: string verification_token = 3;
+	 */
+	verificationToken: string;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp verified_at = 4;
-   */
-  verifiedAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp verified_at = 4;
+	 */
+	verifiedAt?: Timestamp | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 5;
-   */
-  createdAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp created_at = 5;
+	 */
+	createdAt?: Timestamp | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 6;
-   */
-  updatedAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp updated_at = 6;
+	 */
+	updatedAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.WorkspaceDomain.
  * Use `create(WorkspaceDomainSchema)` to create a new message.
  */
-export const WorkspaceDomainSchema: GenMessage<WorkspaceDomain> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 0);
+export const WorkspaceDomainSchema: GenMessage<WorkspaceDomain> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_workspace_domain,
+	0
+);
 
 /**
  * @generated from message nokku.v1.GetWorkspaceDomainRequest
  */
-export type GetWorkspaceDomainRequest = Message<"nokku.v1.GetWorkspaceDomainRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type GetWorkspaceDomainRequest = Message<'nokku.v1.GetWorkspaceDomainRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string domain = 2;
-   */
-  domain: string;
+	/**
+	 * @generated from field: string domain = 2;
+	 */
+	domain: string;
 };
 
 /**
  * Describes the message nokku.v1.GetWorkspaceDomainRequest.
  * Use `create(GetWorkspaceDomainRequestSchema)` to create a new message.
  */
-export const GetWorkspaceDomainRequestSchema: GenMessage<GetWorkspaceDomainRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 1);
+export const GetWorkspaceDomainRequestSchema: GenMessage<GetWorkspaceDomainRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_workspace_domain, 1);
 
 /**
  * @generated from message nokku.v1.GetWorkspaceDomainResponse
  */
-export type GetWorkspaceDomainResponse = Message<"nokku.v1.GetWorkspaceDomainResponse"> & {
-  /**
-   * @generated from field: nokku.v1.WorkspaceDomain domain = 1;
-   */
-  domain?: WorkspaceDomain | undefined;
+export type GetWorkspaceDomainResponse = Message<'nokku.v1.GetWorkspaceDomainResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.WorkspaceDomain domain = 1;
+	 */
+	domain?: WorkspaceDomain | undefined;
 };
 
 /**
  * Describes the message nokku.v1.GetWorkspaceDomainResponse.
  * Use `create(GetWorkspaceDomainResponseSchema)` to create a new message.
  */
-export const GetWorkspaceDomainResponseSchema: GenMessage<GetWorkspaceDomainResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 2);
+export const GetWorkspaceDomainResponseSchema: GenMessage<GetWorkspaceDomainResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_workspace_domain, 2);
 
 /**
  * @generated from message nokku.v1.CreateWorkspaceDomainRequest
  */
-export type CreateWorkspaceDomainRequest = Message<"nokku.v1.CreateWorkspaceDomainRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type CreateWorkspaceDomainRequest = Message<'nokku.v1.CreateWorkspaceDomainRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string domain = 2;
-   */
-  domain: string;
+	/**
+	 * @generated from field: string domain = 2;
+	 */
+	domain: string;
 };
 
 /**
  * Describes the message nokku.v1.CreateWorkspaceDomainRequest.
  * Use `create(CreateWorkspaceDomainRequestSchema)` to create a new message.
  */
-export const CreateWorkspaceDomainRequestSchema: GenMessage<CreateWorkspaceDomainRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 3);
+export const CreateWorkspaceDomainRequestSchema: GenMessage<CreateWorkspaceDomainRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_workspace_domain, 3);
 
 /**
  * @generated from message nokku.v1.CreateWorkspaceDomainResponse
  */
-export type CreateWorkspaceDomainResponse = Message<"nokku.v1.CreateWorkspaceDomainResponse"> & {
-  /**
-   * @generated from field: nokku.v1.WorkspaceDomain domain = 1;
-   */
-  domain?: WorkspaceDomain | undefined;
+export type CreateWorkspaceDomainResponse = Message<'nokku.v1.CreateWorkspaceDomainResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.WorkspaceDomain domain = 1;
+	 */
+	domain?: WorkspaceDomain | undefined;
 };
 
 /**
  * Describes the message nokku.v1.CreateWorkspaceDomainResponse.
  * Use `create(CreateWorkspaceDomainResponseSchema)` to create a new message.
  */
-export const CreateWorkspaceDomainResponseSchema: GenMessage<CreateWorkspaceDomainResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 4);
+export const CreateWorkspaceDomainResponseSchema: GenMessage<CreateWorkspaceDomainResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_workspace_domain, 4);
 
 /**
  * @generated from message nokku.v1.ListWorkspaceDomainsRequest
  */
-export type ListWorkspaceDomainsRequest = Message<"nokku.v1.ListWorkspaceDomainsRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type ListWorkspaceDomainsRequest = Message<'nokku.v1.ListWorkspaceDomainsRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 };
 
 /**
  * Describes the message nokku.v1.ListWorkspaceDomainsRequest.
  * Use `create(ListWorkspaceDomainsRequestSchema)` to create a new message.
  */
-export const ListWorkspaceDomainsRequestSchema: GenMessage<ListWorkspaceDomainsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 5);
+export const ListWorkspaceDomainsRequestSchema: GenMessage<ListWorkspaceDomainsRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_workspace_domain, 5);
 
 /**
  * @generated from message nokku.v1.ListWorkspaceDomainsResponse
  */
-export type ListWorkspaceDomainsResponse = Message<"nokku.v1.ListWorkspaceDomainsResponse"> & {
-  /**
-   * @generated from field: repeated nokku.v1.WorkspaceDomain domains = 1;
-   */
-  domains: WorkspaceDomain[];
+export type ListWorkspaceDomainsResponse = Message<'nokku.v1.ListWorkspaceDomainsResponse'> & {
+	/**
+	 * @generated from field: repeated nokku.v1.WorkspaceDomain domains = 1;
+	 */
+	domains: WorkspaceDomain[];
 };
 
 /**
  * Describes the message nokku.v1.ListWorkspaceDomainsResponse.
  * Use `create(ListWorkspaceDomainsResponseSchema)` to create a new message.
  */
-export const ListWorkspaceDomainsResponseSchema: GenMessage<ListWorkspaceDomainsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 6);
+export const ListWorkspaceDomainsResponseSchema: GenMessage<ListWorkspaceDomainsResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_workspace_domain, 6);
 
 /**
  * @generated from message nokku.v1.DeleteWorkspaceDomainRequest
  */
-export type DeleteWorkspaceDomainRequest = Message<"nokku.v1.DeleteWorkspaceDomainRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type DeleteWorkspaceDomainRequest = Message<'nokku.v1.DeleteWorkspaceDomainRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string domain = 2;
-   */
-  domain: string;
+	/**
+	 * @generated from field: string domain = 2;
+	 */
+	domain: string;
 };
 
 /**
  * Describes the message nokku.v1.DeleteWorkspaceDomainRequest.
  * Use `create(DeleteWorkspaceDomainRequestSchema)` to create a new message.
  */
-export const DeleteWorkspaceDomainRequestSchema: GenMessage<DeleteWorkspaceDomainRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 7);
+export const DeleteWorkspaceDomainRequestSchema: GenMessage<DeleteWorkspaceDomainRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_workspace_domain, 7);
 
 /**
  * @generated from message nokku.v1.DeleteWorkspaceDomainResponse
  */
-export type DeleteWorkspaceDomainResponse = Message<"nokku.v1.DeleteWorkspaceDomainResponse"> & {
-};
+export type DeleteWorkspaceDomainResponse = Message<'nokku.v1.DeleteWorkspaceDomainResponse'> & {};
 
 /**
  * Describes the message nokku.v1.DeleteWorkspaceDomainResponse.
  * Use `create(DeleteWorkspaceDomainResponseSchema)` to create a new message.
  */
-export const DeleteWorkspaceDomainResponseSchema: GenMessage<DeleteWorkspaceDomainResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 8);
+export const DeleteWorkspaceDomainResponseSchema: GenMessage<DeleteWorkspaceDomainResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_workspace_domain, 8);
 
 /**
  * @generated from message nokku.v1.VerifyWorkspaceDomainRequest
  */
-export type VerifyWorkspaceDomainRequest = Message<"nokku.v1.VerifyWorkspaceDomainRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type VerifyWorkspaceDomainRequest = Message<'nokku.v1.VerifyWorkspaceDomainRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string domain = 2;
-   */
-  domain: string;
+	/**
+	 * @generated from field: string domain = 2;
+	 */
+	domain: string;
 };
 
 /**
  * Describes the message nokku.v1.VerifyWorkspaceDomainRequest.
  * Use `create(VerifyWorkspaceDomainRequestSchema)` to create a new message.
  */
-export const VerifyWorkspaceDomainRequestSchema: GenMessage<VerifyWorkspaceDomainRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 9);
+export const VerifyWorkspaceDomainRequestSchema: GenMessage<VerifyWorkspaceDomainRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_workspace_domain, 9);
 
 /**
  * @generated from message nokku.v1.VerifyWorkspaceDomainResponse
  */
-export type VerifyWorkspaceDomainResponse = Message<"nokku.v1.VerifyWorkspaceDomainResponse"> & {
-  /**
-   * @generated from field: nokku.v1.WorkspaceDomain domain = 1;
-   */
-  domain?: WorkspaceDomain | undefined;
+export type VerifyWorkspaceDomainResponse = Message<'nokku.v1.VerifyWorkspaceDomainResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.WorkspaceDomain domain = 1;
+	 */
+	domain?: WorkspaceDomain | undefined;
 };
 
 /**
  * Describes the message nokku.v1.VerifyWorkspaceDomainResponse.
  * Use `create(VerifyWorkspaceDomainResponseSchema)` to create a new message.
  */
-export const VerifyWorkspaceDomainResponseSchema: GenMessage<VerifyWorkspaceDomainResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 10);
+export const VerifyWorkspaceDomainResponseSchema: GenMessage<VerifyWorkspaceDomainResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_workspace_domain, 10);
 
 /**
  * @generated from message nokku.v1.RegenerateWorkspaceDomainTokenRequest
  */
-export type RegenerateWorkspaceDomainTokenRequest = Message<"nokku.v1.RegenerateWorkspaceDomainTokenRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type RegenerateWorkspaceDomainTokenRequest =
+	Message<'nokku.v1.RegenerateWorkspaceDomainTokenRequest'> & {
+		/**
+		 * @generated from field: string workspace_id = 1;
+		 */
+		workspaceId: string;
 
-  /**
-   * @generated from field: string domain = 2;
-   */
-  domain: string;
-};
+		/**
+		 * @generated from field: string domain = 2;
+		 */
+		domain: string;
+	};
 
 /**
  * Describes the message nokku.v1.RegenerateWorkspaceDomainTokenRequest.
  * Use `create(RegenerateWorkspaceDomainTokenRequestSchema)` to create a new message.
  */
-export const RegenerateWorkspaceDomainTokenRequestSchema: GenMessage<RegenerateWorkspaceDomainTokenRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 11);
+export const RegenerateWorkspaceDomainTokenRequestSchema: GenMessage<RegenerateWorkspaceDomainTokenRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_workspace_domain, 11);
 
 /**
  * @generated from message nokku.v1.RegenerateWorkspaceDomainTokenResponse
  */
-export type RegenerateWorkspaceDomainTokenResponse = Message<"nokku.v1.RegenerateWorkspaceDomainTokenResponse"> & {
-  /**
-   * @generated from field: nokku.v1.WorkspaceDomain domain = 1;
-   */
-  domain?: WorkspaceDomain | undefined;
-};
+export type RegenerateWorkspaceDomainTokenResponse =
+	Message<'nokku.v1.RegenerateWorkspaceDomainTokenResponse'> & {
+		/**
+		 * @generated from field: nokku.v1.WorkspaceDomain domain = 1;
+		 */
+		domain?: WorkspaceDomain | undefined;
+	};
 
 /**
  * Describes the message nokku.v1.RegenerateWorkspaceDomainTokenResponse.
  * Use `create(RegenerateWorkspaceDomainTokenResponseSchema)` to create a new message.
  */
-export const RegenerateWorkspaceDomainTokenResponseSchema: GenMessage<RegenerateWorkspaceDomainTokenResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace_domain, 12);
+export const RegenerateWorkspaceDomainTokenResponseSchema: GenMessage<RegenerateWorkspaceDomainTokenResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_workspace_domain, 12);
 
 /**
  * @generated from service nokku.v1.WorkspaceDomainService
  */
 export const WorkspaceDomainService: GenService<{
-  /**
-   * @generated from rpc nokku.v1.WorkspaceDomainService.GetWorkspaceDomain
-   */
-  getWorkspaceDomain: {
-    methodKind: "unary";
-    input: typeof GetWorkspaceDomainRequestSchema;
-    output: typeof GetWorkspaceDomainResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.WorkspaceDomainService.ListWorkspaceDomains
-   */
-  listWorkspaceDomains: {
-    methodKind: "unary";
-    input: typeof ListWorkspaceDomainsRequestSchema;
-    output: typeof ListWorkspaceDomainsResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.WorkspaceDomainService.CreateWorkspaceDomain
-   */
-  createWorkspaceDomain: {
-    methodKind: "unary";
-    input: typeof CreateWorkspaceDomainRequestSchema;
-    output: typeof CreateWorkspaceDomainResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.WorkspaceDomainService.DeleteWorkspaceDomain
-   */
-  deleteWorkspaceDomain: {
-    methodKind: "unary";
-    input: typeof DeleteWorkspaceDomainRequestSchema;
-    output: typeof DeleteWorkspaceDomainResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.WorkspaceDomainService.VerifyWorkspaceDomain
-   */
-  verifyWorkspaceDomain: {
-    methodKind: "unary";
-    input: typeof VerifyWorkspaceDomainRequestSchema;
-    output: typeof VerifyWorkspaceDomainResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.WorkspaceDomainService.RegenerateWorkspaceDomainToken
-   */
-  regenerateWorkspaceDomainToken: {
-    methodKind: "unary";
-    input: typeof RegenerateWorkspaceDomainTokenRequestSchema;
-    output: typeof RegenerateWorkspaceDomainTokenResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_nokku_v1_workspace_domain, 0);
-
+	/**
+	 * @generated from rpc nokku.v1.WorkspaceDomainService.GetWorkspaceDomain
+	 */
+	getWorkspaceDomain: {
+		methodKind: 'unary';
+		input: typeof GetWorkspaceDomainRequestSchema;
+		output: typeof GetWorkspaceDomainResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.WorkspaceDomainService.ListWorkspaceDomains
+	 */
+	listWorkspaceDomains: {
+		methodKind: 'unary';
+		input: typeof ListWorkspaceDomainsRequestSchema;
+		output: typeof ListWorkspaceDomainsResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.WorkspaceDomainService.CreateWorkspaceDomain
+	 */
+	createWorkspaceDomain: {
+		methodKind: 'unary';
+		input: typeof CreateWorkspaceDomainRequestSchema;
+		output: typeof CreateWorkspaceDomainResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.WorkspaceDomainService.DeleteWorkspaceDomain
+	 */
+	deleteWorkspaceDomain: {
+		methodKind: 'unary';
+		input: typeof DeleteWorkspaceDomainRequestSchema;
+		output: typeof DeleteWorkspaceDomainResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.WorkspaceDomainService.VerifyWorkspaceDomain
+	 */
+	verifyWorkspaceDomain: {
+		methodKind: 'unary';
+		input: typeof VerifyWorkspaceDomainRequestSchema;
+		output: typeof VerifyWorkspaceDomainResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.WorkspaceDomainService.RegenerateWorkspaceDomainToken
+	 */
+	regenerateWorkspaceDomainToken: {
+		methodKind: 'unary';
+		input: typeof RegenerateWorkspaceDomainTokenRequestSchema;
+		output: typeof RegenerateWorkspaceDomainTokenResponseSchema;
+	};
+}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_workspace_domain, 0);
