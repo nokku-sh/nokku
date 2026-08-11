@@ -1,9 +1,10 @@
 package geo
 
 import (
+	"archive/zip"
 	"bytes"
-	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -95,6 +96,27 @@ func (s *Service) Lookup(addr string) string {
 	return strings.Join(parts, ", ")
 }
 
+// unwrapBin extracts the BIN file from a downloaded ZIP archive. The
+// token download endpoint always serves the database as a ZIP archive.
+func unwrapBin(data []byte) ([]byte, error) {
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return nil, fmt.Errorf("not a zip archive: %w", err)
+	}
+	for _, f := range zr.File {
+		if !strings.HasSuffix(f.Name, ".BIN") && !strings.HasSuffix(f.Name, ".bin") {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return nil, fmt.Errorf("open %s: %w", f.Name, err)
+		}
+		defer rc.Close()
+		return io.ReadAll(rc)
+	}
+	return nil, errors.New("zip archive contains no BIN file")
+}
+
 // fetch downloads the database, caches it on disk and loads it.
 func (s *Service) fetch() {
 	ctx, cancel := context.WithTimeout(context.Background(), downloadTimeout)
@@ -125,19 +147,11 @@ func (s *Service) fetch() {
 		return
 	}
 
-	// LITE downloads are served gzip-compressed; detect and unwrap.
-	if len(data) > 2 && data[0] == 0x1f && data[1] == 0x8b {
-		gz, err := gzip.NewReader(bytes.NewReader(data))
-		if err != nil {
-			slog.Warn("geo: unzip database", "error", err)
-			return
-		}
-		data, err = io.ReadAll(gz)
-		_ = gz.Close()
-		if err != nil {
-			slog.Warn("geo: unzip database", "error", err)
-			return
-		}
+	// The download arrives as a ZIP archive wrapping the BIN file.
+	data, err = unwrapBin(data)
+	if err != nil {
+		slog.Warn("geo: unpack database", "error", err)
+		return
 	}
 
 	if err := os.MkdirAll(filepath.Dir(s.DBPath), 0o750); err != nil {
