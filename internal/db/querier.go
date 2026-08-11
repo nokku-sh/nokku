@@ -68,6 +68,7 @@ type Querier interface {
 	DeleteWorkspaceDomain(ctx context.Context, domain string) (*WorkspaceDomain, error)
 	DeleteWorkspacesByOwner(ctx context.Context, userID string) error
 	EmailExists(ctx context.Context, email string) (bool, error)
+	EnsureRole(ctx context.Context, arg *EnsureRoleParams) error
 	GetActiveSubscription(ctx context.Context, arg *GetActiveSubscriptionParams) (*WorkspaceSubscription, error)
 	GetActorWorkspaceIDs(ctx context.Context, actorID string) ([]string, error)
 	GetCA(ctx context.Context, caID string) (*CertificateAuthority, error)
@@ -197,7 +198,6 @@ type Querier interface {
 	// Rotation-only (rotate-secrets command): persist the target keyset
 	// atomically within the rotation transaction. Never used on the boot path.
 	UpsertKeysetWrappedData(ctx context.Context, data []byte) error
-	UpsertRole(ctx context.Context, arg *UpsertRoleParams) error
 	// Note: source is only overwritten when the row is provider-managed ('stripe')
 	// or empty, so manual subscriptions survive provider syncs.
 	UpsertSubscription(ctx context.Context, arg *UpsertSubscriptionParams) error

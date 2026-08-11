@@ -61,10 +61,11 @@ CREATE TABLE IF NOT EXISTS backup_codes (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Roles only pin role names for workspace_members and service_accounts.
+-- The permission model lives entirely in Go (internal/db/roles.go).
 CREATE TABLE IF NOT EXISTS roles (
   name TEXT PRIMARY KEY,
-  description TEXT NOT NULL DEFAULT '',
-  permissions TEXT[] NOT NULL DEFAULT '{}'
+  description TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS workspaces (
