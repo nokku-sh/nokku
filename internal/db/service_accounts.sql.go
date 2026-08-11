@@ -69,31 +69,15 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAc
 	return &i, err
 }
 
-const deleteServiceAccount = `-- name: DeleteServiceAccount :one
+const deleteServiceAccount = `-- name: DeleteServiceAccount :exec
 DELETE FROM service_accounts
 WHERE
   id = $1
-RETURNING
-  id, workspace_id, name, description, token_hash, role_name, last_used_at, expires_at, tags, created_at, updated_at
 `
 
-func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID string) (*ServiceAccount, error) {
-	row := q.db.QueryRow(ctx, deleteServiceAccount, serviceAccountID)
-	var i ServiceAccount
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.TokenHash,
-		&i.RoleName,
-		&i.LastUsedAt,
-		&i.ExpiresAt,
-		&i.Tags,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
+func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID string) error {
+	_, err := q.db.Exec(ctx, deleteServiceAccount, serviceAccountID)
+	return err
 }
 
 const getServiceAccount = `-- name: GetServiceAccount :one

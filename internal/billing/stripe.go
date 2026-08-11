@@ -62,11 +62,8 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (strin
 	}
 
 	// One subscription per workspace: block a new checkout while one is active.
-	if _, err := s.db.Q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
-		WorkspaceID: workspaceID,
-		Statuses:    ActiveStatuses,
-		Sources:     []string{"stripe"},
-	}); err == nil {
+	_, err := s.activeSubscription(ctx, workspaceID)
+	if err == nil {
 		return "", ErrActiveSubscription
 	}
 
@@ -98,10 +95,55 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (strin
 	return session.URL, nil
 }
 
+// The helpers below read and write subscription state in system
+// transactions: workspace_subscriptions is under RLS and the Stripe flows
+// (checkout, portal, webhooks, sync jobs) operate outside a tenant scope.
+
+func (s *Stripe) subscription(
+	ctx context.Context,
+	workspaceID string,
+) (*db.WorkspaceSubscription, error) {
+	var sub *db.WorkspaceSubscription
+	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
+		sub, err = q.GetSubscription(ctx, workspaceID)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return sub, nil
+}
+
+func (s *Stripe) activeSubscription(
+	ctx context.Context,
+	workspaceID string,
+) (*db.WorkspaceSubscription, error) {
+	var sub *db.WorkspaceSubscription
+	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
+		sub, err = q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
+			WorkspaceID: workspaceID,
+			Statuses:    ActiveStatuses,
+			Sources:     []string{"stripe"},
+		})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return sub, nil
+}
+
+func (s *Stripe) upsertSubscription(
+	ctx context.Context,
+	params *db.UpsertSubscriptionParams,
+) error {
+	return s.db.WithTx(ctx, func(q *db.Queries) error {
+		return q.UpsertSubscription(ctx, params)
+	})
+}
+
 // customerFor returns the workspace's Stripe customer, reusing the one on the
 // subscription row or creating one tagged with the workspace id.
 func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (string, error) {
-	if sub, err := s.db.Q.GetSubscription(ctx, workspaceID); err == nil && sub.CustomerID != "" {
+	if sub, err := s.subscription(ctx, workspaceID); err == nil && sub.CustomerID != "" {
 		return sub.CustomerID, nil
 	}
 
@@ -117,9 +159,11 @@ func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (st
 	}
 
 	// Record the mapping so later checkouts reuse the same customer.
-	if err := s.db.Q.SetSubscriptionCustomer(ctx, &db.SetSubscriptionCustomerParams{
-		WorkspaceID: workspaceID,
-		CustomerID:  customer.ID,
+	if err := s.db.WithTx(ctx, func(q *db.Queries) error {
+		return q.SetSubscriptionCustomer(ctx, &db.SetSubscriptionCustomerParams{
+			WorkspaceID: workspaceID,
+			CustomerID:  customer.ID,
+		})
 	}); err != nil {
 		slog.Warn("failed to record customer mapping", "error", err, "workspace_id", workspaceID)
 	}
@@ -130,7 +174,7 @@ func (s *Stripe) Portal(ctx context.Context, workspaceID string) (string, error)
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")
 	}
-	sub, err := s.db.Q.GetSubscription(ctx, workspaceID)
+	sub, err := s.subscription(ctx, workspaceID)
 	if err != nil || sub.CustomerID == "" {
 		return "", errors.New("no Stripe customer for this workspace")
 	}
@@ -158,11 +202,7 @@ func (s *Stripe) Cancel(
 	if workspaceID == "" {
 		return errors.New("missing workspace ID")
 	}
-	sub, err := s.db.Q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
-		WorkspaceID: workspaceID,
-		Statuses:    ActiveStatuses,
-		Sources:     []string{"stripe"},
-	})
+	sub, err := s.activeSubscription(ctx, workspaceID)
 	if err != nil {
 		return fmt.Errorf("get active subscription: %w", err)
 	}
@@ -190,7 +230,7 @@ func (s *Stripe) Cancel(
 
 // Sync reconciles one workspace from Stripe (self-heals missed webhooks).
 func (s *Stripe) Sync(ctx context.Context, workspaceID string) {
-	sub, err := s.db.Q.GetSubscription(ctx, workspaceID)
+	sub, err := s.subscription(ctx, workspaceID)
 	if err != nil || sub.SubscriptionID == "" || sub.Source != "stripe" {
 		return
 	}
@@ -202,7 +242,7 @@ func (s *Stripe) Sync(ctx context.Context, workspaceID string) {
 		slog.Warn("failed to fetch Stripe subscription", "error", err, "workspace_id", workspaceID)
 		return
 	}
-	if err := s.db.Q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
+	if err := s.upsertSubscription(ctx, &db.UpsertSubscriptionParams{
 		WorkspaceID:       workspaceID,
 		Source:            "stripe",
 		Plan:              PlanFlex,
@@ -218,8 +258,11 @@ func (s *Stripe) Sync(ctx context.Context, workspaceID string) {
 
 // SyncAll reconciles every Stripe-managed row. Runs at startup.
 func (s *Stripe) SyncAll(ctx context.Context) error {
-	subs, err := s.db.Q.ListProviderSubscriptions(ctx, []string{"stripe"})
-	if err != nil {
+	var subs []*db.WorkspaceSubscription
+	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
+		subs, err = q.ListProviderSubscriptions(ctx, []string{"stripe"})
+		return err
+	}); err != nil {
 		return err
 	}
 	for _, sub := range subs {
@@ -234,11 +277,14 @@ func (s *Stripe) SyncAll(ctx context.Context) error {
 // SyncUsage reports daily gauge events for metered billing. Identifiers make
 // re-reporting the same day idempotent.
 func (s *Stripe) SyncUsage(ctx context.Context) error {
-	subs, err := s.db.Q.ListActiveSubscriptions(ctx, &db.ListActiveSubscriptionsParams{
-		Statuses: ActiveStatuses,
-		Sources:  []string{"stripe"},
-	})
-	if err != nil {
+	var subs []*db.WorkspaceSubscription
+	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
+		subs, err = q.ListActiveSubscriptions(ctx, &db.ListActiveSubscriptionsParams{
+			Statuses: ActiveStatuses,
+			Sources:  []string{"stripe"},
+		})
+		return err
+	}); err != nil {
 		return err
 	}
 	if len(subs) == 0 {
@@ -250,11 +296,16 @@ func (s *Stripe) SyncUsage(ctx context.Context) error {
 		if sub.CustomerID == "" {
 			continue
 		}
-		stats, err := s.db.Q.GetWorkspaceStats(ctx, sub.WorkspaceID)
-		if err != nil {
+
+		var stats *db.GetWorkspaceStatsRow
+		if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
+			stats, err = q.GetWorkspaceStats(ctx, sub.WorkspaceID)
+			return err
+		}); err != nil {
 			slog.Warn("usage stats lookup failed", "error", err, "workspace_id", sub.WorkspaceID)
 			continue
 		}
+
 		for _, m := range billableMeters {
 			count := usageFor(stats, m.resource)
 			if count < 0 {

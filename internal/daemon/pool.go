@@ -148,9 +148,11 @@ func (p *Pool) RegisterDaemon(ctx context.Context, daemonID, workspaceID string)
 		session.shutdown()
 	}
 
-	if err := p.conn.Q.UpdateDaemonOnlineStatus(ctx, &db.UpdateDaemonOnlineStatusParams{
-		DaemonID: daemonID,
-		Online:   true,
+	if err := p.conn.WithTx(ctx, func(q *db.Queries) error {
+		return q.UpdateDaemonOnlineStatus(ctx, &db.UpdateDaemonOnlineStatusParams{
+			DaemonID: daemonID,
+			Online:   true,
+		})
 	}); err != nil {
 		slog.Error("failed to set daemon online", "daemon_id", daemonID, "error", err)
 	}
@@ -193,11 +195,16 @@ func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 		s.shutdown()
 	}
 
-	if err := p.conn.Q.UpdateDaemonOnlineStatus(
+	if err := p.conn.WithTx(
 		context.Background(),
-		&db.UpdateDaemonOnlineStatusParams{
-			DaemonID: daemonID,
-			Online:   false,
+		func(q *db.Queries) error {
+			return q.UpdateDaemonOnlineStatus(
+				context.Background(),
+				&db.UpdateDaemonOnlineStatusParams{
+					DaemonID: daemonID,
+					Online:   false,
+				},
+			)
 		},
 	); err != nil {
 		slog.Error("failed to set daemon offline", "daemon_id", daemonID, "error", err)

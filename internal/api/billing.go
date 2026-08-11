@@ -31,8 +31,17 @@ func (s *BillingService) GetBilling(
 		return nil, NewError(connect.CodeInvalidArgument, "Workspace ID is required")
 	}
 
-	stats, err := s.cfg.Conn.Q.GetWorkspaceStats(ctx, req.GetWorkspaceId())
-	if err != nil {
+	var stats *db.GetWorkspaceStatsRow
+	var sub *db.WorkspaceSubscription
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		stats, err = q.GetWorkspaceStats(ctx, req.GetWorkspaceId())
+		if err != nil {
+			return err
+		}
+		// NotFound is fine: community workspaces have no subscription row.
+		sub, _ = q.GetSubscription(ctx, req.GetWorkspaceId())
+		return nil
+	}); err != nil {
 		return nil, DBError(err)
 	}
 
@@ -52,7 +61,7 @@ func (s *BillingService) GetBilling(
 		),
 	}
 
-	if sub, err := s.cfg.Conn.Q.GetSubscription(ctx, req.GetWorkspaceId()); err == nil {
+	if sub != nil {
 		resp.CustomerId = &sub.CustomerID
 		resp.ProductId = &sub.Plan
 		resp.ProductName = new(sub.Plan)
@@ -136,8 +145,11 @@ func (s *BillingService) CancelSubscription(
 }
 
 func (s *BillingService) requireWorkspaceOwner(ctx context.Context, workspaceID string) error {
-	ownerID, err := s.cfg.Conn.Q.GetWorkspaceOwner(ctx, workspaceID)
-	if err != nil {
+	var ownerID string
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		ownerID, err = q.GetWorkspaceOwner(ctx, workspaceID)
+		return err
+	}); err != nil {
 		return DBError(err)
 	}
 	if ownerID != meta.UserIDFromContext(ctx) {

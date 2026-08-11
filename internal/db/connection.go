@@ -15,22 +15,37 @@ import (
 	"github.com/nokku-sh/nokku/internal/meta"
 )
 
-var ErrNoWorkspaces = errors.New("actor has no assigned workspaces")
-var ErrWorkspaceNotAccessible = errors.New("workspace is not accessible to actor")
+var (
+	ErrWorkspaceNotAccessible = errors.New("workspace is not accessible to actor")
+	ErrPermissionDenied       = errors.New("missing required permission")
+	ErrWorkspaceNotPinned     = errors.New("operation requires a workspace context")
+)
+
+// User and Password identify the administrative connection used for
+// schema migrations and maintenance.
+//
+// 'nokku_app' is the login role used at runtime. It owns nothing and is
+// subject to row-level security on every tenant table. AppPassword
+// defaults to Password when unset, so single-password deployments need
+// no extra configuration.
 
 type Connection struct {
-	Host        string `env:"NOKKU_DB_HOST"        envDefault:"localhost"`
-	Port        string `env:"NOKKU_DB_PORT"        envDefault:"5432"`
-	Database    string `env:"NOKKU_DB_NAME"        envDefault:"nokku"`
-	User        string `env:"NOKKU_DB_USER"        envDefault:"postgres"`
-	Password    string `env:"NOKKU_DB_PASSWORD"    envDefault:"postgres"`
-	SSLMode     string `env:"NOKKU_DB_SSL_MODE"    envDefault:"disable"`
-	AutoMigrate bool   `env:"NOKKU_DB_AUTOMIGRATE" envDefault:"true"`
-	MaxConns    int32  `env:"NOKKU_DB_MAX_CONNS"   envDefault:"10"`
-	MinConns    int32  `env:"NOKKU_DB_MIN_CONNS"   envDefault:"0"`
+	Host        string `env:"NOKKU_DB_HOST"         envDefault:"localhost"`
+	Port        string `env:"NOKKU_DB_PORT"         envDefault:"5432"`
+	Database    string `env:"NOKKU_DB_NAME"         envDefault:"nokku"`
+	User        string `env:"NOKKU_DB_USER"         envDefault:"postgres"`
+	Password    string `env:"NOKKU_DB_PASSWORD"     envDefault:"postgres"`
+	AppPassword string `env:"NOKKU_DB_APP_PASSWORD"`
+	SSLMode     string `env:"NOKKU_DB_SSL_MODE"     envDefault:"disable"`
+	AutoMigrate bool   `env:"NOKKU_DB_AUTOMIGRATE"  envDefault:"true"`
+	MaxConns    int32  `env:"NOKKU_DB_MAX_CONNS"    envDefault:"10"`
+	MinConns    int32  `env:"NOKKU_DB_MIN_CONNS"    envDefault:"0"`
 
-	Pool *pgxpool.Pool
-	Q    *Queries
+	// Pool serves request traffic as AppUser
+	// AdminPool serves schema migrations and privileged maintenance as User.
+	Pool      *pgxpool.Pool
+	AdminPool *pgxpool.Pool
+	Q         *Queries
 }
 
 func NewConnection(ctx context.Context) (*Connection, error) {
@@ -39,27 +54,27 @@ func NewConnection(ctx context.Context) (*Connection, error) {
 		return nil, err
 	}
 
-	if err := c.createPool(ctx); err != nil {
+	if err := c.createPools(ctx); err != nil {
 		return nil, err
 	}
 	return &c, nil
 }
 
-func (c *Connection) createPool(ctx context.Context) error {
+func (c *Connection) poolConfig(user, password string) (*pgxpool.Config, error) {
 	url := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		c.Host, c.Port, c.User, c.Password, c.Database, c.SSLMode,
+		c.Host, c.Port, user, password, c.Database, c.SSLMode,
 	)
 
 	config, err := pgxpool.ParseConfig(url)
 	if err != nil {
-		return fmt.Errorf("parsing pool config: %w", err)
+		return nil, fmt.Errorf("parsing pool config: %w", err)
 	}
 	if c.MaxConns < 1 {
-		return fmt.Errorf("NOKKU_DB_MAX_CONNS must be greater than zero")
+		return nil, fmt.Errorf("NOKKU_DB_MAX_CONNS must be greater than zero")
 	}
 	if c.MinConns < 0 || c.MinConns > c.MaxConns {
-		return fmt.Errorf("NOKKU_DB_MIN_CONNS must be between zero and NOKKU_DB_MAX_CONNS")
+		return nil, fmt.Errorf("NOKKU_DB_MIN_CONNS must be between zero and NOKKU_DB_MAX_CONNS")
 	}
 	config.MaxConns = c.MaxConns
 	config.MinConns = c.MinConns
@@ -67,32 +82,85 @@ func (c *Connection) createPool(ctx context.Context) error {
 	config.MaxConnIdleTime = 5 * time.Minute
 	config.HealthCheckPeriod = time.Minute
 	config.ConnConfig.ConnectTimeout = 5 * time.Second
+	return config, nil
+}
 
-	c.Pool, err = pgxpool.NewWithConfig(ctx, config)
-	if err != nil {
-		return fmt.Errorf("creating pool: %w", err)
+func (c *Connection) createPools(ctx context.Context) error {
+	if c.AppPassword == "" {
+		c.AppPassword = c.Password
 	}
-	c.Q = New(c.Pool)
+
+	adminConfig, err := c.poolConfig(c.User, c.Password)
+	if err != nil {
+		return err
+	}
+	c.AdminPool, err = pgxpool.NewWithConfig(ctx, adminConfig)
+	if err != nil {
+		return fmt.Errorf("creating admin pool: %w", err)
+	}
 
 	if c.AutoMigrate {
-		if err := c.Migrate(ctx); err != nil {
+		if err := c.migrate(ctx); err != nil {
 			return err
 		}
-		if err := c.EnsureRoles(ctx); err != nil {
+		if err := c.setupAppRole(ctx); err != nil {
+			return err
+		}
+		if err := c.setupRBACRoles(ctx); err != nil {
 			return err
 		}
 	}
+
+	appConfig, err := c.poolConfig("nokku_app", c.AppPassword)
+	if err != nil {
+		return err
+	}
+	c.Pool, err = pgxpool.NewWithConfig(ctx, appConfig)
+	if err != nil {
+		return fmt.Errorf("creating app pool: %w", err)
+	}
+	c.Q = New(c.Pool)
 
 	// Handle shutdown
 	go func() {
 		<-ctx.Done()
 		c.Pool.Close()
+		c.AdminPool.Close()
 	}()
 	return nil
 }
 
-// WithTx executes a transaction.
-func (c *Connection) WithTx(ctx context.Context, fn func(q *Queries) error) error {
+// setupAppRole grants the runtime role login rights and sets its password.
+func (c *Connection) setupAppRole(ctx context.Context) error {
+	conn, err := c.AdminPool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("acquiring connection: %w", err)
+	}
+	defer conn.Release()
+
+	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock(hashtext('approle'))"); err != nil {
+		return fmt.Errorf("acquiring app role lock: %w", err)
+	}
+	defer func() {
+		_, _ = conn.Exec(ctx, "SELECT pg_advisory_unlock(hashtext('approle'))")
+	}()
+
+	// ALTER ROLE does not accept bind parameters.
+	escapedPW := strings.ReplaceAll(c.AppPassword, "'", "''")
+	if _, err := conn.Exec(
+		ctx,
+		"ALTER ROLE nokku_app WITH LOGIN PASSWORD '"+escapedPW+"'",
+	); err != nil {
+		return fmt.Errorf("granting login to nokku_app: %w", err)
+	}
+	return nil
+}
+
+// WithTx executes a transaction as nokku_system, bypassing rls entirely.
+func (c *Connection) WithTx(
+	ctx context.Context,
+	fn func(*Queries) error,
+) error {
 	tx, err := c.Pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -105,8 +173,12 @@ func (c *Connection) WithTx(ctx context.Context, fn func(q *Queries) error) erro
 		}
 	}()
 
-	q := New(tx)
-	if err := fn(q); err != nil {
+	if _, err := tx.Exec(ctx, "SET LOCAL ROLE nokku_system"); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+
+	if err := fn(New(tx)); err != nil {
 		_ = tx.Rollback(ctx)
 		return err
 	}
@@ -114,8 +186,12 @@ func (c *Connection) WithTx(ctx context.Context, fn func(q *Queries) error) erro
 	return tx.Commit(ctx)
 }
 
-// WithWorkspace executes a transaction scoped to the correct workspace.
-func (c *Connection) WithWorkspace(ctx context.Context, fn func(*Queries) error) error {
+// WithWorkspace executes a transaction scoped to the workspace pinned in the
+// request context, as the rls constrained nokku_app role.
+func (c *Connection) WithWorkspace(
+	ctx context.Context,
+	fn func(*Queries) error,
+) error {
 	actor := meta.ActorFromContext(ctx)
 	if actor.ID == "" {
 		return errors.New("no actor in context")
@@ -133,36 +209,40 @@ func (c *Connection) WithWorkspace(ctx context.Context, fn func(*Queries) error)
 		}
 	}()
 
-	// Fetch workspace IDs fresh from the database.
-	// Covers users (workspace_members), agents, and service accounts.
-	wsIDs, err := New(tx).GetActorWorkspaceIDs(ctx, actor.ID)
+	// Membership and role resolution must see every workspace, so it runs
+	// as nokku_system; the transaction switches down to nokku_app before
+	// any caller query runs. GUCs are transaction-local and survive the
+	// role switch.
+	if _, err := tx.Exec(ctx, "SET LOCAL ROLE nokku_system"); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+
+	q := New(tx)
+	wsIDs, err := q.GetActorWorkspaceIDs(ctx, actor.ID)
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		return err
 	}
-	if len(wsIDs) == 0 {
-		_ = tx.Rollback(ctx)
-		return ErrNoWorkspaces
-	}
 
-	if workspaceID, ok := meta.WorkspaceIDFromContext(ctx); ok {
-		accessible := slices.Contains(wsIDs, workspaceID)
-		if !accessible {
+	workspaceID := ""
+	if pinned := meta.WorkspaceIDFromContext(ctx); pinned != "" {
+		if !slices.Contains(wsIDs, pinned) {
 			_ = tx.Rollback(ctx)
 			return ErrWorkspaceNotAccessible
 		}
-		wsIDs = []string{workspaceID}
+		workspaceID = pinned
+	} else if len(wsIDs) == 1 {
+		workspaceID = wsIDs[0]
 	}
 
 	if _, err = tx.Exec(
-		ctx, `
-		SELECT 
-			set_config('nokku.workspace_ids', $1, true),
-			set_config('nokku.actor_type', $2, true),
-			set_config('nokku.user_id', $3, true)
-	`,
-		strings.Join(wsIDs, ","),
-		string(actor.Type),
+		ctx,
+		`SELECT
+			set_config('nokku.workspace_id', $1, true),
+			set_config('nokku.actor_id', $2, true)
+		`,
+		workspaceID,
 		actor.ID,
 	); err != nil {
 		_ = tx.Rollback(ctx)
@@ -174,7 +254,7 @@ func (c *Connection) WithWorkspace(ctx context.Context, fn func(*Queries) error)
 		return err
 	}
 
-	if err := fn(New(tx)); err != nil {
+	if err := fn(q); err != nil {
 		_ = tx.Rollback(ctx)
 		return err
 	}

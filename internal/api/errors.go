@@ -175,6 +175,8 @@ func DBError(err error) error {
 	}
 
 	switch {
+	case errors.Is(err, db.ErrPermissionDenied), errors.Is(err, db.ErrWorkspaceNotPinned):
+		return ErrPermissionDenied
 	case errors.Is(err, db.ErrWorkspaceNotAccessible):
 		return ErrPermissionDenied
 	case errors.Is(err, pgx.ErrNoRows):

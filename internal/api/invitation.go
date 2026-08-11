@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,6 +15,12 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
+)
+
+var (
+	errAlreadyMember = errors.New("already a member")
+	errInviteExpired = errors.New("invitation expired")
+	errInviteInvalid = errors.New("invalid invitation token")
 )
 
 type InvitationService struct {
@@ -40,15 +47,23 @@ func (s *InvitationService) GetInvitation(
 		return nil, ErrBadCredentials
 	}
 
-	if _, err := s.cfg.Conn.Q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
-		WorkspaceID: workspaceID,
-		UserID:      actor.ID,
-	}); err == nil {
-		return nil, NewError(connect.CodeAborted, "you have already joined this workspace")
-	}
+	// System transaction: the invitee is not a member of the workspace yet,
+	// so no tenant context can be established. The invite token (validated
+	// below against its hash) authorizes this read.
+	var row *db.GetWorkspaceRow
+	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
+			WorkspaceID: workspaceID,
+			UserID:      actor.ID,
+		}); err == nil {
+			return errAlreadyMember
+		}
 
-	row, err := s.cfg.Conn.Q.GetWorkspace(ctx, workspaceID)
-	if err != nil {
+		row, err = q.GetWorkspace(ctx, workspaceID)
+		return err
+	}); errors.Is(err, errAlreadyMember) {
+		return nil, NewError(connect.CodeAborted, "you have already joined this workspace")
+	} else if err != nil {
 		return nil, DBError(err)
 	}
 
@@ -79,37 +94,44 @@ func (s *InvitationService) AcceptInvitation(
 		return nil, ErrBadCredentials
 	}
 
-	if _, err := s.cfg.Conn.Q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
-		WorkspaceID: workspaceID,
-		UserID:      userID,
-	}); err == nil {
-		return nil, NewError(connect.CodeAborted, "you have already joined this workspace")
-	}
-
-	settings, err := s.cfg.Conn.Q.GetWorkspaceSettings(ctx, workspaceID)
-	if err != nil {
-		return nil, DBError(err)
-	}
-	if settings.InviteExpiresAt != nil && settings.InviteExpiresAt.Before(time.Now()) {
-		return nil, NewError(connect.CodeFailedPrecondition, "invitation has expired")
-	}
-	if !settings.InviteTokenHash.Verify(req.GetToken()) {
-		return nil, NewError(connect.CodeFailedPrecondition, "invalid invitation token")
-	}
-
 	if err := s.cfg.Billing.Check(ctx, workspaceID, billing.ResourceMembers); err != nil {
 		return nil, err
 	}
 
-	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
-	if err != nil {
-		return nil, ErrBadCredentials
-	}
+	// System transaction: the joiner is not a member yet. The invite token
+	// is validated against its stored hash before the membership is added.
+	err = s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
+		if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
+			WorkspaceID: workspaceID,
+			UserID:      userID,
+		}); err == nil {
+			return errAlreadyMember
+		}
 
-	if err = s.cfg.Conn.Q.AddWorkspaceMember(ctx, &db.AddWorkspaceMemberParams{
-		WorkspaceID: workspaceID,
-		UserID:      user.ID,
-	}); err != nil {
+		settings, err := q.GetWorkspaceSettings(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+		if settings.InviteExpiresAt != nil && settings.InviteExpiresAt.Before(time.Now()) {
+			return errInviteExpired
+		}
+		if !settings.InviteTokenHash.Verify(req.GetToken()) {
+			return errInviteInvalid
+		}
+
+		return q.AddWorkspaceMember(ctx, &db.AddWorkspaceMemberParams{
+			WorkspaceID: workspaceID,
+			UserID:      userID,
+		})
+	})
+	switch {
+	case errors.Is(err, errAlreadyMember):
+		return nil, NewError(connect.CodeAborted, "you have already joined this workspace")
+	case errors.Is(err, errInviteExpired):
+		return nil, NewError(connect.CodeFailedPrecondition, "invitation has expired")
+	case errors.Is(err, errInviteInvalid):
+		return nil, NewError(connect.CodeFailedPrecondition, "invalid invitation token")
+	case err != nil:
 		return nil, DBError(err)
 	}
 

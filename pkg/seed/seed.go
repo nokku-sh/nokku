@@ -72,13 +72,17 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 		}
 	}
 
-	// Create workspace with a unique name
-	workspace, err := conn.Q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
-		Name:        uniqueName(gofakeit.Company(), 0),
-		Description: new(gofakeit.Sentence()),
-		CreatedBy:   owner.ID,
-	})
-	if err != nil {
+	// Create workspace with a unique name. The workspace does not exist yet,
+	// so there is no tenant context to pin; it runs as a system transaction.
+	var workspace *db.CreateWorkspaceRow
+	if err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		workspace, err = q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
+			Name:        uniqueName(gofakeit.Company(), 0),
+			Description: new(gofakeit.Sentence()),
+			CreatedBy:   owner.ID,
+		})
+		return err
+	}); err != nil {
 		return fmt.Errorf("failed to create workspace: %w", err)
 	}
 	actor := &meta.Actor{

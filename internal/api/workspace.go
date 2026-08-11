@@ -48,8 +48,11 @@ func (s *WorkspaceService) CreateWorkspace(
 		return nil, DBError(err)
 	}
 
-	count, err := s.cfg.Conn.Q.CountWorkspacesByOwner(ctx, user.ID)
-	if err != nil {
+	var count int32
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		count, err = q.CountWorkspacesByOwner(ctx, user.ID)
+		return err
+	}); err != nil {
 		return nil, DBError(err)
 	}
 	if count >= 5 {
@@ -281,11 +284,14 @@ func (s *WorkspaceService) SubscribeWorkspaceEvents(
 	workspaceID := req.GetWorkspaceId()
 	meta.SetAuditWorkspaceID(ctx, workspaceID)
 
-	if _, err := s.cfg.Conn.Q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
-		WorkspaceID: workspaceID,
-		UserID:      meta.UserIDFromContext(ctx),
+	// Streaming handlers bypass the unary interceptor's workspace promotion,
+	// so pin the workspace here and let the scoped transaction verify
+	// membership before events start flowing.
+	ctx = meta.WithWorkspaceID(ctx, workspaceID)
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(_ *db.Queries) error {
+		return nil
 	}); err != nil {
-		return ErrPermissionDenied
+		return DBError(err)
 	}
 
 	msgCh := s.cfg.Pool.SubscribeEvents(workspaceID, req.GetEventTypes())
@@ -305,17 +311,20 @@ func (s *WorkspaceService) SubscribeWorkspaceEvents(
 
 // Helpers --------------------------------------------------------------------
 
+// initializeWorkspace creates a workspace with all of its dependent records.
+// This deliberately runs as a system transaction (bypassing RLS): the
+// workspace does not exist yet, so no tenant context can be pinned for it.
 func (s *WorkspaceService) initializeWorkspace(
 	ctx context.Context,
 	params *db.CreateWorkspaceParams,
 ) (*nokkuv1.Workspace, error) {
-	workspace, err := s.cfg.Conn.Q.CreateWorkspace(ctx, params)
-	if err != nil {
-		return nil, err
-	}
+	var workspace *db.CreateWorkspaceRow
+	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		workspace, err = q.CreateWorkspace(ctx, params)
+		if err != nil {
+			return err
+		}
 
-	// Create a unscoped transaction
-	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
 		// Generate SAML SP key pair and certificate
 		samlKeyPair, err := util.CreateSAMLKeyPair(workspace.ID)
 		if err != nil {
@@ -359,9 +368,6 @@ func (s *WorkspaceService) initializeWorkspace(
 		}
 		return nil
 	}); err != nil {
-		if err := s.cfg.Conn.Q.DeleteWorkspace(ctx, workspace.ID); err != nil {
-			return nil, err
-		}
 		return nil, err
 	}
 

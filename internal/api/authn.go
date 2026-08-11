@@ -14,6 +14,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
+	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/meta"
 )
@@ -134,14 +135,9 @@ func (a *AuthNInterceptor) authenticateUser(
 }
 
 // authenticateChallenge verifies a signed request challenge against the
-// identity's registered public key. The challenge is bound to the exact
-// procedure being invoked, must be fresh (within ChallengeMaxSkew) and its
-// nonce must not have been seen before. Daemons and CLI user devices both
-// authenticate this way; service accounts keep bearer tokens.
+// identity's registered public key.
 //
-// TODO: GetDaemon/GetUserDevice here is a primary-key read per authenticated
-// RPC. Fine today, but when daemon+CLI traffic grows, add a short-TTL
-// read-through cache for {auth_pubkey, kind} and invalidate on delete/rotate.
+// TODO: add a short-TTL read-through cache for {auth_pubkey, kind} and invalidate on delete/rotate.
 func (a *AuthNInterceptor) authenticateChallenge(
 	ctx context.Context,
 	challenge, procedure string,
@@ -159,8 +155,13 @@ func (a *AuthNInterceptor) authenticateChallenge(
 		return nil, errors.New("stale challenge")
 	}
 
-	daemon, err := a.cfg.Conn.Q.GetDaemon(ctx, chal.IdentityID)
-	if err == nil {
+	// Pre-auth identity lookups run as system transactions: no actor or
+	// workspace is pinned yet, and RLS would hide every tenant row.
+	var daemon *db.Daemon
+	if err := a.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		daemon, err = q.GetDaemon(ctx, chal.IdentityID)
+		return err
+	}); err == nil {
 		if daemon.AuthPubkey == "" {
 			return nil, errors.New("daemon does not use challenge authentication")
 		}
@@ -224,8 +225,11 @@ func (a *AuthNInterceptor) authenticateServiceAccount(
 	ctx context.Context,
 	saID, bearer string,
 ) (context.Context, error) {
-	serviceAccount, err := a.cfg.Conn.Q.GetServiceAccount(ctx, saID)
-	if err != nil {
+	var serviceAccount *db.ServiceAccount
+	if err := a.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		serviceAccount, err = q.GetServiceAccount(ctx, saID)
+		return err
+	}); err != nil {
 		return nil, errors.New("service account not found")
 	}
 
@@ -247,14 +251,17 @@ func (a *AuthNInterceptor) reportUsage(prefix, id string) {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		switch prefix {
-		case crypto.PrefixCLI:
-			_ = a.cfg.Conn.Q.UpdateUserDeviceUsage(bgCtx, id)
-		case crypto.PrefixDaemon:
-			_ = a.cfg.Conn.Q.UpdateDaemonUsage(bgCtx, id)
-		case crypto.PrefixSA:
-			_ = a.cfg.Conn.Q.UpdateServiceAccountUsage(bgCtx, id)
-		}
+		_ = a.cfg.Conn.WithTx(bgCtx, func(q *db.Queries) error {
+			switch prefix {
+			case crypto.PrefixCLI:
+				return q.UpdateUserDeviceUsage(bgCtx, id)
+			case crypto.PrefixDaemon:
+				return q.UpdateDaemonUsage(bgCtx, id)
+			case crypto.PrefixSA:
+				return q.UpdateServiceAccountUsage(bgCtx, id)
+			}
+			return nil
+		})
 	}()
 }
 

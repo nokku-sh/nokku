@@ -165,25 +165,18 @@ type licenseState interface {
 	Valid() bool
 }
 
-// querier is the minimal DB surface entitlement needs; *db.Queries
-// implements it.
-type querier interface {
-	GetSubscription(ctx context.Context, workspaceID string) (*db.WorkspaceSubscription, error)
-	GetWorkspaceStats(ctx context.Context, workspaceID string) (*db.GetWorkspaceStatsRow, error)
-}
-
 type PolicyService struct {
-	q       querier
+	db      *db.Connection
 	license licenseState
 	mode    Mode
 }
 
-func NewPolicyService(q querier, lc licenseState, modes ...Mode) *PolicyService {
+func NewPolicyService(db *db.Connection, lc licenseState, modes ...Mode) *PolicyService {
 	mode := ModeSelfHosted
 	if len(modes) > 0 {
 		mode = modes[0]
 	}
-	return &PolicyService{q: q, license: lc, mode: mode}
+	return &PolicyService{db: db, license: lc, mode: mode}
 }
 
 func (s *PolicyService) Mode() Mode {
@@ -196,8 +189,15 @@ func (s *PolicyService) Resolve(ctx context.Context, workspaceID string) Plan {
 	if s.mode == ModeSelfHosted && s.license != nil && s.license.Valid() {
 		return resolvePlan(PlanEnterprise)
 	}
-	sub, err := s.q.GetSubscription(ctx, workspaceID)
-	if err != nil || sub == nil || !Status(sub.Status).GrantsAccess() {
+	var sub *db.WorkspaceSubscription
+	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
+		sub, err = q.GetSubscription(ctx, workspaceID)
+		return err
+	}); err != nil {
+		return resolvePlan(PlanCommunity)
+	}
+
+	if sub == nil || !Status(sub.Status).GrantsAccess() {
 		return resolvePlan(PlanCommunity)
 	}
 	return resolvePlan(sub.Plan)
@@ -211,9 +211,11 @@ func (s *PolicyService) Check(ctx context.Context, workspaceID string, r Resourc
 	if !ok || quota.Hard < 0 {
 		return nil
 	}
-
-	stats, err := s.q.GetWorkspaceStats(ctx, workspaceID)
-	if err != nil {
+	var stats *db.GetWorkspaceStatsRow
+	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
+		stats, err = q.GetWorkspaceStats(ctx, workspaceID)
+		return err
+	}); err != nil {
 		slog.Warn(
 			"entitlement stats lookup failed",
 			"error", err,

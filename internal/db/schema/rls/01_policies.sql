@@ -1,372 +1,204 @@
--- Helper function to get current workspace IDs from session
-CREATE OR REPLACE FUNCTION current_workspace_ids () RETURNS UUID[] AS $$
-DECLARE
-  ids_text TEXT;
-BEGIN
-  ids_text := current_setting('nokku.workspace_ids', true);
-  IF ids_text IS NULL OR ids_text = '' THEN
-    RETURN ARRAY[]::UUID[];
-  END IF;
-  RETURN string_to_array(ids_text, ',')::UUID[];
-END;
-$$ LANGUAGE plpgsql STABLE;
-
--- Get current actor type: 'user', 'service_account', or 'daemon'
-CREATE OR REPLACE FUNCTION current_actor_type () RETURNS TEXT AS $$
-BEGIN
-  RETURN COALESCE(current_setting('nokku.actor_type', true), 'user');
-END;
-$$ LANGUAGE plpgsql STABLE;
-
--- Single permission check
-CREATE OR REPLACE FUNCTION has_permission (ws_id UUID, perm_code TEXT) RETURNS BOOLEAN AS $$
-DECLARE
-  actor_type TEXT;
-  actor_id_text TEXT;
-  actor_id UUID;
-BEGIN
-  -- Always require workspace context membership first.
-  IF NOT (ws_id = ANY (current_workspace_ids ())) THEN
-    RETURN FALSE;
-  END IF;
-
-  actor_type := current_actor_type ();
-
-  -- Daemons always use the fixed "daemon" role, defined in Go
-  -- (internal/db/roles.go) and seeded by EnsureRoles on startup.
-  IF actor_type = 'daemon' THEN
-    RETURN EXISTS (
-      SELECT 1
-      FROM roles r
-      WHERE r.name = 'daemon'
-        AND perm_code = ANY(r.permissions)
-    );
-  END IF;
-
-  -- The remaining actor types (user, service_account) are role-driven.
-  actor_id_text := current_setting('nokku.user_id', true);
-  IF actor_id_text IS NULL OR actor_id_text = '' THEN
-    RETURN FALSE;
-  END IF;
-  actor_id := actor_id_text::UUID;
-
-  -- Service accounts are scoped by their role, like workspace members.
-  -- Only "member" and "admin" are assignable to service accounts.
-  IF actor_type = 'service_account' THEN
-    RETURN EXISTS (
-      SELECT 1
-      FROM service_accounts sa
-      JOIN roles r ON r.name = sa.role_name
-      WHERE sa.workspace_id = ws_id
-        AND sa.id = actor_id
-        AND perm_code = ANY(r.permissions)
-    );
-  END IF;
-
-  -- Workspace member (user).
-  RETURN EXISTS (
+-- Row-Level Security for nokku
+--
+-- RLS enforces tenant isolation only. Every workspace-scoped table carries
+-- one uniform policy: rows are visible and writable only when the request
+-- pinned that workspace in the session GUC "nokku.workspace_id". The GUC is
+-- set per transaction by the backend (see internal/db/connection.go).
+--
+-- Authorization (who may do what) is enforced in Go against the role
+-- definitions in internal/db/roles.go. Keep SQL free of permission codes.
+--
+-- Fail-closed properties:
+--   - The application connects as nokku_app, which does not own the tables,
+--     so RLS applies to every query; FORCE ROW LEVEL SECURITY extends this
+--     to the table owner as well.
+--   - An unset GUC makes current_workspace_id() return NULL, and
+--     "workspace_id = NULL" matches nothing, so tenant tables are empty by
+--     default.
+--   - Truly cross-tenant operations (bootstrap, billing webhooks, background
+--     jobs, pre-auth lookups) run through the nokku_system role which has
+--     BYPASSRLS; that role switch is explicit in code (Connection.WithTx).
+--
+-- Adding a new tenant table requires exactly:
+--   ALTER TABLE <t> ENABLE ROW LEVEL SECURITY;
+--   ALTER TABLE <t> FORCE ROW LEVEL SECURITY;
+--   CREATE POLICY tenant_isolation ON <t> FOR ALL TO nokku_app
+--     USING (workspace_id = current_workspace_id())
+--     WITH CHECK (workspace_id = current_workspace_id());
+-- (plus one of the variants below when the table needs cross-tenant reads or
+-- referential integrity checks). internal/db/rls_test.go verifies coverage.
+-- Session helpers ------------------------------------------------------------
+-- Membership of the current actor in a workspace. Used for cross-tenant
+-- reads users legitimately need outside a pinned workspace, mainly listing
+-- the workspaces they belong to. Never use this in the workspace_members
+-- policy itself (it would recurse)
+CREATE OR REPLACE FUNCTION is_workspace_member (ws_id UUID) RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
     SELECT 1
     FROM workspace_members wm
-    JOIN roles r ON r.name = wm.role_name
     WHERE wm.workspace_id = ws_id
-      AND wm.user_id = actor_id
-      AND perm_code = ANY(r.permissions)
-  );
-END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER
-SET
-  search_path = public,
-  pg_catalog;
+      AND wm.user_id = current_actor_id ()
+  )
+$$ LANGUAGE sql STABLE;
 
--- Enable RLS on workspace-scoped tables
+-- Tables ---------------------------------------------------------------------
 ALTER TABLE workspaces ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE workspaces FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE workspace_members ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE workspace_domains ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace_members FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE workspace_settings ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE workspace_settings FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE workspace_domains ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE workspace_domains FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE workspace_subscriptions ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE workspace_subscriptions FORCE ROW LEVEL SECURITY;
+
 ALTER TABLE oidc_providers ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE oidc_providers FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE saml_providers ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE saml_providers FORCE ROW LEVEL SECURITY;
+
 ALTER TABLE service_accounts ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE certificate_authorities ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE targets ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE principals ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE principal_users ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE principal_teams ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE principal_service_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_accounts FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE daemons ENABLE ROW LEVEL SECURITY;
 
--- ============================================
--- WORKSPACES
--- ============================================
-CREATE POLICY workspace_insert ON workspaces FOR INSERT TO nokku_app
-WITH
-  CHECK (
-    current_actor_type () = 'user'
-    AND COALESCE(current_setting('nokku.user_id', TRUE), '') <> ''
-  );
+ALTER TABLE daemons FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY workspace_select ON workspaces FOR
+ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE teams FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE team_members FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE certificate_authorities ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE certificate_authorities FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE targets ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE targets FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE principals ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE principals FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE principal_users ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE principal_users FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE principal_teams ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE principal_teams FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE principal_service_accounts ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE principal_service_accounts FORCE ROW LEVEL SECURITY;
+
+-- Workspaces -----------------------------------------------------------------
+-- Readable when pinned, or when the actor is a member (workspace switcher).
+CREATE POLICY workspaces_select ON workspaces FOR
 SELECT
-  TO nokku_app USING (id = ANY (current_workspace_ids ()));
-
-CREATE POLICY workspace_update ON workspaces
-FOR UPDATE
   TO nokku_app USING (
-    id = ANY (current_workspace_ids ())
-    AND has_permission (id, 'workspace.edit')
-  )
-WITH
-  CHECK (
-    id = ANY (current_workspace_ids ())
-    AND has_permission (id, 'workspace.edit')
+    id = current_workspace_id ()
+    OR is_workspace_member (id)
   );
 
-CREATE POLICY workspace_delete ON workspaces FOR DELETE TO nokku_app USING (
-  id = ANY (current_workspace_ids ())
-  AND has_permission (id, 'workspace.delete')
-);
+CREATE POLICY workspaces_write ON workspaces FOR ALL TO nokku_app USING (id = current_workspace_id ())
+WITH
+  CHECK (id = current_workspace_id ());
 
--- ============================================
--- WORKSPACE MEMBERS
--- ============================================
+-- Workspace members ----------------------------------------------------------
+-- Members see all rows of the pinned workspace, and always their own rows
+-- (needed to resolve which workspaces the actor belongs to).
 CREATE POLICY workspace_members_select ON workspace_members FOR
 SELECT
   TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'members.view')
+    workspace_id = current_workspace_id ()
+    OR user_id = current_actor_id ()
   );
 
-CREATE POLICY workspace_members_insert ON workspace_members FOR INSERT TO nokku_app
+CREATE POLICY workspace_members_write ON workspace_members FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
-  CHECK (
-    (
-      workspace_id = ANY (current_workspace_ids ())
-      AND has_permission (workspace_id, 'members.edit')
-    )
-    OR (
-      current_actor_type () = 'user'
-      AND EXISTS (
-        SELECT
-          1
-        FROM
-          workspaces w
-        WHERE
-          w.id = workspace_id
-          AND w.created_by = current_setting('nokku.user_id', TRUE)::UUID
-      )
-    )
-  );
+  CHECK (workspace_id = current_workspace_id ());
 
-CREATE POLICY workspace_members_update ON workspace_members
-FOR UPDATE
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'members.edit')
-  )
-WITH
-  CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'members.edit')
-  );
-
-CREATE POLICY workspace_members_delete ON workspace_members FOR DELETE TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND (
-    has_permission (workspace_id, 'members.edit')
-    OR (
-      current_actor_type () = 'user'
-      AND user_id = current_setting('nokku.user_id', TRUE)::UUID
-    )
-  )
-);
-
--- ============================================
--- OWNER-ONLY TABLES (pattern: view + edit)
--- ============================================
--- Workspace Settings
+-- Workspace settings ---------------------------------------------------------
+-- Embedded in the workspace list response, so members may read settings of
+-- their own workspaces even when no workspace is pinned.
 CREATE POLICY workspace_settings_select ON workspace_settings FOR
 SELECT
   TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'settings.view')
+    workspace_id = current_workspace_id ()
+    OR is_workspace_member (workspace_id)
   );
 
-CREATE POLICY workspace_settings_insert ON workspace_settings FOR INSERT TO nokku_app
+CREATE POLICY workspace_settings_write ON workspace_settings FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+-- Pure tenant tables ---------------------------------------------------------
+CREATE POLICY tenant_isolation ON workspace_domains FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON workspace_subscriptions FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON oidc_providers FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON saml_providers FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON service_accounts FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON daemons FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON teams FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON certificate_authorities FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON targets FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON principals FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+-- Junction tables ------------------------------------------------------------
+-- Besides tenant isolation, writes must reference a parent from the same
+-- workspace, so a member cannot attach rows to another tenant's entities.
+CREATE POLICY team_members_isolation ON team_members FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
   CHECK (
-    current_actor_type () = 'user'
-    AND EXISTS (
-      SELECT
-        1
-      FROM
-        workspaces w
-      WHERE
-        w.id = workspace_id
-        AND w.created_by = current_setting('nokku.user_id', TRUE)::UUID
-    )
-  );
-
-CREATE POLICY workspace_settings_mutate ON workspace_settings FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'settings.edit')
-)
-WITH
-  CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'settings.edit')
-  );
-
--- Workspace Domains
-CREATE POLICY workspace_domains_select ON workspace_domains FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'domains.view')
-  );
-
-CREATE POLICY workspace_domains_mutate ON workspace_domains FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'domains.edit')
-)
-WITH
-  CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'domains.edit')
-  );
-
--- OIDC Providers
-CREATE POLICY oidc_providers_select ON oidc_providers FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'sso.view')
-  );
-
-CREATE POLICY oidc_providers_mutate ON oidc_providers FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'sso.edit')
-)
-WITH
-  CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'sso.edit')
-  );
-
--- SAML Providers
-CREATE POLICY saml_providers_select ON saml_providers FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'sso.view')
-  );
-
-CREATE POLICY saml_providers_mutate ON saml_providers FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'sso.edit')
-)
-WITH
-  CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'sso.edit')
-  );
-
--- Certificate Authorities
-CREATE POLICY cas_select ON certificate_authorities FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'cas.view')
-  );
-
-CREATE POLICY cas_mutate ON certificate_authorities FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'cas.edit')
-)
-WITH
-  CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'cas.edit')
-  );
-
--- ============================================
--- ADMIN TABLES 
--- ============================================
--- Targets
-CREATE POLICY targets_select ON targets FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'targets.view')
-  );
-
-CREATE POLICY targets_mutate ON targets FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'targets.edit')
-)
-WITH
-  CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'targets.edit')
-  );
-
--- Daemons
-CREATE POLICY daemons_select ON daemons FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'daemons.view')
-  );
-
-CREATE POLICY daemons_mutate ON daemons FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'daemons.edit')
-)
-WITH
-  CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'daemons.edit')
-  );
-
--- Teams
-CREATE POLICY teams_select ON teams FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'teams.view')
-  );
-
-CREATE POLICY teams_mutate ON teams FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'teams.edit')
-)
-WITH
-  CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'teams.edit')
-  );
-
--- Team Members
-CREATE POLICY team_members_select ON team_members FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'teams.view')
+    workspace_id = current_workspace_id ()
     AND EXISTS (
       SELECT
         1
@@ -378,122 +210,47 @@ SELECT
     )
   );
 
-CREATE POLICY team_members_mutate ON team_members FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'teams.edit')
-  AND EXISTS (
-    SELECT
-      1
-    FROM
-      teams t
-    WHERE
-      t.id = team_id
-      AND t.workspace_id = team_members.workspace_id
-  )
-)
+CREATE POLICY principal_users_isolation ON principal_users FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
   CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'teams.edit')
+    workspace_id = current_workspace_id ()
     AND EXISTS (
       SELECT
         1
       FROM
-        teams t
+        principals p
       WHERE
-        t.id = team_id
-        AND t.workspace_id = team_members.workspace_id
+        p.id = principal_id
+        AND p.workspace_id = principal_users.workspace_id
     )
   );
 
--- Service Accounts
-CREATE POLICY service_accounts_select ON service_accounts FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'service_accounts.view')
-  );
-
-CREATE POLICY service_accounts_mutate ON service_accounts FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'service_accounts.edit')
-)
+CREATE POLICY principal_teams_isolation ON principal_teams FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
   CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'service_accounts.edit')
+    workspace_id = current_workspace_id ()
+    AND EXISTS (
+      SELECT
+        1
+      FROM
+        principals p
+      WHERE
+        p.id = principal_id
+        AND p.workspace_id = principal_teams.workspace_id
+    )
   );
 
--- ============================================
--- PRINCIPALS
--- ============================================
-CREATE POLICY principals_select ON principals FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'principals.view')
-  );
-
-CREATE POLICY principals_mutate ON principals FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'principals.edit')
-)
+CREATE POLICY principal_service_accounts_isolation ON principal_service_accounts FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
   CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'principals.edit')
-  );
-
--- Principal Users 
-CREATE POLICY principal_users_select ON principal_users FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'principals.view')
-  );
-
-CREATE POLICY principal_users_mutate ON principal_users FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'principals.edit')
-)
-WITH
-  CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'principals.edit')
-  );
-
--- Principal Teams
-CREATE POLICY principal_teams_select ON principal_teams FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'principals.view')
-  );
-
-CREATE POLICY principal_teams_mutate ON principal_teams FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'principals.edit')
-)
-WITH
-  CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'principals.edit')
-  );
-
--- Principal Service Accounts
-CREATE POLICY principal_service_accounts_select ON principal_service_accounts FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'principals.view')
-  );
-
-CREATE POLICY principal_service_accounts_mutate ON principal_service_accounts FOR ALL TO nokku_app USING (
-  workspace_id = ANY (current_workspace_ids ())
-  AND has_permission (workspace_id, 'principals.edit')
-)
-WITH
-  CHECK (
-    workspace_id = ANY (current_workspace_ids ())
-    AND has_permission (workspace_id, 'principals.edit')
+    workspace_id = current_workspace_id ()
+    AND EXISTS (
+      SELECT
+        1
+      FROM
+        principals p
+      WHERE
+        p.id = principal_id
+        AND p.workspace_id = principal_service_accounts.workspace_id
+    )
   );
