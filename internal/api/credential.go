@@ -76,7 +76,7 @@ func (s *CredentialService) DeletePassword(
 		return nil, DBError(err)
 	}
 	if len(passkeys) == 0 {
-		identities, err := s.cfg.Conn.Q.GetOAuthIdentitiesByUserID(ctx, user.ID)
+		identities, err := s.cfg.Conn.Q.GetUserIdentitiesByUserID(ctx, user.ID)
 		if err != nil {
 			return nil, DBError(err)
 		}
@@ -173,7 +173,7 @@ func (s *CredentialService) DeletePasskey(
 		return nil, DBError(err)
 	}
 	if !hasPassword {
-		identities, err := s.cfg.Conn.Q.GetOAuthIdentitiesByUserID(ctx, credential.UserID)
+		identities, err := s.cfg.Conn.Q.GetUserIdentitiesByUserID(ctx, credential.UserID)
 		if err != nil {
 			return nil, DBError(err)
 		}

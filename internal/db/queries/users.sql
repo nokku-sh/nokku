@@ -6,6 +6,15 @@ VALUES
 RETURNING
   *;
 
+-- name: CreateOAuthUser :one
+INSERT INTO
+  users (name, username, password_hash, picture, email, email_verified)
+VALUES
+  (@name, @username, @password_hash, @picture, @email, FALSE)
+ON CONFLICT (email) DO NOTHING
+RETURNING
+  *;
+
 -- name: GetUserByID :one
 SELECT
   *

@@ -16,12 +16,9 @@ CREATE TABLE IF NOT EXISTS user_devices (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  kind TEXT NOT NULL DEFAULT 'cli', -- 'cli' | 'web'
-  -- Signing method used for request authentication: 'tpm' or 'soft' for
-  -- CLI devices, 'token' for web devices.
+  kind TEXT NOT NULL DEFAULT 'cli', -- cli, web
   auth_method TEXT NOT NULL DEFAULT 'token',
-  -- PEM-encoded ECDSA public key used to verify signed request challenges.
-  auth_pubkey TEXT,
+  auth_pubkey TEXT, -- PEM-encoded ECDSA public key used to verify signed request challenges.
   token_hash TEXT,
   expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '6 months'),
   last_used_at TIMESTAMPTZ,
@@ -29,12 +26,13 @@ CREATE TABLE IF NOT EXISTS user_devices (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS oauth_identities (
-  provider_id TEXT NOT NULL, -- ID from the OAuth provider
-  provider TEXT NOT NULL, -- 'google', 'github', 'oidc' etc.
+CREATE TABLE IF NOT EXISTS user_identities (
+  provider_id TEXT NOT NULL, -- identifier from the identity provider
+  provider TEXT NOT NULL, -- google, github, or workspace id
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   provider_email TEXT, -- email from provider (can be different from user email)
   provider_username TEXT, -- username from provider
+  protocol TEXT NOT NULL DEFAULT 'oauth' CHECK (protocol IN ('oauth', 'oidc', 'saml')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (provider_id, provider)
@@ -43,12 +41,12 @@ CREATE TABLE IF NOT EXISTS oauth_identities (
 CREATE TABLE IF NOT EXISTS passkeys (
   id TEXT PRIMARY KEY, -- base64-encoded credential ID
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  name TEXT, -- e.g. "IPhone 13"
+  name TEXT,
   public_key BYTEA NOT NULL,
-  attestation_type TEXT NOT NULL, -- e.g. "none", "basic", "self"
+  attestation_type TEXT NOT NULL, -- none, basic, self
   aaguid BYTEA, -- authenticator's unique ID
   sign_count BIGINT NOT NULL DEFAULT 0, -- protects against cloned authenticators
-  transports TEXT[], -- ["usb", "ble", "nfc", "internal"]
+  transports TEXT[], -- [usb, ble, nfc, internal]
   backup_eligible BOOLEAN NOT NULL DEFAULT FALSE,
   backup_state BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -168,7 +166,7 @@ CREATE TABLE IF NOT EXISTS service_accounts (
   name TEXT NOT NULL, -- e.g., "github-actions-deploy", "ansible-prod"
   description TEXT,
   token_hash TEXT,
-  role_name TEXT NOT NULL DEFAULT 'member' REFERENCES roles (name),
+  role_name TEXT NOT NULL DEFAULT 'viewer' REFERENCES roles (name),
   last_used_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ, -- Optional expiration for temporary access
   tags TEXT[] NOT NULL DEFAULT '{}',

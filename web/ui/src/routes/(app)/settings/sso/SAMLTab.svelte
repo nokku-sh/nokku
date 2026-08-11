@@ -4,7 +4,7 @@
 	import * as Field from '$lib/components/ui/field';
 	import { Label } from '$lib/components/ui/label';
 	import * as Card from '$lib/components/ui/card';
-	import { Save, Info } from '@lucide/svelte';
+	import { Save, Info, Download } from '@lucide/svelte';
 	import { Switch } from '$lib/components/ui/switch';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Spinner } from '$lib/components/ui/spinner';
@@ -28,7 +28,10 @@
 		updateProvider.mutate({ ...change });
 	}
 	const callbackURL = window.location.origin + '/saml/acs';
-	const metadataURL = $derived(window.location.origin + '/saml/metadata/' + provider.data?.id);
+	const metadataURL = $derived(
+		window.location.origin + '/saml/metadata/' + provider.data?.workspaceId
+	);
+	const certURL = $derived('/saml/certificate/' + provider.data?.workspaceId);
 </script>
 
 <Card.Root>
@@ -181,27 +184,34 @@
 				</Field.Description>
 			</div>
 
-			<Field.Group class="grid grid-cols-1 gap-4 md:grid-cols-5">
-				<Field.Field class="md:col-span-2">
+			<Field.Group>
+				<Field.Field>
 					<Field.Label for="acsUrl">Assertion Consumer Service (ACS) URL</Field.Label>
 					<Field.Content>
 						<InputGroupVariants variant="copy-input" value={callbackURL} readonly />
 						<Field.Description class="flex items-center gap-1">
 							<Info size={12} />
-							<span>The endpoint that receives SAML assertions from your IdP</span>
+							<span>
+								The endpoint that receives SAML assertions from your IdP. Use this as the redirect
+								URI.
+							</span>
 						</Field.Description>
 					</Field.Content>
 				</Field.Field>
 
-				<Field.Field class="md:col-span-3">
+				<Field.Field>
 					<Field.Label for="spMetadata">Service Provider Metadata URL</Field.Label>
 					<Field.Content>
 						<InputGroupVariants variant="copy-input" value={metadataURL} readonly />
-						<Field.Description class="flex items-center gap-1">
-							<Info size={12} />
-							<span
-								>Import this URL in your IdP to automatically configure the SAML integration</span
-							>
+						<Field.Description class="flex items-center justify-between gap-2">
+							<span class="flex items-center gap-1">
+								<Info size={12} />
+								<span>Use this value as the Client ID (entity ID) in your identity provider</span>
+							</span>
+							<Button variant="outline" size="sm" onclick={() => (window.location.href = certURL)}>
+								<Download size={14} />
+								Download Signing Certificate (PEM)
+							</Button>
 						</Field.Description>
 					</Field.Content>
 				</Field.Field>

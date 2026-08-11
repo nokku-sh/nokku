@@ -3,36 +3,24 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
-	"slices"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/jackc/pgx/v5"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
-	"golang.org/x/sync/singleflight"
 
 	"github.com/nokku-sh/nokku/internal/authn"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/email"
+	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/util"
 )
-
-type UnifiedUser struct {
-	ProviderID string
-	Provider   string
-	Email      string
-	Name       string
-	Username   string
-	AvatarURL  string
-}
 
 // OAuthSession represents the temporary state stored in cache during the flow.
 type OAuthSession struct {
@@ -42,91 +30,32 @@ type OAuthSession struct {
 	LinkUserID   string `json:"link_user_id,omitempty"`
 }
 
+// OAuthHandler serves the public OAuth2 flow (github).
 type OAuthHandler struct {
-	cfg           *config.Config
-	providerCache sync.Map // Local memory cache for *OIDCProvider to avoid network discovery penalties
-	sf            singleflight.Group
-}
-
-type OIDCProvider struct {
-	dbConfig     *db.OidcProvider
-	oauth2Config *oauth2.Config
-	verifier     *oidc.IDTokenVerifier
+	cfg *config.Config
 }
 
 func NewOAuthHandler(cfg *config.Config) *OAuthHandler {
 	return &OAuthHandler{cfg: cfg}
 }
 
-func (o *OAuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
-	providerID := r.URL.Query().Get("provider")
-	if providerID == "" {
-		writeJSONError(w, http.StatusBadRequest, "Provider required")
-		return
-	}
-
-	state, err := crypto.RandomString(32)
+// startOAuthSession persists the session server-side and drops the CSRF state
+// cookie. The state binds the browser to the cached session for the callback.
+func startOAuthSession(
+	cfg *config.Config,
+	w http.ResponseWriter,
+	r *http.Request,
+	state string,
+	session OAuthSession,
+) error {
+	data, err := json.Marshal(session)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "Internal error")
-		return
+		return err
+	}
+	if err := cfg.Cache.Set(r.Context(), "oauth_state."+state, data, 10*time.Minute); err != nil {
+		return err
 	}
 
-	session := OAuthSession{ProviderID: providerID}
-	if r.URL.Query().Get("link") == "true" {
-		if tokenStr := authn.GetAccessToken(r.Header); tokenStr != "" {
-			if claims, err := o.cfg.Authn.VerifyToken(tokenStr); err == nil {
-				session.LinkUserID = claims.UserID
-			}
-		}
-	}
-
-	var authCodeOptions []oauth2.AuthCodeOption
-	var authURL string
-
-	// Handle Static vs Custom Providers
-	if providerID == "github" {
-		conf := &oauth2.Config{
-			ClientID:     o.cfg.GitHubClientID,
-			ClientSecret: o.cfg.GitHubClientSecret,
-			RedirectURL:  o.cfg.FullURL() + "/oauth/callback",
-			Scopes:       []string{"user:email", "read:user"},
-			Endpoint:     github.Endpoint,
-		}
-		authURL = conf.AuthCodeURL(state)
-	} else {
-		// Handle Google and Custom OIDC Providers
-		config, err := o.getOIDCProvider(r.Context(), providerID)
-		if err != nil {
-			writeJSONError(w, http.StatusInternalServerError, "Provider configuration failed")
-			return
-		}
-
-		nonce, err := crypto.RandomString(32)
-		if err != nil {
-			writeJSONError(w, http.StatusInternalServerError, "Internal error")
-			return
-		}
-		session.Nonce = nonce
-		authCodeOptions = append(authCodeOptions, oidc.Nonce(nonce))
-
-		// Google doesn't enforce PKCE, but custom ones might
-		if config.dbConfig != nil && config.dbConfig.UsePkce {
-			verifier := oauth2.GenerateVerifier()
-			session.PKCEVerifier = verifier
-			authCodeOptions = append(authCodeOptions, oauth2.S256ChallengeOption(verifier))
-		}
-
-		authURL = config.oauth2Config.AuthCodeURL(state, authCodeOptions...)
-	}
-
-	b, err := json.Marshal(session)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "Internal error")
-		return
-	}
-	_ = o.cfg.Cache.Set(r.Context(), "oauth_state."+state, b, 10*time.Minute)
-
-	// Drop CSRF cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth_state",
 		Value:    state,
@@ -136,19 +65,21 @@ func (o *OAuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
-
-	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
+	return nil
 }
 
-func (o *OAuthHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
-	redirect := o.cfg.FullURL()
-
-	// Verify State & CSRF
+// loadOAuthSession validates the CSRF state cookie against the query
+// parameter, consumes the server-side session, and returns it. On failure it
+// returns the error code to surface in the redirect.
+func loadOAuthSession(
+	cfg *config.Config,
+	w http.ResponseWriter,
+	r *http.Request,
+) (*OAuthSession, string) {
 	stateCookie, err := r.Cookie("oauth_state")
 	stateQuery := r.URL.Query().Get("state")
 	if err != nil || stateCookie.Value != stateQuery {
-		http.Redirect(w, r, redirect+"?error=invalid_state", http.StatusTemporaryRedirect)
-		return
+		return nil, "invalid_state"
 	}
 
 	http.SetCookie(w, &http.Cookie{
@@ -160,224 +91,159 @@ func (o *OAuthHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	sessionData, err := o.cfg.Cache.Get(r.Context(), "oauth_state."+stateQuery)
-	if err != nil || sessionData == nil {
-		http.Redirect(w, r, redirect+"?error=session_expired", http.StatusTemporaryRedirect)
-		return
+	data, err := cfg.Cache.Get(r.Context(), "oauth_state."+stateQuery)
+	if err != nil || data == nil {
+		return nil, "session_expired"
 	}
-	_ = o.cfg.Cache.Delete(r.Context(), "oauth_state."+stateQuery)
+	_ = cfg.Cache.Delete(r.Context(), "oauth_state."+stateQuery)
 
 	var session OAuthSession
-	if err := json.Unmarshal(sessionData, &session); err != nil {
-		http.Redirect(w, r, redirect+"?error=invalid_session", http.StatusTemporaryRedirect)
-		return
+	if err := json.Unmarshal(data, &session); err != nil {
+		return nil, "invalid_session"
 	}
-
-	code := r.URL.Query().Get("code")
-	var user UnifiedUser
-	var dbOidc *db.OidcProvider
-
-	if session.ProviderID == "github" {
-		conf := &oauth2.Config{
-			ClientID:     o.cfg.GitHubClientID,
-			ClientSecret: o.cfg.GitHubClientSecret,
-			RedirectURL:  o.cfg.FullURL() + "/oauth/callback",
-			Endpoint:     github.Endpoint,
-		}
-		token, err := conf.Exchange(r.Context(), code)
-		if err != nil {
-			http.Redirect(
-				w,
-				r,
-				redirect+"?error=token_exchange_failed",
-				http.StatusTemporaryRedirect,
-			)
-			return
-		}
-		user, err = fetchGitHubUser(r.Context(), token)
-		if err != nil {
-			http.Redirect(w, r, redirect+"?error=github_fetch_failed", http.StatusTemporaryRedirect)
-			return
-		}
-	} else {
-		// Handle Google and Custom OIDC
-		config, err := o.getOIDCProvider(r.Context(), session.ProviderID)
-		if err != nil {
-			http.Redirect(
-				w,
-				r,
-				redirect+"?error=provider_config_failed",
-				http.StatusTemporaryRedirect,
-			)
-			return
-		}
-		dbOidc = config.dbConfig
-
-		var exchangeOpts []oauth2.AuthCodeOption
-		if session.PKCEVerifier != "" {
-			exchangeOpts = append(
-				exchangeOpts,
-				oauth2.SetAuthURLParam("code_verifier", session.PKCEVerifier),
-			)
-		}
-
-		token, err := config.oauth2Config.Exchange(r.Context(), code, exchangeOpts...)
-		if err != nil {
-			http.Redirect(
-				w,
-				r,
-				redirect+"?error=token_exchange_failed",
-				http.StatusTemporaryRedirect,
-			)
-			return
-		}
-
-		rawIDToken, ok := token.Extra("id_token").(string)
-		if !ok {
-			http.Redirect(w, r, redirect+"?error=no_id_token", http.StatusTemporaryRedirect)
-			return
-		}
-
-		idToken, err := config.verifier.Verify(r.Context(), rawIDToken)
-		if err != nil || idToken.Nonce != session.Nonce {
-			http.Redirect(
-				w,
-				r,
-				redirect+"?error=token_verification_failed",
-				http.StatusTemporaryRedirect,
-			)
-			return
-		}
-
-		user, err = extractOIDCClaims(idToken, dbOidc)
-		if err != nil {
-			http.Redirect(w, r, redirect+"?error=invalid_claims", http.StatusTemporaryRedirect)
-			return
-		}
-		user.Provider = session.ProviderID
-	}
-
-	dbUser, err := o.handleOAuthUser(r.Context(), user, dbOidc, session.LinkUserID)
-	if err != nil {
-		// Never leak backend details into the redirect URL; the frontend
-		// only needs a generic failure indicator.
-		slog.Debug("oauth login failed", "error", err, "provider", session.ProviderID)
-		http.Redirect(
-			w,
-			r,
-			redirect+"?error=user_failed",
-			http.StatusTemporaryRedirect,
-		)
-		return
-	}
-
-	o.cfg.Authn.AccessCookie(r.Context(), w.Header(), dbUser)
-	o.cfg.Authn.RefreshCookie(r.Context(), w.Header(), dbUser)
-	syncWebDevice(r.Context(), o.cfg, r.Header, w.Header(), r.RemoteAddr, dbUser)
-	http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
+	return &session, ""
 }
 
-func (o *OAuthHandler) getOIDCProvider(
+// linkUserIDFromRequest returns the authenticated user's ID when the login is
+// a link request initiated from the app, or "" otherwise.
+func linkUserIDFromRequest(cfg *config.Config, r *http.Request) string {
+	if r.URL.Query().Get("link") != "true" {
+		return ""
+	}
+	tokenStr := authn.GetAccessToken(r.Header)
+	if tokenStr == "" {
+		return ""
+	}
+	claims, err := cfg.Authn.VerifyToken(tokenStr)
+	if err != nil {
+		return ""
+	}
+	return claims.UserID
+}
+
+// authRedirect redirects back to the app after a login callback. 302, not
+// 307: callbacks arrive as POSTs, and the SPA has no form action on the
+// root — a preserved POST would land on a 405 and silently drop the result.
+func authRedirect(w http.ResponseWriter, r *http.Request, base string) {
+	http.Redirect(w, r, base, http.StatusFound)
+}
+
+// authErrorRedirect redirects to the frontend auth-error page with a
+// machine-readable error code.
+func authErrorRedirect(w http.ResponseWriter, r *http.Request, base string, code string) {
+	http.Redirect(w, r, base+"/auth-error?error="+code, http.StatusFound)
+}
+
+// redirectFailure redirects with a generic error code, mapping SSO
+// enforcement to its own code so the frontend can explain the failure.
+func redirectFailure(w http.ResponseWriter, r *http.Request, redirect string, err error) {
+	code := "user_failed"
+	if errors.Is(err, ErrSSORequired) {
+		code = "sso_required"
+	}
+	authErrorRedirect(w, r, redirect, code)
+}
+
+// completeLogin signs the user in: attributes the audit event, issues the
+// session cookies, and redirects to the app.
+func completeLogin(
 	ctx context.Context,
-	providerID string,
-) (*OIDCProvider, error) {
-	var dbConfig *db.OidcProvider
-	var err error
-
-	// Fetch DB config first to get UpdatedAt timestamp for cache validation
-	if providerID != "google" {
-		dbConfig, err = o.cfg.Conn.Q.GetOIDCProviderByID(ctx, providerID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get provider from db: %w", err)
-		}
+	cfg *config.Config,
+	w http.ResponseWriter,
+	r *http.Request,
+	user *db.User,
+) {
+	if a := meta.AuditStateFromContext(ctx); a != nil {
+		a.UserID = user.ID
 	}
-
-	// Check local memory cache first to avoid network penalty
-	if cachedAny, ok := o.providerCache.Load(providerID); ok {
-		cached, ok := cachedAny.(*OIDCProvider)
-		if !ok {
-			o.providerCache.Delete(providerID)
-		} else if dbConfig == nil ||
-			(cached.dbConfig != nil && cached.dbConfig.UpdatedAt.Equal(dbConfig.UpdatedAt)) {
-			return cached, nil
-		}
-	}
-
-	v, err, _ := o.sf.Do(providerID, func() (any, error) {
-		var providerConf *OIDCProvider
-
-		// Handle Google static config
-		if providerID == "google" {
-			provider, err := oidc.NewProvider(ctx, "https://accounts.google.com")
-			if err != nil {
-				return nil, err
-			}
-			providerConf = &OIDCProvider{
-				dbConfig: nil, // Indicates static
-				oauth2Config: &oauth2.Config{
-					ClientID:     o.cfg.GoogleClientID,
-					ClientSecret: o.cfg.GoogleClientSecret,
-					RedirectURL:  o.cfg.FullURL() + "/oauth/callback",
-					Endpoint:     provider.Endpoint(),
-					Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-				},
-				verifier: provider.Verifier(&oidc.Config{ClientID: o.cfg.GoogleClientID}),
-			}
-		} else {
-			// Handle custom DB providers using the already fetched dbConfig
-			if dbConfig.IssuerURL == nil || dbConfig.ClientID == nil {
-				return nil, fmt.Errorf("oidc provider is missing issuer_url or client_id")
-			}
-			provider, err := oidc.NewProvider(ctx, strings.TrimSpace(*dbConfig.IssuerURL))
-			if err != nil {
-				return nil, fmt.Errorf("failed to discover oidc provider: %w", err)
-			}
-
-			scopes := slices.DeleteFunc(
-				dbConfig.Scopes,
-				func(s string) bool { return s == oidc.ScopeOpenID },
-			)
-			scopes = append([]string{oidc.ScopeOpenID}, scopes...)
-
-			providerConf = &OIDCProvider{
-				dbConfig: dbConfig,
-				oauth2Config: &oauth2.Config{
-					ClientID:     *dbConfig.ClientID,
-					ClientSecret: string(dbConfig.ClientSecret.Bytes()),
-					RedirectURL:  o.cfg.FullURL() + "/oauth/callback",
-					Endpoint:     provider.Endpoint(),
-					Scopes:       scopes,
-				},
-				verifier: provider.Verifier(&oidc.Config{ClientID: *dbConfig.ClientID}),
-			}
-		}
-
-		o.providerCache.Store(providerID, providerConf)
-		return providerConf, nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	provider, ok := v.(*OIDCProvider)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type for provider %s", providerID)
-	}
-	return provider, nil
+	cfg.Authn.AccessCookie(ctx, w.Header(), user)
+	cfg.Authn.RefreshCookie(ctx, w.Header(), user)
+	syncWebDevice(ctx, cfg, r.Header, w.Header(), r.RemoteAddr, user)
+	authRedirect(w, r, cfg.FullURL())
 }
 
-func fetchGitHubUser(ctx context.Context, token *oauth2.Token) (UnifiedUser, error) {
+func (o *OAuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
+	state, err := crypto.RandomString(32)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "Internal error")
+		return
+	}
+
+	session := OAuthSession{
+		ProviderID: "github",
+		LinkUserID: linkUserIDFromRequest(o.cfg, r),
+	}
+
+	conf := &oauth2.Config{
+		ClientID:     o.cfg.GitHubClientID,
+		ClientSecret: o.cfg.GitHubClientSecret,
+		RedirectURL:  o.cfg.FullURL() + "/oauth/callback",
+		Scopes:       []string{"user:email", "read:user"},
+		Endpoint:     github.Endpoint,
+	}
+
+	if err := startOAuthSession(o.cfg, w, r, state, session); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "Internal error")
+		return
+	}
+	http.Redirect(w, r, conf.AuthCodeURL(state), http.StatusTemporaryRedirect)
+}
+
+func (o *OAuthHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
+	redirect := o.cfg.FullURL()
+
+	session, code := loadOAuthSession(o.cfg, w, r)
+	if code != "" {
+		authErrorRedirect(w, r, redirect, code)
+		return
+	}
+
+	conf := &oauth2.Config{
+		ClientID:     o.cfg.GitHubClientID,
+		ClientSecret: o.cfg.GitHubClientSecret,
+		RedirectURL:  o.cfg.FullURL() + "/oauth/callback",
+		Endpoint:     github.Endpoint,
+	}
+	token, err := conf.Exchange(r.Context(), r.URL.Query().Get("code"))
+	if err != nil {
+		authErrorRedirect(w, r, redirect, "token_exchange_failed")
+		return
+	}
+
+	profile, providerID, err := fetchGitHubUser(r.Context(), token)
+	if err != nil {
+		authErrorRedirect(w, r, redirect, "github_fetch_failed")
+		return
+	}
+
+	dbUser, err := handleOAuthUser(
+		r.Context(),
+		o.cfg,
+		profile,
+		providerID,
+		"github",
+		nil,
+		session.LinkUserID,
+	)
+	if err != nil {
+		redirectFailure(w, r, redirect, err)
+		return
+	}
+	completeLogin(r.Context(), o.cfg, w, r, dbUser)
+}
+
+// fetchGitHubUser resolves the authenticated GitHub user's profile and the
+// provider's subject identifier.
+func fetchGitHubUser(ctx context.Context, token *oauth2.Token) (*db.User, string, error) {
 	client := oauth2.NewClient(ctx, oauth2.StaticTokenSource(token))
-	var user UnifiedUser
-	user.Provider = "github"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user", nil)
 	if err != nil {
-		return user, err
+		return nil, "", err
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return user, err
+		return nil, "", err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -388,7 +254,7 @@ func fetchGitHubUser(ctx context.Context, token *oauth2.Token) (UnifiedUser, err
 		AvatarURL string `json:"avatar_url"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&ghUser); err != nil {
-		return user, err
+		return nil, "", err
 	}
 
 	reqEmails, err := http.NewRequestWithContext(
@@ -398,14 +264,15 @@ func fetchGitHubUser(ctx context.Context, token *oauth2.Token) (UnifiedUser, err
 		nil,
 	)
 	if err != nil {
-		return user, err
+		return nil, "", err
 	}
 	respEmails, err := client.Do(reqEmails)
 	if err != nil {
-		return user, err
+		return nil, "", err
 	}
 	defer func() { _ = respEmails.Body.Close() }()
 
+	var emailAddr string
 	var emails []struct {
 		Email    string `json:"email"`
 		Primary  bool   `json:"primary"`
@@ -414,226 +281,223 @@ func fetchGitHubUser(ctx context.Context, token *oauth2.Token) (UnifiedUser, err
 	if err := json.NewDecoder(respEmails.Body).Decode(&emails); err == nil {
 		for _, e := range emails {
 			if e.Primary && e.Verified {
-				user.Email = e.Email
+				emailAddr = e.Email
 				break
 			}
 		}
 	}
-
-	if user.Email == "" {
-		return user, fmt.Errorf("no verified primary email found on github")
+	if emailAddr == "" {
+		return nil, "", fmt.Errorf("no verified primary email found on github")
 	}
 
-	user.ProviderID = strconv.FormatInt(ghUser.ID, 10)
-	user.Name = ghUser.Name
-	user.Username = ghUser.Login
-	user.AvatarURL = ghUser.AvatarURL
+	username, err := util.GenerateUsername(emailAddr, ghUser.Login, []string{ghUser.Name})
+	if err != nil || username == "" {
+		return nil, "", fmt.Errorf("no username available from provider")
+	}
 
-	return user, nil
+	return &db.User{
+		Name:     ghUser.Name,
+		Username: username,
+		Email:    emailAddr,
+		Picture:  &ghUser.AvatarURL,
+	}, strconv.FormatInt(ghUser.ID, 10), nil
 }
 
-func (o *OAuthHandler) handleOAuthUser(
+// handleOAuthUser turns a verified provider identity into a local user, either
+// by linking it to the currently authenticated user or by resolving the
+// account behind a login. profile holds the provider-attested profile fields,
+// providerID the provider's subject identifier, and provider the provider
+// name (workspace ID for enterprise OIDC).
+func handleOAuthUser(
 	ctx context.Context,
-	unified UnifiedUser,
+	cfg *config.Config,
+	profile *db.User,
+	providerID, provider string,
 	oidcConfig *db.OidcProvider,
 	linkUserID string,
 ) (*db.User, error) {
-	if unified.ProviderID == "" {
+	if providerID == "" {
 		return nil, fmt.Errorf("no user ID from provider")
 	}
 
-	domain, err := email.GetDomain(unified.Email)
+	// Linking is a consumer feature for public providers. Workspace identities
+	// are owned by the organization and only ever arrive through a login
+	// (federation or JIT provisioning), never by user linking.
+	if linkUserID != "" && oidcConfig != nil {
+		return nil, fmt.Errorf("workspace identities cannot be linked to an existing account")
+	}
+
+	domain, err := email.GetDomain(profile.Email)
 	if err != nil {
 		return nil, fmt.Errorf("invalid email format")
 	}
 
-	providerName := unified.Provider
-
-	// For OIDC, use email domain to find workspace
+	// Enterprise identities are namespaced by workspace so identities from
+	// different organizations can never collide. The user's email domain must
+	// be a verified domain of the provider's workspace: that is what allows
+	// an organization to route its employees through its own IdP.
 	if oidcConfig != nil {
-		providerForDomain, err := o.cfg.Conn.Q.GetOIDCProviderByDomain(ctx, domain)
-		if err != nil || providerForDomain.WorkspaceID != oidcConfig.WorkspaceID {
-			return nil, fmt.Errorf("domain not verified for selected provider")
+		if provider, err = oidcNamespace(ctx, cfg, oidcConfig, domain); err != nil {
+			return nil, err
 		}
-		providerName = oidcConfig.WorkspaceID
 	}
 
-	username, err := util.GenerateUsername(
-		unified.Email,
-		unified.Username,
-		[]string{unified.Name},
-	)
-	if err != nil || username == "" {
-		return nil, fmt.Errorf("no username available from provider")
+	// Social logins (github/google) are subject to workspace SSO enforcement
+	// for new and returning users alike. Logging in through the workspace IdP
+	// itself is the enforced flow, and linking is an authenticated user action.
+	if linkUserID == "" && oidcConfig == nil {
+		if err := checkSSOEnforced(ctx, cfg, profile.Email); err != nil {
+			return nil, err
+		}
 	}
 
 	var user *db.User
-	err = o.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
+	err = cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
+		var err error
 		if linkUserID != "" {
-			// Linking to an already authenticated user
-			existing, err := q.GetOAuthIdentity(ctx, &db.GetOAuthIdentityParams{
-				ProviderID: unified.ProviderID,
-				Provider:   providerName,
-			})
-			if err == nil && existing.UserID != linkUserID {
-				return fmt.Errorf(
-					"this account is already linked to a different user. Delete that account first, then try linking again",
-				)
-			}
-
-			existingUser, err := q.GetUserByID(ctx, linkUserID)
-			if err != nil {
-				return fmt.Errorf("link user not found: %w", err)
-			}
-			user = existingUser
+			user, err = linkIdentity(ctx, q, providerID, provider, linkUserID)
 		} else {
-			existing, err := q.GetOAuthIdentity(ctx, &db.GetOAuthIdentityParams{
-				ProviderID: unified.ProviderID,
-				Provider:   providerName,
-			})
-			if err == nil {
-				existingUser, err := q.GetUserByID(ctx, existing.UserID)
-				if err == nil {
-					user = existingUser
-				}
-			}
-
-			// If not linked yet, try finding by email
-			if user == nil {
-				// Check SSO enforcement for new logins
-				if err := checkSSOEnforced(ctx, o.cfg, unified.Email); err != nil {
-					return fmt.Errorf("sso enforcement check failed: %w", err)
-				}
-
-				existingUser, err := q.GetUserByEmail(ctx, unified.Email)
-				if err == nil {
-					user = existingUser
-				}
-			}
-
-			// If no user exists, check if we can create one
-			if user == nil {
-				// For OIDC, check JIT provisioning
-				if oidcConfig != nil && !oidcConfig.AllowJitProvisioning {
-					return fmt.Errorf("JIT provisioning disabled for this workspace")
-				}
-
-				user, err = q.CreateUser(ctx, &db.CreateUserParams{
-					Username: username,
-					Email:    unified.Email,
-					Name:     unified.Name,
-					Picture:  &unified.AvatarURL,
-				})
-				if err != nil {
-					return fmt.Errorf("create user: %w", err)
-				}
-
-				// Verify email since OAuth provider confirmed it
-				if err = q.VerifyUserEmail(ctx, &db.VerifyUserEmailParams{
-					UserID: user.ID,
-					Email:  unified.Email,
-				}); err != nil {
-					return fmt.Errorf("verify email: %w", err)
-				}
-
-				// Add to workspace for OIDC
-				if oidcConfig != nil {
-					if err = q.AddWorkspaceMember(ctx, &db.AddWorkspaceMemberParams{
-						UserID:      user.ID,
-						WorkspaceID: oidcConfig.WorkspaceID,
-					}); err != nil {
-						return fmt.Errorf("add workspace member: %w", err)
-					}
-				}
-			}
+			user, err = loginUser(ctx, q, profile, providerID, provider, oidcConfig)
+		}
+		if err != nil {
+			return err
 		}
 
-		if _, err = q.UpsertOAuthIdentity(ctx, &db.UpsertOAuthIdentityParams{
-			ProviderID:       unified.ProviderID,
-			Provider:         providerName,
+		// Attach or refresh the link between the provider identity and the
+		// resolved account.
+		if _, err := q.UpsertUserIdentity(ctx, &db.UpsertUserIdentityParams{
+			ProviderID:       providerID,
+			Provider:         provider,
 			UserID:           user.ID,
-			ProviderEmail:    &unified.Email,
-			ProviderUsername: &username,
+			ProviderEmail:    &profile.Email,
+			ProviderUsername: &profile.Username,
+			Protocol:         identityProtocol(provider),
 		}); err != nil {
 			return fmt.Errorf("upsert oauth identity: %w", err)
 		}
 
-		updateParams := &db.UpdateUserParams{
-			UserID:   user.ID,
-			Username: &username,
-			Picture:  &unified.AvatarURL,
-		}
-		if unified.Name != "" {
-			updateParams.Name = &unified.Name
-		}
-
-		if _, err = q.UpdateUser(ctx, updateParams); err != nil {
-			return fmt.Errorf("update user: %w", err)
-		}
-
-		return nil
+		user, err = finalizeEnterpriseLogin(ctx, q, user, profile, oidcConfig)
+		return err
 	})
 
 	return user, err
 }
 
-// extractOIDCClaims extracts user data from ID token using custom claim mappings.
-func extractOIDCClaims(idToken *oidc.IDToken, oidcConfig *db.OidcProvider) (UnifiedUser, error) {
-	var allClaims map[string]any
-	if err := idToken.Claims(&allClaims); err != nil {
-		return UnifiedUser{}, fmt.Errorf("failed to extract claims: %w", err)
+// identityProtocol classifies the identity namespace: public providers
+// (github, google) are plain OAuth, everything else is enterprise OIDC.
+func identityProtocol(provider string) string {
+	if provider == "github" || provider == "google" {
+		return "oauth"
 	}
+	return "oidc"
+}
 
-	getStringClaim := func(claimName string) string {
-		if val, ok := allClaims[claimName]; ok {
-			if str, ok := val.(string); ok {
-				return str
-			}
+// linkIdentity resolves the account for a link request, rejecting identities
+// that are already owned by somebody else.
+func linkIdentity(
+	ctx context.Context,
+	q *db.Queries,
+	providerID, provider, linkUserID string,
+) (*db.User, error) {
+	identity, err := q.GetUserIdentity(ctx, &db.GetUserIdentityParams{
+		ProviderID: providerID,
+		Provider:   provider,
+	})
+	switch {
+	case err == nil:
+		if identity.UserID != linkUserID {
+			return nil, fmt.Errorf(
+				"this account is already linked to a different user. Delete that account first, then try linking again",
+			)
 		}
-		return ""
+	case !errors.Is(err, pgx.ErrNoRows):
+		return nil, fmt.Errorf("get oauth identity: %w", err)
 	}
 
-	getBoolClaim := func(claimName string) bool {
-		if val, ok := allClaims[claimName]; ok {
-			if b, ok := val.(bool); ok {
-				return b
-			}
+	user, err := q.GetUserByID(ctx, linkUserID)
+	if err != nil {
+		return nil, fmt.Errorf("link user not found: %w", err)
+	}
+	return user, nil
+}
+
+// loginUser resolves the account behind an SSO login. A linked identity wins,
+// otherwise the provider-verified email federates onto an existing account,
+// otherwise a new user is provisioned (if the workspace allows it).
+func loginUser(
+	ctx context.Context,
+	q *db.Queries,
+	profile *db.User,
+	providerID, provider string,
+	oidcConfig *db.OidcProvider,
+) (*db.User, error) {
+	identity, err := q.GetUserIdentity(ctx, &db.GetUserIdentityParams{
+		ProviderID: providerID,
+		Provider:   provider,
+	})
+	switch {
+	case err == nil:
+		user, err := q.GetUserByID(ctx, identity.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("get user: %w", err)
 		}
-		return false
+		return user, nil
+	case !errors.Is(err, pgx.ErrNoRows):
+		return nil, fmt.Errorf("get oauth identity: %w", err)
 	}
 
-	// Defaults are Google claims; custom OIDC configs override them.
-	emailClaim, nameClaim, usernameClaim, pictureClaim := "email", "name", "preferred_username", "picture"
-	if oidcConfig != nil {
-		emailClaim = oidcConfig.EmailClaim
-		nameClaim = oidcConfig.NameClaim
-		usernameClaim = oidcConfig.UsernameClaim
-		pictureClaim = oidcConfig.PictureClaim
+	// No identity yet: federate onto the account with the same verified email
+	// and mark it verified, since the provider attested ownership.
+	user, err := q.GetUserByEmail(ctx, profile.Email)
+	if err == nil {
+		if err := q.VerifyUserEmail(ctx, &db.VerifyUserEmailParams{
+			UserID: user.ID,
+			Email:  profile.Email,
+		}); err != nil {
+			return nil, fmt.Errorf("verify email: %w", err)
+		}
+		return user, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("get user by email: %w", err)
 	}
 
-	email := getStringClaim(emailClaim)
-	name := getStringClaim(nameClaim)
-	username := getStringClaim(usernameClaim)
-	picture := getStringClaim(pictureClaim)
+	return provisionUser(ctx, q, profile, oidcConfig)
+}
 
-	emailVerified := getBoolClaim("email_verified")
-	if oidcConfig != nil {
-		emailVerified = emailVerified || getBoolClaim(oidcConfig.EmailClaim+"_verified")
+// provisionUser creates the account for a first-time SSO login. When two
+// first logins race on the same email, one wins the insert and the other
+// proceeds with the winner's account.
+func provisionUser(
+	ctx context.Context,
+	q *db.Queries,
+	profile *db.User,
+	oidcConfig *db.OidcProvider,
+) (*db.User, error) {
+	if oidcConfig != nil && !oidcConfig.AllowJitProvisioning {
+		return nil, fmt.Errorf("user provisioning is disabled for this workspace")
 	}
 
-	if !emailVerified {
-		return UnifiedUser{}, fmt.Errorf("email not verified")
+	user, err := q.CreateOAuthUser(ctx, &db.CreateOAuthUserParams{
+		Username: profile.Username,
+		Email:    profile.Email,
+		Name:     profile.Name,
+		Picture:  profile.Picture,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		// ON CONFLICT DO NOTHING returns no row: a concurrent login created
+		// the account first.
+		user, err = q.GetUserByEmail(ctx, profile.Email)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("create user: %w", err)
 	}
 
-	if email == "" {
-		return UnifiedUser{}, fmt.Errorf("email claim '%s' not found or empty", emailClaim)
+	if err := q.VerifyUserEmail(ctx, &db.VerifyUserEmailParams{
+		UserID: user.ID,
+		Email:  profile.Email,
+	}); err != nil {
+		return nil, fmt.Errorf("verify email: %w", err)
 	}
-
-	return UnifiedUser{
-		Email:      email,
-		Name:       name,
-		Username:   username,
-		AvatarURL:  picture,
-		ProviderID: idToken.Subject,
-	}, nil
+	return user, nil
 }

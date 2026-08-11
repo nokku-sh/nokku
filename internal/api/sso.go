@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strings"
 
 	"connectrpc.com/connect"
 
@@ -98,6 +99,25 @@ func (s *SSOService) UpdateOIDCProvider(
 
 	var result *db.OidcProvider
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		// A changed issuer means a different IdP. Identity mappings under the
+		// old issuer are stale (sub values are only unique within an issuer),
+		// so purge them: everyone must sign in through the new provider again.
+		if req.IssuerUrl != nil {
+			provider, err := q.GetOIDCProvider(ctx, req.GetWorkspaceId())
+			if err != nil {
+				return err
+			}
+			if provider.IssuerURL == nil ||
+				strings.TrimSpace(*provider.IssuerURL) != strings.TrimSpace(req.GetIssuerUrl()) {
+				if err := q.DeleteUserIdentitiesByProvider(
+					ctx,
+					req.GetWorkspaceId(),
+				); err != nil {
+					return err
+				}
+			}
+		}
+
 		result, err = q.UpdateOIDCProvider(ctx, params)
 		return err
 	}); err != nil {
@@ -213,14 +233,19 @@ func (s *SSOService) CheckSSO(
 		return nil, NewError(connect.CodeInvalidArgument, "invalid email address")
 	}
 
-	oidc, err := s.cfg.Conn.Q.GetOIDCProviderByDomain(ctx, domain)
-	if err != nil {
-		oidc = nil
-	}
-	saml, err := s.cfg.Conn.Q.GetSAMLProviderByDomain(ctx, domain)
-	if err != nil {
-		saml = nil
-	}
+	// Pre-authentication lookup by public domain: runs as a system
+	// transaction, same as the other unauthenticated SSO probes.
+	var oidc *db.OidcProvider
+	var saml *db.SamlProvider
+	_ = s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
+		if o, err := q.GetOIDCProviderByDomain(ctx, domain); err == nil {
+			oidc = o
+		}
+		if sp, err := q.GetSAMLProviderByDomain(ctx, domain); err == nil {
+			saml = sp
+		}
+		return nil
+	})
 
 	var providers []*nokkuv1.SSOProvider
 
@@ -263,8 +288,11 @@ func checkSSOEnforced(ctx context.Context, cfg *config.Config, addr string) erro
 	if err != nil {
 		return ErrInternal
 	}
-	enforced, err := cfg.Conn.Q.CheckDomainSSOEnforcement(ctx, domain)
-	if err != nil {
+	var enforced bool
+	if err := cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		enforced, err = q.CheckDomainSSOEnforcement(ctx, domain)
+		return err
+	}); err != nil {
 		return ErrInternal
 	}
 	if enforced {

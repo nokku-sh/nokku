@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
 	import { loginWithPasskey } from '$lib/api/passkey';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
@@ -12,6 +11,7 @@
 	import { sso } from '$lib/api/sso.svelte';
 	import { SSOProvider_Type, type SSOProvider } from '$lib/gen/nokku/v1/sso_pb';
 	import { auth } from '$lib/api/auth.svelte';
+	import { useDebounce } from 'runed';
 	import Logo from '$lib/assets/logo.svelte';
 
 	// State
@@ -21,20 +21,21 @@
 	const login = auth.login();
 	const ssoCheck = sso.check();
 
+	// Home Realm Discovery: probe for a workspace SSO provider as the email is
+	// typed, so the matching button appears without submitting the form.
+	const checkSSO = useDebounce(() => {
+		if (email.includes('@')) {
+			ssoCheck.mutate({ email });
+		}
+	}, 300);
+
 	let enforceSSO = $derived(ssoCheck.isSuccess && ssoCheck.data.enforceSso);
 	let disablePasswordLogin = $derived(enforceSSO || login.isPending);
-
-	$effect(() => {
-		if (page.url.searchParams.has('error')) {
-			let code = page.url.searchParams.get('error');
-			toast.error('OAuth error: ' + code);
-		}
-	});
 
 	function handleSSOLogin(provider: SSOProvider) {
 		switch (provider.type) {
 			case SSOProvider_Type.OIDC:
-				window.location.href = `oauth/login?provider=${provider.id}`;
+				window.location.href = `oidc/login?provider=${provider.id}`;
 				break;
 			case SSOProvider_Type.SAML:
 				window.location.href = `saml/login?provider=${provider.id}`;
@@ -70,7 +71,7 @@
 					type="email"
 					bind:value={email}
 					required
-					onblur={() => ssoCheck.mutate({ email })}
+					oninput={checkSSO}
 					placeholder="Enter your email"
 				/>
 			</div>
@@ -106,7 +107,7 @@
 				{/if}
 
 				{#if ssoCheck.isSuccess && ssoCheck.data.hasSso}
-					{#each ssoCheck.data.providers as p (p.id)}
+					{#each ssoCheck.data.providers as p (`${p.type}:${p.id}`)}
 						<Button
 							type="button"
 							variant="secondary"
@@ -137,15 +138,12 @@
 		<div class="mb-3 grid grid-cols-2 gap-3">
 			<Button
 				variant="secondary"
-				onclick={() => (window.location.href = '/oauth/login?provider=google')}
+				onclick={() => (window.location.href = '/oidc/login?provider=google')}
 			>
 				<GoogleIcon class="size-5" />
 				<span>Google</span>
 			</Button>
-			<Button
-				variant="secondary"
-				onclick={() => (window.location.href = '/oauth/login?provider=github')}
-			>
+			<Button variant="secondary" onclick={() => (window.location.href = '/oauth/login')}>
 				<GitHubIcon class="size-5" />
 				<span>GitHub</span>
 			</Button>

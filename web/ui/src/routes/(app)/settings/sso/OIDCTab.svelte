@@ -35,7 +35,7 @@
 		}
 	}
 
-	const callbackURL = window.location.origin + '/oauth/callback';
+	const callbackURL = window.location.origin + '/oidc/callback';
 </script>
 
 <Card.Root>
@@ -268,7 +268,7 @@
 
 			<Field.Group>
 				<Field.Field>
-					<Field.Label for="callbackUrl">OAuth Redirect URI / Callback URL</Field.Label>
+					<Field.Label for="callbackUrl">Redirect URI / Callback URL</Field.Label>
 					<Field.Content>
 						<InputGroupVariants variant="copy-input" value={callbackURL} readonly />
 						<Field.Description class="flex items-center gap-1">

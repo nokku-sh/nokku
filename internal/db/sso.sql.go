@@ -105,40 +105,6 @@ func (q *Queries) CreatePasskey(ctx context.Context, arg *CreatePasskeyParams) e
 	return err
 }
 
-const deleteOAuthIdentity = `-- name: DeleteOAuthIdentity :exec
-DELETE FROM oauth_identities
-WHERE
-  provider_id = $1
-  AND provider = $2
-`
-
-type DeleteOAuthIdentityParams struct {
-	ProviderID string `json:"providerId"`
-	Provider   string `json:"provider"`
-}
-
-func (q *Queries) DeleteOAuthIdentity(ctx context.Context, arg *DeleteOAuthIdentityParams) error {
-	_, err := q.db.Exec(ctx, deleteOAuthIdentity, arg.ProviderID, arg.Provider)
-	return err
-}
-
-const deleteOAuthIdentityByUser = `-- name: DeleteOAuthIdentityByUser :exec
-DELETE FROM oauth_identities
-WHERE
-  user_id = $1
-  AND provider = $2
-`
-
-type DeleteOAuthIdentityByUserParams struct {
-	UserID   string `json:"userId"`
-	Provider string `json:"provider"`
-}
-
-func (q *Queries) DeleteOAuthIdentityByUser(ctx context.Context, arg *DeleteOAuthIdentityByUserParams) error {
-	_, err := q.db.Exec(ctx, deleteOAuthIdentityByUser, arg.UserID, arg.Provider)
-	return err
-}
-
 const deletePasskey = `-- name: DeletePasskey :exec
 DELETE FROM passkeys
 WHERE
@@ -147,6 +113,70 @@ WHERE
 
 func (q *Queries) DeletePasskey(ctx context.Context, passkeyID string) error {
 	_, err := q.db.Exec(ctx, deletePasskey, passkeyID)
+	return err
+}
+
+const deleteUserIdentitiesByProvider = `-- name: DeleteUserIdentitiesByProvider :exec
+DELETE FROM user_identities
+WHERE
+  provider = $1
+`
+
+func (q *Queries) DeleteUserIdentitiesByProvider(ctx context.Context, provider string) error {
+	_, err := q.db.Exec(ctx, deleteUserIdentitiesByProvider, provider)
+	return err
+}
+
+const deleteUserIdentitiesByUserAndProtocol = `-- name: DeleteUserIdentitiesByUserAndProtocol :exec
+DELETE FROM user_identities
+WHERE
+  user_id = $1
+  AND provider = $2
+  AND protocol = $3
+`
+
+type DeleteUserIdentitiesByUserAndProtocolParams struct {
+	UserID   string `json:"userId"`
+	Provider string `json:"provider"`
+	Protocol string `json:"protocol"`
+}
+
+func (q *Queries) DeleteUserIdentitiesByUserAndProtocol(ctx context.Context, arg *DeleteUserIdentitiesByUserAndProtocolParams) error {
+	_, err := q.db.Exec(ctx, deleteUserIdentitiesByUserAndProtocol, arg.UserID, arg.Provider, arg.Protocol)
+	return err
+}
+
+const deleteUserIdentity = `-- name: DeleteUserIdentity :exec
+DELETE FROM user_identities
+WHERE
+  provider_id = $1
+  AND provider = $2
+`
+
+type DeleteUserIdentityParams struct {
+	ProviderID string `json:"providerId"`
+	Provider   string `json:"provider"`
+}
+
+func (q *Queries) DeleteUserIdentity(ctx context.Context, arg *DeleteUserIdentityParams) error {
+	_, err := q.db.Exec(ctx, deleteUserIdentity, arg.ProviderID, arg.Provider)
+	return err
+}
+
+const deleteUserIdentityByUser = `-- name: DeleteUserIdentityByUser :exec
+DELETE FROM user_identities
+WHERE
+  user_id = $1
+  AND provider = $2
+`
+
+type DeleteUserIdentityByUserParams struct {
+	UserID   string `json:"userId"`
+	Provider string `json:"provider"`
+}
+
+func (q *Queries) DeleteUserIdentityByUser(ctx context.Context, arg *DeleteUserIdentityByUserParams) error {
+	_, err := q.db.Exec(ctx, deleteUserIdentityByUser, arg.UserID, arg.Provider)
 	return err
 }
 
@@ -184,135 +214,6 @@ func (q *Queries) GetExpiringSAMLProviderForUpdate(ctx context.Context) (*SamlPr
 		&i.EnforceSso,
 		&i.AllowJitProvisioning,
 		&i.IsActive,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const getOAuthIdentitiesByProvider = `-- name: GetOAuthIdentitiesByProvider :many
-SELECT
-  o.provider_id, o.provider, o.user_id, o.provider_email, o.provider_username, o.created_at, o.updated_at,
-  u.email,
-  u.username,
-  u.name
-FROM
-  oauth_identities o
-  JOIN users u ON u.id = o.user_id
-WHERE
-  o.provider = $1
-ORDER BY
-  o.created_at DESC
-`
-
-type GetOAuthIdentitiesByProviderRow struct {
-	ProviderID       string    `json:"providerId"`
-	Provider         string    `json:"provider"`
-	UserID           string    `json:"userId"`
-	ProviderEmail    *string   `json:"providerEmail"`
-	ProviderUsername *string   `json:"providerUsername"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
-	Email            string    `json:"email"`
-	Username         string    `json:"username"`
-	Name             string    `json:"name"`
-}
-
-func (q *Queries) GetOAuthIdentitiesByProvider(ctx context.Context, provider string) ([]*GetOAuthIdentitiesByProviderRow, error) {
-	rows, err := q.db.Query(ctx, getOAuthIdentitiesByProvider, provider)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*GetOAuthIdentitiesByProviderRow
-	for rows.Next() {
-		var i GetOAuthIdentitiesByProviderRow
-		if err := rows.Scan(
-			&i.ProviderID,
-			&i.Provider,
-			&i.UserID,
-			&i.ProviderEmail,
-			&i.ProviderUsername,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Email,
-			&i.Username,
-			&i.Name,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getOAuthIdentitiesByUserID = `-- name: GetOAuthIdentitiesByUserID :many
-SELECT
-  provider_id, provider, user_id, provider_email, provider_username, created_at, updated_at
-FROM
-  oauth_identities
-WHERE
-  user_id = $1
-ORDER BY
-  created_at DESC
-`
-
-func (q *Queries) GetOAuthIdentitiesByUserID(ctx context.Context, userID string) ([]*OauthIdentity, error) {
-	rows, err := q.db.Query(ctx, getOAuthIdentitiesByUserID, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*OauthIdentity
-	for rows.Next() {
-		var i OauthIdentity
-		if err := rows.Scan(
-			&i.ProviderID,
-			&i.Provider,
-			&i.UserID,
-			&i.ProviderEmail,
-			&i.ProviderUsername,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getOAuthIdentity = `-- name: GetOAuthIdentity :one
-SELECT
-  provider_id, provider, user_id, provider_email, provider_username, created_at, updated_at
-FROM
-  oauth_identities
-WHERE
-  provider_id = $1
-  AND provider = $2
-`
-
-type GetOAuthIdentityParams struct {
-	ProviderID string `json:"providerId"`
-	Provider   string `json:"provider"`
-}
-
-// OAuth Identities -----------------------------------------------------------
-func (q *Queries) GetOAuthIdentity(ctx context.Context, arg *GetOAuthIdentityParams) (*OauthIdentity, error) {
-	row := q.db.QueryRow(ctx, getOAuthIdentity, arg.ProviderID, arg.Provider)
-	var i OauthIdentity
-	err := row.Scan(
-		&i.ProviderID,
-		&i.Provider,
-		&i.UserID,
-		&i.ProviderEmail,
-		&i.ProviderUsername,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -599,6 +500,139 @@ func (q *Queries) GetSAMLProviderByID(ctx context.Context, workspaceID string) (
 	return &i, err
 }
 
+const getUserIdentitiesByProvider = `-- name: GetUserIdentitiesByProvider :many
+SELECT
+  o.provider_id, o.provider, o.user_id, o.provider_email, o.provider_username, o.protocol, o.created_at, o.updated_at,
+  u.email,
+  u.username,
+  u.name
+FROM
+  user_identities o
+  JOIN users u ON u.id = o.user_id
+WHERE
+  o.provider = $1
+ORDER BY
+  o.created_at DESC
+`
+
+type GetUserIdentitiesByProviderRow struct {
+	ProviderID       string    `json:"providerId"`
+	Provider         string    `json:"provider"`
+	UserID           string    `json:"userId"`
+	ProviderEmail    *string   `json:"providerEmail"`
+	ProviderUsername *string   `json:"providerUsername"`
+	Protocol         string    `json:"protocol"`
+	CreatedAt        time.Time `json:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
+	Email            string    `json:"email"`
+	Username         string    `json:"username"`
+	Name             string    `json:"name"`
+}
+
+func (q *Queries) GetUserIdentitiesByProvider(ctx context.Context, provider string) ([]*GetUserIdentitiesByProviderRow, error) {
+	rows, err := q.db.Query(ctx, getUserIdentitiesByProvider, provider)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetUserIdentitiesByProviderRow
+	for rows.Next() {
+		var i GetUserIdentitiesByProviderRow
+		if err := rows.Scan(
+			&i.ProviderID,
+			&i.Provider,
+			&i.UserID,
+			&i.ProviderEmail,
+			&i.ProviderUsername,
+			&i.Protocol,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Email,
+			&i.Username,
+			&i.Name,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUserIdentitiesByUserID = `-- name: GetUserIdentitiesByUserID :many
+SELECT
+  provider_id, provider, user_id, provider_email, provider_username, protocol, created_at, updated_at
+FROM
+  user_identities
+WHERE
+  user_id = $1
+ORDER BY
+  created_at DESC
+`
+
+func (q *Queries) GetUserIdentitiesByUserID(ctx context.Context, userID string) ([]*UserIdentity, error) {
+	rows, err := q.db.Query(ctx, getUserIdentitiesByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*UserIdentity
+	for rows.Next() {
+		var i UserIdentity
+		if err := rows.Scan(
+			&i.ProviderID,
+			&i.Provider,
+			&i.UserID,
+			&i.ProviderEmail,
+			&i.ProviderUsername,
+			&i.Protocol,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUserIdentity = `-- name: GetUserIdentity :one
+SELECT
+  provider_id, provider, user_id, provider_email, provider_username, protocol, created_at, updated_at
+FROM
+  user_identities
+WHERE
+  provider_id = $1
+  AND provider = $2
+`
+
+type GetUserIdentityParams struct {
+	ProviderID string `json:"providerId"`
+	Provider   string `json:"provider"`
+}
+
+// User Identities -----------------------------------------------------------
+func (q *Queries) GetUserIdentity(ctx context.Context, arg *GetUserIdentityParams) (*UserIdentity, error) {
+	row := q.db.QueryRow(ctx, getUserIdentity, arg.ProviderID, arg.Provider)
+	var i UserIdentity
+	err := row.Scan(
+		&i.ProviderID,
+		&i.Provider,
+		&i.UserID,
+		&i.ProviderEmail,
+		&i.ProviderUsername,
+		&i.Protocol,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
 const updateOIDCProvider = `-- name: UpdateOIDCProvider :one
 UPDATE oidc_providers
 SET
@@ -805,44 +839,73 @@ func (q *Queries) UpdateSAMLProvider(ctx context.Context, arg *UpdateSAMLProvide
 	return &i, err
 }
 
-const upsertOAuthIdentity = `-- name: UpsertOAuthIdentity :one
+const upsertUserIdentity = `-- name: UpsertUserIdentity :one
 INSERT INTO
-  oauth_identities (provider_id, provider, user_id, provider_email, provider_username)
+  user_identities (provider_id, provider, user_id, provider_email, provider_username, protocol)
 VALUES
-  ($1, $2, $3, $4, $5)
+  ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (provider_id, provider) DO UPDATE
 SET
   provider_email = EXCLUDED.provider_email,
-  provider_username = EXCLUDED.provider_username
+  provider_username = EXCLUDED.provider_username,
+  protocol = EXCLUDED.protocol
 RETURNING
-  provider_id, provider, user_id, provider_email, provider_username, created_at, updated_at
+  provider_id, provider, user_id, provider_email, provider_username, protocol, created_at, updated_at
 `
 
-type UpsertOAuthIdentityParams struct {
+type UpsertUserIdentityParams struct {
 	ProviderID       string  `json:"providerId"`
 	Provider         string  `json:"provider"`
 	UserID           string  `json:"userId"`
 	ProviderEmail    *string `json:"providerEmail"`
 	ProviderUsername *string `json:"providerUsername"`
+	Protocol         string  `json:"protocol"`
 }
 
-func (q *Queries) UpsertOAuthIdentity(ctx context.Context, arg *UpsertOAuthIdentityParams) (*OauthIdentity, error) {
-	row := q.db.QueryRow(ctx, upsertOAuthIdentity,
+func (q *Queries) UpsertUserIdentity(ctx context.Context, arg *UpsertUserIdentityParams) (*UserIdentity, error) {
+	row := q.db.QueryRow(ctx, upsertUserIdentity,
 		arg.ProviderID,
 		arg.Provider,
 		arg.UserID,
 		arg.ProviderEmail,
 		arg.ProviderUsername,
+		arg.Protocol,
 	)
-	var i OauthIdentity
+	var i UserIdentity
 	err := row.Scan(
 		&i.ProviderID,
 		&i.Provider,
 		&i.UserID,
 		&i.ProviderEmail,
 		&i.ProviderUsername,
+		&i.Protocol,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
+}
+
+const workspaceOwnsVerifiedDomain = `-- name: WorkspaceOwnsVerifiedDomain :one
+SELECT EXISTS (
+  SELECT
+    1
+  FROM
+    workspace_domains
+  WHERE
+    workspace_id = $1
+    AND domain = $2
+    AND verified_at IS NOT NULL
+)::BOOLEAN AS owns_domain
+`
+
+type WorkspaceOwnsVerifiedDomainParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	Domain      string `json:"domain"`
+}
+
+func (q *Queries) WorkspaceOwnsVerifiedDomain(ctx context.Context, arg *WorkspaceOwnsVerifiedDomainParams) (bool, error) {
+	row := q.db.QueryRow(ctx, workspaceOwnsVerifiedDomain, arg.WorkspaceID, arg.Domain)
+	var owns_domain bool
+	err := row.Scan(&owns_domain)
+	return owns_domain, err
 }
