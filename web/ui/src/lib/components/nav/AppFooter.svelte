@@ -4,7 +4,6 @@
 	import { ImprintURL, PrivacyURL, ToSURL } from '$lib/config';
 
 	const version = $derived(util.getVersion());
-	const currentYear = new Date().getFullYear();
 </script>
 
 <footer
@@ -12,7 +11,7 @@
 >
 	<div class="flex flex-col items-center gap-2 sm:flex-row sm:gap-4">
 		<p class="text-xs text-muted-foreground">
-			&copy; {currentYear} MizuchiLabs. All rights reserved.
+			&copy; {new Date().getFullYear()} Mizuchi Labs. All rights reserved.
 		</p>
 
 		<div class="hidden h-4 w-px bg-border sm:block"></div>
