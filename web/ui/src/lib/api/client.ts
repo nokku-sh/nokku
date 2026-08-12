@@ -15,6 +15,7 @@ import { formatConnectError, parseHTTPError } from './error-formatter';
 import { goto } from '$app/navigation';
 import { SSOService } from '$lib/gen/nokku/v1/sso_pb';
 import { UtilService } from '$lib/gen/nokku/v1/util_pb';
+import { WorkspaceService } from '$lib/gen/nokku/v1/workspace_pb';
 import { workspaceID } from '$lib/store.svelte';
 
 export const queryClient = new QueryClient({
@@ -33,12 +34,38 @@ export const queryClient = new QueryClient({
 		}
 	},
 	queryCache: new QueryCache({
-		onError: (error) => {
-			if (error instanceof ConnectError && error.code !== Code.Unauthenticated) {
-				toast.error(formatConnectError(error).title, {
-					description: formatConnectError(error).description
-				});
+		onError: (error, query) => {
+			if (!(error instanceof ConnectError) || error.code === Code.Unauthenticated) return;
+
+			const key = query.queryKey[1] as { methodName?: string } | undefined;
+
+			// The account behind this session no longer exists (e.g. the
+			// database was restored). Treat it like an expired session.
+			if (key?.methodName === 'whoami' && error.code === Code.NotFound) {
+				handleSessionExpired();
+				return;
 			}
+
+			// A persisted workspace id can outlive the workspace itself (deleted
+			// or membership revoked). Drop it silently and let the workspace list
+			// select a valid one instead of erroring on every load.
+			if (
+				key?.methodName === 'getWorkspace' &&
+				(error.code === Code.NotFound || error.code === Code.PermissionDenied)
+			) {
+				workspaceID.current = '';
+				void queryClient.invalidateQueries({
+					queryKey: [
+						'connect-query',
+						{ serviceName: WorkspaceService.typeName, methodName: 'listWorkspaces' }
+					]
+				});
+				return;
+			}
+
+			toast.error(formatConnectError(error).title, {
+				description: formatConnectError(error).description
+			});
 		}
 	}),
 	mutationCache: new MutationCache({
@@ -65,12 +92,30 @@ export const queryClient = new QueryClient({
 });
 
 let refreshPromise: Promise<void> | null = null;
+let sessionExpiredAt = 0;
 
 const publicServices = new Set([AuthService.typeName]);
 const publicMethods = new Set([
 	UtilService.method.getVersion.name,
 	SSOService.method.checkSSO.name
 ]);
+
+// The session cookies are HttpOnly, so only the backend can clear them. The
+// refresh endpoint does that when it rejects a stale session; here we mirror
+// the logout flow: reset local state, drop cached data and land on /login.
+function handleSessionExpired() {
+	if (!browser || window.location.pathname.startsWith('/login')) return;
+
+	const now = Date.now();
+	if (now - sessionExpiredAt < 5000) return; // dedupe concurrent failures
+	sessionExpiredAt = now;
+
+	workspaceID.current = '';
+	void queryClient.cancelQueries();
+	queryClient.clear();
+	void goto('/login');
+	toast.info('Session expired', { description: 'Please log in again.' });
+}
 
 export const authInterceptor: Interceptor = (next) => async (req) => {
 	if (publicServices.has(req.service.typeName) || publicMethods.has(req.method.name)) {
@@ -87,8 +132,11 @@ export const authInterceptor: Interceptor = (next) => async (req) => {
 					try {
 						await callUnary(AuthService.method.refreshToken, undefined);
 					} catch (refreshErr) {
-						if (browser && !window.location.pathname.startsWith('/login')) {
-							void goto('/login');
+						// Only a confirmed rejection means the session is gone.
+						// Transient failures (network, 5xx) must not force a
+						// logout; the request surfaces its own error instead.
+						if (refreshErr instanceof ConnectError && refreshErr.code === Code.Unauthenticated) {
+							handleSessionExpired();
 						}
 						throw refreshErr;
 					} finally {
