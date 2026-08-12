@@ -89,7 +89,6 @@ func (o *OIDCHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "Internal error")
 		return
 	}
-	fmt.Printf("config.oauth2Config: %v\n", config.oauth2Config)
 	http.Redirect(
 		w,
 		r,
