@@ -7,6 +7,8 @@ import (
 
 // EncryptedBytes automatically encrypts/decrypts byte slices.
 // Alias on []byte so raw bytes convert implicitly, no wrapper constructors.
+// String()/MarshalJSON always render "" so secrets never leak into logs or
+// API responses.
 //
 //nolint:recvcheck // Scan requires pointer receiver for sql.Scanner
 type EncryptedBytes []byte
@@ -70,6 +72,8 @@ func (e EncryptedBytes) MarshalJSON() ([]byte, error) {
 }
 
 // HashedPassword for user passwords - uses slow hashing.
+// String()/MarshalJSON always render "" so hashes never leak into logs or
+// API responses.
 //
 //nolint:recvcheck // Scan requires pointer receiver for sql.Scanner
 type HashedPassword string
@@ -135,6 +139,8 @@ func (h HashedPassword) MarshalJSON() ([]byte, error) {
 }
 
 // HashedToken for API tokens - uses fast hashing.
+// String()/MarshalJSON always render "" so hashes never leak into logs or
+// API responses.
 //
 //nolint:recvcheck // Scan requires pointer receiver for sql.Scanner
 type HashedToken string

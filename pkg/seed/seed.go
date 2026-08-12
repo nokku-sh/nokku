@@ -107,7 +107,6 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 			return err
 		}
 
-		// Create additional users; index-suffixed email/username avoids UNIQUE violations
 		users := make([]*db.User, cfg.NumUsers-1)
 		for i := range cfg.NumUsers - 1 {
 			user, err := q.CreateUser(ctx, &db.CreateUserParams{

@@ -34,6 +34,8 @@ func (s *CredentialService) UpdatePassword(
 	if err := checkSSOEnforced(ctx, s.cfg, user.Email); err != nil {
 		return nil, err
 	}
+	// Users without a password (passkey/OAuth-only accounts) have no current
+	// password to check, so verification is skipped for them.
 	if !user.PasswordHash.IsZero() {
 		if ok := user.PasswordHash.Verify(req.GetCurrentPassword()); !ok {
 			return nil, NewError(connect.CodeInvalidArgument, "current password is incorrect")

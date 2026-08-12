@@ -306,7 +306,6 @@ func (s *Server) getServiceRegistrations(ctx context.Context) []ServiceRegistrat
 func (s *Server) registerServices(ctx context.Context) error {
 	registrations := s.getServiceRegistrations(ctx)
 
-	// Extract service names for health and reflection
 	serviceNames := make([]string, len(registrations))
 	services := make([]*vanguard.Service, len(registrations))
 
@@ -337,7 +336,6 @@ func (s *Server) registerServices(ctx context.Context) error {
 			return
 		}
 
-		// fallback to static files
 		staticHandler.ServeHTTP(w, r)
 	})
 
@@ -421,13 +419,11 @@ func (s *Server) registerHealthAndReflection(serviceNames []string) {
 }
 
 func isAPIRequest(r *http.Request) bool {
-	// Check for Connect-RPC headers
 	if r.Header.Get("Content-Type") == "application/json" &&
 		r.Header.Get("Connect-Protocol-Version") != "" {
 		return true
 	}
 
-	// Check for gRPC headers
 	if contentType := r.Header.Get("Content-Type"); contentType == "application/grpc" ||
 		contentType == "application/grpc+proto" {
 		return true

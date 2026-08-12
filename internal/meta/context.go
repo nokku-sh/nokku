@@ -11,10 +11,9 @@ type (
 )
 
 const (
-	ActorKey      ctxKey = "actor"
-	AuditStateKey ctxKey = "audit"
-	WorkspaceKey  ctxKey = "workspace"
-	// ActorTypeUser identifies a human user actor.
+	ActorKey                ctxKey    = "actor"
+	AuditStateKey           ctxKey    = "audit"
+	WorkspaceKey            ctxKey    = "workspace"
 	ActorTypeUser           ActorType = "user"
 	ActorTypeDaemon         ActorType = "daemon"
 	ActorTypeServiceAccount ActorType = "service_account"

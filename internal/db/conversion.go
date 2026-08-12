@@ -10,7 +10,6 @@ import (
 
 // SQL to Proto ---------------------------------------------------------------
 
-// MapSlice applies a conversion function to each element of a slice.
 func MapSlice[T, R any](in []T, fn func(T) R) []R {
 	if in == nil {
 		return nil

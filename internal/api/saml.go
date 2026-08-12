@@ -241,7 +241,6 @@ func (s *SAMLHandler) handleSAMLUser(
 ) (*db.User, error) {
 	existingUser, err := s.cfg.Conn.Q.GetUserByEmail(ctx, user.Email)
 
-	// User exists, update and return
 	if err == nil {
 		var updatedUser *db.User
 		err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
@@ -477,7 +476,6 @@ func (s *SAMLHandler) getSAMLMiddleware(
 		}
 	}
 
-	// Cache miss - fetch metadata
 	if idpMetadata == nil {
 		metadataURL, err := url.Parse(*provider.MetadataURL)
 		if err != nil {

@@ -90,6 +90,8 @@ func (c *Config) rotateCerts(ctx context.Context) {
 			return err
 		}
 
+		// Older CAs have no stored lifetime; fall back to the certificate's
+		// own validity span.
 		lifetime := ca.Lifetime
 		if lifetime <= 0 {
 			lifetime = ca.NotAfter.Sub(ca.NotBefore)

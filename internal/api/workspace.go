@@ -104,7 +104,6 @@ func (s *WorkspaceService) DeleteWorkspace(
 	ctx context.Context,
 	req *nokkuv1.DeleteWorkspaceRequest,
 ) (*nokkuv1.DeleteWorkspaceResponse, error) {
-	// Revoke subscription
 	if s.cfg.Billing.Enabled() {
 		if err := s.cfg.Billing.Cancel(ctx, req.GetWorkspaceId(), true, ""); err != nil {
 			return nil, ErrInternal
@@ -325,7 +324,6 @@ func (s *WorkspaceService) initializeWorkspace(
 			return err
 		}
 
-		// Generate SAML SP key pair and certificate
 		samlKeyPair, err := util.CreateSAMLKeyPair(workspace.ID)
 		if err != nil {
 			return err
@@ -339,7 +337,6 @@ func (s *WorkspaceService) initializeWorkspace(
 			return err
 		}
 
-		// Create default certificates
 		ca, err := ssh.NewCA(
 			nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519,
 			0,

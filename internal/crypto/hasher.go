@@ -143,6 +143,7 @@ func (h *Hasher) verifyArgon2(secret, encoded string) bool {
 	}
 
 	expectedHashLen := len(expectedHash)
+	// Guard against uint32 overflow when passing the length to argon2.IDKey.
 	if expectedHashLen >= math.MaxUint32 {
 		return false
 	}

@@ -96,6 +96,8 @@ func (a *AuthNInterceptor) authenticate(
 		return a.authenticateChallenge(ctx, challenge, procedure)
 	}
 
+	// Anything that isn't a recognizable nokku token (bad parse or unknown
+	// prefix) falls through to plain user-token auth instead of failing.
 	bearer := authn.GetBearerToken(header)
 	parsed, err := crypto.Parse(bearer)
 	if err != nil {
@@ -136,8 +138,6 @@ func (a *AuthNInterceptor) authenticateUser(
 
 // authenticateChallenge verifies a signed request challenge against the
 // identity's registered public key.
-//
-// TODO: add a short-TTL read-through cache for {auth_pubkey, kind} and invalidate on delete/rotate.
 func (a *AuthNInterceptor) authenticateChallenge(
 	ctx context.Context,
 	challenge, procedure string,

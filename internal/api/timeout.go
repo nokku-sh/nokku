@@ -15,7 +15,6 @@ func NewTimeoutInterceptor() connect.UnaryInterceptorFunc {
 				return next(ctx, req)
 			}
 
-			// Skip if client already provided a deadline
 			if _, hasDeadline := ctx.Deadline(); hasDeadline {
 				return next(ctx, req)
 			}
