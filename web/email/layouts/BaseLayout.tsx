@@ -10,15 +10,21 @@ import {
   Tailwind,
   Text,
   Font,
+  Row,
 } from "react-email";
 import { CONFIG } from "../constants/vars";
 
 interface BaseEmailLayoutProps {
   children: React.ReactNode;
   preview: string;
+  type?: "transactional" | "marketing";
 }
 
-export default function BaseLayout({ children, preview }: BaseEmailLayoutProps) {
+export default function BaseLayout({
+  children,
+  preview,
+  type = "transactional",
+}: BaseEmailLayoutProps) {
   return (
     <Tailwind
       config={{
@@ -61,17 +67,31 @@ export default function BaseLayout({ children, preview }: BaseEmailLayoutProps) 
             </Section>
             <Section className="px-8 py-8">{children}</Section>
             <Section className="border-t border-line bg-[#fafcfe] px-8 py-7">
-              <Text className="m-0 text-xs leading-5 text-muted">
-                This is a transactional security email about your {CONFIG.APP_NAME} account. If you
-                did not initiate this action, contact{" "}
-                <Link
-                  href={`mailto:${CONFIG.SUPPORT_EMAIL}`}
-                  className="font-medium text-brand no-underline"
-                >
-                  {CONFIG.SUPPORT_EMAIL}
-                </Link>
-                .
-              </Text>
+              {type === "marketing" ? (
+                <Text className="m-0 text-xs leading-5 text-muted">
+                  You're receiving this because you subscribed to product updates from{" "}
+                  {CONFIG.APP_NAME}. Want to change how often you hear from us?{" "}
+                  <Link
+                    href={CONFIG.UNSUBSCRIBE_URL}
+                    className="font-medium text-brand no-underline"
+                  >
+                    Unsubscribe
+                  </Link>
+                  .
+                </Text>
+              ) : (
+                <Text className="m-0 text-xs leading-5 text-muted">
+                  This is a transactional security email about your {CONFIG.APP_NAME} account. If
+                  you did not initiate this action, contact{" "}
+                  <Link
+                    href={`mailto:${CONFIG.SUPPORT_EMAIL}`}
+                    className="font-medium text-brand no-underline"
+                  >
+                    {CONFIG.SUPPORT_EMAIL}
+                  </Link>
+                  .
+                </Text>
+              )}
               <Text className="m-0 mt-5 text-xs leading-5 text-muted">
                 <Link href={CONFIG.APP_URL} className="text-muted underline">
                   Website
@@ -89,9 +109,15 @@ export default function BaseLayout({ children, preview }: BaseEmailLayoutProps) 
                   Legal notice
                 </Link>
               </Text>
-              <Text className="m-0 mt-3 text-[11px] leading-5 text-[#8b99aa]">
-                © {new Date().getFullYear()} {CONFIG.COMPANY_NAME} · Austria
-              </Text>
+              <Row className="flex mt-3 items-center">
+                <Text className="text-[11px] leading-5 text-gray-500">
+                  © {new Date().getFullYear()} {CONFIG.COMPANY_NAME}
+                  <br />
+                  {CONFIG.SUPPORT_EMAIL}
+                  <br />
+                  {CONFIG.COMPANY_ADDRESS}
+                </Text>
+              </Row>
             </Section>
           </Container>
         </Body>

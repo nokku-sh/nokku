@@ -6,12 +6,14 @@ export const CONFIG = {
   APP_NAME: "Nokku",
   APP_URL: "https://nokku.sh",
   DOCS_URL: "https://nokku.sh/docs",
+  CHANGELOG_URL: "https://nokku.sh/changelog",
   PRIVACY_URL: "https://nokku.sh/legal/privacy",
   TERMS_URL: "https://nokku.sh/legal/terms",
   IMPRINT_URL: "https://nokku.sh/legal/impressum",
   SUPPORT_EMAIL: "support@mizuchi.dev",
-  COMPANY_NAME: "MizuchiLabs",
+  COMPANY_NAME: "Mizuchi Labs",
   COMPANY_ADDRESS: "Musterstraße 1, 12345, Austria",
+  UNSUBSCRIBE_URL: "https://nokku.sh/unsubscribe",
 } as const;
 
 /**
