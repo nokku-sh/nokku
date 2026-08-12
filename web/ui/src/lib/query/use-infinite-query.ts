@@ -19,7 +19,13 @@ import type {
 	MessageShape
 } from '@bufbuild/protobuf';
 import type { ConnectError, Transport } from '@connectrpc/connect';
-import type { ConnectInfiniteQueryOptions, ConnectQueryKey } from '@connectrpc/connect-query-core';
+import type {
+	ConnectInfiniteQueryOptions,
+	ConnectQueryKey,
+	MessageInitWithPageParam,
+	MessagePageParamKey,
+	MessagePageParamValue
+} from '@connectrpc/connect-query-core';
 import { createInfiniteQueryOptions } from '@connectrpc/connect-query-core';
 import type {
 	InfiniteData,
@@ -37,14 +43,14 @@ import { useTransport } from './use-transport.js';
 export type UseInfiniteQueryOptions<
 	I extends DescMessage,
 	O extends DescMessage,
-	ParamKey extends keyof MessageInitShape<I>
+	ParamKey extends MessagePageParamKey<MessageInitShape<I>>
 > = Omit<
 	TanStackCreateInfiniteQueryOptions<
 		MessageShape<O>,
 		ConnectError,
 		InfiniteData<MessageShape<O>>,
 		ConnectQueryKey<O>,
-		MessageInitShape<I>[ParamKey]
+		MessagePageParamValue<MessageInitShape<I>, ParamKey>
 	>,
 	'getNextPageParam' | 'initialPageParam' | 'queryFn' | 'queryKey'
 > &
@@ -59,10 +65,10 @@ export type UseInfiniteQueryOptions<
 export function useInfiniteQuery<
 	I extends DescMessage,
 	O extends DescMessage,
-	ParamKey extends keyof MessageInitShape<I>
+	ParamKey extends MessagePageParamKey<MessageInitShape<I>>
 >(
 	schema: DescMethodUnary<I, O>,
-	input: SkipToken | (MessageInitShape<I> & Required<Pick<MessageInitShape<I>, ParamKey>>),
+	input: SkipToken | MessageInitWithPageParam<MessageInitShape<I>, ParamKey>,
 	{
 		transport,
 		pageParamKey,
