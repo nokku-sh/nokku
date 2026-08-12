@@ -1,3 +1,4 @@
 updateConfig:
   ignoreDependencies:
     - typescript
+    - '@tanstack/table-core'
