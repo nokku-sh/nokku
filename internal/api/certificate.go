@@ -122,6 +122,9 @@ func (s *CertificateService) GetCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.GetCertificateAuthorityRequest,
 ) (*nokkuv1.GetCertificateAuthorityResponse, error) {
+	if req.GetId() == "" && meta.DaemonIDFromContext(ctx) == "" {
+		return nil, ErrInvalidInput
+	}
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		if req.GetId() != "" {
@@ -277,7 +280,6 @@ func (s *CertificateService) RolloverCertificateAuthority(
 		return nil, DBError(err)
 	}
 
-	// Skip notification if no rollover
 	if result == nil {
 		return &nokkuv1.RolloverCertificateAuthorityResponse{}, nil
 	}
@@ -335,7 +337,6 @@ func (s *CertificateService) SignSSHCertificate(
 					return ErrInvalidInput // target_id is strictly required here
 				}
 
-				// Validate that this target actually exists
 				target, err := q.GetTarget(ctx, req.GetTargetId())
 				if err != nil {
 					return err
