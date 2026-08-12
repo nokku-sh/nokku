@@ -128,6 +128,11 @@ func (a *AuthNInterceptor) authenticateUser(
 		return nil, errors.New("invalid token type")
 	}
 
+	user, err := a.cfg.Conn.Q.GetUserByID(ctx, claims.UserID)
+	if err != nil || !user.IsActive {
+		return nil, errors.New("user not found or inactive")
+	}
+
 	actor := &meta.Actor{
 		ID:   claims.UserID,
 		Name: claims.Username,
