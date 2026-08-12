@@ -35,7 +35,7 @@
 		"@tailwindcss/typography": "^0.5.20",
 		"@tailwindcss/vite": "^4.3.3",
 		"@tanstack/svelte-query": "^6.1.38",
-		"@tanstack/table-core": "^9.1.2",
+		"@tanstack/table-core": "^8.21.3",
 		"@types/dagre": "^0.7.54",
 		"@types/node": "^26.2.0",
 		"@xyflow/svelte": "^1.6.2",
