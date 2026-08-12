@@ -64,6 +64,7 @@ func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 				continue
 			}
 
+			// +1 so reading exactly maxAvatarSize+1 bytes proves oversize.
 			limited := io.LimitReader(part, maxAvatarSize+1)
 			fileBytes, readErr := io.ReadAll(limited)
 			_ = part.Close()

@@ -52,6 +52,7 @@ func (e *Secretbox) Encrypt(plaintext []byte) ([]byte, error) {
 		return nil, errors.New("failed to generate nonce")
 	}
 
+	// Stack copy of the key, wiped on return so it doesn't linger in memory.
 	var key [32]byte
 	copy(key[:], e.key)
 	defer func() {

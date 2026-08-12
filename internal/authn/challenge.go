@@ -34,7 +34,6 @@ type Challenge struct {
 	Signature  []byte
 }
 
-// ParseChallenge parses a raw "Nokku" scheme challenge value.
 func ParseChallenge(challenge string) (*Challenge, error) {
 	sep := strings.LastIndex(challenge, ":")
 	if sep < 0 {

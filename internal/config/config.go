@@ -118,6 +118,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
+	// NOKKU_SECRET set → local secretbox encryption; otherwise KMS-backed.
 	if cfg.Secret != "" {
 		primary, err := crypto.NewSecretbox([]byte(cfg.Secret))
 		if err != nil {
@@ -166,6 +167,8 @@ func (c *Config) FullURL() string {
 		host = "localhost"
 	}
 
+	// Append the port only when it isn't already the scheme's default, so
+	// https://host:443 stays canonical.
 	if _, _, err := net.SplitHostPort(host); err != nil {
 		if port := c.Port; port != "" && port != defaultPort(scheme) {
 			host = net.JoinHostPort(host, port)

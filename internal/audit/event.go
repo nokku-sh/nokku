@@ -88,7 +88,6 @@ func (s *Service) query(
 	return s.conn.WithWorkspace(ctx, fn)
 }
 
-// List retrieves events with filtering and pagination.
 func (s *Service) List(
 	ctx context.Context,
 	opts QueryOptions,
@@ -170,7 +169,6 @@ func (s *Service) List(
 	return events, nil
 }
 
-// Count returns total events matching the filter.
 func (s *Service) Count(ctx context.Context, opts QueryOptions) (int32, error) {
 	var startDate, endDate *time.Time
 	if !opts.StartDate.IsZero() {

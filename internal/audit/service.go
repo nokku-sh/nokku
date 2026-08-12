@@ -61,12 +61,10 @@ func (s *Service) setupPartitions(ctx context.Context) error {
 		return nil
 	}
 
-	// current month
 	if err := s.createPartitionForMonth(ctx, tx, currentMonth); err != nil {
 		return err
 	}
 
-	// next month
 	nextMonth := currentMonth.AddDate(0, 1, 0)
 	if err := s.createPartitionForMonth(ctx, tx, nextMonth); err != nil {
 		return err

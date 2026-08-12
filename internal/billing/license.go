@@ -60,7 +60,6 @@ func NewLicense() (*Key, error) {
 	return validated, nil
 }
 
-// Valid reports whether the key currently grants access.
 func (k *Key) Valid() bool {
 	if k == nil || k.Plan == "" {
 		return false
