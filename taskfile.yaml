@@ -112,7 +112,15 @@ tasks:
   migrate:dump:
     desc: Dump the current schema from a migrated database (for squashing)
     cmds:
-      - pg_dump --schema-only --no-owner --no-privileges --no-comments --no-security-labels --no-publications --no-subscriptions --no-tablespaces -h 127.0.0.1 -p 5432 -U postgres -d nokku > new-001_base.sql
-      - echo "Dumped to new-001_base.sql. To squash, prepend the role creation block from the top of 001_base.sql, replace internal/db/migrations/001_base.sql with the dump, delete the old migrations, and boot once to stamp the version."
+      - |
+        pg_dump --schema-only --no-owner --no-privileges --no-comments \
+        --no-security-labels --no-publications --no-subscriptions \
+        --no-tablespaces -h 127.0.0.1 -p 5432 -U postgres \
+        -d nokku > new-001_base.sql
+      - |
+        echo "Dumped to new-001_base.sql. To squash, prepend the role creation \
+        block from the top of 001_base.sql, replace \
+        internal/db/migrations/001_base.sql with the dump, \
+        delete the old migrations, and boot once to stamp the version."
     env:
       PGPASSWORD: "{{ .NOKKU_DB_PASSWORD }}"
