@@ -119,6 +119,11 @@ func (s *DaemonService) DeleteDaemon(
 	ctx context.Context,
 	req *nokkuv1.DeleteDaemonRequest,
 ) (*nokkuv1.DeleteDaemonResponse, error) {
+	// A daemon can delete itself via the challenge-auth context; either way
+	// one identifier is required.
+	if req.GetId() == "" && meta.DaemonIDFromContext(ctx) == "" {
+		return nil, ErrInvalidInput
+	}
 	var result *db.Daemon
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		if req.GetId() != "" {
@@ -126,7 +131,7 @@ func (s *DaemonService) DeleteDaemon(
 			if err != nil {
 				return err
 			}
-		} else if meta.DaemonIDFromContext(ctx) != "" {
+		} else {
 			result, err = q.DeleteDaemon(ctx, meta.DaemonIDFromContext(ctx))
 			if err != nil {
 				return err
@@ -431,7 +436,6 @@ func (s *DaemonService) SyncDaemon(
 			return err
 		}
 
-		// Sync principals
 		if err := q.SyncPrincipals(ctx, &db.SyncPrincipalsParams{
 			TargetID:  target.ID,
 			Usernames: req.GetUsers(),
@@ -439,7 +443,6 @@ func (s *DaemonService) SyncDaemon(
 			return err
 		}
 
-		// Retrieve principals
 		result, err := q.ListPrincipalsForDaemon(ctx, &daemon.ID)
 		if err != nil {
 			return err
