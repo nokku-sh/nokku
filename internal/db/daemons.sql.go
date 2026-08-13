@@ -376,6 +376,24 @@ func (q *Queries) UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) (*D
 	return &i, err
 }
 
+const updateDaemonMetadata = `-- name: UpdateDaemonMetadata :exec
+UPDATE daemons
+SET
+  metadata = $1
+WHERE
+  id = $2
+`
+
+type UpdateDaemonMetadataParams struct {
+	Metadata []byte `json:"metadata"`
+	DaemonID string `json:"daemonId"`
+}
+
+func (q *Queries) UpdateDaemonMetadata(ctx context.Context, arg *UpdateDaemonMetadataParams) error {
+	_, err := q.db.Exec(ctx, updateDaemonMetadata, arg.Metadata, arg.DaemonID)
+	return err
+}
+
 const updateDaemonOnlineStatus = `-- name: UpdateDaemonOnlineStatus :exec
 UPDATE daemons
 SET

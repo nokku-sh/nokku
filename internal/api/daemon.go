@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -65,11 +64,9 @@ func (s *DaemonService) UpdateDaemon(
 		return nil, DBError(err)
 	}
 
-	s.cfg.Pool.Broadcast(result.WorkspaceID, &nokkuv1.Notification{
-		EventType: nokkuv1.Notification_EVENT_TYPE_STATUS.Enum(),
-		DaemonId:  &result.ID,
-		Status:    &result.Status,
-	})
+	// A status change (accept/reject) is a workspace state change: connected
+	// daemons re-sync and discover their own status from the sync response.
+	s.cfg.Pool.NotifyChange(result.WorkspaceID)
 
 	if req.GetStatus() == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
 		s.cfg.Pool.PublishWorkspaceEvent(
@@ -119,7 +116,7 @@ func (s *DaemonService) DeleteDaemon(
 	ctx context.Context,
 	req *nokkuv1.DeleteDaemonRequest,
 ) (*nokkuv1.DeleteDaemonResponse, error) {
-	// A daemon can delete itself via the challenge-auth context; either way
+	// A daemon can delete itself via the challenge-auth context. Either way
 	// one identifier is required.
 	if req.GetId() == "" && meta.DaemonIDFromContext(ctx) == "" {
 		return nil, ErrInvalidInput
@@ -142,12 +139,8 @@ func (s *DaemonService) DeleteDaemon(
 		return nil, DBError(err)
 	}
 
-	status := nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED
-	s.cfg.Pool.Broadcast(result.WorkspaceID, &nokkuv1.Notification{
-		EventType: nokkuv1.Notification_EVENT_TYPE_STATUS.Enum(),
-		DaemonId:  &result.ID,
-		Status:    &status,
-	})
+	// A deleted daemon discovers its removal on the next sync (not found).
+	s.cfg.Pool.NotifyChange(result.WorkspaceID)
 
 	s.cfg.Pool.PublishWorkspaceEvent(
 		result.WorkspaceID,
@@ -388,9 +381,11 @@ func (s *DaemonService) SyncDaemon(
 ) (*nokkuv1.SyncDaemonResponse, error) {
 	metadata := daemonMetadata(ctx)
 
+	var workspaceID string
 	var status *nokkuv1.DaemonStatus
 	var config *nokkuv1.DaemonConfig
 	var principals []*nokkuv1.PrincipalUsers
+	var caPublicKey string
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		daemon, err := q.GetDaemon(ctx, meta.DaemonIDFromContext(ctx))
 		if err != nil {
@@ -405,14 +400,21 @@ func (s *DaemonService) SyncDaemon(
 			return err
 		}
 
+		workspaceID = daemon.WorkspaceID
 		status = &daemon.Status
 		config = daemon.Config
 
+		// A non-accepted daemon learns its status from the response instead
+		// of an error: pending daemons keep retrying, rejected ones get
+		// told to stop.
 		if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
-			return errors.New("denied")
+			return nil
 		}
 
-		if _, err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
+		// Only the heartbeat metadata is touched: the combined update's
+		// COALESCE cannot protect status from a zero value, so a sync must
+		// never write it (an admin's accept/reject must not be clobbered).
+		if err := q.UpdateDaemonMetadata(ctx, &db.UpdateDaemonMetadataParams{
 			DaemonID: daemon.ID,
 			Metadata: metadata,
 		}); err != nil {
@@ -422,6 +424,13 @@ func (s *DaemonService) SyncDaemon(
 		target, err := q.GetTargetByDaemon(ctx, &daemon.ID)
 		if err != nil {
 			return err
+		}
+
+		// The signing CA goes into the response so the daemon can detect a
+		// rollover by comparing it against its cached copy. A daemon without
+		// a CA cannot renew host certs anyway. Leave the field empty then.
+		if ca, caErr := q.GetCAByDaemonID(ctx, &daemon.ID); caErr == nil {
+			caPublicKey = ca.PublicKey
 		}
 
 		targetMeta, err := json.Marshal(req.GetMetadata())
@@ -459,9 +468,14 @@ func (s *DaemonService) SyncDaemon(
 		return nil, DBError(err)
 	}
 
-	return &nokkuv1.SyncDaemonResponse{
-		Status:     status,
-		Config:     config,
-		Principals: principals,
-	}, nil
+	response := &nokkuv1.SyncDaemonResponse{
+		Status:       status,
+		Config:       config,
+		Principals:   principals,
+		StateVersion: new(s.cfg.Pool.Version(workspaceID)),
+	}
+	if caPublicKey != "" {
+		response.CaPublicKey = &caPublicKey
+	}
+	return response, nil
 }

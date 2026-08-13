@@ -26,9 +26,15 @@ const (
 type Conn struct {
 	daemonID    string
 	workspaceID string
-	send        chan *nokkuv1.ConnectResponse
-	ctx         context.Context
-	cancel      context.CancelFunc
+	// send carries session requests to the daemon. state carries version
+	// updates. It is capacity-1 and replace-on-full, so a burst of changes
+	// coalesces into one update per daemon. The two channels are separate so
+	// coalescing can never drop a session request.
+	send    chan *nokkuv1.ConnectResponse
+	state   chan *nokkuv1.ConnectResponse
+	stateMu sync.Mutex
+	ctx     context.Context
+	cancel  context.CancelFunc
 }
 
 // Session is the server-side handle for one live PTY session. It bridges
@@ -71,6 +77,11 @@ type Pool struct {
 	sessions map[string]*Session
 	pending  map[string]chan struct{}
 	events   map[string][]*eventSubscriber
+	// versions holds the current state version per workspace. It is
+	// in-memory only and resets on server restart. The Connect handler acks
+	// any version mismatch on heartbeat, so a restarted server (counter 0)
+	// makes every daemon re-sync once and no daemon can stay stale.
+	versions map[string]int64
 	conn     connection
 
 	shutdownCtx    context.Context
@@ -85,6 +96,7 @@ func New(ctx context.Context, conn connection) *Pool {
 		sessions:       make(map[string]*Session),
 		pending:        make(map[string]chan struct{}),
 		events:         make(map[string][]*eventSubscriber),
+		versions:       make(map[string]int64),
 		conn:           conn,
 		shutdownCtx:    shutdownCtx,
 		shutdownCancel: shutdownCancel,
@@ -121,6 +133,7 @@ func (p *Pool) RegisterDaemon(ctx context.Context, daemonID, workspaceID string)
 		daemonID:    daemonID,
 		workspaceID: workspaceID,
 		send:        make(chan *nokkuv1.ConnectResponse, sendBufferSize),
+		state:       make(chan *nokkuv1.ConnectResponse, 1),
 		ctx:         ctx,
 		cancel:      cancel,
 	}
@@ -187,7 +200,7 @@ func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 		}
 	}
 	// Tear down this daemon's sessions even if the StreamSession handler
-	// hasn't noticed the control stream drop yet; shutdown() is idempotent.
+	// hasn't noticed the control stream drop yet. shutdown() is idempotent.
 	var sessions []*Session
 	for _, s := range p.sessions {
 		if s.daemonID == daemonID {
@@ -219,34 +232,68 @@ func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 	c.cancel()
 }
 
-func (p *Pool) Broadcast(workspaceID string, n *nokkuv1.Notification) {
-	// Snapshot the daemon set under the read lock
+// Version returns the current state version of a workspace.
+func (p *Pool) Version(workspaceID string) int64 {
 	p.mu.RLock()
-	daemons := p.byWksp[workspaceID]
-	daemonIDs := make([]string, 0, len(daemons))
-	for daemonID := range daemons {
-		daemonIDs = append(daemonIDs, daemonID)
-	}
-	p.mu.RUnlock()
+	defer p.mu.RUnlock()
+	return p.versions[workspaceID]
+}
 
-	for _, daemonID := range daemonIDs {
-		p.sendToDaemon(daemonID, &nokkuv1.ConnectResponse{
-			Msg: &nokkuv1.ConnectResponse_Notification{Notification: n},
-		})
+// HeartbeatVersion resolves a daemon heartbeat's version against the
+// workspace counter. It reports the version to ack with and whether an ack
+// is due at all. A mismatch means the daemon is behind, or the counter was
+// reset by a server restart. Either way the daemon must re-sync so it
+// cannot stay stale.
+func (p *Pool) HeartbeatVersion(daemonID string, version int64) (int64, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	c, ok := p.byID[daemonID]
+	if !ok {
+		return 0, false
+	}
+	cur := p.versions[c.workspaceID]
+	return cur, cur != version
+}
+
+// NotifyChange bumps the workspace state version and pushes a coalesced
+// StateUpdate to every connected daemon. Each daemon re-syncs at most once
+// per burst: its state channel holds one update and replaces it when a newer
+// change lands before it is read.
+func (p *Pool) NotifyChange(workspaceID string) {
+	p.mu.Lock()
+	p.versions[workspaceID]++
+	version := p.versions[workspaceID]
+	daemons := make([]*Conn, 0, len(p.byWksp[workspaceID]))
+	for daemonID := range p.byWksp[workspaceID] {
+		if c := p.byID[daemonID]; c != nil {
+			daemons = append(daemons, c)
+		}
+	}
+	p.mu.Unlock()
+
+	msg := &nokkuv1.ConnectResponse{
+		Msg: &nokkuv1.ConnectResponse_StateUpdate{
+			StateUpdate: &nokkuv1.StateUpdate{StateVersion: &version},
+		},
+	}
+	for _, c := range daemons {
+		p.sendStateUpdate(c, msg)
 	}
 }
 
-func (p *Pool) sendToDaemon(daemonID string, msg *nokkuv1.ConnectResponse) {
-	p.mu.RLock()
-	c, ok := p.byID[daemonID]
-	p.mu.RUnlock()
-	if !ok {
-		return
-	}
+// sendStateUpdate delivers msg to c.state, replacing any older pending
+// update. It never blocks the caller.
+func (p *Pool) sendStateUpdate(c *Conn, msg *nokkuv1.ConnectResponse) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 	select {
-	case c.send <- msg:
+	case c.state <- msg:
 	default:
-		slog.Warn("daemon send buffer full", "daemon_id", daemonID)
+		select {
+		case <-c.state:
+		default:
+		}
+		c.state <- msg
 	}
 }
 
@@ -336,7 +383,7 @@ func (p *Pool) RegisterSession(sessionID, daemonID, username, userID string) *Se
 }
 
 // UnregisterSession removes a session from the pool map. The caller must call
-// s.shutdown() (done by the StreamSession handler defer); it is idempotent.
+// s.shutdown() (done by the StreamSession handler defer). It is idempotent.
 func (p *Pool) UnregisterSession(sessionID string) {
 	p.mu.Lock()
 	delete(p.sessions, sessionID)
@@ -494,7 +541,7 @@ func (s *Session) AppendStdout(data []byte) {
 }
 
 // SnapshotForAttach returns the replay buffer and a channel with only chunks
-// that arrived after this snapshot; older buffered-but-unsent chunks are
+// that arrived after this snapshot. Older buffered-but-unsent chunks are
 // consumed and discarded here. Callers send the replay first, then forward
 // from the returned channel.
 func (s *Session) SnapshotForAttach() (replay []byte, live <-chan []byte) {
@@ -540,7 +587,7 @@ func (s *Session) ReplayBuffer() []byte {
 			break
 		}
 		if b >= 0x20 && b != 0x7f {
-			// Printable character: accept the cut line from here; xterm
+			// Printable character. Accept the cut line from here. Xterm
 			// tolerates a partial leading line. Avoid trimming further so we
 			// don't drop real output.
 			if i > 0 {
@@ -548,8 +595,8 @@ func (s *Session) ReplayBuffer() []byte {
 			}
 			break
 		}
-		// Control/non-printable byte that isn't ESC: likely a trailing byte
-		// of a cut sequence; keep scanning.
+		// Control/non-printable byte that isn't ESC. Likely a trailing byte
+		// of a cut sequence, keep scanning.
 	}
 	return clean
 }
@@ -566,7 +613,7 @@ func (s *Session) trimReplayLocked() {
 			return
 		}
 	}
-	// No safe boundary found within the scan window; hard cut at excess.
+	// No safe boundary found within the scan window. Hard cut at excess.
 	s.replayBuf = append([]byte(nil), s.replayBuf[excess:]...)
 }
 

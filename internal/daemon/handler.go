@@ -39,7 +39,7 @@ func (p *Pool) Connect(
 	conn := p.RegisterDaemon(ctx, daemonID, daemon.WorkspaceID)
 	defer p.UnregisterDaemon(daemonID, conn)
 
-	// Outbound: drain the daemon's send channel to the stream
+	// Outbound: drain the daemon's session and state channels to the stream.
 	go func() {
 		for {
 			select {
@@ -52,17 +52,38 @@ func (p *Pool) Connect(
 				if err := stream.Send(msg); err != nil {
 					return
 				}
+			case msg, ok := <-conn.state:
+				if !ok {
+					return
+				}
+				if err := stream.Send(msg); err != nil {
+					return
+				}
 			}
 		}
 	}()
 
-	// Inbound: heartbeats/sync from the daemon
+	// Inbound: heartbeats carry the daemon's state version. Any mismatch
+	// with the workspace counter gets an ack so the daemon re-syncs: a
+	// daemon that is behind catches up, and after a server restart the
+	// counter starts over at 0, so every daemon re-syncs once and no change
+	// committed while it was disconnected can be missed.
 	recvErr := make(chan error, 1)
 	go func() {
 		for {
-			if _, err := stream.Receive(); err != nil {
+			req, err := stream.Receive()
+			if err != nil {
 				recvErr <- err
 				return
+			}
+			if hb, ok := req.GetMsg().(*nokkuv1.ConnectRequest_Heartbeat); ok {
+				if version, ack := p.HeartbeatVersion(daemonID, hb.Heartbeat.GetStateVersion()); ack {
+					p.sendStateUpdate(conn, &nokkuv1.ConnectResponse{
+						Msg: &nokkuv1.ConnectResponse_HeartbeatAck{
+							HeartbeatAck: &nokkuv1.HeartbeatAck{StateVersion: &version},
+						},
+					})
+				}
 			}
 		}
 	}()

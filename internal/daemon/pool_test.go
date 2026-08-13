@@ -11,7 +11,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-// stubConn satisfies the pool's connection interface without a database; it
+// stubConn satisfies the pool's connection interface without a database. It
 // skips the online-status updates so no SQL ever runs.
 type stubConn struct{}
 
@@ -171,9 +171,10 @@ func TestPool_EventSubscriberStorm(t *testing.T) {
 	}
 }
 
-// TestPool_BroadcastStorm broadcasts to a full workspace while daemons drop
-// off, forcing sendToDaemon to race UnregisterDaemon's map teardown.
-func TestPool_BroadcastStorm(t *testing.T) {
+// TestPool_NotifyChangeStorm pushes state updates to a full workspace while
+// daemons drop off, forcing sendStateUpdate to race UnregisterDaemon's map
+// teardown and the state channel's replace-on-full path.
+func TestPool_NotifyChangeStorm(t *testing.T) {
 	p := newTestPool(t)
 
 	const daemons = 32
@@ -186,7 +187,7 @@ func TestPool_BroadcastStorm(t *testing.T) {
 		id := fmt.Sprintf("d%02d", i)
 		wg.Go(func() {
 			for range 200 {
-				p.Broadcast("w1", &nokkuv1.Notification{DaemonId: &id})
+				p.NotifyChange("w1")
 			}
 			p.mu.RLock()
 			c := p.byID[id]
@@ -197,6 +198,140 @@ func TestPool_BroadcastStorm(t *testing.T) {
 		})
 	}
 	wg.Wait()
+
+	// Every change bumped the workspace version. The final version must
+	// reflect the whole storm (not lost updates on the counter).
+	if got := p.Version("w1"); got < daemons*200 {
+		t.Errorf("Version(w1) = %d, want >= %d", got, daemons*200)
+	}
+}
+
+// TestPool_NotifyChangeCoalesces verifies a burst of changes collapses into
+// at most one queued StateUpdate per daemon, carrying the newest version.
+func TestPool_NotifyChangeCoalesces(t *testing.T) {
+	p := newTestPool(t)
+	c := p.RegisterDaemon(context.Background(), "d1", "w1")
+	defer p.UnregisterDaemon("d1", c)
+
+	// Drain the first update. The rest must coalesce into a single queued
+	// message that no longer blocks NotifyChange.
+	select {
+	case <-c.state:
+	default:
+	}
+	for range 100 {
+		p.NotifyChange("w1")
+	}
+
+	var last int64
+	drained := 0
+	for {
+		select {
+		case msg := <-c.state:
+			drained++
+			last = msg.GetStateUpdate().GetStateVersion()
+		default:
+			if drained > 1 {
+				t.Errorf("coalescing left %d queued updates, want <= 1", drained)
+			}
+			if drained == 0 {
+				t.Fatal("no state update was delivered")
+			}
+			if last != p.Version("w1") {
+				t.Errorf("delivered version %d, want newest %d", last, p.Version("w1"))
+			}
+			return
+		}
+	}
+}
+
+// TestPool_NotifyChangeKeepsSessions verifies coalescing state updates never
+// drops a session request queued on the same connection.
+func TestPool_NotifyChangeKeepsSessions(t *testing.T) {
+	p := newTestPool(t)
+	c := p.RegisterDaemon(context.Background(), "d1", "w1")
+	defer p.UnregisterDaemon("d1", c)
+
+	sid := "s1"
+	sessionMsg := func() *nokkuv1.ConnectResponse {
+		return &nokkuv1.ConnectResponse{
+			Msg: &nokkuv1.ConnectResponse_Session{Session: &nokkuv1.Session{SessionId: &sid}},
+		}
+	}
+	if err := p.sendToDaemonWait("d1", sessionMsg(), time.Second); err != nil {
+		t.Fatalf("queue session request: %v", err)
+	}
+	// Drain the session request off the channel.
+	select {
+	case msg := <-c.send:
+		if msg.GetSession() == nil {
+			t.Fatal("session channel carried a non-session message")
+		}
+	default:
+		t.Fatal("session request was not queued")
+	}
+	for range 10 {
+		p.NotifyChange("w1")
+	}
+	// A fresh session request must still arrive despite the state backlog.
+	if err := p.sendToDaemonWait("d1", sessionMsg(), time.Second); err != nil {
+		t.Fatalf("queue session request after state storm: %v", err)
+	}
+	select {
+	case msg := <-c.send:
+		if msg.GetSession() == nil {
+			t.Fatal("state storm replaced a session request")
+		}
+	default:
+		t.Fatal("session request lost after state storm")
+	}
+}
+
+// TestPool_HeartbeatVersion verifies the ack decision. Quiet when up to
+// date, ack when behind. After a server restart resets the counter, every
+// daemon that synced before must re-sync once.
+func TestPool_HeartbeatVersion(t *testing.T) {
+	p := newTestPool(t)
+	p.RegisterDaemon(context.Background(), "d1", "w1")
+	defer p.UnregisterDaemon("d1", p.byID["d1"])
+
+	// Fresh workspace, fresh daemon: nothing to do.
+	if _, ack := p.HeartbeatVersion("d1", 0); ack {
+		t.Fatal("fresh daemon in a fresh workspace must not be acked")
+	}
+
+	// A change bumps the workspace: the daemon is behind and gets an ack
+	// with the current version.
+	p.NotifyChange("w1")
+	version, ack := p.HeartbeatVersion("d1", 0)
+	if !ack || version != 1 {
+		t.Fatalf("behind daemon: ack=%v version=%d, want ack=true version=1", ack, version)
+	}
+
+	// After the daemon synced (local version == counter), it stays quiet.
+	if _, ack := p.HeartbeatVersion("d1", 1); ack {
+		t.Fatal("up-to-date daemon must not be acked")
+	}
+
+	// Server restart: the counter starts over, so a daemon that synced
+	// before must re-sync even though it reports a higher version.
+	p.mu.Lock()
+	p.versions = make(map[string]int64)
+	p.mu.Unlock()
+	version, ack = p.HeartbeatVersion("d1", 1)
+	if !ack || version != 0 {
+		t.Fatalf("after restart: ack=%v version=%d, want ack=true version=0", ack, version)
+	}
+
+	// Once it re-synced to the reset counter, heartbeats are quiet again.
+	if _, ack := p.HeartbeatVersion("d1", 0); ack {
+		t.Fatal("re-synced daemon must not be acked")
+	}
+
+	// Unknown daemons never get acks.
+	if _, ack := p.HeartbeatVersion("ghost", 0); ack {
+		t.Fatal("unknown daemon must not be acked")
+	}
 }
 
 // TestPool_SessionStdoutStorm hammers AppendStdout against SnapshotForAttach
