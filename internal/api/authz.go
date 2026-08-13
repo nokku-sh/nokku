@@ -15,7 +15,7 @@ import (
 
 // ProcedurePermissions maps every workspace-scoped procedure to the single
 // permission it requires. This is the only place permission codes are
-// resolved from a procedure; handlers run their data access with plain
+// resolved from a procedure. Handlers run their data access with plain
 // WithWorkspace. Procedures that need a different rule (user-scoped, public,
 // token-scoped, owner-only, streaming, or handler-level logic) are not listed
 // here and keep their existing handler checks.

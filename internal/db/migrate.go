@@ -21,8 +21,8 @@ const (
 )
 
 // migrate brings the database schema up to date with the embedded tern
-// migrations. Migrations are versioned SQL files in internal/db/migrations;
-// a schema change is a new file, never an edit to an applied one.
+// migrations. Migrations are versioned SQL files in internal/db/migrations.
+// A schema change is a new file, never an edit to an applied one.
 //
 // Installations that predate versioned migrations (the schema exists but the
 // version table does not) are baselined automatically: the current schema is
@@ -30,7 +30,7 @@ const (
 // deployments zero-touch when upgrading to this release.
 //
 // A database can also be ahead of the migrations on disk when the migration
-// history was squashed into a new base (see the note in 001_base.sql); that
+// history was squashed into a new base (see the note in 001_base.sql). That
 // is stamped down to the newest available migration instead of failing.
 func (c *Connection) migrate(ctx context.Context) error {
 	conn, err := c.AdminPool.Acquire(ctx)
@@ -77,13 +77,13 @@ func (c *Connection) migrate(ctx context.Context) error {
 		return fmt.Errorf("loading migrations: %w", err)
 	}
 
-	// Squashed history: the database is ahead of the migrations on disk, so
+	// Squashed history. The database is ahead of the migrations on disk, so
 	// the old files were replaced by a new base. tern would refuse with
-	// BadVersionError; instead stamp down to the newest available migration,
+	// BadVersionError. Instead stamp down to the newest available migration,
 	// like `tern override-version`.
 	//
-	// NOTE: the version table is a single integer, so this cannot tell a
-	// deliberate squash from an accidentally deleted migration — both look
+	// NOTE. The version table is a single integer, so this cannot tell a
+	// deliberate squash from an accidentally deleted migration. Both look
 	// identical here. Verify the deletion was intentional before booting.
 	if current, err := m.GetCurrentVersion(ctx); err != nil {
 		return fmt.Errorf("reading migration version: %w", err)

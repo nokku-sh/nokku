@@ -21,7 +21,7 @@ import (
 const anonActorID = "00000000-0000-0000-0000-000000000000"
 
 // authProcedures are always audited, even when the request fails before
-// any actor is known; auth events are the core of a security audit trail.
+// any actor is known. Auth events are the core of a security audit trail.
 var authProcedures = map[string]struct{}{
 	nokkuv1connect.AuthServiceLoginProcedure:               {},
 	nokkuv1connect.AuthServiceLoginWithBackupCodeProcedure: {},

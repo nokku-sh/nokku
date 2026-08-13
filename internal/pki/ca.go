@@ -20,7 +20,7 @@ import (
 
 // NewCA generates a self-signed X.509 root certificate authority. Returns
 // ssh.CAInfo so X.509 and SSH authorities share storage and rotation code
-// paths; Certificate holds the PEM root cert (empty for SSH authorities).
+// paths. Certificate holds the PEM root cert (empty for SSH authorities).
 func NewCA(
 	keyType nokkuv1.CertificateKeyType,
 	keyBits int32,

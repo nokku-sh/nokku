@@ -118,7 +118,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	// NOKKU_SECRET set → local secretbox encryption; otherwise KMS-backed.
+	// NOKKU_SECRET set → local secretbox encryption, otherwise KMS-backed.
 	if cfg.Secret != "" {
 		primary, err := crypto.NewSecretbox([]byte(cfg.Secret))
 		if err != nil {

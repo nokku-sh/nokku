@@ -14,7 +14,7 @@ import (
 // container (compose.test.yml) is not running.
 
 // migrateTestDB creates a scratch database and returns a connection to it
-// plus its name; both are cleaned up when the test finishes.
+// plus its name. Both are cleaned up when the test finishes.
 func migrateTestDB(t *testing.T) (*pgx.Conn, string) {
 	t.Helper()
 

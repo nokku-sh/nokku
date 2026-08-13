@@ -117,8 +117,8 @@ func main() {
 						)
 					}
 
-					// Decrypt via the old cipher, re-encrypt via the new one, and
-					// swap the keyset — atomically, in one transaction.
+					// Decrypt with the old cipher, re-encrypt with the new one, and
+					// swap the keyset atomically in one transaction.
 					rotating, err := crypto.NewRotatingCipher(newCipher, oldCipher)
 					if err != nil {
 						return fmt.Errorf("failed to create rotating cipher: %w", err)

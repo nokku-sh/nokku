@@ -72,7 +72,7 @@ var allPermissions = []Permission{
 }
 
 // perm expands access levels for a resource into permission codes.
-// "edit" expands to {"view", "edit"}; every other level is kept literally.
+// "edit" expands to {"view", "edit"}. Every other level is kept literally.
 func perm(resource string, levels ...string) []Permission {
 	out := make([]Permission, 0, len(levels)+1)
 	for _, level := range levels {

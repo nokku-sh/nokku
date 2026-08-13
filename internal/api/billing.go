@@ -162,7 +162,7 @@ func (s *BillingService) requireWorkspaceOwner(ctx context.Context, workspaceID 
 }
 
 // planMetadata is the stable frontend capability contract. The legacy
-// credit_/max_ keys remain for older clients; new clients should use
+// credit_/max_ keys remain for older clients. New clients should use
 // plan, billing_mode, feature.<name>, and limit.<resource>.<field>.
 func planMetadata(p billing.Plan, mode billing.Mode) map[string]string {
 	out := make(map[string]string, len(p.Limits)*4+len(p.Features)+len(p.Values)+2)

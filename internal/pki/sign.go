@@ -20,7 +20,7 @@ import (
 // SignCertificate signs a PEM-encoded PKCS#10 CSR with an X.509 certificate
 // authority and returns the PEM-encoded leaf certificate and its expiry.
 // TTL bounds follow the authority's usage: client certs use user TTLs, server
-// certs host TTLs. SANs and subject come from the CSR; key usage derives from
+// certs host TTLs. SANs and subject come from the CSR. Key usage derives from
 // X509Usage and the leaf key type.
 func SignCertificate(
 	ca *db.CertificateAuthority,
@@ -111,8 +111,8 @@ func extKeyUsageFor(
 	}
 }
 
-// keyUsageFor returns the leaf key usage; RSA additionally gets key
-// encipherment for legacy TLS key transport.
+// keyUsageFor returns the leaf key usage. RSA also gets key encipherment
+// for legacy TLS key transport.
 func keyUsageFor(pub any) x509.KeyUsage {
 	usage := x509.KeyUsageDigitalSignature
 	if _, ok := pub.(*rsa.PublicKey); ok {

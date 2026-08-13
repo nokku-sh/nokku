@@ -21,7 +21,7 @@ const (
 
 // syncWebDevice reconciles the browser's remembered-device cookie against the
 // user's known devices after a successful web login. A matching cookie just
-// marks the device as used; a missing or unknown cookie registers a new
+// marks the device as used. A missing or unknown cookie registers a new
 // device, refreshes the cookie, and sends one security alert.
 func syncWebDevice(
 	ctx context.Context,

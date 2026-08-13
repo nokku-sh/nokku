@@ -16,7 +16,7 @@ func TestNewToken_NoOptions(t *testing.T) {
 		t.Errorf("ID = %q, want empty", tok.ID)
 	}
 
-	// The secret uses base64url, which may itself contain underscores; a
+	// The secret uses base64url, which may itself contain underscores. A
 	// bare token round-trips through Parse as a bare secret.
 	parsed, err := Parse(tok.Plaintext)
 	if err != nil {
@@ -51,7 +51,7 @@ func TestNewToken_WithPrefix(t *testing.T) {
 	if parsed.Prefix != PrefixDaemon {
 		t.Errorf("Prefix = %q, want %q", parsed.Prefix, PrefixDaemon)
 	}
-	// The secret is base64url and may contain underscores; Parse must
+	// The secret is base64url and may contain underscores. Parse must
 	// rejoin everything after the ID.
 	wantSecret := strings.Join(parts[2:], "_")
 	if parsed.ID != tok.ID || parsed.Secret != wantSecret {
@@ -88,7 +88,7 @@ func TestNewToken_WithID(t *testing.T) {
 }
 
 func TestNewToken_WithNonUUIDID_NotRecoverableByParse(t *testing.T) {
-	// Parse only recognizes UUIDs as IDs; a custom non-UUID ID is stored
+	// Parse only recognizes UUIDs as IDs. A custom non-UUID ID is stored
 	// in the plaintext but cannot be recovered (documented limitation).
 	tok, err := NewToken(WithID("custom-id"))
 	if err != nil {

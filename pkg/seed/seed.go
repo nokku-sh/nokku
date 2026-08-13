@@ -72,8 +72,7 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 		}
 	}
 
-	// Create workspace with a unique name. The workspace does not exist yet,
-	// so there is no tenant context to pin; it runs as a system transaction.
+	// Create workspace as a system transaction. No tenant context exists yet.
 	var workspace *db.CreateWorkspaceRow
 	if err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
 		workspace, err = q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
@@ -136,7 +135,7 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 			}
 		}
 
-		// Create teams; index-suffixed names avoid UNIQUE (workspace_id, name) violations
+		// Create teams. Suffixed names avoid UNIQUE (workspace_id, name) violations
 		teams := make([]*db.Team, cfg.NumTeams)
 		for i := range cfg.NumTeams {
 			team, err := q.CreateTeam(ctx, &db.CreateTeamParams{
@@ -164,7 +163,7 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 			}
 		}
 
-		// Create service accounts; index-suffixed names avoid UNIQUE (workspace_id, name) violations
+		// Create service accounts. Suffixed names avoid UNIQUE (workspace_id, name) violations
 		sa := make([]*db.ServiceAccount, cfg.NumServiceAccounts)
 		for i := range cfg.NumServiceAccounts {
 			token, err := crypto.NewServiceAccountToken()
@@ -185,7 +184,7 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 			sa[i] = s
 		}
 
-		// Create CAs; the first one is the workspace default
+		// Create CAs. The first is the workspace default
 		cas := make([]*db.CertificateAuthority, cfg.NumCAs)
 		for i := range cfg.NumCAs {
 			ca, err := ssh.NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0, 0)

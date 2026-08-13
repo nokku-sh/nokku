@@ -2,7 +2,7 @@
 //
 // A single local Tink keyset of DEKs does all encrypt/decrypt work. The
 // keyset is wrapped by a KEK that never leaves the KMS and stored wrapped in
-// the database; the KMS sees no plaintext secrets and the database holds only
+// the database. The KMS sees no plaintext secrets and the database holds only
 // ciphertext.
 //
 // KEK rotation is the KMS's job: it keeps old key versions decryptable, so

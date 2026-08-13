@@ -15,8 +15,8 @@ import (
 )
 
 // ChallengeMaxSkew is the maximum allowed age of a signed request challenge.
-// The identity signs with its current Unix timestamp; anything older (or from
-// the future) than this window is rejected.
+// The identity signs with its current Unix timestamp. Anything older or
+// from the future is rejected.
 const ChallengeMaxSkew = 5 * time.Minute
 
 // Challenge is a signed request challenge of the form

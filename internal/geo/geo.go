@@ -35,7 +35,7 @@ const (
 
 // Service resolves IP addresses to human-readable locations using a local
 // IP2Location BIN database. The database is downloaded from IP2Location once
-// and cached on disk; lookups never leave the server.
+// and cached on disk. Lookups never leave the server.
 type Service struct {
 	Token  string `env:"IP2LOCATION_TOKEN"`
 	DBPath string `env:"IP2LOCATION_DB_PATH" envDefault:"data/ip2location.bin"`

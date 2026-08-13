@@ -581,7 +581,7 @@ func (s *AuthService) VerifyCLILogin(
 
 // registerCLIDevice registers the CLI device's signing key from the login
 // session. When the CLI presents a device ID it already owns, the existing
-// row's credential is updated (no duplicate device); otherwise a new device
+// row's credential is updated (no duplicate device). Otherwise a new device
 // is registered. Returns whether the device is new.
 func (s *AuthService) registerCLIDevice(
 	ctx context.Context,

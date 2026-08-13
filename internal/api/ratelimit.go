@@ -128,7 +128,7 @@ func NewRateLimitInterceptor() connect.UnaryInterceptorFunc {
 	}
 }
 
-// isAPIRoute returns true for backend endpoints; static assets skip rate limiting.
+// isAPIRoute returns true for backend endpoints. Static assets skip rate limiting.
 func isAPIRoute(path string) bool {
 	// Streaming endpoints establish long-lived connections, rate limiting
 	// their initial HTTP request would block legitimate reconnect storms.
