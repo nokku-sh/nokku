@@ -2,383 +2,376 @@
 // @generated from file nokku/v1/util.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenEnum, GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
-import { enumDesc, fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
-import { file_buf_validate_validate } from '../../buf/validate/validate_pb';
-import { file_google_api_annotations } from '../../google/api/annotations_pb';
-import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import { file_google_protobuf_timestamp } from '@bufbuild/protobuf/wkt';
-import type { Message } from '@bufbuild/protobuf';
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
+import { file_google_api_annotations } from "../../google/api/annotations_pb";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file nokku/v1/util.proto.
  */
-export const file_nokku_v1_util: GenFile /*@__PURE__*/ = fileDesc(
-	'ChNub2trdS92MS91dGlsLnByb3RvEghub2trdS52MSITChFHZXRWZXJzaW9uUmVxdWVzdCIlChJHZXRWZXJzaW9uUmVzcG9uc2USDwoHdmVyc2lvbhgBIAEoCSKDAQoEUm9sZRIMCgRuYW1lGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEhMKC3Blcm1pc3Npb25zGAMgAygJEhsKE2Fzc2lnbmFibGVfdG9fdXNlcnMYBCABKAgSJgoeYXNzaWduYWJsZV90b19zZXJ2aWNlX2FjY291bnRzGAUgASgIIhIKEExpc3RSb2xlc1JlcXVlc3QiMgoRTGlzdFJvbGVzUmVzcG9uc2USHQoFcm9sZXMYASADKAsyDi5ub2trdS52MS5Sb2xlIs4BCghFdmVudExvZxIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSEAoIYWN0b3JfaWQYAyABKAkSEgoKYWN0b3JfdHlwZRgEIAEoCRIOCgZhY3Rpb24YBSABKAkSEgoKaXBfYWRkcmVzcxgGIAEoCRISCgp1c2VyX2FnZW50GAcgASgJEhMKC3N0YXR1c19jb2RlGAggASgJEi0KCXRpbWVzdGFtcBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAinwIKFExpc3RBdWRpdExvZ3NSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAiABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAyABKAVCB7pIBBoCKAASDgoGc2VhcmNoGAQgASgJEiAKCWFjdG9yX2lkcxgFIAMoCUINukgKkgEHIgVyA7ABARITCgthY3Rvcl90eXBlcxgGIAMoCRIPCgdhY3Rpb25zGAcgAygJEi4KCnN0YXJ0X2RhdGUYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZF9kYXRlGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJIChVMaXN0QXVkaXRMb2dzUmVzcG9uc2USIAoEbG9ncxgBIAMoCzISLm5va2t1LnYxLkV2ZW50TG9nEg0KBXRvdGFsGAIgASgFIpwCChZFeHBvcnRBdWRpdExvZ3NSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESQQoGZm9ybWF0GAIgASgOMicubm9ra3UudjEuRXhwb3J0QXVkaXRMb2dzUmVxdWVzdC5Gb3JtYXRCCLpIBYIBAhABEi4KCnN0YXJ0X2RhdGUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZF9kYXRlGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJBCgZGb3JtYXQSFgoSRk9STUFUX1VOU1BFQ0lGSUVEEAASDgoKRk9STUFUX0NTVhABEg8KC0ZPUk1BVF9KU09OEAIiTwoXRXhwb3J0QXVkaXRMb2dzUmVzcG9uc2USDAoEZGF0YRgBIAEoDBIQCghmaWxlbmFtZRgCIAEoCRIUCgxjb250ZW50X3R5cGUYAyABKAkypwMKC1V0aWxTZXJ2aWNlEl8KCkdldFZlcnNpb24SGy5ub2trdS52MS5HZXRWZXJzaW9uUmVxdWVzdBocLm5va2t1LnYxLkdldFZlcnNpb25SZXNwb25zZSIWkAIBgtPkkwINEgsvdjEvdmVyc2lvbhJaCglMaXN0Um9sZXMSGi5ub2trdS52MS5MaXN0Um9sZXNSZXF1ZXN0Ghsubm9ra3UudjEuTGlzdFJvbGVzUmVzcG9uc2UiFJACAYLT5JMCCxIJL3YxL3JvbGVzEmYKDUxpc3RBdWRpdExvZ3MSHi5ub2trdS52MS5MaXN0QXVkaXRMb2dzUmVxdWVzdBofLm5va2t1LnYxLkxpc3RBdWRpdExvZ3NSZXNwb25zZSIUkAIBgtPkkwILEgkvdjEvYXVkaXQScwoPRXhwb3J0QXVkaXRMb2dzEiAubm9ra3UudjEuRXhwb3J0QXVkaXRMb2dzUmVxdWVzdBohLm5va2t1LnYxLkV4cG9ydEF1ZGl0TG9nc1Jlc3BvbnNlIhuC0+STAhU6ASoiEC92MS9hdWRpdDpleHBvcnRCkwEKDGNvbS5ub2trdS52MUIJVXRpbFByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
-	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
-);
+export const file_nokku_v1_util: GenFile = /*@__PURE__*/
+  fileDesc("ChNub2trdS92MS91dGlsLnByb3RvEghub2trdS52MSITChFHZXRWZXJzaW9uUmVxdWVzdCIlChJHZXRWZXJzaW9uUmVzcG9uc2USDwoHdmVyc2lvbhgBIAEoCSKDAQoEUm9sZRIMCgRuYW1lGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEhMKC3Blcm1pc3Npb25zGAMgAygJEhsKE2Fzc2lnbmFibGVfdG9fdXNlcnMYBCABKAgSJgoeYXNzaWduYWJsZV90b19zZXJ2aWNlX2FjY291bnRzGAUgASgIIhIKEExpc3RSb2xlc1JlcXVlc3QiMgoRTGlzdFJvbGVzUmVzcG9uc2USHQoFcm9sZXMYASADKAsyDi5ub2trdS52MS5Sb2xlIs4BCghFdmVudExvZxIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSEAoIYWN0b3JfaWQYAyABKAkSEgoKYWN0b3JfdHlwZRgEIAEoCRIOCgZhY3Rpb24YBSABKAkSEgoKaXBfYWRkcmVzcxgGIAEoCRISCgp1c2VyX2FnZW50GAcgASgJEhMKC3N0YXR1c19jb2RlGAggASgJEi0KCXRpbWVzdGFtcBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAinwIKFExpc3RBdWRpdExvZ3NSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAiABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAyABKAVCB7pIBBoCKAASDgoGc2VhcmNoGAQgASgJEiAKCWFjdG9yX2lkcxgFIAMoCUINukgKkgEHIgVyA7ABARITCgthY3Rvcl90eXBlcxgGIAMoCRIPCgdhY3Rpb25zGAcgAygJEi4KCnN0YXJ0X2RhdGUYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZF9kYXRlGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJIChVMaXN0QXVkaXRMb2dzUmVzcG9uc2USIAoEbG9ncxgBIAMoCzISLm5va2t1LnYxLkV2ZW50TG9nEg0KBXRvdGFsGAIgASgFIpwCChZFeHBvcnRBdWRpdExvZ3NSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESQQoGZm9ybWF0GAIgASgOMicubm9ra3UudjEuRXhwb3J0QXVkaXRMb2dzUmVxdWVzdC5Gb3JtYXRCCLpIBYIBAhABEi4KCnN0YXJ0X2RhdGUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZF9kYXRlGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJBCgZGb3JtYXQSFgoSRk9STUFUX1VOU1BFQ0lGSUVEEAASDgoKRk9STUFUX0NTVhABEg8KC0ZPUk1BVF9KU09OEAIiTwoXRXhwb3J0QXVkaXRMb2dzUmVzcG9uc2USDAoEZGF0YRgBIAEoDBIQCghmaWxlbmFtZRgCIAEoCRIUCgxjb250ZW50X3R5cGUYAyABKAkypwMKC1V0aWxTZXJ2aWNlEl8KCkdldFZlcnNpb24SGy5ub2trdS52MS5HZXRWZXJzaW9uUmVxdWVzdBocLm5va2t1LnYxLkdldFZlcnNpb25SZXNwb25zZSIWkAIBgtPkkwINEgsvdjEvdmVyc2lvbhJaCglMaXN0Um9sZXMSGi5ub2trdS52MS5MaXN0Um9sZXNSZXF1ZXN0Ghsubm9ra3UudjEuTGlzdFJvbGVzUmVzcG9uc2UiFJACAYLT5JMCCxIJL3YxL3JvbGVzEmYKDUxpc3RBdWRpdExvZ3MSHi5ub2trdS52MS5MaXN0QXVkaXRMb2dzUmVxdWVzdBofLm5va2t1LnYxLkxpc3RBdWRpdExvZ3NSZXNwb25zZSIUkAIBgtPkkwILEgkvdjEvYXVkaXQScwoPRXhwb3J0QXVkaXRMb2dzEiAubm9ra3UudjEuRXhwb3J0QXVkaXRMb2dzUmVxdWVzdBohLm5va2t1LnYxLkV4cG9ydEF1ZGl0TG9nc1Jlc3BvbnNlIhuC0+STAhU6ASoiEC92MS9hdWRpdDpleHBvcnRCkwEKDGNvbS5ub2trdS52MUIJVXRpbFByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message nokku.v1.GetVersionRequest
  */
-export type GetVersionRequest = Message<'nokku.v1.GetVersionRequest'> & {};
+export type GetVersionRequest = Message<"nokku.v1.GetVersionRequest"> & {
+};
 
 /**
  * Describes the message nokku.v1.GetVersionRequest.
  * Use `create(GetVersionRequestSchema)` to create a new message.
  */
-export const GetVersionRequestSchema: GenMessage<GetVersionRequest> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_util,
-	0
-);
+export const GetVersionRequestSchema: GenMessage<GetVersionRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 0);
 
 /**
  * @generated from message nokku.v1.GetVersionResponse
  */
-export type GetVersionResponse = Message<'nokku.v1.GetVersionResponse'> & {
-	/**
-	 * @generated from field: string version = 1;
-	 */
-	version: string;
+export type GetVersionResponse = Message<"nokku.v1.GetVersionResponse"> & {
+  /**
+   * @generated from field: string version = 1;
+   */
+  version: string;
 };
 
 /**
  * Describes the message nokku.v1.GetVersionResponse.
  * Use `create(GetVersionResponseSchema)` to create a new message.
  */
-export const GetVersionResponseSchema: GenMessage<GetVersionResponse> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_util,
-	1
-);
+export const GetVersionResponseSchema: GenMessage<GetVersionResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 1);
 
 /**
  * @generated from message nokku.v1.Role
  */
-export type Role = Message<'nokku.v1.Role'> & {
-	/**
-	 * @generated from field: string name = 1;
-	 */
-	name: string;
+export type Role = Message<"nokku.v1.Role"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
 
-	/**
-	 * @generated from field: string description = 2;
-	 */
-	description: string;
+  /**
+   * @generated from field: string description = 2;
+   */
+  description: string;
 
-	/**
-	 * @generated from field: repeated string permissions = 3;
-	 */
-	permissions: string[];
+  /**
+   * @generated from field: repeated string permissions = 3;
+   */
+  permissions: string[];
 
-	/**
-	 * @generated from field: bool assignable_to_users = 4;
-	 */
-	assignableToUsers: boolean;
+  /**
+   * @generated from field: bool assignable_to_users = 4;
+   */
+  assignableToUsers: boolean;
 
-	/**
-	 * @generated from field: bool assignable_to_service_accounts = 5;
-	 */
-	assignableToServiceAccounts: boolean;
+  /**
+   * @generated from field: bool assignable_to_service_accounts = 5;
+   */
+  assignableToServiceAccounts: boolean;
 };
 
 /**
  * Describes the message nokku.v1.Role.
  * Use `create(RoleSchema)` to create a new message.
  */
-export const RoleSchema: GenMessage<Role> /*@__PURE__*/ = messageDesc(file_nokku_v1_util, 2);
+export const RoleSchema: GenMessage<Role> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 2);
 
 /**
  * @generated from message nokku.v1.ListRolesRequest
  */
-export type ListRolesRequest = Message<'nokku.v1.ListRolesRequest'> & {};
+export type ListRolesRequest = Message<"nokku.v1.ListRolesRequest"> & {
+};
 
 /**
  * Describes the message nokku.v1.ListRolesRequest.
  * Use `create(ListRolesRequestSchema)` to create a new message.
  */
-export const ListRolesRequestSchema: GenMessage<ListRolesRequest> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_util,
-	3
-);
+export const ListRolesRequestSchema: GenMessage<ListRolesRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 3);
 
 /**
  * @generated from message nokku.v1.ListRolesResponse
  */
-export type ListRolesResponse = Message<'nokku.v1.ListRolesResponse'> & {
-	/**
-	 * @generated from field: repeated nokku.v1.Role roles = 1;
-	 */
-	roles: Role[];
+export type ListRolesResponse = Message<"nokku.v1.ListRolesResponse"> & {
+  /**
+   * @generated from field: repeated nokku.v1.Role roles = 1;
+   */
+  roles: Role[];
 };
 
 /**
  * Describes the message nokku.v1.ListRolesResponse.
  * Use `create(ListRolesResponseSchema)` to create a new message.
  */
-export const ListRolesResponseSchema: GenMessage<ListRolesResponse> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_util,
-	4
-);
+export const ListRolesResponseSchema: GenMessage<ListRolesResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 4);
 
 /**
  * @generated from message nokku.v1.EventLog
  */
-export type EventLog = Message<'nokku.v1.EventLog'> & {
-	/**
-	 * @generated from field: string id = 1;
-	 */
-	id: string;
+export type EventLog = Message<"nokku.v1.EventLog"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
 
-	/**
-	 * @generated from field: string workspace_id = 2;
-	 */
-	workspaceId: string;
+  /**
+   * @generated from field: string workspace_id = 2;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: string actor_id = 3;
-	 */
-	actorId: string;
+  /**
+   * @generated from field: string actor_id = 3;
+   */
+  actorId: string;
 
-	/**
-	 * @generated from field: string actor_type = 4;
-	 */
-	actorType: string;
+  /**
+   * @generated from field: string actor_type = 4;
+   */
+  actorType: string;
 
-	/**
-	 * @generated from field: string action = 5;
-	 */
-	action: string;
+  /**
+   * @generated from field: string action = 5;
+   */
+  action: string;
 
-	/**
-	 * @generated from field: string ip_address = 6;
-	 */
-	ipAddress: string;
+  /**
+   * @generated from field: string ip_address = 6;
+   */
+  ipAddress: string;
 
-	/**
-	 * @generated from field: string user_agent = 7;
-	 */
-	userAgent: string;
+  /**
+   * @generated from field: string user_agent = 7;
+   */
+  userAgent: string;
 
-	/**
-	 * @generated from field: string status_code = 8;
-	 */
-	statusCode: string;
+  /**
+   * @generated from field: string status_code = 8;
+   */
+  statusCode: string;
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp timestamp = 9;
-	 */
-	timestamp?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp timestamp = 9;
+   */
+  timestamp?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.EventLog.
  * Use `create(EventLogSchema)` to create a new message.
  */
-export const EventLogSchema: GenMessage<EventLog> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_util,
-	5
-);
+export const EventLogSchema: GenMessage<EventLog> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 5);
 
 /**
  * @generated from message nokku.v1.ListAuditLogsRequest
  */
-export type ListAuditLogsRequest = Message<'nokku.v1.ListAuditLogsRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
+export type ListAuditLogsRequest = Message<"nokku.v1.ListAuditLogsRequest"> & {
+  /**
+   * @generated from field: string workspace_id = 1;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: int32 limit = 2;
-	 */
-	limit: number;
+  /**
+   * @generated from field: int32 limit = 2;
+   */
+  limit: number;
 
-	/**
-	 * @generated from field: int32 offset = 3;
-	 */
-	offset: number;
+  /**
+   * @generated from field: int32 offset = 3;
+   */
+  offset: number;
 
-	/**
-	 * Filters (optional)
-	 *
-	 * @generated from field: string search = 4;
-	 */
-	search: string;
+  /**
+   * Filters (optional)
+   *
+   * @generated from field: string search = 4;
+   */
+  search: string;
 
-	/**
-	 * @generated from field: repeated string actor_ids = 5;
-	 */
-	actorIds: string[];
+  /**
+   * @generated from field: repeated string actor_ids = 5;
+   */
+  actorIds: string[];
 
-	/**
-	 * @generated from field: repeated string actor_types = 6;
-	 */
-	actorTypes: string[];
+  /**
+   * @generated from field: repeated string actor_types = 6;
+   */
+  actorTypes: string[];
 
-	/**
-	 * @generated from field: repeated string actions = 7;
-	 */
-	actions: string[];
+  /**
+   * @generated from field: repeated string actions = 7;
+   */
+  actions: string[];
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp start_date = 8;
-	 */
-	startDate?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp start_date = 8;
+   */
+  startDate?: Timestamp | undefined;
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp end_date = 9;
-	 */
-	endDate?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp end_date = 9;
+   */
+  endDate?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.ListAuditLogsRequest.
  * Use `create(ListAuditLogsRequestSchema)` to create a new message.
  */
-export const ListAuditLogsRequestSchema: GenMessage<ListAuditLogsRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_util, 6);
+export const ListAuditLogsRequestSchema: GenMessage<ListAuditLogsRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 6);
 
 /**
  * @generated from message nokku.v1.ListAuditLogsResponse
  */
-export type ListAuditLogsResponse = Message<'nokku.v1.ListAuditLogsResponse'> & {
-	/**
-	 * @generated from field: repeated nokku.v1.EventLog logs = 1;
-	 */
-	logs: EventLog[];
+export type ListAuditLogsResponse = Message<"nokku.v1.ListAuditLogsResponse"> & {
+  /**
+   * @generated from field: repeated nokku.v1.EventLog logs = 1;
+   */
+  logs: EventLog[];
 
-	/**
-	 * @generated from field: int32 total = 2;
-	 */
-	total: number;
+  /**
+   * @generated from field: int32 total = 2;
+   */
+  total: number;
 };
 
 /**
  * Describes the message nokku.v1.ListAuditLogsResponse.
  * Use `create(ListAuditLogsResponseSchema)` to create a new message.
  */
-export const ListAuditLogsResponseSchema: GenMessage<ListAuditLogsResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_util, 7);
+export const ListAuditLogsResponseSchema: GenMessage<ListAuditLogsResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 7);
 
 /**
  * @generated from message nokku.v1.ExportAuditLogsRequest
  */
-export type ExportAuditLogsRequest = Message<'nokku.v1.ExportAuditLogsRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
+export type ExportAuditLogsRequest = Message<"nokku.v1.ExportAuditLogsRequest"> & {
+  /**
+   * @generated from field: string workspace_id = 1;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: nokku.v1.ExportAuditLogsRequest.Format format = 2;
-	 */
-	format: ExportAuditLogsRequest_Format;
+  /**
+   * @generated from field: nokku.v1.ExportAuditLogsRequest.Format format = 2;
+   */
+  format: ExportAuditLogsRequest_Format;
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp start_date = 3;
-	 */
-	startDate?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp start_date = 3;
+   */
+  startDate?: Timestamp | undefined;
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp end_date = 4;
-	 */
-	endDate?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp end_date = 4;
+   */
+  endDate?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.ExportAuditLogsRequest.
  * Use `create(ExportAuditLogsRequestSchema)` to create a new message.
  */
-export const ExportAuditLogsRequestSchema: GenMessage<ExportAuditLogsRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_util, 8);
+export const ExportAuditLogsRequestSchema: GenMessage<ExportAuditLogsRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 8);
 
 /**
  * @generated from enum nokku.v1.ExportAuditLogsRequest.Format
  */
 export enum ExportAuditLogsRequest_Format {
-	/**
-	 * @generated from enum value: FORMAT_UNSPECIFIED = 0;
-	 */
-	UNSPECIFIED = 0,
+  /**
+   * @generated from enum value: FORMAT_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
 
-	/**
-	 * @generated from enum value: FORMAT_CSV = 1;
-	 */
-	CSV = 1,
+  /**
+   * @generated from enum value: FORMAT_CSV = 1;
+   */
+  CSV = 1,
 
-	/**
-	 * @generated from enum value: FORMAT_JSON = 2;
-	 */
-	JSON = 2
+  /**
+   * @generated from enum value: FORMAT_JSON = 2;
+   */
+  JSON = 2,
 }
 
 /**
  * Describes the enum nokku.v1.ExportAuditLogsRequest.Format.
  */
-export const ExportAuditLogsRequest_FormatSchema: GenEnum<ExportAuditLogsRequest_Format> /*@__PURE__*/ =
-	enumDesc(file_nokku_v1_util, 8, 0);
+export const ExportAuditLogsRequest_FormatSchema: GenEnum<ExportAuditLogsRequest_Format> = /*@__PURE__*/
+  enumDesc(file_nokku_v1_util, 8, 0);
 
 /**
  * @generated from message nokku.v1.ExportAuditLogsResponse
  */
-export type ExportAuditLogsResponse = Message<'nokku.v1.ExportAuditLogsResponse'> & {
-	/**
-	 * @generated from field: bytes data = 1;
-	 */
-	data: Uint8Array;
+export type ExportAuditLogsResponse = Message<"nokku.v1.ExportAuditLogsResponse"> & {
+  /**
+   * @generated from field: bytes data = 1;
+   */
+  data: Uint8Array;
 
-	/**
-	 * @generated from field: string filename = 2;
-	 */
-	filename: string;
+  /**
+   * @generated from field: string filename = 2;
+   */
+  filename: string;
 
-	/**
-	 * @generated from field: string content_type = 3;
-	 */
-	contentType: string;
+  /**
+   * @generated from field: string content_type = 3;
+   */
+  contentType: string;
 };
 
 /**
  * Describes the message nokku.v1.ExportAuditLogsResponse.
  * Use `create(ExportAuditLogsResponseSchema)` to create a new message.
  */
-export const ExportAuditLogsResponseSchema: GenMessage<ExportAuditLogsResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_util, 9);
+export const ExportAuditLogsResponseSchema: GenMessage<ExportAuditLogsResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 9);
 
 /**
  * @generated from service nokku.v1.UtilService
  */
 export const UtilService: GenService<{
-	/**
-	 * @generated from rpc nokku.v1.UtilService.GetVersion
-	 */
-	getVersion: {
-		methodKind: 'unary';
-		input: typeof GetVersionRequestSchema;
-		output: typeof GetVersionResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.UtilService.ListRoles
-	 */
-	listRoles: {
-		methodKind: 'unary';
-		input: typeof ListRolesRequestSchema;
-		output: typeof ListRolesResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.UtilService.ListAuditLogs
-	 */
-	listAuditLogs: {
-		methodKind: 'unary';
-		input: typeof ListAuditLogsRequestSchema;
-		output: typeof ListAuditLogsResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.UtilService.ExportAuditLogs
-	 */
-	exportAuditLogs: {
-		methodKind: 'unary';
-		input: typeof ExportAuditLogsRequestSchema;
-		output: typeof ExportAuditLogsResponseSchema;
-	};
-}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_util, 0);
+  /**
+   * @generated from rpc nokku.v1.UtilService.GetVersion
+   */
+  getVersion: {
+    methodKind: "unary";
+    input: typeof GetVersionRequestSchema;
+    output: typeof GetVersionResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.UtilService.ListRoles
+   */
+  listRoles: {
+    methodKind: "unary";
+    input: typeof ListRolesRequestSchema;
+    output: typeof ListRolesResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.UtilService.ListAuditLogs
+   */
+  listAuditLogs: {
+    methodKind: "unary";
+    input: typeof ListAuditLogsRequestSchema;
+    output: typeof ListAuditLogsResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.UtilService.ExportAuditLogs
+   */
+  exportAuditLogs: {
+    methodKind: "unary";
+    input: typeof ExportAuditLogsRequestSchema;
+    output: typeof ExportAuditLogsResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_nokku_v1_util, 0);
+
