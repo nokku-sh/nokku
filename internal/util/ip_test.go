@@ -185,7 +185,7 @@ func TestGetRemoteIP_HeaderIPCanonicalization(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Build via Set so the key is canonicalized (Header.Get
-			// canonicalizes lookups; literal map keys would be missed).
+			// canonicalizes lookups, literal map keys would be missed).
 			h := http.Header{}
 			h.Set("X-Real-IP", tt.header)
 			if got := GetRemoteIP(h, "10.1.2.3:80"); got != tt.want {

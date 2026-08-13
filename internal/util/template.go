@@ -67,8 +67,8 @@ func ValidateCriticalOptions(m map[string]string) ([]byte, error) {
 		if _, ok := allowedCriticalOptions[CriticalOption(k)]; !ok {
 			return nil, fmt.Errorf("invalid ssh critical option: %q", k)
 		}
-		// force-command, source-address and verify-required carry values;
-		// only keys are validated here, values are checked at cert creation time.
+		// force-command, source-address and verify-required carry values.
+		// Only keys are validated here, values are checked at cert creation time.
 		if v != "" && k != string(COForceCommand) && k != string(COSourceAddress) &&
 			k != string(COVerifyRequired) {
 			return nil, fmt.Errorf("extension critical option %q must have empty value", k)

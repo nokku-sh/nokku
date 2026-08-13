@@ -10,7 +10,7 @@ import (
 func NewTimeoutInterceptor() connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			// Skip streams; they outlive any reasonable unary timeout.
+			// Skip streams. They outlive any reasonable unary timeout.
 			if req.Spec().StreamType != connect.StreamTypeUnary {
 				return next(ctx, req)
 			}

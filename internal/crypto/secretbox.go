@@ -19,8 +19,8 @@ type Secretbox struct {
 	key []byte
 }
 
-// NewSecretbox builds a Secretbox cipher. A 32-byte secret is used directly;
-// any other length is derived to 32 bytes via HKDF-SHA256 with a fixed salt,
+// NewSecretbox builds a Secretbox cipher. A 32-byte secret is used directly.
+// Any other length is derived to 32 bytes via HKDF-SHA256 with a fixed salt,
 // so passphrases and shorter/longer secrets work unchanged.
 func NewSecretbox(secret []byte) (*Secretbox, error) {
 	if len(secret) == 0 {

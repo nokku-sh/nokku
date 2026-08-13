@@ -29,8 +29,8 @@ func NewVerifier(b64 string) (*Verifier, error) {
 	return &Verifier{pub: ed25519.PublicKey(raw)}, nil
 }
 
-// Verify parses and validates a license key. A valid but expired key returns
-// (*Key, ErrExpired); anything else that fails returns (nil, error).
+// Verify parses and validates a license key. An expired key returns
+// (*Key, ErrExpired). Anything else that fails returns (nil, error).
 func (v *Verifier) Verify(key string) (*Key, error) {
 	payload, sig, err := decodeKey(key)
 	if err != nil {

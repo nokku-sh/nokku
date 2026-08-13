@@ -122,8 +122,8 @@ func linkUserIDFromRequest(cfg *config.Config, r *http.Request) string {
 }
 
 // authRedirect redirects back to the app after a login callback. 302, not
-// 307: callbacks arrive as POSTs, and the SPA has no form action on the
-// root — a preserved POST would land on a 405 and silently drop the result.
+// 307. Callbacks arrive as POSTs and the SPA has no form action on the
+// root. A preserved POST would land on a 405 and silently drop the result.
 func authRedirect(w http.ResponseWriter, r *http.Request, base string) {
 	http.Redirect(w, r, base, http.StatusFound)
 }

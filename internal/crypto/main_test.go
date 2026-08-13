@@ -6,7 +6,7 @@ import (
 )
 
 // TestMain initializes fast (SHA256) hashers so token/password helpers work
-// without the slow argon2 defaults; individual tests override as needed.
+// without the slow argon2 defaults. Individual tests override as needed.
 func TestMain(m *testing.M) {
 	tokenHasher, err := NewHasher(SHA256)
 	if err != nil {

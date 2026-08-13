@@ -10,8 +10,8 @@ import (
 // Secret Rotation -----------------------------------------------------------
 
 // RotateSecrets re-encrypts every secret through the active encryptor (a
-// crypto.RotatingCipher: reads fall back to the old cipher, writes use the
-// new one) and then runs finalize — all in a single transaction, so a crash
+// crypto.RotatingCipher, reads fall back to the old cipher and writes use the
+// new one) and then runs finalize. All in a single transaction, so a crash
 // or failure anywhere leaves the database untouched and the rotate-secrets
 // command can simply be re-run.
 func RotateSecrets(

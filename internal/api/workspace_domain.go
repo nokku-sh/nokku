@@ -108,7 +108,7 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 	dnsQuery := fmt.Sprintf("_nokku-verify.%s", domain.Domain)
 	txtRecords, err := util.LookupTXTDOH(ctx, dnsQuery, "https://cloudflare-dns.com/dns-query")
 	if err != nil {
-		// Fall back to the OS resolver; DoH may be unreachable (offline, blocked).
+		// Fall back to the OS resolver. DoH may be unreachable (offline, blocked).
 		txtRecords, err = net.DefaultResolver.LookupTXT(ctx, dnsQuery)
 	}
 	if err != nil || len(txtRecords) == 0 {

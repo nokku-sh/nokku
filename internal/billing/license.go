@@ -2,7 +2,7 @@ package billing
 
 // A license is an Ed25519-signed payload (plan, email, expiry) encoded as a
 // human-friendly NOKKU-XXXX-... string. The vendor signs with a private key
-// kept in its own environment; instances verify offline against a public key
+// kept in its own environment. Instances verify offline against a public key
 // compiled into the binary, so activation works air-gapped.
 
 import (
@@ -17,7 +17,7 @@ import (
 
 const (
 	prefix  = "NOKKU-" // lets the verifier reject non-keys without decoding.
-	version = byte(1)  // key format version; bump when the payload encoding changes.
+	version = byte(1)  // key format version. Bump when the payload encoding changes.
 )
 
 var (

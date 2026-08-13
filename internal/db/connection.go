@@ -230,7 +230,7 @@ func (c *Connection) WithWorkspace(
 	}()
 
 	// Membership and role resolution must see every workspace, so it runs
-	// as nokku_system; the transaction switches down to nokku_app before
+	// as nokku_system. The transaction switches down to nokku_app before
 	// any caller query runs. GUCs are transaction-local and survive the
 	// role switch.
 	if _, err := tx.Exec(ctx, "SET LOCAL ROLE nokku_system"); err != nil {

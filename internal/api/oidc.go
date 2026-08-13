@@ -40,7 +40,7 @@ func NewOIDCHandler(cfg *config.Config) *OIDCHandler {
 
 // oidcProviderCacheTTL bounds how long discovered endpoints stay cached. The
 // workspace configuration (issuer, client, claims) is always read fresh from
-// the database; only the discovery document — the one network round trip — is
+// the database. Only the discovery document (the one network round trip) is
 // cached, so deactivating a provider takes effect immediately.
 const oidcProviderCacheTTL = 10 * time.Minute
 
@@ -164,7 +164,7 @@ func (o *OIDCHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // getOIDCProvider resolves an OIDC provider. The workspace configuration is
-// read fresh from the database on every call; the discovered endpoints are
+// read fresh from the database on every call. The discovered endpoints are
 // served from the shared cache for oidcProviderCacheTTL.
 func (o *OIDCHandler) getOIDCProvider(
 	ctx context.Context,
@@ -335,7 +335,7 @@ func extractOIDCClaims(idToken *oidc.IDToken, oidcConfig *db.OidcProvider) (*db.
 		return false
 	}
 
-	// Defaults are Google claims; custom OIDC configs override them.
+	// Defaults are Google claims. Custom OIDC configs override them.
 	emailClaim, nameClaim, usernameClaim, pictureClaim := "email", "name", "preferred_username", "picture"
 	if oidcConfig != nil {
 		emailClaim = oidcConfig.EmailClaim

@@ -89,7 +89,7 @@ type Plan struct {
 }
 
 // catalog defines plans in code so enforcement limits never drift. Soft
-// quotas must match the Stripe price tiers; hard quotas are enforced locally.
+// quotas must match the Stripe price tiers. Hard quotas are enforced locally.
 var catalog = map[string]Plan{
 	PlanCommunity: {
 		Features: map[string]bool{
@@ -159,7 +159,7 @@ func (e *QuotaError) Error() string {
 	return fmt.Sprintf("%s limit (%d) reached for your current plan", e.Resource, e.Limit)
 }
 
-// licenseState reports whether the instance is licensed (on-premise); when
+// licenseState reports whether the instance is licensed (on-premise). When
 // active, every workspace resolves to Enterprise.
 type licenseState interface {
 	Valid() bool

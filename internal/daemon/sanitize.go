@@ -1,8 +1,8 @@
 package daemon
 
 // SanitizeReplay strips terminal query/request sequences (DSR, DA, OSC queries,
-// DCS requests, window-title/color queries, sixel queries) from raw PTY output;
-// replaying them into a fresh terminal would make it emit reply bytes back
+// DCS requests, window-title/color queries, sixel queries) from raw PTY output.
+// Replaying them into a fresh terminal would make it emit reply bytes back
 // into the PTY. Regular escape sequences (colors, cursor moves, erase) are
 // preserved.
 func SanitizeReplay(data []byte) []byte {
@@ -124,5 +124,5 @@ func skipDCSRequest(p []byte) int {
 		}
 		i++
 	}
-	return i // unterminated at tail; strip it
+	return i // unterminated at tail, strip it
 }

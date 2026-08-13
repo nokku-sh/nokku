@@ -20,7 +20,7 @@ type TokenParams struct {
 	Email       string `json:"email"`
 	Username    string `json:"username"`
 	TokenType   string `json:"token_type"`
-	Jti         string `json:"jti"` // populated on verify; ignored on create
+	Jti         string `json:"jti"` // populated on verify, ignored on create
 }
 
 type Service struct {
