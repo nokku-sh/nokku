@@ -134,12 +134,12 @@ func (x *User) GetEnableEmailRecovery() bool {
 
 type OAuthIdentity struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
-	Provider         *string                `protobuf:"bytes,1,opt,name=provider" json:"provider,omitempty"`
-	ProviderEmail    *string                `protobuf:"bytes,2,opt,name=provider_email,json=providerEmail" json:"provider_email,omitempty"`
-	ProviderUsername *string                `protobuf:"bytes,3,opt,name=provider_username,json=providerUsername" json:"provider_username,omitempty"`
-	CreatedAt        *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	ProviderId       *string                `protobuf:"bytes,5,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
-	Protocol         *string                `protobuf:"bytes,6,opt,name=protocol" json:"protocol,omitempty"` // 'oauth' | 'oidc' | 'saml'
+	ProviderId       *string                `protobuf:"bytes,1,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
+	Provider         *string                `protobuf:"bytes,2,opt,name=provider" json:"provider,omitempty"`
+	ProviderEmail    *string                `protobuf:"bytes,3,opt,name=provider_email,json=providerEmail" json:"provider_email,omitempty"`
+	ProviderUsername *string                `protobuf:"bytes,4,opt,name=provider_username,json=providerUsername" json:"provider_username,omitempty"`
+	Protocol         *string                `protobuf:"bytes,5,opt,name=protocol" json:"protocol,omitempty"` // 'oauth' | 'oidc' | 'saml'
+	CreatedAt        *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -174,6 +174,13 @@ func (*OAuthIdentity) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_user_proto_rawDescGZIP(), []int{1}
 }
 
+func (x *OAuthIdentity) GetProviderId() string {
+	if x != nil && x.ProviderId != nil {
+		return *x.ProviderId
+	}
+	return ""
+}
+
 func (x *OAuthIdentity) GetProvider() string {
 	if x != nil && x.Provider != nil {
 		return *x.Provider
@@ -195,25 +202,18 @@ func (x *OAuthIdentity) GetProviderUsername() string {
 	return ""
 }
 
-func (x *OAuthIdentity) GetCreatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.CreatedAt
-	}
-	return nil
-}
-
-func (x *OAuthIdentity) GetProviderId() string {
-	if x != nil && x.ProviderId != nil {
-		return *x.ProviderId
-	}
-	return ""
-}
-
 func (x *OAuthIdentity) GetProtocol() string {
 	if x != nil && x.Protocol != nil {
 		return *x.Protocol
 	}
 	return ""
+}
+
+func (x *OAuthIdentity) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
 }
 
 type UserDevice struct {
@@ -991,15 +991,15 @@ const file_nokku_v1_user_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x122\n" +
 	"\x15enable_email_recovery\x18\t \x01(\bR\x13enableEmailRecovery\"\xf7\x01\n" +
-	"\rOAuthIdentity\x12\x1a\n" +
-	"\bprovider\x18\x01 \x01(\tR\bprovider\x12%\n" +
-	"\x0eprovider_email\x18\x02 \x01(\tR\rproviderEmail\x12+\n" +
-	"\x11provider_username\x18\x03 \x01(\tR\x10providerUsername\x129\n" +
-	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1f\n" +
-	"\vprovider_id\x18\x05 \x01(\tR\n" +
+	"\rOAuthIdentity\x12\x1f\n" +
+	"\vprovider_id\x18\x01 \x01(\tR\n" +
 	"providerId\x12\x1a\n" +
-	"\bprotocol\x18\x06 \x01(\tR\bprotocol\"\xf8\x01\n" +
+	"\bprovider\x18\x02 \x01(\tR\bprovider\x12%\n" +
+	"\x0eprovider_email\x18\x03 \x01(\tR\rproviderEmail\x12+\n" +
+	"\x11provider_username\x18\x04 \x01(\tR\x10providerUsername\x12\x1a\n" +
+	"\bprotocol\x18\x05 \x01(\tR\bprotocol\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xf8\x01\n" +
 	"\n" +
 	"UserDevice\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
