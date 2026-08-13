@@ -79,6 +79,13 @@ WHERE
 RETURNING
   *;
 
+-- name: UpdateDaemonMetadata :exec
+UPDATE daemons
+SET
+  metadata = @metadata
+WHERE
+  id = @daemon_id;
+
 -- name: UpdateDaemonOnlineStatus :exec
 UPDATE daemons
 SET

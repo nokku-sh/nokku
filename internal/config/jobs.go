@@ -90,7 +90,7 @@ func (c *Config) rotateCerts(ctx context.Context) {
 			return err
 		}
 
-		// Older CAs have no stored lifetime; fall back to the certificate's
+		// Older CAs have no stored lifetime. Fall back to the certificate's
 		// own validity span.
 		lifetime := ca.Lifetime
 		if lifetime <= 0 {
@@ -121,9 +121,7 @@ func (c *Config) rotateCerts(ctx context.Context) {
 		})
 
 		if err == nil {
-			c.Pool.Broadcast(ca.WorkspaceID, &nokkuv1.Notification{
-				EventType: nokkuv1.Notification_EVENT_TYPE_CERTIFICATES.Enum(),
-			})
+			c.Pool.NotifyChange(ca.WorkspaceID)
 		}
 
 		return err

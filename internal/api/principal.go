@@ -116,9 +116,7 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 		return nil, DBError(err)
 	}
 
-	s.cfg.Pool.Broadcast(workspaceID, &nokkuv1.Notification{
-		EventType: nokkuv1.Notification_EVENT_TYPE_PRINCIPALS.Enum(),
-	})
+	s.cfg.Pool.NotifyChange(workspaceID)
 	return &nokkuv1.AddSubjectsToPrincipalResponse{}, nil
 }
 
@@ -175,9 +173,7 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 		return nil, DBError(err)
 	}
 
-	s.cfg.Pool.Broadcast(workspaceID, &nokkuv1.Notification{
-		EventType: nokkuv1.Notification_EVENT_TYPE_PRINCIPALS.Enum(),
-	})
+	s.cfg.Pool.NotifyChange(workspaceID)
 	return &nokkuv1.RemoveSubjectsFromPrincipalResponse{}, nil
 }
 
@@ -221,8 +217,6 @@ func (s *PrincipalService) RevokeAllAccess(
 		return nil, DBError(err)
 	}
 
-	s.cfg.Pool.Broadcast(req.GetWorkspaceId(), &nokkuv1.Notification{
-		EventType: nokkuv1.Notification_EVENT_TYPE_PRINCIPALS.Enum(),
-	})
+	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
 	return &nokkuv1.RevokeAllAccessResponse{}, nil
 }

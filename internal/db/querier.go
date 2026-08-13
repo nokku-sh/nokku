@@ -171,6 +171,7 @@ type Querier interface {
 	UpdateCA(ctx context.Context, arg *UpdateCAParams) (*CertificateAuthority, error)
 	UpdateCAPrivateKey(ctx context.Context, arg *UpdateCAPrivateKeyParams) error
 	UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) (*Daemon, error)
+	UpdateDaemonMetadata(ctx context.Context, arg *UpdateDaemonMetadataParams) error
 	UpdateDaemonOnlineStatus(ctx context.Context, arg *UpdateDaemonOnlineStatusParams) error
 	UpdateDaemonStatus(ctx context.Context, arg *UpdateDaemonStatusParams) (*Daemon, error)
 	UpdateDaemonUsage(ctx context.Context, daemonID string) error
