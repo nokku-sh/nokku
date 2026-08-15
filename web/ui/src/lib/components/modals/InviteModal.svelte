@@ -15,6 +15,7 @@
 	const ws = $derived(workspace.get());
 	const invitation = invite.refresh();
 	const revoke = invite.revoke();
+	$inspect(ws);
 
 	$effect(() => {
 		if (!open) invitation.reset();
@@ -38,7 +39,7 @@
 				Generate New Link
 			</Button>
 
-			{#if ws.data?.settings?.inviteExpiresAt && toDate(ws.data.settings.inviteExpiresAt) > new Date()}
+			{#if ws.data?.inviteExpiresAt && toDate(ws.data.inviteExpiresAt) > new Date()}
 				<Button
 					variant="destructive"
 					class="flex-1"

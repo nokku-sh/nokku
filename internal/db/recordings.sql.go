@@ -10,51 +10,11 @@ import (
 	"time"
 )
 
-const clearRecordingKey = `-- name: ClearRecordingKey :one
-UPDATE workspace_settings
-SET
-  recording_public_key = '',
-  recording_key_fingerprint = '',
-  recording_key_created_at = NULL
-WHERE
-  workspace_id = $1
-RETURNING
-  workspace_id, enroll_token_hash, enroll_expires_at, enroll_auto_approve, invite_token_hash, invite_expires_at, recording_public_key, recording_key_fingerprint, recording_key_created_at, updated_at
-`
-
-func (q *Queries) ClearRecordingKey(ctx context.Context, workspaceID string) (*WorkspaceSetting, error) {
-	row := q.db.QueryRow(ctx, clearRecordingKey, workspaceID)
-	var i WorkspaceSetting
-	err := row.Scan(
-		&i.WorkspaceID,
-		&i.EnrollTokenHash,
-		&i.EnrollExpiresAt,
-		&i.EnrollAutoApprove,
-		&i.InviteTokenHash,
-		&i.InviteExpiresAt,
-		&i.RecordingPublicKey,
-		&i.RecordingKeyFingerprint,
-		&i.RecordingKeyCreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
 const createRecording = `-- name: CreateRecording :one
-INSERT INTO recordings (
-  id,
-  workspace_id,
-  daemon_id,
-  username,
-  key_fingerprint
-)
-VALUES (
-  $1,
-  $2,
-  $3,
-  $4,
-  $5
-)
+INSERT INTO
+  recordings (id, workspace_id, daemon_id, username, key_fingerprint)
+VALUES
+  ($1, $2, $3, $4, $5)
 RETURNING
   id, workspace_id, daemon_id, username, started_at, ended_at, size_bytes, key_fingerprint, complete, created_at
 `
@@ -323,40 +283,4 @@ func (q *Queries) SumRecordingBytes(ctx context.Context, workspaceID string) (in
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
-}
-
-const updateRecordingKey = `-- name: UpdateRecordingKey :one
-UPDATE workspace_settings
-SET
-  recording_public_key = $1,
-  recording_key_fingerprint = $2,
-  recording_key_created_at = NOW()
-WHERE
-  workspace_id = $3
-RETURNING
-  workspace_id, enroll_token_hash, enroll_expires_at, enroll_auto_approve, invite_token_hash, invite_expires_at, recording_public_key, recording_key_fingerprint, recording_key_created_at, updated_at
-`
-
-type UpdateRecordingKeyParams struct {
-	PublicKey   string `json:"publicKey"`
-	Fingerprint string `json:"fingerprint"`
-	WorkspaceID string `json:"workspaceId"`
-}
-
-func (q *Queries) UpdateRecordingKey(ctx context.Context, arg *UpdateRecordingKeyParams) (*WorkspaceSetting, error) {
-	row := q.db.QueryRow(ctx, updateRecordingKey, arg.PublicKey, arg.Fingerprint, arg.WorkspaceID)
-	var i WorkspaceSetting
-	err := row.Scan(
-		&i.WorkspaceID,
-		&i.EnrollTokenHash,
-		&i.EnrollExpiresAt,
-		&i.EnrollAutoApprove,
-		&i.InviteTokenHash,
-		&i.InviteExpiresAt,
-		&i.RecordingPublicKey,
-		&i.RecordingKeyFingerprint,
-		&i.RecordingKeyCreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
 }

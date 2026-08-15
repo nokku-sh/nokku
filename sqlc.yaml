@@ -77,6 +77,11 @@ sql:
               import: "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
               type: "DaemonConfig"
               pointer: true
+          - column: "workspaces.settings"
+            go_type:
+              import: "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+              type: "WorkspaceSettings"
+              pointer: true
 
           # Hash (one-way) overrides
           - column: "users.password_hash"
@@ -96,11 +101,11 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"
-          - column: "workspace_settings.invite_token_hash"
+          - column: "workspaces.invite_token_hash"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"
-          - column: "workspace_settings.enroll_token_hash"
+          - column: "workspaces.enroll_token_hash"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"

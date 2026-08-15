@@ -64,23 +64,25 @@ func (w *Workspace) ToProto() *nokkuv1.Workspace {
 		return nil
 	}
 	return &nokkuv1.Workspace{
-		Id:          &w.ID,
-		Name:        &w.Name,
-		Description: w.Description,
-		CreatedBy:   &w.CreatedBy,
-		CreatedAt:   SafeTimestamp(&w.CreatedAt),
-		UpdatedAt:   SafeTimestamp(&w.UpdatedAt),
+		Id:              &w.ID,
+		Name:            &w.Name,
+		Description:     w.Description,
+		EnrollTokenHash: new(w.EnrollTokenHash.Hash()),
+		EnrollExpiresAt: SafeTimestamp(w.EnrollExpiresAt),
+		InviteTokenHash: new(w.InviteTokenHash.Hash()),
+		InviteExpiresAt: SafeTimestamp(w.InviteExpiresAt),
+		Settings:        w.Settings,
+		CreatedBy:       &w.CreatedBy,
+		CreatedAt:       SafeTimestamp(&w.CreatedAt),
+		UpdatedAt:       SafeTimestamp(&w.UpdatedAt),
 	}
 }
 
-func (w *GetWorkspaceRow) ToProto() *nokkuv1.Workspace {
-	if w == nil {
-		return nil
-	}
-
-	workspace := w.Workspace.ToProto()
-	workspace.Settings = w.WorkspaceSetting.ToProto()
-	return workspace
+func ListWorkspacesToProto(ws []*Workspace) []*nokkuv1.Workspace {
+	return MapSlice(
+		ws,
+		func(w *Workspace) *nokkuv1.Workspace { return w.ToProto() },
+	)
 }
 
 func (w *CreateWorkspaceRow) ToProto() *nokkuv1.Workspace {
@@ -94,33 +96,6 @@ func (w *CreateWorkspaceRow) ToProto() *nokkuv1.Workspace {
 		CreatedBy:   &w.CreatedBy,
 		CreatedAt:   SafeTimestamp(&w.CreatedAt),
 		UpdatedAt:   SafeTimestamp(&w.UpdatedAt),
-	}
-}
-
-func (w *ListWorkspacesRow) ToProto() *nokkuv1.Workspace {
-	if w == nil {
-		return nil
-	}
-	workspace := w.Workspace.ToProto()
-	workspace.Settings = w.WorkspaceSetting.ToProto()
-	return workspace
-}
-
-func ListWorkspacesToProto(ws []*ListWorkspacesRow) []*nokkuv1.Workspace {
-	return MapSlice(ws, func(w *ListWorkspacesRow) *nokkuv1.Workspace { return w.ToProto() })
-}
-
-func (w *WorkspaceSetting) ToProto() *nokkuv1.WorkspaceSettings {
-	if w == nil {
-		return nil
-	}
-	return &nokkuv1.WorkspaceSettings{
-		EnrollAutoApprove:       &w.EnrollAutoApprove,
-		EnrollExpiresAt:         SafeTimestamp(w.EnrollExpiresAt),
-		InviteExpiresAt:         SafeTimestamp(w.InviteExpiresAt),
-		RecordingPublicKey:      &w.RecordingPublicKey,
-		RecordingKeyFingerprint: &w.RecordingKeyFingerprint,
-		RecordingKeyCreatedAt:   SafeTimestamp(w.RecordingKeyCreatedAt),
 	}
 }
 

@@ -29,6 +29,14 @@ export const recordings = {
 		useMutation(RecordingService.method.deleteRecording, {
 			onSuccess: () => toast.success('Recording deleted')
 		}),
+	setRecordingKey: () =>
+		useMutation(RecordingService.method.setRecordingKey, {
+			onSuccess: () => toast.success('Recording encryption enabled')
+		}),
+	clearRecordingKey: () =>
+		useMutation(RecordingService.method.clearRecordingKey, {
+			onSuccess: () => toast.success('Recording encryption disabled')
+		}),
 
 	// Direct stream (connect-query has no server-stream support).
 	stream: async (

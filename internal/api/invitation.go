@@ -50,7 +50,7 @@ func (s *InvitationService) GetInvitation(
 	// System transaction: the invitee is not a member of the workspace yet,
 	// so no tenant context can be established. The invite token (validated
 	// below against its hash) authorizes this read.
-	var row *db.GetWorkspaceRow
+	var workspace *db.Workspace
 	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
 		if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
 			WorkspaceID: workspaceID,
@@ -59,7 +59,7 @@ func (s *InvitationService) GetInvitation(
 			return errAlreadyMember
 		}
 
-		row, err = q.GetWorkspace(ctx, workspaceID)
+		workspace, err = q.GetWorkspace(ctx, workspaceID)
 		return err
 	}); errors.Is(err, errAlreadyMember) {
 		return nil, NewError(connect.CodeAborted, "you have already joined this workspace")
@@ -67,14 +67,14 @@ func (s *InvitationService) GetInvitation(
 		return nil, DBError(err)
 	}
 
-	if !row.WorkspaceSetting.InviteTokenHash.Verify(req.GetToken()) {
+	if !workspace.InviteTokenHash.Verify(req.GetToken()) {
 		return nil, NewError(connect.CodeFailedPrecondition, "invalid invitation token")
 	}
 
 	return &nokkuv1.GetInvitationResponse{
-		WorkspaceName:        &row.Workspace.Name,
-		WorkspaceDescription: row.Workspace.Description,
-		ExpiresAt:            db.SafeTimestamp(row.WorkspaceSetting.InviteExpiresAt),
+		WorkspaceName:        &workspace.Name,
+		WorkspaceDescription: workspace.Description,
+		ExpiresAt:            db.SafeTimestamp(workspace.InviteExpiresAt),
 	}, nil
 }
 
@@ -108,7 +108,7 @@ func (s *InvitationService) AcceptInvitation(
 			return errAlreadyMember
 		}
 
-		settings, err := q.GetWorkspaceSettings(ctx, workspaceID)
+		settings, err := q.GetWorkspace(ctx, workspaceID)
 		if err != nil {
 			return err
 		}
@@ -151,12 +151,11 @@ func (s *InvitationService) RefreshInviteToken(
 
 	expiresAt := time.Now().Add(24 * time.Hour)
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		_, err = q.UpdateWorkspaceSettings(ctx, &db.UpdateWorkspaceSettingsParams{
+		return q.UpdateInviteToken(ctx, &db.UpdateInviteTokenParams{
 			WorkspaceID:     req.GetWorkspaceId(),
 			InviteTokenHash: token.Hash,
 			InviteExpiresAt: &expiresAt,
 		})
-		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -173,12 +172,11 @@ func (s *InvitationService) RevokeInviteToken(
 	req *nokkuv1.RevokeInviteTokenRequest,
 ) (*nokkuv1.RevokeInviteTokenResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		_, err := q.UpdateWorkspaceSettings(ctx, &db.UpdateWorkspaceSettingsParams{
+		return q.UpdateInviteToken(ctx, &db.UpdateInviteTokenParams{
 			WorkspaceID:     req.GetWorkspaceId(),
 			InviteTokenHash: "",
 			InviteExpiresAt: &time.Time{},
 		})
-		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}

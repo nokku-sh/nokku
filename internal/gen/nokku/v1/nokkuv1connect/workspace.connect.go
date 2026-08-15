@@ -45,9 +45,6 @@ const (
 	// WorkspaceServiceUpdateWorkspaceProcedure is the fully-qualified name of the WorkspaceService's
 	// UpdateWorkspace RPC.
 	WorkspaceServiceUpdateWorkspaceProcedure = "/nokku.v1.WorkspaceService/UpdateWorkspace"
-	// WorkspaceServiceUpdateWorkspaceSettingsProcedure is the fully-qualified name of the
-	// WorkspaceService's UpdateWorkspaceSettings RPC.
-	WorkspaceServiceUpdateWorkspaceSettingsProcedure = "/nokku.v1.WorkspaceService/UpdateWorkspaceSettings"
 	// WorkspaceServiceDeleteWorkspaceProcedure is the fully-qualified name of the WorkspaceService's
 	// DeleteWorkspace RPC.
 	WorkspaceServiceDeleteWorkspaceProcedure = "/nokku.v1.WorkspaceService/DeleteWorkspace"
@@ -69,12 +66,6 @@ const (
 	// WorkspaceServiceSubscribeWorkspaceEventsProcedure is the fully-qualified name of the
 	// WorkspaceService's SubscribeWorkspaceEvents RPC.
 	WorkspaceServiceSubscribeWorkspaceEventsProcedure = "/nokku.v1.WorkspaceService/SubscribeWorkspaceEvents"
-	// WorkspaceServiceSetRecordingKeyProcedure is the fully-qualified name of the WorkspaceService's
-	// SetRecordingKey RPC.
-	WorkspaceServiceSetRecordingKeyProcedure = "/nokku.v1.WorkspaceService/SetRecordingKey"
-	// WorkspaceServiceClearRecordingKeyProcedure is the fully-qualified name of the WorkspaceService's
-	// ClearRecordingKey RPC.
-	WorkspaceServiceClearRecordingKeyProcedure = "/nokku.v1.WorkspaceService/ClearRecordingKey"
 )
 
 // WorkspaceServiceClient is a client for the nokku.v1.WorkspaceService service.
@@ -83,7 +74,6 @@ type WorkspaceServiceClient interface {
 	ListWorkspaces(context.Context, *v1.ListWorkspacesRequest) (*v1.ListWorkspacesResponse, error)
 	CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error)
 	UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error)
-	UpdateWorkspaceSettings(context.Context, *v1.UpdateWorkspaceSettingsRequest) (*v1.UpdateWorkspaceSettingsResponse, error)
 	DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error)
 	GetWorkspaceMember(context.Context, *v1.GetWorkspaceMemberRequest) (*v1.GetWorkspaceMemberResponse, error)
 	ListWorkspaceMembers(context.Context, *v1.ListWorkspaceMembersRequest) (*v1.ListWorkspaceMembersResponse, error)
@@ -91,8 +81,6 @@ type WorkspaceServiceClient interface {
 	UpdateWorkspaceMember(context.Context, *v1.UpdateWorkspaceMemberRequest) (*v1.UpdateWorkspaceMemberResponse, error)
 	UpdateWorkspaceOwner(context.Context, *v1.UpdateWorkspaceOwnerRequest) (*v1.UpdateWorkspaceOwnerResponse, error)
 	SubscribeWorkspaceEvents(context.Context, *v1.SubscribeWorkspaceEventsRequest) (*connect.ServerStreamForClient[v1.SubscribeWorkspaceEventsResponse], error)
-	SetRecordingKey(context.Context, *v1.SetRecordingKeyRequest) (*v1.SetRecordingKeyResponse, error)
-	ClearRecordingKey(context.Context, *v1.ClearRecordingKeyRequest) (*v1.ClearRecordingKeyResponse, error)
 }
 
 // NewWorkspaceServiceClient constructs a client for the nokku.v1.WorkspaceService service. By
@@ -130,12 +118,6 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			httpClient,
 			baseURL+WorkspaceServiceUpdateWorkspaceProcedure,
 			connect.WithSchema(workspaceServiceMethods.ByName("UpdateWorkspace")),
-			connect.WithClientOptions(opts...),
-		),
-		updateWorkspaceSettings: connect.NewClient[v1.UpdateWorkspaceSettingsRequest, v1.UpdateWorkspaceSettingsResponse](
-			httpClient,
-			baseURL+WorkspaceServiceUpdateWorkspaceSettingsProcedure,
-			connect.WithSchema(workspaceServiceMethods.ByName("UpdateWorkspaceSettings")),
 			connect.WithClientOptions(opts...),
 		),
 		deleteWorkspace: connect.NewClient[v1.DeleteWorkspaceRequest, v1.DeleteWorkspaceResponse](
@@ -182,18 +164,6 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(workspaceServiceMethods.ByName("SubscribeWorkspaceEvents")),
 			connect.WithClientOptions(opts...),
 		),
-		setRecordingKey: connect.NewClient[v1.SetRecordingKeyRequest, v1.SetRecordingKeyResponse](
-			httpClient,
-			baseURL+WorkspaceServiceSetRecordingKeyProcedure,
-			connect.WithSchema(workspaceServiceMethods.ByName("SetRecordingKey")),
-			connect.WithClientOptions(opts...),
-		),
-		clearRecordingKey: connect.NewClient[v1.ClearRecordingKeyRequest, v1.ClearRecordingKeyResponse](
-			httpClient,
-			baseURL+WorkspaceServiceClearRecordingKeyProcedure,
-			connect.WithSchema(workspaceServiceMethods.ByName("ClearRecordingKey")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -203,7 +173,6 @@ type workspaceServiceClient struct {
 	listWorkspaces           *connect.Client[v1.ListWorkspacesRequest, v1.ListWorkspacesResponse]
 	createWorkspace          *connect.Client[v1.CreateWorkspaceRequest, v1.CreateWorkspaceResponse]
 	updateWorkspace          *connect.Client[v1.UpdateWorkspaceRequest, v1.UpdateWorkspaceResponse]
-	updateWorkspaceSettings  *connect.Client[v1.UpdateWorkspaceSettingsRequest, v1.UpdateWorkspaceSettingsResponse]
 	deleteWorkspace          *connect.Client[v1.DeleteWorkspaceRequest, v1.DeleteWorkspaceResponse]
 	getWorkspaceMember       *connect.Client[v1.GetWorkspaceMemberRequest, v1.GetWorkspaceMemberResponse]
 	listWorkspaceMembers     *connect.Client[v1.ListWorkspaceMembersRequest, v1.ListWorkspaceMembersResponse]
@@ -211,8 +180,6 @@ type workspaceServiceClient struct {
 	updateWorkspaceMember    *connect.Client[v1.UpdateWorkspaceMemberRequest, v1.UpdateWorkspaceMemberResponse]
 	updateWorkspaceOwner     *connect.Client[v1.UpdateWorkspaceOwnerRequest, v1.UpdateWorkspaceOwnerResponse]
 	subscribeWorkspaceEvents *connect.Client[v1.SubscribeWorkspaceEventsRequest, v1.SubscribeWorkspaceEventsResponse]
-	setRecordingKey          *connect.Client[v1.SetRecordingKeyRequest, v1.SetRecordingKeyResponse]
-	clearRecordingKey        *connect.Client[v1.ClearRecordingKeyRequest, v1.ClearRecordingKeyResponse]
 }
 
 // GetWorkspace calls nokku.v1.WorkspaceService.GetWorkspace.
@@ -245,15 +212,6 @@ func (c *workspaceServiceClient) CreateWorkspace(ctx context.Context, req *v1.Cr
 // UpdateWorkspace calls nokku.v1.WorkspaceService.UpdateWorkspace.
 func (c *workspaceServiceClient) UpdateWorkspace(ctx context.Context, req *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error) {
 	response, err := c.updateWorkspace.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// UpdateWorkspaceSettings calls nokku.v1.WorkspaceService.UpdateWorkspaceSettings.
-func (c *workspaceServiceClient) UpdateWorkspaceSettings(ctx context.Context, req *v1.UpdateWorkspaceSettingsRequest) (*v1.UpdateWorkspaceSettingsResponse, error) {
-	response, err := c.updateWorkspaceSettings.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
@@ -319,31 +277,12 @@ func (c *workspaceServiceClient) SubscribeWorkspaceEvents(ctx context.Context, r
 	return c.subscribeWorkspaceEvents.CallServerStream(ctx, connect.NewRequest(req))
 }
 
-// SetRecordingKey calls nokku.v1.WorkspaceService.SetRecordingKey.
-func (c *workspaceServiceClient) SetRecordingKey(ctx context.Context, req *v1.SetRecordingKeyRequest) (*v1.SetRecordingKeyResponse, error) {
-	response, err := c.setRecordingKey.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ClearRecordingKey calls nokku.v1.WorkspaceService.ClearRecordingKey.
-func (c *workspaceServiceClient) ClearRecordingKey(ctx context.Context, req *v1.ClearRecordingKeyRequest) (*v1.ClearRecordingKeyResponse, error) {
-	response, err := c.clearRecordingKey.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
 // WorkspaceServiceHandler is an implementation of the nokku.v1.WorkspaceService service.
 type WorkspaceServiceHandler interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
 	ListWorkspaces(context.Context, *v1.ListWorkspacesRequest) (*v1.ListWorkspacesResponse, error)
 	CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error)
 	UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error)
-	UpdateWorkspaceSettings(context.Context, *v1.UpdateWorkspaceSettingsRequest) (*v1.UpdateWorkspaceSettingsResponse, error)
 	DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error)
 	GetWorkspaceMember(context.Context, *v1.GetWorkspaceMemberRequest) (*v1.GetWorkspaceMemberResponse, error)
 	ListWorkspaceMembers(context.Context, *v1.ListWorkspaceMembersRequest) (*v1.ListWorkspaceMembersResponse, error)
@@ -351,8 +290,6 @@ type WorkspaceServiceHandler interface {
 	UpdateWorkspaceMember(context.Context, *v1.UpdateWorkspaceMemberRequest) (*v1.UpdateWorkspaceMemberResponse, error)
 	UpdateWorkspaceOwner(context.Context, *v1.UpdateWorkspaceOwnerRequest) (*v1.UpdateWorkspaceOwnerResponse, error)
 	SubscribeWorkspaceEvents(context.Context, *v1.SubscribeWorkspaceEventsRequest, *connect.ServerStream[v1.SubscribeWorkspaceEventsResponse]) error
-	SetRecordingKey(context.Context, *v1.SetRecordingKeyRequest) (*v1.SetRecordingKeyResponse, error)
-	ClearRecordingKey(context.Context, *v1.ClearRecordingKeyRequest) (*v1.ClearRecordingKeyResponse, error)
 }
 
 // NewWorkspaceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -386,12 +323,6 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 		WorkspaceServiceUpdateWorkspaceProcedure,
 		svc.UpdateWorkspace,
 		connect.WithSchema(workspaceServiceMethods.ByName("UpdateWorkspace")),
-		connect.WithHandlerOptions(opts...),
-	)
-	workspaceServiceUpdateWorkspaceSettingsHandler := connect.NewUnaryHandlerSimple(
-		WorkspaceServiceUpdateWorkspaceSettingsProcedure,
-		svc.UpdateWorkspaceSettings,
-		connect.WithSchema(workspaceServiceMethods.ByName("UpdateWorkspaceSettings")),
 		connect.WithHandlerOptions(opts...),
 	)
 	workspaceServiceDeleteWorkspaceHandler := connect.NewUnaryHandlerSimple(
@@ -438,18 +369,6 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 		connect.WithSchema(workspaceServiceMethods.ByName("SubscribeWorkspaceEvents")),
 		connect.WithHandlerOptions(opts...),
 	)
-	workspaceServiceSetRecordingKeyHandler := connect.NewUnaryHandlerSimple(
-		WorkspaceServiceSetRecordingKeyProcedure,
-		svc.SetRecordingKey,
-		connect.WithSchema(workspaceServiceMethods.ByName("SetRecordingKey")),
-		connect.WithHandlerOptions(opts...),
-	)
-	workspaceServiceClearRecordingKeyHandler := connect.NewUnaryHandlerSimple(
-		WorkspaceServiceClearRecordingKeyProcedure,
-		svc.ClearRecordingKey,
-		connect.WithSchema(workspaceServiceMethods.ByName("ClearRecordingKey")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/nokku.v1.WorkspaceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case WorkspaceServiceGetWorkspaceProcedure:
@@ -460,8 +379,6 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 			workspaceServiceCreateWorkspaceHandler.ServeHTTP(w, r)
 		case WorkspaceServiceUpdateWorkspaceProcedure:
 			workspaceServiceUpdateWorkspaceHandler.ServeHTTP(w, r)
-		case WorkspaceServiceUpdateWorkspaceSettingsProcedure:
-			workspaceServiceUpdateWorkspaceSettingsHandler.ServeHTTP(w, r)
 		case WorkspaceServiceDeleteWorkspaceProcedure:
 			workspaceServiceDeleteWorkspaceHandler.ServeHTTP(w, r)
 		case WorkspaceServiceGetWorkspaceMemberProcedure:
@@ -476,10 +393,6 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 			workspaceServiceUpdateWorkspaceOwnerHandler.ServeHTTP(w, r)
 		case WorkspaceServiceSubscribeWorkspaceEventsProcedure:
 			workspaceServiceSubscribeWorkspaceEventsHandler.ServeHTTP(w, r)
-		case WorkspaceServiceSetRecordingKeyProcedure:
-			workspaceServiceSetRecordingKeyHandler.ServeHTTP(w, r)
-		case WorkspaceServiceClearRecordingKeyProcedure:
-			workspaceServiceClearRecordingKeyHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -503,10 +416,6 @@ func (UnimplementedWorkspaceServiceHandler) CreateWorkspace(context.Context, *v1
 
 func (UnimplementedWorkspaceServiceHandler) UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.WorkspaceService.UpdateWorkspace is not implemented"))
-}
-
-func (UnimplementedWorkspaceServiceHandler) UpdateWorkspaceSettings(context.Context, *v1.UpdateWorkspaceSettingsRequest) (*v1.UpdateWorkspaceSettingsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.WorkspaceService.UpdateWorkspaceSettings is not implemented"))
 }
 
 func (UnimplementedWorkspaceServiceHandler) DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error) {
@@ -535,12 +444,4 @@ func (UnimplementedWorkspaceServiceHandler) UpdateWorkspaceOwner(context.Context
 
 func (UnimplementedWorkspaceServiceHandler) SubscribeWorkspaceEvents(context.Context, *v1.SubscribeWorkspaceEventsRequest, *connect.ServerStream[v1.SubscribeWorkspaceEventsResponse]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.WorkspaceService.SubscribeWorkspaceEvents is not implemented"))
-}
-
-func (UnimplementedWorkspaceServiceHandler) SetRecordingKey(context.Context, *v1.SetRecordingKeyRequest) (*v1.SetRecordingKeyResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.WorkspaceService.SetRecordingKey is not implemented"))
-}
-
-func (UnimplementedWorkspaceServiceHandler) ClearRecordingKey(context.Context, *v1.ClearRecordingKeyRequest) (*v1.ClearRecordingKeyResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.WorkspaceService.ClearRecordingKey is not implemented"))
 }
