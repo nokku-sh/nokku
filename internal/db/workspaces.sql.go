@@ -103,7 +103,7 @@ WITH
     INSERT INTO
       workspaces (name, description, settings, created_by)
     VALUES
-      ($1, $2, $3, $4)
+      ($1, $2, COALESCE($3, '{}'::jsonb), $4)
     RETURNING
       id, name, description, enroll_token_hash, enroll_expires_at, invite_token_hash, invite_expires_at, settings, created_by, created_at, updated_at
   ),
@@ -156,10 +156,10 @@ FROM
 `
 
 type CreateWorkspaceParams struct {
-	Name        string                   `json:"name"`
-	Description *string                  `json:"description"`
-	Settings    *nokku.WorkspaceSettings `json:"settings"`
-	CreatedBy   string                   `json:"createdBy"`
+	Name        string      `json:"name"`
+	Description *string     `json:"description"`
+	Settings    interface{} `json:"settings"`
+	CreatedBy   string      `json:"createdBy"`
 }
 
 type CreateWorkspaceRow struct {
