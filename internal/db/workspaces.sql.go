@@ -290,7 +290,7 @@ func (q *Queries) GetUserWorkspaceIDs(ctx context.Context, userID string) ([]str
 const getWorkspace = `-- name: GetWorkspace :one
 SELECT
   w.id, w.name, w.description, w.created_by, w.created_at, w.updated_at,
-  ws.workspace_id, ws.enroll_token_hash, ws.enroll_expires_at, ws.enroll_auto_approve, ws.invite_token_hash, ws.invite_expires_at, ws.updated_at
+  ws.workspace_id, ws.enroll_token_hash, ws.enroll_expires_at, ws.enroll_auto_approve, ws.invite_token_hash, ws.invite_expires_at, ws.recording_public_key, ws.recording_key_fingerprint, ws.recording_key_created_at, ws.updated_at
 FROM
   workspaces w
   LEFT JOIN workspace_settings ws ON ws.workspace_id = w.id
@@ -319,6 +319,9 @@ func (q *Queries) GetWorkspace(ctx context.Context, workspaceID string) (*GetWor
 		&i.WorkspaceSetting.EnrollAutoApprove,
 		&i.WorkspaceSetting.InviteTokenHash,
 		&i.WorkspaceSetting.InviteExpiresAt,
+		&i.WorkspaceSetting.RecordingPublicKey,
+		&i.WorkspaceSetting.RecordingKeyFingerprint,
+		&i.WorkspaceSetting.RecordingKeyCreatedAt,
 		&i.WorkspaceSetting.UpdatedAt,
 	)
 	return &i, err
@@ -401,7 +404,7 @@ func (q *Queries) GetWorkspaceOwner(ctx context.Context, workspaceID string) (st
 
 const getWorkspaceSettings = `-- name: GetWorkspaceSettings :one
 SELECT
-  workspace_id, enroll_token_hash, enroll_expires_at, enroll_auto_approve, invite_token_hash, invite_expires_at, updated_at
+  workspace_id, enroll_token_hash, enroll_expires_at, enroll_auto_approve, invite_token_hash, invite_expires_at, recording_public_key, recording_key_fingerprint, recording_key_created_at, updated_at
 FROM
   workspace_settings
 WHERE
@@ -419,6 +422,9 @@ func (q *Queries) GetWorkspaceSettings(ctx context.Context, workspaceID string) 
 		&i.EnrollAutoApprove,
 		&i.InviteTokenHash,
 		&i.InviteExpiresAt,
+		&i.RecordingPublicKey,
+		&i.RecordingKeyFingerprint,
+		&i.RecordingKeyCreatedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
@@ -555,7 +561,7 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMe
 const listWorkspaces = `-- name: ListWorkspaces :many
 SELECT
   w.id, w.name, w.description, w.created_by, w.created_at, w.updated_at,
-  ws.workspace_id, ws.enroll_token_hash, ws.enroll_expires_at, ws.enroll_auto_approve, ws.invite_token_hash, ws.invite_expires_at, ws.updated_at
+  ws.workspace_id, ws.enroll_token_hash, ws.enroll_expires_at, ws.enroll_auto_approve, ws.invite_token_hash, ws.invite_expires_at, ws.recording_public_key, ws.recording_key_fingerprint, ws.recording_key_created_at, ws.updated_at
 FROM
   workspaces w
   LEFT JOIN workspace_settings ws ON ws.workspace_id = w.id
@@ -590,6 +596,9 @@ func (q *Queries) ListWorkspaces(ctx context.Context) ([]*ListWorkspacesRow, err
 			&i.WorkspaceSetting.EnrollAutoApprove,
 			&i.WorkspaceSetting.InviteTokenHash,
 			&i.WorkspaceSetting.InviteExpiresAt,
+			&i.WorkspaceSetting.RecordingPublicKey,
+			&i.WorkspaceSetting.RecordingKeyFingerprint,
+			&i.WorkspaceSetting.RecordingKeyCreatedAt,
 			&i.WorkspaceSetting.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -739,7 +748,7 @@ SET
 WHERE
   workspace_id = $6
 RETURNING
-  workspace_id, enroll_token_hash, enroll_expires_at, enroll_auto_approve, invite_token_hash, invite_expires_at, updated_at
+  workspace_id, enroll_token_hash, enroll_expires_at, enroll_auto_approve, invite_token_hash, invite_expires_at, recording_public_key, recording_key_fingerprint, recording_key_created_at, updated_at
 `
 
 type UpdateWorkspaceSettingsParams struct {
@@ -768,6 +777,9 @@ func (q *Queries) UpdateWorkspaceSettings(ctx context.Context, arg *UpdateWorksp
 		&i.EnrollAutoApprove,
 		&i.InviteTokenHash,
 		&i.InviteExpiresAt,
+		&i.RecordingPublicKey,
+		&i.RecordingKeyFingerprint,
+		&i.RecordingKeyCreatedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err

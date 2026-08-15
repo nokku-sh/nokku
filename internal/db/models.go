@@ -145,6 +145,19 @@ type PrincipalUser struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
+type Recording struct {
+	ID             string     `json:"id"`
+	WorkspaceID    string     `json:"workspaceId"`
+	DaemonID       string     `json:"daemonId"`
+	Username       string     `json:"username"`
+	StartedAt      time.Time  `json:"startedAt"`
+	EndedAt        *time.Time `json:"endedAt"`
+	SizeBytes      int64      `json:"sizeBytes"`
+	KeyFingerprint string     `json:"keyFingerprint"`
+	Complete       bool       `json:"complete"`
+	CreatedAt      time.Time  `json:"createdAt"`
+}
+
 type Role struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -279,13 +292,16 @@ type WorkspaceMember struct {
 }
 
 type WorkspaceSetting struct {
-	WorkspaceID       string             `json:"workspaceId"`
-	EnrollTokenHash   crypto.HashedToken `json:"enrollTokenHash"`
-	EnrollExpiresAt   *time.Time         `json:"enrollExpiresAt"`
-	EnrollAutoApprove bool               `json:"enrollAutoApprove"`
-	InviteTokenHash   crypto.HashedToken `json:"inviteTokenHash"`
-	InviteExpiresAt   *time.Time         `json:"inviteExpiresAt"`
-	UpdatedAt         time.Time          `json:"updatedAt"`
+	WorkspaceID             string             `json:"workspaceId"`
+	EnrollTokenHash         crypto.HashedToken `json:"enrollTokenHash"`
+	EnrollExpiresAt         *time.Time         `json:"enrollExpiresAt"`
+	EnrollAutoApprove       bool               `json:"enrollAutoApprove"`
+	InviteTokenHash         crypto.HashedToken `json:"inviteTokenHash"`
+	InviteExpiresAt         *time.Time         `json:"inviteExpiresAt"`
+	RecordingPublicKey      string             `json:"recordingPublicKey"`
+	RecordingKeyFingerprint string             `json:"recordingKeyFingerprint"`
+	RecordingKeyCreatedAt   *time.Time         `json:"recordingKeyCreatedAt"`
+	UpdatedAt               time.Time          `json:"updatedAt"`
 }
 
 type WorkspaceSubscription struct {

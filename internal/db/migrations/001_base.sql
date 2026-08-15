@@ -132,6 +132,9 @@ CREATE TABLE IF NOT EXISTS workspace_settings (
   enroll_auto_approve BOOLEAN NOT NULL DEFAULT TRUE,
   invite_token_hash TEXT,
   invite_expires_at TIMESTAMPTZ,
+  recording_public_key TEXT NOT NULL DEFAULT '',
+  recording_key_fingerprint TEXT NOT NULL DEFAULT '',
+  recording_key_created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -315,6 +318,21 @@ CREATE TABLE IF NOT EXISTS principal_service_accounts (
   PRIMARY KEY (principal_id, service_account_id)
 );
 
+CREATE TABLE IF NOT EXISTS recordings (
+  id UUID PRIMARY KEY DEFAULT uuidv7(), -- the session id
+  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  daemon_id UUID NOT NULL REFERENCES daemons (id) ON DELETE CASCADE,
+  username TEXT NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ended_at TIMESTAMPTZ,
+  size_bytes BIGINT NOT NULL DEFAULT 0,
+  key_fingerprint TEXT NOT NULL DEFAULT '',
+  -- False when the upload stream ended without a final message (e.g. the
+  -- daemon died mid-session): the recording is truncated.
+  complete BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Keysets (for envelope encryption - singleton)
 CREATE TABLE IF NOT EXISTS keysets (
   id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -395,13 +413,13 @@ CREATE INDEX idx_principal_sa_service_account_id ON principal_service_accounts (
 
 CREATE INDEX idx_principal_sa_workspace_id ON principal_service_accounts (workspace_id);
 
--- User search (member search in workspace listings); email equality is
--- covered by the UNIQUE constraint index.
 CREATE INDEX idx_users_name_trgm ON users USING GIN (name gin_trgm_ops);
 
 CREATE INDEX idx_users_username_trgm ON users USING GIN (username gin_trgm_ops);
 
 CREATE INDEX idx_users_email_trgm ON users USING GIN (email gin_trgm_ops);
+
+CREATE INDEX recordings_workspace_started_idx ON recordings (workspace_id, started_at DESC);
 
 -- Functions ------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION current_workspace_id () RETURNS UUID AS $$
@@ -604,6 +622,10 @@ ALTER TABLE principal_service_accounts ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE principal_service_accounts FORCE ROW LEVEL SECURITY;
 
+ALTER TABLE recordings ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE recordings FORCE ROW LEVEL SECURITY;
+
 -- Session helpers ------------------------------------------------------------
 -- Membership of the current actor in a workspace. Used for cross-tenant
 -- reads users legitimately need outside a pinned workspace.
@@ -690,6 +712,10 @@ WITH
   CHECK (workspace_id = current_workspace_id ());
 
 CREATE POLICY tenant_isolation ON principals FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON recordings FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
   CHECK (workspace_id = current_workspace_id ());
 

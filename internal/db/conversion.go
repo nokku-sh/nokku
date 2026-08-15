@@ -115,9 +115,29 @@ func (w *WorkspaceSetting) ToProto() *nokkuv1.WorkspaceSettings {
 		return nil
 	}
 	return &nokkuv1.WorkspaceSettings{
-		EnrollAutoApprove: &w.EnrollAutoApprove,
-		EnrollExpiresAt:   SafeTimestamp(w.EnrollExpiresAt),
-		InviteExpiresAt:   SafeTimestamp(w.InviteExpiresAt),
+		EnrollAutoApprove:       &w.EnrollAutoApprove,
+		EnrollExpiresAt:         SafeTimestamp(w.EnrollExpiresAt),
+		InviteExpiresAt:         SafeTimestamp(w.InviteExpiresAt),
+		RecordingPublicKey:      &w.RecordingPublicKey,
+		RecordingKeyFingerprint: &w.RecordingKeyFingerprint,
+		RecordingKeyCreatedAt:   SafeTimestamp(w.RecordingKeyCreatedAt),
+	}
+}
+
+func (r *Recording) ToProto() *nokkuv1.Recording {
+	if r == nil {
+		return nil
+	}
+	return &nokkuv1.Recording{
+		Id:             &r.ID,
+		WorkspaceId:    &r.WorkspaceID,
+		DaemonId:       &r.DaemonID,
+		Username:       &r.Username,
+		StartedAt:      SafeTimestamp(&r.StartedAt),
+		EndedAt:        SafeTimestamp(r.EndedAt),
+		SizeBytes:      &r.SizeBytes,
+		KeyFingerprint: &r.KeyFingerprint,
+		Complete:       &r.Complete,
 	}
 }
 
