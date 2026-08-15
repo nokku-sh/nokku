@@ -23,6 +23,7 @@ type Querier interface {
 	// Whether a subject can reach a specific target. See GetTargetsBySubject for
 	// the definition of a subject and team membership expansion.
 	CheckTargetAccess(ctx context.Context, arg *CheckTargetAccessParams) (*Target, error)
+	ClearRecordingKey(ctx context.Context, workspaceID string) (*WorkspaceSetting, error)
 	CountAuditLogs(ctx context.Context, arg *CountAuditLogsParams) (int32, error)
 	CountMembers(ctx context.Context, arg *CountMembersParams) (int32, error)
 	CountVerifiedWorkspaceDomains(ctx context.Context, workspaceID string) (int32, error)
@@ -36,6 +37,7 @@ type Querier interface {
 	// Passkeys -------------------------------------------------------------------
 	CreatePasskey(ctx context.Context, arg *CreatePasskeyParams) error
 	CreatePrincipal(ctx context.Context, arg *CreatePrincipalParams) (*Principal, error)
+	CreateRecording(ctx context.Context, arg *CreateRecordingParams) (*Recording, error)
 	CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (*ServiceAccount, error)
 	CreateTarget(ctx context.Context, arg *CreateTargetParams) (*Target, error)
 	CreateTeam(ctx context.Context, arg *CreateTeamParams) (*Team, error)
@@ -52,6 +54,7 @@ type Querier interface {
 	DeleteKeyset(ctx context.Context) error
 	DeleteOrphanAuditLogs(ctx context.Context, cutoff time.Time) (int64, error)
 	DeletePasskey(ctx context.Context, passkeyID string) error
+	DeleteRecording(ctx context.Context, id string) error
 	DeleteServiceAccount(ctx context.Context, serviceAccountID string) error
 	DeleteTarget(ctx context.Context, targetID string) (*Target, error)
 	DeleteTeam(ctx context.Context, teamID string) (*Team, error)
@@ -66,6 +69,7 @@ type Querier interface {
 	DeleteWorkspace(ctx context.Context, workspaceID string) error
 	DeleteWorkspaceAuditLogs(ctx context.Context, arg *DeleteWorkspaceAuditLogsParams) (int64, error)
 	DeleteWorkspaceDomain(ctx context.Context, domain string) (*WorkspaceDomain, error)
+	DeleteWorkspaceRecordings(ctx context.Context, workspaceID string) error
 	DeleteWorkspacesByOwner(ctx context.Context, userID string) error
 	EmailExists(ctx context.Context, email string) (bool, error)
 	EnsureRole(ctx context.Context, arg *EnsureRoleParams) error
@@ -94,6 +98,7 @@ type Querier interface {
 	GetPrincipalWorkspace(ctx context.Context, principalID string) (string, error)
 	GetPrincipals(ctx context.Context, principalIds []string) ([]*GetPrincipalsRow, error)
 	GetPrincipalsByTargetIDs(ctx context.Context, targetIds []string) ([]*GetPrincipalsByTargetIDsRow, error)
+	GetRecording(ctx context.Context, id string) (*Recording, error)
 	// SAML Providers ---------------------------------------------------------------
 	GetSAMLProvider(ctx context.Context, workspaceID string) (*SamlProvider, error)
 	GetSAMLProviderByDomain(ctx context.Context, domain string) (*SamlProvider, error)
@@ -139,6 +144,7 @@ type Querier interface {
 	ListPrincipals(ctx context.Context, arg *ListPrincipalsParams) ([]*ListPrincipalsRow, error)
 	ListPrincipalsForDaemon(ctx context.Context, daemonID *string) ([]*ListPrincipalsForDaemonRow, error)
 	ListProviderSubscriptions(ctx context.Context, sources []string) ([]*WorkspaceSubscription, error)
+	ListRecordings(ctx context.Context, arg *ListRecordingsParams) ([]*ListRecordingsRow, error)
 	ListServiceAccounts(ctx context.Context, arg *ListServiceAccountsParams) ([]*ListServiceAccountsRow, error)
 	ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*ListTargetsRow, error)
 	ListTeamMembers(ctx context.Context, teamID string) ([]*ListTeamMembersRow, error)
@@ -148,6 +154,7 @@ type Querier interface {
 	ListWorkspaceDomains(ctx context.Context, workspaceID string) ([]*WorkspaceDomain, error)
 	ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error)
 	ListWorkspaces(ctx context.Context) ([]*ListWorkspacesRow, error)
+	OldestRecordings(ctx context.Context, arg *OldestRecordingsParams) ([]*Recording, error)
 	RegenerateVerificationToken(ctx context.Context, domain string) (*WorkspaceDomain, error)
 	RemoveServiceAccountFromPrincipal(ctx context.Context, arg *RemoveServiceAccountFromPrincipalParams) error
 	RemoveTeamFromPrincipal(ctx context.Context, arg *RemoveTeamFromPrincipalParams) error
@@ -162,10 +169,12 @@ type Querier interface {
 	SetDaemonsOffline(ctx context.Context) error
 	// Clears existing default and sets new one atomically
 	SetDefaultCA(ctx context.Context, arg *SetDefaultCAParams) error
+	SetRecordingComplete(ctx context.Context, arg *SetRecordingCompleteParams) (*Recording, error)
 	// Records which Stripe customer a workspace maps to, so checkout always reuses
 	// the same customer. Status stays inactive so this row never grants
 	// entitlements on its own; the webhook promotes it to a real subscription.
 	SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error
+	SumRecordingBytes(ctx context.Context, workspaceID string) (int64, error)
 	SyncPrincipals(ctx context.Context, arg *SyncPrincipalsParams) error
 	TrySecretRotationLock(ctx context.Context) (bool, error)
 	UpdateCA(ctx context.Context, arg *UpdateCAParams) (*CertificateAuthority, error)
@@ -182,6 +191,7 @@ type Querier interface {
 	UpdatePasskeyLastUsed(ctx context.Context, arg *UpdatePasskeyLastUsedParams) error
 	UpdatePasskeyName(ctx context.Context, arg *UpdatePasskeyNameParams) error
 	UpdatePasskeySignCount(ctx context.Context, arg *UpdatePasskeySignCountParams) error
+	UpdateRecordingKey(ctx context.Context, arg *UpdateRecordingKeyParams) (*WorkspaceSetting, error)
 	UpdateSAMLPrivateKey(ctx context.Context, arg *UpdateSAMLPrivateKeyParams) error
 	UpdateSAMLProvider(ctx context.Context, arg *UpdateSAMLProviderParams) (*SamlProvider, error)
 	UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (*ServiceAccount, error)
