@@ -51,7 +51,6 @@ sort_commits = "oldest"
 recurse_submodules = false
 
 commit_parsers = [
-  { message = "^fix\\(deps\\)", skip = true },
   { message = "^chore\\(deps\\)", skip = true },
   { message = "^chore\\(deps-dev\\)", skip = true },
   { message = "^chore\\(release\\)", skip = true },
@@ -70,4 +69,3 @@ commit_parsers = [
 [bump]
 git_tag_enabled = true
 git_tag_prefix = "v"
-
