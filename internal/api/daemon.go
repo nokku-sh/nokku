@@ -404,6 +404,16 @@ func (s *DaemonService) SyncDaemon(
 		status = &daemon.Status
 		config = daemon.Config
 
+		// The workspace recording key rides along so the daemon seals
+		// recordings with the current key and detects regenerations.
+		settings, err := q.GetWorkspaceSettings(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+		if settings.RecordingPublicKey != "" {
+			config.RecordingPublicKey = &settings.RecordingPublicKey
+		}
+
 		// A non-accepted daemon learns its status from the response instead
 		// of an error: pending daemons keep retrying, rejected ones get
 		// told to stop.
