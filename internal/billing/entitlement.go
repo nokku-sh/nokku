@@ -20,6 +20,7 @@ const (
 	ResourceTargets         Resource = "targets"
 	ResourceCas             Resource = "cas"
 	ResourceServiceAccounts Resource = "service_accounts"
+	ResourceRecordings      Resource = "recordings_storage"
 )
 
 const (
@@ -101,6 +102,8 @@ var catalog = map[string]Plan{
 			ResourceTargets:         {Soft: 10, Hard: 10},
 			ResourceTeams:           {Soft: 3, Hard: 3},
 			ResourceCas:             {Soft: 2, Hard: 2},
+			// 50 MiB of session recordings included, hard cap.
+			ResourceRecordings: {Soft: 50 << 20, Hard: 50 << 20},
 		},
 		Values: map[string]int64{
 			ValueAuditRetentionDays: 7,
@@ -123,6 +126,8 @@ var catalog = map[string]Plan{
 			// Not metered: enforced caps.
 			ResourceTeams: {Soft: 500, Hard: 500},
 			ResourceCas:   {Soft: 100, Hard: 100},
+			// 50 MiB included, overage billed (no hard cap).
+			ResourceRecordings: {Soft: 50 << 20, Hard: -1},
 		},
 		Values: map[string]int64{
 			ValueAuditRetentionDays: 90,
@@ -142,6 +147,7 @@ var catalog = map[string]Plan{
 			ResourceTargets:         {Soft: -1, Hard: -1},
 			ResourceTeams:           {Soft: -1, Hard: -1},
 			ResourceCas:             {Soft: -1, Hard: -1},
+			ResourceRecordings:      {Soft: -1, Hard: -1},
 		},
 		Values: map[string]int64{
 			ValueAuditRetentionDays: 365,
@@ -233,6 +239,73 @@ func (s *PolicyService) Check(ctx context.Context, workspaceID string, r Resourc
 	return nil
 }
 
+// OverBytes returns how many bytes a workspace exceeds its hard cap by for
+// a byte-based resource (e.g. recording storage), given `additional` bytes
+// for an in-flight upload not yet counted in storage. It returns 0 when no
+// hard cap applies or the workspace fits. Fails open on DB errors: a lookup
+// failure reports no overage so uploads are never blocked by bookkeeping.
+func (s *PolicyService) OverBytes(
+	ctx context.Context,
+	workspaceID string,
+	r Resource,
+	additional int64,
+) (int64, error) {
+	over, _, err := s.overage(ctx, workspaceID, r, additional)
+	return over, err
+}
+
+// CheckBytes returns ResourceExhausted if used bytes plus additional would
+// exceed the hard cap of a byte-based resource (e.g. recording storage).
+// Fails open on DB errors.
+func (s *PolicyService) CheckBytes(
+	ctx context.Context,
+	workspaceID string,
+	r Resource,
+	additional int64,
+) error {
+	over, hard, err := s.overage(ctx, workspaceID, r, additional)
+	if err != nil {
+		return connect.NewError(connect.CodeUnavailable, errors.New("quota check unavailable"))
+	}
+	if over > 0 {
+		return connect.NewError(connect.CodeResourceExhausted, &QuotaError{
+			Resource: r,
+			Limit:    hard,
+		})
+	}
+	return nil
+}
+
+// overage computes how many bytes over the hard cap a byte-based resource
+// is, with `additional` bytes for an in-flight upload not yet counted in
+// storage. hard is -1 when no hard cap applies.
+func (s *PolicyService) overage(
+	ctx context.Context,
+	workspaceID string,
+	r Resource,
+	additional int64,
+) (over int64, hard int64, err error) {
+	plan := s.Resolve(ctx, workspaceID)
+	quota, ok := plan.Limits[r]
+	if !ok || quota.Hard < 0 {
+		return 0, -1, nil
+	}
+	var used int64
+	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
+		used, err = q.SumRecordingBytes(ctx, workspaceID)
+		return err
+	}); err != nil {
+		slog.Warn(
+			"entitlement storage lookup failed",
+			"error", err,
+			"workspace_id", workspaceID,
+		)
+		return 0, quota.Hard, err
+	}
+	over = max(used+additional-quota.Hard, 0)
+	return over, quota.Hard, nil
+}
+
 // Has reports whether a feature flag is enabled for the workspace.
 func (s *PolicyService) Has(ctx context.Context, workspaceID, feature string) bool {
 	return s.Resolve(ctx, workspaceID).Features[feature]
@@ -275,6 +348,9 @@ func currentCount(stats *db.GetWorkspaceStatsRow, r Resource) int64 {
 		return stats.TeamCount
 	case ResourceCas:
 		return stats.CaCount
+	case ResourceRecordings:
+		// Byte-based, enforced by CheckBytes, never counted here.
+		return 0
 	}
 	return 0
 }

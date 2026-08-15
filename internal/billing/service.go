@@ -53,6 +53,24 @@ func (s *Service) Check(ctx context.Context, workspaceID string, resource Resour
 	return s.Entitlements.Check(ctx, workspaceID, resource)
 }
 
+func (s *Service) CheckBytes(
+	ctx context.Context,
+	workspaceID string,
+	resource Resource,
+	additional int64,
+) error {
+	return s.Entitlements.CheckBytes(ctx, workspaceID, resource, additional)
+}
+
+func (s *Service) OverBytes(
+	ctx context.Context,
+	workspaceID string,
+	resource Resource,
+	additional int64,
+) (int64, error) {
+	return s.Entitlements.OverBytes(ctx, workspaceID, resource, additional)
+}
+
 func (s *Service) Checkout(ctx context.Context, workspaceID, email string) (string, error) {
 	if !s.Enabled() {
 		return "", ErrDisabled

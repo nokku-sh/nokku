@@ -376,6 +376,10 @@ func usageFor(stats *db.GetWorkspaceStatsRow, r Resource) int64 {
 		return stats.TeamCount
 	case ResourceCas:
 		return stats.CaCount
+	case ResourceRecordings:
+		// Metered via SyncUsage against the recordings table, not the
+		// workspace stats row. Return 0 so this switch stays exhaustive.
+		return 0
 	}
 	return -1
 }
