@@ -138,10 +138,15 @@ func TestParse(t *testing.T) {
 		want ParsedToken
 	}{
 		{"bare secret", "supersecret", ParsedToken{Secret: "supersecret"}},
-		{"uuid + secret", "123e4567-e89b-12d3-a456-426614174000_mys3cr3t",
-			ParsedToken{ID: "123e4567-e89b-12d3-a456-426614174000", Secret: "mys3cr3t"}},
-		{"two segments without uuid treated as bare secret",
-			"notauuid_part", ParsedToken{Secret: "notauuid_part"}},
+		{
+			"uuid + secret", "123e4567-e89b-12d3-a456-426614174000_mys3cr3t",
+			ParsedToken{ID: "123e4567-e89b-12d3-a456-426614174000", Secret: "mys3cr3t"},
+		},
+		{
+			"two segments without uuid treated as bare secret",
+			"notauuid_part",
+			ParsedToken{Secret: "notauuid_part"},
+		},
 		{
 			"prefix + uuid + secret",
 			"nkd_123e4567-e89b-12d3-a456-426614174000_s3cr3t",
@@ -160,9 +165,11 @@ func TestParse(t *testing.T) {
 				Secret: "a_b_c",
 			},
 		},
-		{"uuid + secret with underscores in secret",
+		{
+			"uuid + secret with underscores in secret",
 			"123e4567-e89b-12d3-a456-426614174000_a_b",
-			ParsedToken{ID: "123e4567-e89b-12d3-a456-426614174000", Secret: "a_b"}},
+			ParsedToken{ID: "123e4567-e89b-12d3-a456-426614174000", Secret: "a_b"},
+		},
 		{"bare secret containing underscores", "a_b_c", ParsedToken{Secret: "a_b_c"}},
 		{"bare secret containing many underscores", "a_b_c_d_e", ParsedToken{Secret: "a_b_c_d_e"}},
 	}
