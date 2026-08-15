@@ -1,7 +1,6 @@
 version: "3"
 
 env:
-  CGO_ENABLED: 0
   GOEXPERIMENT: goroutineleakprofile
   IMAGE: ghcr.io/nokku-sh/nokku
 
@@ -65,9 +64,10 @@ tasks:
       - go mod tidy
       - go fmt ./...
       - go vet ./...
+      - gofumpt -w internal
       - golines -w internal pkg cmd
       - govulncheck ./...
-      - go test -cover ./...
+      - go test -race -count=1 -cover ./...
       - golangci-lint run
       - cd web/ui; pnpm fmt; pnpm lint
 

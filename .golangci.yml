@@ -5,6 +5,7 @@ issues:
 
 formatters:
   enable:
+    - gofumpt
     - goimports
     - golines
 

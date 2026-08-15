@@ -77,7 +77,10 @@ func (p *Pool) Connect(
 				return
 			}
 			if hb, ok := req.GetMsg().(*nokkuv1.ConnectRequest_Heartbeat); ok {
-				if version, ack := p.HeartbeatVersion(daemonID, hb.Heartbeat.GetStateVersion()); ack {
+				if version, ack := p.HeartbeatVersion(
+					daemonID,
+					hb.Heartbeat.GetStateVersion(),
+				); ack {
 					p.sendStateUpdate(conn, &nokkuv1.ConnectResponse{
 						Msg: &nokkuv1.ConnectResponse_HeartbeatAck{
 							HeartbeatAck: &nokkuv1.HeartbeatAck{StateVersion: &version},
