@@ -77,7 +77,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: latest
-          args: release --clean --release-notes=$RUNNER_TEMP/CHANGELOG.md
+          args: release --clean --release-notes=${{ runner.temp }}/CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COSIGN_YES: "true"
