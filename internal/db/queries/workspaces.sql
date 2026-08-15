@@ -4,7 +4,7 @@ WITH
     INSERT INTO
       workspaces (name, description, settings, created_by)
     VALUES
-      (@name, @description, @settings, @created_by)
+      (@name, @description, COALESCE(@settings, '{}'::jsonb), @created_by)
     RETURNING
       *
   ),
