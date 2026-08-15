@@ -84,12 +84,11 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.TeamServiceRemoveTeamMemberProcedure: db.PermTeamsEdit,
 
 	// Workspaces
-	nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure:         db.PermWorkspaceEdit,
-	nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure:         db.PermWorkspaceDelete,
-	nokkuv1connect.WorkspaceServiceUpdateWorkspaceSettingsProcedure: db.PermSettingsEdit,
-	nokkuv1connect.WorkspaceServiceGetWorkspaceMemberProcedure:      db.PermMembersView,
-	nokkuv1connect.WorkspaceServiceListWorkspaceMembersProcedure:    db.PermMembersView,
-	nokkuv1connect.WorkspaceServiceUpdateWorkspaceMemberProcedure:   db.PermMembersEdit,
+	nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure:       db.PermWorkspaceEdit,
+	nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure:       db.PermWorkspaceDelete,
+	nokkuv1connect.WorkspaceServiceGetWorkspaceMemberProcedure:    db.PermMembersView,
+	nokkuv1connect.WorkspaceServiceListWorkspaceMembersProcedure:  db.PermMembersView,
+	nokkuv1connect.WorkspaceServiceUpdateWorkspaceMemberProcedure: db.PermMembersEdit,
 
 	// Workspace domains
 	nokkuv1connect.WorkspaceDomainServiceGetWorkspaceDomainProcedure:             db.PermDomainsView,
@@ -100,13 +99,11 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.WorkspaceDomainServiceRegenerateWorkspaceDomainTokenProcedure: db.PermDomainsEdit,
 
 	// Recordings
-	nokkuv1connect.RecordingServiceListRecordingsProcedure:  db.PermDaemonsView,
-	nokkuv1connect.RecordingServiceGetRecordingProcedure:    db.PermDaemonsView,
-	nokkuv1connect.RecordingServiceDeleteRecordingProcedure: db.PermDaemonsEdit,
-
-	// Workspace settings (recording key)
-	nokkuv1connect.WorkspaceServiceSetRecordingKeyProcedure:   db.PermSettingsEdit,
-	nokkuv1connect.WorkspaceServiceClearRecordingKeyProcedure: db.PermSettingsEdit,
+	nokkuv1connect.RecordingServiceListRecordingsProcedure:    db.PermDaemonsView,
+	nokkuv1connect.RecordingServiceGetRecordingProcedure:      db.PermDaemonsView,
+	nokkuv1connect.RecordingServiceDeleteRecordingProcedure:   db.PermDaemonsEdit,
+	nokkuv1connect.RecordingServiceSetRecordingKeyProcedure:   db.PermSettingsEdit,
+	nokkuv1connect.RecordingServiceClearRecordingKeyProcedure: db.PermSettingsEdit,
 }
 
 type AuthorizationInterceptor struct {

@@ -1,18 +1,8 @@
 -- name: CreateRecording :one
-INSERT INTO recordings (
-  id,
-  workspace_id,
-  daemon_id,
-  username,
-  key_fingerprint
-)
-VALUES (
-  @id,
-  @workspace_id,
-  @daemon_id,
-  @username,
-  @key_fingerprint
-)
+INSERT INTO
+  recordings (id, workspace_id, daemon_id, username, key_fingerprint)
+VALUES
+  (@id, @workspace_id, @daemon_id, @username, @key_fingerprint)
 RETURNING
   *;
 
@@ -87,25 +77,3 @@ LIMIT
 DELETE FROM recordings
 WHERE
   workspace_id = @workspace_id;
-
--- name: UpdateRecordingKey :one
-UPDATE workspace_settings
-SET
-  recording_public_key = @public_key,
-  recording_key_fingerprint = @fingerprint,
-  recording_key_created_at = NOW()
-WHERE
-  workspace_id = @workspace_id
-RETURNING
-  *;
-
--- name: ClearRecordingKey :one
-UPDATE workspace_settings
-SET
-  recording_public_key = '',
-  recording_key_fingerprint = '',
-  recording_key_created_at = NULL
-WHERE
-  workspace_id = @workspace_id
-RETURNING
-  *;

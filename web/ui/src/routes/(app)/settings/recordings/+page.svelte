@@ -23,15 +23,7 @@
 		bytesToBase64
 	} from '$lib/crypto/recordings';
 	import { toDate } from '$lib/utils';
-	import {
-		AlertTriangle,
-		Download,
-		KeyRound,
-		Lock,
-		Unlock,
-		RefreshCw,
-		Database
-	} from '@lucide/svelte';
+	import { Download, KeyRound, Lock, RefreshCw, Database } from '@lucide/svelte';
 
 	const ws = $derived(workspace.get());
 	const list = $derived(recordings.list());
@@ -43,8 +35,8 @@
 	const totalBytes = $derived(list.data?.totalBytes ?? 0);
 	const hasQuota = $derived(recordingQuota !== undefined && recordingQuota.hard > 0);
 
-	const setKey = workspace.setRecordingKey();
-	const clearKey = workspace.clearRecordingKey();
+	const setKey = recordings.setRecordingKey();
+	const clearKey = recordings.clearRecordingKey();
 
 	let keyDialogOpen = $state(false);
 	let keyPair = $state<ReturnType<typeof generateKeyPair> | null>(null);

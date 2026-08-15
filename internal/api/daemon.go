@@ -54,10 +54,21 @@ func (s *DaemonService) UpdateDaemon(
 ) (*nokkuv1.UpdateDaemonResponse, error) {
 	var result *db.Daemon
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		base, err := q.GetDaemon(ctx, req.GetId())
+		if err != nil {
+			return err
+		}
+		// A provided config replaces the stored one wholesale: a partial merge
+		// cannot express turning a scalar off (false/0 are "unpopulated" to
+		// proto.Merge). The UI always sends the complete config it received.
+		config := req.GetConfig()
+		if config == nil {
+			config = base.Config
+		}
 		result, err = q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
 			DaemonID: req.GetId(),
 			Status:   req.GetStatus(),
-			Config:   req.GetConfig(),
+			Config:   config,
 		})
 		return err
 	}); err != nil {
@@ -160,15 +171,11 @@ func (s *DaemonService) RefreshEnrollToken(
 	}
 	expiresAt := time.Now().Add(24 * time.Hour)
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		_, err := q.UpdateWorkspaceSettings(ctx, &db.UpdateWorkspaceSettingsParams{
+		return q.UpdateEnrollToken(ctx, &db.UpdateEnrollTokenParams{
 			WorkspaceID:     req.GetWorkspaceId(),
 			EnrollTokenHash: token.Hash,
 			EnrollExpiresAt: &expiresAt,
 		})
-		if err != nil {
-			return err
-		}
-		return nil
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -184,15 +191,11 @@ func (s *DaemonService) RevokeEnrollToken(
 	req *nokkuv1.RevokeEnrollTokenRequest,
 ) (*nokkuv1.RevokeEnrollTokenResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		_, err := q.UpdateWorkspaceSettings(ctx, &db.UpdateWorkspaceSettingsParams{
+		return q.UpdateEnrollToken(ctx, &db.UpdateEnrollTokenParams{
 			WorkspaceID:     req.GetWorkspaceId(),
 			EnrollTokenHash: "",
 			EnrollExpiresAt: &time.Time{},
 		})
-		if err != nil {
-			return err
-		}
-		return nil
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -280,22 +283,22 @@ func (s *DaemonService) EnrollDaemon(
 	// The enrollment token (verified below against its stored hash)
 	// authorizes this otherwise unauthenticated request, so the daemon
 	// provisioning runs as a system transaction without an actor.
-	var settings *db.WorkspaceSetting
+	var workspace *db.Workspace
 	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
-		settings, err = q.GetWorkspaceSettings(ctx, workspaceID)
+		workspace, err = q.GetWorkspace(ctx, workspaceID)
 		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	if settings.EnrollExpiresAt != nil && settings.EnrollExpiresAt.Before(time.Now()) {
+	if workspace.EnrollExpiresAt != nil && workspace.EnrollExpiresAt.Before(time.Now()) {
 		return nil, NewError(connect.CodeFailedPrecondition, "enrollment token has expired")
 	}
-	if !settings.EnrollTokenHash.Verify(req.GetToken()) {
+	if !workspace.EnrollTokenHash.Verify(req.GetToken()) {
 		return nil, NewError(connect.CodeFailedPrecondition, "invalid enrollment token")
 	}
 
 	status := nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING
-	if settings.EnrollAutoApprove {
+	if workspace.Settings.GetEnrollAutoApprove() {
 		status = nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
 	}
 
@@ -313,6 +316,10 @@ func (s *DaemonService) EnrollDaemon(
 	if _, err := authn.ParseAuthPubkey([]byte(authPubkey)); err != nil {
 		return nil, NewError(connect.CodeInvalidArgument, "invalid auth_pubkey")
 	}
+
+	// New daemons inherit the workspace's adjustable default config, so a
+	// freshly deployed daemon picks up the current SSH server policy.
+	config := workspace.Settings.GetDefaultDaemonConfig()
 
 	fingerprint := getHeader(ctx, "Nokku-Daemon-Fingerprint")
 	hostname := getHeader(ctx, "Nokku-Daemon-Hostname")
@@ -339,7 +346,7 @@ func (s *DaemonService) EnrollDaemon(
 			Name:        uniqueName,
 			Metadata:    metadata,
 			Status:      status,
-			Config:      &nokkuv1.DaemonConfig{RecordSessions: new(true)},
+			Config:      config,
 			AuthMethod:  authMethod,
 			AuthPubkey:  authPubkey,
 		})
@@ -372,6 +379,7 @@ func (s *DaemonService) EnrollDaemon(
 		WorkspaceId: &daemon.WorkspaceID,
 		TargetId:    &target.ID,
 		Status:      &status,
+		Config:      config,
 	}, nil
 }
 
@@ -400,19 +408,16 @@ func (s *DaemonService) SyncDaemon(
 			return err
 		}
 
-		workspaceID = daemon.WorkspaceID
 		status = &daemon.Status
 		config = daemon.Config
 
 		// The workspace recording key rides along so the daemon seals
 		// recordings with the current key and detects regenerations.
-		settings, err := q.GetWorkspaceSettings(ctx, workspaceID)
+		workspace, err := q.GetWorkspace(ctx, daemon.WorkspaceID)
 		if err != nil {
 			return err
 		}
-		if settings.RecordingPublicKey != "" {
-			config.RecordingPublicKey = &settings.RecordingPublicKey
-		}
+		config.RecordingPublicKey = workspace.Settings.RecordingPublicKey
 
 		// A non-accepted daemon learns its status from the response instead
 		// of an error: pending daemons keep retrying, rejected ones get
@@ -477,15 +482,11 @@ func (s *DaemonService) SyncDaemon(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-
-	response := &nokkuv1.SyncDaemonResponse{
+	return &nokkuv1.SyncDaemonResponse{
 		Status:       status,
 		Config:       config,
 		Principals:   principals,
+		CaPublicKey:  &caPublicKey,
 		StateVersion: new(s.cfg.Pool.Version(workspaceID)),
-	}
-	if caPublicKey != "" {
-		response.CaPublicKey = &caPublicKey
-	}
-	return response, nil
+	}, nil
 }

@@ -45,6 +45,12 @@ const (
 	// RecordingServiceDeleteRecordingProcedure is the fully-qualified name of the RecordingService's
 	// DeleteRecording RPC.
 	RecordingServiceDeleteRecordingProcedure = "/nokku.v1.RecordingService/DeleteRecording"
+	// RecordingServiceSetRecordingKeyProcedure is the fully-qualified name of the RecordingService's
+	// SetRecordingKey RPC.
+	RecordingServiceSetRecordingKeyProcedure = "/nokku.v1.RecordingService/SetRecordingKey"
+	// RecordingServiceClearRecordingKeyProcedure is the fully-qualified name of the RecordingService's
+	// ClearRecordingKey RPC.
+	RecordingServiceClearRecordingKeyProcedure = "/nokku.v1.RecordingService/ClearRecordingKey"
 )
 
 // RecordingServiceClient is a client for the nokku.v1.RecordingService service.
@@ -53,6 +59,8 @@ type RecordingServiceClient interface {
 	ListRecordings(context.Context, *v1.ListRecordingsRequest) (*v1.ListRecordingsResponse, error)
 	GetRecording(context.Context, *v1.GetRecordingRequest) (*connect.ServerStreamForClient[v1.GetRecordingResponse], error)
 	DeleteRecording(context.Context, *v1.DeleteRecordingRequest) (*v1.DeleteRecordingResponse, error)
+	SetRecordingKey(context.Context, *v1.SetRecordingKeyRequest) (*v1.SetRecordingKeyResponse, error)
+	ClearRecordingKey(context.Context, *v1.ClearRecordingKeyRequest) (*v1.ClearRecordingKeyResponse, error)
 }
 
 // NewRecordingServiceClient constructs a client for the nokku.v1.RecordingService service. By
@@ -92,15 +100,29 @@ func NewRecordingServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(recordingServiceMethods.ByName("DeleteRecording")),
 			connect.WithClientOptions(opts...),
 		),
+		setRecordingKey: connect.NewClient[v1.SetRecordingKeyRequest, v1.SetRecordingKeyResponse](
+			httpClient,
+			baseURL+RecordingServiceSetRecordingKeyProcedure,
+			connect.WithSchema(recordingServiceMethods.ByName("SetRecordingKey")),
+			connect.WithClientOptions(opts...),
+		),
+		clearRecordingKey: connect.NewClient[v1.ClearRecordingKeyRequest, v1.ClearRecordingKeyResponse](
+			httpClient,
+			baseURL+RecordingServiceClearRecordingKeyProcedure,
+			connect.WithSchema(recordingServiceMethods.ByName("ClearRecordingKey")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // recordingServiceClient implements RecordingServiceClient.
 type recordingServiceClient struct {
-	uploadRecording *connect.Client[v1.UploadRecordingRequest, v1.UploadRecordingResponse]
-	listRecordings  *connect.Client[v1.ListRecordingsRequest, v1.ListRecordingsResponse]
-	getRecording    *connect.Client[v1.GetRecordingRequest, v1.GetRecordingResponse]
-	deleteRecording *connect.Client[v1.DeleteRecordingRequest, v1.DeleteRecordingResponse]
+	uploadRecording   *connect.Client[v1.UploadRecordingRequest, v1.UploadRecordingResponse]
+	listRecordings    *connect.Client[v1.ListRecordingsRequest, v1.ListRecordingsResponse]
+	getRecording      *connect.Client[v1.GetRecordingRequest, v1.GetRecordingResponse]
+	deleteRecording   *connect.Client[v1.DeleteRecordingRequest, v1.DeleteRecordingResponse]
+	setRecordingKey   *connect.Client[v1.SetRecordingKeyRequest, v1.SetRecordingKeyResponse]
+	clearRecordingKey *connect.Client[v1.ClearRecordingKeyRequest, v1.ClearRecordingKeyResponse]
 }
 
 // UploadRecording calls nokku.v1.RecordingService.UploadRecording.
@@ -131,12 +153,32 @@ func (c *recordingServiceClient) DeleteRecording(ctx context.Context, req *v1.De
 	return nil, err
 }
 
+// SetRecordingKey calls nokku.v1.RecordingService.SetRecordingKey.
+func (c *recordingServiceClient) SetRecordingKey(ctx context.Context, req *v1.SetRecordingKeyRequest) (*v1.SetRecordingKeyResponse, error) {
+	response, err := c.setRecordingKey.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// ClearRecordingKey calls nokku.v1.RecordingService.ClearRecordingKey.
+func (c *recordingServiceClient) ClearRecordingKey(ctx context.Context, req *v1.ClearRecordingKeyRequest) (*v1.ClearRecordingKeyResponse, error) {
+	response, err := c.clearRecordingKey.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
 // RecordingServiceHandler is an implementation of the nokku.v1.RecordingService service.
 type RecordingServiceHandler interface {
 	UploadRecording(context.Context, *connect.ClientStream[v1.UploadRecordingRequest]) (*v1.UploadRecordingResponse, error)
 	ListRecordings(context.Context, *v1.ListRecordingsRequest) (*v1.ListRecordingsResponse, error)
 	GetRecording(context.Context, *v1.GetRecordingRequest, *connect.ServerStream[v1.GetRecordingResponse]) error
 	DeleteRecording(context.Context, *v1.DeleteRecordingRequest) (*v1.DeleteRecordingResponse, error)
+	SetRecordingKey(context.Context, *v1.SetRecordingKeyRequest) (*v1.SetRecordingKeyResponse, error)
+	ClearRecordingKey(context.Context, *v1.ClearRecordingKeyRequest) (*v1.ClearRecordingKeyResponse, error)
 }
 
 // NewRecordingServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -172,6 +214,18 @@ func NewRecordingServiceHandler(svc RecordingServiceHandler, opts ...connect.Han
 		connect.WithSchema(recordingServiceMethods.ByName("DeleteRecording")),
 		connect.WithHandlerOptions(opts...),
 	)
+	recordingServiceSetRecordingKeyHandler := connect.NewUnaryHandlerSimple(
+		RecordingServiceSetRecordingKeyProcedure,
+		svc.SetRecordingKey,
+		connect.WithSchema(recordingServiceMethods.ByName("SetRecordingKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	recordingServiceClearRecordingKeyHandler := connect.NewUnaryHandlerSimple(
+		RecordingServiceClearRecordingKeyProcedure,
+		svc.ClearRecordingKey,
+		connect.WithSchema(recordingServiceMethods.ByName("ClearRecordingKey")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/nokku.v1.RecordingService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RecordingServiceUploadRecordingProcedure:
@@ -182,6 +236,10 @@ func NewRecordingServiceHandler(svc RecordingServiceHandler, opts ...connect.Han
 			recordingServiceGetRecordingHandler.ServeHTTP(w, r)
 		case RecordingServiceDeleteRecordingProcedure:
 			recordingServiceDeleteRecordingHandler.ServeHTTP(w, r)
+		case RecordingServiceSetRecordingKeyProcedure:
+			recordingServiceSetRecordingKeyHandler.ServeHTTP(w, r)
+		case RecordingServiceClearRecordingKeyProcedure:
+			recordingServiceClearRecordingKeyHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -205,4 +263,12 @@ func (UnimplementedRecordingServiceHandler) GetRecording(context.Context, *v1.Ge
 
 func (UnimplementedRecordingServiceHandler) DeleteRecording(context.Context, *v1.DeleteRecordingRequest) (*v1.DeleteRecordingResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.RecordingService.DeleteRecording is not implemented"))
+}
+
+func (UnimplementedRecordingServiceHandler) SetRecordingKey(context.Context, *v1.SetRecordingKeyRequest) (*v1.SetRecordingKeyResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.RecordingService.SetRecordingKey is not implemented"))
+}
+
+func (UnimplementedRecordingServiceHandler) ClearRecordingKey(context.Context, *v1.ClearRecordingKeyRequest) (*v1.ClearRecordingKeyResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.RecordingService.ClearRecordingKey is not implemented"))
 }

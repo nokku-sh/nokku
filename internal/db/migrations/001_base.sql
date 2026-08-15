@@ -81,14 +81,17 @@ CREATE TABLE IF NOT EXISTS backup_codes (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Roles only pin role names for workspace_members and service_accounts.
--- The permission model lives entirely in Go (internal/db/roles.go).
 CREATE TABLE IF NOT EXISTS roles (name TEXT PRIMARY KEY, description TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE IF NOT EXISTS workspaces (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   name TEXT NOT NULL,
   description TEXT,
+  enroll_token_hash TEXT,
+  enroll_expires_at TIMESTAMPTZ,
+  invite_token_hash TEXT,
+  invite_expires_at TIMESTAMPTZ,
+  settings JSONB NOT NULL DEFAULT '{}',
   created_by UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -123,19 +126,6 @@ CREATE TABLE IF NOT EXISTS workspace_domains (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, domain)
-);
-
-CREATE TABLE IF NOT EXISTS workspace_settings (
-  workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
-  enroll_token_hash TEXT,
-  enroll_expires_at TIMESTAMPTZ,
-  enroll_auto_approve BOOLEAN NOT NULL DEFAULT TRUE,
-  invite_token_hash TEXT,
-  invite_expires_at TIMESTAMPTZ,
-  recording_public_key TEXT NOT NULL DEFAULT '',
-  recording_key_fingerprint TEXT NOT NULL DEFAULT '',
-  recording_key_created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS oidc_providers (
@@ -202,8 +192,7 @@ CREATE TABLE IF NOT EXISTS daemons (
   name TEXT NOT NULL,
   -- Signing method used for request authentication: 'tpm' or 'soft'.
   auth_method TEXT NOT NULL,
-  -- PEM-encoded ECDSA public key used to verify signed request challenges.
-  auth_pubkey TEXT NOT NULL,
+  auth_pubkey TEXT NOT NULL, -- PEM-encoded ECDSA public key 
   status INTEGER NOT NULL DEFAULT 1, -- 1=pending, 2=accepted, 3=rejected
   online BOOLEAN NOT NULL DEFAULT FALSE,
   config JSONB NOT NULL DEFAULT '{}',
@@ -562,10 +551,6 @@ ALTER TABLE workspace_members ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE workspace_members FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE workspace_settings ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE workspace_settings FORCE ROW LEVEL SECURITY;
-
 ALTER TABLE workspace_domains ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE workspace_domains FORCE ROW LEVEL SECURITY;
@@ -659,18 +644,6 @@ SELECT
   );
 
 CREATE POLICY workspace_members_write ON workspace_members FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
--- Workspace settings ---------------------------------------------------------
-CREATE POLICY workspace_settings_select ON workspace_settings FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = current_workspace_id ()
-    OR is_workspace_member (workspace_id)
-  );
-
-CREATE POLICY workspace_settings_write ON workspace_settings FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
   CHECK (workspace_id = current_workspace_id ());
 

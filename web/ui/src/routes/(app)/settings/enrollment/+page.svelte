@@ -7,13 +7,13 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import * as Empty from '$lib/components/ui/empty';
+	import * as Item from '$lib/components/ui/item';
 	import { Switch } from '$lib/components/ui/switch';
 	import InputGroupVariants from '$lib/components/ui/input-group/input-group-variants.svelte';
 	import { Label } from '$lib/components/ui/label';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import type { WorkspaceSettings } from '$lib/gen/nokku/v1/workspace_pb';
 	import { formatTs, toDate } from '$lib/utils';
 	import {
 		Bot,
@@ -26,32 +26,39 @@
 		MonitorPlay,
 		PartyPopper,
 		RefreshCw,
-		Save,
 		ShieldCheck,
 		Terminal,
 		Trash2
 	} from '@lucide/svelte';
 	import CopyButton from '$lib/components/ui/copy-button/copy-button.svelte';
+	import { useDebounce } from 'runed';
+	import { Input } from '$lib/components/ui/input';
+	import { create } from '@bufbuild/protobuf';
+	import { WorkspaceSettingsSchema } from '$lib/gen/nokku/v1/workspace_pb';
+	import { durationFromMs } from '@bufbuild/protobuf/wkt';
+	import { DaemonConfigSchema } from '$lib/gen/nokku/v1/daemon_pb';
 
 	const ws = $derived(workspace.get());
 	const token = daemon.refreshToken();
 	const revoke = daemon.revokeToken();
 
-	let settingsData = $state({ enrollAutoApprove: false } as WorkspaceSettings);
-
-	$effect(() => {
-		if (ws.data?.settings) settingsData = { ...ws.data?.settings };
+	// A proper protobuf message (not a plain object) so mutations and the
+	// transport both work. defaultDaemonConfig is always present, which keeps
+	// the bindings below free of undefined-guards.
+	let settings = $derived.by(() => {
+		const s = create(WorkspaceSettingsSchema, ws.data?.settings);
+		if (!s.defaultDaemonConfig) s.defaultDaemonConfig = create(DaemonConfigSchema);
+		return s;
 	});
+	const daemonConfig = $derived(settings.defaultDaemonConfig!);
 
 	let curlCommand = $derived(
 		`curl -fsSL https://get.nokku.sh/nokkud | TOKEN=${token.data?.token} sh`
 	);
 	let cmdCommand = $derived(`nokkud --enroll ${token.data?.token}`);
 
-	const update = workspace.updateSettings();
-	function handleUpdate() {
-		update.mutate({ ...settingsData });
-	}
+	const update = workspace.update();
+	const set = useDebounce(() => update.mutate({ settings: settings }), 500);
 </script>
 
 <PageHeader
@@ -68,34 +75,172 @@
 			Enrollment Policy
 		</Card.Title>
 	</Card.Header>
-	<Card.Content class="space-y-5">
-		<div
-			class="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50"
-		>
-			<div class="space-y-1">
-				<div class="flex items-center gap-2">
-					<Label class="text-sm font-medium">Auto-approve new daemons</Label>
-					<Badge variant={settingsData.enrollAutoApprove ? 'default' : 'outline'}>
-						{settingsData.enrollAutoApprove ? 'Enabled' : 'Disabled'}
-					</Badge>
-				</div>
-				<p class="text-sm text-muted-foreground">
-					{settingsData.enrollAutoApprove
+	<Card.Content>
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>Auto-approve new daemons</Item.Title>
+				<Item.Description>
+					{settings.enrollAutoApprove
 						? 'Daemons are automatically approved when they enroll with a valid token.'
 						: 'New daemons require manual approval before they can connect.'}
-				</p>
-			</div>
-			<Switch bind:checked={settingsData.enrollAutoApprove} />
-		</div>
+				</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Switch
+					checked={settings.enrollAutoApprove}
+					onCheckedChange={(v) => {
+						settings.enrollAutoApprove = v;
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
 	</Card.Content>
+</Card.Root>
 
-	<Card.Footer class="flex justify-end">
-		<Button variant="default" size="sm" onclick={handleUpdate} disabled={update.isPending}>
-			<Save class={update.isPending ? 'hidden' : ''} />
-			<Spinner class={update.isPending ? '' : 'hidden'} />
-			Save
-		</Button>
-	</Card.Footer>
+<!-- Default Daemon Configuration -->
+<Card.Root>
+	<Card.Header>
+		<Card.Title class="flex items-center gap-2 text-base">
+			<Terminal size={18} />
+			Daemon Configuration
+		</Card.Title>
+		<Card.Description>
+			SSH server settings new daemons inherit on enrollment. Existing daemons keep their own
+			configuration.
+		</Card.Description>
+	</Card.Header>
+	<Card.Content class="flex flex-col gap-4">
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>Session recording</Item.Title>
+				<Item.Description>Record every SSH session for later playback.</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Switch
+					checked={daemonConfig.recordSessions}
+					onCheckedChange={(v) => {
+						daemonConfig.recordSessions = v;
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>Port forwarding</Item.Title>
+				<Item.Description>Allow -L, -D and -R port forwards from sessions.</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Switch
+					checked={daemonConfig.allowForwarding}
+					onCheckedChange={(v) => {
+						daemonConfig.allowForwarding = v;
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>Agent forwarding</Item.Title>
+				<Item.Description
+					>Expose the client's ssh-agent to sessions via SSH_AUTH_SOCK.</Item.Description
+				>
+			</Item.Content>
+			<Item.Actions>
+				<Switch
+					checked={daemonConfig.allowAgentForwarding}
+					onCheckedChange={(v) => {
+						daemonConfig.allowAgentForwarding = v;
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>Gateway ports</Item.Title>
+				<Item.Description>
+					Allow remote (-R) forwards to bind addresses other than loopback.
+				</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Switch
+					checked={daemonConfig.gatewayPorts}
+					onCheckedChange={(v) => {
+						daemonConfig.gatewayPorts = v;
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>Max sessions per connection</Item.Title>
+				<Item.Description>Limit the number of sessions per connection.</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Input
+					id="cfg-max-sessions"
+					type="number"
+					min="0"
+					value={daemonConfig.maxSessions}
+					oninput={(e) => {
+						daemonConfig.maxSessions = Number((e.currentTarget as HTMLInputElement).value);
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>Max concurrent connections</Item.Title>
+				<Item.Description>Limit the number of concurrent connections.</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Input
+					id="cfg-max-conns"
+					type="number"
+					min="0"
+					value={daemonConfig.maxConnections}
+					oninput={(e) => {
+						daemonConfig.maxConnections = Number((e.currentTarget as HTMLInputElement).value);
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>Client alive interval (seconds)</Item.Title>
+				<Item.Description>
+					How often the server probes idle clients. Zero disables keepalive probing.
+				</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Input
+					id="cfg-alive-interval"
+					type="number"
+					min="0"
+					value={daemonConfig.clientAliveInterval?.seconds}
+					oninput={(e) => {
+						let seconds = Number((e.currentTarget as HTMLInputElement).value);
+						daemonConfig.clientAliveInterval = durationFromMs(
+							Math.max(0, Math.floor(seconds)) * 1000
+						);
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+	</Card.Content>
 </Card.Root>
 
 <!-- Enrollment Token -->
@@ -117,8 +262,8 @@
 						<KeyRound />
 					</Empty.Media>
 					<Empty.Title>
-						{#if settingsData.enrollExpiresAt && toDate(settingsData.enrollExpiresAt) > new Date()}
-							Token expires {formatTs(settingsData.enrollExpiresAt, 'relative')}
+						{#if ws.data?.enrollExpiresAt && toDate(ws.data.enrollExpiresAt) > new Date()}
+							Token expires {formatTs(ws.data.enrollExpiresAt, 'relative')}
 						{:else}
 							No active enrollment token
 						{/if}
@@ -130,7 +275,7 @@
 				<Empty.Content>
 					<div class="flex items-center gap-2">
 						<Button size="sm" onclick={token.mutate}>Generate token</Button>
-						{#if settingsData.enrollExpiresAt && toDate(settingsData.enrollExpiresAt) > new Date()}
+						{#if ws.data?.enrollExpiresAt && toDate(ws.data.enrollExpiresAt) > new Date()}
 							<Button
 								variant="destructive"
 								size="sm"

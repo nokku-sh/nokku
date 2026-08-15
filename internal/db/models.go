@@ -266,12 +266,17 @@ type UserIdentity struct {
 }
 
 type Workspace struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description"`
-	CreatedBy   string    `json:"createdBy"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID              string                   `json:"id"`
+	Name            string                   `json:"name"`
+	Description     *string                  `json:"description"`
+	EnrollTokenHash crypto.HashedToken       `json:"enrollTokenHash"`
+	EnrollExpiresAt *time.Time               `json:"enrollExpiresAt"`
+	InviteTokenHash crypto.HashedToken       `json:"inviteTokenHash"`
+	InviteExpiresAt *time.Time               `json:"inviteExpiresAt"`
+	Settings        *nokku.WorkspaceSettings `json:"settings"`
+	CreatedBy       string                   `json:"createdBy"`
+	CreatedAt       time.Time                `json:"createdAt"`
+	UpdatedAt       time.Time                `json:"updatedAt"`
 }
 
 type WorkspaceDomain struct {
@@ -289,19 +294,6 @@ type WorkspaceMember struct {
 	RoleName    string    `json:"roleName"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
-}
-
-type WorkspaceSetting struct {
-	WorkspaceID             string             `json:"workspaceId"`
-	EnrollTokenHash         crypto.HashedToken `json:"enrollTokenHash"`
-	EnrollExpiresAt         *time.Time         `json:"enrollExpiresAt"`
-	EnrollAutoApprove       bool               `json:"enrollAutoApprove"`
-	InviteTokenHash         crypto.HashedToken `json:"inviteTokenHash"`
-	InviteExpiresAt         *time.Time         `json:"inviteExpiresAt"`
-	RecordingPublicKey      string             `json:"recordingPublicKey"`
-	RecordingKeyFingerprint string             `json:"recordingKeyFingerprint"`
-	RecordingKeyCreatedAt   *time.Time         `json:"recordingKeyCreatedAt"`
-	UpdatedAt               time.Time          `json:"updatedAt"`
 }
 
 type WorkspaceSubscription struct {

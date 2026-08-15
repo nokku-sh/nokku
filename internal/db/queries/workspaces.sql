@@ -2,9 +2,9 @@
 WITH
   new_workspace AS (
     INSERT INTO
-      workspaces (name, description, created_by)
+      workspaces (name, description, settings, created_by)
     VALUES
-      (@name, @description, @created_by)
+      (@name, @description, @settings, @created_by)
     RETURNING
       *
   ),
@@ -40,16 +40,6 @@ WITH
     RETURNING
       workspace_id
   ),
-  new_settings AS (
-    INSERT INTO
-      workspace_settings (workspace_id)
-    SELECT
-      id
-    FROM
-      new_workspace
-    RETURNING
-      workspace_id
-  ),
   new_subscription AS (
     INSERT INTO
       workspace_subscriptions (workspace_id)
@@ -67,23 +57,29 @@ FROM
 
 -- name: GetWorkspace :one
 SELECT
-  sqlc.embed(w),
-  sqlc.embed(ws)
+  *
 FROM
   workspaces w
-  LEFT JOIN workspace_settings ws ON ws.workspace_id = w.id
 WHERE
   w.id = @workspace_id;
 
+-- name: GetWorkspaceByInviteToken :one
+SELECT
+  *
+FROM
+  workspaces
+WHERE
+  id = @workspace_id
+  AND invite_token_hash = @invite_token_hash
+  AND invite_token_expires_at > NOW();
+
 -- name: ListWorkspaces :many
 SELECT
-  sqlc.embed(w),
-  sqlc.embed(ws)
+  *
 FROM
-  workspaces w
-  LEFT JOIN workspace_settings ws ON ws.workspace_id = w.id
+  workspaces
 ORDER BY
-  w.id ASC;
+  id ASC;
 
 -- name: CountWorkspaces :one
 SELECT
@@ -230,11 +226,28 @@ WHERE
 UPDATE workspaces
 SET
   name = COALESCE(sqlc.narg('name'), name),
-  description = COALESCE(sqlc.narg('description'), description)
+  description = COALESCE(sqlc.narg('description'), description),
+  settings = @settings
 WHERE
   id = @workspace_id
 RETURNING
   *;
+
+-- name: UpdateEnrollToken :exec
+UPDATE workspaces
+SET
+  enroll_token_hash = @enroll_token_hash,
+  enroll_expires_at = @enroll_expires_at
+WHERE
+  id = @workspace_id;
+
+-- name: UpdateInviteToken :exec
+UPDATE workspaces
+SET
+  invite_token_hash = @invite_token_hash,
+  invite_expires_at = @invite_expires_at
+WHERE
+  id = @workspace_id;
 
 -- name: GetWorkspaceOwner :one
 SELECT
@@ -310,27 +323,5 @@ SET
   created_by = @new_owner_id
 WHERE
   workspaces.id = @workspace_id
-RETURNING
-  *;
-
----- Workspace Settings -------------------------------------------------------\
--- name: GetWorkspaceSettings :one
-SELECT
-  *
-FROM
-  workspace_settings
-WHERE
-  workspace_id = @workspace_id;
-
--- name: UpdateWorkspaceSettings :one
-UPDATE workspace_settings
-SET
-  enroll_token_hash = COALESCE(sqlc.narg('enroll_token_hash'), enroll_token_hash),
-  enroll_expires_at = COALESCE(sqlc.narg('enroll_expires_at'), enroll_expires_at),
-  enroll_auto_approve = COALESCE(sqlc.narg('enroll_auto_approve'), enroll_auto_approve),
-  invite_token_hash = COALESCE(sqlc.narg('invite_token_hash'), invite_token_hash),
-  invite_expires_at = COALESCE(sqlc.narg('invite_expires_at'), invite_expires_at)
-WHERE
-  workspace_id = @workspace_id
 RETURNING
   *;

@@ -3,9 +3,12 @@ package api
 import (
 	"context"
 	"errors"
-	"log/slog"
+	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
@@ -13,9 +16,26 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/ssh"
-	"github.com/nokku-sh/nokku/internal/storage"
 	"github.com/nokku-sh/nokku/internal/util"
 )
+
+func DefaultWorkspaceSettings() *nokkuv1.WorkspaceSettings {
+	return &nokkuv1.WorkspaceSettings{
+		EnrollAutoApprove:       new(true),
+		RecordingPublicKey:      new(string),
+		RecordingKeyFingerprint: new(string),
+		RecordingKeyCreatedAt:   &timestamppb.Timestamp{},
+		DefaultDaemonConfig: &nokkuv1.DaemonConfig{
+			RecordSessions:       new(true),
+			AllowForwarding:      new(true),
+			AllowAgentForwarding: new(true),
+			GatewayPorts:         new(false),
+			MaxSessions:          new(int32(10)),
+			MaxConnections:       new(int32(100)),
+			ClientAliveInterval:  durationpb.New(60 * time.Second),
+		},
+	}
+}
 
 type WorkspaceService struct {
 	cfg *config.Config
@@ -29,7 +49,7 @@ func (s *WorkspaceService) GetWorkspace(
 	ctx context.Context,
 	req *nokkuv1.GetWorkspaceRequest,
 ) (*nokkuv1.GetWorkspaceResponse, error) {
-	var workspace *db.GetWorkspaceRow
+	var workspace *db.Workspace
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		workspace, err = q.GetWorkspace(ctx, req.GetWorkspaceId())
 		return err
@@ -65,6 +85,7 @@ func (s *WorkspaceService) CreateWorkspace(
 		Name:        req.GetName(),
 		Description: req.Description,
 		CreatedBy:   user.ID,
+		Settings:    DefaultWorkspaceSettings(),
 	})
 	if err != nil {
 		return nil, DBError(err)
@@ -84,10 +105,17 @@ func (s *WorkspaceService) UpdateWorkspace(
 ) (*nokkuv1.UpdateWorkspaceResponse, error) {
 	var workspace *db.Workspace
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		base, err := q.GetWorkspace(ctx, req.GetWorkspaceId())
+		if err != nil {
+			return err
+		}
+
+		proto.Merge(base.Settings, req.GetSettings())
 		workspace, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			Name:        req.Name,
 			Description: req.Description,
+			Settings:    base.Settings,
 		})
 		return err
 	}); err != nil {
@@ -124,7 +152,7 @@ func (s *WorkspaceService) ListWorkspaces(
 	ctx context.Context,
 	_ *nokkuv1.ListWorkspacesRequest,
 ) (*nokkuv1.ListWorkspacesResponse, error) {
-	var workspaces []*db.ListWorkspacesRow
+	var workspaces []*db.Workspace
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		workspaces, err = q.ListWorkspaces(ctx)
 		return err
@@ -135,86 +163,6 @@ func (s *WorkspaceService) ListWorkspaces(
 	return &nokkuv1.ListWorkspacesResponse{
 		Workspaces: db.ListWorkspacesToProto(workspaces),
 	}, nil
-}
-
-func (s *WorkspaceService) UpdateWorkspaceSettings(
-	ctx context.Context,
-	req *nokkuv1.UpdateWorkspaceSettingsRequest,
-) (*nokkuv1.UpdateWorkspaceSettingsResponse, error) {
-	var settings *db.WorkspaceSetting
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		params := &db.UpdateWorkspaceSettingsParams{WorkspaceID: req.GetWorkspaceId()}
-		if req.EnrollAutoApprove != nil {
-			params.EnrollAutoApprove = req.EnrollAutoApprove
-		}
-		settings, err = q.UpdateWorkspaceSettings(ctx, params)
-		return err
-	}); err != nil {
-		return nil, DBError(err)
-	}
-
-	return &nokkuv1.UpdateWorkspaceSettingsResponse{
-		Settings: settings.ToProto(),
-	}, nil
-}
-
-func (s *WorkspaceService) SetRecordingKey(
-	ctx context.Context,
-	req *nokkuv1.SetRecordingKeyRequest,
-) (*nokkuv1.SetRecordingKeyResponse, error) {
-	pub, err := crypto.ParseX25519PublicKey(req.GetPublicKey())
-	if err != nil {
-		return nil, NewError(connect.CodeInvalidArgument, err.Error())
-	}
-	fingerprint := crypto.PublicKeyFingerprint(pub)
-
-	var settings *db.WorkspaceSetting
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		settings, err = q.UpdateRecordingKey(ctx, &db.UpdateRecordingKeyParams{
-			WorkspaceID: req.GetWorkspaceId(),
-			PublicKey:   req.GetPublicKey(),
-			Fingerprint: fingerprint,
-		})
-		return err
-	}); err != nil {
-		return nil, DBError(err)
-	}
-
-	if err := s.wipeRecordings(ctx, req.GetWorkspaceId()); err != nil {
-		return nil, err
-	}
-	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
-
-	return &nokkuv1.SetRecordingKeyResponse{Settings: settings.ToProto()}, nil
-}
-
-func (s *WorkspaceService) ClearRecordingKey(
-	ctx context.Context,
-	req *nokkuv1.ClearRecordingKeyRequest,
-) (*nokkuv1.ClearRecordingKeyResponse, error) {
-	var settings *db.WorkspaceSetting
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		settings, err = q.ClearRecordingKey(ctx, req.GetWorkspaceId())
-		return err
-	}); err != nil {
-		return nil, DBError(err)
-	}
-
-	if err := s.wipeRecordings(ctx, req.GetWorkspaceId()); err != nil {
-		return nil, err
-	}
-	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
-
-	return &nokkuv1.ClearRecordingKeyResponse{Settings: settings.ToProto()}, nil
-}
-
-func (s *WorkspaceService) wipeRecordings(ctx context.Context, workspaceID string) error {
-	if err := s.cfg.Storage.DeletePrefix(ctx, storage.RecordingsPrefix(workspaceID)); err != nil {
-		slog.Warn("wipe recording objects", "workspace_id", workspaceID, "error", err)
-	}
-	return s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		return q.DeleteWorkspaceRecordings(ctx, workspaceID)
-	})
 }
 
 func (s *WorkspaceService) GetWorkspaceMember(

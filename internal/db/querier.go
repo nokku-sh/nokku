@@ -23,7 +23,6 @@ type Querier interface {
 	// Whether a subject can reach a specific target. See GetTargetsBySubject for
 	// the definition of a subject and team membership expansion.
 	CheckTargetAccess(ctx context.Context, arg *CheckTargetAccessParams) (*Target, error)
-	ClearRecordingKey(ctx context.Context, workspaceID string) (*WorkspaceSetting, error)
 	CountAuditLogs(ctx context.Context, arg *CountAuditLogsParams) (int32, error)
 	CountMembers(ctx context.Context, arg *CountMembersParams) (int32, error)
 	CountVerifiedWorkspaceDomains(ctx context.Context, workspaceID string) (int32, error)
@@ -123,13 +122,12 @@ type Querier interface {
 	GetUserIdentity(ctx context.Context, arg *GetUserIdentityParams) (*UserIdentity, error)
 	GetUserWebDevice(ctx context.Context, arg *GetUserWebDeviceParams) (*GetUserWebDeviceRow, error)
 	GetUserWorkspaceIDs(ctx context.Context, userID string) ([]string, error)
-	GetWorkspace(ctx context.Context, workspaceID string) (*GetWorkspaceRow, error)
+	GetWorkspace(ctx context.Context, workspaceID string) (*Workspace, error)
+	GetWorkspaceByInviteToken(ctx context.Context, arg *GetWorkspaceByInviteTokenParams) (*Workspace, error)
 	GetWorkspaceDomain(ctx context.Context, domain string) (*WorkspaceDomain, error)
 	GetWorkspaceMember(ctx context.Context, arg *GetWorkspaceMemberParams) (*GetWorkspaceMemberRow, error)
 	GetWorkspaceOwner(ctx context.Context, workspaceID string) (string, error)
 	GetWorkspacePrincipals(ctx context.Context, workspaceID string) ([]string, error)
-	//-- Workspace Settings -------------------------------------------------------\
-	GetWorkspaceSettings(ctx context.Context, workspaceID string) (*WorkspaceSetting, error)
 	GetWorkspaceStats(ctx context.Context, workspaceID string) (*GetWorkspaceStatsRow, error)
 	GetWorkspaceTags(ctx context.Context, workspaceID string) ([]string, error)
 	GetWorkspacesByOwner(ctx context.Context, userID string) ([]string, error)
@@ -153,7 +151,7 @@ type Querier interface {
 	ListWorkspaceAuditLogWorkspaceIDs(ctx context.Context) ([]*string, error)
 	ListWorkspaceDomains(ctx context.Context, workspaceID string) ([]*WorkspaceDomain, error)
 	ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error)
-	ListWorkspaces(ctx context.Context) ([]*ListWorkspacesRow, error)
+	ListWorkspaces(ctx context.Context) ([]*Workspace, error)
 	OldestRecordings(ctx context.Context, arg *OldestRecordingsParams) ([]*Recording, error)
 	RegenerateVerificationToken(ctx context.Context, domain string) (*WorkspaceDomain, error)
 	RemoveServiceAccountFromPrincipal(ctx context.Context, arg *RemoveServiceAccountFromPrincipalParams) error
@@ -185,13 +183,14 @@ type Querier interface {
 	UpdateDaemonStatus(ctx context.Context, arg *UpdateDaemonStatusParams) (*Daemon, error)
 	UpdateDaemonUsage(ctx context.Context, daemonID string) error
 	UpdateEmailRecovery(ctx context.Context, arg *UpdateEmailRecoveryParams) error
+	UpdateEnrollToken(ctx context.Context, arg *UpdateEnrollTokenParams) error
+	UpdateInviteToken(ctx context.Context, arg *UpdateInviteTokenParams) error
 	UpdateKeysetWrappedData(ctx context.Context, data []byte) (int64, error)
 	UpdateOIDCClientSecret(ctx context.Context, arg *UpdateOIDCClientSecretParams) error
 	UpdateOIDCProvider(ctx context.Context, arg *UpdateOIDCProviderParams) (*OidcProvider, error)
 	UpdatePasskeyLastUsed(ctx context.Context, arg *UpdatePasskeyLastUsedParams) error
 	UpdatePasskeyName(ctx context.Context, arg *UpdatePasskeyNameParams) error
 	UpdatePasskeySignCount(ctx context.Context, arg *UpdatePasskeySignCountParams) error
-	UpdateRecordingKey(ctx context.Context, arg *UpdateRecordingKeyParams) (*WorkspaceSetting, error)
 	UpdateSAMLPrivateKey(ctx context.Context, arg *UpdateSAMLPrivateKeyParams) error
 	UpdateSAMLProvider(ctx context.Context, arg *UpdateSAMLProviderParams) (*SamlProvider, error)
 	UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (*ServiceAccount, error)
@@ -205,7 +204,6 @@ type Querier interface {
 	UpdateWorkspace(ctx context.Context, arg *UpdateWorkspaceParams) (*Workspace, error)
 	UpdateWorkspaceMember(ctx context.Context, arg *UpdateWorkspaceMemberParams) error
 	UpdateWorkspaceOwner(ctx context.Context, arg *UpdateWorkspaceOwnerParams) (*Workspace, error)
-	UpdateWorkspaceSettings(ctx context.Context, arg *UpdateWorkspaceSettingsParams) (*WorkspaceSetting, error)
 	// Rotation-only (rotate-secrets command): persist the target keyset
 	// atomically within the rotation transaction. Never used on the boot path.
 	UpsertKeysetWrappedData(ctx context.Context, data []byte) error

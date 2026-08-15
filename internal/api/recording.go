@@ -11,6 +11,7 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
+	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
@@ -214,11 +215,11 @@ func (s *RecordingService) resolveUpload(
 		}
 		workspaceID = daemon.WorkspaceID
 
-		settings, err := q.GetWorkspaceSettings(ctx, workspaceID)
+		workspace, err := q.GetWorkspace(ctx, daemon.WorkspaceID)
 		if err != nil {
 			return err
 		}
-		expectedFP := settings.RecordingKeyFingerprint
+		expectedFP := workspace.Settings.GetRecordingKeyFingerprint()
 		if expectedFP == "" {
 			return errNoRecordingKey
 		}
@@ -388,4 +389,74 @@ func (s *RecordingService) DeleteRecording(
 		slog.Warn("delete recording object", "recording_id", req.GetRecordingId(), "error", err)
 	}
 	return &nokkuv1.DeleteRecordingResponse{}, nil
+}
+
+func (s *RecordingService) SetRecordingKey(
+	ctx context.Context,
+	req *nokkuv1.SetRecordingKeyRequest,
+) (*nokkuv1.SetRecordingKeyResponse, error) {
+	pub, err := crypto.ParseX25519PublicKey(req.GetPublicKey())
+	if err != nil {
+		return nil, NewError(connect.CodeInvalidArgument, err.Error())
+	}
+	fingerprint := crypto.PublicKeyFingerprint(pub)
+
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		base, err := q.GetWorkspace(ctx, req.GetWorkspaceId())
+		if err != nil {
+			return err
+		}
+		base.Settings.RecordingPublicKey = req.PublicKey
+		base.Settings.RecordingKeyFingerprint = &fingerprint
+		_, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
+			WorkspaceID: base.ID,
+			Settings:    base.Settings,
+		})
+		return err
+	}); err != nil {
+		return nil, DBError(err)
+	}
+
+	if err := s.wipeRecordings(ctx, req.GetWorkspaceId()); err != nil {
+		return nil, err
+	}
+	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
+
+	return &nokkuv1.SetRecordingKeyResponse{}, nil
+}
+
+func (s *RecordingService) ClearRecordingKey(
+	ctx context.Context,
+	req *nokkuv1.ClearRecordingKeyRequest,
+) (*nokkuv1.ClearRecordingKeyResponse, error) {
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		base, err := q.GetWorkspace(ctx, req.GetWorkspaceId())
+		if err != nil {
+			return err
+		}
+		base.Settings.RecordingPublicKey = nil
+		_, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
+			WorkspaceID: base.ID,
+			Settings:    base.Settings,
+		})
+		return err
+	}); err != nil {
+		return nil, DBError(err)
+	}
+
+	if err := s.wipeRecordings(ctx, req.GetWorkspaceId()); err != nil {
+		return nil, err
+	}
+	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
+
+	return &nokkuv1.ClearRecordingKeyResponse{}, nil
+}
+
+func (s *RecordingService) wipeRecordings(ctx context.Context, workspaceID string) error {
+	if err := s.cfg.Storage.DeletePrefix(ctx, storage.RecordingsPrefix(workspaceID)); err != nil {
+		slog.Warn("wipe recording objects", "workspace_id", workspaceID, "error", err)
+	}
+	return s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		return q.DeleteWorkspaceRecordings(ctx, workspaceID)
+	})
 }
