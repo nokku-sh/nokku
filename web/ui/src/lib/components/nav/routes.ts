@@ -17,6 +17,7 @@ import {
 	User,
 	Users,
 	VectorSquare,
+	Video,
 	Waypoints,
 	type IconProps
 } from '@lucide/svelte';
@@ -56,7 +57,8 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			]
 		},
 		{ title: 'Certificates', url: '/certificates', icon: IdCard, shortcut: 'c' },
-		{ title: 'Sessions', url: '/sessions', icon: SquareTerminal }
+		{ title: 'Sessions', url: '/sessions', icon: SquareTerminal },
+		{ title: 'Recordings', url: '/recordings', icon: Video }
 	],
 	Management: [
 		{ title: 'Activity', url: '/activity', icon: Activity, shortcut: 'a' },
@@ -67,7 +69,8 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			items: [
 				{ title: 'General', url: '/settings', icon: Settings, shortcut: 's' },
 				{ title: 'Single Sign-On', url: '/settings/sso', icon: KeyRound },
-				{ title: 'Enrollment', url: '/settings/enrollment', icon: Bot }
+				{ title: 'Enrollment', url: '/settings/enrollment', icon: Bot },
+				{ title: 'Recordings', url: '/settings/recordings', icon: Video }
 			]
 		}
 	]
