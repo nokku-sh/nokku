@@ -98,6 +98,15 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.WorkspaceDomainServiceDeleteWorkspaceDomainProcedure:          db.PermDomainsEdit,
 	nokkuv1connect.WorkspaceDomainServiceVerifyWorkspaceDomainProcedure:          db.PermDomainsEdit,
 	nokkuv1connect.WorkspaceDomainServiceRegenerateWorkspaceDomainTokenProcedure: db.PermDomainsEdit,
+
+	// Recordings
+	nokkuv1connect.RecordingServiceListRecordingsProcedure:  db.PermDaemonsView,
+	nokkuv1connect.RecordingServiceGetRecordingProcedure:    db.PermDaemonsView,
+	nokkuv1connect.RecordingServiceDeleteRecordingProcedure: db.PermDaemonsEdit,
+
+	// Workspace settings (recording key)
+	nokkuv1connect.WorkspaceServiceSetRecordingKeyProcedure:   db.PermSettingsEdit,
+	nokkuv1connect.WorkspaceServiceClearRecordingKeyProcedure: db.PermSettingsEdit,
 }
 
 type AuthorizationInterceptor struct {
