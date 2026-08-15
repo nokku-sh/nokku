@@ -101,7 +101,12 @@
 			{/if}
 
 			<Field.Field>
-				<Button variant="destructive" class="w-full" disabled={isDeleting} onclick={handleConfirm}>
+				<Button
+					variant="destructive"
+					class="w-full"
+					disabled={isDeleting || !canConfirm}
+					onclick={handleConfirm}
+				>
 					{submitText}
 				</Button>
 			</Field.Field>

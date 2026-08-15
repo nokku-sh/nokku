@@ -82,6 +82,14 @@ export const workspace = {
 			onSuccess: () => toast.success('Member removed')
 		}),
 	updateSettings: () => useMutation(WorkspaceService.method.updateWorkspaceSettings),
+	setRecordingKey: () =>
+		useMutation(WorkspaceService.method.setRecordingKey, {
+			onSuccess: () => toast.success('Recording encryption enabled')
+		}),
+	clearRecordingKey: () =>
+		useMutation(WorkspaceService.method.clearRecordingKey, {
+			onSuccess: () => toast.success('Recording encryption disabled')
+		}),
 	updateOwner: () =>
 		useMutation(WorkspaceService.method.updateWorkspaceOwner, {
 			onSuccess: () => toast.success('Owner updated')
