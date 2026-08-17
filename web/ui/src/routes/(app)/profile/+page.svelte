@@ -68,7 +68,8 @@
 
 	function linkAccount(provider: string) {
 		const endpoint = provider === 'github' ? '/oauth/login' : '/oidc/login';
-		const query = provider === 'github' ? 'provider=github&link=true' : `provider=${provider}&link=true`;
+		const query =
+			provider === 'github' ? 'provider=github&link=true' : `provider=${provider}&link=true`;
 		window.location.href = `${endpoint}?${query}`;
 	}
 </script>
