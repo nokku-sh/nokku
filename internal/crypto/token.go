@@ -7,13 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	PrefixDaemon = "nkd"
-	PrefixSA     = "nks"
-	PrefixCLI    = "nkc"
-	PrefixDevice = "nkv"
-)
-
 var ErrInvalidToken = errors.New("malformed token")
 
 type Token struct {
@@ -23,7 +16,6 @@ type Token struct {
 }
 
 type ParsedToken struct {
-	Prefix string
 	ID     string
 	Secret string
 }
@@ -31,25 +23,20 @@ type ParsedToken struct {
 type TokenOption func(*tokenConfig)
 
 type tokenConfig struct {
-	prefix string
-	id     string
-	withID bool // explicitly request an ID (generated or supplied)
+	id string
 }
 
-func WithPrefix(p string) TokenOption {
-	return func(c *tokenConfig) {
-		c.prefix = p
-		c.withID = true // prefix implies ID
-	}
-}
-
+// WithID binds the token to an id (a workspace id for enrollment and
+// invitation tokens), so the plaintext is "id_secret" and Parse recovers the
+// id from the token.
 func WithID(id string) TokenOption {
 	return func(c *tokenConfig) {
 		c.id = id
-		c.withID = true
 	}
 }
 
+// NewToken mints an opaque token. WithID binds the token to an id; without it
+// the token is a bare secret.
 func NewToken(opts ...TokenOption) (*Token, error) {
 	cfg := &tokenConfig{}
 	for _, o := range opts {
@@ -61,25 +48,9 @@ func NewToken(opts ...TokenOption) (*Token, error) {
 		return nil, err
 	}
 
-	t := &Token{}
+	t := &Token{ID: cfg.id}
 
-	switch {
-	case cfg.id != "":
-		t.ID = cfg.id
-	case cfg.withID:
-		uid, err := uuid.NewV7()
-		if err != nil {
-			return nil, err
-		}
-		t.ID = uid.String()
-	}
-
-	// Build plaintext: "prefix_id_secret" | "id_secret" | "secret"
 	var b strings.Builder
-	if cfg.prefix != "" {
-		b.WriteString(cfg.prefix)
-		b.WriteByte('_')
-	}
 	if t.ID != "" {
 		b.WriteString(t.ID)
 		b.WriteByte('_')
@@ -95,56 +66,24 @@ func NewToken(opts ...TokenOption) (*Token, error) {
 	return t, nil
 }
 
-// Convenience constructors
-
-func NewServiceAccountToken() (*Token, error) {
-	return NewToken(WithPrefix(PrefixSA))
-}
-
-func NewDeviceToken() (*Token, error) {
-	return NewToken(WithPrefix(PrefixDevice))
-}
-
-// Parse handles all three formats:
+// Parse handles the token formats NewToken produces:
 //
-//	"prefix_uuid_secret" → {Prefix, ID, Secret}
-//	"uuid_secret"        → {ID, Secret}
-//	"secret"             → {Secret}
+//	"uuid_secret" → {ID, Secret}
+//	"secret"      → {Secret}
+//
+// A UUID is recognized in the first segment; everything after it is the
+// secret (which may itself contain underscores).
 func Parse(raw string) (*ParsedToken, error) {
 	if raw == "" {
 		return nil, ErrInvalidToken
 	}
 
-	parts := strings.Split(raw, "_")
-
-	switch len(parts) {
-	case 1:
-		return &ParsedToken{Secret: raw}, nil
-
-	case 2:
-		if _, err := uuid.Parse(parts[0]); err == nil {
-			return &ParsedToken{ID: parts[0], Secret: parts[1]}, nil
-		}
-		// Otherwise treat entire string as bare secret
-		return &ParsedToken{Secret: raw}, nil
-
-	default:
-		// 3+ segments: try "prefix_uuid_rest" first
-		if _, err := uuid.Parse(parts[1]); err == nil {
-			return &ParsedToken{
-				Prefix: parts[0],
-				ID:     parts[1],
-				Secret: strings.Join(parts[2:], "_"),
-			}, nil
-		}
-		// Try "uuid_rest" (UUID contains no underscores, so parts[0])
-		if _, err := uuid.Parse(parts[0]); err == nil {
-			return &ParsedToken{
-				ID:     parts[0],
-				Secret: strings.Join(parts[1:], "_"),
-			}, nil
-		}
-		// Bare secret that happens to contain underscores
+	id, secret, ok := strings.Cut(raw, "_")
+	if !ok {
 		return &ParsedToken{Secret: raw}, nil
 	}
+	if _, err := uuid.Parse(id); err != nil {
+		return &ParsedToken{Secret: raw}, nil
+	}
+	return &ParsedToken{ID: id, Secret: secret}, nil
 }
