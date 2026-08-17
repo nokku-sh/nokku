@@ -92,7 +92,15 @@ let sessionExpiredAt = 0;
 
 // Public routes don't require a session; a failing whoami there is expected
 // and must not bounce the visitor to /login.
-const publicPaths = ['/login', '/register', '/verify', '/recovery', '/reset', '/device', '/auth-error'];
+const publicPaths = [
+	'/login',
+	'/register',
+	'/verify',
+	'/recovery',
+	'/reset',
+	'/device',
+	'/auth-error'
+];
 
 // The session cookie is HttpOnly, so only the backend can clear it. On an
 // expired or revoked session the backend rejects with Unauthenticated; here we
