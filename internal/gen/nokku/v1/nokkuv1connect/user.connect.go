@@ -41,12 +41,6 @@ const (
 	// UserServiceDeleteAccountProcedure is the fully-qualified name of the UserService's DeleteAccount
 	// RPC.
 	UserServiceDeleteAccountProcedure = "/nokku.v1.UserService/DeleteAccount"
-	// UserServiceListUserDevicesProcedure is the fully-qualified name of the UserService's
-	// ListUserDevices RPC.
-	UserServiceListUserDevicesProcedure = "/nokku.v1.UserService/ListUserDevices"
-	// UserServiceDeleteUserDeviceProcedure is the fully-qualified name of the UserService's
-	// DeleteUserDevice RPC.
-	UserServiceDeleteUserDeviceProcedure = "/nokku.v1.UserService/DeleteUserDevice"
 	// UserServiceListLinkedAccountsProcedure is the fully-qualified name of the UserService's
 	// ListLinkedAccounts RPC.
 	UserServiceListLinkedAccountsProcedure = "/nokku.v1.UserService/ListLinkedAccounts"
@@ -63,8 +57,6 @@ type UserServiceClient interface {
 	Whoami(context.Context, *v1.WhoamiRequest) (*v1.WhoamiResponse, error)
 	UpdateProfile(context.Context, *v1.UpdateProfileRequest) (*v1.UpdateProfileResponse, error)
 	DeleteAccount(context.Context, *v1.DeleteAccountRequest) (*v1.DeleteAccountResponse, error)
-	ListUserDevices(context.Context, *v1.ListUserDevicesRequest) (*v1.ListUserDevicesResponse, error)
-	DeleteUserDevice(context.Context, *v1.DeleteUserDeviceRequest) (*v1.DeleteUserDeviceResponse, error)
 	ListLinkedAccounts(context.Context, *v1.ListLinkedAccountsRequest) (*v1.ListLinkedAccountsResponse, error)
 	UnlinkAccount(context.Context, *v1.UnlinkAccountRequest) (*v1.UnlinkAccountResponse, error)
 	SetEmailRecovery(context.Context, *v1.SetEmailRecoveryRequest) (*v1.SetEmailRecoveryResponse, error)
@@ -99,18 +91,6 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("DeleteAccount")),
 			connect.WithClientOptions(opts...),
 		),
-		listUserDevices: connect.NewClient[v1.ListUserDevicesRequest, v1.ListUserDevicesResponse](
-			httpClient,
-			baseURL+UserServiceListUserDevicesProcedure,
-			connect.WithSchema(userServiceMethods.ByName("ListUserDevices")),
-			connect.WithClientOptions(opts...),
-		),
-		deleteUserDevice: connect.NewClient[v1.DeleteUserDeviceRequest, v1.DeleteUserDeviceResponse](
-			httpClient,
-			baseURL+UserServiceDeleteUserDeviceProcedure,
-			connect.WithSchema(userServiceMethods.ByName("DeleteUserDevice")),
-			connect.WithClientOptions(opts...),
-		),
 		listLinkedAccounts: connect.NewClient[v1.ListLinkedAccountsRequest, v1.ListLinkedAccountsResponse](
 			httpClient,
 			baseURL+UserServiceListLinkedAccountsProcedure,
@@ -137,8 +117,6 @@ type userServiceClient struct {
 	whoami             *connect.Client[v1.WhoamiRequest, v1.WhoamiResponse]
 	updateProfile      *connect.Client[v1.UpdateProfileRequest, v1.UpdateProfileResponse]
 	deleteAccount      *connect.Client[v1.DeleteAccountRequest, v1.DeleteAccountResponse]
-	listUserDevices    *connect.Client[v1.ListUserDevicesRequest, v1.ListUserDevicesResponse]
-	deleteUserDevice   *connect.Client[v1.DeleteUserDeviceRequest, v1.DeleteUserDeviceResponse]
 	listLinkedAccounts *connect.Client[v1.ListLinkedAccountsRequest, v1.ListLinkedAccountsResponse]
 	unlinkAccount      *connect.Client[v1.UnlinkAccountRequest, v1.UnlinkAccountResponse]
 	setEmailRecovery   *connect.Client[v1.SetEmailRecoveryRequest, v1.SetEmailRecoveryResponse]
@@ -165,24 +143,6 @@ func (c *userServiceClient) UpdateProfile(ctx context.Context, req *v1.UpdatePro
 // DeleteAccount calls nokku.v1.UserService.DeleteAccount.
 func (c *userServiceClient) DeleteAccount(ctx context.Context, req *v1.DeleteAccountRequest) (*v1.DeleteAccountResponse, error) {
 	response, err := c.deleteAccount.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ListUserDevices calls nokku.v1.UserService.ListUserDevices.
-func (c *userServiceClient) ListUserDevices(ctx context.Context, req *v1.ListUserDevicesRequest) (*v1.ListUserDevicesResponse, error) {
-	response, err := c.listUserDevices.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// DeleteUserDevice calls nokku.v1.UserService.DeleteUserDevice.
-func (c *userServiceClient) DeleteUserDevice(ctx context.Context, req *v1.DeleteUserDeviceRequest) (*v1.DeleteUserDeviceResponse, error) {
-	response, err := c.deleteUserDevice.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
@@ -221,8 +181,6 @@ type UserServiceHandler interface {
 	Whoami(context.Context, *v1.WhoamiRequest) (*v1.WhoamiResponse, error)
 	UpdateProfile(context.Context, *v1.UpdateProfileRequest) (*v1.UpdateProfileResponse, error)
 	DeleteAccount(context.Context, *v1.DeleteAccountRequest) (*v1.DeleteAccountResponse, error)
-	ListUserDevices(context.Context, *v1.ListUserDevicesRequest) (*v1.ListUserDevicesResponse, error)
-	DeleteUserDevice(context.Context, *v1.DeleteUserDeviceRequest) (*v1.DeleteUserDeviceResponse, error)
 	ListLinkedAccounts(context.Context, *v1.ListLinkedAccountsRequest) (*v1.ListLinkedAccountsResponse, error)
 	UnlinkAccount(context.Context, *v1.UnlinkAccountRequest) (*v1.UnlinkAccountResponse, error)
 	SetEmailRecovery(context.Context, *v1.SetEmailRecoveryRequest) (*v1.SetEmailRecoveryResponse, error)
@@ -253,18 +211,6 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("DeleteAccount")),
 		connect.WithHandlerOptions(opts...),
 	)
-	userServiceListUserDevicesHandler := connect.NewUnaryHandlerSimple(
-		UserServiceListUserDevicesProcedure,
-		svc.ListUserDevices,
-		connect.WithSchema(userServiceMethods.ByName("ListUserDevices")),
-		connect.WithHandlerOptions(opts...),
-	)
-	userServiceDeleteUserDeviceHandler := connect.NewUnaryHandlerSimple(
-		UserServiceDeleteUserDeviceProcedure,
-		svc.DeleteUserDevice,
-		connect.WithSchema(userServiceMethods.ByName("DeleteUserDevice")),
-		connect.WithHandlerOptions(opts...),
-	)
 	userServiceListLinkedAccountsHandler := connect.NewUnaryHandlerSimple(
 		UserServiceListLinkedAccountsProcedure,
 		svc.ListLinkedAccounts,
@@ -291,10 +237,6 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceUpdateProfileHandler.ServeHTTP(w, r)
 		case UserServiceDeleteAccountProcedure:
 			userServiceDeleteAccountHandler.ServeHTTP(w, r)
-		case UserServiceListUserDevicesProcedure:
-			userServiceListUserDevicesHandler.ServeHTTP(w, r)
-		case UserServiceDeleteUserDeviceProcedure:
-			userServiceDeleteUserDeviceHandler.ServeHTTP(w, r)
 		case UserServiceListLinkedAccountsProcedure:
 			userServiceListLinkedAccountsHandler.ServeHTTP(w, r)
 		case UserServiceUnlinkAccountProcedure:
@@ -320,14 +262,6 @@ func (UnimplementedUserServiceHandler) UpdateProfile(context.Context, *v1.Update
 
 func (UnimplementedUserServiceHandler) DeleteAccount(context.Context, *v1.DeleteAccountRequest) (*v1.DeleteAccountResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.UserService.DeleteAccount is not implemented"))
-}
-
-func (UnimplementedUserServiceHandler) ListUserDevices(context.Context, *v1.ListUserDevicesRequest) (*v1.ListUserDevicesResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.UserService.ListUserDevices is not implemented"))
-}
-
-func (UnimplementedUserServiceHandler) DeleteUserDevice(context.Context, *v1.DeleteUserDeviceRequest) (*v1.DeleteUserDeviceResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.UserService.DeleteUserDevice is not implemented"))
 }
 
 func (UnimplementedUserServiceHandler) ListLinkedAccounts(context.Context, *v1.ListLinkedAccountsRequest) (*v1.ListLinkedAccountsResponse, error) {

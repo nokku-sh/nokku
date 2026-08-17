@@ -42,12 +42,12 @@ const (
 	// CredentialServiceListPasskeysProcedure is the fully-qualified name of the CredentialService's
 	// ListPasskeys RPC.
 	CredentialServiceListPasskeysProcedure = "/nokku.v1.CredentialService/ListPasskeys"
-	// CredentialServiceUpdatePasskeyProcedure is the fully-qualified name of the CredentialService's
-	// UpdatePasskey RPC.
-	CredentialServiceUpdatePasskeyProcedure = "/nokku.v1.CredentialService/UpdatePasskey"
 	// CredentialServiceDeletePasskeyProcedure is the fully-qualified name of the CredentialService's
 	// DeletePasskey RPC.
 	CredentialServiceDeletePasskeyProcedure = "/nokku.v1.CredentialService/DeletePasskey"
+	// CredentialServiceRenamePasskeyProcedure is the fully-qualified name of the CredentialService's
+	// RenamePasskey RPC.
+	CredentialServiceRenamePasskeyProcedure = "/nokku.v1.CredentialService/RenamePasskey"
 	// CredentialServiceCreateBackupCodesProcedure is the fully-qualified name of the
 	// CredentialService's CreateBackupCodes RPC.
 	CredentialServiceCreateBackupCodesProcedure = "/nokku.v1.CredentialService/CreateBackupCodes"
@@ -66,8 +66,8 @@ type CredentialServiceClient interface {
 	DeletePassword(context.Context, *v1.DeletePasswordRequest) (*v1.DeletePasswordResponse, error)
 	// Passkeys
 	ListPasskeys(context.Context, *v1.ListPasskeysRequest) (*v1.ListPasskeysResponse, error)
-	UpdatePasskey(context.Context, *v1.UpdatePasskeyRequest) (*v1.UpdatePasskeyResponse, error)
 	DeletePasskey(context.Context, *v1.DeletePasskeyRequest) (*v1.DeletePasskeyResponse, error)
+	RenamePasskey(context.Context, *v1.RenamePasskeyRequest) (*v1.RenamePasskeyResponse, error)
 	// Backup codes
 	CreateBackupCodes(context.Context, *v1.CreateBackupCodesRequest) (*v1.CreateBackupCodesResponse, error)
 	ListBackupCodes(context.Context, *v1.ListBackupCodesRequest) (*v1.ListBackupCodesResponse, error)
@@ -103,16 +103,16 @@ func NewCredentialServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(credentialServiceMethods.ByName("ListPasskeys")),
 			connect.WithClientOptions(opts...),
 		),
-		updatePasskey: connect.NewClient[v1.UpdatePasskeyRequest, v1.UpdatePasskeyResponse](
-			httpClient,
-			baseURL+CredentialServiceUpdatePasskeyProcedure,
-			connect.WithSchema(credentialServiceMethods.ByName("UpdatePasskey")),
-			connect.WithClientOptions(opts...),
-		),
 		deletePasskey: connect.NewClient[v1.DeletePasskeyRequest, v1.DeletePasskeyResponse](
 			httpClient,
 			baseURL+CredentialServiceDeletePasskeyProcedure,
 			connect.WithSchema(credentialServiceMethods.ByName("DeletePasskey")),
+			connect.WithClientOptions(opts...),
+		),
+		renamePasskey: connect.NewClient[v1.RenamePasskeyRequest, v1.RenamePasskeyResponse](
+			httpClient,
+			baseURL+CredentialServiceRenamePasskeyProcedure,
+			connect.WithSchema(credentialServiceMethods.ByName("RenamePasskey")),
 			connect.WithClientOptions(opts...),
 		),
 		createBackupCodes: connect.NewClient[v1.CreateBackupCodesRequest, v1.CreateBackupCodesResponse](
@@ -141,8 +141,8 @@ type credentialServiceClient struct {
 	updatePassword    *connect.Client[v1.UpdatePasswordRequest, v1.UpdatePasswordResponse]
 	deletePassword    *connect.Client[v1.DeletePasswordRequest, v1.DeletePasswordResponse]
 	listPasskeys      *connect.Client[v1.ListPasskeysRequest, v1.ListPasskeysResponse]
-	updatePasskey     *connect.Client[v1.UpdatePasskeyRequest, v1.UpdatePasskeyResponse]
 	deletePasskey     *connect.Client[v1.DeletePasskeyRequest, v1.DeletePasskeyResponse]
+	renamePasskey     *connect.Client[v1.RenamePasskeyRequest, v1.RenamePasskeyResponse]
 	createBackupCodes *connect.Client[v1.CreateBackupCodesRequest, v1.CreateBackupCodesResponse]
 	listBackupCodes   *connect.Client[v1.ListBackupCodesRequest, v1.ListBackupCodesResponse]
 	deleteBackupCodes *connect.Client[v1.DeleteBackupCodesRequest, v1.DeleteBackupCodesResponse]
@@ -175,18 +175,18 @@ func (c *credentialServiceClient) ListPasskeys(ctx context.Context, req *v1.List
 	return nil, err
 }
 
-// UpdatePasskey calls nokku.v1.CredentialService.UpdatePasskey.
-func (c *credentialServiceClient) UpdatePasskey(ctx context.Context, req *v1.UpdatePasskeyRequest) (*v1.UpdatePasskeyResponse, error) {
-	response, err := c.updatePasskey.CallUnary(ctx, connect.NewRequest(req))
+// DeletePasskey calls nokku.v1.CredentialService.DeletePasskey.
+func (c *credentialServiceClient) DeletePasskey(ctx context.Context, req *v1.DeletePasskeyRequest) (*v1.DeletePasskeyResponse, error) {
+	response, err := c.deletePasskey.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
 	return nil, err
 }
 
-// DeletePasskey calls nokku.v1.CredentialService.DeletePasskey.
-func (c *credentialServiceClient) DeletePasskey(ctx context.Context, req *v1.DeletePasskeyRequest) (*v1.DeletePasskeyResponse, error) {
-	response, err := c.deletePasskey.CallUnary(ctx, connect.NewRequest(req))
+// RenamePasskey calls nokku.v1.CredentialService.RenamePasskey.
+func (c *credentialServiceClient) RenamePasskey(ctx context.Context, req *v1.RenamePasskeyRequest) (*v1.RenamePasskeyResponse, error) {
+	response, err := c.renamePasskey.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
@@ -227,8 +227,8 @@ type CredentialServiceHandler interface {
 	DeletePassword(context.Context, *v1.DeletePasswordRequest) (*v1.DeletePasswordResponse, error)
 	// Passkeys
 	ListPasskeys(context.Context, *v1.ListPasskeysRequest) (*v1.ListPasskeysResponse, error)
-	UpdatePasskey(context.Context, *v1.UpdatePasskeyRequest) (*v1.UpdatePasskeyResponse, error)
 	DeletePasskey(context.Context, *v1.DeletePasskeyRequest) (*v1.DeletePasskeyResponse, error)
+	RenamePasskey(context.Context, *v1.RenamePasskeyRequest) (*v1.RenamePasskeyResponse, error)
 	// Backup codes
 	CreateBackupCodes(context.Context, *v1.CreateBackupCodesRequest) (*v1.CreateBackupCodesResponse, error)
 	ListBackupCodes(context.Context, *v1.ListBackupCodesRequest) (*v1.ListBackupCodesResponse, error)
@@ -260,16 +260,16 @@ func NewCredentialServiceHandler(svc CredentialServiceHandler, opts ...connect.H
 		connect.WithSchema(credentialServiceMethods.ByName("ListPasskeys")),
 		connect.WithHandlerOptions(opts...),
 	)
-	credentialServiceUpdatePasskeyHandler := connect.NewUnaryHandlerSimple(
-		CredentialServiceUpdatePasskeyProcedure,
-		svc.UpdatePasskey,
-		connect.WithSchema(credentialServiceMethods.ByName("UpdatePasskey")),
-		connect.WithHandlerOptions(opts...),
-	)
 	credentialServiceDeletePasskeyHandler := connect.NewUnaryHandlerSimple(
 		CredentialServiceDeletePasskeyProcedure,
 		svc.DeletePasskey,
 		connect.WithSchema(credentialServiceMethods.ByName("DeletePasskey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	credentialServiceRenamePasskeyHandler := connect.NewUnaryHandlerSimple(
+		CredentialServiceRenamePasskeyProcedure,
+		svc.RenamePasskey,
+		connect.WithSchema(credentialServiceMethods.ByName("RenamePasskey")),
 		connect.WithHandlerOptions(opts...),
 	)
 	credentialServiceCreateBackupCodesHandler := connect.NewUnaryHandlerSimple(
@@ -298,10 +298,10 @@ func NewCredentialServiceHandler(svc CredentialServiceHandler, opts ...connect.H
 			credentialServiceDeletePasswordHandler.ServeHTTP(w, r)
 		case CredentialServiceListPasskeysProcedure:
 			credentialServiceListPasskeysHandler.ServeHTTP(w, r)
-		case CredentialServiceUpdatePasskeyProcedure:
-			credentialServiceUpdatePasskeyHandler.ServeHTTP(w, r)
 		case CredentialServiceDeletePasskeyProcedure:
 			credentialServiceDeletePasskeyHandler.ServeHTTP(w, r)
+		case CredentialServiceRenamePasskeyProcedure:
+			credentialServiceRenamePasskeyHandler.ServeHTTP(w, r)
 		case CredentialServiceCreateBackupCodesProcedure:
 			credentialServiceCreateBackupCodesHandler.ServeHTTP(w, r)
 		case CredentialServiceListBackupCodesProcedure:
@@ -329,12 +329,12 @@ func (UnimplementedCredentialServiceHandler) ListPasskeys(context.Context, *v1.L
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.CredentialService.ListPasskeys is not implemented"))
 }
 
-func (UnimplementedCredentialServiceHandler) UpdatePasskey(context.Context, *v1.UpdatePasskeyRequest) (*v1.UpdatePasskeyResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.CredentialService.UpdatePasskey is not implemented"))
-}
-
 func (UnimplementedCredentialServiceHandler) DeletePasskey(context.Context, *v1.DeletePasskeyRequest) (*v1.DeletePasskeyResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.CredentialService.DeletePasskey is not implemented"))
+}
+
+func (UnimplementedCredentialServiceHandler) RenamePasskey(context.Context, *v1.RenamePasskeyRequest) (*v1.RenamePasskeyResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.CredentialService.RenamePasskey is not implemented"))
 }
 
 func (UnimplementedCredentialServiceHandler) CreateBackupCodes(context.Context, *v1.CreateBackupCodesRequest) (*v1.CreateBackupCodesResponse, error) {

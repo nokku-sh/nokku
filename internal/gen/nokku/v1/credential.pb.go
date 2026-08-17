@@ -197,9 +197,8 @@ func (*DeletePasswordResponse) Descriptor() ([]byte, []int) {
 type Passkey struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -241,13 +240,6 @@ func (x *Passkey) GetId() string {
 	return ""
 }
 
-func (x *Passkey) GetName() string {
-	if x != nil && x.Name != nil {
-		return *x.Name
-	}
-	return ""
-}
-
 func (x *Passkey) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
@@ -255,107 +247,11 @@ func (x *Passkey) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *Passkey) GetLastUsedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.LastUsedAt
-	}
-	return nil
-}
-
-type UpdatePasskeyRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UpdatePasskeyRequest) Reset() {
-	*x = UpdatePasskeyRequest{}
-	mi := &file_nokku_v1_credential_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdatePasskeyRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdatePasskeyRequest) ProtoMessage() {}
-
-func (x *UpdatePasskeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_credential_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdatePasskeyRequest.ProtoReflect.Descriptor instead.
-func (*UpdatePasskeyRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_credential_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *UpdatePasskeyRequest) GetId() string {
-	if x != nil && x.Id != nil {
-		return *x.Id
-	}
-	return ""
-}
-
-func (x *UpdatePasskeyRequest) GetName() string {
+func (x *Passkey) GetName() string {
 	if x != nil && x.Name != nil {
 		return *x.Name
 	}
 	return ""
-}
-
-type UpdatePasskeyResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Passkey       *Passkey               `protobuf:"bytes,1,opt,name=passkey" json:"passkey,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UpdatePasskeyResponse) Reset() {
-	*x = UpdatePasskeyResponse{}
-	mi := &file_nokku_v1_credential_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdatePasskeyResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdatePasskeyResponse) ProtoMessage() {}
-
-func (x *UpdatePasskeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_credential_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdatePasskeyResponse.ProtoReflect.Descriptor instead.
-func (*UpdatePasskeyResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_credential_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *UpdatePasskeyResponse) GetPasskey() *Passkey {
-	if x != nil {
-		return x.Passkey
-	}
-	return nil
 }
 
 type ListPasskeysRequest struct {
@@ -366,7 +262,7 @@ type ListPasskeysRequest struct {
 
 func (x *ListPasskeysRequest) Reset() {
 	*x = ListPasskeysRequest{}
-	mi := &file_nokku_v1_credential_proto_msgTypes[7]
+	mi := &file_nokku_v1_credential_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -378,7 +274,7 @@ func (x *ListPasskeysRequest) String() string {
 func (*ListPasskeysRequest) ProtoMessage() {}
 
 func (x *ListPasskeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_credential_proto_msgTypes[7]
+	mi := &file_nokku_v1_credential_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -391,7 +287,7 @@ func (x *ListPasskeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPasskeysRequest.ProtoReflect.Descriptor instead.
 func (*ListPasskeysRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_credential_proto_rawDescGZIP(), []int{7}
+	return file_nokku_v1_credential_proto_rawDescGZIP(), []int{5}
 }
 
 type ListPasskeysResponse struct {
@@ -403,7 +299,7 @@ type ListPasskeysResponse struct {
 
 func (x *ListPasskeysResponse) Reset() {
 	*x = ListPasskeysResponse{}
-	mi := &file_nokku_v1_credential_proto_msgTypes[8]
+	mi := &file_nokku_v1_credential_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -415,7 +311,7 @@ func (x *ListPasskeysResponse) String() string {
 func (*ListPasskeysResponse) ProtoMessage() {}
 
 func (x *ListPasskeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_credential_proto_msgTypes[8]
+	mi := &file_nokku_v1_credential_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -428,7 +324,7 @@ func (x *ListPasskeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPasskeysResponse.ProtoReflect.Descriptor instead.
 func (*ListPasskeysResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_credential_proto_rawDescGZIP(), []int{8}
+	return file_nokku_v1_credential_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListPasskeysResponse) GetPasskeys() []*Passkey {
@@ -447,7 +343,7 @@ type DeletePasskeyRequest struct {
 
 func (x *DeletePasskeyRequest) Reset() {
 	*x = DeletePasskeyRequest{}
-	mi := &file_nokku_v1_credential_proto_msgTypes[9]
+	mi := &file_nokku_v1_credential_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -459,7 +355,7 @@ func (x *DeletePasskeyRequest) String() string {
 func (*DeletePasskeyRequest) ProtoMessage() {}
 
 func (x *DeletePasskeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_credential_proto_msgTypes[9]
+	mi := &file_nokku_v1_credential_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -472,7 +368,7 @@ func (x *DeletePasskeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeletePasskeyRequest.ProtoReflect.Descriptor instead.
 func (*DeletePasskeyRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_credential_proto_rawDescGZIP(), []int{9}
+	return file_nokku_v1_credential_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DeletePasskeyRequest) GetId() string {
@@ -490,7 +386,7 @@ type DeletePasskeyResponse struct {
 
 func (x *DeletePasskeyResponse) Reset() {
 	*x = DeletePasskeyResponse{}
-	mi := &file_nokku_v1_credential_proto_msgTypes[10]
+	mi := &file_nokku_v1_credential_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -502,7 +398,7 @@ func (x *DeletePasskeyResponse) String() string {
 func (*DeletePasskeyResponse) ProtoMessage() {}
 
 func (x *DeletePasskeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_credential_proto_msgTypes[10]
+	mi := &file_nokku_v1_credential_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -515,6 +411,94 @@ func (x *DeletePasskeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeletePasskeyResponse.ProtoReflect.Descriptor instead.
 func (*DeletePasskeyResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_credential_proto_rawDescGZIP(), []int{8}
+}
+
+type RenamePasskeyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RenamePasskeyRequest) Reset() {
+	*x = RenamePasskeyRequest{}
+	mi := &file_nokku_v1_credential_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenamePasskeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenamePasskeyRequest) ProtoMessage() {}
+
+func (x *RenamePasskeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_credential_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenamePasskeyRequest.ProtoReflect.Descriptor instead.
+func (*RenamePasskeyRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_credential_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RenamePasskeyRequest) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
+	}
+	return ""
+}
+
+func (x *RenamePasskeyRequest) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
+type RenamePasskeyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RenamePasskeyResponse) Reset() {
+	*x = RenamePasskeyResponse{}
+	mi := &file_nokku_v1_credential_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenamePasskeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenamePasskeyResponse) ProtoMessage() {}
+
+func (x *RenamePasskeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_credential_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenamePasskeyResponse.ProtoReflect.Descriptor instead.
+func (*RenamePasskeyResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_credential_proto_rawDescGZIP(), []int{10}
 }
 
@@ -522,8 +506,7 @@ func (*DeletePasskeyResponse) Descriptor() ([]byte, []int) {
 type BackupCode struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	UsedAt        *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=used_at,json=usedAt" json:"used_at,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -563,13 +546,6 @@ func (x *BackupCode) GetId() string {
 		return *x.Id
 	}
 	return ""
-}
-
-func (x *BackupCode) GetUsedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.UsedAt
-	}
-	return nil
 }
 
 func (x *BackupCode) GetCreatedAt() *timestamppb.Timestamp {
@@ -822,31 +798,27 @@ const file_nokku_v1_credential_proto_rawDesc = "" +
 	"\x16UpdatePasswordResponse\"K\n" +
 	"\x15DeletePasswordRequest\x122\n" +
 	"\x10current_password\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x0fcurrentPassword\"\x18\n" +
-	"\x16DeletePasswordResponse\"\xa6\x01\n" +
+	"\x16DeletePasswordResponse\"h\n" +
 	"\aPasskey\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x129\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x129\n" +
 	"\n" +
-	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
-	"\flast_used_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"lastUsedAt\"N\n" +
-	"\x14UpdatePasskeyRequest\x12\x17\n" +
-	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x02id\x12\x1d\n" +
-	"\x04name\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x04name\"D\n" +
-	"\x15UpdatePasskeyResponse\x12+\n" +
-	"\apasskey\x18\x01 \x01(\v2\x11.nokku.v1.PasskeyR\apasskey\"\x15\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\"\x15\n" +
 	"\x13ListPasskeysRequest\"E\n" +
 	"\x14ListPasskeysResponse\x12-\n" +
 	"\bpasskeys\x18\x01 \x03(\v2\x11.nokku.v1.PasskeyR\bpasskeys\"/\n" +
 	"\x14DeletePasskeyRequest\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x02id\"\x17\n" +
-	"\x15DeletePasskeyResponse\"\x8c\x01\n" +
+	"\x15DeletePasskeyResponse\"C\n" +
+	"\x14RenamePasskeyRequest\x12\x17\n" +
+	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x17\n" +
+	"\x15RenamePasskeyResponse\"W\n" +
 	"\n" +
 	"BackupCode\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x123\n" +
-	"\aused_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x06usedAt\x129\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x129\n" +
 	"\n" +
-	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x1a\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x1a\n" +
 	"\x18CreateBackupCodesRequest\"1\n" +
 	"\x19CreateBackupCodesResponse\x12\x14\n" +
 	"\x05codes\x18\x01 \x03(\tR\x05codes\"\x18\n" +
@@ -858,9 +830,9 @@ const file_nokku_v1_credential_proto_rawDesc = "" +
 	"\x11CredentialService\x12x\n" +
 	"\x0eUpdatePassword\x12\x1f.nokku.v1.UpdatePasswordRequest\x1a .nokku.v1.UpdatePasswordResponse\"#\x82\xd3\xe4\x93\x02\x1d:\x01*2\x18/v1/credentials/password\x12u\n" +
 	"\x0eDeletePassword\x12\x1f.nokku.v1.DeletePasswordRequest\x1a .nokku.v1.DeletePasswordResponse\" \x82\xd3\xe4\x93\x02\x1a*\x18/v1/credentials/password\x12o\n" +
-	"\fListPasskeys\x12\x1d.nokku.v1.ListPasskeysRequest\x1a\x1e.nokku.v1.ListPasskeysResponse\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/v1/credentials/passkeys\x12z\n" +
-	"\rUpdatePasskey\x12\x1e.nokku.v1.UpdatePasskeyRequest\x1a\x1f.nokku.v1.UpdatePasskeyResponse\"(\x82\xd3\xe4\x93\x02\":\x01*2\x1d/v1/credentials/passkeys/{id}\x12w\n" +
-	"\rDeletePasskey\x12\x1e.nokku.v1.DeletePasskeyRequest\x1a\x1f.nokku.v1.DeletePasskeyResponse\"%\x82\xd3\xe4\x93\x02\x1f*\x1d/v1/credentials/passkeys/{id}\x12\x82\x01\n" +
+	"\fListPasskeys\x12\x1d.nokku.v1.ListPasskeysRequest\x1a\x1e.nokku.v1.ListPasskeysResponse\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/v1/credentials/passkeys\x12w\n" +
+	"\rDeletePasskey\x12\x1e.nokku.v1.DeletePasskeyRequest\x1a\x1f.nokku.v1.DeletePasskeyResponse\"%\x82\xd3\xe4\x93\x02\x1f*\x1d/v1/credentials/passkeys/{id}\x12z\n" +
+	"\rRenamePasskey\x12\x1e.nokku.v1.RenamePasskeyRequest\x1a\x1f.nokku.v1.RenamePasskeyResponse\"(\x82\xd3\xe4\x93\x02\":\x01*2\x1d/v1/credentials/passkeys/{id}\x12\x82\x01\n" +
 	"\x11CreateBackupCodes\x12\".nokku.v1.CreateBackupCodesRequest\x1a#.nokku.v1.CreateBackupCodesResponse\"$\x82\xd3\xe4\x93\x02\x1e\"\x1c/v1/credentials/backup-codes\x12|\n" +
 	"\x0fListBackupCodes\x12 .nokku.v1.ListBackupCodesRequest\x1a!.nokku.v1.ListBackupCodesResponse\"$\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/credentials/backup-codes\x12\x82\x01\n" +
 	"\x11DeleteBackupCodes\x12\".nokku.v1.DeleteBackupCodesRequest\x1a#.nokku.v1.DeleteBackupCodesResponse\"$\x82\xd3\xe4\x93\x02\x1e*\x1c/v1/credentials/backup-codesB\x99\x01\n" +
@@ -885,12 +857,12 @@ var file_nokku_v1_credential_proto_goTypes = []any{
 	(*DeletePasswordRequest)(nil),     // 2: nokku.v1.DeletePasswordRequest
 	(*DeletePasswordResponse)(nil),    // 3: nokku.v1.DeletePasswordResponse
 	(*Passkey)(nil),                   // 4: nokku.v1.Passkey
-	(*UpdatePasskeyRequest)(nil),      // 5: nokku.v1.UpdatePasskeyRequest
-	(*UpdatePasskeyResponse)(nil),     // 6: nokku.v1.UpdatePasskeyResponse
-	(*ListPasskeysRequest)(nil),       // 7: nokku.v1.ListPasskeysRequest
-	(*ListPasskeysResponse)(nil),      // 8: nokku.v1.ListPasskeysResponse
-	(*DeletePasskeyRequest)(nil),      // 9: nokku.v1.DeletePasskeyRequest
-	(*DeletePasskeyResponse)(nil),     // 10: nokku.v1.DeletePasskeyResponse
+	(*ListPasskeysRequest)(nil),       // 5: nokku.v1.ListPasskeysRequest
+	(*ListPasskeysResponse)(nil),      // 6: nokku.v1.ListPasskeysResponse
+	(*DeletePasskeyRequest)(nil),      // 7: nokku.v1.DeletePasskeyRequest
+	(*DeletePasskeyResponse)(nil),     // 8: nokku.v1.DeletePasskeyResponse
+	(*RenamePasskeyRequest)(nil),      // 9: nokku.v1.RenamePasskeyRequest
+	(*RenamePasskeyResponse)(nil),     // 10: nokku.v1.RenamePasskeyResponse
 	(*BackupCode)(nil),                // 11: nokku.v1.BackupCode
 	(*CreateBackupCodesRequest)(nil),  // 12: nokku.v1.CreateBackupCodesRequest
 	(*CreateBackupCodesResponse)(nil), // 13: nokku.v1.CreateBackupCodesResponse
@@ -902,33 +874,30 @@ var file_nokku_v1_credential_proto_goTypes = []any{
 }
 var file_nokku_v1_credential_proto_depIdxs = []int32{
 	18, // 0: nokku.v1.Passkey.created_at:type_name -> google.protobuf.Timestamp
-	18, // 1: nokku.v1.Passkey.last_used_at:type_name -> google.protobuf.Timestamp
-	4,  // 2: nokku.v1.UpdatePasskeyResponse.passkey:type_name -> nokku.v1.Passkey
-	4,  // 3: nokku.v1.ListPasskeysResponse.passkeys:type_name -> nokku.v1.Passkey
-	18, // 4: nokku.v1.BackupCode.used_at:type_name -> google.protobuf.Timestamp
-	18, // 5: nokku.v1.BackupCode.created_at:type_name -> google.protobuf.Timestamp
-	11, // 6: nokku.v1.ListBackupCodesResponse.codes:type_name -> nokku.v1.BackupCode
-	0,  // 7: nokku.v1.CredentialService.UpdatePassword:input_type -> nokku.v1.UpdatePasswordRequest
-	2,  // 8: nokku.v1.CredentialService.DeletePassword:input_type -> nokku.v1.DeletePasswordRequest
-	7,  // 9: nokku.v1.CredentialService.ListPasskeys:input_type -> nokku.v1.ListPasskeysRequest
-	5,  // 10: nokku.v1.CredentialService.UpdatePasskey:input_type -> nokku.v1.UpdatePasskeyRequest
-	9,  // 11: nokku.v1.CredentialService.DeletePasskey:input_type -> nokku.v1.DeletePasskeyRequest
-	12, // 12: nokku.v1.CredentialService.CreateBackupCodes:input_type -> nokku.v1.CreateBackupCodesRequest
-	14, // 13: nokku.v1.CredentialService.ListBackupCodes:input_type -> nokku.v1.ListBackupCodesRequest
-	16, // 14: nokku.v1.CredentialService.DeleteBackupCodes:input_type -> nokku.v1.DeleteBackupCodesRequest
-	1,  // 15: nokku.v1.CredentialService.UpdatePassword:output_type -> nokku.v1.UpdatePasswordResponse
-	3,  // 16: nokku.v1.CredentialService.DeletePassword:output_type -> nokku.v1.DeletePasswordResponse
-	8,  // 17: nokku.v1.CredentialService.ListPasskeys:output_type -> nokku.v1.ListPasskeysResponse
-	6,  // 18: nokku.v1.CredentialService.UpdatePasskey:output_type -> nokku.v1.UpdatePasskeyResponse
-	10, // 19: nokku.v1.CredentialService.DeletePasskey:output_type -> nokku.v1.DeletePasskeyResponse
-	13, // 20: nokku.v1.CredentialService.CreateBackupCodes:output_type -> nokku.v1.CreateBackupCodesResponse
-	15, // 21: nokku.v1.CredentialService.ListBackupCodes:output_type -> nokku.v1.ListBackupCodesResponse
-	17, // 22: nokku.v1.CredentialService.DeleteBackupCodes:output_type -> nokku.v1.DeleteBackupCodesResponse
-	15, // [15:23] is the sub-list for method output_type
-	7,  // [7:15] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	4,  // 1: nokku.v1.ListPasskeysResponse.passkeys:type_name -> nokku.v1.Passkey
+	18, // 2: nokku.v1.BackupCode.created_at:type_name -> google.protobuf.Timestamp
+	11, // 3: nokku.v1.ListBackupCodesResponse.codes:type_name -> nokku.v1.BackupCode
+	0,  // 4: nokku.v1.CredentialService.UpdatePassword:input_type -> nokku.v1.UpdatePasswordRequest
+	2,  // 5: nokku.v1.CredentialService.DeletePassword:input_type -> nokku.v1.DeletePasswordRequest
+	5,  // 6: nokku.v1.CredentialService.ListPasskeys:input_type -> nokku.v1.ListPasskeysRequest
+	7,  // 7: nokku.v1.CredentialService.DeletePasskey:input_type -> nokku.v1.DeletePasskeyRequest
+	9,  // 8: nokku.v1.CredentialService.RenamePasskey:input_type -> nokku.v1.RenamePasskeyRequest
+	12, // 9: nokku.v1.CredentialService.CreateBackupCodes:input_type -> nokku.v1.CreateBackupCodesRequest
+	14, // 10: nokku.v1.CredentialService.ListBackupCodes:input_type -> nokku.v1.ListBackupCodesRequest
+	16, // 11: nokku.v1.CredentialService.DeleteBackupCodes:input_type -> nokku.v1.DeleteBackupCodesRequest
+	1,  // 12: nokku.v1.CredentialService.UpdatePassword:output_type -> nokku.v1.UpdatePasswordResponse
+	3,  // 13: nokku.v1.CredentialService.DeletePassword:output_type -> nokku.v1.DeletePasswordResponse
+	6,  // 14: nokku.v1.CredentialService.ListPasskeys:output_type -> nokku.v1.ListPasskeysResponse
+	8,  // 15: nokku.v1.CredentialService.DeletePasskey:output_type -> nokku.v1.DeletePasskeyResponse
+	10, // 16: nokku.v1.CredentialService.RenamePasskey:output_type -> nokku.v1.RenamePasskeyResponse
+	13, // 17: nokku.v1.CredentialService.CreateBackupCodes:output_type -> nokku.v1.CreateBackupCodesResponse
+	15, // 18: nokku.v1.CredentialService.ListBackupCodes:output_type -> nokku.v1.ListBackupCodesResponse
+	17, // 19: nokku.v1.CredentialService.DeleteBackupCodes:output_type -> nokku.v1.DeleteBackupCodesResponse
+	12, // [12:20] is the sub-list for method output_type
+	4,  // [4:12] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_credential_proto_init() }
