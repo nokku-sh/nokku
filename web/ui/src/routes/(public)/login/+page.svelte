@@ -143,7 +143,7 @@
 				<GoogleIcon class="size-5" />
 				<span>Google</span>
 			</Button>
-			<Button variant="secondary" onclick={() => (window.location.href = '/oauth/login')}>
+			<Button variant="secondary" onclick={() => (window.location.href = '/oauth/login?provider=github')}>
 				<GitHubIcon class="size-5" />
 				<span>GitHub</span>
 			</Button>
