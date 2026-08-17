@@ -143,6 +143,9 @@ linters:
         - no-unused-link
         - require-stdlib-doclink
 
+    gomoddirectives:
+      replace-local: true
+
     govet:
       enable-all: true
       disable:

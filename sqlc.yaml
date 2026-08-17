@@ -84,15 +84,6 @@ sql:
               pointer: true
 
           # Hash (one-way) overrides
-          - column: "users.password_hash"
-            go_type:
-              import: "github.com/nokku-sh/nokku/internal/crypto"
-              type: "HashedPassword"
-          - column: "user_devices.token_hash"
-            go_type:
-              import: "github.com/nokku-sh/nokku/internal/crypto"
-              type: "HashedToken"
-              pointer: true
           - column: "backup_codes.code_hash"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
@@ -119,7 +110,7 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "EncryptedBytes"
-          - column: "saml_providers.sp_private_key"
+          - column: "saml_sp_keys.private_key"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "EncryptedBytes"
