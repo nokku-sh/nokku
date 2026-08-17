@@ -7,7 +7,7 @@ export default defineConfig({
 	plugins: [tailwindcss(), sveltekit(), compression()],
 	server: {
 		proxy: {
-			'^/(oauth|oidc|saml|passkey|avatars|upload|nokku\\.)': {
+			'^/(auth|oauth|oidc|saml|passkey|avatars|upload|nokku\\.)': {
 				target: 'http://localhost:3000',
 				changeOrigin: true,
 				secure: false

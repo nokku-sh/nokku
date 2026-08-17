@@ -37,10 +37,7 @@ interface BeginRegistrationResponse {
 }
 
 interface BeginLoginResponse {
-	options: {
-		publicKey: PublicKeyCredentialRequestOptionsJSON;
-	};
-	sessionId: string;
+	publicKey: PublicKeyCredentialRequestOptionsJSON;
 }
 
 /**
@@ -242,9 +239,9 @@ export async function loginWithPasskey(): Promise<void> {
 
 	// convert server response to WebAuthn format
 	const publicKeyCredentialRequestOptions: PublicKeyCredentialRequestOptions = {
-		...loginData.options.publicKey,
-		challenge: base64urlToBuffer(loginData.options.publicKey.challenge),
-		allowCredentials: loginData.options.publicKey.allowCredentials?.map((cred) => ({
+		...loginData.publicKey,
+		challenge: base64urlToBuffer(loginData.publicKey.challenge),
+		allowCredentials: loginData.publicKey.allowCredentials?.map((cred) => ({
 			...cred,
 			id: base64urlToBuffer(cred.id)
 		}))
@@ -276,7 +273,7 @@ export async function loginWithPasskey(): Promise<void> {
 		}
 	};
 
-	const finishResponse = await fetch(`/passkey/login/finish?sessionId=${loginData.sessionId}`, {
+	const finishResponse = await fetch('/passkey/login/finish', {
 		method: 'POST',
 		credentials: 'include',
 		headers: { 'Content-Type': 'application/json' },

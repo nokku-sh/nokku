@@ -9,17 +9,25 @@
 	import CommandPalette from '$lib/components/utils/CommandPalette.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { workspace } from '$lib/api/workspaces.svelte';
-	import { cliToken, workspaceID } from '$lib/store.svelte';
-	import { auth } from '$lib/api/auth.svelte';
+	import { pendingDeviceCode, workspaceID } from '$lib/store.svelte';
 
 	let { children } = $props();
 
 	const ws = workspace.list();
-	const verifyCLI = auth.verifyCLI();
 
 	onMount(() => {
 		ws.refetch();
-		if (cliToken.current) verifyCLI.mutate({});
+	});
+
+	// After a sign-in that was triggered from the device page, return there so
+	// the pending authorization completes.
+	$effect(() => {
+		if (page.url.pathname !== '/') return;
+		const code = pendingDeviceCode.current;
+		if (code) {
+			pendingDeviceCode.current = undefined;
+			goto(`/device?user_code=${code}`);
+		}
 	});
 
 	$effect(() => {
