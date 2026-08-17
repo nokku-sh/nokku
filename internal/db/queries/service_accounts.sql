@@ -1,13 +1,12 @@
 -- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (id, workspace_id, name, description, token_hash, role_name, expires_at, tags)
+  service_accounts (id, workspace_id, name, description, role_name, expires_at, tags)
 VALUES
   (
     @id,
     @workspace_id,
     @name,
     @description,
-    @token_hash,
     COALESCE(sqlc.narg('role_name')::TEXT, 'viewer'),
     @expires_at,
     COALESCE(@tags, '{}'::TEXT[])

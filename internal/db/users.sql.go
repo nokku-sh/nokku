@@ -7,59 +7,29 @@ package db
 
 import (
 	"context"
-	"time"
-
-	"github.com/nokku-sh/nokku/internal/crypto"
 )
-
-const createBackupCodes = `-- name: CreateBackupCodes :exec
-WITH
-  deleted AS (
-    DELETE FROM backup_codes
-    WHERE
-      user_id = $1
-  )
-INSERT INTO
-  backup_codes (user_id, code_hash)
-SELECT
-  $1,
-  unnest($2::TEXT[])
-`
-
-type CreateBackupCodesParams struct {
-	UserID     string   `json:"userId"`
-	CodeHashes []string `json:"codeHashes"`
-}
-
-// Backup codes ---------------------------------------------------------------
-func (q *Queries) CreateBackupCodes(ctx context.Context, arg *CreateBackupCodesParams) error {
-	_, err := q.db.Exec(ctx, createBackupCodes, arg.UserID, arg.CodeHashes)
-	return err
-}
 
 const createOAuthUser = `-- name: CreateOAuthUser :one
 INSERT INTO
-  users (name, username, password_hash, picture, email, email_verified)
+  users (name, username, picture, email, email_verified)
 VALUES
-  ($1, $2, $3, $4, $5, FALSE)
+  ($1, $2, $3, $4, FALSE)
 ON CONFLICT (email) DO NOTHING
 RETURNING
-  id, name, username, email, email_verified, password_hash, picture, is_active, enable_email_recovery, created_at, updated_at
+  id, name, username, email, email_verified, picture, is_active, enable_email_recovery, created_at, updated_at
 `
 
 type CreateOAuthUserParams struct {
-	Name         string                `json:"name"`
-	Username     string                `json:"username"`
-	PasswordHash crypto.HashedPassword `json:"passwordHash"`
-	Picture      *string               `json:"picture"`
-	Email        string                `json:"email"`
+	Name     string  `json:"name"`
+	Username string  `json:"username"`
+	Picture  *string `json:"picture"`
+	Email    string  `json:"email"`
 }
 
 func (q *Queries) CreateOAuthUser(ctx context.Context, arg *CreateOAuthUserParams) (*User, error) {
 	row := q.db.QueryRow(ctx, createOAuthUser,
 		arg.Name,
 		arg.Username,
-		arg.PasswordHash,
 		arg.Picture,
 		arg.Email,
 	)
@@ -70,7 +40,6 @@ func (q *Queries) CreateOAuthUser(ctx context.Context, arg *CreateOAuthUserParam
 		&i.Username,
 		&i.Email,
 		&i.EmailVerified,
-		&i.PasswordHash,
 		&i.Picture,
 		&i.IsActive,
 		&i.EnableEmailRecovery,
@@ -82,26 +51,24 @@ func (q *Queries) CreateOAuthUser(ctx context.Context, arg *CreateOAuthUserParam
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO
-  users (name, username, password_hash, picture, email, email_verified)
+  users (name, username, picture, email, email_verified)
 VALUES
-  ($1, $2, $3, $4, $5, FALSE)
+  ($1, $2, $3, $4, FALSE)
 RETURNING
-  id, name, username, email, email_verified, password_hash, picture, is_active, enable_email_recovery, created_at, updated_at
+  id, name, username, email, email_verified, picture, is_active, enable_email_recovery, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	Name         string                `json:"name"`
-	Username     string                `json:"username"`
-	PasswordHash crypto.HashedPassword `json:"passwordHash"`
-	Picture      *string               `json:"picture"`
-	Email        string                `json:"email"`
+	Name     string  `json:"name"`
+	Username string  `json:"username"`
+	Picture  *string `json:"picture"`
+	Email    string  `json:"email"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User, error) {
 	row := q.db.QueryRow(ctx, createUser,
 		arg.Name,
 		arg.Username,
-		arg.PasswordHash,
 		arg.Picture,
 		arg.Email,
 	)
@@ -112,7 +79,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User,
 		&i.Username,
 		&i.Email,
 		&i.EmailVerified,
-		&i.PasswordHash,
 		&i.Picture,
 		&i.IsActive,
 		&i.EnableEmailRecovery,
@@ -120,62 +86,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User,
 		&i.UpdatedAt,
 	)
 	return &i, err
-}
-
-const createUserDevice = `-- name: CreateUserDevice :exec
-INSERT INTO
-  user_devices (id, user_id, name, kind, auth_method, auth_pubkey, token_hash)
-VALUES
-  ($1, $2, $3, $4, $5, $6, $7)
-RETURNING
-  id, user_id, name, kind, auth_method, auth_pubkey, token_hash, expires_at, last_used_at, created_at, updated_at
-`
-
-type CreateUserDeviceParams struct {
-	ID         string              `json:"id"`
-	UserID     string              `json:"userId"`
-	Name       string              `json:"name"`
-	Kind       string              `json:"kind"`
-	AuthMethod string              `json:"authMethod"`
-	AuthPubkey *string             `json:"authPubkey"`
-	TokenHash  *crypto.HashedToken `json:"tokenHash"`
-}
-
-// User Device Tokens ---------------------------------------------------------
-func (q *Queries) CreateUserDevice(ctx context.Context, arg *CreateUserDeviceParams) error {
-	_, err := q.db.Exec(ctx, createUserDevice,
-		arg.ID,
-		arg.UserID,
-		arg.Name,
-		arg.Kind,
-		arg.AuthMethod,
-		arg.AuthPubkey,
-		arg.TokenHash,
-	)
-	return err
-}
-
-const deleteBackupCodes = `-- name: DeleteBackupCodes :exec
-DELETE FROM backup_codes
-WHERE
-  user_id = $1
-`
-
-func (q *Queries) DeleteBackupCodes(ctx context.Context, userID string) error {
-	_, err := q.db.Exec(ctx, deleteBackupCodes, userID)
-	return err
-}
-
-const deleteExpiredUserDevices = `-- name: DeleteExpiredUserDevices :exec
-DELETE FROM user_devices
-WHERE
-  expires_at IS NOT NULL
-  AND expires_at <= NOW()
-`
-
-func (q *Queries) DeleteExpiredUserDevices(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, deleteExpiredUserDevices)
-	return err
 }
 
 const deleteUnverifiedUsers = `-- name: DeleteUnverifiedUsers :exec
@@ -201,36 +111,6 @@ func (q *Queries) DeleteUser(ctx context.Context, userID string) error {
 	return err
 }
 
-const deleteUserDevice = `-- name: DeleteUserDevice :exec
-DELETE FROM user_devices
-WHERE
-  id = $1
-  AND user_id = $2
-`
-
-type DeleteUserDeviceParams struct {
-	ID     string `json:"id"`
-	UserID string `json:"userId"`
-}
-
-func (q *Queries) DeleteUserDevice(ctx context.Context, arg *DeleteUserDeviceParams) error {
-	_, err := q.db.Exec(ctx, deleteUserDevice, arg.ID, arg.UserID)
-	return err
-}
-
-const deleteUserPassword = `-- name: DeleteUserPassword :exec
-UPDATE users
-SET
-  password_hash = NULL
-WHERE
-  id = $1
-`
-
-func (q *Queries) DeleteUserPassword(ctx context.Context, userID string) error {
-	_, err := q.db.Exec(ctx, deleteUserPassword, userID)
-	return err
-}
-
 const emailExists = `-- name: EmailExists :one
 SELECT
   EXISTS (
@@ -252,7 +132,7 @@ func (q *Queries) EmailExists(ctx context.Context, email string) (bool, error) {
 
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT
-  id, name, username, email, email_verified, password_hash, picture, is_active, enable_email_recovery, created_at, updated_at
+  id, name, username, email, email_verified, picture, is_active, enable_email_recovery, created_at, updated_at
 FROM
   users
 WHERE
@@ -268,7 +148,6 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 		&i.Username,
 		&i.Email,
 		&i.EmailVerified,
-		&i.PasswordHash,
 		&i.Picture,
 		&i.IsActive,
 		&i.EnableEmailRecovery,
@@ -280,7 +159,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 
 const getUserByID = `-- name: GetUserByID :one
 SELECT
-  id, name, username, email, email_verified, password_hash, picture, is_active, enable_email_recovery, created_at, updated_at
+  id, name, username, email, email_verified, picture, is_active, enable_email_recovery, created_at, updated_at
 FROM
   users
 WHERE
@@ -296,7 +175,6 @@ func (q *Queries) GetUserByID(ctx context.Context, userID string) (*User, error)
 		&i.Username,
 		&i.Email,
 		&i.EmailVerified,
-		&i.PasswordHash,
 		&i.Picture,
 		&i.IsActive,
 		&i.EnableEmailRecovery,
@@ -306,159 +184,35 @@ func (q *Queries) GetUserByID(ctx context.Context, userID string) (*User, error)
 	return &i, err
 }
 
-const getUserDevice = `-- name: GetUserDevice :one
+const listUsers = `-- name: ListUsers :many
 SELECT
-  id, user_id, name, kind, auth_method, auth_pubkey, token_hash, expires_at, last_used_at, created_at, updated_at
-FROM
-  user_devices
-WHERE
-  id = $1
-`
-
-func (q *Queries) GetUserDevice(ctx context.Context, id string) (*UserDevice, error) {
-	row := q.db.QueryRow(ctx, getUserDevice, id)
-	var i UserDevice
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.Name,
-		&i.Kind,
-		&i.AuthMethod,
-		&i.AuthPubkey,
-		&i.TokenHash,
-		&i.ExpiresAt,
-		&i.LastUsedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const getUserWebDevice = `-- name: GetUserWebDevice :one
-SELECT
-  token_hash,
-  name
-FROM
-  user_devices
-WHERE
-  id = $1
-  AND user_id = $2
-  AND kind = 'web'
-`
-
-type GetUserWebDeviceParams struct {
-	ID     string `json:"id"`
-	UserID string `json:"userId"`
-}
-
-type GetUserWebDeviceRow struct {
-	TokenHash *crypto.HashedToken `json:"tokenHash"`
-	Name      string              `json:"name"`
-}
-
-func (q *Queries) GetUserWebDevice(ctx context.Context, arg *GetUserWebDeviceParams) (*GetUserWebDeviceRow, error) {
-	row := q.db.QueryRow(ctx, getUserWebDevice, arg.ID, arg.UserID)
-	var i GetUserWebDeviceRow
-	err := row.Scan(&i.TokenHash, &i.Name)
-	return &i, err
-}
-
-const hasUserPassword = `-- name: HasUserPassword :one
-SELECT
-  CASE
-    WHEN password_hash IS NOT NULL THEN TRUE
-    ELSE FALSE
-  END AS has_password
+  id, name, username, email, email_verified, picture, is_active, enable_email_recovery, created_at, updated_at
 FROM
   users
-WHERE
-  id = $1
-`
-
-func (q *Queries) HasUserPassword(ctx context.Context, id string) (bool, error) {
-	row := q.db.QueryRow(ctx, hasUserPassword, id)
-	var has_password bool
-	err := row.Scan(&has_password)
-	return has_password, err
-}
-
-const listBackupCodes = `-- name: ListBackupCodes :many
-SELECT
-  id, user_id, code_hash, used_at, created_at
-FROM
-  backup_codes
-WHERE
-  user_id = $1
-  AND used_at IS NULL
-`
-
-func (q *Queries) ListBackupCodes(ctx context.Context, userID string) ([]*BackupCode, error) {
-	rows, err := q.db.Query(ctx, listBackupCodes, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*BackupCode
-	for rows.Next() {
-		var i BackupCode
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.CodeHash,
-			&i.UsedAt,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listUserDevices = `-- name: ListUserDevices :many
-SELECT
-  id,
-  name,
-  kind,
-  expires_at,
-  last_used_at,
-  created_at
-FROM
-  user_devices
-WHERE
-  user_id = $1
 ORDER BY
   created_at DESC
 `
 
-type ListUserDevicesRow struct {
-	ID         string     `json:"id"`
-	Name       string     `json:"name"`
-	Kind       string     `json:"kind"`
-	ExpiresAt  *time.Time `json:"expiresAt"`
-	LastUsedAt *time.Time `json:"lastUsedAt"`
-	CreatedAt  *time.Time `json:"createdAt"`
-}
-
-func (q *Queries) ListUserDevices(ctx context.Context, userID string) ([]*ListUserDevicesRow, error) {
-	rows, err := q.db.Query(ctx, listUserDevices, userID)
+func (q *Queries) ListUsers(ctx context.Context) ([]*User, error) {
+	rows, err := q.db.Query(ctx, listUsers)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*ListUserDevicesRow
+	var items []*User
 	for rows.Next() {
-		var i ListUserDevicesRow
+		var i User
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
-			&i.Kind,
-			&i.ExpiresAt,
-			&i.LastUsedAt,
+			&i.Username,
+			&i.Email,
+			&i.EmailVerified,
+			&i.Picture,
+			&i.IsActive,
+			&i.EnableEmailRecovery,
 			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -468,43 +222,6 @@ func (q *Queries) ListUserDevices(ctx context.Context, userID string) ([]*ListUs
 		return nil, err
 	}
 	return items, nil
-}
-
-const rotateUserDevice = `-- name: RotateUserDevice :one
-UPDATE user_devices
-SET
-  auth_method = $1,
-  auth_pubkey = $2,
-  token_hash = NULL,
-  name = $3,
-  expires_at = NOW() + INTERVAL '6 months'
-WHERE
-  id = $4
-  AND user_id = $5
-  AND kind = 'cli'
-RETURNING
-  id
-`
-
-type RotateUserDeviceParams struct {
-	AuthMethod string  `json:"authMethod"`
-	AuthPubkey *string `json:"authPubkey"`
-	Name       string  `json:"name"`
-	ID         string  `json:"id"`
-	UserID     string  `json:"userId"`
-}
-
-func (q *Queries) RotateUserDevice(ctx context.Context, arg *RotateUserDeviceParams) (string, error) {
-	row := q.db.QueryRow(ctx, rotateUserDevice,
-		arg.AuthMethod,
-		arg.AuthPubkey,
-		arg.Name,
-		arg.ID,
-		arg.UserID,
-	)
-	var id string
-	err := row.Scan(&id)
-	return id, err
 }
 
 const updateEmailRecovery = `-- name: UpdateEmailRecovery :exec
@@ -534,7 +251,7 @@ SET
 WHERE
   id = $4
 RETURNING
-  id, name, username, email, email_verified, password_hash, picture, is_active, enable_email_recovery, created_at, updated_at
+  id, name, username, email, email_verified, picture, is_active, enable_email_recovery, created_at, updated_at
 `
 
 type UpdateUserParams struct {
@@ -558,7 +275,6 @@ func (q *Queries) UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User,
 		&i.Username,
 		&i.Email,
 		&i.EmailVerified,
-		&i.PasswordHash,
 		&i.Picture,
 		&i.IsActive,
 		&i.EnableEmailRecovery,
@@ -566,66 +282,6 @@ func (q *Queries) UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User,
 		&i.UpdatedAt,
 	)
 	return &i, err
-}
-
-const updateUserDeviceUsage = `-- name: UpdateUserDeviceUsage :exec
-UPDATE user_devices
-SET
-  last_used_at = NOW(),
-  expires_at = NOW() + INTERVAL '6 months'
-WHERE
-  id = $1
-  AND (
-    last_used_at IS NULL
-    OR last_used_at < NOW() - INTERVAL '5 minutes'
-  )
-`
-
-func (q *Queries) UpdateUserDeviceUsage(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, updateUserDeviceUsage, id)
-	return err
-}
-
-const updateUserPassword = `-- name: UpdateUserPassword :exec
-UPDATE users
-SET
-  password_hash = $1
-WHERE
-  id = $2
-`
-
-type UpdateUserPasswordParams struct {
-	PasswordHash crypto.HashedPassword `json:"passwordHash"`
-	UserID       string                `json:"userId"`
-}
-
-func (q *Queries) UpdateUserPassword(ctx context.Context, arg *UpdateUserPasswordParams) error {
-	_, err := q.db.Exec(ctx, updateUserPassword, arg.PasswordHash, arg.UserID)
-	return err
-}
-
-const useBackupCode = `-- name: UseBackupCode :one
-UPDATE backup_codes
-SET
-  used_at = NOW()
-WHERE
-  user_id = $1
-  AND code_hash = $2
-  AND used_at IS NULL
-RETURNING
-  id
-`
-
-type UseBackupCodeParams struct {
-	UserID   string             `json:"userId"`
-	CodeHash crypto.HashedToken `json:"codeHash"`
-}
-
-func (q *Queries) UseBackupCode(ctx context.Context, arg *UseBackupCodeParams) (string, error) {
-	row := q.db.QueryRow(ctx, useBackupCode, arg.UserID, arg.CodeHash)
-	var id string
-	err := row.Scan(&id)
-	return id, err
 }
 
 const verifyUserEmail = `-- name: VerifyUserEmail :exec

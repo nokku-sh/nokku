@@ -74,19 +74,3 @@ SET
   client_secret = @client_secret
 WHERE
   workspace_id = @workspace_id;
-
--- name: GetEncryptedSAMLKeys :many
-SELECT
-  workspace_id,
-  sp_private_key
-FROM
-  saml_providers
-WHERE
-  sp_private_key IS NOT NULL;
-
--- name: UpdateSAMLPrivateKey :exec
-UPDATE saml_providers
-SET
-  sp_private_key = @sp_private_key
-WHERE
-  workspace_id = @workspace_id;

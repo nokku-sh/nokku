@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"time"
 
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
@@ -44,180 +43,6 @@ func (q *Queries) CheckDomainSSOEnforcement(ctx context.Context, domain string) 
 	var enforce_sso bool
 	err := row.Scan(&enforce_sso)
 	return enforce_sso, err
-}
-
-const createPasskey = `-- name: CreatePasskey :exec
-INSERT INTO
-  passkeys (
-    id,
-    user_id,
-    public_key,
-    attestation_type,
-    aaguid,
-    sign_count,
-    transports,
-    backup_eligible,
-    backup_state,
-    name
-  )
-VALUES
-  (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7,
-    $8,
-    $9,
-    $10
-  )
-`
-
-type CreatePasskeyParams struct {
-	ID              string   `json:"id"`
-	UserID          string   `json:"userId"`
-	PublicKey       []byte   `json:"publicKey"`
-	AttestationType string   `json:"attestationType"`
-	Aaguid          []byte   `json:"aaguid"`
-	SignCount       int64    `json:"signCount"`
-	Transports      []string `json:"transports"`
-	BackupEligible  bool     `json:"backupEligible"`
-	BackupState     bool     `json:"backupState"`
-	Name            *string  `json:"name"`
-}
-
-// Passkeys -------------------------------------------------------------------
-func (q *Queries) CreatePasskey(ctx context.Context, arg *CreatePasskeyParams) error {
-	_, err := q.db.Exec(ctx, createPasskey,
-		arg.ID,
-		arg.UserID,
-		arg.PublicKey,
-		arg.AttestationType,
-		arg.Aaguid,
-		arg.SignCount,
-		arg.Transports,
-		arg.BackupEligible,
-		arg.BackupState,
-		arg.Name,
-	)
-	return err
-}
-
-const deletePasskey = `-- name: DeletePasskey :exec
-DELETE FROM passkeys
-WHERE
-  id = $1
-`
-
-func (q *Queries) DeletePasskey(ctx context.Context, passkeyID string) error {
-	_, err := q.db.Exec(ctx, deletePasskey, passkeyID)
-	return err
-}
-
-const deleteUserIdentitiesByProvider = `-- name: DeleteUserIdentitiesByProvider :exec
-DELETE FROM user_identities
-WHERE
-  provider = $1
-`
-
-func (q *Queries) DeleteUserIdentitiesByProvider(ctx context.Context, provider string) error {
-	_, err := q.db.Exec(ctx, deleteUserIdentitiesByProvider, provider)
-	return err
-}
-
-const deleteUserIdentitiesByUserAndProtocol = `-- name: DeleteUserIdentitiesByUserAndProtocol :exec
-DELETE FROM user_identities
-WHERE
-  user_id = $1
-  AND provider = $2
-  AND protocol = $3
-`
-
-type DeleteUserIdentitiesByUserAndProtocolParams struct {
-	UserID   string `json:"userId"`
-	Provider string `json:"provider"`
-	Protocol string `json:"protocol"`
-}
-
-func (q *Queries) DeleteUserIdentitiesByUserAndProtocol(ctx context.Context, arg *DeleteUserIdentitiesByUserAndProtocolParams) error {
-	_, err := q.db.Exec(ctx, deleteUserIdentitiesByUserAndProtocol, arg.UserID, arg.Provider, arg.Protocol)
-	return err
-}
-
-const deleteUserIdentity = `-- name: DeleteUserIdentity :exec
-DELETE FROM user_identities
-WHERE
-  provider_id = $1
-  AND provider = $2
-`
-
-type DeleteUserIdentityParams struct {
-	ProviderID string `json:"providerId"`
-	Provider   string `json:"provider"`
-}
-
-func (q *Queries) DeleteUserIdentity(ctx context.Context, arg *DeleteUserIdentityParams) error {
-	_, err := q.db.Exec(ctx, deleteUserIdentity, arg.ProviderID, arg.Provider)
-	return err
-}
-
-const deleteUserIdentityByUser = `-- name: DeleteUserIdentityByUser :exec
-DELETE FROM user_identities
-WHERE
-  user_id = $1
-  AND provider = $2
-`
-
-type DeleteUserIdentityByUserParams struct {
-	UserID   string `json:"userId"`
-	Provider string `json:"provider"`
-}
-
-func (q *Queries) DeleteUserIdentityByUser(ctx context.Context, arg *DeleteUserIdentityByUserParams) error {
-	_, err := q.db.Exec(ctx, deleteUserIdentityByUser, arg.UserID, arg.Provider)
-	return err
-}
-
-const getExpiringSAMLProviderForUpdate = `-- name: GetExpiringSAMLProviderForUpdate :one
-SELECT
-  workspace_id, name, metadata_url, email_attribute, name_attribute, username_attribute, picture_attribute, sp_private_key, sp_certificate, sp_cert_expires_at, enforce_sso, allow_jit_provisioning, is_active, created_at, updated_at
-FROM
-  saml_providers
-WHERE
-  is_active = TRUE
-  AND sp_cert_expires_at IS NOT NULL
-  AND sp_cert_expires_at < NOW() + INTERVAL '30 days'
-ORDER BY
-  sp_cert_expires_at ASC
-LIMIT
-  1
-FOR UPDATE
-  SKIP LOCKED
-`
-
-func (q *Queries) GetExpiringSAMLProviderForUpdate(ctx context.Context) (*SamlProvider, error) {
-	row := q.db.QueryRow(ctx, getExpiringSAMLProviderForUpdate)
-	var i SamlProvider
-	err := row.Scan(
-		&i.WorkspaceID,
-		&i.Name,
-		&i.MetadataURL,
-		&i.EmailAttribute,
-		&i.NameAttribute,
-		&i.UsernameAttribute,
-		&i.PictureAttribute,
-		&i.SpPrivateKey,
-		&i.SpCertificate,
-		&i.SpCertExpiresAt,
-		&i.EnforceSso,
-		&i.AllowJitProvisioning,
-		&i.IsActive,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
 }
 
 const getOIDCProvider = `-- name: GetOIDCProvider :one
@@ -326,80 +151,9 @@ func (q *Queries) GetOIDCProviderByID(ctx context.Context, workspaceID string) (
 	return &i, err
 }
 
-const getPasskey = `-- name: GetPasskey :one
-SELECT
-  id, user_id, name, public_key, attestation_type, aaguid, sign_count, transports, backup_eligible, backup_state, created_at, last_used_at
-FROM
-  passkeys
-WHERE
-  id = $1
-`
-
-func (q *Queries) GetPasskey(ctx context.Context, passkeyID string) (*Passkey, error) {
-	row := q.db.QueryRow(ctx, getPasskey, passkeyID)
-	var i Passkey
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.Name,
-		&i.PublicKey,
-		&i.AttestationType,
-		&i.Aaguid,
-		&i.SignCount,
-		&i.Transports,
-		&i.BackupEligible,
-		&i.BackupState,
-		&i.CreatedAt,
-		&i.LastUsedAt,
-	)
-	return &i, err
-}
-
-const getPasskeysByUserID = `-- name: GetPasskeysByUserID :many
-SELECT
-  id, user_id, name, public_key, attestation_type, aaguid, sign_count, transports, backup_eligible, backup_state, created_at, last_used_at
-FROM
-  passkeys
-WHERE
-  user_id = $1
-`
-
-func (q *Queries) GetPasskeysByUserID(ctx context.Context, userID string) ([]*Passkey, error) {
-	rows, err := q.db.Query(ctx, getPasskeysByUserID, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*Passkey
-	for rows.Next() {
-		var i Passkey
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Name,
-			&i.PublicKey,
-			&i.AttestationType,
-			&i.Aaguid,
-			&i.SignCount,
-			&i.Transports,
-			&i.BackupEligible,
-			&i.BackupState,
-			&i.CreatedAt,
-			&i.LastUsedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getSAMLProvider = `-- name: GetSAMLProvider :one
 SELECT
-  workspace_id, name, metadata_url, email_attribute, name_attribute, username_attribute, picture_attribute, sp_private_key, sp_certificate, sp_cert_expires_at, enforce_sso, allow_jit_provisioning, is_active, created_at, updated_at
+  workspace_id, name, metadata_url, email_attribute, name_attribute, username_attribute, picture_attribute, enforce_sso, allow_jit_provisioning, is_active, created_at, updated_at
 FROM
   saml_providers
 WHERE
@@ -418,9 +172,6 @@ func (q *Queries) GetSAMLProvider(ctx context.Context, workspaceID string) (*Sam
 		&i.NameAttribute,
 		&i.UsernameAttribute,
 		&i.PictureAttribute,
-		&i.SpPrivateKey,
-		&i.SpCertificate,
-		&i.SpCertExpiresAt,
 		&i.EnforceSso,
 		&i.AllowJitProvisioning,
 		&i.IsActive,
@@ -432,7 +183,7 @@ func (q *Queries) GetSAMLProvider(ctx context.Context, workspaceID string) (*Sam
 
 const getSAMLProviderByDomain = `-- name: GetSAMLProviderByDomain :one
 SELECT
-  p.workspace_id, p.name, p.metadata_url, p.email_attribute, p.name_attribute, p.username_attribute, p.picture_attribute, p.sp_private_key, p.sp_certificate, p.sp_cert_expires_at, p.enforce_sso, p.allow_jit_provisioning, p.is_active, p.created_at, p.updated_at
+  p.workspace_id, p.name, p.metadata_url, p.email_attribute, p.name_attribute, p.username_attribute, p.picture_attribute, p.enforce_sso, p.allow_jit_provisioning, p.is_active, p.created_at, p.updated_at
 FROM
   saml_providers p
   JOIN workspace_domains wd ON wd.workspace_id = p.workspace_id
@@ -453,9 +204,6 @@ func (q *Queries) GetSAMLProviderByDomain(ctx context.Context, domain string) (*
 		&i.NameAttribute,
 		&i.UsernameAttribute,
 		&i.PictureAttribute,
-		&i.SpPrivateKey,
-		&i.SpCertificate,
-		&i.SpCertExpiresAt,
 		&i.EnforceSso,
 		&i.AllowJitProvisioning,
 		&i.IsActive,
@@ -467,7 +215,7 @@ func (q *Queries) GetSAMLProviderByDomain(ctx context.Context, domain string) (*
 
 const getSAMLProviderByID = `-- name: GetSAMLProviderByID :one
 SELECT
-  p.workspace_id, p.name, p.metadata_url, p.email_attribute, p.name_attribute, p.username_attribute, p.picture_attribute, p.sp_private_key, p.sp_certificate, p.sp_cert_expires_at, p.enforce_sso, p.allow_jit_provisioning, p.is_active, p.created_at, p.updated_at
+  p.workspace_id, p.name, p.metadata_url, p.email_attribute, p.name_attribute, p.username_attribute, p.picture_attribute, p.enforce_sso, p.allow_jit_provisioning, p.is_active, p.created_at, p.updated_at
 FROM
   saml_providers p
   JOIN workspace_domains wd ON wd.workspace_id = p.workspace_id
@@ -488,145 +236,9 @@ func (q *Queries) GetSAMLProviderByID(ctx context.Context, workspaceID string) (
 		&i.NameAttribute,
 		&i.UsernameAttribute,
 		&i.PictureAttribute,
-		&i.SpPrivateKey,
-		&i.SpCertificate,
-		&i.SpCertExpiresAt,
 		&i.EnforceSso,
 		&i.AllowJitProvisioning,
 		&i.IsActive,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const getUserIdentitiesByProvider = `-- name: GetUserIdentitiesByProvider :many
-SELECT
-  o.provider_id, o.provider, o.user_id, o.provider_email, o.provider_username, o.protocol, o.created_at, o.updated_at,
-  u.email,
-  u.username,
-  u.name
-FROM
-  user_identities o
-  JOIN users u ON u.id = o.user_id
-WHERE
-  o.provider = $1
-ORDER BY
-  o.created_at DESC
-`
-
-type GetUserIdentitiesByProviderRow struct {
-	ProviderID       string    `json:"providerId"`
-	Provider         string    `json:"provider"`
-	UserID           string    `json:"userId"`
-	ProviderEmail    *string   `json:"providerEmail"`
-	ProviderUsername *string   `json:"providerUsername"`
-	Protocol         string    `json:"protocol"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
-	Email            string    `json:"email"`
-	Username         string    `json:"username"`
-	Name             string    `json:"name"`
-}
-
-func (q *Queries) GetUserIdentitiesByProvider(ctx context.Context, provider string) ([]*GetUserIdentitiesByProviderRow, error) {
-	rows, err := q.db.Query(ctx, getUserIdentitiesByProvider, provider)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*GetUserIdentitiesByProviderRow
-	for rows.Next() {
-		var i GetUserIdentitiesByProviderRow
-		if err := rows.Scan(
-			&i.ProviderID,
-			&i.Provider,
-			&i.UserID,
-			&i.ProviderEmail,
-			&i.ProviderUsername,
-			&i.Protocol,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Email,
-			&i.Username,
-			&i.Name,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getUserIdentitiesByUserID = `-- name: GetUserIdentitiesByUserID :many
-SELECT
-  provider_id, provider, user_id, provider_email, provider_username, protocol, created_at, updated_at
-FROM
-  user_identities
-WHERE
-  user_id = $1
-ORDER BY
-  created_at DESC
-`
-
-func (q *Queries) GetUserIdentitiesByUserID(ctx context.Context, userID string) ([]*UserIdentity, error) {
-	rows, err := q.db.Query(ctx, getUserIdentitiesByUserID, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*UserIdentity
-	for rows.Next() {
-		var i UserIdentity
-		if err := rows.Scan(
-			&i.ProviderID,
-			&i.Provider,
-			&i.UserID,
-			&i.ProviderEmail,
-			&i.ProviderUsername,
-			&i.Protocol,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getUserIdentity = `-- name: GetUserIdentity :one
-SELECT
-  provider_id, provider, user_id, provider_email, provider_username, protocol, created_at, updated_at
-FROM
-  user_identities
-WHERE
-  provider_id = $1
-  AND provider = $2
-`
-
-type GetUserIdentityParams struct {
-	ProviderID string `json:"providerId"`
-	Provider   string `json:"provider"`
-}
-
-// User Identities -----------------------------------------------------------
-func (q *Queries) GetUserIdentity(ctx context.Context, arg *GetUserIdentityParams) (*UserIdentity, error) {
-	row := q.db.QueryRow(ctx, getUserIdentity, arg.ProviderID, arg.Provider)
-	var i UserIdentity
-	err := row.Scan(
-		&i.ProviderID,
-		&i.Provider,
-		&i.UserID,
-		&i.ProviderEmail,
-		&i.ProviderUsername,
-		&i.Protocol,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -711,60 +323,6 @@ func (q *Queries) UpdateOIDCProvider(ctx context.Context, arg *UpdateOIDCProvide
 	return &i, err
 }
 
-const updatePasskeyLastUsed = `-- name: UpdatePasskeyLastUsed :exec
-UPDATE passkeys
-SET
-  last_used_at = $1
-WHERE
-  id = $2
-`
-
-type UpdatePasskeyLastUsedParams struct {
-	LastUsedAt *time.Time `json:"lastUsedAt"`
-	PasskeyID  string     `json:"passkeyId"`
-}
-
-func (q *Queries) UpdatePasskeyLastUsed(ctx context.Context, arg *UpdatePasskeyLastUsedParams) error {
-	_, err := q.db.Exec(ctx, updatePasskeyLastUsed, arg.LastUsedAt, arg.PasskeyID)
-	return err
-}
-
-const updatePasskeyName = `-- name: UpdatePasskeyName :exec
-UPDATE passkeys
-SET
-  name = $1
-WHERE
-  id = $2
-`
-
-type UpdatePasskeyNameParams struct {
-	Name      *string `json:"name"`
-	PasskeyID string  `json:"passkeyId"`
-}
-
-func (q *Queries) UpdatePasskeyName(ctx context.Context, arg *UpdatePasskeyNameParams) error {
-	_, err := q.db.Exec(ctx, updatePasskeyName, arg.Name, arg.PasskeyID)
-	return err
-}
-
-const updatePasskeySignCount = `-- name: UpdatePasskeySignCount :exec
-UPDATE passkeys
-SET
-  sign_count = $1
-WHERE
-  id = $2
-`
-
-type UpdatePasskeySignCountParams struct {
-	SignCount int64  `json:"signCount"`
-	PasskeyID string `json:"passkeyId"`
-}
-
-func (q *Queries) UpdatePasskeySignCount(ctx context.Context, arg *UpdatePasskeySignCountParams) error {
-	_, err := q.db.Exec(ctx, updatePasskeySignCount, arg.SignCount, arg.PasskeyID)
-	return err
-}
-
 const updateSAMLProvider = `-- name: UpdateSAMLProvider :one
 UPDATE saml_providers
 SET
@@ -774,32 +332,26 @@ SET
   name_attribute = COALESCE($4, name_attribute),
   username_attribute = COALESCE($5, username_attribute),
   picture_attribute = COALESCE($6, picture_attribute),
-  sp_private_key = COALESCE($7, sp_private_key),
-  sp_certificate = COALESCE($8, sp_certificate),
-  sp_cert_expires_at = COALESCE($9, sp_cert_expires_at),
-  is_active = COALESCE($10, is_active),
-  enforce_sso = COALESCE($11, enforce_sso),
-  allow_jit_provisioning = COALESCE($12, allow_jit_provisioning)
+  is_active = COALESCE($7, is_active),
+  enforce_sso = COALESCE($8, enforce_sso),
+  allow_jit_provisioning = COALESCE($9, allow_jit_provisioning)
 WHERE
-  workspace_id = $13
+  workspace_id = $10
 RETURNING
-  workspace_id, name, metadata_url, email_attribute, name_attribute, username_attribute, picture_attribute, sp_private_key, sp_certificate, sp_cert_expires_at, enforce_sso, allow_jit_provisioning, is_active, created_at, updated_at
+  workspace_id, name, metadata_url, email_attribute, name_attribute, username_attribute, picture_attribute, enforce_sso, allow_jit_provisioning, is_active, created_at, updated_at
 `
 
 type UpdateSAMLProviderParams struct {
-	Name                 *string               `json:"name"`
-	MetadataURL          *string               `json:"metadataUrl"`
-	EmailAttribute       *string               `json:"emailAttribute"`
-	NameAttribute        *string               `json:"nameAttribute"`
-	UsernameAttribute    *string               `json:"usernameAttribute"`
-	PictureAttribute     *string               `json:"pictureAttribute"`
-	SpPrivateKey         crypto.EncryptedBytes `json:"spPrivateKey"`
-	SpCertificate        *string               `json:"spCertificate"`
-	SpCertExpiresAt      *time.Time            `json:"spCertExpiresAt"`
-	IsActive             *bool                 `json:"isActive"`
-	EnforceSso           *bool                 `json:"enforceSso"`
-	AllowJitProvisioning *bool                 `json:"allowJitProvisioning"`
-	WorkspaceID          string                `json:"workspaceId"`
+	Name                 *string `json:"name"`
+	MetadataURL          *string `json:"metadataUrl"`
+	EmailAttribute       *string `json:"emailAttribute"`
+	NameAttribute        *string `json:"nameAttribute"`
+	UsernameAttribute    *string `json:"usernameAttribute"`
+	PictureAttribute     *string `json:"pictureAttribute"`
+	IsActive             *bool   `json:"isActive"`
+	EnforceSso           *bool   `json:"enforceSso"`
+	AllowJitProvisioning *bool   `json:"allowJitProvisioning"`
+	WorkspaceID          string  `json:"workspaceId"`
 }
 
 func (q *Queries) UpdateSAMLProvider(ctx context.Context, arg *UpdateSAMLProviderParams) (*SamlProvider, error) {
@@ -810,9 +362,6 @@ func (q *Queries) UpdateSAMLProvider(ctx context.Context, arg *UpdateSAMLProvide
 		arg.NameAttribute,
 		arg.UsernameAttribute,
 		arg.PictureAttribute,
-		arg.SpPrivateKey,
-		arg.SpCertificate,
-		arg.SpCertExpiresAt,
 		arg.IsActive,
 		arg.EnforceSso,
 		arg.AllowJitProvisioning,
@@ -827,58 +376,9 @@ func (q *Queries) UpdateSAMLProvider(ctx context.Context, arg *UpdateSAMLProvide
 		&i.NameAttribute,
 		&i.UsernameAttribute,
 		&i.PictureAttribute,
-		&i.SpPrivateKey,
-		&i.SpCertificate,
-		&i.SpCertExpiresAt,
 		&i.EnforceSso,
 		&i.AllowJitProvisioning,
 		&i.IsActive,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const upsertUserIdentity = `-- name: UpsertUserIdentity :one
-INSERT INTO
-  user_identities (provider_id, provider, user_id, provider_email, provider_username, protocol)
-VALUES
-  ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (provider_id, provider) DO UPDATE
-SET
-  provider_email = EXCLUDED.provider_email,
-  provider_username = EXCLUDED.provider_username,
-  protocol = EXCLUDED.protocol
-RETURNING
-  provider_id, provider, user_id, provider_email, provider_username, protocol, created_at, updated_at
-`
-
-type UpsertUserIdentityParams struct {
-	ProviderID       string  `json:"providerId"`
-	Provider         string  `json:"provider"`
-	UserID           string  `json:"userId"`
-	ProviderEmail    *string `json:"providerEmail"`
-	ProviderUsername *string `json:"providerUsername"`
-	Protocol         string  `json:"protocol"`
-}
-
-func (q *Queries) UpsertUserIdentity(ctx context.Context, arg *UpsertUserIdentityParams) (*UserIdentity, error) {
-	row := q.db.QueryRow(ctx, upsertUserIdentity,
-		arg.ProviderID,
-		arg.Provider,
-		arg.UserID,
-		arg.ProviderEmail,
-		arg.ProviderUsername,
-		arg.Protocol,
-	)
-	var i UserIdentity
-	err := row.Scan(
-		&i.ProviderID,
-		&i.Provider,
-		&i.UserID,
-		&i.ProviderEmail,
-		&i.ProviderUsername,
-		&i.Protocol,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
