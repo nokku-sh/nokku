@@ -10,12 +10,10 @@ import (
 	"github.com/brianvoe/gofakeit/v7"
 	"github.com/google/uuid"
 
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/ssh"
-	"github.com/nokku-sh/nokku/internal/util"
 )
 
 func uniqueName(base string, i int) string {
@@ -42,7 +40,6 @@ func DefaultConfig() Config {
 	}
 }
 
-//nolint:cyclop // just for testing
 func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 	_ = gofakeit.Seed(time.Now().UnixNano())
 
@@ -50,16 +47,10 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 	email := os.Getenv("NOKKU_ADMIN_EMAIL")
 	owner, err := conn.Q.GetUserByEmail(ctx, email)
 	if err != nil {
-		hash, err := crypto.HashPassword(os.Getenv("NOKKU_ADMIN_PASSWORD"))
-		if err != nil {
-			return fmt.Errorf("failed to hash admin password: %w", err)
-		}
-
 		owner, err = conn.Q.CreateUser(ctx, &db.CreateUserParams{
-			Name:         "Super Admin",
-			Username:     "admin",
-			Email:        email,
-			PasswordHash: hash,
+			Name:     "Super Admin",
+			Username: "admin",
+			Email:    email,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create admin user: %w", err)
@@ -92,27 +83,12 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 	ctx = meta.WithActor(ctx, actor)
 
 	err = conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		samlKeyPair, err := util.CreateSAMLKeyPair(workspace.ID)
-		if err != nil {
-			return err
-		}
-
-		if _, err = q.UpdateSAMLProvider(ctx, &db.UpdateSAMLProviderParams{
-			WorkspaceID:   workspace.ID,
-			SpPrivateKey:  crypto.EncryptedBytes(samlKeyPair.PrivateKey),
-			SpCertificate: &samlKeyPair.Certificate,
-		}); err != nil {
-			slog.Debug("failed to create default SAML provider", "error", err)
-			return err
-		}
-
 		users := make([]*db.User, cfg.NumUsers-1)
 		for i := range cfg.NumUsers - 1 {
 			user, err := q.CreateUser(ctx, &db.CreateUserParams{
-				Name:         gofakeit.Name(),
-				Username:     gofakeit.Username(),
-				Email:        gofakeit.Email(),
-				PasswordHash: owner.PasswordHash,
+				Name:     gofakeit.Name(),
+				Username: gofakeit.Username(),
+				Email:    gofakeit.Email(),
 			})
 			if err != nil {
 				return fmt.Errorf("failed to create user %d: %w", i, err)
@@ -166,14 +142,9 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 		// Create service accounts. Suffixed names avoid UNIQUE (workspace_id, name) violations
 		sa := make([]*db.ServiceAccount, cfg.NumServiceAccounts)
 		for i := range cfg.NumServiceAccounts {
-			token, err := crypto.NewServiceAccountToken()
-			if err != nil {
-				return fmt.Errorf("failed to generate service account token: %w", err)
-			}
 			s, err := q.CreateServiceAccount(ctx, &db.CreateServiceAccountParams{
-				ID:          token.ID,
+				ID:          uuid.NewString(),
 				WorkspaceID: workspace.ID,
-				TokenHash:   token.Hash,
 				Name:        uniqueName(gofakeit.AppName(), i),
 				Description: new(gofakeit.Sentence()),
 				ExpiresAt:   new(gofakeit.FutureDate()),
