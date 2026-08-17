@@ -236,11 +236,7 @@
 						<Item.Media variant="icon"><Icon /></Item.Media>
 						<Item.Content>
 							<Item.Title>{providerName(account)}</Item.Title>
-							<Item.Description
-								>{account.providerEmail ||
-									account.providerUsername ||
-									'Connected'}</Item.Description
-							>
+							<Item.Description>Connected</Item.Description>
 						</Item.Content>
 						<Item.Actions>
 							{#if account.provider === 'github' || account.provider === 'google'}

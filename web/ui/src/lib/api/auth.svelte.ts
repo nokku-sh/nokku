@@ -1,60 +1,68 @@
 import { goto } from '$app/navigation';
 import { toast } from 'svelte-sonner';
-import { useMutation } from '$lib/query';
-import { cliToken, workspaceID } from '$lib/store.svelte';
-import { SquareTerminalIcon } from '@lucide/svelte';
-import { queryClient } from './client';
-import { AuthService } from '$lib/gen/nokku/v1/auth_pb';
+import { createMutation } from '@tanstack/svelte-query';
+import { workspaceID } from '$lib/store.svelte';
+import { queryClient, httpFetch } from './client';
+
+// Auth flows moved from connectrpc RPCs to plain HTTP endpoints backed by
+// kagi. These mutations mirror the previous useMutation(AuthService.method.*)
+// surface so the pages and components keep working unchanged.
+
+function post(url: string, body: unknown) {
+	return httpFetch(url, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+}
+
+function authMutation<B extends object | undefined>(url: string, onSuccess?: () => void) {
+	return createMutation<void, Error, B>(() => ({
+		mutationFn: async (body: B) => {
+			await post(url, body ?? {});
+		},
+		onSuccess: () => {
+			onSuccess?.();
+		}
+	}));
+}
 
 export const auth = {
 	login: () =>
-		useMutation(AuthService.method.login, {
-			onSuccess: () => {
-				void goto('/');
-				toast.success('Welcome back 👋');
-			}
+		authMutation<{ email: string; password: string }>('/auth/login', () => {
+			void goto('/');
+			toast.success('Welcome back 👋');
 		}),
 	loginWithBackupCode: () =>
-		useMutation(AuthService.method.loginWithBackupCode, {
-			onSuccess: () => {
-				void goto('/');
-				toast.success('Welcome back 👋', { description: 'Make sure to change your password!' });
-			}
+		authMutation<{ email: string; code: string }>('/auth/login/backup-code', () => {
+			void goto('/');
+			toast.success('Welcome back 👋', { description: 'Make sure to change your password!' });
 		}),
 	logout: () =>
-		useMutation(AuthService.method.logout, {
-			onSuccess: () => {
-				workspaceID.current = '';
-				void queryClient.cancelQueries();
-				queryClient.clear();
-				void goto('/login');
-				toast.success('Logged out 👋');
-			}
+		authMutation('/auth/logout', () => {
+			workspaceID.current = '';
+			void queryClient.cancelQueries();
+			queryClient.clear();
+			void goto('/login');
+			toast.success('Logged out 👋');
 		}),
 	register: () =>
-		useMutation(AuthService.method.register, {
-			onSuccess: () => toast.success('Registration successful')
-		}),
+		authMutation<{ name: string; username: string; email: string; password: string }>(
+			'/auth/register',
+			() => toast.success('Registration successful')
+		),
 	forgotPassword: () =>
-		useMutation(AuthService.method.forgotPassword, {
-			onSuccess: () => toast.success('Password reset email sent')
-		}),
+		authMutation<{ email: string }>('/auth/forgot-password', () =>
+			toast.success('Password reset email sent')
+		),
 	verifyEmail: () =>
-		useMutation(AuthService.method.verifyEmail, {
-			onSuccess: () => toast.success('Email verified')
-		}),
+		authMutation<{ token: string }>('/auth/verify-email', () => toast.success('Email verified')),
 	resendVerification: () =>
-		useMutation(AuthService.method.resendVerification, {
-			onSuccess: () => toast.success('Verification email sent')
-		}),
+		authMutation<{ email: string }>('/auth/resend-verification', () =>
+			toast.success('Verification email sent')
+		),
 	resetPassword: () =>
-		useMutation(AuthService.method.resetPassword, {
-			onSuccess: () => toast.success('Password reset')
-		}),
-	verifyCLI: () =>
-		useMutation(AuthService.method.verifyCLILogin, {
-			onSuccess: () => toast.success('Login verified', { icon: SquareTerminalIcon }),
-			onSettled: () => (cliToken.current = ''),
-			transform: () => ({ loginCode: cliToken.current })
-		})
+		authMutation<{ token: string; newPassword: string }>('/auth/reset-password', () =>
+			toast.success('Password reset')
+		)
 };

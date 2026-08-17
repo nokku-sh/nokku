@@ -7,7 +7,6 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Field from '$lib/components/ui/field';
-	import * as Rename from '$lib/components/ui/rename';
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress';
@@ -17,24 +16,18 @@
 	import { formatTs } from '$lib/utils';
 	import {
 		Binary,
-		Clock,
 		CopyIcon,
 		DownloadIcon,
-		Globe,
-		IdCard,
 		KeyRound,
 		LoaderCircle,
 		Lock,
 		MailX,
-		MonitorSmartphone,
 		ShieldIcon,
-		Terminal,
 		Trash2,
 		TriangleAlert
 	} from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import Label from '$lib/components/ui/label/label.svelte';
-	import CopyButton from '$lib/components/ui/copy-button/copy-button.svelte';
 
 	const currentUser = $derived(user.self());
 	const deleteAccount = user.deleteAccount();
@@ -42,28 +35,21 @@
 	const deletePassword = password.delete();
 
 	const passkeys = $derived(passkey.list());
-	const updatePasskey = passkey.update();
 	const deletePasskey = passkey.delete();
 
 	const backupCodes = $derived(backupCode.list());
 	const createBackupCodes = backupCode.create();
 	const deleteBackupCodes = backupCode.delete();
 
-	const listDevices = $derived(user.listUserDevices());
-	const deleteDevice = user.deleteUserDevice();
-
 	const setEmailRecovery = user.setEmailRecovery();
 
 	const enableEmailRecovery = $derived(currentUser.data?.enableEmailRecovery ?? true);
 
-	let editingPasskeyId = $state<string | null>(null);
 	let deletePasskeyId = $state('');
 	let deletePasskeyOpen = $state(false);
 	let deletePasswordOpen = $state(false);
 	let deleteAccountOpen = $state(false);
 	let deleteBackupCodesOpen = $state(false);
-	let deleteDeviceOpen = $state(false);
-	let deleteDeviceId = $state('');
 
 	let currentPassword = $state('');
 	let newPassword = $state('');
@@ -194,12 +180,6 @@
 	onConfirm={() => deleteBackupCodes.mutate({})}
 />
 <DeleteConfirmationModal
-	bind:open={deleteDeviceOpen}
-	title="Revoke Device Access"
-	description="This will immediately revoke this CLI device's authorization. Any active terminal sessions will be terminated."
-	onConfirm={() => deleteDevice.mutate({ id: deleteDeviceId })}
-/>
-<DeleteConfirmationModal
 	bind:open={deleteAccountOpen}
 	title="Delete Account"
 	description="This will permanently delete your account, your workspaces, and all associated infrastructure data. Any active subscriptions will be canceled immediately. This action cannot be undone."
@@ -229,22 +209,13 @@
 							<KeyRound />
 						</Item.Media>
 						<Item.Content>
-							<Rename.Root
-								this="span"
-								value={pk.name}
-								validate={(value) => value.trim().length > 0}
-								onSave={(value) => {
-									updatePasskey.mutate({ id: pk.id, name: value.trim() });
-									passkeys.refetch();
-								}}
-							/>
+							<Item.Title>{pk.name || 'Passkey'}</Item.Title>
 							<Item.Description>Added {formatTs(pk.createdAt)}</Item.Description>
 						</Item.Content>
 						<Item.Actions>
 							<Button
 								variant="ghost"
 								size="sm"
-								disabled={editingPasskeyId === pk.id}
 								onclick={() => {
 									deletePasskeyId = pk.id;
 									deletePasskeyOpen = true;
@@ -484,97 +455,6 @@
 			{/if}
 		</div>
 	</Card.Footer>
-</Card.Root>
-
-<!-- Connected Devices Panel -->
-<Card.Root>
-	<Card.Header>
-		<Card.Title class="flex items-center gap-2 text-lg">
-			<MonitorSmartphone class="size-5 text-muted-foreground" />
-			Connected Devices
-		</Card.Title>
-		<Card.Description>
-			Manage laptops, workstations currently authorized to access your account.
-		</Card.Description>
-	</Card.Header>
-
-	<Card.Content>
-		{#if listDevices.isLoading}
-			<div class="flex items-center justify-center py-6 text-muted-foreground">
-				<Spinner class="mr-2 size-4" /> Loading devices...
-			</div>
-		{:else if listDevices.isError}
-			<div class="flex items-center justify-center py-6 text-destructive">
-				Failed to load devices.
-			</div>
-		{:else if !listDevices.data || listDevices.data.length === 0}
-			<Empty.Root class="bg-muted/50">
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<Terminal />
-					</Empty.Media>
-					<Empty.Title>No connected devices</Empty.Title>
-					<Empty.Description>
-						No browsers or CLI applications are connected to your account yet.
-					</Empty.Description>
-				</Empty.Header>
-			</Empty.Root>
-		{:else}
-			<Item.Group class="border-border bg-transparent">
-				{#each listDevices.data as device (device.id)}
-					<Item.Root variant="muted">
-						<Item.Media variant="icon">
-							{#if device.kind === 'web'}
-								<Globe />
-							{:else}
-								<Terminal />
-							{/if}
-						</Item.Media>
-						<Item.Content>
-							<Item.Title>
-								{device.name}
-								<CopyButton text={device.id} icon={false} class="p-0 hover:bg-transparent">
-									<CopyIcon size={12} class="text-muted-foreground" title="Device ID" />
-								</CopyButton>
-							</Item.Title>
-							<Item.Description>
-								<div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-									<span class="flex items-center gap-1">
-										<MonitorSmartphone size={12} />
-										{device.kind === 'web' ? 'Browser' : 'CLI'}
-									</span>
-									{#if device.lastUsedAt}
-										<span class="flex items-center gap-1">
-											<Clock size={12} />
-											Last active: {formatTs(device.lastUsedAt, 'relative')}
-										</span>
-									{/if}
-								</div>
-							</Item.Description>
-						</Item.Content>
-						<Item.Actions>
-							<Button
-								variant="ghost"
-								size="sm"
-								disabled={deleteDevice.isPending}
-								onclick={() => {
-									deleteDeviceId = device.id;
-									deleteDeviceOpen = true;
-								}}
-								class="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-							>
-								{#if deleteDevice.variables?.id === device.id && deleteDevice.isPending}
-									<LoaderCircle class="size-4 animate-spin" />
-								{:else}
-									<Trash2 class="size-4" />
-								{/if}
-							</Button>
-						</Item.Actions>
-					</Item.Root>
-				{/each}
-			</Item.Group>
-		{/if}
-	</Card.Content>
 </Card.Root>
 
 <!-- Email Recovery Panel -->

@@ -35,8 +35,6 @@ export const user = {
 			{}
 		);
 	},
-	listUserDevices: () =>
-		useQuery(UserService.method.listUserDevices, undefined, { select: (res) => res.devices }),
 
 	// Mutations
 	updateProfile: () => useMutation(UserService.method.updateProfile),
@@ -49,7 +47,6 @@ export const user = {
 				toast.success('Account deleted, bye 👋');
 			}
 		}),
-	deleteUserDevice: () => useMutation(UserService.method.deleteUserDevice),
 	unlinkAccount: () => useMutation(UserService.method.unlinkAccount),
 	setEmailRecovery: () =>
 		useMutation(UserService.method.setEmailRecovery, {

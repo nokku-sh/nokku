@@ -8,14 +8,21 @@ import { file_buf_validate_validate } from '../../buf/validate/validate_pb';
 import { file_google_api_annotations } from '../../google/api/annotations_pb';
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
 import { file_google_protobuf_timestamp } from '@bufbuild/protobuf/wkt';
+import type { ServiceAccount } from './service_account_pb';
+import { file_nokku_v1_service_account } from './service_account_pb';
 import type { Message } from '@bufbuild/protobuf';
 
 /**
  * Describes the file nokku/v1/user.proto.
  */
 export const file_nokku_v1_user: GenFile /*@__PURE__*/ = fileDesc(
-	'ChNub2trdS92MS91c2VyLnByb3RvEghub2trdS52MSLpAQoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhAKCHVzZXJuYW1lGAMgASgJEg0KBWVtYWlsGAQgASgJEhYKDmVtYWlsX3ZlcmlmaWVkGAUgASgIEg8KB3BpY3R1cmUYBiABKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHQoVZW5hYmxlX2VtYWlsX3JlY292ZXJ5GAkgASgIIqsBCg1PQXV0aElkZW50aXR5EhMKC3Byb3ZpZGVyX2lkGAEgASgJEhAKCHByb3ZpZGVyGAIgASgJEhYKDnByb3ZpZGVyX2VtYWlsGAMgASgJEhkKEXByb3ZpZGVyX3VzZXJuYW1lGAQgASgJEhAKCHByb3RvY29sGAUgASgJEi4KCmNyZWF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIsYBCgpVc2VyRGV2aWNlEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEa2luZBgDIAEoCRIuCgpleHBpcmVzX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxsYXN0X3VzZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmNyZWF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIg8KDVdob2FtaVJlcXVlc3QiLgoOV2hvYW1pUmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLm5va2t1LnYxLlVzZXIiowEKFFVwZGF0ZVByb2ZpbGVSZXF1ZXN0EhgKBG5hbWUYASABKAlCCrpIB3IFEAMYgAISGQoFZW1haWwYAiABKAlCCrpIB3IFGIACYAESRQoIdXNlcm5hbWUYAyABKAlCM7pIMHIuEAMYJzIoXlthLXpBLVowLTldKFthLXpBLVowLTktX10pKlthLXpBLVowLTldJBIPCgdwaWN0dXJlGAQgASgJIkkKFVVwZGF0ZVByb2ZpbGVSZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlchISCgplbWFpbF9zZW50GAIgASgIIhYKFERlbGV0ZUFjY291bnRSZXF1ZXN0IhcKFURlbGV0ZUFjY291bnRSZXNwb25zZSIYChZMaXN0VXNlckRldmljZXNSZXF1ZXN0IkAKF0xpc3RVc2VyRGV2aWNlc1Jlc3BvbnNlEiUKB2RldmljZXMYASADKAsyFC5ub2trdS52MS5Vc2VyRGV2aWNlIi8KF0RlbGV0ZVVzZXJEZXZpY2VSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIaChhEZWxldGVVc2VyRGV2aWNlUmVzcG9uc2UiGwoZTGlzdExpbmtlZEFjY291bnRzUmVxdWVzdCJHChpMaXN0TGlua2VkQWNjb3VudHNSZXNwb25zZRIpCghhY2NvdW50cxgBIAMoCzIXLm5va2t1LnYxLk9BdXRoSWRlbnRpdHkiMQoUVW5saW5rQWNjb3VudFJlcXVlc3QSGQoIcHJvdmlkZXIYASABKAlCB7pIBHICEAEiFwoVVW5saW5rQWNjb3VudFJlc3BvbnNlIikKF1NldEVtYWlsUmVjb3ZlcnlSZXF1ZXN0Eg4KBmVuYWJsZRgBIAEoCCIaChhTZXRFbWFpbFJlY292ZXJ5UmVzcG9uc2UyigcKC1VzZXJTZXJ2aWNlEk8KBldob2FtaRIXLm5va2t1LnYxLldob2FtaVJlcXVlc3QaGC5ub2trdS52MS5XaG9hbWlSZXNwb25zZSISgtPkkwIMEgovdjEvd2hvYW1pEmgKDVVwZGF0ZVByb2ZpbGUSHi5ub2trdS52MS5VcGRhdGVQcm9maWxlUmVxdWVzdBofLm5va2t1LnYxLlVwZGF0ZVByb2ZpbGVSZXNwb25zZSIWgtPkkwIQOgEqMgsvdjEvcHJvZmlsZRJlCg1EZWxldGVBY2NvdW50Eh4ubm9ra3UudjEuRGVsZXRlQWNjb3VudFJlcXVlc3QaHy5ub2trdS52MS5EZWxldGVBY2NvdW50UmVzcG9uc2UiE4LT5JMCDSoLL3YxL2FjY291bnQSawoPTGlzdFVzZXJEZXZpY2VzEiAubm9ra3UudjEuTGlzdFVzZXJEZXZpY2VzUmVxdWVzdBohLm5va2t1LnYxLkxpc3RVc2VyRGV2aWNlc1Jlc3BvbnNlIhOC0+STAg0SCy92MS9kZXZpY2VzEnMKEERlbGV0ZVVzZXJEZXZpY2USIS5ub2trdS52MS5EZWxldGVVc2VyRGV2aWNlUmVxdWVzdBoiLm5va2t1LnYxLkRlbGV0ZVVzZXJEZXZpY2VSZXNwb25zZSIYgtPkkwISKhAvdjEvZGV2aWNlcy97aWR9EnsKEkxpc3RMaW5rZWRBY2NvdW50cxIjLm5va2t1LnYxLkxpc3RMaW5rZWRBY2NvdW50c1JlcXVlc3QaJC5ub2trdS52MS5MaXN0TGlua2VkQWNjb3VudHNSZXNwb25zZSIagtPkkwIUEhIvdjEvYWNjb3VudHMvb2F1dGgSdwoNVW5saW5rQWNjb3VudBIeLm5va2t1LnYxLlVubGlua0FjY291bnRSZXF1ZXN0Gh8ubm9ra3UudjEuVW5saW5rQWNjb3VudFJlc3BvbnNlIiWC0+STAh8qHS92MS9hY2NvdW50cy9vYXV0aC97cHJvdmlkZXJ9EoABChBTZXRFbWFpbFJlY292ZXJ5EiEubm9ra3UudjEuU2V0RW1haWxSZWNvdmVyeVJlcXVlc3QaIi5ub2trdS52MS5TZXRFbWFpbFJlY292ZXJ5UmVzcG9uc2UiJYLT5JMCHzoBKjIaL3YxL2FjY291bnQvZW1haWwtcmVjb3ZlcnlCkwEKDGNvbS5ub2trdS52MUIJVXNlclByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
-	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
+	'ChNub2trdS92MS91c2VyLnByb3RvEghub2trdS52MSLpAQoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhAKCHVzZXJuYW1lGAMgASgJEg0KBWVtYWlsGAQgASgJEhYKDmVtYWlsX3ZlcmlmaWVkGAUgASgIEg8KB3BpY3R1cmUYBiABKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHQoVZW5hYmxlX2VtYWlsX3JlY292ZXJ5GAkgASgIIngKDU9BdXRoSWRlbnRpdHkSEwoLcHJvdmlkZXJfaWQYASABKAkSEAoIcHJvdmlkZXIYAiABKAkSEAoIcHJvdG9jb2wYAyABKAkSLgoKY3JlYXRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiDwoNV2hvYW1pUmVxdWVzdCJhCg5XaG9hbWlSZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlchIxCg9zZXJ2aWNlX2FjY291bnQYAiABKAsyGC5ub2trdS52MS5TZXJ2aWNlQWNjb3VudCKjAQoUVXBkYXRlUHJvZmlsZVJlcXVlc3QSGAoEbmFtZRgBIAEoCUIKukgHcgUQAxiAAhIZCgVlbWFpbBgCIAEoCUIKukgHcgUYgAJgARJFCgh1c2VybmFtZRgDIAEoCUIzukgwci4QAxgnMiheW2EtekEtWjAtOV0oW2EtekEtWjAtOS1fXSkqW2EtekEtWjAtOV0kEg8KB3BpY3R1cmUYBCABKAkiSQoVVXBkYXRlUHJvZmlsZVJlc3BvbnNlEhwKBHVzZXIYASABKAsyDi5ub2trdS52MS5Vc2VyEhIKCmVtYWlsX3NlbnQYAiABKAgiFgoURGVsZXRlQWNjb3VudFJlcXVlc3QiFwoVRGVsZXRlQWNjb3VudFJlc3BvbnNlIhsKGUxpc3RMaW5rZWRBY2NvdW50c1JlcXVlc3QiRwoaTGlzdExpbmtlZEFjY291bnRzUmVzcG9uc2USKQoIYWNjb3VudHMYASADKAsyFy5ub2trdS52MS5PQXV0aElkZW50aXR5IjEKFFVubGlua0FjY291bnRSZXF1ZXN0EhkKCHByb3ZpZGVyGAEgASgJQge6SARyAhABIhcKFVVubGlua0FjY291bnRSZXNwb25zZSIpChdTZXRFbWFpbFJlY292ZXJ5UmVxdWVzdBIOCgZlbmFibGUYASABKAgiGgoYU2V0RW1haWxSZWNvdmVyeVJlc3BvbnNlMqgFCgtVc2VyU2VydmljZRJPCgZXaG9hbWkSFy5ub2trdS52MS5XaG9hbWlSZXF1ZXN0Ghgubm9ra3UudjEuV2hvYW1pUmVzcG9uc2UiEoLT5JMCDBIKL3YxL3dob2FtaRJoCg1VcGRhdGVQcm9maWxlEh4ubm9ra3UudjEuVXBkYXRlUHJvZmlsZVJlcXVlc3QaHy5ub2trdS52MS5VcGRhdGVQcm9maWxlUmVzcG9uc2UiFoLT5JMCEDoBKjILL3YxL3Byb2ZpbGUSZQoNRGVsZXRlQWNjb3VudBIeLm5va2t1LnYxLkRlbGV0ZUFjY291bnRSZXF1ZXN0Gh8ubm9ra3UudjEuRGVsZXRlQWNjb3VudFJlc3BvbnNlIhOC0+STAg0qCy92MS9hY2NvdW50EnsKEkxpc3RMaW5rZWRBY2NvdW50cxIjLm5va2t1LnYxLkxpc3RMaW5rZWRBY2NvdW50c1JlcXVlc3QaJC5ub2trdS52MS5MaXN0TGlua2VkQWNjb3VudHNSZXNwb25zZSIagtPkkwIUEhIvdjEvYWNjb3VudHMvb2F1dGgSdwoNVW5saW5rQWNjb3VudBIeLm5va2t1LnYxLlVubGlua0FjY291bnRSZXF1ZXN0Gh8ubm9ra3UudjEuVW5saW5rQWNjb3VudFJlc3BvbnNlIiWC0+STAh8qHS92MS9hY2NvdW50cy9vYXV0aC97cHJvdmlkZXJ9EoABChBTZXRFbWFpbFJlY292ZXJ5EiEubm9ra3UudjEuU2V0RW1haWxSZWNvdmVyeVJlcXVlc3QaIi5ub2trdS52MS5TZXRFbWFpbFJlY292ZXJ5UmVzcG9uc2UiJYLT5JMCHzoBKjIaL3YxL2FjY291bnQvZW1haWwtcmVjb3ZlcnlCkwEKDGNvbS5ub2trdS52MUIJVXNlclByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
+	[
+		file_buf_validate_validate,
+		file_google_api_annotations,
+		file_google_protobuf_timestamp,
+		file_nokku_v1_service_account
+	]
 );
 
 /**
@@ -89,24 +96,14 @@ export type OAuthIdentity = Message<'nokku.v1.OAuthIdentity'> & {
 	provider: string;
 
 	/**
-	 * @generated from field: string provider_email = 3;
-	 */
-	providerEmail: string;
-
-	/**
-	 * @generated from field: string provider_username = 4;
-	 */
-	providerUsername: string;
-
-	/**
 	 * 'oauth' | 'oidc' | 'saml'
 	 *
-	 * @generated from field: string protocol = 5;
+	 * @generated from field: string protocol = 3;
 	 */
 	protocol: string;
 
 	/**
-	 * @generated from field: google.protobuf.Timestamp created_at = 6;
+	 * @generated from field: google.protobuf.Timestamp created_at = 4;
 	 */
 	createdAt?: Timestamp | undefined;
 };
@@ -121,52 +118,6 @@ export const OAuthIdentitySchema: GenMessage<OAuthIdentity> /*@__PURE__*/ = mess
 );
 
 /**
- * @generated from message nokku.v1.UserDevice
- */
-export type UserDevice = Message<'nokku.v1.UserDevice'> & {
-	/**
-	 * @generated from field: string id = 1;
-	 */
-	id: string;
-
-	/**
-	 * @generated from field: string name = 2;
-	 */
-	name: string;
-
-	/**
-	 * 'cli' | 'web'
-	 *
-	 * @generated from field: string kind = 3;
-	 */
-	kind: string;
-
-	/**
-	 * @generated from field: google.protobuf.Timestamp expires_at = 4;
-	 */
-	expiresAt?: Timestamp | undefined;
-
-	/**
-	 * @generated from field: google.protobuf.Timestamp last_used_at = 5;
-	 */
-	lastUsedAt?: Timestamp | undefined;
-
-	/**
-	 * @generated from field: google.protobuf.Timestamp created_at = 6;
-	 */
-	createdAt?: Timestamp | undefined;
-};
-
-/**
- * Describes the message nokku.v1.UserDevice.
- * Use `create(UserDeviceSchema)` to create a new message.
- */
-export const UserDeviceSchema: GenMessage<UserDevice> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_user,
-	2
-);
-
-/**
  * @generated from message nokku.v1.WhoamiRequest
  */
 export type WhoamiRequest = Message<'nokku.v1.WhoamiRequest'> & {};
@@ -177,7 +128,7 @@ export type WhoamiRequest = Message<'nokku.v1.WhoamiRequest'> & {};
  */
 export const WhoamiRequestSchema: GenMessage<WhoamiRequest> /*@__PURE__*/ = messageDesc(
 	file_nokku_v1_user,
-	3
+	2
 );
 
 /**
@@ -185,9 +136,23 @@ export const WhoamiRequestSchema: GenMessage<WhoamiRequest> /*@__PURE__*/ = mess
  */
 export type WhoamiResponse = Message<'nokku.v1.WhoamiResponse'> & {
 	/**
+	 * user is set when the caller authenticated as a human user (the normal
+	 * browser case). It is unset for machine principals (service accounts),
+	 * which read service_account instead.
+	 *
 	 * @generated from field: nokku.v1.User user = 1;
 	 */
 	user?: User | undefined;
+
+	/**
+	 * service_account is set when the caller authenticated with a
+	 * service-account API key. It carries the subject's identity and its
+	 * pinned workspace, so headless clients (nk --token) can discover who
+	 * they are without parsing the token.
+	 *
+	 * @generated from field: nokku.v1.ServiceAccount service_account = 2;
+	 */
+	serviceAccount?: ServiceAccount | undefined;
 };
 
 /**
@@ -196,7 +161,7 @@ export type WhoamiResponse = Message<'nokku.v1.WhoamiResponse'> & {
  */
 export const WhoamiResponseSchema: GenMessage<WhoamiResponse> /*@__PURE__*/ = messageDesc(
 	file_nokku_v1_user,
-	4
+	3
 );
 
 /**
@@ -229,7 +194,7 @@ export type UpdateProfileRequest = Message<'nokku.v1.UpdateProfileRequest'> & {
  * Use `create(UpdateProfileRequestSchema)` to create a new message.
  */
 export const UpdateProfileRequestSchema: GenMessage<UpdateProfileRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 5);
+	messageDesc(file_nokku_v1_user, 4);
 
 /**
  * @generated from message nokku.v1.UpdateProfileResponse
@@ -251,7 +216,7 @@ export type UpdateProfileResponse = Message<'nokku.v1.UpdateProfileResponse'> & 
  * Use `create(UpdateProfileResponseSchema)` to create a new message.
  */
 export const UpdateProfileResponseSchema: GenMessage<UpdateProfileResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 6);
+	messageDesc(file_nokku_v1_user, 5);
 
 /**
  * @generated from message nokku.v1.DeleteAccountRequest
@@ -263,7 +228,7 @@ export type DeleteAccountRequest = Message<'nokku.v1.DeleteAccountRequest'> & {}
  * Use `create(DeleteAccountRequestSchema)` to create a new message.
  */
 export const DeleteAccountRequestSchema: GenMessage<DeleteAccountRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 7);
+	messageDesc(file_nokku_v1_user, 6);
 
 /**
  * @generated from message nokku.v1.DeleteAccountResponse
@@ -275,67 +240,7 @@ export type DeleteAccountResponse = Message<'nokku.v1.DeleteAccountResponse'> & 
  * Use `create(DeleteAccountResponseSchema)` to create a new message.
  */
 export const DeleteAccountResponseSchema: GenMessage<DeleteAccountResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 8);
-
-/**
- * Device tokens --------------------------------------------------------------
- *
- * @generated from message nokku.v1.ListUserDevicesRequest
- */
-export type ListUserDevicesRequest = Message<'nokku.v1.ListUserDevicesRequest'> & {};
-
-/**
- * Describes the message nokku.v1.ListUserDevicesRequest.
- * Use `create(ListUserDevicesRequestSchema)` to create a new message.
- */
-export const ListUserDevicesRequestSchema: GenMessage<ListUserDevicesRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 9);
-
-/**
- * @generated from message nokku.v1.ListUserDevicesResponse
- */
-export type ListUserDevicesResponse = Message<'nokku.v1.ListUserDevicesResponse'> & {
-	/**
-	 * @generated from field: repeated nokku.v1.UserDevice devices = 1;
-	 */
-	devices: UserDevice[];
-};
-
-/**
- * Describes the message nokku.v1.ListUserDevicesResponse.
- * Use `create(ListUserDevicesResponseSchema)` to create a new message.
- */
-export const ListUserDevicesResponseSchema: GenMessage<ListUserDevicesResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 10);
-
-/**
- * @generated from message nokku.v1.DeleteUserDeviceRequest
- */
-export type DeleteUserDeviceRequest = Message<'nokku.v1.DeleteUserDeviceRequest'> & {
-	/**
-	 * @generated from field: string id = 1;
-	 */
-	id: string;
-};
-
-/**
- * Describes the message nokku.v1.DeleteUserDeviceRequest.
- * Use `create(DeleteUserDeviceRequestSchema)` to create a new message.
- */
-export const DeleteUserDeviceRequestSchema: GenMessage<DeleteUserDeviceRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 11);
-
-/**
- * @generated from message nokku.v1.DeleteUserDeviceResponse
- */
-export type DeleteUserDeviceResponse = Message<'nokku.v1.DeleteUserDeviceResponse'> & {};
-
-/**
- * Describes the message nokku.v1.DeleteUserDeviceResponse.
- * Use `create(DeleteUserDeviceResponseSchema)` to create a new message.
- */
-export const DeleteUserDeviceResponseSchema: GenMessage<DeleteUserDeviceResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 12);
+	messageDesc(file_nokku_v1_user, 7);
 
 /**
  * OAuth linked accounts -------------------------------------------------------
@@ -349,7 +254,7 @@ export type ListLinkedAccountsRequest = Message<'nokku.v1.ListLinkedAccountsRequ
  * Use `create(ListLinkedAccountsRequestSchema)` to create a new message.
  */
 export const ListLinkedAccountsRequestSchema: GenMessage<ListLinkedAccountsRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 13);
+	messageDesc(file_nokku_v1_user, 8);
 
 /**
  * @generated from message nokku.v1.ListLinkedAccountsResponse
@@ -366,7 +271,7 @@ export type ListLinkedAccountsResponse = Message<'nokku.v1.ListLinkedAccountsRes
  * Use `create(ListLinkedAccountsResponseSchema)` to create a new message.
  */
 export const ListLinkedAccountsResponseSchema: GenMessage<ListLinkedAccountsResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 14);
+	messageDesc(file_nokku_v1_user, 9);
 
 /**
  * @generated from message nokku.v1.UnlinkAccountRequest
@@ -383,7 +288,7 @@ export type UnlinkAccountRequest = Message<'nokku.v1.UnlinkAccountRequest'> & {
  * Use `create(UnlinkAccountRequestSchema)` to create a new message.
  */
 export const UnlinkAccountRequestSchema: GenMessage<UnlinkAccountRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 15);
+	messageDesc(file_nokku_v1_user, 10);
 
 /**
  * @generated from message nokku.v1.UnlinkAccountResponse
@@ -395,7 +300,7 @@ export type UnlinkAccountResponse = Message<'nokku.v1.UnlinkAccountResponse'> & 
  * Use `create(UnlinkAccountResponseSchema)` to create a new message.
  */
 export const UnlinkAccountResponseSchema: GenMessage<UnlinkAccountResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 16);
+	messageDesc(file_nokku_v1_user, 11);
 
 /**
  * @generated from message nokku.v1.SetEmailRecoveryRequest
@@ -412,7 +317,7 @@ export type SetEmailRecoveryRequest = Message<'nokku.v1.SetEmailRecoveryRequest'
  * Use `create(SetEmailRecoveryRequestSchema)` to create a new message.
  */
 export const SetEmailRecoveryRequestSchema: GenMessage<SetEmailRecoveryRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 17);
+	messageDesc(file_nokku_v1_user, 12);
 
 /**
  * @generated from message nokku.v1.SetEmailRecoveryResponse
@@ -424,7 +329,7 @@ export type SetEmailRecoveryResponse = Message<'nokku.v1.SetEmailRecoveryRespons
  * Use `create(SetEmailRecoveryResponseSchema)` to create a new message.
  */
 export const SetEmailRecoveryResponseSchema: GenMessage<SetEmailRecoveryResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_user, 18);
+	messageDesc(file_nokku_v1_user, 13);
 
 /**
  * @generated from service nokku.v1.UserService
@@ -453,22 +358,6 @@ export const UserService: GenService<{
 		methodKind: 'unary';
 		input: typeof DeleteAccountRequestSchema;
 		output: typeof DeleteAccountResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.UserService.ListUserDevices
-	 */
-	listUserDevices: {
-		methodKind: 'unary';
-		input: typeof ListUserDevicesRequestSchema;
-		output: typeof ListUserDevicesResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.UserService.DeleteUserDevice
-	 */
-	deleteUserDevice: {
-		methodKind: 'unary';
-		input: typeof DeleteUserDeviceRequestSchema;
-		output: typeof DeleteUserDeviceResponseSchema;
 	};
 	/**
 	 * @generated from rpc nokku.v1.UserService.ListLinkedAccounts

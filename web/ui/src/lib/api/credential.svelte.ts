@@ -23,8 +23,14 @@ export const passkey = {
 		}),
 
 	// Mutations
-	update: () => useMutation(CredentialService.method.updatePasskey),
-	delete: () => useMutation(CredentialService.method.deletePasskey)
+	delete: () => useMutation(CredentialService.method.deletePasskey),
+	rename: () =>
+		useMutation(CredentialService.method.renamePasskey, {
+			onSuccess: () =>
+				toast.success('Passkey renamed', {
+					description: 'The display name was updated.'
+				})
+		})
 };
 
 // Backup Codes ---------------------------------------------------------------

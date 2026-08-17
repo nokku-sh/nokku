@@ -1,20 +1,10 @@
-import {
-	create,
-	type DescMessage,
-	type DescMethodUnary,
-	type MessageInitShape,
-	type MessageShape
-} from '@bufbuild/protobuf';
 import { createConnectTransport } from '@connectrpc/connect-web';
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/svelte-query';
 import { browser } from '$app/environment';
 import { Code, ConnectError, type Interceptor, type UnaryRequest } from '@connectrpc/connect';
-import { AuthService } from '$lib/gen/nokku/v1/auth_pb';
 import { toast } from 'svelte-sonner';
 import { formatConnectError, parseHTTPError } from './error-formatter';
 import { goto } from '$app/navigation';
-import { SSOService } from '$lib/gen/nokku/v1/sso_pb';
-import { UtilService } from '$lib/gen/nokku/v1/util_pb';
 import { WorkspaceService } from '$lib/gen/nokku/v1/workspace_pb';
 import { workspaceID } from '$lib/store.svelte';
 
@@ -91,18 +81,11 @@ export const queryClient = new QueryClient({
 	})
 });
 
-let refreshPromise: Promise<void> | null = null;
 let sessionExpiredAt = 0;
 
-const publicServices = new Set([AuthService.typeName]);
-const publicMethods = new Set([
-	UtilService.method.getVersion.name,
-	SSOService.method.checkSSO.name
-]);
-
-// The session cookies are HttpOnly, so only the backend can clear them. The
-// refresh endpoint does that when it rejects a stale session; here we mirror
-// the logout flow: reset local state, drop cached data and land on /login.
+// The session cookie is HttpOnly, so only the backend can clear it. On an
+// expired or revoked session the backend rejects with Unauthenticated; here we
+// reset local state, drop cached data and land on /login.
 function handleSessionExpired() {
 	if (!browser || window.location.pathname.startsWith('/login')) return;
 
@@ -116,41 +99,6 @@ function handleSessionExpired() {
 	void goto('/login');
 	toast.info('Session expired', { description: 'Please log in again.' });
 }
-
-export const authInterceptor: Interceptor = (next) => async (req) => {
-	if (publicServices.has(req.service.typeName) || publicMethods.has(req.method.name)) {
-		return await next(req);
-	}
-
-	try {
-		return await next(req);
-	} catch (err) {
-		if (err instanceof ConnectError && err.code === Code.Unauthenticated) {
-			// try to refresh token
-			if (!refreshPromise) {
-				refreshPromise = (async () => {
-					try {
-						await callUnary(AuthService.method.refreshToken, undefined);
-					} catch (refreshErr) {
-						// Only a confirmed rejection means the session is gone.
-						// Transient failures (network, 5xx) must not force a
-						// logout; the request surfaces its own error instead.
-						if (refreshErr instanceof ConnectError && refreshErr.code === Code.Unauthenticated) {
-							handleSessionExpired();
-						}
-						throw refreshErr;
-					} finally {
-						refreshPromise = null;
-					}
-				})();
-			}
-
-			await refreshPromise;
-			return await next(req);
-		}
-		throw err;
-	}
-};
 
 // Workspace-scoped protobuf requests all use the conventional workspace_id field.
 export const workspaceInterceptor: Interceptor = (next) => async (req) => {
@@ -183,39 +131,11 @@ export const authTransport = createConnectTransport({
 	useHttpGet: true,
 	fetch: (input, init) => fetch(input, { ...init, credentials: 'include' }),
 	jsonOptions: { ignoreUnknownFields: true },
-	interceptors: [workspaceInterceptor, authInterceptor]
-});
-
-const transport = createConnectTransport({
-	baseUrl: '/',
-	useHttpGet: true,
-	fetch: (input, init) => fetch(input, { ...init, credentials: 'include' }),
-	jsonOptions: { ignoreUnknownFields: true },
 	interceptors: [workspaceInterceptor]
 });
 
 export interface CallUnaryOptions {
 	signal?: AbortSignal;
-}
-
-export async function callUnary<I extends DescMessage, O extends DescMessage>(
-	schema: DescMethodUnary<I, O>,
-	input?: MessageInitShape<I>,
-	options?: CallUnaryOptions
-): Promise<MessageShape<O> | undefined> {
-	try {
-		const result = await transport.unary(
-			schema,
-			options?.signal,
-			undefined,
-			undefined,
-			input ?? create(schema.input),
-			undefined
-		);
-		if (result.message) return result.message;
-	} catch (error) {
-		return Promise.reject(error);
-	}
 }
 
 export async function httpFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {

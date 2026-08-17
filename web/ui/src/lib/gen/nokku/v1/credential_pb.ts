@@ -14,7 +14,7 @@ import type { Message } from '@bufbuild/protobuf';
  * Describes the file nokku/v1/credential.proto.
  */
 export const file_nokku_v1_credential: GenFile /*@__PURE__*/ = fileDesc(
-	'Chlub2trdS92MS9jcmVkZW50aWFsLnByb3RvEghub2trdS52MSJZChVVcGRhdGVQYXNzd29yZFJlcXVlc3QSIQoQY3VycmVudF9wYXNzd29yZBgBIAEoCUIHukgEcgIQARIdCgxuZXdfcGFzc3dvcmQYAiABKAlCB7pIBHICEAgiGAoWVXBkYXRlUGFzc3dvcmRSZXNwb25zZSI6ChVEZWxldGVQYXNzd29yZFJlcXVlc3QSIQoQY3VycmVudF9wYXNzd29yZBgBIAEoCUIHukgEcgIQASIYChZEZWxldGVQYXNzd29yZFJlc3BvbnNlIoUBCgdQYXNza2V5EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSLgoKY3JlYXRlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF91c2VkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJEChRVcGRhdGVQYXNza2V5UmVxdWVzdBITCgJpZBgBIAEoCUIHukgEcgIQARIXCgRuYW1lGAIgASgJQgm6SAZyBBABGGQiOwoVVXBkYXRlUGFzc2tleVJlc3BvbnNlEiIKB3Bhc3NrZXkYASABKAsyES5ub2trdS52MS5QYXNza2V5IhUKE0xpc3RQYXNza2V5c1JlcXVlc3QiOwoUTGlzdFBhc3NrZXlzUmVzcG9uc2USIwoIcGFzc2tleXMYASADKAsyES5ub2trdS52MS5QYXNza2V5IisKFERlbGV0ZVBhc3NrZXlSZXF1ZXN0EhMKAmlkGAEgASgJQge6SARyAhABIhcKFURlbGV0ZVBhc3NrZXlSZXNwb25zZSJ1CgpCYWNrdXBDb2RlEgoKAmlkGAEgASgJEisKB3VzZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmNyZWF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIhoKGENyZWF0ZUJhY2t1cENvZGVzUmVxdWVzdCIqChlDcmVhdGVCYWNrdXBDb2Rlc1Jlc3BvbnNlEg0KBWNvZGVzGAEgAygJIhgKFkxpc3RCYWNrdXBDb2Rlc1JlcXVlc3QiPgoXTGlzdEJhY2t1cENvZGVzUmVzcG9uc2USIwoFY29kZXMYASADKAsyFC5ub2trdS52MS5CYWNrdXBDb2RlIhoKGERlbGV0ZUJhY2t1cENvZGVzUmVxdWVzdCIbChlEZWxldGVCYWNrdXBDb2Rlc1Jlc3BvbnNlMvIHChFDcmVkZW50aWFsU2VydmljZRJ4Cg5VcGRhdGVQYXNzd29yZBIfLm5va2t1LnYxLlVwZGF0ZVBhc3N3b3JkUmVxdWVzdBogLm5va2t1LnYxLlVwZGF0ZVBhc3N3b3JkUmVzcG9uc2UiI4LT5JMCHToBKjIYL3YxL2NyZWRlbnRpYWxzL3Bhc3N3b3JkEnUKDkRlbGV0ZVBhc3N3b3JkEh8ubm9ra3UudjEuRGVsZXRlUGFzc3dvcmRSZXF1ZXN0GiAubm9ra3UudjEuRGVsZXRlUGFzc3dvcmRSZXNwb25zZSIggtPkkwIaKhgvdjEvY3JlZGVudGlhbHMvcGFzc3dvcmQSbwoMTGlzdFBhc3NrZXlzEh0ubm9ra3UudjEuTGlzdFBhc3NrZXlzUmVxdWVzdBoeLm5va2t1LnYxLkxpc3RQYXNza2V5c1Jlc3BvbnNlIiCC0+STAhoSGC92MS9jcmVkZW50aWFscy9wYXNza2V5cxJ6Cg1VcGRhdGVQYXNza2V5Eh4ubm9ra3UudjEuVXBkYXRlUGFzc2tleVJlcXVlc3QaHy5ub2trdS52MS5VcGRhdGVQYXNza2V5UmVzcG9uc2UiKILT5JMCIjoBKjIdL3YxL2NyZWRlbnRpYWxzL3Bhc3NrZXlzL3tpZH0SdwoNRGVsZXRlUGFzc2tleRIeLm5va2t1LnYxLkRlbGV0ZVBhc3NrZXlSZXF1ZXN0Gh8ubm9ra3UudjEuRGVsZXRlUGFzc2tleVJlc3BvbnNlIiWC0+STAh8qHS92MS9jcmVkZW50aWFscy9wYXNza2V5cy97aWR9EoIBChFDcmVhdGVCYWNrdXBDb2RlcxIiLm5va2t1LnYxLkNyZWF0ZUJhY2t1cENvZGVzUmVxdWVzdBojLm5va2t1LnYxLkNyZWF0ZUJhY2t1cENvZGVzUmVzcG9uc2UiJILT5JMCHiIcL3YxL2NyZWRlbnRpYWxzL2JhY2t1cC1jb2RlcxJ8Cg9MaXN0QmFja3VwQ29kZXMSIC5ub2trdS52MS5MaXN0QmFja3VwQ29kZXNSZXF1ZXN0GiEubm9ra3UudjEuTGlzdEJhY2t1cENvZGVzUmVzcG9uc2UiJILT5JMCHhIcL3YxL2NyZWRlbnRpYWxzL2JhY2t1cC1jb2RlcxKCAQoRRGVsZXRlQmFja3VwQ29kZXMSIi5ub2trdS52MS5EZWxldGVCYWNrdXBDb2Rlc1JlcXVlc3QaIy5ub2trdS52MS5EZWxldGVCYWNrdXBDb2Rlc1Jlc3BvbnNlIiSC0+STAh4qHC92MS9jcmVkZW50aWFscy9iYWNrdXAtY29kZXNCmQEKDGNvbS5ub2trdS52MUIPQ3JlZGVudGlhbFByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
+	'Chlub2trdS92MS9jcmVkZW50aWFsLnByb3RvEghub2trdS52MSJZChVVcGRhdGVQYXNzd29yZFJlcXVlc3QSIQoQY3VycmVudF9wYXNzd29yZBgBIAEoCUIHukgEcgIQARIdCgxuZXdfcGFzc3dvcmQYAiABKAlCB7pIBHICEAgiGAoWVXBkYXRlUGFzc3dvcmRSZXNwb25zZSI6ChVEZWxldGVQYXNzd29yZFJlcXVlc3QSIQoQY3VycmVudF9wYXNzd29yZBgBIAEoCUIHukgEcgIQASIYChZEZWxldGVQYXNzd29yZFJlc3BvbnNlIlMKB1Bhc3NrZXkSCgoCaWQYASABKAkSLgoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDAoEbmFtZRgDIAEoCSIVChNMaXN0UGFzc2tleXNSZXF1ZXN0IjsKFExpc3RQYXNza2V5c1Jlc3BvbnNlEiMKCHBhc3NrZXlzGAEgAygLMhEubm9ra3UudjEuUGFzc2tleSIrChREZWxldGVQYXNza2V5UmVxdWVzdBITCgJpZBgBIAEoCUIHukgEcgIQASIXChVEZWxldGVQYXNza2V5UmVzcG9uc2UiOQoUUmVuYW1lUGFzc2tleVJlcXVlc3QSEwoCaWQYASABKAlCB7pIBHICEAESDAoEbmFtZRgCIAEoCSIXChVSZW5hbWVQYXNza2V5UmVzcG9uc2UiSAoKQmFja3VwQ29kZRIKCgJpZBgBIAEoCRIuCgpjcmVhdGVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCIaChhDcmVhdGVCYWNrdXBDb2Rlc1JlcXVlc3QiKgoZQ3JlYXRlQmFja3VwQ29kZXNSZXNwb25zZRINCgVjb2RlcxgBIAMoCSIYChZMaXN0QmFja3VwQ29kZXNSZXF1ZXN0Ij4KF0xpc3RCYWNrdXBDb2Rlc1Jlc3BvbnNlEiMKBWNvZGVzGAEgAygLMhQubm9ra3UudjEuQmFja3VwQ29kZSIaChhEZWxldGVCYWNrdXBDb2Rlc1JlcXVlc3QiGwoZRGVsZXRlQmFja3VwQ29kZXNSZXNwb25zZTLyBwoRQ3JlZGVudGlhbFNlcnZpY2USeAoOVXBkYXRlUGFzc3dvcmQSHy5ub2trdS52MS5VcGRhdGVQYXNzd29yZFJlcXVlc3QaIC5ub2trdS52MS5VcGRhdGVQYXNzd29yZFJlc3BvbnNlIiOC0+STAh06ASoyGC92MS9jcmVkZW50aWFscy9wYXNzd29yZBJ1Cg5EZWxldGVQYXNzd29yZBIfLm5va2t1LnYxLkRlbGV0ZVBhc3N3b3JkUmVxdWVzdBogLm5va2t1LnYxLkRlbGV0ZVBhc3N3b3JkUmVzcG9uc2UiIILT5JMCGioYL3YxL2NyZWRlbnRpYWxzL3Bhc3N3b3JkEm8KDExpc3RQYXNza2V5cxIdLm5va2t1LnYxLkxpc3RQYXNza2V5c1JlcXVlc3QaHi5ub2trdS52MS5MaXN0UGFzc2tleXNSZXNwb25zZSIggtPkkwIaEhgvdjEvY3JlZGVudGlhbHMvcGFzc2tleXMSdwoNRGVsZXRlUGFzc2tleRIeLm5va2t1LnYxLkRlbGV0ZVBhc3NrZXlSZXF1ZXN0Gh8ubm9ra3UudjEuRGVsZXRlUGFzc2tleVJlc3BvbnNlIiWC0+STAh8qHS92MS9jcmVkZW50aWFscy9wYXNza2V5cy97aWR9EnoKDVJlbmFtZVBhc3NrZXkSHi5ub2trdS52MS5SZW5hbWVQYXNza2V5UmVxdWVzdBofLm5va2t1LnYxLlJlbmFtZVBhc3NrZXlSZXNwb25zZSIogtPkkwIiOgEqMh0vdjEvY3JlZGVudGlhbHMvcGFzc2tleXMve2lkfRKCAQoRQ3JlYXRlQmFja3VwQ29kZXMSIi5ub2trdS52MS5DcmVhdGVCYWNrdXBDb2Rlc1JlcXVlc3QaIy5ub2trdS52MS5DcmVhdGVCYWNrdXBDb2Rlc1Jlc3BvbnNlIiSC0+STAh4iHC92MS9jcmVkZW50aWFscy9iYWNrdXAtY29kZXMSfAoPTGlzdEJhY2t1cENvZGVzEiAubm9ra3UudjEuTGlzdEJhY2t1cENvZGVzUmVxdWVzdBohLm5va2t1LnYxLkxpc3RCYWNrdXBDb2Rlc1Jlc3BvbnNlIiSC0+STAh4SHC92MS9jcmVkZW50aWFscy9iYWNrdXAtY29kZXMSggEKEURlbGV0ZUJhY2t1cENvZGVzEiIubm9ra3UudjEuRGVsZXRlQmFja3VwQ29kZXNSZXF1ZXN0GiMubm9ra3UudjEuRGVsZXRlQmFja3VwQ29kZXNSZXNwb25zZSIkgtPkkwIeKhwvdjEvY3JlZGVudGlhbHMvYmFja3VwLWNvZGVzQpkBCgxjb20ubm9ra3UudjFCD0NyZWRlbnRpYWxQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
 	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
 );
 
@@ -95,19 +95,14 @@ export type Passkey = Message<'nokku.v1.Passkey'> & {
 	id: string;
 
 	/**
-	 * @generated from field: string name = 2;
-	 */
-	name: string;
-
-	/**
-	 * @generated from field: google.protobuf.Timestamp created_at = 3;
+	 * @generated from field: google.protobuf.Timestamp created_at = 2;
 	 */
 	createdAt?: Timestamp | undefined;
 
 	/**
-	 * @generated from field: google.protobuf.Timestamp last_used_at = 4;
+	 * @generated from field: string name = 3;
 	 */
-	lastUsedAt?: Timestamp | undefined;
+	name: string;
 };
 
 /**
@@ -120,45 +115,6 @@ export const PasskeySchema: GenMessage<Passkey> /*@__PURE__*/ = messageDesc(
 );
 
 /**
- * @generated from message nokku.v1.UpdatePasskeyRequest
- */
-export type UpdatePasskeyRequest = Message<'nokku.v1.UpdatePasskeyRequest'> & {
-	/**
-	 * @generated from field: string id = 1;
-	 */
-	id: string;
-
-	/**
-	 * @generated from field: string name = 2;
-	 */
-	name: string;
-};
-
-/**
- * Describes the message nokku.v1.UpdatePasskeyRequest.
- * Use `create(UpdatePasskeyRequestSchema)` to create a new message.
- */
-export const UpdatePasskeyRequestSchema: GenMessage<UpdatePasskeyRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_credential, 5);
-
-/**
- * @generated from message nokku.v1.UpdatePasskeyResponse
- */
-export type UpdatePasskeyResponse = Message<'nokku.v1.UpdatePasskeyResponse'> & {
-	/**
-	 * @generated from field: nokku.v1.Passkey passkey = 1;
-	 */
-	passkey?: Passkey | undefined;
-};
-
-/**
- * Describes the message nokku.v1.UpdatePasskeyResponse.
- * Use `create(UpdatePasskeyResponseSchema)` to create a new message.
- */
-export const UpdatePasskeyResponseSchema: GenMessage<UpdatePasskeyResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_credential, 6);
-
-/**
  * @generated from message nokku.v1.ListPasskeysRequest
  */
 export type ListPasskeysRequest = Message<'nokku.v1.ListPasskeysRequest'> & {};
@@ -169,7 +125,7 @@ export type ListPasskeysRequest = Message<'nokku.v1.ListPasskeysRequest'> & {};
  */
 export const ListPasskeysRequestSchema: GenMessage<ListPasskeysRequest> /*@__PURE__*/ = messageDesc(
 	file_nokku_v1_credential,
-	7
+	5
 );
 
 /**
@@ -187,7 +143,7 @@ export type ListPasskeysResponse = Message<'nokku.v1.ListPasskeysResponse'> & {
  * Use `create(ListPasskeysResponseSchema)` to create a new message.
  */
 export const ListPasskeysResponseSchema: GenMessage<ListPasskeysResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_credential, 8);
+	messageDesc(file_nokku_v1_credential, 6);
 
 /**
  * @generated from message nokku.v1.DeletePasskeyRequest
@@ -204,7 +160,7 @@ export type DeletePasskeyRequest = Message<'nokku.v1.DeletePasskeyRequest'> & {
  * Use `create(DeletePasskeyRequestSchema)` to create a new message.
  */
 export const DeletePasskeyRequestSchema: GenMessage<DeletePasskeyRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_credential, 9);
+	messageDesc(file_nokku_v1_credential, 7);
 
 /**
  * @generated from message nokku.v1.DeletePasskeyResponse
@@ -216,6 +172,40 @@ export type DeletePasskeyResponse = Message<'nokku.v1.DeletePasskeyResponse'> & 
  * Use `create(DeletePasskeyResponseSchema)` to create a new message.
  */
 export const DeletePasskeyResponseSchema: GenMessage<DeletePasskeyResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_credential, 8);
+
+/**
+ * @generated from message nokku.v1.RenamePasskeyRequest
+ */
+export type RenamePasskeyRequest = Message<'nokku.v1.RenamePasskeyRequest'> & {
+	/**
+	 * @generated from field: string id = 1;
+	 */
+	id: string;
+
+	/**
+	 * @generated from field: string name = 2;
+	 */
+	name: string;
+};
+
+/**
+ * Describes the message nokku.v1.RenamePasskeyRequest.
+ * Use `create(RenamePasskeyRequestSchema)` to create a new message.
+ */
+export const RenamePasskeyRequestSchema: GenMessage<RenamePasskeyRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_credential, 9);
+
+/**
+ * @generated from message nokku.v1.RenamePasskeyResponse
+ */
+export type RenamePasskeyResponse = Message<'nokku.v1.RenamePasskeyResponse'> & {};
+
+/**
+ * Describes the message nokku.v1.RenamePasskeyResponse.
+ * Use `create(RenamePasskeyResponseSchema)` to create a new message.
+ */
+export const RenamePasskeyResponseSchema: GenMessage<RenamePasskeyResponse> /*@__PURE__*/ =
 	messageDesc(file_nokku_v1_credential, 10);
 
 /**
@@ -230,12 +220,7 @@ export type BackupCode = Message<'nokku.v1.BackupCode'> & {
 	id: string;
 
 	/**
-	 * @generated from field: google.protobuf.Timestamp used_at = 2;
-	 */
-	usedAt?: Timestamp | undefined;
-
-	/**
-	 * @generated from field: google.protobuf.Timestamp created_at = 3;
+	 * @generated from field: google.protobuf.Timestamp created_at = 2;
 	 */
 	createdAt?: Timestamp | undefined;
 };
@@ -364,20 +349,20 @@ export const CredentialService: GenService<{
 		output: typeof ListPasskeysResponseSchema;
 	};
 	/**
-	 * @generated from rpc nokku.v1.CredentialService.UpdatePasskey
-	 */
-	updatePasskey: {
-		methodKind: 'unary';
-		input: typeof UpdatePasskeyRequestSchema;
-		output: typeof UpdatePasskeyResponseSchema;
-	};
-	/**
 	 * @generated from rpc nokku.v1.CredentialService.DeletePasskey
 	 */
 	deletePasskey: {
 		methodKind: 'unary';
 		input: typeof DeletePasskeyRequestSchema;
 		output: typeof DeletePasskeyResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.CredentialService.RenamePasskey
+	 */
+	renamePasskey: {
+		methodKind: 'unary';
+		input: typeof RenamePasskeyRequestSchema;
+		output: typeof RenamePasskeyResponseSchema;
 	};
 	/**
 	 * Backup codes
