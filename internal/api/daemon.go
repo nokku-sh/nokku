@@ -3,20 +3,25 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"github.com/mizuchilabs/kagi"
+	"github.com/mizuchilabs/kagi/dpop"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/nokku-sh/nokku/internal/authn"
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/meta"
 )
 
@@ -302,19 +307,13 @@ func (s *DaemonService) EnrollDaemon(
 		status = nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
 	}
 
-	// Every daemon authenticates with signed request challenges against
-	// its registered public key, so nothing secret is stored on the
-	// machine.
-	authMethod := req.GetAuthMethod()
-	authPubkey := req.GetAuthPubkey()
-	if authPubkey == "" {
-		return nil, NewError(connect.CodeInvalidArgument, "auth_pubkey required")
-	}
-	if authMethod != "tpm" && authMethod != "soft" {
-		return nil, NewError(connect.CodeInvalidArgument, "unsupported auth_method")
-	}
-	if _, err := authn.ParseAuthPubkey([]byte(authPubkey)); err != nil {
-		return nil, NewError(connect.CodeInvalidArgument, "invalid auth_pubkey")
+	// The daemon proves possession of its TPM/software key with a DPoP proof
+	// bound to this enrollment request; the issued session is bound to that
+	// key (jkt), so a stolen token is useless without the key. The proof is
+	// the only machine credential: nothing secret is stored on the daemon.
+	binding, err := s.enrollBinding(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	// New daemons inherit the workspace's adjustable default config, so a
@@ -347,8 +346,6 @@ func (s *DaemonService) EnrollDaemon(
 			Metadata:    metadata,
 			Status:      status,
 			Config:      config,
-			AuthMethod:  authMethod,
-			AuthPubkey:  authPubkey,
 		})
 		if err != nil {
 			return err
@@ -362,6 +359,19 @@ func (s *DaemonService) EnrollDaemon(
 		return err
 	}); err != nil {
 		return nil, DBError(err)
+	}
+
+	// The daemon's control-plane token never expires; it is revoked by
+	// deleting the daemon (the session cascades), not by a clock.
+	sess, err := s.cfg.Auth.Kagi.Sessions.IssueSession(ctx, kagi.SessionParams{
+		TenantID:  kagi.TenantID(workspaceID),
+		SubjectID: daemon.ID,
+		Kind:      auth.KindDaemon,
+		Method:    kagi.MethodDevice,
+		Binding:   binding,
+	})
+	if err != nil {
+		return nil, ErrInternal
 	}
 
 	eventType := "daemon.pending"
@@ -380,7 +390,53 @@ func (s *DaemonService) EnrollDaemon(
 		TargetId:    &target.ID,
 		Status:      &status,
 		Config:      config,
+		AccessToken: &sess.Token,
 	}, nil
+}
+
+// enrollBinding verifies the DPoP proof presented with the enrollment request
+// and returns its key thumbprint (jkt). It advertises a fresh nonce on
+// stale-nonce failures so the daemon can retry. A missing proof is an error:
+// daemons must enroll key-bound.
+func (s *DaemonService) enrollBinding(ctx context.Context) (string, error) {
+	if s.cfg.Auth.DPoP == nil {
+		return "", NewError(connect.CodeUnimplemented, "DPoP is not configured")
+	}
+	ci, ok := connect.CallInfoForHandlerContext(ctx)
+	if !ok {
+		return "", ErrInternal
+	}
+	proof := ci.RequestHeader().Get("DPoP")
+	if proof == "" {
+		return "", NewError(connect.CodeInvalidArgument, "missing DPoP proof")
+	}
+	htu := dpopHTU(ci.RequestHeader(), nokkuv1connect.DaemonServiceEnrollDaemonProcedure)
+	binding, err := s.cfg.Auth.DPoP.Verify(ctx, proof, "", http.MethodPost, htu)
+	if err != nil {
+		if errors.Is(err, dpop.ErrStaleNonce) {
+			ci.ResponseHeader().Set("DPoP-Nonce", s.cfg.Auth.DPoP.CurrentNonce())
+			return "", NewError(connect.CodeUnauthenticated, "stale DPoP nonce")
+		}
+		return "", NewError(connect.CodeInvalidArgument, "invalid DPoP proof")
+	}
+	return binding, nil
+}
+
+// dpopHTU reconstructs the absolute DPoP target URL for a procedure from the
+// request's forwarding/Host headers, matching what [kagi.AbsoluteURL] derives
+// from the request. It is used for connectrpc handlers (enrollment), where the
+// interceptor has no *http.Request to inspect but the Host header is promoted
+// into the request header by connectrpc.
+func dpopHTU(header http.Header, procedure string) string {
+	scheme := "http"
+	if fwd := header.Get("X-Forwarded-Proto"); fwd != "" {
+		scheme = fwd
+	}
+	host := header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = header.Get("Host")
+	}
+	return scheme + "://" + host + procedure
 }
 
 func (s *DaemonService) SyncDaemon(

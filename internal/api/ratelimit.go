@@ -1,17 +1,13 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"connectrpc.com/connect"
 	"golang.org/x/time/rate"
 
-	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
-	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
@@ -28,14 +24,14 @@ const (
 	entryTTL        = 10 * time.Minute
 )
 
-// sensitiveProcs are ConnectRPC procedures needing tighter per-IP limits.
-var sensitiveProcs = map[string]struct{}{
-	nokkuv1connect.AuthServiceRegisterProcedure:            {},
-	nokkuv1connect.AuthServiceLoginProcedure:               {},
-	nokkuv1connect.AuthServiceLoginWithBackupCodeProcedure: {},
-	nokkuv1connect.AuthServiceForgotPasswordProcedure:      {},
-	nokkuv1connect.AuthServiceResetPasswordProcedure:       {},
-	nokkuv1connect.AuthServiceResendVerificationProcedure:  {},
+// sensitivePaths are the HTTP auth endpoints needing tighter per-IP limits.
+var sensitivePaths = map[string]struct{}{
+	"/auth/register":            {},
+	"/auth/login":               {},
+	"/auth/login/backup-code":   {},
+	"/auth/forgot-password":     {},
+	"/auth/reset-password":      {},
+	"/auth/resend-verification": {},
 }
 
 type limiterEntry struct {
@@ -94,11 +90,20 @@ var (
 
 func (s *Server) WithRateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := util.GetRemoteIP(r.Header, r.RemoteAddr)
+		if _, ok := sensitivePaths[r.URL.Path]; ok {
+			if !sensitiveStore.allow(ip) {
+				w.Header().Set("Retry-After", "1")
+				http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
 		if !isAPIRoute(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
-		ip := util.GetRemoteIP(r.Header, r.RemoteAddr)
 		if !generalStore.allow(ip) {
 			w.Header().Set("Retry-After", "1")
 			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
@@ -106,26 +111,6 @@ func (s *Server) WithRateLimit(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-func NewRateLimitInterceptor() connect.UnaryInterceptorFunc {
-	return func(next connect.UnaryFunc) connect.UnaryFunc {
-		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			if _, ok := sensitiveProcs[req.Spec().Procedure]; !ok {
-				return next(ctx, req)
-			}
-
-			key := meta.UserIDFromContext(ctx)
-			if key == "" {
-				key = util.GetRemoteIP(req.Header(), req.Peer().Addr)
-			}
-
-			if !sensitiveStore.allow(key) {
-				return nil, ErrRateLimited
-			}
-			return next(ctx, req)
-		}
-	}
 }
 
 // isAPIRoute returns true for backend endpoints. Static assets skip rate limiting.

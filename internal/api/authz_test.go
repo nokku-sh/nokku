@@ -84,7 +84,6 @@ func TestProcedurePermissionsExcludesSpecialProcedures(t *testing.T) {
 		nokkuv1connect.InvitationServiceAcceptInvitationProcedure,
 		nokkuv1connect.UtilServiceListAuditLogsProcedure,
 		nokkuv1connect.UtilServiceExportAuditLogsProcedure,
-		nokkuv1connect.AuthServiceLoginProcedure,
 		nokkuv1connect.UserServiceWhoamiProcedure,
 		nokkuv1connect.CredentialServiceUpdatePasswordProcedure,
 	}

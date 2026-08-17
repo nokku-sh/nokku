@@ -11,12 +11,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/ssh"
-	"github.com/nokku-sh/nokku/internal/util"
 )
 
 func DefaultWorkspaceSettings() *nokkuv1.WorkspaceSettings {
@@ -330,19 +328,6 @@ func (s *WorkspaceService) initializeWorkspace(
 	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
 		workspace, err = q.CreateWorkspace(ctx, params)
 		if err != nil {
-			return err
-		}
-
-		samlKeyPair, err := util.CreateSAMLKeyPair(workspace.ID)
-		if err != nil {
-			return err
-		}
-		if _, err = q.UpdateSAMLProvider(ctx, &db.UpdateSAMLProviderParams{
-			WorkspaceID:     workspace.ID,
-			SpPrivateKey:    crypto.EncryptedBytes(samlKeyPair.PrivateKey),
-			SpCertificate:   &samlKeyPair.Certificate,
-			SpCertExpiresAt: &samlKeyPair.ExpiresAt,
-		}); err != nil {
 			return err
 		}
 

@@ -2,10 +2,15 @@ package api
 
 import (
 	"context"
+	"time"
 
+	"connectrpc.com/connect"
+	"github.com/google/uuid"
+	"github.com/mizuchilabs/kagi"
+
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
@@ -50,28 +55,24 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		return nil, err
 	}
 
-	token, err := crypto.NewServiceAccountToken()
-	if err != nil {
-		return nil, ErrInternal
+	roleName := req.GetRoleName()
+	if roleName == "" {
+		roleName = "viewer"
+	}
+	if !db.IsServiceAccountRole(roleName) {
+		return nil, ErrInvalidInput
 	}
 
 	var result *db.ServiceAccount
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		roleName := req.GetRoleName()
-		if roleName == "" {
-			roleName = "viewer"
-		}
-		if !db.IsServiceAccountRole(roleName) {
-			return ErrInvalidInput
-		}
-
+	var key kagi.APIKey
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		id := uuid.NewString()
 		params := &db.CreateServiceAccountParams{
-			ID:          token.ID,
+			ID:          id,
 			WorkspaceID: req.GetWorkspaceId(),
 			Name:        req.GetName(),
 			Description: req.Description,
 			Tags:        req.GetTags(),
-			TokenHash:   token.Hash,
 			RoleName:    &roleName,
 		}
 
@@ -81,6 +82,29 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		}
 
 		result, err = q.CreateServiceAccount(ctx, params)
+		if err != nil {
+			return err
+		}
+
+		// The service account's credential is a kagi API key acting as the
+		// service-account subject. Expiry is enforced by the key at
+		// verification time, so a short-lived key is really short-lived.
+		var ttl time.Duration
+		if req.GetExpiresAt() != nil && !req.GetExpiresAt().AsTime().IsZero() {
+			ttl = time.Until(req.GetExpiresAt().AsTime())
+			if ttl <= 0 {
+				return NewError(connect.CodeInvalidArgument, "expires_at must be in the future")
+			}
+		}
+		key, err = s.cfg.Auth.APIKeys.Issue(
+			ctx,
+			kagi.TenantID(req.GetWorkspaceId()),
+			id,
+			auth.KindServiceAccount,
+			req.GetName(),
+			nil,
+			ttl,
+		)
 		return err
 	}); err != nil {
 		return nil, DBError(err)
@@ -88,7 +112,7 @@ func (s *ServiceAccountService) CreateServiceAccount(
 
 	return &nokkuv1.CreateServiceAccountResponse{
 		ServiceAccount: result.ToProto(),
-		Token:          &token.Plaintext,
+		Token:          &key.FullKey,
 	}, nil
 }
 
@@ -166,5 +190,8 @@ func (s *ServiceAccountService) DeleteServiceAccount(
 	}); err != nil {
 		return nil, DBError(err)
 	}
+	// Revoke every API key minted for the service account so its tokens stop
+	// working immediately, not when they would have expired.
+	_ = s.cfg.Auth.APIKeys.RevokeAll(ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetId())
 	return &nokkuv1.DeleteServiceAccountResponse{}, nil
 }

@@ -6,6 +6,8 @@ import (
 
 	"connectrpc.com/connect"
 
+	"github.com/mizuchilabs/kagi"
+
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
@@ -97,11 +99,12 @@ func (s *SSOService) UpdateOIDCProvider(
 		}
 	}
 
+	var issuerChanged bool
 	var result *db.OidcProvider
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		// A changed issuer means a different IdP. Identity mappings under the
 		// old issuer are stale (sub values are only unique within an issuer),
-		// so purge them: everyone must sign in through the new provider again.
+		// so they are purged after the update.
 		if req.IssuerUrl != nil {
 			provider, err := q.GetOIDCProvider(ctx, req.GetWorkspaceId())
 			if err != nil {
@@ -109,12 +112,7 @@ func (s *SSOService) UpdateOIDCProvider(
 			}
 			if provider.IssuerURL == nil ||
 				strings.TrimSpace(*provider.IssuerURL) != strings.TrimSpace(req.GetIssuerUrl()) {
-				if err := q.DeleteUserIdentitiesByProvider(
-					ctx,
-					req.GetWorkspaceId(),
-				); err != nil {
-					return err
-				}
+				issuerChanged = true
 			}
 		}
 
@@ -125,6 +123,13 @@ func (s *SSOService) UpdateOIDCProvider(
 	}
 	if result == nil {
 		return nil, ErrNotFound
+	}
+	if issuerChanged {
+		_ = s.cfg.Auth.Store.DeleteProviderCredentials(
+			ctx,
+			req.GetWorkspaceId(),
+			kagi.CredentialOIDC,
+		)
 	}
 
 	return &nokkuv1.UpdateOIDCProviderResponse{
