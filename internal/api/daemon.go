@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -399,44 +398,29 @@ func (s *DaemonService) EnrollDaemon(
 // stale-nonce failures so the daemon can retry. A missing proof is an error:
 // daemons must enroll key-bound.
 func (s *DaemonService) enrollBinding(ctx context.Context) (string, error) {
-	if s.cfg.Auth.DPoP == nil {
+	verifier := s.cfg.Auth.DPoP()
+	if verifier == nil {
 		return "", NewError(connect.CodeUnimplemented, "DPoP is not configured")
 	}
 	ci, ok := connect.CallInfoForHandlerContext(ctx)
 	if !ok {
 		return "", ErrInternal
 	}
-	proof := ci.RequestHeader().Get("DPoP")
-	if proof == "" {
-		return "", NewError(connect.CodeInvalidArgument, "missing DPoP proof")
-	}
-	htu := dpopHTU(ci.RequestHeader(), nokkuv1connect.DaemonServiceEnrollDaemonProcedure)
-	binding, err := s.cfg.Auth.DPoP.Verify(ctx, proof, "", http.MethodPost, htu)
+
+	binding, err := verifier.VerifyRequest(
+		ctx,
+		ci.RequestHeader(),
+		nokkuv1connect.DaemonServiceEnrollDaemonProcedure,
+		s.cfg.FullURL(),
+	)
 	if err != nil {
 		if errors.Is(err, dpop.ErrStaleNonce) {
-			ci.ResponseHeader().Set("DPoP-Nonce", s.cfg.Auth.DPoP.CurrentNonce())
+			ci.ResponseHeader().Set("DPoP-Nonce", verifier.CurrentNonce())
 			return "", NewError(connect.CodeUnauthenticated, "stale DPoP nonce")
 		}
 		return "", NewError(connect.CodeInvalidArgument, "invalid DPoP proof")
 	}
 	return binding, nil
-}
-
-// dpopHTU reconstructs the absolute DPoP target URL for a procedure from the
-// request's forwarding/Host headers, matching what [kagi.AbsoluteURL] derives
-// from the request. It is used for connectrpc handlers (enrollment), where the
-// interceptor has no *http.Request to inspect but the Host header is promoted
-// into the request header by connectrpc.
-func dpopHTU(header http.Header, procedure string) string {
-	scheme := "http"
-	if fwd := header.Get("X-Forwarded-Proto"); fwd != "" {
-		scheme = fwd
-	}
-	host := header.Get("X-Forwarded-Host")
-	if host == "" {
-		host = header.Get("Host")
-	}
-	return scheme + "://" + host + procedure
 }
 
 func (s *DaemonService) SyncDaemon(

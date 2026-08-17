@@ -76,7 +76,7 @@ func principalUser(cfg *config.Config) func(context.Context, *http.Request) (kag
 		if !ok {
 			return kagi.User{}, errors.New("not authenticated")
 		}
-		return cfg.Auth.Store.GetUser(ctx, "", p.SubjectID)
+		return cfg.Auth.GetUser(ctx, p.SubjectID)
 	}
 }
 
@@ -95,7 +95,7 @@ func signupUser(cfg *config.Config) func(context.Context, *http.Request) (kagi.U
 			return kagi.User{}, err
 		}
 
-		u, err := cfg.Auth.Store.GetUserByEmail(ctx, "", addr)
+		u, err := cfg.Auth.GetUserByEmail(ctx, addr)
 		if err == nil {
 			return u, nil
 		}
@@ -107,14 +107,14 @@ func signupUser(cfg *config.Config) func(context.Context, *http.Request) (kagi.U
 		if name == "" {
 			name = auth.UsernameFromEmail(addr)
 		}
-		return cfg.Auth.Store.CreateUser(ctx, "", kagi.User{Email: addr, DisplayName: name})
+		return cfg.Auth.CreateUser(ctx, kagi.User{Email: addr, DisplayName: name})
 	}
 }
 
 // welcomeEmail sends the verification email after a passkey-only signup.
 func welcomeEmail(cfg *config.Config) func(context.Context, kagi.TenantID, kagi.User) error {
 	return func(ctx context.Context, _ kagi.TenantID, u kagi.User) error {
-		token, err := cfg.Auth.Tokens.Issue(ctx, u.ID, auth.PurposeVerify)
+		token, err := cfg.Auth.IssueToken(ctx, u.ID, auth.PurposeVerify)
 		if err != nil {
 			return err
 		}

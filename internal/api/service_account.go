@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/mizuchilabs/kagi"
 
-	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -96,13 +95,11 @@ func (s *ServiceAccountService) CreateServiceAccount(
 				return NewError(connect.CodeInvalidArgument, "expires_at must be in the future")
 			}
 		}
-		key, err = s.cfg.Auth.APIKeys.Issue(
+		key, err = s.cfg.Auth.IssueServiceAccountKey(
 			ctx,
-			kagi.TenantID(req.GetWorkspaceId()),
+			req.GetWorkspaceId(),
 			id,
-			auth.KindServiceAccount,
 			req.GetName(),
-			nil,
 			ttl,
 		)
 		return err
@@ -192,6 +189,6 @@ func (s *ServiceAccountService) DeleteServiceAccount(
 	}
 	// Revoke every API key minted for the service account so its tokens stop
 	// working immediately, not when they would have expired.
-	_ = s.cfg.Auth.APIKeys.RevokeAll(ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetId())
+	_ = s.cfg.Auth.RevokeServiceAccountKeys(ctx, req.GetWorkspaceId(), req.GetId())
 	return &nokkuv1.DeleteServiceAccountResponse{}, nil
 }

@@ -125,7 +125,7 @@ func (s *SSOService) UpdateOIDCProvider(
 		return nil, ErrNotFound
 	}
 	if issuerChanged {
-		_ = s.cfg.Auth.Store.DeleteProviderCredentials(
+		_ = s.cfg.Auth.DeleteProviderCredentials(
 			ctx,
 			req.GetWorkspaceId(),
 			kagi.CredentialOIDC,

@@ -35,10 +35,13 @@ func isPublicEndpoint(procedure string) bool {
 // replaces the challenge-based interceptor.
 func NewKagiAuthNInterceptor(cfg *config.Config) connect.Interceptor {
 	return kagiconnect.New(kagiconnect.Options{
-		Authenticator: cfg.Auth.Authenticator,
-		APIKeys:       cfg.Auth.APIKeys,
+		Authenticator: cfg.Auth.Authenticator(),
+		APIKeys:       cfg.Auth.APIKeys(),
 		IsPublic: func(spec connect.Spec) bool {
 			return isPublicEndpoint(spec.Procedure)
+		},
+		ResolveTenant: func(_ context.Context, _ connect.Spec, msg proto.Message) (kagi.TenantID, error) {
+			return kagi.TenantID(requestWorkspace(msg)), nil
 		},
 		BaseURL:    cfg.FullURL(),
 		CookieName: "session",
@@ -50,15 +53,12 @@ func NewKagiAuthNInterceptor(cfg *config.Config) connect.Interceptor {
 func NewHTTPAuth(cfg *config.Config) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return cfg.Auth.Kagi.Middleware(
-			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				p, ok := kagi.PrincipalFromContext(r.Context())
-				if !ok {
-					http.Error(w, "Unauthorized", http.StatusUnauthorized)
-					return
-				}
-				ctx := applyPrincipal(r.Context(), p, nil)
-				next.ServeHTTP(w, r.WithContext(ctx))
-			}),
+			cfg.Auth.Kagi.RequireLogin(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					p, _ := kagi.PrincipalFromContext(r.Context())
+					next.ServeHTTP(w, r.WithContext(applyPrincipal(r.Context(), p)))
+				}),
+			),
 		)
 	}
 }
@@ -77,7 +77,7 @@ type actorInterceptor struct {
 
 func (a *actorInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		ctx = a.withActor(ctx, req.Any())
+		ctx = a.withActor(ctx)
 		return next(ctx, req)
 	}
 }
@@ -92,31 +92,32 @@ func (a *actorInterceptor) WrapStreamingHandler(
 	next connect.StreamingHandlerFunc,
 ) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		ctx = a.withActor(ctx, nil)
+		ctx = a.withActor(ctx)
 		return next(ctx, conn)
 	}
 }
 
-func (a *actorInterceptor) withActor(ctx context.Context, request any) context.Context {
+func (a *actorInterceptor) withActor(ctx context.Context) context.Context {
 	p, ok := kagi.PrincipalFromContext(ctx)
 	if !ok {
-		return withRequestWorkspace(ctx, request)
+		return ctx
 	}
-	ctx = applyPrincipal(ctx, p, request)
+	ctx = applyPrincipal(ctx, p)
 	a.reportUsage(p)
 	return ctx
 }
 
 // applyPrincipal maps a kagi principal onto nokku's actor/workspace context.
 // It is pure (no side effects) so it can be unit tested.
-func applyPrincipal(ctx context.Context, p kagi.Principal, request any) context.Context {
+func applyPrincipal(ctx context.Context, p kagi.Principal) context.Context {
 	ctx = meta.WithActor(ctx, &meta.Actor{ID: p.SubjectID, Type: actorType(p.Kind)})
 	if p.TenantID != "" {
 		// Machine principals are tenant-scoped by construction.
 		ctx = meta.WithWorkspaceID(ctx, string(p.TenantID))
-	} else {
-		// User principals are global; the workspace comes from the request.
-		ctx = withRequestWorkspace(ctx, request)
+	} else if ws, ok := kagi.TenantFromContext(ctx); ok {
+		// User principals are global; the workspace was resolved from the
+		// request by the authn interceptor's ResolveTenant hook.
+		ctx = meta.WithWorkspaceID(ctx, string(ws))
 	}
 	return ctx
 }
@@ -170,24 +171,14 @@ func (a *actorInterceptor) reportUsage(p kagi.Principal) {
 	}()
 }
 
-// withRequestWorkspace promotes the conventional workspace_id protobuf field
-// into request context before authentication and business logic run. Requests
-// without that field are intentionally left global/user-scoped.
-func withRequestWorkspace(ctx context.Context, request any) context.Context {
-	message, ok := request.(proto.Message)
-	if !ok {
-		return ctx
-	}
-
-	fields := message.ProtoReflect().Descriptor().Fields()
+// requestWorkspace returns the conventional workspace_id protobuf field from
+// request, or "" when absent. It is the tenant resolution hook for user
+// principals: their workspace comes from the request, not the credential.
+func requestWorkspace(request proto.Message) string {
+	fields := request.ProtoReflect().Descriptor().Fields()
 	field := fields.ByName("workspace_id")
 	if field == nil || field.Kind() != protoreflect.StringKind {
-		return ctx
+		return ""
 	}
-
-	workspaceID := message.ProtoReflect().Get(field).String()
-	if workspaceID == "" {
-		return ctx
-	}
-	return meta.WithWorkspaceID(ctx, workspaceID)
+	return request.ProtoReflect().Get(field).String()
 }
