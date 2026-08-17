@@ -10,7 +10,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/util"
 )
@@ -23,20 +22,20 @@ const anonActorID = "00000000-0000-0000-0000-000000000000"
 // authProcedures are always audited, even when the request fails before
 // any actor is known. Auth events are the core of a security audit trail.
 var authProcedures = map[string]struct{}{
-	nokkuv1connect.AuthServiceLoginProcedure:               {},
-	nokkuv1connect.AuthServiceLoginWithBackupCodeProcedure: {},
-	nokkuv1connect.AuthServiceLogoutProcedure:              {},
-	nokkuv1connect.AuthServiceRegisterProcedure:            {},
-	nokkuv1connect.AuthServiceRefreshTokenProcedure:        {},
-	nokkuv1connect.AuthServiceForgotPasswordProcedure:      {},
-	nokkuv1connect.AuthServiceResetPasswordProcedure:       {},
-	nokkuv1connect.AuthServiceVerifyEmailProcedure:         {},
-	nokkuv1connect.AuthServiceResendVerificationProcedure:  {},
-	nokkuv1connect.AuthServiceStreamCLILoginProcedure:      {},
-	nokkuv1connect.AuthServiceVerifyCLILoginProcedure:      {},
-	"GET /oauth/callback":                                  {},
-	"GET /oauth/login":                                     {},
-	"GET /saml/login":                                      {},
+	"POST /auth/login":               {},
+	"POST /auth/login/backup-code":   {},
+	"POST /auth/logout":              {},
+	"POST /auth/register":            {},
+	"POST /auth/forgot-password":     {},
+	"POST /auth/reset-password":      {},
+	"POST /auth/verify-email":        {},
+	"POST /auth/resend-verification": {},
+	"GET /oauth/callback":            {},
+	"GET /oauth/login":               {},
+	"GET /oidc/login":                {},
+	"GET /oidc/callback":             {},
+	"GET /saml/login":                {},
+	"POST /saml/acs":                 {},
 }
 
 func (s *Service) LogAction(
