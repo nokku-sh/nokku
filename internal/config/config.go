@@ -6,14 +6,16 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/mizuchilabs/kagi/cache"
+	"github.com/redis/go-redis/v9"
 	"github.com/urfave/cli/v3"
 
 	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
-	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/internal/daemon"
@@ -74,7 +76,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 	cfg.Geo = geo.New()
-	cfg.Cache, err = cache.New(ctx)
+	cfg.Cache, err = newCache(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -203,4 +205,34 @@ func (c *Config) WSOrigins() []string {
 	origins := make([]string, 0, len(c.AllowedOrigins)+1)
 	origins = append(origins, c.FullURL())
 	return append(origins, c.AllowedOrigins...)
+}
+
+// newCache builds the shared cache. When NOKKU_REDIS_ADDR is set it returns a
+// Redis-backed cache, otherwise the single-instance in-memory cache.
+func newCache(ctx context.Context) (cache.Cache, error) {
+	addr := os.Getenv("NOKKU_REDIS_ADDR")
+	if addr == "" {
+		return cache.NewMemory(10_000), nil
+	}
+
+	db, err := strconv.Atoi(os.Getenv("NOKKU_REDIS_DB"))
+	if err != nil {
+		return nil, fmt.Errorf("cache: invalid NOKKU_REDIS_DB: %w", err)
+	}
+
+	client := redis.NewClient(&redis.Options{
+		Addr:     addr,
+		Password: os.Getenv("NOKKU_REDIS_PASSWORD"),
+		DB:       db,
+	})
+	if err := client.Ping(ctx).Err(); err != nil {
+		_ = client.Close()
+		return nil, fmt.Errorf("cache: ping redis: %w", err)
+	}
+	go func() {
+		<-ctx.Done()
+		_ = client.Close()
+	}()
+
+	return cache.NewRedis(client, "nokku:"), nil
 }

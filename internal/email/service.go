@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/mizuchilabs/kagi/cache"
 
-	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/web"
 )
 
