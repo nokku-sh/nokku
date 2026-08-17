@@ -17,88 +17,10 @@ func resetRuntime(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		passwordHasher, err := NewHasher(SHA256)
-		if err != nil {
-			panic(err)
-		}
 		if err := SetTokenHasher(tokenHasher); err != nil {
 			panic(err)
 		}
-		if err := SetPasswordHasher(passwordHasher); err != nil {
-			panic(err)
-		}
 	})
-}
-
-func TestHashedPassword_Verify(t *testing.T) {
-	resetRuntime(t)
-
-	hasher, err := NewHasher(SHA256)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := SetPasswordHasher(hasher); err != nil {
-		t.Fatal(err)
-	}
-
-	hash, err := HashPassword("correct horse")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if hash.IsZero() {
-		t.Error("hash is zero")
-	}
-
-	if !hash.Verify("correct horse") {
-		t.Error("Verify() with correct password: want true")
-	}
-	if hash.Verify("wrong password") {
-		t.Error("Verify() with wrong password: want false")
-	}
-}
-
-func TestHashedPassword_WithoutHasher(t *testing.T) {
-	resetRuntime(t)
-
-	var h HashedPassword
-	if h.Verify("x") {
-		t.Error("Verify() without initialized hasher: want false")
-	}
-	if _, err := HashPassword("x"); err == nil {
-		t.Error("HashPassword() without initialized hasher: want error")
-	}
-}
-
-func TestHashedPassword_ScanAndValue(t *testing.T) {
-	resetRuntime(t)
-
-	var h HashedPassword
-	if err := h.Scan(nil); err != nil {
-		t.Fatal(err)
-	}
-	if !h.IsZero() {
-		t.Error("Scan(nil) should zero the value")
-	}
-
-	h = "digest"
-	v, err := h.Value()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if v != driver.Value("digest") {
-		t.Errorf("Value() = %v, want digest", v)
-	}
-
-	if err := h.Scan([]byte("other")); err != nil {
-		t.Fatal(err)
-	}
-	if h != "other" {
-		t.Errorf("Scan([]byte) = %q, want other", h)
-	}
-
-	if err := h.Scan(42); err == nil {
-		t.Error("Scan(int): want error")
-	}
 }
 
 func TestHashedToken_Verify(t *testing.T) {
@@ -254,17 +176,11 @@ func TestRuntimeSetters(t *testing.T) {
 	if err := SetEncryptor(nil); err == nil {
 		t.Error("SetEncryptor(nil): want error")
 	}
-	if err := SetPasswordHasher(nil); err == nil {
-		t.Error("SetPasswordHasher(nil): want error")
-	}
 	if err := SetTokenHasher(nil); err == nil {
 		t.Error("SetTokenHasher(nil): want error")
 	}
 	if _, err := Encryptor(); err == nil {
 		t.Error("Encryptor() uninitialized: want error")
-	}
-	if _, err := PasswordHasher(); err == nil {
-		t.Error("PasswordHasher() uninitialized: want error")
 	}
 	if _, err := TokenHasher(); err == nil {
 		t.Error("TokenHasher() uninitialized: want error")

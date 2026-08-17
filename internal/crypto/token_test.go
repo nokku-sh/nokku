@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestNewToken_NoOptions(t *testing.T) {
+func TestNewToken_NoID(t *testing.T) {
 	tok, err := NewToken()
 	if err != nil {
 		t.Fatal(err)
@@ -16,49 +16,16 @@ func TestNewToken_NoOptions(t *testing.T) {
 		t.Errorf("ID = %q, want empty", tok.ID)
 	}
 
-	// The secret uses base64url, which may itself contain underscores. A
-	// bare token round-trips through Parse as a bare secret.
+	// A bare token is a bare secret: Parse returns it as the Secret.
 	parsed, err := Parse(tok.Plaintext)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if parsed.Secret != tok.Plaintext || parsed.ID != "" || parsed.Prefix != "" {
+	if parsed.Secret != tok.Plaintext || parsed.ID != "" {
 		t.Errorf("Parse() = %+v, want bare secret", parsed)
 	}
 	if !tok.Hash.Verify(tok.Plaintext) {
 		t.Error("hash does not verify against plaintext")
-	}
-}
-
-func TestNewToken_WithPrefix(t *testing.T) {
-	tok, err := NewToken(WithPrefix(PrefixDaemon))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !strings.HasPrefix(tok.Plaintext, PrefixDaemon+"_") {
-		t.Errorf("plaintext %q missing prefix", tok.Plaintext)
-	}
-	parts := strings.Split(tok.Plaintext, "_")
-	if len(parts) < 3 {
-		t.Fatalf("plaintext %q should be prefix_id_secret", tok.Plaintext)
-	}
-
-	parsed, err := Parse(tok.Plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if parsed.Prefix != PrefixDaemon {
-		t.Errorf("Prefix = %q, want %q", parsed.Prefix, PrefixDaemon)
-	}
-	// The secret is base64url and may contain underscores. Parse must
-	// rejoin everything after the ID.
-	wantSecret := strings.Join(parts[2:], "_")
-	if parsed.ID != tok.ID || parsed.Secret != wantSecret {
-		t.Errorf("Parse() = %+v, want id %q secret %q", parsed, tok.ID, wantSecret)
-	}
-	if !tok.Hash.Verify(tok.Plaintext) {
-		t.Error("hash does not verify")
 	}
 }
 
@@ -82,53 +49,6 @@ func TestNewToken_WithID(t *testing.T) {
 	if parsed.ID != id {
 		t.Errorf("Parse().ID = %q, want %q", parsed.ID, id)
 	}
-	if parsed.Prefix != "" {
-		t.Errorf("Parse().Prefix = %q, want empty", parsed.Prefix)
-	}
-}
-
-func TestNewToken_WithNonUUIDID_NotRecoverableByParse(t *testing.T) {
-	// Parse only recognizes UUIDs as IDs. A custom non-UUID ID is stored
-	// in the plaintext but cannot be recovered (documented limitation).
-	tok, err := NewToken(WithID("custom-id"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if tok.ID != "custom-id" {
-		t.Errorf("ID = %q, want custom-id", tok.ID)
-	}
-	parsed, err := Parse(tok.Plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if parsed.ID != "" || parsed.Prefix != "" {
-		t.Errorf("Parse() = %+v, want bare secret fallback", parsed)
-	}
-}
-
-func TestNewToken_ConvenienceConstructors(t *testing.T) {
-	tests := []struct {
-		name   string
-		got    *Token
-		prefix string
-	}{
-		{"service account", mustNewToken(NewServiceAccountToken()), PrefixSA},
-		{"device", mustNewToken(NewDeviceToken()), PrefixDevice},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if !strings.HasPrefix(tt.got.Plaintext, tt.prefix+"_") {
-				t.Errorf("plaintext %q missing prefix %q", tt.got.Plaintext, tt.prefix)
-			}
-		})
-	}
-}
-
-func mustNewToken(tok *Token, err error) *Token {
-	if err != nil {
-		panic(err)
-	}
-	return tok
 }
 
 func TestParse(t *testing.T) {
@@ -143,27 +63,9 @@ func TestParse(t *testing.T) {
 			ParsedToken{ID: "123e4567-e89b-12d3-a456-426614174000", Secret: "mys3cr3t"},
 		},
 		{
-			"two segments without uuid treated as bare secret",
+			"non-uuid first segment treated as bare secret",
 			"notauuid_part",
 			ParsedToken{Secret: "notauuid_part"},
-		},
-		{
-			"prefix + uuid + secret",
-			"nkd_123e4567-e89b-12d3-a456-426614174000_s3cr3t",
-			ParsedToken{
-				Prefix: "nkd",
-				ID:     "123e4567-e89b-12d3-a456-426614174000",
-				Secret: "s3cr3t",
-			},
-		},
-		{
-			"prefix + uuid + secret with underscores in secret",
-			"nkd_123e4567-e89b-12d3-a456-426614174000_a_b_c",
-			ParsedToken{
-				Prefix: "nkd",
-				ID:     "123e4567-e89b-12d3-a456-426614174000",
-				Secret: "a_b_c",
-			},
 		},
 		{
 			"uuid + secret with underscores in secret",
@@ -194,7 +96,7 @@ func TestParse_Empty(t *testing.T) {
 }
 
 func TestTokenHash_Verification(t *testing.T) {
-	tok, err := NewToken(WithPrefix(PrefixCLI))
+	tok, err := NewToken()
 	if err != nil {
 		t.Fatal(err)
 	}
