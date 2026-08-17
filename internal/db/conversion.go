@@ -38,27 +38,6 @@ func (u *User) ToProto() *nokkuv1.User {
 	}
 }
 
-func (u *ListUserDevicesRow) ToProto() *nokkuv1.UserDevice {
-	if u == nil {
-		return nil
-	}
-	return &nokkuv1.UserDevice{
-		Id:         &u.ID,
-		Name:       &u.Name,
-		Kind:       &u.Kind,
-		ExpiresAt:  SafeTimestamp(u.ExpiresAt),
-		LastUsedAt: SafeTimestamp(u.LastUsedAt),
-		CreatedAt:  SafeTimestamp(u.CreatedAt),
-	}
-}
-
-func UserDevicesToProto(devices []*ListUserDevicesRow) []*nokkuv1.UserDevice {
-	return MapSlice(
-		devices,
-		func(d *ListUserDevicesRow) *nokkuv1.UserDevice { return d.ToProto() },
-	)
-}
-
 func (w *Workspace) ToProto() *nokkuv1.Workspace {
 	if w == nil {
 		return nil
@@ -244,7 +223,6 @@ func (r *ListServiceAccountsRow) ToProto() *nokkuv1.ServiceAccount {
 		Name:        r.Name,
 		Description: r.Description,
 		RoleName:    r.RoleName,
-		TokenHash:   r.TokenHash,
 		LastUsedAt:  r.LastUsedAt,
 		ExpiresAt:   r.ExpiresAt,
 		Tags:        r.Tags,
@@ -374,8 +352,6 @@ func (r *ListDaemonsRow) ToProto() *nokkuv1.Daemon {
 		ID:          r.ID,
 		WorkspaceID: r.WorkspaceID,
 		Name:        r.Name,
-		AuthMethod:  r.AuthMethod,
-		AuthPubkey:  r.AuthPubkey,
 		Status:      r.Status,
 		Online:      r.Online,
 		Config:      r.Config,

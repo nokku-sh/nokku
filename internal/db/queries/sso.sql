@@ -1,140 +1,3 @@
--- User Identities -----------------------------------------------------------
--- name: GetUserIdentity :one
-SELECT
-  *
-FROM
-  user_identities
-WHERE
-  provider_id = @provider_id
-  AND provider = @provider;
-
--- name: GetUserIdentitiesByProvider :many
-SELECT
-  o.*,
-  u.email,
-  u.username,
-  u.name
-FROM
-  user_identities o
-  JOIN users u ON u.id = o.user_id
-WHERE
-  o.provider = @provider
-ORDER BY
-  o.created_at DESC;
-
--- name: UpsertUserIdentity :one
-INSERT INTO
-  user_identities (provider_id, provider, user_id, provider_email, provider_username, protocol)
-VALUES
-  (@provider_id, @provider, @user_id, @provider_email, @provider_username, @protocol)
-ON CONFLICT (provider_id, provider) DO UPDATE
-SET
-  provider_email = EXCLUDED.provider_email,
-  provider_username = EXCLUDED.provider_username,
-  protocol = EXCLUDED.protocol
-RETURNING
-  *;
-
--- name: GetUserIdentitiesByUserID :many
-SELECT
-  *
-FROM
-  user_identities
-WHERE
-  user_id = @user_id
-ORDER BY
-  created_at DESC;
-
--- name: DeleteUserIdentity :exec
-DELETE FROM user_identities
-WHERE
-  provider_id = @provider_id
-  AND provider = @provider;
-
--- name: DeleteUserIdentityByUser :exec
-DELETE FROM user_identities
-WHERE
-  user_id = @user_id
-  AND provider = @provider;
-
--- name: DeleteUserIdentitiesByUserAndProtocol :exec
-DELETE FROM user_identities
-WHERE
-  user_id = @user_id
-  AND provider = @provider
-  AND protocol = @protocol;
-
--- Passkeys -------------------------------------------------------------------
--- name: CreatePasskey :exec
-INSERT INTO
-  passkeys (
-    id,
-    user_id,
-    public_key,
-    attestation_type,
-    aaguid,
-    sign_count,
-    transports,
-    backup_eligible,
-    backup_state,
-    name
-  )
-VALUES
-  (
-    @id,
-    @user_id,
-    @public_key,
-    @attestation_type,
-    @aaguid,
-    @sign_count,
-    @transports,
-    @backup_eligible,
-    @backup_state,
-    @name
-  );
-
--- name: GetPasskey :one
-SELECT
-  *
-FROM
-  passkeys
-WHERE
-  id = @passkey_id;
-
--- name: GetPasskeysByUserID :many
-SELECT
-  *
-FROM
-  passkeys
-WHERE
-  user_id = @user_id;
-
--- name: UpdatePasskeySignCount :exec
-UPDATE passkeys
-SET
-  sign_count = @sign_count
-WHERE
-  id = @passkey_id;
-
--- name: UpdatePasskeyLastUsed :exec
-UPDATE passkeys
-SET
-  last_used_at = @last_used_at
-WHERE
-  id = @passkey_id;
-
--- name: UpdatePasskeyName :exec
-UPDATE passkeys
-SET
-  name = @name
-WHERE
-  id = @passkey_id;
-
--- name: DeletePasskey :exec
-DELETE FROM passkeys
-WHERE
-  id = @passkey_id;
-
 -- OIDC Providers -------------------------------------------------------------
 -- name: GetOIDCProvider :one
 SELECT
@@ -177,11 +40,6 @@ SELECT EXISTS (
     AND domain = @domain
     AND verified_at IS NOT NULL
 )::BOOLEAN AS owns_domain;
-
--- name: DeleteUserIdentitiesByProvider :exec
-DELETE FROM user_identities
-WHERE
-  provider = @provider;
 
 -- name: UpdateOIDCProvider :one
 UPDATE oidc_providers
@@ -244,9 +102,6 @@ SET
   name_attribute = COALESCE(sqlc.narg('name_attribute'), name_attribute),
   username_attribute = COALESCE(sqlc.narg('username_attribute'), username_attribute),
   picture_attribute = COALESCE(sqlc.narg('picture_attribute'), picture_attribute),
-  sp_private_key = COALESCE(sqlc.narg('sp_private_key'), sp_private_key),
-  sp_certificate = COALESCE(sqlc.narg('sp_certificate'), sp_certificate),
-  sp_cert_expires_at = COALESCE(sqlc.narg('sp_cert_expires_at'), sp_cert_expires_at),
   is_active = COALESCE(sqlc.narg('is_active'), is_active),
   enforce_sso = COALESCE(sqlc.narg('enforce_sso'), enforce_sso),
   allow_jit_provisioning = COALESCE(sqlc.narg('allow_jit_provisioning'), allow_jit_provisioning)
@@ -254,22 +109,6 @@ WHERE
   workspace_id = @workspace_id
 RETURNING
   *;
-
--- name: GetExpiringSAMLProviderForUpdate :one
-SELECT
-  *
-FROM
-  saml_providers
-WHERE
-  is_active = TRUE
-  AND sp_cert_expires_at IS NOT NULL
-  AND sp_cert_expires_at < NOW() + INTERVAL '30 days'
-ORDER BY
-  sp_cert_expires_at ASC
-LIMIT
-  1
-FOR UPDATE
-  SKIP LOCKED;
 
 -- name: CheckDomainSSOEnforcement :one
 SELECT

@@ -93,41 +93,6 @@ func (q *Queries) GetEncryptedOIDCSecrets(ctx context.Context) ([]*GetEncryptedO
 	return items, nil
 }
 
-const getEncryptedSAMLKeys = `-- name: GetEncryptedSAMLKeys :many
-SELECT
-  workspace_id,
-  sp_private_key
-FROM
-  saml_providers
-WHERE
-  sp_private_key IS NOT NULL
-`
-
-type GetEncryptedSAMLKeysRow struct {
-	WorkspaceID  string                `json:"workspaceId"`
-	SpPrivateKey crypto.EncryptedBytes `json:"spPrivateKey"`
-}
-
-func (q *Queries) GetEncryptedSAMLKeys(ctx context.Context) ([]*GetEncryptedSAMLKeysRow, error) {
-	rows, err := q.db.Query(ctx, getEncryptedSAMLKeys)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*GetEncryptedSAMLKeysRow
-	for rows.Next() {
-		var i GetEncryptedSAMLKeysRow
-		if err := rows.Scan(&i.WorkspaceID, &i.SpPrivateKey); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getKeysetData = `-- name: GetKeysetData :one
 SELECT
   data
@@ -222,24 +187,6 @@ type UpdateOIDCClientSecretParams struct {
 
 func (q *Queries) UpdateOIDCClientSecret(ctx context.Context, arg *UpdateOIDCClientSecretParams) error {
 	_, err := q.db.Exec(ctx, updateOIDCClientSecret, arg.ClientSecret, arg.WorkspaceID)
-	return err
-}
-
-const updateSAMLPrivateKey = `-- name: UpdateSAMLPrivateKey :exec
-UPDATE saml_providers
-SET
-  sp_private_key = $1
-WHERE
-  workspace_id = $2
-`
-
-type UpdateSAMLPrivateKeyParams struct {
-	SpPrivateKey crypto.EncryptedBytes `json:"spPrivateKey"`
-	WorkspaceID  string                `json:"workspaceId"`
-}
-
-func (q *Queries) UpdateSAMLPrivateKey(ctx context.Context, arg *UpdateSAMLPrivateKeyParams) error {
-	_, err := q.db.Exec(ctx, updateSAMLPrivateKey, arg.SpPrivateKey, arg.WorkspaceID)
 	return err
 }
 

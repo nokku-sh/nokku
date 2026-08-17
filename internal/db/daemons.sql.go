@@ -16,20 +16,18 @@ const createDaemon = `-- name: CreateDaemon :one
 WITH
   new_daemon AS (
     INSERT INTO
-      daemons (id, workspace_id, name, status, auth_method, auth_pubkey, config, metadata)
+      daemons (id, workspace_id, name, status, config, metadata)
     VALUES
       (
         $1,
         $2,
         $3,
         $4,
-        $5,
-        $6,
-        COALESCE($7, '{}'::jsonb),
-        COALESCE($8, '{}'::jsonb)
+        COALESCE($5, '{}'::jsonb),
+        COALESCE($6, '{}'::jsonb)
       )
     RETURNING
-      id, workspace_id, name, auth_method, auth_pubkey, status, online, config, metadata, last_used_at, updated_at, created_at
+      id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
   ),
   new_target AS (
     INSERT INTO
@@ -38,12 +36,12 @@ WITH
       workspace_id,
       id,
       name,
-      COALESCE($8, '{}'::jsonb)
+      COALESCE($6, '{}'::jsonb)
     FROM
       new_daemon
   )
 SELECT
-  id, workspace_id, name, auth_method, auth_pubkey, status, online, config, metadata, last_used_at, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
 FROM
   new_daemon
 `
@@ -53,8 +51,6 @@ type CreateDaemonParams struct {
 	WorkspaceID string             `json:"workspaceId"`
 	Name        string             `json:"name"`
 	Status      nokku.DaemonStatus `json:"status"`
-	AuthMethod  string             `json:"authMethod"`
-	AuthPubkey  string             `json:"authPubkey"`
 	Config      interface{}        `json:"config"`
 	Metadata    interface{}        `json:"metadata"`
 }
@@ -63,8 +59,6 @@ type CreateDaemonRow struct {
 	ID          string     `json:"id"`
 	WorkspaceID string     `json:"workspaceId"`
 	Name        string     `json:"name"`
-	AuthMethod  string     `json:"authMethod"`
-	AuthPubkey  string     `json:"authPubkey"`
 	Status      int32      `json:"status"`
 	Online      bool       `json:"online"`
 	Config      []byte     `json:"config"`
@@ -80,8 +74,6 @@ func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*C
 		arg.WorkspaceID,
 		arg.Name,
 		arg.Status,
-		arg.AuthMethod,
-		arg.AuthPubkey,
 		arg.Config,
 		arg.Metadata,
 	)
@@ -90,8 +82,6 @@ func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*C
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
-		&i.AuthMethod,
-		&i.AuthPubkey,
 		&i.Status,
 		&i.Online,
 		&i.Config,
@@ -108,7 +98,7 @@ DELETE FROM daemons
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, name, auth_method, auth_pubkey, status, online, config, metadata, last_used_at, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
 `
 
 func (q *Queries) DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, error) {
@@ -118,8 +108,6 @@ func (q *Queries) DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, e
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
-		&i.AuthMethod,
-		&i.AuthPubkey,
 		&i.Status,
 		&i.Online,
 		&i.Config,
@@ -133,7 +121,7 @@ func (q *Queries) DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, e
 
 const getDaemon = `-- name: GetDaemon :one
 SELECT
-  id, workspace_id, name, auth_method, auth_pubkey, status, online, config, metadata, last_used_at, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
 FROM
   daemons
 WHERE
@@ -147,8 +135,6 @@ func (q *Queries) GetDaemon(ctx context.Context, daemonID string) (*Daemon, erro
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
-		&i.AuthMethod,
-		&i.AuthPubkey,
 		&i.Status,
 		&i.Online,
 		&i.Config,
@@ -227,7 +213,7 @@ func (q *Queries) GetTargetByDaemon(ctx context.Context, daemonID *string) (*Tar
 
 const listDaemons = `-- name: ListDaemons :many
 SELECT
-  d.id, d.workspace_id, d.name, d.auth_method, d.auth_pubkey, d.status, d.online, d.config, d.metadata, d.last_used_at, d.updated_at, d.created_at,
+  d.id, d.workspace_id, d.name, d.status, d.online, d.config, d.metadata, d.last_used_at, d.updated_at, d.created_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   daemons d
@@ -266,8 +252,6 @@ type ListDaemonsRow struct {
 	ID          string              `json:"id"`
 	WorkspaceID string              `json:"workspaceId"`
 	Name        string              `json:"name"`
-	AuthMethod  string              `json:"authMethod"`
-	AuthPubkey  string              `json:"authPubkey"`
 	Status      nokku.DaemonStatus  `json:"status"`
 	Online      bool                `json:"online"`
 	Config      *nokku.DaemonConfig `json:"config"`
@@ -298,8 +282,6 @@ func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*L
 			&i.ID,
 			&i.WorkspaceID,
 			&i.Name,
-			&i.AuthMethod,
-			&i.AuthPubkey,
 			&i.Status,
 			&i.Online,
 			&i.Config,
@@ -341,7 +323,7 @@ SET
 WHERE
   id = $4
 RETURNING
-  id, workspace_id, name, auth_method, auth_pubkey, status, online, config, metadata, last_used_at, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
 `
 
 type UpdateDaemonParams struct {
@@ -363,8 +345,6 @@ func (q *Queries) UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) (*D
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
-		&i.AuthMethod,
-		&i.AuthPubkey,
 		&i.Status,
 		&i.Online,
 		&i.Config,
@@ -419,7 +399,7 @@ SET
 WHERE
   id = $2
 RETURNING
-  id, workspace_id, name, auth_method, auth_pubkey, status, online, config, metadata, last_used_at, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
 `
 
 type UpdateDaemonStatusParams struct {
@@ -434,8 +414,6 @@ func (q *Queries) UpdateDaemonStatus(ctx context.Context, arg *UpdateDaemonStatu
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
-		&i.AuthMethod,
-		&i.AuthPubkey,
 		&i.Status,
 		&i.Online,
 		&i.Config,

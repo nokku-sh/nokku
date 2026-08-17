@@ -149,7 +149,7 @@ func TestMigrate_SquashedHistory(t *testing.T) {
 	admin, dbName := migrateTestDB(t)
 	ctx := context.Background()
 
-	if _, err := admin.Exec(ctx, `
+	if _, err := admin.Exec(ctx, fmt.Sprintf(`
 		CREATE EXTENSION IF NOT EXISTS pgcrypto;
 		CREATE TABLE roles (
 			name TEXT PRIMARY KEY,
@@ -165,8 +165,8 @@ func TestMigrate_SquashedHistory(t *testing.T) {
 		);
 		INSERT INTO users (name, username, email) VALUES ('legacy', 'legacy', 'legacy@example.com');
 		CREATE TABLE public.schema_migrations(version int4 not null primary key);
-		INSERT INTO public.schema_migrations(version) VALUES (3);
-	`); err != nil {
+		INSERT INTO public.schema_migrations(version) VALUES (%d);
+	`, latestMigrationVersion(t)+1)); err != nil {
 		t.Fatalf("simulating squashed history: %v", err)
 	}
 

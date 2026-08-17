@@ -37,9 +37,9 @@ func RotateSecrets(
 		if err != nil {
 			return fmt.Errorf("failed to get OIDC providers: %w", err)
 		}
-		saml, err := q.GetEncryptedSAMLKeys(ctx)
+		saml, err := q.GetEncryptedSAMLSPKey(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get SAML providers: %w", err)
+			return fmt.Errorf("failed to get SAML SP key: %w", err)
 		}
 		slog.Debug(
 			"fetched encrypted secrets",
@@ -48,7 +48,7 @@ func RotateSecrets(
 			"oidc",
 			len(oidc),
 			"saml",
-			len(saml),
+			len(saml.Bytes()),
 		)
 
 		// Re-encrypt CA private keys
@@ -75,18 +75,9 @@ func RotateSecrets(
 			}
 		}
 
-		// Re-encrypt SAML private keys
-		for _, provider := range saml {
-			if err := q.UpdateSAMLPrivateKey(ctx, &UpdateSAMLPrivateKeyParams{
-				WorkspaceID:  provider.WorkspaceID,
-				SpPrivateKey: provider.SpPrivateKey,
-			}); err != nil {
-				return fmt.Errorf(
-					"failed to update SAML provider %s: %w",
-					provider.WorkspaceID,
-					err,
-				)
-			}
+		// Re-encrypt the shared SAML SP private key
+		if err := q.UpdateSAMLSPPrivateKey(ctx, saml); err != nil {
+			return fmt.Errorf("failed to update SAML SP key: %w", err)
 		}
 
 		if err := finalize(ctx, q); err != nil {
@@ -94,8 +85,7 @@ func RotateSecrets(
 		}
 
 		slog.Info("re-encryption complete",
-			"cas", len(cas), "oidc", len(oidc),
-			"saml", len(saml))
+			"cas", len(cas), "oidc", len(oidc))
 		return nil
 	})
 }
