@@ -8,12 +8,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/pki"
 	"github.com/nokku-sh/nokku/internal/ssh"
-	"github.com/nokku-sh/nokku/internal/util"
 )
 
 func (c *Config) startBackgroundJobs(ctx context.Context) {
@@ -26,7 +24,6 @@ func (c *Config) startBackgroundJobs(ctx context.Context) {
 				return
 			case <-ticker.C:
 				c.rotateCerts(ctx)
-				c.rotateSAMLCerts(ctx)
 				c.cleanupUnverifiedUsers(ctx)
 			}
 		}
@@ -128,31 +125,5 @@ func (c *Config) rotateCerts(ctx context.Context) {
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		slog.Error("ca rotation failed", "error", err)
-	}
-}
-
-func (c *Config) rotateSAMLCerts(ctx context.Context) {
-	err := c.Conn.WithTx(ctx, func(q *db.Queries) error {
-		sp, err := q.GetExpiringSAMLProviderForUpdate(ctx)
-		if err != nil {
-			return err
-		}
-
-		samlKeyPair, err := util.CreateSAMLKeyPair(sp.WorkspaceID)
-		if err != nil {
-			return err
-		}
-
-		_, err = q.UpdateSAMLProvider(ctx, &db.UpdateSAMLProviderParams{
-			WorkspaceID:     sp.WorkspaceID,
-			SpPrivateKey:    crypto.EncryptedBytes(samlKeyPair.PrivateKey),
-			SpCertificate:   &samlKeyPair.Certificate,
-			SpCertExpiresAt: &samlKeyPair.ExpiresAt,
-		})
-
-		return err
-	})
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		slog.Error("saml cert rotation failed", "error", err)
 	}
 }
