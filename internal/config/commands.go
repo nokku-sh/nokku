@@ -5,7 +5,6 @@ import (
 
 	"github.com/caarlos0/env/v11"
 
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
@@ -30,18 +29,16 @@ func (c *Config) BootstrapAdmin(ctx context.Context) error {
 		return nil // User already exists, ignore
 	}
 
-	hash, err := crypto.HashPassword(cfg.Password)
+	admin, err := c.Conn.Q.CreateUser(ctx, &db.CreateUserParams{
+		Name:     cfg.Name,
+		Username: cfg.Username,
+		Email:    cfg.Email,
+	})
 	if err != nil {
 		return err
 	}
 
-	admin, err := c.Conn.Q.CreateUser(ctx, &db.CreateUserParams{
-		Name:         cfg.Name,
-		Username:     cfg.Username,
-		Email:        cfg.Email,
-		PasswordHash: hash,
-	})
-	if err != nil {
+	if err := c.Auth.Passwords.SetPassword(ctx, "", admin.ID, cfg.Password); err != nil {
 		return err
 	}
 

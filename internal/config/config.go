@@ -11,7 +11,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/nokku-sh/nokku/internal/audit"
-	"github.com/nokku-sh/nokku/internal/authn"
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/crypto"
@@ -25,12 +25,13 @@ import (
 )
 
 type EnvConfig struct {
-	BaseURL        string `env:"NOKKU_BASE_URL"        envDefault:"http://localhost"`
-	Port           string `env:"NOKKU_PORT"            envDefault:"3000"`
-	Secret         string `env:"NOKKU_SECRET"`
-	Debug          bool
-	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
-	AllowedOrigins []string `env:"NOKKU_ALLOWED_ORIGINS"`
+	BaseURL         string `env:"NOKKU_BASE_URL"          envDefault:"http://localhost"`
+	Port            string `env:"NOKKU_PORT"              envDefault:"3000"`
+	Secret          string `env:"NOKKU_SECRET"`
+	DPoPNonceSecret string `env:"NOKKU_DPOP_NONCE_SECRET"`
+	Debug           bool
+	TrustedProxies  []string `env:"NOKKU_TRUSTED_PROXIES"`
+	AllowedOrigins  []string `env:"NOKKU_ALLOWED_ORIGINS"`
 
 	// OAuth configuration
 	GoogleClientID     string `env:"GOOGLE_CLIENT_ID"`
@@ -43,7 +44,7 @@ type Config struct {
 	EnvConfig
 
 	Conn    *db.Connection
-	Authn   *authn.Service
+	Auth    *auth.Service
 	Audit   *audit.Service
 	Email   *email.Service
 	Pool    *daemon.Pool
@@ -78,7 +79,17 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 	cfg.Pool = daemon.New(ctx, cfg.Conn)
-	cfg.Authn, err = authn.New(cfg.Conn)
+	nonceSecret := []byte(cfg.DPoPNonceSecret)
+	if len(nonceSecret) == 0 {
+		nonceSecret = []byte(cfg.Secret)
+	}
+	cfg.Auth, err = auth.NewService(cfg.Conn, nonceSecret, auth.SSOConfig{
+		GoogleClientID:     cfg.GoogleClientID,
+		GoogleClientSecret: cfg.GoogleClientSecret,
+		GitHubClientID:     cfg.GitHubClientID,
+		GitHubClientSecret: cfg.GitHubClientSecret,
+		RedirectBase:       cfg.FullURL(),
+	})
 	if err != nil {
 		return nil, err
 	}
