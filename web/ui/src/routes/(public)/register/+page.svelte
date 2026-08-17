@@ -172,7 +172,7 @@
 			<Button
 				type="button"
 				variant="secondary"
-				onclick={() => (window.location.href = '/oauth/login')}
+				onclick={() => (window.location.href = '/oauth/login?provider=github')}
 				disabled={register.isPending || isPasskeySignup}
 			>
 				<GitHubIcon class="size-5" />
