@@ -36,19 +36,13 @@ var (
 func (s *Store) CreateUser(ctx context.Context, _ kagi.TenantID, u kagi.User) (kagi.User, error) {
 	row, err := s.conn.Q.CreateUser(ctx, &db.CreateUserParams{
 		Name:     u.DisplayName,
-		Username: usernameFromEmail(u.Email),
+		Username: UsernameFromEmail(u.Email),
 		Email:    u.Email,
 	})
 	if err != nil {
 		return kagi.User{}, err
 	}
 	return kagiUser(row), nil
-}
-
-// UsernameFromEmail derives a username from an email's local part. nokku does
-// not use usernames for login (email is the identity), but the column exists.
-func UsernameFromEmail(email string) string {
-	return usernameFromEmail(email)
 }
 
 // DeleteProviderCredentials deletes every credential of the given type and
@@ -411,7 +405,7 @@ func timePtr(t time.Time) *time.Time {
 	return &t
 }
 
-func usernameFromEmail(email string) string {
+func UsernameFromEmail(email string) string {
 	local, _, ok := strings.Cut(email, "@")
 	if !ok {
 		local = email
