@@ -91,10 +91,6 @@ var (
 		connect.CodeAlreadyExists,
 		errors.New("an account with this email already exists"),
 	)
-	ErrBackupCodeInvalid = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("invalid or already used backup code"),
-	)
 	ErrPasswordMismatch = connect.NewError(
 		connect.CodeInvalidArgument,
 		errors.New("the password you entered is incorrect"),

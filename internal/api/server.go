@@ -125,9 +125,9 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 	interceptors := []connect.Interceptor{
 		NewLogInterceptor(s.cfg.Debug),
 		NewTimeoutInterceptor(),
-		NewAuthNInterceptor(s.cfg),
+		NewKagiAuthNInterceptor(s.cfg),
+		NewActorInterceptor(s.cfg),
 		NewAuthZInterceptor(s.cfg),
-		NewRateLimitInterceptor(),
 		NewAuditInterceptor(s.cfg.Audit),
 		validate.NewInterceptor(),
 	}
@@ -160,12 +160,6 @@ func (s *Server) getServiceRegistrations(ctx context.Context) []ServiceRegistrat
 		Name    string
 		Handler func() (string, http.Handler)
 	}{
-		{
-			Name: nokkuv1connect.AuthServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewAuthServiceHandler(NewAuthService(s.cfg), opts...)
-			},
-		},
 		{
 			Name: nokkuv1connect.UserServiceName,
 			Handler: func() (string, http.Handler) {
@@ -347,48 +341,85 @@ func (s *Server) registerServices(ctx context.Context) error {
 		staticHandler.ServeHTTP(w, r)
 	})
 
-	auth := NewAuthNInterceptor(s.cfg)
 	audit := NewAuditInterceptor(s.cfg.Audit)
 
-	pubChain := NewChain(audit.WithAudit)                 // Public chain (audit only, no auth)
-	privChain := NewChain(audit.WithAudit, auth.WithAuth) // Private chain (audit + auth)
+	pubChain := NewChain(audit.WithAudit)                      // Public chain (audit only, no auth)
+	privChain := NewChain(audit.WithAudit, NewHTTPAuth(s.cfg)) // Private chain (audit + auth)
+	// Optional auth: a session is attached when present, but the route is
+	// never rejected. Login routes use it so SSO can link to a signed-in user.
+	linkChain := NewChain(audit.WithAudit, s.cfg.Auth.Kagi.Middleware)
 
 	// OAuth handler (public, OAuth2: github)
-	oauthHandler := NewOAuthHandler(s.cfg)
-	s.mux.Handle("/oauth/login", pubChain.ThenFunc(oauthHandler.LoginHandler))
-	s.mux.Handle("/oauth/callback", pubChain.ThenFunc(oauthHandler.CallbackHandler))
+	oauthHandler, err := NewOAuthHandler(s.cfg)
+	if err != nil {
+		return err
+	}
+	s.mux.Handle("/oauth/login", linkChain.ThenFunc(oauthHandler.Login))
+	s.mux.Handle("/oauth/callback", pubChain.ThenFunc(oauthHandler.Callback))
 
 	// OIDC handler (public, OpenID Connect: google + enterprise)
-	oidcHandler := NewOIDCHandler(s.cfg)
-	s.mux.Handle("/oidc/login", pubChain.ThenFunc(oidcHandler.LoginHandler))
-	s.mux.Handle("/oidc/callback", pubChain.ThenFunc(oidcHandler.CallbackHandler))
+	oidcHandler, err := NewOIDCHandler(s.cfg)
+	if err != nil {
+		return err
+	}
+	s.mux.Handle("/oidc/login", linkChain.ThenFunc(oidcHandler.Login))
+	s.mux.Handle("/oidc/callback", pubChain.ThenFunc(oidcHandler.Callback))
 
-	// SAML handlers (public)
-	samlHandler := NewSAMLHandler(s.cfg)
-	s.mux.Handle("/saml/login", pubChain.ThenFunc(samlHandler.LoginHandler))
-	s.mux.Handle("POST /saml/acs", pubChain.ThenFunc(samlHandler.CallbackHandler))
-	s.mux.HandleFunc("/saml/metadata/{id}", samlHandler.MetadataHandler)
-	s.mux.HandleFunc("/saml/certificate/{id}", samlHandler.CertificateHandler)
+	// SAML handlers (public; one shared SP for all workspaces)
+	samlHandler, err := NewSAMLHandler(s.cfg)
+	if err != nil {
+		return err
+	}
+	s.mux.Handle("/saml/login", linkChain.ThenFunc(samlHandler.Login))
+	s.mux.Handle("POST /saml/acs", pubChain.ThenFunc(samlHandler.Callback))
+	s.mux.HandleFunc("/saml/metadata", samlHandler.Metadata)
+	s.mux.HandleFunc("/saml/certificate", samlHandler.Certificate)
 
 	// Passkey handlers
-	passkeyHandler, err := NewPasskeyService(s.cfg)
+	passkeys, err := NewPasskeys(s.cfg)
 	if err != nil {
 		return err
 	}
 	s.mux.Handle(
 		"POST /passkey/register/begin",
-		privChain.ThenFunc(passkeyHandler.BeginRegistration),
+		privChain.ThenFunc(passkeys.Register.BeginRegistration),
 	)
 	s.mux.Handle(
 		"POST /passkey/register/finish",
-		privChain.ThenFunc(passkeyHandler.FinishRegistration),
+		privChain.ThenFunc(passkeys.Register.FinishRegistration),
 	)
-	s.mux.Handle("POST /passkey/login/begin", pubChain.ThenFunc(passkeyHandler.BeginLogin))
-	s.mux.Handle("POST /passkey/login/finish", pubChain.ThenFunc(passkeyHandler.FinishLogin))
+	s.mux.Handle("POST /passkey/login/begin", pubChain.ThenFunc(passkeys.Login.BeginLogin))
+	s.mux.Handle("POST /passkey/login/finish", pubChain.ThenFunc(passkeys.Login.FinishLogin))
 
 	// Passkey signup (public, no auth, creates new users)
-	s.mux.Handle("POST /passkey/signup/begin", pubChain.ThenFunc(passkeyHandler.BeginSignup))
-	s.mux.Handle("POST /passkey/signup/finish", pubChain.ThenFunc(passkeyHandler.FinishSignup))
+	s.mux.Handle("POST /passkey/signup/begin", pubChain.ThenFunc(passkeys.Signup.BeginRegistration))
+	s.mux.Handle(
+		"POST /passkey/signup/finish",
+		pubChain.ThenFunc(passkeys.Signup.FinishRegistration),
+	)
+
+	// Device flow (RFC 8628): a CLI asks for a code, the user approves it in
+	// the browser, and the CLI polls for a DPoP-bound kagi session.
+	devices, err := NewDeviceFlow(s.cfg)
+	if err != nil {
+		return err
+	}
+	s.mux.HandleFunc("/auth/device", devices.Begin)
+	s.mux.Handle("POST /auth/device/verify", privChain.ThenFunc(devices.Verify))
+	s.mux.HandleFunc("/auth/device/token", devices.Poll)
+	s.mux.HandleFunc("/auth/nonce", devices.Nonce)
+
+	// Credential auth flows (password, backup code, registration, logout,
+	// email verification/reset) are plain HTTP handlers, not connectrpc RPCs.
+	authChain := NewChain(audit.WithAudit)
+	s.mux.Handle("POST /auth/login", authChain.ThenFunc(s.handleLogin))
+	s.mux.Handle("POST /auth/login/backup-code", authChain.ThenFunc(s.handleLoginWithBackupCode))
+	s.mux.Handle("POST /auth/register", authChain.ThenFunc(s.handleRegister))
+	s.mux.Handle("POST /auth/logout", authChain.ThenFunc(s.handleLogout))
+	s.mux.Handle("POST /auth/forgot-password", authChain.ThenFunc(s.handleForgotPassword))
+	s.mux.Handle("POST /auth/reset-password", authChain.ThenFunc(s.handleResetPassword))
+	s.mux.Handle("POST /auth/verify-email", authChain.ThenFunc(s.handleVerifyEmail))
+	s.mux.Handle("POST /auth/resend-verification", authChain.ThenFunc(s.handleResendVerification))
 
 	// Avatar handlers
 	s.mux.Handle("GET /avatars/{id}", pubChain.ThenFunc(ServeAvatar(s.cfg)))

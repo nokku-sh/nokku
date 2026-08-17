@@ -6,9 +6,10 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/mizuchilabs/kagi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/nokku-sh/nokku/internal/authn"
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -28,13 +29,32 @@ func (s *UserService) Whoami(
 	ctx context.Context,
 	_ *nokkuv1.WhoamiRequest,
 ) (*nokkuv1.WhoamiResponse, error) {
-	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
-	if err != nil {
-		return nil, DBError(err)
+	actor := meta.ActorFromContext(ctx)
+	//nolint:exhaustive // daemon actors never call Whoami; treat them as users
+	switch actor.Type {
+	case meta.ActorTypeServiceAccount:
+		var result *db.ServiceAccount
+		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+			result, err = q.GetServiceAccount(ctx, actor.ID)
+			return err
+		}); err != nil {
+			return nil, DBError(err)
+		}
+		if result == nil {
+			return nil, ErrNotFound
+		}
+		return &nokkuv1.WhoamiResponse{
+			ServiceAccount: result.ToProto(),
+		}, nil
+	default:
+		user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
+		if err != nil {
+			return nil, DBError(err)
+		}
+		return &nokkuv1.WhoamiResponse{
+			User: user.ToProto(),
+		}, nil
 	}
-	return &nokkuv1.WhoamiResponse{
-		User: user.ToProto(),
-	}, nil
 }
 
 func (s *UserService) UpdateProfile(
@@ -63,12 +83,7 @@ func (s *UserService) UpdateProfile(
 
 	// Send verification email
 	if req.Email != nil && user.Email != req.GetEmail() {
-		token, err := s.cfg.Authn.CreateToken(&authn.TokenParams{
-			UserID:    user.ID,
-			Email:     req.GetEmail(),
-			Username:  user.Username,
-			TokenType: authn.VerifyToken,
-		})
+		token, err := s.cfg.Auth.Tokens.Issue(ctx, user.ID, auth.PurposeVerify)
 		if err != nil {
 			return nil, DBError(err)
 		}
@@ -79,7 +94,7 @@ func (s *UserService) UpdateProfile(
 			user.ID,
 			req.GetEmail(),
 			verifyURL,
-			authn.GetExpiry(authn.VerifyToken),
+			oneTimeTokenTTL.String(),
 		); err != nil {
 			return nil, ErrRateLimited
 		}
@@ -139,40 +154,27 @@ func (s *UserService) DeleteAccount(
 	return &nokkuv1.DeleteAccountResponse{}, nil
 }
 
-func (s *UserService) ListUserDevices(
-	ctx context.Context,
-	_ *nokkuv1.ListUserDevicesRequest,
-) (*nokkuv1.ListUserDevicesResponse, error) {
-	devices, err := s.cfg.Conn.Q.ListUserDevices(ctx, meta.UserIDFromContext(ctx))
-	if err != nil {
-		return nil, DBError(err)
-	}
-	return &nokkuv1.ListUserDevicesResponse{
-		Devices: db.UserDevicesToProto(devices),
-	}, nil
-}
-
 func (s *UserService) ListLinkedAccounts(
 	ctx context.Context,
 	_ *nokkuv1.ListLinkedAccountsRequest,
 ) (*nokkuv1.ListLinkedAccountsResponse, error) {
-	identities, err := s.cfg.Conn.Q.GetUserIdentitiesByUserID(ctx, meta.UserIDFromContext(ctx))
-	if err != nil {
-		return nil, DBError(err)
-	}
+	userID := meta.UserIDFromContext(ctx)
 
-	accounts := make([]*nokkuv1.OAuthIdentity, 0, len(identities))
-	for _, id := range identities {
-		accounts = append(accounts, &nokkuv1.OAuthIdentity{
-			Provider:         new(id.Provider),
-			ProviderId:       new(id.ProviderID),
-			Protocol:         new(id.Protocol),
-			ProviderEmail:    id.ProviderEmail,
-			ProviderUsername: id.ProviderUsername,
-			CreatedAt:        timestamppb.New(id.CreatedAt),
-		})
+	var accounts []*nokkuv1.OAuthIdentity
+	for _, typ := range []kagi.CredentialType{kagi.CredentialOIDC, kagi.CredentialOAuth2, kagi.CredentialSAML} {
+		creds, err := s.cfg.Auth.Store.ListCredentials(ctx, "", userID, typ)
+		if err != nil {
+			return nil, DBError(err)
+		}
+		for _, c := range creds {
+			accounts = append(accounts, &nokkuv1.OAuthIdentity{
+				Provider:   new(c.Provider),
+				ProviderId: new(c.Subject),
+				Protocol:   new(protocolFromType(c.Type)),
+				CreatedAt:  timestamppb.New(c.CreatedAt),
+			})
+		}
 	}
-
 	return &nokkuv1.ListLinkedAccountsResponse{Accounts: accounts}, nil
 }
 
@@ -191,35 +193,71 @@ func (s *UserService) UnlinkAccount(
 		)
 	}
 
-	user, err := s.cfg.Conn.Q.GetUserByID(ctx, userID)
-	if err != nil {
-		return nil, DBError(err)
-	}
-
-	identities, err := s.cfg.Conn.Q.GetUserIdentitiesByUserID(ctx, userID)
-	if err != nil {
-		return nil, DBError(err)
-	}
-
-	// Prevent losing the last login method
-	if len(identities) <= 1 && user.PasswordHash == "" {
-		passkeys, err := s.cfg.Conn.Q.GetPasskeysByUserID(ctx, userID)
-		if err != nil || len(passkeys) == 0 {
-			return nil, NewError(
-				connect.CodeFailedPrecondition,
-				"set a password or add a passkey before unlinking your last account",
-			)
+	var linked []kagi.Credential
+	for _, typ := range []kagi.CredentialType{kagi.CredentialOIDC, kagi.CredentialOAuth2} {
+		creds, err := s.cfg.Auth.Store.ListCredentials(ctx, "", userID, typ)
+		if err != nil {
+			return nil, DBError(err)
+		}
+		for _, c := range creds {
+			if c.Provider == req.GetProvider() {
+				linked = append(linked, c)
+			}
 		}
 	}
 
-	if err := s.cfg.Conn.Q.DeleteUserIdentityByUser(ctx, &db.DeleteUserIdentityByUserParams{
-		UserID:   userID,
-		Provider: req.GetProvider(),
-	}); err != nil {
-		return nil, DBError(err)
+	// Prevent losing the last login method.
+	if len(linked) > 0 && !s.hasOtherLoginMethod(ctx, userID) {
+		return nil, NewError(
+			connect.CodeFailedPrecondition,
+			"set a password or add a passkey before unlinking your last account",
+		)
 	}
 
+	for _, c := range linked {
+		if err := s.cfg.Auth.Store.DeleteCredential(ctx, "", userID, c.ID); err != nil {
+			return nil, DBError(err)
+		}
+	}
 	return &nokkuv1.UnlinkAccountResponse{}, nil
+}
+
+// hasOtherLoginMethod reports whether the user keeps a password or a passkey
+// besides the identities being unlinked.
+func (s *UserService) hasOtherLoginMethod(ctx context.Context, userID string) bool {
+	if has, err := s.cfg.Auth.Passwords.HasPassword(ctx, "", userID); err == nil && has {
+		return true
+	}
+	if creds, err := s.cfg.Auth.Store.ListCredentials(
+		ctx,
+		"",
+		userID,
+		kagi.CredentialPasskey,
+	); err == nil &&
+		len(creds) > 0 {
+		return true
+	}
+	return false
+}
+
+// protocolFromType maps a kagi credential type to the OAuth protocol label.
+func protocolFromType(t kagi.CredentialType) string {
+	switch t {
+	case kagi.CredentialOIDC:
+		return "oidc"
+	case kagi.CredentialOAuth2:
+		return "oauth"
+	case kagi.CredentialSAML:
+		return "saml"
+	case kagi.CredentialPassword,
+		kagi.CredentialPasskey,
+		kagi.CredentialAPIKey,
+		kagi.CredentialKey,
+		kagi.CredentialBackupCode:
+		return string(t)
+	default:
+		return string(t)
+	}
 }
 
 func (s *UserService) SetEmailRecovery(
@@ -233,17 +271,4 @@ func (s *UserService) SetEmailRecovery(
 		return nil, DBError(err)
 	}
 	return &nokkuv1.SetEmailRecoveryResponse{}, nil
-}
-
-func (s *UserService) DeleteUserDevice(
-	ctx context.Context,
-	req *nokkuv1.DeleteUserDeviceRequest,
-) (*nokkuv1.DeleteUserDeviceResponse, error) {
-	if err := s.cfg.Conn.Q.DeleteUserDevice(ctx, &db.DeleteUserDeviceParams{
-		ID:     req.GetId(),
-		UserID: meta.UserIDFromContext(ctx),
-	}); err != nil {
-		return nil, DBError(err)
-	}
-	return &nokkuv1.DeleteUserDeviceResponse{}, nil
 }

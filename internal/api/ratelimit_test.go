@@ -10,8 +10,8 @@ func TestIsAPIRoute(t *testing.T) {
 		want bool
 	}{
 		// API routes are rate limited.
-		{"/nokku.v1.AuthService/Login", true},
-		{"/nokku.v1.AuthService/Register", true},
+		{"/nokku.v1.UserService/Whoami", true},
+		{"/nokku.v1.WorkspaceService/ListWorkspaces", true},
 		{"/grpc.health.v1.Health/Check", true},
 		{"/oauth/authorize", true},
 		{"/saml/acs", true},
