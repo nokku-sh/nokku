@@ -31,7 +31,7 @@ func TestWithActorUserPrincipal(t *testing.T) {
 	ctx := applyPrincipal(context.Background(), kagi.Principal{
 		SubjectID: "user-1",
 		Kind:      kagi.KindUser,
-	}, nil)
+	})
 
 	actor := meta.ActorFromContext(ctx)
 	if actor.ID != "user-1" || actor.Type != meta.ActorTypeUser {
@@ -47,7 +47,7 @@ func TestWithActorDaemonPrincipalPinsWorkspace(t *testing.T) {
 		SubjectID: "daemon-1",
 		Kind:      auth.KindDaemon,
 		TenantID:  "ws-1",
-	}, nil)
+	})
 
 	actor := meta.ActorFromContext(ctx)
 	if actor.ID != "daemon-1" || actor.Type != meta.ActorTypeDaemon {

@@ -38,7 +38,7 @@ func (c *Config) BootstrapAdmin(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.Auth.Passwords.SetPassword(ctx, "", admin.ID, cfg.Password); err != nil {
+	if err := c.Auth.SetPassword(ctx, admin.ID, cfg.Password); err != nil {
 		return err
 	}
 

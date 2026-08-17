@@ -16,18 +16,20 @@ import (
 	"github.com/nokku-sh/nokku/internal/email"
 )
 
-// Service is the kagi authentication engine wired for nokku: the service
-// itself plus the pieces the transport adapters need (session authenticator,
-// API-key manager, DPoP verifier, password manager, one-time tokens).
+// Service is the kagi authentication engine wired for nokku. It exposes the
+// kagi service itself (for the provider handlers and middleware) plus a
+// nokku-shaped facade: users and credentials are global, so the kagi tenant
+// parameter is elided from every method here. Only machine identities
+// (service accounts, daemons) are workspace-scoped, and those methods take an
+// explicit workspace id.
 type Service struct {
-	Kagi          *kagi.Service
-	Store         *Store
-	Authenticator *kagi.Authenticator
-	APIKeys       *apikey.Manager
-	DPoP          *dpop.Verifier
-	Passwords     *password.Manager
-	BackupCodes   *backupcode.Manager
-	Tokens        *Tokens
+	Kagi        *kagi.Service
+	store       *Store
+	apiKeys     *apikey.Manager
+	dpop        *dpop.Verifier
+	passwords   *password.Manager
+	backupCodes *backupcode.Manager
+	tokens      *Tokens
 }
 
 // NewService builds the kagi engine for nokku. nonceSecret keys the stateless
@@ -81,15 +83,170 @@ func NewService(conn *db.Connection, nonceSecret []byte, sso SSOConfig) (*Servic
 	}
 
 	return &Service{
-		Kagi:          kagiSvc,
-		Store:         store,
-		Authenticator: &kagi.Authenticator{Sessions: kagiSvc.Sessions, DPoP: dpopVerifier},
-		APIKeys:       apiKeys,
-		DPoP:          dpopVerifier,
-		Passwords:     password.New(kagiSvc, password.DefaultParams()),
-		BackupCodes:   backupcode.New(kagiSvc),
-		Tokens:        NewTokens(conn, 15*time.Minute),
+		Kagi:        kagiSvc,
+		store:       store,
+		apiKeys:     apiKeys,
+		dpop:        dpopVerifier,
+		passwords:   password.New(kagiSvc, password.DefaultParams()),
+		backupCodes: backupcode.New(kagiSvc),
+		tokens:      NewTokens(conn, 15*time.Minute),
 	}, nil
+}
+
+// Authenticator returns a session authenticator wired to the kagi service.
+func (s *Service) Authenticator() *kagi.Authenticator {
+	return s.Kagi.Authenticator()
+}
+
+// APIKeys returns the API-key manager, for the connectrpc authn interceptor.
+func (s *Service) APIKeys() *apikey.Manager {
+	return s.apiKeys
+}
+
+// DPoP returns the DPoP proof verifier, for handlers that verify a proof
+// outside the connectrpc interceptor (e.g. daemon enrollment).
+func (s *Service) DPoP() *dpop.Verifier {
+	return s.dpop
+}
+
+// --- Passwords (global users) -------------------------------------------------
+
+func (s *Service) CheckPassword(ctx context.Context, userID, pw string) error {
+	return s.passwords.CheckPassword(ctx, "", userID, pw)
+}
+
+func (s *Service) HasPassword(ctx context.Context, userID string) (bool, error) {
+	return s.passwords.HasPassword(ctx, "", userID)
+}
+
+func (s *Service) SetPassword(ctx context.Context, userID, pw string) error {
+	return s.passwords.SetPassword(ctx, "", userID, pw)
+}
+
+func (s *Service) DeletePassword(ctx context.Context, userID string) error {
+	return s.passwords.DeletePassword(ctx, "", userID)
+}
+
+func (s *Service) Register(ctx context.Context, email, name, pw string) (kagi.User, error) {
+	return s.passwords.Register(ctx, "", email, name, pw)
+}
+
+// --- Backup codes (global users) ----------------------------------------------
+
+func (s *Service) ConsumeBackupCode(ctx context.Context, userID, code string) (kagi.User, error) {
+	return s.backupCodes.Consume(ctx, "", userID, code)
+}
+
+func (s *Service) GenerateBackupCodes(ctx context.Context, userID string, n int) ([]string, error) {
+	return s.backupCodes.GenerateCodes(ctx, "", userID, n)
+}
+
+func (s *Service) ListBackupCodes(ctx context.Context, userID string) ([]kagi.Credential, error) {
+	return s.backupCodes.List(ctx, "", userID)
+}
+
+func (s *Service) DeleteBackupCodes(ctx context.Context, userID string) error {
+	return s.backupCodes.Delete(ctx, "", userID)
+}
+
+// --- Credentials (global users) ------------------------------------------------
+
+func (s *Service) ListCredentials(
+	ctx context.Context,
+	userID string,
+	typ kagi.CredentialType,
+) ([]kagi.Credential, error) {
+	return s.store.ListCredentials(ctx, "", userID, typ)
+}
+
+func (s *Service) GetCredential(ctx context.Context, userID, id string) (kagi.Credential, error) {
+	return s.store.GetCredential(ctx, "", userID, id)
+}
+
+func (s *Service) PutCredential(ctx context.Context, c kagi.Credential) error {
+	return s.store.PutCredential(ctx, "", c)
+}
+
+func (s *Service) DeleteCredential(ctx context.Context, userID, id string) error {
+	return s.store.DeleteCredential(ctx, "", userID, id)
+}
+
+func (s *Service) GetUser(ctx context.Context, userID string) (kagi.User, error) {
+	return s.store.GetUser(ctx, "", userID)
+}
+
+func (s *Service) GetUserByEmail(ctx context.Context, email string) (kagi.User, error) {
+	return s.store.GetUserByEmail(ctx, "", email)
+}
+
+func (s *Service) CreateUser(ctx context.Context, u kagi.User) (kagi.User, error) {
+	return s.store.CreateUser(ctx, "", u)
+}
+
+func (s *Service) DeleteProviderCredentials(
+	ctx context.Context,
+	provider string,
+	typ kagi.CredentialType,
+) error {
+	return s.store.DeleteProviderCredentials(ctx, provider, typ)
+}
+
+// --- One-time tokens -----------------------------------------------------------
+
+func (s *Service) IssueToken(
+	ctx context.Context,
+	userID string,
+	purpose TokenPurpose,
+) (string, error) {
+	return s.tokens.Issue(ctx, userID, purpose)
+}
+
+func (s *Service) ConsumeToken(ctx context.Context, raw string) (string, TokenPurpose, error) {
+	return s.tokens.Consume(ctx, raw)
+}
+
+// --- API keys (workspace-scoped machine identities) ----------------------------
+
+// IssueServiceAccountKey mints a workspace-scoped API key acting as the service
+// account. A non-positive ttl issues a key that never expires.
+func (s *Service) IssueServiceAccountKey(
+	ctx context.Context,
+	workspaceID, serviceAccountID, name string,
+	ttl time.Duration,
+) (kagi.APIKey, error) {
+	return s.apiKeys.Issue(
+		ctx,
+		kagi.TenantID(workspaceID),
+		serviceAccountID,
+		KindServiceAccount,
+		name,
+		nil,
+		ttl,
+	)
+}
+
+func (s *Service) RevokeServiceAccountKeys(
+	ctx context.Context,
+	workspaceID, serviceAccountID string,
+) error {
+	return s.apiKeys.RevokeAll(ctx, kagi.TenantID(workspaceID), serviceAccountID)
+}
+
+// --- Sessions ------------------------------------------------------------------
+
+// IssueUserSession issues a kagi session for a global user and sets the
+// session cookie.
+func (s *Service) IssueUserSession(
+	ctx context.Context,
+	w http.ResponseWriter,
+	u kagi.User,
+	m kagi.Method,
+) (kagi.Session, error) {
+	return s.Kagi.IssueSession(ctx, w, "", u, m)
+}
+
+func (s *Service) ClearSession(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	s.Kagi.Sessions.ClearSession(ctx, w, r)
 }
 
 // resolveTenant maps a request to a kagi tenant. nokku's users, credentials,

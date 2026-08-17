@@ -75,7 +75,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeAuthError(w, err)
 		return
 	}
-	if err := s.cfg.Auth.Passwords.CheckPassword(ctx, "", user.ID, req.Password); err != nil {
+	if err := s.cfg.Auth.CheckPassword(ctx, user.ID, req.Password); err != nil {
 		writeAuthError(w, ErrBadCredentials)
 		return
 	}
@@ -105,7 +105,7 @@ func (s *Server) handleLoginWithBackupCode(w http.ResponseWriter, r *http.Reques
 		writeAuthError(w, err)
 		return
 	}
-	if _, err := s.cfg.Auth.BackupCodes.Consume(ctx, "", user.ID, req.Code); err != nil {
+	if _, err := s.cfg.Auth.ConsumeBackupCode(ctx, user.ID, req.Code); err != nil {
 		writeAuthError(w, ErrBadCredentials)
 		return
 	}
@@ -157,13 +157,13 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if name == "" {
 		name = auth.UsernameFromEmail(req.Email)
 	}
-	user, err := s.cfg.Auth.Passwords.Register(ctx, "", req.Email, name, req.Password)
+	user, err := s.cfg.Auth.Register(ctx, req.Email, name, req.Password)
 	if err != nil {
 		writeAuthError(w, ErrInternal)
 		return
 	}
 
-	token, err := s.cfg.Auth.Tokens.Issue(ctx, user.ID, auth.PurposeVerify)
+	token, err := s.cfg.Auth.IssueToken(ctx, user.ID, auth.PurposeVerify)
 	if err != nil {
 		writeAuthError(w, ErrInternal)
 		return
@@ -180,7 +180,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	s.cfg.Auth.Kagi.Sessions.ClearSession(r.Context(), w, r)
+	s.cfg.Auth.ClearSession(r.Context(), w, r)
 	writeJSONOK(w)
 }
 
@@ -199,7 +199,7 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := s.cfg.Auth.Tokens.Issue(ctx, user.ID, auth.PurposeReset)
+	token, err := s.cfg.Auth.IssueToken(ctx, user.ID, auth.PurposeReset)
 	if err != nil {
 		writeAuthError(w, ErrInternal)
 		return
@@ -228,7 +228,7 @@ func (s *Server) handleResendVerification(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	token, err := s.cfg.Auth.Tokens.Issue(ctx, user.ID, auth.PurposeVerify)
+	token, err := s.cfg.Auth.IssueToken(ctx, user.ID, auth.PurposeVerify)
 	if err != nil {
 		writeAuthError(w, ErrInternal)
 		return
@@ -250,7 +250,7 @@ func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 
-	userID, purpose, err := s.cfg.Auth.Tokens.Consume(ctx, req.Token)
+	userID, purpose, err := s.cfg.Auth.ConsumeToken(ctx, req.Token)
 	if err != nil || purpose != auth.PurposeVerify {
 		writeAuthError(w, ErrTokenInvalid)
 		return
@@ -280,12 +280,12 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 
-	userID, purpose, err := s.cfg.Auth.Tokens.Consume(ctx, req.Token)
+	userID, purpose, err := s.cfg.Auth.ConsumeToken(ctx, req.Token)
 	if err != nil || purpose != auth.PurposeReset {
 		writeAuthError(w, ErrTokenInvalid)
 		return
 	}
-	if err := s.cfg.Auth.Passwords.SetPassword(ctx, "", userID, req.NewPassword); err != nil {
+	if err := s.cfg.Auth.SetPassword(ctx, userID, req.NewPassword); err != nil {
 		writeAuthError(w, ErrInternal)
 		return
 	}
@@ -302,10 +302,9 @@ func (s *Server) issueSession(
 	user *db.User,
 	method kagi.Method,
 ) error {
-	_, err := s.cfg.Auth.Kagi.Sessions.Issue(
+	_, err := s.cfg.Auth.IssueUserSession(
 		r.Context(),
 		w,
-		"",
 		kagi.User{ID: user.ID, Email: user.Email, DisplayName: user.Name},
 		method,
 	)

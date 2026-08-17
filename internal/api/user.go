@@ -83,7 +83,7 @@ func (s *UserService) UpdateProfile(
 
 	// Send verification email
 	if req.Email != nil && user.Email != req.GetEmail() {
-		token, err := s.cfg.Auth.Tokens.Issue(ctx, user.ID, auth.PurposeVerify)
+		token, err := s.cfg.Auth.IssueToken(ctx, user.ID, auth.PurposeVerify)
 		if err != nil {
 			return nil, DBError(err)
 		}
@@ -162,7 +162,7 @@ func (s *UserService) ListLinkedAccounts(
 
 	var accounts []*nokkuv1.OAuthIdentity
 	for _, typ := range []kagi.CredentialType{kagi.CredentialOIDC, kagi.CredentialOAuth2, kagi.CredentialSAML} {
-		creds, err := s.cfg.Auth.Store.ListCredentials(ctx, "", userID, typ)
+		creds, err := s.cfg.Auth.ListCredentials(ctx, userID, typ)
 		if err != nil {
 			return nil, DBError(err)
 		}
@@ -195,7 +195,7 @@ func (s *UserService) UnlinkAccount(
 
 	var linked []kagi.Credential
 	for _, typ := range []kagi.CredentialType{kagi.CredentialOIDC, kagi.CredentialOAuth2} {
-		creds, err := s.cfg.Auth.Store.ListCredentials(ctx, "", userID, typ)
+		creds, err := s.cfg.Auth.ListCredentials(ctx, userID, typ)
 		if err != nil {
 			return nil, DBError(err)
 		}
@@ -215,7 +215,7 @@ func (s *UserService) UnlinkAccount(
 	}
 
 	for _, c := range linked {
-		if err := s.cfg.Auth.Store.DeleteCredential(ctx, "", userID, c.ID); err != nil {
+		if err := s.cfg.Auth.DeleteCredential(ctx, userID, c.ID); err != nil {
 			return nil, DBError(err)
 		}
 	}
@@ -225,12 +225,11 @@ func (s *UserService) UnlinkAccount(
 // hasOtherLoginMethod reports whether the user keeps a password or a passkey
 // besides the identities being unlinked.
 func (s *UserService) hasOtherLoginMethod(ctx context.Context, userID string) bool {
-	if has, err := s.cfg.Auth.Passwords.HasPassword(ctx, "", userID); err == nil && has {
+	if has, err := s.cfg.Auth.HasPassword(ctx, userID); err == nil && has {
 		return true
 	}
-	if creds, err := s.cfg.Auth.Store.ListCredentials(
+	if creds, err := s.cfg.Auth.ListCredentials(
 		ctx,
-		"",
 		userID,
 		kagi.CredentialPasskey,
 	); err == nil &&

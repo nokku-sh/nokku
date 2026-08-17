@@ -21,7 +21,7 @@ func NewDeviceFlow(cfg *config.Config) (*deviceauth.Handler, error) {
 	return deviceauth.New(cfg.Auth.Kagi, deviceauth.Options{
 		Cache:           cfg.Cache,
 		VerificationURI: cfg.FullURL() + "/device",
-		DPoP:            cfg.Auth.DPoP,
+		DPoP:            cfg.Auth.DPoP(),
 		Kind:            auth.KindDevice,
 		SessionTTL:      deviceSessionTTL,
 	})

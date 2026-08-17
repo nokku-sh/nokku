@@ -37,12 +37,11 @@ func (s *CredentialService) UpdatePassword(
 
 	// Users without a password (passkey/SSO-only accounts) have no current
 	// password to check, so verification is skipped for them.
-	if has, err := s.cfg.Auth.Passwords.HasPassword(ctx, "", user.ID); err != nil {
+	if has, err := s.cfg.Auth.HasPassword(ctx, user.ID); err != nil {
 		return nil, DBError(err)
 	} else if has {
-		if err := s.cfg.Auth.Passwords.CheckPassword(
+		if err := s.cfg.Auth.CheckPassword(
 			ctx,
-			"",
 			user.ID,
 			req.GetCurrentPassword(),
 		); err != nil {
@@ -50,7 +49,7 @@ func (s *CredentialService) UpdatePassword(
 		}
 	}
 
-	if err := s.cfg.Auth.Passwords.SetPassword(ctx, "", user.ID, req.GetNewPassword()); err != nil {
+	if err := s.cfg.Auth.SetPassword(ctx, user.ID, req.GetNewPassword()); err != nil {
 		return nil, ErrInternal
 	}
 	return &nokkuv1.UpdatePasswordResponse{}, nil
@@ -67,9 +66,8 @@ func (s *CredentialService) DeletePassword(
 	if err := checkSSOEnforced(ctx, s.cfg, user.Email); err != nil {
 		return nil, err
 	}
-	if err := s.cfg.Auth.Passwords.CheckPassword(
+	if err := s.cfg.Auth.CheckPassword(
 		ctx,
-		"",
 		user.ID,
 		req.GetCurrentPassword(),
 	); err != nil {
@@ -83,7 +81,7 @@ func (s *CredentialService) DeletePassword(
 		)
 	}
 
-	if err := s.cfg.Auth.Passwords.DeletePassword(ctx, "", user.ID); err != nil {
+	if err := s.cfg.Auth.DeletePassword(ctx, user.ID); err != nil {
 		return nil, DBError(err)
 	}
 	return &nokkuv1.DeletePasswordResponse{}, nil
@@ -93,9 +91,8 @@ func (s *CredentialService) ListPasskeys(
 	ctx context.Context,
 	_ *nokkuv1.ListPasskeysRequest,
 ) (*nokkuv1.ListPasskeysResponse, error) {
-	creds, err := s.cfg.Auth.Store.ListCredentials(
+	creds, err := s.cfg.Auth.ListCredentials(
 		ctx,
-		"",
 		meta.UserIDFromContext(ctx),
 		kagi.CredentialPasskey,
 	)
@@ -120,13 +117,13 @@ func (s *CredentialService) RenamePasskey(
 	req *nokkuv1.RenamePasskeyRequest,
 ) (*nokkuv1.RenamePasskeyResponse, error) {
 	userID := meta.UserIDFromContext(ctx)
-	cred, err := s.cfg.Auth.Store.GetCredential(ctx, "", userID, req.GetId())
+	cred, err := s.cfg.Auth.GetCredential(ctx, userID, req.GetId())
 	if err != nil || cred.Type != kagi.CredentialPasskey {
 		return nil, ErrNotFound
 	}
 	cred.Label = req.GetName()
 	cred.UpdatedAt = time.Now()
-	if err := s.cfg.Auth.Store.PutCredential(ctx, "", cred); err != nil {
+	if err := s.cfg.Auth.PutCredential(ctx, cred); err != nil {
 		return nil, DBError(err)
 	}
 	return &nokkuv1.RenamePasskeyResponse{}, nil
@@ -137,13 +134,13 @@ func (s *CredentialService) DeletePasskey(
 	req *nokkuv1.DeletePasskeyRequest,
 ) (*nokkuv1.DeletePasskeyResponse, error) {
 	userID := meta.UserIDFromContext(ctx)
-	cred, err := s.cfg.Auth.Store.GetCredential(ctx, "", userID, req.GetId())
+	cred, err := s.cfg.Auth.GetCredential(ctx, userID, req.GetId())
 	if err != nil || cred.Type != kagi.CredentialPasskey {
 		return nil, ErrNotFound
 	}
 
 	// Ensure the user keeps a password or a linked SSO account.
-	if has, err := s.cfg.Auth.Passwords.HasPassword(ctx, "", userID); err != nil {
+	if has, err := s.cfg.Auth.HasPassword(ctx, userID); err != nil {
 		return nil, DBError(err)
 	} else if !has && !s.hasLinkedAccount(ctx, userID) {
 		return nil, NewError(
@@ -152,7 +149,7 @@ func (s *CredentialService) DeletePasskey(
 		)
 	}
 
-	if err := s.cfg.Auth.Store.DeleteCredential(ctx, "", userID, req.GetId()); err != nil {
+	if err := s.cfg.Auth.DeleteCredential(ctx, userID, req.GetId()); err != nil {
 		return nil, DBError(err)
 	}
 	return &nokkuv1.DeletePasskeyResponse{}, nil
@@ -161,9 +158,8 @@ func (s *CredentialService) DeletePasskey(
 // hasOtherLoginMethod reports whether the user has any login method besides a
 // password: a passkey or a linked SSO account.
 func (s *CredentialService) hasOtherLoginMethod(ctx context.Context, userID string) bool {
-	if creds, err := s.cfg.Auth.Store.ListCredentials(
+	if creds, err := s.cfg.Auth.ListCredentials(
 		ctx,
-		"",
 		userID,
 		kagi.CredentialPasskey,
 	); err == nil &&
@@ -177,9 +173,8 @@ func (s *CredentialService) hasOtherLoginMethod(ctx context.Context, userID stri
 // identity.
 func (s *CredentialService) hasLinkedAccount(ctx context.Context, userID string) bool {
 	for _, typ := range []kagi.CredentialType{kagi.CredentialOIDC, kagi.CredentialOAuth2, kagi.CredentialSAML} {
-		if creds, err := s.cfg.Auth.Store.ListCredentials(
+		if creds, err := s.cfg.Auth.ListCredentials(
 			ctx,
-			"",
 			userID,
 			typ,
 		); err == nil &&
@@ -202,7 +197,7 @@ func (s *CredentialService) CreateBackupCodes(
 		return nil, err
 	}
 
-	codes, err := s.cfg.Auth.BackupCodes.GenerateCodes(ctx, "", user.ID, backupcode.DefaultCount)
+	codes, err := s.cfg.Auth.GenerateBackupCodes(ctx, user.ID, backupcode.DefaultCount)
 	if err != nil {
 		return nil, ErrInternal
 	}
@@ -214,7 +209,7 @@ func (s *CredentialService) ListBackupCodes(
 	ctx context.Context,
 	_ *nokkuv1.ListBackupCodesRequest,
 ) (*nokkuv1.ListBackupCodesResponse, error) {
-	creds, err := s.cfg.Auth.BackupCodes.List(ctx, "", meta.UserIDFromContext(ctx))
+	creds, err := s.cfg.Auth.ListBackupCodes(ctx, meta.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -233,7 +228,7 @@ func (s *CredentialService) DeleteBackupCodes(
 	ctx context.Context,
 	_ *nokkuv1.DeleteBackupCodesRequest,
 ) (*nokkuv1.DeleteBackupCodesResponse, error) {
-	if err := s.cfg.Auth.BackupCodes.Delete(ctx, "", meta.UserIDFromContext(ctx)); err != nil {
+	if err := s.cfg.Auth.DeleteBackupCodes(ctx, meta.UserIDFromContext(ctx)); err != nil {
 		return nil, DBError(err)
 	}
 	return &nokkuv1.DeleteBackupCodesResponse{}, nil
