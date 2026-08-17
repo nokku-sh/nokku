@@ -25,16 +25,23 @@ export const queryClient = new QueryClient({
 	},
 	queryCache: new QueryCache({
 		onError: (error, query) => {
-			if (!(error instanceof ConnectError) || error.code === Code.Unauthenticated) return;
+			if (!(error instanceof ConnectError)) return;
 
 			const key = query.queryKey[1] as { methodName?: string } | undefined;
 
-			// The account behind this session no longer exists (e.g. the
-			// database was restored). Treat it like an expired session.
-			if (key?.methodName === 'whoami' && error.code === Code.NotFound) {
+			// whoami is the canonical auth check: any failure means the session
+			// is gone (revoked, expired, or the server rotated its secrets and
+			// invalidated the cookie). Bounce back to /login instead of leaving
+			// a broken page behind.
+			if (
+				key?.methodName === 'whoami' &&
+				(error.code === Code.Unauthenticated || error.code === Code.NotFound)
+			) {
 				handleSessionExpired();
 				return;
 			}
+
+			if (error.code === Code.Unauthenticated) return;
 
 			// A persisted workspace id can outlive the workspace itself (deleted
 			// or membership revoked). Drop it silently and let the workspace list
@@ -83,11 +90,15 @@ export const queryClient = new QueryClient({
 
 let sessionExpiredAt = 0;
 
+// Public routes don't require a session; a failing whoami there is expected
+// and must not bounce the visitor to /login.
+const publicPaths = ['/login', '/register', '/verify', '/recovery', '/reset', '/device', '/auth-error'];
+
 // The session cookie is HttpOnly, so only the backend can clear it. On an
 // expired or revoked session the backend rejects with Unauthenticated; here we
 // reset local state, drop cached data and land on /login.
 function handleSessionExpired() {
-	if (!browser || window.location.pathname.startsWith('/login')) return;
+	if (!browser || publicPaths.some((p) => window.location.pathname.startsWith(p))) return;
 
 	const now = Date.now();
 	if (now - sessionExpiredAt < 5000) return; // dedupe concurrent failures
