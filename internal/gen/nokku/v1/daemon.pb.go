@@ -1201,8 +1201,6 @@ type EnrollDaemonRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Token         *string                `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
 	CaId          *string                `protobuf:"bytes,2,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
-	AuthMethod    *string                `protobuf:"bytes,3,opt,name=auth_method,json=authMethod" json:"auth_method,omitempty"`
-	AuthPubkey    *string                `protobuf:"bytes,4,opt,name=auth_pubkey,json=authPubkey" json:"auth_pubkey,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1251,27 +1249,17 @@ func (x *EnrollDaemonRequest) GetCaId() string {
 	return ""
 }
 
-func (x *EnrollDaemonRequest) GetAuthMethod() string {
-	if x != nil && x.AuthMethod != nil {
-		return *x.AuthMethod
-	}
-	return ""
-}
-
-func (x *EnrollDaemonRequest) GetAuthPubkey() string {
-	if x != nil && x.AuthPubkey != nil {
-		return *x.AuthPubkey
-	}
-	return ""
-}
-
 type EnrollDaemonResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	WorkspaceId   *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	TargetId      *string                `protobuf:"bytes,3,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
-	Status        *DaemonStatus          `protobuf:"varint,4,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
-	Config        *DaemonConfig          `protobuf:"bytes,5,opt,name=config" json:"config,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	WorkspaceId *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	TargetId    *string                `protobuf:"bytes,3,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
+	Status      *DaemonStatus          `protobuf:"varint,4,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
+	Config      *DaemonConfig          `protobuf:"bytes,5,opt,name=config" json:"config,omitempty"`
+	// access_token is the DPoP-bound, non-expiring session token the daemon
+	// uses for control-plane requests. It is returned once at enrollment and
+	// never stored server-side in the clear.
+	AccessToken   *string `protobuf:"bytes,6,opt,name=access_token,json=accessToken" json:"access_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1339,6 +1327,13 @@ func (x *EnrollDaemonResponse) GetConfig() *DaemonConfig {
 		return x.Config
 	}
 	return nil
+}
+
+func (x *EnrollDaemonResponse) GetAccessToken() string {
+	if x != nil && x.AccessToken != nil {
+		return *x.AccessToken
+	}
+	return ""
 }
 
 type PrincipalUsers struct {
@@ -2381,20 +2376,17 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\tdaemon_id\x18\x02 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\bdaemonId\x12*\n" +
 	"\n" +
 	"session_id\x18\x03 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\tsessionId\"\x16\n" +
-	"\x14CloseSessionResponse\"\x8b\x01\n" +
+	"\x14CloseSessionResponse\"I\n" +
 	"\x13EnrollDaemonRequest\x12\x1d\n" +
 	"\x05token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05token\x12\x13\n" +
-	"\x05ca_id\x18\x02 \x01(\tR\x04caId\x12\x1f\n" +
-	"\vauth_method\x18\x03 \x01(\tR\n" +
-	"authMethod\x12\x1f\n" +
-	"\vauth_pubkey\x18\x04 \x01(\tR\n" +
-	"authPubkey\"\xc6\x01\n" +
+	"\x05ca_id\x18\x02 \x01(\tR\x04caId\"\xe9\x01\n" +
 	"\x14EnrollDaemonResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x1b\n" +
 	"\ttarget_id\x18\x03 \x01(\tR\btargetId\x12.\n" +
 	"\x06status\x18\x04 \x01(\x0e2\x16.nokku.v1.DaemonStatusR\x06status\x12.\n" +
-	"\x06config\x18\x05 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\">\n" +
+	"\x06config\x18\x05 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\x12!\n" +
+	"\faccess_token\x18\x06 \x01(\tR\vaccessToken\">\n" +
 	"\x0ePrincipalUsers\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x10\n" +
 	"\x03ids\x18\x02 \x03(\tR\x03ids\"\xce\x01\n" +
