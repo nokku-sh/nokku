@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-08-18
+
+### Features
+
+- db: Add recordings table and queries
+- crypto: Add x25519 key parsing and fingerprinting
+- storage: Add streaming writes and prefix deletes
+- billing: Enforce recording storage quotas
+- api: Add recording upload and playback service
+- ui: Add recordings list, player, and key settings
+- workspaces: Store settings as jsonb and add daemon default config
+- db: Add kagi auth schema and queries
+- auth: Add kagi-backed auth service
+- api: Migrate auth flows to kagi
+- web: Migrate frontend auth to kagi flows
+
+### Bug Fixes
+
+- db: Default workspace settings to empty jsonb object
+- ui: Pass github as provider to oauth login links
+- ui: Treat any whoami failure as expired session
+
+### Refactoring
+
+- crypto: Drop argon2 hashing and token prefixes
+- auth: Delete legacy authn service and helpers
+- config: Wire kagi auth into app config
+- audit: Track new auth http routes
+- seed: Align seed with kagi auth
+- auth: Export username derivation helper
+- cache: Adopt kagi cache package and drop internal cache
+- auth: Rename authn_kagi files to authn
+- auth: Expose facade API on auth service
+
+### Documentation
+
+- auth: Add ADR for kagi auth refactor
+
+### Miscellaneous
+
+- ui: Bump svelte and protobuf dependencies
+- proto: Regenerate clients from local protos
+- go: Enable gofumpt and race-enabled tests
+
 ## [0.1.0] - 2026-08-14
 
 ### Features
