@@ -2,10 +2,9 @@
 WITH
   new_daemon AS (
     INSERT INTO
-      daemons (id, workspace_id, name, status, config, metadata)
+      daemons (workspace_id, name, status, config, metadata)
     VALUES
       (
-        @id,
         @workspace_id,
         @name,
         @status,

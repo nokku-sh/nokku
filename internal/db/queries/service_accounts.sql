@@ -1,9 +1,8 @@
 -- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (id, workspace_id, name, description, role_name, expires_at, tags)
+  service_accounts (workspace_id, name, description, role_name, expires_at, tags)
 VALUES
   (
-    @id,
     @workspace_id,
     @name,
     @description,

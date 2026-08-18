@@ -12,23 +12,21 @@ import (
 
 const createServiceAccount = `-- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (id, workspace_id, name, description, role_name, expires_at, tags)
+  service_accounts (workspace_id, name, description, role_name, expires_at, tags)
 VALUES
   (
     $1,
     $2,
     $3,
-    $4,
-    COALESCE($5::TEXT, 'viewer'),
-    $6,
-    COALESCE($7, '{}'::TEXT[])
+    COALESCE($4::TEXT, 'viewer'),
+    $5,
+    COALESCE($6, '{}'::TEXT[])
   )
 RETURNING
   id, workspace_id, name, description, role_name, last_used_at, expires_at, tags, created_at, updated_at
 `
 
 type CreateServiceAccountParams struct {
-	ID          string      `json:"id"`
 	WorkspaceID string      `json:"workspaceId"`
 	Name        string      `json:"name"`
 	Description *string     `json:"description"`
@@ -39,7 +37,6 @@ type CreateServiceAccountParams struct {
 
 func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (*ServiceAccount, error) {
 	row := q.db.QueryRow(ctx, createServiceAccount,
-		arg.ID,
 		arg.WorkspaceID,
 		arg.Name,
 		arg.Description,
