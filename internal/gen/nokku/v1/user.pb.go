@@ -237,16 +237,9 @@ func (*WhoamiRequest) Descriptor() ([]byte, []int) {
 }
 
 type WhoamiResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// user is set when the caller authenticated as a human user (the normal
-	// browser case). It is unset for machine principals (service accounts),
-	// which read service_account instead.
-	User *User `protobuf:"bytes,1,opt,name=user" json:"user,omitempty"`
-	// service_account is set when the caller authenticated with a
-	// service-account API key. It carries the subject's identity and its
-	// pinned workspace, so headless clients (nk --token) can discover who
-	// they are without parsing the token.
-	ServiceAccount *ServiceAccount `protobuf:"bytes,2,opt,name=service_account,json=serviceAccount" json:"service_account,omitempty"`
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	User           *User                  `protobuf:"bytes,1,opt,name=user" json:"user,omitempty"`
+	ServiceAccount *ServiceAccount        `protobuf:"bytes,2,opt,name=service_account,json=serviceAccount" json:"service_account,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
