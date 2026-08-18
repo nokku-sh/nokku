@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
+	"strconv"
 	"time"
 
 	"connectrpc.com/connect"
@@ -22,6 +22,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/meta"
+	"github.com/nokku-sh/nokku/internal/namegen"
 )
 
 type DaemonService struct {
@@ -319,45 +320,57 @@ func (s *DaemonService) EnrollDaemon(
 	// freshly deployed daemon picks up the current SSH server policy.
 	config := workspace.Settings.GetDefaultDaemonConfig()
 
-	fingerprint := getHeader(ctx, "Nokku-Daemon-Fingerprint")
-	hostname := getHeader(ctx, "Nokku-Daemon-Hostname")
-	metadata := daemonMetadata(ctx)
-
-	if strings.TrimSpace(hostname) == "" {
-		hostname = "daemon"
+	ci, ok := connect.CallInfoForHandlerContext(ctx)
+	if !ok {
+		return nil, ErrInternal
 	}
+	h := ci.RequestHeader()
+	metadata, _ := json.Marshal(map[string]string{
+		"user-agent": h.Get("User-Agent"),
+		"host":       h.Get("Host"),
+	})
 
-	var suffix string
-	if fingerprint != "" && len(fingerprint) >= 6 {
-		suffix = fingerprint[:6] // Use a chunk of the fingerprint for deterministic naming
-	} else {
-		suffix = crypto.RandomSuffix(6) // Fallback to a random 6-character hex string
-	}
-
-	uniqueName := fmt.Sprintf("%s-%s", hostname, suffix)
+	// Names are generated server-side so a workspace never shows a duplicate
+	// label. A collision is a unique violation on (workspace_id, name); we
+	// retry with a numeric suffix before giving up.
 	var daemon *db.CreateDaemonRow
 	var target *db.Target
-	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
-		daemon, err = q.CreateDaemon(ctx, &db.CreateDaemonParams{
-			ID:          uuid.New().String(),
-			WorkspaceID: workspaceID,
-			Name:        uniqueName,
-			Metadata:    metadata,
-			Status:      status,
-			Config:      config,
-		})
-		if err != nil {
-			return err
+	base := namegen.Generate()
+	name := base
+	for attempt := 0; ; attempt++ {
+		if attempt > 0 {
+			name = base + "-" + strconv.Itoa(attempt+1)
 		}
 
-		tp := &db.UpdateTargetCAParams{DaemonID: &daemon.ID}
-		if req.GetCaId() != "" {
-			tp.CaID = req.CaId
+		err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+			daemon, err = q.CreateDaemon(ctx, &db.CreateDaemonParams{
+				WorkspaceID: workspaceID,
+				Name:        name,
+				Metadata:    metadata,
+				Status:      status,
+				Config:      config,
+			})
+			if err != nil {
+				return err
+			}
+
+			if req.GetCaId() != "" {
+				target, err = q.UpdateTargetCA(ctx, &db.UpdateTargetCAParams{
+					DaemonID: &daemon.ID,
+					CaID:     req.CaId,
+				})
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err == nil {
+			break
 		}
-		target, err = q.UpdateTargetCA(ctx, tp)
-		return err
-	}); err != nil {
-		return nil, DBError(err)
+		if !isUniqueViolation(err) || attempt >= 4 {
+			return nil, DBError(err)
+		}
 	}
 
 	// The daemon's control-plane token never expires; it is revoked by
@@ -427,7 +440,15 @@ func (s *DaemonService) SyncDaemon(
 	ctx context.Context,
 	req *nokkuv1.SyncDaemonRequest,
 ) (*nokkuv1.SyncDaemonResponse, error) {
-	metadata := daemonMetadata(ctx)
+	ci, ok := connect.CallInfoForHandlerContext(ctx)
+	if !ok {
+		return nil, ErrInternal
+	}
+	h := ci.RequestHeader()
+	metadata, _ := json.Marshal(map[string]string{
+		"user-agent": h.Get("User-Agent"),
+		"host":       h.Get("Host"),
+	})
 
 	var workspaceID string
 	var status *nokkuv1.DaemonStatus

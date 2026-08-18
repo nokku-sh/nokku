@@ -3,7 +3,6 @@ package crypto
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -25,14 +24,6 @@ func RandomString(size int) (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(bytes), nil
-}
-
-func RandomSuffix(length int) string {
-	bytes := make([]byte, (length+1)/2)
-	if _, err := rand.Read(bytes); err != nil {
-		return "0000" // Fallback if crypto/rand fails (extremely rare)
-	}
-	return hex.EncodeToString(bytes)[:length]
 }
 
 // RandomSerial returns a random 128-bit certificate serial number.
