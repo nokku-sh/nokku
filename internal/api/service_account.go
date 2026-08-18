@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/google/uuid"
 	"github.com/mizuchilabs/kagi"
 
 	"github.com/nokku-sh/nokku/internal/billing"
@@ -65,9 +64,7 @@ func (s *ServiceAccountService) CreateServiceAccount(
 	var result *db.ServiceAccount
 	var key kagi.APIKey
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		id := uuid.NewString()
 		params := &db.CreateServiceAccountParams{
-			ID:          id,
 			WorkspaceID: req.GetWorkspaceId(),
 			Name:        req.GetName(),
 			Description: req.Description,
@@ -98,7 +95,7 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		key, err = s.cfg.Auth.IssueServiceAccountKey(
 			ctx,
 			req.GetWorkspaceId(),
-			id,
+			result.ID,
 			req.GetName(),
 			ttl,
 		)

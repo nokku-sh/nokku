@@ -16,15 +16,14 @@ const createDaemon = `-- name: CreateDaemon :one
 WITH
   new_daemon AS (
     INSERT INTO
-      daemons (id, workspace_id, name, status, config, metadata)
+      daemons (workspace_id, name, status, config, metadata)
     VALUES
       (
         $1,
         $2,
         $3,
-        $4,
-        COALESCE($5, '{}'::jsonb),
-        COALESCE($6, '{}'::jsonb)
+        COALESCE($4, '{}'::jsonb),
+        COALESCE($5, '{}'::jsonb)
       )
     RETURNING
       id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
@@ -36,7 +35,7 @@ WITH
       workspace_id,
       id,
       name,
-      COALESCE($6, '{}'::jsonb)
+      COALESCE($5, '{}'::jsonb)
     FROM
       new_daemon
   )
@@ -47,7 +46,6 @@ FROM
 `
 
 type CreateDaemonParams struct {
-	ID          string             `json:"id"`
 	WorkspaceID string             `json:"workspaceId"`
 	Name        string             `json:"name"`
 	Status      nokku.DaemonStatus `json:"status"`
@@ -70,7 +68,6 @@ type CreateDaemonRow struct {
 
 func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*CreateDaemonRow, error) {
 	row := q.db.QueryRow(ctx, createDaemon,
-		arg.ID,
 		arg.WorkspaceID,
 		arg.Name,
 		arg.Status,

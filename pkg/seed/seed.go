@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
-	"github.com/google/uuid"
 
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -143,7 +142,6 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 		sa := make([]*db.ServiceAccount, cfg.NumServiceAccounts)
 		for i := range cfg.NumServiceAccounts {
 			s, err := q.CreateServiceAccount(ctx, &db.CreateServiceAccountParams{
-				ID:          uuid.NewString(),
 				WorkspaceID: workspace.ID,
 				Name:        uniqueName(gofakeit.AppName(), i),
 				Description: new(gofakeit.Sentence()),
@@ -312,7 +310,6 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 			}
 
 			_, err = q.CreateDaemon(ctx, &db.CreateDaemonParams{
-				ID:          uuid.New().String(),
 				WorkspaceID: workspace.ID,
 				Name:        uniqueName(gofakeit.AppName(), i),
 				Status:      status,
