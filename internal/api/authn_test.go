@@ -6,26 +6,8 @@ import (
 
 	"github.com/mizuchilabs/kagi"
 
-	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/meta"
 )
-
-func TestActorType(t *testing.T) {
-	cases := []struct {
-		kind kagi.Kind
-		want meta.ActorType
-	}{
-		{kagi.KindUser, meta.ActorTypeUser},
-		{auth.KindDaemon, meta.ActorTypeDaemon},
-		{auth.KindServiceAccount, meta.ActorTypeServiceAccount},
-		{auth.KindDevice, meta.ActorTypeUser},
-	}
-	for _, c := range cases {
-		if got := actorType(c.kind); got != c.want {
-			t.Errorf("actorType(%q) = %q, want %q", c.kind, got, c.want)
-		}
-	}
-}
 
 func TestWithActorUserPrincipal(t *testing.T) {
 	ctx := applyPrincipal(context.Background(), kagi.Principal{
@@ -45,7 +27,7 @@ func TestWithActorUserPrincipal(t *testing.T) {
 func TestWithActorDaemonPrincipalPinsWorkspace(t *testing.T) {
 	ctx := applyPrincipal(context.Background(), kagi.Principal{
 		SubjectID: "daemon-1",
-		Kind:      auth.KindDaemon,
+		Kind:      meta.ActorTypeDaemon,
 		TenantID:  "ws-1",
 	})
 

@@ -3,26 +3,28 @@ package meta
 
 import (
 	"context"
+
+	"github.com/mizuchilabs/kagi"
 )
 
 type (
-	ctxKey    string
-	ActorType string
+	ctxKey string
 )
 
 const (
 	ActorKey                ctxKey    = "actor"
 	AuditStateKey           ctxKey    = "audit"
 	WorkspaceKey            ctxKey    = "workspace"
-	ActorTypeUser           ActorType = "user"
-	ActorTypeDaemon         ActorType = "daemon"
-	ActorTypeServiceAccount ActorType = "service_account"
+	ActorTypeUser           kagi.Kind = "user"
+	ActorTypeDevice         kagi.Kind = "device"
+	ActorTypeDaemon         kagi.Kind = "daemon"
+	ActorTypeServiceAccount kagi.Kind = "service_account"
 )
 
 type Actor struct {
 	ID   string
 	Name string
-	Type ActorType
+	Type kagi.Kind
 }
 
 type AuditState struct {

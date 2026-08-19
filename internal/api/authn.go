@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
@@ -12,7 +11,6 @@ import (
 	"github.com/mizuchilabs/kagi"
 	kagiconnect "github.com/mizuchilabs/kagi/connectrpc"
 
-	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/meta"
@@ -103,14 +101,13 @@ func (a *actorInterceptor) withActor(ctx context.Context) context.Context {
 		return ctx
 	}
 	ctx = applyPrincipal(ctx, p)
-	a.reportUsage(p)
 	return ctx
 }
 
 // applyPrincipal maps a kagi principal onto nokku's actor/workspace context.
 // It is pure (no side effects) so it can be unit tested.
 func applyPrincipal(ctx context.Context, p kagi.Principal) context.Context {
-	ctx = meta.WithActor(ctx, &meta.Actor{ID: p.SubjectID, Type: actorType(p.Kind)})
+	ctx = meta.WithActor(ctx, &meta.Actor{ID: p.SubjectID, Type: p.Kind})
 	if p.TenantID != "" {
 		// Machine principals are tenant-scoped by construction.
 		ctx = meta.WithWorkspaceID(ctx, string(p.TenantID))
@@ -120,55 +117,6 @@ func applyPrincipal(ctx context.Context, p kagi.Principal) context.Context {
 		ctx = meta.WithWorkspaceID(ctx, string(ws))
 	}
 	return ctx
-}
-
-func actorType(k kagi.Kind) meta.ActorType {
-	switch k {
-	case auth.KindDaemon:
-		return meta.ActorTypeDaemon
-	case auth.KindServiceAccount:
-		return meta.ActorTypeServiceAccount
-	case kagi.KindUser:
-		return meta.ActorTypeUser
-	default:
-		return meta.ActorTypeUser
-	}
-}
-
-// reportUsage records last-used activity for machine principals. It is
-// fire-and-forget and throttled by the underlying update query.
-func (a *actorInterceptor) reportUsage(p kagi.Principal) {
-	var (
-		query func(ctx context.Context, id string) error
-		id    = p.SubjectID
-	)
-	switch p.Kind {
-	case auth.KindDaemon:
-		query = func(ctx context.Context, id string) error {
-			return a.cfg.Conn.Q.UpdateDaemonUsage(ctx, id)
-		}
-	case auth.KindServiceAccount:
-		query = func(ctx context.Context, id string) error {
-			return a.cfg.Conn.Q.UpdateServiceAccountUsage(ctx, id)
-		}
-	case auth.KindDevice:
-		// Device sessions act as the subject user; there is no machine
-		// usage row to update.
-		fallthrough
-	case kagi.KindUser, kagi.Kind(""):
-		return
-	default:
-		return
-	}
-	if id == "" {
-		return
-	}
-
-	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		_ = query(bgCtx, id)
-	}()
 }
 
 // requestWorkspace returns the conventional workspace_id protobuf field from

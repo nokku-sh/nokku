@@ -42,7 +42,10 @@ func (s *TokenStore) PutToken(
 
 // ConsumeToken looks the token up by hash, deletes it, and returns the user
 // and purpose it was issued for.
-func (s *TokenStore) ConsumeToken(ctx context.Context, hash []byte) (string, tokens.Purpose, error) {
+func (s *TokenStore) ConsumeToken(
+	ctx context.Context,
+	hash []byte,
+) (string, tokens.Purpose, error) {
 	row, err := s.conn.Q.GetOneTimeToken(ctx, hash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

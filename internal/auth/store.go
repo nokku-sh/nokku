@@ -12,6 +12,7 @@ import (
 	"github.com/mizuchilabs/kagi"
 
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 // Store adapts nokku's database to kagi.Store and kagi.APIKeyStore.
@@ -219,7 +220,7 @@ func (s *Store) CreateSession(ctx context.Context, sess kagi.Session) error {
 		TokenHash:  sess.TokenHash,
 		TenantID:   string(sess.TenantID),
 		SubjectID:  sess.SubjectID,
-		Kind:       kindOr(sess.Kind, KindUser),
+		Kind:       kindOr(sess.Kind, meta.ActorTypeUser),
 		IdentityID: strPtr(sess.IdentityID),
 		Method:     string(sess.Method),
 		Binding:    strPtr(sess.Binding),
@@ -291,7 +292,7 @@ func (s *Store) PutKey(ctx context.Context, k kagi.APIKeyRecord) error {
 		KeyID:      k.KeyID,
 		TenantID:   string(k.TenantID),
 		SubjectID:  k.SubjectID,
-		Kind:       kindOr(k.Kind, KindUser),
+		Kind:       kindOr(k.Kind, meta.ActorTypeUser),
 		SecretHash: k.SecretHash,
 		Scopes:     scopes,
 		Name:       k.Name,
