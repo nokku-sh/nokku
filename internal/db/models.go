@@ -218,6 +218,7 @@ type Session struct {
 	Binding    *string    `json:"binding"`
 	ExpiresAt  *time.Time `json:"expiresAt"`
 	CreatedAt  time.Time  `json:"createdAt"`
+	LastSeen   *time.Time `json:"lastSeen"`
 }
 
 type Target struct {

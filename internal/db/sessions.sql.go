@@ -102,7 +102,7 @@ func (q *Queries) DeleteSubjectSessions(ctx context.Context, arg *DeleteSubjectS
 
 const getSessionByHash = `-- name: GetSessionByHash :one
 SELECT
-  id, token_hash, tenant_id, subject_id, kind, identity_id, method, binding, expires_at, created_at
+  id, token_hash, tenant_id, subject_id, kind, identity_id, method, binding, expires_at, created_at, last_seen
 FROM
   sessions
 WHERE
@@ -123,6 +123,67 @@ func (q *Queries) GetSessionByHash(ctx context.Context, tokenHash []byte) (*Sess
 		&i.Binding,
 		&i.ExpiresAt,
 		&i.CreatedAt,
+		&i.LastSeen,
 	)
 	return &i, err
+}
+
+const listSessionsBySubject = `-- name: ListSessionsBySubject :many
+SELECT
+  id, token_hash, tenant_id, subject_id, kind, identity_id, method, binding, expires_at, created_at, last_seen
+FROM
+  sessions
+WHERE
+  tenant_id = $1
+  AND subject_id = $2
+`
+
+type ListSessionsBySubjectParams struct {
+	TenantID  string `json:"tenantId"`
+	SubjectID string `json:"subjectId"`
+}
+
+func (q *Queries) ListSessionsBySubject(ctx context.Context, arg *ListSessionsBySubjectParams) ([]*Session, error) {
+	rows, err := q.db.Query(ctx, listSessionsBySubject, arg.TenantID, arg.SubjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Session
+	for rows.Next() {
+		var i Session
+		if err := rows.Scan(
+			&i.ID,
+			&i.TokenHash,
+			&i.TenantID,
+			&i.SubjectID,
+			&i.Kind,
+			&i.IdentityID,
+			&i.Method,
+			&i.Binding,
+			&i.ExpiresAt,
+			&i.CreatedAt,
+			&i.LastSeen,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const touchSession = `-- name: TouchSession :exec
+UPDATE sessions
+SET
+  last_seen = NOW()
+WHERE
+  token_hash = $1
+`
+
+func (q *Queries) TouchSession(ctx context.Context, tokenHash []byte) error {
+	_, err := q.db.Exec(ctx, touchSession, tokenHash)
+	return err
 }
