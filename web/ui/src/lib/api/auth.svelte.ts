@@ -31,7 +31,6 @@ export const auth = {
 	login: () =>
 		authMutation<{ email: string; password: string }>('/auth/login', () => {
 			void goto('/');
-			toast.success('Welcome back 👋');
 		}),
 	loginWithBackupCode: () =>
 		authMutation<{ email: string; code: string }>('/auth/login/backup-code', () => {
@@ -44,7 +43,6 @@ export const auth = {
 			void queryClient.cancelQueries();
 			queryClient.clear();
 			void goto('/login');
-			toast.success('Logged out 👋');
 		}),
 	register: () =>
 		authMutation<{ name: string; username: string; email: string; password: string }>(
