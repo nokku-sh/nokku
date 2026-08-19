@@ -31,6 +31,22 @@ FROM
 WHERE
   token_hash = @token_hash;
 
+-- name: TouchSession :exec
+UPDATE sessions
+SET
+  last_seen = NOW()
+WHERE
+  token_hash = @token_hash;
+
+-- name: ListSessionsBySubject :many
+SELECT
+  *
+FROM
+  sessions
+WHERE
+  tenant_id = @tenant_id
+  AND subject_id = @subject_id;
+
 -- name: DeleteSessionByHash :exec
 DELETE FROM sessions
 WHERE
