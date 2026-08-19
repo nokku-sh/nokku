@@ -6,7 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/mizuchilabs/kagi"
 
 	"github.com/nokku-sh/nokku/internal/db"
@@ -40,6 +42,9 @@ func (s *Store) CreateUser(ctx context.Context, _ kagi.TenantID, u kagi.User) (k
 		Email:    u.Email,
 	})
 	if err != nil {
+		if isUniqueViolation(err) {
+			return kagi.User{}, kagi.ErrEmailTaken
+		}
 		return kagi.User{}, err
 	}
 	return kagiUser(row), nil
@@ -233,6 +238,29 @@ func (s *Store) GetSession(ctx context.Context, tokenHash []byte) (kagi.Session,
 	return kagiSession(row), nil
 }
 
+func (s *Store) TouchSession(ctx context.Context, tokenHash []byte, _ time.Time) error {
+	return s.conn.Q.TouchSession(ctx, tokenHash)
+}
+
+func (s *Store) ListSessions(
+	ctx context.Context,
+	t kagi.TenantID,
+	subjectID string,
+) ([]kagi.Session, error) {
+	rows, err := s.conn.Q.ListSessionsBySubject(ctx, &db.ListSessionsBySubjectParams{
+		TenantID:  string(t),
+		SubjectID: subjectID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]kagi.Session, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, kagiSession(r))
+	}
+	return out, nil
+}
+
 func (s *Store) DeleteSession(ctx context.Context, tokenHash []byte) error {
 	return s.conn.Q.DeleteSessionByHash(ctx, tokenHash)
 }
@@ -321,7 +349,14 @@ func (s *Store) ListTenantKeys(ctx context.Context, t kagi.TenantID) ([]kagi.API
 // Conversions -----------------------------------------------------------------
 
 func kagiUser(u *db.User) kagi.User {
-	return kagi.User{ID: u.ID, Email: u.Email, DisplayName: u.Name}
+	return kagi.User{
+		ID:                      u.ID,
+		Email:                   u.Email,
+		DisplayName:             u.Name,
+		Active:                  u.IsActive,
+		EmailVerified:           u.EmailVerified,
+		DisablePasswordRecovery: !u.EnableEmailRecovery,
+	}
 }
 
 func kagiCredential(c *db.Credential) kagi.Credential {
@@ -355,6 +390,9 @@ func kagiSession(row *db.Session) kagi.Session {
 	if row.ExpiresAt != nil {
 		s.ExpiresAt = *row.ExpiresAt
 	}
+	if row.LastSeen != nil {
+		s.LastSeenAt = *row.LastSeen
+	}
 	return s
 }
 
@@ -382,6 +420,13 @@ func userErr(err error) error {
 		return kagi.ErrNotFound
 	}
 	return err
+}
+
+// isUniqueViolation reports whether err is a Postgres unique-constraint
+// violation, so CreateUser maps a duplicate email to kagi.ErrEmailTaken.
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation
 }
 
 func kindOr(k kagi.Kind, def kagi.Kind) string {

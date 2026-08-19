@@ -11,6 +11,9 @@ import (
 	"github.com/crewjam/saml/samlsp"
 	"github.com/jackc/pgx/v5"
 	"github.com/mizuchilabs/kagi"
+	"github.com/mizuchilabs/kagi/oauth2"
+	"github.com/mizuchilabs/kagi/oidc"
+	"github.com/mizuchilabs/kagi/saml"
 	"golang.org/x/oauth2/github"
 
 	"github.com/nokku-sh/nokku/internal/db"
@@ -27,11 +30,23 @@ type SSOConfig struct {
 	RedirectBase string
 }
 
-// ssoPolicy builds the kagi Policy hooks from nokku's providers. The provider
-// id doubles as the workspace id for enterprise OIDC/SAML, and is "google" or
-// "github" for the static social providers.
-func ssoPolicy(conn *db.Connection, cfg SSOConfig) kagi.Policy {
-	return kagi.Policy{
+// Resolvers bundles the SSO resolution hooks the kagi OIDC, OAuth2, and SAML
+// handlers consume via their Options. nokku's users and credentials are
+// global, so every hook ignores the tenant argument; the provider id doubles
+// as the workspace id for enterprise providers and is "google" or "github"
+// for the static social providers.
+type Resolvers struct {
+	ResolveOIDCProvider   func(ctx context.Context, t kagi.TenantID, providerID string) (*oidc.ProviderConfig, error)
+	ResolveOIDCUser       func(ctx context.Context, t kagi.TenantID, id *oidc.Identity) (*kagi.User, error)
+	ResolveOAuth2Provider func(ctx context.Context, t kagi.TenantID, providerID string) (*oauth2.ProviderConfig, error)
+	ResolveOAuth2User     func(ctx context.Context, t kagi.TenantID, id *oauth2.Identity) (*kagi.User, error)
+	ResolveSAMLIdP        func(ctx context.Context, t kagi.TenantID, providerID string) (*saml.IDPConfig, error)
+	ResolveSAMLUser       func(ctx context.Context, t kagi.TenantID, id *saml.Identity) (*kagi.User, error)
+}
+
+// NewResolvers builds the SSO hooks from nokku's database and static config.
+func NewResolvers(conn *db.Connection, cfg SSOConfig) Resolvers {
+	return Resolvers{
 		ResolveOIDCProvider:   resolveOIDCProvider(conn, cfg),
 		ResolveOIDCUser:       resolveOIDCUser(conn),
 		ResolveOAuth2Provider: resolveOAuth2Provider(cfg),
@@ -44,10 +59,13 @@ func ssoPolicy(conn *db.Connection, cfg SSOConfig) kagi.Policy {
 func resolveOIDCProvider(
 	conn *db.Connection,
 	cfg SSOConfig,
-) func(context.Context, kagi.TenantID, string) (*kagi.OIDCProviderConfig, error) {
-	return func(ctx context.Context, _ kagi.TenantID, providerID string) (*kagi.OIDCProviderConfig, error) {
+) func(context.Context, kagi.TenantID, string) (*oidc.ProviderConfig, error) {
+	return func(ctx context.Context, _ kagi.TenantID, providerID string) (*oidc.ProviderConfig, error) {
 		if providerID == "google" {
-			return &kagi.OIDCProviderConfig{
+			if cfg.GoogleClientID == "" || cfg.GoogleClientSecret == "" {
+				return nil, kagi.ErrProviderDisabled
+			}
+			return &oidc.ProviderConfig{
 				ProviderID:   "google",
 				IssuerURL:    "https://accounts.google.com",
 				ClientID:     cfg.GoogleClientID,
@@ -63,13 +81,18 @@ func resolveOIDCProvider(
 		if err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
 			p, err = q.GetOIDCProviderByID(ctx, providerID)
 			return err
-		}); err != nil || p.IssuerURL == nil || p.ClientID == nil {
+		}); err != nil || p == nil {
 			return nil, kagi.ErrProviderDisabled
 		}
-		return &kagi.OIDCProviderConfig{
+		issuer := strings.TrimSpace(strOr(p.IssuerURL))
+		clientID := strings.TrimSpace(strOr(p.ClientID))
+		if issuer == "" || clientID == "" {
+			return nil, kagi.ErrProviderDisabled
+		}
+		return &oidc.ProviderConfig{
 			ProviderID:   p.WorkspaceID,
-			IssuerURL:    strings.TrimSpace(*p.IssuerURL),
-			ClientID:     *p.ClientID,
+			IssuerURL:    issuer,
+			ClientID:     clientID,
 			ClientSecret: string(p.ClientSecret.Bytes()),
 			RedirectURL:  cfg.RedirectBase + "/oidc/callback",
 			Scopes:       p.Scopes,
@@ -82,8 +105,8 @@ func resolveOIDCProvider(
 
 func resolveOIDCUser(
 	conn *db.Connection,
-) func(context.Context, kagi.TenantID, *kagi.OIDCIdentity) (*kagi.User, error) {
-	return func(ctx context.Context, _ kagi.TenantID, id *kagi.OIDCIdentity) (*kagi.User, error) {
+) func(context.Context, kagi.TenantID, *oidc.Identity) (*kagi.User, error) {
+	return func(ctx context.Context, _ kagi.TenantID, id *oidc.Identity) (*kagi.User, error) {
 		enterprise := id.ProviderID != "google"
 		allowJIT := true
 		if enterprise {
@@ -91,7 +114,7 @@ func resolveOIDCUser(
 			if err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
 				p, err = q.GetOIDCProvider(ctx, id.ProviderID)
 				return err
-			}); err != nil {
+			}); err != nil || p == nil {
 				return nil, kagi.ErrIdentityRejected
 			}
 			allowJIT = p.AllowJitProvisioning
@@ -102,12 +125,15 @@ func resolveOIDCUser(
 
 func resolveOAuth2Provider(
 	cfg SSOConfig,
-) func(context.Context, kagi.TenantID, string) (*kagi.OAuth2ProviderConfig, error) {
-	return func(_ context.Context, _ kagi.TenantID, providerID string) (*kagi.OAuth2ProviderConfig, error) {
+) func(context.Context, kagi.TenantID, string) (*oauth2.ProviderConfig, error) {
+	return func(_ context.Context, _ kagi.TenantID, providerID string) (*oauth2.ProviderConfig, error) {
 		if providerID != "github" {
 			return nil, kagi.ErrProviderDisabled
 		}
-		return &kagi.OAuth2ProviderConfig{
+		if cfg.GitHubClientID == "" || cfg.GitHubClientSecret == "" {
+			return nil, kagi.ErrProviderDisabled
+		}
+		return &oauth2.ProviderConfig{
 			ProviderID:         "github",
 			ClientID:           cfg.GitHubClientID,
 			ClientSecret:       cfg.GitHubClientSecret,
@@ -127,8 +153,8 @@ func resolveOAuth2Provider(
 
 func resolveOAuth2User(
 	conn *db.Connection,
-) func(context.Context, kagi.TenantID, *kagi.OAuth2Identity) (*kagi.User, error) {
-	return func(ctx context.Context, _ kagi.TenantID, id *kagi.OAuth2Identity) (*kagi.User, error) {
+) func(context.Context, kagi.TenantID, *oauth2.Identity) (*kagi.User, error) {
+	return func(ctx context.Context, _ kagi.TenantID, id *oauth2.Identity) (*kagi.User, error) {
 		if !id.EmailVerified {
 			return nil, kagi.ErrIdentityRejected
 		}
@@ -139,17 +165,21 @@ func resolveOAuth2User(
 func resolveSAMLIdP(
 	conn *db.Connection,
 	cfg SSOConfig,
-) func(context.Context, kagi.TenantID, string) (*kagi.SAMLIdPConfig, error) {
-	return func(ctx context.Context, _ kagi.TenantID, providerID string) (*kagi.SAMLIdPConfig, error) {
+) func(context.Context, kagi.TenantID, string) (*saml.IDPConfig, error) {
+	return func(ctx context.Context, _ kagi.TenantID, providerID string) (*saml.IDPConfig, error) {
 		var p *db.SamlProvider
 		if err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
 			p, err = q.GetSAMLProviderByID(ctx, providerID)
 			return err
-		}); err != nil || p.MetadataURL == nil {
+		}); err != nil || p == nil {
 			return nil, kagi.ErrProviderDisabled
 		}
 
-		metaURL, err := url.Parse(*p.MetadataURL)
+		metaURLStr := strings.TrimSpace(strOr(p.MetadataURL))
+		if metaURLStr == "" {
+			return nil, kagi.ErrProviderDisabled
+		}
+		metaURL, err := url.Parse(metaURLStr)
 		if err != nil {
 			return nil, kagi.ErrProviderDisabled
 		}
@@ -162,7 +192,7 @@ func resolveSAMLIdP(
 			return nil, kagi.ErrProviderDisabled
 		}
 
-		return &kagi.SAMLIdPConfig{
+		return &saml.IDPConfig{
 			ProviderID:     p.WorkspaceID,
 			MetadataXML:    metadataXML,
 			SPEntityID:     cfg.RedirectBase + "/saml/metadata",
@@ -175,13 +205,13 @@ func resolveSAMLIdP(
 
 func resolveSAMLUser(
 	conn *db.Connection,
-) func(context.Context, kagi.TenantID, *kagi.SAMLIdentity) (*kagi.User, error) {
-	return func(ctx context.Context, _ kagi.TenantID, id *kagi.SAMLIdentity) (*kagi.User, error) {
+) func(context.Context, kagi.TenantID, *saml.Identity) (*kagi.User, error) {
+	return func(ctx context.Context, _ kagi.TenantID, id *saml.Identity) (*kagi.User, error) {
 		var p *db.SamlProvider
 		if err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
 			p, err = q.GetSAMLProvider(ctx, id.ProviderID)
 			return err
-		}); err != nil {
+		}); err != nil || p == nil {
 			return nil, kagi.ErrIdentityRejected
 		}
 		return resolveSSOUser(
@@ -274,5 +304,13 @@ func resolveSSOUser(
 	if err != nil || u == nil {
 		return nil, kagi.ErrIdentityRejected
 	}
-	return &kagi.User{ID: u.ID, Email: u.Email, DisplayName: u.Name}, nil
+	user := kagiUser(u)
+	return &user, nil
+}
+
+func strOr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
