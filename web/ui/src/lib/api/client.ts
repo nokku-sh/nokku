@@ -5,6 +5,7 @@ import { Code, ConnectError, type Interceptor, type UnaryRequest } from '@connec
 import { toast } from 'svelte-sonner';
 import { formatConnectError, parseHTTPError } from './error-formatter';
 import { goto } from '$app/navigation';
+import { UserService } from '$lib/gen/nokku/v1/user_pb';
 import { WorkspaceService } from '$lib/gen/nokku/v1/workspace_pb';
 import { workspaceID } from '$lib/store.svelte';
 
@@ -34,7 +35,7 @@ export const queryClient = new QueryClient({
 			// invalidated the cookie). Bounce back to /login instead of leaving
 			// a broken page behind.
 			if (
-				key?.methodName === 'whoami' &&
+				key?.methodName === UserService.method.whoami.name &&
 				(error.code === Code.Unauthenticated || error.code === Code.NotFound)
 			) {
 				handleSessionExpired();
@@ -47,14 +48,17 @@ export const queryClient = new QueryClient({
 			// or membership revoked). Drop it silently and let the workspace list
 			// select a valid one instead of erroring on every load.
 			if (
-				key?.methodName === 'getWorkspace' &&
+				key?.methodName === WorkspaceService.method.getWorkspace.name &&
 				(error.code === Code.NotFound || error.code === Code.PermissionDenied)
 			) {
 				workspaceID.current = '';
 				void queryClient.invalidateQueries({
 					queryKey: [
 						'connect-query',
-						{ serviceName: WorkspaceService.typeName, methodName: 'listWorkspaces' }
+						{
+							serviceName: WorkspaceService.typeName,
+							methodName: WorkspaceService.method.listWorkspaces.name
+						}
 					]
 				});
 				return;
