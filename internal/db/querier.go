@@ -186,7 +186,6 @@ type Querier interface {
 	UpdateDaemonMetadata(ctx context.Context, arg *UpdateDaemonMetadataParams) error
 	UpdateDaemonOnlineStatus(ctx context.Context, arg *UpdateDaemonOnlineStatusParams) error
 	UpdateDaemonStatus(ctx context.Context, arg *UpdateDaemonStatusParams) (*Daemon, error)
-	UpdateDaemonUsage(ctx context.Context, daemonID string) error
 	UpdateEmailRecovery(ctx context.Context, arg *UpdateEmailRecoveryParams) error
 	UpdateEnrollToken(ctx context.Context, arg *UpdateEnrollTokenParams) error
 	UpdateInviteToken(ctx context.Context, arg *UpdateInviteTokenParams) error
@@ -196,7 +195,6 @@ type Querier interface {
 	UpdateSAMLProvider(ctx context.Context, arg *UpdateSAMLProviderParams) (*SamlProvider, error)
 	UpdateSAMLSPPrivateKey(ctx context.Context, privateKey crypto.EncryptedBytes) error
 	UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (*ServiceAccount, error)
-	UpdateServiceAccountUsage(ctx context.Context, serviceAccountID string) error
 	UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*Target, error)
 	UpdateTargetCA(ctx context.Context, arg *UpdateTargetCAParams) (*Target, error)
 	UpdateTeam(ctx context.Context, arg *UpdateTeamParams) (*Team, error)
