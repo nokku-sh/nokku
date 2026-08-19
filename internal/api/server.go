@@ -343,83 +343,25 @@ func (s *Server) registerServices(ctx context.Context) error {
 
 	audit := NewAuditInterceptor(s.cfg.Audit)
 
+	// Consolidated kagi auth handler: SSO, passkey, device, and the
+	// credential/email flows, mounted at their existing public paths. The
+	// handler's own paths are prefix-free, so each route is re-prefixed
+	// with its public location (/auth for the credential and device flows,
+	// none for SSO and passkeys).
+	authHandler, err := NewAuthHandler(s.cfg)
+	if err != nil {
+		return err
+	}
+	for _, route := range authHandler.Routes() {
+		_, path, ok := strings.Cut(route.Pattern, " ")
+		if !ok {
+			continue
+		}
+		s.mux.Handle(authRoutePrefix(path)+route.Pattern, audit.WithAudit(route.Handler))
+	}
+
 	pubChain := NewChain(audit.WithAudit)                      // Public chain (audit only, no auth)
 	privChain := NewChain(audit.WithAudit, NewHTTPAuth(s.cfg)) // Private chain (audit + auth)
-	// Optional auth: a session is attached when present, but the route is
-	// never rejected. Login routes use it so SSO can link to a signed-in user.
-	linkChain := NewChain(audit.WithAudit, s.cfg.Auth.Kagi.Middleware)
-
-	// OAuth handler (public, OAuth2: github)
-	oauthHandler, err := NewOAuthHandler(s.cfg)
-	if err != nil {
-		return err
-	}
-	s.mux.Handle("/oauth/login", linkChain.ThenFunc(oauthHandler.Login))
-	s.mux.Handle("/oauth/callback", pubChain.ThenFunc(oauthHandler.Callback))
-
-	// OIDC handler (public, OpenID Connect: google + enterprise)
-	oidcHandler, err := NewOIDCHandler(s.cfg)
-	if err != nil {
-		return err
-	}
-	s.mux.Handle("/oidc/login", linkChain.ThenFunc(oidcHandler.Login))
-	s.mux.Handle("/oidc/callback", pubChain.ThenFunc(oidcHandler.Callback))
-
-	// SAML handlers (public; one shared SP for all workspaces)
-	samlHandler, err := NewSAMLHandler(s.cfg)
-	if err != nil {
-		return err
-	}
-	s.mux.Handle("/saml/login", linkChain.ThenFunc(samlHandler.Login))
-	s.mux.Handle("POST /saml/acs", pubChain.ThenFunc(samlHandler.Callback))
-	s.mux.HandleFunc("/saml/metadata", samlHandler.Metadata)
-	s.mux.HandleFunc("/saml/certificate", samlHandler.Certificate)
-
-	// Passkey handlers
-	passkeys, err := NewPasskeys(s.cfg)
-	if err != nil {
-		return err
-	}
-	s.mux.Handle(
-		"POST /passkey/register/begin",
-		privChain.ThenFunc(passkeys.Register.BeginRegistration),
-	)
-	s.mux.Handle(
-		"POST /passkey/register/finish",
-		privChain.ThenFunc(passkeys.Register.FinishRegistration),
-	)
-	s.mux.Handle("POST /passkey/login/begin", pubChain.ThenFunc(passkeys.Login.BeginLogin))
-	s.mux.Handle("POST /passkey/login/finish", pubChain.ThenFunc(passkeys.Login.FinishLogin))
-
-	// Passkey signup (public, no auth, creates new users)
-	s.mux.Handle("POST /passkey/signup/begin", pubChain.ThenFunc(passkeys.Signup.BeginRegistration))
-	s.mux.Handle(
-		"POST /passkey/signup/finish",
-		pubChain.ThenFunc(passkeys.Signup.FinishRegistration),
-	)
-
-	// Device flow (RFC 8628): a CLI asks for a code, the user approves it in
-	// the browser, and the CLI polls for a DPoP-bound kagi session.
-	devices, err := NewDeviceFlow(s.cfg)
-	if err != nil {
-		return err
-	}
-	s.mux.HandleFunc("/auth/device", devices.Begin)
-	s.mux.Handle("POST /auth/device/verify", privChain.ThenFunc(devices.Verify))
-	s.mux.HandleFunc("/auth/device/token", devices.Poll)
-	s.mux.HandleFunc("/auth/nonce", devices.Nonce)
-
-	// Credential auth flows (password, backup code, registration, logout,
-	// email verification/reset) are plain HTTP handlers, not connectrpc RPCs.
-	authChain := NewChain(audit.WithAudit)
-	s.mux.Handle("POST /auth/login", authChain.ThenFunc(s.handleLogin))
-	s.mux.Handle("POST /auth/login/backup-code", authChain.ThenFunc(s.handleLoginWithBackupCode))
-	s.mux.Handle("POST /auth/register", authChain.ThenFunc(s.handleRegister))
-	s.mux.Handle("POST /auth/logout", authChain.ThenFunc(s.handleLogout))
-	s.mux.Handle("POST /auth/forgot-password", authChain.ThenFunc(s.handleForgotPassword))
-	s.mux.Handle("POST /auth/reset-password", authChain.ThenFunc(s.handleResetPassword))
-	s.mux.Handle("POST /auth/verify-email", authChain.ThenFunc(s.handleVerifyEmail))
-	s.mux.Handle("POST /auth/resend-verification", authChain.ThenFunc(s.handleResendVerification))
 
 	// Avatar handlers
 	s.mux.Handle("GET /avatars/{id}", pubChain.ThenFunc(ServeAvatar(s.cfg)))
@@ -455,6 +397,21 @@ func (s *Server) registerHealthAndReflection(serviceNames []string) {
 	s.mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+}
+
+// authRoutePrefix returns the public prefix a kagi auth route mounts under:
+// the credential, email, and device flows live under /auth; the SSO and
+// passkey surfaces are mounted at the root.
+func authRoutePrefix(path string) string {
+	switch {
+	case strings.HasPrefix(path, "/oidc"),
+		strings.HasPrefix(path, "/oauth"),
+		strings.HasPrefix(path, "/saml"),
+		strings.HasPrefix(path, "/passkey"):
+		return ""
+	default:
+		return "/auth"
+	}
 }
 
 func isAPIRequest(r *http.Request) bool {

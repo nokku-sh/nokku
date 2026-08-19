@@ -49,23 +49,9 @@ var (
 
 // Validation errors
 
-var (
-	ErrInvalidInput = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("please check your input and try again"),
-	)
-	ErrEmailInvalid = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("please enter a valid email address"),
-	)
-	ErrPasswordShort = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("password must be at least 8 characters"),
-	)
-	ErrFieldMissing = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("please fill in all required fields"),
-	)
+var ErrInvalidInput = connect.NewError(
+	connect.CodeInvalidArgument,
+	errors.New("please check your input and try again"),
 )
 
 // Auth errors
@@ -78,26 +64,6 @@ var (
 	ErrSSORequired = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("single sign-on is required for your account"),
-	)
-	ErrTokenInvalid = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("the link has expired or is no longer valid"),
-	)
-	ErrSessionExpired = connect.NewError(
-		connect.CodeUnauthenticated,
-		errors.New("your session has expired, please sign in again"),
-	)
-	ErrEmailTaken = connect.NewError(
-		connect.CodeAlreadyExists,
-		errors.New("an account with this email already exists"),
-	)
-	ErrPasswordMismatch = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("the password you entered is incorrect"),
-	)
-	ErrCLILoginCodeBad = connect.NewError(
-		connect.CodeNotFound,
-		errors.New("the login code is invalid or has expired"),
 	)
 )
 
