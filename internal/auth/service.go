@@ -11,6 +11,7 @@ import (
 	"github.com/mizuchilabs/kagi/backupcode"
 	"github.com/mizuchilabs/kagi/dpop"
 	"github.com/mizuchilabs/kagi/password"
+	"github.com/mizuchilabs/kagi/tokens"
 
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/email"
@@ -24,12 +25,13 @@ import (
 // explicit workspace id.
 type Service struct {
 	Kagi        *kagi.Service
+	Resolvers   Resolvers
 	store       *Store
 	apiKeys     *apikey.Manager
 	dpop        *dpop.Verifier
 	passwords   *password.Manager
 	backupCodes *backupcode.Manager
-	tokens      *Tokens
+	tokens      *tokens.Manager
 }
 
 // NewService builds the kagi engine for nokku. nonceSecret keys the stateless
@@ -41,7 +43,6 @@ func NewService(conn *db.Connection, nonceSecret []byte, sso SSOConfig) (*Servic
 
 	kagiSvc, err := kagi.New(kagi.Options{
 		Store:         store,
-		Policy:        ssoPolicy(conn, sso),
 		ResolveTenant: resolveTenant,
 		DPoP:          dpopVerifier,
 		Sessions: kagi.SessionOptions{
@@ -59,19 +60,18 @@ func NewService(conn *db.Connection, nonceSecret []byte, sso SSOConfig) (*Servic
 			)
 		}),
 		OnLogin: func(ctx context.Context, _ kagi.TenantID, u kagi.User, m kagi.Method) error {
-			row, err := conn.Q.GetUserByID(ctx, u.ID)
-			if err != nil || !row.IsActive || !row.EmailVerified {
-				return kagi.ErrLoginRejected
-			}
 			// SSO enforcement applies to every method except the IdP flows
-			// themselves (oidc/saml are the enforced path).
+			// themselves (oidc/saml are the enforced path). Account state
+			// (active, verified) is enforced centrally via
+			// EnforceAccountState; this hook only knows the email domain.
 			if m != kagi.MethodOIDC && m != kagi.MethodSAML {
-				if ssoEnforced(ctx, conn, row.Email) {
-					return kagi.ErrLoginRejected
+				if ssoEnforced(ctx, conn, u.Email) {
+					return kagi.ErrSSORequired
 				}
 			}
 			return nil
 		},
+		EnforceAccountState: true,
 	})
 	if err != nil {
 		return nil, err
@@ -84,12 +84,13 @@ func NewService(conn *db.Connection, nonceSecret []byte, sso SSOConfig) (*Servic
 
 	return &Service{
 		Kagi:        kagiSvc,
+		Resolvers:   NewResolvers(conn, sso),
 		store:       store,
 		apiKeys:     apiKeys,
 		dpop:        dpopVerifier,
 		passwords:   password.New(kagiSvc, password.DefaultParams()),
 		backupCodes: backupcode.New(kagiSvc),
-		tokens:      NewTokens(conn, 15*time.Minute),
+		tokens:      tokens.New(NewTokenStore(conn), 15*time.Minute),
 	}, nil
 }
 
@@ -107,6 +108,12 @@ func (s *Service) APIKeys() *apikey.Manager {
 // outside the connectrpc interceptor (e.g. daemon enrollment).
 func (s *Service) DPoP() *dpop.Verifier {
 	return s.dpop
+}
+
+// Tokens returns the one-time-token manager, for the kagi server package's
+// email verification and password-reset flows.
+func (s *Service) Tokens() *tokens.Manager {
+	return s.tokens
 }
 
 // --- Passwords (global users) -------------------------------------------------
@@ -196,12 +203,12 @@ func (s *Service) DeleteProviderCredentials(
 func (s *Service) IssueToken(
 	ctx context.Context,
 	userID string,
-	purpose TokenPurpose,
+	purpose tokens.Purpose,
 ) (string, error) {
 	return s.tokens.Issue(ctx, userID, purpose)
 }
 
-func (s *Service) ConsumeToken(ctx context.Context, raw string) (string, TokenPurpose, error) {
+func (s *Service) ConsumeToken(ctx context.Context, raw string) (string, tokens.Purpose, error) {
 	return s.tokens.Consume(ctx, raw)
 }
 

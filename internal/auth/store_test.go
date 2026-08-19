@@ -195,7 +195,13 @@ func TestKagiServiceRoundTrip(t *testing.T) {
 	}
 
 	// Issue a session through the kagi SessionManager and verify it round-trips.
-	sess, err := svc.Sessions.IssueToken(ctx, "", u, kagi.MethodPassword)
+	sess, err := svc.Sessions.IssueSession(ctx, kagi.SessionParams{
+		TenantID:  "",
+		SubjectID: u.ID,
+		Kind:      kagi.KindUser,
+		Method:    kagi.MethodPassword,
+		TTL:       24 * time.Hour,
+	})
 	if err != nil {
 		t.Fatalf("issue token: %v", err)
 	}
