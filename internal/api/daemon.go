@@ -14,7 +14,6 @@ import (
 	"github.com/mizuchilabs/kagi/dpop"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
@@ -378,7 +377,7 @@ func (s *DaemonService) EnrollDaemon(
 	sess, err := s.cfg.Auth.Kagi.Sessions.IssueSession(ctx, kagi.SessionParams{
 		TenantID:  kagi.TenantID(workspaceID),
 		SubjectID: daemon.ID,
-		Kind:      auth.KindDaemon,
+		Kind:      meta.ActorTypeDaemon,
 		Method:    kagi.MethodDevice,
 		Binding:   binding,
 	})

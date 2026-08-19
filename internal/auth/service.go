@@ -15,6 +15,7 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/email"
+	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 // Service is the kagi authentication engine wired for nokku. It exposes the
@@ -225,7 +226,7 @@ func (s *Service) IssueServiceAccountKey(
 		ctx,
 		kagi.TenantID(workspaceID),
 		serviceAccountID,
-		KindServiceAccount,
+		meta.ActorTypeServiceAccount,
 		name,
 		nil,
 		ttl,

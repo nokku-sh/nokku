@@ -106,7 +106,7 @@ func NewAuthHandler(cfg *config.Config) (*server.Handler, error) {
 			Cache:           cfg.Cache,
 			VerificationURI: cfg.FullURL() + "/device",
 			DPoP:            cfg.Auth.DPoP(),
-			Kind:            auth.KindDevice,
+			Kind:            meta.ActorTypeDevice,
 			SessionTTL:      deviceSessionTTL,
 		},
 

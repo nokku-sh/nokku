@@ -13,6 +13,7 @@ import (
 	"github.com/mizuchilabs/kagi"
 
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 // These tests exercise the kagi store adapter against a real, fully migrated
@@ -131,13 +132,13 @@ func TestStoreRoundTrip(t *testing.T) {
 	tokenHash := sha256.Sum256([]byte("raw-token-123"))
 	sess := kagi.Session{
 		Token: "raw-token-123", TokenHash: tokenHash[:], TenantID: "", SubjectID: u.ID,
-		Kind: KindUser, Method: kagi.MethodPasskey, ExpiresAt: now.Add(time.Hour),
+		Kind: meta.ActorTypeUser, Method: kagi.MethodPasskey, ExpiresAt: now.Add(time.Hour),
 	}
 	if err := store.CreateSession(ctx, sess); err != nil {
 		t.Fatalf("create session: %v", err)
 	}
 	gotSess, err := store.GetSession(ctx, tokenHash[:])
-	if err != nil || gotSess.SubjectID != u.ID || gotSess.Kind != KindUser {
+	if err != nil || gotSess.SubjectID != u.ID || gotSess.Kind != meta.ActorTypeUser {
 		t.Fatalf("get session: %+v (%v)", gotSess, err)
 	}
 	// The raw token is never persisted: only its hash is in the row.
@@ -155,13 +156,13 @@ func TestStoreRoundTrip(t *testing.T) {
 
 	// API key
 	if err := store.PutKey(ctx, kagi.APIKeyRecord{
-		KeyID: "key1", TenantID: "ws1", SubjectID: u.ID, Kind: KindServiceAccount,
+		KeyID: "key1", TenantID: "ws1", SubjectID: u.ID, Kind: meta.ActorTypeServiceAccount,
 		SecretHash: []byte("h"), Scopes: []string{"read"}, Name: "ci", CreatedAt: now,
 	}); err != nil {
 		t.Fatalf("put key: %v", err)
 	}
 	key, err := store.GetKey(ctx, "key1")
-	if err != nil || key.SubjectID != u.ID || key.Kind != KindServiceAccount {
+	if err != nil || key.SubjectID != u.ID || key.Kind != meta.ActorTypeServiceAccount {
 		t.Fatalf("get key: %+v (%v)", key, err)
 	}
 	tenantKeys, err := store.ListTenantKeys(ctx, "ws1")
@@ -198,7 +199,7 @@ func TestKagiServiceRoundTrip(t *testing.T) {
 	sess, err := svc.Sessions.IssueSession(ctx, kagi.SessionParams{
 		TenantID:  "",
 		SubjectID: u.ID,
-		Kind:      kagi.KindUser,
+		Kind:      meta.ActorTypeUser,
 		Method:    kagi.MethodPassword,
 		TTL:       24 * time.Hour,
 	})
@@ -206,7 +207,7 @@ func TestKagiServiceRoundTrip(t *testing.T) {
 		t.Fatalf("issue token: %v", err)
 	}
 	got, err := svc.Sessions.Verify(ctx, sess.Token)
-	if err != nil || got.SubjectID != u.ID || got.Kind != kagi.KindUser {
+	if err != nil || got.SubjectID != u.ID || got.Kind != meta.ActorTypeUser {
 		t.Fatalf("verify: %+v (%v)", got, err)
 	}
 
@@ -222,7 +223,7 @@ func TestKagiServiceRoundTrip(t *testing.T) {
 	bound, err := svc.Sessions.IssueSession(ctx, kagi.SessionParams{
 		TenantID:  "ws1",
 		SubjectID: u.ID,
-		Kind:      KindDaemon,
+		Kind:      meta.ActorTypeDaemon,
 		Binding:   "jkt-thumbprint",
 		Method:    kagi.MethodKey,
 	})
@@ -233,7 +234,7 @@ func TestKagiServiceRoundTrip(t *testing.T) {
 		t.Fatal("expected non-expiring session")
 	}
 	got, err = svc.Sessions.Verify(ctx, bound.Token)
-	if err != nil || got.Binding != "jkt-thumbprint" || got.Kind != KindDaemon {
+	if err != nil || got.Binding != "jkt-thumbprint" || got.Kind != meta.ActorTypeDaemon {
 		t.Fatalf("verify bound session: %+v (%v)", got, err)
 	}
 
