@@ -81,17 +81,6 @@ WHERE
 RETURNING
   *;
 
--- name: UpdateServiceAccountUsage :exec
-UPDATE service_accounts
-SET
-  last_used_at = NOW()
-WHERE
-  id = @service_account_id
-  AND (
-    last_used_at IS NULL
-    OR last_used_at < NOW() - INTERVAL '5 minutes'
-  );
-
 -- name: DeleteServiceAccount :exec
 DELETE FROM service_accounts
 WHERE

@@ -263,20 +263,3 @@ func (q *Queries) UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAc
 	)
 	return &i, err
 }
-
-const updateServiceAccountUsage = `-- name: UpdateServiceAccountUsage :exec
-UPDATE service_accounts
-SET
-  last_used_at = NOW()
-WHERE
-  id = $1
-  AND (
-    last_used_at IS NULL
-    OR last_used_at < NOW() - INTERVAL '5 minutes'
-  )
-`
-
-func (q *Queries) UpdateServiceAccountUsage(ctx context.Context, serviceAccountID string) error {
-	_, err := q.db.Exec(ctx, updateServiceAccountUsage, serviceAccountID)
-	return err
-}

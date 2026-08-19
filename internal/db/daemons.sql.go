@@ -421,21 +421,3 @@ func (q *Queries) UpdateDaemonStatus(ctx context.Context, arg *UpdateDaemonStatu
 	)
 	return &i, err
 }
-
-const updateDaemonUsage = `-- name: UpdateDaemonUsage :exec
-UPDATE daemons
-SET
-  last_used_at = NOW(),
-  online = TRUE
-WHERE
-  id = $1
-  AND (
-    last_used_at IS NULL
-    OR last_used_at < NOW() - INTERVAL '5 minutes'
-  )
-`
-
-func (q *Queries) UpdateDaemonUsage(ctx context.Context, daemonID string) error {
-	_, err := q.db.Exec(ctx, updateDaemonUsage, daemonID)
-	return err
-}

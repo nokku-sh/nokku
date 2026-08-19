@@ -90,18 +90,6 @@ SET
 WHERE
   id = @daemon_id;
 
--- name: UpdateDaemonUsage :exec
-UPDATE daemons
-SET
-  last_used_at = NOW(),
-  online = TRUE
-WHERE
-  id = @daemon_id
-  AND (
-    last_used_at IS NULL
-    OR last_used_at < NOW() - INTERVAL '5 minutes'
-  );
-
 -- name: ListDaemons :many
 SELECT
   d.*,
