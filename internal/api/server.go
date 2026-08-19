@@ -353,11 +353,11 @@ func (s *Server) registerServices(ctx context.Context) error {
 		return err
 	}
 	for _, route := range authHandler.Routes() {
-		_, path, ok := strings.Cut(route.Pattern, " ")
+		method, path, ok := strings.Cut(route.Pattern, " ")
 		if !ok {
 			continue
 		}
-		s.mux.Handle(authRoutePrefix(path)+route.Pattern, audit.WithAudit(route.Handler))
+		s.mux.Handle(method+" "+authRoutePrefix(path)+path, audit.WithAudit(route.Handler))
 	}
 
 	pubChain := NewChain(audit.WithAudit)                      // Public chain (audit only, no auth)
