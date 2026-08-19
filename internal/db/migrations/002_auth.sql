@@ -6,7 +6,6 @@
 -- bound into the credential), not enforced by RLS.
 --
 -- Grants come from the default privileges configured in 001_base.sql.
-
 -- Sessions: opaque, server-side, revocable tokens. token_hash is the sha256
 -- of the raw token; the raw token is never persisted. subject_id is who the
 -- session authorizes as; identity_id is the authenticated entity when it
