@@ -7,9 +7,9 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/mizuchilabs/kagi"
+	"github.com/mizuchilabs/kagi/tokens"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -83,7 +83,7 @@ func (s *UserService) UpdateProfile(
 
 	// Send verification email
 	if req.Email != nil && user.Email != req.GetEmail() {
-		token, err := s.cfg.Auth.IssueToken(ctx, user.ID, auth.PurposeVerify)
+		token, err := s.cfg.Auth.IssueToken(ctx, user.ID, tokens.PurposeVerify)
 		if err != nil {
 			return nil, DBError(err)
 		}
@@ -94,7 +94,7 @@ func (s *UserService) UpdateProfile(
 			user.ID,
 			req.GetEmail(),
 			verifyURL,
-			oneTimeTokenTTL.String(),
+			s.cfg.Auth.Tokens().TTL().String(),
 		); err != nil {
 			return nil, ErrRateLimited
 		}
