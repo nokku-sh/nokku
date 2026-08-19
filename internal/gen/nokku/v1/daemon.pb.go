@@ -193,8 +193,9 @@ type DaemonConfig struct {
 	AllowAgentForwarding *bool                  `protobuf:"varint,4,opt,name=allow_agent_forwarding,json=allowAgentForwarding" json:"allow_agent_forwarding,omitempty"`
 	GatewayPorts         *bool                  `protobuf:"varint,5,opt,name=gateway_ports,json=gatewayPorts" json:"gateway_ports,omitempty"`
 	MaxSessions          *int32                 `protobuf:"varint,6,opt,name=max_sessions,json=maxSessions" json:"max_sessions,omitempty"`
-	MaxConnections       *int32                 `protobuf:"varint,7,opt,name=max_connections,json=maxConnections" json:"max_connections,omitempty"`
-	ClientAliveInterval  *durationpb.Duration   `protobuf:"bytes,8,opt,name=client_alive_interval,json=clientAliveInterval" json:"client_alive_interval,omitempty"`
+	MaxSessionsPerUser   *int32                 `protobuf:"varint,7,opt,name=max_sessions_per_user,json=maxSessionsPerUser" json:"max_sessions_per_user,omitempty"`
+	MaxConnections       *int32                 `protobuf:"varint,8,opt,name=max_connections,json=maxConnections" json:"max_connections,omitempty"`
+	ClientAliveInterval  *durationpb.Duration   `protobuf:"bytes,9,opt,name=client_alive_interval,json=clientAliveInterval" json:"client_alive_interval,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -267,6 +268,13 @@ func (x *DaemonConfig) GetGatewayPorts() bool {
 func (x *DaemonConfig) GetMaxSessions() int32 {
 	if x != nil && x.MaxSessions != nil {
 		return *x.MaxSessions
+	}
+	return 0
+}
+
+func (x *DaemonConfig) GetMaxSessionsPerUser() int32 {
+	if x != nil && x.MaxSessionsPerUser != nil {
+		return *x.MaxSessionsPerUser
 	}
 	return 0
 }
@@ -2308,16 +2316,17 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9c\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd8\x03\n" +
 	"\fDaemonConfig\x12'\n" +
 	"\x0frecord_sessions\x18\x01 \x01(\bR\x0erecordSessions\x120\n" +
 	"\x14recording_public_key\x18\x02 \x01(\tR\x12recordingPublicKey\x12)\n" +
 	"\x10allow_forwarding\x18\x03 \x01(\bR\x0fallowForwarding\x124\n" +
 	"\x16allow_agent_forwarding\x18\x04 \x01(\bR\x14allowAgentForwarding\x12#\n" +
 	"\rgateway_ports\x18\x05 \x01(\bR\fgatewayPorts\x12*\n" +
-	"\fmax_sessions\x18\x06 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\vmaxSessions\x120\n" +
-	"\x0fmax_connections\x18\a \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x0emaxConnections\x12M\n" +
-	"\x15client_alive_interval\x18\b \x01(\v2\x19.google.protobuf.DurationR\x13clientAliveInterval\"Y\n" +
+	"\fmax_sessions\x18\x06 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\vmaxSessions\x12:\n" +
+	"\x15max_sessions_per_user\x18\a \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x12maxSessionsPerUser\x120\n" +
+	"\x0fmax_connections\x18\b \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x0emaxConnections\x12M\n" +
+	"\x15client_alive_interval\x18\t \x01(\v2\x19.google.protobuf.DurationR\x13clientAliveInterval\"Y\n" +
 	"\x10GetDaemonRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
 	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"=\n" +
