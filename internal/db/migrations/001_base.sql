@@ -1,18 +1,4 @@
 -- Base schema for nokku.
---
--- This file is migration 1 and captures the full schema as it existed
--- before versioned migrations were introduced (previously applied by
--- pg-schema-diff at boot). Never edit it: schema changes go in new
--- numbered migration files (002_..., 003_...).
---
--- Squashing: when the migration list grows unwieldy, dump the current
--- schema from a fully migrated database (pg_dump --schema-only --no-owner),
--- prepend the role creation block from the top of this file (pg_dump does
--- not dump roles), replace this file with the dump, and delete the old
--- migrations. The app detects databases ahead of the available migrations
--- and stamps them down automatically (see internal/db/migrate.go). Down
--- migrations across the squash boundary are gone: rollback means restoring
--- from backup.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
@@ -24,7 +10,6 @@ CREATE TABLE IF NOT EXISTS users (
   username TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE CHECK (email = lower(email)),
   email_verified BOOLEAN NOT NULL DEFAULT FALSE,
-  password_hash TEXT, -- nullable for passwordless accounts
   picture TEXT,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   enable_email_recovery BOOLEAN NOT NULL DEFAULT TRUE,
@@ -32,52 +17,52 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS user_devices (
+CREATE TABLE IF NOT EXISTS sessions (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  kind TEXT NOT NULL DEFAULT 'cli', -- cli, web
-  auth_method TEXT NOT NULL DEFAULT 'token',
-  auth_pubkey TEXT, -- PEM-encoded ECDSA public key used to verify signed request challenges.
-  token_hash TEXT,
-  expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '6 months'),
-  last_used_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  token_hash BYTEA NOT NULL UNIQUE,
+  tenant_id TEXT NOT NULL DEFAULT '',
+  subject_id UUID NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'user',
+  identity_id UUID,
+  method TEXT NOT NULL,
+  binding TEXT, -- DPoP key thumbprint (jkt)
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_seen TIMESTAMPTZ -- kagi idle-timeout enforcement
 );
 
-CREATE TABLE IF NOT EXISTS user_identities (
-  provider_id TEXT NOT NULL, -- identifier from the identity provider
-  provider TEXT NOT NULL, -- google, github, or workspace id
+CREATE TABLE IF NOT EXISTS api_keys (
+  key_id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  subject_id UUID NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'user',
+  secret_hash BYTEA NOT NULL,
+  scopes TEXT[] NOT NULL DEFAULT '{}',
+  name TEXT NOT NULL,
+  expires_at TIMESTAMPTZ, -- NULL = never expires
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS credentials (
+  tenant_id TEXT NOT NULL DEFAULT '',
+  id TEXT NOT NULL,
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  provider_email TEXT, -- email from provider (can be different from user email)
-  provider_username TEXT, -- username from provider
-  protocol TEXT NOT NULL DEFAULT 'oauth' CHECK (protocol IN ('oauth', 'oidc', 'saml')),
+  type TEXT NOT NULL,
+  provider TEXT NOT NULL DEFAULT '',
+  subject TEXT NOT NULL DEFAULT '',
+  data BYTEA,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (provider_id, provider)
+  label TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (tenant_id, id)
 );
 
-CREATE TABLE IF NOT EXISTS passkeys (
-  id TEXT PRIMARY KEY, -- base64-encoded credential ID
-  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  name TEXT,
-  public_key BYTEA NOT NULL,
-  attestation_type TEXT NOT NULL, -- none, basic, self
-  aaguid BYTEA, -- authenticator's unique ID
-  sign_count BIGINT NOT NULL DEFAULT 0, -- protects against cloned authenticators
-  transports TEXT[], -- [usb, ble, nfc, internal]
-  backup_eligible BOOLEAN NOT NULL DEFAULT FALSE,
-  backup_state BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  last_used_at TIMESTAMPTZ
-);
-
-CREATE TABLE IF NOT EXISTS backup_codes (
+CREATE TABLE IF NOT EXISTS one_time_tokens (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
+  token_hash BYTEA NOT NULL UNIQUE,
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  code_hash TEXT NOT NULL,
-  used_at TIMESTAMPTZ, -- NULL until used
+  purpose TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -159,10 +144,6 @@ CREATE TABLE IF NOT EXISTS saml_providers (
   name_attribute TEXT NOT NULL DEFAULT 'name',
   username_attribute TEXT NOT NULL DEFAULT 'username',
   picture_attribute TEXT, -- Optional
-  -- Service Provider private key (for signing requests)
-  sp_private_key BYTEA, -- Encrypted via envelope encryption
-  sp_certificate TEXT,
-  sp_cert_expires_at TIMESTAMPTZ,
   -- Settings
   enforce_sso BOOLEAN NOT NULL DEFAULT FALSE,
   allow_jit_provisioning BOOLEAN NOT NULL DEFAULT TRUE,
@@ -176,7 +157,6 @@ CREATE TABLE IF NOT EXISTS service_accounts (
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL, -- e.g., "github-actions-deploy", "ansible-prod"
   description TEXT,
-  token_hash TEXT,
   role_name TEXT NOT NULL DEFAULT 'viewer' REFERENCES roles (name),
   last_used_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ, -- Optional expiration for temporary access
@@ -190,9 +170,6 @@ CREATE TABLE IF NOT EXISTS daemons (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  -- Signing method used for request authentication: 'tpm' or 'soft'.
-  auth_method TEXT NOT NULL,
-  auth_pubkey TEXT NOT NULL, -- PEM-encoded ECDSA public key 
   status INTEGER NOT NULL DEFAULT 1, -- 1=pending, 2=accepted, 3=rejected
   online BOOLEAN NOT NULL DEFAULT FALSE,
   config JSONB NOT NULL DEFAULT '{}',
@@ -322,6 +299,13 @@ CREATE TABLE IF NOT EXISTS recordings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS saml_sp_keys (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  private_key BYTEA NOT NULL,
+  certificate TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Keysets (for envelope encryption - singleton)
 CREATE TABLE IF NOT EXISTS keysets (
   id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -330,15 +314,21 @@ CREATE TABLE IF NOT EXISTS keysets (
 );
 
 -- Indexes --------------------------------------------------------------------
-CREATE INDEX idx_user_identities_user_id ON user_identities (user_id);
+CREATE INDEX idx_sessions_subject ON sessions (subject_id);
 
-CREATE INDEX idx_user_identities_provider_email ON user_identities (provider_email);
+CREATE INDEX idx_sessions_identity ON sessions (identity_id);
 
-CREATE INDEX idx_user_devices_user_id ON user_devices (user_id);
+CREATE INDEX idx_api_keys_tenant ON api_keys (tenant_id);
 
-CREATE INDEX idx_passkeys_user_id ON passkeys (user_id);
+CREATE INDEX idx_api_keys_subject ON api_keys (subject_id);
 
-CREATE INDEX idx_backup_codes_user_id ON backup_codes (user_id);
+CREATE UNIQUE INDEX idx_credentials_subject ON credentials (tenant_id, type, provider, subject)
+WHERE
+  subject <> '';
+
+CREATE INDEX idx_credentials_user ON credentials (user_id, type);
+
+CREATE INDEX idx_one_time_tokens_user ON one_time_tokens (user_id);
 
 CREATE INDEX idx_workspaces_created_by ON workspaces (created_by);
 
@@ -419,6 +409,18 @@ CREATE OR REPLACE FUNCTION current_actor_id () RETURNS UUID AS $$
   SELECT NULLIF(current_setting('nokku.actor_id', TRUE), '')::UUID
 $$ LANGUAGE sql STABLE;
 
+-- Session helpers ------------------------------------------------------------
+-- Membership of the current actor in a workspace. Used for cross-tenant
+-- reads users legitimately need outside a pinned workspace.
+CREATE OR REPLACE FUNCTION is_workspace_member (ws_id UUID) RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM workspace_members wm
+    WHERE wm.workspace_id = ws_id
+      AND wm.user_id = current_actor_id ()
+  )
+$$ LANGUAGE sql STABLE;
+
 -- Triggers -------------------------------------------------------------------
 -- Ensure only one default CA per workspace
 CREATE OR REPLACE FUNCTION enforce_single_default_ca () RETURNS TRIGGER AS $$
@@ -447,37 +449,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Automatically create triggers for all tables with updated_at column
-DO $$
-DECLARE
-  t RECORD;
-  trigger_name TEXT;
-BEGIN
-  FOR t IN
-    SELECT table_name
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND column_name = 'updated_at'
-  LOOP
-    trigger_name := 'update_' || t.table_name || '_updated_at';
-
-    EXECUTE format(
-      'CREATE OR REPLACE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()',
-      trigger_name,
-      t.table_name
-    );
-  END LOOP;
-END;
-$$;
-
 -- Roles and grants -----------------------------------------------------------
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nokku_app') THEN
-	 CREATE ROLE nokku_app NOLOGIN;
+    CREATE ROLE nokku_app NOLOGIN;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nokku_system') THEN
-	 CREATE ROLE nokku_system NOLOGIN BYPASSRLS;
+    CREATE ROLE nokku_system NOLOGIN BYPASSRLS;
   END IF;
 END $$;
 
@@ -542,7 +521,7 @@ SELECT
 --     USING (workspace_id = current_workspace_id())
 --     WITH CHECK (workspace_id = current_workspace_id());
 -- (plus one of the variants below when the table needs cross-tenant reads or
--- referential integrity checks). 
+-- referential integrity checks).
 ALTER TABLE workspaces ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE workspaces FORCE ROW LEVEL SECURITY;
@@ -610,18 +589,6 @@ ALTER TABLE principal_service_accounts FORCE ROW LEVEL SECURITY;
 ALTER TABLE recordings ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE recordings FORCE ROW LEVEL SECURITY;
-
--- Session helpers ------------------------------------------------------------
--- Membership of the current actor in a workspace. Used for cross-tenant
--- reads users legitimately need outside a pinned workspace.
-CREATE OR REPLACE FUNCTION is_workspace_member (ws_id UUID) RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM workspace_members wm
-    WHERE wm.workspace_id = ws_id
-      AND wm.user_id = current_actor_id ()
-  )
-$$ LANGUAGE sql STABLE;
 
 -- Workspaces -----------------------------------------------------------------
 CREATE POLICY workspaces_select ON workspaces FOR
@@ -780,11 +747,13 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit.audit_logs (actor_id, t
 GRANT USAGE ON SCHEMA audit TO nokku_app,
 nokku_system;
 
+-- nokku_app: SELECT + INSERT
 GRANT
 SELECT
 ,
   INSERT ON ALL TABLES IN SCHEMA audit TO nokku_app;
 
+-- nokku_system additionally can DELETE (partition cleanup)
 GRANT
 SELECT
 ,

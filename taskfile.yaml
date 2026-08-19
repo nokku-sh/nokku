@@ -119,8 +119,9 @@ tasks:
         -d nokku > new-001_base.sql
       - |
         echo "Dumped to new-001_base.sql. To squash, prepend the role creation \
-        block from the top of 001_base.sql, replace \
-        internal/db/migrations/001_base.sql with the dump, \
+        block and append the grants section from the current 001_base.sql, \
+        strip pg_dump's schema_version bookkeeping table and \\restrict lines, \
+        replace internal/db/migrations/001_base.sql with the result, \
         delete the old migrations, and boot once to stamp the version."
     env:
       PGPASSWORD: "{{ .NOKKU_DB_PASSWORD }}"
