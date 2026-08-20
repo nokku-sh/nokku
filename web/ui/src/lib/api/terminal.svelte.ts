@@ -2,7 +2,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SvelteMap } from 'svelte/reactivity';
 import { activeSessionID } from '$lib/store.svelte';
-import type { Session } from '$lib/gen/nokku/v1/daemon_pb';
+import type { DaemonSession } from '$lib/gen/nokku/v1/daemon_pb';
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -37,7 +37,7 @@ export function removeSession(id: string) {
 	}
 	sessions.delete(id);
 }
-export function validateActiveSession(sessions: Session[]) {
+export function validateActiveSession(sessions: DaemonSession[]) {
 	if (!activeSessionID.current) return;
 
 	const isValid = sessions.some((s) => s.sessionId === activeSessionID.current);
