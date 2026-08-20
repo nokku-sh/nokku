@@ -15,6 +15,14 @@ func TestUserIDFromContext(t *testing.T) {
 	if id := UserIDFromContext(ctx); id != "user-1" {
 		t.Fatalf("expected user-1, got %q", id)
 	}
+
+	device := kagi.WithPrincipal(context.Background(), kagi.Principal{
+		SubjectID: "user-1",
+		Kind:      ActorTypeDevice,
+	})
+	if id := UserIDFromContext(device); id != "user-1" {
+		t.Fatalf("expected user-1 for device session, got %q", id)
+	}
 }
 
 func TestDaemonIDFromContext(t *testing.T) {
