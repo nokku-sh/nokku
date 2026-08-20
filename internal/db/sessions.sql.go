@@ -83,6 +83,23 @@ func (q *Queries) DeleteSessionByHash(ctx context.Context, tokenHash []byte) err
 	return err
 }
 
+const deleteSessionForSubject = `-- name: DeleteSessionForSubject :exec
+DELETE FROM sessions
+WHERE
+  token_hash = $1
+  AND subject_id = $2
+`
+
+type DeleteSessionForSubjectParams struct {
+	TokenHash []byte `json:"tokenHash"`
+	SubjectID string `json:"subjectId"`
+}
+
+func (q *Queries) DeleteSessionForSubject(ctx context.Context, arg *DeleteSessionForSubjectParams) error {
+	_, err := q.db.Exec(ctx, deleteSessionForSubject, arg.TokenHash, arg.SubjectID)
+	return err
+}
+
 const deleteSubjectSessions = `-- name: DeleteSubjectSessions :exec
 DELETE FROM sessions
 WHERE
