@@ -36,12 +36,12 @@ services:
     env_file: .env
     # Schema migrations run automatically on boot (NOKKU_DB_AUTOMIGRATE=true).
     environment:
-      NOKKU_DB_HOST: postgres
-      NOKKU_DB_PORT: "5432"
-      NOKKU_DB_NAME: ${POSTGRES_DB:-nokku}
-      NOKKU_DB_USER: ${POSTGRES_USER:-nokku}
-      NOKKU_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
-      NOKKU_DB_SSL_MODE: disable
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGNAME: ${POSTGRES_DB:-nokku}
+      PGUSER: ${POSTGRES_USER:-nokku}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
+      PGSSLMODE: disable
       NOKKU_STORAGE: local
       NOKKU_LOCAL_STORAGE_PATH: /data
     volumes:
