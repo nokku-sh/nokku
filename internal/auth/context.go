@@ -27,13 +27,19 @@ func WorkspaceIDFromContext(ctx context.Context) string {
 }
 
 // UserIDFromContext returns the user subject id when the request acts as a
-// human user.
+// human user. Device sessions also resolve: the CLI authenticates on the
+// user's behalf through the device flow, so its subject is the user id.
 func UserIDFromContext(ctx context.Context) string {
 	p, ok := kagi.PrincipalFromContext(ctx)
-	if !ok || p.Kind != ActorTypeUser {
+	if !ok {
 		return ""
 	}
-	return p.SubjectID
+	switch p.Kind {
+	case ActorTypeUser, ActorTypeDevice:
+		return p.SubjectID
+	default:
+		return ""
+	}
 }
 
 // DaemonIDFromContext returns the daemon id when the request acts as a daemon.
