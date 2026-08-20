@@ -124,4 +124,4 @@ tasks:
         replace internal/db/migrations/001_base.sql with the result, \
         delete the old migrations, and boot once to stamp the version."
     env:
-      PGPASSWORD: "{{ .NOKKU_DB_PASSWORD }}"
+      PGPASSWORD: "{{ .PGPASSWORD }}"

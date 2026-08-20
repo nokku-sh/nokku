@@ -76,14 +76,14 @@ services:
     # Schema migrations run automatically on boot (NOKKU_DB_AUTOMIGRATE=true).
     environment:
       # Point the app at the services in this stack.
-      NOKKU_DB_HOST: postgres
-      NOKKU_DB_PORT: "5432"
-      NOKKU_DB_NAME: ${POSTGRES_DB:-nokku}
-      NOKKU_DB_USER: ${POSTGRES_USER:-nokku}
-      NOKKU_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
-      NOKKU_DB_SSL_MODE: disable
-      NOKKU_REDIS_ADDR: redis:6379
-      NOKKU_REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required in .env}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGNAME: ${POSTGRES_DB:-nokku}
+      PGUSER: ${POSTGRES_USER:-nokku}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
+      PGSSLMODE: disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required in .env}
       # Caddy runs on the same internal network; forwarded client headers are
       # only honored from peers in this range.
       NOKKU_TRUSTED_PROXIES: 172.28.0.0/16
