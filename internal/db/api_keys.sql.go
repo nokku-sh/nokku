@@ -23,7 +23,7 @@ func (q *Queries) DeleteKey(ctx context.Context, keyID string) error {
 
 const getKey = `-- name: GetKey :one
 SELECT
-  key_id, tenant_id, subject_id, kind, secret_hash, scopes, name, expires_at, created_at
+  key_id, tenant_id, subject_id, kind, secret_hash, scopes, name, expires_at, created_at, last_seen
 FROM
   api_keys
 WHERE
@@ -43,13 +43,14 @@ func (q *Queries) GetKey(ctx context.Context, keyID string) (*APIKey, error) {
 		&i.Name,
 		&i.ExpiresAt,
 		&i.CreatedAt,
+		&i.LastSeen,
 	)
 	return &i, err
 }
 
 const listKeys = `-- name: ListKeys :many
 SELECT
-  key_id, tenant_id, subject_id, kind, secret_hash, scopes, name, expires_at, created_at
+  key_id, tenant_id, subject_id, kind, secret_hash, scopes, name, expires_at, created_at, last_seen
 FROM
   api_keys
 WHERE
@@ -81,6 +82,7 @@ func (q *Queries) ListKeys(ctx context.Context, arg *ListKeysParams) ([]*APIKey,
 			&i.Name,
 			&i.ExpiresAt,
 			&i.CreatedAt,
+			&i.LastSeen,
 		); err != nil {
 			return nil, err
 		}
@@ -94,7 +96,7 @@ func (q *Queries) ListKeys(ctx context.Context, arg *ListKeysParams) ([]*APIKey,
 
 const listTenantKeys = `-- name: ListTenantKeys :many
 SELECT
-  key_id, tenant_id, subject_id, kind, secret_hash, scopes, name, expires_at, created_at
+  key_id, tenant_id, subject_id, kind, secret_hash, scopes, name, expires_at, created_at, last_seen
 FROM
   api_keys
 WHERE
@@ -120,6 +122,7 @@ func (q *Queries) ListTenantKeys(ctx context.Context, tenantID string) ([]*APIKe
 			&i.Name,
 			&i.ExpiresAt,
 			&i.CreatedAt,
+			&i.LastSeen,
 		); err != nil {
 			return nil, err
 		}
@@ -192,5 +195,18 @@ func (q *Queries) PutKey(ctx context.Context, arg *PutKeyParams) error {
 		arg.ExpiresAt,
 		arg.CreatedAt,
 	)
+	return err
+}
+
+const touchKey = `-- name: TouchKey :exec
+UPDATE api_keys
+SET
+  last_seen = NOW()
+WHERE
+  key_id = $1
+`
+
+func (q *Queries) TouchKey(ctx context.Context, keyID string) error {
+	_, err := q.db.Exec(ctx, touchKey, keyID)
 	return err
 }

@@ -26,7 +26,7 @@ WITH
         COALESCE($5, '{}'::jsonb)
       )
     RETURNING
-      id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
+      id, workspace_id, name, status, online, config, metadata, updated_at, created_at
   ),
   new_target AS (
     INSERT INTO
@@ -40,7 +40,7 @@ WITH
       new_daemon
   )
 SELECT
-  id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, updated_at, created_at
 FROM
   new_daemon
 `
@@ -54,16 +54,15 @@ type CreateDaemonParams struct {
 }
 
 type CreateDaemonRow struct {
-	ID          string     `json:"id"`
-	WorkspaceID string     `json:"workspaceId"`
-	Name        string     `json:"name"`
-	Status      int32      `json:"status"`
-	Online      bool       `json:"online"`
-	Config      []byte     `json:"config"`
-	Metadata    []byte     `json:"metadata"`
-	LastUsedAt  *time.Time `json:"lastUsedAt"`
-	UpdatedAt   time.Time  `json:"updatedAt"`
-	CreatedAt   time.Time  `json:"createdAt"`
+	ID          string    `json:"id"`
+	WorkspaceID string    `json:"workspaceId"`
+	Name        string    `json:"name"`
+	Status      int32     `json:"status"`
+	Online      bool      `json:"online"`
+	Config      []byte    `json:"config"`
+	Metadata    []byte    `json:"metadata"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*CreateDaemonRow, error) {
@@ -83,7 +82,6 @@ func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*C
 		&i.Online,
 		&i.Config,
 		&i.Metadata,
-		&i.LastUsedAt,
 		&i.UpdatedAt,
 		&i.CreatedAt,
 	)
@@ -95,7 +93,7 @@ DELETE FROM daemons
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, updated_at, created_at
 `
 
 func (q *Queries) DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, error) {
@@ -109,7 +107,6 @@ func (q *Queries) DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, e
 		&i.Online,
 		&i.Config,
 		&i.Metadata,
-		&i.LastUsedAt,
 		&i.UpdatedAt,
 		&i.CreatedAt,
 	)
@@ -118,7 +115,7 @@ func (q *Queries) DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, e
 
 const getDaemon = `-- name: GetDaemon :one
 SELECT
-  id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, updated_at, created_at
 FROM
   daemons
 WHERE
@@ -136,7 +133,6 @@ func (q *Queries) GetDaemon(ctx context.Context, daemonID string) (*Daemon, erro
 		&i.Online,
 		&i.Config,
 		&i.Metadata,
-		&i.LastUsedAt,
 		&i.UpdatedAt,
 		&i.CreatedAt,
 	)
@@ -210,7 +206,7 @@ func (q *Queries) GetTargetByDaemon(ctx context.Context, daemonID *string) (*Tar
 
 const listDaemons = `-- name: ListDaemons :many
 SELECT
-  d.id, d.workspace_id, d.name, d.status, d.online, d.config, d.metadata, d.last_used_at, d.updated_at, d.created_at,
+  d.id, d.workspace_id, d.name, d.status, d.online, d.config, d.metadata, d.updated_at, d.created_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   daemons d
@@ -253,7 +249,6 @@ type ListDaemonsRow struct {
 	Online      bool                `json:"online"`
 	Config      *nokku.DaemonConfig `json:"config"`
 	Metadata    []byte              `json:"metadata"`
-	LastUsedAt  *time.Time          `json:"lastUsedAt"`
 	UpdatedAt   time.Time           `json:"updatedAt"`
 	CreatedAt   time.Time           `json:"createdAt"`
 	TotalCount  int32               `json:"totalCount"`
@@ -283,7 +278,6 @@ func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*L
 			&i.Online,
 			&i.Config,
 			&i.Metadata,
-			&i.LastUsedAt,
 			&i.UpdatedAt,
 			&i.CreatedAt,
 			&i.TotalCount,
@@ -320,7 +314,7 @@ SET
 WHERE
   id = $4
 RETURNING
-  id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, updated_at, created_at
 `
 
 type UpdateDaemonParams struct {
@@ -346,7 +340,6 @@ func (q *Queries) UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) (*D
 		&i.Online,
 		&i.Config,
 		&i.Metadata,
-		&i.LastUsedAt,
 		&i.UpdatedAt,
 		&i.CreatedAt,
 	)
@@ -396,7 +389,7 @@ SET
 WHERE
   id = $2
 RETURNING
-  id, workspace_id, name, status, online, config, metadata, last_used_at, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, updated_at, created_at
 `
 
 type UpdateDaemonStatusParams struct {
@@ -415,7 +408,6 @@ func (q *Queries) UpdateDaemonStatus(ctx context.Context, arg *UpdateDaemonStatu
 		&i.Online,
 		&i.Config,
 		&i.Metadata,
-		&i.LastUsedAt,
 		&i.UpdatedAt,
 		&i.CreatedAt,
 	)

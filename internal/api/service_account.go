@@ -25,7 +25,7 @@ func (s *ServiceAccountService) GetServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.GetServiceAccountRequest,
 ) (*nokkuv1.GetServiceAccountResponse, error) {
-	var result *db.ServiceAccount
+	var result *db.GetServiceAccountRow
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.GetServiceAccount(ctx, req.GetId())
 		return err
@@ -61,7 +61,7 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		return nil, ErrInvalidInput
 	}
 
-	var result *db.ServiceAccount
+	var result *db.GetServiceAccountRow
 	var key kagi.APIKey
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		params := &db.CreateServiceAccountParams{
@@ -77,7 +77,7 @@ func (s *ServiceAccountService) CreateServiceAccount(
 			params.ExpiresAt = &expiry
 		}
 
-		result, err = q.CreateServiceAccount(ctx, params)
+		saID, err := q.CreateServiceAccount(ctx, params)
 		if err != nil {
 			return err
 		}
@@ -95,10 +95,14 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		key, err = s.cfg.Auth.IssueServiceAccountKey(
 			ctx,
 			req.GetWorkspaceId(),
-			result.ID,
+			saID,
 			req.GetName(),
 			ttl,
 		)
+		if err != nil {
+			return err
+		}
+		result, err = q.GetServiceAccount(ctx, saID)
 		return err
 	}); err != nil {
 		return nil, DBError(err)
@@ -118,9 +122,9 @@ func (s *ServiceAccountService) UpdateServiceAccount(
 		return nil, ErrInvalidInput
 	}
 
-	var result *db.ServiceAccount
+	var result *db.GetServiceAccountRow
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.UpdateServiceAccount(ctx, &db.UpdateServiceAccountParams{
+		updatedID, err := q.UpdateServiceAccount(ctx, &db.UpdateServiceAccountParams{
 			ServiceAccountID: req.GetId(),
 			Name:             req.Name,
 			Description:      req.Description,
@@ -129,7 +133,8 @@ func (s *ServiceAccountService) UpdateServiceAccount(
 		if err != nil {
 			return err
 		}
-		return nil
+		result, err = q.GetServiceAccount(ctx, updatedID)
+		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}

@@ -23,7 +23,7 @@ VALUES
     COALESCE($6, '{}'::TEXT[])
   )
 RETURNING
-  id, workspace_id, name, description, role_name, last_used_at, expires_at, tags, created_at, updated_at
+  id
 `
 
 type CreateServiceAccountParams struct {
@@ -35,7 +35,7 @@ type CreateServiceAccountParams struct {
 	Tags        interface{} `json:"tags"`
 }
 
-func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (*ServiceAccount, error) {
+func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (string, error) {
 	row := q.db.QueryRow(ctx, createServiceAccount,
 		arg.WorkspaceID,
 		arg.Name,
@@ -44,20 +44,9 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAc
 		arg.ExpiresAt,
 		arg.Tags,
 	)
-	var i ServiceAccount
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.RoleName,
-		&i.LastUsedAt,
-		&i.ExpiresAt,
-		&i.Tags,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }
 
 const deleteServiceAccount = `-- name: DeleteServiceAccount :exec
@@ -73,27 +62,48 @@ func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID str
 
 const getServiceAccount = `-- name: GetServiceAccount :one
 SELECT
-  id, workspace_id, name, description, role_name, last_used_at, expires_at, tags, created_at, updated_at
+  sa.id, sa.workspace_id, sa.name, sa.description, sa.role_name, sa.expires_at, sa.tags, sa.created_at, sa.updated_at,
+  (
+    SELECT
+      MAX(ak.last_seen)
+    FROM
+      api_keys ak
+    WHERE
+      ak.subject_id = sa.id
+  )::TIMESTAMPTZ AS last_used_at
 FROM
-  service_accounts
+  service_accounts sa
 WHERE
-  id = $1
+  sa.id = $1
 `
 
-func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string) (*ServiceAccount, error) {
+type GetServiceAccountRow struct {
+	ID          string     `json:"id"`
+	WorkspaceID string     `json:"workspaceId"`
+	Name        string     `json:"name"`
+	Description *string    `json:"description"`
+	RoleName    string     `json:"roleName"`
+	ExpiresAt   *time.Time `json:"expiresAt"`
+	Tags        []string   `json:"tags"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
+	LastUsedAt  time.Time  `json:"lastUsedAt"`
+}
+
+func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string) (*GetServiceAccountRow, error) {
 	row := q.db.QueryRow(ctx, getServiceAccount, serviceAccountID)
-	var i ServiceAccount
+	var i GetServiceAccountRow
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Description,
 		&i.RoleName,
-		&i.LastUsedAt,
 		&i.ExpiresAt,
 		&i.Tags,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastUsedAt,
 	)
 	return &i, err
 }
@@ -116,7 +126,15 @@ func (q *Queries) GetServiceAccountWorkspaceID(ctx context.Context, serviceAccou
 
 const listServiceAccounts = `-- name: ListServiceAccounts :many
 SELECT
-  sa.id, sa.workspace_id, sa.name, sa.description, sa.role_name, sa.last_used_at, sa.expires_at, sa.tags, sa.created_at, sa.updated_at,
+  sa.id, sa.workspace_id, sa.name, sa.description, sa.role_name, sa.expires_at, sa.tags, sa.created_at, sa.updated_at,
+  (
+    SELECT
+      MAX(ak.last_seen)
+    FROM
+      api_keys ak
+    WHERE
+      ak.subject_id = sa.id
+  )::TIMESTAMPTZ AS last_used_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa
@@ -171,11 +189,11 @@ type ListServiceAccountsRow struct {
 	Name        string     `json:"name"`
 	Description *string    `json:"description"`
 	RoleName    string     `json:"roleName"`
-	LastUsedAt  *time.Time `json:"lastUsedAt"`
 	ExpiresAt   *time.Time `json:"expiresAt"`
 	Tags        []string   `json:"tags"`
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
+	LastUsedAt  time.Time  `json:"lastUsedAt"`
 	TotalCount  int32      `json:"totalCount"`
 }
 
@@ -202,11 +220,11 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 			&i.Name,
 			&i.Description,
 			&i.RoleName,
-			&i.LastUsedAt,
 			&i.ExpiresAt,
 			&i.Tags,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.LastUsedAt,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
@@ -229,7 +247,7 @@ SET
 WHERE
   id = $5
 RETURNING
-  id, workspace_id, name, description, role_name, last_used_at, expires_at, tags, created_at, updated_at
+  id
 `
 
 type UpdateServiceAccountParams struct {
@@ -240,7 +258,7 @@ type UpdateServiceAccountParams struct {
 	ServiceAccountID string   `json:"serviceAccountId"`
 }
 
-func (q *Queries) UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (*ServiceAccount, error) {
+func (q *Queries) UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (string, error) {
 	row := q.db.QueryRow(ctx, updateServiceAccount,
 		arg.Name,
 		arg.Description,
@@ -248,18 +266,7 @@ func (q *Queries) UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAc
 		arg.Tags,
 		arg.ServiceAccountID,
 	)
-	var i ServiceAccount
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.RoleName,
-		&i.LastUsedAt,
-		&i.ExpiresAt,
-		&i.Tags,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }
