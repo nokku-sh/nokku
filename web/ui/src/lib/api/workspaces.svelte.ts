@@ -128,7 +128,7 @@ export const util = {
 			enabled: !!workspaceID.current,
 			select: (res) => res.version
 		}),
-	getLogs: (filters?: {
+	getLogs: (opts?: {
 		search?: string;
 		actorIds?: string[];
 		actorTypes?: string[];
@@ -136,20 +136,22 @@ export const util = {
 		status?: boolean;
 		startDate?: Timestamp;
 		endDate?: Timestamp;
+		limit?: number;
+		offset?: number;
 	}) => {
 		// Filter out undefined/empty values
 		const cleanFilters = Object.fromEntries(
-			Object.entries(filters ?? {}).filter(([_, v]) => v !== undefined && v !== '' && v !== null)
+			Object.entries(opts ?? {}).filter(([_, v]) => v !== undefined && v !== '' && v !== null)
 		);
 
 		return useQuery(
 			UtilService.method.listAuditLogs,
-			{
+			() => ({
 				workspaceId: workspaceID.current,
 				limit: pageSize.current,
 				offset: pageIndex.current,
 				...cleanFilters
-			},
+			}),
 			{ enabled: !!workspaceID.current }
 		);
 	},
