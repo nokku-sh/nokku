@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -21,21 +22,7 @@ var (
 	ErrWorkspaceNotPinned     = errors.New("operation requires a workspace context")
 )
 
-// User and Password identify the administrative connection used for
-// schema migrations and maintenance.
-//
-// 'nokku_app' is the login role used at runtime. It owns nothing and is
-// subject to row-level security on every tenant table. AppPassword
-// defaults to Password when unset, so single-password deployments need
-// no extra configuration.
-
 type Connection struct {
-	Host        string `env:"PGHOST"                envDefault:"localhost"`
-	Port        string `env:"PGPORT"                envDefault:"5432"`
-	Database    string `env:"PGNAME"                envDefault:"nokku"`
-	User        string `env:"PGUSER"                envDefault:"postgres"`
-	Password    string `env:"PGPASSWORD"            envDefault:"postgres"`
-	SSLMode     string `env:"PGSSLMODE"             envDefault:"disable"`
 	AppPassword string `env:"NOKKU_DB_APP_PASSWORD"`
 	AutoMigrate bool   `env:"NOKKU_DB_AUTOMIGRATE"  envDefault:"true"`
 	MaxConns    int32  `env:"NOKKU_DB_MAX_CONNS"    envDefault:"10"`
@@ -54,19 +41,31 @@ func NewConnection(ctx context.Context) (*Connection, error) {
 		return nil, err
 	}
 
+	// Set default environment variables
+	defaults := map[string]string{
+		"PGHOST":     "localhost",
+		"PGPORT":     "5432",
+		"PGDATABASE": "nokku",
+		"PGUSER":     "postgres",
+		"PGPASSWORD": "postgres",
+		"PGSSLMODE":  "disable",
+	}
+
+	for key, fallback := range defaults {
+		// Only set the default if the user hasn't provided the variable
+		if os.Getenv(key) == "" {
+			_ = os.Setenv(key, fallback)
+		}
+	}
+
 	if err := c.createPools(ctx); err != nil {
 		return nil, err
 	}
 	return &c, nil
 }
 
-func (c *Connection) poolConfig(user, password string) (*pgxpool.Config, error) {
-	url := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		c.Host, c.Port, user, password, c.Database, c.SSLMode,
-	)
-
-	config, err := pgxpool.ParseConfig(url)
+func (c *Connection) poolConfig() (*pgxpool.Config, error) {
+	config, err := pgxpool.ParseConfig("")
 	if err != nil {
 		return nil, fmt.Errorf("parsing pool config: %w", err)
 	}
@@ -86,14 +85,16 @@ func (c *Connection) poolConfig(user, password string) (*pgxpool.Config, error) 
 }
 
 func (c *Connection) createPools(ctx context.Context) error {
-	if c.AppPassword == "" {
-		c.AppPassword = c.Password
-	}
-
-	adminConfig, err := c.poolConfig(c.User, c.Password)
+	// Create Admin Config (Uses environment PGUSER and PGPASSWORD)
+	adminConfig, err := c.poolConfig()
 	if err != nil {
 		return err
 	}
+	// Default AppPassword to the environment PGPASSWORD if not provided
+	if c.AppPassword == "" {
+		c.AppPassword = adminConfig.ConnConfig.Password
+	}
+
 	c.AdminPool, err = pgxpool.NewWithConfig(ctx, adminConfig)
 	if err != nil {
 		return fmt.Errorf("creating admin pool: %w", err)
@@ -113,10 +114,16 @@ func (c *Connection) createPools(ctx context.Context) error {
 		}
 	}
 
-	appConfig, err := c.poolConfig("nokku_app", c.AppPassword)
+	// Create App Config
+	appConfig, err := c.poolConfig()
 	if err != nil {
 		return err
 	}
+
+	// Override the role and password for runtime traffic
+	appConfig.ConnConfig.User = "nokku_app"
+	appConfig.ConnConfig.Password = c.AppPassword
+
 	c.Pool, err = pgxpool.NewWithConfig(ctx, appConfig)
 	if err != nil {
 		return fmt.Errorf("creating app pool: %w", err)
