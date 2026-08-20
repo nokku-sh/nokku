@@ -52,6 +52,12 @@ DELETE FROM sessions
 WHERE
   token_hash = @token_hash;
 
+-- name: DeleteSessionForSubject :exec
+DELETE FROM sessions
+WHERE
+  token_hash = @token_hash
+  AND subject_id = @subject_id;
+
 -- name: DeleteSubjectSessions :exec
 DELETE FROM sessions
 WHERE

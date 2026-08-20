@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 
@@ -10,10 +11,10 @@ import (
 	"github.com/mizuchilabs/kagi/tokens"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
@@ -29,13 +30,13 @@ func (s *UserService) Whoami(
 	ctx context.Context,
 	_ *nokkuv1.WhoamiRequest,
 ) (*nokkuv1.WhoamiResponse, error) {
-	actor := meta.ActorFromContext(ctx)
+	actor, _ := kagi.PrincipalFromContext(ctx)
 	//nolint:exhaustive // daemon actors never call Whoami; treat them as users
-	switch actor.Type {
-	case meta.ActorTypeServiceAccount:
-		var result *db.ServiceAccount
+	switch actor.Kind {
+	case auth.ActorTypeServiceAccount:
+		var result *db.GetServiceAccountRow
 		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-			result, err = q.GetServiceAccount(ctx, actor.ID)
+			result, err = q.GetServiceAccount(ctx, actor.SubjectID)
 			return err
 		}); err != nil {
 			return nil, DBError(err)
@@ -47,7 +48,7 @@ func (s *UserService) Whoami(
 			ServiceAccount: result.ToProto(),
 		}, nil
 	default:
-		user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
+		user, err := s.cfg.Conn.Q.GetUserByID(ctx, auth.UserIDFromContext(ctx))
 		if err != nil {
 			return nil, DBError(err)
 		}
@@ -61,7 +62,7 @@ func (s *UserService) UpdateProfile(
 	ctx context.Context,
 	req *nokkuv1.UpdateProfileRequest,
 ) (*nokkuv1.UpdateProfileResponse, error) {
-	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
+	user, err := s.cfg.Conn.Q.GetUserByID(ctx, auth.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -102,7 +103,7 @@ func (s *UserService) UpdateProfile(
 	}
 
 	result, err := s.cfg.Conn.Q.UpdateUser(ctx, &db.UpdateUserParams{
-		UserID:   meta.UserIDFromContext(ctx),
+		UserID:   auth.UserIDFromContext(ctx),
 		Name:     req.Name,
 		Username: req.Username,
 		Picture:  req.Picture,
@@ -120,7 +121,7 @@ func (s *UserService) DeleteAccount(
 	ctx context.Context,
 	_ *nokkuv1.DeleteAccountRequest,
 ) (*nokkuv1.DeleteAccountResponse, error) {
-	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
+	user, err := s.cfg.Conn.Q.GetUserByID(ctx, auth.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -158,7 +159,7 @@ func (s *UserService) ListLinkedAccounts(
 	ctx context.Context,
 	_ *nokkuv1.ListLinkedAccountsRequest,
 ) (*nokkuv1.ListLinkedAccountsResponse, error) {
-	userID := meta.UserIDFromContext(ctx)
+	userID := auth.UserIDFromContext(ctx)
 
 	var accounts []*nokkuv1.OAuthIdentity
 	for _, typ := range []kagi.CredentialType{kagi.CredentialOIDC, kagi.CredentialOAuth2, kagi.CredentialSAML} {
@@ -182,7 +183,7 @@ func (s *UserService) UnlinkAccount(
 	ctx context.Context,
 	req *nokkuv1.UnlinkAccountRequest,
 ) (*nokkuv1.UnlinkAccountResponse, error) {
-	userID := meta.UserIDFromContext(ctx)
+	userID := auth.UserIDFromContext(ctx)
 
 	// Workspace identities (enterprise OIDC/SAML) are owned by the
 	// organization and cannot be unlinked by the user.
@@ -264,10 +265,77 @@ func (s *UserService) SetEmailRecovery(
 	req *nokkuv1.SetEmailRecoveryRequest,
 ) (*nokkuv1.SetEmailRecoveryResponse, error) {
 	if err := s.cfg.Conn.Q.UpdateEmailRecovery(ctx, &db.UpdateEmailRecoveryParams{
-		UserID:              meta.UserIDFromContext(ctx),
+		UserID:              auth.UserIDFromContext(ctx),
 		EnableEmailRecovery: req.GetEnable(),
 	}); err != nil {
 		return nil, DBError(err)
 	}
 	return &nokkuv1.SetEmailRecoveryResponse{}, nil
+}
+
+// Sessions ----------------------------------------------------------------------
+
+// ListUserSessions returns every live session of the calling user, newest
+// activity first. It is always scoped to the principal in context; there is
+// no way to list another user's sessions.
+func (s *UserService) ListUserSessions(
+	ctx context.Context,
+	_ *nokkuv1.ListUserSessionsRequest,
+) (*nokkuv1.ListUserSessionsResponse, error) {
+	userID := auth.UserIDFromContext(ctx)
+	if userID == "" {
+		return nil, ErrNotFound
+	}
+	sessions, err := s.cfg.Auth.Kagi.Sessions.List(ctx, "", userID)
+	if err != nil {
+		return nil, DBError(err)
+	}
+
+	// The principal carries the raw token of the presenting session, so the
+	// UI can mark it as the current one (and warn before revoking it).
+	var current string
+	if p, ok := kagi.PrincipalFromContext(ctx); ok {
+		current = p.SessionToken
+	}
+
+	out := make([]*nokkuv1.UserSession, 0, len(sessions))
+	for _, s := range sessions {
+		id := hex.EncodeToString(s.TokenHash)
+		out = append(out, &nokkuv1.UserSession{
+			Id:         &id,
+			Kind:       new(string(s.Kind)),
+			Method:     new(string(s.Method)),
+			IdentityId: new(s.IdentityID),
+			Binding:    new(s.Binding),
+			ExpiresAt:  db.SafeTimestamp(&s.ExpiresAt),
+			LastSeen:   db.SafeTimestamp(&s.LastSeenAt),
+			IsCurrent:  new(s.Token == current),
+		})
+	}
+	return &nokkuv1.ListUserSessionsResponse{Sessions: out}, nil
+}
+
+// RevokeUserSession deletes one of the calling user's sessions by id. The id
+// is the session's token hash (the value ListUserSessions returns). The delete
+// is scoped to the caller's subject, so a session can only be revoked by the
+// user it belongs to.
+func (s *UserService) RevokeUserSession(
+	ctx context.Context,
+	req *nokkuv1.RevokeUserSessionRequest,
+) (*nokkuv1.RevokeUserSessionResponse, error) {
+	userID := auth.UserIDFromContext(ctx)
+	if userID == "" {
+		return nil, ErrNotFound
+	}
+	hash, err := hex.DecodeString(req.GetSessionId())
+	if err != nil || len(hash) != 32 {
+		return nil, ErrInvalidInput
+	}
+	if err := s.cfg.Conn.Q.DeleteSessionForSubject(ctx, &db.DeleteSessionForSubjectParams{
+		TokenHash: hash,
+		SubjectID: userID,
+	}); err != nil {
+		return nil, DBError(err)
+	}
+	return &nokkuv1.RevokeUserSessionResponse{}, nil
 }

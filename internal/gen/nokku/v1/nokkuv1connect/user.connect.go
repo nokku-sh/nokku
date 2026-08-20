@@ -50,6 +50,12 @@ const (
 	// UserServiceSetEmailRecoveryProcedure is the fully-qualified name of the UserService's
 	// SetEmailRecovery RPC.
 	UserServiceSetEmailRecoveryProcedure = "/nokku.v1.UserService/SetEmailRecovery"
+	// UserServiceListUserSessionsProcedure is the fully-qualified name of the UserService's
+	// ListUserSessions RPC.
+	UserServiceListUserSessionsProcedure = "/nokku.v1.UserService/ListUserSessions"
+	// UserServiceRevokeUserSessionProcedure is the fully-qualified name of the UserService's
+	// RevokeUserSession RPC.
+	UserServiceRevokeUserSessionProcedure = "/nokku.v1.UserService/RevokeUserSession"
 )
 
 // UserServiceClient is a client for the nokku.v1.UserService service.
@@ -60,6 +66,8 @@ type UserServiceClient interface {
 	ListLinkedAccounts(context.Context, *v1.ListLinkedAccountsRequest) (*v1.ListLinkedAccountsResponse, error)
 	UnlinkAccount(context.Context, *v1.UnlinkAccountRequest) (*v1.UnlinkAccountResponse, error)
 	SetEmailRecovery(context.Context, *v1.SetEmailRecoveryRequest) (*v1.SetEmailRecoveryResponse, error)
+	ListUserSessions(context.Context, *v1.ListUserSessionsRequest) (*v1.ListUserSessionsResponse, error)
+	RevokeUserSession(context.Context, *v1.RevokeUserSessionRequest) (*v1.RevokeUserSessionResponse, error)
 }
 
 // NewUserServiceClient constructs a client for the nokku.v1.UserService service. By default, it
@@ -109,6 +117,19 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("SetEmailRecovery")),
 			connect.WithClientOptions(opts...),
 		),
+		listUserSessions: connect.NewClient[v1.ListUserSessionsRequest, v1.ListUserSessionsResponse](
+			httpClient,
+			baseURL+UserServiceListUserSessionsProcedure,
+			connect.WithSchema(userServiceMethods.ByName("ListUserSessions")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		revokeUserSession: connect.NewClient[v1.RevokeUserSessionRequest, v1.RevokeUserSessionResponse](
+			httpClient,
+			baseURL+UserServiceRevokeUserSessionProcedure,
+			connect.WithSchema(userServiceMethods.ByName("RevokeUserSession")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -120,6 +141,8 @@ type userServiceClient struct {
 	listLinkedAccounts *connect.Client[v1.ListLinkedAccountsRequest, v1.ListLinkedAccountsResponse]
 	unlinkAccount      *connect.Client[v1.UnlinkAccountRequest, v1.UnlinkAccountResponse]
 	setEmailRecovery   *connect.Client[v1.SetEmailRecoveryRequest, v1.SetEmailRecoveryResponse]
+	listUserSessions   *connect.Client[v1.ListUserSessionsRequest, v1.ListUserSessionsResponse]
+	revokeUserSession  *connect.Client[v1.RevokeUserSessionRequest, v1.RevokeUserSessionResponse]
 }
 
 // Whoami calls nokku.v1.UserService.Whoami.
@@ -176,6 +199,24 @@ func (c *userServiceClient) SetEmailRecovery(ctx context.Context, req *v1.SetEma
 	return nil, err
 }
 
+// ListUserSessions calls nokku.v1.UserService.ListUserSessions.
+func (c *userServiceClient) ListUserSessions(ctx context.Context, req *v1.ListUserSessionsRequest) (*v1.ListUserSessionsResponse, error) {
+	response, err := c.listUserSessions.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// RevokeUserSession calls nokku.v1.UserService.RevokeUserSession.
+func (c *userServiceClient) RevokeUserSession(ctx context.Context, req *v1.RevokeUserSessionRequest) (*v1.RevokeUserSessionResponse, error) {
+	response, err := c.revokeUserSession.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
 // UserServiceHandler is an implementation of the nokku.v1.UserService service.
 type UserServiceHandler interface {
 	Whoami(context.Context, *v1.WhoamiRequest) (*v1.WhoamiResponse, error)
@@ -184,6 +225,8 @@ type UserServiceHandler interface {
 	ListLinkedAccounts(context.Context, *v1.ListLinkedAccountsRequest) (*v1.ListLinkedAccountsResponse, error)
 	UnlinkAccount(context.Context, *v1.UnlinkAccountRequest) (*v1.UnlinkAccountResponse, error)
 	SetEmailRecovery(context.Context, *v1.SetEmailRecoveryRequest) (*v1.SetEmailRecoveryResponse, error)
+	ListUserSessions(context.Context, *v1.ListUserSessionsRequest) (*v1.ListUserSessionsResponse, error)
+	RevokeUserSession(context.Context, *v1.RevokeUserSessionRequest) (*v1.RevokeUserSessionResponse, error)
 }
 
 // NewUserServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -229,6 +272,19 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("SetEmailRecovery")),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceListUserSessionsHandler := connect.NewUnaryHandlerSimple(
+		UserServiceListUserSessionsProcedure,
+		svc.ListUserSessions,
+		connect.WithSchema(userServiceMethods.ByName("ListUserSessions")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceRevokeUserSessionHandler := connect.NewUnaryHandlerSimple(
+		UserServiceRevokeUserSessionProcedure,
+		svc.RevokeUserSession,
+		connect.WithSchema(userServiceMethods.ByName("RevokeUserSession")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/nokku.v1.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UserServiceWhoamiProcedure:
@@ -243,6 +299,10 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceUnlinkAccountHandler.ServeHTTP(w, r)
 		case UserServiceSetEmailRecoveryProcedure:
 			userServiceSetEmailRecoveryHandler.ServeHTTP(w, r)
+		case UserServiceListUserSessionsProcedure:
+			userServiceListUserSessionsHandler.ServeHTTP(w, r)
+		case UserServiceRevokeUserSessionProcedure:
+			userServiceRevokeUserSessionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -274,4 +334,12 @@ func (UnimplementedUserServiceHandler) UnlinkAccount(context.Context, *v1.Unlink
 
 func (UnimplementedUserServiceHandler) SetEmailRecovery(context.Context, *v1.SetEmailRecoveryRequest) (*v1.SetEmailRecoveryResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.UserService.SetEmailRecovery is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) ListUserSessions(context.Context, *v1.ListUserSessionsRequest) (*v1.ListUserSessionsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.UserService.ListUserSessions is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) RevokeUserSession(context.Context, *v1.RevokeUserSessionRequest) (*v1.RevokeUserSessionResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.UserService.RevokeUserSession is not implemented"))
 }
