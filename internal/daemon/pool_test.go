@@ -255,7 +255,7 @@ func TestPool_NotifyChangeKeepsSessions(t *testing.T) {
 	sid := "s1"
 	sessionMsg := func() *nokkuv1.ConnectResponse {
 		return &nokkuv1.ConnectResponse{
-			Msg: &nokkuv1.ConnectResponse_Session{Session: &nokkuv1.Session{SessionId: &sid}},
+			Msg: &nokkuv1.ConnectResponse_Session{Session: &nokkuv1.DaemonSession{SessionId: &sid}},
 		}
 	}
 	if err := p.sendToDaemonWait("d1", sessionMsg(), time.Second); err != nil {

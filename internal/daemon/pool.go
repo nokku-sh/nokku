@@ -45,7 +45,7 @@ type Session struct {
 	username  string
 	userID    string
 
-	send   chan *nokkuv1.SessionResponse
+	send   chan *nokkuv1.DaemonSessionResponse
 	Stdout chan []byte
 	Exited chan struct{}
 
@@ -340,7 +340,7 @@ func (p *Pool) RequestSession(
 
 	if err := p.sendToDaemonWait(daemonID, &nokkuv1.ConnectResponse{
 		Msg: &nokkuv1.ConnectResponse_Session{
-			Session: &nokkuv1.Session{
+			Session: &nokkuv1.DaemonSession{
 				SessionId: &sessionID,
 				Username:  &username,
 				UserId:    &userID,
@@ -366,7 +366,7 @@ func (p *Pool) RegisterSession(sessionID, daemonID, username, userID string) *Se
 		daemonID:  daemonID,
 		username:  username,
 		userID:    userID,
-		send:      make(chan *nokkuv1.SessionResponse, sendBufferSize),
+		send:      make(chan *nokkuv1.DaemonSessionResponse, sendBufferSize),
 		Stdout:    make(chan []byte, sendBufferSize),
 		Exited:    make(chan struct{}),
 	}
@@ -396,16 +396,16 @@ func (p *Pool) GetSession(sessionID string) *Session {
 	return p.sessions[sessionID]
 }
 
-func (p *Pool) ListSessions(daemonID string) []*nokkuv1.Session {
+func (p *Pool) ListSessions(daemonID string) []*nokkuv1.DaemonSession {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	var result []*nokkuv1.Session
+	var result []*nokkuv1.DaemonSession
 	for _, s := range p.sessions {
 		if s.daemonID == daemonID {
 			sessionID := s.sessionID
 			username := s.username
 			userID := s.userID
-			result = append(result, &nokkuv1.Session{
+			result = append(result, &nokkuv1.DaemonSession{
 				SessionId: &sessionID,
 				Username:  &username,
 				UserId:    &userID,
@@ -429,9 +429,9 @@ func (p *Pool) CloseSession(sessionID string) {
 
 	reason := "closed by user"
 	select {
-	case s.send <- &nokkuv1.SessionResponse{
-		Msg: &nokkuv1.SessionResponse_Close{
-			Close: &nokkuv1.CloseRequest{Reason: &reason},
+	case s.send <- &nokkuv1.DaemonSessionResponse{
+		Msg: &nokkuv1.DaemonSessionResponse_Close{
+			Close: &nokkuv1.DaemonCloseRequest{Reason: &reason},
 		},
 	}:
 	default:
@@ -503,8 +503,8 @@ func (p *Pool) PublishWorkspaceEvent(workspaceID, eventType, payloadJSON string)
 
 func (s *Session) SendStdin(data []byte) {
 	select {
-	case s.send <- &nokkuv1.SessionResponse{
-		Msg: &nokkuv1.SessionResponse_Stdin{Stdin: data},
+	case s.send <- &nokkuv1.DaemonSessionResponse{
+		Msg: &nokkuv1.DaemonSessionResponse_Stdin{Stdin: data},
 	}:
 	default:
 	}
@@ -512,9 +512,9 @@ func (s *Session) SendStdin(data []byte) {
 
 func (s *Session) SendResize(width, height uint32) {
 	select {
-	case s.send <- &nokkuv1.SessionResponse{
-		Msg: &nokkuv1.SessionResponse_Resize{
-			Resize: &nokkuv1.ResizeRequest{Width: &width, Height: &height},
+	case s.send <- &nokkuv1.DaemonSessionResponse{
+		Msg: &nokkuv1.DaemonSessionResponse_Resize{
+			Resize: &nokkuv1.DaemonResizeRequest{Width: &width, Height: &height},
 		},
 	}:
 	default:

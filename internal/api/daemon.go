@@ -14,13 +14,14 @@ import (
 	"github.com/mizuchilabs/kagi/dpop"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/nokku-sh/nokku/internal/audit"
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
-	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/namegen"
 )
 
@@ -133,7 +134,7 @@ func (s *DaemonService) DeleteDaemon(
 ) (*nokkuv1.DeleteDaemonResponse, error) {
 	// A daemon can delete itself via the challenge-auth context. Either way
 	// one identifier is required.
-	if req.GetId() == "" && meta.DaemonIDFromContext(ctx) == "" {
+	if req.GetId() == "" && auth.DaemonIDFromContext(ctx) == "" {
 		return nil, ErrInvalidInput
 	}
 	var result *db.Daemon
@@ -144,7 +145,7 @@ func (s *DaemonService) DeleteDaemon(
 				return err
 			}
 		} else {
-			result, err = q.DeleteDaemon(ctx, meta.DaemonIDFromContext(ctx))
+			result, err = q.DeleteDaemon(ctx, auth.DaemonIDFromContext(ctx))
 			if err != nil {
 				return err
 			}
@@ -224,14 +225,14 @@ func (s *DaemonService) CreateSession(
 	}
 
 	sessionID := uuid.New().String()
-	userID := meta.UserIDFromContext(ctx)
+	userID := auth.UserIDFromContext(ctx)
 	username := req.GetUsername()
 
 	if err := s.cfg.Pool.RequestSession(ctx, daemon.ID, sessionID, username, userID); err != nil {
 		return nil, NewError(connect.CodeResourceExhausted, "daemon did not accept session")
 	}
 	return &nokkuv1.CreateSessionResponse{
-		Session: &nokkuv1.Session{
+		Session: &nokkuv1.DaemonSession{
 			SessionId: &sessionID,
 			UserId:    &userID,
 			Username:  &username,
@@ -278,7 +279,7 @@ func (s *DaemonService) EnrollDaemon(
 		return nil, NewError(connect.CodeInvalidArgument, "invalid token")
 	}
 	workspaceID := enrollToken.ID
-	meta.SetAuditWorkspaceID(ctx, workspaceID)
+	audit.SetWorkspaceID(ctx, workspaceID)
 
 	if err := s.cfg.Billing.Check(ctx, workspaceID, billing.ResourceTargets); err != nil {
 		return nil, err
@@ -377,7 +378,7 @@ func (s *DaemonService) EnrollDaemon(
 	sess, err := s.cfg.Auth.Kagi.Sessions.IssueSession(ctx, kagi.SessionParams{
 		TenantID:  kagi.TenantID(workspaceID),
 		SubjectID: daemon.ID,
-		Kind:      meta.ActorTypeDaemon,
+		Kind:      auth.ActorTypeDaemon,
 		Method:    kagi.MethodDevice,
 		Binding:   binding,
 	})
@@ -455,7 +456,7 @@ func (s *DaemonService) SyncDaemon(
 	var principals []*nokkuv1.PrincipalUsers
 	var caPublicKey string
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		daemon, err := q.GetDaemon(ctx, meta.DaemonIDFromContext(ctx))
+		daemon, err := q.GetDaemon(ctx, auth.DaemonIDFromContext(ctx))
 		if err != nil {
 			return err
 		}
