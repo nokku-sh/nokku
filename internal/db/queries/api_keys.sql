@@ -47,6 +47,13 @@ DELETE FROM api_keys
 WHERE
   key_id = @key_id;
 
+-- name: TouchKey :exec
+UPDATE api_keys
+SET
+  last_seen = NOW()
+WHERE
+  key_id = @key_id;
+
 -- name: ListKeys :many
 SELECT
   *

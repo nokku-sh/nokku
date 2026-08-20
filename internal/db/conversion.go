@@ -206,29 +206,52 @@ func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
 		Description: s.Description,
 		RoleName:    &s.RoleName,
 		Tags:        s.Tags,
-		LastUsedAt:  SafeTimestamp(s.LastUsedAt),
 		ExpiresAt:   SafeTimestamp(s.ExpiresAt),
 		CreatedAt:   SafeTimestamp(&s.CreatedAt),
 		UpdatedAt:   SafeTimestamp(&s.UpdatedAt),
 	}
 }
 
-func (r *ListServiceAccountsRow) ToProto() *nokkuv1.ServiceAccount {
+func (r *GetServiceAccountRow) ToProto() *nokkuv1.ServiceAccount {
 	if r == nil {
 		return nil
 	}
-	return (&ServiceAccount{
+	p := (&ServiceAccount{
 		ID:          r.ID,
 		WorkspaceID: r.WorkspaceID,
 		Name:        r.Name,
 		Description: r.Description,
 		RoleName:    r.RoleName,
-		LastUsedAt:  r.LastUsedAt,
 		ExpiresAt:   r.ExpiresAt,
 		Tags:        r.Tags,
 		CreatedAt:   r.CreatedAt,
 		UpdatedAt:   r.UpdatedAt,
 	}).ToProto()
+	if p != nil && !r.LastUsedAt.IsZero() {
+		p.LastUsedAt = SafeTimestamp(&r.LastUsedAt)
+	}
+	return p
+}
+
+func (r *ListServiceAccountsRow) ToProto() *nokkuv1.ServiceAccount {
+	if r == nil {
+		return nil
+	}
+	p := (&ServiceAccount{
+		ID:          r.ID,
+		WorkspaceID: r.WorkspaceID,
+		Name:        r.Name,
+		Description: r.Description,
+		RoleName:    r.RoleName,
+		ExpiresAt:   r.ExpiresAt,
+		Tags:        r.Tags,
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
+	}).ToProto()
+	if p != nil && !r.LastUsedAt.IsZero() {
+		p.LastUsedAt = SafeTimestamp(&r.LastUsedAt)
+	}
+	return p
 }
 
 func ServiceAccountsToProto(rows []*ListServiceAccountsRow) []*nokkuv1.ServiceAccount {
@@ -356,7 +379,6 @@ func (r *ListDaemonsRow) ToProto() *nokkuv1.Daemon {
 		Online:      r.Online,
 		Config:      r.Config,
 		Metadata:    r.Metadata,
-		LastUsedAt:  r.LastUsedAt,
 		UpdatedAt:   r.UpdatedAt,
 		CreatedAt:   r.CreatedAt,
 	}).ToProto()

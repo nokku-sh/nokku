@@ -21,6 +21,7 @@ type APIKey struct {
 	Name       string     `json:"name"`
 	ExpiresAt  *time.Time `json:"expiresAt"`
 	CreatedAt  time.Time  `json:"createdAt"`
+	LastSeen   *time.Time `json:"lastSeen"`
 }
 
 type AuditAuditLog struct {
@@ -86,7 +87,6 @@ type Daemon struct {
 	Online      bool                `json:"online"`
 	Config      *nokku.DaemonConfig `json:"config"`
 	Metadata    []byte              `json:"metadata"`
-	LastUsedAt  *time.Time          `json:"lastUsedAt"`
 	UpdatedAt   time.Time           `json:"updatedAt"`
 	CreatedAt   time.Time           `json:"createdAt"`
 }
@@ -200,7 +200,6 @@ type ServiceAccount struct {
 	Name        string     `json:"name"`
 	Description *string    `json:"description"`
 	RoleName    string     `json:"roleName"`
-	LastUsedAt  *time.Time `json:"lastUsedAt"`
 	ExpiresAt   *time.Time `json:"expiresAt"`
 	Tags        []string   `json:"tags"`
 	CreatedAt   time.Time  `json:"createdAt"`

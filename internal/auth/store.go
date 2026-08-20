@@ -12,7 +12,6 @@ import (
 	"github.com/mizuchilabs/kagi"
 
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 // Store adapts nokku's database to kagi.Store and kagi.APIKeyStore.
@@ -220,7 +219,7 @@ func (s *Store) CreateSession(ctx context.Context, sess kagi.Session) error {
 		TokenHash:  sess.TokenHash,
 		TenantID:   string(sess.TenantID),
 		SubjectID:  sess.SubjectID,
-		Kind:       kindOr(sess.Kind, meta.ActorTypeUser),
+		Kind:       kindOr(sess.Kind, ActorTypeUser),
 		IdentityID: strPtr(sess.IdentityID),
 		Method:     string(sess.Method),
 		Binding:    strPtr(sess.Binding),
@@ -292,7 +291,7 @@ func (s *Store) PutKey(ctx context.Context, k kagi.APIKeyRecord) error {
 		KeyID:      k.KeyID,
 		TenantID:   string(k.TenantID),
 		SubjectID:  k.SubjectID,
-		Kind:       kindOr(k.Kind, meta.ActorTypeUser),
+		Kind:       kindOr(k.Kind, ActorTypeUser),
 		SecretHash: k.SecretHash,
 		Scopes:     scopes,
 		Name:       k.Name,
@@ -314,6 +313,10 @@ func (s *Store) GetKey(ctx context.Context, keyID string) (kagi.APIKeyRecord, er
 
 func (s *Store) DeleteKey(ctx context.Context, keyID string) error {
 	return s.conn.Q.DeleteKey(ctx, keyID)
+}
+
+func (s *Store) TouchKey(ctx context.Context, keyID string, _ time.Time) error {
+	return s.conn.Q.TouchKey(ctx, keyID)
 }
 
 func (s *Store) ListKeys(
@@ -410,6 +413,9 @@ func kagiAPIKey(k *db.APIKey) kagi.APIKeyRecord {
 	}
 	if k.ExpiresAt != nil {
 		rec.ExpiresAt = *k.ExpiresAt
+	}
+	if k.LastSeen != nil {
+		rec.LastSeenAt = *k.LastSeen
 	}
 	return rec
 }

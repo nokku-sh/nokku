@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS api_keys (
   scopes TEXT[] NOT NULL DEFAULT '{}',
   name TEXT NOT NULL,
   expires_at TIMESTAMPTZ, -- NULL = never expires
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_seen TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS credentials (
@@ -158,7 +159,6 @@ CREATE TABLE IF NOT EXISTS service_accounts (
   name TEXT NOT NULL, -- e.g., "github-actions-deploy", "ansible-prod"
   description TEXT,
   role_name TEXT NOT NULL DEFAULT 'viewer' REFERENCES roles (name),
-  last_used_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ, -- Optional expiration for temporary access
   tags TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -174,7 +174,6 @@ CREATE TABLE IF NOT EXISTS daemons (
   online BOOLEAN NOT NULL DEFAULT FALSE,
   config JSONB NOT NULL DEFAULT '{}',
   metadata JSONB NOT NULL DEFAULT '{}',
-  last_used_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name)

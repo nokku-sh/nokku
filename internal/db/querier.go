@@ -38,7 +38,7 @@ type Querier interface {
 	CreateOneTimeToken(ctx context.Context, arg *CreateOneTimeTokenParams) error
 	CreatePrincipal(ctx context.Context, arg *CreatePrincipalParams) (*Principal, error)
 	CreateRecording(ctx context.Context, arg *CreateRecordingParams) (*Recording, error)
-	CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (*ServiceAccount, error)
+	CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (string, error)
 	// Sessions -------------------------------------------------------------------
 	CreateSession(ctx context.Context, arg *CreateSessionParams) error
 	CreateTarget(ctx context.Context, arg *CreateTargetParams) (*Target, error)
@@ -60,6 +60,7 @@ type Querier interface {
 	DeleteRecording(ctx context.Context, id string) error
 	DeleteServiceAccount(ctx context.Context, serviceAccountID string) error
 	DeleteSessionByHash(ctx context.Context, tokenHash []byte) error
+	DeleteSessionForSubject(ctx context.Context, arg *DeleteSessionForSubjectParams) error
 	DeleteSubjectSessions(ctx context.Context, arg *DeleteSubjectSessionsParams) error
 	DeleteTarget(ctx context.Context, targetID string) (*Target, error)
 	DeleteTeam(ctx context.Context, teamID string) (*Team, error)
@@ -105,7 +106,7 @@ type Querier interface {
 	GetSAMLProviderByID(ctx context.Context, workspaceID string) (*SamlProvider, error)
 	// Shared SAML SP keypair (singleton) -----------------------------------------
 	GetSAMLSPKey(ctx context.Context) (*SamlSpKey, error)
-	GetServiceAccount(ctx context.Context, serviceAccountID string) (*ServiceAccount, error)
+	GetServiceAccount(ctx context.Context, serviceAccountID string) (*GetServiceAccountRow, error)
 	GetServiceAccountWorkspaceID(ctx context.Context, serviceAccountID string) (string, error)
 	GetSessionByHash(ctx context.Context, tokenHash []byte) (*Session, error)
 	GetSubscription(ctx context.Context, workspaceID string) (*WorkspaceSubscription, error)
@@ -178,6 +179,7 @@ type Querier interface {
 	SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error
 	SumRecordingBytes(ctx context.Context, workspaceID string) (int64, error)
 	SyncPrincipals(ctx context.Context, arg *SyncPrincipalsParams) error
+	TouchKey(ctx context.Context, keyID string) error
 	TouchSession(ctx context.Context, tokenHash []byte) error
 	TrySecretRotationLock(ctx context.Context) (bool, error)
 	UpdateCA(ctx context.Context, arg *UpdateCAParams) (*CertificateAuthority, error)
@@ -194,7 +196,7 @@ type Querier interface {
 	UpdateOIDCProvider(ctx context.Context, arg *UpdateOIDCProviderParams) (*OidcProvider, error)
 	UpdateSAMLProvider(ctx context.Context, arg *UpdateSAMLProviderParams) (*SamlProvider, error)
 	UpdateSAMLSPPrivateKey(ctx context.Context, privateKey crypto.EncryptedBytes) error
-	UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (*ServiceAccount, error)
+	UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (string, error)
 	UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*Target, error)
 	UpdateTargetCA(ctx context.Context, arg *UpdateTargetCAParams) (*Target, error)
 	UpdateTeam(ctx context.Context, arg *UpdateTeamParams) (*Team, error)
