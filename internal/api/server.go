@@ -126,7 +126,6 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 		NewLogInterceptor(s.cfg.Debug),
 		NewTimeoutInterceptor(),
 		NewKagiAuthNInterceptor(s.cfg),
-		NewActorInterceptor(s.cfg),
 		NewAuthZInterceptor(s.cfg),
 		NewAuditInterceptor(s.cfg.Audit),
 		validate.NewInterceptor(),

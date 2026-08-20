@@ -6,11 +6,12 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
+	"github.com/mizuchilabs/kagi"
 
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
-	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 // ProcedurePermissions maps every workspace-scoped procedure to the single
@@ -150,20 +151,20 @@ func (a *AuthorizationInterceptor) authorize(
 	ctx context.Context,
 	perm db.Permission,
 ) error {
-	actor := meta.ActorFromContext(ctx)
-	if actor.ID == "" {
+	actor, _ := kagi.PrincipalFromContext(ctx)
+	if actor.SubjectID == "" {
 		return db.ErrNoActor
 	}
 
 	role := "daemon"
-	if actor.Type != meta.ActorTypeDaemon {
-		workspaceID := meta.WorkspaceIDFromContext(ctx)
+	if actor.Kind != auth.ActorTypeDaemon {
+		workspaceID := auth.WorkspaceIDFromContext(ctx)
 		if workspaceID == "" {
 			return db.ErrWorkspaceNotPinned
 		}
 
 		var err error
-		role, err = a.actorRole(ctx, workspaceID, actor.ID)
+		role, err = a.actorRole(ctx, workspaceID, actor.SubjectID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return db.ErrWorkspaceNotAccessible
 		}

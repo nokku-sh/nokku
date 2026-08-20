@@ -15,11 +15,11 @@ import (
 	kagisaml "github.com/mizuchilabs/kagi/saml"
 	"github.com/mizuchilabs/kagi/server"
 
+	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/email"
-	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 // deviceSessionTTL is how long an nk device session lasts before the user
@@ -76,8 +76,8 @@ func NewAuthHandler(cfg *config.Config) (*server.Handler, error) {
 			OnPasswordReset: func(ctx context.Context, u kagi.User) error {
 				return cfg.Auth.Kagi.RevokeSubjectSessions(ctx, "", u.ID)
 			},
-			SetAuditEmail:  meta.SetAuditEmail,
-			SetAuditUserID: meta.SetAuditUserID,
+			SetAuditEmail:  audit.SetEmail,
+			SetAuditUserID: audit.SetUserID,
 		},
 
 		Passkeys: server.PasskeyConfig{
@@ -106,12 +106,8 @@ func NewAuthHandler(cfg *config.Config) (*server.Handler, error) {
 			Cache:           cfg.Cache,
 			VerificationURI: cfg.FullURL() + "/device",
 			DPoP:            cfg.Auth.DPoP(),
-			Kind:            meta.ActorTypeDevice,
+			Kind:            auth.ActorTypeDevice,
 			SessionTTL:      deviceSessionTTL,
-		},
-
-		MapPrincipal: func(ctx context.Context, _ *http.Request, p kagi.Principal) context.Context {
-			return applyPrincipal(ctx, p)
 		},
 	})
 }

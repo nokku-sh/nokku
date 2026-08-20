@@ -6,13 +6,14 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/mizuchilabs/kagi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/pki"
 	"github.com/nokku-sh/nokku/internal/ssh"
 	"github.com/nokku-sh/nokku/internal/util"
@@ -122,7 +123,7 @@ func (s *CertificateService) GetCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.GetCertificateAuthorityRequest,
 ) (*nokkuv1.GetCertificateAuthorityResponse, error) {
-	if req.GetId() == "" && meta.DaemonIDFromContext(ctx) == "" {
+	if req.GetId() == "" && auth.DaemonIDFromContext(ctx) == "" {
 		return nil, ErrInvalidInput
 	}
 	var ca *db.CertificateAuthority
@@ -134,7 +135,7 @@ func (s *CertificateService) GetCertificateAuthority(
 			}
 		}
 
-		daemonID := meta.DaemonIDFromContext(ctx)
+		daemonID := auth.DaemonIDFromContext(ctx)
 		if daemonID != "" {
 			ca, err = q.GetCAByDaemonID(ctx, &daemonID)
 			if err != nil {
@@ -295,10 +296,10 @@ func (s *CertificateService) SignSSHCertificate(
 	req *nokkuv1.SignSSHCertificateRequest,
 ) (*nokkuv1.SignSSHCertificateResponse, error) {
 	// By default id of the actor is the principal for user certificates
-	actor := meta.ActorFromContext(ctx)
-	keyID := fmt.Sprintf("nokku:login:%s:%s:%s", actor.Type, actor.Name, actor.ID)
-	principal := actor.ID
-	daemonID := meta.DaemonIDFromContext(ctx)
+	actor, _ := kagi.PrincipalFromContext(ctx)
+	keyID := fmt.Sprintf("nokku:login:%s:%s", actor.Kind, actor.SubjectID)
+	principal := actor.SubjectID
+	daemonID := auth.DaemonIDFromContext(ctx)
 
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
@@ -342,7 +343,7 @@ func (s *CertificateService) SignSSHCertificate(
 
 				principal = target.ID
 			}
-			keyID = fmt.Sprintf("nokku:provision:%s:%s:%s", actor.Type, actor.Name, actor.ID)
+			keyID = fmt.Sprintf("nokku:provision:%s:%s", actor.Kind, actor.SubjectID)
 		}
 		return nil
 	}); err != nil {

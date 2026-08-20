@@ -7,14 +7,16 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/mizuchilabs/kagi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/nokku-sh/nokku/internal/audit"
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 var (
@@ -40,10 +42,10 @@ func (s *InvitationService) GetInvitation(
 		return nil, ErrInvalidInput
 	}
 	workspaceID := token.ID
-	meta.SetAuditWorkspaceID(ctx, workspaceID)
+	audit.SetWorkspaceID(ctx, workspaceID)
 
-	actor := meta.ActorFromContext(ctx)
-	if actor.ID == "" || actor.Type != meta.ActorTypeUser {
+	actor, _ := kagi.PrincipalFromContext(ctx)
+	if actor.SubjectID == "" || actor.Kind != auth.ActorTypeUser {
 		return nil, ErrBadCredentials
 	}
 
@@ -54,7 +56,7 @@ func (s *InvitationService) GetInvitation(
 	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
 		if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
 			WorkspaceID: workspaceID,
-			UserID:      actor.ID,
+			UserID:      actor.SubjectID,
 		}); err == nil {
 			return errAlreadyMember
 		}
@@ -87,9 +89,9 @@ func (s *InvitationService) AcceptInvitation(
 		return nil, NewError(connect.CodeInvalidArgument, "invalid token")
 	}
 	workspaceID := token.ID
-	meta.SetAuditWorkspaceID(ctx, workspaceID)
+	audit.SetWorkspaceID(ctx, workspaceID)
 
-	userID := meta.UserIDFromContext(ctx)
+	userID := auth.UserIDFromContext(ctx)
 	if userID == "" {
 		return nil, ErrBadCredentials
 	}
