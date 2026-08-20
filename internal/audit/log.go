@@ -10,7 +10,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/nokku-sh/nokku/internal/meta"
+	"github.com/mizuchilabs/kagi"
+
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
@@ -91,11 +92,11 @@ func (s *Service) logAudit(
 		return
 	}
 
-	state := meta.AuditStateFromContext(ctx)
-	actor := meta.ActorFromContext(ctx)
+	state := StateFromContext(ctx)
+	principal, _ := kagi.PrincipalFromContext(ctx)
 
-	actorID := actor.ID
-	actorType := string(actor.Type)
+	actorID := principal.SubjectID
+	actorType := string(principal.Kind)
 	if actorID == "" && state != nil {
 		actorID = state.UserID
 	}

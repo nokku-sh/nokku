@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/mizuchilabs/kagi"
 	"github.com/mizuchilabs/kata/buildinfo"
 
 	"github.com/nokku-sh/nokku/internal/audit"
@@ -14,7 +15,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 type UtilService struct {
@@ -58,13 +58,13 @@ func (s *UtilService) ListAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ListAuditLogsRequest,
 ) (*nokkuv1.ListAuditLogsResponse, error) {
-	actor := meta.ActorFromContext(ctx)
+	actor, _ := kagi.PrincipalFromContext(ctx)
 	var workspaceID string
 
 	if req.GetWorkspaceId() != "" {
 		workspaceID = req.GetWorkspaceId()
 	} else {
-		req.ActorIds = []string{actor.ID}
+		req.ActorIds = []string{actor.SubjectID}
 	}
 	if workspaceID == "" && req.ActorIds == nil {
 		return nil, NewError(connect.CodeInvalidArgument, "actor is required")
@@ -111,7 +111,7 @@ func (s *UtilService) ExportAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ExportAuditLogsRequest,
 ) (*nokkuv1.ExportAuditLogsResponse, error) {
-	actor := meta.ActorFromContext(ctx)
+	actor, _ := kagi.PrincipalFromContext(ctx)
 	workspaceID := req.GetWorkspaceId()
 	if workspaceID != "" && !s.cfg.Billing.Has(ctx, workspaceID, billing.FeatureAuditExport) {
 		return nil, NewError(
@@ -134,7 +134,7 @@ func (s *UtilService) ExportAuditLogs(
 	}
 
 	if workspaceID == "" {
-		query.ActorIDs = []string{actor.ID}
+		query.ActorIDs = []string{actor.SubjectID}
 	}
 
 	data, err := s.cfg.Audit.Export(ctx, query, req.GetFormat())

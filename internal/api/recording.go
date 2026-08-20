@@ -9,12 +9,12 @@ import (
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
@@ -44,7 +44,7 @@ func (s *RecordingService) UploadRecording(
 	ctx context.Context,
 	stream *connect.ClientStream[nokkuv1.UploadRecordingRequest],
 ) (*nokkuv1.UploadRecordingResponse, error) {
-	daemonID := meta.DaemonIDFromContext(ctx)
+	daemonID := auth.DaemonIDFromContext(ctx)
 	if daemonID == "" {
 		return nil, NewError(connect.CodePermissionDenied, "only daemons can upload recordings")
 	}

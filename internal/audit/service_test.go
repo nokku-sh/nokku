@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/mizuchilabs/kagi"
 
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 type stubLicense struct{}
@@ -118,8 +119,8 @@ func TestAuditSchemaRLS(t *testing.T) {
 	}
 
 	// Pinned workspace read: sees the workspace event, but not the global one.
-	actx := meta.WithActor(ctx, &meta.Actor{ID: owner.ID, Type: meta.ActorTypeUser})
-	actx = meta.WithWorkspaceID(actx, ws.ID)
+	actx := kagi.WithPrincipal(ctx, kagi.Principal{SubjectID: owner.ID, Kind: auth.ActorTypeUser})
+	actx = kagi.WithTenant(actx, kagi.TenantID(ws.ID))
 
 	events, err := svc.List(actx, QueryOptions{WorkspaceID: ws.ID})
 	if err != nil {
@@ -140,8 +141,8 @@ func TestAuditSchemaRLS(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("creating second workspace: %v", err)
 	}
-	if err := conn.WithWorkspace(meta.WithActor(
-		ctx, &meta.Actor{ID: owner.ID, Type: meta.ActorTypeUser},
+	if err := conn.WithWorkspace(kagi.WithPrincipal(
+		ctx, kagi.Principal{SubjectID: owner.ID, Kind: auth.ActorTypeUser},
 	), func(q *db.Queries) error {
 		rows, err := q.ListAuditLogs(ctx, &db.ListAuditLogsParams{WorkspaceID: ws.ID, Limit: 10})
 		if err != nil {

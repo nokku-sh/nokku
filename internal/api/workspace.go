@@ -6,14 +6,16 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/mizuchilabs/kagi"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/nokku-sh/nokku/internal/audit"
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
@@ -63,7 +65,7 @@ func (s *WorkspaceService) CreateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.CreateWorkspaceRequest,
 ) (*nokkuv1.CreateWorkspaceResponse, error) {
-	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
+	user, err := s.cfg.Conn.Q.GetUserByID(ctx, auth.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -264,7 +266,7 @@ func (s *WorkspaceService) UpdateWorkspaceOwner(
 		if err != nil {
 			return err
 		}
-		if ownerID != meta.UserIDFromContext(ctx) {
+		if ownerID != auth.UserIDFromContext(ctx) {
 			return ErrPermissionDenied
 		}
 		_, err = q.UpdateWorkspaceOwner(ctx, &db.UpdateWorkspaceOwnerParams{
@@ -288,12 +290,12 @@ func (s *WorkspaceService) SubscribeWorkspaceEvents(
 	stream *connect.ServerStream[nokkuv1.SubscribeWorkspaceEventsResponse],
 ) error {
 	workspaceID := req.GetWorkspaceId()
-	meta.SetAuditWorkspaceID(ctx, workspaceID)
+	audit.SetWorkspaceID(ctx, workspaceID)
 
 	// Streaming handlers bypass the unary interceptor's workspace promotion,
 	// so pin the workspace here and let the scoped transaction verify
 	// membership before events start flowing.
-	ctx = meta.WithWorkspaceID(ctx, workspaceID)
+	ctx = kagi.WithTenant(ctx, kagi.TenantID(workspaceID))
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(_ *db.Queries) error {
 		return nil
 	}); err != nil {

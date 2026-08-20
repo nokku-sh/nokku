@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
+	"github.com/mizuchilabs/kagi"
 
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
@@ -74,12 +75,10 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 	}); err != nil {
 		return fmt.Errorf("failed to create workspace: %w", err)
 	}
-	actor := &meta.Actor{
-		ID:   owner.ID,
-		Name: owner.Username,
-		Type: meta.ActorTypeUser,
-	}
-	ctx = meta.WithActor(ctx, actor)
+	ctx = kagi.WithPrincipal(ctx, kagi.Principal{
+		SubjectID: owner.ID,
+		Kind:      auth.ActorTypeUser,
+	})
 
 	err = conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		users := make([]*db.User, cfg.NumUsers-1)
@@ -139,9 +138,9 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 		}
 
 		// Create service accounts. Suffixed names avoid UNIQUE (workspace_id, name) violations
-		sa := make([]*db.ServiceAccount, cfg.NumServiceAccounts)
+		sa := make([]string, cfg.NumServiceAccounts)
 		for i := range cfg.NumServiceAccounts {
-			s, err := q.CreateServiceAccount(ctx, &db.CreateServiceAccountParams{
+			sa[i], err = q.CreateServiceAccount(ctx, &db.CreateServiceAccountParams{
 				WorkspaceID: workspace.ID,
 				Name:        uniqueName(gofakeit.AppName(), i),
 				Description: new(gofakeit.Sentence()),
@@ -150,7 +149,6 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 			if err != nil {
 				return fmt.Errorf("failed to create service account %d: %w", i, err)
 			}
-			sa[i] = s
 		}
 
 		// Create CAs. The first is the workspace default
@@ -280,11 +278,7 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 
 				numSA := gofakeit.IntRange(0, min(2, len(sa)))
 				if numSA > 0 {
-					saIDs := make([]string, numSA)
-					for k := range saIDs {
-						saIDs[k] = sa[k].ID
-					}
-					for _, saID := range saIDs {
+					for _, saID := range sa[:numSA] {
 						if err := q.AddServiceAccountToPrincipal(
 							ctx,
 							&db.AddServiceAccountToPrincipalParams{

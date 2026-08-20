@@ -15,9 +15,9 @@ import (
 
 	"golang.org/x/image/draw"
 
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/meta"
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
@@ -34,7 +34,7 @@ func resizePicture(src image.Image) image.Image {
 
 func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := meta.UserIDFromContext(r.Context())
+		userID := auth.UserIDFromContext(r.Context())
 		user, err := cfg.Conn.Q.GetUserByID(r.Context(), userID)
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "Failed to get identity")

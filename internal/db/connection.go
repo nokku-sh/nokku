@@ -11,8 +11,7 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/nokku-sh/nokku/internal/meta"
+	"github.com/mizuchilabs/kagi"
 )
 
 var (
@@ -206,14 +205,26 @@ func (c *Connection) WithTx(
 	return tx.Commit(ctx)
 }
 
+// workspaceIDFromContext returns the workspace a request acts in: the tenant
+// carried by a machine principal, or the tenant resolved from the request for
+// global user principals. It mirrors auth.WorkspaceIDFromContext; db cannot
+// import auth, so the small precedence rule lives here too.
+func workspaceIDFromContext(ctx context.Context) string {
+	if p, ok := kagi.PrincipalFromContext(ctx); ok && p.TenantID != "" {
+		return string(p.TenantID)
+	}
+	t, _ := kagi.TenantFromContext(ctx)
+	return string(t)
+}
+
 // WithWorkspace executes a transaction scoped to the workspace pinned in the
 // request context, as the rls constrained nokku_app role.
 func (c *Connection) WithWorkspace(
 	ctx context.Context,
 	fn func(*Queries) error,
 ) error {
-	actor := meta.ActorFromContext(ctx)
-	if actor.ID == "" {
+	actor, ok := kagi.PrincipalFromContext(ctx)
+	if !ok || actor.SubjectID == "" {
 		return ErrNoActor
 	}
 
@@ -239,14 +250,14 @@ func (c *Connection) WithWorkspace(
 	}
 
 	q := New(tx)
-	wsIDs, err := q.GetActorWorkspaceIDs(ctx, actor.ID)
+	wsIDs, err := q.GetActorWorkspaceIDs(ctx, actor.SubjectID)
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		return err
 	}
 
 	workspaceID := ""
-	if pinned := meta.WorkspaceIDFromContext(ctx); pinned != "" {
+	if pinned := workspaceIDFromContext(ctx); pinned != "" {
 		if !slices.Contains(wsIDs, pinned) {
 			_ = tx.Rollback(ctx)
 			return ErrWorkspaceNotAccessible
@@ -263,7 +274,7 @@ func (c *Connection) WithWorkspace(
 			set_config('nokku.actor_id', $2, true)
 		`,
 		workspaceID,
-		actor.ID,
+		actor.SubjectID,
 	); err != nil {
 		_ = tx.Rollback(ctx)
 		return err

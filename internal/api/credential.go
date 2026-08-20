@@ -10,9 +10,9 @@ import (
 	"github.com/mizuchilabs/kagi/passkey"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/config"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 type CredentialService struct {
@@ -27,7 +27,7 @@ func (s *CredentialService) UpdatePassword(
 	ctx context.Context,
 	req *nokkuv1.UpdatePasswordRequest,
 ) (*nokkuv1.UpdatePasswordResponse, error) {
-	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
+	user, err := s.cfg.Conn.Q.GetUserByID(ctx, auth.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -59,7 +59,7 @@ func (s *CredentialService) DeletePassword(
 	ctx context.Context,
 	req *nokkuv1.DeletePasswordRequest,
 ) (*nokkuv1.DeletePasswordResponse, error) {
-	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
+	user, err := s.cfg.Conn.Q.GetUserByID(ctx, auth.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -93,7 +93,7 @@ func (s *CredentialService) ListPasskeys(
 ) (*nokkuv1.ListPasskeysResponse, error) {
 	creds, err := s.cfg.Auth.ListCredentials(
 		ctx,
-		meta.UserIDFromContext(ctx),
+		auth.UserIDFromContext(ctx),
 		kagi.CredentialPasskey,
 	)
 	if err != nil {
@@ -116,7 +116,7 @@ func (s *CredentialService) RenamePasskey(
 	ctx context.Context,
 	req *nokkuv1.RenamePasskeyRequest,
 ) (*nokkuv1.RenamePasskeyResponse, error) {
-	userID := meta.UserIDFromContext(ctx)
+	userID := auth.UserIDFromContext(ctx)
 	cred, err := s.cfg.Auth.GetCredential(ctx, userID, req.GetId())
 	if err != nil || cred.Type != kagi.CredentialPasskey {
 		return nil, ErrNotFound
@@ -133,7 +133,7 @@ func (s *CredentialService) DeletePasskey(
 	ctx context.Context,
 	req *nokkuv1.DeletePasskeyRequest,
 ) (*nokkuv1.DeletePasskeyResponse, error) {
-	userID := meta.UserIDFromContext(ctx)
+	userID := auth.UserIDFromContext(ctx)
 	cred, err := s.cfg.Auth.GetCredential(ctx, userID, req.GetId())
 	if err != nil || cred.Type != kagi.CredentialPasskey {
 		return nil, ErrNotFound
@@ -189,7 +189,7 @@ func (s *CredentialService) CreateBackupCodes(
 	ctx context.Context,
 	_ *nokkuv1.CreateBackupCodesRequest,
 ) (*nokkuv1.CreateBackupCodesResponse, error) {
-	user, err := s.cfg.Conn.Q.GetUserByID(ctx, meta.UserIDFromContext(ctx))
+	user, err := s.cfg.Conn.Q.GetUserByID(ctx, auth.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -209,7 +209,7 @@ func (s *CredentialService) ListBackupCodes(
 	ctx context.Context,
 	_ *nokkuv1.ListBackupCodesRequest,
 ) (*nokkuv1.ListBackupCodesResponse, error) {
-	creds, err := s.cfg.Auth.ListBackupCodes(ctx, meta.UserIDFromContext(ctx))
+	creds, err := s.cfg.Auth.ListBackupCodes(ctx, auth.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -228,7 +228,7 @@ func (s *CredentialService) DeleteBackupCodes(
 	ctx context.Context,
 	_ *nokkuv1.DeleteBackupCodesRequest,
 ) (*nokkuv1.DeleteBackupCodesResponse, error) {
-	if err := s.cfg.Auth.DeleteBackupCodes(ctx, meta.UserIDFromContext(ctx)); err != nil {
+	if err := s.cfg.Auth.DeleteBackupCodes(ctx, auth.UserIDFromContext(ctx)); err != nil {
 		return nil, DBError(err)
 	}
 	return &nokkuv1.DeleteBackupCodesResponse{}, nil
