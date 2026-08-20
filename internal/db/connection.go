@@ -30,13 +30,13 @@ var (
 // no extra configuration.
 
 type Connection struct {
-	Host        string `env:"NOKKU_DB_HOST"         envDefault:"localhost"`
-	Port        string `env:"NOKKU_DB_PORT"         envDefault:"5432"`
-	Database    string `env:"NOKKU_DB_NAME"         envDefault:"nokku"`
-	User        string `env:"NOKKU_DB_USER"         envDefault:"postgres"`
-	Password    string `env:"NOKKU_DB_PASSWORD"     envDefault:"postgres"`
+	Host        string `env:"PGHOST"                envDefault:"localhost"`
+	Port        string `env:"PGPORT"                envDefault:"5432"`
+	Database    string `env:"PGNAME"                envDefault:"nokku"`
+	User        string `env:"PGUSER"                envDefault:"postgres"`
+	Password    string `env:"PGPASSWORD"            envDefault:"postgres"`
+	SSLMode     string `env:"PGSSLMODE"             envDefault:"disable"`
 	AppPassword string `env:"NOKKU_DB_APP_PASSWORD"`
-	SSLMode     string `env:"NOKKU_DB_SSL_MODE"     envDefault:"disable"`
 	AutoMigrate bool   `env:"NOKKU_DB_AUTOMIGRATE"  envDefault:"true"`
 	MaxConns    int32  `env:"NOKKU_DB_MAX_CONNS"    envDefault:"10"`
 	MinConns    int32  `env:"NOKKU_DB_MIN_CONNS"    envDefault:"0"`

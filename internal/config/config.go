@@ -131,7 +131,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	// NOKKU_SECRET set → local secretbox encryption, otherwise KMS-backed.
+	// NOKKU_SECRET set local secretbox encryption, otherwise KMS-backed.
 	if cfg.Secret != "" {
 		primary, err := crypto.NewSecretbox([]byte(cfg.Secret))
 		if err != nil {
@@ -210,19 +210,19 @@ func (c *Config) WSOrigins() []string {
 // newCache builds the shared cache. When NOKKU_REDIS_ADDR is set it returns a
 // Redis-backed cache, otherwise the single-instance in-memory cache.
 func newCache(ctx context.Context) (cache.Cache, error) {
-	addr := os.Getenv("NOKKU_REDIS_ADDR")
+	addr := os.Getenv("REDIS_ADDR")
 	if addr == "" {
 		return cache.NewMemory(10_000), nil
 	}
 
-	db, err := strconv.Atoi(os.Getenv("NOKKU_REDIS_DB"))
+	db, err := strconv.Atoi(os.Getenv("REDIS_DB"))
 	if err != nil {
-		return nil, fmt.Errorf("cache: invalid NOKKU_REDIS_DB: %w", err)
+		return nil, fmt.Errorf("cache: invalid REDIS_DB: %w", err)
 	}
 
 	client := redis.NewClient(&redis.Options{
 		Addr:     addr,
-		Password: os.Getenv("NOKKU_REDIS_PASSWORD"),
+		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       db,
 	})
 	if err := client.Ping(ctx).Err(); err != nil {
