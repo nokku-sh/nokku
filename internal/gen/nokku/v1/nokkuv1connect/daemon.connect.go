@@ -72,9 +72,9 @@ const (
 	// DaemonControlServiceConnectProcedure is the fully-qualified name of the DaemonControlService's
 	// Connect RPC.
 	DaemonControlServiceConnectProcedure = "/nokku.v1.DaemonControlService/Connect"
-	// DaemonSessionServiceSessionProcedure is the fully-qualified name of the DaemonSessionService's
-	// Session RPC.
-	DaemonSessionServiceSessionProcedure = "/nokku.v1.DaemonSessionService/Session"
+	// DaemonSessionServiceDaemonSessionProcedure is the fully-qualified name of the
+	// DaemonSessionService's DaemonSession RPC.
+	DaemonSessionServiceDaemonSessionProcedure = "/nokku.v1.DaemonSessionService/DaemonSession"
 )
 
 // DaemonServiceClient is a client for the nokku.v1.DaemonService service.
@@ -529,7 +529,7 @@ func (UnimplementedDaemonControlServiceHandler) Connect(context.Context, *connec
 
 // DaemonSessionServiceClient is a client for the nokku.v1.DaemonSessionService service.
 type DaemonSessionServiceClient interface {
-	Session(context.Context) (*connect.BidiStreamForClientSimple[v1.SessionRequest, v1.SessionResponse], error)
+	DaemonSession(context.Context) (*connect.BidiStreamForClientSimple[v1.DaemonSessionRequest, v1.DaemonSessionResponse], error)
 }
 
 // NewDaemonSessionServiceClient constructs a client for the nokku.v1.DaemonSessionService service.
@@ -543,10 +543,10 @@ func NewDaemonSessionServiceClient(httpClient connect.HTTPClient, baseURL string
 	baseURL = strings.TrimRight(baseURL, "/")
 	daemonSessionServiceMethods := v1.File_nokku_v1_daemon_proto.Services().ByName("DaemonSessionService").Methods()
 	return &daemonSessionServiceClient{
-		session: connect.NewClient[v1.SessionRequest, v1.SessionResponse](
+		daemonSession: connect.NewClient[v1.DaemonSessionRequest, v1.DaemonSessionResponse](
 			httpClient,
-			baseURL+DaemonSessionServiceSessionProcedure,
-			connect.WithSchema(daemonSessionServiceMethods.ByName("Session")),
+			baseURL+DaemonSessionServiceDaemonSessionProcedure,
+			connect.WithSchema(daemonSessionServiceMethods.ByName("DaemonSession")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -554,17 +554,17 @@ func NewDaemonSessionServiceClient(httpClient connect.HTTPClient, baseURL string
 
 // daemonSessionServiceClient implements DaemonSessionServiceClient.
 type daemonSessionServiceClient struct {
-	session *connect.Client[v1.SessionRequest, v1.SessionResponse]
+	daemonSession *connect.Client[v1.DaemonSessionRequest, v1.DaemonSessionResponse]
 }
 
-// Session calls nokku.v1.DaemonSessionService.Session.
-func (c *daemonSessionServiceClient) Session(ctx context.Context) (*connect.BidiStreamForClientSimple[v1.SessionRequest, v1.SessionResponse], error) {
-	return c.session.CallBidiStreamSimple(ctx)
+// DaemonSession calls nokku.v1.DaemonSessionService.DaemonSession.
+func (c *daemonSessionServiceClient) DaemonSession(ctx context.Context) (*connect.BidiStreamForClientSimple[v1.DaemonSessionRequest, v1.DaemonSessionResponse], error) {
+	return c.daemonSession.CallBidiStreamSimple(ctx)
 }
 
 // DaemonSessionServiceHandler is an implementation of the nokku.v1.DaemonSessionService service.
 type DaemonSessionServiceHandler interface {
-	Session(context.Context, *connect.BidiStream[v1.SessionRequest, v1.SessionResponse]) error
+	DaemonSession(context.Context, *connect.BidiStream[v1.DaemonSessionRequest, v1.DaemonSessionResponse]) error
 }
 
 // NewDaemonSessionServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -574,16 +574,16 @@ type DaemonSessionServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewDaemonSessionServiceHandler(svc DaemonSessionServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	daemonSessionServiceMethods := v1.File_nokku_v1_daemon_proto.Services().ByName("DaemonSessionService").Methods()
-	daemonSessionServiceSessionHandler := connect.NewBidiStreamHandler(
-		DaemonSessionServiceSessionProcedure,
-		svc.Session,
-		connect.WithSchema(daemonSessionServiceMethods.ByName("Session")),
+	daemonSessionServiceDaemonSessionHandler := connect.NewBidiStreamHandler(
+		DaemonSessionServiceDaemonSessionProcedure,
+		svc.DaemonSession,
+		connect.WithSchema(daemonSessionServiceMethods.ByName("DaemonSession")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/nokku.v1.DaemonSessionService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case DaemonSessionServiceSessionProcedure:
-			daemonSessionServiceSessionHandler.ServeHTTP(w, r)
+		case DaemonSessionServiceDaemonSessionProcedure:
+			daemonSessionServiceDaemonSessionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -593,6 +593,6 @@ func NewDaemonSessionServiceHandler(svc DaemonSessionServiceHandler, opts ...con
 // UnimplementedDaemonSessionServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedDaemonSessionServiceHandler struct{}
 
-func (UnimplementedDaemonSessionServiceHandler) Session(context.Context, *connect.BidiStream[v1.SessionRequest, v1.SessionResponse]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.DaemonSessionService.Session is not implemented"))
+func (UnimplementedDaemonSessionServiceHandler) DaemonSession(context.Context, *connect.BidiStream[v1.DaemonSessionRequest, v1.DaemonSessionResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.DaemonSessionService.DaemonSession is not implemented"))
 }

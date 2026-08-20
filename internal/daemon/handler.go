@@ -6,16 +6,16 @@ import (
 
 	"connectrpc.com/connect"
 
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/meta"
 )
 
 func (p *Pool) Connect(
 	ctx context.Context,
 	stream *connect.BidiStream[nokkuv1.ConnectRequest, nokkuv1.ConnectResponse],
 ) error {
-	daemonID := meta.DaemonIDFromContext(ctx)
+	daemonID := auth.DaemonIDFromContext(ctx)
 	if daemonID == "" {
 		return connect.NewError(
 			connect.CodePermissionDenied,
@@ -99,11 +99,11 @@ func (p *Pool) Connect(
 	}
 }
 
-func (p *Pool) Session(
+func (p *Pool) DaemonSession(
 	ctx context.Context,
-	stream *connect.BidiStream[nokkuv1.SessionRequest, nokkuv1.SessionResponse],
+	stream *connect.BidiStream[nokkuv1.DaemonSessionRequest, nokkuv1.DaemonSessionResponse],
 ) error {
-	daemonID := meta.DaemonIDFromContext(ctx)
+	daemonID := auth.DaemonIDFromContext(ctx)
 	if daemonID == "" {
 		return connect.NewError(
 			connect.CodePermissionDenied,
@@ -115,7 +115,7 @@ func (p *Pool) Session(
 	if err != nil {
 		return err
 	}
-	ready, ok := msg.GetMsg().(*nokkuv1.SessionRequest_Ready)
+	ready, ok := msg.GetMsg().(*nokkuv1.DaemonSessionRequest_Ready)
 	if !ok || ready.Ready == nil {
 		return connect.NewError(
 			connect.CodeInvalidArgument,
@@ -171,10 +171,10 @@ func (p *Pool) Session(
 			}
 
 			switch m := msg.GetMsg().(type) {
-			case *nokkuv1.SessionRequest_Stdout:
+			case *nokkuv1.DaemonSessionRequest_Stdout:
 				sess.AppendStdout(m.Stdout)
 
-			case *nokkuv1.SessionRequest_Exited:
+			case *nokkuv1.DaemonSessionRequest_Exited:
 				recvErr <- nil
 				return
 
