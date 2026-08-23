@@ -18,7 +18,6 @@
 		type IconProps
 	} from '@lucide/svelte';
 	import {
-		createTable,
 		FlexRender,
 		renderComponent,
 		type ColumnDef,
@@ -27,11 +26,12 @@
 		type RowData,
 		type Table
 	} from '@tanstack/svelte-table';
-	import type { Component } from 'svelte';
+	import type { Component, Snippet } from 'svelte';
 	import { PersistedState } from 'runed';
 	import BulkActions from './BulkActions.svelte';
 	import type { BulkAction } from './types';
-	import { features, type DataTableFeatures } from './data-table-features.js';
+	import type { DataTableFeatures } from './data-table-features.js';
+	import { createAppTable } from './data-table.js';
 
 	type IconComponent = Component<IconProps, Record<string, never>, ''>;
 
@@ -39,27 +39,31 @@
 		data?: TData[];
 		columns: ColumnDef<DataTableFeatures, TData>[];
 		bulkActions?: BulkAction<TData>[] | undefined;
+		enableRowSelection?: boolean;
 		rowCount?: number;
 		emptyState?: {
 			icon: IconComponent;
 			title: string;
 			description: string;
 		};
-		onTableReady?: (table: Table<DataTableFeatures, TData>) => void;
+		toolbar?: Snippet<[Table<DataTableFeatures, TData>]>;
 	};
 
 	let {
 		data = [],
 		columns,
 		bulkActions,
+		enableRowSelection,
 		rowCount,
 		emptyState = {
 			icon: SearchXIcon,
 			title: 'No Data',
 			description: 'No data found'
 		},
-		onTableReady
+		toolbar
 	}: DataTableProps<TData> = $props();
+
+	const hasSelection = $derived(enableRowSelection ?? (bulkActions && bulkActions.length > 0));
 
 	// Pagination
 	const pageSizeOptions = [2, 10, 15, 20, 30, 50];
@@ -87,31 +91,35 @@
 	let columnVisibility = $state<ColumnVisibilityState>(persistedVisibility.current);
 
 	// Table
-	const table = createTable({
-		features,
+	const table = createAppTable<TData>({
 		get data() {
 			return data;
 		},
 		get columns() {
 			return [
-				{
-					id: 'select',
-					header: ({ table }) =>
-						renderComponent(Checkbox, {
-							checked: table.getIsAllPageRowsSelected(),
-							onCheckedChange: (value: boolean) => table.toggleAllPageRowsSelected(!!value),
-							indeterminate: table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected(),
-							'aria-label': 'Select all'
-						}),
-					cell: ({ row }) =>
-						renderComponent(Checkbox, {
-							checked: row.getIsSelected(),
-							onCheckedChange: (value: boolean) => row.toggleSelected(!!value),
-							'aria-label': 'Select row'
-						}),
-					enableSorting: false,
-					enableHiding: false
-				} as ColumnDef<DataTableFeatures, TData>,
+				...(hasSelection
+					? [
+							{
+								id: 'select',
+								header: ({ table }) =>
+									renderComponent(Checkbox, {
+										checked: table.getIsAllPageRowsSelected(),
+										onCheckedChange: (value: boolean) => table.toggleAllPageRowsSelected(!!value),
+										indeterminate:
+											table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected(),
+										'aria-label': 'Select all'
+									}),
+								cell: ({ row }) =>
+									renderComponent(Checkbox, {
+										checked: row.getIsSelected(),
+										onCheckedChange: (value: boolean) => row.toggleSelected(!!value),
+										'aria-label': 'Select row'
+									}),
+								enableSorting: false,
+								enableHiding: false
+							} as ColumnDef<DataTableFeatures, TData>
+						]
+					: []),
 				...columns
 			];
 		},
@@ -120,6 +128,9 @@
 		},
 		get manualPagination() {
 			return !!rowCount;
+		},
+		get enableRowSelection() {
+			return hasSelection;
 		},
 		onPaginationChange: (updater) => {
 			if (typeof updater === 'function') {
@@ -146,11 +157,11 @@
 	});
 
 	const paginationState = $derived(table.atoms.pagination.get());
-
-	$effect(() => {
-		onTableReady?.(table);
-	});
 </script>
+
+{#if toolbar}
+	{@render toolbar(table)}
+{/if}
 
 {#if !data.length}
 	<Empty.Root class="h-[25vh] rounded-xl border bg-card text-card-foreground shadow-sm">
