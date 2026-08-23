@@ -130,6 +130,15 @@ export const workspaceInterceptor: Interceptor = (next) => async (req) => {
 	}
 
 	const unaryRequest = req as UnaryRequest;
+	// UtilService is user/global scoped (getVersion, listRoles, listAuditLogs,
+	// exportAuditLogs). Its requests decide their own scope: the activity pages
+	// pass an explicit workspace_id (or empty for a personal/global read), so
+	// the blanket injection must not override it.
+	const service = unaryRequest.method.parent as { typeName?: string } | undefined;
+	if (service?.typeName === 'nokku.v1.UtilService') {
+		return await next(req);
+	}
+
 	const hasWorkspaceField = unaryRequest.method.input.fields.some(
 		(field) => field.localName === 'workspaceId'
 	);
