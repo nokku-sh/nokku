@@ -73,7 +73,9 @@ func (s *UtilService) ListAuditLogs(
 	query := audit.QueryOptions{
 		WorkspaceID: workspaceID,
 		ActorIDs:    req.GetActorIds(),
+		ActorTypes:  req.GetActorTypes(),
 		Actions:     req.GetActions(),
+		Search:      req.GetSearch(),
 		Limit:       req.GetLimit(),
 		Offset:      req.GetOffset(),
 	}
