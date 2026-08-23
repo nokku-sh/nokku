@@ -5,20 +5,21 @@
 	import StatusCell from '$lib/components/tables/cells/StatusCell.svelte';
 	import TimeCell from '$lib/components/tables/cells/TimeCell.svelte';
 	import DataTable from '$lib/components/tables/DataTable.svelte';
-	import { renderComponent } from '$lib/components/ui/data-table';
+	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { createModalState } from '$lib/hooks';
 	import { formatBytes } from '$lib/crypto/recordings';
 	import type { Recording } from '$lib/gen/nokku/v1/recordings_pb';
 	import { MonitorPlay, SearchX } from '@lucide/svelte';
-	import type { ColumnDef } from '@tanstack/table-core';
+	import type { ColumnDef } from '@tanstack/svelte-table';
+	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 
 	const list = $derived(recordings.list());
 	const deleteRecording = recordings.delete();
 
 	const player = createModalState<Recording>({} as Recording);
 
-	const columns: ColumnDef<Recording>[] = [
+	const columns: ColumnDef<DataTableFeatures, Recording>[] = [
 		{
 			header: 'Started',
 			accessorKey: 'startedAt',

@@ -9,14 +9,15 @@
 	import DataTable from '$lib/components/tables/DataTable.svelte';
 	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { renderComponent } from '$lib/components/ui/data-table';
+	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
 	import type { ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
 	import { createModalState } from '$lib/hooks';
 	import type { BulkAction } from '$lib/components/tables/types';
 	import { PencilIcon, PlusIcon, Trash2, Waypoints } from '@lucide/svelte';
-	import type { ColumnDef, Table } from '@tanstack/table-core';
+	import type { ColumnDef, Table } from '@tanstack/svelte-table';
+	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 	import { Debounced } from 'runed';
 	import AvatarCell from '$lib/components/tables/cells/AvatarCell.svelte';
 	import { roles } from '$lib/api/roles.svelte';
@@ -55,7 +56,7 @@
 		}))
 	);
 
-	const columns: ColumnDef<ServiceAccount>[] = [
+	const columns: ColumnDef<DataTableFeatures, ServiceAccount>[] = [
 		{
 			header: 'Name',
 			accessorKey: 'name',
@@ -124,7 +125,7 @@
 		}
 	];
 
-	let table = $state<Table<ServiceAccount>>();
+	let table = $state<Table<DataTableFeatures, ServiceAccount>>();
 </script>
 
 <PageHeader

@@ -10,7 +10,7 @@
 	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
 	import type { BulkAction } from '$lib/components/tables/types';
 	import { Button } from '$lib/components/ui/button';
-	import { renderComponent } from '$lib/components/ui/data-table';
+	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { DaemonStatus, type Daemon } from '$lib/gen/nokku/v1/daemon_pb';
 	import { createModalState } from '$lib/hooks';
@@ -26,7 +26,8 @@
 		Wifi,
 		WifiOff
 	} from '@lucide/svelte';
-	import type { ColumnDef, Table } from '@tanstack/table-core';
+	import type { ColumnDef, Table } from '@tanstack/svelte-table';
+	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 	import { Debounced } from 'runed';
 
 	const statusOptions = [
@@ -58,7 +59,7 @@
 	const updateDaemon = daemon.update();
 	const deleteDaemon = daemon.delete();
 
-	const columns: ColumnDef<Daemon>[] = [
+	const columns: ColumnDef<DataTableFeatures, Daemon>[] = [
 		{
 			header: 'Name',
 			accessorKey: 'name',
@@ -145,7 +146,7 @@
 		}
 	];
 
-	let table = $state<Table<Daemon>>();
+	let table = $state<Table<DataTableFeatures, Daemon>>();
 </script>
 
 <DaemonModal bind:open={daemonModal.open} bind:data={daemonModal.selected} />

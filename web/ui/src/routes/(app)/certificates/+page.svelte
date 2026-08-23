@@ -15,7 +15,7 @@
 	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
 	import type { BulkAction } from '$lib/components/tables/types';
 	import { Button } from '$lib/components/ui/button';
-	import { renderComponent } from '$lib/components/ui/data-table';
+	import { renderComponent } from '@tanstack/svelte-table';
 	import {
 		AuthorityType,
 		CertificateKeyType,
@@ -23,7 +23,8 @@
 	} from '$lib/gen/nokku/v1/certificates_pb';
 	import { enumLabel } from '$lib/utils';
 	import { KeyRound, Pencil, Plus, Shield, ShieldAlert, Trash2 } from '@lucide/svelte';
-	import type { ColumnDef, Table } from '@tanstack/table-core';
+	import type { ColumnDef, Table } from '@tanstack/svelte-table';
+	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 
 	const caModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
 	const signModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
@@ -58,8 +59,8 @@
 		{ label: 'X.509', value: 'X509', icon: Shield }
 	];
 
-	let table = $state<Table<CertificateAuthority>>();
-	const columns: ColumnDef<CertificateAuthority>[] = [
+	let table = $state<Table<DataTableFeatures, CertificateAuthority>>();
+	const columns: ColumnDef<DataTableFeatures, CertificateAuthority>[] = [
 		{
 			header: 'Name',
 			accessorKey: 'name',

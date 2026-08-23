@@ -1,9 +1,9 @@
-<script lang="ts" generics="TData">
+<script lang="ts" generics="TData extends RowData">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { SearchIcon, DeleteIcon, CirclePlusIcon, CircleCheckBig } from '@lucide/svelte';
-	import type { Table } from '@tanstack/table-core';
+	import type { RowData, Table } from '@tanstack/svelte-table';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as InputGroup from '$lib/components/ui/input-group';
@@ -12,13 +12,14 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import TableViewOptions from './TableViewOptions.svelte';
 	import type { FilterConfig } from './types';
+	import type { DataTableFeatures } from './data-table-features.js';
 
-	type Props<TData> = {
+	type Props<TData extends RowData> = {
 		search?: boolean | string;
 		searchPlaceholder?: string;
 		searchResultCount?: number;
 		filters?: FilterConfig[];
-		table?: Table<TData>;
+		table?: Table<DataTableFeatures, TData>;
 	};
 
 	let {
