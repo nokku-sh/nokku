@@ -172,6 +172,7 @@ CREATE TABLE IF NOT EXISTS daemons (
   name TEXT NOT NULL,
   status INTEGER NOT NULL DEFAULT 1, -- 1=pending, 2=accepted, 3=rejected
   online BOOLEAN NOT NULL DEFAULT FALSE,
+  key_thumbprint TEXT,
   config JSONB NOT NULL DEFAULT '{}',
   metadata JSONB NOT NULL DEFAULT '{}',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
