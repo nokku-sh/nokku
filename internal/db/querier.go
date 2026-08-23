@@ -26,6 +26,7 @@ type Querier interface {
 	// the definition of a subject and team membership expansion.
 	CheckTargetAccess(ctx context.Context, arg *CheckTargetAccessParams) (*Target, error)
 	ConsumeCredentialBySubject(ctx context.Context, arg *ConsumeCredentialBySubjectParams) (*Credential, error)
+	ConsumeOneTimeToken(ctx context.Context, tokenHash []byte) (*ConsumeOneTimeTokenRow, error)
 	CountAuditLogs(ctx context.Context, arg *CountAuditLogsParams) (int32, error)
 	CountMembers(ctx context.Context, arg *CountMembersParams) (int32, error)
 	CountVerifiedWorkspaceDomains(ctx context.Context, workspaceID string) (int32, error)
@@ -55,7 +56,6 @@ type Querier interface {
 	DeleteKey(ctx context.Context, keyID string) error
 	// Rotation-only: remove the keyset when rotating to a non-KMS cipher.
 	DeleteKeyset(ctx context.Context) error
-	DeleteOneTimeToken(ctx context.Context, tokenHash []byte) error
 	DeleteOrphanAuditLogs(ctx context.Context, cutoff time.Time) (int64, error)
 	DeleteRecording(ctx context.Context, id string) error
 	DeleteServiceAccount(ctx context.Context, serviceAccountID string) error
@@ -96,7 +96,6 @@ type Querier interface {
 	GetOIDCProvider(ctx context.Context, workspaceID string) (*OidcProvider, error)
 	GetOIDCProviderByDomain(ctx context.Context, domain string) (*OidcProvider, error)
 	GetOIDCProviderByID(ctx context.Context, workspaceID string) (*OidcProvider, error)
-	GetOneTimeToken(ctx context.Context, tokenHash []byte) (*OneTimeToken, error)
 	GetPrincipalWorkspace(ctx context.Context, principalID string) (string, error)
 	GetPrincipals(ctx context.Context, principalIds []string) ([]*GetPrincipalsRow, error)
 	GetPrincipalsByTargetIDs(ctx context.Context, targetIds []string) ([]*GetPrincipalsByTargetIDsRow, error)

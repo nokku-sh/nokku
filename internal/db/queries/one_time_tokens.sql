@@ -5,18 +5,14 @@ INSERT INTO
 VALUES
   (@token_hash, @user_id, @purpose, @expires_at);
 
--- name: GetOneTimeToken :one
-SELECT
-  *
-FROM
-  one_time_tokens
-WHERE
-  token_hash = @token_hash;
-
--- name: DeleteOneTimeToken :exec
+-- name: ConsumeOneTimeToken :one
 DELETE FROM one_time_tokens
 WHERE
-  token_hash = @token_hash;
+  token_hash = @token_hash
+  AND expires_at > NOW()
+RETURNING
+  user_id,
+  purpose;
 
 -- name: DeleteExpiredOneTimeTokens :exec
 DELETE FROM one_time_tokens

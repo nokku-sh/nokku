@@ -10,6 +10,28 @@ import (
 	"time"
 )
 
+const consumeOneTimeToken = `-- name: ConsumeOneTimeToken :one
+DELETE FROM one_time_tokens
+WHERE
+  token_hash = $1
+  AND expires_at > NOW()
+RETURNING
+  user_id,
+  purpose
+`
+
+type ConsumeOneTimeTokenRow struct {
+	UserID  string `json:"userId"`
+	Purpose string `json:"purpose"`
+}
+
+func (q *Queries) ConsumeOneTimeToken(ctx context.Context, tokenHash []byte) (*ConsumeOneTimeTokenRow, error) {
+	row := q.db.QueryRow(ctx, consumeOneTimeToken, tokenHash)
+	var i ConsumeOneTimeTokenRow
+	err := row.Scan(&i.UserID, &i.Purpose)
+	return &i, err
+}
+
 const createOneTimeToken = `-- name: CreateOneTimeToken :exec
 INSERT INTO
   one_time_tokens (token_hash, user_id, purpose, expires_at)
@@ -44,38 +66,4 @@ WHERE
 func (q *Queries) DeleteExpiredOneTimeTokens(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, deleteExpiredOneTimeTokens)
 	return err
-}
-
-const deleteOneTimeToken = `-- name: DeleteOneTimeToken :exec
-DELETE FROM one_time_tokens
-WHERE
-  token_hash = $1
-`
-
-func (q *Queries) DeleteOneTimeToken(ctx context.Context, tokenHash []byte) error {
-	_, err := q.db.Exec(ctx, deleteOneTimeToken, tokenHash)
-	return err
-}
-
-const getOneTimeToken = `-- name: GetOneTimeToken :one
-SELECT
-  id, token_hash, user_id, purpose, expires_at, created_at
-FROM
-  one_time_tokens
-WHERE
-  token_hash = $1
-`
-
-func (q *Queries) GetOneTimeToken(ctx context.Context, tokenHash []byte) (*OneTimeToken, error) {
-	row := q.db.QueryRow(ctx, getOneTimeToken, tokenHash)
-	var i OneTimeToken
-	err := row.Scan(
-		&i.ID,
-		&i.TokenHash,
-		&i.UserID,
-		&i.Purpose,
-		&i.ExpiresAt,
-		&i.CreatedAt,
-	)
-	return &i, err
 }

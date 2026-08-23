@@ -40,24 +40,18 @@ func (s *TokenStore) PutToken(
 	})
 }
 
-// ConsumeToken looks the token up by hash, deletes it, and returns the user
-// and purpose it was issued for.
+// ConsumeToken deletes the token and returns the user and purpose it was
+// issued for. It deletes atomically so a token can never be spent twice,
+// whether by concurrent requests or replay after use.
 func (s *TokenStore) ConsumeToken(
 	ctx context.Context,
 	hash []byte,
 ) (string, tokens.Purpose, error) {
-	row, err := s.conn.Q.GetOneTimeToken(ctx, hash)
+	row, err := s.conn.Q.ConsumeOneTimeToken(ctx, hash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", "", kagi.ErrTokenInvalid
 		}
-		return "", "", err
-	}
-	if row.ExpiresAt.Before(time.Now()) {
-		_ = s.conn.Q.DeleteOneTimeToken(ctx, hash)
-		return "", "", kagi.ErrTokenInvalid
-	}
-	if err := s.conn.Q.DeleteOneTimeToken(ctx, hash); err != nil {
 		return "", "", err
 	}
 	return row.UserID, tokens.Purpose(row.Purpose), nil
