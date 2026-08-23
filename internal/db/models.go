@@ -85,11 +85,11 @@ type Daemon struct {
 	Name          string              `json:"name"`
 	Status        nokku.DaemonStatus  `json:"status"`
 	Online        bool                `json:"online"`
+	KeyThumbprint *string             `json:"keyThumbprint"`
 	Config        *nokku.DaemonConfig `json:"config"`
 	Metadata      []byte              `json:"metadata"`
 	UpdatedAt     time.Time           `json:"updatedAt"`
 	CreatedAt     time.Time           `json:"createdAt"`
-	KeyThumbprint *string             `json:"keyThumbprint"`
 }
 
 type Keyset struct {
