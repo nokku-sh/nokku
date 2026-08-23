@@ -83,6 +83,7 @@ type Querier interface {
 	GetCAsByIDs(ctx context.Context, caIds []string) ([]*GetCAsByIDsRow, error)
 	GetCredential(ctx context.Context, arg *GetCredentialParams) (*Credential, error)
 	GetDaemon(ctx context.Context, daemonID string) (*Daemon, error)
+	GetDaemonByKeyThumbprint(ctx context.Context, arg *GetDaemonByKeyThumbprintParams) (*Daemon, error)
 	GetDaemonsByIDs(ctx context.Context, daemonIds []string) ([]*GetDaemonsByIDsRow, error)
 	GetDefaultCA(ctx context.Context, workspaceID string) (*CertificateAuthority, error)
 	GetEncryptedCAKeys(ctx context.Context) ([]*GetEncryptedCAKeysRow, error)

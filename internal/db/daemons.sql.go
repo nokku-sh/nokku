@@ -16,17 +16,18 @@ const createDaemon = `-- name: CreateDaemon :one
 WITH
   new_daemon AS (
     INSERT INTO
-      daemons (workspace_id, name, status, config, metadata)
+      daemons (workspace_id, name, status, config, metadata, key_thumbprint)
     VALUES
       (
         $1,
         $2,
         $3,
         COALESCE($4, '{}'::jsonb),
-        COALESCE($5, '{}'::jsonb)
+        COALESCE($5, '{}'::jsonb),
+        $6
       )
     RETURNING
-      id, workspace_id, name, status, online, config, metadata, updated_at, created_at
+      id, workspace_id, name, status, online, config, metadata, updated_at, created_at, key_thumbprint
   ),
   new_target AS (
     INSERT INTO
@@ -38,31 +39,39 @@ WITH
       COALESCE($5, '{}'::jsonb)
     FROM
       new_daemon
+    RETURNING
+      id
   )
 SELECT
-  id, workspace_id, name, status, online, config, metadata, updated_at, created_at
+  d.id, d.workspace_id, d.name, d.status, d.online, d.config, d.metadata, d.updated_at, d.created_at, d.key_thumbprint,
+  t.id AS target_id
 FROM
-  new_daemon
+  new_daemon d
+CROSS JOIN
+  new_target t
 `
 
 type CreateDaemonParams struct {
-	WorkspaceID string             `json:"workspaceId"`
-	Name        string             `json:"name"`
-	Status      nokku.DaemonStatus `json:"status"`
-	Config      interface{}        `json:"config"`
-	Metadata    interface{}        `json:"metadata"`
+	WorkspaceID   string             `json:"workspaceId"`
+	Name          string             `json:"name"`
+	Status        nokku.DaemonStatus `json:"status"`
+	Config        interface{}        `json:"config"`
+	Metadata      interface{}        `json:"metadata"`
+	KeyThumbprint *string            `json:"keyThumbprint"`
 }
 
 type CreateDaemonRow struct {
-	ID          string    `json:"id"`
-	WorkspaceID string    `json:"workspaceId"`
-	Name        string    `json:"name"`
-	Status      int32     `json:"status"`
-	Online      bool      `json:"online"`
-	Config      []byte    `json:"config"`
-	Metadata    []byte    `json:"metadata"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID            string    `json:"id"`
+	WorkspaceID   string    `json:"workspaceId"`
+	Name          string    `json:"name"`
+	Status        int32     `json:"status"`
+	Online        bool      `json:"online"`
+	Config        []byte    `json:"config"`
+	Metadata      []byte    `json:"metadata"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	CreatedAt     time.Time `json:"createdAt"`
+	KeyThumbprint *string   `json:"keyThumbprint"`
+	TargetID      string    `json:"targetId"`
 }
 
 func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*CreateDaemonRow, error) {
@@ -72,6 +81,7 @@ func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*C
 		arg.Status,
 		arg.Config,
 		arg.Metadata,
+		arg.KeyThumbprint,
 	)
 	var i CreateDaemonRow
 	err := row.Scan(
@@ -84,6 +94,8 @@ func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*C
 		&i.Metadata,
 		&i.UpdatedAt,
 		&i.CreatedAt,
+		&i.KeyThumbprint,
+		&i.TargetID,
 	)
 	return &i, err
 }
@@ -93,7 +105,7 @@ DELETE FROM daemons
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, name, status, online, config, metadata, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, updated_at, created_at, key_thumbprint
 `
 
 func (q *Queries) DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, error) {
@@ -109,13 +121,14 @@ func (q *Queries) DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, e
 		&i.Metadata,
 		&i.UpdatedAt,
 		&i.CreatedAt,
+		&i.KeyThumbprint,
 	)
 	return &i, err
 }
 
 const getDaemon = `-- name: GetDaemon :one
 SELECT
-  id, workspace_id, name, status, online, config, metadata, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, updated_at, created_at, key_thumbprint
 FROM
   daemons
 WHERE
@@ -135,6 +148,41 @@ func (q *Queries) GetDaemon(ctx context.Context, daemonID string) (*Daemon, erro
 		&i.Metadata,
 		&i.UpdatedAt,
 		&i.CreatedAt,
+		&i.KeyThumbprint,
+	)
+	return &i, err
+}
+
+const getDaemonByKeyThumbprint = `-- name: GetDaemonByKeyThumbprint :one
+SELECT
+  id, workspace_id, name, status, online, config, metadata, updated_at, created_at, key_thumbprint
+FROM
+  daemons
+WHERE
+  workspace_id = $1
+  AND key_thumbprint = $2
+LIMIT 1
+`
+
+type GetDaemonByKeyThumbprintParams struct {
+	WorkspaceID   string  `json:"workspaceId"`
+	KeyThumbprint *string `json:"keyThumbprint"`
+}
+
+func (q *Queries) GetDaemonByKeyThumbprint(ctx context.Context, arg *GetDaemonByKeyThumbprintParams) (*Daemon, error) {
+	row := q.db.QueryRow(ctx, getDaemonByKeyThumbprint, arg.WorkspaceID, arg.KeyThumbprint)
+	var i Daemon
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.Status,
+		&i.Online,
+		&i.Config,
+		&i.Metadata,
+		&i.UpdatedAt,
+		&i.CreatedAt,
+		&i.KeyThumbprint,
 	)
 	return &i, err
 }
@@ -206,7 +254,7 @@ func (q *Queries) GetTargetByDaemon(ctx context.Context, daemonID *string) (*Tar
 
 const listDaemons = `-- name: ListDaemons :many
 SELECT
-  d.id, d.workspace_id, d.name, d.status, d.online, d.config, d.metadata, d.updated_at, d.created_at,
+  d.id, d.workspace_id, d.name, d.status, d.online, d.config, d.metadata, d.updated_at, d.created_at, d.key_thumbprint,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   daemons d
@@ -242,16 +290,17 @@ type ListDaemonsParams struct {
 }
 
 type ListDaemonsRow struct {
-	ID          string              `json:"id"`
-	WorkspaceID string              `json:"workspaceId"`
-	Name        string              `json:"name"`
-	Status      nokku.DaemonStatus  `json:"status"`
-	Online      bool                `json:"online"`
-	Config      *nokku.DaemonConfig `json:"config"`
-	Metadata    []byte              `json:"metadata"`
-	UpdatedAt   time.Time           `json:"updatedAt"`
-	CreatedAt   time.Time           `json:"createdAt"`
-	TotalCount  int32               `json:"totalCount"`
+	ID            string              `json:"id"`
+	WorkspaceID   string              `json:"workspaceId"`
+	Name          string              `json:"name"`
+	Status        nokku.DaemonStatus  `json:"status"`
+	Online        bool                `json:"online"`
+	Config        *nokku.DaemonConfig `json:"config"`
+	Metadata      []byte              `json:"metadata"`
+	UpdatedAt     time.Time           `json:"updatedAt"`
+	CreatedAt     time.Time           `json:"createdAt"`
+	KeyThumbprint *string             `json:"keyThumbprint"`
+	TotalCount    int32               `json:"totalCount"`
 }
 
 func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*ListDaemonsRow, error) {
@@ -280,6 +329,7 @@ func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*L
 			&i.Metadata,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.KeyThumbprint,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
@@ -314,7 +364,7 @@ SET
 WHERE
   id = $4
 RETURNING
-  id, workspace_id, name, status, online, config, metadata, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, updated_at, created_at, key_thumbprint
 `
 
 type UpdateDaemonParams struct {
@@ -342,6 +392,7 @@ func (q *Queries) UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) (*D
 		&i.Metadata,
 		&i.UpdatedAt,
 		&i.CreatedAt,
+		&i.KeyThumbprint,
 	)
 	return &i, err
 }
@@ -389,7 +440,7 @@ SET
 WHERE
   id = $2
 RETURNING
-  id, workspace_id, name, status, online, config, metadata, updated_at, created_at
+  id, workspace_id, name, status, online, config, metadata, updated_at, created_at, key_thumbprint
 `
 
 type UpdateDaemonStatusParams struct {
@@ -410,6 +461,7 @@ func (q *Queries) UpdateDaemonStatus(ctx context.Context, arg *UpdateDaemonStatu
 		&i.Metadata,
 		&i.UpdatedAt,
 		&i.CreatedAt,
+		&i.KeyThumbprint,
 	)
 	return &i, err
 }

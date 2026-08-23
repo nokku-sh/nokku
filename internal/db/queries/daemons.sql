@@ -2,14 +2,15 @@
 WITH
   new_daemon AS (
     INSERT INTO
-      daemons (workspace_id, name, status, config, metadata)
+      daemons (workspace_id, name, status, config, metadata, key_thumbprint)
     VALUES
       (
         @workspace_id,
         @name,
         @status,
         COALESCE(@config, '{}'::jsonb),
-        COALESCE(@metadata, '{}'::jsonb)
+        COALESCE(@metadata, '{}'::jsonb),
+        @key_thumbprint
       )
     RETURNING
       *
@@ -24,11 +25,26 @@ WITH
       COALESCE(sqlc.narg('metadata'), '{}'::jsonb)
     FROM
       new_daemon
+    RETURNING
+      id
   )
+SELECT
+  d.*,
+  t.id AS target_id
+FROM
+  new_daemon d
+CROSS JOIN
+  new_target t;
+
+-- name: GetDaemonByKeyThumbprint :one
 SELECT
   *
 FROM
-  new_daemon;
+  daemons
+WHERE
+  workspace_id = @workspace_id
+  AND key_thumbprint = @key_thumbprint
+LIMIT 1;
 
 -- name: GetDaemon :one
 SELECT

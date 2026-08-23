@@ -80,15 +80,16 @@ type Credential struct {
 }
 
 type Daemon struct {
-	ID          string              `json:"id"`
-	WorkspaceID string              `json:"workspaceId"`
-	Name        string              `json:"name"`
-	Status      nokku.DaemonStatus  `json:"status"`
-	Online      bool                `json:"online"`
-	Config      *nokku.DaemonConfig `json:"config"`
-	Metadata    []byte              `json:"metadata"`
-	UpdatedAt   time.Time           `json:"updatedAt"`
-	CreatedAt   time.Time           `json:"createdAt"`
+	ID            string              `json:"id"`
+	WorkspaceID   string              `json:"workspaceId"`
+	Name          string              `json:"name"`
+	Status        nokku.DaemonStatus  `json:"status"`
+	Online        bool                `json:"online"`
+	Config        *nokku.DaemonConfig `json:"config"`
+	Metadata      []byte              `json:"metadata"`
+	UpdatedAt     time.Time           `json:"updatedAt"`
+	CreatedAt     time.Time           `json:"createdAt"`
+	KeyThumbprint *string             `json:"keyThumbprint"`
 }
 
 type Keyset struct {

@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/mizuchilabs/kagi"
 	"github.com/mizuchilabs/kagi/dpop"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -330,46 +332,96 @@ func (s *DaemonService) EnrollDaemon(
 		"host":       h.Get("Host"),
 	})
 
-	// Names are generated server-side so a workspace never shows a duplicate
-	// label. A collision is a unique violation on (workspace_id, name); we
-	// retry with a numeric suffix before giving up.
-	var daemon *db.CreateDaemonRow
-	var target *db.Target
-	base := namegen.Generate()
-	name := base
-	for attempt := 0; ; attempt++ {
-		if attempt > 0 {
-			name = base + "-" + strconv.Itoa(attempt+1)
-		}
+	// Re-enrolling the same machine must not create a second daemon. The
+	// DPoP key thumbprint (binding) is the daemon's stable identity, so look
+	// for an existing daemon bound to this workspace and key and reuse it.
+	var (
+		daemonID   string
+		daemonName string
+		targetID   string
+		statusNow  = status
+	)
+	var existing *db.Daemon
+	lookErr := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		existing, err = q.GetDaemonByKeyThumbprint(ctx, &db.GetDaemonByKeyThumbprintParams{
+			WorkspaceID:   workspaceID,
+			KeyThumbprint: &binding,
+		})
+		return err
+	})
+	found := lookErr == nil && existing != nil
+	if !found && !errors.Is(lookErr, pgx.ErrNoRows) {
+		return nil, DBError(lookErr)
+	}
 
-		err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
-			daemon, err = q.CreateDaemon(ctx, &db.CreateDaemonParams{
-				WorkspaceID: workspaceID,
-				Name:        name,
-				Metadata:    metadata,
-				Status:      status,
-				Config:      config,
-			})
+	if found {
+		daemonID = existing.ID
+		daemonName = existing.Name
+		statusNow = existing.Status
+		config = existing.Config
+
+		if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+			var target *db.Target
+			target, err = q.GetTargetByDaemon(ctx, &existing.ID)
 			if err != nil {
 				return err
 			}
+			targetID = target.ID
+			return nil
+		}); err != nil {
+			return nil, DBError(err)
+		}
+	} else {
+		// First enrollment: generate a name and insert. Names are generated
+		// server-side so a workspace never shows a duplicate label. A
+		// collision is a unique violation on (workspace_id, name), retried
+		// with a numeric suffix before giving up.
+		var name strings.Builder
+		name.WriteString(namegen.Generate())
+		for attempt := 0; ; attempt++ {
+			if attempt > 0 {
+				name.WriteString(strconv.Itoa(attempt + 1))
+			}
 
-			if req.GetCaId() != "" {
-				target, err = q.UpdateTargetCA(ctx, &db.UpdateTargetCAParams{
-					DaemonID: &daemon.ID,
-					CaID:     req.CaId,
+			var created *db.CreateDaemonRow
+			err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+				created, err = q.CreateDaemon(ctx, &db.CreateDaemonParams{
+					WorkspaceID:   workspaceID,
+					Name:          name.String(),
+					Metadata:      metadata,
+					Status:        status,
+					Config:        config,
+					KeyThumbprint: &binding,
 				})
 				if err != nil {
 					return err
 				}
+
+				// Assign the CA the caller picked (req.CaId), or fall back to
+				// the workspace default when none was given. A daemon without
+				// a CA cannot get host certs signed, so this must always run.
+				caID := req.CaId
+				if caID != nil && *caID == "" {
+					caID = nil
+				}
+				_, err = q.UpdateTargetCA(ctx, &db.UpdateTargetCAParams{
+					DaemonID: &created.ID,
+					CaID:     caID,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			})
+			if err == nil {
+				daemonID = created.ID
+				daemonName = created.Name
+				targetID = created.TargetID
+				break
 			}
-			return nil
-		})
-		if err == nil {
-			break
-		}
-		if !isUniqueViolation(err) || attempt >= 4 {
-			return nil, DBError(err)
+			if !isUniqueViolation(err) || attempt >= 4 {
+				return nil, DBError(err)
+			}
 		}
 	}
 
@@ -377,7 +429,7 @@ func (s *DaemonService) EnrollDaemon(
 	// deleting the daemon (the session cascades), not by a clock.
 	sess, err := s.cfg.Auth.Kagi.Sessions.IssueSession(ctx, kagi.SessionParams{
 		TenantID:  kagi.TenantID(workspaceID),
-		SubjectID: daemon.ID,
+		SubjectID: daemonID,
 		Kind:      auth.ActorTypeDaemon,
 		Method:    kagi.MethodDevice,
 		Binding:   binding,
@@ -387,20 +439,20 @@ func (s *DaemonService) EnrollDaemon(
 	}
 
 	eventType := "daemon.pending"
-	if status == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+	if statusNow == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
 		eventType = "daemon.accepted"
 	}
 	s.cfg.Pool.PublishWorkspaceEvent(
-		daemon.WorkspaceID,
+		workspaceID,
 		eventType,
-		fmt.Sprintf(`{"daemon_id":%q,"daemon_name":%q}`, daemon.ID, daemon.Name),
+		fmt.Sprintf(`{"daemon_id":%q,"daemon_name":%q}`, daemonID, daemonName),
 	)
 
 	return &nokkuv1.EnrollDaemonResponse{
-		Id:          &daemon.ID,
-		WorkspaceId: &daemon.WorkspaceID,
-		TargetId:    &target.ID,
-		Status:      &status,
+		Id:          &daemonID,
+		WorkspaceId: &workspaceID,
+		TargetId:    &targetID,
+		Status:      &statusNow,
 		Config:      config,
 		AccessToken: &sess.Token,
 	}, nil
