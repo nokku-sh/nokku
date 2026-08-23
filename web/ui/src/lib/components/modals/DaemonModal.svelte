@@ -114,15 +114,6 @@
 				</Item.Actions>
 			</Item.Root>
 
-			<Item.Root variant="muted" size="sm">
-				<Item.Content>
-					<Item.Title title={data.metadata?.fingerprint}>Fingerprint</Item.Title>
-				</Item.Content>
-				<Item.Actions>
-					<CopyButton text={data.metadata?.fingerprint ?? ''}>Copy</CopyButton>
-				</Item.Actions>
-			</Item.Root>
-
 			{#if data.metadata?.host}
 				<Item.Root variant="muted" size="sm">
 					<Item.Content>
