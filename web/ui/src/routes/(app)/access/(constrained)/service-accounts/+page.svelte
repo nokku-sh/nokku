@@ -3,23 +3,21 @@
 	import { page } from '$app/state';
 	import { serviceAccount } from '$lib/api/service_account.svelte';
 	import ServiceAccountModal from '$lib/components/modals/ServiceAccountModal.svelte';
-	import ActionCell from '$lib/components/tables/cells/ActionCell.svelte';
-	import RoleCell from '$lib/components/tables/cells/RoleCell.svelte';
-	import TimeCell from '$lib/components/tables/cells/TimeCell.svelte';
-	import DataTable from '$lib/components/tables/DataTable.svelte';
-	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
+	import {
+		DataTable,
+		TableToolbar,
+		createAppColumnHelper,
+		type BulkAction
+	} from '$lib/components/tables';
+	import { ActionCell, AvatarCell, RoleCell, TimeCell } from '$lib/components/tables/cells';
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
 	import type { ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
 	import { createModalState } from '$lib/hooks';
-	import type { BulkAction } from '$lib/components/tables/types';
 	import { PencilIcon, PlusIcon, Trash2, Waypoints } from '@lucide/svelte';
-	import type { ColumnDef, Table } from '@tanstack/svelte-table';
-	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 	import { Debounced } from 'runed';
-	import AvatarCell from '$lib/components/tables/cells/AvatarCell.svelte';
 	import { roles } from '$lib/api/roles.svelte';
 	import { roleIcon, roleLabel } from '$lib/roles';
 
@@ -56,48 +54,43 @@
 		}))
 	);
 
-	const columns: ColumnDef<DataTableFeatures, ServiceAccount>[] = [
-		{
+	const columnHelper = createAppColumnHelper<ServiceAccount>();
+	const columns = columnHelper.columns([
+		columnHelper.accessor('name', {
 			header: 'Name',
-			accessorKey: 'name',
 			cell: ({ row }) =>
 				renderComponent(AvatarCell, {
 					id: row.original.id,
 					name: row.original.name,
 					description: row.original.description
 				})
-		},
-		{
+		}),
+		columnHelper.accessor('roleName', {
 			header: 'Role',
-			accessorKey: 'roleName',
 			cell: ({ row }) =>
 				renderComponent(RoleCell, {
 					roleName: row.original.roleName,
 					update: (roleName) => updateSA.mutateAsync({ id: row.original.id, roleName }),
 					scope: 'serviceAccounts'
 				})
-		},
-		{
+		}),
+		columnHelper.accessor('expiresAt', {
 			header: 'Expiry',
-			accessorKey: 'expiresAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.expiresAt })
-		},
-		{
+		}),
+		columnHelper.accessor('lastUsedAt', {
 			header: 'Last Used',
-			accessorKey: 'lastUsedAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.lastUsedAt })
-		},
-		{
+		}),
+		columnHelper.accessor('updatedAt', {
 			header: 'Updated',
-			accessorKey: 'updatedAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.updatedAt })
-		},
-		{
+		}),
+		columnHelper.accessor('createdAt', {
 			header: 'Created',
-			accessorKey: 'createdAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.createdAt })
-		},
-		{
+		}),
+		columnHelper.display({
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
@@ -122,10 +115,8 @@
 					}
 				});
 			}
-		}
-	];
-
-	let table = $state<Table<DataTableFeatures, ServiceAccount>>();
+		})
+	]);
 </script>
 
 <PageHeader
@@ -141,29 +132,30 @@
 
 <ServiceAccountModal bind:open={modal.open} data={modal.selected} />
 
-<TableToolbar
-	{table}
-	search
-	searchResultCount={saData.data?.total}
-	filters={[
-		{
-			title: 'Role',
-			options: roleOptions,
-			param: 'role',
-			mode: 'single'
-		}
-	]}
-/>
-
 <DataTable
 	data={saData.data?.serviceAccounts ?? []}
 	rowCount={saData.data?.total ?? 0}
 	{columns}
 	{bulkActions}
-	onTableReady={(t) => (table = t)}
 	emptyState={{
 		icon: Waypoints,
 		title: 'No Service Accounts',
 		description: 'Create your first service account to enable API access and automation'
 	}}
-/>
+>
+	{#snippet toolbar(table)}
+		<TableToolbar
+			{table}
+			search
+			searchResultCount={saData.data?.total}
+			filters={[
+				{
+					title: 'Role',
+					options: roleOptions,
+					param: 'role',
+					mode: 'single'
+				}
+			]}
+		/>
+	{/snippet}
+</DataTable>

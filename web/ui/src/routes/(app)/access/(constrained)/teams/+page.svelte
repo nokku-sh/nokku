@@ -3,23 +3,21 @@
 	import { page } from '$app/state';
 	import { team } from '$lib/api/team.svelte';
 	import TeamModal from '$lib/components/modals/TeamModal.svelte';
-	import ActionCell from '$lib/components/tables/cells/ActionCell.svelte';
-	import TimeCell from '$lib/components/tables/cells/TimeCell.svelte';
-	import DataTable from '$lib/components/tables/DataTable.svelte';
-	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
+	import {
+		DataTable,
+		TableToolbar,
+		createAppColumnHelper,
+		type BulkAction
+	} from '$lib/components/tables';
+	import { ActionCell, AvatarCell, MemberCell, TimeCell } from '$lib/components/tables/cells';
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
 	import type { Team } from '$lib/gen/nokku/v1/team_pb';
 	import { createModalState } from '$lib/hooks';
-	import type { BulkAction } from '$lib/components/tables/types';
 	import { PencilIcon, PlusIcon, Trash2, Users, UsersIcon } from '@lucide/svelte';
-	import type { ColumnDef, Table } from '@tanstack/svelte-table';
-	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 	import { Debounced } from 'runed';
-	import MemberCell from '$lib/components/tables/cells/MemberCell.svelte';
-	import AvatarCell from '$lib/components/tables/cells/AvatarCell.svelte';
 
 	// Modal states
 	const teamModal = createModalState<Team>({} as Team);
@@ -46,33 +44,30 @@
 	];
 
 	// Columns
-	const columns: ColumnDef<DataTableFeatures, Team>[] = [
-		{
+	const columnHelper = createAppColumnHelper<Team>();
+	const columns = columnHelper.columns([
+		columnHelper.accessor('name', {
 			header: 'Name',
-			accessorKey: 'name',
 			cell: ({ row }) =>
 				renderComponent(AvatarCell, {
 					id: row.original.id,
 					name: row.original.name,
 					description: row.original.description
 				})
-		},
-		{
+		}),
+		columnHelper.accessor('members', {
 			header: 'Members',
-			accessorKey: 'members',
 			cell: ({ row }) => renderComponent(MemberCell, { members: row.original.members })
-		},
-		{
+		}),
+		columnHelper.accessor('updatedAt', {
 			header: 'Updated',
-			accessorKey: 'updatedAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.updatedAt })
-		},
-		{
+		}),
+		columnHelper.accessor('createdAt', {
 			header: 'Created',
-			accessorKey: 'createdAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.createdAt })
-		},
-		{
+		}),
+		columnHelper.display({
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
@@ -97,10 +92,8 @@
 					}
 				});
 			}
-		}
-	];
-
-	let table = $state<Table<DataTableFeatures, Team>>();
+		})
+	]);
 </script>
 
 <PageHeader title="Teams" description="Manage your workspace teams" icon={UsersIcon}>
@@ -112,17 +105,18 @@
 
 <TeamModal bind:open={teamModal.open} bind:data={teamModal.selected} />
 
-<TableToolbar {table} search searchResultCount={teams.data?.total} />
-
 <DataTable
 	data={teams.data?.teams ?? []}
 	rowCount={teams.data?.total ?? 0}
 	{columns}
 	{bulkActions}
-	onTableReady={(t) => (table = t)}
 	emptyState={{
 		icon: Users,
 		title: 'No Teams',
 		description: 'Get started by creating your first team.'
 	}}
-/>
+>
+	{#snippet toolbar(table)}
+		<TableToolbar {table} search searchResultCount={teams.data?.total} />
+	{/snippet}
+</DataTable>

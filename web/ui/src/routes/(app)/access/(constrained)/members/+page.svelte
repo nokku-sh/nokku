@@ -8,13 +8,13 @@
 	import InviteModal from '$lib/components/modals/InviteModal.svelte';
 	import MemberModal from '$lib/components/modals/MemberModal.svelte';
 	import TransferOwnerModal from '$lib/components/modals/TransferOwnerModal.svelte';
-	import ActionCell from '$lib/components/tables/cells/ActionCell.svelte';
-	import RoleCell from '$lib/components/tables/cells/RoleCell.svelte';
-	import TeamCell from '$lib/components/tables/cells/TeamCell.svelte';
-	import UserCell from '$lib/components/tables/cells/UserCell.svelte';
-	import DataTable from '$lib/components/tables/DataTable.svelte';
-	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
-	import type { BulkAction } from '$lib/components/tables/types';
+	import {
+		DataTable,
+		TableToolbar,
+		createAppColumnHelper,
+		type BulkAction
+	} from '$lib/components/tables';
+	import { ActionCell, RoleCell, TeamCell, UserCell } from '$lib/components/tables/cells';
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
@@ -29,8 +29,6 @@
 		PlusIcon,
 		Trash2
 	} from '@lucide/svelte';
-	import type { ColumnDef, Table } from '@tanstack/svelte-table';
-	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 	import { Debounced } from 'runed';
 
 	// Modal states
@@ -48,7 +46,6 @@
 		}))
 	);
 	const teams = $derived(team.list());
-	let table = $state<Table<DataTableFeatures, WorkspaceMember>>();
 
 	const removeMember = workspace.removeMember();
 	const updateMember = workspace.updateMember();
@@ -73,23 +70,21 @@
 	);
 
 	// Columns
-	const columns: ColumnDef<DataTableFeatures, WorkspaceMember>[] = [
-		{
+	const columnHelper = createAppColumnHelper<WorkspaceMember>();
+	const columns = columnHelper.columns([
+		columnHelper.accessor('name', {
 			header: 'Name',
-			accessorKey: 'name',
 			cell: ({ row }) => {
 				return renderComponent(UserCell, { user: row.original });
 			}
-		},
-		{
-			accessorKey: 'username',
+		}),
+		columnHelper.accessor('username', {
 			header: 'Username',
 			enableSorting: true,
 			cell: ({ row }) => row.original.username
-		},
-		{
+		}),
+		columnHelper.accessor('roleName', {
 			header: 'Role',
-			accessorKey: 'roleName',
 			enableColumnFilter: true,
 			cell: ({ row }) =>
 				renderComponent(RoleCell, {
@@ -97,18 +92,17 @@
 					update: (roleName) => updateMember.mutateAsync({ userId: row.original.id, roleName }),
 					scope: 'users'
 				})
-		},
-		{
+		}),
+		columnHelper.display({
+			id: 'teams',
 			header: 'Teams',
-			accessorKey: 'teams',
-			enableColumnFilter: true,
 			cell: ({ row }) => {
 				const userTeams =
 					teams.data?.teams?.filter((t) => t.members.find((m) => m.id === row.original.id)) ?? [];
 				return renderComponent(TeamCell, { teams: userTeams });
 			}
-		},
-		{
+		}),
+		columnHelper.display({
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
@@ -142,8 +136,8 @@
 					}
 				});
 			}
-		}
-	];
+		})
+	]);
 </script>
 
 <MemberModal bind:open={memberModal.open} bind:data={memberModal.selected} />
@@ -160,20 +154,6 @@
 	</Button>
 </PageHeader>
 
-<TableToolbar
-	search
-	searchResultCount={members.data?.total}
-	{table}
-	filters={[
-		{
-			title: 'Role',
-			options: roleOptions,
-			param: 'role',
-			mode: 'single'
-		}
-	]}
-/>
-
 <DataTable
 	data={members.data?.members ?? []}
 	rowCount={members.data?.total ?? 0}
@@ -184,5 +164,20 @@
 		title: 'No Members',
 		description: 'Get started by inviting a new member.'
 	}}
-	onTableReady={(t) => (table = t)}
-/>
+>
+	{#snippet toolbar(table)}
+		<TableToolbar
+			search
+			searchResultCount={members.data?.total}
+			{table}
+			filters={[
+				{
+					title: 'Role',
+					options: roleOptions,
+					param: 'role',
+					mode: 'single'
+				}
+			]}
+		/>
+	{/snippet}
+</DataTable>

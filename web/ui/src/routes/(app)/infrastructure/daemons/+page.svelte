@@ -2,13 +2,13 @@
 	import { page } from '$app/state';
 	import { daemon } from '$lib/api/daemons.svelte';
 	import DaemonModal from '$lib/components/modals/DaemonModal.svelte';
-	import ActionCell from '$lib/components/tables/cells/ActionCell.svelte';
-	import AvatarCell from '$lib/components/tables/cells/AvatarCell.svelte';
-	import StatusCell from '$lib/components/tables/cells/StatusCell.svelte';
-	import TimeCell from '$lib/components/tables/cells/TimeCell.svelte';
-	import DataTable from '$lib/components/tables/DataTable.svelte';
-	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
-	import type { BulkAction } from '$lib/components/tables/types';
+	import {
+		DataTable,
+		TableToolbar,
+		createAppColumnHelper,
+		type BulkAction
+	} from '$lib/components/tables';
+	import { ActionCell, AvatarCell, StatusCell, TimeCell } from '$lib/components/tables/cells';
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
@@ -26,8 +26,6 @@
 		Wifi,
 		WifiOff
 	} from '@lucide/svelte';
-	import type { ColumnDef, Table } from '@tanstack/svelte-table';
-	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 	import { Debounced } from 'runed';
 
 	const statusOptions = [
@@ -59,47 +57,43 @@
 	const updateDaemon = daemon.update();
 	const deleteDaemon = daemon.delete();
 
-	const columns: ColumnDef<DataTableFeatures, Daemon>[] = [
-		{
+	const columnHelper = createAppColumnHelper<Daemon>();
+	const columns = columnHelper.columns([
+		columnHelper.accessor('name', {
 			header: 'Name',
-			accessorKey: 'name',
 			cell: ({ row }) =>
 				renderComponent(AvatarCell, {
 					id: row.original.id,
 					name: row.original.name
 				})
-		},
-		{
+		}),
+		columnHelper.display({
+			id: 'recording',
 			header: 'Recording',
-			accessorKey: 'config.recordSession',
 			cell: ({ row }) =>
 				renderComponent(StatusCell, {
 					status: row.original.config?.recordSessions ? 'enabled' : 'disabled'
 				})
-		},
-		{
+		}),
+		columnHelper.accessor('status', {
 			header: 'Status',
-			accessorKey: 'status',
 			cell: ({ row }) =>
 				renderComponent(StatusCell, { status: enumLabel(DaemonStatus[row.original.status]) })
-		},
-		{
+		}),
+		columnHelper.accessor('online', {
 			header: 'Online',
-			accessorKey: 'online',
 			cell: ({ row }) =>
 				renderComponent(StatusCell, { status: row.original.online ? 'Online' : 'Offline' })
-		},
-		{
+		}),
+		columnHelper.accessor('updatedAt', {
 			header: 'Updated',
-			accessorKey: 'updatedAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.updatedAt })
-		},
-		{
+		}),
+		columnHelper.accessor('createdAt', {
 			header: 'Created',
-			accessorKey: 'createdAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.createdAt })
-		},
-		{
+		}),
+		columnHelper.display({
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
@@ -133,8 +127,8 @@
 					}
 				});
 			}
-		}
-	];
+		})
+	]);
 
 	const bulkActions: BulkAction<Daemon>[] = [
 		{
@@ -145,8 +139,6 @@
 			onClick: (selected) => selected.forEach(({ id }) => deleteDaemon.mutate({ id }))
 		}
 	];
-
-	let table = $state<Table<DataTableFeatures, Daemon>>();
 </script>
 
 <DaemonModal bind:open={daemonModal.open} bind:data={daemonModal.selected} />
@@ -158,35 +150,36 @@
 	</Button>
 </PageHeader>
 
-<TableToolbar
-	{table}
-	search
-	searchResultCount={daemons.data?.total}
-	filters={[
-		{
-			title: 'Status',
-			options: statusOptions,
-			param: 'status',
-			mode: 'single'
-		},
-		{
-			title: 'Online',
-			options: onlineOptions,
-			param: 'online',
-			mode: 'single'
-		}
-	]}
-/>
-
 <DataTable
 	data={daemons.data?.daemons ?? []}
 	rowCount={daemons.data?.total ?? 0}
 	{columns}
 	{bulkActions}
-	onTableReady={(t) => (table = t)}
 	emptyState={{
 		icon: BotOff,
 		title: 'No Daemons',
 		description: 'Deploy daemons to your servers using a enrollment token to get started.'
 	}}
-></DataTable>
+>
+	{#snippet toolbar(table)}
+		<TableToolbar
+			{table}
+			search
+			searchResultCount={daemons.data?.total}
+			filters={[
+				{
+					title: 'Status',
+					options: statusOptions,
+					param: 'status',
+					mode: 'single'
+				},
+				{
+					title: 'Online',
+					options: onlineOptions,
+					param: 'online',
+					mode: 'single'
+				}
+			]}
+		/>
+	{/snippet}
+</DataTable>

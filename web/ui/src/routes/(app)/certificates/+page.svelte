@@ -6,14 +6,19 @@
 	import CAModal from '$lib/components/modals/CAModal.svelte';
 	import SignModal from '$lib/components/modals/SignModal.svelte';
 	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
-	import ActionCell from '$lib/components/tables/cells/ActionCell.svelte';
-	import BadgeCell from '$lib/components/tables/cells/BadgeCell.svelte';
-	import CANameCell from '$lib/components/tables/cells/CANameCell.svelte';
-	import TimeCell from '$lib/components/tables/cells/TimeCell.svelte';
-	import CAStatusCell from '$lib/components/tables/cells/CAStatusCell.svelte';
-	import DataTable from '$lib/components/tables/DataTable.svelte';
-	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
-	import type { BulkAction } from '$lib/components/tables/types';
+	import {
+		DataTable,
+		TableToolbar,
+		createAppColumnHelper,
+		type BulkAction
+	} from '$lib/components/tables';
+	import {
+		ActionCell,
+		BadgeCell,
+		CANameCell,
+		CAStatusCell,
+		TimeCell
+	} from '$lib/components/tables/cells';
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import {
@@ -23,8 +28,6 @@
 	} from '$lib/gen/nokku/v1/certificates_pb';
 	import { enumLabel } from '$lib/utils';
 	import { KeyRound, Pencil, Plus, Shield, ShieldAlert, Trash2 } from '@lucide/svelte';
-	import type { ColumnDef, Table } from '@tanstack/svelte-table';
-	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 
 	const caModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
 	const signModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
@@ -59,30 +62,26 @@
 		{ label: 'X.509', value: 'X509', icon: Shield }
 	];
 
-	let table = $state<Table<DataTableFeatures, CertificateAuthority>>();
-	const columns: ColumnDef<DataTableFeatures, CertificateAuthority>[] = [
-		{
+	const columnHelper = createAppColumnHelper<CertificateAuthority>();
+	const columns = columnHelper.columns([
+		columnHelper.accessor('name', {
 			header: 'Name',
-			accessorKey: 'name',
 			cell: ({ row }) => renderComponent(CANameCell, { ca: row.original })
-		},
-		{
+		}),
+		columnHelper.accessor('authorityType', {
 			header: 'Type',
-			accessorKey: 'authorityType',
 			cell: ({ row }) =>
 				renderComponent(BadgeCell, {
 					value: enumLabel(AuthorityType[row.original.authorityType]).toUpperCase(),
 					variant: row.original.authorityType === AuthorityType.SSH ? 'default' : 'secondary'
 				})
-		},
-		{
+		}),
+		columnHelper.accessor('isActive', {
 			header: 'Status',
-			accessorKey: 'isActive',
 			cell: ({ row }) => renderComponent(CAStatusCell, { caItem: row.original })
-		},
-		{
+		}),
+		columnHelper.accessor('keyType', {
 			header: 'Key',
-			accessorKey: 'keyType',
 			cell: ({ row }) => {
 				let label = enumLabel(CertificateKeyType[row.original.keyType]);
 				if (row.original.keyType !== CertificateKeyType.ED25519 && row.original.keyBits) {
@@ -90,23 +89,20 @@
 				}
 				return renderComponent(BadgeCell, { value: label, variant: 'outline' });
 			}
-		},
-		{
+		}),
+		columnHelper.accessor('notAfter', {
 			header: 'Valid Until',
-			accessorKey: 'notAfter',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.notAfter })
-		},
-		{
+		}),
+		columnHelper.accessor('createdAt', {
 			header: 'Created',
-			accessorKey: 'createdAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.createdAt })
-		},
-		{
+		}),
+		columnHelper.accessor('updatedAt', {
 			header: 'Updated',
-			accessorKey: 'updatedAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.updatedAt })
-		},
-		{
+		}),
+		columnHelper.display({
 			id: 'actions',
 			cell: ({ row }) => {
 				const item = row.original;
@@ -139,8 +135,8 @@
 					}
 				});
 			}
-		}
-	];
+		})
+	]);
 
 	const bulkActions: BulkAction<CertificateAuthority>[] = [
 		{
@@ -186,19 +182,6 @@
 		</Button>
 	</PageHeader>
 
-	<TableToolbar
-		search
-		searchResultCount={filteredCAs.length}
-		{table}
-		filters={[
-			{
-				title: 'Type',
-				options: authorityTypeOptions,
-				param: 'type'
-			}
-		]}
-	/>
-
 	<DataTable
 		data={filteredCAs}
 		{columns}
@@ -208,6 +191,20 @@
 			title: 'No Certificate Authorities',
 			description: 'Create your first CA to start signing certificates.'
 		}}
-		onTableReady={(t) => (table = t)}
-	/>
+	>
+		{#snippet toolbar(table)}
+			<TableToolbar
+				search
+				searchResultCount={filteredCAs.length}
+				{table}
+				filters={[
+					{
+						title: 'Type',
+						options: authorityTypeOptions,
+						param: 'type'
+					}
+				]}
+			/>
+		{/snippet}
+	</DataTable>
 </div>

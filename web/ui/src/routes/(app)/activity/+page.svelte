@@ -1,15 +1,13 @@
 <script lang="ts">
 	import { util } from '$lib/api/workspaces.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-	import DataTable from '$lib/components/tables/DataTable.svelte';
+	import { DataTable, createAppColumnHelper } from '$lib/components/tables';
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import { ExportAuditLogsRequest_Format, type EventLog } from '$lib/gen/nokku/v1/util_pb';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { DateValueToTimestamp } from '$lib/utils';
 	import { Activity, Download, InfoIcon } from '@lucide/svelte';
-	import type { ColumnDef } from '@tanstack/svelte-table';
-	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 	import ActivityModal from '$lib/components/modals/ActivityModal.svelte';
 	import type { DateRange } from 'bits-ui';
 	import { getLocalTimeZone, today } from '@internationalized/date';
@@ -17,11 +15,13 @@
 	import ActivityToolbar from './ActivityToolbar.svelte';
 	import { createModalState } from '$lib/hooks';
 	import DateRangePicker from '$lib/components/utils/DateRangePicker.svelte';
-	import ActionCell from '$lib/components/tables/cells/ActionCell.svelte';
-	import TimeCell from '$lib/components/tables/cells/TimeCell.svelte';
-	import BadgeCell from '$lib/components/tables/cells/BadgeCell.svelte';
-	import TextCell from '$lib/components/tables/cells/TextCell.svelte';
-	import CheckCell from '$lib/components/tables/cells/CheckCell.svelte';
+	import {
+		ActionCell,
+		BadgeCell,
+		CheckCell,
+		TextCell,
+		TimeCell
+	} from '$lib/components/tables/cells';
 
 	// State
 	const modal = createModalState<EventLog>({} as EventLog);
@@ -60,15 +60,15 @@
 		return colors[action] ?? 'bg-primary';
 	};
 
-	const columns: ColumnDef<DataTableFeatures, EventLog>[] = [
-		{
+	const columnHelper = createAppColumnHelper<EventLog>();
+	const columns = columnHelper.columns([
+		columnHelper.display({
+			id: 'status_code',
 			header: 'Status',
-			accessorKey: 'status_code',
 			cell: ({ row }) => renderComponent(CheckCell, { checked: row.original.statusCode === '' })
-		},
-		{
+		}),
+		columnHelper.accessor('action', {
 			header: 'Action',
-			accessorKey: 'action',
 			cell: ({ row }) => {
 				const label = row.original.action.split('/')[2];
 				return renderComponent(BadgeCell, {
@@ -77,31 +77,28 @@
 					class: `${getActionColor(row.original.action)} text-xs text-primary-foreground`
 				});
 			}
-		},
-		{
+		}),
+		columnHelper.accessor('actorId', {
 			header: 'Actor',
-			accessorKey: 'actorId',
 			cell: ({ row }) =>
 				renderComponent(TextCell, {
 					label: row.original.actorType,
 					subLabel: row.original.actorId
 				})
-		},
-		{
+		}),
+		columnHelper.accessor('ipAddress', {
 			header: 'Source',
-			accessorKey: 'ipAddress',
 			cell: ({ row }) =>
 				renderComponent(TextCell, {
 					label: row.original.ipAddress || '',
 					subLabel: row.original.userAgent || ''
 				})
-		},
-		{
+		}),
+		columnHelper.accessor('timestamp', {
 			header: 'Timestamp',
-			accessorKey: 'timestamp',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.timestamp })
-		},
-		{
+		}),
+		columnHelper.display({
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
@@ -113,8 +110,8 @@
 					]
 				});
 			}
-		}
-	];
+		})
+	]);
 </script>
 
 <div class="container mx-auto max-w-6xl space-y-6 p-6">
