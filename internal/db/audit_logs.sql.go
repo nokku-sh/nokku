@@ -29,22 +29,38 @@ WHERE
   )
   AND (
     $3::TEXT[] IS NULL
-    OR action = ANY ($3::TEXT[])
+    OR actor_type = ANY ($3::TEXT[])
   )
   AND (
-    $4::timestamptz IS NULL
-    OR timestamp >= $4
+    $4::TEXT[] IS NULL
+    OR EXISTS (
+      SELECT 1 FROM unnest($4::TEXT[]) AS a(v)
+      WHERE action ILIKE '%' || a.v || '%'
+    )
   )
   AND (
-    $5::timestamptz IS NULL
-    OR timestamp <= $5
+    $5::TEXT IS NULL
+    OR action ILIKE '%' || $5 || '%'
+    OR actor_email ILIKE '%' || $5 || '%'
+    OR actor_id::TEXT ILIKE '%' || $5 || '%'
+    OR user_agent ILIKE '%' || $5 || '%'
+  )
+  AND (
+    $6::timestamptz IS NULL
+    OR timestamp >= $6
+  )
+  AND (
+    $7::timestamptz IS NULL
+    OR timestamp < $7
   )
 `
 
 type CountAuditLogsParams struct {
 	WorkspaceID string     `json:"workspaceId"`
 	ActorIds    []string   `json:"actorIds"`
+	ActorTypes  []string   `json:"actorTypes"`
 	Actions     []string   `json:"actions"`
+	Search      *string    `json:"search"`
 	StartDate   *time.Time `json:"startDate"`
 	EndDate     *time.Time `json:"endDate"`
 }
@@ -53,7 +69,9 @@ func (q *Queries) CountAuditLogs(ctx context.Context, arg *CountAuditLogsParams)
 	row := q.db.QueryRow(ctx, countAuditLogs,
 		arg.WorkspaceID,
 		arg.ActorIds,
+		arg.ActorTypes,
 		arg.Actions,
+		arg.Search,
 		arg.StartDate,
 		arg.EndDate,
 	)
@@ -99,7 +117,7 @@ func (q *Queries) DeleteWorkspaceAuditLogs(ctx context.Context, arg *DeleteWorks
 
 const insertAuditLog = `-- name: InsertAuditLog :exec
 INSERT INTO
-  audit.audit_logs (workspace_id, action, actor_id, actor_type, actor_email, ip_address, user_agent, status_code)
+  audit.audit_logs (workspace_id, action, actor_id, actor_type, actor_email, ip_address, user_agent, status_code, details)
 VALUES
   (
     $1::UUID,
@@ -109,7 +127,8 @@ VALUES
     $5,
     $6,
     $7,
-    $8
+    $8,
+    $9::jsonb
   )
 `
 
@@ -122,6 +141,7 @@ type InsertAuditLogParams struct {
 	IpAddress   *string `json:"ipAddress"`
 	UserAgent   *string `json:"userAgent"`
 	StatusCode  *string `json:"statusCode"`
+	Details     []byte  `json:"details"`
 }
 
 func (q *Queries) InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams) error {
@@ -134,13 +154,14 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams)
 		arg.IpAddress,
 		arg.UserAgent,
 		arg.StatusCode,
+		arg.Details,
 	)
 	return err
 }
 
 const listAuditLogs = `-- name: ListAuditLogs :many
 SELECT
-  id, timestamp, workspace_id, action, actor_id, actor_type, actor_email, ip_address, user_agent, status_code
+  id, timestamp, workspace_id, action, actor_id, actor_type, actor_email, ip_address, user_agent, status_code, details
 FROM
   audit.audit_logs
 WHERE
@@ -157,28 +178,44 @@ WHERE
   )
   AND (
     $3::TEXT[] IS NULL
-    OR action = ANY ($3::TEXT[])
+    OR actor_type = ANY ($3::TEXT[])
   )
   AND (
-    $4::timestamptz IS NULL
-    OR timestamp >= $4
+    $4::TEXT[] IS NULL
+    OR EXISTS (
+      SELECT 1 FROM unnest($4::TEXT[]) AS a(v)
+      WHERE action ILIKE '%' || a.v || '%'
+    )
   )
   AND (
-    $5::timestamptz IS NULL
-    OR timestamp <= $5
+    $5::TEXT IS NULL
+    OR action ILIKE '%' || $5 || '%'
+    OR actor_email ILIKE '%' || $5 || '%'
+    OR actor_id::TEXT ILIKE '%' || $5 || '%'
+    OR user_agent ILIKE '%' || $5 || '%'
+  )
+  AND (
+    $6::timestamptz IS NULL
+    OR timestamp >= $6
+  )
+  AND (
+    $7::timestamptz IS NULL
+    OR timestamp < $7
   )
 ORDER BY
   timestamp DESC
 LIMIT
-  $7
+  $9
 OFFSET
-  $6
+  $8
 `
 
 type ListAuditLogsParams struct {
 	WorkspaceID string     `json:"workspaceId"`
 	ActorIds    []string   `json:"actorIds"`
+	ActorTypes  []string   `json:"actorTypes"`
 	Actions     []string   `json:"actions"`
+	Search      *string    `json:"search"`
 	StartDate   *time.Time `json:"startDate"`
 	EndDate     *time.Time `json:"endDate"`
 	Offset      int32      `json:"offset"`
@@ -189,7 +226,9 @@ func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) (
 	rows, err := q.db.Query(ctx, listAuditLogs,
 		arg.WorkspaceID,
 		arg.ActorIds,
+		arg.ActorTypes,
 		arg.Actions,
+		arg.Search,
 		arg.StartDate,
 		arg.EndDate,
 		arg.Offset,
@@ -213,6 +252,7 @@ func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) (
 			&i.IpAddress,
 			&i.UserAgent,
 			&i.StatusCode,
+			&i.Details,
 		); err != nil {
 			return nil, err
 		}

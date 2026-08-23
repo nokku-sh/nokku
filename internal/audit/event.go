@@ -14,22 +14,25 @@ import (
 )
 
 type Event struct {
-	ID          string    `json:"id"`
-	Timestamp   time.Time `json:"timestamp"`
-	WorkspaceID string    `json:"workspace_id"`
-	Action      string    `json:"action"`
-	ActorID     string    `json:"actor_id"`
-	ActorType   string    `json:"actor_type"`
-	ActorEmail  string    `json:"actor_email,omitempty"`
-	IPAddress   string    `json:"ip_address"`
-	UserAgent   string    `json:"user_agent"`
-	StatusCode  string    `json:"status_code"`
+	ID          string         `json:"id"`
+	Timestamp   time.Time      `json:"timestamp"`
+	WorkspaceID string         `json:"workspace_id"`
+	Action      string         `json:"action"`
+	ActorID     string         `json:"actor_id"`
+	ActorType   string         `json:"actor_type"`
+	ActorEmail  string         `json:"actor_email,omitempty"`
+	IPAddress   string         `json:"ip_address"`
+	UserAgent   string         `json:"user_agent"`
+	StatusCode  string         `json:"status_code"`
+	Details     map[string]any `json:"details,omitempty"`
 }
 
 type QueryOptions struct {
 	WorkspaceID string
 	ActorIDs    []string
+	ActorTypes  []string
 	Actions     []string
+	Search      string
 	StartDate   time.Time
 	EndDate     time.Time
 	Limit       int32
@@ -46,7 +49,26 @@ const (
 	MaxExportRows = 10_000_000 // Safety limit
 )
 
+// Append writes a single event to the append-only log. It is a dumb pipe:
+// it marshals whatever it is handed and inserts it through the app role.
+// The RLS insert policy is WITH CHECK (TRUE), so this succeeds for both
+// global and tenant events without any role switch or transaction. Callers
+// run it async so it never blocks the request.
 func (s *Service) Append(ctx context.Context, event *Event) error {
+	if event == nil {
+		return nil
+	}
+
+	details, err := json.Marshal(event.Details)
+	if err != nil {
+		return err
+	}
+	// The column is NOT NULL DEFAULT '{}'; marshal(nil) yields "null", so
+	// normalize an empty map to an empty JSON object before insert.
+	if len(details) == 0 || string(details) == "null" {
+		details = []byte("{}")
+	}
+
 	var workspaceID, email *string
 	if event.WorkspaceID != "" {
 		workspaceID = &event.WorkspaceID
@@ -54,38 +76,38 @@ func (s *Service) Append(ctx context.Context, event *Event) error {
 	if event.ActorEmail != "" {
 		email = &event.ActorEmail
 	}
-
-	// Audit writes are server-derived and happen inside arbitrary request
-	// flows (including pre-auth and system operations), so they always run
-	// as a system transaction.
-	return s.conn.WithTx(ctx, func(q *db.Queries) error {
-		return q.InsertAuditLog(ctx, &db.InsertAuditLogParams{
-			WorkspaceID: workspaceID,
-			Action:      event.Action,
-			ActorID:     event.ActorID,
-			ActorType:   event.ActorType,
-			ActorEmail:  email,
-			IpAddress:   &event.IPAddress,
-			UserAgent:   &event.UserAgent,
-			StatusCode:  &event.StatusCode,
-		})
+	// Blind write: no read, no filter, no RLS gymnastics. s.conn.Q runs as
+	// the nokku_app role whose audit INSERT policy is WITH CHECK (TRUE).
+	return s.conn.Q.InsertAuditLog(ctx, &db.InsertAuditLogParams{
+		WorkspaceID: workspaceID,
+		Action:      event.Action,
+		ActorID:     event.ActorID,
+		ActorType:   event.ActorType,
+		ActorEmail:  email,
+		IpAddress:   &event.IPAddress,
+		UserAgent:   &event.UserAgent,
+		StatusCode:  &event.StatusCode,
+		Details:     details,
 	})
 }
 
-// query runs fn with a querier appropriate for the requested scope. A
-// workspace-scoped read goes through the RLS-constrained, membership-checked
-// tenant transaction. A read without a workspace only ever matches
-// non-workspace (global) events by query construction, which the tenant role
-// may never see, so it runs as a system transaction.
+// query runs fn with a querier appropriate for the requested scope, always
+// under RLS. A workspace-scoped read is pinned to that tenant (and the
+// caller's membership is checked) via WithWorkspace. A read without a
+// workspace is a principal-scoped read of global events, pinned to the single
+// requested actor via WithActor.
 func (s *Service) query(
 	ctx context.Context,
 	opts QueryOptions,
 	fn func(q *db.Queries) error,
 ) error {
-	if opts.WorkspaceID == "" {
-		return s.conn.WithTx(ctx, fn)
+	if opts.WorkspaceID != "" {
+		return s.conn.WithWorkspace(ctx, fn)
 	}
-	return s.conn.WithWorkspace(ctx, fn)
+	if len(opts.ActorIDs) != 1 || opts.ActorIDs[0] == "" {
+		return fmt.Errorf("global audit read requires exactly one actor_id")
+	}
+	return s.conn.WithActor(ctx, opts.ActorIDs[0], fn)
 }
 
 func (s *Service) List(
@@ -105,12 +127,15 @@ func (s *Service) List(
 		endDate = &opts.EndDate
 	}
 
-	var actorIDs, actions []string
+	var actorIDs, actions, actorTypes []string
 	if len(opts.ActorIDs) > 0 {
 		actorIDs = opts.ActorIDs
 	}
 	if len(opts.Actions) > 0 {
 		actions = opts.Actions
+	}
+	if len(opts.ActorTypes) > 0 {
+		actorTypes = opts.ActorTypes
 	}
 
 	var rows []*db.AuditAuditLog
@@ -118,7 +143,9 @@ func (s *Service) List(
 		rows, err = q.ListAuditLogs(ctx, &db.ListAuditLogsParams{
 			WorkspaceID: opts.WorkspaceID,
 			ActorIds:    actorIDs,
+			ActorTypes:  actorTypes,
 			Actions:     actions,
+			Search:      searchPtr(opts.Search),
 			StartDate:   startDate,
 			EndDate:     endDate,
 			Limit:       limit,
@@ -153,6 +180,11 @@ func (s *Service) List(
 			sc = *row.StatusCode
 		}
 
+		var details map[string]any
+		if len(row.Details) > 0 {
+			_ = json.Unmarshal(row.Details, &details)
+		}
+
 		events = append(events, &Event{
 			ID:          row.ID,
 			Timestamp:   row.Timestamp,
@@ -164,6 +196,7 @@ func (s *Service) List(
 			IPAddress:   ip,
 			UserAgent:   ua,
 			StatusCode:  sc,
+			Details:     details,
 		})
 	}
 	return events, nil
@@ -178,12 +211,15 @@ func (s *Service) Count(ctx context.Context, opts QueryOptions) (int32, error) {
 		endDate = &opts.EndDate
 	}
 
-	var actorIDs, actions []string
+	var actorIDs, actions, actorTypes []string
 	if len(opts.ActorIDs) > 0 {
 		actorIDs = opts.ActorIDs
 	}
 	if len(opts.Actions) > 0 {
 		actions = opts.Actions
+	}
+	if len(opts.ActorTypes) > 0 {
+		actorTypes = opts.ActorTypes
 	}
 
 	var count int32
@@ -191,7 +227,9 @@ func (s *Service) Count(ctx context.Context, opts QueryOptions) (int32, error) {
 		count, err = q.CountAuditLogs(ctx, &db.CountAuditLogsParams{
 			WorkspaceID: opts.WorkspaceID,
 			ActorIds:    actorIDs,
+			ActorTypes:  actorTypes,
 			Actions:     actions,
+			Search:      searchPtr(opts.Search),
 			StartDate:   startDate,
 			EndDate:     endDate,
 		})
@@ -244,7 +282,7 @@ func (s *Service) Export(
 			"id", "timestamp",
 			"actor_id", "actor_type", "actor_email",
 			"action", "workspace_id",
-			"ip_address", "user_agent", "status_code",
+			"ip_address", "user_agent", "status_code", "details",
 		}
 		if err := w.Write(header); err != nil {
 			return nil, fmt.Errorf("failed to write CSV header: %w", err)
@@ -262,6 +300,7 @@ func (s *Service) Export(
 				event.IPAddress,
 				event.UserAgent,
 				event.StatusCode,
+				detailsJSON(event.Details),
 			}
 			if err := w.Write(record); err != nil {
 				return nil, fmt.Errorf("failed to write CSV record: %w", err)
@@ -291,4 +330,26 @@ func (s *Service) Export(
 	}
 
 	return compressed.Bytes(), nil
+}
+
+// detailsJSON renders the details map as a JSON string for CSV output. A nil
+// or empty map becomes an empty JSON object so the cell is never ambiguous.
+func detailsJSON(details map[string]any) string {
+	if len(details) == 0 {
+		return "{}"
+	}
+	b, err := json.Marshal(details)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
+}
+
+// searchPtr returns a pointer to search when non-empty, so an empty string is
+// treated the same as "no filter".
+func searchPtr(search string) *string {
+	if search == "" {
+		return nil
+	}
+	return &search
 }

@@ -298,3 +298,47 @@ func (c *Connection) WithWorkspace(
 	}
 	return tx.Commit(ctx)
 }
+
+// WithActor executes a transaction scoped to a single actor as the RLS
+// constrained nokku_app role, without pinning a workspace. It sets only the
+// actor GUC so RLS policies governed by current_actor_id() apply (e.g. a
+// principal reading its own global audit events). It runs as nokku_app the
+// whole time: every query is RLS-filtered, never BYPASSRLS.
+func (c *Connection) WithActor(
+	ctx context.Context,
+	actorID string,
+	fn func(*Queries) error,
+) error {
+	if actorID == "" {
+		return ErrNoActor
+	}
+
+	tx, err := c.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback(ctx)
+			panic(p)
+		}
+	}()
+
+	// Set the actor GUC transaction-local. Custom GUCs are settable by any
+	// role; no role switch is needed.
+	if _, err := tx.Exec(
+		ctx,
+		`SELECT set_config('nokku.actor_id', $1, true)`,
+		actorID,
+	); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+
+	if err := fn(New(tx)); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+	return tx.Commit(ctx)
+}

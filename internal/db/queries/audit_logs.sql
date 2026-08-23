@@ -1,6 +1,6 @@
 -- name: InsertAuditLog :exec
 INSERT INTO
-  audit.audit_logs (workspace_id, action, actor_id, actor_type, actor_email, ip_address, user_agent, status_code)
+  audit.audit_logs (workspace_id, action, actor_id, actor_type, actor_email, ip_address, user_agent, status_code, details)
 VALUES
   (
     sqlc.narg('workspace_id')::UUID,
@@ -10,7 +10,8 @@ VALUES
     sqlc.narg('actor_email'),
     sqlc.narg('ip_address'),
     sqlc.narg('user_agent'),
-    sqlc.narg('status_code')
+    sqlc.narg('status_code'),
+    sqlc.arg('details')::jsonb
   );
 
 -- name: ListAuditLogs :many
@@ -31,8 +32,22 @@ WHERE
     OR actor_id = ANY (sqlc.narg('actor_ids')::UUID[])
   )
   AND (
+    sqlc.narg('actor_types')::TEXT[] IS NULL
+    OR actor_type = ANY (sqlc.narg('actor_types')::TEXT[])
+  )
+  AND (
     sqlc.narg('actions')::TEXT[] IS NULL
-    OR action = ANY (sqlc.narg('actions')::TEXT[])
+    OR EXISTS (
+      SELECT 1 FROM unnest(sqlc.narg('actions')::TEXT[]) AS a(v)
+      WHERE action ILIKE '%' || a.v || '%'
+    )
+  )
+  AND (
+    sqlc.narg('search')::TEXT IS NULL
+    OR action ILIKE '%' || sqlc.narg('search') || '%'
+    OR actor_email ILIKE '%' || sqlc.narg('search') || '%'
+    OR actor_id::TEXT ILIKE '%' || sqlc.narg('search') || '%'
+    OR user_agent ILIKE '%' || sqlc.narg('search') || '%'
   )
   AND (
     sqlc.narg('start_date')::timestamptz IS NULL
@@ -40,7 +55,7 @@ WHERE
   )
   AND (
     sqlc.narg('end_date')::timestamptz IS NULL
-    OR timestamp <= sqlc.narg('end_date')
+    OR timestamp < sqlc.narg('end_date')
   )
 ORDER BY
   timestamp DESC
@@ -67,8 +82,22 @@ WHERE
     OR actor_id = ANY (sqlc.narg('actor_ids')::UUID[])
   )
   AND (
+    sqlc.narg('actor_types')::TEXT[] IS NULL
+    OR actor_type = ANY (sqlc.narg('actor_types')::TEXT[])
+  )
+  AND (
     sqlc.narg('actions')::TEXT[] IS NULL
-    OR action = ANY (sqlc.narg('actions')::TEXT[])
+    OR EXISTS (
+      SELECT 1 FROM unnest(sqlc.narg('actions')::TEXT[]) AS a(v)
+      WHERE action ILIKE '%' || a.v || '%'
+    )
+  )
+  AND (
+    sqlc.narg('search')::TEXT IS NULL
+    OR action ILIKE '%' || sqlc.narg('search') || '%'
+    OR actor_email ILIKE '%' || sqlc.narg('search') || '%'
+    OR actor_id::TEXT ILIKE '%' || sqlc.narg('search') || '%'
+    OR user_agent ILIKE '%' || sqlc.narg('search') || '%'
   )
   AND (
     sqlc.narg('start_date')::timestamptz IS NULL
@@ -76,7 +105,7 @@ WHERE
   )
   AND (
     sqlc.narg('end_date')::timestamptz IS NULL
-    OR timestamp <= sqlc.narg('end_date')
+    OR timestamp < sqlc.narg('end_date')
   );
 
 -- name: ListWorkspaceAuditLogWorkspaceIDs :many

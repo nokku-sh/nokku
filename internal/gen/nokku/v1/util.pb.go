@@ -736,9 +736,9 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"user_agent\x18\a \x01(\tR\tuserAgent\x12\x1f\n" +
 	"\vstatus_code\x18\b \x01(\tR\n" +
 	"statusCode\x128\n" +
-	"\ttimestamp\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\xf6\x02\n" +
-	"\x14ListAuditLogsRequest\x12+\n" +
-	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1f\n" +
+	"\ttimestamp\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\xec\x02\n" +
+	"\x14ListAuditLogsRequest\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1f\n" +
 	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
 	"\x06offset\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12\x16\n" +
 	"\x06search\x18\x04 \x01(\tR\x06search\x12*\n" +
@@ -752,9 +752,9 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\bend_date\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\aendDate\"U\n" +
 	"\x15ListAuditLogsResponse\x12&\n" +
 	"\x04logs\x18\x01 \x03(\v2\x12.nokku.v1.EventLogR\x04logs\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"\xc5\x02\n" +
-	"\x16ExportAuditLogsRequest\x12+\n" +
-	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12I\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\xbb\x02\n" +
+	"\x16ExportAuditLogsRequest\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12I\n" +
 	"\x06format\x18\x02 \x01(\x0e2'.nokku.v1.ExportAuditLogsRequest.FormatB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06format\x129\n" +
 	"\n" +
 	"start_date\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tstartDate\x125\n" +

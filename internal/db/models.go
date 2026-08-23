@@ -35,6 +35,7 @@ type AuditAuditLog struct {
 	IpAddress   *string   `json:"ipAddress"`
 	UserAgent   *string   `json:"userAgent"`
 	StatusCode  *string   `json:"statusCode"`
+	Details     []byte    `json:"details"`
 }
 
 type CertificateAuthority struct {
