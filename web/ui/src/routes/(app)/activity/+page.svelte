@@ -3,12 +3,13 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import DataTable from '$lib/components/tables/DataTable.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { renderComponent } from '$lib/components/ui/data-table';
+	import { renderComponent } from '@tanstack/svelte-table';
 	import { ExportAuditLogsRequest_Format, type EventLog } from '$lib/gen/nokku/v1/util_pb';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { DateValueToTimestamp } from '$lib/utils';
 	import { Activity, Download, InfoIcon } from '@lucide/svelte';
-	import type { ColumnDef } from '@tanstack/table-core';
+	import type { ColumnDef } from '@tanstack/svelte-table';
+	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 	import ActivityModal from '$lib/components/modals/ActivityModal.svelte';
 	import type { DateRange } from 'bits-ui';
 	import { getLocalTimeZone, today } from '@internationalized/date';
@@ -59,7 +60,7 @@
 		return colors[action] ?? 'bg-primary';
 	};
 
-	const columns: ColumnDef<EventLog>[] = [
+	const columns: ColumnDef<DataTableFeatures, EventLog>[] = [
 		{
 			header: 'Status',
 			accessorKey: 'status_code',

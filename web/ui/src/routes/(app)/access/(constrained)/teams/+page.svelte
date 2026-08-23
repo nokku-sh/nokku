@@ -8,14 +8,15 @@
 	import DataTable from '$lib/components/tables/DataTable.svelte';
 	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { renderComponent } from '$lib/components/ui/data-table';
+	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
 	import type { Team } from '$lib/gen/nokku/v1/team_pb';
 	import { createModalState } from '$lib/hooks';
 	import type { BulkAction } from '$lib/components/tables/types';
 	import { PencilIcon, PlusIcon, Trash2, Users, UsersIcon } from '@lucide/svelte';
-	import type { ColumnDef, Table } from '@tanstack/table-core';
+	import type { ColumnDef, Table } from '@tanstack/svelte-table';
+	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 	import { Debounced } from 'runed';
 	import MemberCell from '$lib/components/tables/cells/MemberCell.svelte';
 	import AvatarCell from '$lib/components/tables/cells/AvatarCell.svelte';
@@ -45,7 +46,7 @@
 	];
 
 	// Columns
-	const columns: ColumnDef<Team>[] = [
+	const columns: ColumnDef<DataTableFeatures, Team>[] = [
 		{
 			header: 'Name',
 			accessorKey: 'name',
@@ -99,7 +100,7 @@
 		}
 	];
 
-	let table = $state<Table<Team>>();
+	let table = $state<Table<DataTableFeatures, Team>>();
 </script>
 
 <PageHeader title="Teams" description="Manage your workspace teams" icon={UsersIcon}>

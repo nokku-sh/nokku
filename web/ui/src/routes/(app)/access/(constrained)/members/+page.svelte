@@ -16,7 +16,7 @@
 	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
 	import type { BulkAction } from '$lib/components/tables/types';
 	import { Button } from '$lib/components/ui/button';
-	import { renderComponent } from '$lib/components/ui/data-table';
+	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
 	import { type WorkspaceMember } from '$lib/gen/nokku/v1/workspace_pb';
@@ -29,7 +29,8 @@
 		PlusIcon,
 		Trash2
 	} from '@lucide/svelte';
-	import type { ColumnDef, Table } from '@tanstack/table-core';
+	import type { ColumnDef, Table } from '@tanstack/svelte-table';
+	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 	import { Debounced } from 'runed';
 
 	// Modal states
@@ -47,7 +48,7 @@
 		}))
 	);
 	const teams = $derived(team.list());
-	let table = $state<Table<WorkspaceMember>>();
+	let table = $state<Table<DataTableFeatures, WorkspaceMember>>();
 
 	const removeMember = workspace.removeMember();
 	const updateMember = workspace.updateMember();
@@ -72,7 +73,7 @@
 	);
 
 	// Columns
-	const columns: ColumnDef<WorkspaceMember>[] = [
+	const columns: ColumnDef<DataTableFeatures, WorkspaceMember>[] = [
 		{
 			header: 'Name',
 			accessorKey: 'name',

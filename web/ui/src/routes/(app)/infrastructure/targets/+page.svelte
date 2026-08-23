@@ -12,18 +12,19 @@
 	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
 	import type { BulkAction } from '$lib/components/tables/types';
 	import { Button } from '$lib/components/ui/button';
-	import { renderComponent } from '$lib/components/ui/data-table';
+	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { type Target } from '$lib/gen/nokku/v1/target_pb';
 	import { createModalState } from '$lib/hooks';
 	import { PencilIcon, Plus, Server, TagIcon, Trash2, UserIcon, IdCard } from '@lucide/svelte';
-	import type { ColumnDef, Table } from '@tanstack/table-core';
+	import type { ColumnDef, Table } from '@tanstack/svelte-table';
+	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 	import { Debounced } from 'runed';
 
 	// Modal states
 	const targetModal = createModalState<Target>({} as Target);
 
-	let table = $state<Table<Target>>();
+	let table = $state<Table<DataTableFeatures, Target>>();
 
 	// Data
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
@@ -57,7 +58,7 @@
 
 	const deleteTarget = target.delete();
 
-	const columns: ColumnDef<Target>[] = [
+	const columns: ColumnDef<DataTableFeatures, Target>[] = [
 		{
 			header: 'Name',
 			accessorKey: 'name',

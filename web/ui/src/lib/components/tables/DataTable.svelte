@@ -1,12 +1,7 @@
-<script lang="ts" generics="TData, TValue">
+<script lang="ts" generics="TData extends RowData">
 	import { untrack } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
-	import {
-		createSvelteTable,
-		FlexRender,
-		renderComponent
-	} from '$lib/components/ui/data-table/index.js';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as TableUI from '$lib/components/ui/table/index.js';
@@ -23,28 +18,26 @@
 		type IconProps
 	} from '@lucide/svelte';
 	import {
-		getCoreRowModel,
-		getFilteredRowModel,
-		getPaginationRowModel,
-		getSortedRowModel,
+		createTable,
+		FlexRender,
+		renderComponent,
 		type ColumnDef,
-		type ColumnFiltersState,
+		type ColumnVisibilityState,
 		type PaginationState,
-		type RowSelectionState,
-		type SortingState,
-		type Table,
-		type VisibilityState
-	} from '@tanstack/table-core';
+		type RowData,
+		type Table
+	} from '@tanstack/svelte-table';
 	import type { Component } from 'svelte';
 	import { PersistedState } from 'runed';
 	import BulkActions from './BulkActions.svelte';
 	import type { BulkAction } from './types';
+	import { features, type DataTableFeatures } from './data-table-features.js';
 
 	type IconComponent = Component<IconProps, Record<string, never>, ''>;
 
-	type DataTableProps<TData, TValue> = {
+	type DataTableProps<TData extends RowData> = {
 		data?: TData[];
-		columns: ColumnDef<TData, TValue>[];
+		columns: ColumnDef<DataTableFeatures, TData>[];
 		bulkActions?: BulkAction<TData>[] | undefined;
 		rowCount?: number;
 		emptyState?: {
@@ -52,7 +45,7 @@
 			title: string;
 			description: string;
 		};
-		onTableReady?: (table: Table<TData>) => void;
+		onTableReady?: (table: Table<DataTableFeatures, TData>) => void;
 	};
 
 	let {
@@ -66,7 +59,7 @@
 			description: 'No data found'
 		},
 		onTableReady
-	}: DataTableProps<TData, TValue> = $props();
+	}: DataTableProps<TData> = $props();
 
 	// Pagination
 	const pageSizeOptions = [2, 10, 15, 20, 30, 50];
@@ -74,9 +67,7 @@
 		pageIndex: 0,
 		pageSize: pageSize.current
 	});
-	let sorting = $state<SortingState>([]);
-	let columnFilters = $derived<ColumnFiltersState>([]);
-	const defaultVisibility: VisibilityState = {
+	const defaultVisibility: ColumnVisibilityState = {
 		id: false,
 		userId: false,
 		updatedAt: false,
@@ -89,13 +80,15 @@
 				.filter(Boolean)
 				.join(':')}`
 	);
-	const persistedVisibility = new PersistedState<VisibilityState>(visibilityKey, defaultVisibility);
-	let columnVisibility = $state<VisibilityState>(persistedVisibility.current);
-	let rowSelection = $state<RowSelectionState>({});
-	let globalFilter = $state<string>('');
+	const persistedVisibility = new PersistedState<ColumnVisibilityState>(
+		visibilityKey,
+		defaultVisibility
+	);
+	let columnVisibility = $state<ColumnVisibilityState>(persistedVisibility.current);
 
 	// Table
-	const table = createSvelteTable({
+	const table = createTable({
+		features,
 		get data() {
 			return data;
 		},
@@ -103,23 +96,22 @@
 			return [
 				{
 					id: 'select',
-					header: ({ table }: { table: any }) =>
+					header: ({ table }) =>
 						renderComponent(Checkbox, {
 							checked: table.getIsAllPageRowsSelected(),
-							onCheckedChange: (value) => table.toggleAllPageRowsSelected(value),
+							onCheckedChange: (value: boolean) => table.toggleAllPageRowsSelected(!!value),
 							indeterminate: table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected(),
 							'aria-label': 'Select all'
 						}),
-					cell: ({ row }: { row: any }) =>
+					cell: ({ row }) =>
 						renderComponent(Checkbox, {
 							checked: row.getIsSelected(),
-							onCheckedChange: (value) => row.toggleSelected(value),
+							onCheckedChange: (value: boolean) => row.toggleSelected(!!value),
 							'aria-label': 'Select row'
 						}),
 					enableSorting: false,
-					enableHiding: false,
-					enableGlobalFilter: false
-				},
+					enableHiding: false
+				} as ColumnDef<DataTableFeatures, TData>,
 				...columns
 			];
 		},
@@ -129,11 +121,6 @@
 		get manualPagination() {
 			return !!rowCount;
 		},
-		globalFilterFn: 'includesString',
-		getCoreRowModel: getCoreRowModel(),
-		getPaginationRowModel: getPaginationRowModel(),
-		getSortedRowModel: getSortedRowModel(),
-		getFilteredRowModel: getFilteredRowModel(),
 		onPaginationChange: (updater) => {
 			if (typeof updater === 'function') {
 				pagination = updater(pagination);
@@ -143,60 +130,22 @@
 			pageSize.current = pagination.pageSize;
 			pageIndex.current = pagination.pageIndex;
 		},
-		onSortingChange: (updater) => {
-			if (typeof updater === 'function') {
-				sorting = updater(sorting);
-			} else {
-				sorting = updater;
-			}
-		},
-		onColumnFiltersChange: (updater) => {
-			if (typeof updater === 'function') {
-				columnFilters = updater(columnFilters);
-			} else {
-				columnFilters = updater;
-			}
-		},
 		onColumnVisibilityChange: (updater) => {
 			const next = typeof updater === 'function' ? updater(columnVisibility) : updater;
 			columnVisibility = next;
-			if (persistedVisibility) persistedVisibility.current = next;
-		},
-		onRowSelectionChange: (updater) => {
-			if (typeof updater === 'function') {
-				rowSelection = updater(rowSelection);
-			} else {
-				rowSelection = updater;
-			}
-		},
-		onGlobalFilterChange: (updater) => {
-			if (typeof updater === 'function') {
-				globalFilter = updater(globalFilter);
-			} else {
-				globalFilter = updater;
-			}
+			persistedVisibility.current = next;
 		},
 		state: {
 			get pagination() {
 				return pagination;
 			},
-			get sorting() {
-				return sorting;
-			},
-			get columnFilters() {
-				return columnFilters;
-			},
 			get columnVisibility() {
 				return columnVisibility;
-			},
-			get rowSelection() {
-				return rowSelection;
-			},
-			get globalFilter() {
-				return globalFilter;
 			}
 		}
 	});
+
+	const paginationState = $derived(table.atoms.pagination.get());
 
 	$effect(() => {
 		onTableReady?.(table);
@@ -232,10 +181,7 @@
 										data-sortable={header.column.getCanSort()}
 										onclick={() => header.column.toggleSorting()}
 									>
-										<FlexRender
-											content={header.column.columnDef.header}
-											context={header.getContext()}
-										/>
+										<FlexRender {header} />
 										{#if header.column.getCanSort()}
 											{#if header.column.getIsSorted() === 'asc'}
 												<ArrowUp />
@@ -257,7 +203,7 @@
 					<TableUI.Row data-state={row.getIsSelected() && 'selected'}>
 						{#each row.getVisibleCells() as cell (cell.id)}
 							<TableUI.Cell>
-								<FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
+								<FlexRender {cell} />
 							</TableUI.Cell>
 						{/each}
 					</TableUI.Row>
@@ -306,14 +252,14 @@
 				<Select.Root
 					allowDeselect={false}
 					type="single"
-					value={`${table.getState().pagination.pageSize}`}
+					value={`${paginationState.pageSize}`}
 					onValueChange={(value) => {
 						table.setPageSize(Number(value));
 						pageSize.current = Number(value);
 					}}
 				>
 					<Select.Trigger class="h-8 w-17.5">
-						{String(table.getState().pagination.pageSize)}
+						{String(paginationState.pageSize)}
 					</Select.Trigger>
 					<Select.Content side="top">
 						{#each pageSizeOptions as size (size)}
@@ -323,7 +269,7 @@
 				</Select.Root>
 			</div>
 			<div class="flex w-25 items-center justify-center text-sm font-medium">
-				Page {table.getState().pagination.pageIndex + 1}
+				Page {paginationState.pageIndex + 1}
 				{table.getPageCount() > 1 ? `of ${table.getPageCount()}` : ''}
 			</div>
 			<div class="flex items-center gap-2">
