@@ -52,9 +52,7 @@ func Generate() string {
 func word(list []string) string {
 	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(list))))
 	if err != nil {
-		// crypto/rand failure is effectively unreachable; degrade to the
-		// first entry rather than returning an empty name.
-		return list[0]
+		return list[0] // degrade to the first entry
 	}
 	return list[n.Int64()]
 }
