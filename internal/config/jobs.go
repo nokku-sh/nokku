@@ -25,6 +25,7 @@ func (c *Config) startBackgroundJobs(ctx context.Context) {
 			case <-ticker.C:
 				c.rotateCerts(ctx)
 				c.cleanupUnverifiedUsers(ctx)
+				c.cleanupOneTimeTokens(ctx)
 			}
 		}
 	}()
@@ -74,6 +75,15 @@ func (c *Config) syncBilling(ctx context.Context) {
 func (c *Config) cleanupUnverifiedUsers(ctx context.Context) {
 	err := c.Conn.WithTx(ctx, func(q *db.Queries) error {
 		return q.DeleteUnverifiedUsers(ctx)
+	})
+	if err != nil {
+		slog.Error("failed to cleanup unverified users", "error", err)
+	}
+}
+
+func (c *Config) cleanupOneTimeTokens(ctx context.Context) {
+	err := c.Conn.WithTx(ctx, func(q *db.Queries) error {
+		return q.DeleteExpiredOneTimeTokens(ctx)
 	})
 	if err != nil {
 		slog.Error("failed to cleanup unverified users", "error", err)
