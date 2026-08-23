@@ -1,49 +1,42 @@
 <script lang="ts">
 	import { recordings } from '$lib/api/recordings.svelte';
 	import RecordingPlayer from './RecordingPlayer.svelte';
-	import ActionCell from '$lib/components/tables/cells/ActionCell.svelte';
-	import StatusCell from '$lib/components/tables/cells/StatusCell.svelte';
-	import TimeCell from '$lib/components/tables/cells/TimeCell.svelte';
-	import DataTable from '$lib/components/tables/DataTable.svelte';
+	import { DataTable, createAppColumnHelper } from '$lib/components/tables';
+	import { ActionCell, StatusCell, TimeCell } from '$lib/components/tables/cells';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { createModalState } from '$lib/hooks';
 	import { formatBytes } from '$lib/crypto/recordings';
 	import type { Recording } from '$lib/gen/nokku/v1/recordings_pb';
 	import { MonitorPlay, SearchX } from '@lucide/svelte';
-	import type { ColumnDef } from '@tanstack/svelte-table';
-	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 
 	const list = $derived(recordings.list());
 	const deleteRecording = recordings.delete();
 
 	const player = createModalState<Recording>({} as Recording);
 
-	const columns: ColumnDef<DataTableFeatures, Recording>[] = [
-		{
+	const columnHelper = createAppColumnHelper<Recording>();
+	const columns = columnHelper.columns([
+		columnHelper.accessor('startedAt', {
 			header: 'Started',
-			accessorKey: 'startedAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.startedAt })
-		},
-		{
+		}),
+		columnHelper.accessor('username', {
 			header: 'User',
-			accessorKey: 'username',
 			cell: ({ row }) => renderComponent(StatusCell, { status: row.original.username || '—' })
-		},
-		{
+		}),
+		columnHelper.accessor('sizeBytes', {
 			header: 'Size',
-			accessorKey: 'sizeBytes',
 			cell: ({ row }) => formatBytes(Number(row.original.sizeBytes))
-		},
-		{
+		}),
+		columnHelper.accessor('complete', {
 			header: 'Status',
-			accessorKey: 'complete',
 			cell: ({ row }) =>
 				renderComponent(StatusCell, {
 					status: row.original.complete ? 'complete' : 'truncated'
 				})
-		},
-		{
+		}),
+		columnHelper.display({
 			id: 'actions',
 			cell: ({ row }) =>
 				renderComponent(ActionCell, {
@@ -61,8 +54,8 @@
 						}
 					}
 				})
-		}
-	];
+		})
+	]);
 </script>
 
 <PageHeader

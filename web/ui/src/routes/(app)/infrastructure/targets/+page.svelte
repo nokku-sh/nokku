@@ -3,28 +3,29 @@
 	import { ca } from '$lib/api/certificates.svelte';
 	import { target } from '$lib/api/targets.svelte';
 	import TargetModal from '$lib/components/modals/TargetModal.svelte';
-	import ActionCell from '$lib/components/tables/cells/ActionCell.svelte';
-	import AvatarCell from '$lib/components/tables/cells/AvatarCell.svelte';
-	import PrincipalsCell from '$lib/components/tables/cells/PrincipalsCell.svelte';
-	import TagsCell from '$lib/components/tables/cells/TagsCell.svelte';
-	import TimeCell from '$lib/components/tables/cells/TimeCell.svelte';
-	import DataTable from '$lib/components/tables/DataTable.svelte';
-	import TableToolbar from '$lib/components/tables/TableToolbar.svelte';
-	import type { BulkAction } from '$lib/components/tables/types';
+	import {
+		DataTable,
+		TableToolbar,
+		createAppColumnHelper,
+		type BulkAction
+	} from '$lib/components/tables';
+	import {
+		ActionCell,
+		AvatarCell,
+		PrincipalsCell,
+		TagsCell,
+		TimeCell
+	} from '$lib/components/tables/cells';
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { type Target } from '$lib/gen/nokku/v1/target_pb';
 	import { createModalState } from '$lib/hooks';
 	import { PencilIcon, Plus, Server, TagIcon, Trash2, UserIcon, IdCard } from '@lucide/svelte';
-	import type { ColumnDef, Table } from '@tanstack/svelte-table';
-	import type { DataTableFeatures } from '$lib/components/tables/data-table-features.js';
 	import { Debounced } from 'runed';
 
 	// Modal states
 	const targetModal = createModalState<Target>({} as Target);
-
-	let table = $state<Table<DataTableFeatures, Target>>();
 
 	// Data
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
@@ -58,49 +59,45 @@
 
 	const deleteTarget = target.delete();
 
-	const columns: ColumnDef<DataTableFeatures, Target>[] = [
-		{
+	const columnHelper = createAppColumnHelper<Target>();
+	const columns = columnHelper.columns([
+		columnHelper.accessor('name', {
 			header: 'Name',
-			accessorKey: 'name',
 			cell: ({ row }) =>
 				renderComponent(AvatarCell, {
 					id: row.original.id,
 					name: row.original.name,
 					description: row.original.description
 				})
-		},
-		{
+		}),
+		columnHelper.accessor('caId', {
 			header: 'CA',
-			accessorKey: 'caId',
 			cell: ({ row }) => {
 				return caData.data?.find((c) => c.id === row.original.caId)?.name;
 			}
-		},
-		{
-			header: 'Principals',
+		}),
+		columnHelper.display({
 			id: 'principals',
+			header: 'Principals',
 			cell: ({ row }) => {
 				return renderComponent(PrincipalsCell, { targetId: row.original.id });
 			}
-		},
-		{
+		}),
+		columnHelper.accessor('tags', {
 			header: 'Tags',
-			accessorKey: 'tags',
 			cell: ({ row }) => {
 				return renderComponent(TagsCell, { tags: row.original.tags });
 			}
-		},
-		{
+		}),
+		columnHelper.accessor('updatedAt', {
 			header: 'Updated',
-			accessorKey: 'updatedAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.updatedAt })
-		},
-		{
+		}),
+		columnHelper.accessor('createdAt', {
 			header: 'Created',
-			accessorKey: 'createdAt',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.createdAt })
-		},
-		{
+		}),
+		columnHelper.display({
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
@@ -118,8 +115,8 @@
 					}
 				});
 			}
-		}
-	];
+		})
+	]);
 
 	const bulkActions: BulkAction<Target>[] = [
 		{
@@ -141,30 +138,6 @@
 	</Button>
 </PageHeader>
 
-<TableToolbar
-	search
-	searchResultCount={targets.data?.total}
-	{table}
-	filters={[
-		{
-			title: 'CA',
-			options: caData.data?.map((c) => ({ label: c.name, value: c.id, icon: IdCard })) ?? [],
-			param: 'ca',
-			mode: 'single'
-		},
-		{
-			title: 'Tags',
-			options: uniqueTags,
-			param: 'tags'
-		},
-		{
-			title: 'Principals',
-			options: uniquePrincipals,
-			param: 'principals'
-		}
-	]}
-/>
-
 <DataTable
 	data={targets.data?.targets ?? []}
 	rowCount={targets.data?.total ?? 0}
@@ -175,5 +148,30 @@
 		title: 'No Targets',
 		description: "You haven't created any targets yet. Get started by creating your first target."
 	}}
-	onTableReady={(t) => (table = t)}
-/>
+>
+	{#snippet toolbar(table)}
+		<TableToolbar
+			search
+			searchResultCount={targets.data?.total}
+			{table}
+			filters={[
+				{
+					title: 'CA',
+					options: caData.data?.map((c) => ({ label: c.name, value: c.id, icon: IdCard })) ?? [],
+					param: 'ca',
+					mode: 'single'
+				},
+				{
+					title: 'Tags',
+					options: uniqueTags,
+					param: 'tags'
+				},
+				{
+					title: 'Principals',
+					options: uniquePrincipals,
+					param: 'principals'
+				}
+			]}
+		/>
+	{/snippet}
+</DataTable>
