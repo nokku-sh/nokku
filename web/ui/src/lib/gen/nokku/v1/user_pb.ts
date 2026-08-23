@@ -432,8 +432,6 @@ export const ListUserSessionsResponseSchema: GenMessage<ListUserSessionsResponse
  */
 export type RevokeUserSessionRequest = Message<'nokku.v1.RevokeUserSessionRequest'> & {
 	/**
-	 * The session id returned by ListUserSessions (the hex-encoded token hash).
-	 *
 	 * @generated from field: string session_id = 1;
 	 */
 	sessionId: string;

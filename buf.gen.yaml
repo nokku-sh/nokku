@@ -25,4 +25,6 @@ plugins:
     include_imports: true
 
 inputs:
-  - directory: ../protos/nokku
+  - git_repo: https://github.com/nokku-sh/protos.git
+    branch: main
+    subdir: nokku
