@@ -126,6 +126,10 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Auth events (login, register, SSO denial, ...) flow into the audit log
+	// via the kagi sink. The audit service needs the DB and billing so it is
+	// built after auth and attached here, before the server serves traffic.
+	cfg.Auth.SetEventSink(cfg.Audit)
 
 	if err := crypto.InitDefaultHashers(); err != nil {
 		return nil, err
