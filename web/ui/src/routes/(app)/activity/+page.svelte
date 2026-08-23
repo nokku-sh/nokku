@@ -6,7 +6,7 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import { ExportAuditLogsRequest_Format, type EventLog } from '$lib/gen/nokku/v1/util_pb';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { DateValueToTimestamp } from '$lib/utils';
+	import { auditStatusOk, DateValueStartTs, DateValueToTimestamp } from '$lib/utils';
 	import { Activity, Download, InfoIcon } from '@lucide/svelte';
 	import ActivityModal from '$lib/components/modals/ActivityModal.svelte';
 	import type { DateRange } from 'bits-ui';
@@ -44,7 +44,7 @@
 			actorIds: Array.from(selectedUsers),
 			actions: Array.from(selectedActions),
 			actorTypes: Array.from(selectedActorTypes),
-			startDate: DateValueToTimestamp(logRange.start),
+			startDate: DateValueStartTs(logRange.start),
 			endDate: DateValueToTimestamp(logRange.end)
 		})
 	);
@@ -65,7 +65,8 @@
 		columnHelper.display({
 			id: 'status_code',
 			header: 'Status',
-			cell: ({ row }) => renderComponent(CheckCell, { checked: row.original.statusCode === '' })
+			cell: ({ row }) =>
+				renderComponent(CheckCell, { checked: auditStatusOk(row.original.statusCode) })
 		}),
 		columnHelper.accessor('action', {
 			header: 'Action',

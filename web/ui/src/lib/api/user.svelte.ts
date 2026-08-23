@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '$lib/query';
 import { queryClient } from './client';
 import { UtilService } from '$lib/gen/nokku/v1/util_pb';
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import { pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
+import { pageIndex, pageSize } from '$lib/store.svelte';
 
 export const user = {
 	// Queries
@@ -18,16 +18,19 @@ export const user = {
 		startDate?: Timestamp;
 		endDate?: Timestamp;
 	}) => {
-		// Filter out undefined/empty values
+		// userID selects the actor for the query; the rest are extra filters.
+		const { userID, ...rest } = filters;
 		const cleanFilters = Object.fromEntries(
-			Object.entries(filters ?? {}).filter(([_, v]) => v !== undefined && v !== '' && v !== null)
+			Object.entries(rest ?? {}).filter(([, v]) => v !== undefined && v !== '' && v !== null)
 		);
 
 		return useQuery(
 			UtilService.method.listAuditLogs,
 			{
-				workspaceId: workspaceID.current,
-				actorIds: [filters.userID],
+				// Empty workspaceId deliberately opts out of the workspace
+				// interceptor so this stays a personal (global) read.
+				workspaceId: '',
+				actorIds: [userID],
 				limit: pageSize.current,
 				offset: pageIndex.current,
 				...cleanFilters

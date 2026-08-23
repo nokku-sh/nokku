@@ -62,6 +62,18 @@ export const DateValueToTimestamp = (date: DateValue | null | undefined) => {
 	return timestampFromDate(nextDay.toDate(getLocalTimeZone()));
 };
 
+/** Convert a DateValue to a Timestamp at the start of that day (local time). */
+export const DateValueStartTs = (date: DateValue | null | undefined) => {
+	if (!date) return undefined;
+	return timestampFromDate(date.toDate(getLocalTimeZone()));
+};
+
+/** An audit status is successful when it is empty, "OK", or any 2xx HTTP code. */
+export const auditStatusOk = (status: string | undefined): boolean => {
+	const s = status ?? '';
+	return s === '' || s === 'OK' || /^2\d\d$/.test(s);
+};
+
 type DateStyle = 'full' | 'long' | 'short' | 'compact' | 'relative' | 'relative-short' | 'withTime';
 
 const formatters = {

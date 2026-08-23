@@ -141,7 +141,7 @@ export const util = {
 	}) => {
 		// Filter out undefined/empty values
 		const cleanFilters = Object.fromEntries(
-			Object.entries(opts ?? {}).filter(([_, v]) => v !== undefined && v !== '' && v !== null)
+			Object.entries(opts ?? {}).filter(([, v]) => v !== undefined && v !== '' && v !== null)
 		);
 
 		return useQuery(
