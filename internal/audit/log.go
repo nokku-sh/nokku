@@ -62,7 +62,18 @@ func (s *Service) LogStreamingAction(
 }
 
 func (s *Service) LogHTTPAction(ctx context.Context, r *http.Request, statusCode int) {
-	s.logAudit(ctx, r.Method+" "+r.URL.Path, r.Header, r.RemoteAddr, strconv.Itoa(statusCode))
+	s.logAudit(ctx, r.Method+" "+r.URL.Path, r.Header, r.RemoteAddr, httpStatusStr(statusCode))
+}
+
+// httpStatusStr normalizes an HTTP status into the same audit status space as
+// RPC and auth events: any 2xx is a success ("OK"), anything else is the
+// numeric status code. This keeps the UI and SIEM rules uniform ("OK" always
+// means success) instead of mixing "200" and "OK" for the same outcome.
+func httpStatusStr(status int) string {
+	if status >= 200 && status < 300 {
+		return "OK"
+	}
+	return strconv.Itoa(status)
 }
 
 // statusCodeOf maps an RPC outcome to an explicit audit status: "OK" on
@@ -112,8 +123,18 @@ func (s *Service) logAudit(
 		email = state.Email
 	}
 
+	// A request's workspace comes from the kagi context (the tenant resolved
+	// from the request for user principals, or the principal's tenant for
+	// machine identities). The state workspace is only a fallback for
+	// unauthenticated flows (e.g. daemon enrollment) that pin a tenant that
+	// is not on the context.
+	workspaceID := WorkspaceIDFromContext(ctx)
+	if state != nil && state.WorkspaceID != "" {
+		workspaceID = state.WorkspaceID
+	}
+
 	log := &Event{
-		WorkspaceID: state.WorkspaceID,
+		WorkspaceID: workspaceID,
 		ActorID:     actorID,
 		ActorType:   actorType,
 		ActorEmail:  email,

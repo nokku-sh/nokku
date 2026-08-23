@@ -50,15 +50,7 @@ func NewService(conn *db.Connection, nonceSecret []byte, sso SSOConfig) (*Servic
 			CookieName: "session",
 			Secure:     true,
 		},
-		Events: kagi.SinkFunc(func(_ context.Context, e kagi.Event) {
-			slog.Info("auth event",
-				"tenant", e.TenantID,
-				"user", e.UserID,
-				"method", e.Method,
-				"action", e.Action,
-				"provider", e.Provider,
-			)
-		}),
+		Events: slogSink(),
 		OnLogin: func(ctx context.Context, _ kagi.TenantID, u kagi.User, m kagi.Method) error {
 			// SSO enforcement applies to every method except the IdP flows
 			// themselves (oidc/saml are the enforced path). Account state
@@ -92,6 +84,30 @@ func NewService(conn *db.Connection, nonceSecret []byte, sso SSOConfig) (*Servic
 		backupCodes: backupcode.New(kagiSvc),
 		tokens:      tokens.New(NewTokenStore(conn), 15*time.Minute),
 	}, nil
+}
+
+// slogSink is the default auth event sink used until the audit service is
+// wired in; it never drops the event, just emits it to the log.
+func slogSink() kagi.Sink {
+	return kagi.SinkFunc(func(_ context.Context, e kagi.Event) {
+		slog.Info("auth event",
+			"tenant", e.TenantID,
+			"user", e.UserID,
+			"method", e.Method,
+			"action", e.Action,
+			"provider", e.Provider,
+		)
+	})
+}
+
+// SetEventSink wires the kagi auth sink to the audit service. The audit
+// service is constructed after auth (it needs billing), so it is attached
+// once both exist. It must be called before the server starts serving.
+func (s *Service) SetEventSink(sink kagi.Sink) {
+	if sink == nil {
+		return
+	}
+	s.Kagi.Events = sink
 }
 
 // Authenticator returns a session authenticator wired to the kagi service.
