@@ -66,14 +66,14 @@ func (s *Server) Start(ctx context.Context) error {
 	proto.SetHTTP1(true)
 	proto.SetHTTP2(true)
 	proto.SetUnencryptedHTTP2(true)
-	//nolint:gosec // slowloris handled by reverse proxy
 	server := &http.Server{
-		Addr:           "0.0.0.0:" + s.cfg.Port,
-		Handler:        chain.Then(s.mux),
-		Protocols:      proto,
-		IdleTimeout:    30 * time.Second,
-		MaxHeaderBytes: 1 << 14, // 16 KiB
-		TLSConfig:      &tls.Config{MinVersion: tls.VersionTLS13},
+		Addr:              "0.0.0.0:" + s.cfg.Port,
+		Handler:           chain.Then(s.mux),
+		Protocols:         proto,
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       30 * time.Second,
+		MaxHeaderBytes:    1 << 14, // 16 KiB
+		TLSConfig:         &tls.Config{MinVersion: tls.VersionTLS13},
 	}
 
 	serverErr := make(chan error, 1)
