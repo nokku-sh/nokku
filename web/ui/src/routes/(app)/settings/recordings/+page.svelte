@@ -1,16 +1,14 @@
 <script lang="ts">
 	import { billing } from '$lib/api/billing.svelte';
 	import { recordings } from '$lib/api/recordings.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
 	import { parseBillingCapabilities } from '$lib/billing-capabilities';
 	import * as Card from '$lib/components/ui/card';
 	import * as Alert from '$lib/components/ui/alert';
 	import { Progress } from '$lib/components/ui/progress';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { formatBytes } from '$lib/crypto/recordings';
+	import { formatBytes } from '$lib/utils';
 	import { Database, Lock } from '@lucide/svelte';
 
-	const ws = $derived(workspace.get());
 	const list = $derived(recordings.list());
 	const billingData = $derived(billing.get());
 	const capabilities = $derived(parseBillingCapabilities(billingData.data?.metadata));
