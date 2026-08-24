@@ -25,18 +25,17 @@ const (
 )
 
 type Recording struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	WorkspaceId    *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	DaemonId       *string                `protobuf:"bytes,3,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
-	Username       *string                `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
-	SizeBytes      *int64                 `protobuf:"varint,5,opt,name=size_bytes,json=sizeBytes" json:"size_bytes,omitempty"`
-	KeyFingerprint *string                `protobuf:"bytes,6,opt,name=key_fingerprint,json=keyFingerprint" json:"key_fingerprint,omitempty"`
-	Complete       *bool                  `protobuf:"varint,7,opt,name=complete" json:"complete,omitempty"`
-	StartedAt      *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
-	EndedAt        *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=ended_at,json=endedAt" json:"ended_at,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	DaemonId      *string                `protobuf:"bytes,3,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
+	Username      *string                `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
+	SizeBytes     *int64                 `protobuf:"varint,5,opt,name=size_bytes,json=sizeBytes" json:"size_bytes,omitempty"`
+	Complete      *bool                  `protobuf:"varint,6,opt,name=complete" json:"complete,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
+	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=ended_at,json=endedAt" json:"ended_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Recording) Reset() {
@@ -102,13 +101,6 @@ func (x *Recording) GetSizeBytes() int64 {
 		return *x.SizeBytes
 	}
 	return 0
-}
-
-func (x *Recording) GetKeyFingerprint() string {
-	if x != nil && x.KeyFingerprint != nil {
-		return *x.KeyFingerprint
-	}
-	return ""
 }
 
 func (x *Recording) GetComplete() bool {
@@ -231,12 +223,11 @@ func (*UploadRecordingRequest_Chunk) isUploadRecordingRequest_Msg() {}
 func (*UploadRecordingRequest_Final) isUploadRecordingRequest_Msg() {}
 
 type RecordingMeta struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	RecordingId    *string                `protobuf:"bytes,1,opt,name=recording_id,json=recordingId" json:"recording_id,omitempty"`
-	Username       *string                `protobuf:"bytes,2,opt,name=username" json:"username,omitempty"`
-	KeyFingerprint *string                `protobuf:"bytes,3,opt,name=key_fingerprint,json=keyFingerprint" json:"key_fingerprint,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RecordingId   *string                `protobuf:"bytes,1,opt,name=recording_id,json=recordingId" json:"recording_id,omitempty"`
+	Username      *string                `protobuf:"bytes,2,opt,name=username" json:"username,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RecordingMeta) Reset() {
@@ -279,13 +270,6 @@ func (x *RecordingMeta) GetRecordingId() string {
 func (x *RecordingMeta) GetUsername() string {
 	if x != nil && x.Username != nil {
 		return *x.Username
-	}
-	return ""
-}
-
-func (x *RecordingMeta) GetKeyFingerprint() string {
-	if x != nil && x.KeyFingerprint != nil {
-		return *x.KeyFingerprint
 	}
 	return ""
 }
@@ -736,200 +720,30 @@ func (*DeleteRecordingResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_recordings_proto_rawDescGZIP(), []int{10}
 }
 
-type SetRecordingKeyRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	PublicKey     *string                `protobuf:"bytes,2,opt,name=public_key,json=publicKey" json:"public_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetRecordingKeyRequest) Reset() {
-	*x = SetRecordingKeyRequest{}
-	mi := &file_nokku_v1_recordings_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetRecordingKeyRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetRecordingKeyRequest) ProtoMessage() {}
-
-func (x *SetRecordingKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_recordings_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetRecordingKeyRequest.ProtoReflect.Descriptor instead.
-func (*SetRecordingKeyRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_recordings_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *SetRecordingKeyRequest) GetWorkspaceId() string {
-	if x != nil && x.WorkspaceId != nil {
-		return *x.WorkspaceId
-	}
-	return ""
-}
-
-func (x *SetRecordingKeyRequest) GetPublicKey() string {
-	if x != nil && x.PublicKey != nil {
-		return *x.PublicKey
-	}
-	return ""
-}
-
-type SetRecordingKeyResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetRecordingKeyResponse) Reset() {
-	*x = SetRecordingKeyResponse{}
-	mi := &file_nokku_v1_recordings_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetRecordingKeyResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetRecordingKeyResponse) ProtoMessage() {}
-
-func (x *SetRecordingKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_recordings_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetRecordingKeyResponse.ProtoReflect.Descriptor instead.
-func (*SetRecordingKeyResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_recordings_proto_rawDescGZIP(), []int{12}
-}
-
-type ClearRecordingKeyRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ClearRecordingKeyRequest) Reset() {
-	*x = ClearRecordingKeyRequest{}
-	mi := &file_nokku_v1_recordings_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ClearRecordingKeyRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ClearRecordingKeyRequest) ProtoMessage() {}
-
-func (x *ClearRecordingKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_recordings_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ClearRecordingKeyRequest.ProtoReflect.Descriptor instead.
-func (*ClearRecordingKeyRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_recordings_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *ClearRecordingKeyRequest) GetWorkspaceId() string {
-	if x != nil && x.WorkspaceId != nil {
-		return *x.WorkspaceId
-	}
-	return ""
-}
-
-type ClearRecordingKeyResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ClearRecordingKeyResponse) Reset() {
-	*x = ClearRecordingKeyResponse{}
-	mi := &file_nokku_v1_recordings_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ClearRecordingKeyResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ClearRecordingKeyResponse) ProtoMessage() {}
-
-func (x *ClearRecordingKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_recordings_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ClearRecordingKeyResponse.ProtoReflect.Descriptor instead.
-func (*ClearRecordingKeyResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_recordings_proto_rawDescGZIP(), []int{14}
-}
-
 var File_nokku_v1_recordings_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_recordings_proto_rawDesc = "" +
 	"\n" +
-	"\x19nokku/v1/recordings.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcd\x02\n" +
+	"\x19nokku/v1/recordings.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa4\x02\n" +
 	"\tRecording\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x1b\n" +
 	"\tdaemon_id\x18\x03 \x01(\tR\bdaemonId\x12\x1a\n" +
 	"\busername\x18\x04 \x01(\tR\busername\x12\x1d\n" +
 	"\n" +
-	"size_bytes\x18\x05 \x01(\x03R\tsizeBytes\x12'\n" +
-	"\x0fkey_fingerprint\x18\x06 \x01(\tR\x0ekeyFingerprint\x12\x1a\n" +
-	"\bcomplete\x18\a \x01(\bR\bcomplete\x129\n" +
+	"size_bytes\x18\x05 \x01(\x03R\tsizeBytes\x12\x1a\n" +
+	"\bcomplete\x18\x06 \x01(\bR\bcomplete\x129\n" +
 	"\n" +
-	"started_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x125\n" +
-	"\bended_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt\"\x98\x01\n" +
+	"started_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x125\n" +
+	"\bended_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt\"\x98\x01\n" +
 	"\x16UploadRecordingRequest\x12-\n" +
 	"\x04meta\x18\x01 \x01(\v2\x17.nokku.v1.RecordingMetaH\x00R\x04meta\x12\x16\n" +
 	"\x05chunk\x18\x02 \x01(\fH\x00R\x05chunk\x120\n" +
 	"\x05final\x18\x03 \x01(\v2\x18.nokku.v1.RecordingFinalH\x00R\x05finalB\x05\n" +
-	"\x03msg\"\x8a\x01\n" +
+	"\x03msg\"a\n" +
 	"\rRecordingMeta\x12+\n" +
 	"\frecording_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vrecordingId\x12#\n" +
-	"\busername\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18 R\busername\x12'\n" +
-	"\x0fkey_fingerprint\x18\x03 \x01(\tR\x0ekeyFingerprint\"\x10\n" +
+	"\busername\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18 R\busername\"\x10\n" +
 	"\x0eRecordingFinal\"[\n" +
 	"\x17UploadRecordingResponse\x12!\n" +
 	"\frecording_id\x18\x01 \x01(\tR\vrecordingId\x12\x1d\n" +
@@ -958,23 +772,12 @@ const file_nokku_v1_recordings_proto_rawDesc = "" +
 	"\x16DeleteRecordingRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12+\n" +
 	"\frecording_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vrecordingId\"\x19\n" +
-	"\x17DeleteRecordingResponse\"p\n" +
-	"\x16SetRecordingKeyRequest\x12+\n" +
-	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12)\n" +
-	"\n" +
-	"public_key\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10 \x18\x80\x01R\tpublicKey\"\x19\n" +
-	"\x17SetRecordingKeyResponse\"G\n" +
-	"\x18ClearRecordingKeyRequest\x12+\n" +
-	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"\x1b\n" +
-	"\x19ClearRecordingKeyResponse2\xeb\x06\n" +
+	"\x17DeleteRecordingResponse2\xa7\x04\n" +
 	"\x10RecordingService\x12X\n" +
 	"\x0fUploadRecording\x12 .nokku.v1.UploadRecordingRequest\x1a!.nokku.v1.UploadRecordingResponse(\x01\x12\x88\x01\n" +
 	"\x0eListRecordings\x12\x1f.nokku.v1.ListRecordingsRequest\x1a .nokku.v1.ListRecordingsResponse\"3\x82\xd3\xe4\x93\x02*\x12(/v1/workspaces/{workspace_id}/recordings\x90\x02\x01\x12\x93\x01\n" +
 	"\fGetRecording\x12\x1d.nokku.v1.GetRecordingRequest\x1a\x1e.nokku.v1.GetRecordingResponse\"B\x82\xd3\xe4\x93\x029\x127/v1/workspaces/{workspace_id}/recordings/{recording_id}\x90\x02\x010\x01\x12\x97\x01\n" +
-	"\x0fDeleteRecording\x12 .nokku.v1.DeleteRecordingRequest\x1a!.nokku.v1.DeleteRecordingResponse\"?\x82\xd3\xe4\x93\x029*7/v1/workspaces/{workspace_id}/recordings/{recording_id}\x12\x9b\x01\n" +
-	"\x0fSetRecordingKey\x12 .nokku.v1.SetRecordingKeyRequest\x1a!.nokku.v1.SetRecordingKeyResponse\"C\x82\xd3\xe4\x93\x02=:\x01*\"8/v1/workspaces/{workspace_id}/settings:set-recording-key\x12\xa3\x01\n" +
-	"\x11ClearRecordingKey\x12\".nokku.v1.ClearRecordingKeyRequest\x1a#.nokku.v1.ClearRecordingKeyResponse\"E\x82\xd3\xe4\x93\x02?:\x01*\":/v1/workspaces/{workspace_id}/settings:clear-recording-keyB\x99\x01\n" +
+	"\x0fDeleteRecording\x12 .nokku.v1.DeleteRecordingRequest\x1a!.nokku.v1.DeleteRecordingResponse\"?\x82\xd3\xe4\x93\x029*7/v1/workspaces/{workspace_id}/recordings/{recording_id}B\x99\x01\n" +
 	"\fcom.nokku.v1B\x0fRecordingsProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -989,28 +792,24 @@ func file_nokku_v1_recordings_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_recordings_proto_rawDescData
 }
 
-var file_nokku_v1_recordings_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_nokku_v1_recordings_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_nokku_v1_recordings_proto_goTypes = []any{
-	(*Recording)(nil),                 // 0: nokku.v1.Recording
-	(*UploadRecordingRequest)(nil),    // 1: nokku.v1.UploadRecordingRequest
-	(*RecordingMeta)(nil),             // 2: nokku.v1.RecordingMeta
-	(*RecordingFinal)(nil),            // 3: nokku.v1.RecordingFinal
-	(*UploadRecordingResponse)(nil),   // 4: nokku.v1.UploadRecordingResponse
-	(*ListRecordingsRequest)(nil),     // 5: nokku.v1.ListRecordingsRequest
-	(*ListRecordingsResponse)(nil),    // 6: nokku.v1.ListRecordingsResponse
-	(*GetRecordingRequest)(nil),       // 7: nokku.v1.GetRecordingRequest
-	(*GetRecordingResponse)(nil),      // 8: nokku.v1.GetRecordingResponse
-	(*DeleteRecordingRequest)(nil),    // 9: nokku.v1.DeleteRecordingRequest
-	(*DeleteRecordingResponse)(nil),   // 10: nokku.v1.DeleteRecordingResponse
-	(*SetRecordingKeyRequest)(nil),    // 11: nokku.v1.SetRecordingKeyRequest
-	(*SetRecordingKeyResponse)(nil),   // 12: nokku.v1.SetRecordingKeyResponse
-	(*ClearRecordingKeyRequest)(nil),  // 13: nokku.v1.ClearRecordingKeyRequest
-	(*ClearRecordingKeyResponse)(nil), // 14: nokku.v1.ClearRecordingKeyResponse
-	(*timestamppb.Timestamp)(nil),     // 15: google.protobuf.Timestamp
+	(*Recording)(nil),               // 0: nokku.v1.Recording
+	(*UploadRecordingRequest)(nil),  // 1: nokku.v1.UploadRecordingRequest
+	(*RecordingMeta)(nil),           // 2: nokku.v1.RecordingMeta
+	(*RecordingFinal)(nil),          // 3: nokku.v1.RecordingFinal
+	(*UploadRecordingResponse)(nil), // 4: nokku.v1.UploadRecordingResponse
+	(*ListRecordingsRequest)(nil),   // 5: nokku.v1.ListRecordingsRequest
+	(*ListRecordingsResponse)(nil),  // 6: nokku.v1.ListRecordingsResponse
+	(*GetRecordingRequest)(nil),     // 7: nokku.v1.GetRecordingRequest
+	(*GetRecordingResponse)(nil),    // 8: nokku.v1.GetRecordingResponse
+	(*DeleteRecordingRequest)(nil),  // 9: nokku.v1.DeleteRecordingRequest
+	(*DeleteRecordingResponse)(nil), // 10: nokku.v1.DeleteRecordingResponse
+	(*timestamppb.Timestamp)(nil),   // 11: google.protobuf.Timestamp
 }
 var file_nokku_v1_recordings_proto_depIdxs = []int32{
-	15, // 0: nokku.v1.Recording.started_at:type_name -> google.protobuf.Timestamp
-	15, // 1: nokku.v1.Recording.ended_at:type_name -> google.protobuf.Timestamp
+	11, // 0: nokku.v1.Recording.started_at:type_name -> google.protobuf.Timestamp
+	11, // 1: nokku.v1.Recording.ended_at:type_name -> google.protobuf.Timestamp
 	2,  // 2: nokku.v1.UploadRecordingRequest.meta:type_name -> nokku.v1.RecordingMeta
 	3,  // 3: nokku.v1.UploadRecordingRequest.final:type_name -> nokku.v1.RecordingFinal
 	0,  // 4: nokku.v1.ListRecordingsResponse.recordings:type_name -> nokku.v1.Recording
@@ -1019,16 +818,12 @@ var file_nokku_v1_recordings_proto_depIdxs = []int32{
 	5,  // 7: nokku.v1.RecordingService.ListRecordings:input_type -> nokku.v1.ListRecordingsRequest
 	7,  // 8: nokku.v1.RecordingService.GetRecording:input_type -> nokku.v1.GetRecordingRequest
 	9,  // 9: nokku.v1.RecordingService.DeleteRecording:input_type -> nokku.v1.DeleteRecordingRequest
-	11, // 10: nokku.v1.RecordingService.SetRecordingKey:input_type -> nokku.v1.SetRecordingKeyRequest
-	13, // 11: nokku.v1.RecordingService.ClearRecordingKey:input_type -> nokku.v1.ClearRecordingKeyRequest
-	4,  // 12: nokku.v1.RecordingService.UploadRecording:output_type -> nokku.v1.UploadRecordingResponse
-	6,  // 13: nokku.v1.RecordingService.ListRecordings:output_type -> nokku.v1.ListRecordingsResponse
-	8,  // 14: nokku.v1.RecordingService.GetRecording:output_type -> nokku.v1.GetRecordingResponse
-	10, // 15: nokku.v1.RecordingService.DeleteRecording:output_type -> nokku.v1.DeleteRecordingResponse
-	12, // 16: nokku.v1.RecordingService.SetRecordingKey:output_type -> nokku.v1.SetRecordingKeyResponse
-	14, // 17: nokku.v1.RecordingService.ClearRecordingKey:output_type -> nokku.v1.ClearRecordingKeyResponse
-	12, // [12:18] is the sub-list for method output_type
-	6,  // [6:12] is the sub-list for method input_type
+	4,  // 10: nokku.v1.RecordingService.UploadRecording:output_type -> nokku.v1.UploadRecordingResponse
+	6,  // 11: nokku.v1.RecordingService.ListRecordings:output_type -> nokku.v1.ListRecordingsResponse
+	8,  // 12: nokku.v1.RecordingService.GetRecording:output_type -> nokku.v1.GetRecordingResponse
+	10, // 13: nokku.v1.RecordingService.DeleteRecording:output_type -> nokku.v1.DeleteRecordingResponse
+	10, // [10:14] is the sub-list for method output_type
+	6,  // [6:10] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name
 	6,  // [6:6] is the sub-list for extension extendee
 	0,  // [0:6] is the sub-list for field type_name
@@ -1054,7 +849,7 @@ func file_nokku_v1_recordings_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_recordings_proto_rawDesc), len(file_nokku_v1_recordings_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   15,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -273,14 +273,11 @@ func (x *WorkspaceMember) GetUpdatedAt() *timestamppb.Timestamp {
 }
 
 type WorkspaceSettings struct {
-	state                   protoimpl.MessageState `protogen:"open.v1"`
-	EnrollAutoApprove       *bool                  `protobuf:"varint,1,opt,name=enroll_auto_approve,json=enrollAutoApprove" json:"enroll_auto_approve,omitempty"`
-	RecordingPublicKey      *string                `protobuf:"bytes,2,opt,name=recording_public_key,json=recordingPublicKey" json:"recording_public_key,omitempty"`
-	RecordingKeyFingerprint *string                `protobuf:"bytes,3,opt,name=recording_key_fingerprint,json=recordingKeyFingerprint" json:"recording_key_fingerprint,omitempty"`
-	RecordingKeyCreatedAt   *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=recording_key_created_at,json=recordingKeyCreatedAt" json:"recording_key_created_at,omitempty"`
-	DefaultDaemonConfig     *DaemonConfig          `protobuf:"bytes,5,opt,name=default_daemon_config,json=defaultDaemonConfig" json:"default_daemon_config,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	EnrollAutoApprove   *bool                  `protobuf:"varint,1,opt,name=enroll_auto_approve,json=enrollAutoApprove" json:"enroll_auto_approve,omitempty"`
+	DefaultDaemonConfig *DaemonConfig          `protobuf:"bytes,2,opt,name=default_daemon_config,json=defaultDaemonConfig" json:"default_daemon_config,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *WorkspaceSettings) Reset() {
@@ -318,27 +315,6 @@ func (x *WorkspaceSettings) GetEnrollAutoApprove() bool {
 		return *x.EnrollAutoApprove
 	}
 	return false
-}
-
-func (x *WorkspaceSettings) GetRecordingPublicKey() string {
-	if x != nil && x.RecordingPublicKey != nil {
-		return *x.RecordingPublicKey
-	}
-	return ""
-}
-
-func (x *WorkspaceSettings) GetRecordingKeyFingerprint() string {
-	if x != nil && x.RecordingKeyFingerprint != nil {
-		return *x.RecordingKeyFingerprint
-	}
-	return ""
-}
-
-func (x *WorkspaceSettings) GetRecordingKeyCreatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.RecordingKeyCreatedAt
-	}
-	return nil
 }
 
 func (x *WorkspaceSettings) GetDefaultDaemonConfig() *DaemonConfig {
@@ -1473,13 +1449,10 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"created_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xd2\x02\n" +
+	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x8f\x01\n" +
 	"\x11WorkspaceSettings\x12.\n" +
-	"\x13enroll_auto_approve\x18\x01 \x01(\bR\x11enrollAutoApprove\x120\n" +
-	"\x14recording_public_key\x18\x02 \x01(\tR\x12recordingPublicKey\x12:\n" +
-	"\x19recording_key_fingerprint\x18\x03 \x01(\tR\x17recordingKeyFingerprint\x12S\n" +
-	"\x18recording_key_created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x15recordingKeyCreatedAt\x12J\n" +
-	"\x15default_daemon_config\x18\x05 \x01(\v2\x16.nokku.v1.DaemonConfigR\x13defaultDaemonConfig\"B\n" +
+	"\x13enroll_auto_approve\x18\x01 \x01(\bR\x11enrollAutoApprove\x12J\n" +
+	"\x15default_daemon_config\x18\x02 \x01(\v2\x16.nokku.v1.DaemonConfigR\x13defaultDaemonConfig\"B\n" +
 	"\x13GetWorkspaceRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"I\n" +
 	"\x14GetWorkspaceResponse\x121\n" +
@@ -1610,43 +1583,42 @@ var file_nokku_v1_workspace_proto_depIdxs = []int32{
 	25, // 4: nokku.v1.Workspace.updated_at:type_name -> google.protobuf.Timestamp
 	25, // 5: nokku.v1.WorkspaceMember.created_at:type_name -> google.protobuf.Timestamp
 	25, // 6: nokku.v1.WorkspaceMember.updated_at:type_name -> google.protobuf.Timestamp
-	25, // 7: nokku.v1.WorkspaceSettings.recording_key_created_at:type_name -> google.protobuf.Timestamp
-	26, // 8: nokku.v1.WorkspaceSettings.default_daemon_config:type_name -> nokku.v1.DaemonConfig
-	0,  // 9: nokku.v1.GetWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
-	0,  // 10: nokku.v1.CreateWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
-	2,  // 11: nokku.v1.UpdateWorkspaceRequest.settings:type_name -> nokku.v1.WorkspaceSettings
-	0,  // 12: nokku.v1.UpdateWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
-	0,  // 13: nokku.v1.ListWorkspacesResponse.workspaces:type_name -> nokku.v1.Workspace
-	1,  // 14: nokku.v1.GetWorkspaceMemberResponse.member:type_name -> nokku.v1.WorkspaceMember
-	1,  // 15: nokku.v1.ListWorkspaceMembersResponse.members:type_name -> nokku.v1.WorkspaceMember
-	25, // 16: nokku.v1.SubscribeWorkspaceEventsResponse.created_at:type_name -> google.protobuf.Timestamp
-	3,  // 17: nokku.v1.WorkspaceService.GetWorkspace:input_type -> nokku.v1.GetWorkspaceRequest
-	11, // 18: nokku.v1.WorkspaceService.ListWorkspaces:input_type -> nokku.v1.ListWorkspacesRequest
-	5,  // 19: nokku.v1.WorkspaceService.CreateWorkspace:input_type -> nokku.v1.CreateWorkspaceRequest
-	7,  // 20: nokku.v1.WorkspaceService.UpdateWorkspace:input_type -> nokku.v1.UpdateWorkspaceRequest
-	9,  // 21: nokku.v1.WorkspaceService.DeleteWorkspace:input_type -> nokku.v1.DeleteWorkspaceRequest
-	13, // 22: nokku.v1.WorkspaceService.GetWorkspaceMember:input_type -> nokku.v1.GetWorkspaceMemberRequest
-	15, // 23: nokku.v1.WorkspaceService.ListWorkspaceMembers:input_type -> nokku.v1.ListWorkspaceMembersRequest
-	17, // 24: nokku.v1.WorkspaceService.RemoveWorkspaceMember:input_type -> nokku.v1.RemoveWorkspaceMemberRequest
-	19, // 25: nokku.v1.WorkspaceService.UpdateWorkspaceMember:input_type -> nokku.v1.UpdateWorkspaceMemberRequest
-	21, // 26: nokku.v1.WorkspaceService.UpdateWorkspaceOwner:input_type -> nokku.v1.UpdateWorkspaceOwnerRequest
-	23, // 27: nokku.v1.WorkspaceService.SubscribeWorkspaceEvents:input_type -> nokku.v1.SubscribeWorkspaceEventsRequest
-	4,  // 28: nokku.v1.WorkspaceService.GetWorkspace:output_type -> nokku.v1.GetWorkspaceResponse
-	12, // 29: nokku.v1.WorkspaceService.ListWorkspaces:output_type -> nokku.v1.ListWorkspacesResponse
-	6,  // 30: nokku.v1.WorkspaceService.CreateWorkspace:output_type -> nokku.v1.CreateWorkspaceResponse
-	8,  // 31: nokku.v1.WorkspaceService.UpdateWorkspace:output_type -> nokku.v1.UpdateWorkspaceResponse
-	10, // 32: nokku.v1.WorkspaceService.DeleteWorkspace:output_type -> nokku.v1.DeleteWorkspaceResponse
-	14, // 33: nokku.v1.WorkspaceService.GetWorkspaceMember:output_type -> nokku.v1.GetWorkspaceMemberResponse
-	16, // 34: nokku.v1.WorkspaceService.ListWorkspaceMembers:output_type -> nokku.v1.ListWorkspaceMembersResponse
-	18, // 35: nokku.v1.WorkspaceService.RemoveWorkspaceMember:output_type -> nokku.v1.RemoveWorkspaceMemberResponse
-	20, // 36: nokku.v1.WorkspaceService.UpdateWorkspaceMember:output_type -> nokku.v1.UpdateWorkspaceMemberResponse
-	22, // 37: nokku.v1.WorkspaceService.UpdateWorkspaceOwner:output_type -> nokku.v1.UpdateWorkspaceOwnerResponse
-	24, // 38: nokku.v1.WorkspaceService.SubscribeWorkspaceEvents:output_type -> nokku.v1.SubscribeWorkspaceEventsResponse
-	28, // [28:39] is the sub-list for method output_type
-	17, // [17:28] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	26, // 7: nokku.v1.WorkspaceSettings.default_daemon_config:type_name -> nokku.v1.DaemonConfig
+	0,  // 8: nokku.v1.GetWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
+	0,  // 9: nokku.v1.CreateWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
+	2,  // 10: nokku.v1.UpdateWorkspaceRequest.settings:type_name -> nokku.v1.WorkspaceSettings
+	0,  // 11: nokku.v1.UpdateWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
+	0,  // 12: nokku.v1.ListWorkspacesResponse.workspaces:type_name -> nokku.v1.Workspace
+	1,  // 13: nokku.v1.GetWorkspaceMemberResponse.member:type_name -> nokku.v1.WorkspaceMember
+	1,  // 14: nokku.v1.ListWorkspaceMembersResponse.members:type_name -> nokku.v1.WorkspaceMember
+	25, // 15: nokku.v1.SubscribeWorkspaceEventsResponse.created_at:type_name -> google.protobuf.Timestamp
+	3,  // 16: nokku.v1.WorkspaceService.GetWorkspace:input_type -> nokku.v1.GetWorkspaceRequest
+	11, // 17: nokku.v1.WorkspaceService.ListWorkspaces:input_type -> nokku.v1.ListWorkspacesRequest
+	5,  // 18: nokku.v1.WorkspaceService.CreateWorkspace:input_type -> nokku.v1.CreateWorkspaceRequest
+	7,  // 19: nokku.v1.WorkspaceService.UpdateWorkspace:input_type -> nokku.v1.UpdateWorkspaceRequest
+	9,  // 20: nokku.v1.WorkspaceService.DeleteWorkspace:input_type -> nokku.v1.DeleteWorkspaceRequest
+	13, // 21: nokku.v1.WorkspaceService.GetWorkspaceMember:input_type -> nokku.v1.GetWorkspaceMemberRequest
+	15, // 22: nokku.v1.WorkspaceService.ListWorkspaceMembers:input_type -> nokku.v1.ListWorkspaceMembersRequest
+	17, // 23: nokku.v1.WorkspaceService.RemoveWorkspaceMember:input_type -> nokku.v1.RemoveWorkspaceMemberRequest
+	19, // 24: nokku.v1.WorkspaceService.UpdateWorkspaceMember:input_type -> nokku.v1.UpdateWorkspaceMemberRequest
+	21, // 25: nokku.v1.WorkspaceService.UpdateWorkspaceOwner:input_type -> nokku.v1.UpdateWorkspaceOwnerRequest
+	23, // 26: nokku.v1.WorkspaceService.SubscribeWorkspaceEvents:input_type -> nokku.v1.SubscribeWorkspaceEventsRequest
+	4,  // 27: nokku.v1.WorkspaceService.GetWorkspace:output_type -> nokku.v1.GetWorkspaceResponse
+	12, // 28: nokku.v1.WorkspaceService.ListWorkspaces:output_type -> nokku.v1.ListWorkspacesResponse
+	6,  // 29: nokku.v1.WorkspaceService.CreateWorkspace:output_type -> nokku.v1.CreateWorkspaceResponse
+	8,  // 30: nokku.v1.WorkspaceService.UpdateWorkspace:output_type -> nokku.v1.UpdateWorkspaceResponse
+	10, // 31: nokku.v1.WorkspaceService.DeleteWorkspace:output_type -> nokku.v1.DeleteWorkspaceResponse
+	14, // 32: nokku.v1.WorkspaceService.GetWorkspaceMember:output_type -> nokku.v1.GetWorkspaceMemberResponse
+	16, // 33: nokku.v1.WorkspaceService.ListWorkspaceMembers:output_type -> nokku.v1.ListWorkspaceMembersResponse
+	18, // 34: nokku.v1.WorkspaceService.RemoveWorkspaceMember:output_type -> nokku.v1.RemoveWorkspaceMemberResponse
+	20, // 35: nokku.v1.WorkspaceService.UpdateWorkspaceMember:output_type -> nokku.v1.UpdateWorkspaceMemberResponse
+	22, // 36: nokku.v1.WorkspaceService.UpdateWorkspaceOwner:output_type -> nokku.v1.UpdateWorkspaceOwnerResponse
+	24, // 37: nokku.v1.WorkspaceService.SubscribeWorkspaceEvents:output_type -> nokku.v1.SubscribeWorkspaceEventsResponse
+	27, // [27:38] is the sub-list for method output_type
+	16, // [16:27] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_workspace_proto_init() }
