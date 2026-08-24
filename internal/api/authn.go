@@ -59,7 +59,15 @@ func NewHTTPAuth(cfg *config.Config) func(http.Handler) http.Handler {
 // requestWorkspace returns the conventional workspace_id protobuf field from
 // request, or "" when absent. It is the tenant resolution hook for user
 // principals: their workspace comes from the request, not the credential.
+//
+// Streaming RPCs (client/server streams) have no single request message at
+// authentication time, so kagi passes a nil message; a nil request contributes
+// no workspace, and the streaming handler authorizes against its own request.
 func requestWorkspace(request proto.Message) (kagi.TenantID, error) {
+	if request == nil {
+		return "", nil
+	}
+
 	fields := request.ProtoReflect().Descriptor().Fields()
 	field := fields.ByName("workspace_id")
 	if field == nil || field.Kind() != protoreflect.StringKind {

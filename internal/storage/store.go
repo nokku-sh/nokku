@@ -34,7 +34,7 @@ func AvatarPath(userID string) string {
 }
 
 // RecordingPath returns the object key for a session recording: a single
-// gzipped asciicast v2 file per session, assembled by the backend from the
+// gzipped asciicast v3 file per session, assembled by the backend from the
 // daemon's upload stream.
 func RecordingPath(workspaceID, recordingID string) string {
 	return path.Join(PathVideos, workspaceID, recordingID+".cast.gz")

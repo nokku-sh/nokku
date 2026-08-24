@@ -157,16 +157,15 @@ type PrincipalUser struct {
 }
 
 type Recording struct {
-	ID             string     `json:"id"`
-	WorkspaceID    string     `json:"workspaceId"`
-	DaemonID       string     `json:"daemonId"`
-	Username       string     `json:"username"`
-	StartedAt      time.Time  `json:"startedAt"`
-	EndedAt        *time.Time `json:"endedAt"`
-	SizeBytes      int64      `json:"sizeBytes"`
-	KeyFingerprint string     `json:"keyFingerprint"`
-	Complete       bool       `json:"complete"`
-	CreatedAt      time.Time  `json:"createdAt"`
+	ID          string     `json:"id"`
+	WorkspaceID string     `json:"workspaceId"`
+	DaemonID    string     `json:"daemonId"`
+	Username    string     `json:"username"`
+	StartedAt   time.Time  `json:"startedAt"`
+	EndedAt     *time.Time `json:"endedAt"`
+	SizeBytes   int64      `json:"sizeBytes"`
+	Complete    bool       `json:"complete"`
+	CreatedAt   time.Time  `json:"createdAt"`
 }
 
 type Role struct {

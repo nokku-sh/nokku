@@ -292,10 +292,7 @@ CREATE TABLE IF NOT EXISTS recordings (
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   ended_at TIMESTAMPTZ,
   size_bytes BIGINT NOT NULL DEFAULT 0,
-  key_fingerprint TEXT NOT NULL DEFAULT '',
-  -- False when the upload stream ended without a final message (e.g. the
-  -- daemon died mid-session): the recording is truncated.
-  complete BOOLEAN NOT NULL DEFAULT FALSE,
+  complete BOOLEAN NOT NULL DEFAULT FALSE, -- False when upload stream ended abruptly
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -734,6 +731,7 @@ CREATE TABLE IF NOT EXISTS audit.audit_logs (
   ip_address TEXT,
   user_agent TEXT,
   status_code TEXT,
+  details JSONB NOT NULL DEFAULT '{}',
   PRIMARY KEY (timestamp, id)
 )
 PARTITION BY
@@ -742,6 +740,16 @@ PARTITION BY
 CREATE INDEX IF NOT EXISTS idx_audit_logs_workspace_time ON audit.audit_logs (workspace_id, timestamp DESC);
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit.audit_logs (actor_id, timestamp DESC);
+
+CREATE POLICY audit_logs_select ON audit.audit_logs FOR
+SELECT
+  TO nokku_app USING (
+    workspace_id = current_workspace_id ()
+    OR (
+      workspace_id IS NULL
+      AND actor_id = current_actor_id ()
+    )
+  );
 
 -- Access for the application roles
 GRANT USAGE ON SCHEMA audit TO nokku_app,
