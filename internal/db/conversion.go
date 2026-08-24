@@ -83,15 +83,14 @@ func (r *Recording) ToProto() *nokkuv1.Recording {
 		return nil
 	}
 	return &nokkuv1.Recording{
-		Id:             &r.ID,
-		WorkspaceId:    &r.WorkspaceID,
-		DaemonId:       &r.DaemonID,
-		Username:       &r.Username,
-		StartedAt:      SafeTimestamp(&r.StartedAt),
-		EndedAt:        SafeTimestamp(r.EndedAt),
-		SizeBytes:      &r.SizeBytes,
-		KeyFingerprint: &r.KeyFingerprint,
-		Complete:       &r.Complete,
+		Id:          &r.ID,
+		WorkspaceId: &r.WorkspaceID,
+		DaemonId:    &r.DaemonID,
+		Username:    &r.Username,
+		StartedAt:   SafeTimestamp(&r.StartedAt),
+		EndedAt:     SafeTimestamp(r.EndedAt),
+		SizeBytes:   &r.SizeBytes,
+		Complete:    &r.Complete,
 	}
 }
 

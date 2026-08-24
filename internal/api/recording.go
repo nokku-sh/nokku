@@ -2,12 +2,15 @@ package api
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"io"
 	"log/slog"
+	"math"
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
+	"github.com/mizuchilabs/kagi"
 
 	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
@@ -22,10 +25,9 @@ import (
 // one upload.
 const quotaCheckInterval = 1 << 20 // 1 MiB
 
-var (
-	errNoRecordingKey    = errors.New("no recording key configured")
-	errStaleRecordingKey = errors.New("stale recording key")
-)
+// maxRecordingFrame bounds a single stored frame so a corrupted object cannot
+// force an unbounded allocation on playback.
+const maxRecordingFrame = 256 << 20
 
 type RecordingService struct {
 	cfg *config.Config
@@ -35,11 +37,33 @@ func NewRecordingService(cfg *config.Config) *RecordingService {
 	return &RecordingService{cfg: cfg}
 }
 
+// frameEncrypted encrypts one plaintext chunk with the server's cipher and
+// prefixes it with a 4-byte length so a stream of frames can be walked and
+// decrypted independently on playback.
+func (s *RecordingService) frameEncrypted(plaintext []byte) ([]byte, error) {
+	cipher, err := crypto.Encryptor()
+	if err != nil {
+		return nil, err
+	}
+	ct, err := cipher.Encrypt(plaintext)
+	if err != nil {
+		return nil, err
+	}
+	if len(ct) > math.MaxUint32 {
+		return nil, errors.New("recording chunk too large")
+	}
+	framed := make([]byte, 0, 4+len(ct))
+	// #nosec G115 -- len(ct) is bounded by the MaxUint32 check above.
+	framed = binary.BigEndian.AppendUint32(framed, uint32(len(ct)))
+	return append(framed, ct...), nil
+}
+
 // UploadRecording receives a session recording streamed by a daemon. Chunks
-// are opaque sealed ciphertext, the backend never inspects them. The stream
-// is drained even when the storage cap is exceeded so the daemon is never
-// blocked, the oldest recordings are evicted to make room, and a recording
-// larger than the whole cap is still accepted.
+// are plaintext gzip slices; the backend encrypts each at rest with its own
+// key so the object store never holds plaintext. The stream is drained even
+// when the storage cap is exceeded so the daemon is never blocked, the
+// oldest recordings are evicted to make room, and a recording larger than the
+// whole cap is still accepted.
 func (s *RecordingService) UploadRecording(
 	ctx context.Context,
 	stream *connect.ClientStream[nokkuv1.UploadRecordingRequest],
@@ -97,8 +121,14 @@ func (s *RecordingService) UploadRecording(
 					)
 				}
 			}
-			n, writeErr := w.Write(data)
-			size += int64(n)
+			framed, encErr := s.frameEncrypted(data)
+			if encErr != nil {
+				_ = w.Close()
+				slog.Error("encrypt recording chunk", "recording_id", rec.ID, "error", encErr)
+				return nil, ErrInternal
+			}
+			_, writeErr := w.Write(framed)
+			size += int64(len(data))
 			if writeErr != nil {
 				_ = w.Close()
 				slog.Error("write recording object", "recording_id", rec.ID, "error", writeErr)
@@ -196,11 +226,9 @@ func (s *RecordingService) evictForBytes(
 }
 
 // resolveUpload validates the metadata against the daemon's workspace and
-// returns the recording row to append chunks to. Uploads are only accepted
-// when the workspace has a recording key, encryption is mandatory so a
-// keyless workspace cannot receive recordings and daemons keep them local.
-// A recording may resume only when its fingerprint matches the workspace's
-// current key, after a key regeneration the daemon re-syncs and restarts.
+// returns the recording row to append chunks to. Uploads are always accepted:
+// the backend encrypts the stream at rest, so a daemon needs no workspace key.
+// A recording may resume when the daemon uploads its id again.
 func (s *RecordingService) resolveUpload(
 	ctx context.Context,
 	daemonID string,
@@ -215,18 +243,6 @@ func (s *RecordingService) resolveUpload(
 		}
 		workspaceID = daemon.WorkspaceID
 
-		workspace, err := q.GetWorkspace(ctx, daemon.WorkspaceID)
-		if err != nil {
-			return err
-		}
-		expectedFP := workspace.Settings.GetRecordingKeyFingerprint()
-		if expectedFP == "" {
-			return errNoRecordingKey
-		}
-		if rm.GetKeyFingerprint() != expectedFP {
-			return errStaleRecordingKey
-		}
-
 		existing, err := q.GetRecording(ctx, rm.GetRecordingId())
 		if err == nil {
 			if existing.DaemonID != daemonID {
@@ -239,26 +255,13 @@ func (s *RecordingService) resolveUpload(
 			return err
 		}
 		rec, err = q.CreateRecording(ctx, &db.CreateRecordingParams{
-			ID:             rm.GetRecordingId(),
-			WorkspaceID:    workspaceID,
-			DaemonID:       daemonID,
-			Username:       rm.GetUsername(),
-			KeyFingerprint: rm.GetKeyFingerprint(),
+			ID:          rm.GetRecordingId(),
+			WorkspaceID: workspaceID,
+			DaemonID:    daemonID,
+			Username:    rm.GetUsername(),
 		})
 		return err
 	}); err != nil {
-		if errors.Is(err, errNoRecordingKey) {
-			return nil, "", NewError(
-				connect.CodeFailedPrecondition,
-				"recording encryption is required: set a workspace recording key",
-			)
-		}
-		if errors.Is(err, errStaleRecordingKey) {
-			return nil, "", NewError(
-				connect.CodeFailedPrecondition,
-				"recording sealed with an outdated key, re-sync and retry",
-			)
-		}
 		return nil, "", DBError(err)
 	}
 	return rec, workspaceID, nil
@@ -296,16 +299,15 @@ func (s *RecordingService) ListRecordings(
 			total = r.TotalCount
 		}
 		recordings = append(recordings, (&db.Recording{
-			ID:             r.ID,
-			WorkspaceID:    r.WorkspaceID,
-			DaemonID:       r.DaemonID,
-			Username:       r.Username,
-			StartedAt:      r.StartedAt,
-			EndedAt:        r.EndedAt,
-			SizeBytes:      r.SizeBytes,
-			KeyFingerprint: r.KeyFingerprint,
-			Complete:       r.Complete,
-			CreatedAt:      r.CreatedAt,
+			ID:          r.ID,
+			WorkspaceID: r.WorkspaceID,
+			DaemonID:    r.DaemonID,
+			Username:    r.Username,
+			StartedAt:   r.StartedAt,
+			EndedAt:     r.EndedAt,
+			SizeBytes:   r.SizeBytes,
+			Complete:    r.Complete,
+			CreatedAt:   r.CreatedAt,
 		}).ToProto())
 	}
 	return &nokkuv1.ListRecordingsResponse{
@@ -320,6 +322,12 @@ func (s *RecordingService) GetRecording(
 	req *nokkuv1.GetRecordingRequest,
 	stream *connect.ServerStream[nokkuv1.GetRecordingResponse],
 ) error {
+	// Streaming RPCs get no tenant from the auth interceptor (kagi passes a
+	// nil message at auth time), so a global user principal's workspace must
+	// be pinned here from the request. WithWorkspace then checks membership
+	// and scopes row-level security.
+	ctx = kagi.WithTenant(ctx, kagi.TenantID(req.GetWorkspaceId()))
+
 	var rec *db.Recording
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		rec, err = q.GetRecording(ctx, req.GetRecordingId())
@@ -334,9 +342,8 @@ func (s *RecordingService) GetRecording(
 	if err := stream.Send(&nokkuv1.GetRecordingResponse{
 		Msg: &nokkuv1.GetRecordingResponse_Meta{
 			Meta: &nokkuv1.RecordingMeta{
-				RecordingId:    &rec.ID,
-				Username:       &rec.Username,
-				KeyFingerprint: &rec.KeyFingerprint,
+				RecordingId: &rec.ID,
+				Username:    &rec.Username,
 			},
 		},
 	}); err != nil {
@@ -350,24 +357,43 @@ func (s *RecordingService) GetRecording(
 	}
 	defer func() { _ = rc.Close() }()
 
-	// Stream the object in slices so playback starts before the download
-	// finishes and multi-hundred-MB sessions stay off the heap.
-	buf := make([]byte, 256<<10)
+	cipher, err := crypto.Encryptor()
+	if err != nil {
+		slog.Error("recording decryptor unavailable", "recording_id", rec.ID, "error", err)
+		return ErrInternal
+	}
+
+	// The object is a stream of [len(4 BE) || ciphertext] frames, each
+	// decrypting to one plaintext gzip slice. Reading frame-by-frame keeps
+	// playback streaming and multi-hundred-MB sessions off the heap.
+	var lenBuf [4]byte
 	for {
-		n, readErr := rc.Read(buf)
-		if n > 0 {
-			if err = stream.Send(&nokkuv1.GetRecordingResponse{
-				Msg: &nokkuv1.GetRecordingResponse_Chunk{Chunk: buf[:n]},
-			}); err != nil {
-				return err
+		if _, err = io.ReadFull(rc, lenBuf[:]); err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				return nil
 			}
-		}
-		if readErr == io.EOF {
-			return nil
-		}
-		if readErr != nil {
-			slog.Error("read recording object", "recording_id", rec.ID, "error", readErr)
+			slog.Error("read recording frame", "recording_id", rec.ID, "error", err)
 			return ErrInternal
+		}
+		length := binary.BigEndian.Uint32(lenBuf[:])
+		if length > maxRecordingFrame {
+			slog.Error("recording frame too large", "recording_id", rec.ID, "size", length)
+			return ErrInternal
+		}
+		ct := make([]byte, length)
+		if _, err = io.ReadFull(rc, ct); err != nil {
+			slog.Error("read recording frame body", "recording_id", rec.ID, "error", err)
+			return ErrInternal
+		}
+		plain, decryptErr := cipher.Decrypt(ct)
+		if decryptErr != nil {
+			slog.Error("decrypt recording chunk", "recording_id", rec.ID, "error", decryptErr)
+			return ErrInternal
+		}
+		if err = stream.Send(&nokkuv1.GetRecordingResponse{
+			Msg: &nokkuv1.GetRecordingResponse_Chunk{Chunk: plain},
+		}); err != nil {
+			return err
 		}
 	}
 }
@@ -389,74 +415,4 @@ func (s *RecordingService) DeleteRecording(
 		slog.Warn("delete recording object", "recording_id", req.GetRecordingId(), "error", err)
 	}
 	return &nokkuv1.DeleteRecordingResponse{}, nil
-}
-
-func (s *RecordingService) SetRecordingKey(
-	ctx context.Context,
-	req *nokkuv1.SetRecordingKeyRequest,
-) (*nokkuv1.SetRecordingKeyResponse, error) {
-	pub, err := crypto.ParseX25519PublicKey(req.GetPublicKey())
-	if err != nil {
-		return nil, NewError(connect.CodeInvalidArgument, err.Error())
-	}
-	fingerprint := crypto.PublicKeyFingerprint(pub)
-
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		base, err := q.GetWorkspace(ctx, req.GetWorkspaceId())
-		if err != nil {
-			return err
-		}
-		base.Settings.RecordingPublicKey = req.PublicKey
-		base.Settings.RecordingKeyFingerprint = &fingerprint
-		_, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
-			WorkspaceID: base.ID,
-			Settings:    base.Settings,
-		})
-		return err
-	}); err != nil {
-		return nil, DBError(err)
-	}
-
-	if err := s.wipeRecordings(ctx, req.GetWorkspaceId()); err != nil {
-		return nil, err
-	}
-	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
-
-	return &nokkuv1.SetRecordingKeyResponse{}, nil
-}
-
-func (s *RecordingService) ClearRecordingKey(
-	ctx context.Context,
-	req *nokkuv1.ClearRecordingKeyRequest,
-) (*nokkuv1.ClearRecordingKeyResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		base, err := q.GetWorkspace(ctx, req.GetWorkspaceId())
-		if err != nil {
-			return err
-		}
-		base.Settings.RecordingPublicKey = nil
-		_, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
-			WorkspaceID: base.ID,
-			Settings:    base.Settings,
-		})
-		return err
-	}); err != nil {
-		return nil, DBError(err)
-	}
-
-	if err := s.wipeRecordings(ctx, req.GetWorkspaceId()); err != nil {
-		return nil, err
-	}
-	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
-
-	return &nokkuv1.ClearRecordingKeyResponse{}, nil
-}
-
-func (s *RecordingService) wipeRecordings(ctx context.Context, workspaceID string) error {
-	if err := s.cfg.Storage.DeletePrefix(ctx, storage.RecordingsPrefix(workspaceID)); err != nil {
-		slog.Warn("wipe recording objects", "workspace_id", workspaceID, "error", err)
-	}
-	return s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		return q.DeleteWorkspaceRecordings(ctx, workspaceID)
-	})
 }

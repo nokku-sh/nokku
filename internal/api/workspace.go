@@ -9,7 +9,6 @@ import (
 	"github.com/mizuchilabs/kagi"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/auth"
@@ -21,10 +20,7 @@ import (
 
 func DefaultWorkspaceSettings() *nokkuv1.WorkspaceSettings {
 	return &nokkuv1.WorkspaceSettings{
-		EnrollAutoApprove:       new(true),
-		RecordingPublicKey:      new(string),
-		RecordingKeyFingerprint: new(string),
-		RecordingKeyCreatedAt:   &timestamppb.Timestamp{},
+		EnrollAutoApprove: new(true),
 		DefaultDaemonConfig: &nokkuv1.DaemonConfig{
 			RecordSessions:       new(true),
 			AllowForwarding:      new(true),

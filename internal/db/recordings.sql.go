@@ -12,19 +12,18 @@ import (
 
 const createRecording = `-- name: CreateRecording :one
 INSERT INTO
-  recordings (id, workspace_id, daemon_id, username, key_fingerprint)
+  recordings (id, workspace_id, daemon_id, username)
 VALUES
-  ($1, $2, $3, $4, $5)
+  ($1, $2, $3, $4)
 RETURNING
-  id, workspace_id, daemon_id, username, started_at, ended_at, size_bytes, key_fingerprint, complete, created_at
+  id, workspace_id, daemon_id, username, started_at, ended_at, size_bytes, complete, created_at
 `
 
 type CreateRecordingParams struct {
-	ID             string `json:"id"`
-	WorkspaceID    string `json:"workspaceId"`
-	DaemonID       string `json:"daemonId"`
-	Username       string `json:"username"`
-	KeyFingerprint string `json:"keyFingerprint"`
+	ID          string `json:"id"`
+	WorkspaceID string `json:"workspaceId"`
+	DaemonID    string `json:"daemonId"`
+	Username    string `json:"username"`
 }
 
 func (q *Queries) CreateRecording(ctx context.Context, arg *CreateRecordingParams) (*Recording, error) {
@@ -33,7 +32,6 @@ func (q *Queries) CreateRecording(ctx context.Context, arg *CreateRecordingParam
 		arg.WorkspaceID,
 		arg.DaemonID,
 		arg.Username,
-		arg.KeyFingerprint,
 	)
 	var i Recording
 	err := row.Scan(
@@ -44,7 +42,6 @@ func (q *Queries) CreateRecording(ctx context.Context, arg *CreateRecordingParam
 		&i.StartedAt,
 		&i.EndedAt,
 		&i.SizeBytes,
-		&i.KeyFingerprint,
 		&i.Complete,
 		&i.CreatedAt,
 	)
@@ -75,7 +72,7 @@ func (q *Queries) DeleteWorkspaceRecordings(ctx context.Context, workspaceID str
 
 const getRecording = `-- name: GetRecording :one
 SELECT
-  id, workspace_id, daemon_id, username, started_at, ended_at, size_bytes, key_fingerprint, complete, created_at
+  id, workspace_id, daemon_id, username, started_at, ended_at, size_bytes, complete, created_at
 FROM
   recordings
 WHERE
@@ -93,7 +90,6 @@ func (q *Queries) GetRecording(ctx context.Context, id string) (*Recording, erro
 		&i.StartedAt,
 		&i.EndedAt,
 		&i.SizeBytes,
-		&i.KeyFingerprint,
 		&i.Complete,
 		&i.CreatedAt,
 	)
@@ -102,7 +98,7 @@ func (q *Queries) GetRecording(ctx context.Context, id string) (*Recording, erro
 
 const listRecordings = `-- name: ListRecordings :many
 SELECT
-  r.id, r.workspace_id, r.daemon_id, r.username, r.started_at, r.ended_at, r.size_bytes, r.key_fingerprint, r.complete, r.created_at,
+  r.id, r.workspace_id, r.daemon_id, r.username, r.started_at, r.ended_at, r.size_bytes, r.complete, r.created_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   recordings r
@@ -133,17 +129,16 @@ type ListRecordingsParams struct {
 }
 
 type ListRecordingsRow struct {
-	ID             string     `json:"id"`
-	WorkspaceID    string     `json:"workspaceId"`
-	DaemonID       string     `json:"daemonId"`
-	Username       string     `json:"username"`
-	StartedAt      time.Time  `json:"startedAt"`
-	EndedAt        *time.Time `json:"endedAt"`
-	SizeBytes      int64      `json:"sizeBytes"`
-	KeyFingerprint string     `json:"keyFingerprint"`
-	Complete       bool       `json:"complete"`
-	CreatedAt      time.Time  `json:"createdAt"`
-	TotalCount     int32      `json:"totalCount"`
+	ID          string     `json:"id"`
+	WorkspaceID string     `json:"workspaceId"`
+	DaemonID    string     `json:"daemonId"`
+	Username    string     `json:"username"`
+	StartedAt   time.Time  `json:"startedAt"`
+	EndedAt     *time.Time `json:"endedAt"`
+	SizeBytes   int64      `json:"sizeBytes"`
+	Complete    bool       `json:"complete"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	TotalCount  int32      `json:"totalCount"`
 }
 
 func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams) ([]*ListRecordingsRow, error) {
@@ -169,7 +164,6 @@ func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams)
 			&i.StartedAt,
 			&i.EndedAt,
 			&i.SizeBytes,
-			&i.KeyFingerprint,
 			&i.Complete,
 			&i.CreatedAt,
 			&i.TotalCount,
@@ -186,7 +180,7 @@ func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams)
 
 const oldestRecordings = `-- name: OldestRecordings :many
 SELECT
-  id, workspace_id, daemon_id, username, started_at, ended_at, size_bytes, key_fingerprint, complete, created_at
+  id, workspace_id, daemon_id, username, started_at, ended_at, size_bytes, complete, created_at
 FROM
   recordings
 WHERE
@@ -219,7 +213,6 @@ func (q *Queries) OldestRecordings(ctx context.Context, arg *OldestRecordingsPar
 			&i.StartedAt,
 			&i.EndedAt,
 			&i.SizeBytes,
-			&i.KeyFingerprint,
 			&i.Complete,
 			&i.CreatedAt,
 		); err != nil {
@@ -242,7 +235,7 @@ SET
 WHERE
   id = $3
 RETURNING
-  id, workspace_id, daemon_id, username, started_at, ended_at, size_bytes, key_fingerprint, complete, created_at
+  id, workspace_id, daemon_id, username, started_at, ended_at, size_bytes, complete, created_at
 `
 
 type SetRecordingCompleteParams struct {
@@ -262,7 +255,6 @@ func (q *Queries) SetRecordingComplete(ctx context.Context, arg *SetRecordingCom
 		&i.StartedAt,
 		&i.EndedAt,
 		&i.SizeBytes,
-		&i.KeyFingerprint,
 		&i.Complete,
 		&i.CreatedAt,
 	)
