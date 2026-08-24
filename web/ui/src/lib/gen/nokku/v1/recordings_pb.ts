@@ -14,7 +14,7 @@ import type { Message } from '@bufbuild/protobuf';
  * Describes the file nokku/v1/recordings.proto.
  */
 export const file_nokku_v1_recordings: GenFile /*@__PURE__*/ = fileDesc(
-	'Chlub2trdS92MS9yZWNvcmRpbmdzLnByb3RvEghub2trdS52MSLvAQoJUmVjb3JkaW5nEgoKAmlkGAEgASgJEhQKDHdvcmtzcGFjZV9pZBgCIAEoCRIRCglkYWVtb25faWQYAyABKAkSEAoIdXNlcm5hbWUYBCABKAkSEgoKc2l6ZV9ieXRlcxgFIAEoAxIXCg9rZXlfZmluZ2VycHJpbnQYBiABKAkSEAoIY29tcGxldGUYByABKAgSLgoKc3RhcnRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLAoIZW5kZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIoQBChZVcGxvYWRSZWNvcmRpbmdSZXF1ZXN0EicKBG1ldGEYASABKAsyFy5ub2trdS52MS5SZWNvcmRpbmdNZXRhSAASDwoFY2h1bmsYAiABKAxIABIpCgVmaW5hbBgDIAEoCzIYLm5va2t1LnYxLlJlY29yZGluZ0ZpbmFsSABCBQoDbXNnImMKDVJlY29yZGluZ01ldGESHgoMcmVjb3JkaW5nX2lkGAEgASgJQgi6SAVyA7ABARIZCgh1c2VybmFtZRgCIAEoCUIHukgEcgIYIBIXCg9rZXlfZmluZ2VycHJpbnQYAyABKAkiEAoOUmVjb3JkaW5nRmluYWwiQwoXVXBsb2FkUmVjb3JkaW5nUmVzcG9uc2USFAoMcmVjb3JkaW5nX2lkGAEgASgJEhIKCnNpemVfYnl0ZXMYAiABKAMimQEKFUxpc3RSZWNvcmRpbmdzUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhsKCWRhZW1vbl9pZBgCIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAyABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYBCABKAVCB7pIBBoCKAASEAoIdXNlcm5hbWUYBSABKAkiZQoWTGlzdFJlY29yZGluZ3NSZXNwb25zZRInCgpyZWNvcmRpbmdzGAEgAygLMhMubm9ra3UudjEuUmVjb3JkaW5nEg0KBXRvdGFsGAIgASgFEhMKC3RvdGFsX2J5dGVzGAMgASgDIlUKE0dldFJlY29yZGluZ1JlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIeCgxyZWNvcmRpbmdfaWQYAiABKAlCCLpIBXIDsAEBIlcKFEdldFJlY29yZGluZ1Jlc3BvbnNlEicKBG1ldGEYASABKAsyFy5ub2trdS52MS5SZWNvcmRpbmdNZXRhSAASDwoFY2h1bmsYAiABKAxIAEIFCgNtc2ciWAoWRGVsZXRlUmVjb3JkaW5nUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEh4KDHJlY29yZGluZ19pZBgCIAEoCUIIukgFcgOwAQEiGQoXRGVsZXRlUmVjb3JkaW5nUmVzcG9uc2UiWAoWU2V0UmVjb3JkaW5nS2V5UmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEh4KCnB1YmxpY19rZXkYAiABKAlCCrpIB3IFECAYgAEiGQoXU2V0UmVjb3JkaW5nS2V5UmVzcG9uc2UiOgoYQ2xlYXJSZWNvcmRpbmdLZXlSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQEiGwoZQ2xlYXJSZWNvcmRpbmdLZXlSZXNwb25zZTLrBgoQUmVjb3JkaW5nU2VydmljZRJYCg9VcGxvYWRSZWNvcmRpbmcSIC5ub2trdS52MS5VcGxvYWRSZWNvcmRpbmdSZXF1ZXN0GiEubm9ra3UudjEuVXBsb2FkUmVjb3JkaW5nUmVzcG9uc2UoARKIAQoOTGlzdFJlY29yZGluZ3MSHy5ub2trdS52MS5MaXN0UmVjb3JkaW5nc1JlcXVlc3QaIC5ub2trdS52MS5MaXN0UmVjb3JkaW5nc1Jlc3BvbnNlIjOQAgGC0+STAioSKC92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3JlY29yZGluZ3MSkwEKDEdldFJlY29yZGluZxIdLm5va2t1LnYxLkdldFJlY29yZGluZ1JlcXVlc3QaHi5ub2trdS52MS5HZXRSZWNvcmRpbmdSZXNwb25zZSJCkAIBgtPkkwI5EjcvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9yZWNvcmRpbmdzL3tyZWNvcmRpbmdfaWR9MAESlwEKD0RlbGV0ZVJlY29yZGluZxIgLm5va2t1LnYxLkRlbGV0ZVJlY29yZGluZ1JlcXVlc3QaIS5ub2trdS52MS5EZWxldGVSZWNvcmRpbmdSZXNwb25zZSI/gtPkkwI5KjcvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9yZWNvcmRpbmdzL3tyZWNvcmRpbmdfaWR9EpsBCg9TZXRSZWNvcmRpbmdLZXkSIC5ub2trdS52MS5TZXRSZWNvcmRpbmdLZXlSZXF1ZXN0GiEubm9ra3UudjEuU2V0UmVjb3JkaW5nS2V5UmVzcG9uc2UiQ4LT5JMCPToBKiI4L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vc2V0dGluZ3M6c2V0LXJlY29yZGluZy1rZXkSowEKEUNsZWFyUmVjb3JkaW5nS2V5EiIubm9ra3UudjEuQ2xlYXJSZWNvcmRpbmdLZXlSZXF1ZXN0GiMubm9ra3UudjEuQ2xlYXJSZWNvcmRpbmdLZXlSZXNwb25zZSJFgtPkkwI/OgEqIjovdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9zZXR0aW5nczpjbGVhci1yZWNvcmRpbmcta2V5QpkBCgxjb20ubm9ra3UudjFCD1JlY29yZGluZ3NQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
+	'Chlub2trdS92MS9yZWNvcmRpbmdzLnByb3RvEghub2trdS52MSLWAQoJUmVjb3JkaW5nEgoKAmlkGAEgASgJEhQKDHdvcmtzcGFjZV9pZBgCIAEoCRIRCglkYWVtb25faWQYAyABKAkSEAoIdXNlcm5hbWUYBCABKAkSEgoKc2l6ZV9ieXRlcxgFIAEoAxIQCghjb21wbGV0ZRgGIAEoCBIuCgpzdGFydGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAihAEKFlVwbG9hZFJlY29yZGluZ1JlcXVlc3QSJwoEbWV0YRgBIAEoCzIXLm5va2t1LnYxLlJlY29yZGluZ01ldGFIABIPCgVjaHVuaxgCIAEoDEgAEikKBWZpbmFsGAMgASgLMhgubm9ra3UudjEuUmVjb3JkaW5nRmluYWxIAEIFCgNtc2ciSgoNUmVjb3JkaW5nTWV0YRIeCgxyZWNvcmRpbmdfaWQYASABKAlCCLpIBXIDsAEBEhkKCHVzZXJuYW1lGAIgASgJQge6SARyAhggIhAKDlJlY29yZGluZ0ZpbmFsIkMKF1VwbG9hZFJlY29yZGluZ1Jlc3BvbnNlEhQKDHJlY29yZGluZ19pZBgBIAEoCRISCgpzaXplX2J5dGVzGAIgASgDIpkBChVMaXN0UmVjb3JkaW5nc1JlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIbCglkYWVtb25faWQYAiABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAMgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAQgASgFQge6SAQaAigAEhAKCHVzZXJuYW1lGAUgASgJImUKFkxpc3RSZWNvcmRpbmdzUmVzcG9uc2USJwoKcmVjb3JkaW5ncxgBIAMoCzITLm5va2t1LnYxLlJlY29yZGluZxINCgV0b3RhbBgCIAEoBRITCgt0b3RhbF9ieXRlcxgDIAEoAyJVChNHZXRSZWNvcmRpbmdSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESHgoMcmVjb3JkaW5nX2lkGAIgASgJQgi6SAVyA7ABASJXChRHZXRSZWNvcmRpbmdSZXNwb25zZRInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSABCBQoDbXNnIlgKFkRlbGV0ZVJlY29yZGluZ1JlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIeCgxyZWNvcmRpbmdfaWQYAiABKAlCCLpIBXIDsAEBIhkKF0RlbGV0ZVJlY29yZGluZ1Jlc3BvbnNlMqcEChBSZWNvcmRpbmdTZXJ2aWNlElgKD1VwbG9hZFJlY29yZGluZxIgLm5va2t1LnYxLlVwbG9hZFJlY29yZGluZ1JlcXVlc3QaIS5ub2trdS52MS5VcGxvYWRSZWNvcmRpbmdSZXNwb25zZSgBEogBCg5MaXN0UmVjb3JkaW5ncxIfLm5va2t1LnYxLkxpc3RSZWNvcmRpbmdzUmVxdWVzdBogLm5va2t1LnYxLkxpc3RSZWNvcmRpbmdzUmVzcG9uc2UiM5ACAYLT5JMCKhIoL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcmVjb3JkaW5ncxKTAQoMR2V0UmVjb3JkaW5nEh0ubm9ra3UudjEuR2V0UmVjb3JkaW5nUmVxdWVzdBoeLm5va2t1LnYxLkdldFJlY29yZGluZ1Jlc3BvbnNlIkKQAgGC0+STAjkSNy92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3JlY29yZGluZ3Mve3JlY29yZGluZ19pZH0wARKXAQoPRGVsZXRlUmVjb3JkaW5nEiAubm9ra3UudjEuRGVsZXRlUmVjb3JkaW5nUmVxdWVzdBohLm5va2t1LnYxLkRlbGV0ZVJlY29yZGluZ1Jlc3BvbnNlIj+C0+STAjkqNy92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3JlY29yZGluZ3Mve3JlY29yZGluZ19pZH1CmQEKDGNvbS5ub2trdS52MUIPUmVjb3JkaW5nc1Byb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
 	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
 );
 
@@ -48,22 +48,17 @@ export type Recording = Message<'nokku.v1.Recording'> & {
 	sizeBytes: bigint;
 
 	/**
-	 * @generated from field: string key_fingerprint = 6;
-	 */
-	keyFingerprint: string;
-
-	/**
-	 * @generated from field: bool complete = 7;
+	 * @generated from field: bool complete = 6;
 	 */
 	complete: boolean;
 
 	/**
-	 * @generated from field: google.protobuf.Timestamp started_at = 8;
+	 * @generated from field: google.protobuf.Timestamp started_at = 7;
 	 */
 	startedAt?: Timestamp | undefined;
 
 	/**
-	 * @generated from field: google.protobuf.Timestamp ended_at = 9;
+	 * @generated from field: google.protobuf.Timestamp ended_at = 8;
 	 */
 	endedAt?: Timestamp | undefined;
 };
@@ -129,11 +124,6 @@ export type RecordingMeta = Message<'nokku.v1.RecordingMeta'> & {
 	 * @generated from field: string username = 2;
 	 */
 	username: string;
-
-	/**
-	 * @generated from field: string key_fingerprint = 3;
-	 */
-	keyFingerprint: string;
 };
 
 /**
@@ -336,69 +326,6 @@ export const DeleteRecordingResponseSchema: GenMessage<DeleteRecordingResponse> 
 	messageDesc(file_nokku_v1_recordings, 10);
 
 /**
- * @generated from message nokku.v1.SetRecordingKeyRequest
- */
-export type SetRecordingKeyRequest = Message<'nokku.v1.SetRecordingKeyRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
-
-	/**
-	 * @generated from field: string public_key = 2;
-	 */
-	publicKey: string;
-};
-
-/**
- * Describes the message nokku.v1.SetRecordingKeyRequest.
- * Use `create(SetRecordingKeyRequestSchema)` to create a new message.
- */
-export const SetRecordingKeyRequestSchema: GenMessage<SetRecordingKeyRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_recordings, 11);
-
-/**
- * @generated from message nokku.v1.SetRecordingKeyResponse
- */
-export type SetRecordingKeyResponse = Message<'nokku.v1.SetRecordingKeyResponse'> & {};
-
-/**
- * Describes the message nokku.v1.SetRecordingKeyResponse.
- * Use `create(SetRecordingKeyResponseSchema)` to create a new message.
- */
-export const SetRecordingKeyResponseSchema: GenMessage<SetRecordingKeyResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_recordings, 12);
-
-/**
- * @generated from message nokku.v1.ClearRecordingKeyRequest
- */
-export type ClearRecordingKeyRequest = Message<'nokku.v1.ClearRecordingKeyRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
-};
-
-/**
- * Describes the message nokku.v1.ClearRecordingKeyRequest.
- * Use `create(ClearRecordingKeyRequestSchema)` to create a new message.
- */
-export const ClearRecordingKeyRequestSchema: GenMessage<ClearRecordingKeyRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_recordings, 13);
-
-/**
- * @generated from message nokku.v1.ClearRecordingKeyResponse
- */
-export type ClearRecordingKeyResponse = Message<'nokku.v1.ClearRecordingKeyResponse'> & {};
-
-/**
- * Describes the message nokku.v1.ClearRecordingKeyResponse.
- * Use `create(ClearRecordingKeyResponseSchema)` to create a new message.
- */
-export const ClearRecordingKeyResponseSchema: GenMessage<ClearRecordingKeyResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_recordings, 14);
-
-/**
  * @generated from service nokku.v1.RecordingService
  */
 export const RecordingService: GenService<{
@@ -433,21 +360,5 @@ export const RecordingService: GenService<{
 		methodKind: 'unary';
 		input: typeof DeleteRecordingRequestSchema;
 		output: typeof DeleteRecordingResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.RecordingService.SetRecordingKey
-	 */
-	setRecordingKey: {
-		methodKind: 'unary';
-		input: typeof SetRecordingKeyRequestSchema;
-		output: typeof SetRecordingKeyResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.RecordingService.ClearRecordingKey
-	 */
-	clearRecordingKey: {
-		methodKind: 'unary';
-		input: typeof ClearRecordingKeyRequestSchema;
-		output: typeof ClearRecordingKeyResponseSchema;
 	};
 }> /*@__PURE__*/ = serviceDesc(file_nokku_v1_recordings, 0);
