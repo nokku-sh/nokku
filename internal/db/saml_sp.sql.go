@@ -54,8 +54,12 @@ INSERT INTO
   saml_sp_keys (id, private_key, certificate)
 VALUES
   (1, $1, $2)
-ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id
-RETURNING private_key, certificate
+ON CONFLICT (id) DO UPDATE
+SET
+  id = EXCLUDED.id
+RETURNING
+  private_key,
+  certificate
 `
 
 type PutSAMLSPKeyParams struct {
