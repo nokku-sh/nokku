@@ -43,10 +43,7 @@ func NewAuthHandler(cfg *config.Config) (*server.Handler, error) {
 		RPOrigins:     rpOrigins(cfg),
 	}
 
-	samlOpts, err := newSAMLOptions(cfg)
-	if err != nil {
-		return nil, err
-	}
+	samlOpts := newSAMLOptions(cfg)
 
 	return server.New(cfg.Auth.Kagi, server.Options{
 		Cache:   cfg.Cache,
@@ -122,22 +119,19 @@ func rpOrigins(cfg *config.Config) []string {
 	return origins
 }
 
-// newSAMLOptions builds the SAML handler options from the shared SP keypair.
-func newSAMLOptions(cfg *config.Config) (*kagisaml.Options, error) {
-	keyPEM, certPEM, err := auth.EnsureSAMLSPKey(context.Background(), cfg.Conn)
-	if err != nil {
-		return nil, err
-	}
+// newSAMLOptions builds the SAML handler options. The SP keypair is managed
+// by the kagi handler via a SAMLSPKeyStore, so it is generated once and
+// reused across restarts without nokku managing a certificate.
+func newSAMLOptions(cfg *config.Config) *kagisaml.Options {
 	return &kagisaml.Options{
 		Cache:         cfg.Cache,
-		Key:           keyPEM,
-		Certificate:   certPEM,
+		Keypair:       auth.NewSAMLSPKeyStore(cfg.Conn),
 		AcsURL:        cfg.FullURL() + "/saml/acs",
 		SPEntityID:    cfg.FullURL() + "/saml/metadata",
 		ErrorRedirect: cfg.FullURL() + "/auth-error",
 		ResolveIDP:    cfg.Auth.Resolvers.ResolveSAMLIdP,
 		ResolveUser:   cfg.Auth.Resolvers.ResolveSAMLUser,
-	}, nil
+	}
 }
 
 // registerPasskeyOptions is the signed-in add-key flow.

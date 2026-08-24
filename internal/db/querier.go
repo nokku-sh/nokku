@@ -158,7 +158,7 @@ type Querier interface {
 	PutCredential(ctx context.Context, arg *PutCredentialParams) error
 	// API keys (kagi APIKeyRecord) ------------------------------------------------
 	PutKey(ctx context.Context, arg *PutKeyParams) error
-	PutSAMLSPKey(ctx context.Context, arg *PutSAMLSPKeyParams) error
+	PutSAMLSPKey(ctx context.Context, arg *PutSAMLSPKeyParams) (*PutSAMLSPKeyRow, error)
 	RegenerateVerificationToken(ctx context.Context, domain string) (*WorkspaceDomain, error)
 	RemoveServiceAccountFromPrincipal(ctx context.Context, arg *RemoveServiceAccountFromPrincipalParams) error
 	RemoveTeamFromPrincipal(ctx context.Context, arg *RemoveTeamFromPrincipalParams) error

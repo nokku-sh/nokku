@@ -7,12 +7,17 @@ FROM
 WHERE
   id = 1;
 
--- name: PutSAMLSPKey :exec
+-- name: PutSAMLSPKey :one
 INSERT INTO
   saml_sp_keys (id, private_key, certificate)
 VALUES
   (1, @private_key, @certificate)
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE
+SET
+  id = EXCLUDED.id
+RETURNING
+  private_key,
+  certificate;
 
 -- name: GetEncryptedSAMLSPKey :one
 SELECT
