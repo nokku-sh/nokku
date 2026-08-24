@@ -6,7 +6,7 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { createModalState } from '$lib/hooks';
-	import { formatBytes } from '$lib/crypto/recordings';
+	import { formatBytes } from '$lib/utils';
 	import type { Recording } from '$lib/gen/nokku/v1/recordings_pb';
 	import { MonitorPlay, SearchX } from '@lucide/svelte';
 
