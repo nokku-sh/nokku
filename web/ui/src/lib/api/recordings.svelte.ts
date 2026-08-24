@@ -6,7 +6,7 @@ import { authTransport } from './client';
 import { toast } from 'svelte-sonner';
 
 export type RecordingChunkHandler = (chunk: Uint8Array) => void;
-export type RecordingMeta = { recordingId: string; username: string; keyFingerprint: string };
+export type RecordingMeta = { recordingId: string; username: string };
 
 export const recordings = {
 	// Queries
@@ -28,14 +28,6 @@ export const recordings = {
 	delete: () =>
 		useMutation(RecordingService.method.deleteRecording, {
 			onSuccess: () => toast.success('Recording deleted')
-		}),
-	setRecordingKey: () =>
-		useMutation(RecordingService.method.setRecordingKey, {
-			onSuccess: () => toast.success('Recording encryption enabled')
-		}),
-	clearRecordingKey: () =>
-		useMutation(RecordingService.method.clearRecordingKey, {
-			onSuccess: () => toast.success('Recording encryption disabled')
 		}),
 
 	// Direct stream (connect-query has no server-stream support).
@@ -64,8 +56,7 @@ export const recordings = {
 				case 'meta':
 					onMeta({
 						recordingId: msg.msg.value.recordingId,
-						username: msg.msg.value.username,
-						keyFingerprint: msg.msg.value.keyFingerprint
+						username: msg.msg.value.username
 					});
 					break;
 				case 'chunk':
