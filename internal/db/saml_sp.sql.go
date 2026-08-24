@@ -49,12 +49,13 @@ func (q *Queries) GetSAMLSPKey(ctx context.Context) (*SamlSpKey, error) {
 	return &i, err
 }
 
-const putSAMLSPKey = `-- name: PutSAMLSPKey :exec
+const putSAMLSPKey = `-- name: PutSAMLSPKey :one
 INSERT INTO
   saml_sp_keys (id, private_key, certificate)
 VALUES
   (1, $1, $2)
-ON CONFLICT (id) DO NOTHING
+ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id
+RETURNING private_key, certificate
 `
 
 type PutSAMLSPKeyParams struct {
@@ -62,9 +63,16 @@ type PutSAMLSPKeyParams struct {
 	Certificate string                `json:"certificate"`
 }
 
-func (q *Queries) PutSAMLSPKey(ctx context.Context, arg *PutSAMLSPKeyParams) error {
-	_, err := q.db.Exec(ctx, putSAMLSPKey, arg.PrivateKey, arg.Certificate)
-	return err
+type PutSAMLSPKeyRow struct {
+	PrivateKey  crypto.EncryptedBytes `json:"privateKey"`
+	Certificate string                `json:"certificate"`
+}
+
+func (q *Queries) PutSAMLSPKey(ctx context.Context, arg *PutSAMLSPKeyParams) (*PutSAMLSPKeyRow, error) {
+	row := q.db.QueryRow(ctx, putSAMLSPKey, arg.PrivateKey, arg.Certificate)
+	var i PutSAMLSPKeyRow
+	err := row.Scan(&i.PrivateKey, &i.Certificate)
+	return &i, err
 }
 
 const updateSAMLSPPrivateKey = `-- name: UpdateSAMLSPPrivateKey :exec

@@ -2,52 +2,57 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
-	"math/big"
-	"time"
+	"errors"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/mizuchilabs/kagi"
+	"github.com/mizuchilabs/kagi/saml"
 
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// EnsureSAMLSPKey returns the deployment's shared SAML SP keypair as PEM,
-// generating and persisting it on first boot. One keypair serves every
-// workspace: the SP certificate identifies Nokku itself to every IdP.
-func EnsureSAMLSPKey(ctx context.Context, conn *db.Connection) (keyPEM, certPEM []byte, err error) {
-	if row, err := conn.Q.GetSAMLSPKey(ctx); err == nil && row != nil {
-		return row.PrivateKey.Bytes(), []byte(row.Certificate), nil
-	}
+// SAMLSPKeyStore persists the deployment's shared SAML SP keypair in the
+// database, encrypting the private key at rest. It implements saml.KeypairStore
+// so the kagi handler generates the keypair once and reuses it across
+// restarts; one keypair serves every workspace because the SP certificate
+// identifies Nokku itself to every IdP.
+type SAMLSPKeyStore struct {
+	conn *db.Connection
+}
 
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
+// NewSAMLSPKeyStore returns a SAMLSPKeyStore backed by conn.
+func NewSAMLSPKeyStore(conn *db.Connection) *SAMLSPKeyStore {
+	return &SAMLSPKeyStore{conn: conn}
+}
+
+// Load returns the stored keypair as PEM, or kagi.ErrNotFound when none has
+// been generated yet.
+func (s *SAMLSPKeyStore) Load(ctx context.Context) (keyPEM, certPEM []byte, err error) {
+	row, err := s.conn.Q.GetSAMLSPKey(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, kagi.ErrNotFound
+	}
 	if err != nil {
 		return nil, nil, err
 	}
-	tmpl := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject:      pkix.Name{CommonName: "nokku"},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(10 * 365 * 24 * time.Hour),
-		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-	}
-	der, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &key.PublicKey, key)
-	if err != nil {
-		return nil, nil, err
-	}
+	return row.PrivateKey.Bytes(), []byte(row.Certificate), nil
+}
 
-	keyPEM = pem.EncodeToMemory(
-		&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)},
-	)
-	certPEM = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
-
-	if err := conn.Q.PutSAMLSPKey(ctx, &db.PutSAMLSPKeyParams{
+// Save stores the generated keypair, encrypting the private key at rest, and
+// returns the keypair that is now canonical. The INSERT is idempotent on
+// first boot: when several instances start at once, only one wins and every
+// caller receives the winner's keypair back, so all pods serve the same SP
+// certificate.
+func (s *SAMLSPKeyStore) Save(ctx context.Context, keyPEM, certPEM []byte) ([]byte, []byte, error) {
+	row, err := s.conn.Q.PutSAMLSPKey(ctx, &db.PutSAMLSPKeyParams{
 		PrivateKey:  crypto.EncryptedBytes(keyPEM),
 		Certificate: string(certPEM),
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, nil, err
 	}
-	return keyPEM, certPEM, nil
+	return row.PrivateKey.Bytes(), []byte(row.Certificate), nil
 }
+
+var _ saml.KeypairStore = (*SAMLSPKeyStore)(nil)
