@@ -7,7 +7,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import type { Recording } from '$lib/gen/nokku/v1/recordings_pb';
-	import { AlertTriangle, RefreshCw } from '@lucide/svelte';
+	import { TriangleAlert, RefreshCw } from '@lucide/svelte';
 
 	interface Props {
 		recording: Recording | null;
@@ -231,14 +231,14 @@
 	>
 		<div class="relative">
 			{#if playState === 'loading'}
-				<div class="flex h-40 w-[36rem] max-w-full items-center justify-center">
+				<div class="flex h-40 w-xl max-w-full items-center justify-center">
 					<Spinner />
 				</div>
 			{:else if playState === 'error'}
 				<div
-					class="flex h-40 w-[36rem] max-w-full flex-col items-center justify-center gap-3 p-6 text-center"
+					class="flex h-40 w-xl max-w-full flex-col items-center justify-center gap-3 p-6 text-center"
 				>
-					<AlertTriangle class="text-destructive" size={24} />
+					<TriangleAlert class="text-destructive" size={24} />
 					<p class="max-w-md text-sm text-destructive">{error}</p>
 					<Button variant="outline" size="sm" onclick={() => void play()}>
 						<RefreshCw size={14} /> Retry
