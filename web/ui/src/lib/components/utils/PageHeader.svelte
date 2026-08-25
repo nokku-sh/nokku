@@ -1,13 +1,11 @@
 <script lang="ts">
-	import type { Component } from 'svelte';
+	import type { LucideIcon } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
-	import type { IconProps } from '@lucide/svelte';
 
-	type IconComponent = Component<IconProps, Record<string, never>, ''>;
 	interface Props {
 		title: string;
 		description?: string;
-		icon?: IconComponent;
+		icon?: LucideIcon;
 		children?: Snippet;
 	}
 

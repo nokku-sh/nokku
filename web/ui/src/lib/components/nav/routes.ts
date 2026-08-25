@@ -19,17 +19,14 @@ import {
 	VectorSquare,
 	Video,
 	Waypoints,
-	type IconProps
+	type LucideIcon
 } from '@lucide/svelte';
-import type { Component } from 'svelte';
-
-type IconComponent = Component<IconProps, Record<string, never>, ''>;
 
 export type RouteItem = {
 	title: string;
 	url: string;
 	shortcut?: string;
-	icon: IconComponent;
+	icon: LucideIcon;
 	items?: RouteItem[];
 };
 
