@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"connectrpc.com/connect"
@@ -25,7 +26,7 @@ func (s *ServiceAccountService) GetServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.GetServiceAccountRequest,
 ) (*nokkuv1.GetServiceAccountResponse, error) {
-	var result *db.GetServiceAccountRow
+	var result *db.ServiceAccount
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.GetServiceAccount(ctx, req.GetId())
 		return err
@@ -61,7 +62,7 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		return nil, ErrInvalidInput
 	}
 
-	var result *db.GetServiceAccountRow
+	var result *db.ServiceAccount
 	var key kagi.APIKey
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		params := &db.CreateServiceAccountParams{
@@ -122,7 +123,7 @@ func (s *ServiceAccountService) UpdateServiceAccount(
 		return nil, ErrInvalidInput
 	}
 
-	var result *db.GetServiceAccountRow
+	var result *db.ServiceAccount
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		updatedID, err := q.UpdateServiceAccount(ctx, &db.UpdateServiceAccountParams{
 			ServiceAccountID: req.GetId(),
@@ -153,8 +154,8 @@ func (s *ServiceAccountService) ListServiceAccounts(
 ) (*nokkuv1.ListServiceAccountsResponse, error) {
 	var result []*db.ListServiceAccountsRow
 	count := int32(0)
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		sas, err := q.ListServiceAccounts(ctx, &db.ListServiceAccountsParams{
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		result, err = q.ListServiceAccounts(ctx, &db.ListServiceAccountsParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			Query:       req.Query,
 			Tags:        req.GetTags(),
@@ -165,12 +166,12 @@ func (s *ServiceAccountService) ListServiceAccounts(
 		if err != nil {
 			return err
 		}
-		result = sas
-		if len(sas) > 0 {
-			count = sas[0].TotalCount
+		if len(result) > 0 {
+			count = result[0].TotalCount
 		}
 		return nil
 	}); err != nil {
+		slog.Error("failed to list service accounts", "err", err)
 		return nil, DBError(err)
 	}
 

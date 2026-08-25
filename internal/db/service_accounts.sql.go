@@ -62,37 +62,16 @@ func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID str
 
 const getServiceAccount = `-- name: GetServiceAccount :one
 SELECT
-  sa.id, sa.workspace_id, sa.name, sa.description, sa.role_name, sa.expires_at, sa.tags, sa.created_at, sa.updated_at,
-  (
-    SELECT
-      MAX(ak.last_seen)
-    FROM
-      api_keys ak
-    WHERE
-      ak.subject_id = sa.id
-  )::TIMESTAMPTZ AS last_used_at
+  id, workspace_id, name, description, role_name, expires_at, tags, created_at, updated_at
 FROM
-  service_accounts sa
+  service_accounts
 WHERE
-  sa.id = $1
+  id = $1
 `
 
-type GetServiceAccountRow struct {
-	ID          string     `json:"id"`
-	WorkspaceID string     `json:"workspaceId"`
-	Name        string     `json:"name"`
-	Description *string    `json:"description"`
-	RoleName    string     `json:"roleName"`
-	ExpiresAt   *time.Time `json:"expiresAt"`
-	Tags        []string   `json:"tags"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	UpdatedAt   time.Time  `json:"updatedAt"`
-	LastUsedAt  time.Time  `json:"lastUsedAt"`
-}
-
-func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string) (*GetServiceAccountRow, error) {
+func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string) (*ServiceAccount, error) {
 	row := q.db.QueryRow(ctx, getServiceAccount, serviceAccountID)
-	var i GetServiceAccountRow
+	var i ServiceAccount
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
@@ -103,7 +82,6 @@ func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string
 		&i.Tags,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.LastUsedAt,
 	)
 	return &i, err
 }
@@ -127,14 +105,6 @@ func (q *Queries) GetServiceAccountWorkspaceID(ctx context.Context, serviceAccou
 const listServiceAccounts = `-- name: ListServiceAccounts :many
 SELECT
   sa.id, sa.workspace_id, sa.name, sa.description, sa.role_name, sa.expires_at, sa.tags, sa.created_at, sa.updated_at,
-  (
-    SELECT
-      MAX(ak.last_seen)
-    FROM
-      api_keys ak
-    WHERE
-      ak.subject_id = sa.id
-  )::TIMESTAMPTZ AS last_used_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa
@@ -193,7 +163,6 @@ type ListServiceAccountsRow struct {
 	Tags        []string   `json:"tags"`
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
-	LastUsedAt  time.Time  `json:"lastUsedAt"`
 	TotalCount  int32      `json:"totalCount"`
 }
 
@@ -224,7 +193,6 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 			&i.Tags,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.LastUsedAt,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err

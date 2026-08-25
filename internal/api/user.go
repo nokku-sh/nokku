@@ -34,7 +34,7 @@ func (s *UserService) Whoami(
 	//nolint:exhaustive // daemon actors never call Whoami; treat them as users
 	switch actor.Kind {
 	case auth.ActorTypeServiceAccount:
-		var result *db.GetServiceAccountRow
+		var result *db.ServiceAccount
 		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 			result, err = q.GetServiceAccount(ctx, actor.SubjectID)
 			return err
