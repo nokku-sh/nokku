@@ -11,6 +11,7 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -315,11 +316,13 @@ type EventLog struct {
 	WorkspaceId   *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
 	ActorId       *string                `protobuf:"bytes,3,opt,name=actor_id,json=actorId" json:"actor_id,omitempty"`
 	ActorType     *string                `protobuf:"bytes,4,opt,name=actor_type,json=actorType" json:"actor_type,omitempty"`
-	Action        *string                `protobuf:"bytes,5,opt,name=action" json:"action,omitempty"`
-	IpAddress     *string                `protobuf:"bytes,6,opt,name=ip_address,json=ipAddress" json:"ip_address,omitempty"`
-	UserAgent     *string                `protobuf:"bytes,7,opt,name=user_agent,json=userAgent" json:"user_agent,omitempty"`
-	StatusCode    *string                `protobuf:"bytes,8,opt,name=status_code,json=statusCode" json:"status_code,omitempty"`
-	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=timestamp" json:"timestamp,omitempty"`
+	ActorEmail    *string                `protobuf:"bytes,5,opt,name=actor_email,json=actorEmail" json:"actor_email,omitempty"`
+	Action        *string                `protobuf:"bytes,6,opt,name=action" json:"action,omitempty"`
+	IpAddress     *string                `protobuf:"bytes,7,opt,name=ip_address,json=ipAddress" json:"ip_address,omitempty"`
+	UserAgent     *string                `protobuf:"bytes,8,opt,name=user_agent,json=userAgent" json:"user_agent,omitempty"`
+	StatusCode    *string                `protobuf:"bytes,9,opt,name=status_code,json=statusCode" json:"status_code,omitempty"`
+	Details       *structpb.Struct       `protobuf:"bytes,10,opt,name=details" json:"details,omitempty"`
+	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=timestamp" json:"timestamp,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -382,6 +385,13 @@ func (x *EventLog) GetActorType() string {
 	return ""
 }
 
+func (x *EventLog) GetActorEmail() string {
+	if x != nil && x.ActorEmail != nil {
+		return *x.ActorEmail
+	}
+	return ""
+}
+
 func (x *EventLog) GetAction() string {
 	if x != nil && x.Action != nil {
 		return *x.Action
@@ -408,6 +418,13 @@ func (x *EventLog) GetStatusCode() string {
 		return *x.StatusCode
 	}
 	return ""
+}
+
+func (x *EventLog) GetDetails() *structpb.Struct {
+	if x != nil {
+		return x.Details
+	}
+	return nil
 }
 
 func (x *EventLog) GetTimestamp() *timestamppb.Timestamp {
@@ -710,7 +727,7 @@ var File_nokku_v1_util_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_util_proto_rawDesc = "" +
 	"\n" +
-	"\x13nokku/v1/util.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x13\n" +
+	"\x13nokku/v1/util.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x13\n" +
 	"\x11GetVersionRequest\".\n" +
 	"\x12GetVersionResponse\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\"\xd3\x01\n" +
@@ -722,21 +739,25 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\x1eassignable_to_service_accounts\x18\x05 \x01(\bR\x1bassignableToServiceAccounts\"\x12\n" +
 	"\x10ListRolesRequest\"9\n" +
 	"\x11ListRolesResponse\x12$\n" +
-	"\x05roles\x18\x01 \x03(\v2\x0e.nokku.v1.RoleR\x05roles\"\xa8\x02\n" +
+	"\x05roles\x18\x01 \x03(\v2\x0e.nokku.v1.RoleR\x05roles\"\xfc\x02\n" +
 	"\bEventLog\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x19\n" +
 	"\bactor_id\x18\x03 \x01(\tR\aactorId\x12\x1d\n" +
 	"\n" +
-	"actor_type\x18\x04 \x01(\tR\tactorType\x12\x16\n" +
-	"\x06action\x18\x05 \x01(\tR\x06action\x12\x1d\n" +
+	"actor_type\x18\x04 \x01(\tR\tactorType\x12\x1f\n" +
+	"\vactor_email\x18\x05 \x01(\tR\n" +
+	"actorEmail\x12\x16\n" +
+	"\x06action\x18\x06 \x01(\tR\x06action\x12\x1d\n" +
 	"\n" +
-	"ip_address\x18\x06 \x01(\tR\tipAddress\x12\x1d\n" +
+	"ip_address\x18\a \x01(\tR\tipAddress\x12\x1d\n" +
 	"\n" +
-	"user_agent\x18\a \x01(\tR\tuserAgent\x12\x1f\n" +
-	"\vstatus_code\x18\b \x01(\tR\n" +
-	"statusCode\x128\n" +
-	"\ttimestamp\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\xec\x02\n" +
+	"user_agent\x18\b \x01(\tR\tuserAgent\x12\x1f\n" +
+	"\vstatus_code\x18\t \x01(\tR\n" +
+	"statusCode\x121\n" +
+	"\adetails\x18\n" +
+	" \x01(\v2\x17.google.protobuf.StructR\adetails\x128\n" +
+	"\ttimestamp\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\xec\x02\n" +
 	"\x14ListAuditLogsRequest\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1f\n" +
 	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
@@ -802,30 +823,32 @@ var file_nokku_v1_util_proto_goTypes = []any{
 	(*ListAuditLogsResponse)(nil),      // 8: nokku.v1.ListAuditLogsResponse
 	(*ExportAuditLogsRequest)(nil),     // 9: nokku.v1.ExportAuditLogsRequest
 	(*ExportAuditLogsResponse)(nil),    // 10: nokku.v1.ExportAuditLogsResponse
-	(*timestamppb.Timestamp)(nil),      // 11: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),            // 11: google.protobuf.Struct
+	(*timestamppb.Timestamp)(nil),      // 12: google.protobuf.Timestamp
 }
 var file_nokku_v1_util_proto_depIdxs = []int32{
 	3,  // 0: nokku.v1.ListRolesResponse.roles:type_name -> nokku.v1.Role
-	11, // 1: nokku.v1.EventLog.timestamp:type_name -> google.protobuf.Timestamp
-	11, // 2: nokku.v1.ListAuditLogsRequest.start_date:type_name -> google.protobuf.Timestamp
-	11, // 3: nokku.v1.ListAuditLogsRequest.end_date:type_name -> google.protobuf.Timestamp
-	6,  // 4: nokku.v1.ListAuditLogsResponse.logs:type_name -> nokku.v1.EventLog
-	0,  // 5: nokku.v1.ExportAuditLogsRequest.format:type_name -> nokku.v1.ExportAuditLogsRequest.Format
-	11, // 6: nokku.v1.ExportAuditLogsRequest.start_date:type_name -> google.protobuf.Timestamp
-	11, // 7: nokku.v1.ExportAuditLogsRequest.end_date:type_name -> google.protobuf.Timestamp
-	1,  // 8: nokku.v1.UtilService.GetVersion:input_type -> nokku.v1.GetVersionRequest
-	4,  // 9: nokku.v1.UtilService.ListRoles:input_type -> nokku.v1.ListRolesRequest
-	7,  // 10: nokku.v1.UtilService.ListAuditLogs:input_type -> nokku.v1.ListAuditLogsRequest
-	9,  // 11: nokku.v1.UtilService.ExportAuditLogs:input_type -> nokku.v1.ExportAuditLogsRequest
-	2,  // 12: nokku.v1.UtilService.GetVersion:output_type -> nokku.v1.GetVersionResponse
-	5,  // 13: nokku.v1.UtilService.ListRoles:output_type -> nokku.v1.ListRolesResponse
-	8,  // 14: nokku.v1.UtilService.ListAuditLogs:output_type -> nokku.v1.ListAuditLogsResponse
-	10, // 15: nokku.v1.UtilService.ExportAuditLogs:output_type -> nokku.v1.ExportAuditLogsResponse
-	12, // [12:16] is the sub-list for method output_type
-	8,  // [8:12] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	11, // 1: nokku.v1.EventLog.details:type_name -> google.protobuf.Struct
+	12, // 2: nokku.v1.EventLog.timestamp:type_name -> google.protobuf.Timestamp
+	12, // 3: nokku.v1.ListAuditLogsRequest.start_date:type_name -> google.protobuf.Timestamp
+	12, // 4: nokku.v1.ListAuditLogsRequest.end_date:type_name -> google.protobuf.Timestamp
+	6,  // 5: nokku.v1.ListAuditLogsResponse.logs:type_name -> nokku.v1.EventLog
+	0,  // 6: nokku.v1.ExportAuditLogsRequest.format:type_name -> nokku.v1.ExportAuditLogsRequest.Format
+	12, // 7: nokku.v1.ExportAuditLogsRequest.start_date:type_name -> google.protobuf.Timestamp
+	12, // 8: nokku.v1.ExportAuditLogsRequest.end_date:type_name -> google.protobuf.Timestamp
+	1,  // 9: nokku.v1.UtilService.GetVersion:input_type -> nokku.v1.GetVersionRequest
+	4,  // 10: nokku.v1.UtilService.ListRoles:input_type -> nokku.v1.ListRolesRequest
+	7,  // 11: nokku.v1.UtilService.ListAuditLogs:input_type -> nokku.v1.ListAuditLogsRequest
+	9,  // 12: nokku.v1.UtilService.ExportAuditLogs:input_type -> nokku.v1.ExportAuditLogsRequest
+	2,  // 13: nokku.v1.UtilService.GetVersion:output_type -> nokku.v1.GetVersionResponse
+	5,  // 14: nokku.v1.UtilService.ListRoles:output_type -> nokku.v1.ListRolesResponse
+	8,  // 15: nokku.v1.UtilService.ListAuditLogs:output_type -> nokku.v1.ListAuditLogsResponse
+	10, // 16: nokku.v1.UtilService.ExportAuditLogs:output_type -> nokku.v1.ExportAuditLogsResponse
+	13, // [13:17] is the sub-list for method output_type
+	9,  // [9:13] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_util_proto_init() }
