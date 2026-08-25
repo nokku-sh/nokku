@@ -15,7 +15,7 @@
 		ChevronsRight,
 		ChevronsUpDown,
 		SearchXIcon,
-		type IconProps
+		type LucideIcon
 	} from '@lucide/svelte';
 	import {
 		FlexRender,
@@ -26,14 +26,12 @@
 		type RowData,
 		type Table
 	} from '@tanstack/svelte-table';
-	import type { Component, Snippet } from 'svelte';
+	import type { Snippet } from 'svelte';
 	import { PersistedState } from 'runed';
 	import BulkActions from './BulkActions.svelte';
 	import type { BulkAction } from './types';
 	import type { DataTableFeatures } from './data-table-features.js';
 	import { createAppTable } from './data-table.js';
-
-	type IconComponent = Component<IconProps, Record<string, never>, ''>;
 
 	type DataTableProps<TData extends RowData> = {
 		data?: TData[];
@@ -42,7 +40,7 @@
 		enableRowSelection?: boolean;
 		rowCount?: number;
 		emptyState?: {
-			icon: IconComponent;
+			icon: LucideIcon;
 			title: string;
 			description: string;
 		};

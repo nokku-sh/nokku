@@ -10,15 +10,15 @@
 		DeleteIcon,
 		CircleQuestionMarkIcon,
 		CodeIcon,
-		type IconProps,
 		EyeOffIcon,
 		EyeIcon,
 		XIcon,
 		Tags,
-		DownloadIcon
+		DownloadIcon,
+		type LucideIcon
 	} from '@lucide/svelte';
 	import { UseClipboard } from '$lib/hooks/use-clipboard.svelte.js';
-	import type { Component, ComponentProps } from 'svelte';
+	import type { ComponentProps } from 'svelte';
 	import type { Textarea } from '../textarea';
 	import Button from '../button/button.svelte';
 	import Input from '../input/input.svelte';
@@ -33,16 +33,15 @@
 		| 'password'
 		| 'tags';
 
-	type IconComponent = Component<IconProps, Record<string, never>, ''>;
 	interface Props {
 		variant: Variant;
 		value?: string;
 		placeholder?: string;
 		readonly?: boolean;
 		icon?: {
-			copy?: IconComponent;
-			code?: IconComponent;
-			tags?: IconComponent;
+			copy?: LucideIcon;
+			code?: LucideIcon;
+			tags?: LucideIcon;
 		};
 		codeHeader?: string;
 		truncate?: number;

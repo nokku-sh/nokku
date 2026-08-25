@@ -1,10 +1,7 @@
 <script lang="ts" module>
-	import type { Component } from 'svelte';
-
-	type IconComponent = Component<IconProps, Record<string, never>, ''>;
 	export type ActionItem = {
 		label?: string;
-		icon?: IconComponent;
+		icon?: LucideIcon;
 		onClick: () => void;
 		disabled?: boolean;
 		isDestructive?: boolean;
@@ -18,7 +15,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { Ellipsis, Trash2, type IconProps } from '@lucide/svelte';
+	import { Ellipsis, Trash2, type LucideIcon } from '@lucide/svelte';
 	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 

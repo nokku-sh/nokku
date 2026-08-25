@@ -1,12 +1,9 @@
-import type { IconProps } from '@lucide/svelte';
-import type { Component } from 'svelte';
-
-export type IconComponent = Component<IconProps, Record<string, never>, ''>;
+import type { IconProps, LucideIcon } from '@lucide/svelte';
 
 export type Action = {
 	type: 'button' | 'dropdown' | 'popover';
 	label: string;
-	icon?: IconComponent;
+	icon?: LucideIcon;
 	onClick: () => void;
 	variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
 	classProps?: string;
@@ -24,7 +21,7 @@ export type PopoverAction = {
 export type BulkAction<T> = {
 	type: 'button' | 'select';
 	label: string;
-	icon?: IconComponent;
+	icon?: LucideIcon;
 	variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
 	class?: string;
 	disabled?: boolean;
@@ -41,13 +38,13 @@ export type BulkAction<T> = {
 export type FacetedFilter = {
 	label: string;
 	value: string;
-	icon?: IconComponent;
+	icon?: LucideIcon;
 };
 
 export type FilterOption = {
 	label: string;
 	value: string;
-	icon?: IconComponent;
+	icon?: LucideIcon;
 };
 
 export type FilterConfig = {
