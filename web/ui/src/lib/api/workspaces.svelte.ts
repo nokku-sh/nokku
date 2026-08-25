@@ -45,6 +45,8 @@ export const workspace = {
 			query?: string;
 			roleName?: string;
 			teamIds?: string[];
+			limit?: number;
+			offset?: number;
 		}
 	) =>
 		useQuery(
