@@ -79,13 +79,19 @@
 				});
 			}
 		}),
-		columnHelper.accessor('actorId', {
+		columnHelper.accessor('actorEmail', {
 			header: 'Actor',
-			cell: ({ row }) =>
-				renderComponent(TextCell, {
-					label: row.original.actorType,
-					subLabel: row.original.actorId
-				})
+			cell: ({ row }) => {
+				const log = row.original;
+				return renderComponent(TextCell, {
+					label:
+						log.actorEmail ||
+						(log.actorType === 'user' && log.actorId
+							? `${log.actorId.slice(0, 8)}…`
+							: log.actorType),
+					subLabel: log.actorEmail ? log.actorType : ''
+				});
+			}
 		}),
 		columnHelper.accessor('ipAddress', {
 			header: 'Source',
