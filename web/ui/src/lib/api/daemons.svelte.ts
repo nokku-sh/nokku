@@ -16,6 +16,8 @@ export const daemon = {
 			query?: string;
 			status?: DaemonStatus;
 			online?: boolean;
+			limit?: number;
+			offset?: number;
 		}
 	) =>
 		useQuery(
