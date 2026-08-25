@@ -15,12 +15,13 @@
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
 	import type { Team } from '$lib/gen/nokku/v1/team_pb';
-	import { createModalState } from '$lib/hooks';
+	import { TeamSchema } from '$lib/gen/nokku/v1/team_pb';
+	import { createEntityModalState } from '$lib/hooks';
 	import { PencilIcon, PlusIcon, Trash2, Users, UsersIcon } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	// Modal states
-	const teamModal = createModalState<Team>({} as Team);
+	const teamModal = createEntityModalState(TeamSchema);
 
 	// Data
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
@@ -74,7 +75,7 @@
 					inlineActions: [
 						{
 							icon: PencilIcon,
-							onClick: () => teamModal.openWith({ ...row.original })
+							onClick: () => teamModal.openEdit(row.original)
 						},
 						{
 							icon: PlusIcon,
@@ -103,7 +104,7 @@
 	</Button>
 </PageHeader>
 
-<TeamModal bind:open={teamModal.open} bind:data={teamModal.selected} />
+<TeamModal bind:open={teamModal.open} draft={teamModal.draft} />
 
 <DataTable
 	data={teams.data?.teams ?? []}

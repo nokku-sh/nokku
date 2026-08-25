@@ -140,7 +140,7 @@
 	]);
 </script>
 
-<MemberModal bind:open={memberModal.open} bind:data={memberModal.selected} />
+<MemberModal bind:open={memberModal.open} data={memberModal.selected} />
 <TransferOwnerModal
 	bind:open={transferOwnerModal.open}
 	targetMember={transferOwnerModal.selected}

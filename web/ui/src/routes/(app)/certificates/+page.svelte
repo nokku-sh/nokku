@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { ca } from '$lib/api/certificates.svelte';
-	import { createModalState } from '$lib/hooks';
+	import { createEntityModalState, createModalState } from '$lib/hooks';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import CAModal from '$lib/components/modals/CAModal.svelte';
+	import CAModal, { defaultCADraft } from '$lib/components/modals/CAModal.svelte';
 	import SignModal from '$lib/components/modals/SignModal.svelte';
 	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
 	import {
@@ -23,13 +23,14 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import {
 		AuthorityType,
+		CertificateAuthoritySchema,
 		CertificateKeyType,
 		type CertificateAuthority
 	} from '$lib/gen/nokku/v1/certificates_pb';
 	import { enumLabel } from '$lib/utils';
 	import { KeyRound, Pencil, Plus, Shield, ShieldAlert, Trash2 } from '@lucide/svelte';
 
-	const caModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
+	const caModal = createEntityModalState(CertificateAuthoritySchema, defaultCADraft);
 	const signModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
 	const deleteModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
 	const rolloverModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
@@ -110,7 +111,7 @@
 					inlineActions: [
 						{
 							icon: Pencil,
-							onClick: () => caModal.openWith({ ...row.original })
+							onClick: () => caModal.openEdit(row.original)
 						},
 						{
 							icon: item.authorityType === AuthorityType.SSH ? KeyRound : Shield,
@@ -149,7 +150,7 @@
 	];
 </script>
 
-<CAModal bind:open={caModal.open} data={caModal.selected} />
+<CAModal bind:open={caModal.open} draft={caModal.draft} />
 <SignModal bind:open={signModal.open} ca={signModal.selected} />
 
 <DeleteConfirmationModal

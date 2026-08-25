@@ -1,8 +1,11 @@
 <script lang="ts">
+	import { timestampFromDate } from '@bufbuild/protobuf/wkt';
+	import { CalendarIcon, WaypointsIcon, XIcon } from '@lucide/svelte';
+	import type { DateValue } from '@internationalized/date';
+	import { getLocalTimeZone, today } from '@internationalized/date';
 	import { serviceAccount } from '$lib/api/service_account.svelte';
 	import { roles as rolesApi } from '$lib/api/roles.svelte';
 	import { assignableRoles, roleIcon, roleLabel } from '$lib/roles';
-	import * as Alert from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button';
 	import { Calendar } from '$lib/components/ui/calendar';
 	import * as Dialog from '$lib/components/ui/dialog/';
@@ -13,22 +16,18 @@
 	import * as Select from '$lib/components/ui/select';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 	import type { ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
-	import { cn, DateValueFormat, formatTs } from '$lib/utils';
-	import { timestampFromDate } from '@bufbuild/protobuf/wkt';
-	import { type DateValue, getLocalTimeZone, today } from '@internationalized/date';
-	import { CalendarIcon, CircleAlert, WaypointsIcon, XIcon } from '@lucide/svelte';
+	import { useAutoSave } from '$lib/hooks';
+	import { cn, DateValueFormat } from '$lib/utils';
 	import FormModal from './FormModal.svelte';
+	import MetaInfo from './MetaInfo.svelte';
 
 	interface Props {
-		data?: ServiceAccount;
+		draft: ServiceAccount;
 		open?: boolean;
 	}
-	let { data, open = $bindable(false) }: Props = $props();
+	let { draft: model, open = $bindable(false) }: Props = $props();
 
-	let saData = $state({} as ServiceAccount);
-	$effect(() => {
-		if (data) saData = { ...data, roleName: data.roleName || 'viewer' };
-	});
+	const isEdit = $derived(!!model.id);
 
 	const rolesQuery = $derived(rolesApi.list());
 	const roleOptions = $derived(
@@ -39,7 +38,7 @@
 			icon: roleIcon(r.name)
 		}))
 	);
-	const selectedRole = $derived(roleOptions.find((r) => r.value === saData.roleName));
+	const selectedRole = $derived(roleOptions.find((r) => r.value === model.roleName));
 
 	let expiry = $state<DateValue>();
 	let calendarOpen = $state(false);
@@ -54,7 +53,12 @@
 
 	const createMutation = serviceAccount.create();
 	const updateMutation = serviceAccount.update();
-	const isLoading = $derived(createMutation.isPending || updateMutation.isPending);
+	const isLoading = $derived(createMutation.isPending);
+
+	const autoSave = useAutoSave(() => updateMutation.mutateAsync({ ...model }));
+	function save() {
+		if (isEdit) autoSave.save();
+	}
 
 	function setExpiryPreset(days: number) {
 		expiry = today(getLocalTimeZone()).add({ days });
@@ -67,12 +71,8 @@
 	}
 
 	function onSubmit() {
-		if (saData.id) {
-			updateMutation.mutate({ ...saData });
-		} else {
-			const expiresAt = expiry ? timestampFromDate(expiry.toDate(getLocalTimeZone())) : undefined;
-			createMutation.mutate({ ...saData, expiresAt });
-		}
+		const expiresAt = expiry ? timestampFromDate(expiry.toDate(getLocalTimeZone())) : undefined;
+		createMutation.mutate({ ...model, expiresAt });
 		open = false;
 	}
 </script>
@@ -93,23 +93,25 @@
 	</Dialog.Content>
 </Dialog.Root>
 
-<!-- Create/Edit Modal -->
 <FormModal
 	bind:open
-	title="{saData?.id ? 'Edit' : 'Create'} Service Account"
-	description="Service accounts provide API access for automation and CI/CD workflows"
-	{onSubmit}
-	submitLabel={saData.id ? 'Update' : 'Create'}
+	title={isEdit ? model.name : 'Create Service Account'}
+	description={isEdit
+		? 'Changes save automatically.'
+		: 'Service accounts provide API access for automation and CI/CD workflows.'}
+	onSubmit={isEdit ? undefined : onSubmit}
 	{isLoading}
+	saveState={autoSave.saveState}
 >
 	<Field.Field>
-		<Field.Label for="name">Name *</Field.Label>
+		<Field.Label for="name">Name</Field.Label>
 		<Field.Content>
 			<Input
 				id="name"
-				bind:value={saData.name}
-				placeholder="ci-cd, ansible-prod, github-actions"
+				bind:value={model.name}
+				placeholder="ci-cd, ansible-prod"
 				required
+				oninput={save}
 			/>
 			<Field.Description>A unique identifier for this service account</Field.Description>
 		</Field.Content>
@@ -120,10 +122,11 @@
 		<Field.Content>
 			<Textarea
 				id="description"
-				bind:value={saData.description}
+				bind:value={model.description}
 				placeholder="CI/CD pipeline account for production deployments"
 				class="min-h-20 resize-none"
 				rows={3}
+				oninput={save}
 			/>
 		</Field.Content>
 	</Field.Field>
@@ -131,7 +134,14 @@
 	<Field.Field>
 		<Field.Label for="role">Role</Field.Label>
 		<Field.Content>
-			<Select.Root type="single" bind:value={saData.roleName}>
+			<Select.Root
+				type="single"
+				value={model.roleName}
+				onValueChange={(v) => {
+					model.roleName = v;
+					save();
+				}}
+			>
 				<Select.Trigger class="w-full" id="role">
 					<div class="flex items-center gap-2">
 						{#if selectedRole}
@@ -157,13 +167,10 @@
 		</Field.Content>
 	</Field.Field>
 
-	<!-- Expiry Configuration (only for new accounts) -->
-	{#if !saData.id}
-		<Field.Separator />
+	{#if !isEdit}
 		<Field.Field>
 			<Field.Label>Token Expiry</Field.Label>
 			<Field.Content class="space-y-2">
-				<!-- Quick Presets -->
 				<div class="grid grid-cols-5 gap-2">
 					{#each expiryPresets as preset (preset.label)}
 						<Button
@@ -178,7 +185,6 @@
 					{/each}
 				</div>
 
-				<!-- Calendar Picker -->
 				<Popover.Root bind:open={calendarOpen}>
 					<Popover.Trigger class="w-full">
 						<Button
@@ -214,28 +220,7 @@
 				</Field.Description>
 			</Field.Content>
 		</Field.Field>
-	{/if}
-
-	<!-- Existing Account Info -->
-	{#if saData.id}
-		<Alert.Root>
-			<CircleAlert />
-			<Alert.Title>Token Security</Alert.Title>
-			<Alert.Description>
-				The token cannot be retrieved after creation. To change it, create a new service account.
-				{#if saData.expiresAt}
-					<div class="mt-2 text-xs">
-						<span class="font-medium">Expires:</span>
-						{formatTs(saData.expiresAt)}
-					</div>
-				{/if}
-				{#if saData.lastUsedAt}
-					<div class="text-xs">
-						<span class="font-medium">Last used:</span>
-						{formatTs(saData.lastUsedAt)}
-					</div>
-				{/if}
-			</Alert.Description>
-		</Alert.Root>
+	{:else}
+		<MetaInfo createdAt={model.createdAt} updatedAt={model.updatedAt} />
 	{/if}
 </FormModal>

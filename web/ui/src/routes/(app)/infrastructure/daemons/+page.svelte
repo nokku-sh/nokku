@@ -12,8 +12,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { DaemonStatus, type Daemon } from '$lib/gen/nokku/v1/daemon_pb';
-	import { createModalState } from '$lib/hooks';
+	import { DaemonStatus, type Daemon, DaemonSchema } from '$lib/gen/nokku/v1/daemon_pb';
+	import { createEntityModalState } from '$lib/hooks';
 	import { enumLabel } from '$lib/utils';
 	import {
 		Bot,
@@ -39,7 +39,7 @@
 	];
 
 	// Modal state
-	const daemonModal = createModalState<Daemon>({} as Daemon);
+	const daemonModal = createEntityModalState(DaemonSchema);
 
 	// Data
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
@@ -116,7 +116,7 @@
 							: [
 									{
 										icon: InfoIcon,
-										onClick: () => daemonModal.openWith({ ...row.original })
+										onClick: () => daemonModal.openEdit(row.original)
 									}
 								],
 
@@ -141,7 +141,7 @@
 	];
 </script>
 
-<DaemonModal bind:open={daemonModal.open} bind:data={daemonModal.selected} />
+<DaemonModal bind:open={daemonModal.open} draft={daemonModal.draft} />
 
 <PageHeader title="Daemons" description="Manage your workspace daemons" icon={Bot}>
 	<Button href="/settings/enrollment" variant="link">

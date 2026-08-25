@@ -19,13 +19,13 @@
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { type Target } from '$lib/gen/nokku/v1/target_pb';
-	import { createModalState } from '$lib/hooks';
+	import { type Target, TargetSchema } from '$lib/gen/nokku/v1/target_pb';
+	import { createEntityModalState } from '$lib/hooks';
 	import { PencilIcon, Plus, Server, TagIcon, Trash2, UserIcon, IdCard } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	// Modal states
-	const targetModal = createModalState<Target>({} as Target);
+	const targetModal = createEntityModalState(TargetSchema);
 
 	// Data
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
@@ -104,7 +104,7 @@
 					inlineActions: [
 						{
 							icon: PencilIcon,
-							onClick: () => targetModal.openWith({ ...row.original })
+							onClick: () => targetModal.openEdit(row.original)
 						}
 					],
 
@@ -129,7 +129,7 @@
 	];
 </script>
 
-<TargetModal bind:open={targetModal.open} bind:data={targetModal.selected} />
+<TargetModal bind:open={targetModal.open} draft={targetModal.draft} />
 
 <PageHeader title="Targets" description="Manage your workspace targets" icon={Server}>
 	<Button onclick={() => targetModal.openNew()}>

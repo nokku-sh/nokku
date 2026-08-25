@@ -15,6 +15,8 @@
 	import * as Collapsible from '$lib/components/ui/collapsible';
 	import WorkspaceModal from '../modals/WorkspaceModal.svelte';
 	import { workspaceID } from '$lib/store.svelte';
+	import { WorkspaceSchema } from '$lib/gen/nokku/v1/workspace_pb';
+	import { createEntityModalState } from '$lib/hooks';
 	import NokkuCaret from '$lib/assets/nokku_caret.svelte';
 
 	let { ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
@@ -27,7 +29,7 @@
 	const logout = auth.logout();
 	const currentRoute = $derived(page.url.pathname);
 
-	let wsModal = $state(false);
+	const wsModal = createEntityModalState(WorkspaceSchema);
 	const isRouteActive = (item: RouteItem) => {
 		if (item.url === '/') {
 			return currentRoute === '/';
@@ -41,7 +43,7 @@
 	};
 </script>
 
-<WorkspaceModal bind:open={wsModal} />
+<WorkspaceModal bind:open={wsModal.open} draft={wsModal.draft} />
 
 <Sidebar.Root collapsible="offcanvas" {...restProps}>
 	<!-- Workspace Selection -->
@@ -101,7 +103,7 @@
 						{/each}
 						<DropdownMenu.Separator />
 						<DropdownMenu.Item
-							onSelect={() => (wsModal = true)}
+							onSelect={() => wsModal.openNew()}
 							class="flex items-center gap-2 text-muted-foreground"
 						>
 							<Plus />
@@ -184,7 +186,7 @@
 					<Empty.Description>Select or create a workspace to get started</Empty.Description>
 				</Empty.Header>
 				<Empty.Content>
-					<Button onclick={() => (wsModal = true)}>Create Workspace</Button>
+					<Button onclick={() => wsModal.openNew()}>Create Workspace</Button>
 				</Empty.Content>
 			</Empty.Root>
 		{/if}

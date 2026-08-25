@@ -1,61 +1,69 @@
 <script lang="ts">
+	import { Settings2, Users } from '@lucide/svelte';
 	import { team } from '$lib/api/team.svelte';
-	import TeamMembersField from './TeamMembersField.svelte';
-	import FormModal from '$lib/components/modals/FormModal.svelte';
 	import * as Field from '$lib/components/ui/field';
 	import { Input } from '$lib/components/ui/input';
-	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
-	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
+	import { Textarea } from '$lib/components/ui/textarea';
 	import type { Team } from '$lib/gen/nokku/v1/team_pb';
-	import { formatTs } from '$lib/utils';
-	import { CalendarIcon, ClockIcon, Settings2, Users } from '@lucide/svelte';
+	import { useAutoSave } from '$lib/hooks';
+	import FormModal from './FormModal.svelte';
+	import MetaInfo from './MetaInfo.svelte';
+	import ModalTabs from './ModalTabs.svelte';
+	import TeamMembersField from './TeamMembersField.svelte';
 
 	interface Props {
-		data: Team;
+		draft: Team;
 		open?: boolean;
 	}
-	let { data = $bindable({} as Team), open = $bindable(false) }: Props = $props();
+	let { draft: model, open = $bindable(false) }: Props = $props();
+
+	const isEdit = $derived(!!model.id);
 
 	const createMutation = team.create();
 	const updateMutation = team.update();
-	const isLoading = $derived(createMutation.isPending || updateMutation.isPending);
+	const isLoading = $derived(createMutation.isPending);
 
-	async function onSubmit() {
-		if (data.id) {
-			updateMutation.mutate({ ...data });
-		} else {
-			createMutation.mutate({ ...data });
-		}
+	const autoSave = useAutoSave(() => updateMutation.mutateAsync({ ...model }));
+	function save() {
+		if (isEdit) autoSave.save();
+	}
+
+	function onSubmit() {
+		createMutation.mutate({ ...model });
 		open = false;
 	}
 </script>
 
 <FormModal
 	bind:open
-	title="{data.id ? 'Edit' : 'Create'} Team"
-	description="Configure your team settings"
-	submitLabel={data.id ? 'Update' : 'Create'}
-	{onSubmit}
+	title={isEdit ? model.name : 'Create Team'}
+	description={isEdit
+		? 'Changes save automatically.'
+		: 'Teams group members for easier access assignment.'}
+	onSubmit={isEdit ? undefined : onSubmit}
 	{isLoading}
+	saveState={autoSave.saveState}
 >
-	<Tabs.Root class="w-full">
-		<Tabs.List class="mb-4 grid w-full grid-cols-2">
-			<Tabs.Trigger value="general">
-				<Settings2 />
-				General
-			</Tabs.Trigger>
-			<Tabs.Trigger value="members">
-				<Users />
-				Members
-			</Tabs.Trigger>
-		</Tabs.List>
-
+	<ModalTabs
+		tabs={isEdit
+			? [
+					{ value: 'general', label: 'General', icon: Settings2 },
+					{ value: 'members', label: 'Members', icon: Users }
+				]
+			: [{ value: 'general', label: 'General', icon: Settings2 }]}
+	>
 		<Tabs.Content value="general" class="space-y-4">
 			<Field.Field>
 				<Field.Label for="team-name">Name</Field.Label>
 				<Field.Content>
-					<Input id="team-name" bind:value={data.name} placeholder="My Team" required />
+					<Input
+						id="team-name"
+						bind:value={model.name}
+						placeholder="Platform Team"
+						required
+						oninput={save}
+					/>
 				</Field.Content>
 			</Field.Field>
 
@@ -64,42 +72,22 @@
 				<Field.Content>
 					<Textarea
 						id="team-description"
-						bind:value={data.description}
-						placeholder="My team description"
+						bind:value={model.description}
+						placeholder="Owns production infrastructure access"
+						oninput={save}
 					/>
 				</Field.Content>
 			</Field.Field>
 
-			{#if data.id}
-				<Item.Group class="grid grid-cols-2 gap-2">
-					<Item.Root variant="muted">
-						<Item.Media variant="icon">
-							<CalendarIcon />
-						</Item.Media>
-						<Item.Content>
-							<Item.Title>Created</Item.Title>
-							<Item.Description class="font-mono text-xs">
-								{formatTs(data.createdAt)}
-							</Item.Description>
-						</Item.Content>
-					</Item.Root>
-					<Item.Root variant="muted">
-						<Item.Media variant="icon">
-							<ClockIcon />
-						</Item.Media>
-						<Item.Content>
-							<Item.Title>Last Updated</Item.Title>
-							<Item.Description class="font-mono text-xs">
-								{formatTs(data.updatedAt, 'relative')}
-							</Item.Description>
-						</Item.Content>
-					</Item.Root>
-				</Item.Group>
+			{#if isEdit}
+				<MetaInfo createdAt={model.createdAt} updatedAt={model.updatedAt} />
 			{/if}
 		</Tabs.Content>
 
-		<Tabs.Content value="members" class="space-y-4">
-			<TeamMembersField bind:data />
-		</Tabs.Content>
-	</Tabs.Root>
+		{#if isEdit}
+			<Tabs.Content value="members" class="space-y-4">
+				<TeamMembersField data={model} />
+			</Tabs.Content>
+		{/if}
+	</ModalTabs>
 </FormModal>

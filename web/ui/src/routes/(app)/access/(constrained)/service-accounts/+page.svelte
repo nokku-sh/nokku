@@ -15,13 +15,14 @@
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
 	import type { ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
-	import { createModalState } from '$lib/hooks';
+	import { ServiceAccountSchema } from '$lib/gen/nokku/v1/service_account_pb';
+	import { createEntityModalState } from '$lib/hooks';
 	import { PencilIcon, PlusIcon, Trash2, Waypoints } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import { roles } from '$lib/api/roles.svelte';
 	import { roleIcon, roleLabel } from '$lib/roles';
 
-	const modal = createModalState<ServiceAccount>({} as ServiceAccount);
+	const modal = createEntityModalState(ServiceAccountSchema);
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
@@ -97,7 +98,7 @@
 					inlineActions: [
 						{
 							icon: PencilIcon,
-							onClick: () => modal.openWith({ ...row.original })
+							onClick: () => modal.openEdit(row.original)
 						},
 						{
 							icon: PlusIcon,
@@ -130,7 +131,7 @@
 	</Button>
 </PageHeader>
 
-<ServiceAccountModal bind:open={modal.open} data={modal.selected} />
+<ServiceAccountModal bind:open={modal.open} draft={modal.draft} />
 
 <DataTable
 	data={saData.data?.serviceAccounts ?? []}
