@@ -13,7 +13,7 @@
 	interface Props {
 		data: Team;
 	}
-	let { data = $bindable() }: Props = $props();
+	let { data }: Props = $props();
 
 	const members = $derived(workspace.listMembers());
 	const addMemberMutation = team.addMember();

@@ -3,13 +3,15 @@
 	import * as Card from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import type { Target } from '$lib/gen/nokku/v1/target_pb';
+	import { TargetSchema } from '$lib/gen/nokku/v1/target_pb';
+	import { createEntityModalState } from '$lib/hooks';
 	import { Server, Pencil, Network, Tag, Globe, Tags } from '@lucide/svelte';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 	import TargetModal from '$lib/components/modals/TargetModal.svelte';
 
 	let { data }: NodeProps = $props();
 	let target = $derived(data as Target);
-	let showModal = $state(false);
+	const targetModal = createEntityModalState(TargetSchema);
 
 	let principalCount = $derived(target.principals?.length || 0);
 	let endpoints = $derived(target.endpoints || []);
@@ -17,7 +19,7 @@
 	let tags = $derived(target.tags || target.metadata?.tags?.split(',') || []);
 </script>
 
-<TargetModal bind:open={showModal} data={target} />
+<TargetModal bind:open={targetModal.open} draft={targetModal.draft} />
 
 <div class="group relative">
 	<Card.Root class="w-[360px] p-0">
@@ -41,7 +43,7 @@
 						variant="ghost"
 						size="icon-sm"
 						class="h-8 w-8 rounded-md"
-						onclick={() => (showModal = true)}
+						onclick={() => targetModal.openEdit({ ...target })}
 					>
 						<Pencil size={14} />
 					</Button>

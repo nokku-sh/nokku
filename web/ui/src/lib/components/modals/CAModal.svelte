@@ -1,44 +1,15 @@
-<script lang="ts">
-	import { ca } from '$lib/api/certificates.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
-	import * as Item from '$lib/components/ui/item';
-	import { Label } from '$lib/components/ui/label';
-	import * as Select from '$lib/components/ui/select';
-	import { Switch } from '$lib/components/ui/switch';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import { Textarea } from '$lib/components/ui/textarea';
+<script lang="ts" module>
 	import {
 		AuthorityType,
-		CertificateKeyType,
-		type CertificateAuthority
+		CertificateAuthoritySchema,
+		CertificateKeyType
 	} from '$lib/gen/nokku/v1/certificates_pb';
-	import { enumLabel, enumToArray, secToD } from '$lib/utils';
-	import {
-		Clock,
-		FileStack,
-		Info,
-		KeyRound,
-		Server,
-		Settings2,
-		Shield,
-		ShieldAlert,
-		ShieldCheck,
-		Star,
-		User
-	} from '@lucide/svelte';
-	import DurationInput from '../utils/DurationInput.svelte';
-	import FormModal from './FormModal.svelte';
+	import type { CertificateAuthority } from '$lib/gen/nokku/v1/certificates_pb';
+	import { secToD } from '$lib/utils';
+	import type { MessageInitShape } from '@bufbuild/protobuf';
 
-	interface Props {
-		data?: CertificateAuthority;
-		open?: boolean;
-	}
-	let { data, open = $bindable(false) }: Props = $props();
-
-	function defaultForm() {
+	/** Sensible starting point for a new CA, used by openNew(). */
+	export function defaultCADraft(): MessageInitShape<typeof CertificateAuthoritySchema> {
 		return {
 			name: '',
 			description: '',
@@ -58,110 +29,144 @@
 			],
 			userExtensions: { 'permit-pty': '', 'permit-user-rc': '' },
 			userCriticalOptions: {}
-		} as unknown as CertificateAuthority;
+		};
 	}
+</script>
 
-	let formData = $state(defaultForm());
+<script lang="ts">
+	import {
+		Clock,
+		FileStack,
+		Info,
+		KeyRound,
+		Server,
+		Settings2,
+		Shield,
+		ShieldAlert,
+		ShieldCheck,
+		Star,
+		User
+	} from '@lucide/svelte';
+	import { ca } from '$lib/api/certificates.svelte';
+	import { Badge } from '$lib/components/ui/badge';
+	import { Checkbox } from '$lib/components/ui/checkbox';
+	import * as Field from '$lib/components/ui/field';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import * as Item from '$lib/components/ui/item';
+	import * as Select from '$lib/components/ui/select';
+	import { Switch } from '$lib/components/ui/switch';
+	import * as Tabs from '$lib/components/ui/tabs';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import { useAutoSave } from '$lib/hooks';
+	import { enumLabel, enumToArray } from '$lib/utils';
+	import DurationInput from '../utils/DurationInput.svelte';
+	import FormModal from './FormModal.svelte';
+	import MetaInfo from './MetaInfo.svelte';
+	import ModalTabs from './ModalTabs.svelte';
 
-	$effect(() => {
-		if (data?.id) {
-			formData = { ...data };
-		}
-	});
+	interface Props {
+		draft: CertificateAuthority;
+		open?: boolean;
+	}
+	let { draft: model, open = $bindable(false) }: Props = $props();
 
-	$effect(() => {
-		if (!open) {
-			formData = defaultForm();
-		}
-	});
+	const isEdit = $derived(!!model.id);
+	const isSSH = $derived(model.authorityType === AuthorityType.SSH);
 
 	const createCA = ca.create();
 	const updateCA = ca.update();
 
-	async function onSubmit() {
-		if (data?.id) {
-			updateCA.mutate({ ...formData });
-		} else {
-			createCA.mutate({ ...formData });
-		}
+	const autoSave = useAutoSave(() => updateCA.mutateAsync({ ...model }));
+	function save() {
+		if (isEdit) autoSave.save();
+	}
+
+	function onSubmit() {
+		createCA.mutate({ ...model });
 		open = false;
 	}
 
-	let isSSH = $derived(formData.authorityType === AuthorityType.SSH);
-	let isEditing = $derived(!!data?.id);
+	const tabs = $derived(
+		isSSH
+			? [
+					{ value: 'general', label: 'General', icon: Settings2 },
+					{ value: 'keys', label: 'Keys', icon: KeyRound },
+					{ value: 'lifecycle', label: 'Lifecycle', icon: Clock },
+					{ value: 'policies', label: 'Policies', icon: ShieldCheck }
+				]
+			: [
+					{ value: 'general', label: 'General', icon: Settings2 },
+					{ value: 'keys', label: 'Keys', icon: KeyRound },
+					{ value: 'lifecycle', label: 'Lifecycle', icon: Clock }
+				]
+	);
 
 	function getKeyBitsOptions(keyType: CertificateKeyType) {
 		if (keyType === CertificateKeyType.RSA) {
 			return [
-				{ value: 2048, label: '2048 bits', desc: 'Minimum (legacy)', recommended: false },
-				{ value: 3072, label: '3072 bits', desc: 'Standard', recommended: false },
-				{ value: 4096, label: '4096 bits', desc: 'Maximum security', recommended: true }
+				{ value: 2048, label: '2048 bits' },
+				{ value: 3072, label: '3072 bits' },
+				{ value: 4096, label: '4096 bits', recommended: true }
 			];
 		}
 		if (keyType === CertificateKeyType.ECDSA) {
 			return [
-				{ value: 256, label: 'P-256', desc: 'Standard', recommended: false },
-				{ value: 384, label: 'P-384', desc: 'Recommended', recommended: true },
-				{ value: 521, label: 'P-521', desc: 'Maximum security', recommended: false }
+				{ value: 256, label: 'P-256' },
+				{ value: 384, label: 'P-384', recommended: true },
+				{ value: 521, label: 'P-521' }
 			];
 		}
 		return [];
 	}
 
-	let isLoading = $derived(createCA.isPending || updateCA.isPending);
 	let needsKeyBits = $derived(
-		formData.keyType === CertificateKeyType.RSA || formData.keyType === CertificateKeyType.ECDSA
+		model.keyType === CertificateKeyType.RSA || model.keyType === CertificateKeyType.ECDSA
 	);
 
-	function isKeyAllowed(keyType: CertificateKeyType) {
-		return formData.allowedKeyTypes?.includes(keyType) ?? false;
-	}
-
 	function toggleAllowedKey(keyType: CertificateKeyType) {
-		if (!formData.allowedKeyTypes) formData.allowedKeyTypes = [];
-		if (formData.allowedKeyTypes.includes(keyType)) {
-			formData.allowedKeyTypes = formData.allowedKeyTypes.filter((t) => t !== keyType);
-		} else {
-			formData.allowedKeyTypes = [...formData.allowedKeyTypes, keyType];
-		}
+		const allowed = model.allowedKeyTypes ?? [];
+		model.allowedKeyTypes = allowed.includes(keyType)
+			? allowed.filter((t) => t !== keyType)
+			: [...allowed, keyType];
+		save();
 	}
 
 	function hasExtension(ext: string) {
-		return formData.userExtensions && formData.userExtensions[ext] !== undefined;
+		return model.userExtensions?.[ext] !== undefined;
 	}
 
 	function toggleExtension(ext: string) {
-		if (!formData.userExtensions) formData.userExtensions = {};
-		const newExts = { ...formData.userExtensions };
-		if (newExts[ext] !== undefined) {
-			delete newExts[ext];
+		const exts = { ...model.userExtensions };
+		if (exts[ext] !== undefined) {
+			delete exts[ext];
 		} else {
-			newExts[ext] = '';
+			exts[ext] = '';
 		}
-		formData.userExtensions = newExts;
-	}
-
-	function hasCriticalOption(key: string) {
-		return formData.userCriticalOptions && formData.userCriticalOptions[key] !== undefined;
+		model.userExtensions = exts;
+		save();
 	}
 
 	function getCriticalOption(key: string) {
-		return formData.userCriticalOptions?.[key] || '';
+		return model.userCriticalOptions?.[key] || '';
+	}
+
+	function hasCriticalOption(key: string) {
+		return model.userCriticalOptions?.[key] !== undefined;
 	}
 
 	function updateCriticalOption(key: string, value: string | undefined) {
-		if (!formData.userCriticalOptions) formData.userCriticalOptions = {};
-		const newOpts = { ...formData.userCriticalOptions };
-
-		if (value === undefined) {
-			delete newOpts[key];
-		} else if (value === '' && (key === 'source-address' || key === 'force-command')) {
-			delete newOpts[key];
+		const opts = { ...model.userCriticalOptions };
+		if (
+			value === undefined ||
+			(value === '' && (key === 'source-address' || key === 'force-command'))
+		) {
+			delete opts[key];
 		} else {
-			newOpts[key] = value;
+			opts[key] = value;
 		}
-
-		formData.userCriticalOptions = newOpts;
+		model.userCriticalOptions = opts;
+		save();
 	}
 
 	const authorityTypeOptions = [
@@ -201,59 +206,31 @@
 
 <FormModal
 	bind:open
-	title="{isEditing ? 'Edit' : 'Create'} Certificate Authority"
-	description={isSSH
-		? 'Configure a certificate authority for SSH certificate signing.'
-		: 'Configure a certificate authority for X.509 certificate signing.'}
-	submitLabel={isEditing ? 'Update' : 'Create CA'}
+	title={isEdit ? model.name : 'Create Certificate Authority'}
+	description={isEdit
+		? `${isSSH ? 'SSH' : 'X.509'} authority. Changes save automatically.`
+		: `Configure a certificate authority for ${isSSH ? 'SSH' : 'X.509'} certificate signing.`}
 	classModal="sm:max-w-xl"
-	{onSubmit}
-	{isLoading}
+	onSubmit={isEdit ? undefined : onSubmit}
+	isLoading={createCA.isPending}
+	saveState={autoSave.saveState}
 >
-	<Tabs.Root class="w-full">
-		<Tabs.List
-			class={formData.authorityType === AuthorityType.SSH
-				? 'mb-4 grid w-full grid-cols-4'
-				: 'mb-4 grid w-full grid-cols-3'}
-		>
-			<Tabs.Trigger value="general">
-				<Settings2 />
-				General
-			</Tabs.Trigger>
-			<Tabs.Trigger value="keys">
-				<KeyRound />
-				Keys
-			</Tabs.Trigger>
-			<Tabs.Trigger value="lifecycle">
-				<Clock />
-				Lifecycle
-			</Tabs.Trigger>
-			{#if isSSH}
-				<Tabs.Trigger value="policies">
-					<ShieldCheck />
-					Policies
-				</Tabs.Trigger>
-			{/if}
-		</Tabs.List>
-
+	<ModalTabs {tabs}>
 		<Tabs.Content value="general" class="space-y-4">
-			<!-- CA Type Selector (only on create) -->
-			{#if !isEditing}
+			{#if !isEdit}
 				<Field.Field>
 					<Field.Label>Certificate Authority Type</Field.Label>
 					<Field.Content>
 						<Select.Root
 							type="single"
-							value={formData.authorityType.toString()}
-							onValueChange={(v) => (formData.authorityType = parseInt(v) as AuthorityType)}
+							value={model.authorityType.toString()}
+							onValueChange={(v) => (model.authorityType = parseInt(v) as AuthorityType)}
 						>
 							<Select.Trigger class="w-full">
-								{formData.authorityType
-									? enumLabel(AuthorityType[formData.authorityType]).toUpperCase()
-									: 'Select type'}
+								{enumLabel(AuthorityType[model.authorityType]).toUpperCase()}
 							</Select.Trigger>
 							<Select.Content>
-								{#each authorityTypeOptions as opt}
+								{#each authorityTypeOptions as opt (opt.value)}
 									<Select.Item value={opt.value.toString()} class="px-4">
 										<div class="flex flex-col gap-0.5">
 											<span class="font-medium">{opt.label}</span>
@@ -270,14 +247,20 @@
 					class="flex items-center gap-2 rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground"
 				>
 					<Info size={16} class="text-primary" />
-					Type: {formData.authorityType === AuthorityType.SSH ? 'SSH' : 'X.509'} Certificate Authority
+					Type: {isSSH ? 'SSH' : 'X.509'} Certificate Authority
 				</div>
 			{/if}
 
 			<Field.Field>
-				<Field.Label for="ca-name">Name *</Field.Label>
+				<Field.Label for="ca-name">Name</Field.Label>
 				<Field.Content>
-					<Input id="ca-name" bind:value={formData.name} placeholder="production-ca" required />
+					<Input
+						id="ca-name"
+						bind:value={model.name}
+						placeholder="production-ca"
+						required
+						oninput={save}
+					/>
 				</Field.Content>
 			</Field.Field>
 
@@ -286,40 +269,51 @@
 				<Field.Content>
 					<Textarea
 						id="ca-description"
-						bind:value={formData.description}
+						bind:value={model.description}
 						placeholder={isSSH
 							? 'Root CA for production SSH certificates'
 							: 'Root CA for internal PKI and mTLS'}
 						rows={3}
+						oninput={save}
 					/>
 				</Field.Content>
 			</Field.Field>
 
-			<!-- Default CA Toggle -->
 			<div
 				class="flex items-start gap-3 rounded-lg border bg-muted/30 p-4 transition-colors hover:bg-muted/50"
 			>
 				<div
-					class="rounded-full p-2 transition-colors {formData.isDefault
+					class="rounded-full p-2 transition-colors {model.isDefault
 						? 'bg-yellow-500/10 text-yellow-600'
 						: 'bg-muted'}"
 				>
-					<Star class="{formData.isDefault ? 'fill-yellow-500' : ''} transition-all" size={16} />
+					<Star class="{model.isDefault ? 'fill-yellow-500' : ''} transition-all" size={16} />
 				</div>
 				<div class="flex-1 space-y-1">
 					<div class="flex items-center justify-between gap-4">
 						<Label for="is-default" class="cursor-pointer font-medium">Set as Default CA</Label>
-						<Switch id="is-default" bind:checked={formData.isDefault} />
+						<Switch
+							id="is-default"
+							checked={model.isDefault}
+							onCheckedChange={(v) => {
+								model.isDefault = v;
+								save();
+							}}
+						/>
 					</div>
 					<p class="text-xs leading-relaxed text-muted-foreground">
 						The default CA is used for new certificate templates and automatic signing.
 					</p>
 				</div>
 			</div>
+
+			{#if isEdit}
+				<MetaInfo createdAt={model.createdAt} updatedAt={model.updatedAt} />
+			{/if}
 		</Tabs.Content>
 
 		<Tabs.Content value="keys" class="space-y-4">
-			{#if isEditing}
+			{#if isEdit}
 				<div
 					class="flex items-center gap-2 rounded-lg border bg-muted/50 p-4 text-sm text-muted-foreground"
 				>
@@ -338,17 +332,17 @@
 						<Field.Content>
 							<Select.Root
 								type="single"
-								value={formData.keyType.toString()}
+								value={model.keyType.toString()}
 								onValueChange={(v) => {
-									formData.keyType = parseInt(v) as CertificateKeyType;
-									formData.keyBits = 0;
+									model.keyType = parseInt(v) as CertificateKeyType;
+									model.keyBits = 0;
 								}}
 							>
 								<Select.Trigger class="w-full">
-									{CertificateKeyType[formData.keyType]}
+									{CertificateKeyType[model.keyType]}
 								</Select.Trigger>
 								<Select.Content>
-									{#each enumToArray(CertificateKeyType) as keyType}
+									{#each enumToArray(CertificateKeyType) as keyType (keyType.value)}
 										<Select.Item value={keyType.value.toString()} class="px-4">
 											<span>{keyType.name}</span>
 											{#if keyType.value === CertificateKeyType.ED25519}
@@ -363,18 +357,18 @@
 
 					{#if needsKeyBits}
 						<Field.Field>
-							<Field.Label for="key-bits">Key Size *</Field.Label>
+							<Field.Label for="key-bits">Key Size</Field.Label>
 							<Field.Content>
 								<Select.Root
 									type="single"
-									value={formData.keyBits.toString()}
-									onValueChange={(v) => (formData.keyBits = parseInt(v))}
+									value={model.keyBits.toString()}
+									onValueChange={(v) => (model.keyBits = parseInt(v))}
 								>
 									<Select.Trigger class="w-full">
-										{formData.keyBits ? `${formData.keyBits} bits` : 'Select size'}
+										{model.keyBits ? `${model.keyBits} bits` : 'Select size'}
 									</Select.Trigger>
 									<Select.Content>
-										{#each getKeyBitsOptions(formData.keyType) as opt}
+										{#each getKeyBitsOptions(model.keyType) as opt (opt.value)}
 											<Select.Item value={opt.value.toString()} class="px-4">
 												<span>{opt.label}</span>
 												{#if opt.recommended}
@@ -400,7 +394,7 @@
 					use when requesting certificates from this CA.
 				</p>
 				<div class="grid gap-3 sm:grid-cols-3">
-					{#each enumToArray(CertificateKeyType) as keyType}
+					{#each enumToArray(CertificateKeyType) as keyType (keyType.value)}
 						<Item.Root variant="outline" onclick={() => toggleAllowedKey(keyType.value)}>
 							<Item.Content>
 								<Item.Title>{keyType.name}</Item.Title>
@@ -408,7 +402,7 @@
 							<Item.Actions>
 								<Checkbox
 									id="allowed-key-{keyType.value}"
-									checked={isKeyAllowed(keyType.value)}
+									checked={(model.allowedKeyTypes ?? []).includes(keyType.value)}
 									onCheckedChange={() => toggleAllowedKey(keyType.value)}
 								/>
 							</Item.Actions>
@@ -422,14 +416,19 @@
 			<Field.Field>
 				<Field.Label>CA Validity Period</Field.Label>
 				<Field.Content>
-					<DurationInput bind:value={formData.lifetime} />
+					<DurationInput
+						value={model.lifetime}
+						onchange={(v) => {
+							model.lifetime = v;
+							save();
+						}}
+					/>
 					<Field.Description>
-						How long the CA itself remains valid (minimum 1 month — maximum 10 years)
+						How long the CA itself remains valid (minimum 1 month, maximum 10 years)
 					</Field.Description>
 				</Field.Content>
 			</Field.Field>
 
-			<!-- User / Client Certificate TTLs -->
 			<div class="space-y-3">
 				<div class="flex items-center gap-2 border-b pb-2 text-sm font-medium">
 					<User class="text-muted-foreground" size={16} />
@@ -439,20 +438,31 @@
 					<Field.Field>
 						<Field.Label>Default TTL</Field.Label>
 						<Field.Content>
-							<DurationInput bind:value={formData.userDefaultTtl} />
+							<DurationInput
+								value={model.userDefaultTtl}
+								onchange={(v) => {
+									model.userDefaultTtl = v;
+									save();
+								}}
+							/>
 						</Field.Content>
 					</Field.Field>
 
 					<Field.Field>
 						<Field.Label>Maximum TTL</Field.Label>
 						<Field.Content>
-							<DurationInput bind:value={formData.userMaxTtl} />
+							<DurationInput
+								value={model.userMaxTtl}
+								onchange={(v) => {
+									model.userMaxTtl = v;
+									save();
+								}}
+							/>
 						</Field.Content>
 					</Field.Field>
 				</div>
 			</div>
 
-			<!-- Host / Server Certificate TTLs -->
 			<div class="space-y-3">
 				<div class="flex items-center gap-2 border-b pb-2 text-sm font-medium">
 					<Server class="text-muted-foreground" size={16} />
@@ -462,14 +472,26 @@
 					<Field.Field>
 						<Field.Label>Default TTL</Field.Label>
 						<Field.Content>
-							<DurationInput bind:value={formData.hostDefaultTtl} />
+							<DurationInput
+								value={model.hostDefaultTtl}
+								onchange={(v) => {
+									model.hostDefaultTtl = v;
+									save();
+								}}
+							/>
 						</Field.Content>
 					</Field.Field>
 
 					<Field.Field>
 						<Field.Label>Maximum TTL</Field.Label>
 						<Field.Content>
-							<DurationInput bind:value={formData.hostMaxTtl} />
+							<DurationInput
+								value={model.hostMaxTtl}
+								onchange={(v) => {
+									model.hostMaxTtl = v;
+									save();
+								}}
+							/>
 						</Field.Content>
 					</Field.Field>
 				</div>
@@ -497,7 +519,7 @@
 						Default extensions included in signed user certificates.
 					</p>
 					<div class="grid gap-4 sm:grid-cols-2">
-						{#each extensionOptions as ext}
+						{#each extensionOptions as ext (ext.id)}
 							<Item.Root variant="outline" onclick={() => toggleExtension(ext.id)}>
 								<Item.Content>
 									<Item.Title>{ext.label}</Item.Title>
@@ -525,26 +547,6 @@
 					</p>
 
 					<div class="space-y-5 rounded-md border bg-muted/20 p-4">
-						<div class="flex items-center space-x-3 border-b pb-4">
-							<Switch
-								id="enable-recording"
-								checked={hasCriticalOption('force-command')}
-								onCheckedChange={(checked) =>
-									updateCriticalOption('force-command', checked ? 'nokkud record' : undefined)}
-							/>
-							<div class="flex flex-col gap-1">
-								<Label for="enable-recording" class="cursor-pointer text-sm font-medium">
-									Enable Session Recording
-								</Label>
-								<span class="text-xs text-muted-foreground">
-									Sets force-command to <code class="rounded bg-muted px-1 py-0.5 text-xs"
-										>nokkud record</code
-									>
-									so the daemon records each session.
-								</span>
-							</div>
-						</div>
-
 						<Field.Field>
 							<Field.Label>Force Command</Field.Label>
 							<Field.Content>
@@ -595,5 +597,5 @@
 				</div>
 			</Tabs.Content>
 		{/if}
-	</Tabs.Root>
+	</ModalTabs>
 </FormModal>
