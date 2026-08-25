@@ -2,6 +2,80 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-08-25
+
+### Features
+
+- daemon: Generate server-side friendly names with collision retry
+- db: Track session last-seen for idle timeout
+- daemon: Add per-user max sessions config
+- db: Track api key last seen instead of entity columns
+- auth: List and revoke user sessions
+- compose: Add redis to test stack
+- daemon: Make enrollment idempotent by key thumbprint
+- config: Add one-time token cleanup job
+- audit: Add details and new filters to audit logs
+- audit: Record kagi auth events in audit log
+- ui: Update activity pages for audit changes
+- api: Encrypt recordings at rest on the server
+- ui: Drop client-side recording encryption
+
+### Bug Fixes
+
+- api: Register auth routes with split method and path
+- deviceauth: Add device deny flow
+- api: Ui types for proto schema
+
+### Security
+
+- api: Add read header timeout to http server
+
+### Refactoring
+
+- db: Let database generate daemon and service account ids
+- auth: Adopt kagi tokens, resolvers, and account-state checks
+- api: Consolidate auth flows into kagi auth server
+- auth: Use kagi.Kind for actor types
+- db: Remove machine usage tracking queries
+- db: Drop squashed auth migrations
+- db: Squash auth schema into base migration
+- web: Use generated service method names
+- web: Drop success toasts on login and logout
+- auth: Replace meta context with kagi principals
+- config: Use standard PG/REDIS env vars
+- db: Read connection env vars in pool config
+- ui: Remove fingerprint row from daemon modal
+- db: Consume one-time tokens atomically
+- ui: Migrate tables to tanstack svelte-table
+- ui: Extract shared app table hook
+- ui: Migrate tables to shared column helper
+- saml: Delegate SP keypair management to kagi keystore
+- ui: Move formatBytes into shared utils
+- ui: Tidy recording player icon and sizing
+
+### Testing
+
+- integration: Remove db-backed integration tests
+
+### Documentation
+
+- adr: Remove superseded auth ADR
+
+### Miscellaneous
+
+- misc: Tidy blank line in auth migration comment
+- proto: Rename daemon session and regen bindings
+- compose: Rename compose.yml to compose.min.yml
+- proto: Regenerate buf stubs
+- namegen: Simplify fallback comment
+- db: Regenerate sqlc output
+- ui: Update dependencies
+- ui: Add agents instructions
+- ui: Format AGENTS.md
+- gen: Regenerate go protobuf bindings for recordings
+- gen: Regenerate ts protobuf bindings for recordings
+- misc: Reformat saml_sp sqlc output
+
 ## [0.2.0] - 2026-08-18
 
 ### Features
