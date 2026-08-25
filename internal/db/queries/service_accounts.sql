@@ -15,19 +15,11 @@ RETURNING
 
 -- name: GetServiceAccount :one
 SELECT
-  sa.*,
-  (
-    SELECT
-      MAX(ak.last_seen)
-    FROM
-      api_keys ak
-    WHERE
-      ak.subject_id = sa.id
-  )::TIMESTAMPTZ AS last_used_at
+  *
 FROM
-  service_accounts sa
+  service_accounts
 WHERE
-  sa.id = @service_account_id;
+  id = @service_account_id;
 
 -- name: GetServiceAccountWorkspaceID :one
 SELECT
@@ -40,14 +32,6 @@ WHERE
 -- name: ListServiceAccounts :many
 SELECT
   sa.*,
-  (
-    SELECT
-      MAX(ak.last_seen)
-    FROM
-      api_keys ak
-    WHERE
-      ak.subject_id = sa.id
-  )::TIMESTAMPTZ AS last_used_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa

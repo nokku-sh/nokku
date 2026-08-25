@@ -106,7 +106,7 @@ type Querier interface {
 	GetSAMLProviderByID(ctx context.Context, workspaceID string) (*SamlProvider, error)
 	// Shared SAML SP keypair (singleton) -----------------------------------------
 	GetSAMLSPKey(ctx context.Context) (*SamlSpKey, error)
-	GetServiceAccount(ctx context.Context, serviceAccountID string) (*GetServiceAccountRow, error)
+	GetServiceAccount(ctx context.Context, serviceAccountID string) (*ServiceAccount, error)
 	GetServiceAccountWorkspaceID(ctx context.Context, serviceAccountID string) (string, error)
 	GetSessionByHash(ctx context.Context, tokenHash []byte) (*Session, error)
 	GetSubscription(ctx context.Context, workspaceID string) (*WorkspaceSubscription, error)

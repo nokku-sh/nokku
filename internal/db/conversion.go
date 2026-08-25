@@ -211,32 +211,12 @@ func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
 	}
 }
 
-func (r *GetServiceAccountRow) ToProto() *nokkuv1.ServiceAccount {
-	if r == nil {
-		return nil
-	}
-	p := (&ServiceAccount{
-		ID:          r.ID,
-		WorkspaceID: r.WorkspaceID,
-		Name:        r.Name,
-		Description: r.Description,
-		RoleName:    r.RoleName,
-		ExpiresAt:   r.ExpiresAt,
-		Tags:        r.Tags,
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
-	}).ToProto()
-	if p != nil && !r.LastUsedAt.IsZero() {
-		p.LastUsedAt = SafeTimestamp(&r.LastUsedAt)
-	}
-	return p
-}
-
 func (r *ListServiceAccountsRow) ToProto() *nokkuv1.ServiceAccount {
 	if r == nil {
 		return nil
 	}
-	p := (&ServiceAccount{
+
+	return (&ServiceAccount{
 		ID:          r.ID,
 		WorkspaceID: r.WorkspaceID,
 		Name:        r.Name,
@@ -247,10 +227,6 @@ func (r *ListServiceAccountsRow) ToProto() *nokkuv1.ServiceAccount {
 		CreatedAt:   r.CreatedAt,
 		UpdatedAt:   r.UpdatedAt,
 	}).ToProto()
-	if p != nil && !r.LastUsedAt.IsZero() {
-		p.LastUsedAt = SafeTimestamp(&r.LastUsedAt)
-	}
-	return p
 }
 
 func ServiceAccountsToProto(rows []*ListServiceAccountsRow) []*nokkuv1.ServiceAccount {
