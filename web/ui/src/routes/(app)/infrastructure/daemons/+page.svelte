@@ -9,18 +9,17 @@
 		type BulkAction
 	} from '$lib/components/tables';
 	import { ActionCell, AvatarCell, StatusCell, TimeCell } from '$lib/components/tables/cells';
-	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { DaemonStatus, type Daemon, DaemonSchema } from '$lib/gen/nokku/v1/daemon_pb';
 	import { createEntityModalState } from '$lib/hooks';
 	import { enumLabel } from '$lib/utils';
+	import EnrollTokenPopover from './EnrollTokenPopover.svelte';
 	import {
 		Bot,
 		BotOff,
 		CircleCheckBig,
 		Clock,
-		ExternalLink,
 		InfoIcon,
 		Trash2,
 		Wifi,
@@ -144,10 +143,7 @@
 <DaemonModal bind:open={daemonModal.open} draft={daemonModal.draft} />
 
 <PageHeader title="Daemons" description="Manage your workspace daemons" icon={Bot}>
-	<Button href="/settings/enrollment" variant="link">
-		Enroll daemons
-		<ExternalLink size={16} class="text-muted-foreground" />
-	</Button>
+	<EnrollTokenPopover />
 </PageHeader>
 
 <DataTable
@@ -158,7 +154,7 @@
 	emptyState={{
 		icon: BotOff,
 		title: 'No Daemons',
-		description: 'Deploy daemons to your servers using a enrollment token to get started.'
+		description: 'Generate an enrollment token to deploy your first daemon.'
 	}}
 >
 	{#snippet toolbar(table)}
