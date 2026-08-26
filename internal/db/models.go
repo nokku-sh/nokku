@@ -29,7 +29,7 @@ type AuditAuditLog struct {
 	Timestamp   time.Time `json:"timestamp"`
 	WorkspaceID *string   `json:"workspaceId"`
 	Action      string    `json:"action"`
-	ActorID     string    `json:"actorId"`
+	ActorID     *string   `json:"actorId"`
 	ActorType   string    `json:"actorType"`
 	ActorEmail  *string   `json:"actorEmail"`
 	IpAddress   *string   `json:"ipAddress"`

@@ -356,11 +356,16 @@ func (s *Server) registerServices(ctx context.Context) error {
 		if !ok {
 			continue
 		}
-		s.mux.Handle(method+" "+authRoutePrefix(path)+path, audit.WithAudit(route.Handler))
+		// No access-log audit wrapper here: kagi records semantic events
+		// (login_success, login_denied, logout, ...) through the sink, one
+		// row per flow instead of two.
+		s.mux.Handle(method+" "+authRoutePrefix(path)+path, route.Handler)
 	}
 
+	// Auth outside audit, matching the RPC interceptor order, so audited
+	// rows see the principal and tenant kagi placed on the request.
 	pubChain := NewChain(audit.WithAudit)                      // Public chain (audit only, no auth)
-	privChain := NewChain(audit.WithAudit, NewHTTPAuth(s.cfg)) // Private chain (audit + auth)
+	privChain := NewChain(NewHTTPAuth(s.cfg), audit.WithAudit) // Private chain (auth + audit)
 
 	// Avatar handlers
 	s.mux.Handle("GET /avatars/{id}", pubChain.ThenFunc(ServeAvatar(s.cfg)))

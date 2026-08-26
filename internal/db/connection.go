@@ -212,14 +212,10 @@ func (c *Connection) WithTx(
 	return tx.Commit(ctx)
 }
 
-// workspaceIDFromContext returns the workspace a request acts in: the tenant
-// carried by a machine principal, or the tenant resolved from the request for
-// global user principals. It mirrors auth.WorkspaceIDFromContext; db cannot
-// import auth, so the small precedence rule lives here too.
+// workspaceIDFromContext returns the workspace a request acts in: the
+// effective tenant kagi placed on the request identity. It mirrors
+// auth.WorkspaceIDFromContext; db cannot import auth.
 func workspaceIDFromContext(ctx context.Context) string {
-	if p, ok := kagi.PrincipalFromContext(ctx); ok && p.TenantID != "" {
-		return string(p.TenantID)
-	}
 	t, _ := kagi.TenantFromContext(ctx)
 	return string(t)
 }

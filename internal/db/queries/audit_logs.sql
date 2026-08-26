@@ -5,7 +5,7 @@ VALUES
   (
     sqlc.narg('workspace_id')::UUID,
     sqlc.arg('action'),
-    sqlc.arg('actor_id')::UUID,
+    sqlc.narg('actor_id')::UUID,
     sqlc.arg('actor_type'),
     sqlc.narg('actor_email'),
     sqlc.narg('ip_address'),

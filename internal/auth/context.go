@@ -15,13 +15,11 @@ const (
 	ActorTypeServiceAccount kagi.Kind = "service_account"
 )
 
-// WorkspaceIDFromContext returns the workspace a request acts in: the tenant
-// carried by a machine principal, or the tenant resolved from the request for
-// global user principals.
+// WorkspaceIDFromContext returns the workspace a request acts in. kagi
+// guarantees the effective tenant is always on the request identity: the
+// credential tenant for machine principals, otherwise the tenant resolved
+// from the request.
 func WorkspaceIDFromContext(ctx context.Context) string {
-	if p, ok := kagi.PrincipalFromContext(ctx); ok && p.TenantID != "" {
-		return string(p.TenantID)
-	}
 	t, _ := kagi.TenantFromContext(ctx)
 	return string(t)
 }

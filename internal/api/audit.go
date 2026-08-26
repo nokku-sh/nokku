@@ -8,7 +8,6 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/nokku-sh/nokku/internal/audit"
-	"github.com/nokku-sh/nokku/internal/auth"
 )
 
 // auditDetach bounds the audit write so a stalled DB connection can't pin an
@@ -28,7 +27,6 @@ func NewAuditInterceptor(audit *audit.Service) *AuditInterceptor {
 
 func (a *AuditInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		ctx = audit.WithState(ctx, &audit.State{UserID: auth.UserIDFromContext(ctx)})
 		resp, err := next(ctx, req)
 		go func() {
 			actx, cancel := auditDetach(ctx)
@@ -49,7 +47,6 @@ func (a *AuditInterceptor) WrapStreamingHandler(
 	next connect.StreamingHandlerFunc,
 ) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		ctx = audit.WithState(ctx, &audit.State{UserID: auth.UserIDFromContext(ctx)})
 		err := next(ctx, conn)
 		go func() {
 			actx, cancel := auditDetach(ctx)
@@ -79,14 +76,10 @@ func (w *statusWriter) WriteHeader(status int) {
 
 func (a *AuditInterceptor) WithAudit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := audit.WithState(
-			r.Context(),
-			&audit.State{UserID: auth.UserIDFromContext(r.Context())},
-		)
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(sw, r.WithContext(ctx))
+		next.ServeHTTP(sw, r)
 		go func() {
-			actx, cancel := auditDetach(ctx)
+			actx, cancel := auditDetach(r.Context())
 			defer cancel()
 			a.audit.LogHTTPAction(actx, r, sw.status)
 		}()

@@ -10,7 +10,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -286,12 +285,11 @@ func (s *WorkspaceService) SubscribeWorkspaceEvents(
 	stream *connect.ServerStream[nokkuv1.SubscribeWorkspaceEventsResponse],
 ) error {
 	workspaceID := req.GetWorkspaceId()
-	audit.SetWorkspaceID(ctx, workspaceID)
+	kagi.AnnotateTenant(ctx, kagi.TenantID(workspaceID))
 
 	// Streaming handlers bypass the unary interceptor's workspace promotion,
 	// so pin the workspace here and let the scoped transaction verify
 	// membership before events start flowing.
-	ctx = kagi.WithTenant(ctx, kagi.TenantID(workspaceID))
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(_ *db.Queries) error {
 		return nil
 	}); err != nil {

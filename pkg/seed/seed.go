@@ -75,12 +75,12 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 	}); err != nil {
 		return fmt.Errorf("failed to create workspace: %w", err)
 	}
-	ctx = kagi.WithPrincipal(ctx, kagi.Principal{
+	ctx = kagi.ContextWithPrincipal(ctx, kagi.Principal{
 		SubjectID: owner.ID,
 		Kind:      auth.ActorTypeUser,
 	})
 
-	ctx = kagi.WithTenant(ctx, kagi.TenantID(workspace.ID))
+	kagi.AnnotateTenant(ctx, kagi.TenantID(workspace.ID))
 	err = conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		users := make([]*db.User, cfg.NumUsers-1)
 		for i := range cfg.NumUsers - 1 {

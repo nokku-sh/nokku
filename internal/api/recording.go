@@ -326,7 +326,7 @@ func (s *RecordingService) GetRecording(
 	// nil message at auth time), so a global user principal's workspace must
 	// be pinned here from the request. WithWorkspace then checks membership
 	// and scopes row-level security.
-	ctx = kagi.WithTenant(ctx, kagi.TenantID(req.GetWorkspaceId()))
+	kagi.AnnotateTenant(ctx, kagi.TenantID(req.GetWorkspaceId()))
 
 	var rec *db.Recording
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {

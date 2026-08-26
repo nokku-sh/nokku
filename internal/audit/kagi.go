@@ -7,25 +7,21 @@ import (
 	"time"
 
 	"github.com/mizuchilabs/kagi"
+
+	"github.com/nokku-sh/nokku/internal/util"
 )
 
 // Record satisfies kagi.Sink: it converts a kagi authentication event into a
-// generic audit Event and appends it to the log. Auth events are always
-// user-scoped and their tenant is the workspace the SSO flow resolved (empty
-// for plain global logins). They carry no HTTP metadata, so the IP/user-agent/
-// status fields are left empty; the semantic action (login_success, etc.) is
-// what makes them a security trail.
+// generic audit Event and appends it to the log. Auth events are the only
+// audit trail for the kagi routes (the HTTP access-log writer skips them), so
+// they carry the transport facts too: IP and user agent come from the request
+// identity the middleware planted.
 func (s *Service) Record(ctx context.Context, e kagi.Event) {
-	// Attribute the HTTP access-log row on this request context as well, not
-	// just the semantic event. The handler resolves the user during the flow
-	// (passkey/SSO/device), after the audit state was created, so mutating the
-	// shared state here lets the async access-log writer see the actor. Login
-	// denials without a known user stay anonymous.
-	if e.UserID != "" {
-		SetUserID(ctx, e.UserID)
-	}
-
 	event := eventFromKagi(e)
+	if id, ok := kagi.IdentityFromContext(ctx); ok {
+		event.IPAddress = util.SanitizeUTF8(util.GetRemoteIP(id.Meta.Header, id.Meta.RemoteAddr))
+		event.UserAgent = util.SanitizeUTF8(id.Meta.Header.Get("User-Agent"))
+	}
 
 	// Never block the auth flow: the insert runs detached from the request
 	// context so a slow DB cannot stall a login.
@@ -39,15 +35,9 @@ func (s *Service) Record(ctx context.Context, e kagi.Event) {
 	}()
 }
 
-// eventFromKagi maps a kagi auth event to a generic audit Event.
+// eventFromKagi maps a kagi auth event to a generic audit Event. Actor
+// fields are written verbatim: events that resolved no account stay empty.
 func eventFromKagi(e kagi.Event) *Event {
-	actorID := e.UserID
-	actorType := "user"
-	if actorID == "" {
-		actorID = anonActorID
-		actorType = "anonymous"
-	}
-
 	details := map[string]any{}
 	if e.Method != "" {
 		details["method"] = string(e.Method)
@@ -76,8 +66,9 @@ func eventFromKagi(e kagi.Event) *Event {
 		Timestamp:   ts.UTC(),
 		WorkspaceID: string(e.TenantID),
 		Action:      string(e.Action),
-		ActorID:     actorID,
-		ActorType:   actorType,
+		ActorID:     e.UserID,
+		ActorType:   string(e.Kind),
+		ActorEmail:  e.Email,
 		StatusCode:  statusCode,
 		Details:     details,
 	}
