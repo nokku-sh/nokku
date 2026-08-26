@@ -84,14 +84,18 @@ function bufferToBase64url(buffer: ArrayBuffer): string {
  */
 export async function signupWithPasskey(params: {
 	email: string;
-	username: string;
 	name?: string;
 }): Promise<void> {
+	// The signup resolver reads email/name from request form values on both
+	// ceremony requests, so they travel as urlencoded data (begin) and a
+	// query parameter (finish), not inside the JSON bodies.
+	const form = new URLSearchParams({ email: params.email });
+	if (params.name) form.set('name', params.name);
+
 	const beginResponse = await fetch('/passkey/signup/begin', {
 		method: 'POST',
 		credentials: 'include',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(params)
+		body: form
 	});
 
 	if (!beginResponse.ok) {
@@ -100,7 +104,6 @@ export async function signupWithPasskey(params: {
 	}
 
 	const beginData = await beginResponse.json();
-	const userId = beginData.userId as string;
 
 	// Convert server response to WebAuthn format
 	const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
@@ -129,7 +132,6 @@ export async function signupWithPasskey(params: {
 	const attestationResponse = credential.response as AuthenticatorAttestationResponse;
 
 	const credentialData = {
-		userId,
 		id: credential.id,
 		rawId: bufferToBase64url(credential.rawId),
 		type: credential.type,
@@ -140,12 +142,15 @@ export async function signupWithPasskey(params: {
 		name: getAuthenticatorName(credential)
 	};
 
-	const finishResponse = await fetch('/passkey/signup/finish', {
-		method: 'POST',
-		credentials: 'include',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(credentialData)
-	});
+	const finishResponse = await fetch(
+		`/passkey/signup/finish?email=${encodeURIComponent(params.email)}`,
+		{
+			method: 'POST',
+			credentials: 'include',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(credentialData)
+		}
+	);
 
 	if (!finishResponse.ok) {
 		const error = await finishResponse.text();
