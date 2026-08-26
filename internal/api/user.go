@@ -271,13 +271,6 @@ func (s *UserService) ListUserSessions(
 		return nil, DBError(err)
 	}
 
-	// The principal carries the raw token of the presenting session, so the
-	// UI can mark it as the current one (and warn before revoking it).
-	var current string
-	if p, ok := kagi.PrincipalFromContext(ctx); ok {
-		current = p.SessionToken
-	}
-
 	out := make([]*nokkuv1.UserSession, 0, len(sessions))
 	for _, s := range sessions {
 		id := hex.EncodeToString(s.TokenHash)
@@ -289,7 +282,6 @@ func (s *UserService) ListUserSessions(
 			Binding:    new(s.Binding),
 			ExpiresAt:  db.SafeTimestamp(&s.ExpiresAt),
 			LastSeen:   db.SafeTimestamp(&s.LastSeenAt),
-			IsCurrent:  new(s.Token == current),
 		})
 	}
 	return &nokkuv1.ListUserSessionsResponse{Sessions: out}, nil

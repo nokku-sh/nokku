@@ -16,7 +16,7 @@ import type { Message } from '@bufbuild/protobuf';
  * Describes the file nokku/v1/user.proto.
  */
 export const file_nokku_v1_user: GenFile /*@__PURE__*/ = fileDesc(
-	'ChNub2trdS92MS91c2VyLnByb3RvEghub2trdS52MSKAAgoLVXNlclNlc3Npb24SCgoCaWQYASABKAkSDAoEa2luZBgCIAEoCRIOCgZtZXRob2QYAyABKAkSEwoLaWRlbnRpdHlfaWQYBCABKAkSDwoHYmluZGluZxgFIAEoCRIuCgpleHBpcmVzX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBItCglsYXN0X3NlZW4YByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmNyZWF0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmlzX2N1cnJlbnQYCSABKAgi6QEKBFVzZXISCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIQCgh1c2VybmFtZRgDIAEoCRINCgVlbWFpbBgEIAEoCRIWCg5lbWFpbF92ZXJpZmllZBgFIAEoCBIPCgdwaWN0dXJlGAYgASgJEi4KCmNyZWF0ZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEh0KFWVuYWJsZV9lbWFpbF9yZWNvdmVyeRgJIAEoCCJ4Cg1PQXV0aElkZW50aXR5EhMKC3Byb3ZpZGVyX2lkGAEgASgJEhAKCHByb3ZpZGVyGAIgASgJEhAKCHByb3RvY29sGAMgASgJEi4KCmNyZWF0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIg8KDVdob2FtaVJlcXVlc3QiYQoOV2hvYW1pUmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLm5va2t1LnYxLlVzZXISMQoPc2VydmljZV9hY2NvdW50GAIgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnQiowEKFFVwZGF0ZVByb2ZpbGVSZXF1ZXN0EhgKBG5hbWUYASABKAlCCrpIB3IFEAMYgAISGQoFZW1haWwYAiABKAlCCrpIB3IFGIACYAESRQoIdXNlcm5hbWUYAyABKAlCM7pIMHIuEAMYJzIoXlthLXpBLVowLTldKFthLXpBLVowLTktX10pKlthLXpBLVowLTldJBIPCgdwaWN0dXJlGAQgASgJIkkKFVVwZGF0ZVByb2ZpbGVSZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlchISCgplbWFpbF9zZW50GAIgASgIIhYKFERlbGV0ZUFjY291bnRSZXF1ZXN0IhcKFURlbGV0ZUFjY291bnRSZXNwb25zZSIbChlMaXN0TGlua2VkQWNjb3VudHNSZXF1ZXN0IkcKGkxpc3RMaW5rZWRBY2NvdW50c1Jlc3BvbnNlEikKCGFjY291bnRzGAEgAygLMhcubm9ra3UudjEuT0F1dGhJZGVudGl0eSIxChRVbmxpbmtBY2NvdW50UmVxdWVzdBIZCghwcm92aWRlchgBIAEoCUIHukgEcgIQASIXChVVbmxpbmtBY2NvdW50UmVzcG9uc2UiKQoXU2V0RW1haWxSZWNvdmVyeVJlcXVlc3QSDgoGZW5hYmxlGAEgASgIIhoKGFNldEVtYWlsUmVjb3ZlcnlSZXNwb25zZSIZChdMaXN0VXNlclNlc3Npb25zUmVxdWVzdCJDChhMaXN0VXNlclNlc3Npb25zUmVzcG9uc2USJwoIc2Vzc2lvbnMYASADKAsyFS5ub2trdS52MS5Vc2VyU2Vzc2lvbiI5ChhSZXZva2VVc2VyU2Vzc2lvblJlcXVlc3QSHQoKc2Vzc2lvbl9pZBgBIAEoCUIJukgGcgQQARhAIhsKGVJldm9rZVVzZXJTZXNzaW9uUmVzcG9uc2UytAcKC1VzZXJTZXJ2aWNlElIKBldob2FtaRIXLm5va2t1LnYxLldob2FtaVJlcXVlc3QaGC5ub2trdS52MS5XaG9hbWlSZXNwb25zZSIVkAIBgtPkkwIMEgovdjEvd2hvYW1pEmgKDVVwZGF0ZVByb2ZpbGUSHi5ub2trdS52MS5VcGRhdGVQcm9maWxlUmVxdWVzdBofLm5va2t1LnYxLlVwZGF0ZVByb2ZpbGVSZXNwb25zZSIWgtPkkwIQOgEqMgsvdjEvcHJvZmlsZRJlCg1EZWxldGVBY2NvdW50Eh4ubm9ra3UudjEuRGVsZXRlQWNjb3VudFJlcXVlc3QaHy5ub2trdS52MS5EZWxldGVBY2NvdW50UmVzcG9uc2UiE4LT5JMCDSoLL3YxL2FjY291bnQSfgoSTGlzdExpbmtlZEFjY291bnRzEiMubm9ra3UudjEuTGlzdExpbmtlZEFjY291bnRzUmVxdWVzdBokLm5va2t1LnYxLkxpc3RMaW5rZWRBY2NvdW50c1Jlc3BvbnNlIh2QAgGC0+STAhQSEi92MS9hY2NvdW50cy9vYXV0aBJ3Cg1VbmxpbmtBY2NvdW50Eh4ubm9ra3UudjEuVW5saW5rQWNjb3VudFJlcXVlc3QaHy5ub2trdS52MS5VbmxpbmtBY2NvdW50UmVzcG9uc2UiJYLT5JMCHyodL3YxL2FjY291bnRzL29hdXRoL3twcm92aWRlcn0SgAEKEFNldEVtYWlsUmVjb3ZlcnkSIS5ub2trdS52MS5TZXRFbWFpbFJlY292ZXJ5UmVxdWVzdBoiLm5va2t1LnYxLlNldEVtYWlsUmVjb3ZlcnlSZXNwb25zZSIlgtPkkwIfOgEqMhovdjEvYWNjb3VudC9lbWFpbC1yZWNvdmVyeRJ6ChBMaXN0VXNlclNlc3Npb25zEiEubm9ra3UudjEuTGlzdFVzZXJTZXNzaW9uc1JlcXVlc3QaIi5ub2trdS52MS5MaXN0VXNlclNlc3Npb25zUmVzcG9uc2UiH5ACAYLT5JMCFhIUL3YxL2FjY291bnQvc2Vzc2lvbnMShwEKEVJldm9rZVVzZXJTZXNzaW9uEiIubm9ra3UudjEuUmV2b2tlVXNlclNlc3Npb25SZXF1ZXN0GiMubm9ra3UudjEuUmV2b2tlVXNlclNlc3Npb25SZXNwb25zZSIpgtPkkwIjKiEvdjEvYWNjb3VudC9zZXNzaW9ucy97c2Vzc2lvbl9pZH1CkwEKDGNvbS5ub2trdS52MUIJVXNlclByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
+	'ChNub2trdS92MS91c2VyLnByb3RvEghub2trdS52MSLsAQoLVXNlclNlc3Npb24SCgoCaWQYASABKAkSDAoEa2luZBgCIAEoCRIOCgZtZXRob2QYAyABKAkSEwoLaWRlbnRpdHlfaWQYBCABKAkSDwoHYmluZGluZxgFIAEoCRIuCgpleHBpcmVzX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBItCglsYXN0X3NlZW4YByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmNyZWF0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIukBCgRVc2VyEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEAoIdXNlcm5hbWUYAyABKAkSDQoFZW1haWwYBCABKAkSFgoOZW1haWxfdmVyaWZpZWQYBSABKAgSDwoHcGljdHVyZRgGIAEoCRIuCgpjcmVhdGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIdChVlbmFibGVfZW1haWxfcmVjb3ZlcnkYCSABKAgieAoNT0F1dGhJZGVudGl0eRITCgtwcm92aWRlcl9pZBgBIAEoCRIQCghwcm92aWRlchgCIAEoCRIQCghwcm90b2NvbBgDIAEoCRIuCgpjcmVhdGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCIPCg1XaG9hbWlSZXF1ZXN0ImEKDldob2FtaVJlc3BvbnNlEhwKBHVzZXIYASABKAsyDi5ub2trdS52MS5Vc2VyEjEKD3NlcnZpY2VfYWNjb3VudBgCIAEoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50IqMBChRVcGRhdGVQcm9maWxlUmVxdWVzdBIYCgRuYW1lGAEgASgJQgq6SAdyBRADGIACEhkKBWVtYWlsGAIgASgJQgq6SAdyBRiAAmABEkUKCHVzZXJuYW1lGAMgASgJQjO6SDByLhADGCcyKF5bYS16QS1aMC05XShbYS16QS1aMC05LV9dKSpbYS16QS1aMC05XSQSDwoHcGljdHVyZRgEIAEoCSJJChVVcGRhdGVQcm9maWxlUmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLm5va2t1LnYxLlVzZXISEgoKZW1haWxfc2VudBgCIAEoCCIWChREZWxldGVBY2NvdW50UmVxdWVzdCIXChVEZWxldGVBY2NvdW50UmVzcG9uc2UiGwoZTGlzdExpbmtlZEFjY291bnRzUmVxdWVzdCJHChpMaXN0TGlua2VkQWNjb3VudHNSZXNwb25zZRIpCghhY2NvdW50cxgBIAMoCzIXLm5va2t1LnYxLk9BdXRoSWRlbnRpdHkiMQoUVW5saW5rQWNjb3VudFJlcXVlc3QSGQoIcHJvdmlkZXIYASABKAlCB7pIBHICEAEiFwoVVW5saW5rQWNjb3VudFJlc3BvbnNlIikKF1NldEVtYWlsUmVjb3ZlcnlSZXF1ZXN0Eg4KBmVuYWJsZRgBIAEoCCIaChhTZXRFbWFpbFJlY292ZXJ5UmVzcG9uc2UiGQoXTGlzdFVzZXJTZXNzaW9uc1JlcXVlc3QiQwoYTGlzdFVzZXJTZXNzaW9uc1Jlc3BvbnNlEicKCHNlc3Npb25zGAEgAygLMhUubm9ra3UudjEuVXNlclNlc3Npb24iOQoYUmV2b2tlVXNlclNlc3Npb25SZXF1ZXN0Eh0KCnNlc3Npb25faWQYASABKAlCCbpIBnIEEAEYQCIbChlSZXZva2VVc2VyU2Vzc2lvblJlc3BvbnNlMrQHCgtVc2VyU2VydmljZRJSCgZXaG9hbWkSFy5ub2trdS52MS5XaG9hbWlSZXF1ZXN0Ghgubm9ra3UudjEuV2hvYW1pUmVzcG9uc2UiFZACAYLT5JMCDBIKL3YxL3dob2FtaRJoCg1VcGRhdGVQcm9maWxlEh4ubm9ra3UudjEuVXBkYXRlUHJvZmlsZVJlcXVlc3QaHy5ub2trdS52MS5VcGRhdGVQcm9maWxlUmVzcG9uc2UiFoLT5JMCEDoBKjILL3YxL3Byb2ZpbGUSZQoNRGVsZXRlQWNjb3VudBIeLm5va2t1LnYxLkRlbGV0ZUFjY291bnRSZXF1ZXN0Gh8ubm9ra3UudjEuRGVsZXRlQWNjb3VudFJlc3BvbnNlIhOC0+STAg0qCy92MS9hY2NvdW50En4KEkxpc3RMaW5rZWRBY2NvdW50cxIjLm5va2t1LnYxLkxpc3RMaW5rZWRBY2NvdW50c1JlcXVlc3QaJC5ub2trdS52MS5MaXN0TGlua2VkQWNjb3VudHNSZXNwb25zZSIdkAIBgtPkkwIUEhIvdjEvYWNjb3VudHMvb2F1dGgSdwoNVW5saW5rQWNjb3VudBIeLm5va2t1LnYxLlVubGlua0FjY291bnRSZXF1ZXN0Gh8ubm9ra3UudjEuVW5saW5rQWNjb3VudFJlc3BvbnNlIiWC0+STAh8qHS92MS9hY2NvdW50cy9vYXV0aC97cHJvdmlkZXJ9EoABChBTZXRFbWFpbFJlY292ZXJ5EiEubm9ra3UudjEuU2V0RW1haWxSZWNvdmVyeVJlcXVlc3QaIi5ub2trdS52MS5TZXRFbWFpbFJlY292ZXJ5UmVzcG9uc2UiJYLT5JMCHzoBKjIaL3YxL2FjY291bnQvZW1haWwtcmVjb3ZlcnkSegoQTGlzdFVzZXJTZXNzaW9ucxIhLm5va2t1LnYxLkxpc3RVc2VyU2Vzc2lvbnNSZXF1ZXN0GiIubm9ra3UudjEuTGlzdFVzZXJTZXNzaW9uc1Jlc3BvbnNlIh+QAgGC0+STAhYSFC92MS9hY2NvdW50L3Nlc3Npb25zEocBChFSZXZva2VVc2VyU2Vzc2lvbhIiLm5va2t1LnYxLlJldm9rZVVzZXJTZXNzaW9uUmVxdWVzdBojLm5va2t1LnYxLlJldm9rZVVzZXJTZXNzaW9uUmVzcG9uc2UiKYLT5JMCIyohL3YxL2FjY291bnQvc2Vzc2lvbnMve3Nlc3Npb25faWR9QpMBCgxjb20ubm9ra3UudjFCCVVzZXJQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
 	[
 		file_buf_validate_validate,
 		file_google_api_annotations,
@@ -26,9 +26,6 @@ export const file_nokku_v1_user: GenFile /*@__PURE__*/ = fileDesc(
 );
 
 /**
- * Session is a login session the user can see and revoke. It never carries
- * the raw token; only the hash-derived id and metadata.
- *
  * @generated from message nokku.v1.UserSession
  */
 export type UserSession = Message<'nokku.v1.UserSession'> & {
@@ -38,36 +35,26 @@ export type UserSession = Message<'nokku.v1.UserSession'> & {
 	id: string;
 
 	/**
-	 * 'user' | 'daemon'
-	 *
 	 * @generated from field: string kind = 2;
 	 */
 	kind: string;
 
 	/**
-	 * 'password' | 'passkey' | 'device' | 'oidc' | ...
-	 *
 	 * @generated from field: string method = 3;
 	 */
 	method: string;
 
 	/**
-	 * CLI device id, when the session is device-bound
-	 *
 	 * @generated from field: string identity_id = 4;
 	 */
 	identityId: string;
 
 	/**
-	 * DPoP key thumbprint (jkt), when key-bound
-	 *
 	 * @generated from field: string binding = 5;
 	 */
 	binding: string;
 
 	/**
-	 * absent = never expires
-	 *
 	 * @generated from field: google.protobuf.Timestamp expires_at = 6;
 	 */
 	expiresAt?: Timestamp | undefined;
@@ -81,13 +68,6 @@ export type UserSession = Message<'nokku.v1.UserSession'> & {
 	 * @generated from field: google.protobuf.Timestamp created_at = 8;
 	 */
 	createdAt?: Timestamp | undefined;
-
-	/**
-	 * true for the session presenting this request
-	 *
-	 * @generated from field: bool is_current = 9;
-	 */
-	isCurrent: boolean;
 };
 
 /**
@@ -170,8 +150,6 @@ export type OAuthIdentity = Message<'nokku.v1.OAuthIdentity'> & {
 	provider: string;
 
 	/**
-	 * 'oauth' | 'oidc' | 'saml'
-	 *
 	 * @generated from field: string protocol = 3;
 	 */
 	protocol: string;
@@ -308,7 +286,7 @@ export const DeleteAccountResponseSchema: GenMessage<DeleteAccountResponse> /*@_
 	messageDesc(file_nokku_v1_user, 8);
 
 /**
- * OAuth linked accounts -------------------------------------------------------
+ * OAuth linked accounts ------------------------------------------------------
  *
  * @generated from message nokku.v1.ListLinkedAccountsRequest
  */
@@ -397,7 +375,7 @@ export const SetEmailRecoveryResponseSchema: GenMessage<SetEmailRecoveryResponse
 	messageDesc(file_nokku_v1_user, 14);
 
 /**
- * Sessions ----------------------------------------------------------------------
+ * Sessions -------------------------------------------------------------------
  *
  * @generated from message nokku.v1.ListUserSessionsRequest
  */
