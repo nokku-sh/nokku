@@ -1,19 +1,31 @@
 <script lang="ts">
 	import { recordings } from '$lib/api/recordings.svelte';
 	import RecordingPlayer from './RecordingPlayer.svelte';
-	import { DataTable, createAppColumnHelper } from '$lib/components/tables';
+	import { DataTable, createAppColumnHelper, type BulkAction } from '$lib/components/tables';
 	import { ActionCell, StatusCell, TimeCell } from '$lib/components/tables/cells';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import StorageQuotaPill from './StorageQuotaPill.svelte';
 	import { createModalState } from '$lib/hooks';
 	import { formatBytes } from '$lib/utils';
 	import type { Recording } from '$lib/gen/nokku/v1/recordings_pb';
-	import { MonitorPlay, SearchX } from '@lucide/svelte';
+	import { Play, SearchX, Trash2, Video } from '@lucide/svelte';
 
 	const list = $derived(recordings.list());
 	const deleteRecording = recordings.delete();
 
 	const player = createModalState<Recording>({} as Recording);
+
+	const bulkActions: BulkAction<Recording>[] = [
+		{
+			type: 'button',
+			label: 'Delete',
+			icon: Trash2,
+			variant: 'destructive',
+			onClick: (selected) =>
+				selected.forEach(({ id }) => deleteRecording.mutate({ recordingId: id }))
+		}
+	];
 
 	const columnHelper = createAppColumnHelper<Recording>();
 	const columns = columnHelper.columns([
@@ -42,7 +54,7 @@
 				renderComponent(ActionCell, {
 					inlineActions: [
 						{
-							icon: MonitorPlay,
+							icon: Play,
 							onClick: () => player.openWith({ ...row.original })
 						}
 					],
@@ -59,15 +71,18 @@
 </script>
 
 <PageHeader
-	icon={MonitorPlay}
+	icon={Video}
 	title="Recordings"
-	description="Session recordings streamed by your daemons. All recordings are encrypted and can only be viewed with the workspace private key."
-/>
+	description="Encrypted session recordings from your daemons."
+>
+	<StorageQuotaPill />
+</PageHeader>
 
 <DataTable
 	data={list.data?.recordings ?? []}
 	rowCount={list.data?.total ?? 0}
 	{columns}
+	{bulkActions}
 	emptyState={{
 		icon: SearchX,
 		title: 'No recordings yet',
