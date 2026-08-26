@@ -233,7 +233,7 @@
 			</div>
 			<div class="flex items-center gap-2">
 				{#if isAdmin}
-					<Button variant="outline" href="/infrastructure/targets">
+					<Button variant="outline" href="/infrastructure/daemons">
 						<Server />
 						Enroll server
 					</Button>

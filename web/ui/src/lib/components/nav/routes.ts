@@ -65,9 +65,8 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			icon: Settings,
 			items: [
 				{ title: 'General', url: '/settings', icon: Settings, shortcut: 's' },
-				{ title: 'Single Sign-On', url: '/settings/sso', icon: KeyRound },
-				{ title: 'Enrollment', url: '/settings/enrollment', icon: Bot },
-				{ title: 'Recordings', url: '/settings/recordings', icon: Video }
+				{ title: 'Daemons', url: '/settings/daemons', icon: Bot },
+				{ title: 'Single Sign-On', url: '/settings/sso', icon: KeyRound }
 			]
 		}
 	]
