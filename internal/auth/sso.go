@@ -96,7 +96,7 @@ func resolveOIDCProvider(
 			ClientSecret: string(p.ClientSecret.Bytes()),
 			RedirectURL:  cfg.RedirectBase + "/oidc/callback",
 			Scopes:       p.Scopes,
-			UsePKCE:      p.UsePkce,
+			DisablePKCE:  !p.UsePkce,
 			EmailClaim:   p.EmailClaim,
 			NameClaim:    p.NameClaim,
 		}, nil
