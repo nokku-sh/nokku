@@ -109,6 +109,7 @@ func resolveOIDCUser(
 	return func(ctx context.Context, _ kagi.TenantID, id *oidc.Identity) (*kagi.User, error) {
 		enterprise := id.ProviderID != "google"
 		allowJIT := true
+		picture := kagi.ClaimString(id.Claims, "picture")
 		if enterprise {
 			var p *db.OidcProvider
 			if err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
@@ -118,8 +119,18 @@ func resolveOIDCUser(
 				return nil, kagi.ErrIdentityRejected
 			}
 			allowJIT = p.AllowJitProvisioning
+			picture = kagi.ClaimString(id.Claims, p.PictureClaim, "picture")
 		}
-		return resolveSSOUser(ctx, conn, id.Email, id.Name, id.ProviderID, enterprise, allowJIT)
+		return resolveSSOUser(
+			ctx,
+			conn,
+			id.Email,
+			id.Name,
+			id.ProviderID,
+			enterprise,
+			allowJIT,
+			picture,
+		)
 	}
 }
 
@@ -158,7 +169,8 @@ func resolveOAuth2User(
 		if !id.EmailVerified {
 			return nil, kagi.ErrIdentityRejected
 		}
-		return resolveSSOUser(ctx, conn, id.Email, id.Name, id.ProviderID, false, true)
+		picture := kagi.ClaimString(id.Profile, "avatar_url")
+		return resolveSSOUser(ctx, conn, id.Email, id.Name, id.ProviderID, false, true, picture)
 	}
 }
 
@@ -214,6 +226,7 @@ func resolveSAMLUser(
 		}); err != nil || p == nil {
 			return nil, kagi.ErrIdentityRejected
 		}
+		picture := kagi.AttrValue(id.Attributes, strOr(p.PictureAttribute))
 		return resolveSSOUser(
 			ctx,
 			conn,
@@ -222,6 +235,7 @@ func resolveSAMLUser(
 			id.ProviderID,
 			true,
 			p.AllowJitProvisioning,
+			picture,
 		)
 	}
 }
@@ -229,12 +243,15 @@ func resolveSAMLUser(
 // resolveSSOUser resolves (or provisions) the local user for a verified
 // external identity. enterprise identities are domain-bound and become
 // workspace members; social identities are subject to SSO enforcement.
+// picture is the provider-issued avatar, stored only at provision time so a
+// locally uploaded avatar is never overwritten by a later login.
 func resolveSSOUser(
 	ctx context.Context,
 	conn *db.Connection,
 	emailAddr, name, provider string,
 	enterprise bool,
 	allowJIT bool,
+	picture string,
 ) (*kagi.User, error) {
 	domain, err := email.GetDomain(emailAddr)
 	if err != nil {
@@ -274,10 +291,15 @@ func resolveSSOUser(
 			if enterprise && !allowJIT {
 				return kagi.ErrIdentityRejected
 			}
+			var pic *string
+			if picture != "" {
+				pic = &picture
+			}
 			if u, err = q.CreateUser(ctx, &db.CreateUserParams{
 				Name:     name,
 				Username: UsernameFromEmail(emailAddr),
 				Email:    emailAddr,
+				Picture:  pic,
 			}); err != nil {
 				return err
 			}
