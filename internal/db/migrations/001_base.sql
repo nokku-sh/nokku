@@ -725,7 +725,7 @@ CREATE TABLE IF NOT EXISTS audit.audit_logs (
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   workspace_id UUID REFERENCES public.workspaces (id) ON DELETE SET NULL,
   action TEXT NOT NULL,
-  actor_id UUID NOT NULL,
+  actor_id UUID,
   actor_type TEXT NOT NULL,
   actor_email TEXT,
   ip_address TEXT,
