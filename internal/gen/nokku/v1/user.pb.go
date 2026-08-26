@@ -24,19 +24,16 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Session is a login session the user can see and revoke. It never carries
-// the raw token; only the hash-derived id and metadata.
 type UserSession struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Kind          *string                `protobuf:"bytes,2,opt,name=kind" json:"kind,omitempty"`                               // 'user' | 'daemon'
-	Method        *string                `protobuf:"bytes,3,opt,name=method" json:"method,omitempty"`                           // 'password' | 'passkey' | 'device' | 'oidc' | ...
-	IdentityId    *string                `protobuf:"bytes,4,opt,name=identity_id,json=identityId" json:"identity_id,omitempty"` // CLI device id, when the session is device-bound
-	Binding       *string                `protobuf:"bytes,5,opt,name=binding" json:"binding,omitempty"`                         // DPoP key thumbprint (jkt), when key-bound
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`    // absent = never expires
+	Kind          *string                `protobuf:"bytes,2,opt,name=kind" json:"kind,omitempty"`
+	Method        *string                `protobuf:"bytes,3,opt,name=method" json:"method,omitempty"`
+	IdentityId    *string                `protobuf:"bytes,4,opt,name=identity_id,json=identityId" json:"identity_id,omitempty"`
+	Binding       *string                `protobuf:"bytes,5,opt,name=binding" json:"binding,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
 	LastSeen      *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=last_seen,json=lastSeen" json:"last_seen,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	IsCurrent     *bool                  `protobuf:"varint,9,opt,name=is_current,json=isCurrent" json:"is_current,omitempty"` // true for the session presenting this request
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -125,13 +122,6 @@ func (x *UserSession) GetCreatedAt() *timestamppb.Timestamp {
 		return x.CreatedAt
 	}
 	return nil
-}
-
-func (x *UserSession) GetIsCurrent() bool {
-	if x != nil && x.IsCurrent != nil {
-		return *x.IsCurrent
-	}
-	return false
 }
 
 type User struct {
@@ -246,7 +236,7 @@ type OAuthIdentity struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ProviderId    *string                `protobuf:"bytes,1,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
 	Provider      *string                `protobuf:"bytes,2,opt,name=provider" json:"provider,omitempty"`
-	Protocol      *string                `protobuf:"bytes,3,opt,name=protocol" json:"protocol,omitempty"` // 'oauth' | 'oidc' | 'saml'
+	Protocol      *string                `protobuf:"bytes,3,opt,name=protocol" json:"protocol,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -590,7 +580,7 @@ func (*DeleteAccountResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_user_proto_rawDescGZIP(), []int{8}
 }
 
-// OAuth linked accounts -------------------------------------------------------
+// OAuth linked accounts ------------------------------------------------------
 type ListLinkedAccountsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -831,7 +821,7 @@ func (*SetEmailRecoveryResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_user_proto_rawDescGZIP(), []int{14}
 }
 
-// Sessions ----------------------------------------------------------------------
+// Sessions -------------------------------------------------------------------
 type ListUserSessionsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -996,7 +986,7 @@ var File_nokku_v1_user_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x13nokku/v1/user.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1enokku/v1/service_account.proto\"\xd2\x02\n" +
+	"\x13nokku/v1/user.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1enokku/v1/service_account.proto\"\xb3\x02\n" +
 	"\vUserSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x16\n" +
@@ -1008,9 +998,7 @@ const file_nokku_v1_user_proto_rawDesc = "" +
 	"expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x127\n" +
 	"\tlast_seen\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\blastSeen\x129\n" +
 	"\n" +
-	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1d\n" +
-	"\n" +
-	"is_current\x18\t \x01(\bR\tisCurrent\"\xc7\x02\n" +
+	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xc7\x02\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
