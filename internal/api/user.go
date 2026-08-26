@@ -162,7 +162,7 @@ func (s *UserService) ListLinkedAccounts(
 	userID := auth.UserIDFromContext(ctx)
 
 	var accounts []*nokkuv1.OAuthIdentity
-	for _, typ := range []kagi.CredentialType{kagi.CredentialOIDC, kagi.CredentialOAuth2, kagi.CredentialSAML} {
+	for _, typ := range []kagi.Method{kagi.MethodOIDC, kagi.MethodOAuth2, kagi.MethodSAML} {
 		creds, err := s.cfg.Auth.ListCredentials(ctx, userID, typ)
 		if err != nil {
 			return nil, DBError(err)
@@ -171,7 +171,7 @@ func (s *UserService) ListLinkedAccounts(
 			accounts = append(accounts, &nokkuv1.OAuthIdentity{
 				Provider:   new(c.Provider),
 				ProviderId: new(c.Subject),
-				Protocol:   new(protocolFromType(c.Type)),
+				Protocol:   new(string(c.Type)),
 				CreatedAt:  timestamppb.New(c.CreatedAt),
 			})
 		}
@@ -195,7 +195,7 @@ func (s *UserService) UnlinkAccount(
 	}
 
 	var linked []kagi.Credential
-	for _, typ := range []kagi.CredentialType{kagi.CredentialOIDC, kagi.CredentialOAuth2} {
+	for _, typ := range []kagi.Method{kagi.MethodOIDC, kagi.MethodOAuth2} {
 		creds, err := s.cfg.Auth.ListCredentials(ctx, userID, typ)
 		if err != nil {
 			return nil, DBError(err)
@@ -232,32 +232,12 @@ func (s *UserService) hasOtherLoginMethod(ctx context.Context, userID string) bo
 	if creds, err := s.cfg.Auth.ListCredentials(
 		ctx,
 		userID,
-		kagi.CredentialPasskey,
+		kagi.MethodPasskey,
 	); err == nil &&
 		len(creds) > 0 {
 		return true
 	}
 	return false
-}
-
-// protocolFromType maps a kagi credential type to the OAuth protocol label.
-func protocolFromType(t kagi.CredentialType) string {
-	switch t {
-	case kagi.CredentialOIDC:
-		return "oidc"
-	case kagi.CredentialOAuth2:
-		return "oauth"
-	case kagi.CredentialSAML:
-		return "saml"
-	case kagi.CredentialPassword,
-		kagi.CredentialPasskey,
-		kagi.CredentialAPIKey,
-		kagi.CredentialKey,
-		kagi.CredentialBackupCode:
-		return string(t)
-	default:
-		return string(t)
-	}
 }
 
 func (s *UserService) SetEmailRecovery(

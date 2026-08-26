@@ -94,7 +94,7 @@ func (s *CredentialService) ListPasskeys(
 	creds, err := s.cfg.Auth.ListCredentials(
 		ctx,
 		auth.UserIDFromContext(ctx),
-		kagi.CredentialPasskey,
+		kagi.MethodPasskey,
 	)
 	if err != nil {
 		return nil, DBError(err)
@@ -118,7 +118,7 @@ func (s *CredentialService) RenamePasskey(
 ) (*nokkuv1.RenamePasskeyResponse, error) {
 	userID := auth.UserIDFromContext(ctx)
 	cred, err := s.cfg.Auth.GetCredential(ctx, userID, req.GetId())
-	if err != nil || cred.Type != kagi.CredentialPasskey {
+	if err != nil || cred.Type != kagi.MethodPasskey {
 		return nil, ErrNotFound
 	}
 	cred.Label = req.GetName()
@@ -135,7 +135,7 @@ func (s *CredentialService) DeletePasskey(
 ) (*nokkuv1.DeletePasskeyResponse, error) {
 	userID := auth.UserIDFromContext(ctx)
 	cred, err := s.cfg.Auth.GetCredential(ctx, userID, req.GetId())
-	if err != nil || cred.Type != kagi.CredentialPasskey {
+	if err != nil || cred.Type != kagi.MethodPasskey {
 		return nil, ErrNotFound
 	}
 
@@ -161,7 +161,7 @@ func (s *CredentialService) hasOtherLoginMethod(ctx context.Context, userID stri
 	if creds, err := s.cfg.Auth.ListCredentials(
 		ctx,
 		userID,
-		kagi.CredentialPasskey,
+		kagi.MethodPasskey,
 	); err == nil &&
 		len(creds) > 0 {
 		return true
@@ -172,7 +172,7 @@ func (s *CredentialService) hasOtherLoginMethod(ctx context.Context, userID stri
 // hasLinkedAccount reports whether the user has a linked OIDC/OAuth2/SAML
 // identity.
 func (s *CredentialService) hasLinkedAccount(ctx context.Context, userID string) bool {
-	for _, typ := range []kagi.CredentialType{kagi.CredentialOIDC, kagi.CredentialOAuth2, kagi.CredentialSAML} {
+	for _, typ := range []kagi.Method{kagi.MethodOIDC, kagi.MethodOAuth2, kagi.MethodSAML} {
 		if creds, err := s.cfg.Auth.ListCredentials(
 			ctx,
 			userID,

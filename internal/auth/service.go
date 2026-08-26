@@ -177,7 +177,7 @@ func (s *Service) DeleteBackupCodes(ctx context.Context, userID string) error {
 func (s *Service) ListCredentials(
 	ctx context.Context,
 	userID string,
-	typ kagi.CredentialType,
+	typ kagi.Method,
 ) ([]kagi.Credential, error) {
 	return s.store.ListCredentials(ctx, "", userID, typ)
 }
@@ -209,7 +209,7 @@ func (s *Service) CreateUser(ctx context.Context, u kagi.User) (kagi.User, error
 func (s *Service) DeleteProviderCredentials(
 	ctx context.Context,
 	provider string,
-	typ kagi.CredentialType,
+	typ kagi.Method,
 ) error {
 	return s.store.DeleteProviderCredentials(ctx, provider, typ)
 }
