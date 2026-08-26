@@ -11,7 +11,6 @@ import (
 	kagidevice "github.com/mizuchilabs/kagi/deviceauth"
 	kagioauth "github.com/mizuchilabs/kagi/oauth2"
 	kagioidc "github.com/mizuchilabs/kagi/oidc"
-	kagipasskey "github.com/mizuchilabs/kagi/passkey"
 	kagisaml "github.com/mizuchilabs/kagi/saml"
 	"github.com/mizuchilabs/kagi/server"
 
@@ -41,8 +40,7 @@ func NewAuthHandler(cfg *config.Config) (*server.Handler, error) {
 		BaseURL: cfg.FullURL(),
 
 		Flows: &server.Flows{
-			ValidateEmail:        email.Verify,
-			BadCredentialsStatus: http.StatusBadRequest,
+			ValidateEmail: email.Verify,
 			BeforeRegister: func(ctx context.Context, addr string) error {
 				if err := checkSSOEnforced(ctx, cfg, addr); err != nil {
 					return kagi.ErrSSORequired
@@ -72,10 +70,43 @@ func NewAuthHandler(cfg *config.Config) (*server.Handler, error) {
 				RPID:          cfg.AppURL().Hostname(),
 				RPOrigins:     rpOrigins(cfg),
 			},
-			Secure:   true,
-			Register: registerPasskeyOptions(cfg),
-			Login:    &kagipasskey.Options{},
-			Signup:   signupPasskeyOptions(cfg),
+			Secure: true,
+			Login:  &server.PasskeyFlow{},
+			Register: &server.PasskeyFlow{
+				ResolveUser: func(ctx context.Context, _ *http.Request) (kagi.User, error) {
+					p, ok := kagi.PrincipalFromContext(ctx)
+					if !ok {
+						return kagi.User{}, errors.New("not authenticated")
+					}
+					return cfg.Auth.GetUser(ctx, p.SubjectID)
+				},
+				SkipSessionOnRegister: true,
+			},
+			Signup: &server.PasskeyFlow{
+				ResolveUser: func(ctx context.Context, r *http.Request) (kagi.User, error) {
+					addr := r.FormValue("email")
+					if addr == "" {
+						return kagi.User{}, errors.New("email required")
+					}
+					if err := email.Verify(addr); err != nil {
+						return kagi.User{}, errors.New("invalid email address")
+					}
+					if err := checkSSOEnforced(ctx, cfg, addr); err != nil {
+						return kagi.User{}, kagi.ErrSSORequired
+					}
+					if u, err := cfg.Auth.GetUserByEmail(ctx, addr); err == nil {
+						return u, nil
+					} else if !errors.Is(err, kagi.ErrNotFound) {
+						return kagi.User{}, err
+					}
+					name := r.FormValue("name")
+					if name == "" {
+						name = auth.UsernameFromEmail(addr)
+					}
+					return cfg.Auth.CreateUser(ctx, kagi.User{Email: addr, DisplayName: name})
+				},
+				SkipSessionOnRegister: true,
+			},
 		},
 
 		OIDC: &kagioidc.Options{
@@ -120,48 +151,4 @@ func rpOrigins(cfg *config.Config) []string {
 		origins = append(origins, "http://localhost:5173")
 	}
 	return origins
-}
-
-// registerPasskeyOptions is the signed-in add-key flow.
-func registerPasskeyOptions(cfg *config.Config) *kagipasskey.Options {
-	return &kagipasskey.Options{
-		ResolveUser: func(ctx context.Context, _ *http.Request) (kagi.User, error) {
-			p, ok := kagi.PrincipalFromContext(ctx)
-			if !ok {
-				return kagi.User{}, errors.New("not authenticated")
-			}
-			return cfg.Auth.GetUser(ctx, p.SubjectID)
-		},
-		SkipSessionOnRegister: true,
-	}
-}
-
-// signupPasskeyOptions is the passkey-only signup flow: resolve the user by
-// email, provisioning it on first sight.
-func signupPasskeyOptions(cfg *config.Config) *kagipasskey.Options {
-	return &kagipasskey.Options{
-		ResolveUser: func(ctx context.Context, r *http.Request) (kagi.User, error) {
-			addr := r.FormValue("email")
-			if addr == "" {
-				return kagi.User{}, errors.New("email required")
-			}
-			if err := email.Verify(addr); err != nil {
-				return kagi.User{}, errors.New("invalid email address")
-			}
-			if err := checkSSOEnforced(ctx, cfg, addr); err != nil {
-				return kagi.User{}, kagi.ErrSSORequired
-			}
-			if u, err := cfg.Auth.GetUserByEmail(ctx, addr); err == nil {
-				return u, nil
-			} else if !errors.Is(err, kagi.ErrNotFound) {
-				return kagi.User{}, err
-			}
-			name := r.FormValue("name")
-			if name == "" {
-				name = auth.UsernameFromEmail(addr)
-			}
-			return cfg.Auth.CreateUser(ctx, kagi.User{Email: addr, DisplayName: name})
-		},
-		SkipSessionOnRegister: true,
-	}
 }
