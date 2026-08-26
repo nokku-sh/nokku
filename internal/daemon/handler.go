@@ -40,7 +40,13 @@ func (p *Pool) Connect(
 	defer p.UnregisterDaemon(daemonID, conn)
 
 	// Outbound: drain the daemon's session and state channels to the stream.
+	// outDone is closed once the pump stops; the handler must wait for it
+	// before returning, because a Send that lands after ServeHTTP returns
+	// panics ("Write called after Handler finished") and, running on this
+	// spawned goroutine, that panic is unrecovered and kills the process.
+	outDone := make(chan struct{})
 	go func() {
+		defer close(outDone)
 		for {
 			select {
 			case <-conn.ctx.Done():
@@ -91,12 +97,19 @@ func (p *Pool) Connect(
 		}
 	}()
 
+	var retErr error
 	select {
 	case <-conn.ctx.Done():
-		return conn.ctx.Err()
+		retErr = conn.ctx.Err()
 	case err := <-recvErr:
-		return err
+		retErr = err
 	}
+	// UnregisterDaemon (deferred) cancels conn.ctx only after we return, so
+	// stop the pump here before joining it. Receive goroutines may outlive
+	// the handler briefly; they only read the request body, which is safe.
+	conn.Cancel()
+	<-outDone
+	return retErr
 }
 
 func (p *Pool) DaemonSession(
@@ -142,8 +155,12 @@ func (p *Pool) DaemonSession(
 	defer p.UnregisterSession(sessionID)
 	defer sess.shutdown()
 
-	// Outbound: stdin/resize/close from browsers to the daemon stream
+	// Outbound: stdin/resize/close from browsers to the daemon stream.
+	// Joined below: a Send landing after this handler returns panics in
+	// net/http, and on a spawned goroutine that panic kills the process.
+	outDone := make(chan struct{})
 	go func() {
+		defer close(outDone)
 		defer cancel()
 		for {
 			select {
@@ -183,12 +200,17 @@ func (p *Pool) DaemonSession(
 		}
 	}()
 
+	var retErr error
 	select {
 	case <-sess.Exited:
-		return nil
 	case <-ctx.Done():
-		return ctx.Err()
+		retErr = ctx.Err()
 	case err := <-recvErr:
-		return err
+		retErr = err
 	}
+	// The deferred cancel only runs at return; stop the pump now so the
+	// join below cannot deadlock if the peer stopped reading.
+	cancel()
+	<-outDone
+	return retErr
 }
