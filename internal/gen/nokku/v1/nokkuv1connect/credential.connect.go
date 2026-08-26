@@ -101,6 +101,7 @@ func NewCredentialServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			httpClient,
 			baseURL+CredentialServiceListPasskeysProcedure,
 			connect.WithSchema(credentialServiceMethods.ByName("ListPasskeys")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
 		deletePasskey: connect.NewClient[v1.DeletePasskeyRequest, v1.DeletePasskeyResponse](
@@ -125,6 +126,7 @@ func NewCredentialServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			httpClient,
 			baseURL+CredentialServiceListBackupCodesProcedure,
 			connect.WithSchema(credentialServiceMethods.ByName("ListBackupCodes")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
 		deleteBackupCodes: connect.NewClient[v1.DeleteBackupCodesRequest, v1.DeleteBackupCodesResponse](
@@ -258,6 +260,7 @@ func NewCredentialServiceHandler(svc CredentialServiceHandler, opts ...connect.H
 		CredentialServiceListPasskeysProcedure,
 		svc.ListPasskeys,
 		connect.WithSchema(credentialServiceMethods.ByName("ListPasskeys")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
 	credentialServiceDeletePasskeyHandler := connect.NewUnaryHandlerSimple(
@@ -282,6 +285,7 @@ func NewCredentialServiceHandler(svc CredentialServiceHandler, opts ...connect.H
 		CredentialServiceListBackupCodesProcedure,
 		svc.ListBackupCodes,
 		connect.WithSchema(credentialServiceMethods.ByName("ListBackupCodes")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
 	credentialServiceDeleteBackupCodesHandler := connect.NewUnaryHandlerSimple(

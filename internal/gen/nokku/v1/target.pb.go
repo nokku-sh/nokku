@@ -1046,14 +1046,14 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\x04tags\x18\x01 \x03(\tR\x04tags\x12\x1e\n" +
 	"\n" +
 	"principals\x18\x02 \x03(\tR\n" +
-	"principals2\xc1\a\n" +
+	"principals2\xc4\a\n" +
 	"\rTargetService\x12{\n" +
 	"\tGetTarget\x12\x1a.nokku.v1.GetTargetRequest\x1a\x1b.nokku.v1.GetTargetResponse\"5\x82\xd3\xe4\x93\x02,\x12*/v1/workspaces/{workspace_id}/targets/{id}\x90\x02\x01\x12|\n" +
 	"\vListTargets\x12\x1c.nokku.v1.ListTargetsRequest\x1a\x1d.nokku.v1.ListTargetsResponse\"0\x82\xd3\xe4\x93\x02'\x12%/v1/workspaces/{workspace_id}/targets\x90\x02\x01\x12\x7f\n" +
 	"\fCreateTarget\x12\x1d.nokku.v1.CreateTargetRequest\x1a\x1e.nokku.v1.CreateTargetResponse\"0\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/workspaces/{workspace_id}/targets\x12\x84\x01\n" +
 	"\fUpdateTarget\x12\x1d.nokku.v1.UpdateTargetRequest\x1a\x1e.nokku.v1.UpdateTargetResponse\"5\x82\xd3\xe4\x93\x02/:\x01*2*/v1/workspaces/{workspace_id}/targets/{id}\x12\x81\x01\n" +
-	"\fDeleteTarget\x12\x1d.nokku.v1.DeleteTargetRequest\x1a\x1e.nokku.v1.DeleteTargetResponse\"2\x82\xd3\xe4\x93\x02,**/v1/workspaces/{workspace_id}/targets/{id}\x12\x92\x01\n" +
-	"\x10GetSubjectAccess\x12!.nokku.v1.GetSubjectAccessRequest\x1a\".nokku.v1.GetSubjectAccessResponse\"7\x82\xd3\xe4\x93\x021:\x01*\",/v1/workspaces/{workspace_id}/targets/access\x12\x93\x01\n" +
+	"\fDeleteTarget\x12\x1d.nokku.v1.DeleteTargetRequest\x1a\x1e.nokku.v1.DeleteTargetResponse\"2\x82\xd3\xe4\x93\x02,**/v1/workspaces/{workspace_id}/targets/{id}\x12\x95\x01\n" +
+	"\x10GetSubjectAccess\x12!.nokku.v1.GetSubjectAccessRequest\x1a\".nokku.v1.GetSubjectAccessResponse\":\x82\xd3\xe4\x93\x021:\x01*\x12,/v1/workspaces/{workspace_id}/targets/access\x90\x02\x01\x12\x93\x01\n" +
 	"\x10GetTargetFilters\x12!.nokku.v1.GetTargetFiltersRequest\x1a\".nokku.v1.GetTargetFiltersResponse\"8\x82\xd3\xe4\x93\x02/\x12-/v1/workspaces/{workspace_id}/targets/filters\x90\x02\x01B\x95\x01\n" +
 	"\fcom.nokku.v1B\vTargetProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 

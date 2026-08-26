@@ -1162,14 +1162,14 @@ const file_nokku_v1_sso_proto_rawDesc = "" +
 	"\ahas_sso\x18\x01 \x01(\bR\x06hasSso\x12\x1f\n" +
 	"\venforce_sso\x18\x02 \x01(\bR\n" +
 	"enforceSso\x123\n" +
-	"\tproviders\x18\x03 \x03(\v2\x15.nokku.v1.SSOProviderR\tproviders2\x9a\x05\n" +
+	"\tproviders\x18\x03 \x03(\v2\x15.nokku.v1.SSOProviderR\tproviders2\x9d\x05\n" +
 	"\n" +
 	"SSOService\x12\x85\x01\n" +
 	"\x0fGetOIDCProvider\x12 .nokku.v1.GetOIDCProviderRequest\x1a!.nokku.v1.GetOIDCProviderResponse\"-\x82\xd3\xe4\x93\x02$\x12\"/v1/workspaces/{workspace_id}/oidc\x90\x02\x01\x12\x8e\x01\n" +
 	"\x12UpdateOIDCProvider\x12#.nokku.v1.UpdateOIDCProviderRequest\x1a$.nokku.v1.UpdateOIDCProviderResponse\"-\x82\xd3\xe4\x93\x02':\x01*2\"/v1/workspaces/{workspace_id}/oidc\x12\x85\x01\n" +
 	"\x0fGetSAMLProvider\x12 .nokku.v1.GetSAMLProviderRequest\x1a!.nokku.v1.GetSAMLProviderResponse\"-\x82\xd3\xe4\x93\x02$\x12\"/v1/workspaces/{workspace_id}/saml\x90\x02\x01\x12\x8e\x01\n" +
-	"\x12UpdateSAMLProvider\x12#.nokku.v1.UpdateSAMLProviderRequest\x1a$.nokku.v1.UpdateSAMLProviderResponse\"-\x82\xd3\xe4\x93\x02':\x01*2\"/v1/workspaces/{workspace_id}/saml\x12Z\n" +
-	"\bCheckSSO\x12\x19.nokku.v1.CheckSSORequest\x1a\x1a.nokku.v1.CheckSSOResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/sso/{email}B\x92\x01\n" +
+	"\x12UpdateSAMLProvider\x12#.nokku.v1.UpdateSAMLProviderRequest\x1a$.nokku.v1.UpdateSAMLProviderResponse\"-\x82\xd3\xe4\x93\x02':\x01*2\"/v1/workspaces/{workspace_id}/saml\x12]\n" +
+	"\bCheckSSO\x12\x19.nokku.v1.CheckSSORequest\x1a\x1a.nokku.v1.CheckSSOResponse\"\x1a\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/sso/{email}\x90\x02\x01B\x92\x01\n" +
 	"\fcom.nokku.v1B\bSsoProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

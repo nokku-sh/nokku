@@ -162,6 +162,7 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			httpClient,
 			baseURL+WorkspaceServiceSubscribeWorkspaceEventsProcedure,
 			connect.WithSchema(workspaceServiceMethods.ByName("SubscribeWorkspaceEvents")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -367,6 +368,7 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 		WorkspaceServiceSubscribeWorkspaceEventsProcedure,
 		svc.SubscribeWorkspaceEvents,
 		connect.WithSchema(workspaceServiceMethods.ByName("SubscribeWorkspaceEvents")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/nokku.v1.WorkspaceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
