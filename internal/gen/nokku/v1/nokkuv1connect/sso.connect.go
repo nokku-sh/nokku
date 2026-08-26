@@ -100,6 +100,7 @@ func NewSSOServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			httpClient,
 			baseURL+SSOServiceCheckSSOProcedure,
 			connect.WithSchema(sSOServiceMethods.ByName("CheckSSO")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -206,6 +207,7 @@ func NewSSOServiceHandler(svc SSOServiceHandler, opts ...connect.HandlerOption) 
 		SSOServiceCheckSSOProcedure,
 		svc.CheckSSO,
 		connect.WithSchema(sSOServiceMethods.ByName("CheckSSO")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/nokku.v1.SSOService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

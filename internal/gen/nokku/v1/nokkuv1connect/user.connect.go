@@ -85,6 +85,7 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+UserServiceWhoamiProcedure,
 			connect.WithSchema(userServiceMethods.ByName("Whoami")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
 		updateProfile: connect.NewClient[v1.UpdateProfileRequest, v1.UpdateProfileResponse](
@@ -103,6 +104,7 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+UserServiceListLinkedAccountsProcedure,
 			connect.WithSchema(userServiceMethods.ByName("ListLinkedAccounts")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
 		unlinkAccount: connect.NewClient[v1.UnlinkAccountRequest, v1.UnlinkAccountResponse](
@@ -240,6 +242,7 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		UserServiceWhoamiProcedure,
 		svc.Whoami,
 		connect.WithSchema(userServiceMethods.ByName("Whoami")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
 	userServiceUpdateProfileHandler := connect.NewUnaryHandlerSimple(
@@ -258,6 +261,7 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		UserServiceListLinkedAccountsProcedure,
 		svc.ListLinkedAccounts,
 		connect.WithSchema(userServiceMethods.ByName("ListLinkedAccounts")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
 	userServiceUnlinkAccountHandler := connect.NewUnaryHandlerSimple(

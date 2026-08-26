@@ -826,15 +826,15 @@ const file_nokku_v1_credential_proto_rawDesc = "" +
 	"\x17ListBackupCodesResponse\x12*\n" +
 	"\x05codes\x18\x01 \x03(\v2\x14.nokku.v1.BackupCodeR\x05codes\"\x1a\n" +
 	"\x18DeleteBackupCodesRequest\"\x1b\n" +
-	"\x19DeleteBackupCodesResponse2\xf2\a\n" +
+	"\x19DeleteBackupCodesResponse2\xf8\a\n" +
 	"\x11CredentialService\x12x\n" +
 	"\x0eUpdatePassword\x12\x1f.nokku.v1.UpdatePasswordRequest\x1a .nokku.v1.UpdatePasswordResponse\"#\x82\xd3\xe4\x93\x02\x1d:\x01*2\x18/v1/credentials/password\x12u\n" +
-	"\x0eDeletePassword\x12\x1f.nokku.v1.DeletePasswordRequest\x1a .nokku.v1.DeletePasswordResponse\" \x82\xd3\xe4\x93\x02\x1a*\x18/v1/credentials/password\x12o\n" +
-	"\fListPasskeys\x12\x1d.nokku.v1.ListPasskeysRequest\x1a\x1e.nokku.v1.ListPasskeysResponse\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/v1/credentials/passkeys\x12w\n" +
+	"\x0eDeletePassword\x12\x1f.nokku.v1.DeletePasswordRequest\x1a .nokku.v1.DeletePasswordResponse\" \x82\xd3\xe4\x93\x02\x1a*\x18/v1/credentials/password\x12r\n" +
+	"\fListPasskeys\x12\x1d.nokku.v1.ListPasskeysRequest\x1a\x1e.nokku.v1.ListPasskeysResponse\"#\x82\xd3\xe4\x93\x02\x1a\x12\x18/v1/credentials/passkeys\x90\x02\x01\x12w\n" +
 	"\rDeletePasskey\x12\x1e.nokku.v1.DeletePasskeyRequest\x1a\x1f.nokku.v1.DeletePasskeyResponse\"%\x82\xd3\xe4\x93\x02\x1f*\x1d/v1/credentials/passkeys/{id}\x12z\n" +
 	"\rRenamePasskey\x12\x1e.nokku.v1.RenamePasskeyRequest\x1a\x1f.nokku.v1.RenamePasskeyResponse\"(\x82\xd3\xe4\x93\x02\":\x01*2\x1d/v1/credentials/passkeys/{id}\x12\x82\x01\n" +
-	"\x11CreateBackupCodes\x12\".nokku.v1.CreateBackupCodesRequest\x1a#.nokku.v1.CreateBackupCodesResponse\"$\x82\xd3\xe4\x93\x02\x1e\"\x1c/v1/credentials/backup-codes\x12|\n" +
-	"\x0fListBackupCodes\x12 .nokku.v1.ListBackupCodesRequest\x1a!.nokku.v1.ListBackupCodesResponse\"$\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/credentials/backup-codes\x12\x82\x01\n" +
+	"\x11CreateBackupCodes\x12\".nokku.v1.CreateBackupCodesRequest\x1a#.nokku.v1.CreateBackupCodesResponse\"$\x82\xd3\xe4\x93\x02\x1e\"\x1c/v1/credentials/backup-codes\x12\x7f\n" +
+	"\x0fListBackupCodes\x12 .nokku.v1.ListBackupCodesRequest\x1a!.nokku.v1.ListBackupCodesResponse\"'\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/credentials/backup-codes\x90\x02\x01\x12\x82\x01\n" +
 	"\x11DeleteBackupCodes\x12\".nokku.v1.DeleteBackupCodesRequest\x1a#.nokku.v1.DeleteBackupCodesResponse\"$\x82\xd3\xe4\x93\x02\x1e*\x1c/v1/credentials/backup-codesB\x99\x01\n" +
 	"\fcom.nokku.v1B\x0fCredentialProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 

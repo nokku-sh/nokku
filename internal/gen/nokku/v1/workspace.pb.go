@@ -1518,7 +1518,7 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\fworkspace_id\x18\x03 \x01(\tR\vworkspaceId\x12\x1d\n" +
 	"\fpayload_json\x18\x04 \x01(\tR\apayload\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xbf\f\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xc2\f\n" +
 	"\x10WorkspaceService\x12w\n" +
 	"\fGetWorkspace\x12\x1d.nokku.v1.GetWorkspaceRequest\x1a\x1e.nokku.v1.GetWorkspaceResponse\"(\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/workspaces/{workspace_id}\x90\x02\x01\x12n\n" +
 	"\x0eListWorkspaces\x12\x1f.nokku.v1.ListWorkspacesRequest\x1a .nokku.v1.ListWorkspacesResponse\"\x19\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/workspaces\x90\x02\x01\x12q\n" +
@@ -1529,8 +1529,8 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\x14ListWorkspaceMembers\x12%.nokku.v1.ListWorkspaceMembersRequest\x1a&.nokku.v1.ListWorkspaceMembersResponse\"0\x82\xd3\xe4\x93\x02'\x12%/v1/workspaces/{workspace_id}/members\x90\x02\x01\x12\xa1\x01\n" +
 	"\x15RemoveWorkspaceMember\x12&.nokku.v1.RemoveWorkspaceMemberRequest\x1a'.nokku.v1.RemoveWorkspaceMemberResponse\"7\x82\xd3\xe4\x93\x021*//v1/workspaces/{workspace_id}/members/{user_id}\x12\xa1\x01\n" +
 	"\x15UpdateWorkspaceMember\x12&.nokku.v1.UpdateWorkspaceMemberRequest\x1a'.nokku.v1.UpdateWorkspaceMemberResponse\"7\x82\xd3\xe4\x93\x021\"//v1/workspaces/{workspace_id}/members/{user_id}\x12\x9e\x01\n" +
-	"\x14UpdateWorkspaceOwner\x12%.nokku.v1.UpdateWorkspaceOwnerRequest\x1a&.nokku.v1.UpdateWorkspaceOwnerResponse\"7\x82\xd3\xe4\x93\x021\"//v1/workspaces/{workspace_id}/owner/{new_owner}\x12\xab\x01\n" +
-	"\x18SubscribeWorkspaceEvents\x12).nokku.v1.SubscribeWorkspaceEventsRequest\x1a*.nokku.v1.SubscribeWorkspaceEventsResponse\"6\x82\xd3\xe4\x93\x020\x12./v1/workspaces/{workspace_id}/events:subscribe0\x01B\x98\x01\n" +
+	"\x14UpdateWorkspaceOwner\x12%.nokku.v1.UpdateWorkspaceOwnerRequest\x1a&.nokku.v1.UpdateWorkspaceOwnerResponse\"7\x82\xd3\xe4\x93\x021\"//v1/workspaces/{workspace_id}/owner/{new_owner}\x12\xae\x01\n" +
+	"\x18SubscribeWorkspaceEvents\x12).nokku.v1.SubscribeWorkspaceEventsRequest\x1a*.nokku.v1.SubscribeWorkspaceEventsResponse\"9\x82\xd3\xe4\x93\x020\x12./v1/workspaces/{workspace_id}/events:subscribe\x90\x02\x010\x01B\x98\x01\n" +
 	"\fcom.nokku.v1B\x0eWorkspaceProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

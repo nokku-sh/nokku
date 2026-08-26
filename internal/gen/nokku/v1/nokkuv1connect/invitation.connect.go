@@ -82,6 +82,7 @@ func NewInvitationServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			httpClient,
 			baseURL+InvitationServiceGetInvitationProcedure,
 			connect.WithSchema(invitationServiceMethods.ByName("GetInvitation")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
 		acceptInvitation: connect.NewClient[v1.AcceptInvitationRequest, v1.AcceptInvitationResponse](
@@ -168,6 +169,7 @@ func NewInvitationServiceHandler(svc InvitationServiceHandler, opts ...connect.H
 		InvitationServiceGetInvitationProcedure,
 		svc.GetInvitation,
 		connect.WithSchema(invitationServiceMethods.ByName("GetInvitation")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
 	invitationServiceAcceptInvitationHandler := connect.NewUnaryHandlerSimple(

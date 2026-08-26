@@ -113,6 +113,7 @@ func NewTargetServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			httpClient,
 			baseURL+TargetServiceGetSubjectAccessProcedure,
 			connect.WithSchema(targetServiceMethods.ByName("GetSubjectAccess")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
 		getTargetFilters: connect.NewClient[v1.GetTargetFiltersRequest, v1.GetTargetFiltersResponse](
@@ -253,6 +254,7 @@ func NewTargetServiceHandler(svc TargetServiceHandler, opts ...connect.HandlerOp
 		TargetServiceGetSubjectAccessProcedure,
 		svc.GetSubjectAccess,
 		connect.WithSchema(targetServiceMethods.ByName("GetSubjectAccess")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
 	targetServiceGetTargetFiltersHandler := connect.NewUnaryHandlerSimple(

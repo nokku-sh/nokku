@@ -416,11 +416,11 @@ const file_nokku_v1_invitation_proto_rawDesc = "" +
 	"\x17AcceptInvitationRequest\x12\x1d\n" +
 	"\x05token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05token\"=\n" +
 	"\x18AcceptInvitationResponse\x12!\n" +
-	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId2\xa8\x04\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId2\xab\x04\n" +
 	"\x11InvitationService\x12\x96\x01\n" +
 	"\x12RefreshInviteToken\x12#.nokku.v1.RefreshInviteTokenRequest\x1a$.nokku.v1.RefreshInviteTokenResponse\"5\x82\xd3\xe4\x93\x02/\"-/v1/workspaces/{workspace_id}/invites:refresh\x12\x92\x01\n" +
-	"\x11RevokeInviteToken\x12\".nokku.v1.RevokeInviteTokenRequest\x1a#.nokku.v1.RevokeInviteTokenResponse\"4\x82\xd3\xe4\x93\x02.*,/v1/workspaces/{workspace_id}/invites:revoke\x12m\n" +
-	"\rGetInvitation\x12\x1e.nokku.v1.GetInvitationRequest\x1a\x1f.nokku.v1.GetInvitationResponse\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/invites/{token}\x12v\n" +
+	"\x11RevokeInviteToken\x12\".nokku.v1.RevokeInviteTokenRequest\x1a#.nokku.v1.RevokeInviteTokenResponse\"4\x82\xd3\xe4\x93\x02.*,/v1/workspaces/{workspace_id}/invites:revoke\x12p\n" +
+	"\rGetInvitation\x12\x1e.nokku.v1.GetInvitationRequest\x1a\x1f.nokku.v1.GetInvitationResponse\"\x1e\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/invites/{token}\x90\x02\x01\x12v\n" +
 	"\x10AcceptInvitation\x12!.nokku.v1.AcceptInvitationRequest\x1a\".nokku.v1.AcceptInvitationResponse\"\x1b\x82\xd3\xe4\x93\x02\x15\"\x13/v1/invites/{token}B\x99\x01\n" +
 	"\fcom.nokku.v1B\x0fInvitationProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 

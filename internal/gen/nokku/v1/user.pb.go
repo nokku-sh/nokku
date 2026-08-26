@@ -1062,13 +1062,13 @@ const file_nokku_v1_user_proto_rawDesc = "" +
 	"\x18RevokeUserSessionRequest\x12(\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18@R\tsessionId\"\x1b\n" +
-	"\x19RevokeUserSessionResponse2\xae\a\n" +
-	"\vUserService\x12O\n" +
-	"\x06Whoami\x12\x17.nokku.v1.WhoamiRequest\x1a\x18.nokku.v1.WhoamiResponse\"\x12\x82\xd3\xe4\x93\x02\f\x12\n" +
-	"/v1/whoami\x12h\n" +
+	"\x19RevokeUserSessionResponse2\xb4\a\n" +
+	"\vUserService\x12R\n" +
+	"\x06Whoami\x12\x17.nokku.v1.WhoamiRequest\x1a\x18.nokku.v1.WhoamiResponse\"\x15\x82\xd3\xe4\x93\x02\f\x12\n" +
+	"/v1/whoami\x90\x02\x01\x12h\n" +
 	"\rUpdateProfile\x12\x1e.nokku.v1.UpdateProfileRequest\x1a\x1f.nokku.v1.UpdateProfileResponse\"\x16\x82\xd3\xe4\x93\x02\x10:\x01*2\v/v1/profile\x12e\n" +
-	"\rDeleteAccount\x12\x1e.nokku.v1.DeleteAccountRequest\x1a\x1f.nokku.v1.DeleteAccountResponse\"\x13\x82\xd3\xe4\x93\x02\r*\v/v1/account\x12{\n" +
-	"\x12ListLinkedAccounts\x12#.nokku.v1.ListLinkedAccountsRequest\x1a$.nokku.v1.ListLinkedAccountsResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/accounts/oauth\x12w\n" +
+	"\rDeleteAccount\x12\x1e.nokku.v1.DeleteAccountRequest\x1a\x1f.nokku.v1.DeleteAccountResponse\"\x13\x82\xd3\xe4\x93\x02\r*\v/v1/account\x12~\n" +
+	"\x12ListLinkedAccounts\x12#.nokku.v1.ListLinkedAccountsRequest\x1a$.nokku.v1.ListLinkedAccountsResponse\"\x1d\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/accounts/oauth\x90\x02\x01\x12w\n" +
 	"\rUnlinkAccount\x12\x1e.nokku.v1.UnlinkAccountRequest\x1a\x1f.nokku.v1.UnlinkAccountResponse\"%\x82\xd3\xe4\x93\x02\x1f*\x1d/v1/accounts/oauth/{provider}\x12\x80\x01\n" +
 	"\x10SetEmailRecovery\x12!.nokku.v1.SetEmailRecoveryRequest\x1a\".nokku.v1.SetEmailRecoveryResponse\"%\x82\xd3\xe4\x93\x02\x1f:\x01*2\x1a/v1/account/email-recovery\x12z\n" +
 	"\x10ListUserSessions\x12!.nokku.v1.ListUserSessionsRequest\x1a\".nokku.v1.ListUserSessionsResponse\"\x1f\x82\xd3\xe4\x93\x02\x16\x12\x14/v1/account/sessions\x90\x02\x01\x12\x87\x01\n" +
