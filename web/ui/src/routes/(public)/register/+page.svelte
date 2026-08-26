@@ -11,7 +11,6 @@
 	import { KeyRound, ChevronDown, ChevronUp } from '@lucide/svelte';
 
 	let name = $state('');
-	let username = $state('');
 	let email = $state('');
 	let password = $state('');
 	let confirmPassword = $state('');
@@ -25,18 +24,18 @@
 
 	async function handleRegistration() {
 		if (!passwordsMatch || !isPasswordValid) return;
-		register.mutate({ name, username, email, password });
+		register.mutate({ name, email, password });
 	}
 
 	async function handlePasskeySignup() {
-		if (!email || !username) {
-			toast.error('Email and username are required');
+		if (!email) {
+			toast.error('Email is required');
 			return;
 		}
 
 		isPasskeySignup = true;
 		try {
-			await signupWithPasskey({ email, username, name });
+			await signupWithPasskey({ email, name });
 			await goto('/verify?sent=true');
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : 'Passkey signup failed');
@@ -64,18 +63,6 @@
 					type="text"
 					bind:value={name}
 					placeholder="John Doe"
-					disabled={register.isPending || isPasskeySignup}
-				/>
-			</div>
-
-			<div class="space-y-2">
-				<Label for="username" class="block text-sm">Username</Label>
-				<Input
-					id="username"
-					type="text"
-					bind:value={username}
-					placeholder="johndoe"
-					required
 					disabled={register.isPending || isPasskeySignup}
 				/>
 			</div>

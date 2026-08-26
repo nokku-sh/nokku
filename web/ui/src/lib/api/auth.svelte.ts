@@ -45,7 +45,7 @@ export const auth = {
 			void goto('/login');
 		}),
 	register: () =>
-		authMutation<{ name: string; username: string; email: string; password: string }>(
+		authMutation<{ name: string; email: string; password: string }>(
 			'/auth/register',
 			() => toast.success('Registration successful')
 		),
