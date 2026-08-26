@@ -59,6 +59,12 @@ func (s *Session) shutdown() {
 	s.shutdownOnce.Do(func() { close(s.Exited) })
 }
 
+// Cancel tears down the connection context unless a reconnect already
+// replaced this connection. Safe to call multiple times.
+func (c *Conn) Cancel() {
+	c.cancel()
+}
+
 type eventSubscriber struct {
 	ch    chan *nokkuv1.SubscribeWorkspaceEventsResponse
 	types []string
