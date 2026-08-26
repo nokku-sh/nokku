@@ -8,7 +8,7 @@ import (
 )
 
 func TestUserIDFromContext(t *testing.T) {
-	ctx := kagi.WithPrincipal(context.Background(), kagi.Principal{
+	ctx := kagi.ContextWithPrincipal(context.Background(), kagi.Principal{
 		SubjectID: "user-1",
 		Kind:      kagi.KindUser,
 	})
@@ -16,7 +16,7 @@ func TestUserIDFromContext(t *testing.T) {
 		t.Fatalf("expected user-1, got %q", id)
 	}
 
-	device := kagi.WithPrincipal(context.Background(), kagi.Principal{
+	device := kagi.ContextWithPrincipal(context.Background(), kagi.Principal{
 		SubjectID: "user-1",
 		Kind:      ActorTypeDevice,
 	})
@@ -26,7 +26,7 @@ func TestUserIDFromContext(t *testing.T) {
 }
 
 func TestDaemonIDFromContext(t *testing.T) {
-	ctx := kagi.WithPrincipal(context.Background(), kagi.Principal{
+	ctx := kagi.ContextWithPrincipal(context.Background(), kagi.Principal{
 		SubjectID: "daemon-1",
 		Kind:      ActorTypeDaemon,
 		TenantID:  "ws-1",
@@ -40,7 +40,7 @@ func TestDaemonIDFromContext(t *testing.T) {
 }
 
 func TestWorkspaceIDFromContext(t *testing.T) {
-	machine := kagi.WithPrincipal(context.Background(), kagi.Principal{
+	machine := kagi.ContextWithPrincipal(context.Background(), kagi.Principal{
 		SubjectID: "daemon-1",
 		Kind:      ActorTypeDaemon,
 		TenantID:  "ws-1",
@@ -49,11 +49,11 @@ func TestWorkspaceIDFromContext(t *testing.T) {
 		t.Fatalf("expected machine tenant ws-1, got %q", ws)
 	}
 
-	user := kagi.WithPrincipal(context.Background(), kagi.Principal{
+	user := kagi.ContextWithPrincipal(context.Background(), kagi.Principal{
 		SubjectID: "user-1",
 		Kind:      kagi.KindUser,
 	})
-	user = kagi.WithTenant(user, "ws-2")
+	kagi.AnnotateTenant(user, "ws-2")
 	if ws := WorkspaceIDFromContext(user); ws != "ws-2" {
 		t.Fatalf("expected resolved tenant ws-2, got %q", ws)
 	}

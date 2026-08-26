@@ -16,7 +16,6 @@ import (
 	"github.com/mizuchilabs/kagi/dpop"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
@@ -281,7 +280,7 @@ func (s *DaemonService) EnrollDaemon(
 		return nil, NewError(connect.CodeInvalidArgument, "invalid token")
 	}
 	workspaceID := enrollToken.ID
-	audit.SetWorkspaceID(ctx, workspaceID)
+	kagi.AnnotateTenant(ctx, kagi.TenantID(workspaceID))
 
 	if err := s.cfg.Billing.Check(ctx, workspaceID, billing.ResourceTargets); err != nil {
 		return nil, err

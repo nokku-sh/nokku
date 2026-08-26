@@ -10,7 +10,6 @@ import (
 	"github.com/mizuchilabs/kagi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
@@ -42,7 +41,7 @@ func (s *InvitationService) GetInvitation(
 		return nil, ErrInvalidInput
 	}
 	workspaceID := token.ID
-	audit.SetWorkspaceID(ctx, workspaceID)
+	kagi.AnnotateTenant(ctx, kagi.TenantID(workspaceID))
 
 	actor, _ := kagi.PrincipalFromContext(ctx)
 	if actor.SubjectID == "" || actor.Kind != auth.ActorTypeUser {
@@ -89,7 +88,7 @@ func (s *InvitationService) AcceptInvitation(
 		return nil, NewError(connect.CodeInvalidArgument, "invalid token")
 	}
 	workspaceID := token.ID
-	audit.SetWorkspaceID(ctx, workspaceID)
+	kagi.AnnotateTenant(ctx, kagi.TenantID(workspaceID))
 
 	userID := auth.UserIDFromContext(ctx)
 	if userID == "" {

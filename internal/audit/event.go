@@ -69,9 +69,12 @@ func (s *Service) Append(ctx context.Context, event *Event) error {
 		details = []byte("{}")
 	}
 
-	var workspaceID, email *string
+	var workspaceID, actorID, email *string
 	if event.WorkspaceID != "" {
 		workspaceID = &event.WorkspaceID
+	}
+	if event.ActorID != "" {
+		actorID = &event.ActorID
 	}
 	if event.ActorEmail != "" {
 		email = &event.ActorEmail
@@ -81,7 +84,7 @@ func (s *Service) Append(ctx context.Context, event *Event) error {
 	return s.conn.Q.InsertAuditLog(ctx, &db.InsertAuditLogParams{
 		WorkspaceID: workspaceID,
 		Action:      event.Action,
-		ActorID:     event.ActorID,
+		ActorID:     actorID,
 		ActorType:   event.ActorType,
 		ActorEmail:  email,
 		IpAddress:   &event.IPAddress,
@@ -163,6 +166,10 @@ func (s *Service) List(
 			workspaceID = *row.WorkspaceID
 		}
 
+		actorID := ""
+		if row.ActorID != nil {
+			actorID = *row.ActorID
+		}
 		email := ""
 		if row.ActorEmail != nil {
 			email = *row.ActorEmail
@@ -190,7 +197,7 @@ func (s *Service) List(
 			Timestamp:   row.Timestamp,
 			WorkspaceID: workspaceID,
 			Action:      row.Action,
-			ActorID:     row.ActorID,
+			ActorID:     actorID,
 			ActorType:   row.ActorType,
 			ActorEmail:  email,
 			IPAddress:   ip,

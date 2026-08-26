@@ -15,7 +15,6 @@ import (
 	kagisaml "github.com/mizuchilabs/kagi/saml"
 	"github.com/mizuchilabs/kagi/server"
 
-	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -37,14 +36,6 @@ const deviceSessionTTL = 7 * 24 * time.Hour
 // enforcement at register/signup is the BeforeRegister hook and the passkey
 // signup resolver, and email delivery is the mailer adapter.
 func NewAuthHandler(cfg *config.Config) (*server.Handler, error) {
-	wa := webauthn.Config{
-		RPDisplayName: "Nokku",
-		RPID:          cfg.AppURL().Hostname(),
-		RPOrigins:     rpOrigins(cfg),
-	}
-
-	samlOpts := newSAMLOptions(cfg)
-
 	return server.New(cfg.Auth.Kagi, server.Options{
 		Cache:   cfg.Cache,
 		BaseURL: cfg.FullURL(),
@@ -73,15 +64,17 @@ func NewAuthHandler(cfg *config.Config) (*server.Handler, error) {
 			OnPasswordReset: func(ctx context.Context, u kagi.User) error {
 				return cfg.Auth.Kagi.RevokeSubjectSessions(ctx, "", u.ID)
 			},
-			SetAuditEmail:  audit.SetEmail,
-			SetAuditUserID: audit.SetUserID,
 		},
 
 		Passkeys: server.PasskeyConfig{
-			Config:   wa,
+			Config: webauthn.Config{
+				RPDisplayName: "Nokku",
+				RPID:          cfg.AppURL().Hostname(),
+				RPOrigins:     rpOrigins(cfg),
+			},
 			Secure:   true,
 			Register: registerPasskeyOptions(cfg),
-			Login:    loginPasskeyOptions(cfg),
+			Login:    &kagipasskey.Options{},
 			Signup:   signupPasskeyOptions(cfg),
 		},
 
@@ -91,13 +84,23 @@ func NewAuthHandler(cfg *config.Config) (*server.Handler, error) {
 			ResolveProvider: cfg.Auth.Resolvers.ResolveOIDCProvider,
 			ResolveUser:     cfg.Auth.Resolvers.ResolveOIDCUser,
 		},
+
 		OAuth2: &kagioauth.Options{
 			Cache:           cfg.Cache,
 			ErrorRedirect:   cfg.FullURL() + "/auth-error",
 			ResolveProvider: cfg.Auth.Resolvers.ResolveOAuth2Provider,
 			ResolveUser:     cfg.Auth.Resolvers.ResolveOAuth2User,
 		},
-		SAML: samlOpts,
+
+		SAML: &kagisaml.Options{
+			Cache:         cfg.Cache,
+			Keypair:       auth.NewSAMLSPKeyStore(cfg.Conn),
+			AcsURL:        cfg.FullURL() + "/saml/acs",
+			SPEntityID:    cfg.FullURL() + "/saml/metadata",
+			ErrorRedirect: cfg.FullURL() + "/auth-error",
+			ResolveIDP:    cfg.Auth.Resolvers.ResolveSAMLIdP,
+			ResolveUser:   cfg.Auth.Resolvers.ResolveSAMLUser,
+		},
 
 		Device: &kagidevice.Options{
 			Cache:           cfg.Cache,
@@ -119,21 +122,6 @@ func rpOrigins(cfg *config.Config) []string {
 	return origins
 }
 
-// newSAMLOptions builds the SAML handler options. The SP keypair is managed
-// by the kagi handler via a SAMLSPKeyStore, so it is generated once and
-// reused across restarts without nokku managing a certificate.
-func newSAMLOptions(cfg *config.Config) *kagisaml.Options {
-	return &kagisaml.Options{
-		Cache:         cfg.Cache,
-		Keypair:       auth.NewSAMLSPKeyStore(cfg.Conn),
-		AcsURL:        cfg.FullURL() + "/saml/acs",
-		SPEntityID:    cfg.FullURL() + "/saml/metadata",
-		ErrorRedirect: cfg.FullURL() + "/auth-error",
-		ResolveIDP:    cfg.Auth.Resolvers.ResolveSAMLIdP,
-		ResolveUser:   cfg.Auth.Resolvers.ResolveSAMLUser,
-	}
-}
-
 // registerPasskeyOptions is the signed-in add-key flow.
 func registerPasskeyOptions(cfg *config.Config) *kagipasskey.Options {
 	return &kagipasskey.Options{
@@ -146,11 +134,6 @@ func registerPasskeyOptions(cfg *config.Config) *kagipasskey.Options {
 		},
 		SkipSessionOnRegister: true,
 	}
-}
-
-// loginPasskeyOptions is the usernameless login flow.
-func loginPasskeyOptions(_ *config.Config) *kagipasskey.Options {
-	return &kagipasskey.Options{}
 }
 
 // signupPasskeyOptions is the passkey-only signup flow: resolve the user by

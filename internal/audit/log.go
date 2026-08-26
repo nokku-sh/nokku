@@ -12,32 +12,9 @@ import (
 
 	"github.com/mizuchilabs/kagi"
 
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/util"
 )
-
-// anonActorID is the placeholder actor for events where no principal is
-// authenticated (e.g. failed logins). The audit schema requires a non-null
-// actor_id.
-const anonActorID = "00000000-0000-0000-0000-000000000000"
-
-// authProcedures are always audited, even when the request fails before
-// any actor is known. Auth events are the core of a security audit trail.
-var authProcedures = map[string]struct{}{
-	"POST /auth/login":               {},
-	"POST /auth/login/backup-code":   {},
-	"POST /auth/logout":              {},
-	"POST /auth/register":            {},
-	"POST /auth/forgot-password":     {},
-	"POST /auth/reset-password":      {},
-	"POST /auth/verify-email":        {},
-	"POST /auth/resend-verification": {},
-	"GET /oauth/callback":            {},
-	"GET /oauth/login":               {},
-	"GET /oidc/login":                {},
-	"GET /oidc/callback":             {},
-	"GET /saml/login":                {},
-	"POST /saml/acs":                 {},
-}
 
 func (s *Service) LogAction(
 	ctx context.Context,
@@ -102,42 +79,14 @@ func (s *Service) logAudit(
 	if s == nil || !shouldAudit(procedure) {
 		return
 	}
-
-	state := StateFromContext(ctx)
 	principal, _ := kagi.PrincipalFromContext(ctx)
-
-	actorID := principal.SubjectID
-	actorType := string(principal.Kind)
-	if actorID == "" && state != nil {
-		actorID = state.UserID
-	}
-	if actorID == "" {
-		actorID = anonActorID
-		actorType = "anonymous"
-	} else if actorType == "" {
-		actorType = "user"
-	}
-
-	email := ""
-	if state != nil {
-		email = state.Email
-	}
-
-	// A request's workspace comes from the kagi context (the tenant resolved
-	// from the request for user principals, or the principal's tenant for
-	// machine identities). The state workspace is only a fallback for
-	// unauthenticated flows (e.g. daemon enrollment) that pin a tenant that
-	// is not on the context.
-	workspaceID := WorkspaceIDFromContext(ctx)
-	if state != nil && state.WorkspaceID != "" {
-		workspaceID = state.WorkspaceID
-	}
+	tenant, _ := kagi.TenantFromContext(ctx)
 
 	log := &Event{
-		WorkspaceID: workspaceID,
-		ActorID:     actorID,
-		ActorType:   actorType,
-		ActorEmail:  email,
+		WorkspaceID: string(tenant),
+		ActorID:     principal.SubjectID,
+		ActorType:   string(principal.Kind),
+		ActorEmail:  s.actorEmail(ctx, principal),
 		Action:      procedure,
 		IPAddress:   util.SanitizeUTF8(util.GetRemoteIP(header, peerAddr)),
 		UserAgent:   util.SanitizeUTF8(header.Get("User-Agent")),
@@ -149,17 +98,26 @@ func (s *Service) logAudit(
 	}
 }
 
-// shouldAudit reports whether a procedure produces an audit record:
-// mutating operations plus authentication events.
-func shouldAudit(procedure string) bool {
-	if isMutatingProcedure(procedure) {
-		return true
+// actorEmail resolves the acting human's email for display. Machine subjects
+// are not users; their rows carry no email. The lookup runs off the request
+// path (logAudit is called from a detached goroutine) and a miss simply leaves
+// the column empty.
+func (s *Service) actorEmail(ctx context.Context, p kagi.Principal) string {
+	if p.SubjectID == "" ||
+		(p.Kind != auth.ActorTypeUser && p.Kind != auth.ActorTypeDevice) {
+		return ""
 	}
-	_, ok := authProcedures[procedure]
-	return ok
+	u, err := s.conn.Q.GetUserByID(ctx, p.SubjectID)
+	if err != nil {
+		return ""
+	}
+	return u.Email
 }
 
-func isMutatingProcedure(procedure string) bool {
+// shouldAudit reports whether a procedure produces an audit record. Only
+// mutating operations do: authentication flows record their own semantic
+// events (login_success, login_denied, ...) through the kagi sink.
+func shouldAudit(procedure string) bool {
 	if method, _, ok := strings.Cut(procedure, " "); ok {
 		switch method {
 		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
