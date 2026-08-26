@@ -57,7 +57,7 @@ func (s *Store) CreateUser(ctx context.Context, _ kagi.TenantID, u kagi.User) (k
 func (s *Store) DeleteProviderCredentials(
 	ctx context.Context,
 	provider string,
-	typ kagi.CredentialType,
+	typ kagi.Method,
 ) error {
 	return s.conn.Q.DeleteCredentialsByProvider(ctx, &db.DeleteCredentialsByProviderParams{
 		Provider: provider,
@@ -72,7 +72,7 @@ func (s *Store) DeleteProviderCredentials(
 func (s *Store) ConsumeCredentialBySubject(
 	ctx context.Context,
 	_ kagi.TenantID,
-	typ kagi.CredentialType,
+	typ kagi.Method,
 	provider, subject, userID string,
 ) (kagi.Credential, error) {
 	row, err := s.conn.Q.ConsumeCredentialBySubject(ctx, &db.ConsumeCredentialBySubjectParams{
@@ -138,7 +138,7 @@ func (s *Store) ListCredentials(
 	ctx context.Context,
 	_ kagi.TenantID,
 	userID string,
-	typ kagi.CredentialType,
+	typ kagi.Method,
 ) ([]kagi.Credential, error) {
 	rows, err := s.conn.Q.ListCredentials(ctx, &db.ListCredentialsParams{
 		UserID: userID,
@@ -172,7 +172,7 @@ func (s *Store) GetCredential(
 func (s *Store) FindCredentialBySubject(
 	ctx context.Context,
 	_ kagi.TenantID,
-	typ kagi.CredentialType,
+	typ kagi.Method,
 	provider, subject string,
 ) (kagi.Credential, error) {
 	row, err := s.conn.Q.FindCredentialBySubject(ctx, &db.FindCredentialBySubjectParams{
@@ -367,7 +367,7 @@ func kagiCredential(c *db.Credential) kagi.Credential {
 	return kagi.Credential{
 		ID:        c.ID,
 		UserID:    c.UserID,
-		Type:      kagi.CredentialType(c.Type),
+		Type:      kagi.Method(c.Type),
 		Provider:  c.Provider,
 		Subject:   c.Subject,
 		Data:      c.Data,
