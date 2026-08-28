@@ -3,8 +3,7 @@ package crypto
 import (
 	"errors"
 	"strings"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 var ErrInvalidToken = errors.New("malformed token")

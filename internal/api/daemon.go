@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/mizuchilabs/kagi"
 	"github.com/mizuchilabs/kagi/dpop"
@@ -225,7 +225,7 @@ func (s *DaemonService) CreateSession(
 		return nil, DBError(err)
 	}
 
-	sessionID := uuid.New().String()
+	sessionID := uuid.NewV7().String()
 	userID := auth.UserIDFromContext(ctx)
 	username := req.GetUsername()
 
