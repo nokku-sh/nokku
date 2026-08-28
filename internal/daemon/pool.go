@@ -7,8 +7,8 @@ import (
 	"slices"
 	"sync"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/internal/db"
@@ -480,7 +480,7 @@ func (p *Pool) UnsubscribeEvents(
 
 func (p *Pool) PublishWorkspaceEvent(workspaceID, eventType, payloadJSON string) {
 	event := &nokkuv1.SubscribeWorkspaceEventsResponse{
-		Id:          new(uuid.New().String()),
+		Id:          new(uuid.NewV7().String()),
 		Type:        &eventType,
 		WorkspaceId: &workspaceID,
 		PayloadJson: &payloadJSON,
