@@ -82,10 +82,7 @@ function bufferToBase64url(buffer: ArrayBuffer): string {
 /**
  * Registers a new user with a passkey (signup flow)
  */
-export async function signupWithPasskey(params: {
-	email: string;
-	name?: string;
-}): Promise<void> {
+export async function signupWithPasskey(params: { email: string; name?: string }): Promise<void> {
 	// The signup resolver reads email/name from request form values on both
 	// ceremony requests, so they travel as urlencoded data (begin) and a
 	// query parameter (finish), not inside the JSON bodies.
