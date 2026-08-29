@@ -10,7 +10,6 @@ import (
 
 // leaked returns the goroutineleak profile report and whether any goroutines
 // are provably stuck. The profile only exists when the toolchain is built
-// with GOEXPERIMENT=goroutineleakprofile (Go 1.27 enables it by default).
 // Without it, detection is skipped.
 func leaked() (string, bool) {
 	p := pprof.Lookup("goroutineleak")
