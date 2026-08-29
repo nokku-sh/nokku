@@ -2,14 +2,6 @@ version: 2
 project_name: nokku
 report_sizes: true
 
-before:
-  hooks:
-    - go fmt ./...
-    - go vet ./...
-    - go test ./...
-    - go mod download
-    - go mod verify
-
 builds:
   - binary: "{{ .ProjectName }}"
     main: ./cmd/nokku
@@ -27,12 +19,6 @@ builds:
     goarch:
       - amd64
       - arm64
-
-upx:
-  - enabled: true
-    lzma: true
-    compress: best
-    goos: [linux]
 
 kos:
   - repositories: [ghcr.io/nokku-sh/nokku]
@@ -71,9 +57,6 @@ archives:
 
 checksum:
   name_template: "{{ .ProjectName }}_checksums.txt"
-
-source:
-  enabled: true
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
