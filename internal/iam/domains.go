@@ -13,7 +13,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
@@ -21,26 +20,21 @@ import (
 // Keep in sync with the UI's instructions text.
 const domainTXTPrefix = "_nokku-verify."
 
-// DomainVerificationWindow is how long a verification stays valid before
-// the domain must be re-proven.
-const DomainVerificationWindow = 180 * 24 * time.Hour
-
 // TenantDomain is one workspace domain binding.
 type TenantDomain struct {
-	WorkspaceID   string
-	ProviderID    string
-	Domain        string
-	Token         string
-	VerifiedAt    time.Time
-	VerifiedUntil time.Time
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	WorkspaceID string
+	ProviderID  string
+	Domain      string
+	Token       string
+	VerifiedAt  time.Time
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
-// Verified reports whether the domain is currently verified.
+// Verified reports whether the domain is verified. Verification is
+// permanent: a proven claim is never re-proven and never expires.
 func (d TenantDomain) Verified() bool {
-	return !d.VerifiedAt.IsZero() &&
-		(d.VerifiedUntil.IsZero() || d.VerifiedUntil.After(time.Now()))
+	return !d.VerifiedAt.IsZero()
 }
 
 // ListTenantDomains returns the workspace's domain bindings.
@@ -48,13 +42,20 @@ func (s *Service) ListTenantDomains(
 	ctx context.Context,
 	workspaceID string,
 ) ([]TenantDomain, error) {
-	rows, err := s.q.ListWorkspaceDomains(ctx, workspaceID)
+	var out []TenantDomain
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		rows, err := q.ListWorkspaceDomains(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+		out = make([]TenantDomain, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, domainFromRow(r))
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
-	}
-	out := make([]TenantDomain, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, domainFromRow(r))
 	}
 	return out, nil
 }
@@ -64,9 +65,17 @@ func (s *Service) GetTenantDomain(
 	ctx context.Context,
 	workspaceID, domain string,
 ) (TenantDomain, error) {
-	r, err := s.q.GetWorkspaceDomain(ctx, &db.GetWorkspaceDomainParams{
-		WorkspaceID: workspaceID,
-		Domain:      domain,
+	var out TenantDomain
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		r, err := q.GetWorkspaceDomain(ctx, &db.GetWorkspaceDomainParams{
+			WorkspaceID: workspaceID,
+			Domain:      domain,
+		})
+		if err != nil {
+			return err
+		}
+		out = domainFromRow(r)
+		return nil
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -74,7 +83,7 @@ func (s *Service) GetTenantDomain(
 		}
 		return TenantDomain{}, err
 	}
-	return domainFromRow(r), nil
+	return out, nil
 }
 
 // PutTenantDomain creates or rebinds a domain: a fresh verification token,
@@ -83,26 +92,31 @@ func (s *Service) PutTenantDomain(
 	ctx context.Context,
 	workspaceID, domain string,
 ) (TenantDomain, error) {
-	token, err := crypto.RandomString(24)
-	if err != nil {
+	var out TenantDomain
+	if err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		r, err := q.UpsertWorkspaceDomain(ctx, &db.UpsertWorkspaceDomainParams{
+			WorkspaceID: workspaceID,
+			ProviderID:  workspaceID,
+			Domain:      domain,
+		})
+		if err != nil {
+			return err
+		}
+		out = domainFromRow(r)
+		return nil
+	}); err != nil {
 		return TenantDomain{}, err
 	}
-	r, err := s.q.UpsertWorkspaceDomain(ctx, &db.UpsertWorkspaceDomainParams{
-		WorkspaceID: workspaceID,
-		Domain:      domain,
-		Token:       token,
-	})
-	if err != nil {
-		return TenantDomain{}, err
-	}
-	return domainFromRow(r), nil
+	return out, nil
 }
 
 // DeleteTenantDomain removes the binding.
 func (s *Service) DeleteTenantDomain(ctx context.Context, workspaceID, domain string) error {
-	return s.q.DeleteWorkspaceDomain(ctx, &db.DeleteWorkspaceDomainParams{
-		WorkspaceID: workspaceID,
-		Domain:      domain,
+	return s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		return q.DeleteWorkspaceDomain(ctx, &db.DeleteWorkspaceDomainParams{
+			WorkspaceID: workspaceID,
+			Domain:      domain,
+		})
 	})
 }
 
@@ -125,13 +139,15 @@ func (s *Service) VerifyTenantDomain(
 		if rec != d.Token {
 			continue
 		}
-		now := time.Now()
-		until := now.Add(DomainVerificationWindow)
-		if err := s.q.VerifyWorkspaceDomain(ctx, &db.VerifyWorkspaceDomainParams{
-			WorkspaceID:   workspaceID,
-			Domain:        domain,
-			VerifiedAt:    &now,
-			VerifiedUntil: &until,
+		// The SQL proof re-checks the token and evicts every other
+		// workspace's claim on the domain; verification is permanent.
+		if err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+			_, err := q.VerifyWorkspaceDomain(ctx, &db.VerifyWorkspaceDomainParams{
+				WorkspaceID: workspaceID,
+				Domain:      domain,
+				Token:       d.Token,
+			})
+			return err
 		}); err != nil {
 			return TenantDomain{}, err
 		}
@@ -141,23 +157,32 @@ func (s *Service) VerifyTenantDomain(
 }
 
 // GetVerifiedTenantDomain returns the verified binding for domain, or
-// ErrNotFound. It backs home-realm discovery on the login page.
+// ErrNotFound. It backs home-realm discovery on the login page. Discovery
+// runs pre-auth with no principal, so the read goes out as nokku_system:
+// matching by domain is global by design.
 func (s *Service) GetVerifiedTenantDomain(
 	ctx context.Context,
 	domain string,
 ) (TenantDomain, error) {
-	r, err := s.q.GetVerifiedWorkspaceDomain(ctx, domain)
+	var out TenantDomain
+	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
+		r, err := q.GetVerifiedWorkspaceDomain(ctx, domain)
+		if err != nil {
+			return err
+		}
+		out = domainFromRow(r)
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return TenantDomain{}, ErrNotFound
 		}
 		return TenantDomain{}, err
 	}
-	d := domainFromRow(r)
-	if !d.Verified() {
+	if !out.Verified() {
 		return TenantDomain{}, ErrNotFound
 	}
-	return d, nil
+	return out, nil
 }
 
 func domainFromRow(r *db.WorkspaceDomain) TenantDomain {
@@ -171,9 +196,6 @@ func domainFromRow(r *db.WorkspaceDomain) TenantDomain {
 	}
 	if r.VerifiedAt != nil {
 		out.VerifiedAt = *r.VerifiedAt
-	}
-	if r.VerifiedUntil != nil {
-		out.VerifiedUntil = *r.VerifiedUntil
 	}
 	return out
 }

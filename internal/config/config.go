@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"time"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/urfave/cli/v3"
@@ -139,7 +138,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
 
-	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Billing, iamUserDirectory{svc: cfg.IAM})
+	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Billing, iamUserDirectory{cfg: &cfg})
 	if err != nil {
 		return nil, err
 	}
@@ -148,16 +147,12 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	// The iam engine receives NOKKU_SECRET for the DPoP nonce and the shared
-	// cache for replay detection and flow state. Auth events flow into the
-	// audit log via the iam sink. SSO logins under a workspace provider
-	// auto-join the workspace.
 	cfg.IAM, err = iam.New(iam.Deps{
 		Querier:          cfg.Conn.Q,
 		BaseURL:          cfg.FullURL(),
 		Events:           cfg.Audit,
 		Secret:           []byte(cfg.Secret),
-		Replay:           replayAdapter{cfg.Cache},
+		Conn:             cfg.Conn,
 		Cache:            cfg.Cache,
 		PasskeyRPOrigins: passkeyOrigins(&cfg),
 		OnSSOLogin: func(ctx context.Context, userID, workspaceID string) error {
@@ -233,26 +228,15 @@ func (c *Config) WSOrigins() []string {
 }
 
 // iamUserDirectory adapts iam to audit's UserDirectory: it resolves an
-// actor id to its user. nokku's users are global.
+// actor id to its user. nokku's users are global. It reads cfg.IAM at call
+// time because audit is constructed before iam (iam consumes the audit
+// sink), so the service pointer only becomes valid once boot completes.
 type iamUserDirectory struct {
-	svc *iam.Service
+	cfg *Config
 }
 
 func (d iamUserDirectory) GetUser(ctx context.Context, userID string) (iam.User, error) {
-	return d.svc.GetUser(ctx, userID)
-}
-
-// replayAdapter fits the shared cache's SetNX to iam's ReplayStore.
-type replayAdapter struct {
-	c cache.Cache
-}
-
-func (a replayAdapter) Add(ctx context.Context, jti string, ttl time.Duration) (bool, error) {
-	nx, ok := a.c.(cache.SetNXer)
-	if !ok {
-		return true, nil
-	}
-	return nx.SetNX(ctx, "dpop:jti:"+jti, nil, ttl)
+	return d.cfg.IAM.GetUser(ctx, userID)
 }
 
 // passkeyOrigins returns every origin the browser may assert during a
@@ -266,9 +250,7 @@ func passkeyOrigins(c *Config) []string {
 }
 
 // seedSocialProviders seeds the static social login providers from the
-// environment credentials into sso storage, so every provider resolves like
-// any stored one. Idempotent: unchanged rows are not rewritten. A provider
-// without credentials is omitted, which disables it.
+// environment credentials into sso storage.
 func (c *Config) seedSocialProviders(ctx context.Context) error {
 	seed := func(providerID, name, clientID, clientSecret string) error {
 		if clientID == "" || clientSecret == "" {
@@ -283,8 +265,6 @@ func (c *Config) seedSocialProviders(ctx context.Context) error {
 				Name:       name,
 				Enabled:    true,
 				OIDC: &iam.OIDCProvider{
-					// Google is an OIDC discovery issuer; defaults cover
-					// endpoints, redirect, and scopes.
 					IssuerURL:       "https://accounts.google.com",
 					ClientID:        clientID,
 					ClientSecret:    clientSecret,

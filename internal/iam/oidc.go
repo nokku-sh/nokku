@@ -6,6 +6,7 @@ package iam
 import (
 	"context"
 	"crypto/subtle"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strings"
@@ -35,7 +36,7 @@ type OAuth2Provider struct {
 	EmailURL        string   `json:"email_url,omitempty"` // used when the profile has no email
 	RedirectURL     string   `json:"redirect_url,omitempty"`
 	Scopes          []string `json:"scopes,omitempty"`
-	ClientSecret    string   `json:"-"`
+	ClientSecret    string   `json:"client_secret,omitempty"` // only ever at rest inside the encrypted config blob
 	ClientID        string   `json:"client_id"`
 	JITProvisioning bool     `json:"jit_provisioning,omitempty"`
 	EnforceSSO      bool     `json:"enforce_sso,omitempty"`
@@ -240,28 +241,37 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		oauth2.SetAuthURLParam("code_verifier", st.PKCEVerifier),
 	)
 	if err != nil {
+		slog.Warn("oidc callback: code exchange failed", "error", err, "provider", cfg.ProviderID)
 		Fail(w, r, h.errRedirect, "login failed")
 		return
 	}
 
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok {
+		slog.Warn("oidc callback: token response has no id_token", "provider", cfg.ProviderID)
 		Fail(w, r, h.errRedirect, "login failed")
 		return
 	}
 	idToken, err := provider.Verifier(&oidc.Config{ClientID: cfg.OIDC.ClientID}).
 		Verify(ctx, rawIDToken)
 	if err != nil {
+		slog.Warn("oidc callback: id token verification failed", "error", err, "provider", cfg.ProviderID)
 		Fail(w, r, h.errRedirect, "login failed")
 		return
 	}
-	if err := idToken.VerifyAccessToken(token.AccessToken); err != nil {
-		Fail(w, r, h.errRedirect, "login failed")
-		return
+	// at_hash is optional in the authorization code flow and some providers
+	// (Keycloak) omit it, so only compare when the claim is present.
+	if idToken.AccessTokenHash != "" {
+		if err := idToken.VerifyAccessToken(token.AccessToken); err != nil {
+			slog.Warn("oidc callback: access token hash mismatch", "error", err, "provider", cfg.ProviderID)
+			Fail(w, r, h.errRedirect, "login failed")
+			return
+		}
 	}
 
 	var claims map[string]any
 	if err := idToken.Claims(&claims); err != nil {
+		slog.Warn("oidc callback: id token claims decode failed", "error", err, "provider", cfg.ProviderID)
 		Fail(w, r, h.errRedirect, "login failed")
 		return
 	}

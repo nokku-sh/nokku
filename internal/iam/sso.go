@@ -23,9 +23,9 @@ import (
 type OIDCProvider struct {
 	IssuerURL       string   `json:"issuer_url"`
 	ClientID        string   `json:"client_id"`
-	ClientSecret    string   `json:"-"` // in-memory only; encrypted into secret_enc
-	RedirectURL     string   `json:"redirect_url,omitempty"`
 	Scopes          []string `json:"scopes,omitempty"`
+	ClientSecret    string   `json:"client_secret,omitempty"` // only ever at rest inside the encrypted config blob
+	RedirectURL     string   `json:"redirect_url,omitempty"`
 	JITProvisioning bool     `json:"jit_provisioning,omitempty"`
 	EnforceSSO      bool     `json:"enforce_sso,omitempty"`
 }
@@ -69,70 +69,124 @@ type providerConfig struct {
 }
 
 // GetSSOProvider returns the provider stored under id, or ErrNotFound. The
-// client secret is decrypted into the payload for in-memory use.
+// client secret is decrypted into the payload for in-memory use. The read is
+// global (nokku_system): login flows resolve providers by their globally
+// unique id before any principal exists. Workspace admin reads go through
+// GetWorkspaceSSOProvider, which enforces tenant isolation.
 func (s *Service) GetSSOProvider(ctx context.Context, providerID string) (*SSOProvider, error) {
-	row, err := s.q.GetSSOProvider(ctx, providerID)
+	var out *SSOProvider
+	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
+		row, err := q.GetSSOProvider(ctx, providerID)
+		if err != nil {
+			return err
+		}
+		out, err = s.ssoProviderFromRow(row)
+		return err
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
-	return s.ssoProviderFromRow(row)
+	return out, nil
+}
+
+// GetWorkspaceSSOProvider returns the workspace's enterprise provider, or
+// ErrNotFound. Tenant-isolated: the read runs pinned to the caller's
+// workspace, so one workspace can never read another's configuration.
+func (s *Service) GetWorkspaceSSOProvider(
+	ctx context.Context,
+	workspaceID string,
+) (*SSOProvider, error) {
+	var out *SSOProvider
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		row, err := q.GetSSOProvider(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+		out, err = s.ssoProviderFromRow(row)
+		return err
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return out, nil
 }
 
 // PutSSOProvider stores the provider. A non-empty client secret replaces the
 // stored one; an empty secret keeps the previous value, so callers can
 // update configuration without resubmitting the secret.
 func (s *Service) PutSSOProvider(ctx context.Context, p SSOProvider) error {
+	// Social rows (NULL workspace) are global: RLS admits them unpinned, and
+	// the boot seeder has no principal to pin with. Enterprise rows carry the
+	// workspace id and must run pinned to pass tenant isolation.
+	if p.WorkspaceID == "" {
+		return s.putSSOProvider(ctx, s.q, p)
+	}
+	return s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		return s.putSSOProvider(ctx, q, p)
+	})
+}
+
+// putSSOProvider stores the provider. The whole configuration, client
+// secret included, is marshaled into one JSON blob that the sqlc type
+// override (crypto.EncryptedBytes) encrypts on the way in and decrypts on
+// the way out; the database never holds it in plaintext.
+func (s *Service) putSSOProvider(
+	ctx context.Context,
+	q db.Querier,
+	p SSOProvider,
+) error {
 	cfg := providerConfig{OIDC: p.OIDC, OAuth2: p.OAuth2, SAML: p.SAML}
+
+	// An empty incoming secret keeps the stored one: decrypt the previous
+	// config through the same querier (so tenant isolation holds) and carry
+	// the secret over before encrypting.
+	if (p.OIDC != nil && p.OIDC.ClientSecret == "") || (p.OAuth2 != nil && p.OAuth2.ClientSecret == "") {
+		if row, err := q.GetSSOProvider(ctx, p.ProviderID); err == nil {
+			var prev providerConfig
+			if json.Unmarshal(row.Config, &prev) == nil {
+				if p.OIDC != nil && prev.OIDC != nil {
+					p.OIDC.ClientSecret = prev.OIDC.ClientSecret
+				}
+				if p.OAuth2 != nil && prev.OAuth2 != nil {
+					p.OAuth2.ClientSecret = prev.OAuth2.ClientSecret
+				}
+			}
+		}
+	}
+
 	cfgJSON, err := json.Marshal(cfg)
 	if err != nil {
 		return err
-	}
-
-	secret := crypto.EncryptedBytes(nil)
-	if p.OIDC != nil && p.OIDC.ClientSecret != "" {
-		enc, err := crypto.Encryptor()
-		if err != nil {
-			return err
-		}
-		secret, err = enc.Encrypt([]byte(p.OIDC.ClientSecret))
-		if err != nil {
-			return err
-		}
-	} else if p.OAuth2 != nil && p.OAuth2.ClientSecret != "" {
-		enc, err := crypto.Encryptor()
-		if err != nil {
-			return err
-		}
-		secret, err = enc.Encrypt([]byte(p.OAuth2.ClientSecret))
-		if err != nil {
-			return err
-		}
-	} else if row, err := s.q.GetSSOProvider(ctx, p.ProviderID); err == nil {
-		secret = row.SecretEnc
 	}
 
 	var workspaceID *string
 	if p.WorkspaceID != "" {
 		workspaceID = &p.WorkspaceID
 	}
-	_, err = s.q.UpsertSSOProvider(ctx, &db.UpsertSSOProviderParams{
+	_, err = q.UpsertSSOProvider(ctx, &db.UpsertSSOProviderParams{
 		WorkspaceID: workspaceID,
 		ProviderID:  p.ProviderID,
 		Method:      string(p.Method),
 		Name:        p.Name,
 		Enabled:     p.Enabled,
-		Config:      cfgJSON,
-		SecretEnc:   secret,
+		Config:      crypto.EncryptedBytes(cfgJSON),
 	})
 	return err
 }
 
-// DeleteSSOProvider removes the provider row.
+// DeleteSSOProvider removes the provider row. Deletion is by globally unique
+// provider id, so it runs as nokku_system; no current caller needs the
+// tenant-pinned variant.
 func (s *Service) DeleteSSOProvider(ctx context.Context, providerID string) error {
-	return s.q.DeleteSSOProvider(ctx, providerID)
+	return s.conn.WithTx(ctx, func(q *db.Queries) error {
+		return q.DeleteSSOProvider(ctx, providerID)
+	})
 }
 
 // DeleteTenantSSOProviders removes every provider of a workspace; used when
@@ -144,22 +198,12 @@ func (s *Service) DeleteTenantSSOProviders(ctx context.Context, workspaceID stri
 func (s *Service) ssoProviderFromRow(
 	row *db.SsoProvider,
 ) (*SSOProvider, error) {
+	// row.Config arrives decrypted (EncryptedBytes scan); it is empty only
+	// for rows written before the unified config column.
 	var cfg providerConfig
-	if err := json.Unmarshal(row.Config, &cfg); err != nil {
-		return nil, err
-	}
-	// Decrypt the stored secret into the in-memory payload.
-	if len(row.SecretEnc) > 0 {
-		enc, err := crypto.Encryptor()
-		if err == nil {
-			if plain, err := enc.Decrypt(row.SecretEnc); err == nil {
-				switch {
-				case cfg.OIDC != nil:
-					cfg.OIDC.ClientSecret = string(plain)
-				case cfg.OAuth2 != nil:
-					cfg.OAuth2.ClientSecret = string(plain)
-				}
-			}
+	if len(row.Config) > 0 {
+		if err := json.Unmarshal(row.Config, &cfg); err != nil {
+			return nil, err
 		}
 	}
 	out := &SSOProvider{
