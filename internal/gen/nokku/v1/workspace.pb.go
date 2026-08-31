@@ -153,7 +153,6 @@ type WorkspaceMember struct {
 	Id              *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"` // User ID
 	WorkspaceId     *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
 	Name            *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
-	Username        *string                `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
 	Email           *string                `protobuf:"bytes,5,opt,name=email" json:"email,omitempty"`
 	EmailVerified   *bool                  `protobuf:"varint,6,opt,name=email_verified,json=emailVerified" json:"email_verified,omitempty"`
 	Picture         *string                `protobuf:"bytes,7,opt,name=picture" json:"picture,omitempty"`
@@ -212,13 +211,6 @@ func (x *WorkspaceMember) GetWorkspaceId() string {
 func (x *WorkspaceMember) GetName() string {
 	if x != nil && x.Name != nil {
 		return *x.Name
-	}
-	return ""
-}
-
-func (x *WorkspaceMember) GetUsername() string {
-	if x != nil && x.Username != nil {
-		return *x.Username
 	}
 	return ""
 }
@@ -1434,12 +1426,11 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"created_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x89\x03\n" +
+	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xf3\x02\n" +
 	"\x0fWorkspaceMember\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\x12\x1a\n" +
-	"\busername\x18\x04 \x01(\tR\busername\x12\x14\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
 	"\x05email\x18\x05 \x01(\tR\x05email\x12%\n" +
 	"\x0eemail_verified\x18\x06 \x01(\bR\remailVerified\x12\x18\n" +
 	"\apicture\x18\a \x01(\tR\apicture\x12\x1b\n" +
@@ -1449,7 +1440,7 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"created_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x8f\x01\n" +
+	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtJ\x04\b\x04\x10\x05\"\x8f\x01\n" +
 	"\x11WorkspaceSettings\x12.\n" +
 	"\x13enroll_auto_approve\x18\x01 \x01(\bR\x11enrollAutoApprove\x12J\n" +
 	"\x15default_daemon_config\x18\x02 \x01(\v2\x16.nokku.v1.DaemonConfigR\x13defaultDaemonConfig\"B\n" +

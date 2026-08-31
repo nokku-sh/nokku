@@ -45,8 +45,6 @@ const (
 	// SSOServiceUpdateSAMLProviderProcedure is the fully-qualified name of the SSOService's
 	// UpdateSAMLProvider RPC.
 	SSOServiceUpdateSAMLProviderProcedure = "/nokku.v1.SSOService/UpdateSAMLProvider"
-	// SSOServiceCheckSSOProcedure is the fully-qualified name of the SSOService's CheckSSO RPC.
-	SSOServiceCheckSSOProcedure = "/nokku.v1.SSOService/CheckSSO"
 )
 
 // SSOServiceClient is a client for the nokku.v1.SSOService service.
@@ -55,8 +53,6 @@ type SSOServiceClient interface {
 	UpdateOIDCProvider(context.Context, *v1.UpdateOIDCProviderRequest) (*v1.UpdateOIDCProviderResponse, error)
 	GetSAMLProvider(context.Context, *v1.GetSAMLProviderRequest) (*v1.GetSAMLProviderResponse, error)
 	UpdateSAMLProvider(context.Context, *v1.UpdateSAMLProviderRequest) (*v1.UpdateSAMLProviderResponse, error)
-	// Public endpoint
-	CheckSSO(context.Context, *v1.CheckSSORequest) (*v1.CheckSSOResponse, error)
 }
 
 // NewSSOServiceClient constructs a client for the nokku.v1.SSOService service. By default, it uses
@@ -96,13 +92,6 @@ func NewSSOServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(sSOServiceMethods.ByName("UpdateSAMLProvider")),
 			connect.WithClientOptions(opts...),
 		),
-		checkSSO: connect.NewClient[v1.CheckSSORequest, v1.CheckSSOResponse](
-			httpClient,
-			baseURL+SSOServiceCheckSSOProcedure,
-			connect.WithSchema(sSOServiceMethods.ByName("CheckSSO")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -112,7 +101,6 @@ type sSOServiceClient struct {
 	updateOIDCProvider *connect.Client[v1.UpdateOIDCProviderRequest, v1.UpdateOIDCProviderResponse]
 	getSAMLProvider    *connect.Client[v1.GetSAMLProviderRequest, v1.GetSAMLProviderResponse]
 	updateSAMLProvider *connect.Client[v1.UpdateSAMLProviderRequest, v1.UpdateSAMLProviderResponse]
-	checkSSO           *connect.Client[v1.CheckSSORequest, v1.CheckSSOResponse]
 }
 
 // GetOIDCProvider calls nokku.v1.SSOService.GetOIDCProvider.
@@ -151,23 +139,12 @@ func (c *sSOServiceClient) UpdateSAMLProvider(ctx context.Context, req *v1.Updat
 	return nil, err
 }
 
-// CheckSSO calls nokku.v1.SSOService.CheckSSO.
-func (c *sSOServiceClient) CheckSSO(ctx context.Context, req *v1.CheckSSORequest) (*v1.CheckSSOResponse, error) {
-	response, err := c.checkSSO.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
 // SSOServiceHandler is an implementation of the nokku.v1.SSOService service.
 type SSOServiceHandler interface {
 	GetOIDCProvider(context.Context, *v1.GetOIDCProviderRequest) (*v1.GetOIDCProviderResponse, error)
 	UpdateOIDCProvider(context.Context, *v1.UpdateOIDCProviderRequest) (*v1.UpdateOIDCProviderResponse, error)
 	GetSAMLProvider(context.Context, *v1.GetSAMLProviderRequest) (*v1.GetSAMLProviderResponse, error)
 	UpdateSAMLProvider(context.Context, *v1.UpdateSAMLProviderRequest) (*v1.UpdateSAMLProviderResponse, error)
-	// Public endpoint
-	CheckSSO(context.Context, *v1.CheckSSORequest) (*v1.CheckSSOResponse, error)
 }
 
 // NewSSOServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -203,13 +180,6 @@ func NewSSOServiceHandler(svc SSOServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(sSOServiceMethods.ByName("UpdateSAMLProvider")),
 		connect.WithHandlerOptions(opts...),
 	)
-	sSOServiceCheckSSOHandler := connect.NewUnaryHandlerSimple(
-		SSOServiceCheckSSOProcedure,
-		svc.CheckSSO,
-		connect.WithSchema(sSOServiceMethods.ByName("CheckSSO")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/nokku.v1.SSOService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SSOServiceGetOIDCProviderProcedure:
@@ -220,8 +190,6 @@ func NewSSOServiceHandler(svc SSOServiceHandler, opts ...connect.HandlerOption) 
 			sSOServiceGetSAMLProviderHandler.ServeHTTP(w, r)
 		case SSOServiceUpdateSAMLProviderProcedure:
 			sSOServiceUpdateSAMLProviderHandler.ServeHTTP(w, r)
-		case SSOServiceCheckSSOProcedure:
-			sSOServiceCheckSSOHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -245,8 +213,4 @@ func (UnimplementedSSOServiceHandler) GetSAMLProvider(context.Context, *v1.GetSA
 
 func (UnimplementedSSOServiceHandler) UpdateSAMLProvider(context.Context, *v1.UpdateSAMLProviderRequest) (*v1.UpdateSAMLProviderResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.SSOService.UpdateSAMLProvider is not implemented"))
-}
-
-func (UnimplementedSSOServiceHandler) CheckSSO(context.Context, *v1.CheckSSORequest) (*v1.CheckSSOResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.SSOService.CheckSSO is not implemented"))
 }

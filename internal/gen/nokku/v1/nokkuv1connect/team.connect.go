@@ -49,6 +49,12 @@ const (
 	// TeamServiceRemoveTeamMemberProcedure is the fully-qualified name of the TeamService's
 	// RemoveTeamMember RPC.
 	TeamServiceRemoveTeamMemberProcedure = "/nokku.v1.TeamService/RemoveTeamMember"
+	// TeamServiceListTeamMembersProcedure is the fully-qualified name of the TeamService's
+	// ListTeamMembers RPC.
+	TeamServiceListTeamMembersProcedure = "/nokku.v1.TeamService/ListTeamMembers"
+	// TeamServiceListTeamsForUserProcedure is the fully-qualified name of the TeamService's
+	// ListTeamsForUser RPC.
+	TeamServiceListTeamsForUserProcedure = "/nokku.v1.TeamService/ListTeamsForUser"
 )
 
 // TeamServiceClient is a client for the nokku.v1.TeamService service.
@@ -60,6 +66,8 @@ type TeamServiceClient interface {
 	DeleteTeam(context.Context, *v1.DeleteTeamRequest) (*v1.DeleteTeamResponse, error)
 	AddTeamMember(context.Context, *v1.AddTeamMemberRequest) (*v1.AddTeamMemberResponse, error)
 	RemoveTeamMember(context.Context, *v1.RemoveTeamMemberRequest) (*v1.RemoveTeamMemberResponse, error)
+	ListTeamMembers(context.Context, *v1.ListTeamMembersRequest) (*v1.ListTeamMembersResponse, error)
+	ListTeamsForUser(context.Context, *v1.ListTeamsForUserRequest) (*v1.ListTeamsForUserResponse, error)
 }
 
 // NewTeamServiceClient constructs a client for the nokku.v1.TeamService service. By default, it
@@ -117,6 +125,20 @@ func NewTeamServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(teamServiceMethods.ByName("RemoveTeamMember")),
 			connect.WithClientOptions(opts...),
 		),
+		listTeamMembers: connect.NewClient[v1.ListTeamMembersRequest, v1.ListTeamMembersResponse](
+			httpClient,
+			baseURL+TeamServiceListTeamMembersProcedure,
+			connect.WithSchema(teamServiceMethods.ByName("ListTeamMembers")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listTeamsForUser: connect.NewClient[v1.ListTeamsForUserRequest, v1.ListTeamsForUserResponse](
+			httpClient,
+			baseURL+TeamServiceListTeamsForUserProcedure,
+			connect.WithSchema(teamServiceMethods.ByName("ListTeamsForUser")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -129,6 +151,8 @@ type teamServiceClient struct {
 	deleteTeam       *connect.Client[v1.DeleteTeamRequest, v1.DeleteTeamResponse]
 	addTeamMember    *connect.Client[v1.AddTeamMemberRequest, v1.AddTeamMemberResponse]
 	removeTeamMember *connect.Client[v1.RemoveTeamMemberRequest, v1.RemoveTeamMemberResponse]
+	listTeamMembers  *connect.Client[v1.ListTeamMembersRequest, v1.ListTeamMembersResponse]
+	listTeamsForUser *connect.Client[v1.ListTeamsForUserRequest, v1.ListTeamsForUserResponse]
 }
 
 // GetTeam calls nokku.v1.TeamService.GetTeam.
@@ -194,6 +218,24 @@ func (c *teamServiceClient) RemoveTeamMember(ctx context.Context, req *v1.Remove
 	return nil, err
 }
 
+// ListTeamMembers calls nokku.v1.TeamService.ListTeamMembers.
+func (c *teamServiceClient) ListTeamMembers(ctx context.Context, req *v1.ListTeamMembersRequest) (*v1.ListTeamMembersResponse, error) {
+	response, err := c.listTeamMembers.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// ListTeamsForUser calls nokku.v1.TeamService.ListTeamsForUser.
+func (c *teamServiceClient) ListTeamsForUser(ctx context.Context, req *v1.ListTeamsForUserRequest) (*v1.ListTeamsForUserResponse, error) {
+	response, err := c.listTeamsForUser.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
 // TeamServiceHandler is an implementation of the nokku.v1.TeamService service.
 type TeamServiceHandler interface {
 	GetTeam(context.Context, *v1.GetTeamRequest) (*v1.GetTeamResponse, error)
@@ -203,6 +245,8 @@ type TeamServiceHandler interface {
 	DeleteTeam(context.Context, *v1.DeleteTeamRequest) (*v1.DeleteTeamResponse, error)
 	AddTeamMember(context.Context, *v1.AddTeamMemberRequest) (*v1.AddTeamMemberResponse, error)
 	RemoveTeamMember(context.Context, *v1.RemoveTeamMemberRequest) (*v1.RemoveTeamMemberResponse, error)
+	ListTeamMembers(context.Context, *v1.ListTeamMembersRequest) (*v1.ListTeamMembersResponse, error)
+	ListTeamsForUser(context.Context, *v1.ListTeamsForUserRequest) (*v1.ListTeamsForUserResponse, error)
 }
 
 // NewTeamServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -256,6 +300,20 @@ func NewTeamServiceHandler(svc TeamServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(teamServiceMethods.ByName("RemoveTeamMember")),
 		connect.WithHandlerOptions(opts...),
 	)
+	teamServiceListTeamMembersHandler := connect.NewUnaryHandlerSimple(
+		TeamServiceListTeamMembersProcedure,
+		svc.ListTeamMembers,
+		connect.WithSchema(teamServiceMethods.ByName("ListTeamMembers")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	teamServiceListTeamsForUserHandler := connect.NewUnaryHandlerSimple(
+		TeamServiceListTeamsForUserProcedure,
+		svc.ListTeamsForUser,
+		connect.WithSchema(teamServiceMethods.ByName("ListTeamsForUser")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/nokku.v1.TeamService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case TeamServiceGetTeamProcedure:
@@ -272,6 +330,10 @@ func NewTeamServiceHandler(svc TeamServiceHandler, opts ...connect.HandlerOption
 			teamServiceAddTeamMemberHandler.ServeHTTP(w, r)
 		case TeamServiceRemoveTeamMemberProcedure:
 			teamServiceRemoveTeamMemberHandler.ServeHTTP(w, r)
+		case TeamServiceListTeamMembersProcedure:
+			teamServiceListTeamMembersHandler.ServeHTTP(w, r)
+		case TeamServiceListTeamsForUserProcedure:
+			teamServiceListTeamsForUserHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -307,4 +369,12 @@ func (UnimplementedTeamServiceHandler) AddTeamMember(context.Context, *v1.AddTea
 
 func (UnimplementedTeamServiceHandler) RemoveTeamMember(context.Context, *v1.RemoveTeamMemberRequest) (*v1.RemoveTeamMemberResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TeamService.RemoveTeamMember is not implemented"))
+}
+
+func (UnimplementedTeamServiceHandler) ListTeamMembers(context.Context, *v1.ListTeamMembersRequest) (*v1.ListTeamMembersResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TeamService.ListTeamMembers is not implemented"))
+}
+
+func (UnimplementedTeamServiceHandler) ListTeamsForUser(context.Context, *v1.ListTeamsForUserRequest) (*v1.ListTeamsForUserResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TeamService.ListTeamsForUser is not implemented"))
 }

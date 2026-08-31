@@ -16,7 +16,7 @@ import type { Message } from '@bufbuild/protobuf';
  * Describes the file nokku/v1/team.proto.
  */
 export const file_nokku_v1_team: GenFile /*@__PURE__*/ = fileDesc(
-	'ChNub2trdS92MS90ZWFtLnByb3RvEghub2trdS52MSLlAQoEVGVhbRIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRITCgtkZXNjcmlwdGlvbhgEIAEoCRIMCgR0YWdzGAUgAygJEioKB21lbWJlcnMYBiADKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VNZW1iZXISLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiRgoOR2V0VGVhbVJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIUCgJpZBgCIAEoCUIIukgFcgOwAQEiLwoPR2V0VGVhbVJlc3BvbnNlEhwKBHRlYW0YASABKAsyDi5ub2trdS52MS5UZWFtInoKEUNyZWF0ZVRlYW1SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGAoEbmFtZRgCIAEoCUIKukgHcgUQARiAAhIdCgtkZXNjcmlwdGlvbhgDIAEoCUIIukgFcgMY6AcSDAoEdGFncxgEIAMoCSIyChJDcmVhdGVUZWFtUmVzcG9uc2USHAoEdGVhbRgBIAEoCzIOLm5va2t1LnYxLlRlYW0ikAEKEVVwZGF0ZVRlYW1SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAyABKAlCCrpIB3IFEAEYgAISHQoLZGVzY3JpcHRpb24YBCABKAlCCLpIBXIDGOgHEgwKBHRhZ3MYBSADKAkiMgoSVXBkYXRlVGVhbVJlc3BvbnNlEhwKBHRlYW0YASABKAsyDi5ub2trdS52MS5UZWFtIkkKEURlbGV0ZVRlYW1SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBIhQKEkRlbGV0ZVRlYW1SZXNwb25zZSKCAQoQTGlzdFRlYW1zUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAIgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAMgASgFQge6SAQaAigAEg0KBXF1ZXJ5GAQgASgJEgwKBHRhZ3MYBSADKAkiQQoRTGlzdFRlYW1zUmVzcG9uc2USHQoFdGVhbXMYASADKAsyDi5ub2trdS52MS5UZWFtEg0KBXRvdGFsGAIgASgFImwKFEFkZFRlYW1NZW1iZXJSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGQoHdGVhbV9pZBgCIAEoCUIIukgFcgOwAQESGQoHdXNlcl9pZBgDIAEoCUIIukgFcgOwAQEiFwoVQWRkVGVhbU1lbWJlclJlc3BvbnNlIm8KF1JlbW92ZVRlYW1NZW1iZXJSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGQoHdGVhbV9pZBgCIAEoCUIIukgFcgOwAQESGQoHdXNlcl9pZBgDIAEoCUIIukgFcgOwAQEiGgoYUmVtb3ZlVGVhbU1lbWJlclJlc3BvbnNlMqsHCgtUZWFtU2VydmljZRJzCgdHZXRUZWFtEhgubm9ra3UudjEuR2V0VGVhbVJlcXVlc3QaGS5ub2trdS52MS5HZXRUZWFtUmVzcG9uc2UiM5ACAYLT5JMCKhIoL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMve2lkfRJ0CglMaXN0VGVhbXMSGi5ub2trdS52MS5MaXN0VGVhbXNSZXF1ZXN0Ghsubm9ra3UudjEuTGlzdFRlYW1zUmVzcG9uc2UiLpACAYLT5JMCJRIjL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMSdwoKQ3JlYXRlVGVhbRIbLm5va2t1LnYxLkNyZWF0ZVRlYW1SZXF1ZXN0Ghwubm9ra3UudjEuQ3JlYXRlVGVhbVJlc3BvbnNlIi6C0+STAig6ASoiIy92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3RlYW1zEnwKClVwZGF0ZVRlYW0SGy5ub2trdS52MS5VcGRhdGVUZWFtUmVxdWVzdBocLm5va2t1LnYxLlVwZGF0ZVRlYW1SZXNwb25zZSIzgtPkkwItOgEqMigvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS90ZWFtcy97aWR9EnkKCkRlbGV0ZVRlYW0SGy5ub2trdS52MS5EZWxldGVUZWFtUmVxdWVzdBocLm5va2t1LnYxLkRlbGV0ZVRlYW1SZXNwb25zZSIwgtPkkwIqKigvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS90ZWFtcy97aWR9EpkBCg1BZGRUZWFtTWVtYmVyEh4ubm9ra3UudjEuQWRkVGVhbU1lbWJlclJlcXVlc3QaHy5ub2trdS52MS5BZGRUZWFtTWVtYmVyUmVzcG9uc2UiR4LT5JMCQSI/L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMve3RlYW1faWR9L21lbWJlcnMve3VzZXJfaWR9EqIBChBSZW1vdmVUZWFtTWVtYmVyEiEubm9ra3UudjEuUmVtb3ZlVGVhbU1lbWJlclJlcXVlc3QaIi5ub2trdS52MS5SZW1vdmVUZWFtTWVtYmVyUmVzcG9uc2UiR4LT5JMCQSo/L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMve3RlYW1faWR9L21lbWJlcnMve3VzZXJfaWR9QpMBCgxjb20ubm9ra3UudjFCCVRlYW1Qcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
+	'ChNub2trdS92MS90ZWFtLnByb3RvEghub2trdS52MSLVAQoEVGVhbRIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRITCgtkZXNjcmlwdGlvbhgEIAEoCRIMCgR0YWdzGAUgAygJEi4KCmNyZWF0ZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhQKDG1lbWJlcl9jb3VudBgJIAEoBUoECAYQByJGCg5HZXRUZWFtUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASIvCg9HZXRUZWFtUmVzcG9uc2USHAoEdGVhbRgBIAEoCzIOLm5va2t1LnYxLlRlYW0iegoRQ3JlYXRlVGVhbVJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIYCgRuYW1lGAIgASgJQgq6SAdyBRABGIACEh0KC2Rlc2NyaXB0aW9uGAMgASgJQgi6SAVyAxjoBxIMCgR0YWdzGAQgAygJIjIKEkNyZWF0ZVRlYW1SZXNwb25zZRIcCgR0ZWFtGAEgASgLMg4ubm9ra3UudjEuVGVhbSKQAQoRVXBkYXRlVGVhbVJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIUCgJpZBgCIAEoCUIIukgFcgOwAQESGAoEbmFtZRgDIAEoCUIKukgHcgUQARiAAhIdCgtkZXNjcmlwdGlvbhgEIAEoCUIIukgFcgMY6AcSDAoEdGFncxgFIAMoCSIyChJVcGRhdGVUZWFtUmVzcG9uc2USHAoEdGVhbRgBIAEoCzIOLm5va2t1LnYxLlRlYW0iSQoRRGVsZXRlVGVhbVJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIUCgJpZBgCIAEoCUIIukgFcgOwAQEiFAoSRGVsZXRlVGVhbVJlc3BvbnNlIoIBChBMaXN0VGVhbXNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAiABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAyABKAVCB7pIBBoCKAASDQoFcXVlcnkYBCABKAkSDAoEdGFncxgFIAMoCSJBChFMaXN0VGVhbXNSZXNwb25zZRIdCgV0ZWFtcxgBIAMoCzIOLm5va2t1LnYxLlRlYW0SDQoFdG90YWwYAiABKAUibAoUQWRkVGVhbU1lbWJlclJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIZCgd0ZWFtX2lkGAIgASgJQgi6SAVyA7ABARIZCgd1c2VyX2lkGAMgASgJQgi6SAVyA7ABASIXChVBZGRUZWFtTWVtYmVyUmVzcG9uc2UibwoXUmVtb3ZlVGVhbU1lbWJlclJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIZCgd0ZWFtX2lkGAIgASgJQgi6SAVyA7ABARIZCgd1c2VyX2lkGAMgASgJQgi6SAVyA7ABASIaChhSZW1vdmVUZWFtTWVtYmVyUmVzcG9uc2UiUwoWTGlzdFRlYW1NZW1iZXJzUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhkKB3RlYW1faWQYAiABKAlCCLpIBXIDsAEBIkUKF0xpc3RUZWFtTWVtYmVyc1Jlc3BvbnNlEioKB21lbWJlcnMYASADKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VNZW1iZXIiVAoXTGlzdFRlYW1zRm9yVXNlclJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIZCgd1c2VyX2lkGAIgASgJQgi6SAVyA7ABASI5ChhMaXN0VGVhbXNGb3JVc2VyUmVzcG9uc2USHQoFdGVhbXMYASADKAsyDi5ub2trdS52MS5UZWFtMuIJCgtUZWFtU2VydmljZRJzCgdHZXRUZWFtEhgubm9ra3UudjEuR2V0VGVhbVJlcXVlc3QaGS5ub2trdS52MS5HZXRUZWFtUmVzcG9uc2UiM5ACAYLT5JMCKhIoL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMve2lkfRJ0CglMaXN0VGVhbXMSGi5ub2trdS52MS5MaXN0VGVhbXNSZXF1ZXN0Ghsubm9ra3UudjEuTGlzdFRlYW1zUmVzcG9uc2UiLpACAYLT5JMCJRIjL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMSdwoKQ3JlYXRlVGVhbRIbLm5va2t1LnYxLkNyZWF0ZVRlYW1SZXF1ZXN0Ghwubm9ra3UudjEuQ3JlYXRlVGVhbVJlc3BvbnNlIi6C0+STAig6ASoiIy92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3RlYW1zEnwKClVwZGF0ZVRlYW0SGy5ub2trdS52MS5VcGRhdGVUZWFtUmVxdWVzdBocLm5va2t1LnYxLlVwZGF0ZVRlYW1SZXNwb25zZSIzgtPkkwItOgEqMigvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS90ZWFtcy97aWR9EnkKCkRlbGV0ZVRlYW0SGy5ub2trdS52MS5EZWxldGVUZWFtUmVxdWVzdBocLm5va2t1LnYxLkRlbGV0ZVRlYW1SZXNwb25zZSIwgtPkkwIqKigvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS90ZWFtcy97aWR9EpkBCg1BZGRUZWFtTWVtYmVyEh4ubm9ra3UudjEuQWRkVGVhbU1lbWJlclJlcXVlc3QaHy5ub2trdS52MS5BZGRUZWFtTWVtYmVyUmVzcG9uc2UiR4LT5JMCQSI/L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMve3RlYW1faWR9L21lbWJlcnMve3VzZXJfaWR9EqIBChBSZW1vdmVUZWFtTWVtYmVyEiEubm9ra3UudjEuUmVtb3ZlVGVhbU1lbWJlclJlcXVlc3QaIi5ub2trdS52MS5SZW1vdmVUZWFtTWVtYmVyUmVzcG9uc2UiR4LT5JMCQSo/L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMve3RlYW1faWR9L21lbWJlcnMve3VzZXJfaWR9EpgBCg9MaXN0VGVhbU1lbWJlcnMSIC5ub2trdS52MS5MaXN0VGVhbU1lbWJlcnNSZXF1ZXN0GiEubm9ra3UudjEuTGlzdFRlYW1NZW1iZXJzUmVzcG9uc2UiQJACAYLT5JMCNxI1L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdGVhbXMve3RlYW1faWR9L21lbWJlcnMSmQEKEExpc3RUZWFtc0ZvclVzZXISIS5ub2trdS52MS5MaXN0VGVhbXNGb3JVc2VyUmVxdWVzdBoiLm5va2t1LnYxLkxpc3RUZWFtc0ZvclVzZXJSZXNwb25zZSI+kAIBgtPkkwI1EjMvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS91c2Vycy97dXNlcl9pZH0vdGVhbXNCkwEKDGNvbS5ub2trdS52MUIJVGVhbVByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
 	[
 		file_buf_validate_validate,
 		file_google_api_annotations,
@@ -55,11 +55,6 @@ export type Team = Message<'nokku.v1.Team'> & {
 	tags: string[];
 
 	/**
-	 * @generated from field: repeated nokku.v1.WorkspaceMember members = 6;
-	 */
-	members: WorkspaceMember[];
-
-	/**
 	 * @generated from field: google.protobuf.Timestamp created_at = 7;
 	 */
 	createdAt?: Timestamp | undefined;
@@ -68,6 +63,11 @@ export type Team = Message<'nokku.v1.Team'> & {
 	 * @generated from field: google.protobuf.Timestamp updated_at = 8;
 	 */
 	updatedAt?: Timestamp | undefined;
+
+	/**
+	 * @generated from field: int32 member_count = 9;
+	 */
+	memberCount: number;
 };
 
 /**
@@ -410,6 +410,84 @@ export const RemoveTeamMemberResponseSchema: GenMessage<RemoveTeamMemberResponse
 	messageDesc(file_nokku_v1_team, 14);
 
 /**
+ * @generated from message nokku.v1.ListTeamMembersRequest
+ */
+export type ListTeamMembersRequest = Message<'nokku.v1.ListTeamMembersRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
+
+	/**
+	 * @generated from field: string team_id = 2;
+	 */
+	teamId: string;
+};
+
+/**
+ * Describes the message nokku.v1.ListTeamMembersRequest.
+ * Use `create(ListTeamMembersRequestSchema)` to create a new message.
+ */
+export const ListTeamMembersRequestSchema: GenMessage<ListTeamMembersRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_team, 15);
+
+/**
+ * @generated from message nokku.v1.ListTeamMembersResponse
+ */
+export type ListTeamMembersResponse = Message<'nokku.v1.ListTeamMembersResponse'> & {
+	/**
+	 * @generated from field: repeated nokku.v1.WorkspaceMember members = 1;
+	 */
+	members: WorkspaceMember[];
+};
+
+/**
+ * Describes the message nokku.v1.ListTeamMembersResponse.
+ * Use `create(ListTeamMembersResponseSchema)` to create a new message.
+ */
+export const ListTeamMembersResponseSchema: GenMessage<ListTeamMembersResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_team, 16);
+
+/**
+ * @generated from message nokku.v1.ListTeamsForUserRequest
+ */
+export type ListTeamsForUserRequest = Message<'nokku.v1.ListTeamsForUserRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
+
+	/**
+	 * @generated from field: string user_id = 2;
+	 */
+	userId: string;
+};
+
+/**
+ * Describes the message nokku.v1.ListTeamsForUserRequest.
+ * Use `create(ListTeamsForUserRequestSchema)` to create a new message.
+ */
+export const ListTeamsForUserRequestSchema: GenMessage<ListTeamsForUserRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_team, 17);
+
+/**
+ * @generated from message nokku.v1.ListTeamsForUserResponse
+ */
+export type ListTeamsForUserResponse = Message<'nokku.v1.ListTeamsForUserResponse'> & {
+	/**
+	 * @generated from field: repeated nokku.v1.Team teams = 1;
+	 */
+	teams: Team[];
+};
+
+/**
+ * Describes the message nokku.v1.ListTeamsForUserResponse.
+ * Use `create(ListTeamsForUserResponseSchema)` to create a new message.
+ */
+export const ListTeamsForUserResponseSchema: GenMessage<ListTeamsForUserResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_team, 18);
+
+/**
  * @generated from service nokku.v1.TeamService
  */
 export const TeamService: GenService<{
@@ -468,5 +546,21 @@ export const TeamService: GenService<{
 		methodKind: 'unary';
 		input: typeof RemoveTeamMemberRequestSchema;
 		output: typeof RemoveTeamMemberResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.TeamService.ListTeamMembers
+	 */
+	listTeamMembers: {
+		methodKind: 'unary';
+		input: typeof ListTeamMembersRequestSchema;
+		output: typeof ListTeamMembersResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.TeamService.ListTeamsForUser
+	 */
+	listTeamsForUser: {
+		methodKind: 'unary';
+		input: typeof ListTeamsForUserRequestSchema;
+		output: typeof ListTeamsForUserResponseSchema;
 	};
 }> /*@__PURE__*/ = serviceDesc(file_nokku_v1_team, 0);
