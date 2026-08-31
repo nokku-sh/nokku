@@ -4,7 +4,7 @@ import { toast } from 'svelte-sonner';
 import { queryClient } from './client';
 import { account } from './account';
 
-// Password, passkeys, and backup codes are kagi's /auth/account surface.
+// Password, passkeys, and backup codes live on the /auth/account surface.
 // The mutations keep the shapes the security page already consumes.
 
 const invalidateCredentials = () => queryClient.invalidateQueries({ queryKey: ['account'] });

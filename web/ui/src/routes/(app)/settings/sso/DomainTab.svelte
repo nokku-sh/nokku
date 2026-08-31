@@ -147,14 +147,14 @@
 									Add a TXT record to your DNS with name: <code
 										class="rounded bg-muted px-1 py-0.5"
 									>
-										_kagi-verify.{d.domain}
+										_nokku-verify.{d.domain}
 									</code>
 									and value set to the verification token above.
 								</p>
 								<p class="text-xs text-muted-foreground">
 									Note: Some DNS providers (like Cloudflare) automatically append your domain to the
 									record name, so you may only need to enter <code
-										class="rounded bg-muted px-1 py-0.5">_kagi-verify</code
+										class="rounded bg-muted px-1 py-0.5">_nokku-verify</code
 									>
 								</p>
 							</div>

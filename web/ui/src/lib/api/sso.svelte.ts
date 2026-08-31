@@ -31,7 +31,7 @@ export const sso = {
 		useMutation(SSOService.method.updateSAMLProvider, {
 			onSuccess: () => toast.success('SAML provider updated')
 		}),
-	// Home realm discovery is kagi's mounted endpoint: it answers which
+	// Home realm discovery is the backend's mounted endpoint: it answers which
 	// providers cover the email's domain. The domain rides along so the
 	// login buttons can hand it to the SSO flows, which resolve the
 	// provider's workspace from it.

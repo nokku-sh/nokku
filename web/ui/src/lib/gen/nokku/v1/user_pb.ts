@@ -2,21 +2,18 @@
 // @generated from file nokku/v1/user.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
-import { fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
-import { file_google_api_annotations } from '../../google/api/annotations_pb';
+import type { GenFile, GenMessage } from '@bufbuild/protobuf/codegenv2';
+import { fileDesc, messageDesc } from '@bufbuild/protobuf/codegenv2';
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
 import { file_google_protobuf_timestamp } from '@bufbuild/protobuf/wkt';
-import type { ServiceAccount } from './service_account_pb';
-import { file_nokku_v1_service_account } from './service_account_pb';
 import type { Message } from '@bufbuild/protobuf';
 
 /**
  * Describes the file nokku/v1/user.proto.
  */
 export const file_nokku_v1_user: GenFile /*@__PURE__*/ = fileDesc(
-	'ChNub2trdS92MS91c2VyLnByb3RvEghub2trdS52MSLdAQoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWVtYWlsGAQgASgJEhYKDmVtYWlsX3ZlcmlmaWVkGAUgASgIEg8KB3BpY3R1cmUYBiABKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHQoVZW5hYmxlX2VtYWlsX3JlY292ZXJ5GAkgASgISgQIAxAEIngKDU9BdXRoSWRlbnRpdHkSEwoLcHJvdmlkZXJfaWQYASABKAkSEAoIcHJvdmlkZXIYAiABKAkSEAoIcHJvdG9jb2wYAyABKAkSLgoKY3JlYXRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiDwoNV2hvYW1pUmVxdWVzdCJhCg5XaG9hbWlSZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlchIxCg9zZXJ2aWNlX2FjY291bnQYAiABKAsyGC5ub2trdS52MS5TZXJ2aWNlQWNjb3VudDJhCgtVc2VyU2VydmljZRJSCgZXaG9hbWkSFy5ub2trdS52MS5XaG9hbWlSZXF1ZXN0Ghgubm9ra3UudjEuV2hvYW1pUmVzcG9uc2UiFZACAYLT5JMCDBIKL3YxL3dob2FtaUKTAQoMY29tLm5va2t1LnYxQglVc2VyUHJvdG9QAVo3Z2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9pbnRlcm5hbC9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac',
-	[file_google_api_annotations, file_google_protobuf_timestamp, file_nokku_v1_service_account]
+	'ChNub2trdS92MS91c2VyLnByb3RvEghub2trdS52MSLdAQoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWVtYWlsGAQgASgJEhYKDmVtYWlsX3ZlcmlmaWVkGAUgASgIEg8KB3BpY3R1cmUYBiABKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHQoVZW5hYmxlX2VtYWlsX3JlY292ZXJ5GAkgASgISgQIAxAEIngKDU9BdXRoSWRlbnRpdHkSEwoLcHJvdmlkZXJfaWQYASABKAkSEAoIcHJvdmlkZXIYAiABKAkSEAoIcHJvdG9jb2wYAyABKAkSLgoKY3JlYXRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCkwEKDGNvbS5ub2trdS52MUIJVXNlclByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
+	[file_google_protobuf_timestamp]
 );
 
 /**
@@ -103,59 +100,3 @@ export const OAuthIdentitySchema: GenMessage<OAuthIdentity> /*@__PURE__*/ = mess
 	file_nokku_v1_user,
 	1
 );
-
-/**
- * @generated from message nokku.v1.WhoamiRequest
- */
-export type WhoamiRequest = Message<'nokku.v1.WhoamiRequest'> & {};
-
-/**
- * Describes the message nokku.v1.WhoamiRequest.
- * Use `create(WhoamiRequestSchema)` to create a new message.
- */
-export const WhoamiRequestSchema: GenMessage<WhoamiRequest> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_user,
-	2
-);
-
-/**
- * @generated from message nokku.v1.WhoamiResponse
- */
-export type WhoamiResponse = Message<'nokku.v1.WhoamiResponse'> & {
-	/**
-	 * @generated from field: nokku.v1.User user = 1;
-	 */
-	user?: User | undefined;
-
-	/**
-	 * @generated from field: nokku.v1.ServiceAccount service_account = 2;
-	 */
-	serviceAccount?: ServiceAccount | undefined;
-};
-
-/**
- * Describes the message nokku.v1.WhoamiResponse.
- * Use `create(WhoamiResponseSchema)` to create a new message.
- */
-export const WhoamiResponseSchema: GenMessage<WhoamiResponse> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_user,
-	3
-);
-
-/**
- * Identity is kagi's: profile, password, passkeys, linked accounts, backup
- * codes, sessions, and account deletion are served by the auth layer under
- * /auth/account. UserService only identifies service-account principals.
- *
- * @generated from service nokku.v1.UserService
- */
-export const UserService: GenService<{
-	/**
-	 * @generated from rpc nokku.v1.UserService.Whoami
-	 */
-	whoami: {
-		methodKind: 'unary';
-		input: typeof WhoamiRequestSchema;
-		output: typeof WhoamiResponseSchema;
-	};
-}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_user, 0);
