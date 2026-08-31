@@ -4,86 +4,233 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/mizuchilabs/kagi"
-	"github.com/mizuchilabs/kagi/apikey"
-	"github.com/mizuchilabs/kagi/backupcode"
-	"github.com/mizuchilabs/kagi/dpop"
-	"github.com/mizuchilabs/kagi/password"
-	"github.com/mizuchilabs/kagi/tokens"
+	kagipg "github.com/mizuchilabs/kagi/store/postgres"
 
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/email"
 )
 
-// Service is the kagi authentication engine wired for nokku. It exposes the
-// kagi service itself (for the provider handlers and middleware) plus a
-// nokku-shaped facade: users and credentials are global, so the kagi tenant
-// parameter is elided from every method here. Only machine identities
-// (service accounts, daemons) are workspace-scoped, and those methods take an
-// explicit workspace id.
-type Service struct {
-	Kagi        *kagi.Service
-	Resolvers   Resolvers
-	store       *Store
-	apiKeys     *apikey.Manager
-	dpop        *dpop.Verifier
-	passwords   *password.Manager
-	backupCodes *backupcode.Manager
-	tokens      *tokens.Manager
+// deviceSessionTTL is how long an nk device session lasts before the user
+// must re-run the browser device flow. Longer than the web session (24h) so a
+// daily-driver CLI is not hitting the browser every day, but bounded because
+// there is no refresh flow.
+const deviceSessionTTL = 7 * 24 * time.Hour
+
+// tokenTTL is the lifetime of one-time email tokens (verify, reset).
+const tokenTTL = 15 * time.Minute
+
+// Deps carries everything kagi needs from nokku to build the auth layer.
+type Deps struct {
+	// Store is the opened kagi store (see OpenStore).
+	Store *kagipg.Store
+	// Conn is nokku's pool, for the SSO enforcement and provisioning hooks.
+	Conn *db.Connection
+	// Cache backs SSO flow state, ceremonies, device grants, DPoP replay,
+	// and rate limits. Shared with the rest of the app.
+	Cache kagi.Cache
+	// Email delivers the one-time-link emails kagi composes.
+	Email *email.Service
+	// BaseURL is the public origin: one-time links, DPoP htu checks, Secure
+	// cookies, and the WebAuthn relying-party id.
+	BaseURL string
+	// Secret is the master secret kagi derives its at-rest keys from: the
+	// cipher for SSO client secrets and the SAML SP private key, and the
+	// DPoP nonce key. Must be shared across instances.
+	Secret []byte
+	// Cipher optionally replaces kagi's derived cipher with an external
+	// one, e.g. the KMS encryptor. nil keeps the derived secretbox.
+	Cipher kagi.Cipher
+	// Google and GitHub credentials for the static social providers; empty
+	// disables a provider.
+	GoogleClientID     string
+	GoogleClientSecret string
+	GitHubClientID     string
+	GitHubClientSecret string
+	// Debug adds the frontend dev server to the WebAuthn origins.
+	Debug bool
 }
 
-// NewService builds the kagi engine for nokku. nonceSecret keys the stateless
-// DPoP server nonce (RFC 9449 section 8) and must be shared across instances.
-// sso carries the static SSO provider credentials.
-func NewService(conn *db.Connection, nonceSecret []byte, sso SSOConfig) (*Service, error) {
-	store := NewStore(conn)
-	dpopVerifier := dpop.New(dpop.Options{NonceSecret: nonceSecret})
+// Runtime is the wired auth layer: the mounted kagi handler plus the kagi
+// handles nokku code calls directly. It is plain data, not a facade: every
+// field is a kagi type used as documented there.
+type Runtime struct {
+	*kagi.Auth
 
-	kagiSvc, err := kagi.New(kagi.Options{
-		Store:         store,
+	// Store is the opened kagi store, for hooks and jobs that run inside
+	// the auth layer's own flows.
+	Store *kagipg.Store
+	// Keys issues and verifies service-account API keys. It is attached to
+	// the auth kernel, so the connect interceptor accepts its keys too.
+	Keys *kagi.APIKeyManager
+	// Account is the account-surface config kagi serves /auth/account with.
+	// The Guard is wired here; config attaches OnDelete once billing and
+	// storage exist (the pointer is shared with the running handler).
+	Account *kagi.AccountConfig
+}
+
+// New builds the kagi auth layer for nokku in one Config block: password and
+// backup-code login with email round trips, passkeys, Google/GitHub social
+// login, per-workspace enterprise OIDC/SAML, the device flow for nk, DPoP for
+// daemons, and service-account API keys.
+func New(ctx context.Context, d Deps) (*Runtime, error) {
+	rt := &Runtime{Store: d.Store}
+	// The one-time-token manager backs the mounted email flows; nothing
+	// outside kagi's config needs it.
+	tokens := kagi.NewTokenManager(d.Store, tokenTTL)
+	rt.Account = &kagi.AccountConfig{}
+
+	svc, err := build(d, tokens, rt.Account)
+	if err != nil {
+		return nil, err
+	}
+	rt.Auth = svc
+
+	// Attach the API-key verifier without mounting kagi's issue endpoint:
+	// service-account keys are issued through the ServiceAccountService RPC.
+	rt.Keys, err = kagi.NewAPIKeyManager(svc.Service())
+	if err != nil {
+		return nil, err
+	}
+
+	// The kagi store owns its pool; release it with the application context.
+	go func() {
+		<-ctx.Done()
+		_ = d.Store.Close()
+	}()
+
+	return rt, nil
+}
+
+// build assembles kagi.New. Split from New so the Runtime can reference the
+// handler in the ResolveUser closures: they run per request, after New has
+// finished, but kagi builds the handlers eagerly.
+func build(
+	d Deps,
+	tokens *kagi.TokenManager,
+	account *kagi.AccountConfig,
+) (*kagi.Auth, error) {
+	u, err := url.Parse(d.BaseURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return kagi.New(kagi.Config{
+		Store:   d.Store,
+		Cache:   d.Cache,
+		BaseURL: d.BaseURL,
+		Secret:  d.Secret,
+		Cipher:  d.Cipher,
+		// nokku's users, credentials, and sessions are global; the workspace
+		// a request acts in is the effective tenant.
 		ResolveTenant: resolveTenant,
-		DPoP:          dpopVerifier,
-		Sessions: kagi.SessionOptions{
-			TTL:        24 * time.Hour,
-			CookieName: "session",
-			Secure:     true,
+		Account:       account,
+
+		// Account state (active, verified) and SSO enforcement gate every
+		// session issuance.
+		EnforceAccountState: true,
+		// Static social providers seed into kagi's storage at boot, so
+		// every provider resolves from storage and no ResolveProvider hook
+		// is needed. Idempotent: unchanged rows are not rewritten.
+		SSOSeed: socialProviders(d),
+		// Enterprise SSO logins run under the provider's workspace (the
+		// provider id doubles as the workspace id) and join it: membership
+		// is nokku data; everything else about the login is kagi's. Social
+		// and password logins run under the global tenant and join nothing.
+		OnLogin: func(ctx context.Context, t kagi.TenantID, u kagi.User, _ kagi.Method) error {
+			if t == "" {
+				return nil
+			}
+			return d.Conn.WithTx(ctx, func(q *db.Queries) error {
+				return q.AddWorkspaceMember(ctx, &db.AddWorkspaceMemberParams{
+					UserID:      u.ID,
+					WorkspaceID: string(t),
+				})
+			})
 		},
 		Events: slogSink(),
-		OnLogin: func(ctx context.Context, _ kagi.TenantID, u kagi.User, m kagi.Method) error {
-			// SSO enforcement applies to every method except the IdP flows
-			// themselves (oidc/saml are the enforced path). Account state
-			// (active, verified) is enforced centrally via
-			// EnforceAccountState; this hook only knows the email domain.
-			if m != kagi.MethodOIDC && m != kagi.MethodSAML {
-				if ssoEnforced(ctx, conn, u.Email) {
-					return kagi.ErrSSORequired
-				}
-			}
-			return nil
+
+		Flows: &kagi.Flows{
+			ValidateEmail: email.Verify,
+			Tokens:        tokens,
+			Mailer:        kagiMailer{email: d.Email},
 		},
-		EnforceAccountState: true,
+
+		Passkeys: &kagi.PasskeyConfig{
+			RPID:          u.Hostname(),
+			RPDisplayName: "Nokku",
+			RPOrigins:     rpOrigins(d),
+			Signup:        true,
+		},
+
+		OIDC: &kagi.OIDCConfig{
+			ErrorRedirect: d.BaseURL + "/auth-error",
+		},
+
+		OAuth2: &kagi.OAuth2Config{
+			ErrorRedirect: d.BaseURL + "/auth-error",
+		},
+
+		SAML: &kagi.SAMLConfig{
+			ErrorRedirect: d.BaseURL + "/auth-error",
+			AcsURL:        d.BaseURL + "/saml/acs",
+			SPEntityID:    d.BaseURL + "/saml/metadata",
+		},
+
+		Device: &kagi.DeviceConfig{
+			VerificationURI: d.BaseURL + "/device",
+			SessionTTL:      deviceSessionTTL,
+			Kind:            ActorTypeDevice,
+		},
+
+		DPoP: &kagi.DPoPConfig{},
 	})
-	if err != nil {
-		return nil, err
-	}
+}
 
-	apiKeys, err := apikey.New(kagiSvc, store)
-	if err != nil {
-		return nil, err
+// socialProviders builds the static social login providers from the
+// environment credentials. They seed into kagi's storage at boot
+// (Config.SSOSeed), so they resolve like any stored provider. A provider
+// without credentials is omitted, which disables it.
+func socialProviders(d Deps) []kagi.SSOProvider {
+	var out []kagi.SSOProvider
+	if d.GoogleClientID != "" && d.GoogleClientSecret != "" {
+		p := kagi.OIDCGoogle(d.GoogleClientID, d.GoogleClientSecret)
+		p.JITProvisioning = true
+		out = append(out, kagi.SSOProvider{
+			TenantID:   "",
+			ProviderID: "google",
+			Method:     kagi.MethodOIDC,
+			Name:       "Google",
+			Enabled:    true,
+			OIDC:       &p,
+		})
 	}
+	if d.GitHubClientID != "" && d.GitHubClientSecret != "" {
+		p := kagi.OAuth2GitHub(d.GitHubClientID, d.GitHubClientSecret)
+		p.JITProvisioning = true
+		out = append(out, kagi.SSOProvider{
+			TenantID:   "",
+			ProviderID: "github",
+			Method:     kagi.MethodOAuth2,
+			Name:       "GitHub",
+			Enabled:    true,
+			OAuth2:     &p,
+		})
+	}
+	return out
+}
 
-	return &Service{
-		Kagi:        kagiSvc,
-		Resolvers:   NewResolvers(conn, sso),
-		store:       store,
-		apiKeys:     apiKeys,
-		dpop:        dpopVerifier,
-		passwords:   password.New(kagiSvc, password.DefaultParams()),
-		backupCodes: backupcode.New(kagiSvc),
-		tokens:      tokens.New(NewTokenStore(conn), 15*time.Minute),
-	}, nil
+// rpOrigins returns the WebAuthn relying-party origins: the app URL plus the
+// frontend dev server in debug mode.
+func rpOrigins(d Deps) []string {
+	origins := []string{d.BaseURL}
+	if d.Debug {
+		origins = append(origins, "http://localhost:5173")
+	}
+	return origins
 }
 
 // slogSink is the default auth event sink used until the audit service is
@@ -100,181 +247,9 @@ func slogSink() kagi.Sink {
 	})
 }
 
-// SetEventSink wires the kagi auth sink to the audit service. The audit
-// service is constructed after auth (it needs billing), so it is attached
-// once both exist. It must be called before the server starts serving.
-func (s *Service) SetEventSink(sink kagi.Sink) {
-	if sink == nil {
-		return
-	}
-	s.Kagi.Events = sink
-}
-
-// Authenticator returns a session authenticator wired to the kagi service.
-func (s *Service) Authenticator() *kagi.Authenticator {
-	return s.Kagi.Authenticator()
-}
-
-// APIKeys returns the API-key manager, for the connectrpc authn interceptor.
-func (s *Service) APIKeys() *apikey.Manager {
-	return s.apiKeys
-}
-
-// DPoP returns the DPoP proof verifier, for handlers that verify a proof
-// outside the connectrpc interceptor (e.g. daemon enrollment).
-func (s *Service) DPoP() *dpop.Verifier {
-	return s.dpop
-}
-
-// Tokens returns the one-time-token manager, for the kagi server package's
-// email verification and password-reset flows.
-func (s *Service) Tokens() *tokens.Manager {
-	return s.tokens
-}
-
-// --- Passwords (global users) -------------------------------------------------
-
-func (s *Service) CheckPassword(ctx context.Context, userID, pw string) error {
-	return s.passwords.CheckPassword(ctx, "", userID, pw)
-}
-
-func (s *Service) HasPassword(ctx context.Context, userID string) (bool, error) {
-	return s.passwords.HasPassword(ctx, "", userID)
-}
-
-func (s *Service) SetPassword(ctx context.Context, userID, pw string) error {
-	return s.passwords.SetPassword(ctx, "", userID, pw)
-}
-
-func (s *Service) DeletePassword(ctx context.Context, userID string) error {
-	return s.passwords.DeletePassword(ctx, "", userID)
-}
-
-func (s *Service) Register(ctx context.Context, email, name, pw string) (kagi.User, error) {
-	return s.passwords.Register(ctx, "", email, name, pw)
-}
-
-// --- Backup codes (global users) ----------------------------------------------
-
-func (s *Service) ConsumeBackupCode(ctx context.Context, userID, code string) (kagi.User, error) {
-	return s.backupCodes.Consume(ctx, "", userID, code)
-}
-
-func (s *Service) GenerateBackupCodes(ctx context.Context, userID string, n int) ([]string, error) {
-	return s.backupCodes.GenerateCodes(ctx, "", userID, n)
-}
-
-func (s *Service) ListBackupCodes(ctx context.Context, userID string) ([]kagi.Credential, error) {
-	return s.backupCodes.List(ctx, "", userID)
-}
-
-func (s *Service) DeleteBackupCodes(ctx context.Context, userID string) error {
-	return s.backupCodes.Delete(ctx, "", userID)
-}
-
-// --- Credentials (global users) ------------------------------------------------
-
-func (s *Service) ListCredentials(
-	ctx context.Context,
-	userID string,
-	typ kagi.Method,
-) ([]kagi.Credential, error) {
-	return s.store.ListCredentials(ctx, "", userID, typ)
-}
-
-func (s *Service) GetCredential(ctx context.Context, userID, id string) (kagi.Credential, error) {
-	return s.store.GetCredential(ctx, "", userID, id)
-}
-
-func (s *Service) PutCredential(ctx context.Context, c kagi.Credential) error {
-	return s.store.PutCredential(ctx, "", c)
-}
-
-func (s *Service) DeleteCredential(ctx context.Context, userID, id string) error {
-	return s.store.DeleteCredential(ctx, "", userID, id)
-}
-
-func (s *Service) GetUser(ctx context.Context, userID string) (kagi.User, error) {
-	return s.store.GetUser(ctx, "", userID)
-}
-
-func (s *Service) GetUserByEmail(ctx context.Context, email string) (kagi.User, error) {
-	return s.store.GetUserByEmail(ctx, "", email)
-}
-
-func (s *Service) CreateUser(ctx context.Context, u kagi.User) (kagi.User, error) {
-	return s.store.CreateUser(ctx, "", u)
-}
-
-func (s *Service) DeleteProviderCredentials(
-	ctx context.Context,
-	provider string,
-	typ kagi.Method,
-) error {
-	return s.store.DeleteProviderCredentials(ctx, provider, typ)
-}
-
-// --- One-time tokens -----------------------------------------------------------
-
-func (s *Service) IssueToken(
-	ctx context.Context,
-	userID string,
-	purpose tokens.Purpose,
-) (string, error) {
-	return s.tokens.Issue(ctx, userID, purpose)
-}
-
-func (s *Service) ConsumeToken(ctx context.Context, raw string) (string, tokens.Purpose, error) {
-	return s.tokens.Consume(ctx, raw)
-}
-
-// --- API keys (workspace-scoped machine identities) ----------------------------
-
-// IssueServiceAccountKey mints a workspace-scoped API key acting as the service
-// account. A non-positive ttl issues a key that never expires.
-func (s *Service) IssueServiceAccountKey(
-	ctx context.Context,
-	workspaceID, serviceAccountID, name string,
-	ttl time.Duration,
-) (kagi.APIKey, error) {
-	return s.apiKeys.Issue(
-		ctx,
-		kagi.TenantID(workspaceID),
-		serviceAccountID,
-		ActorTypeServiceAccount,
-		name,
-		nil,
-		ttl,
-	)
-}
-
-func (s *Service) RevokeServiceAccountKeys(
-	ctx context.Context,
-	workspaceID, serviceAccountID string,
-) error {
-	return s.apiKeys.RevokeAll(ctx, kagi.TenantID(workspaceID), serviceAccountID)
-}
-
-// --- Sessions ------------------------------------------------------------------
-
-// IssueUserSession issues a kagi session for a global user and sets the
-// session cookie.
-func (s *Service) IssueUserSession(
-	ctx context.Context,
-	w http.ResponseWriter,
-	u kagi.User,
-	m kagi.Method,
-) (kagi.Session, error) {
-	return s.Kagi.IssueSession(ctx, w, "", u, m)
-}
-
-func (s *Service) ClearSession(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	s.Kagi.Sessions.ClearSession(ctx, w, r)
-}
-
 // resolveTenant maps a request to a kagi tenant. nokku's users, credentials,
 // and sessions are global, so this returns the workspace a request is acting
-// in when one is present and an empty tenant otherwise. SSO login routes will
+// in when one is present and an empty tenant otherwise. SSO login routes
 // resolve the workspace explicitly from the request (domain or parameter)
 // before calling into kagi's provider handlers.
 func resolveTenant(r *http.Request) (kagi.TenantID, error) {
@@ -285,21 +260,4 @@ func resolveTenant(r *http.Request) (kagi.TenantID, error) {
 		return kagi.TenantID(ws), nil
 	}
 	return "", nil
-}
-
-// ssoEnforced reports whether the email's domain belongs to a workspace that
-// enforces single sign-on.
-func ssoEnforced(ctx context.Context, conn *db.Connection, addr string) bool {
-	domain, err := email.GetDomain(addr)
-	if err != nil {
-		return false
-	}
-	var enforced bool
-	if err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
-		enforced, err = q.CheckDomainSSOEnforcement(ctx, domain)
-		return err
-	}); err != nil {
-		return false
-	}
-	return enforced
 }
