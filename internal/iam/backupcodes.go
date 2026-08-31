@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base32"
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -84,10 +85,28 @@ func (s *Service) DeleteBackupCodes(ctx context.Context, userID string) error {
 	return nil
 }
 
+// normalizeBackupCode uppercases and strips separators, so a code retyped
+// from a printout or pasted as XXXX-XXXX-XXXX-XXXX still verifies against
+// the hash stored at generation time (which is of the bare 16 characters).
+func normalizeBackupCode(code string) string {
+	var b strings.Builder
+	b.Grow(len(code))
+	for _, r := range code {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r - 32)
+		case (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9'):
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 // LoginWithBackupCode verifies a single-use backup code and returns the
 // user. Consumption is atomic: a code can never be spent twice.
 func (s *Service) LoginWithBackupCode(ctx context.Context, email, code string) (*db.User, error) {
 	email = normalizeEmail(email)
+	code = normalizeBackupCode(code)
 	u, err := s.q.GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
