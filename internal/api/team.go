@@ -176,7 +176,15 @@ func (s *TeamService) ListTeamMembers(
 
 	members := make([]*nokkuv1.WorkspaceMember, 0, len(rows))
 	for _, m := range rows {
-		members = append(members, teamMemberProto(m))
+		members = append(members, &nokkuv1.WorkspaceMember{
+			Id:            &m.UserID,
+			WorkspaceId:   &m.WorkspaceID,
+			Name:          &m.Name,
+			Email:         &m.Email,
+			EmailVerified: &m.EmailVerified,
+			Picture:       m.Picture,
+			CreatedAt:     db.SafeTimestamp(&m.CreatedAt),
+		})
 	}
 	return &nokkuv1.ListTeamMembersResponse{Members: members}, nil
 }

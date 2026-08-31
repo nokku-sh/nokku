@@ -18,44 +18,6 @@ import (
 // identityMethods are the external identities the account surface manages.
 var identityMethods = []iam.Method{iam.MethodOIDC, iam.MethodOAuth2, iam.MethodSAML}
 
-// accountUser is the signed-in account, as JSON.
-type accountUser struct {
-	ID                   string    `json:"id"`
-	Email                string    `json:"email"`
-	DisplayName          string    `json:"displayName"`
-	Active               bool      `json:"active"`
-	EmailVerified        bool      `json:"emailVerified"`
-	DisablePasswordReset bool      `json:"disablePasswordReset"`
-	Picture              string    `json:"picture,omitempty"`
-	CreatedAt            time.Time `json:"createdAt"`
-	UpdatedAt            time.Time `json:"updatedAt"`
-}
-
-func newAccountUser(u *db.User) accountUser {
-	return accountUser{
-		ID:                   u.ID,
-		Email:                u.Email,
-		DisplayName:          u.Name,
-		Active:               u.Active,
-		EmailVerified:        u.EmailVerified,
-		DisablePasswordReset: u.DisablePasswordReset,
-		Picture:              derefStr(u.Picture),
-		CreatedAt:            u.CreatedAt,
-		UpdatedAt:            u.UpdatedAt,
-	}
-}
-
-// accountCredential is one stored login method: the password, a passkey, a
-// backup code, or a linked identity.
-type accountCredential struct {
-	ID        string    `json:"id"`
-	Type      string    `json:"type"`
-	Provider  string    `json:"provider,omitempty"`
-	Subject   string    `json:"subject,omitempty"`
-	Label     string    `json:"label,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
-}
-
 // accountSession is one live session of the account. ID is the hex token
 // hash, the value sessions/remove takes.
 type accountSession struct {
@@ -74,7 +36,7 @@ func (a *authAPI) getAccount(w http.ResponseWriter, r *http.Request) {
 		iam.WriteError(w, http.StatusNotFound, "not_found", "account not found")
 		return
 	}
-	iam.WriteJSON(w, http.StatusOK, newAccountUser(u))
+	iam.WriteJSON(w, http.StatusOK, u)
 }
 
 type updateAccountRequest struct {
@@ -103,7 +65,7 @@ func (a *authAPI) updateAccount(w http.ResponseWriter, r *http.Request) {
 		iam.WriteError(w, http.StatusInternalServerError, "internal_error", "something went wrong")
 		return
 	}
-	iam.WriteJSON(w, http.StatusOK, newAccountUser(u))
+	iam.WriteJSON(w, http.StatusOK, u)
 }
 
 type changePasswordRequest struct {
@@ -236,7 +198,7 @@ func (a *authAPI) getCredentials(w http.ResponseWriter, r *http.Request) {
 	types := append(
 		[]iam.Method{iam.MethodPassword, iam.MethodPasskey, iam.MethodBackupCode},
 		identityMethods...)
-	out := []accountCredential{}
+	out := []db.Credential{}
 	for _, typ := range types {
 		creds, err := a.cfg.IAM.ListCredentialsByType(r.Context(), a.principal(r).ID, typ)
 		if err != nil {
@@ -249,7 +211,7 @@ func (a *authAPI) getCredentials(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, c := range creds {
-			out = append(out, accountCredential{
+			out = append(out, db.Credential{
 				ID:        c.ID,
 				Type:      c.Type,
 				Provider:  c.Provider,
@@ -351,9 +313,9 @@ func (a *authAPI) listBackupCodes(w http.ResponseWriter, r *http.Request) {
 		iam.WriteError(w, http.StatusInternalServerError, "internal_error", "something went wrong")
 		return
 	}
-	codes := []accountCredential{}
+	codes := []db.Credential{}
 	for _, c := range creds {
-		codes = append(codes, accountCredential{ID: c.ID, Type: c.Type, CreatedAt: c.CreatedAt})
+		codes = append(codes, db.Credential{ID: c.ID, Type: c.Type, CreatedAt: c.CreatedAt})
 	}
 	iam.WriteJSON(w, http.StatusOK, map[string]any{"codes": codes})
 }
@@ -466,11 +428,4 @@ func (a *authAPI) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, a.cfg.IAM.ClearSessionCookie())
 	iam.WriteOK(w)
-}
-
-func derefStr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }

@@ -239,7 +239,17 @@ func (s *WorkspaceService) ListWorkspaceMembers(
 
 	protos := make([]*nokkuv1.WorkspaceMember, 0, len(members))
 	for _, m := range members {
-		protos = append(protos, workspaceMemberProto(m))
+		protos = append(protos, &nokkuv1.WorkspaceMember{
+			Id:            &m.UserID,
+			WorkspaceId:   &m.WorkspaceID,
+			Name:          &m.Name,
+			Email:         &m.Email,
+			EmailVerified: &m.EmailVerified,
+			Picture:       m.Picture,
+			RoleName:      &m.RoleName,
+			CreatedAt:     db.SafeTimestamp(&m.CreatedAt),
+			UpdatedAt:     db.SafeTimestamp(&m.UpdatedAt),
+		})
 	}
 
 	return &nokkuv1.ListWorkspaceMembersResponse{
