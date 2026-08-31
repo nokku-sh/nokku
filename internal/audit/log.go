@@ -103,11 +103,12 @@ func (s *Service) logAudit(
 // path (logAudit is called from a detached goroutine) and a miss simply leaves
 // the column empty.
 func (s *Service) actorEmail(ctx context.Context, p kagi.Principal) string {
-	if p.SubjectID == "" ||
+	if s.users == nil ||
+		p.SubjectID == "" ||
 		(p.Kind != auth.ActorTypeUser && p.Kind != auth.ActorTypeDevice) {
 		return ""
 	}
-	u, err := s.conn.Q.GetUserByID(ctx, p.SubjectID)
+	u, err := s.users.GetUser(ctx, p.SubjectID)
 	if err != nil {
 		return ""
 	}
