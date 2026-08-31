@@ -3,33 +3,31 @@ package config
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/url"
 	"os"
-	"strconv"
+	"time"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/mizuchilabs/kagi"
-	"github.com/redis/go-redis/v9"
 	"github.com/urfave/cli/v3"
 
 	"github.com/nokku-sh/nokku/internal/audit"
-	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
+	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/internal/daemon"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/email"
 	"github.com/nokku-sh/nokku/internal/geo"
+	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/storage"
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
 type EnvConfig struct {
-	BaseURL        string `env:"NOKKU_BASE_URL"          envDefault:"http://localhost"`
-	Port           string `env:"NOKKU_PORT"              envDefault:"3000"`
+	BaseURL        string `env:"NOKKU_BASE_URL"        envDefault:"http://localhost"`
+	Port           string `env:"NOKKU_PORT"            envDefault:"3000"`
 	Secret         string `env:"NOKKU_SECRET"`
 	Debug          bool
 	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
@@ -46,12 +44,12 @@ type Config struct {
 	EnvConfig
 
 	Conn    *db.Connection
-	Auth    *auth.Runtime
+	IAM     *iam.Service
 	Audit   *audit.Service
 	Email   *email.Service
 	Pool    *daemon.Pool
 	Storage storage.Store
-	Cache   kagi.Cache
+	Cache   cache.Cache
 	Billing *billing.Service
 	License *billing.Key
 	Geo     *geo.Service
@@ -71,20 +69,15 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	// kagi owns identity and its store migrates its own schema on Open, so
-	// it must come up before the nokku schema migration, which references
-	// kagi.users cross-schema.
-	kagiStore, err := auth.OpenStore(ctx)
-	if err != nil {
-		return nil, err
-	}
-
+	// The nokku-owned identity engine (docs/adr/0001). It owns the public
+	// schema's identity tables; the DB migration runs first via
+	// db.NewConnection, so no store bootstrap precedes it.
 	cfg.Conn, err = db.NewConnection(ctx)
 	if err != nil {
 		return nil, err
 	}
 	cfg.Geo = geo.New()
-	cfg.Cache, err = newCache(ctx)
+	cfg.Cache, err = cache.New(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +87,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 	// NOKKU_SECRET keys the default at-rest encryption: nokku's secretbox
-	// for CA private keys and recordings, and kagi derives its cipher and
+	// for CA private keys and recordings, and iam derives its DPoP nonce key
 	// DPoP nonce key from it. Set KMS_URI to route encryption through an
 	// external KMS instead (Enterprise): a tink keyset of data keys
 	// wrapped by the KMS, persisted in the database.
@@ -109,11 +102,9 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	// KMS mode replaces the encryptor before anything can encrypt. The
-	// TinkEncryptor satisfies kagi.Cipher, so kagi's SSO client secrets
-	// and SAML SP key follow the same path; only the DPoP nonce key keeps
-	// deriving from NOKKU_SECRET, which is stateless and needs no KMS.
-	var kmsCipher kagi.Cipher
+	// KMS mode replaces the encryptor before anything can encrypt. Only the
+	// DPoP nonce key keeps deriving from NOKKU_SECRET, which is stateless
+	// and needs no KMS.
 	if os.Getenv("KMS_URI") != "" {
 		enc, err := kms.New(ctx, cfg.Conn)
 		if err != nil {
@@ -123,26 +114,8 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 			return nil, err
 		}
 		enc.Start(ctx)
-		kmsCipher = enc
 	}
 
-	cfg.Auth, err = auth.New(ctx, auth.Deps{
-		Store:              kagiStore,
-		Conn:               cfg.Conn,
-		Cache:              cfg.Cache,
-		Email:              cfg.Email,
-		BaseURL:            cfg.FullURL(),
-		Secret:             []byte(cfg.Secret),
-		Cipher:             kmsCipher,
-		GoogleClientID:     cfg.GoogleClientID,
-		GoogleClientSecret: cfg.GoogleClientSecret,
-		GitHubClientID:     cfg.GitHubClientID,
-		GitHubClientSecret: cfg.GitHubClientSecret,
-		Debug:              cfg.Debug,
-	})
-	if err != nil {
-		return nil, err
-	}
 	cfg.Storage, err = storage.New(ctx, cfg.FullURL())
 	if err != nil {
 		return nil, err
@@ -166,21 +139,40 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
 
-	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Billing, kagiUserDirectory{svc: cfg.Auth.Service()})
+	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Billing, iamUserDirectory{svc: cfg.IAM})
 	if err != nil {
 		return nil, err
 	}
-	// Auth events (login, register, SSO denial, ...) flow into the audit log
-	// via the kagi sink. The audit service needs the DB and billing so it is
-	// built after auth and attached here, before the server serves traffic.
-	cfg.Auth.Service().Events = cfg.Audit
-	// Account deletion cascades nokku's account-scoped data (avatar storage,
-	// subscriptions, owned workspaces) before kagi deletes the identity. The
-	// hook is attached here because it needs billing, which is built last.
-	cfg.Auth.Account.OnDelete = func(ctx context.Context, u kagi.User) error {
-		return deleteAccountData(ctx, &cfg, u)
-	}
+
 	if err := crypto.InitDefaultHashers(); err != nil {
+		return nil, err
+	}
+
+	// The iam engine receives NOKKU_SECRET for the DPoP nonce and the shared
+	// cache for replay detection and flow state. Auth events flow into the
+	// audit log via the iam sink. SSO logins under a workspace provider
+	// auto-join the workspace.
+	cfg.IAM, err = iam.New(iam.Deps{
+		Querier:          cfg.Conn.Q,
+		BaseURL:          cfg.FullURL(),
+		Events:           cfg.Audit,
+		Secret:           []byte(cfg.Secret),
+		Replay:           replayAdapter{cfg.Cache},
+		Cache:            cfg.Cache,
+		PasskeyRPOrigins: passkeyOrigins(&cfg),
+		OnSSOLogin: func(ctx context.Context, userID, workspaceID string) error {
+			return cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
+				return q.EnsureWorkspaceMember(ctx, &db.EnsureWorkspaceMemberParams{
+					UserID:      userID,
+					WorkspaceID: workspaceID,
+				})
+			})
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := cfg.seedSocialProviders(ctx); err != nil {
 		return nil, err
 	}
 
@@ -240,68 +232,87 @@ func (c *Config) WSOrigins() []string {
 	return append(origins, c.AllowedOrigins...)
 }
 
-// newCache builds the shared cache. When REDIS_ADDR is set it returns a
-// Redis-backed cache, otherwise the single-instance in-memory cache.
-func newCache(ctx context.Context) (kagi.Cache, error) {
-	addr := os.Getenv("REDIS_ADDR")
-	if addr == "" {
-		return kagi.NewMemoryCache(10_000), nil
-	}
-
-	db, err := strconv.Atoi(os.Getenv("REDIS_DB"))
-	if err != nil {
-		return nil, fmt.Errorf("cache: invalid REDIS_DB: %w", err)
-	}
-
-	client := redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: os.Getenv("REDIS_PASSWORD"),
-		DB:       db,
-	})
-	if err := client.Ping(ctx).Err(); err != nil {
-		_ = client.Close()
-		return nil, fmt.Errorf("cache: ping redis: %w", err)
-	}
-	go func() {
-		<-ctx.Done()
-		_ = client.Close()
-	}()
-
-	return kagi.NewRedisCache(client, "nokku:"), nil
+// iamUserDirectory adapts iam to audit's UserDirectory: it resolves an
+// actor id to its user. nokku's users are global.
+type iamUserDirectory struct {
+	svc *iam.Service
 }
 
-// kagiUserDirectory adapts kagi's store to audit's UserDirectory: it resolves
-// an actor id to its kagi user. nokku's users are global, so the tenant is
-// the empty value.
-type kagiUserDirectory struct {
-	svc *kagi.Service
+func (d iamUserDirectory) GetUser(ctx context.Context, userID string) (iam.User, error) {
+	return d.svc.GetUser(ctx, userID)
 }
 
-func (d kagiUserDirectory) GetUser(ctx context.Context, userID string) (kagi.User, error) {
-	return d.svc.Users.Get(ctx, "", userID)
+// replayAdapter fits the shared cache's SetNX to iam's ReplayStore.
+type replayAdapter struct {
+	c cache.Cache
 }
 
-// deleteAccountData cascades the nokku-owned half of an account before kagi
-// deletes the identity: the stored avatar, the owned workspaces' billing, and
-// the workspaces themselves. Membership rows cascade through the kagi.users
-// foreign keys.
-func deleteAccountData(ctx context.Context, cfg *Config, u kagi.User) error {
-	if err := cfg.Storage.Delete(ctx, storage.AvatarPath(u.ID)); err != nil {
-		slog.Warn("failed to delete avatar", "error", err)
+func (a replayAdapter) Add(ctx context.Context, jti string, ttl time.Duration) (bool, error) {
+	nx, ok := a.c.(cache.SetNXer)
+	if !ok {
+		return true, nil
 	}
-	return cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
-		workspaceIDs, err := q.GetWorkspacesByOwner(ctx, u.ID)
-		if err != nil {
-			return err
+	return nx.SetNX(ctx, "dpop:jti:"+jti, nil, ttl)
+}
+
+// passkeyOrigins returns every origin the browser may assert during a
+// WebAuthn ceremony: the app URL plus the frontend dev server in debug mode.
+func passkeyOrigins(c *Config) []string {
+	origins := []string{c.FullURL()}
+	if c.Debug {
+		origins = append(origins, "http://localhost:5173")
+	}
+	return origins
+}
+
+// seedSocialProviders seeds the static social login providers from the
+// environment credentials into sso storage, so every provider resolves like
+// any stored one. Idempotent: unchanged rows are not rewritten. A provider
+// without credentials is omitted, which disables it.
+func (c *Config) seedSocialProviders(ctx context.Context) error {
+	seed := func(providerID, name, clientID, clientSecret string) error {
+		if clientID == "" || clientSecret == "" {
+			return nil
 		}
-		for _, workspaceID := range workspaceIDs {
-			if !cfg.Billing.Enabled() {
-				break
+		var p iam.SSOProvider
+		switch providerID {
+		case "google":
+			p = iam.SSOProvider{
+				ProviderID: providerID,
+				Method:     iam.MethodOIDC,
+				Name:       name,
+				Enabled:    true,
+				OIDC: &iam.OIDCProvider{
+					// Google is an OIDC discovery issuer; defaults cover
+					// endpoints, redirect, and scopes.
+					IssuerURL:       "https://accounts.google.com",
+					ClientID:        clientID,
+					ClientSecret:    clientSecret,
+					JITProvisioning: true,
+				},
 			}
-			if err := cfg.Billing.Cancel(ctx, workspaceID, true, ""); err != nil {
-				slog.Warn("failed to cancel subscription", "error", err)
+		case "github":
+			p = iam.SSOProvider{
+				ProviderID: providerID,
+				Method:     iam.MethodOAuth2,
+				Name:       name,
+				Enabled:    true,
+				OAuth2: &iam.OAuth2Provider{ //nolint:gosec // the secret comes from the environment, not hardcoded
+					ClientID:        clientID,
+					ClientSecret:    clientSecret,
+					AuthURL:         "https://github.com/login/oauth/authorize",
+					TokenURL:        "https://github.com/login/oauth/access_token",
+					UserInfoURL:     "https://api.github.com/user",
+					EmailURL:        "https://api.github.com/user/emails",
+					Scopes:          []string{"read:user", "user:email"},
+					JITProvisioning: true,
+				},
 			}
 		}
-		return q.DeleteWorkspacesByOwner(ctx, u.ID)
-	})
+		return c.IAM.PutSSOProvider(ctx, p)
+	}
+	if err := seed("google", "Google", c.GoogleClientID, c.GoogleClientSecret); err != nil {
+		return err
+	}
+	return seed("github", "GitHub", c.GitHubClientID, c.GitHubClientSecret)
 }
