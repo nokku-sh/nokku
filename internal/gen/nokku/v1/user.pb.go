@@ -7,7 +7,6 @@
 package nokkuv1
 
 import (
-	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -24,111 +23,10 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type UserSession struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Kind          *string                `protobuf:"bytes,2,opt,name=kind" json:"kind,omitempty"`
-	Method        *string                `protobuf:"bytes,3,opt,name=method" json:"method,omitempty"`
-	IdentityId    *string                `protobuf:"bytes,4,opt,name=identity_id,json=identityId" json:"identity_id,omitempty"`
-	Binding       *string                `protobuf:"bytes,5,opt,name=binding" json:"binding,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
-	LastSeen      *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=last_seen,json=lastSeen" json:"last_seen,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UserSession) Reset() {
-	*x = UserSession{}
-	mi := &file_nokku_v1_user_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UserSession) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UserSession) ProtoMessage() {}
-
-func (x *UserSession) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UserSession.ProtoReflect.Descriptor instead.
-func (*UserSession) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *UserSession) GetId() string {
-	if x != nil && x.Id != nil {
-		return *x.Id
-	}
-	return ""
-}
-
-func (x *UserSession) GetKind() string {
-	if x != nil && x.Kind != nil {
-		return *x.Kind
-	}
-	return ""
-}
-
-func (x *UserSession) GetMethod() string {
-	if x != nil && x.Method != nil {
-		return *x.Method
-	}
-	return ""
-}
-
-func (x *UserSession) GetIdentityId() string {
-	if x != nil && x.IdentityId != nil {
-		return *x.IdentityId
-	}
-	return ""
-}
-
-func (x *UserSession) GetBinding() string {
-	if x != nil && x.Binding != nil {
-		return *x.Binding
-	}
-	return ""
-}
-
-func (x *UserSession) GetExpiresAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.ExpiresAt
-	}
-	return nil
-}
-
-func (x *UserSession) GetLastSeen() *timestamppb.Timestamp {
-	if x != nil {
-		return x.LastSeen
-	}
-	return nil
-}
-
-func (x *UserSession) GetCreatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.CreatedAt
-	}
-	return nil
-}
-
 type User struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	Id                  *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	Name                *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Username            *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
 	Email               *string                `protobuf:"bytes,4,opt,name=email" json:"email,omitempty"`
 	EmailVerified       *bool                  `protobuf:"varint,5,opt,name=email_verified,json=emailVerified" json:"email_verified,omitempty"`
 	Picture             *string                `protobuf:"bytes,6,opt,name=picture" json:"picture,omitempty"`
@@ -141,7 +39,7 @@ type User struct {
 
 func (x *User) Reset() {
 	*x = User{}
-	mi := &file_nokku_v1_user_proto_msgTypes[1]
+	mi := &file_nokku_v1_user_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -153,7 +51,7 @@ func (x *User) String() string {
 func (*User) ProtoMessage() {}
 
 func (x *User) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[1]
+	mi := &file_nokku_v1_user_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -166,7 +64,7 @@ func (x *User) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use User.ProtoReflect.Descriptor instead.
 func (*User) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{1}
+	return file_nokku_v1_user_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *User) GetId() string {
@@ -179,13 +77,6 @@ func (x *User) GetId() string {
 func (x *User) GetName() string {
 	if x != nil && x.Name != nil {
 		return *x.Name
-	}
-	return ""
-}
-
-func (x *User) GetUsername() string {
-	if x != nil && x.Username != nil {
-		return *x.Username
 	}
 	return ""
 }
@@ -244,7 +135,7 @@ type OAuthIdentity struct {
 
 func (x *OAuthIdentity) Reset() {
 	*x = OAuthIdentity{}
-	mi := &file_nokku_v1_user_proto_msgTypes[2]
+	mi := &file_nokku_v1_user_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -256,7 +147,7 @@ func (x *OAuthIdentity) String() string {
 func (*OAuthIdentity) ProtoMessage() {}
 
 func (x *OAuthIdentity) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[2]
+	mi := &file_nokku_v1_user_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -269,7 +160,7 @@ func (x *OAuthIdentity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OAuthIdentity.ProtoReflect.Descriptor instead.
 func (*OAuthIdentity) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{2}
+	return file_nokku_v1_user_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *OAuthIdentity) GetProviderId() string {
@@ -308,7 +199,7 @@ type WhoamiRequest struct {
 
 func (x *WhoamiRequest) Reset() {
 	*x = WhoamiRequest{}
-	mi := &file_nokku_v1_user_proto_msgTypes[3]
+	mi := &file_nokku_v1_user_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -320,7 +211,7 @@ func (x *WhoamiRequest) String() string {
 func (*WhoamiRequest) ProtoMessage() {}
 
 func (x *WhoamiRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[3]
+	mi := &file_nokku_v1_user_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -333,7 +224,7 @@ func (x *WhoamiRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WhoamiRequest.ProtoReflect.Descriptor instead.
 func (*WhoamiRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{3}
+	return file_nokku_v1_user_proto_rawDescGZIP(), []int{2}
 }
 
 type WhoamiResponse struct {
@@ -346,7 +237,7 @@ type WhoamiResponse struct {
 
 func (x *WhoamiResponse) Reset() {
 	*x = WhoamiResponse{}
-	mi := &file_nokku_v1_user_proto_msgTypes[4]
+	mi := &file_nokku_v1_user_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -358,7 +249,7 @@ func (x *WhoamiResponse) String() string {
 func (*WhoamiResponse) ProtoMessage() {}
 
 func (x *WhoamiResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[4]
+	mi := &file_nokku_v1_user_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -371,7 +262,7 @@ func (x *WhoamiResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WhoamiResponse.ProtoReflect.Descriptor instead.
 func (*WhoamiResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{4}
+	return file_nokku_v1_user_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *WhoamiResponse) GetUser() *User {
@@ -388,621 +279,14 @@ func (x *WhoamiResponse) GetServiceAccount() *ServiceAccount {
 	return nil
 }
 
-type UpdateProfileRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          *string                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	Email         *string                `protobuf:"bytes,2,opt,name=email" json:"email,omitempty"`
-	Username      *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
-	Picture       *string                `protobuf:"bytes,4,opt,name=picture" json:"picture,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UpdateProfileRequest) Reset() {
-	*x = UpdateProfileRequest{}
-	mi := &file_nokku_v1_user_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdateProfileRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdateProfileRequest) ProtoMessage() {}
-
-func (x *UpdateProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdateProfileRequest.ProtoReflect.Descriptor instead.
-func (*UpdateProfileRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *UpdateProfileRequest) GetName() string {
-	if x != nil && x.Name != nil {
-		return *x.Name
-	}
-	return ""
-}
-
-func (x *UpdateProfileRequest) GetEmail() string {
-	if x != nil && x.Email != nil {
-		return *x.Email
-	}
-	return ""
-}
-
-func (x *UpdateProfileRequest) GetUsername() string {
-	if x != nil && x.Username != nil {
-		return *x.Username
-	}
-	return ""
-}
-
-func (x *UpdateProfileRequest) GetPicture() string {
-	if x != nil && x.Picture != nil {
-		return *x.Picture
-	}
-	return ""
-}
-
-type UpdateProfileResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	User          *User                  `protobuf:"bytes,1,opt,name=user" json:"user,omitempty"`
-	EmailSent     *bool                  `protobuf:"varint,2,opt,name=email_sent,json=emailSent" json:"email_sent,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UpdateProfileResponse) Reset() {
-	*x = UpdateProfileResponse{}
-	mi := &file_nokku_v1_user_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdateProfileResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdateProfileResponse) ProtoMessage() {}
-
-func (x *UpdateProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdateProfileResponse.ProtoReflect.Descriptor instead.
-func (*UpdateProfileResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *UpdateProfileResponse) GetUser() *User {
-	if x != nil {
-		return x.User
-	}
-	return nil
-}
-
-func (x *UpdateProfileResponse) GetEmailSent() bool {
-	if x != nil && x.EmailSent != nil {
-		return *x.EmailSent
-	}
-	return false
-}
-
-type DeleteAccountRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DeleteAccountRequest) Reset() {
-	*x = DeleteAccountRequest{}
-	mi := &file_nokku_v1_user_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DeleteAccountRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeleteAccountRequest) ProtoMessage() {}
-
-func (x *DeleteAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeleteAccountRequest.ProtoReflect.Descriptor instead.
-func (*DeleteAccountRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{7}
-}
-
-type DeleteAccountResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DeleteAccountResponse) Reset() {
-	*x = DeleteAccountResponse{}
-	mi := &file_nokku_v1_user_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DeleteAccountResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeleteAccountResponse) ProtoMessage() {}
-
-func (x *DeleteAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeleteAccountResponse.ProtoReflect.Descriptor instead.
-func (*DeleteAccountResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{8}
-}
-
-// OAuth linked accounts ------------------------------------------------------
-type ListLinkedAccountsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListLinkedAccountsRequest) Reset() {
-	*x = ListLinkedAccountsRequest{}
-	mi := &file_nokku_v1_user_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListLinkedAccountsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListLinkedAccountsRequest) ProtoMessage() {}
-
-func (x *ListLinkedAccountsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListLinkedAccountsRequest.ProtoReflect.Descriptor instead.
-func (*ListLinkedAccountsRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{9}
-}
-
-type ListLinkedAccountsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Accounts      []*OAuthIdentity       `protobuf:"bytes,1,rep,name=accounts" json:"accounts,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListLinkedAccountsResponse) Reset() {
-	*x = ListLinkedAccountsResponse{}
-	mi := &file_nokku_v1_user_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListLinkedAccountsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListLinkedAccountsResponse) ProtoMessage() {}
-
-func (x *ListLinkedAccountsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListLinkedAccountsResponse.ProtoReflect.Descriptor instead.
-func (*ListLinkedAccountsResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *ListLinkedAccountsResponse) GetAccounts() []*OAuthIdentity {
-	if x != nil {
-		return x.Accounts
-	}
-	return nil
-}
-
-type UnlinkAccountRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Provider      *string                `protobuf:"bytes,1,opt,name=provider" json:"provider,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UnlinkAccountRequest) Reset() {
-	*x = UnlinkAccountRequest{}
-	mi := &file_nokku_v1_user_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UnlinkAccountRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UnlinkAccountRequest) ProtoMessage() {}
-
-func (x *UnlinkAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UnlinkAccountRequest.ProtoReflect.Descriptor instead.
-func (*UnlinkAccountRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *UnlinkAccountRequest) GetProvider() string {
-	if x != nil && x.Provider != nil {
-		return *x.Provider
-	}
-	return ""
-}
-
-type UnlinkAccountResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UnlinkAccountResponse) Reset() {
-	*x = UnlinkAccountResponse{}
-	mi := &file_nokku_v1_user_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UnlinkAccountResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UnlinkAccountResponse) ProtoMessage() {}
-
-func (x *UnlinkAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UnlinkAccountResponse.ProtoReflect.Descriptor instead.
-func (*UnlinkAccountResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{12}
-}
-
-type SetEmailRecoveryRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Enable        *bool                  `protobuf:"varint,1,opt,name=enable" json:"enable,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetEmailRecoveryRequest) Reset() {
-	*x = SetEmailRecoveryRequest{}
-	mi := &file_nokku_v1_user_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetEmailRecoveryRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetEmailRecoveryRequest) ProtoMessage() {}
-
-func (x *SetEmailRecoveryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetEmailRecoveryRequest.ProtoReflect.Descriptor instead.
-func (*SetEmailRecoveryRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *SetEmailRecoveryRequest) GetEnable() bool {
-	if x != nil && x.Enable != nil {
-		return *x.Enable
-	}
-	return false
-}
-
-type SetEmailRecoveryResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetEmailRecoveryResponse) Reset() {
-	*x = SetEmailRecoveryResponse{}
-	mi := &file_nokku_v1_user_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetEmailRecoveryResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetEmailRecoveryResponse) ProtoMessage() {}
-
-func (x *SetEmailRecoveryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetEmailRecoveryResponse.ProtoReflect.Descriptor instead.
-func (*SetEmailRecoveryResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{14}
-}
-
-// Sessions -------------------------------------------------------------------
-type ListUserSessionsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListUserSessionsRequest) Reset() {
-	*x = ListUserSessionsRequest{}
-	mi := &file_nokku_v1_user_proto_msgTypes[15]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListUserSessionsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListUserSessionsRequest) ProtoMessage() {}
-
-func (x *ListUserSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[15]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListUserSessionsRequest.ProtoReflect.Descriptor instead.
-func (*ListUserSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{15}
-}
-
-type ListUserSessionsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Sessions      []*UserSession         `protobuf:"bytes,1,rep,name=sessions" json:"sessions,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListUserSessionsResponse) Reset() {
-	*x = ListUserSessionsResponse{}
-	mi := &file_nokku_v1_user_proto_msgTypes[16]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListUserSessionsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListUserSessionsResponse) ProtoMessage() {}
-
-func (x *ListUserSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[16]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListUserSessionsResponse.ProtoReflect.Descriptor instead.
-func (*ListUserSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{16}
-}
-
-func (x *ListUserSessionsResponse) GetSessions() []*UserSession {
-	if x != nil {
-		return x.Sessions
-	}
-	return nil
-}
-
-type RevokeUserSessionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SessionId     *string                `protobuf:"bytes,1,opt,name=session_id,json=sessionId" json:"session_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RevokeUserSessionRequest) Reset() {
-	*x = RevokeUserSessionRequest{}
-	mi := &file_nokku_v1_user_proto_msgTypes[17]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RevokeUserSessionRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RevokeUserSessionRequest) ProtoMessage() {}
-
-func (x *RevokeUserSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[17]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RevokeUserSessionRequest.ProtoReflect.Descriptor instead.
-func (*RevokeUserSessionRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{17}
-}
-
-func (x *RevokeUserSessionRequest) GetSessionId() string {
-	if x != nil && x.SessionId != nil {
-		return *x.SessionId
-	}
-	return ""
-}
-
-type RevokeUserSessionResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RevokeUserSessionResponse) Reset() {
-	*x = RevokeUserSessionResponse{}
-	mi := &file_nokku_v1_user_proto_msgTypes[18]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RevokeUserSessionResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RevokeUserSessionResponse) ProtoMessage() {}
-
-func (x *RevokeUserSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[18]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RevokeUserSessionResponse.ProtoReflect.Descriptor instead.
-func (*RevokeUserSessionResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{18}
-}
-
 var File_nokku_v1_user_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x13nokku/v1/user.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1enokku/v1/service_account.proto\"\xb3\x02\n" +
-	"\vUserSession\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x16\n" +
-	"\x06method\x18\x03 \x01(\tR\x06method\x12\x1f\n" +
-	"\videntity_id\x18\x04 \x01(\tR\n" +
-	"identityId\x12\x18\n" +
-	"\abinding\x18\x05 \x01(\tR\abinding\x129\n" +
-	"\n" +
-	"expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x127\n" +
-	"\tlast_seen\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\blastSeen\x129\n" +
-	"\n" +
-	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xc7\x02\n" +
+	"\x13nokku/v1/user.proto\x12\bnokku.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1enokku/v1/service_account.proto\"\xb1\x02\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
-	"\busername\x18\x03 \x01(\tR\busername\x12\x14\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05email\x18\x04 \x01(\tR\x05email\x12%\n" +
 	"\x0eemail_verified\x18\x05 \x01(\bR\remailVerified\x12\x18\n" +
 	"\apicture\x18\x06 \x01(\tR\apicture\x129\n" +
@@ -1010,7 +294,7 @@ const file_nokku_v1_user_proto_rawDesc = "" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x122\n" +
-	"\x15enable_email_recovery\x18\t \x01(\bR\x13enableEmailRecovery\"\xa3\x01\n" +
+	"\x15enable_email_recovery\x18\t \x01(\bR\x13enableEmailRecoveryJ\x04\b\x03\x10\x04\"\xa3\x01\n" +
 	"\rOAuthIdentity\x12\x1f\n" +
 	"\vprovider_id\x18\x01 \x01(\tR\n" +
 	"providerId\x12\x1a\n" +
@@ -1021,46 +305,10 @@ const file_nokku_v1_user_proto_rawDesc = "" +
 	"\rWhoamiRequest\"w\n" +
 	"\x0eWhoamiResponse\x12\"\n" +
 	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\x12A\n" +
-	"\x0fservice_account\x18\x02 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"\xc3\x01\n" +
-	"\x14UpdateProfileRequest\x12\x1e\n" +
-	"\x04name\x18\x01 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x03\x18\x80\x02R\x04name\x12 \n" +
-	"\x05email\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x18\x80\x02`\x01R\x05email\x12O\n" +
-	"\busername\x18\x03 \x01(\tB3\xbaH0r.\x10\x03\x18'2(^[a-zA-Z0-9]([a-zA-Z0-9-_])*[a-zA-Z0-9]$R\busername\x12\x18\n" +
-	"\apicture\x18\x04 \x01(\tR\apicture\"Z\n" +
-	"\x15UpdateProfileResponse\x12\"\n" +
-	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\x12\x1d\n" +
-	"\n" +
-	"email_sent\x18\x02 \x01(\bR\temailSent\"\x16\n" +
-	"\x14DeleteAccountRequest\"\x17\n" +
-	"\x15DeleteAccountResponse\"\x1b\n" +
-	"\x19ListLinkedAccountsRequest\"Q\n" +
-	"\x1aListLinkedAccountsResponse\x123\n" +
-	"\baccounts\x18\x01 \x03(\v2\x17.nokku.v1.OAuthIdentityR\baccounts\";\n" +
-	"\x14UnlinkAccountRequest\x12#\n" +
-	"\bprovider\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\bprovider\"\x17\n" +
-	"\x15UnlinkAccountResponse\"1\n" +
-	"\x17SetEmailRecoveryRequest\x12\x16\n" +
-	"\x06enable\x18\x01 \x01(\bR\x06enable\"\x1a\n" +
-	"\x18SetEmailRecoveryResponse\"\x19\n" +
-	"\x17ListUserSessionsRequest\"M\n" +
-	"\x18ListUserSessionsResponse\x121\n" +
-	"\bsessions\x18\x01 \x03(\v2\x15.nokku.v1.UserSessionR\bsessions\"D\n" +
-	"\x18RevokeUserSessionRequest\x12(\n" +
-	"\n" +
-	"session_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18@R\tsessionId\"\x1b\n" +
-	"\x19RevokeUserSessionResponse2\xb4\a\n" +
+	"\x0fservice_account\x18\x02 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount2a\n" +
 	"\vUserService\x12R\n" +
 	"\x06Whoami\x12\x17.nokku.v1.WhoamiRequest\x1a\x18.nokku.v1.WhoamiResponse\"\x15\x82\xd3\xe4\x93\x02\f\x12\n" +
-	"/v1/whoami\x90\x02\x01\x12h\n" +
-	"\rUpdateProfile\x12\x1e.nokku.v1.UpdateProfileRequest\x1a\x1f.nokku.v1.UpdateProfileResponse\"\x16\x82\xd3\xe4\x93\x02\x10:\x01*2\v/v1/profile\x12e\n" +
-	"\rDeleteAccount\x12\x1e.nokku.v1.DeleteAccountRequest\x1a\x1f.nokku.v1.DeleteAccountResponse\"\x13\x82\xd3\xe4\x93\x02\r*\v/v1/account\x12~\n" +
-	"\x12ListLinkedAccounts\x12#.nokku.v1.ListLinkedAccountsRequest\x1a$.nokku.v1.ListLinkedAccountsResponse\"\x1d\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/accounts/oauth\x90\x02\x01\x12w\n" +
-	"\rUnlinkAccount\x12\x1e.nokku.v1.UnlinkAccountRequest\x1a\x1f.nokku.v1.UnlinkAccountResponse\"%\x82\xd3\xe4\x93\x02\x1f*\x1d/v1/accounts/oauth/{provider}\x12\x80\x01\n" +
-	"\x10SetEmailRecovery\x12!.nokku.v1.SetEmailRecoveryRequest\x1a\".nokku.v1.SetEmailRecoveryResponse\"%\x82\xd3\xe4\x93\x02\x1f:\x01*2\x1a/v1/account/email-recovery\x12z\n" +
-	"\x10ListUserSessions\x12!.nokku.v1.ListUserSessionsRequest\x1a\".nokku.v1.ListUserSessionsResponse\"\x1f\x82\xd3\xe4\x93\x02\x16\x12\x14/v1/account/sessions\x90\x02\x01\x12\x87\x01\n" +
-	"\x11RevokeUserSession\x12\".nokku.v1.RevokeUserSessionRequest\x1a#.nokku.v1.RevokeUserSessionResponse\")\x82\xd3\xe4\x93\x02#*!/v1/account/sessions/{session_id}B\x93\x01\n" +
+	"/v1/whoami\x90\x02\x01B\x93\x01\n" +
 	"\fcom.nokku.v1B\tUserProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -1075,63 +323,28 @@ func file_nokku_v1_user_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_user_proto_rawDescData
 }
 
-var file_nokku_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_nokku_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_nokku_v1_user_proto_goTypes = []any{
-	(*UserSession)(nil),                // 0: nokku.v1.UserSession
-	(*User)(nil),                       // 1: nokku.v1.User
-	(*OAuthIdentity)(nil),              // 2: nokku.v1.OAuthIdentity
-	(*WhoamiRequest)(nil),              // 3: nokku.v1.WhoamiRequest
-	(*WhoamiResponse)(nil),             // 4: nokku.v1.WhoamiResponse
-	(*UpdateProfileRequest)(nil),       // 5: nokku.v1.UpdateProfileRequest
-	(*UpdateProfileResponse)(nil),      // 6: nokku.v1.UpdateProfileResponse
-	(*DeleteAccountRequest)(nil),       // 7: nokku.v1.DeleteAccountRequest
-	(*DeleteAccountResponse)(nil),      // 8: nokku.v1.DeleteAccountResponse
-	(*ListLinkedAccountsRequest)(nil),  // 9: nokku.v1.ListLinkedAccountsRequest
-	(*ListLinkedAccountsResponse)(nil), // 10: nokku.v1.ListLinkedAccountsResponse
-	(*UnlinkAccountRequest)(nil),       // 11: nokku.v1.UnlinkAccountRequest
-	(*UnlinkAccountResponse)(nil),      // 12: nokku.v1.UnlinkAccountResponse
-	(*SetEmailRecoveryRequest)(nil),    // 13: nokku.v1.SetEmailRecoveryRequest
-	(*SetEmailRecoveryResponse)(nil),   // 14: nokku.v1.SetEmailRecoveryResponse
-	(*ListUserSessionsRequest)(nil),    // 15: nokku.v1.ListUserSessionsRequest
-	(*ListUserSessionsResponse)(nil),   // 16: nokku.v1.ListUserSessionsResponse
-	(*RevokeUserSessionRequest)(nil),   // 17: nokku.v1.RevokeUserSessionRequest
-	(*RevokeUserSessionResponse)(nil),  // 18: nokku.v1.RevokeUserSessionResponse
-	(*timestamppb.Timestamp)(nil),      // 19: google.protobuf.Timestamp
-	(*ServiceAccount)(nil),             // 20: nokku.v1.ServiceAccount
+	(*User)(nil),                  // 0: nokku.v1.User
+	(*OAuthIdentity)(nil),         // 1: nokku.v1.OAuthIdentity
+	(*WhoamiRequest)(nil),         // 2: nokku.v1.WhoamiRequest
+	(*WhoamiResponse)(nil),        // 3: nokku.v1.WhoamiResponse
+	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
+	(*ServiceAccount)(nil),        // 5: nokku.v1.ServiceAccount
 }
 var file_nokku_v1_user_proto_depIdxs = []int32{
-	19, // 0: nokku.v1.UserSession.expires_at:type_name -> google.protobuf.Timestamp
-	19, // 1: nokku.v1.UserSession.last_seen:type_name -> google.protobuf.Timestamp
-	19, // 2: nokku.v1.UserSession.created_at:type_name -> google.protobuf.Timestamp
-	19, // 3: nokku.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	19, // 4: nokku.v1.User.updated_at:type_name -> google.protobuf.Timestamp
-	19, // 5: nokku.v1.OAuthIdentity.created_at:type_name -> google.protobuf.Timestamp
-	1,  // 6: nokku.v1.WhoamiResponse.user:type_name -> nokku.v1.User
-	20, // 7: nokku.v1.WhoamiResponse.service_account:type_name -> nokku.v1.ServiceAccount
-	1,  // 8: nokku.v1.UpdateProfileResponse.user:type_name -> nokku.v1.User
-	2,  // 9: nokku.v1.ListLinkedAccountsResponse.accounts:type_name -> nokku.v1.OAuthIdentity
-	0,  // 10: nokku.v1.ListUserSessionsResponse.sessions:type_name -> nokku.v1.UserSession
-	3,  // 11: nokku.v1.UserService.Whoami:input_type -> nokku.v1.WhoamiRequest
-	5,  // 12: nokku.v1.UserService.UpdateProfile:input_type -> nokku.v1.UpdateProfileRequest
-	7,  // 13: nokku.v1.UserService.DeleteAccount:input_type -> nokku.v1.DeleteAccountRequest
-	9,  // 14: nokku.v1.UserService.ListLinkedAccounts:input_type -> nokku.v1.ListLinkedAccountsRequest
-	11, // 15: nokku.v1.UserService.UnlinkAccount:input_type -> nokku.v1.UnlinkAccountRequest
-	13, // 16: nokku.v1.UserService.SetEmailRecovery:input_type -> nokku.v1.SetEmailRecoveryRequest
-	15, // 17: nokku.v1.UserService.ListUserSessions:input_type -> nokku.v1.ListUserSessionsRequest
-	17, // 18: nokku.v1.UserService.RevokeUserSession:input_type -> nokku.v1.RevokeUserSessionRequest
-	4,  // 19: nokku.v1.UserService.Whoami:output_type -> nokku.v1.WhoamiResponse
-	6,  // 20: nokku.v1.UserService.UpdateProfile:output_type -> nokku.v1.UpdateProfileResponse
-	8,  // 21: nokku.v1.UserService.DeleteAccount:output_type -> nokku.v1.DeleteAccountResponse
-	10, // 22: nokku.v1.UserService.ListLinkedAccounts:output_type -> nokku.v1.ListLinkedAccountsResponse
-	12, // 23: nokku.v1.UserService.UnlinkAccount:output_type -> nokku.v1.UnlinkAccountResponse
-	14, // 24: nokku.v1.UserService.SetEmailRecovery:output_type -> nokku.v1.SetEmailRecoveryResponse
-	16, // 25: nokku.v1.UserService.ListUserSessions:output_type -> nokku.v1.ListUserSessionsResponse
-	18, // 26: nokku.v1.UserService.RevokeUserSession:output_type -> nokku.v1.RevokeUserSessionResponse
-	19, // [19:27] is the sub-list for method output_type
-	11, // [11:19] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	4, // 0: nokku.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	4, // 1: nokku.v1.User.updated_at:type_name -> google.protobuf.Timestamp
+	4, // 2: nokku.v1.OAuthIdentity.created_at:type_name -> google.protobuf.Timestamp
+	0, // 3: nokku.v1.WhoamiResponse.user:type_name -> nokku.v1.User
+	5, // 4: nokku.v1.WhoamiResponse.service_account:type_name -> nokku.v1.ServiceAccount
+	2, // 5: nokku.v1.UserService.Whoami:input_type -> nokku.v1.WhoamiRequest
+	3, // 6: nokku.v1.UserService.Whoami:output_type -> nokku.v1.WhoamiResponse
+	6, // [6:7] is the sub-list for method output_type
+	5, // [5:6] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_user_proto_init() }
@@ -1146,7 +359,7 @@ func file_nokku_v1_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_user_proto_rawDesc), len(file_nokku_v1_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
