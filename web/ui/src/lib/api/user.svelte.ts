@@ -15,8 +15,8 @@ import {
 } from '$lib/gen/nokku/v1/user_pb';
 import { pageIndex, pageSize } from '$lib/store.svelte';
 
-// The account reads and mutations are kagi's /auth/account surface. This
-// module maps kagi's JSON onto the proto shapes the pages already consume,
+// The account reads and mutations are the /auth/account surface. This
+// module maps its JSON onto the proto shapes the pages already consume,
 // so the components keep working unchanged.
 
 const invalidateAccount = () => queryClient.invalidateQueries({ queryKey: ['account'] });

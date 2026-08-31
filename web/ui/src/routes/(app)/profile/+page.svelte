@@ -96,7 +96,7 @@
 							body: formData
 						});
 						// The upload only stores the file; the avatar URL is
-						// attached to the account through kagi's update endpoint.
+						// attached to the account through the update endpoint.
 						const { url } = await res.json();
 						updateProfile.mutate({ ...currentUser, picture: url });
 						toast.success('Avatar uploaded successfully!');

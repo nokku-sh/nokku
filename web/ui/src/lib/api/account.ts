@@ -1,9 +1,9 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 import { handleSessionExpired, httpFetch } from './client';
 
-// The account surface is kagi's /auth/account/*: profile, password,
+// The account surface is /auth/account/*: profile, password,
 // credentials, backup codes, sessions, and deletion. These helpers carry the
-// HttpOnly session cookie and parse kagi's JSON.
+// HttpOnly session cookie and parse the backend's JSON.
 
 export interface AccountUser {
 	id: string;

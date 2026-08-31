@@ -4,8 +4,8 @@ import { createMutation } from '@tanstack/svelte-query';
 import { workspaceID } from '$lib/store.svelte';
 import { queryClient, httpFetch } from './client';
 
-// Auth flows moved from connectrpc RPCs to plain HTTP endpoints backed by
-// kagi. These mutations mirror the previous useMutation(AuthService.method.*)
+// Auth flows are plain HTTP endpoints backed by internal/iam. These
+// mutations mirror the previous useMutation(AuthService.method.*)
 // surface so the pages and components keep working unchanged.
 
 function post(url: string, body: unknown) {

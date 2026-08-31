@@ -22,7 +22,7 @@
 
 	// Home Realm Discovery: probe for a workspace SSO provider as the email is
 	// typed, so the matching button appears without submitting the form.
-	// Discovery is kagi's /auth/sso/discover endpoint.
+	// Discovery is the /auth/sso/discover endpoint.
 	const checkSSO = useDebounce(() => {
 		if (email.includes('@')) {
 			ssoCheck.mutate(email);
@@ -33,7 +33,7 @@
 	let disablePasswordLogin = $derived(enforceSSO || login.isPending);
 
 	function handleSSOLogin(p: { method: string; provider: string }) {
-		// The verified email domain tells kagi which workspace's provider is
+		// The verified email domain tells the backend which workspace's provider is
 		// meant: the login itself runs without workspace context.
 		const domain = ssoCheck.data?.domain ?? '';
 		const q = domain ? `&domain=${encodeURIComponent(domain)}` : '';
