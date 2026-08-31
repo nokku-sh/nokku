@@ -88,10 +88,6 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"
-          - column: "service_accounts.token_hash"
-            go_type:
-              import: "github.com/nokku-sh/nokku/internal/crypto"
-              type: "HashedToken"
           - column: "workspaces.invite_token_hash"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"

@@ -3,70 +3,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
+CREATE SCHEMA IF NOT EXISTS kagi;
+
 -- Tables ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
-  name TEXT NOT NULL,
-  username TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE CHECK (email = lower(email)),
-  email_verified BOOLEAN NOT NULL DEFAULT FALSE,
-  picture TEXT,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  enable_email_recovery BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS sessions (
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
-  token_hash BYTEA NOT NULL UNIQUE,
-  tenant_id TEXT NOT NULL DEFAULT '',
-  subject_id UUID NOT NULL,
-  kind TEXT NOT NULL DEFAULT 'user',
-  identity_id UUID,
-  method TEXT NOT NULL,
-  binding TEXT, -- DPoP key thumbprint (jkt)
-  expires_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  last_seen TIMESTAMPTZ -- kagi idle-timeout enforcement
-);
-
-CREATE TABLE IF NOT EXISTS api_keys (
-  key_id TEXT PRIMARY KEY,
-  tenant_id TEXT NOT NULL,
-  subject_id UUID NOT NULL,
-  kind TEXT NOT NULL DEFAULT 'user',
-  secret_hash BYTEA NOT NULL,
-  scopes TEXT[] NOT NULL DEFAULT '{}',
-  name TEXT NOT NULL,
-  expires_at TIMESTAMPTZ, -- NULL = never expires
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  last_seen TIMESTAMPTZ
-);
-
-CREATE TABLE IF NOT EXISTS credentials (
-  tenant_id TEXT NOT NULL DEFAULT '',
-  id TEXT NOT NULL,
-  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  type TEXT NOT NULL,
-  provider TEXT NOT NULL DEFAULT '',
-  subject TEXT NOT NULL DEFAULT '',
-  data BYTEA,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  label TEXT NOT NULL DEFAULT '',
-  PRIMARY KEY (tenant_id, id)
-);
-
-CREATE TABLE IF NOT EXISTS one_time_tokens (
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
-  token_hash BYTEA NOT NULL UNIQUE,
-  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  purpose TEXT NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE TABLE IF NOT EXISTS roles (name TEXT PRIMARY KEY, description TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE IF NOT EXISTS workspaces (
@@ -78,14 +17,14 @@ CREATE TABLE IF NOT EXISTS workspaces (
   invite_token_hash TEXT,
   invite_expires_at TIMESTAMPTZ,
   settings JSONB NOT NULL DEFAULT '{}',
-  created_by UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  created_by TEXT NOT NULL REFERENCES kagi.users (id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS workspace_members (
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES kagi.users (id) ON DELETE CASCADE,
   role_name TEXT NOT NULL REFERENCES roles (name) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -101,55 +40,6 @@ CREATE TABLE IF NOT EXISTS workspace_subscriptions (
   subscription_id TEXT NOT NULL DEFAULT '', -- stripe subscription id, opaque
   current_period_end TIMESTAMPTZ,
   cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS workspace_domains (
-  domain TEXT PRIMARY KEY CHECK (domain = lower(domain)), -- e.g., "acme.com"
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  verification_token TEXT DEFAULT encode(gen_random_bytes (16), 'hex') NOT NULL, -- Token for verification
-  verified_at TIMESTAMPTZ, -- NULL until verified
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (workspace_id, domain)
-);
-
-CREATE TABLE IF NOT EXISTS oidc_providers (
-  workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
-  name TEXT NOT NULL DEFAULT 'OpenID Connect', -- Display name, e.g., "Okta", "Azure AD"
-  issuer_url TEXT, -- e.g., "https://accounts.google.com"
-  client_id TEXT,
-  client_secret BYTEA, -- Encrypted via envelope encryption
-  scopes TEXT[] NOT NULL DEFAULT ARRAY['openid', 'email', 'profile'],
-  -- Claim mappings
-  email_claim TEXT NOT NULL DEFAULT 'email',
-  name_claim TEXT NOT NULL DEFAULT 'name',
-  username_claim TEXT NOT NULL DEFAULT 'preferred_username',
-  picture_claim TEXT NOT NULL DEFAULT 'picture',
-  -- Settings
-  enforce_sso BOOLEAN NOT NULL DEFAULT FALSE,
-  allow_jit_provisioning BOOLEAN NOT NULL DEFAULT TRUE,
-  use_pkce BOOLEAN NOT NULL DEFAULT TRUE,
-  is_active BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS saml_providers (
-  workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
-  name TEXT NOT NULL DEFAULT 'SAML', -- Display name
-  -- Identity Provider metadata URL 
-  metadata_url TEXT, -- e.g., http://localhost:8080/realms/master/protocol/saml/descriptor
-  -- Attribute mappings (SAML sends user data as attributes)
-  email_attribute TEXT NOT NULL DEFAULT 'email',
-  name_attribute TEXT NOT NULL DEFAULT 'name',
-  username_attribute TEXT NOT NULL DEFAULT 'username',
-  picture_attribute TEXT, -- Optional
-  -- Settings
-  enforce_sso BOOLEAN NOT NULL DEFAULT FALSE,
-  allow_jit_provisioning BOOLEAN NOT NULL DEFAULT TRUE,
-  is_active BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -192,7 +82,7 @@ CREATE TABLE IF NOT EXISTS teams (
 
 CREATE TABLE IF NOT EXISTS team_members (
   workspace_id UUID NOT NULL,
-  user_id UUID NOT NULL,
+  user_id TEXT NOT NULL REFERENCES kagi.users (id) ON DELETE CASCADE,
   team_id UUID NOT NULL REFERENCES teams (id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (user_id, team_id),
@@ -263,7 +153,7 @@ CREATE TABLE IF NOT EXISTS principals (
 CREATE TABLE IF NOT EXISTS principal_users (
   principal_id UUID NOT NULL REFERENCES principals (id) ON DELETE CASCADE,
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES kagi.users (id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (principal_id, user_id)
 );
@@ -296,13 +186,6 @@ CREATE TABLE IF NOT EXISTS recordings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS saml_sp_keys (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  private_key BYTEA NOT NULL,
-  certificate TEXT NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 -- Keysets (for envelope encryption - singleton)
 CREATE TABLE IF NOT EXISTS keysets (
   id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -311,22 +194,6 @@ CREATE TABLE IF NOT EXISTS keysets (
 );
 
 -- Indexes --------------------------------------------------------------------
-CREATE INDEX idx_sessions_subject ON sessions (subject_id);
-
-CREATE INDEX idx_sessions_identity ON sessions (identity_id);
-
-CREATE INDEX idx_api_keys_tenant ON api_keys (tenant_id);
-
-CREATE INDEX idx_api_keys_subject ON api_keys (subject_id);
-
-CREATE UNIQUE INDEX idx_credentials_subject ON credentials (tenant_id, type, provider, subject)
-WHERE
-  subject <> '';
-
-CREATE INDEX idx_credentials_user ON credentials (user_id, type);
-
-CREATE INDEX idx_one_time_tokens_user ON one_time_tokens (user_id);
-
 CREATE INDEX idx_workspaces_created_by ON workspaces (created_by);
 
 CREATE INDEX idx_workspace_members_user_id ON workspace_members (user_id, workspace_id);
@@ -389,12 +256,6 @@ CREATE INDEX idx_principal_sa_service_account_id ON principal_service_accounts (
 
 CREATE INDEX idx_principal_sa_workspace_id ON principal_service_accounts (workspace_id);
 
-CREATE INDEX idx_users_name_trgm ON users USING GIN (name gin_trgm_ops);
-
-CREATE INDEX idx_users_username_trgm ON users USING GIN (username gin_trgm_ops);
-
-CREATE INDEX idx_users_email_trgm ON users USING GIN (email gin_trgm_ops);
-
 CREATE INDEX recordings_workspace_started_idx ON recordings (workspace_id, started_at DESC);
 
 -- Functions ------------------------------------------------------------------
@@ -402,8 +263,8 @@ CREATE OR REPLACE FUNCTION current_workspace_id () RETURNS UUID AS $$
   SELECT NULLIF(current_setting('nokku.workspace_id', TRUE), '')::UUID
 $$ LANGUAGE sql STABLE;
 
-CREATE OR REPLACE FUNCTION current_actor_id () RETURNS UUID AS $$
-  SELECT NULLIF(current_setting('nokku.actor_id', TRUE), '')::UUID
+CREATE OR REPLACE FUNCTION current_actor_id () RETURNS TEXT AS $$
+  SELECT NULLIF(current_setting('nokku.actor_id', TRUE), '')
 $$ LANGUAGE sql STABLE;
 
 -- Session helpers ------------------------------------------------------------
@@ -494,6 +355,23 @@ SELECT
   ON SEQUENCES TO nokku_app,
   nokku_system;
 
+-- kagi schema (identity, owned and migrated by kagi). The store itself runs
+-- on its own admin connection; these grants cover nokku's system jobs that
+-- prune users. App-level reads go through kagi's managers on the store
+-- connection, not through this role.
+GRANT USAGE ON SCHEMA kagi TO nokku_app,
+nokku_system;
+
+GRANT
+SELECT
+,
+UPDATE,
+DELETE ON ALL TABLES IN SCHEMA kagi TO nokku_system;
+
+GRANT
+SELECT
+  ON ALL TABLES IN SCHEMA kagi TO nokku_app;
+
 -- Row-level security ---------------------------------------------------------
 -- RLS enforces tenant isolation only. Every workspace-scoped table carries
 -- one uniform policy: rows are visible and writable only when the request
@@ -527,21 +405,9 @@ ALTER TABLE workspace_members ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE workspace_members FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE workspace_domains ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE workspace_domains FORCE ROW LEVEL SECURITY;
-
 ALTER TABLE workspace_subscriptions ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE workspace_subscriptions FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE oidc_providers ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE oidc_providers FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE saml_providers ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE saml_providers FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE service_accounts ENABLE ROW LEVEL SECURITY;
 
@@ -612,19 +478,7 @@ WITH
   CHECK (workspace_id = current_workspace_id ());
 
 -- Pure tenant tables ---------------------------------------------------------
-CREATE POLICY tenant_isolation ON workspace_domains FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
 CREATE POLICY tenant_isolation ON workspace_subscriptions FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON oidc_providers FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON saml_providers FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
   CHECK (workspace_id = current_workspace_id ());
 
@@ -725,7 +579,7 @@ CREATE TABLE IF NOT EXISTS audit.audit_logs (
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   workspace_id UUID REFERENCES public.workspaces (id) ON DELETE SET NULL,
   action TEXT NOT NULL,
-  actor_id UUID,
+  actor_id TEXT,
   actor_type TEXT NOT NULL,
   actor_email TEXT,
   ip_address TEXT,

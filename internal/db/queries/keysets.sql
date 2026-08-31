@@ -33,12 +33,6 @@ SET
   data = @data,
   updated_at = NOW();
 
--- name: DeleteKeyset :exec
--- Rotation-only: remove the keyset when rotating to a non-KMS cipher.
-DELETE FROM keysets
-WHERE
-  id = 1;
-
 -- name: TrySecretRotationLock :one
 SELECT
   pg_try_advisory_xact_lock(hashtext ('global-secret-rotation'));
@@ -59,18 +53,3 @@ SET
 WHERE
   id = @id;
 
--- name: GetEncryptedOIDCSecrets :many
-SELECT
-  workspace_id,
-  client_secret
-FROM
-  oidc_providers
-WHERE
-  client_secret IS NOT NULL;
-
--- name: UpdateOIDCClientSecret :exec
-UPDATE oidc_providers
-SET
-  client_secret = @client_secret
-WHERE
-  workspace_id = @workspace_id;

@@ -11,18 +11,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
-const deleteKeyset = `-- name: DeleteKeyset :exec
-DELETE FROM keysets
-WHERE
-  id = 1
-`
-
-// Rotation-only: remove the keyset when rotating to a non-KMS cipher.
-func (q *Queries) DeleteKeyset(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, deleteKeyset)
-	return err
-}
-
 const getEncryptedCAKeys = `-- name: GetEncryptedCAKeys :many
 SELECT
   id,
@@ -48,41 +36,6 @@ func (q *Queries) GetEncryptedCAKeys(ctx context.Context) ([]*GetEncryptedCAKeys
 	for rows.Next() {
 		var i GetEncryptedCAKeysRow
 		if err := rows.Scan(&i.ID, &i.PrivateKey); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getEncryptedOIDCSecrets = `-- name: GetEncryptedOIDCSecrets :many
-SELECT
-  workspace_id,
-  client_secret
-FROM
-  oidc_providers
-WHERE
-  client_secret IS NOT NULL
-`
-
-type GetEncryptedOIDCSecretsRow struct {
-	WorkspaceID  string                `json:"workspaceId"`
-	ClientSecret crypto.EncryptedBytes `json:"clientSecret"`
-}
-
-func (q *Queries) GetEncryptedOIDCSecrets(ctx context.Context) ([]*GetEncryptedOIDCSecretsRow, error) {
-	rows, err := q.db.Query(ctx, getEncryptedOIDCSecrets)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*GetEncryptedOIDCSecretsRow
-	for rows.Next() {
-		var i GetEncryptedOIDCSecretsRow
-		if err := rows.Scan(&i.WorkspaceID, &i.ClientSecret); err != nil {
 			return nil, err
 		}
 		items = append(items, &i)
@@ -170,24 +123,6 @@ func (q *Queries) UpdateKeysetWrappedData(ctx context.Context, data []byte) (int
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const updateOIDCClientSecret = `-- name: UpdateOIDCClientSecret :exec
-UPDATE oidc_providers
-SET
-  client_secret = $1
-WHERE
-  workspace_id = $2
-`
-
-type UpdateOIDCClientSecretParams struct {
-	ClientSecret crypto.EncryptedBytes `json:"clientSecret"`
-	WorkspaceID  string                `json:"workspaceId"`
-}
-
-func (q *Queries) UpdateOIDCClientSecret(ctx context.Context, arg *UpdateOIDCClientSecretParams) error {
-	_, err := q.db.Exec(ctx, updateOIDCClientSecret, arg.ClientSecret, arg.WorkspaceID)
-	return err
 }
 
 const upsertKeysetWrappedData = `-- name: UpsertKeysetWrappedData :exec

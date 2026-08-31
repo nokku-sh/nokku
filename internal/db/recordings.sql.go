@@ -59,17 +59,6 @@ func (q *Queries) DeleteRecording(ctx context.Context, id string) error {
 	return err
 }
 
-const deleteWorkspaceRecordings = `-- name: DeleteWorkspaceRecordings :exec
-DELETE FROM recordings
-WHERE
-  workspace_id = $1
-`
-
-func (q *Queries) DeleteWorkspaceRecordings(ctx context.Context, workspaceID string) error {
-	_, err := q.db.Exec(ctx, deleteWorkspaceRecordings, workspaceID)
-	return err
-}
-
 const getRecording = `-- name: GetRecording :one
 SELECT
   id, workspace_id, daemon_id, username, started_at, ended_at, size_bytes, complete, created_at

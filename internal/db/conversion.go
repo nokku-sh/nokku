@@ -21,23 +21,6 @@ func MapSlice[T, R any](in []T, fn func(T) R) []R {
 	return out
 }
 
-func (u *User) ToProto() *nokkuv1.User {
-	if u == nil {
-		return nil
-	}
-	return &nokkuv1.User{
-		Id:                  &u.ID,
-		Name:                &u.Name,
-		Username:            &u.Username,
-		Email:               &u.Email,
-		EmailVerified:       &u.EmailVerified,
-		Picture:             u.Picture,
-		EnableEmailRecovery: &u.EnableEmailRecovery,
-		CreatedAt:           SafeTimestamp(&u.CreatedAt),
-		UpdatedAt:           SafeTimestamp(&u.UpdatedAt),
-	}
-}
-
 func (w *Workspace) ToProto() *nokkuv1.Workspace {
 	if w == nil {
 		return nil
@@ -78,6 +61,23 @@ func (w *CreateWorkspaceRow) ToProto() *nokkuv1.Workspace {
 	}
 }
 
+func (w *WorkspaceMember) ToProto() *nokkuv1.WorkspaceMember {
+	if w == nil {
+		return nil
+	}
+	return &nokkuv1.WorkspaceMember{
+		Id:          &w.UserID,
+		WorkspaceId: &w.WorkspaceID,
+		RoleName:    &w.RoleName,
+		CreatedAt:   SafeTimestamp(&w.CreatedAt),
+		UpdatedAt:   SafeTimestamp(&w.UpdatedAt),
+	}
+}
+
+func WorkspaceMembersToProto(rows []*WorkspaceMember) []*nokkuv1.WorkspaceMember {
+	return MapSlice(rows, func(r *WorkspaceMember) *nokkuv1.WorkspaceMember { return r.ToProto() })
+}
+
 func (r *Recording) ToProto() *nokkuv1.Recording {
 	if r == nil {
 		return nil
@@ -92,49 +92,6 @@ func (r *Recording) ToProto() *nokkuv1.Recording {
 		SizeBytes:   &r.SizeBytes,
 		Complete:    &r.Complete,
 	}
-}
-
-func (w *GetWorkspaceMemberRow) ToProto() *nokkuv1.WorkspaceMember {
-	if w == nil {
-		return nil
-	}
-	return &nokkuv1.WorkspaceMember{
-		Id:            &w.ID,
-		WorkspaceId:   &w.WorkspaceID,
-		Name:          &w.Name,
-		Username:      &w.Username,
-		Email:         &w.Email,
-		EmailVerified: &w.EmailVerified,
-		Picture:       w.Picture,
-		RoleName:      &w.RoleName,
-		CreatedAt:     SafeTimestamp(&w.CreatedAt),
-		UpdatedAt:     SafeTimestamp(&w.UpdatedAt),
-	}
-}
-
-func (w *ListWorkspaceMembersRow) ToProto() *nokkuv1.WorkspaceMember {
-	if w == nil {
-		return nil
-	}
-	return &nokkuv1.WorkspaceMember{
-		Id:            &w.ID,
-		WorkspaceId:   &w.WorkspaceID,
-		Name:          &w.Name,
-		Username:      &w.Username,
-		Email:         &w.Email,
-		EmailVerified: &w.EmailVerified,
-		Picture:       w.Picture,
-		RoleName:      &w.RoleName,
-		CreatedAt:     SafeTimestamp(&w.CreatedAt),
-		UpdatedAt:     SafeTimestamp(&w.UpdatedAt),
-	}
-}
-
-func WorkspaceMembersToProto(ws []*ListWorkspaceMembersRow) []*nokkuv1.WorkspaceMember {
-	return MapSlice(
-		ws,
-		func(w *ListWorkspaceMembersRow) *nokkuv1.WorkspaceMember { return w.ToProto() },
-	)
 }
 
 func (t *Team) ToProto() *nokkuv1.Team {
@@ -169,29 +126,6 @@ func (r *ListTeamsRow) ToProto() *nokkuv1.Team {
 
 func TeamsToProto(rows []*ListTeamsRow) []*nokkuv1.Team {
 	return MapSlice(rows, func(r *ListTeamsRow) *nokkuv1.Team { return r.ToProto() })
-}
-
-func (t *ListTeamMembersRow) ToProto() *nokkuv1.WorkspaceMember {
-	if t == nil {
-		return nil
-	}
-	return &nokkuv1.WorkspaceMember{
-		Id:            &t.ID,
-		WorkspaceId:   &t.WorkspaceID,
-		Name:          &t.Name,
-		Username:      &t.Username,
-		Email:         &t.Email,
-		EmailVerified: &t.EmailVerified,
-		Picture:       t.Picture,
-		CreatedAt:     SafeTimestamp(&t.CreatedAt),
-	}
-}
-
-func TeamMembersToProto(ts []*ListTeamMembersRow) []*nokkuv1.WorkspaceMember {
-	return MapSlice(
-		ts,
-		func(t *ListTeamMembersRow) *nokkuv1.WorkspaceMember { return t.ToProto() },
-	)
 }
 
 func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
@@ -413,67 +347,6 @@ func CAsToProto(cas []*CertificateAuthority) []*nokkuv1.CertificateAuthority {
 		cas,
 		func(rca *CertificateAuthority) *nokkuv1.CertificateAuthority { return rca.ToProto() },
 	)
-}
-
-func (d *WorkspaceDomain) ToProto() *nokkuv1.WorkspaceDomain {
-	if d == nil {
-		return nil
-	}
-	return &nokkuv1.WorkspaceDomain{
-		Domain:            &d.Domain,
-		WorkspaceId:       &d.WorkspaceID,
-		VerificationToken: &d.VerificationToken,
-		VerifiedAt:        SafeTimestamp(d.VerifiedAt),
-		CreatedAt:         SafeTimestamp(&d.CreatedAt),
-		UpdatedAt:         SafeTimestamp(&d.UpdatedAt),
-	}
-}
-
-func WorkspaceDomainsToProto(ds []*WorkspaceDomain) []*nokkuv1.WorkspaceDomain {
-	return MapSlice(ds, func(d *WorkspaceDomain) *nokkuv1.WorkspaceDomain { return d.ToProto() })
-}
-
-func (o *OidcProvider) ToProto() *nokkuv1.OIDCProvider {
-	if o == nil {
-		return nil
-	}
-	return &nokkuv1.OIDCProvider{
-		WorkspaceId:          &o.WorkspaceID,
-		Name:                 &o.Name,
-		IssuerUrl:            o.IssuerURL,
-		ClientId:             o.ClientID,
-		Scopes:               o.Scopes,
-		EmailClaim:           &o.EmailClaim,
-		NameClaim:            &o.NameClaim,
-		UsernameClaim:        &o.UsernameClaim,
-		PictureClaim:         &o.PictureClaim,
-		EnforceSso:           &o.EnforceSso,
-		AllowJitProvisioning: &o.AllowJitProvisioning,
-		UsePkce:              &o.UsePkce,
-		IsActive:             &o.IsActive,
-		CreatedAt:            SafeTimestamp(&o.CreatedAt),
-		UpdatedAt:            SafeTimestamp(&o.UpdatedAt),
-	}
-}
-
-func (s *SamlProvider) ToProto() *nokkuv1.SAMLProvider {
-	if s == nil {
-		return nil
-	}
-	return &nokkuv1.SAMLProvider{
-		WorkspaceId:          &s.WorkspaceID,
-		Name:                 &s.Name,
-		MetadataUrl:          s.MetadataURL,
-		EmailAttribute:       &s.EmailAttribute,
-		NameAttribute:        &s.NameAttribute,
-		UsernameAttribute:    &s.UsernameAttribute,
-		PictureAttribute:     s.PictureAttribute,
-		EnforceSso:           &s.EnforceSso,
-		AllowJitProvisioning: &s.AllowJitProvisioning,
-		IsActive:             &s.IsActive,
-		CreatedAt:            SafeTimestamp(&s.CreatedAt),
-		UpdatedAt:            SafeTimestamp(&s.UpdatedAt),
-	}
 }
 
 func (p *ListPrincipalsRow) ToProto() *nokkuv1.Principal {

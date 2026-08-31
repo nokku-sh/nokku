@@ -31,56 +31,6 @@ func (q *Queries) AddWorkspaceMember(ctx context.Context, arg *AddWorkspaceMembe
 	return err
 }
 
-const countMembers = `-- name: CountMembers :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  workspace_members wm
-  JOIN users u ON u.id = wm.user_id
-WHERE
-  wm.workspace_id = $1
-  AND (
-    $2::TEXT IS NULL
-    OR u.name ILIKE '%' || $2 || '%'
-    OR u.username ILIKE '%' || $2 || '%'
-    OR u.email ILIKE '%' || $2 || '%'
-  )
-  AND (
-    $3::TEXT IS NULL
-    OR wm.role_name = $3::TEXT
-  )
-`
-
-type CountMembersParams struct {
-	WorkspaceID string  `json:"workspaceId"`
-	Query       *string `json:"query"`
-	RoleName    *string `json:"roleName"`
-}
-
-func (q *Queries) CountMembers(ctx context.Context, arg *CountMembersParams) (int32, error) {
-	row := q.db.QueryRow(ctx, countMembers, arg.WorkspaceID, arg.Query, arg.RoleName)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const countWorkspaces = `-- name: CountWorkspaces :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  workspaces
-  JOIN workspace_members wm ON wm.workspace_id = workspaces.id
-WHERE
-  wm.user_id = $1
-`
-
-func (q *Queries) CountWorkspaces(ctx context.Context, userID string) (int32, error) {
-	row := q.db.QueryRow(ctx, countWorkspaces, userID)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const countWorkspacesByOwner = `-- name: CountWorkspacesByOwner :one
 SELECT
   COUNT(*)::INTEGER
@@ -114,26 +64,6 @@ WITH
       id,
       created_by,
       'owner'
-    FROM
-      new_workspace
-    RETURNING
-      workspace_id
-  ),
-  new_oidc_provider AS (
-    INSERT INTO
-      oidc_providers (workspace_id)
-    SELECT
-      id
-    FROM
-      new_workspace
-    RETURNING
-      workspace_id
-  ),
-  new_saml_provider AS (
-    INSERT INTO
-      saml_providers (workspace_id)
-    SELECT
-      id
     FROM
       new_workspace
     RETURNING
@@ -228,54 +158,27 @@ SELECT
 FROM
   workspace_members
 WHERE
-  user_id = $1
+  user_id = $1::text
 UNION
 SELECT
   workspace_id
 FROM
   daemons
 WHERE
-  id = $1
+  id = $1::uuid
 UNION
 SELECT
   workspace_id
 FROM
   service_accounts
 WHERE
-  id = $1
+  id = $1::uuid
 `
 
+// The actor id resolves against identity (kagi, TEXT) and machine
+// principals (UUID), so each branch casts explicitly.
 func (q *Queries) GetActorWorkspaceIDs(ctx context.Context, actorID string) ([]string, error) {
 	rows, err := q.db.Query(ctx, getActorWorkspaceIDs, actorID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var workspace_id string
-		if err := rows.Scan(&workspace_id); err != nil {
-			return nil, err
-		}
-		items = append(items, workspace_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getUserWorkspaceIDs = `-- name: GetUserWorkspaceIDs :many
-SELECT
-  workspace_id
-FROM
-  workspace_members
-WHERE
-  user_id = $1
-`
-
-func (q *Queries) GetUserWorkspaceIDs(ctx context.Context, userID string) ([]string, error) {
-	rows, err := q.db.Query(ctx, getUserWorkspaceIDs, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -322,57 +225,15 @@ func (q *Queries) GetWorkspace(ctx context.Context, workspaceID string) (*Worksp
 	return &i, err
 }
 
-const getWorkspaceByInviteToken = `-- name: GetWorkspaceByInviteToken :one
-SELECT
-  id, name, description, enroll_token_hash, enroll_expires_at, invite_token_hash, invite_expires_at, settings, created_by, created_at, updated_at
-FROM
-  workspaces
-WHERE
-  id = $1
-  AND invite_token_hash = $2
-  AND invite_token_expires_at > NOW()
-`
-
-type GetWorkspaceByInviteTokenParams struct {
-	WorkspaceID     string             `json:"workspaceId"`
-	InviteTokenHash crypto.HashedToken `json:"inviteTokenHash"`
-}
-
-func (q *Queries) GetWorkspaceByInviteToken(ctx context.Context, arg *GetWorkspaceByInviteTokenParams) (*Workspace, error) {
-	row := q.db.QueryRow(ctx, getWorkspaceByInviteToken, arg.WorkspaceID, arg.InviteTokenHash)
-	var i Workspace
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Description,
-		&i.EnrollTokenHash,
-		&i.EnrollExpiresAt,
-		&i.InviteTokenHash,
-		&i.InviteExpiresAt,
-		&i.Settings,
-		&i.CreatedBy,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
 const getWorkspaceMember = `-- name: GetWorkspaceMember :one
 SELECT
   wm.workspace_id,
-  u.id,
-  u.name,
-  u.username,
-  u.email,
-  u.email_verified,
-  u.picture,
-  u.is_active,
+  wm.user_id,
   wm.role_name,
   wm.created_at,
   wm.updated_at
 FROM
   workspace_members wm
-  JOIN users u ON u.id = wm.user_id
 WHERE
   wm.workspace_id = $1
   AND wm.user_id = $2
@@ -383,32 +244,12 @@ type GetWorkspaceMemberParams struct {
 	UserID      string `json:"userId"`
 }
 
-type GetWorkspaceMemberRow struct {
-	WorkspaceID   string    `json:"workspaceId"`
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Username      string    `json:"username"`
-	Email         string    `json:"email"`
-	EmailVerified bool      `json:"emailVerified"`
-	Picture       *string   `json:"picture"`
-	IsActive      bool      `json:"isActive"`
-	RoleName      string    `json:"roleName"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
-}
-
-func (q *Queries) GetWorkspaceMember(ctx context.Context, arg *GetWorkspaceMemberParams) (*GetWorkspaceMemberRow, error) {
+func (q *Queries) GetWorkspaceMember(ctx context.Context, arg *GetWorkspaceMemberParams) (*WorkspaceMember, error) {
 	row := q.db.QueryRow(ctx, getWorkspaceMember, arg.WorkspaceID, arg.UserID)
-	var i GetWorkspaceMemberRow
+	var i WorkspaceMember
 	err := row.Scan(
 		&i.WorkspaceID,
-		&i.ID,
-		&i.Name,
-		&i.Username,
-		&i.Email,
-		&i.EmailVerified,
-		&i.Picture,
-		&i.IsActive,
+		&i.UserID,
 		&i.RoleName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -463,89 +304,71 @@ func (q *Queries) GetWorkspacesByOwner(ctx context.Context, userID string) ([]st
 	return items, nil
 }
 
+const listWorkspaceIDs = `-- name: ListWorkspaceIDs :many
+SELECT
+  id
+FROM
+  workspaces
+`
+
+func (q *Queries) ListWorkspaceIDs(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listWorkspaceIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWorkspaceMembers = `-- name: ListWorkspaceMembers :many
 SELECT
   wm.workspace_id,
-  u.id,
-  u.name,
-  u.username,
-  u.email,
-  u.email_verified,
-  u.picture,
-  u.is_active,
+  wm.user_id,
   wm.role_name,
   wm.created_at,
   wm.updated_at
 FROM
   workspace_members wm
-  JOIN users u ON u.id = wm.user_id
 WHERE
   wm.workspace_id = $1
   AND (
     $2::TEXT IS NULL
-    OR u.name ILIKE '%' || $2 || '%'
-    OR u.username ILIKE '%' || $2 || '%'
-    OR u.email ILIKE '%' || $2 || '%'
-  )
-  AND (
-    $3::TEXT IS NULL
-    OR wm.role_name = $3::TEXT
+    OR wm.role_name = $2::TEXT
   )
 ORDER BY
-  u.name ASC,
-  u.username ASC
-LIMIT
-  $5
-OFFSET
-  $4
+  wm.created_at
 `
 
 type ListWorkspaceMembersParams struct {
 	WorkspaceID string  `json:"workspaceId"`
-	Query       *string `json:"query"`
 	RoleName    *string `json:"roleName"`
-	Offset      *int32  `json:"offset"`
-	Limit       *int32  `json:"limit"`
 }
 
-type ListWorkspaceMembersRow struct {
-	WorkspaceID   string    `json:"workspaceId"`
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Username      string    `json:"username"`
-	Email         string    `json:"email"`
-	EmailVerified bool      `json:"emailVerified"`
-	Picture       *string   `json:"picture"`
-	IsActive      bool      `json:"isActive"`
-	RoleName      string    `json:"roleName"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
-}
-
-func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error) {
-	rows, err := q.db.Query(ctx, listWorkspaceMembers,
-		arg.WorkspaceID,
-		arg.Query,
-		arg.RoleName,
-		arg.Offset,
-		arg.Limit,
-	)
+// Members of one workspace without their display fields: identity lives in
+// kagi, and the API layer stitches user data in via kagi's Users manager.
+func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*WorkspaceMember, error) {
+	rows, err := q.db.Query(ctx, listWorkspaceMembers, arg.WorkspaceID, arg.RoleName)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*ListWorkspaceMembersRow
+	var items []*WorkspaceMember
 	for rows.Next() {
-		var i ListWorkspaceMembersRow
+		var i WorkspaceMember
 		if err := rows.Scan(
 			&i.WorkspaceID,
-			&i.ID,
-			&i.Name,
-			&i.Username,
-			&i.Email,
-			&i.EmailVerified,
-			&i.Picture,
-			&i.IsActive,
+			&i.UserID,
 			&i.RoleName,
 			&i.CreatedAt,
 			&i.UpdatedAt,
