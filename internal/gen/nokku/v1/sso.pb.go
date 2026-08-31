@@ -7,15 +7,14 @@
 package nokkuv1
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -25,36 +24,39 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type OIDCProvider struct {
+// SSOProvider is the workspace's single SSO binding. The method selects the
+// protocol and decides which SSOConfig fields are meaningful (OIDC: issuer,
+// client id, scopes; SAML: metadata URL). An unset config means the slot is
+// empty; saving a config with the other method replaces it.
+type SSOProvider struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId          *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	Name                 *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	IssuerUrl            *string                `protobuf:"bytes,3,opt,name=issuer_url,json=issuerUrl" json:"issuer_url,omitempty"`
-	ClientId             *string                `protobuf:"bytes,4,opt,name=client_id,json=clientId" json:"client_id,omitempty"`
-	Scopes               []string               `protobuf:"bytes,5,rep,name=scopes" json:"scopes,omitempty"`
-	EnforceSso           *bool                  `protobuf:"varint,6,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
-	AllowJitProvisioning *bool                  `protobuf:"varint,7,opt,name=allow_jit_provisioning,json=allowJitProvisioning" json:"allow_jit_provisioning,omitempty"`
-	IsActive             *bool                  `protobuf:"varint,8,opt,name=is_active,json=isActive" json:"is_active,omitempty"`
-	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	Method               *string                `protobuf:"bytes,2,opt,name=method" json:"method,omitempty"` // oidc | saml
+	Name                 *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
+	EnforceSso           *bool                  `protobuf:"varint,4,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
+	AllowJitProvisioning *bool                  `protobuf:"varint,5,opt,name=allow_jit_provisioning,json=allowJitProvisioning" json:"allow_jit_provisioning,omitempty"`
+	IsActive             *bool                  `protobuf:"varint,6,opt,name=is_active,json=isActive" json:"is_active,omitempty"`
+	Config               *SSOConfig             `protobuf:"bytes,7,opt,name=config" json:"config,omitempty"`
+	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
 
-func (x *OIDCProvider) Reset() {
-	*x = OIDCProvider{}
+func (x *SSOProvider) Reset() {
+	*x = SSOProvider{}
 	mi := &file_nokku_v1_sso_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *OIDCProvider) String() string {
+func (x *SSOProvider) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*OIDCProvider) ProtoMessage() {}
+func (*SSOProvider) ProtoMessage() {}
 
-func (x *OIDCProvider) ProtoReflect() protoreflect.Message {
+func (x *SSOProvider) ProtoReflect() protoreflect.Message {
 	mi := &file_nokku_v1_sso_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -66,102 +68,100 @@ func (x *OIDCProvider) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use OIDCProvider.ProtoReflect.Descriptor instead.
-func (*OIDCProvider) Descriptor() ([]byte, []int) {
+// Deprecated: Use SSOProvider.ProtoReflect.Descriptor instead.
+func (*SSOProvider) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *OIDCProvider) GetWorkspaceId() string {
+func (x *SSOProvider) GetWorkspaceId() string {
 	if x != nil && x.WorkspaceId != nil {
 		return *x.WorkspaceId
 	}
 	return ""
 }
 
-func (x *OIDCProvider) GetName() string {
+func (x *SSOProvider) GetMethod() string {
+	if x != nil && x.Method != nil {
+		return *x.Method
+	}
+	return ""
+}
+
+func (x *SSOProvider) GetName() string {
 	if x != nil && x.Name != nil {
 		return *x.Name
 	}
 	return ""
 }
 
-func (x *OIDCProvider) GetIssuerUrl() string {
-	if x != nil && x.IssuerUrl != nil {
-		return *x.IssuerUrl
-	}
-	return ""
-}
-
-func (x *OIDCProvider) GetClientId() string {
-	if x != nil && x.ClientId != nil {
-		return *x.ClientId
-	}
-	return ""
-}
-
-func (x *OIDCProvider) GetScopes() []string {
-	if x != nil {
-		return x.Scopes
-	}
-	return nil
-}
-
-func (x *OIDCProvider) GetEnforceSso() bool {
+func (x *SSOProvider) GetEnforceSso() bool {
 	if x != nil && x.EnforceSso != nil {
 		return *x.EnforceSso
 	}
 	return false
 }
 
-func (x *OIDCProvider) GetAllowJitProvisioning() bool {
+func (x *SSOProvider) GetAllowJitProvisioning() bool {
 	if x != nil && x.AllowJitProvisioning != nil {
 		return *x.AllowJitProvisioning
 	}
 	return false
 }
 
-func (x *OIDCProvider) GetIsActive() bool {
+func (x *SSOProvider) GetIsActive() bool {
 	if x != nil && x.IsActive != nil {
 		return *x.IsActive
 	}
 	return false
 }
 
-func (x *OIDCProvider) GetCreatedAt() *timestamppb.Timestamp {
+func (x *SSOProvider) GetConfig() *SSOConfig {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+func (x *SSOProvider) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
 	}
 	return nil
 }
 
-func (x *OIDCProvider) GetUpdatedAt() *timestamppb.Timestamp {
+func (x *SSOProvider) GetUpdatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdatedAt
 	}
 	return nil
 }
 
-type GetOIDCProviderRequest struct {
+// SSOConfig is the protocol-agnostic configuration block. The provider's
+// method decides which fields are required.
+type SSOConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	IssuerUrl     *string                `protobuf:"bytes,1,opt,name=issuer_url,json=issuerUrl" json:"issuer_url,omitempty"`
+	ClientId      *string                `protobuf:"bytes,2,opt,name=client_id,json=clientId" json:"client_id,omitempty"`
+	Scopes        []string               `protobuf:"bytes,3,rep,name=scopes" json:"scopes,omitempty"`
+	MetadataUrl   *string                `protobuf:"bytes,4,opt,name=metadata_url,json=metadataUrl" json:"metadata_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetOIDCProviderRequest) Reset() {
-	*x = GetOIDCProviderRequest{}
+func (x *SSOConfig) Reset() {
+	*x = SSOConfig{}
 	mi := &file_nokku_v1_sso_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetOIDCProviderRequest) String() string {
+func (x *SSOConfig) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetOIDCProviderRequest) ProtoMessage() {}
+func (*SSOConfig) ProtoMessage() {}
 
-func (x *GetOIDCProviderRequest) ProtoReflect() protoreflect.Message {
+func (x *SSOConfig) ProtoReflect() protoreflect.Message {
 	mi := &file_nokku_v1_sso_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -173,242 +173,250 @@ func (x *GetOIDCProviderRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetOIDCProviderRequest.ProtoReflect.Descriptor instead.
-func (*GetOIDCProviderRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use SSOConfig.ProtoReflect.Descriptor instead.
+func (*SSOConfig) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *GetOIDCProviderRequest) GetWorkspaceId() string {
-	if x != nil && x.WorkspaceId != nil {
-		return *x.WorkspaceId
-	}
-	return ""
-}
-
-type GetOIDCProviderResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	OidcProvider  *OIDCProvider          `protobuf:"bytes,1,opt,name=oidc_provider,json=oidcProvider" json:"oidc_provider,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetOIDCProviderResponse) Reset() {
-	*x = GetOIDCProviderResponse{}
-	mi := &file_nokku_v1_sso_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetOIDCProviderResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetOIDCProviderResponse) ProtoMessage() {}
-
-func (x *GetOIDCProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_sso_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetOIDCProviderResponse.ProtoReflect.Descriptor instead.
-func (*GetOIDCProviderResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *GetOIDCProviderResponse) GetOidcProvider() *OIDCProvider {
-	if x != nil {
-		return x.OidcProvider
-	}
-	return nil
-}
-
-type UpdateOIDCProviderRequest struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId          *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	Name                 *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	IssuerUrl            *string                `protobuf:"bytes,3,opt,name=issuer_url,json=issuerUrl" json:"issuer_url,omitempty"`
-	ClientId             *string                `protobuf:"bytes,4,opt,name=client_id,json=clientId" json:"client_id,omitempty"`
-	ClientSecret         *string                `protobuf:"bytes,5,opt,name=client_secret,json=clientSecret" json:"client_secret,omitempty"`
-	Scopes               []string               `protobuf:"bytes,6,rep,name=scopes" json:"scopes,omitempty"`
-	EnforceSso           *bool                  `protobuf:"varint,7,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
-	AllowJitProvisioning *bool                  `protobuf:"varint,8,opt,name=allow_jit_provisioning,json=allowJitProvisioning" json:"allow_jit_provisioning,omitempty"`
-	IsActive             *bool                  `protobuf:"varint,9,opt,name=is_active,json=isActive" json:"is_active,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
-}
-
-func (x *UpdateOIDCProviderRequest) Reset() {
-	*x = UpdateOIDCProviderRequest{}
-	mi := &file_nokku_v1_sso_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdateOIDCProviderRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdateOIDCProviderRequest) ProtoMessage() {}
-
-func (x *UpdateOIDCProviderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_sso_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdateOIDCProviderRequest.ProtoReflect.Descriptor instead.
-func (*UpdateOIDCProviderRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *UpdateOIDCProviderRequest) GetWorkspaceId() string {
-	if x != nil && x.WorkspaceId != nil {
-		return *x.WorkspaceId
-	}
-	return ""
-}
-
-func (x *UpdateOIDCProviderRequest) GetName() string {
-	if x != nil && x.Name != nil {
-		return *x.Name
-	}
-	return ""
-}
-
-func (x *UpdateOIDCProviderRequest) GetIssuerUrl() string {
+func (x *SSOConfig) GetIssuerUrl() string {
 	if x != nil && x.IssuerUrl != nil {
 		return *x.IssuerUrl
 	}
 	return ""
 }
 
-func (x *UpdateOIDCProviderRequest) GetClientId() string {
+func (x *SSOConfig) GetClientId() string {
 	if x != nil && x.ClientId != nil {
 		return *x.ClientId
 	}
 	return ""
 }
 
-func (x *UpdateOIDCProviderRequest) GetClientSecret() string {
+func (x *SSOConfig) GetScopes() []string {
+	if x != nil {
+		return x.Scopes
+	}
+	return nil
+}
+
+func (x *SSOConfig) GetMetadataUrl() string {
+	if x != nil && x.MetadataUrl != nil {
+		return *x.MetadataUrl
+	}
+	return ""
+}
+
+type GetSSOProviderRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSSOProviderRequest) Reset() {
+	*x = GetSSOProviderRequest{}
+	mi := &file_nokku_v1_sso_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSSOProviderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSSOProviderRequest) ProtoMessage() {}
+
+func (x *GetSSOProviderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_sso_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSSOProviderRequest.ProtoReflect.Descriptor instead.
+func (*GetSSOProviderRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetSSOProviderRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
+}
+
+type GetSSOProviderResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      *SSOProvider           `protobuf:"bytes,1,opt,name=provider" json:"provider,omitempty"` // unset when the workspace has no provider
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSSOProviderResponse) Reset() {
+	*x = GetSSOProviderResponse{}
+	mi := &file_nokku_v1_sso_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSSOProviderResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSSOProviderResponse) ProtoMessage() {}
+
+func (x *GetSSOProviderResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_sso_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSSOProviderResponse.ProtoReflect.Descriptor instead.
+func (*GetSSOProviderResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetSSOProviderResponse) GetProvider() *SSOProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return nil
+}
+
+type UpdateSSOProviderRequest struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId          *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Method               *string                `protobuf:"bytes,2,opt,name=method" json:"method,omitempty"`
+	Name                 *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
+	EnforceSso           *bool                  `protobuf:"varint,4,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
+	AllowJitProvisioning *bool                  `protobuf:"varint,5,opt,name=allow_jit_provisioning,json=allowJitProvisioning" json:"allow_jit_provisioning,omitempty"`
+	IsActive             *bool                  `protobuf:"varint,6,opt,name=is_active,json=isActive" json:"is_active,omitempty"`
+	// OIDC only: empty keeps the stored secret, so configuration can be
+	// updated without resubmitting it.
+	ClientSecret  *string    `protobuf:"bytes,7,opt,name=client_secret,json=clientSecret" json:"client_secret,omitempty"`
+	Config        *SSOConfig `protobuf:"bytes,8,opt,name=config" json:"config,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateSSOProviderRequest) Reset() {
+	*x = UpdateSSOProviderRequest{}
+	mi := &file_nokku_v1_sso_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateSSOProviderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateSSOProviderRequest) ProtoMessage() {}
+
+func (x *UpdateSSOProviderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_sso_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateSSOProviderRequest.ProtoReflect.Descriptor instead.
+func (*UpdateSSOProviderRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *UpdateSSOProviderRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *UpdateSSOProviderRequest) GetMethod() string {
+	if x != nil && x.Method != nil {
+		return *x.Method
+	}
+	return ""
+}
+
+func (x *UpdateSSOProviderRequest) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
+func (x *UpdateSSOProviderRequest) GetEnforceSso() bool {
+	if x != nil && x.EnforceSso != nil {
+		return *x.EnforceSso
+	}
+	return false
+}
+
+func (x *UpdateSSOProviderRequest) GetAllowJitProvisioning() bool {
+	if x != nil && x.AllowJitProvisioning != nil {
+		return *x.AllowJitProvisioning
+	}
+	return false
+}
+
+func (x *UpdateSSOProviderRequest) GetIsActive() bool {
+	if x != nil && x.IsActive != nil {
+		return *x.IsActive
+	}
+	return false
+}
+
+func (x *UpdateSSOProviderRequest) GetClientSecret() string {
 	if x != nil && x.ClientSecret != nil {
 		return *x.ClientSecret
 	}
 	return ""
 }
 
-func (x *UpdateOIDCProviderRequest) GetScopes() []string {
+func (x *UpdateSSOProviderRequest) GetConfig() *SSOConfig {
 	if x != nil {
-		return x.Scopes
+		return x.Config
 	}
 	return nil
 }
 
-func (x *UpdateOIDCProviderRequest) GetEnforceSso() bool {
-	if x != nil && x.EnforceSso != nil {
-		return *x.EnforceSso
-	}
-	return false
-}
-
-func (x *UpdateOIDCProviderRequest) GetAllowJitProvisioning() bool {
-	if x != nil && x.AllowJitProvisioning != nil {
-		return *x.AllowJitProvisioning
-	}
-	return false
-}
-
-func (x *UpdateOIDCProviderRequest) GetIsActive() bool {
-	if x != nil && x.IsActive != nil {
-		return *x.IsActive
-	}
-	return false
-}
-
-type UpdateOIDCProviderResponse struct {
+type UpdateSSOProviderResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	OidcProvider  *OIDCProvider          `protobuf:"bytes,1,opt,name=oidc_provider,json=oidcProvider" json:"oidc_provider,omitempty"`
+	Provider      *SSOProvider           `protobuf:"bytes,1,opt,name=provider" json:"provider,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *UpdateOIDCProviderResponse) Reset() {
-	*x = UpdateOIDCProviderResponse{}
-	mi := &file_nokku_v1_sso_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdateOIDCProviderResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdateOIDCProviderResponse) ProtoMessage() {}
-
-func (x *UpdateOIDCProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_sso_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdateOIDCProviderResponse.ProtoReflect.Descriptor instead.
-func (*UpdateOIDCProviderResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *UpdateOIDCProviderResponse) GetOidcProvider() *OIDCProvider {
-	if x != nil {
-		return x.OidcProvider
-	}
-	return nil
-}
-
-type SAMLProvider struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId          *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	Name                 *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	MetadataUrl          *string                `protobuf:"bytes,3,opt,name=metadata_url,json=metadataUrl" json:"metadata_url,omitempty"`
-	EnforceSso           *bool                  `protobuf:"varint,4,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
-	AllowJitProvisioning *bool                  `protobuf:"varint,5,opt,name=allow_jit_provisioning,json=allowJitProvisioning" json:"allow_jit_provisioning,omitempty"`
-	IsActive             *bool                  `protobuf:"varint,6,opt,name=is_active,json=isActive" json:"is_active,omitempty"`
-	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
-}
-
-func (x *SAMLProvider) Reset() {
-	*x = SAMLProvider{}
+func (x *UpdateSSOProviderResponse) Reset() {
+	*x = UpdateSSOProviderResponse{}
 	mi := &file_nokku_v1_sso_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SAMLProvider) String() string {
+func (x *UpdateSSOProviderResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SAMLProvider) ProtoMessage() {}
+func (*UpdateSSOProviderResponse) ProtoMessage() {}
 
-func (x *SAMLProvider) ProtoReflect() protoreflect.Message {
+func (x *UpdateSSOProviderResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_nokku_v1_sso_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -420,279 +428,14 @@ func (x *SAMLProvider) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SAMLProvider.ProtoReflect.Descriptor instead.
-func (*SAMLProvider) Descriptor() ([]byte, []int) {
+// Deprecated: Use UpdateSSOProviderResponse.ProtoReflect.Descriptor instead.
+func (*UpdateSSOProviderResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *SAMLProvider) GetWorkspaceId() string {
-	if x != nil && x.WorkspaceId != nil {
-		return *x.WorkspaceId
-	}
-	return ""
-}
-
-func (x *SAMLProvider) GetName() string {
-	if x != nil && x.Name != nil {
-		return *x.Name
-	}
-	return ""
-}
-
-func (x *SAMLProvider) GetMetadataUrl() string {
-	if x != nil && x.MetadataUrl != nil {
-		return *x.MetadataUrl
-	}
-	return ""
-}
-
-func (x *SAMLProvider) GetEnforceSso() bool {
-	if x != nil && x.EnforceSso != nil {
-		return *x.EnforceSso
-	}
-	return false
-}
-
-func (x *SAMLProvider) GetAllowJitProvisioning() bool {
-	if x != nil && x.AllowJitProvisioning != nil {
-		return *x.AllowJitProvisioning
-	}
-	return false
-}
-
-func (x *SAMLProvider) GetIsActive() bool {
-	if x != nil && x.IsActive != nil {
-		return *x.IsActive
-	}
-	return false
-}
-
-func (x *SAMLProvider) GetCreatedAt() *timestamppb.Timestamp {
+func (x *UpdateSSOProviderResponse) GetProvider() *SSOProvider {
 	if x != nil {
-		return x.CreatedAt
-	}
-	return nil
-}
-
-func (x *SAMLProvider) GetUpdatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.UpdatedAt
-	}
-	return nil
-}
-
-type GetSAMLProviderRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetSAMLProviderRequest) Reset() {
-	*x = GetSAMLProviderRequest{}
-	mi := &file_nokku_v1_sso_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetSAMLProviderRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetSAMLProviderRequest) ProtoMessage() {}
-
-func (x *GetSAMLProviderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_sso_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetSAMLProviderRequest.ProtoReflect.Descriptor instead.
-func (*GetSAMLProviderRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *GetSAMLProviderRequest) GetWorkspaceId() string {
-	if x != nil && x.WorkspaceId != nil {
-		return *x.WorkspaceId
-	}
-	return ""
-}
-
-type GetSAMLProviderResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SamlProvider  *SAMLProvider          `protobuf:"bytes,1,opt,name=saml_provider,json=samlProvider" json:"saml_provider,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetSAMLProviderResponse) Reset() {
-	*x = GetSAMLProviderResponse{}
-	mi := &file_nokku_v1_sso_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetSAMLProviderResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetSAMLProviderResponse) ProtoMessage() {}
-
-func (x *GetSAMLProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_sso_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetSAMLProviderResponse.ProtoReflect.Descriptor instead.
-func (*GetSAMLProviderResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *GetSAMLProviderResponse) GetSamlProvider() *SAMLProvider {
-	if x != nil {
-		return x.SamlProvider
-	}
-	return nil
-}
-
-type UpdateSAMLProviderRequest struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId          *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	Name                 *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	MetadataUrl          *string                `protobuf:"bytes,3,opt,name=metadata_url,json=metadataUrl" json:"metadata_url,omitempty"`
-	EnforceSso           *bool                  `protobuf:"varint,4,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
-	AllowJitProvisioning *bool                  `protobuf:"varint,5,opt,name=allow_jit_provisioning,json=allowJitProvisioning" json:"allow_jit_provisioning,omitempty"`
-	IsActive             *bool                  `protobuf:"varint,6,opt,name=is_active,json=isActive" json:"is_active,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
-}
-
-func (x *UpdateSAMLProviderRequest) Reset() {
-	*x = UpdateSAMLProviderRequest{}
-	mi := &file_nokku_v1_sso_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdateSAMLProviderRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdateSAMLProviderRequest) ProtoMessage() {}
-
-func (x *UpdateSAMLProviderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_sso_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdateSAMLProviderRequest.ProtoReflect.Descriptor instead.
-func (*UpdateSAMLProviderRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *UpdateSAMLProviderRequest) GetWorkspaceId() string {
-	if x != nil && x.WorkspaceId != nil {
-		return *x.WorkspaceId
-	}
-	return ""
-}
-
-func (x *UpdateSAMLProviderRequest) GetName() string {
-	if x != nil && x.Name != nil {
-		return *x.Name
-	}
-	return ""
-}
-
-func (x *UpdateSAMLProviderRequest) GetMetadataUrl() string {
-	if x != nil && x.MetadataUrl != nil {
-		return *x.MetadataUrl
-	}
-	return ""
-}
-
-func (x *UpdateSAMLProviderRequest) GetEnforceSso() bool {
-	if x != nil && x.EnforceSso != nil {
-		return *x.EnforceSso
-	}
-	return false
-}
-
-func (x *UpdateSAMLProviderRequest) GetAllowJitProvisioning() bool {
-	if x != nil && x.AllowJitProvisioning != nil {
-		return *x.AllowJitProvisioning
-	}
-	return false
-}
-
-func (x *UpdateSAMLProviderRequest) GetIsActive() bool {
-	if x != nil && x.IsActive != nil {
-		return *x.IsActive
-	}
-	return false
-}
-
-type UpdateSAMLProviderResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SamlProvider  *SAMLProvider          `protobuf:"bytes,1,opt,name=saml_provider,json=samlProvider" json:"saml_provider,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UpdateSAMLProviderResponse) Reset() {
-	*x = UpdateSAMLProviderResponse{}
-	mi := &file_nokku_v1_sso_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdateSAMLProviderResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdateSAMLProviderResponse) ProtoMessage() {}
-
-func (x *UpdateSAMLProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_sso_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdateSAMLProviderResponse.ProtoReflect.Descriptor instead.
-func (*UpdateSAMLProviderResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *UpdateSAMLProviderResponse) GetSamlProvider() *SAMLProvider {
-	if x != nil {
-		return x.SamlProvider
+		return x.Provider
 	}
 	return nil
 }
@@ -701,77 +444,47 @@ var File_nokku_v1_sso_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_sso_proto_rawDesc = "" +
 	"\n" +
-	"\x12nokku/v1/sso.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x83\x03\n" +
-	"\fOIDCProvider\x12!\n" +
-	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
-	"\n" +
-	"issuer_url\x18\x03 \x01(\tR\tissuerUrl\x12\x1b\n" +
-	"\tclient_id\x18\x04 \x01(\tR\bclientId\x12\x16\n" +
-	"\x06scopes\x18\x05 \x03(\tR\x06scopes\x12\x1f\n" +
-	"\venforce_sso\x18\x06 \x01(\bR\n" +
-	"enforceSso\x124\n" +
-	"\x16allow_jit_provisioning\x18\a \x01(\bR\x14allowJitProvisioning\x12\x1b\n" +
-	"\tis_active\x18\b \x01(\bR\bisActive\x129\n" +
-	"\n" +
-	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
-	"\n" +
-	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"E\n" +
-	"\x16GetOIDCProviderRequest\x12+\n" +
-	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"V\n" +
-	"\x17GetOIDCProviderResponse\x12;\n" +
-	"\roidc_provider\x18\x01 \x01(\v2\x16.nokku.v1.OIDCProviderR\foidcProvider\"\x8b\x03\n" +
-	"\x19UpdateOIDCProviderRequest\x12+\n" +
-	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1e\n" +
-	"\x04name\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x04name\x12'\n" +
-	"\n" +
-	"issuer_url\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x88\x01\x01R\tissuerUrl\x12'\n" +
-	"\tclient_id\x18\x04 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xf4\x03R\bclientId\x12/\n" +
-	"\rclient_secret\x18\x05 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xe8\aR\fclientSecret\x12*\n" +
-	"\x06scopes\x18\x06 \x03(\tB\x12\xbaH\x0f\x92\x01\f\b\x01\x10\x14\"\x06r\x04\x10\x01\x18dR\x06scopes\x12\x1f\n" +
-	"\venforce_sso\x18\a \x01(\bR\n" +
-	"enforceSso\x124\n" +
-	"\x16allow_jit_provisioning\x18\b \x01(\bR\x14allowJitProvisioning\x12\x1b\n" +
-	"\tis_active\x18\t \x01(\bR\bisActive\"Y\n" +
-	"\x1aUpdateOIDCProviderResponse\x12;\n" +
-	"\roidc_provider\x18\x01 \x01(\v2\x16.nokku.v1.OIDCProviderR\foidcProvider\"\xd2\x02\n" +
-	"\fSAMLProvider\x12!\n" +
-	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
-	"\fmetadata_url\x18\x03 \x01(\tR\vmetadataUrl\x12\x1f\n" +
+	"\x12nokku/v1/sso.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf3\x02\n" +
+	"\vSSOProvider\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x16\n" +
+	"\x06method\x18\x02 \x01(\tR\x06method\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x1f\n" +
 	"\venforce_sso\x18\x04 \x01(\bR\n" +
 	"enforceSso\x124\n" +
 	"\x16allow_jit_provisioning\x18\x05 \x01(\bR\x14allowJitProvisioning\x12\x1b\n" +
-	"\tis_active\x18\x06 \x01(\bR\bisActive\x129\n" +
+	"\tis_active\x18\x06 \x01(\bR\bisActive\x12+\n" +
+	"\x06config\x18\a \x01(\v2\x13.nokku.v1.SSOConfigR\x06config\x129\n" +
 	"\n" +
-	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"E\n" +
-	"\x16GetSAMLProviderRequest\x12+\n" +
-	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"V\n" +
-	"\x17GetSAMLProviderResponse\x12;\n" +
-	"\rsaml_provider\x18\x01 \x01(\v2\x16.nokku.v1.SAMLProviderR\fsamlProvider\"\x89\x02\n" +
-	"\x19UpdateSAMLProviderRequest\x12+\n" +
-	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1e\n" +
-	"\x04name\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x04name\x12+\n" +
-	"\fmetadata_url\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x88\x01\x01R\vmetadataUrl\x12\x1f\n" +
+	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x82\x01\n" +
+	"\tSSOConfig\x12\x1d\n" +
+	"\n" +
+	"issuer_url\x18\x01 \x01(\tR\tissuerUrl\x12\x1b\n" +
+	"\tclient_id\x18\x02 \x01(\tR\bclientId\x12\x16\n" +
+	"\x06scopes\x18\x03 \x03(\tR\x06scopes\x12!\n" +
+	"\fmetadata_url\x18\x04 \x01(\tR\vmetadataUrl\"D\n" +
+	"\x15GetSSOProviderRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"K\n" +
+	"\x16GetSSOProviderResponse\x121\n" +
+	"\bprovider\x18\x01 \x01(\v2\x15.nokku.v1.SSOProviderR\bprovider\"\xe2\x02\n" +
+	"\x18UpdateSSOProviderRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12)\n" +
+	"\x06method\x18\x02 \x01(\tB\x11\xbaH\x0er\fR\x04oidcR\x04samlR\x06method\x12\x1e\n" +
+	"\x04name\x18\x03 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x04name\x12\x1f\n" +
 	"\venforce_sso\x18\x04 \x01(\bR\n" +
 	"enforceSso\x124\n" +
 	"\x16allow_jit_provisioning\x18\x05 \x01(\bR\x14allowJitProvisioning\x12\x1b\n" +
-	"\tis_active\x18\x06 \x01(\bR\bisActive\"Y\n" +
-	"\x1aUpdateSAMLProviderResponse\x12;\n" +
-	"\rsaml_provider\x18\x01 \x01(\v2\x16.nokku.v1.SAMLProviderR\fsamlProvider2\xbe\x04\n" +
+	"\tis_active\x18\x06 \x01(\bR\bisActive\x12-\n" +
+	"\rclient_secret\x18\a \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\fclientSecret\x12+\n" +
+	"\x06config\x18\b \x01(\v2\x13.nokku.v1.SSOConfigR\x06config\"N\n" +
+	"\x19UpdateSSOProviderResponse\x121\n" +
+	"\bprovider\x18\x01 \x01(\v2\x15.nokku.v1.SSOProviderR\bprovider2\x9d\x02\n" +
 	"\n" +
-	"SSOService\x12\x85\x01\n" +
-	"\x0fGetOIDCProvider\x12 .nokku.v1.GetOIDCProviderRequest\x1a!.nokku.v1.GetOIDCProviderResponse\"-\x82\xd3\xe4\x93\x02$\x12\"/v1/workspaces/{workspace_id}/oidc\x90\x02\x01\x12\x8e\x01\n" +
-	"\x12UpdateOIDCProvider\x12#.nokku.v1.UpdateOIDCProviderRequest\x1a$.nokku.v1.UpdateOIDCProviderResponse\"-\x82\xd3\xe4\x93\x02':\x01*2\"/v1/workspaces/{workspace_id}/oidc\x12\x85\x01\n" +
-	"\x0fGetSAMLProvider\x12 .nokku.v1.GetSAMLProviderRequest\x1a!.nokku.v1.GetSAMLProviderResponse\"-\x82\xd3\xe4\x93\x02$\x12\"/v1/workspaces/{workspace_id}/saml\x90\x02\x01\x12\x8e\x01\n" +
-	"\x12UpdateSAMLProvider\x12#.nokku.v1.UpdateSAMLProviderRequest\x1a$.nokku.v1.UpdateSAMLProviderResponse\"-\x82\xd3\xe4\x93\x02':\x01*2\"/v1/workspaces/{workspace_id}/samlB\x92\x01\n" +
+	"SSOService\x12\x81\x01\n" +
+	"\x0eGetSSOProvider\x12\x1f.nokku.v1.GetSSOProviderRequest\x1a .nokku.v1.GetSSOProviderResponse\",\x82\xd3\xe4\x93\x02#\x12!/v1/workspaces/{workspace_id}/sso\x90\x02\x01\x12\x8a\x01\n" +
+	"\x11UpdateSSOProvider\x12\".nokku.v1.UpdateSSOProviderRequest\x1a#.nokku.v1.UpdateSSOProviderResponse\",\x82\xd3\xe4\x93\x02&:\x01*2!/v1/workspaces/{workspace_id}/ssoB\x92\x01\n" +
 	"\fcom.nokku.v1B\bSsoProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -786,42 +499,32 @@ func file_nokku_v1_sso_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_sso_proto_rawDescData
 }
 
-var file_nokku_v1_sso_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_nokku_v1_sso_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_nokku_v1_sso_proto_goTypes = []any{
-	(*OIDCProvider)(nil),               // 0: nokku.v1.OIDCProvider
-	(*GetOIDCProviderRequest)(nil),     // 1: nokku.v1.GetOIDCProviderRequest
-	(*GetOIDCProviderResponse)(nil),    // 2: nokku.v1.GetOIDCProviderResponse
-	(*UpdateOIDCProviderRequest)(nil),  // 3: nokku.v1.UpdateOIDCProviderRequest
-	(*UpdateOIDCProviderResponse)(nil), // 4: nokku.v1.UpdateOIDCProviderResponse
-	(*SAMLProvider)(nil),               // 5: nokku.v1.SAMLProvider
-	(*GetSAMLProviderRequest)(nil),     // 6: nokku.v1.GetSAMLProviderRequest
-	(*GetSAMLProviderResponse)(nil),    // 7: nokku.v1.GetSAMLProviderResponse
-	(*UpdateSAMLProviderRequest)(nil),  // 8: nokku.v1.UpdateSAMLProviderRequest
-	(*UpdateSAMLProviderResponse)(nil), // 9: nokku.v1.UpdateSAMLProviderResponse
-	(*timestamppb.Timestamp)(nil),      // 10: google.protobuf.Timestamp
+	(*SSOProvider)(nil),               // 0: nokku.v1.SSOProvider
+	(*SSOConfig)(nil),                 // 1: nokku.v1.SSOConfig
+	(*GetSSOProviderRequest)(nil),     // 2: nokku.v1.GetSSOProviderRequest
+	(*GetSSOProviderResponse)(nil),    // 3: nokku.v1.GetSSOProviderResponse
+	(*UpdateSSOProviderRequest)(nil),  // 4: nokku.v1.UpdateSSOProviderRequest
+	(*UpdateSSOProviderResponse)(nil), // 5: nokku.v1.UpdateSSOProviderResponse
+	(*timestamppb.Timestamp)(nil),     // 6: google.protobuf.Timestamp
 }
 var file_nokku_v1_sso_proto_depIdxs = []int32{
-	10, // 0: nokku.v1.OIDCProvider.created_at:type_name -> google.protobuf.Timestamp
-	10, // 1: nokku.v1.OIDCProvider.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 2: nokku.v1.GetOIDCProviderResponse.oidc_provider:type_name -> nokku.v1.OIDCProvider
-	0,  // 3: nokku.v1.UpdateOIDCProviderResponse.oidc_provider:type_name -> nokku.v1.OIDCProvider
-	10, // 4: nokku.v1.SAMLProvider.created_at:type_name -> google.protobuf.Timestamp
-	10, // 5: nokku.v1.SAMLProvider.updated_at:type_name -> google.protobuf.Timestamp
-	5,  // 6: nokku.v1.GetSAMLProviderResponse.saml_provider:type_name -> nokku.v1.SAMLProvider
-	5,  // 7: nokku.v1.UpdateSAMLProviderResponse.saml_provider:type_name -> nokku.v1.SAMLProvider
-	1,  // 8: nokku.v1.SSOService.GetOIDCProvider:input_type -> nokku.v1.GetOIDCProviderRequest
-	3,  // 9: nokku.v1.SSOService.UpdateOIDCProvider:input_type -> nokku.v1.UpdateOIDCProviderRequest
-	6,  // 10: nokku.v1.SSOService.GetSAMLProvider:input_type -> nokku.v1.GetSAMLProviderRequest
-	8,  // 11: nokku.v1.SSOService.UpdateSAMLProvider:input_type -> nokku.v1.UpdateSAMLProviderRequest
-	2,  // 12: nokku.v1.SSOService.GetOIDCProvider:output_type -> nokku.v1.GetOIDCProviderResponse
-	4,  // 13: nokku.v1.SSOService.UpdateOIDCProvider:output_type -> nokku.v1.UpdateOIDCProviderResponse
-	7,  // 14: nokku.v1.SSOService.GetSAMLProvider:output_type -> nokku.v1.GetSAMLProviderResponse
-	9,  // 15: nokku.v1.SSOService.UpdateSAMLProvider:output_type -> nokku.v1.UpdateSAMLProviderResponse
-	12, // [12:16] is the sub-list for method output_type
-	8,  // [8:12] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	1, // 0: nokku.v1.SSOProvider.config:type_name -> nokku.v1.SSOConfig
+	6, // 1: nokku.v1.SSOProvider.created_at:type_name -> google.protobuf.Timestamp
+	6, // 2: nokku.v1.SSOProvider.updated_at:type_name -> google.protobuf.Timestamp
+	0, // 3: nokku.v1.GetSSOProviderResponse.provider:type_name -> nokku.v1.SSOProvider
+	1, // 4: nokku.v1.UpdateSSOProviderRequest.config:type_name -> nokku.v1.SSOConfig
+	0, // 5: nokku.v1.UpdateSSOProviderResponse.provider:type_name -> nokku.v1.SSOProvider
+	2, // 6: nokku.v1.SSOService.GetSSOProvider:input_type -> nokku.v1.GetSSOProviderRequest
+	4, // 7: nokku.v1.SSOService.UpdateSSOProvider:input_type -> nokku.v1.UpdateSSOProviderRequest
+	3, // 8: nokku.v1.SSOService.GetSSOProvider:output_type -> nokku.v1.GetSSOProviderResponse
+	5, // 9: nokku.v1.SSOService.UpdateSSOProvider:output_type -> nokku.v1.UpdateSSOProviderResponse
+	8, // [8:10] is the sub-list for method output_type
+	6, // [6:8] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_sso_proto_init() }
@@ -835,7 +538,7 @@ func file_nokku_v1_sso_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_sso_proto_rawDesc), len(file_nokku_v1_sso_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

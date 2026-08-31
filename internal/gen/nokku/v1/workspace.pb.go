@@ -7,15 +7,14 @@
 package nokkuv1
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -151,16 +150,16 @@ func (x *Workspace) GetUpdatedAt() *timestamppb.Timestamp {
 
 type WorkspaceMember struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	Id              *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"` // User ID
+	Id              *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	WorkspaceId     *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
 	Name            *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
-	Email           *string                `protobuf:"bytes,5,opt,name=email" json:"email,omitempty"`
-	EmailVerified   *bool                  `protobuf:"varint,6,opt,name=email_verified,json=emailVerified" json:"email_verified,omitempty"`
-	Picture         *string                `protobuf:"bytes,7,opt,name=picture" json:"picture,omitempty"`
-	RoleName        *string                `protobuf:"bytes,8,opt,name=role_name,json=roleName" json:"role_name,omitempty"`
-	RoleDescription *string                `protobuf:"bytes,9,opt,name=role_description,json=roleDescription" json:"role_description,omitempty"`
-	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	Email           *string                `protobuf:"bytes,4,opt,name=email" json:"email,omitempty"`
+	EmailVerified   *bool                  `protobuf:"varint,5,opt,name=email_verified,json=emailVerified" json:"email_verified,omitempty"`
+	Picture         *string                `protobuf:"bytes,6,opt,name=picture" json:"picture,omitempty"`
+	RoleName        *string                `protobuf:"bytes,7,opt,name=role_name,json=roleName" json:"role_name,omitempty"`
+	RoleDescription *string                `protobuf:"bytes,8,opt,name=role_description,json=roleDescription" json:"role_description,omitempty"`
+	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1427,21 +1426,21 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"created_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xf3\x02\n" +
+	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xed\x02\n" +
 	"\x0fWorkspaceMember\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
-	"\x05email\x18\x05 \x01(\tR\x05email\x12%\n" +
-	"\x0eemail_verified\x18\x06 \x01(\bR\remailVerified\x12\x18\n" +
-	"\apicture\x18\a \x01(\tR\apicture\x12\x1b\n" +
-	"\trole_name\x18\b \x01(\tR\broleName\x12)\n" +
-	"\x10role_description\x18\t \x01(\tR\x0froleDescription\x129\n" +
+	"\x05email\x18\x04 \x01(\tR\x05email\x12%\n" +
+	"\x0eemail_verified\x18\x05 \x01(\bR\remailVerified\x12\x18\n" +
+	"\apicture\x18\x06 \x01(\tR\apicture\x12\x1b\n" +
+	"\trole_name\x18\a \x01(\tR\broleName\x12)\n" +
+	"\x10role_description\x18\b \x01(\tR\x0froleDescription\x129\n" +
 	"\n" +
-	"created_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtJ\x04\b\x04\x10\x05\"\x8f\x01\n" +
+	"updated_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x8f\x01\n" +
 	"\x11WorkspaceSettings\x12.\n" +
 	"\x13enroll_auto_approve\x18\x01 \x01(\bR\x11enrollAutoApprove\x12J\n" +
 	"\x15default_daemon_config\x18\x02 \x01(\v2\x16.nokku.v1.DaemonConfigR\x13defaultDaemonConfig\"B\n" +

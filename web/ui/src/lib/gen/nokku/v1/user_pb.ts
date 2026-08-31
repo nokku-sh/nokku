@@ -2,101 +2,67 @@
 // @generated from file nokku/v1/user.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenFile, GenMessage } from '@bufbuild/protobuf/codegenv2';
-import { fileDesc, messageDesc } from '@bufbuild/protobuf/codegenv2';
-import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import { file_google_protobuf_timestamp } from '@bufbuild/protobuf/wkt';
-import type { Message } from '@bufbuild/protobuf';
+import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
+import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file nokku/v1/user.proto.
  */
-export const file_nokku_v1_user: GenFile /*@__PURE__*/ = fileDesc(
-	'ChNub2trdS92MS91c2VyLnByb3RvEghub2trdS52MSLdAQoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWVtYWlsGAQgASgJEhYKDmVtYWlsX3ZlcmlmaWVkGAUgASgIEg8KB3BpY3R1cmUYBiABKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHQoVZW5hYmxlX2VtYWlsX3JlY292ZXJ5GAkgASgISgQIAxAEIngKDU9BdXRoSWRlbnRpdHkSEwoLcHJvdmlkZXJfaWQYASABKAkSEAoIcHJvdmlkZXIYAiABKAkSEAoIcHJvdG9jb2wYAyABKAkSLgoKY3JlYXRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCkwEKDGNvbS5ub2trdS52MUIJVXNlclByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
-	[file_google_protobuf_timestamp]
-);
+export const file_nokku_v1_user: GenFile = /*@__PURE__*/
+  fileDesc("ChNub2trdS92MS91c2VyLnByb3RvEghub2trdS52MSLXAQoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWVtYWlsGAMgASgJEhYKDmVtYWlsX3ZlcmlmaWVkGAQgASgIEg8KB3BpY3R1cmUYBSABKAkSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHQoVZW5hYmxlX2VtYWlsX3JlY292ZXJ5GAggASgIQpMBCgxjb20ubm9ra3UudjFCCVVzZXJQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message nokku.v1.User
  */
-export type User = Message<'nokku.v1.User'> & {
-	/**
-	 * @generated from field: string id = 1;
-	 */
-	id: string;
+export type User = Message<"nokku.v1.User"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
 
-	/**
-	 * @generated from field: string name = 2;
-	 */
-	name: string;
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
 
-	/**
-	 * @generated from field: string email = 4;
-	 */
-	email: string;
+  /**
+   * @generated from field: string email = 3;
+   */
+  email: string;
 
-	/**
-	 * @generated from field: bool email_verified = 5;
-	 */
-	emailVerified: boolean;
+  /**
+   * @generated from field: bool email_verified = 4;
+   */
+  emailVerified: boolean;
 
-	/**
-	 * @generated from field: string picture = 6;
-	 */
-	picture: string;
+  /**
+   * @generated from field: string picture = 5;
+   */
+  picture: string;
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp created_at = 7;
-	 */
-	createdAt?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 6;
+   */
+  createdAt?: Timestamp | undefined;
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp updated_at = 8;
-	 */
-	updatedAt?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 7;
+   */
+  updatedAt?: Timestamp | undefined;
 
-	/**
-	 * @generated from field: bool enable_email_recovery = 9;
-	 */
-	enableEmailRecovery: boolean;
+  /**
+   * @generated from field: bool enable_email_recovery = 8;
+   */
+  enableEmailRecovery: boolean;
 };
 
 /**
  * Describes the message nokku.v1.User.
  * Use `create(UserSchema)` to create a new message.
  */
-export const UserSchema: GenMessage<User> /*@__PURE__*/ = messageDesc(file_nokku_v1_user, 0);
+export const UserSchema: GenMessage<User> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_user, 0);
 
-/**
- * @generated from message nokku.v1.OAuthIdentity
- */
-export type OAuthIdentity = Message<'nokku.v1.OAuthIdentity'> & {
-	/**
-	 * @generated from field: string provider_id = 1;
-	 */
-	providerId: string;
-
-	/**
-	 * @generated from field: string provider = 2;
-	 */
-	provider: string;
-
-	/**
-	 * @generated from field: string protocol = 3;
-	 */
-	protocol: string;
-
-	/**
-	 * @generated from field: google.protobuf.Timestamp created_at = 4;
-	 */
-	createdAt?: Timestamp | undefined;
-};
-
-/**
- * Describes the message nokku.v1.OAuthIdentity.
- * Use `create(OAuthIdentitySchema)` to create a new message.
- */
-export const OAuthIdentitySchema: GenMessage<OAuthIdentity> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_user,
-	1
-);
