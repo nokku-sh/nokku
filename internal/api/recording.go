@@ -10,9 +10,9 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
-	"github.com/mizuchilabs/kagi"
 
-	"github.com/nokku-sh/nokku/internal/auth"
+	"github.com/nokku-sh/nokku/internal/iam"
+
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
@@ -68,7 +68,7 @@ func (s *RecordingService) UploadRecording(
 	ctx context.Context,
 	stream *connect.ClientStream[nokkuv1.UploadRecordingRequest],
 ) (*nokkuv1.UploadRecordingResponse, error) {
-	daemonID := auth.DaemonIDFromContext(ctx)
+	daemonID := iam.DaemonIDFromContext(ctx)
 	if daemonID == "" {
 		return nil, NewError(connect.CodePermissionDenied, "only daemons can upload recordings")
 	}
@@ -322,11 +322,12 @@ func (s *RecordingService) GetRecording(
 	req *nokkuv1.GetRecordingRequest,
 	stream *connect.ServerStream[nokkuv1.GetRecordingResponse],
 ) error {
-	// Streaming RPCs get no tenant from the auth interceptor (kagi passes a
-	// nil message at auth time), so a global user principal's workspace must
+	// Streaming RPCs get no tenant from the auth interceptor (streaming
+	// requests have no single message to resolve one from; the stream
+	// carries no message at all), so a global user principal's workspace must
 	// be pinned here from the request. WithWorkspace then checks membership
 	// and scopes row-level security.
-	kagi.AnnotateTenant(ctx, kagi.TenantID(req.GetWorkspaceId()))
+	iam.AnnotateTenant(ctx, req.GetWorkspaceId())
 
 	var rec *db.Recording
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {

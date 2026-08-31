@@ -1,18 +1,25 @@
 package api
 
+// Transport authentication, ported from the kagi interceptor to internal/iam:
+// opaque session cookies or bearer tokens for users, hashed service-account
+// tokens, and DPoP-bound machine sessions. Tenant resolution and the RLS
+// GUCs ride on the same context values (iam.AnnotateTenant).
+
 import (
 	"context"
+	"errors"
 	"net/http"
+	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/mizuchilabs/kagi"
-	kagiconnect "github.com/mizuchilabs/kagi/connectrpc"
-
 	"github.com/nokku-sh/nokku/internal/config"
+	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
+	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 // publicEndpoints are the connectrpc procedures that skip authentication.
@@ -26,30 +33,114 @@ func isPublicEndpoint(procedure string) bool {
 	return ok
 }
 
-// NewKagiAuthNInterceptor builds the connectrpc authentication interceptor
-// from kagi: opaque sessions, API keys, and DPoP-bound machine tokens.
-func NewKagiAuthNInterceptor(cfg *config.Config) connect.Interceptor {
-	return kagiconnect.New(kagiconnect.Options{
-		Service: cfg.Auth.Service(),
-		IsPublic: func(spec connect.Spec) bool {
-			return isPublicEndpoint(spec.Procedure)
-		},
-		ResolveTenant: func(_ context.Context, _ connect.Spec, msg proto.Message) (kagi.TenantID, error) {
-			return requestWorkspace(msg)
-		},
-		BaseURL:    cfg.FullURL(),
-		CookieName: kagi.SessionCookieName,
+// prefixSA marks service-account bearer tokens. The remainder is the raw
+// secret; only its hash is stored.
+const prefixSA = "nokku_sa_"
+
+// NewAuthNInterceptor builds the connect authentication interceptor on iam.
+func NewAuthNInterceptor(cfg *config.Config) connect.Interceptor {
+	return connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
+		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+			if isPublicEndpoint(req.Spec().Procedure) {
+				return next(ctx, req)
+			}
+
+			p, err := authenticateToken(ctx, cfg, req.Header(), bearerToken(req.Header()))
+			if err != nil {
+				return nil, connect.NewError(connect.CodeUnauthenticated, err)
+			}
+
+			// Machine principals carry their workspace in the credential;
+			// user principals resolve it from the request.
+			workspace := p.WorkspaceID
+			if workspace == "" {
+				workspace = requestWorkspace(req)
+			}
+			if workspace != "" {
+				ctx = iam.AnnotateTenant(ctx, workspace)
+			}
+			return next(iam.ContextWithPrincipal(ctx, p), req)
+		}
 	})
 }
 
-// NewHTTPAuth returns middleware that authenticates web requests via kagi
-// sessions. The kagi middleware places the principal and resolved tenant on
-// the context, which meta reads directly.
+// authenticateToken resolves a session cookie or bearer token to a principal.
+// Bearer tokens try the iam session store first, then service-account token
+// hashes.
+func authenticateToken(
+	ctx context.Context,
+	cfg *config.Config,
+	_ http.Header,
+	token string,
+) (iam.Principal, error) {
+	if token == "" {
+		return iam.Principal{}, errors.New("missing credentials")
+	}
+
+	// Service accounts authenticate by bearer token hash.
+	if strings.HasPrefix(token, prefixSA) {
+		return authenticateServiceAccount(ctx, cfg, token)
+	}
+
+	p, _, err := cfg.IAM.AuthenticateRequest(ctx, token)
+	if err != nil {
+		return iam.Principal{}, err
+	}
+	return p, nil
+}
+
+func authenticateServiceAccount(
+	ctx context.Context,
+	cfg *config.Config,
+	raw string,
+) (iam.Principal, error) {
+	// The token is looked up by the hash of the full raw credential, the
+	// same value minted with the row. The lookup runs on the admin pool:
+	// it is the step that establishes the tenant, so it cannot be
+	// tenant-scoped (RLS) itself.
+	hash, err := crypto.HashToken(raw)
+	if err != nil {
+		return iam.Principal{}, err
+	}
+	sa, err := cfg.Conn.AdminQ.GetServiceAccountByTokenHash(ctx, &hash)
+	if err != nil {
+		return iam.Principal{}, errors.New("invalid credentials")
+	}
+	if sa.ExpiresAt != nil && sa.ExpiresAt.Before(time.Now()) {
+		return iam.Principal{}, errors.New("credentials expired")
+	}
+	return iam.Principal{
+		ID:          sa.ID,
+		Kind:        iam.KindServiceAccount,
+		WorkspaceID: sa.WorkspaceID,
+	}, nil
+}
+
+func bearerToken(header http.Header) string {
+	const prefix = "Bearer "
+	if h := header.Get("Authorization"); strings.HasPrefix(h, prefix) {
+		return strings.TrimPrefix(h, prefix)
+	}
+	// The session cookie doubles as the browser credential for connect
+	// calls made with credentials: include.
+	if c, err := (&http.Request{Header: header}).Cookie(iam.SessionCookieName); err == nil {
+		return c.Value
+	}
+	return ""
+}
+
+// NewHTTPAuth returns middleware that authenticates web requests via iam
+// sessions and annotates the workspace for the RLS layer.
 func NewHTTPAuth(cfg *config.Config) func(http.Handler) http.Handler {
+	svc := cfg.IAM
 	return func(next http.Handler) http.Handler {
-		return cfg.Auth.Middleware(
-			cfg.Auth.RequireLogin(next),
-		)
+		return svc.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if _, ok := iam.PrincipalFromContext(r.Context()); !ok {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+		}))
 	}
 }
 
@@ -58,19 +149,28 @@ func NewHTTPAuth(cfg *config.Config) func(http.Handler) http.Handler {
 // principals: their workspace comes from the request, not the credential.
 //
 // Streaming RPCs (client/server streams) have no single request message at
-// authentication time, so kagi passes a nil message; a nil request contributes
-// no workspace, and the streaming handler authorizes against its own request.
-func requestWorkspace(request proto.Message) (kagi.TenantID, error) {
+// authentication time, so a nil request contributes no workspace, and the
+// streaming handler authorizes against its own request.
+func requestWorkspace(request connect.AnyRequest) string {
 	if request == nil {
-		return "", nil
+		return ""
+	}
+	msg, _ := request.Any().(proto.Message)
+	if msg == nil {
+		// Fall back to the header: the UI sends X-Nokku-Workspace when the
+		// request carries no workspace field (streaming calls).
+		return request.Header().Get("X-Nokku-Workspace")
 	}
 
-	fields := request.ProtoReflect().Descriptor().Fields()
+	fields := msg.ProtoReflect().Descriptor().Fields()
 	field := fields.ByName("workspace_id")
 	if field == nil || field.Kind() != protoreflect.StringKind {
-		return "", nil
+		return request.Header().Get("X-Nokku-Workspace")
 	}
 
-	workspaceID := request.ProtoReflect().Get(field).String()
-	return kagi.TenantID(workspaceID), nil
+	workspaceID := msg.ProtoReflect().Get(field).String()
+	if workspaceID == "" {
+		return request.Header().Get("X-Nokku-Workspace")
+	}
+	return workspaceID
 }

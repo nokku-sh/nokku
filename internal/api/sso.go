@@ -2,24 +2,25 @@ package api
 
 import (
 	"context"
+	"errors"
 
 	"connectrpc.com/connect"
-	"github.com/mizuchilabs/kagi"
 
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// SSOProvider configuration is stored and resolved by kagi's SSOManager;
-// this service only gates it (permissions, verified domains, billing) and
-// maps it to the API surface. The provider id doubles as the workspace id,
-// matching the tenant the provider is stored under, so a tenant holds at
-// most one provider record: configuring the other method overwrites it.
-// Nothing is created by default; a workspace starts with no provider, and
-// the Get RPCs report that as an empty provider rather than an error so
-// the UI can render its setup form.
+// SSOProvider configuration is stored by the iam SSO manager; this service
+// only gates it (permissions, verified domains, billing) and maps it to the
+// API surface. The provider id doubles as the workspace id, matching the
+// tenant the provider is stored under, so a workspace holds at most one
+// provider record: configuring the other method overwrites it. Nothing is
+// created by default; a workspace starts with no provider, and the Get RPCs
+// report that as an empty provider rather than an error so the UI can render
+// its setup form.
 
 type SSOService struct {
 	cfg *config.Config
@@ -33,7 +34,7 @@ func NewSSOService(cfg *config.Config) *SSOService {
 // realm discovery only routes logins whose email domain is bound to the
 // workspace, so a provider without a verified domain can never match.
 func (s *SSOService) requireVerifiedDomain(ctx context.Context, workspaceID string) error {
-	domains, err := s.cfg.Auth.Service().Domains.List(ctx, kagi.TenantID(workspaceID))
+	domains, err := s.cfg.IAM.ListTenantDomains(ctx, workspaceID)
 	if err != nil {
 		return DBError(err)
 	}
@@ -52,8 +53,8 @@ func (s *SSOService) GetOIDCProvider(
 	ctx context.Context,
 	req *nokkuv1.GetOIDCProviderRequest,
 ) (*nokkuv1.GetOIDCProviderResponse, error) {
-	p, err := s.cfg.Auth.Service().SSO.Get(ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetWorkspaceId())
-	if err != nil && !kagi.IsNotFound(err) {
+	p, err := s.cfg.IAM.GetSSOProvider(ctx, req.GetWorkspaceId())
+	if err != nil && !errors.Is(err, iam.ErrNotFound) {
 		return nil, ssoError(err)
 	}
 	// Unset, or the single slot is held by a SAML provider: report an
@@ -75,14 +76,12 @@ func (s *SSOService) UpdateOIDCProvider(
 	// A changed issuer means a different IdP. Identity mappings under the
 	// old issuer are stale (sub values are only unique within an issuer),
 	// so they are purged after the update. Users and their linked
-	// credentials are global in nokku, hence the empty tenant.
+	// credentials are global.
 	issuerChanged := false
-	if prev, err := s.cfg.Auth.Service().SSO.Get(
+	if prev, err := s.cfg.IAM.GetSSOProvider(
 		ctx,
-		kagi.TenantID(req.GetWorkspaceId()),
 		req.GetWorkspaceId(),
-	); err == nil && prev.OIDC != nil &&
-		prev.OIDC.IssuerURL != req.GetIssuerUrl() {
+	); err == nil && prev.OIDC != nil && prev.OIDC.IssuerURL != req.GetIssuerUrl() {
 		issuerChanged = true
 	}
 
@@ -90,34 +89,37 @@ func (s *SSOService) UpdateOIDCProvider(
 		return nil, err
 	}
 
-	p := kagi.SSOProvider{
-		TenantID:   kagi.TenantID(req.GetWorkspaceId()),
-		ProviderID: req.GetWorkspaceId(),
-		Method:     kagi.MethodOIDC,
-		Name:       req.GetName(),
-		Enabled:    req.GetIsActive(),
-		OIDC: &kagi.OIDCProvider{
-			// RedirectURL stays empty: kagi derives it from BaseURL.
+	p := iam.SSOProvider{
+		WorkspaceID: req.GetWorkspaceId(),
+		ProviderID:  req.GetWorkspaceId(),
+		Method:      iam.MethodOIDC,
+		Name:        req.GetName(),
+		Enabled:     req.GetIsActive(),
+		OIDC: &iam.OIDCProvider{
+			// RedirectURL stays empty: the login flow derives it from BaseURL.
 			IssuerURL:       req.GetIssuerUrl(),
 			ClientID:        req.GetClientId(),
-			ClientSecret:    req.GetClientSecret(),
 			Scopes:          req.GetScopes(),
 			JITProvisioning: req.GetAllowJitProvisioning(),
 			EnforceSSO:      req.GetEnforceSso(),
 		},
 	}
-	if err := s.cfg.Auth.Service().SSO.Put(ctx, p); err != nil {
+	if req.GetClientSecret() != "" {
+		p.OIDC.ClientSecret = req.GetClientSecret()
+	}
+	if err := s.cfg.IAM.PutSSOProvider(ctx, p); err != nil {
 		return nil, ssoError(err)
 	}
 	if issuerChanged {
-		_, _ = s.cfg.Auth.Service().Credentials.DeleteByProvider(
+		_, _ = s.cfg.IAM.DeleteCredentialsByProvider(
 			ctx,
 			"",
+			iam.MethodOIDC,
 			req.GetWorkspaceId(),
 		)
 	}
 
-	stored, err := s.cfg.Auth.Service().SSO.Get(ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetWorkspaceId())
+	stored, err := s.cfg.IAM.GetSSOProvider(ctx, req.GetWorkspaceId())
 	if err != nil {
 		return nil, ssoError(err)
 	}
@@ -130,8 +132,8 @@ func (s *SSOService) GetSAMLProvider(
 	ctx context.Context,
 	req *nokkuv1.GetSAMLProviderRequest,
 ) (*nokkuv1.GetSAMLProviderResponse, error) {
-	p, err := s.cfg.Auth.Service().SSO.Get(ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetWorkspaceId())
-	if err != nil && !kagi.IsNotFound(err) {
+	p, err := s.cfg.IAM.GetSSOProvider(ctx, req.GetWorkspaceId())
+	if err != nil && !errors.Is(err, iam.ErrNotFound) {
 		return nil, ssoError(err)
 	}
 	// Unset, or the single slot is held by an OIDC provider: report an
@@ -159,23 +161,23 @@ func (s *SSOService) UpdateSAMLProvider(
 	if err := s.requireVerifiedDomain(ctx, req.GetWorkspaceId()); err != nil {
 		return nil, err
 	}
-	p := kagi.SSOProvider{
-		TenantID:   kagi.TenantID(req.GetWorkspaceId()),
-		ProviderID: req.GetWorkspaceId(),
-		Method:     kagi.MethodSAML,
-		Name:       req.GetName(),
-		Enabled:    req.GetIsActive(),
-		SAML: &kagi.SAMLIDP{
+	p := iam.SSOProvider{
+		WorkspaceID: req.GetWorkspaceId(),
+		ProviderID:  req.GetWorkspaceId(),
+		Method:      iam.MethodSAML,
+		Name:        req.GetName(),
+		Enabled:     req.GetIsActive(),
+		SAML: &iam.SAMLIDP{
 			MetadataURL:     req.GetMetadataUrl(),
 			JITProvisioning: req.GetAllowJitProvisioning(),
 			EnforceSSO:      req.GetEnforceSso(),
 		},
 	}
-	if err := s.cfg.Auth.Service().SSO.Put(ctx, p); err != nil {
+	if err := s.cfg.IAM.PutSSOProvider(ctx, p); err != nil {
 		return nil, ssoError(err)
 	}
 
-	stored, err := s.cfg.Auth.Service().SSO.Get(ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetWorkspaceId())
+	stored, err := s.cfg.IAM.GetSSOProvider(ctx, req.GetWorkspaceId())
 	if err != nil {
 		return nil, ssoError(err)
 	}
@@ -185,7 +187,7 @@ func (s *SSOService) UpdateSAMLProvider(
 }
 
 func ssoError(err error) error {
-	if kagi.IsNotFound(err) {
+	if errors.Is(err, iam.ErrNotFound) {
 		return ErrNotFound
 	}
 	return DBError(err)
@@ -213,7 +215,7 @@ func emptySAMLProvider(workspaceID string) *nokkuv1.SAMLProvider {
 	}
 }
 
-func oidcProviderToProto(p kagi.SSOProvider) *nokkuv1.OIDCProvider {
+func oidcProviderToProto(p *iam.SSOProvider) *nokkuv1.OIDCProvider {
 	out := &nokkuv1.OIDCProvider{
 		WorkspaceId: &p.ProviderID,
 		Name:        &p.Name,
@@ -233,7 +235,7 @@ func oidcProviderToProto(p kagi.SSOProvider) *nokkuv1.OIDCProvider {
 	return out
 }
 
-func samlProviderToProto(p kagi.SSOProvider) *nokkuv1.SAMLProvider {
+func samlProviderToProto(p *iam.SSOProvider) *nokkuv1.SAMLProvider {
 	out := &nokkuv1.SAMLProvider{
 		WorkspaceId: &p.ProviderID,
 		Name:        &p.Name,

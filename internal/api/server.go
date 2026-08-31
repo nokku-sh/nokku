@@ -125,7 +125,7 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 	interceptors := []connect.Interceptor{
 		NewLogInterceptor(s.cfg.Debug),
 		NewTimeoutInterceptor(),
-		NewKagiAuthNInterceptor(s.cfg),
+		NewAuthNInterceptor(s.cfg),
 		NewAuthZInterceptor(s.cfg),
 		NewAuditInterceptor(s.cfg.Audit),
 		validate.NewInterceptor(),
@@ -159,12 +159,6 @@ func (s *Server) getServiceRegistrations(ctx context.Context) []ServiceRegistrat
 		Name    string
 		Handler func() (string, http.Handler)
 	}{
-		{
-			Name: nokkuv1connect.UserServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewUserServiceHandler(NewUserService(s.cfg), opts...)
-			},
-		},
 		{
 			Name: nokkuv1connect.WorkspaceServiceName,
 			Handler: func() (string, http.Handler) {
@@ -333,17 +327,21 @@ func (s *Server) registerServices(ctx context.Context) error {
 
 	audit := NewAuditInterceptor(s.cfg.Audit)
 
-	for _, route := range s.cfg.Auth.Routes() {
-		method, path, ok := strings.Cut(route.Pattern, " ")
-		if !ok {
-			continue
-		}
+	// The browser-facing auth surface: flows, account self-service, device
+	// flow, and SSO discovery (see registerAuthRoutes).
+	registerAuthRoutes(muxAdapter{s.mux}, s.cfg)
 
-		s.mux.Handle(method+" "+authRoutePrefix(path)+path, route.Handler)
-	}
+	// Device flow: the browser page approves under a session; the CLI
+	// endpoints are public (RFC 8628).
+	s.mux.HandleFunc("POST /auth/device", s.cfg.IAM.Device.Begin)
+	s.mux.HandleFunc("POST /auth/device/token", s.cfg.IAM.Device.Poll)
+	s.mux.HandleFunc("GET /auth/device/nonce", s.cfg.IAM.Device.Nonce)
+	deviceGuard := NewChain(NewHTTPAuth(s.cfg))
+	s.mux.Handle("POST /auth/device/verify", deviceGuard.ThenFunc(s.cfg.IAM.Device.Verify))
+	s.mux.Handle("POST /auth/device/deny", deviceGuard.ThenFunc(s.cfg.IAM.Device.Deny))
 
 	// Auth outside audit, matching the RPC interceptor order, so audited
-	// rows see the principal and tenant kagi placed on the request.
+	// rows see the principal and tenant iam placed on the request.
 	pubChain := NewChain(audit.WithAudit)                      // Public chain (audit only, no auth)
 	privChain := NewChain(NewHTTPAuth(s.cfg), audit.WithAudit) // Private chain (auth + audit)
 
@@ -381,21 +379,6 @@ func (s *Server) registerHealthAndReflection(serviceNames []string) {
 	s.mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-}
-
-// authRoutePrefix returns the public prefix a kagi auth route mounts under:
-// the credential, email, and device flows live under /auth; the SSO and
-// passkey surfaces are mounted at the root.
-func authRoutePrefix(path string) string {
-	switch {
-	case strings.HasPrefix(path, "/oidc"),
-		strings.HasPrefix(path, "/oauth"),
-		strings.HasPrefix(path, "/saml"),
-		strings.HasPrefix(path, "/passkey"):
-		return ""
-	default:
-		return "/auth"
-	}
 }
 
 func isAPIRequest(r *http.Request) bool {

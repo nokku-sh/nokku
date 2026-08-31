@@ -84,7 +84,7 @@ func TestProcedurePermissionsExcludesSpecialProcedures(t *testing.T) {
 		nokkuv1connect.InvitationServiceAcceptInvitationProcedure,
 		nokkuv1connect.UtilServiceListAuditLogsProcedure,
 		nokkuv1connect.UtilServiceExportAuditLogsProcedure,
-		nokkuv1connect.UserServiceWhoamiProcedure,
+		nokkuv1connect.UtilServiceWhoamiProcedure,
 	}
 
 	for _, procedure := range special {

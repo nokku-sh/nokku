@@ -7,15 +7,16 @@
 package nokkuv1
 
 import (
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
+
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
 )
 
 const (
@@ -71,7 +72,7 @@ func (x ExportAuditLogsRequest_Format) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ExportAuditLogsRequest_Format.Descriptor instead.
 func (ExportAuditLogsRequest_Format) EnumDescriptor() ([]byte, []int) {
-	return file_nokku_v1_util_proto_rawDescGZIP(), []int{8, 0}
+	return file_nokku_v1_util_proto_rawDescGZIP(), []int{10, 0}
 }
 
 type GetVersionRequest struct {
@@ -154,6 +155,143 @@ func (x *GetVersionResponse) GetVersion() string {
 	return ""
 }
 
+type WhoamiRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WhoamiRequest) Reset() {
+	*x = WhoamiRequest{}
+	mi := &file_nokku_v1_util_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WhoamiRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WhoamiRequest) ProtoMessage() {}
+
+func (x *WhoamiRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_util_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WhoamiRequest.ProtoReflect.Descriptor instead.
+func (*WhoamiRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_util_proto_rawDescGZIP(), []int{2}
+}
+
+type WhoamiResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Kind mirrors iam's session kinds: user, cli, web_device, daemon,
+	// service_account. It tells the caller what credential answered.
+	Kind *string `protobuf:"bytes,1,opt,name=kind" json:"kind,omitempty"`
+	// SubjectID is the id the session was issued to. For user, cli, and
+	// web_device sessions this is the user id; daemons and service accounts
+	// carry their own id.
+	SubjectId *string `protobuf:"bytes,2,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
+	// UserID is the acting user for user and cli sessions; empty otherwise.
+	UserId *string `protobuf:"bytes,3,opt,name=user_id,json=userId" json:"user_id,omitempty"`
+	// WorkspaceID is the credential's pinned workspace for machine
+	// principals; empty when the actor is global.
+	WorkspaceId *string `protobuf:"bytes,4,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	// Hydrated row for the principal, when one applies.
+	User           *User           `protobuf:"bytes,5,opt,name=user" json:"user,omitempty"`
+	ServiceAccount *ServiceAccount `protobuf:"bytes,6,opt,name=service_account,json=serviceAccount" json:"service_account,omitempty"`
+	Daemon         *Daemon         `protobuf:"bytes,7,opt,name=daemon" json:"daemon,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *WhoamiResponse) Reset() {
+	*x = WhoamiResponse{}
+	mi := &file_nokku_v1_util_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WhoamiResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WhoamiResponse) ProtoMessage() {}
+
+func (x *WhoamiResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_util_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WhoamiResponse.ProtoReflect.Descriptor instead.
+func (*WhoamiResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_util_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *WhoamiResponse) GetKind() string {
+	if x != nil && x.Kind != nil {
+		return *x.Kind
+	}
+	return ""
+}
+
+func (x *WhoamiResponse) GetSubjectId() string {
+	if x != nil && x.SubjectId != nil {
+		return *x.SubjectId
+	}
+	return ""
+}
+
+func (x *WhoamiResponse) GetUserId() string {
+	if x != nil && x.UserId != nil {
+		return *x.UserId
+	}
+	return ""
+}
+
+func (x *WhoamiResponse) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WhoamiResponse) GetUser() *User {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
+func (x *WhoamiResponse) GetServiceAccount() *ServiceAccount {
+	if x != nil {
+		return x.ServiceAccount
+	}
+	return nil
+}
+
+func (x *WhoamiResponse) GetDaemon() *Daemon {
+	if x != nil {
+		return x.Daemon
+	}
+	return nil
+}
+
 type Role struct {
 	state                       protoimpl.MessageState `protogen:"open.v1"`
 	Name                        *string                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
@@ -167,7 +305,7 @@ type Role struct {
 
 func (x *Role) Reset() {
 	*x = Role{}
-	mi := &file_nokku_v1_util_proto_msgTypes[2]
+	mi := &file_nokku_v1_util_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -179,7 +317,7 @@ func (x *Role) String() string {
 func (*Role) ProtoMessage() {}
 
 func (x *Role) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_util_proto_msgTypes[2]
+	mi := &file_nokku_v1_util_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -192,7 +330,7 @@ func (x *Role) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Role.ProtoReflect.Descriptor instead.
 func (*Role) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_util_proto_rawDescGZIP(), []int{2}
+	return file_nokku_v1_util_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Role) GetName() string {
@@ -238,7 +376,7 @@ type ListRolesRequest struct {
 
 func (x *ListRolesRequest) Reset() {
 	*x = ListRolesRequest{}
-	mi := &file_nokku_v1_util_proto_msgTypes[3]
+	mi := &file_nokku_v1_util_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -250,7 +388,7 @@ func (x *ListRolesRequest) String() string {
 func (*ListRolesRequest) ProtoMessage() {}
 
 func (x *ListRolesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_util_proto_msgTypes[3]
+	mi := &file_nokku_v1_util_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -263,7 +401,7 @@ func (x *ListRolesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRolesRequest.ProtoReflect.Descriptor instead.
 func (*ListRolesRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_util_proto_rawDescGZIP(), []int{3}
+	return file_nokku_v1_util_proto_rawDescGZIP(), []int{5}
 }
 
 type ListRolesResponse struct {
@@ -275,7 +413,7 @@ type ListRolesResponse struct {
 
 func (x *ListRolesResponse) Reset() {
 	*x = ListRolesResponse{}
-	mi := &file_nokku_v1_util_proto_msgTypes[4]
+	mi := &file_nokku_v1_util_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -287,7 +425,7 @@ func (x *ListRolesResponse) String() string {
 func (*ListRolesResponse) ProtoMessage() {}
 
 func (x *ListRolesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_util_proto_msgTypes[4]
+	mi := &file_nokku_v1_util_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -300,7 +438,7 @@ func (x *ListRolesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRolesResponse.ProtoReflect.Descriptor instead.
 func (*ListRolesResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_util_proto_rawDescGZIP(), []int{4}
+	return file_nokku_v1_util_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListRolesResponse) GetRoles() []*Role {
@@ -329,7 +467,7 @@ type EventLog struct {
 
 func (x *EventLog) Reset() {
 	*x = EventLog{}
-	mi := &file_nokku_v1_util_proto_msgTypes[5]
+	mi := &file_nokku_v1_util_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -341,7 +479,7 @@ func (x *EventLog) String() string {
 func (*EventLog) ProtoMessage() {}
 
 func (x *EventLog) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_util_proto_msgTypes[5]
+	mi := &file_nokku_v1_util_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -354,7 +492,7 @@ func (x *EventLog) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EventLog.ProtoReflect.Descriptor instead.
 func (*EventLog) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_util_proto_rawDescGZIP(), []int{5}
+	return file_nokku_v1_util_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *EventLog) GetId() string {
@@ -452,7 +590,7 @@ type ListAuditLogsRequest struct {
 
 func (x *ListAuditLogsRequest) Reset() {
 	*x = ListAuditLogsRequest{}
-	mi := &file_nokku_v1_util_proto_msgTypes[6]
+	mi := &file_nokku_v1_util_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -464,7 +602,7 @@ func (x *ListAuditLogsRequest) String() string {
 func (*ListAuditLogsRequest) ProtoMessage() {}
 
 func (x *ListAuditLogsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_util_proto_msgTypes[6]
+	mi := &file_nokku_v1_util_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -477,7 +615,7 @@ func (x *ListAuditLogsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAuditLogsRequest.ProtoReflect.Descriptor instead.
 func (*ListAuditLogsRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_util_proto_rawDescGZIP(), []int{6}
+	return file_nokku_v1_util_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListAuditLogsRequest) GetWorkspaceId() string {
@@ -553,7 +691,7 @@ type ListAuditLogsResponse struct {
 
 func (x *ListAuditLogsResponse) Reset() {
 	*x = ListAuditLogsResponse{}
-	mi := &file_nokku_v1_util_proto_msgTypes[7]
+	mi := &file_nokku_v1_util_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -565,7 +703,7 @@ func (x *ListAuditLogsResponse) String() string {
 func (*ListAuditLogsResponse) ProtoMessage() {}
 
 func (x *ListAuditLogsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_util_proto_msgTypes[7]
+	mi := &file_nokku_v1_util_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -578,7 +716,7 @@ func (x *ListAuditLogsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAuditLogsResponse.ProtoReflect.Descriptor instead.
 func (*ListAuditLogsResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_util_proto_rawDescGZIP(), []int{7}
+	return file_nokku_v1_util_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListAuditLogsResponse) GetLogs() []*EventLog {
@@ -607,7 +745,7 @@ type ExportAuditLogsRequest struct {
 
 func (x *ExportAuditLogsRequest) Reset() {
 	*x = ExportAuditLogsRequest{}
-	mi := &file_nokku_v1_util_proto_msgTypes[8]
+	mi := &file_nokku_v1_util_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -619,7 +757,7 @@ func (x *ExportAuditLogsRequest) String() string {
 func (*ExportAuditLogsRequest) ProtoMessage() {}
 
 func (x *ExportAuditLogsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_util_proto_msgTypes[8]
+	mi := &file_nokku_v1_util_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -632,7 +770,7 @@ func (x *ExportAuditLogsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportAuditLogsRequest.ProtoReflect.Descriptor instead.
 func (*ExportAuditLogsRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_util_proto_rawDescGZIP(), []int{8}
+	return file_nokku_v1_util_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ExportAuditLogsRequest) GetWorkspaceId() string {
@@ -674,7 +812,7 @@ type ExportAuditLogsResponse struct {
 
 func (x *ExportAuditLogsResponse) Reset() {
 	*x = ExportAuditLogsResponse{}
-	mi := &file_nokku_v1_util_proto_msgTypes[9]
+	mi := &file_nokku_v1_util_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -686,7 +824,7 @@ func (x *ExportAuditLogsResponse) String() string {
 func (*ExportAuditLogsResponse) ProtoMessage() {}
 
 func (x *ExportAuditLogsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_util_proto_msgTypes[9]
+	mi := &file_nokku_v1_util_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -699,7 +837,7 @@ func (x *ExportAuditLogsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportAuditLogsResponse.ProtoReflect.Descriptor instead.
 func (*ExportAuditLogsResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_util_proto_rawDescGZIP(), []int{9}
+	return file_nokku_v1_util_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ExportAuditLogsResponse) GetData() []byte {
@@ -727,10 +865,20 @@ var File_nokku_v1_util_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_util_proto_rawDesc = "" +
 	"\n" +
-	"\x13nokku/v1/util.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x13\n" +
+	"\x13nokku/v1/util.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/daemon.proto\x1a\x1enokku/v1/service_account.proto\x1a\x13nokku/v1/user.proto\"\x13\n" +
 	"\x11GetVersionRequest\".\n" +
 	"\x12GetVersionResponse\x12\x18\n" +
-	"\aversion\x18\x01 \x01(\tR\aversion\"\xd3\x01\n" +
+	"\aversion\x18\x01 \x01(\tR\aversion\"\x0f\n" +
+	"\rWhoamiRequest\"\x90\x02\n" +
+	"\x0eWhoamiResponse\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x1d\n" +
+	"\n" +
+	"subject_id\x18\x02 \x01(\tR\tsubjectId\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\x12!\n" +
+	"\fworkspace_id\x18\x04 \x01(\tR\vworkspaceId\x12\"\n" +
+	"\x04user\x18\x05 \x01(\v2\x0e.nokku.v1.UserR\x04user\x12A\n" +
+	"\x0fservice_account\x18\x06 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\x12(\n" +
+	"\x06daemon\x18\a \x01(\v2\x10.nokku.v1.DaemonR\x06daemon\"\xd3\x01\n" +
 	"\x04Role\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12 \n" +
@@ -788,10 +936,12 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\x17ExportAuditLogsResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x1a\n" +
 	"\bfilename\x18\x02 \x01(\tR\bfilename\x12!\n" +
-	"\fcontent_type\x18\x03 \x01(\tR\vcontentType2\xa7\x03\n" +
+	"\fcontent_type\x18\x03 \x01(\tR\vcontentType2\xfb\x03\n" +
 	"\vUtilService\x12_\n" +
 	"\n" +
-	"GetVersion\x12\x1b.nokku.v1.GetVersionRequest\x1a\x1c.nokku.v1.GetVersionResponse\"\x16\x82\xd3\xe4\x93\x02\r\x12\v/v1/version\x90\x02\x01\x12Z\n" +
+	"GetVersion\x12\x1b.nokku.v1.GetVersionRequest\x1a\x1c.nokku.v1.GetVersionResponse\"\x16\x82\xd3\xe4\x93\x02\r\x12\v/v1/version\x90\x02\x01\x12R\n" +
+	"\x06Whoami\x12\x17.nokku.v1.WhoamiRequest\x1a\x18.nokku.v1.WhoamiResponse\"\x15\x82\xd3\xe4\x93\x02\f\x12\n" +
+	"/v1/whoami\x90\x02\x01\x12Z\n" +
 	"\tListRoles\x12\x1a.nokku.v1.ListRolesRequest\x1a\x1b.nokku.v1.ListRolesResponse\"\x14\x82\xd3\xe4\x93\x02\v\x12\t/v1/roles\x90\x02\x01\x12f\n" +
 	"\rListAuditLogs\x12\x1e.nokku.v1.ListAuditLogsRequest\x1a\x1f.nokku.v1.ListAuditLogsResponse\"\x14\x82\xd3\xe4\x93\x02\v\x12\t/v1/audit\x90\x02\x01\x12s\n" +
 	"\x0fExportAuditLogs\x12 .nokku.v1.ExportAuditLogsRequest\x1a!.nokku.v1.ExportAuditLogsResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/audit:exportB\x93\x01\n" +
@@ -810,45 +960,55 @@ func file_nokku_v1_util_proto_rawDescGZIP() []byte {
 }
 
 var file_nokku_v1_util_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_nokku_v1_util_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_nokku_v1_util_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_nokku_v1_util_proto_goTypes = []any{
 	(ExportAuditLogsRequest_Format)(0), // 0: nokku.v1.ExportAuditLogsRequest.Format
 	(*GetVersionRequest)(nil),          // 1: nokku.v1.GetVersionRequest
 	(*GetVersionResponse)(nil),         // 2: nokku.v1.GetVersionResponse
-	(*Role)(nil),                       // 3: nokku.v1.Role
-	(*ListRolesRequest)(nil),           // 4: nokku.v1.ListRolesRequest
-	(*ListRolesResponse)(nil),          // 5: nokku.v1.ListRolesResponse
-	(*EventLog)(nil),                   // 6: nokku.v1.EventLog
-	(*ListAuditLogsRequest)(nil),       // 7: nokku.v1.ListAuditLogsRequest
-	(*ListAuditLogsResponse)(nil),      // 8: nokku.v1.ListAuditLogsResponse
-	(*ExportAuditLogsRequest)(nil),     // 9: nokku.v1.ExportAuditLogsRequest
-	(*ExportAuditLogsResponse)(nil),    // 10: nokku.v1.ExportAuditLogsResponse
-	(*structpb.Struct)(nil),            // 11: google.protobuf.Struct
-	(*timestamppb.Timestamp)(nil),      // 12: google.protobuf.Timestamp
+	(*WhoamiRequest)(nil),              // 3: nokku.v1.WhoamiRequest
+	(*WhoamiResponse)(nil),             // 4: nokku.v1.WhoamiResponse
+	(*Role)(nil),                       // 5: nokku.v1.Role
+	(*ListRolesRequest)(nil),           // 6: nokku.v1.ListRolesRequest
+	(*ListRolesResponse)(nil),          // 7: nokku.v1.ListRolesResponse
+	(*EventLog)(nil),                   // 8: nokku.v1.EventLog
+	(*ListAuditLogsRequest)(nil),       // 9: nokku.v1.ListAuditLogsRequest
+	(*ListAuditLogsResponse)(nil),      // 10: nokku.v1.ListAuditLogsResponse
+	(*ExportAuditLogsRequest)(nil),     // 11: nokku.v1.ExportAuditLogsRequest
+	(*ExportAuditLogsResponse)(nil),    // 12: nokku.v1.ExportAuditLogsResponse
+	(*User)(nil),                       // 13: nokku.v1.User
+	(*ServiceAccount)(nil),             // 14: nokku.v1.ServiceAccount
+	(*Daemon)(nil),                     // 15: nokku.v1.Daemon
+	(*structpb.Struct)(nil),            // 16: google.protobuf.Struct
+	(*timestamppb.Timestamp)(nil),      // 17: google.protobuf.Timestamp
 }
 var file_nokku_v1_util_proto_depIdxs = []int32{
-	3,  // 0: nokku.v1.ListRolesResponse.roles:type_name -> nokku.v1.Role
-	11, // 1: nokku.v1.EventLog.details:type_name -> google.protobuf.Struct
-	12, // 2: nokku.v1.EventLog.timestamp:type_name -> google.protobuf.Timestamp
-	12, // 3: nokku.v1.ListAuditLogsRequest.start_date:type_name -> google.protobuf.Timestamp
-	12, // 4: nokku.v1.ListAuditLogsRequest.end_date:type_name -> google.protobuf.Timestamp
-	6,  // 5: nokku.v1.ListAuditLogsResponse.logs:type_name -> nokku.v1.EventLog
-	0,  // 6: nokku.v1.ExportAuditLogsRequest.format:type_name -> nokku.v1.ExportAuditLogsRequest.Format
-	12, // 7: nokku.v1.ExportAuditLogsRequest.start_date:type_name -> google.protobuf.Timestamp
-	12, // 8: nokku.v1.ExportAuditLogsRequest.end_date:type_name -> google.protobuf.Timestamp
-	1,  // 9: nokku.v1.UtilService.GetVersion:input_type -> nokku.v1.GetVersionRequest
-	4,  // 10: nokku.v1.UtilService.ListRoles:input_type -> nokku.v1.ListRolesRequest
-	7,  // 11: nokku.v1.UtilService.ListAuditLogs:input_type -> nokku.v1.ListAuditLogsRequest
-	9,  // 12: nokku.v1.UtilService.ExportAuditLogs:input_type -> nokku.v1.ExportAuditLogsRequest
-	2,  // 13: nokku.v1.UtilService.GetVersion:output_type -> nokku.v1.GetVersionResponse
-	5,  // 14: nokku.v1.UtilService.ListRoles:output_type -> nokku.v1.ListRolesResponse
-	8,  // 15: nokku.v1.UtilService.ListAuditLogs:output_type -> nokku.v1.ListAuditLogsResponse
-	10, // 16: nokku.v1.UtilService.ExportAuditLogs:output_type -> nokku.v1.ExportAuditLogsResponse
-	13, // [13:17] is the sub-list for method output_type
-	9,  // [9:13] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	13, // 0: nokku.v1.WhoamiResponse.user:type_name -> nokku.v1.User
+	14, // 1: nokku.v1.WhoamiResponse.service_account:type_name -> nokku.v1.ServiceAccount
+	15, // 2: nokku.v1.WhoamiResponse.daemon:type_name -> nokku.v1.Daemon
+	5,  // 3: nokku.v1.ListRolesResponse.roles:type_name -> nokku.v1.Role
+	16, // 4: nokku.v1.EventLog.details:type_name -> google.protobuf.Struct
+	17, // 5: nokku.v1.EventLog.timestamp:type_name -> google.protobuf.Timestamp
+	17, // 6: nokku.v1.ListAuditLogsRequest.start_date:type_name -> google.protobuf.Timestamp
+	17, // 7: nokku.v1.ListAuditLogsRequest.end_date:type_name -> google.protobuf.Timestamp
+	8,  // 8: nokku.v1.ListAuditLogsResponse.logs:type_name -> nokku.v1.EventLog
+	0,  // 9: nokku.v1.ExportAuditLogsRequest.format:type_name -> nokku.v1.ExportAuditLogsRequest.Format
+	17, // 10: nokku.v1.ExportAuditLogsRequest.start_date:type_name -> google.protobuf.Timestamp
+	17, // 11: nokku.v1.ExportAuditLogsRequest.end_date:type_name -> google.protobuf.Timestamp
+	1,  // 12: nokku.v1.UtilService.GetVersion:input_type -> nokku.v1.GetVersionRequest
+	3,  // 13: nokku.v1.UtilService.Whoami:input_type -> nokku.v1.WhoamiRequest
+	6,  // 14: nokku.v1.UtilService.ListRoles:input_type -> nokku.v1.ListRolesRequest
+	9,  // 15: nokku.v1.UtilService.ListAuditLogs:input_type -> nokku.v1.ListAuditLogsRequest
+	11, // 16: nokku.v1.UtilService.ExportAuditLogs:input_type -> nokku.v1.ExportAuditLogsRequest
+	2,  // 17: nokku.v1.UtilService.GetVersion:output_type -> nokku.v1.GetVersionResponse
+	4,  // 18: nokku.v1.UtilService.Whoami:output_type -> nokku.v1.WhoamiResponse
+	7,  // 19: nokku.v1.UtilService.ListRoles:output_type -> nokku.v1.ListRolesResponse
+	10, // 20: nokku.v1.UtilService.ListAuditLogs:output_type -> nokku.v1.ListAuditLogsResponse
+	12, // 21: nokku.v1.UtilService.ExportAuditLogs:output_type -> nokku.v1.ExportAuditLogsResponse
+	17, // [17:22] is the sub-list for method output_type
+	12, // [12:17] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_util_proto_init() }
@@ -856,13 +1016,16 @@ func file_nokku_v1_util_proto_init() {
 	if File_nokku_v1_util_proto != nil {
 		return
 	}
+	file_nokku_v1_daemon_proto_init()
+	file_nokku_v1_service_account_proto_init()
+	file_nokku_v1_user_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_util_proto_rawDesc), len(file_nokku_v1_util_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
