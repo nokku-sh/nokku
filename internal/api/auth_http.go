@@ -25,44 +25,40 @@ const (
 )
 
 // registerAuthRoutes mounts the /auth/* surface on mux.
-func registerAuthRoutes(mux authMux, cfg *config.Config) {
+func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	svc := cfg.IAM
 	a := &authAPI{cfg: cfg}
 
-	// Flows: public, CSRF-guarded.
-	flow := mux.Chain(svc.CSRFGuard)
-	flow("POST /auth/register", a.register)
-	flow("POST /auth/login", a.login)
-	flow("POST /auth/login/backup-code", a.loginBackupCode)
-	flow("POST /auth/logout", a.logout)
-	flow("POST /auth/forgot-password", a.forgotPassword)
-	flow("POST /auth/reset-password", a.resetPassword)
-	flow("POST /auth/verify-email", a.verifyEmail)
-	flow("POST /auth/resend-verification", a.resendVerification)
+	// Public, CSRF-guarded flows.
+	flow := NewChain(svc.CSRFGuard)
+	mux.Handle("POST /auth/register", flow.ThenFunc(a.register))
+	mux.Handle("POST /auth/login", flow.ThenFunc(a.login))
+	mux.Handle("POST /auth/login/backup-code", flow.ThenFunc(a.loginBackupCode))
+	mux.Handle("POST /auth/logout", flow.ThenFunc(a.logout))
+	mux.Handle("POST /auth/forgot-password", flow.ThenFunc(a.forgotPassword))
+	mux.Handle("POST /auth/reset-password", flow.ThenFunc(a.resetPassword))
+	mux.Handle("POST /auth/verify-email", flow.ThenFunc(a.verifyEmail))
+	mux.Handle("POST /auth/resend-verification", flow.ThenFunc(a.resendVerification))
+	mux.Handle("GET /auth/sso/discover", flow.ThenFunc(a.ssoDiscover))
+	mux.Handle("POST /passkey/login/begin", flow.ThenFunc(svc.Passkey.BeginLogin))
+	mux.Handle("POST /passkey/login/finish", flow.ThenFunc(svc.Passkey.FinishLogin))
+	mux.Handle("POST /passkey/signup/begin", flow.ThenFunc(svc.Passkey.BeginSignup))
+	mux.Handle("POST /passkey/signup/finish", flow.ThenFunc(svc.Passkey.FinishSignup))
 
-	// Home-realm discovery: public GET, the login page probes it as the
-	// email is typed.
-	mux.Chain(svc.CSRFGuard)("GET /auth/sso/discover", a.ssoDiscover)
+	// WebAuthn add-key needs a session; BeginRegistration checks the
+	// principal itself, so only auth middleware and CSRF wrap the route.
+	addKey := NewChain(svc.Middleware, svc.CSRFGuard)
+	mux.Handle("POST /passkey/register/begin", addKey.ThenFunc(svc.Passkey.BeginRegistration))
+	mux.Handle("POST /passkey/register/finish", addKey.ThenFunc(svc.Passkey.FinishRegistration))
 
-	// WebAuthn passkey ceremonies. Add-key needs a session (Middleware);
-	// login and signup are public. All POST, all CSRF-guarded same-origin
-	// fetches. The hook gives passkey logins the same device remembering
-	// and new-login alerts as password logins.
+	// The hook gives passkey logins the same device remembering and
+	// new-login alerts as password logins.
 	cfg.IAM.OnUserLogin = func(w http.ResponseWriter, r *http.Request, u iam.User, _ iam.Method) {
 		a.rememberDevice(w, r, u)
 	}
 	cfg.IAM.OnPasskeySignup = func(r *http.Request, u iam.User) {
 		a.sendTokenEmail(r, u, iam.TokenVerifyEmail, true)
 	}
-	authed := func(h http.HandlerFunc) http.Handler {
-		return svc.Middleware(svc.CSRFGuard(h))
-	}
-	mux.RawHandle("POST /passkey/register/begin", authed(svc.Passkey.BeginRegistration))
-	mux.RawHandle("POST /passkey/register/finish", authed(svc.Passkey.FinishRegistration))
-	flow("POST /passkey/login/begin", svc.Passkey.BeginLogin)
-	flow("POST /passkey/login/finish", svc.Passkey.FinishLogin)
-	flow("POST /passkey/signup/begin", svc.Passkey.BeginSignup)
-	flow("POST /passkey/signup/finish", svc.Passkey.FinishSignup)
 
 	// SSO login flows. These are browser-redirect endpoints, so they mount
 	// at the root (the paths IdP administrators register and the UI
@@ -70,66 +66,37 @@ func registerAuthRoutes(mux authMux, cfg *config.Config) {
 	// behind optional auth so a signed-in user links a provider; callbacks
 	// are public (the SAML ACS is a cross-origin IdP form post, exempt from
 	// CSRF by design).
-	optAuth := func(next http.HandlerFunc) http.Handler {
-		return svc.Middleware(svc.CSRFGuard(next))
-	}
-	mux.RawHandle("GET /oidc/login", optAuth(svc.OIDC.Login))
-	mux.RawHandle("POST /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
-	mux.RawHandle("GET /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
-	mux.RawHandle("GET /oauth/login", optAuth(svc.OAuth2.Login))
-	mux.RawHandle("POST /oauth/callback", http.HandlerFunc(svc.OAuth2.Callback))
-	mux.RawHandle("GET /oauth/callback", http.HandlerFunc(svc.OAuth2.Callback))
-	mux.RawHandle("GET /saml/login", optAuth(svc.SAML.Login))
-	mux.RawHandle("POST /saml/acs", http.HandlerFunc(svc.SAML.Callback))
-	mux.RawHandle("GET /saml/metadata", http.HandlerFunc(svc.SAML.Metadata))
-	mux.RawHandle("GET /saml/metadata/{id}", http.HandlerFunc(svc.SAML.Metadata))
-	mux.RawHandle("GET /saml/certificate", http.HandlerFunc(svc.SAML.Certificate))
-	mux.RawHandle("GET /saml/certificate/{id}", http.HandlerFunc(svc.SAML.Certificate))
+	optAuth := NewChain(svc.Middleware, svc.CSRFGuard)
+	mux.Handle("GET /oidc/login", optAuth.ThenFunc(svc.OIDC.Login))
+	mux.Handle("POST /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
+	mux.Handle("GET /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
+	mux.Handle("GET /oauth/login", optAuth.ThenFunc(svc.OAuth2.Login))
+	mux.Handle("POST /oauth/callback", http.HandlerFunc(svc.OAuth2.Callback))
+	mux.Handle("GET /oauth/callback", http.HandlerFunc(svc.OAuth2.Callback))
+	mux.Handle("GET /saml/login", optAuth.ThenFunc(svc.SAML.Login))
+	mux.Handle("POST /saml/acs", http.HandlerFunc(svc.SAML.Callback))
+	mux.Handle("GET /saml/metadata", http.HandlerFunc(svc.SAML.Metadata))
+	mux.Handle("GET /saml/metadata/{id}", http.HandlerFunc(svc.SAML.Metadata))
+	mux.Handle("GET /saml/certificate", http.HandlerFunc(svc.SAML.Certificate))
+	mux.Handle("GET /saml/certificate/{id}", http.HandlerFunc(svc.SAML.Certificate))
 
-	// Account: signed-in user sessions only, CSRF-guarded. Middleware is
-	// outermost so RequireLogin sees the principal it plants.
-	account := mux.Chain(func(next http.Handler) http.Handler {
-		return svc.Middleware(svc.CSRFGuard(svc.RequireLogin(svc.RequireUser(next))))
-	})
-	account("GET /auth/account", a.getAccount)
-	account("POST /auth/account/update", a.updateAccount)
-	account("POST /auth/account/password", a.changePassword)
-	account("POST /auth/account/password/remove", a.removePassword)
-	account("GET /auth/account/credentials", a.getCredentials)
-	account("POST /auth/account/credentials/rename", a.renameCredential)
-	account("POST /auth/account/credentials/remove", a.removeCredential)
-	account("POST /auth/account/identities/remove", a.removeIdentity)
-	account("GET /auth/account/backup-codes", a.listBackupCodes)
-	account("POST /auth/account/backup-codes/rotate", a.rotateBackupCodes)
-	account("POST /auth/account/backup-codes/remove", a.removeBackupCodes)
-	account("GET /auth/account/sessions", a.listSessions)
-	account("POST /auth/account/sessions/remove", a.removeSession)
-	account("POST /auth/account/delete", a.deleteAccount)
+	// Account: signed-in user sessions only, CSRF-guarded.
+	account := NewChain(svc.Middleware, svc.CSRFGuard, svc.RequireLogin, svc.RequireUser)
+	mux.Handle("GET /auth/account", account.ThenFunc(a.getAccount))
+	mux.Handle("POST /auth/account/update", account.ThenFunc(a.updateAccount))
+	mux.Handle("POST /auth/account/password", account.ThenFunc(a.changePassword))
+	mux.Handle("POST /auth/account/password/remove", account.ThenFunc(a.removePassword))
+	mux.Handle("GET /auth/account/credentials", account.ThenFunc(a.getCredentials))
+	mux.Handle("POST /auth/account/credentials/rename", account.ThenFunc(a.renameCredential))
+	mux.Handle("POST /auth/account/credentials/remove", account.ThenFunc(a.removeCredential))
+	mux.Handle("POST /auth/account/identities/remove", account.ThenFunc(a.removeIdentity))
+	mux.Handle("GET /auth/account/backup-codes", account.ThenFunc(a.listBackupCodes))
+	mux.Handle("POST /auth/account/backup-codes/rotate", account.ThenFunc(a.rotateBackupCodes))
+	mux.Handle("POST /auth/account/backup-codes/remove", account.ThenFunc(a.removeBackupCodes))
+	mux.Handle("GET /auth/account/sessions", account.ThenFunc(a.listSessions))
+	mux.Handle("POST /auth/account/sessions/remove", account.ThenFunc(a.removeSession))
+	mux.Handle("POST /auth/account/delete", account.ThenFunc(a.deleteAccount))
 }
-
-// muxAdapter adapts [http.ServeMux] to the authMux mounting interface.
-type muxAdapter struct {
-	mux *http.ServeMux
-}
-
-func (m muxAdapter) Chain(mw func(http.Handler) http.Handler) routeSetter {
-	return func(pattern string, h http.HandlerFunc) {
-		m.mux.Handle(pattern, mw(h))
-	}
-}
-
-func (m muxAdapter) RawHandle(pattern string, h http.Handler) {
-	m.mux.Handle(pattern, h)
-}
-
-// authMux is the minimal mux surface registerAuthRoutes needs, so tests can
-// mount routes without the full server.
-type authMux interface {
-	Chain(mw func(http.Handler) http.Handler) routeSetter
-	RawHandle(pattern string, h http.Handler)
-}
-
-type routeSetter func(pattern string, h http.HandlerFunc)
 
 type authAPI struct {
 	cfg *config.Config
