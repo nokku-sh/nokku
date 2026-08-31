@@ -128,7 +128,7 @@ func (h *samlFlow) Login(w http.ResponseWriter, r *http.Request) {
 		ProviderID:  providerID,
 		RequestID:   req.ID,
 		ReturnTo:    SafeReturnTo(r.URL.Query().Get("return_to")),
-		LinkUserID:  flowLinkUserID(ctx),
+		LinkUserID:  SubjectFromContext(ctx),
 	}
 	if err := h.state.Put(ctx, relayState, st); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
@@ -179,6 +179,7 @@ func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	opts := h.identity(cfg.SAML, assertion)
+	opts.ProviderID = st.ProviderID
 	if opts.Subject == "" {
 		Fail(w, r, h.errRedirect, "assertion has no subject")
 		return
@@ -251,8 +252,11 @@ func (h *samlFlow) identity(cfg *SAMLIDP, a *saml.Assertion) flowLinkOptions {
 		subject = email
 	}
 
+	// ProviderID is not set here: the caller knows the stored provider id
+	// and must fill it in. Linking under anything else (like an attribute
+	// or endpoint value) would orphan the credential and disable the
+	// verified-domain binding checks.
 	return flowLinkOptions{
-		ProviderID:      cfg.AcsURL, // overwritten by caller with ProviderID
 		Subject:         subject,
 		Email:           email,
 		EmailVerified:   true, // SAML assertions carry org-managed emails
