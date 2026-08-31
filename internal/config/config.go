@@ -3,13 +3,14 @@ package config
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/url"
 	"os"
 	"strconv"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/mizuchilabs/kagi/cache"
+	"github.com/mizuchilabs/kagi"
 	"github.com/redis/go-redis/v9"
 	"github.com/urfave/cli/v3"
 
@@ -27,13 +28,12 @@ import (
 )
 
 type EnvConfig struct {
-	BaseURL         string `env:"NOKKU_BASE_URL"          envDefault:"http://localhost"`
-	Port            string `env:"NOKKU_PORT"              envDefault:"3000"`
-	Secret          string `env:"NOKKU_SECRET"`
-	DPoPNonceSecret string `env:"NOKKU_DPOP_NONCE_SECRET"`
-	Debug           bool
-	TrustedProxies  []string `env:"NOKKU_TRUSTED_PROXIES"`
-	AllowedOrigins  []string `env:"NOKKU_ALLOWED_ORIGINS"`
+	BaseURL        string `env:"NOKKU_BASE_URL"          envDefault:"http://localhost"`
+	Port           string `env:"NOKKU_PORT"              envDefault:"3000"`
+	Secret         string `env:"NOKKU_SECRET"`
+	Debug          bool
+	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
+	AllowedOrigins []string `env:"NOKKU_ALLOWED_ORIGINS"`
 
 	// OAuth configuration
 	GoogleClientID     string `env:"GOOGLE_CLIENT_ID"`
@@ -46,12 +46,12 @@ type Config struct {
 	EnvConfig
 
 	Conn    *db.Connection
-	Auth    *auth.Service
+	Auth    *auth.Runtime
 	Audit   *audit.Service
 	Email   *email.Service
 	Pool    *daemon.Pool
 	Storage storage.Store
-	Cache   cache.Cache
+	Cache   kagi.Cache
 	Billing *billing.Service
 	License *billing.Key
 	Geo     *geo.Service
@@ -71,6 +71,14 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
+	// kagi owns identity and its store migrates its own schema on Open, so
+	// it must come up before the nokku schema migration, which references
+	// kagi.users cross-schema.
+	kagiStore, err := auth.OpenStore(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	cfg.Conn, err = db.NewConnection(ctx)
 	if err != nil {
 		return nil, err
@@ -81,25 +89,61 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 	cfg.Pool = daemon.New(ctx, cfg.Conn)
-	nonceSecret := []byte(cfg.DPoPNonceSecret)
-	if len(nonceSecret) == 0 {
-		nonceSecret = []byte(cfg.Secret)
+	cfg.Email, err = email.New(cfg.FullURL(), cfg.Cache)
+	if err != nil {
+		return nil, err
 	}
-	cfg.Auth, err = auth.NewService(cfg.Conn, nonceSecret, auth.SSOConfig{
+	// NOKKU_SECRET keys the default at-rest encryption: nokku's secretbox
+	// for CA private keys and recordings, and kagi derives its cipher and
+	// DPoP nonce key from it. Set KMS_URI to route encryption through an
+	// external KMS instead (Enterprise): a tink keyset of data keys
+	// wrapped by the KMS, persisted in the database.
+	if cfg.Secret == "" {
+		return nil, fmt.Errorf("NOKKU_SECRET is required")
+	}
+	primary, err := crypto.NewSecretbox([]byte(cfg.Secret))
+	if err != nil {
+		return nil, err
+	}
+	if err := crypto.SetEncryptor(primary); err != nil {
+		return nil, err
+	}
+
+	// KMS mode replaces the encryptor before anything can encrypt. The
+	// TinkEncryptor satisfies kagi.Cipher, so kagi's SSO client secrets
+	// and SAML SP key follow the same path; only the DPoP nonce key keeps
+	// deriving from NOKKU_SECRET, which is stateless and needs no KMS.
+	var kmsCipher kagi.Cipher
+	if os.Getenv("KMS_URI") != "" {
+		enc, err := kms.New(ctx, cfg.Conn)
+		if err != nil {
+			return nil, err
+		}
+		if err := crypto.SetEncryptor(enc); err != nil {
+			return nil, err
+		}
+		enc.Start(ctx)
+		kmsCipher = enc
+	}
+
+	cfg.Auth, err = auth.New(ctx, auth.Deps{
+		Store:              kagiStore,
+		Conn:               cfg.Conn,
+		Cache:              cfg.Cache,
+		Email:              cfg.Email,
+		BaseURL:            cfg.FullURL(),
+		Secret:             []byte(cfg.Secret),
+		Cipher:             kmsCipher,
 		GoogleClientID:     cfg.GoogleClientID,
 		GoogleClientSecret: cfg.GoogleClientSecret,
 		GitHubClientID:     cfg.GitHubClientID,
 		GitHubClientSecret: cfg.GitHubClientSecret,
-		RedirectBase:       cfg.FullURL(),
+		Debug:              cfg.Debug,
 	})
 	if err != nil {
 		return nil, err
 	}
 	cfg.Storage, err = storage.New(ctx, cfg.FullURL())
-	if err != nil {
-		return nil, err
-	}
-	cfg.Email, err = email.New(cfg.FullURL(), cfg.Cache)
 	if err != nil {
 		return nil, err
 	}
@@ -122,37 +166,22 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
 
-	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Billing)
+	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Billing, kagiUserDirectory{svc: cfg.Auth.Service()})
 	if err != nil {
 		return nil, err
 	}
 	// Auth events (login, register, SSO denial, ...) flow into the audit log
 	// via the kagi sink. The audit service needs the DB and billing so it is
 	// built after auth and attached here, before the server serves traffic.
-	cfg.Auth.SetEventSink(cfg.Audit)
-
+	cfg.Auth.Service().Events = cfg.Audit
+	// Account deletion cascades nokku's account-scoped data (avatar storage,
+	// subscriptions, owned workspaces) before kagi deletes the identity. The
+	// hook is attached here because it needs billing, which is built last.
+	cfg.Auth.Account.OnDelete = func(ctx context.Context, u kagi.User) error {
+		return deleteAccountData(ctx, &cfg, u)
+	}
 	if err := crypto.InitDefaultHashers(); err != nil {
 		return nil, err
-	}
-
-	// NOKKU_SECRET set local secretbox encryption, otherwise KMS-backed.
-	if cfg.Secret != "" {
-		primary, err := crypto.NewSecretbox([]byte(cfg.Secret))
-		if err != nil {
-			return nil, err
-		}
-		if err := crypto.SetEncryptor(primary); err != nil {
-			return nil, err
-		}
-	} else {
-		enc, err := kms.New(ctx, cfg.Conn)
-		if err != nil {
-			return nil, err
-		}
-		if err := crypto.SetEncryptor(enc); err != nil {
-			return nil, err
-		}
-		enc.Start(ctx)
 	}
 
 	if err := cfg.BootstrapAdmin(ctx); err != nil {
@@ -211,12 +240,12 @@ func (c *Config) WSOrigins() []string {
 	return append(origins, c.AllowedOrigins...)
 }
 
-// newCache builds the shared cache. When NOKKU_REDIS_ADDR is set it returns a
+// newCache builds the shared cache. When REDIS_ADDR is set it returns a
 // Redis-backed cache, otherwise the single-instance in-memory cache.
-func newCache(ctx context.Context) (cache.Cache, error) {
+func newCache(ctx context.Context) (kagi.Cache, error) {
 	addr := os.Getenv("REDIS_ADDR")
 	if addr == "" {
-		return cache.NewMemory(10_000), nil
+		return kagi.NewMemoryCache(10_000), nil
 	}
 
 	db, err := strconv.Atoi(os.Getenv("REDIS_DB"))
@@ -238,5 +267,41 @@ func newCache(ctx context.Context) (cache.Cache, error) {
 		_ = client.Close()
 	}()
 
-	return cache.NewRedis(client, "nokku:"), nil
+	return kagi.NewRedisCache(client, "nokku:"), nil
+}
+
+// kagiUserDirectory adapts kagi's store to audit's UserDirectory: it resolves
+// an actor id to its kagi user. nokku's users are global, so the tenant is
+// the empty value.
+type kagiUserDirectory struct {
+	svc *kagi.Service
+}
+
+func (d kagiUserDirectory) GetUser(ctx context.Context, userID string) (kagi.User, error) {
+	return d.svc.Users.Get(ctx, "", userID)
+}
+
+// deleteAccountData cascades the nokku-owned half of an account before kagi
+// deletes the identity: the stored avatar, the owned workspaces' billing, and
+// the workspaces themselves. Membership rows cascade through the kagi.users
+// foreign keys.
+func deleteAccountData(ctx context.Context, cfg *Config, u kagi.User) error {
+	if err := cfg.Storage.Delete(ctx, storage.AvatarPath(u.ID)); err != nil {
+		slog.Warn("failed to delete avatar", "error", err)
+	}
+	return cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
+		workspaceIDs, err := q.GetWorkspacesByOwner(ctx, u.ID)
+		if err != nil {
+			return err
+		}
+		for _, workspaceID := range workspaceIDs {
+			if !cfg.Billing.Enabled() {
+				break
+			}
+			if err := cfg.Billing.Cancel(ctx, workspaceID, true, ""); err != nil {
+				slog.Warn("failed to cancel subscription", "error", err)
+			}
+		}
+		return q.DeleteWorkspacesByOwner(ctx, u.ID)
+	})
 }

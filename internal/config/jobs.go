@@ -73,20 +73,16 @@ func (c *Config) syncBilling(ctx context.Context) {
 }
 
 func (c *Config) cleanupUnverifiedUsers(ctx context.Context) {
-	err := c.Conn.WithTx(ctx, func(q *db.Queries) error {
-		return q.DeleteUnverifiedUsers(ctx)
-	})
+	// Registrations that never verified within 48 hours are pruned.
+	_, err := c.Auth.Service().Users.DeleteUnverified(ctx, "", time.Now().Add(-48*time.Hour))
 	if err != nil {
 		slog.Error("failed to cleanup unverified users", "error", err)
 	}
 }
 
 func (c *Config) cleanupOneTimeTokens(ctx context.Context) {
-	err := c.Conn.WithTx(ctx, func(q *db.Queries) error {
-		return q.DeleteExpiredOneTimeTokens(ctx)
-	})
-	if err != nil {
-		slog.Error("failed to cleanup unverified users", "error", err)
+	if err := c.Auth.Store.DeleteExpiredTokens(ctx); err != nil {
+		slog.Error("failed to cleanup one-time tokens", "error", err)
 	}
 }
 
