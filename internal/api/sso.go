@@ -2,19 +2,24 @@ package api
 
 import (
 	"context"
-	"strings"
 
 	"connectrpc.com/connect"
-
 	"github.com/mizuchilabs/kagi"
 
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/email"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
+
+// SSOProvider configuration is stored and resolved by kagi's SSOManager;
+// this service only gates it (permissions, verified domains, billing) and
+// maps it to the API surface. The provider id doubles as the workspace id,
+// matching the tenant the provider is stored under, so a tenant holds at
+// most one provider record: configuring the other method overwrites it.
+// Nothing is created by default; a workspace starts with no provider, and
+// the Get RPCs report that as an empty provider rather than an error so
+// the UI can render its setup form.
 
 type SSOService struct {
 	cfg *config.Config
@@ -24,23 +29,42 @@ func NewSSOService(cfg *config.Config) *SSOService {
 	return &SSOService{cfg: cfg}
 }
 
+// requireVerifiedDomain gates provider setup on domain ownership: home
+// realm discovery only routes logins whose email domain is bound to the
+// workspace, so a provider without a verified domain can never match.
+func (s *SSOService) requireVerifiedDomain(ctx context.Context, workspaceID string) error {
+	domains, err := s.cfg.Auth.Service().Domains.List(ctx, kagi.TenantID(workspaceID))
+	if err != nil {
+		return DBError(err)
+	}
+	for _, d := range domains {
+		if d.Verified() {
+			return nil
+		}
+	}
+	return NewError(
+		connect.CodeFailedPrecondition,
+		"Add and verify a domain before configuring an SSO provider",
+	)
+}
+
 func (s *SSOService) GetOIDCProvider(
 	ctx context.Context,
 	req *nokkuv1.GetOIDCProviderRequest,
 ) (*nokkuv1.GetOIDCProviderResponse, error) {
-	var result *db.OidcProvider
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.GetOIDCProvider(ctx, req.GetWorkspaceId())
-		return err
-	}); err != nil {
-		return nil, DBError(err)
+	p, err := s.cfg.Auth.Service().SSO.Get(ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetWorkspaceId())
+	if err != nil && !kagi.IsNotFound(err) {
+		return nil, ssoError(err)
 	}
-	if result == nil {
-		return nil, ErrNotFound
+	// Unset, or the single slot is held by a SAML provider: report an
+	// unconfigured OIDC provider instead of an error.
+	if err != nil || p.OIDC == nil {
+		return &nokkuv1.GetOIDCProviderResponse{
+			OidcProvider: emptyOIDCProvider(req.GetWorkspaceId()),
+		}, nil
 	}
-
 	return &nokkuv1.GetOIDCProviderResponse{
-		OidcProvider: result.ToProto(),
+		OidcProvider: oidcProviderToProto(p),
 	}, nil
 }
 
@@ -48,92 +72,57 @@ func (s *SSOService) UpdateOIDCProvider(
 	ctx context.Context,
 	req *nokkuv1.UpdateOIDCProviderRequest,
 ) (*nokkuv1.UpdateOIDCProviderResponse, error) {
-	params := &db.UpdateOIDCProviderParams{
-		WorkspaceID:          req.GetWorkspaceId(),
-		Name:                 req.Name,
-		IssuerURL:            req.IssuerUrl,
-		ClientID:             req.ClientId,
-		Scopes:               req.GetScopes(),
-		EmailClaim:           req.EmailClaim,
-		NameClaim:            req.NameClaim,
-		UsernameClaim:        req.UsernameClaim,
-		PictureClaim:         req.PictureClaim,
-		IsActive:             req.IsActive,
-		EnforceSso:           req.EnforceSso,
-		AllowJitProvisioning: req.AllowJitProvisioning,
-		UsePkce:              req.UsePkce,
+	// A changed issuer means a different IdP. Identity mappings under the
+	// old issuer are stale (sub values are only unique within an issuer),
+	// so they are purged after the update. Users and their linked
+	// credentials are global in nokku, hence the empty tenant.
+	issuerChanged := false
+	if prev, err := s.cfg.Auth.Service().SSO.Get(
+		ctx,
+		kagi.TenantID(req.GetWorkspaceId()),
+		req.GetWorkspaceId(),
+	); err == nil && prev.OIDC != nil &&
+		prev.OIDC.IssuerURL != req.GetIssuerUrl() {
+		issuerChanged = true
 	}
 
-	if req.ClientSecret != nil {
-		params.ClientSecret = crypto.EncryptedBytes(req.GetClientSecret())
+	if err := s.requireVerifiedDomain(ctx, req.GetWorkspaceId()); err != nil {
+		return nil, err
 	}
 
-	if req.GetIsActive() || req.GetEnforceSso() {
-		var count int32
-		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-			count, err = q.CountVerifiedWorkspaceDomains(ctx, req.GetWorkspaceId())
-			return err
-		}); err != nil {
-			return nil, DBError(err)
-		}
-
-		if count == 0 {
-			return nil, NewError(
-				connect.CodeFailedPrecondition,
-				"cannot activate provider without a verified domain",
-			)
-		}
+	p := kagi.SSOProvider{
+		TenantID:   kagi.TenantID(req.GetWorkspaceId()),
+		ProviderID: req.GetWorkspaceId(),
+		Method:     kagi.MethodOIDC,
+		Name:       req.GetName(),
+		Enabled:    req.GetIsActive(),
+		OIDC: &kagi.OIDCProvider{
+			// RedirectURL stays empty: kagi derives it from BaseURL.
+			IssuerURL:       req.GetIssuerUrl(),
+			ClientID:        req.GetClientId(),
+			ClientSecret:    req.GetClientSecret(),
+			Scopes:          req.GetScopes(),
+			JITProvisioning: req.GetAllowJitProvisioning(),
+			EnforceSSO:      req.GetEnforceSso(),
+		},
 	}
-	if req.GetEnforceSso() && !req.GetIsActive() {
-		return nil, NewError(
-			connect.CodeFailedPrecondition,
-			"cannot enforce SSO without being active",
-		)
-	}
-	if req.GetEnforceSso() {
-		if !s.cfg.Billing.Has(ctx, req.GetWorkspaceId(), billing.FeatureEnforceSSO) {
-			return nil, NewError(
-				connect.CodeFailedPrecondition,
-				"SSO enforcement requires an upgraded plan",
-			)
-		}
-	}
-
-	var issuerChanged bool
-	var result *db.OidcProvider
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		// A changed issuer means a different IdP. Identity mappings under the
-		// old issuer are stale (sub values are only unique within an issuer),
-		// so they are purged after the update.
-		if req.IssuerUrl != nil {
-			provider, err := q.GetOIDCProvider(ctx, req.GetWorkspaceId())
-			if err != nil {
-				return err
-			}
-			if provider.IssuerURL == nil ||
-				strings.TrimSpace(*provider.IssuerURL) != strings.TrimSpace(req.GetIssuerUrl()) {
-				issuerChanged = true
-			}
-		}
-
-		result, err = q.UpdateOIDCProvider(ctx, params)
-		return err
-	}); err != nil {
-		return nil, DBError(err)
-	}
-	if result == nil {
-		return nil, ErrNotFound
+	if err := s.cfg.Auth.Service().SSO.Put(ctx, p); err != nil {
+		return nil, ssoError(err)
 	}
 	if issuerChanged {
-		_ = s.cfg.Auth.DeleteProviderCredentials(
+		_, _ = s.cfg.Auth.Service().Credentials.DeleteByProvider(
 			ctx,
+			"",
 			req.GetWorkspaceId(),
-			kagi.MethodOIDC,
 		)
 	}
 
+	stored, err := s.cfg.Auth.Service().SSO.Get(ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetWorkspaceId())
+	if err != nil {
+		return nil, ssoError(err)
+	}
 	return &nokkuv1.UpdateOIDCProviderResponse{
-		OidcProvider: result.ToProto(),
+		OidcProvider: oidcProviderToProto(stored),
 	}, nil
 }
 
@@ -141,19 +130,19 @@ func (s *SSOService) GetSAMLProvider(
 	ctx context.Context,
 	req *nokkuv1.GetSAMLProviderRequest,
 ) (*nokkuv1.GetSAMLProviderResponse, error) {
-	var result *db.SamlProvider
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.GetSAMLProvider(ctx, req.GetWorkspaceId())
-		return err
-	}); err != nil {
-		return nil, DBError(err)
+	p, err := s.cfg.Auth.Service().SSO.Get(ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetWorkspaceId())
+	if err != nil && !kagi.IsNotFound(err) {
+		return nil, ssoError(err)
 	}
-	if result == nil {
-		return nil, ErrNotFound
+	// Unset, or the single slot is held by an OIDC provider: report an
+	// unconfigured SAML provider instead of an error.
+	if err != nil || p.SAML == nil {
+		return &nokkuv1.GetSAMLProviderResponse{
+			SamlProvider: emptySAMLProvider(req.GetWorkspaceId()),
+		}, nil
 	}
-
 	return &nokkuv1.GetSAMLProviderResponse{
-		SamlProvider: result.ToProto(),
+		SamlProvider: samlProviderToProto(p),
 	}, nil
 }
 
@@ -161,147 +150,103 @@ func (s *SSOService) UpdateSAMLProvider(
 	ctx context.Context,
 	req *nokkuv1.UpdateSAMLProviderRequest,
 ) (*nokkuv1.UpdateSAMLProviderResponse, error) {
-	if (req.GetIsActive() || req.GetEnforceSso()) &&
-		!s.cfg.Billing.Has(ctx, req.GetWorkspaceId(), billing.FeatureSAML) {
+	if req.GetIsActive() && !s.cfg.Billing.Has(ctx, req.GetWorkspaceId(), billing.FeatureSAML) {
 		return nil, NewError(
 			connect.CodeFailedPrecondition,
 			"SAML requires an Enterprise plan",
 		)
 	}
-
-	params := &db.UpdateSAMLProviderParams{
-		WorkspaceID:          req.GetWorkspaceId(),
-		Name:                 req.Name,
-		MetadataURL:          req.MetadataUrl,
-		EmailAttribute:       req.EmailAttribute,
-		NameAttribute:        req.NameAttribute,
-		UsernameAttribute:    req.UsernameAttribute,
-		PictureAttribute:     req.PictureAttribute,
-		IsActive:             req.IsActive,
-		EnforceSso:           req.EnforceSso,
-		AllowJitProvisioning: req.AllowJitProvisioning,
+	if err := s.requireVerifiedDomain(ctx, req.GetWorkspaceId()); err != nil {
+		return nil, err
+	}
+	p := kagi.SSOProvider{
+		TenantID:   kagi.TenantID(req.GetWorkspaceId()),
+		ProviderID: req.GetWorkspaceId(),
+		Method:     kagi.MethodSAML,
+		Name:       req.GetName(),
+		Enabled:    req.GetIsActive(),
+		SAML: &kagi.SAMLIDP{
+			MetadataURL:     req.GetMetadataUrl(),
+			JITProvisioning: req.GetAllowJitProvisioning(),
+			EnforceSSO:      req.GetEnforceSso(),
+		},
+	}
+	if err := s.cfg.Auth.Service().SSO.Put(ctx, p); err != nil {
+		return nil, ssoError(err)
 	}
 
-	if req.GetIsActive() || req.GetEnforceSso() {
-		var count int32
-		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-			count, err = q.CountVerifiedWorkspaceDomains(ctx, req.GetWorkspaceId())
-			return err
-		}); err != nil {
-			return nil, DBError(err)
-		}
-
-		if count == 0 {
-			return nil, NewError(
-				connect.CodeFailedPrecondition,
-				"cannot activate provider without a verified domain",
-			)
-		}
+	stored, err := s.cfg.Auth.Service().SSO.Get(ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetWorkspaceId())
+	if err != nil {
+		return nil, ssoError(err)
 	}
-	if req.GetEnforceSso() && !req.GetIsActive() {
-		return nil, NewError(
-			connect.CodeFailedPrecondition,
-			"cannot enforce SSO without being active",
-		)
-	}
-	if req.GetEnforceSso() {
-		if !s.cfg.Billing.Has(ctx, req.GetWorkspaceId(), billing.FeatureEnforceSSO) {
-			return nil, NewError(
-				connect.CodeFailedPrecondition,
-				"SSO enforcement requires an upgraded plan",
-			)
-		}
-	}
-
-	var result *db.SamlProvider
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.UpdateSAMLProvider(ctx, params)
-		return err
-	}); err != nil {
-		return nil, DBError(err)
-	}
-	if result == nil {
-		return nil, ErrNotFound
-	}
-
 	return &nokkuv1.UpdateSAMLProviderResponse{
-		SamlProvider: result.ToProto(),
+		SamlProvider: samlProviderToProto(stored),
 	}, nil
 }
 
-func (s *SSOService) CheckSSO(
-	ctx context.Context,
-	req *nokkuv1.CheckSSORequest,
-) (*nokkuv1.CheckSSOResponse, error) {
-	domain, err := email.GetDomain(req.GetEmail())
-	if err != nil {
-		return nil, NewError(connect.CodeInvalidArgument, "invalid email address")
+func ssoError(err error) error {
+	if kagi.IsNotFound(err) {
+		return ErrNotFound
 	}
-
-	// Pre-authentication lookup by public domain: runs as a system
-	// transaction, same as the other unauthenticated SSO probes.
-	var oidc *db.OidcProvider
-	var saml *db.SamlProvider
-	_ = s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
-		if o, err := q.GetOIDCProviderByDomain(ctx, domain); err == nil {
-			oidc = o
-		}
-		if sp, err := q.GetSAMLProviderByDomain(ctx, domain); err == nil {
-			saml = sp
-		}
-		return nil
-	})
-
-	var providers []*nokkuv1.SSOProvider
-
-	if oidc != nil && oidc.WorkspaceID != "" {
-		providers = append(providers, &nokkuv1.SSOProvider{
-			Type: nokkuv1.SSOProvider_TYPE_OIDC.Enum(),
-			Id:   &oidc.WorkspaceID,
-			Name: &oidc.Name,
-		})
-	}
-
-	if saml != nil && saml.WorkspaceID != "" {
-		providers = append(providers, &nokkuv1.SSOProvider{
-			Type: nokkuv1.SSOProvider_TYPE_SAML.Enum(),
-			Id:   &saml.WorkspaceID,
-			Name: &saml.Name,
-		})
-	}
-
-	hasSSO := len(providers) > 0
-
-	var enforce bool
-	if oidc != nil && oidc.EnforceSso {
-		enforce = true
-	}
-	if saml != nil && saml.EnforceSso {
-		enforce = true
-	}
-
-	return &nokkuv1.CheckSSOResponse{
-		HasSso:     &hasSSO,
-		EnforceSso: &enforce,
-		Providers:  providers,
-	}, nil
+	return DBError(err)
 }
 
-// checkSSOEnforced returns ErrSSORequired when SSO is enforced for the email's domain.
-func checkSSOEnforced(ctx context.Context, cfg *config.Config, addr string) error {
-	domain, err := email.GetDomain(addr)
-	if err != nil {
-		return ErrInternal
+// emptyProvider marks a workspace that has no provider of the requested
+// method configured yet. Only identity fields are set; the UI treats a
+// missing payload (issuer URL, metadata URL) as "needs setup".
+// IsActive is false rather than unset so the proto unambiguously reads as
+// a disabled, unconfigured provider.
+
+func emptyOIDCProvider(workspaceID string) *nokkuv1.OIDCProvider {
+	isActive := false
+	return &nokkuv1.OIDCProvider{
+		WorkspaceId: &workspaceID,
+		IsActive:    &isActive,
 	}
-	var enforced bool
-	if err := cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
-		enforced, err = q.CheckDomainSSOEnforcement(ctx, domain)
-		return err
-	}); err != nil {
-		return ErrInternal
+}
+
+func emptySAMLProvider(workspaceID string) *nokkuv1.SAMLProvider {
+	isActive := false
+	return &nokkuv1.SAMLProvider{
+		WorkspaceId: &workspaceID,
+		IsActive:    &isActive,
 	}
-	if enforced {
-		return ErrSSORequired
+}
+
+func oidcProviderToProto(p kagi.SSOProvider) *nokkuv1.OIDCProvider {
+	out := &nokkuv1.OIDCProvider{
+		WorkspaceId: &p.ProviderID,
+		Name:        &p.Name,
+		IsActive:    &p.Enabled,
+		CreatedAt:   db.SafeTimestamp(&p.CreatedAt),
+		UpdatedAt:   db.SafeTimestamp(&p.UpdatedAt),
 	}
-	return nil
+	if p.OIDC != nil {
+		issuerURL, clientID := p.OIDC.IssuerURL, p.OIDC.ClientID
+		enforceSSO, jit := p.OIDC.EnforceSSO, p.OIDC.JITProvisioning
+		out.IssuerUrl = &issuerURL
+		out.ClientId = &clientID
+		out.Scopes = p.OIDC.Scopes
+		out.EnforceSso = &enforceSSO
+		out.AllowJitProvisioning = &jit
+	}
+	return out
+}
+
+func samlProviderToProto(p kagi.SSOProvider) *nokkuv1.SAMLProvider {
+	out := &nokkuv1.SAMLProvider{
+		WorkspaceId: &p.ProviderID,
+		Name:        &p.Name,
+		IsActive:    &p.Enabled,
+		CreatedAt:   db.SafeTimestamp(&p.CreatedAt),
+		UpdatedAt:   db.SafeTimestamp(&p.UpdatedAt),
+	}
+	if p.SAML != nil {
+		metadataURL := p.SAML.MetadataURL
+		enforceSSO, jit := p.SAML.EnforceSSO, p.SAML.JITProvisioning
+		out.MetadataUrl = &metadataURL
+		out.EnforceSso = &enforceSSO
+		out.AllowJitProvisioning = &jit
+	}
+	return out
 }

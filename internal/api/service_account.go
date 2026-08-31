@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/mizuchilabs/kagi"
 
+	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -37,8 +38,11 @@ func (s *ServiceAccountService) GetServiceAccount(
 		return nil, ErrNotFound
 	}
 
+	used := lastUsedBySubject(ctx, s.cfg.Auth.Keys, req.GetWorkspaceId())
+	sa := result.ToProto()
+	stampLastUsedAt(sa, used)
 	return &nokkuv1.GetServiceAccountResponse{
-		ServiceAccount: result.ToProto(),
+		ServiceAccount: sa,
 	}, nil
 }
 
@@ -93,11 +97,13 @@ func (s *ServiceAccountService) CreateServiceAccount(
 				return NewError(connect.CodeInvalidArgument, "expires_at must be in the future")
 			}
 		}
-		key, err = s.cfg.Auth.IssueServiceAccountKey(
+		key, err = s.cfg.Auth.Keys.Issue(
 			ctx,
-			req.GetWorkspaceId(),
+			kagi.TenantID(req.GetWorkspaceId()),
 			saID,
+			auth.ActorTypeServiceAccount,
 			req.GetName(),
+			nil,
 			ttl,
 		)
 		if err != nil {
@@ -109,8 +115,11 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		return nil, DBError(err)
 	}
 
+	used := lastUsedBySubject(ctx, s.cfg.Auth.Keys, req.GetWorkspaceId())
+	sa := result.ToProto()
+	stampLastUsedAt(sa, used)
 	return &nokkuv1.CreateServiceAccountResponse{
-		ServiceAccount: result.ToProto(),
+		ServiceAccount: sa,
 		Token:          &key.FullKey,
 	}, nil
 }
@@ -143,8 +152,11 @@ func (s *ServiceAccountService) UpdateServiceAccount(
 		return nil, ErrNotFound
 	}
 
+	used := lastUsedBySubject(ctx, s.cfg.Auth.Keys, req.GetWorkspaceId())
+	sa := result.ToProto()
+	stampLastUsedAt(sa, used)
 	return &nokkuv1.UpdateServiceAccountResponse{
-		ServiceAccount: result.ToProto(),
+		ServiceAccount: sa,
 	}, nil
 }
 
@@ -175,8 +187,13 @@ func (s *ServiceAccountService) ListServiceAccounts(
 		return nil, DBError(err)
 	}
 
+	used := lastUsedBySubject(ctx, s.cfg.Auth.Keys, req.GetWorkspaceId())
+	serviceAccounts := db.ServiceAccountsToProto(result)
+	for _, sa := range serviceAccounts {
+		stampLastUsedAt(sa, used)
+	}
 	return &nokkuv1.ListServiceAccountsResponse{
-		ServiceAccounts: db.ServiceAccountsToProto(result),
+		ServiceAccounts: serviceAccounts,
 		Total:           &count,
 	}, nil
 }
@@ -192,6 +209,42 @@ func (s *ServiceAccountService) DeleteServiceAccount(
 	}
 	// Revoke every API key minted for the service account so its tokens stop
 	// working immediately, not when they would have expired.
-	_ = s.cfg.Auth.RevokeServiceAccountKeys(ctx, req.GetWorkspaceId(), req.GetId())
+	_ = s.cfg.Auth.Keys.RevokeAll(ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetId())
 	return &nokkuv1.DeleteServiceAccountResponse{}, nil
+}
+
+// lastUsedBySubject maps service-account IDs to the most recent activity of
+// any of their kagi API keys, sourced from the keys' last_seen_at. Accounts
+// whose keys were never used have no entry. A lookup failure degrades to a
+// nil map: last_used_at is informational and must not fail the request.
+func lastUsedBySubject(
+	ctx context.Context,
+	keys *kagi.APIKeyManager,
+	workspaceID string,
+) map[string]time.Time {
+	records, err := keys.ListTenantKeys(ctx, kagi.TenantID(workspaceID))
+	if err != nil {
+		slog.Error("failed to read api key activity", "err", err)
+		return nil
+	}
+	used := make(map[string]time.Time, len(records))
+	for _, rec := range records {
+		if rec.LastSeenAt.IsZero() {
+			continue
+		}
+		if prev, ok := used[rec.SubjectID]; !ok || rec.LastSeenAt.After(prev) {
+			used[rec.SubjectID] = rec.LastSeenAt
+		}
+	}
+	return used
+}
+
+// stampLastUsedAt sets the proto's last_used_at from key activity, when known.
+func stampLastUsedAt(sa *nokkuv1.ServiceAccount, used map[string]time.Time) {
+	if sa == nil || len(used) == 0 {
+		return
+	}
+	if t, ok := used[sa.GetId()]; ok {
+		sa.LastUsedAt = db.SafeTimestamp(&t)
+	}
 }

@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"errors"
+	"sort"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -60,7 +62,7 @@ func (s *WorkspaceService) CreateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.CreateWorkspaceRequest,
 ) (*nokkuv1.CreateWorkspaceResponse, error) {
-	user, err := s.cfg.Conn.Q.GetUserByID(ctx, auth.UserIDFromContext(ctx))
+	user, err := s.cfg.Auth.Service().Users.Get(ctx, "", auth.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -140,6 +142,9 @@ func (s *WorkspaceService) DeleteWorkspace(
 	}); err != nil {
 		return nil, DBError(err)
 	}
+	// The SSO provider rows lived outside the workspace's FK cascade, in
+	// kagi's schema.
+	_, _ = s.cfg.Auth.Service().SSO.DeleteTenant(ctx, kagi.TenantID(req.GetWorkspaceId()))
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
 }
 
@@ -168,7 +173,7 @@ func (s *WorkspaceService) GetWorkspaceMember(
 		return nil, ErrInvalidInput
 	}
 
-	var member *db.GetWorkspaceMemberRow
+	var member *db.WorkspaceMember
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		member, err = q.GetWorkspaceMember(ctx, &db.GetWorkspaceMemberParams{
 			WorkspaceID: req.GetWorkspaceId(),
@@ -178,9 +183,17 @@ func (s *WorkspaceService) GetWorkspaceMember(
 	}); err != nil {
 		return nil, DBError(err)
 	}
+	result := member.ToProto()
 
+	user, err := s.cfg.Auth.Service().Users.Get(ctx, "", req.GetUserId())
+	if err != nil {
+		return nil, DBError(err)
+	}
+	result.Picture = &user.Picture
+	result.Email = &user.Email
+	result.EmailVerified = &user.EmailVerified
 	return &nokkuv1.GetWorkspaceMemberResponse{
-		Member: member.ToProto(),
+		Member: result,
 	}, nil
 }
 
@@ -205,32 +218,61 @@ func (s *WorkspaceService) ListWorkspaceMembers(
 	ctx context.Context,
 	req *nokkuv1.ListWorkspaceMembersRequest,
 ) (*nokkuv1.ListWorkspaceMembersResponse, error) {
-	var members []*db.ListWorkspaceMembersRow
-	var count int32
+	var members []*db.WorkspaceMember
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		count, err = q.CountMembers(ctx, &db.CountMembersParams{
-			WorkspaceID: req.GetWorkspaceId(),
-			Query:       req.Query,
-		})
-		if err != nil {
-			return err
-		}
-
 		members, err = q.ListWorkspaceMembers(ctx, &db.ListWorkspaceMembersParams{
 			WorkspaceID: req.GetWorkspaceId(),
-			Query:       req.Query,
 			RoleName:    req.RoleName,
-			Limit:       req.Limit,
-			Offset:      req.Offset,
 		})
 		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
 
+	// Identity lives in kagi, so the name/email search and display-name
+	// ordering cannot run in SQL: stitch the users in, then filter, sort,
+	// and paginate here. Workspace member lists are small.
+	userIDs := make([]string, 0, len(members))
+	for _, m := range members {
+		userIDs = append(userIDs, m.UserID)
+	}
+	users, err := memberUsers(ctx, s.cfg.Auth.Service(), userIDs)
+	if err != nil {
+		return nil, DBError(err)
+	}
+
+	protos := make([]*nokkuv1.WorkspaceMember, 0, len(members))
+	for _, m := range members {
+		u := users[m.UserID]
+		if !matchesMemberQuery(u, req.GetQuery()) {
+			continue
+		}
+
+		protos = append(protos, workspaceMemberProto(
+			m.WorkspaceID, m.UserID, m.RoleName,
+			m.CreatedAt, m.UpdatedAt, u,
+		))
+	}
+	sort.Slice(protos, func(i, j int) bool {
+		return strings.ToLower(protos[i].GetName()) < strings.ToLower(protos[j].GetName())
+	})
+
+	total := int32(len(protos))
+	offset := max(req.GetOffset(), 0)
+	if offset > 0 {
+		if int(offset) >= len(protos) {
+			protos = nil
+		} else {
+			protos = protos[offset:]
+		}
+	}
+	if req.GetLimit() > 0 && int(req.GetLimit()) < len(protos) {
+		protos = protos[:req.GetLimit()]
+	}
+
 	return &nokkuv1.ListWorkspaceMembersResponse{
-		Members: db.WorkspaceMembersToProto(members),
-		Total:   &count,
+		Members: protos,
+		Total:   &total,
 	}, nil
 }
 

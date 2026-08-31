@@ -83,6 +83,11 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.TeamServiceDeleteTeamProcedure:       db.PermTeamsEdit,
 	nokkuv1connect.TeamServiceAddTeamMemberProcedure:    db.PermTeamsEdit,
 	nokkuv1connect.TeamServiceRemoveTeamMemberProcedure: db.PermTeamsEdit,
+	nokkuv1connect.TeamServiceListTeamMembersProcedure:  db.PermTeamsView,
+
+	// Teams of one user are member-directory reads, not team-structure
+	// edits: the user-profile modal shows them to any member viewer.
+	nokkuv1connect.TeamServiceListTeamsForUserProcedure: db.PermMembersView,
 
 	// Workspaces
 	nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure:       db.PermWorkspaceEdit,
@@ -188,10 +193,10 @@ func (a *AuthorizationInterceptor) actorRole(
 	err := a.cfg.Conn.AdminPool.QueryRow(
 		ctx,
 		`SELECT role_name FROM workspace_members
-		 WHERE workspace_id = $1 AND user_id = $2
+		 WHERE workspace_id = $1 AND user_id = $2::text
 		 UNION ALL
 		 SELECT role_name FROM service_accounts
-		 WHERE workspace_id = $1 AND id = $2
+		 WHERE workspace_id = $1 AND id = $2::uuid
 		 LIMIT 1`,
 		workspaceID,
 		actorID,
