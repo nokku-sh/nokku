@@ -2,17 +2,19 @@ package api
 
 import (
 	"context"
-	"fmt"
-	"net"
-	"slices"
+	"time"
 
-	"connectrpc.com/connect"
+	"github.com/mizuchilabs/kagi"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/util"
 )
+
+// Workspace domain storage and verification live in kagi
+// (kagi.TenantDomain); this service only maps them to the API surface. The
+// binding's provider is the workspace itself, matching the provider id
+// convention.
 
 type WorkspaceDomainService struct {
 	cfg *config.Config
@@ -26,16 +28,14 @@ func (s *WorkspaceDomainService) GetWorkspaceDomain(
 	ctx context.Context,
 	req *nokkuv1.GetWorkspaceDomainRequest,
 ) (*nokkuv1.GetWorkspaceDomainResponse, error) {
-	var result *db.WorkspaceDomain
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.GetWorkspaceDomain(ctx, req.GetDomain())
-		return err
-	}); err != nil {
+	result, err := s.cfg.Auth.Service().Domains.Get(
+		ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetDomain(),
+	)
+	if err != nil {
 		return nil, DBError(err)
 	}
-
 	return &nokkuv1.GetWorkspaceDomainResponse{
-		Domain: result.ToProto(),
+		Domain: domainToProto(result),
 	}, nil
 }
 
@@ -43,19 +43,17 @@ func (s *WorkspaceDomainService) CreateWorkspaceDomain(
 	ctx context.Context,
 	req *nokkuv1.CreateWorkspaceDomainRequest,
 ) (*nokkuv1.CreateWorkspaceDomainResponse, error) {
-	var result *db.WorkspaceDomain
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.CreateWorkspaceDomain(ctx, &db.CreateWorkspaceDomainParams{
-			WorkspaceID: req.GetWorkspaceId(),
-			Domain:      req.GetDomain(),
-		})
-		return err
-	}); err != nil {
+	result, err := s.cfg.Auth.Service().Domains.Put(
+		ctx,
+		kagi.TenantID(req.GetWorkspaceId()),
+		req.GetWorkspaceId(),
+		req.GetDomain(),
+	)
+	if err != nil {
 		return nil, DBError(err)
 	}
-
 	return &nokkuv1.CreateWorkspaceDomainResponse{
-		Domain: result.ToProto(),
+		Domain: domainToProto(result),
 	}, nil
 }
 
@@ -63,16 +61,16 @@ func (s *WorkspaceDomainService) ListWorkspaceDomains(
 	ctx context.Context,
 	req *nokkuv1.ListWorkspaceDomainsRequest,
 ) (*nokkuv1.ListWorkspaceDomainsResponse, error) {
-	var result []*db.WorkspaceDomain
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.ListWorkspaceDomains(ctx, req.GetWorkspaceId())
-		return err
-	}); err != nil {
+	result, err := s.cfg.Auth.Service().Domains.List(ctx, kagi.TenantID(req.GetWorkspaceId()))
+	if err != nil {
 		return nil, DBError(err)
 	}
-
+	domains := make([]*nokkuv1.WorkspaceDomain, 0, len(result))
+	for _, d := range result {
+		domains = append(domains, domainToProto(d))
+	}
 	return &nokkuv1.ListWorkspaceDomainsResponse{
-		Domains: db.WorkspaceDomainsToProto(result),
+		Domains: domains,
 	}, nil
 }
 
@@ -80,10 +78,9 @@ func (s *WorkspaceDomainService) DeleteWorkspaceDomain(
 	ctx context.Context,
 	req *nokkuv1.DeleteWorkspaceDomainRequest,
 ) (*nokkuv1.DeleteWorkspaceDomainResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		_, err := q.DeleteWorkspaceDomain(ctx, req.GetDomain())
-		return err
-	}); err != nil {
+	if err := s.cfg.Auth.Service().Domains.Delete(
+		ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetDomain(),
+	); err != nil {
 		return nil, DBError(err)
 	}
 	return &nokkuv1.DeleteWorkspaceDomainResponse{}, nil
@@ -93,79 +90,57 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 	ctx context.Context,
 	req *nokkuv1.VerifyWorkspaceDomainRequest,
 ) (*nokkuv1.VerifyWorkspaceDomainResponse, error) {
-	var domain *db.WorkspaceDomain
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		domain, err = q.GetWorkspaceDomain(ctx, req.GetDomain())
-		return err
-	}); err != nil {
-		return nil, DBError(err)
-	}
-
-	if domain.VerifiedAt != nil {
-		return nil, NewError(connect.CodePermissionDenied, "workspace domain already verified")
-	}
-
-	dnsQuery := fmt.Sprintf("_nokku-verify.%s", domain.Domain)
-	txtRecords, err := util.LookupTXTDOH(ctx, dnsQuery, "https://cloudflare-dns.com/dns-query")
-	if err != nil {
-		// Fall back to the OS resolver. DoH may be unreachable (offline, blocked).
-		txtRecords, err = net.DefaultResolver.LookupTXT(ctx, dnsQuery)
-	}
-	if err != nil || len(txtRecords) == 0 {
-		return nil, NewError(connect.CodeNotFound, "no TXT records found")
-	}
-
-	found := slices.Contains(txtRecords, domain.VerificationToken)
-	if !found {
-		return nil, NewError(
-			connect.CodeNotFound,
-			"token invalid, please wait for a few minutes if you just added it",
-		)
-	}
-
-	result, err := s.verifyWorkspaceDomain(ctx, domain)
+	// kagi resolves the TXT proof at _kagi-verify.<domain> itself.
+	result, err := s.cfg.Auth.Service().Domains.Verify(
+		ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetDomain(),
+	)
 	if err != nil {
 		return nil, DBError(err)
 	}
-
 	return &nokkuv1.VerifyWorkspaceDomainResponse{
-		Domain: result.ToProto(),
+		Domain: domainToProto(result),
 	}, nil
-}
-
-// verifyWorkspaceDomain persists the verification in its own scoped
-// transaction, after the (potentially slow) external DNS lookups completed.
-func (s *WorkspaceDomainService) verifyWorkspaceDomain(
-	ctx context.Context,
-	domain *db.WorkspaceDomain,
-) (*db.WorkspaceDomain, error) {
-	var result *db.WorkspaceDomain
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.VerifyWorkspaceDomain(ctx, &db.VerifyWorkspaceDomainParams{
-			Domain:      domain.Domain,
-			Token:       domain.VerificationToken,
-			WorkspaceID: domain.WorkspaceID,
-		})
-		return err
-	}); err != nil {
-		return nil, err
-	}
-	return result, nil
 }
 
 func (s *WorkspaceDomainService) RegenerateWorkspaceDomainToken(
 	ctx context.Context,
 	req *nokkuv1.RegenerateWorkspaceDomainTokenRequest,
 ) (*nokkuv1.RegenerateWorkspaceDomainTokenResponse, error) {
-	var result *db.WorkspaceDomain
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.RegenerateVerificationToken(ctx, req.GetDomain())
-		return err
-	}); err != nil {
+	// Regenerating is a rebind: a fresh token, verification reset.
+	result, err := s.cfg.Auth.Service().Domains.Put(
+		ctx,
+		kagi.TenantID(req.GetWorkspaceId()),
+		req.GetWorkspaceId(),
+		req.GetDomain(),
+	)
+	if err != nil {
 		return nil, DBError(err)
 	}
-
 	return &nokkuv1.RegenerateWorkspaceDomainTokenResponse{
-		Domain: result.ToProto(),
+		Domain: domainToProto(result),
 	}, nil
+}
+
+func domainToProto(d kagi.TenantDomain) *nokkuv1.WorkspaceDomain {
+	var verifiedAt *timestamppb.Timestamp
+	if !d.VerifiedAt.IsZero() {
+		verifiedAt = timestamppb.New(d.VerifiedAt)
+	}
+	return &nokkuv1.WorkspaceDomain{
+		Domain:            &d.Domain,
+		WorkspaceId:       &d.ProviderID,
+		VerificationToken: &d.Token,
+		VerifiedAt:        verifiedAt,
+		CreatedAt:         domainTimestamp(d.CreatedAt),
+		UpdatedAt:         domainTimestamp(d.UpdatedAt),
+	}
+}
+
+// domainTimestamp leaves unset timestamps out of the proto instead of
+// reporting the epoch.
+func domainTimestamp(t time.Time) *timestamppb.Timestamp {
+	if t.IsZero() {
+		return nil
+	}
+	return timestamppb.New(t)
 }

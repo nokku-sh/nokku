@@ -13,7 +13,6 @@ import (
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 	"github.com/mizuchilabs/kagi"
-	"github.com/mizuchilabs/kagi/dpop"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/internal/auth"
@@ -316,7 +315,6 @@ func (s *DaemonService) EnrollDaemon(
 	if err != nil {
 		return nil, err
 	}
-
 	// New daemons inherit the workspace's adjustable default config, so a
 	// freshly deployed daemon picks up the current SSH server policy.
 	config := workspace.Settings.GetDefaultDaemonConfig()
@@ -426,7 +424,7 @@ func (s *DaemonService) EnrollDaemon(
 
 	// The daemon's control-plane token never expires; it is revoked by
 	// deleting the daemon (the session cascades), not by a clock.
-	sess, err := s.cfg.Auth.Kagi.Sessions.IssueSession(ctx, kagi.SessionParams{
+	sess, err := s.cfg.Auth.Service().Sessions.IssueSession(ctx, kagi.SessionParams{
 		TenantID:  kagi.TenantID(workspaceID),
 		SubjectID: daemonID,
 		Kind:      auth.ActorTypeDaemon,
@@ -462,8 +460,8 @@ func (s *DaemonService) EnrollDaemon(
 // stale-nonce failures so the daemon can retry. A missing proof is an error:
 // daemons must enroll key-bound.
 func (s *DaemonService) enrollBinding(ctx context.Context) (string, error) {
-	verifier := s.cfg.Auth.DPoP()
-	if verifier == nil {
+	svc := s.cfg.Auth.Service()
+	if svc.DPoP == nil {
 		return "", NewError(connect.CodeUnimplemented, "DPoP is not configured")
 	}
 	ci, ok := connect.CallInfoForHandlerContext(ctx)
@@ -471,15 +469,17 @@ func (s *DaemonService) enrollBinding(ctx context.Context) (string, error) {
 		return "", ErrInternal
 	}
 
-	binding, err := verifier.VerifyRequest(
+	binding, err := svc.VerifyRequestProof(
 		ctx,
 		ci.RequestHeader(),
 		nokkuv1connect.DaemonServiceEnrollDaemonProcedure,
 		s.cfg.FullURL(),
 	)
 	if err != nil {
-		if errors.Is(err, dpop.ErrStaleNonce) {
-			ci.ResponseHeader().Set("DPoP-Nonce", verifier.CurrentNonce())
+		if errors.Is(err, kagi.ErrDPoPNonce) {
+			if prov, ok := svc.DPoP.(kagi.NonceProvider); ok {
+				ci.ResponseHeader().Set("DPoP-Nonce", prov.CurrentNonce())
+			}
 			return "", NewError(connect.CodeUnauthenticated, "stale DPoP nonce")
 		}
 		return "", NewError(connect.CodeInvalidArgument, "invalid DPoP proof")

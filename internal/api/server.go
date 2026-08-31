@@ -166,15 +166,6 @@ func (s *Server) getServiceRegistrations(ctx context.Context) []ServiceRegistrat
 			},
 		},
 		{
-			Name: nokkuv1connect.CredentialServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewCredentialServiceHandler(
-					NewCredentialService(s.cfg),
-					opts...,
-				)
-			},
-		},
-		{
 			Name: nokkuv1connect.WorkspaceServiceName,
 			Handler: func() (string, http.Handler) {
 				return nokkuv1connect.NewWorkspaceServiceHandler(
@@ -342,23 +333,12 @@ func (s *Server) registerServices(ctx context.Context) error {
 
 	audit := NewAuditInterceptor(s.cfg.Audit)
 
-	// Consolidated kagi auth handler: SSO, passkey, device, and the
-	// credential/email flows, mounted at their existing public paths. The
-	// handler's own paths are prefix-free, so each route is re-prefixed
-	// with its public location (/auth for the credential and device flows,
-	// none for SSO and passkeys).
-	authHandler, err := NewAuthHandler(s.cfg)
-	if err != nil {
-		return err
-	}
-	for _, route := range authHandler.Routes() {
+	for _, route := range s.cfg.Auth.Routes() {
 		method, path, ok := strings.Cut(route.Pattern, " ")
 		if !ok {
 			continue
 		}
-		// No access-log audit wrapper here: kagi records semantic events
-		// (login_success, login_denied, logout, ...) through the sink, one
-		// row per flow instead of two.
+
 		s.mux.Handle(method+" "+authRoutePrefix(path)+path, route.Handler)
 	}
 

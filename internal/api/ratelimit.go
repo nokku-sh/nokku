@@ -16,23 +16,13 @@ const (
 	generalRPS   = 30
 	generalBurst = 50
 
-	// Sensitive auth procedures (register, login, forgot password, etc.)
-	sensitiveRPS   = 5
-	sensitiveBurst = 10
-
 	cleanupInterval = 5 * time.Minute
 	entryTTL        = 10 * time.Minute
 )
 
-// sensitivePaths are the HTTP auth endpoints needing tighter per-IP limits.
-var sensitivePaths = map[string]struct{}{
-	"/auth/register":            {},
-	"/auth/login":               {},
-	"/auth/login/backup-code":   {},
-	"/auth/forgot-password":     {},
-	"/auth/reset-password":      {},
-	"/auth/resend-verification": {},
-}
+// sensitivePaths are gone: kagi rate limits its own auth endpoints
+// (login, register, the mail round trips, SSO, passkeys, device) over the
+// shared cache. The general limiter below still protects the API surface.
 
 type limiterEntry struct {
 	limiter  *rate.Limiter
@@ -84,22 +74,12 @@ func (s *rateLimiterStore) cleanup() {
 }
 
 var (
-	generalStore   = newRateLimiterStore(generalRPS, generalBurst)
-	sensitiveStore = newRateLimiterStore(sensitiveRPS, sensitiveBurst)
+	generalStore = newRateLimiterStore(generalRPS, generalBurst)
 )
 
 func (s *Server) WithRateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := util.GetRemoteIP(r.Header, r.RemoteAddr)
-		if _, ok := sensitivePaths[r.URL.Path]; ok {
-			if !sensitiveStore.allow(ip) {
-				w.Header().Set("Retry-After", "1")
-				http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
-				return
-			}
-			next.ServeHTTP(w, r)
-			return
-		}
 		if !isAPIRoute(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return

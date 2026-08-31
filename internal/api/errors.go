@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"connectrpc.com/connect"
@@ -64,19 +66,6 @@ var (
 	ErrSSORequired = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("single sign-on is required for your account"),
-	)
-)
-
-// SSO errors
-
-var (
-	ErrSSOProviderInactive = connect.NewError(
-		connect.CodeFailedPrecondition,
-		errors.New("activate the provider or add a verified domain first"),
-	)
-	ErrSSOEnforceWithoutActive = connect.NewError(
-		connect.CodeFailedPrecondition,
-		errors.New("enable the provider before enforcing SSO"),
 	)
 )
 
@@ -159,6 +148,7 @@ func DBError(err error) error {
 
 	pgConnErr, ok := errors.AsType[*pgconn.PgError](err)
 	if !ok {
+		slog.Warn("unmapped database error", "error", err, "error_type", fmt.Sprintf("%T", err))
 		return ErrInternal
 	}
 
@@ -232,10 +222,14 @@ type httpError struct {
 	Message string `json:"message"`
 }
 
-func writeJSONError(w http.ResponseWriter, status int, message string) {
+func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(httpError{
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, httpError{
 		Code:    status,
 		Message: message,
 	})

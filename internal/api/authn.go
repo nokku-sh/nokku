@@ -18,7 +18,6 @@ import (
 // publicEndpoints are the connectrpc procedures that skip authentication.
 var publicEndpoints = map[string]struct{}{
 	nokkuv1connect.DaemonServiceEnrollDaemonProcedure: {},
-	nokkuv1connect.SSOServiceCheckSSOProcedure:        {},
 	nokkuv1connect.UtilServiceGetVersionProcedure:     {},
 }
 
@@ -28,12 +27,10 @@ func isPublicEndpoint(procedure string) bool {
 }
 
 // NewKagiAuthNInterceptor builds the connectrpc authentication interceptor
-// from kagi: opaque sessions, API keys, and DPoP-bound machine tokens. It
-// replaces the challenge-based interceptor.
+// from kagi: opaque sessions, API keys, and DPoP-bound machine tokens.
 func NewKagiAuthNInterceptor(cfg *config.Config) connect.Interceptor {
 	return kagiconnect.New(kagiconnect.Options{
-		Authenticator: cfg.Auth.Authenticator(),
-		APIKeys:       cfg.Auth.APIKeys(),
+		Service: cfg.Auth.Service(),
 		IsPublic: func(spec connect.Spec) bool {
 			return isPublicEndpoint(spec.Procedure)
 		},
@@ -41,7 +38,7 @@ func NewKagiAuthNInterceptor(cfg *config.Config) connect.Interceptor {
 			return requestWorkspace(msg)
 		},
 		BaseURL:    cfg.FullURL(),
-		CookieName: "session",
+		CookieName: kagi.SessionCookieName,
 	})
 }
 
@@ -50,8 +47,8 @@ func NewKagiAuthNInterceptor(cfg *config.Config) connect.Interceptor {
 // the context, which meta reads directly.
 func NewHTTPAuth(cfg *config.Config) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return cfg.Auth.Kagi.Middleware(
-			cfg.Auth.Kagi.RequireLogin(next),
+		return cfg.Auth.Middleware(
+			cfg.Auth.RequireLogin(next),
 		)
 	}
 }
