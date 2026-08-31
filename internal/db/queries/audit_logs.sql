@@ -28,8 +28,8 @@ WHERE
     OR workspace_id = NULLIF(sqlc.arg('workspace_id')::TEXT, '')::UUID
   )
   AND (
-    sqlc.narg('actor_ids')::UUID[] IS NULL
-    OR actor_id = ANY (sqlc.narg('actor_ids')::UUID[])
+    sqlc.narg('actor_ids')::TEXT[] IS NULL
+    OR actor_id = ANY (sqlc.narg('actor_ids')::TEXT[])
   )
   AND (
     sqlc.narg('actor_types')::TEXT[] IS NULL
@@ -78,8 +78,8 @@ WHERE
     OR workspace_id = NULLIF(sqlc.arg('workspace_id')::TEXT, '')::UUID
   )
   AND (
-    sqlc.narg('actor_ids')::UUID[] IS NULL
-    OR actor_id = ANY (sqlc.narg('actor_ids')::UUID[])
+    sqlc.narg('actor_ids')::TEXT[] IS NULL
+    OR actor_id = ANY (sqlc.narg('actor_ids')::TEXT[])
   )
   AND (
     sqlc.narg('actor_types')::TEXT[] IS NULL

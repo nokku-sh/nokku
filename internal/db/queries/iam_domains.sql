@@ -1,14 +1,13 @@
 -- name: UpsertWorkspaceDomain :one
 INSERT INTO
-  workspace_domains (workspace_id, domain, token, verified_at, verified_until)
+  workspace_domains (workspace_id, domain, provider_id, verified_at)
 VALUES
-  (@workspace_id, @domain, @token, NULL, NULL)
-ON CONFLICT (domain) DO UPDATE
+  (@workspace_id, @domain, @provider_id, NULL)
+ON CONFLICT (workspace_id, domain) DO UPDATE
 SET
-  workspace_id = EXCLUDED.workspace_id,
-  token = EXCLUDED.token,
+  provider_id = EXCLUDED.provider_id,
+  token = encode(gen_random_bytes (16), 'hex'),
   verified_at = NULL,
-  verified_until = NULL,
   updated_at = NOW()
 RETURNING
   *;
@@ -39,11 +38,7 @@ FROM
   workspace_domains
 WHERE
   domain = @domain
-  AND verified_at IS NOT NULL
-  AND (
-    verified_until IS NULL
-    OR verified_until > NOW()
-  );
+  AND verified_at IS NOT NULL;
 
 -- name: ListVerifiedDomainsForProvider :many
 SELECT
@@ -52,21 +47,31 @@ FROM
   workspace_domains
 WHERE
   provider_id = @provider_id
-  AND verified_at IS NOT NULL
-  AND (
-    verified_until IS NULL
-    OR verified_until > @verified_now
-  );
+  AND verified_at IS NOT NULL;
 
--- name: VerifyWorkspaceDomain :exec
-UPDATE workspace_domains
-SET
-  verified_at = @verified_at,
-  verified_until = @verified_until,
-  updated_at = NOW()
-WHERE
-  workspace_id = @workspace_id
-  AND domain = @domain;
+-- name: VerifyWorkspaceDomain :one
+WITH
+  verified AS (
+    UPDATE workspace_domains wd
+    SET
+      verified_at = NOW()
+    WHERE
+      wd.workspace_id = @workspace_id
+      AND wd.domain = @domain
+      AND wd.token = @token
+    RETURNING
+      *
+  ),
+  evicted AS (
+    DELETE FROM workspace_domains wd USING verified v
+    WHERE
+      wd.domain = v.domain
+      AND wd.workspace_id != @workspace_id
+  )
+SELECT
+  *
+FROM
+  verified;
 
 -- name: DeleteWorkspaceDomain :exec
 DELETE FROM workspace_domains

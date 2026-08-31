@@ -29,13 +29,12 @@ func (q *Queries) DeleteWorkspaceDomain(ctx context.Context, arg *DeleteWorkspac
 
 const getVerifiedWorkspaceDomain = `-- name: GetVerifiedWorkspaceDomain :one
 SELECT
-  workspace_id, domain, provider_id, token, verified_at, verified_until, created_at, updated_at
+  workspace_id, domain, provider_id, token, verified_at, created_at, updated_at
 FROM
   workspace_domains
 WHERE
   domain = $1
   AND verified_at IS NOT NULL
-  AND (verified_until IS NULL OR verified_until > NOW())
 `
 
 func (q *Queries) GetVerifiedWorkspaceDomain(ctx context.Context, domain string) (*WorkspaceDomain, error) {
@@ -47,7 +46,6 @@ func (q *Queries) GetVerifiedWorkspaceDomain(ctx context.Context, domain string)
 		&i.ProviderID,
 		&i.Token,
 		&i.VerifiedAt,
-		&i.VerifiedUntil,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -56,7 +54,7 @@ func (q *Queries) GetVerifiedWorkspaceDomain(ctx context.Context, domain string)
 
 const getWorkspaceDomain = `-- name: GetWorkspaceDomain :one
 SELECT
-  workspace_id, domain, provider_id, token, verified_at, verified_until, created_at, updated_at
+  workspace_id, domain, provider_id, token, verified_at, created_at, updated_at
 FROM
   workspace_domains
 WHERE
@@ -78,7 +76,6 @@ func (q *Queries) GetWorkspaceDomain(ctx context.Context, arg *GetWorkspaceDomai
 		&i.ProviderID,
 		&i.Token,
 		&i.VerifiedAt,
-		&i.VerifiedUntil,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -87,22 +84,16 @@ func (q *Queries) GetWorkspaceDomain(ctx context.Context, arg *GetWorkspaceDomai
 
 const listVerifiedDomainsForProvider = `-- name: ListVerifiedDomainsForProvider :many
 SELECT
-  workspace_id, domain, provider_id, token, verified_at, verified_until, created_at, updated_at
+  workspace_id, domain, provider_id, token, verified_at, created_at, updated_at
 FROM
   workspace_domains
 WHERE
   provider_id = $1
   AND verified_at IS NOT NULL
-  AND (verified_until IS NULL OR verified_until > $2)
 `
 
-type ListVerifiedDomainsForProviderParams struct {
-	ProviderID  string     `json:"providerId"`
-	VerifiedNow *time.Time `json:"verifiedNow"`
-}
-
-func (q *Queries) ListVerifiedDomainsForProvider(ctx context.Context, arg *ListVerifiedDomainsForProviderParams) ([]*WorkspaceDomain, error) {
-	rows, err := q.db.Query(ctx, listVerifiedDomainsForProvider, arg.ProviderID, arg.VerifiedNow)
+func (q *Queries) ListVerifiedDomainsForProvider(ctx context.Context, providerID string) ([]*WorkspaceDomain, error) {
+	rows, err := q.db.Query(ctx, listVerifiedDomainsForProvider, providerID)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +107,6 @@ func (q *Queries) ListVerifiedDomainsForProvider(ctx context.Context, arg *ListV
 			&i.ProviderID,
 			&i.Token,
 			&i.VerifiedAt,
-			&i.VerifiedUntil,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -132,7 +122,7 @@ func (q *Queries) ListVerifiedDomainsForProvider(ctx context.Context, arg *ListV
 
 const listWorkspaceDomains = `-- name: ListWorkspaceDomains :many
 SELECT
-  workspace_id, domain, provider_id, token, verified_at, verified_until, created_at, updated_at
+  workspace_id, domain, provider_id, token, verified_at, created_at, updated_at
 FROM
   workspace_domains
 WHERE
@@ -156,7 +146,6 @@ func (q *Queries) ListWorkspaceDomains(ctx context.Context, workspaceID string) 
 			&i.ProviderID,
 			&i.Token,
 			&i.VerifiedAt,
-			&i.VerifiedUntil,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -172,29 +161,27 @@ func (q *Queries) ListWorkspaceDomains(ctx context.Context, workspaceID string) 
 
 const upsertWorkspaceDomain = `-- name: UpsertWorkspaceDomain :one
 INSERT INTO
-  workspace_domains (workspace_id, domain, token, verified_at, verified_until)
+  workspace_domains (workspace_id, domain, provider_id, verified_at)
 VALUES
-  ($1, $2, $3, NULL, NULL)
-ON CONFLICT (domain) DO
-UPDATE
+  ($1, $2, $3, NULL)
+ON CONFLICT (workspace_id, domain) DO UPDATE
 SET
-  workspace_id = EXCLUDED.workspace_id,
-  token = EXCLUDED.token,
+  provider_id = EXCLUDED.provider_id,
+  token = encode(gen_random_bytes (16), 'hex'),
   verified_at = NULL,
-  verified_until = NULL,
   updated_at = NOW()
 RETURNING
-  workspace_id, domain, provider_id, token, verified_at, verified_until, created_at, updated_at
+  workspace_id, domain, provider_id, token, verified_at, created_at, updated_at
 `
 
 type UpsertWorkspaceDomainParams struct {
 	WorkspaceID string `json:"workspaceId"`
 	Domain      string `json:"domain"`
-	Token       string `json:"token"`
+	ProviderID  string `json:"providerId"`
 }
 
 func (q *Queries) UpsertWorkspaceDomain(ctx context.Context, arg *UpsertWorkspaceDomainParams) (*WorkspaceDomain, error) {
-	row := q.db.QueryRow(ctx, upsertWorkspaceDomain, arg.WorkspaceID, arg.Domain, arg.Token)
+	row := q.db.QueryRow(ctx, upsertWorkspaceDomain, arg.WorkspaceID, arg.Domain, arg.ProviderID)
 	var i WorkspaceDomain
 	err := row.Scan(
 		&i.WorkspaceID,
@@ -202,37 +189,64 @@ func (q *Queries) UpsertWorkspaceDomain(ctx context.Context, arg *UpsertWorkspac
 		&i.ProviderID,
 		&i.Token,
 		&i.VerifiedAt,
-		&i.VerifiedUntil,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
 }
 
-const verifyWorkspaceDomain = `-- name: VerifyWorkspaceDomain :exec
-UPDATE workspace_domains
-SET
-  verified_at = $1,
-  verified_until = $2,
-  updated_at = NOW()
-WHERE
-  workspace_id = $3
-  AND domain = $4
+const verifyWorkspaceDomain = `-- name: VerifyWorkspaceDomain :one
+WITH
+  verified AS (
+    UPDATE workspace_domains wd
+    SET
+      verified_at = NOW()
+    WHERE
+      wd.workspace_id = $1
+      AND wd.domain = $2
+      AND wd.token = $3
+    RETURNING
+      workspace_id, domain, provider_id, token, verified_at, created_at, updated_at
+  ),
+  evicted AS (
+    DELETE FROM workspace_domains wd USING verified v
+    WHERE
+      wd.domain = v.domain
+      AND wd.workspace_id != $1
+  )
+SELECT
+  workspace_id, domain, provider_id, token, verified_at, created_at, updated_at
+FROM
+  verified
 `
 
 type VerifyWorkspaceDomainParams struct {
-	VerifiedAt    *time.Time `json:"verifiedAt"`
-	VerifiedUntil *time.Time `json:"verifiedUntil"`
-	WorkspaceID   string     `json:"workspaceId"`
-	Domain        string     `json:"domain"`
+	WorkspaceID string `json:"workspaceId"`
+	Domain      string `json:"domain"`
+	Token       string `json:"token"`
 }
 
-func (q *Queries) VerifyWorkspaceDomain(ctx context.Context, arg *VerifyWorkspaceDomainParams) error {
-	_, err := q.db.Exec(ctx, verifyWorkspaceDomain,
-		arg.VerifiedAt,
-		arg.VerifiedUntil,
-		arg.WorkspaceID,
-		arg.Domain,
+type VerifyWorkspaceDomainRow struct {
+	WorkspaceID string     `json:"workspaceId"`
+	Domain      string     `json:"domain"`
+	ProviderID  string     `json:"providerId"`
+	Token       string     `json:"token"`
+	VerifiedAt  *time.Time `json:"verifiedAt"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
+}
+
+func (q *Queries) VerifyWorkspaceDomain(ctx context.Context, arg *VerifyWorkspaceDomainParams) (*VerifyWorkspaceDomainRow, error) {
+	row := q.db.QueryRow(ctx, verifyWorkspaceDomain, arg.WorkspaceID, arg.Domain, arg.Token)
+	var i VerifyWorkspaceDomainRow
+	err := row.Scan(
+		&i.WorkspaceID,
+		&i.Domain,
+		&i.ProviderID,
+		&i.Token,
+		&i.VerifiedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
-	return err
+	return &i, err
 }
