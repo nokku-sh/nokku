@@ -89,8 +89,8 @@
 	let userFilter: FacetedFilter[] = $derived.by(() => {
 		return (
 			members.data?.members.map((member) => ({
-				label: member.username,
-				value: member.username,
+				label: member.name,
+				value: member.id,
 				icon: CircleUser
 			})) || []
 		);

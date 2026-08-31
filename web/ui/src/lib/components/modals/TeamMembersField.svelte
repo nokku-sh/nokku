@@ -16,35 +16,36 @@
 	let { data }: Props = $props();
 
 	const members = $derived(workspace.listMembers());
+	const teamMembers = $derived(team.members(data.id));
 	const addMemberMutation = team.addMember();
 	const removeMemberMutation = team.removeMember();
 
-	const isUserInTeam = (userID: string) => data?.members?.find((m) => m.id === userID);
+	const isUserInTeam = (userID: string) => teamMembers.data?.find((m) => m.id === userID);
 
 	const availableMembers = $derived(
 		members.data?.members?.filter((m) => !isUserInTeam(m.id)) || []
 	);
 
+	// Mutations invalidate the team service queries, so teamMembers and the
+	// teams list (member counts) refetch on their own.
 	async function addMember(member: WorkspaceMember) {
 		await addMemberMutation.mutateAsync({ teamId: data.id, userId: member.id });
-		data.members.push(member);
 	}
 
 	async function removeMember(member: WorkspaceMember) {
 		await removeMemberMutation.mutateAsync({ teamId: data.id, userId: member.id });
-		data.members = data.members.filter((m) => m.id !== member.id);
 	}
 </script>
 
 <Field.Set class="flex flex-col gap-3">
-	{#if data.members?.length > 0}
+	{#if teamMembers.data && teamMembers.data.length > 0}
 		<div class="flex flex-col gap-1">
-			{#each data.members as member (member.id)}
+			{#each teamMembers.data as member (member.id)}
 				<div class="flex items-center justify-between gap-3 rounded-lg border p-3">
 					<div class="flex items-center gap-3 truncate">
 						<UserAvatar user={member} class="size-9" />
 						<div class="flex flex-col truncate">
-							<span class="truncate text-sm font-medium">{member.name || member.username}</span>
+							<span class="truncate text-sm font-medium">{member.name}</span>
 							<span class="truncate text-xs text-muted-foreground">{member.email}</span>
 						</div>
 					</div>
@@ -82,11 +83,11 @@
 					<Command.Empty>No user found.</Command.Empty>
 					<Command.Group>
 						{#each availableMembers as member (member.id)}
-							<Command.Item value={member.username} onSelect={() => addMember(member)}>
+							<Command.Item value={member.id} onSelect={() => addMember(member)}>
 								<div class="flex items-center gap-2">
 									<UserAvatar user={member} class="size-7" />
 									<div class="flex flex-col">
-										<span class="text-sm">{member.name || member.username}</span>
+										<span class="text-sm">{member.name}</span>
 										<span class="text-xs text-muted-foreground">{member.email}</span>
 									</div>
 								</div>

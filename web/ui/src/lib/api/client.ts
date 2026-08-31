@@ -5,7 +5,6 @@ import { Code, ConnectError, type Interceptor, type UnaryRequest } from '@connec
 import { toast } from 'svelte-sonner';
 import { formatConnectError, parseHTTPError } from './error-formatter';
 import { goto } from '$app/navigation';
-import { UserService } from '$lib/gen/nokku/v1/user_pb';
 import { WorkspaceService } from '$lib/gen/nokku/v1/workspace_pb';
 import { workspaceID } from '$lib/store.svelte';
 
@@ -30,18 +29,9 @@ export const queryClient = new QueryClient({
 
 			const key = query.queryKey[1] as { methodName?: string } | undefined;
 
-			// whoami is the canonical auth check: any failure means the session
-			// is gone (revoked, expired, or the server rotated its secrets and
-			// invalidated the cookie). Bounce back to /login instead of leaving
-			// a broken page behind.
-			if (
-				key?.methodName === UserService.method.whoami.name &&
-				(error.code === Code.Unauthenticated || error.code === Code.NotFound)
-			) {
-				handleSessionExpired();
-				return;
-			}
-
+			// An Unauthenticated query means the session is gone (revoked,
+			// expired, or invalidated). The account layer bounces to /login
+			// itself; here we only stay quiet.
 			if (error.code === Code.Unauthenticated) return;
 
 			// A persisted workspace id can outlive the workspace itself (deleted
@@ -94,8 +84,7 @@ export const queryClient = new QueryClient({
 
 let sessionExpiredAt = 0;
 
-// Public routes don't require a session; a failing whoami there is expected
-// and must not bounce the visitor to /login.
+// Public routes don't require a session and must not bounce the visitor to /login.
 const publicPaths = [
 	'/login',
 	'/register',
@@ -107,9 +96,9 @@ const publicPaths = [
 ];
 
 // The session cookie is HttpOnly, so only the backend can clear it. On an
-// expired or revoked session the backend rejects with Unauthenticated; here we
-// reset local state, drop cached data and land on /login.
-function handleSessionExpired() {
+// expired or revoked session the backend rejects with 401; here we reset
+// local state, drop cached data and land on /login.
+export function handleSessionExpired() {
 	if (!browser || publicPaths.some((p) => window.location.pathname.startsWith(p))) return;
 
 	const now = Date.now();

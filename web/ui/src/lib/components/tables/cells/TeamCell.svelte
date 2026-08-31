@@ -1,13 +1,18 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
 	import * as HoverCard from '$lib/components/ui/hover-card/index.js';
-	import type { Team } from '$lib/gen/nokku/v1/team_pb';
+	import { team } from '$lib/api/team.svelte';
 	import { Users } from '@lucide/svelte';
 
 	type Props = {
-		teams: Team[];
+		userId: string;
 	};
-	let { teams }: Props = $props();
+	let { userId }: Props = $props();
+
+	// The member's teams: one targeted read per row, cached and refetched
+	// with the team service queries on membership changes.
+	const teamsQuery = $derived(team.listForUser(userId));
+	const teams = $derived(teamsQuery.data ?? []);
 
 	const teamCount = $derived(teams.length);
 	const hasTeams = $derived(teamCount > 0);
@@ -37,10 +42,10 @@
 						<div class="flex-1 space-y-1 overflow-hidden">
 							<div class="flex items-center gap-2">
 								<p class="truncate text-sm leading-none font-medium">{team.name}</p>
-								{#if team.members.length > 0}
+								{#if team.memberCount && team.memberCount > 0}
 									<Badge variant="outline" class="text-[10px] leading-none">
-										{team.members.length}
-										{team.members.length === 1 ? 'member' : 'members'}
+										{team.memberCount}
+										{team.memberCount === 1 ? 'member' : 'members'}
 									</Badge>
 								{/if}
 							</div>

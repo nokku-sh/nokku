@@ -56,11 +56,11 @@
 		};
 	}
 
-	let data = $derived(generateData(user?.username || '', colors));
+	let data = $derived(generateData(user?.email || '', colors));
 </script>
 
 <Avatar.Root {...restProps}>
-	<Avatar.Image src={user?.picture} alt={'@' + user?.username} referrerpolicy="no-referrer" />
+	<Avatar.Image src={user?.picture} alt={user?.name || user?.email} referrerpolicy="no-referrer" />
 	<Avatar.Fallback class="bg-transparent">
 		<svg
 			viewBox="0 0 {SIZE} {SIZE}"

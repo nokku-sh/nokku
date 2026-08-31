@@ -28,7 +28,7 @@
 		if (log.actorEmail) return log.actorEmail;
 		if (log.actorType === 'user') {
 			const member = members.data?.members.find((m) => m.id === log.actorId);
-			if (member) return member.name || member.username;
+			if (member) return member.name;
 		}
 		return log.actorType;
 	}

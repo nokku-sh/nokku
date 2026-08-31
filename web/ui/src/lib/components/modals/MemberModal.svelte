@@ -29,10 +29,8 @@
 		}))
 	);
 
-	const teams = $derived(team.list());
-	const userTeams = $derived(
-		teams.data?.teams.filter((t) => t.members.find((m) => m.id === data?.id)) ?? []
-	);
+	const userTeamsQuery = $derived(team.listForUser(data?.id));
+	const userTeams = $derived(userTeamsQuery.data ?? []);
 
 	const updateMember = workspace.updateMember();
 	function handleRoleChange(val: string) {
@@ -58,7 +56,7 @@
 				</Item.Media>
 				<Item.Content>
 					<Item.Title class="text-lg">{data.name}</Item.Title>
-					<Item.Description>@{data.username}</Item.Description>
+					<Item.Description>{data.email}</Item.Description>
 				</Item.Content>
 				<Item.Actions>
 					<CopyButton text={data.id}>Copy ID</CopyButton>

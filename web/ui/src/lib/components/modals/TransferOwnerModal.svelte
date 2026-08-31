@@ -129,7 +129,7 @@
 					>
 						<span>
 							I understand that I am permanently transferring ownership to
-							<strong class="text-foreground">@{targetMember?.username}</strong>, and they will be
+							<strong class="text-foreground">{targetMember?.name}</strong>, and they will be
 							responsible for ensuring the billing subscription stays active.
 						</span>
 					</Label>

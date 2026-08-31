@@ -13,7 +13,13 @@
 <div class="flex items-center gap-3" {...restProps}>
 	<UserAvatar {user} />
 	<div class="flex flex-col">
-		<span class="truncate text-sm font-medium" title={user.name}>{user.name}</span>
+		{#if user.name}
+			<span class="truncate text-sm font-medium" title={user.name}>{user.name}</span>
+		{:else}
+			<span class="truncate text-sm font-medium" title={user.email.split('@')[0]}>
+				{user.email.split('@')[0]}
+			</span>
+		{/if}
 		<span class="truncate text-xs text-muted-foreground" title={user.email}>
 			<CopyButton text={user.email} icon={false} class="p-0 hover:bg-transparent">
 				<span class="font-mono text-sm font-light">{user.email}</span>

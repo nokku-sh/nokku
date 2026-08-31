@@ -437,7 +437,7 @@
 					<DownloadIcon size={14} class="mr-1.5" /> Download
 				</Button>
 			{:else if backupCodes.isSuccess && backupCodes.data.length > 0}
-				<Button variant="default" size="sm" onclick={createBackupCodes.mutate}>
+				<Button variant="default" size="sm" onclick={() => createBackupCodes.mutate()}>
 					{#if createBackupCodes.isPending}
 						<LoaderCircle size={14} class="mr-2 animate-spin" /> Generating...
 					{:else}
@@ -445,7 +445,7 @@
 					{/if}
 				</Button>
 			{:else}
-				<Button variant="default" size="sm" onclick={createBackupCodes.mutate}>
+				<Button variant="default" size="sm" onclick={() => createBackupCodes.mutate()}>
 					{#if createBackupCodes.isPending}
 						<LoaderCircle size={14} class="animate-spin" /> Generating...
 					{:else}

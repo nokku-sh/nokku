@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { team } from '$lib/api/team.svelte';
 	import { workspace } from '$lib/api/workspaces.svelte';
 	import { roles } from '$lib/api/roles.svelte';
 	import { roleIcon, roleLabel } from '$lib/roles';
@@ -45,7 +44,6 @@
 			roleName: page.url.searchParams.get('role') || undefined
 		}))
 	);
-	const teams = $derived(team.list());
 
 	const removeMember = workspace.removeMember();
 	const updateMember = workspace.updateMember();
@@ -78,11 +76,6 @@
 				return renderComponent(UserCell, { user: row.original });
 			}
 		}),
-		columnHelper.accessor('username', {
-			header: 'Username',
-			enableSorting: true,
-			cell: ({ row }) => row.original.username
-		}),
 		columnHelper.accessor('roleName', {
 			header: 'Role',
 			enableColumnFilter: true,
@@ -96,11 +89,7 @@
 		columnHelper.display({
 			id: 'teams',
 			header: 'Teams',
-			cell: ({ row }) => {
-				const userTeams =
-					teams.data?.teams?.filter((t) => t.members.find((m) => m.id === row.original.id)) ?? [];
-				return renderComponent(TeamCell, { teams: userTeams });
-			}
+			cell: ({ row }) => renderComponent(TeamCell, { userId: row.original.id })
 		}),
 		columnHelper.display({
 			id: 'actions',

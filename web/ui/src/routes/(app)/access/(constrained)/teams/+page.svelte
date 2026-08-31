@@ -56,9 +56,13 @@
 					description: row.original.description
 				})
 		}),
-		columnHelper.accessor('members', {
+		columnHelper.accessor('memberCount', {
 			header: 'Members',
-			cell: ({ row }) => renderComponent(MemberCell, { members: row.original.members })
+			cell: ({ row }) =>
+				renderComponent(MemberCell, {
+					teamId: row.original.id,
+					memberCount: row.original.memberCount
+				})
 		}),
 		columnHelper.accessor('updatedAt', {
 			header: 'Updated',

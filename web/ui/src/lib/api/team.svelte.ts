@@ -22,6 +22,29 @@ export const team = {
 			}),
 			{ enabled: !!workspaceID.current }
 		),
+	// Members of one team, fetched when a view actually shows them. Pass
+	// enabled via opts to defer the fetch (e.g. until a hover card opens).
+	members: (teamId: string, opts?: () => { enabled?: boolean }) =>
+		useQuery(
+			TeamService.method.listTeamMembers,
+			() => ({ workspaceId: workspaceID.current, teamId }),
+			{
+				enabled: !!workspaceID.current && !!teamId,
+				select: (res) => res.members,
+				...opts?.()
+			}
+		),
+	// Teams one user belongs to: the read the member rows and the user
+	// profile modal need, instead of scanning every team's members.
+	listForUser: (userId?: string) =>
+		useQuery(
+			TeamService.method.listTeamsForUser,
+			() => ({ workspaceId: workspaceID.current, userId }),
+			{
+				enabled: !!workspaceID.current && !!userId,
+				select: (res) => res.teams
+			}
+		),
 
 	// Mutations
 	create: () =>
