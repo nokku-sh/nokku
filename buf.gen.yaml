@@ -25,6 +25,4 @@ plugins:
     include_imports: true
 
 inputs:
-  # Local checkout while the username-removal proto changes are unpushed;
-  # switch back to the git_repo input after pushing nokku-sh/protos.
   - directory: ../protos/nokku
