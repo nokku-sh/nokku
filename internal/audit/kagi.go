@@ -2,7 +2,6 @@ package audit
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -18,19 +17,20 @@ import (
 // identity the middleware planted.
 func (s *Service) Record(ctx context.Context, e kagi.Event) {
 	event := eventFromKagi(e)
-	if id, ok := kagi.IdentityFromContext(ctx); ok {
+	if id, ok := kagi.IdentityFromContext(ctx); ok && id.Meta != nil {
 		event.IPAddress = util.SanitizeUTF8(util.GetRemoteIP(id.Meta.Header, id.Meta.RemoteAddr))
 		event.UserAgent = util.SanitizeUTF8(id.Meta.Header.Get("User-Agent"))
 	}
 
 	// Never block the auth flow: the insert runs detached from the request
-	// context so a slow DB cannot stall a login.
+	// context so a slow DB cannot stall a login. cancel moves into the
+	// goroutine: calling it on return from Record would cancel the context
+	// out from under the insert.
 	actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
-	defer cancel()
 	go func() {
+		defer cancel()
 		if err := s.Append(actx, event); err != nil {
-			slog.Warn("failed to write auth audit log",
-				"action", e.Action, "error_type", fmt.Sprintf("%T", err))
+			slog.Warn("failed to write auth audit log", "action", e.Action, "error", err)
 		}
 	}()
 }
