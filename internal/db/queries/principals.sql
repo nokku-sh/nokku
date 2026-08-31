@@ -151,8 +151,7 @@ WHERE
 
 -- Insert-only grant/revoke primitives used by AddSubjectsToPrincipal /
 -- RemoveSubjectsFromPrincipal. They add or remove a single subject without
--- touching other subjects already granted on the principal (unlike the
--- diff-sync AddUsersToPrincipal & co used by the old membership-setting flow).
+-- touching other subjects already granted on the principal.
 -- name: AddUserToPrincipal :exec
 INSERT INTO
   principal_users (principal_id, workspace_id, user_id)

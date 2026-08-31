@@ -73,19 +73,41 @@ WHERE
   AND user_id = @user_id;
 
 -- name: ListTeamMembers :many
+-- Members of one team without their display fields: identity lives in kagi,
+-- and the API layer stitches user data in via kagi's Users manager.
 SELECT
   tm.workspace_id,
   tm.team_id,
-  u.id,
-  u.name,
-  u.username,
-  u.email,
-  u.email_verified,
-  u.picture,
-  u.is_active,
+  tm.user_id,
   tm.created_at
 FROM
   team_members tm
-  JOIN users u ON u.id = tm.user_id
 WHERE
   tm.team_id = @team_id;
+
+-- name: CountTeamMembers :many
+-- Member counts for a set of teams in one read, for list views that show a
+-- count instead of embedding each team's members.
+SELECT
+  tm.team_id,
+  COUNT(*)::INTEGER AS member_count
+FROM
+  team_members tm
+WHERE
+  tm.team_id = ANY (@team_ids::UUID[])
+GROUP BY
+  tm.team_id;
+
+-- name: ListTeamsForUser :many
+-- Teams one user belongs to within a workspace: the read the user-profile
+-- surface needs, without deriving it from a teams-with-members blob.
+SELECT
+  t.*
+FROM
+  teams t
+  JOIN team_members tm ON tm.team_id = t.id
+WHERE
+  tm.workspace_id = @workspace_id
+  AND tm.user_id = @user_id
+ORDER BY
+  t.id ASC;

@@ -20,26 +20,6 @@ WITH
     RETURNING
       workspace_id
   ),
-  new_oidc_provider AS (
-    INSERT INTO
-      oidc_providers (workspace_id)
-    SELECT
-      id
-    FROM
-      new_workspace
-    RETURNING
-      workspace_id
-  ),
-  new_saml_provider AS (
-    INSERT INTO
-      saml_providers (workspace_id)
-    SELECT
-      id
-    FROM
-      new_workspace
-    RETURNING
-      workspace_id
-  ),
   new_subscription AS (
     INSERT INTO
       workspace_subscriptions (workspace_id)
@@ -63,15 +43,11 @@ FROM
 WHERE
   w.id = @workspace_id;
 
--- name: GetWorkspaceByInviteToken :one
+-- name: ListWorkspaceIDs :many
 SELECT
-  *
+  id
 FROM
-  workspaces
-WHERE
-  id = @workspace_id
-  AND invite_token_hash = @invite_token_hash
-  AND invite_token_expires_at > NOW();
+  workspaces;
 
 -- name: ListWorkspaces :many
 SELECT
@@ -80,15 +56,6 @@ FROM
   workspaces
 ORDER BY
   id ASC;
-
--- name: CountWorkspaces :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  workspaces
-  JOIN workspace_members wm ON wm.workspace_id = workspaces.id
-WHERE
-  wm.user_id = @user_id;
 
 -- name: CountWorkspacesByOwner :one
 SELECT
@@ -108,35 +75,29 @@ WHERE
 ORDER BY
   id ASC;
 
--- name: GetUserWorkspaceIDs :many
-SELECT
-  workspace_id
-FROM
-  workspace_members
-WHERE
-  user_id = @user_id;
-
 -- name: GetActorWorkspaceIDs :many
+-- The actor id resolves against identity (kagi, TEXT) and machine
+-- principals (UUID), so each branch casts explicitly.
 SELECT
   workspace_id
 FROM
   workspace_members
 WHERE
-  user_id = @actor_id
+  user_id = @actor_id::text
 UNION
 SELECT
   workspace_id
 FROM
   daemons
 WHERE
-  id = @actor_id
+  id = @actor_id::uuid
 UNION
 SELECT
   workspace_id
 FROM
   service_accounts
 WHERE
-  id = @actor_id;
+  id = @actor_id::uuid;
 
 -- name: UserWorkspaceMember :one
 SELECT
@@ -150,77 +111,35 @@ WHERE
 -- name: GetWorkspaceMember :one
 SELECT
   wm.workspace_id,
-  u.id,
-  u.name,
-  u.username,
-  u.email,
-  u.email_verified,
-  u.picture,
-  u.is_active,
+  wm.user_id,
   wm.role_name,
   wm.created_at,
   wm.updated_at
 FROM
   workspace_members wm
-  JOIN users u ON u.id = wm.user_id
 WHERE
   wm.workspace_id = @workspace_id
   AND wm.user_id = @user_id;
 
 -- name: ListWorkspaceMembers :many
+-- Members of one workspace without their display fields: identity lives in
+-- kagi, and the API layer stitches user data in via kagi's Users manager.
 SELECT
   wm.workspace_id,
-  u.id,
-  u.name,
-  u.username,
-  u.email,
-  u.email_verified,
-  u.picture,
-  u.is_active,
+  wm.user_id,
   wm.role_name,
   wm.created_at,
   wm.updated_at
 FROM
   workspace_members wm
-  JOIN users u ON u.id = wm.user_id
 WHERE
   wm.workspace_id = @workspace_id
-  AND (
-    sqlc.narg('query')::TEXT IS NULL
-    OR u.name ILIKE '%' || sqlc.narg('query') || '%'
-    OR u.username ILIKE '%' || sqlc.narg('query') || '%'
-    OR u.email ILIKE '%' || sqlc.narg('query') || '%'
-  )
   AND (
     sqlc.narg('role_name')::TEXT IS NULL
     OR wm.role_name = sqlc.narg('role_name')::TEXT
   )
 ORDER BY
-  u.name ASC,
-  u.username ASC
-LIMIT
-  sqlc.narg('limit')
-OFFSET
-  sqlc.narg('offset');
-
--- name: CountMembers :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  workspace_members wm
-  JOIN users u ON u.id = wm.user_id
-WHERE
-  wm.workspace_id = @workspace_id
-  AND (
-    sqlc.narg('query')::TEXT IS NULL
-    OR u.name ILIKE '%' || sqlc.narg('query') || '%'
-    OR u.username ILIKE '%' || sqlc.narg('query') || '%'
-    OR u.email ILIKE '%' || sqlc.narg('query') || '%'
-  )
-  AND (
-    sqlc.narg('role_name')::TEXT IS NULL
-    OR wm.role_name = sqlc.narg('role_name')::TEXT
-  );
+  wm.created_at;
 
 -- name: UpdateWorkspace :one
 UPDATE workspaces

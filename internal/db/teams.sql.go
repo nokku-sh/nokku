@@ -34,6 +34,45 @@ func (q *Queries) AddTeamMember(ctx context.Context, arg *AddTeamMemberParams) e
 	return err
 }
 
+const countTeamMembers = `-- name: CountTeamMembers :many
+SELECT
+  tm.team_id,
+  COUNT(*)::INTEGER AS member_count
+FROM
+  team_members tm
+WHERE
+  tm.team_id = ANY ($1::UUID[])
+GROUP BY
+  tm.team_id
+`
+
+type CountTeamMembersRow struct {
+	TeamID      string `json:"teamId"`
+	MemberCount int32  `json:"memberCount"`
+}
+
+// Member counts for a set of teams in one read, for list views that show a
+// count instead of embedding each team's members.
+func (q *Queries) CountTeamMembers(ctx context.Context, teamIds []string) ([]*CountTeamMembersRow, error) {
+	rows, err := q.db.Query(ctx, countTeamMembers, teamIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*CountTeamMembersRow
+	for rows.Next() {
+		var i CountTeamMembersRow
+		if err := rows.Scan(&i.TeamID, &i.MemberCount); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createTeam = `-- name: CreateTeam :one
 INSERT INTO
   teams (workspace_id, name, description, tags)
@@ -121,34 +160,23 @@ const listTeamMembers = `-- name: ListTeamMembers :many
 SELECT
   tm.workspace_id,
   tm.team_id,
-  u.id,
-  u.name,
-  u.username,
-  u.email,
-  u.email_verified,
-  u.picture,
-  u.is_active,
+  tm.user_id,
   tm.created_at
 FROM
   team_members tm
-  JOIN users u ON u.id = tm.user_id
 WHERE
   tm.team_id = $1
 `
 
 type ListTeamMembersRow struct {
-	WorkspaceID   string    `json:"workspaceId"`
-	TeamID        string    `json:"teamId"`
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Username      string    `json:"username"`
-	Email         string    `json:"email"`
-	EmailVerified bool      `json:"emailVerified"`
-	Picture       *string   `json:"picture"`
-	IsActive      bool      `json:"isActive"`
-	CreatedAt     time.Time `json:"createdAt"`
+	WorkspaceID string    `json:"workspaceId"`
+	TeamID      string    `json:"teamId"`
+	UserID      string    `json:"userId"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
+// Members of one team without their display fields: identity lives in kagi,
+// and the API layer stitches user data in via kagi's Users manager.
 func (q *Queries) ListTeamMembers(ctx context.Context, teamID string) ([]*ListTeamMembersRow, error) {
 	rows, err := q.db.Query(ctx, listTeamMembers, teamID)
 	if err != nil {
@@ -161,13 +189,7 @@ func (q *Queries) ListTeamMembers(ctx context.Context, teamID string) ([]*ListTe
 		if err := rows.Scan(
 			&i.WorkspaceID,
 			&i.TeamID,
-			&i.ID,
-			&i.Name,
-			&i.Username,
-			&i.Email,
-			&i.EmailVerified,
-			&i.Picture,
-			&i.IsActive,
+			&i.UserID,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -245,6 +267,54 @@ func (q *Queries) ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*ListT
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.TotalCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTeamsForUser = `-- name: ListTeamsForUser :many
+SELECT
+  t.id, t.workspace_id, t.name, t.description, t.tags, t.created_at, t.updated_at
+FROM
+  teams t
+  JOIN team_members tm ON tm.team_id = t.id
+WHERE
+  tm.workspace_id = $1
+  AND tm.user_id = $2
+ORDER BY
+  t.id ASC
+`
+
+type ListTeamsForUserParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	UserID      string `json:"userId"`
+}
+
+// Teams one user belongs to within a workspace: the read the user-profile
+// surface needs, without deriving it from a teams-with-members blob.
+func (q *Queries) ListTeamsForUser(ctx context.Context, arg *ListTeamsForUserParams) ([]*Team, error) {
+	rows, err := q.db.Query(ctx, listTeamsForUser, arg.WorkspaceID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Team
+	for rows.Next() {
+		var i Team
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.Name,
+			&i.Description,
+			&i.Tags,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

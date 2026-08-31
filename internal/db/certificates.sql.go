@@ -279,55 +279,6 @@ func (q *Queries) GetCAByDaemonID(ctx context.Context, daemonID *string) (*Certi
 	return &i, err
 }
 
-const getCAByName = `-- name: GetCAByName :one
-SELECT
-  id, workspace_id, name, description, certificate, private_key, public_key, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
-FROM
-  certificate_authorities
-WHERE
-  workspace_id = $1
-  AND name = $2
-`
-
-type GetCAByNameParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	Name        string `json:"name"`
-}
-
-func (q *Queries) GetCAByName(ctx context.Context, arg *GetCAByNameParams) (*CertificateAuthority, error) {
-	row := q.db.QueryRow(ctx, getCAByName, arg.WorkspaceID, arg.Name)
-	var i CertificateAuthority
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.Certificate,
-		&i.PrivateKey,
-		&i.PublicKey,
-		&i.SerialNumber,
-		&i.Subject,
-		&i.NotBefore,
-		&i.NotAfter,
-		&i.IsActive,
-		&i.IsDefault,
-		&i.KeyType,
-		&i.AuthorityType,
-		&i.KeyBits,
-		&i.Lifetime,
-		&i.UserDefaultTtl,
-		&i.UserMaxTtl,
-		&i.UserExtensions,
-		&i.UserCriticalOptions,
-		&i.HostDefaultTtl,
-		&i.HostMaxTtl,
-		&i.AllowedKeyTypes,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
 const getCAForUpdate = `-- name: GetCAForUpdate :one
 SELECT
   id, workspace_id, name, description, certificate, private_key, public_key, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at

@@ -69,15 +69,6 @@ WHERE
   id = @ca_id
 FOR UPDATE;
 
--- name: GetCAByName :one
-SELECT
-  *
-FROM
-  certificate_authorities
-WHERE
-  workspace_id = @workspace_id
-  AND name = @name;
-
 -- name: GetDefaultCA :one
 SELECT
   *

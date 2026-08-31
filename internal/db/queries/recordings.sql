@@ -72,8 +72,3 @@ ORDER BY
   started_at ASC
 LIMIT
   sqlc.narg('limit');
-
--- name: DeleteWorkspaceRecordings :exec
-DELETE FROM recordings
-WHERE
-  workspace_id = @workspace_id;

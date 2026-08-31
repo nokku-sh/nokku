@@ -64,8 +64,7 @@ type AddUserToPrincipalParams struct {
 
 // Insert-only grant/revoke primitives used by AddSubjectsToPrincipal /
 // RemoveSubjectsFromPrincipal. They add or remove a single subject without
-// touching other subjects already granted on the principal (unlike the
-// diff-sync AddUsersToPrincipal & co used by the old membership-setting flow).
+// touching other subjects already granted on the principal.
 func (q *Queries) AddUserToPrincipal(ctx context.Context, arg *AddUserToPrincipalParams) error {
 	_, err := q.db.Exec(ctx, addUserToPrincipal, arg.PrincipalID, arg.WorkspaceID, arg.UserID)
 	return err
