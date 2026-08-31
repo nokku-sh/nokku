@@ -105,22 +105,23 @@ func (a *flowAuthorize) Take(ctx context.Context, stateValue string) (*flowAutho
 	return &st, nil
 }
 
-// flowLinkUserID returns the signed-in user's id when ctx carries a session,
-// else "". SSO logins started while signed in link to that account.
-func flowLinkUserID(ctx context.Context) string {
-	return SubjectFromContext(ctx)
-}
-
 // resolveForLogin resolves the flow's provider config for a login request.
 // When no provider matches, it falls back to the provider's workspace via
 // the email's verified domain: home realm discovery lands on a workspace
 // other than the login request's. It returns the effective workspace.
+// Enterprise providers pin their workspace: a login that starts without
+// workspace context resolves to the provider's workspace, so JIT-provisioned
+// users become members there instead of landing with no workspace. Social
+// rows carry no workspace and leave the passed value untouched.
 func (s *Service) resolveForLogin(
 	ctx context.Context,
 	workspaceID, providerID, domain string,
 ) (string, *SSOProvider, error) {
 	cfg, err := s.GetSSOProvider(ctx, providerID)
 	if err == nil {
+		if workspaceID == "" && cfg.WorkspaceID != "" {
+			workspaceID = cfg.WorkspaceID
+		}
 		return workspaceID, cfg, nil
 	}
 	if d, derr := s.GetVerifiedTenantDomain(
@@ -157,7 +158,7 @@ func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
 		WorkspaceID: workspaceID,
 		ProviderID:  providerID,
 		ReturnTo:    SafeReturnTo(r.URL.Query().Get("return_to")),
-		LinkUserID:  flowLinkUserID(ctx),
+		LinkUserID:  SubjectFromContext(ctx),
 	}
 
 	provider, err := h.discover(ctx, cfg.OIDC.IssuerURL)
@@ -213,6 +214,10 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		Fail(w, r, h.errRedirect, "provider not configured")
 		return
 	}
+	// Login set the redirect URL on its in-memory copy; the callback reloads
+	// the stored config, so set it again. Providers like Keycloak reject the
+	// exchange when the redirect_uri the code was issued for is missing.
+	cfg.OIDC.RedirectURL = h.svc.baseURL + "/oidc/callback"
 
 	provider, err := h.discover(ctx, cfg.OIDC.IssuerURL)
 	if err != nil {
@@ -255,7 +260,13 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	idToken, err := provider.Verifier(&oidc.Config{ClientID: cfg.OIDC.ClientID}).
 		Verify(ctx, rawIDToken)
 	if err != nil {
-		slog.Warn("oidc callback: id token verification failed", "error", err, "provider", cfg.ProviderID)
+		slog.Warn(
+			"oidc callback: id token verification failed",
+			"error",
+			err,
+			"provider",
+			cfg.ProviderID,
+		)
 		Fail(w, r, h.errRedirect, "login failed")
 		return
 	}
@@ -263,7 +274,13 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	// (Keycloak) omit it, so only compare when the claim is present.
 	if idToken.AccessTokenHash != "" {
 		if err := idToken.VerifyAccessToken(token.AccessToken); err != nil {
-			slog.Warn("oidc callback: access token hash mismatch", "error", err, "provider", cfg.ProviderID)
+			slog.Warn(
+				"oidc callback: access token hash mismatch",
+				"error",
+				err,
+				"provider",
+				cfg.ProviderID,
+			)
 			Fail(w, r, h.errRedirect, "login failed")
 			return
 		}
@@ -271,7 +288,13 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 
 	var claims map[string]any
 	if err := idToken.Claims(&claims); err != nil {
-		slog.Warn("oidc callback: id token claims decode failed", "error", err, "provider", cfg.ProviderID)
+		slog.Warn(
+			"oidc callback: id token claims decode failed",
+			"error",
+			err,
+			"provider",
+			cfg.ProviderID,
+		)
 		Fail(w, r, h.errRedirect, "login failed")
 		return
 	}

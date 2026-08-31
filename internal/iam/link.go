@@ -226,12 +226,15 @@ func (s *Service) completeSSO(
 		Fail(w, r, errRedirect, "identity rejected")
 		return
 	}
+	// The session stays unpinned: users are global and act per-request in a
+	// workspace (the transport resolves the tenant from each request). A pin
+	// here would hard-bind the browser session to one workspace and break
+	// cross-workspace operations. st.WorkspaceID only drives membership.
 	sess, token, err := s.Sessions.Issue(ctx, SessionParams{
-		SubjectID:   u.ID,
-		Kind:        KindUser,
-		Method:      l.credType,
-		WorkspaceID: st.WorkspaceID,
-		TTL:         s.Sessions.opts.TTL,
+		SubjectID: u.ID,
+		Kind:      KindUser,
+		Method:    l.credType,
+		TTL:       s.Sessions.opts.TTL,
 	})
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")

@@ -54,7 +54,7 @@ func (h *oauth2Flow) Login(w http.ResponseWriter, r *http.Request) {
 		WorkspaceID: workspaceID,
 		ProviderID:  providerID,
 		ReturnTo:    SafeReturnTo(r.URL.Query().Get("return_to")),
-		LinkUserID:  flowLinkUserID(ctx),
+		LinkUserID:  SubjectFromContext(ctx),
 	}
 	st.PKCEVerifier = oauth2.GenerateVerifier()
 
@@ -94,6 +94,10 @@ func (h *oauth2Flow) Callback(w http.ResponseWriter, r *http.Request) {
 		Fail(w, r, h.errRedirect, "provider not configured")
 		return
 	}
+	// Login set the redirect URL on its in-memory copy; the callback reloads
+	// the stored config, so set it again. Strict providers reject the
+	// exchange when the redirect_uri the code was issued for is missing.
+	cfg.OAuth2.RedirectURL = h.svc.baseURL + "/oauth/callback"
 
 	exchangeCtx := context.WithValue(
 		ctx,
