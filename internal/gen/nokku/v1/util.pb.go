@@ -7,16 +7,15 @@
 package nokkuv1
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -192,23 +191,14 @@ func (*WhoamiRequest) Descriptor() ([]byte, []int) {
 }
 
 type WhoamiResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Kind mirrors iam's session kinds: user, cli, web_device, daemon,
-	// service_account. It tells the caller what credential answered.
-	Kind *string `protobuf:"bytes,1,opt,name=kind" json:"kind,omitempty"`
-	// SubjectID is the id the session was issued to. For user, cli, and
-	// web_device sessions this is the user id; daemons and service accounts
-	// carry their own id.
-	SubjectId *string `protobuf:"bytes,2,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
-	// UserID is the acting user for user and cli sessions; empty otherwise.
-	UserId *string `protobuf:"bytes,3,opt,name=user_id,json=userId" json:"user_id,omitempty"`
-	// WorkspaceID is the credential's pinned workspace for machine
-	// principals; empty when the actor is global.
-	WorkspaceId *string `protobuf:"bytes,4,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	// Hydrated row for the principal, when one applies.
-	User           *User           `protobuf:"bytes,5,opt,name=user" json:"user,omitempty"`
-	ServiceAccount *ServiceAccount `protobuf:"bytes,6,opt,name=service_account,json=serviceAccount" json:"service_account,omitempty"`
-	Daemon         *Daemon         `protobuf:"bytes,7,opt,name=daemon" json:"daemon,omitempty"`
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Kind           *string                `protobuf:"bytes,1,opt,name=kind" json:"kind,omitempty"`
+	SubjectId      *string                `protobuf:"bytes,2,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
+	UserId         *string                `protobuf:"bytes,3,opt,name=user_id,json=userId" json:"user_id,omitempty"`
+	WorkspaceId    *string                `protobuf:"bytes,4,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	User           *User                  `protobuf:"bytes,5,opt,name=user" json:"user,omitempty"`
+	ServiceAccount *ServiceAccount        `protobuf:"bytes,6,opt,name=service_account,json=serviceAccount" json:"service_account,omitempty"`
+	Daemon         *Daemon                `protobuf:"bytes,7,opt,name=daemon" json:"daemon,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
