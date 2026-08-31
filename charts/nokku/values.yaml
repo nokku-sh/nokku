@@ -111,12 +111,11 @@ app:
 secrets:
   # Set existingSecret to re-use an already managed secret.
   existingSecret: ""
-  # 32-byte key used for Secretbox encryption in self-hosted mode.
+  # Master secret used for at-rest encryption (secretbox with HKDF-derived
+  # purpose keys: SSO secrets, SAML keys, DPoP nonce, CA keys).
   secret: "0123456789abcdefghijklmnopqrstuv"
   # Used only when bundled PostgreSQL is disabled or custom credentials are needed.
   databasePassword: ""
-  # Optional but recommended to keep auth sessions stable across restarts.
-  sessionSeed: ""
 
 postgresql:
   enabled: true

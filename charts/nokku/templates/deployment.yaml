@@ -60,36 +60,30 @@ spec:
               value: {{ .Values.app.otlpApiKey | quote }}
             - name: OTLP_TRUST_REMOTE
               value: {{ .Values.app.otlpTrustRemote | quote }}
-            - name: DATABASE_HOST
+            - name: PGHOST
               value: {{ include "nokku.databaseHost" . | quote }}
-            - name: DATABASE_PORT
+            - name: PGPORT
               value: {{ .Values.app.database.port | quote }}
-            - name: DATABASE_NAME
+            - name: PGDATABASE
               value: {{ .Values.app.database.name | quote }}
-            - name: DATABASE_USER
+            - name: PGUSER
               value: {{ .Values.app.database.user | quote }}
-            - name: DATABASE_SSL_MODE
+            - name: PGSSLMODE
               value: {{ .Values.app.database.sslMode | quote }}
-            - name: DATABASE_AUTOMIGRATE
+            - name: NOKKU_DB_AUTOMIGRATE
               value: {{ .Values.app.database.autoMigrate | quote }}
             - name: LOCAL_STORAGE_PATH
               value: {{ .Values.app.localStoragePath | quote }}
-            - name: SECRET
+            - name: NOKKU_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ include "nokku.secretName" . }}
-                  key: SECRET
+                  key: NOKKU_SECRET
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "nokku.secretName" . }}
                   key: DATABASE_PASSWORD
-            - name: SESSION_SEED
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "nokku.secretName" . }}
-                  key: SESSION_SEED
-                  optional: true
             {{- with .Values.app.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
