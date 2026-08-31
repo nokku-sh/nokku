@@ -20,17 +20,12 @@ type Querier interface {
 	// touching other subjects already granted on the principal.
 	AddUserToPrincipal(ctx context.Context, arg *AddUserToPrincipalParams) error
 	AddWorkspaceMember(ctx context.Context, arg *AddWorkspaceMemberParams) error
-	// ConsumeCredentialBySubject atomically deletes and returns the credential
-	// for (type, provider, subject, user_id): a credential can never be spent
-	// twice or by the wrong account. Backup codes rely on this.
 	ConsumeCredentialBySubject(ctx context.Context, arg *ConsumeCredentialBySubjectParams) (*Credential, error)
 	ConsumeToken(ctx context.Context, tokenHash crypto.HashedToken) (*ConsumeTokenRow, error)
 	CountAuditLogs(ctx context.Context, arg *CountAuditLogsParams) (int32, error)
 	// Member counts for a set of teams in one read, for list views that show a
 	// count instead of embedding each team's members.
 	CountTeamMembers(ctx context.Context, teamIds []string) ([]*CountTeamMembersRow, error)
-	// The total matching member count for ListWorkspaceMembers, so list views
-	// can paginate without loading every row.
 	CountWorkspaceMembers(ctx context.Context, arg *CountWorkspaceMembersParams) (int32, error)
 	CountWorkspacesByOwner(ctx context.Context, userID string) (int32, error)
 	CreateCA(ctx context.Context, arg *CreateCAParams) (*CertificateAuthority, error)
@@ -42,9 +37,6 @@ type Querier interface {
 	CreateTarget(ctx context.Context, arg *CreateTargetParams) (*Target, error)
 	CreateTeam(ctx context.Context, arg *CreateTeamParams) (*Team, error)
 	CreateUser(ctx context.Context, arg *CreateUserParams) (*User, error)
-	// Passkey-only signup reserves the WebAuthn user handle at ceremony begin
-	// and creates the account with that exact id at finish, so the credential
-	// binds to the user row it was registered against.
 	CreateUserWithID(ctx context.Context, arg *CreateUserWithIDParams) (*User, error)
 	CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParams) (*CreateWorkspaceRow, error)
 	DeleteCA(ctx context.Context, caID string) (*CertificateAuthority, error)
@@ -142,20 +134,14 @@ type Querier interface {
 	// Teams one user belongs to within a workspace: the read the user-profile
 	// surface needs, without deriving it from a teams-with-members blob.
 	ListTeamsForUser(ctx context.Context, arg *ListTeamsForUserParams) ([]*Team, error)
-	ListVerifiedDomainsForProvider(ctx context.Context, arg *ListVerifiedDomainsForProviderParams) ([]*WorkspaceDomain, error)
+	ListVerifiedDomainsForProvider(ctx context.Context, providerID string) ([]*WorkspaceDomain, error)
 	ListWorkspaceAuditLogWorkspaceIDs(ctx context.Context) ([]*string, error)
 	ListWorkspaceDomains(ctx context.Context, workspaceID string) ([]*WorkspaceDomain, error)
 	ListWorkspaceIDs(ctx context.Context) ([]string, error)
-	// Members of one workspace with their identity display fields joined in.
-	// The search query filters on name/email in SQL; ordering and pagination
-	// happen in the database too.
 	ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error)
 	ListWorkspaces(ctx context.Context) ([]*Workspace, error)
 	OldestRecordings(ctx context.Context, arg *OldestRecordingsParams) ([]*Recording, error)
 	PutSAMLKeypair(ctx context.Context, arg *PutSAMLKeypairParams) (*PutSAMLKeypairRow, error)
-	// One-time tokens are stored under their SHA-256 hash. ConsumeToken is a
-	// single atomic delete: a token can never be spent twice, and expired tokens
-	// fail the same way unknown ones do.
 	PutToken(ctx context.Context, arg *PutTokenParams) error
 	RemoveServiceAccountFromPrincipal(ctx context.Context, arg *RemoveServiceAccountFromPrincipalParams) error
 	RemoveTeamFromPrincipal(ctx context.Context, arg *RemoveTeamFromPrincipalParams) error
@@ -209,7 +195,7 @@ type Querier interface {
 	UpsertWorkspaceDomain(ctx context.Context, arg *UpsertWorkspaceDomainParams) (*WorkspaceDomain, error)
 	UserWorkspaceMember(ctx context.Context, arg *UserWorkspaceMemberParams) (bool, error)
 	VerifyUserEmail(ctx context.Context, id string) error
-	VerifyWorkspaceDomain(ctx context.Context, arg *VerifyWorkspaceDomainParams) error
+	VerifyWorkspaceDomain(ctx context.Context, arg *VerifyWorkspaceDomainParams) (*VerifyWorkspaceDomainRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

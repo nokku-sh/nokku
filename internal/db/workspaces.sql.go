@@ -56,8 +56,6 @@ type CountWorkspaceMembersParams struct {
 	RoleName    *string `json:"roleName"`
 }
 
-// The total matching member count for ListWorkspaceMembers, so list views
-// can paginate without loading every row.
 func (q *Queries) CountWorkspaceMembers(ctx context.Context, arg *CountWorkspaceMembersParams) (int32, error) {
 	row := q.db.QueryRow(ctx, countWorkspaceMembers, arg.WorkspaceID, arg.Query, arg.RoleName)
 	var column_1 int32
@@ -439,9 +437,6 @@ type ListWorkspaceMembersRow struct {
 	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
-// Members of one workspace with their identity display fields joined in.
-// The search query filters on name/email in SQL; ordering and pagination
-// happen in the database too.
 func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error) {
 	rows, err := q.db.Query(ctx, listWorkspaceMembers,
 		arg.WorkspaceID,

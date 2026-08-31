@@ -122,9 +122,6 @@ WHERE
   AND wm.user_id = @user_id;
 
 -- name: ListWorkspaceMembers :many
--- Members of one workspace with their identity display fields joined in.
--- The search query filters on name/email in SQL; ordering and pagination
--- happen in the database too.
 SELECT
   wm.workspace_id,
   u.id AS user_id,
@@ -159,8 +156,6 @@ OFFSET
   sqlc.narg('offset');
 
 -- name: CountWorkspaceMembers :one
--- The total matching member count for ListWorkspaceMembers, so list views
--- can paginate without loading every row.
 SELECT
   COUNT(*)::INTEGER
 FROM

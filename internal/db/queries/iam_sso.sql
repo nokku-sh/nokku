@@ -1,8 +1,8 @@
 -- name: UpsertSSOProvider :one
 INSERT INTO
-  sso_providers (workspace_id, provider_id, method, name, enabled, config, secret_enc)
+  sso_providers (workspace_id, provider_id, method, name, enabled, config)
 VALUES
-  (@workspace_id, @provider_id, @method, @name, @enabled, @config, @secret_enc)
+  (@workspace_id, @provider_id, @method, @name, @enabled, @config)
 ON CONFLICT (provider_id) DO UPDATE
 SET
   workspace_id = EXCLUDED.workspace_id,
@@ -10,7 +10,6 @@ SET
   name = EXCLUDED.name,
   enabled = EXCLUDED.enabled,
   config = EXCLUDED.config,
-  secret_enc = EXCLUDED.secret_enc,
   updated_at = NOW()
 RETURNING
   *;

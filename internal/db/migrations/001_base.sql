@@ -1,14 +1,8 @@
 -- Base schema for nokku.
---
--- Identity tables (users, credentials, sessions, one_time_tokens, api_keys,
--- sso_providers, workspace_domains, saml_keypair) live in the public schema
--- alongside domain tables so memberships, teams, and audit can join identity
--- data in plain SQL. See docs/adr/0001-merge-auth-back-into-nokku.md.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- Identity -------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   email TEXT NOT NULL UNIQUE CHECK (email = lower(email)),
@@ -21,12 +15,6 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- One unified credential table for every login method, learned from kagi:
---   type=password     data=argon2 hash, provider/subject empty
---   type=passkey      data=webauthn attestation object, subject=credential id base64
---   type=oauth/oidc/saml  data=provider profile JSON, provider+subject=external identity
---   type=backup_code  data=empty, subject=SHA-256 of the code; consumption
---                     is a single atomic DELETE ... RETURNING
 CREATE TABLE IF NOT EXISTS credentials (
   id TEXT PRIMARY KEY, -- method-specific id: webauthn credential id or uuidv7
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -47,9 +35,6 @@ WHERE
 
 CREATE INDEX credentials_user_idx ON credentials (user_id, type);
 
--- One-time tokens stored under their SHA-256 hash; consumption is a single
--- atomic DELETE returning the row. Deliberately no tenant column: a token
--- hash is globally unique and the raw value crosses the wire once.
 CREATE TABLE IF NOT EXISTS one_time_tokens (
   token_hash TEXT PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -59,7 +44,6 @@ CREATE TABLE IF NOT EXISTS one_time_tokens (
 
 CREATE INDEX one_time_tokens_expiry_idx ON one_time_tokens (expires_at);
 
--- Tables ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS roles (name TEXT PRIMARY KEY, description TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE IF NOT EXISTS workspaces (
@@ -97,12 +81,6 @@ CREATE TABLE IF NOT EXISTS workspace_subscriptions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Identity (workspace-scoped) --------------------------------------------------
--- Opaque server-side sessions keyed by the SHA-256 of the token: a database
--- leak reveals nothing usable. subject_id is deliberately not a foreign key:
--- sessions belong to users, CLI devices, and daemons alike. For device kinds,
--- binding carries the DPoP JWK thumbprint the session is bound to (RFC 9449);
--- proof verification is enforced by the iam middleware, not the schema.
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT NOT NULL PRIMARY KEY,
   subject_id TEXT NOT NULL,
@@ -120,47 +98,29 @@ CREATE INDEX sessions_subject_idx ON sessions (subject_id);
 
 CREATE INDEX sessions_workspace_idx ON sessions (workspace_id);
 
--- One unified SSO provider table, learned from kagi: method distinguishes
--- oidc/oauth2/saml; config carries the method payload as JSON; secret_enc is
--- cipher material (client secret, SAML SP key) encrypted at rest via the KMS
--- envelope cipher. provider_id is globally unique: enterprise providers use
--- the workspace id as their provider id; social providers ("google",
--- "github") are global and carry NULL workspace.
 CREATE TABLE IF NOT EXISTS sso_providers (
   workspace_id UUID REFERENCES workspaces (id) ON DELETE CASCADE,
   provider_id TEXT NOT NULL PRIMARY KEY,
   method TEXT NOT NULL, -- oidc, oauth2, saml
   name TEXT NOT NULL DEFAULT '',
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  config JSONB NOT NULL DEFAULT '{}',
-  secret_enc BYTEA,
+  config BYTEA NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Verified email domains bind a workspace to one SSO provider. They drive
--- discovery, JIT domain checks, and SSO enforcement. verified_until keeps
--- the "verified" state honest: domains must be re-proven periodically.
 CREATE TABLE IF NOT EXISTS workspace_domains (
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  domain TEXT PRIMARY KEY,
+  domain TEXT CHECK (domain = lower(domain)),
   provider_id TEXT NOT NULL,
-  token TEXT NOT NULL, -- DNS TXT verification token
+  token TEXT NOT NULL DEFAULT encode(gen_random_bytes (16), 'hex'), -- DNS TXT verification token
   verified_at TIMESTAMPTZ,
-  verified_until TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (workspace_id, domain)
 );
 
--- The SAML SP keypair is one deployment-global row; the private key is
--- encrypted at rest by the KMS cipher. insert-if-absent on first boot so
--- concurrent boots converge on one key instead of silently rotating the
--- certificate IdPs have pinned.
-CREATE TABLE IF NOT EXISTS saml_keypair (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  key_enc BYTEA NOT NULL,
-  cert_pem BYTEA NOT NULL
-);
+CREATE INDEX idx_workspace_domains_domain ON workspace_domains (domain);
 
 CREATE TABLE IF NOT EXISTS service_accounts (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -305,6 +265,12 @@ CREATE TABLE IF NOT EXISTS recordings (
   size_bytes BIGINT NOT NULL DEFAULT 0,
   complete BOOLEAN NOT NULL DEFAULT FALSE, -- False when upload stream ended abruptly
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS saml_keypair (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  key_enc BYTEA NOT NULL,
+  cert_pem BYTEA NOT NULL
 );
 
 -- Keysets (for envelope encryption - singleton)
@@ -622,10 +588,15 @@ CREATE POLICY tenant_isolation ON recordings FOR ALL TO nokku_app USING (workspa
 WITH
   CHECK (workspace_id = current_workspace_id ());
 
-CREATE POLICY tenant_isolation ON sso_providers FOR ALL TO nokku_app
-USING (workspace_id IS NULL OR workspace_id = current_workspace_id ())
+CREATE POLICY tenant_isolation ON sso_providers FOR ALL TO nokku_app USING (
+  workspace_id IS NULL
+  OR workspace_id = current_workspace_id ()
+)
 WITH
-  CHECK (workspace_id IS NULL OR workspace_id = current_workspace_id ());
+  CHECK (
+    workspace_id IS NULL
+    OR workspace_id = current_workspace_id ()
+  );
 
 CREATE POLICY tenant_isolation ON workspace_domains FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH

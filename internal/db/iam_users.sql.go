@@ -58,9 +58,6 @@ type CreateUserWithIDParams struct {
 	Picture *string `json:"picture"`
 }
 
-// Passkey-only signup reserves the WebAuthn user handle at ceremony begin
-// and creates the account with that exact id at finish, so the credential
-// binds to the user row it was registered against.
 func (q *Queries) CreateUserWithID(ctx context.Context, arg *CreateUserWithIDParams) (*User, error) {
 	row := q.db.QueryRow(ctx, createUserWithID,
 		arg.ID,

@@ -60,7 +60,7 @@ func (q *Queries) GetSAMLKeypair(ctx context.Context) (*GetSAMLKeypairRow, error
 
 const getSSOProvider = `-- name: GetSSOProvider :one
 SELECT
-  workspace_id, provider_id, method, name, enabled, config, secret_enc, created_at, updated_at
+  workspace_id, provider_id, method, name, enabled, config, created_at, updated_at
 FROM
   sso_providers
 WHERE
@@ -77,7 +77,6 @@ func (q *Queries) GetSSOProvider(ctx context.Context, providerID string) (*SsoPr
 		&i.Name,
 		&i.Enabled,
 		&i.Config,
-		&i.SecretEnc,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -89,8 +88,7 @@ INSERT INTO
   saml_keypair (id, key_enc, cert_pem)
 VALUES
   (1, $1, $2)
-ON CONFLICT (id) DO
-UPDATE
+ON CONFLICT (id) DO UPDATE
 SET
   key_enc = saml_keypair.key_enc,
   cert_pem = saml_keypair.cert_pem
@@ -118,21 +116,19 @@ func (q *Queries) PutSAMLKeypair(ctx context.Context, arg *PutSAMLKeypairParams)
 
 const upsertSSOProvider = `-- name: UpsertSSOProvider :one
 INSERT INTO
-  sso_providers (workspace_id, provider_id, method, name, enabled, config, secret_enc)
+  sso_providers (workspace_id, provider_id, method, name, enabled, config)
 VALUES
-  ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (provider_id) DO
-UPDATE
+  ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (provider_id) DO UPDATE
 SET
   workspace_id = EXCLUDED.workspace_id,
   method = EXCLUDED.method,
   name = EXCLUDED.name,
   enabled = EXCLUDED.enabled,
   config = EXCLUDED.config,
-  secret_enc = EXCLUDED.secret_enc,
   updated_at = NOW()
 RETURNING
-  workspace_id, provider_id, method, name, enabled, config, secret_enc, created_at, updated_at
+  workspace_id, provider_id, method, name, enabled, config, created_at, updated_at
 `
 
 type UpsertSSOProviderParams struct {
@@ -141,8 +137,7 @@ type UpsertSSOProviderParams struct {
 	Method      string                `json:"method"`
 	Name        string                `json:"name"`
 	Enabled     bool                  `json:"enabled"`
-	Config      []byte                `json:"config"`
-	SecretEnc   crypto.EncryptedBytes `json:"secretEnc"`
+	Config      crypto.EncryptedBytes `json:"config"`
 }
 
 func (q *Queries) UpsertSSOProvider(ctx context.Context, arg *UpsertSSOProviderParams) (*SsoProvider, error) {
@@ -153,7 +148,6 @@ func (q *Queries) UpsertSSOProvider(ctx context.Context, arg *UpsertSSOProviderP
 		arg.Name,
 		arg.Enabled,
 		arg.Config,
-		arg.SecretEnc,
 	)
 	var i SsoProvider
 	err := row.Scan(
@@ -163,7 +157,6 @@ func (q *Queries) UpsertSSOProvider(ctx context.Context, arg *UpsertSSOProviderP
 		&i.Name,
 		&i.Enabled,
 		&i.Config,
-		&i.SecretEnc,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

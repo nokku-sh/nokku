@@ -27,9 +27,6 @@ type ConsumeCredentialBySubjectParams struct {
 	UserID   string `json:"userId"`
 }
 
-// ConsumeCredentialBySubject atomically deletes and returns the credential
-// for (type, provider, subject, user_id): a credential can never be spent
-// twice or by the wrong account. Backup codes rely on this.
 func (q *Queries) ConsumeCredentialBySubject(ctx context.Context, arg *ConsumeCredentialBySubjectParams) (*Credential, error) {
 	row := q.db.QueryRow(ctx, consumeCredentialBySubject,
 		arg.Type,
@@ -246,13 +243,11 @@ func (q *Queries) RenameCredential(ctx context.Context, arg *RenameCredentialPar
 }
 
 const upsertCredential = `-- name: UpsertCredential :one
-
 INSERT INTO
   credentials (id, user_id, type, provider, subject, data, label)
 VALUES
   ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (id) DO
-UPDATE
+ON CONFLICT (id) DO UPDATE
 SET
   user_id = EXCLUDED.user_id,
   type = EXCLUDED.type,

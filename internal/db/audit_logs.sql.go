@@ -24,8 +24,8 @@ WHERE
     OR workspace_id = NULLIF($1::TEXT, '')::UUID
   )
   AND (
-    $2::UUID[] IS NULL
-    OR actor_id = ANY ($2::UUID[])
+    $2::TEXT[] IS NULL
+    OR actor_id = ANY ($2::TEXT[])
   )
   AND (
     $3::TEXT[] IS NULL
@@ -173,8 +173,8 @@ WHERE
     OR workspace_id = NULLIF($1::TEXT, '')::UUID
   )
   AND (
-    $2::UUID[] IS NULL
-    OR actor_id = ANY ($2::UUID[])
+    $2::TEXT[] IS NULL
+    OR actor_id = ANY ($2::TEXT[])
   )
   AND (
     $3::TEXT[] IS NULL

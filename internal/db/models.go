@@ -177,8 +177,7 @@ type SsoProvider struct {
 	Method      string                `json:"method"`
 	Name        string                `json:"name"`
 	Enabled     bool                  `json:"enabled"`
-	Config      []byte                `json:"config"`
-	SecretEnc   crypto.EncryptedBytes `json:"secretEnc"`
+	Config      crypto.EncryptedBytes `json:"config"`
 	CreatedAt   time.Time             `json:"createdAt"`
 	UpdatedAt   time.Time             `json:"updatedAt"`
 }
@@ -241,14 +240,13 @@ type Workspace struct {
 }
 
 type WorkspaceDomain struct {
-	WorkspaceID   string     `json:"workspaceId"`
-	Domain        string     `json:"domain"`
-	ProviderID    string     `json:"providerId"`
-	Token         string     `json:"token"`
-	VerifiedAt    *time.Time `json:"verifiedAt"`
-	VerifiedUntil *time.Time `json:"verifiedUntil"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	UpdatedAt     time.Time  `json:"updatedAt"`
+	WorkspaceID string     `json:"workspaceId"`
+	Domain      string     `json:"domain"`
+	ProviderID  string     `json:"providerId"`
+	Token       string     `json:"token"`
+	VerifiedAt  *time.Time `json:"verifiedAt"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
 }
 
 type WorkspaceMember struct {

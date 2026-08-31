@@ -49,7 +49,6 @@ func (q *Queries) DeleteExpiredTokens(ctx context.Context, now time.Time) (int64
 }
 
 const putToken = `-- name: PutToken :exec
-
 INSERT INTO
   one_time_tokens (token_hash, user_id, purpose, expires_at)
 VALUES
@@ -63,9 +62,6 @@ type PutTokenParams struct {
 	ExpiresAt time.Time          `json:"expiresAt"`
 }
 
-// One-time tokens are stored under their SHA-256 hash. ConsumeToken is a
-// single atomic delete: a token can never be spent twice, and expired tokens
-// fail the same way unknown ones do.
 func (q *Queries) PutToken(ctx context.Context, arg *PutTokenParams) error {
 	_, err := q.db.Exec(ctx, putToken,
 		arg.TokenHash,

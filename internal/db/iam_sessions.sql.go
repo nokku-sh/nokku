@@ -14,16 +14,7 @@ import (
 
 const createSession = `-- name: CreateSession :exec
 INSERT INTO
-  sessions (
-    token_hash,
-    subject_id,
-    kind,
-    method,
-    workspace_id,
-    binding,
-    label,
-    expires_at
-  )
+  sessions (token_hash, subject_id, kind, method, workspace_id, binding, label, expires_at)
 VALUES
   (
     $1,
