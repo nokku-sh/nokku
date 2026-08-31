@@ -15,7 +15,6 @@
 	const ws = $derived(workspace.get());
 	const invitation = invite.refresh();
 	const revoke = invite.revoke();
-	$inspect(ws);
 
 	$effect(() => {
 		if (!open) invitation.reset();
