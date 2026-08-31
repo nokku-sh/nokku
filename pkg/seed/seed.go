@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
-	"github.com/mizuchilabs/kagi"
-	kagipg "github.com/mizuchilabs/kagi/store/postgres"
 
+	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
@@ -41,23 +41,27 @@ func DefaultConfig() Config {
 	}
 }
 
-func Workspace(ctx context.Context, store *kagipg.Store, conn *db.Connection, cfg Config) error {
+func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cfg Config) error {
 	_ = gofakeit.Seed(time.Now().UnixNano())
 
-	// Create owner user. Identity is kagi's, so seed talks to the kagi store
-	// for users and to the nokku store for workspaces and members.
+	// Create owner user. Identity lives in nokku's own schema now, so the
+	// seed talks to iam for users and to the nokku store for workspaces and
+	// members.
 	email := os.Getenv("NOKKU_ADMIN_EMAIL")
-	owner, err := store.GetUserByEmail(ctx, "", email)
-	if errors.Is(err, kagi.ErrNotFound) {
-		owner, err = store.CreateUser(ctx, "", kagi.User{
-			Email:         email,
-			DisplayName:   "Super Admin",
-			Active:        true,
-			EmailVerified: true,
-		})
+	owner, err := iamSvc.GetUserByEmail(ctx, email)
+	if errors.Is(err, iam.ErrNotFound) {
+		owner, err = iamSvc.Register(
+			ctx,
+			email,
+			"Super Admin",
+			gofakeit.Password(true, true, true, false, false, 24),
+		)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to create admin user: %w", err)
+	}
+	if err := iamSvc.VerifyUserEmail(ctx, owner.ID); err != nil {
+		return fmt.Errorf("failed to verify admin email: %w", err)
 	}
 
 	// Create workspace as a system transaction. No tenant context exists yet.
@@ -72,23 +76,26 @@ func Workspace(ctx context.Context, store *kagipg.Store, conn *db.Connection, cf
 	}); err != nil {
 		return fmt.Errorf("failed to create workspace: %w", err)
 	}
-	ctx = kagi.ContextWithPrincipal(ctx, kagi.Principal{
-		SubjectID: owner.ID,
-		Kind:      kagi.KindUser,
+	ctx = iam.ContextWithPrincipal(ctx, iam.Principal{
+		ID:   owner.ID,
+		Kind: iam.KindUser,
 	})
 
-	kagi.AnnotateTenant(ctx, kagi.TenantID(workspace.ID))
+	ctx = iam.AnnotateTenant(ctx, workspace.ID)
 	err = conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		users := make([]kagi.User, cfg.NumUsers-1)
+		users := make([]*db.User, cfg.NumUsers-1)
 		for i := range cfg.NumUsers - 1 {
-			user, err := store.CreateUser(ctx, "", kagi.User{
-				Email:         gofakeit.Email(),
-				DisplayName:   gofakeit.Name(),
-				Active:        true,
-				EmailVerified: gofakeit.Bool(),
-			})
+			user, err := iamSvc.Register(
+				ctx,
+				gofakeit.Email(),
+				gofakeit.Name(),
+				gofakeit.Password(true, true, true, false, false, 24),
+			)
 			if err != nil {
 				return fmt.Errorf("failed to create user %d: %w", i, err)
+			}
+			if gofakeit.Bool() {
+				_ = iamSvc.VerifyUserEmail(ctx, user.ID)
 			}
 
 			users[i] = user
@@ -114,7 +121,7 @@ func Workspace(ctx context.Context, store *kagipg.Store, conn *db.Connection, cf
 			teams[i] = team
 
 			numberOfMembers := min(gofakeit.IntRange(2, 5), len(users))
-			shuffledUsers := make([]kagi.User, len(users))
+			shuffledUsers := make([]*db.User, len(users))
 			copy(shuffledUsers, users)
 			gofakeit.ShuffleAnySlice(shuffledUsers)
 
@@ -128,7 +135,13 @@ func Workspace(ctx context.Context, store *kagipg.Store, conn *db.Connection, cf
 			}
 		}
 
-		// Create service accounts. Suffixed names avoid UNIQUE (workspace_id, name) violations
+		// Create service accounts. Suffixed names avoid UNIQUE (workspace_id, name) violations.
+		// Seeded accounts share one throwaway credential: the seed tool never
+		// authenticates with them.
+		seedSATokenHash, err := crypto.HashToken(gofakeit.UUID())
+		if err != nil {
+			return fmt.Errorf("failed to hash seed service account token: %w", err)
+		}
 		sa := make([]string, cfg.NumServiceAccounts)
 		for i := range cfg.NumServiceAccounts {
 			sa[i], err = q.CreateServiceAccount(ctx, &db.CreateServiceAccountParams{
@@ -136,6 +149,7 @@ func Workspace(ctx context.Context, store *kagipg.Store, conn *db.Connection, cf
 				Name:        uniqueName(gofakeit.AppName(), i),
 				Description: new(gofakeit.Sentence()),
 				ExpiresAt:   new(gofakeit.FutureDate()),
+				TokenHash:   &seedSATokenHash,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to create service account %d: %w", i, err)
@@ -227,7 +241,7 @@ func Workspace(ctx context.Context, store *kagipg.Store, conn *db.Connection, cf
 					return fmt.Errorf("failed to create principal: %w", err)
 				}
 
-				shuffledUsers := make([]kagi.User, len(users))
+				shuffledUsers := make([]*db.User, len(users))
 				copy(shuffledUsers, users)
 				gofakeit.ShuffleAnySlice(shuffledUsers)
 

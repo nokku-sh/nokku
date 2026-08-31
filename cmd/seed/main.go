@@ -53,7 +53,7 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("failed to load configuration: %w", err)
 			}
-			return seed.Workspace(ctx, cfg.Auth.Store, cfg.Conn, seed.Config{
+			return seed.Workspace(ctx, cfg.IAM, cfg.Conn, seed.Config{
 				NumUsers:           cmd.Int("users"),
 				NumTeams:           cmd.Int("teams"),
 				NumTargets:         cmd.Int("targets"),

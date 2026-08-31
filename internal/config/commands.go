@@ -5,7 +5,8 @@ import (
 	"errors"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/mizuchilabs/kagi"
+
+	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 type AdminConfig struct {
@@ -15,8 +16,8 @@ type AdminConfig struct {
 }
 
 // BootstrapAdmin creates the first admin account from the environment when
-// one does not exist yet. Identity is kagi's; the password manager is the
-// same one the mounted login flow uses.
+// one does not exist yet. The password manager is the same one the mounted
+// login flow uses.
 func (c *Config) BootstrapAdmin(ctx context.Context) error {
 	cfg, err := env.ParseAs[AdminConfig]()
 	if err != nil {
@@ -27,23 +28,18 @@ func (c *Config) BootstrapAdmin(ctx context.Context) error {
 		return nil
 	}
 
-	svc := c.Auth.Service()
-	if _, err := svc.Store.GetUserByEmail(ctx, "", cfg.Email); err == nil {
+	if _, err := c.IAM.GetUserByEmail(ctx, cfg.Email); err == nil {
 		return nil // User already exists, ignore
 	}
 
-	admin, err := svc.Store.CreateUser(ctx, "", kagi.User{
-		Email:         cfg.Email,
-		DisplayName:   cfg.Name,
-		Active:        true,
-		EmailVerified: true,
-	})
+	admin, err := c.IAM.Register(ctx, cfg.Email, cfg.Name, cfg.Password)
 	if err != nil {
-		if errors.Is(err, kagi.ErrEmailTaken) {
+		if errors.Is(err, iam.ErrEmailTaken) {
 			return nil // Lost a race with a concurrent boot; someone else has it.
 		}
 		return err
 	}
 
-	return c.Auth.Service().Passwords.SetPassword(ctx, "", admin.ID, cfg.Password)
+	// Bootstrap accounts are trusted: mark the email verified.
+	return c.IAM.VerifyUserEmail(ctx, admin.ID)
 }

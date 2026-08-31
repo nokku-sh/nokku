@@ -53,8 +53,8 @@ func main() {
 					"  nokku rotate-secrets --new secret:NEW\n" +
 					"  nokku rotate-secrets --new kms:hcvault://vault:8200/transit/keys/nokku\n\n" +
 					"KMS credentials (VAULT_TOKEN, ...) are read from the environment. " +
-					"Identity secrets in the kagi schema (SSO client secrets, the SAML " +
-					"SP private key) follow the active cipher via kagi, not this command. " +
+					"SSO client secrets and the SAML SP private key follow the active " +
+					"cipher via the iam store, not this command. " +
 					"Run this with the app stopped, then update the environment and start again.",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
