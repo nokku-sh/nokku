@@ -7,12 +7,7 @@ import { queryClient } from './client';
 import { account, type AccountUser } from './account';
 import { useQuery } from '$lib/query';
 import { UtilService } from '$lib/gen/nokku/v1/util_pb';
-import {
-	OAuthIdentitySchema,
-	type OAuthIdentity,
-	UserSchema,
-	type User
-} from '$lib/gen/nokku/v1/user_pb';
+import { UserSchema, type User } from '$lib/gen/nokku/v1/user_pb';
 import { pageIndex, pageSize } from '$lib/store.svelte';
 
 // The account reads and mutations are the /auth/account surface. This
@@ -40,6 +35,16 @@ function toUser(u: AccountUser): User {
 
 const identityTypes = ['oidc', 'oauth2', 'saml'];
 
+// The account endpoint returns raw JSON credentials; linked identities are
+// mapped onto this local shape. The proto type was dropped from user.proto
+// because this is not a proto-backed surface.
+export interface LinkedAccount {
+	providerId: string;
+	provider: string;
+	protocol: string;
+	createdAt: Timestamp;
+}
+
 export const user = {
 	// Queries
 	self: () =>
@@ -48,20 +53,18 @@ export const user = {
 			queryFn: async () => toUser(await account.user())
 		})),
 	listLinkedAccounts: () =>
-		createQuery<OAuthIdentity[]>(() => ({
+		createQuery<LinkedAccount[]>(() => ({
 			queryKey: ['account', 'credentials'],
 			queryFn: async () => {
 				const { credentials } = await account.credentials();
 				return credentials
 					.filter((c) => identityTypes.includes(c.type))
-					.map((c) =>
-						create(OAuthIdentitySchema, {
-							providerId: c.subject,
-							provider: c.provider,
-							protocol: c.type,
-							createdAt: toTimestamp(c.createdAt)
-						})
-					);
+					.map((c) => ({
+						providerId: c.subject ?? '',
+						provider: c.provider ?? '',
+						protocol: c.type,
+						createdAt: toTimestamp(c.createdAt)
+					}));
 			}
 		})),
 	activity: (filters: {
