@@ -7,68 +7,60 @@
 
 	type ErrorInfo = { title: string; description: string };
 
+	// Keys are the error messages the backend's SSO flows append to the
+	// redirect (see the iam.Fail call sites).
 	const codes: Record<string, ErrorInfo> = {
-		sso_required: {
-			title: 'Single Sign-On required',
-			description:
-				'Your workspace requires signing in through its identity provider. Go back and use the SSO option for your email domain.'
-		},
-		access_denied: {
+		'login canceled': {
 			title: 'Sign-in cancelled',
 			description: 'The sign-in was cancelled at your identity provider.'
 		},
-		invalid_state: {
+		'invalid or expired login': {
 			title: 'Invalid sign-in request',
 			description: 'The sign-in session expired or was tampered with. Please try again.'
 		},
-		invalid_request: {
-			title: 'Invalid sign-in request',
-			description: 'The sign-in request could not be processed. Please try again.'
-		},
-		provider_config_failed: {
+		'provider not configured': {
 			title: 'Provider configuration error',
 			description:
 				'Your workspace identity provider is not configured correctly. Contact your workspace admin.'
 		},
-		token_exchange_failed: {
+		'provider discovery failed': {
 			title: 'Provider unreachable',
+			description: 'The identity provider could not be reached. Please try again later.'
+		},
+		'login failed': {
+			title: 'Sign-in failed',
 			description: 'The identity provider could not complete the sign-in. Please try again later.'
 		},
-		github_fetch_failed: {
-			title: 'GitHub sign-in failed',
-			description: 'Your GitHub profile could not be loaded. Please try again.'
+		'identity rejected': {
+			title: 'Sign-in not allowed',
+			description:
+				'Your identity provider account is not set up to sign in here yet. Contact your workspace admin.'
 		},
-		token_verification_failed: {
+		'provider metadata invalid': {
+			title: 'Provider configuration error',
+			description:
+				'Your workspace identity provider is not configured correctly. Contact your workspace admin.'
+		},
+		'no SSO endpoint in metadata': {
+			title: 'Provider configuration error',
+			description:
+				'Your workspace identity provider is not configured correctly. Contact your workspace admin.'
+		},
+		'request creation failed': {
+			title: 'Sign-in failed',
+			description: 'The sign-in request could not be created. Please try again.'
+		},
+		'request signing failed': {
+			title: 'Sign-in failed',
+			description: 'The sign-in request could not be created. Please try again.'
+		},
+		'response verification failed': {
 			title: 'Could not verify your identity',
 			description: 'The identity provider response failed verification. Please try again.'
 		},
-		no_id_token: {
-			title: 'Could not verify your identity',
-			description: 'The identity provider did not return the expected credentials.'
-		},
-		invalid_claims: {
-			title: 'Invalid profile data',
-			description:
-				'The identity provider returned unexpected profile data. Contact your workspace admin.'
-		},
-		invalid_assertion: {
-			title: 'Invalid sign-in response',
-			description: 'The identity provider response was rejected. Please try again.'
-		},
-		invalid_attributes: {
-			title: 'Missing profile information',
-			description:
-				'Your identity provider did not provide the required profile attributes (such as email). Contact your workspace admin.'
-		},
-		missing_name_id: {
+		'assertion has no subject': {
 			title: 'Missing identity',
-			description:
-				'The identity provider response did not include a user identity. Contact your workspace admin.'
-		},
-		user_failed: {
-			title: 'Sign-in failed',
-			description:
-				'Your account could not be signed in. It may not be provisioned for this workspace.'
+			description: 'Your identity provider response did not include a user identity.'
 		},
 		unknown: {
 			title: 'Authentication failed',
@@ -79,9 +71,11 @@
 	const code = page.url.searchParams.get('error') ?? 'unknown';
 	const info = $derived(codes[code] ?? codes.unknown);
 
-	// Strip the error param once shown: a refresh shouldn't re-show the
-	// error, and back-navigation shouldn't land on it again.
-	history.replaceState(null, '', '/auth-error');
+	$effect(() => {
+		// Strip the error param once shown: a refresh shouldn't re-show the
+		// error, and back-navigation shouldn't land on it again.
+		history.replaceState(null, '', '/auth-error');
+	});
 </script>
 
 <div
