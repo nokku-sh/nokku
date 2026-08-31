@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/mizuchilabs/kagi/cache"
+	"github.com/mizuchilabs/kagi"
 
 	"github.com/nokku-sh/nokku/web"
 )
@@ -19,7 +19,7 @@ var ErrCooldown = errors.New("email cooldown active")
 
 type Service struct {
 	sender Sender
-	cache  cache.Cache
+	cache  kagi.Cache
 
 	appURL   string
 	Driver   string        `env:"NOKKU_EMAIL_DRIVER"   envDefault:"noop"`
@@ -41,7 +41,7 @@ type sendRequest struct {
 	data     any
 }
 
-func New(appURL string, cache cache.Cache) (*Service, error) {
+func New(appURL string, cache kagi.Cache) (*Service, error) {
 	svc, err := env.ParseAs[Service]()
 	if err != nil {
 		return nil, err

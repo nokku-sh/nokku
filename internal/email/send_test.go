@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mizuchilabs/kagi/cache"
+	"github.com/mizuchilabs/kagi"
 )
 
 type mockSender struct {
@@ -28,7 +28,7 @@ func (m *mockSender) Send(_ context.Context, msg Message) error {
 func newTestService(sender Sender) *Service {
 	return &Service{
 		sender:   sender,
-		cache:    cache.NewMemory(0),
+		cache:    kagi.NewMemoryCache(0),
 		Sender:   "noreply@system.nokku.sh",
 		Cooldown: time.Hour,
 	}
