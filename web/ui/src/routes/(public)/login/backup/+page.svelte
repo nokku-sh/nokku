@@ -12,18 +12,12 @@
 
 	const loginWithBackupCode = auth.loginWithBackupCode();
 
-	// Format code as XXXX-XXXX-XXXX-XXXX before sending
-	function formatBackupCode(rawCode: string): string {
-		const clean = rawCode.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-		return clean.match(/.{1,4}/g)?.join('-') || clean;
-	}
-
 	let isValid = $derived(email.length > 0 && code.length === 16);
 	let isDisabled = $derived(loginWithBackupCode.isPending || !isValid);
 
 	function handleSubmit(e: Event) {
 		e.preventDefault();
-		loginWithBackupCode.mutate({ email, code: formatBackupCode(code) });
+		loginWithBackupCode.mutate({ email, code: code.toUpperCase() });
 	}
 </script>
 
