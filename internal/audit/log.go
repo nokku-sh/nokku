@@ -10,9 +10,7 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/mizuchilabs/kagi"
-
-	"github.com/nokku-sh/nokku/internal/auth"
+	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
@@ -79,12 +77,12 @@ func (s *Service) logAudit(
 	if s == nil || !shouldAudit(procedure) {
 		return
 	}
-	principal, _ := kagi.PrincipalFromContext(ctx)
-	tenant, _ := kagi.TenantFromContext(ctx)
+	principal, _ := iam.PrincipalFromContext(ctx)
+	tenant, _ := iam.TenantFromContext(ctx)
 
 	log := &Event{
-		WorkspaceID: string(tenant),
-		ActorID:     principal.SubjectID,
+		WorkspaceID: tenant,
+		ActorID:     principal.ID,
 		ActorType:   string(principal.Kind),
 		ActorEmail:  s.actorEmail(ctx, principal),
 		Action:      procedure,
@@ -102,13 +100,13 @@ func (s *Service) logAudit(
 // are not users; their rows carry no email. The lookup runs off the request
 // path (logAudit is called from a detached goroutine) and a miss simply leaves
 // the column empty.
-func (s *Service) actorEmail(ctx context.Context, p kagi.Principal) string {
+func (s *Service) actorEmail(ctx context.Context, p iam.Principal) string {
 	if s.users == nil ||
-		p.SubjectID == "" ||
-		(p.Kind != auth.ActorTypeUser && p.Kind != auth.ActorTypeDevice) {
+		p.ID == "" ||
+		(p.Kind != iam.KindUser && p.Kind != iam.KindCLI) {
 		return ""
 	}
-	u, err := s.users.GetUser(ctx, p.SubjectID)
+	u, err := s.users.GetUser(ctx, p.ID)
 	if err != nil {
 		return ""
 	}
@@ -117,7 +115,7 @@ func (s *Service) actorEmail(ctx context.Context, p kagi.Principal) string {
 
 // shouldAudit reports whether a procedure produces an audit record. Only
 // mutating operations do: authentication flows record their own semantic
-// events (login_success, login_denied, ...) through the kagi sink.
+// events (login_success, login_denied, ...) through the iam sink.
 func shouldAudit(procedure string) bool {
 	if method, _, ok := strings.Cut(procedure, " "); ok {
 		switch method {
