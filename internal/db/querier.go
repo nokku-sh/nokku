@@ -7,6 +7,8 @@ package db
 import (
 	"context"
 	"time"
+
+	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
 type Querier interface {
@@ -18,38 +20,68 @@ type Querier interface {
 	// touching other subjects already granted on the principal.
 	AddUserToPrincipal(ctx context.Context, arg *AddUserToPrincipalParams) error
 	AddWorkspaceMember(ctx context.Context, arg *AddWorkspaceMemberParams) error
+	// ConsumeCredentialBySubject atomically deletes and returns the credential
+	// for (type, provider, subject, user_id): a credential can never be spent
+	// twice or by the wrong account. Backup codes rely on this.
+	ConsumeCredentialBySubject(ctx context.Context, arg *ConsumeCredentialBySubjectParams) (*Credential, error)
+	ConsumeToken(ctx context.Context, tokenHash crypto.HashedToken) (*ConsumeTokenRow, error)
 	CountAuditLogs(ctx context.Context, arg *CountAuditLogsParams) (int32, error)
 	// Member counts for a set of teams in one read, for list views that show a
 	// count instead of embedding each team's members.
 	CountTeamMembers(ctx context.Context, teamIds []string) ([]*CountTeamMembersRow, error)
+	// The total matching member count for ListWorkspaceMembers, so list views
+	// can paginate without loading every row.
+	CountWorkspaceMembers(ctx context.Context, arg *CountWorkspaceMembersParams) (int32, error)
 	CountWorkspacesByOwner(ctx context.Context, userID string) (int32, error)
 	CreateCA(ctx context.Context, arg *CreateCAParams) (*CertificateAuthority, error)
 	CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*CreateDaemonRow, error)
 	CreatePrincipal(ctx context.Context, arg *CreatePrincipalParams) (*Principal, error)
 	CreateRecording(ctx context.Context, arg *CreateRecordingParams) (*Recording, error)
 	CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (string, error)
+	CreateSession(ctx context.Context, arg *CreateSessionParams) error
 	CreateTarget(ctx context.Context, arg *CreateTargetParams) (*Target, error)
 	CreateTeam(ctx context.Context, arg *CreateTeamParams) (*Team, error)
+	CreateUser(ctx context.Context, arg *CreateUserParams) (*User, error)
+	// Passkey-only signup reserves the WebAuthn user handle at ceremony begin
+	// and creates the account with that exact id at finish, so the credential
+	// binds to the user row it was registered against.
+	CreateUserWithID(ctx context.Context, arg *CreateUserWithIDParams) (*User, error)
 	CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParams) (*CreateWorkspaceRow, error)
 	DeleteCA(ctx context.Context, caID string) (*CertificateAuthority, error)
+	DeleteCredential(ctx context.Context, arg *DeleteCredentialParams) error
+	DeleteCredentialsByProvider(ctx context.Context, arg *DeleteCredentialsByProviderParams) (int64, error)
 	DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, error)
+	DeleteExpiredSessions(ctx context.Context, now *time.Time) (int64, error)
+	DeleteExpiredTokens(ctx context.Context, now time.Time) (int64, error)
 	DeleteOrphanAuditLogs(ctx context.Context, cutoff time.Time) (int64, error)
 	DeleteRecording(ctx context.Context, id string) error
+	DeleteSSOProvider(ctx context.Context, providerID string) error
 	DeleteServiceAccount(ctx context.Context, serviceAccountID string) error
+	DeleteSession(ctx context.Context, tokenHash crypto.HashedToken) error
+	DeleteSessionsExcept(ctx context.Context, arg *DeleteSessionsExceptParams) (int64, error)
+	DeleteSubjectSessions(ctx context.Context, subjectID string) (int64, error)
 	DeleteTarget(ctx context.Context, targetID string) (*Target, error)
 	DeleteTeam(ctx context.Context, teamID string) (*Team, error)
+	DeleteTenantSSOProviders(ctx context.Context, workspaceID *string) (int64, error)
+	DeleteUnverifiedUsers(ctx context.Context, cutoff time.Time) (int64, error)
+	DeleteUser(ctx context.Context, id string) error
+	DeleteUserCredentialsByProvider(ctx context.Context, arg *DeleteUserCredentialsByProviderParams) (int64, error)
 	DeleteWorkspace(ctx context.Context, workspaceID string) error
 	DeleteWorkspaceAuditLogs(ctx context.Context, arg *DeleteWorkspaceAuditLogsParams) (int64, error)
+	DeleteWorkspaceDomain(ctx context.Context, arg *DeleteWorkspaceDomainParams) error
 	DeleteWorkspacesByOwner(ctx context.Context, userID string) error
 	EnsureRole(ctx context.Context, arg *EnsureRoleParams) error
+	EnsureWorkspaceMember(ctx context.Context, arg *EnsureWorkspaceMemberParams) error
+	FindCredentialBySubject(ctx context.Context, arg *FindCredentialBySubjectParams) (*Credential, error)
 	GetActiveSubscription(ctx context.Context, arg *GetActiveSubscriptionParams) (*WorkspaceSubscription, error)
-	// The actor id resolves against identity (kagi, TEXT) and machine
-	// principals (UUID), so each branch casts explicitly.
+	// The actor id resolves against users, daemons, and service accounts; all
+	// three are UUIDs.
 	GetActorWorkspaceIDs(ctx context.Context, actorID string) ([]string, error)
 	GetCA(ctx context.Context, caID string) (*CertificateAuthority, error)
 	GetCAByDaemonID(ctx context.Context, daemonID *string) (*CertificateAuthority, error)
 	GetCAForUpdate(ctx context.Context, caID string) (*CertificateAuthority, error)
 	GetCAsByIDs(ctx context.Context, caIds []string) ([]*GetCAsByIDsRow, error)
+	GetCredential(ctx context.Context, arg *GetCredentialParams) (*Credential, error)
 	GetDaemon(ctx context.Context, daemonID string) (*Daemon, error)
 	GetDaemonByKeyThumbprint(ctx context.Context, arg *GetDaemonByKeyThumbprintParams) (*Daemon, error)
 	GetDaemonsByIDs(ctx context.Context, daemonIds []string) ([]*GetDaemonsByIDsRow, error)
@@ -61,8 +93,15 @@ type Querier interface {
 	GetPrincipals(ctx context.Context, principalIds []string) ([]*GetPrincipalsRow, error)
 	GetPrincipalsByTargetIDs(ctx context.Context, targetIds []string) ([]*GetPrincipalsByTargetIDsRow, error)
 	GetRecording(ctx context.Context, id string) (*Recording, error)
+	GetSAMLKeypair(ctx context.Context) (*GetSAMLKeypairRow, error)
+	GetSSOProvider(ctx context.Context, providerID string) (*SsoProvider, error)
 	GetServiceAccount(ctx context.Context, serviceAccountID string) (*ServiceAccount, error)
+	// Bearer-token authentication for service accounts: resolve by the stored
+	// hash of the raw secret. A service account's token is its credential, so
+	// only live, unexpired accounts match.
+	GetServiceAccountByTokenHash(ctx context.Context, tokenHash *crypto.HashedToken) (*ServiceAccount, error)
 	GetServiceAccountWorkspaceID(ctx context.Context, serviceAccountID string) (string, error)
+	GetSession(ctx context.Context, tokenHash crypto.HashedToken) (*Session, error)
 	GetSubscription(ctx context.Context, workspaceID string) (*WorkspaceSubscription, error)
 	GetTarget(ctx context.Context, targetID string) (*Target, error)
 	GetTargetByDaemon(ctx context.Context, daemonID *string) (*Target, error)
@@ -72,7 +111,11 @@ type Querier interface {
 	// any of their teams is also included (via team_members).
 	GetTargetsBySubject(ctx context.Context, subjectID string) ([]*Target, error)
 	GetTeam(ctx context.Context, teamID string) (*Team, error)
+	GetUser(ctx context.Context, id string) (*User, error)
+	GetUserByEmail(ctx context.Context, email string) (*User, error)
+	GetVerifiedWorkspaceDomain(ctx context.Context, domain string) (*WorkspaceDomain, error)
 	GetWorkspace(ctx context.Context, workspaceID string) (*Workspace, error)
+	GetWorkspaceDomain(ctx context.Context, arg *GetWorkspaceDomainParams) (*WorkspaceDomain, error)
 	GetWorkspaceMember(ctx context.Context, arg *GetWorkspaceMemberParams) (*WorkspaceMember, error)
 	GetWorkspaceOwner(ctx context.Context, workspaceID string) (string, error)
 	GetWorkspacePrincipals(ctx context.Context, workspaceID string) ([]string, error)
@@ -84,32 +127,42 @@ type Querier interface {
 	ListActiveSubscriptions(ctx context.Context, arg *ListActiveSubscriptionsParams) ([]*WorkspaceSubscription, error)
 	ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) ([]*AuditAuditLog, error)
 	ListCAs(ctx context.Context, arg *ListCAsParams) ([]*CertificateAuthority, error)
+	ListCredentialsByType(ctx context.Context, arg *ListCredentialsByTypeParams) ([]*Credential, error)
 	ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*ListDaemonsRow, error)
 	ListPrincipals(ctx context.Context, arg *ListPrincipalsParams) ([]*ListPrincipalsRow, error)
 	ListPrincipalsForDaemon(ctx context.Context, daemonID *string) ([]*ListPrincipalsForDaemonRow, error)
 	ListProviderSubscriptions(ctx context.Context, sources []string) ([]*WorkspaceSubscription, error)
 	ListRecordings(ctx context.Context, arg *ListRecordingsParams) ([]*ListRecordingsRow, error)
 	ListServiceAccounts(ctx context.Context, arg *ListServiceAccountsParams) ([]*ListServiceAccountsRow, error)
+	ListSessionsBySubject(ctx context.Context, subjectID string) ([]*Session, error)
 	ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*ListTargetsRow, error)
-	// Members of one team without their display fields: identity lives in kagi,
-	// and the API layer stitches user data in via kagi's Users manager.
+	// Members of one team with their identity display fields joined in.
 	ListTeamMembers(ctx context.Context, teamID string) ([]*ListTeamMembersRow, error)
 	ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*ListTeamsRow, error)
 	// Teams one user belongs to within a workspace: the read the user-profile
 	// surface needs, without deriving it from a teams-with-members blob.
 	ListTeamsForUser(ctx context.Context, arg *ListTeamsForUserParams) ([]*Team, error)
+	ListVerifiedDomainsForProvider(ctx context.Context, arg *ListVerifiedDomainsForProviderParams) ([]*WorkspaceDomain, error)
 	ListWorkspaceAuditLogWorkspaceIDs(ctx context.Context) ([]*string, error)
+	ListWorkspaceDomains(ctx context.Context, workspaceID string) ([]*WorkspaceDomain, error)
 	ListWorkspaceIDs(ctx context.Context) ([]string, error)
-	// Members of one workspace without their display fields: identity lives in
-	// kagi, and the API layer stitches user data in via kagi's Users manager.
-	ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*WorkspaceMember, error)
+	// Members of one workspace with their identity display fields joined in.
+	// The search query filters on name/email in SQL; ordering and pagination
+	// happen in the database too.
+	ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error)
 	ListWorkspaces(ctx context.Context) ([]*Workspace, error)
 	OldestRecordings(ctx context.Context, arg *OldestRecordingsParams) ([]*Recording, error)
+	PutSAMLKeypair(ctx context.Context, arg *PutSAMLKeypairParams) (*PutSAMLKeypairRow, error)
+	// One-time tokens are stored under their SHA-256 hash. ConsumeToken is a
+	// single atomic delete: a token can never be spent twice, and expired tokens
+	// fail the same way unknown ones do.
+	PutToken(ctx context.Context, arg *PutTokenParams) error
 	RemoveServiceAccountFromPrincipal(ctx context.Context, arg *RemoveServiceAccountFromPrincipalParams) error
 	RemoveTeamFromPrincipal(ctx context.Context, arg *RemoveTeamFromPrincipalParams) error
 	RemoveTeamMember(ctx context.Context, arg *RemoveTeamMemberParams) error
 	RemoveUserFromPrincipal(ctx context.Context, arg *RemoveUserFromPrincipalParams) error
 	RemoveWorkspaceMember(ctx context.Context, arg *RemoveWorkspaceMemberParams) error
+	RenameCredential(ctx context.Context, arg *RenameCredentialParams) error
 	ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*CertificateAuthority, error)
 	RevokeServiceAccountAccessInWorkspace(ctx context.Context, arg *RevokeServiceAccountAccessInWorkspaceParams) error
 	RevokeTeamAccessInWorkspace(ctx context.Context, arg *RevokeTeamAccessInWorkspaceParams) error
@@ -124,6 +177,8 @@ type Querier interface {
 	SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error
 	SumRecordingBytes(ctx context.Context, workspaceID string) (int64, error)
 	SyncPrincipals(ctx context.Context, arg *SyncPrincipalsParams) error
+	TouchServiceAccount(ctx context.Context, id string) error
+	TouchSession(ctx context.Context, arg *TouchSessionParams) error
 	TrySecretRotationLock(ctx context.Context) (bool, error)
 	UpdateCA(ctx context.Context, arg *UpdateCAParams) (*CertificateAuthority, error)
 	UpdateCAPrivateKey(ctx context.Context, arg *UpdateCAPrivateKeyParams) error
@@ -138,16 +193,23 @@ type Querier interface {
 	UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*Target, error)
 	UpdateTargetCA(ctx context.Context, arg *UpdateTargetCAParams) (*Target, error)
 	UpdateTeam(ctx context.Context, arg *UpdateTeamParams) (*Team, error)
+	UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User, error)
 	UpdateWorkspace(ctx context.Context, arg *UpdateWorkspaceParams) (*Workspace, error)
 	UpdateWorkspaceMember(ctx context.Context, arg *UpdateWorkspaceMemberParams) error
 	UpdateWorkspaceOwner(ctx context.Context, arg *UpdateWorkspaceOwnerParams) (*Workspace, error)
+	// One unified credential table for every login method (see 001_base.sql).
+	UpsertCredential(ctx context.Context, arg *UpsertCredentialParams) (*Credential, error)
 	// Rotation-only (rotate-secrets command): persist the target keyset
 	// atomically within the rotation transaction. Never used on the boot path.
 	UpsertKeysetWrappedData(ctx context.Context, data []byte) error
+	UpsertSSOProvider(ctx context.Context, arg *UpsertSSOProviderParams) (*SsoProvider, error)
 	// Note: source is only overwritten when the row is provider-managed ('stripe')
 	// or empty, so manual subscriptions survive provider syncs.
 	UpsertSubscription(ctx context.Context, arg *UpsertSubscriptionParams) error
+	UpsertWorkspaceDomain(ctx context.Context, arg *UpsertWorkspaceDomainParams) (*WorkspaceDomain, error)
 	UserWorkspaceMember(ctx context.Context, arg *UserWorkspaceMemberParams) (bool, error)
+	VerifyUserEmail(ctx context.Context, id string) error
+	VerifyWorkspaceDomain(ctx context.Context, arg *VerifyWorkspaceDomainParams) error
 }
 
 var _ Querier = (*Queries)(nil)

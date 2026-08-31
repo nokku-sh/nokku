@@ -1,9 +1,63 @@
 -- Base schema for nokku.
+--
+-- Identity tables (users, credentials, sessions, one_time_tokens, api_keys,
+-- sso_providers, workspace_domains, saml_keypair) live in the public schema
+-- alongside domain tables so memberships, teams, and audit can join identity
+-- data in plain SQL. See docs/adr/0001-merge-auth-back-into-nokku.md.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-CREATE SCHEMA IF NOT EXISTS kagi;
+-- Identity -------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  email TEXT NOT NULL UNIQUE CHECK (email = lower(email)),
+  name TEXT NOT NULL DEFAULT '',
+  picture TEXT,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  disable_password_reset BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- One unified credential table for every login method, learned from kagi:
+--   type=password     data=argon2 hash, provider/subject empty
+--   type=passkey      data=webauthn attestation object, subject=credential id base64
+--   type=oauth/oidc/saml  data=provider profile JSON, provider+subject=external identity
+--   type=backup_code  data=empty, subject=SHA-256 of the code; consumption
+--                     is a single atomic DELETE ... RETURNING
+CREATE TABLE IF NOT EXISTS credentials (
+  id TEXT PRIMARY KEY, -- method-specific id: webauthn credential id or uuidv7
+  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  type TEXT NOT NULL, -- password, passkey, oauth, oidc, saml, backup_code
+  provider TEXT NOT NULL DEFAULT '', -- github, google, or the sso provider id
+  subject TEXT NOT NULL DEFAULT '', -- external identity subject or code hash
+  data BYTEA NOT NULL,
+  label TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- An external identity may link to at most one user, and a subject is only
+-- unique within its issuer, so stale mappings must not survive an issuer change.
+CREATE UNIQUE INDEX credentials_external_idx ON credentials (type, provider, subject)
+WHERE
+  subject <> '';
+
+CREATE INDEX credentials_user_idx ON credentials (user_id, type);
+
+-- One-time tokens stored under their SHA-256 hash; consumption is a single
+-- atomic DELETE returning the row. Deliberately no tenant column: a token
+-- hash is globally unique and the raw value crosses the wire once.
+CREATE TABLE IF NOT EXISTS one_time_tokens (
+  token_hash TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  purpose TEXT NOT NULL, -- verify_email, password_reset
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX one_time_tokens_expiry_idx ON one_time_tokens (expires_at);
 
 -- Tables ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS roles (name TEXT PRIMARY KEY, description TEXT NOT NULL DEFAULT '');
@@ -17,14 +71,14 @@ CREATE TABLE IF NOT EXISTS workspaces (
   invite_token_hash TEXT,
   invite_expires_at TIMESTAMPTZ,
   settings JSONB NOT NULL DEFAULT '{}',
-  created_by TEXT NOT NULL REFERENCES kagi.users (id) ON DELETE CASCADE,
+  created_by UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS workspace_members (
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  user_id TEXT NOT NULL REFERENCES kagi.users (id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   role_name TEXT NOT NULL REFERENCES roles (name) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -43,12 +97,79 @@ CREATE TABLE IF NOT EXISTS workspace_subscriptions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Identity (workspace-scoped) --------------------------------------------------
+-- Opaque server-side sessions keyed by the SHA-256 of the token: a database
+-- leak reveals nothing usable. subject_id is deliberately not a foreign key:
+-- sessions belong to users, CLI devices, and daemons alike. For device kinds,
+-- binding carries the DPoP JWK thumbprint the session is bound to (RFC 9449);
+-- proof verification is enforced by the iam middleware, not the schema.
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT NOT NULL PRIMARY KEY,
+  subject_id TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'user', -- user, cli, web_device, daemon
+  method TEXT NOT NULL, -- password, passkey, oidc, oauth2, saml, backup_code, device
+  workspace_id UUID REFERENCES workspaces (id) ON DELETE CASCADE, -- tenant pin for daemons; NULL for global users
+  binding TEXT NOT NULL DEFAULT '', -- DPoP JWK thumbprint, empty for cookie sessions
+  label TEXT NOT NULL DEFAULT '', -- display name for "your devices" listings
+  expires_at TIMESTAMPTZ, -- NULL = non-expiring (daemons re-auth via DPoP proofs)
+  last_seen_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX sessions_subject_idx ON sessions (subject_id);
+
+CREATE INDEX sessions_workspace_idx ON sessions (workspace_id);
+
+-- One unified SSO provider table, learned from kagi: method distinguishes
+-- oidc/oauth2/saml; config carries the method payload as JSON; secret_enc is
+-- cipher material (client secret, SAML SP key) encrypted at rest via the KMS
+-- envelope cipher. provider_id is globally unique: enterprise providers use
+-- the workspace id as their provider id; social providers ("google",
+-- "github") are global and carry NULL workspace.
+CREATE TABLE IF NOT EXISTS sso_providers (
+  workspace_id UUID REFERENCES workspaces (id) ON DELETE CASCADE,
+  provider_id TEXT NOT NULL PRIMARY KEY,
+  method TEXT NOT NULL, -- oidc, oauth2, saml
+  name TEXT NOT NULL DEFAULT '',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  config JSONB NOT NULL DEFAULT '{}',
+  secret_enc BYTEA,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Verified email domains bind a workspace to one SSO provider. They drive
+-- discovery, JIT domain checks, and SSO enforcement. verified_until keeps
+-- the "verified" state honest: domains must be re-proven periodically.
+CREATE TABLE IF NOT EXISTS workspace_domains (
+  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  domain TEXT PRIMARY KEY,
+  provider_id TEXT NOT NULL,
+  token TEXT NOT NULL, -- DNS TXT verification token
+  verified_at TIMESTAMPTZ,
+  verified_until TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- The SAML SP keypair is one deployment-global row; the private key is
+-- encrypted at rest by the KMS cipher. insert-if-absent on first boot so
+-- concurrent boots converge on one key instead of silently rotating the
+-- certificate IdPs have pinned.
+CREATE TABLE IF NOT EXISTS saml_keypair (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  key_enc BYTEA NOT NULL,
+  cert_pem BYTEA NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS service_accounts (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL, -- e.g., "github-actions-deploy", "ansible-prod"
   description TEXT,
+  token_hash TEXT, -- bearer credential for the service account (HashedToken)
   role_name TEXT NOT NULL DEFAULT 'viewer' REFERENCES roles (name),
+  last_used_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ, -- Optional expiration for temporary access
   tags TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -82,7 +203,7 @@ CREATE TABLE IF NOT EXISTS teams (
 
 CREATE TABLE IF NOT EXISTS team_members (
   workspace_id UUID NOT NULL,
-  user_id TEXT NOT NULL REFERENCES kagi.users (id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   team_id UUID NOT NULL REFERENCES teams (id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (user_id, team_id),
@@ -153,7 +274,7 @@ CREATE TABLE IF NOT EXISTS principals (
 CREATE TABLE IF NOT EXISTS principal_users (
   principal_id UUID NOT NULL REFERENCES principals (id) ON DELETE CASCADE,
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  user_id TEXT NOT NULL REFERENCES kagi.users (id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (principal_id, user_id)
 );
@@ -275,7 +396,7 @@ CREATE OR REPLACE FUNCTION is_workspace_member (ws_id UUID) RETURNS BOOLEAN AS $
     SELECT 1
     FROM workspace_members wm
     WHERE wm.workspace_id = ws_id
-      AND wm.user_id = current_actor_id ()
+      AND wm.user_id = current_actor_id ()::UUID
   )
 $$ LANGUAGE sql STABLE;
 
@@ -354,23 +475,6 @@ GRANT USAGE,
 SELECT
   ON SEQUENCES TO nokku_app,
   nokku_system;
-
--- kagi schema (identity, owned and migrated by kagi). The store itself runs
--- on its own admin connection; these grants cover nokku's system jobs that
--- prune users. App-level reads go through kagi's managers on the store
--- connection, not through this role.
-GRANT USAGE ON SCHEMA kagi TO nokku_app,
-nokku_system;
-
-GRANT
-SELECT
-,
-UPDATE,
-DELETE ON ALL TABLES IN SCHEMA kagi TO nokku_system;
-
-GRANT
-SELECT
-  ON ALL TABLES IN SCHEMA kagi TO nokku_app;
 
 -- Row-level security ---------------------------------------------------------
 -- RLS enforces tenant isolation only. Every workspace-scoped table carries
@@ -453,6 +557,14 @@ ALTER TABLE recordings ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE recordings FORCE ROW LEVEL SECURITY;
 
+ALTER TABLE sso_providers ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE sso_providers FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE workspace_domains ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE workspace_domains FORCE ROW LEVEL SECURITY;
+
 -- Workspaces -----------------------------------------------------------------
 CREATE POLICY workspaces_select ON workspaces FOR
 SELECT
@@ -470,7 +582,7 @@ CREATE POLICY workspace_members_select ON workspace_members FOR
 SELECT
   TO nokku_app USING (
     workspace_id = current_workspace_id ()
-    OR user_id = current_actor_id ()
+    OR user_id = current_actor_id ()::UUID
   );
 
 CREATE POLICY workspace_members_write ON workspace_members FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
@@ -507,6 +619,15 @@ WITH
   CHECK (workspace_id = current_workspace_id ());
 
 CREATE POLICY tenant_isolation ON recordings FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON sso_providers FOR ALL TO nokku_app
+USING (workspace_id IS NULL OR workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id IS NULL OR workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON workspace_domains FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
   CHECK (workspace_id = current_workspace_id ());
 

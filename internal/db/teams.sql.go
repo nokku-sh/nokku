@@ -160,23 +160,36 @@ const listTeamMembers = `-- name: ListTeamMembers :many
 SELECT
   tm.workspace_id,
   tm.team_id,
-  tm.user_id,
+  u.id AS user_id,
+  u.name,
+  u.email,
+  u.email_verified,
+  u.picture,
+  u.active,
   tm.created_at
 FROM
   team_members tm
+  JOIN users u ON u.id = tm.user_id
 WHERE
   tm.team_id = $1
+ORDER BY
+  u.name ASC,
+  u.email ASC
 `
 
 type ListTeamMembersRow struct {
-	WorkspaceID string    `json:"workspaceId"`
-	TeamID      string    `json:"teamId"`
-	UserID      string    `json:"userId"`
-	CreatedAt   time.Time `json:"createdAt"`
+	WorkspaceID   string    `json:"workspaceId"`
+	TeamID        string    `json:"teamId"`
+	UserID        string    `json:"userId"`
+	Name          string    `json:"name"`
+	Email         string    `json:"email"`
+	EmailVerified bool      `json:"emailVerified"`
+	Picture       *string   `json:"picture"`
+	Active        bool      `json:"active"`
+	CreatedAt     time.Time `json:"createdAt"`
 }
 
-// Members of one team without their display fields: identity lives in kagi,
-// and the API layer stitches user data in via kagi's Users manager.
+// Members of one team with their identity display fields joined in.
 func (q *Queries) ListTeamMembers(ctx context.Context, teamID string) ([]*ListTeamMembersRow, error) {
 	rows, err := q.db.Query(ctx, listTeamMembers, teamID)
 	if err != nil {
@@ -190,6 +203,11 @@ func (q *Queries) ListTeamMembers(ctx context.Context, teamID string) ([]*ListTe
 			&i.WorkspaceID,
 			&i.TeamID,
 			&i.UserID,
+			&i.Name,
+			&i.Email,
+			&i.EmailVerified,
+			&i.Picture,
+			&i.Active,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

@@ -31,6 +31,40 @@ func (q *Queries) AddWorkspaceMember(ctx context.Context, arg *AddWorkspaceMembe
 	return err
 }
 
+const countWorkspaceMembers = `-- name: CountWorkspaceMembers :one
+SELECT
+  COUNT(*)::INTEGER
+FROM
+  workspace_members wm
+  JOIN users u ON u.id = wm.user_id
+WHERE
+  wm.workspace_id = $1
+  AND (
+    $2::TEXT IS NULL
+    OR u.name ILIKE '%' || $2 || '%'
+    OR u.email ILIKE '%' || $2 || '%'
+  )
+  AND (
+    $3::TEXT IS NULL
+    OR wm.role_name = $3::TEXT
+  )
+`
+
+type CountWorkspaceMembersParams struct {
+	WorkspaceID string  `json:"workspaceId"`
+	Query       *string `json:"query"`
+	RoleName    *string `json:"roleName"`
+}
+
+// The total matching member count for ListWorkspaceMembers, so list views
+// can paginate without loading every row.
+func (q *Queries) CountWorkspaceMembers(ctx context.Context, arg *CountWorkspaceMembersParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countWorkspaceMembers, arg.WorkspaceID, arg.Query, arg.RoleName)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countWorkspacesByOwner = `-- name: CountWorkspacesByOwner :one
 SELECT
   COUNT(*)::INTEGER
@@ -152,13 +186,31 @@ func (q *Queries) DeleteWorkspacesByOwner(ctx context.Context, userID string) er
 	return err
 }
 
+const ensureWorkspaceMember = `-- name: EnsureWorkspaceMember :exec
+INSERT INTO
+  workspace_members (workspace_id, user_id, role_name)
+VALUES
+  ($1, $2, 'viewer')
+ON CONFLICT (workspace_id, user_id) DO NOTHING
+`
+
+type EnsureWorkspaceMemberParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	UserID      string `json:"userId"`
+}
+
+func (q *Queries) EnsureWorkspaceMember(ctx context.Context, arg *EnsureWorkspaceMemberParams) error {
+	_, err := q.db.Exec(ctx, ensureWorkspaceMember, arg.WorkspaceID, arg.UserID)
+	return err
+}
+
 const getActorWorkspaceIDs = `-- name: GetActorWorkspaceIDs :many
 SELECT
   workspace_id
 FROM
   workspace_members
 WHERE
-  user_id = $1::text
+  user_id = $1::uuid
 UNION
 SELECT
   workspace_id
@@ -175,8 +227,8 @@ WHERE
   id = $1::uuid
 `
 
-// The actor id resolves against identity (kagi, TEXT) and machine
-// principals (UUID), so each branch casts explicitly.
+// The actor id resolves against users, daemons, and service accounts; all
+// three are UUIDs.
 func (q *Queries) GetActorWorkspaceIDs(ctx context.Context, actorID string) ([]string, error) {
 	rows, err := q.db.Query(ctx, getActorWorkspaceIDs, actorID)
 	if err != nil {
@@ -334,41 +386,85 @@ func (q *Queries) ListWorkspaceIDs(ctx context.Context) ([]string, error) {
 const listWorkspaceMembers = `-- name: ListWorkspaceMembers :many
 SELECT
   wm.workspace_id,
-  wm.user_id,
+  u.id AS user_id,
+  u.name,
+  u.email,
+  u.email_verified,
+  u.picture,
+  u.active,
   wm.role_name,
   wm.created_at,
   wm.updated_at
 FROM
   workspace_members wm
+  JOIN users u ON u.id = wm.user_id
 WHERE
   wm.workspace_id = $1
   AND (
     $2::TEXT IS NULL
-    OR wm.role_name = $2::TEXT
+    OR u.name ILIKE '%' || $2 || '%'
+    OR u.email ILIKE '%' || $2 || '%'
+  )
+  AND (
+    $3::TEXT IS NULL
+    OR wm.role_name = $3::TEXT
   )
 ORDER BY
-  wm.created_at
+  u.name ASC,
+  u.email ASC
+LIMIT
+  $5
+OFFSET
+  $4
 `
 
 type ListWorkspaceMembersParams struct {
 	WorkspaceID string  `json:"workspaceId"`
+	Query       *string `json:"query"`
 	RoleName    *string `json:"roleName"`
+	Offset      *int32  `json:"offset"`
+	Limit       *int32  `json:"limit"`
 }
 
-// Members of one workspace without their display fields: identity lives in
-// kagi, and the API layer stitches user data in via kagi's Users manager.
-func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*WorkspaceMember, error) {
-	rows, err := q.db.Query(ctx, listWorkspaceMembers, arg.WorkspaceID, arg.RoleName)
+type ListWorkspaceMembersRow struct {
+	WorkspaceID   string    `json:"workspaceId"`
+	UserID        string    `json:"userId"`
+	Name          string    `json:"name"`
+	Email         string    `json:"email"`
+	EmailVerified bool      `json:"emailVerified"`
+	Picture       *string   `json:"picture"`
+	Active        bool      `json:"active"`
+	RoleName      string    `json:"roleName"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+}
+
+// Members of one workspace with their identity display fields joined in.
+// The search query filters on name/email in SQL; ordering and pagination
+// happen in the database too.
+func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error) {
+	rows, err := q.db.Query(ctx, listWorkspaceMembers,
+		arg.WorkspaceID,
+		arg.Query,
+		arg.RoleName,
+		arg.Offset,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*WorkspaceMember
+	var items []*ListWorkspaceMembersRow
 	for rows.Next() {
-		var i WorkspaceMember
+		var i ListWorkspaceMembersRow
 		if err := rows.Scan(
 			&i.WorkspaceID,
 			&i.UserID,
+			&i.Name,
+			&i.Email,
+			&i.EmailVerified,
+			&i.Picture,
+			&i.Active,
 			&i.RoleName,
 			&i.CreatedAt,
 			&i.UpdatedAt,

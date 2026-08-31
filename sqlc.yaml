@@ -84,10 +84,19 @@ sql:
               pointer: true
 
           # Hash (one-way) overrides
-          - column: "backup_codes.code_hash"
+          - column: "sessions.token_hash"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"
+          - column: "one_time_tokens.token_hash"
+            go_type:
+              import: "github.com/nokku-sh/nokku/internal/crypto"
+              type: "HashedToken"
+          - column: "service_accounts.token_hash"
+            go_type:
+              import: "github.com/nokku-sh/nokku/internal/crypto"
+              type: "HashedToken"
+              pointer: true
           - column: "workspaces.invite_token_hash"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
@@ -102,11 +111,11 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "EncryptedBytes"
-          - column: "oidc_providers.client_secret"
+          - column: "sso_providers.secret_enc"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "EncryptedBytes"
-          - column: "saml_sp_keys.private_key"
+          - column: "saml_keypair.key_enc"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "EncryptedBytes"
