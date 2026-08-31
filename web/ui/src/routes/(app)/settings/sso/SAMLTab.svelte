@@ -9,37 +9,54 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { sso } from '$lib/api/sso.svelte';
-	import type { SAMLProvider } from '$lib/gen/nokku/v1/sso_pb';
+	import { workspaceID } from '$lib/store.svelte';
 	import * as Alert from '$lib/components/ui/alert';
 	import InputGroupVariants from '$lib/components/ui/input-group/input-group-variants.svelte';
 
 	let change = $state({
 		isActive: false,
 		enforceSso: false,
-		allowJitProvisioning: false
-	} as SAMLProvider);
-
-	const provider = $derived(sso.getSAML());
-	// A provider is configured once its payload fields are set; the API
-	// reports an unconfigured one as an empty provider instead of 404.
-	const configured = $derived(!!provider.data?.metadataUrl);
-	// Providers share a single slot per workspace: saving here replaces an
-	// existing OIDC configuration.
-	const oidcProvider = $derived(sso.getOIDC());
-	const replacesOIDC = $derived(!!oidcProvider.data?.issuerUrl);
-	$effect(() => {
-		if (provider.data) change = { ...provider.data };
+		allowJitProvisioning: false,
+		name: '',
+		metadataUrl: ''
 	});
 
-	const updateProvider = sso.updateSAML();
+	const provider = $derived(sso.getProvider());
+	// The provider is configured when the stored method is SAML; the config
+	// block carries whichever protocol's fields are set.
+	const configured = $derived(provider.data?.method === 'saml');
+	// Providers share a single slot per workspace: saving here replaces an
+	// existing OIDC configuration.
+	const replacesOIDC = $derived(provider.data?.method === 'oidc');
+	$effect(() => {
+		const p = provider.data;
+		if (!p) return;
+		change = {
+			isActive: p.isActive ?? false,
+			enforceSso: p.enforceSso ?? false,
+			allowJitProvisioning: p.allowJitProvisioning ?? false,
+			name: p.name ?? '',
+			metadataUrl: p.config?.metadataUrl ?? ''
+		};
+	});
+
+	const updateProvider = sso.updateProvider();
 	function handleSubmit() {
-		updateProvider.mutate({ ...change });
+		updateProvider.mutate({
+			workspaceId: workspaceID.current,
+			method: 'saml',
+			name: change.name,
+			isActive: change.isActive,
+			enforceSso: change.enforceSso,
+			allowJitProvisioning: change.allowJitProvisioning,
+			config: {
+				metadataUrl: change.metadataUrl
+			}
+		});
 	}
 	const callbackURL = window.location.origin + '/saml/acs';
-	const metadataURL = $derived(
-		window.location.origin + '/saml/metadata/' + provider.data?.workspaceId
-	);
-	const certURL = $derived('/saml/certificate/' + provider.data?.workspaceId);
+	const metadataURL = $derived(window.location.origin + '/saml/metadata/' + workspaceID.current);
+	const certURL = $derived('/saml/certificate/' + workspaceID.current);
 </script>
 
 <Card.Root>
