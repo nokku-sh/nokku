@@ -7,14 +7,16 @@ export default defineConfig({
 	plugins: [tailwindcss(), sveltekit(), compression()],
 	server: {
 		proxy: {
+			// changeOrigin must stay off: kagi's CSRF guard compares the
+			// browser's Origin against the received Host header, and rewriting
+			// Host to the target makes every authenticated POST fail with 403
+			// invalid_origin.
 			'^/(auth|oauth|oidc|saml|passkey|avatars|upload|nokku\\.)': {
 				target: 'http://localhost:3000',
-				changeOrigin: true,
 				secure: false
 			},
 			'/terminal': {
 				target: 'http://localhost:3000',
-				changeOrigin: true,
 				secure: false,
 				ws: true
 			}
