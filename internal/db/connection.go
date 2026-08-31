@@ -12,7 +12,8 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/mizuchilabs/kagi"
+
+	"github.com/nokku-sh/nokku/internal/actor"
 )
 
 var (
@@ -33,6 +34,10 @@ type Connection struct {
 	Pool      *pgxpool.Pool
 	AdminPool *pgxpool.Pool
 	Q         *Queries
+	// AdminQ runs on the admin (non-RLS) role. Only pre-authorization
+	// lookups use it: resolving a presented credential to a tenant, which
+	// by definition cannot be tenant-scoped yet.
+	AdminQ *Queries
 }
 
 func NewConnection(ctx context.Context) (*Connection, error) {
@@ -129,6 +134,7 @@ func (c *Connection) createPools(ctx context.Context) error {
 		return fmt.Errorf("creating app pool: %w", err)
 	}
 	c.Q = New(c.Pool)
+	c.AdminQ = New(c.AdminPool)
 
 	// Handle shutdown
 	go func() {
@@ -213,11 +219,11 @@ func (c *Connection) WithTx(
 }
 
 // workspaceIDFromContext returns the workspace a request acts in: the
-// effective tenant kagi placed on the request identity. It mirrors
+// effective tenant the transport placed on the request identity. It mirrors
 // auth.WorkspaceIDFromContext; db cannot import auth.
 func workspaceIDFromContext(ctx context.Context) string {
-	t, _ := kagi.TenantFromContext(ctx)
-	return string(t)
+	t, _ := actor.TenantFromContext(ctx)
+	return t
 }
 
 // WithWorkspace executes a transaction scoped to the workspace pinned in the
@@ -226,8 +232,8 @@ func (c *Connection) WithWorkspace(
 	ctx context.Context,
 	fn func(*Queries) error,
 ) error {
-	actor, ok := kagi.PrincipalFromContext(ctx)
-	if !ok || actor.SubjectID == "" {
+	actor, ok := actor.PrincipalFromContext(ctx)
+	if !ok || actor.ID == "" {
 		return ErrNoActor
 	}
 
@@ -253,7 +259,7 @@ func (c *Connection) WithWorkspace(
 	}
 
 	q := New(tx)
-	wsIDs, err := q.GetActorWorkspaceIDs(ctx, actor.SubjectID)
+	wsIDs, err := q.GetActorWorkspaceIDs(ctx, actor.ID)
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		return err
@@ -277,7 +283,7 @@ func (c *Connection) WithWorkspace(
 			set_config('nokku.actor_id', $2, true)
 		`,
 		workspaceID,
-		actor.SubjectID,
+		actor.ID,
 	); err != nil {
 		_ = tx.Rollback(ctx)
 		return err

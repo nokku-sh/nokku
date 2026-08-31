@@ -76,14 +76,14 @@ ORDER BY
   id ASC;
 
 -- name: GetActorWorkspaceIDs :many
--- The actor id resolves against identity (kagi, TEXT) and machine
--- principals (UUID), so each branch casts explicitly.
+-- The actor id resolves against users, daemons, and service accounts; all
+-- three are UUIDs.
 SELECT
   workspace_id
 FROM
   workspace_members
 WHERE
-  user_id = @actor_id::text
+  user_id = @actor_id::uuid
 UNION
 SELECT
   workspace_id
@@ -122,24 +122,61 @@ WHERE
   AND wm.user_id = @user_id;
 
 -- name: ListWorkspaceMembers :many
--- Members of one workspace without their display fields: identity lives in
--- kagi, and the API layer stitches user data in via kagi's Users manager.
+-- Members of one workspace with their identity display fields joined in.
+-- The search query filters on name/email in SQL; ordering and pagination
+-- happen in the database too.
 SELECT
   wm.workspace_id,
-  wm.user_id,
+  u.id AS user_id,
+  u.name,
+  u.email,
+  u.email_verified,
+  u.picture,
+  u.active,
   wm.role_name,
   wm.created_at,
   wm.updated_at
 FROM
   workspace_members wm
+  JOIN users u ON u.id = wm.user_id
 WHERE
   wm.workspace_id = @workspace_id
+  AND (
+    sqlc.narg('query')::TEXT IS NULL
+    OR u.name ILIKE '%' || sqlc.narg('query') || '%'
+    OR u.email ILIKE '%' || sqlc.narg('query') || '%'
+  )
   AND (
     sqlc.narg('role_name')::TEXT IS NULL
     OR wm.role_name = sqlc.narg('role_name')::TEXT
   )
 ORDER BY
-  wm.created_at;
+  u.name ASC,
+  u.email ASC
+LIMIT
+  sqlc.narg('limit')
+OFFSET
+  sqlc.narg('offset');
+
+-- name: CountWorkspaceMembers :one
+-- The total matching member count for ListWorkspaceMembers, so list views
+-- can paginate without loading every row.
+SELECT
+  COUNT(*)::INTEGER
+FROM
+  workspace_members wm
+  JOIN users u ON u.id = wm.user_id
+WHERE
+  wm.workspace_id = @workspace_id
+  AND (
+    sqlc.narg('query')::TEXT IS NULL
+    OR u.name ILIKE '%' || sqlc.narg('query') || '%'
+    OR u.email ILIKE '%' || sqlc.narg('query') || '%'
+  )
+  AND (
+    sqlc.narg('role_name')::TEXT IS NULL
+    OR wm.role_name = sqlc.narg('role_name')::TEXT
+  );
 
 -- name: UpdateWorkspace :one
 UPDATE workspaces
@@ -244,3 +281,10 @@ WHERE
   workspaces.id = @workspace_id
 RETURNING
   *;
+
+-- name: EnsureWorkspaceMember :exec
+INSERT INTO
+  workspace_members (workspace_id, user_id, role_name)
+VALUES
+  (@workspace_id, @user_id, 'viewer')
+ON CONFLICT (workspace_id, user_id) DO NOTHING;

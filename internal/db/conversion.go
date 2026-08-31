@@ -257,6 +257,19 @@ func (p *GetPrincipalsRow) ToProto() *nokkuv1.Principal {
 	}
 }
 
+// UserToProto shapes an identity user row for the API surface.
+func UserToProto(u *User) *nokkuv1.User {
+	return &nokkuv1.User{
+		Id:            &u.ID,
+		Name:          &u.Name,
+		Email:         &u.Email,
+		EmailVerified: &u.EmailVerified,
+		Picture:       u.Picture,
+		CreatedAt:     SafeTimestamp(&u.CreatedAt),
+		UpdatedAt:     SafeTimestamp(&u.UpdatedAt),
+	}
+}
+
 func (d *Daemon) ToProto() *nokkuv1.Daemon {
 	if d == nil {
 		return nil

@@ -73,17 +73,25 @@ WHERE
   AND user_id = @user_id;
 
 -- name: ListTeamMembers :many
--- Members of one team without their display fields: identity lives in kagi,
--- and the API layer stitches user data in via kagi's Users manager.
+-- Members of one team with their identity display fields joined in.
 SELECT
   tm.workspace_id,
   tm.team_id,
-  tm.user_id,
+  u.id AS user_id,
+  u.name,
+  u.email,
+  u.email_verified,
+  u.picture,
+  u.active,
   tm.created_at
 FROM
   team_members tm
+  JOIN users u ON u.id = tm.user_id
 WHERE
-  tm.team_id = @team_id;
+  tm.team_id = @team_id
+ORDER BY
+  u.name ASC,
+  u.email ASC;
 
 -- name: CountTeamMembers :many
 -- Member counts for a set of teams in one read, for list views that show a

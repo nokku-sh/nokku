@@ -1,6 +1,6 @@
 -- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (workspace_id, name, description, role_name, expires_at, tags)
+  service_accounts (workspace_id, name, description, role_name, expires_at, tags, token_hash)
 VALUES
   (
     @workspace_id,
@@ -8,7 +8,8 @@ VALUES
     @description,
     COALESCE(sqlc.narg('role_name')::TEXT, 'viewer'),
     @expires_at,
-    COALESCE(@tags, '{}'::TEXT[])
+    COALESCE(@tags, '{}'::TEXT[]),
+    @token_hash
   )
 RETURNING
   id;
@@ -85,3 +86,22 @@ RETURNING
 DELETE FROM service_accounts
 WHERE
   id = @service_account_id;
+
+-- Bearer-token authentication for service accounts: resolve by the stored
+-- hash of the raw secret. A service account's token is its credential, so
+-- only live, unexpired accounts match.
+-- name: GetServiceAccountByTokenHash :one
+SELECT
+  *
+FROM
+  service_accounts
+WHERE
+  token_hash = @token_hash
+  AND (expires_at IS NULL OR expires_at > NOW());
+
+-- name: TouchServiceAccount :exec
+UPDATE service_accounts
+SET
+  last_used_at = NOW()
+WHERE
+  id = @id;
