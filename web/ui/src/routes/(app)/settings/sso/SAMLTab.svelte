@@ -4,12 +4,13 @@
 	import * as Field from '$lib/components/ui/field';
 	import { Label } from '$lib/components/ui/label';
 	import * as Card from '$lib/components/ui/card';
-	import { Save, Info, Download } from '@lucide/svelte';
+	import { Save, Info, Download, TriangleAlert } from '@lucide/svelte';
 	import { Switch } from '$lib/components/ui/switch';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { sso } from '$lib/api/sso.svelte';
 	import type { SAMLProvider } from '$lib/gen/nokku/v1/sso_pb';
+	import * as Alert from '$lib/components/ui/alert';
 	import InputGroupVariants from '$lib/components/ui/input-group/input-group-variants.svelte';
 
 	let change = $state({
@@ -19,6 +20,13 @@
 	} as SAMLProvider);
 
 	const provider = $derived(sso.getSAML());
+	// A provider is configured once its payload fields are set; the API
+	// reports an unconfigured one as an empty provider instead of 404.
+	const configured = $derived(!!provider.data?.metadataUrl);
+	// Providers share a single slot per workspace: saving here replaces an
+	// existing OIDC configuration.
+	const oidcProvider = $derived(sso.getOIDC());
+	const replacesOIDC = $derived(!!oidcProvider.data?.issuerUrl);
 	$effect(() => {
 		if (provider.data) change = { ...provider.data };
 	});
@@ -43,6 +51,17 @@
 	</Card.Header>
 
 	<Card.Content class="space-y-8">
+		{#if replacesOIDC}
+			<Alert.Root>
+				<TriangleAlert class="h-4 w-4" />
+				<Alert.Title>Replaces the OIDC provider</Alert.Title>
+				<Alert.Description>
+					Only one SSO provider is allowed per workspace. Saving this SAML provider replaces the
+					existing OIDC configuration.
+				</Alert.Description>
+			</Alert.Root>
+		{/if}
+
 		<!-- Basic Configuration -->
 		<Field.Set>
 			<Field.Legend class="sr-only">Basic Configuration</Field.Legend>
@@ -78,49 +97,6 @@
 						</Field.Content>
 					</Field.Field>
 				</div>
-			</Field.Group>
-		</Field.Set>
-
-		<Separator />
-
-		<!-- Attribute Mapping -->
-		<Field.Set>
-			<div class="space-y-1">
-				<Field.Legend>User Attribute Mapping</Field.Legend>
-				<Field.Description>
-					Map SAML assertion attributes to user profile fields. Leave empty to use standard
-					attribute names.
-				</Field.Description>
-			</div>
-
-			<Field.Group class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-				<Field.Field>
-					<Field.Label for="emailAttr">Email</Field.Label>
-					<Field.Content>
-						<Input id="emailAttr" bind:value={change.emailAttribute} placeholder="email" />
-					</Field.Content>
-				</Field.Field>
-
-				<Field.Field>
-					<Field.Label for="nameAttr">Full Name</Field.Label>
-					<Field.Content>
-						<Input id="nameAttr" bind:value={change.nameAttribute} placeholder="name" />
-					</Field.Content>
-				</Field.Field>
-
-				<Field.Field>
-					<Field.Label for="usernameAttr">Username</Field.Label>
-					<Field.Content>
-						<Input id="usernameAttr" bind:value={change.usernameAttribute} placeholder="username" />
-					</Field.Content>
-				</Field.Field>
-
-				<Field.Field>
-					<Field.Label for="picAttr">Profile Picture</Field.Label>
-					<Field.Content>
-						<Input id="picAttr" bind:value={change.pictureAttribute} placeholder="picture" />
-					</Field.Content>
-				</Field.Field>
 			</Field.Group>
 		</Field.Set>
 
@@ -229,7 +205,7 @@
 		>
 			<Save class={updateProvider.isPending ? 'hidden' : ''} />
 			<Spinner class={updateProvider.isPending ? '' : 'hidden'} />
-			Save
+			{configured ? 'Save' : 'Add Provider'}
 		</Button>
 	</Card.Footer>
 </Card.Root>

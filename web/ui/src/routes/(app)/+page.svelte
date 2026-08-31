@@ -81,7 +81,7 @@
 		if (hr < 17) return 'Good afternoon';
 		return 'Good evening';
 	});
-	const displayName = $derived(currentUser.data?.name || currentUser.data?.username || 'Operator');
+	const displayName = $derived(currentUser.data?.name || 'Operator');
 
 	const healthIssues = $derived.by(() => {
 		const issues: HealthIssue[] = [];

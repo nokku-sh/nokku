@@ -91,12 +91,15 @@
 					try {
 						const formData = new FormData();
 						formData.append('picture', file);
-						await httpFetch('/upload/avatar', {
+						const res = await httpFetch('/upload/avatar', {
 							method: 'POST',
 							body: formData
 						});
+						// The upload only stores the file; the avatar URL is
+						// attached to the account through kagi's update endpoint.
+						const { url } = await res.json();
+						updateProfile.mutate({ ...currentUser, picture: url });
 						toast.success('Avatar uploaded successfully!');
-						userData.refetch();
 					} catch {}
 				}}
 				onUnsupportedFile={(file) => {
@@ -126,7 +129,7 @@
 			</ImageCropper.Root>
 
 			<div class="space-y-1">
-				<h3 class="text-xl font-bold">{currentUser?.username || 'Username'}</h3>
+				<h3 class="text-xl font-bold">{currentUser?.name || 'Operator'}</h3>
 				<p class="text-sm text-muted-foreground">
 					{currentUser?.email || 'email@example.com'}
 					{#if currentUser?.emailVerified}
@@ -149,19 +152,6 @@
 						placeholder="Enter your full name"
 					/>
 					<Field.Description>Optional, used for billing and communication.</Field.Description>
-				</Field.Content>
-			</Field.Field>
-
-			<Field.Field>
-				<Field.Label for="name">Username</Field.Label>
-				<Field.Content>
-					<Input
-						id="username"
-						type="text"
-						bind:value={currentUser.username}
-						required
-						placeholder="Enter your username"
-					/>
 				</Field.Content>
 			</Field.Field>
 

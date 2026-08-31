@@ -4,23 +4,30 @@
 	import * as Field from '$lib/components/ui/field';
 	import { Label } from '$lib/components/ui/label';
 	import * as Card from '$lib/components/ui/card';
-	import { Globe, Save, Info } from '@lucide/svelte';
+	import { Globe, Save, Info, TriangleAlert } from '@lucide/svelte';
 	import { Switch } from '$lib/components/ui/switch';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
 	import { Spinner } from '$lib/components/ui/spinner';
+	import * as Alert from '$lib/components/ui/alert';
 	import type { OIDCProvider } from '$lib/gen/nokku/v1/sso_pb';
 	import { sso } from '$lib/api/sso.svelte';
 
 	let change = $state({
 		isActive: false,
 		enforceSso: false,
-		allowJitProvisioning: false,
-		usePkce: false
+		allowJitProvisioning: false
 	} as OIDCProvider);
 	let clientSecret = $state('');
 
 	const provider = $derived(sso.getOIDC());
+	// A provider is configured once its payload fields are set; the API
+	// reports an unconfigured one as an empty provider instead of 404.
+	const configured = $derived(!!provider.data?.issuerUrl);
+	// Providers share a single slot per workspace: saving here replaces an
+	// existing SAML configuration.
+	const samlProvider = $derived(sso.getSAML());
+	const replacesSAML = $derived(!!samlProvider.data?.metadataUrl);
 	$effect(() => {
 		if (provider.data) change = { ...provider.data };
 	});
@@ -48,6 +55,17 @@
 	</Card.Header>
 
 	<Card.Content class="space-y-8">
+		{#if replacesSAML}
+			<Alert.Root>
+				<TriangleAlert class="h-4 w-4" />
+				<Alert.Title>Replaces the SAML provider</Alert.Title>
+				<Alert.Description>
+					Only one SSO provider is allowed per workspace. Saving this OIDC provider replaces the
+					existing SAML configuration.
+				</Alert.Description>
+			</Alert.Root>
+		{/if}
+
 		<!-- Basic Configuration -->
 		<Field.Set>
 			<Field.Legend class="sr-only">Basic Configuration</Field.Legend>
@@ -145,56 +163,6 @@
 
 		<Separator />
 
-		<!-- Claim Mapping -->
-		<Field.Set>
-			<div class="space-y-1">
-				<Field.Legend>User Attribute Mapping</Field.Legend>
-				<Field.Description>
-					Map OIDC claims to user attributes. Leave empty to use standard claim names.
-				</Field.Description>
-			</div>
-
-			<Field.Group class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-				<Field.Field>
-					<Field.Label for="emailClaim">Email</Field.Label>
-					<Field.Content>
-						<Input id="emailClaim" bind:value={change.emailClaim} placeholder="email (default)" />
-					</Field.Content>
-				</Field.Field>
-
-				<Field.Field>
-					<Field.Label for="nameClaim">Full Name</Field.Label>
-					<Field.Content>
-						<Input id="nameClaim" bind:value={change.nameClaim} placeholder="name (default)" />
-					</Field.Content>
-				</Field.Field>
-
-				<Field.Field>
-					<Field.Label for="usernameClaim">Username</Field.Label>
-					<Field.Content>
-						<Input
-							id="usernameClaim"
-							bind:value={change.usernameClaim}
-							placeholder="preferred_username (default)"
-						/>
-					</Field.Content>
-				</Field.Field>
-
-				<Field.Field>
-					<Field.Label for="pictureClaim">Profile Picture</Field.Label>
-					<Field.Content>
-						<Input
-							id="pictureClaim"
-							bind:value={change.pictureClaim}
-							placeholder="picture (default)"
-						/>
-					</Field.Content>
-				</Field.Field>
-			</Field.Group>
-		</Field.Set>
-
-		<Separator />
-
 		<!-- Security & Access Options -->
 		<Field.Set>
 			<div class="space-y-1">
@@ -239,19 +207,6 @@
 					</div>
 					<Switch bind:checked={change.allowJitProvisioning} />
 				</div>
-
-				<div
-					class="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50"
-				>
-					<div class="flex flex-col space-y-1">
-						<Label class="text-base font-medium">Use PKCE</Label>
-						<p class="text-sm text-muted-foreground">
-							Enable Proof Key for Code Exchange for enhanced security (recommended for public
-							clients)
-						</p>
-					</div>
-					<Switch bind:checked={change.usePkce} />
-				</div>
 			</Field.Group>
 		</Field.Set>
 
@@ -291,7 +246,7 @@
 		>
 			<Save class={updateProvider.isPending ? 'hidden' : ''} />
 			<Spinner class={updateProvider.isPending ? '' : 'hidden'} />
-			Save
+			{configured ? 'Save' : 'Add Provider'}
 		</Button>
 	</Card.Footer>
 </Card.Root>

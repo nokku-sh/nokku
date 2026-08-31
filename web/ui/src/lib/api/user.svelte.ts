@@ -1,17 +1,69 @@
-import { UserService } from '$lib/gen/nokku/v1/user_pb';
+import { create } from '@bufbuild/protobuf';
+import { timestampFromDate, type Timestamp } from '@bufbuild/protobuf/wkt';
+import { createMutation, createQuery } from '@tanstack/svelte-query';
 import { goto } from '$app/navigation';
 import { toast } from 'svelte-sonner';
-import { useMutation, useQuery } from '$lib/query';
 import { queryClient } from './client';
+import { account, type AccountUser } from './account';
+import { useQuery } from '$lib/query';
 import { UtilService } from '$lib/gen/nokku/v1/util_pb';
-import type { Timestamp } from '@bufbuild/protobuf/wkt';
+import {
+	OAuthIdentitySchema,
+	type OAuthIdentity,
+	UserSchema,
+	type User
+} from '$lib/gen/nokku/v1/user_pb';
 import { pageIndex, pageSize } from '$lib/store.svelte';
+
+// The account reads and mutations are kagi's /auth/account surface. This
+// module maps kagi's JSON onto the proto shapes the pages already consume,
+// so the components keep working unchanged.
+
+const invalidateAccount = () => queryClient.invalidateQueries({ queryKey: ['account'] });
+
+function toTimestamp(iso: string): Timestamp {
+	return timestampFromDate(new Date(iso));
+}
+
+function toUser(u: AccountUser): User {
+	return create(UserSchema, {
+		id: u.id,
+		name: u.displayName,
+		email: u.email,
+		emailVerified: u.emailVerified,
+		picture: u.picture === '' ? undefined : u.picture,
+		enableEmailRecovery: !u.disablePasswordReset,
+		createdAt: toTimestamp(u.createdAt),
+		updatedAt: toTimestamp(u.updatedAt)
+	});
+}
+
+const identityTypes = ['oidc', 'oauth2', 'saml'];
 
 export const user = {
 	// Queries
-	self: () => useQuery(UserService.method.whoami, {}, { select: (res) => res.user }),
+	self: () =>
+		createQuery<User>(() => ({
+			queryKey: ['account'],
+			queryFn: async () => toUser(await account.user())
+		})),
 	listLinkedAccounts: () =>
-		useQuery(UserService.method.listLinkedAccounts, {}, { select: (res) => res.accounts }),
+		createQuery<OAuthIdentity[]>(() => ({
+			queryKey: ['account', 'credentials'],
+			queryFn: async () => {
+				const { credentials } = await account.credentials();
+				return credentials
+					.filter((c) => identityTypes.includes(c.type))
+					.map((c) =>
+						create(OAuthIdentitySchema, {
+							providerId: c.subject,
+							provider: c.provider,
+							protocol: c.type,
+							createdAt: toTimestamp(c.createdAt)
+						})
+					);
+			}
+		})),
 	activity: (filters: {
 		userID: string;
 		search?: string;
@@ -40,20 +92,38 @@ export const user = {
 	},
 
 	// Mutations
-	updateProfile: () => useMutation(UserService.method.updateProfile),
+	updateProfile: () =>
+		createMutation<AccountUser, Error, { name?: string; picture?: string; email?: string }>(() => ({
+			mutationFn: (variables) =>
+				account.update({
+					displayName: variables.name,
+					picture: variables.picture
+				}),
+			onSuccess: (updated) => {
+				queryClient.setQueryData(['account'], toUser(updated));
+			}
+		})),
 	deleteAccount: () =>
-		useMutation(UserService.method.deleteAccount, {
+		createMutation<void, Error, Record<string, never>>(() => ({
+			mutationFn: () => account.deleteAccount(),
 			onSuccess: () => {
 				void queryClient.cancelQueries();
 				queryClient.clear();
 				void goto('/login');
 				toast.success('Account deleted, bye 👋');
 			}
-		}),
-	unlinkAccount: () => useMutation(UserService.method.unlinkAccount),
+		})),
+	unlinkAccount: () =>
+		createMutation<void, Error, { provider: string }>(() => ({
+			mutationFn: ({ provider }) => account.removeIdentity(provider),
+			onSuccess: invalidateAccount
+		})),
 	setEmailRecovery: () =>
-		useMutation(UserService.method.setEmailRecovery, {
-			onSuccess: (_, variables) =>
-				toast.success(`Email recovery ${variables.enable ? 'enabled' : 'disabled'}`)
-		})
+		createMutation<AccountUser, Error, { enable: boolean }>(() => ({
+			mutationFn: ({ enable }) => account.update({ disablePasswordReset: !enable }),
+			onSuccess: (updated) => {
+				queryClient.setQueryData(['account'], toUser(updated));
+				toast.success(`Email recovery ${updated.disablePasswordReset ? 'disabled' : 'enabled'}`);
+			}
+		}))
 };

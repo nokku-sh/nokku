@@ -5,11 +5,10 @@
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { BinaryIcon, KeyRound, LogIn } from '@lucide/svelte';
+	import { BinaryIcon, GlobeIcon, KeyRound, LogIn } from '@lucide/svelte';
 	import { GoogleIcon, GitHubIcon, OIDCIcon, SAMLIcon } from '$lib/assets';
 	import { toast } from 'svelte-sonner';
 	import { sso } from '$lib/api/sso.svelte';
-	import { SSOProvider_Type, type SSOProvider } from '$lib/gen/nokku/v1/sso_pb';
 	import { auth } from '$lib/api/auth.svelte';
 	import { useDebounce } from 'runed';
 	import Logo from '$lib/assets/logo.svelte';
@@ -23,22 +22,30 @@
 
 	// Home Realm Discovery: probe for a workspace SSO provider as the email is
 	// typed, so the matching button appears without submitting the form.
+	// Discovery is kagi's /auth/sso/discover endpoint.
 	const checkSSO = useDebounce(() => {
 		if (email.includes('@')) {
-			ssoCheck.mutate({ email });
+			ssoCheck.mutate(email);
 		}
 	}, 300);
 
-	let enforceSSO = $derived(ssoCheck.isSuccess && ssoCheck.data.enforceSso);
+	let enforceSSO = $derived(ssoCheck.isSuccess && ssoCheck.data?.enforce);
 	let disablePasswordLogin = $derived(enforceSSO || login.isPending);
 
-	function handleSSOLogin(provider: SSOProvider) {
-		switch (provider.type) {
-			case SSOProvider_Type.OIDC:
-				window.location.href = `oidc/login?provider=${provider.id}`;
+	function handleSSOLogin(p: { method: string; provider: string }) {
+		// The verified email domain tells kagi which workspace's provider is
+		// meant: the login itself runs without workspace context.
+		const domain = ssoCheck.data?.domain ?? '';
+		const q = domain ? `&domain=${encodeURIComponent(domain)}` : '';
+		switch (p.method) {
+			case 'oidc':
+				window.location.href = `oidc/login?provider=${p.provider}${q}`;
 				break;
-			case SSOProvider_Type.SAML:
-				window.location.href = `saml/login?provider=${provider.id}`;
+			case 'saml':
+				window.location.href = `saml/login?provider=${p.provider}${q}`;
+				break;
+			case 'oauth2':
+				window.location.href = `oauth/login?provider=${p.provider}${q}`;
 				break;
 		}
 	}
@@ -106,8 +113,8 @@
 					</Button>
 				{/if}
 
-				{#if ssoCheck.isSuccess && ssoCheck.data.hasSso}
-					{#each ssoCheck.data.providers as p (`${p.type}:${p.id}`)}
+				{#if ssoCheck.isSuccess && ssoCheck.data?.hasSSO}
+					{#each ssoCheck.data.providers as p (`${p.method}:${p.provider}`)}
 						<Button
 							type="button"
 							variant="secondary"
@@ -115,13 +122,12 @@
 							onclick={() => handleSSOLogin(p)}
 							disabled={ssoCheck.isPending}
 						>
-							{#if p.type === SSOProvider_Type.OIDC}
+							{#if p.method === 'oidc'}
 								<OIDCIcon size={16} />
-								<span>Sign in with {p.name}</span>
-							{/if}
-							{#if p.type === SSOProvider_Type.SAML}
+							{:else if p.method === 'saml'}
 								<SAMLIcon size={16} />
-								<span>Sign in with {p.name}</span>
+							{:else}
+								<GlobeIcon size={16} />
 							{/if}
 						</Button>
 					{/each}

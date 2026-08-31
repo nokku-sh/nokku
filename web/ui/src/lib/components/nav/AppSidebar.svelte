@@ -225,7 +225,18 @@
 							<Sidebar.MenuButton size="lg" {...props}>
 								<UserAvatar user={currentUser.data} />
 								<div class="flex flex-col text-sm leading-tight">
-									<span class="truncate font-semibold">{currentUser.data?.username}</span>
+									{#if currentUser.data?.name}
+										<span class="truncate text-sm font-medium" title={currentUser.data?.name}
+											>{currentUser.data?.name}</span
+										>
+									{:else}
+										<span
+											class="truncate text-sm font-medium"
+											title={currentUser.data?.email.split('@')[0]}
+										>
+											{currentUser.data?.email.split('@')[0]}
+										</span>
+									{/if}
 									<span class="truncate text-xs opacity-70">{currentUser.data?.email}</span>
 								</div>
 								<ChevronsUpDown class="ml-auto size-4" />
@@ -242,7 +253,7 @@
 							<div class="flex items-center gap-2 px-1 py-1.5 text-sm">
 								<UserAvatar user={currentUser.data} />
 								<div class="grid flex-1 text-left text-sm leading-tight">
-									<span class="truncate font-semibold">{currentUser.data?.username}</span>
+									<span class="truncate font-semibold">{currentUser.data?.name}</span>
 									<span class="truncate text-xs opacity-70">{currentUser.data?.email}</span>
 								</div>
 							</div>
