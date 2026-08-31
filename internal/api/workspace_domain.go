@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -42,6 +43,7 @@ func (s *WorkspaceDomainService) CreateWorkspaceDomain(
 ) (*nokkuv1.CreateWorkspaceDomainResponse, error) {
 	result, err := s.cfg.IAM.PutTenantDomain(ctx, req.GetWorkspaceId(), req.GetDomain())
 	if err != nil {
+		fmt.Printf("err.Error(): %v\n", err.Error())
 		return nil, DBError(err)
 	}
 	return &nokkuv1.CreateWorkspaceDomainResponse{
