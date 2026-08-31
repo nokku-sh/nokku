@@ -64,8 +64,7 @@ type passkeyFlow struct {
 }
 
 // newPasskeyFlow builds the WebAuthn relying party. rpID comes from the
-// deployment URL's host; rpOrigins lists every origin the browser may
-// assert.
+// deployment URL's host; rpOrigins lists every origin the browser may assert.
 func newPasskeyFlow(svc *Service, rpOrigins []string) (*passkeyFlow, error) {
 	u, err := url.Parse(svc.baseURL)
 	if err != nil {
