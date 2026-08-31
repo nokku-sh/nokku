@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
+
+	"github.com/nokku-sh/nokku/internal/cache"
 )
 
 // Errors returned by DPoPVerifier.Verify. Map ErrDPoPNonce to a fresh
@@ -49,6 +51,20 @@ var allowedAlgs = []jose.SignatureAlgorithm{
 // given jti, so concurrent instances agree on what has been seen.
 type ReplayStore interface {
 	Add(ctx context.Context, jti string, ttl time.Duration) (added bool, err error)
+}
+
+// cacheReplay fits the shared cache's SetNX to ReplayStore. Caches without
+// SetNX degrade to a no-op store (single-instance deployments only).
+type cacheReplay struct {
+	c cache.Cache
+}
+
+func (r cacheReplay) Add(ctx context.Context, jti string, ttl time.Duration) (bool, error) {
+	nx, ok := r.c.(cache.SetNXer)
+	if !ok {
+		return true, nil
+	}
+	return nx.SetNX(ctx, "dpop:jti:"+jti, nil, ttl)
 }
 
 // DPoPOptions configures a DPoPVerifier.

@@ -82,9 +82,9 @@ type Deps struct {
 	// Secret keys the DPoP server nonce. Required for DPoP; derives from
 	// NOKKU_SECRET.
 	Secret []byte
-	// Replay records consumed DPoP proof jtis; must implement SetNX.
-	// nil disables replay detection (tests only).
-	Replay ReplayStore
+	// Conn runs workspace-scoped queries under RLS (domains, SSO
+	// providers). Required for the managers that touch tenant tables.
+	Conn *db.Connection
 	// Cache backs SSO flow state and the device flow. Required for both.
 	Cache Cache
 	// Device flow settings; the flow builds only when Cache is set.
@@ -110,6 +110,7 @@ type Deps struct {
 type Service struct {
 	q               db.Querier
 	baseURL         string
+	conn            *db.Connection
 	cache           Cache
 	events          Sink
 	OnSSOLogin      func(ctx context.Context, userID, workspaceID string) error
@@ -138,6 +139,7 @@ func New(d Deps) (*Service, error) {
 	svc := &Service{
 		q:               d.Querier,
 		baseURL:         d.BaseURL,
+		conn:            d.Conn,
 		cache:           d.Cache,
 		events:          d.Events,
 		OnSSOLogin:      d.OnSSOLogin,
@@ -148,9 +150,15 @@ func New(d Deps) (*Service, error) {
 	svc.Password = newPasswordManager(svc, d.Password)
 	svc.Sessions = &SessionManager{svc: svc, opts: d.Session}
 	if len(d.Secret) > 0 {
+		// Replay detection rides the shared cache the service already
+		// carries; a nil cache disables it (tests only).
+		var replay ReplayStore
+		if d.Cache != nil {
+			replay = cacheReplay{d.Cache}
+		}
 		dpop, err := NewDPoPVerifier(DPoPOptions{
 			NonceSecret: d.Secret,
-			Replay:      d.Replay,
+			Replay:      replay,
 			Now:         svc.now,
 		})
 		if err != nil {

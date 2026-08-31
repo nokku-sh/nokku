@@ -9,7 +9,6 @@ import (
 	"errors"
 	"net/http"
 	"slices"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -172,22 +171,26 @@ func (s *Service) provisionUser(ctx context.Context, opts flowLinkOptions) (*db.
 }
 
 // verifiedDomainsForProvider lists the verified email domains bound to a
-// provider.
+// provider. It runs mid-callback, pre-auth, so the read goes out as
+// nokku_system: the provider id already scopes the result.
 func (s *Service) verifiedDomainsForProvider(
 	ctx context.Context,
 	providerID string,
 ) ([]string, error) {
-	now := time.Now()
-	rows, err := s.q.ListVerifiedDomainsForProvider(ctx, &db.ListVerifiedDomainsForProviderParams{
-		ProviderID:  providerID,
-		VerifiedNow: &now,
+	var out []string
+	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
+		rows, err := q.ListVerifiedDomainsForProvider(ctx, providerID)
+		if err != nil {
+			return err
+		}
+		out = make([]string, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, r.Domain)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-	out := make([]string, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, r.Domain)
 	}
 	return out, nil
 }
