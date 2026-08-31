@@ -37,7 +37,7 @@ Nokku is the control plane for certificate-based access to SSH targets and X.509
 ## Editions & Licensing
 
 Self-hosted instances default to the **Community** plan.
-For unlimited quotas, external KMS, SAML, and SSO enforcement, we offer an **Enterprise** plan. Enterprise license keys are Ed25519-signed and verified offline against a public key compiled directly into the binary, ensuring fully air-gapped activation.
+For unlimited quotas, SAML, and SSO enforcement, we offer an **Enterprise** plan. Enterprise license keys are Ed25519-signed and verified offline against a public key compiled directly into the binary, ensuring fully air-gapped activation.
 
 > **For in-depth documentation, advanced configuration, and production deployment guides, please visit our [Official Documentation (Link)](https://nokku.sh/docs)**
 
@@ -53,8 +53,8 @@ The backend reads configuration from environment variables. Common settings incl
 | ----------------------- | ---------------------------------------------------------------------------------------------------- |
 | `NOKKU_BASE_URL`        | Public base URL                                                                                      |
 | `NOKKU_PORT`            | Port the backend listens on                                                                          |
-| `NOKKU_SECRET`          | 32-byte encryption secret                                                                            |
-| `KMS_URI`               | External key-management URI                                                                          |
+| `NOKKU_SECRET`          | Master secret for at-rest encryption (SSO secrets, SAML keys, DPoP nonce, CA keys)                   |
+| `KMS_URI`               | External key-management URI (Enterprise): routes at-rest encryption through KMS                      |
 | `NOKKU_TRUSTED_PROXIES` | Comma-separated reverse-proxy IPs/CIDRs (e.g. Traefik) whose forwarded client IP headers are honored |
 
 ## Secret rotation
@@ -63,6 +63,8 @@ Stop the backend before rotating encrypted data:
 
 ```bash
 ./nokku rotate-secrets --new secret:NEW_SECRET
+# or, in KMS mode:
+./nokku rotate-secrets --new kms:hcvault://vault:8200/transit/keys/nokku
 ```
 
-The command also supports `kms:<URI>` destinations in the enterprise variant. Update the runtime environment after a successful rotation.
+Update the runtime environment (NOKKU_SECRET, or the KMS keyset reference) after a successful rotation.
