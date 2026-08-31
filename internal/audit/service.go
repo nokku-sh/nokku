@@ -50,7 +50,7 @@ func New(
 }
 
 func (s *Service) setupPartitions(ctx context.Context) error {
-	now := time.Now()
+	now := time.Now().UTC() // use UTC
 
 	// Normalize to the 1st of the current month to prevent AddDate wraparound issues
 	currentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
@@ -76,6 +76,13 @@ func (s *Service) setupPartitions(ctx context.Context) error {
 	}
 
 	if err := s.createPartitionForMonth(ctx, tx, currentMonth); err != nil {
+		return err
+	}
+
+	// A server upgraded (or booted) while the local calendar is ahead of UTC
+	// can still receive rows stamped with the previous UTC month; keep that
+	// partition around so those inserts never hit a missing partition.
+	if err := s.createPartitionForMonth(ctx, tx, currentMonth.AddDate(0, -1, 0)); err != nil {
 		return err
 	}
 
