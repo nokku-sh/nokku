@@ -33,17 +33,3 @@ services:
     ports:
       - "8080:8080"
     restart: unless-stopped
-
-  vault:
-    image: docker.io/hashicorp/vault:latest
-    container_name: vault
-    command: ["server", "-dev"]
-    environment:
-      VAULT_DEV_ROOT_TOKEN_ID: "root"
-      VAULT_ADDR: "http://0.0.0.0:8200"
-      VAULT_API_ADDR: "http://0.0.0.0:8200"
-    cap_add:
-      - IPC_LOCK
-    ports:
-      - 8200:8200
-    restart: unless-stopped
