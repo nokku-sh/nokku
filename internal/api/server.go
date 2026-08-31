@@ -329,7 +329,7 @@ func (s *Server) registerServices(ctx context.Context) error {
 
 	// The browser-facing auth surface: flows, account self-service, device
 	// flow, and SSO discovery (see registerAuthRoutes).
-	registerAuthRoutes(muxAdapter{s.mux}, s.cfg)
+	registerAuthRoutes(s.mux, s.cfg)
 
 	// Device flow: the browser page approves under a session; the CLI
 	// endpoints are public (RFC 8628).
