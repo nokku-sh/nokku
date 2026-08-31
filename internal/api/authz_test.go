@@ -44,8 +44,8 @@ func TestProcedurePermissions(t *testing.T) {
 		{nokkuv1connect.DaemonServiceDeleteDaemonProcedure, db.PermDaemonsEdit},
 		{nokkuv1connect.DaemonServiceRefreshEnrollTokenProcedure, db.PermSettingsEdit},
 
-		{nokkuv1connect.SSOServiceGetOIDCProviderProcedure, db.PermSsoView},
-		{nokkuv1connect.SSOServiceUpdateSAMLProviderProcedure, db.PermSsoEdit},
+		{nokkuv1connect.SSOServiceGetSSOProviderProcedure, db.PermSsoView},
+		{nokkuv1connect.SSOServiceUpdateSSOProviderProcedure, db.PermSsoEdit},
 
 		{nokkuv1connect.WorkspaceDomainServiceGetWorkspaceDomainProcedure, db.PermDomainsView},
 		{nokkuv1connect.WorkspaceDomainServiceVerifyWorkspaceDomainProcedure, db.PermDomainsEdit},

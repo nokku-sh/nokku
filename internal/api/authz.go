@@ -61,10 +61,8 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.ServiceAccountServiceDeleteServiceAccountProcedure: db.PermServiceAccountsEdit,
 
 	// SSO
-	nokkuv1connect.SSOServiceGetOIDCProviderProcedure:    db.PermSsoView,
-	nokkuv1connect.SSOServiceGetSAMLProviderProcedure:    db.PermSsoView,
-	nokkuv1connect.SSOServiceUpdateOIDCProviderProcedure: db.PermSsoEdit,
-	nokkuv1connect.SSOServiceUpdateSAMLProviderProcedure: db.PermSsoEdit,
+	nokkuv1connect.SSOServiceGetSSOProviderProcedure:    db.PermSsoView,
+	nokkuv1connect.SSOServiceUpdateSSOProviderProcedure: db.PermSsoEdit,
 
 	// Targets
 	nokkuv1connect.TargetServiceGetTargetProcedure:        db.PermTargetsView,
