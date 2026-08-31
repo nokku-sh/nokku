@@ -32,6 +32,12 @@
 	let enforceSSO = $derived(ssoCheck.isSuccess && ssoCheck.data?.enforce);
 	let disablePasswordLogin = $derived(enforceSSO || login.isPending);
 
+	// Label for the provider button: the admin-set display name when present,
+	// otherwise the protocol name.
+	function ssoLabel(p: { method: string; name: string }) {
+		return p.name || (p.method === 'saml' ? 'SAML' : 'SSO');
+	}
+
 	function handleSSOLogin(p: { method: string; provider: string }) {
 		// The verified email domain tells the backend which workspace's provider is
 		// meant: the login itself runs without workspace context.
@@ -129,6 +135,7 @@
 							{:else}
 								<GlobeIcon size={16} />
 							{/if}
+							<span>{ssoLabel(p)}</span>
 						</Button>
 					{/each}
 				{/if}

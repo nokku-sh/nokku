@@ -10,36 +10,58 @@
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import * as Alert from '$lib/components/ui/alert';
-	import type { OIDCProvider } from '$lib/gen/nokku/v1/sso_pb';
 	import { sso } from '$lib/api/sso.svelte';
+	import { workspaceID } from '$lib/store.svelte';
 
 	let change = $state({
 		isActive: false,
 		enforceSso: false,
-		allowJitProvisioning: false
-	} as OIDCProvider);
+		allowJitProvisioning: false,
+		name: '',
+		issuerUrl: '',
+		clientId: '',
+		scopes: [] as string[]
+	});
 	let clientSecret = $state('');
 
-	const provider = $derived(sso.getOIDC());
-	// A provider is configured once its payload fields are set; the API
-	// reports an unconfigured one as an empty provider instead of 404.
-	const configured = $derived(!!provider.data?.issuerUrl);
+	const provider = $derived(sso.getProvider());
+	// The provider is configured when the stored method is OIDC; the config
+	// block carries whichever protocol's fields are set.
+	const configured = $derived(provider.data?.method === 'oidc');
 	// Providers share a single slot per workspace: saving here replaces an
 	// existing SAML configuration.
-	const samlProvider = $derived(sso.getSAML());
-	const replacesSAML = $derived(!!samlProvider.data?.metadataUrl);
+	const replacesSAML = $derived(provider.data?.method === 'saml');
 	$effect(() => {
-		if (provider.data) change = { ...provider.data };
+		const p = provider.data;
+		if (!p) return;
+		change = {
+			isActive: p.isActive ?? false,
+			enforceSso: p.enforceSso ?? false,
+			allowJitProvisioning: p.allowJitProvisioning ?? false,
+			name: p.name ?? '',
+			issuerUrl: p.config?.issuerUrl ?? '',
+			clientId: p.config?.clientId ?? '',
+			scopes: p.config?.scopes ? [...p.config.scopes] : []
+		};
 	});
 
-	const updateProvider = sso.updateOIDC();
+	const updateProvider = sso.updateProvider();
 	function handleSubmit() {
 		clientSecret = clientSecret.trim();
-		if (clientSecret === '') {
-			updateProvider.mutate({ ...change });
-		} else {
-			updateProvider.mutate({ ...change, clientSecret: clientSecret });
-		}
+		updateProvider.mutate({
+			workspaceId: workspaceID.current,
+			method: 'oidc',
+			name: change.name,
+			isActive: change.isActive,
+			enforceSso: change.enforceSso,
+			allowJitProvisioning: change.allowJitProvisioning,
+			clientSecret: clientSecret,
+			config: {
+				issuerUrl: change.issuerUrl,
+				clientId: change.clientId,
+				scopes: change.scopes
+			}
+		});
 	}
 
 	const callbackURL = window.location.origin + '/oidc/callback';

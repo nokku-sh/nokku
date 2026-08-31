@@ -7,29 +7,20 @@ import { workspaceID } from '$lib/store.svelte';
 
 export const sso = {
 	// Queries
-	// The API reports an unconfigured provider as an empty provider (not
-	// 404), so these never error while the workspace has no SSO set up yet.
-	getOIDC: () =>
+	// The API reports an unconfigured provider as an unset provider field
+	// (not 404), so this never errors while the workspace has no SSO set up.
+	// The oneof discriminates the protocol: config.case is 'oidc' or 'saml'.
+	getProvider: () =>
 		useQuery(
-			SSOService.method.getOIDCProvider,
+			SSOService.method.getSSOProvider,
 			{ workspaceId: workspaceID.current },
-			{ select: (res) => res.oidcProvider }
-		),
-	getSAML: () =>
-		useQuery(
-			SSOService.method.getSAMLProvider,
-			{ workspaceId: workspaceID.current },
-			{ select: (res) => res.samlProvider }
+			{ select: (res) => res.provider }
 		),
 
 	// Mutations
-	updateOIDC: () =>
-		useMutation(SSOService.method.updateOIDCProvider, {
-			onSuccess: () => toast.success('OIDC provider updated')
-		}),
-	updateSAML: () =>
-		useMutation(SSOService.method.updateSAMLProvider, {
-			onSuccess: () => toast.success('SAML provider updated')
+	updateProvider: () =>
+		useMutation(SSOService.method.updateSSOProvider, {
+			onSuccess: () => toast.success('SSO provider updated')
 		}),
 	// Home realm discovery is the backend's mounted endpoint: it answers which
 	// providers cover the email's domain. The domain rides along so the
