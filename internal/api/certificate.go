@@ -6,10 +6,10 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
-	"github.com/mizuchilabs/kagi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/nokku-sh/nokku/internal/auth"
+	"github.com/nokku-sh/nokku/internal/iam"
+
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -123,7 +123,7 @@ func (s *CertificateService) GetCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.GetCertificateAuthorityRequest,
 ) (*nokkuv1.GetCertificateAuthorityResponse, error) {
-	if req.GetId() == "" && auth.DaemonIDFromContext(ctx) == "" {
+	if req.GetId() == "" && iam.DaemonIDFromContext(ctx) == "" {
 		return nil, ErrInvalidInput
 	}
 	var ca *db.CertificateAuthority
@@ -135,7 +135,7 @@ func (s *CertificateService) GetCertificateAuthority(
 			}
 		}
 
-		daemonID := auth.DaemonIDFromContext(ctx)
+		daemonID := iam.DaemonIDFromContext(ctx)
 		if daemonID != "" {
 			ca, err = q.GetCAByDaemonID(ctx, &daemonID)
 			if err != nil {
@@ -296,10 +296,10 @@ func (s *CertificateService) SignSSHCertificate(
 	req *nokkuv1.SignSSHCertificateRequest,
 ) (*nokkuv1.SignSSHCertificateResponse, error) {
 	// By default id of the actor is the principal for user certificates
-	actor, _ := kagi.PrincipalFromContext(ctx)
-	keyID := fmt.Sprintf("nokku:login:%s:%s", actor.Kind, actor.SubjectID)
-	principal := actor.SubjectID
-	daemonID := auth.DaemonIDFromContext(ctx)
+	actor, _ := iam.PrincipalFromContext(ctx)
+	keyID := fmt.Sprintf("nokku:login:%s:%s", actor.Kind, actor.ID)
+	principal := actor.ID
+	daemonID := iam.DaemonIDFromContext(ctx)
 
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
@@ -343,7 +343,7 @@ func (s *CertificateService) SignSSHCertificate(
 
 				principal = target.ID
 			}
-			keyID = fmt.Sprintf("nokku:provision:%s:%s", actor.Kind, actor.SubjectID)
+			keyID = fmt.Sprintf("nokku:provision:%s:%s", actor.Kind, actor.ID)
 		}
 		return nil
 	}); err != nil {

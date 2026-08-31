@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -12,10 +13,10 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
-	"github.com/mizuchilabs/kagi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/nokku-sh/nokku/internal/auth"
+	"github.com/nokku-sh/nokku/internal/iam"
+
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
@@ -134,7 +135,7 @@ func (s *DaemonService) DeleteDaemon(
 ) (*nokkuv1.DeleteDaemonResponse, error) {
 	// A daemon can delete itself via the challenge-auth context. Either way
 	// one identifier is required.
-	if req.GetId() == "" && auth.DaemonIDFromContext(ctx) == "" {
+	if req.GetId() == "" && iam.DaemonIDFromContext(ctx) == "" {
 		return nil, ErrInvalidInput
 	}
 	var result *db.Daemon
@@ -145,7 +146,7 @@ func (s *DaemonService) DeleteDaemon(
 				return err
 			}
 		} else {
-			result, err = q.DeleteDaemon(ctx, auth.DaemonIDFromContext(ctx))
+			result, err = q.DeleteDaemon(ctx, iam.DaemonIDFromContext(ctx))
 			if err != nil {
 				return err
 			}
@@ -225,7 +226,7 @@ func (s *DaemonService) CreateSession(
 	}
 
 	sessionID := uuid.NewV7().String()
-	userID := auth.UserIDFromContext(ctx)
+	userID := iam.UserIDFromContext(ctx)
 	username := req.GetUsername()
 
 	if err := s.cfg.Pool.RequestSession(ctx, daemon.ID, sessionID, username, userID); err != nil {
@@ -279,7 +280,7 @@ func (s *DaemonService) EnrollDaemon(
 		return nil, NewError(connect.CodeInvalidArgument, "invalid token")
 	}
 	workspaceID := enrollToken.ID
-	kagi.AnnotateTenant(ctx, kagi.TenantID(workspaceID))
+	iam.AnnotateTenant(ctx, workspaceID)
 
 	if err := s.cfg.Billing.Check(ctx, workspaceID, billing.ResourceTargets); err != nil {
 		return nil, err
@@ -424,12 +425,12 @@ func (s *DaemonService) EnrollDaemon(
 
 	// The daemon's control-plane token never expires; it is revoked by
 	// deleting the daemon (the session cascades), not by a clock.
-	sess, err := s.cfg.Auth.Service().Sessions.IssueSession(ctx, kagi.SessionParams{
-		TenantID:  kagi.TenantID(workspaceID),
-		SubjectID: daemonID,
-		Kind:      auth.ActorTypeDaemon,
-		Method:    kagi.MethodDevice,
-		Binding:   binding,
+	_, token, err := s.cfg.IAM.Sessions.Issue(ctx, iam.SessionParams{
+		WorkspaceID: workspaceID,
+		SubjectID:   daemonID,
+		Kind:        iam.KindDaemon,
+		Method:      iam.MethodDevice,
+		Binding:     binding,
 	})
 	if err != nil {
 		return nil, ErrInternal
@@ -451,7 +452,7 @@ func (s *DaemonService) EnrollDaemon(
 		TargetId:    &targetID,
 		Status:      &statusNow,
 		Config:      config,
-		AccessToken: &sess.Token,
+		AccessToken: &token,
 	}, nil
 }
 
@@ -460,7 +461,7 @@ func (s *DaemonService) EnrollDaemon(
 // stale-nonce failures so the daemon can retry. A missing proof is an error:
 // daemons must enroll key-bound.
 func (s *DaemonService) enrollBinding(ctx context.Context) (string, error) {
-	svc := s.cfg.Auth.Service()
+	svc := s.cfg.IAM
 	if svc.DPoP == nil {
 		return "", NewError(connect.CodeUnimplemented, "DPoP is not configured")
 	}
@@ -469,17 +470,16 @@ func (s *DaemonService) enrollBinding(ctx context.Context) (string, error) {
 		return "", ErrInternal
 	}
 
-	binding, err := svc.VerifyRequestProof(
+	binding, err := svc.DPoP.Verify(
 		ctx,
-		ci.RequestHeader(),
-		nokkuv1connect.DaemonServiceEnrollDaemonProcedure,
-		s.cfg.FullURL(),
+		ci.RequestHeader().Get("DPoP"),
+		"",
+		http.MethodPost,
+		s.cfg.FullURL()+"/"+nokkuv1connect.DaemonServiceEnrollDaemonProcedure,
 	)
 	if err != nil {
-		if errors.Is(err, kagi.ErrDPoPNonce) {
-			if prov, ok := svc.DPoP.(kagi.NonceProvider); ok {
-				ci.ResponseHeader().Set("DPoP-Nonce", prov.CurrentNonce())
-			}
+		if errors.Is(err, iam.ErrDPoPNonce) {
+			ci.ResponseHeader().Set("DPoP-Nonce", svc.DPoP.CurrentNonce())
 			return "", NewError(connect.CodeUnauthenticated, "stale DPoP nonce")
 		}
 		return "", NewError(connect.CodeInvalidArgument, "invalid DPoP proof")
@@ -507,7 +507,7 @@ func (s *DaemonService) SyncDaemon(
 	var principals []*nokkuv1.PrincipalUsers
 	var caPublicKey string
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		daemon, err := q.GetDaemon(ctx, auth.DaemonIDFromContext(ctx))
+		daemon, err := q.GetDaemon(ctx, iam.DaemonIDFromContext(ctx))
 		if err != nil {
 			return err
 		}

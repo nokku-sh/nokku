@@ -7,13 +7,13 @@
 package nokkuv1
 
 import (
-	_ "google.golang.org/genproto/googleapis/api/annotations"
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -191,99 +191,11 @@ func (x *OAuthIdentity) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-type WhoamiRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WhoamiRequest) Reset() {
-	*x = WhoamiRequest{}
-	mi := &file_nokku_v1_user_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WhoamiRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WhoamiRequest) ProtoMessage() {}
-
-func (x *WhoamiRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WhoamiRequest.ProtoReflect.Descriptor instead.
-func (*WhoamiRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{2}
-}
-
-type WhoamiResponse struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	User           *User                  `protobuf:"bytes,1,opt,name=user" json:"user,omitempty"`
-	ServiceAccount *ServiceAccount        `protobuf:"bytes,2,opt,name=service_account,json=serviceAccount" json:"service_account,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *WhoamiResponse) Reset() {
-	*x = WhoamiResponse{}
-	mi := &file_nokku_v1_user_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WhoamiResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WhoamiResponse) ProtoMessage() {}
-
-func (x *WhoamiResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_user_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WhoamiResponse.ProtoReflect.Descriptor instead.
-func (*WhoamiResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_user_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *WhoamiResponse) GetUser() *User {
-	if x != nil {
-		return x.User
-	}
-	return nil
-}
-
-func (x *WhoamiResponse) GetServiceAccount() *ServiceAccount {
-	if x != nil {
-		return x.ServiceAccount
-	}
-	return nil
-}
-
 var File_nokku_v1_user_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x13nokku/v1/user.proto\x12\bnokku.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1enokku/v1/service_account.proto\"\xb1\x02\n" +
+	"\x13nokku/v1/user.proto\x12\bnokku.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb1\x02\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -301,14 +213,7 @@ const file_nokku_v1_user_proto_rawDesc = "" +
 	"\bprovider\x18\x02 \x01(\tR\bprovider\x12\x1a\n" +
 	"\bprotocol\x18\x03 \x01(\tR\bprotocol\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x0f\n" +
-	"\rWhoamiRequest\"w\n" +
-	"\x0eWhoamiResponse\x12\"\n" +
-	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\x12A\n" +
-	"\x0fservice_account\x18\x02 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount2a\n" +
-	"\vUserService\x12R\n" +
-	"\x06Whoami\x12\x17.nokku.v1.WhoamiRequest\x1a\x18.nokku.v1.WhoamiResponse\"\x15\x82\xd3\xe4\x93\x02\f\x12\n" +
-	"/v1/whoami\x90\x02\x01B\x93\x01\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAtB\x93\x01\n" +
 	"\fcom.nokku.v1B\tUserProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -323,28 +228,21 @@ func file_nokku_v1_user_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_user_proto_rawDescData
 }
 
-var file_nokku_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_nokku_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_nokku_v1_user_proto_goTypes = []any{
 	(*User)(nil),                  // 0: nokku.v1.User
 	(*OAuthIdentity)(nil),         // 1: nokku.v1.OAuthIdentity
-	(*WhoamiRequest)(nil),         // 2: nokku.v1.WhoamiRequest
-	(*WhoamiResponse)(nil),        // 3: nokku.v1.WhoamiResponse
-	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
-	(*ServiceAccount)(nil),        // 5: nokku.v1.ServiceAccount
+	(*timestamppb.Timestamp)(nil), // 2: google.protobuf.Timestamp
 }
 var file_nokku_v1_user_proto_depIdxs = []int32{
-	4, // 0: nokku.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	4, // 1: nokku.v1.User.updated_at:type_name -> google.protobuf.Timestamp
-	4, // 2: nokku.v1.OAuthIdentity.created_at:type_name -> google.protobuf.Timestamp
-	0, // 3: nokku.v1.WhoamiResponse.user:type_name -> nokku.v1.User
-	5, // 4: nokku.v1.WhoamiResponse.service_account:type_name -> nokku.v1.ServiceAccount
-	2, // 5: nokku.v1.UserService.Whoami:input_type -> nokku.v1.WhoamiRequest
-	3, // 6: nokku.v1.UserService.Whoami:output_type -> nokku.v1.WhoamiResponse
-	6, // [6:7] is the sub-list for method output_type
-	5, // [5:6] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	2, // 0: nokku.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	2, // 1: nokku.v1.User.updated_at:type_name -> google.protobuf.Timestamp
+	2, // 2: nokku.v1.OAuthIdentity.created_at:type_name -> google.protobuf.Timestamp
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_user_proto_init() }
@@ -352,16 +250,15 @@ func file_nokku_v1_user_proto_init() {
 	if File_nokku_v1_user_proto != nil {
 		return
 	}
-	file_nokku_v1_service_account_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_user_proto_rawDesc), len(file_nokku_v1_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   2,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   0,
 		},
 		GoTypes:           file_nokku_v1_user_proto_goTypes,
 		DependencyIndexes: file_nokku_v1_user_proto_depIdxs,

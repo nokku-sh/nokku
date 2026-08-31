@@ -2,15 +2,13 @@ package api
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/mizuchilabs/kagi"
 
-	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
+	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
@@ -37,12 +35,8 @@ func (s *ServiceAccountService) GetServiceAccount(
 	if result == nil {
 		return nil, ErrNotFound
 	}
-
-	used := lastUsedBySubject(ctx, s.cfg.Auth.Keys, req.GetWorkspaceId())
-	sa := result.ToProto()
-	stampLastUsedAt(sa, used)
 	return &nokkuv1.GetServiceAccountResponse{
-		ServiceAccount: sa,
+		ServiceAccount: result.ToProto(),
 	}, nil
 }
 
@@ -66,8 +60,16 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		return nil, ErrInvalidInput
 	}
 
+	// The service account's credential is a bearer token whose hash lives on
+	// the row. Expiry rides on the row and is enforced at verification time,
+	// so a short-lived token is really short-lived.
+	raw := prefixSA + mustRandomToken()
+	tokenHash, err := crypto.HashToken(raw)
+	if err != nil {
+		return nil, ErrInternal
+	}
+
 	var result *db.ServiceAccount
-	var key kagi.APIKey
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		params := &db.CreateServiceAccountParams{
 			WorkspaceID: req.GetWorkspaceId(),
@@ -75,37 +77,18 @@ func (s *ServiceAccountService) CreateServiceAccount(
 			Description: req.Description,
 			Tags:        req.GetTags(),
 			RoleName:    &roleName,
+			TokenHash:   &tokenHash,
 		}
 
 		if req.GetExpiresAt() != nil && !req.GetExpiresAt().AsTime().IsZero() {
 			expiry := req.GetExpiresAt().AsTime()
+			if expiry.Before(time.Now()) {
+				return NewError(connect.CodeInvalidArgument, "expires_at must be in the future")
+			}
 			params.ExpiresAt = &expiry
 		}
 
 		saID, err := q.CreateServiceAccount(ctx, params)
-		if err != nil {
-			return err
-		}
-
-		// The service account's credential is a kagi API key acting as the
-		// service-account subject. Expiry is enforced by the key at
-		// verification time, so a short-lived key is really short-lived.
-		var ttl time.Duration
-		if req.GetExpiresAt() != nil && !req.GetExpiresAt().AsTime().IsZero() {
-			ttl = time.Until(req.GetExpiresAt().AsTime())
-			if ttl <= 0 {
-				return NewError(connect.CodeInvalidArgument, "expires_at must be in the future")
-			}
-		}
-		key, err = s.cfg.Auth.Keys.Issue(
-			ctx,
-			kagi.TenantID(req.GetWorkspaceId()),
-			saID,
-			auth.ActorTypeServiceAccount,
-			req.GetName(),
-			nil,
-			ttl,
-		)
 		if err != nil {
 			return err
 		}
@@ -115,12 +98,9 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		return nil, DBError(err)
 	}
 
-	used := lastUsedBySubject(ctx, s.cfg.Auth.Keys, req.GetWorkspaceId())
-	sa := result.ToProto()
-	stampLastUsedAt(sa, used)
 	return &nokkuv1.CreateServiceAccountResponse{
-		ServiceAccount: sa,
-		Token:          &key.FullKey,
+		ServiceAccount: result.ToProto(),
+		Token:          &raw,
 	}, nil
 }
 
@@ -151,12 +131,8 @@ func (s *ServiceAccountService) UpdateServiceAccount(
 	if result == nil {
 		return nil, ErrNotFound
 	}
-
-	used := lastUsedBySubject(ctx, s.cfg.Auth.Keys, req.GetWorkspaceId())
-	sa := result.ToProto()
-	stampLastUsedAt(sa, used)
 	return &nokkuv1.UpdateServiceAccountResponse{
-		ServiceAccount: sa,
+		ServiceAccount: result.ToProto(),
 	}, nil
 }
 
@@ -183,15 +159,10 @@ func (s *ServiceAccountService) ListServiceAccounts(
 		}
 		return nil
 	}); err != nil {
-		slog.Error("failed to list service accounts", "err", err)
 		return nil, DBError(err)
 	}
 
-	used := lastUsedBySubject(ctx, s.cfg.Auth.Keys, req.GetWorkspaceId())
 	serviceAccounts := db.ServiceAccountsToProto(result)
-	for _, sa := range serviceAccounts {
-		stampLastUsedAt(sa, used)
-	}
 	return &nokkuv1.ListServiceAccountsResponse{
 		ServiceAccounts: serviceAccounts,
 		Total:           &count,
@@ -207,44 +178,17 @@ func (s *ServiceAccountService) DeleteServiceAccount(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	// Revoke every API key minted for the service account so its tokens stop
-	// working immediately, not when they would have expired.
-	_ = s.cfg.Auth.Keys.RevokeAll(ctx, kagi.TenantID(req.GetWorkspaceId()), req.GetId())
+	// The credential is the row's token hash: deletion revokes it.
 	return &nokkuv1.DeleteServiceAccountResponse{}, nil
 }
 
-// lastUsedBySubject maps service-account IDs to the most recent activity of
-// any of their kagi API keys, sourced from the keys' last_seen_at. Accounts
-// whose keys were never used have no entry. A lookup failure degrades to a
-// nil map: last_used_at is informational and must not fail the request.
-func lastUsedBySubject(
-	ctx context.Context,
-	keys *kagi.APIKeyManager,
-	workspaceID string,
-) map[string]time.Time {
-	records, err := keys.ListTenantKeys(ctx, kagi.TenantID(workspaceID))
+// mustRandomToken returns the raw bearer secret for a new service account.
+func mustRandomToken() string {
+	s, err := crypto.RandomString(32)
 	if err != nil {
-		slog.Error("failed to read api key activity", "err", err)
-		return nil
+		// crypto/rand failure is a process-level emergency; the create
+		// request fails with an empty token rather than a reusable one.
+		return ""
 	}
-	used := make(map[string]time.Time, len(records))
-	for _, rec := range records {
-		if rec.LastSeenAt.IsZero() {
-			continue
-		}
-		if prev, ok := used[rec.SubjectID]; !ok || rec.LastSeenAt.After(prev) {
-			used[rec.SubjectID] = rec.LastSeenAt
-		}
-	}
-	return used
-}
-
-// stampLastUsedAt sets the proto's last_used_at from key activity, when known.
-func stampLastUsedAt(sa *nokkuv1.ServiceAccount, used map[string]time.Time) {
-	if sa == nil || len(used) == 0 {
-		return
-	}
-	if t, ok := used[sa.GetId()]; ok {
-		sa.LastUsedAt = db.SafeTimestamp(&t)
-	}
+	return s
 }

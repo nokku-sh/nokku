@@ -159,9 +159,9 @@ func (s *TeamService) ListTeams(
 	}, nil
 }
 
-// ListTeamMembers returns one team's members with their kagi display fields
-// stitched in. The dedicated read keeps ListTeams free of per-team member
-// blobs; views load it when they actually show the members.
+// ListTeamMembers returns one team's members with their identity display
+// fields joined in. The dedicated read keeps ListTeams free of per-team
+// member blobs; views load it when they actually show the members.
 func (s *TeamService) ListTeamMembers(
 	ctx context.Context,
 	req *nokkuv1.ListTeamMembersRequest,
@@ -174,18 +174,9 @@ func (s *TeamService) ListTeamMembers(
 		return nil, DBError(err)
 	}
 
-	ids := make([]string, 0, len(rows))
-	for _, m := range rows {
-		ids = append(ids, m.UserID)
-	}
-	users, err := memberUsers(ctx, s.cfg.Auth.Service(), ids)
-	if err != nil {
-		return nil, DBError(err)
-	}
-
 	members := make([]*nokkuv1.WorkspaceMember, 0, len(rows))
 	for _, m := range rows {
-		members = append(members, teamMemberProto(m.WorkspaceID, m.UserID, m.CreatedAt, users[m.UserID]))
+		members = append(members, teamMemberProto(m))
 	}
 	return &nokkuv1.ListTeamMembersResponse{Members: members}, nil
 }

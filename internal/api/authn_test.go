@@ -5,11 +5,8 @@ import (
 )
 
 func TestRequestWorkspace(t *testing.T) {
-	t.Run("nil message is safe for streaming RPCs", func(t *testing.T) {
-		tenant, err := requestWorkspace(nil)
-		if err != nil {
-			t.Fatalf("requestWorkspace(nil) error: %v", err)
-		}
+	t.Run("nil request is safe for streaming RPCs", func(t *testing.T) {
+		tenant := requestWorkspace(nil)
 		if tenant != "" {
 			t.Fatalf("requestWorkspace(nil) tenant = %q, want empty", tenant)
 		}

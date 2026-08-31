@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/mizuchilabs/kagi"
 	"github.com/mizuchilabs/kata/buildinfo"
+
+	"github.com/nokku-sh/nokku/internal/iam"
 
 	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/billing"
@@ -30,6 +31,59 @@ func (s *UtilService) GetVersion(
 	_ *nokkuv1.GetVersionRequest,
 ) (*nokkuv1.GetVersionResponse, error) {
 	return &nokkuv1.GetVersionResponse{Version: &buildinfo.Version}, nil
+}
+
+// Whoami identifies the authenticated principal: it answers "does my login
+// work, and as what" for every credential kind — a browser session, a CLI
+// device, a daemon, or a service-account API key. It needs no permission;
+// authentication is the check.
+func (s *UtilService) Whoami(
+	ctx context.Context,
+	_ *nokkuv1.WhoamiRequest,
+) (*nokkuv1.WhoamiResponse, error) {
+	p, ok := iam.PrincipalFromContext(ctx)
+	if !ok {
+		return nil, NewError(connect.CodeUnauthenticated, "not authenticated")
+	}
+
+	out := &nokkuv1.WhoamiResponse{
+		Kind:        new(string(p.Kind)),
+		SubjectId:   new(p.ID),
+		UserId:      new(iam.UserIDFromContext(ctx)),
+		WorkspaceId: new(iam.WorkspaceIDFromContext(ctx)),
+	}
+
+	switch p.Kind {
+	case iam.KindUser, iam.KindCLI, iam.KindWebDevice:
+		u, err := s.cfg.IAM.GetUser(ctx, p.ID)
+		if err != nil {
+			return nil, DBError(err)
+		}
+		out.User = db.UserToProto(u)
+	case iam.KindServiceAccount:
+		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+			sa, err := q.GetServiceAccount(ctx, p.ID)
+			if err != nil {
+				return err
+			}
+			out.ServiceAccount = sa.ToProto()
+			return nil
+		}); err != nil {
+			return nil, DBError(err)
+		}
+	case iam.KindDaemon:
+		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+			d, err := q.GetDaemon(ctx, p.ID)
+			if err != nil {
+				return err
+			}
+			out.Daemon = d.ToProto()
+			return nil
+		}); err != nil {
+			return nil, DBError(err)
+		}
+	}
+	return out, nil
 }
 
 func (s *UtilService) ListRoles(
@@ -58,13 +112,13 @@ func (s *UtilService) ListAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ListAuditLogsRequest,
 ) (*nokkuv1.ListAuditLogsResponse, error) {
-	actor, _ := kagi.PrincipalFromContext(ctx)
+	actor, _ := iam.PrincipalFromContext(ctx)
 	var workspaceID string
 
 	if req.GetWorkspaceId() != "" {
 		workspaceID = req.GetWorkspaceId()
 	} else {
-		req.ActorIds = []string{actor.SubjectID}
+		req.ActorIds = []string{actor.ID}
 	}
 	if workspaceID == "" && req.ActorIds == nil {
 		return nil, NewError(connect.CodeInvalidArgument, "actor is required")
@@ -113,7 +167,7 @@ func (s *UtilService) ExportAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ExportAuditLogsRequest,
 ) (*nokkuv1.ExportAuditLogsResponse, error) {
-	actor, _ := kagi.PrincipalFromContext(ctx)
+	actor, _ := iam.PrincipalFromContext(ctx)
 	workspaceID := req.GetWorkspaceId()
 	if workspaceID != "" && !s.cfg.Billing.Has(ctx, workspaceID, billing.FeatureAuditExport) {
 		return nil, NewError(
@@ -136,7 +190,7 @@ func (s *UtilService) ExportAuditLogs(
 	}
 
 	if workspaceID == "" {
-		query.ActorIDs = []string{actor.SubjectID}
+		query.ActorIDs = []string{actor.ID}
 	}
 
 	data, err := s.cfg.Audit.Export(ctx, query, req.GetFormat())

@@ -6,9 +6,9 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
-	"github.com/mizuchilabs/kagi"
 
-	"github.com/nokku-sh/nokku/internal/auth"
+	"github.com/nokku-sh/nokku/internal/iam"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
@@ -154,20 +154,20 @@ func (a *AuthorizationInterceptor) authorize(
 	ctx context.Context,
 	perm db.Permission,
 ) error {
-	actor, _ := kagi.PrincipalFromContext(ctx)
-	if actor.SubjectID == "" {
+	actor, _ := iam.PrincipalFromContext(ctx)
+	if actor.ID == "" {
 		return db.ErrNoActor
 	}
 
 	role := "daemon"
-	if actor.Kind != auth.ActorTypeDaemon {
-		workspaceID := auth.WorkspaceIDFromContext(ctx)
+	if actor.Kind != iam.KindDaemon {
+		workspaceID := iam.WorkspaceIDFromContext(ctx)
 		if workspaceID == "" {
 			return db.ErrWorkspaceNotPinned
 		}
 
 		var err error
-		role, err = a.actorRole(ctx, workspaceID, actor.SubjectID)
+		role, err = a.actorRole(ctx, workspaceID, actor.ID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return db.ErrWorkspaceNotAccessible
 		}
@@ -193,7 +193,7 @@ func (a *AuthorizationInterceptor) actorRole(
 	err := a.cfg.Conn.AdminPool.QueryRow(
 		ctx,
 		`SELECT role_name FROM workspace_members
-		 WHERE workspace_id = $1 AND user_id = $2::text
+		 WHERE workspace_id = $1 AND user_id = $2::uuid
 		 UNION ALL
 		 SELECT role_name FROM service_accounts
 		 WHERE workspace_id = $1 AND id = $2::uuid

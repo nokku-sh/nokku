@@ -12,17 +12,19 @@ import (
 )
 
 const (
-	// General per-IP rate limit (all HTTP requests including SAML, OIDC, passkeys, avatars).
+	// General per-IP rate limit (all HTTP requests including SAML, OIDC, avatars).
 	generalRPS   = 30
 	generalBurst = 50
+
+	// Auth endpoints get a stricter per-IP limit: they are the brute-force
+	// and enumeration surface (login, register, the mail round trips, SSO
+	// start, device polling).
+	authRPS   = 5
+	authBurst = 10
 
 	cleanupInterval = 5 * time.Minute
 	entryTTL        = 10 * time.Minute
 )
-
-// sensitivePaths are gone: kagi rate limits its own auth endpoints
-// (login, register, the mail round trips, SSO, passkeys, device) over the
-// shared cache. The general limiter below still protects the API surface.
 
 type limiterEntry struct {
 	limiter  *rate.Limiter
@@ -73,9 +75,9 @@ func (s *rateLimiterStore) cleanup() {
 	}
 }
 
-var (
-	generalStore = newRateLimiterStore(generalRPS, generalBurst)
-)
+var generalStore = newRateLimiterStore(generalRPS, generalBurst)
+
+var authStore = newRateLimiterStore(authRPS, authBurst)
 
 func (s *Server) WithRateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -84,13 +86,28 @@ func (s *Server) WithRateLimit(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if !generalStore.allow(ip) {
+		store := generalStore
+		if isAuthRoute(r.URL.Path) {
+			store = authStore
+		}
+		if !store.allow(ip) {
 			w.Header().Set("Retry-After", "1")
 			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isAuthRoute returns true for the browser-facing auth surface, which gets
+// the stricter per-IP limit: the JSON API under /auth plus the SSO flow
+// redirects at the root.
+func isAuthRoute(path string) bool {
+	return strings.HasPrefix(path, "/auth/") ||
+		strings.HasPrefix(path, "/oidc/") ||
+		strings.HasPrefix(path, "/oauth/") ||
+		strings.HasPrefix(path, "/saml/") ||
+		strings.HasPrefix(path, "/passkey/")
 }
 
 // isAPIRoute returns true for backend endpoints. Static assets skip rate limiting.
@@ -101,7 +118,8 @@ func isAPIRoute(path string) bool {
 		strings.HasPrefix(path, "/nokku.v1.DaemonSessionService/") {
 		return false
 	}
-	return strings.HasPrefix(path, "/nokku.v1.") ||
+	return strings.HasPrefix(path, "/auth/") ||
+		strings.HasPrefix(path, "/nokku.v1.") ||
 		strings.HasPrefix(path, "/grpc.") ||
 		strings.HasPrefix(path, "/oauth/") ||
 		strings.HasPrefix(path, "/saml/") ||

@@ -8,11 +8,11 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 type BillingService struct {
@@ -83,7 +83,7 @@ func (s *BillingService) CreateCheckout(
 	if err := s.requireWorkspaceOwner(ctx, req.GetWorkspaceId()); err != nil {
 		return nil, err
 	}
-	user, err := s.cfg.Auth.Service().Users.Get(ctx, "", auth.UserIDFromContext(ctx))
+	user, err := s.cfg.IAM.GetUser(ctx, iam.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -152,7 +152,7 @@ func (s *BillingService) requireWorkspaceOwner(ctx context.Context, workspaceID 
 	}); err != nil {
 		return DBError(err)
 	}
-	if ownerID != auth.UserIDFromContext(ctx) {
+	if ownerID != iam.UserIDFromContext(ctx) {
 		return connect.NewError(
 			connect.CodePermissionDenied,
 			errors.New("workspace owner required"),

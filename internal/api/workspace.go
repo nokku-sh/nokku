@@ -3,16 +3,14 @@ package api
 import (
 	"context"
 	"errors"
-	"sort"
-	"strings"
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/mizuchilabs/kagi"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/nokku-sh/nokku/internal/auth"
+	"github.com/nokku-sh/nokku/internal/iam"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -62,7 +60,7 @@ func (s *WorkspaceService) CreateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.CreateWorkspaceRequest,
 ) (*nokkuv1.CreateWorkspaceResponse, error) {
-	user, err := s.cfg.Auth.Service().Users.Get(ctx, "", auth.UserIDFromContext(ctx))
+	user, err := s.cfg.IAM.GetUser(ctx, iam.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -142,9 +140,7 @@ func (s *WorkspaceService) DeleteWorkspace(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	// The SSO provider rows lived outside the workspace's FK cascade, in
-	// kagi's schema.
-	_, _ = s.cfg.Auth.Service().SSO.DeleteTenant(ctx, kagi.TenantID(req.GetWorkspaceId()))
+	// SSO provider and domain rows cascade through the workspace FK.
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
 }
 
@@ -185,11 +181,11 @@ func (s *WorkspaceService) GetWorkspaceMember(
 	}
 	result := member.ToProto()
 
-	user, err := s.cfg.Auth.Service().Users.Get(ctx, "", req.GetUserId())
+	user, err := s.cfg.IAM.GetUser(ctx, req.GetUserId())
 	if err != nil {
 		return nil, DBError(err)
 	}
-	result.Picture = &user.Picture
+	result.Picture = user.Picture
 	result.Email = &user.Email
 	result.EmailVerified = &user.EmailVerified
 	return &nokkuv1.GetWorkspaceMemberResponse{
@@ -218,61 +214,37 @@ func (s *WorkspaceService) ListWorkspaceMembers(
 	ctx context.Context,
 	req *nokkuv1.ListWorkspaceMembersRequest,
 ) (*nokkuv1.ListWorkspaceMembersResponse, error) {
-	var members []*db.WorkspaceMember
+	var members []*db.ListWorkspaceMembersRow
+	var count int32
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		count, err = q.CountWorkspaceMembers(ctx, &db.CountWorkspaceMembersParams{
+			WorkspaceID: req.GetWorkspaceId(),
+			Query:       req.Query,
+			RoleName:    req.RoleName,
+		})
+		if err != nil {
+			return err
+		}
 		members, err = q.ListWorkspaceMembers(ctx, &db.ListWorkspaceMembersParams{
 			WorkspaceID: req.GetWorkspaceId(),
+			Query:       req.Query,
 			RoleName:    req.RoleName,
+			Limit:       req.Limit,
+			Offset:      req.Offset,
 		})
 		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
 
-	// Identity lives in kagi, so the name/email search and display-name
-	// ordering cannot run in SQL: stitch the users in, then filter, sort,
-	// and paginate here. Workspace member lists are small.
-	userIDs := make([]string, 0, len(members))
-	for _, m := range members {
-		userIDs = append(userIDs, m.UserID)
-	}
-	users, err := memberUsers(ctx, s.cfg.Auth.Service(), userIDs)
-	if err != nil {
-		return nil, DBError(err)
-	}
-
 	protos := make([]*nokkuv1.WorkspaceMember, 0, len(members))
 	for _, m := range members {
-		u := users[m.UserID]
-		if !matchesMemberQuery(u, req.GetQuery()) {
-			continue
-		}
-
-		protos = append(protos, workspaceMemberProto(
-			m.WorkspaceID, m.UserID, m.RoleName,
-			m.CreatedAt, m.UpdatedAt, u,
-		))
-	}
-	sort.Slice(protos, func(i, j int) bool {
-		return strings.ToLower(protos[i].GetName()) < strings.ToLower(protos[j].GetName())
-	})
-
-	total := int32(len(protos))
-	offset := max(req.GetOffset(), 0)
-	if offset > 0 {
-		if int(offset) >= len(protos) {
-			protos = nil
-		} else {
-			protos = protos[offset:]
-		}
-	}
-	if req.GetLimit() > 0 && int(req.GetLimit()) < len(protos) {
-		protos = protos[:req.GetLimit()]
+		protos = append(protos, workspaceMemberProto(m))
 	}
 
 	return &nokkuv1.ListWorkspaceMembersResponse{
 		Members: protos,
-		Total:   &total,
+		Total:   &count,
 	}, nil
 }
 
@@ -303,7 +275,7 @@ func (s *WorkspaceService) UpdateWorkspaceOwner(
 		if err != nil {
 			return err
 		}
-		if ownerID != auth.UserIDFromContext(ctx) {
+		if ownerID != iam.UserIDFromContext(ctx) {
 			return ErrPermissionDenied
 		}
 		_, err = q.UpdateWorkspaceOwner(ctx, &db.UpdateWorkspaceOwnerParams{
@@ -327,7 +299,7 @@ func (s *WorkspaceService) SubscribeWorkspaceEvents(
 	stream *connect.ServerStream[nokkuv1.SubscribeWorkspaceEventsResponse],
 ) error {
 	workspaceID := req.GetWorkspaceId()
-	kagi.AnnotateTenant(ctx, kagi.TenantID(workspaceID))
+	iam.AnnotateTenant(ctx, workspaceID)
 
 	// Streaming handlers bypass the unary interceptor's workspace promotion,
 	// so pin the workspace here and let the scoped transaction verify

@@ -15,8 +15,8 @@ import (
 
 	"golang.org/x/image/draw"
 
-	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/config"
+	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
@@ -33,7 +33,7 @@ func resizePicture(src image.Image) image.Image {
 
 func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := auth.UserIDFromContext(r.Context())
+		userID := iam.UserIDFromContext(r.Context())
 		if userID == "" {
 			writeJSONError(w, http.StatusUnauthorized, "authentication required")
 			return
@@ -128,7 +128,7 @@ func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 
 		versionedURL := fmt.Sprintf("%s?v=%d", *fileURL, time.Now().UnixMilli())
 
-		// The avatar URL lives on the kagi user; the caller attaches it with
+		// The avatar URL lives on the user profile; the caller attaches it with
 		// the account-surface update (POST /auth/account/update).
 		writeJSON(w, http.StatusOK, map[string]string{"url": versionedURL})
 	}
