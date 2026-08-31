@@ -5,21 +5,20 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/mizuchilabs/kagi"
-
+	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
-// Record satisfies kagi.Sink: it converts a kagi authentication event into a
+// Record satisfies iam.Sink: it converts an iam authentication event into a
 // generic audit Event and appends it to the log. Auth events are the only
-// audit trail for the kagi routes (the HTTP access-log writer skips them), so
-// they carry the transport facts too: IP and user agent come from the request
-// identity the middleware planted.
-func (s *Service) Record(ctx context.Context, e kagi.Event) {
-	event := eventFromKagi(e)
-	if id, ok := kagi.IdentityFromContext(ctx); ok && id.Meta != nil {
-		event.IPAddress = util.SanitizeUTF8(util.GetRemoteIP(id.Meta.Header, id.Meta.RemoteAddr))
-		event.UserAgent = util.SanitizeUTF8(id.Meta.Header.Get("User-Agent"))
+// audit trail for the /auth routes (the HTTP access-log writer skips them),
+// so they carry the transport facts too: IP and user agent come from the
+// request metadata the iam middleware planted.
+func (s *Service) Record(ctx context.Context, e iam.Event) {
+	event := eventFromIAM(e)
+	if meta, ok := iam.RequestMetaFromContext(ctx); ok {
+		event.IPAddress = util.SanitizeUTF8(util.GetRemoteIP(meta.Header, meta.RemoteAddr))
+		event.UserAgent = util.SanitizeUTF8(meta.Header.Get("User-Agent"))
 	}
 
 	// Never block the auth flow: the insert runs detached from the request
@@ -35,36 +34,28 @@ func (s *Service) Record(ctx context.Context, e kagi.Event) {
 	}()
 }
 
-// eventFromKagi maps a kagi auth event to a generic audit Event. Actor
+// eventFromIAM maps an iam auth event to a generic audit Event. Actor
 // fields are written verbatim: events that resolved no account stay empty.
-func eventFromKagi(e kagi.Event) *Event {
+func eventFromIAM(e iam.Event) *Event {
 	details := map[string]any{}
 	if e.Method != "" {
 		details["method"] = string(e.Method)
 	}
-	if e.Provider != "" {
-		details["provider"] = e.Provider
-	}
 	if e.Detail != "" {
 		details["detail"] = e.Detail
-	}
-
-	ts := e.Time
-	if ts.IsZero() {
-		ts = time.Now()
 	}
 
 	// The status column is what the UI keys on to render success vs failure.
 	// Success actions are "OK" to match the RPC convention; a denied login is
 	// the notable failure and carries "denied".
 	statusCode := "OK"
-	if e.Action == kagi.ActionLoginDenied {
+	if e.Action == iam.ActionLoginDenied {
 		statusCode = "denied"
 	}
 
 	return &Event{
-		Timestamp:   ts.UTC(),
-		WorkspaceID: string(e.TenantID),
+		Timestamp:   time.Now().UTC(),
+		WorkspaceID: e.WorkspaceID,
 		Action:      string(e.Action),
 		ActorID:     e.UserID,
 		ActorType:   string(e.Kind),
