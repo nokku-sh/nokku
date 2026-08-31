@@ -2,6 +2,7 @@ package seed
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -9,8 +10,8 @@ import (
 
 	"github.com/brianvoe/gofakeit/v7"
 	"github.com/mizuchilabs/kagi"
+	kagipg "github.com/mizuchilabs/kagi/store/postgres"
 
-	"github.com/nokku-sh/nokku/internal/auth"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/ssh"
@@ -40,27 +41,23 @@ func DefaultConfig() Config {
 	}
 }
 
-func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
+func Workspace(ctx context.Context, store *kagipg.Store, conn *db.Connection, cfg Config) error {
 	_ = gofakeit.Seed(time.Now().UnixNano())
 
-	// Create owner user
+	// Create owner user. Identity is kagi's, so seed talks to the kagi store
+	// for users and to the nokku store for workspaces and members.
 	email := os.Getenv("NOKKU_ADMIN_EMAIL")
-	owner, err := conn.Q.GetUserByEmail(ctx, email)
-	if err != nil {
-		owner, err = conn.Q.CreateUser(ctx, &db.CreateUserParams{
-			Name:     "Super Admin",
-			Username: "admin",
-			Email:    email,
+	owner, err := store.GetUserByEmail(ctx, "", email)
+	if errors.Is(err, kagi.ErrNotFound) {
+		owner, err = store.CreateUser(ctx, "", kagi.User{
+			Email:         email,
+			DisplayName:   "Super Admin",
+			Active:        true,
+			EmailVerified: true,
 		})
-		if err != nil {
-			return fmt.Errorf("failed to create admin user: %w", err)
-		}
-		if err := conn.Q.VerifyUserEmail(ctx, &db.VerifyUserEmailParams{
-			UserID: owner.ID,
-			Email:  email,
-		}); err != nil {
-			return fmt.Errorf("failed to verify admin user email: %w", err)
-		}
+	}
+	if err != nil {
+		return fmt.Errorf("failed to create admin user: %w", err)
 	}
 
 	// Create workspace as a system transaction. No tenant context exists yet.
@@ -77,28 +74,21 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 	}
 	ctx = kagi.ContextWithPrincipal(ctx, kagi.Principal{
 		SubjectID: owner.ID,
-		Kind:      auth.ActorTypeUser,
+		Kind:      kagi.KindUser,
 	})
 
 	kagi.AnnotateTenant(ctx, kagi.TenantID(workspace.ID))
 	err = conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		users := make([]*db.User, cfg.NumUsers-1)
+		users := make([]kagi.User, cfg.NumUsers-1)
 		for i := range cfg.NumUsers - 1 {
-			user, err := q.CreateUser(ctx, &db.CreateUserParams{
-				Name:     gofakeit.Name(),
-				Username: gofakeit.Username(),
-				Email:    gofakeit.Email(),
+			user, err := store.CreateUser(ctx, "", kagi.User{
+				Email:         gofakeit.Email(),
+				DisplayName:   gofakeit.Name(),
+				Active:        true,
+				EmailVerified: gofakeit.Bool(),
 			})
 			if err != nil {
 				return fmt.Errorf("failed to create user %d: %w", i, err)
-			}
-			if gofakeit.Bool() {
-				if err := q.VerifyUserEmail(ctx, &db.VerifyUserEmailParams{
-					UserID: user.ID,
-					Email:  user.Email,
-				}); err != nil {
-					return fmt.Errorf("failed to verify user email: %w", err)
-				}
 			}
 
 			users[i] = user
@@ -124,7 +114,7 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 			teams[i] = team
 
 			numberOfMembers := min(gofakeit.IntRange(2, 5), len(users))
-			shuffledUsers := make([]*db.User, len(users))
+			shuffledUsers := make([]kagi.User, len(users))
 			copy(shuffledUsers, users)
 			gofakeit.ShuffleAnySlice(shuffledUsers)
 
@@ -237,7 +227,7 @@ func Workspace(ctx context.Context, conn *db.Connection, cfg Config) error {
 					return fmt.Errorf("failed to create principal: %w", err)
 				}
 
-				shuffledUsers := make([]*db.User, len(users))
+				shuffledUsers := make([]kagi.User, len(users))
 				copy(shuffledUsers, users)
 				gofakeit.ShuffleAnySlice(shuffledUsers)
 
