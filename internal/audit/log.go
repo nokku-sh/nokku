@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"strconv"
 	"strings"
 
@@ -70,7 +71,11 @@ func (s *Service) logAudit(
 ) {
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Debug("panic while writing audit log", "panic_type", fmt.Sprintf("%T", r))
+			slog.Debug(
+				"panic while writing audit log",
+				"panic", r,
+				"stack", string(debug.Stack()),
+			)
 		}
 	}()
 

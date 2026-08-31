@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 
 	"golang.org/x/oauth2"
@@ -105,12 +106,14 @@ func (h *oauth2Flow) Callback(w http.ResponseWriter, r *http.Request) {
 		oauth2.SetAuthURLParam("code_verifier", st.PKCEVerifier),
 	)
 	if err != nil {
+		slog.Warn("oauth2 callback: code exchange failed", "error", err, "provider", cfg.ProviderID)
 		Fail(w, r, h.errRedirect, "login failed")
 		return
 	}
 
 	profile, err := h.fetchProfile(ctx, cfg.OAuth2, token)
 	if err != nil {
+		slog.Warn("oauth2 callback: profile fetch failed", "error", err, "provider", cfg.ProviderID)
 		Fail(w, r, h.errRedirect, "login failed")
 		return
 	}
