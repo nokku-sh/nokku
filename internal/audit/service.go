@@ -10,6 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/mizuchilabs/kagi"
+
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -19,13 +21,20 @@ const (
 	maxRetentionDays     = 365
 )
 
+// UserDirectory resolves a subject id to a kagi user. audit depends on the
+// interface, not on the auth service, so the dependency stays one-way.
+type UserDirectory interface {
+	GetUser(ctx context.Context, userID string) (kagi.User, error)
+}
+
 type Service struct {
 	conn    *db.Connection
 	billing *billing.Service
+	users   UserDirectory
 }
 
-func New(ctx context.Context, conn *db.Connection, b *billing.Service) (*Service, error) {
-	s := &Service{conn: conn, billing: b}
+func New(ctx context.Context, conn *db.Connection, b *billing.Service, users UserDirectory) (*Service, error) {
+	s := &Service{conn: conn, billing: b, users: users}
 
 	if err := s.setupPartitions(ctx); err != nil {
 		return nil, err
