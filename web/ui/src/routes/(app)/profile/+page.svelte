@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { auth } from '$lib/api/auth.svelte';
 	import { httpFetch } from '$lib/api/client';
-	import { user } from '$lib/api/user.svelte';
+	import { user, type LinkedAccount } from '$lib/api/user.svelte';
 	import { GitHubIcon, GoogleIcon, OIDCIcon, SAMLIcon } from '$lib/assets';
 	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
 	import Badge from '$lib/components/ui/badge/badge.svelte';
@@ -14,7 +14,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { UserSchema, type OAuthIdentity } from '$lib/gen/nokku/v1/user_pb';
+	import { UserSchema } from '$lib/gen/nokku/v1/user_pb';
 	import { create } from '@bufbuild/protobuf';
 	import {
 		BadgeCheck,
@@ -44,7 +44,7 @@
 	let unlinkProvider = $state('');
 	let unlinkOpen = $state(false);
 
-	function providerName(account: OAuthIdentity): string {
+	function providerName(account: LinkedAccount): string {
 		switch (account.provider) {
 			case 'github':
 				return 'GitHub';
@@ -55,7 +55,7 @@
 		}
 	}
 
-	function providerIcon(account: OAuthIdentity) {
+	function providerIcon(account: LinkedAccount) {
 		switch (account.provider) {
 			case 'github':
 				return GitHubIcon;
