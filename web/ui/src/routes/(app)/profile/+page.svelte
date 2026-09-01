@@ -255,6 +255,11 @@
 					Link a GitHub or Google account to sign in without a password.
 				</Empty.Description>
 			</Empty.Root>
+		{:else if linkedAccounts.isError}
+			<Empty.Root class="bg-muted/50">
+				<Empty.Title>Could not load linked accounts</Empty.Title>
+				<Empty.Description>Try reloading the page.</Empty.Description>
+			</Empty.Root>
 		{/if}
 	</Card.Content>
 
