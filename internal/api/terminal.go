@@ -11,6 +11,8 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/daemon"
+	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 const wsReadLimit = 64 * 1024
@@ -35,6 +37,13 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 	sess := t.cfg.Pool.GetSession(sessionID)
 	if sess == nil {
 		writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+
+	// Attaching means full stdin/stdout access to a live PTY. Without this
+	// check any authenticated principal who learned a session id could
+	// watch and drive any workspace's sessions.
+	if !t.authorizeAttach(w, r, sess) {
 		return
 	}
 
@@ -117,6 +126,54 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 			t.handleControlMessage(logger, sess, data)
 		}
 	}
+}
+
+// authorizeAttach allows the session's initiator always, and any other
+// principal who holds daemons.edit in the daemon's workspace (every daemon
+// is enrolled into a workspace). It runs before the WebSocket upgrade so
+// rejections stay plain HTTP responses.
+func (t *TerminalHandler) authorizeAttach(
+	w http.ResponseWriter,
+	r *http.Request,
+	sess *daemon.Session,
+) bool {
+	actor, ok := iam.PrincipalFromContext(r.Context())
+	if !ok || actor.ID == "" {
+		writeJSONError(w, http.StatusUnauthorized, "authentication required")
+		return false
+	}
+	if actor.Kind == iam.KindUser && sess.UserID() == actor.ID {
+		return true
+	}
+
+	var workspaceID string
+	err := t.cfg.Conn.AdminPool.QueryRow(
+		r.Context(),
+		`SELECT workspace_id FROM daemons WHERE id = $1`,
+		sess.DaemonID(),
+	).Scan(&workspaceID)
+	if err != nil {
+		writeJSONError(w, http.StatusForbidden, "permission denied")
+		return false
+	}
+
+	var role string
+	err = t.cfg.Conn.AdminPool.QueryRow(
+		r.Context(),
+		`SELECT role_name FROM workspace_members
+		 WHERE workspace_id = $1 AND user_id = $2::uuid
+		 UNION ALL
+		 SELECT role_name FROM service_accounts
+		 WHERE workspace_id = $1 AND id = $2::uuid
+		 LIMIT 1`,
+		workspaceID,
+		actor.ID,
+	).Scan(&role)
+	if err != nil || !db.HasPermission(role, db.PermDaemonsEdit) {
+		writeJSONError(w, http.StatusForbidden, "permission denied")
+		return false
+	}
+	return true
 }
 
 func (t *TerminalHandler) handleControlMessage(
