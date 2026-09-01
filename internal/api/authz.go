@@ -93,6 +93,10 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.WorkspaceServiceGetWorkspaceMemberProcedure:    db.PermMembersView,
 	nokkuv1connect.WorkspaceServiceListWorkspaceMembersProcedure:  db.PermMembersView,
 	nokkuv1connect.WorkspaceServiceUpdateWorkspaceMemberProcedure: db.PermMembersEdit,
+	// Member removal is a directory edit, not something every member may
+	// do: RLS only proves membership, so without this entry a viewer could
+	// remove editors and admins (the SQL only spares the workspace owner).
+	nokkuv1connect.WorkspaceServiceRemoveWorkspaceMemberProcedure: db.PermMembersEdit,
 
 	// Workspace domains
 	nokkuv1connect.WorkspaceDomainServiceGetWorkspaceDomainProcedure:             db.PermDomainsView,
@@ -106,6 +110,16 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.RecordingServiceListRecordingsProcedure:  db.PermDaemonsView,
 	nokkuv1connect.RecordingServiceGetRecordingProcedure:    db.PermDaemonsView,
 	nokkuv1connect.RecordingServiceDeleteRecordingProcedure: db.PermDaemonsEdit,
+
+	// Workspace audit trail. Actors, IPs, and the full activity history are
+	// sensitive: viewers hold no audit.view, only owner and editor do.
+	nokkuv1connect.UtilServiceListAuditLogsProcedure:   db.PermAuditView,
+	nokkuv1connect.UtilServiceExportAuditLogsProcedure: db.PermAuditView,
+
+	// Daemon session control. The handler works against the in-memory pool
+	// only, so without an interceptor rule any authenticated principal
+	// could kill any live session id.
+	nokkuv1connect.DaemonServiceCloseSessionProcedure: db.PermDaemonsEdit,
 }
 
 type AuthorizationInterceptor struct {

@@ -37,6 +37,7 @@ const (
 	PermPrincipalsEdit      Permission = "principals.edit"
 	PermDaemonsView         Permission = "daemons.view"
 	PermDaemonsEdit         Permission = "daemons.edit"
+	PermAuditView           Permission = "audit.view"
 	PermTeamsView           Permission = "teams.view"
 	PermTeamsEdit           Permission = "teams.edit"
 	PermServiceAccountsView Permission = "service_accounts.view"
@@ -65,6 +66,7 @@ var allPermissions = []Permission{
 	PermPrincipalsEdit,
 	PermDaemonsView,
 	PermDaemonsEdit,
+	PermAuditView,
 	PermTeamsView,
 	PermTeamsEdit,
 	PermServiceAccountsView,
@@ -113,6 +115,7 @@ var builtinRoles = []builtinRole{
 			perm("daemons", "edit"),
 			perm("teams", "edit"),
 			perm("service_accounts", "edit"),
+			perm("audit", "view"),
 		),
 	},
 	{
@@ -131,6 +134,7 @@ var builtinRoles = []builtinRole{
 			perm("daemons", "edit"),
 			perm("teams", "edit"),
 			perm("service_accounts", "edit"),
+			perm("audit", "view"),
 		),
 	},
 	{
