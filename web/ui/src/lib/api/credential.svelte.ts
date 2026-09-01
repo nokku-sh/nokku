@@ -40,7 +40,7 @@ export const passkey = {
 	// Queries
 	list: () =>
 		createQuery<Passkey[]>(() => ({
-			queryKey: ['account', 'credentials'],
+			queryKey: ['account', 'credentials', 'passkeys'],
 			queryFn: async () => {
 				const credentials = await account.credentials();
 				return credentials

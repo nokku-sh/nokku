@@ -43,7 +43,7 @@ export const user = {
 		})),
 	listLinkedAccounts: () =>
 		createQuery<LinkedAccount[]>(() => ({
-			queryKey: ['account', 'credentials'],
+			queryKey: ['account', 'credentials', 'linked'],
 			queryFn: async () => {
 				const credentials = await account.credentials();
 				return credentials.filter((c) => identityTypes.includes(c.type)).map(toLinkedAccount);
