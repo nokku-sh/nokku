@@ -868,6 +868,209 @@ func (x *GetSubjectAccessResponse) GetCertificateAuthorities() []*CertificateAut
 	return nil
 }
 
+// GetMyAccessRequest is deliberately empty: the subject is always the
+// authenticated principal, so a caller can only ever read its own access.
+type GetMyAccessRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyAccessRequest) Reset() {
+	*x = GetMyAccessRequest{}
+	mi := &file_nokku_v1_target_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyAccessRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyAccessRequest) ProtoMessage() {}
+
+func (x *GetMyAccessRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_target_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyAccessRequest.ProtoReflect.Descriptor instead.
+func (*GetMyAccessRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_target_proto_rawDescGZIP(), []int{13}
+}
+
+// GetMyAccessResponse carries the caller's reachable targets and SSH CAs
+// across all of their workspace memberships in one snapshot. Membership is
+// re-resolved on the server on every call, so revoked access disappears from
+// subsequent responses.
+type GetMyAccessResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Subject:
+	//
+	//	*GetMyAccessResponse_User
+	//	*GetMyAccessResponse_ServiceAccount
+	Subject       isGetMyAccessResponse_Subject `protobuf_oneof:"subject"`
+	Workspaces    []*WorkspaceAccess            `protobuf:"bytes,3,rep,name=workspaces" json:"workspaces,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyAccessResponse) Reset() {
+	*x = GetMyAccessResponse{}
+	mi := &file_nokku_v1_target_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyAccessResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyAccessResponse) ProtoMessage() {}
+
+func (x *GetMyAccessResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_target_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyAccessResponse.ProtoReflect.Descriptor instead.
+func (*GetMyAccessResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_target_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetMyAccessResponse) GetSubject() isGetMyAccessResponse_Subject {
+	if x != nil {
+		return x.Subject
+	}
+	return nil
+}
+
+func (x *GetMyAccessResponse) GetUser() *User {
+	if x != nil {
+		if x, ok := x.Subject.(*GetMyAccessResponse_User); ok {
+			return x.User
+		}
+	}
+	return nil
+}
+
+func (x *GetMyAccessResponse) GetServiceAccount() *ServiceAccount {
+	if x != nil {
+		if x, ok := x.Subject.(*GetMyAccessResponse_ServiceAccount); ok {
+			return x.ServiceAccount
+		}
+	}
+	return nil
+}
+
+func (x *GetMyAccessResponse) GetWorkspaces() []*WorkspaceAccess {
+	if x != nil {
+		return x.Workspaces
+	}
+	return nil
+}
+
+type isGetMyAccessResponse_Subject interface {
+	isGetMyAccessResponse_Subject()
+}
+
+type GetMyAccessResponse_User struct {
+	User *User `protobuf:"bytes,1,opt,name=user,oneof"`
+}
+
+type GetMyAccessResponse_ServiceAccount struct {
+	ServiceAccount *ServiceAccount `protobuf:"bytes,2,opt,name=service_account,json=serviceAccount,oneof"`
+}
+
+func (*GetMyAccessResponse_User) isGetMyAccessResponse_Subject() {}
+
+func (*GetMyAccessResponse_ServiceAccount) isGetMyAccessResponse_Subject() {}
+
+// WorkspaceAccess is one workspace slice of a subject's access snapshot.
+type WorkspaceAccess struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	WorkspaceName *string                `protobuf:"bytes,2,opt,name=workspace_name,json=workspaceName" json:"workspace_name,omitempty"`
+	// Targets the subject can reach in this workspace, principals embedded.
+	Targets []*Target `protobuf:"bytes,3,rep,name=targets" json:"targets,omitempty"`
+	// SSH certificate authorities referenced by those targets.
+	CertificateAuthorities []*CertificateAuthority `protobuf:"bytes,4,rep,name=certificate_authorities,json=certificateAuthorities" json:"certificate_authorities,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *WorkspaceAccess) Reset() {
+	*x = WorkspaceAccess{}
+	mi := &file_nokku_v1_target_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkspaceAccess) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkspaceAccess) ProtoMessage() {}
+
+func (x *WorkspaceAccess) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_target_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkspaceAccess.ProtoReflect.Descriptor instead.
+func (*WorkspaceAccess) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_target_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *WorkspaceAccess) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WorkspaceAccess) GetWorkspaceName() string {
+	if x != nil && x.WorkspaceName != nil {
+		return *x.WorkspaceName
+	}
+	return ""
+}
+
+func (x *WorkspaceAccess) GetTargets() []*Target {
+	if x != nil {
+		return x.Targets
+	}
+	return nil
+}
+
+func (x *WorkspaceAccess) GetCertificateAuthorities() []*CertificateAuthority {
+	if x != nil {
+		return x.CertificateAuthorities
+	}
+	return nil
+}
+
 type GetTargetFiltersRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
@@ -877,7 +1080,7 @@ type GetTargetFiltersRequest struct {
 
 func (x *GetTargetFiltersRequest) Reset() {
 	*x = GetTargetFiltersRequest{}
-	mi := &file_nokku_v1_target_proto_msgTypes[13]
+	mi := &file_nokku_v1_target_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -889,7 +1092,7 @@ func (x *GetTargetFiltersRequest) String() string {
 func (*GetTargetFiltersRequest) ProtoMessage() {}
 
 func (x *GetTargetFiltersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_proto_msgTypes[13]
+	mi := &file_nokku_v1_target_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -902,7 +1105,7 @@ func (x *GetTargetFiltersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTargetFiltersRequest.ProtoReflect.Descriptor instead.
 func (*GetTargetFiltersRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_proto_rawDescGZIP(), []int{13}
+	return file_nokku_v1_target_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetTargetFiltersRequest) GetWorkspaceId() string {
@@ -922,7 +1125,7 @@ type GetTargetFiltersResponse struct {
 
 func (x *GetTargetFiltersResponse) Reset() {
 	*x = GetTargetFiltersResponse{}
-	mi := &file_nokku_v1_target_proto_msgTypes[14]
+	mi := &file_nokku_v1_target_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -934,7 +1137,7 @@ func (x *GetTargetFiltersResponse) String() string {
 func (*GetTargetFiltersResponse) ProtoMessage() {}
 
 func (x *GetTargetFiltersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_proto_msgTypes[14]
+	mi := &file_nokku_v1_target_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -947,7 +1150,7 @@ func (x *GetTargetFiltersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTargetFiltersResponse.ProtoReflect.Descriptor instead.
 func (*GetTargetFiltersResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_proto_rawDescGZIP(), []int{14}
+	return file_nokku_v1_target_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetTargetFiltersResponse) GetTags() []string {
@@ -968,7 +1171,7 @@ var File_nokku_v1_target_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_target_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/target.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bnokku/v1/certificates.proto\x1a\x15nokku/v1/daemon.proto\x1a\x18nokku/v1/principal.proto\"\xf9\x03\n" +
+	"\x15nokku/v1/target.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16nokku/v1/account.proto\x1a\x1bnokku/v1/certificates.proto\x1a\x15nokku/v1/daemon.proto\x1a\x18nokku/v1/principal.proto\x1a\x1enokku/v1/service_account.proto\"\xf9\x03\n" +
 	"\x06Target\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x13\n" +
@@ -1039,21 +1242,35 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\x18GetSubjectAccessResponse\x12*\n" +
 	"\atargets\x18\x01 \x03(\v2\x10.nokku.v1.TargetR\atargets\x12*\n" +
 	"\adaemons\x18\x02 \x03(\v2\x10.nokku.v1.DaemonR\adaemons\x12W\n" +
-	"\x17certificate_authorities\x18\x03 \x03(\v2\x1e.nokku.v1.CertificateAuthorityR\x16certificateAuthorities\"F\n" +
+	"\x17certificate_authorities\x18\x03 \x03(\v2\x1e.nokku.v1.CertificateAuthorityR\x16certificateAuthorities\"\x14\n" +
+	"\x12GetMyAccessRequest\"\xc6\x01\n" +
+	"\x13GetMyAccessResponse\x12$\n" +
+	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserH\x00R\x04user\x12C\n" +
+	"\x0fservice_account\x18\x02 \x01(\v2\x18.nokku.v1.ServiceAccountH\x00R\x0eserviceAccount\x129\n" +
+	"\n" +
+	"workspaces\x18\x03 \x03(\v2\x19.nokku.v1.WorkspaceAccessR\n" +
+	"workspacesB\t\n" +
+	"\asubject\"\xe0\x01\n" +
+	"\x0fWorkspaceAccess\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12%\n" +
+	"\x0eworkspace_name\x18\x02 \x01(\tR\rworkspaceName\x12*\n" +
+	"\atargets\x18\x03 \x03(\v2\x10.nokku.v1.TargetR\atargets\x12W\n" +
+	"\x17certificate_authorities\x18\x04 \x03(\v2\x1e.nokku.v1.CertificateAuthorityR\x16certificateAuthorities\"F\n" +
 	"\x17GetTargetFiltersRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"N\n" +
 	"\x18GetTargetFiltersResponse\x12\x12\n" +
 	"\x04tags\x18\x01 \x03(\tR\x04tags\x12\x1e\n" +
 	"\n" +
 	"principals\x18\x02 \x03(\tR\n" +
-	"principals2\xc4\a\n" +
+	"principals2\xaf\b\n" +
 	"\rTargetService\x12{\n" +
 	"\tGetTarget\x12\x1a.nokku.v1.GetTargetRequest\x1a\x1b.nokku.v1.GetTargetResponse\"5\x82\xd3\xe4\x93\x02,\x12*/v1/workspaces/{workspace_id}/targets/{id}\x90\x02\x01\x12|\n" +
 	"\vListTargets\x12\x1c.nokku.v1.ListTargetsRequest\x1a\x1d.nokku.v1.ListTargetsResponse\"0\x82\xd3\xe4\x93\x02'\x12%/v1/workspaces/{workspace_id}/targets\x90\x02\x01\x12\x7f\n" +
 	"\fCreateTarget\x12\x1d.nokku.v1.CreateTargetRequest\x1a\x1e.nokku.v1.CreateTargetResponse\"0\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/workspaces/{workspace_id}/targets\x12\x84\x01\n" +
 	"\fUpdateTarget\x12\x1d.nokku.v1.UpdateTargetRequest\x1a\x1e.nokku.v1.UpdateTargetResponse\"5\x82\xd3\xe4\x93\x02/:\x01*2*/v1/workspaces/{workspace_id}/targets/{id}\x12\x81\x01\n" +
 	"\fDeleteTarget\x12\x1d.nokku.v1.DeleteTargetRequest\x1a\x1e.nokku.v1.DeleteTargetResponse\"2\x82\xd3\xe4\x93\x02,**/v1/workspaces/{workspace_id}/targets/{id}\x12\x95\x01\n" +
-	"\x10GetSubjectAccess\x12!.nokku.v1.GetSubjectAccessRequest\x1a\".nokku.v1.GetSubjectAccessResponse\":\x82\xd3\xe4\x93\x021:\x01*\x12,/v1/workspaces/{workspace_id}/targets/access\x90\x02\x01\x12\x93\x01\n" +
+	"\x10GetSubjectAccess\x12!.nokku.v1.GetSubjectAccessRequest\x1a\".nokku.v1.GetSubjectAccessResponse\":\x82\xd3\xe4\x93\x021:\x01*\x12,/v1/workspaces/{workspace_id}/targets/access\x90\x02\x01\x12i\n" +
+	"\vGetMyAccess\x12\x1c.nokku.v1.GetMyAccessRequest\x1a\x1d.nokku.v1.GetMyAccessResponse\"\x1d\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/targets/access\x90\x02\x01\x12\x93\x01\n" +
 	"\x10GetTargetFilters\x12!.nokku.v1.GetTargetFiltersRequest\x1a\".nokku.v1.GetTargetFiltersResponse\"8\x82\xd3\xe4\x93\x02/\x12-/v1/workspaces/{workspace_id}/targets/filters\x90\x02\x01B\x95\x01\n" +
 	"\fcom.nokku.v1B\vTargetProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
@@ -1069,7 +1286,7 @@ func file_nokku_v1_target_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_target_proto_rawDescData
 }
 
-var file_nokku_v1_target_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_nokku_v1_target_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_nokku_v1_target_proto_goTypes = []any{
 	(*Target)(nil),                   // 0: nokku.v1.Target
 	(*GetTargetRequest)(nil),         // 1: nokku.v1.GetTargetRequest
@@ -1084,45 +1301,57 @@ var file_nokku_v1_target_proto_goTypes = []any{
 	(*ListTargetsResponse)(nil),      // 10: nokku.v1.ListTargetsResponse
 	(*GetSubjectAccessRequest)(nil),  // 11: nokku.v1.GetSubjectAccessRequest
 	(*GetSubjectAccessResponse)(nil), // 12: nokku.v1.GetSubjectAccessResponse
-	(*GetTargetFiltersRequest)(nil),  // 13: nokku.v1.GetTargetFiltersRequest
-	(*GetTargetFiltersResponse)(nil), // 14: nokku.v1.GetTargetFiltersResponse
-	nil,                              // 15: nokku.v1.Target.MetadataEntry
-	(*Principal)(nil),                // 16: nokku.v1.Principal
-	(*timestamppb.Timestamp)(nil),    // 17: google.protobuf.Timestamp
-	(*Daemon)(nil),                   // 18: nokku.v1.Daemon
-	(*CertificateAuthority)(nil),     // 19: nokku.v1.CertificateAuthority
+	(*GetMyAccessRequest)(nil),       // 13: nokku.v1.GetMyAccessRequest
+	(*GetMyAccessResponse)(nil),      // 14: nokku.v1.GetMyAccessResponse
+	(*WorkspaceAccess)(nil),          // 15: nokku.v1.WorkspaceAccess
+	(*GetTargetFiltersRequest)(nil),  // 16: nokku.v1.GetTargetFiltersRequest
+	(*GetTargetFiltersResponse)(nil), // 17: nokku.v1.GetTargetFiltersResponse
+	nil,                              // 18: nokku.v1.Target.MetadataEntry
+	(*Principal)(nil),                // 19: nokku.v1.Principal
+	(*timestamppb.Timestamp)(nil),    // 20: google.protobuf.Timestamp
+	(*Daemon)(nil),                   // 21: nokku.v1.Daemon
+	(*CertificateAuthority)(nil),     // 22: nokku.v1.CertificateAuthority
+	(*User)(nil),                     // 23: nokku.v1.User
+	(*ServiceAccount)(nil),           // 24: nokku.v1.ServiceAccount
 }
 var file_nokku_v1_target_proto_depIdxs = []int32{
-	16, // 0: nokku.v1.Target.principals:type_name -> nokku.v1.Principal
-	15, // 1: nokku.v1.Target.metadata:type_name -> nokku.v1.Target.MetadataEntry
-	17, // 2: nokku.v1.Target.created_at:type_name -> google.protobuf.Timestamp
-	17, // 3: nokku.v1.Target.updated_at:type_name -> google.protobuf.Timestamp
+	19, // 0: nokku.v1.Target.principals:type_name -> nokku.v1.Principal
+	18, // 1: nokku.v1.Target.metadata:type_name -> nokku.v1.Target.MetadataEntry
+	20, // 2: nokku.v1.Target.created_at:type_name -> google.protobuf.Timestamp
+	20, // 3: nokku.v1.Target.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 4: nokku.v1.GetTargetResponse.target:type_name -> nokku.v1.Target
 	0,  // 5: nokku.v1.CreateTargetResponse.target:type_name -> nokku.v1.Target
 	0,  // 6: nokku.v1.UpdateTargetResponse.target:type_name -> nokku.v1.Target
 	0,  // 7: nokku.v1.ListTargetsResponse.targets:type_name -> nokku.v1.Target
 	0,  // 8: nokku.v1.GetSubjectAccessResponse.targets:type_name -> nokku.v1.Target
-	18, // 9: nokku.v1.GetSubjectAccessResponse.daemons:type_name -> nokku.v1.Daemon
-	19, // 10: nokku.v1.GetSubjectAccessResponse.certificate_authorities:type_name -> nokku.v1.CertificateAuthority
-	1,  // 11: nokku.v1.TargetService.GetTarget:input_type -> nokku.v1.GetTargetRequest
-	9,  // 12: nokku.v1.TargetService.ListTargets:input_type -> nokku.v1.ListTargetsRequest
-	3,  // 13: nokku.v1.TargetService.CreateTarget:input_type -> nokku.v1.CreateTargetRequest
-	5,  // 14: nokku.v1.TargetService.UpdateTarget:input_type -> nokku.v1.UpdateTargetRequest
-	7,  // 15: nokku.v1.TargetService.DeleteTarget:input_type -> nokku.v1.DeleteTargetRequest
-	11, // 16: nokku.v1.TargetService.GetSubjectAccess:input_type -> nokku.v1.GetSubjectAccessRequest
-	13, // 17: nokku.v1.TargetService.GetTargetFilters:input_type -> nokku.v1.GetTargetFiltersRequest
-	2,  // 18: nokku.v1.TargetService.GetTarget:output_type -> nokku.v1.GetTargetResponse
-	10, // 19: nokku.v1.TargetService.ListTargets:output_type -> nokku.v1.ListTargetsResponse
-	4,  // 20: nokku.v1.TargetService.CreateTarget:output_type -> nokku.v1.CreateTargetResponse
-	6,  // 21: nokku.v1.TargetService.UpdateTarget:output_type -> nokku.v1.UpdateTargetResponse
-	8,  // 22: nokku.v1.TargetService.DeleteTarget:output_type -> nokku.v1.DeleteTargetResponse
-	12, // 23: nokku.v1.TargetService.GetSubjectAccess:output_type -> nokku.v1.GetSubjectAccessResponse
-	14, // 24: nokku.v1.TargetService.GetTargetFilters:output_type -> nokku.v1.GetTargetFiltersResponse
-	18, // [18:25] is the sub-list for method output_type
-	11, // [11:18] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	21, // 9: nokku.v1.GetSubjectAccessResponse.daemons:type_name -> nokku.v1.Daemon
+	22, // 10: nokku.v1.GetSubjectAccessResponse.certificate_authorities:type_name -> nokku.v1.CertificateAuthority
+	23, // 11: nokku.v1.GetMyAccessResponse.user:type_name -> nokku.v1.User
+	24, // 12: nokku.v1.GetMyAccessResponse.service_account:type_name -> nokku.v1.ServiceAccount
+	15, // 13: nokku.v1.GetMyAccessResponse.workspaces:type_name -> nokku.v1.WorkspaceAccess
+	0,  // 14: nokku.v1.WorkspaceAccess.targets:type_name -> nokku.v1.Target
+	22, // 15: nokku.v1.WorkspaceAccess.certificate_authorities:type_name -> nokku.v1.CertificateAuthority
+	1,  // 16: nokku.v1.TargetService.GetTarget:input_type -> nokku.v1.GetTargetRequest
+	9,  // 17: nokku.v1.TargetService.ListTargets:input_type -> nokku.v1.ListTargetsRequest
+	3,  // 18: nokku.v1.TargetService.CreateTarget:input_type -> nokku.v1.CreateTargetRequest
+	5,  // 19: nokku.v1.TargetService.UpdateTarget:input_type -> nokku.v1.UpdateTargetRequest
+	7,  // 20: nokku.v1.TargetService.DeleteTarget:input_type -> nokku.v1.DeleteTargetRequest
+	11, // 21: nokku.v1.TargetService.GetSubjectAccess:input_type -> nokku.v1.GetSubjectAccessRequest
+	13, // 22: nokku.v1.TargetService.GetMyAccess:input_type -> nokku.v1.GetMyAccessRequest
+	16, // 23: nokku.v1.TargetService.GetTargetFilters:input_type -> nokku.v1.GetTargetFiltersRequest
+	2,  // 24: nokku.v1.TargetService.GetTarget:output_type -> nokku.v1.GetTargetResponse
+	10, // 25: nokku.v1.TargetService.ListTargets:output_type -> nokku.v1.ListTargetsResponse
+	4,  // 26: nokku.v1.TargetService.CreateTarget:output_type -> nokku.v1.CreateTargetResponse
+	6,  // 27: nokku.v1.TargetService.UpdateTarget:output_type -> nokku.v1.UpdateTargetResponse
+	8,  // 28: nokku.v1.TargetService.DeleteTarget:output_type -> nokku.v1.DeleteTargetResponse
+	12, // 29: nokku.v1.TargetService.GetSubjectAccess:output_type -> nokku.v1.GetSubjectAccessResponse
+	14, // 30: nokku.v1.TargetService.GetMyAccess:output_type -> nokku.v1.GetMyAccessResponse
+	17, // 31: nokku.v1.TargetService.GetTargetFilters:output_type -> nokku.v1.GetTargetFiltersResponse
+	24, // [24:32] is the sub-list for method output_type
+	16, // [16:24] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_target_proto_init() }
@@ -1130,16 +1359,22 @@ func file_nokku_v1_target_proto_init() {
 	if File_nokku_v1_target_proto != nil {
 		return
 	}
+	file_nokku_v1_account_proto_init()
 	file_nokku_v1_certificates_proto_init()
 	file_nokku_v1_daemon_proto_init()
 	file_nokku_v1_principal_proto_init()
+	file_nokku_v1_service_account_proto_init()
+	file_nokku_v1_target_proto_msgTypes[14].OneofWrappers = []any{
+		(*GetMyAccessResponse_User)(nil),
+		(*GetMyAccessResponse_ServiceAccount)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_target_proto_rawDesc), len(file_nokku_v1_target_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
