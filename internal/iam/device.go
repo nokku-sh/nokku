@@ -294,6 +294,7 @@ func (h *DeviceFlow) Nonce(w http.ResponseWriter, _ *http.Request) {
 		WriteError(w, http.StatusNotFound, "dpop_disabled", "dpop disabled")
 		return
 	}
+	w.Header().Set(URLHeader, h.svc.baseURL)
 	w.Header().Set("DPoP-Nonce", h.svc.DPoP.CurrentNonce())
 	w.WriteHeader(http.StatusNoContent)
 }

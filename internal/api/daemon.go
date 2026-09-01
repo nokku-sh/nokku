@@ -480,6 +480,7 @@ func (s *DaemonService) enrollBinding(ctx context.Context) (string, error) {
 	if err != nil {
 		if errors.Is(err, iam.ErrDPoPNonce) {
 			ci.ResponseHeader().Set("DPoP-Nonce", svc.DPoP.CurrentNonce())
+			ci.ResponseHeader().Set(iam.URLHeader, s.cfg.FullURL())
 			return "", NewError(connect.CodeUnauthenticated, "stale DPoP nonce")
 		}
 		return "", NewError(connect.CodeInvalidArgument, "invalid DPoP proof")
