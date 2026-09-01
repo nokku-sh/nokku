@@ -2,71 +2,74 @@
 // @generated from file nokku/v1/license.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import { file_google_api_annotations } from "../../google/api/annotations_pb";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { Message } from "@bufbuild/protobuf";
+import type { GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
+import { fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
+import { file_google_api_annotations } from '../../google/api/annotations_pb';
+import type { Timestamp } from '@bufbuild/protobuf/wkt';
+import { file_google_protobuf_timestamp } from '@bufbuild/protobuf/wkt';
+import type { Message } from '@bufbuild/protobuf';
 
 /**
  * Describes the file nokku/v1/license.proto.
  */
-export const file_nokku_v1_license: GenFile = /*@__PURE__*/
-  fileDesc("ChZub2trdS92MS9saWNlbnNlLnByb3RvEghub2trdS52MSITChFHZXRMaWNlbnNlUmVxdWVzdCJiChJHZXRMaWNlbnNlUmVzcG9uc2USDAoEcGxhbhgBIAEoCRIOCgZhY3RpdmUYAiABKAgSLgoKZXhwaXJlc19hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAycQoOTGljZW5zZVNlcnZpY2USXwoKR2V0TGljZW5zZRIbLm5va2t1LnYxLkdldExpY2Vuc2VSZXF1ZXN0Ghwubm9ra3UudjEuR2V0TGljZW5zZVJlc3BvbnNlIhaQAgGC0+STAg0SCy92MS9saWNlbnNlQpYBCgxjb20ubm9ra3UudjFCDExpY2Vuc2VQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_google_api_annotations, file_google_protobuf_timestamp]);
+export const file_nokku_v1_license: GenFile /*@__PURE__*/ = fileDesc(
+	'ChZub2trdS92MS9saWNlbnNlLnByb3RvEghub2trdS52MSITChFHZXRMaWNlbnNlUmVxdWVzdCJiChJHZXRMaWNlbnNlUmVzcG9uc2USDAoEcGxhbhgBIAEoCRIOCgZhY3RpdmUYAiABKAgSLgoKZXhwaXJlc19hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAycQoOTGljZW5zZVNlcnZpY2USXwoKR2V0TGljZW5zZRIbLm5va2t1LnYxLkdldExpY2Vuc2VSZXF1ZXN0Ghwubm9ra3UudjEuR2V0TGljZW5zZVJlc3BvbnNlIhaQAgGC0+STAg0SCy92MS9saWNlbnNlQpYBCgxjb20ubm9ra3UudjFCDExpY2Vuc2VQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
+	[file_google_api_annotations, file_google_protobuf_timestamp]
+);
 
 /**
  * @generated from message nokku.v1.GetLicenseRequest
  */
-export type GetLicenseRequest = Message<"nokku.v1.GetLicenseRequest"> & {
-};
+export type GetLicenseRequest = Message<'nokku.v1.GetLicenseRequest'> & {};
 
 /**
  * Describes the message nokku.v1.GetLicenseRequest.
  * Use `create(GetLicenseRequestSchema)` to create a new message.
  */
-export const GetLicenseRequestSchema: GenMessage<GetLicenseRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_license, 0);
+export const GetLicenseRequestSchema: GenMessage<GetLicenseRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_license,
+	0
+);
 
 /**
  * @generated from message nokku.v1.GetLicenseResponse
  */
-export type GetLicenseResponse = Message<"nokku.v1.GetLicenseResponse"> & {
-  /**
-   * @generated from field: string plan = 1;
-   */
-  plan: string;
+export type GetLicenseResponse = Message<'nokku.v1.GetLicenseResponse'> & {
+	/**
+	 * @generated from field: string plan = 1;
+	 */
+	plan: string;
 
-  /**
-   * @generated from field: bool active = 2;
-   */
-  active: boolean;
+	/**
+	 * @generated from field: bool active = 2;
+	 */
+	active: boolean;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 3;
-   */
-  expiresAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp expires_at = 3;
+	 */
+	expiresAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.GetLicenseResponse.
  * Use `create(GetLicenseResponseSchema)` to create a new message.
  */
-export const GetLicenseResponseSchema: GenMessage<GetLicenseResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_license, 1);
+export const GetLicenseResponseSchema: GenMessage<GetLicenseResponse> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_license,
+	1
+);
 
 /**
  * @generated from service nokku.v1.LicenseService
  */
 export const LicenseService: GenService<{
-  /**
-   * @generated from rpc nokku.v1.LicenseService.GetLicense
-   */
-  getLicense: {
-    methodKind: "unary";
-    input: typeof GetLicenseRequestSchema;
-    output: typeof GetLicenseResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_nokku_v1_license, 0);
-
+	/**
+	 * @generated from rpc nokku.v1.LicenseService.GetLicense
+	 */
+	getLicense: {
+		methodKind: 'unary';
+		input: typeof GetLicenseRequestSchema;
+		output: typeof GetLicenseResponseSchema;
+	};
+}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_license, 0);
