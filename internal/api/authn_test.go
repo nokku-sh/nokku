@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -178,7 +179,7 @@ func TestVerifyProof(t *testing.T) {
 		header := http.Header{}
 		header.Set("Authorization", "DPoP "+token)
 		err := a.verifyProof(context.Background(), header, procedure, token, binding)
-		if err == nil || err != errDPoPRequired {
+		if err == nil || !errors.Is(err, errDPoPRequired) {
 			t.Fatalf("verifyProof() = %v, want errDPoPRequired", err)
 		}
 	})
