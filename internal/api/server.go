@@ -241,6 +241,15 @@ func (s *Server) getServiceRegistrations(ctx context.Context) []ServiceRegistrat
 			},
 		},
 		{
+			Name: nokkuv1connect.AccountServiceName,
+			Handler: func() (string, http.Handler) {
+				return nokkuv1connect.NewAccountServiceHandler(
+					NewAccountService(s.cfg),
+					opts...,
+				)
+			},
+		},
+		{
 			Name: nokkuv1connect.WorkspaceDomainServiceName,
 			Handler: func() (string, http.Handler) {
 				return nokkuv1connect.NewWorkspaceDomainServiceHandler(

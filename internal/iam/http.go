@@ -98,8 +98,8 @@ func (s *Service) Middleware(next http.Handler) http.Handler {
 			p, sess, err := s.AuthenticateRequest(r.Context(), token)
 			if err == nil {
 				ctx := ContextWithPrincipal(r.Context(), p)
-				ctx = context.WithValue(ctx, sessionKey{}, sess)
-				ctx = context.WithValue(ctx, requestMetaKey{}, RequestMeta{
+				ctx = ContextWithSession(ctx, sess)
+				ctx = ContextWithRequestMeta(ctx, RequestMeta{
 					Header:     r.Header,
 					RemoteAddr: r.RemoteAddr,
 				})
@@ -109,6 +109,19 @@ func (s *Service) Middleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// ContextWithSession stores the authenticated session of the request. Both
+// the HTTP middleware and the connectrpc interceptor call it, so handlers
+// see the same request state on either transport.
+func ContextWithSession(ctx context.Context, sess db.Session) context.Context {
+	return context.WithValue(ctx, sessionKey{}, sess)
+}
+
+// ContextWithRequestMeta stores the transport facts of an authenticated
+// request; the audit sink reads them so auth events carry IP and user agent.
+func ContextWithRequestMeta(ctx context.Context, meta RequestMeta) context.Context {
+	return context.WithValue(ctx, requestMetaKey{}, meta)
 }
 
 // RequestMeta carries the transport facts of an authenticated request: the
