@@ -7,10 +7,12 @@ package iam
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"slices"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -123,6 +125,15 @@ func (l *linker) resolve(
 	if len(bindings) > 0 && !slices.Contains(bindings, emailDomain(opts.Email)) {
 		return nil, ErrIdentityRejected
 	}
+	// The email of an unmatched identity may auto-match a local account
+	// only when the provider has verified it, or when the identity comes
+	// through a provider the workspace has already vetted via a verified
+	// domain binding. Otherwise an attacker controlling their profile at a
+	// loosely-asserting provider could claim someone else's email and be
+	// signed in as that account.
+	if !opts.EmailVerified && len(bindings) == 0 {
+		return nil, ErrIdentityRejected
+	}
 
 	u, uerr := l.svc.GetUserByEmail(ctx, opts.Email)
 	switch {
@@ -146,9 +157,28 @@ func (l *linker) resolve(
 		return nil, uerr
 	}
 
-	// Best effort: the store's unique index makes this idempotent.
-	_ = l.Link(ctx, opts.ProviderID, opts.Subject, u.ID, opts.Data)
+	// Best effort: the store's unique index makes this idempotent. Any
+	// other failure still logs: the session is valid but the identity is
+	// not persisted, which breaks future logins once JIT provisioning is
+	// disabled, with no trace of why.
+	if err := l.Link(ctx, opts.ProviderID, opts.Subject, u.ID, opts.Data); err != nil &&
+		!isUniqueViolation(err) {
+		slog.Warn(
+			"sso identity link failed",
+			"error", err,
+			"provider", opts.ProviderID,
+			"user_id", u.ID,
+		)
+	}
 	return u, nil
+}
+
+// isUniqueViolation reports whether err is a PostgreSQL unique-constraint
+// violation: the expected outcome when a concurrent login linked the same
+// identity first.
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // provisionUser creates a JIT account from a verified identity.
@@ -223,6 +253,10 @@ func (s *Service) completeSSO(
 	opts.LinkUserID = st.LinkUserID
 	u, err := l.Resolve(ctx, st.WorkspaceID, opts)
 	if err != nil {
+		// The user-facing message is intentionally generic; this log is the
+		// only place a membership-join failure (OnSSOLogin) is visible, as
+		// resolve rejections are already audited as login_denied.
+		slog.Warn("sso login rejected", "error", err, "provider", opts.ProviderID)
 		Fail(w, r, errRedirect, "identity rejected")
 		return
 	}
@@ -240,6 +274,7 @@ func (s *Service) completeSSO(
 		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
 		return
 	}
+	http.SetCookie(w, endFlowBinding())
 	http.SetCookie(w, s.SessionCookie(token, derefTime(sess.ExpiresAt)))
 	if s.OnUserLogin != nil {
 		s.OnUserLogin(w, r, u, l.credType)
