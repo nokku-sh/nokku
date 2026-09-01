@@ -323,6 +323,49 @@ func (q *Queries) GetWorkspaceOwner(ctx context.Context, workspaceID string) (st
 	return created_by, err
 }
 
+const getWorkspacesByIDs = `-- name: GetWorkspacesByIDs :many
+SELECT
+  id, name, description, enroll_token_hash, enroll_expires_at, invite_token_hash, invite_expires_at, settings, created_by, created_at, updated_at
+FROM
+  workspaces w
+WHERE
+  w.id = ANY ($1::UUID[])
+ORDER BY
+  w.id
+`
+
+func (q *Queries) GetWorkspacesByIDs(ctx context.Context, workspaceIds []string) ([]*Workspace, error) {
+	rows, err := q.db.Query(ctx, getWorkspacesByIDs, workspaceIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Workspace
+	for rows.Next() {
+		var i Workspace
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.EnrollTokenHash,
+			&i.EnrollExpiresAt,
+			&i.InviteTokenHash,
+			&i.InviteExpiresAt,
+			&i.Settings,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getWorkspacesByOwner = `-- name: GetWorkspacesByOwner :many
 SELECT
   id

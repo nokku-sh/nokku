@@ -43,6 +43,16 @@ FROM
 WHERE
   w.id = @workspace_id;
 
+-- name: GetWorkspacesByIDs :many
+SELECT
+  *
+FROM
+  workspaces w
+WHERE
+  w.id = ANY (sqlc.arg('workspace_ids')::UUID[])
+ORDER BY
+  w.id;
+
 -- name: ListWorkspaceIDs :many
 SELECT
   id

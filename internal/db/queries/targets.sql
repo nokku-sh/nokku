@@ -171,6 +171,76 @@ WHERE
       )
   );
 
+-- name: GetSubjectTargetsByWorkspaces :many
+-- Returns every target a subject can reach within an explicit workspace set.
+-- Grant logic is identical to GetTargetsBySubject (direct user grants, team
+-- grants, service-account grants, and team membership for users); the
+-- workspace set constrains the result so a caller can never read beyond its
+-- current memberships, even if a stale grant lingers elsewhere.
+SELECT DISTINCT
+  t.*
+FROM
+  targets t
+WHERE
+  t.workspace_id = ANY (sqlc.arg('workspace_ids')::UUID[])
+  AND (
+    t.daemon_id = sqlc.arg('subject_id')::UUID
+    OR EXISTS (
+      SELECT
+        1
+      FROM
+        principals p
+      WHERE
+        p.target_id = t.id
+        AND (
+          -- Direct user grant
+          EXISTS (
+            SELECT
+              1
+            FROM
+              principal_users pu
+            WHERE
+              pu.principal_id = p.id
+              AND pu.user_id = sqlc.arg('subject_id')::UUID
+          )
+          -- Subject is a team with a direct grant
+          OR EXISTS (
+            SELECT
+              1
+            FROM
+              principal_teams pt
+            WHERE
+              pt.principal_id = p.id
+              AND pt.team_id = sqlc.arg('subject_id')::UUID
+          )
+          -- Subject is a service account with a direct grant
+          OR EXISTS (
+            SELECT
+              1
+            FROM
+              principal_service_accounts psa
+            WHERE
+              psa.principal_id = p.id
+              AND psa.service_account_id = sqlc.arg('subject_id')::UUID
+          )
+          -- Subject is a user who belongs to a team granted access
+          OR EXISTS (
+            SELECT
+              1
+            FROM
+              principal_teams granted_team
+              JOIN team_members tm ON tm.team_id = granted_team.team_id
+            WHERE
+              granted_team.principal_id = p.id
+              AND tm.user_id = sqlc.arg('subject_id')::UUID
+          )
+        )
+    )
+  )
+ORDER BY
+  t.workspace_id,
+  t.name;
+
 -- name: GetWorkspaceTags :many
 SELECT DISTINCT
   unnest(tags)::TEXT AS tag
