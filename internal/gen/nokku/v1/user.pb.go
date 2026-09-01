@@ -23,17 +23,17 @@ const (
 )
 
 type User struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	Id                  *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name                *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Email               *string                `protobuf:"bytes,3,opt,name=email" json:"email,omitempty"`
-	EmailVerified       *bool                  `protobuf:"varint,4,opt,name=email_verified,json=emailVerified" json:"email_verified,omitempty"`
-	Picture             *string                `protobuf:"bytes,5,opt,name=picture" json:"picture,omitempty"`
-	CreatedAt           *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt           *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	EnableEmailRecovery *bool                  `protobuf:"varint,8,opt,name=enable_email_recovery,json=enableEmailRecovery" json:"enable_email_recovery,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Id                   *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name                 *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Email                *string                `protobuf:"bytes,3,opt,name=email" json:"email,omitempty"`
+	EmailVerified        *bool                  `protobuf:"varint,4,opt,name=email_verified,json=emailVerified" json:"email_verified,omitempty"`
+	Picture              *string                `protobuf:"bytes,5,opt,name=picture" json:"picture,omitempty"`
+	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	DisablePasswordReset *bool                  `protobuf:"varint,8,opt,name=disable_password_reset,json=disablePasswordReset" json:"disable_password_reset,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -115,9 +115,9 @@ func (x *User) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *User) GetEnableEmailRecovery() bool {
-	if x != nil && x.EnableEmailRecovery != nil {
-		return *x.EnableEmailRecovery
+func (x *User) GetDisablePasswordReset() bool {
+	if x != nil && x.DisablePasswordReset != nil {
+		return *x.DisablePasswordReset
 	}
 	return false
 }
@@ -126,7 +126,7 @@ var File_nokku_v1_user_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x13nokku/v1/user.proto\x12\bnokku.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xab\x02\n" +
+	"\x13nokku/v1/user.proto\x12\bnokku.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xad\x02\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -136,8 +136,8 @@ const file_nokku_v1_user_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x122\n" +
-	"\x15enable_email_recovery\x18\b \x01(\bR\x13enableEmailRecoveryB\x93\x01\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x124\n" +
+	"\x16disable_password_reset\x18\b \x01(\bR\x14disablePasswordResetB\x93\x01\n" +
 	"\fcom.nokku.v1B\tUserProtoP\x01Z7github.com/nokku-sh/nokku/internal/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

@@ -24,10 +24,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// SSOProvider is the workspace's single SSO binding. The method selects the
-// protocol and decides which SSOConfig fields are meaningful (OIDC: issuer,
-// client id, scopes; SAML: metadata URL). An unset config means the slot is
-// empty; saving a config with the other method replaces it.
 type SSOProvider struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId          *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
@@ -136,8 +132,6 @@ func (x *SSOProvider) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-// SSOConfig is the protocol-agnostic configuration block. The provider's
-// method decides which fields are required.
 type SSOConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	IssuerUrl     *string                `protobuf:"bytes,1,opt,name=issuer_url,json=issuerUrl" json:"issuer_url,omitempty"`
@@ -302,12 +296,10 @@ type UpdateSSOProviderRequest struct {
 	EnforceSso           *bool                  `protobuf:"varint,4,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
 	AllowJitProvisioning *bool                  `protobuf:"varint,5,opt,name=allow_jit_provisioning,json=allowJitProvisioning" json:"allow_jit_provisioning,omitempty"`
 	IsActive             *bool                  `protobuf:"varint,6,opt,name=is_active,json=isActive" json:"is_active,omitempty"`
-	// OIDC only: empty keeps the stored secret, so configuration can be
-	// updated without resubmitting it.
-	ClientSecret  *string    `protobuf:"bytes,7,opt,name=client_secret,json=clientSecret" json:"client_secret,omitempty"`
-	Config        *SSOConfig `protobuf:"bytes,8,opt,name=config" json:"config,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ClientSecret         *string                `protobuf:"bytes,7,opt,name=client_secret,json=clientSecret" json:"client_secret,omitempty"`
+	Config               *SSOConfig             `protobuf:"bytes,8,opt,name=config" json:"config,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *UpdateSSOProviderRequest) Reset() {
