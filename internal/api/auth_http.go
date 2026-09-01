@@ -24,6 +24,10 @@ const (
 	sessionTTL        = 24 * time.Hour
 )
 
+type authAPI struct {
+	cfg *config.Config
+}
+
 // registerAuthRoutes mounts the /auth/* surface on mux.
 func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	svc := cfg.IAM
@@ -96,16 +100,6 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.Handle("GET /auth/account/sessions", account.ThenFunc(a.listSessions))
 	mux.Handle("POST /auth/account/sessions/remove", account.ThenFunc(a.removeSession))
 	mux.Handle("POST /auth/account/delete", account.ThenFunc(a.deleteAccount))
-}
-
-type authAPI struct {
-	cfg *config.Config
-}
-
-// principal returns the signed-in user principal of the request.
-func (a *authAPI) principal(r *http.Request) iam.Principal {
-	p, _ := iam.PrincipalFromContext(r.Context())
-	return p
 }
 
 // --- Flows ------------------------------------------------------------------

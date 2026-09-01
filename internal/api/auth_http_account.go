@@ -30,6 +30,12 @@ type accountSession struct {
 	LastSeenAt *time.Time `json:"lastSeenAt,omitempty"`
 }
 
+// principal returns the signed-in user principal of the request.
+func (a *authAPI) principal(r *http.Request) iam.Principal {
+	p, _ := iam.PrincipalFromContext(r.Context())
+	return p
+}
+
 func (a *authAPI) getAccount(w http.ResponseWriter, r *http.Request) {
 	u, err := a.cfg.IAM.GetUser(r.Context(), a.principal(r).ID)
 	if err != nil {
