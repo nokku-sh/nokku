@@ -2,11 +2,16 @@ package api
 
 import (
 	"context"
+	"slices"
+	"strings"
+
+	"connectrpc.com/connect"
 
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 type TargetService struct {
@@ -247,6 +252,154 @@ func (s *TargetService) GetSubjectAccess(
 		CertificateAuthorities: cas,
 		Daemons:                daemons,
 	}, nil
+}
+
+func (s *TargetService) GetMyAccess(
+	ctx context.Context,
+	_ *nokkuv1.GetMyAccessRequest,
+) (*nokkuv1.GetMyAccessResponse, error) {
+	p, ok := iam.PrincipalFromContext(ctx)
+	if !ok || p.ID == "" {
+		return nil, NewError(connect.CodeUnauthenticated, "not authenticated")
+	}
+	//nolint:exhaustive // daemons (and any future kind) are intentionally excluded
+	switch p.Kind {
+	case iam.KindUser, iam.KindCLI, iam.KindWebDevice, iam.KindServiceAccount:
+	default:
+		return nil, NewError(
+			connect.CodePermissionDenied,
+			"unsupported principal kind; daemons sync through SyncDaemon",
+		)
+	}
+
+	resp := &nokkuv1.GetMyAccessResponse{}
+	err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
+		// The workspace set is the source of truth for "what can this actor
+		// see at all"; every query below filters against it.
+		wsIDs, err := q.GetActorWorkspaceIDs(ctx, p.ID)
+		if err != nil {
+			return err
+		}
+		if len(wsIDs) == 0 {
+			return nil
+		}
+
+		//nolint:exhaustive // daemon was rejected above; the remaining kinds are user-like or service account
+		switch p.Kind {
+		case iam.KindUser, iam.KindCLI, iam.KindWebDevice:
+			u, err := s.cfg.IAM.GetUser(ctx, p.ID)
+			if err != nil {
+				return err
+			}
+			resp.Subject = &nokkuv1.GetMyAccessResponse_User{User: db.UserToProto(u)}
+		case iam.KindServiceAccount:
+			sa, err := q.GetServiceAccount(ctx, p.ID)
+			if err != nil {
+				return err
+			}
+			resp.Subject = &nokkuv1.GetMyAccessResponse_ServiceAccount{ServiceAccount: sa.ToProto()}
+		}
+
+		wsRows, err := q.GetWorkspacesByIDs(ctx, wsIDs)
+		if err != nil {
+			return err
+		}
+		wsNames := make(map[string]string, len(wsRows))
+		for _, w := range wsRows {
+			wsNames[w.ID] = w.Name
+		}
+
+		rows, err := q.GetSubjectTargetsByWorkspaces(ctx, &db.GetSubjectTargetsByWorkspacesParams{
+			WorkspaceIds: wsIDs,
+			SubjectID:    p.ID,
+		})
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return nil
+		}
+
+		targetIDs := make([]string, 0, len(rows))
+		caIDs := make(map[string]struct{})
+		targetsByWS := make(map[string][]*nokkuv1.Target, len(wsRows))
+		for _, r := range rows {
+			targetIDs = append(targetIDs, r.ID)
+			if r.CaID != nil {
+				caIDs[*r.CaID] = struct{}{}
+			}
+			target := r.ToProto()
+			targetsByWS[r.WorkspaceID] = append(targetsByWS[r.WorkspaceID], target)
+		}
+
+		principalsByTarget := make(map[string][]*nokkuv1.Principal)
+		pRows, err := q.GetPrincipalsByTargetIDs(ctx, targetIDs)
+		if err != nil {
+			return err
+		}
+		for _, pr := range pRows {
+			principalsByTarget[pr.TargetID] = append(principalsByTarget[pr.TargetID], pr.ToProto())
+		}
+		for wsID, targets := range targetsByWS {
+			for _, t := range targets {
+				t.Principals = principalsByTarget[t.GetId()]
+			}
+			// Row order from the query is (workspace_id, name); keep it so
+			// consumers get a deterministic snapshot.
+			slices.SortStableFunc(targets, func(a, b *nokkuv1.Target) int {
+				return strings.Compare(a.GetName(), b.GetName())
+			})
+			targetsByWS[wsID] = targets
+		}
+
+		caArgs := make([]string, 0, len(caIDs))
+		for id := range caIDs {
+			caArgs = append(caArgs, id)
+		}
+		casByWS := make(map[string][]*nokkuv1.CertificateAuthority)
+		if len(caArgs) > 0 {
+			caRows, err := q.GetCAsByIDs(ctx, caArgs)
+			if err != nil {
+				return err
+			}
+			for _, ca := range caRows {
+				// Only SSH authorities belong in an access snapshot; X.509
+				// CAs are listed separately and must not leak into SSH
+				// trust stores.
+				if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH {
+					continue
+				}
+				casByWS[ca.WorkspaceID] = append(
+					casByWS[ca.WorkspaceID],
+					&nokkuv1.CertificateAuthority{
+						Id:             &ca.ID,
+						WorkspaceId:    &ca.WorkspaceID,
+						Name:           &ca.Name,
+						PublicKey:      &ca.PublicKey,
+						IsDefault:      &ca.IsDefault,
+						AuthorityType:  &ca.AuthorityType,
+						Certificate:    &ca.Certificate,
+						UserDefaultTtl: db.SafeDuration(&ca.UserDefaultTtl),
+						UserMaxTtl:     db.SafeDuration(&ca.UserMaxTtl),
+					},
+				)
+			}
+		}
+
+		for _, w := range wsRows {
+			resp.Workspaces = append(resp.Workspaces, &nokkuv1.WorkspaceAccess{
+				WorkspaceId:            &w.ID,
+				WorkspaceName:          &w.Name,
+				Targets:                targetsByWS[w.ID],
+				CertificateAuthorities: casByWS[w.ID],
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, DBError(err)
+	}
+	return resp, nil
 }
 
 func (s *TargetService) GetTargetFilters(
