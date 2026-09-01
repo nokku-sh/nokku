@@ -92,7 +92,7 @@ const publicPaths = [
 	'/recovery',
 	'/reset',
 	'/device',
-	'/auth-error'
+	'/sso-error'
 ];
 
 // The session cookie is HttpOnly, so only the backend can clear it. On an

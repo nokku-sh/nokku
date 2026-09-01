@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { afterNavigate, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 	import * as Alert from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -71,10 +72,11 @@
 	const code = page.url.searchParams.get('error') ?? 'unknown';
 	const info = $derived(codes[code] ?? codes.unknown);
 
-	$effect(() => {
+	afterNavigate(() => {
 		// Strip the error param once shown: a refresh shouldn't re-show the
-		// error, and back-navigation shouldn't land on it again.
-		history.replaceState(null, '', '/auth-error');
+		// error, and back-navigation shouldn't land on it again. Uses the
+		// SvelteKit-aware helper so the router state stays in sync.
+		replaceState('/sso-error', {});
 	});
 </script>
 
