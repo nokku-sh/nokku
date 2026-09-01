@@ -45,11 +45,19 @@ func NewAuthNInterceptor(cfg *config.Config) connect.Interceptor {
 				return next(ctx, req)
 			}
 
-			p, err := authenticateToken(ctx, cfg, req.Header(), bearerToken(req.Header()))
+			token, isBearer := sessionToken(req.Header())
+			p, err := authenticateToken(ctx, cfg, token)
+			if err == nil && isBearer && p.Kind == iam.KindWebDevice {
+				// The remembered-device cookie is a device handle, not an
+				// API credential: it only ever rides the cookie path, so a
+				// bearer presentation means a leaked cookie being replayed.
+				// Accepting it would turn a 24-hour session leak into a
+				// 180-day one.
+				err = errors.New("device credentials are not API tokens")
+			}
 			if err != nil {
 				return nil, connect.NewError(connect.CodeUnauthenticated, err)
 			}
-
 			// Machine principals carry their workspace in the credential;
 			// user principals resolve it from the request.
 			workspace := p.WorkspaceID
@@ -70,7 +78,6 @@ func NewAuthNInterceptor(cfg *config.Config) connect.Interceptor {
 func authenticateToken(
 	ctx context.Context,
 	cfg *config.Config,
-	_ http.Header,
 	token string,
 ) (iam.Principal, error) {
 	if token == "" {
@@ -116,17 +123,19 @@ func authenticateServiceAccount(
 	}, nil
 }
 
-func bearerToken(header http.Header) string {
+// sessionToken extracts the request credential and reports whether it came
+// from the Authorization header (as opposed to the session cookie).
+func sessionToken(header http.Header) (token string, isBearer bool) {
 	const prefix = "Bearer "
 	if h := header.Get("Authorization"); strings.HasPrefix(h, prefix) {
-		return strings.TrimPrefix(h, prefix)
+		return strings.TrimPrefix(h, prefix), true
 	}
 	// The session cookie doubles as the browser credential for connect
 	// calls made with credentials: include.
 	if c, err := (&http.Request{Header: header}).Cookie(iam.SessionCookieName); err == nil {
-		return c.Value
+		return c.Value, false
 	}
-	return ""
+	return "", false
 }
 
 // NewHTTPAuth returns middleware that authenticates web requests via iam
