@@ -3,6 +3,7 @@ package iam
 import "testing"
 
 func TestNormalizeBackupCode(t *testing.T) {
+	//nolint:gocritic // we're testing here
 	cases := map[string]string{
 		"ABCD2345EFGH6789":      "ABCD2345EFGH6789", // bare, as generated
 		"abcd2345efgh6789":      "ABCD2345EFGH6789", // lowercase retyping
