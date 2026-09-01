@@ -91,6 +91,114 @@ func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, e
 	return &i, err
 }
 
+const getSubjectTargetsByWorkspaces = `-- name: GetSubjectTargetsByWorkspaces :many
+SELECT DISTINCT
+  t.id, t.workspace_id, t.ca_id, t.daemon_id, t.name, t.description, t.endpoints, t.tags, t.metadata, t.created_at, t.updated_at
+FROM
+  targets t
+WHERE
+  t.workspace_id = ANY ($1::UUID[])
+  AND (
+    t.daemon_id = $2::UUID
+    OR EXISTS (
+      SELECT
+        1
+      FROM
+        principals p
+      WHERE
+        p.target_id = t.id
+        AND (
+          -- Direct user grant
+          EXISTS (
+            SELECT
+              1
+            FROM
+              principal_users pu
+            WHERE
+              pu.principal_id = p.id
+              AND pu.user_id = $2::UUID
+          )
+          -- Subject is a team with a direct grant
+          OR EXISTS (
+            SELECT
+              1
+            FROM
+              principal_teams pt
+            WHERE
+              pt.principal_id = p.id
+              AND pt.team_id = $2::UUID
+          )
+          -- Subject is a service account with a direct grant
+          OR EXISTS (
+            SELECT
+              1
+            FROM
+              principal_service_accounts psa
+            WHERE
+              psa.principal_id = p.id
+              AND psa.service_account_id = $2::UUID
+          )
+          -- Subject is a user who belongs to a team granted access
+          OR EXISTS (
+            SELECT
+              1
+            FROM
+              principal_teams granted_team
+              JOIN team_members tm ON tm.team_id = granted_team.team_id
+            WHERE
+              granted_team.principal_id = p.id
+              AND tm.user_id = $2::UUID
+          )
+        )
+    )
+  )
+ORDER BY
+  t.workspace_id,
+  t.name
+`
+
+type GetSubjectTargetsByWorkspacesParams struct {
+	WorkspaceIds []string `json:"workspaceIds"`
+	SubjectID    string   `json:"subjectId"`
+}
+
+// Returns every target a subject can reach within an explicit workspace set.
+// Grant logic is identical to GetTargetsBySubject (direct user grants, team
+// grants, service-account grants, and team membership for users); the
+// workspace set constrains the result so a caller can never read beyond its
+// current memberships, even if a stale grant lingers elsewhere.
+func (q *Queries) GetSubjectTargetsByWorkspaces(ctx context.Context, arg *GetSubjectTargetsByWorkspacesParams) ([]*Target, error) {
+	rows, err := q.db.Query(ctx, getSubjectTargetsByWorkspaces, arg.WorkspaceIds, arg.SubjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Target
+	for rows.Next() {
+		var i Target
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.CaID,
+			&i.DaemonID,
+			&i.Name,
+			&i.Description,
+			&i.Endpoints,
+			&i.Tags,
+			&i.Metadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTarget = `-- name: GetTarget :one
 SELECT
   id, workspace_id, ca_id, daemon_id, name, description, endpoints, tags, metadata, created_at, updated_at

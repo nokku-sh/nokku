@@ -94,6 +94,12 @@ type Querier interface {
 	GetServiceAccountByTokenHash(ctx context.Context, tokenHash *crypto.HashedToken) (*ServiceAccount, error)
 	GetServiceAccountWorkspaceID(ctx context.Context, serviceAccountID string) (string, error)
 	GetSession(ctx context.Context, tokenHash crypto.HashedToken) (*Session, error)
+	// Returns every target a subject can reach within an explicit workspace set.
+	// Grant logic is identical to GetTargetsBySubject (direct user grants, team
+	// grants, service-account grants, and team membership for users); the
+	// workspace set constrains the result so a caller can never read beyond its
+	// current memberships, even if a stale grant lingers elsewhere.
+	GetSubjectTargetsByWorkspaces(ctx context.Context, arg *GetSubjectTargetsByWorkspacesParams) ([]*Target, error)
 	GetSubscription(ctx context.Context, workspaceID string) (*WorkspaceSubscription, error)
 	GetTarget(ctx context.Context, targetID string) (*Target, error)
 	GetTargetByDaemon(ctx context.Context, daemonID *string) (*Target, error)
@@ -113,6 +119,7 @@ type Querier interface {
 	GetWorkspacePrincipals(ctx context.Context, workspaceID string) ([]string, error)
 	GetWorkspaceStats(ctx context.Context, workspaceID string) (*GetWorkspaceStatsRow, error)
 	GetWorkspaceTags(ctx context.Context, workspaceID string) ([]string, error)
+	GetWorkspacesByIDs(ctx context.Context, workspaceIds []string) ([]*Workspace, error)
 	GetWorkspacesByOwner(ctx context.Context, userID string) ([]string, error)
 	InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams) error
 	InsertKeyset(ctx context.Context, data []byte) (int64, error)
