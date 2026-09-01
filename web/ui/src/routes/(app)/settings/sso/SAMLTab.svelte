@@ -22,11 +22,7 @@
 	});
 
 	const provider = $derived(sso.getProvider());
-	// The provider is configured when the stored method is SAML; the config
-	// block carries whichever protocol's fields are set.
 	const configured = $derived(provider.data?.method === 'saml');
-	// Providers share a single slot per workspace: saving here replaces an
-	// existing OIDC configuration.
 	const replacesOIDC = $derived(provider.data?.method === 'oidc');
 	$effect(() => {
 		const p = provider.data;
@@ -54,9 +50,10 @@
 			}
 		});
 	}
+
 	const callbackURL = window.location.origin + '/saml/acs';
-	const metadataURL = $derived(window.location.origin + '/saml/metadata/' + workspaceID.current);
-	const certURL = $derived('/saml/certificate/' + workspaceID.current);
+	const metadataURL = window.location.origin + '/saml/metadata';
+	const certURL = '/saml/certificate';
 </script>
 
 <Card.Root>
@@ -193,7 +190,13 @@
 				</Field.Field>
 
 				<Field.Field>
-					<Field.Label for="spMetadata">Service Provider Metadata URL</Field.Label>
+					<Field.Label for="spMetadata" class="flex items-center justify-between">
+						Service Provider Metadata URL
+						<Button variant="outline" size="sm" onclick={() => (window.location.href = certURL)}>
+							<Download size={14} />
+							Download Signing Certificate (PEM)
+						</Button>
+					</Field.Label>
 					<Field.Content>
 						<InputGroupVariants variant="copy-input" value={metadataURL} readonly />
 						<Field.Description class="flex items-center justify-between gap-2">
@@ -201,10 +204,6 @@
 								<Info size={12} />
 								<span>Use this value as the Client ID (entity ID) in your identity provider</span>
 							</span>
-							<Button variant="outline" size="sm" onclick={() => (window.location.href = certURL)}>
-								<Download size={14} />
-								Download Signing Certificate (PEM)
-							</Button>
 						</Field.Description>
 					</Field.Content>
 				</Field.Field>
