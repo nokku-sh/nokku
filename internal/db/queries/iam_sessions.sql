@@ -1,6 +1,6 @@
 -- name: CreateSession :exec
 INSERT INTO
-  sessions (token_hash, subject_id, kind, method, workspace_id, binding, label, expires_at)
+  sessions (token_hash, subject_id, kind, method, workspace_id, binding, label, expires_at, last_seen_at)
 VALUES
   (
     @token_hash,
@@ -10,7 +10,8 @@ VALUES
     sqlc.narg('workspace_id'),
     @binding,
     @label,
-    sqlc.narg('expires_at')
+    sqlc.narg('expires_at'),
+    sqlc.narg('last_seen_at')
   );
 
 -- name: GetSession :one

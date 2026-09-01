@@ -14,7 +14,7 @@ import (
 
 const createSession = `-- name: CreateSession :exec
 INSERT INTO
-  sessions (token_hash, subject_id, kind, method, workspace_id, binding, label, expires_at)
+  sessions (token_hash, subject_id, kind, method, workspace_id, binding, label, expires_at, last_seen_at)
 VALUES
   (
     $1,
@@ -24,7 +24,8 @@ VALUES
     $5,
     $6,
     $7,
-    $8
+    $8,
+    $9
   )
 `
 
@@ -37,6 +38,7 @@ type CreateSessionParams struct {
 	Binding     string             `json:"binding"`
 	Label       string             `json:"label"`
 	ExpiresAt   *time.Time         `json:"expiresAt"`
+	LastSeenAt  *time.Time         `json:"lastSeenAt"`
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg *CreateSessionParams) error {
@@ -49,6 +51,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg *CreateSessionParams) e
 		arg.Binding,
 		arg.Label,
 		arg.ExpiresAt,
+		arg.LastSeenAt,
 	)
 	return err
 }

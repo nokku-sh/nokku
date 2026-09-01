@@ -95,6 +95,7 @@ func (sm *SessionManager) Issue(ctx context.Context, p SessionParams) (db.Sessio
 		Binding:     row.Binding,
 		Label:       row.Label,
 		ExpiresAt:   row.ExpiresAt,
+		LastSeenAt:  row.LastSeenAt,
 	}); err != nil {
 		return db.Session{}, "", err
 	}
@@ -151,6 +152,18 @@ func (sm *SessionManager) Verify(ctx context.Context, token string) (db.Session,
 		}
 	}
 	return *s, nil
+}
+
+// Touch refreshes a session's last-seen time unconditionally. Verify's
+// refresh is throttled by the idle timeout, which may be zero; this one
+// backs surfaces that want an accurate "last active" regardless, such as
+// the remembered-device handshake on login.
+func (sm *SessionManager) Touch(ctx context.Context, tokenHash SessionHash) error {
+	now := sm.svc.now()
+	return sm.svc.q.TouchSession(
+		ctx,
+		&db.TouchSessionParams{TokenHash: crypto.HashedToken(tokenHash), LastSeenAt: &now},
+	)
 }
 
 // List returns every live session of the subject, newest activity first. It
