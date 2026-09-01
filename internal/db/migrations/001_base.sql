@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS credentials (
   id TEXT PRIMARY KEY, -- method-specific id: webauthn credential id or uuidv7
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  type TEXT NOT NULL, -- password, passkey, oauth, oidc, saml, backup_code
+  type TEXT NOT NULL, -- password, passkey, oauth2, oidc, saml, backup_code
   provider TEXT NOT NULL DEFAULT '', -- github, google, or the sso provider id
   subject TEXT NOT NULL DEFAULT '', -- external identity subject or code hash
   data BYTEA NOT NULL,
