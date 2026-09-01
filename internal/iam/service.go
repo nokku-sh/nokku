@@ -179,12 +179,17 @@ func New(d Deps) (*Service, error) {
 	if svc.cache != nil {
 		svc.OIDC = newOIDCFlow(svc)
 		svc.OAuth2 = newOAuth2Flow(svc)
-		if saml, err := newSAMLFlow(svc, SAMLConfig{
+		// Unlike the flows above, the SAML flow's error must not be
+		// swallowed: a nil receiver would panic on the first /saml/*
+		// request, so construction failure fails startup like the rest.
+		saml, err := newSAMLFlow(svc, SAMLConfig{
 			AcsURL:     d.BaseURL + "/saml/acs",
 			SPEntityID: d.BaseURL + "/saml/metadata",
-		}); err == nil {
-			svc.SAML = saml
+		})
+		if err != nil {
+			return nil, err
 		}
+		svc.SAML = saml
 	}
 	if svc.cache != nil {
 		passkey, err := newPasskeyFlow(
