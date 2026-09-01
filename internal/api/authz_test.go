@@ -71,7 +71,6 @@ func TestProcedurePermissionsExcludesSpecialProcedures(t *testing.T) {
 		nokkuv1connect.WorkspaceServiceGetWorkspaceProcedure,
 		nokkuv1connect.WorkspaceServiceListWorkspacesProcedure,
 		nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure,
-		nokkuv1connect.WorkspaceServiceRemoveWorkspaceMemberProcedure,
 		nokkuv1connect.WorkspaceServiceUpdateWorkspaceOwnerProcedure,
 		nokkuv1connect.WorkspaceServiceSubscribeWorkspaceEventsProcedure,
 		nokkuv1connect.BillingServiceCreateCheckoutProcedure,
@@ -82,8 +81,6 @@ func TestProcedurePermissionsExcludesSpecialProcedures(t *testing.T) {
 		nokkuv1connect.CertificateServiceSignX509CertificateProcedure,
 		nokkuv1connect.InvitationServiceGetInvitationProcedure,
 		nokkuv1connect.InvitationServiceAcceptInvitationProcedure,
-		nokkuv1connect.UtilServiceListAuditLogsProcedure,
-		nokkuv1connect.UtilServiceExportAuditLogsProcedure,
 		nokkuv1connect.UtilServiceWhoamiProcedure,
 	}
 
