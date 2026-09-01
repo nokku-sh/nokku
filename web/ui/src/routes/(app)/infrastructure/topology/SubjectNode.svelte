@@ -6,7 +6,7 @@
 	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
 	import { type ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
 	import type { Team } from '$lib/gen/nokku/v1/team_pb';
-	import type { User } from '$lib/gen/nokku/v1/user_pb';
+	import type { User } from '$lib/gen/nokku/v1/account_pb';
 	import { formatTs } from '$lib/utils';
 	import {
 		Users,

@@ -1,7 +1,7 @@
 import { Code, ConnectError, createClient } from '@connectrpc/connect';
 import { AccountService } from '$lib/gen/nokku/v1/account_pb';
 import type { AccountCredential, AccountSession } from '$lib/gen/nokku/v1/account_pb';
-import type { User } from '$lib/gen/nokku/v1/user_pb';
+import type { User } from '$lib/gen/nokku/v1/account_pb';
 import { authTransport, handleSessionExpired } from './client';
 
 // The account surface is the Connect AccountService: profile, password,

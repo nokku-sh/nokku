@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { CopyButton } from '$lib/components/ui/copy-button';
 	import UserAvatar from '$lib/components/utils/UserAvatar.svelte';
-	import type { User } from '$lib/gen/nokku/v1/user_pb';
+	import type { User } from '$lib/gen/nokku/v1/account_pb';
 	import type { WorkspaceMember } from '$lib/gen/nokku/v1/workspace_pb';
 
 	type Props = {
