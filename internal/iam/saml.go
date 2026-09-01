@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"encoding/xml"
 	"errors"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -38,6 +39,8 @@ type samlState struct {
 	RequestID   string `json:"request_id"`
 	ReturnTo    string `json:"return_to,omitempty"`
 	LinkUserID  string `json:"link_user_id,omitempty"`
+	// FlowCookie is the browser-scoped flow binding value (login CSRF).
+	FlowCookie string `json:"flow_cookie,omitempty"`
 }
 
 // samlFlow serves the SAML SP-initiated flow.
@@ -128,7 +131,11 @@ func (h *samlFlow) Login(w http.ResponseWriter, r *http.Request) {
 		ProviderID:  providerID,
 		RequestID:   req.ID,
 		ReturnTo:    SafeReturnTo(r.URL.Query().Get("return_to")),
-		LinkUserID:  SubjectFromContext(ctx),
+		LinkUserID:  linkUserIDFor(ctx, r),
+
+		// The IdP posts the assertion back cross-site, so the binding cookie
+		// must be a None cookie: only possible over HTTPS.
+		FlowCookie: startFlowBinding(w, strings.HasPrefix(h.svc.baseURL, "https://")),
 	}
 	if err := h.state.Put(ctx, relayState, st); err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
@@ -158,6 +165,11 @@ func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		Fail(w, r, h.errRedirect, "invalid or expired login")
 		return
 	}
+	// The callback must arrive in the browser that started the flow.
+	if !checkFlowBinding(r, st.FlowCookie) {
+		Fail(w, r, h.errRedirect, "invalid or expired login")
+		return
+	}
 
 	cfg, err := h.svc.GetSSOProvider(ctx, st.ProviderID)
 	if err != nil {
@@ -167,6 +179,13 @@ func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 
 	ed, err := h.idpMetadata(ctx, st.ProviderID, cfg.SAML)
 	if err != nil {
+		slog.Warn(
+			"saml callback: provider metadata invalid",
+			"error",
+			err,
+			"provider",
+			st.ProviderID,
+		)
 		Fail(w, r, h.errRedirect, "provider metadata invalid")
 		return
 	}
@@ -174,6 +193,13 @@ func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	sp := h.serviceProvider(cfg.SAML, ed)
 	assertion, err := sp.ParseResponse(r, []string{st.RequestID})
 	if err != nil {
+		slog.Warn(
+			"saml callback: response verification failed",
+			"error",
+			err,
+			"provider",
+			st.ProviderID,
+		)
 		Fail(w, r, h.errRedirect, "response verification failed")
 		return
 	}
@@ -181,6 +207,7 @@ func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	opts := h.identity(cfg.SAML, assertion)
 	opts.ProviderID = st.ProviderID
 	if opts.Subject == "" {
+		slog.Warn("saml callback: assertion has no subject", "provider", st.ProviderID)
 		Fail(w, r, h.errRedirect, "assertion has no subject")
 		return
 	}

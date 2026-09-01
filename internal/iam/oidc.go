@@ -72,6 +72,9 @@ type flowAuthorizeState struct {
 	PKCEVerifier string `json:"pkce_verifier,omitempty"`
 	ReturnTo     string `json:"return_to,omitempty"`
 	LinkUserID   string `json:"link_user_id,omitempty"`
+	// FlowCookie is the value of the browser-scoped flow cookie; the
+	// callback must present the same value (login CSRF binding).
+	FlowCookie string `json:"flow_cookie,omitempty"`
 }
 
 // flowAuthorize stores single-use flowAuthorizeState values under a per-flow
@@ -158,7 +161,7 @@ func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
 		WorkspaceID: workspaceID,
 		ProviderID:  providerID,
 		ReturnTo:    SafeReturnTo(r.URL.Query().Get("return_to")),
-		LinkUserID:  SubjectFromContext(ctx),
+		LinkUserID:  linkUserIDFor(ctx, r),
 	}
 
 	provider, err := h.discover(ctx, cfg.OIDC.IssuerURL)
@@ -166,6 +169,7 @@ func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
 		Fail(w, r, h.errRedirect, "provider discovery failed")
 		return
 	}
+	st.FlowCookie = startFlowBinding(w, false)
 	nonce, err := crypto.RandomString(32)
 	if err != nil {
 		Fail(w, r, h.errRedirect, "provider discovery failed")
@@ -206,6 +210,11 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 
 	st, err := h.authorize.Take(ctx, q.Get("state"))
 	if err != nil {
+		Fail(w, r, h.errRedirect, "invalid or expired login")
+		return
+	}
+	// The callback must arrive in the browser that started the flow.
+	if !checkFlowBinding(r, st.FlowCookie) {
 		Fail(w, r, h.errRedirect, "invalid or expired login")
 		return
 	}

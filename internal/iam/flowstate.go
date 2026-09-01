@@ -25,6 +25,80 @@ type Cache = cache.Cache
 // flowStateTTL bounds how long an in-flight SSO login state stays valid.
 const flowStateTTL = 10 * time.Minute
 
+// flowCookieName identifies the browser that started an SSO flow. The
+// callback is only honored in that browser, which blocks login CSRF: an
+// attacker completing the IdP leg themselves cannot donate the resulting
+// callback URL to a signed-in victim to swap their session.
+const flowCookieName = "nokku_flow"
+
+// startFlowBinding sets the flow cookie and returns its value for the flow
+// state to carry. For SAML the callback arrives as a cross-site IdP form
+// POST, which SameSite=Lax cookies do not accompany, so those flows need a
+// None cookie (Secure, and therefore only when the app is served over
+// HTTPS); pass none=true there. A crypto failure returns "" and the
+// binding degrades to allowing the callback: availability over
+// strictness on a defense-in-depth control.
+func startFlowBinding(w http.ResponseWriter, none bool) string {
+	v, err := crypto.RandomString(32)
+	if err != nil {
+		return ""
+	}
+	c := &http.Cookie{
+		Name:     flowCookieName,
+		Value:    v,
+		Path:     "/",
+		MaxAge:   int(flowStateTTL.Seconds()),
+		HttpOnly: true,
+	}
+	if none {
+		c.SameSite = http.SameSiteNoneMode
+		c.Secure = true
+	} else {
+		c.SameSite = http.SameSiteLaxMode
+	}
+	http.SetCookie(w, c)
+	return v
+}
+
+// checkFlowBinding reports whether the callback browser matches the one the
+// flow was started in. An empty recorded value (binding was not set) allows.
+func checkFlowBinding(r *http.Request, expected string) bool {
+	if expected == "" {
+		return true
+	}
+	c, err := r.Cookie(flowCookieName)
+	return err == nil && c.Value == expected
+}
+
+// endFlowBinding clears the flow cookie after the flow resolved.
+func endFlowBinding() *http.Cookie {
+	return &http.Cookie{
+		Name:     flowCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	}
+}
+
+// crossSiteNavigation reports whether the browser marked the request as a
+// cross-site navigation. SSO login GETs attach the signed-in user for
+// account linking, and top-level cross-site navigations carry the
+// SameSite=Lax session cookie past the CSRF guard (which inspects POSTs
+// only), so linking must not start from a link on another site.
+func crossSiteNavigation(r *http.Request) bool {
+	return r.Header.Get("Sec-Fetch-Site") == "cross-site"
+}
+
+// linkUserIDFor returns the signed-in user to link the SSO identity to, or
+// "" when the login started as a cross-site navigation (no linking).
+func linkUserIDFor(ctx context.Context, r *http.Request) string {
+	if crossSiteNavigation(r) {
+		return ""
+	}
+	return SubjectFromContext(ctx)
+}
+
 // providerHTTPTimeout bounds every outbound call to an identity provider.
 const providerHTTPTimeout = 15 * time.Second
 

@@ -54,9 +54,10 @@ func (h *oauth2Flow) Login(w http.ResponseWriter, r *http.Request) {
 		WorkspaceID: workspaceID,
 		ProviderID:  providerID,
 		ReturnTo:    SafeReturnTo(r.URL.Query().Get("return_to")),
-		LinkUserID:  SubjectFromContext(ctx),
+		LinkUserID:  linkUserIDFor(ctx, r),
 	}
 	st.PKCEVerifier = oauth2.GenerateVerifier()
+	st.FlowCookie = startFlowBinding(w, false)
 
 	stateValue, err := h.authorize.Put(ctx, st)
 	if err != nil {
@@ -86,6 +87,11 @@ func (h *oauth2Flow) Callback(w http.ResponseWriter, r *http.Request) {
 
 	st, err := h.authorize.Take(ctx, q.Get("state"))
 	if err != nil {
+		Fail(w, r, h.errRedirect, "invalid or expired login")
+		return
+	}
+	// The callback must arrive in the browser that started the flow.
+	if !checkFlowBinding(r, st.FlowCookie) {
 		Fail(w, r, h.errRedirect, "invalid or expired login")
 		return
 	}
