@@ -14,7 +14,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { UserSchema } from '$lib/gen/nokku/v1/user_pb';
+	import { UserSchema } from '$lib/gen/nokku/v1/account_pb';
 	import { create } from '@bufbuild/protobuf';
 	import {
 		BadgeCheck,

@@ -6,7 +6,7 @@ import { queryClient } from './client';
 import { account, type AccountCredential } from './account';
 import { useQuery } from '$lib/query';
 import { UtilService } from '$lib/gen/nokku/v1/util_pb';
-import type { User } from '$lib/gen/nokku/v1/user_pb';
+import type { User } from '$lib/gen/nokku/v1/account_pb';
 import { pageIndex, pageSize } from '$lib/store.svelte';
 
 // The account reads and mutations ride the proto-backed AccountService. The

@@ -24,6 +24,106 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type User struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Id                   *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name                 *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Email                *string                `protobuf:"bytes,3,opt,name=email" json:"email,omitempty"`
+	EmailVerified        *bool                  `protobuf:"varint,4,opt,name=email_verified,json=emailVerified" json:"email_verified,omitempty"`
+	Picture              *string                `protobuf:"bytes,5,opt,name=picture" json:"picture,omitempty"`
+	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	DisablePasswordReset *bool                  `protobuf:"varint,8,opt,name=disable_password_reset,json=disablePasswordReset" json:"disable_password_reset,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *User) Reset() {
+	*x = User{}
+	mi := &file_nokku_v1_account_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *User) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*User) ProtoMessage() {}
+
+func (x *User) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_account_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use User.ProtoReflect.Descriptor instead.
+func (*User) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *User) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
+	}
+	return ""
+}
+
+func (x *User) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
+func (x *User) GetEmail() string {
+	if x != nil && x.Email != nil {
+		return *x.Email
+	}
+	return ""
+}
+
+func (x *User) GetEmailVerified() bool {
+	if x != nil && x.EmailVerified != nil {
+		return *x.EmailVerified
+	}
+	return false
+}
+
+func (x *User) GetPicture() string {
+	if x != nil && x.Picture != nil {
+		return *x.Picture
+	}
+	return ""
+}
+
+func (x *User) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *User) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *User) GetDisablePasswordReset() bool {
+	if x != nil && x.DisablePasswordReset != nil {
+		return *x.DisablePasswordReset
+	}
+	return false
+}
+
 type AccountCredential struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
@@ -38,7 +138,7 @@ type AccountCredential struct {
 
 func (x *AccountCredential) Reset() {
 	*x = AccountCredential{}
-	mi := &file_nokku_v1_account_proto_msgTypes[0]
+	mi := &file_nokku_v1_account_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -50,7 +150,7 @@ func (x *AccountCredential) String() string {
 func (*AccountCredential) ProtoMessage() {}
 
 func (x *AccountCredential) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[0]
+	mi := &file_nokku_v1_account_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -63,7 +163,7 @@ func (x *AccountCredential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccountCredential.ProtoReflect.Descriptor instead.
 func (*AccountCredential) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{0}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *AccountCredential) GetId() string {
@@ -123,7 +223,7 @@ type AccountSession struct {
 
 func (x *AccountSession) Reset() {
 	*x = AccountSession{}
-	mi := &file_nokku_v1_account_proto_msgTypes[1]
+	mi := &file_nokku_v1_account_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -135,7 +235,7 @@ func (x *AccountSession) String() string {
 func (*AccountSession) ProtoMessage() {}
 
 func (x *AccountSession) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[1]
+	mi := &file_nokku_v1_account_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -148,7 +248,7 @@ func (x *AccountSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccountSession.ProtoReflect.Descriptor instead.
 func (*AccountSession) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{1}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *AccountSession) GetId() string {
@@ -208,7 +308,7 @@ type GetAccountRequest struct {
 
 func (x *GetAccountRequest) Reset() {
 	*x = GetAccountRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[2]
+	mi := &file_nokku_v1_account_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -220,7 +320,7 @@ func (x *GetAccountRequest) String() string {
 func (*GetAccountRequest) ProtoMessage() {}
 
 func (x *GetAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[2]
+	mi := &file_nokku_v1_account_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -233,7 +333,7 @@ func (x *GetAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAccountRequest.ProtoReflect.Descriptor instead.
 func (*GetAccountRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{2}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{3}
 }
 
 type GetAccountResponse struct {
@@ -245,7 +345,7 @@ type GetAccountResponse struct {
 
 func (x *GetAccountResponse) Reset() {
 	*x = GetAccountResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[3]
+	mi := &file_nokku_v1_account_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -257,7 +357,7 @@ func (x *GetAccountResponse) String() string {
 func (*GetAccountResponse) ProtoMessage() {}
 
 func (x *GetAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[3]
+	mi := &file_nokku_v1_account_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -270,7 +370,7 @@ func (x *GetAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAccountResponse.ProtoReflect.Descriptor instead.
 func (*GetAccountResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{3}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetAccountResponse) GetUser() *User {
@@ -291,7 +391,7 @@ type UpdateAccountRequest struct {
 
 func (x *UpdateAccountRequest) Reset() {
 	*x = UpdateAccountRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[4]
+	mi := &file_nokku_v1_account_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -303,7 +403,7 @@ func (x *UpdateAccountRequest) String() string {
 func (*UpdateAccountRequest) ProtoMessage() {}
 
 func (x *UpdateAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[4]
+	mi := &file_nokku_v1_account_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -316,7 +416,7 @@ func (x *UpdateAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAccountRequest.ProtoReflect.Descriptor instead.
 func (*UpdateAccountRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{4}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UpdateAccountRequest) GetName() string {
@@ -349,7 +449,7 @@ type UpdateAccountResponse struct {
 
 func (x *UpdateAccountResponse) Reset() {
 	*x = UpdateAccountResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[5]
+	mi := &file_nokku_v1_account_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -361,7 +461,7 @@ func (x *UpdateAccountResponse) String() string {
 func (*UpdateAccountResponse) ProtoMessage() {}
 
 func (x *UpdateAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[5]
+	mi := &file_nokku_v1_account_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -374,7 +474,7 @@ func (x *UpdateAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAccountResponse.ProtoReflect.Descriptor instead.
 func (*UpdateAccountResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{5}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdateAccountResponse) GetUser() *User {
@@ -394,7 +494,7 @@ type ChangePasswordRequest struct {
 
 func (x *ChangePasswordRequest) Reset() {
 	*x = ChangePasswordRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[6]
+	mi := &file_nokku_v1_account_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -406,7 +506,7 @@ func (x *ChangePasswordRequest) String() string {
 func (*ChangePasswordRequest) ProtoMessage() {}
 
 func (x *ChangePasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[6]
+	mi := &file_nokku_v1_account_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -419,7 +519,7 @@ func (x *ChangePasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangePasswordRequest.ProtoReflect.Descriptor instead.
 func (*ChangePasswordRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{6}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ChangePasswordRequest) GetCurrentPassword() string {
@@ -444,7 +544,7 @@ type ChangePasswordResponse struct {
 
 func (x *ChangePasswordResponse) Reset() {
 	*x = ChangePasswordResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[7]
+	mi := &file_nokku_v1_account_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -456,7 +556,7 @@ func (x *ChangePasswordResponse) String() string {
 func (*ChangePasswordResponse) ProtoMessage() {}
 
 func (x *ChangePasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[7]
+	mi := &file_nokku_v1_account_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -469,7 +569,7 @@ func (x *ChangePasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangePasswordResponse.ProtoReflect.Descriptor instead.
 func (*ChangePasswordResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{7}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{8}
 }
 
 type RemovePasswordRequest struct {
@@ -481,7 +581,7 @@ type RemovePasswordRequest struct {
 
 func (x *RemovePasswordRequest) Reset() {
 	*x = RemovePasswordRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[8]
+	mi := &file_nokku_v1_account_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -493,7 +593,7 @@ func (x *RemovePasswordRequest) String() string {
 func (*RemovePasswordRequest) ProtoMessage() {}
 
 func (x *RemovePasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[8]
+	mi := &file_nokku_v1_account_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -506,7 +606,7 @@ func (x *RemovePasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemovePasswordRequest.ProtoReflect.Descriptor instead.
 func (*RemovePasswordRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{8}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RemovePasswordRequest) GetCurrentPassword() string {
@@ -524,7 +624,7 @@ type RemovePasswordResponse struct {
 
 func (x *RemovePasswordResponse) Reset() {
 	*x = RemovePasswordResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[9]
+	mi := &file_nokku_v1_account_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -536,7 +636,7 @@ func (x *RemovePasswordResponse) String() string {
 func (*RemovePasswordResponse) ProtoMessage() {}
 
 func (x *RemovePasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[9]
+	mi := &file_nokku_v1_account_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -549,7 +649,7 @@ func (x *RemovePasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemovePasswordResponse.ProtoReflect.Descriptor instead.
 func (*RemovePasswordResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{9}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{10}
 }
 
 type ListCredentialsRequest struct {
@@ -560,7 +660,7 @@ type ListCredentialsRequest struct {
 
 func (x *ListCredentialsRequest) Reset() {
 	*x = ListCredentialsRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[10]
+	mi := &file_nokku_v1_account_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -572,7 +672,7 @@ func (x *ListCredentialsRequest) String() string {
 func (*ListCredentialsRequest) ProtoMessage() {}
 
 func (x *ListCredentialsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[10]
+	mi := &file_nokku_v1_account_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -585,7 +685,7 @@ func (x *ListCredentialsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCredentialsRequest.ProtoReflect.Descriptor instead.
 func (*ListCredentialsRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{10}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{11}
 }
 
 type ListCredentialsResponse struct {
@@ -597,7 +697,7 @@ type ListCredentialsResponse struct {
 
 func (x *ListCredentialsResponse) Reset() {
 	*x = ListCredentialsResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[11]
+	mi := &file_nokku_v1_account_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -609,7 +709,7 @@ func (x *ListCredentialsResponse) String() string {
 func (*ListCredentialsResponse) ProtoMessage() {}
 
 func (x *ListCredentialsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[11]
+	mi := &file_nokku_v1_account_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -622,7 +722,7 @@ func (x *ListCredentialsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCredentialsResponse.ProtoReflect.Descriptor instead.
 func (*ListCredentialsResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{11}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListCredentialsResponse) GetCredentials() []*AccountCredential {
@@ -642,7 +742,7 @@ type RenameCredentialRequest struct {
 
 func (x *RenameCredentialRequest) Reset() {
 	*x = RenameCredentialRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[12]
+	mi := &file_nokku_v1_account_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -654,7 +754,7 @@ func (x *RenameCredentialRequest) String() string {
 func (*RenameCredentialRequest) ProtoMessage() {}
 
 func (x *RenameCredentialRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[12]
+	mi := &file_nokku_v1_account_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -667,7 +767,7 @@ func (x *RenameCredentialRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameCredentialRequest.ProtoReflect.Descriptor instead.
 func (*RenameCredentialRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{12}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RenameCredentialRequest) GetId() string {
@@ -692,7 +792,7 @@ type RenameCredentialResponse struct {
 
 func (x *RenameCredentialResponse) Reset() {
 	*x = RenameCredentialResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[13]
+	mi := &file_nokku_v1_account_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -704,7 +804,7 @@ func (x *RenameCredentialResponse) String() string {
 func (*RenameCredentialResponse) ProtoMessage() {}
 
 func (x *RenameCredentialResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[13]
+	mi := &file_nokku_v1_account_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -717,7 +817,7 @@ func (x *RenameCredentialResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameCredentialResponse.ProtoReflect.Descriptor instead.
 func (*RenameCredentialResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{13}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{14}
 }
 
 type RemoveCredentialRequest struct {
@@ -729,7 +829,7 @@ type RemoveCredentialRequest struct {
 
 func (x *RemoveCredentialRequest) Reset() {
 	*x = RemoveCredentialRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[14]
+	mi := &file_nokku_v1_account_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -741,7 +841,7 @@ func (x *RemoveCredentialRequest) String() string {
 func (*RemoveCredentialRequest) ProtoMessage() {}
 
 func (x *RemoveCredentialRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[14]
+	mi := &file_nokku_v1_account_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -754,7 +854,7 @@ func (x *RemoveCredentialRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveCredentialRequest.ProtoReflect.Descriptor instead.
 func (*RemoveCredentialRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{14}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RemoveCredentialRequest) GetId() string {
@@ -772,7 +872,7 @@ type RemoveCredentialResponse struct {
 
 func (x *RemoveCredentialResponse) Reset() {
 	*x = RemoveCredentialResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[15]
+	mi := &file_nokku_v1_account_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -784,7 +884,7 @@ func (x *RemoveCredentialResponse) String() string {
 func (*RemoveCredentialResponse) ProtoMessage() {}
 
 func (x *RemoveCredentialResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[15]
+	mi := &file_nokku_v1_account_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -797,7 +897,7 @@ func (x *RemoveCredentialResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveCredentialResponse.ProtoReflect.Descriptor instead.
 func (*RemoveCredentialResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{15}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{16}
 }
 
 type RemoveIdentityRequest struct {
@@ -809,7 +909,7 @@ type RemoveIdentityRequest struct {
 
 func (x *RemoveIdentityRequest) Reset() {
 	*x = RemoveIdentityRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[16]
+	mi := &file_nokku_v1_account_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -821,7 +921,7 @@ func (x *RemoveIdentityRequest) String() string {
 func (*RemoveIdentityRequest) ProtoMessage() {}
 
 func (x *RemoveIdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[16]
+	mi := &file_nokku_v1_account_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -834,7 +934,7 @@ func (x *RemoveIdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveIdentityRequest.ProtoReflect.Descriptor instead.
 func (*RemoveIdentityRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{16}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RemoveIdentityRequest) GetProvider() string {
@@ -852,7 +952,7 @@ type RemoveIdentityResponse struct {
 
 func (x *RemoveIdentityResponse) Reset() {
 	*x = RemoveIdentityResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[17]
+	mi := &file_nokku_v1_account_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -864,7 +964,7 @@ func (x *RemoveIdentityResponse) String() string {
 func (*RemoveIdentityResponse) ProtoMessage() {}
 
 func (x *RemoveIdentityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[17]
+	mi := &file_nokku_v1_account_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -877,7 +977,7 @@ func (x *RemoveIdentityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveIdentityResponse.ProtoReflect.Descriptor instead.
 func (*RemoveIdentityResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{17}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{18}
 }
 
 type ListBackupCodesRequest struct {
@@ -888,7 +988,7 @@ type ListBackupCodesRequest struct {
 
 func (x *ListBackupCodesRequest) Reset() {
 	*x = ListBackupCodesRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[18]
+	mi := &file_nokku_v1_account_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -900,7 +1000,7 @@ func (x *ListBackupCodesRequest) String() string {
 func (*ListBackupCodesRequest) ProtoMessage() {}
 
 func (x *ListBackupCodesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[18]
+	mi := &file_nokku_v1_account_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -913,7 +1013,7 @@ func (x *ListBackupCodesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBackupCodesRequest.ProtoReflect.Descriptor instead.
 func (*ListBackupCodesRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{18}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{19}
 }
 
 type ListBackupCodesResponse struct {
@@ -925,7 +1025,7 @@ type ListBackupCodesResponse struct {
 
 func (x *ListBackupCodesResponse) Reset() {
 	*x = ListBackupCodesResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[19]
+	mi := &file_nokku_v1_account_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -937,7 +1037,7 @@ func (x *ListBackupCodesResponse) String() string {
 func (*ListBackupCodesResponse) ProtoMessage() {}
 
 func (x *ListBackupCodesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[19]
+	mi := &file_nokku_v1_account_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -950,7 +1050,7 @@ func (x *ListBackupCodesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBackupCodesResponse.ProtoReflect.Descriptor instead.
 func (*ListBackupCodesResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{19}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListBackupCodesResponse) GetCodes() []*AccountCredential {
@@ -968,7 +1068,7 @@ type RotateBackupCodesRequest struct {
 
 func (x *RotateBackupCodesRequest) Reset() {
 	*x = RotateBackupCodesRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[20]
+	mi := &file_nokku_v1_account_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -980,7 +1080,7 @@ func (x *RotateBackupCodesRequest) String() string {
 func (*RotateBackupCodesRequest) ProtoMessage() {}
 
 func (x *RotateBackupCodesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[20]
+	mi := &file_nokku_v1_account_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -993,7 +1093,7 @@ func (x *RotateBackupCodesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateBackupCodesRequest.ProtoReflect.Descriptor instead.
 func (*RotateBackupCodesRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{20}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{21}
 }
 
 type RotateBackupCodesResponse struct {
@@ -1005,7 +1105,7 @@ type RotateBackupCodesResponse struct {
 
 func (x *RotateBackupCodesResponse) Reset() {
 	*x = RotateBackupCodesResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[21]
+	mi := &file_nokku_v1_account_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1017,7 +1117,7 @@ func (x *RotateBackupCodesResponse) String() string {
 func (*RotateBackupCodesResponse) ProtoMessage() {}
 
 func (x *RotateBackupCodesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[21]
+	mi := &file_nokku_v1_account_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1030,7 +1130,7 @@ func (x *RotateBackupCodesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateBackupCodesResponse.ProtoReflect.Descriptor instead.
 func (*RotateBackupCodesResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{21}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RotateBackupCodesResponse) GetCodes() []string {
@@ -1048,7 +1148,7 @@ type RemoveBackupCodesRequest struct {
 
 func (x *RemoveBackupCodesRequest) Reset() {
 	*x = RemoveBackupCodesRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[22]
+	mi := &file_nokku_v1_account_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1060,7 +1160,7 @@ func (x *RemoveBackupCodesRequest) String() string {
 func (*RemoveBackupCodesRequest) ProtoMessage() {}
 
 func (x *RemoveBackupCodesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[22]
+	mi := &file_nokku_v1_account_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1073,7 +1173,7 @@ func (x *RemoveBackupCodesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveBackupCodesRequest.ProtoReflect.Descriptor instead.
 func (*RemoveBackupCodesRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{22}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{23}
 }
 
 type RemoveBackupCodesResponse struct {
@@ -1084,7 +1184,7 @@ type RemoveBackupCodesResponse struct {
 
 func (x *RemoveBackupCodesResponse) Reset() {
 	*x = RemoveBackupCodesResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[23]
+	mi := &file_nokku_v1_account_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1096,7 +1196,7 @@ func (x *RemoveBackupCodesResponse) String() string {
 func (*RemoveBackupCodesResponse) ProtoMessage() {}
 
 func (x *RemoveBackupCodesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[23]
+	mi := &file_nokku_v1_account_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1109,7 +1209,7 @@ func (x *RemoveBackupCodesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveBackupCodesResponse.ProtoReflect.Descriptor instead.
 func (*RemoveBackupCodesResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{23}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{24}
 }
 
 type ListAccountSessionsRequest struct {
@@ -1120,7 +1220,7 @@ type ListAccountSessionsRequest struct {
 
 func (x *ListAccountSessionsRequest) Reset() {
 	*x = ListAccountSessionsRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[24]
+	mi := &file_nokku_v1_account_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1132,7 +1232,7 @@ func (x *ListAccountSessionsRequest) String() string {
 func (*ListAccountSessionsRequest) ProtoMessage() {}
 
 func (x *ListAccountSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[24]
+	mi := &file_nokku_v1_account_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1145,7 +1245,7 @@ func (x *ListAccountSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAccountSessionsRequest.ProtoReflect.Descriptor instead.
 func (*ListAccountSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{24}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{25}
 }
 
 type ListAccountSessionsResponse struct {
@@ -1157,7 +1257,7 @@ type ListAccountSessionsResponse struct {
 
 func (x *ListAccountSessionsResponse) Reset() {
 	*x = ListAccountSessionsResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[25]
+	mi := &file_nokku_v1_account_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1169,7 +1269,7 @@ func (x *ListAccountSessionsResponse) String() string {
 func (*ListAccountSessionsResponse) ProtoMessage() {}
 
 func (x *ListAccountSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[25]
+	mi := &file_nokku_v1_account_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1182,7 +1282,7 @@ func (x *ListAccountSessionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAccountSessionsResponse.ProtoReflect.Descriptor instead.
 func (*ListAccountSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{25}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ListAccountSessionsResponse) GetSessions() []*AccountSession {
@@ -1202,7 +1302,7 @@ type RemoveSessionRequest struct {
 
 func (x *RemoveSessionRequest) Reset() {
 	*x = RemoveSessionRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[26]
+	mi := &file_nokku_v1_account_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1214,7 +1314,7 @@ func (x *RemoveSessionRequest) String() string {
 func (*RemoveSessionRequest) ProtoMessage() {}
 
 func (x *RemoveSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[26]
+	mi := &file_nokku_v1_account_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1227,7 +1327,7 @@ func (x *RemoveSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveSessionRequest.ProtoReflect.Descriptor instead.
 func (*RemoveSessionRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{26}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *RemoveSessionRequest) GetId() string {
@@ -1245,7 +1345,7 @@ type RemoveSessionResponse struct {
 
 func (x *RemoveSessionResponse) Reset() {
 	*x = RemoveSessionResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[27]
+	mi := &file_nokku_v1_account_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1257,7 +1357,7 @@ func (x *RemoveSessionResponse) String() string {
 func (*RemoveSessionResponse) ProtoMessage() {}
 
 func (x *RemoveSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[27]
+	mi := &file_nokku_v1_account_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1270,7 +1370,7 @@ func (x *RemoveSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveSessionResponse.ProtoReflect.Descriptor instead.
 func (*RemoveSessionResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{27}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{28}
 }
 
 type DeleteAccountRequest struct {
@@ -1281,7 +1381,7 @@ type DeleteAccountRequest struct {
 
 func (x *DeleteAccountRequest) Reset() {
 	*x = DeleteAccountRequest{}
-	mi := &file_nokku_v1_account_proto_msgTypes[28]
+	mi := &file_nokku_v1_account_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1293,7 +1393,7 @@ func (x *DeleteAccountRequest) String() string {
 func (*DeleteAccountRequest) ProtoMessage() {}
 
 func (x *DeleteAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[28]
+	mi := &file_nokku_v1_account_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1306,7 +1406,7 @@ func (x *DeleteAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAccountRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAccountRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{28}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{29}
 }
 
 type DeleteAccountResponse struct {
@@ -1317,7 +1417,7 @@ type DeleteAccountResponse struct {
 
 func (x *DeleteAccountResponse) Reset() {
 	*x = DeleteAccountResponse{}
-	mi := &file_nokku_v1_account_proto_msgTypes[29]
+	mi := &file_nokku_v1_account_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1329,7 +1429,7 @@ func (x *DeleteAccountResponse) String() string {
 func (*DeleteAccountResponse) ProtoMessage() {}
 
 func (x *DeleteAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_account_proto_msgTypes[29]
+	mi := &file_nokku_v1_account_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1342,14 +1442,25 @@ func (x *DeleteAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAccountResponse.ProtoReflect.Descriptor instead.
 func (*DeleteAccountResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_account_proto_rawDescGZIP(), []int{29}
+	return file_nokku_v1_account_proto_rawDescGZIP(), []int{30}
 }
 
 var File_nokku_v1_account_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_account_proto_rawDesc = "" +
 	"\n" +
-	"\x16nokku/v1/account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13nokku/v1/user.proto\"\xbe\x01\n" +
+	"\x16nokku/v1/account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xad\x02\n" +
+	"\x04User\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12%\n" +
+	"\x0eemail_verified\x18\x04 \x01(\bR\remailVerified\x12\x18\n" +
+	"\apicture\x18\x05 \x01(\tR\apicture\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x124\n" +
+	"\x16disable_password_reset\x18\b \x01(\bR\x14disablePasswordReset\"\xbe\x01\n" +
 	"\x11AccountCredential\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x1a\n" +
@@ -1447,83 +1558,85 @@ func file_nokku_v1_account_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_account_proto_rawDescData
 }
 
-var file_nokku_v1_account_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_nokku_v1_account_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_nokku_v1_account_proto_goTypes = []any{
-	(*AccountCredential)(nil),           // 0: nokku.v1.AccountCredential
-	(*AccountSession)(nil),              // 1: nokku.v1.AccountSession
-	(*GetAccountRequest)(nil),           // 2: nokku.v1.GetAccountRequest
-	(*GetAccountResponse)(nil),          // 3: nokku.v1.GetAccountResponse
-	(*UpdateAccountRequest)(nil),        // 4: nokku.v1.UpdateAccountRequest
-	(*UpdateAccountResponse)(nil),       // 5: nokku.v1.UpdateAccountResponse
-	(*ChangePasswordRequest)(nil),       // 6: nokku.v1.ChangePasswordRequest
-	(*ChangePasswordResponse)(nil),      // 7: nokku.v1.ChangePasswordResponse
-	(*RemovePasswordRequest)(nil),       // 8: nokku.v1.RemovePasswordRequest
-	(*RemovePasswordResponse)(nil),      // 9: nokku.v1.RemovePasswordResponse
-	(*ListCredentialsRequest)(nil),      // 10: nokku.v1.ListCredentialsRequest
-	(*ListCredentialsResponse)(nil),     // 11: nokku.v1.ListCredentialsResponse
-	(*RenameCredentialRequest)(nil),     // 12: nokku.v1.RenameCredentialRequest
-	(*RenameCredentialResponse)(nil),    // 13: nokku.v1.RenameCredentialResponse
-	(*RemoveCredentialRequest)(nil),     // 14: nokku.v1.RemoveCredentialRequest
-	(*RemoveCredentialResponse)(nil),    // 15: nokku.v1.RemoveCredentialResponse
-	(*RemoveIdentityRequest)(nil),       // 16: nokku.v1.RemoveIdentityRequest
-	(*RemoveIdentityResponse)(nil),      // 17: nokku.v1.RemoveIdentityResponse
-	(*ListBackupCodesRequest)(nil),      // 18: nokku.v1.ListBackupCodesRequest
-	(*ListBackupCodesResponse)(nil),     // 19: nokku.v1.ListBackupCodesResponse
-	(*RotateBackupCodesRequest)(nil),    // 20: nokku.v1.RotateBackupCodesRequest
-	(*RotateBackupCodesResponse)(nil),   // 21: nokku.v1.RotateBackupCodesResponse
-	(*RemoveBackupCodesRequest)(nil),    // 22: nokku.v1.RemoveBackupCodesRequest
-	(*RemoveBackupCodesResponse)(nil),   // 23: nokku.v1.RemoveBackupCodesResponse
-	(*ListAccountSessionsRequest)(nil),  // 24: nokku.v1.ListAccountSessionsRequest
-	(*ListAccountSessionsResponse)(nil), // 25: nokku.v1.ListAccountSessionsResponse
-	(*RemoveSessionRequest)(nil),        // 26: nokku.v1.RemoveSessionRequest
-	(*RemoveSessionResponse)(nil),       // 27: nokku.v1.RemoveSessionResponse
-	(*DeleteAccountRequest)(nil),        // 28: nokku.v1.DeleteAccountRequest
-	(*DeleteAccountResponse)(nil),       // 29: nokku.v1.DeleteAccountResponse
-	(*timestamppb.Timestamp)(nil),       // 30: google.protobuf.Timestamp
-	(*User)(nil),                        // 31: nokku.v1.User
+	(*User)(nil),                        // 0: nokku.v1.User
+	(*AccountCredential)(nil),           // 1: nokku.v1.AccountCredential
+	(*AccountSession)(nil),              // 2: nokku.v1.AccountSession
+	(*GetAccountRequest)(nil),           // 3: nokku.v1.GetAccountRequest
+	(*GetAccountResponse)(nil),          // 4: nokku.v1.GetAccountResponse
+	(*UpdateAccountRequest)(nil),        // 5: nokku.v1.UpdateAccountRequest
+	(*UpdateAccountResponse)(nil),       // 6: nokku.v1.UpdateAccountResponse
+	(*ChangePasswordRequest)(nil),       // 7: nokku.v1.ChangePasswordRequest
+	(*ChangePasswordResponse)(nil),      // 8: nokku.v1.ChangePasswordResponse
+	(*RemovePasswordRequest)(nil),       // 9: nokku.v1.RemovePasswordRequest
+	(*RemovePasswordResponse)(nil),      // 10: nokku.v1.RemovePasswordResponse
+	(*ListCredentialsRequest)(nil),      // 11: nokku.v1.ListCredentialsRequest
+	(*ListCredentialsResponse)(nil),     // 12: nokku.v1.ListCredentialsResponse
+	(*RenameCredentialRequest)(nil),     // 13: nokku.v1.RenameCredentialRequest
+	(*RenameCredentialResponse)(nil),    // 14: nokku.v1.RenameCredentialResponse
+	(*RemoveCredentialRequest)(nil),     // 15: nokku.v1.RemoveCredentialRequest
+	(*RemoveCredentialResponse)(nil),    // 16: nokku.v1.RemoveCredentialResponse
+	(*RemoveIdentityRequest)(nil),       // 17: nokku.v1.RemoveIdentityRequest
+	(*RemoveIdentityResponse)(nil),      // 18: nokku.v1.RemoveIdentityResponse
+	(*ListBackupCodesRequest)(nil),      // 19: nokku.v1.ListBackupCodesRequest
+	(*ListBackupCodesResponse)(nil),     // 20: nokku.v1.ListBackupCodesResponse
+	(*RotateBackupCodesRequest)(nil),    // 21: nokku.v1.RotateBackupCodesRequest
+	(*RotateBackupCodesResponse)(nil),   // 22: nokku.v1.RotateBackupCodesResponse
+	(*RemoveBackupCodesRequest)(nil),    // 23: nokku.v1.RemoveBackupCodesRequest
+	(*RemoveBackupCodesResponse)(nil),   // 24: nokku.v1.RemoveBackupCodesResponse
+	(*ListAccountSessionsRequest)(nil),  // 25: nokku.v1.ListAccountSessionsRequest
+	(*ListAccountSessionsResponse)(nil), // 26: nokku.v1.ListAccountSessionsResponse
+	(*RemoveSessionRequest)(nil),        // 27: nokku.v1.RemoveSessionRequest
+	(*RemoveSessionResponse)(nil),       // 28: nokku.v1.RemoveSessionResponse
+	(*DeleteAccountRequest)(nil),        // 29: nokku.v1.DeleteAccountRequest
+	(*DeleteAccountResponse)(nil),       // 30: nokku.v1.DeleteAccountResponse
+	(*timestamppb.Timestamp)(nil),       // 31: google.protobuf.Timestamp
 }
 var file_nokku_v1_account_proto_depIdxs = []int32{
-	30, // 0: nokku.v1.AccountCredential.created_at:type_name -> google.protobuf.Timestamp
-	30, // 1: nokku.v1.AccountSession.expires_at:type_name -> google.protobuf.Timestamp
-	30, // 2: nokku.v1.AccountSession.last_seen_at:type_name -> google.protobuf.Timestamp
-	31, // 3: nokku.v1.GetAccountResponse.user:type_name -> nokku.v1.User
-	31, // 4: nokku.v1.UpdateAccountResponse.user:type_name -> nokku.v1.User
-	0,  // 5: nokku.v1.ListCredentialsResponse.credentials:type_name -> nokku.v1.AccountCredential
-	0,  // 6: nokku.v1.ListBackupCodesResponse.codes:type_name -> nokku.v1.AccountCredential
-	1,  // 7: nokku.v1.ListAccountSessionsResponse.sessions:type_name -> nokku.v1.AccountSession
-	2,  // 8: nokku.v1.AccountService.GetAccount:input_type -> nokku.v1.GetAccountRequest
-	4,  // 9: nokku.v1.AccountService.UpdateAccount:input_type -> nokku.v1.UpdateAccountRequest
-	6,  // 10: nokku.v1.AccountService.ChangePassword:input_type -> nokku.v1.ChangePasswordRequest
-	8,  // 11: nokku.v1.AccountService.RemovePassword:input_type -> nokku.v1.RemovePasswordRequest
-	10, // 12: nokku.v1.AccountService.ListCredentials:input_type -> nokku.v1.ListCredentialsRequest
-	12, // 13: nokku.v1.AccountService.RenameCredential:input_type -> nokku.v1.RenameCredentialRequest
-	14, // 14: nokku.v1.AccountService.RemoveCredential:input_type -> nokku.v1.RemoveCredentialRequest
-	16, // 15: nokku.v1.AccountService.RemoveIdentity:input_type -> nokku.v1.RemoveIdentityRequest
-	18, // 16: nokku.v1.AccountService.ListBackupCodes:input_type -> nokku.v1.ListBackupCodesRequest
-	20, // 17: nokku.v1.AccountService.RotateBackupCodes:input_type -> nokku.v1.RotateBackupCodesRequest
-	22, // 18: nokku.v1.AccountService.RemoveBackupCodes:input_type -> nokku.v1.RemoveBackupCodesRequest
-	24, // 19: nokku.v1.AccountService.ListAccountSessions:input_type -> nokku.v1.ListAccountSessionsRequest
-	26, // 20: nokku.v1.AccountService.RemoveSession:input_type -> nokku.v1.RemoveSessionRequest
-	28, // 21: nokku.v1.AccountService.DeleteAccount:input_type -> nokku.v1.DeleteAccountRequest
-	3,  // 22: nokku.v1.AccountService.GetAccount:output_type -> nokku.v1.GetAccountResponse
-	5,  // 23: nokku.v1.AccountService.UpdateAccount:output_type -> nokku.v1.UpdateAccountResponse
-	7,  // 24: nokku.v1.AccountService.ChangePassword:output_type -> nokku.v1.ChangePasswordResponse
-	9,  // 25: nokku.v1.AccountService.RemovePassword:output_type -> nokku.v1.RemovePasswordResponse
-	11, // 26: nokku.v1.AccountService.ListCredentials:output_type -> nokku.v1.ListCredentialsResponse
-	13, // 27: nokku.v1.AccountService.RenameCredential:output_type -> nokku.v1.RenameCredentialResponse
-	15, // 28: nokku.v1.AccountService.RemoveCredential:output_type -> nokku.v1.RemoveCredentialResponse
-	17, // 29: nokku.v1.AccountService.RemoveIdentity:output_type -> nokku.v1.RemoveIdentityResponse
-	19, // 30: nokku.v1.AccountService.ListBackupCodes:output_type -> nokku.v1.ListBackupCodesResponse
-	21, // 31: nokku.v1.AccountService.RotateBackupCodes:output_type -> nokku.v1.RotateBackupCodesResponse
-	23, // 32: nokku.v1.AccountService.RemoveBackupCodes:output_type -> nokku.v1.RemoveBackupCodesResponse
-	25, // 33: nokku.v1.AccountService.ListAccountSessions:output_type -> nokku.v1.ListAccountSessionsResponse
-	27, // 34: nokku.v1.AccountService.RemoveSession:output_type -> nokku.v1.RemoveSessionResponse
-	29, // 35: nokku.v1.AccountService.DeleteAccount:output_type -> nokku.v1.DeleteAccountResponse
-	22, // [22:36] is the sub-list for method output_type
-	8,  // [8:22] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	31, // 0: nokku.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	31, // 1: nokku.v1.User.updated_at:type_name -> google.protobuf.Timestamp
+	31, // 2: nokku.v1.AccountCredential.created_at:type_name -> google.protobuf.Timestamp
+	31, // 3: nokku.v1.AccountSession.expires_at:type_name -> google.protobuf.Timestamp
+	31, // 4: nokku.v1.AccountSession.last_seen_at:type_name -> google.protobuf.Timestamp
+	0,  // 5: nokku.v1.GetAccountResponse.user:type_name -> nokku.v1.User
+	0,  // 6: nokku.v1.UpdateAccountResponse.user:type_name -> nokku.v1.User
+	1,  // 7: nokku.v1.ListCredentialsResponse.credentials:type_name -> nokku.v1.AccountCredential
+	1,  // 8: nokku.v1.ListBackupCodesResponse.codes:type_name -> nokku.v1.AccountCredential
+	2,  // 9: nokku.v1.ListAccountSessionsResponse.sessions:type_name -> nokku.v1.AccountSession
+	3,  // 10: nokku.v1.AccountService.GetAccount:input_type -> nokku.v1.GetAccountRequest
+	5,  // 11: nokku.v1.AccountService.UpdateAccount:input_type -> nokku.v1.UpdateAccountRequest
+	7,  // 12: nokku.v1.AccountService.ChangePassword:input_type -> nokku.v1.ChangePasswordRequest
+	9,  // 13: nokku.v1.AccountService.RemovePassword:input_type -> nokku.v1.RemovePasswordRequest
+	11, // 14: nokku.v1.AccountService.ListCredentials:input_type -> nokku.v1.ListCredentialsRequest
+	13, // 15: nokku.v1.AccountService.RenameCredential:input_type -> nokku.v1.RenameCredentialRequest
+	15, // 16: nokku.v1.AccountService.RemoveCredential:input_type -> nokku.v1.RemoveCredentialRequest
+	17, // 17: nokku.v1.AccountService.RemoveIdentity:input_type -> nokku.v1.RemoveIdentityRequest
+	19, // 18: nokku.v1.AccountService.ListBackupCodes:input_type -> nokku.v1.ListBackupCodesRequest
+	21, // 19: nokku.v1.AccountService.RotateBackupCodes:input_type -> nokku.v1.RotateBackupCodesRequest
+	23, // 20: nokku.v1.AccountService.RemoveBackupCodes:input_type -> nokku.v1.RemoveBackupCodesRequest
+	25, // 21: nokku.v1.AccountService.ListAccountSessions:input_type -> nokku.v1.ListAccountSessionsRequest
+	27, // 22: nokku.v1.AccountService.RemoveSession:input_type -> nokku.v1.RemoveSessionRequest
+	29, // 23: nokku.v1.AccountService.DeleteAccount:input_type -> nokku.v1.DeleteAccountRequest
+	4,  // 24: nokku.v1.AccountService.GetAccount:output_type -> nokku.v1.GetAccountResponse
+	6,  // 25: nokku.v1.AccountService.UpdateAccount:output_type -> nokku.v1.UpdateAccountResponse
+	8,  // 26: nokku.v1.AccountService.ChangePassword:output_type -> nokku.v1.ChangePasswordResponse
+	10, // 27: nokku.v1.AccountService.RemovePassword:output_type -> nokku.v1.RemovePasswordResponse
+	12, // 28: nokku.v1.AccountService.ListCredentials:output_type -> nokku.v1.ListCredentialsResponse
+	14, // 29: nokku.v1.AccountService.RenameCredential:output_type -> nokku.v1.RenameCredentialResponse
+	16, // 30: nokku.v1.AccountService.RemoveCredential:output_type -> nokku.v1.RemoveCredentialResponse
+	18, // 31: nokku.v1.AccountService.RemoveIdentity:output_type -> nokku.v1.RemoveIdentityResponse
+	20, // 32: nokku.v1.AccountService.ListBackupCodes:output_type -> nokku.v1.ListBackupCodesResponse
+	22, // 33: nokku.v1.AccountService.RotateBackupCodes:output_type -> nokku.v1.RotateBackupCodesResponse
+	24, // 34: nokku.v1.AccountService.RemoveBackupCodes:output_type -> nokku.v1.RemoveBackupCodesResponse
+	26, // 35: nokku.v1.AccountService.ListAccountSessions:output_type -> nokku.v1.ListAccountSessionsResponse
+	28, // 36: nokku.v1.AccountService.RemoveSession:output_type -> nokku.v1.RemoveSessionResponse
+	30, // 37: nokku.v1.AccountService.DeleteAccount:output_type -> nokku.v1.DeleteAccountResponse
+	24, // [24:38] is the sub-list for method output_type
+	10, // [10:24] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_account_proto_init() }
@@ -1531,14 +1644,13 @@ func file_nokku_v1_account_proto_init() {
 	if File_nokku_v1_account_proto != nil {
 		return
 	}
-	file_nokku_v1_user_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_account_proto_rawDesc), len(file_nokku_v1_account_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   30,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
