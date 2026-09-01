@@ -2,1116 +2,1179 @@
 // @generated from file nokku/v1/daemon.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
-import { file_google_api_annotations } from "../../google/api/annotations_pb";
-import type { Duration, Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_duration, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { Message } from "@bufbuild/protobuf";
+import type { GenEnum, GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
+import { file_buf_validate_validate } from '../../buf/validate/validate_pb';
+import { file_google_api_annotations } from '../../google/api/annotations_pb';
+import type { Duration, Timestamp } from '@bufbuild/protobuf/wkt';
+import {
+	file_google_protobuf_duration,
+	file_google_protobuf_timestamp
+} from '@bufbuild/protobuf/wkt';
+import type { Message } from '@bufbuild/protobuf';
 
 /**
  * Describes the file nokku/v1/daemon.proto.
  */
-export const file_nokku_v1_daemon: GenFile = /*@__PURE__*/
-  fileDesc("ChVub2trdS92MS9kYWVtb24ucHJvdG8SCG5va2t1LnYxItsCCgZEYWVtb24SCgoCaWQYASABKAkSFAoMd29ya3NwYWNlX2lkGAIgASgJEgwKBG5hbWUYAyABKAkSDgoGb25saW5lGAQgASgIEiYKBnN0YXR1cxgFIAEoDjIWLm5va2t1LnYxLkRhZW1vblN0YXR1cxImCgZjb25maWcYBiABKAsyFi5ub2trdS52MS5EYWVtb25Db25maWcSMAoIbWV0YWRhdGEYByADKAsyHi5ub2trdS52MS5EYWVtb24uTWV0YWRhdGFFbnRyeRIuCgp1cGRhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEimwIKDERhZW1vbkNvbmZpZxIXCg9yZWNvcmRfc2Vzc2lvbnMYASABKAgSGAoQYWxsb3dfZm9yd2FyZGluZxgCIAEoCBIeChZhbGxvd19hZ2VudF9mb3J3YXJkaW5nGAMgASgIEhUKDWdhdGV3YXlfcG9ydHMYBCABKAgSHQoMbWF4X3Nlc3Npb25zGAUgASgFQge6SAQaAigAEiYKFW1heF9zZXNzaW9uc19wZXJfdXNlchgGIAEoBUIHukgEGgIoABIgCg9tYXhfY29ubmVjdGlvbnMYByABKAVCB7pIBBoCKAASOAoVY2xpZW50X2FsaXZlX2ludGVydmFsGAggASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uIkgKEEdldERhZW1vblJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIUCgJpZBgCIAEoCUIIukgFcgOwAQEiNQoRR2V0RGFlbW9uUmVzcG9uc2USIAoGZGFlbW9uGAEgASgLMhAubm9ra3UudjEuRGFlbW9uIqcBChNVcGRhdGVEYWVtb25SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBEjIKBnN0YXR1cxgDIAEoDjIWLm5va2t1LnYxLkRhZW1vblN0YXR1c0IKukgHggEEEAEgABImCgZjb25maWcYBCABKAsyFi5ub2trdS52MS5EYWVtb25Db25maWciFgoUVXBkYXRlRGFlbW9uUmVzcG9uc2UiSwoTRGVsZXRlRGFlbW9uUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASIWChREZWxldGVEYWVtb25SZXNwb25zZSKuAQoSTGlzdERhZW1vbnNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAiABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAyABKAVCB7pIBBoCKAASDQoFcXVlcnkYBCABKAkSDgoGb25saW5lGAUgASgIEiYKBnN0YXR1cxgGIAEoDjIWLm5va2t1LnYxLkRhZW1vblN0YXR1cyJHChNMaXN0RGFlbW9uc1Jlc3BvbnNlEiEKB2RhZW1vbnMYASADKAsyEC5ub2trdS52MS5EYWVtb24SDQoFdG90YWwYAiABKAUiOwoZUmVmcmVzaEVucm9sbFRva2VuUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBIlsKGlJlZnJlc2hFbnJvbGxUb2tlblJlc3BvbnNlEg0KBXRva2VuGAEgASgJEi4KCmV4cGlyZXNfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjoKGFJldm9rZUVucm9sbFRva2VuUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBIhsKGVJldm9rZUVucm9sbFRva2VuUmVzcG9uc2UiiwEKFENyZWF0ZVNlc3Npb25SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESHgoJZGFlbW9uX2lkGAIgASgJQgu6SAjIAQFyA7ABARIzCgh1c2VybmFtZRgDIAEoCUIhukgechwQARggMhZeW2Etel9dW2EtejAtOS1fXSpcJD8kIlYKFUNyZWF0ZVNlc3Npb25SZXNwb25zZRIoCgdzZXNzaW9uGAEgASgLMhcubm9ra3UudjEuRGFlbW9uU2Vzc2lvbhITCgtkYWVtb25fbmFtZRgCIAEoCSJVChNMaXN0U2Vzc2lvbnNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESHgoJZGFlbW9uX2lkGAIgASgJQgu6SAjIAQFyA7ABASJWChRMaXN0U2Vzc2lvbnNSZXNwb25zZRIpCghzZXNzaW9ucxgBIAMoCzIXLm5va2t1LnYxLkRhZW1vblNlc3Npb24SEwoLZGFlbW9uX25hbWUYAiABKAkidgoTQ2xvc2VTZXNzaW9uUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEh4KCWRhZW1vbl9pZBgCIAEoCUILukgIyAEBcgOwAQESHwoKc2Vzc2lvbl9pZBgDIAEoCUILukgIyAEBcgOwAQEiFgoUQ2xvc2VTZXNzaW9uUmVzcG9uc2UiPAoTRW5yb2xsRGFlbW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQARINCgVjYV9pZBgCIAEoCSKxAQoURW5yb2xsRGFlbW9uUmVzcG9uc2USCgoCaWQYASABKAkSFAoMd29ya3NwYWNlX2lkGAIgASgJEhEKCXRhcmdldF9pZBgDIAEoCRImCgZzdGF0dXMYBCABKA4yFi5ub2trdS52MS5EYWVtb25TdGF0dXMSJgoGY29uZmlnGAUgASgLMhYubm9ra3UudjEuRGFlbW9uQ29uZmlnEhQKDGFjY2Vzc190b2tlbhgGIAEoCSIvCg5QcmluY2lwYWxVc2VycxIQCgh1c2VybmFtZRgBIAEoCRILCgNpZHMYAiADKAkipQEKEVN5bmNEYWVtb25SZXF1ZXN0Eg0KBXVzZXJzGAEgAygJEhMKC3ByaXZhdGVfaXBzGAIgAygJEjsKCG1ldGFkYXRhGAMgAygLMikubm9ra3UudjEuU3luY0RhZW1vblJlcXVlc3QuTWV0YWRhdGFFbnRyeRovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiwAEKElN5bmNEYWVtb25SZXNwb25zZRImCgZzdGF0dXMYASABKA4yFi5ub2trdS52MS5EYWVtb25TdGF0dXMSJgoGY29uZmlnGAIgASgLMhYubm9ra3UudjEuRGFlbW9uQ29uZmlnEiwKCnByaW5jaXBhbHMYAyADKAsyGC5ub2trdS52MS5QcmluY2lwYWxVc2VycxIVCg1zdGF0ZV92ZXJzaW9uGAQgASgDEhUKDWNhX3B1YmxpY19rZXkYBSABKAkiQQoOQ29ubmVjdFJlcXVlc3QSKAoJaGVhcnRiZWF0GAEgASgLMhMubm9ra3UudjEuSGVhcnRiZWF0SABCBQoDbXNnIqQBCg9Db25uZWN0UmVzcG9uc2USLwoNaGVhcnRiZWF0X2FjaxgBIAEoCzIWLm5va2t1LnYxLkhlYXJ0YmVhdEFja0gAEi0KDHN0YXRlX3VwZGF0ZRgCIAEoCzIVLm5va2t1LnYxLlN0YXRlVXBkYXRlSAASKgoHc2Vzc2lvbhgDIAEoCzIXLm5va2t1LnYxLkRhZW1vblNlc3Npb25IAEIFCgNtc2ciIgoJSGVhcnRiZWF0EhUKDXN0YXRlX3ZlcnNpb24YASABKAMiJQoMSGVhcnRiZWF0QWNrEhUKDXN0YXRlX3ZlcnNpb24YASABKAMiJAoLU3RhdGVVcGRhdGUSFQoNc3RhdGVfdmVyc2lvbhgBIAEoAyJGCg1EYWVtb25TZXNzaW9uEhIKCnNlc3Npb25faWQYASABKAkSEAoIdXNlcm5hbWUYAiABKAkSDwoHdXNlcl9pZBgDIAEoCSKOAQoURGFlbW9uU2Vzc2lvblJlcXVlc3QSLQoFcmVhZHkYASABKAsyHC5ub2trdS52MS5EYWVtb25TZXNzaW9uUmVhZHlIABIQCgZzdGRvdXQYAiABKAxIABIuCgZleGl0ZWQYAyABKAsyHC5ub2trdS52MS5EYWVtb25TZXNzaW9uRW5kZWRIAEIFCgNtc2cijwEKFURhZW1vblNlc3Npb25SZXNwb25zZRIPCgVzdGRpbhgBIAEoDEgAEi8KBnJlc2l6ZRgCIAEoCzIdLm5va2t1LnYxLkRhZW1vblJlc2l6ZVJlcXVlc3RIABItCgVjbG9zZRgDIAEoCzIcLm5va2t1LnYxLkRhZW1vbkNsb3NlUmVxdWVzdEgAQgUKA21zZyJiChJEYWVtb25TZXNzaW9uUmVhZHkSEgoKc2Vzc2lvbl9pZBgBIAEoCRIVCg1yZXBsYXlfYnVmZmVyGAIgASgMEhAKCHVzZXJuYW1lGAMgASgJEg8KB3VzZXJfaWQYBCABKAkiNAoTRGFlbW9uUmVzaXplUmVxdWVzdBINCgV3aWR0aBgBIAEoDRIOCgZoZWlnaHQYAiABKA0iPgoSRGFlbW9uU2Vzc2lvbkVuZGVkEhEKCWV4aXRfY29kZRgBIAEoBRIVCg1lcnJvcl9tZXNzYWdlGAIgASgJIiQKEkRhZW1vbkNsb3NlUmVxdWVzdBIOCgZyZWFzb24YASABKAkqgAEKDERhZW1vblN0YXR1cxIdChlEQUVNT05fU1RBVFVTX1VOU1BFQ0lGSUVEEAASGQoVREFFTU9OX1NUQVRVU19QRU5ESU5HEAESGgoWREFFTU9OX1NUQVRVU19BQ0NFUFRFRBACEhoKFkRBRU1PTl9TVEFUVVNfUkVKRUNURUQQAzKrCwoNRGFlbW9uU2VydmljZRJ7CglHZXREYWVtb24SGi5ub2trdS52MS5HZXREYWVtb25SZXF1ZXN0Ghsubm9ra3UudjEuR2V0RGFlbW9uUmVzcG9uc2UiNZACAYLT5JMCLBIqL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZGFlbW9ucy97aWR9EoQBCgxVcGRhdGVEYWVtb24SHS5ub2trdS52MS5VcGRhdGVEYWVtb25SZXF1ZXN0Gh4ubm9ra3UudjEuVXBkYXRlRGFlbW9uUmVzcG9uc2UiNYLT5JMCLzoBKjIqL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZGFlbW9ucy97aWR9EoEBCgxEZWxldGVEYWVtb24SHS5ub2trdS52MS5EZWxldGVEYWVtb25SZXF1ZXN0Gh4ubm9ra3UudjEuRGVsZXRlRGFlbW9uUmVzcG9uc2UiMoLT5JMCLCoqL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZGFlbW9ucy97aWR9EnwKC0xpc3REYWVtb25zEhwubm9ra3UudjEuTGlzdERhZW1vbnNSZXF1ZXN0Gh0ubm9ra3UudjEuTGlzdERhZW1vbnNSZXNwb25zZSIwkAIBgtPkkwInEiUvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9kYWVtb25zEpUBChJSZWZyZXNoRW5yb2xsVG9rZW4SIy5ub2trdS52MS5SZWZyZXNoRW5yb2xsVG9rZW5SZXF1ZXN0GiQubm9ra3UudjEuUmVmcmVzaEVucm9sbFRva2VuUmVzcG9uc2UiNILT5JMCLiIsL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZW5yb2xsOnJlZnJlc2gSkQEKEVJldm9rZUVucm9sbFRva2VuEiIubm9ra3UudjEuUmV2b2tlRW5yb2xsVG9rZW5SZXF1ZXN0GiMubm9ra3UudjEuUmV2b2tlRW5yb2xsVG9rZW5SZXNwb25zZSIzgtPkkwItKisvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9lbnJvbGw6cmV2b2tlEpQBCgxMaXN0U2Vzc2lvbnMSHS5ub2trdS52MS5MaXN0U2Vzc2lvbnNSZXF1ZXN0Gh4ubm9ra3UudjEuTGlzdFNlc3Npb25zUmVzcG9uc2UiRZACAYLT5JMCPBI6L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZGFlbW9ucy97ZGFlbW9uX2lkfS9zZXNzaW9ucxKXAQoNQ3JlYXRlU2Vzc2lvbhIeLm5va2t1LnYxLkNyZWF0ZVNlc3Npb25SZXF1ZXN0Gh8ubm9ra3UudjEuQ3JlYXRlU2Vzc2lvblJlc3BvbnNlIkWC0+STAj86ASoiOi92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L2RhZW1vbnMve2RhZW1vbl9pZH0vc2Vzc2lvbnMSngEKDENsb3NlU2Vzc2lvbhIdLm5va2t1LnYxLkNsb3NlU2Vzc2lvblJlcXVlc3QaHi5ub2trdS52MS5DbG9zZVNlc3Npb25SZXNwb25zZSJPgtPkkwJJKkcvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9kYWVtb25zL3tkYWVtb25faWR9L3Nlc3Npb25zL3tzZXNzaW9uX2lkfRJNCgxFbnJvbGxEYWVtb24SHS5ub2trdS52MS5FbnJvbGxEYWVtb25SZXF1ZXN0Gh4ubm9ra3UudjEuRW5yb2xsRGFlbW9uUmVzcG9uc2USRwoKU3luY0RhZW1vbhIbLm5va2t1LnYxLlN5bmNEYWVtb25SZXF1ZXN0Ghwubm9ra3UudjEuU3luY0RhZW1vblJlc3BvbnNlMloKFERhZW1vbkNvbnRyb2xTZXJ2aWNlEkIKB0Nvbm5lY3QSGC5ub2trdS52MS5Db25uZWN0UmVxdWVzdBoZLm5va2t1LnYxLkNvbm5lY3RSZXNwb25zZSgBMAEybAoURGFlbW9uU2Vzc2lvblNlcnZpY2USVAoNRGFlbW9uU2Vzc2lvbhIeLm5va2t1LnYxLkRhZW1vblNlc3Npb25SZXF1ZXN0Gh8ubm9ra3UudjEuRGFlbW9uU2Vzc2lvblJlc3BvbnNlKAEwAUKVAQoMY29tLm5va2t1LnYxQgtEYWVtb25Qcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_duration, file_google_protobuf_timestamp]);
+export const file_nokku_v1_daemon: GenFile /*@__PURE__*/ = fileDesc(
+	'ChVub2trdS92MS9kYWVtb24ucHJvdG8SCG5va2t1LnYxItsCCgZEYWVtb24SCgoCaWQYASABKAkSFAoMd29ya3NwYWNlX2lkGAIgASgJEgwKBG5hbWUYAyABKAkSDgoGb25saW5lGAQgASgIEiYKBnN0YXR1cxgFIAEoDjIWLm5va2t1LnYxLkRhZW1vblN0YXR1cxImCgZjb25maWcYBiABKAsyFi5ub2trdS52MS5EYWVtb25Db25maWcSMAoIbWV0YWRhdGEYByADKAsyHi5ub2trdS52MS5EYWVtb24uTWV0YWRhdGFFbnRyeRIuCgp1cGRhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEimwIKDERhZW1vbkNvbmZpZxIXCg9yZWNvcmRfc2Vzc2lvbnMYASABKAgSGAoQYWxsb3dfZm9yd2FyZGluZxgCIAEoCBIeChZhbGxvd19hZ2VudF9mb3J3YXJkaW5nGAMgASgIEhUKDWdhdGV3YXlfcG9ydHMYBCABKAgSHQoMbWF4X3Nlc3Npb25zGAUgASgFQge6SAQaAigAEiYKFW1heF9zZXNzaW9uc19wZXJfdXNlchgGIAEoBUIHukgEGgIoABIgCg9tYXhfY29ubmVjdGlvbnMYByABKAVCB7pIBBoCKAASOAoVY2xpZW50X2FsaXZlX2ludGVydmFsGAggASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uIkgKEEdldERhZW1vblJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIUCgJpZBgCIAEoCUIIukgFcgOwAQEiNQoRR2V0RGFlbW9uUmVzcG9uc2USIAoGZGFlbW9uGAEgASgLMhAubm9ra3UudjEuRGFlbW9uIqcBChNVcGRhdGVEYWVtb25SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBEjIKBnN0YXR1cxgDIAEoDjIWLm5va2t1LnYxLkRhZW1vblN0YXR1c0IKukgHggEEEAEgABImCgZjb25maWcYBCABKAsyFi5ub2trdS52MS5EYWVtb25Db25maWciFgoUVXBkYXRlRGFlbW9uUmVzcG9uc2UiSwoTRGVsZXRlRGFlbW9uUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASIWChREZWxldGVEYWVtb25SZXNwb25zZSKuAQoSTGlzdERhZW1vbnNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAiABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAyABKAVCB7pIBBoCKAASDQoFcXVlcnkYBCABKAkSDgoGb25saW5lGAUgASgIEiYKBnN0YXR1cxgGIAEoDjIWLm5va2t1LnYxLkRhZW1vblN0YXR1cyJHChNMaXN0RGFlbW9uc1Jlc3BvbnNlEiEKB2RhZW1vbnMYASADKAsyEC5ub2trdS52MS5EYWVtb24SDQoFdG90YWwYAiABKAUiOwoZUmVmcmVzaEVucm9sbFRva2VuUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBIlsKGlJlZnJlc2hFbnJvbGxUb2tlblJlc3BvbnNlEg0KBXRva2VuGAEgASgJEi4KCmV4cGlyZXNfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjoKGFJldm9rZUVucm9sbFRva2VuUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBIhsKGVJldm9rZUVucm9sbFRva2VuUmVzcG9uc2UiiwEKFENyZWF0ZVNlc3Npb25SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESHgoJZGFlbW9uX2lkGAIgASgJQgu6SAjIAQFyA7ABARIzCgh1c2VybmFtZRgDIAEoCUIhukgechwQARggMhZeW2Etel9dW2EtejAtOS1fXSpcJD8kIlYKFUNyZWF0ZVNlc3Npb25SZXNwb25zZRIoCgdzZXNzaW9uGAEgASgLMhcubm9ra3UudjEuRGFlbW9uU2Vzc2lvbhITCgtkYWVtb25fbmFtZRgCIAEoCSJVChNMaXN0U2Vzc2lvbnNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESHgoJZGFlbW9uX2lkGAIgASgJQgu6SAjIAQFyA7ABASJWChRMaXN0U2Vzc2lvbnNSZXNwb25zZRIpCghzZXNzaW9ucxgBIAMoCzIXLm5va2t1LnYxLkRhZW1vblNlc3Npb24SEwoLZGFlbW9uX25hbWUYAiABKAkidgoTQ2xvc2VTZXNzaW9uUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEh4KCWRhZW1vbl9pZBgCIAEoCUILukgIyAEBcgOwAQESHwoKc2Vzc2lvbl9pZBgDIAEoCUILukgIyAEBcgOwAQEiFgoUQ2xvc2VTZXNzaW9uUmVzcG9uc2UiPAoTRW5yb2xsRGFlbW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQARINCgVjYV9pZBgCIAEoCSKxAQoURW5yb2xsRGFlbW9uUmVzcG9uc2USCgoCaWQYASABKAkSFAoMd29ya3NwYWNlX2lkGAIgASgJEhEKCXRhcmdldF9pZBgDIAEoCRImCgZzdGF0dXMYBCABKA4yFi5ub2trdS52MS5EYWVtb25TdGF0dXMSJgoGY29uZmlnGAUgASgLMhYubm9ra3UudjEuRGFlbW9uQ29uZmlnEhQKDGFjY2Vzc190b2tlbhgGIAEoCSIvCg5QcmluY2lwYWxVc2VycxIQCgh1c2VybmFtZRgBIAEoCRILCgNpZHMYAiADKAkipQEKEVN5bmNEYWVtb25SZXF1ZXN0Eg0KBXVzZXJzGAEgAygJEhMKC3ByaXZhdGVfaXBzGAIgAygJEjsKCG1ldGFkYXRhGAMgAygLMikubm9ra3UudjEuU3luY0RhZW1vblJlcXVlc3QuTWV0YWRhdGFFbnRyeRovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiwAEKElN5bmNEYWVtb25SZXNwb25zZRImCgZzdGF0dXMYASABKA4yFi5ub2trdS52MS5EYWVtb25TdGF0dXMSJgoGY29uZmlnGAIgASgLMhYubm9ra3UudjEuRGFlbW9uQ29uZmlnEiwKCnByaW5jaXBhbHMYAyADKAsyGC5ub2trdS52MS5QcmluY2lwYWxVc2VycxIVCg1zdGF0ZV92ZXJzaW9uGAQgASgDEhUKDWNhX3B1YmxpY19rZXkYBSABKAkiQQoOQ29ubmVjdFJlcXVlc3QSKAoJaGVhcnRiZWF0GAEgASgLMhMubm9ra3UudjEuSGVhcnRiZWF0SABCBQoDbXNnIqQBCg9Db25uZWN0UmVzcG9uc2USLwoNaGVhcnRiZWF0X2FjaxgBIAEoCzIWLm5va2t1LnYxLkhlYXJ0YmVhdEFja0gAEi0KDHN0YXRlX3VwZGF0ZRgCIAEoCzIVLm5va2t1LnYxLlN0YXRlVXBkYXRlSAASKgoHc2Vzc2lvbhgDIAEoCzIXLm5va2t1LnYxLkRhZW1vblNlc3Npb25IAEIFCgNtc2ciIgoJSGVhcnRiZWF0EhUKDXN0YXRlX3ZlcnNpb24YASABKAMiJQoMSGVhcnRiZWF0QWNrEhUKDXN0YXRlX3ZlcnNpb24YASABKAMiJAoLU3RhdGVVcGRhdGUSFQoNc3RhdGVfdmVyc2lvbhgBIAEoAyJGCg1EYWVtb25TZXNzaW9uEhIKCnNlc3Npb25faWQYASABKAkSEAoIdXNlcm5hbWUYAiABKAkSDwoHdXNlcl9pZBgDIAEoCSKOAQoURGFlbW9uU2Vzc2lvblJlcXVlc3QSLQoFcmVhZHkYASABKAsyHC5ub2trdS52MS5EYWVtb25TZXNzaW9uUmVhZHlIABIQCgZzdGRvdXQYAiABKAxIABIuCgZleGl0ZWQYAyABKAsyHC5ub2trdS52MS5EYWVtb25TZXNzaW9uRW5kZWRIAEIFCgNtc2cijwEKFURhZW1vblNlc3Npb25SZXNwb25zZRIPCgVzdGRpbhgBIAEoDEgAEi8KBnJlc2l6ZRgCIAEoCzIdLm5va2t1LnYxLkRhZW1vblJlc2l6ZVJlcXVlc3RIABItCgVjbG9zZRgDIAEoCzIcLm5va2t1LnYxLkRhZW1vbkNsb3NlUmVxdWVzdEgAQgUKA21zZyJiChJEYWVtb25TZXNzaW9uUmVhZHkSEgoKc2Vzc2lvbl9pZBgBIAEoCRIVCg1yZXBsYXlfYnVmZmVyGAIgASgMEhAKCHVzZXJuYW1lGAMgASgJEg8KB3VzZXJfaWQYBCABKAkiNAoTRGFlbW9uUmVzaXplUmVxdWVzdBINCgV3aWR0aBgBIAEoDRIOCgZoZWlnaHQYAiABKA0iPgoSRGFlbW9uU2Vzc2lvbkVuZGVkEhEKCWV4aXRfY29kZRgBIAEoBRIVCg1lcnJvcl9tZXNzYWdlGAIgASgJIiQKEkRhZW1vbkNsb3NlUmVxdWVzdBIOCgZyZWFzb24YASABKAkqgAEKDERhZW1vblN0YXR1cxIdChlEQUVNT05fU1RBVFVTX1VOU1BFQ0lGSUVEEAASGQoVREFFTU9OX1NUQVRVU19QRU5ESU5HEAESGgoWREFFTU9OX1NUQVRVU19BQ0NFUFRFRBACEhoKFkRBRU1PTl9TVEFUVVNfUkVKRUNURUQQAzKrCwoNRGFlbW9uU2VydmljZRJ7CglHZXREYWVtb24SGi5ub2trdS52MS5HZXREYWVtb25SZXF1ZXN0Ghsubm9ra3UudjEuR2V0RGFlbW9uUmVzcG9uc2UiNZACAYLT5JMCLBIqL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZGFlbW9ucy97aWR9EoQBCgxVcGRhdGVEYWVtb24SHS5ub2trdS52MS5VcGRhdGVEYWVtb25SZXF1ZXN0Gh4ubm9ra3UudjEuVXBkYXRlRGFlbW9uUmVzcG9uc2UiNYLT5JMCLzoBKjIqL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZGFlbW9ucy97aWR9EoEBCgxEZWxldGVEYWVtb24SHS5ub2trdS52MS5EZWxldGVEYWVtb25SZXF1ZXN0Gh4ubm9ra3UudjEuRGVsZXRlRGFlbW9uUmVzcG9uc2UiMoLT5JMCLCoqL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZGFlbW9ucy97aWR9EnwKC0xpc3REYWVtb25zEhwubm9ra3UudjEuTGlzdERhZW1vbnNSZXF1ZXN0Gh0ubm9ra3UudjEuTGlzdERhZW1vbnNSZXNwb25zZSIwkAIBgtPkkwInEiUvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9kYWVtb25zEpUBChJSZWZyZXNoRW5yb2xsVG9rZW4SIy5ub2trdS52MS5SZWZyZXNoRW5yb2xsVG9rZW5SZXF1ZXN0GiQubm9ra3UudjEuUmVmcmVzaEVucm9sbFRva2VuUmVzcG9uc2UiNILT5JMCLiIsL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZW5yb2xsOnJlZnJlc2gSkQEKEVJldm9rZUVucm9sbFRva2VuEiIubm9ra3UudjEuUmV2b2tlRW5yb2xsVG9rZW5SZXF1ZXN0GiMubm9ra3UudjEuUmV2b2tlRW5yb2xsVG9rZW5SZXNwb25zZSIzgtPkkwItKisvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9lbnJvbGw6cmV2b2tlEpQBCgxMaXN0U2Vzc2lvbnMSHS5ub2trdS52MS5MaXN0U2Vzc2lvbnNSZXF1ZXN0Gh4ubm9ra3UudjEuTGlzdFNlc3Npb25zUmVzcG9uc2UiRZACAYLT5JMCPBI6L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vZGFlbW9ucy97ZGFlbW9uX2lkfS9zZXNzaW9ucxKXAQoNQ3JlYXRlU2Vzc2lvbhIeLm5va2t1LnYxLkNyZWF0ZVNlc3Npb25SZXF1ZXN0Gh8ubm9ra3UudjEuQ3JlYXRlU2Vzc2lvblJlc3BvbnNlIkWC0+STAj86ASoiOi92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L2RhZW1vbnMve2RhZW1vbl9pZH0vc2Vzc2lvbnMSngEKDENsb3NlU2Vzc2lvbhIdLm5va2t1LnYxLkNsb3NlU2Vzc2lvblJlcXVlc3QaHi5ub2trdS52MS5DbG9zZVNlc3Npb25SZXNwb25zZSJPgtPkkwJJKkcvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9kYWVtb25zL3tkYWVtb25faWR9L3Nlc3Npb25zL3tzZXNzaW9uX2lkfRJNCgxFbnJvbGxEYWVtb24SHS5ub2trdS52MS5FbnJvbGxEYWVtb25SZXF1ZXN0Gh4ubm9ra3UudjEuRW5yb2xsRGFlbW9uUmVzcG9uc2USRwoKU3luY0RhZW1vbhIbLm5va2t1LnYxLlN5bmNEYWVtb25SZXF1ZXN0Ghwubm9ra3UudjEuU3luY0RhZW1vblJlc3BvbnNlMloKFERhZW1vbkNvbnRyb2xTZXJ2aWNlEkIKB0Nvbm5lY3QSGC5ub2trdS52MS5Db25uZWN0UmVxdWVzdBoZLm5va2t1LnYxLkNvbm5lY3RSZXNwb25zZSgBMAEybAoURGFlbW9uU2Vzc2lvblNlcnZpY2USVAoNRGFlbW9uU2Vzc2lvbhIeLm5va2t1LnYxLkRhZW1vblNlc3Npb25SZXF1ZXN0Gh8ubm9ra3UudjEuRGFlbW9uU2Vzc2lvblJlc3BvbnNlKAEwAUKVAQoMY29tLm5va2t1LnYxQgtEYWVtb25Qcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
+	[
+		file_buf_validate_validate,
+		file_google_api_annotations,
+		file_google_protobuf_duration,
+		file_google_protobuf_timestamp
+	]
+);
 
 /**
  * @generated from message nokku.v1.Daemon
  */
-export type Daemon = Message<"nokku.v1.Daemon"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
+export type Daemon = Message<'nokku.v1.Daemon'> & {
+	/**
+	 * @generated from field: string id = 1;
+	 */
+	id: string;
 
-  /**
-   * @generated from field: string workspace_id = 2;
-   */
-  workspaceId: string;
+	/**
+	 * @generated from field: string workspace_id = 2;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string name = 3;
-   */
-  name: string;
+	/**
+	 * @generated from field: string name = 3;
+	 */
+	name: string;
 
-  /**
-   * @generated from field: bool online = 4;
-   */
-  online: boolean;
+	/**
+	 * @generated from field: bool online = 4;
+	 */
+	online: boolean;
 
-  /**
-   * @generated from field: nokku.v1.DaemonStatus status = 5;
-   */
-  status: DaemonStatus;
+	/**
+	 * @generated from field: nokku.v1.DaemonStatus status = 5;
+	 */
+	status: DaemonStatus;
 
-  /**
-   * @generated from field: nokku.v1.DaemonConfig config = 6;
-   */
-  config?: DaemonConfig | undefined;
+	/**
+	 * @generated from field: nokku.v1.DaemonConfig config = 6;
+	 */
+	config?: DaemonConfig | undefined;
 
-  /**
-   * @generated from field: map<string, string> metadata = 7;
-   */
-  metadata: { [key: string]: string };
+	/**
+	 * @generated from field: map<string, string> metadata = 7;
+	 */
+	metadata: { [key: string]: string };
 
-  /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 8;
-   */
-  updatedAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp updated_at = 8;
+	 */
+	updatedAt?: Timestamp | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 9;
-   */
-  createdAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp created_at = 9;
+	 */
+	createdAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.Daemon.
  * Use `create(DaemonSchema)` to create a new message.
  */
-export const DaemonSchema: GenMessage<Daemon> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 0);
+export const DaemonSchema: GenMessage<Daemon> /*@__PURE__*/ = messageDesc(file_nokku_v1_daemon, 0);
 
 /**
  * @generated from message nokku.v1.DaemonConfig
  */
-export type DaemonConfig = Message<"nokku.v1.DaemonConfig"> & {
-  /**
-   * @generated from field: bool record_sessions = 1;
-   */
-  recordSessions: boolean;
+export type DaemonConfig = Message<'nokku.v1.DaemonConfig'> & {
+	/**
+	 * @generated from field: bool record_sessions = 1;
+	 */
+	recordSessions: boolean;
 
-  /**
-   * @generated from field: bool allow_forwarding = 2;
-   */
-  allowForwarding: boolean;
+	/**
+	 * @generated from field: bool allow_forwarding = 2;
+	 */
+	allowForwarding: boolean;
 
-  /**
-   * @generated from field: bool allow_agent_forwarding = 3;
-   */
-  allowAgentForwarding: boolean;
+	/**
+	 * @generated from field: bool allow_agent_forwarding = 3;
+	 */
+	allowAgentForwarding: boolean;
 
-  /**
-   * @generated from field: bool gateway_ports = 4;
-   */
-  gatewayPorts: boolean;
+	/**
+	 * @generated from field: bool gateway_ports = 4;
+	 */
+	gatewayPorts: boolean;
 
-  /**
-   * @generated from field: int32 max_sessions = 5;
-   */
-  maxSessions: number;
+	/**
+	 * @generated from field: int32 max_sessions = 5;
+	 */
+	maxSessions: number;
 
-  /**
-   * @generated from field: int32 max_sessions_per_user = 6;
-   */
-  maxSessionsPerUser: number;
+	/**
+	 * @generated from field: int32 max_sessions_per_user = 6;
+	 */
+	maxSessionsPerUser: number;
 
-  /**
-   * @generated from field: int32 max_connections = 7;
-   */
-  maxConnections: number;
+	/**
+	 * @generated from field: int32 max_connections = 7;
+	 */
+	maxConnections: number;
 
-  /**
-   * @generated from field: google.protobuf.Duration client_alive_interval = 8;
-   */
-  clientAliveInterval?: Duration | undefined;
+	/**
+	 * @generated from field: google.protobuf.Duration client_alive_interval = 8;
+	 */
+	clientAliveInterval?: Duration | undefined;
 };
 
 /**
  * Describes the message nokku.v1.DaemonConfig.
  * Use `create(DaemonConfigSchema)` to create a new message.
  */
-export const DaemonConfigSchema: GenMessage<DaemonConfig> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 1);
+export const DaemonConfigSchema: GenMessage<DaemonConfig> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	1
+);
 
 /**
  * @generated from message nokku.v1.GetDaemonRequest
  */
-export type GetDaemonRequest = Message<"nokku.v1.GetDaemonRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type GetDaemonRequest = Message<'nokku.v1.GetDaemonRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string id = 2;
-   */
-  id: string;
+	/**
+	 * @generated from field: string id = 2;
+	 */
+	id: string;
 };
 
 /**
  * Describes the message nokku.v1.GetDaemonRequest.
  * Use `create(GetDaemonRequestSchema)` to create a new message.
  */
-export const GetDaemonRequestSchema: GenMessage<GetDaemonRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 2);
+export const GetDaemonRequestSchema: GenMessage<GetDaemonRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	2
+);
 
 /**
  * @generated from message nokku.v1.GetDaemonResponse
  */
-export type GetDaemonResponse = Message<"nokku.v1.GetDaemonResponse"> & {
-  /**
-   * @generated from field: nokku.v1.Daemon daemon = 1;
-   */
-  daemon?: Daemon | undefined;
+export type GetDaemonResponse = Message<'nokku.v1.GetDaemonResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.Daemon daemon = 1;
+	 */
+	daemon?: Daemon | undefined;
 };
 
 /**
  * Describes the message nokku.v1.GetDaemonResponse.
  * Use `create(GetDaemonResponseSchema)` to create a new message.
  */
-export const GetDaemonResponseSchema: GenMessage<GetDaemonResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 3);
+export const GetDaemonResponseSchema: GenMessage<GetDaemonResponse> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	3
+);
 
 /**
  * @generated from message nokku.v1.UpdateDaemonRequest
  */
-export type UpdateDaemonRequest = Message<"nokku.v1.UpdateDaemonRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type UpdateDaemonRequest = Message<'nokku.v1.UpdateDaemonRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string id = 2;
-   */
-  id: string;
+	/**
+	 * @generated from field: string id = 2;
+	 */
+	id: string;
 
-  /**
-   * @generated from field: nokku.v1.DaemonStatus status = 3;
-   */
-  status: DaemonStatus;
+	/**
+	 * @generated from field: nokku.v1.DaemonStatus status = 3;
+	 */
+	status: DaemonStatus;
 
-  /**
-   * @generated from field: nokku.v1.DaemonConfig config = 4;
-   */
-  config?: DaemonConfig | undefined;
+	/**
+	 * @generated from field: nokku.v1.DaemonConfig config = 4;
+	 */
+	config?: DaemonConfig | undefined;
 };
 
 /**
  * Describes the message nokku.v1.UpdateDaemonRequest.
  * Use `create(UpdateDaemonRequestSchema)` to create a new message.
  */
-export const UpdateDaemonRequestSchema: GenMessage<UpdateDaemonRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 4);
+export const UpdateDaemonRequestSchema: GenMessage<UpdateDaemonRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	4
+);
 
 /**
  * @generated from message nokku.v1.UpdateDaemonResponse
  */
-export type UpdateDaemonResponse = Message<"nokku.v1.UpdateDaemonResponse"> & {
-};
+export type UpdateDaemonResponse = Message<'nokku.v1.UpdateDaemonResponse'> & {};
 
 /**
  * Describes the message nokku.v1.UpdateDaemonResponse.
  * Use `create(UpdateDaemonResponseSchema)` to create a new message.
  */
-export const UpdateDaemonResponseSchema: GenMessage<UpdateDaemonResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 5);
+export const UpdateDaemonResponseSchema: GenMessage<UpdateDaemonResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 5);
 
 /**
  * @generated from message nokku.v1.DeleteDaemonRequest
  */
-export type DeleteDaemonRequest = Message<"nokku.v1.DeleteDaemonRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type DeleteDaemonRequest = Message<'nokku.v1.DeleteDaemonRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string id = 2;
-   */
-  id: string;
+	/**
+	 * @generated from field: string id = 2;
+	 */
+	id: string;
 };
 
 /**
  * Describes the message nokku.v1.DeleteDaemonRequest.
  * Use `create(DeleteDaemonRequestSchema)` to create a new message.
  */
-export const DeleteDaemonRequestSchema: GenMessage<DeleteDaemonRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 6);
+export const DeleteDaemonRequestSchema: GenMessage<DeleteDaemonRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	6
+);
 
 /**
  * @generated from message nokku.v1.DeleteDaemonResponse
  */
-export type DeleteDaemonResponse = Message<"nokku.v1.DeleteDaemonResponse"> & {
-};
+export type DeleteDaemonResponse = Message<'nokku.v1.DeleteDaemonResponse'> & {};
 
 /**
  * Describes the message nokku.v1.DeleteDaemonResponse.
  * Use `create(DeleteDaemonResponseSchema)` to create a new message.
  */
-export const DeleteDaemonResponseSchema: GenMessage<DeleteDaemonResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 7);
+export const DeleteDaemonResponseSchema: GenMessage<DeleteDaemonResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 7);
 
 /**
  * @generated from message nokku.v1.ListDaemonsRequest
  */
-export type ListDaemonsRequest = Message<"nokku.v1.ListDaemonsRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type ListDaemonsRequest = Message<'nokku.v1.ListDaemonsRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: int32 limit = 2;
-   */
-  limit: number;
+	/**
+	 * @generated from field: int32 limit = 2;
+	 */
+	limit: number;
 
-  /**
-   * @generated from field: int32 offset = 3;
-   */
-  offset: number;
+	/**
+	 * @generated from field: int32 offset = 3;
+	 */
+	offset: number;
 
-  /**
-   * @generated from field: string query = 4;
-   */
-  query: string;
+	/**
+	 * @generated from field: string query = 4;
+	 */
+	query: string;
 
-  /**
-   * @generated from field: bool online = 5;
-   */
-  online: boolean;
+	/**
+	 * @generated from field: bool online = 5;
+	 */
+	online: boolean;
 
-  /**
-   * @generated from field: nokku.v1.DaemonStatus status = 6;
-   */
-  status: DaemonStatus;
+	/**
+	 * @generated from field: nokku.v1.DaemonStatus status = 6;
+	 */
+	status: DaemonStatus;
 };
 
 /**
  * Describes the message nokku.v1.ListDaemonsRequest.
  * Use `create(ListDaemonsRequestSchema)` to create a new message.
  */
-export const ListDaemonsRequestSchema: GenMessage<ListDaemonsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 8);
+export const ListDaemonsRequestSchema: GenMessage<ListDaemonsRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	8
+);
 
 /**
  * @generated from message nokku.v1.ListDaemonsResponse
  */
-export type ListDaemonsResponse = Message<"nokku.v1.ListDaemonsResponse"> & {
-  /**
-   * @generated from field: repeated nokku.v1.Daemon daemons = 1;
-   */
-  daemons: Daemon[];
+export type ListDaemonsResponse = Message<'nokku.v1.ListDaemonsResponse'> & {
+	/**
+	 * @generated from field: repeated nokku.v1.Daemon daemons = 1;
+	 */
+	daemons: Daemon[];
 
-  /**
-   * @generated from field: int32 total = 2;
-   */
-  total: number;
+	/**
+	 * @generated from field: int32 total = 2;
+	 */
+	total: number;
 };
 
 /**
  * Describes the message nokku.v1.ListDaemonsResponse.
  * Use `create(ListDaemonsResponseSchema)` to create a new message.
  */
-export const ListDaemonsResponseSchema: GenMessage<ListDaemonsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 9);
+export const ListDaemonsResponseSchema: GenMessage<ListDaemonsResponse> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	9
+);
 
 /**
  * @generated from message nokku.v1.RefreshEnrollTokenRequest
  */
-export type RefreshEnrollTokenRequest = Message<"nokku.v1.RefreshEnrollTokenRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type RefreshEnrollTokenRequest = Message<'nokku.v1.RefreshEnrollTokenRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 };
 
 /**
  * Describes the message nokku.v1.RefreshEnrollTokenRequest.
  * Use `create(RefreshEnrollTokenRequestSchema)` to create a new message.
  */
-export const RefreshEnrollTokenRequestSchema: GenMessage<RefreshEnrollTokenRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 10);
+export const RefreshEnrollTokenRequestSchema: GenMessage<RefreshEnrollTokenRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 10);
 
 /**
  * @generated from message nokku.v1.RefreshEnrollTokenResponse
  */
-export type RefreshEnrollTokenResponse = Message<"nokku.v1.RefreshEnrollTokenResponse"> & {
-  /**
-   * @generated from field: string token = 1;
-   */
-  token: string;
+export type RefreshEnrollTokenResponse = Message<'nokku.v1.RefreshEnrollTokenResponse'> & {
+	/**
+	 * @generated from field: string token = 1;
+	 */
+	token: string;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 2;
-   */
-  expiresAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp expires_at = 2;
+	 */
+	expiresAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.RefreshEnrollTokenResponse.
  * Use `create(RefreshEnrollTokenResponseSchema)` to create a new message.
  */
-export const RefreshEnrollTokenResponseSchema: GenMessage<RefreshEnrollTokenResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 11);
+export const RefreshEnrollTokenResponseSchema: GenMessage<RefreshEnrollTokenResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 11);
 
 /**
  * @generated from message nokku.v1.RevokeEnrollTokenRequest
  */
-export type RevokeEnrollTokenRequest = Message<"nokku.v1.RevokeEnrollTokenRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type RevokeEnrollTokenRequest = Message<'nokku.v1.RevokeEnrollTokenRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 };
 
 /**
  * Describes the message nokku.v1.RevokeEnrollTokenRequest.
  * Use `create(RevokeEnrollTokenRequestSchema)` to create a new message.
  */
-export const RevokeEnrollTokenRequestSchema: GenMessage<RevokeEnrollTokenRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 12);
+export const RevokeEnrollTokenRequestSchema: GenMessage<RevokeEnrollTokenRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 12);
 
 /**
  * @generated from message nokku.v1.RevokeEnrollTokenResponse
  */
-export type RevokeEnrollTokenResponse = Message<"nokku.v1.RevokeEnrollTokenResponse"> & {
-};
+export type RevokeEnrollTokenResponse = Message<'nokku.v1.RevokeEnrollTokenResponse'> & {};
 
 /**
  * Describes the message nokku.v1.RevokeEnrollTokenResponse.
  * Use `create(RevokeEnrollTokenResponseSchema)` to create a new message.
  */
-export const RevokeEnrollTokenResponseSchema: GenMessage<RevokeEnrollTokenResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 13);
+export const RevokeEnrollTokenResponseSchema: GenMessage<RevokeEnrollTokenResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 13);
 
 /**
  * @generated from message nokku.v1.CreateSessionRequest
  */
-export type CreateSessionRequest = Message<"nokku.v1.CreateSessionRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type CreateSessionRequest = Message<'nokku.v1.CreateSessionRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string daemon_id = 2;
-   */
-  daemonId: string;
+	/**
+	 * @generated from field: string daemon_id = 2;
+	 */
+	daemonId: string;
 
-  /**
-   * @generated from field: string username = 3;
-   */
-  username: string;
+	/**
+	 * @generated from field: string username = 3;
+	 */
+	username: string;
 };
 
 /**
  * Describes the message nokku.v1.CreateSessionRequest.
  * Use `create(CreateSessionRequestSchema)` to create a new message.
  */
-export const CreateSessionRequestSchema: GenMessage<CreateSessionRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 14);
+export const CreateSessionRequestSchema: GenMessage<CreateSessionRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 14);
 
 /**
  * @generated from message nokku.v1.CreateSessionResponse
  */
-export type CreateSessionResponse = Message<"nokku.v1.CreateSessionResponse"> & {
-  /**
-   * @generated from field: nokku.v1.DaemonSession session = 1;
-   */
-  session?: DaemonSession | undefined;
+export type CreateSessionResponse = Message<'nokku.v1.CreateSessionResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.DaemonSession session = 1;
+	 */
+	session?: DaemonSession | undefined;
 
-  /**
-   * @generated from field: string daemon_name = 2;
-   */
-  daemonName: string;
+	/**
+	 * @generated from field: string daemon_name = 2;
+	 */
+	daemonName: string;
 };
 
 /**
  * Describes the message nokku.v1.CreateSessionResponse.
  * Use `create(CreateSessionResponseSchema)` to create a new message.
  */
-export const CreateSessionResponseSchema: GenMessage<CreateSessionResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 15);
+export const CreateSessionResponseSchema: GenMessage<CreateSessionResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 15);
 
 /**
  * @generated from message nokku.v1.ListSessionsRequest
  */
-export type ListSessionsRequest = Message<"nokku.v1.ListSessionsRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type ListSessionsRequest = Message<'nokku.v1.ListSessionsRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string daemon_id = 2;
-   */
-  daemonId: string;
+	/**
+	 * @generated from field: string daemon_id = 2;
+	 */
+	daemonId: string;
 };
 
 /**
  * Describes the message nokku.v1.ListSessionsRequest.
  * Use `create(ListSessionsRequestSchema)` to create a new message.
  */
-export const ListSessionsRequestSchema: GenMessage<ListSessionsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 16);
+export const ListSessionsRequestSchema: GenMessage<ListSessionsRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	16
+);
 
 /**
  * @generated from message nokku.v1.ListSessionsResponse
  */
-export type ListSessionsResponse = Message<"nokku.v1.ListSessionsResponse"> & {
-  /**
-   * @generated from field: repeated nokku.v1.DaemonSession sessions = 1;
-   */
-  sessions: DaemonSession[];
+export type ListSessionsResponse = Message<'nokku.v1.ListSessionsResponse'> & {
+	/**
+	 * @generated from field: repeated nokku.v1.DaemonSession sessions = 1;
+	 */
+	sessions: DaemonSession[];
 
-  /**
-   * @generated from field: string daemon_name = 2;
-   */
-  daemonName: string;
+	/**
+	 * @generated from field: string daemon_name = 2;
+	 */
+	daemonName: string;
 };
 
 /**
  * Describes the message nokku.v1.ListSessionsResponse.
  * Use `create(ListSessionsResponseSchema)` to create a new message.
  */
-export const ListSessionsResponseSchema: GenMessage<ListSessionsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 17);
+export const ListSessionsResponseSchema: GenMessage<ListSessionsResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 17);
 
 /**
  * @generated from message nokku.v1.CloseSessionRequest
  */
-export type CloseSessionRequest = Message<"nokku.v1.CloseSessionRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type CloseSessionRequest = Message<'nokku.v1.CloseSessionRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string daemon_id = 2;
-   */
-  daemonId: string;
+	/**
+	 * @generated from field: string daemon_id = 2;
+	 */
+	daemonId: string;
 
-  /**
-   * @generated from field: string session_id = 3;
-   */
-  sessionId: string;
+	/**
+	 * @generated from field: string session_id = 3;
+	 */
+	sessionId: string;
 };
 
 /**
  * Describes the message nokku.v1.CloseSessionRequest.
  * Use `create(CloseSessionRequestSchema)` to create a new message.
  */
-export const CloseSessionRequestSchema: GenMessage<CloseSessionRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 18);
+export const CloseSessionRequestSchema: GenMessage<CloseSessionRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	18
+);
 
 /**
  * @generated from message nokku.v1.CloseSessionResponse
  */
-export type CloseSessionResponse = Message<"nokku.v1.CloseSessionResponse"> & {
-};
+export type CloseSessionResponse = Message<'nokku.v1.CloseSessionResponse'> & {};
 
 /**
  * Describes the message nokku.v1.CloseSessionResponse.
  * Use `create(CloseSessionResponseSchema)` to create a new message.
  */
-export const CloseSessionResponseSchema: GenMessage<CloseSessionResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 19);
+export const CloseSessionResponseSchema: GenMessage<CloseSessionResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 19);
 
 /**
  * @generated from message nokku.v1.EnrollDaemonRequest
  */
-export type EnrollDaemonRequest = Message<"nokku.v1.EnrollDaemonRequest"> & {
-  /**
-   * @generated from field: string token = 1;
-   */
-  token: string;
+export type EnrollDaemonRequest = Message<'nokku.v1.EnrollDaemonRequest'> & {
+	/**
+	 * @generated from field: string token = 1;
+	 */
+	token: string;
 
-  /**
-   * @generated from field: string ca_id = 2;
-   */
-  caId: string;
+	/**
+	 * @generated from field: string ca_id = 2;
+	 */
+	caId: string;
 };
 
 /**
  * Describes the message nokku.v1.EnrollDaemonRequest.
  * Use `create(EnrollDaemonRequestSchema)` to create a new message.
  */
-export const EnrollDaemonRequestSchema: GenMessage<EnrollDaemonRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 20);
+export const EnrollDaemonRequestSchema: GenMessage<EnrollDaemonRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	20
+);
 
 /**
  * @generated from message nokku.v1.EnrollDaemonResponse
  */
-export type EnrollDaemonResponse = Message<"nokku.v1.EnrollDaemonResponse"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
+export type EnrollDaemonResponse = Message<'nokku.v1.EnrollDaemonResponse'> & {
+	/**
+	 * @generated from field: string id = 1;
+	 */
+	id: string;
 
-  /**
-   * @generated from field: string workspace_id = 2;
-   */
-  workspaceId: string;
+	/**
+	 * @generated from field: string workspace_id = 2;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string target_id = 3;
-   */
-  targetId: string;
+	/**
+	 * @generated from field: string target_id = 3;
+	 */
+	targetId: string;
 
-  /**
-   * @generated from field: nokku.v1.DaemonStatus status = 4;
-   */
-  status: DaemonStatus;
+	/**
+	 * @generated from field: nokku.v1.DaemonStatus status = 4;
+	 */
+	status: DaemonStatus;
 
-  /**
-   * @generated from field: nokku.v1.DaemonConfig config = 5;
-   */
-  config?: DaemonConfig | undefined;
+	/**
+	 * @generated from field: nokku.v1.DaemonConfig config = 5;
+	 */
+	config?: DaemonConfig | undefined;
 
-  /**
-   * @generated from field: string access_token = 6;
-   */
-  accessToken: string;
+	/**
+	 * @generated from field: string access_token = 6;
+	 */
+	accessToken: string;
 };
 
 /**
  * Describes the message nokku.v1.EnrollDaemonResponse.
  * Use `create(EnrollDaemonResponseSchema)` to create a new message.
  */
-export const EnrollDaemonResponseSchema: GenMessage<EnrollDaemonResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 21);
+export const EnrollDaemonResponseSchema: GenMessage<EnrollDaemonResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 21);
 
 /**
  * @generated from message nokku.v1.PrincipalUsers
  */
-export type PrincipalUsers = Message<"nokku.v1.PrincipalUsers"> & {
-  /**
-   * @generated from field: string username = 1;
-   */
-  username: string;
+export type PrincipalUsers = Message<'nokku.v1.PrincipalUsers'> & {
+	/**
+	 * @generated from field: string username = 1;
+	 */
+	username: string;
 
-  /**
-   * @generated from field: repeated string ids = 2;
-   */
-  ids: string[];
+	/**
+	 * @generated from field: repeated string ids = 2;
+	 */
+	ids: string[];
 };
 
 /**
  * Describes the message nokku.v1.PrincipalUsers.
  * Use `create(PrincipalUsersSchema)` to create a new message.
  */
-export const PrincipalUsersSchema: GenMessage<PrincipalUsers> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 22);
+export const PrincipalUsersSchema: GenMessage<PrincipalUsers> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	22
+);
 
 /**
  * @generated from message nokku.v1.SyncDaemonRequest
  */
-export type SyncDaemonRequest = Message<"nokku.v1.SyncDaemonRequest"> & {
-  /**
-   * @generated from field: repeated string users = 1;
-   */
-  users: string[];
+export type SyncDaemonRequest = Message<'nokku.v1.SyncDaemonRequest'> & {
+	/**
+	 * @generated from field: repeated string users = 1;
+	 */
+	users: string[];
 
-  /**
-   * @generated from field: repeated string private_ips = 2;
-   */
-  privateIps: string[];
+	/**
+	 * @generated from field: repeated string private_ips = 2;
+	 */
+	privateIps: string[];
 
-  /**
-   * @generated from field: map<string, string> metadata = 3;
-   */
-  metadata: { [key: string]: string };
+	/**
+	 * @generated from field: map<string, string> metadata = 3;
+	 */
+	metadata: { [key: string]: string };
 };
 
 /**
  * Describes the message nokku.v1.SyncDaemonRequest.
  * Use `create(SyncDaemonRequestSchema)` to create a new message.
  */
-export const SyncDaemonRequestSchema: GenMessage<SyncDaemonRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 23);
+export const SyncDaemonRequestSchema: GenMessage<SyncDaemonRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	23
+);
 
 /**
  * @generated from message nokku.v1.SyncDaemonResponse
  */
-export type SyncDaemonResponse = Message<"nokku.v1.SyncDaemonResponse"> & {
-  /**
-   * @generated from field: nokku.v1.DaemonStatus status = 1;
-   */
-  status: DaemonStatus;
+export type SyncDaemonResponse = Message<'nokku.v1.SyncDaemonResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.DaemonStatus status = 1;
+	 */
+	status: DaemonStatus;
 
-  /**
-   * @generated from field: nokku.v1.DaemonConfig config = 2;
-   */
-  config?: DaemonConfig | undefined;
+	/**
+	 * @generated from field: nokku.v1.DaemonConfig config = 2;
+	 */
+	config?: DaemonConfig | undefined;
 
-  /**
-   * @generated from field: repeated nokku.v1.PrincipalUsers principals = 3;
-   */
-  principals: PrincipalUsers[];
+	/**
+	 * @generated from field: repeated nokku.v1.PrincipalUsers principals = 3;
+	 */
+	principals: PrincipalUsers[];
 
-  /**
-   * @generated from field: int64 state_version = 4;
-   */
-  stateVersion: bigint;
+	/**
+	 * @generated from field: int64 state_version = 4;
+	 */
+	stateVersion: bigint;
 
-  /**
-   * @generated from field: string ca_public_key = 5;
-   */
-  caPublicKey: string;
+	/**
+	 * @generated from field: string ca_public_key = 5;
+	 */
+	caPublicKey: string;
 };
 
 /**
  * Describes the message nokku.v1.SyncDaemonResponse.
  * Use `create(SyncDaemonResponseSchema)` to create a new message.
  */
-export const SyncDaemonResponseSchema: GenMessage<SyncDaemonResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 24);
+export const SyncDaemonResponseSchema: GenMessage<SyncDaemonResponse> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	24
+);
 
 /**
  * @generated from message nokku.v1.ConnectRequest
  */
-export type ConnectRequest = Message<"nokku.v1.ConnectRequest"> & {
-  /**
-   * @generated from oneof nokku.v1.ConnectRequest.msg
-   */
-  msg: {
-    /**
-     * @generated from field: nokku.v1.Heartbeat heartbeat = 1;
-     */
-    value: Heartbeat;
-    case: "heartbeat";
-  } | { case: undefined; value?: undefined };
+export type ConnectRequest = Message<'nokku.v1.ConnectRequest'> & {
+	/**
+	 * @generated from oneof nokku.v1.ConnectRequest.msg
+	 */
+	msg:
+		| {
+				/**
+				 * @generated from field: nokku.v1.Heartbeat heartbeat = 1;
+				 */
+				value: Heartbeat;
+				case: 'heartbeat';
+		  }
+		| { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message nokku.v1.ConnectRequest.
  * Use `create(ConnectRequestSchema)` to create a new message.
  */
-export const ConnectRequestSchema: GenMessage<ConnectRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 25);
+export const ConnectRequestSchema: GenMessage<ConnectRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	25
+);
 
 /**
  * @generated from message nokku.v1.ConnectResponse
  */
-export type ConnectResponse = Message<"nokku.v1.ConnectResponse"> & {
-  /**
-   * @generated from oneof nokku.v1.ConnectResponse.msg
-   */
-  msg: {
-    /**
-     * @generated from field: nokku.v1.HeartbeatAck heartbeat_ack = 1;
-     */
-    value: HeartbeatAck;
-    case: "heartbeatAck";
-  } | {
-    /**
-     * @generated from field: nokku.v1.StateUpdate state_update = 2;
-     */
-    value: StateUpdate;
-    case: "stateUpdate";
-  } | {
-    /**
-     * @generated from field: nokku.v1.DaemonSession session = 3;
-     */
-    value: DaemonSession;
-    case: "session";
-  } | { case: undefined; value?: undefined };
+export type ConnectResponse = Message<'nokku.v1.ConnectResponse'> & {
+	/**
+	 * @generated from oneof nokku.v1.ConnectResponse.msg
+	 */
+	msg:
+		| {
+				/**
+				 * @generated from field: nokku.v1.HeartbeatAck heartbeat_ack = 1;
+				 */
+				value: HeartbeatAck;
+				case: 'heartbeatAck';
+		  }
+		| {
+				/**
+				 * @generated from field: nokku.v1.StateUpdate state_update = 2;
+				 */
+				value: StateUpdate;
+				case: 'stateUpdate';
+		  }
+		| {
+				/**
+				 * @generated from field: nokku.v1.DaemonSession session = 3;
+				 */
+				value: DaemonSession;
+				case: 'session';
+		  }
+		| { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message nokku.v1.ConnectResponse.
  * Use `create(ConnectResponseSchema)` to create a new message.
  */
-export const ConnectResponseSchema: GenMessage<ConnectResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 26);
+export const ConnectResponseSchema: GenMessage<ConnectResponse> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	26
+);
 
 /**
  * @generated from message nokku.v1.Heartbeat
  */
-export type Heartbeat = Message<"nokku.v1.Heartbeat"> & {
-  /**
-   * @generated from field: int64 state_version = 1;
-   */
-  stateVersion: bigint;
+export type Heartbeat = Message<'nokku.v1.Heartbeat'> & {
+	/**
+	 * @generated from field: int64 state_version = 1;
+	 */
+	stateVersion: bigint;
 };
 
 /**
  * Describes the message nokku.v1.Heartbeat.
  * Use `create(HeartbeatSchema)` to create a new message.
  */
-export const HeartbeatSchema: GenMessage<Heartbeat> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 27);
+export const HeartbeatSchema: GenMessage<Heartbeat> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	27
+);
 
 /**
  * @generated from message nokku.v1.HeartbeatAck
  */
-export type HeartbeatAck = Message<"nokku.v1.HeartbeatAck"> & {
-  /**
-   * @generated from field: int64 state_version = 1;
-   */
-  stateVersion: bigint;
+export type HeartbeatAck = Message<'nokku.v1.HeartbeatAck'> & {
+	/**
+	 * @generated from field: int64 state_version = 1;
+	 */
+	stateVersion: bigint;
 };
 
 /**
  * Describes the message nokku.v1.HeartbeatAck.
  * Use `create(HeartbeatAckSchema)` to create a new message.
  */
-export const HeartbeatAckSchema: GenMessage<HeartbeatAck> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 28);
+export const HeartbeatAckSchema: GenMessage<HeartbeatAck> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	28
+);
 
 /**
  * @generated from message nokku.v1.StateUpdate
  */
-export type StateUpdate = Message<"nokku.v1.StateUpdate"> & {
-  /**
-   * @generated from field: int64 state_version = 1;
-   */
-  stateVersion: bigint;
+export type StateUpdate = Message<'nokku.v1.StateUpdate'> & {
+	/**
+	 * @generated from field: int64 state_version = 1;
+	 */
+	stateVersion: bigint;
 };
 
 /**
  * Describes the message nokku.v1.StateUpdate.
  * Use `create(StateUpdateSchema)` to create a new message.
  */
-export const StateUpdateSchema: GenMessage<StateUpdate> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 29);
+export const StateUpdateSchema: GenMessage<StateUpdate> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	29
+);
 
 /**
  * @generated from message nokku.v1.DaemonSession
  */
-export type DaemonSession = Message<"nokku.v1.DaemonSession"> & {
-  /**
-   * @generated from field: string session_id = 1;
-   */
-  sessionId: string;
+export type DaemonSession = Message<'nokku.v1.DaemonSession'> & {
+	/**
+	 * @generated from field: string session_id = 1;
+	 */
+	sessionId: string;
 
-  /**
-   * @generated from field: string username = 2;
-   */
-  username: string;
+	/**
+	 * @generated from field: string username = 2;
+	 */
+	username: string;
 
-  /**
-   * @generated from field: string user_id = 3;
-   */
-  userId: string;
+	/**
+	 * @generated from field: string user_id = 3;
+	 */
+	userId: string;
 };
 
 /**
  * Describes the message nokku.v1.DaemonSession.
  * Use `create(DaemonSessionSchema)` to create a new message.
  */
-export const DaemonSessionSchema: GenMessage<DaemonSession> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 30);
+export const DaemonSessionSchema: GenMessage<DaemonSession> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	30
+);
 
 /**
  * @generated from message nokku.v1.DaemonSessionRequest
  */
-export type DaemonSessionRequest = Message<"nokku.v1.DaemonSessionRequest"> & {
-  /**
-   * @generated from oneof nokku.v1.DaemonSessionRequest.msg
-   */
-  msg: {
-    /**
-     * @generated from field: nokku.v1.DaemonSessionReady ready = 1;
-     */
-    value: DaemonSessionReady;
-    case: "ready";
-  } | {
-    /**
-     * @generated from field: bytes stdout = 2;
-     */
-    value: Uint8Array;
-    case: "stdout";
-  } | {
-    /**
-     * @generated from field: nokku.v1.DaemonSessionEnded exited = 3;
-     */
-    value: DaemonSessionEnded;
-    case: "exited";
-  } | { case: undefined; value?: undefined };
+export type DaemonSessionRequest = Message<'nokku.v1.DaemonSessionRequest'> & {
+	/**
+	 * @generated from oneof nokku.v1.DaemonSessionRequest.msg
+	 */
+	msg:
+		| {
+				/**
+				 * @generated from field: nokku.v1.DaemonSessionReady ready = 1;
+				 */
+				value: DaemonSessionReady;
+				case: 'ready';
+		  }
+		| {
+				/**
+				 * @generated from field: bytes stdout = 2;
+				 */
+				value: Uint8Array;
+				case: 'stdout';
+		  }
+		| {
+				/**
+				 * @generated from field: nokku.v1.DaemonSessionEnded exited = 3;
+				 */
+				value: DaemonSessionEnded;
+				case: 'exited';
+		  }
+		| { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message nokku.v1.DaemonSessionRequest.
  * Use `create(DaemonSessionRequestSchema)` to create a new message.
  */
-export const DaemonSessionRequestSchema: GenMessage<DaemonSessionRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 31);
+export const DaemonSessionRequestSchema: GenMessage<DaemonSessionRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 31);
 
 /**
  * @generated from message nokku.v1.DaemonSessionResponse
  */
-export type DaemonSessionResponse = Message<"nokku.v1.DaemonSessionResponse"> & {
-  /**
-   * @generated from oneof nokku.v1.DaemonSessionResponse.msg
-   */
-  msg: {
-    /**
-     * @generated from field: bytes stdin = 1;
-     */
-    value: Uint8Array;
-    case: "stdin";
-  } | {
-    /**
-     * @generated from field: nokku.v1.DaemonResizeRequest resize = 2;
-     */
-    value: DaemonResizeRequest;
-    case: "resize";
-  } | {
-    /**
-     * @generated from field: nokku.v1.DaemonCloseRequest close = 3;
-     */
-    value: DaemonCloseRequest;
-    case: "close";
-  } | { case: undefined; value?: undefined };
+export type DaemonSessionResponse = Message<'nokku.v1.DaemonSessionResponse'> & {
+	/**
+	 * @generated from oneof nokku.v1.DaemonSessionResponse.msg
+	 */
+	msg:
+		| {
+				/**
+				 * @generated from field: bytes stdin = 1;
+				 */
+				value: Uint8Array;
+				case: 'stdin';
+		  }
+		| {
+				/**
+				 * @generated from field: nokku.v1.DaemonResizeRequest resize = 2;
+				 */
+				value: DaemonResizeRequest;
+				case: 'resize';
+		  }
+		| {
+				/**
+				 * @generated from field: nokku.v1.DaemonCloseRequest close = 3;
+				 */
+				value: DaemonCloseRequest;
+				case: 'close';
+		  }
+		| { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message nokku.v1.DaemonSessionResponse.
  * Use `create(DaemonSessionResponseSchema)` to create a new message.
  */
-export const DaemonSessionResponseSchema: GenMessage<DaemonSessionResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 32);
+export const DaemonSessionResponseSchema: GenMessage<DaemonSessionResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_daemon, 32);
 
 /**
  * @generated from message nokku.v1.DaemonSessionReady
  */
-export type DaemonSessionReady = Message<"nokku.v1.DaemonSessionReady"> & {
-  /**
-   * @generated from field: string session_id = 1;
-   */
-  sessionId: string;
+export type DaemonSessionReady = Message<'nokku.v1.DaemonSessionReady'> & {
+	/**
+	 * @generated from field: string session_id = 1;
+	 */
+	sessionId: string;
 
-  /**
-   * @generated from field: bytes replay_buffer = 2;
-   */
-  replayBuffer: Uint8Array;
+	/**
+	 * @generated from field: bytes replay_buffer = 2;
+	 */
+	replayBuffer: Uint8Array;
 
-  /**
-   * @generated from field: string username = 3;
-   */
-  username: string;
+	/**
+	 * @generated from field: string username = 3;
+	 */
+	username: string;
 
-  /**
-   * @generated from field: string user_id = 4;
-   */
-  userId: string;
+	/**
+	 * @generated from field: string user_id = 4;
+	 */
+	userId: string;
 };
 
 /**
  * Describes the message nokku.v1.DaemonSessionReady.
  * Use `create(DaemonSessionReadySchema)` to create a new message.
  */
-export const DaemonSessionReadySchema: GenMessage<DaemonSessionReady> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 33);
+export const DaemonSessionReadySchema: GenMessage<DaemonSessionReady> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	33
+);
 
 /**
  * @generated from message nokku.v1.DaemonResizeRequest
  */
-export type DaemonResizeRequest = Message<"nokku.v1.DaemonResizeRequest"> & {
-  /**
-   * @generated from field: uint32 width = 1;
-   */
-  width: number;
+export type DaemonResizeRequest = Message<'nokku.v1.DaemonResizeRequest'> & {
+	/**
+	 * @generated from field: uint32 width = 1;
+	 */
+	width: number;
 
-  /**
-   * @generated from field: uint32 height = 2;
-   */
-  height: number;
+	/**
+	 * @generated from field: uint32 height = 2;
+	 */
+	height: number;
 };
 
 /**
  * Describes the message nokku.v1.DaemonResizeRequest.
  * Use `create(DaemonResizeRequestSchema)` to create a new message.
  */
-export const DaemonResizeRequestSchema: GenMessage<DaemonResizeRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 34);
+export const DaemonResizeRequestSchema: GenMessage<DaemonResizeRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	34
+);
 
 /**
  * @generated from message nokku.v1.DaemonSessionEnded
  */
-export type DaemonSessionEnded = Message<"nokku.v1.DaemonSessionEnded"> & {
-  /**
-   * @generated from field: int32 exit_code = 1;
-   */
-  exitCode: number;
+export type DaemonSessionEnded = Message<'nokku.v1.DaemonSessionEnded'> & {
+	/**
+	 * @generated from field: int32 exit_code = 1;
+	 */
+	exitCode: number;
 
-  /**
-   * @generated from field: string error_message = 2;
-   */
-  errorMessage: string;
+	/**
+	 * @generated from field: string error_message = 2;
+	 */
+	errorMessage: string;
 };
 
 /**
  * Describes the message nokku.v1.DaemonSessionEnded.
  * Use `create(DaemonSessionEndedSchema)` to create a new message.
  */
-export const DaemonSessionEndedSchema: GenMessage<DaemonSessionEnded> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 35);
+export const DaemonSessionEndedSchema: GenMessage<DaemonSessionEnded> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	35
+);
 
 /**
  * @generated from message nokku.v1.DaemonCloseRequest
  */
-export type DaemonCloseRequest = Message<"nokku.v1.DaemonCloseRequest"> & {
-  /**
-   * @generated from field: string reason = 1;
-   */
-  reason: string;
+export type DaemonCloseRequest = Message<'nokku.v1.DaemonCloseRequest'> & {
+	/**
+	 * @generated from field: string reason = 1;
+	 */
+	reason: string;
 };
 
 /**
  * Describes the message nokku.v1.DaemonCloseRequest.
  * Use `create(DaemonCloseRequestSchema)` to create a new message.
  */
-export const DaemonCloseRequestSchema: GenMessage<DaemonCloseRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_daemon, 36);
+export const DaemonCloseRequestSchema: GenMessage<DaemonCloseRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_daemon,
+	36
+);
 
 /**
  * @generated from enum nokku.v1.DaemonStatus
  */
 export enum DaemonStatus {
-  /**
-   * @generated from enum value: DAEMON_STATUS_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
+	/**
+	 * @generated from enum value: DAEMON_STATUS_UNSPECIFIED = 0;
+	 */
+	UNSPECIFIED = 0,
 
-  /**
-   * @generated from enum value: DAEMON_STATUS_PENDING = 1;
-   */
-  PENDING = 1,
+	/**
+	 * @generated from enum value: DAEMON_STATUS_PENDING = 1;
+	 */
+	PENDING = 1,
 
-  /**
-   * @generated from enum value: DAEMON_STATUS_ACCEPTED = 2;
-   */
-  ACCEPTED = 2,
+	/**
+	 * @generated from enum value: DAEMON_STATUS_ACCEPTED = 2;
+	 */
+	ACCEPTED = 2,
 
-  /**
-   * @generated from enum value: DAEMON_STATUS_REJECTED = 3;
-   */
-  REJECTED = 3,
+	/**
+	 * @generated from enum value: DAEMON_STATUS_REJECTED = 3;
+	 */
+	REJECTED = 3
 }
 
 /**
  * Describes the enum nokku.v1.DaemonStatus.
  */
-export const DaemonStatusSchema: GenEnum<DaemonStatus> = /*@__PURE__*/
-  enumDesc(file_nokku_v1_daemon, 0);
+export const DaemonStatusSchema: GenEnum<DaemonStatus> /*@__PURE__*/ = enumDesc(
+	file_nokku_v1_daemon,
+	0
+);
 
 /**
  * @generated from service nokku.v1.DaemonService
  */
 export const DaemonService: GenService<{
-  /**
-   * @generated from rpc nokku.v1.DaemonService.GetDaemon
-   */
-  getDaemon: {
-    methodKind: "unary";
-    input: typeof GetDaemonRequestSchema;
-    output: typeof GetDaemonResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.DaemonService.UpdateDaemon
-   */
-  updateDaemon: {
-    methodKind: "unary";
-    input: typeof UpdateDaemonRequestSchema;
-    output: typeof UpdateDaemonResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.DaemonService.DeleteDaemon
-   */
-  deleteDaemon: {
-    methodKind: "unary";
-    input: typeof DeleteDaemonRequestSchema;
-    output: typeof DeleteDaemonResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.DaemonService.ListDaemons
-   */
-  listDaemons: {
-    methodKind: "unary";
-    input: typeof ListDaemonsRequestSchema;
-    output: typeof ListDaemonsResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.DaemonService.RefreshEnrollToken
-   */
-  refreshEnrollToken: {
-    methodKind: "unary";
-    input: typeof RefreshEnrollTokenRequestSchema;
-    output: typeof RefreshEnrollTokenResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.DaemonService.RevokeEnrollToken
-   */
-  revokeEnrollToken: {
-    methodKind: "unary";
-    input: typeof RevokeEnrollTokenRequestSchema;
-    output: typeof RevokeEnrollTokenResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.DaemonService.ListSessions
-   */
-  listSessions: {
-    methodKind: "unary";
-    input: typeof ListSessionsRequestSchema;
-    output: typeof ListSessionsResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.DaemonService.CreateSession
-   */
-  createSession: {
-    methodKind: "unary";
-    input: typeof CreateSessionRequestSchema;
-    output: typeof CreateSessionResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.DaemonService.CloseSession
-   */
-  closeSession: {
-    methodKind: "unary";
-    input: typeof CloseSessionRequestSchema;
-    output: typeof CloseSessionResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.DaemonService.EnrollDaemon
-   */
-  enrollDaemon: {
-    methodKind: "unary";
-    input: typeof EnrollDaemonRequestSchema;
-    output: typeof EnrollDaemonResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.DaemonService.SyncDaemon
-   */
-  syncDaemon: {
-    methodKind: "unary";
-    input: typeof SyncDaemonRequestSchema;
-    output: typeof SyncDaemonResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_nokku_v1_daemon, 0);
+	/**
+	 * @generated from rpc nokku.v1.DaemonService.GetDaemon
+	 */
+	getDaemon: {
+		methodKind: 'unary';
+		input: typeof GetDaemonRequestSchema;
+		output: typeof GetDaemonResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.DaemonService.UpdateDaemon
+	 */
+	updateDaemon: {
+		methodKind: 'unary';
+		input: typeof UpdateDaemonRequestSchema;
+		output: typeof UpdateDaemonResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.DaemonService.DeleteDaemon
+	 */
+	deleteDaemon: {
+		methodKind: 'unary';
+		input: typeof DeleteDaemonRequestSchema;
+		output: typeof DeleteDaemonResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.DaemonService.ListDaemons
+	 */
+	listDaemons: {
+		methodKind: 'unary';
+		input: typeof ListDaemonsRequestSchema;
+		output: typeof ListDaemonsResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.DaemonService.RefreshEnrollToken
+	 */
+	refreshEnrollToken: {
+		methodKind: 'unary';
+		input: typeof RefreshEnrollTokenRequestSchema;
+		output: typeof RefreshEnrollTokenResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.DaemonService.RevokeEnrollToken
+	 */
+	revokeEnrollToken: {
+		methodKind: 'unary';
+		input: typeof RevokeEnrollTokenRequestSchema;
+		output: typeof RevokeEnrollTokenResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.DaemonService.ListSessions
+	 */
+	listSessions: {
+		methodKind: 'unary';
+		input: typeof ListSessionsRequestSchema;
+		output: typeof ListSessionsResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.DaemonService.CreateSession
+	 */
+	createSession: {
+		methodKind: 'unary';
+		input: typeof CreateSessionRequestSchema;
+		output: typeof CreateSessionResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.DaemonService.CloseSession
+	 */
+	closeSession: {
+		methodKind: 'unary';
+		input: typeof CloseSessionRequestSchema;
+		output: typeof CloseSessionResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.DaemonService.EnrollDaemon
+	 */
+	enrollDaemon: {
+		methodKind: 'unary';
+		input: typeof EnrollDaemonRequestSchema;
+		output: typeof EnrollDaemonResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.DaemonService.SyncDaemon
+	 */
+	syncDaemon: {
+		methodKind: 'unary';
+		input: typeof SyncDaemonRequestSchema;
+		output: typeof SyncDaemonResponseSchema;
+	};
+}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_daemon, 0);
 
 /**
  * @generated from service nokku.v1.DaemonControlService
  */
 export const DaemonControlService: GenService<{
-  /**
-   * @generated from rpc nokku.v1.DaemonControlService.Connect
-   */
-  connect: {
-    methodKind: "bidi_streaming";
-    input: typeof ConnectRequestSchema;
-    output: typeof ConnectResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_nokku_v1_daemon, 1);
+	/**
+	 * @generated from rpc nokku.v1.DaemonControlService.Connect
+	 */
+	connect: {
+		methodKind: 'bidi_streaming';
+		input: typeof ConnectRequestSchema;
+		output: typeof ConnectResponseSchema;
+	};
+}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_daemon, 1);
 
 /**
  * @generated from service nokku.v1.DaemonSessionService
  */
 export const DaemonSessionService: GenService<{
-  /**
-   * @generated from rpc nokku.v1.DaemonSessionService.DaemonSession
-   */
-  daemonSession: {
-    methodKind: "bidi_streaming";
-    input: typeof DaemonSessionRequestSchema;
-    output: typeof DaemonSessionResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_nokku_v1_daemon, 2);
-
+	/**
+	 * @generated from rpc nokku.v1.DaemonSessionService.DaemonSession
+	 */
+	daemonSession: {
+		methodKind: 'bidi_streaming';
+		input: typeof DaemonSessionRequestSchema;
+		output: typeof DaemonSessionResponseSchema;
+	};
+}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_daemon, 2);
