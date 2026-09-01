@@ -227,6 +227,12 @@ func (s *Service) verifiedDomainsForProvider(
 
 // Link persists the credential that binds the external subject to the user.
 func (l *linker) Link(ctx context.Context, providerID, subject, userID string, data []byte) error {
+	// Identity flows carry no method-specific blob (only passkeys and
+	// passwords do), but the column is NOT NULL: store empty bytes instead
+	// of failing the insert and silently dropping the link.
+	if data == nil {
+		data = []byte{}
+	}
 	_, err := l.svc.q.UpsertCredential(ctx, &db.UpsertCredentialParams{
 		ID:       providerID + ":" + subject,
 		UserID:   userID,
