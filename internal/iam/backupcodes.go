@@ -28,36 +28,55 @@ var backupEncoding = base32.NewEncoding("ABCDEFGHJKLMNPQRSTUVWXYZ23456789").
 
 // RotateBackupCodes replaces the user's existing backup codes with a fresh
 // set and returns the plaintext codes, shown to the user exactly once.
+// Delete and reinsert run in one transaction: a partial failure must never
+// leave the user with zero backup codes and no way back in.
 func (s *Service) RotateBackupCodes(ctx context.Context, userID string) ([]string, error) {
-	if err := s.DeleteBackupCodes(ctx, userID); err != nil {
-		return nil, err
-	}
-
-	codes := make([]string, BackupCodeCount)
-	for i := range codes {
+	fresh := make([]string, BackupCodeCount)
+	for i := range fresh {
 		raw := make([]byte, backupCodeBytes)
 		if _, err := rand.Read(raw); err != nil {
 			return nil, err
 		}
-		codes[i] = backupEncoding.EncodeToString(raw)
+		fresh[i] = backupEncoding.EncodeToString(raw)
 	}
 
-	for _, code := range codes {
-		hash, err := crypto.HashToken(code)
+	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
+		creds, err := q.ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
+			UserID: userID,
+			Type:   string(MethodBackupCode),
+		})
 		if err != nil {
-			return nil, err
+			return err
 		}
-		if _, err := s.q.UpsertCredential(ctx, &db.UpsertCredentialParams{
-			ID:      userID + ":backup:" + hash.Hash(),
-			UserID:  userID,
-			Type:    string(MethodBackupCode),
-			Subject: hash.Hash(),
-			Data:    []byte{},
-		}); err != nil {
-			return nil, err
+		for _, c := range creds {
+			if err := q.DeleteCredential(
+				ctx,
+				&db.DeleteCredentialParams{UserID: userID, ID: c.ID},
+			); err != nil {
+				return err
+			}
 		}
+		for _, code := range fresh {
+			hash, err := crypto.HashToken(code)
+			if err != nil {
+				return err
+			}
+			if _, err := q.UpsertCredential(ctx, &db.UpsertCredentialParams{
+				ID:      userID + ":backup:" + hash.Hash(),
+				UserID:  userID,
+				Type:    string(MethodBackupCode),
+				Subject: hash.Hash(),
+				Data:    []byte{},
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	return codes, nil
+	return fresh, nil
 }
 
 // ListBackupCodes returns the user's remaining (unspent) backup codes.
