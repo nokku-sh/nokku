@@ -1,10 +1,10 @@
-import { timestampFromDate, type Timestamp } from '@bufbuild/protobuf/wkt';
 import { createMutation, createQuery } from '@tanstack/svelte-query';
+import type { Timestamp } from '@bufbuild/protobuf/wkt';
 import { toast } from 'svelte-sonner';
 import { queryClient } from './client';
 import { account } from './account';
 
-// Password, passkeys, and backup codes live on the /auth/account surface.
+// Password, passkeys, and backup codes ride the proto-backed AccountService.
 // The mutations keep the shapes the security page already consumes.
 
 const invalidateCredentials = () => queryClient.invalidateQueries({ queryKey: ['account'] });
@@ -33,7 +33,7 @@ export const password = {
 export interface Passkey {
 	id: string;
 	name: string;
-	createdAt: Timestamp;
+	createdAt?: Timestamp;
 }
 
 export const passkey = {
@@ -42,13 +42,13 @@ export const passkey = {
 		createQuery<Passkey[]>(() => ({
 			queryKey: ['account', 'credentials'],
 			queryFn: async () => {
-				const { credentials } = await account.credentials();
+				const credentials = await account.credentials();
 				return credentials
 					.filter((c) => c.type === 'passkey')
 					.map((c) => ({
 						id: c.id,
 						name: c.label ?? '',
-						createdAt: timestampFromDate(new Date(c.createdAt))
+						createdAt: c.createdAt
 					}));
 			}
 		})),
@@ -75,7 +75,7 @@ export const passkey = {
 
 export interface BackupCode {
 	id: string;
-	createdAt: Timestamp;
+	createdAt?: Timestamp;
 }
 
 export const backupCode = {
@@ -84,10 +84,10 @@ export const backupCode = {
 		createQuery<BackupCode[]>(() => ({
 			queryKey: ['account', 'backup-codes'],
 			queryFn: async () => {
-				const { codes } = await account.backupCodes();
+				const codes = await account.backupCodes();
 				return codes.map((c) => ({
 					id: c.id,
-					createdAt: timestampFromDate(new Date(c.createdAt))
+					createdAt: c.createdAt
 				}));
 			}
 		})),
@@ -95,7 +95,7 @@ export const backupCode = {
 	// Mutations
 	create: () =>
 		createMutation<{ codes: string[] }, Error, void>(() => ({
-			mutationFn: () => account.rotateBackupCodes(),
+			mutationFn: () => account.rotateBackupCodes().then((codes) => ({ codes })),
 			onSuccess: invalidateCredentials
 		})),
 	delete: () =>

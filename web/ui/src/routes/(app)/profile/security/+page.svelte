@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { backupCode, passkey, password } from '$lib/api/credential.svelte';
 	import { registerPasskey } from '$lib/api/passkey';
+	import { session, sessionKindLabel, sessionMethodLabel } from '$lib/api/session.svelte';
 	import { user } from '$lib/api/user.svelte';
 	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
+	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import * as Empty from '$lib/components/ui/empty';
@@ -22,6 +24,7 @@
 		LoaderCircle,
 		Lock,
 		MailX,
+		MonitorSmartphone,
 		ShieldIcon,
 		Trash2,
 		TriangleAlert
@@ -41,9 +44,12 @@
 	const createBackupCodes = backupCode.create();
 	const deleteBackupCodes = backupCode.delete();
 
+	const sessions = $derived(session.list());
+	const revokeSession = session.revoke();
+
 	const setEmailRecovery = user.setEmailRecovery();
 
-	const enableEmailRecovery = $derived(currentUser.data?.enableEmailRecovery ?? true);
+	const disablePasswordReset = $derived(currentUser.data?.disablePasswordReset ?? false);
 
 	let deletePasskeyId = $state('');
 	let deletePasskeyOpen = $state(false);
@@ -457,6 +463,77 @@
 	</Card.Footer>
 </Card.Root>
 
+<!-- Sessions Panel -->
+<Card.Root>
+	<Card.Header>
+		<Card.Title class="flex items-center gap-2 text-lg">
+			<MonitorSmartphone class="size-5 text-muted-foreground" />
+			Active Sessions
+		</Card.Title>
+		<Card.Description>
+			Devices currently signed in to your account. Revoking a session signs that device out; you
+			stay signed in here.
+		</Card.Description>
+	</Card.Header>
+	<Card.Content>
+		{#if sessions.isSuccess && sessions.data.length > 0}
+			<Item.Group class="border-border bg-transparent">
+				{#each sessions.data as s (s.id)}
+					<Item.Root variant="muted">
+						<Item.Media variant="icon">
+							<MonitorSmartphone />
+						</Item.Media>
+						<Item.Content>
+							<Item.Title class="flex items-center gap-2">
+								{sessionKindLabel(s.kind)}
+								{#if s.current}
+									<Badge variant="secondary">This device</Badge>
+								{/if}
+							</Item.Title>
+							<Item.Description>
+								Signed in with {sessionMethodLabel(s.method)} · Last active
+								{formatTs(s.lastSeenAt, 'relative', 'unknown')} · Expires
+								{formatTs(s.expiresAt, 'short', 'never')}
+							</Item.Description>
+						</Item.Content>
+						<Item.Actions>
+							{#if s.current}
+								<Badge variant="outline">Active now</Badge>
+							{:else}
+								<Button
+									variant="ghost"
+									size="sm"
+									disabled={revokeSession.isPending}
+									onclick={() => revokeSession.mutate({ id: s.id })}
+									class="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+								>
+									<Trash2 />
+									Revoke
+								</Button>
+							{/if}
+						</Item.Actions>
+					</Item.Root>
+				{/each}
+			</Item.Group>
+		{:else if sessions.isSuccess}
+			<Empty.Root class="bg-muted/50">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<MonitorSmartphone />
+					</Empty.Media>
+					<Empty.Title>No other active sessions</Empty.Title>
+					<Empty.Description>You are only signed in on this device.</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
+		{:else}
+			<div class="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+				<Spinner class="size-4" />
+				Loading sessions
+			</div>
+		{/if}
+	</Card.Content>
+</Card.Root>
+
 <!-- Email Recovery Panel -->
 <Card.Root class="border border-chart-2/20">
 	<Card.Header>
@@ -479,9 +556,9 @@
 		</div>
 		<Switch
 			id="email-recovery"
-			checked={enableEmailRecovery}
+			checked={!disablePasswordReset}
 			disabled={setEmailRecovery.isPending}
-			onCheckedChange={() => setEmailRecovery.mutate({ enable: !enableEmailRecovery })}
+			onCheckedChange={() => setEmailRecovery.mutate({ enable: disablePasswordReset })}
 		/>
 	</Card.Footer>
 </Card.Root>

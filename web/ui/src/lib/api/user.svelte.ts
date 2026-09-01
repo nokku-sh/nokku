@@ -1,48 +1,37 @@
-import { create } from '@bufbuild/protobuf';
-import { timestampFromDate, type Timestamp } from '@bufbuild/protobuf/wkt';
 import { createMutation, createQuery } from '@tanstack/svelte-query';
+import type { Timestamp } from '@bufbuild/protobuf/wkt';
 import { goto } from '$app/navigation';
 import { toast } from 'svelte-sonner';
 import { queryClient } from './client';
-import { account, type AccountUser } from './account';
+import { account, type AccountCredential } from './account';
 import { useQuery } from '$lib/query';
 import { UtilService } from '$lib/gen/nokku/v1/util_pb';
-import { UserSchema, type User } from '$lib/gen/nokku/v1/user_pb';
+import type { User } from '$lib/gen/nokku/v1/user_pb';
 import { pageIndex, pageSize } from '$lib/store.svelte';
 
-// The account reads and mutations are the /auth/account surface. This
-// module maps its JSON onto the proto shapes the pages already consume,
-// so the components keep working unchanged.
+// The account reads and mutations ride the proto-backed AccountService. The
+// User shape comes straight from the proto, so components consume it without
+// a translation layer.
 
 const invalidateAccount = () => queryClient.invalidateQueries({ queryKey: ['account'] });
 
-function toTimestamp(iso: string): Timestamp {
-	return timestampFromDate(new Date(iso));
-}
-
-function toUser(u: AccountUser): User {
-	return create(UserSchema, {
-		id: u.id,
-		name: u.displayName,
-		email: u.email,
-		emailVerified: u.emailVerified,
-		picture: u.picture === '' ? undefined : u.picture,
-		enableEmailRecovery: !u.disablePasswordReset,
-		createdAt: toTimestamp(u.createdAt),
-		updatedAt: toTimestamp(u.updatedAt)
-	});
-}
-
 const identityTypes = ['oidc', 'oauth2', 'saml'];
 
-// The account endpoint returns raw JSON credentials; linked identities are
-// mapped onto this local shape. The proto type was dropped from user.proto
-// because this is not a proto-backed surface.
+// Linked identities are credentials of the OIDC/OAuth2/SAML kinds.
 export interface LinkedAccount {
 	providerId: string;
 	provider: string;
 	protocol: string;
-	createdAt: Timestamp;
+	createdAt?: Timestamp;
+}
+
+function toLinkedAccount(c: AccountCredential): LinkedAccount {
+	return {
+		providerId: c.subject ?? '',
+		provider: c.provider ?? '',
+		protocol: c.type,
+		createdAt: c.createdAt
+	};
 }
 
 export const user = {
@@ -50,21 +39,14 @@ export const user = {
 	self: () =>
 		createQuery<User>(() => ({
 			queryKey: ['account'],
-			queryFn: async () => toUser(await account.user())
+			queryFn: () => account.user()
 		})),
 	listLinkedAccounts: () =>
 		createQuery<LinkedAccount[]>(() => ({
 			queryKey: ['account', 'credentials'],
 			queryFn: async () => {
-				const { credentials } = await account.credentials();
-				return credentials
-					.filter((c) => identityTypes.includes(c.type))
-					.map((c) => ({
-						providerId: c.subject ?? '',
-						provider: c.provider ?? '',
-						protocol: c.type,
-						createdAt: toTimestamp(c.createdAt)
-					}));
+				const credentials = await account.credentials();
+				return credentials.filter((c) => identityTypes.includes(c.type)).map(toLinkedAccount);
 			}
 		})),
 	activity: (filters: {
@@ -96,14 +78,14 @@ export const user = {
 
 	// Mutations
 	updateProfile: () =>
-		createMutation<AccountUser, Error, { name?: string; picture?: string; email?: string }>(() => ({
+		createMutation<User, Error, { name?: string; picture?: string; email?: string }>(() => ({
 			mutationFn: (variables) =>
 				account.update({
 					displayName: variables.name,
 					picture: variables.picture
 				}),
 			onSuccess: (updated) => {
-				queryClient.setQueryData(['account'], toUser(updated));
+				queryClient.setQueryData(['account'], updated);
 			}
 		})),
 	deleteAccount: () =>
@@ -122,10 +104,10 @@ export const user = {
 			onSuccess: invalidateAccount
 		})),
 	setEmailRecovery: () =>
-		createMutation<AccountUser, Error, { enable: boolean }>(() => ({
+		createMutation<User, Error, { enable: boolean }>(() => ({
 			mutationFn: ({ enable }) => account.update({ disablePasswordReset: !enable }),
 			onSuccess: (updated) => {
-				queryClient.setQueryData(['account'], toUser(updated));
+				queryClient.setQueryData(['account'], updated);
 				toast.success(`Email recovery ${updated.disablePasswordReset ? 'disabled' : 'enabled'}`);
 			}
 		}))
