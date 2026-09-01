@@ -153,16 +153,16 @@ func (s *AccountService) requireRemovable(
 		return slices.ContainsFunc(identityMethods, has)
 	}
 
-	var ok bool
 	switch rm {
 	case iam.MethodPassword:
-		ok = has(iam.MethodPasskey) || hasIdentity()
+		return has(iam.MethodPasskey) || hasIdentity()
 	case iam.MethodPasskey:
-		ok = has(iam.MethodPassword) || hasIdentity()
-	default:
-		ok = has(iam.MethodPassword) || has(iam.MethodPasskey)
+		return has(iam.MethodPassword) || hasIdentity()
+	case iam.MethodOIDC, iam.MethodOAuth2, iam.MethodSAML,
+		iam.MethodBackupCode, iam.MethodDevice:
+		return has(iam.MethodPassword) || has(iam.MethodPasskey)
 	}
-	return ok
+	return false
 }
 
 func (s *AccountService) ListCredentials(
