@@ -2,854 +2,876 @@
 // @generated from file nokku/v1/certificates.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
-import { file_google_api_annotations } from "../../google/api/annotations_pb";
-import type { Duration, Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_duration, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { Message } from "@bufbuild/protobuf";
+import type { GenEnum, GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
+import { file_buf_validate_validate } from '../../buf/validate/validate_pb';
+import { file_google_api_annotations } from '../../google/api/annotations_pb';
+import type { Duration, Timestamp } from '@bufbuild/protobuf/wkt';
+import {
+	file_google_protobuf_duration,
+	file_google_protobuf_timestamp
+} from '@bufbuild/protobuf/wkt';
+import type { Message } from '@bufbuild/protobuf';
 
 /**
  * Describes the file nokku/v1/certificates.proto.
  */
-export const file_nokku_v1_certificates: GenFile = /*@__PURE__*/
-  fileDesc("Chtub2trdS92MS9jZXJ0aWZpY2F0ZXMucHJvdG8SCG5va2t1LnYxIs8IChRDZXJ0aWZpY2F0ZUF1dGhvcml0eRIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRITCgtkZXNjcmlwdGlvbhgEIAEoCRITCgtjZXJ0aWZpY2F0ZRgFIAEoCRISCgpwdWJsaWNfa2V5GAYgASgJEhUKDXNlcmlhbF9udW1iZXIYByABKAkSDwoHc3ViamVjdBgIIAEoCRIuCgpub3RfYmVmb3JlGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBItCglub3RfYWZ0ZXIYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhEKCWlzX2FjdGl2ZRgLIAEoCBISCgppc19kZWZhdWx0GAwgASgIEhAKCGtleV9iaXRzGA0gASgFEi4KCGtleV90eXBlGA4gASgOMhwubm9ra3UudjEuQ2VydGlmaWNhdGVLZXlUeXBlEjcKEWFsbG93ZWRfa2V5X3R5cGVzGA8gAygOMhwubm9ra3UudjEuQ2VydGlmaWNhdGVLZXlUeXBlEisKCGxpZmV0aW1lGBAgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEjMKEHVzZXJfZGVmYXVsdF90dGwYESABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SLwoMdXNlcl9tYXhfdHRsGBIgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEksKD3VzZXJfZXh0ZW5zaW9ucxgTIAMoCzIyLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5LlVzZXJFeHRlbnNpb25zRW50cnkSVgoVdXNlcl9jcml0aWNhbF9vcHRpb25zGBQgAygLMjcubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkuVXNlckNyaXRpY2FsT3B0aW9uc0VudHJ5EjMKEGhvc3RfZGVmYXVsdF90dGwYFSABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SLwoMaG9zdF9tYXhfdHRsGBYgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEi4KCmNyZWF0ZWRfYXQYFyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYGCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KDmF1dGhvcml0eV90eXBlGBkgASgOMhcubm9ra3UudjEuQXV0aG9yaXR5VHlwZRo1ChNVc2VyRXh0ZW5zaW9uc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEaOgoYVXNlckNyaXRpY2FsT3B0aW9uc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEi4AcKIUNyZWF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISHQoLZGVzY3JpcHRpb24YAyABKAlCCLpIBXIDGOgHEjoKCGtleV90eXBlGAQgASgOMhwubm9ra3UudjEuQ2VydGlmaWNhdGVLZXlUeXBlQgq6SAeCAQQQASAAEhAKCGtleV9iaXRzGAUgASgFEhIKCmlzX2RlZmF1bHQYBiABKAgSNwoRYWxsb3dlZF9rZXlfdHlwZXMYByADKA4yHC5ub2trdS52MS5DZXJ0aWZpY2F0ZUtleVR5cGUSQgoIbGlmZXRpbWUYCCABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CFbpIEqoBDyIGCICGsJYBMgUIoLOgARJGChB1c2VyX2RlZmF1bHRfdHRsGAkgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBJCCgx1c2VyX21heF90dGwYCiABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkYKEGhvc3RfZGVmYXVsdF90dGwYCyABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkIKDGhvc3RfbWF4X3R0bBgMIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSWAoPdXNlcl9leHRlbnNpb25zGA0gAygLMj8ubm9ra3UudjEuQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0LlVzZXJFeHRlbnNpb25zRW50cnkSYwoVdXNlcl9jcml0aWNhbF9vcHRpb25zGA4gAygLMkQubm9ra3UudjEuQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0LlVzZXJDcml0aWNhbE9wdGlvbnNFbnRyeRI5Cg5hdXRob3JpdHlfdHlwZRgPIAEoDjIXLm5va2t1LnYxLkF1dGhvcml0eVR5cGVCCLpIBYIBAhABGjUKE1VzZXJFeHRlbnNpb25zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ARo6ChhVc2VyQ3JpdGljYWxPcHRpb25zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJjCiJDcmVhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlEj0KFWNlcnRpZmljYXRlX2F1dGhvcml0eRgBIAEoCzIeLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5IlYKHkdldENlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASJgCh9HZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlEj0KFWNlcnRpZmljYXRlX2F1dGhvcml0eRgBIAEoCzIeLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5IkMKIUxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBImUKIkxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzUmVzcG9uc2USPwoXY2VydGlmaWNhdGVfYXV0aG9yaXRpZXMYASADKAsyHi5ub2trdS52MS5DZXJ0aWZpY2F0ZUF1dGhvcml0eSKABwohVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAyABKAlCCrpIB3IFEAEYgAISHQoLZGVzY3JpcHRpb24YBCABKAlCCLpIBXIDGOgHEhEKCWlzX2FjdGl2ZRgFIAEoCBISCgppc19kZWZhdWx0GAYgASgIEjcKEWFsbG93ZWRfa2V5X3R5cGVzGAcgAygOMhwubm9ra3UudjEuQ2VydGlmaWNhdGVLZXlUeXBlEkIKCGxpZmV0aW1lGAggASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhW6SBKqAQ8iBgiAhrCWATIFCKCzoAESRgoQdXNlcl9kZWZhdWx0X3R0bBgJIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSQgoMdXNlcl9tYXhfdHRsGAogASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBJGChBob3N0X2RlZmF1bHRfdHRsGAsgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBJCCgxob3N0X21heF90dGwYDCABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8ElgKD3VzZXJfZXh0ZW5zaW9ucxgNIAMoCzI/Lm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdC5Vc2VyRXh0ZW5zaW9uc0VudHJ5EmMKFXVzZXJfY3JpdGljYWxfb3B0aW9ucxgOIAMoCzJELm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdC5Vc2VyQ3JpdGljYWxPcHRpb25zRW50cnkaNQoTVXNlckV4dGVuc2lvbnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBGjoKGFVzZXJDcml0aWNhbE9wdGlvbnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBImMKIlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2USPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAEgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkiWQohRGVsZXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBIiQKIkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UinQEKI1JvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBEhAKCGtleV9iaXRzGAMgASgFEi4KCGtleV90eXBlGAQgASgOMhwubm9ra3UudjEuQ2VydGlmaWNhdGVLZXlUeXBlImUKJFJvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZRI9ChVjZXJ0aWZpY2F0ZV9hdXRob3JpdHkYASABKAsyHi5ub2trdS52MS5DZXJ0aWZpY2F0ZUF1dGhvcml0eSL6AgoZU2lnblNTSENlcnRpZmljYXRlUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhcKBWNhX2lkGAIgASgJQgi6SAVyA7ABARIbCgl0YXJnZXRfaWQYAyABKAlCCLpIBXIDsAEBEkEKBHR5cGUYBCABKA4yMy5ub2trdS52MS5TaWduU1NIQ2VydGlmaWNhdGVSZXF1ZXN0LkNlcnRpZmljYXRlVHlwZRIeCgpwdWJsaWNfa2V5GAUgASgJQgq6SAdyBRABGJBOEjkKA3R0bBgGIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwiaQoPQ2VydGlmaWNhdGVUeXBlEiAKHENFUlRJRklDQVRFX1RZUEVfVU5TUEVDSUZJRUQQABIZChVDRVJUSUZJQ0FURV9UWVBFX1VTRVIQARIZChVDRVJUSUZJQ0FURV9UWVBFX0hPU1QQAiKfAQoaU2lnblNTSENlcnRpZmljYXRlUmVzcG9uc2USDQoFY2FfaWQYASABKAkSDwoHY2FfbmFtZRgCIAEoCRIVCg1jYV9wdWJsaWNfa2V5GAMgASgJEhoKEnNpZ25lZF9jZXJ0aWZpY2F0ZRgEIAEoCRIuCgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCL2AgoaU2lnblg1MDlDZXJ0aWZpY2F0ZVJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIXCgVjYV9pZBgCIAEoCUIIukgFcgOwAQESFwoDY3NyGAMgASgJQgq6SAdyBRABGJBOEkcKBXVzYWdlGAQgASgOMi4ubm9ra3UudjEuU2lnblg1MDlDZXJ0aWZpY2F0ZVJlcXVlc3QuWDUwOVVzYWdlQgi6SAWCAQIQARI5CgN0dGwYBSABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8IoEBCglYNTA5VXNhZ2USGgoWWDUwOV9VU0FHRV9VTlNQRUNJRklFRBAAEhoKFlg1MDlfVVNBR0VfQ0xJRU5UX0FVVEgQARIaChZYNTA5X1VTQUdFX1NFUlZFUl9BVVRIEAISIAocWDUwOV9VU0FHRV9DTElFTlRfQU5EX1NFUlZFUhADIpQBChtTaWduWDUwOUNlcnRpZmljYXRlUmVzcG9uc2USDQoFY2FfaWQYASABKAkSDwoHY2FfbmFtZRgCIAEoCRITCgtjZXJ0aWZpY2F0ZRgDIAEoCRIQCghjYV9jaGFpbhgEIAEoCRIuCgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCqaAQoSQ2VydGlmaWNhdGVLZXlUeXBlEiQKIENFUlRJRklDQVRFX0tFWV9UWVBFX1VOU1BFQ0lGSUVEEAASHAoYQ0VSVElGSUNBVEVfS0VZX1RZUEVfUlNBEAESHgoaQ0VSVElGSUNBVEVfS0VZX1RZUEVfRUNEU0EQAhIgChxDRVJUSUZJQ0FURV9LRVlfVFlQRV9FRDI1NTE5EAMqYAoNQXV0aG9yaXR5VHlwZRIeChpBVVRIT1JJVFlfVFlQRV9VTlNQRUNJRklFRBAAEhYKEkFVVEhPUklUWV9UWVBFX1NTSBABEhcKE0FVVEhPUklUWV9UWVBFX1g1MDkQAjLBCwoSQ2VydGlmaWNhdGVTZXJ2aWNlErUBChdHZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eRIoLm5va2t1LnYxLkdldENlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBopLm5va2t1LnYxLkdldENlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiRZACAYLT5JMCPBI6L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vY2VydGlmaWNhdGVfYXV0aG9yaXRpZXMve2lkfRK5AQoaQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHkSKy5ub2trdS52MS5DcmVhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QaLC5ub2trdS52MS5DcmVhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIkCC0+STAjo6ASoiNS92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L2NlcnRpZmljYXRlX2F1dGhvcml0aWVzEr4BChpVcGRhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eRIrLm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBosLm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiRYLT5JMCPzoBKjI6L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vY2VydGlmaWNhdGVfYXV0aG9yaXRpZXMve2lkfRK5AQoaTGlzdENlcnRpZmljYXRlQXV0aG9yaXRpZXMSKy5ub2trdS52MS5MaXN0Q2VydGlmaWNhdGVBdXRob3JpdGllc1JlcXVlc3QaLC5ub2trdS52MS5MaXN0Q2VydGlmaWNhdGVBdXRob3JpdGllc1Jlc3BvbnNlIkCQAgGC0+STAjcSNS92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L2NlcnRpZmljYXRlX2F1dGhvcml0aWVzErsBChpEZWxldGVDZXJ0aWZpY2F0ZUF1dGhvcml0eRIrLm5va2t1LnYxLkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBosLm5va2t1LnYxLkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiQoLT5JMCPCo6L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vY2VydGlmaWNhdGVfYXV0aG9yaXRpZXMve2lkfRLNAQocUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eRItLm5va2t1LnYxLlJvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Gi4ubm9ra3UudjEuUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIk6C0+STAkg6ASoiQy92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L2NlcnRpZmljYXRlX2F1dGhvcml0aWVzL3tpZH06cm9sbG92ZXISkgEKElNpZ25TU0hDZXJ0aWZpY2F0ZRIjLm5va2t1LnYxLlNpZ25TU0hDZXJ0aWZpY2F0ZVJlcXVlc3QaJC5ub2trdS52MS5TaWduU1NIQ2VydGlmaWNhdGVSZXNwb25zZSIxgtPkkwIrOgEqIiYvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9zaWduLXNzaBKWAQoTU2lnblg1MDlDZXJ0aWZpY2F0ZRIkLm5va2t1LnYxLlNpZ25YNTA5Q2VydGlmaWNhdGVSZXF1ZXN0GiUubm9ra3UudjEuU2lnblg1MDlDZXJ0aWZpY2F0ZVJlc3BvbnNlIjKC0+STAiw6ASoiJy92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3NpZ24teDUwOUKbAQoMY29tLm5va2t1LnYxQhFDZXJ0aWZpY2F0ZXNQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_duration, file_google_protobuf_timestamp]);
+export const file_nokku_v1_certificates: GenFile /*@__PURE__*/ = fileDesc(
+	'Chtub2trdS92MS9jZXJ0aWZpY2F0ZXMucHJvdG8SCG5va2t1LnYxIs8IChRDZXJ0aWZpY2F0ZUF1dGhvcml0eRIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRITCgtkZXNjcmlwdGlvbhgEIAEoCRITCgtjZXJ0aWZpY2F0ZRgFIAEoCRISCgpwdWJsaWNfa2V5GAYgASgJEhUKDXNlcmlhbF9udW1iZXIYByABKAkSDwoHc3ViamVjdBgIIAEoCRIuCgpub3RfYmVmb3JlGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBItCglub3RfYWZ0ZXIYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhEKCWlzX2FjdGl2ZRgLIAEoCBISCgppc19kZWZhdWx0GAwgASgIEhAKCGtleV9iaXRzGA0gASgFEi4KCGtleV90eXBlGA4gASgOMhwubm9ra3UudjEuQ2VydGlmaWNhdGVLZXlUeXBlEjcKEWFsbG93ZWRfa2V5X3R5cGVzGA8gAygOMhwubm9ra3UudjEuQ2VydGlmaWNhdGVLZXlUeXBlEisKCGxpZmV0aW1lGBAgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEjMKEHVzZXJfZGVmYXVsdF90dGwYESABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SLwoMdXNlcl9tYXhfdHRsGBIgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEksKD3VzZXJfZXh0ZW5zaW9ucxgTIAMoCzIyLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5LlVzZXJFeHRlbnNpb25zRW50cnkSVgoVdXNlcl9jcml0aWNhbF9vcHRpb25zGBQgAygLMjcubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkuVXNlckNyaXRpY2FsT3B0aW9uc0VudHJ5EjMKEGhvc3RfZGVmYXVsdF90dGwYFSABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SLwoMaG9zdF9tYXhfdHRsGBYgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEi4KCmNyZWF0ZWRfYXQYFyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYGCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KDmF1dGhvcml0eV90eXBlGBkgASgOMhcubm9ra3UudjEuQXV0aG9yaXR5VHlwZRo1ChNVc2VyRXh0ZW5zaW9uc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEaOgoYVXNlckNyaXRpY2FsT3B0aW9uc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEi4AcKIUNyZWF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISHQoLZGVzY3JpcHRpb24YAyABKAlCCLpIBXIDGOgHEjoKCGtleV90eXBlGAQgASgOMhwubm9ra3UudjEuQ2VydGlmaWNhdGVLZXlUeXBlQgq6SAeCAQQQASAAEhAKCGtleV9iaXRzGAUgASgFEhIKCmlzX2RlZmF1bHQYBiABKAgSNwoRYWxsb3dlZF9rZXlfdHlwZXMYByADKA4yHC5ub2trdS52MS5DZXJ0aWZpY2F0ZUtleVR5cGUSQgoIbGlmZXRpbWUYCCABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CFbpIEqoBDyIGCICGsJYBMgUIoLOgARJGChB1c2VyX2RlZmF1bHRfdHRsGAkgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBJCCgx1c2VyX21heF90dGwYCiABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkYKEGhvc3RfZGVmYXVsdF90dGwYCyABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkIKDGhvc3RfbWF4X3R0bBgMIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSWAoPdXNlcl9leHRlbnNpb25zGA0gAygLMj8ubm9ra3UudjEuQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0LlVzZXJFeHRlbnNpb25zRW50cnkSYwoVdXNlcl9jcml0aWNhbF9vcHRpb25zGA4gAygLMkQubm9ra3UudjEuQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0LlVzZXJDcml0aWNhbE9wdGlvbnNFbnRyeRI5Cg5hdXRob3JpdHlfdHlwZRgPIAEoDjIXLm5va2t1LnYxLkF1dGhvcml0eVR5cGVCCLpIBYIBAhABGjUKE1VzZXJFeHRlbnNpb25zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ARo6ChhVc2VyQ3JpdGljYWxPcHRpb25zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJjCiJDcmVhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlEj0KFWNlcnRpZmljYXRlX2F1dGhvcml0eRgBIAEoCzIeLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5IlYKHkdldENlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASJgCh9HZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlEj0KFWNlcnRpZmljYXRlX2F1dGhvcml0eRgBIAEoCzIeLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5IkMKIUxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBImUKIkxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzUmVzcG9uc2USPwoXY2VydGlmaWNhdGVfYXV0aG9yaXRpZXMYASADKAsyHi5ub2trdS52MS5DZXJ0aWZpY2F0ZUF1dGhvcml0eSKABwohVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAyABKAlCCrpIB3IFEAEYgAISHQoLZGVzY3JpcHRpb24YBCABKAlCCLpIBXIDGOgHEhEKCWlzX2FjdGl2ZRgFIAEoCBISCgppc19kZWZhdWx0GAYgASgIEjcKEWFsbG93ZWRfa2V5X3R5cGVzGAcgAygOMhwubm9ra3UudjEuQ2VydGlmaWNhdGVLZXlUeXBlEkIKCGxpZmV0aW1lGAggASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhW6SBKqAQ8iBgiAhrCWATIFCKCzoAESRgoQdXNlcl9kZWZhdWx0X3R0bBgJIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSQgoMdXNlcl9tYXhfdHRsGAogASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBJGChBob3N0X2RlZmF1bHRfdHRsGAsgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBJCCgxob3N0X21heF90dGwYDCABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8ElgKD3VzZXJfZXh0ZW5zaW9ucxgNIAMoCzI/Lm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdC5Vc2VyRXh0ZW5zaW9uc0VudHJ5EmMKFXVzZXJfY3JpdGljYWxfb3B0aW9ucxgOIAMoCzJELm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdC5Vc2VyQ3JpdGljYWxPcHRpb25zRW50cnkaNQoTVXNlckV4dGVuc2lvbnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBGjoKGFVzZXJDcml0aWNhbE9wdGlvbnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBImMKIlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2USPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAEgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkiWQohRGVsZXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBIiQKIkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UinQEKI1JvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBEhAKCGtleV9iaXRzGAMgASgFEi4KCGtleV90eXBlGAQgASgOMhwubm9ra3UudjEuQ2VydGlmaWNhdGVLZXlUeXBlImUKJFJvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZRI9ChVjZXJ0aWZpY2F0ZV9hdXRob3JpdHkYASABKAsyHi5ub2trdS52MS5DZXJ0aWZpY2F0ZUF1dGhvcml0eSL6AgoZU2lnblNTSENlcnRpZmljYXRlUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhcKBWNhX2lkGAIgASgJQgi6SAVyA7ABARIbCgl0YXJnZXRfaWQYAyABKAlCCLpIBXIDsAEBEkEKBHR5cGUYBCABKA4yMy5ub2trdS52MS5TaWduU1NIQ2VydGlmaWNhdGVSZXF1ZXN0LkNlcnRpZmljYXRlVHlwZRIeCgpwdWJsaWNfa2V5GAUgASgJQgq6SAdyBRABGJBOEjkKA3R0bBgGIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwiaQoPQ2VydGlmaWNhdGVUeXBlEiAKHENFUlRJRklDQVRFX1RZUEVfVU5TUEVDSUZJRUQQABIZChVDRVJUSUZJQ0FURV9UWVBFX1VTRVIQARIZChVDRVJUSUZJQ0FURV9UWVBFX0hPU1QQAiKfAQoaU2lnblNTSENlcnRpZmljYXRlUmVzcG9uc2USDQoFY2FfaWQYASABKAkSDwoHY2FfbmFtZRgCIAEoCRIVCg1jYV9wdWJsaWNfa2V5GAMgASgJEhoKEnNpZ25lZF9jZXJ0aWZpY2F0ZRgEIAEoCRIuCgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCL2AgoaU2lnblg1MDlDZXJ0aWZpY2F0ZVJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIXCgVjYV9pZBgCIAEoCUIIukgFcgOwAQESFwoDY3NyGAMgASgJQgq6SAdyBRABGJBOEkcKBXVzYWdlGAQgASgOMi4ubm9ra3UudjEuU2lnblg1MDlDZXJ0aWZpY2F0ZVJlcXVlc3QuWDUwOVVzYWdlQgi6SAWCAQIQARI5CgN0dGwYBSABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8IoEBCglYNTA5VXNhZ2USGgoWWDUwOV9VU0FHRV9VTlNQRUNJRklFRBAAEhoKFlg1MDlfVVNBR0VfQ0xJRU5UX0FVVEgQARIaChZYNTA5X1VTQUdFX1NFUlZFUl9BVVRIEAISIAocWDUwOV9VU0FHRV9DTElFTlRfQU5EX1NFUlZFUhADIpQBChtTaWduWDUwOUNlcnRpZmljYXRlUmVzcG9uc2USDQoFY2FfaWQYASABKAkSDwoHY2FfbmFtZRgCIAEoCRITCgtjZXJ0aWZpY2F0ZRgDIAEoCRIQCghjYV9jaGFpbhgEIAEoCRIuCgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCqaAQoSQ2VydGlmaWNhdGVLZXlUeXBlEiQKIENFUlRJRklDQVRFX0tFWV9UWVBFX1VOU1BFQ0lGSUVEEAASHAoYQ0VSVElGSUNBVEVfS0VZX1RZUEVfUlNBEAESHgoaQ0VSVElGSUNBVEVfS0VZX1RZUEVfRUNEU0EQAhIgChxDRVJUSUZJQ0FURV9LRVlfVFlQRV9FRDI1NTE5EAMqYAoNQXV0aG9yaXR5VHlwZRIeChpBVVRIT1JJVFlfVFlQRV9VTlNQRUNJRklFRBAAEhYKEkFVVEhPUklUWV9UWVBFX1NTSBABEhcKE0FVVEhPUklUWV9UWVBFX1g1MDkQAjLBCwoSQ2VydGlmaWNhdGVTZXJ2aWNlErUBChdHZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eRIoLm5va2t1LnYxLkdldENlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBopLm5va2t1LnYxLkdldENlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiRZACAYLT5JMCPBI6L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vY2VydGlmaWNhdGVfYXV0aG9yaXRpZXMve2lkfRK5AQoaQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHkSKy5ub2trdS52MS5DcmVhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QaLC5ub2trdS52MS5DcmVhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIkCC0+STAjo6ASoiNS92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L2NlcnRpZmljYXRlX2F1dGhvcml0aWVzEr4BChpVcGRhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eRIrLm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBosLm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiRYLT5JMCPzoBKjI6L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vY2VydGlmaWNhdGVfYXV0aG9yaXRpZXMve2lkfRK5AQoaTGlzdENlcnRpZmljYXRlQXV0aG9yaXRpZXMSKy5ub2trdS52MS5MaXN0Q2VydGlmaWNhdGVBdXRob3JpdGllc1JlcXVlc3QaLC5ub2trdS52MS5MaXN0Q2VydGlmaWNhdGVBdXRob3JpdGllc1Jlc3BvbnNlIkCQAgGC0+STAjcSNS92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L2NlcnRpZmljYXRlX2F1dGhvcml0aWVzErsBChpEZWxldGVDZXJ0aWZpY2F0ZUF1dGhvcml0eRIrLm5va2t1LnYxLkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBosLm5va2t1LnYxLkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiQoLT5JMCPCo6L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vY2VydGlmaWNhdGVfYXV0aG9yaXRpZXMve2lkfRLNAQocUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eRItLm5va2t1LnYxLlJvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Gi4ubm9ra3UudjEuUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIk6C0+STAkg6ASoiQy92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L2NlcnRpZmljYXRlX2F1dGhvcml0aWVzL3tpZH06cm9sbG92ZXISkgEKElNpZ25TU0hDZXJ0aWZpY2F0ZRIjLm5va2t1LnYxLlNpZ25TU0hDZXJ0aWZpY2F0ZVJlcXVlc3QaJC5ub2trdS52MS5TaWduU1NIQ2VydGlmaWNhdGVSZXNwb25zZSIxgtPkkwIrOgEqIiYvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9zaWduLXNzaBKWAQoTU2lnblg1MDlDZXJ0aWZpY2F0ZRIkLm5va2t1LnYxLlNpZ25YNTA5Q2VydGlmaWNhdGVSZXF1ZXN0GiUubm9ra3UudjEuU2lnblg1MDlDZXJ0aWZpY2F0ZVJlc3BvbnNlIjKC0+STAiw6ASoiJy92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3NpZ24teDUwOUKbAQoMY29tLm5va2t1LnYxQhFDZXJ0aWZpY2F0ZXNQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
+	[
+		file_buf_validate_validate,
+		file_google_api_annotations,
+		file_google_protobuf_duration,
+		file_google_protobuf_timestamp
+	]
+);
 
 /**
  * Certificate Authority messages ---------------------------------------------
  *
  * @generated from message nokku.v1.CertificateAuthority
  */
-export type CertificateAuthority = Message<"nokku.v1.CertificateAuthority"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
+export type CertificateAuthority = Message<'nokku.v1.CertificateAuthority'> & {
+	/**
+	 * @generated from field: string id = 1;
+	 */
+	id: string;
 
-  /**
-   * @generated from field: string workspace_id = 2;
-   */
-  workspaceId: string;
+	/**
+	 * @generated from field: string workspace_id = 2;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string name = 3;
-   */
-  name: string;
+	/**
+	 * @generated from field: string name = 3;
+	 */
+	name: string;
 
-  /**
-   * @generated from field: string description = 4;
-   */
-  description: string;
+	/**
+	 * @generated from field: string description = 4;
+	 */
+	description: string;
 
-  /**
-   * @generated from field: string certificate = 5;
-   */
-  certificate: string;
+	/**
+	 * @generated from field: string certificate = 5;
+	 */
+	certificate: string;
 
-  /**
-   * @generated from field: string public_key = 6;
-   */
-  publicKey: string;
+	/**
+	 * @generated from field: string public_key = 6;
+	 */
+	publicKey: string;
 
-  /**
-   * @generated from field: string serial_number = 7;
-   */
-  serialNumber: string;
+	/**
+	 * @generated from field: string serial_number = 7;
+	 */
+	serialNumber: string;
 
-  /**
-   * @generated from field: string subject = 8;
-   */
-  subject: string;
+	/**
+	 * @generated from field: string subject = 8;
+	 */
+	subject: string;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp not_before = 9;
-   */
-  notBefore?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp not_before = 9;
+	 */
+	notBefore?: Timestamp | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp not_after = 10;
-   */
-  notAfter?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp not_after = 10;
+	 */
+	notAfter?: Timestamp | undefined;
 
-  /**
-   * @generated from field: bool is_active = 11;
-   */
-  isActive: boolean;
+	/**
+	 * @generated from field: bool is_active = 11;
+	 */
+	isActive: boolean;
 
-  /**
-   * @generated from field: bool is_default = 12;
-   */
-  isDefault: boolean;
+	/**
+	 * @generated from field: bool is_default = 12;
+	 */
+	isDefault: boolean;
 
-  /**
-   * @generated from field: int32 key_bits = 13;
-   */
-  keyBits: number;
+	/**
+	 * @generated from field: int32 key_bits = 13;
+	 */
+	keyBits: number;
 
-  /**
-   * @generated from field: nokku.v1.CertificateKeyType key_type = 14;
-   */
-  keyType: CertificateKeyType;
+	/**
+	 * @generated from field: nokku.v1.CertificateKeyType key_type = 14;
+	 */
+	keyType: CertificateKeyType;
 
-  /**
-   * @generated from field: repeated nokku.v1.CertificateKeyType allowed_key_types = 15;
-   */
-  allowedKeyTypes: CertificateKeyType[];
+	/**
+	 * @generated from field: repeated nokku.v1.CertificateKeyType allowed_key_types = 15;
+	 */
+	allowedKeyTypes: CertificateKeyType[];
 
-  /**
-   * @generated from field: google.protobuf.Duration lifetime = 16;
-   */
-  lifetime?: Duration | undefined;
+	/**
+	 * @generated from field: google.protobuf.Duration lifetime = 16;
+	 */
+	lifetime?: Duration | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Duration user_default_ttl = 17;
-   */
-  userDefaultTtl?: Duration | undefined;
+	/**
+	 * @generated from field: google.protobuf.Duration user_default_ttl = 17;
+	 */
+	userDefaultTtl?: Duration | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Duration user_max_ttl = 18;
-   */
-  userMaxTtl?: Duration | undefined;
+	/**
+	 * @generated from field: google.protobuf.Duration user_max_ttl = 18;
+	 */
+	userMaxTtl?: Duration | undefined;
 
-  /**
-   * @generated from field: map<string, string> user_extensions = 19;
-   */
-  userExtensions: { [key: string]: string };
+	/**
+	 * @generated from field: map<string, string> user_extensions = 19;
+	 */
+	userExtensions: { [key: string]: string };
 
-  /**
-   * @generated from field: map<string, string> user_critical_options = 20;
-   */
-  userCriticalOptions: { [key: string]: string };
+	/**
+	 * @generated from field: map<string, string> user_critical_options = 20;
+	 */
+	userCriticalOptions: { [key: string]: string };
 
-  /**
-   * @generated from field: google.protobuf.Duration host_default_ttl = 21;
-   */
-  hostDefaultTtl?: Duration | undefined;
+	/**
+	 * @generated from field: google.protobuf.Duration host_default_ttl = 21;
+	 */
+	hostDefaultTtl?: Duration | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Duration host_max_ttl = 22;
-   */
-  hostMaxTtl?: Duration | undefined;
+	/**
+	 * @generated from field: google.protobuf.Duration host_max_ttl = 22;
+	 */
+	hostMaxTtl?: Duration | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 23;
-   */
-  createdAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp created_at = 23;
+	 */
+	createdAt?: Timestamp | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 24;
-   */
-  updatedAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp updated_at = 24;
+	 */
+	updatedAt?: Timestamp | undefined;
 
-  /**
-   * @generated from field: nokku.v1.AuthorityType authority_type = 25;
-   */
-  authorityType: AuthorityType;
+	/**
+	 * @generated from field: nokku.v1.AuthorityType authority_type = 25;
+	 */
+	authorityType: AuthorityType;
 };
 
 /**
  * Describes the message nokku.v1.CertificateAuthority.
  * Use `create(CertificateAuthoritySchema)` to create a new message.
  */
-export const CertificateAuthoritySchema: GenMessage<CertificateAuthority> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 0);
+export const CertificateAuthoritySchema: GenMessage<CertificateAuthority> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 0);
 
 /**
  * @generated from message nokku.v1.CreateCertificateAuthorityRequest
  */
-export type CreateCertificateAuthorityRequest = Message<"nokku.v1.CreateCertificateAuthorityRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type CreateCertificateAuthorityRequest =
+	Message<'nokku.v1.CreateCertificateAuthorityRequest'> & {
+		/**
+		 * @generated from field: string workspace_id = 1;
+		 */
+		workspaceId: string;
 
-  /**
-   * @generated from field: string name = 2;
-   */
-  name: string;
+		/**
+		 * @generated from field: string name = 2;
+		 */
+		name: string;
 
-  /**
-   * @generated from field: string description = 3;
-   */
-  description: string;
+		/**
+		 * @generated from field: string description = 3;
+		 */
+		description: string;
 
-  /**
-   * @generated from field: nokku.v1.CertificateKeyType key_type = 4;
-   */
-  keyType: CertificateKeyType;
+		/**
+		 * @generated from field: nokku.v1.CertificateKeyType key_type = 4;
+		 */
+		keyType: CertificateKeyType;
 
-  /**
-   * @generated from field: int32 key_bits = 5;
-   */
-  keyBits: number;
+		/**
+		 * @generated from field: int32 key_bits = 5;
+		 */
+		keyBits: number;
 
-  /**
-   * @generated from field: bool is_default = 6;
-   */
-  isDefault: boolean;
+		/**
+		 * @generated from field: bool is_default = 6;
+		 */
+		isDefault: boolean;
 
-  /**
-   * @generated from field: repeated nokku.v1.CertificateKeyType allowed_key_types = 7;
-   */
-  allowedKeyTypes: CertificateKeyType[];
+		/**
+		 * @generated from field: repeated nokku.v1.CertificateKeyType allowed_key_types = 7;
+		 */
+		allowedKeyTypes: CertificateKeyType[];
 
-  /**
-   * @generated from field: google.protobuf.Duration lifetime = 8;
-   */
-  lifetime?: Duration | undefined;
+		/**
+		 * @generated from field: google.protobuf.Duration lifetime = 8;
+		 */
+		lifetime?: Duration | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Duration user_default_ttl = 9;
-   */
-  userDefaultTtl?: Duration | undefined;
+		/**
+		 * @generated from field: google.protobuf.Duration user_default_ttl = 9;
+		 */
+		userDefaultTtl?: Duration | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Duration user_max_ttl = 10;
-   */
-  userMaxTtl?: Duration | undefined;
+		/**
+		 * @generated from field: google.protobuf.Duration user_max_ttl = 10;
+		 */
+		userMaxTtl?: Duration | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Duration host_default_ttl = 11;
-   */
-  hostDefaultTtl?: Duration | undefined;
+		/**
+		 * @generated from field: google.protobuf.Duration host_default_ttl = 11;
+		 */
+		hostDefaultTtl?: Duration | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Duration host_max_ttl = 12;
-   */
-  hostMaxTtl?: Duration | undefined;
+		/**
+		 * @generated from field: google.protobuf.Duration host_max_ttl = 12;
+		 */
+		hostMaxTtl?: Duration | undefined;
 
-  /**
-   * @generated from field: map<string, string> user_extensions = 13;
-   */
-  userExtensions: { [key: string]: string };
+		/**
+		 * @generated from field: map<string, string> user_extensions = 13;
+		 */
+		userExtensions: { [key: string]: string };
 
-  /**
-   * @generated from field: map<string, string> user_critical_options = 14;
-   */
-  userCriticalOptions: { [key: string]: string };
+		/**
+		 * @generated from field: map<string, string> user_critical_options = 14;
+		 */
+		userCriticalOptions: { [key: string]: string };
 
-  /**
-   * @generated from field: nokku.v1.AuthorityType authority_type = 15;
-   */
-  authorityType: AuthorityType;
-};
+		/**
+		 * @generated from field: nokku.v1.AuthorityType authority_type = 15;
+		 */
+		authorityType: AuthorityType;
+	};
 
 /**
  * Describes the message nokku.v1.CreateCertificateAuthorityRequest.
  * Use `create(CreateCertificateAuthorityRequestSchema)` to create a new message.
  */
-export const CreateCertificateAuthorityRequestSchema: GenMessage<CreateCertificateAuthorityRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 1);
+export const CreateCertificateAuthorityRequestSchema: GenMessage<CreateCertificateAuthorityRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 1);
 
 /**
  * @generated from message nokku.v1.CreateCertificateAuthorityResponse
  */
-export type CreateCertificateAuthorityResponse = Message<"nokku.v1.CreateCertificateAuthorityResponse"> & {
-  /**
-   * @generated from field: nokku.v1.CertificateAuthority certificate_authority = 1;
-   */
-  certificateAuthority?: CertificateAuthority | undefined;
-};
+export type CreateCertificateAuthorityResponse =
+	Message<'nokku.v1.CreateCertificateAuthorityResponse'> & {
+		/**
+		 * @generated from field: nokku.v1.CertificateAuthority certificate_authority = 1;
+		 */
+		certificateAuthority?: CertificateAuthority | undefined;
+	};
 
 /**
  * Describes the message nokku.v1.CreateCertificateAuthorityResponse.
  * Use `create(CreateCertificateAuthorityResponseSchema)` to create a new message.
  */
-export const CreateCertificateAuthorityResponseSchema: GenMessage<CreateCertificateAuthorityResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 2);
+export const CreateCertificateAuthorityResponseSchema: GenMessage<CreateCertificateAuthorityResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 2);
 
 /**
  * @generated from message nokku.v1.GetCertificateAuthorityRequest
  */
-export type GetCertificateAuthorityRequest = Message<"nokku.v1.GetCertificateAuthorityRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type GetCertificateAuthorityRequest = Message<'nokku.v1.GetCertificateAuthorityRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string id = 2;
-   */
-  id: string;
+	/**
+	 * @generated from field: string id = 2;
+	 */
+	id: string;
 };
 
 /**
  * Describes the message nokku.v1.GetCertificateAuthorityRequest.
  * Use `create(GetCertificateAuthorityRequestSchema)` to create a new message.
  */
-export const GetCertificateAuthorityRequestSchema: GenMessage<GetCertificateAuthorityRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 3);
+export const GetCertificateAuthorityRequestSchema: GenMessage<GetCertificateAuthorityRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 3);
 
 /**
  * @generated from message nokku.v1.GetCertificateAuthorityResponse
  */
-export type GetCertificateAuthorityResponse = Message<"nokku.v1.GetCertificateAuthorityResponse"> & {
-  /**
-   * @generated from field: nokku.v1.CertificateAuthority certificate_authority = 1;
-   */
-  certificateAuthority?: CertificateAuthority | undefined;
-};
+export type GetCertificateAuthorityResponse =
+	Message<'nokku.v1.GetCertificateAuthorityResponse'> & {
+		/**
+		 * @generated from field: nokku.v1.CertificateAuthority certificate_authority = 1;
+		 */
+		certificateAuthority?: CertificateAuthority | undefined;
+	};
 
 /**
  * Describes the message nokku.v1.GetCertificateAuthorityResponse.
  * Use `create(GetCertificateAuthorityResponseSchema)` to create a new message.
  */
-export const GetCertificateAuthorityResponseSchema: GenMessage<GetCertificateAuthorityResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 4);
+export const GetCertificateAuthorityResponseSchema: GenMessage<GetCertificateAuthorityResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 4);
 
 /**
  * @generated from message nokku.v1.ListCertificateAuthoritiesRequest
  */
-export type ListCertificateAuthoritiesRequest = Message<"nokku.v1.ListCertificateAuthoritiesRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-};
+export type ListCertificateAuthoritiesRequest =
+	Message<'nokku.v1.ListCertificateAuthoritiesRequest'> & {
+		/**
+		 * @generated from field: string workspace_id = 1;
+		 */
+		workspaceId: string;
+	};
 
 /**
  * Describes the message nokku.v1.ListCertificateAuthoritiesRequest.
  * Use `create(ListCertificateAuthoritiesRequestSchema)` to create a new message.
  */
-export const ListCertificateAuthoritiesRequestSchema: GenMessage<ListCertificateAuthoritiesRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 5);
+export const ListCertificateAuthoritiesRequestSchema: GenMessage<ListCertificateAuthoritiesRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 5);
 
 /**
  * @generated from message nokku.v1.ListCertificateAuthoritiesResponse
  */
-export type ListCertificateAuthoritiesResponse = Message<"nokku.v1.ListCertificateAuthoritiesResponse"> & {
-  /**
-   * @generated from field: repeated nokku.v1.CertificateAuthority certificate_authorities = 1;
-   */
-  certificateAuthorities: CertificateAuthority[];
-};
+export type ListCertificateAuthoritiesResponse =
+	Message<'nokku.v1.ListCertificateAuthoritiesResponse'> & {
+		/**
+		 * @generated from field: repeated nokku.v1.CertificateAuthority certificate_authorities = 1;
+		 */
+		certificateAuthorities: CertificateAuthority[];
+	};
 
 /**
  * Describes the message nokku.v1.ListCertificateAuthoritiesResponse.
  * Use `create(ListCertificateAuthoritiesResponseSchema)` to create a new message.
  */
-export const ListCertificateAuthoritiesResponseSchema: GenMessage<ListCertificateAuthoritiesResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 6);
+export const ListCertificateAuthoritiesResponseSchema: GenMessage<ListCertificateAuthoritiesResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 6);
 
 /**
  * @generated from message nokku.v1.UpdateCertificateAuthorityRequest
  */
-export type UpdateCertificateAuthorityRequest = Message<"nokku.v1.UpdateCertificateAuthorityRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type UpdateCertificateAuthorityRequest =
+	Message<'nokku.v1.UpdateCertificateAuthorityRequest'> & {
+		/**
+		 * @generated from field: string workspace_id = 1;
+		 */
+		workspaceId: string;
 
-  /**
-   * @generated from field: string id = 2;
-   */
-  id: string;
+		/**
+		 * @generated from field: string id = 2;
+		 */
+		id: string;
 
-  /**
-   * @generated from field: string name = 3;
-   */
-  name: string;
+		/**
+		 * @generated from field: string name = 3;
+		 */
+		name: string;
 
-  /**
-   * @generated from field: string description = 4;
-   */
-  description: string;
+		/**
+		 * @generated from field: string description = 4;
+		 */
+		description: string;
 
-  /**
-   * @generated from field: bool is_active = 5;
-   */
-  isActive: boolean;
+		/**
+		 * @generated from field: bool is_active = 5;
+		 */
+		isActive: boolean;
 
-  /**
-   * @generated from field: bool is_default = 6;
-   */
-  isDefault: boolean;
+		/**
+		 * @generated from field: bool is_default = 6;
+		 */
+		isDefault: boolean;
 
-  /**
-   * @generated from field: repeated nokku.v1.CertificateKeyType allowed_key_types = 7;
-   */
-  allowedKeyTypes: CertificateKeyType[];
+		/**
+		 * @generated from field: repeated nokku.v1.CertificateKeyType allowed_key_types = 7;
+		 */
+		allowedKeyTypes: CertificateKeyType[];
 
-  /**
-   * @generated from field: google.protobuf.Duration lifetime = 8;
-   */
-  lifetime?: Duration | undefined;
+		/**
+		 * @generated from field: google.protobuf.Duration lifetime = 8;
+		 */
+		lifetime?: Duration | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Duration user_default_ttl = 9;
-   */
-  userDefaultTtl?: Duration | undefined;
+		/**
+		 * @generated from field: google.protobuf.Duration user_default_ttl = 9;
+		 */
+		userDefaultTtl?: Duration | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Duration user_max_ttl = 10;
-   */
-  userMaxTtl?: Duration | undefined;
+		/**
+		 * @generated from field: google.protobuf.Duration user_max_ttl = 10;
+		 */
+		userMaxTtl?: Duration | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Duration host_default_ttl = 11;
-   */
-  hostDefaultTtl?: Duration | undefined;
+		/**
+		 * @generated from field: google.protobuf.Duration host_default_ttl = 11;
+		 */
+		hostDefaultTtl?: Duration | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Duration host_max_ttl = 12;
-   */
-  hostMaxTtl?: Duration | undefined;
+		/**
+		 * @generated from field: google.protobuf.Duration host_max_ttl = 12;
+		 */
+		hostMaxTtl?: Duration | undefined;
 
-  /**
-   * @generated from field: map<string, string> user_extensions = 13;
-   */
-  userExtensions: { [key: string]: string };
+		/**
+		 * @generated from field: map<string, string> user_extensions = 13;
+		 */
+		userExtensions: { [key: string]: string };
 
-  /**
-   * @generated from field: map<string, string> user_critical_options = 14;
-   */
-  userCriticalOptions: { [key: string]: string };
-};
+		/**
+		 * @generated from field: map<string, string> user_critical_options = 14;
+		 */
+		userCriticalOptions: { [key: string]: string };
+	};
 
 /**
  * Describes the message nokku.v1.UpdateCertificateAuthorityRequest.
  * Use `create(UpdateCertificateAuthorityRequestSchema)` to create a new message.
  */
-export const UpdateCertificateAuthorityRequestSchema: GenMessage<UpdateCertificateAuthorityRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 7);
+export const UpdateCertificateAuthorityRequestSchema: GenMessage<UpdateCertificateAuthorityRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 7);
 
 /**
  * @generated from message nokku.v1.UpdateCertificateAuthorityResponse
  */
-export type UpdateCertificateAuthorityResponse = Message<"nokku.v1.UpdateCertificateAuthorityResponse"> & {
-  /**
-   * @generated from field: nokku.v1.CertificateAuthority certificate_authority = 1;
-   */
-  certificateAuthority?: CertificateAuthority | undefined;
-};
+export type UpdateCertificateAuthorityResponse =
+	Message<'nokku.v1.UpdateCertificateAuthorityResponse'> & {
+		/**
+		 * @generated from field: nokku.v1.CertificateAuthority certificate_authority = 1;
+		 */
+		certificateAuthority?: CertificateAuthority | undefined;
+	};
 
 /**
  * Describes the message nokku.v1.UpdateCertificateAuthorityResponse.
  * Use `create(UpdateCertificateAuthorityResponseSchema)` to create a new message.
  */
-export const UpdateCertificateAuthorityResponseSchema: GenMessage<UpdateCertificateAuthorityResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 8);
+export const UpdateCertificateAuthorityResponseSchema: GenMessage<UpdateCertificateAuthorityResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 8);
 
 /**
  * @generated from message nokku.v1.DeleteCertificateAuthorityRequest
  */
-export type DeleteCertificateAuthorityRequest = Message<"nokku.v1.DeleteCertificateAuthorityRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type DeleteCertificateAuthorityRequest =
+	Message<'nokku.v1.DeleteCertificateAuthorityRequest'> & {
+		/**
+		 * @generated from field: string workspace_id = 1;
+		 */
+		workspaceId: string;
 
-  /**
-   * @generated from field: string id = 2;
-   */
-  id: string;
-};
+		/**
+		 * @generated from field: string id = 2;
+		 */
+		id: string;
+	};
 
 /**
  * Describes the message nokku.v1.DeleteCertificateAuthorityRequest.
  * Use `create(DeleteCertificateAuthorityRequestSchema)` to create a new message.
  */
-export const DeleteCertificateAuthorityRequestSchema: GenMessage<DeleteCertificateAuthorityRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 9);
+export const DeleteCertificateAuthorityRequestSchema: GenMessage<DeleteCertificateAuthorityRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 9);
 
 /**
  * @generated from message nokku.v1.DeleteCertificateAuthorityResponse
  */
-export type DeleteCertificateAuthorityResponse = Message<"nokku.v1.DeleteCertificateAuthorityResponse"> & {
-};
+export type DeleteCertificateAuthorityResponse =
+	Message<'nokku.v1.DeleteCertificateAuthorityResponse'> & {};
 
 /**
  * Describes the message nokku.v1.DeleteCertificateAuthorityResponse.
  * Use `create(DeleteCertificateAuthorityResponseSchema)` to create a new message.
  */
-export const DeleteCertificateAuthorityResponseSchema: GenMessage<DeleteCertificateAuthorityResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 10);
+export const DeleteCertificateAuthorityResponseSchema: GenMessage<DeleteCertificateAuthorityResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 10);
 
 /**
  * @generated from message nokku.v1.RolloverCertificateAuthorityRequest
  */
-export type RolloverCertificateAuthorityRequest = Message<"nokku.v1.RolloverCertificateAuthorityRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type RolloverCertificateAuthorityRequest =
+	Message<'nokku.v1.RolloverCertificateAuthorityRequest'> & {
+		/**
+		 * @generated from field: string workspace_id = 1;
+		 */
+		workspaceId: string;
 
-  /**
-   * @generated from field: string id = 2;
-   */
-  id: string;
+		/**
+		 * @generated from field: string id = 2;
+		 */
+		id: string;
 
-  /**
-   * @generated from field: int32 key_bits = 3;
-   */
-  keyBits: number;
+		/**
+		 * @generated from field: int32 key_bits = 3;
+		 */
+		keyBits: number;
 
-  /**
-   * @generated from field: nokku.v1.CertificateKeyType key_type = 4;
-   */
-  keyType: CertificateKeyType;
-};
+		/**
+		 * @generated from field: nokku.v1.CertificateKeyType key_type = 4;
+		 */
+		keyType: CertificateKeyType;
+	};
 
 /**
  * Describes the message nokku.v1.RolloverCertificateAuthorityRequest.
  * Use `create(RolloverCertificateAuthorityRequestSchema)` to create a new message.
  */
-export const RolloverCertificateAuthorityRequestSchema: GenMessage<RolloverCertificateAuthorityRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 11);
+export const RolloverCertificateAuthorityRequestSchema: GenMessage<RolloverCertificateAuthorityRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 11);
 
 /**
  * @generated from message nokku.v1.RolloverCertificateAuthorityResponse
  */
-export type RolloverCertificateAuthorityResponse = Message<"nokku.v1.RolloverCertificateAuthorityResponse"> & {
-  /**
-   * @generated from field: nokku.v1.CertificateAuthority certificate_authority = 1;
-   */
-  certificateAuthority?: CertificateAuthority | undefined;
-};
+export type RolloverCertificateAuthorityResponse =
+	Message<'nokku.v1.RolloverCertificateAuthorityResponse'> & {
+		/**
+		 * @generated from field: nokku.v1.CertificateAuthority certificate_authority = 1;
+		 */
+		certificateAuthority?: CertificateAuthority | undefined;
+	};
 
 /**
  * Describes the message nokku.v1.RolloverCertificateAuthorityResponse.
  * Use `create(RolloverCertificateAuthorityResponseSchema)` to create a new message.
  */
-export const RolloverCertificateAuthorityResponseSchema: GenMessage<RolloverCertificateAuthorityResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 12);
+export const RolloverCertificateAuthorityResponseSchema: GenMessage<RolloverCertificateAuthorityResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 12);
 
 /**
  * @generated from message nokku.v1.SignSSHCertificateRequest
  */
-export type SignSSHCertificateRequest = Message<"nokku.v1.SignSSHCertificateRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type SignSSHCertificateRequest = Message<'nokku.v1.SignSSHCertificateRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string ca_id = 2;
-   */
-  caId: string;
+	/**
+	 * @generated from field: string ca_id = 2;
+	 */
+	caId: string;
 
-  /**
-   * @generated from field: string target_id = 3;
-   */
-  targetId: string;
+	/**
+	 * @generated from field: string target_id = 3;
+	 */
+	targetId: string;
 
-  /**
-   * @generated from field: nokku.v1.SignSSHCertificateRequest.CertificateType type = 4;
-   */
-  type: SignSSHCertificateRequest_CertificateType;
+	/**
+	 * @generated from field: nokku.v1.SignSSHCertificateRequest.CertificateType type = 4;
+	 */
+	type: SignSSHCertificateRequest_CertificateType;
 
-  /**
-   * @generated from field: string public_key = 5;
-   */
-  publicKey: string;
+	/**
+	 * @generated from field: string public_key = 5;
+	 */
+	publicKey: string;
 
-  /**
-   * @generated from field: google.protobuf.Duration ttl = 6;
-   */
-  ttl?: Duration | undefined;
+	/**
+	 * @generated from field: google.protobuf.Duration ttl = 6;
+	 */
+	ttl?: Duration | undefined;
 };
 
 /**
  * Describes the message nokku.v1.SignSSHCertificateRequest.
  * Use `create(SignSSHCertificateRequestSchema)` to create a new message.
  */
-export const SignSSHCertificateRequestSchema: GenMessage<SignSSHCertificateRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 13);
+export const SignSSHCertificateRequestSchema: GenMessage<SignSSHCertificateRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 13);
 
 /**
  * @generated from enum nokku.v1.SignSSHCertificateRequest.CertificateType
  */
 export enum SignSSHCertificateRequest_CertificateType {
-  /**
-   * @generated from enum value: CERTIFICATE_TYPE_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
+	/**
+	 * @generated from enum value: CERTIFICATE_TYPE_UNSPECIFIED = 0;
+	 */
+	UNSPECIFIED = 0,
 
-  /**
-   * @generated from enum value: CERTIFICATE_TYPE_USER = 1;
-   */
-  USER = 1,
+	/**
+	 * @generated from enum value: CERTIFICATE_TYPE_USER = 1;
+	 */
+	USER = 1,
 
-  /**
-   * @generated from enum value: CERTIFICATE_TYPE_HOST = 2;
-   */
-  HOST = 2,
+	/**
+	 * @generated from enum value: CERTIFICATE_TYPE_HOST = 2;
+	 */
+	HOST = 2
 }
 
 /**
  * Describes the enum nokku.v1.SignSSHCertificateRequest.CertificateType.
  */
-export const SignSSHCertificateRequest_CertificateTypeSchema: GenEnum<SignSSHCertificateRequest_CertificateType> = /*@__PURE__*/
-  enumDesc(file_nokku_v1_certificates, 13, 0);
+export const SignSSHCertificateRequest_CertificateTypeSchema: GenEnum<SignSSHCertificateRequest_CertificateType> /*@__PURE__*/ =
+	enumDesc(file_nokku_v1_certificates, 13, 0);
 
 /**
  * @generated from message nokku.v1.SignSSHCertificateResponse
  */
-export type SignSSHCertificateResponse = Message<"nokku.v1.SignSSHCertificateResponse"> & {
-  /**
-   * @generated from field: string ca_id = 1;
-   */
-  caId: string;
+export type SignSSHCertificateResponse = Message<'nokku.v1.SignSSHCertificateResponse'> & {
+	/**
+	 * @generated from field: string ca_id = 1;
+	 */
+	caId: string;
 
-  /**
-   * @generated from field: string ca_name = 2;
-   */
-  caName: string;
+	/**
+	 * @generated from field: string ca_name = 2;
+	 */
+	caName: string;
 
-  /**
-   * @generated from field: string ca_public_key = 3;
-   */
-  caPublicKey: string;
+	/**
+	 * @generated from field: string ca_public_key = 3;
+	 */
+	caPublicKey: string;
 
-  /**
-   * @generated from field: string signed_certificate = 4;
-   */
-  signedCertificate: string;
+	/**
+	 * @generated from field: string signed_certificate = 4;
+	 */
+	signedCertificate: string;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 5;
-   */
-  expiresAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp expires_at = 5;
+	 */
+	expiresAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.SignSSHCertificateResponse.
  * Use `create(SignSSHCertificateResponseSchema)` to create a new message.
  */
-export const SignSSHCertificateResponseSchema: GenMessage<SignSSHCertificateResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 14);
+export const SignSSHCertificateResponseSchema: GenMessage<SignSSHCertificateResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 14);
 
 /**
  * @generated from message nokku.v1.SignX509CertificateRequest
  */
-export type SignX509CertificateRequest = Message<"nokku.v1.SignX509CertificateRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type SignX509CertificateRequest = Message<'nokku.v1.SignX509CertificateRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string ca_id = 2;
-   */
-  caId: string;
+	/**
+	 * @generated from field: string ca_id = 2;
+	 */
+	caId: string;
 
-  /**
-   * @generated from field: string csr = 3;
-   */
-  csr: string;
+	/**
+	 * @generated from field: string csr = 3;
+	 */
+	csr: string;
 
-  /**
-   * @generated from field: nokku.v1.SignX509CertificateRequest.X509Usage usage = 4;
-   */
-  usage: SignX509CertificateRequest_X509Usage;
+	/**
+	 * @generated from field: nokku.v1.SignX509CertificateRequest.X509Usage usage = 4;
+	 */
+	usage: SignX509CertificateRequest_X509Usage;
 
-  /**
-   * @generated from field: google.protobuf.Duration ttl = 5;
-   */
-  ttl?: Duration | undefined;
+	/**
+	 * @generated from field: google.protobuf.Duration ttl = 5;
+	 */
+	ttl?: Duration | undefined;
 };
 
 /**
  * Describes the message nokku.v1.SignX509CertificateRequest.
  * Use `create(SignX509CertificateRequestSchema)` to create a new message.
  */
-export const SignX509CertificateRequestSchema: GenMessage<SignX509CertificateRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 15);
+export const SignX509CertificateRequestSchema: GenMessage<SignX509CertificateRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 15);
 
 /**
  * @generated from enum nokku.v1.SignX509CertificateRequest.X509Usage
  */
 export enum SignX509CertificateRequest_X509Usage {
-  /**
-   * @generated from enum value: X509_USAGE_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
+	/**
+	 * @generated from enum value: X509_USAGE_UNSPECIFIED = 0;
+	 */
+	UNSPECIFIED = 0,
 
-  /**
-   * @generated from enum value: X509_USAGE_CLIENT_AUTH = 1;
-   */
-  CLIENT_AUTH = 1,
+	/**
+	 * @generated from enum value: X509_USAGE_CLIENT_AUTH = 1;
+	 */
+	CLIENT_AUTH = 1,
 
-  /**
-   * @generated from enum value: X509_USAGE_SERVER_AUTH = 2;
-   */
-  SERVER_AUTH = 2,
+	/**
+	 * @generated from enum value: X509_USAGE_SERVER_AUTH = 2;
+	 */
+	SERVER_AUTH = 2,
 
-  /**
-   * @generated from enum value: X509_USAGE_CLIENT_AND_SERVER = 3;
-   */
-  CLIENT_AND_SERVER = 3,
+	/**
+	 * @generated from enum value: X509_USAGE_CLIENT_AND_SERVER = 3;
+	 */
+	CLIENT_AND_SERVER = 3
 }
 
 /**
  * Describes the enum nokku.v1.SignX509CertificateRequest.X509Usage.
  */
-export const SignX509CertificateRequest_X509UsageSchema: GenEnum<SignX509CertificateRequest_X509Usage> = /*@__PURE__*/
-  enumDesc(file_nokku_v1_certificates, 15, 0);
+export const SignX509CertificateRequest_X509UsageSchema: GenEnum<SignX509CertificateRequest_X509Usage> /*@__PURE__*/ =
+	enumDesc(file_nokku_v1_certificates, 15, 0);
 
 /**
  * @generated from message nokku.v1.SignX509CertificateResponse
  */
-export type SignX509CertificateResponse = Message<"nokku.v1.SignX509CertificateResponse"> & {
-  /**
-   * @generated from field: string ca_id = 1;
-   */
-  caId: string;
+export type SignX509CertificateResponse = Message<'nokku.v1.SignX509CertificateResponse'> & {
+	/**
+	 * @generated from field: string ca_id = 1;
+	 */
+	caId: string;
 
-  /**
-   * @generated from field: string ca_name = 2;
-   */
-  caName: string;
+	/**
+	 * @generated from field: string ca_name = 2;
+	 */
+	caName: string;
 
-  /**
-   * @generated from field: string certificate = 3;
-   */
-  certificate: string;
+	/**
+	 * @generated from field: string certificate = 3;
+	 */
+	certificate: string;
 
-  /**
-   * @generated from field: string ca_chain = 4;
-   */
-  caChain: string;
+	/**
+	 * @generated from field: string ca_chain = 4;
+	 */
+	caChain: string;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 5;
-   */
-  expiresAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp expires_at = 5;
+	 */
+	expiresAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.SignX509CertificateResponse.
  * Use `create(SignX509CertificateResponseSchema)` to create a new message.
  */
-export const SignX509CertificateResponseSchema: GenMessage<SignX509CertificateResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_certificates, 16);
+export const SignX509CertificateResponseSchema: GenMessage<SignX509CertificateResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_certificates, 16);
 
 /**
  * @generated from enum nokku.v1.CertificateKeyType
  */
 export enum CertificateKeyType {
-  /**
-   * @generated from enum value: CERTIFICATE_KEY_TYPE_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
+	/**
+	 * @generated from enum value: CERTIFICATE_KEY_TYPE_UNSPECIFIED = 0;
+	 */
+	UNSPECIFIED = 0,
 
-  /**
-   * @generated from enum value: CERTIFICATE_KEY_TYPE_RSA = 1;
-   */
-  RSA = 1,
+	/**
+	 * @generated from enum value: CERTIFICATE_KEY_TYPE_RSA = 1;
+	 */
+	RSA = 1,
 
-  /**
-   * @generated from enum value: CERTIFICATE_KEY_TYPE_ECDSA = 2;
-   */
-  ECDSA = 2,
+	/**
+	 * @generated from enum value: CERTIFICATE_KEY_TYPE_ECDSA = 2;
+	 */
+	ECDSA = 2,
 
-  /**
-   * @generated from enum value: CERTIFICATE_KEY_TYPE_ED25519 = 3;
-   */
-  ED25519 = 3,
+	/**
+	 * @generated from enum value: CERTIFICATE_KEY_TYPE_ED25519 = 3;
+	 */
+	ED25519 = 3
 }
 
 /**
  * Describes the enum nokku.v1.CertificateKeyType.
  */
-export const CertificateKeyTypeSchema: GenEnum<CertificateKeyType> = /*@__PURE__*/
-  enumDesc(file_nokku_v1_certificates, 0);
+export const CertificateKeyTypeSchema: GenEnum<CertificateKeyType> /*@__PURE__*/ = enumDesc(
+	file_nokku_v1_certificates,
+	0
+);
 
 /**
  * @generated from enum nokku.v1.AuthorityType
  */
 export enum AuthorityType {
-  /**
-   * @generated from enum value: AUTHORITY_TYPE_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
+	/**
+	 * @generated from enum value: AUTHORITY_TYPE_UNSPECIFIED = 0;
+	 */
+	UNSPECIFIED = 0,
 
-  /**
-   * @generated from enum value: AUTHORITY_TYPE_SSH = 1;
-   */
-  SSH = 1,
+	/**
+	 * @generated from enum value: AUTHORITY_TYPE_SSH = 1;
+	 */
+	SSH = 1,
 
-  /**
-   * @generated from enum value: AUTHORITY_TYPE_X509 = 2;
-   */
-  X509 = 2,
+	/**
+	 * @generated from enum value: AUTHORITY_TYPE_X509 = 2;
+	 */
+	X509 = 2
 }
 
 /**
  * Describes the enum nokku.v1.AuthorityType.
  */
-export const AuthorityTypeSchema: GenEnum<AuthorityType> = /*@__PURE__*/
-  enumDesc(file_nokku_v1_certificates, 1);
+export const AuthorityTypeSchema: GenEnum<AuthorityType> /*@__PURE__*/ = enumDesc(
+	file_nokku_v1_certificates,
+	1
+);
 
 /**
  * @generated from service nokku.v1.CertificateService
  */
 export const CertificateService: GenService<{
-  /**
-   * @generated from rpc nokku.v1.CertificateService.GetCertificateAuthority
-   */
-  getCertificateAuthority: {
-    methodKind: "unary";
-    input: typeof GetCertificateAuthorityRequestSchema;
-    output: typeof GetCertificateAuthorityResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.CertificateService.CreateCertificateAuthority
-   */
-  createCertificateAuthority: {
-    methodKind: "unary";
-    input: typeof CreateCertificateAuthorityRequestSchema;
-    output: typeof CreateCertificateAuthorityResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.CertificateService.UpdateCertificateAuthority
-   */
-  updateCertificateAuthority: {
-    methodKind: "unary";
-    input: typeof UpdateCertificateAuthorityRequestSchema;
-    output: typeof UpdateCertificateAuthorityResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.CertificateService.ListCertificateAuthorities
-   */
-  listCertificateAuthorities: {
-    methodKind: "unary";
-    input: typeof ListCertificateAuthoritiesRequestSchema;
-    output: typeof ListCertificateAuthoritiesResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.CertificateService.DeleteCertificateAuthority
-   */
-  deleteCertificateAuthority: {
-    methodKind: "unary";
-    input: typeof DeleteCertificateAuthorityRequestSchema;
-    output: typeof DeleteCertificateAuthorityResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.CertificateService.RolloverCertificateAuthority
-   */
-  rolloverCertificateAuthority: {
-    methodKind: "unary";
-    input: typeof RolloverCertificateAuthorityRequestSchema;
-    output: typeof RolloverCertificateAuthorityResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.CertificateService.SignSSHCertificate
-   */
-  signSSHCertificate: {
-    methodKind: "unary";
-    input: typeof SignSSHCertificateRequestSchema;
-    output: typeof SignSSHCertificateResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.CertificateService.SignX509Certificate
-   */
-  signX509Certificate: {
-    methodKind: "unary";
-    input: typeof SignX509CertificateRequestSchema;
-    output: typeof SignX509CertificateResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_nokku_v1_certificates, 0);
-
+	/**
+	 * @generated from rpc nokku.v1.CertificateService.GetCertificateAuthority
+	 */
+	getCertificateAuthority: {
+		methodKind: 'unary';
+		input: typeof GetCertificateAuthorityRequestSchema;
+		output: typeof GetCertificateAuthorityResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.CertificateService.CreateCertificateAuthority
+	 */
+	createCertificateAuthority: {
+		methodKind: 'unary';
+		input: typeof CreateCertificateAuthorityRequestSchema;
+		output: typeof CreateCertificateAuthorityResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.CertificateService.UpdateCertificateAuthority
+	 */
+	updateCertificateAuthority: {
+		methodKind: 'unary';
+		input: typeof UpdateCertificateAuthorityRequestSchema;
+		output: typeof UpdateCertificateAuthorityResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.CertificateService.ListCertificateAuthorities
+	 */
+	listCertificateAuthorities: {
+		methodKind: 'unary';
+		input: typeof ListCertificateAuthoritiesRequestSchema;
+		output: typeof ListCertificateAuthoritiesResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.CertificateService.DeleteCertificateAuthority
+	 */
+	deleteCertificateAuthority: {
+		methodKind: 'unary';
+		input: typeof DeleteCertificateAuthorityRequestSchema;
+		output: typeof DeleteCertificateAuthorityResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.CertificateService.RolloverCertificateAuthority
+	 */
+	rolloverCertificateAuthority: {
+		methodKind: 'unary';
+		input: typeof RolloverCertificateAuthorityRequestSchema;
+		output: typeof RolloverCertificateAuthorityResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.CertificateService.SignSSHCertificate
+	 */
+	signSSHCertificate: {
+		methodKind: 'unary';
+		input: typeof SignSSHCertificateRequestSchema;
+		output: typeof SignSSHCertificateResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.CertificateService.SignX509Certificate
+	 */
+	signX509Certificate: {
+		methodKind: 'unary';
+		input: typeof SignX509CertificateRequestSchema;
+		output: typeof SignX509CertificateResponseSchema;
+	};
+}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_certificates, 0);
