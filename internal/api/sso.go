@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"connectrpc.com/connect"
 
@@ -112,6 +113,19 @@ func (s *SSOService) UpdateSSOProvider(
 			JITProvisioning: req.GetAllowJitProvisioning(),
 			EnforceSSO:      req.GetEnforceSso(),
 		}
+		// An update that sends no metadata keeps the stored IdP metadata, so
+		// toggling JIT provisioning or enforce-SSO never wipes a working
+		// configuration (mirrors how an empty client secret is handled).
+		if p.SAML.MetadataURL == "" {
+			if prev, err := s.cfg.IAM.GetWorkspaceSSOProvider(
+				ctx,
+				req.GetWorkspaceId(),
+			); err == nil &&
+				prev.SAML != nil {
+				p.SAML.MetadataURL = prev.SAML.MetadataURL
+				p.SAML.MetadataXML = prev.SAML.MetadataXML
+			}
+		}
 	default:
 		return nil, NewError(connect.CodeInvalidArgument, "method must be oidc or saml")
 	}
@@ -123,12 +137,21 @@ func (s *SSOService) UpdateSSOProvider(
 		return nil, ssoError(err)
 	}
 	if issuerChanged {
-		_, _ = s.cfg.IAM.DeleteCredentialsByProvider(
+		// The update itself succeeded, so a purge failure must not fail the
+		// call; it must however be loud: stale identities under the old
+		// issuer stay valid until this is retried.
+		if _, err := s.cfg.IAM.DeleteCredentialsByProvider(
 			ctx,
 			"",
 			iam.MethodOIDC,
 			req.GetWorkspaceId(),
-		)
+		); err != nil {
+			slog.Error(
+				"purging identities after issuer change failed",
+				"error", err,
+				"workspace_id", req.GetWorkspaceId(),
+			)
+		}
 	}
 
 	stored, err := s.cfg.IAM.GetWorkspaceSSOProvider(ctx, req.GetWorkspaceId())

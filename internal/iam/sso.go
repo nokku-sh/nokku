@@ -146,7 +146,8 @@ func (s *Service) putSSOProvider(
 	// An empty incoming secret keeps the stored one: decrypt the previous
 	// config through the same querier (so tenant isolation holds) and carry
 	// the secret over before encrypting.
-	if (p.OIDC != nil && p.OIDC.ClientSecret == "") || (p.OAuth2 != nil && p.OAuth2.ClientSecret == "") {
+	if (p.OIDC != nil && p.OIDC.ClientSecret == "") ||
+		(p.OAuth2 != nil && p.OAuth2.ClientSecret == "") {
 		if row, err := q.GetSSOProvider(ctx, p.ProviderID); err == nil {
 			var prev providerConfig
 			if json.Unmarshal(row.Config, &prev) == nil {
