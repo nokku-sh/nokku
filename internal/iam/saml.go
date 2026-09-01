@@ -72,7 +72,7 @@ func newSAMLFlow(svc *Service, cfg SAMLConfig) (*samlFlow, error) {
 		svc:         svc,
 		linker:      &linker{svc: svc, credType: MethodSAML, OnSSOLogin: svc.OnSSOLogin},
 		state:       newState[samlState](svc.cache, "saml:state:", flowStateTTL),
-		errRedirect: svc.baseURL + "/auth-error",
+		errRedirect: svc.baseURL + "/sso-error",
 		samlConfig:  cfg,
 		spKey:       key,
 		spCert:      cert,

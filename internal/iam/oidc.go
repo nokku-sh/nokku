@@ -48,7 +48,7 @@ func newOIDCFlow(svc *Service) *oidcFlow {
 		svc:         svc,
 		linker:      &linker{svc: svc, credType: MethodOIDC, OnSSOLogin: svc.OnSSOLogin},
 		authorize:   newFlowAuthorize(svc.cache, "oidc:authorize:"),
-		errRedirect: svc.baseURL + "/auth-error",
+		errRedirect: svc.baseURL + "/sso-error",
 		providers:   cache.NewLocal[*oidc.Provider](providerCacheTTL),
 	}
 }
@@ -59,7 +59,7 @@ func newOAuth2Flow(svc *Service) *oauth2Flow {
 		svc:         svc,
 		linker:      &linker{svc: svc, credType: MethodOAuth2, OnSSOLogin: svc.OnSSOLogin},
 		authorize:   newFlowAuthorize(svc.cache, "oauth2:authorize:"),
-		errRedirect: svc.baseURL + "/auth-error",
+		errRedirect: svc.baseURL + "/sso-error",
 	}
 }
 
