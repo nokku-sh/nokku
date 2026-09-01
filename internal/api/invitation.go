@@ -41,7 +41,7 @@ func (s *InvitationService) GetInvitation(
 		return nil, ErrInvalidInput
 	}
 	workspaceID := token.ID
-	iam.AnnotateTenant(ctx, workspaceID)
+	ctx = iam.AnnotateTenant(ctx, workspaceID)
 
 	actor, _ := iam.PrincipalFromContext(ctx)
 	if actor.ID == "" || actor.Kind != iam.KindUser {
@@ -88,7 +88,7 @@ func (s *InvitationService) AcceptInvitation(
 		return nil, NewError(connect.CodeInvalidArgument, "invalid token")
 	}
 	workspaceID := token.ID
-	iam.AnnotateTenant(ctx, workspaceID)
+	ctx = iam.AnnotateTenant(ctx, workspaceID)
 
 	userID := iam.UserIDFromContext(ctx)
 	if userID == "" {

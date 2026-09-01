@@ -327,7 +327,7 @@ func (s *RecordingService) GetRecording(
 	// carries no message at all), so a global user principal's workspace must
 	// be pinned here from the request. WithWorkspace then checks membership
 	// and scopes row-level security.
-	iam.AnnotateTenant(ctx, req.GetWorkspaceId())
+	ctx = iam.AnnotateTenant(ctx, req.GetWorkspaceId())
 
 	var rec *db.Recording
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {

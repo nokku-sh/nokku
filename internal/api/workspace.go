@@ -309,11 +309,12 @@ func (s *WorkspaceService) SubscribeWorkspaceEvents(
 	stream *connect.ServerStream[nokkuv1.SubscribeWorkspaceEventsResponse],
 ) error {
 	workspaceID := req.GetWorkspaceId()
-	iam.AnnotateTenant(ctx, workspaceID)
-
 	// Streaming handlers bypass the unary interceptor's workspace promotion,
 	// so pin the workspace here and let the scoped transaction verify
-	// membership before events start flowing.
+	// membership before events start flowing. AnnotateTenant returns a new
+	// context; discarding it would leave the pin unset and the membership
+	// check below would run against the fallback workspace instead.
+	ctx = iam.AnnotateTenant(ctx, workspaceID)
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(_ *db.Queries) error {
 		return nil
 	}); err != nil {
