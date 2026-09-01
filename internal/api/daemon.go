@@ -280,7 +280,7 @@ func (s *DaemonService) EnrollDaemon(
 		return nil, NewError(connect.CodeInvalidArgument, "invalid token")
 	}
 	workspaceID := enrollToken.ID
-	iam.AnnotateTenant(ctx, workspaceID)
+	ctx = iam.AnnotateTenant(ctx, workspaceID)
 
 	if err := s.cfg.Billing.Check(ctx, workspaceID, billing.ResourceTargets); err != nil {
 		return nil, err
