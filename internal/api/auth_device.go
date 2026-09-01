@@ -30,7 +30,14 @@ func (a *authAPI) rememberDevice(w http.ResponseWriter, r *http.Request, u *db.U
 	if raw := deviceCookie(r); raw != "" {
 		if sess, err := a.cfg.IAM.Sessions.Verify(r.Context(), raw); err == nil &&
 			sess.Kind == string(iam.KindWebDevice) && sess.SubjectID == u.ID {
-			// Known device: the session's idle window just refreshed. No alert.
+			// Known device: refresh its last-seen time so the sessions list
+			// shows current activity. No alert.
+			if err := a.cfg.IAM.Sessions.Touch(
+				r.Context(),
+				iam.SessionHash(sess.TokenHash),
+			); err != nil {
+				slog.Debug("failed to touch device session", "error", err)
+			}
 			return
 		}
 	}
