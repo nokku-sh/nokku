@@ -129,7 +129,7 @@ func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 		versionedURL := fmt.Sprintf("%s?v=%d", *fileURL, time.Now().UnixMilli())
 
 		// The avatar URL lives on the user profile; the caller attaches it with
-		// the account-surface update (POST /auth/account/update).
+		// the account-surface update (AccountService/UpdateAccount).
 		writeJSON(w, http.StatusOK, map[string]string{"url": versionedURL})
 	}
 }

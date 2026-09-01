@@ -83,23 +83,6 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.Handle("GET /saml/metadata/{id}", http.HandlerFunc(svc.SAML.Metadata))
 	mux.Handle("GET /saml/certificate", http.HandlerFunc(svc.SAML.Certificate))
 	mux.Handle("GET /saml/certificate/{id}", http.HandlerFunc(svc.SAML.Certificate))
-
-	// Account: signed-in user sessions only, CSRF-guarded.
-	account := NewChain(svc.Middleware, svc.CSRFGuard, svc.RequireLogin, svc.RequireUser)
-	mux.Handle("GET /auth/account", account.ThenFunc(a.getAccount))
-	mux.Handle("POST /auth/account/update", account.ThenFunc(a.updateAccount))
-	mux.Handle("POST /auth/account/password", account.ThenFunc(a.changePassword))
-	mux.Handle("POST /auth/account/password/remove", account.ThenFunc(a.removePassword))
-	mux.Handle("GET /auth/account/credentials", account.ThenFunc(a.getCredentials))
-	mux.Handle("POST /auth/account/credentials/rename", account.ThenFunc(a.renameCredential))
-	mux.Handle("POST /auth/account/credentials/remove", account.ThenFunc(a.removeCredential))
-	mux.Handle("POST /auth/account/identities/remove", account.ThenFunc(a.removeIdentity))
-	mux.Handle("GET /auth/account/backup-codes", account.ThenFunc(a.listBackupCodes))
-	mux.Handle("POST /auth/account/backup-codes/rotate", account.ThenFunc(a.rotateBackupCodes))
-	mux.Handle("POST /auth/account/backup-codes/remove", account.ThenFunc(a.removeBackupCodes))
-	mux.Handle("GET /auth/account/sessions", account.ThenFunc(a.listSessions))
-	mux.Handle("POST /auth/account/sessions/remove", account.ThenFunc(a.removeSession))
-	mux.Handle("POST /auth/account/delete", account.ThenFunc(a.deleteAccount))
 }
 
 // --- Flows ------------------------------------------------------------------

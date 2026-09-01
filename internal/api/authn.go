@@ -18,6 +18,7 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
+	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
@@ -59,7 +60,7 @@ func (a *authNInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		if isPublicEndpoint(req.Spec().Procedure) {
 			return next(ctx, req)
 		}
-		p, err := a.authenticate(ctx, req.Header(), req.Spec().Procedure)
+		p, sess, err := a.authenticate(ctx, req.Header(), req.Spec().Procedure)
 		if err != nil {
 			return nil, a.fail(ctx, err)
 		}
@@ -72,6 +73,11 @@ func (a *authNInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		if workspace != "" {
 			ctx = iam.AnnotateTenant(ctx, workspace)
 		}
+		ctx = iam.ContextWithSession(ctx, sess)
+		ctx = iam.ContextWithRequestMeta(ctx, iam.RequestMeta{
+			Header:     req.Header(),
+			RemoteAddr: req.Peer().Addr,
+		})
 		return next(iam.ContextWithPrincipal(ctx, p), req)
 	}
 }
@@ -95,7 +101,7 @@ func (a *authNInterceptor) WrapStreamingHandler(
 		if isPublicEndpoint(conn.Spec().Procedure) {
 			return next(ctx, conn)
 		}
-		p, err := a.authenticate(ctx, conn.RequestHeader(), conn.Spec().Procedure)
+		p, sess, err := a.authenticate(ctx, conn.RequestHeader(), conn.Spec().Procedure)
 		if err != nil {
 			a.advertiseNonce(conn.ResponseHeader(), err)
 			return connect.NewError(connect.CodeUnauthenticated, err)
@@ -103,19 +109,26 @@ func (a *authNInterceptor) WrapStreamingHandler(
 		if p.WorkspaceID != "" {
 			ctx = iam.AnnotateTenant(ctx, p.WorkspaceID)
 		}
+		ctx = iam.ContextWithSession(ctx, sess)
+		ctx = iam.ContextWithRequestMeta(ctx, iam.RequestMeta{
+			Header:     conn.RequestHeader(),
+			RemoteAddr: conn.Peer().Addr,
+		})
 		return next(iam.ContextWithPrincipal(ctx, p), conn)
 	}
 }
 
 // authenticate resolves the request credential into a principal and verifies
-// the DPoP proof of key-bound sessions.
+// the DPoP proof of key-bound sessions. It returns the resolved session row
+// (empty for service accounts, which have no session) so callers can stash
+// it in the request context.
 func (a *authNInterceptor) authenticate(
 	ctx context.Context,
 	header http.Header,
 	procedure string,
-) (iam.Principal, error) {
+) (iam.Principal, db.Session, error) {
 	token, isBearer := sessionToken(header)
-	p, binding, err := authenticateToken(ctx, a.cfg, token)
+	p, sess, binding, err := authenticateToken(ctx, a.cfg, token)
 	if err == nil && isBearer && p.Kind == iam.KindWebDevice {
 		// The remembered-device cookie is a device handle, not an API
 		// credential: it only ever rides the cookie path, so a header
@@ -124,14 +137,14 @@ func (a *authNInterceptor) authenticate(
 		err = errors.New("device credentials are not API tokens")
 	}
 	if err != nil {
-		return iam.Principal{}, err
+		return iam.Principal{}, db.Session{}, err
 	}
 	if binding != "" {
 		if err := a.verifyProof(ctx, header, procedure, token, binding); err != nil {
-			return iam.Principal{}, err
+			return iam.Principal{}, db.Session{}, err
 		}
 	}
-	return p, nil
+	return p, sess, nil
 }
 
 // verifyProof checks the DPoP proof that must accompany every request made
@@ -176,30 +189,31 @@ func (a *authNInterceptor) advertiseNonce(header http.Header, err error) {
 	}
 }
 
-// authenticateToken resolves a session cookie or bearer token to a principal
-// and reports the session's DPoP key binding, if any. Bearer tokens try the
-// iam session store first, then service-account token hashes.
+// authenticateToken resolves a session cookie or bearer token to a principal,
+// the session row behind it (empty for service accounts), and the session's
+// DPoP key binding, if any. Bearer tokens try the iam session store first,
+// then service-account token hashes.
 func authenticateToken(
 	ctx context.Context,
 	cfg *config.Config,
 	token string,
-) (iam.Principal, string, error) {
+) (iam.Principal, db.Session, string, error) {
 	if token == "" {
-		return iam.Principal{}, "", errors.New("missing credentials")
+		return iam.Principal{}, db.Session{}, "", errors.New("missing credentials")
 	}
 
 	// Service accounts authenticate by bearer token hash. They carry no
 	// DPoP binding: the secret is the whole credential.
 	if strings.HasPrefix(token, prefixSA) {
 		p, err := authenticateServiceAccount(ctx, cfg, token)
-		return p, "", err
+		return p, db.Session{}, "", err
 	}
 
 	p, sess, err := cfg.IAM.AuthenticateRequest(ctx, token)
 	if err != nil {
-		return iam.Principal{}, "", err
+		return iam.Principal{}, db.Session{}, "", err
 	}
-	return p, sess.Binding, nil
+	return p, sess, sess.Binding, nil
 }
 
 func authenticateServiceAccount(
