@@ -55,6 +55,12 @@ type Session struct {
 	shutdownOnce sync.Once
 }
 
+// DaemonID returns the daemon the session runs on.
+func (s *Session) DaemonID() string { return s.daemonID }
+
+// UserID returns the user who requested the session.
+func (s *Session) UserID() string { return s.userID }
+
 func (s *Session) shutdown() {
 	s.shutdownOnce.Do(func() { close(s.Exited) })
 }
