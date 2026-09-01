@@ -73,13 +73,14 @@ func NewDeviceFlow(svc *Service, opts DeviceOptions) (*DeviceFlow, error) {
 }
 
 // grant is a cross-request device grant, stored under both the device code
-// and the user code.
+// and the user code. Sessions issued from a device login stay unpinned:
+// users are global and act per-request in a workspace, like every other
+// interactive login.
 type deviceGrant struct {
 	DeviceCode string `json:"device_code"`
 	UserCode   string `json:"user_code"`
 	Status     string `json:"status"`
 	UserID     string `json:"user_id,omitempty"`
-	Workspace  string `json:"workspace,omitempty"`
 }
 
 type pollState struct {
@@ -90,7 +91,7 @@ type pollState struct {
 // Begin starts a device grant (POST /auth/device). Public: the CLI has no
 // credentials yet.
 func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
-	deviceCode, err := RandomString32()
+	deviceCode, err := crypto.RandomString(32)
 	if err != nil {
 		writeOAuthError(w, "server_error")
 		return
@@ -159,10 +160,6 @@ func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool
 		WriteError(w, http.StatusBadRequest, "invalid_or_expired_code", "invalid or expired code")
 		return
 	}
-	if p.WorkspaceID != "" && g.Workspace != "" && g.Workspace != p.WorkspaceID {
-		WriteError(w, http.StatusForbidden, "wrong_tenant", "wrong workspace")
-		return
-	}
 
 	if approve {
 		g.Status = grantApproved
@@ -208,6 +205,13 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		}
 		writeOAuthError(w, "authorization_pending")
 	case grantDenied:
+		// Consume the grant: a CLI left polling must not re-record the
+		// denial as an audit event on every poll until the TTL expires.
+		if _, err := h.cache.GetDel(ctx, "device:code:"+deviceCode); err != nil {
+			writeOAuthError(w, "expired_token") // a concurrent poll consumed it
+			return
+		}
+		_ = h.cache.Delete(ctx, "device:user:"+g.UserCode)
 		h.svc.record(
 			ctx,
 			Event{
@@ -248,12 +252,11 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		_ = h.cache.Delete(ctx, "device:user:"+g.UserCode)
 
 		sess, token, err := h.svc.Sessions.Issue(ctx, SessionParams{
-			SubjectID:   u.ID,
-			Kind:        KindCLI,
-			Method:      MethodDevice,
-			Binding:     binding,
-			WorkspaceID: g.Workspace,
-			TTL:         h.opts.SessionTTL,
+			SubjectID: u.ID,
+			Kind:      KindCLI,
+			Method:    MethodDevice,
+			Binding:   binding,
+			TTL:       h.opts.SessionTTL,
 		})
 		if err != nil {
 			writeOAuthError(w, "server_error")
@@ -350,12 +353,6 @@ func decodePollState(b []byte) pollState {
 	}
 	v, _ := strconv.Atoi(vS)
 	return pollState{last: time.Unix(0, nano), violations: v}
-}
-
-// RandomString32 returns a 32-character random base64url string, used for
-// device codes.
-func RandomString32() (string, error) {
-	return crypto.RandomString(32)
 }
 
 // randomUserCode returns a short, human-typed code like "ABCD-EFGH". Approval
