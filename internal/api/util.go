@@ -33,10 +33,6 @@ func (s *UtilService) GetVersion(
 	return &nokkuv1.GetVersionResponse{Version: &buildinfo.Version}, nil
 }
 
-// Whoami identifies the authenticated principal: it answers "does my login
-// work, and as what" for every credential kind — a browser session, a CLI
-// device, a daemon, or a service-account API key. It needs no permission;
-// authentication is the check.
 func (s *UtilService) Whoami(
 	ctx context.Context,
 	_ *nokkuv1.WhoamiRequest,
