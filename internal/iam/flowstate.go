@@ -70,14 +70,18 @@ func checkFlowBinding(r *http.Request, expected string) bool {
 	return err == nil && c.Value == expected
 }
 
-// endFlowBinding clears the flow cookie after the flow resolved.
+// endFlowBinding clears the flow cookie after the flow resolved. Browsers
+// match the deletion by name, path, and domain, so a Secure attribute is
+// unnecessary on the clearing cookie; Lax keeps the Set-Cookie acceptable
+// over plain HTTP.
 func endFlowBinding() *http.Cookie {
-	return &http.Cookie{
+	return &http.Cookie{ //nolint:gosec // Secure is not needed to match a cookie for deletion
 		Name:     flowCookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
 	}
 }
 
