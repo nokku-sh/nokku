@@ -25,10 +25,6 @@ import (
 // one upload.
 const quotaCheckInterval = 1 << 20 // 1 MiB
 
-// maxRecordingFrame bounds a single stored frame so a corrupted object cannot
-// force an unbounded allocation on playback.
-const maxRecordingFrame = 256 << 20
-
 type RecordingService struct {
 	cfg *config.Config
 }
@@ -356,46 +352,38 @@ func (s *RecordingService) GetRecording(
 		slog.Error("open recording object", "recording_id", rec.ID, "error", err)
 		return ErrInternal
 	}
-	defer func() { _ = rc.Close() }()
 
 	cipher, err := crypto.Encryptor()
 	if err != nil {
+		_ = rc.Close()
 		slog.Error("recording decryptor unavailable", "recording_id", rec.ID, "error", err)
 		return ErrInternal
 	}
 
 	// The object is a stream of [len(4 BE) || ciphertext] frames, each
-	// decrypting to one plaintext gzip slice. Reading frame-by-frame keeps
-	// playback streaming and multi-hundred-MB sessions off the heap.
-	var lenBuf [4]byte
+	// decrypting to one plaintext gzip slice. Playback clients append the
+	// stream, so bounded 32 KiB sends keep memory flat on long sessions.
+	fr := &frameReader{rc: rc, cipher: cipher}
+	defer func() { _ = fr.Close() }()
+
+	buf := make([]byte, 32<<10)
 	for {
-		if _, err = io.ReadFull(rc, lenBuf[:]); err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-				return nil
+		n, readErr := fr.Read(buf)
+		if n > 0 {
+			if err = stream.Send(&nokkuv1.GetRecordingResponse{
+				Msg: &nokkuv1.GetRecordingResponse_Chunk{Chunk: buf[:n]},
+			}); err != nil {
+				return err
 			}
-			slog.Error("read recording frame", "recording_id", rec.ID, "error", err)
-			return ErrInternal
 		}
-		length := binary.BigEndian.Uint32(lenBuf[:])
-		if length > maxRecordingFrame {
-			slog.Error("recording frame too large", "recording_id", rec.ID, "size", length)
-			return ErrInternal
+		if readErr == nil {
+			continue
 		}
-		ct := make([]byte, length)
-		if _, err = io.ReadFull(rc, ct); err != nil {
-			slog.Error("read recording frame body", "recording_id", rec.ID, "error", err)
-			return ErrInternal
+		if errors.Is(readErr, io.EOF) {
+			return nil
 		}
-		plain, decryptErr := cipher.Decrypt(ct)
-		if decryptErr != nil {
-			slog.Error("decrypt recording chunk", "recording_id", rec.ID, "error", decryptErr)
-			return ErrInternal
-		}
-		if err = stream.Send(&nokkuv1.GetRecordingResponse{
-			Msg: &nokkuv1.GetRecordingResponse_Chunk{Chunk: plain},
-		}); err != nil {
-			return err
-		}
+		slog.Error("read recording frame", "recording_id", rec.ID, "error", readErr)
+		return ErrInternal
 	}
 }
 
