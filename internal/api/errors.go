@@ -69,6 +69,31 @@ var (
 	)
 )
 
+// Account errors
+
+var (
+	ErrAccountNotFound = connect.NewError(
+		connect.CodeNotFound,
+		errors.New("account not found"),
+	)
+	ErrCurrentPassword = connect.NewError(
+		connect.CodeInvalidArgument,
+		errors.New("current password is incorrect"),
+	)
+	ErrPasswordTooShort = connect.NewError(
+		connect.CodeInvalidArgument,
+		errors.New("password must be at least 8 characters"),
+	)
+	ErrLastLoginMethod = connect.NewError(
+		connect.CodeFailedPrecondition,
+		errors.New("add another login method before removing this one"),
+	)
+	ErrCurrentSession = connect.NewError(
+		connect.CodeFailedPrecondition,
+		errors.New("use logout to end the current session"),
+	)
+)
+
 // Workspace errors
 
 var ErrWorkspaceLimit = connect.NewError(

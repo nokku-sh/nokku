@@ -8,7 +8,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"slices"
 
@@ -26,21 +25,6 @@ const minPasswordLength = 8
 
 // identityMethods are the external identities the account surface manages.
 var identityMethods = []iam.Method{iam.MethodOIDC, iam.MethodOAuth2, iam.MethodSAML}
-
-// Account errors. The messages surface verbatim in the UI, so they carry the
-// same guidance the old HTTP codes did.
-var (
-	errAccountNotFound  = errors.New("account not found")
-	errCurrentPassword  = errors.New("current password is incorrect")
-	errPasswordTooShort = errors.New("password must be at least 8 characters")
-	errLastLoginMethod  = errors.New("add another login method before removing this one")
-	errCurrentSession   = errors.New("use logout to end the current session")
-	ErrAccountNotFound  = connect.NewError(connect.CodeNotFound, errAccountNotFound)
-	ErrCurrentPassword  = connect.NewError(connect.CodeInvalidArgument, errCurrentPassword)
-	ErrPasswordTooShort = connect.NewError(connect.CodeInvalidArgument, errPasswordTooShort)
-	ErrLastLoginMethod  = connect.NewError(connect.CodeFailedPrecondition, errLastLoginMethod)
-	ErrCurrentSession   = connect.NewError(connect.CodeFailedPrecondition, errCurrentSession)
-)
 
 type AccountService struct {
 	cfg *config.Config
@@ -94,7 +78,11 @@ func (s *AccountService) ChangePassword(
 		return nil, ErrInternal
 	}
 	if has {
-		if err := s.cfg.IAM.Password.CheckPassword(ctx, p.ID, req.GetCurrentPassword()); err != nil {
+		if err := s.cfg.IAM.Password.CheckPassword(
+			ctx,
+			p.ID,
+			req.GetCurrentPassword(),
+		); err != nil {
 			return nil, ErrCurrentPassword
 		}
 	}
