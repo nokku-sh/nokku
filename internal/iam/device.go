@@ -233,8 +233,16 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		if derr != nil {
 			// A proof error is retryable, so the grant stays usable: the
 			// device re-signs with the advertised nonce and polls again.
-			if errors.Is(derr, ErrDPoPNonce) && h.svc.DPoP != nil {
+			// Advertise the canonical URL alongside the nonce on every
+			// failure, so a client that signed the wrong htu (its
+			// configured API URL differs from the canonical base URL)
+			// corrects itself, like the connect interceptor does (RFC
+			// 9449 section 8).
+			if h.svc.DPoP != nil {
+				w.Header().Set(URLHeader, h.svc.baseURL)
 				w.Header().Set("DPoP-Nonce", h.svc.DPoP.CurrentNonce())
+			}
+			if errors.Is(derr, ErrDPoPNonce) {
 				writeOAuthError(w, "use_dpop_nonce")
 			} else {
 				writeOAuthError(w, "invalid_dpop_proof")
