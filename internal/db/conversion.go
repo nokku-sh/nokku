@@ -78,6 +78,20 @@ func WorkspaceMembersToProto(rows []*WorkspaceMember) []*nokkuv1.WorkspaceMember
 	return MapSlice(rows, func(r *WorkspaceMember) *nokkuv1.WorkspaceMember { return r.ToProto() })
 }
 
+func (c *Credential) ToProto() *nokkuv1.AccountCredential {
+	if c == nil {
+		return nil
+	}
+	return &nokkuv1.AccountCredential{
+		Id:        &c.ID,
+		Type:      &c.Type,
+		Provider:  &c.Provider,
+		Subject:   &c.Subject,
+		Label:     &c.Label,
+		CreatedAt: SafeTimestamp(&c.CreatedAt),
+	}
+}
+
 func (r *Recording) ToProto() *nokkuv1.Recording {
 	if r == nil {
 		return nil
