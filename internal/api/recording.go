@@ -155,6 +155,10 @@ func (s *RecordingService) UploadRecording(
 		return nil, DBError(err)
 	}
 
+	if complete {
+		s.ScrubRecording(rec)
+	}
+
 	return &nokkuv1.UploadRecordingResponse{
 		RecordingId: &rec.ID,
 		SizeBytes:   &size,
