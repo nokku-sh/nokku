@@ -167,7 +167,7 @@ func (s *AccountService) ListCredentials(
 			return nil, ErrInternal
 		}
 		for _, c := range creds {
-			credentials = append(credentials, credentialToProto(c))
+			credentials = append(credentials, c.ToProto())
 		}
 	}
 	return &nokkuv1.ListCredentialsResponse{Credentials: credentials}, nil
@@ -243,7 +243,7 @@ func (s *AccountService) ListBackupCodes(
 	}
 	codes := make([]*nokkuv1.AccountCredential, 0, len(creds))
 	for _, c := range creds {
-		codes = append(codes, credentialToProto(c))
+		codes = append(codes, c.ToProto())
 	}
 	return &nokkuv1.ListBackupCodesResponse{Codes: codes}, nil
 }
@@ -353,17 +353,4 @@ func (s *AccountService) DeleteAccount(
 		ci.ResponseHeader().Add("Set-Cookie", s.cfg.IAM.ClearSessionCookie().String())
 	}
 	return &nokkuv1.DeleteAccountResponse{}, nil
-}
-
-// credentialToProto strips the credential to its metadata: Data holds the
-// secret material and never leaves the database.
-func credentialToProto(c *db.Credential) *nokkuv1.AccountCredential {
-	return &nokkuv1.AccountCredential{
-		Id:        new(c.ID),
-		Type:      new(c.Type),
-		Provider:  new(c.Provider),
-		Subject:   new(c.Subject),
-		Label:     new(c.Label),
-		CreatedAt: db.SafeTimestamp(&c.CreatedAt),
-	}
 }
