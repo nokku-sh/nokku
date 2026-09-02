@@ -73,6 +73,13 @@ that governs access to every target.
 - Set a strong `NOKKU_SECRET` (32 bytes) and rotate secrets by stopping the
   backend before running `rotate-secrets` to avoid encrypting data with
   different keys.
+- **Session recordings**: daemons stream terminal recordings to the backend,
+  where they are encrypted at rest. Credential scrubbing runs asynchronously
+  after an upload completes and replaces the stored recording with a redacted
+  copy in place. Between upload completion and scrub completion the stored
+  recording is unredacted (but still encrypted at rest). Scrubbing is best
+  effort: a failed scrub is logged and the recording is kept as uploaded, and
+  scrubbing is heuristic, so it cannot catch every secret.
 - Self-hosted instances default to the Community plan; Enterprise licensing is
   verified offline via Ed25519-signed license keys and falls back to Community
   when a key expires or is revoked. External KMS configuration is an Enterprise
