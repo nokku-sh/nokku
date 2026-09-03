@@ -12,6 +12,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/actor"
 
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	nokkuv1connect "github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 )
 
 // wiredFeatures lists every feature gated somewhere in the guard.
@@ -211,5 +212,137 @@ func TestGuard_AllowsPaidPlanAndUnpinnedContext(t *testing.T) {
 	// Ungated procedures pass everywhere.
 	if err := sut.check(ctx, "/nokku.v1.UtilService/GetVersion", struct{}{}); err != nil {
 		t.Errorf("ungated procedure denied: %v", err)
+	}
+}
+
+// createProcedures lists every create-style procedure in the API surface
+// (Create* and Enroll* RPCs). Kept in sync manually; the golden test below
+// fails when this list and the cappedCreate map drift apart. A new resource
+// type must be added here in the same change that adds its RPC.
+var createProcedures = []string{
+	nokkuv1connect.TargetServiceCreateTargetProcedure,
+	nokkuv1connect.TeamServiceCreateTeamProcedure,
+	nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure,
+	nokkuv1connect.CertificateServiceCreateCertificateAuthorityProcedure,
+	nokkuv1connect.WorkspaceDomainServiceCreateWorkspaceDomainProcedure,
+	nokkuv1connect.DaemonServiceEnrollDaemonProcedure,
+	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure,
+	nokkuv1connect.DaemonServiceCreateSessionProcedure,
+}
+
+// createProceduresGatedOutsideTheGuard are create procedures whose quota
+// check happens elsewhere, with the enforcement point documented.
+var createProceduresGatedOutsideTheGuard = map[string]string{
+	// Enrollment is a public endpoint whose workspace comes from the
+	// enroll token; the handler checks the cap directly (daemon.go).
+	nokkuv1connect.DaemonServiceEnrollDaemonProcedure: "handler: CheckResources in EnrollDaemon (public endpoint, workspace from token)",
+	// Pre-tenant: there is no workspace to resolve a cap for. Per-user
+	// workspace count caps are separate scope, enforced in CreateWorkspace.
+	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure: "out of scope: per-user workspace caps",
+	// Sessions are bounded by the recording storage cap and eviction
+	// (recording/evict.go); they produce no permanent resource rows.
+	nokkuv1connect.DaemonServiceCreateSessionProcedure: "bounded by recording storage eviction",
+}
+
+// TestGolden_CappedProceduresWired fails whenever a create-style procedure
+// is neither resource-capped in the guard nor explicitly exempted. An
+// uncapped create route on SaaS is an unbounded-resource hole; an exempted
+// route without a documented reason is indistinguishable from a forgotten
+// one.
+func TestGolden_CappedProceduresWired(t *testing.T) {
+	for _, procedure := range createProcedures {
+		switch {
+		case cappedCreate[procedure]:
+			continue
+		default:
+			if _, ok := createProceduresGatedOutsideTheGuard[procedure]; ok {
+				continue
+			}
+			t.Errorf(
+				"create procedure %q is capped nowhere: wire it in cappedCreate or exempt it with a documented reason",
+				procedure,
+			)
+		}
+	}
+
+	// The reverse direction: caps must reference real procedures.
+	for procedure := range cappedCreate {
+		if !slices.Contains(createProcedures, procedure) {
+			t.Errorf("cappedCreate gates %q, which is not a known create procedure", procedure)
+		}
+	}
+}
+
+func TestGuard_ResourceCapDeniesAndAdvertisesUpgrade(t *testing.T) {
+	// Community: 50-resource cap, fake reports 50 used.
+	sut := NewGuardInterceptor(NewService(
+		&fakeDB{resources: 50},
+		nil,
+		ModeSaaS,
+	))
+
+	ctx := actor.AnnotateTenant(context.Background(), "ws1")
+	err := sut.checkResources(ctx, "/nokku.v1.TargetService/CreateTarget")
+
+	if err == nil {
+		t.Fatal("expected denial at resource cap")
+	}
+	var connectErr *connect.Error
+	if !errors.As(err, &connectErr) {
+		t.Fatalf("expected *connect.Error, got %T", err)
+	}
+	if connectErr.Code() != connect.CodeResourceExhausted {
+		t.Errorf("code = %v, want ResourceExhausted", connectErr.Code())
+	}
+	if got := connectErr.Meta().Get("x-nokku-plan"); got != PlanCommunity {
+		t.Errorf("x-nokku-plan = %q, want %q", got, PlanCommunity)
+	}
+	if got := connectErr.Meta().Get("x-nokku-quota"); got != "resources" {
+		t.Errorf("x-nokku-quota = %q, want %q", got, "resources")
+	}
+	if got := connectErr.Meta().Get("x-nokku-upgrade"); got != UpgradeURL {
+		t.Errorf("x-nokku-upgrade = %q, want %q", got, UpgradeURL)
+	}
+}
+
+func TestCheckResources(t *testing.T) {
+	tests := []struct {
+		name    string
+		db      *fakeDB
+		mode    Mode
+		wantErr bool
+	}{
+		{
+			name:    "below cap passes",
+			db:      &fakeDB{resources: 10},
+			mode:    ModeSaaS,
+			wantErr: false,
+		},
+		{
+			name:    "at cap denies",
+			db:      &fakeDB{resources: 50},
+			mode:    ModeSaaS,
+			wantErr: true,
+		},
+		{
+			name: "count lookup fails open",
+			db:   &fakeDB{resourceErr: errors.New("db down")},
+			mode: ModeSaaS,
+		},
+		{
+			name: "self-hosted is never capped",
+			db:   &fakeDB{resources: 1 << 20},
+			mode: ModeSelfHosted,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sut := NewService(tt.db, nil, tt.mode)
+			err := sut.CheckResources(context.Background(), "ws1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CheckResources() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

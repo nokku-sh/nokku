@@ -36,6 +36,7 @@ const Unlimited int64 = -1
 type Plan struct {
 	Name                  string
 	SeatCap               int64 // maximum members; Unlimited = per-seat billing
+	ResourceCap           int64 // pooled cap on managed resources
 	RetentionDays         int64 // audit log and session recording retention
 	RecordingStorageBytes int64
 	Features              map[string]bool
@@ -50,6 +51,7 @@ var catalog = map[string]Plan{
 	PlanCommunity: {
 		Name:                  PlanCommunity,
 		SeatCap:               5,
+		ResourceCap:           50,
 		RetentionDays:         7,
 		RecordingStorageBytes: 10 << 20,
 		Features: map[string]bool{
@@ -59,6 +61,7 @@ var catalog = map[string]Plan{
 	PlanPro: {
 		Name:                  PlanPro,
 		SeatCap:               Unlimited,
+		ResourceCap:           2000,
 		RetentionDays:         90,
 		RecordingStorageBytes: 100 << 20,
 		Features: map[string]bool{
@@ -93,6 +96,7 @@ func resolvePlan(name string) Plan {
 	return Plan{
 		Name:                  name,
 		SeatCap:               base.SeatCap,
+		ResourceCap:           base.ResourceCap,
 		RetentionDays:         base.RetentionDays,
 		RecordingStorageBytes: base.RecordingStorageBytes,
 		Features:              maps.Clone(base.Features),
