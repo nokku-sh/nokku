@@ -23,9 +23,26 @@ const UpgradeURL = "https://nokku.sh/pricing"
 // import plan logic (§5.2). The golden test in guard_test.go fails when a
 // catalog feature has no wiring here or in conditionalRules.
 var procedureFeatures = map[string]string{
-	// Audit export feeds SIEMs and auditor evidence packs: a paid
-	// evidence feature, not a daily-driver feature.
 	nokkuv1connect.UtilServiceExportAuditLogsProcedure: FeatureAuditExport,
+}
+
+// cappedCreate gates create procedures behind the plan's pooled resource
+// cap (quota.go CheckResources). ResourceExhausted, fail open — the quota
+// counterpart of procedureFeatures, and equally the ONLY place resource
+// caps are wired: the companion golden test in guard_test.go fails when a
+// create procedure is missing here or lacks a documented exemption.
+//
+// Seats are deliberately absent: they are the per-seat-billed dimension
+// with bespoke denial semantics, checked in CanInvite (seats.go).
+// DaemonServiceEnrollDaemon is gated in the handler instead: enrollment is
+// a public endpoint whose workspace comes from the enroll token, so the
+// guard interceptor cannot see it pinned in the request context.
+var cappedCreate = map[string]bool{
+	nokkuv1connect.TargetServiceCreateTargetProcedure:                    true,
+	nokkuv1connect.TeamServiceCreateTeamProcedure:                        true,
+	nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure:    true,
+	nokkuv1connect.CertificateServiceCreateCertificateAuthorityProcedure: true,
+	nokkuv1connect.WorkspaceDomainServiceCreateWorkspaceDomainProcedure:  true,
 }
 
 // featureLabels are the human-facing names used in denial messages.
@@ -51,7 +68,11 @@ func NewGuardInterceptor(ent *Service) *GuardInterceptor {
 func (g *GuardInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		ctx = WithRequestCache(ctx)
-		if err := g.check(ctx, req.Spec().Procedure, req.Any()); err != nil {
+		procedure := req.Spec().Procedure
+		if err := g.check(ctx, procedure, req.Any()); err != nil {
+			return nil, err
+		}
+		if err := g.checkResources(ctx, procedure); err != nil {
 			return nil, err
 		}
 		return next(ctx, req)
@@ -95,6 +116,21 @@ func (g *GuardInterceptor) check(ctx context.Context, procedure string, msg any)
 	return g.deny(ctx, workspaceID, feature)
 }
 
+// checkResources denies resource-capped create procedures when the
+// workspace's pooled resource budget is exhausted. Unpinned contexts pass
+// through (the authz interceptor owns that boundary); CheckResources owns
+// the denial semantics (fail open, ResourceExhausted, quota metadata).
+func (g *GuardInterceptor) checkResources(ctx context.Context, procedure string) error {
+	if !cappedCreate[procedure] {
+		return nil
+	}
+	workspaceID := actor.WorkspaceIDFromContext(ctx)
+	if workspaceID == "" {
+		return nil
+	}
+	return g.ent.CheckResources(ctx, workspaceID)
+}
+
 // conditionalFeature gates procedures where only part of the payload
 // exercises the feature. Turning a feature OFF must always work: a
 // downgrade or an admin cleaning up must never be blocked by the paywall
@@ -126,7 +162,11 @@ func (g *GuardInterceptor) deny(ctx context.Context, workspaceID, feature string
 
 	err := connect.NewError(
 		connect.CodePermissionDenied,
-		fmt.Errorf("%s is not available on the %s plan", featureLabel(feature), displayName(plan.Name)),
+		fmt.Errorf(
+			"%s is not available on the %s plan",
+			featureLabel(feature),
+			displayName(plan.Name),
+		),
 	)
 	err.Meta().Set("x-nokku-plan", plan.Name)
 	err.Meta().Set("x-nokku-feature", feature)

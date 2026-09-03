@@ -10,11 +10,13 @@ import (
 
 // fakeDB is a narrow in-memory DB for resolver tests.
 type fakeDB struct {
-	plan      string
-	status    Status
-	subErr    error
-	members   int64
-	memberErr error
+	plan        string
+	status      Status
+	subErr      error
+	members     int64
+	memberErr   error
+	resources   int64
+	resourceErr error
 }
 
 func (f *fakeDB) Subscription(_ context.Context, _ string) (string, Status, error) {
@@ -26,6 +28,10 @@ func (f *fakeDB) Subscription(_ context.Context, _ string) (string, Status, erro
 
 func (f *fakeDB) MemberCount(_ context.Context, _ string) (int64, error) {
 	return f.members, f.memberErr
+}
+
+func (f *fakeDB) ResourceCount(_ context.Context, _ string) (int64, error) {
+	return f.resources, f.resourceErr
 }
 
 type fakeLicense struct {

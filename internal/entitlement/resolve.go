@@ -67,6 +67,8 @@ type DB interface {
 	Subscription(ctx context.Context, workspaceID string) (plan string, status Status, err error)
 	// MemberCount returns the current number of workspace members.
 	MemberCount(ctx context.Context, workspaceID string) (int64, error)
+	// ResourceCount returns the pooled count of managed resources.
+	ResourceCount(ctx context.Context, workspaceID string) (int64, error)
 }
 
 func NewService(db DB, license License, mode Mode) *Service {
@@ -126,9 +128,11 @@ func (s *Service) resolve(ctx context.Context, workspaceID string) Plan {
 
 	resolved := resolvePlan(plan)
 	if s.mode == ModeSelfHosted {
-		// Recording storage caps protect SaaS infrastructure only. On
-		// self-hosted the disk is the customer's own, whatever the plan.
+		// Recording storage caps and resource caps protect SaaS
+		// infrastructure only. On self-hosted the disk and database are the
+		// customer's own, whatever the plan.
 		resolved.RecordingStorageBytes = Unlimited
+		resolved.ResourceCap = Unlimited
 	}
 	return resolved
 }
