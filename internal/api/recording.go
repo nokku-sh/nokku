@@ -2,27 +2,20 @@ package api
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"io"
 	"log/slog"
-	"math"
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/nokku-sh/nokku/internal/iam"
-
-	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
-// quotaCheckInterval bounds how often the storage quota is re-checked during
-// one upload.
 const quotaCheckInterval = 1 << 20 // 1 MiB
 
 type RecordingService struct {
@@ -33,33 +26,6 @@ func NewRecordingService(cfg *config.Config) *RecordingService {
 	return &RecordingService{cfg: cfg}
 }
 
-// frameEncrypted encrypts one plaintext chunk with the server's cipher and
-// prefixes it with a 4-byte length so a stream of frames can be walked and
-// decrypted independently on playback.
-func (s *RecordingService) frameEncrypted(plaintext []byte) ([]byte, error) {
-	cipher, err := crypto.Encryptor()
-	if err != nil {
-		return nil, err
-	}
-	ct, err := cipher.Encrypt(plaintext)
-	if err != nil {
-		return nil, err
-	}
-	if len(ct) > math.MaxUint32 {
-		return nil, errors.New("recording chunk too large")
-	}
-	framed := make([]byte, 0, 4+len(ct))
-	// #nosec G115 -- len(ct) is bounded by the MaxUint32 check above.
-	framed = binary.BigEndian.AppendUint32(framed, uint32(len(ct)))
-	return append(framed, ct...), nil
-}
-
-// UploadRecording receives a session recording streamed by a daemon. Chunks
-// are plaintext gzip slices; the backend encrypts each at rest with its own
-// key so the object store never holds plaintext. The stream is drained even
-// when the storage cap is exceeded so the daemon is never blocked, the
-// oldest recordings are evicted to make room, and a recording larger than the
-// whole cap is still accepted.
 func (s *RecordingService) UploadRecording(
 	ctx context.Context,
 	stream *connect.ClientStream[nokkuv1.UploadRecordingRequest],
@@ -72,23 +38,17 @@ func (s *RecordingService) UploadRecording(
 	if !stream.Receive() {
 		return nil, NewError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
-	rm := stream.Msg().GetMeta()
-	if rm == nil || rm.GetRecordingId() == "" {
+	meta := stream.Msg().GetMeta()
+	if meta == nil || meta.GetRecordingId() == "" {
 		return nil, NewError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
 
-	rec, workspaceID, err := s.resolveUpload(ctx, daemonID, rm)
+	rec, workspaceID, err := s.resolveUpload(ctx, daemonID, meta)
 	if err != nil {
 		return nil, err
 	}
 
-	// Stream the session into a single object. The writer commits on Close
-	// so a died daemon still leaves a partial recording.
-	w, err := s.cfg.Storage.CreateWriter(
-		ctx,
-		storage.RecordingPath(workspaceID, rec.ID),
-		storage.StoreOptions{ContentType: "application/octet-stream"},
-	)
+	w, err := s.cfg.Record.NewWriter(ctx, workspaceID, rec.ID)
 	if err != nil {
 		slog.Error("open recording object", "recording_id", rec.ID, "error", err)
 		return nil, ErrInternal
@@ -108,7 +68,7 @@ func (s *RecordingService) UploadRecording(
 			// Never blocks the stream, the oldest recordings are evicted.
 			if size-lastChecked >= quotaCheckInterval {
 				lastChecked = size
-				if err := s.evictForBytes(ctx, workspaceID, rec.ID, size); err != nil {
+				if err := s.cfg.Record.EvictForBytes(ctx, workspaceID, rec.ID, size); err != nil {
 					slog.Warn(
 						"recording eviction sweep failed",
 						"workspace_id", workspaceID,
@@ -117,19 +77,12 @@ func (s *RecordingService) UploadRecording(
 					)
 				}
 			}
-			framed, encErr := s.frameEncrypted(data)
-			if encErr != nil {
+			if err := w.WriteChunk(data); err != nil {
 				_ = w.Close()
-				slog.Error("encrypt recording chunk", "recording_id", rec.ID, "error", encErr)
+				slog.Error("write recording chunk", "recording_id", rec.ID, "error", err)
 				return nil, ErrInternal
 			}
-			_, writeErr := w.Write(framed)
 			size += int64(len(data))
-			if writeErr != nil {
-				_ = w.Close()
-				slog.Error("write recording object", "recording_id", rec.ID, "error", writeErr)
-				return nil, ErrInternal
-			}
 		case *nokkuv1.UploadRecordingRequest_Final:
 			complete = true
 		}
@@ -156,73 +109,13 @@ func (s *RecordingService) UploadRecording(
 	}
 
 	if complete {
-		s.ScrubRecording(rec)
+		s.cfg.Record.ScrubRecording(rec)
 	}
 
 	return &nokkuv1.UploadRecordingResponse{
 		RecordingId: &rec.ID,
 		SizeBytes:   &size,
 	}, nil
-}
-
-// evictForBytes keeps a workspace within its recording storage cap by
-// deleting the oldest recordings (rows and objects) until the workspace
-// fits, counting `inFlight` bytes for the upload in progress. The in-flight
-// recording itself is never evicted. An overage that cannot be cleared (a
-// single recording larger than the whole cap) is simply accepted.
-func (s *RecordingService) evictForBytes(
-	ctx context.Context,
-	workspaceID, recordingID string,
-	inFlight int64,
-) error {
-	over, err := s.cfg.Billing.OverBytes(ctx, workspaceID, billing.ResourceRecordings, inFlight)
-	if err != nil {
-		return err
-	}
-	for over > 0 {
-		var victims []*db.Recording
-		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-			victims, err = q.OldestRecordings(ctx, &db.OldestRecordingsParams{
-				WorkspaceID: workspaceID,
-				Limit:       &[]int32{100}[0],
-			})
-			return err
-		}); err != nil {
-			return err
-		}
-		var freed int64
-		for _, v := range victims {
-			if v.ID == recordingID {
-				continue
-			}
-			if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-				return q.DeleteRecording(ctx, v.ID)
-			}); err != nil {
-				return err
-			}
-			// The object is best-effort: a stray object without a row is
-			// invisible and swept by the workspace wipe.
-			if err := s.cfg.Storage.Delete(
-				ctx,
-				storage.RecordingPath(workspaceID, v.ID),
-			); err != nil {
-				slog.Warn("delete evicted recording object", "recording_id", v.ID, "error", err)
-			}
-			freed += v.SizeBytes
-			slog.Info(
-				"evicted recording over storage cap",
-				"recording_id",
-				v.ID,
-				"size",
-				v.SizeBytes,
-			)
-		}
-		if freed == 0 {
-			return nil
-		}
-		over -= freed
-	}
-	return nil
 }
 
 // resolveUpload validates the metadata against the daemon's workspace and
@@ -351,25 +244,14 @@ func (s *RecordingService) GetRecording(
 		return err
 	}
 
-	rc, err := s.cfg.Storage.Reader(ctx, storage.RecordingPath(req.GetWorkspaceId(), rec.ID))
+	fr, err := s.cfg.Record.OpenReader(ctx, req.GetWorkspaceId(), rec.ID)
 	if err != nil {
 		slog.Error("open recording object", "recording_id", rec.ID, "error", err)
 		return ErrInternal
 	}
-
-	cipher, err := crypto.Encryptor()
-	if err != nil {
-		_ = rc.Close()
-		slog.Error("recording decryptor unavailable", "recording_id", rec.ID, "error", err)
-		return ErrInternal
-	}
-
-	// The object is a stream of [len(4 BE) || ciphertext] frames, each
-	// decrypting to one plaintext gzip slice. Playback clients append the
-	// stream, so bounded 32 KiB sends keep memory flat on long sessions.
-	fr := &frameReader{rc: rc, cipher: cipher}
 	defer func() { _ = fr.Close() }()
 
+	// Bounded 32 KiB sends keep memory flat on long sessions.
 	buf := make([]byte, 32<<10)
 	for {
 		n, readErr := fr.Read(buf)
@@ -403,8 +285,10 @@ func (s *RecordingService) DeleteRecording(
 	// The object is best-effort: a stray object without a row is invisible
 	// and swept by the workspace wipe. Rows are gone first so listings are
 	// right.
-	path := storage.RecordingPath(req.GetWorkspaceId(), req.GetRecordingId())
-	if err := s.cfg.Storage.Delete(ctx, path); err != nil {
+	if err := s.cfg.Storage.Delete(
+		ctx,
+		storage.RecordingPath(req.GetWorkspaceId(), req.GetRecordingId()),
+	); err != nil {
 		slog.Warn("delete recording object", "recording_id", req.GetRecordingId(), "error", err)
 	}
 	return &nokkuv1.DeleteRecordingResponse{}, nil

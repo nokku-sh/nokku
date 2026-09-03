@@ -18,8 +18,10 @@ import (
 	"github.com/nokku-sh/nokku/internal/daemon"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/email"
+	"github.com/nokku-sh/nokku/internal/entitlement"
 	"github.com/nokku-sh/nokku/internal/geo"
 	"github.com/nokku-sh/nokku/internal/iam"
+	"github.com/nokku-sh/nokku/internal/recording"
 	"github.com/nokku-sh/nokku/internal/storage"
 	"github.com/nokku-sh/nokku/internal/util"
 )
@@ -42,16 +44,17 @@ type EnvConfig struct {
 type Config struct {
 	EnvConfig
 
-	Conn    *db.Connection
-	IAM     *iam.Service
-	Audit   *audit.Service
-	Email   *email.Service
-	Pool    *daemon.Pool
-	Storage storage.Store
-	Cache   cache.Cache
-	Billing *billing.Service
-	License *billing.Key
-	Geo     *geo.Service
+	Conn         *db.Connection
+	IAM          *iam.Service
+	Audit        *audit.Service
+	Email        *email.Service
+	Pool         *daemon.Pool
+	Storage      storage.Store
+	Cache        cache.Cache
+	Record       *recording.Service
+	Billing      *billing.Service
+	Entitlements *entitlement.Service
+	Geo          *geo.Service
 }
 
 func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
@@ -85,11 +88,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	// NOKKU_SECRET keys the default at-rest encryption: nokku's secretbox
-	// for CA private keys and recordings, and iam derives its DPoP nonce key
-	// DPoP nonce key from it. Set KMS_URI to route encryption through an
-	// external KMS instead (Enterprise): a tink keyset of data keys
-	// wrapped by the KMS, persisted in the database.
+
 	if cfg.Secret == "" {
 		return nil, fmt.Errorf("NOKKU_SECRET is required")
 	}
@@ -119,26 +118,28 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	provider, err := billing.NewStripe(cfg.Conn, cfg.FullURL())
-	if err != nil {
-		return nil, err
-	}
-	cfg.License, err = billing.NewLicense()
+	cfg.Billing, err = billing.New(cfg.Conn, cfg.FullURL())
 	if err != nil {
 		return nil, err
 	}
 
-	mode := billing.ModeSelfHosted
-	if provider != nil {
-		mode = billing.ModeSaaS
+	mode := entitlement.ModeSelfHosted
+	if cfg.Billing.Enabled() {
+		mode = entitlement.ModeSaaS
 	}
-	cfg.Billing = billing.NewService(cfg.Conn, cfg.License, provider, mode)
+	cfg.Entitlements = entitlement.NewService(
+		entitlement.NewStore(cfg.Conn),
+		cfg.Billing.License,
+		mode,
+	)
 
-	if mode == billing.ModeSelfHosted && os.Getenv("KMS_URI") != "" && !cfg.License.Valid() {
+	if mode == entitlement.ModeSelfHosted && os.Getenv("KMS_URI") != "" &&
+		!cfg.Billing.License.Valid() {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
+	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Storage, cfg.Entitlements)
 
-	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Billing, iamUserDirectory{cfg: &cfg})
+	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Entitlements, iamUserDirectory{cfg: &cfg})
 	if err != nil {
 		return nil, err
 	}

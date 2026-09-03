@@ -273,18 +273,15 @@ func secretSpans(blob []byte, det *detect.Detector) []span {
 			continue
 		}
 		for _, m := range rule.Regex.FindAllSubmatchIndex(blob, -1) {
-			start, end := m[0], m[1]
-			if rule.SecretGroup > 0 {
-				start, end = m[2*rule.SecretGroup], m[2*rule.SecretGroup+1]
-				if start < 0 {
-					continue
-				}
+			start, end := secretSpan(rule, m)
+			if start < 0 || start >= end {
+				continue
 			}
 			secret := blob[start:end]
 			if rule.Entropy > 0 && shannonEntropy(secret) < rule.Entropy {
 				continue
 			}
-			if allowlisted(rule, det.Config, secret) {
+			if allowlisted(rule, det.Config, blob[m[0]:m[1]], secret) {
 				continue
 			}
 			spans = append(spans, span{start, end})
@@ -293,6 +290,21 @@ func secretSpans(blob []byte, det *detect.Detector) []span {
 
 	slices.SortFunc(spans, func(a, b span) int { return a.start - b.start })
 	return mergeSpans(preferTightest(spans))
+}
+
+// secretSpan narrows a rule match to the secret itself: the configured
+// secret group, else gitleaks' first non-empty capture group, else the
+// full match. Redacting only the span keeps assignment keys readable.
+func secretSpan(rule config.Rule, m []int) (int, int) {
+	if rule.SecretGroup > 0 {
+		return m[2*rule.SecretGroup], m[2*rule.SecretGroup+1]
+	}
+	for g := 1; 2*g+1 < len(m); g++ {
+		if m[2*g] >= 0 {
+			return m[2*g], m[2*g+1]
+		}
+	}
+	return m[0], m[1]
 }
 
 // preferTightest drops spans fully contained in a strictly larger one, so a
@@ -325,17 +337,16 @@ func len2(s span) int { return s.end - s.start }
 
 // allowlisted reports whether a candidate secret matches a rule or global
 // allowlist regex, which gitleaks uses to suppress known false positives.
-func allowlisted(rule config.Rule, cfg config.Config, secret []byte) bool {
-	for _, al := range rule.Allowlists {
+// An allowlist regex targets the secret unless it opts into "match" or
+// "line" (the closest approximation we track).
+func allowlisted(rule config.Rule, cfg config.Config, match, secret []byte) bool {
+	for _, al := range append(rule.Allowlists, cfg.Allowlists...) {
 		for _, re := range al.Regexes {
-			if re.Match(secret) {
-				return true
+			target := secret
+			if al.RegexTarget == "match" || al.RegexTarget == "line" {
+				target = match
 			}
-		}
-	}
-	for _, al := range cfg.Allowlists {
-		for _, re := range al.Regexes {
-			if re.Match(secret) {
+			if re.Match(target) {
 				return true
 			}
 		}
