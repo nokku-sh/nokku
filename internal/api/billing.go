@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"strconv"
 
 	"connectrpc.com/connect"
 
@@ -32,13 +31,14 @@ func (s *BillingService) GetBilling(
 		return nil, NewError(connect.CodeInvalidArgument, "Workspace ID is required")
 	}
 
-	var stats *db.GetWorkspaceStatsRow
+	var memberCount int64
 	var sub *db.WorkspaceSubscription
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		stats, err = q.GetWorkspaceStats(ctx, req.GetWorkspaceId())
+		stats, err := q.GetWorkspaceStats(ctx, req.GetWorkspaceId())
 		if err != nil {
 			return err
 		}
+		memberCount = stats.MemberCount
 		// NotFound is fine: community workspaces have no subscription row.
 		sub, _ = q.GetSubscription(ctx, req.GetWorkspaceId())
 		return nil
@@ -46,30 +46,21 @@ func (s *BillingService) GetBilling(
 		return nil, DBError(err)
 	}
 
-	billingEnabled := s.cfg.Billing.Enabled()
+	plan := s.cfg.Entitlements.Resolve(ctx, req.GetWorkspaceId())
 	resp := &nokkuv1.GetBillingResponse{
-		BillingEnabled: &billingEnabled,
-		Counts: &nokkuv1.WorkspaceCounts{
-			Members:         &stats.MemberCount,
-			Teams:           &stats.TeamCount,
-			ServiceAccounts: &stats.ServiceAccountCount,
-			Targets:         &stats.TargetCount,
-			Cas:             &stats.CaCount,
-		},
-		Metadata: planMetadata(
-			s.cfg.Entitlements.Resolve(ctx, req.GetWorkspaceId()),
-			s.cfg.Entitlements.Mode(),
-		),
+		Plan:        new(plan.Name),
+		Mode:        new(string(s.cfg.Entitlements.Mode())),
+		Features:    featuresProto(plan),
+		Quotas:      quotasProto(plan),
+		MemberCount: new(memberCount),
 	}
 
 	if sub != nil {
-		resp.CustomerId = &sub.CustomerID
-		resp.ProductId = &sub.Plan
-		// Resolved plan name, not the raw row's plan string.
-		resp.ProductName = new(s.cfg.Entitlements.Resolve(ctx, req.GetWorkspaceId()).Name)
-		resp.Status = &sub.Status
-		resp.CancelAtPeriodEnd = &sub.CancelAtPeriodEnd
-		resp.CurrentPeriodEnd = db.SafeTimestamp(sub.CurrentPeriodEnd)
+		resp.Subscription = &nokkuv1.Subscription{
+			Status:            new(sub.Status),
+			CancelAtPeriodEnd: new(sub.CancelAtPeriodEnd),
+			CurrentPeriodEnd:  db.SafeTimestamp(sub.CurrentPeriodEnd),
+		}
 	}
 
 	return resp, nil
@@ -146,6 +137,24 @@ func (s *BillingService) CancelSubscription(
 	return &nokkuv1.CancelSubscriptionResponse{}, nil
 }
 
+func (s *BillingService) GetLicense(
+	_ context.Context,
+	_ *nokkuv1.GetLicenseRequest,
+) (*nokkuv1.GetLicenseResponse, error) {
+	license := s.cfg.Billing.License
+	plan := entitlement.PlanCommunity
+	active := s.cfg.Entitlements.Mode() == entitlement.ModeSelfHosted && license.Valid()
+	if active {
+		plan = entitlement.LicensedPlanFor(license)
+	}
+
+	return &nokkuv1.GetLicenseResponse{
+		Plan:      new(plan),
+		Active:    new(active),
+		ExpiresAt: db.SafeTimestamp(license.ExpiresAt),
+	}, nil
+}
+
 func (s *BillingService) requireWorkspaceOwner(ctx context.Context, workspaceID string) error {
 	var ownerID string
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
@@ -163,23 +172,23 @@ func (s *BillingService) requireWorkspaceOwner(ctx context.Context, workspaceID 
 	return nil
 }
 
-// planMetadata is the stable frontend capability contract: plan,
-// billing_mode, one boolean per feature flag, the seat cap under the
-// legacy limit.members keys, and retention as a numeric value. Paid
-// dimensions are exactly seats, retention, and features — nothing else.
-func planMetadata(p entitlement.Plan, mode entitlement.Mode) map[string]string {
-	out := make(map[string]string, len(p.Features)+5)
-	out["plan"] = p.Name
-	out["billing_mode"] = string(mode)
-	for feature, enabled := range p.Features {
-		out["feature."+feature] = strconv.FormatBool(enabled)
+// featuresProto returns the full feature catalog with per-plan enablement,
+// so clients can render locked features (not just enabled ones).
+func featuresProto(p entitlement.Plan) map[string]bool {
+	return map[string]bool{
+		entitlement.FeatureOIDC:        p.Has(entitlement.FeatureOIDC),
+		entitlement.FeatureEnforceSSO:  p.Has(entitlement.FeatureEnforceSSO),
+		entitlement.FeatureSAML:        p.Has(entitlement.FeatureSAML),
+		entitlement.FeatureAuditExport: p.Has(entitlement.FeatureAuditExport),
+		entitlement.FeatureExternalKMS: p.Has(entitlement.FeatureExternalKMS),
 	}
-	// limit.members keeps the pre-split UI contract for the seat cap.
-	out["limit.members.included"] = strconv.FormatInt(p.SeatCap, 10)
-	out["limit.members.hard"] = strconv.FormatInt(p.SeatCap, 10)
-	out["seats.cap"] = strconv.FormatInt(p.SeatCap, 10)
-	out["audit_log_retention_days"] = strconv.FormatInt(p.RetentionDays, 10)
-	// Recording storage cap: plan value on SaaS, Unlimited on self-hosted.
-	out["recordings_storage_cap"] = strconv.FormatInt(p.RecordingStorageBytes, 10)
-	return out
+}
+
+// quotasProto renders the plan's caps; -1 means unlimited.
+func quotasProto(p entitlement.Plan) *nokkuv1.Quotas {
+	return &nokkuv1.Quotas{
+		Seats:                 new(p.SeatCap),
+		RetentionDays:         new(p.RetentionDays),
+		RecordingStorageBytes: new(p.RecordingStorageBytes),
+	}
 }
