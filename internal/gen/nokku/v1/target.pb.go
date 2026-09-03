@@ -868,8 +868,6 @@ func (x *GetSubjectAccessResponse) GetCertificateAuthorities() []*CertificateAut
 	return nil
 }
 
-// GetMyAccessRequest is deliberately empty: the subject is always the
-// authenticated principal, so a caller can only ever read its own access.
 type GetMyAccessRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -906,10 +904,6 @@ func (*GetMyAccessRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_target_proto_rawDescGZIP(), []int{13}
 }
 
-// GetMyAccessResponse carries the caller's reachable targets and SSH CAs
-// across all of their workspace memberships in one snapshot. Membership is
-// re-resolved on the server on every call, so revoked access disappears from
-// subsequent responses.
 type GetMyAccessResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Subject:
@@ -1000,14 +994,11 @@ func (*GetMyAccessResponse_User) isGetMyAccessResponse_Subject() {}
 
 func (*GetMyAccessResponse_ServiceAccount) isGetMyAccessResponse_Subject() {}
 
-// WorkspaceAccess is one workspace slice of a subject's access snapshot.
 type WorkspaceAccess struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	WorkspaceName *string                `protobuf:"bytes,2,opt,name=workspace_name,json=workspaceName" json:"workspace_name,omitempty"`
-	// Targets the subject can reach in this workspace, principals embedded.
-	Targets []*Target `protobuf:"bytes,3,rep,name=targets" json:"targets,omitempty"`
-	// SSH certificate authorities referenced by those targets.
+	state                  protoimpl.MessageState  `protogen:"open.v1"`
+	WorkspaceId            *string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	WorkspaceName          *string                 `protobuf:"bytes,2,opt,name=workspace_name,json=workspaceName" json:"workspace_name,omitempty"`
+	Targets                []*Target               `protobuf:"bytes,3,rep,name=targets" json:"targets,omitempty"`
 	CertificateAuthorities []*CertificateAuthority `protobuf:"bytes,4,rep,name=certificate_authorities,json=certificateAuthorities" json:"certificate_authorities,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
