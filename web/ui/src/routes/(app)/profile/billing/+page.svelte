@@ -12,8 +12,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { LicensePurchaseURL } from '$lib/config';
-	import { parseBillingCapabilities } from '$lib/billing-capabilities';
-	import { formatTs } from '$lib/utils';
+	import { formatBytes, formatTs } from '$lib/utils';
 	import {
 		CircleUserIcon,
 		CreditCard,
@@ -24,7 +23,10 @@
 		CreditCardIcon,
 		ArrowLeftRightIcon,
 		BadgeCheck,
-		Check
+		Check,
+		Clock,
+		Lock,
+		Database
 	} from '@lucide/svelte';
 
 	let showCancelDialog = $state(false);
@@ -32,12 +34,10 @@
 	let cancelReason = $state('');
 
 	const customerData = $derived(billing.get());
-	const subscription = $derived(customerData.data);
-	const counts = $derived(customerData.data?.counts);
-	const capabilities = $derived(parseBillingCapabilities(customerData.data?.metadata));
-
+	const data = $derived(customerData.data);
+	const subscription = $derived(customerData.data?.subscription);
 	const licenseData = $derived(license.get());
-	const billingEnabled = $derived(customerData.data?.billingEnabled === true);
+	const billingEnabled = $derived(customerData.data?.mode === 'saas');
 
 	const licenseBenefits = [
 		'Unlimited members and infrastructure',
@@ -51,27 +51,39 @@
 	const isActive = $derived(
 		subscription?.status === 'active' || subscription?.status === 'trialing'
 	);
+	const isPastDue = $derived(subscription?.status === 'past_due');
 	const isCancelling = $derived(isActive && subscription?.cancelAtPeriodEnd);
 	const cancel = billing.cancelSubscription();
 
-	const planDisplayName = $derived(
-		(capabilities.plan || subscription?.productName || 'Free')
-			.replace(/^Nokku\s*-\s*/i, '')
-			.replace(/^community$/i, 'Free')
-			.replace(/^(pro|flex)$/i, 'Pro')
-			.replace(/^enterprise$/i, 'Enterprise')
-	);
+	// The API resolves the canonical plan name; community renders as Free.
+	const planNames: Record<string, string> = {
+		community: 'Free',
+		pro: 'Pro',
+		enterprise: 'Enterprise'
+	};
+	const planDisplayName = $derived(planNames[data?.plan ?? 'community'] ?? 'Free');
 
 	const checkout = billing.checkout();
 	const portal = billing.portal();
 
-	// Seats are the only billable dimension; everything else is unlimited
-	// or a feature flag. Retention is the plan's evidence window.
+	// -1 = unlimited (per-seat billing on pro/enterprise).
+	// int64 fields arrive as number | bigint; coerce for arithmetic.
 	const seats = $derived({
-		used: Number(counts?.members ?? 0),
-		cap: capabilities.limit('members')?.hard ?? -1
+		used: Number(data?.memberCount ?? 0),
+		cap: Number(data?.quotas?.seats ?? -1)
 	});
-	const retentionDays = $derived(capabilities.values['audit_log_retention_days'] ?? 7);
+	const seatsUnlimited = $derived(seats.cap < 0);
+	const retentionDays = $derived(Number(data?.quotas?.retentionDays ?? 7));
+	const storageBytes = $derived(Number(data?.quotas?.recordingStorageBytes ?? -1));
+
+	// Full catalog from the API: true = enabled, false = locked upgrade bait.
+	const featureCatalog = [
+		{ key: 'oidc', label: 'OIDC SSO', unlocks: null },
+		{ key: 'enforce_sso', label: 'Enforced SSO', unlocks: 'Pro' },
+		{ key: 'saml', label: 'SAML SSO', unlocks: 'Pro' },
+		{ key: 'audit_export', label: 'Audit log export', unlocks: 'Pro' },
+		{ key: 'external_kms', label: 'External KMS', unlocks: 'Enterprise' }
+	];
 
 	function handleCancel() {
 		cancel.mutate({
@@ -156,9 +168,9 @@
 	</Alert.Root>
 {/if}
 
-<div class="mx-auto mt-8 max-w-xl">
+<div class="mx-auto mt-8 max-w-xl space-y-6">
 	{#if billingEnabled}
-		<!-- Active Plan Overview -->
+		<!-- Plan Overview -->
 		<Card.Root class="relative overflow-hidden rounded-xl border shadow-sm">
 			<div
 				class="pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full bg-primary/5 blur-3xl"
@@ -170,13 +182,15 @@
 						{planDisplayName}
 					</Card.Title>
 					<Badge
-						variant={isActive ? (isCancelling ? 'destructive' : 'secondary') : 'outline'}
+						variant={isPastDue ? 'destructive' : isActive ? 'secondary' : 'outline'}
 						class="z-10 border-primary/20 bg-primary/10 font-medium text-primary hover:bg-primary/20"
 					>
 						{#if isCancelling}
 							Cancelling
 						{:else if subscription?.status === 'trialing'}
 							Trial
+						{:else if isPastDue}
+							Past Due
 						{:else if isActive}
 							Active
 						{:else}
@@ -193,48 +207,13 @@
 						<span class="font-medium text-foreground"
 							>{formatTs(subscription?.currentPeriodEnd)}</span
 						>
+					{:else if isPastDue}
+						Update your payment method in the billing portal to restore full access.
 					{:else}
 						You are on our free, limited capacity tier.
 					{/if}
 				</Card.Description>
 			</Card.Header>
-
-			<Card.Content class="relative z-10 mb-4">
-				<div class="space-y-3">
-					<div class="flex items-center justify-between gap-4 text-sm">
-						<div class="flex items-center gap-2">
-							<CircleUserIcon size={14} class="text-muted-foreground" />
-							<span class="text-muted-foreground">Members</span>
-						</div>
-						<span class="font-medium tabular-nums">
-							{seats.used}
-							{#if seats.cap !== -1}
-								<span class="text-muted-foreground">/{seats.cap}</span>
-							{/if}
-						</span>
-					</div>
-					{#if seats.cap !== -1}
-						{@const pct = Math.min(Math.round((seats.used / seats.cap) * 100), 100)}
-						<div class="h-1 w-full overflow-hidden rounded-full bg-secondary">
-							<div
-								class="h-full rounded-full {pct >= 100
-									? 'bg-destructive'
-									: pct >= 90
-										? 'bg-amber-500'
-										: 'bg-primary'}"
-								style="width: {pct}%"
-							></div>
-						</div>
-					{/if}
-					<div class="flex items-center justify-between gap-4 text-sm">
-						<div class="flex items-center gap-2">
-							<ShieldAlert size={14} class="text-muted-foreground" />
-							<span class="text-muted-foreground">Audit & recording retention</span>
-						</div>
-						<span class="font-medium tabular-nums">{retentionDays} days</span>
-					</div>
-				</div>
-			</Card.Content>
 
 			<Card.Footer class="relative z-10 flex flex-col items-stretch gap-3 border-t sm:items-center">
 				{#if isActive && !isCancelling}
@@ -291,6 +270,91 @@
 				{/if}
 			</Card.Footer>
 		</Card.Root>
+
+		<!-- Usage & Quotas -->
+		<Card.Root class="rounded-xl border shadow-sm">
+			<Card.Header class="pb-3">
+				<Card.Title class="text-lg font-semibold tracking-tight">Usage & Quotas</Card.Title>
+				<Card.Description>What your current plan includes.</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-3">
+				<div class="flex items-center justify-between gap-4 text-sm">
+					<div class="flex items-center gap-2">
+						<CircleUserIcon size={14} class="text-muted-foreground" />
+						<span class="text-muted-foreground">Members</span>
+					</div>
+					<span class="font-medium tabular-nums">
+						{seats.used}
+						{#if seatsUnlimited}
+							<span class="text-muted-foreground">· per-seat billing</span>
+						{:else}
+							<span class="text-muted-foreground">/{seats.cap}</span>
+						{/if}
+					</span>
+				</div>
+				{#if !seatsUnlimited}
+					{@const pct = Math.min(Math.round((seats.used / seats.cap) * 100), 100)}
+					<div class="h-1 w-full overflow-hidden rounded-full bg-secondary">
+						<div
+							class="h-full rounded-full {pct >= 100
+								? 'bg-destructive'
+								: pct >= 90
+									? 'bg-amber-500'
+									: 'bg-primary'}"
+							style="width: {pct}%"
+						></div>
+					</div>
+				{/if}
+				<div class="grid grid-cols-2 gap-3 pt-1">
+					<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
+						<div class="flex items-center gap-2">
+							<Clock size={14} class="text-muted-foreground" />
+							<span class="text-muted-foreground">Retention</span>
+						</div>
+						<span class="font-medium tabular-nums">{retentionDays} days</span>
+					</div>
+					<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
+						<div class="flex items-center gap-2">
+							<Database size={14} class="text-muted-foreground" />
+							<span class="text-muted-foreground">Recording storage</span>
+						</div>
+						<span class="font-medium tabular-nums">
+							{storageBytes < 0 ? 'Unlimited' : formatBytes(storageBytes)}
+						</span>
+					</div>
+				</div>
+			</Card.Content>
+		</Card.Root>
+
+		<!-- Features -->
+		<Card.Root class="rounded-xl border shadow-sm">
+			<Card.Header class="pb-3">
+				<Card.Title class="text-lg font-semibold tracking-tight">Features</Card.Title>
+				<Card.Description>Included in {planDisplayName}, and what's locked.</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<ul class="space-y-3">
+					{#each featureCatalog as f (f.key)}
+						{@const enabled = data?.features?.[f.key] === true}
+						<li class="flex items-center justify-between gap-4 text-sm">
+							<div class="flex items-center gap-2.5">
+								{#if enabled}
+									<Check size={16} strokeWidth={2.5} class="shrink-0 text-primary" />
+								{:else}
+									<Lock size={14} class="shrink-0 text-muted-foreground/60" />
+								{/if}
+								<span class={enabled ? '' : 'text-muted-foreground/70'}>{f.label}</span>
+							</div>
+							{#if !enabled && f.unlocks}
+								<Badge variant="outline" class="text-[11px] text-muted-foreground">
+									{f.unlocks}
+								</Badge>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			</Card.Content>
+		</Card.Root>
 	{:else}
 		<!-- On-Premise License (self-hosted deployments only) -->
 		{#if licenseData.data?.active}
@@ -310,7 +374,6 @@
 						<Card.Title
 							class="relative z-10 flex items-center gap-2.5 text-2xl font-semibold tracking-tight"
 						>
-							<!-- Added fill-primary/10 for a subtle two-tone icon effect -->
 							<BadgeCheck size={24} class="fill-primary/10 text-primary" />
 							<span
 								class="bg-linear-to-br from-foreground to-foreground/70 bg-clip-text text-transparent"
