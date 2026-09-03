@@ -23,6 +23,7 @@
 		CreditCardIcon,
 		ArrowLeftRightIcon,
 		BadgeCheck,
+		Boxes,
 		Check,
 		Clock,
 		Lock,
@@ -75,6 +76,11 @@
 	const seatsUnlimited = $derived(seats.cap < 0);
 	const retentionDays = $derived(Number(data?.quotas?.retentionDays ?? 7));
 	const storageBytes = $derived(Number(data?.quotas?.recordingStorageBytes ?? -1));
+	const resources = $derived({
+		used: Number(data?.resourceCount ?? 0),
+		cap: Number(data?.quotas?.resourceCap ?? -1)
+	});
+	const resourcesUnlimited = $derived(resources.cap < 0);
 
 	// Full catalog from the API: true = enabled, false = locked upgrade bait.
 	const featureCatalog = [
@@ -305,21 +311,34 @@
 						></div>
 					</div>
 				{/if}
-				<div class="grid grid-cols-2 gap-3 pt-1">
-					<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
+				<div class="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-3">
+					<div class="flex flex-col gap-1 rounded-lg border p-3 text-sm">
 						<div class="flex items-center gap-2">
 							<Clock size={14} class="text-muted-foreground" />
 							<span class="text-muted-foreground">Retention</span>
 						</div>
 						<span class="font-medium tabular-nums">{retentionDays} days</span>
 					</div>
-					<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
+					<div class="flex flex-col gap-1 rounded-lg border p-3 text-sm">
 						<div class="flex items-center gap-2">
 							<Database size={14} class="text-muted-foreground" />
 							<span class="text-muted-foreground">Recording storage</span>
 						</div>
 						<span class="font-medium tabular-nums">
 							{storageBytes < 0 ? 'Unlimited' : formatBytes(storageBytes)}
+						</span>
+					</div>
+					<div class="flex flex-col gap-1 rounded-lg border p-3 text-sm">
+						<div class="flex items-center gap-2">
+							<Boxes size={14} class="text-muted-foreground" />
+							<span class="text-muted-foreground">Resources</span>
+						</div>
+						<span class="font-medium tabular-nums">
+							{#if resourcesUnlimited}
+								Unlimited
+							{:else}
+								{resources.used}<span class="text-muted-foreground">/{resources.cap}</span>
+							{/if}
 						</span>
 					</div>
 				</div>
