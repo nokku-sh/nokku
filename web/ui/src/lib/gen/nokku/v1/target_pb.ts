@@ -442,9 +442,6 @@ export const GetSubjectAccessResponseSchema: GenMessage<GetSubjectAccessResponse
 	messageDesc(file_nokku_v1_target, 12);
 
 /**
- * GetMyAccessRequest is deliberately empty: the subject is always the
- * authenticated principal, so a caller can only ever read its own access.
- *
  * @generated from message nokku.v1.GetMyAccessRequest
  */
 export type GetMyAccessRequest = Message<'nokku.v1.GetMyAccessRequest'> & {};
@@ -459,11 +456,6 @@ export const GetMyAccessRequestSchema: GenMessage<GetMyAccessRequest> /*@__PURE_
 );
 
 /**
- * GetMyAccessResponse carries the caller's reachable targets and SSH CAs
- * across all of their workspace memberships in one snapshot. Membership is
- * re-resolved on the server on every call, so revoked access disappears from
- * subsequent responses.
- *
  * @generated from message nokku.v1.GetMyAccessResponse
  */
 export type GetMyAccessResponse = Message<'nokku.v1.GetMyAccessResponse'> & {
@@ -503,8 +495,6 @@ export const GetMyAccessResponseSchema: GenMessage<GetMyAccessResponse> /*@__PUR
 );
 
 /**
- * WorkspaceAccess is one workspace slice of a subject's access snapshot.
- *
  * @generated from message nokku.v1.WorkspaceAccess
  */
 export type WorkspaceAccess = Message<'nokku.v1.WorkspaceAccess'> & {
@@ -519,15 +509,11 @@ export type WorkspaceAccess = Message<'nokku.v1.WorkspaceAccess'> & {
 	workspaceName: string;
 
 	/**
-	 * Targets the subject can reach in this workspace, principals embedded.
-	 *
 	 * @generated from field: repeated nokku.v1.Target targets = 3;
 	 */
 	targets: Target[];
 
 	/**
-	 * SSH certificate authorities referenced by those targets.
-	 *
 	 * @generated from field: repeated nokku.v1.CertificateAuthority certificate_authorities = 4;
 	 */
 	certificateAuthorities: CertificateAuthority[];
