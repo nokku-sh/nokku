@@ -5,16 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"time"
 
 	"github.com/caarlos0/env/v11"
 	stripe "github.com/stripe/stripe-go/v86"
 
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
 var ErrActiveSubscription = errors.New("workspace already has an active subscription")
+
+// minBillableSeats is the smallest per-seat subscription: the pricing floor
+// (5 seats × €96/user/yr = €480/yr, see §4.2 of the monetization plan).
+const minBillableSeats = 5
 
 // Stripe implements Provider on top of Stripe Billing (Managed Payments).
 type Stripe struct {
@@ -22,30 +26,20 @@ type Stripe struct {
 	db        *db.Connection
 	returnURL string
 
-	FlexPriceID    string `env:"STRIPE_FLEX_PRICE_ID"`
+	ProPriceID     string `env:"STRIPE_PRO_PRICE_ID"`
 	LicensePriceID string `env:"STRIPE_LICENSE_PRICE_ID"`
 	SecretKey      string `env:"STRIPE_SECRET_KEY"`
 	WebhookSecret  string `env:"STRIPE_WEBHOOK_SECRET"`
 }
 
-// billableMeters lists resources billed on overage. Each event name must
-// match a Stripe Billing Meter with "last" aggregation.
-var billableMeters = []struct {
-	resource Resource
-	event    string
-}{
-	{ResourceMembers, "nokku_members"},
-	{ResourceTargets, "nokku_targets"},
-}
-
-// NewStripe returns nil (billing disabled) when a required Stripe env var is
-// unset. Returns the Provider interface so the nil value is a nil interface.
-func NewStripe(conn *db.Connection, returnURL string) (Provider, error) {
+// newStripe returns nil (billing disabled) when a required Stripe env var
+// is unset.
+func newStripe(conn *db.Connection, returnURL string) (*Stripe, error) {
 	s, err := env.ParseAs[Stripe]()
 	if err != nil {
 		return nil, err
 	}
-	if s.SecretKey == "" || s.WebhookSecret == "" || s.FlexPriceID == "" {
+	if s.SecretKey == "" || s.WebhookSecret == "" || s.ProPriceID == "" {
 		return nil, nil // billing disabled
 	}
 
@@ -55,15 +49,20 @@ func NewStripe(conn *db.Connection, returnURL string) (Provider, error) {
 	return &s, nil
 }
 
-// Checkout creates a Checkout Session for the workspace Flex subscription.
+// Checkout creates a Checkout Session for the workspace's Pro per-seat
+// subscription. Quantity is the current member count (never below the
+// pricing floor); seat count changes are handled by the customer in the
+// Stripe portal. There is deliberately no quantity-sync job — that would
+// reintroduce the usage-reporting machinery this design deletes. Known
+// gap: seats added between checkout and the next portal edit are unbilled
+// until the customer adjusts quantity.
 func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (string, error) {
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")
 	}
 
 	// One subscription per workspace: block a new checkout while one is active.
-	_, err := s.activeSubscription(ctx, workspaceID)
-	if err == nil {
+	if _, err := s.activeSubscription(ctx, workspaceID); err == nil {
 		return "", ErrActiveSubscription
 	}
 
@@ -72,11 +71,16 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (strin
 		return "", err
 	}
 
+	quantity, err := s.billableSeats(ctx, workspaceID)
+	if err != nil {
+		return "", err
+	}
+
 	params := &stripe.CheckoutSessionCreateParams{
 		Mode: stripe.String(stripe.CheckoutSessionModeSubscription),
 		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{{
-			Price:    stripe.String(s.FlexPriceID),
-			Quantity: stripe.Int64(1),
+			Price:    stripe.String(s.ProPriceID),
+			Quantity: new(quantity),
 		}},
 		SuccessURL:        stripe.String(s.returnURL + "/profile/billing"),
 		CancelURL:         stripe.String(s.returnURL + "/profile/billing"),
@@ -121,7 +125,7 @@ func (s *Stripe) activeSubscription(
 	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
 		sub, err = q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
 			WorkspaceID: workspaceID,
-			Statuses:    ActiveStatuses,
+			Statuses:    entitlement.ActiveStatuses,
 			Sources:     []string{"stripe"},
 		})
 		return err
@@ -245,7 +249,7 @@ func (s *Stripe) Sync(ctx context.Context, workspaceID string) {
 	if err := s.upsertSubscription(ctx, &db.UpsertSubscriptionParams{
 		WorkspaceID:       workspaceID,
 		Source:            "stripe",
-		Plan:              PlanFlex,
+		Plan:              entitlement.PlanPro,
 		Status:            string(mapStatus(remote.Status)),
 		CustomerID:        remote.Customer.ID,
 		SubscriptionID:    remote.ID,
@@ -274,63 +278,21 @@ func (s *Stripe) SyncAll(ctx context.Context) error {
 	return nil
 }
 
-// SyncUsage reports daily gauge events for metered billing. Identifiers make
-// re-reporting the same day idempotent.
-func (s *Stripe) SyncUsage(ctx context.Context) error {
-	var subs []*db.WorkspaceSubscription
+// billableSeats returns the quantity for the per-seat subscription: the
+// current member count, never below the pricing floor.
+func (s *Stripe) billableSeats(ctx context.Context, workspaceID string) (int64, error) {
+	var members int64
 	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
-		subs, err = q.ListActiveSubscriptions(ctx, &db.ListActiveSubscriptionsParams{
-			Statuses: ActiveStatuses,
-			Sources:  []string{"stripe"},
-		})
-		return err
-	}); err != nil {
-		return err
-	}
-	if len(subs) == 0 {
-		return nil
-	}
-
-	day := time.Now().UTC().Format("2006-01-02")
-	for _, sub := range subs {
-		if sub.CustomerID == "" {
-			continue
-		}
-
-		var stats *db.GetWorkspaceStatsRow
-		if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
-			stats, err = q.GetWorkspaceStats(ctx, sub.WorkspaceID)
+		stats, err := q.GetWorkspaceStats(ctx, workspaceID)
+		if err != nil {
 			return err
-		}); err != nil {
-			slog.Warn("usage stats lookup failed", "error", err, "workspace_id", sub.WorkspaceID)
-			continue
 		}
-
-		for _, m := range billableMeters {
-			count := usageFor(stats, m.resource)
-			if count < 0 {
-				continue
-			}
-			_, err := s.client.V1BillingMeterEvents.Create(
-				ctx,
-				&stripe.BillingMeterEventCreateParams{
-					EventName: stripe.String(m.event),
-					Identifier: stripe.String(
-						fmt.Sprintf("usage_%s_%s_%s", sub.WorkspaceID, m.event, day),
-					),
-					Payload: map[string]string{
-						"stripe_customer_id": sub.CustomerID,
-						"value":              strconv.FormatInt(count, 10),
-					},
-				},
-			)
-			if err != nil {
-				slog.Warn("failed to report meter event", "error", err,
-					"workspace_id", sub.WorkspaceID, "meter", m.event)
-			}
-		}
+		members = stats.MemberCount
+		return nil
+	}); err != nil {
+		return 0, fmt.Errorf("count members for checkout: %w", err)
 	}
-	return nil
+	return max(members, minBillableSeats), nil
 }
 
 // periodEnd returns the current period end for a single-item subscription.
@@ -346,40 +308,20 @@ func periodEnd(sub *stripe.Subscription) *time.Time {
 	return &t
 }
 
-func mapStatus(s stripe.SubscriptionStatus) Status {
+func mapStatus(s stripe.SubscriptionStatus) entitlement.Status {
 	switch s {
 	case stripe.SubscriptionStatusActive:
-		return StatusActive
+		return entitlement.StatusActive
 	case stripe.SubscriptionStatusTrialing:
-		return StatusTrialing
+		return entitlement.StatusTrialing
 	case stripe.SubscriptionStatusPastDue:
-		return StatusPastDue
+		return entitlement.StatusPastDue
 	case stripe.SubscriptionStatusCanceled,
 		stripe.SubscriptionStatusIncomplete,
 		stripe.SubscriptionStatusIncompleteExpired,
 		stripe.SubscriptionStatusPaused,
 		stripe.SubscriptionStatusUnpaid:
-		return StatusInactive
+		return entitlement.StatusInactive
 	}
-	return StatusInactive
-}
-
-func usageFor(stats *db.GetWorkspaceStatsRow, r Resource) int64 {
-	switch r {
-	case ResourceMembers:
-		return stats.MemberCount
-	case ResourceServiceAccounts:
-		return stats.ServiceAccountCount
-	case ResourceTargets:
-		return stats.TargetCount
-	case ResourceTeams:
-		return stats.TeamCount
-	case ResourceCas:
-		return stats.CaCount
-	case ResourceRecordings:
-		// Metered via SyncUsage against the recordings table, not the
-		// workspace stats row. Return 0 so this switch stays exhaustive.
-		return 0
-	}
-	return -1
+	return entitlement.StatusInactive
 }

@@ -6,7 +6,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -44,14 +43,6 @@ func (s *ServiceAccountService) CreateServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.CreateServiceAccountRequest,
 ) (*nokkuv1.CreateServiceAccountResponse, error) {
-	if err := s.cfg.Billing.Check(
-		ctx,
-		req.GetWorkspaceId(),
-		billing.ResourceServiceAccounts,
-	); err != nil {
-		return nil, err
-	}
-
 	roleName := req.GetRoleName()
 	if roleName == "" {
 		roleName = "viewer"

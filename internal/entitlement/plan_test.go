@@ -1,0 +1,114 @@
+package entitlement
+
+import (
+	"testing"
+)
+
+// TestPlanMatrix locks the pricing table (idea/billing-and-monetization.md
+// §3.2) into code. Changing any cell here is a pricing decision, not a
+// refactor: it must come with a docs, pricing page, and Stripe update.
+func TestPlanMatrix(t *testing.T) {
+	tests := []struct {
+		plan           string
+		wantSeatCap    int64
+		wantRetention  int64
+		wantStorageCap int64
+		wantFeatures   map[string]bool
+	}{
+		{
+			plan:           PlanCommunity,
+			wantSeatCap:    5,
+			wantRetention:  7,
+			wantStorageCap: 10 << 20,
+			wantFeatures: map[string]bool{
+				FeatureOIDC:        true,
+				FeatureEnforceSSO:  false,
+				FeatureSAML:        false,
+				FeatureAuditExport: false,
+				FeatureExternalKMS: false,
+			},
+		},
+		{
+			plan:           PlanPro,
+			wantSeatCap:    Unlimited,
+			wantRetention:  90,
+			wantStorageCap: 100 << 20,
+			wantFeatures: map[string]bool{
+				FeatureOIDC:        true,
+				FeatureEnforceSSO:  true,
+				FeatureSAML:        true,
+				FeatureAuditExport: true,
+				FeatureExternalKMS: false,
+			},
+		},
+		{
+			plan:           PlanEnterprise,
+			wantSeatCap:    Unlimited,
+			wantRetention:  365,
+			wantStorageCap: 1 << 30,
+			wantFeatures: map[string]bool{
+				FeatureOIDC:        true,
+				FeatureEnforceSSO:  true,
+				FeatureSAML:        true,
+				FeatureAuditExport: true,
+				FeatureExternalKMS: true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.plan, func(t *testing.T) {
+			plan := resolvePlan(tt.plan)
+			if plan.Name != tt.plan {
+				t.Errorf("Name = %q, want %q", plan.Name, tt.plan)
+			}
+			if plan.SeatCap != tt.wantSeatCap {
+				t.Errorf("SeatCap = %d, want %d", plan.SeatCap, tt.wantSeatCap)
+			}
+			if plan.RetentionDays != tt.wantRetention {
+				t.Errorf("RetentionDays = %d, want %d", plan.RetentionDays, tt.wantRetention)
+			}
+			if plan.RecordingStorageBytes != tt.wantStorageCap {
+				t.Errorf(
+					"RecordingStorageBytes = %d, want %d",
+					plan.RecordingStorageBytes,
+					tt.wantStorageCap,
+				)
+			}
+			for feature, want := range tt.wantFeatures {
+				if got := plan.Has(feature); got != want {
+					t.Errorf("Has(%q) = %v, want %v", feature, got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestResolvePlan_LegacyAndUnknown(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"unknown falls back to community", "gold", PlanCommunity},
+		{"empty falls back to community", "", PlanCommunity},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolvePlan(tt.input).Name; got != tt.want {
+				t.Errorf("resolvePlan(%q).Name = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolvePlan_ReturnsCopies(t *testing.T) {
+	plan := resolvePlan(PlanCommunity)
+	plan.Features["hacked"] = true
+
+	again := resolvePlan(PlanCommunity)
+	if again.Has("hacked") {
+		t.Error("catalog features corrupted by resolved plan mutation")
+	}
+}

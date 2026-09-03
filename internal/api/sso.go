@@ -7,7 +7,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -101,12 +100,8 @@ func (s *SSOService) UpdateSSOProvider(
 			issuerChanged = true
 		}
 	case "saml":
-		if req.GetIsActive() && !s.cfg.Billing.Has(ctx, req.GetWorkspaceId(), billing.FeatureSAML) {
-			return nil, NewError(
-				connect.CodeFailedPrecondition,
-				"SAML requires an Enterprise plan",
-			)
-		}
+		// SAML activation is gated by the entitlement guard interceptor
+		// (deactivation must always work, so the gate is conditional).
 		p.Method = iam.MethodSAML
 		p.SAML = &iam.SAMLIDP{
 			MetadataURL:     req.GetConfig().GetMetadataUrl(),

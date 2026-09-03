@@ -11,6 +11,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/entitlement"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
@@ -56,15 +57,16 @@ func (s *BillingService) GetBilling(
 			Cas:             &stats.CaCount,
 		},
 		Metadata: planMetadata(
-			s.cfg.Billing.Resolve(ctx, req.GetWorkspaceId()),
-			s.cfg.Billing.Mode(),
+			s.cfg.Entitlements.Resolve(ctx, req.GetWorkspaceId()),
+			s.cfg.Entitlements.Mode(),
 		),
 	}
 
 	if sub != nil {
 		resp.CustomerId = &sub.CustomerID
 		resp.ProductId = &sub.Plan
-		resp.ProductName = new(sub.Plan)
+		// Resolved plan name, not the raw row's plan string.
+		resp.ProductName = new(s.cfg.Entitlements.Resolve(ctx, req.GetWorkspaceId()).Name)
 		resp.Status = &sub.Status
 		resp.CancelAtPeriodEnd = &sub.CancelAtPeriodEnd
 		resp.CurrentPeriodEnd = db.SafeTimestamp(sub.CurrentPeriodEnd)
@@ -161,35 +163,23 @@ func (s *BillingService) requireWorkspaceOwner(ctx context.Context, workspaceID 
 	return nil
 }
 
-// planMetadata is the stable frontend capability contract. The legacy
-// credit_/max_ keys remain for older clients. New clients should use
-// plan, billing_mode, feature.<name>, and limit.<resource>.<field>.
-func planMetadata(p billing.Plan, mode billing.Mode) map[string]string {
-	out := make(map[string]string, len(p.Limits)*4+len(p.Features)+len(p.Values)+2)
+// planMetadata is the stable frontend capability contract: plan,
+// billing_mode, one boolean per feature flag, the seat cap under the
+// legacy limit.members keys, and retention as a numeric value. Paid
+// dimensions are exactly seats, retention, and features — nothing else.
+func planMetadata(p entitlement.Plan, mode entitlement.Mode) map[string]string {
+	out := make(map[string]string, len(p.Features)+5)
 	out["plan"] = p.Name
 	out["billing_mode"] = string(mode)
-	for r, q := range p.Limits {
-		key := string(r)
-		out["limit."+key+".included"] = strconv.FormatInt(q.Soft, 10)
-		out["limit."+key+".hard"] = strconv.FormatInt(q.Hard, 10)
-		if q.Soft > 0 {
-			out["credit_"+key] = strconv.FormatInt(q.Soft, 10)
-		}
-		if q.Hard >= 0 {
-			out["max_"+key] = strconv.FormatInt(q.Hard, 10)
-		}
+	for feature, enabled := range p.Features {
+		out["feature."+feature] = strconv.FormatBool(enabled)
 	}
-	for _, k := range []string{
-		billing.FeatureOIDC,
-		billing.FeatureEnforceSSO,
-		billing.FeatureSAML,
-		billing.FeatureAuditExport,
-		billing.FeatureExternalKMS,
-	} {
-		out["feature."+k] = strconv.FormatBool(p.Features[k])
-	}
-	for k, v := range p.Values {
-		out[k] = strconv.FormatInt(v, 10)
-	}
+	// limit.members keeps the pre-split UI contract for the seat cap.
+	out["limit.members.included"] = strconv.FormatInt(p.SeatCap, 10)
+	out["limit.members.hard"] = strconv.FormatInt(p.SeatCap, 10)
+	out["seats.cap"] = strconv.FormatInt(p.SeatCap, 10)
+	out["audit_log_retention_days"] = strconv.FormatInt(p.RetentionDays, 10)
+	// Recording storage cap: plan value on SaaS, Unlimited on self-hosted.
+	out["recordings_storage_cap"] = strconv.FormatInt(p.RecordingStorageBytes, 10)
 	return out
 }

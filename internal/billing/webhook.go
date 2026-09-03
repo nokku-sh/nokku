@@ -11,6 +11,7 @@ import (
 	"github.com/stripe/stripe-go/v86/webhook"
 
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
 const maxWebhookBody = 2 << 20
@@ -64,7 +65,7 @@ func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscriptio
 			WorkspaceID:       workspaceID,
 			Source:            "stripe",
 			Plan:              "",
-			Status:            string(StatusInactive),
+			Status:            string(entitlement.StatusInactive),
 			CustomerID:        sub.Customer.ID,
 			SubscriptionID:    sub.ID,
 			CurrentPeriodEnd:  periodEnd(sub),
@@ -92,7 +93,7 @@ func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscriptio
 	if err := s.upsertSubscription(ctx, &db.UpsertSubscriptionParams{
 		WorkspaceID:       workspaceID,
 		Source:            "stripe",
-		Plan:              PlanFlex,
+		Plan:              entitlement.PlanPro,
 		Status:            string(mapStatus(sub.Status)),
 		CustomerID:        sub.Customer.ID,
 		SubscriptionID:    sub.ID,

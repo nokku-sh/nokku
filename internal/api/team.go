@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 
-	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -40,14 +39,6 @@ func (s *TeamService) CreateTeam(
 	ctx context.Context,
 	req *nokkuv1.CreateTeamRequest,
 ) (*nokkuv1.CreateTeamResponse, error) {
-	if err := s.cfg.Billing.Check(
-		ctx,
-		req.GetWorkspaceId(),
-		billing.ResourceTeams,
-	); err != nil {
-		return nil, err
-	}
-
 	var result *db.Team
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.CreateTeam(ctx, &db.CreateTeamParams{

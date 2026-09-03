@@ -10,79 +10,48 @@ import (
 
 var ErrDisabled = errors.New("billing provider is not configured")
 
-// Service is the single billing boundary used by the application. It owns
-// policy resolution and optionally delegates commercial operations to Stripe.
+// Service is the single money-movement boundary used by the application:
+// Stripe checkout, portal, cancellation, and subscription reconciliation,
+// plus the instance license for self-hosted deployments. Plan resolution
+// and enforcement live in internal/entitlement; this package never decides
+// what a workspace may do.
 type Service struct {
-	provider     Provider
-	Entitlements *PolicyService
+	stripe  *Stripe // nil when the STRIPE_* environment is unset (billing disabled)
+	License *Key
 }
 
-func NewService(
-	conn *db.Connection,
-	license interface{ Valid() bool },
-	provider Provider,
-	mode Mode,
-) *Service {
-	return &Service{
-		provider:     provider,
-		Entitlements: NewPolicyService(conn, license, mode),
+// New wires the billing layer. It never returns a nil Service: when Stripe
+// is unconfigured the service is simply disabled (Enabled() == false), and
+// an absent or invalid license yields a zero-value Key so callers rely on
+// Valid() == false without nil checks.
+func New(conn *db.Connection, baseURL string) (*Service, error) {
+	license, err := newLicense()
+	if err != nil {
+		return nil, err
 	}
+	stripe, err := newStripe(conn, baseURL)
+	if err != nil {
+		return nil, err
+	}
+	return &Service{stripe: stripe, License: license}, nil
 }
 
 func (s *Service) Enabled() bool {
-	return s != nil && s.provider != nil
-}
-
-func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
-	return s.Entitlements.Resolve(ctx, workspaceID)
-}
-
-func (s *Service) Mode() Mode {
-	return s.Entitlements.Mode()
-}
-
-func (s *Service) Has(ctx context.Context, workspaceID, feature string) bool {
-	return s.Entitlements.Has(ctx, workspaceID, feature)
-}
-
-func (s *Service) Int(ctx context.Context, workspaceID, key string, fallback int64) int64 {
-	return s.Entitlements.Int(ctx, workspaceID, key, fallback)
-}
-
-func (s *Service) Check(ctx context.Context, workspaceID string, resource Resource) error {
-	return s.Entitlements.Check(ctx, workspaceID, resource)
-}
-
-func (s *Service) CheckBytes(
-	ctx context.Context,
-	workspaceID string,
-	resource Resource,
-	additional int64,
-) error {
-	return s.Entitlements.CheckBytes(ctx, workspaceID, resource, additional)
-}
-
-func (s *Service) OverBytes(
-	ctx context.Context,
-	workspaceID string,
-	resource Resource,
-	additional int64,
-) (int64, error) {
-	return s.Entitlements.OverBytes(ctx, workspaceID, resource, additional)
+	return s.stripe != nil
 }
 
 func (s *Service) Checkout(ctx context.Context, workspaceID, email string) (string, error) {
 	if !s.Enabled() {
 		return "", ErrDisabled
 	}
-	return s.provider.Checkout(ctx, workspaceID, email)
+	return s.stripe.Checkout(ctx, workspaceID, email)
 }
 
 func (s *Service) Portal(ctx context.Context, workspaceID string) (string, error) {
 	if !s.Enabled() {
 		return "", ErrDisabled
 	}
-	return s.provider.Portal(ctx, workspaceID)
+	return s.stripe.Portal(ctx, workspaceID)
 }
 
 func (s *Service) Cancel(
@@ -94,12 +63,12 @@ func (s *Service) Cancel(
 	if !s.Enabled() {
 		return ErrDisabled
 	}
-	return s.provider.Cancel(ctx, workspaceID, immediate, reason)
+	return s.stripe.Cancel(ctx, workspaceID, immediate, reason)
 }
 
 func (s *Service) Sync(ctx context.Context, workspaceID string) {
 	if s.Enabled() {
-		s.provider.Sync(ctx, workspaceID)
+		s.stripe.Sync(ctx, workspaceID)
 	}
 }
 
@@ -107,14 +76,7 @@ func (s *Service) SyncAll(ctx context.Context) error {
 	if !s.Enabled() {
 		return nil
 	}
-	return s.provider.SyncAll(ctx)
-}
-
-func (s *Service) SyncUsage(ctx context.Context) error {
-	if !s.Enabled() {
-		return nil
-	}
-	return s.provider.SyncUsage(ctx)
+	return s.stripe.SyncAll(ctx)
 }
 
 func (s *Service) WebhookHandler() http.Handler {
@@ -123,5 +85,5 @@ func (s *Service) WebhookHandler() http.Handler {
 			http.Error(w, ErrDisabled.Error(), http.StatusNotFound)
 		})
 	}
-	return s.provider.WebhookHandler()
+	return s.stripe.WebhookHandler()
 }

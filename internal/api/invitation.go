@@ -11,7 +11,6 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/iam"
 
-	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -48,9 +47,6 @@ func (s *InvitationService) GetInvitation(
 		return nil, ErrBadCredentials
 	}
 
-	// System transaction: the invitee is not a member of the workspace yet,
-	// so no tenant context can be established. The invite token (validated
-	// below against its hash) authorizes this read.
 	var workspace *db.Workspace
 	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
 		if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
@@ -95,7 +91,8 @@ func (s *InvitationService) AcceptInvitation(
 		return nil, ErrBadCredentials
 	}
 
-	if err := s.cfg.Billing.Check(ctx, workspaceID, billing.ResourceMembers); err != nil {
+	// The only remaining quota check in the product: the seat cap.
+	if err := s.cfg.Entitlements.CanInvite(ctx, workspaceID); err != nil {
 		return nil, err
 	}
 

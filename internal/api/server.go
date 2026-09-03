@@ -20,6 +20,7 @@ import (
 	"github.com/vearutop/statigz"
 
 	"github.com/nokku-sh/nokku/internal/config"
+	"github.com/nokku-sh/nokku/internal/entitlement"
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/web"
 )
@@ -127,11 +128,10 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 		NewTimeoutInterceptor(),
 		NewAuthNInterceptor(s.cfg),
 		NewAuthZInterceptor(s.cfg),
+		entitlement.NewGuardInterceptor(s.cfg.Entitlements),
 		NewAuditInterceptor(s.cfg.Audit),
 		validate.NewInterceptor(),
-	}
-	if otel := NewOTLPInterceptor(ctx); otel != nil {
-		interceptors = append(interceptors, otel)
+		NewOTLPInterceptor(ctx),
 	}
 
 	return []connect.HandlerOption{
@@ -300,7 +300,6 @@ func (s *Server) getServiceRegistrations(ctx context.Context) []ServiceRegistrat
 
 func (s *Server) registerServices(ctx context.Context) error {
 	registrations := s.getServiceRegistrations(ctx)
-
 	serviceNames := make([]string, len(registrations))
 	services := make([]*vanguard.Service, len(registrations))
 
@@ -334,33 +333,20 @@ func (s *Server) registerServices(ctx context.Context) error {
 		staticHandler.ServeHTTP(w, r)
 	})
 
-	audit := NewAuditInterceptor(s.cfg.Audit)
-
-	// The browser-facing auth surface: flows, account self-service, device
-	// flow, and SSO discovery (see registerAuthRoutes).
+	// The browser-facing auth surface
 	registerAuthRoutes(s.mux, s.cfg)
-
-	// Device flow: the browser page approves under a session; the CLI
-	// endpoints are public (RFC 8628).
-	s.mux.HandleFunc("POST /auth/device", s.cfg.IAM.Device.Begin)
-	s.mux.HandleFunc("POST /auth/device/token", s.cfg.IAM.Device.Poll)
-	s.mux.HandleFunc("GET /auth/device/nonce", s.cfg.IAM.Device.Nonce)
-	deviceGuard := NewChain(NewHTTPAuth(s.cfg))
-	s.mux.Handle("POST /auth/device/verify", deviceGuard.ThenFunc(s.cfg.IAM.Device.Verify))
-	s.mux.Handle("POST /auth/device/deny", deviceGuard.ThenFunc(s.cfg.IAM.Device.Deny))
 
 	// Auth outside audit, matching the RPC interceptor order, so audited
 	// rows see the principal and tenant iam placed on the request.
-	pubChain := NewChain(audit.WithAudit)                      // Public chain (audit only, no auth)
-	privChain := NewChain(NewHTTPAuth(s.cfg), audit.WithAudit) // Private chain (auth + audit)
+	protec := NewChain(NewHTTPAuth(s.cfg))
 
 	// Avatar handlers
-	s.mux.Handle("GET /avatars/{id}", pubChain.ThenFunc(ServeAvatar(s.cfg)))
-	s.mux.Handle("POST /upload/avatar", privChain.ThenFunc(UploadAvatar(s.cfg)))
+	s.mux.Handle("GET /avatars/{id}", ServeAvatar(s.cfg))
+	s.mux.Handle("POST /upload/avatar", protec.ThenFunc(UploadAvatar(s.cfg)))
 
 	// Terminal WebSocket: proxies browser <-> daemon's StreamSession PTY stream.
 	terminal := NewTerminalHandler(s.cfg)
-	s.mux.Handle("GET /terminal/ws", privChain.ThenFunc(terminal.HandleWebSocket))
+	s.mux.Handle("GET /terminal/ws", protec.ThenFunc(terminal.HandleWebSocket))
 
 	// Billing provider webhook
 	if s.cfg.Billing.Enabled() {

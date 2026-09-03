@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"github.com/mizuchilabs/kata/buildinfo"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
@@ -21,7 +22,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 )
 
-func NewOTLPInterceptor(ctx context.Context) *otelconnect.Interceptor {
+func NewOTLPInterceptor(ctx context.Context) connect.Interceptor {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
 		return nil
 	}

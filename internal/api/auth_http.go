@@ -55,6 +55,16 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.Handle("POST /passkey/register/begin", addKey.ThenFunc(svc.Passkey.BeginRegistration))
 	mux.Handle("POST /passkey/register/finish", addKey.ThenFunc(svc.Passkey.FinishRegistration))
 
+	// Device flow: the browser page approves under a session; the CLI
+	// endpoints are public (RFC 8628).
+	mux.HandleFunc("POST /auth/device", svc.Device.Begin)
+	mux.HandleFunc("POST /auth/device/token", svc.Device.Poll)
+	mux.HandleFunc("GET /auth/device/nonce", svc.Device.Nonce)
+
+	deviceGuard := NewChain(NewHTTPAuth(cfg))
+	mux.Handle("POST /auth/device/verify", deviceGuard.ThenFunc(svc.Device.Verify))
+	mux.Handle("POST /auth/device/deny", deviceGuard.ThenFunc(svc.Device.Deny))
+
 	// The hook gives passkey logins the same device remembering and
 	// new-login alerts as password logins.
 	cfg.IAM.OnUserLogin = func(w http.ResponseWriter, r *http.Request, u iam.User, _ iam.Method) {

@@ -3,9 +3,9 @@ package api
 import (
 	"context"
 
-	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/entitlement"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
@@ -21,15 +21,16 @@ func (s *LicenseService) GetLicense(
 	_ context.Context,
 	_ *nokkuv1.GetLicenseRequest,
 ) (*nokkuv1.GetLicenseResponse, error) {
-	plan := billing.PlanCommunity
-	active := s.cfg.Billing.Mode() == billing.ModeSelfHosted && s.cfg.License.Valid()
+	license := s.cfg.Billing.License
+	plan := entitlement.PlanCommunity
+	active := s.cfg.Entitlements.Mode() == entitlement.ModeSelfHosted && license.Valid()
 	if active {
-		plan = billing.PlanEnterprise
+		plan = entitlement.LicensedPlanFor(license)
 	}
 
 	return &nokkuv1.GetLicenseResponse{
 		Plan:      new(plan),
 		Active:    new(active),
-		ExpiresAt: db.SafeTimestamp(s.cfg.License.ExpiresAt),
+		ExpiresAt: db.SafeTimestamp(license.ExpiresAt),
 	}, nil
 }
