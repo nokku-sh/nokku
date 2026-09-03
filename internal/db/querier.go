@@ -27,6 +27,8 @@ type Querier interface {
 	// count instead of embedding each team's members.
 	CountTeamMembers(ctx context.Context, teamIds []string) ([]*CountTeamMembersRow, error)
 	CountWorkspaceMembers(ctx context.Context, arg *CountWorkspaceMembersParams) (int32, error)
+	CountWorkspaceResources(ctx context.Context, workspaceID string) (int64, error)
+	CountWorkspaceSeats(ctx context.Context, workspaceID string) (int64, error)
 	CountWorkspacesByOwner(ctx context.Context, userID string) (int32, error)
 	CreateCA(ctx context.Context, arg *CreateCAParams) (*CertificateAuthority, error)
 	CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*CreateDaemonRow, error)
@@ -67,8 +69,6 @@ type Querier interface {
 	EnsureWorkspaceMember(ctx context.Context, arg *EnsureWorkspaceMemberParams) error
 	FindCredentialBySubject(ctx context.Context, arg *FindCredentialBySubjectParams) (*Credential, error)
 	GetActiveSubscription(ctx context.Context, arg *GetActiveSubscriptionParams) (*WorkspaceSubscription, error)
-	// The actor id resolves against users, daemons, and service accounts; all
-	// three are UUIDs.
 	GetActorWorkspaceIDs(ctx context.Context, actorID string) ([]string, error)
 	GetCA(ctx context.Context, caID string) (*CertificateAuthority, error)
 	GetCAByDaemonID(ctx context.Context, daemonID *string) (*CertificateAuthority, error)
@@ -118,7 +118,6 @@ type Querier interface {
 	GetWorkspaceMember(ctx context.Context, arg *GetWorkspaceMemberParams) (*WorkspaceMember, error)
 	GetWorkspaceOwner(ctx context.Context, workspaceID string) (string, error)
 	GetWorkspacePrincipals(ctx context.Context, workspaceID string) ([]string, error)
-	GetWorkspaceStats(ctx context.Context, workspaceID string) (*GetWorkspaceStatsRow, error)
 	GetWorkspaceTags(ctx context.Context, workspaceID string) ([]string, error)
 	GetWorkspacesByIDs(ctx context.Context, workspaceIds []string) ([]*Workspace, error)
 	GetWorkspacesByOwner(ctx context.Context, userID string) ([]string, error)

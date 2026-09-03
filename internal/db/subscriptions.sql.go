@@ -10,6 +10,78 @@ import (
 	"time"
 )
 
+const countWorkspaceResources = `-- name: CountWorkspaceResources :one
+SELECT
+  (
+    (
+      SELECT
+        COUNT(*)
+      FROM
+        targets tg
+      WHERE
+        tg.workspace_id = $1
+    ) + (
+      SELECT
+        COUNT(*)
+      FROM
+        teams t
+      WHERE
+        t.workspace_id = $1
+    ) + (
+      SELECT
+        COUNT(*)
+      FROM
+        service_accounts sa
+      WHERE
+        sa.workspace_id = $1
+    ) + (
+      SELECT
+        COUNT(*)
+      FROM
+        certificate_authorities ca
+      WHERE
+        ca.workspace_id = $1
+    ) + (
+      SELECT
+        COUNT(*)
+      FROM
+        daemons d
+      WHERE
+        d.workspace_id = $1
+    ) + (
+      SELECT
+        COUNT(*)
+      FROM
+        workspace_domains wd
+      WHERE
+        wd.workspace_id = $1
+    )
+  )::bigint AS resource_count
+`
+
+func (q *Queries) CountWorkspaceResources(ctx context.Context, workspaceID string) (int64, error) {
+	row := q.db.QueryRow(ctx, countWorkspaceResources, workspaceID)
+	var resource_count int64
+	err := row.Scan(&resource_count)
+	return resource_count, err
+}
+
+const countWorkspaceSeats = `-- name: CountWorkspaceSeats :one
+SELECT
+  COUNT(*)
+FROM
+  workspace_members
+WHERE
+  workspace_id = $1
+`
+
+func (q *Queries) CountWorkspaceSeats(ctx context.Context, workspaceID string) (int64, error) {
+	row := q.db.QueryRow(ctx, countWorkspaceSeats, workspaceID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getActiveSubscription = `-- name: GetActiveSubscription :one
 SELECT
   workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, updated_at
@@ -66,71 +138,6 @@ func (q *Queries) GetSubscription(ctx context.Context, workspaceID string) (*Wor
 		&i.CurrentPeriodEnd,
 		&i.CancelAtPeriodEnd,
 		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const getWorkspaceStats = `-- name: GetWorkspaceStats :one
-SELECT
-  (
-    SELECT
-      COUNT(*)
-    FROM
-      workspace_members wm
-    WHERE
-      wm.workspace_id = $1
-  ) AS member_count,
-  (
-    SELECT
-      COUNT(*)
-    FROM
-      teams t
-    WHERE
-      t.workspace_id = $1
-  ) AS team_count,
-  (
-    SELECT
-      COUNT(*)
-    FROM
-      targets tg
-    WHERE
-      tg.workspace_id = $1
-  ) AS target_count,
-  (
-    SELECT
-      COUNT(*)
-    FROM
-      certificate_authorities ca
-    WHERE
-      ca.workspace_id = $1
-  ) AS ca_count,
-  (
-    SELECT
-      COUNT(*)
-    FROM
-      service_accounts sa
-    WHERE
-      sa.workspace_id = $1
-  ) AS service_account_count
-`
-
-type GetWorkspaceStatsRow struct {
-	MemberCount         int64 `json:"memberCount"`
-	TeamCount           int64 `json:"teamCount"`
-	TargetCount         int64 `json:"targetCount"`
-	CaCount             int64 `json:"caCount"`
-	ServiceAccountCount int64 `json:"serviceAccountCount"`
-}
-
-func (q *Queries) GetWorkspaceStats(ctx context.Context, workspaceID string) (*GetWorkspaceStatsRow, error) {
-	row := q.db.QueryRow(ctx, getWorkspaceStats, workspaceID)
-	var i GetWorkspaceStatsRow
-	err := row.Scan(
-		&i.MemberCount,
-		&i.TeamCount,
-		&i.TargetCount,
-		&i.CaCount,
-		&i.ServiceAccountCount,
 	)
 	return &i, err
 }
