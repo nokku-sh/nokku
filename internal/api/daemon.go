@@ -281,6 +281,14 @@ func (s *DaemonService) EnrollDaemon(
 	workspaceID := enrollToken.ID
 	ctx = iam.AnnotateTenant(ctx, workspaceID)
 
+	// Resource cap check lives here, not in the guard: enrollment is a
+	// public endpoint whose workspace comes from the enroll token, so the
+	// interceptor cannot see it pinned in the request context. Mirrors the
+	// seat check in invitation.go.
+	if err := s.cfg.Entitlements.CheckResources(ctx, workspaceID); err != nil {
+		return nil, err
+	}
+
 	// The enrollment token (verified below against its stored hash)
 	// authorizes this otherwise unauthenticated request, so the daemon
 	// provisioning runs as a system transaction without an actor.

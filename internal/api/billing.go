@@ -32,13 +32,17 @@ func (s *BillingService) GetBilling(
 	}
 
 	var memberCount int64
+	var resourceCount int64
 	var sub *db.WorkspaceSubscription
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		stats, err := q.GetWorkspaceStats(ctx, req.GetWorkspaceId())
+		memberCount, err = q.CountWorkspaceSeats(ctx, req.GetWorkspaceId())
 		if err != nil {
 			return err
 		}
-		memberCount = stats.MemberCount
+		resourceCount, err = q.CountWorkspaceResources(ctx, req.GetWorkspaceId())
+		if err != nil {
+			return err
+		}
 		// NotFound is fine: community workspaces have no subscription row.
 		sub, _ = q.GetSubscription(ctx, req.GetWorkspaceId())
 		return nil
@@ -48,11 +52,12 @@ func (s *BillingService) GetBilling(
 
 	plan := s.cfg.Entitlements.Resolve(ctx, req.GetWorkspaceId())
 	resp := &nokkuv1.GetBillingResponse{
-		Plan:        new(plan.Name),
-		Mode:        new(string(s.cfg.Entitlements.Mode())),
-		Features:    featuresProto(plan),
-		Quotas:      quotasProto(plan),
-		MemberCount: new(memberCount),
+		Plan:          new(plan.Name),
+		Mode:          new(string(s.cfg.Entitlements.Mode())),
+		Features:      featuresProto(plan),
+		Quotas:        quotasProto(plan),
+		MemberCount:   new(memberCount),
+		ResourceCount: new(resourceCount),
 	}
 
 	if sub != nil {
@@ -190,5 +195,6 @@ func quotasProto(p entitlement.Plan) *nokkuv1.Quotas {
 		Seats:                 new(p.SeatCap),
 		RetentionDays:         new(p.RetentionDays),
 		RecordingStorageBytes: new(p.RecordingStorageBytes),
+		ResourceCap:           new(p.ResourceCap),
 	}
 }

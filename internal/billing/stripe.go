@@ -281,18 +281,17 @@ func (s *Stripe) SyncAll(ctx context.Context) error {
 // billableSeats returns the quantity for the per-seat subscription: the
 // current member count, never below the pricing floor.
 func (s *Stripe) billableSeats(ctx context.Context, workspaceID string) (int64, error) {
-	var members int64
+	var count int64
 	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
-		stats, err := q.GetWorkspaceStats(ctx, workspaceID)
+		count, err = q.CountWorkspaceSeats(ctx, workspaceID)
 		if err != nil {
 			return err
 		}
-		members = stats.MemberCount
 		return nil
 	}); err != nil {
 		return 0, fmt.Errorf("count members for checkout: %w", err)
 	}
-	return max(members, minBillableSeats), nil
+	return max(count, minBillableSeats), nil
 }
 
 // periodEnd returns the current period end for a single-item subscription.
