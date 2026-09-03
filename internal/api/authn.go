@@ -24,9 +24,21 @@ import (
 )
 
 // publicEndpoints are the connectrpc procedures that skip authentication.
+// AuthService is the pre-session surface entirely: its RPCs establish (or
+// tear down) the session, so authn must not gate them — Logout in particular
+// must stay reachable with a stale session to clear the cookie.
 var publicEndpoints = map[string]struct{}{
-	nokkuv1connect.DaemonServiceEnrollDaemonProcedure: {},
-	nokkuv1connect.UtilServiceGetVersionProcedure:     {},
+	nokkuv1connect.DaemonServiceEnrollDaemonProcedure:      {},
+	nokkuv1connect.UtilServiceGetVersionProcedure:          {},
+	nokkuv1connect.AuthServiceRegisterProcedure:            {},
+	nokkuv1connect.AuthServiceLoginProcedure:               {},
+	nokkuv1connect.AuthServiceLoginWithBackupCodeProcedure: {},
+	nokkuv1connect.AuthServiceLogoutProcedure:              {},
+	nokkuv1connect.AuthServiceForgotPasswordProcedure:      {},
+	nokkuv1connect.AuthServiceResetPasswordProcedure:       {},
+	nokkuv1connect.AuthServiceVerifyEmailProcedure:         {},
+	nokkuv1connect.AuthServiceResendVerificationProcedure:  {},
+	nokkuv1connect.AuthServiceDiscoverSSOProcedure:         {},
 }
 
 func isPublicEndpoint(procedure string) bool {
