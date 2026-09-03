@@ -32,3 +32,6 @@ bin/
 dist/
 data/
 artifacts/
+
+# Internal strategy docs — never publish (see idea/billing-and-monetization.md)
+/idea/
