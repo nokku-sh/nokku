@@ -86,8 +86,6 @@ ORDER BY
   id ASC;
 
 -- name: GetActorWorkspaceIDs :many
--- The actor id resolves against users, daemons, and service accounts; all
--- three are UUIDs.
 SELECT
   workspace_id
 FROM

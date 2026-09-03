@@ -225,8 +225,6 @@ WHERE
   id = $1::uuid
 `
 
-// The actor id resolves against users, daemons, and service accounts; all
-// three are UUIDs.
 func (q *Queries) GetActorWorkspaceIDs(ctx context.Context, actorID string) ([]string, error) {
 	rows, err := q.db.Query(ctx, getActorWorkspaceIDs, actorID)
 	if err != nil {
