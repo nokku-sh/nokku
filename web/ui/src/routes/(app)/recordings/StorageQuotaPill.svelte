@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { billing } from '$lib/api/billing.svelte';
 	import { recordings } from '$lib/api/recordings.svelte';
-	import { parseBillingCapabilities } from '$lib/billing-capabilities';
 	import * as HoverCard from '$lib/components/ui/hover-card';
 	import { Progress } from '$lib/components/ui/progress';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -10,10 +9,9 @@
 
 	const list = $derived(recordings.list());
 	const billingData = $derived(billing.get());
-	const capabilities = $derived(parseBillingCapabilities(billingData.data?.metadata));
 
-	// Ops-level global cap (env-configured), not a plan feature. 0 = none.
-	let limitBytes = $derived(capabilities.values['recordings_storage_cap'] ?? 0);
+	// Plan storage cap; -1 = unlimited (self-hosted or unlimited plan).
+	let limitBytes = $derived(Number(billingData.data?.quotas?.recordingStorageBytes ?? 0));
 	const unlimited = $derived(limitBytes <= 0);
 	const usedBytes = $derived(Number(list.data?.totalBytes ?? 0));
 

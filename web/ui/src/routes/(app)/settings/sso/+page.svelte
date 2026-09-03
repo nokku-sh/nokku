@@ -1,7 +1,6 @@
 <script lang="ts">
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { billing } from '$lib/api/billing.svelte';
-	import { parseBillingCapabilities } from '$lib/billing-capabilities';
 	import { activeSSOTab } from '$lib/store.svelte';
 	import { domain } from '$lib/api/sso.svelte';
 	import { Globe, KeyRound } from '@lucide/svelte';
@@ -14,8 +13,7 @@
 	import { Button } from '$lib/components/ui/button';
 
 	const billingData = $derived(billing.get());
-	const capabilities = $derived(parseBillingCapabilities(billingData.data?.metadata));
-	const samlAvailable = $derived(capabilities.hasFeature('saml'));
+	const samlAvailable = $derived(billingData.data?.features?.['saml'] === true);
 
 	const domains = $derived(domain.list());
 	// Providers can only be added once a domain is verified: home realm

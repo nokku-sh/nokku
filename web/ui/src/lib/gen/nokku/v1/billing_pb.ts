@@ -14,47 +14,8 @@ import type { Message } from '@bufbuild/protobuf';
  * Describes the file nokku/v1/billing.proto.
  */
 export const file_nokku_v1_billing: GenFile /*@__PURE__*/ = fileDesc(
-	'ChZub2trdS92MS9iaWxsaW5nLnByb3RvEghub2trdS52MSJpCg9Xb3Jrc3BhY2VDb3VudHMSDwoHbWVtYmVycxgBIAEoAxINCgV0ZWFtcxgCIAEoAxIYChBzZXJ2aWNlX2FjY291bnRzGAMgASgDEg8KB3RhcmdldHMYBCABKAMSCwoDY2FzGAUgASgDIjMKEUdldEJpbGxpbmdSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQEi7AIKEkdldEJpbGxpbmdSZXNwb25zZRITCgtjdXN0b21lcl9pZBgBIAEoCRISCgpwcm9kdWN0X2lkGAIgASgJEhQKDHByb2R1Y3RfbmFtZRgDIAEoCRIOCgZzdGF0dXMYBCABKAkSFwoPYmlsbGluZ19lbmFibGVkGAUgASgIEhwKFGNhbmNlbF9hdF9wZXJpb2RfZW5kGAYgASgIEjwKCG1ldGFkYXRhGAcgAygLMioubm9ra3UudjEuR2V0QmlsbGluZ1Jlc3BvbnNlLk1ldGFkYXRhRW50cnkSKQoGY291bnRzGAggASgLMhkubm9ra3UudjEuV29ya3NwYWNlQ291bnRzEjYKEmN1cnJlbnRfcGVyaW9kX2VuZBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjUKE0NyZWF0ZVBvcnRhbFJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABASIjChRDcmVhdGVQb3J0YWxSZXNwb25zZRILCgN1cmwYASABKAkiNwoVQ3JlYXRlQ2hlY2tvdXRSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQEiJQoWQ3JlYXRlQ2hlY2tvdXRSZXNwb25zZRILCgN1cmwYASABKAkiaAoZQ2FuY2VsU3Vic2NyaXB0aW9uUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhEKCWltbWVkaWF0ZRgCIAEoCBIYCgZyZWFzb24YAyABKAlCCLpIBXIDGOgHIhwKGkNhbmNlbFN1YnNjcmlwdGlvblJlc3BvbnNlMuoDCg5CaWxsaW5nU2VydmljZRJsCgpHZXRCaWxsaW5nEhsubm9ra3UudjEuR2V0QmlsbGluZ1JlcXVlc3QaHC5ub2trdS52MS5HZXRCaWxsaW5nUmVzcG9uc2UiI5ACAYLT5JMCGhIYL3YxL2JpbGxpbmcvc3Vic2NyaXB0aW9uEmkKDENyZWF0ZVBvcnRhbBIdLm5va2t1LnYxLkNyZWF0ZVBvcnRhbFJlcXVlc3QaHi5ub2trdS52MS5DcmVhdGVQb3J0YWxSZXNwb25zZSIagtPkkwIUIhIvdjEvYmlsbGluZy9wb3J0YWwScQoOQ3JlYXRlQ2hlY2tvdXQSHy5ub2trdS52MS5DcmVhdGVDaGVja291dFJlcXVlc3QaIC5ub2trdS52MS5DcmVhdGVDaGVja291dFJlc3BvbnNlIhyC0+STAhYiFC92MS9iaWxsaW5nL2NoZWNrb3V0EosBChJDYW5jZWxTdWJzY3JpcHRpb24SIy5ub2trdS52MS5DYW5jZWxTdWJzY3JpcHRpb25SZXF1ZXN0GiQubm9ra3UudjEuQ2FuY2VsU3Vic2NyaXB0aW9uUmVzcG9uc2UiKoLT5JMCJDoBKiIfL3YxL2JpbGxpbmcvc3Vic2NyaXB0aW9uL2NhbmNlbEKWAQoMY29tLm5va2t1LnYxQgxCaWxsaW5nUHJvdG9QAVo3Z2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9pbnRlcm5hbC9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac',
+	'ChZub2trdS92MS9iaWxsaW5nLnByb3RvEghub2trdS52MSIzChFHZXRCaWxsaW5nUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBIoUCChJHZXRCaWxsaW5nUmVzcG9uc2USDAoEcGxhbhgBIAEoCRIMCgRtb2RlGAIgASgJEjwKCGZlYXR1cmVzGAMgAygLMioubm9ra3UudjEuR2V0QmlsbGluZ1Jlc3BvbnNlLkZlYXR1cmVzRW50cnkSIAoGcXVvdGFzGAQgASgLMhAubm9ra3UudjEuUXVvdGFzEhQKDG1lbWJlcl9jb3VudBgFIAEoAxIsCgxzdWJzY3JpcHRpb24YBiABKAsyFi5ub2trdS52MS5TdWJzY3JpcHRpb24aLwoNRmVhdHVyZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAg6AjgBIlAKBlF1b3RhcxINCgVzZWF0cxgBIAEoAxIWCg5yZXRlbnRpb25fZGF5cxgCIAEoAxIfChdyZWNvcmRpbmdfc3RvcmFnZV9ieXRlcxgDIAEoAyJ0CgxTdWJzY3JpcHRpb24SDgoGc3RhdHVzGAEgASgJEhwKFGNhbmNlbF9hdF9wZXJpb2RfZW5kGAIgASgIEjYKEmN1cnJlbnRfcGVyaW9kX2VuZBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiNQoTQ3JlYXRlUG9ydGFsUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBIiMKFENyZWF0ZVBvcnRhbFJlc3BvbnNlEgsKA3VybBgBIAEoCSI3ChVDcmVhdGVDaGVja291dFJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABASIlChZDcmVhdGVDaGVja291dFJlc3BvbnNlEgsKA3VybBgBIAEoCSJoChlDYW5jZWxTdWJzY3JpcHRpb25SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESEQoJaW1tZWRpYXRlGAIgASgIEhgKBnJlYXNvbhgDIAEoCUIIukgFcgMY6AciHAoaQ2FuY2VsU3Vic2NyaXB0aW9uUmVzcG9uc2UiEwoRR2V0TGljZW5zZVJlcXVlc3QiYgoSR2V0TGljZW5zZVJlc3BvbnNlEgwKBHBsYW4YASABKAkSDgoGYWN0aXZlGAIgASgIEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wMssECg5CaWxsaW5nU2VydmljZRJsCgpHZXRCaWxsaW5nEhsubm9ra3UudjEuR2V0QmlsbGluZ1JlcXVlc3QaHC5ub2trdS52MS5HZXRCaWxsaW5nUmVzcG9uc2UiI5ACAYLT5JMCGhIYL3YxL2JpbGxpbmcvc3Vic2NyaXB0aW9uEmkKDENyZWF0ZVBvcnRhbBIdLm5va2t1LnYxLkNyZWF0ZVBvcnRhbFJlcXVlc3QaHi5ub2trdS52MS5DcmVhdGVQb3J0YWxSZXNwb25zZSIagtPkkwIUIhIvdjEvYmlsbGluZy9wb3J0YWwScQoOQ3JlYXRlQ2hlY2tvdXQSHy5ub2trdS52MS5DcmVhdGVDaGVja291dFJlcXVlc3QaIC5ub2trdS52MS5DcmVhdGVDaGVja291dFJlc3BvbnNlIhyC0+STAhYiFC92MS9iaWxsaW5nL2NoZWNrb3V0EosBChJDYW5jZWxTdWJzY3JpcHRpb24SIy5ub2trdS52MS5DYW5jZWxTdWJzY3JpcHRpb25SZXF1ZXN0GiQubm9ra3UudjEuQ2FuY2VsU3Vic2NyaXB0aW9uUmVzcG9uc2UiKoLT5JMCJDoBKiIfL3YxL2JpbGxpbmcvc3Vic2NyaXB0aW9uL2NhbmNlbBJfCgpHZXRMaWNlbnNlEhsubm9ra3UudjEuR2V0TGljZW5zZVJlcXVlc3QaHC5ub2trdS52MS5HZXRMaWNlbnNlUmVzcG9uc2UiFpACAYLT5JMCDRILL3YxL2xpY2Vuc2VClgEKDGNvbS5ub2trdS52MUIMQmlsbGluZ1Byb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
 	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
-);
-
-/**
- * @generated from message nokku.v1.WorkspaceCounts
- */
-export type WorkspaceCounts = Message<'nokku.v1.WorkspaceCounts'> & {
-	/**
-	 * @generated from field: int64 members = 1;
-	 */
-	members: bigint;
-
-	/**
-	 * @generated from field: int64 teams = 2;
-	 */
-	teams: bigint;
-
-	/**
-	 * @generated from field: int64 service_accounts = 3;
-	 */
-	serviceAccounts: bigint;
-
-	/**
-	 * @generated from field: int64 targets = 4;
-	 */
-	targets: bigint;
-
-	/**
-	 * @generated from field: int64 cas = 5;
-	 */
-	cas: bigint;
-};
-
-/**
- * Describes the message nokku.v1.WorkspaceCounts.
- * Use `create(WorkspaceCountsSchema)` to create a new message.
- */
-export const WorkspaceCountsSchema: GenMessage<WorkspaceCounts> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_billing,
-	0
 );
 
 /**
@@ -73,7 +34,7 @@ export type GetBillingRequest = Message<'nokku.v1.GetBillingRequest'> & {
  */
 export const GetBillingRequestSchema: GenMessage<GetBillingRequest> /*@__PURE__*/ = messageDesc(
 	file_nokku_v1_billing,
-	1
+	0
 );
 
 /**
@@ -81,49 +42,45 @@ export const GetBillingRequestSchema: GenMessage<GetBillingRequest> /*@__PURE__*
  */
 export type GetBillingResponse = Message<'nokku.v1.GetBillingResponse'> & {
 	/**
-	 * @generated from field: string customer_id = 1;
+	 * Resolved plan name for the workspace (community, pro, enterprise).
+	 *
+	 * @generated from field: string plan = 1;
 	 */
-	customerId: string;
+	plan: string;
 
 	/**
-	 * @generated from field: string product_id = 2;
+	 * Instance operating mode (saas, self_hosted): decides whether billing
+	 * actions are available or the instance runs on a license.
+	 *
+	 * @generated from field: string mode = 2;
 	 */
-	productId: string;
+	mode: string;
 
 	/**
-	 * @generated from field: string product_name = 3;
+	 * Full feature catalog with per-plan enablement; true = enabled.
+	 *
+	 * @generated from field: map<string, bool> features = 3;
 	 */
-	productName: string;
+	features: { [key: string]: boolean };
 
 	/**
-	 * @generated from field: string status = 4;
+	 * Plan quotas. A value of -1 means unlimited.
+	 *
+	 * @generated from field: nokku.v1.Quotas quotas = 4;
 	 */
-	status: string;
+	quotas?: Quotas | undefined;
 
 	/**
-	 * @generated from field: bool billing_enabled = 5;
+	 * @generated from field: int64 member_count = 5;
 	 */
-	billingEnabled: boolean;
+	memberCount: bigint;
 
 	/**
-	 * @generated from field: bool cancel_at_period_end = 6;
+	 * Set only when a subscription row exists (SaaS paid workspaces).
+	 *
+	 * @generated from field: nokku.v1.Subscription subscription = 6;
 	 */
-	cancelAtPeriodEnd: boolean;
-
-	/**
-	 * @generated from field: map<string, string> metadata = 7;
-	 */
-	metadata: { [key: string]: string };
-
-	/**
-	 * @generated from field: nokku.v1.WorkspaceCounts counts = 8;
-	 */
-	counts?: WorkspaceCounts | undefined;
-
-	/**
-	 * @generated from field: google.protobuf.Timestamp current_period_end = 9;
-	 */
-	currentPeriodEnd?: Timestamp | undefined;
+	subscription?: Subscription | undefined;
 };
 
 /**
@@ -132,7 +89,68 @@ export type GetBillingResponse = Message<'nokku.v1.GetBillingResponse'> & {
  */
 export const GetBillingResponseSchema: GenMessage<GetBillingResponse> /*@__PURE__*/ = messageDesc(
 	file_nokku_v1_billing,
-	2
+	1
+);
+
+/**
+ * @generated from message nokku.v1.Quotas
+ */
+export type Quotas = Message<'nokku.v1.Quotas'> & {
+	/**
+	 * Maximum members; -1 = unlimited (per-seat billing).
+	 *
+	 * @generated from field: int64 seats = 1;
+	 */
+	seats: bigint;
+
+	/**
+	 * Audit log and session recording retention window in days.
+	 *
+	 * @generated from field: int64 retention_days = 2;
+	 */
+	retentionDays: bigint;
+
+	/**
+	 * Session recording storage cap in bytes; -1 = unlimited (self-hosted).
+	 *
+	 * @generated from field: int64 recording_storage_bytes = 3;
+	 */
+	recordingStorageBytes: bigint;
+};
+
+/**
+ * Describes the message nokku.v1.Quotas.
+ * Use `create(QuotasSchema)` to create a new message.
+ */
+export const QuotasSchema: GenMessage<Quotas> /*@__PURE__*/ = messageDesc(file_nokku_v1_billing, 2);
+
+/**
+ * @generated from message nokku.v1.Subscription
+ */
+export type Subscription = Message<'nokku.v1.Subscription'> & {
+	/**
+	 * @generated from field: string status = 1;
+	 */
+	status: string;
+
+	/**
+	 * @generated from field: bool cancel_at_period_end = 2;
+	 */
+	cancelAtPeriodEnd: boolean;
+
+	/**
+	 * @generated from field: google.protobuf.Timestamp current_period_end = 3;
+	 */
+	currentPeriodEnd?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.Subscription.
+ * Use `create(SubscriptionSchema)` to create a new message.
+ */
+export const SubscriptionSchema: GenMessage<Subscription> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_billing,
+	3
 );
 
 /**
@@ -151,7 +169,7 @@ export type CreatePortalRequest = Message<'nokku.v1.CreatePortalRequest'> & {
  */
 export const CreatePortalRequestSchema: GenMessage<CreatePortalRequest> /*@__PURE__*/ = messageDesc(
 	file_nokku_v1_billing,
-	3
+	4
 );
 
 /**
@@ -169,7 +187,7 @@ export type CreatePortalResponse = Message<'nokku.v1.CreatePortalResponse'> & {
  * Use `create(CreatePortalResponseSchema)` to create a new message.
  */
 export const CreatePortalResponseSchema: GenMessage<CreatePortalResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_billing, 4);
+	messageDesc(file_nokku_v1_billing, 5);
 
 /**
  * @generated from message nokku.v1.CreateCheckoutRequest
@@ -186,7 +204,7 @@ export type CreateCheckoutRequest = Message<'nokku.v1.CreateCheckoutRequest'> & 
  * Use `create(CreateCheckoutRequestSchema)` to create a new message.
  */
 export const CreateCheckoutRequestSchema: GenMessage<CreateCheckoutRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_billing, 5);
+	messageDesc(file_nokku_v1_billing, 6);
 
 /**
  * @generated from message nokku.v1.CreateCheckoutResponse
@@ -203,7 +221,7 @@ export type CreateCheckoutResponse = Message<'nokku.v1.CreateCheckoutResponse'> 
  * Use `create(CreateCheckoutResponseSchema)` to create a new message.
  */
 export const CreateCheckoutResponseSchema: GenMessage<CreateCheckoutResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_billing, 6);
+	messageDesc(file_nokku_v1_billing, 7);
 
 /**
  * @generated from message nokku.v1.CancelSubscriptionRequest
@@ -230,7 +248,7 @@ export type CancelSubscriptionRequest = Message<'nokku.v1.CancelSubscriptionRequ
  * Use `create(CancelSubscriptionRequestSchema)` to create a new message.
  */
 export const CancelSubscriptionRequestSchema: GenMessage<CancelSubscriptionRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_billing, 7);
+	messageDesc(file_nokku_v1_billing, 8);
 
 /**
  * @generated from message nokku.v1.CancelSubscriptionResponse
@@ -242,7 +260,53 @@ export type CancelSubscriptionResponse = Message<'nokku.v1.CancelSubscriptionRes
  * Use `create(CancelSubscriptionResponseSchema)` to create a new message.
  */
 export const CancelSubscriptionResponseSchema: GenMessage<CancelSubscriptionResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_billing, 8);
+	messageDesc(file_nokku_v1_billing, 9);
+
+/**
+ * The instance license comes from the NOKKU_LICENSE_KEY env var and is
+ * verified offline (air-gapped activation), independent of Stripe billing.
+ *
+ * @generated from message nokku.v1.GetLicenseRequest
+ */
+export type GetLicenseRequest = Message<'nokku.v1.GetLicenseRequest'> & {};
+
+/**
+ * Describes the message nokku.v1.GetLicenseRequest.
+ * Use `create(GetLicenseRequestSchema)` to create a new message.
+ */
+export const GetLicenseRequestSchema: GenMessage<GetLicenseRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_billing,
+	10
+);
+
+/**
+ * @generated from message nokku.v1.GetLicenseResponse
+ */
+export type GetLicenseResponse = Message<'nokku.v1.GetLicenseResponse'> & {
+	/**
+	 * @generated from field: string plan = 1;
+	 */
+	plan: string;
+
+	/**
+	 * @generated from field: bool active = 2;
+	 */
+	active: boolean;
+
+	/**
+	 * @generated from field: google.protobuf.Timestamp expires_at = 3;
+	 */
+	expiresAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.GetLicenseResponse.
+ * Use `create(GetLicenseResponseSchema)` to create a new message.
+ */
+export const GetLicenseResponseSchema: GenMessage<GetLicenseResponse> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_billing,
+	11
+);
 
 /**
  * @generated from service nokku.v1.BillingService
@@ -279,5 +343,13 @@ export const BillingService: GenService<{
 		methodKind: 'unary';
 		input: typeof CancelSubscriptionRequestSchema;
 		output: typeof CancelSubscriptionResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.BillingService.GetLicense
+	 */
+	getLicense: {
+		methodKind: 'unary';
+		input: typeof GetLicenseRequestSchema;
+		output: typeof GetLicenseResponseSchema;
 	};
 }> /*@__PURE__*/ = serviceDesc(file_nokku_v1_billing, 0);
