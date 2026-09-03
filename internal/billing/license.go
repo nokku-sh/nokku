@@ -39,10 +39,10 @@ type Key struct {
 	ExpiresAt *time.Time
 }
 
-// NewLicense returns the validated instance license from the environment, or a
-// zero-value Key when absent/invalid so callers can rely on Valid() == false
-// without nil checks. It never returns a nil-key/nil-error pair.
-func NewLicense() (*Key, error) {
+// newLicense returns the validated instance license from the environment, or
+// a zero-value Key when absent/invalid so callers can rely on Valid() ==
+// false without nil checks. It never returns a nil-key/nil-error pair.
+func newLicense() (*Key, error) {
 	verifier, err := DefaultVerifier()
 	if err != nil {
 		return nil, err
@@ -106,4 +106,13 @@ func decodeKey(key string) (payload, sig []byte, err error) {
 	}
 	sigLen := ed25519.SignatureSize
 	return raw[1 : len(raw)-sigLen], raw[len(raw)-sigLen:], nil
+}
+
+// LicensedPlan satisfies entitlement.License: entitlement reads the
+// licensed plan while verification stays in billing (vendor side).
+func (k *Key) LicensedPlan() string {
+	if k == nil {
+		return ""
+	}
+	return k.Plan
 }

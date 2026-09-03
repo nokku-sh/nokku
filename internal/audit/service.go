@@ -12,8 +12,8 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/iam"
 
-	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
 const (
@@ -28,18 +28,18 @@ type UserDirectory interface {
 }
 
 type Service struct {
-	conn    *db.Connection
-	billing *billing.Service
-	users   UserDirectory
+	conn         *db.Connection
+	entitlements *entitlement.Service
+	users        UserDirectory
 }
 
 func New(
 	ctx context.Context,
 	conn *db.Connection,
-	b *billing.Service,
+	entitlements *entitlement.Service,
 	users UserDirectory,
 ) (*Service, error) {
-	s := &Service{conn: conn, billing: b, users: users}
+	s := &Service{conn: conn, entitlements: entitlements, users: users}
 
 	if err := s.setupPartitions(ctx); err != nil {
 		return nil, err
@@ -218,12 +218,8 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 		if wsID == nil {
 			continue
 		}
-		retentionDays := int64(defaultRetentionDays)
+		retentionDays := s.entitlements.RetentionDays(ctx, *wsID)
 		hardcap := int64(maxRetentionDays)
-
-		if v := s.billing.Int(ctx, *wsID, billing.ValueAuditRetentionDays, 0); v > 0 {
-			retentionDays = v
-		}
 
 		if retentionDays > hardcap {
 			retentionDays = hardcap

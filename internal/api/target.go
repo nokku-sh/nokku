@@ -7,7 +7,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -46,14 +45,6 @@ func (s *TargetService) CreateTarget(
 	ctx context.Context,
 	req *nokkuv1.CreateTargetRequest,
 ) (*nokkuv1.CreateTargetResponse, error) {
-	if err := s.cfg.Billing.Check(
-		ctx,
-		req.GetWorkspaceId(),
-		billing.ResourceTargets,
-	); err != nil {
-		return nil, err
-	}
-
 	var result *db.Target
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.CreateTarget(ctx, &db.CreateTargetParams{

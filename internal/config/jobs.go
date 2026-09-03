@@ -35,8 +35,9 @@ func (c *Config) startBackgroundJobs(ctx context.Context) {
 	}
 }
 
-// runBillingJobs reconciles subscription state and reports usage to the
-// billing provider.
+// runBillingJobs reconciles local subscription state from the billing
+// provider so missed webhooks self-heal. There is no usage reporting:
+// billing is per-seat, quantity is managed in the Stripe portal.
 func (c *Config) runBillingJobs(ctx context.Context) {
 	timer := time.NewTimer(5 * time.Minute)
 	defer timer.Stop()
@@ -66,9 +67,6 @@ func (c *Config) syncBilling(ctx context.Context) {
 	}
 	if err := c.Billing.SyncAll(ctx); err != nil {
 		slog.Error("failed to reconcile subscriptions", "error", err)
-	}
-	if err := c.Billing.SyncUsage(ctx); err != nil {
-		slog.Error("failed to report usage", "error", err)
 	}
 }
 

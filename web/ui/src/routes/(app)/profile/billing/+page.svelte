@@ -18,11 +18,7 @@
 		CircleUserIcon,
 		CreditCard,
 		ExternalLink,
-		IdCardIcon,
 		KeyRound,
-		ServerIcon,
-		UsersIcon,
-		WaypointsIcon,
 		ShieldAlert,
 		LoaderCircle,
 		CreditCardIcon,
@@ -44,10 +40,10 @@
 	const billingEnabled = $derived(customerData.data?.billingEnabled === true);
 
 	const licenseBenefits = [
-		'Unlimited members, targets, teams & CAs',
-		'SSO enforcement',
+		'Unlimited members and infrastructure',
+		'SAML, enforced SSO & audit export',
 		'365-day audit retention',
-		'No per-workspace limits'
+		'Offline, air-gapped activation'
 	];
 
 	let ws = $derived(workspace.get());
@@ -62,64 +58,20 @@
 		(capabilities.plan || subscription?.productName || 'Free')
 			.replace(/^Nokku\s*-\s*/i, '')
 			.replace(/^community$/i, 'Free')
-			.replace(/^flex$/i, 'Flex')
+			.replace(/^(pro|flex)$/i, 'Pro')
 			.replace(/^enterprise$/i, 'Enterprise')
 	);
 
 	const checkout = billing.checkout();
 	const portal = billing.portal();
 
-	const overageAllowed = $derived(
-		subscription?.status === 'active' || subscription?.status === 'trialing'
-	);
-
-	const resources = $derived([
-		{
-			key: 'members',
-			label: 'Members',
-			limit: capabilities.limit('members')?.hard ?? -1,
-			credited: capabilities.limit('members')?.included ?? 0,
-			used: Number(counts?.members ?? 0),
-			icon: CircleUserIcon,
-			overage: overageAllowed
-		},
-		{
-			key: 'teams',
-			label: 'Teams',
-			limit: capabilities.limit('teams')?.hard ?? -1,
-			credited: capabilities.limit('teams')?.included ?? 0,
-			used: Number(counts?.teams ?? 0),
-			icon: UsersIcon,
-			overage: false
-		},
-		{
-			key: 'service_accounts',
-			label: 'Service Accounts',
-			limit: capabilities.limit('service_accounts')?.hard ?? -1,
-			credited: capabilities.limit('service_accounts')?.included ?? 0,
-			used: Number(counts?.serviceAccounts ?? 0),
-			icon: WaypointsIcon,
-			overage: false
-		},
-		{
-			key: 'targets',
-			label: 'Targets',
-			limit: capabilities.limit('targets')?.hard ?? -1,
-			credited: capabilities.limit('targets')?.included ?? 0,
-			used: Number(counts?.targets ?? 0),
-			icon: ServerIcon,
-			overage: overageAllowed
-		},
-		{
-			key: 'cas',
-			label: 'Certificate Authorities',
-			limit: capabilities.limit('cas')?.hard ?? -1,
-			credited: capabilities.limit('cas')?.included ?? 0,
-			used: Number(counts?.cas ?? 0),
-			icon: IdCardIcon,
-			overage: false
-		}
-	]);
+	// Seats are the only billable dimension; everything else is unlimited
+	// or a feature flag. Retention is the plan's evidence window.
+	const seats = $derived({
+		used: Number(counts?.members ?? 0),
+		cap: capabilities.limit('members')?.hard ?? -1
+	});
+	const retentionDays = $derived(capabilities.values['audit_log_retention_days'] ?? 7);
 
 	function handleCancel() {
 		cancel.mutate({
@@ -249,40 +201,38 @@
 
 			<Card.Content class="relative z-10 mb-4">
 				<div class="space-y-3">
-					{#each resources as r (r.key)}
-						{@const effectiveMax = r.limit > 0 ? r.limit : r.credited > 0 ? r.credited * 3 : -1}
-						{@const pct =
-							effectiveMax > 0 ? Math.min(Math.round((r.used / effectiveMax) * 100), 100) : 0}
-						{@const inOverage = r.overage && r.credited > 0 && r.used >= r.credited}
-						{@const nearLimit = effectiveMax > 0 && !inOverage && pct >= 90}
-						<div class="flex items-center justify-between gap-4 text-sm">
-							<div class="flex items-center gap-2">
-								<r.icon size={14} class="text-muted-foreground" />
-								<span class="text-muted-foreground">{r.label}</span>
-							</div>
-							<span class="font-medium tabular-nums">
-								{r.used}
-								{#if r.credited > 0}
-									<span class="text-muted-foreground">/{r.credited}</span>
-									<span class="text-xs text-muted-foreground/60"> ({effectiveMax})</span>
-								{:else if r.limit !== -1}
-									<span class="text-muted-foreground">/{r.limit}</span>
-								{/if}
-							</span>
+					<div class="flex items-center justify-between gap-4 text-sm">
+						<div class="flex items-center gap-2">
+							<CircleUserIcon size={14} class="text-muted-foreground" />
+							<span class="text-muted-foreground">Members</span>
 						</div>
-						{#if effectiveMax > 0}
-							<div class="h-1 w-full overflow-hidden rounded-full bg-secondary">
-								<div
-									class="h-full rounded-full {inOverage
+						<span class="font-medium tabular-nums">
+							{seats.used}
+							{#if seats.cap !== -1}
+								<span class="text-muted-foreground">/{seats.cap}</span>
+							{/if}
+						</span>
+					</div>
+					{#if seats.cap !== -1}
+						{@const pct = Math.min(Math.round((seats.used / seats.cap) * 100), 100)}
+						<div class="h-1 w-full overflow-hidden rounded-full bg-secondary">
+							<div
+								class="h-full rounded-full {pct >= 100
+									? 'bg-destructive'
+									: pct >= 90
 										? 'bg-amber-500'
-										: nearLimit
-											? 'bg-destructive'
-											: 'bg-primary'}"
-									style="width: {pct}%"
-								></div>
-							</div>
-						{/if}
-					{/each}
+										: 'bg-primary'}"
+								style="width: {pct}%"
+							></div>
+						</div>
+					{/if}
+					<div class="flex items-center justify-between gap-4 text-sm">
+						<div class="flex items-center gap-2">
+							<ShieldAlert size={14} class="text-muted-foreground" />
+							<span class="text-muted-foreground">Audit & recording retention</span>
+						</div>
+						<span class="font-medium tabular-nums">{retentionDays} days</span>
+					</div>
 				</div>
 			</Card.Content>
 

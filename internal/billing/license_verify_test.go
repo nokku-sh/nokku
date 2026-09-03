@@ -82,7 +82,7 @@ func TestVerify_ClaimsValidation(t *testing.T) {
 	}{
 		{"wrong version", Claims{Version: 99, Plan: "enterprise"}},
 		{"missing plan", Claims{Version: int(version)}},
-		{"empty email ok but plan required", Claims{Version: int(version), Plan: "flex"}},
+		{"empty email ok but plan required", Claims{Version: int(version), Plan: "pro"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -199,15 +199,15 @@ func TestVerify_TruncatedKey(t *testing.T) {
 
 func TestNew_FromEnv(t *testing.T) {
 	// The positive path (valid key -> validated Key) can't be exercised here:
-	// NewLicense() verifies against the compiled-in vendor public key, whose private
+	// newLicense() verifies against the compiled-in vendor public key, whose private
 	// key we don't hold. Key validation itself is covered by TestVerify_*.
-	// These cases assert NewLicense()'s env wiring and nil-safety contract.
+	// These cases assert newLicense()'s env wiring and nil-safety contract.
 
 	// Garbage keys are ignored, not fatal.
 	t.Setenv("NOKKU_LICENSE_KEY", "NOKKU-BOGUS")
-	key, err := NewLicense()
+	key, err := newLicense()
 	if err != nil {
-		t.Fatalf("NewLicense() with garbage key: %v", err)
+		t.Fatalf("newLicense() with garbage key: %v", err)
 	}
 	if key == nil || key.Valid() {
 		t.Error("expected invalid, non-nil license for garbage key")
@@ -215,9 +215,9 @@ func TestNew_FromEnv(t *testing.T) {
 
 	// Empty env value behaves like absence.
 	t.Setenv("NOKKU_LICENSE_KEY", "")
-	key, err = NewLicense()
+	key, err = newLicense()
 	if err != nil {
-		t.Fatalf("NewLicense() without env: %v", err)
+		t.Fatalf("newLicense() without env: %v", err)
 	}
 	if key == nil || key.Valid() {
 		t.Error("expected invalid, non-nil license without env")

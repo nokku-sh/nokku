@@ -10,7 +10,6 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/iam"
 
-	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -31,14 +30,6 @@ func (s *CertificateService) CreateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.CreateCertificateAuthorityRequest,
 ) (*nokkuv1.CreateCertificateAuthorityResponse, error) {
-	if err := s.cfg.Billing.Check(
-		ctx,
-		req.GetWorkspaceId(),
-		billing.ResourceCas,
-	); err != nil {
-		return nil, err
-	}
-
 	authorityType := req.GetAuthorityType()
 	if authorityType == nokkuv1.AuthorityType_AUTHORITY_TYPE_UNSPECIFIED {
 		authorityType = nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH

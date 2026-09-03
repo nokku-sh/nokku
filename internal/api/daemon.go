@@ -17,7 +17,6 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/iam"
 
-	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -282,10 +281,6 @@ func (s *DaemonService) EnrollDaemon(
 	workspaceID := enrollToken.ID
 	ctx = iam.AnnotateTenant(ctx, workspaceID)
 
-	if err := s.cfg.Billing.Check(ctx, workspaceID, billing.ResourceTargets); err != nil {
-		return nil, err
-	}
-
 	// The enrollment token (verified below against its stored hash)
 	// authorizes this otherwise unauthenticated request, so the daemon
 	// provisioning runs as a system transaction without an actor.
@@ -512,15 +507,6 @@ func (s *DaemonService) SyncDaemon(
 		if err != nil {
 			return err
 		}
-		// Stop heartbeat if over quota and on free plan
-		if err := s.cfg.Billing.Check(
-			ctx,
-			daemon.WorkspaceID,
-			billing.ResourceTargets,
-		); err != nil {
-			return err
-		}
-
 		status = &daemon.Status
 		config = daemon.Config
 
