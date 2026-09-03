@@ -17,8 +17,8 @@ import (
 const scrubTestCast = `{"version":3,"term":{"cols":80,"rows":24,"type":"xterm-256color"},"timestamp":1700000000}
 [0.0, "o", "git push https://ci:AKIAABCDEFGHIJKLMNOP@github.com/x\r\n"]
 [0.1, "o", "-----BEGIN RSA PRIVATE KEY-----\r\n"]
-[0.2, "o", "MIIB\r\n-----END RSA PRIVATE KEY-----\r\n"]
-[0.3, "i", "export DB_PASSWORD=hunter2doomed\r\n"]
+[0.2, "o", "MIIB\r\nqwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890\r\n-----END RSA PRIVATE KEY-----\r\n"]
+[0.3, "i", "export DB_PASSWORD=VhT9xNq2mLb4Zw\r\n"]
 [0.4, "o", "ls -la < /tmp & > out\r\n"]
 `
 
@@ -131,7 +131,8 @@ func parseCastEvents(t *testing.T, cast []byte) []scrubTestEvent {
 // TestScrubRemovesSecrets runs the full scrub pipeline over a stored
 // recording: AWS keys, private key blocks spanning events, and assignment
 // values must be masked, benign content must survive byte for byte, and the
-// event structure must stay intact.
+// event structure must stay intact. The fake key body is 64+ chars because
+// gitleaks' private-key rule requires that much between the BEGIN/END markers.
 func TestScrubRemovesSecrets(t *testing.T) {
 	s := newScrubTestService(t)
 	const ws, id = "ws1", "rec1"
@@ -148,7 +149,7 @@ func TestScrubRemovesSecrets(t *testing.T) {
 
 	const secret = "<redacted>"
 	for _, ev := range events {
-		for _, leak := range []string{"AKIA", "MIIB", "hunter2doomed", "PRIVATE KEY"} {
+		for _, leak := range []string{"AKIA", "MIIB", "VhT9xNq2mLb4Zw", "PRIVATE KEY"} {
 			if strings.Contains(ev.data, leak) {
 				t.Fatalf("secret fragment %q survived in %q event: %q", leak, ev.code, ev.data)
 			}

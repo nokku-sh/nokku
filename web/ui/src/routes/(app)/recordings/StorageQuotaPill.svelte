@@ -12,8 +12,8 @@
 	const billingData = $derived(billing.get());
 	const capabilities = $derived(parseBillingCapabilities(billingData.data?.metadata));
 
-	// hard <= 0 means the plan carries no storage ceiling
-	const limitBytes = $derived(capabilities.limit('recordings_storage')?.hard ?? 0);
+	// Ops-level global cap (env-configured), not a plan feature. 0 = none.
+	let limitBytes = $derived(capabilities.values['recordings_storage_cap'] ?? 0);
 	const unlimited = $derived(limitBytes <= 0);
 	const usedBytes = $derived(Number(list.data?.totalBytes ?? 0));
 

@@ -59,6 +59,46 @@ func (q *Queries) DeleteRecording(ctx context.Context, id string) error {
 	return err
 }
 
+const deleteRecordingsBefore = `-- name: DeleteRecordingsBefore :many
+DELETE FROM recordings
+WHERE
+  workspace_id = $1
+  AND started_at < $2
+RETURNING
+  id,
+  size_bytes
+`
+
+type DeleteRecordingsBeforeParams struct {
+	WorkspaceID string    `json:"workspaceId"`
+	Cutoff      time.Time `json:"cutoff"`
+}
+
+type DeleteRecordingsBeforeRow struct {
+	ID        string `json:"id"`
+	SizeBytes int64  `json:"sizeBytes"`
+}
+
+func (q *Queries) DeleteRecordingsBefore(ctx context.Context, arg *DeleteRecordingsBeforeParams) ([]*DeleteRecordingsBeforeRow, error) {
+	rows, err := q.db.Query(ctx, deleteRecordingsBefore, arg.WorkspaceID, arg.Cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*DeleteRecordingsBeforeRow
+	for rows.Next() {
+		var i DeleteRecordingsBeforeRow
+		if err := rows.Scan(&i.ID, &i.SizeBytes); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getRecording = `-- name: GetRecording :one
 SELECT
   id, workspace_id, daemon_id, username, started_at, ended_at, size_bytes, complete, created_at
@@ -83,6 +123,33 @@ func (q *Queries) GetRecording(ctx context.Context, id string) (*Recording, erro
 		&i.CreatedAt,
 	)
 	return &i, err
+}
+
+const listRecordingWorkspaceIDs = `-- name: ListRecordingWorkspaceIDs :many
+SELECT DISTINCT
+  workspace_id
+FROM
+  recordings
+`
+
+func (q *Queries) ListRecordingWorkspaceIDs(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listRecordingWorkspaceIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var workspace_id string
+		if err := rows.Scan(&workspace_id); err != nil {
+			return nil, err
+		}
+		items = append(items, workspace_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listRecordings = `-- name: ListRecordings :many

@@ -72,3 +72,18 @@ ORDER BY
   started_at ASC
 LIMIT
   sqlc.narg('limit');
+
+-- name: ListRecordingWorkspaceIDs :many
+SELECT DISTINCT
+  workspace_id
+FROM
+  recordings;
+
+-- name: DeleteRecordingsBefore :many
+DELETE FROM recordings
+WHERE
+  workspace_id = @workspace_id
+  AND started_at < @cutoff
+RETURNING
+  id,
+  size_bytes;

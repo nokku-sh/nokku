@@ -47,6 +47,7 @@ type Querier interface {
 	DeleteExpiredTokens(ctx context.Context, now time.Time) (int64, error)
 	DeleteOrphanAuditLogs(ctx context.Context, cutoff time.Time) (int64, error)
 	DeleteRecording(ctx context.Context, id string) error
+	DeleteRecordingsBefore(ctx context.Context, arg *DeleteRecordingsBeforeParams) ([]*DeleteRecordingsBeforeRow, error)
 	DeleteSSOProvider(ctx context.Context, providerID string) error
 	DeleteServiceAccount(ctx context.Context, serviceAccountID string) error
 	DeleteSession(ctx context.Context, tokenHash crypto.HashedToken) error
@@ -131,6 +132,7 @@ type Querier interface {
 	ListPrincipals(ctx context.Context, arg *ListPrincipalsParams) ([]*ListPrincipalsRow, error)
 	ListPrincipalsForDaemon(ctx context.Context, daemonID *string) ([]*ListPrincipalsForDaemonRow, error)
 	ListProviderSubscriptions(ctx context.Context, sources []string) ([]*WorkspaceSubscription, error)
+	ListRecordingWorkspaceIDs(ctx context.Context) ([]string, error)
 	ListRecordings(ctx context.Context, arg *ListRecordingsParams) ([]*ListRecordingsRow, error)
 	ListServiceAccounts(ctx context.Context, arg *ListServiceAccountsParams) ([]*ListServiceAccountsRow, error)
 	ListSessionsBySubject(ctx context.Context, subjectID string) ([]*Session, error)
