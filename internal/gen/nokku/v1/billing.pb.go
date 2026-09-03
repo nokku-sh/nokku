@@ -69,19 +69,14 @@ func (x *GetBillingRequest) GetWorkspaceId() string {
 }
 
 type GetBillingResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Resolved plan name for the workspace (community, pro, enterprise).
-	Plan *string `protobuf:"bytes,1,opt,name=plan" json:"plan,omitempty"`
-	// Instance operating mode (saas, self_hosted): decides whether billing
-	// actions are available or the instance runs on a license.
-	Mode *string `protobuf:"bytes,2,opt,name=mode" json:"mode,omitempty"`
-	// Full feature catalog with per-plan enablement; true = enabled.
-	Features map[string]bool `protobuf:"bytes,3,rep,name=features" json:"features,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	// Plan quotas. A value of -1 means unlimited.
-	Quotas      *Quotas `protobuf:"bytes,4,opt,name=quotas" json:"quotas,omitempty"`
-	MemberCount *int64  `protobuf:"varint,5,opt,name=member_count,json=memberCount" json:"member_count,omitempty"`
-	// Set only when a subscription row exists (SaaS paid workspaces).
-	Subscription  *Subscription `protobuf:"bytes,6,opt,name=subscription" json:"subscription,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Plan          *string                `protobuf:"bytes,1,opt,name=plan" json:"plan,omitempty"`
+	Mode          *string                `protobuf:"bytes,2,opt,name=mode" json:"mode,omitempty"`
+	Features      map[string]bool        `protobuf:"bytes,3,rep,name=features" json:"features,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Quotas        *Quotas                `protobuf:"bytes,4,opt,name=quotas" json:"quotas,omitempty"`
+	MemberCount   *int64                 `protobuf:"varint,5,opt,name=member_count,json=memberCount" json:"member_count,omitempty"`
+	ResourceCount *int64                 `protobuf:"varint,6,opt,name=resource_count,json=resourceCount" json:"resource_count,omitempty"`
+	Subscription  *Subscription          `protobuf:"bytes,7,opt,name=subscription" json:"subscription,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -151,6 +146,13 @@ func (x *GetBillingResponse) GetMemberCount() int64 {
 	return 0
 }
 
+func (x *GetBillingResponse) GetResourceCount() int64 {
+	if x != nil && x.ResourceCount != nil {
+		return *x.ResourceCount
+	}
+	return 0
+}
+
 func (x *GetBillingResponse) GetSubscription() *Subscription {
 	if x != nil {
 		return x.Subscription
@@ -159,13 +161,11 @@ func (x *GetBillingResponse) GetSubscription() *Subscription {
 }
 
 type Quotas struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Maximum members; -1 = unlimited (per-seat billing).
-	Seats *int64 `protobuf:"varint,1,opt,name=seats" json:"seats,omitempty"`
-	// Audit log and session recording retention window in days.
-	RetentionDays *int64 `protobuf:"varint,2,opt,name=retention_days,json=retentionDays" json:"retention_days,omitempty"`
-	// Session recording storage cap in bytes; -1 = unlimited (self-hosted).
-	RecordingStorageBytes *int64 `protobuf:"varint,3,opt,name=recording_storage_bytes,json=recordingStorageBytes" json:"recording_storage_bytes,omitempty"`
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Seats                 *int64                 `protobuf:"varint,1,opt,name=seats" json:"seats,omitempty"`
+	RetentionDays         *int64                 `protobuf:"varint,2,opt,name=retention_days,json=retentionDays" json:"retention_days,omitempty"`
+	RecordingStorageBytes *int64                 `protobuf:"varint,3,opt,name=recording_storage_bytes,json=recordingStorageBytes" json:"recording_storage_bytes,omitempty"`
+	ResourceCap           *int64                 `protobuf:"varint,4,opt,name=resource_cap,json=resourceCap" json:"resource_cap,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -217,6 +217,13 @@ func (x *Quotas) GetRetentionDays() int64 {
 func (x *Quotas) GetRecordingStorageBytes() int64 {
 	if x != nil && x.RecordingStorageBytes != nil {
 		return *x.RecordingStorageBytes
+	}
+	return 0
+}
+
+func (x *Quotas) GetResourceCap() int64 {
+	if x != nil && x.ResourceCap != nil {
+		return *x.ResourceCap
 	}
 	return 0
 }
@@ -553,8 +560,6 @@ func (*CancelSubscriptionResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_billing_proto_rawDescGZIP(), []int{9}
 }
 
-// The instance license comes from the NOKKU_LICENSE_KEY env var and is
-// verified offline (air-gapped activation), independent of Stripe billing.
 type GetLicenseRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -657,21 +662,23 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\n" +
 	"\x16nokku/v1/billing.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"@\n" +
 	"\x11GetBillingRequest\x12+\n" +
-	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"\xca\x02\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"\xf1\x02\n" +
 	"\x12GetBillingResponse\x12\x12\n" +
 	"\x04plan\x18\x01 \x01(\tR\x04plan\x12\x12\n" +
 	"\x04mode\x18\x02 \x01(\tR\x04mode\x12F\n" +
 	"\bfeatures\x18\x03 \x03(\v2*.nokku.v1.GetBillingResponse.FeaturesEntryR\bfeatures\x12(\n" +
 	"\x06quotas\x18\x04 \x01(\v2\x10.nokku.v1.QuotasR\x06quotas\x12!\n" +
-	"\fmember_count\x18\x05 \x01(\x03R\vmemberCount\x12:\n" +
-	"\fsubscription\x18\x06 \x01(\v2\x16.nokku.v1.SubscriptionR\fsubscription\x1a;\n" +
+	"\fmember_count\x18\x05 \x01(\x03R\vmemberCount\x12%\n" +
+	"\x0eresource_count\x18\x06 \x01(\x03R\rresourceCount\x12:\n" +
+	"\fsubscription\x18\a \x01(\v2\x16.nokku.v1.SubscriptionR\fsubscription\x1a;\n" +
 	"\rFeaturesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\bR\x05value:\x028\x01\"}\n" +
+	"\x05value\x18\x02 \x01(\bR\x05value:\x028\x01\"\xa0\x01\n" +
 	"\x06Quotas\x12\x14\n" +
 	"\x05seats\x18\x01 \x01(\x03R\x05seats\x12%\n" +
 	"\x0eretention_days\x18\x02 \x01(\x03R\rretentionDays\x126\n" +
-	"\x17recording_storage_bytes\x18\x03 \x01(\x03R\x15recordingStorageBytes\"\xa1\x01\n" +
+	"\x17recording_storage_bytes\x18\x03 \x01(\x03R\x15recordingStorageBytes\x12!\n" +
+	"\fresource_cap\x18\x04 \x01(\x03R\vresourceCap\"\xa1\x01\n" +
 	"\fSubscription\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12/\n" +
 	"\x14cancel_at_period_end\x18\x02 \x01(\bR\x11cancelAtPeriodEnd\x12H\n" +

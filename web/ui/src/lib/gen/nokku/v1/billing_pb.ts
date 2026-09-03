@@ -14,7 +14,7 @@ import type { Message } from '@bufbuild/protobuf';
  * Describes the file nokku/v1/billing.proto.
  */
 export const file_nokku_v1_billing: GenFile /*@__PURE__*/ = fileDesc(
-	'ChZub2trdS92MS9iaWxsaW5nLnByb3RvEghub2trdS52MSIzChFHZXRCaWxsaW5nUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBIoUCChJHZXRCaWxsaW5nUmVzcG9uc2USDAoEcGxhbhgBIAEoCRIMCgRtb2RlGAIgASgJEjwKCGZlYXR1cmVzGAMgAygLMioubm9ra3UudjEuR2V0QmlsbGluZ1Jlc3BvbnNlLkZlYXR1cmVzRW50cnkSIAoGcXVvdGFzGAQgASgLMhAubm9ra3UudjEuUXVvdGFzEhQKDG1lbWJlcl9jb3VudBgFIAEoAxIsCgxzdWJzY3JpcHRpb24YBiABKAsyFi5ub2trdS52MS5TdWJzY3JpcHRpb24aLwoNRmVhdHVyZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAg6AjgBIlAKBlF1b3RhcxINCgVzZWF0cxgBIAEoAxIWCg5yZXRlbnRpb25fZGF5cxgCIAEoAxIfChdyZWNvcmRpbmdfc3RvcmFnZV9ieXRlcxgDIAEoAyJ0CgxTdWJzY3JpcHRpb24SDgoGc3RhdHVzGAEgASgJEhwKFGNhbmNlbF9hdF9wZXJpb2RfZW5kGAIgASgIEjYKEmN1cnJlbnRfcGVyaW9kX2VuZBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiNQoTQ3JlYXRlUG9ydGFsUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBIiMKFENyZWF0ZVBvcnRhbFJlc3BvbnNlEgsKA3VybBgBIAEoCSI3ChVDcmVhdGVDaGVja291dFJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABASIlChZDcmVhdGVDaGVja291dFJlc3BvbnNlEgsKA3VybBgBIAEoCSJoChlDYW5jZWxTdWJzY3JpcHRpb25SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESEQoJaW1tZWRpYXRlGAIgASgIEhgKBnJlYXNvbhgDIAEoCUIIukgFcgMY6AciHAoaQ2FuY2VsU3Vic2NyaXB0aW9uUmVzcG9uc2UiEwoRR2V0TGljZW5zZVJlcXVlc3QiYgoSR2V0TGljZW5zZVJlc3BvbnNlEgwKBHBsYW4YASABKAkSDgoGYWN0aXZlGAIgASgIEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wMssECg5CaWxsaW5nU2VydmljZRJsCgpHZXRCaWxsaW5nEhsubm9ra3UudjEuR2V0QmlsbGluZ1JlcXVlc3QaHC5ub2trdS52MS5HZXRCaWxsaW5nUmVzcG9uc2UiI5ACAYLT5JMCGhIYL3YxL2JpbGxpbmcvc3Vic2NyaXB0aW9uEmkKDENyZWF0ZVBvcnRhbBIdLm5va2t1LnYxLkNyZWF0ZVBvcnRhbFJlcXVlc3QaHi5ub2trdS52MS5DcmVhdGVQb3J0YWxSZXNwb25zZSIagtPkkwIUIhIvdjEvYmlsbGluZy9wb3J0YWwScQoOQ3JlYXRlQ2hlY2tvdXQSHy5ub2trdS52MS5DcmVhdGVDaGVja291dFJlcXVlc3QaIC5ub2trdS52MS5DcmVhdGVDaGVja291dFJlc3BvbnNlIhyC0+STAhYiFC92MS9iaWxsaW5nL2NoZWNrb3V0EosBChJDYW5jZWxTdWJzY3JpcHRpb24SIy5ub2trdS52MS5DYW5jZWxTdWJzY3JpcHRpb25SZXF1ZXN0GiQubm9ra3UudjEuQ2FuY2VsU3Vic2NyaXB0aW9uUmVzcG9uc2UiKoLT5JMCJDoBKiIfL3YxL2JpbGxpbmcvc3Vic2NyaXB0aW9uL2NhbmNlbBJfCgpHZXRMaWNlbnNlEhsubm9ra3UudjEuR2V0TGljZW5zZVJlcXVlc3QaHC5ub2trdS52MS5HZXRMaWNlbnNlUmVzcG9uc2UiFpACAYLT5JMCDRILL3YxL2xpY2Vuc2VClgEKDGNvbS5ub2trdS52MUIMQmlsbGluZ1Byb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
+	'ChZub2trdS92MS9iaWxsaW5nLnByb3RvEghub2trdS52MSIzChFHZXRCaWxsaW5nUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBIp0CChJHZXRCaWxsaW5nUmVzcG9uc2USDAoEcGxhbhgBIAEoCRIMCgRtb2RlGAIgASgJEjwKCGZlYXR1cmVzGAMgAygLMioubm9ra3UudjEuR2V0QmlsbGluZ1Jlc3BvbnNlLkZlYXR1cmVzRW50cnkSIAoGcXVvdGFzGAQgASgLMhAubm9ra3UudjEuUXVvdGFzEhQKDG1lbWJlcl9jb3VudBgFIAEoAxIWCg5yZXNvdXJjZV9jb3VudBgGIAEoAxIsCgxzdWJzY3JpcHRpb24YByABKAsyFi5ub2trdS52MS5TdWJzY3JpcHRpb24aLwoNRmVhdHVyZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAg6AjgBImYKBlF1b3RhcxINCgVzZWF0cxgBIAEoAxIWCg5yZXRlbnRpb25fZGF5cxgCIAEoAxIfChdyZWNvcmRpbmdfc3RvcmFnZV9ieXRlcxgDIAEoAxIUCgxyZXNvdXJjZV9jYXAYBCABKAMidAoMU3Vic2NyaXB0aW9uEg4KBnN0YXR1cxgBIAEoCRIcChRjYW5jZWxfYXRfcGVyaW9kX2VuZBgCIAEoCBI2ChJjdXJyZW50X3BlcmlvZF9lbmQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjUKE0NyZWF0ZVBvcnRhbFJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABASIjChRDcmVhdGVQb3J0YWxSZXNwb25zZRILCgN1cmwYASABKAkiNwoVQ3JlYXRlQ2hlY2tvdXRSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQEiJQoWQ3JlYXRlQ2hlY2tvdXRSZXNwb25zZRILCgN1cmwYASABKAkiaAoZQ2FuY2VsU3Vic2NyaXB0aW9uUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhEKCWltbWVkaWF0ZRgCIAEoCBIYCgZyZWFzb24YAyABKAlCCLpIBXIDGOgHIhwKGkNhbmNlbFN1YnNjcmlwdGlvblJlc3BvbnNlIhMKEUdldExpY2Vuc2VSZXF1ZXN0ImIKEkdldExpY2Vuc2VSZXNwb25zZRIMCgRwbGFuGAEgASgJEg4KBmFjdGl2ZRgCIAEoCBIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcDLLBAoOQmlsbGluZ1NlcnZpY2USbAoKR2V0QmlsbGluZxIbLm5va2t1LnYxLkdldEJpbGxpbmdSZXF1ZXN0Ghwubm9ra3UudjEuR2V0QmlsbGluZ1Jlc3BvbnNlIiOQAgGC0+STAhoSGC92MS9iaWxsaW5nL3N1YnNjcmlwdGlvbhJpCgxDcmVhdGVQb3J0YWwSHS5ub2trdS52MS5DcmVhdGVQb3J0YWxSZXF1ZXN0Gh4ubm9ra3UudjEuQ3JlYXRlUG9ydGFsUmVzcG9uc2UiGoLT5JMCFCISL3YxL2JpbGxpbmcvcG9ydGFsEnEKDkNyZWF0ZUNoZWNrb3V0Eh8ubm9ra3UudjEuQ3JlYXRlQ2hlY2tvdXRSZXF1ZXN0GiAubm9ra3UudjEuQ3JlYXRlQ2hlY2tvdXRSZXNwb25zZSIcgtPkkwIWIhQvdjEvYmlsbGluZy9jaGVja291dBKLAQoSQ2FuY2VsU3Vic2NyaXB0aW9uEiMubm9ra3UudjEuQ2FuY2VsU3Vic2NyaXB0aW9uUmVxdWVzdBokLm5va2t1LnYxLkNhbmNlbFN1YnNjcmlwdGlvblJlc3BvbnNlIiqC0+STAiQ6ASoiHy92MS9iaWxsaW5nL3N1YnNjcmlwdGlvbi9jYW5jZWwSXwoKR2V0TGljZW5zZRIbLm5va2t1LnYxLkdldExpY2Vuc2VSZXF1ZXN0Ghwubm9ra3UudjEuR2V0TGljZW5zZVJlc3BvbnNlIhaQAgGC0+STAg0SCy92MS9saWNlbnNlQpYBCgxjb20ubm9ra3UudjFCDEJpbGxpbmdQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
 	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
 );
 
@@ -42,30 +42,21 @@ export const GetBillingRequestSchema: GenMessage<GetBillingRequest> /*@__PURE__*
  */
 export type GetBillingResponse = Message<'nokku.v1.GetBillingResponse'> & {
 	/**
-	 * Resolved plan name for the workspace (community, pro, enterprise).
-	 *
 	 * @generated from field: string plan = 1;
 	 */
 	plan: string;
 
 	/**
-	 * Instance operating mode (saas, self_hosted): decides whether billing
-	 * actions are available or the instance runs on a license.
-	 *
 	 * @generated from field: string mode = 2;
 	 */
 	mode: string;
 
 	/**
-	 * Full feature catalog with per-plan enablement; true = enabled.
-	 *
 	 * @generated from field: map<string, bool> features = 3;
 	 */
 	features: { [key: string]: boolean };
 
 	/**
-	 * Plan quotas. A value of -1 means unlimited.
-	 *
 	 * @generated from field: nokku.v1.Quotas quotas = 4;
 	 */
 	quotas?: Quotas | undefined;
@@ -76,9 +67,12 @@ export type GetBillingResponse = Message<'nokku.v1.GetBillingResponse'> & {
 	memberCount: bigint;
 
 	/**
-	 * Set only when a subscription row exists (SaaS paid workspaces).
-	 *
-	 * @generated from field: nokku.v1.Subscription subscription = 6;
+	 * @generated from field: int64 resource_count = 6;
+	 */
+	resourceCount: bigint;
+
+	/**
+	 * @generated from field: nokku.v1.Subscription subscription = 7;
 	 */
 	subscription?: Subscription | undefined;
 };
@@ -97,25 +91,24 @@ export const GetBillingResponseSchema: GenMessage<GetBillingResponse> /*@__PURE_
  */
 export type Quotas = Message<'nokku.v1.Quotas'> & {
 	/**
-	 * Maximum members; -1 = unlimited (per-seat billing).
-	 *
 	 * @generated from field: int64 seats = 1;
 	 */
 	seats: bigint;
 
 	/**
-	 * Audit log and session recording retention window in days.
-	 *
 	 * @generated from field: int64 retention_days = 2;
 	 */
 	retentionDays: bigint;
 
 	/**
-	 * Session recording storage cap in bytes; -1 = unlimited (self-hosted).
-	 *
 	 * @generated from field: int64 recording_storage_bytes = 3;
 	 */
 	recordingStorageBytes: bigint;
+
+	/**
+	 * @generated from field: int64 resource_cap = 4;
+	 */
+	resourceCap: bigint;
 };
 
 /**
@@ -263,9 +256,6 @@ export const CancelSubscriptionResponseSchema: GenMessage<CancelSubscriptionResp
 	messageDesc(file_nokku_v1_billing, 9);
 
 /**
- * The instance license comes from the NOKKU_LICENSE_KEY env var and is
- * verified offline (air-gapped activation), independent of Stripe billing.
- *
  * @generated from message nokku.v1.GetLicenseRequest
  */
 export type GetLicenseRequest = Message<'nokku.v1.GetLicenseRequest'> & {};
