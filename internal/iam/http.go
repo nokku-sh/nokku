@@ -54,12 +54,36 @@ func (s *Service) Secure() bool {
 // SessionTokenFromRequest extracts the session token from the request: the
 // cookie first, then an "Authorization: Bearer" header.
 func SessionTokenFromRequest(r *http.Request) string {
-	if c, err := r.Cookie(SessionCookieName); err == nil && c.Value != "" {
-		return c.Value
+	return SessionTokenFromHeader(r.Header)
+}
+
+// SessionTokenFromHeader extracts the session token from request headers:
+// the cookie first, then an "Authorization: Bearer" header. It is the
+// transport-neutral counterpart of SessionTokenFromRequest: the connect
+// handlers only see the raw header map.
+func SessionTokenFromHeader(h http.Header) string {
+	if v := CookieFromHeader(h, SessionCookieName); v != "" {
+		return v
 	}
 	const prefix = "Bearer "
-	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, prefix) {
-		return strings.TrimPrefix(h, prefix)
+	if v := h.Get("Authorization"); strings.HasPrefix(v, prefix) {
+		return strings.TrimPrefix(v, prefix)
+	}
+	return ""
+}
+
+// CookieFromHeader returns the value of the named cookie in the request
+// header map, or "". The net/http cookie parser only speaks [http.Request],
+// so the connect surface (request headers only) shares this.
+func CookieFromHeader(h http.Header, name string) string {
+	for _, line := range h.Values("Cookie") {
+		for pair := range strings.SplitSeq(line, ";") {
+			n, v, _ := strings.Cut(pair, "=")
+			if strings.TrimSpace(n) != name {
+				continue
+			}
+			return strings.Trim(strings.TrimSpace(v), `"`)
+		}
 	}
 	return ""
 }
@@ -276,4 +300,42 @@ func derefTime(t *time.Time) time.Time {
 		return time.Time{}
 	}
 	return *t
+}
+
+func DeviceNameFromUA(ua string) string {
+	if ua == "" {
+		return "Unknown device"
+	}
+
+	browser := "Unknown browser"
+	switch {
+	case strings.Contains(ua, "Edg/"):
+		browser = "Edge"
+	case strings.Contains(ua, "OPR/") || strings.Contains(ua, "Opera"):
+		browser = "Opera"
+	case strings.Contains(ua, "Firefox/"):
+		browser = "Firefox"
+	case strings.Contains(ua, "Chrome/"):
+		browser = "Chrome"
+	case strings.Contains(ua, "Safari/"):
+		browser = "Safari"
+	}
+
+	os := "unknown OS"
+	switch {
+	case strings.Contains(ua, "Windows"):
+		os = "Windows"
+	case strings.Contains(ua, "Android"):
+		os = "Android"
+	case strings.Contains(ua, "iPhone") || strings.Contains(ua, "iPad"):
+		os = "iOS"
+	case strings.Contains(ua, "Mac OS X"):
+		os = "macOS"
+	case strings.Contains(ua, "CrOS"):
+		os = "ChromeOS"
+	case strings.Contains(ua, "Linux"):
+		os = "Linux"
+	}
+
+	return browser + " on " + os
 }

@@ -89,3 +89,31 @@ func TestRateLimiterStore_Refills(t *testing.T) {
 		t.Fatal("second request: want denied (burst 1)")
 	}
 }
+
+func TestIsAuthRoute(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		// The pre-session AuthService gets the strict brute-force limit.
+		{"/nokku.v1.AuthService/Login", true},
+		{"/nokku.v1.AuthService/Register", true},
+		{"/nokku.v1.AuthService/DiscoverSSO", true},
+
+		// Other RPCs stay on the general limit.
+		{"/nokku.v1.AccountService/GetAccount", false},
+
+		// The legacy HTTP auth mounts keep the strict limit.
+		{"/auth/device", true},
+		{"/passkey/login/begin", true},
+		{"/oidc/login", true},
+		{"/saml/acs", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			if got := isAuthRoute(tt.path); got != tt.want {
+				t.Errorf("isAuthRoute(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}

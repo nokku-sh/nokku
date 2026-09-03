@@ -100,10 +100,12 @@ func (s *Server) WithRateLimit(next http.Handler) http.Handler {
 }
 
 // isAuthRoute returns true for the browser-facing auth surface, which gets
-// the stricter per-IP limit: the JSON API under /auth plus the SSO flow
-// redirects at the root.
+// the stricter per-IP limit: the pre-session AuthService RPCs (login,
+// register, the mail round trips), the leftover /auth mounts, and the SSO
+// flow redirects at the root.
 func isAuthRoute(path string) bool {
-	return strings.HasPrefix(path, "/auth/") ||
+	return strings.HasPrefix(path, "/nokku.v1.AuthService/") ||
+		strings.HasPrefix(path, "/auth/") ||
 		strings.HasPrefix(path, "/oidc/") ||
 		strings.HasPrefix(path, "/oauth/") ||
 		strings.HasPrefix(path, "/saml/") ||

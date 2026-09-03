@@ -69,6 +69,20 @@ var (
 	)
 )
 
+// Login flow errors. Bad credentials answers Unauthenticated: the client
+// suppresses the generic toast for that code (the login page shows its own
+// inline affordances), matching the previous 401 JSON surface.
+var (
+	ErrLoginFailed = connect.NewError(
+		connect.CodeUnauthenticated,
+		errors.New("invalid email or password"),
+	)
+	ErrAccountInactive = connect.NewError(
+		connect.CodeFailedPrecondition,
+		errors.New("this account has been deactivated"),
+	)
+)
+
 // Account errors
 
 var (
