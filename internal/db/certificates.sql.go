@@ -58,7 +58,7 @@ VALUES
     COALESCE($15, '8760 hours'::interval),
     COALESCE($16, '120 hours'::interval),
     COALESCE($17, '168 hours'::interval),
-    COALESCE($18, '{"permit-pty": "", "permit-user-rc": ""}'::jsonb),
+    COALESCE($18, '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}'::jsonb),
     COALESCE($19, '{}'::jsonb),
     COALESCE($20, '2160 hours'::interval),
     COALESCE($21, '4320 hours'::interval),

@@ -192,7 +192,7 @@ CREATE TABLE IF NOT EXISTS certificate_authorities (
   -- User certificate config 
   user_default_ttl INTERVAL NOT NULL DEFAULT '120 hours', -- 5 days
   user_max_ttl INTERVAL NOT NULL DEFAULT '168 hours', -- 7 days
-  user_extensions JSONB DEFAULT '{"permit-pty": "", "permit-user-rc": ""}',
+  user_extensions JSONB DEFAULT '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}',
   user_critical_options JSONB DEFAULT '{}',
   -- Host certificate config
   host_default_ttl INTERVAL NOT NULL DEFAULT '168 hours', -- 7 days

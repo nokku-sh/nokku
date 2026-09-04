@@ -43,7 +43,7 @@ VALUES
     COALESCE(sqlc.narg('lifetime'), '8760 hours'::interval),
     COALESCE(sqlc.narg('user_default_ttl'), '120 hours'::interval),
     COALESCE(sqlc.narg('user_max_ttl'), '168 hours'::interval),
-    COALESCE(sqlc.narg('user_extensions'), '{"permit-pty": "", "permit-user-rc": ""}'::jsonb),
+    COALESCE(sqlc.narg('user_extensions'), '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}'::jsonb),
     COALESCE(sqlc.narg('user_critical_options'), '{}'::jsonb),
     COALESCE(sqlc.narg('host_default_ttl'), '2160 hours'::interval),
     COALESCE(sqlc.narg('host_max_ttl'), '4320 hours'::interval),
