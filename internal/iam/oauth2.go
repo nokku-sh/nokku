@@ -144,6 +144,7 @@ func (h *oauth2Flow) Callback(w http.ResponseWriter, r *http.Request) {
 		Subject:         subject,
 		Email:           email,
 		EmailVerified:   verified,
+		Public:          cfg.WorkspaceID == "",
 		Name:            claimString(profile, "name", "login"),
 		Picture:         claimString(profile, "avatar_url"),
 		JITProvisioning: cfg.OAuth2.JITProvisioning,

@@ -319,6 +319,7 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		Subject:         idToken.Subject,
 		Email:           claimString(claims, "email"),
 		EmailVerified:   claimBool(claims, "email_verified"),
+		Public:          cfg.WorkspaceID == "",
 		Name:            claimString(claims, "name"),
 		Picture:         claimString(claims, "picture"),
 		JITProvisioning: cfg.OIDC.JITProvisioning,

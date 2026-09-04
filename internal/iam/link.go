@@ -37,6 +37,10 @@ type flowLinkOptions struct {
 	// EmailVerified marks the email as verified by the provider; a fresh
 	// JIT account inherits it.
 	EmailVerified bool
+	// Public marks a global social provider (Google, GitHub). Such a
+	// provider vouches for nobody, so its identities are only accepted
+	// when it asserted the email as verified.
+	Public bool
 	// JITProvisioning lets a first-time identity become a user by email;
 	// without it only linked identities and explicit account links resolve.
 	JITProvisioning bool
@@ -128,10 +132,11 @@ func (l *linker) resolve(
 	// The email of an unmatched identity may auto-match a local account
 	// only when the provider has verified it, or when the identity comes
 	// through a provider the workspace has already vetted via a verified
-	// domain binding. Otherwise an attacker controlling their profile at a
-	// loosely-asserting provider could claim someone else's email and be
-	// signed in as that account.
-	if !opts.EmailVerified && len(bindings) == 0 {
+	// domain binding. Public providers never get the benefit of the
+	// doubt: an attacker controlling their profile at a loosely-asserting
+	// provider could otherwise claim someone else's email and be signed
+	// in as that account.
+	if !opts.EmailVerified && (opts.Public || len(bindings) == 0) {
 		return nil, ErrIdentityRejected
 	}
 
@@ -285,9 +290,13 @@ func (s *Service) completeSSO(
 	if s.OnUserLogin != nil {
 		s.OnUserLogin(w, r, u, l.credType)
 	}
-	returnTo := st.ReturnTo
+	// Re-sanitize at the sink: the state round-tripped through the cache,
+	// and the redirect target must be same-origin regardless of what wrote
+	// the state.
+	returnTo := SafeReturnTo(st.ReturnTo)
 	if returnTo == "" {
 		returnTo = "/"
 	}
+	// #nosec G710 -- returnTo passes SafeReturnTo at flow start and again here, so only same-origin absolute paths reach the redirect.
 	http.Redirect(w, r, returnTo, http.StatusTemporaryRedirect)
 }
