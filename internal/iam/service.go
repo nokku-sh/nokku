@@ -84,7 +84,7 @@ type Deps struct {
 	Secret []byte
 	// Conn runs workspace-scoped queries under RLS (domains, SSO
 	// providers). Required for the managers that touch tenant tables.
-	Conn *db.Connection
+	Conn txRunner
 	// Cache backs SSO flow state and the device flow. Required for both.
 	Cache Cache
 	// Device flow settings; the flow builds only when Cache is set.
@@ -105,12 +105,21 @@ type Deps struct {
 	PasskeyRPOrigins []string
 }
 
+// txRunner runs store reads and writes in the role the table needs: the
+// system role for global tables, the RLS-pinned role for tenant tables.
+// Narrow on purpose: *db.Connection satisfies it, tests provide in-memory
+// implementations.
+type txRunner interface {
+	WithTx(ctx context.Context, fn func(*db.Queries) error) error
+	WithWorkspace(ctx context.Context, fn func(*db.Queries) error) error
+}
+
 // Service is the iam engine. Managers hang off it and share its querier and
 // event sink.
 type Service struct {
 	q               db.Querier
 	baseURL         string
-	conn            *db.Connection
+	conn            txRunner
 	cache           Cache
 	events          Sink
 	OnSSOLogin      func(ctx context.Context, userID, workspaceID string) error
