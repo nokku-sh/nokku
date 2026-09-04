@@ -81,6 +81,10 @@ var (
 		connect.CodeFailedPrecondition,
 		errors.New("this account has been deactivated"),
 	)
+	ErrEmailUnverified = connect.NewError(
+		connect.CodeFailedPrecondition,
+		errors.New("verify your email address before signing in"),
+	)
 )
 
 // Account errors

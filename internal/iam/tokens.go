@@ -15,6 +15,7 @@ import (
 const (
 	TokenVerifyEmail   = "verify"
 	TokenPasswordReset = "reset"
+	resendCooldown     = time.Minute
 )
 
 // IssueToken creates a one-time token for the user and returns the raw
@@ -73,4 +74,17 @@ func (s *Service) ConsumeToken(
 // went. It backs a hygiene job.
 func (s *Service) DeleteExpiredTokens(ctx context.Context) (int64, error) {
 	return s.q.DeleteExpiredTokens(ctx, s.now())
+}
+
+// HasRecentToken reports whether a token for the user and purpose was
+// issued within the window, so hosts can rate-limit resend emails.
+func (s *Service) HasRecentToken(
+	ctx context.Context,
+	userID, purpose string,
+) (bool, error) {
+	return s.q.HasRecentToken(ctx, &db.HasRecentTokenParams{
+		UserID:  userID,
+		Purpose: purpose,
+		Since:   s.now().Add(-resendCooldown),
+	})
 }
