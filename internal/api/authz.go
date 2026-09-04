@@ -6,6 +6,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nokku-sh/nokku/internal/iam"
 
@@ -83,8 +84,7 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.TeamServiceRemoveTeamMemberProcedure: db.PermTeamsEdit,
 	nokkuv1connect.TeamServiceListTeamMembersProcedure:  db.PermTeamsView,
 
-	// Teams of one user are member-directory reads, not team-structure
-	// edits: the user-profile modal shows them to any member viewer.
+	// Teams of one user are member-directory reads, not team-structure edits
 	nokkuv1connect.TeamServiceListTeamsForUserProcedure: db.PermMembersView,
 
 	// Workspaces
@@ -93,9 +93,6 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.WorkspaceServiceGetWorkspaceMemberProcedure:    db.PermMembersView,
 	nokkuv1connect.WorkspaceServiceListWorkspaceMembersProcedure:  db.PermMembersView,
 	nokkuv1connect.WorkspaceServiceUpdateWorkspaceMemberProcedure: db.PermMembersEdit,
-	// Member removal is a directory edit, not something every member may
-	// do: RLS only proves membership, so without this entry a viewer could
-	// remove editors and admins (the SQL only spares the workspace owner).
 	nokkuv1connect.WorkspaceServiceRemoveWorkspaceMemberProcedure: db.PermMembersEdit,
 
 	// Workspace domains
@@ -111,14 +108,9 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.RecordingServiceGetRecordingProcedure:    db.PermDaemonsView,
 	nokkuv1connect.RecordingServiceDeleteRecordingProcedure: db.PermDaemonsEdit,
 
-	// Workspace audit trail. Actors, IPs, and the full activity history are
-	// sensitive: viewers hold no audit.view, only owner and editor do.
 	nokkuv1connect.UtilServiceListAuditLogsProcedure:   db.PermAuditView,
 	nokkuv1connect.UtilServiceExportAuditLogsProcedure: db.PermAuditView,
 
-	// Daemon session control. The handler works against the in-memory pool
-	// only, so without an interceptor rule any authenticated principal
-	// could kill any live session id.
 	nokkuv1connect.DaemonServiceCloseSessionProcedure: db.PermDaemonsEdit,
 }
 
@@ -166,6 +158,16 @@ func (a *AuthorizationInterceptor) authorize(
 	ctx context.Context,
 	perm db.Permission,
 ) error {
+	return actorHasPermission(ctx, a.cfg.Conn, perm)
+}
+
+// actorHasPermission resolves the request actor's role and checks it against
+// the permission.
+func actorHasPermission(
+	ctx context.Context,
+	conn *db.Connection,
+	perm db.Permission,
+) error {
 	actor, _ := iam.PrincipalFromContext(ctx)
 	if actor.ID == "" {
 		return db.ErrNoActor
@@ -179,7 +181,7 @@ func (a *AuthorizationInterceptor) authorize(
 		}
 
 		var err error
-		role, err = a.actorRole(ctx, workspaceID, actor.ID)
+		role, err = actorRole(ctx, conn.AdminPool, workspaceID, actor.ID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return db.ErrWorkspaceNotAccessible
 		}
@@ -197,12 +199,13 @@ func (a *AuthorizationInterceptor) authorize(
 // actorRole returns the workspace role of a user or service account. It must
 // run against a connection that bypasses RLS (the admin pool), because it
 // resolves membership for a workspace that is not yet pinned for data access.
-func (a *AuthorizationInterceptor) actorRole(
+func actorRole(
 	ctx context.Context,
+	pool *pgxpool.Pool,
 	workspaceID, actorID string,
 ) (string, error) {
 	var role string
-	err := a.cfg.Conn.AdminPool.QueryRow(
+	err := pool.QueryRow(
 		ctx,
 		`SELECT role_name FROM workspace_members
 		 WHERE workspace_id = $1 AND user_id = $2::uuid

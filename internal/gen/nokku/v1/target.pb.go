@@ -25,19 +25,22 @@ const (
 )
 
 type Target struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	WorkspaceId   *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	CaId          *string                `protobuf:"bytes,3,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
-	DaemonId      *string                `protobuf:"bytes,4,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
-	Name          *string                `protobuf:"bytes,5,opt,name=name" json:"name,omitempty"`
-	Description   *string                `protobuf:"bytes,6,opt,name=description" json:"description,omitempty"`
-	Tags          []string               `protobuf:"bytes,7,rep,name=tags" json:"tags,omitempty"`
-	Endpoints     []string               `protobuf:"bytes,8,rep,name=endpoints" json:"endpoints,omitempty"`
-	Principals    []*Principal           `protobuf:"bytes,9,rep,name=principals" json:"principals,omitempty"`
-	Metadata      map[string]string      `protobuf:"bytes,10,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	WorkspaceId *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	CaId        *string                `protobuf:"bytes,3,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
+	DaemonId    *string                `protobuf:"bytes,4,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
+	Name        *string                `protobuf:"bytes,5,opt,name=name" json:"name,omitempty"`
+	Description *string                `protobuf:"bytes,6,opt,name=description" json:"description,omitempty"`
+	Tags        []string               `protobuf:"bytes,7,rep,name=tags" json:"tags,omitempty"`
+	Endpoints   []string               `protobuf:"bytes,8,rep,name=endpoints" json:"endpoints,omitempty"`
+	Principals  []*Principal           `protobuf:"bytes,9,rep,name=principals" json:"principals,omitempty"`
+	Metadata    map[string]string      `protobuf:"bytes,10,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	CreatedAt   *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt   *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	// Pinned SSH host public key. Manual (daemon-less) targets set it at
+	// creation; host certificate signing only succeeds for this key.
+	HostPublicKey *string `protobuf:"bytes,13,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -156,6 +159,13 @@ func (x *Target) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Target) GetHostPublicKey() string {
+	if x != nil && x.HostPublicKey != nil {
+		return *x.HostPublicKey
+	}
+	return ""
+}
+
 type GetTargetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
@@ -253,13 +263,16 @@ func (x *GetTargetResponse) GetTarget() *Target {
 }
 
 type CreateTargetRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	CaId          *string                `protobuf:"bytes,2,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
-	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
-	Description   *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
-	Endpoints     []string               `protobuf:"bytes,5,rep,name=endpoints" json:"endpoints,omitempty"`
-	Tags          []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	CaId        *string                `protobuf:"bytes,2,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
+	Name        *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
+	Description *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
+	Endpoints   []string               `protobuf:"bytes,5,rep,name=endpoints" json:"endpoints,omitempty"`
+	Tags        []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
+	// SSH host public key pinned at creation. Required for targets without a
+	// daemon; host certificates are only signed for this key.
+	HostPublicKey *string `protobuf:"bytes,7,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -336,6 +349,13 @@ func (x *CreateTargetRequest) GetTags() []string {
 	return nil
 }
 
+func (x *CreateTargetRequest) GetHostPublicKey() string {
+	if x != nil && x.HostPublicKey != nil {
+		return *x.HostPublicKey
+	}
+	return ""
+}
+
 type CreateTargetResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Target        *Target                `protobuf:"bytes,1,opt,name=target" json:"target,omitempty"`
@@ -381,14 +401,16 @@ func (x *CreateTargetResponse) GetTarget() *Target {
 }
 
 type UpdateTargetRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
-	CaId          *string                `protobuf:"bytes,3,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
-	Name          *string                `protobuf:"bytes,4,opt,name=name" json:"name,omitempty"`
-	Description   *string                `protobuf:"bytes,5,opt,name=description" json:"description,omitempty"`
-	Endpoints     []string               `protobuf:"bytes,6,rep,name=endpoints" json:"endpoints,omitempty"`
-	Tags          []string               `protobuf:"bytes,7,rep,name=tags" json:"tags,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id          *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
+	CaId        *string                `protobuf:"bytes,3,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
+	Name        *string                `protobuf:"bytes,4,opt,name=name" json:"name,omitempty"`
+	Description *string                `protobuf:"bytes,5,opt,name=description" json:"description,omitempty"`
+	Endpoints   []string               `protobuf:"bytes,6,rep,name=endpoints" json:"endpoints,omitempty"`
+	Tags        []string               `protobuf:"bytes,7,rep,name=tags" json:"tags,omitempty"`
+	// Replaces the pinned SSH host public key (key rotation).
+	HostPublicKey *string `protobuf:"bytes,8,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -470,6 +492,13 @@ func (x *UpdateTargetRequest) GetTags() []string {
 		return x.Tags
 	}
 	return nil
+}
+
+func (x *UpdateTargetRequest) GetHostPublicKey() string {
+	if x != nil && x.HostPublicKey != nil {
+		return *x.HostPublicKey
+	}
+	return ""
 }
 
 type UpdateTargetResponse struct {
@@ -1162,7 +1191,7 @@ var File_nokku_v1_target_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_target_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/target.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16nokku/v1/account.proto\x1a\x1bnokku/v1/certificates.proto\x1a\x15nokku/v1/daemon.proto\x1a\x18nokku/v1/principal.proto\x1a\x1enokku/v1/service_account.proto\"\xf9\x03\n" +
+	"\x15nokku/v1/target.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16nokku/v1/account.proto\x1a\x1bnokku/v1/certificates.proto\x1a\x15nokku/v1/daemon.proto\x1a\x18nokku/v1/principal.proto\x1a\x1enokku/v1/service_account.proto\"\xa1\x04\n" +
 	"\x06Target\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x13\n" +
@@ -1180,7 +1209,8 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a;\n" +
+	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12&\n" +
+	"\x0fhost_public_key\x18\r \x01(\tR\rhostPublicKey\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"Y\n" +
@@ -1188,16 +1218,17 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
 	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"=\n" +
 	"\x11GetTargetResponse\x12(\n" +
-	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xfc\x01\n" +
+	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xa4\x02\n" +
 	"\x13CreateTargetRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x1d\n" +
 	"\x05ca_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x04caId\x12;\n" +
 	"\x04name\x18\x03 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
 	"\vdescription\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x1c\n" +
 	"\tendpoints\x18\x05 \x03(\tR\tendpoints\x12\x12\n" +
-	"\x04tags\x18\x06 \x03(\tR\x04tags\"@\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\x12&\n" +
+	"\x0fhost_public_key\x18\a \x01(\tR\rhostPublicKey\"@\n" +
 	"\x14CreateTargetResponse\x12(\n" +
-	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\x96\x02\n" +
+	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xbe\x02\n" +
 	"\x13UpdateTargetRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
 	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12\x1d\n" +
@@ -1205,7 +1236,8 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\x04name\x18\x04 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
 	"\vdescription\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x1c\n" +
 	"\tendpoints\x18\x06 \x03(\tR\tendpoints\x12\x12\n" +
-	"\x04tags\x18\a \x03(\tR\x04tags\"@\n" +
+	"\x04tags\x18\a \x03(\tR\x04tags\x12&\n" +
+	"\x0fhost_public_key\x18\b \x01(\tR\rhostPublicKey\"@\n" +
 	"\x14UpdateTargetResponse\x12(\n" +
 	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\\\n" +
 	"\x13DeleteTargetRequest\x12+\n" +

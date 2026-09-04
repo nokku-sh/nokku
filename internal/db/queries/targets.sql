@@ -1,6 +1,15 @@
 -- name: CreateTarget :one
 INSERT INTO
-  targets (workspace_id, ca_id, name, description, endpoints, tags, metadata)
+  targets (
+    workspace_id,
+    ca_id,
+    name,
+    description,
+    endpoints,
+    tags,
+    metadata,
+    host_public_key
+  )
 VALUES
   (
     @workspace_id,
@@ -9,7 +18,8 @@ VALUES
     @description,
     @endpoints,
     COALESCE(@tags, '{}'::TEXT[]),
-    COALESCE(@metadata, '{}'::JSONB)
+    COALESCE(@metadata, '{}'::JSONB),
+    sqlc.narg('host_public_key')
   )
 RETURNING
   *;
@@ -74,7 +84,8 @@ SET
   description = COALESCE(sqlc.narg('description'), description),
   endpoints = COALESCE(sqlc.narg('endpoints'), endpoints),
   tags = COALESCE(sqlc.narg('tags'), tags),
-  metadata = COALESCE(sqlc.narg('metadata'), metadata)
+  metadata = COALESCE(sqlc.narg('metadata'), metadata),
+  host_public_key = COALESCE(sqlc.narg('host_public_key'), host_public_key)
 WHERE
   id = @target_id
 RETURNING

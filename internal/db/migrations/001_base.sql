@@ -194,8 +194,8 @@ CREATE TABLE IF NOT EXISTS certificate_authorities (
   user_extensions JSONB DEFAULT '{"permit-pty": "", "permit-user-rc": ""}',
   user_critical_options JSONB DEFAULT '{}',
   -- Host certificate config
-  host_default_ttl INTERVAL NOT NULL DEFAULT '2160 hours', -- 3 months
-  host_max_ttl INTERVAL NOT NULL DEFAULT '4320 hours', -- 6 months
+  host_default_ttl INTERVAL NOT NULL DEFAULT '168 hours', -- 7 days
+  host_max_ttl INTERVAL NOT NULL DEFAULT '720 hours', -- 30 days
   -- Shared config
   allowed_key_types INTEGER[] DEFAULT ARRAY[1, 2, 3],
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -215,6 +215,7 @@ CREATE TABLE IF NOT EXISTS targets (
   name TEXT NOT NULL,
   description TEXT,
   endpoints TEXT[],
+  host_public_key TEXT,
   tags TEXT[] NOT NULL DEFAULT '{}',
   metadata JSONB NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

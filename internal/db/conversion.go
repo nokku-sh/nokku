@@ -192,17 +192,18 @@ func (t *Target) ToProto() *nokkuv1.Target {
 	metadata := make(map[string]string)
 	_ = json.Unmarshal(t.Metadata, &metadata)
 	return &nokkuv1.Target{
-		Id:          &t.ID,
-		WorkspaceId: &t.WorkspaceID,
-		DaemonId:    t.DaemonID,
-		CaId:        t.CaID,
-		Description: t.Description,
-		Name:        &t.Name,
-		Endpoints:   t.Endpoints,
-		Tags:        t.Tags,
-		Metadata:    metadata,
-		CreatedAt:   SafeTimestamp(&t.CreatedAt),
-		UpdatedAt:   SafeTimestamp(&t.UpdatedAt),
+		Id:            &t.ID,
+		WorkspaceId:   &t.WorkspaceID,
+		DaemonId:      t.DaemonID,
+		CaId:          t.CaID,
+		Description:   t.Description,
+		Name:          &t.Name,
+		Endpoints:     t.Endpoints,
+		Tags:          t.Tags,
+		Metadata:      metadata,
+		HostPublicKey: t.HostPublicKey,
+		CreatedAt:     SafeTimestamp(&t.CreatedAt),
+		UpdatedAt:     SafeTimestamp(&t.UpdatedAt),
 	}
 }
 
@@ -211,17 +212,18 @@ func (r *ListTargetsRow) ToProto() *nokkuv1.Target {
 		return nil
 	}
 	return (&Target{
-		ID:          r.ID,
-		WorkspaceID: r.WorkspaceID,
-		CaID:        r.CaID,
-		DaemonID:    r.DaemonID,
-		Name:        r.Name,
-		Description: r.Description,
-		Endpoints:   r.Endpoints,
-		Tags:        r.Tags,
-		Metadata:    r.Metadata,
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
+		ID:            r.ID,
+		WorkspaceID:   r.WorkspaceID,
+		CaID:          r.CaID,
+		DaemonID:      r.DaemonID,
+		Name:          r.Name,
+		Description:   r.Description,
+		Endpoints:     r.Endpoints,
+		Tags:          r.Tags,
+		Metadata:      r.Metadata,
+		HostPublicKey: r.HostPublicKey,
+		CreatedAt:     r.CreatedAt,
+		UpdatedAt:     r.UpdatedAt,
 	}).ToProto()
 }
 
