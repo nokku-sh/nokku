@@ -48,6 +48,30 @@ func (q *Queries) DeleteExpiredTokens(ctx context.Context, now time.Time) (int64
 	return result.RowsAffected(), nil
 }
 
+const hasRecentToken = `-- name: HasRecentToken :one
+SELECT EXISTS (
+  SELECT 1
+  FROM one_time_tokens
+  WHERE
+    user_id = $1
+    AND purpose = $2
+    AND created_at > $3
+)
+`
+
+type HasRecentTokenParams struct {
+	UserID  string    `json:"userId"`
+	Purpose string    `json:"purpose"`
+	Since   time.Time `json:"since"`
+}
+
+func (q *Queries) HasRecentToken(ctx context.Context, arg *HasRecentTokenParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasRecentToken, arg.UserID, arg.Purpose, arg.Since)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const putToken = `-- name: PutToken :exec
 INSERT INTO
   one_time_tokens (token_hash, user_id, purpose, expires_at)

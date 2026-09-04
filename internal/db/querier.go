@@ -121,6 +121,7 @@ type Querier interface {
 	GetWorkspaceTags(ctx context.Context, workspaceID string) ([]string, error)
 	GetWorkspacesByIDs(ctx context.Context, workspaceIds []string) ([]*Workspace, error)
 	GetWorkspacesByOwner(ctx context.Context, userID string) ([]string, error)
+	HasRecentToken(ctx context.Context, arg *HasRecentTokenParams) (bool, error)
 	InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams) error
 	InsertKeyset(ctx context.Context, data []byte) (int64, error)
 	ListActiveSubscriptions(ctx context.Context, arg *ListActiveSubscriptionsParams) ([]*WorkspaceSubscription, error)

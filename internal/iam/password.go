@@ -114,6 +114,19 @@ func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User
 		)
 		return nil, ErrInactive
 	}
+	if !u.EmailVerified {
+		m.svc.record(
+			ctx,
+			Event{
+				Action: ActionLoginDenied,
+				Method: MethodPassword,
+				UserID: u.ID,
+				Email:  u.Email,
+				Detail: "unverified email",
+			},
+		)
+		return nil, ErrEmailUnverified
+	}
 	m.svc.record(
 		ctx,
 		Event{

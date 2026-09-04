@@ -23,15 +23,14 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
+	emailverify "github.com/nokku-sh/nokku/internal/email"
 )
 
 // challengeTTL bounds one registration or login ceremony.
-const challengeTTL = 5 * time.Minute
-
-// ceremonyCookieName carries the ceremony id between begin and finish.
-//
-// #nosec G101 -- a cookie name, not a credential
-const ceremonyCookieName = "webauthn_session"
+const (
+	challengeTTL       = 5 * time.Minute
+	ceremonyCookieName = "webauthn_session"
+)
 
 // passkeySignupState carries the reserved account between the signup
 // ceremony's begin and finish, so the user row is only created once the
@@ -313,6 +312,11 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "missing_fields", "email is required")
 		return
 	}
+	if err := emailverify.Verify(email); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_email", "please enter a valid email address")
+		return
+	}
+
 	if name == "" {
 		if _, local, ok := strings.Cut(email, "@"); ok && local != "" {
 			name = local
@@ -365,7 +369,8 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 }
 
 // FinishSignup verifies the ceremony, creates the account, persists the
-// passkey, sends the verification email, and signs the account in.
+// passkey, and sends the verification email. Like the password flow, the
+// account signs in only after confirming the emailed link.
 func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := f.signup.Take(ctx, CookieToken(r, ceremonyCookieName))
@@ -441,14 +446,14 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 		Email:  u.Email,
 	})
 
-	// Mirror the register flow: the account starts unverified, the emailed
-	// link fixes that.
+	// Mirror the register flow: the account starts unverified and the
+	// emailed link fixes that. No session is issued until then.
 	if f.svc.OnPasskeySignup != nil {
 		f.svc.OnPasskeySignup(r, u)
 	}
 
 	http.SetCookie(w, f.clearedCeremonyCookie())
-	f.issueSessionFor(w, r, u)
+	WriteJSON(w, http.StatusOK, map[string]string{"status": "verification_required"})
 }
 
 // login ceremony -----------------------------------------------------------
@@ -550,6 +555,15 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	if !u.Active {
 		WriteError(w, http.StatusForbidden, "inactive", "this account has been deactivated")
+		return
+	}
+	if !u.EmailVerified {
+		WriteError(
+			w,
+			http.StatusForbidden,
+			"email_unverified",
+			"verify your email address before signing in",
+		)
 		return
 	}
 

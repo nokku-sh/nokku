@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS one_time_tokens (
   token_hash TEXT PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   purpose TEXT NOT NULL, -- verify_email, password_reset
-  expires_at TIMESTAMPTZ NOT NULL
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX one_time_tokens_expiry_idx ON one_time_tokens (expires_at);

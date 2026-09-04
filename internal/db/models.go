@@ -90,6 +90,7 @@ type OneTimeToken struct {
 	UserID    string             `json:"userId"`
 	Purpose   string             `json:"purpose"`
 	ExpiresAt time.Time          `json:"expiresAt"`
+	CreatedAt time.Time          `json:"createdAt"`
 }
 
 type Principal struct {

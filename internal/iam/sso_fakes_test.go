@@ -32,8 +32,16 @@ type fakeStore struct {
 	byEmail     map[string]*db.User
 	creds       map[string]*db.Credential // key: type|provider|subject
 	sessions    map[string]*db.Session    // key: token hash
+	tokens      map[string]fakeToken      // key: token hash
 	keypair     *db.GetSAMLKeypairRow
 	userCounter int
+}
+
+// fakeToken records a one-time token with the time the fake issued it, so
+// HasRecentToken can answer cooldown checks.
+type fakeToken struct {
+	params    db.PutTokenParams
+	createdAt time.Time
 }
 
 func newFakeStore() *fakeStore {
@@ -42,7 +50,24 @@ func newFakeStore() *fakeStore {
 		byEmail:  map[string]*db.User{},
 		creds:    map[string]*db.Credential{},
 		sessions: map[string]*db.Session{},
+		tokens:   map[string]fakeToken{},
 	}
+}
+
+func (f *fakeStore) PutToken(_ context.Context, arg *db.PutTokenParams) error {
+	f.tokens[arg.TokenHash.Hash()] = fakeToken{params: *arg, createdAt: time.Now()}
+	return nil
+}
+
+func (f *fakeStore) HasRecentToken(_ context.Context, arg *db.HasRecentTokenParams) (bool, error) {
+	for _, tok := range f.tokens {
+		if tok.params.UserID == arg.UserID &&
+			tok.params.Purpose == arg.Purpose &&
+			tok.createdAt.After(arg.Since) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (f *fakeStore) FindCredentialBySubject(
@@ -78,6 +103,8 @@ func (f *fakeStore) CreateUser(_ context.Context, arg *db.CreateUserParams) (*db
 		ID:    "user-000" + string(rune('a'+f.userCounter)),
 		Email: normalizeEmail(arg.Email),
 		Name:  arg.Name,
+		// Mirror the schema defaults: new accounts are active and unverified.
+		Active: true,
 	}
 	f.users[u.ID] = u
 	f.byEmail[u.Email] = u
@@ -96,6 +123,19 @@ func (f *fakeStore) UpdateUser(_ context.Context, arg *db.UpdateUserParams) (*db
 		u.Picture = arg.Picture
 	}
 	return u, nil
+}
+
+func (f *fakeStore) ListCredentialsByType(
+	_ context.Context,
+	arg *db.ListCredentialsByTypeParams,
+) ([]*db.Credential, error) {
+	var out []*db.Credential
+	for _, c := range f.creds {
+		if c.UserID == arg.UserID && c.Type == arg.Type {
+			out = append(out, c)
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeStore) VerifyUserEmail(_ context.Context, id string) error {

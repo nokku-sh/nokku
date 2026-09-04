@@ -134,6 +134,15 @@ func (s *Service) LoginWithBackupCode(ctx context.Context, email, code string) (
 		return nil, err
 	}
 
+	// Rejected logins must not burn a scarce recovery code, so the account
+	// state is checked before the code is consumed.
+	if !u.Active {
+		return nil, ErrInactive
+	}
+	if !u.EmailVerified {
+		return nil, ErrEmailUnverified
+	}
+
 	hash, err := crypto.HashToken(code)
 	if err != nil {
 		return nil, err
@@ -157,9 +166,6 @@ func (s *Service) LoginWithBackupCode(ctx context.Context, email, code string) (
 			return nil, ErrInvalidCredentials
 		}
 		return nil, err
-	}
-	if !u.Active {
-		return nil, ErrInactive
 	}
 	s.record(
 		ctx,
