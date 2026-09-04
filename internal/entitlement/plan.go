@@ -74,6 +74,7 @@ var catalog = map[string]Plan{
 	PlanEnterprise: {
 		Name:                  PlanEnterprise,
 		SeatCap:               Unlimited,
+		ResourceCap:           Unlimited,
 		RetentionDays:         365,
 		RecordingStorageBytes: 1 << 30,
 		Features: map[string]bool{

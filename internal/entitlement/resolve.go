@@ -107,30 +107,32 @@ func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
 }
 
 func (s *Service) resolve(ctx context.Context, workspaceID string) Plan {
-	if s.mode == ModeSelfHosted && s.license != nil && s.license.Valid() {
-		return resolvePlan(licensedPlanName(s.license))
-	}
-
 	plan := PlanCommunity
-	subPlan, status, err := s.db.Subscription(ctx, workspaceID)
-	switch {
-	case err == nil && status.GrantsAccess():
-		plan = subPlan
-	case errors.Is(err, ErrNoSubscription):
-		// No subscription row is the normal community case.
-	case err == nil:
-		// Inactive subscription falls back to Community.
-	default:
-		// Fail closed to Community so a billing outage never grants paid
-		// features.
-		slog.Warn("entitlement subscription lookup failed", "error", err, "workspace_id", workspaceID)
+	if s.mode == ModeSelfHosted && s.license != nil && s.license.Valid() {
+		plan = licensedPlanName(s.license)
+	} else {
+		subPlan, status, err := s.db.Subscription(ctx, workspaceID)
+		switch {
+		case err == nil && status.GrantsAccess():
+			plan = subPlan
+		case errors.Is(err, ErrNoSubscription):
+			// No subscription row is the normal community case.
+		case err == nil:
+			// Inactive subscription falls back to Community.
+		default:
+			// Fail closed to Community so a billing outage never grants paid
+			// features.
+			slog.Warn("entitlement subscription lookup failed", "error", err, "workspace_id", workspaceID)
+		}
 	}
 
 	resolved := resolvePlan(plan)
 	if s.mode == ModeSelfHosted {
 		// Recording storage caps and resource caps protect SaaS
 		// infrastructure only. On self-hosted the disk and database are the
-		// customer's own, whatever the plan.
+		// customer's own, whatever the plan. This must also apply to the
+		// licensed branch: a valid license resolves its plan directly from
+		// the catalog and would otherwise inherit its caps.
 		resolved.RecordingStorageBytes = Unlimited
 		resolved.ResourceCap = Unlimited
 	}

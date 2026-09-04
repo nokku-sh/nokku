@@ -144,6 +144,32 @@ func TestResolve_FailClosedOnDBError(t *testing.T) {
 	}
 }
 
+func TestResolve_SelfHostedLicensedPlanUnlimited(t *testing.T) {
+	// The licensed self-hosted branch resolves its plan straight from the
+	// catalog, but the caps still protect SaaS infrastructure only. An
+	// enterprise key must enroll daemons, not hit ResourceCap zero from the
+	// catalog entry.
+	sut := NewService(
+		&fakeDB{},
+		&fakeLicense{valid: true, plan: PlanEnterprise},
+		ModeSelfHosted,
+	)
+	got := sut.Resolve(context.Background(), "ws1")
+
+	if got.Name != PlanEnterprise {
+		t.Errorf("Resolve() = %q, want enterprise", got.Name)
+	}
+	if got.ResourceCap != Unlimited {
+		t.Errorf("self-hosted licensed ResourceCap = %d, want unlimited", got.ResourceCap)
+	}
+	if got.RecordingStorageBytes != Unlimited {
+		t.Errorf("self-hosted licensed storage cap = %d, want unlimited", got.RecordingStorageBytes)
+	}
+	if err := sut.CheckResources(context.Background(), "ws1"); err != nil {
+		t.Errorf("CheckResources() = %v, want nil", err)
+	}
+}
+
 func TestResolve_SelfHostedRecordingStorageUnlimited(t *testing.T) {
 	// The recording storage cap protects SaaS infrastructure only. On
 	// self-hosted, the disk is the customer's own whatever the plan says.
