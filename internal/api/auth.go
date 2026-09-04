@@ -64,6 +64,12 @@ func (s *AuthService) Register(
 				"an account with this email already exists",
 			)
 		}
+		if errors.Is(err, iam.ErrEmailRejected) {
+			return nil, NewError(
+				connect.CodeInvalidArgument,
+				"please enter a valid email address",
+			)
+		}
 		return nil, ErrInternal
 	}
 	// Field shape is the proto schema's business (validate interceptor);
@@ -128,6 +134,9 @@ func (s *AuthService) issueSession(ctx context.Context, u *db.User, method iam.M
 func loginError(err error) error {
 	if errors.Is(err, iam.ErrInactive) {
 		return ErrAccountInactive
+	}
+	if errors.Is(err, iam.ErrEmailUnverified) {
+		return ErrEmailUnverified
 	}
 	return ErrLoginFailed
 }
@@ -204,7 +213,7 @@ func (s *AuthService) ResendVerification(
 	// Unknown and already-verified accounts answer OK so the endpoint
 	// cannot enumerate accounts.
 	if u, err := s.cfg.IAM.GetUserByEmail(ctx, req.GetEmail()); err == nil && !u.EmailVerified {
-		s.sendTokenEmail(ctx, u, iam.TokenVerifyEmail, false)
+		s.sendTokenEmail(ctx, u, iam.TokenVerifyEmail, true)
 	}
 	return &nokkuv1.ResendVerificationResponse{}, nil
 }
@@ -316,6 +325,13 @@ func (s *AuthService) sendTokenEmail(
 	purpose string,
 	welcome bool,
 ) {
+	recent, err := s.cfg.IAM.HasRecentToken(ctx, u.ID, purpose)
+	if err != nil {
+		// Fail open: the worst case is an extra email, not a locked-out user.
+		slog.Debug("resend cooldown check failed", "error", err)
+	} else if recent {
+		return
+	}
 	raw, err := s.cfg.IAM.IssueToken(ctx, u.ID, purpose, tokenTTL)
 	if err != nil {
 		return
