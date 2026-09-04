@@ -12,6 +12,7 @@
 	import * as Alert from '$lib/components/ui/alert';
 	import { sso } from '$lib/api/sso.svelte';
 	import { workspaceID } from '$lib/store.svelte';
+	import { page } from '$app/state';
 
 	let change = $state({
 		isActive: false,
@@ -25,11 +26,7 @@
 	let clientSecret = $state('');
 
 	const provider = $derived(sso.getProvider());
-	// The provider is configured when the stored method is OIDC; the config
-	// block carries whichever protocol's fields are set.
 	const configured = $derived(provider.data?.method === 'oidc');
-	// Providers share a single slot per workspace: saving here replaces an
-	// existing SAML configuration.
 	const replacesSAML = $derived(provider.data?.method === 'saml');
 	$effect(() => {
 		const p = provider.data;
@@ -64,7 +61,7 @@
 		});
 	}
 
-	const callbackURL = window.location.origin + '/oidc/callback';
+	const callbackURL = page.url.origin + '/oidc/callback';
 </script>
 
 <Card.Root>
