@@ -28,6 +28,7 @@ const (
 	MethodSAML       Method = "saml"
 	MethodBackupCode Method = "backup_code"
 	MethodDevice     Method = "device"
+	MethodSCIM       Method = "scim"
 )
 
 // Action identifies an auth lifecycle event for the audit sink.
@@ -36,6 +37,7 @@ type Action string
 const (
 	ActionUserCreated     Action = "user_created"
 	ActionUserDeleted     Action = "user_deleted"
+	ActionUserDeactivated Action = "user_deactivated"
 	ActionLoginSucceeded  Action = "login_succeeded"
 	ActionLoginDenied     Action = "login_denied"
 	ActionSessionIssued   Action = "session_issued"
@@ -133,6 +135,7 @@ type Service struct {
 	OAuth2          *oauth2Flow
 	SAML            *samlFlow
 	Passkey         *passkeyFlow
+	SCIM            *SCIMFlow
 
 	now func() time.Time
 }
@@ -209,6 +212,9 @@ func New(d Deps) (*Service, error) {
 			return nil, err
 		}
 		svc.Passkey = passkey
+	}
+	if svc.conn != nil {
+		svc.SCIM = newSCIMFlow(svc)
 	}
 	return svc, nil
 }

@@ -2,6 +2,7 @@ import { env } from '$env/dynamic/public';
 
 export const SupportEmail = env.PUBLIC_SUPPORT_EMAIL || 'mailto:support@mizuchi.dev';
 export const DocsURL = env.PUBLIC_DOCS_URL || 'https://nokku.sh/docs';
+export const UpgradeURL = env.PUBLIC_UPGRADE_URL || 'https://nokku.sh/pricing';
 export const DaemonURL = env.PUBLIC_DOCS_URL || 'https://nokku.sh/docs/daemon';
 export const CLIURL = env.PUBLIC_DOCS_URL || 'https://nokku.sh/docs/cli';
 export const ToSURL = env.PUBLIC_DOCS_URL || 'https://nokku.sh/legal/terms';

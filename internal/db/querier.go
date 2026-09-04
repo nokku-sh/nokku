@@ -23,6 +23,12 @@ type Querier interface {
 	ConsumeCredentialBySubject(ctx context.Context, arg *ConsumeCredentialBySubjectParams) (*Credential, error)
 	ConsumeToken(ctx context.Context, tokenHash crypto.HashedToken) (*ConsumeTokenRow, error)
 	CountAuditLogs(ctx context.Context, arg *CountAuditLogsParams) (int32, error)
+	// Memberships the user holds in workspaces they did not create, outside
+	// the given workspace. SCIM deprovision keys off this: a membership in
+	// someone else's workspace keeps the global account alive, while ties
+	// only to the user's own workspaces are the shadow-IT orphan that gets
+	// deactivated instead of deleted (the created_by cascade must never fire).
+	CountOtherUserMemberships(ctx context.Context, arg *CountOtherUserMembershipsParams) (int32, error)
 	// Member counts for a set of teams in one read, for list views that show a
 	// count instead of embedding each team's members.
 	CountTeamMembers(ctx context.Context, teamIds []string) ([]*CountTeamMembersRow, error)
@@ -30,10 +36,15 @@ type Querier interface {
 	CountWorkspaceResources(ctx context.Context, workspaceID string) (int64, error)
 	CountWorkspaceSeats(ctx context.Context, workspaceID string) (int64, error)
 	CountWorkspacesByOwner(ctx context.Context, userID string) (int32, error)
+	// Workspaces the user owns. A SCIM deprovision must never delete a global
+	// account that owns a workspace: the schema's created_by cascade would take
+	// the whole workspace with it.
+	CountWorkspacesCreatedBy(ctx context.Context, userID string) (int32, error)
 	CreateCA(ctx context.Context, arg *CreateCAParams) (*CertificateAuthority, error)
 	CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*CreateDaemonRow, error)
 	CreatePrincipal(ctx context.Context, arg *CreatePrincipalParams) (*Principal, error)
 	CreateRecording(ctx context.Context, arg *CreateRecordingParams) (*Recording, error)
+	CreateSCIMToken(ctx context.Context, arg *CreateSCIMTokenParams) (*CreateSCIMTokenRow, error)
 	CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (string, error)
 	CreateSession(ctx context.Context, arg *CreateSessionParams) error
 	CreateTarget(ctx context.Context, arg *CreateTargetParams) (*Target, error)
@@ -50,10 +61,15 @@ type Querier interface {
 	DeleteOrphanAuditLogs(ctx context.Context, cutoff time.Time) (int64, error)
 	DeleteRecording(ctx context.Context, id string) error
 	DeleteRecordingsBefore(ctx context.Context, arg *DeleteRecordingsBeforeParams) ([]*DeleteRecordingsBeforeRow, error)
+	DeleteSCIMToken(ctx context.Context, arg *DeleteSCIMTokenParams) error
 	DeleteSSOProvider(ctx context.Context, providerID string) error
 	DeleteServiceAccount(ctx context.Context, serviceAccountID string) error
 	DeleteSession(ctx context.Context, tokenHash crypto.HashedToken) error
 	DeleteSessionsExcept(ctx context.Context, arg *DeleteSessionsExceptParams) (int64, error)
+	// Drops the user's other SCIM externalId mappings for the workspace, so an
+	// IdP-side identity migration never leaves two links on one account. Run
+	// before UpsertCredential, which re-adds the current subject.
+	DeleteStaleUserSCIMCredentials(ctx context.Context, arg *DeleteStaleUserSCIMCredentialsParams) error
 	DeleteSubjectSessions(ctx context.Context, subjectID string) (int64, error)
 	DeleteTarget(ctx context.Context, targetID string) (*Target, error)
 	DeleteTeam(ctx context.Context, teamID string) (*Team, error)
@@ -61,6 +77,7 @@ type Querier interface {
 	DeleteUnverifiedUsers(ctx context.Context, cutoff time.Time) (int64, error)
 	DeleteUser(ctx context.Context, id string) error
 	DeleteUserCredentialsByProvider(ctx context.Context, arg *DeleteUserCredentialsByProviderParams) (int64, error)
+	DeleteUserSCIMCredentials(ctx context.Context, arg *DeleteUserSCIMCredentialsParams) error
 	DeleteWorkspace(ctx context.Context, workspaceID string) error
 	DeleteWorkspaceAuditLogs(ctx context.Context, arg *DeleteWorkspaceAuditLogsParams) (int64, error)
 	DeleteWorkspaceDomain(ctx context.Context, arg *DeleteWorkspaceDomainParams) error
@@ -87,6 +104,8 @@ type Querier interface {
 	GetPrincipalsByTargetIDs(ctx context.Context, targetIds []string) ([]*GetPrincipalsByTargetIDsRow, error)
 	GetRecording(ctx context.Context, id string) (*Recording, error)
 	GetSAMLKeypair(ctx context.Context) (*GetSAMLKeypairRow, error)
+	GetSCIMCredentialByUser(ctx context.Context, arg *GetSCIMCredentialByUserParams) (string, error)
+	GetSCIMTokenByHash(ctx context.Context, tokenHash crypto.HashedToken) (*ScimToken, error)
 	GetSSOProvider(ctx context.Context, providerID string) (*SsoProvider, error)
 	GetServiceAccount(ctx context.Context, serviceAccountID string) (*ServiceAccount, error)
 	// Bearer-token authentication for service accounts: resolve by the stored
@@ -148,6 +167,10 @@ type Querier interface {
 	ListWorkspaceDomains(ctx context.Context, workspaceID string) ([]*WorkspaceDomain, error)
 	ListWorkspaceIDs(ctx context.Context) ([]string, error)
 	ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error)
+	// externalId mappings for every SCIM-linked user of the workspace, one read
+	// for list responses instead of one per resource.
+	ListWorkspaceSCIMCredentials(ctx context.Context, workspaceID string) ([]*ListWorkspaceSCIMCredentialsRow, error)
+	ListWorkspaceSCIMTokens(ctx context.Context, workspaceID string) ([]*ListWorkspaceSCIMTokensRow, error)
 	ListWorkspaces(ctx context.Context) ([]*Workspace, error)
 	OldestRecordings(ctx context.Context, arg *OldestRecordingsParams) ([]*Recording, error)
 	PutSAMLKeypair(ctx context.Context, arg *PutSAMLKeypairParams) (*PutSAMLKeypairRow, error)
@@ -172,6 +195,9 @@ type Querier interface {
 	SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error
 	SumRecordingBytes(ctx context.Context, workspaceID string) (int64, error)
 	SyncPrincipals(ctx context.Context, arg *SyncPrincipalsParams) error
+	// Throttled: only writes when the stored stamp is over an hour old, so a
+	// busy provisioning client does not turn every read into a write.
+	TouchSCIMToken(ctx context.Context, id string) error
 	TouchServiceAccount(ctx context.Context, id string) error
 	TouchSession(ctx context.Context, arg *TouchSessionParams) error
 	TrySecretRotationLock(ctx context.Context) (bool, error)

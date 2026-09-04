@@ -350,6 +350,18 @@ func scanVals(vals []any, dest []any) error {
 				return pgx.ErrNoRows
 			}
 			*out = b
+		case *int32:
+			n, ok := indirect(v).(int32)
+			if !ok {
+				return pgx.ErrNoRows
+			}
+			*out = n
+		case *crypto.HashedToken:
+			s, ok := indirect(v).(crypto.HashedToken)
+			if !ok {
+				return pgx.ErrNoRows
+			}
+			*out = s
 		default:
 			return pgx.ErrNoRows
 		}

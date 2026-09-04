@@ -3,22 +3,25 @@
 	import { billing } from '$lib/api/billing.svelte';
 	import { activeSSOTab } from '$lib/store.svelte';
 	import { domain } from '$lib/api/sso.svelte';
-	import { Globe, KeyRound } from '@lucide/svelte';
+	import { Globe, KeyRound, UsersRound } from '@lucide/svelte';
 	import DomainTab from './DomainTab.svelte';
 	import OIDCTab from './OIDCTab.svelte';
+	import SCIMTab from './SCIMTab.svelte';
 	import SAMLTab from './SAMLTab.svelte';
 	import { OIDCIcon, SAMLIcon } from '$lib/assets';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import * as Empty from '$lib/components/ui/empty';
 	import { Button } from '$lib/components/ui/button';
+	import { UpgradeURL } from '$lib/config';
 
 	const billingData = $derived(billing.get());
 	const samlAvailable = $derived(billingData.data?.features?.['saml'] === true);
+	const scimAvailable = $derived(billingData.data?.features?.['scim'] === true);
 
 	const domains = $derived(domain.list());
-	// Providers can only be added once a domain is verified: home realm
-	// discovery routes users by their email domain, so without one the
-	// provider could never match a login.
+	// Providers and the SCIM connector can only be set up once a domain is
+	// verified: home realm discovery routes users by their email domain, so
+	// without one nothing could ever match.
 	const hasVerifiedDomain = $derived(
 		(domains.data ?? []).some((d) => d.verifiedAt !== undefined && d.verifiedAt !== null)
 	);
@@ -45,7 +48,7 @@
 			<Empty.Title>No verified domain</Empty.Title>
 			<Empty.Description>
 				Add and verify a domain first. SSO only matches users whose email domain is verified for
-				this workspace.
+				this workspace, and SCIM provisioning requires the same proof of ownership.
 			</Empty.Description>
 		</Empty.Header>
 		<Empty.Content>
@@ -54,10 +57,28 @@
 	</Empty.Root>
 {/snippet}
 
+{#snippet needsUpgrade()}
+	<Empty.Root class="border border-dashed">
+		<Empty.Header>
+			<Empty.Media variant="icon">
+				<UsersRound />
+			</Empty.Media>
+			<Empty.Title>Available on Enterprise</Empty.Title>
+			<Empty.Description>
+				SCIM provisioning syncs users and groups from your identity provider automatically. Upgrade
+				to Enterprise to connect Okta, Azure AD, and other SCIM directories.
+			</Empty.Description>
+		</Empty.Header>
+		<Empty.Content>
+			<Button onclick={() => window.open(UpgradeURL, '_blank', 'noopener')}>See Plans</Button>
+		</Empty.Content>
+	</Empty.Root>
+{/snippet}
+
 <PageHeader
 	icon={KeyRound}
-	title="Single Sign-On"
-	description="Verify a domain, then configure an OIDC or SAML provider. One provider per workspace."
+	title="Single Sign-On & Provisioning"
+	description="Verify a domain, then configure an OIDC or SAML provider and SCIM provisioning. One provider per workspace."
 >
 	<Tabs.Root bind:value={activeSSOTab.current}>
 		<Tabs.List class="flex items-center gap-2">
@@ -72,6 +93,10 @@
 			>
 				<SAMLIcon class="dark:invert" />
 				SAML
+			</Tabs.Trigger>
+			<Tabs.Trigger value="scim" class="flex items-center gap-2">
+				<UsersRound size={16} />
+				SCIM
 			</Tabs.Trigger>
 			<Tabs.Trigger value="domains">
 				<Globe size={16} />
@@ -98,6 +123,16 @@
 			{/if}
 		</Tabs.Content>
 	{/if}
+
+	<Tabs.Content value="scim">
+		{#if !scimAvailable}
+			{@render needsUpgrade()}
+		{:else if !hasVerifiedDomain}
+			{@render needsDomain()}
+		{:else}
+			<SCIMTab />
+		{/if}
+	</Tabs.Content>
 
 	<Tabs.Content value="domains">
 		<DomainTab />

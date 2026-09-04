@@ -31,11 +31,16 @@ func NewSSOService(cfg *config.Config) *SSOService {
 	return &SSOService{cfg: cfg}
 }
 
-// requireVerifiedDomain gates provider setup on domain ownership: home
+// requireVerifiedDomain gates org-level setup on domain ownership: home
 // realm discovery only routes logins whose email domain is bound to the
-// workspace, so a provider without a verified domain can never match.
-func (s *SSOService) requireVerifiedDomain(ctx context.Context, workspaceID string) error {
-	domains, err := s.cfg.IAM.ListTenantDomains(ctx, workspaceID)
+// workspace, so SSO without a verified domain can never match, and SCIM
+// without one could mint accounts on arbitrary emails.
+func requireVerifiedDomain(
+	ctx context.Context,
+	svc *iam.Service,
+	what, workspaceID string,
+) error {
+	domains, err := svc.ListTenantDomains(ctx, workspaceID)
 	if err != nil {
 		return DBError(err)
 	}
@@ -46,7 +51,7 @@ func (s *SSOService) requireVerifiedDomain(ctx context.Context, workspaceID stri
 	}
 	return NewError(
 		connect.CodeFailedPrecondition,
-		"Add and verify a domain before configuring an SSO provider",
+		"Add and verify a domain before configuring "+what,
 	)
 }
 
@@ -125,7 +130,7 @@ func (s *SSOService) UpdateSSOProvider(
 		return nil, NewError(connect.CodeInvalidArgument, "method must be oidc or saml")
 	}
 
-	if err := s.requireVerifiedDomain(ctx, req.GetWorkspaceId()); err != nil {
+	if err := requireVerifiedDomain(ctx, s.cfg.IAM, "an SSO provider", req.GetWorkspaceId()); err != nil {
 		return nil, err
 	}
 	if err := s.cfg.IAM.PutSSOProvider(ctx, p); err != nil {

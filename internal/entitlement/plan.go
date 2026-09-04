@@ -21,6 +21,7 @@ const (
 	FeatureOIDC        = "oidc"
 	FeatureEnforceSSO  = "enforce_sso"
 	FeatureSAML        = "saml"
+	FeatureSCIM        = "scim"
 	FeatureAuditExport = "audit_export"
 	FeatureExternalKMS = "external_kms"
 )
@@ -81,6 +82,7 @@ var catalog = map[string]Plan{
 			FeatureOIDC:        true,
 			FeatureEnforceSSO:  true,
 			FeatureSAML:        true,
+			FeatureSCIM:        true,
 			FeatureAuditExport: true,
 			FeatureExternalKMS: true,
 		},

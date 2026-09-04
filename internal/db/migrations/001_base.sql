@@ -110,6 +110,15 @@ CREATE TABLE IF NOT EXISTS sso_providers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS scim_tokens (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_used_at TIMESTAMPTZ
+);
+
 CREATE TABLE IF NOT EXISTS workspace_domains (
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
   domain TEXT CHECK (domain = lower(domain)),
@@ -347,6 +356,11 @@ CREATE INDEX idx_principal_sa_workspace_id ON principal_service_accounts (worksp
 
 CREATE INDEX recordings_workspace_started_idx ON recordings (workspace_id, started_at DESC);
 
+-- SCIM group sync expects displayName to resolve to one group per
+-- workspace (RFC 7643). Without this, duplicate pushes create duplicate
+-- teams and the IdP's member updates hit the wrong one.
+CREATE UNIQUE INDEX IF NOT EXISTS teams_workspace_name_idx ON teams (workspace_id, name);
+
 -- Functions ------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION current_workspace_id () RETURNS UUID AS $$
   SELECT NULLIF(current_setting('nokku.workspace_id', TRUE), '')::UUID
@@ -529,6 +543,10 @@ ALTER TABLE sso_providers ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE sso_providers FORCE ROW LEVEL SECURITY;
 
+ALTER TABLE scim_tokens ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE scim_tokens FORCE ROW LEVEL SECURITY;
+
 ALTER TABLE workspace_domains ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE workspace_domains FORCE ROW LEVEL SECURITY;
@@ -599,6 +617,10 @@ WITH
     workspace_id IS NULL
     OR workspace_id = current_workspace_id ()
   );
+
+CREATE POLICY tenant_isolation ON scim_tokens FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
 
 CREATE POLICY tenant_isolation ON workspace_domains FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH

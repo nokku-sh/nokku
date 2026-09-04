@@ -268,6 +268,12 @@ func (s *Server) getServiceRegistrations(ctx context.Context) []ServiceRegistrat
 			},
 		},
 		{
+			Name: nokkuv1connect.SCIMServiceName,
+			Handler: func() (string, http.Handler) {
+				return nokkuv1connect.NewSCIMServiceHandler(NewSCIMService(s.cfg), opts...)
+			},
+		},
+		{
 			Name: nokkuv1connect.DaemonControlServiceName,
 			Handler: func() (string, http.Handler) {
 				return nokkuv1connect.NewDaemonControlServiceHandler(s.cfg.Pool, opts...)

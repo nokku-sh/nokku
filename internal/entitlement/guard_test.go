@@ -58,6 +58,7 @@ func TestGolden_FeaturesWired(t *testing.T) {
 		FeatureSAML,
 		FeatureAuditExport,
 		FeatureExternalKMS,
+		FeatureSCIM,
 	}
 
 	for _, feature := range allFeatures {

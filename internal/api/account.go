@@ -147,7 +147,7 @@ func (s *AccountService) requireRemovable(
 	case iam.MethodPasskey:
 		return has(iam.MethodPassword) || hasIdentity()
 	case iam.MethodOIDC, iam.MethodOAuth2, iam.MethodSAML,
-		iam.MethodBackupCode, iam.MethodDevice:
+		iam.MethodBackupCode, iam.MethodDevice, iam.MethodSCIM:
 		return has(iam.MethodPassword) || has(iam.MethodPasskey)
 	}
 	return false

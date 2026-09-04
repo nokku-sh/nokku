@@ -105,6 +105,10 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"
+          - column: "scim_tokens.token_hash"
+            go_type:
+              import: "github.com/nokku-sh/nokku/internal/crypto"
+              type: "HashedToken"
 
           # Encrypt (reversible) overrides
           - column: "certificate_authorities.private_key"
