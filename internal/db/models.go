@@ -183,17 +183,18 @@ type SsoProvider struct {
 }
 
 type Target struct {
-	ID          string    `json:"id"`
-	WorkspaceID string    `json:"workspaceId"`
-	CaID        *string   `json:"caId"`
-	DaemonID    *string   `json:"daemonId"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description"`
-	Endpoints   []string  `json:"endpoints"`
-	Tags        []string  `json:"tags"`
-	Metadata    []byte    `json:"metadata"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID            string    `json:"id"`
+	WorkspaceID   string    `json:"workspaceId"`
+	CaID          *string   `json:"caId"`
+	DaemonID      *string   `json:"daemonId"`
+	Name          string    `json:"name"`
+	Description   *string   `json:"description"`
+	Endpoints     []string  `json:"endpoints"`
+	HostPublicKey *string   `json:"hostPublicKey"`
+	Tags          []string  `json:"tags"`
+	Metadata      []byte    `json:"metadata"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 type Team struct {

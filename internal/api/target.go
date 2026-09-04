@@ -11,6 +11,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/iam"
+	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
 type TargetService struct {
@@ -45,15 +46,19 @@ func (s *TargetService) CreateTarget(
 	ctx context.Context,
 	req *nokkuv1.CreateTargetRequest,
 ) (*nokkuv1.CreateTargetResponse, error) {
+	if err := validateHostPublicKey(req.GetHostPublicKey()); err != nil {
+		return nil, err
+	}
 	var result *db.Target
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.CreateTarget(ctx, &db.CreateTargetParams{
-			WorkspaceID: req.GetWorkspaceId(),
-			Name:        req.GetName(),
-			Description: req.Description,
-			CaID:        req.CaId,
-			Endpoints:   req.GetEndpoints(),
-			Tags:        req.GetTags(),
+			WorkspaceID:   req.GetWorkspaceId(),
+			Name:          req.GetName(),
+			Description:   req.Description,
+			CaID:          req.CaId,
+			Endpoints:     req.GetEndpoints(),
+			Tags:          req.GetTags(),
+			HostPublicKey: trimmed(req.HostPublicKey),
 		})
 		if err != nil {
 			return err
@@ -76,15 +81,19 @@ func (s *TargetService) UpdateTarget(
 	ctx context.Context,
 	req *nokkuv1.UpdateTargetRequest,
 ) (*nokkuv1.UpdateTargetResponse, error) {
+	if err := validateHostPublicKey(req.GetHostPublicKey()); err != nil {
+		return nil, err
+	}
 	var result *db.Target
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.UpdateTarget(ctx, &db.UpdateTargetParams{
-			TargetID:    req.GetId(),
-			Name:        req.Name,
-			Description: req.Description,
-			Endpoints:   req.GetEndpoints(),
-			CaID:        req.CaId,
-			Tags:        req.GetTags(),
+			TargetID:      req.GetId(),
+			Name:          req.Name,
+			Description:   req.Description,
+			Endpoints:     req.GetEndpoints(),
+			CaID:          req.CaId,
+			Tags:          req.GetTags(),
+			HostPublicKey: trimmed(req.HostPublicKey),
 		})
 		if err != nil {
 			return err
@@ -416,4 +425,29 @@ func (s *TargetService) GetTargetFilters(
 		Tags:       tags,
 		Principals: principals,
 	}, nil
+}
+
+// validateHostPublicKey rejects malformed host keys early so a typo in a
+// provisioning script never pins an unusable identity.
+func validateHostPublicKey(key string) error {
+	if key == "" {
+		return nil
+	}
+	if _, err := ssh.ParsePublicKey(key); err != nil {
+		return NewError(connect.CodeInvalidArgument, "invalid host public key")
+	}
+	return nil
+}
+
+// trimmed normalizes an optional proto string: nil stays nil, empty becomes
+// nil so COALESCE keeps the stored value.
+func trimmed(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	v := strings.TrimSpace(*s)
+	if v == "" {
+		return nil
+	}
+	return &v
 }
