@@ -145,6 +145,24 @@
 
 		<Item.Root variant="outline">
 			<Item.Content>
+				<Item.Title>Pre-auth banner</Item.Title>
+				<Item.Description>
+					Show clients a banner describing session policy before login.
+				</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Switch
+					checked={daemonConfig.banner}
+					onCheckedChange={(v) => {
+						daemonConfig.banner = v;
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="outline">
+			<Item.Content>
 				<Item.Title>Max sessions per connection</Item.Title>
 				<Item.Description>Limit the number of sessions per connection.</Item.Description>
 			</Item.Content>
@@ -175,6 +193,48 @@
 					value={daemonConfig.maxConnections}
 					oninput={(e) => {
 						daemonConfig.maxConnections = Number((e.currentTarget as HTMLInputElement).value);
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>Connection rate</Item.Title>
+				<Item.Description>
+					New connections per second per source IP. Zero disables rate limiting.
+				</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Input
+					id="cfg-conn-rate"
+					type="number"
+					min="0"
+					value={daemonConfig.connRate}
+					oninput={(e) => {
+						daemonConfig.connRate = Number((e.currentTarget as HTMLInputElement).value);
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>Rate burst</Item.Title>
+				<Item.Description>
+					Short bursts of connections allowed above the steady rate.
+				</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Input
+					id="cfg-conn-rate-burst"
+					type="number"
+					min="0"
+					value={daemonConfig.connRateBurst}
+					oninput={(e) => {
+						daemonConfig.connRateBurst = Number((e.currentTarget as HTMLInputElement).value);
 						set();
 					}}
 				/>

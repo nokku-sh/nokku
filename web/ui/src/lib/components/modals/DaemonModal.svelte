@@ -185,6 +185,24 @@
 
 			<Item.Root variant="outline">
 				<Item.Content>
+					<Item.Title>Pre-auth banner</Item.Title>
+					<Item.Description>
+						Show clients a banner describing session policy before login.
+					</Item.Description>
+				</Item.Content>
+				<Item.Actions>
+					<Switch
+						checked={cfg.banner}
+						onCheckedChange={(v) => {
+							cfg.banner = v;
+							autoSave.save();
+						}}
+					/>
+				</Item.Actions>
+			</Item.Root>
+
+			<Item.Root variant="outline">
+				<Item.Content>
 					<Item.Title>Max sessions per connection</Item.Title>
 					<Item.Description>Limit the number of sessions per connection.</Item.Description>
 				</Item.Content>
@@ -215,6 +233,48 @@
 						value={cfg.maxConnections}
 						oninput={(e) => {
 							cfg.maxConnections = Number((e.currentTarget as HTMLInputElement).value);
+							autoSave.save();
+						}}
+					/>
+				</Item.Actions>
+			</Item.Root>
+
+			<Item.Root variant="outline">
+				<Item.Content>
+					<Item.Title>Connection rate</Item.Title>
+					<Item.Description>
+						New connections per second per source IP. Zero disables rate limiting.
+					</Item.Description>
+				</Item.Content>
+				<Item.Actions>
+					<Input
+						type="number"
+						min="0"
+						class="w-24 text-right"
+						value={cfg.connRate}
+						oninput={(e) => {
+							cfg.connRate = Number((e.currentTarget as HTMLInputElement).value);
+							autoSave.save();
+						}}
+					/>
+				</Item.Actions>
+			</Item.Root>
+
+			<Item.Root variant="outline">
+				<Item.Content>
+					<Item.Title>Rate burst</Item.Title>
+					<Item.Description>
+						Short bursts of connections allowed above the steady rate.
+					</Item.Description>
+				</Item.Content>
+				<Item.Actions>
+					<Input
+						type="number"
+						min="0"
+						class="w-24 text-right"
+						value={cfg.connRateBurst}
+						oninput={(e) => {
+							cfg.connRateBurst = Number((e.currentTarget as HTMLInputElement).value);
 							autoSave.save();
 						}}
 					/>
