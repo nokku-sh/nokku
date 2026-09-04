@@ -24,6 +24,9 @@ const UpgradeURL = "https://nokku.sh/pricing"
 // catalog feature has no wiring here or in conditionalRules.
 var procedureFeatures = map[string]string{
 	nokkuv1connect.UtilServiceExportAuditLogsProcedure: FeatureAuditExport,
+	// Only minting is gated: listing and revoking must always work so a
+	// downgrade or cleanup is never blocked by the paywall it created.
+	nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure: FeatureSCIM,
 }
 
 // cappedCreate gates create procedures behind the plan's pooled resource
@@ -52,6 +55,7 @@ var featureLabels = map[string]string{
 	FeatureSAML:        "SAML single sign-on",
 	FeatureAuditExport: "audit log export",
 	FeatureExternalKMS: "external key management",
+	FeatureSCIM:        "SCIM provisioning",
 }
 
 // GuardInterceptor enforces plan features at the route level. It runs

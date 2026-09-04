@@ -65,4 +65,12 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.Handle("GET /saml/metadata/{id}", http.HandlerFunc(svc.SAML.Metadata))
 	mux.Handle("GET /saml/certificate", http.HandlerFunc(svc.SAML.Certificate))
 	mux.Handle("GET /saml/certificate/{id}", http.HandlerFunc(svc.SAML.Certificate))
+
+	// SCIM 2.0 provisioning. Bearer-token surface mounted at the path IdP
+	// administrators register as the connector base URL. No session, no
+	// CSRF: the workspace-scoped token lookup is the only gate.
+	if cfg.IAM.SCIM != nil {
+		mux.Handle("/scim/v2/{workspace_id}", cfg.IAM.SCIMHandler())
+		mux.Handle("/scim/v2/{workspace_id}/", cfg.IAM.SCIMHandler())
+	}
 }

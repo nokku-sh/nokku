@@ -65,6 +65,11 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.SSOServiceGetSSOProviderProcedure:    db.PermSsoView,
 	nokkuv1connect.SSOServiceUpdateSSOProviderProcedure: db.PermSsoEdit,
 
+	// SCIM connector tokens (the endpoint itself is token-scoped)
+	nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure: db.PermSettingsEdit,
+	nokkuv1connect.SCIMServiceListSCIMTokensProcedure:  db.PermSettingsView,
+	nokkuv1connect.SCIMServiceDeleteSCIMTokenProcedure: db.PermSettingsEdit,
+
 	// Targets
 	nokkuv1connect.TargetServiceGetTargetProcedure:        db.PermTargetsView,
 	nokkuv1connect.TargetServiceListTargetsProcedure:      db.PermTargetsView,

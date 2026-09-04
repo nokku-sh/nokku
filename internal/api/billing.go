@@ -186,6 +186,7 @@ func featuresProto(p entitlement.Plan) map[string]bool {
 		entitlement.FeatureSAML:        p.Has(entitlement.FeatureSAML),
 		entitlement.FeatureAuditExport: p.Has(entitlement.FeatureAuditExport),
 		entitlement.FeatureExternalKMS: p.Has(entitlement.FeatureExternalKMS),
+		entitlement.FeatureSCIM:        p.Has(entitlement.FeatureSCIM),
 	}
 }
 

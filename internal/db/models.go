@@ -145,6 +145,15 @@ type SamlKeypair struct {
 	CertPem []byte                `json:"certPem"`
 }
 
+type ScimToken struct {
+	ID          string             `json:"id"`
+	WorkspaceID string             `json:"workspaceId"`
+	TokenHash   crypto.HashedToken `json:"tokenHash"`
+	Label       string             `json:"label"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	LastUsedAt  *time.Time         `json:"lastUsedAt"`
+}
+
 type ServiceAccount struct {
 	ID          string              `json:"id"`
 	WorkspaceID string              `json:"workspaceId"`
