@@ -8,12 +8,18 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/nokku-sh/nokku/internal/db"
+	emailverify "github.com/nokku-sh/nokku/internal/email"
 )
 
 // Register creates a user with the given email and password. The email is
-// normalized; a duplicate returns ErrEmailTaken.
+// normalized and validated (ErrEmailRejected); a duplicate returns
+// ErrEmailTaken. The account starts unverified and can only log in after
+// confirming the emailed link.
 func (s *Service) Register(ctx context.Context, email, name, pw string) (*db.User, error) {
 	email = normalizeEmail(email)
+	if err := emailverify.Verify(email); err != nil {
+		return nil, ErrEmailRejected
+	}
 	u, err := s.q.CreateUser(ctx, &db.CreateUserParams{Email: email, Name: name})
 	if err != nil {
 		return nil, mapUserError(err)

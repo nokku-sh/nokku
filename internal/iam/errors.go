@@ -23,4 +23,10 @@ var (
 	// ErrInvalidToken is returned when a one-time token is unknown, spent,
 	// or expired.
 	ErrInvalidToken = errors.New("iam: invalid token")
+	// ErrEmailUnverified is returned when the credentials verify but the
+	// account's email is not verified yet, so no session may be issued.
+	ErrEmailUnverified = errors.New("iam: email not verified")
+	// ErrEmailRejected is returned when a signup email fails validation:
+	// malformed, disposable, or a domain that does not accept mail.
+	ErrEmailRejected = errors.New("iam: email rejected")
 )
