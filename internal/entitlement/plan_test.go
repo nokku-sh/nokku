@@ -9,17 +9,19 @@ import (
 // refactor: it must come with a docs, pricing page, and Stripe update.
 func TestPlanMatrix(t *testing.T) {
 	tests := []struct {
-		plan           string
-		wantSeatCap    int64
-		wantRetention  int64
-		wantStorageCap int64
-		wantFeatures   map[string]bool
+		plan            string
+		wantSeatCap     int64
+		wantResourceCap int64
+		wantRetention   int64
+		wantStorageCap  int64
+		wantFeatures    map[string]bool
 	}{
 		{
-			plan:           PlanCommunity,
-			wantSeatCap:    5,
-			wantRetention:  7,
-			wantStorageCap: 10 << 20,
+			plan:            PlanCommunity,
+			wantSeatCap:     5,
+			wantResourceCap: 50,
+			wantRetention:   7,
+			wantStorageCap:  10 << 20,
 			wantFeatures: map[string]bool{
 				FeatureOIDC:        true,
 				FeatureEnforceSSO:  false,
@@ -29,10 +31,11 @@ func TestPlanMatrix(t *testing.T) {
 			},
 		},
 		{
-			plan:           PlanPro,
-			wantSeatCap:    Unlimited,
-			wantRetention:  90,
-			wantStorageCap: 100 << 20,
+			plan:            PlanPro,
+			wantSeatCap:     Unlimited,
+			wantResourceCap: 2000,
+			wantRetention:   90,
+			wantStorageCap:  100 << 20,
 			wantFeatures: map[string]bool{
 				FeatureOIDC:        true,
 				FeatureEnforceSSO:  true,
@@ -42,10 +45,11 @@ func TestPlanMatrix(t *testing.T) {
 			},
 		},
 		{
-			plan:           PlanEnterprise,
-			wantSeatCap:    Unlimited,
-			wantRetention:  365,
-			wantStorageCap: 1 << 30,
+			plan:            PlanEnterprise,
+			wantSeatCap:     Unlimited,
+			wantResourceCap: Unlimited,
+			wantRetention:   365,
+			wantStorageCap:  1 << 30,
 			wantFeatures: map[string]bool{
 				FeatureOIDC:        true,
 				FeatureEnforceSSO:  true,
@@ -64,6 +68,9 @@ func TestPlanMatrix(t *testing.T) {
 			}
 			if plan.SeatCap != tt.wantSeatCap {
 				t.Errorf("SeatCap = %d, want %d", plan.SeatCap, tt.wantSeatCap)
+			}
+			if plan.ResourceCap != tt.wantResourceCap {
+				t.Errorf("ResourceCap = %d, want %d", plan.ResourceCap, tt.wantResourceCap)
 			}
 			if plan.RetentionDays != tt.wantRetention {
 				t.Errorf("RetentionDays = %d, want %d", plan.RetentionDays, tt.wantRetention)
