@@ -1,17 +1,18 @@
 <script lang="ts">
+	import { page } from '$app/state';
+	import { sso } from '$lib/api/sso.svelte';
+	import * as Alert from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import * as Field from '$lib/components/ui/field';
-	import { Label } from '$lib/components/ui/label';
 	import * as Card from '$lib/components/ui/card';
-	import { Save, Info, Download, TriangleAlert } from '@lucide/svelte';
-	import { Switch } from '$lib/components/ui/switch';
+	import * as Field from '$lib/components/ui/field';
+	import { Input } from '$lib/components/ui/input';
+	import InputGroupVariants from '$lib/components/ui/input-group/input-group-variants.svelte';
+	import { Label } from '$lib/components/ui/label';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Spinner } from '$lib/components/ui/spinner';
-	import { sso } from '$lib/api/sso.svelte';
+	import { Switch } from '$lib/components/ui/switch';
 	import { workspaceID } from '$lib/store.svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import InputGroupVariants from '$lib/components/ui/input-group/input-group-variants.svelte';
+	import { Download, Info, Save, TriangleAlert } from '@lucide/svelte';
 
 	let change = $state({
 		isActive: false,
@@ -51,8 +52,8 @@
 		});
 	}
 
-	const callbackURL = window.location.origin + '/saml/acs';
-	const metadataURL = window.location.origin + '/saml/metadata';
+	const callbackURL = page.url.origin + '/saml/acs';
+	const metadataURL = page.url.origin + '/saml/metadata';
 	const certURL = '/saml/certificate';
 </script>
 
