@@ -171,10 +171,8 @@ func (x *LoginRequest) GetPassword() string {
 }
 
 type LoginResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// The freshly signed-in user, so the client can hydrate without a
-	// follow-up GetAccount round trip.
-	User          *User `protobuf:"bytes,1,opt,name=user" json:"user,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	User          *User                  `protobuf:"bytes,1,opt,name=user" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
