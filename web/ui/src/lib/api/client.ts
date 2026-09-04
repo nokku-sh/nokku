@@ -3,7 +3,7 @@ import { MutationCache, QueryCache, QueryClient } from '@tanstack/svelte-query';
 import { browser } from '$app/environment';
 import { Code, ConnectError, type Interceptor, type UnaryRequest } from '@connectrpc/connect';
 import { toast } from 'svelte-sonner';
-import { formatConnectError, parseHTTPError } from './error-formatter';
+import { formatConnectError, parseHTTPError, isEmailUnverifiedError } from './error-formatter';
 import { goto } from '$app/navigation';
 import { WorkspaceService } from '$lib/gen/nokku/v1/workspace_pb';
 import { workspaceID } from '$lib/store.svelte';
@@ -73,11 +73,14 @@ export const queryClient = new QueryClient({
 			}
 		},
 		onError: (error) => {
-			if (error instanceof ConnectError && error.code !== Code.Unauthenticated) {
-				toast.error(formatConnectError(error).title, {
-					description: formatConnectError(error).description
-				});
-			}
+			if (!(error instanceof ConnectError)) return;
+			if (error.code === Code.Unauthenticated) return;
+			// The login page shows its own inline verify-your-email state with a
+			// resend affordance for this case.
+			if (isEmailUnverifiedError(error)) return;
+			toast.error(formatConnectError(error).title, {
+				description: formatConnectError(error).description
+			});
 		}
 	})
 });

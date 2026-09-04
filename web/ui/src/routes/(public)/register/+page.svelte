@@ -36,7 +36,7 @@
 		isPasskeySignup = true;
 		try {
 			await signupWithPasskey({ email, name });
-			await goto('/verify?sent=true');
+			await goto(`/verify?sent=true&email=${encodeURIComponent(email)}`);
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : 'Passkey signup failed');
 		} finally {
