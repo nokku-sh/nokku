@@ -28,6 +28,9 @@ func DefaultWorkspaceSettings() *nokkuv1.WorkspaceSettings {
 			MaxSessions:          new(int32(10)),
 			MaxConnections:       new(int32(100)),
 			ClientAliveInterval:  durationpb.New(60 * time.Second),
+			ConnRate:             new(int32(5)),
+			ConnRateBurst:        new(int32(20)),
+			Banner:               new(true),
 		},
 	}
 }
