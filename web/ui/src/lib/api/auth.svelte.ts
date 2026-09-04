@@ -16,12 +16,12 @@ const client = createClient(AuthService, authTransport);
 
 function authMutation<B extends object | undefined, D = void>(
 	mutationFn: (body: B) => Promise<D>,
-	onSuccess?: () => void
+	onSuccess?: (variables: B) => void
 ) {
 	return createMutation<D, Error, B>(() => ({
 		mutationFn: async (body: B) => mutationFn(body),
-		onSuccess: () => {
-			onSuccess?.();
+		onSuccess: (_data, variables) => {
+			onSuccess?.(variables);
 		}
 	}));
 }
@@ -58,7 +58,10 @@ export const auth = {
 		authMutation(
 			(body: { name: string; email: string; password: string }) =>
 				client.register({ name: body.name, email: body.email, password: body.password }),
-			() => toast.success('Registration successful')
+			(body) => {
+				// The account stays locked until the emailed link is confirmed.
+				void goto(`/verify?sent=true&email=${encodeURIComponent(body.email)}`);
+			}
 		),
 	forgotPassword: () =>
 		authMutation(

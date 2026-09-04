@@ -80,6 +80,15 @@ function bufferToBase64url(buffer: ArrayBuffer): string {
 }
 
 /**
+ * The finish endpoints answer errors as {code, message} JSON (WriteError);
+ * throw the human message instead of the raw body text.
+ */
+async function fail(response: Response, fallback: string): Promise<never> {
+	const body = (await response.json().catch(() => null)) as { message?: string } | null;
+	throw new Error(body?.message || fallback);
+}
+
+/**
  * Registers a new user with a passkey (signup flow)
  */
 export async function signupWithPasskey(params: { email: string; name?: string }): Promise<void> {
@@ -150,8 +159,7 @@ export async function signupWithPasskey(params: { email: string; name?: string }
 	);
 
 	if (!finishResponse.ok) {
-		const error = await finishResponse.text();
-		throw new Error(error || 'Failed to finish passkey signup');
+		await fail(finishResponse, 'Failed to finish passkey signup');
 	}
 }
 
@@ -218,8 +226,7 @@ export async function registerPasskey(): Promise<void> {
 	});
 
 	if (!finishResponse.ok) {
-		const error = await finishResponse.text();
-		throw new Error(`Failed to finish registration: ${error}`);
+		await fail(finishResponse, 'Failed to finish registration');
 	}
 }
 
@@ -283,7 +290,6 @@ export async function loginWithPasskey(): Promise<void> {
 	});
 
 	if (!finishResponse.ok) {
-		const error = await finishResponse.text();
-		throw new Error(`Failed to finish passkey login: ${error}`);
+		await fail(finishResponse, 'Failed to finish passkey login');
 	}
 }

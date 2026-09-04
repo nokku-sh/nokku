@@ -1,5 +1,13 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 
+// Backend sentinel: the rawMessage of api.ErrEmailUnverified. Matching on
+// rawMessage is the convention for code-level error detection here (see the
+// validation-error matching below).
+export const emailUnverifiedMessage = 'verify your email address before signing in';
+
+export const isEmailUnverifiedError = (error: unknown): boolean =>
+	error instanceof ConnectError && error.rawMessage === emailUnverifiedMessage;
+
 type HTTPErrorBody = {
 	code?: number;
 	message?: string;

@@ -7,7 +7,7 @@
 
 	// State
 	let token = page.url.searchParams.get('token');
-	let email = $state('');
+	let email = $state(page.url.searchParams.get('email') ?? '');
 
 	const verifyEmail = auth.verifyEmail();
 	const resendVerification = auth.resendVerification();

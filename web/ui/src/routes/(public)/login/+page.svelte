@@ -5,11 +5,12 @@
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { BinaryIcon, GlobeIcon, KeyRound, LogIn } from '@lucide/svelte';
+	import { BinaryIcon, GlobeIcon, KeyRound, LogIn, Mail } from '@lucide/svelte';
 	import { GoogleIcon, GitHubIcon, OIDCIcon, SAMLIcon } from '$lib/assets';
 	import { toast } from 'svelte-sonner';
 	import { sso } from '$lib/api/sso.svelte';
 	import { auth } from '$lib/api/auth.svelte';
+	import { isEmailUnverifiedError, emailUnverifiedMessage } from '$lib/api/error-formatter';
 	import { useDebounce } from 'runed';
 	import Logo from '$lib/assets/logo.svelte';
 
@@ -18,7 +19,12 @@
 	let password = $state('');
 
 	const login = auth.login();
+	const resendVerification = auth.resendVerification();
 	const ssoCheck = sso.check();
+
+	// Credentials verified but the account is still locked behind its email
+	// confirmation: swap the form for a check-your-inbox state with a resend.
+	const showUnverified = $derived(login.isError && isEmailUnverifiedError(login.error));
 
 	// Home Realm Discovery: probe for a workspace SSO provider as the email is
 	// typed, so the matching button appears without submitting the form.
@@ -61,6 +67,12 @@
 			await loginWithPasskey();
 			await goto('/');
 		} catch (error) {
+			// Passkey login knows no email: route to the verify screen, whose
+			// resend form takes one.
+			if (error instanceof Error && error.message === emailUnverifiedMessage) {
+				await goto('/verify?sent=true');
+				return;
+			}
 			toast.error(error instanceof Error ? error.message : 'Passkey login failed');
 		}
 	}
@@ -90,24 +102,42 @@
 			</div>
 
 			{#if !enforceSSO}
-				<div class="space-y-0.5">
-					<div class="flex items-center justify-between">
-						<Label for="password" class="text-sm">Password</Label>
-						<Button href="/recovery" variant="link" size="sm" class="text-sm">
-							Forgot your Password?
+				{#if showUnverified}
+					<div class="space-y-3 rounded-lg bg-muted p-4">
+						<p class="text-sm font-medium">Check your email</p>
+						<p class="text-sm text-muted-foreground">
+							We sent a verification link to {email}. Confirm it to activate your account.
+						</p>
+						<Button
+							variant="outline"
+							type="button"
+							class="w-full"
+							onclick={() => resendVerification.mutate({ email })}
+						>
+							<Mail size={16} />
+							{resendVerification.isPending ? 'Sending…' : 'Resend verification email'}
 						</Button>
 					</div>
-					<InputGroupVariants
-						variant="password"
-						bind:value={password}
-						placeholder="Enter your password"
-						inputProps={{ required: true }}
-					/>
-				</div>
+				{:else}
+					<div class="space-y-0.5">
+						<div class="flex items-center justify-between">
+							<Label for="password" class="text-sm">Password</Label>
+							<Button href="/recovery" variant="link" size="sm" class="text-sm">
+								Forgot your Password?
+							</Button>
+						</div>
+						<InputGroupVariants
+							variant="password"
+							bind:value={password}
+							placeholder="Enter your password"
+							inputProps={{ required: true }}
+						/>
+					</div>
+				{/if}
 			{/if}
 
 			<div class="space-y-2 transition-transform">
-				{#if !enforceSSO}
+				{#if !enforceSSO && !showUnverified}
 					<Button
 						type="submit"
 						class="w-full"
@@ -178,7 +208,7 @@
 				<span>Passkey</span>
 			</Button>
 
-			{#if !enforceSSO && email && login.isError}
+			{#if !enforceSSO && email && login.isError && !showUnverified}
 				<Button href="/login/backup" variant="outline" class="group flex w-full items-center gap-2">
 					<BinaryIcon
 						size={16}
