@@ -308,7 +308,8 @@ CREATE INDEX idx_ca_workspace_id ON certificate_authorities (workspace_id);
 
 CREATE INDEX idx_ca_name_trgm ON certificate_authorities USING GIN (name gin_trgm_ops);
 
-CREATE UNIQUE INDEX idx_ca_default_per_workspace ON certificate_authorities (workspace_id)
+-- One default per authority type per workspace (one SSH, one X509)
+CREATE UNIQUE INDEX idx_ca_default_per_workspace ON certificate_authorities (workspace_id, authority_type)
 WHERE
   is_default = TRUE;
 
@@ -382,13 +383,14 @@ CREATE OR REPLACE FUNCTION is_workspace_member (ws_id UUID) RETURNS BOOLEAN AS $
 $$ LANGUAGE sql STABLE;
 
 -- Triggers -------------------------------------------------------------------
--- Ensure only one default CA per workspace
+-- Ensure only one default CA per workspace and authority type
 CREATE OR REPLACE FUNCTION enforce_single_default_ca () RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.is_default = TRUE THEN
     UPDATE certificate_authorities
     SET is_default = FALSE
     WHERE workspace_id = NEW.workspace_id
+      AND authority_type = NEW.authority_type
       AND id != NEW.id
       AND is_default = TRUE;
   END IF;

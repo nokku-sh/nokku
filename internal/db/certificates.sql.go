@@ -389,13 +389,19 @@ FROM
   certificate_authorities
 WHERE
   workspace_id = $1
+  AND authority_type = $2
   AND is_default = TRUE
   AND is_active = TRUE
   AND NOW() BETWEEN not_before AND not_after
 `
 
-func (q *Queries) GetDefaultCA(ctx context.Context, workspaceID string) (*CertificateAuthority, error) {
-	row := q.db.QueryRow(ctx, getDefaultCA, workspaceID)
+type GetDefaultCAParams struct {
+	WorkspaceID   string              `json:"workspaceId"`
+	AuthorityType nokku.AuthorityType `json:"authorityType"`
+}
+
+func (q *Queries) GetDefaultCA(ctx context.Context, arg *GetDefaultCAParams) (*CertificateAuthority, error) {
+	row := q.db.QueryRow(ctx, getDefaultCA, arg.WorkspaceID, arg.AuthorityType)
 	var i CertificateAuthority
 	err := row.Scan(
 		&i.ID,
@@ -678,23 +684,13 @@ func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*Certifi
 }
 
 const setDefaultCA = `-- name: SetDefaultCA :exec
-WITH
-  clear_default AS (
-    UPDATE certificate_authorities
-    SET
-      is_default = FALSE,
-      updated_at = NOW()
-    WHERE
-      workspace_id = $2
-      AND is_default = TRUE
-  )
-UPDATE certificate_authorities ca
+UPDATE certificate_authorities
 SET
-  ca.is_default = TRUE,
-  ca.updated_at = NOW()
+  is_default = TRUE,
+  updated_at = NOW()
 WHERE
-  ca.id = $1
-  AND ca.workspace_id = $2
+  id = $1
+  AND workspace_id = $2
 `
 
 type SetDefaultCAParams struct {
@@ -702,7 +698,8 @@ type SetDefaultCAParams struct {
 	WorkspaceID string `json:"workspaceId"`
 }
 
-// Clears existing default and sets new one atomically
+// The enforce_single_default_ca trigger clears the previous default of the
+// same authority type before this row is written.
 func (q *Queries) SetDefaultCA(ctx context.Context, arg *SetDefaultCAParams) error {
 	_, err := q.db.Exec(ctx, setDefaultCA, arg.CaID, arg.WorkspaceID)
 	return err

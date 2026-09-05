@@ -76,6 +76,7 @@ FROM
   certificate_authorities
 WHERE
   workspace_id = @workspace_id
+  AND authority_type = @authority_type
   AND is_default = TRUE
   AND is_active = TRUE
   AND NOW() BETWEEN not_before AND not_after;
@@ -188,25 +189,16 @@ WHERE
 RETURNING
   *;
 
--- Clears existing default and sets new one atomically
+-- The enforce_single_default_ca trigger clears the previous default of the
+-- same authority type before this row is written.
 -- name: SetDefaultCA :exec
-WITH
-  clear_default AS (
-    UPDATE certificate_authorities
-    SET
-      is_default = FALSE,
-      updated_at = NOW()
-    WHERE
-      workspace_id = @workspace_id
-      AND is_default = TRUE
-  )
-UPDATE certificate_authorities ca
+UPDATE certificate_authorities
 SET
-  ca.is_default = TRUE,
-  ca.updated_at = NOW()
+  is_default = TRUE,
+  updated_at = NOW()
 WHERE
-  ca.id = @ca_id
-  AND ca.workspace_id = @workspace_id;
+  id = @ca_id
+  AND workspace_id = @workspace_id;
 
 -- name: DeleteCA :one
 DELETE FROM certificate_authorities

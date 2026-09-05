@@ -95,7 +95,7 @@ type Querier interface {
 	GetDaemon(ctx context.Context, daemonID string) (*Daemon, error)
 	GetDaemonByKeyThumbprint(ctx context.Context, arg *GetDaemonByKeyThumbprintParams) (*Daemon, error)
 	GetDaemonsByIDs(ctx context.Context, daemonIds []string) ([]*GetDaemonsByIDsRow, error)
-	GetDefaultCA(ctx context.Context, workspaceID string) (*CertificateAuthority, error)
+	GetDefaultCA(ctx context.Context, arg *GetDefaultCAParams) (*CertificateAuthority, error)
 	GetEncryptedCAKeys(ctx context.Context) ([]*GetEncryptedCAKeysRow, error)
 	GetExpiringCAForUpdate(ctx context.Context) (*CertificateAuthority, error)
 	GetKeysetData(ctx context.Context) ([]byte, error)
@@ -186,7 +186,8 @@ type Querier interface {
 	RevokeTeamAccessInWorkspace(ctx context.Context, arg *RevokeTeamAccessInWorkspaceParams) error
 	RevokeUserAccessInWorkspace(ctx context.Context, arg *RevokeUserAccessInWorkspaceParams) error
 	SetDaemonsOffline(ctx context.Context) error
-	// Clears existing default and sets new one atomically
+	// The enforce_single_default_ca trigger clears the previous default of the
+	// same authority type before this row is written.
 	SetDefaultCA(ctx context.Context, arg *SetDefaultCAParams) error
 	SetRecordingComplete(ctx context.Context, arg *SetRecordingCompleteParams) (*Recording, error)
 	// Records which Stripe customer a workspace maps to, so checkout always reuses

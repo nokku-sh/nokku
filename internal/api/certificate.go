@@ -315,7 +315,10 @@ func (s *CertificateService) SignSSHCertificate(
 				return err
 			}
 		} else if req.GetWorkspaceId() != "" {
-			ca, err = q.GetDefaultCA(ctx, req.GetWorkspaceId())
+			ca, err = q.GetDefaultCA(ctx, &db.GetDefaultCAParams{
+				WorkspaceID:   req.GetWorkspaceId(),
+				AuthorityType: nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH,
+			})
 			if err != nil {
 				return err
 			}
@@ -383,14 +386,24 @@ func (s *CertificateService) SignX509Certificate(
 	ctx context.Context,
 	req *nokkuv1.SignX509CertificateRequest,
 ) (*nokkuv1.SignX509CertificateResponse, error) {
-	if req.GetCaId() == "" {
-		return nil, NewError(connect.CodeInvalidArgument, "ca_id is required")
-	}
-
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		ca, err = q.GetCA(ctx, req.GetCaId())
-		return err
+		if req.GetCaId() != "" {
+			ca, err = q.GetCA(ctx, req.GetCaId())
+			if err != nil {
+				return err
+			}
+		} else if req.GetWorkspaceId() != "" {
+			ca, err = q.GetDefaultCA(ctx, &db.GetDefaultCAParams{
+				WorkspaceID:   req.GetWorkspaceId(),
+				AuthorityType: nokkuv1.AuthorityType_AUTHORITY_TYPE_X509,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}); err != nil {
 		return nil, DBError(err)
 	}
