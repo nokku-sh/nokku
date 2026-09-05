@@ -27,14 +27,6 @@ CREATE TABLE IF NOT EXISTS credentials (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- An external identity may link to at most one user, and a subject is only
--- unique within its issuer, so stale mappings must not survive an issuer change.
-CREATE UNIQUE INDEX credentials_external_idx ON credentials (type, provider, subject)
-WHERE
-  subject <> '';
-
-CREATE INDEX credentials_user_idx ON credentials (user_id, type);
-
 CREATE TABLE IF NOT EXISTS one_time_tokens (
   token_hash TEXT PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -42,8 +34,6 @@ CREATE TABLE IF NOT EXISTS one_time_tokens (
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX one_time_tokens_expiry_idx ON one_time_tokens (expires_at);
 
 CREATE TABLE IF NOT EXISTS roles (name TEXT PRIMARY KEY, description TEXT NOT NULL DEFAULT '');
 
@@ -95,10 +85,6 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX sessions_subject_idx ON sessions (subject_id);
-
-CREATE INDEX sessions_workspace_idx ON sessions (workspace_id);
-
 CREATE TABLE IF NOT EXISTS sso_providers (
   workspace_id UUID REFERENCES workspaces (id) ON DELETE CASCADE,
   provider_id TEXT NOT NULL PRIMARY KEY,
@@ -129,8 +115,6 @@ CREATE TABLE IF NOT EXISTS workspace_domains (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (workspace_id, domain)
 );
-
-CREATE INDEX idx_workspace_domains_domain ON workspace_domains (domain);
 
 CREATE TABLE IF NOT EXISTS service_accounts (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -296,6 +280,8 @@ CREATE INDEX idx_workspaces_created_by ON workspaces (created_by);
 
 CREATE INDEX idx_workspace_members_user_id ON workspace_members (user_id, workspace_id);
 
+CREATE INDEX idx_workspace_domains_domain ON workspace_domains (domain);
+
 CREATE INDEX idx_service_accounts_workspace_id ON service_accounts (workspace_id);
 
 CREATE INDEX idx_service_accounts_name_trgm ON service_accounts USING GIN (name gin_trgm_ops);
@@ -354,12 +340,25 @@ CREATE INDEX idx_principal_sa_service_account_id ON principal_service_accounts (
 
 CREATE INDEX idx_principal_sa_workspace_id ON principal_service_accounts (workspace_id);
 
-CREATE INDEX recordings_workspace_started_idx ON recordings (workspace_id, started_at DESC);
+CREATE INDEX idx_recordings_workspace_started ON recordings (workspace_id, started_at DESC);
+
+-- An external identity may link to at most one user.
+CREATE UNIQUE INDEX idx_credentials_external ON credentials (type, provider, subject)
+WHERE
+  subject <> '';
+
+CREATE INDEX idx_credentials_user ON credentials (user_id, type);
+
+CREATE INDEX idx_one_time_tokens_expiry ON one_time_tokens (expires_at);
+
+CREATE INDEX idx_sessions_subject ON sessions (subject_id);
+
+CREATE INDEX idx_sessions_workspace ON sessions (workspace_id);
 
 -- SCIM group sync expects displayName to resolve to one group per
 -- workspace (RFC 7643). Without this, duplicate pushes create duplicate
 -- teams and the IdP's member updates hit the wrong one.
-CREATE UNIQUE INDEX IF NOT EXISTS teams_workspace_name_idx ON teams (workspace_id, name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_teams_workspace_name ON teams (workspace_id, name);
 
 -- Functions ------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION current_workspace_id () RETURNS UUID AS $$
