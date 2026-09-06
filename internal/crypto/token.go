@@ -34,6 +34,20 @@ func WithID(id string) TokenOption {
 	}
 }
 
+// NewSecret returns a fresh opaque secret and the hash to store. Only the
+// hash is persisted; the raw secret is delivered to the client exactly once.
+func NewSecret() (raw string, hash HashedToken, err error) {
+	raw, err = RandomString(32)
+	if err != nil {
+		return "", "", err
+	}
+	hash, err = HashToken(raw)
+	if err != nil {
+		return "", "", err
+	}
+	return raw, hash, nil
+}
+
 // NewToken mints an opaque token. WithID binds the token to an id; without it
 // the token is a bare secret.
 func NewToken(opts ...TokenOption) (*Token, error) {
