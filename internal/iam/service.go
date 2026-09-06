@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/nokku-sh/nokku/internal/db"
@@ -96,6 +97,10 @@ type Deps struct {
 	// passkey), after the session cookie is set. Hosts attach post-login
 	// side effects: device remembering, new-login alerts.
 	OnUserLogin func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
+	// OnNewDeviceLogin fires when RememberDevice issued a first session for
+	// a device, so the host can send its geo-located new-login alert. Runs
+	// on a detached goroutine; delivery failures are the host's to log.
+	OnNewDeviceLogin func(ctx context.Context, u *db.User, sess db.Session, label, ip string)
 	// OnPasskeySignup fires after passkey-only signup created the account,
 	// so the host can send its verification email.
 	OnPasskeySignup func(r *http.Request, u *db.User)
@@ -110,6 +115,9 @@ type Deps struct {
 // implementations.
 type txRunner interface {
 	Querier() db.Querier
+	// AdminQuerier runs pre-authorization lookups that cannot be
+	// tenant-scoped: resolving a presented credential to a tenant.
+	AdminQuerier() db.Querier
 	WithTx(ctx context.Context, fn func(*db.Queries) error) error
 	WithWorkspace(ctx context.Context, fn func(*db.Queries) error) error
 }
@@ -117,23 +125,25 @@ type txRunner interface {
 // Service is the iam engine. Managers hang off it and share its querier and
 // event sink.
 type Service struct {
-	q               db.Querier
-	baseURL         string
-	conn            txRunner
-	cache           Cache
-	events          Sink
-	OnSSOLogin      func(ctx context.Context, userID, workspaceID string) error
-	CanJoin         func(ctx context.Context, workspaceID string, used int64) error
-	OnUserLogin     func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
-	OnPasskeySignup func(r *http.Request, u *db.User)
-	Password        *PasswordManager
-	DPoP            *DPoPVerifier
-	Device          *DeviceFlow
-	OIDC            *oidcFlow
-	OAuth2          *oauth2Flow
-	SAML            *samlFlow
-	Passkey         *passkeyFlow
-	SCIM            *SCIMFlow
+	q                db.Querier
+	baseURL          string
+	secure           bool
+	conn             txRunner
+	cache            Cache
+	events           Sink
+	OnSSOLogin       func(ctx context.Context, userID, workspaceID string) error
+	CanJoin          func(ctx context.Context, workspaceID string, used int64) error
+	OnUserLogin      func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
+	OnNewDeviceLogin func(ctx context.Context, u *db.User, sess db.Session, label, ip string)
+	OnPasskeySignup  func(r *http.Request, u *db.User)
+	Password         *PasswordManager
+	DPoP             *DPoPVerifier
+	Device           *DeviceFlow
+	OIDC             *oidcFlow
+	OAuth2           *oauth2Flow
+	SAML             *samlFlow
+	Passkey          *passkeyFlow
+	SCIM             *SCIMFlow
 
 	now func() time.Time
 }
@@ -145,16 +155,18 @@ func New(d Deps) (*Service, error) {
 	}
 
 	svc := &Service{
-		q:               d.Conn.Querier(),
-		baseURL:         d.BaseURL,
-		conn:            d.Conn,
-		cache:           d.Cache,
-		events:          d.Events,
-		OnSSOLogin:      d.OnSSOLogin,
-		CanJoin:         d.CanJoin,
-		OnUserLogin:     d.OnUserLogin,
-		OnPasskeySignup: d.OnPasskeySignup,
-		now:             time.Now,
+		q:                d.Conn.Querier(),
+		baseURL:          d.BaseURL,
+		secure:           strings.HasPrefix(strings.ToLower(d.BaseURL), "https://"),
+		conn:             d.Conn,
+		cache:            d.Cache,
+		events:           d.Events,
+		OnSSOLogin:       d.OnSSOLogin,
+		CanJoin:          d.CanJoin,
+		OnUserLogin:      d.OnUserLogin,
+		OnNewDeviceLogin: d.OnNewDeviceLogin,
+		OnPasskeySignup:  d.OnPasskeySignup,
+		now:              time.Now,
 	}
 	svc.Password = newPasswordManager(svc, d.Password)
 	if len(d.Secret) > 0 {

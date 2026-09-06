@@ -428,13 +428,7 @@ func (s *DaemonService) EnrollDaemon(
 
 	// The daemon's control-plane token never expires; it is revoked by
 	// deleting the daemon (the session cascades), not by a clock.
-	_, token, err := s.cfg.IAM.IssueSession(ctx, iam.SessionParams{
-		WorkspaceID: workspaceID,
-		SubjectID:   daemonID,
-		Kind:        iam.KindDaemon,
-		Method:      iam.MethodDevice,
-		Binding:     binding,
-	})
+	token, err := s.cfg.IAM.IssueDaemonSession(ctx, workspaceID, daemonID, binding)
 	if err != nil {
 		return nil, ErrInternal
 	}
@@ -482,8 +476,7 @@ func (s *DaemonService) enrollBinding(ctx context.Context) (string, error) {
 	)
 	if err != nil {
 		if errors.Is(err, iam.ErrDPoPNonce) {
-			ci.ResponseHeader().Set("DPoP-Nonce", svc.DPoP.CurrentNonce())
-			ci.ResponseHeader().Set(iam.DeviceURLHeader, s.cfg.FullURL())
+			svc.AdvertiseDPoPNonce(ci.ResponseHeader())
 			return "", NewError(connect.CodeUnauthenticated, "stale DPoP nonce")
 		}
 		return "", NewError(connect.CodeInvalidArgument, "invalid DPoP proof")

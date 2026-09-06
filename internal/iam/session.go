@@ -3,6 +3,8 @@ package iam
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"net/http"
 	"slices"
 	"time"
 
@@ -10,10 +12,16 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/util"
 )
 
 const (
-	sessionTTL = 168 * time.Hour
+
+	// Remembered-device ("your devices") settings. The device cookie is a
+	// handle that speeds up future logins and powers the sessions list; it
+	// is never an API credential.
+	webDeviceCookieName = "nokku_device"
+	webDeviceTTL        = 180 * 24 * time.Hour
 )
 
 // SessionHash is the hex token hash a sessions listing exposes as the
@@ -38,11 +46,7 @@ type SessionParams struct {
 // IssueSession creates a session and returns it together with the raw token. The
 // raw token must be delivered to the client (cookie or body) exactly once.
 func (s *Service) IssueSession(ctx context.Context, p SessionParams) (db.Session, string, error) {
-	token, err := crypto.RandomString(32)
-	if err != nil {
-		return db.Session{}, "", err
-	}
-	tokenHash, err := crypto.HashToken(token)
+	token, tokenHash, err := crypto.NewSecret()
 	if err != nil {
 		return db.Session{}, "", err
 	}
@@ -51,7 +55,7 @@ func (s *Service) IssueSession(ctx context.Context, p SessionParams) (db.Session
 	}
 
 	now := s.now()
-	row := db.Session{
+	params := db.CreateSessionParams{
 		TokenHash:  tokenHash,
 		SubjectID:  p.SubjectID,
 		Kind:       string(p.Kind),
@@ -59,27 +63,16 @@ func (s *Service) IssueSession(ctx context.Context, p SessionParams) (db.Session
 		Binding:    p.Binding,
 		Label:      p.Label,
 		LastSeenAt: &now,
-		CreatedAt:  now,
 	}
 	if p.WorkspaceID != "" {
-		row.WorkspaceID = &p.WorkspaceID
+		params.WorkspaceID = &p.WorkspaceID
 	}
 	if p.TTL > 0 {
 		expires := now.Add(p.TTL)
-		row.ExpiresAt = &expires
+		params.ExpiresAt = &expires
 	}
 
-	if err := s.q.CreateSession(ctx, &db.CreateSessionParams{
-		TokenHash:   row.TokenHash,
-		SubjectID:   row.SubjectID,
-		Kind:        row.Kind,
-		Method:      row.Method,
-		WorkspaceID: row.WorkspaceID,
-		Binding:     row.Binding,
-		Label:       row.Label,
-		ExpiresAt:   row.ExpiresAt,
-		LastSeenAt:  row.LastSeenAt,
-	}); err != nil {
+	if err := s.q.CreateSession(ctx, &params); err != nil {
 		return db.Session{}, "", err
 	}
 
@@ -90,7 +83,106 @@ func (s *Service) IssueSession(ctx context.Context, p SessionParams) (db.Session
 		UserID:      p.SubjectID,
 		WorkspaceID: p.WorkspaceID,
 	})
+	row := db.Session{
+		TokenHash:   tokenHash,
+		SubjectID:   p.SubjectID,
+		Kind:        string(p.Kind),
+		Method:      string(p.Method),
+		Binding:     p.Binding,
+		Label:       p.Label,
+		LastSeenAt:  &now,
+		CreatedAt:   now,
+		ExpiresAt:   params.ExpiresAt,
+		WorkspaceID: params.WorkspaceID,
+	}
 	return row, token, nil
+}
+
+// completeLogin finishes a verified interactive login: it issues the user
+// session, records the audit event, and returns the session cookie for the
+// response. The session stays unpinned: users are global and act per-request
+// in a workspace, like every other interactive login.
+func (s *Service) completeLogin(
+	ctx context.Context,
+	u *db.User,
+	method Method,
+) (*http.Cookie, error) {
+	sess, token, err := s.IssueSession(ctx, SessionParams{
+		SubjectID: u.ID,
+		Kind:      KindUser,
+		Method:    method,
+		TTL:       sessionTTL,
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.record(ctx, Event{
+		Action: ActionLoginSucceeded,
+		Kind:   KindUser,
+		Method: method,
+		UserID: u.ID,
+		Email:  u.Email,
+	})
+	return s.SessionCookie(token, sess.ExpiresAt), nil
+}
+
+// IssueDaemonSession issues the daemon's control-plane token. It never
+// expires; it is revoked by deleting the daemon (the session cascades).
+func (s *Service) IssueDaemonSession(
+	ctx context.Context,
+	workspaceID, daemonID, binding string,
+) (string, error) {
+	_, token, err := s.IssueSession(ctx, SessionParams{
+		WorkspaceID: workspaceID,
+		SubjectID:   daemonID,
+		Kind:        KindDaemon,
+		Method:      MethodDevice,
+		Binding:     binding,
+	})
+	return token, err
+}
+
+// RememberDevice refreshes the remembered-device session when the login
+// request carries its cookie, otherwise issues a first one (firing
+// OnNewDeviceLogin so the host can alert). It returns the cookie to set on
+// the login response, nil when the device was already known.
+func (s *Service) RememberDevice(
+	ctx context.Context,
+	header http.Header,
+	remoteAddr string,
+	u *db.User,
+) *http.Cookie {
+	if raw := CookieFromHeader(header, webDeviceCookieName); raw != "" {
+		if sess, err := s.VerifySession(ctx, raw); err == nil &&
+			sess.Kind == string(KindWebDevice) && sess.SubjectID == u.ID {
+			// Known device: refresh its last-seen time so the sessions list
+			// shows current activity. No alert.
+			if err := s.TouchSession(ctx, SessionHash(sess.TokenHash)); err != nil {
+				slog.Debug("failed to touch device session", "error", err)
+			}
+			return nil
+		}
+	}
+
+	name := DeviceNameFromUA(header.Get("User-Agent"))
+	sess, token, err := s.IssueSession(ctx, SessionParams{
+		SubjectID: u.ID,
+		Kind:      KindWebDevice,
+		Method:    MethodDevice,
+		Label:     name,
+		TTL:       webDeviceTTL,
+	})
+	if err != nil {
+		slog.Error("failed to register device session", "error", err)
+		return nil
+	}
+
+	if s.OnNewDeviceLogin != nil {
+		ip := util.GetRemoteIP(header, remoteAddr)
+		go s.OnNewDeviceLogin(context.WithoutCancel(ctx), u, sess, name, ip)
+	}
+
+	return s.newCookie(webDeviceCookieName, token, derefTime(sess.ExpiresAt))
 }
 
 // VerifySession loads and validates the session for token. It enforces the absolute

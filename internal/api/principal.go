@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -106,9 +105,9 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 				}
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
-			return errors.New("invalid principal type")
+			return ErrInvalidInput
 		default:
-			return errors.New("invalid principal type")
+			return ErrInvalidInput
 		}
 
 		return nil
@@ -163,9 +162,9 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 				}
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
-			return errors.New("invalid principal type")
+			return ErrInvalidInput
 		default:
-			return errors.New("invalid principal type")
+			return ErrInvalidInput
 		}
 
 		return nil
@@ -208,9 +207,9 @@ func (s *PrincipalService) RevokeAllAccess(
 				return err
 			}
 		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
-			return errors.New("invalid principal type")
+			return ErrInvalidInput
 		default:
-			return errors.New("invalid principal type")
+			return ErrInvalidInput
 		}
 		return nil
 	}); err != nil {

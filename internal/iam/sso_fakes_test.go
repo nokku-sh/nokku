@@ -198,6 +198,8 @@ type fakeStoreConn struct {
 
 func (c *fakeStoreConn) Querier() db.Querier { return c.store }
 
+func (c *fakeStoreConn) AdminQuerier() db.Querier { return c.store }
+
 func (c *fakeStoreConn) WithTx(_ context.Context, fn func(*db.Queries) error) error {
 	return fn(db.New(c))
 }

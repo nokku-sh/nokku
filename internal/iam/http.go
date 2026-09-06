@@ -13,59 +13,44 @@ import (
 )
 
 const (
-	SessionTTL        = 24 * time.Hour
-	SessionCookieName = "nokku_session"
+	sessionTTL        = 168 * time.Hour
+	sessionCookieName = "nokku_session"
 	maxBodyBytes      = 1 << 20
 )
 
+// newCookie builds a host-only, HttpOnly, Lax cookie with the service's
+// Secure attribute; every browser cookie of the service shares these.
+func (s *Service) newCookie(name, value string, expires time.Time) *http.Cookie {
+	return &http.Cookie{ //nolint:gosec // Secure is set dynamically from the base URL scheme
+		Name:     name,
+		Value:    value,
+		Path:     "/",
+		Expires:  expires,
+		HttpOnly: true,
+		Secure:   s.secure,
+		SameSite: http.SameSiteLaxMode,
+	}
+}
+
 // SessionCookie returns the session cookie for token and expiry.
 func (s *Service) SessionCookie(token string, expires *time.Time) *http.Cookie {
-	exp := time.Now().Add(SessionTTL)
+	exp := time.Now().Add(sessionTTL)
 	if expires != nil {
 		exp = *expires
 	}
-	return &http.Cookie{ //nolint:gosec // Secure is set dynamically from the base URL scheme
-		Name:     SessionCookieName,
-		Value:    token,
-		Path:     "/",
-		Expires:  exp,
-		HttpOnly: true,
-		Secure:   s.Secure(),
-		SameSite: http.SameSiteLaxMode,
-	}
+	return s.newCookie(sessionCookieName, token, exp)
 }
 
 // ClearSessionCookie returns the expired empty session cookie.
 func (s *Service) ClearSessionCookie() *http.Cookie {
-	return &http.Cookie{ //nolint:gosec // Secure is set dynamically from the base URL scheme
-		Name:     SessionCookieName,
-		Value:    "",
-		Path:     "/",
-		Expires:  time.Unix(0, 0),
-		HttpOnly: true,
-		Secure:   s.Secure(),
-		SameSite: http.SameSiteLaxMode,
-	}
-}
-
-// Secure reports whether the base URL is https, driving the cookie's Secure
-// attribute.
-func (s *Service) Secure() bool {
-	return strings.HasPrefix(strings.ToLower(s.baseURL), "https://")
-}
-
-// SessionTokenFromRequest extracts the session token from the request: the
-// cookie first, then an "Authorization: Bearer" header.
-func SessionTokenFromRequest(r *http.Request) string {
-	return SessionTokenFromHeader(r.Header)
+	return s.newCookie(sessionCookieName, "", time.Unix(0, 0))
 }
 
 // SessionTokenFromHeader extracts the session token from request headers:
-// the cookie first, then an "Authorization: Bearer" header. It is the
-// transport-neutral counterpart of SessionTokenFromRequest: the connect
-// handlers only see the raw header map.
+// the cookie first, then an "Authorization: Bearer" header. The connect
+// handlers only see the raw header map, so this speaks headers directly.
 func SessionTokenFromHeader(h http.Header) string {
-	if v := CookieFromHeader(h, SessionCookieName); v != "" {
+	if v := CookieFromHeader(h, sessionCookieName); v != "" {
 		return v
 	}
 	const prefix = "Bearer "
@@ -91,38 +76,12 @@ func CookieFromHeader(h http.Header, name string) string {
 	return ""
 }
 
-// AuthenticateRequest resolves token to a principal. User sessions load the
-// account so inactive accounts fail closed; device sessions authenticate on
-// the session row alone.
-func (s *Service) AuthenticateRequest(
-	ctx context.Context,
-	token string,
-) (Principal, db.Session, error) {
-	sess, err := s.VerifySession(ctx, token)
-	if err != nil {
-		return Principal{}, db.Session{}, err
-	}
-	kind := Kind(sess.Kind)
-	p := Principal{ID: sess.SubjectID, Kind: kind, WorkspaceID: deref(sess.WorkspaceID)}
-	if kind == KindUser {
-		u, err := s.GetUserByID(ctx, sess.SubjectID)
-		if err != nil {
-			return Principal{}, db.Session{}, err
-		}
-		if !u.Active {
-			return Principal{}, db.Session{}, ErrInactive
-		}
-		p.Email = u.Email
-	}
-	return p, sess, nil
-}
-
 // Middleware attaches the request's principal when a valid session is
 // present, and continues either way. Pair with RequireLogin to enforce.
 func (s *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if token := SessionTokenFromRequest(r); token != "" {
-			p, sess, err := s.AuthenticateRequest(r.Context(), token)
+		if token := SessionTokenFromHeader(r.Header); token != "" {
+			p, sess, err := s.AuthenticateToken(r.Context(), token)
 			if err == nil {
 				ctx := ContextWithPrincipal(r.Context(), p)
 				ctx = ContextWithSession(ctx, sess)
@@ -170,7 +129,7 @@ func RequestMetaFromContext(ctx context.Context) (RequestMeta, bool) {
 func (s *Service) RequireLogin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := PrincipalFromContext(r.Context()); !ok {
-			WriteError(w, http.StatusUnauthorized, "unauthenticated", "sign in to continue")
+			WriteError(w, http.StatusUnauthorized, "sign in to continue")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -182,12 +141,7 @@ func (s *Service) RequireLogin(next http.Handler) http.Handler {
 func (s *Service) RequireUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if p, ok := PrincipalFromContext(r.Context()); ok && p.Kind != KindUser {
-			WriteError(
-				w,
-				http.StatusForbidden,
-				"forbidden",
-				"account endpoints require a user session",
-			)
+			WriteError(w, http.StatusForbidden, "account endpoints require a user session")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -211,13 +165,8 @@ type sessionKey struct{}
 func (s *Service) CSRFGuard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
-			if _, err := r.Cookie(SessionCookieName); err == nil && !sameOrigin(r) {
-				WriteError(
-					w,
-					http.StatusForbidden,
-					"invalid_origin",
-					"cross-origin request rejected",
-				)
+			if _, err := r.Cookie(sessionCookieName); err == nil && !sameOrigin(r) {
+				WriteError(w, http.StatusForbidden, "cross-origin request rejected")
 				return
 			}
 		}
@@ -260,15 +209,10 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// WriteOK writes an empty 200 JSON object.
-func WriteOK(w http.ResponseWriter) {
-	WriteJSON(w, http.StatusOK, struct{}{})
-}
-
 // WriteError writes the error body the UI parses: {"code": <http status>,
 // "message": ...}. The status alone drives the connect code mapping; the
 // message carries the human-readable detail.
-func WriteError(w http.ResponseWriter, status int, _, msg string) {
+func WriteError(w http.ResponseWriter, status int, msg string) {
 	WriteJSON(w, status, map[string]any{"code": status, "message": msg})
 }
 
@@ -287,15 +231,6 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
-}
-
-// CookieToken returns the named cookie's value, or "" when absent.
-func CookieToken(r *http.Request, name string) string {
-	c, err := r.Cookie(name)
-	if err != nil {
-		return ""
-	}
-	return c.Value
 }
 
 func DeviceNameFromUA(ua string) string {

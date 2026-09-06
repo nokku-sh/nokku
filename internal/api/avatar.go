@@ -130,7 +130,7 @@ func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 
 		// The avatar URL lives on the user profile; the caller attaches it with
 		// the account-surface update (AccountService/UpdateAccount).
-		writeJSON(w, http.StatusOK, map[string]string{"url": versionedURL})
+		iam.WriteJSON(w, http.StatusOK, map[string]string{"url": versionedURL})
 	}
 }
 

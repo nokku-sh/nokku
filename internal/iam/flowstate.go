@@ -244,7 +244,7 @@ func Fail(w http.ResponseWriter, r *http.Request, errRedirect, msg string) {
 		)
 		return
 	}
-	WriteError(w, http.StatusUnauthorized, "unauthorized", msg)
+	WriteError(w, http.StatusUnauthorized, msg)
 }
 
 func emailDomain(email string) string {

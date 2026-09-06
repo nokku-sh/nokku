@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -14,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 // Generic errors
@@ -170,10 +170,15 @@ func isUniqueViolation(err error) bool {
 }
 
 // DBError maps a pgx or postgres error to a connect error with a message that
-// fits the underlying failure. It returns nil only when err is nil.
+// fits the underlying failure. It returns nil only when err is nil. Errors
+// that are already connect errors pass through unchanged, so handlers can
+// map a domain failure inside a transaction closure.
 func DBError(err error) error {
 	if err == nil {
 		return nil
+	}
+	if _, ok := errors.AsType[*connect.Error](err); ok {
+		return err
 	}
 
 	switch {
@@ -260,20 +265,9 @@ func DBError(err error) error {
 
 // Http errors
 
-type httpError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
-}
-
+// writeJSONError writes the plain-JSON error body the HTTP surfaces (avatar
+// upload, terminal) parse: {"code": <status>, "message": ...}. It shares
+// iam's JSON encoder so the wire shape stays identical everywhere.
 func writeJSONError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, httpError{
-		Code:    status,
-		Message: message,
-	})
+	iam.WriteJSON(w, status, map[string]any{"code": status, "message": message})
 }

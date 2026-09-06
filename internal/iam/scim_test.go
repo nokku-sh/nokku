@@ -307,6 +307,8 @@ type scimConn struct{ st *scimStore }
 
 func (c *scimConn) Querier() db.Querier { return c.st }
 
+func (c *scimConn) AdminQuerier() db.Querier { return c.st }
+
 func (c *scimConn) WithTx(_ context.Context, fn func(*db.Queries) error) error {
 	return fn(db.New(c))
 }

@@ -38,7 +38,7 @@ func (h *oauth2Flow) Login(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	providerID := r.URL.Query().Get("provider")
 	if providerID == "" {
-		WriteError(w, http.StatusBadRequest, "missing_provider", "missing provider")
+		WriteError(w, http.StatusBadRequest, "missing provider")
 		return
 	}
 
@@ -61,7 +61,7 @@ func (h *oauth2Flow) Login(w http.ResponseWriter, r *http.Request) {
 
 	stateValue, err := h.authorize.Put(ctx, st)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 

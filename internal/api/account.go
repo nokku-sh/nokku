@@ -299,7 +299,7 @@ func (s *AccountService) DeleteAccount(
 	// The session cookie is HttpOnly, so only a response from the backend
 	// can clear it. Connect carries cookies on the response headers.
 	if ci, ok := connect.CallInfoForHandlerContext(ctx); ok {
-		ci.ResponseHeader().Add("Set-Cookie", s.cfg.IAM.ClearSessionCookie().String())
+		setCookie(ci, s.cfg.IAM.ClearSessionCookie())
 	}
 	return &nokkuv1.DeleteAccountResponse{}, nil
 }
