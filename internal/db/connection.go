@@ -191,6 +191,9 @@ func (c *Connection) setupAppRole(ctx context.Context) error {
 // Querier exposes the app-pool querier for global table reads and writes.
 func (c *Connection) Querier() Querier { return c.Q }
 
+// AdminQuerier returns the non-RLS querier for pre-authorization lookups.
+func (c *Connection) AdminQuerier() Querier { return c.AdminQ }
+
 // WithTx executes a transaction as nokku_system, bypassing rls entirely.
 func (c *Connection) WithTx(
 	ctx context.Context,
