@@ -47,25 +47,32 @@ func (s *InvitationService) GetInvitation(
 		return nil, ErrBadCredentials
 	}
 
+	// The joiner is not a member yet, so this runs as a system transaction:
+	// RLS would deny the workspace read to nokku_app. The token is verified
+	// before any state checks so no information leaks without a valid token.
 	var workspace *db.Workspace
-	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
+		var err error
+		workspace, err = q.GetWorkspace(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+		if !workspace.InviteTokenHash.Verify(req.GetToken()) {
+			return errInviteInvalid
+		}
 		if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
 			WorkspaceID: workspaceID,
 			UserID:      actor.ID,
 		}); err == nil {
 			return errAlreadyMember
 		}
-
-		workspace, err = q.GetWorkspace(ctx, workspaceID)
-		return err
-	}); errors.Is(err, errAlreadyMember) {
+		return nil
+	}); errors.Is(err, errInviteInvalid) {
+		return nil, NewError(connect.CodeFailedPrecondition, "invalid invitation token")
+	} else if errors.Is(err, errAlreadyMember) {
 		return nil, NewError(connect.CodeAborted, "you have already joined this workspace")
 	} else if err != nil {
 		return nil, DBError(err)
-	}
-
-	if !workspace.InviteTokenHash.Verify(req.GetToken()) {
-		return nil, NewError(connect.CodeFailedPrecondition, "invalid invitation token")
 	}
 
 	return &nokkuv1.GetInvitationResponse{
@@ -91,14 +98,20 @@ func (s *InvitationService) AcceptInvitation(
 		return nil, ErrBadCredentials
 	}
 
-	// The only remaining quota check in the product: the seat cap.
-	if err := s.cfg.Entitlements.CanInvite(ctx, workspaceID); err != nil {
-		return nil, err
-	}
-
-	// System transaction: the joiner is not a member yet. The invite token
-	// is validated against its stored hash before the membership is added.
+	// System transaction: the joiner is not a member yet. The workspace row
+	// is locked so concurrent joins serialize before the seat count, and the
+	// token is verified before any state checks.
 	err = s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
+		settings, err := q.GetWorkspaceForUpdate(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+		if !settings.InviteTokenHash.Verify(req.GetToken()) {
+			return errInviteInvalid
+		}
+		if settings.InviteExpiresAt != nil && settings.InviteExpiresAt.Before(time.Now()) {
+			return errInviteExpired
+		}
 		if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
 			WorkspaceID: workspaceID,
 			UserID:      userID,
@@ -106,15 +119,12 @@ func (s *InvitationService) AcceptInvitation(
 			return errAlreadyMember
 		}
 
-		settings, err := q.GetWorkspace(ctx, workspaceID)
+		used, err := q.CountWorkspaceSeats(ctx, workspaceID)
 		if err != nil {
 			return err
 		}
-		if settings.InviteExpiresAt != nil && settings.InviteExpiresAt.Before(time.Now()) {
-			return errInviteExpired
-		}
-		if !settings.InviteTokenHash.Verify(req.GetToken()) {
-			return errInviteInvalid
+		if err := s.cfg.Entitlements.CanInvite(ctx, workspaceID, used); err != nil {
+			return err
 		}
 
 		return q.AddWorkspaceMember(ctx, &db.AddWorkspaceMemberParams{
@@ -123,13 +133,17 @@ func (s *InvitationService) AcceptInvitation(
 		})
 	})
 	switch {
+	case err == nil:
 	case errors.Is(err, errAlreadyMember):
 		return nil, NewError(connect.CodeAborted, "you have already joined this workspace")
 	case errors.Is(err, errInviteExpired):
 		return nil, NewError(connect.CodeFailedPrecondition, "invitation has expired")
 	case errors.Is(err, errInviteInvalid):
 		return nil, NewError(connect.CodeFailedPrecondition, "invalid invitation token")
-	case err != nil:
+	default:
+		if _, ok := errors.AsType[*connect.Error](err); ok {
+			return nil, err
+		}
 		return nil, DBError(err)
 	}
 

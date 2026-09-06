@@ -65,8 +65,6 @@ type DB interface {
 	// Subscription returns the workspace subscription row, or an error
 	// when none exists (community workspaces).
 	Subscription(ctx context.Context, workspaceID string) (plan string, status Status, err error)
-	// MemberCount returns the current number of workspace members.
-	MemberCount(ctx context.Context, workspaceID string) (int64, error)
 	// ResourceCount returns the pooled count of managed resources.
 	ResourceCount(ctx context.Context, workspaceID string) (int64, error)
 }

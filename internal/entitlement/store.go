@@ -40,17 +40,6 @@ func (s *Store) Subscription(
 	return sub.Plan, Status(sub.Status), nil
 }
 
-func (s *Store) MemberCount(ctx context.Context, workspaceID string) (int64, error) {
-	var count int64
-	if err := s.conn.WithTx(ctx, func(q *db.Queries) (err error) {
-		count, err = q.CountWorkspaceSeats(ctx, workspaceID)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-	return count, nil
-}
-
 func (s *Store) ResourceCount(ctx context.Context, workspaceID string) (int64, error) {
 	var count int64
 	if err := s.conn.WithTx(ctx, func(q *db.Queries) (err error) {
