@@ -26,20 +26,9 @@ import (
 	"github.com/nokku-sh/nokku/internal/cache"
 )
 
-// Errors returned by DPoPVerifier.Verify. Map ErrDPoPNonce to a fresh
-// DPoP-Nonce response header (retry with use_dpop_nonce) and everything else
-// to an invalid-proof rejection.
-var (
-	ErrInvalidProof = errors.New("iam: invalid dpop proof")
-	// ErrDPoPNonce marks a proof missing or bearing a stale server nonce.
-	ErrDPoPNonce = errors.New("iam: dpop nonce required")
-	// ErrReplay marks a proof whose jti was already consumed (RFC 9449
-	// sections 8.1 and 11.1). It wraps ErrInvalidProof.
-	ErrReplay = fmt.Errorf("%w: replayed proof", ErrInvalidProof)
-	// ErrBindingMismatch marks a valid proof whose key does not match the
-	// session's bound thumbprint.
-	ErrBindingMismatch = fmt.Errorf("%w: jkt mismatch", ErrInvalidProof)
-)
+// Errors returned by DPoPVerifier.Verify are sentinels in errors.go. Map
+// ErrDPoPNonce to a fresh DPoP-Nonce response header (retry with
+// use_dpop_nonce) and everything else to an invalid-proof rejection.
 
 // allowedAlgs is the set of signature algorithms accepted for proofs.
 var allowedAlgs = []jose.SignatureAlgorithm{

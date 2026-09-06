@@ -1,6 +1,9 @@
 package iam
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Sentinel errors. Wrap with %w and match with [errors.Is]; transport layers
 // map them to HTTP/gRPC status codes in one place.
@@ -29,4 +32,22 @@ var (
 	// ErrEmailRejected is returned when a signup email fails validation:
 	// malformed, disposable, or a domain that does not accept mail.
 	ErrEmailRejected = errors.New("iam: email rejected")
+	// ErrCredentialsExpired is returned when a service-account credential is
+	// past the expiry stored on its row.
+	ErrCredentialsExpired = errors.New("iam: credentials expired")
+	// ErrDPoPRequired marks a key-bound session token presented without a
+	// DPoP proof. Like a stale nonce, it is advertised with a DPoP-Nonce
+	// header so the client signs and retries (RFC 9449 section 8).
+	ErrDPoPRequired = errors.New("iam: dpop proof required")
+	// ErrInvalidProof marks a malformed or failing DPoP proof. Specific
+	// failures wrap it so callers can match the class with [errors.Is].
+	ErrInvalidProof = errors.New("iam: invalid dpop proof")
+	// ErrDPoPNonce marks a proof missing or bearing a stale server nonce.
+	ErrDPoPNonce = errors.New("iam: dpop nonce required")
+	// ErrReplay marks a proof whose jti was already consumed (RFC 9449
+	// sections 8.1 and 11.1). It wraps ErrInvalidProof.
+	ErrReplay = fmt.Errorf("%w: replayed proof", ErrInvalidProof)
+	// ErrBindingMismatch marks a valid proof whose key does not match the
+	// session's bound thumbprint. It wraps ErrInvalidProof.
+	ErrBindingMismatch = fmt.Errorf("%w: jkt mismatch", ErrInvalidProof)
 )
