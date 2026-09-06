@@ -106,12 +106,11 @@ func (s *Service) logAudit(
 // path (logAudit is called from a detached goroutine) and a miss simply leaves
 // the column empty.
 func (s *Service) actorEmail(ctx context.Context, p iam.Principal) string {
-	if s.users == nil ||
-		p.ID == "" ||
-		(p.Kind != iam.KindUser && p.Kind != iam.KindCLI) {
+	if p.Kind != iam.KindUser && p.Kind != iam.KindCLI {
 		return ""
 	}
-	u, err := s.users.GetUser(ctx, p.ID)
+
+	u, err := s.conn.Q.GetUser(ctx, p.ID)
 	if err != nil {
 		return ""
 	}

@@ -139,7 +139,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	}
 	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Storage, cfg.Entitlements)
 
-	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Entitlements, iamUserDirectory{cfg: &cfg})
+	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Entitlements)
 	if err != nil {
 		return nil, err
 	}
@@ -149,11 +149,10 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	}
 
 	cfg.IAM, err = iam.New(iam.Deps{
-		Querier:          cfg.Conn.Q,
+		Conn:             cfg.Conn,
 		BaseURL:          cfg.FullURL(),
 		Events:           cfg.Audit,
 		Secret:           []byte(cfg.Secret),
-		Conn:             cfg.Conn,
 		Cache:            cfg.Cache,
 		PasskeyRPOrigins: passkeyOrigins(&cfg),
 		OnSSOLogin: func(ctx context.Context, userID, workspaceID string) error {
@@ -249,18 +248,6 @@ func (c *Config) WSOrigins() []string {
 	origins := make([]string, 0, len(c.AllowedOrigins)+1)
 	origins = append(origins, c.FullURL())
 	return append(origins, c.AllowedOrigins...)
-}
-
-// iamUserDirectory adapts iam to audit's UserDirectory: it resolves an
-// actor id to its user. nokku's users are global. It reads cfg.IAM at call
-// time because audit is constructed before iam (iam consumes the audit
-// sink), so the service pointer only becomes valid once boot completes.
-type iamUserDirectory struct {
-	cfg *Config
-}
-
-func (d iamUserDirectory) GetUser(ctx context.Context, userID string) (iam.User, error) {
-	return d.cfg.IAM.GetUser(ctx, userID)
 }
 
 // passkeyOrigins returns every origin the browser may assert during a

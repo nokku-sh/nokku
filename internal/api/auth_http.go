@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/nokku-sh/nokku/internal/config"
+	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
@@ -37,12 +38,12 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 
 	// The hook gives passkey logins the same device remembering and
 	// new-login alerts as password logins.
-	cfg.IAM.OnUserLogin = func(w http.ResponseWriter, r *http.Request, u iam.User, _ iam.Method) {
+	cfg.IAM.OnUserLogin = func(w http.ResponseWriter, r *http.Request, u *db.User, _ iam.Method) {
 		if c := as.reconcileDevice(r.Context(), r.Header, r.RemoteAddr, u); c != nil {
 			http.SetCookie(w, c)
 		}
 	}
-	cfg.IAM.OnPasskeySignup = func(r *http.Request, u iam.User) {
+	cfg.IAM.OnPasskeySignup = func(r *http.Request, u *db.User) {
 		as.sendTokenEmail(r.Context(), u, iam.TokenVerifyEmail, true)
 	}
 

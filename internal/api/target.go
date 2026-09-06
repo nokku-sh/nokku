@@ -287,7 +287,7 @@ func (s *TargetService) GetMyAccess(
 		//nolint:exhaustive // daemon was rejected above; the remaining kinds are user-like or service account
 		switch p.Kind {
 		case iam.KindUser, iam.KindCLI, iam.KindWebDevice:
-			u, err := s.cfg.IAM.GetUser(ctx, p.ID)
+			u, err := s.cfg.IAM.GetUser(ctx)
 			if err != nil {
 				return err
 			}

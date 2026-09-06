@@ -10,8 +10,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/nokku-sh/nokku/internal/iam"
-
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/entitlement"
 )
@@ -21,25 +19,17 @@ const (
 	maxRetentionDays     = 365
 )
 
-// UserDirectory resolves a subject id to an iam user. audit depends on the
-// interface, not on the iam service, so the dependency stays one-way.
-type UserDirectory interface {
-	GetUser(ctx context.Context, userID string) (iam.User, error)
-}
-
 type Service struct {
 	conn         *db.Connection
 	entitlements *entitlement.Service
-	users        UserDirectory
 }
 
 func New(
 	ctx context.Context,
 	conn *db.Connection,
 	entitlements *entitlement.Service,
-	users UserDirectory,
 ) (*Service, error) {
-	s := &Service{conn: conn, entitlements: entitlements, users: users}
+	s := &Service{conn: conn, entitlements: entitlements}
 
 	if err := s.setupPartitions(ctx); err != nil {
 		return nil, err

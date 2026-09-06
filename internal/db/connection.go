@@ -188,6 +188,9 @@ func (c *Connection) setupAppRole(ctx context.Context) error {
 	return nil
 }
 
+// Querier exposes the app-pool querier for global table reads and writes.
+func (c *Connection) Querier() Querier { return c.Q }
+
 // WithTx executes a transaction as nokku_system, bypassing rls entirely.
 func (c *Connection) WithTx(
 	ctx context.Context,

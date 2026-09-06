@@ -7,6 +7,7 @@ package iam
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -96,18 +97,20 @@ func (l *linker) resolve(
 		Provider: opts.ProviderID,
 		Subject:  opts.Subject,
 	})
+	fmt.Printf("cred: %v\n", cred)
+	fmt.Println(PrincipalFromContext(ctx))
 	if err == nil {
 		if opts.LinkUserID != "" && cred.UserID != opts.LinkUserID {
 			return nil, ErrIdentityLinked
 		}
-		return l.svc.GetUser(ctx, cred.UserID)
+		return l.svc.GetUserByID(ctx, cred.UserID)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
 
 	if opts.LinkUserID != "" {
-		u, uerr := l.svc.GetUser(ctx, opts.LinkUserID)
+		u, uerr := l.svc.GetUserByID(ctx, opts.LinkUserID)
 		if uerr != nil {
 			return nil, uerr
 		}
@@ -147,7 +150,7 @@ func (l *linker) resolve(
 		// only so a locally uploaded avatar never regresses.
 		if opts.Name != "" && u.Name != opts.Name {
 			name := opts.Name
-			if u, uerr = l.svc.UpdateUser(ctx, u.ID, UpdateUserPatch{Name: &name}); uerr != nil {
+			if u, uerr = l.svc.UpdateUser(ctx, db.UpdateUserParams{ID: u.ID, Name: &name}); uerr != nil {
 				return nil, uerr
 			}
 		}
@@ -200,9 +203,9 @@ func (s *Service) provisionUser(ctx context.Context, opts flowLinkOptions) (*db.
 	}
 	if opts.Picture != "" {
 		pic := opts.Picture
-		_, _ = s.UpdateUser(ctx, u.ID, UpdateUserPatch{Picture: &pic})
+		_, _ = s.UpdateUser(ctx, db.UpdateUserParams{ID: u.ID, Picture: &pic})
 	}
-	return s.GetUser(ctx, u.ID)
+	return s.GetUserByID(ctx, u.ID)
 }
 
 // verifiedDomainsForProvider lists the verified email domains bound to a
@@ -275,18 +278,18 @@ func (s *Service) completeSSO(
 	// workspace (the transport resolves the tenant from each request). A pin
 	// here would hard-bind the browser session to one workspace and break
 	// cross-workspace operations. st.WorkspaceID only drives membership.
-	sess, token, err := s.Sessions.Issue(ctx, SessionParams{
+	sess, token, err := s.IssueSession(ctx, SessionParams{
 		SubjectID: u.ID,
 		Kind:      KindUser,
 		Method:    l.credType,
-		TTL:       s.Sessions.opts.TTL,
+		TTL:       sessionTTL,
 	})
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
 		return
 	}
 	http.SetCookie(w, endFlowBinding())
-	http.SetCookie(w, s.SessionCookie(token, derefTime(sess.ExpiresAt)))
+	http.SetCookie(w, s.SessionCookie(token, sess.ExpiresAt))
 	if s.OnUserLogin != nil {
 		s.OnUserLogin(w, r, u, l.credType)
 	}

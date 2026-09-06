@@ -22,7 +22,7 @@ func TestPasswordLoginRequiresVerifiedEmail(t *testing.T) {
 		t.Fatalf("store password: %v", err)
 	}
 
-	if _, err := svc.Password.Login(
+	if _, _, err := svc.Password.Login(
 		ctx,
 		"user@test.dev",
 		"correct horse battery",
@@ -35,7 +35,7 @@ func TestPasswordLoginRequiresVerifiedEmail(t *testing.T) {
 	if err := svc.VerifyUserEmail(ctx, u.ID); err != nil {
 		t.Fatalf("verify email: %v", err)
 	}
-	if _, err := svc.Password.Login(ctx, "user@test.dev", "correct horse battery"); err != nil {
+	if _, _, err := svc.Password.Login(ctx, "user@test.dev", "correct horse battery"); err != nil {
 		t.Fatalf("verified login: %v", err)
 	}
 }
@@ -54,7 +54,7 @@ func TestBackupCodeLoginRequiresVerifiedEmail(t *testing.T) {
 
 	// fakeStore does not implement ConsumeCredentialBySubject, so a call
 	// past the gate would panic: a rejected login must not burn a code.
-	_, err := svc.LoginWithBackupCode(ctx, "user@test.dev", "AAAAAAAAAAAA")
+	_, _, err := svc.LoginWithBackupCode(ctx, "user@test.dev", "AAAAAAAAAAAA")
 	if !errors.Is(err, ErrEmailUnverified) {
 		t.Fatalf("err = %v, want ErrEmailUnverified", err)
 	}

@@ -9,7 +9,6 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -255,8 +254,3 @@ func emailDomain(email string) string {
 	}
 	return strings.ToLower(domain)
 }
-
-var (
-	_ = slices.Contains[[]string, string]
-	_ = crypto.RandomString
-)

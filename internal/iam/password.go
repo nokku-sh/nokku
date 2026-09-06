@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -75,7 +76,7 @@ func newPasswordManager(svc *Service, params PasswordParams) *PasswordManager {
 // Login returns the user matching email if the password verifies, or
 // ErrInvalidCredentials. An unknown email costs the same argon2id work as a
 // wrong password, so latency does not reveal whether the account exists.
-func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User, error) {
+func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User, *http.Cookie, error) {
 	email = normalizeEmail(email)
 	u, err := m.svc.q.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -91,15 +92,15 @@ func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User
 					Detail: "unknown email",
 				},
 			)
-			return nil, ErrInvalidCredentials
+			return nil, nil, ErrInvalidCredentials
 		}
-		return nil, err
+		return nil, nil, err
 	}
 	if err := m.CheckPassword(ctx, u.ID, pw); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := m.svc.enforceSSO(ctx, email); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if !u.Active {
 		m.svc.record(
@@ -112,7 +113,7 @@ func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User
 				Detail: "inactive",
 			},
 		)
-		return nil, ErrInactive
+		return nil, nil, ErrInactive
 	}
 	if !u.EmailVerified {
 		m.svc.record(
@@ -125,8 +126,18 @@ func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User
 				Detail: "unverified email",
 			},
 		)
-		return nil, ErrEmailUnverified
+		return nil, nil, ErrEmailUnverified
 	}
+	sess, token, err := m.svc.IssueSession(ctx, SessionParams{
+		SubjectID: u.ID,
+		Kind:      KindUser,
+		Method:    MethodPassword,
+		TTL:       sessionTTL,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	cookie := m.svc.SessionCookie(token, sess.ExpiresAt)
 	m.svc.record(
 		ctx,
 		Event{
@@ -137,7 +148,7 @@ func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User
 			Email:  u.Email,
 		},
 	)
-	return u, nil
+	return u, cookie, nil
 }
 
 // CheckPassword verifies pw against the user's stored password credential.

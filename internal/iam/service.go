@@ -64,28 +64,21 @@ type Sink interface {
 	Record(ctx context.Context, e Event)
 }
 
-// User is the identity user record. It aliases the generated pointer type
-// so callers depend on the iam vocabulary, not the storage layer.
-type User = *db.User
-
 // Deps configures the service. Querier is required; everything else has a
 // sane default.
 type Deps struct {
-	Querier db.Querier
 	// BaseURL drives the session cookie's Secure attribute and email
 	// link construction.
 	BaseURL string
 	// Events receives lifecycle events. Optional; nil disables recording.
 	Events Sink
-	// Session configures issuance. A zero TTL selects the default.
-	Session SessionOptions
 	// Password selects argon2id parameters. A zero value selects defaults.
 	Password PasswordParams
 	// Secret keys the DPoP server nonce. Required for DPoP; derives from
 	// NOKKU_SECRET.
 	Secret []byte
-	// Conn runs workspace-scoped queries under RLS (domains, SSO
-	// providers). Required for the managers that touch tenant tables.
+	// Conn runs global queries and workspace-scoped queries under RLS
+	// (domains, SSO providers). Required.
 	Conn txRunner
 	// Cache backs SSO flow state and the device flow. Required for both.
 	Cache Cache
@@ -102,10 +95,10 @@ type Deps struct {
 	// OnUserLogin fires after a successful interactive user login (SSO or
 	// passkey), after the session cookie is set. Hosts attach post-login
 	// side effects: device remembering, new-login alerts.
-	OnUserLogin func(w http.ResponseWriter, r *http.Request, u User, method Method)
+	OnUserLogin func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
 	// OnPasskeySignup fires after passkey-only signup created the account,
 	// so the host can send its verification email.
-	OnPasskeySignup func(r *http.Request, u User)
+	OnPasskeySignup func(r *http.Request, u *db.User)
 	// Passkey relying-party settings; the flow builds only when Cache and
 	// PasskeyRPID are set.
 	PasskeyRPOrigins []string
@@ -116,6 +109,7 @@ type Deps struct {
 // Narrow on purpose: *db.Connection satisfies it, tests provide in-memory
 // implementations.
 type txRunner interface {
+	Querier() db.Querier
 	WithTx(ctx context.Context, fn func(*db.Queries) error) error
 	WithWorkspace(ctx context.Context, fn func(*db.Queries) error) error
 }
@@ -130,10 +124,9 @@ type Service struct {
 	events          Sink
 	OnSSOLogin      func(ctx context.Context, userID, workspaceID string) error
 	CanJoin         func(ctx context.Context, workspaceID string, used int64) error
-	OnUserLogin     func(w http.ResponseWriter, r *http.Request, u User, method Method)
-	OnPasskeySignup func(r *http.Request, u User)
+	OnUserLogin     func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
+	OnPasskeySignup func(r *http.Request, u *db.User)
 	Password        *PasswordManager
-	Sessions        *SessionManager
 	DPoP            *DPoPVerifier
 	Device          *DeviceFlow
 	OIDC            *oidcFlow
@@ -147,14 +140,12 @@ type Service struct {
 
 // New builds the service.
 func New(d Deps) (*Service, error) {
-	if d.Querier == nil {
-		return nil, errors.New("iam: querier is required")
+	if d.Conn == nil {
+		return nil, errors.New("iam: db connection is required")
 	}
-	if d.Session.TTL == 0 {
-		d.Session.TTL = 24 * time.Hour
-	}
+
 	svc := &Service{
-		q:               d.Querier,
+		q:               d.Conn.Querier(),
 		baseURL:         d.BaseURL,
 		conn:            d.Conn,
 		cache:           d.Cache,
@@ -166,7 +157,6 @@ func New(d Deps) (*Service, error) {
 		now:             time.Now,
 	}
 	svc.Password = newPasswordManager(svc, d.Password)
-	svc.Sessions = &SessionManager{svc: svc, opts: d.Session}
 	if len(d.Secret) > 0 {
 		// Replay detection rides the shared cache the service already
 		// carries; a nil cache disables it (tests only).

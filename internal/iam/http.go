@@ -12,20 +12,23 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// SessionCookieName is the cookie the session token is issued in. HttpOnly,
-// SameSite Lax, Secure on https, host-only.
-const SessionCookieName = "nokku_session"
-
-// maxBodyBytes bounds JSON request bodies.
-const maxBodyBytes = 1 << 20
+const (
+	SessionTTL        = 24 * time.Hour
+	SessionCookieName = "nokku_session"
+	maxBodyBytes      = 1 << 20
+)
 
 // SessionCookie returns the session cookie for token and expiry.
-func (s *Service) SessionCookie(token string, expires time.Time) *http.Cookie {
+func (s *Service) SessionCookie(token string, expires *time.Time) *http.Cookie {
+	exp := time.Now().Add(SessionTTL)
+	if expires != nil {
+		exp = *expires
+	}
 	return &http.Cookie{ //nolint:gosec // Secure is set dynamically from the base URL scheme
 		Name:     SessionCookieName,
 		Value:    token,
 		Path:     "/",
-		Expires:  expires,
+		Expires:  exp,
 		HttpOnly: true,
 		Secure:   s.Secure(),
 		SameSite: http.SameSiteLaxMode,
@@ -95,14 +98,14 @@ func (s *Service) AuthenticateRequest(
 	ctx context.Context,
 	token string,
 ) (Principal, db.Session, error) {
-	sess, err := s.Sessions.Verify(ctx, token)
+	sess, err := s.VerifySession(ctx, token)
 	if err != nil {
 		return Principal{}, db.Session{}, err
 	}
 	kind := Kind(sess.Kind)
 	p := Principal{ID: sess.SubjectID, Kind: kind, WorkspaceID: deref(sess.WorkspaceID)}
 	if kind == KindUser {
-		u, err := s.GetUser(ctx, sess.SubjectID)
+		u, err := s.GetUserByID(ctx, sess.SubjectID)
 		if err != nil {
 			return Principal{}, db.Session{}, err
 		}
@@ -293,13 +296,6 @@ func CookieToken(r *http.Request, name string) string {
 		return ""
 	}
 	return c.Value
-}
-
-func derefTime(t *time.Time) time.Time {
-	if t == nil {
-		return time.Time{}
-	}
-	return *t
 }
 
 func DeviceNameFromUA(ua string) string {

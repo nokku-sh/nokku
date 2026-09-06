@@ -20,18 +20,15 @@ import (
 )
 
 const (
-	// grantTTL is how long a device grant stays pending.
-	grantTTL = 15 * time.Minute
-	// slowDownPenalty is the extra interval RFC 8628 section 3.5 asks a
-	// client to add after each slow_down response.
-	slowDownPenalty = 5 * time.Second
-	// deviceInterval is the default poll interval hint. Default 5s.
+	grantTTL         = 15 * time.Minute
+	slowDownPenalty  = 5 * time.Second
 	deviceInterval   = 5 * time.Second
 	deviceSessionTTL = 7 * 24 * time.Hour
 
-	grantPending  = "pending"
-	grantApproved = "approved"
-	grantDenied   = "denied"
+	DeviceURLHeader = "Nokku-Api-Url"
+	grantPending    = "pending"
+	grantApproved   = "approved"
+	grantDenied     = "denied"
 )
 
 // DeviceOptions configures the device flow.
@@ -54,6 +51,22 @@ type DeviceFlow struct {
 	cache cache.Cache
 }
 
+// grant is a cross-request device grant, stored under both the device code
+// and the user code. Sessions issued from a device login stay unpinned:
+// users are global and act per-request in a workspace, like every other
+// interactive login.
+type deviceGrant struct {
+	DeviceCode string `json:"device_code"`
+	UserCode   string `json:"user_code"`
+	Status     string `json:"status"`
+	UserID     string `json:"user_id,omitempty"`
+}
+
+type pollState struct {
+	last       time.Time
+	violations int
+}
+
 // NewDeviceFlow builds the device flow handler.
 func NewDeviceFlow(svc *Service, opts DeviceOptions) (*DeviceFlow, error) {
 	if svc == nil || opts.Cache == nil {
@@ -70,22 +83,6 @@ func NewDeviceFlow(svc *Service, opts DeviceOptions) (*DeviceFlow, error) {
 		opts.SessionTTL = deviceSessionTTL
 	}
 	return &DeviceFlow{svc: svc, opts: opts, cache: opts.Cache}, nil
-}
-
-// grant is a cross-request device grant, stored under both the device code
-// and the user code. Sessions issued from a device login stay unpinned:
-// users are global and act per-request in a workspace, like every other
-// interactive login.
-type deviceGrant struct {
-	DeviceCode string `json:"device_code"`
-	UserCode   string `json:"user_code"`
-	Status     string `json:"status"`
-	UserID     string `json:"user_id,omitempty"`
-}
-
-type pollState struct {
-	last       time.Time
-	violations int
 }
 
 // Begin starts a device grant (POST /auth/device). Public: the CLI has no
@@ -223,7 +220,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		)
 		writeOAuthError(w, "access_denied")
 	case grantApproved:
-		u, err := h.svc.GetUser(ctx, g.UserID)
+		u, err := h.svc.GetUserByID(ctx, g.UserID)
 		if err != nil || !u.Active {
 			writeOAuthError(w, "access_denied")
 			return
@@ -239,7 +236,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			// corrects itself, like the connect interceptor does (RFC
 			// 9449 section 8).
 			if h.svc.DPoP != nil {
-				w.Header().Set(URLHeader, h.svc.baseURL)
+				w.Header().Set(DeviceURLHeader, h.svc.baseURL)
 				w.Header().Set("DPoP-Nonce", h.svc.DPoP.CurrentNonce())
 			}
 			if errors.Is(derr, ErrDPoPNonce) {
@@ -259,7 +256,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = h.cache.Delete(ctx, "device:user:"+g.UserCode)
 
-		sess, token, err := h.svc.Sessions.Issue(ctx, SessionParams{
+		sess, token, err := h.svc.IssueSession(ctx, SessionParams{
 			SubjectID: u.ID,
 			Kind:      KindCLI,
 			Method:    MethodDevice,
@@ -302,7 +299,7 @@ func (h *DeviceFlow) Nonce(w http.ResponseWriter, _ *http.Request) {
 		WriteError(w, http.StatusNotFound, "dpop_disabled", "dpop disabled")
 		return
 	}
-	w.Header().Set(URLHeader, h.svc.baseURL)
+	w.Header().Set(DeviceURLHeader, h.svc.baseURL)
 	w.Header().Set("DPoP-Nonce", h.svc.DPoP.CurrentNonce())
 	w.WriteHeader(http.StatusNoContent)
 }

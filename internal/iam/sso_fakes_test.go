@@ -191,9 +191,12 @@ func (f *fakeStore) PutSAMLKeypair(
 // login path issues: the provider row and workspace domain rows. Anything
 // else panics so an unexpected transactional read fails the test.
 type fakeStoreConn struct {
+	store    *fakeStore
 	provider *db.SsoProvider
 	domains  []*db.WorkspaceDomain
 }
+
+func (c *fakeStoreConn) Querier() db.Querier { return c.store }
 
 func (c *fakeStoreConn) WithTx(_ context.Context, fn func(*db.Queries) error) error {
 	return fn(db.New(c))
@@ -390,15 +393,14 @@ func indirect(v any) any {
 // serve the OIDC and SAML flows at http://nokku.test.
 func newSSOTestService(t *testing.T, store *fakeStore, conn *fakeStoreConn) *Service {
 	t.Helper()
+	conn.store = store
 	if err := crypto.InitDefaultHashers(); err != nil {
 		t.Fatalf("init hashers: %v", err)
 	}
 	svc, err := New(Deps{
-		Querier: store,
 		BaseURL: "http://nokku.test",
 		Conn:    conn,
 		Cache:   cache.NewMemory(1000),
-		Session: SessionOptions{TTL: time.Hour},
 		// The passkey flow builds unconditionally when the cache exists and
 		// validates its origins eagerly.
 		PasskeyRPOrigins: []string{"http://nokku.test"},

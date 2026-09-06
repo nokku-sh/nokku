@@ -81,7 +81,7 @@ func (s *BillingService) CreateCheckout(
 	if err := s.requireWorkspaceOwner(ctx, req.GetWorkspaceId()); err != nil {
 		return nil, err
 	}
-	user, err := s.cfg.IAM.GetUser(ctx, iam.UserIDFromContext(ctx))
+	user, err := s.cfg.IAM.GetUser(ctx)
 	if err != nil {
 		return nil, DBError(err)
 	}
