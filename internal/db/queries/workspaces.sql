@@ -43,6 +43,15 @@ FROM
 WHERE
   w.id = @workspace_id;
 
+-- name: GetWorkspaceForUpdate :one
+SELECT
+  *
+FROM
+  workspaces w
+WHERE
+  w.id = @workspace_id
+FOR UPDATE;
+
 -- name: GetWorkspacesByIDs :many
 SELECT
   *

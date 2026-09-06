@@ -273,6 +273,35 @@ func (q *Queries) GetWorkspace(ctx context.Context, workspaceID string) (*Worksp
 	return &i, err
 }
 
+const getWorkspaceForUpdate = `-- name: GetWorkspaceForUpdate :one
+SELECT
+  id, name, description, enroll_token_hash, enroll_expires_at, invite_token_hash, invite_expires_at, settings, created_by, created_at, updated_at
+FROM
+  workspaces w
+WHERE
+  w.id = $1
+FOR UPDATE
+`
+
+func (q *Queries) GetWorkspaceForUpdate(ctx context.Context, workspaceID string) (*Workspace, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceForUpdate, workspaceID)
+	var i Workspace
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.EnrollTokenHash,
+		&i.EnrollExpiresAt,
+		&i.InviteTokenHash,
+		&i.InviteExpiresAt,
+		&i.Settings,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
 const getWorkspaceMember = `-- name: GetWorkspaceMember :one
 SELECT
   wm.workspace_id,

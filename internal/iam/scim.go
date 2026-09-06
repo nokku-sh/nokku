@@ -248,7 +248,11 @@ func (s *Service) scimProvisionUser(
 			}
 		}
 		noReset := true
-		if _, err := s.UpdateUser(ctx, u.ID, UpdateUserPatch{DisablePasswordReset: &noReset}); err != nil {
+		if _, err := s.UpdateUser(
+			ctx,
+			u.ID,
+			UpdateUserPatch{DisablePasswordReset: &noReset},
+		); err != nil {
 			return nil, err
 		}
 		s.record(ctx, Event{
@@ -270,6 +274,29 @@ func (s *Service) scimProvisionUser(
 	}
 
 	err = s.conn.WithTx(ctx, func(q *db.Queries) error {
+		// Same choke point as the invitation path: dormant today (SCIM is
+		// Enterprise-only and Enterprise has no seat cap) but it wakes up the
+		// moment the catalog ships a capped plan with SCIM. Re-syncs of
+		// existing members skip the gate, a re-push must not fail because the
+		// workspace filled up after a downgrade.
+		if s.CanJoin != nil {
+			if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
+				WorkspaceID: workspaceID,
+				UserID:      u.ID,
+			}); err != nil {
+				if _, err := q.GetWorkspaceForUpdate(ctx, workspaceID); err != nil {
+					return err
+				}
+				used, err := q.CountWorkspaceSeats(ctx, workspaceID)
+				if err != nil {
+					return err
+				}
+				if err := s.CanJoin(ctx, workspaceID, used); err != nil {
+					return scimerrors.ScimError{Status: http.StatusForbidden, Detail: err.Error()}
+				}
+			}
+		}
+
 		if err := q.EnsureWorkspaceMember(ctx, &db.EnsureWorkspaceMemberParams{
 			WorkspaceID: workspaceID,
 			UserID:      u.ID,
@@ -366,7 +393,10 @@ func (s *Service) scimDeprovisionUser(ctx context.Context, workspaceID, userID s
 			deleted = true
 		case other == 0 && u.Active:
 			inactive := false
-			if _, err := q.UpdateUser(ctx, &db.UpdateUserParams{ID: userID, Active: &inactive}); err != nil {
+			if _, err := q.UpdateUser(
+				ctx,
+				&db.UpdateUserParams{ID: userID, Active: &inactive},
+			); err != nil {
 				return err
 			}
 			// Deactivation fails every session closed at the authn check;

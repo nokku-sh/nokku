@@ -134,6 +134,7 @@ type Querier interface {
 	GetVerifiedWorkspaceDomain(ctx context.Context, domain string) (*WorkspaceDomain, error)
 	GetWorkspace(ctx context.Context, workspaceID string) (*Workspace, error)
 	GetWorkspaceDomain(ctx context.Context, arg *GetWorkspaceDomainParams) (*WorkspaceDomain, error)
+	GetWorkspaceForUpdate(ctx context.Context, workspaceID string) (*Workspace, error)
 	GetWorkspaceMember(ctx context.Context, arg *GetWorkspaceMemberParams) (*WorkspaceMember, error)
 	GetWorkspaceOwner(ctx context.Context, workspaceID string) (string, error)
 	GetWorkspacePrincipals(ctx context.Context, workspaceID string) ([]string, error)

@@ -13,8 +13,6 @@ type fakeDB struct {
 	plan        string
 	status      Status
 	subErr      error
-	members     int64
-	memberErr   error
 	resources   int64
 	resourceErr error
 }
@@ -24,10 +22,6 @@ func (f *fakeDB) Subscription(_ context.Context, _ string) (string, Status, erro
 		return "", StatusInactive, f.subErr
 	}
 	return f.plan, f.status, nil
-}
-
-func (f *fakeDB) MemberCount(_ context.Context, _ string) (int64, error) {
-	return f.members, f.memberErr
 }
 
 func (f *fakeDB) ResourceCount(_ context.Context, _ string) (int64, error) {
@@ -249,31 +243,31 @@ func TestCanInvite(t *testing.T) {
 	tests := []struct {
 		name    string
 		db      *fakeDB
+		members int64
 		wantErr bool
 	}{
 		{
-			name: "under cap allows invite",
-			db:   &fakeDB{members: 4},
+			name:    "under cap allows invite",
+			db:      &fakeDB{},
+			members: 4,
 		},
 		{
 			name:    "at cap denies invite",
-			db:      &fakeDB{members: 5},
+			db:      &fakeDB{},
+			members: 5,
 			wantErr: true,
 		},
 		{
-			name: "unlimited plan always allows",
-			db:   &fakeDB{plan: PlanPro, status: StatusActive, members: 5000},
-		},
-		{
-			name: "member count failure fails open",
-			db:   &fakeDB{memberErr: errors.New("connection refused")},
+			name:    "unlimited plan always allows",
+			db:      &fakeDB{plan: PlanPro, status: StatusActive},
+			members: 5000,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sut := NewService(tt.db, nil, ModeSaaS)
-			err := sut.CanInvite(context.Background(), "ws1")
+			err := sut.CanInvite(context.Background(), "ws1", tt.members)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CanInvite() error = %v, wantErr %v", err, tt.wantErr)
 			}

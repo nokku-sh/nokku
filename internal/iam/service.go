@@ -95,6 +95,10 @@ type Deps struct {
 	// OnSSOLogin fires after a successful SSO login under a
 	// workspace-scoped provider (membership auto-join).
 	OnSSOLogin func(ctx context.Context, userID, workspaceID string) error
+	// CanJoin gates SCIM provisioning on the plan's seat cap. used is the
+	// member count read in the provisioning transaction. Optional; nil
+	// allows all joins.
+	CanJoin func(ctx context.Context, workspaceID string, used int64) error
 	// OnUserLogin fires after a successful interactive user login (SSO or
 	// passkey), after the session cookie is set. Hosts attach post-login
 	// side effects: device remembering, new-login alerts.
@@ -125,6 +129,7 @@ type Service struct {
 	cache           Cache
 	events          Sink
 	OnSSOLogin      func(ctx context.Context, userID, workspaceID string) error
+	CanJoin         func(ctx context.Context, workspaceID string, used int64) error
 	OnUserLogin     func(w http.ResponseWriter, r *http.Request, u User, method Method)
 	OnPasskeySignup func(r *http.Request, u User)
 	Password        *PasswordManager
@@ -155,6 +160,7 @@ func New(d Deps) (*Service, error) {
 		cache:           d.Cache,
 		events:          d.Events,
 		OnSSOLogin:      d.OnSSOLogin,
+		CanJoin:         d.CanJoin,
 		OnUserLogin:     d.OnUserLogin,
 		OnPasskeySignup: d.OnPasskeySignup,
 		now:             time.Now,
