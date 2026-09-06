@@ -226,7 +226,7 @@ func TestOIDCFlowHappyPath(t *testing.T) {
 
 	hasSession := false
 	for _, c := range rec.Result().Cookies() {
-		if c.Name == SessionCookieName && c.Value != "" {
+		if c.Name == sessionCookieName && c.Value != "" {
 			hasSession = true
 		}
 	}

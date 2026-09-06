@@ -137,24 +137,24 @@ func (h *DeviceFlow) Deny(w http.ResponseWriter, r *http.Request) {
 func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool) {
 	p, ok := PrincipalFromContext(r.Context())
 	if !ok || p.Kind != KindUser {
-		WriteError(w, http.StatusUnauthorized, "unauthenticated", "sign in to approve a device")
+		WriteError(w, http.StatusUnauthorized, "sign in to approve a device")
 		return
 	}
 
 	userCode := normalizeUserCode(r.FormValue("user_code"))
 	if userCode == "" {
-		WriteError(w, http.StatusBadRequest, "missing_user_code", "missing user_code")
+		WriteError(w, http.StatusBadRequest, "missing user_code")
 		return
 	}
 
 	b, err := h.cache.Get(r.Context(), "device:user:"+userCode)
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid_or_expired_code", "invalid or expired code")
+		WriteError(w, http.StatusBadRequest, "invalid or expired code")
 		return
 	}
 	var g deviceGrant
 	if err := json.Unmarshal(b, &g); err != nil || g.Status != grantPending {
-		WriteError(w, http.StatusBadRequest, "invalid_or_expired_code", "invalid or expired code")
+		WriteError(w, http.StatusBadRequest, "invalid or expired code")
 		return
 	}
 
@@ -235,10 +235,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			// configured API URL differs from the canonical base URL)
 			// corrects itself, like the connect interceptor does (RFC
 			// 9449 section 8).
-			if h.svc.DPoP != nil {
-				w.Header().Set(DeviceURLHeader, h.svc.baseURL)
-				w.Header().Set("DPoP-Nonce", h.svc.DPoP.CurrentNonce())
-			}
+			h.svc.AdvertiseDPoPNonce(w.Header())
 			if errors.Is(derr, ErrDPoPNonce) {
 				writeOAuthError(w, "use_dpop_nonce")
 			} else {
@@ -296,11 +293,10 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 // DPoP-protected call (RFC 9449 section 8). Returns 204.
 func (h *DeviceFlow) Nonce(w http.ResponseWriter, _ *http.Request) {
 	if h.svc.DPoP == nil {
-		WriteError(w, http.StatusNotFound, "dpop_disabled", "dpop disabled")
+		WriteError(w, http.StatusNotFound, "dpop disabled")
 		return
 	}
-	w.Header().Set(DeviceURLHeader, h.svc.baseURL)
-	w.Header().Set("DPoP-Nonce", h.svc.DPoP.CurrentNonce())
+	h.svc.AdvertiseDPoPNonce(w.Header())
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -315,13 +311,7 @@ func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string
 	if proof == "" {
 		return "", nil
 	}
-	return h.svc.DPoP.Verify(ctx, proof, "", r.Method, h.svc.requestHTU(r))
-}
-
-// requestHTU reconstructs the request URL for DPoP htu checks: the public
-// base URL plus the request path.
-func (s *Service) requestHTU(r *http.Request) string {
-	return s.baseURL + r.URL.Path
+	return h.svc.DPoP.Verify(ctx, proof, "", r.Method, h.svc.baseURL+r.URL.Path)
 }
 
 // pollTrack records one poll and reports whether it came too fast. The

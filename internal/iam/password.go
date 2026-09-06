@@ -128,26 +128,10 @@ func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User
 		)
 		return nil, nil, ErrEmailUnverified
 	}
-	sess, token, err := m.svc.IssueSession(ctx, SessionParams{
-		SubjectID: u.ID,
-		Kind:      KindUser,
-		Method:    MethodPassword,
-		TTL:       sessionTTL,
-	})
+	cookie, err := m.svc.completeLogin(ctx, u, MethodPassword)
 	if err != nil {
 		return nil, nil, err
 	}
-	cookie := m.svc.SessionCookie(token, sess.ExpiresAt)
-	m.svc.record(
-		ctx,
-		Event{
-			Action: ActionLoginSucceeded,
-			Kind:   KindUser,
-			Method: MethodPassword,
-			UserID: u.ID,
-			Email:  u.Email,
-		},
-	)
 	return u, cookie, nil
 }
 

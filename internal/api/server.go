@@ -347,7 +347,7 @@ func (s *Server) registerServices(ctx context.Context) error {
 
 	// Auth outside audit, matching the RPC interceptor order, so audited
 	// rows see the principal and tenant iam placed on the request.
-	protec := NewChain(NewHTTPAuth(s.cfg))
+	protec := NewChain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
 
 	// Avatar handlers
 	s.mux.Handle("GET /avatars/{id}", ServeAvatar(s.cfg))

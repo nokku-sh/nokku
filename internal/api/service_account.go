@@ -7,9 +7,9 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 type ServiceAccountService struct {
@@ -54,8 +54,7 @@ func (s *ServiceAccountService) CreateServiceAccount(
 	// The service account's credential is a bearer token whose hash lives on
 	// the row. Expiry rides on the row and is enforced at verification time,
 	// so a short-lived token is really short-lived.
-	raw := prefixSA + mustRandomToken()
-	tokenHash, err := crypto.HashToken(raw)
+	raw, tokenHash, err := iam.NewAPIKey()
 	if err != nil {
 		return nil, ErrInternal
 	}
@@ -171,15 +170,4 @@ func (s *ServiceAccountService) DeleteServiceAccount(
 	}
 	// The credential is the row's token hash: deletion revokes it.
 	return &nokkuv1.DeleteServiceAccountResponse{}, nil
-}
-
-// mustRandomToken returns the raw bearer secret for a new service account.
-func mustRandomToken() string {
-	s, err := crypto.RandomString(32)
-	if err != nil {
-		// crypto/rand failure is a process-level emergency; the create
-		// request fails with an empty token rather than a reusable one.
-		return ""
-	}
-	return s
 }

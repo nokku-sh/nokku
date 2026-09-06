@@ -26,11 +26,7 @@ func (s *Service) IssueToken(
 	userID, purpose string,
 	ttl time.Duration,
 ) (string, error) {
-	raw, err := crypto.RandomString(32)
-	if err != nil {
-		return "", err
-	}
-	tokenHash, err := crypto.HashToken(raw)
+	raw, tokenHash, err := crypto.NewSecret()
 	if err != nil {
 		return "", err
 	}

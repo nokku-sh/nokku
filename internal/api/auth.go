@@ -14,13 +14,10 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/iam"
-	"github.com/nokku-sh/nokku/internal/util"
 )
 
 const (
-	tokenTTL         = 15 * time.Minute
-	deviceCookieName = "nokku_device"
-	deviceSessionTTL = 180 * 24 * time.Hour // 6 months, refreshed on each login
+	tokenTTL = 15 * time.Minute
 )
 
 type AuthService struct {
@@ -91,7 +88,7 @@ func (s *AuthService) Login(
 		return nil, loginError(err)
 	}
 	setCookie(ci, cookie)
-	if c := s.reconcileDevice(ctx, ci.RequestHeader(), ci.Peer().Addr, u); c != nil {
+	if c := s.cfg.IAM.RememberDevice(ctx, ci.RequestHeader(), ci.Peer().Addr, u); c != nil {
 		setCookie(ci, c)
 	}
 	return &nokkuv1.LoginResponse{User: db.UserToProto(u)}, nil
@@ -111,7 +108,7 @@ func (s *AuthService) LoginWithBackupCode(
 		return nil, loginError(err)
 	}
 	setCookie(ci, cookie)
-	if c := s.reconcileDevice(ctx, ci.RequestHeader(), ci.Peer().Addr, u); c != nil {
+	if c := s.cfg.IAM.RememberDevice(ctx, ci.RequestHeader(), ci.Peer().Addr, u); c != nil {
 		setCookie(ci, c)
 	}
 	return &nokkuv1.LoginWithBackupCodeResponse{User: db.UserToProto(u)}, nil
@@ -243,70 +240,8 @@ func (s *AuthService) DiscoverSSO(
 
 // --- Shared login side effects ----------------------------------------------
 
-// reconcileDevice reads the remembered-device cookie from header and returns
-// the refreshed or freshly issued device cookie, or nil. The geo-located
-// new-login alert (one per new device) is a side effect.
-func (s *AuthService) reconcileDevice(
-	ctx context.Context,
-	h http.Header,
-	remoteAddr string,
-	u *db.User,
-) *http.Cookie {
-	if raw := iam.CookieFromHeader(h, deviceCookieName); raw != "" {
-		if sess, err := s.cfg.IAM.VerifySession(ctx, raw); err == nil &&
-			sess.Kind == string(iam.KindWebDevice) && sess.SubjectID == u.ID {
-			// Known device: refresh its last-seen time so the sessions list
-			// shows current activity. No alert.
-			if err := s.cfg.IAM.TouchSession(
-				ctx,
-				iam.SessionHash(sess.TokenHash),
-			); err != nil {
-				slog.Debug("failed to touch device session", "error", err)
-			}
-			return nil
-		}
-	}
-
-	name := iam.DeviceNameFromUA(h.Get("User-Agent"))
-	sess, token, err := s.cfg.IAM.IssueSession(ctx, iam.SessionParams{
-		SubjectID: u.ID,
-		Kind:      iam.KindWebDevice,
-		Method:    iam.MethodDevice,
-		Label:     name,
-		TTL:       deviceSessionTTL,
-	})
-	if err != nil {
-		slog.Error("failed to register device session", "error", err)
-		return nil
-	}
-
-	ip := util.GetRemoteIP(h, remoteAddr)
-	go func() {
-		actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
-		defer cancel()
-		if err := s.cfg.Email.SendNewLoginEmail(
-			actx,
-			u.ID,
-			u.Email,
-			string(sess.TokenHash),
-			name,
-			s.cfg.Geo.Lookup(ip),
-		); err != nil {
-			slog.Debug("failed to send new login email", "error", err)
-		}
-	}()
-
-	return &http.Cookie{ //nolint:gosec // Secure is set dynamically from the base URL scheme
-		Name:     deviceCookieName,
-		Value:    token,
-		Path:     "/",
-		Expires:  derefTime(sess.ExpiresAt),
-		HttpOnly: true,
-		Secure:   s.cfg.IAM.Secure(),
-		SameSite: http.SameSiteLaxMode,
-	}
-}
-
+// sendTokenEmail issues the verification or reset token and delivers its
+// email link, unless the same token was just sent.
 func (s *AuthService) sendTokenEmail(
 	ctx context.Context,
 	u *db.User,
@@ -339,11 +274,4 @@ func (s *AuthService) sendTokenEmail(
 	if err != nil {
 		slog.Error("send auth email", "error", err)
 	}
-}
-
-func derefTime(t *time.Time) time.Time {
-	if t == nil {
-		return time.Time{}
-	}
-	return *t
 }

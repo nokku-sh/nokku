@@ -278,18 +278,13 @@ func (s *Service) completeSSO(
 	// workspace (the transport resolves the tenant from each request). A pin
 	// here would hard-bind the browser session to one workspace and break
 	// cross-workspace operations. st.WorkspaceID only drives membership.
-	sess, token, err := s.IssueSession(ctx, SessionParams{
-		SubjectID: u.ID,
-		Kind:      KindUser,
-		Method:    l.credType,
-		TTL:       sessionTTL,
-	})
+	cookie, err := s.completeLogin(ctx, u, l.credType)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	http.SetCookie(w, endFlowBinding())
-	http.SetCookie(w, s.SessionCookie(token, sess.ExpiresAt))
+	http.SetCookie(w, cookie)
 	if s.OnUserLogin != nil {
 		s.OnUserLogin(w, r, u, l.credType)
 	}

@@ -1,7 +1,10 @@
 package api
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -32,15 +35,30 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.HandleFunc("POST /auth/device/token", svc.Device.Poll)
 	mux.HandleFunc("GET /auth/device/nonce", svc.Device.Nonce)
 
-	deviceGuard := NewChain(NewHTTPAuth(cfg))
+	deviceGuard := NewChain(svc.Middleware, svc.RequireLogin)
 	mux.Handle("POST /auth/device/verify", deviceGuard.ThenFunc(svc.Device.Verify))
 	mux.Handle("POST /auth/device/deny", deviceGuard.ThenFunc(svc.Device.Deny))
 
-	// The hook gives passkey logins the same device remembering and
-	// new-login alerts as password logins.
+	// The hooks give passkey logins the same device remembering and
+	// new-login alerts as password logins, and passkey signups the same
+	// verification email.
 	cfg.IAM.OnUserLogin = func(w http.ResponseWriter, r *http.Request, u *db.User, _ iam.Method) {
-		if c := as.reconcileDevice(r.Context(), r.Header, r.RemoteAddr, u); c != nil {
+		if c := cfg.IAM.RememberDevice(r.Context(), r.Header, r.RemoteAddr, u); c != nil {
 			http.SetCookie(w, c)
+		}
+	}
+	cfg.IAM.OnNewDeviceLogin = func(ctx context.Context, u *db.User, sess db.Session, label, ip string) {
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		if err := cfg.Email.SendNewLoginEmail(
+			ctx,
+			u.ID,
+			u.Email,
+			string(sess.TokenHash),
+			label,
+			cfg.Geo.Lookup(ip),
+		); err != nil {
+			slog.Debug("failed to send new login email", "error", err)
 		}
 	}
 	cfg.IAM.OnPasskeySignup = func(r *http.Request, u *db.User) {

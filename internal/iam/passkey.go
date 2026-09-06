@@ -113,7 +113,7 @@ func (f *passkeyFlow) ceremonyCookie(id string) *http.Cookie {
 		Path:     "/",
 		Expires:  time.Now().Add(challengeTTL),
 		HttpOnly: true,
-		Secure:   f.svc.Secure(),
+		Secure:   f.svc.secure,
 		SameSite: http.SameSiteLaxMode,
 	}
 }
@@ -125,7 +125,7 @@ func (f *passkeyFlow) clearedCeremonyCookie() *http.Cookie {
 		Path:     "/",
 		Expires:  time.Unix(0, 0),
 		HttpOnly: true,
-		Secure:   f.svc.Secure(),
+		Secure:   f.svc.secure,
 		SameSite: http.SameSiteLaxMode,
 	}
 }
@@ -153,17 +153,17 @@ func (f *passkeyFlow) webUserFor(ctx context.Context, u *db.User) (*webUser, err
 func (f *passkeyFlow) sessionUser(ctx context.Context, w http.ResponseWriter) (*webUser, bool) {
 	// p, ok := PrincipalFromContext(ctx)
 	// if !ok {
-	// 	WriteError(w, http.StatusUnauthorized, "no_session", "sign in first")
+	// 	WriteError(w, http.StatusUnauthorized, "sign in first")
 	// 	return nil, false
 	// }
 	u, err := f.svc.GetUser(ctx)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return nil, false
 	}
 	wu, err := f.webUserFor(ctx, u)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return nil, false
 	}
 	return wu, true
@@ -205,20 +205,15 @@ func (f *passkeyFlow) upsertPasskey(
 	return label, err
 }
 
-// issueSessionFor issues the user session, sets the cookie, and fires the
-// OnUserLogin hook (device remembering, new-login alerts).
+// issueSessionFor completes the passkey login and fires the OnUserLogin
+// hook (device remembering, new-login alerts).
 func (f *passkeyFlow) issueSessionFor(w http.ResponseWriter, r *http.Request, u *db.User) {
-	sess, token, err := f.svc.IssueSession(r.Context(), SessionParams{
-		SubjectID: u.ID,
-		Kind:      KindUser,
-		Method:    MethodPasskey,
-		TTL:       sessionTTL,
-	})
+	cookie, err := f.svc.completeLogin(r.Context(), u, MethodPasskey)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	http.SetCookie(w, f.svc.SessionCookie(token, sess.ExpiresAt))
+	http.SetCookie(w, cookie)
 	if f.svc.OnUserLogin != nil {
 		f.svc.OnUserLogin(w, r, u, MethodPasskey)
 	}
@@ -237,12 +232,12 @@ func (f *passkeyFlow) BeginRegistration(w http.ResponseWriter, r *http.Request) 
 
 	creation, session, err := f.wa.BeginRegistration(wu)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "registration_failed", "registration failed")
+		WriteError(w, http.StatusInternalServerError, "registration failed")
 		return
 	}
 	sid, err := f.putCeremony(ctx, session)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	http.SetCookie(w, f.ceremonyCookie(sid))
@@ -253,14 +248,9 @@ func (f *passkeyFlow) BeginRegistration(w http.ResponseWriter, r *http.Request) 
 // signed-in session survives: this is credential management, not a login.
 func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	session, err := f.state.Take(ctx, CookieToken(r, ceremonyCookieName))
+	session, err := f.state.Take(ctx, CookieFromHeader(r.Header, ceremonyCookieName))
 	if err != nil {
-		WriteError(
-			w,
-			http.StatusBadRequest,
-			"invalid_or_expired_ceremony",
-			"invalid or expired ceremony",
-		)
+		WriteError(w, http.StatusBadRequest, "invalid or expired ceremony")
 		return
 	}
 	wu, ok := f.sessionUser(ctx, w)
@@ -270,17 +260,12 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 
 	cred, err := f.wa.FinishRegistration(wu, session, r)
 	if err != nil {
-		WriteError(
-			w,
-			http.StatusBadRequest,
-			"registration_verification_failed",
-			"registration verification failed",
-		)
+		WriteError(w, http.StatusBadRequest, "registration verification failed")
 		return
 	}
 	name, err := f.upsertPasskey(ctx, wu.user, cred)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	f.svc.record(ctx, Event{
@@ -303,17 +288,17 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if err := r.ParseForm(); err != nil {
-		WriteError(w, http.StatusBadRequest, "bad_input", "invalid request body")
+		WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	email := normalizeEmail(r.PostFormValue("email"))
 	name := strings.TrimSpace(r.PostFormValue("name"))
 	if email == "" {
-		WriteError(w, http.StatusBadRequest, "missing_fields", "email is required")
+		WriteError(w, http.StatusBadRequest, "email is required")
 		return
 	}
 	if err := emailverify.Verify(email); err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid_email", "please enter a valid email address")
+		WriteError(w, http.StatusBadRequest, "please enter a valid email address")
 		return
 	}
 
@@ -326,12 +311,7 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 		// Attaching a key to an existing account goes through the signed-in
 		// add-key flow; public signup must never attach to someone's
 		// account.
-		WriteError(
-			w,
-			http.StatusConflict,
-			"email_taken",
-			"an account with this email already exists",
-		)
+		WriteError(w, http.StatusConflict, "an account with this email already exists")
 		return
 	}
 
@@ -340,19 +320,19 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 	// to.
 	reserved, err := uuid.NewV7()
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	reservedID := reserved.String()
 	wu := &webUser{user: &db.User{ID: reservedID, Email: email, Name: name}}
 	creation, session, err := f.wa.BeginRegistration(wu)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "registration_failed", "registration failed")
+		WriteError(w, http.StatusInternalServerError, "registration failed")
 		return
 	}
 	sid, err := crypto.RandomString(16)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	if err := f.signup.Put(ctx, sid, passkeySignupState{
@@ -361,7 +341,7 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 		Email:   email,
 		Name:    name,
 	}); err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	http.SetCookie(w, f.ceremonyCookie(sid))
@@ -373,24 +353,14 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 // account signs in only after confirming the emailed link.
 func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	st, err := f.signup.Take(ctx, CookieToken(r, ceremonyCookieName))
+	st, err := f.signup.Take(ctx, CookieFromHeader(r.Header, ceremonyCookieName))
 	if err != nil {
-		WriteError(
-			w,
-			http.StatusBadRequest,
-			"invalid_or_expired_ceremony",
-			"invalid or expired ceremony",
-		)
+		WriteError(w, http.StatusBadRequest, "invalid or expired ceremony")
 		return
 	}
 	email := normalizeEmail(r.URL.Query().Get("email"))
 	if email != "" && email != st.Email {
-		WriteError(
-			w,
-			http.StatusBadRequest,
-			"invalid_or_expired_ceremony",
-			"invalid or expired ceremony",
-		)
+		WriteError(w, http.StatusBadRequest, "invalid or expired ceremony")
 		return
 	}
 
@@ -399,12 +369,7 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	wu := &webUser{user: &db.User{ID: st.ID, Email: st.Email}}
 	cred, err := f.wa.FinishRegistration(wu, *st.Session, r)
 	if err != nil {
-		WriteError(
-			w,
-			http.StatusBadRequest,
-			"registration_verification_failed",
-			"registration verification failed",
-		)
+		WriteError(w, http.StatusBadRequest, "registration verification failed")
 		return
 	}
 
@@ -415,12 +380,7 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		// A register flow raced the same email to the store.
-		WriteError(
-			w,
-			http.StatusConflict,
-			"email_taken",
-			"an account with this email already exists",
-		)
+		WriteError(w, http.StatusConflict, "an account with this email already exists")
 		return
 	}
 
@@ -432,7 +392,7 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if _, err := f.upsertPasskey(ctx, u, cred); err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	f.svc.record(ctx, Event{
@@ -464,12 +424,12 @@ func (f *passkeyFlow) BeginLogin(w http.ResponseWriter, r *http.Request) {
 		webauthn.WithUserVerification(protocol.VerificationRequired),
 	)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "login_failed", "login failed")
+		WriteError(w, http.StatusInternalServerError, "login failed")
 		return
 	}
 	sid, err := f.putCeremony(ctx, session)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	http.SetCookie(w, f.ceremonyCookie(sid))
@@ -480,14 +440,9 @@ func (f *passkeyFlow) BeginLogin(w http.ResponseWriter, r *http.Request) {
 // and issues a session.
 func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	session, err := f.state.Take(ctx, CookieToken(r, ceremonyCookieName))
+	session, err := f.state.Take(ctx, CookieFromHeader(r.Header, ceremonyCookieName))
 	if err != nil {
-		WriteError(
-			w,
-			http.StatusBadRequest,
-			"invalid_or_expired_ceremony",
-			"invalid or expired ceremony",
-		)
+		WriteError(w, http.StatusBadRequest, "invalid or expired ceremony")
 		return
 	}
 
@@ -499,27 +454,17 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		// assertion must belong to that user.
 		candidate, err := f.svc.GetUserByID(ctx, string(session.UserID))
 		if err != nil {
-			WriteError(
-				w,
-				http.StatusBadRequest,
-				"login_verification_failed",
-				"login verification failed",
-			)
+			WriteError(w, http.StatusBadRequest, "login verification failed")
 			return
 		}
 		wu, err := f.webUserFor(ctx, candidate)
 		if err != nil {
-			WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+			WriteError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
 		verified, err := f.wa.FinishLogin(wu, session, r)
 		if err != nil {
-			WriteError(
-				w,
-				http.StatusBadRequest,
-				"login_verification_failed",
-				"login verification failed",
-			)
+			WriteError(w, http.StatusBadRequest, "login verification failed")
 			return
 		}
 		cred = verified
@@ -529,17 +474,12 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		// user handle.
 		found, verified, err := f.wa.FinishPasskeyLogin(f.discoverableUser(ctx), session, r)
 		if err != nil {
-			WriteError(
-				w,
-				http.StatusBadRequest,
-				"login_verification_failed",
-				"login verification failed",
-			)
+			WriteError(w, http.StatusBadRequest, "login verification failed")
 			return
 		}
 		adapter, ok := found.(*webUser)
 		if !ok {
-			WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+			WriteError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
 		u = adapter.user
@@ -547,20 +487,15 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := f.upsertPasskey(ctx, u, cred); err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	if !u.Active {
-		WriteError(w, http.StatusForbidden, "inactive", "this account has been deactivated")
+		WriteError(w, http.StatusForbidden, "this account has been deactivated")
 		return
 	}
 	if !u.EmailVerified {
-		WriteError(
-			w,
-			http.StatusForbidden,
-			"email_unverified",
-			"verify your email address before signing in",
-		)
+		WriteError(w, http.StatusForbidden, "verify your email address before signing in")
 		return
 	}
 

@@ -87,7 +87,7 @@ func (h *samlFlow) Login(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	providerID := r.URL.Query().Get("provider")
 	if providerID == "" {
-		WriteError(w, http.StatusBadRequest, "missing_provider", "missing provider")
+		WriteError(w, http.StatusBadRequest, "missing provider")
 		return
 	}
 
@@ -123,7 +123,7 @@ func (h *samlFlow) Login(w http.ResponseWriter, r *http.Request) {
 
 	relayState, err := crypto.RandomString(32)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	st := samlState{
@@ -138,7 +138,7 @@ func (h *samlFlow) Login(w http.ResponseWriter, r *http.Request) {
 		FlowCookie: startFlowBinding(w, strings.HasPrefix(h.svc.baseURL, "https://")),
 	}
 	if err := h.state.Put(ctx, relayState, st); err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
+		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
@@ -156,7 +156,7 @@ func (h *samlFlow) Login(w http.ResponseWriter, r *http.Request) {
 func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if err := r.ParseForm(); err != nil {
-		WriteError(w, http.StatusBadRequest, "bad_request", "bad request")
+		WriteError(w, http.StatusBadRequest, "bad request")
 		return
 	}
 
@@ -346,12 +346,7 @@ func (h *samlFlow) Metadata(w http.ResponseWriter, _ *http.Request) {
 	}
 	buf, err := xml.MarshalIndent(sp.Metadata(), "", "  ")
 	if err != nil {
-		WriteError(
-			w,
-			http.StatusInternalServerError,
-			"failed_to_generate_metadata",
-			"failed to generate metadata",
-		)
+		WriteError(w, http.StatusInternalServerError, "failed to generate metadata")
 		return
 	}
 	w.Header().Set("Content-Type", "application/samlmetadata+xml")

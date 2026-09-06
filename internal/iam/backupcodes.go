@@ -151,26 +151,10 @@ func (s *Service) LoginWithBackupCode(ctx context.Context, email, code string) (
 		}
 		return nil, nil, err
 	}
-	sess, token, err := s.IssueSession(ctx, SessionParams{
-		SubjectID: u.ID,
-		Kind:      KindUser,
-		Method:    MethodBackupCode,
-		TTL:       sessionTTL,
-	})
+	cookie, err := s.completeLogin(ctx, u, MethodBackupCode)
 	if err != nil {
 		return nil, nil, err
 	}
-	cookie := s.SessionCookie(token, sess.ExpiresAt)
-	s.record(
-		ctx,
-		Event{
-			Action: ActionLoginSucceeded,
-			Kind:   KindUser,
-			Method: MethodBackupCode,
-			UserID: u.ID,
-			Email:  u.Email,
-		},
-	)
 	return u, cookie, nil
 }
 
