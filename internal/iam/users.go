@@ -37,11 +37,22 @@ func (s *Service) Register(ctx context.Context, email, name, pw string) (*db.Use
 			Email:  u.Email,
 		},
 	)
-	return s.GetUser(ctx, u.ID)
+	return u, nil
 }
 
 // GetUser returns the user by ID, or ErrNotFound.
-func (s *Service) GetUser(ctx context.Context, userID string) (*db.User, error) {
+func (s *Service) GetUser(ctx context.Context) (*db.User, error) {
+	u, err := s.q.GetUser(ctx, UserIDFromContext(ctx))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return u, nil
+}
+
+func (s *Service) GetUserByID(ctx context.Context, userID string) (*db.User, error) {
 	u, err := s.q.GetUser(ctx, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -64,20 +75,12 @@ func (s *Service) GetUserByEmail(ctx context.Context, email string) (*db.User, e
 	return u, nil
 }
 
-// UpdateUserPatch carries the fields to change; nil leaves a field alone.
-type UpdateUserPatch struct {
-	Name                 *string
-	Picture              *string
-	Active               *bool
-	DisablePasswordReset *bool
-}
-
 // UpdateUser applies the patch and returns the updated user.
-func (s *Service) UpdateUser(
-	ctx context.Context,
-	userID string,
-	p UpdateUserPatch,
-) (*db.User, error) {
+func (s *Service) UpdateUser(ctx context.Context, p db.UpdateUserParams) (*db.User, error) {
+	userID := UserIDFromContext(ctx)
+	if userID == "" && p.ID != "" {
+		userID = p.ID
+	}
 	u, err := s.q.UpdateUser(ctx, &db.UpdateUserParams{
 		ID:                   userID,
 		Name:                 p.Name,
@@ -98,8 +101,9 @@ func (s *Service) UpdateUser(
 // sessions, one-time tokens, memberships, and owned workspaces, through the
 // schema's ON DELETE CASCADE. A deprovisioned account must not leave a live
 // session or a stored credential behind.
-func (s *Service) DeleteUser(ctx context.Context, userID string) error {
-	u, err := s.GetUser(ctx, userID)
+func (s *Service) DeleteUser(ctx context.Context) error {
+	userID := UserIDFromContext(ctx)
+	u, err := s.GetUser(ctx)
 	if err != nil {
 		return err
 	}

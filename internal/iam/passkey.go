@@ -45,7 +45,7 @@ type passkeySignupState struct {
 
 // webUser adapts a user row to the webauthn.User interface.
 type webUser struct {
-	user  User
+	user  *db.User
 	creds []webauthn.Credential
 }
 
@@ -133,7 +133,7 @@ func (f *passkeyFlow) clearedCeremonyCookie() *http.Cookie {
 // user helpers -------------------------------------------------------------
 
 // webUserFor wraps a user with its stored passkey credentials.
-func (f *passkeyFlow) webUserFor(ctx context.Context, u User) (*webUser, error) {
+func (f *passkeyFlow) webUserFor(ctx context.Context, u *db.User) (*webUser, error) {
 	creds, err := f.svc.ListCredentialsByType(ctx, u.ID, MethodPasskey)
 	if err != nil {
 		return nil, err
@@ -151,12 +151,12 @@ func (f *passkeyFlow) webUserFor(ctx context.Context, u User) (*webUser, error) 
 
 // sessionUser resolves the signed-in account for the add-key surface.
 func (f *passkeyFlow) sessionUser(ctx context.Context, w http.ResponseWriter) (*webUser, bool) {
-	p, ok := PrincipalFromContext(ctx)
-	if !ok {
-		WriteError(w, http.StatusUnauthorized, "no_session", "sign in first")
-		return nil, false
-	}
-	u, err := f.svc.GetUser(ctx, p.ID)
+	// p, ok := PrincipalFromContext(ctx)
+	// if !ok {
+	// 	WriteError(w, http.StatusUnauthorized, "no_session", "sign in first")
+	// 	return nil, false
+	// }
+	u, err := f.svc.GetUser(ctx)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
 		return nil, false
@@ -174,7 +174,7 @@ func (f *passkeyFlow) sessionUser(ctx context.Context, w http.ResponseWriter) (*
 // its label.
 func (f *passkeyFlow) upsertPasskey(
 	ctx context.Context,
-	u User,
+	u *db.User,
 	cred *webauthn.Credential,
 ) (string, error) {
 	data, err := json.Marshal(cred)
@@ -207,18 +207,18 @@ func (f *passkeyFlow) upsertPasskey(
 
 // issueSessionFor issues the user session, sets the cookie, and fires the
 // OnUserLogin hook (device remembering, new-login alerts).
-func (f *passkeyFlow) issueSessionFor(w http.ResponseWriter, r *http.Request, u User) {
-	sess, token, err := f.svc.Sessions.Issue(r.Context(), SessionParams{
+func (f *passkeyFlow) issueSessionFor(w http.ResponseWriter, r *http.Request, u *db.User) {
+	sess, token, err := f.svc.IssueSession(r.Context(), SessionParams{
 		SubjectID: u.ID,
 		Kind:      KindUser,
 		Method:    MethodPasskey,
-		TTL:       f.svc.Sessions.opts.TTL,
+		TTL:       sessionTTL,
 	})
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
 		return
 	}
-	http.SetCookie(w, f.svc.SessionCookie(token, derefTime(sess.ExpiresAt)))
+	http.SetCookie(w, f.svc.SessionCookie(token, sess.ExpiresAt))
 	if f.svc.OnUserLogin != nil {
 		f.svc.OnUserLogin(w, r, u, MethodPasskey)
 	}
@@ -408,11 +408,12 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := f.svc.q.CreateUserWithID(ctx, &db.CreateUserWithIDParams{
+	u, err := f.svc.q.CreateUserWithID(ctx, &db.CreateUserWithIDParams{
 		ID:    st.ID,
 		Email: st.Email,
 		Name:  st.Name,
-	}); err != nil {
+	})
+	if err != nil {
 		// A register flow raced the same email to the store.
 		WriteError(
 			w,
@@ -422,11 +423,7 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	u, err := f.svc.GetUser(ctx, st.ID)
-	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
-		return
-	}
+
 	f.svc.record(ctx, Event{
 		Action: ActionUserCreated,
 		Kind:   KindUser,
@@ -494,13 +491,13 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u User
+	var u *db.User
 	var cred *webauthn.Credential
 
 	if len(session.UserID) > 0 {
 		// A non-discoverable begin resolved the email to a user; the
 		// assertion must belong to that user.
-		candidate, err := f.svc.GetUser(ctx, string(session.UserID))
+		candidate, err := f.svc.GetUserByID(ctx, string(session.UserID))
 		if err != nil {
 			WriteError(
 				w,
@@ -583,7 +580,7 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 func (f *passkeyFlow) discoverableUser(ctx context.Context) webauthn.DiscoverableUserHandler {
 	return func(rawID, userHandle []byte) (webauthn.User, error) {
 		if len(userHandle) > 0 {
-			if u, err := f.svc.GetUser(ctx, string(userHandle)); err == nil {
+			if u, err := f.svc.GetUserByID(ctx, string(userHandle)); err == nil {
 				return f.webUserFor(ctx, u)
 			}
 		}
@@ -595,7 +592,7 @@ func (f *passkeyFlow) discoverableUser(ctx context.Context) webauthn.Discoverabl
 		if err != nil {
 			return nil, err
 		}
-		u, err := f.svc.GetUser(ctx, cred.UserID)
+		u, err := f.svc.GetUserByID(ctx, cred.UserID)
 		if err != nil {
 			return nil, err
 		}

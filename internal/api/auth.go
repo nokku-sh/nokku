@@ -19,7 +19,6 @@ import (
 
 const (
 	tokenTTL         = 15 * time.Minute
-	sessionTTL       = 24 * time.Hour
 	deviceCookieName = "nokku_device"
 	deviceSessionTTL = 180 * 24 * time.Hour // 6 months, refreshed on each login
 )
@@ -82,12 +81,18 @@ func (s *AuthService) Login(
 	ctx context.Context,
 	req *nokkuv1.LoginRequest,
 ) (*nokkuv1.LoginResponse, error) {
-	u, err := s.cfg.IAM.Password.Login(ctx, req.GetEmail(), req.GetPassword())
+	ci, err := callInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	u, cookie, err := s.cfg.IAM.Password.Login(ctx, req.GetEmail(), req.GetPassword())
 	if err != nil {
 		return nil, loginError(err)
 	}
-	if err := s.issueSession(ctx, u, iam.MethodPassword); err != nil {
-		return nil, err
+	setCookie(ci, cookie)
+	if c := s.reconcileDevice(ctx, ci.RequestHeader(), ci.Peer().Addr, u); c != nil {
+		setCookie(ci, c)
 	}
 	return &nokkuv1.LoginResponse{User: db.UserToProto(u)}, nil
 }
@@ -96,37 +101,20 @@ func (s *AuthService) LoginWithBackupCode(
 	ctx context.Context,
 	req *nokkuv1.LoginWithBackupCodeRequest,
 ) (*nokkuv1.LoginWithBackupCodeResponse, error) {
-	u, err := s.cfg.IAM.LoginWithBackupCode(ctx, req.GetEmail(), req.GetCode())
+	ci, err := callInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	u, cookie, err := s.cfg.IAM.LoginWithBackupCode(ctx, req.GetEmail(), req.GetCode())
 	if err != nil {
 		return nil, loginError(err)
 	}
-	if err := s.issueSession(ctx, u, iam.MethodBackupCode); err != nil {
-		return nil, err
-	}
-	return &nokkuv1.LoginWithBackupCodeResponse{User: db.UserToProto(u)}, nil
-}
-
-// issueSession creates the web session, writes the cookie, and reconciles
-// the remembered device (new device => one geo-located security alert).
-func (s *AuthService) issueSession(ctx context.Context, u *db.User, method iam.Method) error {
-	ci, err := callInfo(ctx)
-	if err != nil {
-		return err
-	}
-	sess, token, err := s.cfg.IAM.Sessions.Issue(ctx, iam.SessionParams{
-		SubjectID: u.ID,
-		Kind:      iam.KindUser,
-		Method:    method,
-		TTL:       sessionTTL,
-	})
-	if err != nil {
-		return ErrInternal
-	}
-	setCookie(ci, s.cfg.IAM.SessionCookie(token, derefTime(sess.ExpiresAt)))
+	setCookie(ci, cookie)
 	if c := s.reconcileDevice(ctx, ci.RequestHeader(), ci.Peer().Addr, u); c != nil {
 		setCookie(ci, c)
 	}
-	return nil
+	return &nokkuv1.LoginWithBackupCodeResponse{User: db.UserToProto(u)}, nil
 }
 
 // loginError writes a uniform bad-credentials response; ErrInactive keeps
@@ -153,7 +141,7 @@ func (s *AuthService) Logout(
 	// principal. Revoke when present, always clear the cookie: logout must
 	// succeed on a stale or expired session too.
 	if token := iam.SessionTokenFromHeader(ci.RequestHeader()); token != "" {
-		_ = s.cfg.IAM.Sessions.Revoke(ctx, token)
+		_ = s.cfg.IAM.RevokeSession(ctx, token)
 	}
 	setCookie(ci, s.cfg.IAM.ClearSessionCookie())
 	return &nokkuv1.LogoutResponse{}, nil
@@ -265,11 +253,11 @@ func (s *AuthService) reconcileDevice(
 	u *db.User,
 ) *http.Cookie {
 	if raw := iam.CookieFromHeader(h, deviceCookieName); raw != "" {
-		if sess, err := s.cfg.IAM.Sessions.Verify(ctx, raw); err == nil &&
+		if sess, err := s.cfg.IAM.VerifySession(ctx, raw); err == nil &&
 			sess.Kind == string(iam.KindWebDevice) && sess.SubjectID == u.ID {
 			// Known device: refresh its last-seen time so the sessions list
 			// shows current activity. No alert.
-			if err := s.cfg.IAM.Sessions.Touch(
+			if err := s.cfg.IAM.TouchSession(
 				ctx,
 				iam.SessionHash(sess.TokenHash),
 			); err != nil {
@@ -280,7 +268,7 @@ func (s *AuthService) reconcileDevice(
 	}
 
 	name := iam.DeviceNameFromUA(h.Get("User-Agent"))
-	sess, token, err := s.cfg.IAM.Sessions.Issue(ctx, iam.SessionParams{
+	sess, token, err := s.cfg.IAM.IssueSession(ctx, iam.SessionParams{
 		SubjectID: u.ID,
 		Kind:      iam.KindWebDevice,
 		Method:    iam.MethodDevice,

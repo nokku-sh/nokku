@@ -50,7 +50,7 @@ func (s *UtilService) Whoami(
 
 	switch p.Kind {
 	case iam.KindUser, iam.KindCLI, iam.KindWebDevice:
-		u, err := s.cfg.IAM.GetUser(ctx, p.ID)
+		u, err := s.cfg.IAM.GetUser(ctx)
 		if err != nil {
 			return nil, DBError(err)
 		}

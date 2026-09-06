@@ -305,6 +305,8 @@ func (f *scimStore) ListTeamMembers(_ context.Context, teamID string) ([]*db.Lis
 // the SCIM path issues onto the shared in-memory store.
 type scimConn struct{ st *scimStore }
 
+func (c *scimConn) Querier() db.Querier { return c.st }
+
 func (c *scimConn) WithTx(_ context.Context, fn func(*db.Queries) error) error {
 	return fn(db.New(c))
 }
@@ -459,7 +461,7 @@ func newSCIMTest(t *testing.T) (*Service, *scimStore, string) {
 		t.Fatalf("init hashers: %v", err)
 	}
 	st := newSCIMStore()
-	svc, err := New(Deps{Querier: st, Conn: &scimConn{st: st}})
+	svc, err := New(Deps{Conn: &scimConn{st: st}})
 	if err != nil {
 		t.Fatal(err)
 	}

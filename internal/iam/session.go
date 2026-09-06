@@ -12,27 +12,18 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// SessionOptions configures session issuance.
-type SessionOptions struct {
-	// TTL is the default absolute session lifetime for issued sessions.
-	TTL time.Duration
-	// IdleTimeout, when positive, caps inactivity: a session expires when
-	// this much time passes without a request. It is enforced alongside the
-	// absolute TTL, whichever comes first. Zero disables the idle check.
-	IdleTimeout time.Duration
-}
+const (
+	sessionTTL = 168 * time.Hour
+)
 
 // SessionHash is the hex token hash a sessions listing exposes as the
 // session ID; it is the only session identifier that ever leaves the server.
 type SessionHash string
 
-// SessionParams parameterizes SessionManager.Issue.
 type SessionParams struct {
-	SubjectID string
-	Kind      Kind
-	Method    Method
-	// WorkspaceID pins the session to a workspace tenant (daemons); empty
-	// means the subject is global.
+	SubjectID   string
+	Kind        Kind
+	Method      Method
 	WorkspaceID string
 	// Binding is the DPoP key thumbprint (jkt) to bind the token to. Empty
 	// for cookie sessions.
@@ -44,17 +35,9 @@ type SessionParams struct {
 	TTL time.Duration
 }
 
-// SessionManager issues and validates opaque session tokens against the
-// store. The raw token crosses the wire once; only its SHA-256 hash is
-// stored, so a database leak reveals nothing usable.
-type SessionManager struct {
-	svc  *Service
-	opts SessionOptions
-}
-
-// Issue creates a session and returns it together with the raw token. The
+// IssueSession creates a session and returns it together with the raw token. The
 // raw token must be delivered to the client (cookie or body) exactly once.
-func (sm *SessionManager) Issue(ctx context.Context, p SessionParams) (db.Session, string, error) {
+func (s *Service) IssueSession(ctx context.Context, p SessionParams) (db.Session, string, error) {
 	token, err := crypto.RandomString(32)
 	if err != nil {
 		return db.Session{}, "", err
@@ -67,7 +50,7 @@ func (sm *SessionManager) Issue(ctx context.Context, p SessionParams) (db.Sessio
 		p.Kind = KindUser
 	}
 
-	now := sm.svc.now()
+	now := s.now()
 	row := db.Session{
 		TokenHash:  tokenHash,
 		SubjectID:  p.SubjectID,
@@ -86,7 +69,7 @@ func (sm *SessionManager) Issue(ctx context.Context, p SessionParams) (db.Sessio
 		row.ExpiresAt = &expires
 	}
 
-	if err := sm.svc.q.CreateSession(ctx, &db.CreateSessionParams{
+	if err := s.q.CreateSession(ctx, &db.CreateSessionParams{
 		TokenHash:   row.TokenHash,
 		SubjectID:   row.SubjectID,
 		Kind:        row.Kind,
@@ -100,7 +83,7 @@ func (sm *SessionManager) Issue(ctx context.Context, p SessionParams) (db.Sessio
 		return db.Session{}, "", err
 	}
 
-	sm.svc.record(ctx, Event{
+	s.record(ctx, Event{
 		Action:      ActionSessionIssued,
 		Kind:        p.Kind,
 		Method:      p.Method,
@@ -110,11 +93,11 @@ func (sm *SessionManager) Issue(ctx context.Context, p SessionParams) (db.Sessio
 	return row, token, nil
 }
 
-// Verify loads and validates the session for token. It enforces the absolute
+// VerifySession loads and validates the session for token. It enforces the absolute
 // expiry and, when configured, the idle timeout, and refreshes LastSeenAt so
 // activity extends the idle window. The refresh is best-effort: a store that
 // cannot update it still authenticates.
-func (sm *SessionManager) Verify(ctx context.Context, token string) (db.Session, error) {
+func (s *Service) VerifySession(ctx context.Context, token string) (db.Session, error) {
 	if token == "" {
 		return db.Session{}, ErrNoSession
 	}
@@ -122,7 +105,7 @@ func (sm *SessionManager) Verify(ctx context.Context, token string) (db.Session,
 	if err != nil {
 		return db.Session{}, err
 	}
-	s, err := sm.svc.q.GetSession(ctx, tokenHash)
+	sess, err := s.q.GetSession(ctx, tokenHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return db.Session{}, ErrNoSession
@@ -130,47 +113,32 @@ func (sm *SessionManager) Verify(ctx context.Context, token string) (db.Session,
 		return db.Session{}, err
 	}
 
-	now := sm.svc.now()
-	if s.ExpiresAt != nil && !s.ExpiresAt.After(now) {
-		_ = sm.svc.q.DeleteSession(ctx, s.TokenHash)
+	now := s.now()
+	if sess.ExpiresAt != nil && !sess.ExpiresAt.After(now) {
+		_ = s.q.DeleteSession(ctx, sess.TokenHash)
 		return db.Session{}, ErrSessionExpired
 	}
-	if sm.opts.IdleTimeout > 0 && s.LastSeenAt != nil {
-		if now.After(s.LastSeenAt.Add(sm.opts.IdleTimeout)) {
-			// Prune the dead session so listings stay honest.
-			_ = sm.svc.q.DeleteSession(ctx, s.TokenHash)
-			return db.Session{}, ErrSessionExpired
-		}
-		// Refresh at most twice per idle window so the touch does not turn
-		// into a write per request.
-		if now.Sub(*s.LastSeenAt) > sm.opts.IdleTimeout/2 {
-			_ = sm.svc.q.TouchSession(
-				ctx,
-				&db.TouchSessionParams{TokenHash: s.TokenHash, LastSeenAt: &now},
-			)
-			s.LastSeenAt = &now
-		}
-	}
-	return *s, nil
+
+	return *sess, nil
 }
 
-// Touch refreshes a session's last-seen time unconditionally. Verify's
+// TouchSession refreshes a session's last-seen time unconditionally. Verify's
 // refresh is throttled by the idle timeout, which may be zero; this one
 // backs surfaces that want an accurate "last active" regardless, such as
 // the remembered-device handshake on login.
-func (sm *SessionManager) Touch(ctx context.Context, tokenHash SessionHash) error {
-	now := sm.svc.now()
-	return sm.svc.q.TouchSession(
+func (s *Service) TouchSession(ctx context.Context, tokenHash SessionHash) error {
+	now := s.now()
+	return s.q.TouchSession(
 		ctx,
 		&db.TouchSessionParams{TokenHash: crypto.HashedToken(tokenHash), LastSeenAt: &now},
 	)
 }
 
-// List returns every live session of the subject, newest activity first. It
+// ListSessions returns every live session of the subject, newest activity first. It
 // backs "your devices" UIs. Expired sessions are pruned opportunistically
 // by the hygiene job, not here.
-func (sm *SessionManager) List(ctx context.Context, subjectID string) ([]db.Session, error) {
-	rows, err := sm.svc.q.ListSessionsBySubject(ctx, subjectID)
+func (s *Service) ListSessions(ctx context.Context, subjectID string) ([]db.Session, error) {
+	rows, err := s.q.ListSessionsBySubject(ctx, subjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -184,34 +152,34 @@ func (sm *SessionManager) List(ctx context.Context, subjectID string) ([]db.Sess
 	return sessions, nil
 }
 
-// Revoke deletes the session identified by the raw token.
-func (sm *SessionManager) Revoke(ctx context.Context, token string) error {
+// RevokeSession deletes the session identified by the raw token.
+func (s *Service) RevokeSession(ctx context.Context, token string) error {
 	tokenHash, err := crypto.HashToken(token)
 	if err != nil {
 		return err
 	}
-	if err := sm.svc.q.DeleteSession(ctx, tokenHash); err != nil {
+	if err := s.q.DeleteSession(ctx, tokenHash); err != nil {
 		return err
 	}
-	sm.svc.record(ctx, Event{Action: ActionSessionRevoked})
+	s.record(ctx, Event{Action: ActionSessionRevoked})
 	return nil
 }
 
 // RevokeSubject deletes every session of the subject and reports how many
 // were removed. Used when a password changes or an account is deactivated.
-func (sm *SessionManager) RevokeSubject(ctx context.Context, subjectID string) (int64, error) {
-	return sm.svc.q.DeleteSubjectSessions(ctx, subjectID)
+func (s *Service) RevokeSubject(ctx context.Context, subjectID string) (int64, error) {
+	return s.q.DeleteSubjectSessions(ctx, subjectID)
 }
 
 // RevokeOtherSessions deletes every session of the subject except keep and
 // reports how many were removed. The current session survives a deliberate
 // password change; everything else dies (NIST 800-63B).
-func (sm *SessionManager) RevokeOtherSessions(
+func (s *Service) RevokeOtherSessions(
 	ctx context.Context,
 	subjectID string,
 	keep SessionHash,
 ) (int64, error) {
-	return sm.svc.q.DeleteSessionsExcept(ctx, &db.DeleteSessionsExceptParams{
+	return s.q.DeleteSessionsExcept(ctx, &db.DeleteSessionsExceptParams{
 		SubjectID: subjectID,
 		KeepHash:  crypto.HashedToken(keep),
 	})
@@ -219,15 +187,15 @@ func (sm *SessionManager) RevokeOtherSessions(
 
 // DeleteSessionByHash removes a session by its token hash, the ID the
 // sessions listing exposes.
-func (sm *SessionManager) DeleteSessionByHash(ctx context.Context, hash SessionHash) error {
-	return sm.svc.q.DeleteSession(ctx, crypto.HashedToken(hash))
+func (s *Service) DeleteSessionByHash(ctx context.Context, hash SessionHash) error {
+	return s.q.DeleteSession(ctx, crypto.HashedToken(hash))
 }
 
 // DeleteExpired prunes expired sessions and reports how many went. It backs
 // a hygiene job.
-func (sm *SessionManager) DeleteExpired(ctx context.Context) (int64, error) {
-	now := sm.svc.now()
-	return sm.svc.q.DeleteExpiredSessions(ctx, &now)
+func (s *Service) DeleteExpired(ctx context.Context) (int64, error) {
+	now := s.now()
+	return s.q.DeleteExpiredSessions(ctx, &now)
 }
 
 // lastSeen tolerates a NULL last_seen_at for sorting.

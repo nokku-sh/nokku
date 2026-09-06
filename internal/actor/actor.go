@@ -3,7 +3,9 @@
 // the vocabulary with iam and the api without import cycles.
 package actor
 
-import "context"
+import (
+	"context"
+)
 
 // Kind is the actor kind a session belongs to.
 type Kind string
@@ -49,9 +51,9 @@ func PrincipalFromContext(ctx context.Context) (Principal, bool) {
 func UserIDFromContext(ctx context.Context) string {
 	if p, ok := PrincipalFromContext(ctx); ok {
 		switch p.Kind {
-		case KindUser, KindCLI:
+		case KindUser, KindCLI, KindWebDevice:
 			return p.ID
-		case KindWebDevice, KindDaemon, KindServiceAccount:
+		case KindDaemon, KindServiceAccount:
 			return ""
 		}
 	}

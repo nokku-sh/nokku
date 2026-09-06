@@ -63,7 +63,7 @@ func (s *WorkspaceService) CreateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.CreateWorkspaceRequest,
 ) (*nokkuv1.CreateWorkspaceResponse, error) {
-	user, err := s.cfg.IAM.GetUser(ctx, iam.UserIDFromContext(ctx))
+	user, err := s.cfg.IAM.GetUser(ctx)
 	if err != nil {
 		return nil, DBError(err)
 	}
@@ -184,7 +184,7 @@ func (s *WorkspaceService) GetWorkspaceMember(
 	}
 	result := member.ToProto()
 
-	user, err := s.cfg.IAM.GetUser(ctx, req.GetUserId())
+	user, err := s.cfg.IAM.GetUser(ctx)
 	if err != nil {
 		return nil, DBError(err)
 	}

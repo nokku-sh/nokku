@@ -37,10 +37,18 @@ const scimMountPath = "/scim/v2"
 // they are immutable per workspace (static schemas, baseURL pinning the
 // workspace), so construction happens once.
 type SCIMFlow struct {
-	svc *Service
-
+	svc     *Service
 	mu      sync.Mutex
 	servers map[string]scim.Server
+}
+
+// SCIMToken is a stored workspace connector token. The plaintext is never
+// stored and only returned by IssueSCIMToken.
+type SCIMToken struct {
+	ID         string
+	Label      string
+	CreatedAt  time.Time
+	LastUsedAt *time.Time
 }
 
 func newSCIMFlow(svc *Service) *SCIMFlow {
@@ -145,15 +153,6 @@ func (s *Service) verifySCIMToken(ctx context.Context, workspaceID, raw string) 
 	})
 }
 
-// SCIMToken is a stored workspace connector token. The plaintext is never
-// stored and only returned by IssueSCIMToken.
-type SCIMToken struct {
-	ID         string
-	Label      string
-	CreatedAt  time.Time
-	LastUsedAt *time.Time
-}
-
 // IssueSCIMToken mints a workspace connector token. The plaintext is shown
 // once, at creation; the store keeps only its hash.
 func (s *Service) IssueSCIMToken(
@@ -243,15 +242,14 @@ func (s *Service) scimProvisionUser(
 		// and inactive until the IdP says otherwise.
 		if !active {
 			inactive := false
-			if u, err = s.UpdateUser(ctx, u.ID, UpdateUserPatch{Active: &inactive}); err != nil {
+			if u, err = s.UpdateUser(ctx, db.UpdateUserParams{ID: u.ID, Active: &inactive}); err != nil {
 				return nil, err
 			}
 		}
 		noReset := true
 		if _, err := s.UpdateUser(
 			ctx,
-			u.ID,
-			UpdateUserPatch{DisablePasswordReset: &noReset},
+			db.UpdateUserParams{ID: u.ID, DisablePasswordReset: &noReset},
 		); err != nil {
 			return nil, err
 		}
@@ -267,7 +265,7 @@ func (s *Service) scimProvisionUser(
 		return nil, err
 	default:
 		if u.Active != active {
-			if u, err = s.UpdateUser(ctx, u.ID, UpdateUserPatch{Active: &active}); err != nil {
+			if u, err = s.UpdateUser(ctx, db.UpdateUserParams{ID: u.ID, Active: &active}); err != nil {
 				return nil, err
 			}
 		}
@@ -356,7 +354,7 @@ func linkSCIMCredential(
 // survives for recovery while access dies, and an IdP re-assignment
 // reactivates it.
 func (s *Service) scimDeprovisionUser(ctx context.Context, workspaceID, userID string) error {
-	u, err := s.GetUser(ctx, userID)
+	u, err := s.GetUserByID(ctx, userID)
 	if err != nil {
 		return err
 	}

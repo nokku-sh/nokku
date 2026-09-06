@@ -199,7 +199,7 @@ func (a *authNInterceptor) advertiseNonce(header http.Header, err error) {
 	// Advertise the canonical API URL alongside the nonce, so a client
 	// recovering from a stale nonce also corrects the htu it signs.
 	if a.cfg.IAM.DPoP != nil {
-		header.Set(iam.URLHeader, a.cfg.FullURL())
+		header.Set(iam.DeviceURLHeader, a.cfg.FullURL())
 		header.Set("DPoP-Nonce", a.cfg.IAM.DPoP.CurrentNonce())
 	}
 }

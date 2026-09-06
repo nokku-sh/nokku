@@ -87,7 +87,8 @@ func (h scimUserHandler) Replace(r *http.Request, id string, attrs scim.Resource
 	}
 	externalID := scimAttrString(attrs["externalId"])
 	patch := scimUserPatch(attrs)
-	u, err = h.apply(ctx, id, patch, externalID, externalID != "")
+	patch.ID = id
+	u, err = h.apply(ctx, patch, externalID, externalID != "")
 	if err != nil {
 		return scim.Resource{}, err
 	}
@@ -111,7 +112,7 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 		return scim.Resource{}, err
 	}
 
-	patch := UpdateUserPatch{}
+	patch := db.UpdateUserParams{ID: id}
 	externalID := ""
 	externalSet := false
 	changed := false
@@ -176,7 +177,7 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 		// resource.
 		return scim.Resource{}, nil
 	}
-	u, err = h.apply(ctx, id, patch, externalID, externalSet && externalID != "")
+	u, err = h.apply(ctx, patch, externalID, externalSet && externalID != "")
 	if err != nil {
 		return scim.Resource{}, err
 	}
@@ -191,13 +192,13 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 // the revocation keeps device listings from showing dead sessions.
 func (h scimUserHandler) revokeOnDeactivate(
 	ctx context.Context,
-	patch UpdateUserPatch,
+	patch db.UpdateUserParams,
 	u *db.User,
 ) error {
 	if patch.Active == nil || *patch.Active || u.Active {
 		return nil
 	}
-	_, err := h.svc.Sessions.RevokeSubject(ctx, u.ID)
+	_, err := h.svc.RevokeSubject(ctx, u.ID)
 	return err
 }
 
@@ -245,12 +246,11 @@ func (h scimUserHandler) resource(ctx context.Context, u *db.User) (scim.Resourc
 // same user is a no-op upsert.
 func (h scimUserHandler) apply(
 	ctx context.Context,
-	id string,
-	patch UpdateUserPatch,
+	patch db.UpdateUserParams,
 	externalID string,
 	linkExternal bool,
 ) (*db.User, error) {
-	u, err := h.svc.UpdateUser(ctx, id, patch)
+	u, err := h.svc.UpdateUser(ctx, patch)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +258,7 @@ func (h scimUserHandler) apply(
 		return u, nil
 	}
 	err = h.svc.conn.WithTx(ctx, func(q *db.Queries) error {
-		return linkSCIMCredential(ctx, q, h.workspaceID, id, externalID)
+		return linkSCIMCredential(ctx, q, h.workspaceID, patch.ID, externalID)
 	})
 	if err != nil {
 		return nil, err
@@ -280,8 +280,8 @@ func (h scimUserHandler) externalIDs(ctx context.Context) map[string]string {
 }
 
 // scimUserPatch reads the writable attributes off a full representation.
-func scimUserPatch(attrs scim.ResourceAttributes) UpdateUserPatch {
-	patch := UpdateUserPatch{}
+func scimUserPatch(attrs scim.ResourceAttributes) db.UpdateUserParams {
+	patch := db.UpdateUserParams{}
 	if name := scimDisplayName(attrs["displayName"], attrs["name"]); name != "" {
 		patch.Name = &name
 	}

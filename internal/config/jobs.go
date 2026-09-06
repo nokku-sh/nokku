@@ -82,7 +82,7 @@ func (c *Config) cleanupOneTimeTokens(ctx context.Context) {
 	if _, err := c.IAM.DeleteExpiredTokens(ctx); err != nil {
 		slog.Error("failed to cleanup one-time tokens", "error", err)
 	}
-	if _, err := c.IAM.Sessions.DeleteExpired(ctx); err != nil {
+	if _, err := c.IAM.DeleteExpired(ctx); err != nil {
 		slog.Error("failed to cleanup expired sessions", "error", err)
 	}
 }

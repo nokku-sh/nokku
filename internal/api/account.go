@@ -32,7 +32,7 @@ func (s *AccountService) GetAccount(
 	ctx context.Context,
 	_ *nokkuv1.GetAccountRequest,
 ) (*nokkuv1.GetAccountResponse, error) {
-	u, err := s.cfg.IAM.GetUser(ctx, iam.UserIDFromContext(ctx))
+	u, err := s.cfg.IAM.GetUser(ctx)
 	if err != nil {
 		return nil, ErrAccountNotFound
 	}
@@ -43,7 +43,7 @@ func (s *AccountService) UpdateAccount(
 	ctx context.Context,
 	req *nokkuv1.UpdateAccountRequest,
 ) (*nokkuv1.UpdateAccountResponse, error) {
-	u, err := s.cfg.IAM.UpdateUser(ctx, iam.UserIDFromContext(ctx), iam.UpdateUserPatch{
+	u, err := s.cfg.IAM.UpdateUser(ctx, db.UpdateUserParams{
 		Name:                 req.Name,
 		Picture:              req.Picture,
 		DisablePasswordReset: req.DisablePasswordReset,
@@ -84,7 +84,7 @@ func (s *AccountService) ChangePassword(
 		return nil, ErrInternal
 	}
 	current, _ := iam.CurrentSession(ctx)
-	_, _ = s.cfg.IAM.Sessions.RevokeOtherSessions(ctx, userID, iam.SessionHash(current.TokenHash))
+	_, _ = s.cfg.IAM.RevokeOtherSessions(ctx, userID, iam.SessionHash(current.TokenHash))
 	return &nokkuv1.ChangePasswordResponse{}, nil
 }
 
@@ -225,7 +225,7 @@ func (s *AccountService) ListAccountSessions(
 	_ *nokkuv1.ListAccountSessionsRequest,
 ) (*nokkuv1.ListAccountSessionsResponse, error) {
 	current, _ := iam.CurrentSession(ctx)
-	sessions, err := s.cfg.IAM.Sessions.List(ctx, iam.UserIDFromContext(ctx))
+	sessions, err := s.cfg.IAM.ListSessions(ctx, iam.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, ErrInternal
 	}
@@ -252,7 +252,7 @@ func (s *AccountService) RemoveSession(
 	if req.GetId() == string(current.TokenHash) {
 		return nil, ErrCurrentSession
 	}
-	if err := s.cfg.IAM.Sessions.DeleteSessionByHash(
+	if err := s.cfg.IAM.DeleteSessionByHash(
 		ctx,
 		iam.SessionHash(req.GetId()),
 	); err != nil {
@@ -265,7 +265,7 @@ func (s *AccountService) DeleteAccount(
 	ctx context.Context,
 	_ *nokkuv1.DeleteAccountRequest,
 ) (*nokkuv1.DeleteAccountResponse, error) {
-	u, err := s.cfg.IAM.GetUser(ctx, iam.UserIDFromContext(ctx))
+	u, err := s.cfg.IAM.GetUser(ctx)
 	if err != nil {
 		return nil, ErrAccountNotFound
 	}
@@ -292,7 +292,7 @@ func (s *AccountService) DeleteAccount(
 		return nil, DBError(err)
 	}
 
-	if err := s.cfg.IAM.DeleteUser(ctx, u.ID); err != nil {
+	if err := s.cfg.IAM.DeleteUser(ctx); err != nil {
 		return nil, ErrInternal
 	}
 
