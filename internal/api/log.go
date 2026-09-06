@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -29,7 +28,6 @@ func (l *LogInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 			attrs = append(
 				attrs,
 				slog.String("code", connect.CodeOf(err).String()),
-				slog.String("error_type", fmt.Sprintf("%T", err)),
 			)
 			if isServerError(connect.CodeOf(err)) {
 				slog.LogAttrs(ctx, slog.LevelError, "rpc failed", attrs...)
@@ -63,7 +61,6 @@ func (l *LogInterceptor) WrapStreamingHandler(
 			attrs = append(
 				attrs,
 				slog.String("code", connect.CodeOf(err).String()),
-				slog.String("error_type", fmt.Sprintf("%T", err)),
 			)
 			if isServerError(connect.CodeOf(err)) {
 				slog.LogAttrs(ctx, slog.LevelError, "stream failed", attrs...)
