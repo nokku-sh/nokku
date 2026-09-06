@@ -15,7 +15,7 @@ import (
 const (
 	TokenVerifyEmail   = "verify"
 	TokenPasswordReset = "reset"
-	resendCooldown     = time.Minute
+	resendCooldown     = 5 * time.Minute
 )
 
 // IssueToken creates a one-time token for the user and returns the raw
