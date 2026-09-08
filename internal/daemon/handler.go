@@ -112,9 +112,9 @@ func (p *Pool) Connect(
 	return retErr
 }
 
-func (p *Pool) DaemonSession(
+func (p *Pool) DaemonRelay(
 	ctx context.Context,
-	stream *connect.BidiStream[nokkuv1.DaemonSessionRequest, nokkuv1.DaemonSessionResponse],
+	stream *connect.BidiStream[nokkuv1.DaemonRelayRequest, nokkuv1.DaemonRelayResponse],
 ) error {
 	daemonID := iam.DaemonIDFromContext(ctx)
 	if daemonID == "" {
@@ -128,34 +128,30 @@ func (p *Pool) DaemonSession(
 	if err != nil {
 		return err
 	}
-	ready, ok := msg.GetMsg().(*nokkuv1.DaemonSessionRequest_Ready)
+	ready, ok := msg.GetMsg().(*nokkuv1.DaemonRelayRequest_Ready)
 	if !ok || ready.Ready == nil {
 		return connect.NewError(
 			connect.CodeInvalidArgument,
-			errors.New("first message must be SessionReady"),
+			errors.New("first message must be DaemonRelayReady"),
 		)
 	}
-
-	sessionID := ready.Ready.GetSessionId()
-	if sessionID == "" {
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("session_id required"))
+	relayID := ready.Ready.GetRelayId()
+	if relayID == "" {
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("relay_id required"))
 	}
+
+	relay := p.RegisterRelay(relayID, daemonID)
+	if relay == nil {
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("unknown relay"))
+	}
+	defer p.UnregisterRelay(relayID)
 
 	// Cancelling on return guarantees both directions unwind even on a
 	// send/receive error.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	sess := p.RegisterSession(
-		sessionID,
-		daemonID,
-		ready.Ready.GetUsername(),
-		ready.Ready.GetUserId(),
-	)
-	defer p.UnregisterSession(sessionID)
-	defer sess.shutdown()
-
-	// Outbound: stdin/resize/close from browsers to the daemon stream.
+	// Outbound: user bytes to the daemon stream.
 	// Joined below: a Send landing after this handler returns panics in
 	// net/http, and on a spawned goroutine that panic kills the process.
 	outDone := make(chan struct{})
@@ -166,33 +162,38 @@ func (p *Pool) DaemonSession(
 			select {
 			case <-ctx.Done():
 				return
-			case m, ok := <-sess.send:
-				if !ok {
-					return
-				}
-				if err := stream.Send(m); err != nil {
+			case data := <-relay.ToDaemon:
+				if err := stream.Send(&nokkuv1.DaemonRelayResponse{
+					Msg: &nokkuv1.DaemonRelayResponse_Data{Data: data},
+				}); err != nil {
+					relay.Close()
 					return
 				}
 			}
 		}
 	}()
 
-	// Inbound: PTY stdout / exit from the daemon
+	// Inbound: sshd bytes from the daemon, or an explicit close.
 	recvErr := make(chan error, 1)
 	go func() {
 		for {
 			msg, err := stream.Receive()
 			if err != nil {
 				recvErr <- err
+				relay.Close()
 				return
 			}
-
 			switch m := msg.GetMsg().(type) {
-			case *nokkuv1.DaemonSessionRequest_Stdout:
-				sess.AppendStdout(m.Stdout)
+			case *nokkuv1.DaemonRelayRequest_Data:
+				select {
+				case relay.ToUser <- m.Data:
+				case <-relay.Done():
+					return
+				}
 
-			case *nokkuv1.DaemonSessionRequest_Exited:
+			case *nokkuv1.DaemonRelayRequest_Closed:
 				recvErr <- nil
+				relay.Close()
 				return
 
 			default:
@@ -202,15 +203,18 @@ func (p *Pool) DaemonSession(
 
 	var retErr error
 	select {
-	case <-sess.Exited:
+	case <-relay.Done():
 	case <-ctx.Done():
 		retErr = ctx.Err()
 	case err := <-recvErr:
 		retErr = err
 	}
-	// The deferred cancel only runs at return; stop the pump now so the
-	// join below cannot deadlock if the peer stopped reading.
 	cancel()
 	<-outDone
+	// Best-effort closed notice so the daemon tears down its sshd dial even
+	// when it stopped reading.
+	_ = stream.Send(&nokkuv1.DaemonRelayResponse{
+		Msg: &nokkuv1.DaemonRelayResponse_Closed{Closed: &nokkuv1.DaemonRelayClosed{}},
+	})
 	return retErr
 }

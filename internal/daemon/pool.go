@@ -6,30 +6,44 @@ import (
 	"log/slog"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 	"uuid"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/time/rate"
+
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/sshclient"
 )
 
 const (
-	sendBufferSize        = 64
-	pendingSessionTimeout = 10 * time.Second
-	replayBufferSize      = 64 * 1024
+	sendBufferSize   = 64
+	replayBufferSize = 64 * 1024
 	// Caps how far the replay trim scans for a safe boundary.
 	replayTrimScan = 256
+
+	sessionTTL      = 8 * time.Hour
+	sessionIdle     = 30 * time.Minute
+	sessionDialTime = 30 * time.Second
+	idleCheckEvery  = 30 * time.Second
+
+	// Binds shell output toward the browser, inherited from the old PTY
+	// path. sshclient chunks at 32 KB, below the burst, so WaitN is valid.
+	webStdoutRate  = 512 << 10
+	webStdoutBurst = 64 << 10
 )
 
 type Conn struct {
 	daemonID    string
 	workspaceID string
-	// send carries session requests to the daemon. state carries version
+	// send carries control messages to the daemon. state carries version
 	// updates. It is capacity-1 and replace-on-full, so a burst of changes
 	// coalesces into one update per daemon. The two channels are separate so
-	// coalescing can never drop a session request.
+	// coalescing can never drop a control message.
 	send    chan *nokkuv1.ConnectResponse
 	state   chan *nokkuv1.ConnectResponse
 	stateMu sync.Mutex
@@ -37,20 +51,31 @@ type Conn struct {
 	cancel  context.CancelFunc
 }
 
-// Session is the server-side handle for one live PTY session. It bridges
-// the daemon's StreamSession bidi stream and any attached browser WebSocket.
+// Session is the server-side handle for one live SSH session. It bridges
+// the session's SSH channel over its relay and any attached browser
+// WebSocket. Its public shape is what the websocket handler depends on:
+// SendStdin, SendResize, AppendStdout, SnapshotForAttach, Exited.
 type Session struct {
 	sessionID string
 	daemonID  string
 	username  string
 	userID    string
 
-	send   chan *nokkuv1.DaemonSessionResponse
-	Stdout chan []byte
-	Exited chan struct{}
+	stdin  chan []byte
+	resize chan [2]uint32
+	// closed is the kill switch: CloseSession closes it and the wiring
+	// tears the terminal and relay down.
+	closed    chan struct{}
+	closeOnce sync.Once
+	Stdout    chan []byte
+	Exited    chan struct{}
 
 	replayMu  sync.Mutex
 	replayBuf []byte
+
+	// lastActivity is unix nanos of the most recent stdin or stdout, for
+	// the idle watcher.
+	lastActivity atomic.Int64
 
 	shutdownOnce sync.Once
 }
@@ -63,6 +88,16 @@ func (s *Session) UserID() string { return s.userID }
 
 func (s *Session) shutdown() {
 	s.shutdownOnce.Do(func() { close(s.Exited) })
+}
+
+// Close is the kill switch for CloseSession. The wiring tears the SSH
+// terminal and relay down in response.
+func (s *Session) Close() {
+	s.closeOnce.Do(func() { close(s.closed) })
+}
+
+func (s *Session) touch() {
+	s.lastActivity.Store(time.Now().UnixNano())
 }
 
 // Cancel tears down the connection context unless a reconnect already
@@ -83,12 +118,14 @@ type connection interface {
 }
 
 type Pool struct {
-	mu       sync.RWMutex
-	byID     map[string]*Conn
-	byWksp   map[string]map[string]struct{}
-	sessions map[string]*Session
-	pending  map[string]chan struct{}
-	events   map[string][]*eventSubscriber
+	mu            sync.RWMutex
+	byID          map[string]*Conn
+	byWksp        map[string]map[string]struct{}
+	sessions      map[string]*Session
+	relays        map[string]*Relay
+	pendingRelays map[string]*relayPending
+	relayCounts   map[string]int
+	events        map[string][]*eventSubscriber
 	// versions holds the current state version per workspace. It is
 	// in-memory only and resets on server restart. The Connect handler acks
 	// any version mismatch on heartbeat, so a restarted server (counter 0)
@@ -106,7 +143,9 @@ func New(ctx context.Context, conn connection) *Pool {
 		byID:           make(map[string]*Conn),
 		byWksp:         make(map[string]map[string]struct{}),
 		sessions:       make(map[string]*Session),
-		pending:        make(map[string]chan struct{}),
+		relays:         make(map[string]*Relay),
+		pendingRelays:  make(map[string]*relayPending),
+		relayCounts:    make(map[string]int),
 		events:         make(map[string][]*eventSubscriber),
 		versions:       make(map[string]int64),
 		conn:           conn,
@@ -152,10 +191,16 @@ func (p *Pool) RegisterDaemon(ctx context.Context, daemonID, workspaceID string)
 	p.mu.Lock()
 	previous := p.byID[daemonID]
 	var staleSessions []*Session
+	var staleRelays []string
 	for sessionID, session := range p.sessions {
 		if session.daemonID == daemonID {
 			delete(p.sessions, sessionID)
 			staleSessions = append(staleSessions, session)
+		}
+	}
+	for relayID, relay := range p.relays {
+		if relay.daemonID == daemonID {
+			staleRelays = append(staleRelays, relayID)
 		}
 	}
 	if previous != nil && previous.workspaceID != workspaceID {
@@ -177,6 +222,9 @@ func (p *Pool) RegisterDaemon(ctx context.Context, daemonID, workspaceID string)
 	}
 	for _, session := range staleSessions {
 		session.shutdown()
+	}
+	for _, relayID := range staleRelays {
+		p.UnregisterRelay(relayID)
 	}
 
 	if err := p.conn.WithTx(ctx, func(q *db.Queries) error {
@@ -211,19 +259,29 @@ func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 			delete(p.byWksp, wksp)
 		}
 	}
-	// Tear down this daemon's sessions even if the StreamSession handler
-	// hasn't noticed the control stream drop yet. shutdown() is idempotent.
+	// Tear down this daemon's sessions and relays even if the stream
+	// handlers haven't noticed the control stream drop yet. shutdown() and
+	// Close() are idempotent.
 	var sessions []*Session
+	var relayIDs []string
 	for _, s := range p.sessions {
 		if s.daemonID == daemonID {
 			delete(p.sessions, s.sessionID)
 			sessions = append(sessions, s)
 		}
 	}
+	for id, r := range p.relays {
+		if r.daemonID == daemonID {
+			relayIDs = append(relayIDs, id)
+		}
+	}
 	p.mu.Unlock()
 
 	for _, s := range sessions {
 		s.shutdown()
+	}
+	for _, id := range relayIDs {
+		p.UnregisterRelay(id)
 	}
 
 	if err := p.conn.WithTx(
@@ -332,70 +390,132 @@ func (p *Pool) sendToDaemonWait(
 	}
 }
 
-func (p *Pool) RequestSession(
-	ctx context.Context,
-	daemonID, sessionID, username, userID string,
-) error {
-	pending := make(chan struct{})
-	p.mu.Lock()
-	p.pending[sessionID] = pending
-	p.mu.Unlock()
-	defer func() {
-		p.mu.Lock()
-		// Only remove our own entry: a newer RequestSession for the same
-		// sessionID may have replaced it while we were waiting.
-		if p.pending[sessionID] == pending {
-			delete(p.pending, sessionID)
-		}
-		p.mu.Unlock()
-	}()
-
-	if err := p.sendToDaemonWait(daemonID, &nokkuv1.ConnectResponse{
-		Msg: &nokkuv1.ConnectResponse_Session{
-			Session: &nokkuv1.DaemonSession{
-				SessionId: &sessionID,
-				Username:  &username,
-				UserId:    &userID,
-			},
-		},
-	}, 5*time.Second); err != nil {
-		return err
-	}
-
-	select {
-	case <-pending:
-		return nil
-	case <-time.After(pendingSessionTimeout):
-		return fmt.Errorf("session request timed out")
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+// SessionConfig carries the minted material StartSession needs to dial the
+// daemon's sshd: the SSH signer and CA public key come from CreateSession.
+type SessionConfig struct {
+	DaemonID  string
+	SessionID string
+	Username  string
+	UserID    string
+	Signer    ssh.Signer
+	CAKey     ssh.PublicKey
+	// HostPrincipal is the host certificate principal to require, the
+	// daemon's target id.
+	HostPrincipal string
 }
 
+// StartSession opens a web session: a relay to the daemon, an SSH session
+// channel over it, and the wiring between the terminal and the Session the
+// websocket attaches to. The session lives until the shell ends, CloseSession,
+// the 8h TTL, or the idle timeout. On failure the relay slot is released and
+// a typed or wrapped error is returned.
+func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, error) {
+	relayID := uuid.NewV7().String()
+	relay, err := p.RequestRelay(ctx, cfg.DaemonID, relayID, cfg.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	dialCtx, dialCancel := context.WithTimeout(ctx, sessionDialTime)
+	defer dialCancel()
+	term, err := sshclient.DialTerminal(dialCtx, NewRelayConn(relay), sshclient.Config{
+		HostPrincipal: cfg.HostPrincipal,
+		Username:      cfg.Username,
+		Signer:        cfg.Signer,
+		CAKey:         cfg.CAKey,
+		SessionID:     cfg.SessionID,
+	})
+	if err != nil {
+		p.UnregisterRelay(relayID)
+		return nil, fmt.Errorf("ssh session: %w", err)
+	}
+
+	s := p.RegisterSession(cfg.SessionID, cfg.DaemonID, cfg.Username, cfg.UserID)
+
+	// The TTL context is parented to the pool so a server shutdown ends
+	// every session.
+	sessionCtx, cancel := context.WithTimeout(p.shutdownCtx, sessionTTL)
+	teardown := sync.OnceFunc(func() {
+		cancel()
+		term.Close()
+		p.UnregisterRelay(relayID)
+		p.UnregisterSession(cfg.SessionID)
+		s.shutdown()
+	})
+
+	// Stdout: SSH channel output into the replay buffer and Stdout chan,
+	// throttled so a chatty shell cannot flood the websocket. Its exit
+	// (remote shell ended or transport died) is the session's end.
+	go func() {
+		limiter := rate.NewLimiter(webStdoutRate, webStdoutBurst)
+		for data := range term.Stdout() {
+			if err := limiter.WaitN(sessionCtx, len(data)); err != nil {
+				break
+			}
+			s.AppendStdout(data)
+			s.touch()
+		}
+		teardown()
+		slog.Debug("web session ended", "session_id", cfg.SessionID)
+	}()
+
+	// Input: browser stdin/resize toward the terminal, plus the exit signals.
+	go func() {
+		defer teardown()
+		idle := time.NewTicker(idleCheckEvery)
+		defer idle.Stop()
+		for {
+			select {
+			case <-sessionCtx.Done():
+				return
+			case <-s.Exited:
+				// Killed externally: a daemon disconnect removed the session
+				// from the map, or the relay died underneath the terminal.
+				return
+			case <-s.closed:
+				return
+			case data := <-s.stdin:
+				s.touch()
+				if _, err := term.Write(data); err != nil {
+					return
+				}
+			case size := <-s.resize:
+				if err := term.Resize(size[0], size[1]); err != nil {
+					return
+				}
+			case <-idle.C:
+				if time.Since(time.Unix(0, s.lastActivity.Load())) > sessionIdle {
+					return
+				}
+			}
+		}
+	}()
+
+	return s, nil
+}
+
+// RegisterSession inserts a session into the pool map.
 func (p *Pool) RegisterSession(sessionID, daemonID, username, userID string) *Session {
 	s := &Session{
 		sessionID: sessionID,
 		daemonID:  daemonID,
 		username:  username,
 		userID:    userID,
-		send:      make(chan *nokkuv1.DaemonSessionResponse, sendBufferSize),
+		stdin:     make(chan []byte, sendBufferSize),
+		resize:    make(chan [2]uint32, sendBufferSize),
+		closed:    make(chan struct{}),
 		Stdout:    make(chan []byte, sendBufferSize),
 		Exited:    make(chan struct{}),
 	}
+	s.touch()
 	p.mu.Lock()
 	p.sessions[sessionID] = s
-	if ch, ok := p.pending[sessionID]; ok {
-		// Remove under the same lock so a concurrent duplicate RegisterSession
-		// can't observe the entry and close an already-closed channel.
-		delete(p.pending, sessionID)
-		close(ch)
-	}
 	p.mu.Unlock()
 	return s
 }
 
-// UnregisterSession removes a session from the pool map. The caller must call
-// s.shutdown() (done by the StreamSession handler defer). It is idempotent.
+// UnregisterSession removes a session from the pool map. The session wiring
+// calls it from its teardown. Idempotent.
 func (p *Pool) UnregisterSession(sessionID string) {
 	p.mu.Lock()
 	delete(p.sessions, sessionID)
@@ -438,16 +558,7 @@ func (p *Pool) CloseSession(sessionID string) {
 	delete(p.sessions, sessionID)
 	p.mu.Unlock()
 	s.shutdown()
-
-	reason := "closed by user"
-	select {
-	case s.send <- &nokkuv1.DaemonSessionResponse{
-		Msg: &nokkuv1.DaemonSessionResponse_Close{
-			Close: &nokkuv1.DaemonCloseRequest{Reason: &reason},
-		},
-	}:
-	default:
-	}
+	s.Close()
 }
 
 func (p *Pool) SubscribeEvents(
@@ -515,20 +626,14 @@ func (p *Pool) PublishWorkspaceEvent(workspaceID, eventType, payloadJSON string)
 
 func (s *Session) SendStdin(data []byte) {
 	select {
-	case s.send <- &nokkuv1.DaemonSessionResponse{
-		Msg: &nokkuv1.DaemonSessionResponse_Stdin{Stdin: data},
-	}:
+	case s.stdin <- data:
 	default:
 	}
 }
 
 func (s *Session) SendResize(width, height uint32) {
 	select {
-	case s.send <- &nokkuv1.DaemonSessionResponse{
-		Msg: &nokkuv1.DaemonSessionResponse_Resize{
-			Resize: &nokkuv1.DaemonResizeRequest{Width: &width, Height: &height},
-		},
-	}:
+	case s.resize <- [2]uint32{width, height}:
 	default:
 	}
 }

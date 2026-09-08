@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -24,6 +25,25 @@ func newTestPool(t *testing.T) *Pool {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	return New(ctx, stubConn{})
+}
+
+// waitRelayPending blocks until the request goroutine's pending entry exists,
+// so RegisterRelay in the test cannot win the race it isn't testing.
+func waitRelayPending(t *testing.T, p *Pool, relayID string) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for {
+		p.mu.RLock()
+		_, ok := p.pendingRelays[relayID]
+		p.mu.RUnlock()
+		if ok {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("relay %s never became pending", relayID)
+		}
+		time.Sleep(time.Millisecond)
+	}
 }
 
 // TestPool_ReconnectStorm hammers RegisterDaemon/UnregisterDaemon with the
@@ -61,65 +81,6 @@ func TestPool_ReconnectStorm(t *testing.T) {
 		if len(daemons) != 0 {
 			t.Errorf("workspace %s still lists %d daemons", wksp, len(daemons))
 		}
-	}
-}
-
-// TestPool_SessionRequestRace races RequestSession (which may time out and
-// clean up its pending entry) against RegisterSession (which closes the
-// pending channel), the exact path that used to clobber a newer request.
-func TestPool_SessionRequestRace(t *testing.T) {
-	p := newTestPool(t)
-	p.RegisterDaemon(context.Background(), "d1", "w1")
-
-	const sessions = 128
-	var wg sync.WaitGroup
-	for i := range sessions {
-		sid := fmt.Sprintf("s%d", i)
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
-			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-			defer cancel()
-			_ = p.RequestSession(ctx, "d1", sid, "user", "u1")
-		}()
-		go func() {
-			defer wg.Done()
-			time.Sleep(time.Duration(i%3) * time.Millisecond)
-			s := p.RegisterSession(sid, "d1", "user", "u1")
-			defer p.UnregisterSession(sid)
-			defer s.shutdown()
-		}()
-	}
-	wg.Wait()
-
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	if len(p.pending) != 0 {
-		t.Errorf("%d pending session requests left behind", len(p.pending))
-	}
-	if len(p.sessions) != 0 {
-		t.Errorf("%d sessions left behind", len(p.sessions))
-	}
-}
-
-// TestPool_SessionRequestSameID reuses one session ID so the pending entries
-// genuinely collide: a timed-out request must not delete its successor's
-// entry, or the daemon's RegisterSession would never close the successor's
-// channel and it would sit blocked until timeout.
-func TestPool_SessionRequestSameID(t *testing.T) {
-	p := newTestPool(t)
-	p.RegisterDaemon(context.Background(), "d1", "w1")
-
-	const rounds = 50
-	for range rounds {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
-		_ = p.RequestSession(ctx, "d1", "same-id", "user", "u1")
-		cancel()
-	}
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	if len(p.pending) != 0 {
-		t.Errorf("%d pending session requests left behind", len(p.pending))
 	}
 }
 
@@ -245,45 +206,46 @@ func TestPool_NotifyChangeCoalesces(t *testing.T) {
 	}
 }
 
-// TestPool_NotifyChangeKeepsSessions verifies coalescing state updates never
-// drops a session request queued on the same connection.
-func TestPool_NotifyChangeKeepsSessions(t *testing.T) {
+// TestPool_NotifyChangeKeepsControlMessages verifies coalescing state
+// updates never drops a control message queued on the same connection.
+func TestPool_NotifyChangeKeepsControlMessages(t *testing.T) {
 	p := newTestPool(t)
 	c := p.RegisterDaemon(context.Background(), "d1", "w1")
 	defer p.UnregisterDaemon("d1", c)
 
-	sid := "s1"
-	sessionMsg := func() *nokkuv1.ConnectResponse {
+	relayMsg := func(rid string) *nokkuv1.ConnectResponse {
 		return &nokkuv1.ConnectResponse{
-			Msg: &nokkuv1.ConnectResponse_Session{Session: &nokkuv1.DaemonSession{SessionId: &sid}},
+			Msg: &nokkuv1.ConnectResponse_RelayOpen{
+				RelayOpen: &nokkuv1.RelayOpen{RelayId: &rid},
+			},
 		}
 	}
-	if err := p.sendToDaemonWait("d1", sessionMsg(), time.Second); err != nil {
-		t.Fatalf("queue session request: %v", err)
+	if err := p.sendToDaemonWait("d1", relayMsg("r1"), time.Second); err != nil {
+		t.Fatalf("queue relay open: %v", err)
 	}
-	// Drain the session request off the channel.
+	// Drain the control message off the channel.
 	select {
 	case msg := <-c.send:
-		if msg.GetSession() == nil {
-			t.Fatal("session channel carried a non-session message")
+		if msg.GetRelayOpen() == nil {
+			t.Fatal("control channel carried a non-relay message")
 		}
 	default:
-		t.Fatal("session request was not queued")
+		t.Fatal("relay open was not queued")
 	}
 	for range 10 {
 		p.NotifyChange("w1")
 	}
-	// A fresh session request must still arrive despite the state backlog.
-	if err := p.sendToDaemonWait("d1", sessionMsg(), time.Second); err != nil {
-		t.Fatalf("queue session request after state storm: %v", err)
+	// A fresh control message must still arrive despite the state backlog.
+	if err := p.sendToDaemonWait("d1", relayMsg("r2"), time.Second); err != nil {
+		t.Fatalf("queue relay open after state storm: %v", err)
 	}
 	select {
 	case msg := <-c.send:
-		if msg.GetSession() == nil {
-			t.Fatal("state storm replaced a session request")
+		if msg.GetRelayOpen() == nil {
+			t.Fatal("state storm replaced a control message")
 		}
 	default:
-		t.Fatal("session request lost after state storm")
+		t.Fatal("control message lost after state storm")
 	}
 }
 
@@ -363,15 +325,197 @@ func TestPool_SessionStdoutStorm(t *testing.T) {
 	wg.Wait()
 }
 
-// TestPool_Shutdown verifies Shutdown is idempotent, closes Done, and lets
-// RequestSession return promptly after shutdown.
-func TestPool_Shutdown(t *testing.T) {
+// TestPool_RelayRequestRace races RequestRelay (which may time out and
+// clean up its pending entry and slot) against RegisterRelay (which closes
+// the pending channel), the relay counterpart of the session request race.
+func TestPool_RelayRequestRace(t *testing.T) {
 	p := newTestPool(t)
 	p.RegisterDaemon(context.Background(), "d1", "w1")
 
+	const relays = 128
+	var wg sync.WaitGroup
+	for i := range relays {
+		rid := fmt.Sprintf("r%d", i)
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			defer cancel()
+			if r, err := p.RequestRelay(ctx, "d1", rid, "u1"); err == nil {
+				r.Close()
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			time.Sleep(time.Duration(i%3) * time.Millisecond)
+			if r := p.RegisterRelay(rid, "d1"); r != nil {
+				p.UnregisterRelay(rid)
+			}
+		}()
+	}
+	wg.Wait()
+
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if len(p.pendingRelays) != 0 {
+		t.Errorf("%d pending relay requests left behind", len(p.pendingRelays))
+	}
+	if len(p.relays) != 0 {
+		t.Errorf("%d relays left behind", len(p.relays))
+	}
+	if len(p.relayCounts) != 0 {
+		t.Errorf("relay slots left held: %v", p.relayCounts)
+	}
+}
+
+// TestPool_RelayCap verifies the per-principal cap: the over-limit request is
+// refused before anything reaches the daemon, other principals are unaffected,
+// and released slots become available again.
+func TestPool_RelayCap(t *testing.T) {
+	p := newTestPool(t)
+	p.RegisterDaemon(context.Background(), "d1", "w1")
+
+	var wg sync.WaitGroup
+	for i := range maxRelaysPerPrincipal {
+		rid := fmt.Sprintf("r%d", i)
+		wg.Go(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			if _, err := p.RequestRelay(ctx, "d1", rid, "u1"); err != nil {
+				t.Errorf("RequestRelay %s: %v", rid, err)
+			}
+		})
+		time.Sleep(time.Millisecond)
+		if r := p.RegisterRelay(rid, "d1"); r == nil {
+			t.Fatalf("relay %s was not pending", rid)
+		}
+	}
+	wg.Wait()
+
+	if _, err := p.RequestRelay(context.Background(), "d1", "over", "u1"); !errors.Is(err, ErrRelayLimit) {
+		t.Fatalf("over-cap request: err=%v, want ErrRelayLimit", err)
+	}
+
+	// A different principal is unaffected: the request gets past the cap and
+	// fails on the (never registered) pending wait instead.
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, err := p.RequestRelay(ctx, "d1", "other", "u2"); errors.Is(err, ErrRelayLimit) {
+		t.Fatal("u2 must not be blocked by u1's cap")
+	}
+
+	for i := range maxRelaysPerPrincipal {
+		p.UnregisterRelay(fmt.Sprintf("r%d", i))
+	}
+	// Reusable, but the pending wait still needs a bound since nothing will
+	// register this relay.
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel2()
+	if _, err := p.RequestRelay(ctx2, "d1", "again", "u1"); errors.Is(err, ErrRelayLimit) {
+		t.Fatal("released slots must be reusable")
+	}
+}
+
+// TestPool_RelayBridging walks a relay through the full request/register
+// lifecycle and pushes bytes both directions through its channels.
+func TestPool_RelayBridging(t *testing.T) {
+	p := newTestPool(t)
+	p.RegisterDaemon(context.Background(), "d1", "w1")
+
+	type result struct {
+		r   *Relay
+		err error
+	}
+	res := make(chan result, 1)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	go p.RequestSession(ctx, "d1", "s1", "user", "u1")
+	go func() {
+		r, err := p.RequestRelay(ctx, "d1", "r1", "u1")
+		res <- result{r, err}
+	}()
+	waitRelayPending(t, p, "r1")
+	relay := p.RegisterRelay("r1", "d1")
+	if relay == nil {
+		t.Fatal("relay was not pending")
+	}
+	got := <-res
+	if got.err != nil {
+		t.Fatalf("RequestRelay: %v", got.err)
+	}
+
+	if r := p.RegisterRelay("ghost", "d1"); r != nil {
+		t.Fatal("unknown relay id must not register")
+	}
+
+	relay.ToDaemon <- []byte("ping")
+	relay.ToUser <- []byte("pong")
+	if data := <-relay.ToDaemon; string(data) != "ping" {
+		t.Errorf("ToDaemon carried %q", data)
+	}
+	if data := <-relay.ToUser; string(data) != "pong" {
+		t.Errorf("ToUser carried %q", data)
+	}
+
+	select {
+	case <-relay.Done():
+		t.Fatal("relay closed before unregister")
+	default:
+	}
+
+	p.UnregisterRelay("r1")
+	select {
+	case <-relay.Done():
+	default:
+		t.Fatal("relay not closed by UnregisterRelay")
+	}
+	p.UnregisterRelay("r1")
+
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if len(p.relayCounts) != 0 {
+		t.Errorf("relay slots left held: %v", p.relayCounts)
+	}
+}
+
+// TestPool_UnregisterDaemonClosesRelays verifies a daemon disconnect tears
+// down its relays and frees their slots.
+func TestPool_UnregisterDaemonClosesRelays(t *testing.T) {
+	p := newTestPool(t)
+	c := p.RegisterDaemon(context.Background(), "d1", "w1")
+
+	res := make(chan error, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go func() {
+		_, err := p.RequestRelay(ctx, "d1", "r1", "u1")
+		res <- err
+	}()
+	waitRelayPending(t, p, "r1")
+	if r := p.RegisterRelay("r1", "d1"); r == nil {
+		t.Fatal("relay was not pending")
+	}
+	if err := <-res; err != nil {
+		t.Fatalf("RequestRelay: %v", err)
+	}
+
+	p.UnregisterDaemon("d1", c)
+	p.mu.RLock()
+	relay := p.relays["r1"]
+	p.mu.RUnlock()
+	if relay != nil {
+		t.Fatal("relay outlived its daemon")
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if len(p.relayCounts) != 0 {
+		t.Errorf("relay slots left held: %v", p.relayCounts)
+	}
+}
+
+// TestPool_Shutdown verifies Shutdown is idempotent and closes Done.
+func TestPool_Shutdown(t *testing.T) {
+	p := newTestPool(t)
+	p.RegisterDaemon(context.Background(), "d1", "w1")
 
 	p.Shutdown()
 	p.Shutdown()
