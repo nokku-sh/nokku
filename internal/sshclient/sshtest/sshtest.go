@@ -9,6 +9,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	crand "crypto/rand"
+	"encoding/pem"
 	"errors"
 	"io"
 	"net"
@@ -19,6 +20,9 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
+	"github.com/nokku-sh/nokku/internal/crypto"
+	"github.com/nokku-sh/nokku/internal/db"
+	nokkussh "github.com/nokku-sh/nokku/internal/ssh"
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
@@ -40,6 +44,7 @@ type Server struct {
 	connUser      string
 
 	ca        ssh.Signer
+	caPriv    ed25519.PrivateKey
 	hostKey   ssh.Signer
 	listener  net.Listener
 	conns     map[net.Conn]struct{}
@@ -94,6 +99,7 @@ func NewServer(t testing.TB) *Server {
 		HostPrincipal: "target-1",
 		env:           make(map[string]string),
 		ca:            caSigner,
+		caPriv:        caPriv,
 		hostKey:       hostSigner,
 		listener:      ln,
 		conns:         make(map[net.Conn]struct{}),
@@ -108,6 +114,45 @@ func (s *Server) Addr() string { return s.listener.Addr().String() }
 
 // CAKey returns the CA public key clients must pin for host verification.
 func (s *Server) CAKey() ssh.PublicKey { return s.ca.PublicKey() }
+
+// CA returns the server's CA in the row form the api layer loads, so
+// callers exercise the real certificate-minting path.
+func (s *Server) CA(t testing.TB) *db.CertificateAuthority {
+	t.Helper()
+	return caRow(t, s.caPriv)
+}
+
+// NewCA generates a CA row no server trusts, for handshake-failure tests.
+func NewCA(t testing.TB) *db.CertificateAuthority {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate CA key: %v", err)
+	}
+	return caRow(t, priv)
+}
+
+func caRow(t testing.TB, priv ed25519.PrivateKey) *db.CertificateAuthority {
+	t.Helper()
+	privPEM, err := ssh.MarshalPrivateKey(priv, "")
+	if err != nil {
+		t.Fatalf("marshal CA private key: %v", err)
+	}
+	signer, err := ssh.NewSignerFromKey(priv)
+	if err != nil {
+		t.Fatalf("CA signer: %v", err)
+	}
+	return &db.CertificateAuthority{
+		PrivateKey:     crypto.EncryptedBytes(pem.EncodeToMemory(privPEM)),
+		PublicKey:      nokkussh.MarshalKey(signer.PublicKey()),
+		UserDefaultTtl: time.Hour,
+		UserMaxTtl:     24 * time.Hour,
+		UserExtensions: []byte(
+			`{"permit-pty":"","permit-port-forwarding":"","permit-agent-forwarding":""}`,
+		),
+		IsActive: true,
+	}
+}
 
 // UserSigner mints a user certificate signed by the test CA.
 func (s *Server) UserSigner(t testing.TB, principal string) ssh.Signer {

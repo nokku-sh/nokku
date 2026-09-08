@@ -1,14 +1,10 @@
 package daemon
 
 import (
-	"crypto/ed25519"
-	crand "crypto/rand"
 	"net"
 	"strings"
 	"testing"
 	"time"
-
-	"golang.org/x/crypto/ssh"
 
 	"github.com/nokku-sh/nokku/internal/sshclient/sshtest"
 )
@@ -113,8 +109,7 @@ func startTestSession(t *testing.T, p *Pool, srv *sshtest.Server, sessionID stri
 			SessionID:     sessionID,
 			Username:      "user",
 			UserID:        "u1",
-			Signer:        srv.UserSigner(t, srv.UserPrincipal),
-			CAKey:         srv.CAKey(),
+			CA:            srv.CA(t),
 			HostPrincipal: srv.HostPrincipal,
 		})
 		res <- result{s, err}
@@ -213,21 +208,13 @@ collect:
 	}
 }
 
-// TestPool_StartSession_HandshakeFailure: a wrong CA fails the dial, the
-// error surfaces to the caller, and no slot or session is left behind.
+// TestPool_StartSession_HandshakeFailure: a CA the server does not trust
+// fails the dial, the error surfaces to the caller, and no slot or session
+// is left behind.
 func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 	p := newTestPool(t)
 	p.RegisterDaemon(t.Context(), "d1", "w1")
 	srv := sshtest.NewServer(t)
-
-	_, roguePriv, err := ed25519.GenerateKey(crand.Reader)
-	if err != nil {
-		t.Fatalf("generate rogue CA: %v", err)
-	}
-	roguePub, err := ssh.NewPublicKey(roguePriv.Public())
-	if err != nil {
-		t.Fatalf("rogue public key: %v", err)
-	}
 
 	c := testConn(t, p)
 	go serveRelayRequests(t, p, c, srv.Addr())
@@ -239,8 +226,7 @@ func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 			SessionID:     "web-2",
 			Username:      "user",
 			UserID:        "u1",
-			Signer:        srv.UserSigner(t, srv.UserPrincipal),
-			CAKey:         roguePub,
+			CA:            sshtest.NewCA(t),
 			HostPrincipal: srv.HostPrincipal,
 		})
 		errCh <- err

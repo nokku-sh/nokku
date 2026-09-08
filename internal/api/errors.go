@@ -161,14 +161,6 @@ func NewError(code connect.Code, msg string) error {
 	return connect.NewError(code, errors.New(msg))
 }
 
-// isUniqueViolation reports whether err is a Postgres unique/exclusion
-// constraint violation, used to retry name generation on collision.
-func isUniqueViolation(err error) bool {
-	pgConnErr, ok := errors.AsType[*pgconn.PgError](err)
-	return ok && (pgConnErr.Code == pgerrcode.UniqueViolation ||
-		pgConnErr.Code == pgerrcode.ExclusionViolation)
-}
-
 // DBError maps a pgx or postgres error to a connect error with a message that
 // fits the underlying failure. It returns nil only when err is nil. Errors
 // that are already connect errors pass through unchanged, so handlers can
