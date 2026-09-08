@@ -2,9 +2,13 @@ package api
 
 import (
 	"context"
+	"crypto/ed25519"
+	crand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,9 +17,15 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
+	ssh "golang.org/x/crypto/ssh"
+	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/nokku-sh/nokku/internal/audit"
+	nokkudaemon "github.com/nokku-sh/nokku/internal/daemon"
 	"github.com/nokku-sh/nokku/internal/iam"
+	nokkussh "github.com/nokku-sh/nokku/internal/ssh"
+	"github.com/nokku-sh/nokku/internal/util"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
@@ -209,27 +219,71 @@ func (s *DaemonService) RevokeEnrollToken(
 
 // Session endpoints ----------------------------------------------------------
 
+// CreateSession opens a web terminal session as a real SSH session: it
+// mints an ephemeral user certificate, opens a relay to the daemon, and has
+// the pool dial the daemon's sshd over it. The browser protocol is
+// unchanged, only the transport behind the Session swapped.
 func (s *DaemonService) CreateSession(
 	ctx context.Context,
 	req *nokkuv1.CreateSessionRequest,
 ) (*nokkuv1.CreateSessionResponse, error) {
+	// The session certificate's principal is the actor id, so a non-user
+	// actor could only mint a cert sshd will always refuse.
+	userID := iam.UserIDFromContext(ctx)
+	if userID == "" {
+		return nil, NewError(connect.CodePermissionDenied, "web sessions require a user principal")
+	}
+
 	var daemon *db.Daemon
+	var ca *db.CertificateAuthority
+	var targetID string
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		daemon, err = q.GetDaemon(ctx, req.GetDaemonId())
 		if err != nil {
 			return err
 		}
+		// The daemon's sshd trusts exactly the CA whose public key is synced
+		// to it, so the session certificate must come from that CA.
+		ca, err = q.GetCAByDaemonID(ctx, &daemon.ID)
+		if err != nil {
+			return err
+		}
+		target, err := q.GetTargetByDaemon(ctx, &daemon.ID)
+		if err != nil {
+			return err
+		}
+		targetID = target.ID
 		return nil
 	}); err != nil {
 		return nil, DBError(err)
 	}
 
 	sessionID := uuid.NewV7().String()
-	userID := iam.UserIDFromContext(ctx)
 	username := req.GetUsername()
 
-	if err := s.cfg.Pool.RequestSession(ctx, daemon.ID, sessionID, username, userID); err != nil {
-		return nil, NewError(connect.CodeResourceExhausted, "daemon did not accept session")
+	signer, err := s.mintSessionCert(ca, userID, sessionID)
+	if err != nil {
+		return nil, NewError(connect.CodeUnavailable, "mint session certificate: "+err.Error())
+	}
+
+	caKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(ca.PublicKey))
+	if err != nil {
+		return nil, NewError(connect.CodeInternal, "parse CA public key")
+	}
+
+	if _, err := s.cfg.Pool.StartSession(ctx, nokkudaemon.SessionConfig{
+		DaemonID:      daemon.ID,
+		SessionID:     sessionID,
+		Username:      username,
+		UserID:        userID,
+		Signer:        signer,
+		CAKey:         caKey,
+		HostPrincipal: targetID,
+	}); err != nil {
+		if errors.Is(err, nokkudaemon.ErrRelayLimit) {
+			return nil, NewError(connect.CodeResourceExhausted, "too many concurrent sessions")
+		}
+		return nil, NewError(connect.CodeUnavailable, err.Error())
 	}
 	return &nokkuv1.CreateSessionResponse{
 		Session: &nokkuv1.DaemonSession{
@@ -239,6 +293,39 @@ func (s *DaemonService) CreateSession(
 		},
 		DaemonName: &daemon.Name,
 	}, nil
+}
+
+// mintSessionCert generates an ephemeral key pair and signs it as a user
+// certificate for the actor. The private key dies with the request, it is
+// only used for this session's handshake.
+func (s *DaemonService) mintSessionCert(
+	ca *db.CertificateAuthority,
+	principal, sessionID string,
+) (ssh.Signer, error) {
+	_, key, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("generate session key: %w", err)
+	}
+	pub, err := ssh.NewPublicKey(key.Public())
+	if err != nil {
+		return nil, fmt.Errorf("session public key: %w", err)
+	}
+	cert, err := nokkussh.SignCertificate(
+		ca,
+		nokkussh.MarshalKey(pub),
+		principal,
+		"nokku:web:session:"+sessionID,
+		time.Hour,
+		nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_USER,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("sign session certificate: %w", err)
+	}
+	base, err := ssh.NewSignerFromKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("session signer: %w", err)
+	}
+	return ssh.NewCertSigner(cert, base)
 }
 
 func (s *DaemonService) ListSessions(
@@ -266,6 +353,204 @@ func (s *DaemonService) CloseSession(
 ) (*nokkuv1.CloseSessionResponse, error) {
 	s.cfg.Pool.CloseSession(req.GetSessionId())
 	return &nokkuv1.CloseSessionResponse{}, nil
+}
+
+// Relay bridges a user's raw byte stream to the daemon's own sshd. Streaming
+// handlers bypass the unary interceptor's permission gate, so the same check
+// CreateSession gets from ProcedurePermissions runs here.
+func (s *DaemonService) Relay(
+	ctx context.Context,
+	stream *connect.BidiStream[nokkuv1.RelayRequest, nokkuv1.RelayResponse],
+) error {
+	msg, err := stream.Receive()
+	if err != nil {
+		return err
+	}
+	start, ok := msg.GetMsg().(*nokkuv1.RelayRequest_Start)
+	if !ok || start.Start == nil {
+		return connect.NewError(
+			connect.CodeInvalidArgument,
+			errors.New("first message must be RelayStart"),
+		)
+	}
+	workspaceID := start.Start.GetWorkspaceId()
+	daemonID := start.Start.GetDaemonId()
+	if workspaceID == "" || daemonID == "" {
+		return connect.NewError(
+			connect.CodeInvalidArgument,
+			errors.New("workspace_id and daemon_id required"),
+		)
+	}
+
+	// Streaming handlers get no tenant from the auth interceptor, so pin the
+	// workspace from the start message before resolving membership.
+	ctx = iam.AnnotateTenant(ctx, workspaceID)
+	// View is deliberate: CreateSession already grants web sessions on view,
+	// so relay transport demands no more. The real SSH gate is the daemon's
+	// synced principal list plus certificate auth inside sshd.
+	if err := actorHasPermission(ctx, s.cfg.Conn, db.PermDaemonsView); err != nil {
+		return DBError(err)
+	}
+
+	var d *db.Daemon
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		d, err = q.GetDaemon(ctx, daemonID)
+		return err
+	}); err != nil {
+		return DBError(err)
+	}
+
+	relayID := uuid.NewV7().String()
+	actor, _ := iam.PrincipalFromContext(ctx)
+	relay, err := s.cfg.Pool.RequestRelay(ctx, d.ID, relayID, actor.ID)
+	if err != nil {
+		if errors.Is(err, nokkudaemon.ErrRelayLimit) {
+			return NewError(connect.CodeResourceExhausted, "too many concurrent relays")
+		}
+		return NewError(connect.CodeUnavailable, "daemon did not accept relay")
+	}
+	defer s.cfg.Pool.UnregisterRelay(relayID)
+
+	s.logRelayEvent(ctx, "relay.open", workspaceID, d.ID, relayID, actor)
+	defer s.logRelayEvent(ctx, "relay.close", workspaceID, d.ID, relayID, actor)
+
+	if err := stream.Send(&nokkuv1.RelayResponse{
+		Msg: &nokkuv1.RelayResponse_Ready{Ready: &nokkuv1.RelayReady{RelayId: &relayID}},
+	}); err != nil {
+		return err
+	}
+	return bridgeRelay(ctx, stream, relay)
+}
+
+// logRelayEvent records the semantic relay.open and relay.close events. The
+// audit interceptor skips Relay (it only logs procedures matching its
+// mutating prefixes), so the handler emits them directly, with the same
+// transport facts the interceptor rows carry. WithoutCancel keeps the row
+// when the peer hangs up and the request context dies first.
+func (s *DaemonService) logRelayEvent(
+	ctx context.Context,
+	action, workspaceID, daemonID, relayID string,
+	actor iam.Principal,
+) {
+	event := &audit.Event{
+		Timestamp:   time.Now().UTC(),
+		WorkspaceID: workspaceID,
+		Action:      action,
+		ActorID:     actor.ID,
+		ActorType:   string(actor.Kind),
+		StatusCode:  "OK",
+		Details:     map[string]any{"relay_id": relayID, "daemon_id": daemonID},
+	}
+	if meta, ok := iam.RequestMetaFromContext(ctx); ok {
+		event.IPAddress = util.SanitizeUTF8(util.GetRemoteIP(meta.Header, meta.RemoteAddr))
+		event.UserAgent = util.SanitizeUTF8(meta.Header.Get("User-Agent"))
+	}
+	if err := s.cfg.Audit.Append(context.WithoutCancel(ctx), event); err != nil {
+		slog.Warn("failed to write relay audit log", "error", err)
+	}
+}
+
+const (
+	// Bytes per second per relay direction.
+	relayBandwidth = 32 << 20
+	relayBurst     = 1 << 20
+)
+
+// waitRelayBytes drains the bucket in burst-sized steps, since WaitN
+// rejects requests larger than the burst.
+func waitRelayBytes(ctx context.Context, l *rate.Limiter, n int) error {
+	for n > relayBurst {
+		if err := l.WaitN(ctx, relayBurst); err != nil {
+			return err
+		}
+		n -= relayBurst
+	}
+	return l.WaitN(ctx, n)
+}
+
+// bridgeRelay pumps bytes between the user's stream and the daemon side
+// until either closes. The relay is a dumb pipe: the SSH session inside is
+// end-to-end encrypted between the user's client and the daemon's sshd.
+func bridgeRelay(
+	ctx context.Context,
+	stream *connect.BidiStream[nokkuv1.RelayRequest, nokkuv1.RelayResponse],
+	relay *nokkudaemon.Relay,
+) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// One bucket per direction: rsync-heavy traffic one way must not starve
+	// the other.
+	outLimiter := rate.NewLimiter(relayBandwidth, relayBurst)
+	inLimiter := rate.NewLimiter(relayBandwidth, relayBurst)
+
+	// Outbound: daemon bytes to the user.
+	outDone := make(chan struct{})
+	go func() {
+		defer close(outDone)
+		defer cancel()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case data := <-relay.ToUser:
+				if err := waitRelayBytes(ctx, outLimiter, len(data)); err != nil {
+					relay.Close()
+					return
+				}
+				if err := stream.Send(&nokkuv1.RelayResponse{
+					Msg: &nokkuv1.RelayResponse_Data{Data: data},
+				}); err != nil {
+					relay.Close()
+					return
+				}
+			}
+		}
+	}()
+
+	// Inbound: user bytes to the daemon. A clean client hangup (EOF) ends
+	// the relay without an error.
+	recvErr := make(chan error, 1)
+	go func() {
+		for {
+			msg, err := stream.Receive()
+			if err != nil {
+				recvErr <- err
+				relay.Close()
+				return
+			}
+			if data, ok := msg.GetMsg().(*nokkuv1.RelayRequest_Data); ok {
+				if err := waitRelayBytes(ctx, inLimiter, len(data.Data)); err != nil {
+					recvErr <- err
+					relay.Close()
+					return
+				}
+				select {
+				case relay.ToDaemon <- data.Data:
+				case <-relay.Done():
+					return
+				}
+			}
+		}
+	}()
+
+	var retErr error
+	select {
+	case <-relay.Done():
+	case err := <-recvErr:
+		if !errors.Is(err, io.EOF) {
+			retErr = err
+		}
+	}
+	// The deferred cancel only runs at return. Stop the pump now so the
+	// join below cannot deadlock if the peer stopped reading.
+	cancel()
+	<-outDone
+	// Best-effort closed notices so the peer never waits on a wedged half.
+	_ = stream.Send(&nokkuv1.RelayResponse{
+		Msg: &nokkuv1.RelayResponse_Closed{Closed: &nokkuv1.RelayClosed{}},
+	})
+	return retErr
 }
 
 // Daemon endpoints ------------------------------------------------------------
