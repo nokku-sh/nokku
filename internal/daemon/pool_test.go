@@ -20,6 +20,10 @@ func (stubConn) WithTx(context.Context, func(*db.Queries) error) error {
 	return nil
 }
 
+func (stubConn) WithWorkspace(context.Context, func(*db.Queries) error) error {
+	return nil
+}
+
 func newTestPool(t *testing.T) *Pool {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
