@@ -69,12 +69,14 @@ const (
 	// DaemonServiceSyncDaemonProcedure is the fully-qualified name of the DaemonService's SyncDaemon
 	// RPC.
 	DaemonServiceSyncDaemonProcedure = "/nokku.v1.DaemonService/SyncDaemon"
+	// DaemonServiceRelayProcedure is the fully-qualified name of the DaemonService's Relay RPC.
+	DaemonServiceRelayProcedure = "/nokku.v1.DaemonService/Relay"
 	// DaemonControlServiceConnectProcedure is the fully-qualified name of the DaemonControlService's
 	// Connect RPC.
 	DaemonControlServiceConnectProcedure = "/nokku.v1.DaemonControlService/Connect"
-	// DaemonSessionServiceDaemonSessionProcedure is the fully-qualified name of the
-	// DaemonSessionService's DaemonSession RPC.
-	DaemonSessionServiceDaemonSessionProcedure = "/nokku.v1.DaemonSessionService/DaemonSession"
+	// DaemonSessionServiceDaemonRelayProcedure is the fully-qualified name of the
+	// DaemonSessionService's DaemonRelay RPC.
+	DaemonSessionServiceDaemonRelayProcedure = "/nokku.v1.DaemonSessionService/DaemonRelay"
 )
 
 // DaemonServiceClient is a client for the nokku.v1.DaemonService service.
@@ -90,6 +92,7 @@ type DaemonServiceClient interface {
 	CloseSession(context.Context, *v1.CloseSessionRequest) (*v1.CloseSessionResponse, error)
 	EnrollDaemon(context.Context, *v1.EnrollDaemonRequest) (*v1.EnrollDaemonResponse, error)
 	SyncDaemon(context.Context, *v1.SyncDaemonRequest) (*v1.SyncDaemonResponse, error)
+	Relay(context.Context) (*connect.BidiStreamForClientSimple[v1.RelayRequest, v1.RelayResponse], error)
 }
 
 // NewDaemonServiceClient constructs a client for the nokku.v1.DaemonService service. By default, it
@@ -172,6 +175,12 @@ func NewDaemonServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(daemonServiceMethods.ByName("SyncDaemon")),
 			connect.WithClientOptions(opts...),
 		),
+		relay: connect.NewClient[v1.RelayRequest, v1.RelayResponse](
+			httpClient,
+			baseURL+DaemonServiceRelayProcedure,
+			connect.WithSchema(daemonServiceMethods.ByName("Relay")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -188,6 +197,7 @@ type daemonServiceClient struct {
 	closeSession       *connect.Client[v1.CloseSessionRequest, v1.CloseSessionResponse]
 	enrollDaemon       *connect.Client[v1.EnrollDaemonRequest, v1.EnrollDaemonResponse]
 	syncDaemon         *connect.Client[v1.SyncDaemonRequest, v1.SyncDaemonResponse]
+	relay              *connect.Client[v1.RelayRequest, v1.RelayResponse]
 }
 
 // GetDaemon calls nokku.v1.DaemonService.GetDaemon.
@@ -289,6 +299,11 @@ func (c *daemonServiceClient) SyncDaemon(ctx context.Context, req *v1.SyncDaemon
 	return nil, err
 }
 
+// Relay calls nokku.v1.DaemonService.Relay.
+func (c *daemonServiceClient) Relay(ctx context.Context) (*connect.BidiStreamForClientSimple[v1.RelayRequest, v1.RelayResponse], error) {
+	return c.relay.CallBidiStreamSimple(ctx)
+}
+
 // DaemonServiceHandler is an implementation of the nokku.v1.DaemonService service.
 type DaemonServiceHandler interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
@@ -302,6 +317,7 @@ type DaemonServiceHandler interface {
 	CloseSession(context.Context, *v1.CloseSessionRequest) (*v1.CloseSessionResponse, error)
 	EnrollDaemon(context.Context, *v1.EnrollDaemonRequest) (*v1.EnrollDaemonResponse, error)
 	SyncDaemon(context.Context, *v1.SyncDaemonRequest) (*v1.SyncDaemonResponse, error)
+	Relay(context.Context, *connect.BidiStream[v1.RelayRequest, v1.RelayResponse]) error
 }
 
 // NewDaemonServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -380,6 +396,12 @@ func NewDaemonServiceHandler(svc DaemonServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(daemonServiceMethods.ByName("SyncDaemon")),
 		connect.WithHandlerOptions(opts...),
 	)
+	daemonServiceRelayHandler := connect.NewBidiStreamHandler(
+		DaemonServiceRelayProcedure,
+		svc.Relay,
+		connect.WithSchema(daemonServiceMethods.ByName("Relay")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/nokku.v1.DaemonService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DaemonServiceGetDaemonProcedure:
@@ -404,6 +426,8 @@ func NewDaemonServiceHandler(svc DaemonServiceHandler, opts ...connect.HandlerOp
 			daemonServiceEnrollDaemonHandler.ServeHTTP(w, r)
 		case DaemonServiceSyncDaemonProcedure:
 			daemonServiceSyncDaemonHandler.ServeHTTP(w, r)
+		case DaemonServiceRelayProcedure:
+			daemonServiceRelayHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -455,6 +479,10 @@ func (UnimplementedDaemonServiceHandler) EnrollDaemon(context.Context, *v1.Enrol
 
 func (UnimplementedDaemonServiceHandler) SyncDaemon(context.Context, *v1.SyncDaemonRequest) (*v1.SyncDaemonResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.DaemonService.SyncDaemon is not implemented"))
+}
+
+func (UnimplementedDaemonServiceHandler) Relay(context.Context, *connect.BidiStream[v1.RelayRequest, v1.RelayResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.DaemonService.Relay is not implemented"))
 }
 
 // DaemonControlServiceClient is a client for the nokku.v1.DaemonControlService service.
@@ -529,7 +557,7 @@ func (UnimplementedDaemonControlServiceHandler) Connect(context.Context, *connec
 
 // DaemonSessionServiceClient is a client for the nokku.v1.DaemonSessionService service.
 type DaemonSessionServiceClient interface {
-	DaemonSession(context.Context) (*connect.BidiStreamForClientSimple[v1.DaemonSessionRequest, v1.DaemonSessionResponse], error)
+	DaemonRelay(context.Context) (*connect.BidiStreamForClientSimple[v1.DaemonRelayRequest, v1.DaemonRelayResponse], error)
 }
 
 // NewDaemonSessionServiceClient constructs a client for the nokku.v1.DaemonSessionService service.
@@ -543,10 +571,10 @@ func NewDaemonSessionServiceClient(httpClient connect.HTTPClient, baseURL string
 	baseURL = strings.TrimRight(baseURL, "/")
 	daemonSessionServiceMethods := v1.File_nokku_v1_daemon_proto.Services().ByName("DaemonSessionService").Methods()
 	return &daemonSessionServiceClient{
-		daemonSession: connect.NewClient[v1.DaemonSessionRequest, v1.DaemonSessionResponse](
+		daemonRelay: connect.NewClient[v1.DaemonRelayRequest, v1.DaemonRelayResponse](
 			httpClient,
-			baseURL+DaemonSessionServiceDaemonSessionProcedure,
-			connect.WithSchema(daemonSessionServiceMethods.ByName("DaemonSession")),
+			baseURL+DaemonSessionServiceDaemonRelayProcedure,
+			connect.WithSchema(daemonSessionServiceMethods.ByName("DaemonRelay")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -554,17 +582,17 @@ func NewDaemonSessionServiceClient(httpClient connect.HTTPClient, baseURL string
 
 // daemonSessionServiceClient implements DaemonSessionServiceClient.
 type daemonSessionServiceClient struct {
-	daemonSession *connect.Client[v1.DaemonSessionRequest, v1.DaemonSessionResponse]
+	daemonRelay *connect.Client[v1.DaemonRelayRequest, v1.DaemonRelayResponse]
 }
 
-// DaemonSession calls nokku.v1.DaemonSessionService.DaemonSession.
-func (c *daemonSessionServiceClient) DaemonSession(ctx context.Context) (*connect.BidiStreamForClientSimple[v1.DaemonSessionRequest, v1.DaemonSessionResponse], error) {
-	return c.daemonSession.CallBidiStreamSimple(ctx)
+// DaemonRelay calls nokku.v1.DaemonSessionService.DaemonRelay.
+func (c *daemonSessionServiceClient) DaemonRelay(ctx context.Context) (*connect.BidiStreamForClientSimple[v1.DaemonRelayRequest, v1.DaemonRelayResponse], error) {
+	return c.daemonRelay.CallBidiStreamSimple(ctx)
 }
 
 // DaemonSessionServiceHandler is an implementation of the nokku.v1.DaemonSessionService service.
 type DaemonSessionServiceHandler interface {
-	DaemonSession(context.Context, *connect.BidiStream[v1.DaemonSessionRequest, v1.DaemonSessionResponse]) error
+	DaemonRelay(context.Context, *connect.BidiStream[v1.DaemonRelayRequest, v1.DaemonRelayResponse]) error
 }
 
 // NewDaemonSessionServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -574,16 +602,16 @@ type DaemonSessionServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewDaemonSessionServiceHandler(svc DaemonSessionServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	daemonSessionServiceMethods := v1.File_nokku_v1_daemon_proto.Services().ByName("DaemonSessionService").Methods()
-	daemonSessionServiceDaemonSessionHandler := connect.NewBidiStreamHandler(
-		DaemonSessionServiceDaemonSessionProcedure,
-		svc.DaemonSession,
-		connect.WithSchema(daemonSessionServiceMethods.ByName("DaemonSession")),
+	daemonSessionServiceDaemonRelayHandler := connect.NewBidiStreamHandler(
+		DaemonSessionServiceDaemonRelayProcedure,
+		svc.DaemonRelay,
+		connect.WithSchema(daemonSessionServiceMethods.ByName("DaemonRelay")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/nokku.v1.DaemonSessionService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case DaemonSessionServiceDaemonSessionProcedure:
-			daemonSessionServiceDaemonSessionHandler.ServeHTTP(w, r)
+		case DaemonSessionServiceDaemonRelayProcedure:
+			daemonSessionServiceDaemonRelayHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -593,6 +621,6 @@ func NewDaemonSessionServiceHandler(svc DaemonSessionServiceHandler, opts ...con
 // UnimplementedDaemonSessionServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedDaemonSessionServiceHandler struct{}
 
-func (UnimplementedDaemonSessionServiceHandler) DaemonSession(context.Context, *connect.BidiStream[v1.DaemonSessionRequest, v1.DaemonSessionResponse]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.DaemonSessionService.DaemonSession is not implemented"))
+func (UnimplementedDaemonSessionServiceHandler) DaemonRelay(context.Context, *connect.BidiStream[v1.DaemonRelayRequest, v1.DaemonRelayResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.DaemonSessionService.DaemonRelay is not implemented"))
 }
