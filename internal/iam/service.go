@@ -145,7 +145,7 @@ type Service struct {
 }
 
 // New builds the service.
-func New(d Deps) (*Service, error) {
+func New(ctx context.Context, d Deps) (*Service, error) {
 	if d.Conn == nil {
 		return nil, errors.New("iam: db connection is required")
 	}
@@ -218,6 +218,14 @@ func New(d Deps) (*Service, error) {
 	}
 	if svc.conn != nil {
 		svc.SCIM = newSCIMFlow(svc)
+	}
+
+	if err := svc.seedSocialProviders(ctx); err != nil {
+		return nil, err
+	}
+
+	if err := svc.bootstrapUser(ctx); err != nil {
+		return nil, err
 	}
 	return svc, nil
 }

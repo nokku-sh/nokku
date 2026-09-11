@@ -33,12 +33,6 @@ type EnvConfig struct {
 	Debug          bool
 	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
 	AllowedOrigins []string `env:"NOKKU_ALLOWED_ORIGINS"`
-
-	// OAuth configuration
-	GoogleClientID     string `env:"GOOGLE_CLIENT_ID"`
-	GoogleClientSecret string `env:"GOOGLE_CLIENT_SECRET"`
-	GitHubClientID     string `env:"GITHUB_CLIENT_ID"`
-	GitHubClientSecret string `env:"GITHUB_CLIENT_SECRET"`
 }
 
 type Config struct {
@@ -127,11 +121,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if cfg.Billing.Enabled() {
 		mode = entitlement.ModeSaaS
 	}
-	cfg.Entitlements = entitlement.NewService(
-		entitlement.NewStore(cfg.Conn),
-		cfg.Billing.License,
-		mode,
-	)
+	cfg.Entitlements = entitlement.NewService(cfg.Conn, cfg.Billing.License, mode)
 
 	if mode == entitlement.ModeSelfHosted && os.Getenv("KMS_URI") != "" &&
 		!cfg.Billing.License.Valid() {
@@ -143,7 +133,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	}
 	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Storage, cfg.Entitlements, cfg.Audit)
 
-	cfg.IAM, err = iam.New(iam.Deps{
+	cfg.IAM, err = iam.New(ctx, iam.Deps{
 		Conn:             cfg.Conn,
 		BaseURL:          cfg.FullURL(),
 		Events:           cfg.Audit,
@@ -153,13 +143,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		CanJoin:          cfg.Entitlements.CanInvite,
 	})
 	if err != nil {
-		return nil, err
-	}
-	if err := cfg.seedSocialProviders(ctx); err != nil {
-		return nil, err
-	}
-
-	if err := cfg.BootstrapAdmin(ctx); err != nil {
 		return nil, err
 	}
 
@@ -223,52 +206,4 @@ func passkeyOrigins(c *Config) []string {
 		origins = append(origins, "http://localhost:5173")
 	}
 	return origins
-}
-
-// seedSocialProviders seeds the static social login providers from the
-// environment credentials into sso storage.
-func (c *Config) seedSocialProviders(ctx context.Context) error {
-	seed := func(providerID, name, clientID, clientSecret string) error {
-		if clientID == "" || clientSecret == "" {
-			return nil
-		}
-		var p iam.SSOProvider
-		switch providerID {
-		case "google":
-			p = iam.SSOProvider{
-				ProviderID: providerID,
-				Method:     iam.MethodOIDC,
-				Name:       name,
-				Enabled:    true,
-				OIDC: &iam.OIDCProvider{
-					IssuerURL:       "https://accounts.google.com",
-					ClientID:        clientID,
-					ClientSecret:    clientSecret,
-					JITProvisioning: true,
-				},
-			}
-		case "github":
-			p = iam.SSOProvider{
-				ProviderID: providerID,
-				Method:     iam.MethodOAuth2,
-				Name:       name,
-				Enabled:    true,
-				OAuth2: &iam.OAuth2Provider{ //nolint:gosec // the secret comes from the environment, not hardcoded
-					ClientID:        clientID,
-					ClientSecret:    clientSecret,
-					AuthURL:         "https://github.com/login/oauth/authorize",
-					TokenURL:        "https://github.com/login/oauth/access_token",
-					UserInfoURL:     "https://api.github.com/user",
-					EmailURL:        "https://api.github.com/user/emails",
-					Scopes:          []string{"read:user", "user:email"},
-					JITProvisioning: true,
-				},
-			}
-		}
-		return c.IAM.PutSSOProvider(ctx, p)
-	}
-	if err := seed("google", "Google", c.GoogleClientID, c.GoogleClientSecret); err != nil {
-		return err
-	}
-	return seed("github", "GitHub", c.GitHubClientID, c.GitHubClientSecret)
 }
