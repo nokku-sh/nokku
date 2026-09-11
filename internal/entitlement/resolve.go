@@ -4,7 +4,13 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/nokku-sh/nokku/internal/db"
 )
+
+var ErrNoSubscription = pgx.ErrNoRows
 
 // Mode distinguishes who operates the instance. Self-hosted and SaaS run
 // the same binary and the same catalog; only the plan source differs.
@@ -55,25 +61,20 @@ type License interface {
 
 // Service resolves workspace plans. It is safe for concurrent use.
 type Service struct {
-	db      DB
+	conn    txRunner
 	license License
 	mode    Mode
 }
 
-// DB is the storage surface entitlement needs, kept narrow for tests.
-type DB interface {
-	// Subscription returns the workspace subscription row, or an error
-	// when none exists (community workspaces).
-	Subscription(ctx context.Context, workspaceID string) (plan string, status Status, err error)
-	// ResourceCount returns the pooled count of managed resources.
-	ResourceCount(ctx context.Context, workspaceID string) (int64, error)
+type txRunner interface {
+	WithTx(ctx context.Context, fn func(*db.Queries) error) error
 }
 
-func NewService(db DB, license License, mode Mode) *Service {
+func NewService(conn txRunner, license License, mode Mode) *Service {
 	if mode == "" {
 		mode = ModeSelfHosted
 	}
-	return &Service{db: db, license: license, mode: mode}
+	return &Service{conn: conn, license: license, mode: mode}
 }
 
 func (s *Service) Mode() Mode {
@@ -109,10 +110,15 @@ func (s *Service) resolve(ctx context.Context, workspaceID string) Plan {
 	if s.mode == ModeSelfHosted && s.license != nil && s.license.Valid() {
 		plan = licensedPlanName(s.license)
 	} else {
-		subPlan, status, err := s.db.Subscription(ctx, workspaceID)
+		var sub *db.WorkspaceSubscription
+		err := s.conn.WithTx(ctx, func(q *db.Queries) (err error) {
+			sub, err = q.GetSubscription(ctx, workspaceID)
+			return err
+		})
+
 		switch {
-		case err == nil && status.GrantsAccess():
-			plan = subPlan
+		case err == nil && Status(sub.Status).GrantsAccess():
+			plan = sub.Plan
 		case errors.Is(err, ErrNoSubscription):
 			// No subscription row is the normal community case.
 		case err == nil:
