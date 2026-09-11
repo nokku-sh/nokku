@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strings"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -21,7 +22,7 @@ func (s *PrincipalService) SetPrincipals(
 	req *nokkuv1.SetPrincipalsRequest,
 ) (*nokkuv1.SetPrincipalsResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		return q.SyncPrincipals(ctx, &db.SyncPrincipalsParams{
+		return q.SetPrincipals(ctx, &db.SetPrincipalsParams{
 			TargetID:  req.GetTargetId(),
 			Usernames: req.GetUsernames(),
 		})
@@ -54,7 +55,7 @@ func (s *PrincipalService) ListPrincipals(
 	}
 
 	return &nokkuv1.ListPrincipalsResponse{
-		Principals: db.ListPrincipalsToProto(principals),
+		Principals: db.PrincipalsToProto(principals),
 		Total:      &count,
 	}, nil
 }
@@ -70,46 +71,20 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 			return err
 		}
 
-		switch req.GetType() {
-		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_USER:
-			for _, subjectID := range req.GetSubjectIds() {
-				if err := q.AddUserToPrincipal(ctx, &db.AddUserToPrincipalParams{
-					UserID:      subjectID,
-					PrincipalID: req.GetId(),
-					WorkspaceID: workspaceID,
-				}); err != nil {
-					return err
-				}
-			}
-		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_TEAM:
-			for _, subjectID := range req.GetSubjectIds() {
-				if err := q.AddTeamToPrincipal(ctx, &db.AddTeamToPrincipalParams{
-					TeamID:      subjectID,
-					PrincipalID: req.GetId(),
-					WorkspaceID: workspaceID,
-				}); err != nil {
-					return err
-				}
-			}
-		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_SERVICE_ACCOUNT:
-			for _, subjectID := range req.GetSubjectIds() {
-				if err := q.AddServiceAccountToPrincipal(
-					ctx,
-					&db.AddServiceAccountToPrincipalParams{
-						ServiceAccountID: subjectID,
-						PrincipalID:      req.GetId(),
-						WorkspaceID:      workspaceID,
-					},
-				); err != nil {
-					return err
-				}
-			}
-		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
-			return ErrInvalidInput
-		default:
+		kind, ok := subjectKind(req.GetType())
+		if !ok {
 			return ErrInvalidInput
 		}
-
+		for _, subjectID := range req.GetSubjectIds() {
+			if err := q.AddPrincipalGrant(ctx, &db.AddPrincipalGrantParams{
+				PrincipalID: req.GetId(),
+				WorkspaceID: workspaceID,
+				SubjectKind: kind,
+				SubjectID:   subjectID,
+			}); err != nil {
+				return err
+			}
+		}
 		return nil
 	}); err != nil {
 		return nil, DBError(err)
@@ -130,44 +105,31 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 			return err
 		}
 
-		switch req.GetType() {
-		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_USER:
-			for _, subjectID := range req.GetSubjectIds() {
-				if err := q.RemoveUserFromPrincipal(ctx, &db.RemoveUserFromPrincipalParams{
-					UserID:      subjectID,
-					PrincipalID: req.GetId(),
-				}); err != nil {
-					return err
-				}
-			}
-		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_TEAM:
-			for _, subjectID := range req.GetSubjectIds() {
-				if err := q.RemoveTeamFromPrincipal(ctx, &db.RemoveTeamFromPrincipalParams{
-					TeamID:      subjectID,
-					PrincipalID: req.GetId(),
-				}); err != nil {
-					return err
-				}
-			}
-		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_SERVICE_ACCOUNT:
-			for _, subjectID := range req.GetSubjectIds() {
-				if err := q.RemoveServiceAccountFromPrincipal(
-					ctx,
-					&db.RemoveServiceAccountFromPrincipalParams{
-						ServiceAccountID: subjectID,
-						PrincipalID:      req.GetId(),
-					},
-				); err != nil {
-					return err
-				}
-			}
-		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
-			return ErrInvalidInput
-		default:
+		kind, ok := subjectKind(req.GetType())
+		if !ok {
 			return ErrInvalidInput
 		}
+		for _, subjectID := range req.GetSubjectIds() {
+			if err := q.RemovePrincipalGrant(ctx, &db.RemovePrincipalGrantParams{
+				PrincipalID: req.GetId(),
+				SubjectKind: kind,
+				SubjectID:   subjectID,
+			}); err != nil {
+				return err
+			}
+		}
 
-		return nil
+		// Removing a grant must invalidate certificates already issued for
+		// the removed subjects: otherwise a re-grant (or a lost device) keeps
+		// working until the cert expires.
+		revokeIDs := req.GetSubjectIds()
+		if kind == db.SubjectKindTeam {
+			revokeIDs, err = teamMemberUserIDs(ctx, q, req.GetSubjectIds())
+			if err != nil {
+				return err
+			}
+		}
+		return revokePrincipals(ctx, q, workspaceID, revokeIDs)
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -181,41 +143,115 @@ func (s *PrincipalService) RevokeAllAccess(
 	req *nokkuv1.RevokeAllAccessRequest,
 ) (*nokkuv1.RevokeAllAccessResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		switch req.GetType() {
-		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_USER:
-			if err := q.RevokeUserAccessInWorkspace(ctx, &db.RevokeUserAccessInWorkspaceParams{
-				UserID:      req.GetSubjectId(),
-				WorkspaceID: req.GetWorkspaceId(),
-			}); err != nil {
-				return err
-			}
-		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_TEAM:
-			if err := q.RevokeTeamAccessInWorkspace(ctx, &db.RevokeTeamAccessInWorkspaceParams{
-				TeamID:      req.GetSubjectId(),
-				WorkspaceID: req.GetWorkspaceId(),
-			}); err != nil {
-				return err
-			}
-		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_SERVICE_ACCOUNT:
-			if err := q.RevokeServiceAccountAccessInWorkspace(
-				ctx,
-				&db.RevokeServiceAccountAccessInWorkspaceParams{
-					ServiceAccountID: req.GetSubjectId(),
-					WorkspaceID:      req.GetWorkspaceId(),
-				},
-			); err != nil {
-				return err
-			}
-		case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
-			return ErrInvalidInput
-		default:
+		kind, ok := subjectKind(req.GetType())
+		if !ok {
 			return ErrInvalidInput
 		}
-		return nil
+		if err := q.RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
+			WorkspaceID: req.GetWorkspaceId(),
+			SubjectKind: kind,
+			SubjectID:   req.GetSubjectId(),
+		}); err != nil {
+			return err
+		}
+
+		revokeIDs := []string{req.GetSubjectId()}
+		if kind == db.SubjectKindTeam {
+			members, err := teamMemberUserIDs(ctx, q, revokeIDs)
+			if err != nil {
+				return err
+			}
+			revokeIDs = members
+		}
+		return revokePrincipals(ctx, q, req.GetWorkspaceId(), revokeIDs)
 	}); err != nil {
 		return nil, DBError(err)
 	}
 
 	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
 	return &nokkuv1.RevokeAllAccessResponse{}, nil
+}
+
+// AddPrincipal adds one local account to a target. Manual targets have no
+// daemon to report accounts, so the operator adds them here. Idempotent: an
+// existing account is returned unchanged.
+func (s *PrincipalService) AddPrincipal(
+	ctx context.Context,
+	req *nokkuv1.AddPrincipalRequest,
+) (*nokkuv1.AddPrincipalResponse, error) {
+	var principal *db.Principal
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		principal, err = q.CreatePrincipal(ctx, &db.CreatePrincipalParams{
+			WorkspaceID: req.GetWorkspaceId(),
+			TargetID:    req.GetTargetId(),
+			Username:    strings.TrimSpace(req.GetUsername()),
+		})
+		return err
+	}); err != nil {
+		return nil, DBError(err)
+	}
+
+	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
+	return &nokkuv1.AddPrincipalResponse{Principal: principal.ToProto()}, nil
+}
+
+// RemovePrincipal drops one local account. Its grants cascade, so this is the
+// deliberate way to stop granting access to an account that no longer exists.
+func (s *PrincipalService) RemovePrincipal(
+	ctx context.Context,
+	req *nokkuv1.RemovePrincipalRequest,
+) (*nokkuv1.RemovePrincipalResponse, error) {
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		return q.DeletePrincipal(ctx, req.GetId())
+	}); err != nil {
+		return nil, DBError(err)
+	}
+
+	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
+	return &nokkuv1.RemovePrincipalResponse{}, nil
+}
+
+// subjectKind maps the wire principal type to principal_grants.subject_kind.
+func subjectKind(t nokkuv1.PrincipalType) (string, bool) {
+	switch t {
+	case nokkuv1.PrincipalType_PRINCIPAL_TYPE_USER:
+		return db.SubjectKindUser, true
+	case nokkuv1.PrincipalType_PRINCIPAL_TYPE_TEAM:
+		return db.SubjectKindTeam, true
+	case nokkuv1.PrincipalType_PRINCIPAL_TYPE_SERVICE_ACCOUNT:
+		return db.SubjectKindServiceAccount, true
+	case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
+		return "", false
+	default:
+		return "", false
+	}
+}
+
+// revokePrincipals records a revocation for each subject id, invalidating
+// every certificate issued to them before now while a freshly minted one
+// works. See ssh_principal_revocations and the daemon's ValidAfter check.
+func revokePrincipals(ctx context.Context, q *db.Queries, workspaceID string, ids []string) error {
+	for _, id := range ids {
+		if err := q.UpsertPrincipalRevocation(ctx, &db.UpsertPrincipalRevocationParams{
+			WorkspaceID: workspaceID,
+			SubjectID:   id,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// teamMemberUserIDs expands team ids to the user ids of their members, so a
+// team-level grant removal revokes each member's certificates too.
+func teamMemberUserIDs(ctx context.Context, q *db.Queries, teamIDs []string) ([]string, error) {
+	var ids []string
+	for _, teamID := range teamIDs {
+		members, err := q.ListTeamMemberUserIDs(ctx, teamID)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, members...)
+	}
+	return ids, nil
 }

@@ -1,7 +1,16 @@
 import { PrincipalService, PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
+import { TargetService } from '$lib/gen/nokku/v1/target_pb';
+import { queryClient } from '$lib/api/client';
 import { toast } from 'svelte-sonner';
 import { useMutation, useQuery } from '$lib/query';
 import { pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
+
+// A grant change also moves the subject's access snapshot
+// (TargetService.GetSubjectAccess), which the assign page and dashboard read
+// for their access badges. The global mutation cache only invalidates the
+// mutating service, so refresh the snapshot alongside it.
+const invalidateAccess = () =>
+	queryClient.invalidateQueries({ queryKey: ['connect-query', TargetService.typeName] });
 
 export const principal = {
 	// Queries
@@ -20,8 +29,8 @@ export const principal = {
 				targetId: opts().targetId || '',
 				query: opts().query,
 				type: opts().type,
-				limit: pageSize.current,
-				offset: pageIndex.current,
+				limit: opts().limit ?? pageSize.current,
+				offset: opts().offset ?? pageIndex.current,
 				workspaceId: workspaceID.current
 			}),
 			() => ({
@@ -30,12 +39,21 @@ export const principal = {
 		),
 
 	// Mutations
-	set: () => useMutation(PrincipalService.method.setPrincipals),
-	addSubjects: () => useMutation(PrincipalService.method.addSubjectsToPrincipal),
-	removeSubjects: () => useMutation(PrincipalService.method.removeSubjectsFromPrincipal),
+	set: () => useMutation(PrincipalService.method.setPrincipals, { onSuccess: invalidateAccess }),
+	addAccount: () =>
+		useMutation(PrincipalService.method.addPrincipal, { onSuccess: invalidateAccess }),
+	removeAccount: () =>
+		useMutation(PrincipalService.method.removePrincipal, { onSuccess: invalidateAccess }),
+	addSubjects: () =>
+		useMutation(PrincipalService.method.addSubjectsToPrincipal, { onSuccess: invalidateAccess }),
+	removeSubjects: () =>
+		useMutation(PrincipalService.method.removeSubjectsFromPrincipal, {
+			onSuccess: invalidateAccess
+		}),
 	revokeSubject: () =>
 		useMutation(PrincipalService.method.revokeAllAccess, {
 			onSuccess: (_, variables) => {
+				invalidateAccess();
 				switch (variables.type) {
 					case PrincipalType.USER:
 						toast.success('User access revoked');

@@ -4,6 +4,7 @@
 	import ActivityModal from '$lib/components/modals/ActivityModal.svelte';
 	import * as Empty from '$lib/components/ui/empty';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { MAX_PAGE_SIZE } from '$lib/config';
 	import { createModalState } from '$lib/hooks';
 	import type { EventLog } from '$lib/gen/nokku/v1/util_pb';
 	import { auditStatusOk, formatTs } from '$lib/utils';
@@ -17,7 +18,7 @@
 
 	const modal = createModalState<EventLog>({} as EventLog);
 	const logs = $derived(util.getLogs({ limit, offset: 0 }));
-	const members = $derived(workspace.listMembers(() => ({ limit: 200 })));
+	const members = $derived(workspace.listMembers(() => ({ limit: MAX_PAGE_SIZE })));
 
 	function actionLabel(action: string): string {
 		const seg = action.split('/').filter(Boolean).pop() ?? action;

@@ -2,37 +2,21 @@ package crypto
 
 import (
 	"database/sql/driver"
+	"strings"
 	"testing"
 )
 
-// resetRuntime clears the package-global crypto primitives immediately, then
-// restores the fast SHA256 baseline so tests stay order-independent.
+// resetRuntime clears the package-global encryptor so tests stay
+// order-independent.
 func resetRuntime(t *testing.T) {
 	t.Helper()
 	runtimeMu.Lock()
 	runtime = primitives{}
 	runtimeMu.Unlock()
-	t.Cleanup(func() {
-		tokenHasher, err := NewHasher(SHA256)
-		if err != nil {
-			panic(err)
-		}
-		if err := SetTokenHasher(tokenHasher); err != nil {
-			panic(err)
-		}
-	})
 }
 
 func TestHashedToken_Verify(t *testing.T) {
 	resetRuntime(t)
-
-	hasher, err := NewHasher(SHA256)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := SetTokenHasher(hasher); err != nil {
-		t.Fatal(err)
-	}
 
 	hash, err := HashToken("nkd_abc_secret")
 	if err != nil {
@@ -46,6 +30,38 @@ func TestHashedToken_Verify(t *testing.T) {
 	}
 	if hash.Hash() != string(hash) {
 		t.Error("Hash() should return the raw digest")
+	}
+}
+
+// TestHashToken_Digest pins the stored representation to lowercase hex of
+// the sha256 digest. Any change silently invalidates stored tokens.
+func TestHashToken_Digest(t *testing.T) {
+	hash, err := HashToken("abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+	if string(hash) != want {
+		t.Errorf("HashToken(abc) = %q, want %q", hash, want)
+	}
+}
+
+func TestHashedToken_Verify_MalformedDigests(t *testing.T) {
+	tests := []struct {
+		name   string
+		digest string
+	}{
+		{"empty", ""},
+		{"not hex", "zzzz"},
+		{"short hex", "abc"},
+		{"valid hex wrong length", strings.Repeat("ab", 31)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if HashedToken(tt.digest).Verify("secret") {
+				t.Errorf("Verify(%q): want false", tt.digest)
+			}
+		})
 	}
 }
 
@@ -176,13 +192,7 @@ func TestRuntimeSetters(t *testing.T) {
 	if err := SetEncryptor(nil); err == nil {
 		t.Error("SetEncryptor(nil): want error")
 	}
-	if err := SetTokenHasher(nil); err == nil {
-		t.Error("SetTokenHasher(nil): want error")
-	}
 	if _, err := Encryptor(); err == nil {
 		t.Error("Encryptor() uninitialized: want error")
-	}
-	if _, err := TokenHasher(); err == nil {
-		t.Error("TokenHasher() uninitialized: want error")
 	}
 }

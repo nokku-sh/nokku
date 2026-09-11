@@ -165,7 +165,6 @@ func (s *Storage) Store(
 	writerOpts := &blob.WriterOptions{
 		ContentType:  opts.ContentType,
 		CacheControl: opts.CacheControl,
-		Metadata:     opts.Metadata,
 	}
 	if err := s.bucket.WriteAll(ctx, name, data, writerOpts); err != nil {
 		return nil, fmt.Errorf("write data: %w", err)
@@ -208,41 +207,6 @@ func (s *Storage) CreateWriter(
 		return nil, fmt.Errorf("open writer for %q: %w", name, err)
 	}
 	return w, nil
-}
-
-// DeletePrefix removes every object under prefix. Best-effort per object:
-// failures are collected and returned together so callers can retry.
-func (s *Storage) DeletePrefix(ctx context.Context, prefix string) error {
-	var errs []error
-	it := s.bucket.List(&blob.ListOptions{Prefix: prefix})
-	for {
-		obj, err := it.Next(ctx)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("list objects under %q: %w", prefix, err)
-		}
-		if err = s.bucket.Delete(
-			ctx,
-			obj.Key,
-		); err != nil &&
-			gcerrors.Code(err) != gcerrors.NotFound {
-			errs = append(errs, fmt.Errorf("delete object %q: %w", obj.Key, err))
-		}
-	}
-	return errors.Join(errs...)
-}
-
-func (s *Storage) Exists(ctx context.Context, name string) (bool, error) {
-	_, err := s.bucket.Attributes(ctx, name)
-	if err != nil {
-		if gcerrors.Code(err) == gcerrors.NotFound {
-			return false, nil
-		}
-		return false, fmt.Errorf("check existence: %w", err)
-	}
-	return true, nil
 }
 
 // PublicURL returns the public URL for name when the backend serves objects

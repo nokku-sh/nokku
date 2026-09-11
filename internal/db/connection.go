@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nokku-sh/nokku/internal/actor"
@@ -194,117 +195,111 @@ func (c *Connection) Querier() Querier { return c.Q }
 // AdminQuerier returns the non-RLS querier for pre-authorization lookups.
 func (c *Connection) AdminQuerier() Querier { return c.AdminQ }
 
-// WithTx executes a transaction as nokku_system, bypassing rls entirely.
+// withTx is the one transaction scaffold: begin, roll back on error or panic,
+// otherwise commit. The role and GUC setup that decides whether RLS applies is
+// the caller's job, which is what keeps the scope entry points below
+// readable as policy instead of plumbing.
+func (c *Connection) withTx(
+	ctx context.Context,
+	fn func(context.Context, pgx.Tx, *Queries) error,
+) error {
+	tx, err := c.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback(ctx)
+			panic(p)
+		}
+	}()
+
+	if err := fn(ctx, tx, New(tx)); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// Pick the transaction scope by what the query is allowed to see, never by
+// convenience:
+//
+//	Connection.WithTx        every tenant, RLS bypassed
+//	Connection.WithWorkspace tenant rows only, pinned to the request's workspace
+//	Connection.WithActor     the request's own rows, no tenant pinned
+//
+// AdminQ stays for pre-authorization lookups, which by definition run before a
+// tenant can be resolved.
+
+// WithTx executes a transaction as nokku_system, bypassing RLS entirely. Only
+// cross-tenant work belongs here: the queries see every workspace. Tenant
+// scoped work must use WithWorkspace or WithActor.
 func (c *Connection) WithTx(
 	ctx context.Context,
 	fn func(*Queries) error,
 ) error {
-	tx, err := c.Pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback(ctx)
-			panic(p)
+	return c.withTx(ctx, func(ctx context.Context, tx pgx.Tx, q *Queries) error {
+		if _, err := tx.Exec(ctx, "SET LOCAL ROLE nokku_system"); err != nil {
+			return err
 		}
-	}()
-
-	if _, err := tx.Exec(ctx, "SET LOCAL ROLE nokku_system"); err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
-
-	if err := fn(New(tx)); err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
-
-	return tx.Commit(ctx)
-}
-
-// workspaceIDFromContext returns the workspace a request acts in: the
-// effective tenant the transport placed on the request identity. It mirrors
-// auth.WorkspaceIDFromContext; db cannot import auth.
-func workspaceIDFromContext(ctx context.Context) string {
-	t, _ := actor.TenantFromContext(ctx)
-	return t
+		return fn(q)
+	})
 }
 
 // WithWorkspace executes a transaction scoped to the workspace pinned in the
-// request context, as the rls constrained nokku_app role.
+// request context, as the RLS constrained nokku_app role. Every query inside
+// sees only that workspace's rows.
 func (c *Connection) WithWorkspace(
 	ctx context.Context,
 	fn func(*Queries) error,
 ) error {
-	actor, ok := actor.PrincipalFromContext(ctx)
-	if !ok || actor.ID == "" {
-		return ErrNoActor
-	}
-
-	tx, err := c.Pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback(ctx)
-			panic(p)
+	return c.withTx(ctx, func(ctx context.Context, tx pgx.Tx, q *Queries) error {
+		principal, ok := actor.PrincipalFromContext(ctx)
+		if !ok || principal.ID == "" {
+			return ErrNoActor
 		}
-	}()
 
-	// Membership and role resolution must see every workspace, so it runs
-	// as nokku_system. The transaction switches down to nokku_app before
-	// any caller query runs. GUCs are transaction-local and survive the
-	// role switch.
-	if _, err := tx.Exec(ctx, "SET LOCAL ROLE nokku_system"); err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
-
-	q := New(tx)
-	wsIDs, err := q.GetActorWorkspaceIDs(ctx, actor.ID)
-	if err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
-
-	workspaceID := ""
-	if pinned := workspaceIDFromContext(ctx); pinned != "" {
-		if !slices.Contains(wsIDs, pinned) {
-			_ = tx.Rollback(ctx)
-			return ErrWorkspaceNotAccessible
+		// Membership and role resolution must see every workspace, so it runs
+		// as nokku_system. The transaction switches down to nokku_app before
+		// any caller query runs. GUCs are transaction-local and survive the
+		// role switch.
+		if _, err := tx.Exec(ctx, "SET LOCAL ROLE nokku_system"); err != nil {
+			return err
 		}
-		workspaceID = pinned
-	} else if len(wsIDs) == 1 {
-		workspaceID = wsIDs[0]
-	}
 
-	if _, err = tx.Exec(
-		ctx,
-		`SELECT
-			set_config('nokku.workspace_id', $1, true),
-			set_config('nokku.actor_id', $2, true)
-		`,
-		workspaceID,
-		actor.ID,
-	); err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
+		wsIDs, err := q.GetActorWorkspaceIDs(ctx, principal.ID)
+		if err != nil {
+			return err
+		}
 
-	if _, err := tx.Exec(ctx, "SET LOCAL ROLE nokku_app"); err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
+		workspaceID := ""
+		if pinned := actor.WorkspaceIDFromContext(ctx); pinned != "" {
+			if !slices.Contains(wsIDs, pinned) {
+				return ErrWorkspaceNotAccessible
+			}
+			workspaceID = pinned
+		} else if len(wsIDs) == 1 {
+			workspaceID = wsIDs[0]
+		}
 
-	if err := fn(q); err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
-	return tx.Commit(ctx)
+		if _, err = tx.Exec(
+			ctx,
+			`SELECT
+				set_config('nokku.workspace_id', $1, true),
+				set_config('nokku.actor_id', $2, true)
+			`,
+			workspaceID,
+			principal.ID,
+		); err != nil {
+			return err
+		}
+
+		if _, err := tx.Exec(ctx, "SET LOCAL ROLE nokku_app"); err != nil {
+			return err
+		}
+		return fn(q)
+	})
 }
 
 // WithActor executes a transaction scoped to a single actor as the RLS
@@ -321,32 +316,16 @@ func (c *Connection) WithActor(
 		return ErrNoActor
 	}
 
-	tx, err := c.Pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback(ctx)
-			panic(p)
+	return c.withTx(ctx, func(ctx context.Context, tx pgx.Tx, q *Queries) error {
+		// Set the actor GUC transaction-local. Custom GUCs are settable by any
+		// role; no role switch is needed.
+		if _, err := tx.Exec(
+			ctx,
+			`SELECT set_config('nokku.actor_id', $1, true)`,
+			actorID,
+		); err != nil {
+			return err
 		}
-	}()
-
-	// Set the actor GUC transaction-local. Custom GUCs are settable by any
-	// role; no role switch is needed.
-	if _, err := tx.Exec(
-		ctx,
-		`SELECT set_config('nokku.actor_id', $1, true)`,
-		actorID,
-	); err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
-
-	if err := fn(New(tx)); err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
-	return tx.Commit(ctx)
+		return fn(q)
+	})
 }

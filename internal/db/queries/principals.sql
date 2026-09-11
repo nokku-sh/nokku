@@ -5,42 +5,11 @@ SELECT
   @workspace_id,
   @target_id,
   @username
+ON CONFLICT (target_id, username) DO UPDATE
+SET
+  username = EXCLUDED.username
 RETURNING
   *;
-
--- name: GetPrincipals :many
-SELECT
-  p.*,
-  COALESCE(
-    array_agg(DISTINCT pu.user_id) FILTER (
-      WHERE
-        pu.user_id IS NOT NULL
-    ),
-    '{}'
-  )::UUID[] AS user_ids,
-  COALESCE(
-    array_agg(DISTINCT pt.team_id) FILTER (
-      WHERE
-        pt.team_id IS NOT NULL
-    ),
-    '{}'
-  )::UUID[] AS team_ids,
-  COALESCE(
-    array_agg(DISTINCT psa.service_account_id) FILTER (
-      WHERE
-        psa.service_account_id IS NOT NULL
-    ),
-    '{}'
-  )::UUID[] AS service_account_ids
-FROM
-  principals p
-  LEFT JOIN principal_users pu ON pu.principal_id = p.id
-  LEFT JOIN principal_teams pt ON pt.principal_id = p.id
-  LEFT JOIN principal_service_accounts psa ON psa.principal_id = p.id
-WHERE
-  p.id = ANY (@principal_ids::UUID[])
-GROUP BY
-  p.id;
 
 -- name: ListPrincipals :many
 WITH
@@ -70,17 +39,17 @@ WITH
       sqlc.narg('offset')
   )
 SELECT
-  p.*,
+  sqlc.embed(p),
   COALESCE(
-    array_agg(DISTINCT pu.user_id) FILTER (WHERE pu.user_id IS NOT NULL),
+    array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'user'),
     '{}'
   )::UUID[] AS "userIds",
   COALESCE(
-    array_agg(DISTINCT pt.team_id) FILTER (WHERE pt.team_id IS NOT NULL),
+    array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'team'),
     '{}'
   )::UUID[] AS "teamIds",
   COALESCE(
-    array_agg(DISTINCT psa.service_account_id) FILTER (WHERE psa.service_account_id IS NOT NULL),
+    array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'service_account'),
     '{}'
   )::UUID[] AS "serviceAccountIds",
   (SELECT
@@ -90,23 +59,13 @@ SELECT
 FROM
   principals p
   JOIN paginated_principals pp ON pp.id = p.id
-  LEFT JOIN principal_users pu ON pu.principal_id = p.id
-  LEFT JOIN principal_teams pt ON pt.principal_id = p.id
-  LEFT JOIN principal_service_accounts psa ON psa.principal_id = p.id
+  LEFT JOIN principal_grants g ON g.principal_id = p.id
 GROUP BY
   p.id
 ORDER BY
   p.username ASC;
 
--- name: GetTargetUsernames :many
-SELECT
-  username
-FROM
-  principals
-WHERE
-  target_id = @target_id;
-
--- name: SyncPrincipals :exec
+-- name: SetPrincipals :exec
 WITH
   desired AS (
     SELECT
@@ -140,6 +99,34 @@ FROM
   desired d
 ON CONFLICT (target_id, username) DO NOTHING;
 
+-- name: SetReportedUsers :exec
+UPDATE targets
+SET
+  reported_users = @usernames::TEXT[],
+  reported_at = NOW()
+WHERE
+  id = @target_id;
+
+-- name: InsertTargetPrincipals :exec
+-- Creates the principal anchor for each reported account so it becomes
+-- assignable. Never deletes: a host's reported list is a hint, not authority.
+INSERT INTO
+  principals (workspace_id, target_id, username)
+SELECT
+  (
+    SELECT
+      workspace_id
+    FROM
+      targets
+    WHERE
+      id = @target_id
+  ),
+  @target_id,
+  d.username
+FROM
+  unnest(@usernames::TEXT[]) AS d (username)
+ON CONFLICT (target_id, username) DO NOTHING;
+
 -- name: GetPrincipalWorkspace :one
 SELECT
   t.workspace_id
@@ -149,65 +136,37 @@ FROM
 WHERE
   p.id = @principal_id;
 
--- Insert-only grant/revoke primitives used by AddSubjectsToPrincipal /
--- RemoveSubjectsFromPrincipal. They add or remove a single subject without
--- touching other subjects already granted on the principal.
--- name: AddUserToPrincipal :exec
+-- Grant primitives used by AddSubjectsToPrincipal / RemoveSubjectsFromPrincipal.
+-- One row per (principal, subject kind, subject id) in principal_grants.
+-- name: AddPrincipalGrant :exec
 INSERT INTO
-  principal_users (principal_id, workspace_id, user_id)
+  principal_grants (principal_id, workspace_id, subject_kind, subject_id)
 VALUES
-  (@principal_id, @workspace_id, @user_id)
-ON CONFLICT (principal_id, user_id) DO NOTHING;
+  (@principal_id, @workspace_id, @subject_kind, @subject_id)
+ON CONFLICT (principal_id, subject_kind, subject_id) DO NOTHING;
 
--- name: AddTeamToPrincipal :exec
-INSERT INTO
-  principal_teams (principal_id, workspace_id, team_id)
-VALUES
-  (@principal_id, @workspace_id, @team_id)
-ON CONFLICT (principal_id, team_id) DO NOTHING;
-
--- name: AddServiceAccountToPrincipal :exec
-INSERT INTO
-  principal_service_accounts (principal_id, workspace_id, service_account_id)
-VALUES
-  (@principal_id, @workspace_id, @service_account_id)
-ON CONFLICT (principal_id, service_account_id) DO NOTHING;
-
--- name: RemoveUserFromPrincipal :exec
-DELETE FROM principal_users
+-- name: RemovePrincipalGrant :exec
+DELETE FROM principal_grants
 WHERE
   principal_id = @principal_id
-  AND user_id = @user_id;
+  AND subject_kind = @subject_kind
+  AND subject_id = @subject_id;
 
--- name: RemoveTeamFromPrincipal :exec
-DELETE FROM principal_teams
-WHERE
-  principal_id = @principal_id
-  AND team_id = @team_id;
-
--- name: RemoveServiceAccountFromPrincipal :exec
-DELETE FROM principal_service_accounts
-WHERE
-  principal_id = @principal_id
-  AND service_account_id = @service_account_id;
-
--- name: RevokeUserAccessInWorkspace :exec
-DELETE FROM principal_users
+-- name: RevokeSubjectAccessInWorkspace :exec
+DELETE FROM principal_grants
 WHERE
   workspace_id = @workspace_id
-  AND user_id = @user_id;
+  AND subject_kind = @subject_kind
+  AND subject_id = @subject_id;
 
--- name: RevokeTeamAccessInWorkspace :exec
-DELETE FROM principal_teams
+-- name: DeleteSubjectGrants :exec
+-- Removes every grant for a subject that no longer exists, so no dangling
+-- subject id outlives the user, team, or service account it pointed at.
+-- Subject ids are unique across kinds and never reused.
+DELETE FROM principal_grants
 WHERE
-  workspace_id = @workspace_id
-  AND team_id = @team_id;
-
--- name: RevokeServiceAccountAccessInWorkspace :exec
-DELETE FROM principal_service_accounts
-WHERE
-  workspace_id = @workspace_id
-  AND service_account_id = @service_account_id;
+  subject_kind = @subject_kind
+  AND subject_id = @subject_id;
 
 -- name: ListPrincipalsForDaemon :many
 SELECT
@@ -217,26 +176,21 @@ FROM
   principals p
   CROSS JOIN LATERAL (
     SELECT
-      pu.user_id
+      g.subject_id AS ids
     FROM
-      principal_users pu
+      principal_grants g
     WHERE
-      pu.principal_id = p.id
+      g.principal_id = p.id
+      AND g.subject_kind IN ('user', 'service_account')
     UNION
     SELECT
       tm.user_id
     FROM
-      principal_teams pt
-      JOIN team_members tm ON tm.team_id = pt.team_id
+      principal_grants g
+      JOIN team_members tm ON tm.team_id = g.subject_id
     WHERE
-      pt.principal_id = p.id
-    UNION
-    SELECT
-      psa.service_account_id
-    FROM
-      principal_service_accounts psa
-    WHERE
-      psa.principal_id = p.id
+      g.principal_id = p.id
+      AND g.subject_kind = 'team'
   ) AS combined (ids)
 WHERE
   p.target_id = (
@@ -254,26 +208,130 @@ ORDER BY
 
 -- name: GetPrincipalsByTargetIDs :many
 SELECT
-  p.*,
+  sqlc.embed(p),
   COALESCE(
-    array_agg(DISTINCT pu.user_id) FILTER (WHERE pu.user_id IS NOT NULL),
+    array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'user'),
     '{}'
   )::UUID[] AS user_ids,
   COALESCE(
-    array_agg(DISTINCT pt.team_id) FILTER (WHERE pt.team_id IS NOT NULL),
+    array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'team'),
     '{}'
   )::UUID[] AS team_ids,
   COALESCE(
-    array_agg(DISTINCT psa.service_account_id) FILTER (WHERE psa.service_account_id IS NOT NULL),
+    array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'service_account'),
     '{}'
   )::UUID[] AS service_account_ids
 FROM
   principals p
-  LEFT JOIN principal_users pu ON pu.principal_id = p.id
-  LEFT JOIN principal_teams pt ON pt.principal_id = p.id
-  LEFT JOIN principal_service_accounts psa ON psa.principal_id = p.id
+  LEFT JOIN principal_grants g ON g.principal_id = p.id
 WHERE
   p.target_id = ANY (@target_ids::UUID[])
 GROUP BY
-  p.id;
+  p.id
+ORDER BY
+  p.username;
 
+-- name: ListSubjectUsernamesForTargets :many
+-- The local accounts a subject may log in as, per target: the grant predicate
+-- resolved for one subject, without the rest of the target's assignment graph.
+-- A team grant counts for its members, and a subject may be a user, a team, or
+-- a service account (all identified by UUID, which is unique across them).
+SELECT DISTINCT
+  p.target_id,
+  p.username
+FROM
+  principals p
+WHERE
+  p.target_id = ANY (@target_ids::UUID[])
+  AND EXISTS (
+    SELECT
+      1
+    FROM
+      principal_grants g
+    WHERE
+      g.principal_id = p.id
+      AND (
+        g.subject_id = @subject_id
+        OR (
+          g.subject_kind = 'team'
+          AND g.subject_id IN (
+            SELECT
+              tm.team_id
+            FROM
+              team_members tm
+            WHERE
+              tm.user_id = @subject_id
+          )
+        )
+      )
+  )
+ORDER BY
+  p.target_id,
+  p.username;
+
+-- Principal revocation -------------------------------------------------------
+-- A revocation invalidates every certificate for a principal issued before
+-- revoked_at. Re-revoking moves the cutoff forward, so a fresh certificate
+-- always works.
+-- name: UpsertPrincipalRevocation :exec
+INSERT INTO
+  ssh_principal_revocations (workspace_id, subject_id)
+VALUES
+  (@workspace_id, @subject_id)
+ON CONFLICT (workspace_id, subject_id) DO UPDATE
+SET
+  revoked_at = NOW();
+
+-- name: ListPrincipalRevocations :many
+SELECT
+  subject_id,
+  revoked_at
+FROM
+  ssh_principal_revocations
+WHERE
+  workspace_id = @workspace_id
+  -- Session certificates live at most an hour, so older cutoffs match no
+  -- live certificate. The days of margin cover daemons that synced before
+  -- the revoke and reconnect late, plus clock skew.
+  AND revoked_at > NOW() - INTERVAL '8 days'
+ORDER BY
+  subject_id;
+
+-- name: ListPrincipalsForTarget :many
+-- The same per-account subject list the daemon receives, for a daemonless
+-- target whose sshd reads it from AuthorizedPrincipalsFile. Teams are
+-- expanded to their members here, so the host needs no team knowledge.
+SELECT
+  p.username,
+  array_agg(DISTINCT ids)::TEXT[] AS ids
+FROM
+  principals p
+  CROSS JOIN LATERAL (
+    SELECT
+      g.subject_id AS ids
+    FROM
+      principal_grants g
+    WHERE
+      g.principal_id = p.id
+      AND g.subject_kind IN ('user', 'service_account')
+    UNION
+    SELECT
+      tm.user_id
+    FROM
+      principal_grants g
+      JOIN team_members tm ON tm.team_id = g.subject_id
+    WHERE
+      g.principal_id = p.id
+      AND g.subject_kind = 'team'
+  ) AS combined (ids)
+WHERE
+  p.target_id = @target_id
+GROUP BY
+  p.username
+ORDER BY
+  p.username;
+
+-- name: DeletePrincipal :exec
+DELETE FROM principals
+WHERE
+  id = @id;

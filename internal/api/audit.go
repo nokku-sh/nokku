@@ -59,29 +59,14 @@ func (a *AuditInterceptor) WrapStreamingHandler(
 
 // HTTP wrappers --------------------------------------------------------------
 
-type statusWriter struct {
-	http.ResponseWriter
-
-	status int
-}
-
-func (w *statusWriter) Unwrap() http.ResponseWriter {
-	return w.ResponseWriter
-}
-
-func (w *statusWriter) WriteHeader(status int) {
-	w.status = status
-	w.ResponseWriter.WriteHeader(status)
-}
-
 func (a *AuditInterceptor) WithAudit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(sw, r)
+		rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+		next.ServeHTTP(rw, r)
 		go func() {
 			actx, cancel := auditDetach(r.Context())
 			defer cancel()
-			a.audit.LogHTTPAction(actx, r, sw.status)
+			a.audit.LogHTTPAction(actx, r, rw.statusCode)
 		}()
 	})
 }

@@ -10,6 +10,7 @@ import {
 	KeyRound,
 	Mail,
 	Orbit,
+	ScrollText,
 	Settings,
 	Shield,
 	Sparkles,
@@ -66,6 +67,7 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			items: [
 				{ title: 'General', url: '/settings', icon: Settings, shortcut: 's' },
 				{ title: 'Daemons', url: '/settings/daemons', icon: Bot },
+				{ title: 'Audit Streaming', url: '/settings/audit', icon: ScrollText },
 				{ title: 'Single Sign-On', url: '/settings/sso', icon: KeyRound }
 			]
 		}

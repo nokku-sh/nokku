@@ -7,13 +7,11 @@ package iam
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -52,12 +50,11 @@ type flowLinkOptions struct {
 	Data []byte
 }
 
-// linker resolves identities. OnSSOLogin fires after a successful resolve
-// under a workspace-scoped provider so the host can join memberships.
+// linker resolves identities, joining the provider's workspace after a
+// successful resolve.
 type linker struct {
-	svc        *Service
-	credType   Method
-	OnSSOLogin func(ctx context.Context, userID, workspaceID string) error
+	svc      *Service
+	credType Method
 }
 
 // Resolve returns the local user for a verified identity: an existing linked
@@ -80,8 +77,8 @@ func (l *linker) Resolve(
 		})
 		return nil, err
 	}
-	if workspaceID != "" && l.OnSSOLogin != nil {
-		if err := l.OnSSOLogin(ctx, u.ID, workspaceID); err != nil {
+	if workspaceID != "" {
+		if err := l.svc.JoinWorkspace(ctx, u.ID, workspaceID); err != nil {
 			return nil, err
 		}
 	}
@@ -97,8 +94,6 @@ func (l *linker) resolve(
 		Provider: opts.ProviderID,
 		Subject:  opts.Subject,
 	})
-	fmt.Printf("cred: %v\n", cred)
-	fmt.Println(PrincipalFromContext(ctx))
 	if err == nil {
 		if opts.LinkUserID != "" && cred.UserID != opts.LinkUserID {
 			return nil, ErrIdentityLinked
@@ -170,7 +165,7 @@ func (l *linker) resolve(
 	// not persisted, which breaks future logins once JIT provisioning is
 	// disabled, with no trace of why.
 	if err := l.Link(ctx, opts.ProviderID, opts.Subject, u.ID, opts.Data); err != nil &&
-		!isUniqueViolation(err) {
+		!db.IsUniqueViolation(err) {
 		slog.Warn(
 			"sso identity link failed",
 			"error", err,
@@ -179,14 +174,6 @@ func (l *linker) resolve(
 		)
 	}
 	return u, nil
-}
-
-// isUniqueViolation reports whether err is a PostgreSQL unique-constraint
-// violation: the expected outcome when a concurrent login linked the same
-// identity first.
-func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // provisionUser creates a JIT account from a verified identity.
@@ -268,7 +255,7 @@ func (s *Service) completeSSO(
 	u, err := l.Resolve(ctx, st.WorkspaceID, opts)
 	if err != nil {
 		// The user-facing message is intentionally generic; this log is the
-		// only place a membership-join failure (OnSSOLogin) is visible, as
+		// only place a membership-join failure is visible, as
 		// resolve rejections are already audited as login_denied.
 		slog.Warn("sso login rejected", "error", err, "provider", opts.ProviderID)
 		Fail(w, r, errRedirect, "identity rejected")

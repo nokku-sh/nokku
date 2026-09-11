@@ -99,7 +99,7 @@ func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cf
 			}
 
 			users[i] = user
-			if err := q.AddWorkspaceMember(ctx, &db.AddWorkspaceMemberParams{
+			if err := q.EnsureWorkspaceMember(ctx, &db.EnsureWorkspaceMemberParams{
 				WorkspaceID: workspace.ID,
 				UserID:      user.ID,
 			}); err != nil {
@@ -252,10 +252,11 @@ func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cf
 				}
 
 				for _, userID := range userIDs {
-					if err := q.AddUserToPrincipal(ctx, &db.AddUserToPrincipalParams{
+					if err := q.AddPrincipalGrant(ctx, &db.AddPrincipalGrantParams{
 						WorkspaceID: principal.WorkspaceID,
 						PrincipalID: principal.ID,
-						UserID:      userID,
+						SubjectKind: db.SubjectKindUser,
+						SubjectID:   userID,
 					}); err != nil {
 						return fmt.Errorf("failed to assign principal users: %w", err)
 					}
@@ -272,10 +273,11 @@ func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cf
 				}
 
 				for _, teamID := range teamIDs {
-					if err := q.AddTeamToPrincipal(ctx, &db.AddTeamToPrincipalParams{
+					if err := q.AddPrincipalGrant(ctx, &db.AddPrincipalGrantParams{
 						WorkspaceID: principal.WorkspaceID,
 						PrincipalID: principal.ID,
-						TeamID:      teamID,
+						SubjectKind: db.SubjectKindTeam,
+						SubjectID:   teamID,
 					}); err != nil {
 						return fmt.Errorf("failed to assign principal teams: %w", err)
 					}
@@ -284,12 +286,13 @@ func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cf
 				numSA := gofakeit.IntRange(0, min(2, len(sa)))
 				if numSA > 0 {
 					for _, saID := range sa[:numSA] {
-						if err := q.AddServiceAccountToPrincipal(
+						if err := q.AddPrincipalGrant(
 							ctx,
-							&db.AddServiceAccountToPrincipalParams{
-								WorkspaceID:      principal.WorkspaceID,
-								PrincipalID:      principal.ID,
-								ServiceAccountID: saID,
+							&db.AddPrincipalGrantParams{
+								WorkspaceID: principal.WorkspaceID,
+								PrincipalID: principal.ID,
+								SubjectKind: db.SubjectKindServiceAccount,
+								SubjectID:   saID,
 							},
 						); err != nil {
 							return fmt.Errorf(

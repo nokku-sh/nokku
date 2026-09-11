@@ -175,7 +175,7 @@ func (m *PasswordManager) CheckPassword(ctx context.Context, userID, pw string) 
 		return ErrInvalidCredentials
 	}
 	if needsRehash(encoded, m.params) {
-		_ = m.store(ctx, userID, pw)
+		_ = m.Store(ctx, userID, pw)
 	}
 	return nil
 }
@@ -225,7 +225,7 @@ func (m *PasswordManager) HasPassword(ctx context.Context, userID string) (bool,
 // every session of the user, so a stolen session cannot outlive a password
 // change or reset.
 func (m *PasswordManager) SetPassword(ctx context.Context, userID, pw string) error {
-	if err := m.store(ctx, userID, pw); err != nil {
+	if err := m.Store(ctx, userID, pw); err != nil {
 		return err
 	}
 	if _, err := m.svc.q.DeleteSubjectSessions(ctx, userID); err != nil {
@@ -239,27 +239,14 @@ func (m *PasswordManager) SetPassword(ctx context.Context, userID, pw string) er
 // DeletePassword removes the user's password credential, leaving other
 // methods (passkeys, SSO) intact.
 func (m *PasswordManager) DeletePassword(ctx context.Context, userID string) error {
-	creds, err := m.svc.q.ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
-		UserID: userID,
-		Type:   string(MethodPassword),
-	})
-	if err != nil {
-		return err
-	}
-	for _, c := range creds {
-		if err := m.svc.q.DeleteCredential(
-			ctx,
-			&db.DeleteCredentialParams{UserID: userID, ID: c.ID},
-		); err != nil {
-			return err
-		}
-	}
-	return nil
+	return deleteCredentialsOfType(ctx, m.svc.q, userID, MethodPassword)
 }
 
-// store persists a new password hash without revoking sessions, so
+// Store persists a new password hash without revoking sessions, so
 // rehash-on-login does not end the session the user just authenticated with.
-func (m *PasswordManager) store(ctx context.Context, userID, pw string) error {
+// Pair with Sessions.RevokeOtherSessions when the current session must
+// survive.
+func (m *PasswordManager) Store(ctx context.Context, userID, pw string) error {
 	encoded, err := hashPassword(pw, m.params)
 	if err != nil {
 		return err
@@ -279,12 +266,6 @@ func (m *PasswordManager) store(ctx context.Context, userID, pw string) error {
 	}
 	_, err = m.svc.q.UpsertCredential(ctx, &cred)
 	return err
-}
-
-// Store persists a new password hash without revoking sessions; pair with
-// Sessions.RevokeOtherSessions when the current session must survive.
-func (m *PasswordManager) Store(ctx context.Context, userID, pw string) error {
-	return m.store(ctx, userID, pw)
 }
 
 // burn runs one argon2id verification against the dummy hash.

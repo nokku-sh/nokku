@@ -49,7 +49,7 @@ type Config struct {
 	Audit        *audit.Service
 	Email        *email.Service
 	Pool         *daemon.Pool
-	Storage      storage.Store
+	Storage      *storage.Storage
 	Cache        cache.Cache
 	Record       *recording.Service
 	Billing      *billing.Service
@@ -137,16 +137,11 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		!cfg.Billing.License.Valid() {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
-	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Storage, cfg.Entitlements)
-
 	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Entitlements)
 	if err != nil {
 		return nil, err
 	}
-
-	if err := crypto.InitDefaultHashers(); err != nil {
-		return nil, err
-	}
+	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Storage, cfg.Entitlements, cfg.Audit)
 
 	cfg.IAM, err = iam.New(iam.Deps{
 		Conn:             cfg.Conn,
@@ -155,37 +150,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		Secret:           []byte(cfg.Secret),
 		Cache:            cfg.Cache,
 		PasskeyRPOrigins: passkeyOrigins(&cfg),
-		OnSSOLogin: func(ctx context.Context, userID, workspaceID string) error {
-			return cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
-				// Existing members skip the seat gate
-				if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
-					WorkspaceID: workspaceID,
-					UserID:      userID,
-				}); err == nil {
-					return nil
-				}
-
-				// Same seat gate as invitations and SCIM. The row lock makes
-				// concurrent joins serialize before the count. Community
-				// workspaces ship OIDC, so this path is reachable on capped
-				// plans.
-				if _, err := q.GetWorkspaceForUpdate(ctx, workspaceID); err != nil {
-					return err
-				}
-				used, err := q.CountWorkspaceSeats(ctx, workspaceID)
-				if err != nil {
-					return err
-				}
-				if err := cfg.Entitlements.CanInvite(ctx, workspaceID, used); err != nil {
-					return err
-				}
-				return q.EnsureWorkspaceMember(ctx, &db.EnsureWorkspaceMemberParams{
-					UserID:      userID,
-					WorkspaceID: workspaceID,
-				})
-			})
-		},
-		CanJoin: cfg.Entitlements.CanInvite,
+		CanJoin:          cfg.Entitlements.CanInvite,
 	})
 	if err != nil {
 		return nil, err

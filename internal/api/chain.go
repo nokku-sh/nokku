@@ -4,17 +4,17 @@ import (
 	"net/http"
 )
 
-type Constructor func(http.Handler) http.Handler
+type constructor func(http.Handler) http.Handler
 
-type Chain struct {
-	constructors []Constructor
+type chain struct {
+	constructors []constructor
 }
 
-func NewChain(constructors ...Constructor) Chain {
-	return Chain{append(([]Constructor)(nil), constructors...)}
+func newChain(constructors ...constructor) chain {
+	return chain{append(([]constructor)(nil), constructors...)}
 }
 
-func (c Chain) Then(h http.Handler) http.Handler {
+func (c chain) Then(h http.Handler) http.Handler {
 	if h == nil {
 		h = http.DefaultServeMux
 	}
@@ -24,7 +24,7 @@ func (c Chain) Then(h http.Handler) http.Handler {
 	return h
 }
 
-func (c Chain) ThenFunc(fn http.HandlerFunc) http.Handler {
+func (c chain) ThenFunc(fn http.HandlerFunc) http.Handler {
 	if fn == nil {
 		return c.Then(nil)
 	}

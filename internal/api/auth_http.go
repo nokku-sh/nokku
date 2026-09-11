@@ -17,7 +17,7 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	as := NewAuthService(cfg)
 
 	// Public, CSRF-guarded flows.
-	flow := NewChain(svc.CSRFGuard)
+	flow := newChain(svc.CSRFGuard)
 	mux.Handle("POST /passkey/login/begin", flow.ThenFunc(svc.Passkey.BeginLogin))
 	mux.Handle("POST /passkey/login/finish", flow.ThenFunc(svc.Passkey.FinishLogin))
 	mux.Handle("POST /passkey/signup/begin", flow.ThenFunc(svc.Passkey.BeginSignup))
@@ -25,7 +25,7 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 
 	// WebAuthn add-key needs a session; BeginRegistration checks the
 	// principal itself, so only auth middleware and CSRF wrap the route.
-	addKey := NewChain(svc.Middleware, svc.CSRFGuard)
+	addKey := newChain(svc.Middleware, svc.CSRFGuard)
 	mux.Handle("POST /passkey/register/begin", addKey.ThenFunc(svc.Passkey.BeginRegistration))
 	mux.Handle("POST /passkey/register/finish", addKey.ThenFunc(svc.Passkey.FinishRegistration))
 
@@ -35,7 +35,7 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.HandleFunc("POST /auth/device/token", svc.Device.Poll)
 	mux.HandleFunc("GET /auth/device/nonce", svc.Device.Nonce)
 
-	deviceGuard := NewChain(svc.Middleware, svc.RequireLogin)
+	deviceGuard := newChain(svc.Middleware, svc.RequireLogin)
 	mux.Handle("POST /auth/device/verify", deviceGuard.ThenFunc(svc.Device.Verify))
 	mux.Handle("POST /auth/device/deny", deviceGuard.ThenFunc(svc.Device.Deny))
 
@@ -71,7 +71,7 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	// behind optional auth so a signed-in user links a provider; callbacks
 	// are public (the SAML ACS is a cross-origin IdP form post, exempt from
 	// CSRF by design).
-	optAuth := NewChain(svc.Middleware, svc.CSRFGuard)
+	optAuth := newChain(svc.Middleware, svc.CSRFGuard)
 	mux.Handle("GET /oidc/login", optAuth.ThenFunc(svc.OIDC.Login))
 	mux.Handle("POST /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
 	mux.Handle("GET /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))

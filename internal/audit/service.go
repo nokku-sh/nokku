@@ -15,13 +15,14 @@ import (
 )
 
 const (
-	defaultRetentionDays = 7
-	maxRetentionDays     = 365
+	maxRetentionDays = 365
 )
 
 type Service struct {
 	conn         *db.Connection
 	entitlements *entitlement.Service
+	// sinks receive every event. See Sink.
+	sinks []Sink
 }
 
 func New(
@@ -29,7 +30,14 @@ func New(
 	conn *db.Connection,
 	entitlements *entitlement.Service,
 ) (*Service, error) {
-	s := &Service{conn: conn, entitlements: entitlements}
+	s := &Service{
+		conn:         conn,
+		entitlements: entitlements,
+		sinks: []Sink{
+			NewPostgresSink(conn),
+			NewWebhookSink(ctx, conn, entitlements),
+		},
+	}
 
 	if err := s.setupPartitions(ctx); err != nil {
 		return nil, err
@@ -181,6 +189,13 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 		return
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	// The audit table refuses DELETE unless the transaction opts in here,
+	// which leaves retention its one legitimate path to erasing rows.
+	if _, err := tx.Exec(ctx, `SET LOCAL nokku.audit_retention = 'on'`); err != nil {
+		slog.Error("audit retention failed to enable the delete guard", "error", err)
+		return
+	}
 
 	var locked bool
 	err = tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock(hashtext('audit-retention'))`).

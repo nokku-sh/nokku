@@ -42,20 +42,8 @@ func (s *Service) RotateBackupCodes(ctx context.Context, userID string) ([]strin
 	}
 
 	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
-		creds, err := q.ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
-			UserID: userID,
-			Type:   string(MethodBackupCode),
-		})
-		if err != nil {
+		if err := deleteCredentialsOfType(ctx, q, userID, MethodBackupCode); err != nil {
 			return err
-		}
-		for _, c := range creds {
-			if err := q.DeleteCredential(
-				ctx,
-				&db.DeleteCredentialParams{UserID: userID, ID: c.ID},
-			); err != nil {
-				return err
-			}
 		}
 		for _, code := range fresh {
 			hash, err := crypto.HashToken(code)
@@ -90,19 +78,7 @@ func (s *Service) ListBackupCodes(ctx context.Context, userID string) ([]*db.Cre
 
 // DeleteBackupCodes removes every remaining backup code.
 func (s *Service) DeleteBackupCodes(ctx context.Context, userID string) error {
-	creds, err := s.ListBackupCodes(ctx, userID)
-	if err != nil {
-		return err
-	}
-	for _, c := range creds {
-		if err := s.q.DeleteCredential(
-			ctx,
-			&db.DeleteCredentialParams{UserID: userID, ID: c.ID},
-		); err != nil {
-			return err
-		}
-	}
-	return nil
+	return deleteCredentialsOfType(ctx, s.q, userID, MethodBackupCode)
 }
 
 // LoginWithBackupCode verifies a single-use backup code and returns the

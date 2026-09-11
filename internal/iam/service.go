@@ -86,9 +86,6 @@ type Deps struct {
 	// Device flow settings; the flow builds only when Cache is set.
 	// DeviceVerificationURI string
 	DeviceSessionTTL time.Duration
-	// OnSSOLogin fires after a successful SSO login under a
-	// workspace-scoped provider (membership auto-join).
-	OnSSOLogin func(ctx context.Context, userID, workspaceID string) error
 	// CanJoin gates SCIM provisioning on the plan's seat cap. used is the
 	// member count read in the provisioning transaction. Optional; nil
 	// allows all joins.
@@ -131,7 +128,6 @@ type Service struct {
 	conn             txRunner
 	cache            Cache
 	events           Sink
-	OnSSOLogin       func(ctx context.Context, userID, workspaceID string) error
 	CanJoin          func(ctx context.Context, workspaceID string, used int64) error
 	OnUserLogin      func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
 	OnNewDeviceLogin func(ctx context.Context, u *db.User, sess db.Session, label, ip string)
@@ -161,7 +157,6 @@ func New(d Deps) (*Service, error) {
 		conn:             d.Conn,
 		cache:            d.Cache,
 		events:           d.Events,
-		OnSSOLogin:       d.OnSSOLogin,
 		CanJoin:          d.CanJoin,
 		OnUserLogin:      d.OnUserLogin,
 		OnNewDeviceLogin: d.OnNewDeviceLogin,

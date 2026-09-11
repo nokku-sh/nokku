@@ -36,7 +36,9 @@ type scimStore struct {
 	teams    map[string]*db.Team
 	teamMems map[string]map[string]bool // team id -> user ids
 
-	ownedWorkspaces map[string]int // user id -> owned workspace count
+	revocations     map[string]bool // subject ids whose certificates were revoked
+	grantDrops      map[string]int  // subject id -> grant delete statements run
+	ownedWorkspaces map[string]int  // user id -> owned workspace count
 
 	userCounter int
 	teamCounter int
@@ -51,9 +53,11 @@ func newSCIMStore() *scimStore {
 		creds:           map[string]*db.Credential{},
 		tokens:          map[string]*db.ScimToken{},
 		sessions:        map[string]string{},
+		ownedWorkspaces: map[string]int{},
 		teams:           map[string]*db.Team{},
 		teamMems:        map[string]map[string]bool{},
-		ownedWorkspaces: map[string]int{},
+		revocations:     map[string]bool{},
+		grantDrops:      map[string]int{},
 	}
 }
 
@@ -237,13 +241,7 @@ func (f *scimStore) ListTeams(_ context.Context, arg *db.ListTeamsParams) ([]*db
 		if team.WorkspaceID != arg.WorkspaceID {
 			continue
 		}
-		out = append(out, &db.ListTeamsRow{
-			ID:          team.ID,
-			WorkspaceID: team.WorkspaceID,
-			Name:        team.Name,
-			CreatedAt:   team.CreatedAt,
-			UpdatedAt:   team.UpdatedAt,
-		})
+		out = append(out, &db.ListTeamsRow{Team: *team})
 	}
 	return out, nil
 }
@@ -347,6 +345,14 @@ func (c *scimConn) Exec(_ context.Context, sql string, args ...any) (pgconn.Comm
 				delete(c.st.tokens, key)
 			}
 		}
+	case strings.Contains(sql, "principal_grants") && strings.Contains(sql, "DELETE"):
+		if strings.Contains(sql, "workspace_id") {
+			c.st.grantDrops[args[2].(string)]++
+		} else {
+			c.st.grantDrops[args[1].(string)]++
+		}
+	case strings.Contains(sql, "ssh_principal_revocations"):
+		c.st.revocations[args[1].(string)] = true
 	case strings.Contains(sql, "DELETE") && strings.Contains(sql, "users"):
 		uid := args[0].(string)
 		if u, ok := c.st.users[uid]; ok {
@@ -459,9 +465,6 @@ func scimNullTime(t *time.Time) any {
 // newSCIMTest builds a service with a SCIM flow and mints a bearer token.
 func newSCIMTest(t *testing.T) (*Service, *scimStore, string) {
 	t.Helper()
-	if err := crypto.InitDefaultHashers(); err != nil {
-		t.Fatalf("init hashers: %v", err)
-	}
 	st := newSCIMStore()
 	svc, err := New(Deps{Conn: &scimConn{st: st}})
 	if err != nil {
@@ -635,6 +638,12 @@ func TestSCIMUserLifecycle(t *testing.T) {
 	if _, ok := st.creds["scim|"+testWorkspaceID+"|okta-user-42"]; ok {
 		t.Fatal("scim credential survived delete")
 	}
+	if !st.revocations[created.ID] {
+		t.Fatal("deprovision did not revoke the user's certificates")
+	}
+	if st.grantDrops[created.ID] == 0 {
+		t.Fatal("deprovision kept the user's workspace grants")
+	}
 
 	// Re-provision resolves back to the same account.
 	w = scimRequest(
@@ -693,6 +702,9 @@ func TestSCIMUserLifecycle(t *testing.T) {
 	}
 	if st.users[created.ID] != nil {
 		t.Fatal("orphan account survived final delete")
+	}
+	if st.grantDrops[created.ID] < 2 {
+		t.Fatal("final delete did not drop the user's remaining grants")
 	}
 }
 

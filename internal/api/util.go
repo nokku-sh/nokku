@@ -10,6 +10,7 @@ import (
 	"github.com/mizuchilabs/kata/buildinfo"
 
 	"github.com/nokku-sh/nokku/internal/iam"
+	"github.com/nokku-sh/nokku/internal/util"
 
 	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/config"
@@ -54,7 +55,7 @@ func (s *UtilService) Whoami(
 		if err != nil {
 			return nil, DBError(err)
 		}
-		out.User = db.UserToProto(u)
+		out.User = u.ToProto()
 	case iam.KindServiceAccount:
 		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 			sa, err := q.GetServiceAccount(ctx, p.ID)
@@ -205,4 +206,32 @@ func (s *UtilService) ExportAuditLogs(
 		Filename:    &filename,
 		ContentType: &contentType,
 	}, nil
+}
+
+// appendAuditRow writes an audit event for a procedure the audit interceptor
+// does not cover: streaming RPCs and content reads. WithoutCancel keeps the row
+// when the peer hangs up and the request context dies first.
+func appendAuditRow(
+	ctx context.Context,
+	auditSvc *audit.Service,
+	action, workspaceID string,
+	actor iam.Principal,
+	details map[string]any,
+) {
+	event := &audit.Event{
+		Timestamp:   time.Now().UTC(),
+		WorkspaceID: workspaceID,
+		Action:      action,
+		ActorID:     actor.ID,
+		ActorType:   string(actor.Kind),
+		StatusCode:  "OK",
+		Details:     details,
+	}
+	if meta, ok := iam.RequestMetaFromContext(ctx); ok {
+		event.IPAddress = util.SanitizeUTF8(util.GetRemoteIP(meta.Header, meta.RemoteAddr))
+		event.UserAgent = util.SanitizeUTF8(meta.Header.Get("User-Agent"))
+	}
+	if err := auditSvc.Append(context.WithoutCancel(ctx), event); err != nil {
+		slog.Warn("failed to write audit log", "action", action, "error", err)
+	}
 }

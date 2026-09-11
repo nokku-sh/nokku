@@ -185,16 +185,8 @@ type ListRecordingsParams struct {
 }
 
 type ListRecordingsRow struct {
-	ID          string     `json:"id"`
-	WorkspaceID string     `json:"workspaceId"`
-	DaemonID    string     `json:"daemonId"`
-	Username    string     `json:"username"`
-	StartedAt   time.Time  `json:"startedAt"`
-	EndedAt     *time.Time `json:"endedAt"`
-	SizeBytes   int64      `json:"sizeBytes"`
-	Complete    bool       `json:"complete"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	TotalCount  int32      `json:"totalCount"`
+	Recording  Recording `json:"recording"`
+	TotalCount int32     `json:"totalCount"`
 }
 
 func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams) ([]*ListRecordingsRow, error) {
@@ -213,15 +205,15 @@ func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams)
 	for rows.Next() {
 		var i ListRecordingsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.DaemonID,
-			&i.Username,
-			&i.StartedAt,
-			&i.EndedAt,
-			&i.SizeBytes,
-			&i.Complete,
-			&i.CreatedAt,
+			&i.Recording.ID,
+			&i.Recording.WorkspaceID,
+			&i.Recording.DaemonID,
+			&i.Recording.Username,
+			&i.Recording.StartedAt,
+			&i.Recording.EndedAt,
+			&i.Recording.SizeBytes,
+			&i.Recording.Complete,
+			&i.Recording.CreatedAt,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err

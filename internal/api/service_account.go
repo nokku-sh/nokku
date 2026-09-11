@@ -164,6 +164,12 @@ func (s *ServiceAccountService) DeleteServiceAccount(
 	req *nokkuv1.DeleteServiceAccountRequest,
 ) (*nokkuv1.DeleteServiceAccountResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		if err := q.DeleteSubjectGrants(ctx, &db.DeleteSubjectGrantsParams{
+			SubjectKind: db.SubjectKindServiceAccount,
+			SubjectID:   req.GetId(),
+		}); err != nil {
+			return err
+		}
 		return q.DeleteServiceAccount(ctx, req.GetId())
 	}); err != nil {
 		return nil, DBError(err)

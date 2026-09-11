@@ -189,6 +189,10 @@ func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 		delete(daemons, daemonID)
 		if len(daemons) == 0 {
 			delete(p.byWksp, wksp)
+			// No daemon is left to ack this counter. Drop it so the map
+			// cannot grow without bound; a reconnecting daemon sees 0,
+			// re-syncs once, and the counter resumes from there.
+			delete(p.versions, wksp)
 		}
 	}
 	// Tear down this daemon's sessions and relays even if the stream

@@ -24,7 +24,7 @@ func (s *Service) Register(ctx context.Context, email, name, pw string) (*db.Use
 	if err != nil {
 		return nil, mapUserError(err)
 	}
-	if err := s.Password.store(ctx, u.ID, pw); err != nil {
+	if err := s.Password.Store(ctx, u.ID, pw); err != nil {
 		return nil, err
 	}
 	s.record(

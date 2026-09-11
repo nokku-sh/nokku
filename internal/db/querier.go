@@ -12,14 +12,10 @@ import (
 )
 
 type Querier interface {
-	AddServiceAccountToPrincipal(ctx context.Context, arg *AddServiceAccountToPrincipalParams) error
+	// Grant primitives used by AddSubjectsToPrincipal / RemoveSubjectsFromPrincipal.
+	// One row per (principal, subject kind, subject id) in principal_grants.
+	AddPrincipalGrant(ctx context.Context, arg *AddPrincipalGrantParams) error
 	AddTeamMember(ctx context.Context, arg *AddTeamMemberParams) error
-	AddTeamToPrincipal(ctx context.Context, arg *AddTeamToPrincipalParams) error
-	// Insert-only grant/revoke primitives used by AddSubjectsToPrincipal /
-	// RemoveSubjectsFromPrincipal. They add or remove a single subject without
-	// touching other subjects already granted on the principal.
-	AddUserToPrincipal(ctx context.Context, arg *AddUserToPrincipalParams) error
-	AddWorkspaceMember(ctx context.Context, arg *AddWorkspaceMemberParams) error
 	ConsumeCredentialBySubject(ctx context.Context, arg *ConsumeCredentialBySubjectParams) (*Credential, error)
 	ConsumeToken(ctx context.Context, tokenHash crypto.HashedToken) (*ConsumeTokenRow, error)
 	CountAuditLogs(ctx context.Context, arg *CountAuditLogsParams) (int32, error)
@@ -59,6 +55,7 @@ type Querier interface {
 	DeleteExpiredSessions(ctx context.Context, now *time.Time) (int64, error)
 	DeleteExpiredTokens(ctx context.Context, now time.Time) (int64, error)
 	DeleteOrphanAuditLogs(ctx context.Context, cutoff time.Time) (int64, error)
+	DeletePrincipal(ctx context.Context, id string) error
 	DeleteRecording(ctx context.Context, id string) error
 	DeleteRecordingsBefore(ctx context.Context, arg *DeleteRecordingsBeforeParams) ([]*DeleteRecordingsBeforeRow, error)
 	DeleteSCIMToken(ctx context.Context, arg *DeleteSCIMTokenParams) error
@@ -70,6 +67,10 @@ type Querier interface {
 	// IdP-side identity migration never leaves two links on one account. Run
 	// before UpsertCredential, which re-adds the current subject.
 	DeleteStaleUserSCIMCredentials(ctx context.Context, arg *DeleteStaleUserSCIMCredentialsParams) error
+	// Removes every grant for a subject that no longer exists, so no dangling
+	// subject id outlives the user, team, or service account it pointed at.
+	// Subject ids are unique across kinds and never reused.
+	DeleteSubjectGrants(ctx context.Context, arg *DeleteSubjectGrantsParams) error
 	DeleteSubjectSessions(ctx context.Context, subjectID string) (int64, error)
 	DeleteTarget(ctx context.Context, targetID string) (*Target, error)
 	DeleteTeam(ctx context.Context, teamID string) (*Team, error)
@@ -100,7 +101,6 @@ type Querier interface {
 	GetExpiringCAForUpdate(ctx context.Context) (*CertificateAuthority, error)
 	GetKeysetData(ctx context.Context) ([]byte, error)
 	GetPrincipalWorkspace(ctx context.Context, principalID string) (string, error)
-	GetPrincipals(ctx context.Context, principalIds []string) ([]*GetPrincipalsRow, error)
 	GetPrincipalsByTargetIDs(ctx context.Context, targetIds []string) ([]*GetPrincipalsByTargetIDsRow, error)
 	GetRecording(ctx context.Context, id string) (*Recording, error)
 	GetSAMLKeypair(ctx context.Context) (*GetSAMLKeypairRow, error)
@@ -123,7 +123,6 @@ type Querier interface {
 	GetSubscription(ctx context.Context, workspaceID string) (*WorkspaceSubscription, error)
 	GetTarget(ctx context.Context, targetID string) (*Target, error)
 	GetTargetByDaemon(ctx context.Context, daemonID *string) (*Target, error)
-	GetTargetUsernames(ctx context.Context, targetID string) ([]string, error)
 	// Returns every target a subject can reach. A subject is a user, a team, or a
 	// service account, all identified by their UUID. For a user, access granted to
 	// any of their teams is also included (via team_members).
@@ -144,19 +143,35 @@ type Querier interface {
 	HasRecentToken(ctx context.Context, arg *HasRecentTokenParams) (bool, error)
 	InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams) error
 	InsertKeyset(ctx context.Context, data []byte) (int64, error)
+	// Creates the principal anchor for each reported account so it becomes
+	// assignable. Never deletes: a host's reported list is a hint, not authority.
+	InsertTargetPrincipals(ctx context.Context, arg *InsertTargetPrincipalsParams) error
 	ListActiveSubscriptions(ctx context.Context, arg *ListActiveSubscriptionsParams) ([]*WorkspaceSubscription, error)
 	ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) ([]*AuditAuditLog, error)
 	ListCAs(ctx context.Context, arg *ListCAsParams) ([]*CertificateAuthority, error)
 	ListCredentialsByType(ctx context.Context, arg *ListCredentialsByTypeParams) ([]*Credential, error)
 	ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*ListDaemonsRow, error)
+	ListPrincipalRevocations(ctx context.Context, workspaceID string) ([]*ListPrincipalRevocationsRow, error)
 	ListPrincipals(ctx context.Context, arg *ListPrincipalsParams) ([]*ListPrincipalsRow, error)
 	ListPrincipalsForDaemon(ctx context.Context, daemonID *string) ([]*ListPrincipalsForDaemonRow, error)
+	// The same per-account subject list the daemon receives, for a daemonless
+	// target whose sshd reads it from AuthorizedPrincipalsFile. Teams are
+	// expanded to their members here, so the host needs no team knowledge.
+	ListPrincipalsForTarget(ctx context.Context, targetID string) ([]*ListPrincipalsForTargetRow, error)
 	ListProviderSubscriptions(ctx context.Context, sources []string) ([]*WorkspaceSubscription, error)
 	ListRecordingWorkspaceIDs(ctx context.Context) ([]string, error)
 	ListRecordings(ctx context.Context, arg *ListRecordingsParams) ([]*ListRecordingsRow, error)
 	ListServiceAccounts(ctx context.Context, arg *ListServiceAccountsParams) ([]*ListServiceAccountsRow, error)
 	ListSessionsBySubject(ctx context.Context, subjectID string) ([]*Session, error)
+	// The local accounts a subject may log in as, per target: the grant predicate
+	// resolved for one subject, without the rest of the target's assignment graph.
+	// A team grant counts for its members, and a subject may be a user, a team, or
+	// a service account (all identified by UUID, which is unique across them).
+	ListSubjectUsernamesForTargets(ctx context.Context, arg *ListSubjectUsernamesForTargetsParams) ([]*ListSubjectUsernamesForTargetsRow, error)
 	ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*ListTargetsRow, error)
+	// Just the user ids, for callers that only need the membership set (for
+	// example expanding a team into the users whose certificates must revoke).
+	ListTeamMemberUserIDs(ctx context.Context, teamID string) ([]string, error)
 	// Members of one team with their identity display fields joined in.
 	ListTeamMembers(ctx context.Context, teamID string) ([]*ListTeamMembersRow, error)
 	ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*ListTeamsRow, error)
@@ -165,6 +180,10 @@ type Querier interface {
 	ListTeamsForUser(ctx context.Context, arg *ListTeamsForUserParams) ([]*Team, error)
 	ListVerifiedDomainsForProvider(ctx context.Context, providerID string) ([]*WorkspaceDomain, error)
 	ListWorkspaceAuditLogWorkspaceIDs(ctx context.Context) ([]*string, error)
+	// Destinations for the audit streaming sink. Read as nokku_system: the
+	// workspaces table is RLS-scoped to one tenant, and this is a cross-tenant
+	// read.
+	ListWorkspaceAuditWebhooks(ctx context.Context) ([]*ListWorkspaceAuditWebhooksRow, error)
 	ListWorkspaceDomains(ctx context.Context, workspaceID string) ([]*WorkspaceDomain, error)
 	ListWorkspaceIDs(ctx context.Context) ([]string, error)
 	ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error)
@@ -176,27 +195,24 @@ type Querier interface {
 	OldestRecordings(ctx context.Context, arg *OldestRecordingsParams) ([]*Recording, error)
 	PutSAMLKeypair(ctx context.Context, arg *PutSAMLKeypairParams) (*PutSAMLKeypairRow, error)
 	PutToken(ctx context.Context, arg *PutTokenParams) error
-	RemoveServiceAccountFromPrincipal(ctx context.Context, arg *RemoveServiceAccountFromPrincipalParams) error
-	RemoveTeamFromPrincipal(ctx context.Context, arg *RemoveTeamFromPrincipalParams) error
+	RemovePrincipalGrant(ctx context.Context, arg *RemovePrincipalGrantParams) error
 	RemoveTeamMember(ctx context.Context, arg *RemoveTeamMemberParams) error
-	RemoveUserFromPrincipal(ctx context.Context, arg *RemoveUserFromPrincipalParams) error
 	RemoveWorkspaceMember(ctx context.Context, arg *RemoveWorkspaceMemberParams) error
 	RenameCredential(ctx context.Context, arg *RenameCredentialParams) error
 	ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*CertificateAuthority, error)
-	RevokeServiceAccountAccessInWorkspace(ctx context.Context, arg *RevokeServiceAccountAccessInWorkspaceParams) error
-	RevokeTeamAccessInWorkspace(ctx context.Context, arg *RevokeTeamAccessInWorkspaceParams) error
-	RevokeUserAccessInWorkspace(ctx context.Context, arg *RevokeUserAccessInWorkspaceParams) error
+	RevokeSubjectAccessInWorkspace(ctx context.Context, arg *RevokeSubjectAccessInWorkspaceParams) error
 	SetDaemonsOffline(ctx context.Context) error
 	// The enforce_single_default_ca trigger clears the previous default of the
 	// same authority type before this row is written.
 	SetDefaultCA(ctx context.Context, arg *SetDefaultCAParams) error
+	SetPrincipals(ctx context.Context, arg *SetPrincipalsParams) error
 	SetRecordingComplete(ctx context.Context, arg *SetRecordingCompleteParams) (*Recording, error)
+	SetReportedUsers(ctx context.Context, arg *SetReportedUsersParams) error
 	// Records which Stripe customer a workspace maps to, so checkout always reuses
 	// the same customer. Status stays inactive so this row never grants
 	// entitlements on its own; the webhook promotes it to a real subscription.
 	SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error
 	SumRecordingBytes(ctx context.Context, workspaceID string) (int64, error)
-	SyncPrincipals(ctx context.Context, arg *SyncPrincipalsParams) error
 	// Throttled: only writes when the stored stamp is over an hour old, so a
 	// busy provisioning client does not turn every read into a write.
 	TouchSCIMToken(ctx context.Context, id string) error
@@ -225,6 +241,11 @@ type Querier interface {
 	// Rotation-only (rotate-secrets command): persist the target keyset
 	// atomically within the rotation transaction. Never used on the boot path.
 	UpsertKeysetWrappedData(ctx context.Context, data []byte) error
+	// Principal revocation -------------------------------------------------------
+	// A revocation invalidates every certificate for a principal issued before
+	// revoked_at. Re-revoking moves the cutoff forward, so a fresh certificate
+	// always works.
+	UpsertPrincipalRevocation(ctx context.Context, arg *UpsertPrincipalRevocationParams) error
 	UpsertSSOProvider(ctx context.Context, arg *UpsertSSOProviderParams) (*SsoProvider, error)
 	// Note: source is only overwritten when the row is provider-managed ('stripe')
 	// or empty, so manual subscriptions survive provider syncs.

@@ -146,6 +146,8 @@ func (t *TerminalHandler) authorizeAttach(
 		return true
 	}
 
+	// Pre-authorization lookup: the daemon's workspace cannot be pinned before
+	// the request is authorized, so it runs on the admin pool.
 	var workspaceID string
 	err := t.cfg.Conn.AdminPool.QueryRow(
 		r.Context(),
@@ -157,18 +159,8 @@ func (t *TerminalHandler) authorizeAttach(
 		return false
 	}
 
-	var role string
-	err = t.cfg.Conn.AdminPool.QueryRow(
-		r.Context(),
-		`SELECT role_name FROM workspace_members
-		 WHERE workspace_id = $1 AND user_id = $2::uuid
-		 UNION ALL
-		 SELECT role_name FROM service_accounts
-		 WHERE workspace_id = $1 AND id = $2::uuid
-		 LIMIT 1`,
-		workspaceID,
-		actor.ID,
-	).Scan(&role)
+	// Same role resolution the RPC authorization interceptor uses.
+	role, err := actorRole(r.Context(), t.cfg.Conn.AdminPool, workspaceID, actor.ID)
 	if err != nil || !db.HasPermission(role, db.PermDaemonsEdit) {
 		writeJSONError(w, http.StatusForbidden, "permission denied")
 		return false

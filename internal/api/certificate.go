@@ -117,23 +117,16 @@ func (s *CertificateService) GetCertificateAuthority(
 	if req.GetId() == "" && iam.DaemonIDFromContext(ctx) == "" {
 		return nil, ErrInvalidInput
 	}
+	// A daemon request resolves its own CA, which wins over a request id.
+	daemonID := iam.DaemonIDFromContext(ctx)
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		if req.GetId() != "" {
-			ca, err = q.GetCA(ctx, req.GetId())
-			if err != nil {
-				return err
-			}
-		}
-
-		daemonID := iam.DaemonIDFromContext(ctx)
 		if daemonID != "" {
 			ca, err = q.GetCAByDaemonID(ctx, &daemonID)
-			if err != nil {
-				return err
-			}
+			return err
 		}
-		return nil
+		ca, err = q.GetCA(ctx, req.GetId())
+		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -193,13 +186,14 @@ func (s *CertificateService) UpdateCertificateAuthority(
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		var err error
 		result, err = q.UpdateCA(ctx, params)
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
+
+	// A deactivation is a trust change: daemons re-sync and drop the CA from
+	// their cached key set instead of waiting for an unrelated version bump.
+	s.cfg.Pool.NotifyChange(result.WorkspaceID)
 
 	return &nokkuv1.UpdateCertificateAuthorityResponse{
 		CertificateAuthority: result.ToProto(),
@@ -210,12 +204,16 @@ func (s *CertificateService) DeleteCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.DeleteCertificateAuthorityRequest,
 ) (*nokkuv1.DeleteCertificateAuthorityResponse, error) {
+	var deleted *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		_, err := q.DeleteCA(ctx, req.GetId())
+		var err error
+		deleted, err = q.DeleteCA(ctx, req.GetId())
 		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
+
+	s.cfg.Pool.NotifyChange(deleted.WorkspaceID)
 
 	return &nokkuv1.DeleteCertificateAuthorityResponse{}, nil
 }

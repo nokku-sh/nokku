@@ -241,6 +241,66 @@
 
 			<Item.Root variant="outline">
 				<Item.Content>
+					<Item.Title>Max startup connections</Item.Title>
+					<Item.Description>
+						Limit connections still completing the pre-auth handshake. Zero disables the cap.
+					</Item.Description>
+				</Item.Content>
+				<Item.Actions>
+					<Input
+						type="number"
+						min="0"
+						class="w-24 text-right"
+						value={cfg.maxStartups}
+						oninput={(e) => {
+							cfg.maxStartups = Number((e.currentTarget as HTMLInputElement).value);
+							autoSave.save();
+						}}
+					/>
+				</Item.Actions>
+			</Item.Root>
+
+			<Item.Root variant="outline">
+				<Item.Content>
+					<Item.Title>Max channels per connection</Item.Title>
+					<Item.Description>
+						Limit channels a single connection may hold open. Zero disables the cap.
+					</Item.Description>
+				</Item.Content>
+				<Item.Actions>
+					<Input
+						type="number"
+						min="0"
+						class="w-24 text-right"
+						value={cfg.maxChannels}
+						oninput={(e) => {
+							cfg.maxChannels = Number((e.currentTarget as HTMLInputElement).value);
+							autoSave.save();
+						}}
+					/>
+				</Item.Actions>
+			</Item.Root>
+
+			<Item.Root variant="outline">
+				<Item.Content>
+					<Item.Title>Drop retired CA</Item.Title>
+					<Item.Description>
+						Stop trusting the previously rotated CA immediately after a rollover.
+					</Item.Description>
+				</Item.Content>
+				<Item.Actions>
+					<Switch
+						checked={cfg.dropRetiredCa}
+						onCheckedChange={(v) => {
+							cfg.dropRetiredCa = v;
+							autoSave.save();
+						}}
+					/>
+				</Item.Actions>
+			</Item.Root>
+
+			<Item.Root variant="outline">
+				<Item.Content>
 					<Item.Title>Connection rate</Item.Title>
 					<Item.Description>
 						New connections per second per source IP. Zero disables rate limiting.

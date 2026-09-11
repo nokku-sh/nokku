@@ -284,10 +284,7 @@ func (s *Stripe) billableSeats(ctx context.Context, workspaceID string) (int64, 
 	var count int64
 	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
 		count, err = q.CountWorkspaceSeats(ctx, workspaceID)
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	}); err != nil {
 		return 0, fmt.Errorf("count members for checkout: %w", err)
 	}

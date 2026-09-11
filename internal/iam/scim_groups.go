@@ -35,7 +35,7 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 		Name:        name,
 	})
 	if err != nil {
-		if isUniqueViolation(err) {
+		if db.IsUniqueViolation(err) {
 			// One displayName per workspace, per RFC 7643 and the schema's
 			// unique index.
 			return scim.Resource{}, scimerrors.ScimErrorUniqueness
@@ -62,17 +62,9 @@ func (h scimGroupHandler) GetAll(r *http.Request, params scim.ListRequestParams)
 
 	all := make([]scim.Resource, 0, len(rows))
 	for _, row := range rows {
-		res, err := h.groupResource(ctx, &db.Team{
-			ID:        row.ID,
-			Name:      row.Name,
-			CreatedAt: row.CreatedAt,
-			UpdatedAt: row.UpdatedAt,
-		})
+		res, err := h.groupResource(ctx, &row.Team)
 		if err != nil {
 			return scim.Page{}, err
-		}
-		if params.FilterValidator != nil && params.FilterValidator.PassesFilter(res.Attributes) != nil {
-			continue
 		}
 		all = append(all, res)
 	}
@@ -87,7 +79,7 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 	}
 	if name := scimAttrString(attrs["displayName"]); name != "" && name != team.Name {
 		if _, err := h.svc.q.UpdateTeam(ctx, &db.UpdateTeamParams{TeamID: id, Name: &name}); err != nil {
-			if isUniqueViolation(err) {
+			if db.IsUniqueViolation(err) {
 				return scim.Resource{}, scimerrors.ScimErrorUniqueness
 			}
 			return scim.Resource{}, err
@@ -127,12 +119,12 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 	}
 	changed := false
 
-	apply := func(opName, attr, _ string, expr filter.Expression, value any) error {
+	apply := func(opName, attr string, expr filter.Expression, value any) error {
 		switch attr {
 		case "displayName":
 			if name := scimAttrString(value); name != "" {
 				if _, err := h.svc.q.UpdateTeam(ctx, &db.UpdateTeamParams{TeamID: id, Name: &name}); err != nil {
-					if isUniqueViolation(err) {
+					if db.IsUniqueViolation(err) {
 						return scimerrors.ScimErrorUniqueness
 					}
 					return err
@@ -163,27 +155,8 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 		return nil
 	}
 
-	for _, op := range operations {
-		if op.Path == nil {
-			m, ok := op.Value.(map[string]any)
-			if !ok {
-				return scim.Resource{}, scimerrors.ScimErrorBadRequest("missing attribute path")
-			}
-			for attr, value := range m {
-				if err := apply(op.Op, attr, "", nil, value); err != nil {
-					return scim.Resource{}, err
-				}
-			}
-			continue
-		}
-		attr := op.Path.AttributePath.AttributeName
-		sub := op.Path.AttributePath.SubAttributeName()
-		if sub == "" && op.Path.SubAttribute != nil {
-			sub = *op.Path.SubAttribute
-		}
-		if err := apply(op.Op, attr, sub, op.Path.ValueExpression, op.Value); err != nil {
-			return scim.Resource{}, err
-		}
+	if err := eachScimOp(operations, apply); err != nil {
+		return scim.Resource{}, err
 	}
 
 	if !changed {

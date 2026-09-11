@@ -15,6 +15,7 @@ import (
 	scimerrors "github.com/elimity-com/scim/errors"
 	"github.com/elimity-com/scim/optional"
 	"github.com/jackc/pgx/v5"
+	filter "github.com/scim2/filter-parser/v2"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -64,11 +65,7 @@ func (h scimUserHandler) GetAll(r *http.Request, params scim.ListRequestParams) 
 
 	all := make([]scim.Resource, 0, len(rows))
 	for _, row := range rows {
-		res := memberResource(row, externals[row.UserID])
-		if params.FilterValidator != nil && params.FilterValidator.PassesFilter(res.Attributes) != nil {
-			continue
-		}
-		all = append(all, res)
+		all = append(all, memberResource(row, externals[row.UserID]))
 	}
 	return paginate(all, params), nil
 }
@@ -117,7 +114,7 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 	externalSet := false
 	changed := false
 
-	apply := func(opName, attr, _ string, value any) error {
+	apply := func(opName, attr string, _ filter.Expression, value any) error {
 		switch attr {
 		case "active":
 			// Remove resets to the attribute default (RFC 7644 3.5.2.2).
@@ -147,28 +144,8 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 		return nil
 	}
 
-	for _, op := range operations {
-		if op.Path == nil {
-			// Path-less add/replace carries a full or partial attrs object.
-			m, ok := op.Value.(map[string]any)
-			if !ok {
-				return scim.Resource{}, scimerrors.ScimErrorBadRequest("missing attribute path")
-			}
-			for attr, value := range m {
-				if err := apply(op.Op, attr, "", value); err != nil {
-					return scim.Resource{}, err
-				}
-			}
-			continue
-		}
-		attr := op.Path.AttributePath.AttributeName
-		sub := op.Path.AttributePath.SubAttributeName()
-		if sub == "" && op.Path.SubAttribute != nil {
-			sub = *op.Path.SubAttribute
-		}
-		if err := apply(op.Op, attr, sub, op.Value); err != nil {
-			return scim.Resource{}, err
-		}
+	if err := eachScimOp(operations, apply); err != nil {
+		return scim.Resource{}, err
 	}
 
 	if !changed {
@@ -319,32 +296,17 @@ func userResource(u *db.User, externalID string) scim.Resource {
 	return out
 }
 
+// memberResource renders a list row. The list query already selected the
+// user columns, so project them and reuse the single user renderer.
 func memberResource(row *db.ListWorkspaceMembersRow, externalID string) scim.Resource {
-	attrs := scim.ResourceAttributes{
-		"userName": row.Email,
-		"active":   row.Active,
-		"emails": []any{map[string]any{
-			"value":   row.Email,
-			"type":    "work",
-			"primary": true,
-		}},
-	}
-	if row.Name != "" {
-		attrs["displayName"] = row.Name
-		attrs["name"] = map[string]any{"formatted": row.Name}
-	}
-	out := scim.Resource{
-		ID:         row.UserID,
-		Attributes: attrs,
-		Meta: scim.Meta{
-			Created:      &row.CreatedAt,
-			LastModified: &row.UpdatedAt,
-		},
-	}
-	if externalID != "" {
-		out.ExternalID = optional.NewString(externalID)
-	}
-	return out
+	return userResource(&db.User{
+		ID:        row.UserID,
+		Email:     row.Email,
+		Name:      row.Name,
+		Active:    row.Active,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+	}, externalID)
 }
 
 // scimEmailValue pulls the first address out of an emails value, whichever
@@ -363,8 +325,18 @@ func scimEmailValue(v any) string {
 	}
 }
 
-// paginate applies RFC 7644 list pagination over an already-filtered slice.
+// paginate applies the request's RFC 7644 filter and pagination to the
+// candidate resources.
 func paginate(all []scim.Resource, params scim.ListRequestParams) scim.Page {
+	if params.FilterValidator != nil {
+		matching := all[:0]
+		for _, res := range all {
+			if params.FilterValidator.PassesFilter(res.Attributes) == nil {
+				matching = append(matching, res)
+			}
+		}
+		all = matching
+	}
 	total := len(all)
 	start := max(params.StartIndex, 1)
 	count := max(params.Count, 0)

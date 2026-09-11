@@ -235,13 +235,6 @@ DELETE FROM workspaces
 WHERE
   created_by = @user_id;
 
--- name: AddWorkspaceMember :exec
-INSERT INTO
-  workspace_members (workspace_id, user_id, role_name)
-VALUES
-  (@workspace_id, @user_id, 'viewer')
-ON CONFLICT (workspace_id, user_id) DO NOTHING;
-
 -- name: RemoveWorkspaceMember :exec
 DELETE FROM workspace_members wm USING workspaces w
 WHERE
@@ -300,3 +293,15 @@ INSERT INTO
 VALUES
   (@workspace_id, @user_id, 'viewer')
 ON CONFLICT (workspace_id, user_id) DO NOTHING;
+
+-- name: ListWorkspaceAuditWebhooks :many
+-- Destinations for the audit streaming sink. Read as nokku_system: the
+-- workspaces table is RLS-scoped to one tenant, and this is a cross-tenant
+-- read.
+SELECT
+  id,
+  (settings ->> 'audit_webhook_url')::text AS webhook_url,
+  (settings ->> 'audit_webhook_secret')::text AS webhook_secret
+FROM workspaces
+WHERE
+  coalesce(settings ->> 'audit_webhook_url', '') <> '';

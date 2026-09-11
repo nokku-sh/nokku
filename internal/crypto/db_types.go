@@ -1,7 +1,10 @@
 package crypto
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql/driver"
+	"encoding/hex"
 	"fmt"
 )
 
@@ -71,7 +74,7 @@ func (e EncryptedBytes) MarshalJSON() ([]byte, error) {
 	return []byte(`""`), nil
 }
 
-// HashedToken for API tokens - uses fast hashing.
+// HashedToken is the hex-encoded sha256 digest of an API token.
 // String()/MarshalJSON always render "" so hashes never leak into logs or
 // API responses.
 //
@@ -79,26 +82,20 @@ func (e EncryptedBytes) MarshalJSON() ([]byte, error) {
 type HashedToken string
 
 func HashToken(plaintext string) (HashedToken, error) {
-	hasher, err := TokenHasher()
-	if err != nil {
-		return "", err
-	}
-	hash, err := hasher.Digest(plaintext)
-	if err != nil {
-		return "", err
-	}
-	return HashedToken(hash), nil
+	sum := sha256.Sum256([]byte(plaintext))
+	return HashedToken(hex.EncodeToString(sum[:])), nil
 }
 
 func (h HashedToken) Verify(plaintext string) bool {
-	hasher, err := TokenHasher()
-	if err != nil {
-		return false
-	}
 	if h.IsZero() {
 		return false
 	}
-	return hasher.Verify(plaintext, string(h))
+	sum := sha256.Sum256([]byte(plaintext))
+	decoded, err := hex.DecodeString(string(h))
+	if err != nil {
+		return false
+	}
+	return subtle.ConstantTimeCompare(sum[:], decoded) == 1
 }
 
 func (h HashedToken) Hash() string {

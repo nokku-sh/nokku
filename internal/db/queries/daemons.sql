@@ -108,7 +108,7 @@ WHERE
 
 -- name: ListDaemons :many
 SELECT
-  d.*,
+  sqlc.embed(d),
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   daemons d

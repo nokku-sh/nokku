@@ -12,6 +12,7 @@ import (
 	"io"
 	"math"
 
+	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/storage"
@@ -25,11 +26,18 @@ type Limits interface {
 	RecordingStorageBytes(ctx context.Context, workspaceID string) int64
 }
 
+// EventSink records background failures that have no request to surface them
+// on. *audit.Service satisfies it.
+type EventSink interface {
+	Append(ctx context.Context, event *audit.Event) error
+}
+
 // Service owns recording storage operations. Safe for concurrent use.
 type Service struct {
 	conn   *db.Connection
-	store  storage.Store
+	store  *storage.Storage
 	limits Limits
+	events EventSink
 }
 
 // Writer appends encrypted frames to one recording object.
@@ -42,10 +50,11 @@ type Writer struct {
 func New(
 	ctx context.Context,
 	conn *db.Connection,
-	store storage.Store,
+	store *storage.Storage,
 	limits Limits,
+	events EventSink,
 ) *Service {
-	s := &Service{conn: conn, store: store, limits: limits}
+	s := &Service{conn: conn, store: store, limits: limits, events: events}
 	go s.runSweeper(ctx)
 	return s
 }

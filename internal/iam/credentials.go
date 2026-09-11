@@ -71,3 +71,25 @@ func (s *Service) DeleteCredentialsByProvider(
 		Provider: provider,
 	})
 }
+
+// deleteCredentialsOfType removes every credential of one method type for the
+// user. q is a parameter so callers inside a transaction delete through that
+// transaction's querier.
+func deleteCredentialsOfType(ctx context.Context, q db.Querier, userID string, typ Method) error {
+	creds, err := q.ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
+		UserID: userID,
+		Type:   string(typ),
+	})
+	if err != nil {
+		return err
+	}
+	for _, c := range creds {
+		if err := q.DeleteCredential(
+			ctx,
+			&db.DeleteCredentialParams{UserID: userID, ID: c.ID},
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}

@@ -134,18 +134,6 @@ func (s *state[T]) Put(ctx context.Context, key string, v T) error {
 	return s.cache.Set(ctx, s.prefix+key, b, s.ttl)
 }
 
-func (s *state[T]) Get(ctx context.Context, key string) (T, error) {
-	var v T
-	if key == "" {
-		return v, errors.New("missing state")
-	}
-	b, err := s.cache.Get(ctx, s.prefix+key)
-	if err != nil {
-		return v, err
-	}
-	return v, json.Unmarshal(b, &v)
-}
-
 func (s *state[T]) Take(ctx context.Context, key string) (T, error) {
 	var v T
 	if key == "" {
@@ -157,8 +145,6 @@ func (s *state[T]) Take(ctx context.Context, key string) (T, error) {
 	}
 	return v, json.Unmarshal(b, &v)
 }
-
-// claimString returns the first non-empty string value among the named keys,
 
 // claimString returns the first non-empty string value among the named keys,
 // stringifying numeric claims (OIDC subjects, GitHub's numeric "id").

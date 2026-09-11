@@ -34,7 +34,7 @@ WHERE
 
 -- name: ListTargets :many
 SELECT
-  t.*,
+  sqlc.embed(t),
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   targets t
@@ -137,48 +137,30 @@ WHERE
       principals p
     WHERE
       p.target_id = t.id
-      AND (
-        -- Direct user grant
-        EXISTS (
-          SELECT
-            1
-          FROM
-            principal_users pu
-          WHERE
-            pu.principal_id = p.id
-            AND pu.user_id = sqlc.arg('subject_id')::UUID
-        )
-        -- Subject is a team with a direct grant
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            principal_teams pt
-          WHERE
-            pt.principal_id = p.id
-            AND pt.team_id = sqlc.arg('subject_id')::UUID
-        )
-        -- Subject is a service account with a direct grant
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            principal_service_accounts psa
-          WHERE
-            psa.principal_id = p.id
-            AND psa.service_account_id = sqlc.arg('subject_id')::UUID
-        )
-        -- Subject is a user who belongs to a team granted access
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            principal_teams granted_team
-            JOIN team_members tm ON tm.team_id = granted_team.team_id
-          WHERE
-            granted_team.principal_id = p.id
-            AND tm.user_id = sqlc.arg('subject_id')::UUID
-        )
+      AND EXISTS (
+        SELECT
+          1
+        FROM
+          principal_grants g
+        WHERE
+          g.principal_id = p.id
+          AND (
+            -- Direct grant to this subject: user, team, or service account.
+            -- Subject UUIDs are unique across the three kinds.
+            g.subject_id = sqlc.arg('subject_id')::UUID
+            -- Or the subject is a user who belongs to a granted team.
+            OR (
+              g.subject_kind = 'team'
+              AND g.subject_id IN (
+                SELECT
+                  tm.team_id
+                FROM
+                  team_members tm
+                WHERE
+                  tm.user_id = sqlc.arg('subject_id')::UUID
+              )
+            )
+          )
       )
   );
 
@@ -203,48 +185,29 @@ WHERE
         principals p
       WHERE
         p.target_id = t.id
-        AND (
-          -- Direct user grant
-          EXISTS (
-            SELECT
-              1
-            FROM
-              principal_users pu
-            WHERE
-              pu.principal_id = p.id
-              AND pu.user_id = sqlc.arg('subject_id')::UUID
-          )
-          -- Subject is a team with a direct grant
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              principal_teams pt
-            WHERE
-              pt.principal_id = p.id
-              AND pt.team_id = sqlc.arg('subject_id')::UUID
-          )
-          -- Subject is a service account with a direct grant
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              principal_service_accounts psa
-            WHERE
-              psa.principal_id = p.id
-              AND psa.service_account_id = sqlc.arg('subject_id')::UUID
-          )
-          -- Subject is a user who belongs to a team granted access
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              principal_teams granted_team
-              JOIN team_members tm ON tm.team_id = granted_team.team_id
-            WHERE
-              granted_team.principal_id = p.id
-              AND tm.user_id = sqlc.arg('subject_id')::UUID
-          )
+        AND EXISTS (
+          SELECT
+            1
+          FROM
+            principal_grants g
+          WHERE
+            g.principal_id = p.id
+            AND (
+              -- Direct grant to this subject: user, team, or service account.
+              g.subject_id = sqlc.arg('subject_id')::UUID
+              -- Or the subject is a user who belongs to a granted team.
+              OR (
+                g.subject_kind = 'team'
+                AND g.subject_id IN (
+                  SELECT
+                    tm.team_id
+                  FROM
+                    team_members tm
+                  WHERE
+                    tm.user_id = sqlc.arg('subject_id')::UUID
+                )
+              )
+            )
         )
     )
   )

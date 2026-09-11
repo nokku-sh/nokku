@@ -39,6 +39,12 @@ const (
 	// PrincipalServiceListPrincipalsProcedure is the fully-qualified name of the PrincipalService's
 	// ListPrincipals RPC.
 	PrincipalServiceListPrincipalsProcedure = "/nokku.v1.PrincipalService/ListPrincipals"
+	// PrincipalServiceAddPrincipalProcedure is the fully-qualified name of the PrincipalService's
+	// AddPrincipal RPC.
+	PrincipalServiceAddPrincipalProcedure = "/nokku.v1.PrincipalService/AddPrincipal"
+	// PrincipalServiceRemovePrincipalProcedure is the fully-qualified name of the PrincipalService's
+	// RemovePrincipal RPC.
+	PrincipalServiceRemovePrincipalProcedure = "/nokku.v1.PrincipalService/RemovePrincipal"
 	// PrincipalServiceAddSubjectsToPrincipalProcedure is the fully-qualified name of the
 	// PrincipalService's AddSubjectsToPrincipal RPC.
 	PrincipalServiceAddSubjectsToPrincipalProcedure = "/nokku.v1.PrincipalService/AddSubjectsToPrincipal"
@@ -54,6 +60,8 @@ const (
 type PrincipalServiceClient interface {
 	SetPrincipals(context.Context, *v1.SetPrincipalsRequest) (*v1.SetPrincipalsResponse, error)
 	ListPrincipals(context.Context, *v1.ListPrincipalsRequest) (*v1.ListPrincipalsResponse, error)
+	AddPrincipal(context.Context, *v1.AddPrincipalRequest) (*v1.AddPrincipalResponse, error)
+	RemovePrincipal(context.Context, *v1.RemovePrincipalRequest) (*v1.RemovePrincipalResponse, error)
 	AddSubjectsToPrincipal(context.Context, *v1.AddSubjectsToPrincipalRequest) (*v1.AddSubjectsToPrincipalResponse, error)
 	RemoveSubjectsFromPrincipal(context.Context, *v1.RemoveSubjectsFromPrincipalRequest) (*v1.RemoveSubjectsFromPrincipalResponse, error)
 	RevokeAllAccess(context.Context, *v1.RevokeAllAccessRequest) (*v1.RevokeAllAccessResponse, error)
@@ -83,6 +91,18 @@ func NewPrincipalServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		addPrincipal: connect.NewClient[v1.AddPrincipalRequest, v1.AddPrincipalResponse](
+			httpClient,
+			baseURL+PrincipalServiceAddPrincipalProcedure,
+			connect.WithSchema(principalServiceMethods.ByName("AddPrincipal")),
+			connect.WithClientOptions(opts...),
+		),
+		removePrincipal: connect.NewClient[v1.RemovePrincipalRequest, v1.RemovePrincipalResponse](
+			httpClient,
+			baseURL+PrincipalServiceRemovePrincipalProcedure,
+			connect.WithSchema(principalServiceMethods.ByName("RemovePrincipal")),
+			connect.WithClientOptions(opts...),
+		),
 		addSubjectsToPrincipal: connect.NewClient[v1.AddSubjectsToPrincipalRequest, v1.AddSubjectsToPrincipalResponse](
 			httpClient,
 			baseURL+PrincipalServiceAddSubjectsToPrincipalProcedure,
@@ -108,6 +128,8 @@ func NewPrincipalServiceClient(httpClient connect.HTTPClient, baseURL string, op
 type principalServiceClient struct {
 	setPrincipals               *connect.Client[v1.SetPrincipalsRequest, v1.SetPrincipalsResponse]
 	listPrincipals              *connect.Client[v1.ListPrincipalsRequest, v1.ListPrincipalsResponse]
+	addPrincipal                *connect.Client[v1.AddPrincipalRequest, v1.AddPrincipalResponse]
+	removePrincipal             *connect.Client[v1.RemovePrincipalRequest, v1.RemovePrincipalResponse]
 	addSubjectsToPrincipal      *connect.Client[v1.AddSubjectsToPrincipalRequest, v1.AddSubjectsToPrincipalResponse]
 	removeSubjectsFromPrincipal *connect.Client[v1.RemoveSubjectsFromPrincipalRequest, v1.RemoveSubjectsFromPrincipalResponse]
 	revokeAllAccess             *connect.Client[v1.RevokeAllAccessRequest, v1.RevokeAllAccessResponse]
@@ -125,6 +147,24 @@ func (c *principalServiceClient) SetPrincipals(ctx context.Context, req *v1.SetP
 // ListPrincipals calls nokku.v1.PrincipalService.ListPrincipals.
 func (c *principalServiceClient) ListPrincipals(ctx context.Context, req *v1.ListPrincipalsRequest) (*v1.ListPrincipalsResponse, error) {
 	response, err := c.listPrincipals.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// AddPrincipal calls nokku.v1.PrincipalService.AddPrincipal.
+func (c *principalServiceClient) AddPrincipal(ctx context.Context, req *v1.AddPrincipalRequest) (*v1.AddPrincipalResponse, error) {
+	response, err := c.addPrincipal.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// RemovePrincipal calls nokku.v1.PrincipalService.RemovePrincipal.
+func (c *principalServiceClient) RemovePrincipal(ctx context.Context, req *v1.RemovePrincipalRequest) (*v1.RemovePrincipalResponse, error) {
+	response, err := c.removePrincipal.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
@@ -162,6 +202,8 @@ func (c *principalServiceClient) RevokeAllAccess(ctx context.Context, req *v1.Re
 type PrincipalServiceHandler interface {
 	SetPrincipals(context.Context, *v1.SetPrincipalsRequest) (*v1.SetPrincipalsResponse, error)
 	ListPrincipals(context.Context, *v1.ListPrincipalsRequest) (*v1.ListPrincipalsResponse, error)
+	AddPrincipal(context.Context, *v1.AddPrincipalRequest) (*v1.AddPrincipalResponse, error)
+	RemovePrincipal(context.Context, *v1.RemovePrincipalRequest) (*v1.RemovePrincipalResponse, error)
 	AddSubjectsToPrincipal(context.Context, *v1.AddSubjectsToPrincipalRequest) (*v1.AddSubjectsToPrincipalResponse, error)
 	RemoveSubjectsFromPrincipal(context.Context, *v1.RemoveSubjectsFromPrincipalRequest) (*v1.RemoveSubjectsFromPrincipalResponse, error)
 	RevokeAllAccess(context.Context, *v1.RevokeAllAccessRequest) (*v1.RevokeAllAccessResponse, error)
@@ -185,6 +227,18 @@ func NewPrincipalServiceHandler(svc PrincipalServiceHandler, opts ...connect.Han
 		svc.ListPrincipals,
 		connect.WithSchema(principalServiceMethods.ByName("ListPrincipals")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	principalServiceAddPrincipalHandler := connect.NewUnaryHandlerSimple(
+		PrincipalServiceAddPrincipalProcedure,
+		svc.AddPrincipal,
+		connect.WithSchema(principalServiceMethods.ByName("AddPrincipal")),
+		connect.WithHandlerOptions(opts...),
+	)
+	principalServiceRemovePrincipalHandler := connect.NewUnaryHandlerSimple(
+		PrincipalServiceRemovePrincipalProcedure,
+		svc.RemovePrincipal,
+		connect.WithSchema(principalServiceMethods.ByName("RemovePrincipal")),
 		connect.WithHandlerOptions(opts...),
 	)
 	principalServiceAddSubjectsToPrincipalHandler := connect.NewUnaryHandlerSimple(
@@ -211,6 +265,10 @@ func NewPrincipalServiceHandler(svc PrincipalServiceHandler, opts ...connect.Han
 			principalServiceSetPrincipalsHandler.ServeHTTP(w, r)
 		case PrincipalServiceListPrincipalsProcedure:
 			principalServiceListPrincipalsHandler.ServeHTTP(w, r)
+		case PrincipalServiceAddPrincipalProcedure:
+			principalServiceAddPrincipalHandler.ServeHTTP(w, r)
+		case PrincipalServiceRemovePrincipalProcedure:
+			principalServiceRemovePrincipalHandler.ServeHTTP(w, r)
 		case PrincipalServiceAddSubjectsToPrincipalProcedure:
 			principalServiceAddSubjectsToPrincipalHandler.ServeHTTP(w, r)
 		case PrincipalServiceRemoveSubjectsFromPrincipalProcedure:
@@ -232,6 +290,14 @@ func (UnimplementedPrincipalServiceHandler) SetPrincipals(context.Context, *v1.S
 
 func (UnimplementedPrincipalServiceHandler) ListPrincipals(context.Context, *v1.ListPrincipalsRequest) (*v1.ListPrincipalsResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.PrincipalService.ListPrincipals is not implemented"))
+}
+
+func (UnimplementedPrincipalServiceHandler) AddPrincipal(context.Context, *v1.AddPrincipalRequest) (*v1.AddPrincipalResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.PrincipalService.AddPrincipal is not implemented"))
+}
+
+func (UnimplementedPrincipalServiceHandler) RemovePrincipal(context.Context, *v1.RemovePrincipalRequest) (*v1.RemovePrincipalResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.PrincipalService.RemovePrincipal is not implemented"))
 }
 
 func (UnimplementedPrincipalServiceHandler) AddSubjectsToPrincipal(context.Context, *v1.AddSubjectsToPrincipalRequest) (*v1.AddSubjectsToPrincipalResponse, error) {

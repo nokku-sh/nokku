@@ -704,6 +704,198 @@ func (*RevokeAllAccessResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_principal_proto_rawDescGZIP(), []int{10}
 }
 
+type AddPrincipalRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	TargetId      *string                `protobuf:"bytes,2,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
+	Username      *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddPrincipalRequest) Reset() {
+	*x = AddPrincipalRequest{}
+	mi := &file_nokku_v1_principal_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddPrincipalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddPrincipalRequest) ProtoMessage() {}
+
+func (x *AddPrincipalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_principal_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddPrincipalRequest.ProtoReflect.Descriptor instead.
+func (*AddPrincipalRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_principal_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AddPrincipalRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *AddPrincipalRequest) GetTargetId() string {
+	if x != nil && x.TargetId != nil {
+		return *x.TargetId
+	}
+	return ""
+}
+
+func (x *AddPrincipalRequest) GetUsername() string {
+	if x != nil && x.Username != nil {
+		return *x.Username
+	}
+	return ""
+}
+
+type AddPrincipalResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Principal     *Principal             `protobuf:"bytes,1,opt,name=principal" json:"principal,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddPrincipalResponse) Reset() {
+	*x = AddPrincipalResponse{}
+	mi := &file_nokku_v1_principal_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddPrincipalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddPrincipalResponse) ProtoMessage() {}
+
+func (x *AddPrincipalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_principal_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddPrincipalResponse.ProtoReflect.Descriptor instead.
+func (*AddPrincipalResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_principal_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AddPrincipalResponse) GetPrincipal() *Principal {
+	if x != nil {
+		return x.Principal
+	}
+	return nil
+}
+
+type RemovePrincipalRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemovePrincipalRequest) Reset() {
+	*x = RemovePrincipalRequest{}
+	mi := &file_nokku_v1_principal_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemovePrincipalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemovePrincipalRequest) ProtoMessage() {}
+
+func (x *RemovePrincipalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_principal_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemovePrincipalRequest.ProtoReflect.Descriptor instead.
+func (*RemovePrincipalRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_principal_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *RemovePrincipalRequest) GetWorkspaceId() string {
+	if x != nil && x.WorkspaceId != nil {
+		return *x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *RemovePrincipalRequest) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
+	}
+	return ""
+}
+
+type RemovePrincipalResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemovePrincipalResponse) Reset() {
+	*x = RemovePrincipalResponse{}
+	mi := &file_nokku_v1_principal_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemovePrincipalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemovePrincipalResponse) ProtoMessage() {}
+
+func (x *RemovePrincipalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_principal_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemovePrincipalResponse.ProtoReflect.Descriptor instead.
+func (*RemovePrincipalResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_principal_proto_rawDescGZIP(), []int{14}
+}
+
 var File_nokku_v1_principal_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_principal_proto_rawDesc = "" +
@@ -758,15 +950,27 @@ const file_nokku_v1_principal_proto_rawDesc = "" +
 	"\fworkspace_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x127\n" +
 	"\x04type\x18\x03 \x01(\x0e2\x17.nokku.v1.PrincipalTypeB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04type\"\x19\n" +
-	"\x17RevokeAllAccessResponse*\x85\x01\n" +
+	"\x17RevokeAllAccessResponse\"\x90\x01\n" +
+	"\x13AddPrincipalRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12%\n" +
+	"\ttarget_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\btargetId\x12%\n" +
+	"\busername\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18@R\busername\"I\n" +
+	"\x14AddPrincipalResponse\x121\n" +
+	"\tprincipal\x18\x01 \x01(\v2\x13.nokku.v1.PrincipalR\tprincipal\"_\n" +
+	"\x16RemovePrincipalRequest\x12+\n" +
+	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x19\n" +
+	"\x17RemovePrincipalResponse*\x85\x01\n" +
 	"\rPrincipalType\x12\x1e\n" +
 	"\x1aPRINCIPAL_TYPE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13PRINCIPAL_TYPE_USER\x10\x01\x12\x17\n" +
 	"\x13PRINCIPAL_TYPE_TEAM\x10\x02\x12\"\n" +
-	"\x1ePRINCIPAL_TYPE_SERVICE_ACCOUNT\x10\x032\x9a\x06\n" +
+	"\x1ePRINCIPAL_TYPE_SERVICE_ACCOUNT\x10\x032\xc6\b\n" +
 	"\x10PrincipalService\x12\x85\x01\n" +
 	"\rSetPrincipals\x12\x1e.nokku.v1.SetPrincipalsRequest\x1a\x1f.nokku.v1.SetPrincipalsResponse\"3\x82\xd3\xe4\x93\x02-:\x01*\"(/v1/workspaces/{workspace_id}/principals\x12\x88\x01\n" +
-	"\x0eListPrincipals\x12\x1f.nokku.v1.ListPrincipalsRequest\x1a .nokku.v1.ListPrincipalsResponse\"3\x82\xd3\xe4\x93\x02*\x12(/v1/workspaces/{workspace_id}/principals\x90\x02\x01\x12\xa4\x01\n" +
+	"\x0eListPrincipals\x12\x1f.nokku.v1.ListPrincipalsRequest\x1a .nokku.v1.ListPrincipalsResponse\"3\x82\xd3\xe4\x93\x02*\x12(/v1/workspaces/{workspace_id}/principals\x90\x02\x01\x12\x8b\x01\n" +
+	"\fAddPrincipal\x12\x1d.nokku.v1.AddPrincipalRequest\x1a\x1e.nokku.v1.AddPrincipalResponse\"<\x82\xd3\xe4\x93\x026:\x01*\"1/v1/workspaces/{workspace_id}/principals/accounts\x12\x9b\x01\n" +
+	"\x0fRemovePrincipal\x12 .nokku.v1.RemovePrincipalRequest\x1a!.nokku.v1.RemovePrincipalResponse\"C\x82\xd3\xe4\x93\x02=:\x01*\"8/v1/workspaces/{workspace_id}/principals/accounts:remove\x12\xa4\x01\n" +
 	"\x16AddSubjectsToPrincipal\x12'.nokku.v1.AddSubjectsToPrincipalRequest\x1a(.nokku.v1.AddSubjectsToPrincipalResponse\"7\x82\xd3\xe4\x93\x021:\x01*\",/v1/workspaces/{workspace_id}/principals:add\x12\xb6\x01\n" +
 	"\x1bRemoveSubjectsFromPrincipal\x12,.nokku.v1.RemoveSubjectsFromPrincipalRequest\x1a-.nokku.v1.RemoveSubjectsFromPrincipalResponse\":\x82\xd3\xe4\x93\x024:\x01*\"//v1/workspaces/{workspace_id}/principals:remove\x12\x92\x01\n" +
 	"\x0fRevokeAllAccess\x12 .nokku.v1.RevokeAllAccessRequest\x1a!.nokku.v1.RevokeAllAccessResponse\":\x82\xd3\xe4\x93\x024:\x01*\"//v1/workspaces/{workspace_id}/principals:revokeB\x98\x01\n" +
@@ -785,7 +989,7 @@ func file_nokku_v1_principal_proto_rawDescGZIP() []byte {
 }
 
 var file_nokku_v1_principal_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_nokku_v1_principal_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_nokku_v1_principal_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_nokku_v1_principal_proto_goTypes = []any{
 	(PrincipalType)(0),                          // 0: nokku.v1.PrincipalType
 	(*Principal)(nil),                           // 1: nokku.v1.Principal
@@ -799,30 +1003,39 @@ var file_nokku_v1_principal_proto_goTypes = []any{
 	(*RemoveSubjectsFromPrincipalResponse)(nil), // 9: nokku.v1.RemoveSubjectsFromPrincipalResponse
 	(*RevokeAllAccessRequest)(nil),              // 10: nokku.v1.RevokeAllAccessRequest
 	(*RevokeAllAccessResponse)(nil),             // 11: nokku.v1.RevokeAllAccessResponse
-	(*timestamppb.Timestamp)(nil),               // 12: google.protobuf.Timestamp
+	(*AddPrincipalRequest)(nil),                 // 12: nokku.v1.AddPrincipalRequest
+	(*AddPrincipalResponse)(nil),                // 13: nokku.v1.AddPrincipalResponse
+	(*RemovePrincipalRequest)(nil),              // 14: nokku.v1.RemovePrincipalRequest
+	(*RemovePrincipalResponse)(nil),             // 15: nokku.v1.RemovePrincipalResponse
+	(*timestamppb.Timestamp)(nil),               // 16: google.protobuf.Timestamp
 }
 var file_nokku_v1_principal_proto_depIdxs = []int32{
-	12, // 0: nokku.v1.Principal.created_at:type_name -> google.protobuf.Timestamp
+	16, // 0: nokku.v1.Principal.created_at:type_name -> google.protobuf.Timestamp
 	0,  // 1: nokku.v1.ListPrincipalsRequest.type:type_name -> nokku.v1.PrincipalType
 	1,  // 2: nokku.v1.ListPrincipalsResponse.principals:type_name -> nokku.v1.Principal
 	0,  // 3: nokku.v1.AddSubjectsToPrincipalRequest.type:type_name -> nokku.v1.PrincipalType
 	0,  // 4: nokku.v1.RemoveSubjectsFromPrincipalRequest.type:type_name -> nokku.v1.PrincipalType
 	0,  // 5: nokku.v1.RevokeAllAccessRequest.type:type_name -> nokku.v1.PrincipalType
-	2,  // 6: nokku.v1.PrincipalService.SetPrincipals:input_type -> nokku.v1.SetPrincipalsRequest
-	4,  // 7: nokku.v1.PrincipalService.ListPrincipals:input_type -> nokku.v1.ListPrincipalsRequest
-	6,  // 8: nokku.v1.PrincipalService.AddSubjectsToPrincipal:input_type -> nokku.v1.AddSubjectsToPrincipalRequest
-	8,  // 9: nokku.v1.PrincipalService.RemoveSubjectsFromPrincipal:input_type -> nokku.v1.RemoveSubjectsFromPrincipalRequest
-	10, // 10: nokku.v1.PrincipalService.RevokeAllAccess:input_type -> nokku.v1.RevokeAllAccessRequest
-	3,  // 11: nokku.v1.PrincipalService.SetPrincipals:output_type -> nokku.v1.SetPrincipalsResponse
-	5,  // 12: nokku.v1.PrincipalService.ListPrincipals:output_type -> nokku.v1.ListPrincipalsResponse
-	7,  // 13: nokku.v1.PrincipalService.AddSubjectsToPrincipal:output_type -> nokku.v1.AddSubjectsToPrincipalResponse
-	9,  // 14: nokku.v1.PrincipalService.RemoveSubjectsFromPrincipal:output_type -> nokku.v1.RemoveSubjectsFromPrincipalResponse
-	11, // 15: nokku.v1.PrincipalService.RevokeAllAccess:output_type -> nokku.v1.RevokeAllAccessResponse
-	11, // [11:16] is the sub-list for method output_type
-	6,  // [6:11] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	1,  // 6: nokku.v1.AddPrincipalResponse.principal:type_name -> nokku.v1.Principal
+	2,  // 7: nokku.v1.PrincipalService.SetPrincipals:input_type -> nokku.v1.SetPrincipalsRequest
+	4,  // 8: nokku.v1.PrincipalService.ListPrincipals:input_type -> nokku.v1.ListPrincipalsRequest
+	12, // 9: nokku.v1.PrincipalService.AddPrincipal:input_type -> nokku.v1.AddPrincipalRequest
+	14, // 10: nokku.v1.PrincipalService.RemovePrincipal:input_type -> nokku.v1.RemovePrincipalRequest
+	6,  // 11: nokku.v1.PrincipalService.AddSubjectsToPrincipal:input_type -> nokku.v1.AddSubjectsToPrincipalRequest
+	8,  // 12: nokku.v1.PrincipalService.RemoveSubjectsFromPrincipal:input_type -> nokku.v1.RemoveSubjectsFromPrincipalRequest
+	10, // 13: nokku.v1.PrincipalService.RevokeAllAccess:input_type -> nokku.v1.RevokeAllAccessRequest
+	3,  // 14: nokku.v1.PrincipalService.SetPrincipals:output_type -> nokku.v1.SetPrincipalsResponse
+	5,  // 15: nokku.v1.PrincipalService.ListPrincipals:output_type -> nokku.v1.ListPrincipalsResponse
+	13, // 16: nokku.v1.PrincipalService.AddPrincipal:output_type -> nokku.v1.AddPrincipalResponse
+	15, // 17: nokku.v1.PrincipalService.RemovePrincipal:output_type -> nokku.v1.RemovePrincipalResponse
+	7,  // 18: nokku.v1.PrincipalService.AddSubjectsToPrincipal:output_type -> nokku.v1.AddSubjectsToPrincipalResponse
+	9,  // 19: nokku.v1.PrincipalService.RemoveSubjectsFromPrincipal:output_type -> nokku.v1.RemoveSubjectsFromPrincipalResponse
+	11, // 20: nokku.v1.PrincipalService.RevokeAllAccess:output_type -> nokku.v1.RevokeAllAccessResponse
+	14, // [14:21] is the sub-list for method output_type
+	7,  // [7:14] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_principal_proto_init() }
@@ -836,7 +1049,7 @@ func file_nokku_v1_principal_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_principal_proto_rawDesc), len(file_nokku_v1_principal_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   11,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { create } from '@bufbuild/protobuf';
 	import { Globe, Info, Monitor, Plus, Server, Users, X } from '@lucide/svelte';
 	import { ca } from '$lib/api/certificates.svelte';
 	import { principal } from '$lib/api/principals.svelte';
 	import { target as targetApi } from '$lib/api/targets.svelte';
+	import { MAX_PAGE_SIZE } from '$lib/config';
+	import * as Alert from '$lib/components/ui/alert';
 	import * as Card from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -16,9 +17,9 @@
 	import * as Select from '$lib/components/ui/select';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { PrincipalSchema } from '$lib/gen/nokku/v1/principal_pb';
 	import type { Target } from '$lib/gen/nokku/v1/target_pb';
 	import { useAutoSave } from '$lib/hooks';
+	import { formatTs } from '$lib/utils';
 	import FormModal from './FormModal.svelte';
 	import MetaInfo from './MetaInfo.svelte';
 	import ModalTabs from './ModalTabs.svelte';
@@ -36,8 +37,37 @@
 
 	const createTarget = targetApi.create();
 	const updateTarget = targetApi.update();
-	const setPrincipals = principal.set();
+	// The target's accounts come from the machine, not from this form. The
+	// daemon reports its local users and the backend keeps an anchor per
+	// account, so a stale draft can never drop an account or its grants.
+	const accounts = principal.list(() => ({ targetId: model.id, limit: MAX_PAGE_SIZE }));
+	const accountList = $derived(accounts.data?.principals ?? []);
+	const accountNames = $derived(new Set(accountList.map((a) => a.username)));
+	const reportedUsers = $derived(new Set(model.reportedUsers ?? []));
 	const isLoading = $derived(createTarget.isPending);
+
+	const addAccount = principal.addAccount();
+	const removeAccount = principal.removeAccount();
+
+	// No daemon means no live reporter, so the host is read by `nk target sync`
+	// and the accounts are whatever that run found.
+	const isManual = $derived(!model.daemonId);
+	const syncCommand = $derived(`nk target sync ${model.name || '<name>'}`);
+	const reportedLabel = $derived(
+		model.reportedAt
+			? `Accounts last reported ${formatTs(model.reportedAt, 'relative')}`
+			: 'Accounts have not been reported yet'
+	);
+
+	let newAccountValue = $state('');
+	const pendingAccount = $derived(newAccountValue.trim());
+	const canAddAccount = $derived(!!pendingAccount && !accountNames.has(pendingAccount));
+
+	function addAccountSubmit() {
+		if (!isEdit || !canAddAccount) return;
+		addAccount.mutate({ targetId: model.id, username: pendingAccount });
+		newAccountValue = '';
+	}
 
 	const autoSave = useAutoSave(() => updateTarget.mutateAsync({ ...model }));
 	function save() {
@@ -57,11 +87,6 @@
 	function removeEndpoint(endpoint: string) {
 		model.endpoints = model.endpoints?.filter((e) => e !== endpoint) ?? [];
 		save();
-	}
-
-	function changePrincipals(usernames: string[]) {
-		model.principals = usernames.map((username) => create(PrincipalSchema, { username }));
-		if (isEdit) setPrincipals.mutate({ targetId: model.id, usernames });
 	}
 
 	function onSubmit() {
@@ -136,17 +161,116 @@
 			</Field.Field>
 
 			<Field.Field>
-				<Field.Label for="principals">Principals</Field.Label>
-				<Field.Content>
-					<InputGroupVariants
-						variant="tags"
-						icon={{ tags: Users }}
-						tags={model.principals?.map((p) => p.username)}
-						onTagChange={changePrincipals}
-						placeholder="root, ubuntu, ec2-user"
-					/>
+				<Field.Label class="flex items-center gap-2">
+					Accounts
+					{#if isManual}
+						<Badge variant="secondary">Manual</Badge>
+					{/if}
+				</Field.Label>
+				<Field.Content class="gap-2">
+					{#if accountList.length > 0}
+						<div class="flex flex-col gap-1.5">
+							{#each accountList as account (account.id)}
+								{@const assigned =
+									account.userIds.length +
+									account.teamIds.length +
+									account.serviceAccountIds.length}
+								{@const reported = reportedUsers.has(account.username)}
+								<div
+									class="flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5"
+								>
+									<div class="flex min-w-0 items-center gap-2">
+										<span class="truncate font-mono text-sm">{account.username}</span>
+										{#if !reported}
+											<Badge variant="outline" class="text-[10px] text-muted-foreground">
+												not reported
+											</Badge>
+										{/if}
+									</div>
+									<div class="flex shrink-0 items-center gap-1">
+										<span class="text-xs text-muted-foreground">{assigned} assigned</span>
+										{#if isEdit}
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												aria-label={`Remove ${account.username}`}
+												disabled={removeAccount.isPending}
+												onclick={() => removeAccount.mutate({ id: account.id })}
+											>
+												<X size={14} />
+											</Button>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<p class="text-sm text-muted-foreground">No accounts yet.</p>
+					{/if}
+					{#if isEdit}
+						<InputGroup.Root>
+							<InputGroup.Input
+								bind:value={newAccountValue}
+								placeholder="Add an account (e.g. deploy)"
+								onkeydown={(e) => {
+									if (e.key === 'Enter') {
+										e.preventDefault();
+										e.stopPropagation();
+										addAccountSubmit();
+									}
+								}}
+							/>
+							<InputGroup.Addon>
+								<Users />
+							</InputGroup.Addon>
+							<InputGroup.Addon align="inline-end">
+								<InputGroup.Button
+									variant="secondary"
+									size="icon-xs"
+									class="size-6"
+									disabled={!canAddAccount}
+									onclick={addAccountSubmit}
+								>
+									<Plus />
+								</InputGroup.Button>
+							</InputGroup.Addon>
+						</InputGroup.Root>
+					{/if}
+					<Field.Description>
+						{#if isManual}
+							The host's local accounts. They are refreshed by nk target sync, and access is granted
+							per account from the access pages.
+						{:else}
+							The machine's local users. A daemon reports them on connect, and access is granted per
+							account from the access pages.
+						{/if}
+					</Field.Description>
 				</Field.Content>
 			</Field.Field>
+
+			{#if isManual}
+				<Field.Field>
+					<Field.Label>Manual sync</Field.Label>
+					<Field.Content class="gap-2">
+						<div
+							class="flex items-center justify-between gap-2 rounded-md border bg-muted/50 px-2.5 py-1.5"
+						>
+							<span class="truncate font-mono text-sm">{syncCommand}</span>
+							<CopyButton text={syncCommand} />
+						</div>
+						<p class="text-xs text-muted-foreground">{reportedLabel}</p>
+						<Alert.Root>
+							<Info />
+							<Alert.Title>Host trust material</Alert.Title>
+							<Alert.Description>
+								The host needs the CA public key and a principal file per account under
+								/etc/ssh/nokku_principals. That command writes them, checks the sshd configuration
+								and reloads sshd.
+							</Alert.Description>
+						</Alert.Root>
+					</Field.Content>
+				</Field.Field>
+			{/if}
 
 			<Field.Field>
 				<Field.Label for="tags">Tags</Field.Label>

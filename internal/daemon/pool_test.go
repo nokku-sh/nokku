@@ -142,6 +142,12 @@ func TestPool_EventSubscriberStorm(t *testing.T) {
 func TestPool_NotifyChangeStorm(t *testing.T) {
 	p := newTestPool(t)
 
+	// A witness daemon stays registered for the whole test: UnregisterDaemon
+	// drops the workspace counter once the last daemon of a workspace leaves,
+	// which is a separate behavior covered by its own test.
+	witness := p.RegisterDaemon(context.Background(), "witness", "w1")
+	defer p.UnregisterDaemon("witness", witness)
+
 	const daemons = 32
 	for i := range daemons {
 		p.RegisterDaemon(context.Background(), fmt.Sprintf("d%02d", i), "w1")
@@ -168,6 +174,25 @@ func TestPool_NotifyChangeStorm(t *testing.T) {
 	// reflect the whole storm (not lost updates on the counter).
 	if got := p.Version("w1"); got < daemons*200 {
 		t.Errorf("Version(w1) = %d, want >= %d", got, daemons*200)
+	}
+}
+
+// TestPool_VersionDroppedWithLastDaemon: a workspace counter must not outlive
+// its last daemon, or the map grows with every workspace ever touched.
+func TestPool_VersionDroppedWithLastDaemon(t *testing.T) {
+	p := newTestPool(t)
+	a := p.RegisterDaemon(context.Background(), "d1", "w1")
+	b := p.RegisterDaemon(context.Background(), "d2", "w1")
+	p.NotifyChange("w1")
+	p.NotifyChange("w1")
+
+	p.UnregisterDaemon("d1", a)
+	if got := p.Version("w1"); got != 2 {
+		t.Fatalf("Version(w1) after one daemon left = %d, want 2", got)
+	}
+	p.UnregisterDaemon("d2", b)
+	if got := p.Version("w1"); got != 0 {
+		t.Fatalf("Version(w1) after last daemon left = %d, want 0", got)
 	}
 }
 

@@ -2,7 +2,6 @@ package email
 
 import (
 	"errors"
-	"strings"
 
 	emailverifier "github.com/AfterShip/email-verifier"
 )
@@ -28,12 +27,4 @@ func Verify(email string) error {
 		return errors.New("email domain does not accept mail")
 	}
 	return nil
-}
-
-func GetDomain(email string) (string, error) {
-	_, domain, ok := strings.Cut(email, "@")
-	if !ok || domain == "" {
-		return "", errors.New("invalid email address")
-	}
-	return strings.ToLower(domain), nil
 }

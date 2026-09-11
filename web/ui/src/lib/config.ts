@@ -17,3 +17,7 @@ export const LicensePurchaseURL =
 
 export const APP_NAME = 'Nokku';
 export const DEFAULT_LANGUAGE = 'en';
+
+// The list RPCs validate limit as 1..100, so a larger value is rejected with a
+// validation error. Use this for "fetch everything" queries.
+export const MAX_PAGE_SIZE = 100;

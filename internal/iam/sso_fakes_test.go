@@ -187,9 +187,9 @@ func (f *fakeStore) PutSAMLKeypair(
 }
 
 // fakeStoreConn fakes the WithTx/WithWorkspace surface. It doubles as the
-// sqlc DBTX underneath, serving only the two transactional queries the SSO
-// login path issues: the provider row and workspace domain rows. Anything
-// else panics so an unexpected transactional read fails the test.
+// sqlc DBTX underneath, serving the transactional queries the SSO login path
+// issues: the provider row and workspace domain rows. Anything else panics so
+// an unexpected transactional read fails the test.
 type fakeStoreConn struct {
 	store    *fakeStore
 	provider *db.SsoProvider
@@ -209,6 +209,12 @@ func (c *fakeStoreConn) WithWorkspace(_ context.Context, fn func(*db.Queries) er
 }
 
 func (c *fakeStoreConn) Exec(_ context.Context, sql string, _ ...any) (pgconn.CommandTag, error) {
+	// Every SSO login upserts the provider's workspace membership. These tests
+	// cover the flow, not membership, so the insert is accepted and not
+	// modelled.
+	if strings.Contains(sql, "workspace_members") && strings.Contains(sql, "INSERT") {
+		return pgconn.CommandTag{}, nil
+	}
 	panic("sso test: unexpected exec: " + sql)
 }
 
@@ -396,9 +402,6 @@ func indirect(v any) any {
 func newSSOTestService(t *testing.T, store *fakeStore, conn *fakeStoreConn) *Service {
 	t.Helper()
 	conn.store = store
-	if err := crypto.InitDefaultHashers(); err != nil {
-		t.Fatalf("init hashers: %v", err)
-	}
 	svc, err := New(Deps{
 		BaseURL: "http://nokku.test",
 		Conn:    conn,
