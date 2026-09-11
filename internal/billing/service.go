@@ -66,12 +66,6 @@ func (s *Service) Cancel(
 	return s.stripe.Cancel(ctx, workspaceID, immediate, reason)
 }
 
-func (s *Service) Sync(ctx context.Context, workspaceID string) {
-	if s.Enabled() {
-		s.stripe.Sync(ctx, workspaceID)
-	}
-}
-
 func (s *Service) SyncAll(ctx context.Context) error {
 	if !s.Enabled() {
 		return nil

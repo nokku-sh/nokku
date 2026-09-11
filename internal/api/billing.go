@@ -12,7 +12,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/entitlement"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 type BillingService struct {
@@ -161,33 +160,28 @@ func (s *BillingService) GetLicense(
 }
 
 func (s *BillingService) requireWorkspaceOwner(ctx context.Context, workspaceID string) error {
-	var ownerID string
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		ownerID, err = q.GetWorkspaceOwner(ctx, workspaceID)
-		return err
-	}); err != nil {
-		return DBError(err)
-	}
-	if ownerID != iam.UserIDFromContext(ctx) {
+	err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		return checkWorkspaceOwner(ctx, q, workspaceID)
+	})
+	if errors.Is(err, ErrPermissionDenied) {
 		return connect.NewError(
 			connect.CodePermissionDenied,
 			errors.New("workspace owner required"),
 		)
 	}
-	return nil
+	return DBError(err)
 }
 
 // featuresProto returns the full feature catalog with per-plan enablement,
-// so clients can render locked features (not just enabled ones).
+// so clients can render locked features (not just enabled ones). It iterates
+// the catalog rather than repeating it: a feature that is missing here is
+// invisible to every client whatever the plan.
 func featuresProto(p entitlement.Plan) map[string]bool {
-	return map[string]bool{
-		entitlement.FeatureOIDC:        p.Has(entitlement.FeatureOIDC),
-		entitlement.FeatureEnforceSSO:  p.Has(entitlement.FeatureEnforceSSO),
-		entitlement.FeatureSAML:        p.Has(entitlement.FeatureSAML),
-		entitlement.FeatureAuditExport: p.Has(entitlement.FeatureAuditExport),
-		entitlement.FeatureExternalKMS: p.Has(entitlement.FeatureExternalKMS),
-		entitlement.FeatureSCIM:        p.Has(entitlement.FeatureSCIM),
+	features := make(map[string]bool, len(entitlement.CatalogFeatures))
+	for _, feature := range entitlement.CatalogFeatures {
+		features[feature.Code] = p.Has(feature.Code)
 	}
+	return features
 }
 
 // quotasProto renders the plan's caps; -1 means unlimited.

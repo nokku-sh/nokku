@@ -7,9 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -155,7 +153,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 				targetID = created.TargetID
 				break
 			}
-			if !isUniqueViolation(err) || attempt >= 4 {
+			if !db.IsUniqueViolation(err) || attempt >= 4 {
 				return nil, err
 			}
 		}
@@ -169,12 +167,4 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		Status:      statusNow,
 		Config:      config,
 	}, nil
-}
-
-// isUniqueViolation reports whether err is a Postgres unique/exclusion
-// constraint violation, used to retry name generation on collision.
-func isUniqueViolation(err error) bool {
-	pgConnErr, ok := errors.AsType[*pgconn.PgError](err)
-	return ok && (pgConnErr.Code == pgerrcode.UniqueViolation ||
-		pgConnErr.Code == pgerrcode.ExclusionViolation)
 }

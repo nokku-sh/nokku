@@ -32,7 +32,7 @@ WHERE
 
 -- name: ListServiceAccounts :many
 SELECT
-  sa.*,
+  sqlc.embed(sa),
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa

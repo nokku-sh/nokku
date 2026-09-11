@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"slices"
+	"strconv"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -11,6 +12,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/iam"
+	"github.com/nokku-sh/nokku/internal/namegen"
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
@@ -49,11 +51,47 @@ func (s *TargetService) CreateTarget(
 	if err := validateHostPublicKey(req.GetHostPublicKey()); err != nil {
 		return nil, err
 	}
+
+	name := strings.TrimSpace(req.GetName())
+	if name != "" {
+		created, err := s.insertTarget(ctx, req, name)
+		if err != nil {
+			return nil, DBError(err)
+		}
+		return created, nil
+	}
+
+	// No name from the caller, which is what a manual sync sends: generate a
+	// friendly one. Names are unique per workspace, so a collision retries
+	// with a numeric suffix, the way daemon enrollment does.
+	for attempt := 0; ; attempt++ {
+		generated := namegen.Generate()
+		if attempt > 0 {
+			generated += strconv.Itoa(attempt + 1)
+		}
+		created, err := s.insertTarget(ctx, req, generated)
+		if err == nil {
+			return created, nil
+		}
+		if !db.IsUniqueViolation(err) {
+			return nil, DBError(err)
+		}
+	}
+}
+
+// insertTarget creates the target and its default root principal in one
+// transaction. The name must already be resolved. The error is returned
+// unmapped so the caller can tell a name collision from a real failure.
+func (s *TargetService) insertTarget(
+	ctx context.Context,
+	req *nokkuv1.CreateTargetRequest,
+	name string,
+) (*nokkuv1.CreateTargetResponse, error) {
 	var result *db.Target
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.CreateTarget(ctx, &db.CreateTargetParams{
 			WorkspaceID:   req.GetWorkspaceId(),
-			Name:          req.GetName(),
+			Name:          name,
 			Description:   req.Description,
 			CaID:          req.CaId,
 			Endpoints:     req.GetEndpoints(),
@@ -65,12 +103,12 @@ func (s *TargetService) CreateTarget(
 		}
 
 		// Add a default root principal to the target
-		return q.SyncPrincipals(ctx, &db.SyncPrincipalsParams{
+		return q.SetPrincipals(ctx, &db.SetPrincipalsParams{
 			TargetID:  result.ID,
 			Usernames: []string{"root"},
 		})
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.CreateTargetResponse{
 		Target: result.ToProto(),
@@ -95,10 +133,7 @@ func (s *TargetService) UpdateTarget(
 			Tags:          req.GetTags(),
 			HostPublicKey: trimmed(req.HostPublicKey),
 		})
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -147,9 +182,86 @@ func (s *TargetService) ListTargets(
 	}
 
 	return &nokkuv1.ListTargetsResponse{
-		Targets: db.ListTargetsToProto(targets),
+		Targets: db.TargetsToProto(targets),
 		Total:   &count,
 	}, nil
+}
+
+// GetTargetPrincipals returns the per-account subject list for one target,
+// with teams expanded. It is what a daemonless host needs: the operator writes
+// it into AuthorizedPrincipalsFile, so the host's own sshd enforces the same
+// grant predicate the daemon would.
+func (s *TargetService) GetTargetPrincipals(
+	ctx context.Context,
+	req *nokkuv1.GetTargetPrincipalsRequest,
+) (*nokkuv1.GetTargetPrincipalsResponse, error) {
+	var rows []*db.ListPrincipalsForTargetRow
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		rows, err = q.ListPrincipalsForTarget(ctx, req.GetTargetId())
+		return err
+	}); err != nil {
+		return nil, DBError(err)
+	}
+
+	principals := make([]*nokkuv1.PrincipalUsers, 0, len(rows))
+	for _, r := range rows {
+		username := r.Username
+		principals = append(principals, &nokkuv1.PrincipalUsers{
+			Username: &username,
+			Ids:      r.Ids,
+		})
+	}
+	return &nokkuv1.GetTargetPrincipalsResponse{Principals: principals}, nil
+}
+
+// SyncTargetUsers reports a target's local accounts, host key, and endpoints.
+// Daemonless targets use it: the operator runs the report from their own
+// machine over SSH. Like the daemon's sync it is advisory and never deletes,
+// so a failed report cannot revoke anyone.
+func (s *TargetService) SyncTargetUsers(
+	ctx context.Context,
+	req *nokkuv1.SyncTargetUsersRequest,
+) (*nokkuv1.SyncTargetUsersResponse, error) {
+	if err := validateHostPublicKey(req.GetHostPublicKey()); err != nil {
+		return nil, err
+	}
+
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		if len(req.GetUsernames()) > 0 {
+			if err := q.SetReportedUsers(ctx, &db.SetReportedUsersParams{
+				TargetID:  req.GetTargetId(),
+				Usernames: req.GetUsernames(),
+			}); err != nil {
+				return err
+			}
+			if err := q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
+				TargetID:  req.GetTargetId(),
+				Usernames: req.GetUsernames(),
+			}); err != nil {
+				return err
+			}
+		}
+
+		// Only the fields the report carries: the update COALESCEs, so nil
+		// leaves the stored value alone.
+		params := &db.UpdateTargetParams{TargetID: req.GetTargetId()}
+		if len(req.GetEndpoints()) > 0 {
+			params.Endpoints = req.GetEndpoints()
+		}
+		if req.GetHostPublicKey() != "" {
+			params.HostPublicKey = trimmed(req.HostPublicKey)
+		}
+		if params.Endpoints == nil && params.HostPublicKey == nil {
+			return nil
+		}
+		_, err := q.UpdateTarget(ctx, params)
+		return err
+	}); err != nil {
+		return nil, DBError(err)
+	}
+
+	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
+	return &nokkuv1.SyncTargetUsersResponse{}, nil
 }
 
 func (s *TargetService) GetSubjectAccess(
@@ -190,7 +302,8 @@ func (s *TargetService) GetSubjectAccess(
 			return err
 		}
 		for _, p := range pRows {
-			principalsByTarget[p.TargetID] = append(principalsByTarget[p.TargetID], p.ToProto())
+			targetID := p.Principal.TargetID
+			principalsByTarget[targetID] = append(principalsByTarget[targetID], p.ToProto())
 		}
 
 		for _, r := range rows {
@@ -229,17 +342,7 @@ func (s *TargetService) GetSubjectAccess(
 				return err
 			}
 			for _, ca := range caRows {
-				cas = append(cas, &nokkuv1.CertificateAuthority{
-					Id:             &ca.ID,
-					WorkspaceId:    &ca.WorkspaceID,
-					Name:           &ca.Name,
-					PublicKey:      &ca.PublicKey,
-					IsDefault:      &ca.IsDefault,
-					AuthorityType:  &ca.AuthorityType,
-					Certificate:    &ca.Certificate,
-					UserDefaultTtl: db.SafeDuration(&ca.UserDefaultTtl),
-					UserMaxTtl:     db.SafeDuration(&ca.UserMaxTtl),
-				})
+				cas = append(cas, ca.ToProto())
 			}
 		}
 		return nil
@@ -291,7 +394,7 @@ func (s *TargetService) GetMyAccess(
 			if err != nil {
 				return err
 			}
-			resp.Subject = &nokkuv1.GetMyAccessResponse_User{User: db.UserToProto(u)}
+			resp.Subject = &nokkuv1.GetMyAccessResponse_User{User: u.ToProto()}
 		case iam.KindServiceAccount:
 			sa, err := q.GetServiceAccount(ctx, p.ID)
 			if err != nil {
@@ -332,17 +435,27 @@ func (s *TargetService) GetMyAccess(
 			targetsByWS[r.WorkspaceID] = append(targetsByWS[r.WorkspaceID], target)
 		}
 
-		principalsByTarget := make(map[string][]*nokkuv1.Principal)
-		pRows, err := q.GetPrincipalsByTargetIDs(ctx, targetIDs)
+		// Resolve the grant predicate for this one subject: the CLI needs the
+		// local accounts it may use, not the target's assignment graph.
+		usernamesByTarget := make(map[string][]string)
+		uRows, err := q.ListSubjectUsernamesForTargets(
+			ctx,
+			&db.ListSubjectUsernamesForTargetsParams{
+				TargetIds: targetIDs,
+				SubjectID: p.ID,
+			},
+		)
 		if err != nil {
 			return err
 		}
-		for _, pr := range pRows {
-			principalsByTarget[pr.TargetID] = append(principalsByTarget[pr.TargetID], pr.ToProto())
+		for _, u := range uRows {
+			usernamesByTarget[u.TargetID] = append(
+				usernamesByTarget[u.TargetID], u.Username,
+			)
 		}
 		for wsID, targets := range targetsByWS {
 			for _, t := range targets {
-				t.Principals = principalsByTarget[t.GetId()]
+				t.Usernames = usernamesByTarget[t.GetId()]
 			}
 			// Row order from the query is (workspace_id, name); keep it so
 			// consumers get a deterministic snapshot.
@@ -369,20 +482,7 @@ func (s *TargetService) GetMyAccess(
 				if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH {
 					continue
 				}
-				casByWS[ca.WorkspaceID] = append(
-					casByWS[ca.WorkspaceID],
-					&nokkuv1.CertificateAuthority{
-						Id:             &ca.ID,
-						WorkspaceId:    &ca.WorkspaceID,
-						Name:           &ca.Name,
-						PublicKey:      &ca.PublicKey,
-						IsDefault:      &ca.IsDefault,
-						AuthorityType:  &ca.AuthorityType,
-						Certificate:    &ca.Certificate,
-						UserDefaultTtl: db.SafeDuration(&ca.UserDefaultTtl),
-						UserMaxTtl:     db.SafeDuration(&ca.UserMaxTtl),
-					},
-				)
+				casByWS[ca.WorkspaceID] = append(casByWS[ca.WorkspaceID], ca.ToProto())
 			}
 		}
 

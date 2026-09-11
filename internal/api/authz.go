@@ -53,6 +53,8 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.PrincipalServiceAddSubjectsToPrincipalProcedure:      db.PermPrincipalsEdit,
 	nokkuv1connect.PrincipalServiceRemoveSubjectsFromPrincipalProcedure: db.PermPrincipalsEdit,
 	nokkuv1connect.PrincipalServiceRevokeAllAccessProcedure:             db.PermPrincipalsEdit,
+	nokkuv1connect.PrincipalServiceAddPrincipalProcedure:                db.PermPrincipalsEdit,
+	nokkuv1connect.PrincipalServiceRemovePrincipalProcedure:             db.PermPrincipalsEdit,
 
 	// Service accounts
 	nokkuv1connect.ServiceAccountServiceGetServiceAccountProcedure:    db.PermServiceAccountsView,
@@ -71,13 +73,15 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.SCIMServiceDeleteSCIMTokenProcedure: db.PermSettingsEdit,
 
 	// Targets
-	nokkuv1connect.TargetServiceGetTargetProcedure:        db.PermTargetsView,
-	nokkuv1connect.TargetServiceListTargetsProcedure:      db.PermTargetsView,
-	nokkuv1connect.TargetServiceGetSubjectAccessProcedure: db.PermTargetsView,
-	nokkuv1connect.TargetServiceGetTargetFiltersProcedure: db.PermTargetsView,
-	nokkuv1connect.TargetServiceCreateTargetProcedure:     db.PermTargetsEdit,
-	nokkuv1connect.TargetServiceUpdateTargetProcedure:     db.PermTargetsEdit,
-	nokkuv1connect.TargetServiceDeleteTargetProcedure:     db.PermTargetsEdit,
+	nokkuv1connect.TargetServiceGetTargetProcedure:           db.PermTargetsView,
+	nokkuv1connect.TargetServiceListTargetsProcedure:         db.PermTargetsView,
+	nokkuv1connect.TargetServiceGetSubjectAccessProcedure:    db.PermTargetsView,
+	nokkuv1connect.TargetServiceGetTargetFiltersProcedure:    db.PermTargetsView,
+	nokkuv1connect.TargetServiceCreateTargetProcedure:        db.PermTargetsEdit,
+	nokkuv1connect.TargetServiceUpdateTargetProcedure:        db.PermTargetsEdit,
+	nokkuv1connect.TargetServiceDeleteTargetProcedure:        db.PermTargetsEdit,
+	nokkuv1connect.TargetServiceGetTargetPrincipalsProcedure: db.PermTargetsView,
+	nokkuv1connect.TargetServiceSyncTargetUsersProcedure:     db.PermTargetsEdit,
 
 	// Teams
 	nokkuv1connect.TeamServiceGetTeamProcedure:          db.PermTeamsView,

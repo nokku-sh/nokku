@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/pprof"
 	"runtime/debug"
@@ -28,16 +29,6 @@ import (
 type Server struct {
 	mux *http.ServeMux
 	cfg *config.Config
-
-	// Process root context, canceled on SIGINT/SIGTERM. Consumed by
-	// WithShutdownSignal so long-lived streams exit before Shutdown's deadline.
-	rootCtx context.Context
-}
-
-type ServiceRegistration struct {
-	Name    string
-	Path    string
-	Handler http.Handler
 }
 
 func New(cfg *config.Config) *Server {
@@ -48,14 +39,11 @@ func New(cfg *config.Config) *Server {
 }
 
 func (s *Server) Start(ctx context.Context) error {
-	s.rootCtx = ctx
-
 	if err := s.registerServices(ctx); err != nil {
 		return err
 	}
 
-	chain := NewChain(
-		s.WithShutdownSignal,
+	chain := newChain(
 		s.WithRateLimit,
 		s.WithHeaders,
 		s.WithCORS,
@@ -68,6 +56,9 @@ func (s *Server) Start(ctx context.Context) error {
 	proto.SetHTTP2(true)
 	proto.SetUnencryptedHTTP2(true)
 	server := &http.Server{
+		// Requests derive from the process context, so a long-lived stream
+		// exits as soon as SIGINT/SIGTERM cancels it.
+		BaseContext:       func(net.Listener) context.Context { return ctx },
 		Addr:              "0.0.0.0:" + s.cfg.Port,
 		Handler:           chain.Then(s.mux),
 		Protocols:         proto,
@@ -98,28 +89,6 @@ func (s *Server) Start(ctx context.Context) error {
 	case err := <-serverErr:
 		return fmt.Errorf("server error: %w", err)
 	}
-}
-
-// WithShutdownSignal cancels each request's context when the root ctx
-// (SIGINT/SIGTERM) is done.
-func (s *Server) WithShutdownSignal(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		root := s.rootCtx
-		if root == nil {
-			next.ServeHTTP(w, r)
-			return
-		}
-		ctx, cancel := context.WithCancel(r.Context())
-		defer cancel()
-		go func() {
-			select {
-			case <-ctx.Done():
-			case <-root.Done():
-				cancel()
-			}
-		}()
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
 }
 
 func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption {
@@ -153,170 +122,106 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 	}
 }
 
-func (s *Server) getServiceRegistrations(ctx context.Context) []ServiceRegistration {
+func (s *Server) serviceHandlers(ctx context.Context) []func() (string, http.Handler) {
 	opts := s.withHandlerOptions(ctx)
-	services := []struct {
-		Name    string
-		Handler func() (string, http.Handler)
-	}{
-		{
-			Name: nokkuv1connect.WorkspaceServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewWorkspaceServiceHandler(
-					NewWorkspaceService(s.cfg),
-					opts...,
-				)
-			},
-		},
-		{
-			Name: nokkuv1connect.TeamServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewTeamServiceHandler(NewTeamService(s.cfg), opts...)
-			},
-		},
-		{
-			Name: nokkuv1connect.UtilServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewUtilServiceHandler(NewUtilService(s.cfg), opts...)
-			},
-		},
-		{
-			Name: nokkuv1connect.TargetServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewTargetServiceHandler(NewTargetService(s.cfg), opts...)
-			},
-		},
-		{
-			Name: nokkuv1connect.PrincipalServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewPrincipalServiceHandler(
-					NewPrincipalService(s.cfg),
-					opts...,
-				)
-			},
-		},
-		{
-			Name: nokkuv1connect.DaemonServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewDaemonServiceHandler(NewDaemonService(s.cfg), opts...)
-			},
-		},
-		{
-			Name: nokkuv1connect.CertificateServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewCertificateServiceHandler(
-					NewCertificateService(s.cfg),
-					opts...,
-				)
-			},
-		},
-		{
-			Name: nokkuv1connect.InvitationServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewInvitationServiceHandler(
-					NewInvitationService(s.cfg),
-					opts...,
-				)
-			},
-		},
-		{
-			Name: nokkuv1connect.BillingServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewBillingServiceHandler(NewBillingService(s.cfg), opts...)
-			},
-		},
-		{
-			Name: nokkuv1connect.ServiceAccountServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewServiceAccountServiceHandler(
-					NewServiceAccountService(s.cfg),
-					opts...,
-				)
-			},
-		},
-		{
-			Name: nokkuv1connect.AccountServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewAccountServiceHandler(
-					NewAccountService(s.cfg),
-					opts...,
-				)
-			},
-		},
-		{
-			Name: nokkuv1connect.AuthServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewAuthServiceHandler(
-					NewAuthService(s.cfg),
-					opts...,
-				)
-			},
-		},
-		{
-			Name: nokkuv1connect.WorkspaceDomainServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewWorkspaceDomainServiceHandler(
-					NewWorkspaceDomainService(s.cfg),
-					opts...,
-				)
-			},
-		},
-		{
-			Name: nokkuv1connect.SSOServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewSSOServiceHandler(NewSSOService(s.cfg), opts...)
-			},
-		},
-		{
-			Name: nokkuv1connect.SCIMServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewSCIMServiceHandler(NewSCIMService(s.cfg), opts...)
-			},
-		},
-		{
-			Name: nokkuv1connect.DaemonControlServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewDaemonControlServiceHandler(s.cfg.Pool, opts...)
-			},
-		},
-		{
-			Name: nokkuv1connect.DaemonSessionServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewDaemonSessionServiceHandler(s.cfg.Pool, opts...)
-			},
-		},
-		{
-			Name: nokkuv1connect.RecordingServiceName,
-			Handler: func() (string, http.Handler) {
-				return nokkuv1connect.NewRecordingServiceHandler(
-					NewRecordingService(s.cfg),
-					opts...)
-			},
-		},
-	}
 
-	registrations := make([]ServiceRegistration, 0, len(services))
-	for _, svc := range services {
-		path, handler := svc.Handler()
-		registrations = append(registrations, ServiceRegistration{
-			Name:    svc.Name,
-			Path:    path,
-			Handler: handler,
-		})
+	// Each connect constructor reports its own path, which carries the service
+	// name that health checking and reflection register.
+	return []func() (string, http.Handler){
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewWorkspaceServiceHandler(
+				NewWorkspaceService(s.cfg),
+				opts...,
+			)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewTeamServiceHandler(NewTeamService(s.cfg), opts...)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewUtilServiceHandler(NewUtilService(s.cfg), opts...)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewTargetServiceHandler(NewTargetService(s.cfg), opts...)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewPrincipalServiceHandler(
+				NewPrincipalService(s.cfg),
+				opts...,
+			)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewDaemonServiceHandler(NewDaemonService(s.cfg), opts...)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewCertificateServiceHandler(
+				NewCertificateService(s.cfg),
+				opts...,
+			)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewInvitationServiceHandler(
+				NewInvitationService(s.cfg),
+				opts...,
+			)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewBillingServiceHandler(NewBillingService(s.cfg), opts...)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewServiceAccountServiceHandler(
+				NewServiceAccountService(s.cfg),
+				opts...,
+			)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewAccountServiceHandler(
+				NewAccountService(s.cfg),
+				opts...,
+			)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewAuthServiceHandler(
+				NewAuthService(s.cfg),
+				opts...,
+			)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewWorkspaceDomainServiceHandler(
+				NewWorkspaceDomainService(s.cfg),
+				opts...,
+			)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewSSOServiceHandler(NewSSOService(s.cfg), opts...)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewSCIMServiceHandler(NewSCIMService(s.cfg), opts...)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewDaemonControlServiceHandler(s.cfg.Pool, opts...)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewDaemonSessionServiceHandler(s.cfg.Pool, opts...)
+		},
+		func() (string, http.Handler) {
+			return nokkuv1connect.NewRecordingServiceHandler(
+				NewRecordingService(s.cfg),
+				opts...)
+		},
 	}
-	return registrations
 }
 
 func (s *Server) registerServices(ctx context.Context) error {
-	registrations := s.getServiceRegistrations(ctx)
-	serviceNames := make([]string, len(registrations))
-	services := make([]*vanguard.Service, len(registrations))
+	decls := s.serviceHandlers(ctx)
+	names := make([]string, len(decls))
+	services := make([]*vanguard.Service, len(decls))
 
-	for i, reg := range registrations {
-		serviceNames[i] = reg.Name
-		services[i] = vanguard.NewService(reg.Path, reg.Handler)
+	for i, decl := range decls {
+		path, handler := decl()
+		names[i] = strings.Trim(path, "/")
+		services[i] = vanguard.NewService(path, handler)
 	}
-	s.registerHealthAndReflection(serviceNames)
+	s.registerHealthAndReflection(names)
 
 	transcoder, err := vanguard.NewTranscoder(services)
 	if err != nil {
@@ -347,7 +252,7 @@ func (s *Server) registerServices(ctx context.Context) error {
 
 	// Auth outside audit, matching the RPC interceptor order, so audited
 	// rows see the principal and tenant iam placed on the request.
-	protec := NewChain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
+	protec := newChain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
 
 	// Avatar handlers
 	s.mux.Handle("GET /avatars/{id}", ServeAvatar(s.cfg))

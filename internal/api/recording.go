@@ -141,6 +141,9 @@ func (s *RecordingService) resolveUpload(
 			if existing.DaemonID != daemonID {
 				return errors.New("recording belongs to another daemon")
 			}
+			if existing.Complete {
+				return NewError(connect.CodeInvalidArgument, "recording is already finalized")
+			}
 			rec = existing
 			return nil
 		}
@@ -191,23 +194,27 @@ func (s *RecordingService) ListRecordings(
 		if total == 0 {
 			total = r.TotalCount
 		}
-		recordings = append(recordings, (&db.Recording{
-			ID:          r.ID,
-			WorkspaceID: r.WorkspaceID,
-			DaemonID:    r.DaemonID,
-			Username:    r.Username,
-			StartedAt:   r.StartedAt,
-			EndedAt:     r.EndedAt,
-			SizeBytes:   r.SizeBytes,
-			Complete:    r.Complete,
-			CreatedAt:   r.CreatedAt,
-		}).ToProto())
+		recordings = append(recordings, r.Recording.ToProto())
 	}
+	s.logRecordingEvent(ctx, "recording.list", req.GetWorkspaceId(), "", "")
 	return &nokkuv1.ListRecordingsResponse{
 		Recordings: recordings,
 		Total:      &total,
 		TotalBytes: &totalBytes,
 	}, nil
+}
+
+// logRecordingEvent records a recording read. The audit interceptor only
+// covers mutating procedures, so reads that expose session content (which can
+// contain credentials) emit their own rows. WithoutCancel keeps the row when
+// the peer hangs up and the request context dies first.
+func (s *RecordingService) logRecordingEvent(
+	ctx context.Context,
+	action, workspaceID, recordingID, daemonID string,
+) {
+	actor, _ := iam.PrincipalFromContext(ctx)
+	appendAuditRow(ctx, s.cfg.Audit, action, workspaceID, actor,
+		map[string]any{"recording_id": recordingID, "daemon_id": daemonID})
 }
 
 func (s *RecordingService) GetRecording(
@@ -221,6 +228,12 @@ func (s *RecordingService) GetRecording(
 	// be pinned here from the request. WithWorkspace then checks membership
 	// and scopes row-level security.
 	ctx = iam.AnnotateTenant(ctx, req.GetWorkspaceId())
+
+	// Streaming RPCs bypass the unary permission interceptor, so the
+	// ProcedurePermissions gate for this procedure is inert and must run here.
+	if err := actorHasPermission(ctx, s.cfg.Conn, db.PermDaemonsView); err != nil {
+		return DBError(err)
+	}
 
 	var rec *db.Recording
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
@@ -243,6 +256,8 @@ func (s *RecordingService) GetRecording(
 	}); err != nil {
 		return err
 	}
+
+	s.logRecordingEvent(ctx, "recording.download", req.GetWorkspaceId(), rec.ID, rec.DaemonID)
 
 	fr, err := s.cfg.Record.OpenReader(ctx, req.GetWorkspaceId(), rec.ID)
 	if err != nil {

@@ -201,6 +201,66 @@
 
 		<Item.Root variant="outline">
 			<Item.Content>
+				<Item.Title>Max startup connections</Item.Title>
+				<Item.Description>
+					Limit connections still completing the pre-auth handshake. Zero disables the cap.
+				</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Input
+					id="cfg-max-startups"
+					type="number"
+					min="0"
+					value={daemonConfig.maxStartups}
+					oninput={(e) => {
+						daemonConfig.maxStartups = Number((e.currentTarget as HTMLInputElement).value);
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>Max channels per connection</Item.Title>
+				<Item.Description>
+					Limit channels a single connection may hold open. Zero disables the cap.
+				</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Input
+					id="cfg-max-channels"
+					type="number"
+					min="0"
+					value={daemonConfig.maxChannels}
+					oninput={(e) => {
+						daemonConfig.maxChannels = Number((e.currentTarget as HTMLInputElement).value);
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>Drop retired CA</Item.Title>
+				<Item.Description>
+					Stop trusting the previously rotated CA immediately after a rollover.
+				</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				<Switch
+					checked={daemonConfig.dropRetiredCa}
+					onCheckedChange={(v) => {
+						daemonConfig.dropRetiredCa = v;
+						set();
+					}}
+				/>
+			</Item.Actions>
+		</Item.Root>
+
+		<Item.Root variant="outline">
+			<Item.Content>
 				<Item.Title>Connection rate</Item.Title>
 				<Item.Description>
 					New connections per second per source IP. Zero disables rate limiting.

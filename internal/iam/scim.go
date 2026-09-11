@@ -272,33 +272,14 @@ func (s *Service) scimProvisionUser(
 	}
 
 	err = s.conn.WithTx(ctx, func(q *db.Queries) error {
-		// Same choke point as the invitation path: dormant today (SCIM is
-		// Enterprise-only and Enterprise has no seat cap) but it wakes up the
-		// moment the catalog ships a capped plan with SCIM. Re-syncs of
-		// existing members skip the gate, a re-push must not fail because the
-		// workspace filled up after a downgrade.
-		if s.CanJoin != nil {
-			if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
-				WorkspaceID: workspaceID,
-				UserID:      u.ID,
-			}); err != nil {
-				if _, err := q.GetWorkspaceForUpdate(ctx, workspaceID); err != nil {
-					return err
-				}
-				used, err := q.CountWorkspaceSeats(ctx, workspaceID)
-				if err != nil {
-					return err
-				}
-				if err := s.CanJoin(ctx, workspaceID, used); err != nil {
-					return scimerrors.ScimError{Status: http.StatusForbidden, Detail: err.Error()}
-				}
+		// Dormant today (SCIM is Enterprise-only, and Enterprise has no seat
+		// cap) but it wakes up the moment the catalog ships a capped plan with
+		// SCIM. An existing member always passes, so a re-push cannot fail
+		// because the workspace filled up after a downgrade.
+		if err := s.EnsureMember(ctx, q, u.ID, workspaceID); err != nil {
+			if errors.Is(err, ErrSeatLimit) {
+				return scimerrors.ScimError{Status: http.StatusForbidden, Detail: err.Error()}
 			}
-		}
-
-		if err := q.EnsureWorkspaceMember(ctx, &db.EnsureWorkspaceMemberParams{
-			WorkspaceID: workspaceID,
-			UserID:      u.ID,
-		}); err != nil {
 			return err
 		}
 		if externalID == "" {
@@ -334,7 +315,7 @@ func linkSCIMCredential(
 		Subject:  externalID,
 		Data:     []byte{},
 	})
-	if isUniqueViolation(err) {
+	if db.IsUniqueViolation(err) {
 		// The externalId is already bound to another account; the IdP must
 		// not silently repoint one user's identity at a different one.
 		return scimerrors.ScimErrorBadRequest("externalId is already linked to another user")
@@ -360,6 +341,22 @@ func (s *Service) scimDeprovisionUser(ctx context.Context, workspaceID, userID s
 	}
 	var deleted, deactivated bool
 	err = s.conn.WithTx(ctx, func(q *db.Queries) error {
+		// A deprovisioned user keeps no access: drop their grants in this
+		// workspace and revoke the certificates already issued, mirroring
+		// RemoveWorkspaceMember.
+		if err := q.RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
+			WorkspaceID: workspaceID,
+			SubjectKind: db.SubjectKindUser,
+			SubjectID:   userID,
+		}); err != nil {
+			return err
+		}
+		if err := q.UpsertPrincipalRevocation(ctx, &db.UpsertPrincipalRevocationParams{
+			WorkspaceID: workspaceID,
+			SubjectID:   userID,
+		}); err != nil {
+			return err
+		}
 		if err := q.RemoveWorkspaceMember(ctx, &db.RemoveWorkspaceMemberParams{
 			WorkspaceID: workspaceID,
 			UserID:      userID,
@@ -385,6 +382,14 @@ func (s *Service) scimDeprovisionUser(ctx context.Context, workspaceID, userID s
 		}
 		switch {
 		case other == 0 && owned == 0:
+			// The user row is going away: drop every grant that points at
+			// them, across every workspace, so no dangling user id remains.
+			if err := q.DeleteSubjectGrants(ctx, &db.DeleteSubjectGrantsParams{
+				SubjectKind: db.SubjectKindUser,
+				SubjectID:   userID,
+			}); err != nil {
+				return err
+			}
 			if err := q.DeleteUser(ctx, userID); err != nil {
 				return err
 			}

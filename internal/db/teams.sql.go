@@ -156,6 +156,37 @@ func (q *Queries) GetTeam(ctx context.Context, teamID string) (*Team, error) {
 	return &i, err
 }
 
+const listTeamMemberUserIDs = `-- name: ListTeamMemberUserIDs :many
+SELECT
+  user_id
+FROM
+  team_members
+WHERE
+  team_id = $1
+`
+
+// Just the user ids, for callers that only need the membership set (for
+// example expanding a team into the users whose certificates must revoke).
+func (q *Queries) ListTeamMemberUserIDs(ctx context.Context, teamID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listTeamMemberUserIDs, teamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var user_id string
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTeamMembers = `-- name: ListTeamMembers :many
 SELECT
   tm.workspace_id,
@@ -251,14 +282,8 @@ type ListTeamsParams struct {
 }
 
 type ListTeamsRow struct {
-	ID          string    `json:"id"`
-	WorkspaceID string    `json:"workspaceId"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description"`
-	Tags        []string  `json:"tags"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-	TotalCount  int32     `json:"totalCount"`
+	Team       Team  `json:"team"`
+	TotalCount int32 `json:"totalCount"`
 }
 
 func (q *Queries) ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*ListTeamsRow, error) {
@@ -277,13 +302,13 @@ func (q *Queries) ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*ListT
 	for rows.Next() {
 		var i ListTeamsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.Name,
-			&i.Description,
-			&i.Tags,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.Team.ID,
+			&i.Team.WorkspaceID,
+			&i.Team.Name,
+			&i.Team.Description,
+			&i.Team.Tags,
+			&i.Team.CreatedAt,
+			&i.Team.UpdatedAt,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err

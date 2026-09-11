@@ -48,16 +48,6 @@ var cappedCreate = map[string]bool{
 	nokkuv1connect.WorkspaceDomainServiceCreateWorkspaceDomainProcedure:  true,
 }
 
-// featureLabels are the human-facing names used in denial messages.
-var featureLabels = map[string]string{
-	FeatureOIDC:        "OIDC single sign-on",
-	FeatureEnforceSSO:  "enforced single sign-on",
-	FeatureSAML:        "SAML single sign-on",
-	FeatureAuditExport: "audit log export",
-	FeatureExternalKMS: "external key management",
-	FeatureSCIM:        "SCIM provisioning",
-}
-
 // GuardInterceptor enforces plan features at the route level. It runs
 // after authentication and authorization, pinning its plan resolutions to
 // the request context so downstream handlers reuse them.
@@ -140,6 +130,18 @@ func (g *GuardInterceptor) checkResources(ctx context.Context, procedure string)
 // downgrade or an admin cleaning up must never be blocked by the paywall
 // it created.
 func conditionalFeature(procedure string, msg any) (string, bool) {
+	if req, ok := msg.(*nokkuv1.UpdateWorkspaceRequest); ok &&
+		procedure == nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure {
+		// Streaming is configured on the workspace settings, so only the two
+		// fields that turn it on are gated. Clearing them works on any plan,
+		// which keeps a downgraded workspace able to switch the stream off.
+		settings := req.GetSettings()
+		if settings.GetAuditWebhookUrl() != "" || settings.GetAuditWebhookSecret() != "" {
+			return FeatureAuditStreaming, true
+		}
+		return "", false
+	}
+
 	req, ok := msg.(*nokkuv1.UpdateSSOProviderRequest)
 	if !ok || procedure != nokkuv1connect.SSOServiceUpdateSSOProviderProcedure {
 		return "", false
@@ -178,11 +180,11 @@ func (g *GuardInterceptor) deny(ctx context.Context, workspaceID, feature string
 	return err
 }
 
-func featureLabel(feature string) string {
-	if label, ok := featureLabels[feature]; ok {
-		return label
+func featureLabel(code string) string {
+	if f, ok := featureInCatalog(code); ok {
+		return f.Label
 	}
-	return feature
+	return code
 }
 
 // displayName maps internal plan names to their marketed names.

@@ -35,43 +35,18 @@ type oauth2Flow struct {
 
 // Login starts the authorization-code flow.
 func (h *oauth2Flow) Login(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	providerID := r.URL.Query().Get("provider")
-	if providerID == "" {
-		WriteError(w, http.StatusBadRequest, "missing provider")
-		return
-	}
-
-	workspaceID, cfg, err := h.svc.resolveForLogin(
-		ctx, "", providerID, r.URL.Query().Get("domain"),
-	)
-	if err != nil {
-		Fail(w, r, h.errRedirect, "provider not configured")
-		return
-	}
-
-	st := &flowAuthorizeState{
-		WorkspaceID: workspaceID,
-		ProviderID:  providerID,
-		ReturnTo:    SafeReturnTo(r.URL.Query().Get("return_to")),
-		LinkUserID:  linkUserIDFor(ctx, r),
-	}
-	st.PKCEVerifier = oauth2.GenerateVerifier()
-	st.FlowCookie = startFlowBinding(w, false)
-
-	stateValue, err := h.authorize.Put(ctx, st)
-	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-
-	cfg.OAuth2.RedirectURL = h.svc.baseURL + "/oauth/callback"
-	// #nosec G710 -- redirects to the provider authorization endpoint from its configuration.
-	http.Redirect(
+	authorizeLoginStart(
 		w,
 		r,
-		h.oauth2Config(cfg.OAuth2).AuthCodeURL(stateValue),
-		http.StatusTemporaryRedirect,
+		h.svc,
+		h.authorize,
+		h.errRedirect,
+		func(_ context.Context, st *flowAuthorizeState, cfg *SSOProvider) (*oauth2.Config, []oauth2.AuthCodeOption, bool) {
+			st.PKCEVerifier = oauth2.GenerateVerifier()
+			st.FlowCookie = startFlowBinding(w, false)
+			cfg.OAuth2.RedirectURL = h.svc.baseURL + "/oauth/callback"
+			return h.oauth2Config(cfg.OAuth2), nil, true
+		},
 	)
 }
 

@@ -38,11 +38,6 @@ func TestLocalStorage(t *testing.T) {
 		t.Fatalf("file not written to disk: %v", err)
 	}
 
-	exists, err := s.Exists(context.Background(), path)
-	if err != nil || !exists {
-		t.Fatalf("Exists: %v %v", exists, err)
-	}
-
 	rc, err := s.Reader(context.Background(), path)
 	if err != nil {
 		t.Fatalf("Reader: %v", err)

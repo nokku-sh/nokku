@@ -226,7 +226,7 @@ func (q *Queries) GetDaemonsByIDs(ctx context.Context, daemonIds []string) ([]*G
 
 const getTargetByDaemon = `-- name: GetTargetByDaemon :one
 SELECT
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, created_at, updated_at
+  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, reported_users, reported_at, created_at, updated_at
 FROM
   targets
 WHERE
@@ -247,6 +247,8 @@ func (q *Queries) GetTargetByDaemon(ctx context.Context, daemonID *string) (*Tar
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
+		&i.ReportedUsers,
+		&i.ReportedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -291,17 +293,8 @@ type ListDaemonsParams struct {
 }
 
 type ListDaemonsRow struct {
-	ID            string              `json:"id"`
-	WorkspaceID   string              `json:"workspaceId"`
-	Name          string              `json:"name"`
-	Status        nokku.DaemonStatus  `json:"status"`
-	Online        bool                `json:"online"`
-	KeyThumbprint *string             `json:"keyThumbprint"`
-	Config        *nokku.DaemonConfig `json:"config"`
-	Metadata      []byte              `json:"metadata"`
-	UpdatedAt     time.Time           `json:"updatedAt"`
-	CreatedAt     time.Time           `json:"createdAt"`
-	TotalCount    int32               `json:"totalCount"`
+	Daemon     Daemon `json:"daemon"`
+	TotalCount int32  `json:"totalCount"`
 }
 
 func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*ListDaemonsRow, error) {
@@ -321,16 +314,16 @@ func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*L
 	for rows.Next() {
 		var i ListDaemonsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.Name,
-			&i.Status,
-			&i.Online,
-			&i.KeyThumbprint,
-			&i.Config,
-			&i.Metadata,
-			&i.UpdatedAt,
-			&i.CreatedAt,
+			&i.Daemon.ID,
+			&i.Daemon.WorkspaceID,
+			&i.Daemon.Name,
+			&i.Daemon.Status,
+			&i.Daemon.Online,
+			&i.Daemon.KeyThumbprint,
+			&i.Daemon.Config,
+			&i.Daemon.Metadata,
+			&i.Daemon.UpdatedAt,
+			&i.Daemon.CreatedAt,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err

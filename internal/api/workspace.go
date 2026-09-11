@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"connectrpc.com/connect"
@@ -17,7 +16,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
-func DefaultWorkspaceSettings() *nokkuv1.WorkspaceSettings {
+func defaultWorkspaceSettings() *nokkuv1.WorkspaceSettings {
 	return &nokkuv1.WorkspaceSettings{
 		EnrollAutoApprove: new(true),
 		DefaultDaemonConfig: &nokkuv1.DaemonConfig{
@@ -27,10 +26,13 @@ func DefaultWorkspaceSettings() *nokkuv1.WorkspaceSettings {
 			GatewayPorts:         new(false),
 			MaxSessions:          new(int32(10)),
 			MaxConnections:       new(int32(100)),
+			MaxChannels:          new(int32(50)),
+			MaxStartups:          new(int32(10)),
 			ClientAliveInterval:  durationpb.New(60 * time.Second),
 			ConnRate:             new(int32(5)),
 			ConnRateBurst:        new(int32(20)),
 			Banner:               new(true),
+			DropRetiredCa:        new(false),
 		},
 	}
 }
@@ -83,7 +85,7 @@ func (s *WorkspaceService) CreateWorkspace(
 		Name:        req.GetName(),
 		Description: req.Description,
 		CreatedBy:   user.ID,
-		Settings:    DefaultWorkspaceSettings(),
+		Settings:    defaultWorkspaceSettings(),
 	})
 	if err != nil {
 		return nil, DBError(err)
@@ -160,7 +162,7 @@ func (s *WorkspaceService) ListWorkspaces(
 	}
 
 	return &nokkuv1.ListWorkspacesResponse{
-		Workspaces: db.ListWorkspacesToProto(workspaces),
+		Workspaces: db.WorkspacesToProto(workspaces),
 	}, nil
 }
 
@@ -265,7 +267,19 @@ func (s *WorkspaceService) RemoveWorkspaceMember(
 	ctx context.Context,
 	req *nokkuv1.RemoveWorkspaceMemberRequest,
 ) (*nokkuv1.RemoveWorkspaceMemberResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		// A removed member keeps no access: drop their grants in this
+		// workspace and revoke the certificates already issued.
+		if err = q.RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
+			WorkspaceID: req.GetWorkspaceId(),
+			SubjectKind: db.SubjectKindUser,
+			SubjectID:   req.GetUserId(),
+		}); err != nil {
+			return err
+		}
+		if err = revokePrincipals(ctx, q, req.GetWorkspaceId(), []string{req.GetUserId()}); err != nil {
+			return err
+		}
 		return q.RemoveWorkspaceMember(ctx, &db.RemoveWorkspaceMemberParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			UserID:      req.GetUserId(),
@@ -277,29 +291,34 @@ func (s *WorkspaceService) RemoveWorkspaceMember(
 	return &nokkuv1.RemoveWorkspaceMemberResponse{}, nil
 }
 
+// checkWorkspaceOwner reports whether the request actor owns the workspace.
+// The lookup runs on the caller's querier so billing and workspace changes can
+// fold it into the transaction that makes the change.
+func checkWorkspaceOwner(ctx context.Context, q db.Querier, workspaceID string) error {
+	ownerID, err := q.GetWorkspaceOwner(ctx, workspaceID)
+	if err != nil {
+		return err
+	}
+	if ownerID != iam.UserIDFromContext(ctx) {
+		return ErrPermissionDenied
+	}
+	return nil
+}
+
 func (s *WorkspaceService) UpdateWorkspaceOwner(
 	ctx context.Context,
 	req *nokkuv1.UpdateWorkspaceOwnerRequest,
 ) (*nokkuv1.UpdateWorkspaceOwnerResponse, error) {
-	var ownerID string
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		var err error
-		ownerID, err = q.GetWorkspaceOwner(ctx, req.GetWorkspaceId())
-		if err != nil {
+		if err := checkWorkspaceOwner(ctx, q, req.GetWorkspaceId()); err != nil {
 			return err
 		}
-		if ownerID != iam.UserIDFromContext(ctx) {
-			return ErrPermissionDenied
-		}
-		_, err = q.UpdateWorkspaceOwner(ctx, &db.UpdateWorkspaceOwnerParams{
+		_, err := q.UpdateWorkspaceOwner(ctx, &db.UpdateWorkspaceOwnerParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			NewOwnerID:  req.GetNewOwner(),
 		})
 		return err
 	}); err != nil {
-		if errors.Is(err, ErrPermissionDenied) {
-			return nil, ErrPermissionDenied
-		}
 		return nil, DBError(err)
 	}
 
@@ -321,6 +340,13 @@ func (s *WorkspaceService) SubscribeWorkspaceEvents(
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(_ *db.Queries) error {
 		return nil
 	}); err != nil {
+		return DBError(err)
+	}
+
+	// Streaming RPCs bypass the unary permission interceptor. Every event
+	// this stream carries is daemon lifecycle, so require the same gate the
+	// daemon procedures use.
+	if err := actorHasPermission(ctx, s.cfg.Conn, db.PermDaemonsView); err != nil {
 		return DBError(err)
 	}
 

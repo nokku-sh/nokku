@@ -119,18 +119,9 @@ func (s *InvitationService) AcceptInvitation(
 			return errAlreadyMember
 		}
 
-		used, err := q.CountWorkspaceSeats(ctx, workspaceID)
-		if err != nil {
-			return err
-		}
-		if err := s.cfg.Entitlements.CanInvite(ctx, workspaceID, used); err != nil {
-			return err
-		}
-
-		return q.AddWorkspaceMember(ctx, &db.AddWorkspaceMemberParams{
-			WorkspaceID: workspaceID,
-			UserID:      userID,
-		})
+		// The gate and the insert share this transaction, so the workspace row
+		// lock the seat count depends on is held across both.
+		return s.cfg.IAM.EnsureMember(ctx, q, userID, workspaceID)
 	})
 	switch {
 	case err == nil:

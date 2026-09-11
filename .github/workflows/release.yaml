@@ -19,7 +19,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       bump: ${{ steps.version.outputs.bump }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -60,16 +60,16 @@ jobs:
     if: needs.tag.outputs.bump == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: "v${{ needs.tag.outputs.version }}"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: "go.mod"
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: "lts/*"
 
@@ -96,14 +96,12 @@ jobs:
       - uses: taiki-e/install-action@git-cliff
 
       - name: Generate release notes
-        run: git-cliff --latest --strip header --config cliff.toml -o "$RUNNER_TEMP/CHANGELOG.md"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git-cliff --latest --strip header --config cliff.toml -o "$RUNNER_TEMP/release-notes.md"
 
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: latest
-          args: release --clean --release-notes=${{ runner.temp }}/CHANGELOG.md
+          args: release --clean --release-notes=${{ runner.temp }}/release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COSIGN_YES: "true"

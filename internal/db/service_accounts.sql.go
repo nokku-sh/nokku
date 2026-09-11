@@ -193,18 +193,8 @@ type ListServiceAccountsParams struct {
 }
 
 type ListServiceAccountsRow struct {
-	ID          string              `json:"id"`
-	WorkspaceID string              `json:"workspaceId"`
-	Name        string              `json:"name"`
-	Description *string             `json:"description"`
-	TokenHash   *crypto.HashedToken `json:"tokenHash"`
-	RoleName    string              `json:"roleName"`
-	LastUsedAt  *time.Time          `json:"lastUsedAt"`
-	ExpiresAt   *time.Time          `json:"expiresAt"`
-	Tags        []string            `json:"tags"`
-	CreatedAt   time.Time           `json:"createdAt"`
-	UpdatedAt   time.Time           `json:"updatedAt"`
-	TotalCount  int32               `json:"totalCount"`
+	ServiceAccount ServiceAccount `json:"serviceAccount"`
+	TotalCount     int32          `json:"totalCount"`
 }
 
 func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccountsParams) ([]*ListServiceAccountsRow, error) {
@@ -225,17 +215,17 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 	for rows.Next() {
 		var i ListServiceAccountsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.Name,
-			&i.Description,
-			&i.TokenHash,
-			&i.RoleName,
-			&i.LastUsedAt,
-			&i.ExpiresAt,
-			&i.Tags,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.ServiceAccount.ID,
+			&i.ServiceAccount.WorkspaceID,
+			&i.ServiceAccount.Name,
+			&i.ServiceAccount.Description,
+			&i.ServiceAccount.TokenHash,
+			&i.ServiceAccount.RoleName,
+			&i.ServiceAccount.LastUsedAt,
+			&i.ServiceAccount.ExpiresAt,
+			&i.ServiceAccount.Tags,
+			&i.ServiceAccount.CreatedAt,
+			&i.ServiceAccount.UpdatedAt,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err

@@ -10,7 +10,7 @@ import (
 
 // SQL to Proto ---------------------------------------------------------------
 
-func MapSlice[T, R any](in []T, fn func(T) R) []R {
+func mapSlice[T, R any](in []T, fn func(T) R) []R {
 	if in == nil {
 		return nil
 	}
@@ -19,6 +19,20 @@ func MapSlice[T, R any](in []T, fn func(T) R) []R {
 		out[i] = fn(v)
 	}
 	return out
+}
+
+// jsonMap decodes a JSONB object column. A malformed blob is data corruption,
+// not a request failure: the row is still readable without it, so it is logged
+// and the caller gets an empty map.
+func jsonMap(column string, raw []byte) map[string]string {
+	m := make(map[string]string)
+	if len(raw) == 0 {
+		return m
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		slog.Warn("dropping malformed jsonb column", "column", column, "error", err)
+	}
+	return m
 }
 
 func (w *Workspace) ToProto() *nokkuv1.Workspace {
@@ -40,8 +54,8 @@ func (w *Workspace) ToProto() *nokkuv1.Workspace {
 	}
 }
 
-func ListWorkspacesToProto(ws []*Workspace) []*nokkuv1.Workspace {
-	return MapSlice(
+func WorkspacesToProto(ws []*Workspace) []*nokkuv1.Workspace {
+	return mapSlice(
 		ws,
 		func(w *Workspace) *nokkuv1.Workspace { return w.ToProto() },
 	)
@@ -72,10 +86,6 @@ func (w *WorkspaceMember) ToProto() *nokkuv1.WorkspaceMember {
 		CreatedAt:   SafeTimestamp(&w.CreatedAt),
 		UpdatedAt:   SafeTimestamp(&w.UpdatedAt),
 	}
-}
-
-func WorkspaceMembersToProto(rows []*WorkspaceMember) []*nokkuv1.WorkspaceMember {
-	return MapSlice(rows, func(r *WorkspaceMember) *nokkuv1.WorkspaceMember { return r.ToProto() })
 }
 
 func (c *Credential) ToProto() *nokkuv1.AccountCredential {
@@ -123,23 +133,8 @@ func (t *Team) ToProto() *nokkuv1.Team {
 	}
 }
 
-func (r *ListTeamsRow) ToProto() *nokkuv1.Team {
-	if r == nil {
-		return nil
-	}
-	return (&Team{
-		ID:          r.ID,
-		WorkspaceID: r.WorkspaceID,
-		Name:        r.Name,
-		Description: r.Description,
-		Tags:        r.Tags,
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
-	}).ToProto()
-}
-
 func TeamsToProto(rows []*ListTeamsRow) []*nokkuv1.Team {
-	return MapSlice(rows, func(r *ListTeamsRow) *nokkuv1.Team { return r.ToProto() })
+	return mapSlice(rows, func(r *ListTeamsRow) *nokkuv1.Team { return r.Team.ToProto() })
 }
 
 func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
@@ -159,28 +154,10 @@ func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
 	}
 }
 
-func (r *ListServiceAccountsRow) ToProto() *nokkuv1.ServiceAccount {
-	if r == nil {
-		return nil
-	}
-
-	return (&ServiceAccount{
-		ID:          r.ID,
-		WorkspaceID: r.WorkspaceID,
-		Name:        r.Name,
-		Description: r.Description,
-		RoleName:    r.RoleName,
-		ExpiresAt:   r.ExpiresAt,
-		Tags:        r.Tags,
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
-	}).ToProto()
-}
-
 func ServiceAccountsToProto(rows []*ListServiceAccountsRow) []*nokkuv1.ServiceAccount {
-	return MapSlice(
+	return mapSlice(
 		rows,
-		func(r *ListServiceAccountsRow) *nokkuv1.ServiceAccount { return r.ToProto() },
+		func(r *ListServiceAccountsRow) *nokkuv1.ServiceAccount { return r.ServiceAccount.ToProto() },
 	)
 }
 
@@ -189,8 +166,7 @@ func (t *Target) ToProto() *nokkuv1.Target {
 		return nil
 	}
 
-	metadata := make(map[string]string)
-	_ = json.Unmarshal(t.Metadata, &metadata)
+	metadata := jsonMap("targets.metadata", t.Metadata)
 	return &nokkuv1.Target{
 		Id:            &t.ID,
 		WorkspaceId:   &t.WorkspaceID,
@@ -202,33 +178,15 @@ func (t *Target) ToProto() *nokkuv1.Target {
 		Tags:          t.Tags,
 		Metadata:      metadata,
 		HostPublicKey: t.HostPublicKey,
+		ReportedUsers: t.ReportedUsers,
+		ReportedAt:    SafeTimestamp(t.ReportedAt),
 		CreatedAt:     SafeTimestamp(&t.CreatedAt),
 		UpdatedAt:     SafeTimestamp(&t.UpdatedAt),
 	}
 }
 
-func (r *ListTargetsRow) ToProto() *nokkuv1.Target {
-	if r == nil {
-		return nil
-	}
-	return (&Target{
-		ID:            r.ID,
-		WorkspaceID:   r.WorkspaceID,
-		CaID:          r.CaID,
-		DaemonID:      r.DaemonID,
-		Name:          r.Name,
-		Description:   r.Description,
-		Endpoints:     r.Endpoints,
-		Tags:          r.Tags,
-		Metadata:      r.Metadata,
-		HostPublicKey: r.HostPublicKey,
-		CreatedAt:     r.CreatedAt,
-		UpdatedAt:     r.UpdatedAt,
-	}).ToProto()
-}
-
-func ListTargetsToProto(rows []*ListTargetsRow) []*nokkuv1.Target {
-	return MapSlice(rows, func(r *ListTargetsRow) *nokkuv1.Target { return r.ToProto() })
+func TargetsToProto(rows []*ListTargetsRow) []*nokkuv1.Target {
+	return mapSlice(rows, func(r *ListTargetsRow) *nokkuv1.Target { return r.Target.ToProto() })
 }
 
 func (p *Principal) ToProto() *nokkuv1.Principal {
@@ -247,34 +205,16 @@ func (p *GetPrincipalsByTargetIDsRow) ToProto() *nokkuv1.Principal {
 	if p == nil {
 		return nil
 	}
-	return &nokkuv1.Principal{
-		Id:                &p.ID,
-		TargetId:          &p.TargetID,
-		Username:          &p.Username,
-		CreatedAt:         SafeTimestamp(&p.CreatedAt),
-		UserIds:           p.UserIds,
-		TeamIds:           p.TeamIds,
-		ServiceAccountIds: p.ServiceAccountIds,
-	}
+
+	out := p.Principal.ToProto()
+	out.UserIds = p.UserIds
+	out.TeamIds = p.TeamIds
+	out.ServiceAccountIds = p.ServiceAccountIds
+	return out
 }
 
-func (p *GetPrincipalsRow) ToProto() *nokkuv1.Principal {
-	if p == nil {
-		return nil
-	}
-	return &nokkuv1.Principal{
-		Id:                &p.ID,
-		TargetId:          &p.TargetID,
-		Username:          &p.Username,
-		CreatedAt:         SafeTimestamp(&p.CreatedAt),
-		UserIds:           p.UserIds,
-		TeamIds:           p.TeamIds,
-		ServiceAccountIds: p.ServiceAccountIds,
-	}
-}
-
-// UserToProto shapes an identity user row for the API surface.
-func UserToProto(u *User) *nokkuv1.User {
+// ToProto shapes an identity user row for the API surface.
+func (u *User) ToProto() *nokkuv1.User {
 	return &nokkuv1.User{
 		Id:                   &u.ID,
 		Name:                 &u.Name,
@@ -291,8 +231,7 @@ func (d *Daemon) ToProto() *nokkuv1.Daemon {
 	if d == nil {
 		return nil
 	}
-	metadata := make(map[string]string)
-	_ = json.Unmarshal(d.Metadata, &metadata)
+	metadata := jsonMap("daemons.metadata", d.Metadata)
 	return &nokkuv1.Daemon{
 		Id:          &d.ID,
 		WorkspaceId: &d.WorkspaceID,
@@ -306,25 +245,8 @@ func (d *Daemon) ToProto() *nokkuv1.Daemon {
 	}
 }
 
-func (r *ListDaemonsRow) ToProto() *nokkuv1.Daemon {
-	if r == nil {
-		return nil
-	}
-	return (&Daemon{
-		ID:          r.ID,
-		WorkspaceID: r.WorkspaceID,
-		Name:        r.Name,
-		Status:      r.Status,
-		Online:      r.Online,
-		Config:      r.Config,
-		Metadata:    r.Metadata,
-		UpdatedAt:   r.UpdatedAt,
-		CreatedAt:   r.CreatedAt,
-	}).ToProto()
-}
-
 func DaemonsToProto(rows []*ListDaemonsRow) []*nokkuv1.Daemon {
-	return MapSlice(rows, func(r *ListDaemonsRow) *nokkuv1.Daemon { return r.ToProto() })
+	return mapSlice(rows, func(r *ListDaemonsRow) *nokkuv1.Daemon { return r.Daemon.ToProto() })
 }
 
 func (r *CertificateAuthority) ToProto() *nokkuv1.CertificateAuthority {
@@ -373,27 +295,43 @@ func (r *CertificateAuthority) ToProto() *nokkuv1.CertificateAuthority {
 }
 
 func CAsToProto(cas []*CertificateAuthority) []*nokkuv1.CertificateAuthority {
-	return MapSlice(
+	return mapSlice(
 		cas,
 		func(rca *CertificateAuthority) *nokkuv1.CertificateAuthority { return rca.ToProto() },
 	)
+}
+
+// ToProto converts the display subset of a CA row: the access views show which
+// authority issues a target's certificates without the private fields.
+func (r *GetCAsByIDsRow) ToProto() *nokkuv1.CertificateAuthority {
+	if r == nil {
+		return nil
+	}
+	return &nokkuv1.CertificateAuthority{
+		Id:             &r.ID,
+		WorkspaceId:    &r.WorkspaceID,
+		Name:           &r.Name,
+		PublicKey:      &r.PublicKey,
+		IsDefault:      &r.IsDefault,
+		AuthorityType:  &r.AuthorityType,
+		Certificate:    &r.Certificate,
+		UserDefaultTtl: SafeDuration(&r.UserDefaultTtl),
+		UserMaxTtl:     SafeDuration(&r.UserMaxTtl),
+	}
 }
 
 func (p *ListPrincipalsRow) ToProto() *nokkuv1.Principal {
 	if p == nil {
 		return nil
 	}
-	return &nokkuv1.Principal{
-		Id:                &p.ID,
-		TargetId:          &p.TargetID,
-		Username:          &p.Username,
-		CreatedAt:         SafeTimestamp(&p.CreatedAt),
-		UserIds:           p.UserIds,
-		TeamIds:           p.TeamIds,
-		ServiceAccountIds: p.ServiceAccountIds,
-	}
+
+	out := p.Principal.ToProto()
+	out.UserIds = p.UserIds
+	out.TeamIds = p.TeamIds
+	out.ServiceAccountIds = p.ServiceAccountIds
+	return out
 }
 
-func ListPrincipalsToProto(ps []*ListPrincipalsRow) []*nokkuv1.Principal {
-	return MapSlice(ps, func(p *ListPrincipalsRow) *nokkuv1.Principal { return p.ToProto() })
+func PrincipalsToProto(ps []*ListPrincipalsRow) []*nokkuv1.Principal {
+	return mapSlice(ps, func(p *ListPrincipalsRow) *nokkuv1.Principal { return p.ToProto() })
 }

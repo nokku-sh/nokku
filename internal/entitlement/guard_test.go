@@ -31,7 +31,7 @@ func wiredFeatures() map[string]bool {
 // conditionalFeature. Kept in sync manually; the golden test below fails
 // when the switch and this list drift apart.
 func conditionalFeatures() []string {
-	return []string{FeatureSAML, FeatureEnforceSSO}
+	return []string{FeatureSAML, FeatureEnforceSSO, FeatureAuditStreaming}
 }
 
 // featuresFreeInAllPlans are catalog features that need no gate because
@@ -52,16 +52,10 @@ var featuresGatedOutsideTheGuard = map[string]string{
 // route enforces is revenue leakage; a feature no plan includes is dead
 // catalog weight.
 func TestGolden_FeaturesWired(t *testing.T) {
-	allFeatures := []string{
-		FeatureOIDC,
-		FeatureEnforceSSO,
-		FeatureSAML,
-		FeatureAuditExport,
-		FeatureExternalKMS,
-		FeatureSCIM,
-	}
+	allFeatures := CatalogFeatures
 
-	for _, feature := range allFeatures {
+	for _, f := range allFeatures {
+		feature := f.Code
 		reason := "unwired"
 		switch {
 		case wiredFeatures()[feature]:
@@ -83,7 +77,7 @@ func TestGolden_FeaturesWired(t *testing.T) {
 
 	// The reverse direction: gates must reference real catalog features.
 	for feature := range wiredFeatures() {
-		if !slices.Contains(allFeatures, feature) {
+		if _, ok := featureInCatalog(feature); !ok {
 			t.Errorf("guard gates %q, which is not a catalog feature", feature)
 		}
 	}
@@ -100,6 +94,23 @@ func TestConditionalFeature(t *testing.T) {
 		EnforceSso: new(true),
 	}
 	oidcPlain := &nokkuv1.UpdateSSOProviderRequest{Method: new("oidc")}
+
+	streamingOn := &nokkuv1.UpdateWorkspaceRequest{
+		Settings: &nokkuv1.WorkspaceSettings{
+			AuditWebhookUrl: new("https://hooks.example.com/nokku"),
+		},
+	}
+	streamingSecretOnly := &nokkuv1.UpdateWorkspaceRequest{
+		Settings: &nokkuv1.WorkspaceSettings{AuditWebhookSecret: new("s3cret")},
+	}
+	streamingOff := &nokkuv1.UpdateWorkspaceRequest{
+		Name:     new("renamed"),
+		Settings: &nokkuv1.WorkspaceSettings{AuditWebhookUrl: new("")},
+	}
+	workspacePlain := &nokkuv1.UpdateWorkspaceRequest{
+		Name:     new("renamed"),
+		Settings: &nokkuv1.WorkspaceSettings{},
+	}
 
 	tests := []struct {
 		name      string
@@ -136,6 +147,30 @@ func TestConditionalFeature(t *testing.T) {
 			name:      "other procedures are not conditionally gated",
 			procedure: "/nokku.v1.SSOService/GetSSOProvider",
 			msg:       samlActivate,
+		},
+		{
+			name:      "configuring audit streaming is gated",
+			procedure: "/nokku.v1.WorkspaceService/UpdateWorkspace",
+			msg:       streamingOn,
+			wantFeat:  FeatureAuditStreaming,
+			wantGated: true,
+		},
+		{
+			name:      "setting only the streaming secret is gated",
+			procedure: "/nokku.v1.WorkspaceService/UpdateWorkspace",
+			msg:       streamingSecretOnly,
+			wantFeat:  FeatureAuditStreaming,
+			wantGated: true,
+		},
+		{
+			name:      "clearing audit streaming is never gated",
+			procedure: "/nokku.v1.WorkspaceService/UpdateWorkspace",
+			msg:       streamingOff,
+		},
+		{
+			name:      "other workspace updates are not gated",
+			procedure: "/nokku.v1.WorkspaceService/UpdateWorkspace",
+			msg:       workspacePlain,
 		},
 		{
 			name:      "non-SSO request types are ignored",
@@ -189,6 +224,37 @@ func TestGuard_DeniesAndAdvertisesUpgrade(t *testing.T) {
 	}
 	if !strings.Contains(connectErr.Message(), "audit log export") {
 		t.Errorf("message %q should name the feature", connectErr.Message())
+	}
+}
+
+func TestGuard_DeniesAuditStreamingOnCommunity(t *testing.T) {
+	sut := NewGuardInterceptor(NewService(&fakeDB{}, nil, ModeSaaS))
+	ctx := actor.AnnotateTenant(context.Background(), "ws1")
+
+	req := &nokkuv1.UpdateWorkspaceRequest{
+		Settings: &nokkuv1.WorkspaceSettings{AuditWebhookUrl: new("https://hooks.example.com")},
+	}
+	err := sut.check(ctx, "/nokku.v1.WorkspaceService/UpdateWorkspace", req)
+	if err == nil {
+		t.Fatal("expected denial for audit streaming on community")
+	}
+	var connectErr *connect.Error
+	if !errors.As(err, &connectErr) {
+		t.Fatalf("expected *connect.Error, got %T", err)
+	}
+	if connectErr.Code() != connect.CodePermissionDenied {
+		t.Errorf("code = %v, want PermissionDenied", connectErr.Code())
+	}
+	if got := connectErr.Meta().Get("x-nokku-feature"); got != FeatureAuditStreaming {
+		t.Errorf("x-nokku-feature = %q, want %q", got, FeatureAuditStreaming)
+	}
+
+	// Clearing the destination stays possible on any plan.
+	cleared := &nokkuv1.UpdateWorkspaceRequest{
+		Settings: &nokkuv1.WorkspaceSettings{AuditWebhookUrl: new("")},
+	}
+	if err := sut.check(ctx, "/nokku.v1.WorkspaceService/UpdateWorkspace", cleared); err != nil {
+		t.Errorf("clearing the destination was denied: %v", err)
 	}
 }
 

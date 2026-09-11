@@ -99,16 +99,9 @@ func NewOTLPInterceptor(ctx context.Context) connect.Interceptor {
 	go func() {
 		<-ctx.Done()
 		bg := context.WithoutCancel(ctx)
-
-		if lp != nil {
-			_ = lp.Shutdown(bg)
-		}
-		if mp != nil {
-			_ = mp.Shutdown(bg)
-		}
-		if tp != nil {
-			_ = tp.Shutdown(bg)
-		}
+		_ = lp.Shutdown(bg)
+		_ = mp.Shutdown(bg)
+		_ = tp.Shutdown(bg)
 	}()
 	return interceptor
 }

@@ -1,11 +1,13 @@
 package daemon
 
 import (
+	"errors"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/sshclient/sshtest"
 )
 
@@ -205,6 +207,30 @@ collect:
 		default:
 		}
 		time.Sleep(time.Millisecond)
+	}
+}
+
+// TestPool_StartSession_RejectsInactiveCA: a deactivated (or missing) CA must
+// not mint web-session certificates, whatever the rest of the config says.
+func TestPool_StartSession_RejectsInactiveCA(t *testing.T) {
+	p := newTestPool(t)
+	cases := map[string]*db.CertificateAuthority{
+		"missing":  nil,
+		"inactive": {},
+	}
+	for name, ca := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := p.StartSession(t.Context(), SessionConfig{
+				DaemonID:  "d1",
+				SessionID: "s1",
+				UserID:    "u1",
+				Username:  "root",
+				CA:        ca,
+			})
+			if !errors.Is(err, ErrCAInactive) {
+				t.Fatalf("StartSession err = %v, want ErrCAInactive", err)
+			}
+		})
 	}
 }
 

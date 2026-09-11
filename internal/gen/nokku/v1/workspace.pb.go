@@ -268,6 +268,8 @@ type WorkspaceSettings struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	EnrollAutoApprove   *bool                  `protobuf:"varint,1,opt,name=enroll_auto_approve,json=enrollAutoApprove" json:"enroll_auto_approve,omitempty"`
 	DefaultDaemonConfig *DaemonConfig          `protobuf:"bytes,2,opt,name=default_daemon_config,json=defaultDaemonConfig" json:"default_daemon_config,omitempty"`
+	AuditWebhookUrl     *string                `protobuf:"bytes,3,opt,name=audit_webhook_url,json=auditWebhookUrl" json:"audit_webhook_url,omitempty"`
+	AuditWebhookSecret  *string                `protobuf:"bytes,4,opt,name=audit_webhook_secret,json=auditWebhookSecret" json:"audit_webhook_secret,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -314,6 +316,20 @@ func (x *WorkspaceSettings) GetDefaultDaemonConfig() *DaemonConfig {
 		return x.DefaultDaemonConfig
 	}
 	return nil
+}
+
+func (x *WorkspaceSettings) GetAuditWebhookUrl() string {
+	if x != nil && x.AuditWebhookUrl != nil {
+		return *x.AuditWebhookUrl
+	}
+	return ""
+}
+
+func (x *WorkspaceSettings) GetAuditWebhookSecret() string {
+	if x != nil && x.AuditWebhookSecret != nil {
+		return *x.AuditWebhookSecret
+	}
+	return ""
 }
 
 type GetWorkspaceRequest struct {
@@ -1440,10 +1456,12 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x8f\x01\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xed\x01\n" +
 	"\x11WorkspaceSettings\x12.\n" +
 	"\x13enroll_auto_approve\x18\x01 \x01(\bR\x11enrollAutoApprove\x12J\n" +
-	"\x15default_daemon_config\x18\x02 \x01(\v2\x16.nokku.v1.DaemonConfigR\x13defaultDaemonConfig\"B\n" +
+	"\x15default_daemon_config\x18\x02 \x01(\v2\x16.nokku.v1.DaemonConfigR\x13defaultDaemonConfig\x12*\n" +
+	"\x11audit_webhook_url\x18\x03 \x01(\tR\x0fauditWebhookUrl\x120\n" +
+	"\x14audit_webhook_secret\x18\x04 \x01(\tR\x12auditWebhookSecret\"B\n" +
 	"\x13GetWorkspaceRequest\x12+\n" +
 	"\fworkspace_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vworkspaceId\"I\n" +
 	"\x14GetWorkspaceResponse\x121\n" +

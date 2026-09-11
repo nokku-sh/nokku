@@ -91,7 +91,7 @@ func (s *AuthService) Login(
 	if c := s.cfg.IAM.RememberDevice(ctx, ci.RequestHeader(), ci.Peer().Addr, u); c != nil {
 		setCookie(ci, c)
 	}
-	return &nokkuv1.LoginResponse{User: db.UserToProto(u)}, nil
+	return &nokkuv1.LoginResponse{User: u.ToProto()}, nil
 }
 
 func (s *AuthService) LoginWithBackupCode(
@@ -111,7 +111,7 @@ func (s *AuthService) LoginWithBackupCode(
 	if c := s.cfg.IAM.RememberDevice(ctx, ci.RequestHeader(), ci.Peer().Addr, u); c != nil {
 		setCookie(ci, c)
 	}
-	return &nokkuv1.LoginWithBackupCodeResponse{User: db.UserToProto(u)}, nil
+	return &nokkuv1.LoginWithBackupCodeResponse{User: u.ToProto()}, nil
 }
 
 // loginError writes a uniform bad-credentials response; ErrInactive keeps

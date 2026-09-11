@@ -212,6 +212,10 @@ CREATE TABLE IF NOT EXISTS targets (
   host_public_key TEXT,
   tags TEXT[] NOT NULL DEFAULT '{}',
   metadata JSONB NOT NULL DEFAULT '{}',
+  -- The local accounts the daemon last reported. Advisory: a host that cannot
+  -- enumerate users must not change access.
+  reported_users TEXT[] NOT NULL DEFAULT '{}',
+  reported_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name)
@@ -226,28 +230,27 @@ CREATE TABLE IF NOT EXISTS principals (
   UNIQUE (target_id, username)
 );
 
-CREATE TABLE IF NOT EXISTS principal_users (
+CREATE TABLE IF NOT EXISTS principal_grants (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
   principal_id UUID NOT NULL REFERENCES principals (id) ON DELETE CASCADE,
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  subject_kind TEXT NOT NULL,
+  subject_id UUID NOT NULL, -- user, team, or service account id
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (principal_id, user_id)
+  UNIQUE (principal_id, subject_kind, subject_id),
+  CHECK (subject_kind IN ('user', 'team', 'service_account'))
 );
 
-CREATE TABLE IF NOT EXISTS principal_teams (
-  principal_id UUID NOT NULL REFERENCES principals (id) ON DELETE CASCADE,
+-- Subject-level revocation, keyed by the id the SSH certificate carries as
+-- its principal (a user id, teams are expanded first). A certificate is
+-- refused when its ValidAfter is earlier than revoked_at, so revoking
+-- invalidates every certificate already issued while a freshly minted one
+-- works again.
+CREATE TABLE IF NOT EXISTS ssh_principal_revocations (
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  team_id UUID NOT NULL REFERENCES teams (id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (principal_id, team_id)
-);
-
-CREATE TABLE IF NOT EXISTS principal_service_accounts (
-  principal_id UUID NOT NULL REFERENCES principals (id) ON DELETE CASCADE,
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  service_account_id UUID NOT NULL REFERENCES service_accounts (id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (principal_id, service_account_id)
+  subject_id UUID NOT NULL,
+  revoked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (workspace_id, subject_id)
 );
 
 CREATE TABLE IF NOT EXISTS recordings (
@@ -329,17 +332,9 @@ CREATE INDEX idx_principals_workspace_id ON principals (workspace_id);
 
 CREATE INDEX idx_principals_target_id ON principals (target_id);
 
-CREATE INDEX idx_principal_users_user_id ON principal_users (user_id);
+CREATE INDEX idx_principal_grants_subject ON principal_grants (subject_kind, subject_id);
 
-CREATE INDEX idx_principal_users_workspace_id ON principal_users (workspace_id);
-
-CREATE INDEX idx_principal_teams_team_id ON principal_teams (team_id);
-
-CREATE INDEX idx_principal_teams_workspace_id ON principal_teams (workspace_id);
-
-CREATE INDEX idx_principal_sa_service_account_id ON principal_service_accounts (service_account_id);
-
-CREATE INDEX idx_principal_sa_workspace_id ON principal_service_accounts (workspace_id);
+CREATE INDEX idx_principal_grants_workspace_id ON principal_grants (workspace_id);
 
 CREATE INDEX idx_recordings_workspace_started ON recordings (workspace_id, started_at DESC);
 
@@ -524,17 +519,13 @@ ALTER TABLE principals ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE principals FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE principal_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE principal_grants ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE principal_users FORCE ROW LEVEL SECURITY;
+ALTER TABLE principal_grants FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE principal_teams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ssh_principal_revocations ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE principal_teams FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE principal_service_accounts ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE principal_service_accounts FORCE ROW LEVEL SECURITY;
+ALTER TABLE ssh_principal_revocations FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE recordings ENABLE ROW LEVEL SECURITY;
 
@@ -643,7 +634,7 @@ WITH
     )
   );
 
-CREATE POLICY principal_users_isolation ON principal_users FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+CREATE POLICY principal_grants_isolation ON principal_grants FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
   CHECK (
     workspace_id = current_workspace_id ()
@@ -654,39 +645,13 @@ WITH
         principals p
       WHERE
         p.id = principal_id
-        AND p.workspace_id = principal_users.workspace_id
+        AND p.workspace_id = principal_grants.workspace_id
     )
   );
 
-CREATE POLICY principal_teams_isolation ON principal_teams FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+CREATE POLICY tenant_isolation ON ssh_principal_revocations FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
-  CHECK (
-    workspace_id = current_workspace_id ()
-    AND EXISTS (
-      SELECT
-        1
-      FROM
-        principals p
-      WHERE
-        p.id = principal_id
-        AND p.workspace_id = principal_teams.workspace_id
-    )
-  );
-
-CREATE POLICY principal_service_accounts_isolation ON principal_service_accounts FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (
-    workspace_id = current_workspace_id ()
-    AND EXISTS (
-      SELECT
-        1
-      FROM
-        principals p
-      WHERE
-        p.id = principal_id
-        AND p.workspace_id = principal_service_accounts.workspace_id
-    )
-  );
+  CHECK (workspace_id = current_workspace_id ());
 
 -- Audit schema ---------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS audit;
@@ -781,3 +746,33 @@ BEGIN
       CHECK (TRUE);
   END IF;
 END $$;
+
+-- Audit immutability ---------------------------------------------------------
+-- An audit row is a fact that is only ever written. Two layers keep it that
+-- way, and the honest division of labour is:
+--
+--   UPDATE is denied by privilege. No role holds UPDATE on this table.
+--   DELETE is refused by this trigger unless the transaction opts in, which
+--   only the retention job does. The app role inherits DELETE from
+--   nokku_system, so this trigger is what actually stops a delete that can
+--   reach rows.
+--   The app role cannot reach rows at all: RLS is enabled and forced on this
+--   table and there is no DELETE policy, so a DELETE from nokku_app matches
+--   zero rows regardless of privilege. Do not add a DELETE policy. If one is
+--   ever needed, the trigger's opt-in must stop being a plain GUC.
+--
+-- The trigger sits on the partitioned parent, so every partition, including
+-- the ones the retention job creates later, inherits it.
+CREATE OR REPLACE FUNCTION audit.audit_logs_immutable () RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    RAISE EXCEPTION 'audit.audit_logs is append-only, update denied';
+  END IF;
+  IF coalesce(current_setting('nokku.audit_retention', true), '') <> 'on' THEN
+    RAISE EXCEPTION 'audit.audit_logs is append-only, delete denied';
+  END IF;
+  RETURN OLD;
+END $$;
+
+CREATE TRIGGER audit_logs_immutable BEFORE UPDATE OR DELETE ON audit.audit_logs FOR EACH ROW
+EXECUTE FUNCTION audit.audit_logs_immutable ();

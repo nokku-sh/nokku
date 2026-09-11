@@ -19,6 +19,7 @@ import (
 	"github.com/zricethezav/gitleaks/v8/config"
 	"github.com/zricethezav/gitleaks/v8/detect"
 
+	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/storage"
 )
@@ -69,8 +70,28 @@ func (s *Service) ScrubRecording(rec *db.Recording) {
 	go func() {
 		defer cancel()
 		if err := s.scrub(ctx, rec.WorkspaceID, rec.ID); err != nil {
-			slog.Warn("scrub recording failed, recording kept as uploaded",
-				"recording_id", rec.ID, "error", err)
+			slog.Error("scrub recording failed, recording kept as uploaded",
+				"recording_id", rec.ID, "workspace_id", rec.WorkspaceID, "error", err)
+			// A failed scrub leaves secrets in the stored object. Record it
+			// so it is visible and attributable, not one log line among many.
+			if s.events != nil {
+				event := &audit.Event{
+					Timestamp:   time.Now().UTC(),
+					WorkspaceID: rec.WorkspaceID,
+					Action:      "recording.scrub_failed",
+					ActorType:   "system",
+					StatusCode:  "ERROR",
+					Details: map[string]any{
+						"recording_id": rec.ID,
+						"daemon_id":    rec.DaemonID,
+						"error":        err.Error(),
+					},
+				}
+				if appendErr := s.events.Append(ctx, event); appendErr != nil {
+					slog.Warn("failed to write scrub failure audit log",
+						"recording_id", rec.ID, "error", appendErr)
+				}
+			}
 		}
 	}()
 }
@@ -100,26 +121,17 @@ func (s *Service) scrub(ctx context.Context, workspaceID, recordingID string) er
 		return fmt.Errorf("finish gzip scrubbed cast: %w", err)
 	}
 
-	w, err := s.store.CreateWriter(ctx, storage.RecordingPath(workspaceID, recordingID),
-		storage.StoreOptions{ContentType: "application/octet-stream"})
+	w, err := s.NewWriter(ctx, workspaceID, recordingID)
 	if err != nil {
-		return fmt.Errorf("open scrubbed recording object: %w", err)
+		return err
 	}
-	// CreateWriter commits on Close and stages through a temp object, so a
-	// failure here never damages the original recording.
-	payload := gz.Bytes()
-	for len(payload) > 0 {
-		n := min(scrubChunk, len(payload))
-		framed, encErr := s.frameEncrypted(payload[:n])
-		if encErr != nil {
-			_ = w.Close()
-			return fmt.Errorf("encrypt scrubbed chunk: %w", encErr)
-		}
-		if _, err = w.Write(framed); err != nil {
+	// NewWriter frames each chunk the way the daemon uploads them and commits
+	// on Close, so the format stays identical.
+	for chunk := range slices.Chunk(gz.Bytes(), scrubChunk) {
+		if err := w.WriteChunk(chunk); err != nil {
 			_ = w.Close()
 			return fmt.Errorf("write scrubbed recording object: %w", err)
 		}
-		payload = payload[n:]
 	}
 	if err = w.Close(); err != nil {
 		return fmt.Errorf("commit scrubbed recording object: %w", err)

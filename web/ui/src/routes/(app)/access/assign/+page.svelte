@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { principal } from '$lib/api/principals.svelte';
 	import { target } from '$lib/api/targets.svelte';
+	import { MAX_PAGE_SIZE } from '$lib/config';
 	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
 	import Badge from '$lib/components/ui/badge/badge.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -54,10 +55,16 @@
 	// Lets a switch flip immediately while the mutation is in flight; the server
 	// refetch (global connect-query invalidation) becomes the source of truth.
 	let pendingAssign = $state(new Map<string, boolean>());
-	let targetPrincipals = principal.list(() => ({ targetId: selectedTargetId }));
+	let targetPrincipals = principal.list(() => ({
+		targetId: selectedTargetId,
+		limit: MAX_PAGE_SIZE
+	}));
 
 	const displayedTargets = $derived(targets.data?.targets || []);
 	const selectedTarget = $derived(displayedTargets.find((t) => t.id === selectedTargetId) || null);
+	// Accounts the machine last reported. A stale assignment is inert (the OS
+	// user is gone) but it should not look like a usable account.
+	const reportedUsers = $derived(new Set(selectedTarget?.reportedUsers ?? []));
 
 	const accessibleTargetIds = $derived(new Set(access.data?.targets?.map((t) => t.id) || []));
 	// access.data.targets carry each target's principals, so we can tell whether
@@ -442,6 +449,11 @@
 												<div class="flex items-center gap-2">
 													<span class="font-mono text-base font-semibold">{principal.username}</span
 													>
+													{#if !reportedUsers.has(principal.username)}
+														<Badge variant="outline" class="text-[10px] text-muted-foreground">
+															not on host
+														</Badge>
+													{/if}
 												</div>
 												<Tooltip.Root>
 													<Tooltip.Trigger class="text-left">

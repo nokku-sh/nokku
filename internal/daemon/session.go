@@ -35,6 +35,11 @@ const (
 	// path. sshclient chunks at 32 KB, below the burst, so WaitN is valid.
 	webStdoutRate  = 512 << 10
 	webStdoutBurst = 64 << 10
+
+	// sendTimeout bounds how long a producer waits on a stalled consumer
+	// before closing the session. Dropping bytes corrupts a terminal, so a
+	// sustained stall means the browser is gone and closing is honest.
+	sendTimeout = 5 * time.Second
 )
 
 // SessionConfig carries what StartSession needs to dial the daemon's
@@ -105,6 +110,9 @@ func (s *Session) touch() {
 // the 8h TTL, or the idle timeout. On failure the relay slot is released and
 // a typed or wrapped error is returned.
 func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, error) {
+	if cfg.CA == nil || !cfg.CA.IsActive {
+		return nil, ErrCAInactive
+	}
 	signer, err := mintSessionCert(cfg.CA, cfg.UserID, cfg.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("mint session certificate: %w", err)
@@ -301,14 +309,20 @@ func (p *Pool) CloseSession(sessionID string) {
 func (s *Session) SendStdin(data []byte) {
 	select {
 	case s.stdin <- data:
-	default:
+	case <-s.closed:
+	case <-time.After(sendTimeout):
+		slog.Warn("terminal stdin buffer full, closing session", "session_id", s.sessionID)
+		s.Close()
 	}
 }
 
 func (s *Session) SendResize(width, height uint32) {
 	select {
 	case s.resize <- [2]uint32{width, height}:
-	default:
+	case <-s.closed:
+	case <-time.After(sendTimeout):
+		slog.Warn("terminal resize buffer full, closing session", "session_id", s.sessionID)
+		s.Close()
 	}
 }
 
@@ -326,7 +340,10 @@ func (s *Session) AppendStdout(data []byte) {
 	// replay copy is not also queued on Stdout (which would render it twice).
 	select {
 	case s.Stdout <- data:
-	default:
+	case <-s.closed:
+	case <-time.After(sendTimeout):
+		slog.Warn("terminal stdout buffer full, closing session", "session_id", s.sessionID)
+		s.Close()
 	}
 	s.replayMu.Unlock()
 }
@@ -334,11 +351,13 @@ func (s *Session) AppendStdout(data []byte) {
 // SnapshotForAttach returns the replay buffer and a channel with only chunks
 // that arrived after this snapshot. Older buffered-but-unsent chunks are
 // consumed and discarded here. Callers send the replay first, then forward
-// from the returned channel.
+// from the returned channel. The replay is stripped of terminal query and
+// request sequences: a fresh terminal must not answer stale queries, whose
+// reply bytes would be forwarded as stdin into the session.
 func (s *Session) SnapshotForAttach() (replay []byte, live <-chan []byte) {
 	s.replayMu.Lock()
-	replay = append([]byte(nil), s.replayBuf...)
-	// Drain chunks already queued on Stdout: they are already in `replay`
+	raw := append([]byte(nil), s.replayBuf...)
+	// Drain chunks already queued on Stdout: they are already in the replay
 	// (AppendStdout appends before sending), so a new attach would otherwise
 	// render them twice. New chunks land in the channel and forward as live.
 drain:
@@ -350,46 +369,7 @@ drain:
 		}
 	}
 	s.replayMu.Unlock()
-	return replay, s.Stdout
-}
-
-func (s *Session) ReplayBuffer() []byte {
-	s.replayMu.Lock()
-	raw := append([]byte(nil), s.replayBuf...)
-	s.replayMu.Unlock()
-	if len(raw) == 0 {
-		return nil
-	}
-	clean := SanitizeReplay(raw)
-	if len(clean) <= replayBufferSize {
-		return clean
-	}
-	// Take the last replayBufferSize bytes, then advance past leading bytes to
-	// a safe boundary (escape start or printable char) so the replay never
-	// begins mid-way through a cut escape sequence.
-	clean = clean[len(clean)-replayBufferSize:]
-	for i := 0; i < len(clean) && i < replayTrimScan; i++ {
-		b := clean[i]
-		if b == 0x1b {
-			// Complete escape sequence: begin here.
-			if i > 0 {
-				clean = clean[i:]
-			}
-			break
-		}
-		if b >= 0x20 && b != 0x7f {
-			// Printable character. Accept the cut line from here. Xterm
-			// tolerates a partial leading line. Avoid trimming further so we
-			// don't drop real output.
-			if i > 0 {
-				clean = clean[i:]
-			}
-			break
-		}
-		// Control/non-printable byte that isn't ESC. Likely a trailing byte
-		// of a cut sequence, keep scanning.
-	}
-	return clean
+	return SanitizeReplay(raw), s.Stdout
 }
 
 // trimReplayLocked trims replayBuf to roughly replayBufferSize by dropping the
@@ -408,5 +388,4 @@ func (s *Session) trimReplayLocked() {
 	s.replayBuf = append([]byte(nil), s.replayBuf[excess:]...)
 }
 
-func (s *Session) StdoutChan() <-chan []byte   { return s.Stdout }
 func (s *Session) ExitedChan() <-chan struct{} { return s.Exited }

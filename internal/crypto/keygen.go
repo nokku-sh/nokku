@@ -10,7 +10,7 @@ import (
 
 var ErrGenerateRandom = errors.New("failed to generate random bytes")
 
-func RandomBytes(size int) ([]byte, error) {
+func randomBytes(size int) ([]byte, error) {
 	bytes := make([]byte, size)
 	if _, err := rand.Read(bytes); err != nil {
 		return nil, ErrGenerateRandom
@@ -19,7 +19,7 @@ func RandomBytes(size int) ([]byte, error) {
 }
 
 func RandomString(size int) (string, error) {
-	bytes, err := RandomBytes(size)
+	bytes, err := randomBytes(size)
 	if err != nil {
 		return "", err
 	}

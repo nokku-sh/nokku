@@ -1,7 +1,8 @@
 package iam
 
-// The OIDC authorization-code flow, ported from kagi. Provider configs come
-// from the sso_providers table; discovered endpoints are cached in memory.
+// The OIDC authorization-code flow plus the flow machinery shared with the
+// plain OAuth2 and SAML flows, ported from kagi. Provider configs come from
+// the sso_providers table; discovered endpoints are cached in memory.
 
 import (
 	"context"
@@ -46,7 +47,7 @@ type OAuth2Provider struct {
 func newOIDCFlow(svc *Service) *oidcFlow {
 	return &oidcFlow{
 		svc:         svc,
-		linker:      &linker{svc: svc, credType: MethodOIDC, OnSSOLogin: svc.OnSSOLogin},
+		linker:      &linker{svc: svc, credType: MethodOIDC},
 		authorize:   newFlowAuthorize(svc.cache, "oidc:authorize:"),
 		errRedirect: svc.baseURL + "/sso-error",
 		providers:   cache.NewLocal[*oidc.Provider](providerCacheTTL),
@@ -57,7 +58,7 @@ func newOIDCFlow(svc *Service) *oidcFlow {
 func newOAuth2Flow(svc *Service) *oauth2Flow {
 	return &oauth2Flow{
 		svc:         svc,
-		linker:      &linker{svc: svc, credType: MethodOAuth2, OnSSOLogin: svc.OnSSOLogin},
+		linker:      &linker{svc: svc, credType: MethodOAuth2},
 		authorize:   newFlowAuthorize(svc.cache, "oauth2:authorize:"),
 		errRedirect: svc.baseURL + "/sso-error",
 	}
@@ -139,21 +140,41 @@ func (s *Service) resolveForLogin(
 	return workspaceID, nil, ErrNotFound
 }
 
-// Login starts the OIDC authorization-code flow. Behind Middleware with a
-// live session, the identity links to the signed-in user.
-func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
+// authorizeLoginPrepare fills the provider-specific parts of the login state
+// and returns the provider's oauth2 client, its RedirectURL already set, and
+// the options for the authorize URL (an OIDC nonce and PKCE challenge, or
+// none for plain OAuth2). It writes its own failure response and reports
+// ok=false when it cannot proceed.
+type authorizeLoginPrepare func(
+	ctx context.Context,
+	st *flowAuthorizeState,
+	cfg *SSOProvider,
+) (conf *oauth2.Config, opts []oauth2.AuthCodeOption, ok bool)
+
+// authorizeLoginStart runs the shared authorization-code login preamble:
+// resolve the requested provider, build the cross-request state, let prepare
+// finish it, store the state, and redirect to the provider. The state is
+// stored only once prepare succeeded, so the callback never sees a half-built
+// state.
+func authorizeLoginStart(
+	w http.ResponseWriter,
+	r *http.Request,
+	svc *Service,
+	authorize *flowAuthorize,
+	errRedirect string,
+	prepare authorizeLoginPrepare,
+) {
 	ctx := r.Context()
 	providerID := r.URL.Query().Get("provider")
 	if providerID == "" {
 		WriteError(w, http.StatusBadRequest, "missing provider")
 		return
 	}
-
-	workspaceID, cfg, err := h.svc.resolveForLogin(
+	workspaceID, cfg, err := svc.resolveForLogin(
 		ctx, "", providerID, r.URL.Query().Get("domain"),
 	)
 	if err != nil {
-		Fail(w, r, h.errRedirect, "provider not configured")
+		Fail(w, r, errRedirect, "provider not configured")
 		return
 	}
 
@@ -163,38 +184,50 @@ func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
 		ReturnTo:    SafeReturnTo(r.URL.Query().Get("return_to")),
 		LinkUserID:  linkUserIDFor(ctx, r),
 	}
-
-	provider, err := h.discover(ctx, cfg.OIDC.IssuerURL)
-	if err != nil {
-		Fail(w, r, h.errRedirect, "provider discovery failed")
+	conf, opts, ok := prepare(ctx, st, cfg)
+	if !ok {
 		return
 	}
-	st.FlowCookie = startFlowBinding(w, false)
-	nonce, err := crypto.RandomString(32)
-	if err != nil {
-		Fail(w, r, h.errRedirect, "provider discovery failed")
-		return
-	}
-	st.Nonce = nonce
-	st.PKCEVerifier = oauth2.GenerateVerifier()
-	cfg.OIDC.RedirectURL = h.svc.baseURL + "/oidc/callback"
-	authOpts := []oauth2.AuthCodeOption{
-		oidc.Nonce(nonce),
-		oauth2.S256ChallengeOption(st.PKCEVerifier),
-	}
 
-	stateValue, err := h.authorize.Put(ctx, st)
+	stateValue, err := authorize.Put(ctx, st)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
 	// #nosec G710 -- redirects to the provider authorization endpoint from its configuration.
-	http.Redirect(
+	http.Redirect(w, r, conf.AuthCodeURL(stateValue, opts...), http.StatusTemporaryRedirect)
+}
+
+// Login starts the OIDC authorization-code flow. Behind Middleware with a
+// live session, the identity links to the signed-in user.
+func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
+	authorizeLoginStart(
 		w,
 		r,
-		h.oauth2Config(cfg.OIDC, provider).AuthCodeURL(stateValue, authOpts...),
-		http.StatusTemporaryRedirect,
+		h.svc,
+		h.authorize,
+		h.errRedirect,
+		func(ctx context.Context, st *flowAuthorizeState, cfg *SSOProvider) (*oauth2.Config, []oauth2.AuthCodeOption, bool) {
+			provider, err := h.discover(ctx, cfg.OIDC.IssuerURL)
+			if err != nil {
+				Fail(w, r, h.errRedirect, "provider discovery failed")
+				return nil, nil, false
+			}
+			st.FlowCookie = startFlowBinding(w, false)
+			nonce, err := crypto.RandomString(32)
+			if err != nil {
+				Fail(w, r, h.errRedirect, "provider discovery failed")
+				return nil, nil, false
+			}
+			st.Nonce = nonce
+			st.PKCEVerifier = oauth2.GenerateVerifier()
+			cfg.OIDC.RedirectURL = h.svc.baseURL + "/oidc/callback"
+			return h.oauth2Config(cfg.OIDC, provider), []oauth2.AuthCodeOption{
+				oidc.Nonce(nonce),
+				oauth2.S256ChallengeOption(st.PKCEVerifier),
+			}, true
+		},
 	)
 }
 

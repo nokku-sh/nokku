@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto"
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
@@ -17,7 +16,6 @@ import (
 	"fmt"
 	"net"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
@@ -42,8 +40,9 @@ type ReplayStore interface {
 	Add(ctx context.Context, jti string, ttl time.Duration) (added bool, err error)
 }
 
-// cacheReplay fits the shared cache's SetNX to ReplayStore. Caches without
-// SetNX degrade to a no-op store (single-instance deployments only).
+// cacheReplay fits the shared cache's SetNX to ReplayStore. A cache without
+// SetNX cannot record consumed jtis, so replay protection is impossible:
+// fail closed instead of silently accepting every proof.
 type cacheReplay struct {
 	c cache.Cache
 }
@@ -51,7 +50,7 @@ type cacheReplay struct {
 func (r cacheReplay) Add(ctx context.Context, jti string, ttl time.Duration) (bool, error) {
 	nx, ok := r.c.(cache.SetNXer)
 	if !ok {
-		return true, nil
+		return false, errors.New("iam: cache does not support atomic replay tracking")
 	}
 	return nx.SetNX(ctx, "dpop:jti:"+jti, nil, ttl)
 }
@@ -346,14 +345,4 @@ func unhex(c byte) (byte, bool) {
 		return c - 'A' + 10, true
 	}
 	return 0, false
-}
-
-// NewJTI returns a fresh, unique proof identifier.
-func NewJTI() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		// Extremely rare. Fall back to a time-based suffix.
-		return strconv.FormatInt(time.Now().UnixNano(), 10)
-	}
-	return base64.RawURLEncoding.EncodeToString(b)
 }

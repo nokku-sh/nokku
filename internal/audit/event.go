@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -39,59 +40,26 @@ type QueryOptions struct {
 	Offset      int32
 }
 
-type ExportFormat string
-
 const (
-	FormatJSON ExportFormat = "json"
-	FormatCSV  ExportFormat = "csv"
-
 	MaxExportDays = 90         // Maximum time range for a single export
 	MaxExportRows = 10_000_000 // Safety limit
 )
 
-// Append writes a single event to the append-only log. It is a dumb pipe:
-// it marshals whatever it is handed and inserts it through the app role.
-// The RLS insert policy is WITH CHECK (TRUE), so this succeeds for both
-// global and tenant events without any role switch or transaction. Callers
-// run it async so it never blocks the request.
+// Append fans an event out to every configured sink. A failing sink is
+// reported but never fatal: the caller is usually on a request path, and an
+// audit write must not take that down.
 func (s *Service) Append(ctx context.Context, event *Event) error {
 	if event == nil {
 		return nil
 	}
 
-	details, err := json.Marshal(event.Details)
-	if err != nil {
-		return err
+	var errs []error
+	for _, sink := range s.sinks {
+		if err := sink.Append(ctx, event); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	// The column is NOT NULL DEFAULT '{}'; marshal(nil) yields "null", so
-	// normalize an empty map to an empty JSON object before insert.
-	if len(details) == 0 || string(details) == "null" {
-		details = []byte("{}")
-	}
-
-	var workspaceID, actorID, email *string
-	if event.WorkspaceID != "" {
-		workspaceID = &event.WorkspaceID
-	}
-	if event.ActorID != "" {
-		actorID = &event.ActorID
-	}
-	if event.ActorEmail != "" {
-		email = &event.ActorEmail
-	}
-	// Blind write: no read, no filter, no RLS gymnastics. s.conn.Q runs as
-	// the nokku_app role whose audit INSERT policy is WITH CHECK (TRUE).
-	return s.conn.Q.InsertAuditLog(ctx, &db.InsertAuditLogParams{
-		WorkspaceID: workspaceID,
-		Action:      event.Action,
-		ActorID:     actorID,
-		ActorType:   event.ActorType,
-		ActorEmail:  email,
-		IpAddress:   &event.IPAddress,
-		UserAgent:   &event.UserAgent,
-		StatusCode:  &event.StatusCode,
-		Details:     details,
-	})
+	return errors.Join(errs...)
 }
 
 // query runs fn with a querier appropriate for the requested scope, always
@@ -148,7 +116,7 @@ func (s *Service) List(
 			ActorIds:    actorIDs,
 			ActorTypes:  actorTypes,
 			Actions:     actions,
-			Search:      searchPtr(opts.Search),
+			Search:      new(opts.Search),
 			StartDate:   startDate,
 			EndDate:     endDate,
 			Limit:       limit,
@@ -236,7 +204,7 @@ func (s *Service) Count(ctx context.Context, opts QueryOptions) (int32, error) {
 			ActorIds:    actorIDs,
 			ActorTypes:  actorTypes,
 			Actions:     actions,
-			Search:      searchPtr(opts.Search),
+			Search:      new(opts.Search),
 			StartDate:   startDate,
 			EndDate:     endDate,
 		})
@@ -321,6 +289,8 @@ func (s *Service) Export(
 		data = buf.Bytes()
 
 	case nokkuv1.ExportAuditLogsRequest_FORMAT_UNSPECIFIED:
+		// Listed separately because the exhaustive linter requires every enum
+		// value, even though it lands on the same rejection as default.
 		return nil, fmt.Errorf("unsupported export format: %s", format)
 
 	default:
@@ -350,13 +320,4 @@ func detailsJSON(details map[string]any) string {
 		return "{}"
 	}
 	return string(b)
-}
-
-// searchPtr returns a pointer to search when non-empty, so an empty string is
-// treated the same as "no filter".
-func searchPtr(search string) *string {
-	if search == "" {
-		return nil
-	}
-	return &search
 }

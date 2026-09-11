@@ -56,6 +56,12 @@ const (
 	// TargetServiceGetTargetFiltersProcedure is the fully-qualified name of the TargetService's
 	// GetTargetFilters RPC.
 	TargetServiceGetTargetFiltersProcedure = "/nokku.v1.TargetService/GetTargetFilters"
+	// TargetServiceGetTargetPrincipalsProcedure is the fully-qualified name of the TargetService's
+	// GetTargetPrincipals RPC.
+	TargetServiceGetTargetPrincipalsProcedure = "/nokku.v1.TargetService/GetTargetPrincipals"
+	// TargetServiceSyncTargetUsersProcedure is the fully-qualified name of the TargetService's
+	// SyncTargetUsers RPC.
+	TargetServiceSyncTargetUsersProcedure = "/nokku.v1.TargetService/SyncTargetUsers"
 )
 
 // TargetServiceClient is a client for the nokku.v1.TargetService service.
@@ -68,6 +74,8 @@ type TargetServiceClient interface {
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
 	GetMyAccess(context.Context, *v1.GetMyAccessRequest) (*v1.GetMyAccessResponse, error)
 	GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error)
+	GetTargetPrincipals(context.Context, *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error)
+	SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error)
 }
 
 // NewTargetServiceClient constructs a client for the nokku.v1.TargetService service. By default, it
@@ -134,19 +142,34 @@ func NewTargetServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		getTargetPrincipals: connect.NewClient[v1.GetTargetPrincipalsRequest, v1.GetTargetPrincipalsResponse](
+			httpClient,
+			baseURL+TargetServiceGetTargetPrincipalsProcedure,
+			connect.WithSchema(targetServiceMethods.ByName("GetTargetPrincipals")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		syncTargetUsers: connect.NewClient[v1.SyncTargetUsersRequest, v1.SyncTargetUsersResponse](
+			httpClient,
+			baseURL+TargetServiceSyncTargetUsersProcedure,
+			connect.WithSchema(targetServiceMethods.ByName("SyncTargetUsers")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // targetServiceClient implements TargetServiceClient.
 type targetServiceClient struct {
-	getTarget        *connect.Client[v1.GetTargetRequest, v1.GetTargetResponse]
-	listTargets      *connect.Client[v1.ListTargetsRequest, v1.ListTargetsResponse]
-	createTarget     *connect.Client[v1.CreateTargetRequest, v1.CreateTargetResponse]
-	updateTarget     *connect.Client[v1.UpdateTargetRequest, v1.UpdateTargetResponse]
-	deleteTarget     *connect.Client[v1.DeleteTargetRequest, v1.DeleteTargetResponse]
-	getSubjectAccess *connect.Client[v1.GetSubjectAccessRequest, v1.GetSubjectAccessResponse]
-	getMyAccess      *connect.Client[v1.GetMyAccessRequest, v1.GetMyAccessResponse]
-	getTargetFilters *connect.Client[v1.GetTargetFiltersRequest, v1.GetTargetFiltersResponse]
+	getTarget           *connect.Client[v1.GetTargetRequest, v1.GetTargetResponse]
+	listTargets         *connect.Client[v1.ListTargetsRequest, v1.ListTargetsResponse]
+	createTarget        *connect.Client[v1.CreateTargetRequest, v1.CreateTargetResponse]
+	updateTarget        *connect.Client[v1.UpdateTargetRequest, v1.UpdateTargetResponse]
+	deleteTarget        *connect.Client[v1.DeleteTargetRequest, v1.DeleteTargetResponse]
+	getSubjectAccess    *connect.Client[v1.GetSubjectAccessRequest, v1.GetSubjectAccessResponse]
+	getMyAccess         *connect.Client[v1.GetMyAccessRequest, v1.GetMyAccessResponse]
+	getTargetFilters    *connect.Client[v1.GetTargetFiltersRequest, v1.GetTargetFiltersResponse]
+	getTargetPrincipals *connect.Client[v1.GetTargetPrincipalsRequest, v1.GetTargetPrincipalsResponse]
+	syncTargetUsers     *connect.Client[v1.SyncTargetUsersRequest, v1.SyncTargetUsersResponse]
 }
 
 // GetTarget calls nokku.v1.TargetService.GetTarget.
@@ -221,6 +244,24 @@ func (c *targetServiceClient) GetTargetFilters(ctx context.Context, req *v1.GetT
 	return nil, err
 }
 
+// GetTargetPrincipals calls nokku.v1.TargetService.GetTargetPrincipals.
+func (c *targetServiceClient) GetTargetPrincipals(ctx context.Context, req *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error) {
+	response, err := c.getTargetPrincipals.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// SyncTargetUsers calls nokku.v1.TargetService.SyncTargetUsers.
+func (c *targetServiceClient) SyncTargetUsers(ctx context.Context, req *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error) {
+	response, err := c.syncTargetUsers.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
 // TargetServiceHandler is an implementation of the nokku.v1.TargetService service.
 type TargetServiceHandler interface {
 	GetTarget(context.Context, *v1.GetTargetRequest) (*v1.GetTargetResponse, error)
@@ -231,6 +272,8 @@ type TargetServiceHandler interface {
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
 	GetMyAccess(context.Context, *v1.GetMyAccessRequest) (*v1.GetMyAccessResponse, error)
 	GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error)
+	GetTargetPrincipals(context.Context, *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error)
+	SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error)
 }
 
 // NewTargetServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -293,6 +336,19 @@ func NewTargetServiceHandler(svc TargetServiceHandler, opts ...connect.HandlerOp
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	targetServiceGetTargetPrincipalsHandler := connect.NewUnaryHandlerSimple(
+		TargetServiceGetTargetPrincipalsProcedure,
+		svc.GetTargetPrincipals,
+		connect.WithSchema(targetServiceMethods.ByName("GetTargetPrincipals")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	targetServiceSyncTargetUsersHandler := connect.NewUnaryHandlerSimple(
+		TargetServiceSyncTargetUsersProcedure,
+		svc.SyncTargetUsers,
+		connect.WithSchema(targetServiceMethods.ByName("SyncTargetUsers")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/nokku.v1.TargetService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case TargetServiceGetTargetProcedure:
@@ -311,6 +367,10 @@ func NewTargetServiceHandler(svc TargetServiceHandler, opts ...connect.HandlerOp
 			targetServiceGetMyAccessHandler.ServeHTTP(w, r)
 		case TargetServiceGetTargetFiltersProcedure:
 			targetServiceGetTargetFiltersHandler.ServeHTTP(w, r)
+		case TargetServiceGetTargetPrincipalsProcedure:
+			targetServiceGetTargetPrincipalsHandler.ServeHTTP(w, r)
+		case TargetServiceSyncTargetUsersProcedure:
+			targetServiceSyncTargetUsersHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -350,4 +410,12 @@ func (UnimplementedTargetServiceHandler) GetMyAccess(context.Context, *v1.GetMyA
 
 func (UnimplementedTargetServiceHandler) GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.GetTargetFilters is not implemented"))
+}
+
+func (UnimplementedTargetServiceHandler) GetTargetPrincipals(context.Context, *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.GetTargetPrincipals is not implemented"))
+}
+
+func (UnimplementedTargetServiceHandler) SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.SyncTargetUsers is not implemented"))
 }

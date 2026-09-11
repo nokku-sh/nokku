@@ -21,6 +21,7 @@ const (
 var (
 	ErrRelayLimit       = errors.New("relay limit reached")
 	ErrRelayUnavailable = errors.New("relay unavailable")
+	ErrCAInactive       = errors.New("certificate authority is not active")
 )
 
 // Relay is the server-side handle for one relayed SSH connection. It bridges

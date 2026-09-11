@@ -23,10 +23,6 @@ var (
 		connect.CodeInternal,
 		errors.New("something went wrong, please try again"),
 	)
-	ErrUnauthorized = connect.NewError(
-		connect.CodeUnauthenticated,
-		errors.New("please sign in to continue"),
-	)
 	ErrNotFound = connect.NewError(
 		connect.CodeNotFound,
 		errors.New("the requested resource was not found"),
@@ -34,10 +30,6 @@ var (
 	ErrTimeout = connect.NewError(
 		connect.CodeDeadlineExceeded,
 		errors.New("the request took too long, please try again"),
-	)
-	ErrRateLimited = connect.NewError(
-		connect.CodeResourceExhausted,
-		errors.New("too many requests, please try again later"),
 	)
 	ErrPermissionDenied = connect.NewError(
 		connect.CodePermissionDenied,
@@ -58,15 +50,9 @@ var ErrInvalidInput = connect.NewError(
 
 // Auth errors
 
-var (
-	ErrBadCredentials = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("incorrect email or password"),
-	)
-	ErrSSORequired = connect.NewError(
-		connect.CodeFailedPrecondition,
-		errors.New("single sign-on is required for your account"),
-	)
+var ErrBadCredentials = connect.NewError(
+	connect.CodeInvalidArgument,
+	errors.New("incorrect email or password"),
 )
 
 // Login flow errors. Bad credentials answers Unauthenticated: the client
@@ -109,51 +95,6 @@ var (
 	ErrCurrentSession = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("use logout to end the current session"),
-	)
-)
-
-// Workspace errors
-
-var ErrWorkspaceLimit = connect.NewError(
-	connect.CodeResourceExhausted,
-	errors.New("you've reached the maximum number of workspaces"),
-)
-
-// Invitation errors
-
-var (
-	ErrInvitationExpired = connect.NewError(
-		connect.CodeFailedPrecondition,
-		errors.New("this invitation has expired"),
-	)
-	ErrInvitationInvalid = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("the invitation link is invalid"),
-	)
-	ErrInvitationAlreadyJoin = connect.NewError(
-		connect.CodeAlreadyExists,
-		errors.New("you're already a member of this workspace"),
-	)
-)
-
-// Certificate errors
-
-var (
-	ErrCertExtensionInvalid = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("please provide valid certificate extensions"),
-	)
-	ErrCertCriticalInvalid = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("please provide valid critical options"),
-	)
-	ErrCertKeyMalformed = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("the public key format is not recognized"),
-	)
-	ErrCertTargetAccess = connect.NewError(
-		connect.CodePermissionDenied,
-		errors.New("you don't have access to this target"),
 	)
 )
 

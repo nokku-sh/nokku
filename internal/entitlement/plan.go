@@ -18,12 +18,13 @@ package entitlement
 import "maps"
 
 const (
-	FeatureOIDC        = "oidc"
-	FeatureEnforceSSO  = "enforce_sso"
-	FeatureSAML        = "saml"
-	FeatureSCIM        = "scim"
-	FeatureAuditExport = "audit_export"
-	FeatureExternalKMS = "external_kms"
+	FeatureOIDC           = "oidc"
+	FeatureEnforceSSO     = "enforce_sso"
+	FeatureSAML           = "saml"
+	FeatureSCIM           = "scim"
+	FeatureAuditExport    = "audit_export"
+	FeatureAuditStreaming = "audit_streaming"
+	FeatureExternalKMS    = "external_kms"
 )
 
 const (
@@ -31,6 +32,37 @@ const (
 	PlanPro        = "pro"
 	PlanEnterprise = "enterprise"
 )
+
+// Feature is one plan-gated capability: its catalog code and the human-facing
+// name shown in denial messages.
+type Feature struct {
+	Code  string
+	Label string
+}
+
+// CatalogFeatures lists every feature the catalog can grant, code and label
+// together so the two cannot drift. Callers that must cover the whole catalog,
+// the billing payload and the golden test that police feature wiring, iterate
+// this instead of repeating the list.
+var CatalogFeatures = []Feature{
+	{FeatureOIDC, "OIDC single sign-on"},
+	{FeatureEnforceSSO, "enforced single sign-on"},
+	{FeatureSAML, "SAML single sign-on"},
+	{FeatureSCIM, "SCIM provisioning"},
+	{FeatureAuditExport, "audit log export"},
+	{FeatureAuditStreaming, "audit log streaming"},
+	{FeatureExternalKMS, "external key management"},
+}
+
+// featureInCatalog returns the catalog entry for a feature code.
+func featureInCatalog(code string) (Feature, bool) {
+	for _, f := range CatalogFeatures {
+		if f.Code == code {
+			return f, true
+		}
+	}
+	return Feature{}, false
+}
 
 const Unlimited int64 = -1
 
@@ -79,12 +111,13 @@ var catalog = map[string]Plan{
 		RetentionDays:         365,
 		RecordingStorageBytes: 1 << 30,
 		Features: map[string]bool{
-			FeatureOIDC:        true,
-			FeatureEnforceSSO:  true,
-			FeatureSAML:        true,
-			FeatureSCIM:        true,
-			FeatureAuditExport: true,
-			FeatureExternalKMS: true,
+			FeatureOIDC:           true,
+			FeatureEnforceSSO:     true,
+			FeatureSAML:           true,
+			FeatureSCIM:           true,
+			FeatureAuditExport:    true,
+			FeatureAuditStreaming: true,
+			FeatureExternalKMS:    true,
 		},
 	},
 }

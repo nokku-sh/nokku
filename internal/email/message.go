@@ -20,7 +20,6 @@ func (a Address) String() string {
 type Message struct {
 	From     Address
 	To       []Address
-	ReplyTo  []Address
 	Subject  string
 	HTMLBody string
 	TextBody string
@@ -50,8 +49,4 @@ type SenderFunc func(ctx context.Context, msg Message) error
 
 func (f SenderFunc) Send(ctx context.Context, msg Message) error {
 	return f(ctx, msg)
-}
-
-type Renderer interface {
-	Render(template string, data any) (html string, err error)
 }

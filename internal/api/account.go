@@ -36,7 +36,7 @@ func (s *AccountService) GetAccount(
 	if err != nil {
 		return nil, ErrAccountNotFound
 	}
-	return &nokkuv1.GetAccountResponse{User: db.UserToProto(u)}, nil
+	return &nokkuv1.GetAccountResponse{User: u.ToProto()}, nil
 }
 
 func (s *AccountService) UpdateAccount(
@@ -51,7 +51,7 @@ func (s *AccountService) UpdateAccount(
 	if err != nil {
 		return nil, ErrInternal
 	}
-	return &nokkuv1.UpdateAccountResponse{User: db.UserToProto(u)}, nil
+	return &nokkuv1.UpdateAccountResponse{User: u.ToProto()}, nil
 }
 
 func (s *AccountService) ChangePassword(
@@ -275,6 +275,15 @@ func (s *AccountService) DeleteAccount(
 	}
 
 	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
+		// The user is going away: drop every grant that points at them,
+		// across every workspace, so no dangling user id remains.
+		if err := q.DeleteSubjectGrants(ctx, &db.DeleteSubjectGrantsParams{
+			SubjectKind: db.SubjectKindUser,
+			SubjectID:   u.ID,
+		}); err != nil {
+			return err
+		}
+
 		workspaceIDs, err := q.GetWorkspacesByOwner(ctx, u.ID)
 		if err != nil {
 			return err

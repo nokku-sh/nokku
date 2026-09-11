@@ -16,7 +16,7 @@ WHERE
 
 -- name: ListRecordings :many
 SELECT
-  r.*,
+  sqlc.embed(r),
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   recordings r

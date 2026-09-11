@@ -13,24 +13,6 @@ import (
 	nokku "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-const addWorkspaceMember = `-- name: AddWorkspaceMember :exec
-INSERT INTO
-  workspace_members (workspace_id, user_id, role_name)
-VALUES
-  ($1, $2, 'viewer')
-ON CONFLICT (workspace_id, user_id) DO NOTHING
-`
-
-type AddWorkspaceMemberParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-}
-
-func (q *Queries) AddWorkspaceMember(ctx context.Context, arg *AddWorkspaceMemberParams) error {
-	_, err := q.db.Exec(ctx, addWorkspaceMember, arg.WorkspaceID, arg.UserID)
-	return err
-}
-
 const countWorkspaceMembers = `-- name: CountWorkspaceMembers :one
 SELECT
   COUNT(*)::INTEGER
@@ -417,6 +399,45 @@ func (q *Queries) GetWorkspacesByOwner(ctx context.Context, userID string) ([]st
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWorkspaceAuditWebhooks = `-- name: ListWorkspaceAuditWebhooks :many
+SELECT
+  id,
+  (settings ->> 'audit_webhook_url')::text AS webhook_url,
+  (settings ->> 'audit_webhook_secret')::text AS webhook_secret
+FROM workspaces
+WHERE
+  coalesce(settings ->> 'audit_webhook_url', '') <> ''
+`
+
+type ListWorkspaceAuditWebhooksRow struct {
+	ID            string `json:"id"`
+	WebhookURL    string `json:"webhookUrl"`
+	WebhookSecret string `json:"webhookSecret"`
+}
+
+// Destinations for the audit streaming sink. Read as nokku_system: the
+// workspaces table is RLS-scoped to one tenant, and this is a cross-tenant
+// read.
+func (q *Queries) ListWorkspaceAuditWebhooks(ctx context.Context) ([]*ListWorkspaceAuditWebhooksRow, error) {
+	rows, err := q.db.Query(ctx, listWorkspaceAuditWebhooks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListWorkspaceAuditWebhooksRow
+	for rows.Next() {
+		var i ListWorkspaceAuditWebhooksRow
+		if err := rows.Scan(&i.ID, &i.WebhookURL, &i.WebhookSecret); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

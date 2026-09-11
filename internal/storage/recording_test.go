@@ -98,16 +98,4 @@ func TestCreateWriterRoundtrip(t *testing.T) {
 	if _, err = os.Stat(filepath.Join(dir, filepath.FromSlash(key))); !os.IsNotExist(err) {
 		t.Fatalf("object still present after delete (err=%v)", err)
 	}
-
-	// DeletePrefix sweeps a workspace.
-	if err = s.DeletePrefix(context.Background(), RecordingsPrefix("ws-1")); err != nil {
-		t.Fatalf("delete prefix: %v", err)
-	}
-	exists, err := s.Exists(context.Background(), key2)
-	if err != nil {
-		t.Fatalf("exists: %v", err)
-	}
-	if exists {
-		t.Fatal("object still present after prefix delete")
-	}
 }

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"time"
 	"uuid"
@@ -13,10 +12,8 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/nokku-sh/nokku/internal/audit"
 	nokkudaemon "github.com/nokku-sh/nokku/internal/daemon"
 	"github.com/nokku-sh/nokku/internal/iam"
-	"github.com/nokku-sh/nokku/internal/util"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
@@ -257,6 +254,9 @@ func (s *DaemonService) CreateSession(
 		CA:            ca,
 		HostPrincipal: targetID,
 	}); err != nil {
+		if errors.Is(err, nokkudaemon.ErrCAInactive) {
+			return nil, NewError(connect.CodeFailedPrecondition, "certificate authority is not active")
+		}
 		if errors.Is(err, nokkudaemon.ErrRelayLimit) {
 			return nil, NewError(connect.CodeResourceExhausted, "too many concurrent sessions")
 		}
@@ -376,22 +376,8 @@ func (s *DaemonService) logRelayEvent(
 	action, workspaceID, daemonID, relayID string,
 	actor iam.Principal,
 ) {
-	event := &audit.Event{
-		Timestamp:   time.Now().UTC(),
-		WorkspaceID: workspaceID,
-		Action:      action,
-		ActorID:     actor.ID,
-		ActorType:   string(actor.Kind),
-		StatusCode:  "OK",
-		Details:     map[string]any{"relay_id": relayID, "daemon_id": daemonID},
-	}
-	if meta, ok := iam.RequestMetaFromContext(ctx); ok {
-		event.IPAddress = util.SanitizeUTF8(util.GetRemoteIP(meta.Header, meta.RemoteAddr))
-		event.UserAgent = util.SanitizeUTF8(meta.Header.Get("User-Agent"))
-	}
-	if err := s.cfg.Audit.Append(context.WithoutCancel(ctx), event); err != nil {
-		slog.Warn("failed to write relay audit log", "error", err)
-	}
+	appendAuditRow(ctx, s.cfg.Audit, action, workspaceID, actor,
+		map[string]any{"relay_id": relayID, "daemon_id": daemonID})
 }
 
 // Daemon endpoints ------------------------------------------------------------
@@ -500,11 +486,12 @@ func (s *DaemonService) SyncDaemon(
 		return nil, DBError(err)
 	}
 	return &nokkuv1.SyncDaemonResponse{
-		Status:       res.Status,
-		Config:       res.Config,
-		Principals:   res.Principals,
-		CaPublicKey:  &res.CAPublicKey,
-		StateVersion: new(s.cfg.Pool.Version(res.WorkspaceID)),
+		Status:            res.Status,
+		Config:            res.Config,
+		Principals:        res.Principals,
+		CaPublicKey:       &res.CAPublicKey,
+		StateVersion:      new(s.cfg.Pool.Version(res.WorkspaceID)),
+		RevokedPrincipals: res.Revocations,
 	}, nil
 }
 

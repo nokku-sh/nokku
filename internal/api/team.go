@@ -47,10 +47,7 @@ func (s *TeamService) CreateTeam(
 			Description: req.Description,
 			Tags:        req.GetTags(),
 		})
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -72,10 +69,7 @@ func (s *TeamService) UpdateTeam(
 			Description: req.Description,
 			Tags:        req.GetTags(),
 		})
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -90,6 +84,14 @@ func (s *TeamService) DeleteTeam(
 	req *nokkuv1.DeleteTeamRequest,
 ) (*nokkuv1.DeleteTeamResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		// Drop the team's grants first: the team is a shared subject, so its
+		// id must not linger in any principal.
+		if err := q.DeleteSubjectGrants(ctx, &db.DeleteSubjectGrantsParams{
+			SubjectKind: db.SubjectKindTeam,
+			SubjectID:   req.GetId(),
+		}); err != nil {
+			return err
+		}
 		_, err = q.DeleteTeam(ctx, req.GetId())
 		return err
 	}); err != nil {
@@ -123,7 +125,7 @@ func (s *TeamService) ListTeams(
 		// fetched per team through ListTeamMembers when a view needs them.
 		ids := make([]string, 0, len(teams))
 		for _, t := range teams {
-			ids = append(ids, t.ID)
+			ids = append(ids, t.Team.ID)
 		}
 		counts, err := q.CountTeamMembers(ctx, ids)
 		if err != nil {

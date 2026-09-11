@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"time"
 )
 
 const createTarget = `-- name: CreateTarget :one
@@ -34,7 +33,7 @@ VALUES
     $8
   )
 RETURNING
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, created_at, updated_at
+  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, reported_users, reported_at, created_at, updated_at
 `
 
 type CreateTargetParams struct {
@@ -71,6 +70,8 @@ func (q *Queries) CreateTarget(ctx context.Context, arg *CreateTargetParams) (*T
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
+		&i.ReportedUsers,
+		&i.ReportedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -82,7 +83,7 @@ DELETE FROM targets
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, created_at, updated_at
+  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, reported_users, reported_at, created_at, updated_at
 `
 
 func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, error) {
@@ -99,6 +100,8 @@ func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, e
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
+		&i.ReportedUsers,
+		&i.ReportedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -107,7 +110,7 @@ func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, e
 
 const getSubjectTargetsByWorkspaces = `-- name: GetSubjectTargetsByWorkspaces :many
 SELECT DISTINCT
-  t.id, t.workspace_id, t.ca_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.created_at, t.updated_at
+  t.id, t.workspace_id, t.ca_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.reported_users, t.reported_at, t.created_at, t.updated_at
 FROM
   targets t
 WHERE
@@ -121,48 +124,29 @@ WHERE
         principals p
       WHERE
         p.target_id = t.id
-        AND (
-          -- Direct user grant
-          EXISTS (
-            SELECT
-              1
-            FROM
-              principal_users pu
-            WHERE
-              pu.principal_id = p.id
-              AND pu.user_id = $2::UUID
-          )
-          -- Subject is a team with a direct grant
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              principal_teams pt
-            WHERE
-              pt.principal_id = p.id
-              AND pt.team_id = $2::UUID
-          )
-          -- Subject is a service account with a direct grant
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              principal_service_accounts psa
-            WHERE
-              psa.principal_id = p.id
-              AND psa.service_account_id = $2::UUID
-          )
-          -- Subject is a user who belongs to a team granted access
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              principal_teams granted_team
-              JOIN team_members tm ON tm.team_id = granted_team.team_id
-            WHERE
-              granted_team.principal_id = p.id
-              AND tm.user_id = $2::UUID
-          )
+        AND EXISTS (
+          SELECT
+            1
+          FROM
+            principal_grants g
+          WHERE
+            g.principal_id = p.id
+            AND (
+              -- Direct grant to this subject: user, team, or service account.
+              g.subject_id = $2::UUID
+              -- Or the subject is a user who belongs to a granted team.
+              OR (
+                g.subject_kind = 'team'
+                AND g.subject_id IN (
+                  SELECT
+                    tm.team_id
+                  FROM
+                    team_members tm
+                  WHERE
+                    tm.user_id = $2::UUID
+                )
+              )
+            )
         )
     )
   )
@@ -201,6 +185,8 @@ func (q *Queries) GetSubjectTargetsByWorkspaces(ctx context.Context, arg *GetSub
 			&i.HostPublicKey,
 			&i.Tags,
 			&i.Metadata,
+			&i.ReportedUsers,
+			&i.ReportedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -216,7 +202,7 @@ func (q *Queries) GetSubjectTargetsByWorkspaces(ctx context.Context, arg *GetSub
 
 const getTarget = `-- name: GetTarget :one
 SELECT
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, created_at, updated_at
+  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, reported_users, reported_at, created_at, updated_at
 FROM
   targets
 WHERE
@@ -237,6 +223,8 @@ func (q *Queries) GetTarget(ctx context.Context, targetID string) (*Target, erro
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
+		&i.ReportedUsers,
+		&i.ReportedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -245,7 +233,7 @@ func (q *Queries) GetTarget(ctx context.Context, targetID string) (*Target, erro
 
 const getTargetsBySubject = `-- name: GetTargetsBySubject :many
 SELECT DISTINCT
-  t.id, t.workspace_id, t.ca_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.created_at, t.updated_at
+  t.id, t.workspace_id, t.ca_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.reported_users, t.reported_at, t.created_at, t.updated_at
 FROM
   targets t
 WHERE
@@ -257,48 +245,30 @@ WHERE
       principals p
     WHERE
       p.target_id = t.id
-      AND (
-        -- Direct user grant
-        EXISTS (
-          SELECT
-            1
-          FROM
-            principal_users pu
-          WHERE
-            pu.principal_id = p.id
-            AND pu.user_id = $1::UUID
-        )
-        -- Subject is a team with a direct grant
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            principal_teams pt
-          WHERE
-            pt.principal_id = p.id
-            AND pt.team_id = $1::UUID
-        )
-        -- Subject is a service account with a direct grant
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            principal_service_accounts psa
-          WHERE
-            psa.principal_id = p.id
-            AND psa.service_account_id = $1::UUID
-        )
-        -- Subject is a user who belongs to a team granted access
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            principal_teams granted_team
-            JOIN team_members tm ON tm.team_id = granted_team.team_id
-          WHERE
-            granted_team.principal_id = p.id
-            AND tm.user_id = $1::UUID
-        )
+      AND EXISTS (
+        SELECT
+          1
+        FROM
+          principal_grants g
+        WHERE
+          g.principal_id = p.id
+          AND (
+            -- Direct grant to this subject: user, team, or service account.
+            -- Subject UUIDs are unique across the three kinds.
+            g.subject_id = $1::UUID
+            -- Or the subject is a user who belongs to a granted team.
+            OR (
+              g.subject_kind = 'team'
+              AND g.subject_id IN (
+                SELECT
+                  tm.team_id
+                FROM
+                  team_members tm
+                WHERE
+                  tm.user_id = $1::UUID
+              )
+            )
+          )
       )
   )
 `
@@ -326,6 +296,8 @@ func (q *Queries) GetTargetsBySubject(ctx context.Context, subjectID string) ([]
 			&i.HostPublicKey,
 			&i.Tags,
 			&i.Metadata,
+			&i.ReportedUsers,
+			&i.ReportedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -403,7 +375,7 @@ func (q *Queries) GetWorkspaceTags(ctx context.Context, workspaceID string) ([]s
 
 const listTargets = `-- name: ListTargets :many
 SELECT
-  t.id, t.workspace_id, t.ca_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.created_at, t.updated_at,
+  t.id, t.workspace_id, t.ca_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.reported_users, t.reported_at, t.created_at, t.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   targets t
@@ -458,19 +430,8 @@ type ListTargetsParams struct {
 }
 
 type ListTargetsRow struct {
-	ID            string    `json:"id"`
-	WorkspaceID   string    `json:"workspaceId"`
-	CaID          *string   `json:"caId"`
-	DaemonID      *string   `json:"daemonId"`
-	Name          string    `json:"name"`
-	Description   *string   `json:"description"`
-	Endpoints     []string  `json:"endpoints"`
-	HostPublicKey *string   `json:"hostPublicKey"`
-	Tags          []string  `json:"tags"`
-	Metadata      []byte    `json:"metadata"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
-	TotalCount    int32     `json:"totalCount"`
+	Target     Target `json:"target"`
+	TotalCount int32  `json:"totalCount"`
 }
 
 func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*ListTargetsRow, error) {
@@ -492,18 +453,20 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*L
 	for rows.Next() {
 		var i ListTargetsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.CaID,
-			&i.DaemonID,
-			&i.Name,
-			&i.Description,
-			&i.Endpoints,
-			&i.HostPublicKey,
-			&i.Tags,
-			&i.Metadata,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.Target.ID,
+			&i.Target.WorkspaceID,
+			&i.Target.CaID,
+			&i.Target.DaemonID,
+			&i.Target.Name,
+			&i.Target.Description,
+			&i.Target.Endpoints,
+			&i.Target.HostPublicKey,
+			&i.Target.Tags,
+			&i.Target.Metadata,
+			&i.Target.ReportedUsers,
+			&i.Target.ReportedAt,
+			&i.Target.CreatedAt,
+			&i.Target.UpdatedAt,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
@@ -529,7 +492,7 @@ SET
 WHERE
   id = $8
 RETURNING
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, created_at, updated_at
+  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, reported_users, reported_at, created_at, updated_at
 `
 
 type UpdateTargetParams struct {
@@ -566,6 +529,8 @@ func (q *Queries) UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*T
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
+		&i.ReportedUsers,
+		&i.ReportedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -592,7 +557,7 @@ SET
 WHERE
   targets.daemon_id = $2
 RETURNING
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, created_at, updated_at
+  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, reported_users, reported_at, created_at, updated_at
 `
 
 type UpdateTargetCAParams struct {
@@ -614,6 +579,8 @@ func (q *Queries) UpdateTargetCA(ctx context.Context, arg *UpdateTargetCAParams)
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
+		&i.ReportedUsers,
+		&i.ReportedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
