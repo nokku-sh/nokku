@@ -3,12 +3,20 @@ package entitlement
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// fakeDB is a narrow in-memory DB for resolver tests.
+// fakeDB fakes the transactional surface the resolver reads through. It
+// doubles as the sqlc DBTX underneath, serving the two queries entitlement
+// issues: the workspace subscription row and the pooled resource count.
 type fakeDB struct {
 	plan        string
 	status      Status
@@ -17,15 +25,69 @@ type fakeDB struct {
 	resourceErr error
 }
 
-func (f *fakeDB) Subscription(_ context.Context, _ string) (string, Status, error) {
-	if f.subErr != nil {
-		return "", StatusInactive, f.subErr
-	}
-	return f.plan, f.status, nil
+func (f *fakeDB) WithTx(_ context.Context, fn func(*db.Queries) error) error {
+	return fn(db.New(f))
 }
 
-func (f *fakeDB) ResourceCount(_ context.Context, _ string) (int64, error) {
-	return f.resources, f.resourceErr
+func (f *fakeDB) Exec(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+	return pgconn.CommandTag{}, nil
+}
+
+func (f *fakeDB) Query(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
+	return nil, errors.New("entitlement test: unexpected query")
+}
+
+func (f *fakeDB) QueryRow(_ context.Context, sql string, _ ...any) pgx.Row {
+	switch {
+	case strings.Contains(sql, "workspace_subscriptions"):
+		if f.subErr != nil {
+			return errRow{f.subErr}
+		}
+		return rowVals{vals: []any{
+			"ws1", "stripe", f.plan, string(f.status),
+			"cus_1", "sub_1", nil, false,
+			time.Time{},
+		}}
+	case strings.Contains(sql, "resource_count"):
+		if f.resourceErr != nil {
+			return errRow{f.resourceErr}
+		}
+		return rowVals{vals: []any{f.resources}}
+	default:
+		panic("entitlement test: unexpected query row: " + sql)
+	}
+}
+
+// errRow is a pgx.Row that always fails with err.
+type errRow struct{ err error }
+
+func (r errRow) Scan(_ ...any) error { return r.err }
+
+// rowVals scans one row positionally into the sqlc-generated destinations
+// for the queries above.
+type rowVals struct{ vals []any }
+
+func (r rowVals) Scan(dest ...any) error {
+	if len(r.vals) != len(dest) {
+		return pgx.ErrNoRows
+	}
+	for i, d := range dest {
+		switch out := d.(type) {
+		case *string:
+			*out = r.vals[i].(string)
+		case *bool:
+			*out = r.vals[i].(bool)
+		case *time.Time:
+			*out = r.vals[i].(time.Time)
+		case **time.Time:
+			*out = nil
+		case *int64:
+			*out = r.vals[i].(int64)
+		default:
+			return fmt.Errorf("rowVals: unsupported dest %T", d)
+		}
+	}
+	return nil
 }
 
 type fakeLicense struct {

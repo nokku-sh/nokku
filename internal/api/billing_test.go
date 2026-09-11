@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
@@ -38,17 +39,13 @@ func TestFeaturesProto_EnterpriseLicenseEnablesStreaming(t *testing.T) {
 	}
 }
 
+// noSubscription reports the workspace has no subscription row, the normal
+// Community case. The transaction short-circuits with ErrNoSubscription,
+// which is exactly what the resolver treats as "no row".
 type noSubscription struct{}
 
-func (noSubscription) Subscription(
-	context.Context,
-	string,
-) (string, entitlement.Status, error) {
-	return "", "", entitlement.ErrNoSubscription
-}
-
-func (noSubscription) ResourceCount(context.Context, string) (int64, error) {
-	return 0, nil
+func (noSubscription) WithTx(_ context.Context, _ func(*db.Queries) error) error {
+	return entitlement.ErrNoSubscription
 }
 
 type enterpriseLicense struct{}
