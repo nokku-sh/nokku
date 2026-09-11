@@ -2,471 +2,475 @@
 // @generated from file nokku/v1/principal.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
-import { file_google_api_annotations } from "../../google/api/annotations_pb";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { Message } from "@bufbuild/protobuf";
+import type { GenEnum, GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
+import { file_buf_validate_validate } from '../../buf/validate/validate_pb';
+import { file_google_api_annotations } from '../../google/api/annotations_pb';
+import type { Timestamp } from '@bufbuild/protobuf/wkt';
+import { file_google_protobuf_timestamp } from '@bufbuild/protobuf/wkt';
+import type { Message } from '@bufbuild/protobuf';
 
 /**
  * Describes the file nokku/v1/principal.proto.
  */
-export const file_nokku_v1_principal: GenFile = /*@__PURE__*/
-  fileDesc("Chhub2trdS92MS9wcmluY2lwYWwucHJvdG8SCG5va2t1LnYxIq0BCglQcmluY2lwYWwSCgoCaWQYASABKAkSEQoJdGFyZ2V0X2lkGAIgASgJEhAKCHVzZXJuYW1lGAMgASgJEhAKCHVzZXJfaWRzGAQgAygJEhAKCHRlYW1faWRzGAUgAygJEhsKE3NlcnZpY2VfYWNjb3VudF9pZHMYBiADKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAijgEKFFNldFByaW5jaXBhbHNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJdGFyZ2V0X2lkGAIgASgJQgi6SAVyA7ABARI5Cgl1c2VybmFtZXMYAyADKAlCJrpII5IBICIechwQARggMhZeW2Etel9dW2EtejAtOS1fXSpcJD8kIhcKFVNldFByaW5jaXBhbHNSZXNwb25zZSLJAQoVTGlzdFByaW5jaXBhbHNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJdGFyZ2V0X2lkGAIgASgJQgi6SAVyA7ABARIYCgVsaW1pdBgDIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgEIAEoBUIHukgEGgIoABINCgVxdWVyeRgFIAEoCRIxCgR0eXBlGAYgASgOMhcubm9ra3UudjEuUHJpbmNpcGFsVHlwZUIKukgHggEEEAEgACJQChZMaXN0UHJpbmNpcGFsc1Jlc3BvbnNlEicKCnByaW5jaXBhbHMYASADKAsyEy5ub2trdS52MS5QcmluY2lwYWwSDQoFdG90YWwYAiABKAUisAEKHUFkZFN1YmplY3RzVG9QcmluY2lwYWxSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBEiYKC3N1YmplY3RfaWRzGAMgAygJQhG6SA6SAQsIARAyIgVyA7ABARIxCgR0eXBlGAQgASgOMhcubm9ra3UudjEuUHJpbmNpcGFsVHlwZUIKukgHggEEEAEgACIgCh5BZGRTdWJqZWN0c1RvUHJpbmNpcGFsUmVzcG9uc2UitQEKIlJlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbFJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIUCgJpZBgCIAEoCUIIukgFcgOwAQESJgoLc3ViamVjdF9pZHMYAyADKAlCEbpIDpIBCwgBEDIiBXIDsAEBEjEKBHR5cGUYBCABKA4yFy5ub2trdS52MS5QcmluY2lwYWxUeXBlQgq6SAeCAQQQASAAIiUKI1JlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbFJlc3BvbnNlIokBChZSZXZva2VBbGxBY2Nlc3NSZXF1ZXN0EhwKCnN1YmplY3RfaWQYASABKAlCCLpIBXIDsAEBEh4KDHdvcmtzcGFjZV9pZBgCIAEoCUIIukgFcgOwAQESMQoEdHlwZRgDIAEoDjIXLm5va2t1LnYxLlByaW5jaXBhbFR5cGVCCrpIB4IBBBABIAAiGQoXUmV2b2tlQWxsQWNjZXNzUmVzcG9uc2UibwoTQWRkUHJpbmNpcGFsUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhsKCXRhcmdldF9pZBgCIAEoCUIIukgFcgOwAQESGwoIdXNlcm5hbWUYAyABKAlCCbpIBnIEEAEYQCI+ChRBZGRQcmluY2lwYWxSZXNwb25zZRImCglwcmluY2lwYWwYASABKAsyEy5ub2trdS52MS5QcmluY2lwYWwiTgoWUmVtb3ZlUHJpbmNpcGFsUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASIZChdSZW1vdmVQcmluY2lwYWxSZXNwb25zZSqFAQoNUHJpbmNpcGFsVHlwZRIeChpQUklOQ0lQQUxfVFlQRV9VTlNQRUNJRklFRBAAEhcKE1BSSU5DSVBBTF9UWVBFX1VTRVIQARIXChNQUklOQ0lQQUxfVFlQRV9URUFNEAISIgoeUFJJTkNJUEFMX1RZUEVfU0VSVklDRV9BQ0NPVU5UEAMyxggKEFByaW5jaXBhbFNlcnZpY2UShQEKDVNldFByaW5jaXBhbHMSHi5ub2trdS52MS5TZXRQcmluY2lwYWxzUmVxdWVzdBofLm5va2t1LnYxLlNldFByaW5jaXBhbHNSZXNwb25zZSIzgtPkkwItOgEqIigvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9wcmluY2lwYWxzEogBCg5MaXN0UHJpbmNpcGFscxIfLm5va2t1LnYxLkxpc3RQcmluY2lwYWxzUmVxdWVzdBogLm5va2t1LnYxLkxpc3RQcmluY2lwYWxzUmVzcG9uc2UiM5ACAYLT5JMCKhIoL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcHJpbmNpcGFscxKLAQoMQWRkUHJpbmNpcGFsEh0ubm9ra3UudjEuQWRkUHJpbmNpcGFsUmVxdWVzdBoeLm5va2t1LnYxLkFkZFByaW5jaXBhbFJlc3BvbnNlIjyC0+STAjY6ASoiMS92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3ByaW5jaXBhbHMvYWNjb3VudHMSmwEKD1JlbW92ZVByaW5jaXBhbBIgLm5va2t1LnYxLlJlbW92ZVByaW5jaXBhbFJlcXVlc3QaIS5ub2trdS52MS5SZW1vdmVQcmluY2lwYWxSZXNwb25zZSJDgtPkkwI9OgEqIjgvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9wcmluY2lwYWxzL2FjY291bnRzOnJlbW92ZRKkAQoWQWRkU3ViamVjdHNUb1ByaW5jaXBhbBInLm5va2t1LnYxLkFkZFN1YmplY3RzVG9QcmluY2lwYWxSZXF1ZXN0Gigubm9ra3UudjEuQWRkU3ViamVjdHNUb1ByaW5jaXBhbFJlc3BvbnNlIjeC0+STAjE6ASoiLC92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3ByaW5jaXBhbHM6YWRkErYBChtSZW1vdmVTdWJqZWN0c0Zyb21QcmluY2lwYWwSLC5ub2trdS52MS5SZW1vdmVTdWJqZWN0c0Zyb21QcmluY2lwYWxSZXF1ZXN0Gi0ubm9ra3UudjEuUmVtb3ZlU3ViamVjdHNGcm9tUHJpbmNpcGFsUmVzcG9uc2UiOoLT5JMCNDoBKiIvL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcHJpbmNpcGFsczpyZW1vdmUSkgEKD1Jldm9rZUFsbEFjY2VzcxIgLm5va2t1LnYxLlJldm9rZUFsbEFjY2Vzc1JlcXVlc3QaIS5ub2trdS52MS5SZXZva2VBbGxBY2Nlc3NSZXNwb25zZSI6gtPkkwI0OgEqIi8vdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9wcmluY2lwYWxzOnJldm9rZUKYAQoMY29tLm5va2t1LnYxQg5QcmluY2lwYWxQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]);
+export const file_nokku_v1_principal: GenFile /*@__PURE__*/ = fileDesc(
+	'Chhub2trdS92MS9wcmluY2lwYWwucHJvdG8SCG5va2t1LnYxIq0BCglQcmluY2lwYWwSCgoCaWQYASABKAkSEQoJdGFyZ2V0X2lkGAIgASgJEhAKCHVzZXJuYW1lGAMgASgJEhAKCHVzZXJfaWRzGAQgAygJEhAKCHRlYW1faWRzGAUgAygJEhsKE3NlcnZpY2VfYWNjb3VudF9pZHMYBiADKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAijgEKFFNldFByaW5jaXBhbHNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJdGFyZ2V0X2lkGAIgASgJQgi6SAVyA7ABARI5Cgl1c2VybmFtZXMYAyADKAlCJrpII5IBICIechwQARggMhZeW2Etel9dW2EtejAtOS1fXSpcJD8kIhcKFVNldFByaW5jaXBhbHNSZXNwb25zZSLJAQoVTGlzdFByaW5jaXBhbHNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJdGFyZ2V0X2lkGAIgASgJQgi6SAVyA7ABARIYCgVsaW1pdBgDIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgEIAEoBUIHukgEGgIoABINCgVxdWVyeRgFIAEoCRIxCgR0eXBlGAYgASgOMhcubm9ra3UudjEuUHJpbmNpcGFsVHlwZUIKukgHggEEEAEgACJQChZMaXN0UHJpbmNpcGFsc1Jlc3BvbnNlEicKCnByaW5jaXBhbHMYASADKAsyEy5ub2trdS52MS5QcmluY2lwYWwSDQoFdG90YWwYAiABKAUisAEKHUFkZFN1YmplY3RzVG9QcmluY2lwYWxSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBEiYKC3N1YmplY3RfaWRzGAMgAygJQhG6SA6SAQsIARAyIgVyA7ABARIxCgR0eXBlGAQgASgOMhcubm9ra3UudjEuUHJpbmNpcGFsVHlwZUIKukgHggEEEAEgACIgCh5BZGRTdWJqZWN0c1RvUHJpbmNpcGFsUmVzcG9uc2UitQEKIlJlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbFJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIUCgJpZBgCIAEoCUIIukgFcgOwAQESJgoLc3ViamVjdF9pZHMYAyADKAlCEbpIDpIBCwgBEDIiBXIDsAEBEjEKBHR5cGUYBCABKA4yFy5ub2trdS52MS5QcmluY2lwYWxUeXBlQgq6SAeCAQQQASAAIiUKI1JlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbFJlc3BvbnNlIokBChZSZXZva2VBbGxBY2Nlc3NSZXF1ZXN0EhwKCnN1YmplY3RfaWQYASABKAlCCLpIBXIDsAEBEh4KDHdvcmtzcGFjZV9pZBgCIAEoCUIIukgFcgOwAQESMQoEdHlwZRgDIAEoDjIXLm5va2t1LnYxLlByaW5jaXBhbFR5cGVCCrpIB4IBBBABIAAiGQoXUmV2b2tlQWxsQWNjZXNzUmVzcG9uc2UibwoTQWRkUHJpbmNpcGFsUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhsKCXRhcmdldF9pZBgCIAEoCUIIukgFcgOwAQESGwoIdXNlcm5hbWUYAyABKAlCCbpIBnIEEAEYQCI+ChRBZGRQcmluY2lwYWxSZXNwb25zZRImCglwcmluY2lwYWwYASABKAsyEy5ub2trdS52MS5QcmluY2lwYWwiTgoWUmVtb3ZlUHJpbmNpcGFsUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASIZChdSZW1vdmVQcmluY2lwYWxSZXNwb25zZSqFAQoNUHJpbmNpcGFsVHlwZRIeChpQUklOQ0lQQUxfVFlQRV9VTlNQRUNJRklFRBAAEhcKE1BSSU5DSVBBTF9UWVBFX1VTRVIQARIXChNQUklOQ0lQQUxfVFlQRV9URUFNEAISIgoeUFJJTkNJUEFMX1RZUEVfU0VSVklDRV9BQ0NPVU5UEAMyxggKEFByaW5jaXBhbFNlcnZpY2UShQEKDVNldFByaW5jaXBhbHMSHi5ub2trdS52MS5TZXRQcmluY2lwYWxzUmVxdWVzdBofLm5va2t1LnYxLlNldFByaW5jaXBhbHNSZXNwb25zZSIzgtPkkwItOgEqIigvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9wcmluY2lwYWxzEogBCg5MaXN0UHJpbmNpcGFscxIfLm5va2t1LnYxLkxpc3RQcmluY2lwYWxzUmVxdWVzdBogLm5va2t1LnYxLkxpc3RQcmluY2lwYWxzUmVzcG9uc2UiM5ACAYLT5JMCKhIoL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcHJpbmNpcGFscxKLAQoMQWRkUHJpbmNpcGFsEh0ubm9ra3UudjEuQWRkUHJpbmNpcGFsUmVxdWVzdBoeLm5va2t1LnYxLkFkZFByaW5jaXBhbFJlc3BvbnNlIjyC0+STAjY6ASoiMS92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3ByaW5jaXBhbHMvYWNjb3VudHMSmwEKD1JlbW92ZVByaW5jaXBhbBIgLm5va2t1LnYxLlJlbW92ZVByaW5jaXBhbFJlcXVlc3QaIS5ub2trdS52MS5SZW1vdmVQcmluY2lwYWxSZXNwb25zZSJDgtPkkwI9OgEqIjgvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9wcmluY2lwYWxzL2FjY291bnRzOnJlbW92ZRKkAQoWQWRkU3ViamVjdHNUb1ByaW5jaXBhbBInLm5va2t1LnYxLkFkZFN1YmplY3RzVG9QcmluY2lwYWxSZXF1ZXN0Gigubm9ra3UudjEuQWRkU3ViamVjdHNUb1ByaW5jaXBhbFJlc3BvbnNlIjeC0+STAjE6ASoiLC92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3ByaW5jaXBhbHM6YWRkErYBChtSZW1vdmVTdWJqZWN0c0Zyb21QcmluY2lwYWwSLC5ub2trdS52MS5SZW1vdmVTdWJqZWN0c0Zyb21QcmluY2lwYWxSZXF1ZXN0Gi0ubm9ra3UudjEuUmVtb3ZlU3ViamVjdHNGcm9tUHJpbmNpcGFsUmVzcG9uc2UiOoLT5JMCNDoBKiIvL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcHJpbmNpcGFsczpyZW1vdmUSkgEKD1Jldm9rZUFsbEFjY2VzcxIgLm5va2t1LnYxLlJldm9rZUFsbEFjY2Vzc1JlcXVlc3QaIS5ub2trdS52MS5SZXZva2VBbGxBY2Nlc3NSZXNwb25zZSI6gtPkkwI0OgEqIi8vdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9wcmluY2lwYWxzOnJldm9rZUKYAQoMY29tLm5va2t1LnYxQg5QcmluY2lwYWxQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
+	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
+);
 
 /**
  * @generated from message nokku.v1.Principal
  */
-export type Principal = Message<"nokku.v1.Principal"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
+export type Principal = Message<'nokku.v1.Principal'> & {
+	/**
+	 * @generated from field: string id = 1;
+	 */
+	id: string;
 
-  /**
-   * @generated from field: string target_id = 2;
-   */
-  targetId: string;
+	/**
+	 * @generated from field: string target_id = 2;
+	 */
+	targetId: string;
 
-  /**
-   * @generated from field: string username = 3;
-   */
-  username: string;
+	/**
+	 * @generated from field: string username = 3;
+	 */
+	username: string;
 
-  /**
-   * @generated from field: repeated string user_ids = 4;
-   */
-  userIds: string[];
+	/**
+	 * @generated from field: repeated string user_ids = 4;
+	 */
+	userIds: string[];
 
-  /**
-   * @generated from field: repeated string team_ids = 5;
-   */
-  teamIds: string[];
+	/**
+	 * @generated from field: repeated string team_ids = 5;
+	 */
+	teamIds: string[];
 
-  /**
-   * @generated from field: repeated string service_account_ids = 6;
-   */
-  serviceAccountIds: string[];
+	/**
+	 * @generated from field: repeated string service_account_ids = 6;
+	 */
+	serviceAccountIds: string[];
 
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 7;
-   */
-  createdAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp created_at = 7;
+	 */
+	createdAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.Principal.
  * Use `create(PrincipalSchema)` to create a new message.
  */
-export const PrincipalSchema: GenMessage<Principal> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 0);
+export const PrincipalSchema: GenMessage<Principal> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_principal,
+	0
+);
 
 /**
  * @generated from message nokku.v1.SetPrincipalsRequest
  */
-export type SetPrincipalsRequest = Message<"nokku.v1.SetPrincipalsRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type SetPrincipalsRequest = Message<'nokku.v1.SetPrincipalsRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string target_id = 2;
-   */
-  targetId: string;
+	/**
+	 * @generated from field: string target_id = 2;
+	 */
+	targetId: string;
 
-  /**
-   * @generated from field: repeated string usernames = 3;
-   */
-  usernames: string[];
+	/**
+	 * @generated from field: repeated string usernames = 3;
+	 */
+	usernames: string[];
 };
 
 /**
  * Describes the message nokku.v1.SetPrincipalsRequest.
  * Use `create(SetPrincipalsRequestSchema)` to create a new message.
  */
-export const SetPrincipalsRequestSchema: GenMessage<SetPrincipalsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 1);
+export const SetPrincipalsRequestSchema: GenMessage<SetPrincipalsRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 1);
 
 /**
  * @generated from message nokku.v1.SetPrincipalsResponse
  */
-export type SetPrincipalsResponse = Message<"nokku.v1.SetPrincipalsResponse"> & {
-};
+export type SetPrincipalsResponse = Message<'nokku.v1.SetPrincipalsResponse'> & {};
 
 /**
  * Describes the message nokku.v1.SetPrincipalsResponse.
  * Use `create(SetPrincipalsResponseSchema)` to create a new message.
  */
-export const SetPrincipalsResponseSchema: GenMessage<SetPrincipalsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 2);
+export const SetPrincipalsResponseSchema: GenMessage<SetPrincipalsResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 2);
 
 /**
  * @generated from message nokku.v1.ListPrincipalsRequest
  */
-export type ListPrincipalsRequest = Message<"nokku.v1.ListPrincipalsRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type ListPrincipalsRequest = Message<'nokku.v1.ListPrincipalsRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string target_id = 2;
-   */
-  targetId: string;
+	/**
+	 * @generated from field: string target_id = 2;
+	 */
+	targetId: string;
 
-  /**
-   * @generated from field: int32 limit = 3;
-   */
-  limit: number;
+	/**
+	 * @generated from field: int32 limit = 3;
+	 */
+	limit: number;
 
-  /**
-   * @generated from field: int32 offset = 4;
-   */
-  offset: number;
+	/**
+	 * @generated from field: int32 offset = 4;
+	 */
+	offset: number;
 
-  /**
-   * @generated from field: string query = 5;
-   */
-  query: string;
+	/**
+	 * @generated from field: string query = 5;
+	 */
+	query: string;
 
-  /**
-   * @generated from field: nokku.v1.PrincipalType type = 6;
-   */
-  type: PrincipalType;
+	/**
+	 * @generated from field: nokku.v1.PrincipalType type = 6;
+	 */
+	type: PrincipalType;
 };
 
 /**
  * Describes the message nokku.v1.ListPrincipalsRequest.
  * Use `create(ListPrincipalsRequestSchema)` to create a new message.
  */
-export const ListPrincipalsRequestSchema: GenMessage<ListPrincipalsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 3);
+export const ListPrincipalsRequestSchema: GenMessage<ListPrincipalsRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 3);
 
 /**
  * @generated from message nokku.v1.ListPrincipalsResponse
  */
-export type ListPrincipalsResponse = Message<"nokku.v1.ListPrincipalsResponse"> & {
-  /**
-   * @generated from field: repeated nokku.v1.Principal principals = 1;
-   */
-  principals: Principal[];
+export type ListPrincipalsResponse = Message<'nokku.v1.ListPrincipalsResponse'> & {
+	/**
+	 * @generated from field: repeated nokku.v1.Principal principals = 1;
+	 */
+	principals: Principal[];
 
-  /**
-   * @generated from field: int32 total = 2;
-   */
-  total: number;
+	/**
+	 * @generated from field: int32 total = 2;
+	 */
+	total: number;
 };
 
 /**
  * Describes the message nokku.v1.ListPrincipalsResponse.
  * Use `create(ListPrincipalsResponseSchema)` to create a new message.
  */
-export const ListPrincipalsResponseSchema: GenMessage<ListPrincipalsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 4);
+export const ListPrincipalsResponseSchema: GenMessage<ListPrincipalsResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 4);
 
 /**
  * @generated from message nokku.v1.AddSubjectsToPrincipalRequest
  */
-export type AddSubjectsToPrincipalRequest = Message<"nokku.v1.AddSubjectsToPrincipalRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type AddSubjectsToPrincipalRequest = Message<'nokku.v1.AddSubjectsToPrincipalRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string id = 2;
-   */
-  id: string;
+	/**
+	 * @generated from field: string id = 2;
+	 */
+	id: string;
 
-  /**
-   * @generated from field: repeated string subject_ids = 3;
-   */
-  subjectIds: string[];
+	/**
+	 * @generated from field: repeated string subject_ids = 3;
+	 */
+	subjectIds: string[];
 
-  /**
-   * @generated from field: nokku.v1.PrincipalType type = 4;
-   */
-  type: PrincipalType;
+	/**
+	 * @generated from field: nokku.v1.PrincipalType type = 4;
+	 */
+	type: PrincipalType;
 };
 
 /**
  * Describes the message nokku.v1.AddSubjectsToPrincipalRequest.
  * Use `create(AddSubjectsToPrincipalRequestSchema)` to create a new message.
  */
-export const AddSubjectsToPrincipalRequestSchema: GenMessage<AddSubjectsToPrincipalRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 5);
+export const AddSubjectsToPrincipalRequestSchema: GenMessage<AddSubjectsToPrincipalRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 5);
 
 /**
  * @generated from message nokku.v1.AddSubjectsToPrincipalResponse
  */
-export type AddSubjectsToPrincipalResponse = Message<"nokku.v1.AddSubjectsToPrincipalResponse"> & {
-};
+export type AddSubjectsToPrincipalResponse =
+	Message<'nokku.v1.AddSubjectsToPrincipalResponse'> & {};
 
 /**
  * Describes the message nokku.v1.AddSubjectsToPrincipalResponse.
  * Use `create(AddSubjectsToPrincipalResponseSchema)` to create a new message.
  */
-export const AddSubjectsToPrincipalResponseSchema: GenMessage<AddSubjectsToPrincipalResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 6);
+export const AddSubjectsToPrincipalResponseSchema: GenMessage<AddSubjectsToPrincipalResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 6);
 
 /**
  * @generated from message nokku.v1.RemoveSubjectsFromPrincipalRequest
  */
-export type RemoveSubjectsFromPrincipalRequest = Message<"nokku.v1.RemoveSubjectsFromPrincipalRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type RemoveSubjectsFromPrincipalRequest =
+	Message<'nokku.v1.RemoveSubjectsFromPrincipalRequest'> & {
+		/**
+		 * @generated from field: string workspace_id = 1;
+		 */
+		workspaceId: string;
 
-  /**
-   * @generated from field: string id = 2;
-   */
-  id: string;
+		/**
+		 * @generated from field: string id = 2;
+		 */
+		id: string;
 
-  /**
-   * @generated from field: repeated string subject_ids = 3;
-   */
-  subjectIds: string[];
+		/**
+		 * @generated from field: repeated string subject_ids = 3;
+		 */
+		subjectIds: string[];
 
-  /**
-   * @generated from field: nokku.v1.PrincipalType type = 4;
-   */
-  type: PrincipalType;
-};
+		/**
+		 * @generated from field: nokku.v1.PrincipalType type = 4;
+		 */
+		type: PrincipalType;
+	};
 
 /**
  * Describes the message nokku.v1.RemoveSubjectsFromPrincipalRequest.
  * Use `create(RemoveSubjectsFromPrincipalRequestSchema)` to create a new message.
  */
-export const RemoveSubjectsFromPrincipalRequestSchema: GenMessage<RemoveSubjectsFromPrincipalRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 7);
+export const RemoveSubjectsFromPrincipalRequestSchema: GenMessage<RemoveSubjectsFromPrincipalRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 7);
 
 /**
  * @generated from message nokku.v1.RemoveSubjectsFromPrincipalResponse
  */
-export type RemoveSubjectsFromPrincipalResponse = Message<"nokku.v1.RemoveSubjectsFromPrincipalResponse"> & {
-};
+export type RemoveSubjectsFromPrincipalResponse =
+	Message<'nokku.v1.RemoveSubjectsFromPrincipalResponse'> & {};
 
 /**
  * Describes the message nokku.v1.RemoveSubjectsFromPrincipalResponse.
  * Use `create(RemoveSubjectsFromPrincipalResponseSchema)` to create a new message.
  */
-export const RemoveSubjectsFromPrincipalResponseSchema: GenMessage<RemoveSubjectsFromPrincipalResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 8);
+export const RemoveSubjectsFromPrincipalResponseSchema: GenMessage<RemoveSubjectsFromPrincipalResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 8);
 
 /**
  * @generated from message nokku.v1.RevokeAllAccessRequest
  */
-export type RevokeAllAccessRequest = Message<"nokku.v1.RevokeAllAccessRequest"> & {
-  /**
-   * @generated from field: string subject_id = 1;
-   */
-  subjectId: string;
+export type RevokeAllAccessRequest = Message<'nokku.v1.RevokeAllAccessRequest'> & {
+	/**
+	 * @generated from field: string subject_id = 1;
+	 */
+	subjectId: string;
 
-  /**
-   * @generated from field: string workspace_id = 2;
-   */
-  workspaceId: string;
+	/**
+	 * @generated from field: string workspace_id = 2;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: nokku.v1.PrincipalType type = 3;
-   */
-  type: PrincipalType;
+	/**
+	 * @generated from field: nokku.v1.PrincipalType type = 3;
+	 */
+	type: PrincipalType;
 };
 
 /**
  * Describes the message nokku.v1.RevokeAllAccessRequest.
  * Use `create(RevokeAllAccessRequestSchema)` to create a new message.
  */
-export const RevokeAllAccessRequestSchema: GenMessage<RevokeAllAccessRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 9);
+export const RevokeAllAccessRequestSchema: GenMessage<RevokeAllAccessRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 9);
 
 /**
  * @generated from message nokku.v1.RevokeAllAccessResponse
  */
-export type RevokeAllAccessResponse = Message<"nokku.v1.RevokeAllAccessResponse"> & {
-};
+export type RevokeAllAccessResponse = Message<'nokku.v1.RevokeAllAccessResponse'> & {};
 
 /**
  * Describes the message nokku.v1.RevokeAllAccessResponse.
  * Use `create(RevokeAllAccessResponseSchema)` to create a new message.
  */
-export const RevokeAllAccessResponseSchema: GenMessage<RevokeAllAccessResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 10);
+export const RevokeAllAccessResponseSchema: GenMessage<RevokeAllAccessResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 10);
 
 /**
  * @generated from message nokku.v1.AddPrincipalRequest
  */
-export type AddPrincipalRequest = Message<"nokku.v1.AddPrincipalRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type AddPrincipalRequest = Message<'nokku.v1.AddPrincipalRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string target_id = 2;
-   */
-  targetId: string;
+	/**
+	 * @generated from field: string target_id = 2;
+	 */
+	targetId: string;
 
-  /**
-   * @generated from field: string username = 3;
-   */
-  username: string;
+	/**
+	 * @generated from field: string username = 3;
+	 */
+	username: string;
 };
 
 /**
  * Describes the message nokku.v1.AddPrincipalRequest.
  * Use `create(AddPrincipalRequestSchema)` to create a new message.
  */
-export const AddPrincipalRequestSchema: GenMessage<AddPrincipalRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 11);
+export const AddPrincipalRequestSchema: GenMessage<AddPrincipalRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_principal,
+	11
+);
 
 /**
  * @generated from message nokku.v1.AddPrincipalResponse
  */
-export type AddPrincipalResponse = Message<"nokku.v1.AddPrincipalResponse"> & {
-  /**
-   * @generated from field: nokku.v1.Principal principal = 1;
-   */
-  principal?: Principal | undefined;
+export type AddPrincipalResponse = Message<'nokku.v1.AddPrincipalResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.Principal principal = 1;
+	 */
+	principal?: Principal | undefined;
 };
 
 /**
  * Describes the message nokku.v1.AddPrincipalResponse.
  * Use `create(AddPrincipalResponseSchema)` to create a new message.
  */
-export const AddPrincipalResponseSchema: GenMessage<AddPrincipalResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 12);
+export const AddPrincipalResponseSchema: GenMessage<AddPrincipalResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 12);
 
 /**
  * @generated from message nokku.v1.RemovePrincipalRequest
  */
-export type RemovePrincipalRequest = Message<"nokku.v1.RemovePrincipalRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+export type RemovePrincipalRequest = Message<'nokku.v1.RemovePrincipalRequest'> & {
+	/**
+	 * @generated from field: string workspace_id = 1;
+	 */
+	workspaceId: string;
 
-  /**
-   * @generated from field: string id = 2;
-   */
-  id: string;
+	/**
+	 * @generated from field: string id = 2;
+	 */
+	id: string;
 };
 
 /**
  * Describes the message nokku.v1.RemovePrincipalRequest.
  * Use `create(RemovePrincipalRequestSchema)` to create a new message.
  */
-export const RemovePrincipalRequestSchema: GenMessage<RemovePrincipalRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 13);
+export const RemovePrincipalRequestSchema: GenMessage<RemovePrincipalRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 13);
 
 /**
  * @generated from message nokku.v1.RemovePrincipalResponse
  */
-export type RemovePrincipalResponse = Message<"nokku.v1.RemovePrincipalResponse"> & {
-};
+export type RemovePrincipalResponse = Message<'nokku.v1.RemovePrincipalResponse'> & {};
 
 /**
  * Describes the message nokku.v1.RemovePrincipalResponse.
  * Use `create(RemovePrincipalResponseSchema)` to create a new message.
  */
-export const RemovePrincipalResponseSchema: GenMessage<RemovePrincipalResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_principal, 14);
+export const RemovePrincipalResponseSchema: GenMessage<RemovePrincipalResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_principal, 14);
 
 /**
  * @generated from enum nokku.v1.PrincipalType
  */
 export enum PrincipalType {
-  /**
-   * @generated from enum value: PRINCIPAL_TYPE_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
+	/**
+	 * @generated from enum value: PRINCIPAL_TYPE_UNSPECIFIED = 0;
+	 */
+	UNSPECIFIED = 0,
 
-  /**
-   * @generated from enum value: PRINCIPAL_TYPE_USER = 1;
-   */
-  USER = 1,
+	/**
+	 * @generated from enum value: PRINCIPAL_TYPE_USER = 1;
+	 */
+	USER = 1,
 
-  /**
-   * @generated from enum value: PRINCIPAL_TYPE_TEAM = 2;
-   */
-  TEAM = 2,
+	/**
+	 * @generated from enum value: PRINCIPAL_TYPE_TEAM = 2;
+	 */
+	TEAM = 2,
 
-  /**
-   * @generated from enum value: PRINCIPAL_TYPE_SERVICE_ACCOUNT = 3;
-   */
-  SERVICE_ACCOUNT = 3,
+	/**
+	 * @generated from enum value: PRINCIPAL_TYPE_SERVICE_ACCOUNT = 3;
+	 */
+	SERVICE_ACCOUNT = 3
 }
 
 /**
  * Describes the enum nokku.v1.PrincipalType.
  */
-export const PrincipalTypeSchema: GenEnum<PrincipalType> = /*@__PURE__*/
-  enumDesc(file_nokku_v1_principal, 0);
+export const PrincipalTypeSchema: GenEnum<PrincipalType> /*@__PURE__*/ = enumDesc(
+	file_nokku_v1_principal,
+	0
+);
 
 /**
  * @generated from service nokku.v1.PrincipalService
  */
 export const PrincipalService: GenService<{
-  /**
-   * @generated from rpc nokku.v1.PrincipalService.SetPrincipals
-   */
-  setPrincipals: {
-    methodKind: "unary";
-    input: typeof SetPrincipalsRequestSchema;
-    output: typeof SetPrincipalsResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.PrincipalService.ListPrincipals
-   */
-  listPrincipals: {
-    methodKind: "unary";
-    input: typeof ListPrincipalsRequestSchema;
-    output: typeof ListPrincipalsResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.PrincipalService.AddPrincipal
-   */
-  addPrincipal: {
-    methodKind: "unary";
-    input: typeof AddPrincipalRequestSchema;
-    output: typeof AddPrincipalResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.PrincipalService.RemovePrincipal
-   */
-  removePrincipal: {
-    methodKind: "unary";
-    input: typeof RemovePrincipalRequestSchema;
-    output: typeof RemovePrincipalResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.PrincipalService.AddSubjectsToPrincipal
-   */
-  addSubjectsToPrincipal: {
-    methodKind: "unary";
-    input: typeof AddSubjectsToPrincipalRequestSchema;
-    output: typeof AddSubjectsToPrincipalResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.PrincipalService.RemoveSubjectsFromPrincipal
-   */
-  removeSubjectsFromPrincipal: {
-    methodKind: "unary";
-    input: typeof RemoveSubjectsFromPrincipalRequestSchema;
-    output: typeof RemoveSubjectsFromPrincipalResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.PrincipalService.RevokeAllAccess
-   */
-  revokeAllAccess: {
-    methodKind: "unary";
-    input: typeof RevokeAllAccessRequestSchema;
-    output: typeof RevokeAllAccessResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_nokku_v1_principal, 0);
-
+	/**
+	 * @generated from rpc nokku.v1.PrincipalService.SetPrincipals
+	 */
+	setPrincipals: {
+		methodKind: 'unary';
+		input: typeof SetPrincipalsRequestSchema;
+		output: typeof SetPrincipalsResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.PrincipalService.ListPrincipals
+	 */
+	listPrincipals: {
+		methodKind: 'unary';
+		input: typeof ListPrincipalsRequestSchema;
+		output: typeof ListPrincipalsResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.PrincipalService.AddPrincipal
+	 */
+	addPrincipal: {
+		methodKind: 'unary';
+		input: typeof AddPrincipalRequestSchema;
+		output: typeof AddPrincipalResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.PrincipalService.RemovePrincipal
+	 */
+	removePrincipal: {
+		methodKind: 'unary';
+		input: typeof RemovePrincipalRequestSchema;
+		output: typeof RemovePrincipalResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.PrincipalService.AddSubjectsToPrincipal
+	 */
+	addSubjectsToPrincipal: {
+		methodKind: 'unary';
+		input: typeof AddSubjectsToPrincipalRequestSchema;
+		output: typeof AddSubjectsToPrincipalResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.PrincipalService.RemoveSubjectsFromPrincipal
+	 */
+	removeSubjectsFromPrincipal: {
+		methodKind: 'unary';
+		input: typeof RemoveSubjectsFromPrincipalRequestSchema;
+		output: typeof RemoveSubjectsFromPrincipalResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.PrincipalService.RevokeAllAccess
+	 */
+	revokeAllAccess: {
+		methodKind: 'unary';
+		input: typeof RevokeAllAccessRequestSchema;
+		output: typeof RevokeAllAccessResponseSchema;
+	};
+}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_principal, 0);

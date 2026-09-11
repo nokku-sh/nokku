@@ -2,715 +2,707 @@
 // @generated from file nokku/v1/account.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
-import { file_google_api_annotations } from "../../google/api/annotations_pb";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { Message } from "@bufbuild/protobuf";
+import type { GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
+import { fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
+import { file_buf_validate_validate } from '../../buf/validate/validate_pb';
+import { file_google_api_annotations } from '../../google/api/annotations_pb';
+import type { Timestamp } from '@bufbuild/protobuf/wkt';
+import { file_google_protobuf_timestamp } from '@bufbuild/protobuf/wkt';
+import type { Message } from '@bufbuild/protobuf';
 
 /**
  * Describes the file nokku/v1/account.proto.
  */
-export const file_nokku_v1_account: GenFile = /*@__PURE__*/
-  fileDesc("ChZub2trdS92MS9hY2NvdW50LnByb3RvEghub2trdS52MSLYAQoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWVtYWlsGAMgASgJEhYKDmVtYWlsX3ZlcmlmaWVkGAQgASgIEg8KB3BpY3R1cmUYBSABKAkSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHgoWZGlzYWJsZV9wYXNzd29yZF9yZXNldBgIIAEoCCKPAQoRQWNjb3VudENyZWRlbnRpYWwSCgoCaWQYASABKAkSDAoEdHlwZRgCIAEoCRIQCghwcm92aWRlchgDIAEoCRIPCgdzdWJqZWN0GAQgASgJEg0KBWxhYmVsGAUgASgJEi4KCmNyZWF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIr4BCg5BY2NvdW50U2Vzc2lvbhIKCgJpZBgBIAEoCRIMCgRraW5kGAIgASgJEg4KBm1ldGhvZBgDIAEoCRIPCgdiaW5kaW5nGAQgASgJEg8KB2N1cnJlbnQYBSABKAgSLgoKZXhwaXJlc19hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF9zZWVuX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCITChFHZXRBY2NvdW50UmVxdWVzdCIyChJHZXRBY2NvdW50UmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLm5va2t1LnYxLlVzZXIiXwoUVXBkYXRlQWNjb3VudFJlcXVlc3QSFgoEbmFtZRgBIAEoCUIIukgFcgMYgAISDwoHcGljdHVyZRgCIAEoCRIeChZkaXNhYmxlX3Bhc3N3b3JkX3Jlc2V0GAMgASgIIjUKFVVwZGF0ZUFjY291bnRSZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlciJfChVDaGFuZ2VQYXNzd29yZFJlcXVlc3QSJAoQY3VycmVudF9wYXNzd29yZBgBIAEoCUIKukgHcgUQARiAARIgCgxuZXdfcGFzc3dvcmQYAiABKAlCCrpIB3IFEAgYgAEiGAoWQ2hhbmdlUGFzc3dvcmRSZXNwb25zZSI9ChVSZW1vdmVQYXNzd29yZFJlcXVlc3QSJAoQY3VycmVudF9wYXNzd29yZBgBIAEoCUIKukgHcgUQARiAASIYChZSZW1vdmVQYXNzd29yZFJlc3BvbnNlIhgKFkxpc3RDcmVkZW50aWFsc1JlcXVlc3QiSwoXTGlzdENyZWRlbnRpYWxzUmVzcG9uc2USMAoLY3JlZGVudGlhbHMYASADKAsyGy5ub2trdS52MS5BY2NvdW50Q3JlZGVudGlhbCJJChdSZW5hbWVDcmVkZW50aWFsUmVxdWVzdBITCgJpZBgBIAEoCUIHukgEcgIQARIZCgVsYWJlbBgCIAEoCUIKukgHcgUQARiAAiIaChhSZW5hbWVDcmVkZW50aWFsUmVzcG9uc2UiLgoXUmVtb3ZlQ3JlZGVudGlhbFJlcXVlc3QSEwoCaWQYASABKAlCB7pIBHICEAEiGgoYUmVtb3ZlQ3JlZGVudGlhbFJlc3BvbnNlIjIKFVJlbW92ZUlkZW50aXR5UmVxdWVzdBIZCghwcm92aWRlchgBIAEoCUIHukgEcgIQASIYChZSZW1vdmVJZGVudGl0eVJlc3BvbnNlIhgKFkxpc3RCYWNrdXBDb2Rlc1JlcXVlc3QiRQoXTGlzdEJhY2t1cENvZGVzUmVzcG9uc2USKgoFY29kZXMYASADKAsyGy5ub2trdS52MS5BY2NvdW50Q3JlZGVudGlhbCIaChhSb3RhdGVCYWNrdXBDb2Rlc1JlcXVlc3QiKgoZUm90YXRlQmFja3VwQ29kZXNSZXNwb25zZRINCgVjb2RlcxgBIAMoCSIaChhSZW1vdmVCYWNrdXBDb2Rlc1JlcXVlc3QiGwoZUmVtb3ZlQmFja3VwQ29kZXNSZXNwb25zZSIcChpMaXN0QWNjb3VudFNlc3Npb25zUmVxdWVzdCJJChtMaXN0QWNjb3VudFNlc3Npb25zUmVzcG9uc2USKgoIc2Vzc2lvbnMYASADKAsyGC5ub2trdS52MS5BY2NvdW50U2Vzc2lvbiIrChRSZW1vdmVTZXNzaW9uUmVxdWVzdBITCgJpZBgBIAEoCUIHukgEcgIQASIXChVSZW1vdmVTZXNzaW9uUmVzcG9uc2UiFgoURGVsZXRlQWNjb3VudFJlcXVlc3QiFwoVRGVsZXRlQWNjb3VudFJlc3BvbnNlMsoNCg5BY2NvdW50U2VydmljZRJfCgpHZXRBY2NvdW50Ehsubm9ra3UudjEuR2V0QWNjb3VudFJlcXVlc3QaHC5ub2trdS52MS5HZXRBY2NvdW50UmVzcG9uc2UiFpACAYLT5JMCDRILL3YxL2FjY291bnQSaAoNVXBkYXRlQWNjb3VudBIeLm5va2t1LnYxLlVwZGF0ZUFjY291bnRSZXF1ZXN0Gh8ubm9ra3UudjEuVXBkYXRlQWNjb3VudFJlc3BvbnNlIhaC0+STAhA6ASoyCy92MS9hY2NvdW50EnQKDkNoYW5nZVBhc3N3b3JkEh8ubm9ra3UudjEuQ2hhbmdlUGFzc3dvcmRSZXF1ZXN0GiAubm9ra3UudjEuQ2hhbmdlUGFzc3dvcmRSZXNwb25zZSIfgtPkkwIZOgEqIhQvdjEvYWNjb3VudC9wYXNzd29yZBJ7Cg5SZW1vdmVQYXNzd29yZBIfLm5va2t1LnYxLlJlbW92ZVBhc3N3b3JkUmVxdWVzdBogLm5va2t1LnYxLlJlbW92ZVBhc3N3b3JkUmVzcG9uc2UiJoLT5JMCIDoBKiIbL3YxL2FjY291bnQvcGFzc3dvcmQ6cmVtb3ZlEnoKD0xpc3RDcmVkZW50aWFscxIgLm5va2t1LnYxLkxpc3RDcmVkZW50aWFsc1JlcXVlc3QaIS5ub2trdS52MS5MaXN0Q3JlZGVudGlhbHNSZXNwb25zZSIikAIBgtPkkwIZEhcvdjEvYWNjb3VudC9jcmVkZW50aWFscxKJAQoQUmVuYW1lQ3JlZGVudGlhbBIhLm5va2t1LnYxLlJlbmFtZUNyZWRlbnRpYWxSZXF1ZXN0GiIubm9ra3UudjEuUmVuYW1lQ3JlZGVudGlhbFJlc3BvbnNlIi6C0+STAig6ASoiIy92MS9hY2NvdW50L2NyZWRlbnRpYWxzL3tpZH06cmVuYW1lEn8KEFJlbW92ZUNyZWRlbnRpYWwSIS5ub2trdS52MS5SZW1vdmVDcmVkZW50aWFsUmVxdWVzdBoiLm5va2t1LnYxLlJlbW92ZUNyZWRlbnRpYWxSZXNwb25zZSIkgtPkkwIeKhwvdjEvYWNjb3VudC9jcmVkZW50aWFscy97aWR9En0KDlJlbW92ZUlkZW50aXR5Eh8ubm9ra3UudjEuUmVtb3ZlSWRlbnRpdHlSZXF1ZXN0GiAubm9ra3UudjEuUmVtb3ZlSWRlbnRpdHlSZXNwb25zZSIogtPkkwIiOgEqIh0vdjEvYWNjb3VudC9pZGVudGl0aWVzOnJlbW92ZRJ7Cg9MaXN0QmFja3VwQ29kZXMSIC5ub2trdS52MS5MaXN0QmFja3VwQ29kZXNSZXF1ZXN0GiEubm9ra3UudjEuTGlzdEJhY2t1cENvZGVzUmVzcG9uc2UiI5ACAYLT5JMCGhIYL3YxL2FjY291bnQvYmFja3VwLWNvZGVzEogBChFSb3RhdGVCYWNrdXBDb2RlcxIiLm5va2t1LnYxLlJvdGF0ZUJhY2t1cENvZGVzUmVxdWVzdBojLm5va2t1LnYxLlJvdGF0ZUJhY2t1cENvZGVzUmVzcG9uc2UiKoLT5JMCJDoBKiIfL3YxL2FjY291bnQvYmFja3VwLWNvZGVzOnJvdGF0ZRJ+ChFSZW1vdmVCYWNrdXBDb2RlcxIiLm5va2t1LnYxLlJlbW92ZUJhY2t1cENvZGVzUmVxdWVzdBojLm5va2t1LnYxLlJlbW92ZUJhY2t1cENvZGVzUmVzcG9uc2UiIILT5JMCGioYL3YxL2FjY291bnQvYmFja3VwLWNvZGVzEoMBChNMaXN0QWNjb3VudFNlc3Npb25zEiQubm9ra3UudjEuTGlzdEFjY291bnRTZXNzaW9uc1JlcXVlc3QaJS5ub2trdS52MS5MaXN0QWNjb3VudFNlc3Npb25zUmVzcG9uc2UiH5ACAYLT5JMCFhIUL3YxL2FjY291bnQvc2Vzc2lvbnMScwoNUmVtb3ZlU2Vzc2lvbhIeLm5va2t1LnYxLlJlbW92ZVNlc3Npb25SZXF1ZXN0Gh8ubm9ra3UudjEuUmVtb3ZlU2Vzc2lvblJlc3BvbnNlIiGC0+STAhsqGS92MS9hY2NvdW50L3Nlc3Npb25zL3tpZH0SbwoNRGVsZXRlQWNjb3VudBIeLm5va2t1LnYxLkRlbGV0ZUFjY291bnRSZXF1ZXN0Gh8ubm9ra3UudjEuRGVsZXRlQWNjb3VudFJlc3BvbnNlIh2C0+STAhc6ASoiEi92MS9hY2NvdW50OmRlbGV0ZUKWAQoMY29tLm5va2t1LnYxQgxBY2NvdW50UHJvdG9QAVo3Z2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9pbnRlcm5hbC9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]);
+export const file_nokku_v1_account: GenFile /*@__PURE__*/ = fileDesc(
+	'ChZub2trdS92MS9hY2NvdW50LnByb3RvEghub2trdS52MSLYAQoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWVtYWlsGAMgASgJEhYKDmVtYWlsX3ZlcmlmaWVkGAQgASgIEg8KB3BpY3R1cmUYBSABKAkSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHgoWZGlzYWJsZV9wYXNzd29yZF9yZXNldBgIIAEoCCKPAQoRQWNjb3VudENyZWRlbnRpYWwSCgoCaWQYASABKAkSDAoEdHlwZRgCIAEoCRIQCghwcm92aWRlchgDIAEoCRIPCgdzdWJqZWN0GAQgASgJEg0KBWxhYmVsGAUgASgJEi4KCmNyZWF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIr4BCg5BY2NvdW50U2Vzc2lvbhIKCgJpZBgBIAEoCRIMCgRraW5kGAIgASgJEg4KBm1ldGhvZBgDIAEoCRIPCgdiaW5kaW5nGAQgASgJEg8KB2N1cnJlbnQYBSABKAgSLgoKZXhwaXJlc19hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF9zZWVuX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCITChFHZXRBY2NvdW50UmVxdWVzdCIyChJHZXRBY2NvdW50UmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLm5va2t1LnYxLlVzZXIiXwoUVXBkYXRlQWNjb3VudFJlcXVlc3QSFgoEbmFtZRgBIAEoCUIIukgFcgMYgAISDwoHcGljdHVyZRgCIAEoCRIeChZkaXNhYmxlX3Bhc3N3b3JkX3Jlc2V0GAMgASgIIjUKFVVwZGF0ZUFjY291bnRSZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlciJfChVDaGFuZ2VQYXNzd29yZFJlcXVlc3QSJAoQY3VycmVudF9wYXNzd29yZBgBIAEoCUIKukgHcgUQARiAARIgCgxuZXdfcGFzc3dvcmQYAiABKAlCCrpIB3IFEAgYgAEiGAoWQ2hhbmdlUGFzc3dvcmRSZXNwb25zZSI9ChVSZW1vdmVQYXNzd29yZFJlcXVlc3QSJAoQY3VycmVudF9wYXNzd29yZBgBIAEoCUIKukgHcgUQARiAASIYChZSZW1vdmVQYXNzd29yZFJlc3BvbnNlIhgKFkxpc3RDcmVkZW50aWFsc1JlcXVlc3QiSwoXTGlzdENyZWRlbnRpYWxzUmVzcG9uc2USMAoLY3JlZGVudGlhbHMYASADKAsyGy5ub2trdS52MS5BY2NvdW50Q3JlZGVudGlhbCJJChdSZW5hbWVDcmVkZW50aWFsUmVxdWVzdBITCgJpZBgBIAEoCUIHukgEcgIQARIZCgVsYWJlbBgCIAEoCUIKukgHcgUQARiAAiIaChhSZW5hbWVDcmVkZW50aWFsUmVzcG9uc2UiLgoXUmVtb3ZlQ3JlZGVudGlhbFJlcXVlc3QSEwoCaWQYASABKAlCB7pIBHICEAEiGgoYUmVtb3ZlQ3JlZGVudGlhbFJlc3BvbnNlIjIKFVJlbW92ZUlkZW50aXR5UmVxdWVzdBIZCghwcm92aWRlchgBIAEoCUIHukgEcgIQASIYChZSZW1vdmVJZGVudGl0eVJlc3BvbnNlIhgKFkxpc3RCYWNrdXBDb2Rlc1JlcXVlc3QiRQoXTGlzdEJhY2t1cENvZGVzUmVzcG9uc2USKgoFY29kZXMYASADKAsyGy5ub2trdS52MS5BY2NvdW50Q3JlZGVudGlhbCIaChhSb3RhdGVCYWNrdXBDb2Rlc1JlcXVlc3QiKgoZUm90YXRlQmFja3VwQ29kZXNSZXNwb25zZRINCgVjb2RlcxgBIAMoCSIaChhSZW1vdmVCYWNrdXBDb2Rlc1JlcXVlc3QiGwoZUmVtb3ZlQmFja3VwQ29kZXNSZXNwb25zZSIcChpMaXN0QWNjb3VudFNlc3Npb25zUmVxdWVzdCJJChtMaXN0QWNjb3VudFNlc3Npb25zUmVzcG9uc2USKgoIc2Vzc2lvbnMYASADKAsyGC5ub2trdS52MS5BY2NvdW50U2Vzc2lvbiIrChRSZW1vdmVTZXNzaW9uUmVxdWVzdBITCgJpZBgBIAEoCUIHukgEcgIQASIXChVSZW1vdmVTZXNzaW9uUmVzcG9uc2UiFgoURGVsZXRlQWNjb3VudFJlcXVlc3QiFwoVRGVsZXRlQWNjb3VudFJlc3BvbnNlMsoNCg5BY2NvdW50U2VydmljZRJfCgpHZXRBY2NvdW50Ehsubm9ra3UudjEuR2V0QWNjb3VudFJlcXVlc3QaHC5ub2trdS52MS5HZXRBY2NvdW50UmVzcG9uc2UiFpACAYLT5JMCDRILL3YxL2FjY291bnQSaAoNVXBkYXRlQWNjb3VudBIeLm5va2t1LnYxLlVwZGF0ZUFjY291bnRSZXF1ZXN0Gh8ubm9ra3UudjEuVXBkYXRlQWNjb3VudFJlc3BvbnNlIhaC0+STAhA6ASoyCy92MS9hY2NvdW50EnQKDkNoYW5nZVBhc3N3b3JkEh8ubm9ra3UudjEuQ2hhbmdlUGFzc3dvcmRSZXF1ZXN0GiAubm9ra3UudjEuQ2hhbmdlUGFzc3dvcmRSZXNwb25zZSIfgtPkkwIZOgEqIhQvdjEvYWNjb3VudC9wYXNzd29yZBJ7Cg5SZW1vdmVQYXNzd29yZBIfLm5va2t1LnYxLlJlbW92ZVBhc3N3b3JkUmVxdWVzdBogLm5va2t1LnYxLlJlbW92ZVBhc3N3b3JkUmVzcG9uc2UiJoLT5JMCIDoBKiIbL3YxL2FjY291bnQvcGFzc3dvcmQ6cmVtb3ZlEnoKD0xpc3RDcmVkZW50aWFscxIgLm5va2t1LnYxLkxpc3RDcmVkZW50aWFsc1JlcXVlc3QaIS5ub2trdS52MS5MaXN0Q3JlZGVudGlhbHNSZXNwb25zZSIikAIBgtPkkwIZEhcvdjEvYWNjb3VudC9jcmVkZW50aWFscxKJAQoQUmVuYW1lQ3JlZGVudGlhbBIhLm5va2t1LnYxLlJlbmFtZUNyZWRlbnRpYWxSZXF1ZXN0GiIubm9ra3UudjEuUmVuYW1lQ3JlZGVudGlhbFJlc3BvbnNlIi6C0+STAig6ASoiIy92MS9hY2NvdW50L2NyZWRlbnRpYWxzL3tpZH06cmVuYW1lEn8KEFJlbW92ZUNyZWRlbnRpYWwSIS5ub2trdS52MS5SZW1vdmVDcmVkZW50aWFsUmVxdWVzdBoiLm5va2t1LnYxLlJlbW92ZUNyZWRlbnRpYWxSZXNwb25zZSIkgtPkkwIeKhwvdjEvYWNjb3VudC9jcmVkZW50aWFscy97aWR9En0KDlJlbW92ZUlkZW50aXR5Eh8ubm9ra3UudjEuUmVtb3ZlSWRlbnRpdHlSZXF1ZXN0GiAubm9ra3UudjEuUmVtb3ZlSWRlbnRpdHlSZXNwb25zZSIogtPkkwIiOgEqIh0vdjEvYWNjb3VudC9pZGVudGl0aWVzOnJlbW92ZRJ7Cg9MaXN0QmFja3VwQ29kZXMSIC5ub2trdS52MS5MaXN0QmFja3VwQ29kZXNSZXF1ZXN0GiEubm9ra3UudjEuTGlzdEJhY2t1cENvZGVzUmVzcG9uc2UiI5ACAYLT5JMCGhIYL3YxL2FjY291bnQvYmFja3VwLWNvZGVzEogBChFSb3RhdGVCYWNrdXBDb2RlcxIiLm5va2t1LnYxLlJvdGF0ZUJhY2t1cENvZGVzUmVxdWVzdBojLm5va2t1LnYxLlJvdGF0ZUJhY2t1cENvZGVzUmVzcG9uc2UiKoLT5JMCJDoBKiIfL3YxL2FjY291bnQvYmFja3VwLWNvZGVzOnJvdGF0ZRJ+ChFSZW1vdmVCYWNrdXBDb2RlcxIiLm5va2t1LnYxLlJlbW92ZUJhY2t1cENvZGVzUmVxdWVzdBojLm5va2t1LnYxLlJlbW92ZUJhY2t1cENvZGVzUmVzcG9uc2UiIILT5JMCGioYL3YxL2FjY291bnQvYmFja3VwLWNvZGVzEoMBChNMaXN0QWNjb3VudFNlc3Npb25zEiQubm9ra3UudjEuTGlzdEFjY291bnRTZXNzaW9uc1JlcXVlc3QaJS5ub2trdS52MS5MaXN0QWNjb3VudFNlc3Npb25zUmVzcG9uc2UiH5ACAYLT5JMCFhIUL3YxL2FjY291bnQvc2Vzc2lvbnMScwoNUmVtb3ZlU2Vzc2lvbhIeLm5va2t1LnYxLlJlbW92ZVNlc3Npb25SZXF1ZXN0Gh8ubm9ra3UudjEuUmVtb3ZlU2Vzc2lvblJlc3BvbnNlIiGC0+STAhsqGS92MS9hY2NvdW50L3Nlc3Npb25zL3tpZH0SbwoNRGVsZXRlQWNjb3VudBIeLm5va2t1LnYxLkRlbGV0ZUFjY291bnRSZXF1ZXN0Gh8ubm9ra3UudjEuRGVsZXRlQWNjb3VudFJlc3BvbnNlIh2C0+STAhc6ASoiEi92MS9hY2NvdW50OmRlbGV0ZUKWAQoMY29tLm5va2t1LnYxQgxBY2NvdW50UHJvdG9QAVo3Z2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9pbnRlcm5hbC9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac',
+	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
+);
 
 /**
  * @generated from message nokku.v1.User
  */
-export type User = Message<"nokku.v1.User"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
+export type User = Message<'nokku.v1.User'> & {
+	/**
+	 * @generated from field: string id = 1;
+	 */
+	id: string;
 
-  /**
-   * @generated from field: string name = 2;
-   */
-  name: string;
+	/**
+	 * @generated from field: string name = 2;
+	 */
+	name: string;
 
-  /**
-   * @generated from field: string email = 3;
-   */
-  email: string;
+	/**
+	 * @generated from field: string email = 3;
+	 */
+	email: string;
 
-  /**
-   * @generated from field: bool email_verified = 4;
-   */
-  emailVerified: boolean;
+	/**
+	 * @generated from field: bool email_verified = 4;
+	 */
+	emailVerified: boolean;
 
-  /**
-   * @generated from field: string picture = 5;
-   */
-  picture: string;
+	/**
+	 * @generated from field: string picture = 5;
+	 */
+	picture: string;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 6;
-   */
-  createdAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp created_at = 6;
+	 */
+	createdAt?: Timestamp | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 7;
-   */
-  updatedAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp updated_at = 7;
+	 */
+	updatedAt?: Timestamp | undefined;
 
-  /**
-   * @generated from field: bool disable_password_reset = 8;
-   */
-  disablePasswordReset: boolean;
+	/**
+	 * @generated from field: bool disable_password_reset = 8;
+	 */
+	disablePasswordReset: boolean;
 };
 
 /**
  * Describes the message nokku.v1.User.
  * Use `create(UserSchema)` to create a new message.
  */
-export const UserSchema: GenMessage<User> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 0);
+export const UserSchema: GenMessage<User> /*@__PURE__*/ = messageDesc(file_nokku_v1_account, 0);
 
 /**
  * @generated from message nokku.v1.AccountCredential
  */
-export type AccountCredential = Message<"nokku.v1.AccountCredential"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
+export type AccountCredential = Message<'nokku.v1.AccountCredential'> & {
+	/**
+	 * @generated from field: string id = 1;
+	 */
+	id: string;
 
-  /**
-   * @generated from field: string type = 2;
-   */
-  type: string;
+	/**
+	 * @generated from field: string type = 2;
+	 */
+	type: string;
 
-  /**
-   * @generated from field: string provider = 3;
-   */
-  provider: string;
+	/**
+	 * @generated from field: string provider = 3;
+	 */
+	provider: string;
 
-  /**
-   * @generated from field: string subject = 4;
-   */
-  subject: string;
+	/**
+	 * @generated from field: string subject = 4;
+	 */
+	subject: string;
 
-  /**
-   * @generated from field: string label = 5;
-   */
-  label: string;
+	/**
+	 * @generated from field: string label = 5;
+	 */
+	label: string;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 6;
-   */
-  createdAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp created_at = 6;
+	 */
+	createdAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.AccountCredential.
  * Use `create(AccountCredentialSchema)` to create a new message.
  */
-export const AccountCredentialSchema: GenMessage<AccountCredential> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 1);
+export const AccountCredentialSchema: GenMessage<AccountCredential> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_account,
+	1
+);
 
 /**
  * @generated from message nokku.v1.AccountSession
  */
-export type AccountSession = Message<"nokku.v1.AccountSession"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
+export type AccountSession = Message<'nokku.v1.AccountSession'> & {
+	/**
+	 * @generated from field: string id = 1;
+	 */
+	id: string;
 
-  /**
-   * @generated from field: string kind = 2;
-   */
-  kind: string;
+	/**
+	 * @generated from field: string kind = 2;
+	 */
+	kind: string;
 
-  /**
-   * @generated from field: string method = 3;
-   */
-  method: string;
+	/**
+	 * @generated from field: string method = 3;
+	 */
+	method: string;
 
-  /**
-   * @generated from field: string binding = 4;
-   */
-  binding: string;
+	/**
+	 * @generated from field: string binding = 4;
+	 */
+	binding: string;
 
-  /**
-   * @generated from field: bool current = 5;
-   */
-  current: boolean;
+	/**
+	 * @generated from field: bool current = 5;
+	 */
+	current: boolean;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 6;
-   */
-  expiresAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp expires_at = 6;
+	 */
+	expiresAt?: Timestamp | undefined;
 
-  /**
-   * @generated from field: google.protobuf.Timestamp last_seen_at = 7;
-   */
-  lastSeenAt?: Timestamp | undefined;
+	/**
+	 * @generated from field: google.protobuf.Timestamp last_seen_at = 7;
+	 */
+	lastSeenAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.AccountSession.
  * Use `create(AccountSessionSchema)` to create a new message.
  */
-export const AccountSessionSchema: GenMessage<AccountSession> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 2);
+export const AccountSessionSchema: GenMessage<AccountSession> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_account,
+	2
+);
 
 /**
  * @generated from message nokku.v1.GetAccountRequest
  */
-export type GetAccountRequest = Message<"nokku.v1.GetAccountRequest"> & {
-};
+export type GetAccountRequest = Message<'nokku.v1.GetAccountRequest'> & {};
 
 /**
  * Describes the message nokku.v1.GetAccountRequest.
  * Use `create(GetAccountRequestSchema)` to create a new message.
  */
-export const GetAccountRequestSchema: GenMessage<GetAccountRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 3);
+export const GetAccountRequestSchema: GenMessage<GetAccountRequest> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_account,
+	3
+);
 
 /**
  * @generated from message nokku.v1.GetAccountResponse
  */
-export type GetAccountResponse = Message<"nokku.v1.GetAccountResponse"> & {
-  /**
-   * @generated from field: nokku.v1.User user = 1;
-   */
-  user?: User | undefined;
+export type GetAccountResponse = Message<'nokku.v1.GetAccountResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.User user = 1;
+	 */
+	user?: User | undefined;
 };
 
 /**
  * Describes the message nokku.v1.GetAccountResponse.
  * Use `create(GetAccountResponseSchema)` to create a new message.
  */
-export const GetAccountResponseSchema: GenMessage<GetAccountResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 4);
+export const GetAccountResponseSchema: GenMessage<GetAccountResponse> /*@__PURE__*/ = messageDesc(
+	file_nokku_v1_account,
+	4
+);
 
 /**
  * @generated from message nokku.v1.UpdateAccountRequest
  */
-export type UpdateAccountRequest = Message<"nokku.v1.UpdateAccountRequest"> & {
-  /**
-   * @generated from field: string name = 1;
-   */
-  name: string;
+export type UpdateAccountRequest = Message<'nokku.v1.UpdateAccountRequest'> & {
+	/**
+	 * @generated from field: string name = 1;
+	 */
+	name: string;
 
-  /**
-   * @generated from field: string picture = 2;
-   */
-  picture: string;
+	/**
+	 * @generated from field: string picture = 2;
+	 */
+	picture: string;
 
-  /**
-   * @generated from field: bool disable_password_reset = 3;
-   */
-  disablePasswordReset: boolean;
+	/**
+	 * @generated from field: bool disable_password_reset = 3;
+	 */
+	disablePasswordReset: boolean;
 };
 
 /**
  * Describes the message nokku.v1.UpdateAccountRequest.
  * Use `create(UpdateAccountRequestSchema)` to create a new message.
  */
-export const UpdateAccountRequestSchema: GenMessage<UpdateAccountRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 5);
+export const UpdateAccountRequestSchema: GenMessage<UpdateAccountRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 5);
 
 /**
  * @generated from message nokku.v1.UpdateAccountResponse
  */
-export type UpdateAccountResponse = Message<"nokku.v1.UpdateAccountResponse"> & {
-  /**
-   * @generated from field: nokku.v1.User user = 1;
-   */
-  user?: User | undefined;
+export type UpdateAccountResponse = Message<'nokku.v1.UpdateAccountResponse'> & {
+	/**
+	 * @generated from field: nokku.v1.User user = 1;
+	 */
+	user?: User | undefined;
 };
 
 /**
  * Describes the message nokku.v1.UpdateAccountResponse.
  * Use `create(UpdateAccountResponseSchema)` to create a new message.
  */
-export const UpdateAccountResponseSchema: GenMessage<UpdateAccountResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 6);
+export const UpdateAccountResponseSchema: GenMessage<UpdateAccountResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 6);
 
 /**
  * @generated from message nokku.v1.ChangePasswordRequest
  */
-export type ChangePasswordRequest = Message<"nokku.v1.ChangePasswordRequest"> & {
-  /**
-   * @generated from field: string current_password = 1;
-   */
-  currentPassword: string;
+export type ChangePasswordRequest = Message<'nokku.v1.ChangePasswordRequest'> & {
+	/**
+	 * @generated from field: string current_password = 1;
+	 */
+	currentPassword: string;
 
-  /**
-   * @generated from field: string new_password = 2;
-   */
-  newPassword: string;
+	/**
+	 * @generated from field: string new_password = 2;
+	 */
+	newPassword: string;
 };
 
 /**
  * Describes the message nokku.v1.ChangePasswordRequest.
  * Use `create(ChangePasswordRequestSchema)` to create a new message.
  */
-export const ChangePasswordRequestSchema: GenMessage<ChangePasswordRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 7);
+export const ChangePasswordRequestSchema: GenMessage<ChangePasswordRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 7);
 
 /**
  * @generated from message nokku.v1.ChangePasswordResponse
  */
-export type ChangePasswordResponse = Message<"nokku.v1.ChangePasswordResponse"> & {
-};
+export type ChangePasswordResponse = Message<'nokku.v1.ChangePasswordResponse'> & {};
 
 /**
  * Describes the message nokku.v1.ChangePasswordResponse.
  * Use `create(ChangePasswordResponseSchema)` to create a new message.
  */
-export const ChangePasswordResponseSchema: GenMessage<ChangePasswordResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 8);
+export const ChangePasswordResponseSchema: GenMessage<ChangePasswordResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 8);
 
 /**
  * @generated from message nokku.v1.RemovePasswordRequest
  */
-export type RemovePasswordRequest = Message<"nokku.v1.RemovePasswordRequest"> & {
-  /**
-   * @generated from field: string current_password = 1;
-   */
-  currentPassword: string;
+export type RemovePasswordRequest = Message<'nokku.v1.RemovePasswordRequest'> & {
+	/**
+	 * @generated from field: string current_password = 1;
+	 */
+	currentPassword: string;
 };
 
 /**
  * Describes the message nokku.v1.RemovePasswordRequest.
  * Use `create(RemovePasswordRequestSchema)` to create a new message.
  */
-export const RemovePasswordRequestSchema: GenMessage<RemovePasswordRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 9);
+export const RemovePasswordRequestSchema: GenMessage<RemovePasswordRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 9);
 
 /**
  * @generated from message nokku.v1.RemovePasswordResponse
  */
-export type RemovePasswordResponse = Message<"nokku.v1.RemovePasswordResponse"> & {
-};
+export type RemovePasswordResponse = Message<'nokku.v1.RemovePasswordResponse'> & {};
 
 /**
  * Describes the message nokku.v1.RemovePasswordResponse.
  * Use `create(RemovePasswordResponseSchema)` to create a new message.
  */
-export const RemovePasswordResponseSchema: GenMessage<RemovePasswordResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 10);
+export const RemovePasswordResponseSchema: GenMessage<RemovePasswordResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 10);
 
 /**
  * @generated from message nokku.v1.ListCredentialsRequest
  */
-export type ListCredentialsRequest = Message<"nokku.v1.ListCredentialsRequest"> & {
-};
+export type ListCredentialsRequest = Message<'nokku.v1.ListCredentialsRequest'> & {};
 
 /**
  * Describes the message nokku.v1.ListCredentialsRequest.
  * Use `create(ListCredentialsRequestSchema)` to create a new message.
  */
-export const ListCredentialsRequestSchema: GenMessage<ListCredentialsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 11);
+export const ListCredentialsRequestSchema: GenMessage<ListCredentialsRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 11);
 
 /**
  * @generated from message nokku.v1.ListCredentialsResponse
  */
-export type ListCredentialsResponse = Message<"nokku.v1.ListCredentialsResponse"> & {
-  /**
-   * @generated from field: repeated nokku.v1.AccountCredential credentials = 1;
-   */
-  credentials: AccountCredential[];
+export type ListCredentialsResponse = Message<'nokku.v1.ListCredentialsResponse'> & {
+	/**
+	 * @generated from field: repeated nokku.v1.AccountCredential credentials = 1;
+	 */
+	credentials: AccountCredential[];
 };
 
 /**
  * Describes the message nokku.v1.ListCredentialsResponse.
  * Use `create(ListCredentialsResponseSchema)` to create a new message.
  */
-export const ListCredentialsResponseSchema: GenMessage<ListCredentialsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 12);
+export const ListCredentialsResponseSchema: GenMessage<ListCredentialsResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 12);
 
 /**
  * @generated from message nokku.v1.RenameCredentialRequest
  */
-export type RenameCredentialRequest = Message<"nokku.v1.RenameCredentialRequest"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
+export type RenameCredentialRequest = Message<'nokku.v1.RenameCredentialRequest'> & {
+	/**
+	 * @generated from field: string id = 1;
+	 */
+	id: string;
 
-  /**
-   * @generated from field: string label = 2;
-   */
-  label: string;
+	/**
+	 * @generated from field: string label = 2;
+	 */
+	label: string;
 };
 
 /**
  * Describes the message nokku.v1.RenameCredentialRequest.
  * Use `create(RenameCredentialRequestSchema)` to create a new message.
  */
-export const RenameCredentialRequestSchema: GenMessage<RenameCredentialRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 13);
+export const RenameCredentialRequestSchema: GenMessage<RenameCredentialRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 13);
 
 /**
  * @generated from message nokku.v1.RenameCredentialResponse
  */
-export type RenameCredentialResponse = Message<"nokku.v1.RenameCredentialResponse"> & {
-};
+export type RenameCredentialResponse = Message<'nokku.v1.RenameCredentialResponse'> & {};
 
 /**
  * Describes the message nokku.v1.RenameCredentialResponse.
  * Use `create(RenameCredentialResponseSchema)` to create a new message.
  */
-export const RenameCredentialResponseSchema: GenMessage<RenameCredentialResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 14);
+export const RenameCredentialResponseSchema: GenMessage<RenameCredentialResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 14);
 
 /**
  * @generated from message nokku.v1.RemoveCredentialRequest
  */
-export type RemoveCredentialRequest = Message<"nokku.v1.RemoveCredentialRequest"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
+export type RemoveCredentialRequest = Message<'nokku.v1.RemoveCredentialRequest'> & {
+	/**
+	 * @generated from field: string id = 1;
+	 */
+	id: string;
 };
 
 /**
  * Describes the message nokku.v1.RemoveCredentialRequest.
  * Use `create(RemoveCredentialRequestSchema)` to create a new message.
  */
-export const RemoveCredentialRequestSchema: GenMessage<RemoveCredentialRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 15);
+export const RemoveCredentialRequestSchema: GenMessage<RemoveCredentialRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 15);
 
 /**
  * @generated from message nokku.v1.RemoveCredentialResponse
  */
-export type RemoveCredentialResponse = Message<"nokku.v1.RemoveCredentialResponse"> & {
-};
+export type RemoveCredentialResponse = Message<'nokku.v1.RemoveCredentialResponse'> & {};
 
 /**
  * Describes the message nokku.v1.RemoveCredentialResponse.
  * Use `create(RemoveCredentialResponseSchema)` to create a new message.
  */
-export const RemoveCredentialResponseSchema: GenMessage<RemoveCredentialResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 16);
+export const RemoveCredentialResponseSchema: GenMessage<RemoveCredentialResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 16);
 
 /**
  * @generated from message nokku.v1.RemoveIdentityRequest
  */
-export type RemoveIdentityRequest = Message<"nokku.v1.RemoveIdentityRequest"> & {
-  /**
-   * @generated from field: string provider = 1;
-   */
-  provider: string;
+export type RemoveIdentityRequest = Message<'nokku.v1.RemoveIdentityRequest'> & {
+	/**
+	 * @generated from field: string provider = 1;
+	 */
+	provider: string;
 };
 
 /**
  * Describes the message nokku.v1.RemoveIdentityRequest.
  * Use `create(RemoveIdentityRequestSchema)` to create a new message.
  */
-export const RemoveIdentityRequestSchema: GenMessage<RemoveIdentityRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 17);
+export const RemoveIdentityRequestSchema: GenMessage<RemoveIdentityRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 17);
 
 /**
  * @generated from message nokku.v1.RemoveIdentityResponse
  */
-export type RemoveIdentityResponse = Message<"nokku.v1.RemoveIdentityResponse"> & {
-};
+export type RemoveIdentityResponse = Message<'nokku.v1.RemoveIdentityResponse'> & {};
 
 /**
  * Describes the message nokku.v1.RemoveIdentityResponse.
  * Use `create(RemoveIdentityResponseSchema)` to create a new message.
  */
-export const RemoveIdentityResponseSchema: GenMessage<RemoveIdentityResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 18);
+export const RemoveIdentityResponseSchema: GenMessage<RemoveIdentityResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 18);
 
 /**
  * @generated from message nokku.v1.ListBackupCodesRequest
  */
-export type ListBackupCodesRequest = Message<"nokku.v1.ListBackupCodesRequest"> & {
-};
+export type ListBackupCodesRequest = Message<'nokku.v1.ListBackupCodesRequest'> & {};
 
 /**
  * Describes the message nokku.v1.ListBackupCodesRequest.
  * Use `create(ListBackupCodesRequestSchema)` to create a new message.
  */
-export const ListBackupCodesRequestSchema: GenMessage<ListBackupCodesRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 19);
+export const ListBackupCodesRequestSchema: GenMessage<ListBackupCodesRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 19);
 
 /**
  * @generated from message nokku.v1.ListBackupCodesResponse
  */
-export type ListBackupCodesResponse = Message<"nokku.v1.ListBackupCodesResponse"> & {
-  /**
-   * @generated from field: repeated nokku.v1.AccountCredential codes = 1;
-   */
-  codes: AccountCredential[];
+export type ListBackupCodesResponse = Message<'nokku.v1.ListBackupCodesResponse'> & {
+	/**
+	 * @generated from field: repeated nokku.v1.AccountCredential codes = 1;
+	 */
+	codes: AccountCredential[];
 };
 
 /**
  * Describes the message nokku.v1.ListBackupCodesResponse.
  * Use `create(ListBackupCodesResponseSchema)` to create a new message.
  */
-export const ListBackupCodesResponseSchema: GenMessage<ListBackupCodesResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 20);
+export const ListBackupCodesResponseSchema: GenMessage<ListBackupCodesResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 20);
 
 /**
  * @generated from message nokku.v1.RotateBackupCodesRequest
  */
-export type RotateBackupCodesRequest = Message<"nokku.v1.RotateBackupCodesRequest"> & {
-};
+export type RotateBackupCodesRequest = Message<'nokku.v1.RotateBackupCodesRequest'> & {};
 
 /**
  * Describes the message nokku.v1.RotateBackupCodesRequest.
  * Use `create(RotateBackupCodesRequestSchema)` to create a new message.
  */
-export const RotateBackupCodesRequestSchema: GenMessage<RotateBackupCodesRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 21);
+export const RotateBackupCodesRequestSchema: GenMessage<RotateBackupCodesRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 21);
 
 /**
  * @generated from message nokku.v1.RotateBackupCodesResponse
  */
-export type RotateBackupCodesResponse = Message<"nokku.v1.RotateBackupCodesResponse"> & {
-  /**
-   * @generated from field: repeated string codes = 1;
-   */
-  codes: string[];
+export type RotateBackupCodesResponse = Message<'nokku.v1.RotateBackupCodesResponse'> & {
+	/**
+	 * @generated from field: repeated string codes = 1;
+	 */
+	codes: string[];
 };
 
 /**
  * Describes the message nokku.v1.RotateBackupCodesResponse.
  * Use `create(RotateBackupCodesResponseSchema)` to create a new message.
  */
-export const RotateBackupCodesResponseSchema: GenMessage<RotateBackupCodesResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 22);
+export const RotateBackupCodesResponseSchema: GenMessage<RotateBackupCodesResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 22);
 
 /**
  * @generated from message nokku.v1.RemoveBackupCodesRequest
  */
-export type RemoveBackupCodesRequest = Message<"nokku.v1.RemoveBackupCodesRequest"> & {
-};
+export type RemoveBackupCodesRequest = Message<'nokku.v1.RemoveBackupCodesRequest'> & {};
 
 /**
  * Describes the message nokku.v1.RemoveBackupCodesRequest.
  * Use `create(RemoveBackupCodesRequestSchema)` to create a new message.
  */
-export const RemoveBackupCodesRequestSchema: GenMessage<RemoveBackupCodesRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 23);
+export const RemoveBackupCodesRequestSchema: GenMessage<RemoveBackupCodesRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 23);
 
 /**
  * @generated from message nokku.v1.RemoveBackupCodesResponse
  */
-export type RemoveBackupCodesResponse = Message<"nokku.v1.RemoveBackupCodesResponse"> & {
-};
+export type RemoveBackupCodesResponse = Message<'nokku.v1.RemoveBackupCodesResponse'> & {};
 
 /**
  * Describes the message nokku.v1.RemoveBackupCodesResponse.
  * Use `create(RemoveBackupCodesResponseSchema)` to create a new message.
  */
-export const RemoveBackupCodesResponseSchema: GenMessage<RemoveBackupCodesResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 24);
+export const RemoveBackupCodesResponseSchema: GenMessage<RemoveBackupCodesResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 24);
 
 /**
  * @generated from message nokku.v1.ListAccountSessionsRequest
  */
-export type ListAccountSessionsRequest = Message<"nokku.v1.ListAccountSessionsRequest"> & {
-};
+export type ListAccountSessionsRequest = Message<'nokku.v1.ListAccountSessionsRequest'> & {};
 
 /**
  * Describes the message nokku.v1.ListAccountSessionsRequest.
  * Use `create(ListAccountSessionsRequestSchema)` to create a new message.
  */
-export const ListAccountSessionsRequestSchema: GenMessage<ListAccountSessionsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 25);
+export const ListAccountSessionsRequestSchema: GenMessage<ListAccountSessionsRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 25);
 
 /**
  * @generated from message nokku.v1.ListAccountSessionsResponse
  */
-export type ListAccountSessionsResponse = Message<"nokku.v1.ListAccountSessionsResponse"> & {
-  /**
-   * @generated from field: repeated nokku.v1.AccountSession sessions = 1;
-   */
-  sessions: AccountSession[];
+export type ListAccountSessionsResponse = Message<'nokku.v1.ListAccountSessionsResponse'> & {
+	/**
+	 * @generated from field: repeated nokku.v1.AccountSession sessions = 1;
+	 */
+	sessions: AccountSession[];
 };
 
 /**
  * Describes the message nokku.v1.ListAccountSessionsResponse.
  * Use `create(ListAccountSessionsResponseSchema)` to create a new message.
  */
-export const ListAccountSessionsResponseSchema: GenMessage<ListAccountSessionsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 26);
+export const ListAccountSessionsResponseSchema: GenMessage<ListAccountSessionsResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 26);
 
 /**
  * @generated from message nokku.v1.RemoveSessionRequest
  */
-export type RemoveSessionRequest = Message<"nokku.v1.RemoveSessionRequest"> & {
-  /**
-   * The hex token hash of the session, as returned by ListSessions.
-   *
-   * @generated from field: string id = 1;
-   */
-  id: string;
+export type RemoveSessionRequest = Message<'nokku.v1.RemoveSessionRequest'> & {
+	/**
+	 * The hex token hash of the session, as returned by ListSessions.
+	 *
+	 * @generated from field: string id = 1;
+	 */
+	id: string;
 };
 
 /**
  * Describes the message nokku.v1.RemoveSessionRequest.
  * Use `create(RemoveSessionRequestSchema)` to create a new message.
  */
-export const RemoveSessionRequestSchema: GenMessage<RemoveSessionRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 27);
+export const RemoveSessionRequestSchema: GenMessage<RemoveSessionRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 27);
 
 /**
  * @generated from message nokku.v1.RemoveSessionResponse
  */
-export type RemoveSessionResponse = Message<"nokku.v1.RemoveSessionResponse"> & {
-};
+export type RemoveSessionResponse = Message<'nokku.v1.RemoveSessionResponse'> & {};
 
 /**
  * Describes the message nokku.v1.RemoveSessionResponse.
  * Use `create(RemoveSessionResponseSchema)` to create a new message.
  */
-export const RemoveSessionResponseSchema: GenMessage<RemoveSessionResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 28);
+export const RemoveSessionResponseSchema: GenMessage<RemoveSessionResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 28);
 
 /**
  * @generated from message nokku.v1.DeleteAccountRequest
  */
-export type DeleteAccountRequest = Message<"nokku.v1.DeleteAccountRequest"> & {
-};
+export type DeleteAccountRequest = Message<'nokku.v1.DeleteAccountRequest'> & {};
 
 /**
  * Describes the message nokku.v1.DeleteAccountRequest.
  * Use `create(DeleteAccountRequestSchema)` to create a new message.
  */
-export const DeleteAccountRequestSchema: GenMessage<DeleteAccountRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 29);
+export const DeleteAccountRequestSchema: GenMessage<DeleteAccountRequest> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 29);
 
 /**
  * @generated from message nokku.v1.DeleteAccountResponse
  */
-export type DeleteAccountResponse = Message<"nokku.v1.DeleteAccountResponse"> & {
-};
+export type DeleteAccountResponse = Message<'nokku.v1.DeleteAccountResponse'> & {};
 
 /**
  * Describes the message nokku.v1.DeleteAccountResponse.
  * Use `create(DeleteAccountResponseSchema)` to create a new message.
  */
-export const DeleteAccountResponseSchema: GenMessage<DeleteAccountResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_account, 30);
+export const DeleteAccountResponseSchema: GenMessage<DeleteAccountResponse> /*@__PURE__*/ =
+	messageDesc(file_nokku_v1_account, 30);
 
 /**
  * @generated from service nokku.v1.AccountService
  */
 export const AccountService: GenService<{
-  /**
-   * @generated from rpc nokku.v1.AccountService.GetAccount
-   */
-  getAccount: {
-    methodKind: "unary";
-    input: typeof GetAccountRequestSchema;
-    output: typeof GetAccountResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.UpdateAccount
-   */
-  updateAccount: {
-    methodKind: "unary";
-    input: typeof UpdateAccountRequestSchema;
-    output: typeof UpdateAccountResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.ChangePassword
-   */
-  changePassword: {
-    methodKind: "unary";
-    input: typeof ChangePasswordRequestSchema;
-    output: typeof ChangePasswordResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.RemovePassword
-   */
-  removePassword: {
-    methodKind: "unary";
-    input: typeof RemovePasswordRequestSchema;
-    output: typeof RemovePasswordResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.ListCredentials
-   */
-  listCredentials: {
-    methodKind: "unary";
-    input: typeof ListCredentialsRequestSchema;
-    output: typeof ListCredentialsResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.RenameCredential
-   */
-  renameCredential: {
-    methodKind: "unary";
-    input: typeof RenameCredentialRequestSchema;
-    output: typeof RenameCredentialResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.RemoveCredential
-   */
-  removeCredential: {
-    methodKind: "unary";
-    input: typeof RemoveCredentialRequestSchema;
-    output: typeof RemoveCredentialResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.RemoveIdentity
-   */
-  removeIdentity: {
-    methodKind: "unary";
-    input: typeof RemoveIdentityRequestSchema;
-    output: typeof RemoveIdentityResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.ListBackupCodes
-   */
-  listBackupCodes: {
-    methodKind: "unary";
-    input: typeof ListBackupCodesRequestSchema;
-    output: typeof ListBackupCodesResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.RotateBackupCodes
-   */
-  rotateBackupCodes: {
-    methodKind: "unary";
-    input: typeof RotateBackupCodesRequestSchema;
-    output: typeof RotateBackupCodesResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.RemoveBackupCodes
-   */
-  removeBackupCodes: {
-    methodKind: "unary";
-    input: typeof RemoveBackupCodesRequestSchema;
-    output: typeof RemoveBackupCodesResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.ListAccountSessions
-   */
-  listAccountSessions: {
-    methodKind: "unary";
-    input: typeof ListAccountSessionsRequestSchema;
-    output: typeof ListAccountSessionsResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.RemoveSession
-   */
-  removeSession: {
-    methodKind: "unary";
-    input: typeof RemoveSessionRequestSchema;
-    output: typeof RemoveSessionResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AccountService.DeleteAccount
-   */
-  deleteAccount: {
-    methodKind: "unary";
-    input: typeof DeleteAccountRequestSchema;
-    output: typeof DeleteAccountResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_nokku_v1_account, 0);
-
+	/**
+	 * @generated from rpc nokku.v1.AccountService.GetAccount
+	 */
+	getAccount: {
+		methodKind: 'unary';
+		input: typeof GetAccountRequestSchema;
+		output: typeof GetAccountResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.UpdateAccount
+	 */
+	updateAccount: {
+		methodKind: 'unary';
+		input: typeof UpdateAccountRequestSchema;
+		output: typeof UpdateAccountResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.ChangePassword
+	 */
+	changePassword: {
+		methodKind: 'unary';
+		input: typeof ChangePasswordRequestSchema;
+		output: typeof ChangePasswordResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.RemovePassword
+	 */
+	removePassword: {
+		methodKind: 'unary';
+		input: typeof RemovePasswordRequestSchema;
+		output: typeof RemovePasswordResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.ListCredentials
+	 */
+	listCredentials: {
+		methodKind: 'unary';
+		input: typeof ListCredentialsRequestSchema;
+		output: typeof ListCredentialsResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.RenameCredential
+	 */
+	renameCredential: {
+		methodKind: 'unary';
+		input: typeof RenameCredentialRequestSchema;
+		output: typeof RenameCredentialResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.RemoveCredential
+	 */
+	removeCredential: {
+		methodKind: 'unary';
+		input: typeof RemoveCredentialRequestSchema;
+		output: typeof RemoveCredentialResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.RemoveIdentity
+	 */
+	removeIdentity: {
+		methodKind: 'unary';
+		input: typeof RemoveIdentityRequestSchema;
+		output: typeof RemoveIdentityResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.ListBackupCodes
+	 */
+	listBackupCodes: {
+		methodKind: 'unary';
+		input: typeof ListBackupCodesRequestSchema;
+		output: typeof ListBackupCodesResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.RotateBackupCodes
+	 */
+	rotateBackupCodes: {
+		methodKind: 'unary';
+		input: typeof RotateBackupCodesRequestSchema;
+		output: typeof RotateBackupCodesResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.RemoveBackupCodes
+	 */
+	removeBackupCodes: {
+		methodKind: 'unary';
+		input: typeof RemoveBackupCodesRequestSchema;
+		output: typeof RemoveBackupCodesResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.ListAccountSessions
+	 */
+	listAccountSessions: {
+		methodKind: 'unary';
+		input: typeof ListAccountSessionsRequestSchema;
+		output: typeof ListAccountSessionsResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.RemoveSession
+	 */
+	removeSession: {
+		methodKind: 'unary';
+		input: typeof RemoveSessionRequestSchema;
+		output: typeof RemoveSessionResponseSchema;
+	};
+	/**
+	 * @generated from rpc nokku.v1.AccountService.DeleteAccount
+	 */
+	deleteAccount: {
+		methodKind: 'unary';
+		input: typeof DeleteAccountRequestSchema;
+		output: typeof DeleteAccountResponseSchema;
+	};
+}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_account, 0);
