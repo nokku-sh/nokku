@@ -402,7 +402,7 @@ func indirect(v any) any {
 func newSSOTestService(t *testing.T, store *fakeStore, conn *fakeStoreConn) *Service {
 	t.Helper()
 	conn.store = store
-	svc, err := New(Deps{
+	svc, err := New(t.Context(), Deps{
 		BaseURL: "http://nokku.test",
 		Conn:    conn,
 		Cache:   cache.NewMemory(1000),

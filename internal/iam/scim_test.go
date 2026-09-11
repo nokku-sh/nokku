@@ -466,7 +466,7 @@ func scimNullTime(t *time.Time) any {
 func newSCIMTest(t *testing.T) (*Service, *scimStore, string) {
 	t.Helper()
 	st := newSCIMStore()
-	svc, err := New(Deps{Conn: &scimConn{st: st}})
+	svc, err := New(t.Context(), Deps{Conn: &scimConn{st: st}})
 	if err != nil {
 		t.Fatal(err)
 	}
