@@ -234,3 +234,16 @@ WHERE
   workspace_id = @workspace_id
 ORDER BY
   username ASC;
+
+-- name: TouchTargetManualSync :exec
+-- A manual sync reports liveness. The timestamp rides targets.metadata so
+-- nothing about the grant model changes.
+UPDATE targets
+SET
+  metadata = COALESCE(metadata, '{}'::jsonb)
+    || jsonb_build_object(
+      'last_manual_sync',
+      to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+    )
+WHERE
+  id = @target_id;

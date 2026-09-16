@@ -17,6 +17,7 @@
 	import * as Select from '$lib/components/ui/select';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import { timeAgo } from '$lib/time';
 	import type { Target } from '$lib/gen/nokku/v1/target_pb';
 	import { useAutoSave } from '$lib/hooks';
 	import FormModal from './FormModal.svelte';
@@ -51,6 +52,7 @@
 	// and the accounts are whatever that run found.
 	const isManual = $derived(!model.daemonId);
 	const syncCommand = $derived(`nk target sync ${model.name || '<name>'}`);
+	const lastSynced = $derived(timeAgo(model.metadata?.['last_manual_sync']));
 
 	let newAccountValue = $state('');
 	const pendingAccount = $derived(newAccountValue.trim());
@@ -245,6 +247,9 @@
 							<span class="truncate font-mono text-sm">{syncCommand}</span>
 							<CopyButton text={syncCommand} />
 						</div>
+						<p class="text-sm text-muted-foreground">
+							{lastSynced ? `Last synced ${lastSynced}` : 'Not synced yet'}
+						</p>
 						<Alert.Root>
 							<Info />
 							<Alert.Title>Host trust material</Alert.Title>

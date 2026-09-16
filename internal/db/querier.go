@@ -213,6 +213,9 @@ type Querier interface {
 	TouchSCIMToken(ctx context.Context, id string) error
 	TouchServiceAccount(ctx context.Context, id string) error
 	TouchSession(ctx context.Context, arg *TouchSessionParams) error
+	// A manual sync reports liveness. The timestamp rides targets.metadata so
+	// nothing about the grant model changes.
+	TouchTargetManualSync(ctx context.Context, targetID string) error
 	TrySecretRotationLock(ctx context.Context) (bool, error)
 	UpdateCA(ctx context.Context, arg *UpdateCAParams) (*CertificateAuthority, error)
 	UpdateCAPrivateKey(ctx context.Context, arg *UpdateCAPrivateKeyParams) error
