@@ -62,9 +62,6 @@
 
 	const displayedTargets = $derived(targets.data?.targets || []);
 	const selectedTarget = $derived(displayedTargets.find((t) => t.id === selectedTargetId) || null);
-	// Accounts the machine last reported. A stale assignment is inert (the OS
-	// user is gone) but it should not look like a usable account.
-	const reportedUsers = $derived(new Set(selectedTarget?.reportedUsers ?? []));
 
 	const accessibleTargetIds = $derived(new Set(access.data?.targets?.map((t) => t.id) || []));
 	// access.data.targets carry each target's principals, so we can tell whether
@@ -449,11 +446,6 @@
 												<div class="flex items-center gap-2">
 													<span class="font-mono text-base font-semibold">{principal.username}</span
 													>
-													{#if !reportedUsers.has(principal.username)}
-														<Badge variant="outline" class="text-[10px] text-muted-foreground">
-															not on host
-														</Badge>
-													{/if}
 												</div>
 												<Tooltip.Root>
 													<Tooltip.Trigger class="text-left">

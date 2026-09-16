@@ -226,7 +226,7 @@ func (q *Queries) GetDaemonsByIDs(ctx context.Context, daemonIds []string) ([]*G
 
 const getTargetByDaemon = `-- name: GetTargetByDaemon :one
 SELECT
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, reported_users, reported_at, created_at, updated_at
+  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, created_at, updated_at
 FROM
   targets
 WHERE
@@ -247,8 +247,6 @@ func (q *Queries) GetTargetByDaemon(ctx context.Context, daemonID *string) (*Tar
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
-		&i.ReportedUsers,
-		&i.ReportedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

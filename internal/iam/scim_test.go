@@ -36,9 +36,8 @@ type scimStore struct {
 	teams    map[string]*db.Team
 	teamMems map[string]map[string]bool // team id -> user ids
 
-	revocations     map[string]bool // subject ids whose certificates were revoked
-	grantDrops      map[string]int  // subject id -> grant delete statements run
-	ownedWorkspaces map[string]int  // user id -> owned workspace count
+	grantDrops      map[string]int // subject id -> grant delete statements run
+	ownedWorkspaces map[string]int // user id -> owned workspace count
 
 	userCounter int
 	teamCounter int
@@ -56,7 +55,6 @@ func newSCIMStore() *scimStore {
 		ownedWorkspaces: map[string]int{},
 		teams:           map[string]*db.Team{},
 		teamMems:        map[string]map[string]bool{},
-		revocations:     map[string]bool{},
 		grantDrops:      map[string]int{},
 	}
 }
@@ -351,8 +349,6 @@ func (c *scimConn) Exec(_ context.Context, sql string, args ...any) (pgconn.Comm
 		} else {
 			c.st.grantDrops[args[1].(string)]++
 		}
-	case strings.Contains(sql, "ssh_principal_revocations"):
-		c.st.revocations[args[1].(string)] = true
 	case strings.Contains(sql, "DELETE") && strings.Contains(sql, "users"):
 		uid := args[0].(string)
 		if u, ok := c.st.users[uid]; ok {
@@ -637,9 +633,6 @@ func TestSCIMUserLifecycle(t *testing.T) {
 	}
 	if _, ok := st.creds["scim|"+testWorkspaceID+"|okta-user-42"]; ok {
 		t.Fatal("scim credential survived delete")
-	}
-	if !st.revocations[created.ID] {
-		t.Fatal("deprovision did not revoke the user's certificates")
 	}
 	if st.grantDrops[created.ID] == 0 {
 		t.Fatal("deprovision kept the user's workspace grants")

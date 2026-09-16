@@ -486,12 +486,11 @@ func (s *DaemonService) SyncDaemon(
 		return nil, DBError(err)
 	}
 	return &nokkuv1.SyncDaemonResponse{
-		Status:            res.Status,
-		Config:            res.Config,
-		Principals:        res.Principals,
-		CaPublicKey:       &res.CAPublicKey,
-		StateVersion:      new(s.cfg.Pool.Version(res.WorkspaceID)),
-		RevokedPrincipals: res.Revocations,
+		Status:       res.Status,
+		Config:       res.Config,
+		Principals:   res.Principals,
+		CaPublicKey:  &res.CAPublicKey,
+		StateVersion: new(s.cfg.Pool.Version(res.WorkspaceID)),
 	}, nil
 }
 

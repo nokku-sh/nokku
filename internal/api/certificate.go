@@ -290,12 +290,10 @@ func (s *CertificateService) SignSSHCertificate(
 	principal := actor.ID
 	daemonID := iam.DaemonIDFromContext(ctx)
 
-	// Manual host signing is target management. Daemons authenticate with
-	// their own DPoP-bound identity and skip this gate.
+	// Host certificates are minted by daemons only, backed by their
+	// DPoP-bound identity.
 	if req.GetType() == nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST && daemonID == "" {
-		if err := actorHasPermission(ctx, s.cfg.Conn, db.PermTargetsEdit); err != nil {
-			return nil, DBError(err)
-		}
+		return nil, NewError(connect.CodePermissionDenied, "host certificates are issued by daemons")
 	}
 
 	var ca *db.CertificateAuthority
@@ -324,18 +322,11 @@ func (s *CertificateService) SignSSHCertificate(
 
 		// Override principal if a host certificate was requested
 		if req.GetType() == nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST {
-			if daemonID != "" {
-				target, err := q.GetTargetByDaemon(ctx, &daemonID)
-				if err != nil {
-					return err
-				}
-				principal = target.ID
-			} else {
-				principal, err = s.manualHostTarget(ctx, q, req)
-				if err != nil {
-					return err
-				}
+			target, err := q.GetTargetByDaemon(ctx, &daemonID)
+			if err != nil {
+				return err
 			}
+			principal = target.ID
 			keyID = fmt.Sprintf("nokku:provision:%s:%s", actor.Kind, actor.ID)
 		}
 		return nil
@@ -430,49 +421,9 @@ func (s *CertificateService) SignX509Certificate(
 	}
 
 	return &nokkuv1.SignX509CertificateResponse{
-		CaId:        &ca.ID,
 		CaName:      &ca.Name,
 		Certificate: new(string(certPEM)),
 		CaChain:     &ca.Certificate,
 		ExpiresAt:   timestamppb.New(expiresAt),
 	}, nil
-}
-
-// manualHostTarget resolves the target a user or service account may mint a
-// host certificate for. Daemon-managed targets are excluded: their identity
-// is issued through the daemon itself. The submitted key must be the one
-// pinned at target creation, so possession of a workspace credential alone
-// cannot mint new host identities.
-func (s *CertificateService) manualHostTarget(
-	ctx context.Context,
-	q *db.Queries,
-	req *nokkuv1.SignSSHCertificateRequest,
-) (string, error) {
-	if req.GetTargetId() == "" {
-		return "", ErrInvalidInput // target_id is strictly required here
-	}
-
-	target, err := q.GetTarget(ctx, req.GetTargetId())
-	if err != nil {
-		return "", err
-	}
-	if target.DaemonID != nil {
-		return "", NewError(
-			connect.CodeFailedPrecondition,
-			"target is managed by a daemon; its host certificates are issued by the daemon",
-		)
-	}
-	if target.HostPublicKey == nil || *target.HostPublicKey == "" {
-		return "", NewError(
-			connect.CodeFailedPrecondition,
-			"target has no pinned host public key; set host_public_key when creating the target",
-		)
-	}
-	if !ssh.HostKeyMatches(*target.HostPublicKey, req.GetPublicKey()) {
-		return "", NewError(
-			connect.CodePermissionDenied,
-			"public key does not match the pinned host key; rotate it via UpdateTarget",
-		)
-	}
-	return target.ID, nil
 }

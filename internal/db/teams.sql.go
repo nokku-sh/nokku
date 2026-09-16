@@ -156,37 +156,6 @@ func (q *Queries) GetTeam(ctx context.Context, teamID string) (*Team, error) {
 	return &i, err
 }
 
-const listTeamMemberUserIDs = `-- name: ListTeamMemberUserIDs :many
-SELECT
-  user_id
-FROM
-  team_members
-WHERE
-  team_id = $1
-`
-
-// Just the user ids, for callers that only need the membership set (for
-// example expanding a team into the users whose certificates must revoke).
-func (q *Queries) ListTeamMemberUserIDs(ctx context.Context, teamID string) ([]string, error) {
-	rows, err := q.db.Query(ctx, listTeamMemberUserIDs, teamID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var user_id string
-		if err := rows.Scan(&user_id); err != nil {
-			return nil, err
-		}
-		items = append(items, user_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listTeamMembers = `-- name: ListTeamMembers :many
 SELECT
   tm.workspace_id,

@@ -341,18 +341,12 @@ func (s *Service) scimDeprovisionUser(ctx context.Context, workspaceID, userID s
 	}
 	var deleted, deactivated bool
 	err = s.conn.WithTx(ctx, func(q *db.Queries) error {
-		// A deprovisioned user keeps no access: drop their grants in this
-		// workspace and revoke the certificates already issued, mirroring
+		// A deprovisioned user keeps no access: dropping their grants
+		// removes them from the synced principals map, mirroring
 		// RemoveWorkspaceMember.
 		if err := q.RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
 			WorkspaceID: workspaceID,
 			SubjectKind: db.SubjectKindUser,
-			SubjectID:   userID,
-		}); err != nil {
-			return err
-		}
-		if err := q.UpsertPrincipalRevocation(ctx, &db.UpsertPrincipalRevocationParams{
-			WorkspaceID: workspaceID,
 			SubjectID:   userID,
 		}); err != nil {
 			return err

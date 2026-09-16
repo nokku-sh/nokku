@@ -3,7 +3,6 @@ package daemon
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -26,7 +25,6 @@ type Synced struct {
 	Config      *nokkuv1.DaemonConfig
 	Principals  []*nokkuv1.PrincipalUsers
 	CAPublicKey string
-	Revocations []*nokkuv1.RevokedPrincipal
 }
 
 // Sync records a daemon heartbeat and returns the state the daemon should
@@ -83,26 +81,14 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			return err
 		}
 
-		// The reported account list is advisory. It refreshes the hint and
-		// creates anchors for new accounts, but never deletes: a host that
-		// cannot enumerate users must not change who has access. An empty
-		// list is a failed getent, so keep the previous hint.
-		if len(in.Users) == 0 {
-			slog.Warn("daemon reported no users, keeping the previous reported list",
-				"daemon_id", in.DaemonID)
-		} else {
-			if err := q.SetReportedUsers(ctx, &db.SetReportedUsersParams{
-				TargetID:  target.ID,
-				Usernames: in.Users,
-			}); err != nil {
-				return err
-			}
-			if err := q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
-				TargetID:  target.ID,
-				Usernames: in.Users,
-			}); err != nil {
-				return err
-			}
+		// The reported account list only creates anchors for new accounts.
+		// It never deletes: a host that cannot enumerate users must not
+		// change who has access.
+		if err := q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
+			TargetID:  target.ID,
+			Usernames: in.Users,
+		}); err != nil {
+			return err
 		}
 
 		result, err := q.ListPrincipalsForDaemon(ctx, &daemon.ID)
@@ -113,19 +99,6 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			res.Principals = append(res.Principals, &nokkuv1.PrincipalUsers{
 				Username: &p.Username,
 				Ids:      p.Ids,
-			})
-		}
-
-		revocations, err := q.ListPrincipalRevocations(ctx, daemon.WorkspaceID)
-		if err != nil {
-			return err
-		}
-		for _, r := range revocations {
-			principal := r.SubjectID
-			revokedBefore := r.RevokedAt.Unix()
-			res.Revocations = append(res.Revocations, &nokkuv1.RevokedPrincipal{
-				Principal:     &principal,
-				RevokedBefore: &revokedBefore,
 			})
 		}
 

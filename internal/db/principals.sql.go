@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"time"
 )
 
 const addPrincipalGrant = `-- name: AddPrincipalGrant :exec
@@ -209,47 +208,6 @@ type InsertTargetPrincipalsParams struct {
 func (q *Queries) InsertTargetPrincipals(ctx context.Context, arg *InsertTargetPrincipalsParams) error {
 	_, err := q.db.Exec(ctx, insertTargetPrincipals, arg.TargetID, arg.Usernames)
 	return err
-}
-
-const listPrincipalRevocations = `-- name: ListPrincipalRevocations :many
-SELECT
-  subject_id,
-  revoked_at
-FROM
-  ssh_principal_revocations
-WHERE
-  workspace_id = $1
-  -- Session certificates live at most an hour, so older cutoffs match no
-  -- live certificate. The days of margin cover daemons that synced before
-  -- the revoke and reconnect late, plus clock skew.
-  AND revoked_at > NOW() - INTERVAL '8 days'
-ORDER BY
-  subject_id
-`
-
-type ListPrincipalRevocationsRow struct {
-	SubjectID string    `json:"subjectId"`
-	RevokedAt time.Time `json:"revokedAt"`
-}
-
-func (q *Queries) ListPrincipalRevocations(ctx context.Context, workspaceID string) ([]*ListPrincipalRevocationsRow, error) {
-	rows, err := q.db.Query(ctx, listPrincipalRevocations, workspaceID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*ListPrincipalRevocationsRow
-	for rows.Next() {
-		var i ListPrincipalRevocationsRow
-		if err := rows.Scan(&i.SubjectID, &i.RevokedAt); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listPrincipals = `-- name: ListPrincipals :many
@@ -630,48 +588,5 @@ type SetPrincipalsParams struct {
 
 func (q *Queries) SetPrincipals(ctx context.Context, arg *SetPrincipalsParams) error {
 	_, err := q.db.Exec(ctx, setPrincipals, arg.TargetID, arg.Usernames)
-	return err
-}
-
-const setReportedUsers = `-- name: SetReportedUsers :exec
-UPDATE targets
-SET
-  reported_users = $1::TEXT[],
-  reported_at = NOW()
-WHERE
-  id = $2
-`
-
-type SetReportedUsersParams struct {
-	Usernames []string `json:"usernames"`
-	TargetID  string   `json:"targetId"`
-}
-
-func (q *Queries) SetReportedUsers(ctx context.Context, arg *SetReportedUsersParams) error {
-	_, err := q.db.Exec(ctx, setReportedUsers, arg.Usernames, arg.TargetID)
-	return err
-}
-
-const upsertPrincipalRevocation = `-- name: UpsertPrincipalRevocation :exec
-INSERT INTO
-  ssh_principal_revocations (workspace_id, subject_id)
-VALUES
-  ($1, $2)
-ON CONFLICT (workspace_id, subject_id) DO UPDATE
-SET
-  revoked_at = NOW()
-`
-
-type UpsertPrincipalRevocationParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	SubjectID   string `json:"subjectId"`
-}
-
-// Principal revocation -------------------------------------------------------
-// A revocation invalidates every certificate for a principal issued before
-// revoked_at. Re-revoking moves the cutoff forward, so a fresh certificate
-// always works.
-func (q *Queries) UpsertPrincipalRevocation(ctx context.Context, arg *UpsertPrincipalRevocationParams) error {
-	_, err := q.db.Exec(ctx, upsertPrincipalRevocation, arg.WorkspaceID, arg.SubjectID)
 	return err
 }

@@ -216,8 +216,8 @@ func (s *TargetService) GetTargetPrincipals(
 
 // SyncTargetUsers reports a target's local accounts, host key, and endpoints.
 // Daemonless targets use it: the operator runs the report from their own
-// machine over SSH. Like the daemon's sync it is advisory and never deletes,
-// so a failed report cannot revoke anyone.
+// machine over SSH. The account list only creates anchors and never deletes,
+// so a failed report cannot lock anyone out.
 func (s *TargetService) SyncTargetUsers(
 	ctx context.Context,
 	req *nokkuv1.SyncTargetUsersRequest,
@@ -227,19 +227,11 @@ func (s *TargetService) SyncTargetUsers(
 	}
 
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		if len(req.GetUsernames()) > 0 {
-			if err := q.SetReportedUsers(ctx, &db.SetReportedUsersParams{
-				TargetID:  req.GetTargetId(),
-				Usernames: req.GetUsernames(),
-			}); err != nil {
-				return err
-			}
-			if err := q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
-				TargetID:  req.GetTargetId(),
-				Usernames: req.GetUsernames(),
-			}); err != nil {
-				return err
-			}
+		if err := q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
+			TargetID:  req.GetTargetId(),
+			Usernames: req.GetUsernames(),
+		}); err != nil {
+			return err
 		}
 
 		// Only the fields the report carries: the update COALESCEs, so nil

@@ -268,16 +268,13 @@ func (s *WorkspaceService) RemoveWorkspaceMember(
 	req *nokkuv1.RemoveWorkspaceMemberRequest,
 ) (*nokkuv1.RemoveWorkspaceMemberResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		// A removed member keeps no access: drop their grants in this
-		// workspace and revoke the certificates already issued.
+		// A removed member keeps no access: dropping their grants removes
+		// them from the synced principals map.
 		if err = q.RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			SubjectKind: db.SubjectKindUser,
 			SubjectID:   req.GetUserId(),
 		}); err != nil {
-			return err
-		}
-		if err = revokePrincipals(ctx, q, req.GetWorkspaceId(), []string{req.GetUserId()}); err != nil {
 			return err
 		}
 		return q.RemoveWorkspaceMember(ctx, &db.RemoveWorkspaceMemberParams{

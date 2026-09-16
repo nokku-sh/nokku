@@ -169,12 +169,6 @@ type Session struct {
 	CreatedAt   time.Time          `json:"createdAt"`
 }
 
-type SshPrincipalRevocation struct {
-	WorkspaceID string    `json:"workspaceId"`
-	SubjectID   string    `json:"subjectId"`
-	RevokedAt   time.Time `json:"revokedAt"`
-}
-
 type SsoProvider struct {
 	WorkspaceID *string               `json:"workspaceId"`
 	ProviderID  string                `json:"providerId"`
@@ -187,20 +181,18 @@ type SsoProvider struct {
 }
 
 type Target struct {
-	ID            string     `json:"id"`
-	WorkspaceID   string     `json:"workspaceId"`
-	CaID          *string    `json:"caId"`
-	DaemonID      *string    `json:"daemonId"`
-	Name          string     `json:"name"`
-	Description   *string    `json:"description"`
-	Endpoints     []string   `json:"endpoints"`
-	HostPublicKey *string    `json:"hostPublicKey"`
-	Tags          []string   `json:"tags"`
-	Metadata      []byte     `json:"metadata"`
-	ReportedUsers []string   `json:"reportedUsers"`
-	ReportedAt    *time.Time `json:"reportedAt"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	UpdatedAt     time.Time  `json:"updatedAt"`
+	ID            string    `json:"id"`
+	WorkspaceID   string    `json:"workspaceId"`
+	CaID          *string   `json:"caId"`
+	DaemonID      *string   `json:"daemonId"`
+	Name          string    `json:"name"`
+	Description   *string   `json:"description"`
+	Endpoints     []string  `json:"endpoints"`
+	HostPublicKey *string   `json:"hostPublicKey"`
+	Tags          []string  `json:"tags"`
+	Metadata      []byte    `json:"metadata"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 type Team struct {

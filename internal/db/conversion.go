@@ -178,8 +178,6 @@ func (t *Target) ToProto() *nokkuv1.Target {
 		Tags:          t.Tags,
 		Metadata:      metadata,
 		HostPublicKey: t.HostPublicKey,
-		ReportedUsers: t.ReportedUsers,
-		ReportedAt:    SafeTimestamp(t.ReportedAt),
 		CreatedAt:     SafeTimestamp(&t.CreatedAt),
 		UpdatedAt:     SafeTimestamp(&t.UpdatedAt),
 	}

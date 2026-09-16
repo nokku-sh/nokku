@@ -24,32 +24,6 @@ func keyLine(t *testing.T, comment string) string {
 	return line + " " + comment
 }
 
-func TestHostKeyMatches(t *testing.T) {
-	line := keyLine(t, "host@example")
-
-	if !HostKeyMatches(line, line) {
-		t.Fatal("identical lines should match")
-	}
-
-	// Same key material, different comment and surrounding whitespace.
-	base := strings.TrimSuffix(line, " host@example")
-	if !HostKeyMatches(line, "  "+base+"  rotated  ") {
-		t.Fatal("same key with different comments should match")
-	}
-
-	other := keyLine(t, "host@example")
-	if HostKeyMatches(line, other) {
-		t.Fatal("different keys should not match")
-	}
-
-	if HostKeyMatches(line, "not a key") {
-		t.Fatal("unparseable submitted key should not match")
-	}
-	if HostKeyMatches("not a key", line) {
-		t.Fatal("unparseable pinned key should not match")
-	}
-}
-
 func TestParsePublicKey(t *testing.T) {
 	line := keyLine(t, "x")
 

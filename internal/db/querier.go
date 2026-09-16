@@ -151,7 +151,6 @@ type Querier interface {
 	ListCAs(ctx context.Context, arg *ListCAsParams) ([]*CertificateAuthority, error)
 	ListCredentialsByType(ctx context.Context, arg *ListCredentialsByTypeParams) ([]*Credential, error)
 	ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*ListDaemonsRow, error)
-	ListPrincipalRevocations(ctx context.Context, workspaceID string) ([]*ListPrincipalRevocationsRow, error)
 	ListPrincipals(ctx context.Context, arg *ListPrincipalsParams) ([]*ListPrincipalsRow, error)
 	ListPrincipalsForDaemon(ctx context.Context, daemonID *string) ([]*ListPrincipalsForDaemonRow, error)
 	// The same per-account subject list the daemon receives, for a daemonless
@@ -169,9 +168,6 @@ type Querier interface {
 	// a service account (all identified by UUID, which is unique across them).
 	ListSubjectUsernamesForTargets(ctx context.Context, arg *ListSubjectUsernamesForTargetsParams) ([]*ListSubjectUsernamesForTargetsRow, error)
 	ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*ListTargetsRow, error)
-	// Just the user ids, for callers that only need the membership set (for
-	// example expanding a team into the users whose certificates must revoke).
-	ListTeamMemberUserIDs(ctx context.Context, teamID string) ([]string, error)
 	// Members of one team with their identity display fields joined in.
 	ListTeamMembers(ctx context.Context, teamID string) ([]*ListTeamMembersRow, error)
 	ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*ListTeamsRow, error)
@@ -207,7 +203,6 @@ type Querier interface {
 	SetDefaultCA(ctx context.Context, arg *SetDefaultCAParams) error
 	SetPrincipals(ctx context.Context, arg *SetPrincipalsParams) error
 	SetRecordingComplete(ctx context.Context, arg *SetRecordingCompleteParams) (*Recording, error)
-	SetReportedUsers(ctx context.Context, arg *SetReportedUsersParams) error
 	// Records which Stripe customer a workspace maps to, so checkout always reuses
 	// the same customer. Status stays inactive so this row never grants
 	// entitlements on its own; the webhook promotes it to a real subscription.
@@ -241,11 +236,6 @@ type Querier interface {
 	// Rotation-only (rotate-secrets command): persist the target keyset
 	// atomically within the rotation transaction. Never used on the boot path.
 	UpsertKeysetWrappedData(ctx context.Context, data []byte) error
-	// Principal revocation -------------------------------------------------------
-	// A revocation invalidates every certificate for a principal issued before
-	// revoked_at. Re-revoking moves the cutoff forward, so a fresh certificate
-	// always works.
-	UpsertPrincipalRevocation(ctx context.Context, arg *UpsertPrincipalRevocationParams) error
 	UpsertSSOProvider(ctx context.Context, arg *UpsertSSOProviderParams) (*SsoProvider, error)
 	// Note: source is only overwritten when the row is provider-managed ('stripe')
 	// or empty, so manual subscriptions survive provider syncs.
