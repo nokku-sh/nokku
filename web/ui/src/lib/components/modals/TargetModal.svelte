@@ -19,7 +19,6 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import type { Target } from '$lib/gen/nokku/v1/target_pb';
 	import { useAutoSave } from '$lib/hooks';
-	import { formatTs } from '$lib/utils';
 	import FormModal from './FormModal.svelte';
 	import MetaInfo from './MetaInfo.svelte';
 	import ModalTabs from './ModalTabs.svelte';
@@ -43,7 +42,6 @@
 	const accounts = principal.list(() => ({ targetId: model.id, limit: MAX_PAGE_SIZE }));
 	const accountList = $derived(accounts.data?.principals ?? []);
 	const accountNames = $derived(new Set(accountList.map((a) => a.username)));
-	const reportedUsers = $derived(new Set(model.reportedUsers ?? []));
 	const isLoading = $derived(createTarget.isPending);
 
 	const addAccount = principal.addAccount();
@@ -53,11 +51,6 @@
 	// and the accounts are whatever that run found.
 	const isManual = $derived(!model.daemonId);
 	const syncCommand = $derived(`nk target sync ${model.name || '<name>'}`);
-	const reportedLabel = $derived(
-		model.reportedAt
-			? `Accounts last reported ${formatTs(model.reportedAt, 'relative')}`
-			: 'Accounts have not been reported yet'
-	);
 
 	let newAccountValue = $state('');
 	const pendingAccount = $derived(newAccountValue.trim());
@@ -175,17 +168,11 @@
 									account.userIds.length +
 									account.teamIds.length +
 									account.serviceAccountIds.length}
-								{@const reported = reportedUsers.has(account.username)}
 								<div
 									class="flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5"
 								>
 									<div class="flex min-w-0 items-center gap-2">
 										<span class="truncate font-mono text-sm">{account.username}</span>
-										{#if !reported}
-											<Badge variant="outline" class="text-[10px] text-muted-foreground">
-												not reported
-											</Badge>
-										{/if}
 									</div>
 									<div class="flex shrink-0 items-center gap-1">
 										<span class="text-xs text-muted-foreground">{assigned} assigned</span>
@@ -258,7 +245,6 @@
 							<span class="truncate font-mono text-sm">{syncCommand}</span>
 							<CopyButton text={syncCommand} />
 						</div>
-						<p class="text-xs text-muted-foreground">{reportedLabel}</p>
 						<Alert.Root>
 							<Info />
 							<Alert.Title>Host trust material</Alert.Title>

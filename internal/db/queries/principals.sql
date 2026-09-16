@@ -99,14 +99,6 @@ FROM
   desired d
 ON CONFLICT (target_id, username) DO NOTHING;
 
--- name: SetReportedUsers :exec
-UPDATE targets
-SET
-  reported_users = @usernames::TEXT[],
-  reported_at = NOW()
-WHERE
-  id = @target_id;
-
 -- name: InsertTargetPrincipals :exec
 -- Creates the principal anchor for each reported account so it becomes
 -- assignable. Never deletes: a host's reported list is a hint, not authority.
@@ -268,34 +260,6 @@ WHERE
 ORDER BY
   p.target_id,
   p.username;
-
--- Principal revocation -------------------------------------------------------
--- A revocation invalidates every certificate for a principal issued before
--- revoked_at. Re-revoking moves the cutoff forward, so a fresh certificate
--- always works.
--- name: UpsertPrincipalRevocation :exec
-INSERT INTO
-  ssh_principal_revocations (workspace_id, subject_id)
-VALUES
-  (@workspace_id, @subject_id)
-ON CONFLICT (workspace_id, subject_id) DO UPDATE
-SET
-  revoked_at = NOW();
-
--- name: ListPrincipalRevocations :many
-SELECT
-  subject_id,
-  revoked_at
-FROM
-  ssh_principal_revocations
-WHERE
-  workspace_id = @workspace_id
-  -- Session certificates live at most an hour, so older cutoffs match no
-  -- live certificate. The days of margin cover daemons that synced before
-  -- the revoke and reconnect late, plus clock skew.
-  AND revoked_at > NOW() - INTERVAL '8 days'
-ORDER BY
-  subject_id;
 
 -- name: ListPrincipalsForTarget :many
 -- The same per-account subject list the daemon receives, for a daemonless

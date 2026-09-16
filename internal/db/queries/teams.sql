@@ -93,16 +93,6 @@ ORDER BY
   u.name ASC,
   u.email ASC;
 
--- name: ListTeamMemberUserIDs :many
--- Just the user ids, for callers that only need the membership set (for
--- example expanding a team into the users whose certificates must revoke).
-SELECT
-  user_id
-FROM
-  team_members
-WHERE
-  team_id = @team_id;
-
 -- name: CountTeamMembers :many
 -- Member counts for a set of teams in one read, for list views that show a
 -- count instead of embedding each team's members.

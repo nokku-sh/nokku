@@ -212,10 +212,6 @@ CREATE TABLE IF NOT EXISTS targets (
   host_public_key TEXT,
   tags TEXT[] NOT NULL DEFAULT '{}',
   metadata JSONB NOT NULL DEFAULT '{}',
-  -- The local accounts the daemon last reported. Advisory: a host that cannot
-  -- enumerate users must not change access.
-  reported_users TEXT[] NOT NULL DEFAULT '{}',
-  reported_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name)
@@ -239,18 +235,6 @@ CREATE TABLE IF NOT EXISTS principal_grants (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (principal_id, subject_kind, subject_id),
   CHECK (subject_kind IN ('user', 'team', 'service_account'))
-);
-
--- Subject-level revocation, keyed by the id the SSH certificate carries as
--- its principal (a user id, teams are expanded first). A certificate is
--- refused when its ValidAfter is earlier than revoked_at, so revoking
--- invalidates every certificate already issued while a freshly minted one
--- works again.
-CREATE TABLE IF NOT EXISTS ssh_principal_revocations (
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  subject_id UUID NOT NULL,
-  revoked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (workspace_id, subject_id)
 );
 
 CREATE TABLE IF NOT EXISTS recordings (
@@ -398,14 +382,6 @@ OR
 UPDATE OF is_default ON certificate_authorities FOR EACH ROW WHEN (NEW.is_default = TRUE)
 EXECUTE FUNCTION enforce_single_default_ca ();
 
--- Auto-update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column () RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 -- Roles and grants -----------------------------------------------------------
 DO $$
 BEGIN
@@ -522,10 +498,6 @@ ALTER TABLE principals FORCE ROW LEVEL SECURITY;
 ALTER TABLE principal_grants ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE principal_grants FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE ssh_principal_revocations ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE ssh_principal_revocations FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE recordings ENABLE ROW LEVEL SECURITY;
 
@@ -648,10 +620,6 @@ WITH
         AND p.workspace_id = principal_grants.workspace_id
     )
   );
-
-CREATE POLICY tenant_isolation ON ssh_principal_revocations FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
 
 -- Audit schema ---------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS audit;

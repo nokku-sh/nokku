@@ -119,17 +119,10 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 			}
 		}
 
-		// Removing a grant must invalidate certificates already issued for
-		// the removed subjects: otherwise a re-grant (or a lost device) keeps
-		// working until the cert expires.
-		revokeIDs := req.GetSubjectIds()
-		if kind == db.SubjectKindTeam {
-			revokeIDs, err = teamMemberUserIDs(ctx, q, req.GetSubjectIds())
-			if err != nil {
-				return err
-			}
-		}
-		return revokePrincipals(ctx, q, workspaceID, revokeIDs)
+		// Grant removal is the whole lockout. The next sync drops the
+		// subject from the principals map, so a certificate already issued
+		// matches no account.
+		return nil
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -155,15 +148,9 @@ func (s *PrincipalService) RevokeAllAccess(
 			return err
 		}
 
-		revokeIDs := []string{req.GetSubjectId()}
-		if kind == db.SubjectKindTeam {
-			members, err := teamMemberUserIDs(ctx, q, revokeIDs)
-			if err != nil {
-				return err
-			}
-			revokeIDs = members
-		}
-		return revokePrincipals(ctx, q, req.GetWorkspaceId(), revokeIDs)
+		// Grant removal is the whole lockout, same as above: the subject
+		// vanishes from every synced principals map.
+		return nil
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -225,33 +212,4 @@ func subjectKind(t nokkuv1.PrincipalType) (string, bool) {
 	default:
 		return "", false
 	}
-}
-
-// revokePrincipals records a revocation for each subject id, invalidating
-// every certificate issued to them before now while a freshly minted one
-// works. See ssh_principal_revocations and the daemon's ValidAfter check.
-func revokePrincipals(ctx context.Context, q *db.Queries, workspaceID string, ids []string) error {
-	for _, id := range ids {
-		if err := q.UpsertPrincipalRevocation(ctx, &db.UpsertPrincipalRevocationParams{
-			WorkspaceID: workspaceID,
-			SubjectID:   id,
-		}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// teamMemberUserIDs expands team ids to the user ids of their members, so a
-// team-level grant removal revokes each member's certificates too.
-func teamMemberUserIDs(ctx context.Context, q *db.Queries, teamIDs []string) ([]string, error) {
-	var ids []string
-	for _, teamID := range teamIDs {
-		members, err := q.ListTeamMemberUserIDs(ctx, teamID)
-		if err != nil {
-			return nil, err
-		}
-		ids = append(ids, members...)
-	}
-	return ids, nil
 }
