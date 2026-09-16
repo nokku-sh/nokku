@@ -217,7 +217,8 @@ func (s *TargetService) GetTargetPrincipals(
 // SyncTargetUsers reports a target's local accounts, host key, and endpoints.
 // Daemonless targets use it: the operator runs the report from their own
 // machine over SSH. The account list only creates anchors and never deletes,
-// so a failed report cannot lock anyone out.
+// so a failed report cannot lock anyone out. Each report also records
+// metadata.last_manual_sync.
 func (s *TargetService) SyncTargetUsers(
 	ctx context.Context,
 	req *nokkuv1.SyncTargetUsersRequest,
@@ -231,6 +232,10 @@ func (s *TargetService) SyncTargetUsers(
 			TargetID:  req.GetTargetId(),
 			Usernames: req.GetUsernames(),
 		}); err != nil {
+			return err
+		}
+
+		if err := q.TouchTargetManualSync(ctx, req.GetTargetId()); err != nil {
 			return err
 		}
 

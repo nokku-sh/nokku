@@ -467,6 +467,25 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*L
 	return items, nil
 }
 
+const touchTargetManualSync = `-- name: TouchTargetManualSync :exec
+UPDATE targets
+SET
+  metadata = COALESCE(metadata, '{}'::jsonb)
+    || jsonb_build_object(
+      'last_manual_sync',
+      to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+    )
+WHERE
+  id = $1
+`
+
+// A manual sync reports liveness. The timestamp rides targets.metadata so
+// nothing about the grant model changes.
+func (q *Queries) TouchTargetManualSync(ctx context.Context, targetID string) error {
+	_, err := q.db.Exec(ctx, touchTargetManualSync, targetID)
+	return err
+}
+
 const updateTarget = `-- name: UpdateTarget :one
 UPDATE targets
 SET
