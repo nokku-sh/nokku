@@ -1,38 +1,22 @@
-# sv
+# Nokku web UI
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+The control plane UI for Nokku. SvelteKit 5 with shadcn-svelte components and Tailwind CSS 4. The production build is embedded into the Go binary by `../web/embed.go`, so the backend serves it with no separate deployment.
 
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
+## Commands
 
 ```bash
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
+pnpm install        # first time only
+pnpm dev            # dev server
+pnpm build          # production build
+pnpm check          # type checking
+pnpm fmt            # format with oxfmt
+pnpm lint           # oxlint
 ```
 
-## Developing
+The dev server needs a backend. Run `task backend` from the repo root and point the proxy at it.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Generated code
 
-```bash
-npm run dev
+`src/lib/gen` holds the generated API client for the Nokku protos. Never edit it by hand. Regenerate with `task gen` from the repo root, which runs buf against `../protos`.
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```bash
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+See the repo root `AGENTS.md` for project conventions.
