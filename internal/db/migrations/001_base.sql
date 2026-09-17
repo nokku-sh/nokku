@@ -331,6 +331,8 @@ CREATE INDEX idx_credentials_user ON credentials (user_id, type);
 
 CREATE INDEX idx_one_time_tokens_expiry ON one_time_tokens (expires_at);
 
+CREATE INDEX idx_scim_tokens_workspace_id ON scim_tokens (workspace_id);
+
 CREATE INDEX idx_sessions_subject ON sessions (subject_id);
 
 CREATE INDEX idx_sessions_workspace ON sessions (workspace_id);
@@ -742,5 +744,7 @@ BEGIN
   RETURN OLD;
 END $$;
 
-CREATE TRIGGER audit_logs_immutable BEFORE UPDATE OR DELETE ON audit.audit_logs FOR EACH ROW
+CREATE TRIGGER audit_logs_immutable BEFORE
+UPDATE
+OR DELETE ON audit.audit_logs FOR EACH ROW
 EXECUTE FUNCTION audit.audit_logs_immutable ();
