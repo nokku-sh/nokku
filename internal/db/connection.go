@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -96,6 +95,10 @@ func (c *Connection) createPools(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// The admin pool only serves migrations, role setup, and pre-auth
+	// lookups, so it never needs the tenant pool's full connection budget.
+	adminConfig.MaxConns = min(c.MaxConns, 4)
+	adminConfig.MinConns = min(c.MinConns, adminConfig.MaxConns)
 	// Default AppPassword to the environment PGPASSWORD if not provided
 	if c.AppPassword == "" {
 		c.AppPassword = adminConfig.ConnConfig.Password
@@ -178,12 +181,17 @@ func (c *Connection) setupAppRole(ctx context.Context) error {
 		_, _ = conn.Exec(ctx, "SELECT pg_advisory_unlock(hashtext('approle'))")
 	}()
 
-	// ALTER ROLE does not accept bind parameters.
-	escapedPW := strings.ReplaceAll(c.AppPassword, "'", "''")
-	if _, err := conn.Exec(
+	// ALTER ROLE does not accept bind parameters, so the statement is built
+	// with format() server-side and the password stays a bind parameter.
+	var stmt string
+	if err := conn.QueryRow(
 		ctx,
-		"ALTER ROLE nokku_app WITH LOGIN PASSWORD '"+escapedPW+"'",
-	); err != nil {
+		"SELECT format('ALTER ROLE nokku_app WITH LOGIN PASSWORD %L', $1::text)",
+		c.AppPassword,
+	).Scan(&stmt); err != nil {
+		return fmt.Errorf("building role statement: %w", err)
+	}
+	if _, err := conn.Exec(ctx, stmt); err != nil {
 		return fmt.Errorf("granting login to nokku_app: %w", err)
 	}
 	return nil
@@ -264,7 +272,14 @@ func (c *Connection) WithWorkspace(
 		// as nokku_system. The transaction switches down to nokku_app before
 		// any caller query runs. GUCs are transaction-local and survive the
 		// role switch.
-		if _, err := tx.Exec(ctx, "SET LOCAL ROLE nokku_system"); err != nil {
+		if _, err := tx.Exec(
+			ctx,
+			`SELECT
+				set_config('role', 'nokku_system', true),
+				set_config('nokku.actor_id', $1, true)
+			`,
+			principal.ID,
+		); err != nil {
 			return err
 		}
 
@@ -283,19 +298,14 @@ func (c *Connection) WithWorkspace(
 			workspaceID = wsIDs[0]
 		}
 
-		if _, err = tx.Exec(
+		if _, err := tx.Exec(
 			ctx,
 			`SELECT
 				set_config('nokku.workspace_id', $1, true),
-				set_config('nokku.actor_id', $2, true)
+				set_config('role', 'nokku_app', true)
 			`,
 			workspaceID,
-			principal.ID,
 		); err != nil {
-			return err
-		}
-
-		if _, err := tx.Exec(ctx, "SET LOCAL ROLE nokku_app"); err != nil {
 			return err
 		}
 		return fn(q)
