@@ -15,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/crypto"
@@ -300,6 +301,8 @@ func (r *sliceRows) FieldDescriptions() []pgconn.FieldDescription {
 func (r *sliceRows) Values() ([]any, error) { return r.rows[r.i-1], nil }
 func (r *sliceRows) RawValues() [][]byte    { return nil }
 func (r *sliceRows) Conn() *pgx.Conn        { return nil }
+
+func (r *sliceRows) TypeMap() *pgtype.Map { return pgtype.NewMap() }
 
 // scanVals fills dests positionally. The supported dest types cover the
 // sqlc-generated scans of the rows the fake serves. Source values may be

@@ -121,10 +121,15 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if cfg.Billing.Enabled() {
 		mode = entitlement.ModeSaaS
 	}
-	cfg.Entitlements = entitlement.NewService(cfg.Conn, cfg.Billing.License, mode)
+	license := cfg.Billing.License
+	var licensedPlan string
+	if license != nil {
+		licensedPlan = license.Plan
+	}
+	cfg.Entitlements = entitlement.NewService(cfg.Conn, licensedPlan, mode)
 
 	if mode == entitlement.ModeSelfHosted && os.Getenv("KMS_URI") != "" &&
-		!cfg.Billing.License.Valid() {
+		(license == nil || license.IsExpired()) {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
 	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Entitlements)
