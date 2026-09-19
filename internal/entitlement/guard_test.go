@@ -196,7 +196,7 @@ func TestGuard_DeniesAndAdvertisesUpgrade(t *testing.T) {
 	// Community workspace: audit export must deny with upgrade metadata.
 	sut := NewGuardInterceptor(NewService(
 		&fakeDB{},
-		nil,
+		"",
 		ModeSaaS,
 	))
 
@@ -228,7 +228,7 @@ func TestGuard_DeniesAndAdvertisesUpgrade(t *testing.T) {
 }
 
 func TestGuard_DeniesAuditStreamingOnCommunity(t *testing.T) {
-	sut := NewGuardInterceptor(NewService(&fakeDB{}, nil, ModeSaaS))
+	sut := NewGuardInterceptor(NewService(&fakeDB{}, "", ModeSaaS))
 	ctx := actor.AnnotateTenant(context.Background(), "ws1")
 
 	req := &nokkuv1.UpdateWorkspaceRequest{
@@ -261,7 +261,7 @@ func TestGuard_DeniesAuditStreamingOnCommunity(t *testing.T) {
 func TestGuard_AllowsPaidPlanAndUnpinnedContext(t *testing.T) {
 	sut := NewGuardInterceptor(NewService(
 		&fakeDB{plan: PlanPro, status: StatusActive},
-		nil,
+		"",
 		ModeSaaS,
 	))
 
@@ -344,7 +344,7 @@ func TestGuard_ResourceCapDeniesAndAdvertisesUpgrade(t *testing.T) {
 	// Community: 50-resource cap, fake reports 50 used.
 	sut := NewGuardInterceptor(NewService(
 		&fakeDB{resources: 50},
-		nil,
+		"",
 		ModeSaaS,
 	))
 
@@ -405,7 +405,7 @@ func TestCheckResources(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sut := NewService(tt.db, nil, tt.mode)
+			sut := NewService(tt.db, "", tt.mode)
 			err := sut.CheckResources(context.Background(), "ws1")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CheckResources() error = %v, wantErr %v", err, tt.wantErr)

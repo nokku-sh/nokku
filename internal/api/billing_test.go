@@ -26,14 +26,14 @@ func TestFeaturesProto_CoversTheCatalog(t *testing.T) {
 func TestFeaturesProto_EnterpriseLicenseEnablesStreaming(t *testing.T) {
 	ctx := context.Background()
 
-	licensed := entitlement.NewService(noSubscription{}, enterpriseLicense{}, entitlement.ModeSelfHosted)
+	licensed := entitlement.NewService(noSubscription{}, entitlement.PlanEnterprise, entitlement.ModeSelfHosted)
 	if !featuresProto(licensed.Resolve(ctx, "ws1"))[entitlement.FeatureAuditStreaming] {
 		t.Error("audit_streaming is false with a valid Enterprise license")
 	}
 
 	// Without a license the same instance resolves to Community, which does
 	// not include streaming.
-	unlicensed := entitlement.NewService(noSubscription{}, nil, entitlement.ModeSelfHosted)
+	unlicensed := entitlement.NewService(noSubscription{}, "", entitlement.ModeSelfHosted)
 	if featuresProto(unlicensed.Resolve(ctx, "ws1"))[entitlement.FeatureAuditStreaming] {
 		t.Error("audit_streaming is true without any license")
 	}
@@ -47,9 +47,3 @@ type noSubscription struct{}
 func (noSubscription) WithTx(_ context.Context, _ func(*db.Queries) error) error {
 	return entitlement.ErrNoSubscription
 }
-
-type enterpriseLicense struct{}
-
-func (enterpriseLicense) Valid() bool { return true }
-
-func (enterpriseLicense) LicensedPlan() string { return entitlement.PlanEnterprise }

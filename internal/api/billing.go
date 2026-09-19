@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -146,16 +147,21 @@ func (s *BillingService) GetLicense(
 	_ *nokkuv1.GetLicenseRequest,
 ) (*nokkuv1.GetLicenseResponse, error) {
 	license := s.cfg.Billing.License
+	active := s.cfg.Entitlements.Mode() == entitlement.ModeSelfHosted &&
+		license != nil && !license.IsExpired()
 	plan := entitlement.PlanCommunity
-	active := s.cfg.Entitlements.Mode() == entitlement.ModeSelfHosted && license.Valid()
 	if active {
-		plan = entitlement.LicensedPlanFor(license)
+		plan = license.Plan
 	}
-
+	var expiry *time.Time
+	if license != nil {
+		t := time.Unix(license.ExpiresAt, 0)
+		expiry = &t
+	}
 	return &nokkuv1.GetLicenseResponse{
 		Plan:      new(plan),
 		Active:    new(active),
-		ExpiresAt: db.SafeTimestamp(license.ExpiresAt),
+		ExpiresAt: db.SafeTimestamp(expiry),
 	}, nil
 }
 

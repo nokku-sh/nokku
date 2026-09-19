@@ -51,18 +51,10 @@ func (s Status) GrantsAccess() bool {
 	return false
 }
 
-// License is the instance license view entitlement needs. billing.Key
-// implements it: license verification stays in billing (vendor side), plan
-// resolution reads only its result.
-type License interface {
-	Valid() bool
-	LicensedPlan() string
-}
-
 // Service resolves workspace plans. It is safe for concurrent use.
 type Service struct {
 	conn    txRunner
-	license License
+	license string
 	mode    Mode
 }
 
@@ -70,7 +62,7 @@ type txRunner interface {
 	WithTx(ctx context.Context, fn func(*db.Queries) error) error
 }
 
-func NewService(conn txRunner, license License, mode Mode) *Service {
+func NewService(conn txRunner, license string, mode Mode) *Service {
 	if mode == "" {
 		mode = ModeSelfHosted
 	}
@@ -107,8 +99,8 @@ func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
 
 func (s *Service) resolve(ctx context.Context, workspaceID string) Plan {
 	plan := PlanCommunity
-	if s.mode == ModeSelfHosted && s.license != nil && s.license.Valid() {
-		plan = licensedPlanName(s.license)
+	if s.mode == ModeSelfHosted && s.license != "" {
+		plan = s.license
 	} else {
 		var sub *db.WorkspaceSubscription
 		err := s.conn.WithTx(ctx, func(q *db.Queries) (err error) {
@@ -141,24 +133,6 @@ func (s *Service) resolve(ctx context.Context, workspaceID string) Plan {
 		resolved.ResourceCap = Unlimited
 	}
 	return resolved
-}
-
-// LicensedPlanFor reports the plan a valid license grants, defaulting to
-// Enterprise for v1 keys that carried no plan name. Shared by resolve and
-// the license API so both show the same truth.
-func LicensedPlanFor(license License) string {
-	if license == nil || !license.Valid() {
-		return PlanCommunity
-	}
-	return licensedPlanName(license)
-}
-
-func licensedPlanName(license License) string {
-	name := license.LicensedPlan()
-	if _, ok := catalog[name]; !ok {
-		return PlanEnterprise
-	}
-	return name
 }
 
 // Has reports whether a feature flag is enabled for the workspace.

@@ -90,19 +90,11 @@ func (r rowVals) Scan(dest ...any) error {
 	return nil
 }
 
-type fakeLicense struct {
-	valid bool
-	plan  string
-}
-
-func (f fakeLicense) Valid() bool          { return f.valid }
-func (f fakeLicense) LicensedPlan() string { return f.plan }
-
 func TestResolve(t *testing.T) {
 	tests := []struct {
 		name    string
 		db      *fakeDB
-		license *fakeLicense
+		license string
 		mode    Mode
 		want    string
 	}{
@@ -147,28 +139,28 @@ func TestResolve(t *testing.T) {
 			name:    "self-hosted valid license grants licensed plan",
 			db:      &fakeDB{},
 			mode:    ModeSelfHosted,
-			license: &fakeLicense{valid: true, plan: PlanEnterprise},
+			license: PlanEnterprise,
 			want:    PlanEnterprise,
 		},
 		{
-			name:    "self-hosted license with unknown plan degrades to enterprise",
+			name:    "self-hosted license with unknown plan resolves to community",
 			db:      &fakeDB{},
 			mode:    ModeSelfHosted,
-			license: &fakeLicense{valid: true, plan: "ultimate"},
-			want:    PlanEnterprise,
+			license: "ultimate",
+			want:    PlanCommunity,
 		},
 		{
 			name:    "invalid license ignores subscription-less workspace",
 			db:      &fakeDB{subErr: errors.New("no rows")},
 			mode:    ModeSelfHosted,
-			license: &fakeLicense{valid: false},
+			license: "",
 			want:    PlanCommunity,
 		},
 		{
 			name:    "subscription wins over invalid license",
 			db:      &fakeDB{plan: PlanPro, status: StatusActive},
 			mode:    ModeSelfHosted,
-			license: &fakeLicense{valid: false},
+			license: "",
 			want:    PlanPro,
 		},
 	}
@@ -188,7 +180,7 @@ func TestResolve_FailClosedOnDBError(t *testing.T) {
 	// A billing outage must never hand out paid features (§5.2).
 	sut := NewService(
 		&fakeDB{subErr: errors.New("connection refused")},
-		nil,
+		"",
 		ModeSaaS,
 	)
 	got := sut.Resolve(context.Background(), "ws1")
@@ -207,7 +199,7 @@ func TestResolve_SelfHostedLicensedPlanUnlimited(t *testing.T) {
 	// catalog entry.
 	sut := NewService(
 		&fakeDB{},
-		&fakeLicense{valid: true, plan: PlanEnterprise},
+		PlanEnterprise,
 		ModeSelfHosted,
 	)
 	got := sut.Resolve(context.Background(), "ws1")
@@ -231,11 +223,11 @@ func TestResolve_SelfHostedRecordingStorageUnlimited(t *testing.T) {
 	// self-hosted, the disk is the customer's own whatever the plan says.
 	sut := NewService(
 		&fakeDB{plan: PlanEnterprise, status: StatusActive},
-		nil,
+		"",
 		ModeSelfHosted,
 	)
 	// Even with no subscription and no license: unlimited, not 10 MiB.
-	bare := NewService(&fakeDB{}, nil, ModeSelfHosted)
+	bare := NewService(&fakeDB{}, "", ModeSelfHosted)
 
 	if got := sut.RecordingStorageBytes(context.Background(), "ws1"); got != Unlimited {
 		t.Errorf("self-hosted pro storage cap = %d, want unlimited", got)
@@ -247,7 +239,7 @@ func TestResolve_SelfHostedRecordingStorageUnlimited(t *testing.T) {
 
 func TestResolve_RequestCache(t *testing.T) {
 	db := &fakeDB{plan: PlanPro, status: StatusActive}
-	sut := NewService(db, nil, ModeSaaS)
+	sut := NewService(db, "", ModeSaaS)
 
 	ctx := WithRequestCache(context.Background())
 	first := sut.Resolve(ctx, "ws1")
@@ -262,42 +254,6 @@ func TestResolve_RequestCache(t *testing.T) {
 	fresh := sut.Resolve(context.Background(), "ws1")
 	if fresh.Name != PlanCommunity {
 		t.Errorf("fresh resolve = %q, want community", fresh.Name)
-	}
-}
-
-func TestLicensedPlanFor(t *testing.T) {
-	tests := []struct {
-		name    string
-		license License
-		want    string
-	}{
-		{
-			name:    "nil license yields community",
-			license: nil,
-			want:    PlanCommunity,
-		},
-		{
-			name:    "invalid license yields community",
-			license: &fakeLicense{valid: false, plan: PlanPro},
-			want:    PlanCommunity,
-		},
-		{
-			name:    "valid license honors its plan",
-			license: &fakeLicense{valid: true, plan: PlanPro},
-			want:    PlanPro,
-		},
-		{
-			name:    "v1 key without plan defaults to enterprise",
-			license: &fakeLicense{valid: true},
-			want:    PlanEnterprise,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := LicensedPlanFor(tt.license); got != tt.want {
-				t.Errorf("LicensedPlanFor() = %q, want %q", got, tt.want)
-			}
-		})
 	}
 }
 
@@ -328,7 +284,7 @@ func TestCanInvite(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sut := NewService(tt.db, nil, ModeSaaS)
+			sut := NewService(tt.db, "", ModeSaaS)
 			err := sut.CanInvite(context.Background(), "ws1", tt.members)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CanInvite() error = %v, wantErr %v", err, tt.wantErr)
