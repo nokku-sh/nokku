@@ -30,7 +30,7 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jackc/tern/v2 v2.4.3
-	github.com/mizuchilabs/kata v0.1.10
+	github.com/mizuchilabs/kata v0.1.11
 	github.com/oauth2-proxy/mockoidc v0.0.0-20240214162133-caebfff84d25
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/rs/cors v1.11.1
