@@ -12,7 +12,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
-const createSession = `-- name: CreateSession :exec
+const createSession = `-- name: CreateSession :one
 INSERT INTO
   sessions (token_hash, subject_id, kind, method, workspace_id, binding, label, expires_at, last_seen_at)
 VALUES
@@ -27,6 +27,8 @@ VALUES
     $8,
     $9
   )
+RETURNING
+  token_hash, subject_id, kind, method, workspace_id, binding, label, expires_at, last_seen_at, created_at
 `
 
 type CreateSessionParams struct {
@@ -41,8 +43,8 @@ type CreateSessionParams struct {
 	LastSeenAt  *time.Time         `json:"lastSeenAt"`
 }
 
-func (q *Queries) CreateSession(ctx context.Context, arg *CreateSessionParams) error {
-	_, err := q.db.Exec(ctx, createSession,
+func (q *Queries) CreateSession(ctx context.Context, arg *CreateSessionParams) (*Session, error) {
+	row := q.db.QueryRow(ctx, createSession,
 		arg.TokenHash,
 		arg.SubjectID,
 		arg.Kind,
@@ -53,7 +55,20 @@ func (q *Queries) CreateSession(ctx context.Context, arg *CreateSessionParams) e
 		arg.ExpiresAt,
 		arg.LastSeenAt,
 	)
-	return err
+	var i Session
+	err := row.Scan(
+		&i.TokenHash,
+		&i.SubjectID,
+		&i.Kind,
+		&i.Method,
+		&i.WorkspaceID,
+		&i.Binding,
+		&i.Label,
+		&i.ExpiresAt,
+		&i.LastSeenAt,
+		&i.CreatedAt,
+	)
+	return &i, err
 }
 
 const deleteExpiredSessions = `-- name: DeleteExpiredSessions :execrows
@@ -151,7 +166,7 @@ FROM
 WHERE
   subject_id = $1
 ORDER BY
-  last_seen_at DESC
+  last_seen_at DESC NULLS LAST
 `
 
 func (q *Queries) ListSessionsBySubject(ctx context.Context, subjectID string) ([]*Session, error) {

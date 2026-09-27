@@ -65,40 +65,6 @@ GROUP BY
 ORDER BY
   p.username ASC;
 
--- name: SetPrincipals :exec
-WITH
-  desired AS (
-    SELECT
-      unnest(@usernames::TEXT[]) AS username
-  ),
-  deleted AS (
-    DELETE FROM principals
-    WHERE
-      target_id = @target_id
-      AND username NOT IN (
-        SELECT
-          username
-        FROM
-          desired
-      )
-  )
-INSERT INTO
-  principals (workspace_id, target_id, username)
-SELECT
-  (
-    SELECT
-      workspace_id
-    FROM
-      targets
-    WHERE
-      id = @target_id
-  ),
-  @target_id,
-  d.username
-FROM
-  desired d
-ON CONFLICT (target_id, username) DO NOTHING;
-
 -- name: InsertTargetPrincipals :exec
 -- Creates the principal anchor for each reported account so it becomes
 -- assignable. Never deletes: a host's reported list is a hint, not authority.
@@ -132,71 +98,42 @@ WHERE
 -- One row per (principal, subject kind, subject id) in principal_grants.
 -- name: AddPrincipalGrant :exec
 INSERT INTO
-  principal_grants (principal_id, workspace_id, subject_kind, subject_id)
+  principal_grants (
+    principal_id,
+    workspace_id,
+    user_id,
+    team_id,
+    service_account_id
+  )
 VALUES
-  (@principal_id, @workspace_id, @subject_kind, @subject_id)
-ON CONFLICT (principal_id, subject_kind, subject_id) DO NOTHING;
+  (
+    @principal_id,
+    @workspace_id,
+    CASE
+      WHEN @subject_kind::TEXT = 'user' THEN @subject_id::UUID
+    END,
+    CASE
+      WHEN @subject_kind::TEXT = 'team' THEN @subject_id::UUID
+    END,
+    CASE
+      WHEN @subject_kind::TEXT = 'service_account' THEN @subject_id::UUID
+    END
+  )
+ON CONFLICT DO NOTHING;
 
 -- name: RemovePrincipalGrant :exec
 DELETE FROM principal_grants
 WHERE
   principal_id = @principal_id
-  AND subject_kind = @subject_kind
-  AND subject_id = @subject_id;
+  AND subject_kind = @subject_kind::TEXT
+  AND subject_id = @subject_id::UUID;
 
 -- name: RevokeSubjectAccessInWorkspace :exec
 DELETE FROM principal_grants
 WHERE
   workspace_id = @workspace_id
-  AND subject_kind = @subject_kind
-  AND subject_id = @subject_id;
-
--- name: DeleteSubjectGrants :exec
--- Removes every grant for a subject that no longer exists, so no dangling
--- subject id outlives the user, team, or service account it pointed at.
--- Subject ids are unique across kinds and never reused.
-DELETE FROM principal_grants
-WHERE
-  subject_kind = @subject_kind
-  AND subject_id = @subject_id;
-
--- name: ListPrincipalsForDaemon :many
-SELECT
-  p.username,
-  array_agg(DISTINCT ids)::TEXT[] AS ids
-FROM
-  principals p
-  CROSS JOIN LATERAL (
-    SELECT
-      g.subject_id AS ids
-    FROM
-      principal_grants g
-    WHERE
-      g.principal_id = p.id
-      AND g.subject_kind IN ('user', 'service_account')
-    UNION
-    SELECT
-      tm.user_id
-    FROM
-      principal_grants g
-      JOIN team_members tm ON tm.team_id = g.subject_id
-    WHERE
-      g.principal_id = p.id
-      AND g.subject_kind = 'team'
-  ) AS combined (ids)
-WHERE
-  p.target_id = (
-    SELECT
-      t.id
-    FROM
-      targets t
-    WHERE
-      t.daemon_id = @daemon_id
-  )
-GROUP BY
-  p.username
-ORDER BY
-  p.username;
+  AND subject_kind = @subject_kind::TEXT
+  AND subject_id = @subject_id::UUID;
 
 -- name: GetPrincipalsByTargetIDs :many
 SELECT
@@ -262,9 +199,9 @@ ORDER BY
   p.username;
 
 -- name: ListPrincipalsForTarget :many
--- The same per-account subject list the daemon receives, for a daemonless
--- target whose sshd reads it from AuthorizedPrincipalsFile. Teams are
--- expanded to their members here, so the host needs no team knowledge.
+-- The per-account subject list a host enforces: the daemon's synced map, or
+-- AuthorizedPrincipalsFile on a manual target. Teams are expanded to their
+-- members here, so the host needs no team knowledge.
 SELECT
   p.username,
   array_agg(DISTINCT ids)::TEXT[] AS ids

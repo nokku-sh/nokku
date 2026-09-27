@@ -9,7 +9,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/nokku-sh/nokku/internal/crypto"
 	nokku "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
@@ -69,7 +68,7 @@ WITH
     VALUES
       ($1, $2, COALESCE($3, '{}'::jsonb), $4)
     RETURNING
-      id, name, description, enroll_token_hash, enroll_expires_at, invite_token_hash, invite_expires_at, settings, created_by, created_at, updated_at
+      id, name, description, settings, created_by, created_at, updated_at
   ),
   new_member AS (
     INSERT INTO
@@ -94,7 +93,7 @@ WITH
       workspace_id
   )
 SELECT
-  new_workspace.id, new_workspace.name, new_workspace.description, new_workspace.enroll_token_hash, new_workspace.enroll_expires_at, new_workspace.invite_token_hash, new_workspace.invite_expires_at, new_workspace.settings, new_workspace.created_by, new_workspace.created_at, new_workspace.updated_at
+  new_workspace.id, new_workspace.name, new_workspace.description, new_workspace.settings, new_workspace.created_by, new_workspace.created_at, new_workspace.updated_at
 FROM
   new_workspace
 `
@@ -107,17 +106,13 @@ type CreateWorkspaceParams struct {
 }
 
 type CreateWorkspaceRow struct {
-	ID              string     `json:"id"`
-	Name            string     `json:"name"`
-	Description     *string    `json:"description"`
-	EnrollTokenHash *string    `json:"enrollTokenHash"`
-	EnrollExpiresAt *time.Time `json:"enrollExpiresAt"`
-	InviteTokenHash *string    `json:"inviteTokenHash"`
-	InviteExpiresAt *time.Time `json:"inviteExpiresAt"`
-	Settings        []byte     `json:"settings"`
-	CreatedBy       string     `json:"createdBy"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	UpdatedAt       time.Time  `json:"updatedAt"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description"`
+	Settings    []byte    `json:"settings"`
+	CreatedBy   string    `json:"createdBy"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 func (q *Queries) CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParams) (*CreateWorkspaceRow, error) {
@@ -132,10 +127,6 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParam
 		&i.ID,
 		&i.Name,
 		&i.Description,
-		&i.EnrollTokenHash,
-		&i.EnrollExpiresAt,
-		&i.InviteTokenHash,
-		&i.InviteExpiresAt,
 		&i.Settings,
 		&i.CreatedBy,
 		&i.CreatedAt,
@@ -155,32 +146,22 @@ func (q *Queries) DeleteWorkspace(ctx context.Context, workspaceID string) error
 	return err
 }
 
-const deleteWorkspacesByOwner = `-- name: DeleteWorkspacesByOwner :exec
-DELETE FROM workspaces
-WHERE
-  created_by = $1
-`
-
-func (q *Queries) DeleteWorkspacesByOwner(ctx context.Context, userID string) error {
-	_, err := q.db.Exec(ctx, deleteWorkspacesByOwner, userID)
-	return err
-}
-
 const ensureWorkspaceMember = `-- name: EnsureWorkspaceMember :exec
 INSERT INTO
   workspace_members (workspace_id, user_id, role_name)
 VALUES
-  ($1, $2, 'viewer')
+  ($1, $2, $3)
 ON CONFLICT (workspace_id, user_id) DO NOTHING
 `
 
 type EnsureWorkspaceMemberParams struct {
 	WorkspaceID string `json:"workspaceId"`
 	UserID      string `json:"userId"`
+	RoleName    string `json:"roleName"`
 }
 
 func (q *Queries) EnsureWorkspaceMember(ctx context.Context, arg *EnsureWorkspaceMemberParams) error {
-	_, err := q.db.Exec(ctx, ensureWorkspaceMember, arg.WorkspaceID, arg.UserID)
+	_, err := q.db.Exec(ctx, ensureWorkspaceMember, arg.WorkspaceID, arg.UserID, arg.RoleName)
 	return err
 }
 
@@ -229,7 +210,7 @@ func (q *Queries) GetActorWorkspaceIDs(ctx context.Context, actorID string) ([]s
 
 const getWorkspace = `-- name: GetWorkspace :one
 SELECT
-  id, name, description, enroll_token_hash, enroll_expires_at, invite_token_hash, invite_expires_at, settings, created_by, created_at, updated_at
+  id, name, description, settings, created_by, created_at, updated_at
 FROM
   workspaces w
 WHERE
@@ -243,10 +224,6 @@ func (q *Queries) GetWorkspace(ctx context.Context, workspaceID string) (*Worksp
 		&i.ID,
 		&i.Name,
 		&i.Description,
-		&i.EnrollTokenHash,
-		&i.EnrollExpiresAt,
-		&i.InviteTokenHash,
-		&i.InviteExpiresAt,
 		&i.Settings,
 		&i.CreatedBy,
 		&i.CreatedAt,
@@ -257,7 +234,7 @@ func (q *Queries) GetWorkspace(ctx context.Context, workspaceID string) (*Worksp
 
 const getWorkspaceForUpdate = `-- name: GetWorkspaceForUpdate :one
 SELECT
-  id, name, description, enroll_token_hash, enroll_expires_at, invite_token_hash, invite_expires_at, settings, created_by, created_at, updated_at
+  id, name, description, settings, created_by, created_at, updated_at
 FROM
   workspaces w
 WHERE
@@ -272,10 +249,6 @@ func (q *Queries) GetWorkspaceForUpdate(ctx context.Context, workspaceID string)
 		&i.ID,
 		&i.Name,
 		&i.Description,
-		&i.EnrollTokenHash,
-		&i.EnrollExpiresAt,
-		&i.InviteTokenHash,
-		&i.InviteExpiresAt,
 		&i.Settings,
 		&i.CreatedBy,
 		&i.CreatedAt,
@@ -332,9 +305,25 @@ func (q *Queries) GetWorkspaceOwner(ctx context.Context, workspaceID string) (st
 	return created_by, err
 }
 
+const getWorkspaceStateVersion = `-- name: GetWorkspaceStateVersion :one
+SELECT
+  version
+FROM
+  workspace_state
+WHERE
+  workspace_id = $1
+`
+
+func (q *Queries) GetWorkspaceStateVersion(ctx context.Context, workspaceID string) (int64, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceStateVersion, workspaceID)
+	var version int64
+	err := row.Scan(&version)
+	return version, err
+}
+
 const getWorkspacesByIDs = `-- name: GetWorkspacesByIDs :many
 SELECT
-  id, name, description, enroll_token_hash, enroll_expires_at, invite_token_hash, invite_expires_at, settings, created_by, created_at, updated_at
+  id, name, description, settings, created_by, created_at, updated_at
 FROM
   workspaces w
 WHERE
@@ -356,10 +345,6 @@ func (q *Queries) GetWorkspacesByIDs(ctx context.Context, workspaceIds []string)
 			&i.ID,
 			&i.Name,
 			&i.Description,
-			&i.EnrollTokenHash,
-			&i.EnrollExpiresAt,
-			&i.InviteTokenHash,
-			&i.InviteExpiresAt,
 			&i.Settings,
 			&i.CreatedBy,
 			&i.CreatedAt,
@@ -375,30 +360,47 @@ func (q *Queries) GetWorkspacesByIDs(ctx context.Context, workspaceIds []string)
 	return items, nil
 }
 
-const getWorkspacesByOwner = `-- name: GetWorkspacesByOwner :many
+const listOwnedWorkspaces = `-- name: ListOwnedWorkspaces :many
 SELECT
-  id
+  w.id,
+  w.name,
+  (
+    SELECT
+      COUNT(*)
+    FROM
+      workspace_members wm
+    WHERE
+      wm.workspace_id = w.id
+  )::INTEGER AS member_count
 FROM
-  workspaces
+  workspaces w
 WHERE
-  created_by = $1
+  w.created_by = $1
 ORDER BY
-  id ASC
+  w.name ASC
 `
 
-func (q *Queries) GetWorkspacesByOwner(ctx context.Context, userID string) ([]string, error) {
-	rows, err := q.db.Query(ctx, getWorkspacesByOwner, userID)
+type ListOwnedWorkspacesRow struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	MemberCount int32  `json:"memberCount"`
+}
+
+// The user's owned workspaces with their member count, so account deletion
+// can tell solo workspaces from ones other people still use.
+func (q *Queries) ListOwnedWorkspaces(ctx context.Context, userID string) ([]*ListOwnedWorkspacesRow, error) {
+	rows, err := q.db.Query(ctx, listOwnedWorkspaces, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []string
+	var items []*ListOwnedWorkspacesRow
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
+		var i ListOwnedWorkspacesRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.MemberCount); err != nil {
 			return nil, err
 		}
-		items = append(items, id)
+		items = append(items, &i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -567,7 +569,7 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMe
 
 const listWorkspaces = `-- name: ListWorkspaces :many
 SELECT
-  id, name, description, enroll_token_hash, enroll_expires_at, invite_token_hash, invite_expires_at, settings, created_by, created_at, updated_at
+  id, name, description, settings, created_by, created_at, updated_at
 FROM
   workspaces
 ORDER BY
@@ -587,10 +589,6 @@ func (q *Queries) ListWorkspaces(ctx context.Context) ([]*Workspace, error) {
 			&i.ID,
 			&i.Name,
 			&i.Description,
-			&i.EnrollTokenHash,
-			&i.EnrollExpiresAt,
-			&i.InviteTokenHash,
-			&i.InviteExpiresAt,
 			&i.Settings,
 			&i.CreatedBy,
 			&i.CreatedAt,
@@ -625,46 +623,6 @@ func (q *Queries) RemoveWorkspaceMember(ctx context.Context, arg *RemoveWorkspac
 	return err
 }
 
-const updateEnrollToken = `-- name: UpdateEnrollToken :exec
-UPDATE workspaces
-SET
-  enroll_token_hash = $1,
-  enroll_expires_at = $2
-WHERE
-  id = $3
-`
-
-type UpdateEnrollTokenParams struct {
-	EnrollTokenHash crypto.HashedToken `json:"enrollTokenHash"`
-	EnrollExpiresAt *time.Time         `json:"enrollExpiresAt"`
-	WorkspaceID     string             `json:"workspaceId"`
-}
-
-func (q *Queries) UpdateEnrollToken(ctx context.Context, arg *UpdateEnrollTokenParams) error {
-	_, err := q.db.Exec(ctx, updateEnrollToken, arg.EnrollTokenHash, arg.EnrollExpiresAt, arg.WorkspaceID)
-	return err
-}
-
-const updateInviteToken = `-- name: UpdateInviteToken :exec
-UPDATE workspaces
-SET
-  invite_token_hash = $1,
-  invite_expires_at = $2
-WHERE
-  id = $3
-`
-
-type UpdateInviteTokenParams struct {
-	InviteTokenHash crypto.HashedToken `json:"inviteTokenHash"`
-	InviteExpiresAt *time.Time         `json:"inviteExpiresAt"`
-	WorkspaceID     string             `json:"workspaceId"`
-}
-
-func (q *Queries) UpdateInviteToken(ctx context.Context, arg *UpdateInviteTokenParams) error {
-	_, err := q.db.Exec(ctx, updateInviteToken, arg.InviteTokenHash, arg.InviteExpiresAt, arg.WorkspaceID)
-	return err
-}
-
 const updateWorkspace = `-- name: UpdateWorkspace :one
 UPDATE workspaces
 SET
@@ -674,7 +632,7 @@ SET
 WHERE
   id = $4
 RETURNING
-  id, name, description, enroll_token_hash, enroll_expires_at, invite_token_hash, invite_expires_at, settings, created_by, created_at, updated_at
+  id, name, description, settings, created_by, created_at, updated_at
 `
 
 type UpdateWorkspaceParams struct {
@@ -696,10 +654,6 @@ func (q *Queries) UpdateWorkspace(ctx context.Context, arg *UpdateWorkspaceParam
 		&i.ID,
 		&i.Name,
 		&i.Description,
-		&i.EnrollTokenHash,
-		&i.EnrollExpiresAt,
-		&i.InviteTokenHash,
-		&i.InviteExpiresAt,
 		&i.Settings,
 		&i.CreatedBy,
 		&i.CreatedAt,
@@ -762,7 +716,7 @@ SET
 WHERE
   workspaces.id = $2
 RETURNING
-  id, name, description, enroll_token_hash, enroll_expires_at, invite_token_hash, invite_expires_at, settings, created_by, created_at, updated_at
+  id, name, description, settings, created_by, created_at, updated_at
 `
 
 type UpdateWorkspaceOwnerParams struct {
@@ -777,10 +731,6 @@ func (q *Queries) UpdateWorkspaceOwner(ctx context.Context, arg *UpdateWorkspace
 		&i.ID,
 		&i.Name,
 		&i.Description,
-		&i.EnrollTokenHash,
-		&i.EnrollExpiresAt,
-		&i.InviteTokenHash,
-		&i.InviteExpiresAt,
 		&i.Settings,
 		&i.CreatedBy,
 		&i.CreatedAt,

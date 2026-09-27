@@ -41,14 +41,20 @@ CREATE TABLE IF NOT EXISTS workspaces (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   name TEXT NOT NULL,
   description TEXT,
-  enroll_token_hash TEXT,
-  enroll_expires_at TIMESTAMPTZ,
-  invite_token_hash TEXT,
-  invite_expires_at TIMESTAMPTZ,
   settings JSONB NOT NULL DEFAULT '{}',
-  created_by UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  -- The single owner. RESTRICT: deleting a user never takes a workspace down,
+  -- ownership moves first or the workspace is deleted explicitly.
+  created_by UUID NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Bumped by triggers whenever what a daemon enforces changes. No RLS: it
+-- holds a counter, not tenant data, and only the SECURITY DEFINER trigger
+-- functions below may write it.
+CREATE TABLE IF NOT EXISTS workspace_state (
+  workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
+  version BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS workspace_members (
@@ -108,7 +114,6 @@ CREATE TABLE IF NOT EXISTS scim_tokens (
 CREATE TABLE IF NOT EXISTS workspace_domains (
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
   domain TEXT CHECK (domain = lower(domain)),
-  provider_id TEXT NOT NULL,
   token TEXT NOT NULL DEFAULT encode(gen_random_bytes (16), 'hex'), -- DNS TXT verification token
   verified_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -128,7 +133,8 @@ CREATE TABLE IF NOT EXISTS service_accounts (
   tags TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (workspace_id, name)
+  UNIQUE (workspace_id, name),
+  UNIQUE (workspace_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS daemons (
@@ -142,7 +148,10 @@ CREATE TABLE IF NOT EXISTS daemons (
   metadata JSONB NOT NULL DEFAULT '{}',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (workspace_id, name)
+  UNIQUE (workspace_id, name),
+  UNIQUE (workspace_id, id),
+  -- The DPoP key is the machine's identity. Re-enrolling reuses the row.
+  UNIQUE (workspace_id, key_thumbprint)
 );
 
 CREATE TABLE IF NOT EXISTS teams (
@@ -152,16 +161,18 @@ CREATE TABLE IF NOT EXISTS teams (
   description TEXT,
   tags TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (workspace_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS team_members (
   workspace_id UUID NOT NULL,
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  team_id UUID NOT NULL REFERENCES teams (id) ON DELETE CASCADE,
+  team_id UUID NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (user_id, team_id),
-  FOREIGN KEY (workspace_id, user_id) REFERENCES workspace_members (workspace_id, user_id) ON DELETE CASCADE
+  FOREIGN KEY (workspace_id, user_id) REFERENCES workspace_members (workspace_id, user_id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS certificate_authorities (
@@ -195,6 +206,7 @@ CREATE TABLE IF NOT EXISTS certificate_authorities (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name),
+  UNIQUE (workspace_id, id),
   CHECK (not_before < not_after),
   CHECK (authority_type IN (1, 2)),
   CHECK (user_default_ttl <= user_max_ttl),
@@ -204,8 +216,8 @@ CREATE TABLE IF NOT EXISTS certificate_authorities (
 CREATE TABLE IF NOT EXISTS targets (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  ca_id UUID REFERENCES certificate_authorities (id) ON DELETE SET NULL,
-  daemon_id UUID REFERENCES daemons (id) ON DELETE CASCADE,
+  ca_id UUID,
+  daemon_id UUID,
   name TEXT NOT NULL,
   description TEXT,
   endpoints TEXT[],
@@ -214,27 +226,78 @@ CREATE TABLE IF NOT EXISTS targets (
   metadata JSONB NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (workspace_id, name)
+  UNIQUE (workspace_id, name),
+  UNIQUE (workspace_id, id),
+  FOREIGN KEY (workspace_id, ca_id) REFERENCES certificate_authorities (workspace_id, id) ON DELETE SET NULL (ca_id),
+  FOREIGN KEY (workspace_id, daemon_id) REFERENCES daemons (workspace_id, id) ON DELETE CASCADE
+);
+
+-- Join tokens. Enroll tokens bring daemons in, invite tokens bring people
+-- in. The plaintext is "<id>_<secret>", so redemption looks the row up by id
+-- and compares the hash of the whole token.
+CREATE TABLE IF NOT EXISTS workspace_tokens (
+  id UUID PRIMARY KEY,
+  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  kind INTEGER NOT NULL CHECK (kind IN (1, 2)), -- 1=enroll, 2=invite
+  label TEXT NOT NULL DEFAULT '',
+  token_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ, -- NULL never expires
+  max_uses INTEGER CHECK (max_uses > 0), -- NULL is unlimited
+  uses INTEGER NOT NULL DEFAULT 0,
+  auto_approve BOOLEAN NOT NULL DEFAULT FALSE, -- enroll only
+  ca_id UUID, -- enroll only, NULL is the workspace default
+  role_name TEXT REFERENCES roles (name), -- invite only
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_used_at TIMESTAMPTZ,
+  FOREIGN KEY (workspace_id, ca_id) REFERENCES certificate_authorities (workspace_id, id) ON DELETE SET NULL (ca_id),
+  CHECK (
+    kind = 1
+    OR (
+      NOT auto_approve
+      AND ca_id IS NULL
+    )
+  ),
+  CHECK (
+    (kind = 2) = (role_name IS NOT NULL)
+  )
 );
 
 CREATE TABLE IF NOT EXISTS principals (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  target_id UUID NOT NULL REFERENCES targets (id) ON DELETE CASCADE,
+  target_id UUID NOT NULL,
   username TEXT NOT NULL DEFAULT 'root', -- e.g. "root", "ubuntu", "ec2-user"
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (target_id, username)
+  UNIQUE (target_id, username),
+  UNIQUE (workspace_id, id),
+  FOREIGN KEY (workspace_id, target_id) REFERENCES targets (workspace_id, id) ON DELETE CASCADE
 );
 
+-- Exactly one subject column is set. Every reference is scoped to the same
+-- workspace and cascades, so a removed member, team, or service account can
+-- never leave a grant behind, and no grant can point across tenants.
 CREATE TABLE IF NOT EXISTS principal_grants (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  principal_id UUID NOT NULL REFERENCES principals (id) ON DELETE CASCADE,
+  principal_id UUID NOT NULL,
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  subject_kind TEXT NOT NULL,
-  subject_id UUID NOT NULL, -- user, team, or service account id
+  user_id UUID,
+  team_id UUID,
+  service_account_id UUID,
+  subject_kind TEXT GENERATED ALWAYS AS (
+    CASE
+      WHEN user_id IS NOT NULL THEN 'user'
+      WHEN team_id IS NOT NULL THEN 'team'
+      ELSE 'service_account'
+    END
+  ) STORED,
+  subject_id UUID GENERATED ALWAYS AS (COALESCE(user_id, team_id, service_account_id)) STORED,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (principal_id, subject_kind, subject_id),
-  CHECK (subject_kind IN ('user', 'team', 'service_account'))
+  FOREIGN KEY (workspace_id, principal_id) REFERENCES principals (workspace_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, user_id) REFERENCES workspace_members (workspace_id, user_id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, service_account_id) REFERENCES service_accounts (workspace_id, id) ON DELETE CASCADE,
+  UNIQUE NULLS NOT DISTINCT (principal_id, user_id, team_id, service_account_id),
+  CHECK (num_nonnulls(user_id, team_id, service_account_id) = 1)
 );
 
 CREATE TABLE IF NOT EXISTS recordings (
@@ -314,9 +377,11 @@ CREATE INDEX idx_targets_description_trgm ON targets USING GIN (description gin_
 
 CREATE INDEX idx_principals_workspace_id ON principals (workspace_id);
 
+CREATE INDEX idx_workspace_tokens_workspace ON workspace_tokens (workspace_id, kind);
+
 CREATE INDEX idx_principals_target_id ON principals (target_id);
 
-CREATE INDEX idx_principal_grants_subject ON principal_grants (subject_kind, subject_id);
+CREATE INDEX idx_principal_grants_subject ON principal_grants (subject_id);
 
 CREATE INDEX idx_principal_grants_workspace_id ON principal_grants (workspace_id);
 
@@ -384,6 +449,89 @@ OR
 UPDATE OF is_default ON certificate_authorities FOR EACH ROW WHEN (NEW.is_default = TRUE)
 EXECUTE FUNCTION enforce_single_default_ca ();
 
+-- Daemon state versioning. Any change to what a daemon enforces bumps the
+-- workspace version and notifies on commit, so no code path can forget it.
+CREATE OR REPLACE FUNCTION create_workspace_state () RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO workspace_state (workspace_id) VALUES (NEW.id);
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET
+  search_path = public,
+  pg_temp;
+
+CREATE TRIGGER create_workspace_state
+AFTER INSERT ON workspaces FOR EACH ROW
+EXECUTE FUNCTION create_workspace_state ();
+
+CREATE OR REPLACE FUNCTION bump_state_version () RETURNS TRIGGER AS $$
+DECLARE
+  ws UUID;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    ws := OLD.workspace_id;
+  ELSE
+    ws := NEW.workspace_id;
+  END IF;
+  UPDATE workspace_state SET version = version + 1 WHERE workspace_id = ws;
+  PERFORM pg_notify('nokku_state', ws::TEXT);
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET
+  search_path = public,
+  pg_temp;
+
+CREATE TRIGGER bump_state_version
+AFTER INSERT
+OR DELETE ON principal_grants FOR EACH ROW
+EXECUTE FUNCTION bump_state_version ();
+
+CREATE TRIGGER bump_state_version
+AFTER INSERT
+OR DELETE ON team_members FOR EACH ROW
+EXECUTE FUNCTION bump_state_version ();
+
+-- A new account anchor carries no grants, so only deletes matter.
+CREATE TRIGGER bump_state_version
+AFTER DELETE ON principals FOR EACH ROW
+EXECUTE FUNCTION bump_state_version ();
+
+CREATE TRIGGER bump_state_version
+AFTER
+UPDATE OF status,
+config ON daemons FOR EACH ROW WHEN (
+  OLD.status IS DISTINCT FROM NEW.status
+  OR OLD.config IS DISTINCT FROM NEW.config
+)
+EXECUTE FUNCTION bump_state_version ();
+
+CREATE TRIGGER bump_state_version_delete
+AFTER DELETE ON daemons FOR EACH ROW
+EXECUTE FUNCTION bump_state_version ();
+
+CREATE TRIGGER bump_state_version
+AFTER INSERT
+OR DELETE ON certificate_authorities FOR EACH ROW
+EXECUTE FUNCTION bump_state_version ();
+
+CREATE TRIGGER bump_state_version_update
+AFTER
+UPDATE OF public_key,
+is_active,
+is_default ON certificate_authorities FOR EACH ROW WHEN (
+  OLD.public_key IS DISTINCT FROM NEW.public_key
+  OR OLD.is_active IS DISTINCT FROM NEW.is_active
+  OR OLD.is_default IS DISTINCT FROM NEW.is_default
+)
+EXECUTE FUNCTION bump_state_version ();
+
+CREATE TRIGGER bump_state_version
+AFTER
+UPDATE OF ca_id ON targets FOR EACH ROW WHEN (OLD.ca_id IS DISTINCT FROM NEW.ca_id)
+EXECUTE FUNCTION bump_state_version ();
+
 -- Roles and grants -----------------------------------------------------------
 DO $$
 BEGIN
@@ -432,6 +580,13 @@ SELECT
   ON SEQUENCES TO nokku_app,
   nokku_system;
 
+REVOKE INSERT,
+UPDATE,
+DELETE ON workspace_state
+FROM
+  nokku_app,
+  nokku_system;
+
 -- Row-level security ---------------------------------------------------------
 -- RLS enforces tenant isolation only. Every workspace-scoped table carries
 -- one uniform policy: rows are visible and writable only when the request
@@ -455,8 +610,8 @@ SELECT
 --   CREATE POLICY tenant_isolation ON <t> FOR ALL TO nokku_app
 --     USING (workspace_id = current_workspace_id())
 --     WITH CHECK (workspace_id = current_workspace_id());
--- (plus one of the variants below when the table needs cross-tenant reads or
--- referential integrity checks).
+-- References to other tenant tables use composite (workspace_id, id) foreign
+-- keys, so no policy needs a subquery to keep a row inside its workspace.
 ALTER TABLE workspaces ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE workspaces FORCE ROW LEVEL SECURITY;
@@ -512,6 +667,10 @@ ALTER TABLE sso_providers FORCE ROW LEVEL SECURITY;
 ALTER TABLE scim_tokens ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE scim_tokens FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE workspace_tokens ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE workspace_tokens FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE workspace_domains ENABLE ROW LEVEL SECURITY;
 
@@ -574,17 +733,24 @@ CREATE POLICY tenant_isolation ON recordings FOR ALL TO nokku_app USING (workspa
 WITH
   CHECK (workspace_id = current_workspace_id ());
 
-CREATE POLICY tenant_isolation ON sso_providers FOR ALL TO nokku_app USING (
-  workspace_id IS NULL
-  OR workspace_id = current_workspace_id ()
-)
-WITH
-  CHECK (
+-- Global providers (workspace_id NULL) are readable by everyone and written
+-- only by nokku_system.
+CREATE POLICY sso_providers_select ON sso_providers FOR
+SELECT
+  TO nokku_app USING (
     workspace_id IS NULL
     OR workspace_id = current_workspace_id ()
   );
 
+CREATE POLICY tenant_isolation ON sso_providers FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
 CREATE POLICY tenant_isolation ON scim_tokens FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON workspace_tokens FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
   CHECK (workspace_id = current_workspace_id ());
 
@@ -592,36 +758,73 @@ CREATE POLICY tenant_isolation ON workspace_domains FOR ALL TO nokku_app USING (
 WITH
   CHECK (workspace_id = current_workspace_id ());
 
--- Junction tables ------------------------------------------------------------
-CREATE POLICY team_members_isolation ON team_members FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+-- Composite foreign keys keep every reference inside one workspace, so these
+-- need nothing beyond the uniform policy.
+CREATE POLICY tenant_isolation ON team_members FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
 WITH
-  CHECK (
-    workspace_id = current_workspace_id ()
-    AND EXISTS (
+  CHECK (workspace_id = current_workspace_id ());
+
+CREATE POLICY tenant_isolation ON principal_grants FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+WITH
+  CHECK (workspace_id = current_workspace_id ());
+
+-- Identity tables ------------------------------------------------------------
+-- Users are global, so the tenant GUC alone cannot scope them. The app role
+-- sees a user only as themselves or as a member of the pinned workspace, and
+-- writes only its own row. Credentials and sessions are private to their
+-- owner. Login, signup, and SCIM run as nokku_system. Tokens and key
+-- material have no app policy at all.
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE users FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE credentials ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE credentials FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE sessions FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE one_time_tokens ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE one_time_tokens FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE keysets ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE keysets FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE saml_keypair ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE saml_keypair FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY users_select ON users FOR
+SELECT
+  TO nokku_app USING (
+    id = current_actor_id ()::UUID
+    OR EXISTS (
       SELECT
         1
       FROM
-        teams t
+        workspace_members wm
       WHERE
-        t.id = team_id
-        AND t.workspace_id = team_members.workspace_id
+        wm.user_id = users.id
+        AND wm.workspace_id = current_workspace_id ()
     )
   );
 
-CREATE POLICY principal_grants_isolation ON principal_grants FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
+CREATE POLICY users_update ON users FOR
+UPDATE TO nokku_app USING (id = current_actor_id ()::UUID)
 WITH
-  CHECK (
-    workspace_id = current_workspace_id ()
-    AND EXISTS (
-      SELECT
-        1
-      FROM
-        principals p
-      WHERE
-        p.id = principal_id
-        AND p.workspace_id = principal_grants.workspace_id
-    )
-  );
+  CHECK (id = current_actor_id ()::UUID);
+
+CREATE POLICY credentials_owner ON credentials FOR ALL TO nokku_app USING (user_id = current_actor_id ()::UUID)
+WITH
+  CHECK (user_id = current_actor_id ()::UUID);
+
+CREATE POLICY sessions_owner ON sessions FOR ALL TO nokku_app USING (subject_id = current_actor_id ())
+WITH
+  CHECK (subject_id = current_actor_id ());
 
 -- Audit schema ---------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS audit;
@@ -661,11 +864,10 @@ SELECT
 GRANT USAGE ON SCHEMA audit TO nokku_app,
 nokku_system;
 
--- nokku_app: SELECT + INSERT
+-- nokku_app reads its own workspace's events. Writes go through nokku_system.
 GRANT
 SELECT
-,
-  INSERT ON ALL TABLES IN SCHEMA audit TO nokku_app;
+  ON ALL TABLES IN SCHEMA audit TO nokku_app;
 
 -- nokku_system additionally can DELETE (partition cleanup)
 GRANT
@@ -678,8 +880,7 @@ SELECT
 ALTER DEFAULT PRIVILEGES IN SCHEMA audit
 GRANT
 SELECT
-,
-  INSERT ON TABLES TO nokku_app;
+  ON TABLES TO nokku_app;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA audit
 GRANT
@@ -691,31 +892,6 @@ SELECT
 ALTER TABLE audit.audit_logs ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE audit.audit_logs FORCE ROW LEVEL SECURITY;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'audit'
-      AND tablename = 'audit_logs'
-      AND policyname = 'audit_logs_select'
-  ) THEN
-    CREATE POLICY audit_logs_select ON audit.audit_logs FOR
-    SELECT
-      TO nokku_app USING (workspace_id = current_workspace_id ());
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'audit'
-      AND tablename = 'audit_logs'
-      AND policyname = 'audit_logs_insert'
-  ) THEN
-    CREATE POLICY audit_logs_insert ON audit.audit_logs FOR INSERT TO nokku_app
-    WITH
-      CHECK (TRUE);
-  END IF;
-END $$;
 
 -- Audit immutability ---------------------------------------------------------
 -- An audit row is a fact that is only ever written. Two layers keep it that
@@ -748,3 +924,52 @@ CREATE TRIGGER audit_logs_immutable BEFORE
 UPDATE
 OR DELETE ON audit.audit_logs FOR EACH ROW
 EXECUTE FUNCTION audit.audit_logs_immutable ();
+
+-- Audit partitions ------------------------------------------------------------
+-- Monthly partitions are DDL, which needs the table owner. This function runs
+-- as the owner so the runtime roles never need owner rights. It keeps the
+-- previous, current, and next UTC month, and drops partitions older than 14
+-- months (the longest retention plus margin).
+CREATE OR REPLACE FUNCTION audit.maintain_partitions () RETURNS VOID AS $$
+DECLARE
+  this_month TIMESTAMP := date_trunc('month', now() AT TIME ZONE 'UTC');
+  m TIMESTAMP;
+  part TEXT;
+BEGIN
+  IF NOT pg_try_advisory_xact_lock(hashtext('audit-partitions')) THEN
+    RETURN;
+  END IF;
+  FOR i IN -1..1 LOOP
+    m := this_month + make_interval(months => i);
+    EXECUTE format(
+      'CREATE TABLE IF NOT EXISTS audit.%I PARTITION OF audit.audit_logs FOR VALUES FROM (%L) TO (%L)',
+      to_char(m, '"audit_logs_y"YYYY"m"MM'),
+      m AT TIME ZONE 'UTC',
+      (m + INTERVAL '1 month') AT TIME ZONE 'UTC'
+    );
+  END LOOP;
+  FOR part IN
+    SELECT c.relname
+    FROM pg_inherits inh
+      JOIN pg_class c ON c.oid = inh.inhrelid
+    WHERE inh.inhparent = 'audit.audit_logs'::REGCLASS
+      AND c.relname < to_char(this_month - INTERVAL '14 months', '"audit_logs_y"YYYY"m"MM')
+  LOOP
+    EXECUTE format('DROP TABLE IF EXISTS audit.%I', part);
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET
+  search_path = audit,
+  public,
+  pg_temp;
+
+REVOKE ALL ON FUNCTION audit.maintain_partitions ()
+FROM
+  PUBLIC;
+
+GRANT
+EXECUTE ON FUNCTION audit.maintain_partitions () TO nokku_system;
+
+SELECT
+  audit.maintain_partitions ();

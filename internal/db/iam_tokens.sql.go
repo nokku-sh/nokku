@@ -16,22 +16,22 @@ const consumeToken = `-- name: ConsumeToken :one
 DELETE FROM one_time_tokens
 WHERE
   token_hash = $1
+  AND purpose = $2
   AND expires_at > NOW()
 RETURNING
-  user_id,
-  purpose
+  user_id
 `
 
-type ConsumeTokenRow struct {
-	UserID  string `json:"userId"`
-	Purpose string `json:"purpose"`
+type ConsumeTokenParams struct {
+	TokenHash crypto.HashedToken `json:"tokenHash"`
+	Purpose   string             `json:"purpose"`
 }
 
-func (q *Queries) ConsumeToken(ctx context.Context, tokenHash crypto.HashedToken) (*ConsumeTokenRow, error) {
-	row := q.db.QueryRow(ctx, consumeToken, tokenHash)
-	var i ConsumeTokenRow
-	err := row.Scan(&i.UserID, &i.Purpose)
-	return &i, err
+func (q *Queries) ConsumeToken(ctx context.Context, arg *ConsumeTokenParams) (string, error) {
+	row := q.db.QueryRow(ctx, consumeToken, arg.TokenHash, arg.Purpose)
+	var user_id string
+	err := row.Scan(&user_id)
+	return user_id, err
 }
 
 const deleteExpiredTokens = `-- name: DeleteExpiredTokens :execrows

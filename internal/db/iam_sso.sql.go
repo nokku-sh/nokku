@@ -11,31 +11,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
-const deleteSSOProvider = `-- name: DeleteSSOProvider :exec
-DELETE FROM sso_providers
-WHERE
-  provider_id = $1
-`
-
-func (q *Queries) DeleteSSOProvider(ctx context.Context, providerID string) error {
-	_, err := q.db.Exec(ctx, deleteSSOProvider, providerID)
-	return err
-}
-
-const deleteTenantSSOProviders = `-- name: DeleteTenantSSOProviders :execrows
-DELETE FROM sso_providers
-WHERE
-  workspace_id = $1
-`
-
-func (q *Queries) DeleteTenantSSOProviders(ctx context.Context, workspaceID *string) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteTenantSSOProviders, workspaceID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const getSAMLKeypair = `-- name: GetSAMLKeypair :one
 SELECT
   key_enc,

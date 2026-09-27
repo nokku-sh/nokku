@@ -102,12 +102,15 @@ type Principal struct {
 }
 
 type PrincipalGrant struct {
-	ID          string    `json:"id"`
-	PrincipalID string    `json:"principalId"`
-	WorkspaceID string    `json:"workspaceId"`
-	SubjectKind string    `json:"subjectKind"`
-	SubjectID   string    `json:"subjectId"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID               string    `json:"id"`
+	PrincipalID      string    `json:"principalId"`
+	WorkspaceID      string    `json:"workspaceId"`
+	UserID           *string   `json:"userId"`
+	TeamID           *string   `json:"teamId"`
+	ServiceAccountID *string   `json:"serviceAccountId"`
+	SubjectKind      *string   `json:"subjectKind"`
+	SubjectID        *string   `json:"subjectId"`
+	CreatedAt        time.Time `json:"createdAt"`
 }
 
 type Recording struct {
@@ -225,23 +228,18 @@ type User struct {
 }
 
 type Workspace struct {
-	ID              string                   `json:"id"`
-	Name            string                   `json:"name"`
-	Description     *string                  `json:"description"`
-	EnrollTokenHash crypto.HashedToken       `json:"enrollTokenHash"`
-	EnrollExpiresAt *time.Time               `json:"enrollExpiresAt"`
-	InviteTokenHash crypto.HashedToken       `json:"inviteTokenHash"`
-	InviteExpiresAt *time.Time               `json:"inviteExpiresAt"`
-	Settings        *nokku.WorkspaceSettings `json:"settings"`
-	CreatedBy       string                   `json:"createdBy"`
-	CreatedAt       time.Time                `json:"createdAt"`
-	UpdatedAt       time.Time                `json:"updatedAt"`
+	ID          string                   `json:"id"`
+	Name        string                   `json:"name"`
+	Description *string                  `json:"description"`
+	Settings    *nokku.WorkspaceSettings `json:"settings"`
+	CreatedBy   string                   `json:"createdBy"`
+	CreatedAt   time.Time                `json:"createdAt"`
+	UpdatedAt   time.Time                `json:"updatedAt"`
 }
 
 type WorkspaceDomain struct {
 	WorkspaceID string     `json:"workspaceId"`
 	Domain      string     `json:"domain"`
-	ProviderID  string     `json:"providerId"`
 	Token       string     `json:"token"`
 	VerifiedAt  *time.Time `json:"verifiedAt"`
 	CreatedAt   time.Time  `json:"createdAt"`
@@ -256,6 +254,11 @@ type WorkspaceMember struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
+type WorkspaceState struct {
+	WorkspaceID string `json:"workspaceId"`
+	Version     int64  `json:"version"`
+}
+
 type WorkspaceSubscription struct {
 	WorkspaceID       string     `json:"workspaceId"`
 	Source            string     `json:"source"`
@@ -266,4 +269,20 @@ type WorkspaceSubscription struct {
 	CurrentPeriodEnd  *time.Time `json:"currentPeriodEnd"`
 	CancelAtPeriodEnd bool       `json:"cancelAtPeriodEnd"`
 	UpdatedAt         time.Time  `json:"updatedAt"`
+}
+
+type WorkspaceToken struct {
+	ID          string             `json:"id"`
+	WorkspaceID string             `json:"workspaceId"`
+	Kind        nokku.TokenKind    `json:"kind"`
+	Label       string             `json:"label"`
+	TokenHash   crypto.HashedToken `json:"tokenHash"`
+	ExpiresAt   *time.Time         `json:"expiresAt"`
+	MaxUses     *int32             `json:"maxUses"`
+	Uses        int32              `json:"uses"`
+	AutoApprove bool               `json:"autoApprove"`
+	CaID        *string            `json:"caId"`
+	RoleName    *string            `json:"roleName"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	LastUsedAt  *time.Time         `json:"lastUsedAt"`
 }

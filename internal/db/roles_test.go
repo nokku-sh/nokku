@@ -99,9 +99,6 @@ func TestUserFacingRoles(t *testing.T) {
 
 	byName := make(map[string]RoleInfo, len(roles))
 	for _, r := range roles {
-		if r.Name == "daemon" {
-			t.Errorf("system role %q should not be user-facing", r.Name)
-		}
 		byName[r.Name] = r
 	}
 

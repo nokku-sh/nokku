@@ -70,6 +70,10 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
               type: "DaemonStatus"
+          - column: "workspace_tokens.kind"
+            go_type:
+              import: "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+              type: "TokenKind"
 
           # JSON overrides
           - column: "daemons.config"
@@ -97,11 +101,7 @@ sql:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"
               pointer: true
-          - column: "workspaces.invite_token_hash"
-            go_type:
-              import: "github.com/nokku-sh/nokku/internal/crypto"
-              type: "HashedToken"
-          - column: "workspaces.enroll_token_hash"
+          - column: "workspace_tokens.token_hash"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"

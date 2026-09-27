@@ -11,10 +11,28 @@ import (
 
 const addPrincipalGrant = `-- name: AddPrincipalGrant :exec
 INSERT INTO
-  principal_grants (principal_id, workspace_id, subject_kind, subject_id)
+  principal_grants (
+    principal_id,
+    workspace_id,
+    user_id,
+    team_id,
+    service_account_id
+  )
 VALUES
-  ($1, $2, $3, $4)
-ON CONFLICT (principal_id, subject_kind, subject_id) DO NOTHING
+  (
+    $1,
+    $2,
+    CASE
+      WHEN $3::TEXT = 'user' THEN $4::UUID
+    END,
+    CASE
+      WHEN $3::TEXT = 'team' THEN $4::UUID
+    END,
+    CASE
+      WHEN $3::TEXT = 'service_account' THEN $4::UUID
+    END
+  )
+ON CONFLICT DO NOTHING
 `
 
 type AddPrincipalGrantParams struct {
@@ -77,26 +95,6 @@ WHERE
 
 func (q *Queries) DeletePrincipal(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, deletePrincipal, id)
-	return err
-}
-
-const deleteSubjectGrants = `-- name: DeleteSubjectGrants :exec
-DELETE FROM principal_grants
-WHERE
-  subject_kind = $1
-  AND subject_id = $2
-`
-
-type DeleteSubjectGrantsParams struct {
-	SubjectKind string `json:"subjectKind"`
-	SubjectID   string `json:"subjectId"`
-}
-
-// Removes every grant for a subject that no longer exists, so no dangling
-// subject id outlives the user, team, or service account it pointed at.
-// Subject ids are unique across kinds and never reused.
-func (q *Queries) DeleteSubjectGrants(ctx context.Context, arg *DeleteSubjectGrantsParams) error {
-	_, err := q.db.Exec(ctx, deleteSubjectGrants, arg.SubjectKind, arg.SubjectID)
 	return err
 }
 
@@ -315,70 +313,6 @@ func (q *Queries) ListPrincipals(ctx context.Context, arg *ListPrincipalsParams)
 	return items, nil
 }
 
-const listPrincipalsForDaemon = `-- name: ListPrincipalsForDaemon :many
-SELECT
-  p.username,
-  array_agg(DISTINCT ids)::TEXT[] AS ids
-FROM
-  principals p
-  CROSS JOIN LATERAL (
-    SELECT
-      g.subject_id AS ids
-    FROM
-      principal_grants g
-    WHERE
-      g.principal_id = p.id
-      AND g.subject_kind IN ('user', 'service_account')
-    UNION
-    SELECT
-      tm.user_id
-    FROM
-      principal_grants g
-      JOIN team_members tm ON tm.team_id = g.subject_id
-    WHERE
-      g.principal_id = p.id
-      AND g.subject_kind = 'team'
-  ) AS combined (ids)
-WHERE
-  p.target_id = (
-    SELECT
-      t.id
-    FROM
-      targets t
-    WHERE
-      t.daemon_id = $1
-  )
-GROUP BY
-  p.username
-ORDER BY
-  p.username
-`
-
-type ListPrincipalsForDaemonRow struct {
-	Username string   `json:"username"`
-	Ids      []string `json:"ids"`
-}
-
-func (q *Queries) ListPrincipalsForDaemon(ctx context.Context, daemonID *string) ([]*ListPrincipalsForDaemonRow, error) {
-	rows, err := q.db.Query(ctx, listPrincipalsForDaemon, daemonID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*ListPrincipalsForDaemonRow
-	for rows.Next() {
-		var i ListPrincipalsForDaemonRow
-		if err := rows.Scan(&i.Username, &i.Ids); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listPrincipalsForTarget = `-- name: ListPrincipalsForTarget :many
 SELECT
   p.username,
@@ -416,9 +350,9 @@ type ListPrincipalsForTargetRow struct {
 	Ids      []string `json:"ids"`
 }
 
-// The same per-account subject list the daemon receives, for a daemonless
-// target whose sshd reads it from AuthorizedPrincipalsFile. Teams are
-// expanded to their members here, so the host needs no team knowledge.
+// The per-account subject list a host enforces: the daemon's synced map, or
+// AuthorizedPrincipalsFile on a manual target. Teams are expanded to their
+// members here, so the host needs no team knowledge.
 func (q *Queries) ListPrincipalsForTarget(ctx context.Context, targetID string) ([]*ListPrincipalsForTargetRow, error) {
 	rows, err := q.db.Query(ctx, listPrincipalsForTarget, targetID)
 	if err != nil {
@@ -476,7 +410,7 @@ ORDER BY
 
 type ListSubjectUsernamesForTargetsParams struct {
 	TargetIds []string `json:"targetIds"`
-	SubjectID string   `json:"subjectId"`
+	SubjectID *string  `json:"subjectId"`
 }
 
 type ListSubjectUsernamesForTargetsRow struct {
@@ -512,8 +446,8 @@ const removePrincipalGrant = `-- name: RemovePrincipalGrant :exec
 DELETE FROM principal_grants
 WHERE
   principal_id = $1
-  AND subject_kind = $2
-  AND subject_id = $3
+  AND subject_kind = $2::TEXT
+  AND subject_id = $3::UUID
 `
 
 type RemovePrincipalGrantParams struct {
@@ -531,8 +465,8 @@ const revokeSubjectAccessInWorkspace = `-- name: RevokeSubjectAccessInWorkspace 
 DELETE FROM principal_grants
 WHERE
   workspace_id = $1
-  AND subject_kind = $2
-  AND subject_id = $3
+  AND subject_kind = $2::TEXT
+  AND subject_id = $3::UUID
 `
 
 type RevokeSubjectAccessInWorkspaceParams struct {
@@ -543,50 +477,5 @@ type RevokeSubjectAccessInWorkspaceParams struct {
 
 func (q *Queries) RevokeSubjectAccessInWorkspace(ctx context.Context, arg *RevokeSubjectAccessInWorkspaceParams) error {
 	_, err := q.db.Exec(ctx, revokeSubjectAccessInWorkspace, arg.WorkspaceID, arg.SubjectKind, arg.SubjectID)
-	return err
-}
-
-const setPrincipals = `-- name: SetPrincipals :exec
-WITH
-  desired AS (
-    SELECT
-      unnest($2::TEXT[]) AS username
-  ),
-  deleted AS (
-    DELETE FROM principals
-    WHERE
-      target_id = $1
-      AND username NOT IN (
-        SELECT
-          username
-        FROM
-          desired
-      )
-  )
-INSERT INTO
-  principals (workspace_id, target_id, username)
-SELECT
-  (
-    SELECT
-      workspace_id
-    FROM
-      targets
-    WHERE
-      id = $1
-  ),
-  $1,
-  d.username
-FROM
-  desired d
-ON CONFLICT (target_id, username) DO NOTHING
-`
-
-type SetPrincipalsParams struct {
-	TargetID  string   `json:"targetId"`
-	Usernames []string `json:"usernames"`
-}
-
-func (q *Queries) SetPrincipals(ctx context.Context, arg *SetPrincipalsParams) error {
-	_, err := q.db.Exec(ctx, setPrincipals, arg.TargetID, arg.Usernames)
 	return err
 }

@@ -29,15 +29,10 @@ type Connection struct {
 	MaxConns    int32  `env:"NOKKU_DB_MAX_CONNS"    envDefault:"10"`
 	MinConns    int32  `env:"NOKKU_DB_MIN_CONNS"    envDefault:"0"`
 
-	// Pool serves request traffic as AppUser
-	// AdminPool serves schema migrations and privileged maintenance as User.
-	Pool      *pgxpool.Pool
-	AdminPool *pgxpool.Pool
-	Q         *Queries
-	// AdminQ runs on the admin (non-RLS) role. Only pre-authorization
-	// lookups use it: resolving a presented credential to a tenant, which
-	// by definition cannot be tenant-scoped yet.
-	AdminQ *Queries
+	// Pool serves request traffic as nokku_app, under RLS.
+	Pool    *pgxpool.Pool
+	sys     *Queries
+	sysPool *pgxpool.Pool
 }
 
 func NewConnection(ctx context.Context) (*Connection, error) {
@@ -90,46 +85,21 @@ func (c *Connection) poolConfig() (*pgxpool.Config, error) {
 }
 
 func (c *Connection) createPools(ctx context.Context) error {
-	// Create Admin Config (Uses environment PGUSER and PGPASSWORD)
-	adminConfig, err := c.poolConfig()
-	if err != nil {
-		return err
-	}
-	// The admin pool only serves migrations, role setup, and pre-auth
-	// lookups, so it never needs the tenant pool's full connection budget.
-	adminConfig.MaxConns = min(c.MaxConns, 4)
-	adminConfig.MinConns = min(c.MinConns, adminConfig.MaxConns)
-	// Default AppPassword to the environment PGPASSWORD if not provided
-	if c.AppPassword == "" {
-		c.AppPassword = adminConfig.ConnConfig.Password
-	}
-
-	c.AdminPool, err = pgxpool.NewWithConfig(ctx, adminConfig)
-	if err != nil {
-		return fmt.Errorf("creating admin pool: %w", err)
-	}
-
 	if c.AutoMigrate {
-		if err := c.withSchemaLock(ctx, func() error {
-			if err := c.migrate(ctx); err != nil {
-				return err
-			}
-			if err := c.setupAppRole(ctx); err != nil {
-				return err
-			}
-			return c.setupRBACRoles(ctx)
-		}); err != nil {
+		if err := c.setupSchema(ctx); err != nil {
 			return err
 		}
 	}
 
-	// Create App Config
 	appConfig, err := c.poolConfig()
 	if err != nil {
 		return err
 	}
-
-	// Override the role and password for runtime traffic
+	// Runtime traffic never uses the owner role. PGPASSWORD is the fallback
+	// so a single-credential dev setup keeps working.
+	if c.AppPassword == "" {
+		c.AppPassword = appConfig.ConnConfig.Password
+	}
 	appConfig.ConnConfig.User = "nokku_app"
 	appConfig.ConnConfig.Password = c.AppPassword
 
@@ -137,50 +107,75 @@ func (c *Connection) createPools(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("creating app pool: %w", err)
 	}
-	c.Q = New(c.Pool)
-	c.AdminQ = New(c.AdminPool)
 
-	// Handle shutdown
+	// The system pool logs in as nokku_app too and switches every
+	// connection to nokku_system, so no runtime path holds owner rights.
+	sysConfig := appConfig.Copy()
+	sysConfig.MaxConns = min(c.MaxConns, 4)
+	sysConfig.MinConns = min(c.MinConns, sysConfig.MaxConns)
+	sysConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, "SET ROLE nokku_system")
+		return err
+	}
+	c.sysPool, err = pgxpool.NewWithConfig(ctx, sysConfig)
+	if err != nil {
+		c.Pool.Close()
+		return fmt.Errorf("creating system pool: %w", err)
+	}
+	c.sys = New(c.sysPool)
+
 	go func() {
 		<-ctx.Done()
 		c.Pool.Close()
-		c.AdminPool.Close()
+		c.sysPool.Close()
 	}()
 	return nil
 }
 
-// withSchemaLock serializes the full auto-migrate sequence across processes:
-// parallel `go test` packages and multiple instances booting at once.
-func (c *Connection) withSchemaLock(ctx context.Context, fn func() error) error {
-	conn, err := c.AdminPool.Acquire(ctx)
+// setupSchema migrates and seeds roles as the owner (PGUSER), on a short-lived
+// pool closed before any request is served.
+func (c *Connection) setupSchema(ctx context.Context) error {
+	adminConfig, err := c.poolConfig()
 	if err != nil {
-		return fmt.Errorf("acquiring schema lock connection: %w", err)
+		return err
+	}
+	adminConfig.MaxConns = 1
+	adminConfig.MinConns = 0
+	if c.AppPassword == "" {
+		c.AppPassword = adminConfig.ConnConfig.Password
+	}
+	admin, err := pgxpool.NewWithConfig(ctx, adminConfig)
+	if err != nil {
+		return fmt.Errorf("creating admin pool: %w", err)
+	}
+	defer admin.Close()
+
+	conn, err := admin.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("acquiring admin connection: %w", err)
 	}
 	defer conn.Release()
+
+	// Serializes the whole sequence across processes: parallel test packages
+	// and multiple instances booting at once.
 	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock(hashtext('nokku_schema'))"); err != nil {
 		return fmt.Errorf("acquiring schema lock: %w", err)
 	}
 	defer func() {
-		_, _ = conn.Exec(ctx, "SELECT pg_advisory_unlock(hashtext('nokku_schema'))")
+		_, _ = conn.Exec(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock(hashtext('nokku_schema'))")
 	}()
-	return fn()
+
+	if err := runMigrations(ctx, conn.Conn()); err != nil {
+		return err
+	}
+	if err := c.setupAppRole(ctx, conn.Conn()); err != nil {
+		return err
+	}
+	return setupRBACRoles(ctx, conn.Conn())
 }
 
 // setupAppRole grants the runtime role login rights and sets its password.
-func (c *Connection) setupAppRole(ctx context.Context) error {
-	conn, err := c.AdminPool.Acquire(ctx)
-	if err != nil {
-		return fmt.Errorf("acquiring connection: %w", err)
-	}
-	defer conn.Release()
-
-	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock(hashtext('approle'))"); err != nil {
-		return fmt.Errorf("acquiring app role lock: %w", err)
-	}
-	defer func() {
-		_, _ = conn.Exec(ctx, "SELECT pg_advisory_unlock(hashtext('approle'))")
-	}()
-
+func (c *Connection) setupAppRole(ctx context.Context, conn *pgx.Conn) error {
 	// ALTER ROLE does not accept bind parameters, so the statement is built
 	// with format() server-side and the password stays a bind parameter.
 	var stmt string
@@ -197,21 +192,21 @@ func (c *Connection) setupAppRole(ctx context.Context) error {
 	return nil
 }
 
-// Querier exposes the app-pool querier for global table reads and writes.
-func (c *Connection) Querier() Querier { return c.Q }
-
-// AdminQuerier returns the non-RLS querier for pre-authorization lookups.
-func (c *Connection) AdminQuerier() Querier { return c.AdminQ }
+// Sys runs single statements as nokku_system (BYPASSRLS). It is for
+// pre-authorization lookups and background jobs, which by definition cannot
+// be tenant-scoped. Multi-statement system work uses WithTx.
+func (c *Connection) Sys() Querier { return c.sys }
 
 // withTx is the one transaction scaffold: begin, roll back on error or panic,
 // otherwise commit. The role and GUC setup that decides whether RLS applies is
 // the caller's job, which is what keeps the scope entry points below
 // readable as policy instead of plumbing.
-func (c *Connection) withTx(
+func withTx(
 	ctx context.Context,
+	pool *pgxpool.Pool,
 	fn func(context.Context, pgx.Tx, *Queries) error,
 ) error {
-	tx, err := c.Pool.Begin(ctx)
+	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -233,12 +228,10 @@ func (c *Connection) withTx(
 // Pick the transaction scope by what the query is allowed to see, never by
 // convenience:
 //
-//	Connection.WithTx        every tenant, RLS bypassed
 //	Connection.WithWorkspace tenant rows only, pinned to the request's workspace
 //	Connection.WithActor     the request's own rows, no tenant pinned
-//
-// AdminQ stays for pre-authorization lookups, which by definition run before a
-// tenant can be resolved.
+//	Connection.WithTx        every tenant, RLS bypassed
+//	Connection.Sys           WithTx for a single statement
 
 // WithTx executes a transaction as nokku_system, bypassing RLS entirely. Only
 // cross-tenant work belongs here: the queries see every workspace. Tenant
@@ -247,10 +240,7 @@ func (c *Connection) WithTx(
 	ctx context.Context,
 	fn func(*Queries) error,
 ) error {
-	return c.withTx(ctx, func(ctx context.Context, tx pgx.Tx, q *Queries) error {
-		if _, err := tx.Exec(ctx, "SET LOCAL ROLE nokku_system"); err != nil {
-			return err
-		}
+	return withTx(ctx, c.sysPool, func(_ context.Context, _ pgx.Tx, q *Queries) error {
 		return fn(q)
 	})
 }
@@ -262,10 +252,27 @@ func (c *Connection) WithWorkspace(
 	ctx context.Context,
 	fn func(*Queries) error,
 ) error {
-	return c.withTx(ctx, func(ctx context.Context, tx pgx.Tx, q *Queries) error {
+	return withTx(ctx, c.Pool, func(ctx context.Context, tx pgx.Tx, q *Queries) error {
 		principal, ok := actor.PrincipalFromContext(ctx)
 		if !ok || principal.ID == "" {
 			return ErrNoActor
+		}
+
+		// The authorization interceptor already resolved the actor's role in
+		// this workspace, so membership needs no second lookup.
+		if pinned := actor.WorkspaceIDFromContext(ctx); pinned != "" && actor.MemberOf(ctx) == pinned {
+			if _, err := tx.Exec(
+				ctx,
+				`SELECT
+					set_config('nokku.actor_id', $1, true),
+					set_config('nokku.workspace_id', $2, true)
+				`,
+				principal.ID,
+				pinned,
+			); err != nil {
+				return err
+			}
+			return fn(q)
 		}
 
 		// Membership and role resolution must see every workspace, so it runs
@@ -326,7 +333,7 @@ func (c *Connection) WithActor(
 		return ErrNoActor
 	}
 
-	return c.withTx(ctx, func(ctx context.Context, tx pgx.Tx, q *Queries) error {
+	return withTx(ctx, c.Pool, func(ctx context.Context, tx pgx.Tx, q *Queries) error {
 		// Set the actor GUC transaction-local. Custom GUCs are settable by any
 		// role; no role switch is needed.
 		if _, err := tx.Exec(

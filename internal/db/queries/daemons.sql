@@ -1,4 +1,6 @@
 -- name: CreateDaemon :one
+-- Returns no row when the name or the key is already taken, so the caller
+-- can retry inside its transaction instead of aborting it.
 WITH
   new_daemon AS (
     INSERT INTO
@@ -12,6 +14,7 @@ WITH
         COALESCE(@metadata, '{}'::jsonb),
         @key_thumbprint
       )
+    ON CONFLICT DO NOTHING
     RETURNING
       *
   ),
@@ -43,8 +46,7 @@ FROM
   daemons
 WHERE
   workspace_id = @workspace_id
-  AND key_thumbprint = @key_thumbprint
-LIMIT 1;
+  AND key_thumbprint = @key_thumbprint;
 
 -- name: GetDaemon :one
 SELECT
@@ -99,12 +101,12 @@ SET
 WHERE
   id = @daemon_id;
 
--- name: UpdateDaemonOnlineStatus :exec
+-- name: SetDaemonsOnline :exec
 UPDATE daemons
 SET
   online = @online
 WHERE
-  id = @daemon_id;
+  id = ANY (@daemon_ids::UUID[]);
 
 -- name: ListDaemons :many
 SELECT

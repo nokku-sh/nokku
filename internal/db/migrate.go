@@ -20,7 +20,7 @@ const (
 	baseMigrationVersion   = 1
 )
 
-// migrate brings the database schema up to date with the embedded tern
+// runMigrations brings the database schema up to date with the embedded tern
 // migrations. Migrations are versioned SQL files in internal/db/migrations.
 // A schema change is a new file, never an edit to an applied one.
 //
@@ -32,16 +32,10 @@ const (
 // A database can also be ahead of the migrations on disk when the migration
 // history was squashed into a new base (see the note in 001_base.sql). That
 // is stamped down to the newest available migration instead of failing.
-func (c *Connection) migrate(ctx context.Context) error {
-	conn, err := c.AdminPool.Acquire(ctx)
-	if err != nil {
-		return fmt.Errorf("acquiring migration connection: %w", err)
-	}
-	defer conn.Release()
-
+func runMigrations(ctx context.Context, conn *pgx.Conn) error {
 	// The version table must be checked before creating the migrator: tern's
 	// NewMigrator creates it eagerly, which would mask pre-versioned installs.
-	tableExists, err := versionTableExists(ctx, conn.Conn(), migrationsVersionTable)
+	tableExists, err := versionTableExists(ctx, conn, migrationsVersionTable)
 	if err != nil {
 		return fmt.Errorf("checking version table: %w", err)
 	}
@@ -65,7 +59,7 @@ func (c *Connection) migrate(ctx context.Context) error {
 		}
 	}
 
-	m, err := migrate.NewMigrator(ctx, conn.Conn(), migrationsVersionTable)
+	m, err := migrate.NewMigrator(ctx, conn, migrationsVersionTable)
 	if err != nil {
 		return fmt.Errorf("initializing migrator: %w", err)
 	}

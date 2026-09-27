@@ -115,6 +115,17 @@ func (q *Queries) DeleteWorkspaceAuditLogs(ctx context.Context, arg *DeleteWorks
 	return result.RowsAffected(), nil
 }
 
+const enableAuditRetention = `-- name: EnableAuditRetention :exec
+SELECT
+  set_config('nokku.audit_retention', 'on', TRUE)
+`
+
+// Opts this transaction into the audit_logs delete guard.
+func (q *Queries) EnableAuditRetention(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, enableAuditRetention)
+	return err
+}
+
 const insertAuditLog = `-- name: InsertAuditLog :exec
 INSERT INTO
   audit.audit_logs (workspace_id, action, actor_id, actor_type, actor_email, ip_address, user_agent, status_code, details)
@@ -291,4 +302,14 @@ func (q *Queries) ListWorkspaceAuditLogWorkspaceIDs(ctx context.Context) ([]*str
 		return nil, err
 	}
 	return items, nil
+}
+
+const maintainAuditPartitions = `-- name: MaintainAuditPartitions :exec
+SELECT
+  audit.maintain_partitions ()
+`
+
+func (q *Queries) MaintainAuditPartitions(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, maintainAuditPartitions)
+	return err
 }

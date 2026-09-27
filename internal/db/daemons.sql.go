@@ -26,6 +26,7 @@ WITH
         COALESCE($5, '{}'::jsonb),
         $6
       )
+    ON CONFLICT DO NOTHING
     RETURNING
       id, workspace_id, name, status, online, key_thumbprint, config, metadata, updated_at, created_at
   ),
@@ -74,6 +75,8 @@ type CreateDaemonRow struct {
 	TargetID      string    `json:"targetId"`
 }
 
+// Returns no row when the name or the key is already taken, so the caller
+// can retry inside its transaction instead of aborting it.
 func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*CreateDaemonRow, error) {
 	row := q.db.QueryRow(ctx, createDaemon,
 		arg.WorkspaceID,
@@ -161,7 +164,6 @@ FROM
 WHERE
   workspace_id = $1
   AND key_thumbprint = $2
-LIMIT 1
 `
 
 type GetDaemonByKeyThumbprintParams struct {
@@ -347,6 +349,24 @@ func (q *Queries) SetDaemonsOffline(ctx context.Context) error {
 	return err
 }
 
+const setDaemonsOnline = `-- name: SetDaemonsOnline :exec
+UPDATE daemons
+SET
+  online = $1
+WHERE
+  id = ANY ($2::UUID[])
+`
+
+type SetDaemonsOnlineParams struct {
+	Online    bool     `json:"online"`
+	DaemonIds []string `json:"daemonIds"`
+}
+
+func (q *Queries) SetDaemonsOnline(ctx context.Context, arg *SetDaemonsOnlineParams) error {
+	_, err := q.db.Exec(ctx, setDaemonsOnline, arg.Online, arg.DaemonIds)
+	return err
+}
+
 const updateDaemon = `-- name: UpdateDaemon :one
 UPDATE daemons
 SET
@@ -404,24 +424,6 @@ type UpdateDaemonMetadataParams struct {
 
 func (q *Queries) UpdateDaemonMetadata(ctx context.Context, arg *UpdateDaemonMetadataParams) error {
 	_, err := q.db.Exec(ctx, updateDaemonMetadata, arg.Metadata, arg.DaemonID)
-	return err
-}
-
-const updateDaemonOnlineStatus = `-- name: UpdateDaemonOnlineStatus :exec
-UPDATE daemons
-SET
-  online = $1
-WHERE
-  id = $2
-`
-
-type UpdateDaemonOnlineStatusParams struct {
-	Online   bool   `json:"online"`
-	DaemonID string `json:"daemonId"`
-}
-
-func (q *Queries) UpdateDaemonOnlineStatus(ctx context.Context, arg *UpdateDaemonOnlineStatusParams) error {
-	_, err := q.db.Exec(ctx, updateDaemonOnlineStatus, arg.Online, arg.DaemonID)
 	return err
 }
 

@@ -24,7 +24,6 @@ require (
 	github.com/elimity-com/scim v0.0.0-20260728105928-2641426a1539
 	github.com/go-jose/go-jose/v4 v4.1.5
 	github.com/go-webauthn/webauthn v0.18.2
-	github.com/google/uuid v1.6.0
 	github.com/hashicorp/vault/api v1.23.0
 	github.com/ip2location/ip2location-go/v9 v9.8.0
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
@@ -135,6 +134,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/google/wire v0.7.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.24.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
