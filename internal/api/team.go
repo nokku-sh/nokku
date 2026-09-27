@@ -83,16 +83,8 @@ func (s *TeamService) DeleteTeam(
 	ctx context.Context,
 	req *nokkuv1.DeleteTeamRequest,
 ) (*nokkuv1.DeleteTeamResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		// Drop the team's grants first: the team is a shared subject, so its
-		// id must not linger in any principal.
-		if err := q.DeleteSubjectGrants(ctx, &db.DeleteSubjectGrantsParams{
-			SubjectKind: db.SubjectKindTeam,
-			SubjectID:   req.GetId(),
-		}); err != nil {
-			return err
-		}
-		_, err = q.DeleteTeam(ctx, req.GetId())
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		_, err := q.DeleteTeam(ctx, req.GetId())
 		return err
 	}); err != nil {
 		return nil, DBError(err)

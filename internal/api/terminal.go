@@ -60,9 +60,29 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
-	// Bound each read/write so a half-dead client that stops reading and
-	// sending can't pin the handler or its pump goroutine forever.
-	wsTimeout := 15 * time.Second
+	// Writes and pings are bounded, so a half-dead client cannot pin the
+	// handler. Reads are not: an idle terminal sends nothing for as long as
+	// the user just watches, and the pings prove the browser is still there.
+	const wsTimeout = 15 * time.Second
+	const wsPingEvery = 20 * time.Second
+	go func() {
+		ticker := time.NewTicker(wsPingEvery)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+			pctx, pcancel := context.WithTimeout(ctx, wsTimeout)
+			err := conn.Ping(pctx)
+			pcancel()
+			if err != nil {
+				cancel()
+				return
+			}
+		}
+	}()
 
 	logger := slog.With("session_id", sessionID, "daemon_id", daemonID)
 
@@ -112,9 +132,7 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 
 	// Read loop: WebSocket -> session stdin/resize.
 	for {
-		rctx, rcancel := context.WithTimeout(ctx, wsTimeout)
-		typ, data, err := conn.Read(rctx)
-		rcancel()
+		typ, data, err := conn.Read(ctx)
 		if err != nil {
 			break
 		}
@@ -146,21 +164,17 @@ func (t *TerminalHandler) authorizeAttach(
 		return true
 	}
 
-	// Pre-authorization lookup: the daemon's workspace cannot be pinned before
-	// the request is authorized, so it runs on the admin pool.
-	var workspaceID string
-	err := t.cfg.Conn.AdminPool.QueryRow(
-		r.Context(),
-		`SELECT workspace_id FROM daemons WHERE id = $1`,
-		sess.DaemonID(),
-	).Scan(&workspaceID)
+	// Pre-authorization lookups: the daemon's workspace cannot be pinned
+	// before the request is authorized, so they run as the system role.
+	d, err := t.cfg.Conn.Sys().GetDaemon(r.Context(), sess.DaemonID())
 	if err != nil {
 		writeJSONError(w, http.StatusForbidden, "permission denied")
 		return false
 	}
-
-	// Same role resolution the RPC authorization interceptor uses.
-	role, err := actorRole(r.Context(), t.cfg.Conn.AdminPool, workspaceID, actor.ID)
+	role, err := t.cfg.Conn.Sys().GetActorRole(r.Context(), &db.GetActorRoleParams{
+		WorkspaceID: d.WorkspaceID,
+		ActorID:     actor.ID,
+	})
 	if err != nil || !db.HasPermission(role, db.PermDaemonsEdit) {
 		writeJSONError(w, http.StatusForbidden, "permission denied")
 		return false

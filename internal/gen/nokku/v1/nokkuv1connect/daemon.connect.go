@@ -48,12 +48,6 @@ const (
 	// DaemonServiceListDaemonsProcedure is the fully-qualified name of the DaemonService's ListDaemons
 	// RPC.
 	DaemonServiceListDaemonsProcedure = "/nokku.v1.DaemonService/ListDaemons"
-	// DaemonServiceRefreshEnrollTokenProcedure is the fully-qualified name of the DaemonService's
-	// RefreshEnrollToken RPC.
-	DaemonServiceRefreshEnrollTokenProcedure = "/nokku.v1.DaemonService/RefreshEnrollToken"
-	// DaemonServiceRevokeEnrollTokenProcedure is the fully-qualified name of the DaemonService's
-	// RevokeEnrollToken RPC.
-	DaemonServiceRevokeEnrollTokenProcedure = "/nokku.v1.DaemonService/RevokeEnrollToken"
 	// DaemonServiceListSessionsProcedure is the fully-qualified name of the DaemonService's
 	// ListSessions RPC.
 	DaemonServiceListSessionsProcedure = "/nokku.v1.DaemonService/ListSessions"
@@ -85,8 +79,6 @@ type DaemonServiceClient interface {
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
-	RefreshEnrollToken(context.Context, *v1.RefreshEnrollTokenRequest) (*v1.RefreshEnrollTokenResponse, error)
-	RevokeEnrollToken(context.Context, *v1.RevokeEnrollTokenRequest) (*v1.RevokeEnrollTokenResponse, error)
 	ListSessions(context.Context, *v1.ListSessionsRequest) (*v1.ListSessionsResponse, error)
 	CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error)
 	CloseSession(context.Context, *v1.CloseSessionRequest) (*v1.CloseSessionResponse, error)
@@ -132,18 +124,6 @@ func NewDaemonServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
-		refreshEnrollToken: connect.NewClient[v1.RefreshEnrollTokenRequest, v1.RefreshEnrollTokenResponse](
-			httpClient,
-			baseURL+DaemonServiceRefreshEnrollTokenProcedure,
-			connect.WithSchema(daemonServiceMethods.ByName("RefreshEnrollToken")),
-			connect.WithClientOptions(opts...),
-		),
-		revokeEnrollToken: connect.NewClient[v1.RevokeEnrollTokenRequest, v1.RevokeEnrollTokenResponse](
-			httpClient,
-			baseURL+DaemonServiceRevokeEnrollTokenProcedure,
-			connect.WithSchema(daemonServiceMethods.ByName("RevokeEnrollToken")),
-			connect.WithClientOptions(opts...),
-		),
 		listSessions: connect.NewClient[v1.ListSessionsRequest, v1.ListSessionsResponse](
 			httpClient,
 			baseURL+DaemonServiceListSessionsProcedure,
@@ -186,18 +166,16 @@ func NewDaemonServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 
 // daemonServiceClient implements DaemonServiceClient.
 type daemonServiceClient struct {
-	getDaemon          *connect.Client[v1.GetDaemonRequest, v1.GetDaemonResponse]
-	updateDaemon       *connect.Client[v1.UpdateDaemonRequest, v1.UpdateDaemonResponse]
-	deleteDaemon       *connect.Client[v1.DeleteDaemonRequest, v1.DeleteDaemonResponse]
-	listDaemons        *connect.Client[v1.ListDaemonsRequest, v1.ListDaemonsResponse]
-	refreshEnrollToken *connect.Client[v1.RefreshEnrollTokenRequest, v1.RefreshEnrollTokenResponse]
-	revokeEnrollToken  *connect.Client[v1.RevokeEnrollTokenRequest, v1.RevokeEnrollTokenResponse]
-	listSessions       *connect.Client[v1.ListSessionsRequest, v1.ListSessionsResponse]
-	createSession      *connect.Client[v1.CreateSessionRequest, v1.CreateSessionResponse]
-	closeSession       *connect.Client[v1.CloseSessionRequest, v1.CloseSessionResponse]
-	enrollDaemon       *connect.Client[v1.EnrollDaemonRequest, v1.EnrollDaemonResponse]
-	syncDaemon         *connect.Client[v1.SyncDaemonRequest, v1.SyncDaemonResponse]
-	relay              *connect.Client[v1.RelayRequest, v1.RelayResponse]
+	getDaemon     *connect.Client[v1.GetDaemonRequest, v1.GetDaemonResponse]
+	updateDaemon  *connect.Client[v1.UpdateDaemonRequest, v1.UpdateDaemonResponse]
+	deleteDaemon  *connect.Client[v1.DeleteDaemonRequest, v1.DeleteDaemonResponse]
+	listDaemons   *connect.Client[v1.ListDaemonsRequest, v1.ListDaemonsResponse]
+	listSessions  *connect.Client[v1.ListSessionsRequest, v1.ListSessionsResponse]
+	createSession *connect.Client[v1.CreateSessionRequest, v1.CreateSessionResponse]
+	closeSession  *connect.Client[v1.CloseSessionRequest, v1.CloseSessionResponse]
+	enrollDaemon  *connect.Client[v1.EnrollDaemonRequest, v1.EnrollDaemonResponse]
+	syncDaemon    *connect.Client[v1.SyncDaemonRequest, v1.SyncDaemonResponse]
+	relay         *connect.Client[v1.RelayRequest, v1.RelayResponse]
 }
 
 // GetDaemon calls nokku.v1.DaemonService.GetDaemon.
@@ -230,24 +208,6 @@ func (c *daemonServiceClient) DeleteDaemon(ctx context.Context, req *v1.DeleteDa
 // ListDaemons calls nokku.v1.DaemonService.ListDaemons.
 func (c *daemonServiceClient) ListDaemons(ctx context.Context, req *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error) {
 	response, err := c.listDaemons.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// RefreshEnrollToken calls nokku.v1.DaemonService.RefreshEnrollToken.
-func (c *daemonServiceClient) RefreshEnrollToken(ctx context.Context, req *v1.RefreshEnrollTokenRequest) (*v1.RefreshEnrollTokenResponse, error) {
-	response, err := c.refreshEnrollToken.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// RevokeEnrollToken calls nokku.v1.DaemonService.RevokeEnrollToken.
-func (c *daemonServiceClient) RevokeEnrollToken(ctx context.Context, req *v1.RevokeEnrollTokenRequest) (*v1.RevokeEnrollTokenResponse, error) {
-	response, err := c.revokeEnrollToken.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
@@ -310,8 +270,6 @@ type DaemonServiceHandler interface {
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
-	RefreshEnrollToken(context.Context, *v1.RefreshEnrollTokenRequest) (*v1.RefreshEnrollTokenResponse, error)
-	RevokeEnrollToken(context.Context, *v1.RevokeEnrollTokenRequest) (*v1.RevokeEnrollTokenResponse, error)
 	ListSessions(context.Context, *v1.ListSessionsRequest) (*v1.ListSessionsResponse, error)
 	CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error)
 	CloseSession(context.Context, *v1.CloseSessionRequest) (*v1.CloseSessionResponse, error)
@@ -351,18 +309,6 @@ func NewDaemonServiceHandler(svc DaemonServiceHandler, opts ...connect.HandlerOp
 		svc.ListDaemons,
 		connect.WithSchema(daemonServiceMethods.ByName("ListDaemons")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	daemonServiceRefreshEnrollTokenHandler := connect.NewUnaryHandlerSimple(
-		DaemonServiceRefreshEnrollTokenProcedure,
-		svc.RefreshEnrollToken,
-		connect.WithSchema(daemonServiceMethods.ByName("RefreshEnrollToken")),
-		connect.WithHandlerOptions(opts...),
-	)
-	daemonServiceRevokeEnrollTokenHandler := connect.NewUnaryHandlerSimple(
-		DaemonServiceRevokeEnrollTokenProcedure,
-		svc.RevokeEnrollToken,
-		connect.WithSchema(daemonServiceMethods.ByName("RevokeEnrollToken")),
 		connect.WithHandlerOptions(opts...),
 	)
 	daemonServiceListSessionsHandler := connect.NewUnaryHandlerSimple(
@@ -412,10 +358,6 @@ func NewDaemonServiceHandler(svc DaemonServiceHandler, opts ...connect.HandlerOp
 			daemonServiceDeleteDaemonHandler.ServeHTTP(w, r)
 		case DaemonServiceListDaemonsProcedure:
 			daemonServiceListDaemonsHandler.ServeHTTP(w, r)
-		case DaemonServiceRefreshEnrollTokenProcedure:
-			daemonServiceRefreshEnrollTokenHandler.ServeHTTP(w, r)
-		case DaemonServiceRevokeEnrollTokenProcedure:
-			daemonServiceRevokeEnrollTokenHandler.ServeHTTP(w, r)
 		case DaemonServiceListSessionsProcedure:
 			daemonServiceListSessionsHandler.ServeHTTP(w, r)
 		case DaemonServiceCreateSessionProcedure:
@@ -451,14 +393,6 @@ func (UnimplementedDaemonServiceHandler) DeleteDaemon(context.Context, *v1.Delet
 
 func (UnimplementedDaemonServiceHandler) ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.DaemonService.ListDaemons is not implemented"))
-}
-
-func (UnimplementedDaemonServiceHandler) RefreshEnrollToken(context.Context, *v1.RefreshEnrollTokenRequest) (*v1.RefreshEnrollTokenResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.DaemonService.RefreshEnrollToken is not implemented"))
-}
-
-func (UnimplementedDaemonServiceHandler) RevokeEnrollToken(context.Context, *v1.RevokeEnrollTokenRequest) (*v1.RevokeEnrollTokenResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.DaemonService.RevokeEnrollToken is not implemented"))
 }
 
 func (UnimplementedDaemonServiceHandler) ListSessions(context.Context, *v1.ListSessionsRequest) (*v1.ListSessionsResponse, error) {

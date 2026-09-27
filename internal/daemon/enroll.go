@@ -3,31 +3,28 @@ package daemon
 import (
 	"context"
 	"errors"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/namegen"
 )
 
-var (
-	ErrEnrollExpired = errors.New("enrollment token has expired")
-	ErrEnrollToken   = errors.New("invalid enrollment token")
-)
+// ErrEnrollToken covers unknown, revoked, expired, and used-up tokens alike,
+// so a caller learns nothing about which it hit.
+var ErrEnrollToken = errors.New("invalid or expired enrollment token")
 
 // EnrollInput carries what the transport layer gleans from the request: the
-// parsed token's workspace, the raw enroll token, the DPoP key thumbprint,
-// marshaled transport metadata, and the caller-picked CA.
+// raw enroll token, the DPoP key thumbprint, and marshaled transport
+// metadata. CanCreate runs only when the machine is new, so re-enrolling
+// works even at the plan cap.
 type EnrollInput struct {
-	WorkspaceID string
-	Token       string
-	Binding     string
-	Metadata    []byte
-	CaID        *string
+	Token     string
+	Binding   string
+	Metadata  []byte
+	CanCreate func(ctx context.Context, workspaceID string) error
 }
 
 // Enrolled is the enrollment outcome the response is built from.
@@ -40,131 +37,153 @@ type Enrolled struct {
 	Config      *nokkuv1.DaemonConfig
 }
 
-// Enroll verifies the enroll token against the workspace and returns the
-// existing daemon bound to the DPoP key thumbprint, or provisions a new one.
+// maxNameAttempts bounds retries on a generated name that is already taken.
+const maxNameAttempts = 5
+
+// Enroll verifies the enroll token and returns the daemon bound to the DPoP
+// key thumbprint, provisioning it on first contact. The token authorizes this
+// otherwise unauthenticated request, so it runs as the system role. Only a
+// new daemon spends a use of the token. The quota check runs between the two
+// transactions: it reads the database itself, and nesting it would let
+// parallel enrollments exhaust the pool.
 func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, error) {
-	// The enrollment token (verified below against its stored hash)
-	// authorizes this otherwise unauthenticated request, so the daemon
-	// provisioning runs as a system transaction without an actor.
-	var workspace *db.Workspace
-	if err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
-		workspace, err = q.GetWorkspace(ctx, in.WorkspaceID)
-		return err
-	}); err != nil {
-		return nil, err
+	parsed, err := crypto.Parse(in.Token)
+	if err != nil || parsed.ID == "" {
+		return nil, ErrEnrollToken
 	}
-	if workspace.EnrollExpiresAt != nil && workspace.EnrollExpiresAt.Before(time.Now()) {
-		return nil, ErrEnrollExpired
-	}
-	if !workspace.EnrollTokenHash.Verify(in.Token) {
+	hash, err := crypto.HashToken(in.Token)
+	if err != nil {
 		return nil, ErrEnrollToken
 	}
 
+	var (
+		token     *db.WorkspaceToken
+		workspace *db.Workspace
+		out       *Enrolled
+	)
+	err = conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		token, err = q.GetLiveToken(ctx, &db.GetLiveTokenParams{
+			ID:        parsed.ID,
+			Kind:      nokkuv1.TokenKind_TOKEN_KIND_ENROLL,
+			TokenHash: hash,
+		})
+		if err != nil {
+			return ErrEnrollToken
+		}
+		workspace, err = q.GetWorkspace(ctx, token.WorkspaceID)
+		if err != nil {
+			return err
+		}
+		out, err = enrolledDaemon(ctx, q, token.WorkspaceID, in.Binding)
+		return err
+	})
+	if err != nil || out != nil {
+		return out, err
+	}
+
+	if in.CanCreate != nil {
+		if err := in.CanCreate(ctx, token.WorkspaceID); err != nil {
+			return nil, err
+		}
+	}
+
 	status := nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING
-	if workspace.Settings.GetEnrollAutoApprove() {
+	if token.AutoApprove {
 		status = nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
 	}
-
-	// New daemons inherit the workspace's adjustable default config, so a
-	// freshly deployed daemon picks up the current SSH server policy.
 	config := workspace.Settings.GetDefaultDaemonConfig()
 
-	// Re-enrolling the same machine must not create a second daemon. The
-	// DPoP key thumbprint (binding) is the daemon's stable identity, so look
-	// for an existing daemon bound to this workspace and key and reuse it.
-	var (
-		daemonID   string
-		daemonName string
-		targetID   string
-		statusNow  = status
-	)
-	var existing *db.Daemon
-	if err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
-		existing, err = q.GetDaemonByKeyThumbprint(ctx, &db.GetDaemonByKeyThumbprintParams{
-			WorkspaceID:   in.WorkspaceID,
-			KeyThumbprint: &in.Binding,
-		})
-		if errors.Is(err, pgx.ErrNoRows) {
-			// sqlc :one hands back a non-nil zero row with ErrNoRows, clear it
-			// or the create path below never runs.
-			existing = nil
+	err = conn.WithTx(ctx, func(q *db.Queries) error {
+		for range maxNameAttempts {
+			// A racing enrollment of the same key turns the insert below
+			// into a no-op, so look again every round.
+			if out, err = enrolledDaemon(ctx, q, token.WorkspaceID, in.Binding); err != nil || out != nil {
+				return err
+			}
+			// Names are generated server-side so a workspace never shows a
+			// duplicate label. A taken name returns no row and we try again.
+			created, err := q.CreateDaemon(ctx, &db.CreateDaemonParams{
+				WorkspaceID:   token.WorkspaceID,
+				Name:          namegen.Generate(),
+				Metadata:      in.Metadata,
+				Status:        status,
+				Config:        config,
+				KeyThumbprint: &in.Binding,
+			})
+			if errors.Is(err, pgx.ErrNoRows) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			// Spending the use in the same transaction means a token that
+			// ran out meanwhile rolls the new daemon back.
+			if _, err := q.RedeemToken(ctx, &db.RedeemTokenParams{
+				ID:        parsed.ID,
+				Kind:      nokkuv1.TokenKind_TOKEN_KIND_ENROLL,
+				TokenHash: hash,
+			}); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return ErrEnrollToken
+				}
+				return err
+			}
+			// A NULL CA falls back to the workspace default.
+			if _, err := q.UpdateTargetCA(ctx, &db.UpdateTargetCAParams{
+				DaemonID: &created.ID,
+				CaID:     token.CaID,
+			}); err != nil {
+				return err
+			}
+			out = &Enrolled{
+				WorkspaceID: token.WorkspaceID,
+				DaemonID:    created.ID,
+				Name:        created.Name,
+				TargetID:    created.TargetID,
+				Status:      status,
+				Config:      config,
+			}
 			return nil
 		}
-		if err != nil {
-			return err
-		}
-		target, err := q.GetTargetByDaemon(ctx, &existing.ID)
-		if err != nil {
-			return err
-		}
-		targetID = target.ID
-		return nil
-	}); err != nil {
+		return errors.New("could not find a free daemon name")
+	})
+	if err != nil {
 		return nil, err
 	}
+	return out, nil
+}
 
-	if existing != nil {
-		daemonID = existing.ID
-		daemonName = existing.Name
-		statusNow = existing.Status
-		config = existing.Config
-	} else {
-		// First enrollment: generate a name and insert. Names are generated
-		// server-side so a workspace never shows a duplicate label. A
-		// collision is a unique violation on (workspace_id, name), retried
-		// with a numeric suffix before giving up.
-		var name strings.Builder
-		name.WriteString(namegen.Generate())
-		for attempt := 0; ; attempt++ {
-			if attempt > 0 {
-				name.WriteString(strconv.Itoa(attempt + 1))
-			}
-
-			var created *db.CreateDaemonRow
-			err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
-				created, err = q.CreateDaemon(ctx, &db.CreateDaemonParams{
-					WorkspaceID:   in.WorkspaceID,
-					Name:          name.String(),
-					Metadata:      in.Metadata,
-					Status:        status,
-					Config:        config,
-					KeyThumbprint: &in.Binding,
-				})
-				if err != nil {
-					return err
-				}
-
-				// Assign the CA the caller picked, or fall back to the
-				// workspace default when none was given. A daemon without
-				// a CA cannot get host certs signed, so this must always run.
-				caID := in.CaID
-				if caID != nil && *caID == "" {
-					caID = nil
-				}
-				_, err = q.UpdateTargetCA(ctx, &db.UpdateTargetCAParams{
-					DaemonID: &created.ID,
-					CaID:     caID,
-				})
-				return err
-			})
-			if err == nil {
-				daemonID = created.ID
-				daemonName = created.Name
-				targetID = created.TargetID
-				break
-			}
-			if !db.IsUniqueViolation(err) || attempt >= 4 {
-				return nil, err
-			}
-		}
+// enrolledDaemon returns the daemon already bound to the enrolling key, or
+// nil. The key is the machine's identity, so re-enrolling reuses it.
+func enrolledDaemon(ctx context.Context, q *db.Queries, workspaceID, binding string) (*Enrolled, error) {
+	d, err := q.GetDaemonByKeyThumbprint(ctx, &db.GetDaemonByKeyThumbprintParams{
+		WorkspaceID:   workspaceID,
+		KeyThumbprint: &binding,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
 	}
-
+	if err != nil {
+		return nil, err
+	}
+	target, err := q.GetTargetByDaemon(ctx, &d.ID)
+	if err != nil {
+		return nil, err
+	}
 	return &Enrolled{
-		WorkspaceID: in.WorkspaceID,
-		DaemonID:    daemonID,
-		Name:        daemonName,
-		TargetID:    targetID,
-		Status:      statusNow,
-		Config:      config,
+		WorkspaceID: workspaceID,
+		DaemonID:    d.ID,
+		Name:        d.Name,
+		TargetID:    target.ID,
+		Status:      d.Status,
+		Config:      d.Config,
 	}, nil
+}
+
+// GetStatus returns the enrolled status, or unspecified for a nil result.
+func (e *Enrolled) GetStatus() nokkuv1.DaemonStatus {
+	if e == nil {
+		return nokkuv1.DaemonStatus_DAEMON_STATUS_UNSPECIFIED
+	}
+	return e.Status
 }

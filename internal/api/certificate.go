@@ -191,10 +191,6 @@ func (s *CertificateService) UpdateCertificateAuthority(
 		return nil, DBError(err)
 	}
 
-	// A deactivation is a trust change: daemons re-sync and drop the CA from
-	// their cached key set instead of waiting for an unrelated version bump.
-	s.cfg.Pool.NotifyChange(result.WorkspaceID)
-
 	return &nokkuv1.UpdateCertificateAuthorityResponse{
 		CertificateAuthority: result.ToProto(),
 	}, nil
@@ -204,16 +200,12 @@ func (s *CertificateService) DeleteCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.DeleteCertificateAuthorityRequest,
 ) (*nokkuv1.DeleteCertificateAuthorityResponse, error) {
-	var deleted *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		var err error
-		deleted, err = q.DeleteCA(ctx, req.GetId())
+		_, err := q.DeleteCA(ctx, req.GetId())
 		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
-
-	s.cfg.Pool.NotifyChange(deleted.WorkspaceID)
 
 	return &nokkuv1.DeleteCertificateAuthorityResponse{}, nil
 }
@@ -274,7 +266,6 @@ func (s *CertificateService) RolloverCertificateAuthority(
 		return &nokkuv1.RolloverCertificateAuthorityResponse{}, nil
 	}
 
-	s.cfg.Pool.NotifyChange(result.WorkspaceID)
 	return &nokkuv1.RolloverCertificateAuthorityResponse{
 		CertificateAuthority: result.ToProto(),
 	}, nil
@@ -291,22 +282,22 @@ func (s *CertificateService) SignSSHCertificate(
 	daemonID := iam.DaemonIDFromContext(ctx)
 
 	// Host certificates are minted by daemons only, backed by their
-	// DPoP-bound identity.
-	if req.GetType() == nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST && daemonID == "" {
-		return nil, NewError(connect.CodePermissionDenied, "host certificates are issued by daemons")
+	// DPoP-bound identity, and a daemon mints nothing else.
+	if (req.GetType() == nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST) != (daemonID != "") {
+		return nil, NewError(connect.CodePermissionDenied, "host certificates are issued to daemons only")
 	}
 
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		//nolint:gocritic // false positive
-		if req.GetCaId() != "" {
-			ca, err = q.GetCA(ctx, req.GetCaId())
+		if daemonID != "" {
+			// A daemon always signs under its target's CA.
+			ca, err = q.GetCAByDaemonID(ctx, &daemonID)
 			if err != nil {
 				return err
 			}
-		} else if daemonID != "" {
-			// Daemons get automatically the correct CA
-			ca, err = q.GetCAByDaemonID(ctx, &daemonID)
+		} else if req.GetCaId() != "" {
+			ca, err = q.GetCA(ctx, req.GetCaId())
 			if err != nil {
 				return err
 			}

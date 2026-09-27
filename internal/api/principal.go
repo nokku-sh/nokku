@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"strings"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -15,21 +14,6 @@ type PrincipalService struct {
 
 func NewPrincipalService(cfg *config.Config) *PrincipalService {
 	return &PrincipalService{cfg: cfg}
-}
-
-func (s *PrincipalService) SetPrincipals(
-	ctx context.Context,
-	req *nokkuv1.SetPrincipalsRequest,
-) (*nokkuv1.SetPrincipalsResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		return q.SetPrincipals(ctx, &db.SetPrincipalsParams{
-			TargetID:  req.GetTargetId(),
-			Usernames: req.GetUsernames(),
-		})
-	}); err != nil {
-		return nil, DBError(err)
-	}
-	return &nokkuv1.SetPrincipalsResponse{}, nil
 }
 
 func (s *PrincipalService) ListPrincipals(
@@ -71,7 +55,7 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 			return err
 		}
 
-		kind, ok := subjectKind(req.GetType())
+		kind, ok := subjectKind(req.GetKind())
 		if !ok {
 			return ErrInvalidInput
 		}
@@ -90,7 +74,6 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 		return nil, DBError(err)
 	}
 
-	s.cfg.Pool.NotifyChange(workspaceID)
 	return &nokkuv1.AddSubjectsToPrincipalResponse{}, nil
 }
 
@@ -98,14 +81,8 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 	ctx context.Context,
 	req *nokkuv1.RemoveSubjectsFromPrincipalRequest,
 ) (*nokkuv1.RemoveSubjectsFromPrincipalResponse, error) {
-	var workspaceID string
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		workspaceID, err = q.GetPrincipalWorkspace(ctx, req.GetId())
-		if err != nil {
-			return err
-		}
-
-		kind, ok := subjectKind(req.GetType())
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		kind, ok := subjectKind(req.GetKind())
 		if !ok {
 			return ErrInvalidInput
 		}
@@ -127,7 +104,6 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 		return nil, DBError(err)
 	}
 
-	s.cfg.Pool.NotifyChange(workspaceID)
 	return &nokkuv1.RemoveSubjectsFromPrincipalResponse{}, nil
 }
 
@@ -136,7 +112,7 @@ func (s *PrincipalService) RevokeAllAccess(
 	req *nokkuv1.RevokeAllAccessRequest,
 ) (*nokkuv1.RevokeAllAccessResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		kind, ok := subjectKind(req.GetType())
+		kind, ok := subjectKind(req.GetKind())
 		if !ok {
 			return ErrInvalidInput
 		}
@@ -155,7 +131,6 @@ func (s *PrincipalService) RevokeAllAccess(
 		return nil, DBError(err)
 	}
 
-	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
 	return &nokkuv1.RevokeAllAccessResponse{}, nil
 }
 
@@ -171,14 +146,13 @@ func (s *PrincipalService) AddPrincipal(
 		principal, err = q.CreatePrincipal(ctx, &db.CreatePrincipalParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			TargetID:    req.GetTargetId(),
-			Username:    strings.TrimSpace(req.GetUsername()),
+			Username:    req.GetUsername(),
 		})
 		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
 
-	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
 	return &nokkuv1.AddPrincipalResponse{Principal: principal.ToProto()}, nil
 }
 
@@ -194,20 +168,19 @@ func (s *PrincipalService) RemovePrincipal(
 		return nil, DBError(err)
 	}
 
-	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
 	return &nokkuv1.RemovePrincipalResponse{}, nil
 }
 
-// subjectKind maps the wire principal type to principal_grants.subject_kind.
-func subjectKind(t nokkuv1.PrincipalType) (string, bool) {
-	switch t {
-	case nokkuv1.PrincipalType_PRINCIPAL_TYPE_USER:
+// subjectKind maps the wire subject kind to principal_grants.subject_kind.
+func subjectKind(k nokkuv1.SubjectKind) (string, bool) {
+	switch k {
+	case nokkuv1.SubjectKind_SUBJECT_KIND_USER:
 		return db.SubjectKindUser, true
-	case nokkuv1.PrincipalType_PRINCIPAL_TYPE_TEAM:
+	case nokkuv1.SubjectKind_SUBJECT_KIND_TEAM:
 		return db.SubjectKindTeam, true
-	case nokkuv1.PrincipalType_PRINCIPAL_TYPE_SERVICE_ACCOUNT:
+	case nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT:
 		return db.SubjectKindServiceAccount, true
-	case nokkuv1.PrincipalType_PRINCIPAL_TYPE_UNSPECIFIED:
+	case nokkuv1.SubjectKind_SUBJECT_KIND_UNSPECIFIED:
 		return "", false
 	default:
 		return "", false

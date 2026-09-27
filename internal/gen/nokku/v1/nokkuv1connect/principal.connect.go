@@ -33,9 +33,6 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// PrincipalServiceSetPrincipalsProcedure is the fully-qualified name of the PrincipalService's
-	// SetPrincipals RPC.
-	PrincipalServiceSetPrincipalsProcedure = "/nokku.v1.PrincipalService/SetPrincipals"
 	// PrincipalServiceListPrincipalsProcedure is the fully-qualified name of the PrincipalService's
 	// ListPrincipals RPC.
 	PrincipalServiceListPrincipalsProcedure = "/nokku.v1.PrincipalService/ListPrincipals"
@@ -58,7 +55,6 @@ const (
 
 // PrincipalServiceClient is a client for the nokku.v1.PrincipalService service.
 type PrincipalServiceClient interface {
-	SetPrincipals(context.Context, *v1.SetPrincipalsRequest) (*v1.SetPrincipalsResponse, error)
 	ListPrincipals(context.Context, *v1.ListPrincipalsRequest) (*v1.ListPrincipalsResponse, error)
 	AddPrincipal(context.Context, *v1.AddPrincipalRequest) (*v1.AddPrincipalResponse, error)
 	RemovePrincipal(context.Context, *v1.RemovePrincipalRequest) (*v1.RemovePrincipalResponse, error)
@@ -78,12 +74,6 @@ func NewPrincipalServiceClient(httpClient connect.HTTPClient, baseURL string, op
 	baseURL = strings.TrimRight(baseURL, "/")
 	principalServiceMethods := v1.File_nokku_v1_principal_proto.Services().ByName("PrincipalService").Methods()
 	return &principalServiceClient{
-		setPrincipals: connect.NewClient[v1.SetPrincipalsRequest, v1.SetPrincipalsResponse](
-			httpClient,
-			baseURL+PrincipalServiceSetPrincipalsProcedure,
-			connect.WithSchema(principalServiceMethods.ByName("SetPrincipals")),
-			connect.WithClientOptions(opts...),
-		),
 		listPrincipals: connect.NewClient[v1.ListPrincipalsRequest, v1.ListPrincipalsResponse](
 			httpClient,
 			baseURL+PrincipalServiceListPrincipalsProcedure,
@@ -126,22 +116,12 @@ func NewPrincipalServiceClient(httpClient connect.HTTPClient, baseURL string, op
 
 // principalServiceClient implements PrincipalServiceClient.
 type principalServiceClient struct {
-	setPrincipals               *connect.Client[v1.SetPrincipalsRequest, v1.SetPrincipalsResponse]
 	listPrincipals              *connect.Client[v1.ListPrincipalsRequest, v1.ListPrincipalsResponse]
 	addPrincipal                *connect.Client[v1.AddPrincipalRequest, v1.AddPrincipalResponse]
 	removePrincipal             *connect.Client[v1.RemovePrincipalRequest, v1.RemovePrincipalResponse]
 	addSubjectsToPrincipal      *connect.Client[v1.AddSubjectsToPrincipalRequest, v1.AddSubjectsToPrincipalResponse]
 	removeSubjectsFromPrincipal *connect.Client[v1.RemoveSubjectsFromPrincipalRequest, v1.RemoveSubjectsFromPrincipalResponse]
 	revokeAllAccess             *connect.Client[v1.RevokeAllAccessRequest, v1.RevokeAllAccessResponse]
-}
-
-// SetPrincipals calls nokku.v1.PrincipalService.SetPrincipals.
-func (c *principalServiceClient) SetPrincipals(ctx context.Context, req *v1.SetPrincipalsRequest) (*v1.SetPrincipalsResponse, error) {
-	response, err := c.setPrincipals.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
 }
 
 // ListPrincipals calls nokku.v1.PrincipalService.ListPrincipals.
@@ -200,7 +180,6 @@ func (c *principalServiceClient) RevokeAllAccess(ctx context.Context, req *v1.Re
 
 // PrincipalServiceHandler is an implementation of the nokku.v1.PrincipalService service.
 type PrincipalServiceHandler interface {
-	SetPrincipals(context.Context, *v1.SetPrincipalsRequest) (*v1.SetPrincipalsResponse, error)
 	ListPrincipals(context.Context, *v1.ListPrincipalsRequest) (*v1.ListPrincipalsResponse, error)
 	AddPrincipal(context.Context, *v1.AddPrincipalRequest) (*v1.AddPrincipalResponse, error)
 	RemovePrincipal(context.Context, *v1.RemovePrincipalRequest) (*v1.RemovePrincipalResponse, error)
@@ -216,12 +195,6 @@ type PrincipalServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewPrincipalServiceHandler(svc PrincipalServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	principalServiceMethods := v1.File_nokku_v1_principal_proto.Services().ByName("PrincipalService").Methods()
-	principalServiceSetPrincipalsHandler := connect.NewUnaryHandlerSimple(
-		PrincipalServiceSetPrincipalsProcedure,
-		svc.SetPrincipals,
-		connect.WithSchema(principalServiceMethods.ByName("SetPrincipals")),
-		connect.WithHandlerOptions(opts...),
-	)
 	principalServiceListPrincipalsHandler := connect.NewUnaryHandlerSimple(
 		PrincipalServiceListPrincipalsProcedure,
 		svc.ListPrincipals,
@@ -261,8 +234,6 @@ func NewPrincipalServiceHandler(svc PrincipalServiceHandler, opts ...connect.Han
 	)
 	return "/nokku.v1.PrincipalService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case PrincipalServiceSetPrincipalsProcedure:
-			principalServiceSetPrincipalsHandler.ServeHTTP(w, r)
 		case PrincipalServiceListPrincipalsProcedure:
 			principalServiceListPrincipalsHandler.ServeHTTP(w, r)
 		case PrincipalServiceAddPrincipalProcedure:
@@ -283,10 +254,6 @@ func NewPrincipalServiceHandler(svc PrincipalServiceHandler, opts ...connect.Han
 
 // UnimplementedPrincipalServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedPrincipalServiceHandler struct{}
-
-func (UnimplementedPrincipalServiceHandler) SetPrincipals(context.Context, *v1.SetPrincipalsRequest) (*v1.SetPrincipalsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.PrincipalService.SetPrincipals is not implemented"))
-}
 
 func (UnimplementedPrincipalServiceHandler) ListPrincipals(context.Context, *v1.ListPrincipalsRequest) (*v1.ListPrincipalsResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.PrincipalService.ListPrincipals is not implemented"))

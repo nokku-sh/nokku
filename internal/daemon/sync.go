@@ -20,7 +20,7 @@ type SyncInput struct {
 
 // Synced is the state a daemon's next heartbeat runs against.
 type Synced struct {
-	WorkspaceID string
+	Version     int64
 	Status      *nokkuv1.DaemonStatus
 	Config      *nokkuv1.DaemonConfig
 	Principals  []*nokkuv1.PrincipalUsers
@@ -36,7 +36,6 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		if err != nil {
 			return err
 		}
-		res.WorkspaceID = daemon.WorkspaceID
 		res.Status = &daemon.Status
 		res.Config = daemon.Config
 
@@ -45,6 +44,13 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		// told to stop.
 		if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
 			return nil
+		}
+
+		// Read the version before the state it covers. A change committed
+		// in between then costs one extra sync instead of a stale daemon.
+		res.Version, err = q.GetWorkspaceStateVersion(ctx, daemon.WorkspaceID)
+		if err != nil {
+			return err
 		}
 
 		// Only the heartbeat metadata is touched: the combined update's
@@ -91,7 +97,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			return err
 		}
 
-		result, err := q.ListPrincipalsForDaemon(ctx, &daemon.ID)
+		result, err := q.ListPrincipalsForTarget(ctx, target.ID)
 		if err != nil {
 			return err
 		}

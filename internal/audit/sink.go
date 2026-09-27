@@ -24,19 +24,18 @@ type Sink interface {
 // append-only by grant and by trigger, so this insert is the only write path
 // that exists.
 type PostgresSink struct {
-	q *db.Queries
+	q db.Querier
 }
 
 var _ Sink = (*PostgresSink)(nil)
 
 func NewPostgresSink(conn *db.Connection) *PostgresSink {
-	return &PostgresSink{q: conn.Q}
+	return &PostgresSink{q: conn.Sys()}
 }
 
 // Append inserts one event. It is a dumb pipe: it marshals whatever it is
-// handed and inserts it through the app role. The RLS insert policy is WITH
-// CHECK (TRUE), so this succeeds for both global and tenant events without any
-// role switch or transaction.
+// handed and inserts it as nokku_system. The app role has no insert policy,
+// so tenant transactions cannot write audit rows.
 func (s *PostgresSink) Append(ctx context.Context, event *Event) error {
 	if event == nil {
 		return nil

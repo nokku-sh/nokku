@@ -16,6 +16,8 @@ const (
 	KindWebDevice      Kind = "web_device"
 	KindDaemon         Kind = "daemon"
 	KindServiceAccount Kind = "service_account"
+	// KindSCIM is a SCIM connector token, pinned to its workspace.
+	KindSCIM Kind = "scim"
 )
 
 // Principal is the authenticated actor of a request. It mirrors what the
@@ -53,7 +55,7 @@ func UserIDFromContext(ctx context.Context) string {
 		switch p.Kind {
 		case KindUser, KindCLI, KindWebDevice:
 			return p.ID
-		case KindDaemon, KindServiceAccount:
+		case KindDaemon, KindServiceAccount, KindSCIM:
 			return ""
 		}
 	}
@@ -103,4 +105,18 @@ func TenantFromContext(ctx context.Context) (TenantID, bool) {
 func WorkspaceIDFromContext(ctx context.Context) string {
 	t, _ := TenantFromContext(ctx)
 	return t
+}
+
+type memberKey struct{}
+
+// WithMember records that authorization verified the actor's membership in
+// workspaceID, so the DB layer can skip a second lookup.
+func WithMember(ctx context.Context, workspaceID string) context.Context {
+	return context.WithValue(ctx, memberKey{}, workspaceID)
+}
+
+// MemberOf returns the workspace whose membership authorization verified.
+func MemberOf(ctx context.Context) string {
+	ws, _ := ctx.Value(memberKey{}).(string)
+	return ws
 }

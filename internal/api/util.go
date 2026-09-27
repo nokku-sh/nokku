@@ -78,6 +78,8 @@ func (s *UtilService) Whoami(
 		}); err != nil {
 			return nil, DBError(err)
 		}
+	case iam.KindSCIM:
+		// SCIM tokens only reach the SCIM endpoint, never connect.
 	}
 	return out, nil
 }

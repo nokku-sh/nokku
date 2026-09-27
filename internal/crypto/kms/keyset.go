@@ -17,7 +17,7 @@ import (
 // persisting one on first boot. Concurrent first boots are race-safe: the
 // insert uses ON CONFLICT DO NOTHING.
 func (t *TinkEncryptor) loadOrCreateKeyset(ctx context.Context) (*keyset.Handle, error) {
-	data, err := t.db.Q.GetKeysetData(ctx)
+	data, err := t.db.Sys().GetKeysetData(ctx)
 	switch {
 	case err == nil:
 		return unwrap(data, t.kek())
@@ -34,7 +34,7 @@ func (t *TinkEncryptor) loadOrCreateKeyset(ctx context.Context) (*keyset.Handle,
 	if err != nil {
 		return nil, err
 	}
-	inserted, err := t.db.Q.InsertKeyset(ctx, data)
+	inserted, err := t.db.Sys().InsertKeyset(ctx, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to persist initial keyset: %w", err)
 	}
@@ -44,7 +44,7 @@ func (t *TinkEncryptor) loadOrCreateKeyset(ctx context.Context) (*keyset.Handle,
 
 	// Lost a first-boot race: another replica persisted its keyset first.
 	slog.Debug("another instance created the keyset first, loading it")
-	data, err = t.db.Q.GetKeysetData(ctx)
+	data, err = t.db.Sys().GetKeysetData(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reload keyset after first-boot race: %w", err)
 	}

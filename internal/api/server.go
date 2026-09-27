@@ -165,6 +165,9 @@ func (s *Server) serviceHandlers(ctx context.Context) []func() (string, http.Han
 			)
 		},
 		func() (string, http.Handler) {
+			return nokkuv1connect.NewTokenServiceHandler(NewTokenService(s.cfg), opts...)
+		},
+		func() (string, http.Handler) {
 			return nokkuv1connect.NewBillingServiceHandler(NewBillingService(s.cfg), opts...)
 		},
 		func() (string, http.Handler) {

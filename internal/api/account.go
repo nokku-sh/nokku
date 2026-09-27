@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"slices"
+	"strings"
 
 	"connectrpc.com/connect"
 
@@ -43,7 +45,7 @@ func (s *AccountService) UpdateAccount(
 	ctx context.Context,
 	req *nokkuv1.UpdateAccountRequest,
 ) (*nokkuv1.UpdateAccountResponse, error) {
-	u, err := s.cfg.IAM.UpdateUser(ctx, db.UpdateUserParams{
+	u, err := s.cfg.IAM.UpdateSelf(ctx, db.UpdateUserParams{
 		Name:                 req.Name,
 		Picture:              req.Picture,
 		DisablePasswordReset: req.DisablePasswordReset,
@@ -84,7 +86,7 @@ func (s *AccountService) ChangePassword(
 		return nil, ErrInternal
 	}
 	current, _ := iam.CurrentSession(ctx)
-	_, _ = s.cfg.IAM.RevokeOtherSessions(ctx, userID, iam.SessionHash(current.TokenHash))
+	_, _ = s.cfg.IAM.RevokeOtherSessions(ctx, iam.SessionHash(current.TokenHash))
 	return &nokkuv1.ChangePasswordResponse{}, nil
 }
 
@@ -116,7 +118,7 @@ func (s *AccountService) ListCredentials(
 		identityMethods...)
 	credentials := []*nokkuv1.AccountCredential{}
 	for _, typ := range types {
-		creds, err := s.cfg.IAM.ListCredentialsByType(ctx, iam.UserIDFromContext(ctx), typ)
+		creds, err := s.cfg.IAM.ListCredentialsByType(ctx, typ)
 		if err != nil {
 			return nil, ErrInternal
 		}
@@ -131,12 +133,7 @@ func (s *AccountService) RenameCredential(
 	ctx context.Context,
 	req *nokkuv1.RenameCredentialRequest,
 ) (*nokkuv1.RenameCredentialResponse, error) {
-	if err := s.cfg.IAM.RenameCredential(
-		ctx,
-		iam.UserIDFromContext(ctx),
-		req.GetId(),
-		req.GetLabel(),
-	); err != nil {
+	if err := s.cfg.IAM.RenameCredential(ctx, req.GetId(), req.GetLabel()); err != nil {
 		return nil, ErrInternal
 	}
 	return &nokkuv1.RenameCredentialResponse{}, nil
@@ -146,8 +143,7 @@ func (s *AccountService) RemoveCredential(
 	ctx context.Context,
 	req *nokkuv1.RemoveCredentialRequest,
 ) (*nokkuv1.RemoveCredentialResponse, error) {
-	userID := iam.UserIDFromContext(ctx)
-	cred, err := s.cfg.IAM.GetCredential(ctx, userID, req.GetId())
+	cred, err := s.cfg.IAM.GetCredential(ctx, req.GetId())
 	if err != nil {
 		return nil, ErrAccountNotFound
 	}
@@ -158,7 +154,7 @@ func (s *AccountService) RemoveCredential(
 			return nil, ErrLastLoginMethod
 		}
 	}
-	if err := s.cfg.IAM.DeleteCredential(ctx, userID, req.GetId()); err != nil {
+	if err := s.cfg.IAM.DeleteCredential(ctx, req.GetId()); err != nil {
 		return nil, ErrInternal
 	}
 	return &nokkuv1.RemoveCredentialResponse{}, nil
@@ -171,15 +167,8 @@ func (s *AccountService) RemoveIdentity(
 	if !s.requireRemovable(ctx, iam.MethodOAuth2) {
 		return nil, ErrLastLoginMethod
 	}
-	for _, m := range identityMethods {
-		if _, err := s.cfg.IAM.DeleteCredentialsByProvider(
-			ctx,
-			iam.UserIDFromContext(ctx),
-			m,
-			req.GetProvider(),
-		); err != nil {
-			return nil, ErrInternal
-		}
+	if err := s.cfg.IAM.UnlinkIdentity(ctx, req.GetProvider(), identityMethods...); err != nil {
+		return nil, ErrInternal
 	}
 	return &nokkuv1.RemoveIdentityResponse{}, nil
 }
@@ -188,7 +177,7 @@ func (s *AccountService) ListBackupCodes(
 	ctx context.Context,
 	_ *nokkuv1.ListBackupCodesRequest,
 ) (*nokkuv1.ListBackupCodesResponse, error) {
-	creds, err := s.cfg.IAM.ListBackupCodes(ctx, iam.UserIDFromContext(ctx))
+	creds, err := s.cfg.IAM.ListBackupCodes(ctx)
 	if err != nil {
 		return nil, ErrInternal
 	}
@@ -203,7 +192,7 @@ func (s *AccountService) RotateBackupCodes(
 	ctx context.Context,
 	_ *nokkuv1.RotateBackupCodesRequest,
 ) (*nokkuv1.RotateBackupCodesResponse, error) {
-	codes, err := s.cfg.IAM.RotateBackupCodes(ctx, iam.UserIDFromContext(ctx))
+	codes, err := s.cfg.IAM.RotateBackupCodes(ctx)
 	if err != nil {
 		return nil, ErrInternal
 	}
@@ -214,7 +203,7 @@ func (s *AccountService) RemoveBackupCodes(
 	ctx context.Context,
 	_ *nokkuv1.RemoveBackupCodesRequest,
 ) (*nokkuv1.RemoveBackupCodesResponse, error) {
-	if err := s.cfg.IAM.DeleteBackupCodes(ctx, iam.UserIDFromContext(ctx)); err != nil {
+	if err := s.cfg.IAM.DeleteBackupCodes(ctx); err != nil {
 		return nil, ErrInternal
 	}
 	return &nokkuv1.RemoveBackupCodesResponse{}, nil
@@ -225,7 +214,7 @@ func (s *AccountService) ListAccountSessions(
 	_ *nokkuv1.ListAccountSessionsRequest,
 ) (*nokkuv1.ListAccountSessionsResponse, error) {
 	current, _ := iam.CurrentSession(ctx)
-	sessions, err := s.cfg.IAM.ListSessions(ctx, iam.UserIDFromContext(ctx))
+	sessions, err := s.cfg.IAM.ListSessions(ctx)
 	if err != nil {
 		return nil, ErrInternal
 	}
@@ -252,10 +241,7 @@ func (s *AccountService) RemoveSession(
 	if req.GetId() == string(current.TokenHash) {
 		return nil, ErrCurrentSession
 	}
-	if err := s.cfg.IAM.DeleteSessionByHash(
-		ctx,
-		iam.SessionHash(req.GetId()),
-	); err != nil {
+	if err := s.cfg.IAM.DeleteOwnSession(ctx, iam.SessionHash(req.GetId())); err != nil {
 		return nil, ErrInternal
 	}
 	return &nokkuv1.RemoveSessionResponse{}, nil
@@ -270,39 +256,36 @@ func (s *AccountService) DeleteAccount(
 		return nil, ErrAccountNotFound
 	}
 
-	if err := s.cfg.Storage.Delete(ctx, storage.AvatarPath(u.ID)); err != nil {
-		slog.Warn("failed to delete avatar", "error", err)
+	// Workspaces only the owner uses go with the account. Their billing
+	// is canceled first, while the subscription rows still exist. A shared
+	// workspace blocks the delete below until ownership moves.
+	owned, err := s.cfg.Conn.Sys().ListOwnedWorkspaces(ctx, u.ID)
+	if err != nil {
+		return nil, DBError(err)
 	}
-
-	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
-		// The user is going away: drop every grant that points at them,
-		// across every workspace, so no dangling user id remains.
-		if err := q.DeleteSubjectGrants(ctx, &db.DeleteSubjectGrantsParams{
-			SubjectKind: db.SubjectKindUser,
-			SubjectID:   u.ID,
-		}); err != nil {
-			return err
-		}
-
-		workspaceIDs, err := q.GetWorkspacesByOwner(ctx, u.ID)
-		if err != nil {
-			return err
-		}
-		for _, workspaceID := range workspaceIDs {
-			if !s.cfg.Billing.Enabled() {
-				break
+	if s.cfg.Billing.Enabled() {
+		for _, w := range owned {
+			if w.MemberCount > 1 {
+				continue
 			}
-			if err := s.cfg.Billing.Cancel(ctx, workspaceID, true, ""); err != nil {
+			if err := s.cfg.Billing.Cancel(ctx, w.ID, true, ""); err != nil {
 				slog.Warn("failed to cancel subscription", "error", err)
 			}
 		}
-		return q.DeleteWorkspacesByOwner(ctx, u.ID)
-	}); err != nil {
-		return nil, DBError(err)
 	}
 
-	if err := s.cfg.IAM.DeleteUser(ctx); err != nil {
+	err = s.cfg.IAM.DeleteUser(ctx)
+	if shared, ok := errors.AsType[*iam.SharedWorkspacesError](err); ok {
+		return nil, NewError(
+			connect.CodeFailedPrecondition,
+			"transfer ownership of "+strings.Join(shared.Names, ", ")+" before deleting your account",
+		)
+	}
+	if err != nil {
 		return nil, ErrInternal
+	}
+	if err := s.cfg.Storage.Delete(ctx, storage.AvatarPath(u.ID)); err != nil {
+		slog.Warn("failed to delete avatar", "error", err)
 	}
 
 	// The session cookie is HttpOnly, so only a response from the backend
@@ -317,7 +300,7 @@ func (s *AccountService) DeleteAccount(
 // account reachable. Backup codes are recovery, not a way in.
 func (s *AccountService) requireRemovable(ctx context.Context, rm iam.Method) bool {
 	has := func(m iam.Method) bool {
-		creds, err := s.cfg.IAM.ListCredentialsByType(ctx, iam.UserIDFromContext(ctx), m)
+		creds, err := s.cfg.IAM.ListCredentialsByType(ctx, m)
 		return err == nil && len(creds) > 0
 	}
 	hasIdentity := func() bool {

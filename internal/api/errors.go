@@ -71,6 +71,10 @@ var (
 		connect.CodeFailedPrecondition,
 		errors.New("verify your email address before signing in"),
 	)
+	ErrSSORequired = connect.NewError(
+		connect.CodeFailedPrecondition,
+		errors.New("your organization requires single sign-on"),
+	)
 )
 
 // Account errors
