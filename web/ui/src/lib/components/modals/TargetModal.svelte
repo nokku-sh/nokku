@@ -48,10 +48,10 @@
 	const addAccount = principal.addAccount();
 	const removeAccount = principal.removeAccount();
 
-	// No daemon means no live reporter, so the host is read by `nk target sync`
+	// No daemon means no live reporter, so the host is read by `nk sync`
 	// and the accounts are whatever that run found.
 	const isManual = $derived(!model.daemonId);
-	const syncCommand = $derived(`nk target sync ${model.name || '<name>'}`);
+	const syncCommand = $derived(`nk sync ${model.name || '<name>'}`);
 	const lastSynced = $derived(timeAgo(model.metadata?.['last_manual_sync']));
 
 	let newAccountValue = $state('');
@@ -227,8 +227,8 @@
 					{/if}
 					<Field.Description>
 						{#if isManual}
-							The host's local accounts. They are refreshed by nk target sync, and access is granted
-							per account from the access pages.
+							The host's local accounts. They are refreshed by nk sync, and access is granted per
+							account from the access pages.
 						{:else}
 							The machine's local users. A daemon reports them on connect, and access is granted per
 							account from the access pages.

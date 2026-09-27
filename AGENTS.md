@@ -22,7 +22,9 @@ task migrate:up     # apply migrations (tern, dev only, production auto-migrates
 ```
 
 Plain `go test ./...` works. DB-backed tests need
-`docker compose -f compose.test.yml up -d`.
+`docker compose -f compose.test.yml up -d`. Each such package calls
+`testdb.Setup` in its `TestMain` and gets a fresh `nokku_test_<pkg>` database,
+so tests never touch the dev database.
 
 ## Layout
 
@@ -32,8 +34,10 @@ Plain `go test ./...` works. DB-backed tests need
   gates resolve. `authz.go` holds `ProcedurePermissions`.
 - `internal/daemon` - in-memory pool of live daemon control streams, relays,
   and web sessions.
-- `internal/db` - sqlc queries and migrations. RLS-scoped, two pools:
-  `nokku_app` for tenant traffic, `nokku_system` (BYPASSRLS) for bootstrap.
+- `internal/db` - sqlc queries and migrations. RLS-scoped. Four entry
+  points: `WithWorkspace` (tenant rows), `WithActor` (the user's own rows),
+  `WithTx` and `Sys()` (nokku_system, BYPASSRLS, for pre-auth and jobs). The
+  owner role only migrates at startup.
 - `internal/iam` - identity: passwords, passkeys, OIDC, SAML, device flow,
   DPoP, SCIM. Never answers may-X.
 - `internal/entitlement` - plan gating.
@@ -47,7 +51,10 @@ Plain `go test ./...` works. DB-backed tests need
 ## Conventions
 
 - Permissions are declared in exactly one place:
-  `internal/api/authz.go` `ProcedurePermissions`.
+  `internal/api/authz.go` `ProcedurePermissions`. Every RPC must be
+  classified there (or in `publicEndpoints`), unclassified RPCs are denied.
+- Daemon state changes notify through DB triggers. Never hand-roll a
+  daemon poke in a handler.
 - Tenant isolation is RLS via `Conn.WithWorkspace`. Never hand-roll workspace
   filters.
 - A new RPC means a proto edit in `../protos`, then `task gen` in all three

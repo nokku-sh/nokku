@@ -23,7 +23,7 @@
 	import { principal } from '$lib/api/principals.svelte';
 	import { serviceAccount } from '$lib/api/service_account.svelte';
 	import Toolbar from './Toolbar.svelte';
-	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
+	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
 	import { VectorSquare } from '@lucide/svelte';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -104,7 +104,7 @@
 						type: 'subject',
 						data: {
 							...user,
-							subjectType: PrincipalType.USER,
+							subjectType: SubjectKind.USER,
 							principalId: p.id,
 							principalUsername: p.username
 						},
@@ -134,7 +134,7 @@
 						type: 'subject',
 						data: {
 							...t,
-							subjectType: PrincipalType.TEAM,
+							subjectType: SubjectKind.TEAM,
 							principalId: p.id,
 							principalUsername: p.username
 						},
@@ -164,7 +164,7 @@
 						type: 'subject',
 						data: {
 							...serviceAccount,
-							subjectType: PrincipalType.SERVICE_ACCOUNT,
+							subjectType: SubjectKind.SERVICE_ACCOUNT,
 							principalId: p.id,
 							principalUsername: p.username
 						},

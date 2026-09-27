@@ -46,8 +46,12 @@ The request path through nokku is strictly layered:
   permissions and plan gates resolve.
 - `internal/daemon` is an in-memory pool of live daemon control streams,
   relays, and web sessions.
-- `internal/db` is RLS-scoped sqlc over pgx/v5. Two pools: `nokku_app` for
-  tenant traffic, `nokku_system` (BYPASSRLS) for bootstrap work.
+- `internal/db` is RLS-scoped sqlc over pgx/v5. `WithWorkspace` pins a
+  tenant, `WithActor` scopes to the user's own rows, `WithTx` and `Sys()` run
+  as `nokku_system` (BYPASSRLS) for pre-auth and background jobs. The owner
+  role only migrates at startup. Tenant references are composite
+  `(workspace_id, id)` foreign keys, so every tenant table has the same
+  one-line policy.
 - Identity lives in `internal/iam` and never answers may-X. Authorization is
   `internal/db/roles.go` plus `internal/api/authz.go`. Plan gating is
   `internal/entitlement`.
@@ -77,8 +81,11 @@ The request path through nokku is strictly layered:
   end-to-end encrypted.
 - **Web terminal**: a browser SSH session. The backend mints an ephemeral
   user cert and connects through a relay like any other client.
-- **Enrollment token**: `<workspace-uuid>_<32-byte-secret>`, 24h expiry,
-  stored hashed. Mints a daemon session that does not expire.
+- **Join token**: a `workspace_tokens` row, `<token-id>_<32-byte-secret>`,
+  stored hashed, with an optional expiry and use limit. Enroll tokens bring
+  daemons in (with per-token auto-approve and CA), invite tokens bring people
+  in (with a role). An enroll token mints a daemon session that does not
+  expire.
 
 ### Data model
 
@@ -89,7 +96,10 @@ Core tables, all RLS-scoped to the workspace:
   `host_public_key` (the pin, manual mode only). `metadata` is a jsonb bag
   for signals like `last_manual_sync`.
 - `principals(target_id, username)` is one local account.
-- `principal_grants(principal_id, subject_kind, subject_id)` is the ACL.
+- `principal_grants(principal_id, user_id | team_id | service_account_id)`
+  is the ACL. Exactly one subject column is set, each a workspace-scoped FK
+  with `ON DELETE CASCADE`, so removing a member, team, or service account
+  removes its grants. `subject_kind` and `subject_id` are generated columns.
   Teams expand through `team_members`.
 - The CA row sets `user_default_ttl` (120h) and `user_max_ttl` (168h). One
   CA signs both user and host certs.
@@ -127,6 +137,18 @@ passkey, backup codes, OIDC, OAuth2 social seeds, SAML, the device flow
 (RFC 8628, the CLI login path), DPoP (RFC 9449), and SCIM 2.0. No LDAP, no
 TOTP.
 
+Accounts are global, so a workspace only gains authority over an account by
+verifying its email domain over DNS. A verified domain belongs to one
+workspace. Only that workspace's SSO provider may match, provision, or rename
+accounts under it, and only its SCIM connector may create, deactivate, or
+delete them. Every other account is reachable by invite only. SSO
+enforcement applies to every non-SSO login method (password, passkey, backup
+code) for accounts under the domain.
+
+A workspace has exactly one owner. An account that owns a workspace with
+other members cannot be deleted until ownership moves. Workspaces the owner
+uses alone are deleted with the account.
+
 ## Invariants, never break
 
 1. The SSH certificate principal is the subject UUID.
@@ -150,12 +172,14 @@ Each flow names its entry point. Paths are relative to their repo.
 
 ### Daemon enrollment
 
-An admin mints a token in the UI: `nokku/internal/api/daemon.go`
-`DaemonService.RefreshEnrollToken` stores it hashed with a 24h expiry. On the
-host, `sudo nokkud --enroll` (or `NOKKUD_ENROLL_TOKEN`) carries the token to
+An admin mints an enroll token in the UI through
+`nokku/internal/api/token.go` `TokenService.CreateToken`. One token can
+enroll a fleet: it may never expire and may cap its uses. On the host,
+`sudo nokkud --enroll` (or `NOKKUD_ENROLL_TOKEN`) carries the token to
 `DaemonService.EnrollDaemon`, a public endpoint that still demands a DPoP
-proof. Identity is the key thumbprint, so re-enrollment is stable across
-token rotation. The daemon starts PENDING unless `settings.enroll_auto_approve`.
+proof. Identity is the key thumbprint, so a known machine re-enrolls onto
+its existing daemon without spending a use, even with a used-up token. The
+daemon starts PENDING unless the token auto-approves.
 On approval `nokku/internal/iam` issues a session with no expiry, pinned to
 the workspace and the key binding.
 
@@ -163,26 +187,41 @@ the workspace and the key binding.
 
 `nokkud/internal/client/client.go` `Run` holds a bidi control stream open to
 `DaemonControlService.Connect`, registered on the pool in
-`nokku/internal/api/server.go`. Heartbeats every 5 minutes carry an in-memory
-per-workspace state version that resets on server restart, so every daemon
-re-syncs once after a backend restart. `SyncDaemon` pushes the principals map,
-the CA public key, and daemon config. The daemon caches all of it under
-`/var/lib/nokkud` so auth decisions survive a backend outage.
+`nokku/internal/api/server.go`. `SyncDaemon` returns the principals map, the
+CA public key, daemon config, and the workspace state version. The daemon
+caches all of it under `/var/lib/nokkud` so auth decisions survive a backend
+outage.
+
+The state version lives in `workspace_state` and is bumped by database
+triggers on every change that alters what a daemon enforces (grants, team
+seats, account deletes, daemon status and config, CAs). The trigger also
+fires `pg_notify('nokku_state', workspace_id)` on commit. `Pool.Listen`
+turns that into a `StateUpdate` poke, and the daemon re-syncs. No handler
+calls anything by hand. Heartbeats every 30 seconds carry the daemon's cached
+version and get a poke on mismatch, which covers pushes missed while
+disconnected.
+
+Daemons authenticate as themselves, never through a workspace role. They may
+call only the procedures in `daemonOnlyProcedures` and
+`daemonSharedProcedures` in `nokku/internal/api/authz.go`.
 
 ### Manual sync (`nk sync`)
 
-`nk/internal/cmd/target.go` `syncManualTarget` drives it. It resolves the
-workspace and CA, finds or creates the target (reading the host key over the
-operator's ssh pins it), lists local accounts with `getent passwd`, and pulls
-grants from `nokku/internal/api/target.go` `GetTargetPrincipals`. It renders
-host files with `nk/internal/manual` (`HostFiles`): the CA at
-`/etc/ssh/nokku_ca.pub`, a drop-in at `/etc/ssh/sshd_config.d/60-nokku.conf`
-setting `TrustedUserCAKeys` and a per-account `AuthorizedPrincipalsFile`, one
-principals file per account under `/etc/ssh/nokku_principals`. It reports to
-the backend with `SyncTargetUsers`, which also stamps
-`metadata.last_manual_sync`, then writes everything through an idempotent
-`sh -s` script (`WriteScript`) that stages with tmp+mv, validates with
-`sshd -t`, reloads sshd, and verifies with `sshd -T` that the drop-in is live.
+`nk/internal/cmd/target.go` `targetSync` drives it. It finds the target by
+name or endpoint, or prepares a new one in the resolved workspace and CA. It
+connects as root over the operator's own ssh and runs one probe
+(`manual.ProbeCommand`) for the local accounts, the host key, and the existing
+principals files. A new target is created with that host key as its pin.
+Grants come from `nokku/internal/api/target.go` `GetTargetPrincipals`.
+`nk/internal/manual` `NewPlan` renders the CA at `/etc/ssh/nokku_ca.pub`, a
+drop-in at `/etc/ssh/sshd_config.d/60-nokku.conf` setting `TrustedUserCAKeys`
+and a per-account `AuthorizedPrincipalsFile`, and one principals file per
+account under `/etc/ssh/nokku_principals`. `Plan.Script` writes them through
+an idempotent `sh -s` script: it refuses a host whose sshd config is already
+invalid, stages with tmp+mv, validates with `sshd -t` and rolls every file
+back on failure, reloads sshd, and verifies with `sshd -T` that the drop-in is
+live. Only after the host is written does nk report to the backend with
+`SyncTargetUsers`, which also stamps `metadata.last_manual_sync`.
 
 The `/etc/ssh` layout constants are shared with nokkud and the web UI, so all
 three agree on where trust material lives.
@@ -190,12 +229,14 @@ three agree on where trust material lives.
 ### User connect
 
 `nk/internal/client/client.go` `sync` generates `~/.config/nk/ssh_config`
-(one Host block per target with `ProxyCommand nk proxy %h %p`, the cert file,
-the agent socket, and `HostKeyAlias <targetID>`) plus `known_hosts`.
-The agent socket serves a `mon/tpm` signer. Certs are minted by
-`EnsureCert` against the backend's CertificateService.
-`nk/internal/cmd/proxy.go` `proxyCMD` (hidden) dials the target endpoints
-directly with a 2s timeout and falls back to the backend relay stream.
+(one Host block per target with `ProxyCommand nk proxy <targetID> %p`, the
+cert file, the agent socket, and `HostKeyAlias <targetID>`) plus
+`known_hosts`. A background `nk agent`, started by the proxy and gone after
+30 idle minutes, serves the `mon/tpm` signer on a unix socket, or a named pipe
+on Windows. Certs are minted by `EnsureCert` against the backend's
+CertificateService. `nk/internal/cmd/proxy.go` `proxyCMD` (hidden) dials the
+target endpoints in order with a 2s timeout. Daemon targets fall back to the
+backend relay stream, manual targets have none.
 Daemon targets verify host certs via `@cert-authority`, manual targets via
 the pinned raw key. The backend is consulted on every connection so grants
 apply immediately. The cache and valid certs cover outages.

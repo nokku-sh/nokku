@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { roleLabel } from '$lib/roles';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -77,7 +78,7 @@
 							</p>
 						{/if}
 					</div>
-					<Badge variant="default">Active</Badge>
+					<Badge variant="default">{roleLabel(invitation.data.roleName || 'viewer')}</Badge>
 				</div>
 			</div>
 
