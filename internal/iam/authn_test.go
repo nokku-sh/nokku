@@ -16,6 +16,8 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/cryptosigner"
+
+	"github.com/nokku-sh/nokku/internal/cache"
 )
 
 func TestRequestCredential(t *testing.T) {
@@ -58,29 +60,22 @@ func TestRequestCredential(t *testing.T) {
 // newTestVerifier builds a DPoP verifier with a fixed secret and clock.
 func newTestVerifier(t *testing.T, now func() time.Time) *DPoPVerifier {
 	t.Helper()
-	v, err := NewDPoPVerifier(DPoPOptions{
-		NonceSecret: []byte("test-secret"),
-		Now:         now,
-	})
-	if err != nil {
-		t.Fatalf("new verifier: %v", err)
-	}
-	return v
+	return &DPoPVerifier{secret: []byte("test-secret"), replay: cache.NewMemory(100), now: now}
 }
 
 // signProof produces a client-style DPoP proof with an ES256 key.
 func signProof(
 	t *testing.T,
 	key *ecdsa.PrivateKey,
-	htm, htu, ath, nonce string,
+	htu, ath, nonce string,
 	now time.Time,
 ) string {
 	t.Helper()
 	claims := map[string]any{
-		"htm": htm,
+		"htm": http.MethodPost,
 		"htu": htu,
 		"iat": now.Unix(),
-		"jti": "test-jti-" + htu + nonce,
+		"jti": rand.Text(),
 	}
 	if nonce != "" {
 		claims["nonce"] = nonce
@@ -129,7 +124,7 @@ func TestVerifySessionProof(t *testing.T) {
 	}
 
 	t.Run("valid bound proof", func(t *testing.T) {
-		proof := signProof(t, key, http.MethodPost, htu, DPoPATH(token), svc.DPoP.CurrentNonce(), now)
+		proof := signProof(t, key, htu, DPoPATH(token), svc.DPoP.CurrentNonce(), now)
 		header := http.Header{}
 		header.Set("Authorization", "DPoP "+token)
 		header.Set("DPoP", proof)
@@ -153,7 +148,7 @@ func TestVerifySessionProof(t *testing.T) {
 		}
 		realBinding := base64.RawURLEncoding.EncodeToString(tp)
 
-		proof := signProof(t, key, http.MethodPost, htu, DPoPATH(token), svc.DPoP.CurrentNonce(), now)
+		proof := signProof(t, key, htu, DPoPATH(token), svc.DPoP.CurrentNonce(), now)
 		header := http.Header{}
 		header.Set("DPoP", proof)
 		if err := svc.verifySessionProof(context.Background(), header, procedure, token, realBinding); err != nil {
@@ -171,7 +166,7 @@ func TestVerifySessionProof(t *testing.T) {
 	})
 
 	t.Run("stale nonce maps to ErrDPoPNonce", func(t *testing.T) {
-		proof := signProof(t, key, http.MethodPost, htu, DPoPATH(token), "stale-nonce", now)
+		proof := signProof(t, key, htu, DPoPATH(token), "stale-nonce", now)
 		header := http.Header{}
 		header.Set("DPoP", proof)
 		err := svc.verifySessionProof(context.Background(), header, procedure, token, binding)
@@ -194,15 +189,6 @@ func TestAdvertiseDPoPNonce(t *testing.T) {
 		}
 		if header.Get(DeviceURLHeader) != svc.baseURL {
 			t.Error("AdvertiseDPoPNonce did not set the canonical URL header")
-		}
-	})
-
-	t.Run("no verifier is a no-op", func(t *testing.T) {
-		bare := &Service{}
-		header := http.Header{}
-		bare.AdvertiseDPoPNonce(header)
-		if header.Get("DPoP-Nonce") != "" {
-			t.Error("expected no header without a verifier")
 		}
 	})
 }

@@ -11,9 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/argon2"
 
 	"github.com/nokku-sh/nokku/internal/db"
@@ -78,55 +76,20 @@ func newPasswordManager(svc *Service, params PasswordParams) *PasswordManager {
 // wrong password, so latency does not reveal whether the account exists.
 func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User, *http.Cookie, error) {
 	email = normalizeEmail(email)
-	u, err := m.svc.q.GetUserByEmail(ctx, email)
+	u, err := m.svc.sys.GetUserByEmail(ctx, email)
+	if errors.Is(err, pgx.ErrNoRows) {
+		m.burn(pw)
+		m.svc.record(
+			ctx,
+			Event{Action: ActionLoginDenied, Method: MethodPassword, Email: email, Detail: "unknown email"},
+		)
+		return nil, nil, ErrInvalidCredentials
+	}
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			// Burn the same argon2id work as a real check.
-			m.burn(pw)
-			m.svc.record(
-				ctx,
-				Event{
-					Action: ActionLoginDenied,
-					Method: MethodPassword,
-					Email:  email,
-					Detail: "unknown email",
-				},
-			)
-			return nil, nil, ErrInvalidCredentials
-		}
 		return nil, nil, err
 	}
 	if err := m.CheckPassword(ctx, u.ID, pw); err != nil {
 		return nil, nil, err
-	}
-	if err := m.svc.enforceSSO(ctx, email); err != nil {
-		return nil, nil, err
-	}
-	if !u.Active {
-		m.svc.record(
-			ctx,
-			Event{
-				Action: ActionLoginDenied,
-				Method: MethodPassword,
-				UserID: u.ID,
-				Email:  u.Email,
-				Detail: "inactive",
-			},
-		)
-		return nil, nil, ErrInactive
-	}
-	if !u.EmailVerified {
-		m.svc.record(
-			ctx,
-			Event{
-				Action: ActionLoginDenied,
-				Method: MethodPassword,
-				UserID: u.ID,
-				Email:  u.Email,
-				Detail: "unverified email",
-			},
-		)
-		return nil, nil, ErrEmailUnverified
 	}
 	cookie, err := m.svc.completeLogin(ctx, u, MethodPassword)
 	if err != nil {
@@ -137,42 +100,22 @@ func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User
 
 // CheckPassword verifies pw against the user's stored password credential.
 func (m *PasswordManager) CheckPassword(ctx context.Context, userID, pw string) error {
-	creds, err := m.svc.q.ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
-		UserID: userID,
-		Type:   string(MethodPassword),
-	})
+	denied := func(detail string) error {
+		m.svc.record(ctx, Event{Action: ActionLoginDenied, Method: MethodPassword, UserID: userID, Detail: detail})
+		return ErrInvalidCredentials
+	}
+	cred, err := m.svc.sys.GetCredential(ctx, &db.GetCredentialParams{UserID: userID, ID: passwordCredentialID(userID)})
+	if errors.Is(err, pgx.ErrNoRows) {
+		// A passwordless account costs the same work as a wrong password.
+		m.burn(pw)
+		return denied("passwordless")
+	}
 	if err != nil {
 		return err
 	}
-	if len(creds) == 0 {
-		// A passwordless account must cost the same argon2id work as a wrong
-		// password, so latency does not reveal which case occurred.
-		m.burn(pw)
-		m.svc.record(
-			ctx,
-			Event{
-				Action: ActionLoginDenied,
-				Method: MethodPassword,
-				UserID: userID,
-				Detail: "passwordless",
-			},
-		)
-		return ErrInvalidCredentials
-	}
-
-	encoded := string(creds[0].Data)
-	ok, err := verifyPassword(pw, encoded)
-	if err != nil || !ok {
-		m.svc.record(
-			ctx,
-			Event{
-				Action: ActionLoginDenied,
-				Method: MethodPassword,
-				UserID: userID,
-				Detail: "wrong password",
-			},
-		)
-		return ErrInvalidCredentials
+	encoded := string(cred.Data)
+	if ok, err := verifyPassword(pw, encoded); err != nil || !ok {
+		return denied("wrong password")
 	}
 	if needsRehash(encoded, m.params) {
 		_ = m.Store(ctx, userID, pw)
@@ -180,56 +123,22 @@ func (m *PasswordManager) CheckPassword(ctx context.Context, userID, pw string) 
 	return nil
 }
 
-// enforceSSO rejects the login when the email's verified domain binds a
-// provider with SSO enforcement on.
-func (s *Service) enforceSSO(ctx context.Context, email string) error {
-	d, err := s.GetVerifiedTenantDomain(ctx, emailDomain(email))
-	if err != nil {
-		return nil // no binding: password login is fine
-	}
-	p, err := s.GetSSOProvider(ctx, d.ProviderID)
-	if err != nil {
-		return nil
-	}
-	enforced := (p.OIDC != nil && p.OIDC.EnforceSSO) ||
-		(p.OAuth2 != nil && p.OAuth2.EnforceSSO) ||
-		(p.SAML != nil && p.SAML.EnforceSSO)
-	if enforced {
-		s.record(
-			ctx,
-			Event{
-				Action: ActionLoginDenied,
-				Method: MethodPassword,
-				Email:  email,
-				Detail: "sso enforced",
-			},
-		)
-		return ErrSSORequired
-	}
-	return nil
-}
-
 // HasPassword reports whether the user has a password credential.
 func (m *PasswordManager) HasPassword(ctx context.Context, userID string) (bool, error) {
-	creds, err := m.svc.q.ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
-		UserID: userID,
-		Type:   string(MethodPassword),
-	})
-	if err != nil {
-		return false, err
+	_, err := m.svc.sys.GetCredential(ctx, &db.GetCredentialParams{UserID: userID, ID: passwordCredentialID(userID)})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
 	}
-	return len(creds) > 0, nil
+	return err == nil, err
 }
 
-// SetPassword creates or replaces the user's password credential and revokes
-// every session of the user, so a stolen session cannot outlive a password
-// change or reset.
+// SetPassword replaces the user's password and revokes every session of the
+// user, so a stolen session cannot outlive a reset.
 func (m *PasswordManager) SetPassword(ctx context.Context, userID, pw string) error {
 	if err := m.Store(ctx, userID, pw); err != nil {
 		return err
 	}
-	if _, err := m.svc.q.DeleteSubjectSessions(ctx, userID); err != nil {
-		// Report revocation failure rather than silently leaving stale sessions.
+	if _, err := m.svc.sys.DeleteSubjectSessions(ctx, userID); err != nil {
 		return err
 	}
 	m.svc.record(ctx, Event{Action: ActionPasswordSet, Method: MethodPassword, UserID: userID})
@@ -237,35 +146,33 @@ func (m *PasswordManager) SetPassword(ctx context.Context, userID, pw string) er
 }
 
 // DeletePassword removes the user's password credential, leaving other
-// methods (passkeys, SSO) intact.
+// methods intact.
 func (m *PasswordManager) DeletePassword(ctx context.Context, userID string) error {
-	return deleteCredentialsOfType(ctx, m.svc.q, userID, MethodPassword)
+	return m.svc.sys.DeleteCredential(ctx, &db.DeleteCredentialParams{UserID: userID, ID: passwordCredentialID(userID)})
 }
 
-// Store persists a new password hash without revoking sessions, so
-// rehash-on-login does not end the session the user just authenticated with.
-// Pair with Sessions.RevokeOtherSessions when the current session must
-// survive.
+// Store persists a new password hash without revoking sessions. Pair it
+// with RevokeOtherSessions when the current session must survive.
 func (m *PasswordManager) Store(ctx context.Context, userID, pw string) error {
+	return m.store(ctx, m.svc.sys, userID, pw)
+}
+
+func (m *PasswordManager) store(ctx context.Context, q db.Querier, userID, pw string) error {
 	encoded, err := hashPassword(pw, m.params)
 	if err != nil {
 		return err
 	}
-
-	cred := db.UpsertCredentialParams{
-		ID:     userID + ":password",
+	_, err = q.UpsertCredential(ctx, &db.UpsertCredentialParams{
+		ID:     passwordCredentialID(userID),
 		UserID: userID,
 		Type:   string(MethodPassword),
 		Data:   []byte(encoded),
-	}
-	if existing, err := m.svc.q.ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
-		UserID: userID,
-		Type:   string(MethodPassword),
-	}); err == nil && len(existing) > 0 {
-		cred.ID = existing[0].ID
-	}
-	_, err = m.svc.q.UpsertCredential(ctx, &cred)
+	})
 	return err
+}
+
+func passwordCredentialID(userID string) string {
+	return userID + ":password"
 }
 
 // burn runs one argon2id verification against the dummy hash.
@@ -362,8 +269,7 @@ func decodeHash(encoded string) (PasswordParams, []byte, []byte, error) {
 
 // mapUserError translates a duplicate-email insert into ErrEmailTaken.
 func mapUserError(err error) error {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+	if db.IsUniqueViolation(err) {
 		return ErrEmailTaken
 	}
 	return err

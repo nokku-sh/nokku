@@ -3,7 +3,6 @@ package iam
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,7 +14,6 @@ import (
 const (
 	sessionTTL        = 168 * time.Hour
 	sessionCookieName = "nokku_session"
-	maxBodyBytes      = 1 << 20
 )
 
 // newCookie builds a host-only, HttpOnly, Lax cookie with the service's
@@ -32,38 +30,20 @@ func (s *Service) newCookie(name, value string, expires time.Time) *http.Cookie 
 	}
 }
 
-// SessionCookie returns the session cookie for token and expiry.
-func (s *Service) SessionCookie(token string, expires *time.Time) *http.Cookie {
-	exp := time.Now().Add(sessionTTL)
-	if expires != nil {
-		exp = *expires
-	}
-	return s.newCookie(sessionCookieName, token, exp)
-}
-
 // ClearSessionCookie returns the expired empty session cookie.
 func (s *Service) ClearSessionCookie() *http.Cookie {
 	return s.newCookie(sessionCookieName, "", time.Unix(0, 0))
 }
 
-// SessionTokenFromHeader extracts the session token from request headers:
-// the cookie first, then an "Authorization: Bearer" header. The connect
-// handlers only see the raw header map, so this speaks headers directly.
-func SessionTokenFromHeader(h http.Header) string {
-	if v := CookieFromHeader(h, sessionCookieName); v != "" {
-		return v
-	}
-	const prefix = "Bearer "
-	if v := h.Get("Authorization"); strings.HasPrefix(v, prefix) {
-		return strings.TrimPrefix(v, prefix)
-	}
-	return ""
+// sessionFromCookie returns the browser session token, or "".
+func sessionFromCookie(h http.Header) string {
+	return cookieFromHeader(h, sessionCookieName)
 }
 
-// CookieFromHeader returns the value of the named cookie in the request
+// cookieFromHeader returns the value of the named cookie in the request
 // header map, or "". The net/http cookie parser only speaks [http.Request],
 // so the connect surface (request headers only) shares this.
-func CookieFromHeader(h http.Header, name string) string {
+func cookieFromHeader(h http.Header, name string) string {
 	for _, line := range h.Values("Cookie") {
 		for pair := range strings.SplitSeq(line, ";") {
 			n, v, _ := strings.Cut(pair, "=")
@@ -76,24 +56,21 @@ func CookieFromHeader(h http.Header, name string) string {
 	return ""
 }
 
-// Middleware attaches the request's principal when a valid session is
-// present, and continues either way. Pair with RequireLogin to enforce.
+// Middleware attaches the principal of a browser session cookie, and
+// continues either way. Pair with RequireLogin to enforce. Only user cookie
+// sessions count here: header tokens belong to the connect surface, which
+// also checks their DPoP binding.
 func (s *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if token := SessionTokenFromHeader(r.Header); token != "" {
-			p, sess, err := s.AuthenticateToken(r.Context(), token)
-			if err == nil {
-				ctx := ContextWithPrincipal(r.Context(), p)
-				ctx = ContextWithSession(ctx, sess)
-				ctx = ContextWithRequestMeta(ctx, RequestMeta{
-					Header:     r.Header,
-					RemoteAddr: r.RemoteAddr,
-				})
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
+		p, sess, err := s.AuthenticateToken(r.Context(), sessionFromCookie(r.Header))
+		if err != nil || p.Kind != KindUser {
+			next.ServeHTTP(w, r)
+			return
 		}
-		next.ServeHTTP(w, r)
+		ctx := ContextWithPrincipal(r.Context(), p)
+		ctx = ContextWithSession(ctx, sess)
+		ctx = ContextWithRequestMeta(ctx, RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr})
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -129,19 +106,7 @@ func RequestMetaFromContext(ctx context.Context) (RequestMeta, bool) {
 func (s *Service) RequireLogin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := PrincipalFromContext(r.Context()); !ok {
-			WriteError(w, http.StatusUnauthorized, "sign in to continue")
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-// RequireUser rejects principals that are not user sessions: account
-// endpoints are a browser surface.
-func (s *Service) RequireUser(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if p, ok := PrincipalFromContext(r.Context()); ok && p.Kind != KindUser {
-			WriteError(w, http.StatusForbidden, "account endpoints require a user session")
+			writeError(w, http.StatusUnauthorized, "sign in to continue")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -166,7 +131,7 @@ func (s *Service) CSRFGuard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			if _, err := r.Cookie(sessionCookieName); err == nil && !sameOrigin(r) {
-				WriteError(w, http.StatusForbidden, "cross-origin request rejected")
+				writeError(w, http.StatusForbidden, "cross-origin request rejected")
 				return
 			}
 		}
@@ -212,18 +177,8 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 // WriteError writes the error body the UI parses: {"code": <http status>,
 // "message": ...}. The status alone drives the connect code mapping; the
 // message carries the human-readable detail.
-func WriteError(w http.ResponseWriter, status int, msg string) {
+func writeError(w http.ResponseWriter, status int, msg string) {
 	WriteJSON(w, status, map[string]any{"code": status, "message": msg})
-}
-
-// ReadJSON decodes the request body into dst.
-func ReadJSON(r *http.Request, dst any) error {
-	defer r.Body.Close()
-	dec := json.NewDecoder(io.LimitReader(r.Body, maxBodyBytes))
-	if err := dec.Decode(dst); err != nil {
-		return err
-	}
-	return nil
 }
 
 func deref(s *string) string {
@@ -233,7 +188,7 @@ func deref(s *string) string {
 	return *s
 }
 
-func DeviceNameFromUA(ua string) string {
+func deviceNameFromUA(ua string) string {
 	if ua == "" {
 		return "Unknown device"
 	}

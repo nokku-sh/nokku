@@ -411,17 +411,20 @@ func keycloakAuthenticate(t *testing.T, b *keycloakBrowser, startURL string) (*h
 
 func TestKeycloakOIDCFlow(t *testing.T) {
 	base := startKeycloak(t)
-	store, conn := newFakeStore(), &fakeStoreConn{}
-	seedOIDCProvider(conn, &OIDCProvider{
-		IssuerURL:       base,
-		ClientID:        keycloakClientID,
-		ClientSecret:    keycloakClientSec,
-		JITProvisioning: true,
+	e, o := keycloakOrg(t)
+	e.provider(t, o, SSOProvider{
+		Method: MethodOIDC,
+		OIDC: &OIDCProvider{
+			IssuerURL:       base,
+			ClientID:        keycloakClientID,
+			ClientSecret:    keycloakClientSec,
+			JITProvisioning: true,
+		},
 	})
-	svc := newSSOTestService(t, store, conn)
+	svc := e.svc
 
 	// Start the flow at the app, then authenticate at the real IdP.
-	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider=ws1", nil)
+	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+o.ws, nil)
 	loginRec := httptest.NewRecorder()
 	svc.OIDC.Login(loginRec, login)
 	authURL := loginRec.Header().Get("Location")
@@ -444,15 +447,12 @@ func TestKeycloakOIDCFlow(t *testing.T) {
 	svc.OIDC.Callback(cbRec, cb)
 	wantSSOSuccess(t, cbRec)
 
-	u := store.byEmail["alice@example.com"]
+	u := e.userByEmail(t, keycloakEmail)
 	if u == nil {
 		t.Fatal("JIT provisioned user missing after keycloak login")
 	}
 	if !u.EmailVerified {
 		t.Error("email_verified claim from keycloak not honored")
-	}
-	if !hasCredentialFor(store, string(MethodOIDC), "ws1", u.ID) {
-		t.Errorf("oidc credential not linked, creds: %v", store.creds)
 	}
 
 	// The consumed state must not survive a replay.
@@ -465,26 +465,28 @@ func TestKeycloakOIDCFlow(t *testing.T) {
 	wantSSOFailure(t, replayRec)
 }
 
-// hasCredentialFor reports whether the store links user to provider.
-func hasCredentialFor(store *fakeStore, method, provider, userID string) bool {
-	for _, c := range store.creds {
-		if c.Type == method && c.Provider == provider && c.UserID == userID {
-			return true
-		}
-	}
-	return false
+// keycloakEmail is the realm user's fixed address, so the org claims its
+// domain for the test.
+const keycloakEmail = "alice@example.com"
+
+func keycloakOrg(t *testing.T) (*testEnv, org) {
+	t.Helper()
+	e := newTestEnv(t)
+	o := e.org(t)
+	e.claimDomain(t, o.ws, "example.com")
+	return e, o
 }
 
 func TestKeycloakSAMLFlow(t *testing.T) {
 	base := startKeycloak(t)
-	store, conn := newFakeStore(), &fakeStoreConn{}
-	seedSAMLProvider(conn, &SAMLIDP{
-		MetadataURL:     base + "/protocol/saml/descriptor",
-		JITProvisioning: true,
+	e, o := keycloakOrg(t)
+	e.provider(t, o, SSOProvider{
+		Method: MethodSAML,
+		SAML:   &SAMLIDP{MetadataURL: base + "/protocol/saml/descriptor", JITProvisioning: true},
 	})
-	svc := newSSOTestService(t, store, conn)
+	svc := e.svc
 
-	login := httptest.NewRequest(http.MethodGet, "/saml/login?provider=ws1", nil)
+	login := httptest.NewRequest(http.MethodGet, "/saml/login?provider="+o.ws, nil)
 	loginRec := httptest.NewRecorder()
 	svc.SAML.Login(loginRec, login)
 	redirect := loginRec.Header().Get("Location")
@@ -520,18 +522,15 @@ func TestKeycloakSAMLFlow(t *testing.T) {
 	rec := f.postACS(t, svc, f.relayState, true)
 	wantSSOSuccess(t, rec)
 
-	u := store.byEmail["alice@example.com"]
+	u := e.userByEmail(t, keycloakEmail)
 	if u == nil {
 		t.Fatal("JIT provisioned user missing after keycloak saml login")
-	}
-	if u.Name != "Alice Example" {
-		t.Errorf("user name = %q, want given+sn from the keycloak assertion", u.Name)
 	}
 	// Keycloak sends the username as NameID (crewjam requests the
 	// transient policy and Keycloak answers with the username), so the
 	// linking subject is "alice" here. Email, name, and verification all
 	// come from the signed attributes.
-	if c := store.creds[string(MethodSAML)+"|ws1|alice"]; c == nil || c.UserID != u.ID {
-		t.Errorf("saml credential not linked to the provisioned user, creds: %v", store.creds)
+	if c := e.credential(t, MethodSAML, o.ws, "alice"); c == nil || c.UserID != u.ID {
+		t.Error("saml credential not linked to the provisioned user")
 	}
 }

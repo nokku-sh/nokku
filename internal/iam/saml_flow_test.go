@@ -44,6 +44,11 @@ type samlIDPHarness struct {
 	// spMetadata is the SP's EntityDescriptor, set by the test after the
 	// service under test is built.
 	spMetadata *saml.EntityDescriptor
+
+	org   org
+	email string
+	// down makes the metadata endpoint fail.
+	down bool
 }
 
 func newSAMLIdP(t *testing.T) *samlIDPHarness {
@@ -53,6 +58,10 @@ func newSAMLIdP(t *testing.T) *samlIDPHarness {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /metadata", func(w http.ResponseWriter, _ *http.Request) {
+		if h.down {
+			http.Error(w, "maintenance", http.StatusServiceUnavailable)
+			return
+		}
 		// Metadata always advertises the trusted keypair, so a rotated
 		// signing key is a genuine forgery from the SP's point of view.
 		metadataURL, _ := url.Parse(h.ts.URL + "/metadata")
@@ -124,17 +133,34 @@ func (h *samlIDPHarness) GetSession(_ http.ResponseWriter, _ *http.Request, _ *s
 	return h.session
 }
 
-func (h *samlIDPHarness) alice() {
+// setup builds the service and an enterprise org whose SAML provider points
+// at the harness, with alice queued as the IdP user.
+func (h *samlIDPHarness) setup(t *testing.T) (*testEnv, *Service) {
+	t.Helper()
+	e := newTestEnv(t)
+	h.org = e.org(t)
+	e.provider(t, h.org, SSOProvider{
+		Method: MethodSAML,
+		Name:   "Test SAML",
+		SAML:   &SAMLIDP{MetadataURL: h.ts.URL + "/metadata", JITProvisioning: true},
+	})
+	h.spMetadata = spMetadataFor(t, e.svc)
+	h.alice("alice@" + h.org.domain)
+	return e, e.svc
+}
+
+func (h *samlIDPHarness) alice(email string) {
+	h.email = email
 	now := time.Now()
 	h.session = &saml.Session{
 		ID:             "saml-session-1",
 		CreateTime:     now,
 		ExpireTime:     now.Add(time.Hour),
 		Index:          "index-1",
-		NameID:         "alice@example.com",
+		NameID:         email,
 		NameIDFormat:   string(saml.EmailAddressNameIDFormat),
 		UserName:       "alice",
-		UserEmail:      "alice@example.com",
+		UserEmail:      email,
 		UserCommonName: "Alice Example",
 		UserGivenName:  "Alice",
 		UserSurname:    "Example",
@@ -183,7 +209,7 @@ var (
 func (h *samlIDPHarness) startSAMLFlow(t *testing.T, svc *Service) *samlFlowRun {
 	t.Helper()
 
-	login := httptest.NewRequest(http.MethodGet, "/saml/login?provider=ws1", nil)
+	login := httptest.NewRequest(http.MethodGet, "/saml/login?provider="+h.org.ws, nil)
 	loginRec := httptest.NewRecorder()
 	svc.SAML.Login(loginRec, login)
 	redirect := loginRec.Header().Get("Location")
@@ -272,20 +298,12 @@ func spMetadataFor(t *testing.T, svc *Service) *saml.EntityDescriptor {
 
 func TestSAMLFlowHappyPath(t *testing.T) {
 	h := newSAMLIdP(t)
-	h.alice()
-	store, conn := newFakeStore(), &fakeStoreConn{}
-	seedSAMLProvider(conn, &SAMLIDP{
-		MetadataURL:     h.ts.URL + "/metadata",
-		JITProvisioning: true,
-	})
-	svc := newSSOTestService(t, store, conn)
-	h.spMetadata = spMetadataFor(t, svc)
+	e, svc := h.setup(t)
 
 	f := h.startSAMLFlow(t, svc)
-	rec := f.postACS(t, svc, f.relayState, true)
-	wantSSOSuccess(t, rec)
+	wantSSOSuccess(t, f.postACS(t, svc, f.relayState, true))
 
-	u := store.byEmail["alice@example.com"]
+	u := e.userByEmail(t, h.email)
 	if u == nil {
 		t.Fatal("JIT provisioned user missing")
 	}
@@ -295,105 +313,119 @@ func TestSAMLFlowHappyPath(t *testing.T) {
 	if u.Name != "Alice Example" {
 		t.Errorf("user name = %q, want value from the cn attribute", u.Name)
 	}
-	if c := store.creds[string(MethodSAML)+"|ws1|alice@example.com"]; c == nil {
+	if c := e.credential(t, MethodSAML, h.org.ws, h.email); c == nil || c.UserID != u.ID {
 		t.Error("saml credential not linked")
 	}
-	if len(store.sessions) != 1 {
-		t.Errorf("sessions issued = %d, want 1", len(store.sessions))
+	if n := e.sessions(t, u.ID); n != 1 {
+		t.Errorf("sessions issued = %d, want 1", n)
+	}
+}
+
+// A workspace that lost its domain loses the accounts under it, including
+// identities it linked before.
+func TestSAMLFlowLostDomainRejectsLinkedIdentity(t *testing.T) {
+	h := newSAMLIdP(t)
+	e, svc := h.setup(t)
+	f := h.startSAMLFlow(t, svc)
+	wantSSOSuccess(t, f.postACS(t, svc, f.relayState, true))
+
+	e.dropDomain(t, h.org.ws, h.org.domain)
+	f = h.startSAMLFlow(t, svc)
+	wantSSOFailure(t, f.postACS(t, svc, f.relayState, true))
+}
+
+// ageMetadata backdates the SP's cached copy of the IdP metadata.
+func ageMetadata(svc *Service, by time.Duration) {
+	svc.SAML.mu.Lock()
+	defer svc.SAML.mu.Unlock()
+	for k, m := range svc.SAML.metas {
+		m.at = m.at.Add(-by)
+		svc.SAML.metas[k] = m
+	}
+}
+
+// An IdP that rotates its signing key without any overlap keeps working:
+// the failed verification refetches the metadata and tries again.
+func TestSAMLFlowFollowsIdPKeyRotation(t *testing.T) {
+	h := newSAMLIdP(t)
+	_, svc := h.setup(t)
+	f := h.startSAMLFlow(t, svc)
+	wantSSOSuccess(t, f.postACS(t, svc, f.relayState, true))
+
+	h.resetKeys(t)
+	// Still within the cache lifetime, so the first verification runs
+	// against the old key, but past the one-minute refetch throttle.
+	ageMetadata(svc, 2*time.Minute)
+	f = h.startSAMLFlow(t, svc)
+	wantSSOSuccess(t, f.postACS(t, svc, f.relayState, true))
+}
+
+// An IdP metadata outage does not lock anyone out.
+func TestSAMLFlowSurvivesMetadataOutage(t *testing.T) {
+	h := newSAMLIdP(t)
+	_, svc := h.setup(t)
+	f := h.startSAMLFlow(t, svc)
+	wantSSOSuccess(t, f.postACS(t, svc, f.relayState, true))
+
+	h.down = true
+	ageMetadata(svc, time.Hour)
+	f = h.startSAMLFlow(t, svc)
+	wantSSOSuccess(t, f.postACS(t, svc, f.relayState, true))
+}
+
+func TestSAMLSPCertificateNeverExpires(t *testing.T) {
+	e := newTestEnv(t)
+	if got := e.svc.SAML.spCert.NotAfter.Year(); got != 9999 {
+		t.Errorf("SP certificate expires in %d", got)
 	}
 }
 
 func TestSAMLFlowForgedSignature(t *testing.T) {
 	h := newSAMLIdP(t)
-	h.alice()
-	store, conn := newFakeStore(), &fakeStoreConn{}
-	seedSAMLProvider(conn, &SAMLIDP{
-		MetadataURL:     h.ts.URL + "/metadata",
-		JITProvisioning: true,
-	})
-	svc := newSSOTestService(t, store, conn)
-	h.spMetadata = spMetadataFor(t, svc)
-
+	e, svc := h.setup(t)
 	// The IdP now signs with a key the SP's trusted metadata does not carry.
 	h.forge(t)
 
 	f := h.startSAMLFlow(t, svc)
-	rec := f.postACS(t, svc, f.relayState, true)
-	wantSSOFailure(t, rec)
-	if len(store.sessions) != 0 {
-		t.Error("a forged assertion issued a session")
+	wantSSOFailure(t, f.postACS(t, svc, f.relayState, true))
+	if e.userByEmail(t, h.email) != nil {
+		t.Error("a forged assertion provisioned an account")
 	}
 }
 
 func TestSAMLFlowRelayStateReplay(t *testing.T) {
 	h := newSAMLIdP(t)
-	h.alice()
-	store, conn := newFakeStore(), &fakeStoreConn{}
-	seedSAMLProvider(conn, &SAMLIDP{
-		MetadataURL:     h.ts.URL + "/metadata",
-		JITProvisioning: true,
-	})
-	svc := newSSOTestService(t, store, conn)
-	h.spMetadata = spMetadataFor(t, svc)
+	_, svc := h.setup(t)
 
 	f := h.startSAMLFlow(t, svc)
-	rec := f.postACS(t, svc, f.relayState, true)
-	wantSSOSuccess(t, rec)
-
-	// The same signed response and RelayState posted again must be
-	// rejected: RelayState is single use.
-	replay := f.postACS(t, svc, f.relayState, true)
-	wantSSOFailure(t, replay)
+	wantSSOSuccess(t, f.postACS(t, svc, f.relayState, true))
+	// RelayState is single use.
+	wantSSOFailure(t, f.postACS(t, svc, f.relayState, true))
 }
 
 func TestSAMLFlowCrossFlowResponse(t *testing.T) {
 	h := newSAMLIdP(t)
-	h.alice()
-	store, conn := newFakeStore(), &fakeStoreConn{}
-	seedSAMLProvider(conn, &SAMLIDP{
-		MetadataURL:     h.ts.URL + "/metadata",
-		JITProvisioning: true,
-	})
-	svc := newSSOTestService(t, store, conn)
-	h.spMetadata = spMetadataFor(t, svc)
+	e, svc := h.setup(t)
 
-	// Start two flows. A response minted for flow 1 relayed into flow 2's
-	// in-flight browser session (flow 2's RelayState and flow cookie) is
-	// stopped by the InResponseTo check: the response answers flow 1's
-	// request, not flow 2's.
+	// A response minted for flow 1 relayed into flow 2's browser session is
+	// stopped by InResponseTo: it answers flow 1's request.
 	f1 := h.startSAMLFlow(t, svc)
 	f2 := h.startSAMLFlow(t, svc)
-
-	rec := f1.postACSCustom(t, svc, f2.relayState, f2.loginCookies)
-	wantSSOFailure(t, rec)
-	if len(store.sessions) != 0 {
-		t.Error("a cross-flow response issued a session")
+	wantSSOFailure(t, f1.postACSCustom(t, svc, f2.relayState, f2.loginCookies))
+	if e.userByEmail(t, h.email) != nil {
+		t.Error("a cross-flow response provisioned an account")
 	}
 }
 
 func TestSAMLFlowFlowCookieMismatch(t *testing.T) {
 	h := newSAMLIdP(t)
-	h.alice()
-	store, conn := newFakeStore(), &fakeStoreConn{}
-	seedSAMLProvider(conn, &SAMLIDP{
-		MetadataURL:     h.ts.URL + "/metadata",
-		JITProvisioning: true,
-	})
-	svc := newSSOTestService(t, store, conn)
-	h.spMetadata = spMetadataFor(t, svc)
+	_, svc := h.setup(t)
 
 	f := h.startSAMLFlow(t, svc)
-	rec := f.postACS(t, svc, f.relayState, false)
-	wantSSOFailure(t, rec)
+	wantSSOFailure(t, f.postACS(t, svc, f.relayState, false))
 }
 
 func TestSAMLIdentityMapping(t *testing.T) {
-	h := newSAMLIdP(t)
-	store, conn := newFakeStore(), &fakeStoreConn{}
-	seedSAMLProvider(conn, &SAMLIDP{MetadataURL: h.ts.URL + "/metadata"})
-	svc := newSSOTestService(t, store, conn)
-	cfg := &SAMLIDP{JITProvisioning: true}
-
 	assertion := func(nameID string, attrs ...saml.Attribute) *saml.Assertion {
 		a := &saml.Assertion{}
 		if nameID != "" {
@@ -409,7 +441,7 @@ func TestSAMLIdentityMapping(t *testing.T) {
 		}
 	}
 
-	opts := svc.SAML.identity(cfg, assertion("alice@example.com",
+	opts := identity(assertion("alice@example.com",
 		attr("urn:oid:0.9.2342.19200300.100.1.3", "mail", "alice@example.com"),
 		attr("urn:oid:2.5.4.3", "cn", "Alice Example"),
 	))
@@ -419,7 +451,7 @@ func TestSAMLIdentityMapping(t *testing.T) {
 	}
 
 	// Keycloak-style OID mail attribute and givenName/surname split.
-	opts = svc.SAML.identity(cfg, assertion("a1b2c3",
+	opts = identity(assertion("a1b2c3",
 		attr("urn:oid:1.2.840.113549.1.9.1", "emailaddress", "bob@corp.example"),
 		attr("urn:oid:2.5.4.42", "givenName", "Bob"),
 		attr("urn:oid:2.5.4.4", "sn", "Barnes"),
@@ -430,7 +462,7 @@ func TestSAMLIdentityMapping(t *testing.T) {
 	}
 
 	// No NameID: the email becomes the stable linking subject.
-	opts = svc.SAML.identity(cfg, assertion("",
+	opts = identity(assertion("",
 		attr("mail", "", "carol@corp.example"),
 	))
 	if opts.Subject != "carol@corp.example" {

@@ -33,7 +33,7 @@ func (s *Service) IssueToken(
 	if ttl <= 0 {
 		ttl = 15 * time.Minute
 	}
-	err = s.q.PutToken(ctx, &db.PutTokenParams{
+	err = s.sys.PutToken(ctx, &db.PutTokenParams{
 		TokenHash: tokenHash,
 		UserID:    userID,
 		Purpose:   purpose,
@@ -45,31 +45,25 @@ func (s *Service) IssueToken(
 	return raw, nil
 }
 
-// ConsumeToken atomically deletes and returns the token's owner and purpose.
-// Unknown, spent, and expired tokens all return ErrInvalidToken, so latency
-// and errors do not distinguish them.
-func (s *Service) ConsumeToken(
-	ctx context.Context,
-	raw string,
-) (userID, purpose string, err error) {
+// ConsumeToken atomically deletes a token of the given purpose and returns
+// its owner. Unknown, spent, expired, and wrong-purpose tokens all return
+// ErrInvalidToken. A wrong-purpose token stays unspent.
+func (s *Service) ConsumeToken(ctx context.Context, raw, purpose string) (string, error) {
 	tokenHash, err := crypto.HashToken(raw)
 	if err != nil {
-		return "", "", err
+		return "", ErrInvalidToken
 	}
-	row, err := s.q.ConsumeToken(ctx, tokenHash)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", "", ErrInvalidToken
-		}
-		return "", "", err
+	userID, err := s.sys.ConsumeToken(ctx, &db.ConsumeTokenParams{TokenHash: tokenHash, Purpose: purpose})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrInvalidToken
 	}
-	return row.UserID, row.Purpose, nil
+	return userID, err
 }
 
 // DeleteExpiredTokens prunes expired one-time tokens and reports how many
 // went. It backs a hygiene job.
 func (s *Service) DeleteExpiredTokens(ctx context.Context) (int64, error) {
-	return s.q.DeleteExpiredTokens(ctx, s.now())
+	return s.sys.DeleteExpiredTokens(ctx, s.now())
 }
 
 // HasRecentToken reports whether a token for the user and purpose was
@@ -78,7 +72,7 @@ func (s *Service) HasRecentToken(
 	ctx context.Context,
 	userID, purpose string,
 ) (bool, error) {
-	return s.q.HasRecentToken(ctx, &db.HasRecentTokenParams{
+	return s.sys.HasRecentToken(ctx, &db.HasRecentTokenParams{
 		UserID:  userID,
 		Purpose: purpose,
 		Since:   s.now().Add(-resendCooldown),

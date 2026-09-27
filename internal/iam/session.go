@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -16,16 +15,14 @@ import (
 )
 
 const (
-
-	// Remembered-device ("your devices") settings. The device cookie is a
-	// handle that speeds up future logins and powers the sessions list; it
-	// is never an API credential.
+	// The remembered-device cookie is a handle that powers the sessions list
+	// and new-login alerts. It is never an API credential.
 	webDeviceCookieName = "nokku_device"
 	webDeviceTTL        = 180 * 24 * time.Hour
 )
 
 // SessionHash is the hex token hash a sessions listing exposes as the
-// session ID; it is the only session identifier that ever leaves the server.
+// session ID. It is the only session identifier that ever leaves the server.
 type SessionHash string
 
 type SessionParams struct {
@@ -38,24 +35,20 @@ type SessionParams struct {
 	Binding string
 	// Label names the device for "your devices" listings.
 	Label string
-	// TTL is the session lifetime. Zero means the session never expires.
-	// The caller must revoke it explicitly.
+	// TTL is the session lifetime. Zero means the session never expires and
+	// must be revoked explicitly.
 	TTL time.Duration
 }
 
-// IssueSession creates a session and returns it together with the raw token. The
-// raw token must be delivered to the client (cookie or body) exactly once.
-func (s *Service) IssueSession(ctx context.Context, p SessionParams) (db.Session, string, error) {
+// IssueSession creates a session and returns it with the raw token. The raw
+// token must be delivered to the client exactly once.
+func (s *Service) IssueSession(ctx context.Context, p SessionParams) (*db.Session, string, error) {
 	token, tokenHash, err := crypto.NewSecret()
 	if err != nil {
-		return db.Session{}, "", err
+		return nil, "", err
 	}
-	if p.Kind == "" {
-		p.Kind = KindUser
-	}
-
 	now := s.now()
-	params := db.CreateSessionParams{
+	params := &db.CreateSessionParams{
 		TokenHash:  tokenHash,
 		SubjectID:  p.SubjectID,
 		Kind:       string(p.Kind),
@@ -68,14 +61,12 @@ func (s *Service) IssueSession(ctx context.Context, p SessionParams) (db.Session
 		params.WorkspaceID = &p.WorkspaceID
 	}
 	if p.TTL > 0 {
-		expires := now.Add(p.TTL)
-		params.ExpiresAt = &expires
+		params.ExpiresAt = new(now.Add(p.TTL))
 	}
-
-	if err := s.q.CreateSession(ctx, &params); err != nil {
-		return db.Session{}, "", err
+	sess, err := s.sys.CreateSession(ctx, params)
+	if err != nil {
+		return nil, "", err
 	}
-
 	s.record(ctx, Event{
 		Action:      ActionSessionIssued,
 		Kind:        p.Kind,
@@ -83,30 +74,35 @@ func (s *Service) IssueSession(ctx context.Context, p SessionParams) (db.Session
 		UserID:      p.SubjectID,
 		WorkspaceID: p.WorkspaceID,
 	})
-	row := db.Session{
-		TokenHash:   tokenHash,
-		SubjectID:   p.SubjectID,
-		Kind:        string(p.Kind),
-		Method:      string(p.Method),
-		Binding:     p.Binding,
-		Label:       p.Label,
-		LastSeenAt:  &now,
-		CreatedAt:   now,
-		ExpiresAt:   params.ExpiresAt,
-		WorkspaceID: params.WorkspaceID,
-	}
-	return row, token, nil
+	return sess, token, nil
 }
 
-// completeLogin finishes a verified interactive login: it issues the user
-// session, records the audit event, and returns the session cookie for the
-// response. The session stays unpinned: users are global and act per-request
-// in a workspace, like every other interactive login.
-func (s *Service) completeLogin(
-	ctx context.Context,
-	u *db.User,
-	method Method,
-) (*http.Cookie, error) {
+// completeLogin finishes a verified interactive login: it applies the
+// account gates every method shares, issues the user session, and returns
+// the session cookie. The session stays unpinned: users are global and act
+// per request in a workspace.
+func (s *Service) completeLogin(ctx context.Context, u *db.User, method Method) (*http.Cookie, error) {
+	deny := func(err error, detail string) (*http.Cookie, error) {
+		s.record(ctx, Event{
+			Action: ActionLoginDenied,
+			Method: method,
+			UserID: u.ID,
+			Email:  u.Email,
+			Detail: detail,
+		})
+		return nil, err
+	}
+	if !u.Active {
+		return deny(ErrInactive, "inactive")
+	}
+	if !u.EmailVerified {
+		return deny(ErrEmailUnverified, "unverified email")
+	}
+	if !isSSOMethod(method) {
+		if err := s.enforceSSO(ctx, u.Email); err != nil {
+			return deny(err, "sso enforced")
+		}
+	}
 	sess, token, err := s.IssueSession(ctx, SessionParams{
 		SubjectID: u.ID,
 		Kind:      KindUser,
@@ -123,15 +119,12 @@ func (s *Service) completeLogin(
 		UserID: u.ID,
 		Email:  u.Email,
 	})
-	return s.SessionCookie(token, sess.ExpiresAt), nil
+	return s.newCookie(sessionCookieName, token, *sess.ExpiresAt), nil
 }
 
 // IssueDaemonSession issues the daemon's control-plane token. It never
-// expires; it is revoked by deleting the daemon (the session cascades).
-func (s *Service) IssueDaemonSession(
-	ctx context.Context,
-	workspaceID, daemonID, binding string,
-) (string, error) {
+// expires. Deleting the daemon revokes it.
+func (s *Service) IssueDaemonSession(ctx context.Context, workspaceID, daemonID, binding string) (string, error) {
 	_, token, err := s.IssueSession(ctx, SessionParams{
 		WorkspaceID: workspaceID,
 		SubjectID:   daemonID,
@@ -143,28 +136,24 @@ func (s *Service) IssueDaemonSession(
 }
 
 // RememberDevice refreshes the remembered-device session when the login
-// request carries its cookie, otherwise issues a first one (firing
-// OnNewDeviceLogin so the host can alert). It returns the cookie to set on
-// the login response, nil when the device was already known.
-func (s *Service) RememberDevice(
-	ctx context.Context,
-	header http.Header,
-	remoteAddr string,
-	u *db.User,
-) *http.Cookie {
-	if raw := CookieFromHeader(header, webDeviceCookieName); raw != "" {
+// request carries its cookie, otherwise issues a first one and fires
+// OnNewDeviceLogin. It returns the cookie to set, nil for a known device.
+func (s *Service) RememberDevice(ctx context.Context, header http.Header, remoteAddr string, u *db.User) *http.Cookie {
+	if raw := cookieFromHeader(header, webDeviceCookieName); raw != "" {
 		if sess, err := s.VerifySession(ctx, raw); err == nil &&
 			sess.Kind == string(KindWebDevice) && sess.SubjectID == u.ID {
-			// Known device: refresh its last-seen time so the sessions list
-			// shows current activity. No alert.
-			if err := s.TouchSession(ctx, SessionHash(sess.TokenHash)); err != nil {
+			now := s.now()
+			if err := s.sys.TouchSession(
+				ctx,
+				&db.TouchSessionParams{TokenHash: sess.TokenHash, LastSeenAt: &now},
+			); err != nil {
 				slog.Debug("failed to touch device session", "error", err)
 			}
 			return nil
 		}
 	}
 
-	name := DeviceNameFromUA(header.Get("User-Agent"))
+	name := deviceNameFromUA(header.Get("User-Agent"))
 	sess, token, err := s.IssueSession(ctx, SessionParams{
 		SubjectID: u.ID,
 		Kind:      KindWebDevice,
@@ -176,19 +165,15 @@ func (s *Service) RememberDevice(
 		slog.Error("failed to register device session", "error", err)
 		return nil
 	}
-
 	if s.OnNewDeviceLogin != nil {
 		ip := util.GetRemoteIP(header, remoteAddr)
 		go s.OnNewDeviceLogin(context.WithoutCancel(ctx), u, sess, name, ip)
 	}
-
-	return s.newCookie(webDeviceCookieName, token, derefTime(sess.ExpiresAt))
+	return s.newCookie(webDeviceCookieName, token, *sess.ExpiresAt)
 }
 
-// VerifySession loads and validates the session for token. It enforces the absolute
-// expiry and, when configured, the idle timeout, and refreshes LastSeenAt so
-// activity extends the idle window. The refresh is best-effort: a store that
-// cannot update it still authenticates.
+// VerifySession loads the session for token and enforces its expiry. An
+// expired session is deleted before the error returns.
 func (s *Service) VerifySession(ctx context.Context, token string) (db.Session, error) {
 	if token == "" {
 		return db.Session{}, ErrNoSession
@@ -197,103 +182,82 @@ func (s *Service) VerifySession(ctx context.Context, token string) (db.Session, 
 	if err != nil {
 		return db.Session{}, err
 	}
-	sess, err := s.q.GetSession(ctx, tokenHash)
+	sess, err := s.sys.GetSession(ctx, tokenHash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return db.Session{}, ErrNoSession
+	}
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return db.Session{}, ErrNoSession
-		}
 		return db.Session{}, err
 	}
-
-	now := s.now()
-	if sess.ExpiresAt != nil && !sess.ExpiresAt.After(now) {
-		_ = s.q.DeleteSession(ctx, sess.TokenHash)
+	if sess.ExpiresAt != nil && !sess.ExpiresAt.After(s.now()) {
+		_ = s.sys.DeleteSession(ctx, sess.TokenHash)
 		return db.Session{}, ErrSessionExpired
 	}
-
 	return *sess, nil
 }
 
-// TouchSession refreshes a session's last-seen time unconditionally. Verify's
-// refresh is throttled by the idle timeout, which may be zero; this one
-// backs surfaces that want an accurate "last active" regardless, such as
-// the remembered-device handshake on login.
-func (s *Service) TouchSession(ctx context.Context, tokenHash SessionHash) error {
-	now := s.now()
-	return s.q.TouchSession(
-		ctx,
-		&db.TouchSessionParams{TokenHash: crypto.HashedToken(tokenHash), LastSeenAt: &now},
-	)
-}
-
-// ListSessions returns every live session of the subject, newest activity first. It
-// backs "your devices" UIs. Expired sessions are pruned opportunistically
-// by the hygiene job, not here.
-func (s *Service) ListSessions(ctx context.Context, subjectID string) ([]db.Session, error) {
-	rows, err := s.q.ListSessionsBySubject(ctx, subjectID)
-	if err != nil {
-		return nil, err
-	}
-	sessions := make([]db.Session, 0, len(rows))
-	for _, r := range rows {
-		sessions = append(sessions, *r)
-	}
-	slices.SortFunc(sessions, func(a, b db.Session) int {
-		return lastSeen(b).Compare(lastSeen(a))
+// ListSessions returns every session of the request user, newest activity
+// first. It backs the "your devices" list.
+func (s *Service) ListSessions(ctx context.Context) ([]*db.Session, error) {
+	var rows []*db.Session
+	err := s.asSelf(ctx, func(q *db.Queries) (err error) {
+		rows, err = q.ListSessionsBySubject(ctx, UserIDFromContext(ctx))
+		return err
 	})
-	return sessions, nil
+	return rows, err
 }
 
-// RevokeSession deletes the session identified by the raw token.
-func (s *Service) RevokeSession(ctx context.Context, token string) error {
-	tokenHash, err := crypto.HashToken(token)
-	if err != nil {
+// Logout revokes the session behind the request credential. A header token
+// only counts with its DPoP proof, so a leaked token alone cannot end
+// someone's session. Service-account keys have no session to revoke. An
+// unknown or expired credential is already gone, so only a proof the
+// client can fix by re-signing (ErrDPoPNonce, ErrDPoPRequired) fails.
+func (s *Service) Logout(ctx context.Context, header http.Header, procedure string) error {
+	p, sess, err := s.Authenticate(ctx, header, procedure)
+	if errors.Is(err, ErrDPoPNonce) || errors.Is(err, ErrDPoPRequired) {
 		return err
 	}
-	if err := s.q.DeleteSession(ctx, tokenHash); err != nil {
+	if err != nil || sess.TokenHash == "" {
+		return nil
+	}
+	if err := s.sys.DeleteSession(ctx, sess.TokenHash); err != nil {
 		return err
 	}
-	s.record(ctx, Event{Action: ActionSessionRevoked})
+	s.record(ctx, Event{Action: ActionSessionRevoked, Kind: p.Kind, Method: Method(sess.Method), UserID: p.ID})
 	return nil
 }
 
 // RevokeSubject deletes every session of the subject and reports how many
-// were removed. Used when a password changes or an account is deactivated.
+// went. Used when an account is deactivated.
 func (s *Service) RevokeSubject(ctx context.Context, subjectID string) (int64, error) {
-	return s.q.DeleteSubjectSessions(ctx, subjectID)
+	return s.sys.DeleteSubjectSessions(ctx, subjectID)
 }
 
-// RevokeOtherSessions deletes every session of the subject except keep and
-// reports how many were removed. The current session survives a deliberate
-// password change; everything else dies (NIST 800-63B).
-func (s *Service) RevokeOtherSessions(
-	ctx context.Context,
-	subjectID string,
-	keep SessionHash,
-) (int64, error) {
-	return s.q.DeleteSessionsExcept(ctx, &db.DeleteSessionsExceptParams{
-		SubjectID: subjectID,
-		KeepHash:  crypto.HashedToken(keep),
+// RevokeOtherSessions deletes every session of the request user except keep
+// and reports how many went. The current session survives a deliberate
+// password change, everything else dies (NIST 800-63B).
+func (s *Service) RevokeOtherSessions(ctx context.Context, keep SessionHash) (int64, error) {
+	var n int64
+	err := s.asSelf(ctx, func(q *db.Queries) (err error) {
+		n, err = q.DeleteSessionsExcept(ctx, &db.DeleteSessionsExceptParams{
+			SubjectID: UserIDFromContext(ctx),
+			KeepHash:  crypto.HashedToken(keep),
+		})
+		return err
 	})
+	return n, err
 }
 
-// DeleteSessionByHash removes a session by its token hash, the ID the
-// sessions listing exposes.
-func (s *Service) DeleteSessionByHash(ctx context.Context, hash SessionHash) error {
-	return s.q.DeleteSession(ctx, crypto.HashedToken(hash))
+// DeleteOwnSession removes one of the request user's sessions by the hash
+// the sessions listing exposes. Other users' sessions are invisible to it.
+func (s *Service) DeleteOwnSession(ctx context.Context, hash SessionHash) error {
+	return s.asSelf(ctx, func(q *db.Queries) error {
+		return q.DeleteSession(ctx, crypto.HashedToken(hash))
+	})
 }
 
 // DeleteExpired prunes expired sessions and reports how many went. It backs
 // a hygiene job.
 func (s *Service) DeleteExpired(ctx context.Context) (int64, error) {
-	now := s.now()
-	return s.q.DeleteExpiredSessions(ctx, &now)
-}
-
-// lastSeen tolerates a NULL last_seen_at for sorting.
-func lastSeen(s db.Session) time.Time {
-	if s.LastSeenAt == nil {
-		return time.Time{}
-	}
-	return *s.LastSeenAt
+	return s.sys.DeleteExpiredSessions(ctx, new(s.now()))
 }

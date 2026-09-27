@@ -1,20 +1,18 @@
 package iam
 
-// SCIM User resource handler: maps /Users onto workspace members. The SCIM
-// id is the user id, userName is the email, and externalId rides the
-// credentials table (type 'scim', provider = workspace id) so a
-// SCIM-provisioned user and the SSO identity of the same person resolve to
-// one account.
+// SCIM User resource handler: maps /Users onto the workspace's managed
+// members. The SCIM id is the user id, userName is the email, and externalId
+// rides the credentials table (type 'scim', provider = workspace id).
 
 import (
 	"context"
-	"errors"
 	"net/http"
+	"uuid"
 
 	scim "github.com/elimity-com/scim"
 	scimerrors "github.com/elimity-com/scim/errors"
+	scimfilter "github.com/elimity-com/scim/filter"
 	"github.com/elimity-com/scim/optional"
-	"github.com/jackc/pgx/v5"
 	filter "github.com/scim2/filter-parser/v2"
 
 	"github.com/nokku-sh/nokku/internal/db"
@@ -30,96 +28,85 @@ func (h scimUserHandler) Create(r *http.Request, attrs scim.ResourceAttributes) 
 	if email == "" {
 		return scim.Resource{}, scimerrors.ScimErrorBadRequest("userName must be an email address")
 	}
-	name := scimDisplayName(attrs["displayName"], attrs["name"])
 	u, err := h.svc.scimProvisionUser(
 		r.Context(),
 		h.workspaceID,
 		email,
-		name,
+		scimDisplayName(attrs["displayName"], attrs["name"]),
 		scimAttrBool(attrs["active"], true),
 		scimAttrString(attrs["externalId"]),
 	)
 	if err != nil {
 		return scim.Resource{}, err
 	}
-	return h.resource(r.Context(), u)
+	return h.Get(r, u.ID)
 }
 
 func (h scimUserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
-	u, err := h.member(r.Context(), id)
+	m, err := h.member(r.Context(), id)
 	if err != nil {
 		return scim.Resource{}, err
 	}
-	return h.resource(r.Context(), u)
+	return userResource(m), nil
 }
 
+// GetAll lists managed members. Connectors look accounts up with
+// userName eq "...", which runs as an indexed query instead of a scan.
 func (h scimUserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
-	ctx := r.Context()
-	rows, err := h.svc.q.ListWorkspaceMembers(ctx, &db.ListWorkspaceMembersParams{
+	rows, err := h.svc.sys.ListManagedMembers(r.Context(), &db.ListManagedMembersParams{
 		WorkspaceID: h.workspaceID,
+		Email:       userNameFilter(params.FilterValidator),
 	})
 	if err != nil {
 		return scim.Page{}, err
 	}
-	externals := h.externalIDs(ctx)
-
 	all := make([]scim.Resource, 0, len(rows))
 	for _, row := range rows {
-		all = append(all, memberResource(row, externals[row.UserID]))
+		all = append(all, userResource(row))
 	}
 	return paginate(all, params), nil
 }
 
 func (h scimUserHandler) Replace(r *http.Request, id string, attrs scim.ResourceAttributes) (scim.Resource, error) {
-	ctx := r.Context()
-	u, err := h.member(ctx, id)
+	m, err := h.member(r.Context(), id)
 	if err != nil {
 		return scim.Resource{}, err
 	}
-	if requested := normalizeEmail(scimAttrString(attrs["userName"])); requested != "" && requested != u.Email {
-		// userName is the login email; SCIM never renames it. An IdP-side
-		// rename surfaces as invalidMutability instead of a silent drift
-		// between the two systems.
+	if requested := normalizeEmail(scimAttrString(attrs["userName"])); requested != "" && requested != m.Email {
+		// userName is the login email and SCIM never renames it.
 		return scim.Resource{}, scimerrors.ScimErrorMutability
 	}
-	externalID := scimAttrString(attrs["externalId"])
-	patch := scimUserPatch(attrs)
-	patch.ID = id
-	u, err = h.apply(ctx, patch, externalID, externalID != "")
-	if err != nil {
-		return scim.Resource{}, err
+	patch := db.UpdateUserParams{ID: id}
+	if name := scimDisplayName(attrs["displayName"], attrs["name"]); name != "" {
+		patch.Name = &name
 	}
-	if err := h.revokeOnDeactivate(ctx, patch, u); err != nil {
-		return scim.Resource{}, err
+	if active, ok := attrs["active"].(bool); ok {
+		patch.Active = &active
 	}
-	return h.resource(ctx, u)
+	return h.apply(r.Context(), patch, scimAttrString(attrs["externalId"]))
 }
 
 func (h scimUserHandler) Delete(r *http.Request, id string) error {
-	if _, err := h.member(r.Context(), id); err != nil {
+	m, err := h.member(r.Context(), id)
+	if err != nil {
 		return err
 	}
-	return h.svc.scimDeprovisionUser(r.Context(), h.workspaceID, id)
+	return h.svc.scimDeprovisionUser(r.Context(), h.workspaceID, userFromRow(m))
 }
 
 func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
-	ctx := r.Context()
-	u, err := h.member(ctx, id)
+	m, err := h.member(r.Context(), id)
 	if err != nil {
 		return scim.Resource{}, err
 	}
-
 	patch := db.UpdateUserParams{ID: id}
 	externalID := ""
-	externalSet := false
 	changed := false
-
-	apply := func(opName, attr string, _ filter.Expression, value any) error {
+	err = eachScimOp(operations, func(opName, attr string, _ filter.Expression, value any) error {
 		switch attr {
 		case "active":
 			// Remove resets to the attribute default (RFC 7644 3.5.2.2).
-			active := opName != "remove" && scimAttrBool(value, true)
-			patch.Active = &active
+			patch.Active = new(opName != "remove" && scimAttrBool(value, true))
 			changed = true
 		case "displayName", "name":
 			name := ""
@@ -129,193 +116,127 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 			patch.Name = &name
 			changed = true
 		case "emails":
-			if s := scimEmailValue(value); s != "" && s != u.Email {
-				// The login email never changes over SCIM; see Replace.
+			if s := scimEmailValue(value); s != "" && normalizeEmail(s) != m.Email {
 				return scimerrors.ScimErrorMutability
 			}
 		case "externalId":
-			if opName == "remove" {
-				return nil
+			if opName != "remove" {
+				externalID = scimAttrString(value)
+				changed = true
 			}
-			externalID = scimAttrString(value)
-			externalSet = true
-			changed = true
 		}
 		return nil
-	}
-
-	if err := eachScimOp(operations, apply); err != nil {
+	})
+	if err != nil {
 		return scim.Resource{}, err
 	}
-
 	if !changed {
-		// Nothing to persist: RFC 7644 3.5.2 wants a no-content answer for
-		// idempotent no-ops, which the library renders from an empty
-		// resource.
+		// RFC 7644 3.5.2 wants no content for a no-op, which the library
+		// renders from an empty resource.
 		return scim.Resource{}, nil
 	}
-	u, err = h.apply(ctx, patch, externalID, externalSet && externalID != "")
-	if err != nil {
-		return scim.Resource{}, err
-	}
-	if err := h.revokeOnDeactivate(ctx, patch, u); err != nil {
-		return scim.Resource{}, err
-	}
-	return h.resource(ctx, u)
+	return h.apply(r.Context(), patch, externalID)
 }
 
-// revokeOnDeactivate drops the account's sessions when the connector
-// deactivated it: the active check already fails every request closed, and
-// the revocation keeps device listings from showing dead sessions.
-func (h scimUserHandler) revokeOnDeactivate(
-	ctx context.Context,
-	patch db.UpdateUserParams,
-	u *db.User,
-) error {
-	if patch.Active == nil || *patch.Active || u.Active {
-		return nil
+// member loads a managed member of the workspace. Anything else is a 404,
+// the answer an IdP expects for an unknown id.
+func (h scimUserHandler) member(ctx context.Context, id string) (*db.ListManagedMembersRow, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, scimerrors.ScimErrorResourceNotFound(id)
 	}
-	_, err := h.svc.RevokeSubject(ctx, u.ID)
-	return err
-}
-
-// member loads the user and requires workspace membership: SCIM resources
-// are scoped to the connector's workspace, and anything else is a 404, the
-// same answer an IdP would give a nonexistent id.
-func (h scimUserHandler) member(ctx context.Context, id string) (*db.User, error) {
-	_, err := h.svc.q.GetWorkspaceMember(ctx, &db.GetWorkspaceMemberParams{
+	rows, err := h.svc.sys.ListManagedMembers(ctx, &db.ListManagedMembersParams{
 		WorkspaceID: h.workspaceID,
-		UserID:      id,
+		UserID:      &id,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, scimerrors.ScimErrorResourceNotFound(id)
-		}
 		return nil, err
 	}
-	u, err := h.svc.q.GetUser(ctx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, scimerrors.ScimErrorResourceNotFound(id)
-		}
-		return nil, err
+	if len(rows) == 0 {
+		return nil, scimerrors.ScimErrorResourceNotFound(id)
 	}
-	return u, nil
+	return rows[0], nil
 }
 
-func (h scimUserHandler) resource(ctx context.Context, u *db.User) (scim.Resource, error) {
-	var externalID string
-	subject, err := h.svc.q.GetSCIMCredentialByUser(ctx, &db.GetSCIMCredentialByUserParams{
-		UserID:      u.ID,
-		WorkspaceID: h.workspaceID,
-	})
-	switch {
-	case err == nil:
-		externalID = subject
-	case !errors.Is(err, pgx.ErrNoRows):
-		return scim.Resource{}, err
-	}
-	return userResource(u, externalID), nil
-}
-
-// apply persists a user patch and, when the request carried an externalId,
-// the identity link. The re-link is idempotent: the same subject on the
-// same user is a no-op upsert.
+// apply persists a user patch and the externalId link in one transaction,
+// and revokes every session of an account the IdP deactivated.
 func (h scimUserHandler) apply(
 	ctx context.Context,
 	patch db.UpdateUserParams,
 	externalID string,
-	linkExternal bool,
-) (*db.User, error) {
-	u, err := h.svc.UpdateUser(ctx, patch)
-	if err != nil {
-		return nil, err
-	}
-	if !linkExternal {
-		return u, nil
-	}
-	err = h.svc.conn.WithTx(ctx, func(q *db.Queries) error {
+) (scim.Resource, error) {
+	err := h.svc.conn.WithTx(ctx, func(q *db.Queries) error {
+		if _, err := q.UpdateUser(ctx, &patch); err != nil {
+			return err
+		}
 		return linkSCIMCredential(ctx, q, h.workspaceID, patch.ID, externalID)
 	})
 	if err != nil {
-		return nil, err
+		return scim.Resource{}, err
 	}
-	return u, nil
+	if patch.Active != nil && !*patch.Active {
+		if _, err := h.svc.RevokeSubject(ctx, patch.ID); err != nil {
+			return scim.Resource{}, err
+		}
+	}
+	m, err := h.member(ctx, patch.ID)
+	if err != nil {
+		return scim.Resource{}, err
+	}
+	return userResource(m), nil
 }
 
-// externalIDs maps user id to SCIM externalId in one read for list pages.
-func (h scimUserHandler) externalIDs(ctx context.Context) map[string]string {
-	rows, err := h.svc.q.ListWorkspaceSCIMCredentials(ctx, h.workspaceID)
-	if err != nil {
+// userNameFilter returns the email of a `userName eq "..."` filter, the
+// lookup every connector runs before creating a user.
+func userNameFilter(v *scimfilter.Validator) *string {
+	if v == nil {
 		return nil
 	}
-	out := make(map[string]string, len(rows))
-	for _, r := range rows {
-		out[r.UserID] = r.Subject
+	ae, ok := v.GetFilter().(*filter.AttributeExpression)
+	if !ok || ae.Operator != filter.EQ || ae.AttributePath.AttributeName != "userName" {
+		return nil
 	}
-	return out
+	s, ok := ae.CompareValue.(string)
+	if !ok {
+		return nil
+	}
+	return new(normalizeEmail(s))
 }
 
-// scimUserPatch reads the writable attributes off a full representation.
-func scimUserPatch(attrs scim.ResourceAttributes) db.UpdateUserParams {
-	patch := db.UpdateUserParams{}
-	if name := scimDisplayName(attrs["displayName"], attrs["name"]); name != "" {
-		patch.Name = &name
-	}
-	if active, ok := attrs["active"].(bool); ok {
-		patch.Active = &active
-	}
-	return patch
+func userFromRow(m *db.ListManagedMembersRow) *db.User {
+	return &db.User{ID: m.ID, Email: m.Email, Name: m.Name, Active: m.Active}
 }
 
-func userResource(u *db.User, externalID string) scim.Resource {
+func userResource(m *db.ListManagedMembersRow) scim.Resource {
 	attrs := scim.ResourceAttributes{
-		"userName": u.Email,
-		"active":   u.Active,
-		"emails": []any{map[string]any{
-			"value":   u.Email,
-			"type":    "work",
-			"primary": true,
-		}},
+		"userName": m.Email,
+		"active":   m.Active,
+		"emails":   []any{map[string]any{"value": m.Email, "type": "work", "primary": true}},
 	}
-	if u.Name != "" {
-		attrs["displayName"] = u.Name
-		attrs["name"] = map[string]any{"formatted": u.Name}
+	if m.Name != "" {
+		attrs["displayName"] = m.Name
+		attrs["name"] = map[string]any{"formatted": m.Name}
 	}
 	out := scim.Resource{
-		ID:         u.ID,
+		ID:         m.ID,
 		Attributes: attrs,
-		Meta: scim.Meta{
-			Created:      &u.CreatedAt,
-			LastModified: &u.UpdatedAt,
-		},
+		Meta:       scim.Meta{Created: &m.CreatedAt, LastModified: &m.UpdatedAt},
 	}
-	if externalID != "" {
-		out.ExternalID = optional.NewString(externalID)
+	if m.ExternalID != "" {
+		out.ExternalID = optional.NewString(m.ExternalID)
 	}
 	return out
-}
-
-// memberResource renders a list row. The list query already selected the
-// user columns, so project them and reuse the single user renderer.
-func memberResource(row *db.ListWorkspaceMembersRow, externalID string) scim.Resource {
-	return userResource(&db.User{
-		ID:        row.UserID,
-		Email:     row.Email,
-		Name:      row.Name,
-		Active:    row.Active,
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
-	}, externalID)
 }
 
 // scimEmailValue pulls the first address out of an emails value, whichever
-// of the accepted shapes the client sent.
+// shape the client sent.
 func scimEmailValue(v any) string {
 	switch emails := v.(type) {
 	case []any:
 		if len(emails) == 0 {
 			return ""
+		}
+		if m, ok := emails[0].(map[string]any); ok {
+			return scimAttrString(m["value"])
 		}
 		return scimAttrString(emails[0])
 	case map[string]any:
@@ -325,8 +246,7 @@ func scimEmailValue(v any) string {
 	}
 }
 
-// paginate applies the request's RFC 7644 filter and pagination to the
-// candidate resources.
+// paginate applies the request's filter and pagination to the candidates.
 func paginate(all []scim.Resource, params scim.ListRequestParams) scim.Page {
 	if params.FilterValidator != nil {
 		matching := all[:0]
@@ -338,13 +258,7 @@ func paginate(all []scim.Resource, params scim.ListRequestParams) scim.Page {
 		all = matching
 	}
 	total := len(all)
-	start := max(params.StartIndex, 1)
-	count := max(params.Count, 0)
-	lo := min(start-1, total)
-	hi := min(lo+count, total)
-	page := all[lo:hi]
-	if page == nil {
-		page = []scim.Resource{}
-	}
-	return scim.Page{TotalResults: total, Resources: page}
+	lo := min(max(params.StartIndex, 1)-1, total)
+	hi := min(lo+max(params.Count, 0), total)
+	return scim.Page{TotalResults: total, Resources: append([]scim.Resource{}, all[lo:hi]...)}
 }
