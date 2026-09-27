@@ -14,6 +14,7 @@ const (
 	KindWebDevice      = actor.KindWebDevice
 	KindDaemon         = actor.KindDaemon
 	KindServiceAccount = actor.KindServiceAccount
+	KindSCIM           = actor.KindSCIM
 )
 
 // Principal is the authenticated actor of a request.
@@ -31,4 +32,5 @@ var (
 	AnnotateTenant         = actor.AnnotateTenant
 	TenantFromContext      = actor.TenantFromContext
 	WorkspaceIDFromContext = actor.WorkspaceIDFromContext
+	WithMember             = actor.WithMember
 )

@@ -1,7 +1,6 @@
 package iam
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,8 +11,8 @@ import (
 // Secure, since the IdP posts back cross-site.
 func TestFlowBinding(t *testing.T) {
 	rec := httptest.NewRecorder()
-	value := startFlowBinding(rec, false)
-	if value == "" {
+	value, err := startFlowBinding(rec, false)
+	if err != nil || value == "" {
 		t.Fatal("startFlowBinding returned no value")
 	}
 
@@ -53,14 +52,14 @@ func TestFlowBinding(t *testing.T) {
 	if checkFlowBinding(reqWith(""), value) {
 		t.Error("missing flow cookie was accepted")
 	}
-	if !checkFlowBinding(reqWith(value), "") {
-		t.Error("flow without a recorded binding must be allowed")
+	if checkFlowBinding(reqWith(value), "") {
+		t.Error("a flow without a recorded binding must fail closed")
 	}
 
 	// SAML: cross-site IdP form POST needs a None cookie, which requires
 	// Secure.
 	rec2 := httptest.NewRecorder()
-	if startFlowBinding(rec2, true) == "" {
+	if v, err := startFlowBinding(rec2, true); err != nil || v == "" {
 		t.Fatal("startFlowBinding returned no value")
 	}
 	var samlCookie *http.Cookie
@@ -83,7 +82,7 @@ func TestFlowBinding(t *testing.T) {
 // mode, same-origin and header-less (older) clients must.
 func TestLinkUserIDFor(t *testing.T) {
 	const uid = "01a05a0f-d857-723f-a3ed-c43125834aa5"
-	ctx := ContextWithPrincipal(context.Background(), Principal{ID: uid, Kind: KindUser})
+	ctx := ContextWithPrincipal(t.Context(), Principal{ID: uid, Kind: KindUser})
 
 	tests := []struct {
 		name    string

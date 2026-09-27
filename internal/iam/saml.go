@@ -1,9 +1,10 @@
 package iam
 
-// The SAML SP-initiated flow, ported from kagi. The SP keypair is generated
-// once and persisted in the saml_keypair table, encrypted at rest.
+// The SAML SP-initiated flow. The SP keypair is generated once and stored
+// in the saml_keypair table, encrypted at rest.
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -17,6 +18,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/crewjam/saml"
@@ -24,199 +26,156 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/nokku-sh/nokku/internal/db"
-
-	"github.com/nokku-sh/nokku/internal/cache"
-	"github.com/nokku-sh/nokku/internal/crypto"
 )
-
-// metadataCacheTTL bounds how long parsed IdP metadata stays cached.
-const metadataCacheTTL = 10 * time.Minute
 
 // samlState is the cross-request payload carried in the RelayState.
 type samlState struct {
-	WorkspaceID string `json:"workspace_id,omitempty"`
-	ProviderID  string `json:"provider_id"`
-	RequestID   string `json:"request_id"`
-	ReturnTo    string `json:"return_to,omitempty"`
-	LinkUserID  string `json:"link_user_id,omitempty"`
-	// FlowCookie is the browser-scoped flow binding value (login CSRF).
-	FlowCookie string `json:"flow_cookie,omitempty"`
+	ProviderID string `json:"provider_id"`
+	RequestID  string `json:"request_id"`
+	ReturnTo   string `json:"return_to,omitempty"`
+	LinkUserID string `json:"link_user_id,omitempty"`
+	FlowCookie string `json:"flow_cookie"`
 }
 
-// samlFlow serves the SAML SP-initiated flow.
+// samlFlow serves the SAML SP-initiated flow. One SP keypair serves every
+// provider.
 type samlFlow struct {
-	svc         *Service
-	linker      *linker
-	state       *state[samlState]
-	errRedirect string
-	samlConfig  SAMLConfig
-	spKey       *rsa.PrivateKey
-	spCert      *x509.Certificate
-	certPEM     []byte
-	metas       *cache.Local[*saml.EntityDescriptor]
+	svc     *Service
+	linker  *linker
+	state   *state[samlState]
+	spKey   *rsa.PrivateKey
+	spCert  *x509.Certificate
+	certPEM []byte
+
+	mu    sync.Mutex
+	metas map[string]fetchedMetadata // by metadata URL
 }
 
-// newSAMLFlow builds the SAML flow handler, resolving or generating the SP
-// keypair. The canonical stored pair wins, so concurrent first boots
-// converge on one key.
-func newSAMLFlow(svc *Service, cfg SAMLConfig) (*samlFlow, error) {
-	keyPEM, certPEM, err := svc.resolveSAMLKeypair()
+type fetchedMetadata struct {
+	ed *saml.EntityDescriptor
+	at time.Time
+}
+
+// newSAMLFlow loads the SP keypair, generating it on first boot. The stored
+// pair wins, so concurrent first boots converge on one key.
+func newSAMLFlow(ctx context.Context, svc *Service) (*samlFlow, error) {
+	keyPEM, certPEM, err := svc.samlKeypair(ctx)
 	if err != nil {
 		return nil, err
 	}
-	key, cert, certPEM, err := parseSAMLKeypair(keyPEM, certPEM)
+	key, cert, err := parseSAMLKeypair(keyPEM, certPEM)
 	if err != nil {
 		return nil, err
 	}
 	return &samlFlow{
-		svc:         svc,
-		linker:      &linker{svc: svc, credType: MethodSAML},
-		state:       newState[samlState](svc.cache, "saml:state:", flowStateTTL),
-		errRedirect: svc.baseURL + "/sso-error",
-		samlConfig:  cfg,
-		spKey:       key,
-		spCert:      cert,
-		certPEM:     certPEM,
-		metas:       cache.NewLocal[*saml.EntityDescriptor](metadataCacheTTL),
+		svc:     svc,
+		linker:  &linker{svc: svc, credType: MethodSAML},
+		state:   newState[samlState](svc.cache, "saml:state:", flowStateTTL),
+		spKey:   key,
+		spCert:  cert,
+		certPEM: certPEM,
+		metas:   map[string]fetchedMetadata{},
 	}, nil
 }
 
-// Login starts the SP-initiated flow. It expects a "provider" query
-// parameter and an optional "return_to" query parameter.
+// Login starts the SP-initiated flow for the "provider" query parameter.
 func (h *samlFlow) Login(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	providerID := r.URL.Query().Get("provider")
-	if providerID == "" {
-		WriteError(w, http.StatusBadRequest, "missing provider")
-		return
-	}
-
-	workspaceID, cfg, err := h.svc.resolveForLogin(
-		ctx, "", providerID, r.URL.Query().Get("domain"),
-	)
+	cfg, err := h.svc.loginProvider(ctx, r.URL.Query().Get("provider"), MethodSAML)
 	if err != nil {
-		Fail(w, r, h.errRedirect, "provider not configured")
+		fail(w, r, "provider not configured")
 		return
 	}
-
-	ed, err := h.idpMetadata(ctx, providerID, cfg.SAML)
+	sp, err := h.serviceProvider(ctx, cfg.SAML, false)
 	if err != nil {
-		Fail(w, r, h.errRedirect, "provider metadata invalid")
+		slog.Warn("saml login: provider metadata invalid", "error", err, "provider", cfg.ProviderID)
+		fail(w, r, "provider metadata invalid")
 		return
 	}
-
-	sp := h.serviceProvider(cfg.SAML, ed)
-	ssoURL := sp.GetSSOBindingLocation(saml.HTTPRedirectBinding)
+	ssoURL := cmp.Or(sp.GetSSOBindingLocation(saml.HTTPRedirectBinding), sp.GetSSOBindingLocation(saml.HTTPPostBinding))
 	if ssoURL == "" {
-		ssoURL = sp.GetSSOBindingLocation(saml.HTTPPostBinding)
-	}
-	if ssoURL == "" {
-		Fail(w, r, h.errRedirect, "no SSO endpoint in metadata")
+		fail(w, r, "no SSO endpoint in metadata")
 		return
 	}
-
 	req, err := sp.MakeAuthenticationRequest(ssoURL, saml.HTTPRedirectBinding, saml.HTTPPostBinding)
 	if err != nil {
-		Fail(w, r, h.errRedirect, "request creation failed")
+		fail(w, r, "request creation failed")
 		return
 	}
-
-	relayState, err := crypto.RandomString(32)
+	// The IdP posts the assertion back cross-site, so the binding cookie
+	// must be SameSite=None, which only works over HTTPS.
+	flowCookie, err := startFlowBinding(w, h.svc.secure)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal error")
+		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	st := samlState{
-		WorkspaceID: workspaceID,
-		ProviderID:  providerID,
-		RequestID:   req.ID,
-		ReturnTo:    SafeReturnTo(r.URL.Query().Get("return_to")),
-		LinkUserID:  linkUserIDFor(ctx, r),
-
-		// The IdP posts the assertion back cross-site, so the binding cookie
-		// must be a None cookie: only possible over HTTPS.
-		FlowCookie: startFlowBinding(w, strings.HasPrefix(h.svc.baseURL, "https://")),
-	}
-	if err := h.state.Put(ctx, relayState, st); err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal error")
+	relayState, err := h.state.Put(ctx, samlState{
+		ProviderID: cfg.ProviderID,
+		RequestID:  req.ID,
+		ReturnTo:   safeReturnTo(r.URL.Query().Get("return_to")),
+		LinkUserID: linkUserIDFor(ctx, r),
+		FlowCookie: flowCookie,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-
 	redirect, err := req.Redirect(relayState, sp)
 	if err != nil {
-		Fail(w, r, h.errRedirect, "request signing failed")
+		fail(w, r, "request signing failed")
 		return
 	}
 	// #nosec G710 -- redirects to the IdP SSO endpoint from its metadata.
 	http.Redirect(w, r, redirect.String(), http.StatusTemporaryRedirect)
 }
 
-// Callback is the ACS endpoint: it parses and verifies the SAML response,
-// resolves the user, and issues a session.
+// Callback is the ACS endpoint: it verifies the SAML response, resolves the
+// user, and issues a session.
 func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if err := r.ParseForm(); err != nil {
-		WriteError(w, http.StatusBadRequest, "bad request")
+		writeError(w, http.StatusBadRequest, "bad request")
 		return
 	}
-
 	st, err := h.state.Take(ctx, r.PostForm.Get("RelayState"))
+	if err != nil || !checkFlowBinding(r, st.FlowCookie) {
+		fail(w, r, "invalid or expired login")
+		return
+	}
+	cfg, err := h.svc.loginProvider(ctx, st.ProviderID, MethodSAML)
 	if err != nil {
-		Fail(w, r, h.errRedirect, "invalid or expired login")
+		fail(w, r, "provider not configured")
 		return
 	}
-	// The callback must arrive in the browser that started the flow.
-	if !checkFlowBinding(r, st.FlowCookie) {
-		Fail(w, r, h.errRedirect, "invalid or expired login")
-		return
-	}
-
-	cfg, err := h.svc.GetSSOProvider(ctx, st.ProviderID)
+	sp, err := h.serviceProvider(ctx, cfg.SAML, false)
 	if err != nil {
-		Fail(w, r, h.errRedirect, "provider not configured")
+		slog.Warn("saml callback: provider metadata invalid", "error", err, "provider", st.ProviderID)
+		fail(w, r, "provider metadata invalid")
 		return
 	}
-
-	ed, err := h.idpMetadata(ctx, st.ProviderID, cfg.SAML)
-	if err != nil {
-		slog.Warn(
-			"saml callback: provider metadata invalid",
-			"error",
-			err,
-			"provider",
-			st.ProviderID,
-		)
-		Fail(w, r, h.errRedirect, "provider metadata invalid")
-		return
-	}
-
-	sp := h.serviceProvider(cfg.SAML, ed)
 	assertion, err := sp.ParseResponse(r, []string{st.RequestID})
 	if err != nil {
-		slog.Warn(
-			"saml callback: response verification failed",
-			"error",
-			err,
-			"provider",
-			st.ProviderID,
-		)
-		Fail(w, r, h.errRedirect, "response verification failed")
+		// The IdP may have rotated its signing key since the metadata was
+		// cached. Verify once more against fresh metadata.
+		if sp, err = h.serviceProvider(ctx, cfg.SAML, true); err == nil {
+			assertion, err = sp.ParseResponse(r, []string{st.RequestID})
+		}
+	}
+	if err != nil {
+		slog.Warn("saml callback: response verification failed", "error", err, "provider", st.ProviderID)
+		fail(w, r, "response verification failed")
 		return
 	}
-
-	opts := h.identity(cfg.SAML, assertion)
-	opts.ProviderID = st.ProviderID
+	opts := identity(assertion)
 	if opts.Subject == "" {
-		slog.Warn("saml callback: assertion has no subject", "provider", st.ProviderID)
-		Fail(w, r, h.errRedirect, "assertion has no subject")
+		fail(w, r, "assertion has no subject")
 		return
 	}
-
-	h.svc.completeSSO(ctx, w, r, h.linker, &flowAuthorizeState{
-		WorkspaceID: st.WorkspaceID,
-		ReturnTo:    st.ReturnTo,
-		LinkUserID:  st.LinkUserID,
-	}, opts, h.errRedirect)
+	opts.ProviderID = cfg.ProviderID
+	opts.WorkspaceID = cfg.WorkspaceID
+	opts.JITProvisioning = cfg.SAML.JITProvisioning
+	opts.LinkUserID = st.LinkUserID
+	h.svc.completeSSO(w, r, h.linker, st.ReturnTo, opts)
 }
 
 // assertionAttributes flattens the assertion's attribute statements, keying
@@ -237,9 +196,9 @@ func assertionAttributes(a *saml.Assertion) map[string][]string {
 	return attrs
 }
 
-// identity maps the assertion onto the linker options. SAML assertions
-// carry org-managed emails, so EmailVerified is always true.
-func (h *samlFlow) identity(cfg *SAMLIDP, a *saml.Assertion) flowLinkOptions {
+// identity maps the assertion onto the linker options. The linker only
+// trusts the email for the provider workspace's verified domains.
+func identity(a *saml.Assertion) flowLinkOptions {
 	attrs := assertionAttributes(a)
 
 	var subject string
@@ -279,74 +238,70 @@ func (h *samlFlow) identity(cfg *SAMLIDP, a *saml.Assertion) flowLinkOptions {
 		subject = email
 	}
 
-	// ProviderID is not set here: the caller knows the stored provider id
-	// and must fill it in. Linking under anything else (like an attribute
-	// or endpoint value) would orphan the credential and disable the
-	// verified-domain binding checks.
 	return flowLinkOptions{
-		Subject:         subject,
-		Email:           email,
-		EmailVerified:   true, // SAML assertions carry org-managed emails
-		Name:            name,
-		Picture:         attrValue(attrs, "picture"),
-		JITProvisioning: cfg.JITProvisioning,
+		Subject:       subject,
+		Email:         normalizeEmail(email),
+		EmailVerified: true,
+		Name:          name,
+		Picture:       attrValue(attrs, "picture"),
 	}
 }
 
-func (h *samlFlow) idpMetadata(
-	ctx context.Context,
-	providerID string,
-	cfg *SAMLIDP,
-) (*saml.EntityDescriptor, error) {
-	key := providerID
-	if ed, ok := h.metas.Get(key); ok {
-		return ed, nil
-	}
-
-	if len(cfg.MetadataXML) == 0 && cfg.MetadataURL != "" {
-		// #nosec G709 -- the metadata URL is operator-provided configuration, not request data.
-		u, err := url.Parse(cfg.MetadataURL)
-		if err != nil {
+// idpMetadata loads the IdP metadata. Fetched metadata is reused for
+// providerCacheTTL, so IdP certificate rollovers arrive without anyone
+// touching the configuration. refresh forces a fetch, at most once a
+// minute. When the IdP's metadata endpoint is down, the last good copy
+// keeps logins working.
+func (h *samlFlow) idpMetadata(ctx context.Context, cfg *SAMLIDP, refresh bool) (*saml.EntityDescriptor, error) {
+	if len(cfg.MetadataXML) > 0 {
+		ed := &saml.EntityDescriptor{}
+		if err := xml.Unmarshal(cfg.MetadataXML, ed); err != nil {
 			return nil, err
 		}
-		ed, err := samlsp.FetchMetadata(ctx, &http.Client{Timeout: providerHTTPTimeout}, *u)
-		if err != nil {
-			return nil, err
-		}
-		h.metas.Put(key, ed)
-		return ed, nil
+		return ed, validMetadata(ed)
 	}
 
-	ed := &saml.EntityDescriptor{}
-	// #nosec G709 -- IdP metadata is operator-provided configuration, not request data.
-	if err := xml.Unmarshal(cfg.MetadataXML, ed); err != nil {
+	h.mu.Lock()
+	cached, ok := h.metas[cfg.MetadataURL]
+	h.mu.Unlock()
+	age := time.Since(cached.at)
+	if ok && (age < time.Minute || !refresh && age < providerCacheTTL) {
+		return cached.ed, nil
+	}
+
+	u, err := url.Parse(cfg.MetadataURL)
+	if err != nil {
 		return nil, err
 	}
-	if len(ed.IDPSSODescriptors) == 0 {
-		return nil, errors.New("saml: metadata has no IDPSSODescriptor")
+	ed, err := samlsp.FetchMetadata(ctx, h.svc.idp, *u)
+	if err == nil {
+		err = validMetadata(ed)
 	}
-
-	h.metas.Put(key, ed)
+	if err != nil {
+		if ok {
+			slog.Warn("saml: metadata refresh failed, using the last good copy", "error", err, "url", cfg.MetadataURL)
+			return cached.ed, nil
+		}
+		return nil, err
+	}
+	h.mu.Lock()
+	h.metas[cfg.MetadataURL] = fetchedMetadata{ed: ed, at: time.Now()}
+	h.mu.Unlock()
 	return ed, nil
 }
 
-// Metadata serves the SP metadata for the IdP administrator to configure.
+func validMetadata(ed *saml.EntityDescriptor) error {
+	if len(ed.IDPSSODescriptors) == 0 {
+		return errors.New("saml: metadata has no IDPSSODescriptor")
+	}
+	return nil
+}
+
+// Metadata serves the SP metadata for the IdP administrator.
 func (h *samlFlow) Metadata(w http.ResponseWriter, _ *http.Request) {
-	acsURL := h.spAcsURL()
-	entityID := h.samlConfig.SPEntityID
-	if entityID == "" {
-		entityID = h.samlConfig.AcsURL
-	}
-	sp := &saml.ServiceProvider{
-		EntityID:    entityID,
-		Key:         h.spKey,
-		Certificate: h.spCert,
-		AcsURL:      acsURL,
-		MetadataURL: acsURL,
-	}
-	buf, err := xml.MarshalIndent(sp.Metadata(), "", "  ")
+	buf, err := xml.MarshalIndent(h.sp(nil).Metadata(), "", "  ")
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "failed to generate metadata")
+		writeError(w, http.StatusInternalServerError, "failed to generate metadata")
 		return
 	}
 	w.Header().Set("Content-Type", "application/samlmetadata+xml")
@@ -361,140 +316,70 @@ func (h *samlFlow) Certificate(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(h.certPEM)
 }
 
-func (h *samlFlow) spAcsURL() url.URL {
-	u, err := url.Parse(h.samlConfig.AcsURL)
+func (h *samlFlow) serviceProvider(ctx context.Context, cfg *SAMLIDP, refresh bool) (*saml.ServiceProvider, error) {
+	ed, err := h.idpMetadata(ctx, cfg, refresh)
 	if err != nil {
-		return url.URL{}
+		return nil, err
 	}
-	return *u
+	return h.sp(ed), nil
 }
 
-func (h *samlFlow) serviceProvider(cfg *SAMLIDP, ed *saml.EntityDescriptor) *saml.ServiceProvider {
-	acsStr := cfg.AcsURL
-	if acsStr == "" {
-		acsStr = h.samlConfig.AcsURL
-	}
-	entityID := cfg.SPEntityID
-	if entityID == "" {
-		entityID = h.samlConfig.SPEntityID
-	}
-	if entityID == "" {
-		entityID = acsStr
-	}
+func (h *samlFlow) sp(ed *saml.EntityDescriptor) *saml.ServiceProvider {
+	acs, _ := url.Parse(h.svc.baseURL + "/saml/acs")
+	meta, _ := url.Parse(h.svc.baseURL + "/saml/metadata")
 	return &saml.ServiceProvider{
-		EntityID:    entityID,
+		EntityID:    meta.String(),
 		Key:         h.spKey,
 		Certificate: h.spCert,
-		AcsURL:      parseURLOrEmpty(acsStr),
-		MetadataURL: parseURLOrEmpty(acsStr),
+		AcsURL:      *acs,
+		MetadataURL: *meta,
 		IDPMetadata: ed,
 	}
 }
 
-// resolveSAMLKeypair returns the SP keypair from the store, generating and
-// persisting a fresh self-signed pair on first boot. The canonical stored
-// pair wins, so concurrent first boots converge on one key. The private key
-// PEM is encrypted at rest with the app cipher.
-func (s *Service) resolveSAMLKeypair() (keyPEM, certPEM []byte, err error) {
-	if row, err := s.q.GetSAMLKeypair(context.Background()); err == nil {
-		keyPEM, err := decryptSAMLKey(row.KeyEnc)
-		if err != nil {
-			return nil, nil, err
-		}
-		return keyPEM, row.CertPem, nil
-	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil, err
-	}
-
-	genKeyPEM, genCertPEM, err := generateSAMLKeypair()
-	if err != nil {
-		return nil, nil, err
-	}
-	stored, err := s.q.PutSAMLKeypair(context.Background(), &db.PutSAMLKeypairParams{
-		KeyEnc:  encryptSAMLKey(genKeyPEM),
-		CertPem: genCertPEM,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	keyPEM, err = decryptSAMLKey(stored.KeyEnc)
-	if err != nil {
-		return nil, nil, err
-	}
-	return keyPEM, stored.CertPem, nil
-}
-
-// encryptSAMLKey encrypts the private key PEM for at-rest storage. The
-// certificate is public and stays plaintext.
-func encryptSAMLKey(keyPEM []byte) []byte {
-	enc, err := crypto.Encryptor()
-	if err != nil {
-		// Storing the key unencrypted beats failing startup; the error is
-		// not recoverable by the caller either way.
-		return keyPEM
-	}
-	out, err := enc.Encrypt(keyPEM)
-	if err != nil {
-		return keyPEM
-	}
-	return out
-}
-
-// decryptSAMLKey reverses encryptSAMLKey. A row that predates
-// encryption-at-rest is plaintext PEM; it is returned as-is when the
-// ciphertext does not decrypt but does parse as PEM. Anything else fails.
-func decryptSAMLKey(blob []byte) ([]byte, error) {
-	if len(blob) == 0 {
-		return blob, nil
-	}
-	enc, err := crypto.Encryptor()
-	if err != nil {
-		return blob, nil
-	}
-	plain, err := enc.Decrypt(blob)
+// samlKeypair returns the SP keypair PEMs, generating and storing a fresh
+// self-signed pair on first boot. The key column encrypts at rest through
+// its sqlc type.
+func (s *Service) samlKeypair(ctx context.Context) (keyPEM, certPEM []byte, err error) {
+	row, err := s.sys.GetSAMLKeypair(ctx)
 	if err == nil {
-		return plain, nil
+		return row.KeyEnc, row.CertPem, nil
 	}
-	if block, _ := pem.Decode(blob); block != nil {
-		return blob, nil
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, err
 	}
-	return nil, err
-}
-
-func parseSAMLKeypair(keyPEM, certPEM []byte) (*rsa.PrivateKey, *x509.Certificate, []byte, error) {
-	if len(keyPEM) == 0 || len(certPEM) == 0 {
-		return nil, nil, nil, errors.New("saml: both key and certificate are required")
-	}
-
-	block, _ := pem.Decode(keyPEM)
-	if block == nil {
-		return nil, nil, nil, errors.New("saml: invalid key PEM")
-	}
-	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	keyPEM, certPEM, err = generateSAMLKeypair()
 	if err != nil {
-		parsed, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-		if err != nil {
-			return nil, nil, nil, err
-		}
+		return nil, nil, err
 	}
-	key, ok := parsed.(*rsa.PrivateKey)
-	if !ok {
-		return nil, nil, nil, errors.New("saml: key is not RSA")
+	stored, err := s.sys.PutSAMLKeypair(ctx, &db.PutSAMLKeypairParams{KeyEnc: keyPEM, CertPem: certPEM})
+	if err != nil {
+		return nil, nil, err
 	}
-
-	certBlock, _ := pem.Decode(certPEM)
-	if certBlock == nil {
-		return nil, nil, nil, errors.New("saml: invalid certificate PEM")
-	}
-	cert, certErr := x509.ParseCertificate(certBlock.Bytes)
-	if certErr != nil {
-		return nil, nil, nil, certErr
-	}
-	return key, cert, certPEM, nil
+	return stored.KeyEnc, stored.CertPem, nil
 }
 
-// generateSAMLKeypair returns the SP keypair as PEM: the encrypted private
-// key goes to the store, the certificate is public and served as metadata.
+func parseSAMLKeypair(keyPEM, certPEM []byte) (*rsa.PrivateKey, *x509.Certificate, error) {
+	keyBlock, _ := pem.Decode(keyPEM)
+	certBlock, _ := pem.Decode(certPEM)
+	if keyBlock == nil || certBlock == nil {
+		return nil, nil, errors.New("saml: invalid keypair PEM")
+	}
+	key, err := x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	cert, err := x509.ParseCertificate(certBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	return key, cert, nil
+}
+
+// generateSAMLKeypair returns the SP keypair as PEM. The certificate never
+// expires (RFC 5280 4.1.2.5): SAML treats metadata certificates as bare keys,
+// nokku does not sign requests, and IdPs that encrypt assertions pin this
+// key, so rotating it would only break them.
 func generateSAMLKeypair() (keyPEM, certPEM []byte, err error) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -504,7 +389,7 @@ func generateSAMLKeypair() (keyPEM, certPEM []byte, err error) {
 		SerialNumber: big.NewInt(1),
 		Subject:      pkix.Name{CommonName: "nokku-saml-sp"},
 		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(10 * 365 * 24 * time.Hour),
+		NotAfter:     time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC),
 		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 	}
 	der, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &key.PublicKey, key)
@@ -520,12 +405,4 @@ func generateSAMLKeypair() (keyPEM, certPEM []byte, err error) {
 	)
 	certPEM = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
 	return keyPEM, certPEM, nil
-}
-
-func parseURLOrEmpty(s string) url.URL {
-	u, err := url.Parse(s)
-	if err != nil || u.Scheme == "" {
-		return url.URL{}
-	}
-	return *u
 }

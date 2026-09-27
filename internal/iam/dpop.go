@@ -12,7 +12,6 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"path"
@@ -20,8 +19,6 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
-
-	"github.com/nokku-sh/nokku/internal/cache"
 )
 
 // Errors returned by DPoPVerifier.Verify are sentinels in errors.go. Map
@@ -33,78 +30,20 @@ var allowedAlgs = []jose.SignatureAlgorithm{
 	jose.EdDSA, jose.ES256, jose.ES384, jose.ES512, jose.RS256, jose.PS256,
 }
 
-// ReplayStore records consumed proof identifiers (jti) within their validity
-// window. Add must be atomic: true only for the first caller to record a
-// given jti, so concurrent instances agree on what has been seen.
-type ReplayStore interface {
-	Add(ctx context.Context, jti string, ttl time.Duration) (added bool, err error)
-}
-
-// cacheReplay fits the shared cache's SetNX to ReplayStore. A cache without
-// SetNX cannot record consumed jtis, so replay protection is impossible:
-// fail closed instead of silently accepting every proof.
-type cacheReplay struct {
-	c cache.Cache
-}
-
-func (r cacheReplay) Add(ctx context.Context, jti string, ttl time.Duration) (bool, error) {
-	nx, ok := r.c.(cache.SetNXer)
-	if !ok {
-		return false, errors.New("iam: cache does not support atomic replay tracking")
-	}
-	return nx.SetNX(ctx, "dpop:jti:"+jti, nil, ttl)
-}
-
-// DPoPOptions configures a DPoPVerifier.
-type DPoPOptions struct {
-	// NonceTTL is the rotation period of the server nonce. Default 5m.
-	NonceTTL time.Duration
-	// MaxClockSkew bounds how far a proof's iat may be from now. Default 1m.
-	MaxClockSkew time.Duration
-	// NonceSecret keys the stateless nonce. Multi-instance deployments must
-	// share it; it derives from NOKKU_SECRET.
-	NonceSecret []byte
-	// Replay tracks each proof's jti for its validity window. A store
-	// failure fails verification closed, so the store must be as available
-	// as the endpoints it protects.
-	Replay ReplayStore
-	// Now injects the clock for tests.
-	Now func() time.Time
-}
+const (
+	// dpopNonceTTL is the rotation period of the server nonce.
+	dpopNonceTTL = 5 * time.Minute
+	// dpopMaxSkew bounds how far a proof's iat may be from now.
+	dpopMaxSkew = time.Minute
+)
 
 // DPoPVerifier verifies DPoP proofs. The server nonce is a stateless HMAC
-// over a time bucket keyed by NonceSecret, so instances sharing the secret
-// validate nonces without shared storage; the Replay store catches jti reuse.
+// over a time bucket keyed by the shared secret, so instances validate
+// nonces without shared storage. The cache catches jti reuse.
 type DPoPVerifier struct {
-	nonceTTL time.Duration
-	maxSkew  time.Duration
-	secret   []byte
-	replay   ReplayStore
-	now      func() time.Time
-}
-
-// NewDPoPVerifier builds the verifier. NonceSecret is required: a random
-// per-process secret silently breaks multi-instance deployments.
-func NewDPoPVerifier(opts DPoPOptions) (*DPoPVerifier, error) {
-	if len(opts.NonceSecret) == 0 {
-		return nil, errors.New("iam: dpop nonce secret is required")
-	}
-	if opts.NonceTTL <= 0 {
-		opts.NonceTTL = 5 * time.Minute
-	}
-	if opts.MaxClockSkew <= 0 {
-		opts.MaxClockSkew = time.Minute
-	}
-	if opts.Now == nil {
-		opts.Now = time.Now
-	}
-	return &DPoPVerifier{
-		nonceTTL: opts.NonceTTL,
-		maxSkew:  opts.MaxClockSkew,
-		secret:   opts.NonceSecret,
-		replay:   opts.Replay,
-		now:      opts.Now,
-	}, nil
+	secret []byte
+	replay Cache
+	now    func() time.Time
 }
 
 // CurrentNonce returns the nonce to advertise in the DPoP-Nonce header.
@@ -114,7 +53,7 @@ func (v *DPoPVerifier) CurrentNonce() string {
 
 // bucket returns the nonce time bucket for t.
 func (v *DPoPVerifier) bucket(t time.Time) int64 {
-	return t.Unix() / int64(v.nonceTTL.Seconds())
+	return t.Unix() / int64(dpopNonceTTL.Seconds())
 }
 
 func (v *DPoPVerifier) nonceFor(bucket int64) string {
@@ -178,7 +117,7 @@ func (v *DPoPVerifier) Verify(
 	}
 
 	now := v.now().Unix()
-	skew := int64(v.maxSkew.Seconds())
+	skew := int64(dpopMaxSkew.Seconds())
 	if diff := now - c.IAT; diff > skew || diff < -skew {
 		return "", fmt.Errorf("%w: stale iat", ErrInvalidProof)
 	}
@@ -194,17 +133,14 @@ func (v *DPoPVerifier) Verify(
 		}
 	}
 
-	if v.replay != nil {
-		// The jti is remembered for two nonce windows plus skew, as long as a
-		// proof could still be accepted.
-		ttl := 2*v.nonceTTL + v.maxSkew
-		added, err := v.replay.Add(ctx, c.JTI, ttl)
-		if err != nil {
-			return "", fmt.Errorf("%w: replay store: %w", ErrInvalidProof, err)
-		}
-		if !added {
-			return "", ErrReplay
-		}
+	// A jti is remembered as long as its proof could still be accepted: two
+	// nonce windows plus skew.
+	added, err := v.replay.SetNX(ctx, "dpop:jti:"+c.JTI, nil, 2*dpopNonceTTL+dpopMaxSkew)
+	if err != nil {
+		return "", fmt.Errorf("%w: replay store: %w", ErrInvalidProof, err)
+	}
+	if !added {
+		return "", ErrReplay
 	}
 
 	tp, err := jwk.Thumbprint(crypto.SHA256)

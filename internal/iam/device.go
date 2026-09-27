@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
@@ -31,30 +30,14 @@ const (
 	grantDenied     = "denied"
 )
 
-// DeviceOptions configures the device flow.
-type DeviceOptions struct {
-	// VerificationURI is the browser page the user opens: /device.
-	VerificationURI string
-	// Interval is the poll interval hint returned to the device.
-	Interval time.Duration
-	// SessionTTL is the lifetime of the session the flow issues. Zero
-	// means the service default.
-	SessionTTL time.Duration
-	// Cache stores grants and poll bookkeeping. Required.
-	Cache cache.Cache
-}
-
-// DeviceFlow implements the RFC 8628 endpoints on top of the service.
+// DeviceFlow implements the RFC 8628 endpoints. The session it issues is
+// always bound to the device's DPoP key.
 type DeviceFlow struct {
-	svc   *Service
-	opts  DeviceOptions
-	cache cache.Cache
+	svc *Service
 }
 
-// grant is a cross-request device grant, stored under both the device code
-// and the user code. Sessions issued from a device login stay unpinned:
-// users are global and act per-request in a workspace, like every other
-// interactive login.
+// deviceGrant is a cross-request device grant, stored under the device code
+// and, until someone decides on it, under the user code.
 type deviceGrant struct {
 	DeviceCode string `json:"device_code"`
 	UserCode   string `json:"user_code"`
@@ -65,24 +48,6 @@ type deviceGrant struct {
 type pollState struct {
 	last       time.Time
 	violations int
-}
-
-// NewDeviceFlow builds the device flow handler.
-func NewDeviceFlow(svc *Service, opts DeviceOptions) (*DeviceFlow, error) {
-	if svc == nil || opts.Cache == nil {
-		return nil, errors.New("iam: device flow requires a service and cache")
-	}
-	if svc.baseURL == "" {
-		return nil, errors.New("iam: device flow requires a baseURL")
-	}
-	opts.VerificationURI = svc.baseURL + "/device"
-	if opts.Interval <= 0 {
-		opts.Interval = deviceInterval
-	}
-	if opts.SessionTTL <= 0 {
-		opts.SessionTTL = deviceSessionTTL
-	}
-	return &DeviceFlow{svc: svc, opts: opts, cache: opts.Cache}, nil
 }
 
 // Begin starts a device grant (POST /auth/device). Public: the CLI has no
@@ -105,8 +70,8 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 		Status:     grantPending,
 	}
 	b, _ := json.Marshal(g)
-	if err := h.cache.Set(r.Context(), "device:code:"+deviceCode, b, grantTTL); err != nil ||
-		h.cache.Set(r.Context(), "device:user:"+userCode, b, grantTTL) != nil {
+	if err := h.svc.cache.Set(r.Context(), "device:code:"+deviceCode, b, grantTTL); err != nil ||
+		h.svc.cache.Set(r.Context(), "device:user:"+userCode, b, grantTTL) != nil {
 		writeOAuthError(w, "server_error")
 		return
 	}
@@ -114,10 +79,10 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"device_code":               deviceCode,
 		"user_code":                 userCode,
-		"verification_uri":          h.opts.VerificationURI,
-		"verification_uri_complete": h.opts.VerificationURI + "?user_code=" + userCode,
+		"verification_uri":          h.svc.baseURL + "/device",
+		"verification_uri_complete": h.svc.baseURL + "/device?user_code=" + userCode,
 		"expires_in":                int(grantTTL.Seconds()),
-		"interval":                  int(h.opts.Interval.Seconds()),
+		"interval":                  int(deviceInterval.Seconds()),
 	})
 }
 
@@ -137,24 +102,26 @@ func (h *DeviceFlow) Deny(w http.ResponseWriter, r *http.Request) {
 func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool) {
 	p, ok := PrincipalFromContext(r.Context())
 	if !ok || p.Kind != KindUser {
-		WriteError(w, http.StatusUnauthorized, "sign in to approve a device")
+		writeError(w, http.StatusUnauthorized, "sign in to approve a device")
 		return
 	}
 
 	userCode := normalizeUserCode(r.FormValue("user_code"))
 	if userCode == "" {
-		WriteError(w, http.StatusBadRequest, "missing user_code")
+		writeError(w, http.StatusBadRequest, "missing user_code")
 		return
 	}
 
-	b, err := h.cache.Get(r.Context(), "device:user:"+userCode)
+	// Consuming the user code makes the decision single-use: nobody can
+	// flip a denial or approve a grant someone else already decided.
+	b, err := h.svc.cache.GetDel(r.Context(), "device:user:"+userCode)
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid or expired code")
+		writeError(w, http.StatusBadRequest, "invalid or expired code")
 		return
 	}
 	var g deviceGrant
 	if err := json.Unmarshal(b, &g); err != nil || g.Status != grantPending {
-		WriteError(w, http.StatusBadRequest, "invalid or expired code")
+		writeError(w, http.StatusBadRequest, "invalid or expired code")
 		return
 	}
 
@@ -165,7 +132,7 @@ func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool
 	}
 	g.UserID = p.ID
 	b, _ = json.Marshal(g)
-	if err := h.cache.Set(r.Context(), "device:code:"+g.DeviceCode, b, grantTTL); err != nil {
+	if err := h.svc.cache.Set(r.Context(), "device:code:"+g.DeviceCode, b, grantTTL); err != nil {
 		writeOAuthError(w, "server_error")
 		return
 	}
@@ -183,7 +150,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, err := h.cache.Get(ctx, "device:code:"+deviceCode)
+	b, err := h.svc.cache.Get(ctx, "device:code:"+deviceCode)
 	if err != nil {
 		writeOAuthError(w, "expired_token")
 		return
@@ -204,11 +171,10 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 	case grantDenied:
 		// Consume the grant: a CLI left polling must not re-record the
 		// denial as an audit event on every poll until the TTL expires.
-		if _, err := h.cache.GetDel(ctx, "device:code:"+deviceCode); err != nil {
+		if _, err := h.svc.cache.GetDel(ctx, "device:code:"+deviceCode); err != nil {
 			writeOAuthError(w, "expired_token") // a concurrent poll consumed it
 			return
 		}
-		_ = h.cache.Delete(ctx, "device:user:"+g.UserCode)
 		h.svc.record(
 			ctx,
 			Event{
@@ -247,18 +213,17 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		// Consume the grant before issuing, so one approval can never yield
 		// two sessions no matter how the polls race. Past this point a
 		// failure costs the device its grant and it re-runs the flow.
-		if _, err := h.cache.GetDel(ctx, "device:code:"+deviceCode); err != nil {
+		if _, err := h.svc.cache.GetDel(ctx, "device:code:"+deviceCode); err != nil {
 			writeOAuthError(w, "expired_token") // a concurrent poll consumed it
 			return
 		}
-		_ = h.cache.Delete(ctx, "device:user:"+g.UserCode)
 
 		sess, token, err := h.svc.IssueSession(ctx, SessionParams{
 			SubjectID: u.ID,
 			Kind:      KindCLI,
 			Method:    MethodDevice,
 			Binding:   binding,
-			TTL:       h.opts.SessionTTL,
+			TTL:       deviceSessionTTL,
 		})
 		if err != nil {
 			writeOAuthError(w, "server_error")
@@ -271,13 +236,9 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			UserID: u.ID,
 			Email:  u.Email,
 		})
-		tokenType := "Bearer"
-		if binding != "" {
-			tokenType = "DPoP"
-		}
 		resp := map[string]any{
 			"access_token": token,
-			"token_type":   tokenType,
+			"token_type":   "DPoP",
 			"method":       string(MethodDevice),
 			"user_id":      g.UserID,
 		}
@@ -290,26 +251,18 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 
 // Nonce advertises the current DPoP nonce over an unauthenticated endpoint
 // (GET /auth/device/nonce), so devices can fetch one before their first
-// DPoP-protected call (RFC 9449 section 8). Returns 204.
+// proof (RFC 9449 section 8). Returns 204.
 func (h *DeviceFlow) Nonce(w http.ResponseWriter, _ *http.Request) {
-	if h.svc.DPoP == nil {
-		WriteError(w, http.StatusNotFound, "dpop disabled")
-		return
-	}
 	h.svc.AdvertiseDPoPNonce(w.Header())
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// deviceBinding returns the DPoP key thumbprint the session should be bound
-// to: the verified proof's jkt, or "" when no verifier is configured or the
-// device sent no proof.
+// deviceBinding verifies the poll's DPoP proof and returns its key
+// thumbprint. The CLI session is always key-bound, so a missing proof fails.
 func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string, error) {
-	if h.svc.DPoP == nil {
-		return "", nil
-	}
 	proof := r.Header.Get("DPoP")
 	if proof == "" {
-		return "", nil
+		return "", ErrDPoPNonce
 	}
 	return h.svc.DPoP.Verify(ctx, proof, "", r.Method, h.svc.baseURL+r.URL.Path)
 }
@@ -321,19 +274,19 @@ func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string
 func (h *DeviceFlow) pollTrack(ctx context.Context, deviceCode string) bool {
 	key := "device:poll:" + deviceCode
 	var st pollState
-	if b, err := h.cache.Get(ctx, key); err == nil {
+	if b, err := h.svc.cache.Get(ctx, key); err == nil {
 		st = decodePollState(b)
 	}
 
-	required := h.opts.Interval + time.Duration(st.violations)*slowDownPenalty
+	required := deviceInterval + time.Duration(st.violations)*slowDownPenalty
 	now := time.Now()
 	if !st.last.IsZero() && now.Sub(st.last) < required {
 		st.violations++
-		_ = h.cache.Set(ctx, key, encodePollState(st), grantTTL)
+		_ = h.svc.cache.Set(ctx, key, encodePollState(st), grantTTL)
 		return true
 	}
 	st.last = now
-	_ = h.cache.Set(ctx, key, encodePollState(st), grantTTL)
+	_ = h.svc.cache.Set(ctx, key, encodePollState(st), grantTTL)
 	return false
 }
 

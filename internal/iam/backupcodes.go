@@ -27,11 +27,10 @@ const (
 var backupEncoding = base32.NewEncoding("ABCDEFGHJKLMNPQRSTUVWXYZ23456789").
 	WithPadding(base32.NoPadding)
 
-// RotateBackupCodes replaces the user's existing backup codes with a fresh
-// set and returns the plaintext codes, shown to the user exactly once.
-// Delete and reinsert run in one transaction: a partial failure must never
-// leave the user with zero backup codes and no way back in.
-func (s *Service) RotateBackupCodes(ctx context.Context, userID string) ([]string, error) {
+// RotateBackupCodes replaces the request user's backup codes with a fresh
+// set and returns the plaintext codes, shown exactly once. Delete and insert
+// share one transaction, so a failure never leaves the user with no codes.
+func (s *Service) RotateBackupCodes(ctx context.Context) ([]string, error) {
 	fresh := make([]string, BackupCodeCount)
 	for i := range fresh {
 		raw := make([]byte, backupCodeBytes)
@@ -41,8 +40,12 @@ func (s *Service) RotateBackupCodes(ctx context.Context, userID string) ([]strin
 		fresh[i] = backupEncoding.EncodeToString(raw)
 	}
 
-	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
-		if err := deleteCredentialsOfType(ctx, q, userID, MethodBackupCode); err != nil {
+	userID := UserIDFromContext(ctx)
+	err := s.asSelf(ctx, func(q *db.Queries) error {
+		if _, err := q.DeleteUserCredentialsByProvider(ctx, &db.DeleteUserCredentialsByProviderParams{
+			UserID: userID,
+			Type:   string(MethodBackupCode),
+		}); err != nil {
 			return err
 		}
 		for _, code := range fresh {
@@ -68,63 +71,60 @@ func (s *Service) RotateBackupCodes(ctx context.Context, userID string) ([]strin
 	return fresh, nil
 }
 
-// ListBackupCodes returns the user's remaining (unspent) backup codes.
-func (s *Service) ListBackupCodes(ctx context.Context, userID string) ([]*db.Credential, error) {
-	return s.q.ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
-		UserID: userID,
-		Type:   string(MethodBackupCode),
-	})
+// ListBackupCodes returns the request user's unspent backup codes.
+func (s *Service) ListBackupCodes(ctx context.Context) ([]*db.Credential, error) {
+	return s.ListCredentialsByType(ctx, MethodBackupCode)
 }
 
-// DeleteBackupCodes removes every remaining backup code.
-func (s *Service) DeleteBackupCodes(ctx context.Context, userID string) error {
-	return deleteCredentialsOfType(ctx, s.q, userID, MethodBackupCode)
+// DeleteBackupCodes removes the request user's backup codes.
+func (s *Service) DeleteBackupCodes(ctx context.Context) error {
+	return s.UnlinkIdentity(ctx, "", MethodBackupCode)
 }
 
-// LoginWithBackupCode verifies a single-use backup code and returns the
-// user. Consumption is atomic: a code can never be spent twice.
+// LoginWithBackupCode verifies a single-use backup code and signs the user
+// in. Consumption is atomic, so a code is never spent twice.
 func (s *Service) LoginWithBackupCode(ctx context.Context, email, code string) (*db.User, *http.Cookie, error) {
-	email = normalizeEmail(email)
-	code = normalizeBackupCode(code)
-	u, err := s.q.GetUserByEmail(ctx, email)
+	u, err := s.sys.GetUserByEmail(ctx, normalizeEmail(email))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, ErrInvalidCredentials
+	}
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil, ErrInvalidCredentials
-		}
 		return nil, nil, err
 	}
-
-	// Rejected logins must not burn a scarce recovery code, so the account
-	// state is checked before the code is consumed.
-	if !u.Active {
+	// A login the account gates refuse must not burn a scarce recovery
+	// code, so they run before the code is consumed. completeLogin checks
+	// them again.
+	switch {
+	case !u.Active:
 		return nil, nil, ErrInactive
-	}
-	if !u.EmailVerified {
+	case !u.EmailVerified:
 		return nil, nil, ErrEmailUnverified
 	}
-
-	hash, err := crypto.HashToken(code)
-	if err != nil {
+	if err := s.enforceSSO(ctx, u.Email); err != nil {
 		return nil, nil, err
 	}
-	if _, err := s.q.ConsumeCredentialBySubject(ctx, &db.ConsumeCredentialBySubjectParams{
+
+	hash, err := crypto.HashToken(normalizeBackupCode(code))
+	if err != nil {
+		return nil, nil, ErrInvalidCredentials
+	}
+	if _, err := s.sys.ConsumeCredentialBySubject(ctx, &db.ConsumeCredentialBySubjectParams{
 		Type:    string(MethodBackupCode),
 		Subject: hash.Hash(),
 		UserID:  u.ID,
-	}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			s.record(
-				ctx,
-				Event{
-					Action: ActionLoginDenied,
-					Method: MethodBackupCode,
-					UserID: u.ID,
-					Email:  u.Email,
-					Detail: "unknown code",
-				},
-			)
-			return nil, nil, ErrInvalidCredentials
-		}
+	}); errors.Is(err, pgx.ErrNoRows) {
+		s.record(
+			ctx,
+			Event{
+				Action: ActionLoginDenied,
+				Method: MethodBackupCode,
+				UserID: u.ID,
+				Email:  u.Email,
+				Detail: "unknown code",
+			},
+		)
+		return nil, nil, ErrInvalidCredentials
+	} else if err != nil {
 		return nil, nil, err
 	}
 	cookie, err := s.completeLogin(ctx, u, MethodBackupCode)

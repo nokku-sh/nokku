@@ -1,7 +1,7 @@
 package iam
 
 // The plain OAuth2 authorization-code flow for providers without OIDC
-// discovery (GitHub), ported from kagi.
+// discovery (GitHub).
 
 import (
 	"context"
@@ -14,206 +14,134 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// profileBodyLimit caps the provider profile and email responses iam is
-// willing to buffer.
+// profileBodyLimit caps the provider profile and email responses.
 const profileBodyLimit = 1 << 20
-
-// emailEntry is one entry of an email-list endpoint response.
-type emailEntry struct {
-	Email    string `json:"email"`
-	Primary  bool   `json:"primary"`
-	Verified bool   `json:"verified"`
-}
 
 // oauth2Flow serves the OAuth2 authorization-code flow.
 type oauth2Flow struct {
-	svc         *Service
-	linker      *linker
-	authorize   *flowAuthorize
-	errRedirect string
+	svc    *Service
+	linker *linker
+	state  *state[authorizeState]
+}
+
+func newOAuth2Flow(svc *Service) *oauth2Flow {
+	return &oauth2Flow{
+		svc:    svc,
+		linker: &linker{svc: svc, credType: MethodOAuth2},
+		state:  newState[authorizeState](svc.cache, "oauth2:authorize:", flowStateTTL),
+	}
 }
 
 // Login starts the authorization-code flow.
 func (h *oauth2Flow) Login(w http.ResponseWriter, r *http.Request) {
-	authorizeLoginStart(
-		w,
-		r,
-		h.svc,
-		h.authorize,
-		h.errRedirect,
-		func(_ context.Context, st *flowAuthorizeState, cfg *SSOProvider) (*oauth2.Config, []oauth2.AuthCodeOption, bool) {
-			st.PKCEVerifier = oauth2.GenerateVerifier()
-			st.FlowCookie = startFlowBinding(w, false)
-			cfg.OAuth2.RedirectURL = h.svc.baseURL + "/oauth/callback"
-			return h.oauth2Config(cfg.OAuth2), nil, true
-		},
-	)
+	h.svc.startLogin(w, r, MethodOAuth2, h.state,
+		func(_ context.Context, _ *authorizeState, cfg *SSOProvider) (*oauth2.Config, []oauth2.AuthCodeOption, error) {
+			return h.oauth2Config(cfg.OAuth2), nil, nil
+		})
 }
 
-// Callback completes the flow: fetches the profile, resolves the user, and
-// issues a session.
+// Callback fetches the profile, resolves the user, and issues a session.
 func (h *oauth2Flow) Callback(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	q := r.URL.Query()
-	if q.Get("error") != "" {
-		Fail(w, r, h.errRedirect, "login canceled")
+	st, cfg, ok := h.svc.takeLogin(w, r, MethodOAuth2, h.state)
+	if !ok {
 		return
 	}
-
-	st, err := h.authorize.Take(ctx, q.Get("state"))
-	if err != nil {
-		Fail(w, r, h.errRedirect, "invalid or expired login")
-		return
-	}
-	// The callback must arrive in the browser that started the flow.
-	if !checkFlowBinding(r, st.FlowCookie) {
-		Fail(w, r, h.errRedirect, "invalid or expired login")
-		return
-	}
-	cfg, err := h.svc.GetSSOProvider(ctx, st.ProviderID)
-	if err != nil {
-		Fail(w, r, h.errRedirect, "provider not configured")
-		return
-	}
-	// Login set the redirect URL on its in-memory copy; the callback reloads
-	// the stored config, so set it again. Strict providers reject the
-	// exchange when the redirect_uri the code was issued for is missing.
-	cfg.OAuth2.RedirectURL = h.svc.baseURL + "/oauth/callback"
-
-	exchangeCtx := context.WithValue(
-		ctx,
-		oauth2.HTTPClient,
-		&http.Client{Timeout: providerHTTPTimeout},
-	)
+	ctx := h.svc.providerContext(r.Context())
 	token, err := h.oauth2Config(cfg.OAuth2).Exchange(
-		exchangeCtx,
-		q.Get("code"),
-		oauth2.SetAuthURLParam("code_verifier", st.PKCEVerifier),
+		ctx,
+		r.URL.Query().Get("code"),
+		oauth2.VerifierOption(st.PKCEVerifier),
 	)
 	if err != nil {
 		slog.Warn("oauth2 callback: code exchange failed", "error", err, "provider", cfg.ProviderID)
-		Fail(w, r, h.errRedirect, "login failed")
+		fail(w, r, "login failed")
 		return
 	}
-
-	profile, err := h.fetchProfile(ctx, cfg.OAuth2, token)
-	if err != nil {
+	var profile map[string]any
+	if err := oauthGet(ctx, token, cfg.OAuth2.UserInfoURL, &profile); err != nil {
 		slog.Warn("oauth2 callback: profile fetch failed", "error", err, "provider", cfg.ProviderID)
-		Fail(w, r, h.errRedirect, "login failed")
+		fail(w, r, "login failed")
 		return
 	}
-
 	subject := claimString(profile, "id", "sub")
 	if subject == "" {
-		Fail(w, r, h.errRedirect, "login failed")
+		fail(w, r, "login failed")
 		return
 	}
 	email := claimString(profile, "email")
 	verified := claimBool(profile, "email_verified")
-	if email == "" && cfg.OAuth2.EmailURL != "" {
-		email, verified = h.fetchEmail(ctx, cfg.OAuth2, token)
+	if cfg.OAuth2.EmailURL != "" {
+		// GitHub never marks the profile email verified, the emails endpoint
+		// is the only source for that.
+		email, verified = fetchEmail(ctx, cfg.OAuth2, token)
 	}
 
-	h.svc.completeSSO(ctx, w, r, h.linker, st, flowLinkOptions{
+	h.svc.completeSSO(w, r, h.linker, st.ReturnTo, flowLinkOptions{
 		ProviderID:      cfg.ProviderID,
+		WorkspaceID:     cfg.WorkspaceID,
 		Subject:         subject,
 		Email:           email,
 		EmailVerified:   verified,
-		Public:          cfg.WorkspaceID == "",
 		Name:            claimString(profile, "name", "login"),
 		Picture:         claimString(profile, "avatar_url"),
 		JITProvisioning: cfg.OAuth2.JITProvisioning,
-	}, h.errRedirect)
+		LinkUserID:      st.LinkUserID,
+	})
 }
 
-func (h *oauth2Flow) fetchProfile(
-	ctx context.Context,
-	cfg *OAuth2Provider,
-	tok *oauth2.Token,
-) (map[string]any, error) {
-	resp, err := oauthGet(ctx, tok, cfg.UserInfoURL)
-	if err != nil {
-		return nil, err
+// fetchEmail picks the primary verified address from an email-list
+// endpoint, else any verified one. Unverified addresses never match an
+// account, so they are not worth returning.
+func fetchEmail(ctx context.Context, cfg *OAuth2Provider, tok *oauth2.Token) (string, bool) {
+	var entries []struct {
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, errors.New("oauth2: userinfo request failed")
-	}
-
-	dec := json.NewDecoder(io.LimitReader(resp.Body, profileBodyLimit))
-	dec.UseNumber()
-	var profile map[string]any
-	if err := dec.Decode(&profile); err != nil {
-		return nil, err
-	}
-	return profile, nil
-}
-
-// fetchEmail is a best-effort fetch for providers that keep email out of the
-// profile. It returns the chosen address and whether it is verified.
-func (h *oauth2Flow) fetchEmail(
-	ctx context.Context,
-	cfg *OAuth2Provider,
-	tok *oauth2.Token,
-) (string, bool) {
-	resp, err := oauthGet(ctx, tok, cfg.EmailURL)
-	if err != nil {
+	if err := oauthGet(ctx, tok, cfg.EmailURL, &entries); err != nil {
 		return "", false
 	}
-	defer resp.Body.Close()
-
-	var entries []emailEntry
-	if err := json.NewDecoder(io.LimitReader(resp.Body, profileBodyLimit)).
-		Decode(&entries); err != nil {
-		return "", false
-	}
-
 	var fallback string
-	var fallbackVerified bool
 	for _, e := range entries {
-		if fallback == "" {
-			fallback, fallbackVerified = e.Email, e.Verified
+		if !e.Verified {
+			continue
 		}
-		if e.Primary && e.Verified {
-			return e.Email, true
-		}
-	}
-	for _, e := range entries {
 		if e.Primary {
-			return e.Email, e.Verified
-		}
-	}
-	for _, e := range entries {
-		if e.Verified {
 			return e.Email, true
 		}
+		if fallback == "" {
+			fallback = e.Email
+		}
 	}
-	return fallback, fallbackVerified
+	return fallback, fallback != ""
 }
 
 func (h *oauth2Flow) oauth2Config(cfg *OAuth2Provider) *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  cfg.AuthURL,
-			TokenURL: cfg.TokenURL,
-		},
-		RedirectURL: cfg.RedirectURL,
-		Scopes:      cfg.Scopes,
+		Endpoint:     oauth2.Endpoint{AuthURL: cfg.AuthURL, TokenURL: cfg.TokenURL},
+		RedirectURL:  h.svc.baseURL + "/oauth/callback",
+		Scopes:       cfg.Scopes,
 	}
 }
 
-// oauthGet performs an authenticated GET, carrying ctx so cancellation
-// works. The URL comes from host-configured provider fields, never request
-// input.
-func oauthGet(ctx context.Context, tok *oauth2.Token, url string) (*http.Response, error) {
+// oauthGet performs an authenticated GET and decodes the JSON body into
+// dst. ctx carries the guarded provider client.
+func oauthGet(ctx context.Context, tok *oauth2.Token, url string, dst any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	client := oauth2.NewClient(ctx, oauth2.StaticTokenSource(tok))
-	client.Timeout = providerHTTPTimeout
-	return client.Do(req)
+	resp, err := oauth2.NewClient(ctx, oauth2.StaticTokenSource(tok)).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return errors.New("oauth2: " + resp.Status)
+	}
+	dec := json.NewDecoder(io.LimitReader(resp.Body, profileBodyLimit))
+	dec.UseNumber()
+	return dec.Decode(dst)
 }

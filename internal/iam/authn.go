@@ -15,7 +15,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -87,20 +86,21 @@ func (s *Service) AuthenticateToken(
 }
 
 // AuthenticateAPIKey resolves a service-account bearer credential. The
-// lookup runs on the admin pool: it is the step that establishes the
-// tenant, so it cannot be tenant-scoped (RLS) itself.
+// lookup is the step that establishes the tenant, so it runs as the system
+// role instead of tenant-scoped.
 func (s *Service) AuthenticateAPIKey(ctx context.Context, raw string) (Principal, error) {
 	hash, err := crypto.HashToken(raw)
 	if err != nil {
 		return Principal{}, err
 	}
-	sa, err := s.conn.AdminQuerier().GetServiceAccountByTokenHash(ctx, &hash)
+	sa, err := s.sys.GetServiceAccountByTokenHash(ctx, &hash)
 	if err != nil {
 		return Principal{}, ErrInvalidCredentials
 	}
 	if sa.ExpiresAt != nil && sa.ExpiresAt.Before(s.now()) {
 		return Principal{}, ErrCredentialsExpired
 	}
+	_ = s.sys.TouchServiceAccount(ctx, sa.ID)
 	return Principal{
 		ID:          sa.ID,
 		Kind:        KindServiceAccount,
@@ -134,9 +134,6 @@ func (s *Service) verifySessionProof(
 	header http.Header,
 	procedure, token, binding string,
 ) error {
-	if s.DPoP == nil {
-		return errors.New("iam: dpop is not configured")
-	}
 	proof := header.Get("DPoP")
 	if proof == "" {
 		return ErrDPoPRequired
@@ -148,9 +145,6 @@ func (s *Service) verifySessionProof(
 // API URL, to a response header so a client recovering from a stale nonce
 // also corrects the htu it signs (RFC 9449 section 8).
 func (s *Service) AdvertiseDPoPNonce(h http.Header) {
-	if s.DPoP == nil {
-		return
-	}
 	h.Set(DeviceURLHeader, s.baseURL)
 	h.Set("DPoP-Nonce", s.DPoP.CurrentNonce())
 }
@@ -171,16 +165,8 @@ func requestCredential(h http.Header) (token string, fromHeader bool) {
 	}
 	// The session cookie doubles as the browser credential for connect
 	// calls made with credentials: include.
-	if c := CookieFromHeader(h, sessionCookieName); c != "" {
+	if c := cookieFromHeader(h, sessionCookieName); c != "" {
 		return c, false
 	}
 	return "", false
-}
-
-// derefTime tolerates a nil expiry.
-func derefTime(t *time.Time) time.Time {
-	if t == nil {
-		return time.Time{}
-	}
-	return *t
 }

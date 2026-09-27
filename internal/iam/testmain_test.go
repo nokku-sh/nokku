@@ -3,6 +3,8 @@ package iam
 import (
 	"os"
 	"testing"
+
+	"github.com/nokku-sh/nokku/internal/testdb"
 )
 
 // TestMain clears the boot-seeding environment so constructing a Service in
@@ -21,5 +23,6 @@ func TestMain(m *testing.M) {
 	} {
 		os.Unsetenv(key)
 	}
+	testdb.Setup("iam")
 	os.Exit(m.Run())
 }

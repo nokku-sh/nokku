@@ -1,17 +1,16 @@
 package iam
 
-// Workspace domains: verified email-domain to workspace bindings that drive
-// home-realm discovery, JIT checks, and SSO enforcement. Verification is a
-// DNS TXT lookup at _nokku-verify.<domain> (the label the UI shows; kept
-// stable across the merge-back).
+// Workspace domains: verified email-domain to workspace bindings. A verified
+// domain belongs to exactly one workspace and makes that workspace the
+// authority over every account under it: home-realm discovery, SSO
+// enforcement, SSO email matching, JIT provisioning, and SCIM. Verification
+// is a DNS TXT lookup at _nokku-verify.<domain>.
 
 import (
 	"context"
 	"errors"
 	"net"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -23,7 +22,6 @@ const domainTXTPrefix = "_nokku-verify."
 // TenantDomain is one workspace domain binding.
 type TenantDomain struct {
 	WorkspaceID string
-	ProviderID  string
 	Domain      string
 	Token       string
 	VerifiedAt  time.Time
@@ -78,10 +76,7 @@ func (s *Service) GetTenantDomain(
 		return nil
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return TenantDomain{}, ErrNotFound
-		}
-		return TenantDomain{}, err
+		return TenantDomain{}, mapNotFound(err)
 	}
 	return out, nil
 }
@@ -96,7 +91,6 @@ func (s *Service) PutTenantDomain(
 	if err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		r, err := q.UpsertWorkspaceDomain(ctx, &db.UpsertWorkspaceDomainParams{
 			WorkspaceID: workspaceID,
-			ProviderID:  workspaceID,
 			Domain:      domain,
 		})
 		if err != nil {
@@ -121,7 +115,7 @@ func (s *Service) DeleteTenantDomain(ctx context.Context, workspaceID, domain st
 }
 
 // VerifyTenantDomain resolves the TXT proof at _nokku-verify.<domain> and, on
-// a match, marks the binding verified for the verification window.
+// a match, marks the binding verified.
 func (s *Service) VerifyTenantDomain(
 	ctx context.Context,
 	workspaceID, domain string,
@@ -157,38 +151,33 @@ func (s *Service) VerifyTenantDomain(
 }
 
 // GetVerifiedTenantDomain returns the verified binding for domain, or
-// ErrNotFound. It backs home-realm discovery on the login page. Discovery
-// runs pre-auth with no principal, so the read goes out as nokku_system:
-// matching by domain is global by design.
-func (s *Service) GetVerifiedTenantDomain(
-	ctx context.Context,
-	domain string,
-) (TenantDomain, error) {
-	var out TenantDomain
-	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
-		r, err := q.GetVerifiedWorkspaceDomain(ctx, domain)
-		if err != nil {
-			return err
-		}
-		out = domainFromRow(r)
-		return nil
-	})
+// ErrNotFound. Discovery runs pre-auth, so the read is global by design.
+func (s *Service) GetVerifiedTenantDomain(ctx context.Context, domain string) (TenantDomain, error) {
+	r, err := s.sys.GetVerifiedWorkspaceDomain(ctx, domain)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return TenantDomain{}, ErrNotFound
-		}
-		return TenantDomain{}, err
+		return TenantDomain{}, mapNotFound(err)
 	}
-	if !out.Verified() {
-		return TenantDomain{}, ErrNotFound
+	return domainFromRow(r), nil
+}
+
+// managedBy reports whether workspaceID has verified the domain of email.
+// Only then may the workspace create, match, change, or delete the account
+// behind it. Anything else would let one tenant reach another tenant's
+// users, since accounts are global.
+func (s *Service) managedBy(ctx context.Context, workspaceID, email string) (bool, error) {
+	d, err := s.GetVerifiedTenantDomain(ctx, emailDomain(email))
+	if errors.Is(err, ErrNotFound) {
+		return false, nil
 	}
-	return out, nil
+	if err != nil {
+		return false, err
+	}
+	return d.WorkspaceID == workspaceID, nil
 }
 
 func domainFromRow(r *db.WorkspaceDomain) TenantDomain {
 	out := TenantDomain{
 		WorkspaceID: r.WorkspaceID,
-		ProviderID:  r.ProviderID,
 		Domain:      r.Domain,
 		Token:       r.Token,
 		CreatedAt:   r.CreatedAt,

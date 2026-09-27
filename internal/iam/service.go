@@ -1,11 +1,13 @@
 // Package iam owns nokku's identity and access management: users,
-// credentials, sessions, and one-time tokens. It is the merged-back auth
-// engine (see docs/adr/0001-merge-auth-back-into-nokku.md): identity lives in
-// the same schema as the domain so memberships, teams, and audit join it in
-// plain SQL.
+// credentials, sessions, and one-time tokens. Identity lives in the same
+// schema as the domain so memberships, teams, and audit join it in plain SQL.
 //
 // The package deals in identities only. Roles, permissions, workspaces, and
-// billing stay outside; iam never answers "may this actor do X".
+// billing stay outside, iam never answers "may this actor do X".
+//
+// Users are global. A workspace gains authority over an account (SCIM
+// changes, SSO email matching, JIT provisioning) only when it has verified
+// the account's email domain. See managedBy.
 package iam
 
 import (
@@ -14,6 +16,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/caarlos0/env/v11"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -47,7 +51,7 @@ const (
 	ActionCredentialAdded Action = "credential_added" //nolint:gosec // an audit action name, not a credential
 )
 
-// Event is an auth lifecycle event. The audit service subscribes as a Sink;
+// Event is an auth lifecycle event. The audit service subscribes as a Sink,
 // iam never writes audit rows itself.
 type Event struct {
 	Action      Action
@@ -65,175 +69,135 @@ type Sink interface {
 	Record(ctx context.Context, e Event)
 }
 
-// Deps configures the service. Querier is required; everything else has a
-// sane default.
+// Deps configures the service. Conn, Cache, Secret, and BaseURL are required.
 type Deps struct {
-	// BaseURL drives the session cookie's Secure attribute and email
-	// link construction.
+	// BaseURL drives the cookie Secure attribute, the passkey RP ID, and the
+	// DPoP htu.
 	BaseURL string
-	// Events receives lifecycle events. Optional; nil disables recording.
+	Conn    txRunner
+	// Cache backs SSO flow state, passkey ceremonies, the device flow, and
+	// DPoP replay tracking.
+	Cache Cache
+	// Secret keys the DPoP server nonce. It derives from NOKKU_SECRET.
+	Secret []byte
+	// Events receives lifecycle events. Optional.
 	Events Sink
 	// Password selects argon2id parameters. A zero value selects defaults.
-	Password PasswordParams
-	// Secret keys the DPoP server nonce. Required for DPoP; derives from
-	// NOKKU_SECRET.
-	Secret []byte
-	// Conn runs global queries and workspace-scoped queries under RLS
-	// (domains, SSO providers). Required.
-	Conn txRunner
-	// Cache backs SSO flow state and the device flow. Required for both.
-	Cache Cache
-	// Device flow settings; the flow builds only when Cache is set.
-	// DeviceVerificationURI string
-	DeviceSessionTTL time.Duration
-	// CanJoin gates SCIM provisioning on the plan's seat cap. used is the
-	// member count read in the provisioning transaction. Optional; nil
-	// allows all joins.
-	CanJoin func(ctx context.Context, workspaceID string, used int64) error
-	// OnUserLogin fires after a successful interactive user login (SSO or
-	// passkey), after the session cookie is set. Hosts attach post-login
-	// side effects: device remembering, new-login alerts.
-	OnUserLogin func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
-	// OnNewDeviceLogin fires when RememberDevice issued a first session for
-	// a device, so the host can send its geo-located new-login alert. Runs
-	// on a detached goroutine; delivery failures are the host's to log.
-	OnNewDeviceLogin func(ctx context.Context, u *db.User, sess db.Session, label, ip string)
-	// OnPasskeySignup fires after passkey-only signup created the account,
-	// so the host can send its verification email.
-	OnPasskeySignup func(r *http.Request, u *db.User)
-	// Passkey relying-party settings; the flow builds only when Cache and
-	// PasskeyRPID are set.
+	Password         PasswordParams
 	PasskeyRPOrigins []string
+	// CanJoin gates joins on the plan's seat cap. used is the member count
+	// read in the joining transaction. Optional.
+	CanJoin func(ctx context.Context, workspaceID string, used int64) error
+}
+
+// egressConfig lets self-hosted installs reach an IdP on a private network.
+// Leave it off for a multi-tenant deployment: workspace admins pick the IdP
+// URLs the server fetches.
+type egressConfig struct {
+	AllowPrivate bool `env:"NOKKU_SSO_ALLOW_PRIVATE_NETWORKS"`
 }
 
 // txRunner runs store reads and writes in the role the table needs: the
 // system role for global tables, the RLS-pinned role for tenant tables.
-// Narrow on purpose: *db.Connection satisfies it, tests provide in-memory
-// implementations.
+// *db.Connection satisfies it.
 type txRunner interface {
-	Querier() db.Querier
-	// AdminQuerier runs pre-authorization lookups that cannot be
-	// tenant-scoped: resolving a presented credential to a tenant.
-	AdminQuerier() db.Querier
+	// Sys runs single system statements: pre-authorization lookups that
+	// cannot be tenant-scoped, and the global identity tables.
+	Sys() db.Querier
 	WithTx(ctx context.Context, fn func(*db.Queries) error) error
 	WithWorkspace(ctx context.Context, fn func(*db.Queries) error) error
+	WithActor(ctx context.Context, actorID string, fn func(*db.Queries) error) error
 }
 
-// Service is the iam engine. Managers hang off it and share its querier and
-// event sink.
+// Service is the iam engine. Flows hang off it and share its store, cache,
+// and event sink. The hooks are set by the host after New.
 type Service struct {
-	q                db.Querier
-	baseURL          string
-	secure           bool
-	conn             txRunner
-	cache            Cache
-	events           Sink
-	CanJoin          func(ctx context.Context, workspaceID string, used int64) error
-	OnUserLogin      func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
-	OnNewDeviceLogin func(ctx context.Context, u *db.User, sess db.Session, label, ip string)
-	OnPasskeySignup  func(r *http.Request, u *db.User)
-	Password         *PasswordManager
-	DPoP             *DPoPVerifier
-	Device           *DeviceFlow
-	OIDC             *oidcFlow
-	OAuth2           *oauth2Flow
-	SAML             *samlFlow
-	Passkey          *passkeyFlow
-	SCIM             *SCIMFlow
+	sys     db.Querier // nokku_system, bypasses RLS
+	conn    txRunner
+	cache   Cache
+	events  Sink
+	baseURL string
+	secure  bool
+	now     func() time.Time
+	canJoin func(ctx context.Context, workspaceID string, used int64) error
+	idp     *http.Client // IdP egress, see newProviderClient
 
-	now func() time.Time
+	// OnUserLogin fires after a successful interactive browser login, after
+	// the session cookie is set: device remembering, new-login alerts.
+	OnUserLogin func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
+	// OnNewDeviceLogin fires on a detached goroutine when RememberDevice
+	// issued a first session for a device.
+	OnNewDeviceLogin func(ctx context.Context, u *db.User, sess *db.Session, label, ip string)
+	// OnPasskeySignup fires after passkey-only signup created the account,
+	// so the host can send its verification email.
+	OnPasskeySignup func(r *http.Request, u *db.User)
+
+	Password *PasswordManager
+	DPoP     *DPoPVerifier
+	Device   *DeviceFlow
+	OIDC     *oidcFlow
+	OAuth2   *oauth2Flow
+	SAML     *samlFlow
+	Passkey  *passkeyFlow
+	SCIM     *SCIMFlow
 }
 
-// New builds the service.
+// New builds the service, seeds the social providers and the bootstrap admin
+// from the environment, and loads or creates the SAML SP keypair.
 func New(ctx context.Context, d Deps) (*Service, error) {
-	if d.Conn == nil {
-		return nil, errors.New("iam: db connection is required")
+	if d.Conn == nil || d.Cache == nil || len(d.Secret) == 0 || d.BaseURL == "" {
+		return nil, errors.New("iam: conn, cache, secret, and base url are required")
 	}
-
-	svc := &Service{
-		q:                d.Conn.Querier(),
-		baseURL:          d.BaseURL,
-		secure:           strings.HasPrefix(strings.ToLower(d.BaseURL), "https://"),
-		conn:             d.Conn,
-		cache:            d.Cache,
-		events:           d.Events,
-		CanJoin:          d.CanJoin,
-		OnUserLogin:      d.OnUserLogin,
-		OnNewDeviceLogin: d.OnNewDeviceLogin,
-		OnPasskeySignup:  d.OnPasskeySignup,
-		now:              time.Now,
+	s := &Service{
+		sys:     d.Conn.Sys(),
+		conn:    d.Conn,
+		cache:   d.Cache,
+		events:  d.Events,
+		baseURL: d.BaseURL,
+		secure:  strings.HasPrefix(strings.ToLower(d.BaseURL), "https://"),
+		now:     time.Now,
+		canJoin: d.CanJoin,
 	}
-	svc.Password = newPasswordManager(svc, d.Password)
-	if len(d.Secret) > 0 {
-		// Replay detection rides the shared cache the service already
-		// carries; a nil cache disables it (tests only).
-		var replay ReplayStore
-		if d.Cache != nil {
-			replay = cacheReplay{d.Cache}
-		}
-		dpop, err := NewDPoPVerifier(DPoPOptions{
-			NonceSecret: d.Secret,
-			Replay:      replay,
-			Now:         svc.now,
-		})
-		if err != nil {
-			return nil, err
-		}
-		svc.DPoP = dpop
-	}
-	if svc.cache != nil && svc.DPoP != nil {
-		flow, err := NewDeviceFlow(svc, DeviceOptions{
-			Cache:      svc.cache,
-			SessionTTL: d.DeviceSessionTTL,
-		})
-		if err != nil {
-			return nil, err
-		}
-		svc.Device = flow
-	}
-	if svc.cache != nil {
-		svc.OIDC = newOIDCFlow(svc)
-		svc.OAuth2 = newOAuth2Flow(svc)
-		// Unlike the flows above, the SAML flow's error must not be
-		// swallowed: a nil receiver would panic on the first /saml/*
-		// request, so construction failure fails startup like the rest.
-		saml, err := newSAMLFlow(svc, SAMLConfig{
-			AcsURL:     d.BaseURL + "/saml/acs",
-			SPEntityID: d.BaseURL + "/saml/metadata",
-		})
-		if err != nil {
-			return nil, err
-		}
-		svc.SAML = saml
-	}
-	if svc.cache != nil {
-		passkey, err := newPasskeyFlow(
-			svc,
-			d.PasskeyRPOrigins,
-		)
-		if err != nil {
-			return nil, err
-		}
-		svc.Passkey = passkey
-	}
-	if svc.conn != nil {
-		svc.SCIM = newSCIMFlow(svc)
-	}
-
-	if err := svc.seedSocialProviders(ctx); err != nil {
+	cfg, err := env.ParseAs[egressConfig]()
+	if err != nil {
 		return nil, err
 	}
-
-	if err := svc.bootstrapUser(ctx); err != nil {
+	s.idp = newProviderClient(cfg.AllowPrivate)
+	s.Password = newPasswordManager(s, d.Password)
+	s.DPoP = &DPoPVerifier{secret: d.Secret, replay: d.Cache, now: s.now}
+	s.Device = &DeviceFlow{svc: s}
+	s.OIDC = newOIDCFlow(s)
+	s.OAuth2 = newOAuth2Flow(s)
+	if s.SAML, err = newSAMLFlow(ctx, s); err != nil {
 		return nil, err
 	}
-	return svc, nil
+	if s.Passkey, err = newPasskeyFlow(s, d.PasskeyRPOrigins); err != nil {
+		return nil, err
+	}
+	s.SCIM = newSCIMFlow(s)
+
+	if err := s.seedSocialProviders(ctx); err != nil {
+		return nil, err
+	}
+	if err := s.bootstrapUser(ctx); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// asSelf runs fn as the request's user under RLS. Whatever ids the caller
+// passes, fn can only reach that user's own rows.
+func (s *Service) asSelf(ctx context.Context, fn func(*db.Queries) error) error {
+	userID := UserIDFromContext(ctx)
+	if userID == "" {
+		return ErrNotFound
+	}
+	return s.conn.WithActor(ctx, userID, fn)
 }
 
 // record emits an event when a sink is configured.
 func (s *Service) record(ctx context.Context, e Event) {
-	if s.events == nil {
-		return
+	if s.events != nil {
+		s.events.Record(ctx, e)
 	}
-	s.events.Record(ctx, e)
 }
