@@ -6,13 +6,16 @@ VALUES
   (@id, @user_id, @type, @provider, @subject, @data, @label)
 ON CONFLICT (id) DO UPDATE
 SET
-  user_id = EXCLUDED.user_id,
   type = EXCLUDED.type,
   provider = EXCLUDED.provider,
   subject = EXCLUDED.subject,
   data = EXCLUDED.data,
   label = EXCLUDED.label,
   updated_at = NOW()
+-- A credential never moves to another account. A clash with someone else's
+-- row returns no rows.
+WHERE
+  credentials.user_id = EXCLUDED.user_id
 RETURNING
   *;
 

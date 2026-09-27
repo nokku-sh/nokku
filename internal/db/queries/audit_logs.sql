@@ -127,3 +127,12 @@ DELETE FROM audit.audit_logs
 WHERE
   workspace_id IS NULL
   AND timestamp < @cutoff;
+
+-- name: MaintainAuditPartitions :exec
+SELECT
+  audit.maintain_partitions ();
+
+-- name: EnableAuditRetention :exec
+-- Opts this transaction into the audit_logs delete guard.
+SELECT
+  set_config('nokku.audit_retention', 'on', TRUE);

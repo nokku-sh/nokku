@@ -244,8 +244,14 @@ SET
   last_used_at = NOW()
 WHERE
   id = $1
+  AND (
+    last_used_at IS NULL
+    OR last_used_at < NOW() - INTERVAL '1 minute'
+  )
 `
 
+// Throttled like the SCIM token touch, so a busy key does not turn every
+// request into a write.
 func (q *Queries) TouchServiceAccount(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, touchServiceAccount, id)
 	return err

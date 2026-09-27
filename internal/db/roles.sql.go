@@ -26,3 +26,37 @@ func (q *Queries) EnsureRole(ctx context.Context, arg *EnsureRoleParams) error {
 	_, err := q.db.Exec(ctx, ensureRole, arg.Name, arg.Description)
 	return err
 }
+
+const getActorRole = `-- name: GetActorRole :one
+SELECT
+  wm.role_name
+FROM
+  workspace_members wm
+WHERE
+  wm.workspace_id = $1::UUID
+  AND wm.user_id = $2::UUID
+UNION ALL
+SELECT
+  sa.role_name
+FROM
+  service_accounts sa
+WHERE
+  sa.workspace_id = $1::UUID
+  AND sa.id = $2::UUID
+LIMIT
+  1
+`
+
+type GetActorRoleParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	ActorID     string `json:"actorId"`
+}
+
+// The workspace role of a user or service account. Runs as the system role:
+// it resolves membership before any workspace is pinned.
+func (q *Queries) GetActorRole(ctx context.Context, arg *GetActorRoleParams) (string, error) {
+	row := q.db.QueryRow(ctx, getActorRole, arg.WorkspaceID, arg.ActorID)
+	var role_name string
+	err := row.Scan(&role_name)
+	return role_name, err
+}

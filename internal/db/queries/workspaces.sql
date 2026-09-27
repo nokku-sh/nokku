@@ -84,15 +84,26 @@ FROM
 WHERE
   created_by = @user_id;
 
--- name: GetWorkspacesByOwner :many
+-- name: ListOwnedWorkspaces :many
+-- The user's owned workspaces with their member count, so account deletion
+-- can tell solo workspaces from ones other people still use.
 SELECT
-  id
+  w.id,
+  w.name,
+  (
+    SELECT
+      COUNT(*)
+    FROM
+      workspace_members wm
+    WHERE
+      wm.workspace_id = w.id
+  )::INTEGER AS member_count
 FROM
-  workspaces
+  workspaces w
 WHERE
-  created_by = @user_id
+  w.created_by = @user_id
 ORDER BY
-  id ASC;
+  w.name ASC;
 
 -- name: GetActorWorkspaceIDs :many
 SELECT
@@ -201,22 +212,6 @@ WHERE
 RETURNING
   *;
 
--- name: UpdateEnrollToken :exec
-UPDATE workspaces
-SET
-  enroll_token_hash = @enroll_token_hash,
-  enroll_expires_at = @enroll_expires_at
-WHERE
-  id = @workspace_id;
-
--- name: UpdateInviteToken :exec
-UPDATE workspaces
-SET
-  invite_token_hash = @invite_token_hash,
-  invite_expires_at = @invite_expires_at
-WHERE
-  id = @workspace_id;
-
 -- name: GetWorkspaceOwner :one
 SELECT
   created_by
@@ -229,11 +224,6 @@ WHERE
 DELETE FROM workspaces
 WHERE
   id = @workspace_id;
-
--- name: DeleteWorkspacesByOwner :exec
-DELETE FROM workspaces
-WHERE
-  created_by = @user_id;
 
 -- name: RemoveWorkspaceMember :exec
 DELETE FROM workspace_members wm USING workspaces w
@@ -291,7 +281,7 @@ RETURNING
 INSERT INTO
   workspace_members (workspace_id, user_id, role_name)
 VALUES
-  (@workspace_id, @user_id, 'viewer')
+  (@workspace_id, @user_id, @role_name)
 ON CONFLICT (workspace_id, user_id) DO NOTHING;
 
 -- name: ListWorkspaceAuditWebhooks :many
@@ -305,3 +295,11 @@ SELECT
 FROM workspaces
 WHERE
   coalesce(settings ->> 'audit_webhook_url', '') <> '';
+
+-- name: GetWorkspaceStateVersion :one
+SELECT
+  version
+FROM
+  workspace_state
+WHERE
+  workspace_id = @workspace_id;

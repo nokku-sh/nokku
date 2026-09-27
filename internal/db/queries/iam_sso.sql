@@ -22,16 +22,6 @@ FROM
 WHERE
   provider_id = @provider_id;
 
--- name: DeleteSSOProvider :exec
-DELETE FROM sso_providers
-WHERE
-  provider_id = @provider_id;
-
--- name: DeleteTenantSSOProviders :execrows
-DELETE FROM sso_providers
-WHERE
-  workspace_id = @workspace_id;
-
 -- name: GetSAMLKeypair :one
 SELECT
   key_enc,

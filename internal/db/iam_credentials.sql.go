@@ -249,13 +249,14 @@ VALUES
   ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (id) DO UPDATE
 SET
-  user_id = EXCLUDED.user_id,
   type = EXCLUDED.type,
   provider = EXCLUDED.provider,
   subject = EXCLUDED.subject,
   data = EXCLUDED.data,
   label = EXCLUDED.label,
   updated_at = NOW()
+WHERE
+  credentials.user_id = EXCLUDED.user_id
 RETURNING
   id, user_id, type, provider, subject, data, label, created_at, updated_at
 `
@@ -271,6 +272,8 @@ type UpsertCredentialParams struct {
 }
 
 // One unified credential table for every login method (see 001_base.sql).
+// A credential never moves to another account. A clash with someone else's
+// row returns no rows.
 func (q *Queries) UpsertCredential(ctx context.Context, arg *UpsertCredentialParams) (*Credential, error) {
 	row := q.db.QueryRow(ctx, upsertCredential,
 		arg.ID,

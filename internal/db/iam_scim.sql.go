@@ -12,56 +12,17 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
-const countOtherUserMemberships = `-- name: CountOtherUserMemberships :one
+const countUserMemberships = `-- name: CountUserMemberships :one
 SELECT
   COUNT(*)::INTEGER
 FROM
-  workspace_members wm
+  workspace_members
 WHERE
-  wm.user_id = $1
-  AND wm.workspace_id <> $2
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      workspaces w
-    WHERE
-      w.id = wm.workspace_id
-      AND w.created_by = wm.user_id
-  )
+  user_id = $1
 `
 
-type CountOtherUserMembershipsParams struct {
-	UserID      string `json:"userId"`
-	WorkspaceID string `json:"workspaceId"`
-}
-
-// Memberships the user holds in workspaces they did not create, outside
-// the given workspace. SCIM deprovision keys off this: a membership in
-// someone else's workspace keeps the global account alive, while ties
-// only to the user's own workspaces are the shadow-IT orphan that gets
-// deactivated instead of deleted (the created_by cascade must never fire).
-func (q *Queries) CountOtherUserMemberships(ctx context.Context, arg *CountOtherUserMembershipsParams) (int32, error) {
-	row := q.db.QueryRow(ctx, countOtherUserMemberships, arg.UserID, arg.WorkspaceID)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const countWorkspacesCreatedBy = `-- name: CountWorkspacesCreatedBy :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  workspaces
-WHERE
-  created_by = $1
-`
-
-// Workspaces the user owns. A SCIM deprovision must never delete a global
-// account that owns a workspace: the schema's created_by cascade would take
-// the whole workspace with it.
-func (q *Queries) CountWorkspacesCreatedBy(ctx context.Context, userID string) (int32, error) {
-	row := q.db.QueryRow(ctx, countWorkspacesCreatedBy, userID)
+func (q *Queries) CountUserMemberships(ctx context.Context, userID string) (int32, error) {
+	row := q.db.QueryRow(ctx, countUserMemberships, userID)
 	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -162,32 +123,6 @@ func (q *Queries) DeleteUserSCIMCredentials(ctx context.Context, arg *DeleteUser
 	return err
 }
 
-const getSCIMCredentialByUser = `-- name: GetSCIMCredentialByUser :one
-SELECT
-  subject
-FROM
-  credentials
-WHERE
-  user_id = $1
-  AND type = 'scim'
-  AND provider = $2
-  AND subject <> ''
-LIMIT
-  1
-`
-
-type GetSCIMCredentialByUserParams struct {
-	UserID      string `json:"userId"`
-	WorkspaceID string `json:"workspaceId"`
-}
-
-func (q *Queries) GetSCIMCredentialByUser(ctx context.Context, arg *GetSCIMCredentialByUserParams) (string, error) {
-	row := q.db.QueryRow(ctx, getSCIMCredentialByUser, arg.UserID, arg.WorkspaceID)
-	var subject string
-	err := row.Scan(&subject)
-	return subject, err
-}
-
 const getSCIMTokenByHash = `-- name: GetSCIMTokenByHash :one
 SELECT
   id, workspace_id, token_hash, label, created_at, last_used_at
@@ -211,35 +146,76 @@ func (q *Queries) GetSCIMTokenByHash(ctx context.Context, tokenHash crypto.Hashe
 	return &i, err
 }
 
-const listWorkspaceSCIMCredentials = `-- name: ListWorkspaceSCIMCredentials :many
+const listManagedMembers = `-- name: ListManagedMembers :many
 SELECT
-  user_id,
-  subject
+  u.id, u.email, u.name, u.picture, u.active, u.email_verified, u.disable_password_reset, u.created_at, u.updated_at,
+  COALESCE(c.subject, '')::TEXT AS external_id
 FROM
-  credentials
+  workspace_members wm
+  JOIN users u ON u.id = wm.user_id
+  JOIN workspace_domains d ON d.workspace_id = wm.workspace_id
+  AND d.domain = split_part(u.email, '@', 2)
+  AND d.verified_at IS NOT NULL
+  LEFT JOIN credentials c ON c.user_id = u.id
+  AND c.type = 'scim'
+  AND c.provider = wm.workspace_id::TEXT
 WHERE
-  type = 'scim'
-  AND provider = $1
-  AND subject <> ''
+  wm.workspace_id = $1
+  AND (
+    $2::UUID IS NULL
+    OR u.id = $2
+  )
+  AND (
+    $3::TEXT IS NULL
+    OR u.email = $3
+  )
+ORDER BY
+  u.created_at ASC,
+  u.id ASC
 `
 
-type ListWorkspaceSCIMCredentialsRow struct {
-	UserID  string `json:"userId"`
-	Subject string `json:"subject"`
+type ListManagedMembersParams struct {
+	WorkspaceID string  `json:"workspaceId"`
+	UserID      *string `json:"userId"`
+	Email       *string `json:"email"`
 }
 
-// externalId mappings for every SCIM-linked user of the workspace, one read
-// for list responses instead of one per resource.
-func (q *Queries) ListWorkspaceSCIMCredentials(ctx context.Context, workspaceID string) ([]*ListWorkspaceSCIMCredentialsRow, error) {
-	rows, err := q.db.Query(ctx, listWorkspaceSCIMCredentials, workspaceID)
+type ListManagedMembersRow struct {
+	ID                   string    `json:"id"`
+	Email                string    `json:"email"`
+	Name                 string    `json:"name"`
+	Picture              *string   `json:"picture"`
+	Active               bool      `json:"active"`
+	EmailVerified        bool      `json:"emailVerified"`
+	DisablePasswordReset bool      `json:"disablePasswordReset"`
+	CreatedAt            time.Time `json:"createdAt"`
+	UpdatedAt            time.Time `json:"updatedAt"`
+	ExternalID           string    `json:"externalId"`
+}
+
+// Members whose email domain the workspace has verified: the only accounts
+// a SCIM connector may see or change. email narrows to one account.
+func (q *Queries) ListManagedMembers(ctx context.Context, arg *ListManagedMembersParams) ([]*ListManagedMembersRow, error) {
+	rows, err := q.db.Query(ctx, listManagedMembers, arg.WorkspaceID, arg.UserID, arg.Email)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*ListWorkspaceSCIMCredentialsRow
+	var items []*ListManagedMembersRow
 	for rows.Next() {
-		var i ListWorkspaceSCIMCredentialsRow
-		if err := rows.Scan(&i.UserID, &i.Subject); err != nil {
+		var i ListManagedMembersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Name,
+			&i.Picture,
+			&i.Active,
+			&i.EmailVerified,
+			&i.DisablePasswordReset,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ExternalID,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, &i)

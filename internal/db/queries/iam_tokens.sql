@@ -8,10 +8,10 @@ VALUES
 DELETE FROM one_time_tokens
 WHERE
   token_hash = @token_hash
+  AND purpose = @purpose
   AND expires_at > NOW()
 RETURNING
-  user_id,
-  purpose;
+  user_id;
 
 -- name: HasRecentToken :one
 SELECT EXISTS (

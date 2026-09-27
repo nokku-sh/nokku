@@ -1,11 +1,10 @@
 -- name: UpsertWorkspaceDomain :one
 INSERT INTO
-  workspace_domains (workspace_id, domain, provider_id, verified_at)
+  workspace_domains (workspace_id, domain, verified_at)
 VALUES
-  (@workspace_id, @domain, @provider_id, NULL)
+  (@workspace_id, @domain, NULL)
 ON CONFLICT (workspace_id, domain) DO UPDATE
 SET
-  provider_id = EXCLUDED.provider_id,
   token = encode(gen_random_bytes (16), 'hex'),
   verified_at = NULL,
   updated_at = NOW()
@@ -38,15 +37,6 @@ FROM
   workspace_domains
 WHERE
   domain = @domain
-  AND verified_at IS NOT NULL;
-
--- name: ListVerifiedDomainsForProvider :many
-SELECT
-  *
-FROM
-  workspace_domains
-WHERE
-  provider_id = @provider_id
   AND verified_at IS NOT NULL;
 
 -- name: VerifyWorkspaceDomain :one

@@ -40,17 +40,13 @@ func (w *Workspace) ToProto() *nokkuv1.Workspace {
 		return nil
 	}
 	return &nokkuv1.Workspace{
-		Id:              &w.ID,
-		Name:            &w.Name,
-		Description:     w.Description,
-		EnrollTokenHash: new(w.EnrollTokenHash.Hash()),
-		EnrollExpiresAt: SafeTimestamp(w.EnrollExpiresAt),
-		InviteTokenHash: new(w.InviteTokenHash.Hash()),
-		InviteExpiresAt: SafeTimestamp(w.InviteExpiresAt),
-		Settings:        w.Settings,
-		CreatedBy:       &w.CreatedBy,
-		CreatedAt:       SafeTimestamp(&w.CreatedAt),
-		UpdatedAt:       SafeTimestamp(&w.UpdatedAt),
+		Id:          &w.ID,
+		Name:        &w.Name,
+		Description: w.Description,
+		Settings:    w.Settings,
+		CreatedBy:   &w.CreatedBy,
+		CreatedAt:   SafeTimestamp(&w.CreatedAt),
+		UpdatedAt:   SafeTimestamp(&w.UpdatedAt),
 	}
 }
 
@@ -332,4 +328,24 @@ func (p *ListPrincipalsRow) ToProto() *nokkuv1.Principal {
 
 func PrincipalsToProto(ps []*ListPrincipalsRow) []*nokkuv1.Principal {
 	return mapSlice(ps, func(p *ListPrincipalsRow) *nokkuv1.Principal { return p.ToProto() })
+}
+
+func (t *WorkspaceToken) ToProto() *nokkuv1.Token {
+	return &nokkuv1.Token{
+		Id:          &t.ID,
+		Kind:        &t.Kind,
+		Label:       &t.Label,
+		ExpiresAt:   SafeTimestamp(t.ExpiresAt),
+		MaxUses:     t.MaxUses,
+		Uses:        &t.Uses,
+		AutoApprove: &t.AutoApprove,
+		CaId:        t.CaID,
+		RoleName:    t.RoleName,
+		CreatedAt:   SafeTimestamp(&t.CreatedAt),
+		LastUsedAt:  SafeTimestamp(t.LastUsedAt),
+	}
+}
+
+func TokensToProto(ts []*WorkspaceToken) []*nokkuv1.Token {
+	return mapSlice(ts, func(t *WorkspaceToken) *nokkuv1.Token { return t.ToProto() })
 }

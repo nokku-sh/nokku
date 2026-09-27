@@ -49,28 +49,42 @@ WHERE
   id = @id
   AND workspace_id = @workspace_id;
 
--- name: CountOtherUserMemberships :one
--- Memberships the user holds in workspaces they did not create, outside
--- the given workspace. SCIM deprovision keys off this: a membership in
--- someone else's workspace keeps the global account alive, while ties
--- only to the user's own workspaces are the shadow-IT orphan that gets
--- deactivated instead of deleted (the created_by cascade must never fire).
+-- name: CountUserMemberships :one
 SELECT
   COUNT(*)::INTEGER
 FROM
-  workspace_members wm
+  workspace_members
 WHERE
-  wm.user_id = @user_id
-  AND wm.workspace_id <> @workspace_id
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      workspaces w
-    WHERE
-      w.id = wm.workspace_id
-      AND w.created_by = wm.user_id
-  );
+  user_id = @user_id;
+
+-- name: ListManagedMembers :many
+-- Members whose email domain the workspace has verified: the only accounts
+-- a SCIM connector may see or change. email narrows to one account.
+SELECT
+  u.*,
+  COALESCE(c.subject, '')::TEXT AS external_id
+FROM
+  workspace_members wm
+  JOIN users u ON u.id = wm.user_id
+  JOIN workspace_domains d ON d.workspace_id = wm.workspace_id
+  AND d.domain = split_part(u.email, '@', 2)
+  AND d.verified_at IS NOT NULL
+  LEFT JOIN credentials c ON c.user_id = u.id
+  AND c.type = 'scim'
+  AND c.provider = wm.workspace_id::TEXT
+WHERE
+  wm.workspace_id = @workspace_id
+  AND (
+    sqlc.narg('user_id')::UUID IS NULL
+    OR u.id = sqlc.narg('user_id')
+  )
+  AND (
+    sqlc.narg('email')::TEXT IS NULL
+    OR u.email = sqlc.narg('email')
+  )
+ORDER BY
+  u.created_at ASC,
+  u.id ASC;
 
 -- name: DeleteUserSCIMCredentials :exec
 DELETE FROM credentials
@@ -78,43 +92,6 @@ WHERE
   user_id = @user_id
   AND type = 'scim'
   AND provider = @workspace_id;
-
--- name: ListWorkspaceSCIMCredentials :many
--- externalId mappings for every SCIM-linked user of the workspace, one read
--- for list responses instead of one per resource.
-SELECT
-  user_id,
-  subject
-FROM
-  credentials
-WHERE
-  type = 'scim'
-  AND provider = @workspace_id
-  AND subject <> '';
-
--- name: GetSCIMCredentialByUser :one
-SELECT
-  subject
-FROM
-  credentials
-WHERE
-  user_id = @user_id
-  AND type = 'scim'
-  AND provider = @workspace_id
-  AND subject <> ''
-LIMIT
-  1;
-
--- name: CountWorkspacesCreatedBy :one
--- Workspaces the user owns. A SCIM deprovision must never delete a global
--- account that owns a workspace: the schema's created_by cascade would take
--- the whole workspace with it.
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  workspaces
-WHERE
-  created_by = @user_id;
 
 -- name: DeleteStaleUserSCIMCredentials :exec
 -- Drops the user's other SCIM externalId mappings for the workspace, so an

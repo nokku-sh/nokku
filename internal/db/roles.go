@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"slices"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // Permission is a single action a role may perform on a resource.
@@ -90,7 +92,6 @@ type builtinRole struct {
 	name                        string
 	description                 string
 	permissions                 []Permission
-	system                      bool // internal role, not exposed to users
 	assignableToUsers           bool // grantable to members via role change
 	assignableToServiceAccounts bool // grantable to service accounts
 }
@@ -155,18 +156,6 @@ var builtinRoles = []builtinRole{
 			perm("service_accounts", "view"),
 		),
 	},
-	{
-		// "daemon" is a system role, not assignable to users or service accounts.
-		name:        "daemon",
-		description: "Fixed permissions for daemon agents",
-		system:      true,
-		permissions: slices.Concat(
-			perm("cas", "view"),
-			perm("targets", "edit"),
-			perm("principals", "edit"),
-			perm("daemons", "edit"),
-		),
-	},
 }
 
 // RoleInfo describes a role for API consumers.
@@ -179,13 +168,10 @@ type RoleInfo struct {
 }
 
 // UserFacingRoles returns the roles that can be held by workspace members and
-// service accounts, excluding system roles such as "daemon".
+// service accounts.
 func UserFacingRoles() []RoleInfo {
 	out := make([]RoleInfo, 0, len(builtinRoles))
 	for _, r := range builtinRoles {
-		if r.system {
-			continue
-		}
 		out = append(out, RoleInfo{
 			Name:                        r.name,
 			Description:                 r.description,
@@ -195,6 +181,17 @@ func UserFacingRoles() []RoleInfo {
 		})
 	}
 	return out
+}
+
+// IsUserRole reports whether a role may be given to a workspace member, by
+// role change or invite.
+func IsUserRole(roleName string) bool {
+	for _, r := range builtinRoles {
+		if r.name == roleName {
+			return r.assignableToUsers
+		}
+	}
+	return false
 }
 
 // IsServiceAccountRole reports whether a role may be assigned to a service
@@ -220,8 +217,8 @@ func HasPermission(roleName string, p Permission) bool {
 
 // setupRBACRoles seeds the built-in role names so workspace_members and
 // service_accounts can reference them via foreign keys.
-func (c *Connection) setupRBACRoles(ctx context.Context) error {
-	tx, err := c.AdminPool.Begin(ctx)
+func setupRBACRoles(ctx context.Context, conn *pgx.Conn) error {
+	tx, err := conn.Begin(ctx)
 	if err != nil {
 		return err
 	}

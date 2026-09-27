@@ -1,4 +1,4 @@
--- name: CreateSession :exec
+-- name: CreateSession :one
 INSERT INTO
   sessions (token_hash, subject_id, kind, method, workspace_id, binding, label, expires_at, last_seen_at)
 VALUES
@@ -12,7 +12,9 @@ VALUES
     @label,
     sqlc.narg('expires_at'),
     sqlc.narg('last_seen_at')
-  );
+  )
+RETURNING
+  *;
 
 -- name: GetSession :one
 SELECT
@@ -30,7 +32,7 @@ FROM
 WHERE
   subject_id = @subject_id
 ORDER BY
-  last_seen_at DESC;
+  last_seen_at DESC NULLS LAST;
 
 -- name: TouchSession :exec
 UPDATE sessions

@@ -100,8 +100,14 @@ WHERE
   AND (expires_at IS NULL OR expires_at > NOW());
 
 -- name: TouchServiceAccount :exec
+-- Throttled like the SCIM token touch, so a busy key does not turn every
+-- request into a write.
 UPDATE service_accounts
 SET
   last_used_at = NOW()
 WHERE
-  id = @id;
+  id = @id
+  AND (
+    last_used_at IS NULL
+    OR last_used_at < NOW() - INTERVAL '1 minute'
+  );
