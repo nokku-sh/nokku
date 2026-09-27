@@ -14,77 +14,9 @@ import type { Message } from '@bufbuild/protobuf';
  * Describes the file nokku/v1/invitation.proto.
  */
 export const file_nokku_v1_invitation: GenFile /*@__PURE__*/ = fileDesc(
-	'Chlub2trdS92MS9pbnZpdGF0aW9uLnByb3RvEghub2trdS52MSI7ChlSZWZyZXNoSW52aXRlVG9rZW5SZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQEiWgoaUmVmcmVzaEludml0ZVRva2VuUmVzcG9uc2USDAoEbGluaxgBIAEoCRIuCgpleHBpcmVzX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI6ChhSZXZva2VJbnZpdGVUb2tlblJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABASIbChlSZXZva2VJbnZpdGVUb2tlblJlc3BvbnNlIi4KFEdldEludml0YXRpb25SZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABIn4KFUdldEludml0YXRpb25SZXNwb25zZRIWCg53b3Jrc3BhY2VfbmFtZRgBIAEoCRIdChV3b3Jrc3BhY2VfZGVzY3JpcHRpb24YAiABKAkSLgoKZXhwaXJlc19hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiMQoXQWNjZXB0SW52aXRhdGlvblJlcXVlc3QSFgoFdG9rZW4YASABKAlCB7pIBHICEAEiMAoYQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlEhQKDHdvcmtzcGFjZV9pZBgBIAEoCTKrBAoRSW52aXRhdGlvblNlcnZpY2USlgEKElJlZnJlc2hJbnZpdGVUb2tlbhIjLm5va2t1LnYxLlJlZnJlc2hJbnZpdGVUb2tlblJlcXVlc3QaJC5ub2trdS52MS5SZWZyZXNoSW52aXRlVG9rZW5SZXNwb25zZSI1gtPkkwIvIi0vdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9pbnZpdGVzOnJlZnJlc2gSkgEKEVJldm9rZUludml0ZVRva2VuEiIubm9ra3UudjEuUmV2b2tlSW52aXRlVG9rZW5SZXF1ZXN0GiMubm9ra3UudjEuUmV2b2tlSW52aXRlVG9rZW5SZXNwb25zZSI0gtPkkwIuKiwvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9pbnZpdGVzOnJldm9rZRJwCg1HZXRJbnZpdGF0aW9uEh4ubm9ra3UudjEuR2V0SW52aXRhdGlvblJlcXVlc3QaHy5ub2trdS52MS5HZXRJbnZpdGF0aW9uUmVzcG9uc2UiHpACAYLT5JMCFRITL3YxL2ludml0ZXMve3Rva2VufRJ2ChBBY2NlcHRJbnZpdGF0aW9uEiEubm9ra3UudjEuQWNjZXB0SW52aXRhdGlvblJlcXVlc3QaIi5ub2trdS52MS5BY2NlcHRJbnZpdGF0aW9uUmVzcG9uc2UiG4LT5JMCFSITL3YxL2ludml0ZXMve3Rva2VufUKZAQoMY29tLm5va2t1LnYxQg9JbnZpdGF0aW9uUHJvdG9QAVo3Z2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9pbnRlcm5hbC9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac',
+	'Chlub2trdS92MS9pbnZpdGF0aW9uLnByb3RvEghub2trdS52MSIuChRHZXRJbnZpdGF0aW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQASKRAQoVR2V0SW52aXRhdGlvblJlc3BvbnNlEhYKDndvcmtzcGFjZV9uYW1lGAEgASgJEh0KFXdvcmtzcGFjZV9kZXNjcmlwdGlvbhgCIAEoCRIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglyb2xlX25hbWUYBCABKAkiMQoXQWNjZXB0SW52aXRhdGlvblJlcXVlc3QSFgoFdG9rZW4YASABKAlCB7pIBHICEAEiMAoYQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlEhQKDHdvcmtzcGFjZV9pZBgBIAEoCTL9AQoRSW52aXRhdGlvblNlcnZpY2UScAoNR2V0SW52aXRhdGlvbhIeLm5va2t1LnYxLkdldEludml0YXRpb25SZXF1ZXN0Gh8ubm9ra3UudjEuR2V0SW52aXRhdGlvblJlc3BvbnNlIh6QAgGC0+STAhUSEy92MS9pbnZpdGVzL3t0b2tlbn0SdgoQQWNjZXB0SW52aXRhdGlvbhIhLm5va2t1LnYxLkFjY2VwdEludml0YXRpb25SZXF1ZXN0GiIubm9ra3UudjEuQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlIhuC0+STAhUiEy92MS9pbnZpdGVzL3t0b2tlbn1CmQEKDGNvbS5ub2trdS52MUIPSW52aXRhdGlvblByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
 	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
 );
-
-/**
- * @generated from message nokku.v1.RefreshInviteTokenRequest
- */
-export type RefreshInviteTokenRequest = Message<'nokku.v1.RefreshInviteTokenRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
-};
-
-/**
- * Describes the message nokku.v1.RefreshInviteTokenRequest.
- * Use `create(RefreshInviteTokenRequestSchema)` to create a new message.
- */
-export const RefreshInviteTokenRequestSchema: GenMessage<RefreshInviteTokenRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_invitation, 0);
-
-/**
- * @generated from message nokku.v1.RefreshInviteTokenResponse
- */
-export type RefreshInviteTokenResponse = Message<'nokku.v1.RefreshInviteTokenResponse'> & {
-	/**
-	 * @generated from field: string link = 1;
-	 */
-	link: string;
-
-	/**
-	 * @generated from field: google.protobuf.Timestamp expires_at = 2;
-	 */
-	expiresAt?: Timestamp | undefined;
-};
-
-/**
- * Describes the message nokku.v1.RefreshInviteTokenResponse.
- * Use `create(RefreshInviteTokenResponseSchema)` to create a new message.
- */
-export const RefreshInviteTokenResponseSchema: GenMessage<RefreshInviteTokenResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_invitation, 1);
-
-/**
- * @generated from message nokku.v1.RevokeInviteTokenRequest
- */
-export type RevokeInviteTokenRequest = Message<'nokku.v1.RevokeInviteTokenRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
-};
-
-/**
- * Describes the message nokku.v1.RevokeInviteTokenRequest.
- * Use `create(RevokeInviteTokenRequestSchema)` to create a new message.
- */
-export const RevokeInviteTokenRequestSchema: GenMessage<RevokeInviteTokenRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_invitation, 2);
-
-/**
- * @generated from message nokku.v1.RevokeInviteTokenResponse
- */
-export type RevokeInviteTokenResponse = Message<'nokku.v1.RevokeInviteTokenResponse'> & {};
-
-/**
- * Describes the message nokku.v1.RevokeInviteTokenResponse.
- * Use `create(RevokeInviteTokenResponseSchema)` to create a new message.
- */
-export const RevokeInviteTokenResponseSchema: GenMessage<RevokeInviteTokenResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_invitation, 3);
 
 /**
  * @generated from message nokku.v1.GetInvitationRequest
@@ -101,7 +33,7 @@ export type GetInvitationRequest = Message<'nokku.v1.GetInvitationRequest'> & {
  * Use `create(GetInvitationRequestSchema)` to create a new message.
  */
 export const GetInvitationRequestSchema: GenMessage<GetInvitationRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_invitation, 4);
+	messageDesc(file_nokku_v1_invitation, 0);
 
 /**
  * @generated from message nokku.v1.GetInvitationResponse
@@ -121,6 +53,11 @@ export type GetInvitationResponse = Message<'nokku.v1.GetInvitationResponse'> & 
 	 * @generated from field: google.protobuf.Timestamp expires_at = 3;
 	 */
 	expiresAt?: Timestamp | undefined;
+
+	/**
+	 * @generated from field: string role_name = 4;
+	 */
+	roleName: string;
 };
 
 /**
@@ -128,7 +65,7 @@ export type GetInvitationResponse = Message<'nokku.v1.GetInvitationResponse'> & 
  * Use `create(GetInvitationResponseSchema)` to create a new message.
  */
 export const GetInvitationResponseSchema: GenMessage<GetInvitationResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_invitation, 5);
+	messageDesc(file_nokku_v1_invitation, 1);
 
 /**
  * @generated from message nokku.v1.AcceptInvitationRequest
@@ -145,7 +82,7 @@ export type AcceptInvitationRequest = Message<'nokku.v1.AcceptInvitationRequest'
  * Use `create(AcceptInvitationRequestSchema)` to create a new message.
  */
 export const AcceptInvitationRequestSchema: GenMessage<AcceptInvitationRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_invitation, 6);
+	messageDesc(file_nokku_v1_invitation, 2);
 
 /**
  * @generated from message nokku.v1.AcceptInvitationResponse
@@ -162,28 +99,12 @@ export type AcceptInvitationResponse = Message<'nokku.v1.AcceptInvitationRespons
  * Use `create(AcceptInvitationResponseSchema)` to create a new message.
  */
 export const AcceptInvitationResponseSchema: GenMessage<AcceptInvitationResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_invitation, 7);
+	messageDesc(file_nokku_v1_invitation, 3);
 
 /**
  * @generated from service nokku.v1.InvitationService
  */
 export const InvitationService: GenService<{
-	/**
-	 * @generated from rpc nokku.v1.InvitationService.RefreshInviteToken
-	 */
-	refreshInviteToken: {
-		methodKind: 'unary';
-		input: typeof RefreshInviteTokenRequestSchema;
-		output: typeof RefreshInviteTokenResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.InvitationService.RevokeInviteToken
-	 */
-	revokeInviteToken: {
-		methodKind: 'unary';
-		input: typeof RevokeInviteTokenRequestSchema;
-		output: typeof RevokeInviteTokenResponseSchema;
-	};
 	/**
 	 * @generated from rpc nokku.v1.InvitationService.GetInvitation
 	 */

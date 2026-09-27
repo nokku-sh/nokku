@@ -109,17 +109,6 @@ export const invite = {
 				inviteToken.current = '';
 				return toast.error('Failed to join workspace');
 			}
-		}),
-	refresh: () =>
-		useMutation(InvitationService.method.refreshInviteToken, {
-			onSuccess: () => toast.success('Invitation token refreshed!')
-		}),
-	revoke: () =>
-		useMutation(InvitationService.method.revokeInviteToken, {
-			onSuccess: () => {
-				inviteToken.current = '';
-				return toast.success('Invitation revoked!');
-			}
 		})
 };
 

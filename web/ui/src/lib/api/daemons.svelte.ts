@@ -71,8 +71,6 @@ export const daemon = {
 		useMutation(DaemonService.method.closeSession, {
 			onSuccess: (_, vars) => vars.sessionId && removeSession(vars.sessionId)
 		}),
-	refreshToken: () => useMutation(DaemonService.method.refreshEnrollToken),
-	revokeToken: () => useMutation(DaemonService.method.revokeEnrollToken),
 	update: () => useMutation(DaemonService.method.updateDaemon),
 	delete: () => useMutation(DaemonService.method.deleteDaemon)
 };

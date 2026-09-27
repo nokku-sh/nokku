@@ -14,7 +14,7 @@
 	import { DaemonStatus, type Daemon, DaemonSchema } from '$lib/gen/nokku/v1/daemon_pb';
 	import { createEntityModalState } from '$lib/hooks';
 	import { enumLabel } from '$lib/utils';
-	import EnrollTokenPopover from './EnrollTokenPopover.svelte';
+	import EnrollDialog from './EnrollDialog.svelte';
 	import {
 		Bot,
 		BotOff,
@@ -143,7 +143,7 @@
 <DaemonModal bind:open={daemonModal.open} draft={daemonModal.draft} />
 
 <PageHeader title="Daemons" description="Manage your workspace daemons" icon={Bot}>
-	<EnrollTokenPopover />
+	<EnrollDialog />
 </PageHeader>
 
 <DataTable

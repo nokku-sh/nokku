@@ -13,7 +13,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
+	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
 	import type { ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
 	import { ServiceAccountSchema } from '$lib/gen/nokku/v1/service_account_pb';
 	import { createEntityModalState } from '$lib/hooks';
@@ -104,7 +104,7 @@
 							icon: PlusIcon,
 							onClick: () =>
 								goto(
-									`/access/assign?type=${PrincipalType.SERVICE_ACCOUNT}&id=${row.original.id}&name=${encodeURIComponent(row.original.name)}`
+									`/access/assign?type=${SubjectKind.SERVICE_ACCOUNT}&id=${row.original.id}&name=${encodeURIComponent(row.original.name)}`
 								)
 						}
 					],

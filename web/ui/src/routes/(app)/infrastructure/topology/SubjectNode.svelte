@@ -3,7 +3,7 @@
 	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
-	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
+	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
 	import { type ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
 	import type { Team } from '$lib/gen/nokku/v1/team_pb';
 	import type { User } from '$lib/gen/nokku/v1/account_pb';
@@ -21,13 +21,13 @@
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 
 	let { data }: NodeProps = $props();
-	let subjectType = $derived(data.subjectType as PrincipalType);
+	let subjectType = $derived(data.subjectType as SubjectKind);
 
 	let openRevokeModal = $state(false);
 
 	const config = $derived.by(() => {
 		switch (subjectType) {
-			case PrincipalType.USER:
+			case SubjectKind.USER:
 				return {
 					borderColor: 'border-blue-500',
 					headerBg: 'bg-blue-500/10',
@@ -36,7 +36,7 @@
 					label: 'User',
 					handleColor: 'bg-blue-500!'
 				};
-			case PrincipalType.TEAM:
+			case SubjectKind.TEAM:
 				return {
 					borderColor: 'border-emerald-500',
 					headerBg: 'bg-emerald-500/10',
@@ -45,7 +45,7 @@
 					label: 'Team',
 					handleColor: 'bg-emerald-500!'
 				};
-			case PrincipalType.SERVICE_ACCOUNT:
+			case SubjectKind.SERVICE_ACCOUNT:
 				return {
 					borderColor: 'border-purple-500',
 					headerBg: 'bg-purple-500/10',
@@ -73,7 +73,7 @@
 		revokeAccessTarget.mutate({
 			id: data.principalId as string,
 			subjectIds: [subjectID],
-			type: data.subjectType as PrincipalType
+			kind: data.subjectType as SubjectKind
 		});
 	}
 </script>
@@ -103,13 +103,13 @@
 						{data.name || data.username}
 					</h4>
 					<div class="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-						{#if subjectType === PrincipalType.USER && data.email}
+						{#if subjectType === SubjectKind.USER && data.email}
 							<Mail class="h-3 w-3 shrink-0" />
 							<span class="truncate">{data.email}</span>
-						{:else if subjectType === PrincipalType.TEAM}
+						{:else if subjectType === SubjectKind.TEAM}
 							<Users class="h-3 w-3 shrink-0" />
 							<span>{config.label}</span>
-						{:else if subjectType === PrincipalType.SERVICE_ACCOUNT}
+						{:else if subjectType === SubjectKind.SERVICE_ACCOUNT}
 							{@const sa = data as ServiceAccount}
 							<Clock class="h-3 w-3 shrink-0" />
 

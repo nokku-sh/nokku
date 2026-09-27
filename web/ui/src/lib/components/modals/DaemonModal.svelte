@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { create } from '@bufbuild/protobuf';
-	import { durationFromMs, durationMs } from '@bufbuild/protobuf/wkt';
 	import { Info, Settings2, Terminal } from '@lucide/svelte';
 	import { daemon } from '$lib/api/daemons.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import CopyButton from '$lib/components/ui/copy-button/copy-button.svelte';
-	import { Input } from '$lib/components/ui/input';
 	import * as Item from '$lib/components/ui/item';
 	import { Switch } from '$lib/components/ui/switch';
 	import * as Tabs from '$lib/components/ui/tabs';
@@ -34,16 +32,6 @@
 			config: create(DaemonConfigSchema, { ...cfg })
 		})
 	);
-
-	let aliveSeconds = $derived(
-		cfg.clientAliveInterval ? Math.floor(durationMs(cfg.clientAliveInterval) / 1000) : 0
-	);
-
-	function setAliveInterval(e: Event) {
-		const seconds = Number((e.currentTarget as HTMLInputElement).value);
-		cfg.clientAliveInterval = durationFromMs(Math.max(0, Math.floor(seconds)) * 1000);
-		autoSave.save();
-	}
 </script>
 
 <FormModal
@@ -185,104 +173,6 @@
 
 			<Item.Root variant="outline">
 				<Item.Content>
-					<Item.Title>Pre-auth banner</Item.Title>
-					<Item.Description>
-						Show clients a banner describing session policy before login.
-					</Item.Description>
-				</Item.Content>
-				<Item.Actions>
-					<Switch
-						checked={cfg.banner}
-						onCheckedChange={(v) => {
-							cfg.banner = v;
-							autoSave.save();
-						}}
-					/>
-				</Item.Actions>
-			</Item.Root>
-
-			<Item.Root variant="outline">
-				<Item.Content>
-					<Item.Title>Max sessions per connection</Item.Title>
-					<Item.Description>Limit the number of sessions per connection.</Item.Description>
-				</Item.Content>
-				<Item.Actions>
-					<Input
-						type="number"
-						min="0"
-						class="w-24 text-right"
-						value={cfg.maxSessions}
-						oninput={(e) => {
-							cfg.maxSessions = Number((e.currentTarget as HTMLInputElement).value);
-							autoSave.save();
-						}}
-					/>
-				</Item.Actions>
-			</Item.Root>
-
-			<Item.Root variant="outline">
-				<Item.Content>
-					<Item.Title>Max concurrent connections</Item.Title>
-					<Item.Description>Limit the number of concurrent connections.</Item.Description>
-				</Item.Content>
-				<Item.Actions>
-					<Input
-						type="number"
-						min="0"
-						class="w-24 text-right"
-						value={cfg.maxConnections}
-						oninput={(e) => {
-							cfg.maxConnections = Number((e.currentTarget as HTMLInputElement).value);
-							autoSave.save();
-						}}
-					/>
-				</Item.Actions>
-			</Item.Root>
-
-			<Item.Root variant="outline">
-				<Item.Content>
-					<Item.Title>Max startup connections</Item.Title>
-					<Item.Description>
-						Limit connections still completing the pre-auth handshake. Zero disables the cap.
-					</Item.Description>
-				</Item.Content>
-				<Item.Actions>
-					<Input
-						type="number"
-						min="0"
-						class="w-24 text-right"
-						value={cfg.maxStartups}
-						oninput={(e) => {
-							cfg.maxStartups = Number((e.currentTarget as HTMLInputElement).value);
-							autoSave.save();
-						}}
-					/>
-				</Item.Actions>
-			</Item.Root>
-
-			<Item.Root variant="outline">
-				<Item.Content>
-					<Item.Title>Max channels per connection</Item.Title>
-					<Item.Description>
-						Limit channels a single connection may hold open. Zero disables the cap.
-					</Item.Description>
-				</Item.Content>
-				<Item.Actions>
-					<Input
-						type="number"
-						min="0"
-						class="w-24 text-right"
-						value={cfg.maxChannels}
-						oninput={(e) => {
-							cfg.maxChannels = Number((e.currentTarget as HTMLInputElement).value);
-							autoSave.save();
-						}}
-					/>
-				</Item.Actions>
-			</Item.Root>
-
-			<Item.Root variant="outline">
-				<Item.Content>
 					<Item.Title>Drop retired CA</Item.Title>
 					<Item.Description>
 						Stop trusting the previously rotated CA immediately after a rollover.
@@ -295,66 +185,6 @@
 							cfg.dropRetiredCa = v;
 							autoSave.save();
 						}}
-					/>
-				</Item.Actions>
-			</Item.Root>
-
-			<Item.Root variant="outline">
-				<Item.Content>
-					<Item.Title>Connection rate</Item.Title>
-					<Item.Description>
-						New connections per second per source IP. Zero disables rate limiting.
-					</Item.Description>
-				</Item.Content>
-				<Item.Actions>
-					<Input
-						type="number"
-						min="0"
-						class="w-24 text-right"
-						value={cfg.connRate}
-						oninput={(e) => {
-							cfg.connRate = Number((e.currentTarget as HTMLInputElement).value);
-							autoSave.save();
-						}}
-					/>
-				</Item.Actions>
-			</Item.Root>
-
-			<Item.Root variant="outline">
-				<Item.Content>
-					<Item.Title>Rate burst</Item.Title>
-					<Item.Description>
-						Short bursts of connections allowed above the steady rate.
-					</Item.Description>
-				</Item.Content>
-				<Item.Actions>
-					<Input
-						type="number"
-						min="0"
-						class="w-24 text-right"
-						value={cfg.connRateBurst}
-						oninput={(e) => {
-							cfg.connRateBurst = Number((e.currentTarget as HTMLInputElement).value);
-							autoSave.save();
-						}}
-					/>
-				</Item.Actions>
-			</Item.Root>
-
-			<Item.Root variant="outline">
-				<Item.Content>
-					<Item.Title>Client alive interval (seconds)</Item.Title>
-					<Item.Description>
-						How often the server probes idle clients. Zero disables keepalive probing.
-					</Item.Description>
-				</Item.Content>
-				<Item.Actions>
-					<Input
-						type="number"
-						min="0"
-						class="w-24 text-right"
-						value={aliveSeconds}
-						oninput={setAliveInterval}
 					/>
 				</Item.Actions>
 			</Item.Root>

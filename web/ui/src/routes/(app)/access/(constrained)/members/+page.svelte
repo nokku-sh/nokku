@@ -17,7 +17,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
+	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
 	import { type WorkspaceMember } from '$lib/gen/nokku/v1/workspace_pb';
 	import { createModalState } from '$lib/hooks';
 	import {
@@ -104,7 +104,7 @@
 							icon: PlusIcon,
 							onClick: () =>
 								goto(
-									`/access/assign?type=${PrincipalType.USER}&id=${row.original.id}&name=${encodeURIComponent(row.original.name)}`
+									`/access/assign?type=${SubjectKind.USER}&id=${row.original.id}&name=${encodeURIComponent(row.original.name)}`
 								)
 						}
 					],

@@ -1,4 +1,4 @@
-import { PrincipalService, PrincipalType } from '$lib/gen/nokku/v1/principal_pb';
+import { PrincipalService, SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
 import { TargetService } from '$lib/gen/nokku/v1/target_pb';
 import { queryClient } from '$lib/api/client';
 import { toast } from 'svelte-sonner';
@@ -20,7 +20,6 @@ export const principal = {
 			limit?: number;
 			offset?: number;
 			query?: string;
-			type?: PrincipalType;
 		}
 	) =>
 		useQuery(
@@ -28,7 +27,6 @@ export const principal = {
 			() => ({
 				targetId: opts().targetId || '',
 				query: opts().query,
-				type: opts().type,
 				limit: opts().limit ?? pageSize.current,
 				offset: opts().offset ?? pageIndex.current,
 				workspaceId: workspaceID.current
@@ -39,7 +37,6 @@ export const principal = {
 		),
 
 	// Mutations
-	set: () => useMutation(PrincipalService.method.setPrincipals, { onSuccess: invalidateAccess }),
 	addAccount: () =>
 		useMutation(PrincipalService.method.addPrincipal, { onSuccess: invalidateAccess }),
 	removeAccount: () =>
@@ -54,14 +51,14 @@ export const principal = {
 		useMutation(PrincipalService.method.revokeAllAccess, {
 			onSuccess: (_, variables) => {
 				invalidateAccess();
-				switch (variables.type) {
-					case PrincipalType.USER:
+				switch (variables.kind) {
+					case SubjectKind.USER:
 						toast.success('User access revoked');
 						break;
-					case PrincipalType.TEAM:
+					case SubjectKind.TEAM:
 						toast.success('Team access revoked');
 						break;
-					case PrincipalType.SERVICE_ACCOUNT:
+					case SubjectKind.SERVICE_ACCOUNT:
 						toast.success('Service account access revoked');
 						break;
 				}

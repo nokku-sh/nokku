@@ -84,5 +84,16 @@ that governs access to every target.
   verified offline via Ed25519-signed license keys and falls back to Community
   when a key expires or is revoked. External KMS configuration is an Enterprise
   feature; Community deployments use `NOKKU_SECRET`.
+- **Database roles and RLS**: the owner role (`PGUSER`) only migrates at
+  startup. Runtime traffic uses `nokku_app`, under row-level security, and
+  `nokku_system` (BYPASSRLS) for login, global account changes, and
+  background jobs. SCIM team work runs pinned to the connector's workspace.
+  Tenant rows are scoped to the pinned workspace. Users are visible only to
+  themselves and to fellow members of the pinned workspace. Credentials and
+  sessions are visible only to their owner. RLS is a safety net against
+  application bugs, such as a query that forgets its workspace filter. It is
+  not a boundary against a compromised backend: `nokku_app` can assume
+  `nokku_system`, and the scoping settings are ordinary session variables.
+  Queries are parameterized through sqlc, which is the injection defense.
 - Releases are built via GoReleaser and signed/checksummed — verify downloads
   against the published checksums and signatures.

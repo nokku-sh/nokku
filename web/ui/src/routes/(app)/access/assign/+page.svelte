@@ -11,7 +11,7 @@
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
 	import { Switch } from '$lib/components/ui/switch';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { PrincipalType, type Principal } from '$lib/gen/nokku/v1/principal_pb';
+	import { SubjectKind, type Principal } from '$lib/gen/nokku/v1/principal_pb';
 	import type { Target } from '$lib/gen/nokku/v1/target_pb';
 	import {
 		ChevronLeft,
@@ -28,7 +28,7 @@
 	// URL Params
 	const subjectID = $derived(page.url.searchParams.get('id') || '');
 	const subjectName = $derived(page.url.searchParams.get('name') || 'Unknown');
-	const subjectType = $derived(Number(page.url.searchParams.get('type') || '0') as PrincipalType);
+	const subjectType = $derived(Number(page.url.searchParams.get('type') || '0') as SubjectKind);
 
 	// State
 	let search = $state('');
@@ -73,40 +73,40 @@
 	const totalPages = $derived(Math.ceil((targets.data?.total || 0) / limit));
 
 	// Helpers
-	function getSubjectTypeLabel(type: PrincipalType): string {
+	function getSubjectTypeLabel(type: SubjectKind): string {
 		switch (type) {
-			case PrincipalType.USER:
+			case SubjectKind.USER:
 				return 'User';
-			case PrincipalType.TEAM:
+			case SubjectKind.TEAM:
 				return 'Team';
-			case PrincipalType.SERVICE_ACCOUNT:
+			case SubjectKind.SERVICE_ACCOUNT:
 				return 'Service Account';
 			default:
 				return 'Subject';
 		}
 	}
 
-	function getSubjectIds(principal: Principal, type: PrincipalType): string[] {
+	function getSubjectIds(principal: Principal, type: SubjectKind): string[] {
 		switch (type) {
-			case PrincipalType.USER:
+			case SubjectKind.USER:
 				return principal.userIds;
-			case PrincipalType.TEAM:
+			case SubjectKind.TEAM:
 				return principal.teamIds;
-			case PrincipalType.SERVICE_ACCOUNT:
+			case SubjectKind.SERVICE_ACCOUNT:
 				return principal.serviceAccountIds;
 			default:
 				return [];
 		}
 	}
 
-	function getSubjectCount(principal: Principal, type: PrincipalType): number {
+	function getSubjectCount(principal: Principal, type: SubjectKind): number {
 		return getSubjectIds(principal, type).length;
 	}
 
 	const subjectTypeLabel = $derived(getSubjectTypeLabel(subjectType));
 	const subjectTypeLower = $derived(subjectTypeLabel.toLowerCase());
 	const subjectTypePlural = $derived(
-		subjectType === PrincipalType.SERVICE_ACCOUNT ? 'service accounts' : `${subjectTypeLower}s`
+		subjectType === SubjectKind.SERVICE_ACCOUNT ? 'service accounts' : `${subjectTypeLower}s`
 	);
 
 	// Effective assignment of this subject to a principal, honoring any
@@ -135,7 +135,7 @@
 		if (subjectID) pendingAssign.set(p.id, assigned);
 		const mutate = assigned ? addToPrincipal : removeFromPrincipal;
 		mutate.mutate(
-			{ id: p.id, subjectIds: [subjectID], type: subjectType },
+			{ id: p.id, subjectIds: [subjectID], kind: subjectType },
 			{ onSettled: () => pendingAssign.delete(p.id) }
 		);
 	}
@@ -172,7 +172,7 @@
 	title="Revoke All Access"
 	description="This will revoke all access globally for {subjectName}. This action cannot be undone."
 	itemName={subjectName}
-	onConfirm={() => revokeAccess.mutate({ subjectId: subjectID, type: subjectType })}
+	onConfirm={() => revokeAccess.mutate({ subjectId: subjectID, kind: subjectType })}
 />
 
 <div class="flex flex-1 overflow-hidden bg-background">

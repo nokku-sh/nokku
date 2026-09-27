@@ -3,6 +3,7 @@
 	import { registerPasskey } from '$lib/api/passkey';
 	import { session, sessionKindLabel, sessionMethodLabel } from '$lib/api/session.svelte';
 	import { user } from '$lib/api/user.svelte';
+	import { workspace } from '$lib/api/workspaces.svelte';
 	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -50,6 +51,19 @@
 	const setEmailRecovery = user.setEmailRecovery();
 
 	const disablePasswordReset = $derived(currentUser.data?.disablePasswordReset ?? false);
+
+	const workspaces = $derived(workspace.list());
+	const ownedNames = $derived(
+		(workspaces.data ?? [])
+			.filter((w) => w.createdBy === currentUser.data?.id)
+			.map((w) => w.name)
+			.join(', ')
+	);
+	const deleteAccountDescription = $derived(
+		ownedNames
+			? `This permanently deletes your account and the workspaces you own: ${ownedNames}. A workspace other people still use cannot go with your account, transfer its ownership first. Active subscriptions are canceled. This cannot be undone.`
+			: 'This permanently deletes your account and removes you from every workspace. This cannot be undone.'
+	);
 
 	let deletePasskeyId = $state('');
 	let deletePasskeyOpen = $state(false);
@@ -188,7 +202,7 @@
 <DeleteConfirmationModal
 	bind:open={deleteAccountOpen}
 	title="Delete Account"
-	description="This will permanently delete your account, your workspaces, and all associated infrastructure data. Any active subscriptions will be canceled immediately. This action cannot be undone."
+	description={deleteAccountDescription}
 	itemName={currentUser.data?.email}
 	requireConfirmation={true}
 	onConfirm={() => deleteAccount.mutate({})}

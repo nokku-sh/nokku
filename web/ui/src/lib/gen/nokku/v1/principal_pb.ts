@@ -14,7 +14,7 @@ import type { Message } from '@bufbuild/protobuf';
  * Describes the file nokku/v1/principal.proto.
  */
 export const file_nokku_v1_principal: GenFile /*@__PURE__*/ = fileDesc(
-	'Chhub2trdS92MS9wcmluY2lwYWwucHJvdG8SCG5va2t1LnYxIq0BCglQcmluY2lwYWwSCgoCaWQYASABKAkSEQoJdGFyZ2V0X2lkGAIgASgJEhAKCHVzZXJuYW1lGAMgASgJEhAKCHVzZXJfaWRzGAQgAygJEhAKCHRlYW1faWRzGAUgAygJEhsKE3NlcnZpY2VfYWNjb3VudF9pZHMYBiADKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAijgEKFFNldFByaW5jaXBhbHNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJdGFyZ2V0X2lkGAIgASgJQgi6SAVyA7ABARI5Cgl1c2VybmFtZXMYAyADKAlCJrpII5IBICIechwQARggMhZeW2Etel9dW2EtejAtOS1fXSpcJD8kIhcKFVNldFByaW5jaXBhbHNSZXNwb25zZSLJAQoVTGlzdFByaW5jaXBhbHNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJdGFyZ2V0X2lkGAIgASgJQgi6SAVyA7ABARIYCgVsaW1pdBgDIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgEIAEoBUIHukgEGgIoABINCgVxdWVyeRgFIAEoCRIxCgR0eXBlGAYgASgOMhcubm9ra3UudjEuUHJpbmNpcGFsVHlwZUIKukgHggEEEAEgACJQChZMaXN0UHJpbmNpcGFsc1Jlc3BvbnNlEicKCnByaW5jaXBhbHMYASADKAsyEy5ub2trdS52MS5QcmluY2lwYWwSDQoFdG90YWwYAiABKAUisAEKHUFkZFN1YmplY3RzVG9QcmluY2lwYWxSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBEiYKC3N1YmplY3RfaWRzGAMgAygJQhG6SA6SAQsIARAyIgVyA7ABARIxCgR0eXBlGAQgASgOMhcubm9ra3UudjEuUHJpbmNpcGFsVHlwZUIKukgHggEEEAEgACIgCh5BZGRTdWJqZWN0c1RvUHJpbmNpcGFsUmVzcG9uc2UitQEKIlJlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbFJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIUCgJpZBgCIAEoCUIIukgFcgOwAQESJgoLc3ViamVjdF9pZHMYAyADKAlCEbpIDpIBCwgBEDIiBXIDsAEBEjEKBHR5cGUYBCABKA4yFy5ub2trdS52MS5QcmluY2lwYWxUeXBlQgq6SAeCAQQQASAAIiUKI1JlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbFJlc3BvbnNlIokBChZSZXZva2VBbGxBY2Nlc3NSZXF1ZXN0EhwKCnN1YmplY3RfaWQYASABKAlCCLpIBXIDsAEBEh4KDHdvcmtzcGFjZV9pZBgCIAEoCUIIukgFcgOwAQESMQoEdHlwZRgDIAEoDjIXLm5va2t1LnYxLlByaW5jaXBhbFR5cGVCCrpIB4IBBBABIAAiGQoXUmV2b2tlQWxsQWNjZXNzUmVzcG9uc2UibwoTQWRkUHJpbmNpcGFsUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhsKCXRhcmdldF9pZBgCIAEoCUIIukgFcgOwAQESGwoIdXNlcm5hbWUYAyABKAlCCbpIBnIEEAEYQCI+ChRBZGRQcmluY2lwYWxSZXNwb25zZRImCglwcmluY2lwYWwYASABKAsyEy5ub2trdS52MS5QcmluY2lwYWwiTgoWUmVtb3ZlUHJpbmNpcGFsUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASIZChdSZW1vdmVQcmluY2lwYWxSZXNwb25zZSqFAQoNUHJpbmNpcGFsVHlwZRIeChpQUklOQ0lQQUxfVFlQRV9VTlNQRUNJRklFRBAAEhcKE1BSSU5DSVBBTF9UWVBFX1VTRVIQARIXChNQUklOQ0lQQUxfVFlQRV9URUFNEAISIgoeUFJJTkNJUEFMX1RZUEVfU0VSVklDRV9BQ0NPVU5UEAMyxggKEFByaW5jaXBhbFNlcnZpY2UShQEKDVNldFByaW5jaXBhbHMSHi5ub2trdS52MS5TZXRQcmluY2lwYWxzUmVxdWVzdBofLm5va2t1LnYxLlNldFByaW5jaXBhbHNSZXNwb25zZSIzgtPkkwItOgEqIigvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9wcmluY2lwYWxzEogBCg5MaXN0UHJpbmNpcGFscxIfLm5va2t1LnYxLkxpc3RQcmluY2lwYWxzUmVxdWVzdBogLm5va2t1LnYxLkxpc3RQcmluY2lwYWxzUmVzcG9uc2UiM5ACAYLT5JMCKhIoL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcHJpbmNpcGFscxKLAQoMQWRkUHJpbmNpcGFsEh0ubm9ra3UudjEuQWRkUHJpbmNpcGFsUmVxdWVzdBoeLm5va2t1LnYxLkFkZFByaW5jaXBhbFJlc3BvbnNlIjyC0+STAjY6ASoiMS92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3ByaW5jaXBhbHMvYWNjb3VudHMSmwEKD1JlbW92ZVByaW5jaXBhbBIgLm5va2t1LnYxLlJlbW92ZVByaW5jaXBhbFJlcXVlc3QaIS5ub2trdS52MS5SZW1vdmVQcmluY2lwYWxSZXNwb25zZSJDgtPkkwI9OgEqIjgvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9wcmluY2lwYWxzL2FjY291bnRzOnJlbW92ZRKkAQoWQWRkU3ViamVjdHNUb1ByaW5jaXBhbBInLm5va2t1LnYxLkFkZFN1YmplY3RzVG9QcmluY2lwYWxSZXF1ZXN0Gigubm9ra3UudjEuQWRkU3ViamVjdHNUb1ByaW5jaXBhbFJlc3BvbnNlIjeC0+STAjE6ASoiLC92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3ByaW5jaXBhbHM6YWRkErYBChtSZW1vdmVTdWJqZWN0c0Zyb21QcmluY2lwYWwSLC5ub2trdS52MS5SZW1vdmVTdWJqZWN0c0Zyb21QcmluY2lwYWxSZXF1ZXN0Gi0ubm9ra3UudjEuUmVtb3ZlU3ViamVjdHNGcm9tUHJpbmNpcGFsUmVzcG9uc2UiOoLT5JMCNDoBKiIvL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcHJpbmNpcGFsczpyZW1vdmUSkgEKD1Jldm9rZUFsbEFjY2VzcxIgLm5va2t1LnYxLlJldm9rZUFsbEFjY2Vzc1JlcXVlc3QaIS5ub2trdS52MS5SZXZva2VBbGxBY2Nlc3NSZXNwb25zZSI6gtPkkwI0OgEqIi8vdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9wcmluY2lwYWxzOnJldm9rZUKYAQoMY29tLm5va2t1LnYxQg5QcmluY2lwYWxQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
+	'Chhub2trdS92MS9wcmluY2lwYWwucHJvdG8SCG5va2t1LnYxIq0BCglQcmluY2lwYWwSCgoCaWQYASABKAkSEQoJdGFyZ2V0X2lkGAIgASgJEhAKCHVzZXJuYW1lGAMgASgJEhAKCHVzZXJfaWRzGAQgAygJEhAKCHRlYW1faWRzGAUgAygJEhsKE3NlcnZpY2VfYWNjb3VudF9pZHMYBiADKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAilgEKFUxpc3RQcmluY2lwYWxzUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhsKCXRhcmdldF9pZBgCIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAyABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYBCABKAVCB7pIBBoCKAASDQoFcXVlcnkYBSABKAkiUAoWTGlzdFByaW5jaXBhbHNSZXNwb25zZRInCgpwcmluY2lwYWxzGAEgAygLMhMubm9ra3UudjEuUHJpbmNpcGFsEg0KBXRvdGFsGAIgASgFIq4BCh1BZGRTdWJqZWN0c1RvUHJpbmNpcGFsUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABARImCgtzdWJqZWN0X2lkcxgDIAMoCUIRukgOkgELCAEQMiIFcgOwAQESLwoEa2luZBgEIAEoDjIVLm5va2t1LnYxLlN1YmplY3RLaW5kQgq6SAeCAQQQASAAIiAKHkFkZFN1YmplY3RzVG9QcmluY2lwYWxSZXNwb25zZSKzAQoiUmVtb3ZlU3ViamVjdHNGcm9tUHJpbmNpcGFsUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABARImCgtzdWJqZWN0X2lkcxgDIAMoCUIRukgOkgELCAEQMiIFcgOwAQESLwoEa2luZBgEIAEoDjIVLm5va2t1LnYxLlN1YmplY3RLaW5kQgq6SAeCAQQQASAAIiUKI1JlbW92ZVN1YmplY3RzRnJvbVByaW5jaXBhbFJlc3BvbnNlIocBChZSZXZva2VBbGxBY2Nlc3NSZXF1ZXN0EhwKCnN1YmplY3RfaWQYASABKAlCCLpIBXIDsAEBEh4KDHdvcmtzcGFjZV9pZBgCIAEoCUIIukgFcgOwAQESLwoEa2luZBgDIAEoDjIVLm5va2t1LnYxLlN1YmplY3RLaW5kQgq6SAeCAQQQASAAIhkKF1Jldm9rZUFsbEFjY2Vzc1Jlc3BvbnNlIo4BChNBZGRQcmluY2lwYWxSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJdGFyZ2V0X2lkGAIgASgJQgi6SAVyA7ABARI6Cgh1c2VybmFtZRgDIAEoCUIoukglciMQARggMh1eW0EtWmEtel9dW0EtWmEtejAtOS5fLV0qXCQ/JCI+ChRBZGRQcmluY2lwYWxSZXNwb25zZRImCglwcmluY2lwYWwYASABKAsyEy5ub2trdS52MS5QcmluY2lwYWwiTgoWUmVtb3ZlUHJpbmNpcGFsUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASIZChdSZW1vdmVQcmluY2lwYWxSZXNwb25zZSp7CgtTdWJqZWN0S2luZBIcChhTVUJKRUNUX0tJTkRfVU5TUEVDSUZJRUQQABIVChFTVUJKRUNUX0tJTkRfVVNFUhABEhUKEVNVQkpFQ1RfS0lORF9URUFNEAISIAocU1VCSkVDVF9LSU5EX1NFUlZJQ0VfQUNDT1VOVBADMr4HChBQcmluY2lwYWxTZXJ2aWNlEogBCg5MaXN0UHJpbmNpcGFscxIfLm5va2t1LnYxLkxpc3RQcmluY2lwYWxzUmVxdWVzdBogLm5va2t1LnYxLkxpc3RQcmluY2lwYWxzUmVzcG9uc2UiM5ACAYLT5JMCKhIoL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcHJpbmNpcGFscxKLAQoMQWRkUHJpbmNpcGFsEh0ubm9ra3UudjEuQWRkUHJpbmNpcGFsUmVxdWVzdBoeLm5va2t1LnYxLkFkZFByaW5jaXBhbFJlc3BvbnNlIjyC0+STAjY6ASoiMS92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3ByaW5jaXBhbHMvYWNjb3VudHMSmwEKD1JlbW92ZVByaW5jaXBhbBIgLm5va2t1LnYxLlJlbW92ZVByaW5jaXBhbFJlcXVlc3QaIS5ub2trdS52MS5SZW1vdmVQcmluY2lwYWxSZXNwb25zZSJDgtPkkwI9OgEqIjgvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9wcmluY2lwYWxzL2FjY291bnRzOnJlbW92ZRKkAQoWQWRkU3ViamVjdHNUb1ByaW5jaXBhbBInLm5va2t1LnYxLkFkZFN1YmplY3RzVG9QcmluY2lwYWxSZXF1ZXN0Gigubm9ra3UudjEuQWRkU3ViamVjdHNUb1ByaW5jaXBhbFJlc3BvbnNlIjeC0+STAjE6ASoiLC92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3ByaW5jaXBhbHM6YWRkErYBChtSZW1vdmVTdWJqZWN0c0Zyb21QcmluY2lwYWwSLC5ub2trdS52MS5SZW1vdmVTdWJqZWN0c0Zyb21QcmluY2lwYWxSZXF1ZXN0Gi0ubm9ra3UudjEuUmVtb3ZlU3ViamVjdHNGcm9tUHJpbmNpcGFsUmVzcG9uc2UiOoLT5JMCNDoBKiIvL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcHJpbmNpcGFsczpyZW1vdmUSkgEKD1Jldm9rZUFsbEFjY2VzcxIgLm5va2t1LnYxLlJldm9rZUFsbEFjY2Vzc1JlcXVlc3QaIS5ub2trdS52MS5SZXZva2VBbGxBY2Nlc3NSZXNwb25zZSI6gtPkkwI0OgEqIi8vdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9wcmluY2lwYWxzOnJldm9rZUKYAQoMY29tLm5va2t1LnYxQg5QcmluY2lwYWxQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
 	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
 );
 
@@ -68,45 +68,6 @@ export const PrincipalSchema: GenMessage<Principal> /*@__PURE__*/ = messageDesc(
 );
 
 /**
- * @generated from message nokku.v1.SetPrincipalsRequest
- */
-export type SetPrincipalsRequest = Message<'nokku.v1.SetPrincipalsRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
-
-	/**
-	 * @generated from field: string target_id = 2;
-	 */
-	targetId: string;
-
-	/**
-	 * @generated from field: repeated string usernames = 3;
-	 */
-	usernames: string[];
-};
-
-/**
- * Describes the message nokku.v1.SetPrincipalsRequest.
- * Use `create(SetPrincipalsRequestSchema)` to create a new message.
- */
-export const SetPrincipalsRequestSchema: GenMessage<SetPrincipalsRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 1);
-
-/**
- * @generated from message nokku.v1.SetPrincipalsResponse
- */
-export type SetPrincipalsResponse = Message<'nokku.v1.SetPrincipalsResponse'> & {};
-
-/**
- * Describes the message nokku.v1.SetPrincipalsResponse.
- * Use `create(SetPrincipalsResponseSchema)` to create a new message.
- */
-export const SetPrincipalsResponseSchema: GenMessage<SetPrincipalsResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 2);
-
-/**
  * @generated from message nokku.v1.ListPrincipalsRequest
  */
 export type ListPrincipalsRequest = Message<'nokku.v1.ListPrincipalsRequest'> & {
@@ -134,11 +95,6 @@ export type ListPrincipalsRequest = Message<'nokku.v1.ListPrincipalsRequest'> & 
 	 * @generated from field: string query = 5;
 	 */
 	query: string;
-
-	/**
-	 * @generated from field: nokku.v1.PrincipalType type = 6;
-	 */
-	type: PrincipalType;
 };
 
 /**
@@ -146,7 +102,7 @@ export type ListPrincipalsRequest = Message<'nokku.v1.ListPrincipalsRequest'> & 
  * Use `create(ListPrincipalsRequestSchema)` to create a new message.
  */
 export const ListPrincipalsRequestSchema: GenMessage<ListPrincipalsRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 3);
+	messageDesc(file_nokku_v1_principal, 1);
 
 /**
  * @generated from message nokku.v1.ListPrincipalsResponse
@@ -168,7 +124,7 @@ export type ListPrincipalsResponse = Message<'nokku.v1.ListPrincipalsResponse'> 
  * Use `create(ListPrincipalsResponseSchema)` to create a new message.
  */
 export const ListPrincipalsResponseSchema: GenMessage<ListPrincipalsResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 4);
+	messageDesc(file_nokku_v1_principal, 2);
 
 /**
  * @generated from message nokku.v1.AddSubjectsToPrincipalRequest
@@ -190,9 +146,9 @@ export type AddSubjectsToPrincipalRequest = Message<'nokku.v1.AddSubjectsToPrinc
 	subjectIds: string[];
 
 	/**
-	 * @generated from field: nokku.v1.PrincipalType type = 4;
+	 * @generated from field: nokku.v1.SubjectKind kind = 4;
 	 */
-	type: PrincipalType;
+	kind: SubjectKind;
 };
 
 /**
@@ -200,7 +156,7 @@ export type AddSubjectsToPrincipalRequest = Message<'nokku.v1.AddSubjectsToPrinc
  * Use `create(AddSubjectsToPrincipalRequestSchema)` to create a new message.
  */
 export const AddSubjectsToPrincipalRequestSchema: GenMessage<AddSubjectsToPrincipalRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 5);
+	messageDesc(file_nokku_v1_principal, 3);
 
 /**
  * @generated from message nokku.v1.AddSubjectsToPrincipalResponse
@@ -213,7 +169,7 @@ export type AddSubjectsToPrincipalResponse =
  * Use `create(AddSubjectsToPrincipalResponseSchema)` to create a new message.
  */
 export const AddSubjectsToPrincipalResponseSchema: GenMessage<AddSubjectsToPrincipalResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 6);
+	messageDesc(file_nokku_v1_principal, 4);
 
 /**
  * @generated from message nokku.v1.RemoveSubjectsFromPrincipalRequest
@@ -236,9 +192,9 @@ export type RemoveSubjectsFromPrincipalRequest =
 		subjectIds: string[];
 
 		/**
-		 * @generated from field: nokku.v1.PrincipalType type = 4;
+		 * @generated from field: nokku.v1.SubjectKind kind = 4;
 		 */
-		type: PrincipalType;
+		kind: SubjectKind;
 	};
 
 /**
@@ -246,7 +202,7 @@ export type RemoveSubjectsFromPrincipalRequest =
  * Use `create(RemoveSubjectsFromPrincipalRequestSchema)` to create a new message.
  */
 export const RemoveSubjectsFromPrincipalRequestSchema: GenMessage<RemoveSubjectsFromPrincipalRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 7);
+	messageDesc(file_nokku_v1_principal, 5);
 
 /**
  * @generated from message nokku.v1.RemoveSubjectsFromPrincipalResponse
@@ -259,7 +215,7 @@ export type RemoveSubjectsFromPrincipalResponse =
  * Use `create(RemoveSubjectsFromPrincipalResponseSchema)` to create a new message.
  */
 export const RemoveSubjectsFromPrincipalResponseSchema: GenMessage<RemoveSubjectsFromPrincipalResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 8);
+	messageDesc(file_nokku_v1_principal, 6);
 
 /**
  * @generated from message nokku.v1.RevokeAllAccessRequest
@@ -276,9 +232,9 @@ export type RevokeAllAccessRequest = Message<'nokku.v1.RevokeAllAccessRequest'> 
 	workspaceId: string;
 
 	/**
-	 * @generated from field: nokku.v1.PrincipalType type = 3;
+	 * @generated from field: nokku.v1.SubjectKind kind = 3;
 	 */
-	type: PrincipalType;
+	kind: SubjectKind;
 };
 
 /**
@@ -286,7 +242,7 @@ export type RevokeAllAccessRequest = Message<'nokku.v1.RevokeAllAccessRequest'> 
  * Use `create(RevokeAllAccessRequestSchema)` to create a new message.
  */
 export const RevokeAllAccessRequestSchema: GenMessage<RevokeAllAccessRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 9);
+	messageDesc(file_nokku_v1_principal, 7);
 
 /**
  * @generated from message nokku.v1.RevokeAllAccessResponse
@@ -298,7 +254,7 @@ export type RevokeAllAccessResponse = Message<'nokku.v1.RevokeAllAccessResponse'
  * Use `create(RevokeAllAccessResponseSchema)` to create a new message.
  */
 export const RevokeAllAccessResponseSchema: GenMessage<RevokeAllAccessResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 10);
+	messageDesc(file_nokku_v1_principal, 8);
 
 /**
  * @generated from message nokku.v1.AddPrincipalRequest
@@ -326,7 +282,7 @@ export type AddPrincipalRequest = Message<'nokku.v1.AddPrincipalRequest'> & {
  */
 export const AddPrincipalRequestSchema: GenMessage<AddPrincipalRequest> /*@__PURE__*/ = messageDesc(
 	file_nokku_v1_principal,
-	11
+	9
 );
 
 /**
@@ -344,7 +300,7 @@ export type AddPrincipalResponse = Message<'nokku.v1.AddPrincipalResponse'> & {
  * Use `create(AddPrincipalResponseSchema)` to create a new message.
  */
 export const AddPrincipalResponseSchema: GenMessage<AddPrincipalResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 12);
+	messageDesc(file_nokku_v1_principal, 10);
 
 /**
  * @generated from message nokku.v1.RemovePrincipalRequest
@@ -366,7 +322,7 @@ export type RemovePrincipalRequest = Message<'nokku.v1.RemovePrincipalRequest'> 
  * Use `create(RemovePrincipalRequestSchema)` to create a new message.
  */
 export const RemovePrincipalRequestSchema: GenMessage<RemovePrincipalRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 13);
+	messageDesc(file_nokku_v1_principal, 11);
 
 /**
  * @generated from message nokku.v1.RemovePrincipalResponse
@@ -378,37 +334,39 @@ export type RemovePrincipalResponse = Message<'nokku.v1.RemovePrincipalResponse'
  * Use `create(RemovePrincipalResponseSchema)` to create a new message.
  */
 export const RemovePrincipalResponseSchema: GenMessage<RemovePrincipalResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_principal, 14);
+	messageDesc(file_nokku_v1_principal, 12);
 
 /**
- * @generated from enum nokku.v1.PrincipalType
+ * SubjectKind is who a grant is for. A Principal is the local account.
+ *
+ * @generated from enum nokku.v1.SubjectKind
  */
-export enum PrincipalType {
+export enum SubjectKind {
 	/**
-	 * @generated from enum value: PRINCIPAL_TYPE_UNSPECIFIED = 0;
+	 * @generated from enum value: SUBJECT_KIND_UNSPECIFIED = 0;
 	 */
 	UNSPECIFIED = 0,
 
 	/**
-	 * @generated from enum value: PRINCIPAL_TYPE_USER = 1;
+	 * @generated from enum value: SUBJECT_KIND_USER = 1;
 	 */
 	USER = 1,
 
 	/**
-	 * @generated from enum value: PRINCIPAL_TYPE_TEAM = 2;
+	 * @generated from enum value: SUBJECT_KIND_TEAM = 2;
 	 */
 	TEAM = 2,
 
 	/**
-	 * @generated from enum value: PRINCIPAL_TYPE_SERVICE_ACCOUNT = 3;
+	 * @generated from enum value: SUBJECT_KIND_SERVICE_ACCOUNT = 3;
 	 */
 	SERVICE_ACCOUNT = 3
 }
 
 /**
- * Describes the enum nokku.v1.PrincipalType.
+ * Describes the enum nokku.v1.SubjectKind.
  */
-export const PrincipalTypeSchema: GenEnum<PrincipalType> /*@__PURE__*/ = enumDesc(
+export const SubjectKindSchema: GenEnum<SubjectKind> /*@__PURE__*/ = enumDesc(
 	file_nokku_v1_principal,
 	0
 );
@@ -417,14 +375,6 @@ export const PrincipalTypeSchema: GenEnum<PrincipalType> /*@__PURE__*/ = enumDes
  * @generated from service nokku.v1.PrincipalService
  */
 export const PrincipalService: GenService<{
-	/**
-	 * @generated from rpc nokku.v1.PrincipalService.SetPrincipals
-	 */
-	setPrincipals: {
-		methodKind: 'unary';
-		input: typeof SetPrincipalsRequestSchema;
-		output: typeof SetPrincipalsResponseSchema;
-	};
 	/**
 	 * @generated from rpc nokku.v1.PrincipalService.ListPrincipals
 	 */
