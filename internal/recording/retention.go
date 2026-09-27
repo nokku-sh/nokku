@@ -28,70 +28,49 @@ func (s *Service) runSweeper(ctx context.Context) {
 func (s *Service) cleanup(ctx context.Context) {
 	now := time.Now()
 
-	// Retention deletes across every workspace: system transaction
-	// (BYPASSRLS), single-flight via advisory lock like audit retention.
-	tx, err := s.conn.AdminPool.Begin(ctx)
-	if err != nil {
-		slog.Error("recording retention failed to begin transaction", "error", err)
-		return
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	var locked bool
-	if err := tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock(hashtext('recording-retention'))`).
-		Scan(&locked); err != nil {
-		slog.Error("recording retention failed to acquire lock", "error", err)
-		return
-	}
-	if !locked {
-		slog.Debug("recording retention skipped, another instance running")
-		return
-	}
-
-	q := db.New(tx)
-
-	workspaceIDs, err := q.ListRecordingWorkspaceIDs(ctx)
-	if err != nil {
-		slog.Error("recording retention failed to list workspaces", "error", err)
-		return
-	}
-
-	for _, wsID := range workspaceIDs {
-		retentionDays := s.limits.RetentionDays(ctx, wsID)
-		if retentionDays <= 0 {
-			retentionDays = 7
+	// Retention deletes across every workspace, so it runs as a system
+	// transaction, single-flight like audit retention.
+	var expired []string
+	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
+		locked, err := q.TryAdvisoryXactLock(ctx, "recording-retention")
+		if err != nil || !locked {
+			return err
 		}
-		cutoff := now.AddDate(0, 0, -int(retentionDays))
-
-		expired, err := q.DeleteRecordingsBefore(ctx, &db.DeleteRecordingsBeforeParams{
-			WorkspaceID: wsID,
-			Cutoff:      cutoff,
-		})
+		workspaceIDs, err := q.ListRecordingWorkspaceIDs(ctx)
 		if err != nil {
-			slog.Error("recording retention delete failed",
-				"error", err, "workspace_id", wsID)
-			continue
+			return err
 		}
-		if len(expired) == 0 {
-			continue
-		}
-
-		// Objects are best-effort: a stray object without a row is
-		// invisible and swept by the workspace wipe.
-		for _, rec := range expired {
-			if err := s.store.Delete(
-				ctx,
-				storage.RecordingPath(wsID, rec.ID),
-			); err != nil {
-				slog.Warn("delete expired recording object",
-					"error", err, "recording_id", rec.ID)
+		for _, wsID := range workspaceIDs {
+			retentionDays := s.limits.RetentionDays(ctx, wsID)
+			if retentionDays <= 0 {
+				retentionDays = 7
+			}
+			rows, err := q.DeleteRecordingsBefore(ctx, &db.DeleteRecordingsBeforeParams{
+				WorkspaceID: wsID,
+				Cutoff:      now.AddDate(0, 0, -int(retentionDays)),
+			})
+			if err != nil {
+				return err
+			}
+			for _, rec := range rows {
+				expired = append(expired, storage.RecordingPath(wsID, rec.ID))
 			}
 		}
-		slog.Info("expired recordings removed",
-			"workspace_id", wsID, "count", len(expired))
+		return nil
+	})
+	if err != nil {
+		slog.Error("recording retention failed", "error", err)
+		return
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		slog.Error("recording retention failed to commit", "error", err)
+	// Objects go only after the rows are gone for good. A stray object
+	// without a row is invisible and swept by the workspace wipe.
+	for _, path := range expired {
+		if err := s.store.Delete(ctx, path); err != nil {
+			slog.Warn("delete expired recording object", "error", err, "path", path)
+		}
+	}
+	if len(expired) > 0 {
+		slog.Info("expired recordings removed", "count", len(expired))
 	}
 }

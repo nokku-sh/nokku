@@ -13,6 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
@@ -123,6 +124,9 @@ func loginError(err error) error {
 	if errors.Is(err, iam.ErrEmailUnverified) {
 		return ErrEmailUnverified
 	}
+	if errors.Is(err, iam.ErrSSORequired) {
+		return ErrSSORequired
+	}
 	return ErrLoginFailed
 }
 
@@ -134,13 +138,17 @@ func (s *AuthService) Logout(
 	if err != nil {
 		return nil, err
 	}
-	// Public endpoint, so the session arrives as a cookie rather than a
-	// principal. Revoke when present, always clear the cookie: logout must
-	// succeed on a stale or expired session too.
-	if token := iam.SessionTokenFromHeader(ci.RequestHeader()); token != "" {
-		_ = s.cfg.IAM.RevokeSession(ctx, token)
-	}
+	// Public endpoint, so a stale session still gets its cookie cleared. The
+	// credential itself, a browser cookie or nk's DPoP-bound token, is
+	// authenticated here and its session revoked.
 	setCookie(ci, s.cfg.IAM.ClearSessionCookie())
+	if err := s.cfg.IAM.Logout(ctx, ci.RequestHeader(), nokkuv1connect.AuthServiceLogoutProcedure); err != nil {
+		if errors.Is(err, iam.ErrDPoPNonce) || errors.Is(err, iam.ErrDPoPRequired) {
+			s.cfg.IAM.AdvertiseDPoPNonce(ci.ResponseHeader())
+			return nil, connect.NewError(connect.CodeUnauthenticated, err)
+		}
+		return nil, ErrInternal
+	}
 	return &nokkuv1.LogoutResponse{}, nil
 }
 
@@ -161,8 +169,8 @@ func (s *AuthService) ResetPassword(
 	ctx context.Context,
 	req *nokkuv1.ResetPasswordRequest,
 ) (*nokkuv1.ResetPasswordResponse, error) {
-	userID, purpose, err := s.cfg.IAM.ConsumeToken(ctx, req.GetToken())
-	if err != nil || purpose != iam.TokenPasswordReset {
+	userID, err := s.cfg.IAM.ConsumeToken(ctx, req.GetToken(), iam.TokenPasswordReset)
+	if err != nil {
 		return nil, NewError(
 			connect.CodeInvalidArgument,
 			"this reset link is invalid or expired",
@@ -178,8 +186,8 @@ func (s *AuthService) VerifyEmail(
 	ctx context.Context,
 	req *nokkuv1.VerifyEmailRequest,
 ) (*nokkuv1.VerifyEmailResponse, error) {
-	userID, purpose, err := s.cfg.IAM.ConsumeToken(ctx, req.GetToken())
-	if err != nil || purpose != iam.TokenVerifyEmail {
+	userID, err := s.cfg.IAM.ConsumeToken(ctx, req.GetToken(), iam.TokenVerifyEmail)
+	if err != nil {
 		return nil, NewError(
 			connect.CodeInvalidArgument,
 			"this verification link is invalid or expired",
@@ -219,17 +227,13 @@ func (s *AuthService) DiscoverSSO(
 		return out, nil
 	}
 
-	p, err := s.cfg.IAM.GetSSOProvider(ctx, d.ProviderID)
+	p, err := s.cfg.IAM.GetSSOProvider(ctx, d.WorkspaceID)
 	if err != nil || !p.Enabled {
 		return out, nil
 	}
 
 	out.HasSso = new(true)
-	if p.OIDC != nil {
-		out.Enforce = new(p.OIDC.EnforceSSO)
-	} else if p.SAML != nil {
-		out.Enforce = new(p.SAML.EnforceSSO)
-	}
+	out.Enforce = new(p.Enforced())
 	out.Providers = []*nokkuv1.SSOProviderInfo{{
 		Method:   new(string(p.Method)),
 		Provider: new(p.ProviderID),

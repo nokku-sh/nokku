@@ -102,8 +102,7 @@ func (s *TargetService) insertTarget(
 			return err
 		}
 
-		// Add a default root principal to the target
-		return q.SetPrincipals(ctx, &db.SetPrincipalsParams{
+		return q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
 			TargetID:  result.ID,
 			Usernames: []string{"root"},
 		})
@@ -257,7 +256,6 @@ func (s *TargetService) SyncTargetUsers(
 		return nil, DBError(err)
 	}
 
-	s.cfg.Pool.NotifyChange(req.GetWorkspaceId())
 	return &nokkuv1.SyncTargetUsersResponse{}, nil
 }
 
@@ -439,7 +437,7 @@ func (s *TargetService) GetMyAccess(
 			ctx,
 			&db.ListSubjectUsernamesForTargetsParams{
 				TargetIds: targetIDs,
-				SubjectID: p.ID,
+				SubjectID: &p.ID,
 			},
 		)
 		if err != nil {

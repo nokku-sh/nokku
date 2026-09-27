@@ -136,17 +136,10 @@ func TestPool_EventSubscriberStorm(t *testing.T) {
 	}
 }
 
-// TestPool_NotifyChangeStorm pushes state updates to a full workspace while
-// daemons drop off, forcing sendStateUpdate to race UnregisterDaemon's map
-// teardown and the state channel's replace-on-full path.
-func TestPool_NotifyChangeStorm(t *testing.T) {
+// TestPool_PokeStorm pokes a full workspace while daemons drop off, racing
+// Poke against UnregisterDaemon's map teardown.
+func TestPool_PokeStorm(t *testing.T) {
 	p := newTestPool(t)
-
-	// A witness daemon stays registered for the whole test: UnregisterDaemon
-	// drops the workspace counter once the last daemon of a workspace leaves,
-	// which is a separate behavior covered by its own test.
-	witness := p.RegisterDaemon(context.Background(), "witness", "w1")
-	defer p.UnregisterDaemon("witness", witness)
 
 	const daemons = 32
 	for i := range daemons {
@@ -158,7 +151,7 @@ func TestPool_NotifyChangeStorm(t *testing.T) {
 		id := fmt.Sprintf("d%02d", i)
 		wg.Go(func() {
 			for range 200 {
-				p.NotifyChange("w1")
+				p.Poke("w1")
 			}
 			p.mu.RLock()
 			c := p.byID[id]
@@ -169,104 +162,50 @@ func TestPool_NotifyChangeStorm(t *testing.T) {
 		})
 	}
 	wg.Wait()
-
-	// Every change bumped the workspace version. The final version must
-	// reflect the whole storm (not lost updates on the counter).
-	if got := p.Version("w1"); got < daemons*200 {
-		t.Errorf("Version(w1) = %d, want >= %d", got, daemons*200)
-	}
 }
 
-// TestPool_VersionDroppedWithLastDaemon: a workspace counter must not outlive
-// its last daemon, or the map grows with every workspace ever touched.
-func TestPool_VersionDroppedWithLastDaemon(t *testing.T) {
-	p := newTestPool(t)
-	a := p.RegisterDaemon(context.Background(), "d1", "w1")
-	b := p.RegisterDaemon(context.Background(), "d2", "w1")
-	p.NotifyChange("w1")
-	p.NotifyChange("w1")
-
-	p.UnregisterDaemon("d1", a)
-	if got := p.Version("w1"); got != 2 {
-		t.Fatalf("Version(w1) after one daemon left = %d, want 2", got)
-	}
-	p.UnregisterDaemon("d2", b)
-	if got := p.Version("w1"); got != 0 {
-		t.Fatalf("Version(w1) after last daemon left = %d, want 0", got)
-	}
-}
-
-// TestPool_NotifyChangeCoalesces verifies a burst of changes collapses into
-// at most one queued StateUpdate per daemon, carrying the newest version.
-func TestPool_NotifyChangeCoalesces(t *testing.T) {
+// TestPool_PokeCoalesces verifies a burst of pokes collapses into one queued
+// StateUpdate per daemon, and only reaches the poked workspace.
+func TestPool_PokeCoalesces(t *testing.T) {
 	p := newTestPool(t)
 	c := p.RegisterDaemon(context.Background(), "d1", "w1")
 	defer p.UnregisterDaemon("d1", c)
+	other := p.RegisterDaemon(context.Background(), "d2", "w2")
+	defer p.UnregisterDaemon("d2", other)
 
-	// Drain the first update. The rest must coalesce into a single queued
-	// message that no longer blocks NotifyChange.
-	select {
-	case <-c.state:
-	default:
-	}
 	for range 100 {
-		p.NotifyChange("w1")
+		p.Poke("w1")
 	}
 
-	var last int64
-	drained := 0
-	for {
-		select {
-		case msg := <-c.state:
-			drained++
-			last = msg.GetStateUpdate().GetStateVersion()
-		default:
-			if drained > 1 {
-				t.Errorf("coalescing left %d queued updates, want <= 1", drained)
-			}
-			if drained == 0 {
-				t.Fatal("no state update was delivered")
-			}
-			if last != p.Version("w1") {
-				t.Errorf("delivered version %d, want newest %d", last, p.Version("w1"))
-			}
-			return
-		}
+	if got := len(c.state); got != 1 {
+		t.Fatalf("queued state updates = %d, want 1", got)
+	}
+	if msg := <-c.state; msg.GetStateUpdate() == nil {
+		t.Fatal("queued message is not a StateUpdate")
+	}
+	if got := len(other.state); got != 0 {
+		t.Fatalf("other workspace got %d state updates, want 0", got)
 	}
 }
 
-// TestPool_NotifyChangeKeepsControlMessages verifies coalescing state
-// updates never drops a control message queued on the same connection.
-func TestPool_NotifyChangeKeepsControlMessages(t *testing.T) {
+// TestPool_PokeKeepsControlMessages verifies coalescing state updates never
+// drops a control message queued on the same connection.
+func TestPool_PokeKeepsControlMessages(t *testing.T) {
 	p := newTestPool(t)
 	c := p.RegisterDaemon(context.Background(), "d1", "w1")
 	defer p.UnregisterDaemon("d1", c)
 
-	relayMsg := func(rid string) *nokkuv1.ConnectResponse {
-		return &nokkuv1.ConnectResponse{
-			Msg: &nokkuv1.ConnectResponse_RelayOpen{
-				RelayOpen: &nokkuv1.RelayOpen{RelayId: &rid},
-			},
-		}
+	rid := "r1"
+	relayOpen := &nokkuv1.ConnectResponse{
+		Msg: &nokkuv1.ConnectResponse_RelayOpen{
+			RelayOpen: &nokkuv1.RelayOpen{RelayId: &rid},
+		},
 	}
-	if err := p.sendToDaemonWait("d1", relayMsg("r1"), time.Second); err != nil {
+	if err := p.sendToDaemonWait("d1", relayOpen, time.Second); err != nil {
 		t.Fatalf("queue relay open: %v", err)
 	}
-	// Drain the control message off the channel.
-	select {
-	case msg := <-c.send:
-		if msg.GetRelayOpen() == nil {
-			t.Fatal("control channel carried a non-relay message")
-		}
-	default:
-		t.Fatal("relay open was not queued")
-	}
 	for range 10 {
-		p.NotifyChange("w1")
-	}
-	// A fresh control message must still arrive despite the state backlog.
-	if err := p.sendToDaemonWait("d1", relayMsg("r2"), time.Second); err != nil {
-		t.Fatalf("queue relay open after state storm: %v", err)
+		p.Poke("w1")
 	}
 	select {
 	case msg := <-c.send:
@@ -275,53 +214,6 @@ func TestPool_NotifyChangeKeepsControlMessages(t *testing.T) {
 		}
 	default:
 		t.Fatal("control message lost after state storm")
-	}
-}
-
-// TestPool_HeartbeatVersion verifies the ack decision. Quiet when up to
-// date, ack when behind. After a server restart resets the counter, every
-// daemon that synced before must re-sync once.
-func TestPool_HeartbeatVersion(t *testing.T) {
-	p := newTestPool(t)
-	p.RegisterDaemon(context.Background(), "d1", "w1")
-	defer p.UnregisterDaemon("d1", p.byID["d1"])
-
-	// Fresh workspace, fresh daemon: nothing to do.
-	if _, ack := p.HeartbeatVersion("d1", 0); ack {
-		t.Fatal("fresh daemon in a fresh workspace must not be acked")
-	}
-
-	// A change bumps the workspace: the daemon is behind and gets an ack
-	// with the current version.
-	p.NotifyChange("w1")
-	version, ack := p.HeartbeatVersion("d1", 0)
-	if !ack || version != 1 {
-		t.Fatalf("behind daemon: ack=%v version=%d, want ack=true version=1", ack, version)
-	}
-
-	// After the daemon synced (local version == counter), it stays quiet.
-	if _, ack := p.HeartbeatVersion("d1", 1); ack {
-		t.Fatal("up-to-date daemon must not be acked")
-	}
-
-	// Server restart: the counter starts over, so a daemon that synced
-	// before must re-sync even though it reports a higher version.
-	p.mu.Lock()
-	p.versions = make(map[string]int64)
-	p.mu.Unlock()
-	version, ack = p.HeartbeatVersion("d1", 1)
-	if !ack || version != 0 {
-		t.Fatalf("after restart: ack=%v version=%d, want ack=true version=0", ack, version)
-	}
-
-	// Once it re-synced to the reset counter, heartbeats are quiet again.
-	if _, ack := p.HeartbeatVersion("d1", 0); ack {
-		t.Fatal("re-synced daemon must not be acked")
-	}
-
-	// Unknown daemons never get acks.
-	if _, ack := p.HeartbeatVersion("ghost", 0); ack {
-		t.Fatal("unknown daemon must not be acked")
 	}
 }
 
@@ -553,5 +445,63 @@ func TestPool_Shutdown(t *testing.T) {
 	case <-p.Done():
 	case <-time.After(time.Second):
 		t.Fatal("Done() not closed after Shutdown")
+	}
+}
+
+// A disconnect tears down exactly that daemon's sessions and relays, and
+// leaves no index entry behind.
+func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
+	p := newTestPool(t)
+	c1 := p.RegisterDaemon(context.Background(), "d1", "w1")
+	c2 := p.RegisterDaemon(context.Background(), "d2", "w1")
+	defer p.UnregisterDaemon("d2", c2)
+	mine := p.RegisterSession("s1", "d1", "root", "u1")
+	other := p.RegisterSession("s2", "d2", "root", "u1")
+
+	p.UnregisterDaemon("d1", c1)
+
+	select {
+	case <-mine.Exited:
+	default:
+		t.Fatal("session of the disconnected daemon is still running")
+	}
+	select {
+	case <-other.Exited:
+		t.Fatal("session of another daemon was torn down")
+	default:
+	}
+	if p.GetSession("s1") != nil || p.GetSession("s2") == nil {
+		t.Fatal("session map out of sync with the teardown")
+	}
+	if _, ok := p.owned["d1"]; ok {
+		t.Fatal("index entry of the disconnected daemon survived")
+	}
+	if got := len(p.ListSessions("d2")); got != 1 {
+		t.Fatalf("ListSessions(d2) = %d, want 1", got)
+	}
+
+	p.UnregisterSession("s2")
+	if _, ok := p.owned["d2"]; ok {
+		t.Fatal("empty index entry was not dropped")
+	}
+}
+
+// Presence changes coalesce per daemon until the next flush.
+func TestPool_PresenceCoalesces(t *testing.T) {
+	p := newTestPool(t)
+	for range 3 {
+		c := p.RegisterDaemon(context.Background(), "d1", "w1")
+		p.UnregisterDaemon("d1", c)
+	}
+	c := p.RegisterDaemon(context.Background(), "d2", "w1")
+	defer p.UnregisterDaemon("d2", c)
+
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if up, ok := p.presence["d1"]; !ok || up {
+		t.Fatalf("d1 presence = %v (queued %v), want offline", up, ok)
+	}
+	if !p.presence["d2"] {
+		t.Fatal("d2 presence not queued as online")
 	}
 }

@@ -140,12 +140,7 @@ func (s *SSOService) UpdateSSOProvider(
 		// The update itself succeeded, so a purge failure must not fail the
 		// call; it must however be loud: stale identities under the old
 		// issuer stay valid until this is retried.
-		if _, err := s.cfg.IAM.DeleteCredentialsByProvider(
-			ctx,
-			"",
-			iam.MethodOIDC,
-			req.GetWorkspaceId(),
-		); err != nil {
+		if _, err := s.cfg.IAM.PurgeProviderIdentities(ctx, iam.MethodOIDC, req.GetWorkspaceId()); err != nil {
 			slog.Error(
 				"purging identities after issuer change failed",
 				"error", err,

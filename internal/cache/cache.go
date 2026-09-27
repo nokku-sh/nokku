@@ -28,12 +28,7 @@ type Cache interface {
 	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
 	Delete(ctx context.Context, key string) error
 	GetDel(ctx context.Context, key string) ([]byte, error)
-}
-
-// SetNXer atomically stores a value only when the key is absent (SET NX),
-// which DPoP replay detection needs to stay correct across instances.
-// Both implementations provide it.
-type SetNXer interface {
+	// SetNX stores value only when key is absent and reports whether it did.
 	SetNX(ctx context.Context, key string, value []byte, ttl time.Duration) (bool, error)
 }
 

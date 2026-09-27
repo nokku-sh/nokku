@@ -78,6 +78,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 	cfg.Pool = daemon.New(ctx, cfg.Conn)
+	go cfg.Pool.Listen(ctx, cfg.Conn.Pool.Config().ConnConfig)
 	cfg.Email, err = email.New(cfg.FullURL(), cfg.Cache)
 	if err != nil {
 		return nil, err

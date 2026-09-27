@@ -47,7 +47,7 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 			http.SetCookie(w, c)
 		}
 	}
-	cfg.IAM.OnNewDeviceLogin = func(ctx context.Context, u *db.User, sess db.Session, label, ip string) {
+	cfg.IAM.OnNewDeviceLogin = func(ctx context.Context, u *db.User, sess *db.Session, label, ip string) {
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		if err := cfg.Email.SendNewLoginEmail(

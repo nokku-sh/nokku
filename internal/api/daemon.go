@@ -1,22 +1,20 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 	"uuid"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkudaemon "github.com/nokku-sh/nokku/internal/daemon"
 	"github.com/nokku-sh/nokku/internal/iam"
 
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
@@ -81,10 +79,6 @@ func (s *DaemonService) UpdateDaemon(
 		return nil, DBError(err)
 	}
 
-	// A status change (accept/reject) is a workspace state change: connected
-	// daemons re-sync and discover their own status from the sync response.
-	s.cfg.Pool.NotifyChange(result.WorkspaceID)
-
 	if req.GetStatus() == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
 		s.cfg.Pool.PublishWorkspaceEvent(
 			result.WorkspaceID,
@@ -133,14 +127,10 @@ func (s *DaemonService) DeleteDaemon(
 	ctx context.Context,
 	req *nokkuv1.DeleteDaemonRequest,
 ) (*nokkuv1.DeleteDaemonResponse, error) {
-	// A daemon can delete itself via the challenge-auth context. Either way
-	// one identifier is required.
-	id := req.GetId()
+	// A daemon can only delete itself, whatever id it sends.
+	id := cmp.Or(iam.DaemonIDFromContext(ctx), req.GetId())
 	if id == "" {
-		id = iam.DaemonIDFromContext(ctx)
-		if id == "" {
-			return nil, ErrInvalidInput
-		}
+		return nil, ErrInvalidInput
 	}
 	var result *db.Daemon
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
@@ -150,56 +140,12 @@ func (s *DaemonService) DeleteDaemon(
 		return nil, DBError(err)
 	}
 
-	// A deleted daemon discovers its removal on the next sync (not found).
-	s.cfg.Pool.NotifyChange(result.WorkspaceID)
-
 	s.cfg.Pool.PublishWorkspaceEvent(
 		result.WorkspaceID,
 		"daemon.removed",
 		daemonEventPayload(result.ID, result.Name),
 	)
 	return &nokkuv1.DeleteDaemonResponse{}, nil
-}
-
-func (s *DaemonService) RefreshEnrollToken(
-	ctx context.Context,
-	req *nokkuv1.RefreshEnrollTokenRequest,
-) (*nokkuv1.RefreshEnrollTokenResponse, error) {
-	token, err := crypto.NewToken(crypto.WithID(req.GetWorkspaceId()))
-	if err != nil {
-		return nil, ErrInternal
-	}
-	expiresAt := time.Now().Add(24 * time.Hour)
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		return q.UpdateEnrollToken(ctx, &db.UpdateEnrollTokenParams{
-			WorkspaceID:     req.GetWorkspaceId(),
-			EnrollTokenHash: token.Hash,
-			EnrollExpiresAt: &expiresAt,
-		})
-	}); err != nil {
-		return nil, DBError(err)
-	}
-
-	return &nokkuv1.RefreshEnrollTokenResponse{
-		Token:     &token.Plaintext,
-		ExpiresAt: timestamppb.New(expiresAt),
-	}, nil
-}
-
-func (s *DaemonService) RevokeEnrollToken(
-	ctx context.Context,
-	req *nokkuv1.RevokeEnrollTokenRequest,
-) (*nokkuv1.RevokeEnrollTokenResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		return q.UpdateEnrollToken(ctx, &db.UpdateEnrollTokenParams{
-			WorkspaceID:     req.GetWorkspaceId(),
-			EnrollTokenHash: "",
-			EnrollExpiresAt: &time.Time{},
-		})
-	}); err != nil {
-		return nil, DBError(err)
-	}
-	return &nokkuv1.RevokeEnrollTokenResponse{}, nil
 }
 
 // Session endpoints ----------------------------------------------------------
@@ -292,9 +238,21 @@ func (s *DaemonService) ListSessions(
 }
 
 func (s *DaemonService) CloseSession(
-	_ context.Context,
+	ctx context.Context,
 	req *nokkuv1.CloseSessionRequest,
 ) (*nokkuv1.CloseSessionResponse, error) {
+	// Sessions live in one pool for every tenant, so the session's daemon
+	// must resolve in the pinned workspace before anyone may end it.
+	sess := s.cfg.Pool.GetSession(req.GetSessionId())
+	if sess == nil || sess.DaemonID() != req.GetDaemonId() {
+		return nil, ErrNotFound
+	}
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		_, err := q.GetDaemon(ctx, sess.DaemonID())
+		return err
+	}); err != nil {
+		return nil, DBError(err)
+	}
 	s.cfg.Pool.CloseSession(req.GetSessionId())
 	return &nokkuv1.CloseSessionResponse{}, nil
 }
@@ -386,21 +344,6 @@ func (s *DaemonService) EnrollDaemon(
 	ctx context.Context,
 	req *nokkuv1.EnrollDaemonRequest,
 ) (*nokkuv1.EnrollDaemonResponse, error) {
-	enrollToken, err := crypto.Parse(req.GetToken())
-	if err != nil {
-		return nil, NewError(connect.CodeInvalidArgument, "invalid token")
-	}
-	workspaceID := enrollToken.ID
-	ctx = iam.AnnotateTenant(ctx, workspaceID)
-
-	// Resource cap check lives here, not in the guard: enrollment is a
-	// public endpoint whose workspace comes from the enroll token, so the
-	// interceptor cannot see it pinned in the request context. Mirrors the
-	// seat check in invitation.go.
-	if err := s.cfg.Entitlements.CheckResources(ctx, workspaceID); err != nil {
-		return nil, err
-	}
-
 	// The daemon proves possession of its TPM/software key with a DPoP proof
 	// bound to this enrollment request; the issued session is bound to that
 	// key (jkt), so a stolen token is useless without the key. The proof is
@@ -420,19 +363,24 @@ func (s *DaemonService) EnrollDaemon(
 	})
 
 	out, err := nokkudaemon.Enroll(ctx, s.cfg.Conn, nokkudaemon.EnrollInput{
-		WorkspaceID: workspaceID,
-		Token:       req.GetToken(),
-		Binding:     binding,
-		Metadata:    metadata,
-		CaID:        req.CaId,
+		Token:    req.GetToken(),
+		Binding:  binding,
+		Metadata: metadata,
+		// The resource cap is checked here, not in the guard: the workspace
+		// comes from the token, and only after the token verified. A known
+		// machine re-enrolls even at the cap.
+		CanCreate: func(ctx context.Context, workspaceID string) error {
+			return s.cfg.Entitlements.CheckResources(ctx, workspaceID)
+		},
 	})
+	if errors.Is(err, nokkudaemon.ErrEnrollToken) {
+		return nil, NewError(connect.CodeFailedPrecondition, err.Error())
+	}
 	if err != nil {
-		if errors.Is(err, nokkudaemon.ErrEnrollExpired) ||
-			errors.Is(err, nokkudaemon.ErrEnrollToken) {
-			return nil, NewError(connect.CodeFailedPrecondition, err.Error())
-		}
 		return nil, DBError(err)
 	}
+	workspaceID := out.WorkspaceID
+	ctx = iam.AnnotateTenant(ctx, workspaceID)
 
 	// The daemon's control-plane token never expires; it is revoked by
 	// deleting the daemon (the session cascades), not by a clock.
@@ -490,7 +438,7 @@ func (s *DaemonService) SyncDaemon(
 		Config:       res.Config,
 		Principals:   res.Principals,
 		CaPublicKey:  &res.CAPublicKey,
-		StateVersion: new(s.cfg.Pool.Version(res.WorkspaceID)),
+		StateVersion: &res.Version,
 	}, nil
 }
 

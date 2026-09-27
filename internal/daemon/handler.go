@@ -3,6 +3,8 @@ package daemon
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -10,6 +12,10 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
+
+// heartbeatDeadline drops a control stream that has been silent for this
+// long. Daemons heartbeat every 30s, so this allows three missed beats.
+const heartbeatDeadline = 2 * time.Minute
 
 func (p *Pool) Connect(
 	ctx context.Context,
@@ -69,11 +75,12 @@ func (p *Pool) Connect(
 		}
 	}()
 
-	// Inbound: heartbeats carry the daemon's state version. Any mismatch
-	// with the workspace counter gets an ack so the daemon re-syncs: a
-	// daemon that is behind catches up, and after a server restart the
-	// counter starts over at 0, so every daemon re-syncs once and no change
-	// committed while it was disconnected can be missed.
+	// Inbound: heartbeats carry the daemon's state version. A mismatch gets
+	// a StateUpdate, so a daemon that missed a push while disconnected
+	// catches up on its first heartbeat. A daemon that stops sending is
+	// dropped, so a half-open connection cannot stay online.
+	silence := time.AfterFunc(heartbeatDeadline, conn.Cancel)
+	defer silence.Stop()
 	recvErr := make(chan error, 1)
 	go func() {
 		for {
@@ -82,17 +89,18 @@ func (p *Pool) Connect(
 				recvErr <- err
 				return
 			}
-			if hb, ok := req.GetMsg().(*nokkuv1.ConnectRequest_Heartbeat); ok {
-				if version, ack := p.HeartbeatVersion(
-					daemonID,
-					hb.Heartbeat.GetStateVersion(),
-				); ack {
-					p.sendStateUpdate(conn, &nokkuv1.ConnectResponse{
-						Msg: &nokkuv1.ConnectResponse_HeartbeatAck{
-							HeartbeatAck: &nokkuv1.HeartbeatAck{StateVersion: &version},
-						},
-					})
-				}
+			silence.Reset(heartbeatDeadline)
+			hb := req.GetHeartbeat()
+			if hb == nil {
+				continue
+			}
+			version, err := p.stateVersion(conn.ctx, daemon.WorkspaceID)
+			if err != nil {
+				slog.Warn("read workspace state version", "daemon_id", daemonID, "error", err)
+				continue
+			}
+			if version != hb.GetStateVersion() {
+				conn.poke()
 			}
 		}
 	}()

@@ -6,6 +6,8 @@ import (
 	"os"
 	"runtime/pprof"
 	"testing"
+
+	"github.com/nokku-sh/nokku/internal/testdb"
 )
 
 // leaked returns the goroutineleak profile report and whether any goroutines
@@ -26,6 +28,7 @@ func leaked() (string, bool) {
 // streams, event subscribers), so guard it here rather than only in
 // individual tests.
 func TestMain(m *testing.M) {
+	testdb.Setup("daemon")
 	code := m.Run()
 	if code == 0 {
 		if report, ok := leaked(); ok {

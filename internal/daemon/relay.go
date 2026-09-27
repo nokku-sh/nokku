@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	maxRelaysPerPrincipal = 8
+	maxRelaysPerPrincipal = 64
 	relayBufferSize       = 16
 	// How long the daemon has to answer a RelayOpen before the request
 	// gives up.
@@ -146,6 +146,7 @@ func (p *Pool) RegisterRelay(relayID, daemonID string) *Relay {
 		releaseSlot: pend.releaseSlot,
 	}
 	p.relays[relayID] = r
+	p.ownLocked(daemonID).relays[relayID] = struct{}{}
 	close(pend.ready)
 	p.mu.Unlock()
 	return r
@@ -158,6 +159,10 @@ func (p *Pool) UnregisterRelay(relayID string) {
 	r := p.relays[relayID]
 	if r != nil {
 		delete(p.relays, relayID)
+		if o := p.owned[r.daemonID]; o != nil {
+			delete(o.relays, relayID)
+			p.disownLocked(r.daemonID)
+		}
 		r.Close()
 	}
 	p.mu.Unlock()

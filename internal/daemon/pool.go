@@ -4,31 +4,41 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"sync"
 	"time"
 	"uuid"
 
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-const sendBufferSize = 64
+const (
+	sendBufferSize = 64
+	// presenceFlushEvery batches online/offline writes, so a reconnect
+	// storm costs a few UPDATEs instead of one per daemon.
+	presenceFlushEvery = 2 * time.Second
+)
+
+var stateUpdate = &nokkuv1.ConnectResponse{
+	Msg: &nokkuv1.ConnectResponse_StateUpdate{StateUpdate: &nokkuv1.StateUpdate{}},
+}
 
 type Conn struct {
 	daemonID    string
 	workspaceID string
-	// send carries control messages to the daemon. state carries version
-	// updates. It is capacity-1 and replace-on-full, so a burst of changes
-	// coalesces into one update per daemon. The two channels are separate so
-	// coalescing can never drop a control message.
-	send    chan *nokkuv1.ConnectResponse
-	state   chan *nokkuv1.ConnectResponse
-	stateMu sync.Mutex
-	ctx     context.Context
-	cancel  context.CancelFunc
+	// send carries control messages to the daemon. state holds at most one
+	// pending StateUpdate, so a burst of changes coalesces into one sync. The
+	// two channels are separate so coalescing can never drop a control
+	// message.
+	send   chan *nokkuv1.ConnectResponse
+	state  chan *nokkuv1.ConnectResponse
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // Cancel tears down the connection context unless a reconnect already
@@ -49,20 +59,28 @@ type connection interface {
 	WithWorkspace(ctx context.Context, fn func(*db.Queries) error) error
 }
 
+// owned indexes one daemon's sessions and relays, so a disconnect tears
+// them down without scanning the whole pool.
+type owned struct {
+	sessions map[string]*Session
+	relays   map[string]struct{}
+}
+
 type Pool struct {
 	mu            sync.RWMutex
 	byID          map[string]*Conn
 	byWksp        map[string]map[string]struct{}
+	owned         map[string]*owned
 	sessions      map[string]*Session
 	relays        map[string]*Relay
 	pendingRelays map[string]*relayPending
 	relayCounts   map[string]int
 	events        map[string][]*eventSubscriber
-	// versions holds the current state version per workspace. It is
-	// in-memory only and resets on server restart. The Connect handler acks
-	// any version mismatch on heartbeat, so a restarted server (counter 0)
-	// makes every daemon re-sync once and no daemon can stay stale.
+	// versions caches the workspace state version for heartbeat checks. The
+	// listener refreshes an entry on every change notification.
 	versions map[string]int64
+	// presence holds online flags not yet written to the database.
+	presence map[string]bool
 	conn     connection
 
 	shutdownCtx    context.Context
@@ -74,12 +92,14 @@ func New(ctx context.Context, conn connection) *Pool {
 	p := &Pool{
 		byID:           make(map[string]*Conn),
 		byWksp:         make(map[string]map[string]struct{}),
+		owned:          make(map[string]*owned),
 		sessions:       make(map[string]*Session),
 		relays:         make(map[string]*Relay),
 		pendingRelays:  make(map[string]*relayPending),
 		relayCounts:    make(map[string]int),
 		events:         make(map[string][]*eventSubscriber),
 		versions:       make(map[string]int64),
+		presence:       make(map[string]bool),
 		conn:           conn,
 		shutdownCtx:    shutdownCtx,
 		shutdownCancel: shutdownCancel,
@@ -89,8 +109,84 @@ func New(ctx context.Context, conn connection) *Pool {
 		<-ctx.Done()
 		p.Shutdown()
 	}()
+	go p.writePresence(ctx)
 
 	return p
+}
+
+// writePresence flushes online flags in batches. It starts by clearing every
+// flag, because a crashed server never marked its daemons offline.
+func (p *Pool) writePresence(ctx context.Context) {
+	if err := p.conn.WithTx(ctx, func(q *db.Queries) error {
+		return q.SetDaemonsOffline(ctx)
+	}); err != nil {
+		slog.Error("reset daemon presence", "error", err)
+	}
+	ticker := time.NewTicker(presenceFlushEvery)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		p.mu.Lock()
+		pending := p.presence
+		p.presence = make(map[string]bool)
+		p.mu.Unlock()
+		if len(pending) == 0 {
+			continue
+		}
+		var online, offline []string
+		for id, up := range pending {
+			if up {
+				online = append(online, id)
+			} else {
+				offline = append(offline, id)
+			}
+		}
+		if err := p.conn.WithTx(ctx, func(q *db.Queries) error {
+			if err := q.SetDaemonsOnline(ctx, &db.SetDaemonsOnlineParams{Online: true, DaemonIds: online}); err != nil {
+				return err
+			}
+			return q.SetDaemonsOnline(ctx, &db.SetDaemonsOnlineParams{Online: false, DaemonIds: offline})
+		}); err != nil {
+			slog.Error("write daemon presence", "error", err, "online", len(online), "offline", len(offline))
+		}
+	}
+}
+
+// dropOwnedLocked detaches every session and relay of a daemon from the pool
+// and returns them for teardown outside the lock. Caller holds p.mu.
+func (p *Pool) dropOwnedLocked(daemonID string) ([]*Session, []string) {
+	o := p.owned[daemonID]
+	if o == nil {
+		return nil, nil
+	}
+	sessions := slices.Collect(maps.Values(o.sessions))
+	relays := slices.Collect(maps.Keys(o.relays))
+	for _, s := range sessions {
+		delete(p.sessions, s.sessionID)
+	}
+	delete(p.owned, daemonID)
+	return sessions, relays
+}
+
+// ownLocked returns the daemon's index entry, creating it. Caller holds p.mu.
+func (p *Pool) ownLocked(daemonID string) *owned {
+	o := p.owned[daemonID]
+	if o == nil {
+		o = &owned{sessions: make(map[string]*Session), relays: make(map[string]struct{})}
+		p.owned[daemonID] = o
+	}
+	return o
+}
+
+// disownLocked drops an emptied index entry. Caller holds p.mu.
+func (p *Pool) disownLocked(daemonID string) {
+	if o := p.owned[daemonID]; o != nil && len(o.sessions) == 0 && len(o.relays) == 0 {
+		delete(p.owned, daemonID)
+	}
 }
 
 // Shutdown cancels all daemon connections and signals the shutdown context so
@@ -122,19 +218,8 @@ func (p *Pool) RegisterDaemon(ctx context.Context, daemonID, workspaceID string)
 	}
 	p.mu.Lock()
 	previous := p.byID[daemonID]
-	var staleSessions []*Session
-	var staleRelays []string
-	for sessionID, session := range p.sessions {
-		if session.daemonID == daemonID {
-			delete(p.sessions, sessionID)
-			staleSessions = append(staleSessions, session)
-		}
-	}
-	for relayID, relay := range p.relays {
-		if relay.daemonID == daemonID {
-			staleRelays = append(staleRelays, relayID)
-		}
-	}
+	staleSessions, staleRelays := p.dropOwnedLocked(daemonID)
+	p.presence[daemonID] = true
 	if previous != nil && previous.workspaceID != workspaceID {
 		if daemons := p.byWksp[previous.workspaceID]; daemons != nil {
 			delete(daemons, daemonID)
@@ -158,15 +243,6 @@ func (p *Pool) RegisterDaemon(ctx context.Context, daemonID, workspaceID string)
 	for _, relayID := range staleRelays {
 		p.UnregisterRelay(relayID)
 	}
-
-	if err := p.conn.WithTx(ctx, func(q *db.Queries) error {
-		return q.UpdateDaemonOnlineStatus(ctx, &db.UpdateDaemonOnlineStatusParams{
-			DaemonID: daemonID,
-			Online:   true,
-		})
-	}); err != nil {
-		slog.Error("failed to set daemon online", "daemon_id", daemonID, "error", err)
-	}
 	return c
 }
 
@@ -189,28 +265,14 @@ func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 		delete(daemons, daemonID)
 		if len(daemons) == 0 {
 			delete(p.byWksp, wksp)
-			// No daemon is left to ack this counter. Drop it so the map
-			// cannot grow without bound; a reconnecting daemon sees 0,
-			// re-syncs once, and the counter resumes from there.
 			delete(p.versions, wksp)
 		}
 	}
+	p.presence[daemonID] = false
 	// Tear down this daemon's sessions and relays even if the stream
 	// handlers haven't noticed the control stream drop yet. shutdown() and
 	// Close() are idempotent.
-	var sessions []*Session
-	var relayIDs []string
-	for _, s := range p.sessions {
-		if s.daemonID == daemonID {
-			delete(p.sessions, s.sessionID)
-			sessions = append(sessions, s)
-		}
-	}
-	for id, r := range p.relays {
-		if r.daemonID == daemonID {
-			relayIDs = append(relayIDs, id)
-		}
-	}
+	sessions, relayIDs := p.dropOwnedLocked(daemonID)
 	p.mu.Unlock()
 
 	for _, s := range sessions {
@@ -219,87 +281,123 @@ func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 	for _, id := range relayIDs {
 		p.UnregisterRelay(id)
 	}
-
-	if err := p.conn.WithTx(
-		context.Background(),
-		func(q *db.Queries) error {
-			return q.UpdateDaemonOnlineStatus(
-				context.Background(),
-				&db.UpdateDaemonOnlineStatusParams{
-					DaemonID: daemonID,
-					Online:   false,
-				},
-			)
-		},
-	); err != nil {
-		slog.Error("failed to set daemon offline", "daemon_id", daemonID, "error", err)
-	}
-
 	c.cancel()
 }
 
-// Version returns the current state version of a workspace.
-func (p *Pool) Version(workspaceID string) int64 {
+// Poke tells every connected daemon of a workspace to re-sync.
+func (p *Pool) Poke(workspaceID string) {
 	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.versions[workspaceID]
-}
-
-// HeartbeatVersion resolves a daemon heartbeat's version against the
-// workspace counter. It reports the version to ack with and whether an ack
-// is due at all. A mismatch means the daemon is behind, or the counter was
-// reset by a server restart. Either way the daemon must re-sync so it
-// cannot stay stale.
-func (p *Pool) HeartbeatVersion(daemonID string, version int64) (int64, bool) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	c, ok := p.byID[daemonID]
-	if !ok {
-		return 0, false
-	}
-	cur := p.versions[c.workspaceID]
-	return cur, cur != version
-}
-
-// NotifyChange bumps the workspace state version and pushes a coalesced
-// StateUpdate to every connected daemon. Each daemon re-syncs at most once
-// per burst: its state channel holds one update and replaces it when a newer
-// change lands before it is read.
-func (p *Pool) NotifyChange(workspaceID string) {
-	p.mu.Lock()
-	p.versions[workspaceID]++
-	version := p.versions[workspaceID]
 	daemons := make([]*Conn, 0, len(p.byWksp[workspaceID]))
 	for daemonID := range p.byWksp[workspaceID] {
 		if c := p.byID[daemonID]; c != nil {
 			daemons = append(daemons, c)
 		}
 	}
-	p.mu.Unlock()
-
-	msg := &nokkuv1.ConnectResponse{
-		Msg: &nokkuv1.ConnectResponse_StateUpdate{
-			StateUpdate: &nokkuv1.StateUpdate{StateVersion: &version},
-		},
-	}
+	p.mu.RUnlock()
 	for _, c := range daemons {
-		p.sendStateUpdate(c, msg)
+		c.poke()
 	}
 }
 
-// sendStateUpdate delivers msg to c.state, replacing any older pending
-// update. It never blocks the caller.
-func (p *Pool) sendStateUpdate(c *Conn, msg *nokkuv1.ConnectResponse) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	select {
-	case c.state <- msg:
-	default:
-		select {
-		case <-c.state:
-		default:
+// Listen pokes a workspace's daemons whenever the database reports a state
+// change for it. The notifications come from triggers and arrive on commit.
+// It reconnects until ctx is done.
+func (p *Pool) Listen(ctx context.Context, cfg *pgx.ConnConfig) {
+	for ctx.Err() == nil {
+		if err := p.listen(ctx, cfg); err != nil && ctx.Err() == nil {
+			slog.Warn("state listener disconnected", "error", err)
 		}
-		c.state <- msg
+		select {
+		case <-ctx.Done():
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+func (p *Pool) listen(ctx context.Context, cfg *pgx.ConnConfig) error {
+	conn, err := pgx.ConnectConfig(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(context.WithoutCancel(ctx))
+	if _, err := conn.Exec(ctx, "LISTEN nokku_state"); err != nil {
+		return err
+	}
+	// Anything that changed while we were not listening went unnoticed.
+	p.mu.Lock()
+	clear(p.versions)
+	p.mu.Unlock()
+	p.pokeAll()
+	for {
+		n, err := conn.WaitForNotification(ctx)
+		if err != nil {
+			return err
+		}
+		// Read after commit, so the cached version is never older than the
+		// change that fired the notification.
+		ws := n.Payload
+		var version int64
+		if err := p.conn.WithTx(ctx, func(q *db.Queries) (err error) {
+			version, err = q.GetWorkspaceStateVersion(ctx, ws)
+			return err
+		}); err != nil {
+			slog.Warn("read workspace state version", "workspace_id", ws, "error", err)
+			p.mu.Lock()
+			delete(p.versions, ws)
+			p.mu.Unlock()
+		} else {
+			p.mu.Lock()
+			if _, ok := p.byWksp[ws]; ok {
+				p.versions[ws] = version
+			}
+			p.mu.Unlock()
+		}
+		p.Poke(ws)
+	}
+}
+
+// stateVersion returns a workspace's state version, from the cache when the
+// listener has seen it. A miss reads the database and fills the cache only if
+// the listener did not store a fresher value meanwhile.
+func (p *Pool) stateVersion(ctx context.Context, workspaceID string) (int64, error) {
+	p.mu.RLock()
+	v, ok := p.versions[workspaceID]
+	p.mu.RUnlock()
+	if ok {
+		return v, nil
+	}
+	if err := p.conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		v, err = q.GetWorkspaceStateVersion(ctx, workspaceID)
+		return err
+	}); err != nil {
+		return 0, err
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if cached, ok := p.versions[workspaceID]; ok {
+		return cached, nil
+	}
+	if _, ok := p.byWksp[workspaceID]; ok {
+		p.versions[workspaceID] = v
+	}
+	return v, nil
+}
+
+func (p *Pool) pokeAll() {
+	p.mu.RLock()
+	daemons := slices.Collect(maps.Values(p.byID))
+	p.mu.RUnlock()
+	for _, c := range daemons {
+		c.poke()
+	}
+}
+
+// poke queues a StateUpdate. A pending one already covers it, so a burst of
+// changes costs the daemon one sync. It never blocks the caller.
+func (c *Conn) poke() {
+	select {
+	case c.state <- stateUpdate:
+	default:
 	}
 }
 

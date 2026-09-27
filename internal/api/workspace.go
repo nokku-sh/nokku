@@ -2,11 +2,9 @@ package api
 
 import (
 	"context"
-	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/nokku-sh/nokku/internal/iam"
 
@@ -18,20 +16,11 @@ import (
 
 func defaultWorkspaceSettings() *nokkuv1.WorkspaceSettings {
 	return &nokkuv1.WorkspaceSettings{
-		EnrollAutoApprove: new(true),
 		DefaultDaemonConfig: &nokkuv1.DaemonConfig{
 			RecordSessions:       new(true),
 			AllowForwarding:      new(true),
 			AllowAgentForwarding: new(true),
 			GatewayPorts:         new(false),
-			MaxSessions:          new(int32(10)),
-			MaxConnections:       new(int32(100)),
-			MaxChannels:          new(int32(50)),
-			MaxStartups:          new(int32(10)),
-			ClientAliveInterval:  durationpb.New(60 * time.Second),
-			ConnRate:             new(int32(5)),
-			ConnRateBurst:        new(int32(20)),
-			Banner:               new(true),
 			DropRetiredCa:        new(false),
 		},
 	}
@@ -202,6 +191,10 @@ func (s *WorkspaceService) UpdateWorkspaceMember(
 	ctx context.Context,
 	req *nokkuv1.UpdateWorkspaceMemberRequest,
 ) (*nokkuv1.UpdateWorkspaceMemberResponse, error) {
+	// Ownership moves only through UpdateWorkspaceOwner.
+	if !db.IsUserRole(req.GetRoleName()) {
+		return nil, NewError(connect.CodeInvalidArgument, "role cannot be assigned to a member")
+	}
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		return q.UpdateWorkspaceMember(ctx, &db.UpdateWorkspaceMemberParams{
 			WorkspaceID: req.GetWorkspaceId(),
@@ -267,16 +260,9 @@ func (s *WorkspaceService) RemoveWorkspaceMember(
 	ctx context.Context,
 	req *nokkuv1.RemoveWorkspaceMemberRequest,
 ) (*nokkuv1.RemoveWorkspaceMemberResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		// A removed member keeps no access: dropping their grants removes
-		// them from the synced principals map.
-		if err = q.RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
-			WorkspaceID: req.GetWorkspaceId(),
-			SubjectKind: db.SubjectKindUser,
-			SubjectID:   req.GetUserId(),
-		}); err != nil {
-			return err
-		}
+	// Grants and team seats cascade from the membership, so a removed member
+	// drops out of every synced principals map.
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		return q.RemoveWorkspaceMember(ctx, &db.RemoveWorkspaceMemberParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			UserID:      req.GetUserId(),

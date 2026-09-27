@@ -110,7 +110,7 @@ func (s *Service) actorEmail(ctx context.Context, p iam.Principal) string {
 		return ""
 	}
 
-	u, err := s.conn.Q.GetUser(ctx, p.ID)
+	u, err := s.conn.Sys().GetUser(ctx, p.ID)
 	if err != nil {
 		return ""
 	}

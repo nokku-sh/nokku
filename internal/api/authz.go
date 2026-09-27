@@ -6,7 +6,6 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nokku-sh/nokku/internal/iam"
 
@@ -15,12 +14,14 @@ import (
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 )
 
+// Every procedure is classified exactly once, here or in publicEndpoints.
+// Anything unclassified is denied, so a new RPC fails closed until someone
+// decides who may call it.
+
 // ProcedurePermissions maps every workspace-scoped procedure to the single
 // permission it requires. This is the only place permission codes are
 // resolved from a procedure. Handlers run their data access with plain
-// WithWorkspace. Procedures that need a different rule (user-scoped, public,
-// token-scoped, owner-only, streaming, or handler-level logic) are not listed
-// here and keep their existing handler checks.
+// WithWorkspace.
 var ProcedurePermissions = map[string]db.Permission{
 	// Billing
 	nokkuv1connect.BillingServiceGetBillingProcedure: db.PermSettingsView,
@@ -34,22 +35,20 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.CertificateServiceRolloverCertificateAuthorityProcedure: db.PermCasEdit,
 
 	// Daemons
-	nokkuv1connect.DaemonServiceGetDaemonProcedure:          db.PermDaemonsView,
-	nokkuv1connect.DaemonServiceListDaemonsProcedure:        db.PermDaemonsView,
-	nokkuv1connect.DaemonServiceListSessionsProcedure:       db.PermDaemonsView,
-	nokkuv1connect.DaemonServiceCreateSessionProcedure:      db.PermDaemonsView,
-	nokkuv1connect.DaemonServiceUpdateDaemonProcedure:       db.PermDaemonsEdit,
-	nokkuv1connect.DaemonServiceDeleteDaemonProcedure:       db.PermDaemonsEdit,
-	nokkuv1connect.DaemonServiceRefreshEnrollTokenProcedure: db.PermSettingsEdit,
-	nokkuv1connect.DaemonServiceRevokeEnrollTokenProcedure:  db.PermSettingsEdit,
+	nokkuv1connect.DaemonServiceGetDaemonProcedure:     db.PermDaemonsView,
+	nokkuv1connect.DaemonServiceListDaemonsProcedure:   db.PermDaemonsView,
+	nokkuv1connect.DaemonServiceListSessionsProcedure:  db.PermDaemonsView,
+	nokkuv1connect.DaemonServiceCreateSessionProcedure: db.PermDaemonsView,
+	nokkuv1connect.DaemonServiceUpdateDaemonProcedure:  db.PermDaemonsEdit,
+	nokkuv1connect.DaemonServiceDeleteDaemonProcedure:  db.PermDaemonsEdit,
 
-	// Invitations
-	nokkuv1connect.InvitationServiceRefreshInviteTokenProcedure: db.PermSettingsEdit,
-	nokkuv1connect.InvitationServiceRevokeInviteTokenProcedure:  db.PermSettingsEdit,
+	// Join tokens (enroll and invite)
+	nokkuv1connect.TokenServiceCreateTokenProcedure: db.PermSettingsEdit,
+	nokkuv1connect.TokenServiceListTokensProcedure:  db.PermSettingsView,
+	nokkuv1connect.TokenServiceDeleteTokenProcedure: db.PermSettingsEdit,
 
 	// Principals
 	nokkuv1connect.PrincipalServiceListPrincipalsProcedure:              db.PermPrincipalsView,
-	nokkuv1connect.PrincipalServiceSetPrincipalsProcedure:               db.PermPrincipalsEdit,
 	nokkuv1connect.PrincipalServiceAddSubjectsToPrincipalProcedure:      db.PermPrincipalsEdit,
 	nokkuv1connect.PrincipalServiceRemoveSubjectsFromPrincipalProcedure: db.PermPrincipalsEdit,
 	nokkuv1connect.PrincipalServiceRevokeAllAccessProcedure:             db.PermPrincipalsEdit,
@@ -123,6 +122,58 @@ var ProcedurePermissions = map[string]db.Permission{
 	nokkuv1connect.DaemonServiceCloseSessionProcedure: db.PermDaemonsEdit,
 }
 
+// selfScopedProcedures are open to any authenticated user or service
+// account. Each one is scoped to the caller (their account, their
+// workspaces, their certs) or checks owner rights in the handler.
+var selfScopedProcedures = map[string]struct{}{
+	nokkuv1connect.AccountServiceChangePasswordProcedure:             {},
+	nokkuv1connect.AccountServiceDeleteAccountProcedure:              {},
+	nokkuv1connect.AccountServiceGetAccountProcedure:                 {},
+	nokkuv1connect.AccountServiceListAccountSessionsProcedure:        {},
+	nokkuv1connect.AccountServiceListBackupCodesProcedure:            {},
+	nokkuv1connect.AccountServiceListCredentialsProcedure:            {},
+	nokkuv1connect.AccountServiceRemoveBackupCodesProcedure:          {},
+	nokkuv1connect.AccountServiceRemoveCredentialProcedure:           {},
+	nokkuv1connect.AccountServiceRemoveIdentityProcedure:             {},
+	nokkuv1connect.AccountServiceRemovePasswordProcedure:             {},
+	nokkuv1connect.AccountServiceRemoveSessionProcedure:              {},
+	nokkuv1connect.AccountServiceRenameCredentialProcedure:           {},
+	nokkuv1connect.AccountServiceRotateBackupCodesProcedure:          {},
+	nokkuv1connect.AccountServiceUpdateAccountProcedure:              {},
+	nokkuv1connect.BillingServiceCancelSubscriptionProcedure:         {},
+	nokkuv1connect.BillingServiceCreateCheckoutProcedure:             {},
+	nokkuv1connect.BillingServiceCreatePortalProcedure:               {},
+	nokkuv1connect.BillingServiceGetLicenseProcedure:                 {},
+	nokkuv1connect.CertificateServiceSignSSHCertificateProcedure:     {},
+	nokkuv1connect.CertificateServiceSignX509CertificateProcedure:    {},
+	nokkuv1connect.DaemonServiceRelayProcedure:                       {},
+	nokkuv1connect.InvitationServiceAcceptInvitationProcedure:        {},
+	nokkuv1connect.InvitationServiceGetInvitationProcedure:           {},
+	nokkuv1connect.TargetServiceGetMyAccessProcedure:                 {},
+	nokkuv1connect.UtilServiceListRolesProcedure:                     {},
+	nokkuv1connect.UtilServiceWhoamiProcedure:                        {},
+	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure:          {},
+	nokkuv1connect.WorkspaceServiceGetWorkspaceProcedure:             {},
+	nokkuv1connect.WorkspaceServiceListWorkspacesProcedure:           {},
+	nokkuv1connect.WorkspaceServiceSubscribeWorkspaceEventsProcedure: {},
+	nokkuv1connect.WorkspaceServiceUpdateWorkspaceOwnerProcedure:     {},
+}
+
+// daemonOnlyProcedures serve the daemon identity and nobody else.
+var daemonOnlyProcedures = map[string]struct{}{
+	nokkuv1connect.DaemonServiceSyncDaemonProcedure:         {},
+	nokkuv1connect.DaemonControlServiceConnectProcedure:     {},
+	nokkuv1connect.DaemonSessionServiceDaemonRelayProcedure: {},
+	nokkuv1connect.RecordingServiceUploadRecordingProcedure: {},
+}
+
+// daemonSharedProcedures are the only other procedures a daemon may call.
+// Their handlers narrow a daemon to its own host cert and its own record.
+var daemonSharedProcedures = map[string]struct{}{
+	nokkuv1connect.CertificateServiceSignSSHCertificateProcedure: {},
+	nokkuv1connect.DaemonServiceDeleteDaemonProcedure:            {},
+}
+
 type AuthorizationInterceptor struct {
 	cfg *config.Config
 }
@@ -135,12 +186,8 @@ func NewAuthZInterceptor(
 
 func (a *AuthorizationInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		perm, ok := ProcedurePermissions[req.Spec().Procedure]
-		if !ok {
-			return next(ctx, req)
-		}
-
-		if err := a.authorize(ctx, perm); err != nil {
+		ctx, err := a.authorize(ctx, req.Spec().Procedure)
+		if err != nil {
 			return nil, DBError(err)
 		}
 		return next(ctx, req)
@@ -156,18 +203,46 @@ func (a *AuthorizationInterceptor) WrapStreamingClient(
 func (a *AuthorizationInterceptor) WrapStreamingHandler(
 	next connect.StreamingHandlerFunc,
 ) connect.StreamingHandlerFunc {
-	return next
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		ctx, err := a.authorize(ctx, conn.Spec().Procedure)
+		if err != nil {
+			return DBError(err)
+		}
+		return next(ctx, conn)
+	}
 }
 
-// authorize resolves the actor's current role in the pinned workspace and
-// checks it against the permission. Daemons always act with the fixed
-// "daemon" role. It runs as a single admin-pool query so it never opens the
-// data transaction or sets RLS state.
+// authorize decides whether the request actor may call procedure at all. A
+// workspace permission check also marks the membership as verified on the
+// returned context, so WithWorkspace skips its own lookup.
 func (a *AuthorizationInterceptor) authorize(
 	ctx context.Context,
-	perm db.Permission,
-) error {
-	return actorHasPermission(ctx, a.cfg.Conn, perm)
+	procedure string,
+) (context.Context, error) {
+	actor, _ := iam.PrincipalFromContext(ctx)
+	_, daemonOnly := daemonOnlyProcedures[procedure]
+	if actor.Kind == iam.KindDaemon {
+		if _, shared := daemonSharedProcedures[procedure]; daemonOnly || shared {
+			return ctx, nil
+		}
+		return ctx, db.ErrPermissionDenied
+	}
+	if daemonOnly {
+		return ctx, db.ErrPermissionDenied
+	}
+	if perm, ok := ProcedurePermissions[procedure]; ok {
+		if err := actorHasPermission(ctx, a.cfg.Conn, perm); err != nil {
+			return ctx, err
+		}
+		return iam.WithMember(ctx, iam.WorkspaceIDFromContext(ctx)), nil
+	}
+	if _, ok := selfScopedProcedures[procedure]; ok {
+		return ctx, nil
+	}
+	if isPublicEndpoint(procedure) {
+		return ctx, nil
+	}
+	return ctx, db.ErrPermissionDenied
 }
 
 // actorHasPermission resolves the request actor's role and checks it against
@@ -181,49 +256,22 @@ func actorHasPermission(
 	if actor.ID == "" {
 		return db.ErrNoActor
 	}
-
-	role := "daemon"
-	if actor.Kind != iam.KindDaemon {
-		workspaceID := iam.WorkspaceIDFromContext(ctx)
-		if workspaceID == "" {
-			return db.ErrWorkspaceNotPinned
-		}
-
-		var err error
-		role, err = actorRole(ctx, conn.AdminPool, workspaceID, actor.ID)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return db.ErrWorkspaceNotAccessible
-		}
-		if err != nil {
-			return err
-		}
+	workspaceID := iam.WorkspaceIDFromContext(ctx)
+	if workspaceID == "" {
+		return db.ErrWorkspaceNotPinned
 	}
-
+	role, err := conn.Sys().GetActorRole(ctx, &db.GetActorRoleParams{
+		WorkspaceID: workspaceID,
+		ActorID:     actor.ID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return db.ErrWorkspaceNotAccessible
+	}
+	if err != nil {
+		return err
+	}
 	if !db.HasPermission(role, perm) {
 		return db.ErrPermissionDenied
 	}
 	return nil
-}
-
-// actorRole returns the workspace role of a user or service account. It must
-// run against a connection that bypasses RLS (the admin pool), because it
-// resolves membership for a workspace that is not yet pinned for data access.
-func actorRole(
-	ctx context.Context,
-	pool *pgxpool.Pool,
-	workspaceID, actorID string,
-) (string, error) {
-	var role string
-	err := pool.QueryRow(
-		ctx,
-		`SELECT role_name FROM workspace_members
-		 WHERE workspace_id = $1 AND user_id = $2::uuid
-		 UNION ALL
-		 SELECT role_name FROM service_accounts
-		 WHERE workspace_id = $1 AND id = $2::uuid
-		 LIMIT 1`,
-		workspaceID,
-		actorID,
-	).Scan(&role)
-	return role, err
 }

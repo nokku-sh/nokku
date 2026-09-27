@@ -33,12 +33,6 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// InvitationServiceRefreshInviteTokenProcedure is the fully-qualified name of the
-	// InvitationService's RefreshInviteToken RPC.
-	InvitationServiceRefreshInviteTokenProcedure = "/nokku.v1.InvitationService/RefreshInviteToken"
-	// InvitationServiceRevokeInviteTokenProcedure is the fully-qualified name of the
-	// InvitationService's RevokeInviteToken RPC.
-	InvitationServiceRevokeInviteTokenProcedure = "/nokku.v1.InvitationService/RevokeInviteToken"
 	// InvitationServiceGetInvitationProcedure is the fully-qualified name of the InvitationService's
 	// GetInvitation RPC.
 	InvitationServiceGetInvitationProcedure = "/nokku.v1.InvitationService/GetInvitation"
@@ -49,8 +43,6 @@ const (
 
 // InvitationServiceClient is a client for the nokku.v1.InvitationService service.
 type InvitationServiceClient interface {
-	RefreshInviteToken(context.Context, *v1.RefreshInviteTokenRequest) (*v1.RefreshInviteTokenResponse, error)
-	RevokeInviteToken(context.Context, *v1.RevokeInviteTokenRequest) (*v1.RevokeInviteTokenResponse, error)
 	GetInvitation(context.Context, *v1.GetInvitationRequest) (*v1.GetInvitationResponse, error)
 	AcceptInvitation(context.Context, *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error)
 }
@@ -66,18 +58,6 @@ func NewInvitationServiceClient(httpClient connect.HTTPClient, baseURL string, o
 	baseURL = strings.TrimRight(baseURL, "/")
 	invitationServiceMethods := v1.File_nokku_v1_invitation_proto.Services().ByName("InvitationService").Methods()
 	return &invitationServiceClient{
-		refreshInviteToken: connect.NewClient[v1.RefreshInviteTokenRequest, v1.RefreshInviteTokenResponse](
-			httpClient,
-			baseURL+InvitationServiceRefreshInviteTokenProcedure,
-			connect.WithSchema(invitationServiceMethods.ByName("RefreshInviteToken")),
-			connect.WithClientOptions(opts...),
-		),
-		revokeInviteToken: connect.NewClient[v1.RevokeInviteTokenRequest, v1.RevokeInviteTokenResponse](
-			httpClient,
-			baseURL+InvitationServiceRevokeInviteTokenProcedure,
-			connect.WithSchema(invitationServiceMethods.ByName("RevokeInviteToken")),
-			connect.WithClientOptions(opts...),
-		),
 		getInvitation: connect.NewClient[v1.GetInvitationRequest, v1.GetInvitationResponse](
 			httpClient,
 			baseURL+InvitationServiceGetInvitationProcedure,
@@ -96,28 +76,8 @@ func NewInvitationServiceClient(httpClient connect.HTTPClient, baseURL string, o
 
 // invitationServiceClient implements InvitationServiceClient.
 type invitationServiceClient struct {
-	refreshInviteToken *connect.Client[v1.RefreshInviteTokenRequest, v1.RefreshInviteTokenResponse]
-	revokeInviteToken  *connect.Client[v1.RevokeInviteTokenRequest, v1.RevokeInviteTokenResponse]
-	getInvitation      *connect.Client[v1.GetInvitationRequest, v1.GetInvitationResponse]
-	acceptInvitation   *connect.Client[v1.AcceptInvitationRequest, v1.AcceptInvitationResponse]
-}
-
-// RefreshInviteToken calls nokku.v1.InvitationService.RefreshInviteToken.
-func (c *invitationServiceClient) RefreshInviteToken(ctx context.Context, req *v1.RefreshInviteTokenRequest) (*v1.RefreshInviteTokenResponse, error) {
-	response, err := c.refreshInviteToken.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// RevokeInviteToken calls nokku.v1.InvitationService.RevokeInviteToken.
-func (c *invitationServiceClient) RevokeInviteToken(ctx context.Context, req *v1.RevokeInviteTokenRequest) (*v1.RevokeInviteTokenResponse, error) {
-	response, err := c.revokeInviteToken.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+	getInvitation    *connect.Client[v1.GetInvitationRequest, v1.GetInvitationResponse]
+	acceptInvitation *connect.Client[v1.AcceptInvitationRequest, v1.AcceptInvitationResponse]
 }
 
 // GetInvitation calls nokku.v1.InvitationService.GetInvitation.
@@ -140,8 +100,6 @@ func (c *invitationServiceClient) AcceptInvitation(ctx context.Context, req *v1.
 
 // InvitationServiceHandler is an implementation of the nokku.v1.InvitationService service.
 type InvitationServiceHandler interface {
-	RefreshInviteToken(context.Context, *v1.RefreshInviteTokenRequest) (*v1.RefreshInviteTokenResponse, error)
-	RevokeInviteToken(context.Context, *v1.RevokeInviteTokenRequest) (*v1.RevokeInviteTokenResponse, error)
 	GetInvitation(context.Context, *v1.GetInvitationRequest) (*v1.GetInvitationResponse, error)
 	AcceptInvitation(context.Context, *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error)
 }
@@ -153,18 +111,6 @@ type InvitationServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewInvitationServiceHandler(svc InvitationServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	invitationServiceMethods := v1.File_nokku_v1_invitation_proto.Services().ByName("InvitationService").Methods()
-	invitationServiceRefreshInviteTokenHandler := connect.NewUnaryHandlerSimple(
-		InvitationServiceRefreshInviteTokenProcedure,
-		svc.RefreshInviteToken,
-		connect.WithSchema(invitationServiceMethods.ByName("RefreshInviteToken")),
-		connect.WithHandlerOptions(opts...),
-	)
-	invitationServiceRevokeInviteTokenHandler := connect.NewUnaryHandlerSimple(
-		InvitationServiceRevokeInviteTokenProcedure,
-		svc.RevokeInviteToken,
-		connect.WithSchema(invitationServiceMethods.ByName("RevokeInviteToken")),
-		connect.WithHandlerOptions(opts...),
-	)
 	invitationServiceGetInvitationHandler := connect.NewUnaryHandlerSimple(
 		InvitationServiceGetInvitationProcedure,
 		svc.GetInvitation,
@@ -180,10 +126,6 @@ func NewInvitationServiceHandler(svc InvitationServiceHandler, opts ...connect.H
 	)
 	return "/nokku.v1.InvitationService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case InvitationServiceRefreshInviteTokenProcedure:
-			invitationServiceRefreshInviteTokenHandler.ServeHTTP(w, r)
-		case InvitationServiceRevokeInviteTokenProcedure:
-			invitationServiceRevokeInviteTokenHandler.ServeHTTP(w, r)
 		case InvitationServiceGetInvitationProcedure:
 			invitationServiceGetInvitationHandler.ServeHTTP(w, r)
 		case InvitationServiceAcceptInvitationProcedure:
@@ -196,14 +138,6 @@ func NewInvitationServiceHandler(svc InvitationServiceHandler, opts ...connect.H
 
 // UnimplementedInvitationServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedInvitationServiceHandler struct{}
-
-func (UnimplementedInvitationServiceHandler) RefreshInviteToken(context.Context, *v1.RefreshInviteTokenRequest) (*v1.RefreshInviteTokenResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.InvitationService.RefreshInviteToken is not implemented"))
-}
-
-func (UnimplementedInvitationServiceHandler) RevokeInviteToken(context.Context, *v1.RevokeInviteTokenRequest) (*v1.RevokeInviteTokenResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.InvitationService.RevokeInviteToken is not implemented"))
-}
 
 func (UnimplementedInvitationServiceHandler) GetInvitation(context.Context, *v1.GetInvitationRequest) (*v1.GetInvitationResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.InvitationService.GetInvitation is not implemented"))

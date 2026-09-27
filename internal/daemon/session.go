@@ -255,6 +255,7 @@ func (p *Pool) RegisterSession(sessionID, daemonID, username, userID string) *Se
 	s.touch()
 	p.mu.Lock()
 	p.sessions[sessionID] = s
+	p.ownLocked(daemonID).sessions[sessionID] = s
 	p.mu.Unlock()
 	return s
 }
@@ -263,8 +264,23 @@ func (p *Pool) RegisterSession(sessionID, daemonID, username, userID string) *Se
 // calls it from its teardown. Idempotent.
 func (p *Pool) UnregisterSession(sessionID string) {
 	p.mu.Lock()
-	delete(p.sessions, sessionID)
+	p.removeSessionLocked(sessionID)
 	p.mu.Unlock()
+}
+
+// removeSessionLocked drops a session from both indexes and returns it.
+// Caller holds p.mu.
+func (p *Pool) removeSessionLocked(sessionID string) *Session {
+	s := p.sessions[sessionID]
+	if s == nil {
+		return nil
+	}
+	delete(p.sessions, sessionID)
+	if o := p.owned[s.daemonID]; o != nil {
+		delete(o.sessions, sessionID)
+		p.disownLocked(s.daemonID)
+	}
+	return s
 }
 
 func (p *Pool) GetSession(sessionID string) *Session {
@@ -277,15 +293,12 @@ func (p *Pool) ListSessions(daemonID string) []*nokkuv1.DaemonSession {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	var result []*nokkuv1.DaemonSession
-	for _, s := range p.sessions {
-		if s.daemonID == daemonID {
-			sessionID := s.sessionID
-			username := s.username
-			userID := s.userID
+	if o := p.owned[daemonID]; o != nil {
+		for _, s := range o.sessions {
 			result = append(result, &nokkuv1.DaemonSession{
-				SessionId: &sessionID,
-				Username:  &username,
-				UserId:    &userID,
+				SessionId: new(s.sessionID),
+				Username:  new(s.username),
+				UserId:    new(s.userID),
 			})
 		}
 	}
@@ -294,14 +307,12 @@ func (p *Pool) ListSessions(daemonID string) []*nokkuv1.DaemonSession {
 
 func (p *Pool) CloseSession(sessionID string) {
 	p.mu.Lock()
-	s, ok := p.sessions[sessionID]
-	if !ok {
-		p.mu.Unlock()
+	// Remove from the maps immediately so ListSessions stops returning it.
+	s := p.removeSessionLocked(sessionID)
+	p.mu.Unlock()
+	if s == nil {
 		return
 	}
-	// Remove from map immediately so ListSessions stops returning it.
-	delete(p.sessions, sessionID)
-	p.mu.Unlock()
 	s.shutdown()
 	s.Close()
 }

@@ -123,11 +123,6 @@ func (c *Config) rotateCerts(ctx context.Context) {
 			KeyType:      newCA.KeyType,
 			KeyBits:      newCA.KeyBits,
 		})
-
-		if err == nil {
-			c.Pool.NotifyChange(ca.WorkspaceID)
-		}
-
 		return err
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {

@@ -37,7 +37,7 @@ func (t *TinkEncryptor) Rewrap(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	updated, err := t.db.Q.UpdateKeysetWrappedData(ctx, data)
+	updated, err := t.db.Sys().UpdateKeysetWrappedData(ctx, data)
 	if err != nil {
 		return fmt.Errorf("failed to persist rewrapped keyset: %w", err)
 	}
