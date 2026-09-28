@@ -18,7 +18,7 @@
 
 	let { limit = 6, hosts = {}, principals, title = 'Recent sessions' }: Props = $props();
 
-	const list = $derived(recordings.list());
+	const list = recordings.list();
 
 	const sessions = $derived.by(() => {
 		let rs: Recording[] = list.data?.recordings ?? [];
@@ -116,7 +116,7 @@
 						</div>
 						<div class="shrink-0 text-right">
 							{#if live}
-								<span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-500">
+								<span class="inline-flex items-center gap-1.5 text-xs font-medium text-success">
 									<Radio class="size-3 animate-pulse" />
 									live
 								</span>

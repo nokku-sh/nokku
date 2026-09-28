@@ -1,595 +1,702 @@
 <script lang="ts">
-	import { backupCode, passkey, password } from '$lib/api/credential.svelte';
+	import { describeAgent } from '$lib/agent';
+	import { backupCode, credentials, passkey, password } from '$lib/api/credential.svelte';
 	import { registerPasskey } from '$lib/api/passkey';
 	import { session, sessionKindLabel, sessionMethodLabel } from '$lib/api/session.svelte';
-	import { user } from '$lib/api/user.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
+	import { user, type LinkedAccount } from '$lib/api/user.svelte';
+	import { GitHubIcon, GoogleIcon, OIDCIcon, SAMLIcon } from '$lib/assets';
+	import Section from '$lib/components/sheets/Section.svelte';
+	import * as Alert from '$lib/components/ui/alert';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
-	import * as Empty from '$lib/components/ui/empty';
+	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as Field from '$lib/components/ui/field';
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress';
+	import { Rename } from '$lib/components/ui/rename';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Switch } from '$lib/components/ui/switch';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import { AuditOutcome } from '$lib/gen/nokku/v1/util_pb';
 	import { formatTs } from '$lib/utils';
+	import type { Timestamp } from '@bufbuild/protobuf/wkt';
 	import {
 		Binary,
-		CopyIcon,
-		DownloadIcon,
+		Check,
+		CircleAlert,
+		Copy,
+		Download,
 		KeyRound,
-		LoaderCircle,
+		Link,
 		Lock,
-		MailX,
+		LogIn,
+		LogOut,
+		Mail,
+		Monitor,
 		MonitorSmartphone,
-		ShieldIcon,
+		Plus,
+		ShieldCheck,
+		Smartphone,
+		Terminal,
 		Trash2,
-		TriangleAlert
+		Unlink
 	} from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
-	import Label from '$lib/components/ui/label/label.svelte';
+	import { confirm } from '$lib/hooks';
 
-	const currentUser = $derived(user.self());
-	const deleteAccount = user.deleteAccount();
+	const me = user.self();
+	const all = credentials.all();
+	const passkeys = passkey.list();
+	const renamePasskey = passkey.rename();
+	const deletePasskey = passkey.delete();
+	const linked = user.listLinkedAccounts();
+	const unlink = user.unlinkAccount();
 	const changePassword = password.update();
 	const deletePassword = password.delete();
-
-	const passkeys = $derived(passkey.list());
-	const deletePasskey = passkey.delete();
-
-	const backupCodes = $derived(backupCode.list());
-	const createBackupCodes = backupCode.create();
-	const deleteBackupCodes = backupCode.delete();
-
-	const sessions = $derived(session.list());
+	const codes = backupCode.list();
+	const createCodes = backupCode.create();
+	const deleteCodes = backupCode.delete();
+	const sessions = session.list();
 	const revokeSession = session.revoke();
-
+	const revokeOthers = session.revokeOthers();
 	const setEmailRecovery = user.setEmailRecovery();
+	const recentSignIns = user.activity(() => ({
+		enabled: !!me.data?.id,
+		limit: 5,
+		filter: { actions: ['Login', 'LoginDenied'], outcome: AuditOutcome.UNSPECIFIED }
+	}));
 
-	const disablePasswordReset = $derived(currentUser.data?.disablePasswordReset ?? false);
+	const passwordCredential = $derived((all.data ?? []).find((c) => c.type === 'password'));
+	const hasPassword = $derived(!!passwordCredential);
 
-	const workspaces = $derived(workspace.list());
-	const ownedNames = $derived(
-		(workspaces.data ?? [])
-			.filter((w) => w.createdBy === currentUser.data?.id)
-			.map((w) => w.name)
-			.join(', ')
+	const usage = (added?: Timestamp, used?: Timestamp) =>
+		`Added ${formatTs(added, 'relative', 'a while ago')} · ${used ? `last used ${formatTs(used, 'relative')}` : 'not used yet'}`;
+	const passkeyCount = $derived(passkeys.data?.length ?? 0);
+	const codeCount = $derived(codes.data?.length ?? 0);
+	// Every way in, used to stop the last one from being removed.
+	const methodCount = $derived(passkeyCount + (hasPassword ? 1 : 0) + (linked.data?.length ?? 0));
+	const otherSessions = $derived((sessions.data ?? []).filter((s) => !s.current));
+	const emailRecovery = $derived(!me.data?.disablePasswordReset);
+
+	const checks = $derived([
+		{
+			done: passkeyCount > 0,
+			label: 'Add a passkey',
+			doneLabel: `${passkeyCount} ${passkeyCount === 1 ? 'passkey' : 'passkeys'}`,
+			hint: 'Phishing proof, and faster than a password.',
+			href: '#sign-in'
+		},
+		{
+			done: codeCount > 0,
+			label: 'Create backup codes',
+			doneLabel: `${codeCount} backup codes left`,
+			hint: 'Your way back in if you lose every device.',
+			href: '#recovery'
+		},
+		{
+			done: !!me.data?.emailVerified,
+			label: 'Verify your email',
+			doneLabel: 'Email verified',
+			hint: 'Needed for password resets and important notices.',
+			href: '/profile'
+		}
+	]);
+	const doneCount = $derived(checks.filter((c) => c.done).length);
+	const status = $derived(
+		doneCount === checks.length
+			? { label: 'Strong', variant: 'success' as const }
+			: doneCount === checks.length - 1
+				? { label: 'Good', variant: 'info' as const }
+				: { label: 'Needs attention', variant: 'warning' as const }
 	);
-	const deleteAccountDescription = $derived(
-		ownedNames
-			? `This permanently deletes your account and the workspaces you own: ${ownedNames}. A workspace other people still use cannot go with your account, transfer its ownership first. Active subscriptions are canceled. This cannot be undone.`
-			: 'This permanently deletes your account and removes you from every workspace. This cannot be undone.'
-	);
 
-	let deletePasskeyId = $state('');
-	let deletePasskeyOpen = $state(false);
-	let deletePasswordOpen = $state(false);
-	let deleteAccountOpen = $state(false);
-	let deleteBackupCodesOpen = $state(false);
-
-	let currentPassword = $state('');
-	let newPassword = $state('');
-	let confirmPassword = $state('');
-	let isRegisteringPasskey = $state(false); // Added dedicated loading state
-
-	const getPasswordStrength = (password: string) => {
-		if (password.length === 0) return { score: -1, text: '', color: 'default' };
-		if (password.length < 8) return { score: 0, text: 'Too short', color: 'destructive' };
-		if (password.length < 12) return { score: 1, text: 'Weak', color: 'destructive' };
-		if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password))
-			return { score: 2, text: 'Fair', color: 'secondary' };
-		return { score: 3, text: 'Strong', color: 'default' };
-	};
-
-	let passwordsMatch = $derived(newPassword === confirmPassword);
-	let passwordStrength = $derived(getPasswordStrength(newPassword));
-
-	const handleRegisterPasskey = async () => {
+	let adding = $state(false);
+	async function addPasskey() {
+		if (!window.PublicKeyCredential) {
+			toast.error('Passkeys not supported', { description: 'Try a current browser.' });
+			return;
+		}
+		adding = true;
 		try {
-			if (!window.PublicKeyCredential) {
-				toast.error('Passkeys not supported', {
-					description: 'Your browser does not support passkeys. Please use a modern browser.'
-				});
-				return;
-			}
-			isRegisteringPasskey = true;
 			await registerPasskey();
-			toast.success('Passkey added', {
-				description: 'Your passkey has been successfully registered.'
-			});
-			passkeys.refetch();
+			toast.success('Passkey added');
+			await passkeys.refetch();
 		} catch (error) {
-			if (error instanceof DOMException) {
-				if (error.name === 'NotAllowedError') {
-					toast.error('Registration cancelled', {
-						description: 'Passkey registration was cancelled or timed out.'
-					});
-				} else if (error.name === 'InvalidStateError') {
-					toast.error('Passkey already exists', {
-						description: 'This authenticator is already registered.'
-					});
-				} else {
-					toast.error('Registration failed', { description: error.message });
-				}
-			} else {
-				toast.error('Registration failed', {
-					description: 'Failed to register passkey. Please try again.'
-				});
-			}
+			const cancelled = error instanceof DOMException && error.name === 'NotAllowedError';
+			const exists = error instanceof DOMException && error.name === 'InvalidStateError';
+			toast.error(
+				cancelled ? 'Cancelled' : exists ? 'This key is already added' : 'Adding failed',
+				{ description: cancelled ? 'The passkey prompt was closed or timed out.' : undefined }
+			);
 		} finally {
-			isRegisteringPasskey = false;
+			adding = false;
 		}
-	};
+	}
 
-	const handleDeletePassword = async () => {
-		if (!currentPassword.trim()) {
-			toast.error('Please enter your current password');
-			return;
-		}
-		deletePassword.mutate({ currentPassword });
-		deletePasswordOpen = false;
-		currentPassword = '';
-	};
+	let passwordOpen = $state(false);
+	let current = $state('');
+	let next = $state('');
+	let repeat = $state('');
+	const strength = $derived.by(() => {
+		if (!next) return undefined;
+		if (next.length < 8) return { score: 0, text: 'Too short' };
+		if (next.length < 12) return { score: 1, text: 'Weak' };
+		if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(next)) return { score: 2, text: 'Fair' };
+		return { score: 3, text: 'Strong' };
+	});
+	const canChange = $derived(!!current && next === repeat && (strength?.score ?? 0) >= 2);
 
-	const handlePasswordUpdate = async (event: Event) => {
-		event.preventDefault();
-		if (!passwordsMatch) {
-			toast.error('Passwords do not match');
-			return;
-		}
-		if (passwordStrength.score < 2) {
-			toast.error('Password is too weak');
-			return;
-		}
-		changePassword.mutate({ currentPassword, newPassword });
-		currentPassword = '';
-		newPassword = '';
-		confirmPassword = '';
-	};
+	async function submitPassword(e: SubmitEvent) {
+		e.preventDefault();
+		if (!canChange) return;
+		await changePassword.mutateAsync({ currentPassword: current, newPassword: next });
+		toast.success('Password changed');
+		current = next = repeat = '';
+		passwordOpen = false;
+	}
 
-	const handleDownloadBackupCodes = (codes: string[]) => {
-		if (!codes) return;
-		const codesList = codes.join('\n');
-		const content = `Nokku Backup Codes\nGenerated: ${new Date().toLocaleString()}\n\nKeep these codes in a safe place. Each code can only be used once.\n\n${codesList}\n\nThese codes can be used to access your account if you lose your passkey or password.`;
-		const blob = new Blob([content], { type: 'text/plain' });
-		const url = URL.createObjectURL(blob);
+	function providerName(a: LinkedAccount) {
+		if (a.provider === 'github') return 'GitHub';
+		if (a.provider === 'google') return 'Google';
+		return a.protocol === 'saml' ? 'SAML' : 'OIDC';
+	}
+	function providerIcon(a: LinkedAccount) {
+		if (a.provider === 'github') return GitHubIcon;
+		if (a.provider === 'google') return GoogleIcon;
+		return a.protocol === 'saml' ? SAMLIcon : OIDCIcon;
+	}
+	const linkable = [
+		{
+			provider: 'google',
+			label: 'Google',
+			icon: GoogleIcon,
+			href: '/oidc/login?provider=google&link=true'
+		},
+		{
+			provider: 'github',
+			label: 'GitHub',
+			icon: GitHubIcon,
+			href: '/oauth/login?provider=github&link=true'
+		}
+	];
+
+	function download(list: string[]) {
+		const content = `Nokku backup codes\nCreated ${new Date().toLocaleString()}\n\nEach code works once.\n\n${list.join('\n')}\n`;
+		const url = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `nokku-backup-codes-${new Date().toISOString().split('T')[0]}.txt`;
+		a.download = `nokku-backup-codes-${new Date().toISOString().slice(0, 10)}.txt`;
 		a.click();
 		URL.revokeObjectURL(url);
-		toast.success('Backup codes downloaded');
-	};
+	}
 
-	const handleCopyBackupCodes = async (codes: string[]) => {
-		if (!codes) return;
-		await navigator.clipboard.writeText(codes.join('\n'));
-		toast.success('Backup codes copied to clipboard');
-	};
+	const kindIcon = (kind: string) =>
+		kind === 'cli' ? Terminal : kind === 'web_device' ? Smartphone : Monitor;
 </script>
+
+{#snippet lastWayIn(disabled: boolean)}
+	{#if disabled}
+		<Tooltip.Content>Your only way in, add another method first.</Tooltip.Content>
+	{/if}
+{/snippet}
 
 <PageHeader
 	title="Security"
-	description="Manage your authentication methods, connected devices, and account recovery options."
-	icon={ShieldIcon}
-/>
-
-<DeleteConfirmationModal
-	bind:open={deletePasskeyOpen}
-	title="Delete Passkey"
-	description="This will remove your passkey permanently. Make sure you have other ways to access your account."
-	onConfirm={() => deletePasskey.mutate({ id: deletePasskeyId })}
-/>
-<DeleteConfirmationModal
-	bind:open={deletePasswordOpen}
-	title="Delete Password"
-	description="This will remove your password permanently. You will only be able to sign in using your passkeys. Make sure your passkeys are working before deleting your password. You won't be able to recover it."
-	itemName="Enter your current password"
-	bind:confirmationText={currentPassword}
-	requireTyping={true}
-	onConfirm={handleDeletePassword}
-/>
-<DeleteConfirmationModal
-	bind:open={deleteBackupCodesOpen}
-	title="Delete Backup Codes"
-	description="This will invalidate all existing backup codes, making it impossible to use them to recover your account."
-	onConfirm={() => deleteBackupCodes.mutate({})}
-/>
-<DeleteConfirmationModal
-	bind:open={deleteAccountOpen}
-	title="Delete Account"
-	description={deleteAccountDescription}
-	itemName={currentUser.data?.email}
-	requireConfirmation={true}
-	onConfirm={() => deleteAccount.mutate({})}
+	description="How you sign in, how you get back in, and where you are signed in."
+	icon={ShieldCheck}
 />
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title class="flex items-center gap-2 text-lg">
-			<KeyRound class="size-5 text-muted-foreground" />
-			Passkeys
+		<Card.Title class="flex items-center gap-2 text-base">
+			Security checkup
+			<Badge variant={status.variant}>{status.label}</Badge>
 		</Card.Title>
-		<Card.Description>
-			Log in securely and quickly using your device's biometrics (Touch ID, Face ID) or a hardware
-			security key. No password required.
-		</Card.Description>
+		<Card.Description>{doneCount} of {checks.length} done.</Card.Description>
+		<Card.Action>
+			<Progress value={(doneCount / checks.length) * 100} class="h-1.5 w-28" />
+		</Card.Action>
 	</Card.Header>
-	<Card.Content>
-		{#if passkeys.isSuccess && passkeys.data.length > 0}
-			<Item.Group class="border-border bg-transparent">
-				{#each passkeys.data || [] as pk (pk.id)}
-					<Item.Root variant="muted">
-						<Item.Media variant="icon">
-							<KeyRound />
-						</Item.Media>
-						<Item.Content>
-							<Item.Title>{pk.name || 'Passkey'}</Item.Title>
-							<Item.Description>Added {formatTs(pk.createdAt)}</Item.Description>
-						</Item.Content>
-						<Item.Actions>
-							<Button
-								variant="ghost"
-								size="sm"
-								onclick={() => {
-									deletePasskeyId = pk.id;
-									deletePasskeyOpen = true;
-								}}
-								class="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-							>
-								<Trash2 />
-							</Button>
-						</Item.Actions>
-					</Item.Root>
-				{/each}
-			</Item.Group>
-		{:else}
-			<Empty.Root class="bg-muted/50">
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<KeyRound />
-					</Empty.Media>
-					<Empty.Title>No passkeys configured</Empty.Title>
-					<Empty.Description>Add a passkey for secure, passwordless login.</Empty.Description>
-				</Empty.Header>
-			</Empty.Root>
-		{/if}
-	</Card.Content>
-
-	<Card.Footer class="flex items-center justify-between">
-		<p class="text-sm text-muted-foreground">Passkeys are the most secure way to sign in.</p>
-		<Button size="sm" onclick={handleRegisterPasskey} disabled={isRegisteringPasskey}>
-			{#if isRegisteringPasskey}
-				<LoaderCircle class="animate-spin" /> Adding...
-			{:else}
-				Add Passkey
-			{/if}
-		</Button>
-	</Card.Footer>
-</Card.Root>
-
-<Card.Root>
-	<Card.Header>
-		<Card.Title class="flex items-center gap-2 text-lg">
-			<Lock class="size-5 text-muted-foreground" />
-			Password
-		</Card.Title>
-		<Card.Description>
-			Protect your account with a strong, unique password. If you add a passkey, you can remove your
-			password entirely for enhanced security.
-		</Card.Description>
-	</Card.Header>
-	<Card.Content class="space-y-4">
-		<Field.Field>
-			<Field.Label for="currentPassword">Current Password</Field.Label>
-			<Field.Content>
-				<InputGroupVariants
-					variant="password"
-					bind:value={currentPassword}
-					placeholder="Enter your current password"
-					inputProps={{ id: 'currentPassword', autocomplete: 'new-password' }}
-				/>
-			</Field.Content>
-		</Field.Field>
-
-		<Field.Field>
-			<Field.Label for="newPassword">New Password</Field.Label>
-			<Field.Content>
-				<InputGroupVariants
-					variant="password"
-					bind:value={newPassword}
-					placeholder="Enter your new password"
-					inputProps={{ id: 'new-pw', autocomplete: 'new-password' }}
-				/>
-				{#if newPassword && passwordStrength.score !== -1}
-					<div class="mt-2 space-y-1.5">
-						<div class="flex items-center justify-between">
-							<span class="text-[10px] tracking-wider text-muted-foreground uppercase">
-								Strength
-							</span>
-							<span
-								class="text-[10px] font-medium"
-								class:text-destructive={passwordStrength.score < 2}
-								class:text-success={passwordStrength.score >= 2}>{passwordStrength.text}</span
-							>
-						</div>
-						<Progress value={(passwordStrength.score + 1) * 25} class="h-1" />
-					</div>
-				{/if}
-			</Field.Content>
-		</Field.Field>
-
-		<Field.Field>
-			<Field.Label for="confirmPassword">Confirm New Password</Field.Label>
-			<Field.Content>
-				<InputGroupVariants
-					variant="password"
-					bind:value={confirmPassword}
-					placeholder="Confirm your new password"
-					inputProps={{ id: 'confirm-pw', autocomplete: 'new-password' }}
-					class={confirmPassword && !passwordsMatch
-						? 'border-destructive focus-within:ring-destructive/20'
-						: ''}
-				/>
-				{#if confirmPassword && !passwordsMatch}
-					<p class="mt-1.5 text-xs text-destructive">Passwords do not match</p>
-				{/if}
-			</Field.Content>
-		</Field.Field>
-	</Card.Content>
-
-	<Card.Footer class="flex items-center justify-between">
-		<p class="text-sm text-muted-foreground">Ensure your new password is secure.</p>
-		<div class="flex gap-3">
-			<Button
-				variant="outline"
-				size="sm"
-				class="border-orange-500/30 text-orange-600 hover:bg-orange-500/10"
-				disabled={!passkeys.isSuccess || passkeys.data.length === 0}
-				onclick={() => (deletePasswordOpen = true)}
+	<Card.Content class="grid gap-2 sm:grid-cols-3">
+		{#each checks as c (c.label)}
+			<a
+				href={c.href}
+				class={[
+					'flex items-start gap-2.5 rounded-lg border p-3 transition-colors hover:bg-muted/40',
+					!c.done && 'border-warning/40 bg-warning/5'
+				]}
 			>
-				Remove Password
-			</Button>
-			<Button
-				size="sm"
-				onclick={handlePasswordUpdate}
-				disabled={changePassword.isPending ||
-					!passwordsMatch ||
-					passwordStrength.score < 2 ||
-					!currentPassword}
-			>
-				{#if changePassword.isPending}
-					<LoaderCircle class="animate-spin" /> Updating...
+				{#if c.done}
+					<Check class="mt-0.5 size-4 shrink-0 text-success" />
 				{:else}
-					Update Password
+					<CircleAlert class="mt-0.5 size-4 shrink-0 text-warning" />
 				{/if}
-			</Button>
-		</div>
-	</Card.Footer>
+				<span class="flex flex-col">
+					<span class="text-sm font-medium">{c.done ? c.doneLabel : c.label}</span>
+					<span class="text-xs text-muted-foreground">{c.hint}</span>
+				</span>
+			</a>
+		{/each}
+	</Card.Content>
 </Card.Root>
 
-<Card.Root>
+<Card.Root id="sign-in">
 	<Card.Header>
-		<Card.Title class="flex items-center gap-2 text-lg">
-			<Binary class="size-5 text-muted-foreground" />
-			Account Recovery Codes
-		</Card.Title>
-		<Card.Description>
-			Emergency one-time codes. Use these to access your account if you lose your phone or security
-			key. Store them somewhere safe, like a password manager.
-		</Card.Description>
+		<Card.Title class="text-base">Ways to sign in</Card.Title>
+		<Card.Description>Keep at least two, so losing one device never locks you out.</Card.Description
+		>
 	</Card.Header>
-	<Card.Content>
-		{#if createBackupCodes.isSuccess}
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-				{#each createBackupCodes.data.codes || [] as code (code)}
-					<div
-						class="rounded-md border bg-muted/30 px-3 py-2.5 text-center font-mono text-sm font-medium tracking-widest select-all"
-					>
-						{code}
-					</div>
-				{/each}
-			</div>
-			<div class="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
-				<div class="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-					<TriangleAlert size={16} />
-					<p class="text-sm">
-						Keep these safe. They will not be shown again. Each code works only once.
+	<Card.Content class="flex flex-col divide-y">
+		<Section title="Passkeys" icon={KeyRound} count={passkeyCount}>
+			{#snippet action()}
+				<Button size="sm" variant="ghost" onclick={addPasskey} disabled={adding}>
+					{#if adding}<Spinner data-icon="inline-start" />{:else}<Plus
+							data-icon="inline-start"
+						/>{/if}
+					Add passkey
+				</Button>
+			{/snippet}
+			{#if passkeys.isLoading}
+				<Skeleton class="h-12 w-full" />
+			{:else if passkeyCount}
+				<Item.Group class="divide-y rounded-lg border">
+					{#each passkeys.data ?? [] as pk (pk.id)}
+						<Item.Root size="sm" class="rounded-none">
+							<Item.Media variant="icon"><KeyRound /></Item.Media>
+							<Item.Content>
+								<Item.Title>
+									<Rename
+										this="span"
+										value={pk.name || 'Passkey'}
+										class="rounded-sm hover:bg-muted"
+										onSave={(name) => renamePasskey.mutate({ id: pk.id, name })}
+										validate={(v) => v.trim().length > 0}
+									/>
+								</Item.Title>
+								<Item.Description>{usage(pk.createdAt, pk.lastUsedAt)}</Item.Description>
+							</Item.Content>
+							<Item.Actions>
+								<Tooltip.Root>
+									<Tooltip.Trigger>
+										{#snippet child({ props })}
+											<span {...props}>
+												<Button
+													variant="ghost"
+													size="icon-sm"
+													aria-label={`Remove ${pk.name || 'passkey'}`}
+													disabled={methodCount <= 1}
+													onclick={() =>
+														confirm({
+															title: `Remove ${pk.name || 'this passkey'}?`,
+															description: 'You can no longer sign in with it.',
+															confirmText: 'Remove',
+															onConfirm: () => deletePasskey.mutateAsync({ id: pk.id })
+														})}
+												>
+													<Trash2 />
+												</Button>
+											</span>
+										{/snippet}
+									</Tooltip.Trigger>
+									{@render lastWayIn(methodCount <= 1)}
+								</Tooltip.Root>
+							</Item.Actions>
+						</Item.Root>
+					{/each}
+				</Item.Group>
+			{:else}
+				<p class="text-sm text-muted-foreground">
+					No passkey yet. Use Touch ID, Windows Hello or a security key instead of a password.
+				</p>
+			{/if}
+		</Section>
+
+		<Section title="Password" icon={Lock}>
+			<Collapsible.Root bind:open={passwordOpen}>
+				<div class="flex items-center justify-between gap-3">
+					<p class="text-sm text-muted-foreground">
+						{passwordCredential
+							? usage(passwordCredential.createdAt, passwordCredential.lastUsedAt)
+							: 'No password set.'}
 					</p>
+					{#if hasPassword}
+						<div class="flex gap-1">
+							<Collapsible.Trigger>
+								{#snippet child({ props })}
+									<Button {...props} size="sm" variant="ghost">
+										{passwordOpen ? 'Cancel' : 'Change'}
+									</Button>
+								{/snippet}
+							</Collapsible.Trigger>
+							<Button
+								size="sm"
+								variant="ghost"
+								disabled={passkeyCount === 0}
+								title={passkeyCount === 0 ? 'Add a passkey first' : undefined}
+								onclick={() =>
+									confirm({
+										title: 'Remove your password?',
+										description:
+											'You will sign in with passkeys only. Make sure they work first, a removed password cannot be recovered.',
+										input: { label: 'Current password', type: 'password' },
+										confirmText: 'Remove',
+										onConfirm: (currentPassword) => deletePassword.mutateAsync({ currentPassword })
+									})}
+							>
+								Remove
+							</Button>
+						</div>
+					{/if}
 				</div>
-			</div>
-		{:else}
-			<Empty.Root class="bg-muted/50">
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<Binary />
-					</Empty.Media>
-					<Empty.Title>
-						{#if backupCodes.isSuccess && backupCodes.data.length > 0}
-							{backupCodes.data.length} codes remaining
-						{:else}
-							No backup codes generated
-						{/if}
-					</Empty.Title>
-					<Empty.Description>
-						{#if backupCodes.isSuccess && backupCodes.data.length > 0}
-							You have active backup codes. If you lost them, regenerate a new set immediately to
-							invalidate the old ones.
-						{:else}
-							Generate backup codes to ensure you never lose access to your account.
-						{/if}
-					</Empty.Description>
-				</Empty.Header>
-				<Empty.Content>
-					{#if backupCodes.isSuccess && backupCodes.data.length > 0}
-						<Button variant="destructive" size="sm" onclick={() => (deleteBackupCodesOpen = true)}>
-							Delete Backup Codes
+				<Collapsible.Content>
+					<form class="mt-3 flex flex-col gap-3 rounded-lg border p-3" onsubmit={submitPassword}>
+						<Field.Field>
+							<Field.Label for="current-password">Current password</Field.Label>
+							<InputGroupVariants
+								variant="password"
+								bind:value={current}
+								inputProps={{ id: 'current-password', autocomplete: 'current-password' }}
+							/>
+						</Field.Field>
+						<div class="grid gap-3 sm:grid-cols-2">
+							<Field.Field>
+								<Field.Label for="new-password">New password</Field.Label>
+								<InputGroupVariants
+									variant="password"
+									bind:value={next}
+									inputProps={{ id: 'new-password', autocomplete: 'new-password' }}
+								/>
+								{#if strength}
+									<div class="flex items-center gap-2">
+										<Progress value={(strength.score + 1) * 25} class="h-1 flex-1" />
+										<span
+											class={['text-xs', strength.score < 2 ? 'text-destructive' : 'text-success']}
+										>
+											{strength.text}
+										</span>
+									</div>
+								{/if}
+							</Field.Field>
+							<Field.Field data-invalid={!!repeat && repeat !== next}>
+								<Field.Label for="repeat-password">Repeat it</Field.Label>
+								<InputGroupVariants
+									variant="password"
+									bind:value={repeat}
+									inputProps={{
+										id: 'repeat-password',
+										autocomplete: 'new-password',
+										'aria-invalid': !!repeat && repeat !== next
+									}}
+								/>
+								{#if repeat && repeat !== next}
+									<Field.Description class="text-destructive">Doesn't match.</Field.Description>
+								{/if}
+							</Field.Field>
+						</div>
+						<Button
+							type="submit"
+							size="sm"
+							class="self-end"
+							disabled={!canChange || changePassword.isPending}
+						>
+							{#if changePassword.isPending}<Spinner data-icon="inline-start" />{/if}
+							Change password
+						</Button>
+					</form>
+				</Collapsible.Content>
+			</Collapsible.Root>
+		</Section>
+
+		<Section title="Connected accounts" icon={Link} count={linked.data?.length}>
+			{#snippet action()}
+				{#each linkable.filter((l) => !linked.data?.some((a) => a.provider === l.provider)) as l (l.provider)}
+					<Button size="sm" variant="ghost" href={l.href}>
+						<l.icon data-icon="inline-start" />
+						Link {l.label}
+					</Button>
+				{/each}
+			{/snippet}
+			{#if linked.data?.length}
+				<Item.Group class="divide-y rounded-lg border">
+					{#each linked.data as a (a.provider + a.providerId)}
+						{@const Icon = providerIcon(a)}
+						{@const managed = a.provider !== 'github' && a.provider !== 'google'}
+						<Item.Root size="sm" class="rounded-none">
+							<Item.Media variant="icon"><Icon /></Item.Media>
+							<Item.Content>
+								<Item.Title>{providerName(a)}</Item.Title>
+								<Item.Description>
+									{usage(a.createdAt, a.lastUsedAt)}
+									{#if managed}· managed by your organization's SSO{/if}
+								</Item.Description>
+							</Item.Content>
+							<Item.Actions>
+								{#if managed}
+									<Badge variant="outline">SSO</Badge>
+								{:else}
+									<Tooltip.Root>
+										<Tooltip.Trigger>
+											{#snippet child({ props })}
+												<span {...props}>
+													<Button
+														variant="ghost"
+														size="icon-sm"
+														aria-label={`Unlink ${providerName(a)}`}
+														disabled={methodCount <= 1}
+														onclick={() =>
+															confirm({
+																title: `Unlink ${providerName(a)}?`,
+																description: 'You can link it again later.',
+																confirmText: 'Unlink',
+																onConfirm: () => unlink.mutateAsync({ provider: a.provider })
+															})}
+													>
+														<Unlink />
+													</Button>
+												</span>
+											{/snippet}
+										</Tooltip.Trigger>
+										{@render lastWayIn(methodCount <= 1)}
+									</Tooltip.Root>
+								{/if}
+							</Item.Actions>
+						</Item.Root>
+					{/each}
+				</Item.Group>
+			{:else if !linked.isLoading}
+				<p class="text-sm text-muted-foreground">
+					Link GitHub or Google to sign in with one click.
+				</p>
+			{/if}
+		</Section>
+	</Card.Content>
+</Card.Root>
+
+<Card.Root id="recovery">
+	<Card.Header>
+		<Card.Title class="text-base">Recovery</Card.Title>
+		<Card.Description>Your way back in when every device is gone.</Card.Description>
+	</Card.Header>
+	<Card.Content class="flex flex-col divide-y">
+		<Section title="Backup codes" icon={Binary}>
+			{#snippet action()}
+				<Button
+					size="sm"
+					variant="ghost"
+					disabled={createCodes.isPending}
+					onclick={() =>
+						codeCount
+							? confirm({
+									title: 'Create new backup codes?',
+									description: 'Your current codes stop working right away.',
+									confirmText: 'Create new codes',
+									destructive: false,
+									onConfirm: () => createCodes.mutateAsync()
+								})
+							: createCodes.mutate()}
+				>
+					{#if createCodes.isPending}<Spinner data-icon="inline-start" />{/if}
+					{codeCount ? 'Regenerate' : 'Create codes'}
+				</Button>
+			{/snippet}
+			{#if createCodes.isSuccess}
+				<Alert.Root variant="warning">
+					<Binary />
+					<Alert.Title>Save these now, they are shown once</Alert.Title>
+					<Alert.Description
+						>Each code works one time. Keep them in your password manager.</Alert.Description
+					>
+				</Alert.Root>
+				<div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+					{#each createCodes.data.codes as code (code)}
+						<code
+							class="rounded-md border bg-muted/40 px-2 py-2 text-center font-mono text-sm tracking-widest select-all"
+						>
+							{code}
+						</code>
+					{/each}
+				</div>
+				<div class="flex gap-2">
+					<Button
+						size="sm"
+						variant="outline"
+						onclick={async () => {
+							await navigator.clipboard.writeText(createCodes.data.codes.join('\n'));
+							toast.success('Codes copied');
+						}}
+					>
+						<Copy data-icon="inline-start" /> Copy
+					</Button>
+					<Button size="sm" variant="outline" onclick={() => download(createCodes.data.codes)}>
+						<Download data-icon="inline-start" /> Download
+					</Button>
+					<Button size="sm" variant="ghost" onclick={() => createCodes.reset()}>I saved them</Button
+					>
+				</div>
+			{:else}
+				<div class="flex items-center justify-between gap-3">
+					<p class="text-sm text-muted-foreground">
+						{codeCount
+							? `${codeCount} codes left. Regenerate if you lost them.`
+							: 'No backup codes yet.'}
+					</p>
+					{#if codeCount}
+						<Button
+							size="sm"
+							variant="ghost"
+							onclick={() =>
+								confirm({
+									title: 'Delete backup codes?',
+									description: 'They stop working and can no longer recover your account.',
+									onConfirm: () => deleteCodes.mutateAsync({})
+								})}
+						>
+							Delete
 						</Button>
 					{/if}
-				</Empty.Content>
-			</Empty.Root>
-		{/if}
-	</Card.Content>
-
-	<Card.Footer class="flex items-center justify-between">
-		<p class="text-sm text-muted-foreground">Store your codes in a secure password manager.</p>
-		<div class="flex items-center gap-2">
-			{#if createBackupCodes.isSuccess}
-				<Button
-					variant="outline"
-					size="sm"
-					onclick={() => handleCopyBackupCodes(createBackupCodes.data.codes)}
-				>
-					<CopyIcon size={14} class="mr-1.5" /> Copy All
-				</Button>
-				<Button
-					variant="default"
-					size="sm"
-					onclick={() => handleDownloadBackupCodes(createBackupCodes.data.codes)}
-				>
-					<DownloadIcon size={14} class="mr-1.5" /> Download
-				</Button>
-			{:else if backupCodes.isSuccess && backupCodes.data.length > 0}
-				<Button variant="default" size="sm" onclick={() => createBackupCodes.mutate()}>
-					{#if createBackupCodes.isPending}
-						<LoaderCircle size={14} class="mr-2 animate-spin" /> Generating...
-					{:else}
-						Regenerate Codes
-					{/if}
-				</Button>
-			{:else}
-				<Button variant="default" size="sm" onclick={() => createBackupCodes.mutate()}>
-					{#if createBackupCodes.isPending}
-						<LoaderCircle size={14} class="animate-spin" /> Generating...
-					{:else}
-						Generate Backup Codes
-					{/if}
-				</Button>
+				</div>
 			{/if}
-		</div>
-	</Card.Footer>
+		</Section>
+
+		<Section title="Email recovery" icon={Mail}>
+			<Field.Field orientation="horizontal">
+				<Field.Content>
+					<Field.Label for="email-recovery">Allow password resets by email</Field.Label>
+					<Field.Description>
+						Turn it off for stricter security. Then only your passkeys, password, backup codes and
+						connected accounts get you in, and losing all of them locks you out for good.
+					</Field.Description>
+				</Field.Content>
+				<Switch
+					id="email-recovery"
+					checked={emailRecovery}
+					disabled={setEmailRecovery.isPending}
+					onCheckedChange={(on) =>
+						on
+							? setEmailRecovery.mutate({ enable: true })
+							: confirm({
+									title: 'Turn off email recovery?',
+									description:
+										'Nobody, including support, can reset your password by email anymore. Make sure you have backup codes.',
+									confirmText: 'Turn off',
+									onConfirm: () => setEmailRecovery.mutateAsync({ enable: false })
+								})}
+				/>
+			</Field.Field>
+		</Section>
+	</Card.Content>
 </Card.Root>
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title class="flex items-center gap-2 text-lg">
-			<MonitorSmartphone class="size-5 text-muted-foreground" />
-			Active Sessions
-		</Card.Title>
-		<Card.Description>
-			Devices currently signed in to your account. Revoking a session signs that device out; you
-			stay signed in here.
-		</Card.Description>
+		<Card.Title class="text-base">Where you're signed in</Card.Title>
+		<Card.Description>Browsers, the nk CLI and remembered devices.</Card.Description>
+		{#if otherSessions.length}
+			<Card.Action>
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={revokeOthers.isPending}
+					onclick={() =>
+						confirm({
+							title: 'Sign out everywhere else?',
+							description: `Signs out ${otherSessions.length} ${otherSessions.length === 1 ? 'device' : 'devices'}. You stay signed in here.`,
+							confirmText: 'Sign out',
+							onConfirm: () => revokeOthers.mutateAsync({ ids: otherSessions.map((s) => s.id) })
+						})}
+				>
+					<LogOut data-icon="inline-start" />
+					Sign out everywhere else
+				</Button>
+			</Card.Action>
+		{/if}
 	</Card.Header>
 	<Card.Content>
-		{#if sessions.isSuccess && sessions.data.length > 0}
-			<Item.Group class="border-border bg-transparent">
-				{#each sessions.data as s (s.id)}
-					<Item.Root variant="muted">
-						<Item.Media variant="icon">
-							<MonitorSmartphone />
-						</Item.Media>
+		{#if sessions.isLoading}
+			<Skeleton class="h-24 w-full" />
+		{:else}
+			<Item.Group class="divide-y rounded-lg border">
+				{#each sessions.data ?? [] as s (s.id)}
+					{@const Icon = kindIcon(s.kind)}
+					<Item.Root size="sm" class="rounded-none">
+						<Item.Media variant="icon"><Icon /></Item.Media>
 						<Item.Content>
 							<Item.Title class="flex items-center gap-2">
-								{sessionKindLabel(s.kind)}
-								{#if s.current}
-									<Badge variant="secondary">This device</Badge>
-								{/if}
+								{s.userAgent ? describeAgent(s.userAgent) : sessionKindLabel(s.kind)}
+								{#if s.current}<Badge variant="success">This device</Badge>{/if}
 							</Item.Title>
 							<Item.Description>
-								Signed in with {sessionMethodLabel(s.method)} · Last active
-								{formatTs(s.lastSeenAt, 'relative', 'unknown')} · Expires
-								{formatTs(s.expiresAt, 'short', 'never')}
+								{sessionKindLabel(s.kind)} · {sessionMethodLabel(s.method)}{s.ip
+									? ` · ${s.ip}`
+									: ''}
+								· active {formatTs(s.lastSeenAt, 'relative', 'unknown')}
 							</Item.Description>
 						</Item.Content>
 						<Item.Actions>
-							{#if s.current}
-								<Badge variant="outline">Active now</Badge>
-							{:else}
+							{#if !s.current}
 								<Button
-									variant="ghost"
 									size="sm"
+									variant="ghost"
 									disabled={revokeSession.isPending}
 									onclick={() => revokeSession.mutate({ id: s.id })}
-									class="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
 								>
-									<Trash2 />
-									Revoke
+									Sign out
 								</Button>
 							{/if}
 						</Item.Actions>
 					</Item.Root>
 				{/each}
 			</Item.Group>
-		{:else if sessions.isSuccess}
-			<Empty.Root class="bg-muted/50">
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<MonitorSmartphone />
-					</Empty.Media>
-					<Empty.Title>No other active sessions</Empty.Title>
-					<Empty.Description>You are only signed in on this device.</Empty.Description>
-				</Empty.Header>
-			</Empty.Root>
-		{:else}
-			<div class="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-				<Spinner class="size-4" />
-				Loading sessions
-			</div>
 		{/if}
 	</Card.Content>
 </Card.Root>
 
-<Card.Root class="border border-chart-2/20">
+<Card.Root>
 	<Card.Header>
-		<Card.Title class="flex items-center gap-2 text-lg text-chart-2">
-			<MailX class="size-5" />
-			Email Recovery
-		</Card.Title>
-		<Card.Description>
-			When enabled, you can reset your password and verify your email via email. Disable this for
-			stricter security. You will only be able to log in using your passkeys, password, backup
-			codes, or linked OAuth accounts. If you lose access to all of them, your account is
-			permanently unrecoverable!
-		</Card.Description>
+		<Card.Title class="text-base">Recent sign-ins</Card.Title>
+		<Card.Description>The last five attempts on your account.</Card.Description>
+		<Card.Action>
+			<Button size="sm" variant="ghost" href="/profile/activity?view=signins">View all</Button>
+		</Card.Action>
 	</Card.Header>
-
-	<Card.Footer class="flex justify-between border-t border-chart-2/20 bg-chart-2/5">
-		<div class="space-y-0.5">
-			<Label for="email-recovery" class="text-chart-2">Enable email recovery</Label>
-			<p class="text-sm text-muted-foreground">Allow password reset and verification emails</p>
-		</div>
-		<Switch
-			id="email-recovery"
-			checked={!disablePasswordReset}
-			disabled={setEmailRecovery.isPending}
-			onCheckedChange={() => setEmailRecovery.mutate({ enable: disablePasswordReset })}
-		/>
-	</Card.Footer>
-</Card.Root>
-
-<Card.Root class="border border-destructive/20">
-	<Card.Header>
-		<Card.Title class="font-medium text-destructive">Delete Account</Card.Title>
-		<Card.Description>
-			Permanently delete your account, workspaces, and all associated infrastructure data. This
-			action is irreversible and cannot be undone.
-		</Card.Description>
-	</Card.Header>
-
-	<Card.Footer class="flex justify-between border-t border-destructive/20 bg-destructive/5">
-		<p class="text-sm font-medium text-destructive">Proceed with caution.</p>
-		<Button
-			variant="destructive"
-			size="sm"
-			onclick={() => (deleteAccountOpen = true)}
-			class="w-full sm:w-auto"
-		>
-			Delete Account
-		</Button>
-	</Card.Footer>
+	<Card.Content>
+		{#if recentSignIns.isLoading}
+			<Skeleton class="h-24 w-full" />
+		{:else if recentSignIns.data?.logs.length}
+			<Item.Group class="divide-y rounded-lg border">
+				{#each recentSignIns.data.logs as e (e.id)}
+					{@const denied = !e.ok}
+					<Item.Root size="sm" class="rounded-none">
+						<Item.Media variant="icon" class={denied ? 'text-destructive' : undefined}>
+							{#if denied}<CircleAlert />{:else}<LogIn />{/if}
+						</Item.Media>
+						<Item.Content>
+							<Item.Title class="flex items-center gap-2">
+								{denied ? 'Sign-in denied' : 'Signed in'}
+								{#if typeof e.details?.['method'] === 'string'}
+									<Badge variant="secondary"
+										>{sessionMethodLabel(e.details['method'] as string)}</Badge
+									>
+								{/if}
+							</Item.Title>
+							<Item.Description>
+								{describeAgent(e.userAgent)}{e.ip ? ` · ${e.ip}` : ''}
+							</Item.Description>
+						</Item.Content>
+						<Item.Actions class="text-xs text-muted-foreground">
+							{formatTs(e.timestamp, 'relative')}
+						</Item.Actions>
+					</Item.Root>
+				{/each}
+			</Item.Group>
+		{:else}
+			<p class="flex items-center gap-2 text-sm text-muted-foreground">
+				<MonitorSmartphone class="size-4" /> No sign-ins recorded yet.
+			</p>
+		{/if}
+	</Card.Content>
 </Card.Root>

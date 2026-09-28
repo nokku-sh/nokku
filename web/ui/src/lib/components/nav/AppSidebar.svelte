@@ -24,9 +24,9 @@
 
 	const sidebar = Sidebar.useSidebar();
 
-	const ws = $derived(workspace.get());
-	const workspaces = $derived(workspace.list());
-	const currentUser = $derived(user.self());
+	const ws = workspace.get();
+	const workspaces = workspace.list();
+	const currentUser = user.self();
 	const logout = auth.logout();
 	const currentRoute = $derived(page.url.pathname);
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -19,6 +20,8 @@ const (
 	// never an API credential.
 	webDeviceCookieName = "nokku_device"
 	webDeviceTTL        = 180 * 24 * time.Hour
+	// maxUserAgent keeps a hostile header from bloating the sessions table.
+	maxUserAgent = 512
 )
 
 // SessionHash is the only session identifier that ever leaves the server.
@@ -50,6 +53,10 @@ func (s *Service) IssueSession(ctx context.Context, p SessionParams) (*db.Sessio
 		Binding:    p.Binding,
 		Label:      p.Label,
 		LastSeenAt: &now,
+	}
+	if meta, ok := RequestMetaFromContext(ctx); ok {
+		params.UserAgent = truncate(util.SanitizeUTF8(meta.Header.Get("User-Agent")), maxUserAgent)
+		params.Ip = util.SanitizeUTF8(util.GetRemoteIP(meta.Header, meta.RemoteAddr))
 	}
 	if p.WorkspaceID != "" {
 		params.WorkspaceID = &p.WorkspaceID
@@ -235,4 +242,19 @@ func (s *Service) DeleteOwnSession(ctx context.Context, hash SessionHash) error 
 
 func (s *Service) DeleteExpired(ctx context.Context) (int64, error) {
 	return s.sys.DeleteExpiredSessions(ctx, new(s.now()))
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return strings.ToValidUTF8(s[:n], "")
+}
+
+// touchCredential marks a credential as used by a sign-in. It never fails
+// the sign-in, "last used" is only a hint for the owner.
+func (s *Service) touchCredential(ctx context.Context, id string) {
+	if err := s.sys.TouchCredential(ctx, id); err != nil {
+		slog.Warn("failed to mark credential used", "error", err)
+	}
 }

@@ -74,12 +74,13 @@ func (c *Credential) ToProto() *nokkuv1.AccountCredential {
 		return nil
 	}
 	return &nokkuv1.AccountCredential{
-		Id:        &c.ID,
-		Type:      &c.Type,
-		Provider:  &c.Provider,
-		Subject:   &c.Subject,
-		Label:     &c.Label,
-		CreatedAt: SafeTimestamp(&c.CreatedAt),
+		Id:         &c.ID,
+		Type:       &c.Type,
+		Provider:   &c.Provider,
+		Subject:    &c.Subject,
+		Label:      &c.Label,
+		CreatedAt:  SafeTimestamp(&c.CreatedAt),
+		LastUsedAt: SafeTimestamp(c.LastUsedAt),
 	}
 }
 

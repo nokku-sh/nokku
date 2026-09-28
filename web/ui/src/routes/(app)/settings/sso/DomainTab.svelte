@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { confirm } from '$lib/hooks';
 	import { domain } from '$lib/api/sso.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -19,11 +20,9 @@
 		Trash2
 	} from '@lucide/svelte';
 	import { formatTs } from '$lib/utils';
-	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
 
-	let domains = $derived(domain.list());
+	const domains = domain.list();
 	let showAddDialog = $state(false);
-	let deleteDomainName = $state('');
 	let newDomain = $state('');
 
 	const createDomain = domain.create();
@@ -37,14 +36,6 @@
 		newDomain = '';
 	}
 </script>
-
-<DeleteConfirmationModal
-	open={deleteDomainName !== ''}
-	title="Delete Domain"
-	description="Are you sure you want to delete this domain?"
-	itemName={deleteDomainName}
-	onConfirm={() => deleteDomain.mutate({ domain: deleteDomainName })}
-/>
 
 <div class="flex flex-col gap-4">
 	{#if !domains.data?.length}
@@ -121,7 +112,11 @@
 								class="text-destructive hover:text-destructive"
 								onclick={(e) => {
 									e.stopPropagation();
-									deleteDomainName = d.domain;
+									confirm({
+										title: `Delete ${d.domain}?`,
+										description: 'SSO discovery for this domain stops working.',
+										onConfirm: () => deleteDomain.mutateAsync({ domain: d.domain })
+									});
 								}}
 								title="Delete Domain"
 							>

@@ -326,6 +326,7 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	f.svc.touchCredential(ctx, "passkey:"+base64.RawURLEncoding.EncodeToString(cred.ID))
 	http.SetCookie(w, cookie)
 	if f.svc.OnUserLogin != nil {
 		f.svc.OnUserLogin(w, r, u, MethodPasskey)

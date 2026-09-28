@@ -8,11 +8,14 @@
 	import { Switch } from '$lib/components/ui/switch';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
+	import { TagsInput } from '$lib/components/ui/tags-input';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import * as Alert from '$lib/components/ui/alert';
 	import { sso } from '$lib/api/sso.svelte';
 	import { workspaceID } from '$lib/store.svelte';
 	import { page } from '$app/state';
+
+	const standardScopes = ['openid', 'profile', 'email', 'groups', 'offline_access'];
 
 	let change = $state({
 		isActive: false,
@@ -25,7 +28,7 @@
 	});
 	let clientSecret = $state('');
 
-	const provider = $derived(sso.getProvider());
+	const provider = sso.getProvider();
 	const configured = $derived(provider.data?.method === 'oidc');
 	const replacesSAML = $derived(provider.data?.method === 'saml');
 	$effect(() => {
@@ -155,15 +158,13 @@
 						OAuth Scopes <span class="ml-1 text-destructive">*</span>
 					</Field.Label>
 					<Field.Content>
-						<InputGroupVariants
-							variant="tags"
-							tags={change.scopes}
-							icon={{ tags: Globe }}
-							placeholder="Press Enter to add scopes"
-							onTagChange={(tags) => {
-								if (!change.scopes) change.scopes = [];
-								change.scopes = tags;
-							}}
+						<TagsInput
+							id="scopes"
+							bind:value={change.scopes}
+							icon={Globe}
+							suggestions={standardScopes}
+							separator={/[\s,]+/}
+							placeholder="openid, profile, email"
 						/>
 						<Field.Description class="flex items-center gap-1">
 							<Info size={12} />

@@ -133,42 +133,64 @@ WHERE
     $3::TEXT[] IS NULL
     OR actor_kind = ANY ($3::TEXT[])
   )
-  -- Actions match by prefix, so "Delete" finds every delete.
+  -- Actions match exactly, a trailing * matches by prefix, e.g. "Delete*".
   AND (
     $4::TEXT[] IS NULL
+    OR action = ANY ($4::TEXT[])
     OR EXISTS (
       SELECT
         1
       FROM
         unnest($4::TEXT[]) AS a (v)
       WHERE
-        action ILIKE a.v || '%'
+        a.v LIKE '%*'
+        AND action LIKE rtrim(a.v, '*') || '%'
     )
   )
   AND (
     $5::TEXT IS NULL
     OR target = $5
   )
+  -- Failed is every failed call, denied only those an auth or permission check stopped.
   AND (
     $6::TEXT IS NULL
-    OR action ILIKE '%' || $6 || '%'
-    OR actor_name ILIKE '%' || $6 || '%'
-    OR target ILIKE '%' || $6 || '%'
+    OR (
+      $6 = 'succeeded'
+      AND ok
+    )
+    OR (
+      $6 = 'denied'
+      AND NOT ok
+      AND (
+        action = 'LoginDenied'
+        OR details ->> 'code' IN ('permission_denied', 'unauthenticated')
+      )
+    )
+    OR (
+      $6 = 'failed'
+      AND NOT ok
+    )
   )
   AND (
-    $7::timestamptz IS NULL
-    OR timestamp >= $7
+    $7::TEXT IS NULL
+    OR action ILIKE '%' || $7 || '%'
+    OR actor_name ILIKE '%' || $7 || '%'
+    OR target ILIKE '%' || $7 || '%'
   )
   AND (
     $8::timestamptz IS NULL
-    OR timestamp < $8
+    OR timestamp >= $8
+  )
+  AND (
+    $9::timestamptz IS NULL
+    OR timestamp < $9
   )
 ORDER BY
   timestamp DESC
 LIMIT
-  $10
+  $11
 OFFSET
-  $9
+  $10
 `
 
 type ListAuditLogsParams struct {
@@ -177,6 +199,7 @@ type ListAuditLogsParams struct {
 	ActorKinds  []string   `json:"actorKinds"`
 	Actions     []string   `json:"actions"`
 	Target      *string    `json:"target"`
+	Outcome     *string    `json:"outcome"`
 	Search      *string    `json:"search"`
 	StartDate   *time.Time `json:"startDate"`
 	EndDate     *time.Time `json:"endDate"`
@@ -208,6 +231,7 @@ func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) (
 		arg.ActorKinds,
 		arg.Actions,
 		arg.Target,
+		arg.Outcome,
 		arg.Search,
 		arg.StartDate,
 		arg.EndDate,

@@ -1,4 +1,5 @@
 <script lang="ts" generics="TData extends RowData">
+	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -10,6 +11,7 @@
 	import * as Command from '$lib/components/ui/command';
 	import * as Popover from '$lib/components/ui/popover';
 	import { Separator } from '$lib/components/ui/separator';
+	import { PAGE_PARAM } from '$lib/hooks';
 	import TableViewOptions from './TableViewOptions.svelte';
 	import type { FilterConfig } from './types';
 	import type { DataTableFeatures } from './data-table-features.js';
@@ -20,6 +22,10 @@
 		searchResultCount?: number;
 		filters?: FilterConfig[];
 		table?: Table<DataTableFeatures, TData>;
+		/** Extra filter controls, placed after the built-in ones. */
+		children?: Snippet;
+		/** More URL params the reset button clears. */
+		extraParams?: string[];
 	};
 
 	let {
@@ -27,22 +33,22 @@
 		searchPlaceholder = 'Search...',
 		searchResultCount,
 		filters,
-		table
+		table,
+		children,
+		extraParams = []
 	}: Props<TData> = $props();
 
 	const searchParamKey = $derived(typeof searchProp === 'string' ? searchProp : 'q');
 	const hasSearch = $derived(searchProp !== false);
 
-	let searchValue = $state('');
+	let searchValue = $derived(page.url.searchParams.get(searchParamKey) ?? '');
 
-	$effect(() => {
-		searchValue = page.url.searchParams.get(searchParamKey) ?? '';
-	});
-
+	// A new search or filter changes the result set, so it starts at page 1.
 	function updateUrlParam(key: string, value: string | undefined) {
 		const url = new URL(page.url);
 		if (value) url.searchParams.set(key, value);
 		else url.searchParams.delete(key);
+		url.searchParams.delete(PAGE_PARAM);
 		goto(url, { replaceState: true, keepFocus: true });
 	}
 
@@ -64,12 +70,15 @@
 			searchValue = '';
 		}
 		filters?.forEach((f) => url.searchParams.delete(f.param));
+		extraParams.forEach((p) => url.searchParams.delete(p));
+		url.searchParams.delete(PAGE_PARAM);
 		goto(url, { replaceState: true, keepFocus: true });
 	}
 
 	const isFiltered = $derived(
 		(hasSearch && !!searchValue) ||
-			(filters?.some((f) => page.url.searchParams.has(f.param)) ?? false)
+			(filters?.some((f) => page.url.searchParams.has(f.param)) ?? false) ||
+			extraParams.some((p) => page.url.searchParams.has(p))
 	);
 
 	function filterValue(f: FilterConfig): string[] {
@@ -141,7 +150,7 @@
 									<Badge variant="secondary" class="rounded-sm px-1 font-normal lg:hidden">
 										{values.length}
 									</Badge>
-									<div class="hidden space-x-1 lg:flex">
+									<div class="hidden gap-1 lg:flex">
 										{#if values.length > 1}
 											<Badge variant="secondary" class="rounded-sm px-1 font-normal">
 												{values.length} selected
@@ -177,7 +186,7 @@
 												<span>{option.label}</span>
 											</div>
 											{#if isSelected}
-												<CircleCheckBig size="4" class="text-primary" />
+												<CircleCheckBig class="text-primary" />
 											{/if}
 										</Command.Item>
 									{/each}
@@ -199,6 +208,8 @@
 				</Popover.Root>
 			{/each}
 		{/if}
+
+		{@render children?.()}
 
 		{#if isFiltered}
 			<Button variant="ghost" onclick={handleReset} title="Reset filters">

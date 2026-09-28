@@ -2,6 +2,7 @@ import { DocsURL, SupportEmail } from '$lib/config';
 import type { RoleName } from '$lib/roles';
 import {
 	Activity,
+	FileClock,
 	BookText,
 	Bot,
 	CircleQuestionMark,
@@ -64,7 +65,7 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 		{ title: 'Recordings', url: '/recordings', icon: Video, role: 'viewer' }
 	],
 	Management: [
-		{ title: 'Activity', url: '/activity', icon: Activity, shortcut: 'a', role: 'viewer' },
+		{ title: 'Audit log', url: '/audit', icon: FileClock, shortcut: 'a', role: 'viewer' },
 		{
 			title: 'Settings',
 			url: '/settings',

@@ -11,13 +11,13 @@
 	function stateColor(state?: ConnectionState): string {
 		switch (state) {
 			case 'connected':
-				return 'bg-emerald-500';
+				return 'bg-success';
 			case 'connecting':
-				return 'bg-yellow-500 animate-pulse';
+				return 'bg-warning animate-pulse';
 			case 'disconnected':
 				return 'bg-gray-400';
 			case 'error':
-				return 'bg-red-500';
+				return 'bg-destructive';
 			default:
 				return 'bg-gray-400';
 		}

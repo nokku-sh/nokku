@@ -1,0 +1,61 @@
+<script lang="ts" module>
+	export type Detail = {
+		label: string;
+		value?: string;
+		mono?: boolean;
+		copy?: boolean;
+		href?: string;
+		/** Takes the full row, for long values like keys. */
+		wide?: boolean;
+	};
+</script>
+
+<script lang="ts">
+	import CopyText from '$lib/components/utils/CopyText.svelte';
+	import { cn } from '$lib/utils';
+
+	interface Props {
+		items: Detail[];
+		class?: string;
+	}
+
+	let { items, class: className }: Props = $props();
+
+	// A lone half-width tile would leave a gap, so it stretches instead.
+	const tiles = $derived.by(() => {
+		const shown = items.filter((i) => i.value);
+		let column = 0;
+		return shown.map((item, i) => {
+			const nextWide = shown[i + 1]?.wide ?? true;
+			const wide = item.wide || (column === 0 && nextWide);
+			column = wide ? 0 : (column + 1) % 2;
+			return { ...item, wide };
+		});
+	});
+</script>
+
+{#if tiles.length}
+	<dl
+		class={cn(
+			'grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border text-sm',
+			className
+		)}
+	>
+		{#each tiles as item (item.label)}
+			<div class={cn('flex min-w-0 flex-col gap-0.5 bg-card px-3 py-2', item.wide && 'col-span-2')}>
+				<dt class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+					{item.label}
+				</dt>
+				<dd class={cn('flex min-w-0', item.mono && 'font-mono text-xs leading-5')}>
+					{#if item.copy && item.value}
+						<CopyText value={item.value} mono={item.mono} />
+					{:else if item.href}
+						<a href={item.href} class="truncate hover:underline">{item.value}</a>
+					{:else}
+						<span class="truncate" title={item.value}>{item.value}</span>
+					{/if}
+				</dd>
+			</div>
+		{/each}
+	</dl>
+{/if}

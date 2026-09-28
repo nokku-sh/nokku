@@ -1,15 +1,19 @@
-import { createMutation, createQuery } from '@tanstack/svelte-query';
+import { MAX_PAGE_SIZE } from '$lib/config';
+import { createInfiniteQuery, createMutation, createQuery } from '@tanstack/svelte-query';
+import { callUnaryMethod } from '@connectrpc/connect-query-core';
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
 import { goto } from '$app/navigation';
 import { toast } from 'svelte-sonner';
 import { queryClient } from './client';
 import { account, type AccountCredential } from './account';
-import { useQuery } from '$lib/query';
-import { UtilService } from '$lib/gen/nokku/v1/util_pb';
+import { useQuery, useTransport } from '$lib/query';
+import { cleanFilters, type AuditFilter, type AuditQuery } from './workspaces.svelte';
+import { UtilService, type ListAuditLogsResponse } from '$lib/gen/nokku/v1/util_pb';
 import type { User } from '$lib/gen/nokku/v1/account_pb';
-import { pageIndex, pageSize } from '$lib/store.svelte';
 
 const invalidateAccount = () => queryClient.invalidateQueries({ queryKey: ['account'] });
+
+const FEED_PAGE = 25;
 
 const identityTypes = ['oidc', 'oauth2', 'saml'];
 
@@ -18,6 +22,7 @@ export interface LinkedAccount {
 	provider: string;
 	protocol: string;
 	createdAt?: Timestamp;
+	lastUsedAt?: Timestamp;
 }
 
 function toLinkedAccount(c: AccountCredential): LinkedAccount {
@@ -25,7 +30,8 @@ function toLinkedAccount(c: AccountCredential): LinkedAccount {
 		providerId: c.subject ?? '',
 		provider: c.provider ?? '',
 		protocol: c.type,
-		createdAt: c.createdAt
+		createdAt: c.createdAt,
+		lastUsedAt: c.lastUsedAt
 	};
 }
 
@@ -43,29 +49,43 @@ export const user = {
 				return credentials.filter((c) => identityTypes.includes(c.type)).map(toLinkedAccount);
 			}
 		})),
-	activity: (filters: {
-		userID: string;
-		search?: string;
-		startDate?: Timestamp;
-		endDate?: Timestamp;
-	}) => {
-		const { userID, ...rest } = filters;
-		const cleanFilters = Object.fromEntries(
-			Object.entries(rest ?? {}).filter(([, v]) => v !== undefined && v !== '' && v !== null)
-		);
-
-		return useQuery(
+	// The personal log is always the caller's own, across workspaces.
+	activity: (opts: () => AuditQuery & { enabled: boolean }) =>
+		useQuery(
 			UtilService.method.listAuditLogs,
-			{
-				// Empty opts out of the workspace interceptor, a personal read.
-				workspaceId: '',
-				actorIds: [userID],
-				limit: pageSize.current,
-				offset: pageIndex.current,
-				...cleanFilters
+			() => {
+				const { filter, limit, offset } = opts();
+				return {
+					// Empty opts out of the workspace interceptor, a personal read.
+					workspaceId: '',
+					limit: limit ?? MAX_PAGE_SIZE,
+					offset: offset ?? 0,
+					filter: cleanFilters(filter) as AuditFilter
+				};
 			},
-			{}
-		);
+			() => ({ enabled: opts().enabled })
+		),
+
+	// Pages by offset for "Load more". The key is plain strings, timestamps
+	// hold bigints that can't be hashed into a query key.
+	activityFeed: (opts: () => { enabled: boolean; filter: AuditFilter; key: string[] }) => {
+		const transport = useTransport();
+		return createInfiniteQuery(() => ({
+			queryKey: ['account', 'activity', ...opts().key],
+			queryFn: ({ pageParam }: { pageParam: number }) =>
+				callUnaryMethod(transport, UtilService.method.listAuditLogs, {
+					workspaceId: '',
+					limit: FEED_PAGE,
+					offset: pageParam,
+					filter: cleanFilters(opts().filter) as AuditFilter
+				}),
+			initialPageParam: 0,
+			getNextPageParam: (last: ListAuditLogsResponse, pages: ListAuditLogsResponse[]) => {
+				const loaded = pages.reduce((n, p) => n + p.logs.length, 0);
+				return loaded < last.total ? loaded : undefined;
+			},
+			enabled: opts().enabled
+		}));
 	},
 
 	updateProfile: () =>

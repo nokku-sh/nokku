@@ -1,11 +1,14 @@
 <script lang="ts" generics="TData extends RowData">
 	import { untrack } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button';
 	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as TableUI from '$lib/components/ui/table/index.js';
-	import { pageIndex, pageSize } from '$lib/store.svelte';
+	import { PAGE_PARAM, SHEET_PARAMS, usePagination } from '$lib/hooks';
 	import {
 		ArrowDown,
 		ArrowUp,
@@ -14,6 +17,7 @@
 		ChevronsLeft,
 		ChevronsRight,
 		ChevronsUpDown,
+		FilterX,
 		SearchXIcon,
 		type LucideIcon
 	} from '@lucide/svelte';
@@ -22,7 +26,6 @@
 		renderComponent,
 		type ColumnDef,
 		type ColumnVisibilityState,
-		type PaginationState,
 		type RowData,
 		type Table
 	} from '@tanstack/svelte-table';
@@ -38,13 +41,17 @@
 		columns: ColumnDef<DataTableFeatures, TData>[];
 		bulkActions?: BulkAction<TData>[] | undefined;
 		enableRowSelection?: boolean;
+		/** Set for server-side pagination, the query then reads `usePagination().args`. */
 		rowCount?: number;
+		isLoading?: boolean;
 		emptyState?: {
 			icon: LucideIcon;
 			title: string;
 			description: string;
 		};
 		toolbar?: Snippet<[Table<DataTableFeatures, TData>]>;
+		/** Makes rows clickable, usually to open the entity sheet. */
+		onRowClick?: (row: TData) => void;
 	};
 
 	let {
@@ -53,21 +60,52 @@
 		bulkActions,
 		enableRowSelection,
 		rowCount,
+		isLoading = false,
 		emptyState = {
 			icon: SearchXIcon,
 			title: 'No Data',
 			description: 'No data found'
 		},
-		toolbar
+		toolbar,
+		onRowClick
 	}: DataTableProps<TData> = $props();
+
+	// Clicks on controls inside a row keep their own behavior.
+	const interactive =
+		'button, a, input, label, [role="checkbox"], [role="combobox"], [role="menuitem"]';
+
+	function rowClick(e: MouseEvent, row: TData) {
+		if (!onRowClick || (e.target as HTMLElement).closest(interactive)) return;
+		onRowClick(row);
+	}
+
+	function rowKey(e: KeyboardEvent, row: TData) {
+		if (!onRowClick || e.target !== e.currentTarget || e.key !== 'Enter') return;
+		onRowClick(row);
+	}
 
 	const hasSelection = $derived(enableRowSelection ?? (bulkActions && bulkActions.length > 0));
 
-	const pageSizeOptions = [2, 10, 15, 20, 30, 50];
-	let pagination = $state<PaginationState>({
-		pageIndex: 0,
-		pageSize: pageSize.current
-	});
+	const pageSizeOptions = [10, 15, 20, 30, 50, 100];
+	const pager = usePagination();
+
+	// Any query param besides paging and sheets is a search or filter from TableToolbar.
+	const ownParams = [PAGE_PARAM, ...SHEET_PARAMS];
+	const isFiltered = $derived(
+		[...page.url.searchParams.keys()].some((k) => !ownParams.includes(k))
+	);
+
+	function clearFilters() {
+		const url = new URL(page.url);
+		const kept = new URLSearchParams();
+		for (const key of SHEET_PARAMS) {
+			const value = url.searchParams.get(key);
+			if (value) kept.set(key, value);
+		}
+		url.search = kept.toString();
+		void goto(url, { replaceState: true, keepFocus: true });
+	}
+
 	const defaultVisibility: ColumnVisibilityState = {
 		id: false,
 		userId: false,
@@ -119,23 +157,21 @@
 				...columns
 			];
 		},
+		// Index ids would move a selection onto another row after a delete.
+		getRowId: (row, index) => (row as { id?: string }).id || String(index),
 		get rowCount() {
-			if (rowCount) return rowCount;
+			return rowCount;
 		},
 		get manualPagination() {
-			return !!rowCount;
+			return rowCount !== undefined;
 		},
 		get enableRowSelection() {
 			return hasSelection;
 		},
 		onPaginationChange: (updater) => {
-			if (typeof updater === 'function') {
-				pagination = updater(pagination);
-			} else {
-				pagination = updater;
-			}
-			pageSize.current = pagination.pageSize;
-			pageIndex.current = pagination.pageIndex;
+			const current = { pageIndex: pager.pageIndex, pageSize: pager.pageSize };
+			const next = typeof updater === 'function' ? updater(current) : updater;
+			pager.set(next.pageIndex, next.pageSize);
 		},
 		onColumnVisibilityChange: (updater) => {
 			const next = typeof updater === 'function' ? updater(columnVisibility) : updater;
@@ -144,7 +180,7 @@
 		},
 		state: {
 			get pagination() {
-				return pagination;
+				return { pageIndex: pager.pageIndex, pageSize: pager.pageSize };
 			},
 			get columnVisibility() {
 				return columnVisibility;
@@ -152,24 +188,43 @@
 		}
 	});
 
-	const paginationState = $derived(table.atoms.pagination.get());
+	const colSpan = $derived(table.getVisibleLeafColumns().length);
+	const pageCount = $derived(table.getPageCount());
+	const selectedCount = $derived(table.getFilteredSelectedRowModel().rows.length);
+	const total = $derived(table.getRowCount());
+
+	// Deleting the last row on the last page would strand the user on an empty page.
+	$effect(() => {
+		if (!isLoading && pageCount > 0 && pager.pageIndex >= pageCount) {
+			untrack(() => pager.set(pageCount - 1));
+		}
+	});
 </script>
 
 {#if toolbar}
 	{@render toolbar(table)}
 {/if}
 
-{#if !data.length}
-	<Empty.Root class="h-[25vh] rounded-xl border bg-card text-card-foreground shadow-sm">
+{#if !isLoading && !data.length}
+	<Empty.Root class="h-[25vh] rounded-xl border bg-card text-card-foreground">
 		<Empty.Header>
 			<Empty.Media variant="icon">
-				<emptyState.icon />
+				{#if isFiltered}
+					<FilterX />
+				{:else}
+					<emptyState.icon />
+				{/if}
 			</Empty.Media>
-			<Empty.Title>{emptyState.title}</Empty.Title>
+			<Empty.Title>{isFiltered ? 'No matches' : emptyState.title}</Empty.Title>
 			<Empty.Description>
-				{emptyState.description}
+				{isFiltered ? 'Nothing matches the current search and filters.' : emptyState.description}
 			</Empty.Description>
 		</Empty.Header>
+		{#if isFiltered}
+			<Empty.Content>
+				<Button variant="outline" size="sm" onclick={clearFilters}>Clear filters</Button>
+			</Empty.Content>
+		{/if}
 	</Empty.Root>
 {:else}
 	<div class="overflow-hidden rounded-md border">
@@ -205,40 +260,43 @@
 				{/each}
 			</TableUI.Header>
 			<TableUI.Body>
-				{#each table.getRowModel().rows as row (row.id)}
-					<TableUI.Row data-state={row.getIsSelected() && 'selected'}>
-						{#each row.getVisibleCells() as cell (cell.id)}
-							<TableUI.Cell>
-								<FlexRender {cell} />
+				{#if isLoading}
+					{#each { length: 5 }, i (i)}
+						<TableUI.Row>
+							<TableUI.Cell colspan={colSpan}>
+								<Skeleton class="h-6 w-full" />
 							</TableUI.Cell>
-						{/each}
-					</TableUI.Row>
+						</TableUI.Row>
+					{/each}
 				{:else}
-					<TableUI.Row>
-						<TableUI.Cell colspan={columns.length} class="h-24 text-center"
-							>No results.</TableUI.Cell
+					{#each table.getRowModel().rows as row (row.id)}
+						<TableUI.Row
+							data-state={row.getIsSelected() && 'selected'}
+							class={onRowClick ? 'cursor-pointer' : undefined}
+							tabindex={onRowClick ? 0 : undefined}
+							onclick={(e) => rowClick(e, row.original)}
+							onkeydown={(e) => rowKey(e, row.original)}
 						>
-					</TableUI.Row>
-				{/each}
+							{#each row.getVisibleCells() as cell (cell.id)}
+								<TableUI.Cell>
+									<FlexRender {cell} />
+								</TableUI.Cell>
+							{/each}
+						</TableUI.Row>
+					{:else}
+						<TableUI.Row>
+							<TableUI.Cell colspan={colSpan} class="h-24 text-center">No results.</TableUI.Cell>
+						</TableUI.Row>
+					{/each}
+				{/if}
 			</TableUI.Body>
-			{#if table.getRowCount() > 0}
-				<TableUI.Footer>
-					<TableUI.Row>
-						<TableUI.Cell colspan={columns.length}>Total</TableUI.Cell>
-						<TableUI.Cell class="text-right">{table.getRowCount()}</TableUI.Cell>
-					</TableUI.Row>
-				</TableUI.Footer>
-			{/if}
 		</TableUI.Root>
 
-		{#if table.getSelectedRowModel().rows.length > 0 && bulkActions && bulkActions.length > 0}
+		{#if selectedCount > 0 && bulkActions && bulkActions.length > 0}
 			<BulkActions
 				items={table.getSelectedRowModel().rows.map((row) => row.original)}
 				actions={bulkActions}
-				count={{
-					selected: table.getFilteredSelectedRowModel().rows.length,
-					total: table.getFilteredRowModel().rows.length
-				}}
+				count={{ selected: selectedCount, total: table.getFilteredRowModel().rows.length }}
 				onClear={() => table.resetRowSelection()}
 			/>
 		{/if}
@@ -246,41 +304,42 @@
 
 	<div class="flex items-center justify-between px-2">
 		<div class="flex-1 text-sm text-muted-foreground">
-			{#if table.getFilteredSelectedRowModel().rows.length > 0}
-				{table.getFilteredSelectedRowModel().rows.length} of
-				{table.getFilteredRowModel().rows.length} row(s) selected.
+			{#if selectedCount > 0}
+				{selectedCount} of {table.getFilteredRowModel().rows.length} row(s) selected.
+			{:else if total > 0}
+				{total} total
 			{/if}
 		</div>
 		<div class="flex items-center gap-2">
 			<div class="flex items-center gap-2">
-				<p class="text-sm font-medium">Rows per page</p>
+				<p class="hidden text-sm font-medium sm:block">Rows per page</p>
 				<Select.Root
 					allowDeselect={false}
 					type="single"
-					value={`${paginationState.pageSize}`}
-					onValueChange={(value) => {
-						table.setPageSize(Number(value));
-						pageSize.current = Number(value);
-					}}
+					value={`${pager.pageSize}`}
+					onValueChange={(value) => table.setPageSize(Number(value))}
 				>
-					<Select.Trigger class="h-8 w-17.5">
-						{String(paginationState.pageSize)}
+					<Select.Trigger class="w-17.5" aria-label="Rows per page">
+						{pager.pageSize}
 					</Select.Trigger>
 					<Select.Content side="top">
-						{#each pageSizeOptions as size (size)}
-							<Select.Item value={size.toString()}>{size}</Select.Item>
-						{/each}
+						<Select.Group>
+							{#each pageSizeOptions as size (size)}
+								<Select.Item value={size.toString()}>{size}</Select.Item>
+							{/each}
+						</Select.Group>
 					</Select.Content>
 				</Select.Root>
 			</div>
 			<div class="flex w-25 items-center justify-center text-sm font-medium">
-				Page {paginationState.pageIndex + 1}
-				{table.getPageCount() > 1 ? `of ${table.getPageCount()}` : ''}
+				Page {pager.pageIndex + 1}
+				{pageCount > 1 ? `of ${pageCount}` : ''}
 			</div>
 			<div class="flex items-center gap-2">
 				<Button
 					variant="outline"
-					class="hidden size-8 p-0 lg:flex"
+					size="icon"
+					class="hidden lg:flex"
 					onclick={() => table.setPageIndex(0)}
 					disabled={!table.getCanPreviousPage()}
 				>
@@ -289,7 +348,7 @@
 				</Button>
 				<Button
 					variant="outline"
-					class="size-8 p-0"
+					size="icon"
 					onclick={() => table.previousPage()}
 					disabled={!table.getCanPreviousPage()}
 				>
@@ -298,7 +357,7 @@
 				</Button>
 				<Button
 					variant="outline"
-					class="size-8 p-0"
+					size="icon"
 					onclick={() => table.nextPage()}
 					disabled={!table.getCanNextPage()}
 				>
@@ -307,9 +366,10 @@
 				</Button>
 				<Button
 					variant="outline"
-					class="hidden size-8 p-0 lg:flex"
-					onclick={() => table.setPageIndex(table.getPageCount() - 1)}
-					disabled={!table.getCanNextPage() || table.getPageCount() === 1}
+					size="icon"
+					class="hidden lg:flex"
+					onclick={() => table.setPageIndex(pageCount - 1)}
+					disabled={!table.getCanNextPage()}
 				>
 					<span class="sr-only">Go to last page</span>
 					<ChevronsRight />

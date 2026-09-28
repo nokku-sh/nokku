@@ -1,0 +1,126 @@
+<script lang="ts">
+	import TokenSheet from '$lib/components/sheets/TokenSheet.svelte';
+	import * as Alert from '$lib/components/ui/alert';
+	import * as Tabs from '$lib/components/ui/tabs';
+	import CodeSnippet from '$lib/components/utils/CodeSnippet.svelte';
+	import CopyText from '$lib/components/utils/CopyText.svelte';
+	import { TokenKind } from '$lib/gen/nokku/v1/token_pb';
+	import { Info, Rocket } from '@lucide/svelte';
+
+	let { open = $bindable(false) }: { open?: boolean } = $props();
+
+	const install = 'curl -fsSL https://get.nokku.sh/nokkud | sh';
+	// nokkud talks to app.nokku.sh unless told otherwise, self-hosted needs the URL.
+	const selfHosted = location.origin !== 'https://app.nokku.sh';
+	const apiEnv = selfHosted ? `NOKKUD_API_URL=${location.origin} ` : '';
+
+	function snippets(token: string) {
+		return [
+			{
+				value: 'host',
+				label: 'One host',
+				language: 'bash',
+				hint: 'Paste the token when nokkud asks for it. It never ends up in your shell history.',
+				code: [install, `sudo ${apiEnv}nokkud enroll`, 'sudo systemctl restart nokkud'].join('\n')
+			},
+			{
+				value: 'script',
+				label: 'Script',
+				language: 'bash',
+				hint: 'Unattended. The token goes in through the environment, never as an argument.',
+				code: [
+					install,
+					`sudo NOKKUD_ENROLL_TOKEN='${token}' ${apiEnv}nokkud enroll`,
+					'sudo systemctl restart nokkud'
+				].join('\n')
+			},
+			{
+				value: 'ansible',
+				label: 'Ansible',
+				language: 'yaml',
+				hint: 'Idempotent, reruns skip enrolled hosts. Keep the token in ansible-vault for real playbooks.',
+				code: `- name: Enroll hosts with Nokku
+  hosts: all
+  become: true
+  vars:
+    nokkud_enroll_token: "${token}"
+  tasks:
+    - name: Install nokkud
+      ansible.builtin.shell: ${install}
+      args:
+        creates: /usr/bin/nokkud
+
+    - name: Enroll
+      ansible.builtin.command: nokkud enroll
+      args:
+        creates: /var/lib/nokkud/config.json
+      environment:
+        NOKKUD_ENROLL_TOKEN: "{{ nokkud_enroll_token }}"${selfHosted ? `\n        NOKKUD_API_URL: "${location.origin}"` : ''}
+      no_log: true
+      notify: Restart nokkud
+
+    - name: Keep nokkud running
+      ansible.builtin.systemd_service:
+        name: nokkud
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart nokkud
+      ansible.builtin.systemd_service:
+        name: nokkud
+        state: restarted`
+			},
+			{
+				value: 'cloud-init',
+				label: 'cloud-init',
+				language: 'yaml',
+				hint: 'User data is readable from the instance metadata, so use a short expiry and a use limit.',
+				code: `#cloud-config
+runcmd:
+  - ${install}
+  - NOKKUD_ENROLL_TOKEN='${token}' ${apiEnv}nokkud enroll
+  - systemctl restart nokkud`
+			}
+		];
+	}
+</script>
+
+<TokenSheet
+	bind:open
+	kind={TokenKind.ENROLL}
+	title="Enroll daemons"
+	description="Tokens let new nokkud installs join this workspace. One token can enroll a whole fleet."
+	icon={Rocket}
+	labelPlaceholder="ansible prod-eu"
+>
+	{#snippet reveal(secret)}
+		<div class="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+			<span class="shrink-0 text-xs text-muted-foreground">Token</span>
+			<CopyText value={secret} mono class="text-sm" />
+		</div>
+
+		<Tabs.Root value="host" class="gap-2">
+			<Tabs.List variant="line" class="w-full justify-start">
+				{#each snippets(secret) as s (s.value)}
+					<Tabs.Trigger value={s.value} class="flex-none">{s.label}</Tabs.Trigger>
+				{/each}
+			</Tabs.List>
+			{#each snippets(secret) as s (s.value)}
+				<Tabs.Content value={s.value} class="flex flex-col gap-2">
+					<CodeSnippet code={s.code} language={s.language} />
+					<p class="text-xs text-muted-foreground">{s.hint}</p>
+				</Tabs.Content>
+			{/each}
+		</Tabs.Root>
+
+		{#if selfHosted}
+			<Alert.Root variant="info">
+				<Info />
+				<Alert.Description>
+					Self-hosted: the commands point nokkud at {location.origin} through NOKKUD_API_URL.
+				</Alert.Description>
+			</Alert.Root>
+		{/if}
+	{/snippet}
+</TokenSheet>

@@ -20,6 +20,9 @@ const (
 	maxExportRows = 100_000
 )
 
+// ErrExportLimit means the caller has to narrow the export, not retry it.
+var ErrExportLimit = errors.New("export limit")
+
 // Event is also the wire format of the webhook sink.
 type Event struct {
 	ID          string         `json:"id"`
@@ -103,10 +106,10 @@ func (s *Service) Export(
 	format nokkuv1.ExportAuditLogsRequest_Format,
 ) ([]byte, error) {
 	if p.StartDate == nil || p.EndDate == nil {
-		return nil, errors.New("start_date and end_date are required for export")
+		return nil, fmt.Errorf("%w: start and end date are required", ErrExportLimit)
 	}
 	if p.EndDate.Sub(*p.StartDate) > maxExportDays*24*time.Hour {
-		return nil, fmt.Errorf("export range exceeds %d days", maxExportDays)
+		return nil, fmt.Errorf("%w: the range is longer than %d days", ErrExportLimit, maxExportDays)
 	}
 
 	p.Limit, p.Offset = maxExportRows, 0
@@ -115,7 +118,12 @@ func (s *Service) Export(
 		return nil, err
 	}
 	if total > maxExportRows {
-		return nil, fmt.Errorf("export has %d rows, maximum is %d, narrow the range", total, maxExportRows)
+		return nil, fmt.Errorf(
+			"%w: %d events match, at most %d fit, narrow the filters",
+			ErrExportLimit,
+			total,
+			maxExportRows,
+		)
 	}
 
 	var data []byte

@@ -2,7 +2,7 @@ import { createMutation, createQuery } from '@tanstack/svelte-query';
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
 import { toast } from 'svelte-sonner';
 import { queryClient } from './client';
-import { account } from './account';
+import { account, type AccountCredential } from './account';
 
 const invalidateCredentials = () => queryClient.invalidateQueries({ queryKey: ['account'] });
 
@@ -25,10 +25,20 @@ export const password = {
 		}))
 };
 
+// all feeds the security checkup and the last-way-in guard.
+export const credentials = {
+	all: () =>
+		createQuery<AccountCredential[]>(() => ({
+			queryKey: ['account', 'credentials', 'all'],
+			queryFn: () => account.credentials()
+		}))
+};
+
 export interface Passkey {
 	id: string;
 	name: string;
 	createdAt?: Timestamp;
+	lastUsedAt?: Timestamp;
 }
 
 export const passkey = {
@@ -42,7 +52,8 @@ export const passkey = {
 					.map((c) => ({
 						id: c.id,
 						name: c.label ?? '',
-						createdAt: c.createdAt
+						createdAt: c.createdAt,
+						lastUsedAt: c.lastUsedAt
 					}));
 			}
 		})),

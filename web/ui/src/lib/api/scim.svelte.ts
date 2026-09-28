@@ -7,8 +7,8 @@ export const scim = {
 	listTokens: () =>
 		useQuery(
 			SCIMService.method.listSCIMTokens,
-			{ workspaceId: workspaceID.current },
-			{ select: (res) => res.tokens ?? [] }
+			() => ({ workspaceId: workspaceID.current }),
+			() => ({ enabled: !!workspaceID.current, select: (res) => res.tokens ?? [] })
 		),
 
 	createToken: () =>

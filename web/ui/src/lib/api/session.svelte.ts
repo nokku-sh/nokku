@@ -21,6 +21,17 @@ export const session = {
 					description: 'That device has been signed out.'
 				});
 			}
+		})),
+	revokeOthers: () =>
+		createMutation<number, Error, { ids: string[] }>(() => ({
+			mutationFn: async ({ ids }) => {
+				await Promise.all(ids.map((id) => account.removeSession(id)));
+				return ids.length;
+			},
+			onSuccess: (n) => {
+				void invalidateSessions();
+				toast.success(`Signed out ${n} ${n === 1 ? 'device' : 'devices'}`);
+			}
 		}))
 };
 

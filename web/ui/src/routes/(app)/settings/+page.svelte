@@ -1,179 +1,252 @@
 <script lang="ts">
+	import { daemon } from '$lib/api/daemons.svelte';
+	import { roles } from '$lib/api/roles.svelte';
+	import { target } from '$lib/api/targets.svelte';
+	import { team } from '$lib/api/team.svelte';
 	import { workspace } from '$lib/api/workspaces.svelte';
-	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
-	import { Button } from '$lib/components/ui/button';
+	import DangerZone from '$lib/components/sheets/DangerZone.svelte';
+	import DetailList from '$lib/components/sheets/DetailList.svelte';
+	import SaveStatus from '$lib/components/sheets/SaveStatus.svelte';
+	import { Badge } from '$lib/components/ui/badge';
 	import * as Card from '$lib/components/ui/card';
-	import CopyButton from '$lib/components/ui/copy-button/copy-button.svelte';
 	import * as Field from '$lib/components/ui/field';
 	import { Input } from '$lib/components/ui/input';
 	import * as Item from '$lib/components/ui/item';
-	import { Spinner } from '$lib/components/ui/spinner';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import Avatar from '$lib/components/utils/Avatar.svelte';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { type Workspace } from '$lib/gen/nokku/v1/workspace_pb';
+	import UserAvatar from '$lib/components/utils/UserAvatar.svelte';
+	import { WorkspaceSchema } from '$lib/gen/nokku/v1/workspace_pb';
+	import { confirm, useAutoSave, useDraft } from '$lib/hooks';
+	import { atLeast, roleIcon, roleLabel } from '$lib/roles';
 	import { formatTs } from '$lib/utils';
-	import { CalendarIcon, ClockIcon, Hash, Layers2, Save, User } from '@lucide/svelte';
+	import {
+		Bot,
+		ChevronRight,
+		CircleUser,
+		KeyRound,
+		Layers2,
+		ScrollText,
+		Server,
+		Users
+	} from '@lucide/svelte';
 
-	let ws = $derived(workspace.get());
-	let members = $derived(workspace.listMembers());
-	let owner = $derived(members.data?.members.find((m) => m.id === ws.data?.createdBy));
+	const ws = workspace.get();
+	const draft = useDraft(WorkspaceSchema, () => ws.data);
+	const model = $derived(draft.current);
+	const canEdit = $derived(atLeast(ws.data?.role, 'admin'));
+	const isOwner = $derived(ws.data?.role === 'owner');
 
-	let wsData = $state({} as Workspace);
-	$effect(() => {
-		if (ws.data) wsData = { ...ws.data };
-	});
+	const owner = workspace.getMember(() => ws.data?.createdBy);
+	const roleList = roles.list();
+	const myRole = $derived(roleList.data?.find((r) => r.name === ws.data?.role));
+	const MyRoleIcon = $derived(roleIcon(ws.data?.role ?? 'member'));
+
+	const one = () => ({ limit: 1 });
+	const counts = [
+		{
+			label: 'Members',
+			icon: CircleUser,
+			href: '/access/members',
+			query: workspace.listMembers(one)
+		},
+		{ label: 'Teams', icon: Users, href: '/access/teams', query: team.list(one) },
+		{ label: 'Targets', icon: Server, href: '/infrastructure/targets', query: target.list(one) },
+		{ label: 'Daemons', icon: Bot, href: '/infrastructure/daemons', query: daemon.list(one) }
+	];
+
+	const more = [
+		{
+			title: 'Daemon defaults',
+			description: 'Session policy new daemons start with.',
+			icon: Bot,
+			href: '/settings/daemons'
+		},
+		{
+			title: 'Audit streaming',
+			description: 'Send every event to your SIEM.',
+			icon: ScrollText,
+			href: '/settings/audit'
+		},
+		{
+			title: 'Single sign-on',
+			description: 'OIDC, SAML, SCIM and verified domains.',
+			icon: KeyRound,
+			href: '/settings/sso'
+		}
+	];
 
 	const update = workspace.update();
-	const deleteWorkspace = workspace.delete();
-	let deleteOpen = $state(false);
-</script>
+	const remove = workspace.delete();
 
-<DeleteConfirmationModal
-	bind:open={deleteOpen}
-	title="Delete Workspace"
-	description="This will permanently delete your workspace and all associated data. Active subscriptions tied to this workspace will be immediately canceled. This action cannot be undone."
-	itemName={ws.data?.name}
-	requireConfirmation={true}
-	onConfirm={() => deleteWorkspace.mutate({ workspaceId: ws.data?.id })}
-/>
+	// Settings are left out on purpose, the backend keeps what isn't sent.
+	const autoSave = useAutoSave(() =>
+		update.mutateAsync({
+			workspaceId: model?.id,
+			name: model?.name,
+			description: model?.description
+		})
+	);
+	const save = () => canEdit && autoSave.save();
+</script>
 
 <PageHeader
 	icon={Layers2}
-	title="General Settings"
-	description="Manage your workspace's basic information and preferences."
+	title="Workspace"
+	description="How this workspace is named, who runs it and what's in it."
 />
 
-{#if ws.data}
-	<Card.Root class="overflow-hidden rounded-xl border shadow-sm">
-		<Card.Header>
-			<Card.Title class="flex items-center gap-2 text-base">
-				<Layers2 size={18} />
-				Workspace Profile
-			</Card.Title>
-			<Card.Description>Update your workspace name and description.</Card.Description>
-		</Card.Header>
-		<Card.Content class="space-y-6">
-			<Field.Field>
-				<Field.Label for="name">Name</Field.Label>
-				<Field.Content>
+{#if !model || !ws.data}
+	<Skeleton class="h-40 w-full rounded-xl" />
+	<Skeleton class="h-24 w-full rounded-xl" />
+{:else}
+	<Card.Root>
+		<Card.Content class="flex flex-col gap-5 sm:flex-row">
+			<Avatar id={model.id} class="size-16 shrink-0 rounded-xl" />
+			<Field.Group class="flex-1 gap-4">
+				<Field.Field>
+					<Field.Label for="ws-name">Name</Field.Label>
 					<Input
-						id="name"
-						bind:value={wsData.name}
-						placeholder="Enter workspace name"
-						disabled={update.isPending}
-						required
+						id="ws-name"
+						bind:value={model.name}
+						oninput={save}
+						disabled={!canEdit}
+						class="text-base font-medium"
 					/>
-				</Field.Content>
-			</Field.Field>
-
-			<Field.Field>
-				<Field.Label for="description">Description</Field.Label>
-				<Field.Content>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="ws-description">Description</Field.Label>
 					<Textarea
-						id="description"
-						bind:value={wsData.description}
-						placeholder="Describe your workspace (optional)"
-						rows={4}
-						disabled={update.isPending}
+						id="ws-description"
+						bind:value={model.description}
+						oninput={save}
+						disabled={!canEdit}
+						rows={2}
+						placeholder="What this workspace is for, e.g. Production EU"
 					/>
-				</Field.Content>
-			</Field.Field>
+				</Field.Field>
+			</Field.Group>
 		</Card.Content>
-
-		<Card.Footer class="flex justify-end">
-			<Button
-				variant="default"
-				size="sm"
-				onclick={() => update.mutate({ ...wsData })}
-				disabled={update.isPending}
-				class="w-full sm:w-auto"
-			>
-				<Save class={update.isPending ? 'hidden' : ''} />
-				<Spinner class={update.isPending ? '' : 'hidden'} />
-				Save
-			</Button>
+		<Card.Footer class="border-t">
+			<SaveStatus
+				state={autoSave.saveState}
+				idleText={canEdit ? 'Changes save automatically' : 'Only admins can change this'}
+			/>
 		</Card.Footer>
 	</Card.Root>
 
-	<Card.Root class="overflow-hidden rounded-xl border shadow-sm">
+	<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+		{#each counts as c (c.label)}
+			<a
+				href={c.href}
+				class="group flex items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/40"
+			>
+				<div
+					class="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground"
+				>
+					<c.icon class="size-4" />
+				</div>
+				<div class="flex flex-col">
+					{#if c.query.isLoading}
+						<Skeleton class="h-6 w-8" />
+					{:else}
+						<span class="text-xl font-semibold tabular-nums">{c.query.data?.total ?? 0}</span>
+					{/if}
+					<span class="text-xs text-muted-foreground">{c.label}</span>
+				</div>
+			</a>
+		{/each}
+	</div>
+
+	<div class="grid gap-4 md:grid-cols-2">
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">People</Card.Title>
+				<Card.Description>Who owns the workspace and what you can do in it.</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-col gap-2">
+				<Item.Root variant="muted" size="sm">
+					{#snippet child({ props })}
+						<a href={`/access/members?id=${ws.data?.createdBy}`} {...props}>
+							<Item.Media><UserAvatar user={owner.data} class="size-8" /></Item.Media>
+							<Item.Content>
+								<Item.Title>{owner.data?.name ?? '…'}</Item.Title>
+								<Item.Description>{owner.data?.email}</Item.Description>
+							</Item.Content>
+							<Item.Actions><Badge variant="secondary">Owner</Badge></Item.Actions>
+						</a>
+					{/snippet}
+				</Item.Root>
+				<Item.Root variant="muted" size="sm">
+					<Item.Media variant="icon"><MyRoleIcon /></Item.Media>
+					<Item.Content>
+						<Item.Title>You are {roleLabel(ws.data.role).toLowerCase()}</Item.Title>
+						<Item.Description>{myRole?.description}</Item.Description>
+					</Item.Content>
+				</Item.Root>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Details</Card.Title>
+				<Card.Description>Handy for the CLI, the API and support.</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<DetailList
+					items={[
+						{ label: 'Workspace ID', value: ws.data.id, mono: true, copy: true, wide: true },
+						{ label: 'Created', value: formatTs(ws.data.createdAt) },
+						{ label: 'Updated', value: formatTs(ws.data.updatedAt, 'relative') }
+					]}
+				/>
+			</Card.Content>
+		</Card.Root>
+	</div>
+
+	<Card.Root>
 		<Card.Header>
-			<Card.Title class="text-base font-semibold">Details</Card.Title>
+			<Card.Title class="text-base">More settings</Card.Title>
 		</Card.Header>
-		<Card.Content class="grid gap-4 sm:grid-cols-2">
-			<Item.Root variant="outline" size="sm">
-				<Item.Media>
-					<Hash class="text-muted-foreground" />
-				</Item.Media>
-				<Item.Content class="overflow-hidden">
-					<Item.Title>Workspace ID</Item.Title>
-					<Item.Description class="truncate font-mono">
-						<CopyButton text={ws.data.id} icon={false} class="p-0 hover:bg-transparent">
-							<span class="font-mono text-sm font-light">{ws.data.id}</span>
-						</CopyButton>
-					</Item.Description>
-				</Item.Content>
-			</Item.Root>
-
-			<Item.Root variant="outline" size="sm">
-				<Item.Media>
-					<User class="text-muted-foreground" />
-				</Item.Media>
-				<Item.Content class="overflow-hidden">
-					<Item.Title>Owner</Item.Title>
-					<Item.Description class="truncate font-mono">
-						<CopyButton text={owner?.email || ''} icon={false} class="p-0 hover:bg-transparent">
-							<span class="font-mono text-sm font-light">{owner?.email}</span>
-						</CopyButton>
-					</Item.Description>
-				</Item.Content>
-			</Item.Root>
-
-			<Item.Root variant="outline" size="sm">
-				<Item.Media>
-					<CalendarIcon class="text-muted-foreground" />
-				</Item.Media>
-				<Item.Content class="overflow-hidden">
-					<Item.Title>Created</Item.Title>
-					<Item.Description class="truncate font-mono">
-						{formatTs(ws.data.createdAt)}
-					</Item.Description>
-				</Item.Content>
-			</Item.Root>
-
-			<Item.Root variant="outline" size="sm">
-				<Item.Media>
-					<ClockIcon class="text-muted-foreground" />
-				</Item.Media>
-				<Item.Content class="overflow-hidden">
-					<Item.Title>Last Updated</Item.Title>
-					<Item.Description class="truncate font-mono">
-						{formatTs(ws.data.updatedAt, 'relative')}
-					</Item.Description>
-				</Item.Content>
-			</Item.Root>
+		<Card.Content>
+			<Item.Group class="divide-y rounded-lg border">
+				{#each more as link (link.href)}
+					<Item.Root size="sm" class="rounded-none">
+						{#snippet child({ props })}
+							<a href={link.href} {...props}>
+								<Item.Media variant="icon"><link.icon /></Item.Media>
+								<Item.Content>
+									<Item.Title>{link.title}</Item.Title>
+									<Item.Description>{link.description}</Item.Description>
+								</Item.Content>
+								<Item.Actions><ChevronRight class="size-4 text-muted-foreground" /></Item.Actions>
+							</a>
+						{/snippet}
+					</Item.Root>
+				{/each}
+			</Item.Group>
 		</Card.Content>
 	</Card.Root>
 
-	<Card.Root class="border border-destructive/20">
-		<Card.Header>
-			<Card.Title class="font-medium text-destructive">Delete this workspace</Card.Title>
-			<Card.Description>
-				Once you delete a workspace, there is no going back. All data including members, teams, and
-				certificates will be permanently removed. Any active subscription attached to this workspace
-				will also be canceled.</Card.Description
-			>
-		</Card.Header>
-
-		<Card.Footer class="flex justify-between border-t border-destructive/20 bg-destructive/5">
-			<p class="text-sm font-medium text-destructive">Proceed with caution.</p>
-			<Button
-				variant="destructive"
-				size="sm"
-				onclick={() => (deleteOpen = true)}
-				class="w-full sm:w-auto"
-			>
-				Delete Workspace
-			</Button>
-		</Card.Footer>
-	</Card.Root>
+	{#if isOwner}
+		<DangerZone
+			actions={[
+				{
+					title: 'Delete workspace',
+					description:
+						'Removes every member, team, target and certificate. Active subscriptions are canceled.',
+					label: 'Delete',
+					onClick: () =>
+						confirm({
+							title: 'Delete workspace?',
+							description:
+								'This permanently deletes the workspace and all its data. Active subscriptions for it are canceled immediately. This cannot be undone.',
+							typeToConfirm: ws.data?.name,
+							onConfirm: () => remove.mutateAsync({ workspaceId: ws.data?.id })
+						})
+				}
+			]}
+		/>
+	{/if}
 {/if}

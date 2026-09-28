@@ -86,6 +86,7 @@ func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User
 	if err != nil {
 		return nil, nil, err
 	}
+	m.svc.touchCredential(ctx, passwordCredentialID(u.ID))
 	return u, cookie, nil
 }
 

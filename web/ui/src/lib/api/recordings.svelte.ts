@@ -4,29 +4,34 @@ import { useMutation, useQuery } from '$lib/query';
 import { workspaceID } from '$lib/store.svelte';
 import { authTransport } from './client';
 import { toast } from 'svelte-sonner';
+import { MAX_PAGE_SIZE } from '$lib/config';
+import { plural, useBulkMutation } from './bulk';
 
 export type RecordingChunkHandler = (chunk: Uint8Array) => void;
 export type RecordingMeta = { recordingId: string; username: string };
 
 export const recordings = {
-	list: () =>
+	list: (opts?: () => { limit?: number; offset?: number }) =>
 		useQuery(
 			RecordingService.method.listRecordings,
 			() => ({
 				workspaceId: workspaceID.current,
-				limit: 100,
-				offset: 0
+				limit: MAX_PAGE_SIZE,
+				offset: 0,
+				...opts?.()
 			}),
-			{
-				enabled: !!workspaceID.current,
-				refetchInterval: 30000
-			}
+			() => ({ enabled: !!workspaceID.current, refetchInterval: 30000 })
 		),
 
 	delete: () =>
 		useMutation(RecordingService.method.deleteRecording, {
 			onSuccess: () => toast.success('Recording deleted')
 		}),
+	deleteMany: () =>
+		useBulkMutation(
+			RecordingService.method.deleteRecording,
+			(n) => `${plural(n, 'recording')} deleted`
+		),
 
 	// Direct stream (connect-query has no server-stream support).
 	stream: async (

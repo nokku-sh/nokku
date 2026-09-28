@@ -169,6 +169,7 @@ type Querier interface {
 	// webhook promotes it.
 	SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error
 	SumRecordingBytes(ctx context.Context, workspaceID string) (int64, error)
+	TouchCredential(ctx context.Context, id string) error
 	TouchDaemons(ctx context.Context, daemonIds []string) error
 	// Only writes when the stamp is over an hour old.
 	TouchSCIMToken(ctx context.Context, id string) error

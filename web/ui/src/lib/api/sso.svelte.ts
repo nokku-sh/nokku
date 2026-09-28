@@ -24,8 +24,8 @@ export const sso = {
 	getProvider: () =>
 		useQuery(
 			SSOService.method.getSSOProvider,
-			{ workspaceId: workspaceID.current },
-			{ select: (res) => res.provider }
+			() => ({ workspaceId: workspaceID.current }),
+			() => ({ enabled: !!workspaceID.current, select: (res) => res.provider })
 		),
 
 	updateProvider: () =>
@@ -67,8 +67,8 @@ export const domain = {
 	list: () =>
 		useQuery(
 			WorkspaceDomainService.method.listWorkspaceDomains,
-			{ workspaceId: workspaceID.current },
-			{ select: (res) => res.domains }
+			() => ({ workspaceId: workspaceID.current }),
+			() => ({ enabled: !!workspaceID.current, select: (res) => res.domains })
 		),
 
 	create: () =>

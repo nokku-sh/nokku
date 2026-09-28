@@ -1,11 +1,10 @@
 <script lang="ts">
 	import { CircleCheck, CircleX, History } from '@lucide/svelte';
 	import { util, workspace } from '$lib/api/workspaces.svelte';
-	import ActivityModal from '$lib/components/modals/ActivityModal.svelte';
+	import ActivitySheet from '$lib/components/sheets/ActivitySheet.svelte';
 	import * as Empty from '$lib/components/ui/empty';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { MAX_PAGE_SIZE } from '$lib/config';
-	import { createModalState } from '$lib/hooks';
 	import type { EventLog } from '$lib/gen/nokku/v1/util_pb';
 	import { actionLabel, formatTs } from '$lib/utils';
 
@@ -16,9 +15,9 @@
 
 	let { limit = 8, title = 'Recent activity' }: Props = $props();
 
-	const modal = createModalState<EventLog>({} as EventLog);
-	const logs = $derived(util.getLogs({ limit, offset: 0 }));
-	const members = $derived(workspace.listMembers(() => ({ limit: MAX_PAGE_SIZE })));
+	let selected = $state<EventLog>();
+	const logs = util.getLogs(() => ({ limit }));
+	const members = workspace.listMembers(() => ({ limit: MAX_PAGE_SIZE }));
 
 	function actorLabel(log: EventLog): string {
 		if (log.actorName) return log.actorName;
@@ -30,13 +29,13 @@
 	}
 </script>
 
-<ActivityModal log={modal.selected} bind:open={modal.open} />
+<ActivitySheet log={selected} onClose={() => (selected = undefined)} />
 
 <div class="overflow-hidden rounded-xl border bg-card">
 	<div class="flex items-center justify-between border-b px-4 py-3">
 		<h3 class="text-sm font-semibold">{title}</h3>
 		<a
-			href="/activity"
+			href="/audit"
 			class="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
 		>
 			View all
@@ -73,10 +72,10 @@
 					<button
 						type="button"
 						class="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/40"
-						onclick={() => modal.openWith({ ...log })}
+						onclick={() => (selected = log)}
 					>
 						{#if log.ok}
-							<CircleCheck class="size-4 shrink-0 text-emerald-500" />
+							<CircleCheck class="size-4 shrink-0 text-success" />
 						{:else}
 							<CircleX class="size-4 shrink-0 text-destructive" />
 						{/if}

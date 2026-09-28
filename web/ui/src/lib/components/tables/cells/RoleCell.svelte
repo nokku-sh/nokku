@@ -15,7 +15,7 @@
 	let optimistic = $state<string>();
 	const currentRole = $derived(optimistic ?? roleName);
 
-	const rolesQuery = $derived(rolesApi.list());
+	const rolesQuery = rolesApi.list();
 	const roleOptions = $derived(
 		(rolesQuery.data ?? []).map((r) => ({
 			value: r.name,
@@ -48,7 +48,7 @@
 {:else if !update || !selectedRole}
 	<Badge
 		variant="outline"
-		class="gap-1.5 border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/10"
+		class="gap-1.5 border-warning/30 bg-warning/10 text-warning hover:bg-warning/10"
 	>
 		{#if roleName === 'owner'}
 			<Crown />

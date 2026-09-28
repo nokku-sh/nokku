@@ -34,10 +34,10 @@
 	let cancelImmediately = $state(false);
 	let cancelReason = $state('');
 
-	const customerData = $derived(billing.get());
+	const customerData = billing.get();
 	const data = $derived(customerData.data);
 	const subscription = $derived(customerData.data?.subscription);
-	const licenseData = $derived(license.get());
+	const licenseData = license.get();
 	const billingEnabled = $derived(customerData.data?.mode === 'saas');
 
 	const licenseBenefits = [
@@ -47,7 +47,7 @@
 		'Offline, air-gapped activation'
 	];
 
-	let ws = $derived(workspace.get());
+	const ws = workspace.get();
 
 	const isActive = $derived(
 		subscription?.status === 'active' || subscription?.status === 'trialing'
@@ -301,7 +301,7 @@
 							class="h-full rounded-full {pct >= 100
 								? 'bg-destructive'
 								: pct >= 90
-									? 'bg-amber-500'
+									? 'bg-warning'
 									: 'bg-primary'}"
 							style="width: {pct}%"
 						></div>

@@ -14,7 +14,19 @@ import (
 
 const createSession = `-- name: CreateSession :one
 INSERT INTO
-  sessions (token_hash, subject_id, kind, method, workspace_id, binding, label, expires_at, last_seen_at)
+  sessions (
+    token_hash,
+    subject_id,
+    kind,
+    method,
+    workspace_id,
+    binding,
+    label,
+    user_agent,
+    ip,
+    expires_at,
+    last_seen_at
+  )
 VALUES
   (
     $1,
@@ -25,10 +37,12 @@ VALUES
     $6,
     $7,
     $8,
-    $9
+    $9,
+    $10,
+    $11
   )
 RETURNING
-  token_hash, subject_id, kind, method, workspace_id, binding, label, expires_at, last_seen_at, created_at
+  token_hash, subject_id, kind, method, workspace_id, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
 `
 
 type CreateSessionParams struct {
@@ -39,6 +53,8 @@ type CreateSessionParams struct {
 	WorkspaceID *string            `json:"workspaceId"`
 	Binding     string             `json:"binding"`
 	Label       string             `json:"label"`
+	UserAgent   string             `json:"userAgent"`
+	Ip          string             `json:"ip"`
 	ExpiresAt   *time.Time         `json:"expiresAt"`
 	LastSeenAt  *time.Time         `json:"lastSeenAt"`
 }
@@ -52,6 +68,8 @@ func (q *Queries) CreateSession(ctx context.Context, arg *CreateSessionParams) (
 		arg.WorkspaceID,
 		arg.Binding,
 		arg.Label,
+		arg.UserAgent,
+		arg.Ip,
 		arg.ExpiresAt,
 		arg.LastSeenAt,
 	)
@@ -64,6 +82,8 @@ func (q *Queries) CreateSession(ctx context.Context, arg *CreateSessionParams) (
 		&i.WorkspaceID,
 		&i.Binding,
 		&i.Label,
+		&i.Ip,
+		&i.UserAgent,
 		&i.ExpiresAt,
 		&i.LastSeenAt,
 		&i.CreatedAt,
@@ -133,7 +153,7 @@ func (q *Queries) DeleteSubjectSessions(ctx context.Context, subjectID string) (
 
 const getSession = `-- name: GetSession :one
 SELECT
-  token_hash, subject_id, kind, method, workspace_id, binding, label, expires_at, last_seen_at, created_at
+  token_hash, subject_id, kind, method, workspace_id, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
 FROM
   sessions
 WHERE
@@ -151,6 +171,8 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash crypto.HashedToken) 
 		&i.WorkspaceID,
 		&i.Binding,
 		&i.Label,
+		&i.Ip,
+		&i.UserAgent,
 		&i.ExpiresAt,
 		&i.LastSeenAt,
 		&i.CreatedAt,
@@ -160,7 +182,7 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash crypto.HashedToken) 
 
 const listSessionsBySubject = `-- name: ListSessionsBySubject :many
 SELECT
-  token_hash, subject_id, kind, method, workspace_id, binding, label, expires_at, last_seen_at, created_at
+  token_hash, subject_id, kind, method, workspace_id, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
 FROM
   sessions
 WHERE
@@ -186,6 +208,8 @@ func (q *Queries) ListSessionsBySubject(ctx context.Context, subjectID string) (
 			&i.WorkspaceID,
 			&i.Binding,
 			&i.Label,
+			&i.Ip,
+			&i.UserAgent,
 			&i.ExpiresAt,
 			&i.LastSeenAt,
 			&i.CreatedAt,

@@ -4,7 +4,12 @@ import { workspaceID } from '$lib/store.svelte';
 import { toast } from 'svelte-sonner';
 
 export const billing = {
-	get: () => useQuery(BillingService.method.getBilling, { workspaceId: workspaceID.current }),
+	get: () =>
+		useQuery(
+			BillingService.method.getBilling,
+			() => ({ workspaceId: workspaceID.current }),
+			() => ({ enabled: !!workspaceID.current })
+		),
 
 	checkout: () =>
 		useMutation(BillingService.method.createCheckout, {

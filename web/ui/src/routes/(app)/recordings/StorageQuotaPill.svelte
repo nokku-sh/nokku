@@ -7,8 +7,8 @@
 	import { cn, formatBytes } from '$lib/utils';
 	import { Database, TriangleAlert } from '@lucide/svelte';
 
-	const list = $derived(recordings.list());
-	const billingData = $derived(billing.get());
+	const list = recordings.list();
+	const billingData = billing.get();
 
 	// -1 is unlimited.
 	let limitBytes = $derived(Number(billingData.data?.quotas?.recordingStorageBytes ?? 0));
@@ -22,14 +22,14 @@
 		level === 'danger'
 			? 'border-destructive/30 bg-destructive/10 text-destructive'
 			: level === 'warn'
-				? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200'
+				? 'border-warning/30 bg-warning/10 text-warning'
 				: ''
 	);
 	const progressClass = $derived(
 		level === 'danger'
 			? '[&_[data-slot=progress-indicator]]:bg-destructive'
 			: level === 'warn'
-				? '[&_[data-slot=progress-indicator]]:bg-amber-500'
+				? '[&_[data-slot=progress-indicator]]:bg-warning'
 				: ''
 	);
 </script>

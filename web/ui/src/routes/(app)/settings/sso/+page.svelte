@@ -14,11 +14,11 @@
 	import { Button } from '$lib/components/ui/button';
 	import { UpgradeURL } from '$lib/config';
 
-	const billingData = $derived(billing.get());
+	const billingData = billing.get();
 	const samlAvailable = $derived(billingData.data?.features?.['saml'] === true);
 	const scimAvailable = $derived(billingData.data?.features?.['scim'] === true);
 
-	const domains = $derived(domain.list());
+	const domains = domain.list();
 	const hasVerifiedDomain = $derived(
 		(domains.data ?? []).some((d) => d.verifiedAt !== undefined && d.verifiedAt !== null)
 	);

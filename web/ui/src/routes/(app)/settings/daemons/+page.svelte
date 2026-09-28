@@ -10,7 +10,7 @@
 	import { WorkspaceSettingsSchema } from '$lib/gen/nokku/v1/workspace_pb';
 	import { DaemonConfigSchema } from '$lib/gen/nokku/v1/daemon_pb';
 
-	const ws = $derived(workspace.get());
+	const ws = workspace.get();
 
 	// A real protobuf message, not a plain object, so the transport accepts it.
 	let settings = $derived.by(() => {

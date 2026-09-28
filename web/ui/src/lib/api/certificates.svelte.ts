@@ -3,6 +3,8 @@ import {
 	SignSSHCertificateRequest_CertificateType
 } from '$lib/gen/nokku/v1/certificates_pb';
 import { toast } from 'svelte-sonner';
+import { plural, useBulkMutation } from './bulk';
+import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '$lib/query';
 import { workspaceID } from '$lib/store.svelte';
 
@@ -30,17 +32,20 @@ export const sign = {
 };
 
 export const ca = {
-	get: (id?: string) =>
+	get: (id: MaybeGetter<string | undefined>) =>
 		useQuery(
 			CertificateService.method.getCertificateAuthority,
-			{ workspaceId: workspaceID.current, id },
-			{ enabled: !!workspaceID.current && !!id, select: (res) => res.certificateAuthority }
+			() => ({ workspaceId: workspaceID.current, id: extract(id) }),
+			() => ({
+				enabled: !!workspaceID.current && !!extract(id),
+				select: (res) => res.certificateAuthority
+			})
 		),
 	list: () =>
 		useQuery(
 			CertificateService.method.listCertificateAuthorities,
-			{ workspaceId: workspaceID.current },
-			{ enabled: !!workspaceID.current, select: (res) => res.certificateAuthorities }
+			() => ({ workspaceId: workspaceID.current }),
+			() => ({ enabled: !!workspaceID.current, select: (res) => res.certificateAuthorities })
 		),
 
 	create: () =>
@@ -49,6 +54,11 @@ export const ca = {
 		}),
 	update: () => useMutation(CertificateService.method.updateCertificateAuthority),
 	delete: () => useMutation(CertificateService.method.deleteCertificateAuthority),
+	deleteMany: () =>
+		useBulkMutation(
+			CertificateService.method.deleteCertificateAuthority,
+			(n) => `${plural(n, 'certificate authority', 'certificate authorities')} deleted`
+		),
 	rollover: () =>
 		useMutation(CertificateService.method.rolloverCertificateAuthority, {
 			onSuccess: (data) => {

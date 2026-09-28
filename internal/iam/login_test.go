@@ -390,3 +390,52 @@ func TestLogoutRevokesBoundSession(t *testing.T) {
 		t.Fatalf("repeat logout: %v", err)
 	}
 }
+
+func TestSessionRecordsDevice(t *testing.T) {
+	e := newTestEnv(t)
+	u := e.user(t, "device@"+testDomain(), true)
+	header := http.Header{"User-Agent": {"Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0"}}
+	ctx := ContextWithRequestMeta(t.Context(), RequestMeta{Header: header, RemoteAddr: "203.0.113.7:4242"})
+
+	sess, _, err := e.svc.IssueSession(ctx, SessionParams{
+		SubjectID: u.ID, Kind: KindUser, Method: MethodPassword, TTL: time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sess.UserAgent != header.Get("User-Agent") {
+		t.Errorf("user agent = %q, want the request's", sess.UserAgent)
+	}
+	if sess.Ip != "203.0.113.7" {
+		t.Errorf("ip = %q, want 203.0.113.7", sess.Ip)
+	}
+}
+
+func TestPasswordLoginMarksCredentialUsed(t *testing.T) {
+	e := newTestEnv(t)
+	u := e.user(t, "used@"+testDomain(), true)
+	e.withPassword(t, u)
+	stored := func() *db.Credential {
+		t.Helper()
+		c, err := e.svc.sys.GetCredential(t.Context(), &db.GetCredentialParams{
+			UserID: u.ID, ID: passwordCredentialID(u.ID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+
+	if _, _, err := e.svc.Password.Login(t.Context(), u.Email, "wrong"); err == nil {
+		t.Fatal("wrong password signed in")
+	}
+	if stored().LastUsedAt != nil {
+		t.Error("a failed sign-in marked the password used")
+	}
+	if _, _, err := e.svc.Password.Login(t.Context(), u.Email, testPassword); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if stored().LastUsedAt == nil {
+		t.Error("a successful sign-in did not mark the password used")
+	}
+}

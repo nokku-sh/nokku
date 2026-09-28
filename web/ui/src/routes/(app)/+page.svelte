@@ -39,18 +39,18 @@
 
 	const workspaceModal = createEntityModalState(WorkspaceSchema);
 
-	const currentUser = $derived(user.self());
-	const currentWorkspace = $derived(workspace.get());
+	const currentUser = user.self();
+	const currentWorkspace = workspace.get();
 	const isAdmin = $derived(atLeast(currentWorkspace.data?.role, 'editor'));
 
-	const access = $derived(target.access(currentUser.data?.id));
+	const access = target.access(() => currentUser.data?.id);
 	const accessTargets = $derived(access.data?.targets ?? []);
 	const accessAgents = $derived(access.data?.daemons ?? []);
 
-	const daemons = $derived(daemon.list(() => ({ limit: 100 })));
-	const cas = $derived(ca.list());
-	const members = $derived(workspace.listMembers(() => ({ limit: 1 })));
-	const recs = $derived(recordings.list());
+	const daemons = daemon.list(() => ({ limit: 100 }));
+	const cas = ca.list();
+	const members = workspace.listMembers(() => ({ limit: 1 }));
+	const recs = recordings.list();
 
 	const onlineAgents = $derived(accessAgents.filter((a) => a.online));
 	const reachableTargets = $derived(
@@ -209,16 +209,16 @@
 						{#if healthIssues.length === 0}
 							<span class="relative flex size-2">
 								<span
-									class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75"
+									class="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75"
 								></span>
-								<span class="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
+								<span class="relative inline-flex size-2 rounded-full bg-success"></span>
 							</span>
 							All systems normal.
 							{reachableTargets.length}
 							of {accessTargets.length}
 							servers reachable.
 						{:else}
-							<TriangleAlert class="size-3.5 text-amber-500" />
+							<TriangleAlert class="size-3.5 text-warning" />
 							{healthIssues.length}
 							{healthIssues.length === 1 ? 'thing needs' : 'things need'} attention below.
 						{/if}

@@ -13,7 +13,10 @@
 
 	// Members load when the hover card opens, so a page of teams costs no queries.
 	let open = $state(false);
-	const membersQuery = $derived(team.members(teamId, () => ({ enabled: open })));
+	const membersQuery = team.members(
+		() => teamId,
+		() => ({ enabled: open })
+	);
 
 	const hasMembers = $derived(memberCount > 0);
 </script>

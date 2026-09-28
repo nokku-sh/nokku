@@ -193,8 +193,6 @@ func (s *RecordingService) ListRecordings(
 		}
 		recordings = append(recordings, r.Recording.ToProto())
 	}
-	// Recordings can hold credentials, so reading them is audited too.
-	s.cfg.Audit.Log(ctx, &audit.Event{Action: "ListRecordings"})
 	return &nokkuv1.ListRecordingsResponse{
 		Recordings: recordings,
 		Total:      &total,

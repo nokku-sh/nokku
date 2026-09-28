@@ -15,3 +15,5 @@ export { default as TeamCell } from './TeamCell.svelte';
 export { default as TextCell } from './TextCell.svelte';
 export { default as TimeCell } from './TimeCell.svelte';
 export { default as UserCell } from './UserCell.svelte';
+export { default as RecordingCell } from './RecordingCell.svelte';
+export { default as DaemonStatusCell } from './DaemonStatusCell.svelte';

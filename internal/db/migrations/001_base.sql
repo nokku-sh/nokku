@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS credentials (
   subject TEXT NOT NULL DEFAULT '', -- external identity subject or code hash
   data BYTEA NOT NULL,
   label TEXT NOT NULL DEFAULT '',
+  last_used_at TIMESTAMPTZ, -- last successful sign-in with it
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -84,6 +85,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   workspace_id UUID REFERENCES workspaces (id) ON DELETE CASCADE, -- tenant pin for daemons; NULL for global users
   binding TEXT NOT NULL DEFAULT '', -- DPoP JWK thumbprint, empty for cookie sessions
   label TEXT NOT NULL DEFAULT '', -- display name for "your devices" listings
+  ip TEXT NOT NULL DEFAULT '', -- of the request that created the session
+  user_agent TEXT NOT NULL DEFAULT '', -- of the request that created the session
   expires_at TIMESTAMPTZ, -- NULL = non-expiring (daemons re-auth via DPoP proofs)
   last_seen_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -257,9 +260,7 @@ CREATE TABLE IF NOT EXISTS workspace_tokens (
       AND ca_id IS NULL
     )
   ),
-  CHECK (
-    (kind = 2) = (role_name IS NOT NULL)
-  )
+  CHECK ((kind = 2) = (role_name IS NOT NULL))
 );
 
 CREATE TABLE IF NOT EXISTS principals (
@@ -297,7 +298,7 @@ CREATE TABLE IF NOT EXISTS principal_grants (
   FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, service_account_id) REFERENCES service_accounts (workspace_id, id) ON DELETE CASCADE,
   UNIQUE NULLS NOT DISTINCT (principal_id, user_id, team_id, service_account_id),
-  CHECK (num_nonnulls(user_id, team_id, service_account_id) = 1)
+  CHECK (num_nonnulls (user_id, team_id, service_account_id) = 1)
 );
 
 CREATE TABLE IF NOT EXISTS recordings (
@@ -813,8 +814,9 @@ SELECT
     )
   );
 
-CREATE POLICY users_update ON users FOR
-UPDATE TO nokku_app USING (id = current_actor_id ()::UUID)
+CREATE POLICY users_update ON users
+FOR UPDATE
+  TO nokku_app USING (id = current_actor_id ()::UUID)
 WITH
   CHECK (id = current_actor_id ()::UUID);
 

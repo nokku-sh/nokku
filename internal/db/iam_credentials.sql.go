@@ -17,7 +17,7 @@ WHERE
   AND subject = $3
   AND user_id = $4
 RETURNING
-  id, user_id, type, provider, subject, data, label, created_at, updated_at
+  id, user_id, type, provider, subject, data, label, last_used_at, created_at, updated_at
 `
 
 type ConsumeCredentialBySubjectParams struct {
@@ -43,6 +43,7 @@ func (q *Queries) ConsumeCredentialBySubject(ctx context.Context, arg *ConsumeCr
 		&i.Subject,
 		&i.Data,
 		&i.Label,
+		&i.LastUsedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -110,7 +111,7 @@ func (q *Queries) DeleteUserCredentialsByProvider(ctx context.Context, arg *Dele
 
 const findCredentialBySubject = `-- name: FindCredentialBySubject :one
 SELECT
-  id, user_id, type, provider, subject, data, label, created_at, updated_at
+  id, user_id, type, provider, subject, data, label, last_used_at, created_at, updated_at
 FROM
   credentials
 WHERE
@@ -136,6 +137,7 @@ func (q *Queries) FindCredentialBySubject(ctx context.Context, arg *FindCredenti
 		&i.Subject,
 		&i.Data,
 		&i.Label,
+		&i.LastUsedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -144,7 +146,7 @@ func (q *Queries) FindCredentialBySubject(ctx context.Context, arg *FindCredenti
 
 const getCredential = `-- name: GetCredential :one
 SELECT
-  id, user_id, type, provider, subject, data, label, created_at, updated_at
+  id, user_id, type, provider, subject, data, label, last_used_at, created_at, updated_at
 FROM
   credentials
 WHERE
@@ -168,6 +170,7 @@ func (q *Queries) GetCredential(ctx context.Context, arg *GetCredentialParams) (
 		&i.Subject,
 		&i.Data,
 		&i.Label,
+		&i.LastUsedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -176,7 +179,7 @@ func (q *Queries) GetCredential(ctx context.Context, arg *GetCredentialParams) (
 
 const listCredentialsByType = `-- name: ListCredentialsByType :many
 SELECT
-  id, user_id, type, provider, subject, data, label, created_at, updated_at
+  id, user_id, type, provider, subject, data, label, last_used_at, created_at, updated_at
 FROM
   credentials
 WHERE
@@ -208,6 +211,7 @@ func (q *Queries) ListCredentialsByType(ctx context.Context, arg *ListCredential
 			&i.Subject,
 			&i.Data,
 			&i.Label,
+			&i.LastUsedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -242,6 +246,19 @@ func (q *Queries) RenameCredential(ctx context.Context, arg *RenameCredentialPar
 	return err
 }
 
+const touchCredential = `-- name: TouchCredential :exec
+UPDATE credentials
+SET
+  last_used_at = NOW()
+WHERE
+  id = $1
+`
+
+func (q *Queries) TouchCredential(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, touchCredential, id)
+	return err
+}
+
 const upsertCredential = `-- name: UpsertCredential :one
 INSERT INTO
   credentials (id, user_id, type, provider, subject, data, label)
@@ -258,7 +275,7 @@ SET
 WHERE
   credentials.user_id = EXCLUDED.user_id
 RETURNING
-  id, user_id, type, provider, subject, data, label, created_at, updated_at
+  id, user_id, type, provider, subject, data, label, last_used_at, created_at, updated_at
 `
 
 type UpsertCredentialParams struct {
@@ -291,6 +308,7 @@ func (q *Queries) UpsertCredential(ctx context.Context, arg *UpsertCredentialPar
 		&i.Subject,
 		&i.Data,
 		&i.Label,
+		&i.LastUsedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

@@ -122,18 +122,18 @@
 			{:else}
 				{#if result === 'success'}
 					<div class="flex flex-col items-center gap-3 py-2 text-center">
-						<div class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
-							<Check size={24} class="text-emerald-500" />
+						<div class="flex h-12 w-12 items-center justify-center rounded-full bg-success/10">
+							<Check size={24} class="text-success" />
 						</div>
-						<p class="text-sm font-medium text-emerald-600 dark:text-emerald-400">Success!</p>
+						<p class="text-sm font-medium text-success">Success!</p>
 						<p class="text-sm text-muted-foreground">{message}</p>
 					</div>
 				{:else if result === 'denied'}
 					<div class="flex flex-col items-center gap-3 py-2 text-center">
-						<div class="flex h-12 w-12 items-center justify-center rounded-full bg-rose-500/10">
-							<X size={24} class="text-rose-500" />
+						<div class="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+							<X size={24} class="text-destructive" />
 						</div>
-						<p class="text-sm font-medium text-rose-600 dark:text-rose-400">Denied</p>
+						<p class="text-sm font-medium text-destructive">Denied</p>
 						<p class="text-sm text-muted-foreground">Authorization request denied.</p>
 					</div>
 				{:else if result === 'error'}
@@ -156,15 +156,13 @@
 							</div>
 						</div>
 
-						<div
-							class="mt-4 flex items-start gap-3 rounded-md bg-amber-500/10 p-3 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400"
-						>
-							<ShieldAlert class="mt-0.5 size-4 shrink-0" />
-							<p class="text-xs leading-relaxed">
+						<Alert.Root variant="warning" class="mt-4">
+							<ShieldAlert />
+							<Alert.Description class="text-xs">
 								Verify that this code exactly matches the one displayed in your terminal before
 								approving.
-							</p>
-						</div>
+							</Alert.Description>
+						</Alert.Root>
 
 						<div class="mt-6 flex flex-col gap-2">
 							<Button class="w-full" onclick={apply} disabled={submitting}>

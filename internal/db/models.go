@@ -56,15 +56,16 @@ type CertificateAuthority struct {
 }
 
 type Credential struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"userId"`
-	Type      string    `json:"type"`
-	Provider  string    `json:"provider"`
-	Subject   string    `json:"subject"`
-	Data      []byte    `json:"data"`
-	Label     string    `json:"label"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID         string     `json:"id"`
+	UserID     string     `json:"userId"`
+	Type       string     `json:"type"`
+	Provider   string     `json:"provider"`
+	Subject    string     `json:"subject"`
+	Data       []byte     `json:"data"`
+	Label      string     `json:"label"`
+	LastUsedAt *time.Time `json:"lastUsedAt"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
 }
 
 type Daemon struct {
@@ -163,6 +164,8 @@ type Session struct {
 	WorkspaceID *string            `json:"workspaceId"`
 	Binding     string             `json:"binding"`
 	Label       string             `json:"label"`
+	Ip          string             `json:"ip"`
+	UserAgent   string             `json:"userAgent"`
 	ExpiresAt   *time.Time         `json:"expiresAt"`
 	LastSeenAt  *time.Time         `json:"lastSeenAt"`
 	CreatedAt   time.Time          `json:"createdAt"`

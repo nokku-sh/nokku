@@ -1,12 +1,11 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { plural } from '$lib/api/bulk';
 	import { page } from '$app/state';
 	import { workspace } from '$lib/api/workspaces.svelte';
 	import { roles } from '$lib/api/roles.svelte';
 	import { roleIcon, roleLabel } from '$lib/roles';
-	import InviteModal from '$lib/components/modals/InviteModal.svelte';
-	import MemberModal from '$lib/components/modals/MemberModal.svelte';
-	import TransferOwnerModal from '$lib/components/modals/TransferOwnerModal.svelte';
+	import InviteSheet from '$lib/components/sheets/InviteSheet.svelte';
+	import MemberSheet from '$lib/components/sheets/MemberSheet.svelte';
 	import {
 		DataTable,
 		TableToolbar,
@@ -17,33 +16,25 @@
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
 	import { type WorkspaceMember } from '$lib/gen/nokku/v1/workspace_pb';
-	import { createModalState } from '$lib/hooks';
-	import {
-		CircleUser,
-		CircleUserIcon,
-		CrownIcon,
-		InfoIcon,
-		PlusIcon,
-		Trash2
-	} from '@lucide/svelte';
+	import { confirm, usePagination, useSheet } from '$lib/hooks';
+	import { CircleUser, CircleUserIcon, PlusIcon, ShieldCheck, Trash2 } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
-	const memberModal = createModalState<WorkspaceMember>({} as WorkspaceMember);
-	const inviteModal = createModalState();
-	const transferOwnerModal = createModalState<WorkspaceMember>({} as WorkspaceMember);
+	const sheet = useSheet();
+	let inviteOpen = $state(false);
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
-	const members = $derived(
-		workspace.listMembers(() => ({
-			query: debounced.current,
-			roleName: page.url.searchParams.get('role') || undefined
-		}))
-	);
+	const pager = usePagination();
+	const members = workspace.listMembers(() => ({
+		...pager.args,
+		query: debounced.current,
+		roleName: page.url.searchParams.get('role') || undefined
+	}));
 
 	const removeMember = workspace.removeMember();
+	const removeMembers = workspace.removeMembers();
 	const updateMember = workspace.updateMember();
 
 	const bulkActions: BulkAction<WorkspaceMember>[] = [
@@ -52,11 +43,18 @@
 			label: 'Remove',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: (selected) => selected.forEach(({ id }) => removeMember.mutate({ userId: id }))
+			onClick: async (selected) => {
+				const ok = await confirm({
+					title: `Remove ${plural(selected.length, 'member')}?`,
+					description: 'This action cannot be undone.',
+					confirmText: 'Remove'
+				});
+				if (ok) await removeMembers.mutateAsync(selected.map(({ id }) => ({ userId: id })));
+			}
 		}
 	];
 
-	const rolesQuery = $derived(roles.list());
+	const rolesQuery = roles.list();
 	const roleOptions = $derived(
 		(rolesQuery.data ?? []).map((r) => ({
 			label: roleLabel(r.name),
@@ -91,32 +89,18 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
-					inlineActions: [
-						{
-							icon: InfoIcon,
-							onClick: () => memberModal.openWith({ ...row.original })
-						},
-						{
-							icon: PlusIcon,
-							onClick: () =>
-								goto(
-									`/access/assign?type=${SubjectKind.USER}&id=${row.original.id}&name=${encodeURIComponent(row.original.name)}`
-								)
-						}
-					],
-
 					menuActions: [
 						{
-							label: 'Transfer Ownership',
-							icon: CrownIcon,
-							onClick: () => transferOwnerModal.openWith({ ...row.original })
+							label: 'Manage access',
+							icon: ShieldCheck,
+							onClick: () => sheet.show(row.original.id, 'access')
 						}
 					],
 
 					deleteConfig: {
 						itemName: row.original.name,
 						description: 'Are you sure you want to remove this member from your workspace?',
-						onDelete: () => removeMember.mutate({ userId: row.original.id }),
+						onDelete: () => removeMember.mutateAsync({ userId: row.original.id }),
 						requireTyping: true
 					}
 				});
@@ -125,25 +109,27 @@
 	]);
 </script>
 
-<MemberModal bind:open={memberModal.open} data={memberModal.selected} />
-<TransferOwnerModal
-	bind:open={transferOwnerModal.open}
-	targetMember={transferOwnerModal.selected}
-/>
-<InviteModal bind:open={inviteModal.open} />
+<MemberSheet />
+<InviteSheet bind:open={inviteOpen} />
 
-<PageHeader title="Members" description="Manage your workspace members" icon={CircleUserIcon}>
-	<Button onclick={() => inviteModal.openNew()}>
+<PageHeader
+	title="Members"
+	description="People in this workspace, their role and their teams"
+	icon={CircleUserIcon}
+>
+	<Button onclick={() => (inviteOpen = true)}>
 		<PlusIcon data-icon="inline-start" />
-		Invite Member
+		Invite people
 	</Button>
 </PageHeader>
 
 <DataTable
 	data={members.data?.members ?? []}
 	rowCount={members.data?.total ?? 0}
+	isLoading={members.isLoading}
 	{columns}
 	{bulkActions}
+	onRowClick={(m) => sheet.show(m.id)}
 	emptyState={{
 		icon: CircleUser,
 		title: 'No Members',

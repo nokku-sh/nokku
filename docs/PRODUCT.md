@@ -175,7 +175,8 @@ Each flow names its entry point. Paths are relative to their repo.
 An admin mints an enroll token in the UI through
 `nokku/internal/api/token.go` `TokenService.CreateToken`. One token can
 enroll a fleet: it may never expire and may cap its uses. On the host,
-`sudo nokkud --enroll` (or `NOKKUD_ENROLL_TOKEN`) carries the token to
+`sudo nokkud enroll` (the token at its prompt, or `NOKKUD_ENROLL_TOKEN` in
+its environment) carries the token to
 `DaemonService.EnrollDaemon`, a public endpoint that still demands a DPoP
 proof. Identity is the key thumbprint, so a known machine re-enrolls onto
 its existing daemon without spending a use, even with a used-up token. The
