@@ -11,11 +11,9 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/pkg/seed"
 )
 
 func main() {
-	defaults := seed.DefaultConfig()
 	cmd := &cli.Command{
 		EnableShellCompletion: true,
 		Suggest:               true,
@@ -33,18 +31,18 @@ func main() {
 				Usage:   "Enable debug logging",
 				Sources: cli.EnvVars("NOKKU_DEBUG"),
 			},
-			&cli.IntFlag{Name: "users", Value: defaults.NumUsers, Usage: "number of users"},
-			&cli.IntFlag{Name: "teams", Value: defaults.NumTeams, Usage: "number of teams"},
-			&cli.IntFlag{Name: "targets", Value: defaults.NumTargets, Usage: "number of targets"},
-			&cli.IntFlag{Name: "daemons", Value: defaults.NumDaemons, Usage: "number of daemons"},
+			&cli.IntFlag{Name: "users", Value: 10, Usage: "number of users"},
+			&cli.IntFlag{Name: "teams", Value: 5, Usage: "number of teams"},
+			&cli.IntFlag{Name: "targets", Value: 10, Usage: "number of targets"},
+			&cli.IntFlag{Name: "daemons", Value: 10, Usage: "number of daemons"},
 			&cli.IntFlag{
 				Name:  "cas",
-				Value: defaults.NumCAs,
+				Value: 2,
 				Usage: "number of certificate authorities",
 			},
 			&cli.IntFlag{
 				Name:  "service-accounts",
-				Value: defaults.NumServiceAccounts,
+				Value: 5,
 				Usage: "number of service accounts",
 			},
 		},
@@ -53,7 +51,7 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("failed to load configuration: %w", err)
 			}
-			return seed.Workspace(ctx, cfg.IAM, cfg.Conn, seed.Config{
+			return seedWorkspace(ctx, cfg.IAM, cfg.Conn, seedConfig{
 				NumUsers:           cmd.Int("users"),
 				NumTeams:           cmd.Int("teams"),
 				NumTargets:         cmd.Int("targets"),
