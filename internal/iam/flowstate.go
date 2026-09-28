@@ -4,13 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -32,35 +29,6 @@ const (
 )
 
 var ErrSSORequired = errors.New("iam: single sign-on is required for this account")
-
-// cgnat is internal on most clouds.
-var cgnat = netip.MustParsePrefix("100.64.0.0/10")
-
-// newProviderClient refuses non-public addresses since workspace admins pick
-// the IdP URLs. The check runs on the dialed address, so DNS rebinding cannot
-// slip past it.
-func newProviderClient(allowPrivate bool) *http.Client {
-	dialer := &net.Dialer{Timeout: providerHTTPTimeout}
-	if !allowPrivate {
-		dialer.Control = func(_, address string, _ syscall.RawConn) error {
-			ap, err := netip.ParseAddrPort(address)
-			if err != nil {
-				return err
-			}
-			ip := ap.Addr().Unmap()
-			if !ip.IsGlobalUnicast() || ip.IsPrivate() || cgnat.Contains(ip) {
-				return errors.New("iam: identity provider address is not public")
-			}
-			return nil
-		}
-	}
-	transport := &http.Transport{
-		DialContext:         dialer.DialContext,
-		TLSHandshakeTimeout: providerHTTPTimeout,
-		ForceAttemptHTTP2:   true,
-	}
-	return &http.Client{Timeout: providerHTTPTimeout, Transport: transport}
-}
 
 // providerContext is how oauth2 and go-oidc pick up the guarded client.
 func (s *Service) providerContext(ctx context.Context) context.Context {

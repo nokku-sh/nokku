@@ -60,6 +60,7 @@ The backend reads configuration from environment variables. Only `NOKKU_SECRET` 
 | `NOKKU_ALLOWED_ORIGINS` | Additional allowed CORS origins                                                                      |
 | `NOKKU_DEBUG`           | Debug logging (`--debug`)                                                                            |
 | `NOKKU_LICENSE_KEY`     | License key activating licensed self-host features                                                   |
+| `NOKKU_ALLOW_PRIVATE_NETWORKS` | Let SSO providers and audit webhooks reach private addresses (default `false`). Keep it off when hosting for other people. |
 
 ### Database (PostgreSQL, required)
 

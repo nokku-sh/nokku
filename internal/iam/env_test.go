@@ -29,7 +29,7 @@ type testEnv struct {
 func newTestEnv(t *testing.T) *testEnv {
 	t.Helper()
 	// The mock IdPs listen on loopback.
-	t.Setenv("NOKKU_SSO_ALLOW_PRIVATE_NETWORKS", "true")
+	t.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "true")
 	cipher, err := crypto.NewSecretbox([]byte("0123456789abcdef0123456789abcdef"))
 	if err != nil {
 		t.Fatal(err)
