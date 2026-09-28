@@ -1,4 +1,4 @@
-package seed
+package main
 
 import (
 	"context"
@@ -21,7 +21,7 @@ func uniqueName(base string, i int) string {
 	return fmt.Sprintf("%s-%d", base, i)
 }
 
-type Config struct {
+type seedConfig struct {
 	NumUsers           int
 	NumTeams           int
 	NumTargets         int
@@ -30,18 +30,7 @@ type Config struct {
 	NumServiceAccounts int
 }
 
-func DefaultConfig() Config {
-	return Config{
-		NumUsers:           10,
-		NumTeams:           5,
-		NumTargets:         10,
-		NumDaemons:         10,
-		NumCAs:             2,
-		NumServiceAccounts: 5,
-	}
-}
-
-func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cfg Config) error {
+func seedWorkspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cfg seedConfig) error {
 	_ = gofakeit.Seed(time.Now().UnixNano())
 
 	email := os.Getenv("NOKKU_ADMIN_EMAIL")
