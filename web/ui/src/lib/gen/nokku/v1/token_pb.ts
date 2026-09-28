@@ -2,321 +2,289 @@
 // @generated from file nokku/v1/token.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenEnum, GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
-import { enumDesc, fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
-import { file_buf_validate_validate } from '../../buf/validate/validate_pb';
-import { file_google_api_annotations } from '../../google/api/annotations_pb';
-import type { Duration, Timestamp } from '@bufbuild/protobuf/wkt';
-import {
-	file_google_protobuf_duration,
-	file_google_protobuf_timestamp
-} from '@bufbuild/protobuf/wkt';
-import type { Message } from '@bufbuild/protobuf';
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
+import { file_google_api_annotations } from "../../google/api/annotations_pb";
+import type { Duration, Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_duration, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file nokku/v1/token.proto.
  */
-export const file_nokku_v1_token: GenFile /*@__PURE__*/ = fileDesc(
-	'ChRub2trdS92MS90b2tlbi5wcm90bxIIbm9ra3UudjEirwIKBVRva2VuEgoKAmlkGAEgASgJEiEKBGtpbmQYAiABKA4yEy5ub2trdS52MS5Ub2tlbktpbmQSDQoFbGFiZWwYAyABKAkSLgoKZXhwaXJlc19hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEAoIbWF4X3VzZXMYBSABKAUSDAoEdXNlcxgGIAEoBRIUCgxhdXRvX2FwcHJvdmUYByABKAgSDQoFY2FfaWQYCCABKAkSEQoJcm9sZV9uYW1lGAkgASgJEi4KCmNyZWF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3RfdXNlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiigIKEkNyZWF0ZVRva2VuUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEi0KBGtpbmQYAiABKA4yEy5ub2trdS52MS5Ub2tlbktpbmRCCrpIB4IBBBABIAASFgoFbGFiZWwYAyABKAlCB7pIBHICGGQSMAoDdHRsGAQgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQgi6SAWqAQIqABIZCghtYXhfdXNlcxgFIAEoBUIHukgEGgIgABIUCgxhdXRvX2FwcHJvdmUYBiABKAgSFwoFY2FfaWQYByABKAlCCLpIBXIDsAEBEhEKCXJvbGVfbmFtZRgIIAEoCSJFChNDcmVhdGVUb2tlblJlc3BvbnNlEh4KBXRva2VuGAEgASgLMg8ubm9ra3UudjEuVG9rZW4SDgoGc2VjcmV0GAIgASgJImAKEUxpc3RUb2tlbnNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESKwoEa2luZBgCIAEoDjITLm5va2t1LnYxLlRva2VuS2luZEIIukgFggECEAEiNQoSTGlzdFRva2Vuc1Jlc3BvbnNlEh8KBnRva2VucxgBIAMoCzIPLm5va2t1LnYxLlRva2VuIkoKEkRlbGV0ZVRva2VuUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASIVChNEZWxldGVUb2tlblJlc3BvbnNlKlUKCVRva2VuS2luZBIaChZUT0tFTl9LSU5EX1VOU1BFQ0lGSUVEEAASFQoRVE9LRU5fS0lORF9FTlJPTEwQARIVChFUT0tFTl9LSU5EX0lOVklURRACMoQDCgxUb2tlblNlcnZpY2USewoLQ3JlYXRlVG9rZW4SHC5ub2trdS52MS5DcmVhdGVUb2tlblJlcXVlc3QaHS5ub2trdS52MS5DcmVhdGVUb2tlblJlc3BvbnNlIi+C0+STAik6ASoiJC92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3Rva2VucxJ4CgpMaXN0VG9rZW5zEhsubm9ra3UudjEuTGlzdFRva2Vuc1JlcXVlc3QaHC5ub2trdS52MS5MaXN0VG9rZW5zUmVzcG9uc2UiL5ACAYLT5JMCJhIkL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdG9rZW5zEn0KC0RlbGV0ZVRva2VuEhwubm9ra3UudjEuRGVsZXRlVG9rZW5SZXF1ZXN0Gh0ubm9ra3UudjEuRGVsZXRlVG9rZW5SZXNwb25zZSIxgtPkkwIrKikvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS90b2tlbnMve2lkfUKUAQoMY29tLm5va2t1LnYxQgpUb2tlblByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
-	[
-		file_buf_validate_validate,
-		file_google_api_annotations,
-		file_google_protobuf_duration,
-		file_google_protobuf_timestamp
-	]
-);
+export const file_nokku_v1_token: GenFile = /*@__PURE__*/
+  fileDesc("ChRub2trdS92MS90b2tlbi5wcm90bxIIbm9ra3UudjEirwIKBVRva2VuEgoKAmlkGAEgASgJEiEKBGtpbmQYAiABKA4yEy5ub2trdS52MS5Ub2tlbktpbmQSDQoFbGFiZWwYAyABKAkSLgoKZXhwaXJlc19hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEAoIbWF4X3VzZXMYBSABKAUSDAoEdXNlcxgGIAEoBRIUCgxhdXRvX2FwcHJvdmUYByABKAgSDQoFY2FfaWQYCCABKAkSEQoJcm9sZV9uYW1lGAkgASgJEi4KCmNyZWF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3RfdXNlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiigIKEkNyZWF0ZVRva2VuUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEi0KBGtpbmQYAiABKA4yEy5ub2trdS52MS5Ub2tlbktpbmRCCrpIB4IBBBABIAASFgoFbGFiZWwYAyABKAlCB7pIBHICGGQSMAoDdHRsGAQgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQgi6SAWqAQIqABIZCghtYXhfdXNlcxgFIAEoBUIHukgEGgIgABIUCgxhdXRvX2FwcHJvdmUYBiABKAgSFwoFY2FfaWQYByABKAlCCLpIBXIDsAEBEhEKCXJvbGVfbmFtZRgIIAEoCSJFChNDcmVhdGVUb2tlblJlc3BvbnNlEh4KBXRva2VuGAEgASgLMg8ubm9ra3UudjEuVG9rZW4SDgoGc2VjcmV0GAIgASgJImAKEUxpc3RUb2tlbnNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESKwoEa2luZBgCIAEoDjITLm5va2t1LnYxLlRva2VuS2luZEIIukgFggECEAEiNQoSTGlzdFRva2Vuc1Jlc3BvbnNlEh8KBnRva2VucxgBIAMoCzIPLm5va2t1LnYxLlRva2VuIkoKEkRlbGV0ZVRva2VuUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASIVChNEZWxldGVUb2tlblJlc3BvbnNlKlUKCVRva2VuS2luZBIaChZUT0tFTl9LSU5EX1VOU1BFQ0lGSUVEEAASFQoRVE9LRU5fS0lORF9FTlJPTEwQARIVChFUT0tFTl9LSU5EX0lOVklURRACMoQDCgxUb2tlblNlcnZpY2USewoLQ3JlYXRlVG9rZW4SHC5ub2trdS52MS5DcmVhdGVUb2tlblJlcXVlc3QaHS5ub2trdS52MS5DcmVhdGVUb2tlblJlc3BvbnNlIi+C0+STAik6ASoiJC92MS93b3Jrc3BhY2VzL3t3b3Jrc3BhY2VfaWR9L3Rva2VucxJ4CgpMaXN0VG9rZW5zEhsubm9ra3UudjEuTGlzdFRva2Vuc1JlcXVlc3QaHC5ub2trdS52MS5MaXN0VG9rZW5zUmVzcG9uc2UiL5ACAYLT5JMCJhIkL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vdG9rZW5zEn0KC0RlbGV0ZVRva2VuEhwubm9ra3UudjEuRGVsZXRlVG9rZW5SZXF1ZXN0Gh0ubm9ra3UudjEuRGVsZXRlVG9rZW5SZXNwb25zZSIxgtPkkwIrKikvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS90b2tlbnMve2lkfUKUAQoMY29tLm5va2t1LnYxQgpUb2tlblByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_duration, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message nokku.v1.Token
  */
-export type Token = Message<'nokku.v1.Token'> & {
-	/**
-	 * @generated from field: string id = 1;
-	 */
-	id: string;
+export type Token = Message<"nokku.v1.Token"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
 
-	/**
-	 * @generated from field: nokku.v1.TokenKind kind = 2;
-	 */
-	kind: TokenKind;
+  /**
+   * @generated from field: nokku.v1.TokenKind kind = 2;
+   */
+  kind: TokenKind;
 
-	/**
-	 * @generated from field: string label = 3;
-	 */
-	label: string;
+  /**
+   * @generated from field: string label = 3;
+   */
+  label: string;
 
-	/**
-	 * Unset means the token never expires.
-	 *
-	 * @generated from field: google.protobuf.Timestamp expires_at = 4;
-	 */
-	expiresAt?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 4;
+   */
+  expiresAt?: Timestamp | undefined;
 
-	/**
-	 * Unset means unlimited uses.
-	 *
-	 * @generated from field: int32 max_uses = 5;
-	 */
-	maxUses: number;
+  /**
+   * @generated from field: int32 max_uses = 5;
+   */
+  maxUses: number;
 
-	/**
-	 * @generated from field: int32 uses = 6;
-	 */
-	uses: number;
+  /**
+   * @generated from field: int32 uses = 6;
+   */
+  uses: number;
 
-	/**
-	 * Enroll tokens: accept daemons without review, and the CA they trust.
-	 *
-	 * @generated from field: bool auto_approve = 7;
-	 */
-	autoApprove: boolean;
+  /**
+   * @generated from field: bool auto_approve = 7;
+   */
+  autoApprove: boolean;
 
-	/**
-	 * @generated from field: string ca_id = 8;
-	 */
-	caId: string;
+  /**
+   * @generated from field: string ca_id = 8;
+   */
+  caId: string;
 
-	/**
-	 * Invite tokens: the role new members get.
-	 *
-	 * @generated from field: string role_name = 9;
-	 */
-	roleName: string;
+  /**
+   * @generated from field: string role_name = 9;
+   */
+  roleName: string;
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp created_at = 10;
-	 */
-	createdAt?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 10;
+   */
+  createdAt?: Timestamp | undefined;
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp last_used_at = 11;
-	 */
-	lastUsedAt?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp last_used_at = 11;
+   */
+  lastUsedAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.Token.
  * Use `create(TokenSchema)` to create a new message.
  */
-export const TokenSchema: GenMessage<Token> /*@__PURE__*/ = messageDesc(file_nokku_v1_token, 0);
+export const TokenSchema: GenMessage<Token> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_token, 0);
 
 /**
  * @generated from message nokku.v1.CreateTokenRequest
  */
-export type CreateTokenRequest = Message<'nokku.v1.CreateTokenRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
+export type CreateTokenRequest = Message<"nokku.v1.CreateTokenRequest"> & {
+  /**
+   * @generated from field: string workspace_id = 1;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: nokku.v1.TokenKind kind = 2;
-	 */
-	kind: TokenKind;
+  /**
+   * @generated from field: nokku.v1.TokenKind kind = 2;
+   */
+  kind: TokenKind;
 
-	/**
-	 * @generated from field: string label = 3;
-	 */
-	label: string;
+  /**
+   * @generated from field: string label = 3;
+   */
+  label: string;
 
-	/**
-	 * Unset means the token never expires.
-	 *
-	 * @generated from field: google.protobuf.Duration ttl = 4;
-	 */
-	ttl?: Duration | undefined;
+  /**
+   * @generated from field: google.protobuf.Duration ttl = 4;
+   */
+  ttl?: Duration | undefined;
 
-	/**
-	 * @generated from field: int32 max_uses = 5;
-	 */
-	maxUses: number;
+  /**
+   * @generated from field: int32 max_uses = 5;
+   */
+  maxUses: number;
 
-	/**
-	 * @generated from field: bool auto_approve = 6;
-	 */
-	autoApprove: boolean;
+  /**
+   * @generated from field: bool auto_approve = 6;
+   */
+  autoApprove: boolean;
 
-	/**
-	 * @generated from field: string ca_id = 7;
-	 */
-	caId: string;
+  /**
+   * @generated from field: string ca_id = 7;
+   */
+  caId: string;
 
-	/**
-	 * @generated from field: string role_name = 8;
-	 */
-	roleName: string;
+  /**
+   * @generated from field: string role_name = 8;
+   */
+  roleName: string;
 };
 
 /**
  * Describes the message nokku.v1.CreateTokenRequest.
  * Use `create(CreateTokenRequestSchema)` to create a new message.
  */
-export const CreateTokenRequestSchema: GenMessage<CreateTokenRequest> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_token,
-	1
-);
+export const CreateTokenRequestSchema: GenMessage<CreateTokenRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_token, 1);
 
 /**
  * @generated from message nokku.v1.CreateTokenResponse
  */
-export type CreateTokenResponse = Message<'nokku.v1.CreateTokenResponse'> & {
-	/**
-	 * @generated from field: nokku.v1.Token token = 1;
-	 */
-	token?: Token | undefined;
+export type CreateTokenResponse = Message<"nokku.v1.CreateTokenResponse"> & {
+  /**
+   * @generated from field: nokku.v1.Token token = 1;
+   */
+  token?: Token | undefined;
 
-	/**
-	 * The plaintext token. It is never shown again.
-	 *
-	 * @generated from field: string secret = 2;
-	 */
-	secret: string;
+  /**
+   * @generated from field: string secret = 2;
+   */
+  secret: string;
 };
 
 /**
  * Describes the message nokku.v1.CreateTokenResponse.
  * Use `create(CreateTokenResponseSchema)` to create a new message.
  */
-export const CreateTokenResponseSchema: GenMessage<CreateTokenResponse> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_token,
-	2
-);
+export const CreateTokenResponseSchema: GenMessage<CreateTokenResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_token, 2);
 
 /**
  * @generated from message nokku.v1.ListTokensRequest
  */
-export type ListTokensRequest = Message<'nokku.v1.ListTokensRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
+export type ListTokensRequest = Message<"nokku.v1.ListTokensRequest"> & {
+  /**
+   * @generated from field: string workspace_id = 1;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: nokku.v1.TokenKind kind = 2;
-	 */
-	kind: TokenKind;
+  /**
+   * @generated from field: nokku.v1.TokenKind kind = 2;
+   */
+  kind: TokenKind;
 };
 
 /**
  * Describes the message nokku.v1.ListTokensRequest.
  * Use `create(ListTokensRequestSchema)` to create a new message.
  */
-export const ListTokensRequestSchema: GenMessage<ListTokensRequest> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_token,
-	3
-);
+export const ListTokensRequestSchema: GenMessage<ListTokensRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_token, 3);
 
 /**
  * @generated from message nokku.v1.ListTokensResponse
  */
-export type ListTokensResponse = Message<'nokku.v1.ListTokensResponse'> & {
-	/**
-	 * @generated from field: repeated nokku.v1.Token tokens = 1;
-	 */
-	tokens: Token[];
+export type ListTokensResponse = Message<"nokku.v1.ListTokensResponse"> & {
+  /**
+   * @generated from field: repeated nokku.v1.Token tokens = 1;
+   */
+  tokens: Token[];
 };
 
 /**
  * Describes the message nokku.v1.ListTokensResponse.
  * Use `create(ListTokensResponseSchema)` to create a new message.
  */
-export const ListTokensResponseSchema: GenMessage<ListTokensResponse> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_token,
-	4
-);
+export const ListTokensResponseSchema: GenMessage<ListTokensResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_token, 4);
 
 /**
  * @generated from message nokku.v1.DeleteTokenRequest
  */
-export type DeleteTokenRequest = Message<'nokku.v1.DeleteTokenRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
+export type DeleteTokenRequest = Message<"nokku.v1.DeleteTokenRequest"> & {
+  /**
+   * @generated from field: string workspace_id = 1;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: string id = 2;
-	 */
-	id: string;
+  /**
+   * @generated from field: string id = 2;
+   */
+  id: string;
 };
 
 /**
  * Describes the message nokku.v1.DeleteTokenRequest.
  * Use `create(DeleteTokenRequestSchema)` to create a new message.
  */
-export const DeleteTokenRequestSchema: GenMessage<DeleteTokenRequest> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_token,
-	5
-);
+export const DeleteTokenRequestSchema: GenMessage<DeleteTokenRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_token, 5);
 
 /**
  * @generated from message nokku.v1.DeleteTokenResponse
  */
-export type DeleteTokenResponse = Message<'nokku.v1.DeleteTokenResponse'> & {};
+export type DeleteTokenResponse = Message<"nokku.v1.DeleteTokenResponse"> & {
+};
 
 /**
  * Describes the message nokku.v1.DeleteTokenResponse.
  * Use `create(DeleteTokenResponseSchema)` to create a new message.
  */
-export const DeleteTokenResponseSchema: GenMessage<DeleteTokenResponse> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_token,
-	6
-);
+export const DeleteTokenResponseSchema: GenMessage<DeleteTokenResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_token, 6);
 
 /**
  * @generated from enum nokku.v1.TokenKind
  */
 export enum TokenKind {
-	/**
-	 * @generated from enum value: TOKEN_KIND_UNSPECIFIED = 0;
-	 */
-	UNSPECIFIED = 0,
+  /**
+   * @generated from enum value: TOKEN_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
 
-	/**
-	 * @generated from enum value: TOKEN_KIND_ENROLL = 1;
-	 */
-	ENROLL = 1,
+  /**
+   * @generated from enum value: TOKEN_KIND_ENROLL = 1;
+   */
+  ENROLL = 1,
 
-	/**
-	 * @generated from enum value: TOKEN_KIND_INVITE = 2;
-	 */
-	INVITE = 2
+  /**
+   * @generated from enum value: TOKEN_KIND_INVITE = 2;
+   */
+  INVITE = 2,
 }
 
 /**
  * Describes the enum nokku.v1.TokenKind.
  */
-export const TokenKindSchema: GenEnum<TokenKind> /*@__PURE__*/ = enumDesc(file_nokku_v1_token, 0);
+export const TokenKindSchema: GenEnum<TokenKind> = /*@__PURE__*/
+  enumDesc(file_nokku_v1_token, 0);
 
 /**
- * TokenService manages the workspace's join tokens: enroll tokens bring
- * daemons in, invite tokens bring people in. A token is shown once, on create.
- *
  * @generated from service nokku.v1.TokenService
  */
 export const TokenService: GenService<{
-	/**
-	 * @generated from rpc nokku.v1.TokenService.CreateToken
-	 */
-	createToken: {
-		methodKind: 'unary';
-		input: typeof CreateTokenRequestSchema;
-		output: typeof CreateTokenResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.TokenService.ListTokens
-	 */
-	listTokens: {
-		methodKind: 'unary';
-		input: typeof ListTokensRequestSchema;
-		output: typeof ListTokensResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.TokenService.DeleteToken
-	 */
-	deleteToken: {
-		methodKind: 'unary';
-		input: typeof DeleteTokenRequestSchema;
-		output: typeof DeleteTokenResponseSchema;
-	};
-}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_token, 0);
+  /**
+   * @generated from rpc nokku.v1.TokenService.CreateToken
+   */
+  createToken: {
+    methodKind: "unary";
+    input: typeof CreateTokenRequestSchema;
+    output: typeof CreateTokenResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.TokenService.ListTokens
+   */
+  listTokens: {
+    methodKind: "unary";
+    input: typeof ListTokensRequestSchema;
+    output: typeof ListTokensResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.TokenService.DeleteToken
+   */
+  deleteToken: {
+    methodKind: "unary";
+    input: typeof DeleteTokenRequestSchema;
+    output: typeof DeleteTokenResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_nokku_v1_token, 0);
+

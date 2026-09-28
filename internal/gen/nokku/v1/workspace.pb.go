@@ -25,16 +25,15 @@ const (
 )
 
 type Workspace struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name        *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Description *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	CreatedBy   *string                `protobuf:"bytes,4,opt,name=created_by,json=createdBy" json:"created_by,omitempty"`
-	Settings    *WorkspaceSettings     `protobuf:"bytes,5,opt,name=settings" json:"settings,omitempty"`
-	CreatedAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	// The caller's role in this workspace.
-	Role          *string `protobuf:"bytes,8,opt,name=role" json:"role,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
+	CreatedBy     *string                `protobuf:"bytes,4,opt,name=created_by,json=createdBy" json:"created_by,omitempty"`
+	Role          *string                `protobuf:"bytes,5,opt,name=role" json:"role,omitempty"` // The caller's role in this workspace.
+	Settings      *WorkspaceSettings     `protobuf:"bytes,6,opt,name=settings" json:"settings,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -97,6 +96,13 @@ func (x *Workspace) GetCreatedBy() string {
 	return ""
 }
 
+func (x *Workspace) GetRole() string {
+	if x != nil && x.Role != nil {
+		return *x.Role
+	}
+	return ""
+}
+
 func (x *Workspace) GetSettings() *WorkspaceSettings {
 	if x != nil {
 		return x.Settings
@@ -116,13 +122,6 @@ func (x *Workspace) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
-}
-
-func (x *Workspace) GetRole() string {
-	if x != nil && x.Role != nil {
-		return *x.Role
-	}
-	return ""
 }
 
 type WorkspaceMember struct {
@@ -1273,13 +1272,13 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1d\n" +
 	"\n" +
-	"created_by\x18\x04 \x01(\tR\tcreatedBy\x127\n" +
-	"\bsettings\x18\x05 \x01(\v2\x1b.nokku.v1.WorkspaceSettingsR\bsettings\x129\n" +
+	"created_by\x18\x04 \x01(\tR\tcreatedBy\x12\x12\n" +
+	"\x04role\x18\x05 \x01(\tR\x04role\x127\n" +
+	"\bsettings\x18\x06 \x01(\v2\x1b.nokku.v1.WorkspaceSettingsR\bsettings\x129\n" +
 	"\n" +
-	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x12\n" +
-	"\x04role\x18\b \x01(\tR\x04role\"\xed\x02\n" +
+	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xed\x02\n" +
 	"\x0fWorkspaceMember\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x12\n" +
