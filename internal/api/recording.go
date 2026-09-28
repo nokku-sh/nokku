@@ -274,7 +274,7 @@ func (s *RecordingService) DeleteRecording(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	// Best effort, a stray object without a row is swept by the workspace wipe.
+	// Best effort, a stray object goes with the workspace purge.
 	if err := s.cfg.Storage.Delete(
 		ctx,
 		storage.RecordingPath(req.GetWorkspaceId(), req.GetRecordingId()),

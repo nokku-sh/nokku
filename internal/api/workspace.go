@@ -138,6 +138,7 @@ func (s *WorkspaceService) DeleteWorkspace(
 	}); err != nil {
 		return nil, DBError(err)
 	}
+	s.cfg.Record.PurgeWorkspace(ctx, req.GetWorkspaceId())
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
 }
 
