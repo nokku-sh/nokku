@@ -51,11 +51,8 @@ func (s *Service) EvictForBytes(
 			}); err != nil {
 				return err
 			}
-			// Best effort, a stray object is swept by the workspace wipe.
-			if err := s.store.Delete(
-				ctx,
-				storage.RecordingPath(workspaceID, v.ID),
-			); err != nil {
+			// Best effort, a stray object goes with the workspace purge.
+			if err := s.store.Delete(ctx, storage.RecordingPath(workspaceID, v.ID)); err != nil {
 				slog.Warn("delete evicted recording object", "recording_id", v.ID, "error", err)
 			}
 			freed += v.SizeBytes

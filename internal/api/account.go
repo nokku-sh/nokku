@@ -278,6 +278,11 @@ func (s *AccountService) DeleteAccount(
 	if err := s.cfg.Storage.Delete(ctx, storage.AvatarPath(u.ID)); err != nil {
 		slog.Warn("failed to delete avatar", "error", err)
 	}
+	for _, w := range owned {
+		if w.MemberCount <= 1 {
+			s.cfg.Record.PurgeWorkspace(ctx, w.ID)
+		}
+	}
 
 	// The session cookie is HttpOnly, only a backend response can clear it.
 	if ci, ok := connect.CallInfoForHandlerContext(ctx); ok {

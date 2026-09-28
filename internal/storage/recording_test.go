@@ -99,3 +99,42 @@ func TestCreateWriterRoundtrip(t *testing.T) {
 		t.Fatalf("object still present after delete (err=%v)", err)
 	}
 }
+
+// A workspace purge must never reach another workspace's recordings, even one
+// whose id shares a prefix.
+func TestDeletePrefixStaysInsideWorkspace(t *testing.T) {
+	t.Setenv("NOKKU_STORAGE", ModeLocal)
+	t.Setenv("NOKKU_LOCAL_STORAGE_PATH", t.TempDir())
+	s, err := New(t.Context(), "")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	gone := []string{RecordingPath("ws-1", "rec-a"), RecordingPath("ws-1", "rec-b")}
+	kept := []string{RecordingPath("ws-10", "rec-c"), RecordingPath("ws-2", "rec-d"), AvatarPath("ws-1")}
+	for _, key := range append(gone, kept...) {
+		if _, err := s.Store(t.Context(), key, []byte("x"), StoreOptions{}); err != nil {
+			t.Fatalf("Store %s: %v", key, err)
+		}
+	}
+
+	if err := s.DeletePrefix(t.Context(), RecordingPrefix("ws-1")); err != nil {
+		t.Fatalf("DeletePrefix: %v", err)
+	}
+	for _, key := range gone {
+		if ok, _ := s.bucket.Exists(t.Context(), key); ok {
+			t.Errorf("%s survived the purge", key)
+		}
+	}
+	for _, key := range kept {
+		if ok, _ := s.bucket.Exists(t.Context(), key); !ok {
+			t.Errorf("%s was deleted by another workspace's purge", key)
+		}
+	}
+	if err := s.DeletePrefix(t.Context(), "videos"); err == nil {
+		t.Error("a prefix without a trailing slash must be refused")
+	}
+	if err := s.DeletePrefix(t.Context(), "/"); err == nil {
+		t.Error("the bucket root must be refused")
+	}
+}

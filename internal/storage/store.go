@@ -19,3 +19,7 @@ func AvatarPath(userID string) string {
 func RecordingPath(workspaceID, recordingID string) string {
 	return path.Join(PathVideos, workspaceID, recordingID+".cast.gz")
 }
+
+func RecordingPrefix(workspaceID string) string {
+	return path.Join(PathVideos, workspaceID) + "/"
+}
