@@ -127,7 +127,7 @@ func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 		}
 
 		// The client saves the URL through UpdateAccount.
-		versionedURL := fmt.Sprintf("%s?v=%d", *fileURL, time.Now().UnixMilli())
+		versionedURL := fmt.Sprintf("%s?v=%d", fileURL, time.Now().UnixMilli())
 		iam.WriteJSON(w, http.StatusOK, map[string]string{"url": versionedURL})
 	}
 }
