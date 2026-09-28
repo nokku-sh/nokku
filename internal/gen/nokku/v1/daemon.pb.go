@@ -77,12 +77,11 @@ func (DaemonStatus) EnumDescriptor() ([]byte, []int) {
 }
 
 type Daemon struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	WorkspaceId *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	Name        *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
-	// Derived from last_seen_at: seen by a core instance in the last 30 seconds.
-	Online        *bool                  `protobuf:"varint,4,opt,name=online" json:"online,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	WorkspaceId   *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
+	Online        *bool                  `protobuf:"varint,4,opt,name=online" json:"online,omitempty"` // Derived from last_seen_at: seen by a core instance in the last 30 seconds.
 	Status        *DaemonStatus          `protobuf:"varint,5,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
 	Config        *DaemonConfig          `protobuf:"bytes,6,opt,name=config" json:"config,omitempty"`
 	Metadata      map[string]string      `protobuf:"bytes,7,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`

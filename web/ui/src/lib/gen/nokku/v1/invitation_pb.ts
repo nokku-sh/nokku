@@ -2,123 +2,123 @@
 // @generated from file nokku/v1/invitation.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
-import { fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
-import { file_buf_validate_validate } from '../../buf/validate/validate_pb';
-import { file_google_api_annotations } from '../../google/api/annotations_pb';
-import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import { file_google_protobuf_timestamp } from '@bufbuild/protobuf/wkt';
-import type { Message } from '@bufbuild/protobuf';
+import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
+import { file_google_api_annotations } from "../../google/api/annotations_pb";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file nokku/v1/invitation.proto.
  */
-export const file_nokku_v1_invitation: GenFile /*@__PURE__*/ = fileDesc(
-	'Chlub2trdS92MS9pbnZpdGF0aW9uLnByb3RvEghub2trdS52MSIuChRHZXRJbnZpdGF0aW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQASKRAQoVR2V0SW52aXRhdGlvblJlc3BvbnNlEhYKDndvcmtzcGFjZV9uYW1lGAEgASgJEh0KFXdvcmtzcGFjZV9kZXNjcmlwdGlvbhgCIAEoCRIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglyb2xlX25hbWUYBCABKAkiMQoXQWNjZXB0SW52aXRhdGlvblJlcXVlc3QSFgoFdG9rZW4YASABKAlCB7pIBHICEAEiMAoYQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlEhQKDHdvcmtzcGFjZV9pZBgBIAEoCTL9AQoRSW52aXRhdGlvblNlcnZpY2UScAoNR2V0SW52aXRhdGlvbhIeLm5va2t1LnYxLkdldEludml0YXRpb25SZXF1ZXN0Gh8ubm9ra3UudjEuR2V0SW52aXRhdGlvblJlc3BvbnNlIh6QAgGC0+STAhUSEy92MS9pbnZpdGVzL3t0b2tlbn0SdgoQQWNjZXB0SW52aXRhdGlvbhIhLm5va2t1LnYxLkFjY2VwdEludml0YXRpb25SZXF1ZXN0GiIubm9ra3UudjEuQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlIhuC0+STAhUiEy92MS9pbnZpdGVzL3t0b2tlbn1CmQEKDGNvbS5ub2trdS52MUIPSW52aXRhdGlvblByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
-	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
-);
+export const file_nokku_v1_invitation: GenFile = /*@__PURE__*/
+  fileDesc("Chlub2trdS92MS9pbnZpdGF0aW9uLnByb3RvEghub2trdS52MSIuChRHZXRJbnZpdGF0aW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQASKRAQoVR2V0SW52aXRhdGlvblJlc3BvbnNlEhYKDndvcmtzcGFjZV9uYW1lGAEgASgJEh0KFXdvcmtzcGFjZV9kZXNjcmlwdGlvbhgCIAEoCRIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglyb2xlX25hbWUYBCABKAkiMQoXQWNjZXB0SW52aXRhdGlvblJlcXVlc3QSFgoFdG9rZW4YASABKAlCB7pIBHICEAEiMAoYQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlEhQKDHdvcmtzcGFjZV9pZBgBIAEoCTL9AQoRSW52aXRhdGlvblNlcnZpY2UScAoNR2V0SW52aXRhdGlvbhIeLm5va2t1LnYxLkdldEludml0YXRpb25SZXF1ZXN0Gh8ubm9ra3UudjEuR2V0SW52aXRhdGlvblJlc3BvbnNlIh6QAgGC0+STAhUSEy92MS9pbnZpdGVzL3t0b2tlbn0SdgoQQWNjZXB0SW52aXRhdGlvbhIhLm5va2t1LnYxLkFjY2VwdEludml0YXRpb25SZXF1ZXN0GiIubm9ra3UudjEuQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlIhuC0+STAhUiEy92MS9pbnZpdGVzL3t0b2tlbn1CmQEKDGNvbS5ub2trdS52MUIPSW52aXRhdGlvblByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message nokku.v1.GetInvitationRequest
  */
-export type GetInvitationRequest = Message<'nokku.v1.GetInvitationRequest'> & {
-	/**
-	 * @generated from field: string token = 1;
-	 */
-	token: string;
+export type GetInvitationRequest = Message<"nokku.v1.GetInvitationRequest"> & {
+  /**
+   * @generated from field: string token = 1;
+   */
+  token: string;
 };
 
 /**
  * Describes the message nokku.v1.GetInvitationRequest.
  * Use `create(GetInvitationRequestSchema)` to create a new message.
  */
-export const GetInvitationRequestSchema: GenMessage<GetInvitationRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_invitation, 0);
+export const GetInvitationRequestSchema: GenMessage<GetInvitationRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_invitation, 0);
 
 /**
  * @generated from message nokku.v1.GetInvitationResponse
  */
-export type GetInvitationResponse = Message<'nokku.v1.GetInvitationResponse'> & {
-	/**
-	 * @generated from field: string workspace_name = 1;
-	 */
-	workspaceName: string;
+export type GetInvitationResponse = Message<"nokku.v1.GetInvitationResponse"> & {
+  /**
+   * @generated from field: string workspace_name = 1;
+   */
+  workspaceName: string;
 
-	/**
-	 * @generated from field: string workspace_description = 2;
-	 */
-	workspaceDescription: string;
+  /**
+   * @generated from field: string workspace_description = 2;
+   */
+  workspaceDescription: string;
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp expires_at = 3;
-	 */
-	expiresAt?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 3;
+   */
+  expiresAt?: Timestamp | undefined;
 
-	/**
-	 * @generated from field: string role_name = 4;
-	 */
-	roleName: string;
+  /**
+   * @generated from field: string role_name = 4;
+   */
+  roleName: string;
 };
 
 /**
  * Describes the message nokku.v1.GetInvitationResponse.
  * Use `create(GetInvitationResponseSchema)` to create a new message.
  */
-export const GetInvitationResponseSchema: GenMessage<GetInvitationResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_invitation, 1);
+export const GetInvitationResponseSchema: GenMessage<GetInvitationResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_invitation, 1);
 
 /**
  * @generated from message nokku.v1.AcceptInvitationRequest
  */
-export type AcceptInvitationRequest = Message<'nokku.v1.AcceptInvitationRequest'> & {
-	/**
-	 * @generated from field: string token = 1;
-	 */
-	token: string;
+export type AcceptInvitationRequest = Message<"nokku.v1.AcceptInvitationRequest"> & {
+  /**
+   * @generated from field: string token = 1;
+   */
+  token: string;
 };
 
 /**
  * Describes the message nokku.v1.AcceptInvitationRequest.
  * Use `create(AcceptInvitationRequestSchema)` to create a new message.
  */
-export const AcceptInvitationRequestSchema: GenMessage<AcceptInvitationRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_invitation, 2);
+export const AcceptInvitationRequestSchema: GenMessage<AcceptInvitationRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_invitation, 2);
 
 /**
  * @generated from message nokku.v1.AcceptInvitationResponse
  */
-export type AcceptInvitationResponse = Message<'nokku.v1.AcceptInvitationResponse'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
+export type AcceptInvitationResponse = Message<"nokku.v1.AcceptInvitationResponse"> & {
+  /**
+   * @generated from field: string workspace_id = 1;
+   */
+  workspaceId: string;
 };
 
 /**
  * Describes the message nokku.v1.AcceptInvitationResponse.
  * Use `create(AcceptInvitationResponseSchema)` to create a new message.
  */
-export const AcceptInvitationResponseSchema: GenMessage<AcceptInvitationResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_invitation, 3);
+export const AcceptInvitationResponseSchema: GenMessage<AcceptInvitationResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_invitation, 3);
 
 /**
  * @generated from service nokku.v1.InvitationService
  */
 export const InvitationService: GenService<{
-	/**
-	 * @generated from rpc nokku.v1.InvitationService.GetInvitation
-	 */
-	getInvitation: {
-		methodKind: 'unary';
-		input: typeof GetInvitationRequestSchema;
-		output: typeof GetInvitationResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.InvitationService.AcceptInvitation
-	 */
-	acceptInvitation: {
-		methodKind: 'unary';
-		input: typeof AcceptInvitationRequestSchema;
-		output: typeof AcceptInvitationResponseSchema;
-	};
-}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_invitation, 0);
+  /**
+   * @generated from rpc nokku.v1.InvitationService.GetInvitation
+   */
+  getInvitation: {
+    methodKind: "unary";
+    input: typeof GetInvitationRequestSchema;
+    output: typeof GetInvitationResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.InvitationService.AcceptInvitation
+   */
+  acceptInvitation: {
+    methodKind: "unary";
+    input: typeof AcceptInvitationRequestSchema;
+    output: typeof AcceptInvitationResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_nokku_v1_invitation, 0);
+

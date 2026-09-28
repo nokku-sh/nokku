@@ -75,19 +75,15 @@ func (TokenKind) EnumDescriptor() ([]byte, []int) {
 }
 
 type Token struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Id    *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Kind  *TokenKind             `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.TokenKind" json:"kind,omitempty"`
-	Label *string                `protobuf:"bytes,3,opt,name=label" json:"label,omitempty"`
-	// Unset means the token never expires.
-	ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
-	// Unset means unlimited uses.
-	MaxUses *int32 `protobuf:"varint,5,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
-	Uses    *int32 `protobuf:"varint,6,opt,name=uses" json:"uses,omitempty"`
-	// Enroll tokens: accept daemons without review, and the CA they trust.
-	AutoApprove *bool   `protobuf:"varint,7,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
-	CaId        *string `protobuf:"bytes,8,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
-	// Invite tokens: the role new members get.
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Kind          *TokenKind             `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.TokenKind" json:"kind,omitempty"`
+	Label         *string                `protobuf:"bytes,3,opt,name=label" json:"label,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	MaxUses       *int32                 `protobuf:"varint,5,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
+	Uses          *int32                 `protobuf:"varint,6,opt,name=uses" json:"uses,omitempty"`
+	AutoApprove   *bool                  `protobuf:"varint,7,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
+	CaId          *string                `protobuf:"bytes,8,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
 	RoleName      *string                `protobuf:"bytes,9,opt,name=role_name,json=roleName" json:"role_name,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
@@ -203,16 +199,15 @@ func (x *Token) GetLastUsedAt() *timestamppb.Timestamp {
 }
 
 type CreateTokenRequest struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceId *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
-	Kind        *TokenKind             `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.TokenKind" json:"kind,omitempty"`
-	Label       *string                `protobuf:"bytes,3,opt,name=label" json:"label,omitempty"`
-	// Unset means the token never expires.
-	Ttl           *durationpb.Duration `protobuf:"bytes,4,opt,name=ttl" json:"ttl,omitempty"`
-	MaxUses       *int32               `protobuf:"varint,5,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
-	AutoApprove   *bool                `protobuf:"varint,6,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
-	CaId          *string              `protobuf:"bytes,7,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
-	RoleName      *string              `protobuf:"bytes,8,opt,name=role_name,json=roleName" json:"role_name,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
+	Kind          *TokenKind             `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.TokenKind" json:"kind,omitempty"`
+	Label         *string                `protobuf:"bytes,3,opt,name=label" json:"label,omitempty"`
+	Ttl           *durationpb.Duration   `protobuf:"bytes,4,opt,name=ttl" json:"ttl,omitempty"`
+	MaxUses       *int32                 `protobuf:"varint,5,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
+	AutoApprove   *bool                  `protobuf:"varint,6,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
+	CaId          *string                `protobuf:"bytes,7,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
+	RoleName      *string                `protobuf:"bytes,8,opt,name=role_name,json=roleName" json:"role_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -304,10 +299,9 @@ func (x *CreateTokenRequest) GetRoleName() string {
 }
 
 type CreateTokenResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Token *Token                 `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
-	// The plaintext token. It is never shown again.
-	Secret        *string `protobuf:"bytes,2,opt,name=secret" json:"secret,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         *Token                 `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
+	Secret        *string                `protobuf:"bytes,2,opt,name=secret" json:"secret,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

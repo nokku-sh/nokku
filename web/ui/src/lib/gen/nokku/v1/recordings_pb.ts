@@ -2,363 +2,350 @@
 // @generated from file nokku/v1/recordings.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
-import { fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
-import { file_buf_validate_validate } from '../../buf/validate/validate_pb';
-import { file_google_api_annotations } from '../../google/api/annotations_pb';
-import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import { file_google_protobuf_timestamp } from '@bufbuild/protobuf/wkt';
-import type { Message } from '@bufbuild/protobuf';
+import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
+import { file_google_api_annotations } from "../../google/api/annotations_pb";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file nokku/v1/recordings.proto.
  */
-export const file_nokku_v1_recordings: GenFile /*@__PURE__*/ = fileDesc(
-	'Chlub2trdS92MS9yZWNvcmRpbmdzLnByb3RvEghub2trdS52MSLWAQoJUmVjb3JkaW5nEgoKAmlkGAEgASgJEhQKDHdvcmtzcGFjZV9pZBgCIAEoCRIRCglkYWVtb25faWQYAyABKAkSEAoIdXNlcm5hbWUYBCABKAkSEgoKc2l6ZV9ieXRlcxgFIAEoAxIQCghjb21wbGV0ZRgGIAEoCBIuCgpzdGFydGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAihAEKFlVwbG9hZFJlY29yZGluZ1JlcXVlc3QSJwoEbWV0YRgBIAEoCzIXLm5va2t1LnYxLlJlY29yZGluZ01ldGFIABIPCgVjaHVuaxgCIAEoDEgAEikKBWZpbmFsGAMgASgLMhgubm9ra3UudjEuUmVjb3JkaW5nRmluYWxIAEIFCgNtc2ciSgoNUmVjb3JkaW5nTWV0YRIeCgxyZWNvcmRpbmdfaWQYASABKAlCCLpIBXIDsAEBEhkKCHVzZXJuYW1lGAIgASgJQge6SARyAhggIhAKDlJlY29yZGluZ0ZpbmFsIkMKF1VwbG9hZFJlY29yZGluZ1Jlc3BvbnNlEhQKDHJlY29yZGluZ19pZBgBIAEoCRISCgpzaXplX2J5dGVzGAIgASgDIpkBChVMaXN0UmVjb3JkaW5nc1JlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIbCglkYWVtb25faWQYAiABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAMgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAQgASgFQge6SAQaAigAEhAKCHVzZXJuYW1lGAUgASgJImUKFkxpc3RSZWNvcmRpbmdzUmVzcG9uc2USJwoKcmVjb3JkaW5ncxgBIAMoCzITLm5va2t1LnYxLlJlY29yZGluZxINCgV0b3RhbBgCIAEoBRITCgt0b3RhbF9ieXRlcxgDIAEoAyJVChNHZXRSZWNvcmRpbmdSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESHgoMcmVjb3JkaW5nX2lkGAIgASgJQgi6SAVyA7ABASJXChRHZXRSZWNvcmRpbmdSZXNwb25zZRInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSABCBQoDbXNnIlgKFkRlbGV0ZVJlY29yZGluZ1JlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIeCgxyZWNvcmRpbmdfaWQYAiABKAlCCLpIBXIDsAEBIhkKF0RlbGV0ZVJlY29yZGluZ1Jlc3BvbnNlMsYEChBSZWNvcmRpbmdTZXJ2aWNlEpMBCgxHZXRSZWNvcmRpbmcSHS5ub2trdS52MS5HZXRSZWNvcmRpbmdSZXF1ZXN0Gh4ubm9ra3UudjEuR2V0UmVjb3JkaW5nUmVzcG9uc2UiQpACAYLT5JMCORI3L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcmVjb3JkaW5ncy97cmVjb3JkaW5nX2lkfTABEogBCg5MaXN0UmVjb3JkaW5ncxIfLm5va2t1LnYxLkxpc3RSZWNvcmRpbmdzUmVxdWVzdBogLm5va2t1LnYxLkxpc3RSZWNvcmRpbmdzUmVzcG9uc2UiM5ACAYLT5JMCKhIoL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcmVjb3JkaW5ncxJ3Cg9VcGxvYWRSZWNvcmRpbmcSIC5ub2trdS52MS5VcGxvYWRSZWNvcmRpbmdSZXF1ZXN0GiEubm9ra3UudjEuVXBsb2FkUmVjb3JkaW5nUmVzcG9uc2UiHYLT5JMCFyIVL3YxL3JlY29yZGluZ3M6dXBsb2FkKAESlwEKD0RlbGV0ZVJlY29yZGluZxIgLm5va2t1LnYxLkRlbGV0ZVJlY29yZGluZ1JlcXVlc3QaIS5ub2trdS52MS5EZWxldGVSZWNvcmRpbmdSZXNwb25zZSI/gtPkkwI5KjcvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9yZWNvcmRpbmdzL3tyZWNvcmRpbmdfaWR9QpkBCgxjb20ubm9ra3UudjFCD1JlY29yZGluZ3NQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
-	[file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]
-);
+export const file_nokku_v1_recordings: GenFile = /*@__PURE__*/
+  fileDesc("Chlub2trdS92MS9yZWNvcmRpbmdzLnByb3RvEghub2trdS52MSLWAQoJUmVjb3JkaW5nEgoKAmlkGAEgASgJEhQKDHdvcmtzcGFjZV9pZBgCIAEoCRIRCglkYWVtb25faWQYAyABKAkSEAoIdXNlcm5hbWUYBCABKAkSEgoKc2l6ZV9ieXRlcxgFIAEoAxIQCghjb21wbGV0ZRgGIAEoCBIuCgpzdGFydGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAihAEKFlVwbG9hZFJlY29yZGluZ1JlcXVlc3QSJwoEbWV0YRgBIAEoCzIXLm5va2t1LnYxLlJlY29yZGluZ01ldGFIABIPCgVjaHVuaxgCIAEoDEgAEikKBWZpbmFsGAMgASgLMhgubm9ra3UudjEuUmVjb3JkaW5nRmluYWxIAEIFCgNtc2ciSgoNUmVjb3JkaW5nTWV0YRIeCgxyZWNvcmRpbmdfaWQYASABKAlCCLpIBXIDsAEBEhkKCHVzZXJuYW1lGAIgASgJQge6SARyAhggIhAKDlJlY29yZGluZ0ZpbmFsIkMKF1VwbG9hZFJlY29yZGluZ1Jlc3BvbnNlEhQKDHJlY29yZGluZ19pZBgBIAEoCRISCgpzaXplX2J5dGVzGAIgASgDIpkBChVMaXN0UmVjb3JkaW5nc1JlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIbCglkYWVtb25faWQYAiABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAMgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAQgASgFQge6SAQaAigAEhAKCHVzZXJuYW1lGAUgASgJImUKFkxpc3RSZWNvcmRpbmdzUmVzcG9uc2USJwoKcmVjb3JkaW5ncxgBIAMoCzITLm5va2t1LnYxLlJlY29yZGluZxINCgV0b3RhbBgCIAEoBRITCgt0b3RhbF9ieXRlcxgDIAEoAyJVChNHZXRSZWNvcmRpbmdSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESHgoMcmVjb3JkaW5nX2lkGAIgASgJQgi6SAVyA7ABASJXChRHZXRSZWNvcmRpbmdSZXNwb25zZRInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSABCBQoDbXNnIlgKFkRlbGV0ZVJlY29yZGluZ1JlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIeCgxyZWNvcmRpbmdfaWQYAiABKAlCCLpIBXIDsAEBIhkKF0RlbGV0ZVJlY29yZGluZ1Jlc3BvbnNlMsYEChBSZWNvcmRpbmdTZXJ2aWNlEpMBCgxHZXRSZWNvcmRpbmcSHS5ub2trdS52MS5HZXRSZWNvcmRpbmdSZXF1ZXN0Gh4ubm9ra3UudjEuR2V0UmVjb3JkaW5nUmVzcG9uc2UiQpACAYLT5JMCORI3L3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcmVjb3JkaW5ncy97cmVjb3JkaW5nX2lkfTABEogBCg5MaXN0UmVjb3JkaW5ncxIfLm5va2t1LnYxLkxpc3RSZWNvcmRpbmdzUmVxdWVzdBogLm5va2t1LnYxLkxpc3RSZWNvcmRpbmdzUmVzcG9uc2UiM5ACAYLT5JMCKhIoL3YxL3dvcmtzcGFjZXMve3dvcmtzcGFjZV9pZH0vcmVjb3JkaW5ncxJ3Cg9VcGxvYWRSZWNvcmRpbmcSIC5ub2trdS52MS5VcGxvYWRSZWNvcmRpbmdSZXF1ZXN0GiEubm9ra3UudjEuVXBsb2FkUmVjb3JkaW5nUmVzcG9uc2UiHYLT5JMCFyIVL3YxL3JlY29yZGluZ3M6dXBsb2FkKAESlwEKD0RlbGV0ZVJlY29yZGluZxIgLm5va2t1LnYxLkRlbGV0ZVJlY29yZGluZ1JlcXVlc3QaIS5ub2trdS52MS5EZWxldGVSZWNvcmRpbmdSZXNwb25zZSI/gtPkkwI5KjcvdjEvd29ya3NwYWNlcy97d29ya3NwYWNlX2lkfS9yZWNvcmRpbmdzL3tyZWNvcmRpbmdfaWR9QpkBCgxjb20ubm9ra3UudjFCD1JlY29yZGluZ3NQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_api_annotations, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message nokku.v1.Recording
  */
-export type Recording = Message<'nokku.v1.Recording'> & {
-	/**
-	 * @generated from field: string id = 1;
-	 */
-	id: string;
+export type Recording = Message<"nokku.v1.Recording"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
 
-	/**
-	 * @generated from field: string workspace_id = 2;
-	 */
-	workspaceId: string;
+  /**
+   * @generated from field: string workspace_id = 2;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: string daemon_id = 3;
-	 */
-	daemonId: string;
+  /**
+   * @generated from field: string daemon_id = 3;
+   */
+  daemonId: string;
 
-	/**
-	 * @generated from field: string username = 4;
-	 */
-	username: string;
+  /**
+   * @generated from field: string username = 4;
+   */
+  username: string;
 
-	/**
-	 * @generated from field: int64 size_bytes = 5;
-	 */
-	sizeBytes: bigint;
+  /**
+   * @generated from field: int64 size_bytes = 5;
+   */
+  sizeBytes: bigint;
 
-	/**
-	 * @generated from field: bool complete = 6;
-	 */
-	complete: boolean;
+  /**
+   * @generated from field: bool complete = 6;
+   */
+  complete: boolean;
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp started_at = 7;
-	 */
-	startedAt?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp started_at = 7;
+   */
+  startedAt?: Timestamp | undefined;
 
-	/**
-	 * @generated from field: google.protobuf.Timestamp ended_at = 8;
-	 */
-	endedAt?: Timestamp | undefined;
+  /**
+   * @generated from field: google.protobuf.Timestamp ended_at = 8;
+   */
+  endedAt?: Timestamp | undefined;
 };
 
 /**
  * Describes the message nokku.v1.Recording.
  * Use `create(RecordingSchema)` to create a new message.
  */
-export const RecordingSchema: GenMessage<Recording> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_recordings,
-	0
-);
+export const RecordingSchema: GenMessage<Recording> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_recordings, 0);
 
 /**
  * @generated from message nokku.v1.UploadRecordingRequest
  */
-export type UploadRecordingRequest = Message<'nokku.v1.UploadRecordingRequest'> & {
-	/**
-	 * @generated from oneof nokku.v1.UploadRecordingRequest.msg
-	 */
-	msg:
-		| {
-				/**
-				 * @generated from field: nokku.v1.RecordingMeta meta = 1;
-				 */
-				value: RecordingMeta;
-				case: 'meta';
-		  }
-		| {
-				/**
-				 * @generated from field: bytes chunk = 2;
-				 */
-				value: Uint8Array;
-				case: 'chunk';
-		  }
-		| {
-				/**
-				 * @generated from field: nokku.v1.RecordingFinal final = 3;
-				 */
-				value: RecordingFinal;
-				case: 'final';
-		  }
-		| { case: undefined; value?: undefined };
+export type UploadRecordingRequest = Message<"nokku.v1.UploadRecordingRequest"> & {
+  /**
+   * @generated from oneof nokku.v1.UploadRecordingRequest.msg
+   */
+  msg: {
+    /**
+     * @generated from field: nokku.v1.RecordingMeta meta = 1;
+     */
+    value: RecordingMeta;
+    case: "meta";
+  } | {
+    /**
+     * @generated from field: bytes chunk = 2;
+     */
+    value: Uint8Array;
+    case: "chunk";
+  } | {
+    /**
+     * @generated from field: nokku.v1.RecordingFinal final = 3;
+     */
+    value: RecordingFinal;
+    case: "final";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message nokku.v1.UploadRecordingRequest.
  * Use `create(UploadRecordingRequestSchema)` to create a new message.
  */
-export const UploadRecordingRequestSchema: GenMessage<UploadRecordingRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_recordings, 1);
+export const UploadRecordingRequestSchema: GenMessage<UploadRecordingRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_recordings, 1);
 
 /**
  * @generated from message nokku.v1.RecordingMeta
  */
-export type RecordingMeta = Message<'nokku.v1.RecordingMeta'> & {
-	/**
-	 * @generated from field: string recording_id = 1;
-	 */
-	recordingId: string;
+export type RecordingMeta = Message<"nokku.v1.RecordingMeta"> & {
+  /**
+   * @generated from field: string recording_id = 1;
+   */
+  recordingId: string;
 
-	/**
-	 * @generated from field: string username = 2;
-	 */
-	username: string;
+  /**
+   * @generated from field: string username = 2;
+   */
+  username: string;
 };
 
 /**
  * Describes the message nokku.v1.RecordingMeta.
  * Use `create(RecordingMetaSchema)` to create a new message.
  */
-export const RecordingMetaSchema: GenMessage<RecordingMeta> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_recordings,
-	2
-);
+export const RecordingMetaSchema: GenMessage<RecordingMeta> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_recordings, 2);
 
 /**
  * @generated from message nokku.v1.RecordingFinal
  */
-export type RecordingFinal = Message<'nokku.v1.RecordingFinal'> & {};
+export type RecordingFinal = Message<"nokku.v1.RecordingFinal"> & {
+};
 
 /**
  * Describes the message nokku.v1.RecordingFinal.
  * Use `create(RecordingFinalSchema)` to create a new message.
  */
-export const RecordingFinalSchema: GenMessage<RecordingFinal> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_recordings,
-	3
-);
+export const RecordingFinalSchema: GenMessage<RecordingFinal> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_recordings, 3);
 
 /**
  * @generated from message nokku.v1.UploadRecordingResponse
  */
-export type UploadRecordingResponse = Message<'nokku.v1.UploadRecordingResponse'> & {
-	/**
-	 * @generated from field: string recording_id = 1;
-	 */
-	recordingId: string;
+export type UploadRecordingResponse = Message<"nokku.v1.UploadRecordingResponse"> & {
+  /**
+   * @generated from field: string recording_id = 1;
+   */
+  recordingId: string;
 
-	/**
-	 * @generated from field: int64 size_bytes = 2;
-	 */
-	sizeBytes: bigint;
+  /**
+   * @generated from field: int64 size_bytes = 2;
+   */
+  sizeBytes: bigint;
 };
 
 /**
  * Describes the message nokku.v1.UploadRecordingResponse.
  * Use `create(UploadRecordingResponseSchema)` to create a new message.
  */
-export const UploadRecordingResponseSchema: GenMessage<UploadRecordingResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_recordings, 4);
+export const UploadRecordingResponseSchema: GenMessage<UploadRecordingResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_recordings, 4);
 
 /**
  * @generated from message nokku.v1.ListRecordingsRequest
  */
-export type ListRecordingsRequest = Message<'nokku.v1.ListRecordingsRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
+export type ListRecordingsRequest = Message<"nokku.v1.ListRecordingsRequest"> & {
+  /**
+   * @generated from field: string workspace_id = 1;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: string daemon_id = 2;
-	 */
-	daemonId: string;
+  /**
+   * @generated from field: string daemon_id = 2;
+   */
+  daemonId: string;
 
-	/**
-	 * @generated from field: int32 limit = 3;
-	 */
-	limit: number;
+  /**
+   * @generated from field: int32 limit = 3;
+   */
+  limit: number;
 
-	/**
-	 * @generated from field: int32 offset = 4;
-	 */
-	offset: number;
+  /**
+   * @generated from field: int32 offset = 4;
+   */
+  offset: number;
 
-	/**
-	 * @generated from field: string username = 5;
-	 */
-	username: string;
+  /**
+   * @generated from field: string username = 5;
+   */
+  username: string;
 };
 
 /**
  * Describes the message nokku.v1.ListRecordingsRequest.
  * Use `create(ListRecordingsRequestSchema)` to create a new message.
  */
-export const ListRecordingsRequestSchema: GenMessage<ListRecordingsRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_recordings, 5);
+export const ListRecordingsRequestSchema: GenMessage<ListRecordingsRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_recordings, 5);
 
 /**
  * @generated from message nokku.v1.ListRecordingsResponse
  */
-export type ListRecordingsResponse = Message<'nokku.v1.ListRecordingsResponse'> & {
-	/**
-	 * @generated from field: repeated nokku.v1.Recording recordings = 1;
-	 */
-	recordings: Recording[];
+export type ListRecordingsResponse = Message<"nokku.v1.ListRecordingsResponse"> & {
+  /**
+   * @generated from field: repeated nokku.v1.Recording recordings = 1;
+   */
+  recordings: Recording[];
 
-	/**
-	 * @generated from field: int32 total = 2;
-	 */
-	total: number;
+  /**
+   * @generated from field: int32 total = 2;
+   */
+  total: number;
 
-	/**
-	 * @generated from field: int64 total_bytes = 3;
-	 */
-	totalBytes: bigint;
+  /**
+   * @generated from field: int64 total_bytes = 3;
+   */
+  totalBytes: bigint;
 };
 
 /**
  * Describes the message nokku.v1.ListRecordingsResponse.
  * Use `create(ListRecordingsResponseSchema)` to create a new message.
  */
-export const ListRecordingsResponseSchema: GenMessage<ListRecordingsResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_recordings, 6);
+export const ListRecordingsResponseSchema: GenMessage<ListRecordingsResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_recordings, 6);
 
 /**
  * @generated from message nokku.v1.GetRecordingRequest
  */
-export type GetRecordingRequest = Message<'nokku.v1.GetRecordingRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
+export type GetRecordingRequest = Message<"nokku.v1.GetRecordingRequest"> & {
+  /**
+   * @generated from field: string workspace_id = 1;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: string recording_id = 2;
-	 */
-	recordingId: string;
+  /**
+   * @generated from field: string recording_id = 2;
+   */
+  recordingId: string;
 };
 
 /**
  * Describes the message nokku.v1.GetRecordingRequest.
  * Use `create(GetRecordingRequestSchema)` to create a new message.
  */
-export const GetRecordingRequestSchema: GenMessage<GetRecordingRequest> /*@__PURE__*/ = messageDesc(
-	file_nokku_v1_recordings,
-	7
-);
+export const GetRecordingRequestSchema: GenMessage<GetRecordingRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_recordings, 7);
 
 /**
  * @generated from message nokku.v1.GetRecordingResponse
  */
-export type GetRecordingResponse = Message<'nokku.v1.GetRecordingResponse'> & {
-	/**
-	 * @generated from oneof nokku.v1.GetRecordingResponse.msg
-	 */
-	msg:
-		| {
-				/**
-				 * @generated from field: nokku.v1.RecordingMeta meta = 1;
-				 */
-				value: RecordingMeta;
-				case: 'meta';
-		  }
-		| {
-				/**
-				 * @generated from field: bytes chunk = 2;
-				 */
-				value: Uint8Array;
-				case: 'chunk';
-		  }
-		| { case: undefined; value?: undefined };
+export type GetRecordingResponse = Message<"nokku.v1.GetRecordingResponse"> & {
+  /**
+   * @generated from oneof nokku.v1.GetRecordingResponse.msg
+   */
+  msg: {
+    /**
+     * @generated from field: nokku.v1.RecordingMeta meta = 1;
+     */
+    value: RecordingMeta;
+    case: "meta";
+  } | {
+    /**
+     * @generated from field: bytes chunk = 2;
+     */
+    value: Uint8Array;
+    case: "chunk";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message nokku.v1.GetRecordingResponse.
  * Use `create(GetRecordingResponseSchema)` to create a new message.
  */
-export const GetRecordingResponseSchema: GenMessage<GetRecordingResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_recordings, 8);
+export const GetRecordingResponseSchema: GenMessage<GetRecordingResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_recordings, 8);
 
 /**
  * @generated from message nokku.v1.DeleteRecordingRequest
  */
-export type DeleteRecordingRequest = Message<'nokku.v1.DeleteRecordingRequest'> & {
-	/**
-	 * @generated from field: string workspace_id = 1;
-	 */
-	workspaceId: string;
+export type DeleteRecordingRequest = Message<"nokku.v1.DeleteRecordingRequest"> & {
+  /**
+   * @generated from field: string workspace_id = 1;
+   */
+  workspaceId: string;
 
-	/**
-	 * @generated from field: string recording_id = 2;
-	 */
-	recordingId: string;
+  /**
+   * @generated from field: string recording_id = 2;
+   */
+  recordingId: string;
 };
 
 /**
  * Describes the message nokku.v1.DeleteRecordingRequest.
  * Use `create(DeleteRecordingRequestSchema)` to create a new message.
  */
-export const DeleteRecordingRequestSchema: GenMessage<DeleteRecordingRequest> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_recordings, 9);
+export const DeleteRecordingRequestSchema: GenMessage<DeleteRecordingRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_recordings, 9);
 
 /**
  * @generated from message nokku.v1.DeleteRecordingResponse
  */
-export type DeleteRecordingResponse = Message<'nokku.v1.DeleteRecordingResponse'> & {};
+export type DeleteRecordingResponse = Message<"nokku.v1.DeleteRecordingResponse"> & {
+};
 
 /**
  * Describes the message nokku.v1.DeleteRecordingResponse.
  * Use `create(DeleteRecordingResponseSchema)` to create a new message.
  */
-export const DeleteRecordingResponseSchema: GenMessage<DeleteRecordingResponse> /*@__PURE__*/ =
-	messageDesc(file_nokku_v1_recordings, 10);
+export const DeleteRecordingResponseSchema: GenMessage<DeleteRecordingResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_recordings, 10);
 
 /**
  * @generated from service nokku.v1.RecordingService
  */
 export const RecordingService: GenService<{
-	/**
-	 * @generated from rpc nokku.v1.RecordingService.GetRecording
-	 */
-	getRecording: {
-		methodKind: 'server_streaming';
-		input: typeof GetRecordingRequestSchema;
-		output: typeof GetRecordingResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.RecordingService.ListRecordings
-	 */
-	listRecordings: {
-		methodKind: 'unary';
-		input: typeof ListRecordingsRequestSchema;
-		output: typeof ListRecordingsResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.RecordingService.UploadRecording
-	 */
-	uploadRecording: {
-		methodKind: 'client_streaming';
-		input: typeof UploadRecordingRequestSchema;
-		output: typeof UploadRecordingResponseSchema;
-	};
-	/**
-	 * @generated from rpc nokku.v1.RecordingService.DeleteRecording
-	 */
-	deleteRecording: {
-		methodKind: 'unary';
-		input: typeof DeleteRecordingRequestSchema;
-		output: typeof DeleteRecordingResponseSchema;
-	};
-}> /*@__PURE__*/ = serviceDesc(file_nokku_v1_recordings, 0);
+  /**
+   * @generated from rpc nokku.v1.RecordingService.GetRecording
+   */
+  getRecording: {
+    methodKind: "server_streaming";
+    input: typeof GetRecordingRequestSchema;
+    output: typeof GetRecordingResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.RecordingService.ListRecordings
+   */
+  listRecordings: {
+    methodKind: "unary";
+    input: typeof ListRecordingsRequestSchema;
+    output: typeof ListRecordingsResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.RecordingService.UploadRecording
+   */
+  uploadRecording: {
+    methodKind: "client_streaming";
+    input: typeof UploadRecordingRequestSchema;
+    output: typeof UploadRecordingResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.RecordingService.DeleteRecording
+   */
+  deleteRecording: {
+    methodKind: "unary";
+    input: typeof DeleteRecordingRequestSchema;
+    output: typeof DeleteRecordingResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_nokku_v1_recordings, 0);
+

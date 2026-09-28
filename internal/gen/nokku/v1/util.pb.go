@@ -282,8 +282,6 @@ func (x *WhoamiResponse) GetDaemon() *Daemon {
 	return nil
 }
 
-// Role is a workspace role. Roles are ordered, each includes the ones before
-// it. ListRoles returns the assignable ones from least to most privileged.
 type Role struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          *string                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
