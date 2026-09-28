@@ -31,8 +31,8 @@ func TestLocalStorage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Store: %v", err)
 	}
-	if *url != "http://localhost:3000/"+path {
-		t.Fatalf("unexpected url %q", *url)
+	if url != "http://localhost:3000/"+path {
+		t.Fatalf("unexpected url %q", url)
 	}
 	if _, err := os.Stat(filepath.Join(dir, path)); err != nil {
 		t.Fatalf("file not written to disk: %v", err)

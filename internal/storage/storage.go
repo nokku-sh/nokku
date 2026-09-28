@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -153,7 +154,7 @@ func (s *Storage) Store(
 	name string,
 	data []byte,
 	opts StoreOptions,
-) (*string, error) {
+) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -162,10 +163,9 @@ func (s *Storage) Store(
 		CacheControl: opts.CacheControl,
 	}
 	if err := s.bucket.WriteAll(ctx, name, data, writerOpts); err != nil {
-		return nil, fmt.Errorf("write data: %w", err)
+		return "", fmt.Errorf("write data: %w", err)
 	}
-	url := s.getURL(name)
-	return &url, nil
+	return s.getURL(name), nil
 }
 
 func (s *Storage) Delete(ctx context.Context, name string) error {
@@ -180,6 +180,29 @@ func (s *Storage) Delete(ctx context.Context, name string) error {
 		return fmt.Errorf("delete object: %w", err)
 	}
 	return nil
+}
+
+// DeletePrefix only takes directory prefixes, so "videos/a" can never match
+// "videos/ab".
+func (s *Storage) DeletePrefix(ctx context.Context, prefix string) error {
+	if !strings.HasSuffix(prefix, "/") || strings.Trim(prefix, "/") == "" {
+		return fmt.Errorf("refusing to delete prefix %q", prefix)
+	}
+	var errs []error
+	iter := s.bucket.List(&blob.ListOptions{Prefix: prefix})
+	for {
+		obj, err := iter.Next(ctx)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if err := s.Delete(ctx, obj.Key); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // CreateWriter commits on Close, so a truncated upload leaves a partial object.
@@ -213,10 +236,7 @@ func (s *Storage) getURL(name string) string {
 	if s.CDNURL != "" {
 		return joinURL(s.CDNURL, name)
 	}
-	if s.BaseURL != "" {
-		return joinURL(s.BaseURL, name)
-	}
-	return name
+	return joinURL(s.BaseURL, name)
 }
 
 func joinURL(base, name string) string {
