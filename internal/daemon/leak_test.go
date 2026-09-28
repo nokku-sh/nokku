@@ -10,9 +10,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/testdb"
 )
 
-// leaked returns the goroutineleak profile report and whether any goroutines
-// are provably stuck. The profile only exists when the toolchain is built
-// Without it, detection is skipped.
+// leaked skips detection when the toolchain has no goroutineleak profile.
 func leaked() (string, bool) {
 	p := pprof.Lookup("goroutineleak")
 	if p == nil {
@@ -23,10 +21,8 @@ func leaked() (string, bool) {
 	return b.String(), p.Count() > 0
 }
 
-// TestMain fails the suite if any goroutine is left provably stuck after the
-// tests finish. The daemon pool is the leak-prone code (channels, bidi
-// streams, event subscribers), so guard it here rather than only in
-// individual tests.
+// TestMain fails the suite on any provably stuck goroutine, the pool is the
+// leak-prone code.
 func TestMain(m *testing.M) {
 	testdb.Setup("daemon")
 	code := m.Run()

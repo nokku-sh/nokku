@@ -7,8 +7,6 @@
 	let { ...restProps } = $props();
 
 	async function handleToggleTheme(event: MouseEvent) {
-		// Fallback for browsers that don't support View Transitions
-		// or users who prefer reduced motion
 		if (
 			!document.startViewTransition ||
 			window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -37,7 +35,6 @@
 				{
 					duration: 400,
 					easing: 'ease-out',
-					// We animate the new view expanding over the old one
 					pseudoElement: '::view-transition-new(root)'
 				}
 			);

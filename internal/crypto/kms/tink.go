@@ -1,17 +1,7 @@
-// Package kms implements envelope encryption backed by an external KMS.
-//
-// A single local Tink keyset of DEKs does all encrypt/decrypt work. The
-// keyset is wrapped by a KEK that never leaves the KMS and stored wrapped in
-// the database. The KMS sees no plaintext secrets and the database holds only
-// ciphertext.
-//
-// KEK rotation is the KMS's job: it keeps old key versions decryptable, so
-// the stored keyset stays readable across rotations. A periodic background
-// rewrap migrates it to the current KEK version. There is deliberately no
-// automatic DEK rotation: every intermediate state leaves all data
-// decryptable. Switching ciphers or rotating the keyset is an explicit
-// operator action via the rotate-secrets command, which re-encrypts every
-// secret and swaps the keyset atomically in a single transaction.
+// Package kms does envelope encryption. A local Tink keyset does the work and
+// is stored wrapped by a KEK that never leaves the KMS. KEK rotation is the
+// KMS's job. There is deliberately no automatic DEK rotation, rotate-secrets
+// swaps the keyset in one transaction.
 package kms
 
 import (
@@ -57,7 +47,7 @@ func New(ctx context.Context, db *db.Connection) (*TinkEncryptor, error) {
 	return t.withHandle(handle)
 }
 
-// NewForRotation creates a KMS encryptor with a FRESH keyset that is not persisted anywhere.
+// NewForRotation creates a fresh keyset that is not persisted anywhere.
 func NewForRotation(ctx context.Context, kmsURI string) (*TinkEncryptor, error) {
 	t, err := newEncryptor(ctx, kmsURI)
 	if err != nil {

@@ -18,8 +18,7 @@ import (
 
 var ErrCooldown = errors.New("email cooldown active")
 
-// Service sends the transactional emails. Delivery is on when an SMTP host is
-// set, any relay works (Scaleway TEM, SES, Postmark, your own server).
+// Service only delivers when an SMTP host is set.
 type Service struct {
 	sender Sender
 	cache  cache.Cache
@@ -129,9 +128,8 @@ func (s *Service) SendNewLoginEmail(
 	})
 }
 
-// sendTemplate sends at most one email per user and template per cooldown.
-// The slot is claimed atomically before sending and released if the send
-// fails, so concurrent requests cannot double-send and a failure can retry.
+// sendTemplate claims the cooldown slot before sending and releases it on
+// failure, so concurrent requests cannot double-send.
 func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 	if req.userID == "" {
 		return errors.New("email user id is required")

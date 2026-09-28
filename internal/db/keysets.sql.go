@@ -136,8 +136,7 @@ SET
   updated_at = NOW()
 `
 
-// Rotation-only (rotate-secrets command): persist the target keyset
-// atomically within the rotation transaction. Never used on the boot path.
+// Only for rotate-secrets, never on the boot path.
 func (q *Queries) UpsertKeysetWrappedData(ctx context.Context, data []byte) error {
 	_, err := q.db.Exec(ctx, upsertKeysetWrappedData, data)
 	return err

@@ -88,7 +88,7 @@ func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		// Restrict to reasonable max dimensions (prevent decompression bombs)
+		// Guards against decompression bombs.
 		if imgConfig.Width > 4000 || imgConfig.Height > 4000 {
 			writeJSONError(w, http.StatusBadRequest, "image dimensions too large")
 			return
@@ -126,17 +126,14 @@ func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
+		// The client saves the URL through UpdateAccount.
 		versionedURL := fmt.Sprintf("%s?v=%d", *fileURL, time.Now().UnixMilli())
-
-		// The avatar URL lives on the user profile; the caller attaches it with
-		// the account-surface update (AccountService/UpdateAccount).
 		iam.WriteJSON(w, http.StatusOK, map[string]string{"url": versionedURL})
 	}
 }
 
 func ServeAvatar(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Strip extension from /avatars/{id}
 		userID, _, ok := strings.Cut(r.PathValue("id"), ".")
 		if userID == "" || !ok {
 			writeJSONError(w, http.StatusBadRequest, "missing user ID")

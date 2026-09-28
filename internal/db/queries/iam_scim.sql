@@ -18,8 +18,7 @@ WHERE
   token_hash = @token_hash;
 
 -- name: TouchSCIMToken :exec
--- Throttled: only writes when the stored stamp is over an hour old, so a
--- busy provisioning client does not turn every read into a write.
+-- Only writes when the stamp is over an hour old.
 UPDATE scim_tokens
 SET
   last_used_at = NOW()
@@ -58,8 +57,7 @@ WHERE
   user_id = @user_id;
 
 -- name: ListManagedMembers :many
--- Members whose email domain the workspace has verified: the only accounts
--- a SCIM connector may see or change. email narrows to one account.
+-- Only members under the workspace's verified domains.
 SELECT
   u.*,
   COALESCE(c.subject, '')::TEXT AS external_id
@@ -94,9 +92,7 @@ WHERE
   AND provider = @workspace_id;
 
 -- name: DeleteStaleUserSCIMCredentials :exec
--- Drops the user's other SCIM externalId mappings for the workspace, so an
--- IdP-side identity migration never leaves two links on one account. Run
--- before UpsertCredential, which re-adds the current subject.
+-- Run before UpsertCredential so one account never carries two links.
 DELETE FROM credentials
 WHERE
   user_id = @user_id

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"connectrpc.com/connect"
@@ -79,7 +80,7 @@ func (s *UtilService) Whoami(
 			return nil, DBError(err)
 		}
 	case iam.KindSCIM:
-		// SCIM tokens only reach the SCIM endpoint, never connect.
+		// SCIM tokens never reach connect.
 	}
 	return out, nil
 }
@@ -132,7 +133,6 @@ func (s *UtilService) ListAuditLogs(
 	return &nokkuv1.ListAuditLogsResponse{Logs: logs, Total: &total}, nil
 }
 
-// ExportAuditLogs is gated by the entitlement guard interceptor.
 func (s *UtilService) ExportAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ExportAuditLogsRequest,
@@ -154,9 +154,8 @@ func (s *UtilService) ExportAuditLogs(
 	}, nil
 }
 
-// auditParams scopes an audit read: the workspace log when a workspace is
-// given, otherwise the caller's own activity. Without dates it covers the
-// last 14 days.
+// auditParams falls back to the caller's own activity without a workspace,
+// and to the last 14 days without dates.
 func auditParams(
 	ctx context.Context,
 	workspaceID string,
@@ -179,4 +178,11 @@ func auditParams(
 		p.EndDate = new(end.AsTime())
 	}
 	return p
+}
+
+func optDuration(d *durationpb.Duration) *time.Duration {
+	if d == nil {
+		return nil
+	}
+	return new(d.AsDuration())
 }

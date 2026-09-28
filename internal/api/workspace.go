@@ -88,9 +88,6 @@ func (s *WorkspaceService) CreateWorkspace(
 	if err != nil {
 		return nil, DBError(err)
 	}
-	if workspace == nil {
-		return nil, ErrInternal
-	}
 	audit.SetTarget(ctx, workspace.GetId())
 
 	return &nokkuv1.CreateWorkspaceResponse{
@@ -120,9 +117,6 @@ func (s *WorkspaceService) UpdateWorkspace(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	if workspace == nil {
-		return nil, ErrNotFound
-	}
 
 	return &nokkuv1.UpdateWorkspaceResponse{
 		Workspace: workspace.ToProto(),
@@ -144,7 +138,6 @@ func (s *WorkspaceService) DeleteWorkspace(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	// SSO provider and domain rows cascade through the workspace FK.
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
 }
 
@@ -164,12 +157,14 @@ func (s *WorkspaceService) ListWorkspaces(
 		return nil, DBError(err)
 	}
 
+	roleByWorkspace := make(map[string]string, len(roles))
+	for _, r := range roles {
+		roleByWorkspace[r.WorkspaceID] = r.RoleName
+	}
 	result := db.WorkspacesToProto(workspaces)
 	for _, w := range result {
-		for _, r := range roles {
-			if r.WorkspaceID == w.GetId() {
-				w.Role = &r.RoleName
-			}
+		if role, ok := roleByWorkspace[w.GetId()]; ok {
+			w.Role = &role
 		}
 	}
 	return &nokkuv1.ListWorkspacesResponse{Workspaces: result}, nil
@@ -278,8 +273,7 @@ func (s *WorkspaceService) RemoveWorkspaceMember(
 	ctx context.Context,
 	req *nokkuv1.RemoveWorkspaceMemberRequest,
 ) (*nokkuv1.RemoveWorkspaceMemberResponse, error) {
-	// Grants and team seats cascade from the membership, so a removed member
-	// drops out of every synced principals map.
+	// Grants and team seats cascade from the membership.
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		if err := checkCanManageMember(ctx, q, req.GetWorkspaceId(), req.GetUserId()); err != nil {
 			return err
@@ -295,8 +289,7 @@ func (s *WorkspaceService) RemoveWorkspaceMember(
 	return &nokkuv1.RemoveWorkspaceMemberResponse{}, nil
 }
 
-// checkCanManageMember refuses changes to a member whose role is above the
-// caller's. The owner is above everyone, so nobody demotes or removes them.
+// checkCanManageMember also protects the owner, who is above everyone.
 func checkCanManageMember(ctx context.Context, q db.Querier, workspaceID, userID string) error {
 	m, err := q.GetWorkspaceMember(ctx, &db.GetWorkspaceMemberParams{
 		WorkspaceID: workspaceID,
@@ -311,9 +304,6 @@ func checkCanManageMember(ctx context.Context, q db.Querier, workspaceID, userID
 	return nil
 }
 
-// checkWorkspaceOwner reports whether the request actor owns the workspace.
-// The lookup runs on the caller's querier so billing and workspace changes can
-// fold it into the transaction that makes the change.
 func checkWorkspaceOwner(ctx context.Context, q db.Querier, workspaceID string) error {
 	ownerID, err := q.GetWorkspaceOwner(ctx, workspaceID)
 	if err != nil {
@@ -345,11 +335,8 @@ func (s *WorkspaceService) UpdateWorkspaceOwner(
 	return &nokkuv1.UpdateWorkspaceOwnerResponse{}, nil
 }
 
-// Helpers --------------------------------------------------------------------
-
-// initializeWorkspace creates a workspace with all of its dependent records.
-// This deliberately runs as a system transaction (bypassing RLS): the
-// workspace does not exist yet, so no tenant context can be pinned for it.
+// initializeWorkspace runs as a system tx since the workspace does not exist
+// yet and cannot be pinned.
 func (s *WorkspaceService) initializeWorkspace(
 	ctx context.Context,
 	params *db.CreateWorkspaceParams,
@@ -370,7 +357,7 @@ func (s *WorkspaceService) initializeWorkspace(
 			return err
 		}
 
-		if _, err = q.CreateCA(ctx, &db.CreateCAParams{
+		_, err = q.CreateCA(ctx, &db.CreateCAParams{
 			WorkspaceID:  workspace.ID,
 			Name:         "Default CA",
 			Description:  new("Default CA for workspace " + workspace.Name),
@@ -384,10 +371,8 @@ func (s *WorkspaceService) initializeWorkspace(
 			NotAfter:     ca.NotAfter,
 			KeyType:      ca.KeyType,
 			KeyBits:      ca.KeyBits,
-		}); err != nil {
-			return err
-		}
-		return nil
+		})
+		return err
 	}); err != nil {
 		return nil, err
 	}

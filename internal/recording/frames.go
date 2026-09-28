@@ -10,14 +10,10 @@ import (
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
-// maxRecordingFrame bounds a single stored frame so a corrupted object cannot
-// force an unbounded allocation.
+// maxRecordingFrame stops a corrupted object from forcing a huge allocation.
 const maxRecordingFrame = 256 << 20
 
-// Reader streams a recording object as decrypted plaintext: each
-// [len(4 BE) || ciphertext] frame decrypts to one gzip slice, and reads
-// walk the concatenated plaintext. Playback clients and the scrubber only
-// append or scan the stream, so frame boundaries do not need to survive.
+// Reader decrypts [len(4 BE) || ciphertext] frames into one plaintext stream.
 type Reader struct {
 	rc     io.ReadCloser
 	cipher crypto.Cipher
@@ -27,7 +23,6 @@ type Reader struct {
 	off    int
 }
 
-// OpenReader opens a recording for decrypted streaming playback.
 func (s *Service) OpenReader(
 	ctx context.Context,
 	workspaceID, recordingID string,

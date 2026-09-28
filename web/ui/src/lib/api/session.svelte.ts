@@ -3,10 +3,6 @@ import { toast } from 'svelte-sonner';
 import { queryClient } from './client';
 import { account, type AccountSession } from './account';
 
-// Active sessions of the account, as listed and revoked on the security
-// page. Revoking the current session is rejected by the backend: logout is
-// the way out.
-
 const invalidateSessions = () => queryClient.invalidateQueries({ queryKey: ['account'] });
 
 export const session = {
@@ -28,7 +24,6 @@ export const session = {
 		}))
 };
 
-// Human labels for the stored session kind and login method values.
 export function sessionKindLabel(kind: string): string {
 	switch (kind) {
 		case 'user':

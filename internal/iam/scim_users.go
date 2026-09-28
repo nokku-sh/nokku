@@ -1,8 +1,7 @@
 package iam
 
-// SCIM User resource handler: maps /Users onto the workspace's managed
-// members. The SCIM id is the user id, userName is the email, and externalId
-// rides the credentials table (type 'scim', provider = workspace id).
+// SCIM Users are managed workspace members. The SCIM id is the user id,
+// userName is the email, and externalId lives in the credentials table.
 
 import (
 	"context"
@@ -50,8 +49,7 @@ func (h scimUserHandler) Get(r *http.Request, id string) (scim.Resource, error) 
 	return userResource(m), nil
 }
 
-// GetAll lists managed members. Connectors look accounts up with
-// userName eq "...", which runs as an indexed query instead of a scan.
+// GetAll turns the connectors' userName eq "..." lookups into an indexed query.
 func (h scimUserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
 	rows, err := h.svc.sys.ListManagedMembers(r.Context(), &db.ListManagedMembersParams{
 		WorkspaceID: h.workspaceID,
@@ -138,8 +136,7 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 	return h.apply(r.Context(), patch, externalID)
 }
 
-// member loads a managed member of the workspace. Anything else is a 404,
-// the answer an IdP expects for an unknown id.
+// member answers 404 for anything unmanaged, which is what an IdP expects.
 func (h scimUserHandler) member(ctx context.Context, id string) (*db.ListManagedMembersRow, error) {
 	if _, err := uuid.Parse(id); err != nil {
 		return nil, scimerrors.ScimErrorResourceNotFound(id)
@@ -157,8 +154,6 @@ func (h scimUserHandler) member(ctx context.Context, id string) (*db.ListManaged
 	return rows[0], nil
 }
 
-// apply persists a user patch and the externalId link in one transaction,
-// and revokes every session of an account the IdP deactivated.
 func (h scimUserHandler) apply(
 	ctx context.Context,
 	patch db.UpdateUserParams,
@@ -185,8 +180,6 @@ func (h scimUserHandler) apply(
 	return userResource(m), nil
 }
 
-// userNameFilter returns the email of a `userName eq "..."` filter, the
-// lookup every connector runs before creating a user.
 func userNameFilter(v *scimfilter.Validator) *string {
 	if v == nil {
 		return nil
@@ -227,8 +220,6 @@ func userResource(m *db.ListManagedMembersRow) scim.Resource {
 	return out
 }
 
-// scimEmailValue pulls the first address out of an emails value, whichever
-// shape the client sent.
 func scimEmailValue(v any) string {
 	switch emails := v.(type) {
 	case []any:
@@ -246,7 +237,6 @@ func scimEmailValue(v any) string {
 	}
 }
 
-// paginate applies the request's filter and pagination to the candidates.
 func paginate(all []scim.Resource, params scim.ListRequestParams) scim.Page {
 	if params.FilterValidator != nil {
 		matching := all[:0]

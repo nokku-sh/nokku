@@ -54,6 +54,9 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	if cfg.Secret == "" {
+		return nil, fmt.Errorf("NOKKU_SECRET is required")
+	}
 
 	if cmd != nil {
 		cfg.Debug = cmd.Bool("debug")
@@ -78,9 +81,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	if cfg.Secret == "" {
-		return nil, fmt.Errorf("NOKKU_SECRET is required")
-	}
 	primary, err := crypto.NewSecretbox([]byte(cfg.Secret))
 	if err != nil {
 		return nil, err
@@ -89,9 +89,8 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	// KMS mode replaces the encryptor before anything can encrypt. Only the
-	// DPoP nonce key keeps deriving from NOKKU_SECRET, which is stateless
-	// and needs no KMS.
+	// KMS replaces the encryptor before anything encrypts. The DPoP nonce key
+	// still derives from NOKKU_SECRET.
 	if os.Getenv("KMS_URI") != "" {
 		enc, err := kms.New(ctx, cfg.Conn)
 		if err != nil {
@@ -172,8 +171,7 @@ func (c *Config) FullURL() string {
 		host = "localhost"
 	}
 
-	// Append the port only when it isn't already the scheme's default, so
-	// https://host:443 stays canonical.
+	// Skip default ports so https://host:443 stays canonical.
 	if _, _, err := net.SplitHostPort(host); err != nil {
 		if port := c.Port; port != "" && port != defaultPort(scheme) {
 			host = net.JoinHostPort(host, port)
@@ -190,17 +188,12 @@ func defaultPort(scheme string) string {
 	return "80"
 }
 
-// WSOrigins returns the origin patterns allowed to open websocket
-// connections: the app URL itself plus any configured extra origins (e.g.
-// a frontend dev server on a different port).
 func (c *Config) WSOrigins() []string {
 	origins := make([]string, 0, len(c.AllowedOrigins)+1)
 	origins = append(origins, c.FullURL())
 	return append(origins, c.AllowedOrigins...)
 }
 
-// passkeyOrigins returns every origin the browser may assert during a
-// WebAuthn ceremony: the app URL plus the frontend dev server in debug mode.
 func passkeyOrigins(c *Config) []string {
 	origins := []string{c.FullURL()}
 	if c.Debug {

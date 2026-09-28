@@ -95,6 +95,12 @@ func TestSSOEnforcementCoversEveryMethod(t *testing.T) {
 	if _, err := e.svc.completeLogin(t.Context(), u, MethodPasskey); !errors.Is(err, ErrSSORequired) {
 		t.Errorf("passkey: err = %v, want ErrSSORequired", err)
 	}
+	social := &linker{svc: e.svc, credType: MethodOAuth2}
+	if _, err := social.Resolve(t.Context(), flowLinkOptions{
+		ProviderID: "github", Subject: "gh-" + u.ID, Email: u.Email, EmailVerified: true,
+	}); !errors.Is(err, ErrSSORequired) {
+		t.Errorf("social login: err = %v, want ErrSSORequired", err)
+	}
 	if _, err := e.svc.completeLogin(t.Context(), u, MethodOIDC); err != nil {
 		t.Errorf("sso login refused: %v", err)
 	}

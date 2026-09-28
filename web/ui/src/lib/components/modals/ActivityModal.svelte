@@ -39,7 +39,6 @@
 		</Dialog.Header>
 
 		<div class="space-y-4">
-			<!-- Actor -->
 			<div class="space-y-2">
 				<Label class="text-sm font-semibold">Actor</Label>
 				<div
@@ -81,7 +80,6 @@
 				</div>
 			{/if}
 
-			<!-- Source -->
 			<div class="space-y-2">
 				<Label class="text-sm font-semibold">Source</Label>
 				<div class="grid gap-2 rounded-lg border bg-muted/30 p-4">
@@ -100,7 +98,6 @@
 				</div>
 			</div>
 
-			<!-- Details -->
 			{#if detailEntries.length > 0}
 				<div class="space-y-2">
 					<Label class="text-sm font-semibold">Details</Label>

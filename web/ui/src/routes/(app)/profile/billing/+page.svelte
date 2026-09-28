@@ -56,7 +56,7 @@
 	const isCancelling = $derived(isActive && subscription?.cancelAtPeriodEnd);
 	const cancel = billing.cancelSubscription();
 
-	// The API resolves the canonical plan name; community renders as Free.
+	// Community renders as Free.
 	const planNames: Record<string, string> = {
 		community: 'Free',
 		pro: 'Pro',
@@ -67,8 +67,7 @@
 	const checkout = billing.checkout();
 	const portal = billing.portal();
 
-	// -1 = unlimited (per-seat billing on pro/enterprise).
-	// int64 fields arrive as number | bigint; coerce for arithmetic.
+	// -1 is unlimited. int64 fields arrive as number | bigint.
 	const seats = $derived({
 		used: Number(data?.memberCount ?? 0),
 		cap: Number(data?.quotas?.seats ?? -1)
@@ -82,7 +81,6 @@
 	});
 	const resourcesUnlimited = $derived(resources.cap < 0);
 
-	// Full catalog from the API: true = enabled, false = locked upgrade bait.
 	const featureCatalog = [
 		{ key: 'oidc', label: 'OIDC SSO', unlocks: null },
 		{ key: 'enforce_sso', label: 'Enforced SSO', unlocks: 'Pro' },
@@ -176,7 +174,6 @@
 
 <div class="mx-auto mt-8 max-w-xl space-y-6">
 	{#if billingEnabled}
-		<!-- Plan Overview -->
 		<Card.Root class="relative overflow-hidden rounded-xl border shadow-sm">
 			<div
 				class="pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full bg-primary/5 blur-3xl"
@@ -277,7 +274,6 @@
 			</Card.Footer>
 		</Card.Root>
 
-		<!-- Usage & Quotas -->
 		<Card.Root class="rounded-xl border shadow-sm">
 			<Card.Header class="pb-3">
 				<Card.Title class="text-lg font-semibold tracking-tight">Usage & Quotas</Card.Title>
@@ -345,7 +341,6 @@
 			</Card.Content>
 		</Card.Root>
 
-		<!-- Features -->
 		<Card.Root class="rounded-xl border shadow-sm">
 			<Card.Header class="pb-3">
 				<Card.Title class="text-lg font-semibold tracking-tight">Features</Card.Title>
@@ -375,9 +370,7 @@
 			</Card.Content>
 		</Card.Root>
 	{:else}
-		<!-- On-Premise License (self-hosted deployments only) -->
 		{#if licenseData.data?.active}
-			<!-- Enterprise Card -->
 			<Card.Root
 				class="relative overflow-hidden rounded-xl border border-primary/20 bg-linear-to-b from-background to-muted/20 shadow-lg shadow-primary/5"
 			>
@@ -426,7 +419,6 @@
 				</Card.Content>
 			</Card.Root>
 		{:else}
-			<!-- Community Card -->
 			<Card.Root
 				class="relative overflow-hidden rounded-xl border bg-background shadow-sm transition-all hover:shadow-md"
 			>

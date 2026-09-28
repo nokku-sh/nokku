@@ -18,7 +18,6 @@
 
 		handle = openTerminal(session.daemonID, session.id, containerEl);
 
-		// Fit on container resize
 		const observer = new ResizeObserver(() => {
 			handle?.fitAddon.fit();
 		});
@@ -30,10 +29,9 @@
 		};
 	});
 
-	// Refit when tab becomes visible
 	$effect(() => {
 		if (visible && handle) {
-			// Small delay to let the DOM settle after display change
+			// Let the DOM settle after the display change.
 			requestAnimationFrame(() => {
 				handle?.fitAddon.fit();
 				handle?.terminal.focus();

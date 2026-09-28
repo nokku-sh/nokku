@@ -31,11 +31,10 @@ const (
 	redaction     = "<redacted>"
 )
 
-// scrubDetector loads the embedded gitleaks ruleset once per process.
 var scrubDetector = sync.OnceValues(detect.NewDetectorDefaultConfig)
 
-// keywordRe matches any rule keyword in one pass over the blob, replacing
-// gitleaks' per-rule prefilter. A nil regex runs every rule unfiltered.
+// keywordRe replaces gitleaks' per-rule prefilter with one pass. Nil runs
+// every rule unfiltered.
 var keywordRe = sync.OnceValue(func() *regexp.Regexp {
 	det, err := scrubDetector()
 	if err != nil {
@@ -55,16 +54,13 @@ var keywordRe = sync.OnceValue(func() *regexp.Regexp {
 	return regexp.MustCompile(`(?i)(?:` + strings.Join(kws, "|") + `)`)
 })
 
-// span is a half-open byte range of the stream blob to redact.
+// span is half-open.
 type span struct {
 	start, end int
 }
 
-// ScrubRecording asynchronously scrubs credential patterns from a completed
-// recording and replaces the stored object in place. Best effort: a failure
-// leaves the recording exactly as uploaded. A failed scrub is not retried,
-// and a scrub racing a delete writes a stray object, which the workspace
-// wipe sweeps.
+// ScrubRecording is best effort and never retried. A failure leaves the
+// recording as uploaded.
 func (s *Service) ScrubRecording(rec *db.Recording) {
 	ctx, cancel := context.WithTimeout(context.Background(), scrubTimeout)
 	go func() {
@@ -72,8 +68,7 @@ func (s *Service) ScrubRecording(rec *db.Recording) {
 		if err := s.scrub(ctx, rec.WorkspaceID, rec.ID); err != nil {
 			slog.Error("scrub recording failed, recording kept as uploaded",
 				"recording_id", rec.ID, "workspace_id", rec.WorkspaceID, "error", err)
-			// A failed scrub leaves secrets in the stored object. Record it
-			// so it is visible and attributable, not one log line among many.
+			// Audit it, a failed scrub leaves secrets in the stored object.
 			if s.events != nil {
 				event := &audit.Event{
 					Timestamp:   time.Now().UTC(),
@@ -95,8 +90,6 @@ func (s *Service) ScrubRecording(rec *db.Recording) {
 	}()
 }
 
-// scrub rewrites the recording object with detected secrets masked. The
-// object format is unchanged: framed encrypted slices of the gzipped cast.
 func (s *Service) scrub(ctx context.Context, workspaceID, recordingID string) error {
 	cast, err := s.readRecordingCast(ctx, workspaceID, recordingID)
 	if err != nil {
@@ -124,8 +117,6 @@ func (s *Service) scrub(ctx context.Context, workspaceID, recordingID string) er
 	if err != nil {
 		return err
 	}
-	// NewWriter frames each chunk the way the daemon uploads them and commits
-	// on Close, so the format stays identical.
 	for chunk := range slices.Chunk(gz.Bytes(), scrubChunk) {
 		if err := w.WriteChunk(chunk); err != nil {
 			_ = w.Close()
@@ -140,7 +131,6 @@ func (s *Service) scrub(ctx context.Context, workspaceID, recordingID string) er
 	return nil
 }
 
-// readRecordingCast returns the decompressed asciicast text of a recording.
 func (s *Service) readRecordingCast(
 	ctx context.Context,
 	workspaceID, recordingID string,
@@ -167,7 +157,6 @@ func (s *Service) readRecordingCast(
 	return cast, nil
 }
 
-// castEvent is one parsed event line whose stream participates in scrubbing.
 type castEvent struct {
 	line      int
 	code      string
@@ -178,10 +167,8 @@ type castEvent struct {
 	dataEnd   int
 }
 
-// scrubCast redacts secrets across the cast and returns the rewritten text.
-// Detection runs over each stream (output, input) concatenated back into the
-// bytes the terminal produced, so secrets split across event boundaries are
-// still caught, then the redactions are mapped back onto the events.
+// scrubCast detects over each stream concatenated, so secrets split across
+// events are still caught, then maps the redactions back onto the events.
 func scrubCast(cast []byte) ([]byte, bool, error) {
 	det, err := scrubDetector()
 	if err != nil {
@@ -237,8 +224,7 @@ func scrubCast(cast []byte) ([]byte, bool, error) {
 	return bytes.Join(lines, []byte("\n")), true, nil
 }
 
-// parseCastEvent decodes one asciicast event line. Only output and input
-// events carry user-controlled data worth scrubbing.
+// parseCastEvent only keeps output and input events.
 func parseCastEvent(line []byte) (castEvent, bool) {
 	var raw []json.RawMessage
 	if err := json.Unmarshal(line, &raw); err != nil || len(raw) != 3 {
@@ -260,8 +246,7 @@ func parseCastEvent(line []byte) (castEvent, bool) {
 	return ev, true
 }
 
-// marshalCastEvent re-encodes one event line without HTML escaping, matching
-// the daemon's writer so the cast stays readable.
+// marshalCastEvent skips HTML escaping to match the daemon's writer.
 func marshalCastEvent(interval float64, code string, data []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -272,7 +257,6 @@ func marshalCastEvent(interval float64, code string, data []byte) ([]byte, error
 	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
 }
 
-// secretSpans returns the merged, sorted byte spans of detected secrets.
 func secretSpans(blob []byte, det *detect.Detector) []span {
 	var spans []span
 	kws := keywordRe()
@@ -303,9 +287,7 @@ func secretSpans(blob []byte, det *detect.Detector) []span {
 	return mergeSpans(preferTightest(spans))
 }
 
-// secretSpan narrows a rule match to the secret itself: the configured
-// secret group, else gitleaks' first non-empty capture group, else the
-// full match. Redacting only the span keeps assignment keys readable.
+// secretSpan narrows the match so assignment keys stay readable.
 func secretSpan(rule config.Rule, m []int) (int, int) {
 	if g := rule.SecretGroup; g > 0 && 2*g+1 < len(m) && m[2*g] >= 0 {
 		return m[2*g], m[2*g+1]
@@ -318,9 +300,8 @@ func secretSpan(rule config.Rule, m []int) (int, int) {
 	return m[0], m[1]
 }
 
-// preferTightest drops spans fully contained in a strictly larger one, so a
-// key=value redaction keeps the key name readable when a wider rule matched
-// the whole assignment. Huge span counts fall through to the plain merge.
+// preferTightest drops spans that contain a smaller one, so a key=value
+// redaction keeps the key readable. Huge span counts skip this.
 func preferTightest(spans []span) []span {
 	if len(spans) > 1000 {
 		return spans
@@ -346,10 +327,7 @@ func preferTightest(spans []span) []span {
 
 func len2(s span) int { return s.end - s.start }
 
-// allowlisted reports whether a candidate secret matches a rule or global
-// allowlist regex, which gitleaks uses to suppress known false positives.
-// An allowlist regex targets the secret unless it opts into "match" or
-// "line" (the closest approximation we track).
+// allowlisted approximates "line" targets with the match.
 func allowlisted(rule config.Rule, cfg config.Config, match, secret []byte) bool {
 	for _, al := range append(rule.Allowlists, cfg.Allowlists...) {
 		for _, re := range al.Regexes {
@@ -365,7 +343,6 @@ func allowlisted(rule config.Rule, cfg config.Config, match, secret []byte) bool
 	return false
 }
 
-// redactEvents maps blob-level spans onto each event of one stream.
 func redactEvents(events []castEvent, code string, blob []byte, spans []span) {
 	for i := range events {
 		ev := &events[i]
@@ -376,7 +353,6 @@ func redactEvents(events []castEvent, code string, blob []byte, spans []span) {
 	}
 }
 
-// applySpans rebuilds blob[start:end] with intersecting spans masked.
 func applySpans(blob []byte, start, end int, spans []span) []byte {
 	seg := blob[start:end]
 	i := sort.Search(len(spans), func(i int) bool { return spans[i].end > start })

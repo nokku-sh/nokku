@@ -1,18 +1,9 @@
-// Package entitlement resolves what a workspace's plan allows: seats,
-// retention, and org-level feature gates. It is the single enforcement
-// point for plan logic; money movement (Stripe, license keys) lives in
-// internal/billing.
+// Package entitlement is the single enforcement point for plan logic. Money
+// movement lives in internal/billing.
 //
-// Design rules (see idea/billing-and-monetization.md §5.2):
-//   - Fail open on quota (seats): billing data problems never block daily
-//     work. Fail closed on features: resolution errors fall back to
-//     Community, and the admin sees the missing feature, not silent access.
-//   - Downgrades never destroy data. Features stop, retention shrinks on
-//     its normal schedule, nothing is deleted on plan change.
-//   - One Resolve per request, cached in context, like authn.
-//   - The catalog lives in code and ships in the public binary. That is
-//     transparency, not leakage: prices reference the catalog by name, the
-//     Ed25519 signing key is the only secret in the system.
+//   - Fail open on quotas, billing data problems never block daily work.
+//   - Fail closed on features, resolution errors fall back to Community.
+//   - Downgrades never destroy data.
 package entitlement
 
 import "maps"
@@ -33,17 +24,11 @@ const (
 	PlanEnterprise = "enterprise"
 )
 
-// Feature is one plan-gated capability: its catalog code and the human-facing
-// name shown in denial messages.
 type Feature struct {
 	Code  string
 	Label string
 }
 
-// CatalogFeatures lists every feature the catalog can grant, code and label
-// together so the two cannot drift. Callers that must cover the whole catalog,
-// the billing payload and the golden test that police feature wiring, iterate
-// this instead of repeating the list.
 var CatalogFeatures = []Feature{
 	{FeatureOIDC, "OIDC single sign-on"},
 	{FeatureEnforceSSO, "enforced single sign-on"},
@@ -54,7 +39,6 @@ var CatalogFeatures = []Feature{
 	{FeatureExternalKMS, "external key management"},
 }
 
-// featureInCatalog returns the catalog entry for a feature code.
 func featureInCatalog(code string) (Feature, bool) {
 	for _, f := range CatalogFeatures {
 		if f.Code == code {
@@ -75,7 +59,6 @@ type Plan struct {
 	Features              map[string]bool
 }
 
-// Has reports whether the plan enables the feature.
 func (p Plan) Has(feature string) bool {
 	return p.Features[feature]
 }

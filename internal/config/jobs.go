@@ -35,9 +35,7 @@ func (c *Config) startBackgroundJobs(ctx context.Context) {
 	}
 }
 
-// runBillingJobs reconciles local subscription state from the billing
-// provider so missed webhooks self-heal. There is no usage reporting:
-// billing is per-seat, quantity is managed in the Stripe portal.
+// runBillingJobs lets missed webhooks self-heal.
 func (c *Config) runBillingJobs(ctx context.Context) {
 	timer := time.NewTimer(5 * time.Minute)
 	defer timer.Stop()
@@ -71,7 +69,6 @@ func (c *Config) syncBilling(ctx context.Context) {
 }
 
 func (c *Config) cleanupUnverifiedUsers(ctx context.Context) {
-	// Registrations that never verified within 48 hours are pruned.
 	_, err := c.IAM.DeleteUnverifiedUsers(ctx, time.Now().Add(-48*time.Hour))
 	if err != nil {
 		slog.Error("failed to cleanup unverified users", "error", err)
@@ -94,8 +91,7 @@ func (c *Config) rotateCerts(ctx context.Context) {
 			return err
 		}
 
-		// Older CAs have no stored lifetime. Fall back to the certificate's
-		// own validity span.
+		// Older CAs have no stored lifetime.
 		lifetime := ca.Lifetime
 		if lifetime <= 0 {
 			lifetime = ca.NotAfter.Sub(ca.NotBefore)

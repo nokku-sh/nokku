@@ -95,8 +95,7 @@
 							method: 'POST',
 							body: formData
 						});
-						// The upload only stores the file; the avatar URL is
-						// attached to the account through the update endpoint.
+						// The upload only stores the file, UpdateAccount attaches it.
 						const { url } = await res.json();
 						updateProfile.mutate({ ...currentUser, picture: url });
 						toast.success('Avatar uploaded successfully!');

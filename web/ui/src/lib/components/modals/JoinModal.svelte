@@ -28,7 +28,6 @@
 	}
 
 	function clearTokens() {
-		// Remove token and redirect to home
 		inviteToken.current = '';
 		goto('/');
 	}

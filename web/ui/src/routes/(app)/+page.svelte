@@ -199,7 +199,6 @@
 			</Empty.Content>
 		</Empty.Root>
 	{:else}
-		<!-- Header -->
 		<header class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
 			<div class="space-y-1">
 				<h1 class="text-2xl font-bold tracking-tight md:text-3xl">
@@ -248,7 +247,6 @@
 		{/if}
 
 		{#if isAdmin}
-			<!-- Stats -->
 			<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 				<StatCard
 					label="Servers"
@@ -291,7 +289,6 @@
 			</div>
 		{/if}
 
-		<!-- Main content -->
 		<div class="grid gap-6 lg:grid-cols-3">
 			<section class="space-y-4 lg:col-span-2">
 				<SectionHeading

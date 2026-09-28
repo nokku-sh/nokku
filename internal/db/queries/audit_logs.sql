@@ -27,8 +27,7 @@ VALUES
   );
 
 -- name: ListAuditLogs :many
--- RLS already limits rows to the pinned workspace or the actor's own. A NULL
--- workspace_id is the personal log: every row of the actor, any workspace.
+-- A NULL workspace_id is the personal log, RLS already limits the rows.
 SELECT
   *,
   COUNT(*) OVER ()::INTEGER AS total

@@ -9,15 +9,10 @@ import { UtilService } from '$lib/gen/nokku/v1/util_pb';
 import type { User } from '$lib/gen/nokku/v1/account_pb';
 import { pageIndex, pageSize } from '$lib/store.svelte';
 
-// The account reads and mutations ride the proto-backed AccountService. The
-// User shape comes straight from the proto, so components consume it without
-// a translation layer.
-
 const invalidateAccount = () => queryClient.invalidateQueries({ queryKey: ['account'] });
 
 const identityTypes = ['oidc', 'oauth2', 'saml'];
 
-// Linked identities are credentials of the OIDC/OAuth2/SAML kinds.
 export interface LinkedAccount {
 	providerId: string;
 	provider: string;
@@ -35,7 +30,6 @@ function toLinkedAccount(c: AccountCredential): LinkedAccount {
 }
 
 export const user = {
-	// Queries
 	self: () =>
 		createQuery<User>(() => ({
 			queryKey: ['account'],
@@ -55,7 +49,6 @@ export const user = {
 		startDate?: Timestamp;
 		endDate?: Timestamp;
 	}) => {
-		// userID selects the actor for the query; the rest are extra filters.
 		const { userID, ...rest } = filters;
 		const cleanFilters = Object.fromEntries(
 			Object.entries(rest ?? {}).filter(([, v]) => v !== undefined && v !== '' && v !== null)
@@ -64,8 +57,7 @@ export const user = {
 		return useQuery(
 			UtilService.method.listAuditLogs,
 			{
-				// Empty workspaceId deliberately opts out of the workspace
-				// interceptor so this stays a personal (global) read.
+				// Empty opts out of the workspace interceptor, a personal read.
 				workspaceId: '',
 				actorIds: [userID],
 				limit: pageSize.current,
@@ -76,7 +68,6 @@ export const user = {
 		);
 	},
 
-	// Mutations
 	updateProfile: () =>
 		createMutation<User, Error, { name?: string; picture?: string; email?: string }>(() => ({
 			mutationFn: (variables) =>

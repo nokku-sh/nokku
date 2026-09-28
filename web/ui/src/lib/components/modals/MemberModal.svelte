@@ -49,7 +49,6 @@
 				<Dialog.Description>View user details and permissions</Dialog.Description>
 			</Dialog.Header>
 
-			<!-- User Header -->
 			<Item.Root variant="muted">
 				<Item.Media>
 					<UserAvatar user={data} />
@@ -65,7 +64,6 @@
 
 			<Separator />
 
-			<!-- Information -->
 			<Item.Group>
 				<Item.Root variant="muted" size="sm">
 					<Item.Content>

@@ -34,19 +34,16 @@
 		{ value: 'years', label: 'Years', ms: 365 * 24 * 60 * 60 * 1000 }
 	];
 
-	// Determine best unit from current value
 	function getBestUnit(ms: number): Unit {
 		if (ms === 0) return 'hours';
 		const absMs = Math.abs(ms);
 
-		// Find the largest unit that divides evenly, or the best fit
 		for (let i = units.length - 1; i >= 0; i--) {
 			if (absMs >= units[i].ms && absMs % units[i].ms === 0) {
 				return units[i].value;
 			}
 		}
 
-		// Fallback: find most appropriate unit
 		if (absMs >= 365 * 24 * 60 * 60 * 1000) return 'years';
 		if (absMs >= 24 * 60 * 60 * 1000) return 'days';
 		if (absMs >= 60 * 60 * 1000) return 'hours';
@@ -60,7 +57,6 @@
 		const ms = durationMs(value);
 		const unit = units.find((u) => u.value === selectedUnit)!;
 		const num = ms / unit.ms;
-		// Show clean number if possible
 		return Number.isInteger(num) ? num.toString() : num.toFixed(2).replace(/\.?0+$/, '');
 	});
 
@@ -78,7 +74,6 @@
 
 		let ms = num * getUnitMs(selectedUnit);
 
-		// Apply min/max constraints (in ms)
 		if (min !== undefined) ms = Math.max(ms, min);
 		if (max !== undefined) ms = Math.min(ms, max);
 
@@ -93,12 +88,10 @@
 			return;
 		}
 
-		// Keep the same total duration, just change display unit
 		selectedUnit = unit;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		// Allow arrow keys to increment/decrement
 		if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
 			e.preventDefault();
 			const current = value ? durationMs(value) : 0;

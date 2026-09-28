@@ -22,10 +22,6 @@ export type WithoutChildren<T> = T extends { children?: any } ? Omit<T, 'childre
 export type WithoutChildrenOrChild<T> = WithoutChildren<WithoutChild<T>>;
 export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & { ref?: U | null };
 
-// =============================================================================
-// Bytes
-// =============================================================================
-
 export function formatBytes(bytes: number): string {
 	if (bytes >= 1 << 30) return `${(bytes / (1 << 30)).toFixed(1)} GiB`;
 	if (bytes >= 1 << 20) return `${(bytes / (1 << 20)).toFixed(1)} MiB`;
@@ -33,18 +29,11 @@ export function formatBytes(bytes: number): string {
 	return `${bytes} B`;
 }
 
-// =============================================================================
-// Timestamps
-// =============================================================================
-
-/** Convert Timestamp to Date (passthrough for convenience) */
 export const toDate = (ts: Timestamp | null | undefined): Date =>
 	ts ? timestampDate(ts) : new Date();
 
-/** Create Timestamp from Date */
 export const fromDate = (date: Date): Timestamp => timestampFromDate(date);
 
-/** Create Timestamp for current time */
 export const now = (): Timestamp => fromDate(new Date());
 
 export const DateValueFormat = (date: DateValue | null | undefined) => {
@@ -117,7 +106,6 @@ const formatters = {
 	})
 };
 
-/** Format a Timestamp for display */
 export function formatTs(
 	ts: Timestamp | null | undefined,
 	style: DateStyle = 'long',
@@ -157,17 +145,10 @@ function formatRelative(ts: Timestamp, short = false): string {
 	return isFuture ? `in ${str}` : `${str} ago`;
 }
 
-// =============================================================================
-// Durations
-// =============================================================================
-
-/** Convert seconds to Duration */
 export const secToD = (sec: number): Duration => durationFromMs(sec * 1000);
 
-/** Convert Duration to milliseconds */
 export const dToMs = (d: Duration | null | undefined): number => (d ? durationMs(d) : 0);
 
-/** Convert Duration to seconds */
 export const dToSec = (d: Duration | null | undefined): number => dToMs(d) / 1000;
 
 type DurationStyle = 'short' | 'long' | 'compact' | 'clock';
@@ -182,7 +163,6 @@ const UNITS = [
 	{ s: 's', l: 'second', ms: 1000 }
 ] as const;
 
-/** Format a Duration for display */
 export function formatD(
 	d: Duration | null | undefined,
 	style: DurationStyle = 'short',
@@ -221,10 +201,6 @@ export function formatD(
 
 const pad = (n: number) => n.toString().padStart(2, '0');
 
-// =============================================================================
-// Duration Parsing
-// =============================================================================
-
 const PARSE_UNITS: Record<string, number> = {
 	y: 365 * 24 * 60 * 60 * 1000,
 	mo: 30 * 24 * 60 * 60 * 1000,
@@ -236,15 +212,11 @@ const PARSE_UNITS: Record<string, number> = {
 	ms: 1
 };
 
-/**
- * Parse a duration string into a Duration.
- * Supports formats like: "1h30m", "2d", "1h 30m 15s", "90s", "1.5h"
- */
+// parseD accepts "1h30m", "2d", "1h 30m 15s", "90s", "1.5h", or plain seconds.
 export function parseD(input: string): Duration | null {
 	const str = input.trim().toLowerCase();
 	if (!str) return null;
 
-	// Match number + unit pairs (e.g., "1h", "30m", "1.5s")
 	const regex = /(-?\d+\.?\d*)\s*(y|mo|w|d|h|m(?!s)|s|ms)/g;
 	let totalMs = 0;
 	let matched = false;
@@ -259,7 +231,6 @@ export function parseD(input: string): Duration | null {
 	}
 
 	if (!matched) {
-		// Try parsing as plain number (assume seconds)
 		const num = parseFloat(str);
 		if (!isNaN(num)) {
 			totalMs = num * 1000;
@@ -270,18 +241,13 @@ export function parseD(input: string): Duration | null {
 	return matched ? durationFromMs(Math.round(totalMs)) : null;
 }
 
-// =============================================================================
-// Enums
-// =============================================================================
-
-/** Convert protobuf enum to array (excludes 0/UNSPECIFIED) */
+/** Excludes 0/UNSPECIFIED. */
 export function enumToArray<T extends object>(e: T): { name: string; value: number }[] {
 	return Object.entries(e)
 		.filter(([, v]) => typeof v === 'number' && v !== 0)
 		.map(([name, value]) => ({ name, value: value as number }));
 }
 
-/** Convert SCREAMING_SNAKE_CASE enum to Title Case */
 export function enumLabel(value: string | undefined): string {
 	if (!value) return '';
 	return value

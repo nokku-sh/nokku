@@ -1,9 +1,7 @@
 package iam
 
-// The SAML SP-initiated flow, exercised end to end against an in-process
-// crewjam saml.IdentityProvider that serves real metadata and signs real
-// assertions. Attack paths tamper with the signing key, replay the
-// RelayState, and relay responses across flows.
+// End-to-end SAML tests against an in-process crewjam IdentityProvider that
+// signs real assertions.
 
 import (
 	"crypto/rand"
@@ -27,9 +25,8 @@ import (
 	dsig "github.com/russellhaering/goxmldsig"
 )
 
-// samlIDPHarness is the in-process IdP. Metadata always advertises the trusted
-// keypair; assertions are signed with the signing keypair, which a test can
-// rotate to simulate a forged signer while the SP still trusts the old key.
+// samlIDPHarness signs with a keypair a test can rotate away from the one
+// its metadata advertises, to simulate a forged signer.
 type samlIDPHarness struct {
 	ts *httptest.Server
 
@@ -41,14 +38,11 @@ type samlIDPHarness struct {
 
 	session *saml.Session
 
-	// spMetadata is the SP's EntityDescriptor, set by the test after the
-	// service under test is built.
 	spMetadata *saml.EntityDescriptor
 
 	org   org
 	email string
-	// down makes the metadata endpoint fail.
-	down bool
+	down  bool
 }
 
 func newSAMLIdP(t *testing.T) *samlIDPHarness {
@@ -90,7 +84,6 @@ func newSAMLIdP(t *testing.T) *samlIDPHarness {
 	return h
 }
 
-// resetKeys generates a fresh trusted and signing keypair.
 func (h *samlIDPHarness) resetKeys(t *testing.T) {
 	t.Helper()
 	trustedKey, trustedCert := newKeyCert(t)
@@ -98,9 +91,6 @@ func (h *samlIDPHarness) resetKeys(t *testing.T) {
 	h.signingKey, h.signingCert = trustedKey, trustedCert
 }
 
-// forge rotates the signing keypair away from the trusted one: metadata
-// still advertises the trusted certificate, so an assertion signed now
-// must fail verification at the SP.
 func (h *samlIDPHarness) forge(t *testing.T) {
 	t.Helper()
 	h.signingKey, h.signingCert = newKeyCert(t)
@@ -133,8 +123,6 @@ func (h *samlIDPHarness) GetSession(_ http.ResponseWriter, _ *http.Request, _ *s
 	return h.session
 }
 
-// setup builds the service and an enterprise org whose SAML provider points
-// at the harness, with alice queued as the IdP user.
 func (h *samlIDPHarness) setup(t *testing.T) (*testEnv, *Service) {
 	t.Helper()
 	e := newTestEnv(t)
@@ -191,8 +179,6 @@ func newKeyCert(t *testing.T) (*rsa.PrivateKey, *x509.Certificate) {
 	return key, cert
 }
 
-// samlFlowRun is one started flow: the login response's cookies plus the
-// signed response the IdP posted back.
 type samlFlowRun struct {
 	loginCookies []*http.Cookie
 	samlResponse string
@@ -204,8 +190,6 @@ var (
 	reRelayState   = regexp.MustCompile(`name="RelayState" value="([^"]+)"`)
 )
 
-// startSAMLFlow runs the SP login and the IdP authorize leg, ending with
-// the browser holding the auto-POST form for the ACS.
 func (h *samlIDPHarness) startSAMLFlow(t *testing.T, svc *Service) *samlFlowRun {
 	t.Helper()
 
@@ -245,7 +229,6 @@ func (h *samlIDPHarness) startSAMLFlow(t *testing.T, svc *Service) *samlFlowRun 
 	}
 }
 
-// postACS submits the flow's response to the ACS endpoint.
 func (f *samlFlowRun) postACS(
 	t *testing.T,
 	svc *Service,
@@ -256,7 +239,6 @@ func (f *samlFlowRun) postACS(
 	return f.postACSCustom(t, svc, relayState, f.cookiesFor(withCookies))
 }
 
-// postACSCustom submits the flow's response with explicit cookies.
 func (f *samlFlowRun) postACSCustom(
 	t *testing.T,
 	svc *Service,
@@ -282,7 +264,6 @@ func (f *samlFlowRun) cookiesFor(with bool) []*http.Cookie {
 	return f.loginCookies
 }
 
-// spMetadataFor captures the SP metadata the service under test serves.
 func spMetadataFor(t *testing.T, svc *Service) *saml.EntityDescriptor {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/saml/metadata", nil)
@@ -334,7 +315,6 @@ func TestSAMLFlowLostDomainRejectsLinkedIdentity(t *testing.T) {
 	wantSSOFailure(t, f.postACS(t, svc, f.relayState, true))
 }
 
-// ageMetadata backdates the SP's cached copy of the IdP metadata.
 func ageMetadata(svc *Service, by time.Duration) {
 	svc.SAML.mu.Lock()
 	defer svc.SAML.mu.Unlock()

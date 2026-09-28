@@ -54,7 +54,6 @@ func parsePrivateKey(keyBytes []byte) (any, error) {
 	return nil, errors.New("unsupported private key format")
 }
 
-// MarshalPubKey converts a public key to an authorized key string.
 func MarshalPubKey(key any) (string, error) {
 	pub, err := ssh.NewPublicKey(key)
 	if err != nil {

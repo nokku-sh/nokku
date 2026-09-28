@@ -375,8 +375,6 @@ type ListOwnedWorkspacesRow struct {
 	MemberCount int32  `json:"memberCount"`
 }
 
-// The user's owned workspaces with their member count, so account deletion
-// can tell solo workspaces from ones other people still use.
 func (q *Queries) ListOwnedWorkspaces(ctx context.Context, userID string) ([]*ListOwnedWorkspacesRow, error) {
 	rows, err := q.db.Query(ctx, listOwnedWorkspaces, userID)
 	if err != nil {
@@ -413,9 +411,7 @@ type ListWorkspaceAuditWebhooksRow struct {
 	WebhookSecret string `json:"webhookSecret"`
 }
 
-// Destinations for the audit streaming sink. Read as nokku_system: the
-// workspaces table is RLS-scoped to one tenant, and this is a cross-tenant
-// read.
+// Cross-tenant read, must run as nokku_system.
 func (q *Queries) ListWorkspaceAuditWebhooks(ctx context.Context) ([]*ListWorkspaceAuditWebhooksRow, error) {
 	rows, err := q.db.Query(ctx, listWorkspaceAuditWebhooks)
 	if err != nil {

@@ -4,7 +4,6 @@ import { addSession, removeSession, validateActiveSession } from './terminal.sve
 import { activeSessionID, pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
 
 export const daemon = {
-	// Queries
 	get: (id?: string) =>
 		useQuery(
 			DaemonService.method.getDaemon,
@@ -53,7 +52,6 @@ export const daemon = {
 			}
 		),
 
-	// Mutations
 	createSession: () =>
 		useMutation(DaemonService.method.createSession, {
 			onSuccess: (data, vars) => {

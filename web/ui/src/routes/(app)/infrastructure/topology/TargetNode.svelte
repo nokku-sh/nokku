@@ -24,7 +24,6 @@
 <div class="group relative">
 	<Card.Root class="w-[360px] p-0">
 		<Card.Content class="space-y-4 p-0">
-			<!-- Header -->
 			<div class="rounded-t-xl border-b border-border/50 bg-background p-4">
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-3">
@@ -50,7 +49,6 @@
 				</div>
 			</div>
 
-			<!-- Description -->
 			<div class="flex flex-col">
 				{#if target.description}
 					<div class="mb-4 px-4 text-sm text-muted-foreground">
@@ -58,9 +56,7 @@
 					</div>
 				{/if}
 
-				<!-- <div class="grid grid-cols-2 gap-3"> -->
 				<div class="grid grid-cols-2 divide-x divide-border/50 border-y border-border/50 px-2">
-					<!-- Endpoints -->
 					<div class="p-2.5">
 						<div class="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
 							<Network size={14} />
@@ -86,7 +82,6 @@
 						</div>
 					</div>
 
-					<!-- Tags -->
 					<div class="p-2.5">
 						<div class="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
 							<Tags size={14} />
@@ -113,7 +108,6 @@
 					</div>
 				</div>
 
-				<!-- Footer -->
 				<div class="flex items-center justify-between bg-muted/10 p-2.5 px-4 text-xs">
 					<span class="text-muted-foreground">Total Principals</span>
 					<Badge variant={principalCount > 0 ? 'default' : 'secondary'} class="h-5">

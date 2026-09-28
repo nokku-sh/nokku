@@ -6,12 +6,6 @@ import { AuthService } from '$lib/gen/nokku/v1/auth_pb';
 import { workspaceID } from '$lib/store.svelte';
 import { queryClient, authTransport } from './client';
 
-// The pre-session auth flows are the Connect AuthService: registration,
-// password and backup-code login, logout, and the email round trips. The
-// calls carry the session cookie through authTransport; issued cookies come
-// back on the response headers. These mutations keep the pre-Connect
-// surface (auth.mutation().mutate(body)) so the pages stay untouched.
-
 const client = createClient(AuthService, authTransport);
 
 function authMutation<B extends object | undefined, D = void>(

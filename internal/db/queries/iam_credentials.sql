@@ -1,4 +1,3 @@
--- One unified credential table for every login method (see 001_base.sql).
 -- name: UpsertCredential :one
 INSERT INTO
   credentials (id, user_id, type, provider, subject, data, label)
@@ -12,8 +11,7 @@ SET
   data = EXCLUDED.data,
   label = EXCLUDED.label,
   updated_at = NOW()
--- A credential never moves to another account. A clash with someone else's
--- row returns no rows.
+-- A credential never moves accounts, a clash returns no rows.
 WHERE
   credentials.user_id = EXCLUDED.user_id
 RETURNING

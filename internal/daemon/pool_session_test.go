@@ -160,7 +160,7 @@ func TestPool_StartSession(t *testing.T) {
 collect:
 	for {
 		select {
-		case chunk := <-s.Stdout:
+		case chunk := <-s.stdout:
 			got = append(got, chunk...)
 			if strings.Contains(string(got), "ping") {
 				break collect
@@ -191,7 +191,7 @@ collect:
 	// slot.
 	p.CloseSession("web-1")
 	select {
-	case <-s.Exited:
+	case <-s.exited:
 	case <-time.After(2 * time.Second):
 		t.Fatal("Exited not closed after CloseSession")
 	}
@@ -295,7 +295,7 @@ func TestPool_StartSession_ServerDeath(t *testing.T) {
 	srv.Close()
 
 	select {
-	case <-s.Exited:
+	case <-s.exited:
 	case <-time.After(2 * time.Second):
 		t.Fatal("Exited not closed after the ssh server died")
 	}

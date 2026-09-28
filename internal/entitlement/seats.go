@@ -8,7 +8,6 @@ import (
 	"connectrpc.com/connect"
 )
 
-// SeatLimitError is the user-facing denial when a workspace is full.
 type SeatLimitError struct {
 	Plan string
 	Cap  int64
@@ -21,9 +20,7 @@ func (e *SeatLimitError) Error() string {
 	)
 }
 
-// CanInvite reports whether one more member fits under the plan's seat
-// cap. The only remaining quota check in the product, shared by the
-// invitation and SCIM provisioning paths.
+// CanInvite is shared by the invitation, SSO, and SCIM join paths.
 func (s *Service) CanInvite(ctx context.Context, workspaceID string, used int64) error {
 	plan := s.Resolve(ctx, workspaceID)
 	if plan.SeatCap != Unlimited && used >= plan.SeatCap {

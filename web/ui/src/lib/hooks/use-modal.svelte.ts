@@ -5,10 +5,6 @@ import {
 	type MessageShape
 } from '@bufbuild/protobuf';
 
-/**
- * Reactive modal state manager for Svelte 5
- * Handles open state and selected item for modal dialogs
- */
 export function createModalState<T>(defaultValue: T = {} as T) {
 	let open = $state(false);
 	let selected = $state<T>(defaultValue);
@@ -26,17 +22,14 @@ export function createModalState<T>(defaultValue: T = {} as T) {
 		set selected(value: T) {
 			selected = value;
 		},
-		/** Open modal with selected item */
 		openWith(item: T) {
 			selected = item;
 			open = true;
 		},
-		/** Open modal for creating new item (resets to default) */
 		openNew() {
 			selected = defaultValue;
 			open = true;
 		},
-		/** Close modal and optionally reset selection */
 		close(resetSelection = false) {
 			open = false;
 			if (resetSelection) {
@@ -46,23 +39,15 @@ export function createModalState<T>(defaultValue: T = {} as T) {
 	};
 }
 
-/**
- * Modal state for entity create/edit forms. The draft is a protobuf message
- * built with create(), so form fields always bind to a complete, schema-valid
- * object. openEdit() clones the entity into a fresh draft, which means the
- * query cache is never mutated and reopening an entity starts from its latest
- * server state.
- */
+// createEntityModalState edits a clone, so the query cache is never mutated.
 export function createEntityModalState<Desc extends DescMessage>(
 	schema: Desc,
 	newInit?: () => MessageInitShape<Desc>
 ) {
 	type Entity = MessageShape<Desc>;
 
-	// Svelte's $state only deep-proxies plain objects and arrays. Protobuf
-	// messages are class instances, so they would pass through untracked and
-	// field writes would never re-render the form. Cloning into a plain object
-	// (keeping the $typeName discriminator) makes every draft reactive.
+	// $state only deep-proxies plain objects, protobuf messages are class
+	// instances and would never re-render the form.
 	function plainClone(entity: Entity): Entity {
 		const clone = structuredClone(entity) as Entity;
 		if (!('$typeName' in clone)) {
@@ -87,12 +72,10 @@ export function createEntityModalState<Desc extends DescMessage>(
 		set draft(value: Entity) {
 			draft = value;
 		},
-		/** Start a blank draft from the schema defaults (or a custom init) */
 		openNew() {
 			draft = plainClone(create(schema, newInit?.()));
 			open = true;
 		},
-		/** Clone an existing entity into a fresh editable draft */
 		openEdit(entity: Entity) {
 			draft = plainClone(create(schema, entity));
 			open = true;
@@ -103,9 +86,6 @@ export function createEntityModalState<Desc extends DescMessage>(
 	};
 }
 
-/**
- * Create multiple modal states at once for pages with several modals
- */
 export function createModalStates<T extends Record<string, unknown>>(config: {
 	[K in keyof T]: T[K];
 }) {

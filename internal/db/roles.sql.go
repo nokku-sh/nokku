@@ -34,8 +34,7 @@ type GetActorRoleParams struct {
 	ActorID     string `json:"actorId"`
 }
 
-// The workspace role of a user or service account. Runs as the system role:
-// it resolves membership before any workspace is pinned.
+// Runs as the system role, before any workspace is pinned.
 func (q *Queries) GetActorRole(ctx context.Context, arg *GetActorRoleParams) (string, error) {
 	row := q.db.QueryRow(ctx, getActorRole, arg.WorkspaceID, arg.ActorID)
 	var role_name string
@@ -66,7 +65,6 @@ type ListActorRolesRow struct {
 	RoleName    string `json:"roleName"`
 }
 
-// Every workspace role of a user or service account, keyed by workspace.
 func (q *Queries) ListActorRoles(ctx context.Context, actorID string) ([]*ListActorRolesRow, error) {
 	rows, err := q.db.Query(ctx, listActorRoles, actorID)
 	if err != nil {

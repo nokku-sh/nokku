@@ -9,11 +9,8 @@ import (
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
-// Record satisfies iam.Sink: it converts an iam authentication event into a
-// generic audit Event and appends it to the log. Auth events are the only
-// audit trail for the /auth routes (the HTTP access-log writer skips them),
-// so they carry the transport facts too: IP and user agent come from the
-// request metadata the iam middleware planted.
+// Record is the only audit trail for the /auth routes, so it carries the
+// transport facts too.
 func (s *Service) Record(ctx context.Context, e iam.Event) {
 	event := eventFromIAM(e)
 	if meta, ok := iam.RequestMetaFromContext(ctx); ok {
@@ -21,10 +18,7 @@ func (s *Service) Record(ctx context.Context, e iam.Event) {
 		event.UserAgent = util.SanitizeUTF8(meta.Header.Get("User-Agent"))
 	}
 
-	// Never block the auth flow: the insert runs detached from the request
-	// context so a slow DB cannot stall a login. cancel moves into the
-	// goroutine: calling it on return from Record would cancel the context
-	// out from under the insert.
+	// Detached so a slow DB cannot stall a login.
 	actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	go func() {
 		defer cancel()
@@ -34,8 +28,6 @@ func (s *Service) Record(ctx context.Context, e iam.Event) {
 	}()
 }
 
-// eventFromIAM maps an iam auth event to a generic audit Event. Actor
-// fields are written verbatim: events that resolved no account stay empty.
 func eventFromIAM(e iam.Event) *Event {
 	details := map[string]any{}
 	if e.Method != "" {

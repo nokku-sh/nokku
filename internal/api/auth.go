@@ -17,9 +17,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-const (
-	tokenTTL = 15 * time.Minute
-)
+const tokenTTL = 15 * time.Minute
 
 type AuthService struct {
 	cfg *config.Config
@@ -69,8 +67,6 @@ func (s *AuthService) Register(
 		}
 		return nil, ErrInternal
 	}
-	// Field shape is the proto schema's business (validate interceptor);
-	// normalization above is the handler's.
 	s.sendTokenEmail(ctx, u, iam.TokenVerifyEmail, true)
 	return &nokkuv1.RegisterResponse{}, nil
 }
@@ -115,8 +111,6 @@ func (s *AuthService) LoginWithBackupCode(
 	return &nokkuv1.LoginWithBackupCodeResponse{User: u.ToProto()}, nil
 }
 
-// loginError writes a uniform bad-credentials response; ErrInactive keeps
-// its own code so the client can tell the account apart.
 func loginError(err error) error {
 	if errors.Is(err, iam.ErrInactive) {
 		return ErrAccountInactive
@@ -138,9 +132,7 @@ func (s *AuthService) Logout(
 	if err != nil {
 		return nil, err
 	}
-	// Public endpoint, so a stale session still gets its cookie cleared. The
-	// credential itself, a browser cookie or nk's DPoP-bound token, is
-	// authenticated here and its session revoked.
+	// Public endpoint, so authenticate the credential here before revoking.
 	setCookie(ci, s.cfg.IAM.ClearSessionCookie())
 	if err := s.cfg.IAM.Logout(ctx, ci.RequestHeader(), nokkuv1connect.AuthServiceLogoutProcedure); err != nil {
 		if errors.Is(err, iam.ErrDPoPNonce) || errors.Is(err, iam.ErrDPoPRequired) {
@@ -156,8 +148,7 @@ func (s *AuthService) ForgotPassword(
 	ctx context.Context,
 	req *nokkuv1.ForgotPasswordRequest,
 ) (*nokkuv1.ForgotPasswordResponse, error) {
-	// Unknown email, unverified email, and disabled reset all answer OK so
-	// the endpoint cannot enumerate accounts.
+	// Always answer OK so the endpoint cannot enumerate accounts.
 	if u, err := s.cfg.IAM.GetUserByEmail(ctx, req.GetEmail()); err == nil &&
 		u.Active && !u.DisablePasswordReset {
 		s.sendTokenEmail(ctx, u, iam.TokenPasswordReset, false)
@@ -203,8 +194,7 @@ func (s *AuthService) ResendVerification(
 	ctx context.Context,
 	req *nokkuv1.ResendVerificationRequest,
 ) (*nokkuv1.ResendVerificationResponse, error) {
-	// Unknown and already-verified accounts answer OK so the endpoint
-	// cannot enumerate accounts.
+	// Always answer OK so the endpoint cannot enumerate accounts.
 	if u, err := s.cfg.IAM.GetUserByEmail(ctx, req.GetEmail()); err == nil && !u.EmailVerified {
 		s.sendTokenEmail(ctx, u, iam.TokenVerifyEmail, true)
 	}
@@ -242,10 +232,7 @@ func (s *AuthService) DiscoverSSO(
 	return out, nil
 }
 
-// --- Shared login side effects ----------------------------------------------
-
-// sendTokenEmail issues the verification or reset token and delivers its
-// email link, unless the same token was just sent.
+// sendTokenEmail skips the send when the same token went out recently.
 func (s *AuthService) sendTokenEmail(
 	ctx context.Context,
 	u *db.User,
@@ -254,7 +241,7 @@ func (s *AuthService) sendTokenEmail(
 ) {
 	recent, err := s.cfg.IAM.HasRecentToken(ctx, u.ID, purpose)
 	if err != nil {
-		// Fail open: the worst case is an extra email, not a locked-out user.
+		// Fail open, the worst case is an extra email.
 		slog.Debug("resend cooldown check failed", "error", err)
 	} else if recent {
 		return

@@ -1,8 +1,5 @@
 package iam
 
-// The OIDC authorization-code flow plus the login start and callback
-// plumbing it shares with the plain OAuth2 flow.
-
 import (
 	"context"
 	"crypto/subtle"
@@ -18,7 +15,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
-// oidcFlow serves the OIDC authorization-code flow.
 type oidcFlow struct {
 	svc       *Service
 	linker    *linker
@@ -26,17 +22,13 @@ type oidcFlow struct {
 	providers *cache.Local[*oidc.Provider]
 }
 
-// authorizeState is the cross-request payload behind the OAuth 2.0 state
-// value.
 type authorizeState struct {
 	ProviderID   string `json:"provider_id"`
 	Nonce        string `json:"nonce,omitempty"`
 	PKCEVerifier string `json:"pkce_verifier"`
 	ReturnTo     string `json:"return_to,omitempty"`
 	LinkUserID   string `json:"link_user_id,omitempty"`
-	// FlowCookie is the browser-bound flow cookie value the callback must
-	// present (login CSRF binding).
-	FlowCookie string `json:"flow_cookie"`
+	FlowCookie   string `json:"flow_cookie"`
 }
 
 func newOIDCFlow(svc *Service) *oidcFlow {
@@ -48,7 +40,6 @@ func newOIDCFlow(svc *Service) *oidcFlow {
 	}
 }
 
-// loginProvider returns the enabled provider of method m, or ErrNotFound.
 func (s *Service) loginProvider(ctx context.Context, id string, m Method) (*SSOProvider, error) {
 	p, err := s.GetSSOProvider(ctx, id)
 	if err != nil {
@@ -60,12 +51,8 @@ func (s *Service) loginProvider(ctx context.Context, id string, m Method) (*SSOP
 	return p, nil
 }
 
-// authorizePrepare builds the provider's oauth2 client and any extra
-// authorize options, filling provider-specific parts of the state.
 type authorizePrepare func(ctx context.Context, st *authorizeState, cfg *SSOProvider) (*oauth2.Config, []oauth2.AuthCodeOption, error)
 
-// startLogin runs the shared authorization-code preamble: resolve the
-// provider, bind the flow to this browser, store the state, and redirect.
 func (s *Service) startLogin(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -105,8 +92,7 @@ func (s *Service) startLogin(
 	http.Redirect(w, r, conf.AuthCodeURL(key, opts...), http.StatusTemporaryRedirect)
 }
 
-// takeLogin runs the shared callback preamble: consume the state, check the
-// browser binding, and reload the provider. It writes the failure itself.
+// takeLogin writes the failure response itself.
 func (s *Service) takeLogin(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -131,8 +117,7 @@ func (s *Service) takeLogin(
 	return &st, cfg, true
 }
 
-// Login starts the OIDC flow. Behind Middleware with a live session, the
-// identity links to the signed-in user.
+// Login links the identity to the signed-in user when there is one.
 func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
 	h.svc.startLogin(
 		w,
@@ -152,8 +137,6 @@ func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-// Callback verifies the ID token, resolves the user, issues a session, and
-// redirects to returnTo.
 func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	st, cfg, ok := h.svc.takeLogin(w, r, MethodOIDC, h.state)
 	if !ok {
@@ -170,8 +153,7 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		loginFailed("provider discovery failed", err)
 		return
 	}
-	// RFC 9207: an iss parameter must match the issuer, or the response may
-	// be a mix-up attack.
+	// RFC 9207 mix-up attack protection.
 	if iss := r.URL.Query().Get("iss"); iss != "" &&
 		!strings.EqualFold(strings.TrimSuffix(iss, "/"), strings.TrimSuffix(cfg.OIDC.IssuerURL, "/")) {
 		loginFailed("issuer mismatch", nil)

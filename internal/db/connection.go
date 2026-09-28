@@ -41,7 +41,6 @@ func NewConnection(ctx context.Context) (*Connection, error) {
 		return nil, err
 	}
 
-	// Set default environment variables
 	defaults := map[string]string{
 		"PGHOST":     "localhost",
 		"PGPORT":     "5432",
@@ -52,7 +51,6 @@ func NewConnection(ctx context.Context) (*Connection, error) {
 	}
 
 	for key, fallback := range defaults {
-		// Only set the default if the user hasn't provided the variable
 		if os.Getenv(key) == "" {
 			_ = os.Setenv(key, fallback)
 		}
@@ -95,8 +93,7 @@ func (c *Connection) createPools(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// Runtime traffic never uses the owner role. PGPASSWORD is the fallback
-	// so a single-credential dev setup keeps working.
+	// Falling back to PGPASSWORD keeps single-credential dev setups working.
 	if c.AppPassword == "" {
 		c.AppPassword = appConfig.ConnConfig.Password
 	}
@@ -132,8 +129,7 @@ func (c *Connection) createPools(ctx context.Context) error {
 	return nil
 }
 
-// setupSchema migrates and seeds roles as the owner (PGUSER), on a short-lived
-// pool closed before any request is served.
+// setupSchema is the only place the owner role (PGUSER) is used.
 func (c *Connection) setupSchema(ctx context.Context) error {
 	adminConfig, err := c.poolConfig()
 	if err != nil {
@@ -156,8 +152,7 @@ func (c *Connection) setupSchema(ctx context.Context) error {
 	}
 	defer conn.Release()
 
-	// Serializes the whole sequence across processes: parallel test packages
-	// and multiple instances booting at once.
+	// Serializes parallel test packages and instances booting at once.
 	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock(hashtext('nokku_schema'))"); err != nil {
 		return fmt.Errorf("acquiring schema lock: %w", err)
 	}
@@ -171,10 +166,8 @@ func (c *Connection) setupSchema(ctx context.Context) error {
 	return c.setupAppRole(ctx, conn.Conn())
 }
 
-// setupAppRole grants the runtime role login rights and sets its password.
 func (c *Connection) setupAppRole(ctx context.Context, conn *pgx.Conn) error {
-	// ALTER ROLE does not accept bind parameters, so the statement is built
-	// with format() server-side and the password stays a bind parameter.
+	// ALTER ROLE takes no bind parameters, so format() quotes it server-side.
 	var stmt string
 	if err := conn.QueryRow(
 		ctx,
@@ -189,15 +182,10 @@ func (c *Connection) setupAppRole(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
-// Sys runs single statements as nokku_system (BYPASSRLS). It is for
-// pre-authorization lookups and background jobs, which by definition cannot
-// be tenant-scoped. Multi-statement system work uses WithTx.
+// Sys runs single statements as nokku_system (BYPASSRLS), for pre-auth
+// lookups and jobs.
 func (c *Connection) Sys() Querier { return c.sys }
 
-// withTx is the one transaction scaffold: begin, roll back on error or panic,
-// otherwise commit. The role and GUC setup that decides whether RLS applies is
-// the caller's job, which is what keeps the scope entry points below
-// readable as policy instead of plumbing.
 func withTx(
 	ctx context.Context,
 	pool *pgxpool.Pool,
@@ -222,17 +210,14 @@ func withTx(
 	return tx.Commit(ctx)
 }
 
-// Pick the transaction scope by what the query is allowed to see, never by
-// convenience:
+// Pick the scope by what the query may see, never by convenience:
 //
-//	Connection.WithWorkspace tenant rows only, pinned to the request's workspace
-//	Connection.WithActor     the request's own rows, no tenant pinned
-//	Connection.WithTx        every tenant, RLS bypassed
-//	Connection.Sys           WithTx for a single statement
+//	WithWorkspace  tenant rows, pinned to the request's workspace
+//	WithActor      the request's own rows, no tenant pinned
+//	WithTx         every tenant, RLS bypassed
+//	Sys            WithTx for a single statement
 
-// WithTx executes a transaction as nokku_system, bypassing RLS entirely. Only
-// cross-tenant work belongs here: the queries see every workspace. Tenant
-// scoped work must use WithWorkspace or WithActor.
+// WithTx bypasses RLS, only cross-tenant work belongs here.
 func (c *Connection) WithTx(
 	ctx context.Context,
 	fn func(*Queries) error,
@@ -242,9 +227,6 @@ func (c *Connection) WithTx(
 	})
 }
 
-// WithWorkspace executes a transaction scoped to the workspace pinned in the
-// request context, as the RLS constrained nokku_app role. Every query inside
-// sees only that workspace's rows.
 func (c *Connection) WithWorkspace(
 	ctx context.Context,
 	fn func(*Queries) error,
@@ -255,8 +237,7 @@ func (c *Connection) WithWorkspace(
 			return ErrNoActor
 		}
 
-		// The authorization interceptor already resolved the actor's role in
-		// this workspace, so membership needs no second lookup.
+		// Authorization already verified the membership.
 		if pinned := actor.WorkspaceIDFromContext(ctx); pinned != "" && actor.MemberOf(ctx) == pinned {
 			if _, err := tx.Exec(
 				ctx,
@@ -272,10 +253,9 @@ func (c *Connection) WithWorkspace(
 			return fn(q)
 		}
 
-		// Membership and role resolution must see every workspace, so it runs
-		// as nokku_system. The transaction switches down to nokku_app before
-		// any caller query runs. GUCs are transaction-local and survive the
-		// role switch.
+		// Membership lookup must see every workspace, so it runs as
+		// nokku_system and drops to nokku_app before any caller query.
+		// Transaction-local GUCs survive the role switch.
 		if _, err := tx.Exec(
 			ctx,
 			`SELECT
@@ -316,11 +296,7 @@ func (c *Connection) WithWorkspace(
 	})
 }
 
-// WithActor executes a transaction scoped to a single actor as the RLS
-// constrained nokku_app role, without pinning a workspace. It sets only the
-// actor GUC so RLS policies governed by current_actor_id() apply (e.g. a
-// principal reading its own global audit events). It runs as nokku_app the
-// whole time: every query is RLS-filtered, never BYPASSRLS.
+// WithActor stays nokku_app the whole time, so every query is RLS-filtered.
 func (c *Connection) WithActor(
 	ctx context.Context,
 	actorID string,
@@ -331,8 +307,6 @@ func (c *Connection) WithActor(
 	}
 
 	return withTx(ctx, c.Pool, func(ctx context.Context, tx pgx.Tx, q *Queries) error {
-		// Set the actor GUC transaction-local. Custom GUCs are settable by any
-		// role; no role switch is needed.
 		if _, err := tx.Exec(
 			ctx,
 			`SELECT set_config('nokku.actor_id', $1, true)`,

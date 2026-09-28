@@ -1,7 +1,4 @@
-// Package pki provides X.509 certificate authority functionality:
-// self-signed root CA generation and CSR signing for client/server
-// certificates. It complements the SSH certificate authority in
-// internal/ssh and shares its persistence and rotation paths.
+// Package pki is the X.509 counterpart of internal/ssh.
 package pki
 
 import (
@@ -18,9 +15,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
-// NewCA generates a self-signed X.509 root certificate authority. Returns
-// ssh.CAInfo so X.509 and SSH authorities share storage and rotation code
-// paths. Certificate holds the PEM root cert (empty for SSH authorities).
+// NewCA returns ssh.CAInfo so both authority types share storage and rotation.
 func NewCA(
 	keyType nokkuv1.CertificateKeyType,
 	keyBits int32,
@@ -84,7 +79,6 @@ func NewCA(
 	}, nil
 }
 
-// subjectKeyID derives the RFC 5280 subject key identifier for a public key.
 func subjectKeyID(pub any) []byte {
 	pubDER, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {

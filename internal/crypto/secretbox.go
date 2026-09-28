@@ -19,9 +19,8 @@ type Secretbox struct {
 	key []byte
 }
 
-// NewSecretbox builds a Secretbox cipher. A 32-byte secret is used directly.
-// Any other length is derived to 32 bytes via HKDF-SHA256 with a fixed salt,
-// so passphrases and shorter/longer secrets work unchanged.
+// NewSecretbox uses a 32-byte secret directly and derives any other length
+// via HKDF-SHA256.
 func NewSecretbox(secret []byte) (*Secretbox, error) {
 	if len(secret) == 0 {
 		return nil, errors.New("secret must not be empty")
@@ -52,7 +51,7 @@ func (e *Secretbox) Encrypt(plaintext []byte) ([]byte, error) {
 		return nil, errors.New("failed to generate nonce")
 	}
 
-	// Stack copy of the key, wiped on return so it doesn't linger in memory.
+	// Wiped on return so the key doesn't linger in memory.
 	var key [32]byte
 	copy(key[:], e.key)
 	defer func() {

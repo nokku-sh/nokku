@@ -4,7 +4,6 @@ import { useMutation, useQuery } from '$lib/query';
 import { pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
 
 export const team = {
-	// Queries
 	get: (id?: string) =>
 		useQuery(
 			TeamService.method.getTeam,
@@ -22,8 +21,7 @@ export const team = {
 			}),
 			{ enabled: !!workspaceID.current }
 		),
-	// Members of one team, fetched when a view actually shows them. Pass
-	// enabled via opts to defer the fetch (e.g. until a hover card opens).
+	// Pass enabled to defer the fetch, e.g. until a hover card opens.
 	members: (teamId: string, opts?: () => { enabled?: boolean }) =>
 		useQuery(
 			TeamService.method.listTeamMembers,
@@ -34,8 +32,6 @@ export const team = {
 				...opts?.()
 			}
 		),
-	// Teams one user belongs to: the read the member rows and the user
-	// profile modal need, instead of scanning every team's members.
 	listForUser: (userId?: string) =>
 		useQuery(
 			TeamService.method.listTeamsForUser,
@@ -46,7 +42,6 @@ export const team = {
 			}
 		),
 
-	// Mutations
 	create: () =>
 		useMutation(TeamService.method.createTeam, {
 			onSuccess: () => toast.success('Team created!')

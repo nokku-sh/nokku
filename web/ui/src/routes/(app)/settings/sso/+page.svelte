@@ -19,9 +19,6 @@
 	const scimAvailable = $derived(billingData.data?.features?.['scim'] === true);
 
 	const domains = $derived(domain.list());
-	// Providers and the SCIM connector can only be set up once a domain is
-	// verified: home realm discovery routes users by their email domain, so
-	// without one nothing could ever match.
 	const hasVerifiedDomain = $derived(
 		(domains.data ?? []).some((d) => d.verifiedAt !== undefined && d.verifiedAt !== null)
 	);
@@ -31,7 +28,7 @@
 			activeSSOTab.current = 'oidc';
 		}
 	});
-	// New workspaces land on the Domains tab: the setup flow starts there.
+	// Setup starts on the Domains tab.
 	$effect(() => {
 		if (domains.isSuccess && !hasVerifiedDomain && activeSSOTab.current !== 'domains') {
 			activeSSOTab.current = 'domains';

@@ -2,9 +2,7 @@ package db
 
 import "slices"
 
-// Role is a workspace role. Roles are ordered: each one includes everything
-// the roles before it may do, so a check is a single comparison. The
-// role_name columns hold these names, guarded by a CHECK constraint.
+// Role values are ordered, each includes everything the ones before it may do.
 type Role string
 
 const (
@@ -15,10 +13,8 @@ const (
 	RoleOwner  Role = "owner"
 )
 
-// Roles lists every role from least to most privileged.
 var Roles = []Role{RoleMember, RoleViewer, RoleEditor, RoleAdmin, RoleOwner}
 
-// Description is the one-line summary the UI shows next to a role.
 func (r Role) Description() string {
 	switch r {
 	case RoleMember:
@@ -35,16 +31,14 @@ func (r Role) Description() string {
 	return ""
 }
 
-// AtLeast reports whether r grants everything required grants. An unknown role
-// satisfies nothing.
+// AtLeast is false for unknown roles.
 func (r Role) AtLeast(required Role) bool {
 	rank := slices.Index(Roles, r)
 	return rank >= 0 && rank >= slices.Index(Roles, required)
 }
 
-// CanAssign reports whether an actor holding r may give target to someone or
-// act on someone who holds it. Nobody manages above their own role, and
-// ownership only moves through a transfer.
+// CanAssign never allows managing above your own role, and ownership only
+// moves through a transfer.
 func (r Role) CanAssign(target Role) bool {
 	return target != RoleOwner && slices.Contains(Roles, target) && r.AtLeast(target)
 }

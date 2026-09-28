@@ -13,8 +13,6 @@ import (
 	"github.com/tink-crypto/tink-go-hcvault/v2/integration/hcvault"
 )
 
-// setupClient creates the KMS client for the configured URI scheme and
-// caches the KEK AEAD used to wrap/unwrap the stored keyset.
 func (t *TinkEncryptor) setupClient(ctx context.Context) (err error) {
 	slog.Debug("setting up kms client", "provider", kmsProvider(t.KMSURI))
 	switch {

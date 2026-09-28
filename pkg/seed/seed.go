@@ -44,9 +44,6 @@ func DefaultConfig() Config {
 func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cfg Config) error {
 	_ = gofakeit.Seed(time.Now().UnixNano())
 
-	// Create owner user. Identity lives in nokku's own schema now, so the
-	// seed talks to iam for users and to the nokku store for workspaces and
-	// members.
 	email := os.Getenv("NOKKU_ADMIN_EMAIL")
 	owner, err := iamSvc.GetUserByEmail(ctx, email)
 	if errors.Is(err, iam.ErrNotFound) {
@@ -64,7 +61,6 @@ func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cf
 		return fmt.Errorf("failed to verify admin email: %w", err)
 	}
 
-	// Create workspace as a system transaction. No tenant context exists yet.
 	var workspace *db.CreateWorkspaceRow
 	if err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
 		workspace, err = q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
@@ -107,7 +103,7 @@ func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cf
 			}
 		}
 
-		// Create teams. Suffixed names avoid UNIQUE (workspace_id, name) violations
+		// Suffixed names avoid UNIQUE (workspace_id, name) violations.
 		teams := make([]*db.Team, cfg.NumTeams)
 		for i := range cfg.NumTeams {
 			team, err := q.CreateTeam(ctx, &db.CreateTeamParams{
@@ -135,9 +131,7 @@ func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cf
 			}
 		}
 
-		// Create service accounts. Suffixed names avoid UNIQUE (workspace_id, name) violations.
-		// Seeded accounts share one throwaway credential: the seed tool never
-		// authenticates with them.
+		// Seeded accounts share one throwaway credential.
 		seedSATokenHash, err := crypto.HashToken(gofakeit.UUID())
 		if err != nil {
 			return fmt.Errorf("failed to hash seed service account token: %w", err)
@@ -156,7 +150,7 @@ func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cf
 			}
 		}
 
-		// Create CAs. The first is the workspace default
+		// The first CA is the workspace default.
 		cas := make([]*db.CertificateAuthority, cfg.NumCAs)
 		for i := range cfg.NumCAs {
 			ca, err := ssh.NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0, 0)
@@ -204,7 +198,6 @@ func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cf
 
 			desc := gofakeit.Sentence()
 
-			// Use index-suffixed name to avoid UNIQUE (workspace_id, name) violations
 			target, err := q.CreateTarget(ctx, &db.CreateTargetParams{
 				WorkspaceID: workspace.ID,
 				Name:        uniqueName(gofakeit.AppName(), i),
@@ -226,7 +219,6 @@ func Workspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection, cf
 				"ansible",
 				"cicd",
 			}
-			// Pick 1-3 unique principals per target
 			numPrincipals := gofakeit.IntRange(1, 3)
 			gofakeit.ShuffleStrings(usernames)
 			selectedUsernames := usernames[:min(numPrincipals, len(usernames))]

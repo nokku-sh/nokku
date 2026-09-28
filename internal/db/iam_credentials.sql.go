@@ -271,9 +271,7 @@ type UpsertCredentialParams struct {
 	Label    string `json:"label"`
 }
 
-// One unified credential table for every login method (see 001_base.sql).
-// A credential never moves to another account. A clash with someone else's
-// row returns no rows.
+// A credential never moves accounts, a clash returns no rows.
 func (q *Queries) UpsertCredential(ctx context.Context, arg *UpsertCredentialParams) (*Credential, error) {
 	row := q.db.QueryRow(ctx, upsertCredential,
 		arg.ID,

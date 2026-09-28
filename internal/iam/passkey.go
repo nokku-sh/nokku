@@ -1,10 +1,5 @@
 package iam
 
-// The WebAuthn passkey ceremonies: adding a key to the signed-in account,
-// passkey-only signup, and discoverable passkey login. Ceremony state lives
-// in the shared cache behind a short-lived HttpOnly cookie. The credential
-// material is the serialized webauthn.Credential in the credentials table.
-
 import (
 	"context"
 	"encoding/base64"
@@ -28,9 +23,8 @@ const (
 	ceremonyCookieName = "webauthn_session"
 )
 
-// passkeySignupState reserves the account between the signup ceremony's
-// begin and finish, so the user row only exists once the ceremony verifies.
-// The reserved ID is the WebAuthn user handle the authenticator binds to.
+// passkeySignupState reserves the account so the user row only exists once
+// the ceremony verifies. ID is the user handle the authenticator binds to.
 type passkeySignupState struct {
 	Session *webauthn.SessionData `json:"session"`
 	ID      string                `json:"id"`
@@ -38,7 +32,6 @@ type passkeySignupState struct {
 	Name    string                `json:"name"`
 }
 
-// webUser adapts a user row to the webauthn.User interface.
 type webUser struct {
 	user  *db.User
 	creds []webauthn.Credential
@@ -49,7 +42,6 @@ func (u *webUser) WebAuthnName() string                       { return u.user.Em
 func (u *webUser) WebAuthnDisplayName() string                { return u.user.Name }
 func (u *webUser) WebAuthnCredentials() []webauthn.Credential { return u.creds }
 
-// passkeyFlow serves the WebAuthn ceremonies.
 type passkeyFlow struct {
 	svc    *Service
 	wa     *webauthn.WebAuthn
@@ -57,8 +49,6 @@ type passkeyFlow struct {
 	signup *state[passkeySignupState]
 }
 
-// newPasskeyFlow builds the relying party. The RP ID is the base URL's
-// host. Platform authenticators and hardware keys are both accepted.
 func newPasskeyFlow(svc *Service, rpOrigins []string) (*passkeyFlow, error) {
 	u, err := url.Parse(svc.baseURL)
 	if err != nil {
@@ -93,7 +83,6 @@ func (f *passkeyFlow) clearedCeremonyCookie() *http.Cookie {
 	return f.svc.newCookie(ceremonyCookieName, "", time.Unix(0, 0))
 }
 
-// webUserFor wraps a user with its stored passkeys.
 func (f *passkeyFlow) webUserFor(ctx context.Context, u *db.User) (*webUser, error) {
 	creds, err := f.svc.sys.ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
 		UserID: u.ID,
@@ -112,7 +101,6 @@ func (f *passkeyFlow) webUserFor(ctx context.Context, u *db.User) (*webUser, err
 	return &webUser{user: u, creds: out}, nil
 }
 
-// sessionUser resolves the signed-in account for the add-key surface.
 func (f *passkeyFlow) sessionUser(ctx context.Context, w http.ResponseWriter) (*webUser, bool) {
 	u, err := f.svc.GetUser(ctx)
 	if errors.Is(err, ErrNotFound) {
@@ -131,9 +119,8 @@ func (f *passkeyFlow) sessionUser(ctx context.Context, w http.ResponseWriter) (*
 	return wu, true
 }
 
-// savePasskey stores the credential material. A refresh (sign count,
-// transports) keeps the existing label. The upsert never moves a credential
-// id to another account.
+// savePasskey keeps the existing label on a refresh. The upsert never moves a
+// credential id to another account.
 func savePasskey(ctx context.Context, q db.Querier, userID string, cred *webauthn.Credential) (string, error) {
 	data, err := json.Marshal(cred)
 	if err != nil {
@@ -158,7 +145,6 @@ func savePasskey(ctx context.Context, q db.Querier, userID string, cred *webauth
 	return label, err
 }
 
-// BeginRegistration starts the add-key ceremony for the signed-in account.
 func (f *passkeyFlow) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	wu, ok := f.sessionUser(ctx, w)
@@ -179,8 +165,6 @@ func (f *passkeyFlow) BeginRegistration(w http.ResponseWriter, r *http.Request) 
 	WriteJSON(w, http.StatusOK, creation)
 }
 
-// FinishRegistration verifies the ceremony and stores the passkey. The
-// signed-in session survives: this is credential management, not a login.
 func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	session, err := f.state.Take(ctx, cookieFromHeader(r.Header, ceremonyCookieName))
@@ -213,9 +197,6 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "ok", "name": name})
 }
 
-// BeginSignup starts passkey-only registration. It refuses taken emails and
-// reserves the account without creating it, so an abandoned ceremony leaves
-// no user row behind.
 func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if err := r.ParseForm(); err != nil {
@@ -232,8 +213,6 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 		name, _, _ = strings.Cut(email, "@")
 	}
 	if _, err := f.svc.GetUserByEmail(ctx, email); err == nil {
-		// Adding a key to an existing account goes through the signed-in
-		// add-key flow. Public signup never attaches to someone's account.
 		writeError(w, http.StatusConflict, "an account with this email already exists")
 		return
 	}
@@ -254,9 +233,7 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, creation)
 }
 
-// FinishSignup verifies the ceremony, creates the account with its passkey,
-// and sends the verification email. Like password signup, the account signs
-// in only after confirming the emailed link.
+// FinishSignup doesn't sign in, the account must confirm its email first.
 func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := f.signup.Take(ctx, cookieFromHeader(r.Header, ceremonyCookieName))
@@ -295,7 +272,6 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "verification_required"})
 }
 
-// BeginLogin starts a discoverable login. The UI sends no body.
 func (f *passkeyFlow) BeginLogin(w http.ResponseWriter, r *http.Request) {
 	assertion, session, err := f.wa.BeginDiscoverableLogin(webauthn.WithUserVerification(protocol.VerificationRequired))
 	if err != nil {
@@ -311,8 +287,6 @@ func (f *passkeyFlow) BeginLogin(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, assertion)
 }
 
-// FinishLogin verifies the assertion, refreshes the credential's sign
-// count, and issues a session.
 func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	session, err := f.state.Take(ctx, cookieFromHeader(r.Header, ceremonyCookieName))
@@ -359,8 +333,7 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// discoverableUser resolves the user a discoverable credential names by its
-// user handle, which is the account id.
+// discoverableUser treats the user handle as the account id.
 func (f *passkeyFlow) discoverableUser(ctx context.Context) webauthn.DiscoverableUserHandler {
 	return func(_, userHandle []byte) (webauthn.User, error) {
 		u, err := f.svc.GetUserByID(ctx, string(userHandle))

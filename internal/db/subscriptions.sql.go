@@ -200,9 +200,8 @@ type SetSubscriptionCustomerParams struct {
 	CustomerID  string `json:"customerId"`
 }
 
-// Records which Stripe customer a workspace maps to, so checkout always reuses
-// the same customer. Status stays inactive so this row never grants
-// entitlements on its own; the webhook promotes it to a real subscription.
+// Status stays inactive so this row never grants entitlements until the
+// webhook promotes it.
 func (q *Queries) SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error {
 	_, err := q.db.Exec(ctx, setSubscriptionCustomer, arg.WorkspaceID, arg.CustomerID)
 	return err
@@ -246,8 +245,7 @@ type UpsertSubscriptionParams struct {
 	CancelAtPeriodEnd bool       `json:"cancelAtPeriodEnd"`
 }
 
-// Note: source is only overwritten when the row is provider-managed ('stripe')
-// or empty, so manual subscriptions survive provider syncs.
+// Manual subscriptions survive provider syncs.
 func (q *Queries) UpsertSubscription(ctx context.Context, arg *UpsertSubscriptionParams) error {
 	_, err := q.db.Exec(ctx, upsertSubscription,
 		arg.WorkspaceID,

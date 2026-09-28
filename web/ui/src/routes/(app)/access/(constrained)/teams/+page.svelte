@@ -20,10 +20,8 @@
 	import { PencilIcon, PlusIcon, Trash2, Users, UsersIcon } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
-	// Modal states
 	const teamModal = createEntityModalState(TeamSchema);
 
-	// Data
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
 	const teams = $derived(
@@ -44,7 +42,6 @@
 		}
 	];
 
-	// Columns
 	const columnHelper = createAppColumnHelper<Team>();
 	const columns = columnHelper.columns([
 		columnHelper.accessor('name', {

@@ -12,7 +12,6 @@
 	};
 	let { roleName = '', update }: Props = $props();
 
-	/** Pending optimistic value while a change is being saved. */
 	let optimistic = $state<string>();
 	const currentRole = $derived(optimistic ?? roleName);
 
@@ -47,7 +46,6 @@
 {#if rolesQuery.isPending}
 	<LoaderCircle class="size-3 animate-spin text-muted-foreground"></LoaderCircle>
 {:else if !update || !selectedRole}
-	<!-- Fixed role (e.g. owner) or read-only: shown as a badge -->
 	<Badge
 		variant="outline"
 		class="gap-1.5 border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/10"

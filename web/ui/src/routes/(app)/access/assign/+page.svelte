@@ -25,35 +25,28 @@
 	} from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
-	// URL Params
 	const subjectID = $derived(page.url.searchParams.get('id') || '');
 	const subjectName = $derived(page.url.searchParams.get('name') || 'Unknown');
 	const subjectType = $derived(Number(page.url.searchParams.get('type') || '0') as SubjectKind);
 
-	// State
 	let search = $state('');
 	const debounced = new Debounced(() => search, 500);
 
 	let pageIdx = $state(0);
 	const limit = 10;
 
-	// Queries
 	const queryOpts = $derived({ limit, offset: pageIdx * limit, query: debounced.current });
 	const targets = target.list(() => queryOpts);
 
-	// Only query access if we have a subject ID
 	const access = $derived(target.access(subjectID));
 
-	// Mutations
 	const addToPrincipal = principal.addSubjects();
 	const removeFromPrincipal = principal.removeSubjects();
 	const revokeAccess = principal.revokeSubject();
 
 	let openRevokeAllModal = $state(false);
 	let selectedTargetId = $state<string>('');
-	// Optimistic per-principal assignment toggles (principalId -> desired assigned).
-	// Lets a switch flip immediately while the mutation is in flight; the server
-	// refetch (global connect-query invalidation) becomes the source of truth.
+	// Optimistic toggles until the refetch after the mutation reconciles.
 	let pendingAssign = $state(new Map<string, boolean>());
 	let targetPrincipals = principal.list(() => ({
 		targetId: selectedTargetId,
@@ -64,15 +57,12 @@
 	const selectedTarget = $derived(displayedTargets.find((t) => t.id === selectedTargetId) || null);
 
 	const accessibleTargetIds = $derived(new Set(access.data?.targets?.map((t) => t.id) || []));
-	// access.data.targets carry each target's principals, so we can tell whether
-	// this subject is directly assigned or only reaches the target via a team.
 	const accessTargetsById = $derived(
 		new Map<string, Target>((access.data?.targets || []).map((t) => [t.id, t]))
 	);
 
 	const totalPages = $derived(Math.ceil((targets.data?.total || 0) / limit));
 
-	// Helpers
 	function getSubjectTypeLabel(type: SubjectKind): string {
 		switch (type) {
 			case SubjectKind.USER:
@@ -109,16 +99,13 @@
 		subjectType === SubjectKind.SERVICE_ACCOUNT ? 'service accounts' : `${subjectTypeLower}s`
 	);
 
-	// Effective assignment of this subject to a principal, honoring any
-	// optimistic toggle still in flight.
 	function isAssignedNow(p: Principal): boolean {
 		const serverAssigned = getSubjectIds(p, subjectType).includes(subjectID);
 		const pending = pendingAssign.get(p.id);
 		return pending === undefined ? serverAssigned : pending;
 	}
 
-	// Per-target access for the sidebar: whether the subject reaches the target
-	// and whether that's via a direct assignment or only through team membership.
+	// direct is false when the subject only reaches the target through a team.
 	function getTargetAccess(t: Target): { accessible: boolean; direct: boolean } {
 		const at = accessTargetsById.get(t.id);
 		if (!at) return { accessible: false, direct: false };
@@ -128,9 +115,6 @@
 		return { accessible: true, direct };
 	}
 
-	// Set this subject's assignment to a principal optimistically, then persist
-	// it via the matching mutation. The pending entry is cleared once the
-	// mutation settles and the server refetch reconciles.
 	function setAssignment(p: Principal, assigned: boolean) {
 		if (subjectID) pendingAssign.set(p.id, assigned);
 		const mutate = assigned ? addToPrincipal : removeFromPrincipal;
@@ -176,7 +160,6 @@
 />
 
 <div class="flex flex-1 overflow-hidden bg-background">
-	<!-- Left Panel: Targets Sidebar -->
 	<div class="flex w-80 shrink-0 flex-col border-r bg-muted/10">
 		<div class="border-b p-4">
 			<div class="mb-4 flex items-center gap-2">
@@ -250,7 +233,6 @@
 			{/if}
 		</div>
 
-		<!-- Pagination Footer -->
 		<div class="flex items-center justify-between border-t bg-muted/5 p-3">
 			<Button
 				variant="outline"
@@ -276,9 +258,7 @@
 		</div>
 	</div>
 
-	<!-- Right Panel: Main Content Area -->
 	<div class="flex flex-1 flex-col overflow-hidden bg-background/50">
-		<!-- Header showing Subject Info -->
 		<div class="flex items-center justify-between border-b px-8 py-6 backdrop-blur-sm">
 			<div class="flex items-center gap-4">
 				<div
@@ -325,9 +305,7 @@
 					assignedPrincipals.length === allPrincipals.length && allPrincipals.length > 0}
 				{@const targetAccess = getTargetAccess(selectedTarget)}
 
-				<!-- Details of selected target -->
 				<div class="mx-auto max-w-5xl">
-					<!-- Subheader -->
 					<div class="mb-8">
 						<h2 class="text-3xl font-bold tracking-tight">{selectedTarget.name}</h2>
 						{#if selectedTarget.description}
@@ -342,7 +320,6 @@
 						{/if}
 					</div>
 
-					<!-- Stats Row -->
 					<div class="mb-10 grid grid-cols-2 gap-4 md:grid-cols-4">
 						<Card.Root class="bg-card/50 shadow-sm transition-colors hover:bg-card">
 							<Card.Content class="px-5 py-2">
@@ -384,7 +361,6 @@
 						</Card.Root>
 					</div>
 
-					<!-- Principals Assignment Section -->
 					<div class="mb-6 flex items-end justify-between">
 						<div>
 							<h3 class="text-xl font-semibold tracking-tight">Available Principals</h3>

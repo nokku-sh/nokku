@@ -1,17 +1,13 @@
 package iam
 
-// Shared RFC 7644 Patch operation walk for the SCIM user and group handlers.
-
 import (
 	scim "github.com/elimity-com/scim"
 	scimerrors "github.com/elimity-com/scim/errors"
 	filter "github.com/scim2/filter-parser/v2"
 )
 
-// eachScimOp walks Patch operations and calls apply for every attribute they
-// name. A path-less add or replace carries a full or partial attributes
-// object, which fans out one call per entry. expr is the path's value filter
-// (the members[value eq ...] form), nil for path-less operations.
+// eachScimOp fans a path-less add or replace out to one call per attribute.
+// expr is the path's value filter, nil for path-less operations.
 func eachScimOp(
 	ops []scim.PatchOperation,
 	apply func(opName, attr string, expr filter.Expression, value any) error,

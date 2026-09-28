@@ -7,17 +7,14 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { CircleAlert, CircleCheckBig, KeyRound, RefreshCw, Undo2Icon } from '@lucide/svelte';
 
-	// State
 	const token = page.url.searchParams.get('token');
 	let newPassword = $state('');
 	let confirmPassword = $state('');
 
-	// Get token from URL params
 	$effect(() => {
 		if (!token) goto('/login');
 	});
 
-	// Password validation
 	const resetPassword = auth.resetPassword();
 	const passwordsMatch = $derived(newPassword === confirmPassword && newPassword.length > 0);
 	const isPasswordValid = $derived(newPassword.length >= 8);

@@ -1,4 +1,4 @@
-// Package audit contains the audit service
+// Package audit contains the audit service.
 package audit
 
 import (
@@ -18,8 +18,7 @@ const (
 type Service struct {
 	conn         *db.Connection
 	entitlements *entitlement.Service
-	// sinks receive every event. See Sink.
-	sinks []Sink
+	sinks        []Sink
 }
 
 func New(
@@ -44,8 +43,7 @@ func New(
 	return s, nil
 }
 
-// setupPartitions keeps the monthly audit partitions in place. The DDL lives
-// in audit.maintain_partitions, which runs as the table owner.
+// setupPartitions relies on audit.maintain_partitions running as the table owner.
 func (s *Service) setupPartitions(ctx context.Context) error {
 	return s.conn.Sys().MaintainAuditPartitions(ctx)
 }
@@ -72,9 +70,7 @@ func (s *Service) runBackgroundJobs(ctx context.Context) {
 func (s *Service) retentionCleanup(ctx context.Context) {
 	now := time.Now()
 
-	// Retention deletes across every workspace, so it runs as a system
-	// transaction. The audit table refuses DELETE unless the transaction opts
-	// in, which leaves retention its one legitimate path to erasing rows.
+	// The audit table refuses DELETE unless the transaction opts in.
 	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
 		locked, err := q.TryAdvisoryXactLock(ctx, "audit-retention")
 		if err != nil || !locked {

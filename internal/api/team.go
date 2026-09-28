@@ -27,9 +27,6 @@ func (s *TeamService) GetTeam(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	if result == nil {
-		return nil, ErrNotFound
-	}
 	return &nokkuv1.GetTeamResponse{
 		Team: result.ToProto(),
 	}, nil
@@ -97,7 +94,7 @@ func (s *TeamService) ListTeams(
 	req *nokkuv1.ListTeamsRequest,
 ) (*nokkuv1.ListTeamsResponse, error) {
 	var result []*nokkuv1.Team
-	count := int32(0)
+	var count int32
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		teams, err := q.ListTeams(ctx, &db.ListTeamsParams{
 			WorkspaceID: req.GetWorkspaceId(),
@@ -113,8 +110,6 @@ func (s *TeamService) ListTeams(
 			count = teams[0].TotalCount
 		}
 
-		// Member counts in one grouped read; the members themselves are
-		// fetched per team through ListTeamMembers when a view needs them.
 		ids := make([]string, 0, len(teams))
 		for _, t := range teams {
 			ids = append(ids, t.Team.ID)
@@ -130,8 +125,7 @@ func (s *TeamService) ListTeams(
 
 		result = db.TeamsToProto(teams)
 		for _, t := range result {
-			c := byTeam[t.GetId()]
-			t.MemberCount = &c
+			t.MemberCount = new(byTeam[t.GetId()])
 		}
 		return nil
 	}); err != nil {
@@ -144,9 +138,6 @@ func (s *TeamService) ListTeams(
 	}, nil
 }
 
-// ListTeamMembers returns one team's members with their identity display
-// fields joined in. The dedicated read keeps ListTeams free of per-team
-// member blobs; views load it when they actually show the members.
 func (s *TeamService) ListTeamMembers(
 	ctx context.Context,
 	req *nokkuv1.ListTeamMembersRequest,
@@ -174,8 +165,6 @@ func (s *TeamService) ListTeamMembers(
 	return &nokkuv1.ListTeamMembersResponse{Members: members}, nil
 }
 
-// ListTeamsForUser returns the teams one user belongs to in a workspace. The
-// user-profile modal used to derive this by scanning every team's members.
 func (s *TeamService) ListTeamsForUser(
 	ctx context.Context,
 	req *nokkuv1.ListTeamsForUserRequest,

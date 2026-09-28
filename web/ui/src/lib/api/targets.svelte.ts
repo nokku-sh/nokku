@@ -4,7 +4,6 @@ import { useMutation, useQuery } from '$lib/query';
 import { pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
 
 export const target = {
-	// Queries
 	get: (id?: string) =>
 		useQuery(
 			TargetService.method.getTarget,
@@ -44,7 +43,6 @@ export const target = {
 			enabled: !!workspaceID.current
 		}),
 
-	// Mutations
 	create: () =>
 		useMutation(TargetService.method.createTarget, {
 			onSuccess: () => toast.success('Target created!')

@@ -33,8 +33,8 @@ func (s *Server) WithCSRF(h http.Handler) http.Handler {
 	}))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip CSRF for webhooks and SSO callbacks (they originate from
-		// external servers; their protection is the single-use flow state)
+		// Webhooks and SSO callbacks come from external servers, their
+		// protection is the single-use flow state.
 		if r.URL.Path == "/saml/acs" ||
 			r.URL.Path == "/oauth/callback" ||
 			r.URL.Path == "/oidc/callback" ||
@@ -65,9 +65,7 @@ func (s *Server) WithHeaders(h http.Handler) http.Handler {
 			}
 		}
 
-		// Only add HSTS if using HTTPS
-		isSecure := r.Header.Get("X-Forwarded-Proto") == "https" || r.TLS != nil
-		if isSecure {
+		if r.Header.Get("X-Forwarded-Proto") == "https" || r.TLS != nil {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
 		h.ServeHTTP(w, r)

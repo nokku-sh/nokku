@@ -120,9 +120,9 @@ func TestSanitizeReplay(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := SanitizeReplay([]byte(tt.in))
+			got := sanitizeReplay([]byte(tt.in))
 			if !bytes.Equal(got, []byte(tt.want)) {
-				t.Errorf("SanitizeReplay(%q) = %q, want %q", tt.in, got, tt.want)
+				t.Errorf("sanitizeReplay(%q) = %q, want %q", tt.in, got, tt.want)
 			}
 		})
 	}
@@ -131,9 +131,9 @@ func TestSanitizeReplay(t *testing.T) {
 func TestSanitizeReplay_UnicodePreserved(t *testing.T) {
 	in := "héllo\x1b[6n wörld ✓\n"
 	want := "héllo wörld ✓\n"
-	got := SanitizeReplay([]byte(in))
+	got := sanitizeReplay([]byte(in))
 	if !bytes.Equal(got, []byte(want)) {
-		t.Errorf("SanitizeReplay() = %q, want %q", got, want)
+		t.Errorf("sanitizeReplay() = %q, want %q", got, want)
 	}
 }
 
@@ -141,8 +141,8 @@ func TestSanitizeReplay_MultibyteAcrossQueries(t *testing.T) {
 	// Query sequences must not corrupt surrounding multibyte characters.
 	in := "é\x1b[?1;2cè"
 	want := "éè"
-	got := SanitizeReplay([]byte(in))
+	got := sanitizeReplay([]byte(in))
 	if !bytes.Equal(got, []byte(want)) {
-		t.Errorf("SanitizeReplay() = %q, want %q", got, want)
+		t.Errorf("sanitizeReplay() = %q, want %q", got, want)
 	}
 }

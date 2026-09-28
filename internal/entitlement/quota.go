@@ -11,8 +11,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// ResourceCapError is the user-facing denial when a workspace's pooled
-// resource budget is exhausted.
 type ResourceCapError struct {
 	Plan string
 	Cap  int64
@@ -44,9 +42,7 @@ func (s *Service) CheckResources(ctx context.Context, workspaceID string) error 
 	}
 
 	if used >= plan.ResourceCap {
-		// Machine-readable quota metadata mirrors the feature paywall in
-		// guard.go so the UI can render an upgrade affordance instead of a
-		// raw error.
+		// Same metadata as the feature paywall so the UI can prompt an upgrade.
 		err := connect.NewError(connect.CodeResourceExhausted, &ResourceCapError{
 			Plan: plan.Name,
 			Cap:  plan.ResourceCap,

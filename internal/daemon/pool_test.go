@@ -13,8 +13,6 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-// stubConn satisfies the pool's connection interface without a database. It
-// skips the online-status updates so no SQL ever runs.
 type stubConn struct{}
 
 func (stubConn) WithTx(context.Context, func(*db.Queries) error) error {
@@ -168,20 +166,20 @@ func TestPool_PokeKeepsControlMessages(t *testing.T) {
 	}
 }
 
-// TestPool_SessionStdoutStorm hammers AppendStdout against SnapshotForAttach
+// TestPool_SessionStdoutStorm hammers appendStdout against SnapshotForAttach
 // (both take replayMu) and CloseSession, exercising the replay buffer and the
 // shared Stdout channel under contention.
 func TestPool_SessionStdoutStorm(t *testing.T) {
 	p := newTestPool(t)
-	s := p.RegisterSession("s1", "d1", "user", "u1")
-	defer p.UnregisterSession("s1")
+	s := p.registerSession("s1", "d1", "user", "u1")
+	defer p.unregisterSession("s1")
 	defer s.shutdown()
 
 	var wg sync.WaitGroup
 	for range 4 {
 		wg.Go(func() {
 			for range 2000 {
-				s.AppendStdout([]byte("chunk"))
+				s.appendStdout([]byte("chunk"))
 			}
 		})
 		wg.Go(func() {
@@ -406,18 +404,18 @@ func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 	c1 := p.RegisterDaemon(context.Background(), "d1", "w1")
 	c2 := p.RegisterDaemon(context.Background(), "d2", "w1")
 	defer p.UnregisterDaemon("d2", c2)
-	mine := p.RegisterSession("s1", "d1", "root", "u1")
-	other := p.RegisterSession("s2", "d2", "root", "u1")
+	mine := p.registerSession("s1", "d1", "root", "u1")
+	other := p.registerSession("s2", "d2", "root", "u1")
 
 	p.UnregisterDaemon("d1", c1)
 
 	select {
-	case <-mine.Exited:
+	case <-mine.exited:
 	default:
 		t.Fatal("session of the disconnected daemon is still running")
 	}
 	select {
-	case <-other.Exited:
+	case <-other.exited:
 		t.Fatal("session of another daemon was torn down")
 	default:
 	}
@@ -431,7 +429,7 @@ func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 		t.Fatalf("ListSessions(d2) = %d, want 1", got)
 	}
 
-	p.UnregisterSession("s2")
+	p.unregisterSession("s2")
 	if _, ok := p.owned["d2"]; ok {
 		t.Fatal("empty index entry was not dropped")
 	}

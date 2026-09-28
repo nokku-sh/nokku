@@ -76,9 +76,7 @@ func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscriptio
 		return
 	}
 
-	// Backstop for the one-subscription-per-workspace rule: cancel a newcomer
-	// if the workspace already holds a different active subscription, so a
-	// tenant never ends up with two.
+	// Backstop so a workspace never ends up with two active subscriptions.
 	if existing, err := s.activeSubscription(ctx, workspaceID); err == nil &&
 		existing.SubscriptionID != "" && existing.SubscriptionID != sub.ID {
 		slog.Warn("cancelling duplicate subscription",

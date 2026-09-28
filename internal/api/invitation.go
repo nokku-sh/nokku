@@ -28,7 +28,6 @@ func NewInvitationService(cfg *config.Config) *InvitationService {
 	return &InvitationService{cfg: cfg}
 }
 
-// inviteLookup parses an invite token into the key its row is stored under.
 func inviteLookup(raw string) (*db.GetLiveTokenParams, error) {
 	parsed, err := crypto.Parse(raw)
 	if err != nil || parsed.ID == "" {
@@ -58,15 +57,15 @@ func (s *InvitationService) GetInvitation(
 ) (*nokkuv1.GetInvitationResponse, error) {
 	userID := iam.UserIDFromContext(ctx)
 	if userID == "" {
-		return nil, ErrBadCredentials
+		return nil, ErrUserRequired
 	}
 	lookup, err := inviteLookup(req.GetToken())
 	if err != nil {
 		return nil, inviteError(err)
 	}
 
-	// The joiner is not a member yet, so this runs as a system transaction.
-	// The token is checked first, so nothing leaks without a valid one.
+	// System tx since the joiner is not a member yet. The token is checked
+	// first, so nothing leaks without a valid one.
 	var (
 		token     *db.WorkspaceToken
 		workspace *db.Workspace
@@ -105,16 +104,14 @@ func (s *InvitationService) AcceptInvitation(
 ) (*nokkuv1.AcceptInvitationResponse, error) {
 	userID := iam.UserIDFromContext(ctx)
 	if userID == "" {
-		return nil, ErrBadCredentials
+		return nil, ErrUserRequired
 	}
 	lookup, err := inviteLookup(req.GetToken())
 	if err != nil {
 		return nil, inviteError(err)
 	}
 
-	// System transaction: the joiner is not a member yet. An existing member
-	// is turned away before the token spends a use, and the use and the
-	// seat are taken together or not at all.
+	// Existing members are turned away before the token spends a use.
 	var workspaceID string
 	err = s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
 		token, err := q.GetLiveToken(ctx, lookup)
@@ -141,9 +138,6 @@ func (s *InvitationService) AcceptInvitation(
 		return s.cfg.IAM.EnsureMember(ctx, q, userID, workspaceID, *token.RoleName)
 	})
 	if err != nil {
-		if _, ok := errors.AsType[*connect.Error](err); ok {
-			return nil, err
-		}
 		return nil, inviteError(err)
 	}
 	return &nokkuv1.AcceptInvitationResponse{WorkspaceId: &workspaceID}, nil

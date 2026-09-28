@@ -11,11 +11,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// SCIMService manages workspace connector tokens. The SCIM endpoint itself
-// is mounted at /scim/v2/{workspace_id} and authenticates with these
-// tokens; the service is the only place they are minted, listed, and
-// revoked, and the plaintext is shown exactly once at creation.
-
 type SCIMService struct {
 	cfg *config.Config
 }
@@ -28,9 +23,6 @@ func (s *SCIMService) CreateSCIMToken(
 	ctx context.Context,
 	req *nokkuv1.CreateSCIMTokenRequest,
 ) (*nokkuv1.CreateSCIMTokenResponse, error) {
-	// The connector mints accounts on any userName it is told to create.
-	// Without a verified domain, a token holder could squat arbitrary
-	// emails at scale, so SCIM setup demands the same domain proof as SSO.
 	if err := requireVerifiedDomain(ctx, s.cfg.IAM, "a SCIM connector", req.GetWorkspaceId()); err != nil {
 		return nil, err
 	}
@@ -38,14 +30,12 @@ func (s *SCIMService) CreateSCIMToken(
 	if err != nil {
 		return nil, DBError(err)
 	}
-	token := plaintext
 	entry := scimTokenToProto(tok)
 	audit.SetTarget(ctx, entry.GetId())
-	baseURL := s.cfg.FullURL() + "/scim/v2/" + req.GetWorkspaceId()
 	return &nokkuv1.CreateSCIMTokenResponse{
-		Token:   &token,
+		Token:   &plaintext,
 		Entry:   entry,
-		BaseUrl: &baseURL,
+		BaseUrl: new(s.cfg.FullURL() + "/scim/v2/" + req.GetWorkspaceId()),
 	}, nil
 }
 

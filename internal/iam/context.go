@@ -1,11 +1,9 @@
 package iam
 
-// Request identity re-exports: the principal and tenant context primitives
-// live in internal/actor so the db layer can read them without importing iam.
+// Re-exports from internal/actor, which exists so db can read them without importing iam.
 
 import "github.com/nokku-sh/nokku/internal/actor"
 
-// Kind is the actor kind a session belongs to.
 type Kind = actor.Kind
 
 const (
@@ -17,11 +15,10 @@ const (
 	KindSCIM           = actor.KindSCIM
 )
 
-// Principal is the authenticated actor of a request.
-type Principal = actor.Principal
-
-// TenantID is the resolved workspace of a request.
-type TenantID = actor.TenantID
+type (
+	Principal = actor.Principal
+	TenantID  = actor.TenantID
+)
 
 var (
 	ContextWithPrincipal   = actor.ContextWithPrincipal

@@ -7,15 +7,9 @@ import (
 	"strings"
 )
 
-// trustedProxies holds reverse proxy CIDRs/IPs. Client IP headers are
-// honored only when the direct peer matches one of these, otherwise the
-// socket peer address is used. Configured via [SetTrustedProxies].
 var trustedProxies []*net.IPNet
 
-// SetTrustedProxies configures the reverse proxies allowed to forward
-// client IP headers (True-Client-Ip, X-Real-IP, X-Forwarded-For). Each
-// entry is an IP or CIDR. With no entries, forwarding headers are ignored,
-// the secure default.
+// SetTrustedProxies with no entries ignores forwarding headers, the secure default.
 func SetTrustedProxies(proxies []string) error {
 	trustedProxies = nil
 	for _, raw := range proxies {

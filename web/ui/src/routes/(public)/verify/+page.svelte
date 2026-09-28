@@ -5,14 +5,12 @@
 	import { page } from '$app/state';
 	import { auth } from '$lib/api/auth.svelte';
 
-	// State
 	let token = page.url.searchParams.get('token');
 	let email = $state(page.url.searchParams.get('email') ?? '');
 
 	const verifyEmail = auth.verifyEmail();
 	const resendVerification = auth.resendVerification();
 
-	// Auto-verify when component loads
 	$effect(() => {
 		if (token) verifyEmail.mutate({ token });
 	});
@@ -23,7 +21,6 @@
 >
 	<div class="-m-px flex flex-col gap-4 rounded-[calc(var(--radius)+.125rem)] border bg-card p-6">
 		{#if verifyEmail.isPending}
-			<!-- Loading State -->
 			<div class="flex flex-col items-center text-center">
 				<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
 					<RefreshCw size={24} class="animate-spin text-primary" />
@@ -34,7 +31,6 @@
 				</p>
 			</div>
 		{:else if verifyEmail.isSuccess}
-			<!-- Success State -->
 			<div class="flex flex-col gap-5">
 				<div class="flex flex-col items-center text-center">
 					<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-chart-3">
@@ -57,7 +53,6 @@
 				<Button variant="link" class="w-full" href="/login">Continue to Sign In</Button>
 			</div>
 		{:else if verifyEmail.isError}
-			<!-- Error State -->
 			<div class="flex flex-col gap-5">
 				<div class="flex flex-col items-center text-center">
 					<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-chart-2">

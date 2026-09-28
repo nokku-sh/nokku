@@ -25,9 +25,7 @@ export type BulkAction<T> = {
 	variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
 	class?: string;
 	disabled?: boolean;
-	// For button type
 	onClick?: (selectedItems: T[]) => Promise<void> | void;
-	// For select type
 	options?: {
 		label: string;
 		value: string;

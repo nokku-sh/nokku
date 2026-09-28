@@ -85,7 +85,6 @@
 			</Alert.Root>
 		{/if}
 
-		<!-- Basic Configuration -->
 		<Field.Set>
 			<Field.Legend class="sr-only">Basic Configuration</Field.Legend>
 			<Field.Group>
@@ -182,7 +181,6 @@
 
 		<Separator />
 
-		<!-- Security & Access Options -->
 		<Field.Set>
 			<div class="space-y-1">
 				<Field.Legend>Security & Access Options</Field.Legend>
@@ -231,7 +229,6 @@
 
 		<Separator />
 
-		<!-- Service Provider Information -->
 		<Field.Set>
 			<div class="space-y-1">
 				<Field.Legend>Service Provider Information</Field.Legend>

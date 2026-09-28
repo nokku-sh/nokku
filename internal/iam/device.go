@@ -1,8 +1,7 @@
 package iam
 
-// RFC 8628 device flow, ported from kagi: the CLI starts a grant, the user
-// approves it from the browser (an authenticated web_device page), and the
-// CLI polls the token endpoint for a DPoP-bound session.
+// RFC 8628 device flow. The CLI starts a grant, the user approves it in the
+// browser, and the CLI polls for a DPoP-bound session.
 
 import (
 	"context"
@@ -30,14 +29,12 @@ const (
 	grantDenied     = "denied"
 )
 
-// DeviceFlow implements the RFC 8628 endpoints. The session it issues is
-// always bound to the device's DPoP key.
 type DeviceFlow struct {
 	svc *Service
 }
 
-// deviceGrant is a cross-request device grant, stored under the device code
-// and, until someone decides on it, under the user code.
+// deviceGrant is stored under the device code, and under the user code until
+// someone decides on it.
 type deviceGrant struct {
 	DeviceCode string `json:"device_code"`
 	UserCode   string `json:"user_code"`
@@ -50,8 +47,6 @@ type pollState struct {
 	violations int
 }
 
-// Begin starts a device grant (POST /auth/device). Public: the CLI has no
-// credentials yet.
 func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 	deviceCode, err := crypto.RandomString(32)
 	if err != nil {
@@ -86,15 +81,10 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Verify marks a grant approved (POST /auth/device/verify). Mounted behind
-// RequireLogin so the approving principal is present. The user code is the
-// only input.
 func (h *DeviceFlow) Verify(w http.ResponseWriter, r *http.Request) {
 	h.decide(w, r, true)
 }
 
-// Deny marks a grant denied (POST /auth/device/deny) so a concurrent poll
-// returns access_denied and the device aborts the flow.
 func (h *DeviceFlow) Deny(w http.ResponseWriter, r *http.Request) {
 	h.decide(w, r, false)
 }
@@ -112,8 +102,7 @@ func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool
 		return
 	}
 
-	// Consuming the user code makes the decision single-use: nobody can
-	// flip a denial or approve a grant someone else already decided.
+	// Consuming the user code makes the decision single-use.
 	b, err := h.svc.cache.GetDel(r.Context(), "device:user:"+userCode)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid or expired code")
@@ -139,9 +128,6 @@ func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// Poll is the device token endpoint (POST /auth/device/token): pending
-// returns authorization_pending or slow_down (RFC 8628 section 3.5),
-// approval issues a DPoP-bound session, denial access_denied.
 func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	deviceCode := r.FormValue("device_code")
@@ -169,8 +155,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		}
 		writeOAuthError(w, "authorization_pending")
 	case grantDenied:
-		// Consume the grant: a CLI left polling must not re-record the
-		// denial as an audit event on every poll until the TTL expires.
+		// Consume it so a CLI left polling doesn't audit the denial every poll.
 		if _, err := h.svc.cache.GetDel(ctx, "device:code:"+deviceCode); err != nil {
 			writeOAuthError(w, "expired_token") // a concurrent poll consumed it
 			return
@@ -194,13 +179,8 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 
 		binding, derr := h.deviceBinding(ctx, r)
 		if derr != nil {
-			// A proof error is retryable, so the grant stays usable: the
-			// device re-signs with the advertised nonce and polls again.
-			// Advertise the canonical URL alongside the nonce on every
-			// failure, so a client that signed the wrong htu (its
-			// configured API URL differs from the canonical base URL)
-			// corrects itself, like the connect interceptor does (RFC
-			// 9449 section 8).
+			// Retryable, the grant stays usable. The advertised URL also
+			// fixes clients that signed the wrong htu.
 			h.svc.AdvertiseDPoPNonce(w.Header())
 			if errors.Is(derr, ErrDPoPNonce) {
 				writeOAuthError(w, "use_dpop_nonce")
@@ -210,9 +190,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Consume the grant before issuing, so one approval can never yield
-		// two sessions no matter how the polls race. Past this point a
-		// failure costs the device its grant and it re-runs the flow.
+		// Consume before issuing so racing polls never yield two sessions.
 		if _, err := h.svc.cache.GetDel(ctx, "device:code:"+deviceCode); err != nil {
 			writeOAuthError(w, "expired_token") // a concurrent poll consumed it
 			return
@@ -249,16 +227,12 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Nonce advertises the current DPoP nonce over an unauthenticated endpoint
-// (GET /auth/device/nonce), so devices can fetch one before their first
-// proof (RFC 9449 section 8). Returns 204.
+// Nonce lets devices fetch a nonce before their first proof.
 func (h *DeviceFlow) Nonce(w http.ResponseWriter, _ *http.Request) {
 	h.svc.AdvertiseDPoPNonce(w.Header())
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// deviceBinding verifies the poll's DPoP proof and returns its key
-// thumbprint. The CLI session is always key-bound, so a missing proof fails.
 func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string, error) {
 	proof := r.Header.Get("DPoP")
 	if proof == "" {
@@ -267,10 +241,8 @@ func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string
 	return h.svc.DPoP.Verify(ctx, proof, "", r.Method, h.svc.baseURL+r.URL.Path)
 }
 
-// pollTrack records one poll and reports whether it came too fast. The
-// required interval grows by slowDownPenalty per slow_down, and a too-fast
-// poll does not move the last-accepted timestamp. A cache failure allows
-// the poll.
+// pollTrack reports a too-fast poll. The interval grows per slow_down, and a
+// cache failure allows the poll.
 func (h *DeviceFlow) pollTrack(ctx context.Context, deviceCode string) bool {
 	key := "device:poll:" + deviceCode
 	var st pollState
@@ -304,9 +276,8 @@ func decodePollState(b []byte) pollState {
 	return pollState{last: time.Unix(0, nano), violations: v}
 }
 
-// randomUserCode returns a short, human-typed code like "ABCD-EFGH". Approval
-// still requires an authenticated session, so it is a correlation handle, not
-// a secret. Characters avoid 0/O/1/I ambiguity.
+// randomUserCode is a correlation handle, not a secret, since approval needs a
+// session. The charset avoids 0/O/1/I.
 func randomUserCode() (string, error) {
 	const chars = "BCDFGHJKLMNPQRSTVWXZ23456789"
 	out := make([]byte, 8)
@@ -320,9 +291,6 @@ func randomUserCode() (string, error) {
 	return string(out[:4]) + "-" + string(out[4:]), nil
 }
 
-// normalizeUserCode canonicalizes a typed user code: uppercased with
-// separators and whitespace removed and re-dashed, so a user typing
-// "ABCDEFGH" or "abcd efgh" still matches the issued "XXXX-XXXX" grant.
 func normalizeUserCode(code string) string {
 	var b strings.Builder
 	b.Grow(len(code))
@@ -339,8 +307,7 @@ func normalizeUserCode(code string) string {
 	return s
 }
 
-// writeOAuthError writes the RFC 6749 section 5.2 error shape the device
-// client parses: {"error": "..."}.
+// writeOAuthError uses the RFC 6749 section 5.2 shape.
 func writeOAuthError(w http.ResponseWriter, code string) {
 	WriteJSON(w, http.StatusBadRequest, map[string]string{"error": code})
 }

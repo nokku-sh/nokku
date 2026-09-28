@@ -73,7 +73,6 @@ WHERE
   AND user_id = @user_id;
 
 -- name: ListTeamMembers :many
--- Members of one team with their identity display fields joined in.
 SELECT
   tm.workspace_id,
   tm.team_id,
@@ -94,8 +93,6 @@ ORDER BY
   u.email ASC;
 
 -- name: CountTeamMembers :many
--- Member counts for a set of teams in one read, for list views that show a
--- count instead of embedding each team's members.
 SELECT
   tm.team_id,
   COUNT(*)::INTEGER AS member_count
@@ -107,8 +104,6 @@ GROUP BY
   tm.team_id;
 
 -- name: ListTeamsForUser :many
--- Teams one user belongs to within a workspace: the read the user-profile
--- surface needs, without deriving it from a teams-with-members blob.
 SELECT
   t.*
 FROM

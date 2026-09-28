@@ -4,16 +4,11 @@ import type { AccountCredential, AccountSession } from '$lib/gen/nokku/v1/accoun
 import type { User } from '$lib/gen/nokku/v1/account_pb';
 import { authTransport, handleSessionExpired } from './client';
 
-// The account surface is the Connect AccountService: profile, password,
-// credentials, linked identities, backup codes, sessions, and deletion. The
-// calls carry the HttpOnly session cookie through authTransport.
-
 export type { AccountCredential, AccountSession, User };
 
 const client = createClient(AccountService, authTransport);
 
-// guard sends an expired or revoked session to /login, exactly like the
-// fetch layer used to; every other error propagates to the caller.
+// guard sends an expired session to /login, other errors propagate.
 async function guard<T>(p: Promise<T>): Promise<T> {
 	try {
 		return await p;

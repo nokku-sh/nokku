@@ -97,9 +97,7 @@ type DeleteStaleUserSCIMCredentialsParams struct {
 	Subject     string `json:"subject"`
 }
 
-// Drops the user's other SCIM externalId mappings for the workspace, so an
-// IdP-side identity migration never leaves two links on one account. Run
-// before UpsertCredential, which re-adds the current subject.
+// Run before UpsertCredential so one account never carries two links.
 func (q *Queries) DeleteStaleUserSCIMCredentials(ctx context.Context, arg *DeleteStaleUserSCIMCredentialsParams) error {
 	_, err := q.db.Exec(ctx, deleteStaleUserSCIMCredentials, arg.UserID, arg.WorkspaceID, arg.Subject)
 	return err
@@ -193,8 +191,7 @@ type ListManagedMembersRow struct {
 	ExternalID           string    `json:"externalId"`
 }
 
-// Members whose email domain the workspace has verified: the only accounts
-// a SCIM connector may see or change. email narrows to one account.
+// Only members under the workspace's verified domains.
 func (q *Queries) ListManagedMembers(ctx context.Context, arg *ListManagedMembersParams) ([]*ListManagedMembersRow, error) {
 	rows, err := q.db.Query(ctx, listManagedMembers, arg.WorkspaceID, arg.UserID, arg.Email)
 	if err != nil {
@@ -284,8 +281,7 @@ WHERE
   )
 `
 
-// Throttled: only writes when the stored stamp is over an hour old, so a
-// busy provisioning client does not turn every read into a write.
+// Only writes when the stamp is over an hour old.
 func (q *Queries) TouchSCIMToken(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, touchSCIMToken, id)
 	return err

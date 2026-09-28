@@ -1,4 +1,4 @@
-// Package web embeds various files for the backend
+// Package web embeds the built UI and email templates.
 package web
 
 import (

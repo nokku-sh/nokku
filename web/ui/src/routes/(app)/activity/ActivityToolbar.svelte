@@ -97,7 +97,6 @@
 	});
 </script>
 
-<!-- Custom Toolbar -->
 <div class="flex items-center gap-2">
 	<InputGroupVariants
 		variant="search"

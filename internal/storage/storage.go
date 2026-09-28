@@ -42,9 +42,6 @@ type Storage struct {
 	bucket *blob.Bucket
 }
 
-// New creates a storage backend. The backend is selected explicitly:
-//   - NOKKU_STORAGE=s3 - S3-compatible object storage (Scaleway, R2, MinIO, AWS)
-//   - NOKKU_STORAGE=local (default) - local filesystem at NOKKU_LOCAL_STORAGE_PATH
 func New(ctx context.Context, baseURL string) (*Storage, error) {
 	s, err := env.ParseAs[Storage]()
 	if err != nil {
@@ -70,7 +67,6 @@ func New(ctx context.Context, baseURL string) (*Storage, error) {
 		)
 	}
 
-	// Handle shutdown
 	go func() {
 		<-ctx.Done()
 		if s.bucket != nil {
@@ -114,8 +110,7 @@ func (s *Storage) initS3(ctx context.Context) error {
 		return fmt.Errorf("open s3 bucket: %w", err)
 	}
 
-	// Fail fast: verify credentials and bucket access at startup so a
-	// misconfigured deployment surfaces on boot, not on the first upload.
+	// Fail on boot, not on the first upload.
 	if _, err := s.bucket.Attributes(ctx, ".nokku-probe"); err != nil {
 		if code := gcerrors.Code(err); code != gcerrors.NotFound {
 			_ = s.bucket.Close()
@@ -187,10 +182,7 @@ func (s *Storage) Delete(ctx context.Context, name string) error {
 	return nil
 }
 
-// CreateWriter opens a streaming writer for a new object. Writes are streamed
-// to the backend (S3 multipart / local temp file) and committed on Close. A
-// truncated session still commits whatever was written, so a died daemon
-// leaves a partial recording instead of nothing.
+// CreateWriter commits on Close, so a truncated upload leaves a partial object.
 func (s *Storage) CreateWriter(
 	ctx context.Context,
 	name string,
@@ -209,9 +201,7 @@ func (s *Storage) CreateWriter(
 	return w, nil
 }
 
-// PublicURL returns the public URL for name when the backend serves objects
-// directly (S3 + PublicURL) and false otherwise (local storage is proxied
-// through the application server).
+// PublicURL is false for local storage, which the server proxies.
 func (s *Storage) PublicURL(name string) (string, bool) {
 	if s.CDNURL == "" {
 		return "", false

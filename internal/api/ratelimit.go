@@ -12,13 +12,10 @@ import (
 )
 
 const (
-	// General per-IP rate limit (all HTTP requests including SAML, OIDC, avatars).
 	generalRPS   = 30
 	generalBurst = 50
 
-	// Auth endpoints get a stricter per-IP limit: they are the brute-force
-	// and enumeration surface (login, register, the mail round trips, SSO
-	// start, device polling).
+	// Auth endpoints are the brute-force and enumeration surface.
 	authRPS   = 5
 	authBurst = 10
 
@@ -99,10 +96,6 @@ func (s *Server) WithRateLimit(next http.Handler) http.Handler {
 	})
 }
 
-// isAuthRoute returns true for the browser-facing auth surface, which gets
-// the stricter per-IP limit: the pre-session AuthService RPCs (login,
-// register, the mail round trips), the leftover /auth mounts, and the SSO
-// flow redirects at the root.
 func isAuthRoute(path string) bool {
 	return strings.HasPrefix(path, "/nokku.v1.AuthService/") ||
 		strings.HasPrefix(path, "/auth/") ||
@@ -112,10 +105,8 @@ func isAuthRoute(path string) bool {
 		strings.HasPrefix(path, "/passkey/")
 }
 
-// isAPIRoute returns true for backend endpoints. Static assets skip rate limiting.
 func isAPIRoute(path string) bool {
-	// Streaming endpoints establish long-lived connections, rate limiting
-	// their initial HTTP request would block legitimate reconnect storms.
+	// Rate limiting daemon streams would block legitimate reconnect storms.
 	if strings.HasPrefix(path, "/nokku.v1.DaemonControlService/") ||
 		strings.HasPrefix(path, "/nokku.v1.DaemonSessionService/") {
 		return false

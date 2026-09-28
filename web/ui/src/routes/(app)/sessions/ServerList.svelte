@@ -16,17 +16,6 @@
 
 	let searchQuery = $state('');
 
-	// Build a list of connectable servers: targets the user can access, with their daemon info
-	// const connectableServers = $derived.by(() => {
-	// 	if (!accessibleTargets.data || !agents.data || !targets.data) return [];
-
-	// 	return accessibleTargets.data.sort((a, b) => {
-	// 		// Online first, then alphabetical
-	// 		if (a.online !== b.online) return a.online ? -1 : 1;
-	// 		return a.name.localeCompare(b.name);
-	// 	});
-	// });
-
 	const filtered = $derived.by(() => {
 		if (!targets) return [];
 		const q = searchQuery.toLowerCase();
@@ -41,7 +30,6 @@
 </script>
 
 <div class="flex h-full flex-col">
-	<!-- Header -->
 	<div class="border-b px-3 py-3">
 		<div class="mb-2 flex items-center justify-between">
 			<h2 class="text-sm font-semibold">Servers</h2>
@@ -56,7 +44,6 @@
 		/>
 	</div>
 
-	<!-- Server list -->
 	<div class="flex-1 overflow-y-auto">
 		{#if access.isPending}
 			<div class="space-y-1 p-2">
@@ -83,7 +70,6 @@
 						{#if isOnline && target.daemonId}
 							<ConnectPopover {target} />
 						{:else}
-							<!-- Offline daemon -->
 							<Tooltip.Provider>
 								<Tooltip.Root>
 									<Tooltip.Trigger>

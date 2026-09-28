@@ -42,8 +42,6 @@ type AddPrincipalGrantParams struct {
 	SubjectID   string `json:"subjectId"`
 }
 
-// Grant primitives used by AddSubjectsToPrincipal / RemoveSubjectsFromPrincipal.
-// One row per (principal, subject kind, subject id) in principal_grants.
 func (q *Queries) AddPrincipalGrant(ctx context.Context, arg *AddPrincipalGrantParams) error {
 	_, err := q.db.Exec(ctx, addPrincipalGrant,
 		arg.PrincipalID,
@@ -201,8 +199,7 @@ type InsertTargetPrincipalsParams struct {
 	Usernames []string `json:"usernames"`
 }
 
-// Creates the principal anchor for each reported account so it becomes
-// assignable. Never deletes: a host's reported list is a hint, not authority.
+// Never deletes, a host's reported list is a hint, not authority.
 func (q *Queries) InsertTargetPrincipals(ctx context.Context, arg *InsertTargetPrincipalsParams) error {
 	_, err := q.db.Exec(ctx, insertTargetPrincipals, arg.TargetID, arg.Usernames)
 	return err
@@ -350,9 +347,7 @@ type ListPrincipalsForTargetRow struct {
 	Ids      []string `json:"ids"`
 }
 
-// The per-account subject list a host enforces: the daemon's synced map, or
-// AuthorizedPrincipalsFile on a manual target. Teams are expanded to their
-// members here, so the host needs no team knowledge.
+// Teams are expanded so the host needs no team knowledge.
 func (q *Queries) ListPrincipalsForTarget(ctx context.Context, targetID string) ([]*ListPrincipalsForTargetRow, error) {
 	rows, err := q.db.Query(ctx, listPrincipalsForTarget, targetID)
 	if err != nil {
@@ -418,10 +413,7 @@ type ListSubjectUsernamesForTargetsRow struct {
 	Username string `json:"username"`
 }
 
-// The local accounts a subject may log in as, per target: the grant predicate
-// resolved for one subject, without the rest of the target's assignment graph.
-// A team grant counts for its members, and a subject may be a user, a team, or
-// a service account (all identified by UUID, which is unique across them).
+// A team grant counts for its members. Subject UUIDs are unique across kinds.
 func (q *Queries) ListSubjectUsernamesForTargets(ctx context.Context, arg *ListSubjectUsernamesForTargetsParams) ([]*ListSubjectUsernamesForTargetsRow, error) {
 	rows, err := q.db.Query(ctx, listSubjectUsernamesForTargets, arg.TargetIds, arg.SubjectID)
 	if err != nil {

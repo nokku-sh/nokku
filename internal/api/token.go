@@ -24,8 +24,7 @@ func NewTokenService(cfg *config.Config) *TokenService {
 	return &TokenService{cfg: cfg}
 }
 
-// CreateToken mints an enroll or invite token. The plaintext is
-// "<id>_<secret>" and is returned once, only its hash is stored.
+// CreateToken returns the "<id>_<secret>" plaintext once, only its hash is stored.
 func (s *TokenService) CreateToken(
 	ctx context.Context,
 	req *nokkuv1.CreateTokenRequest,
@@ -100,8 +99,7 @@ func (s *TokenService) ListTokens(
 	return &nokkuv1.ListTokensResponse{Tokens: db.TokensToProto(tokens)}, nil
 }
 
-// DeleteToken revokes a token. Daemons and members it already brought in
-// stay.
+// DeleteToken keeps the daemons and members the token already brought in.
 func (s *TokenService) DeleteToken(
 	ctx context.Context,
 	req *nokkuv1.DeleteTokenRequest,

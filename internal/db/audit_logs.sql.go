@@ -200,8 +200,7 @@ type ListAuditLogsRow struct {
 	Total       int32     `json:"total"`
 }
 
-// RLS already limits rows to the pinned workspace or the actor's own. A NULL
-// workspace_id is the personal log: every row of the actor, any workspace.
+// A NULL workspace_id is the personal log, RLS already limits the rows.
 func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) ([]*ListAuditLogsRow, error) {
 	rows, err := q.db.Query(ctx, listAuditLogs,
 		arg.WorkspaceID,

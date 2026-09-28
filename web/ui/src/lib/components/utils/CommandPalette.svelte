@@ -123,7 +123,6 @@
 			{/each}
 		</Command.Group>
 
-		<!-- SUPPORT ROUTES -->
 		{#each Object.entries(SupportRoutes) as [groupName, routes]}
 			<Command.Group heading={groupName}>
 				{#each flattenRoutes(routes) as item}

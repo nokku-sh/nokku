@@ -32,9 +32,6 @@ func (s *ServiceAccountService) GetServiceAccount(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	if result == nil {
-		return nil, ErrNotFound
-	}
 	return &nokkuv1.GetServiceAccountResponse{
 		ServiceAccount: result.ToProto(),
 	}, nil
@@ -49,9 +46,6 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		return nil, NewError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
 
-	// The service account's credential is a bearer token whose hash lives on
-	// the row. Expiry rides on the row and is enforced at verification time,
-	// so a short-lived token is really short-lived.
 	raw, tokenHash, err := iam.NewAPIKey()
 	if err != nil {
 		return nil, ErrInternal
@@ -119,9 +113,6 @@ func (s *ServiceAccountService) UpdateServiceAccount(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	if result == nil {
-		return nil, ErrNotFound
-	}
 	return &nokkuv1.UpdateServiceAccountResponse{
 		ServiceAccount: result.ToProto(),
 	}, nil
@@ -132,7 +123,6 @@ func (s *ServiceAccountService) ListServiceAccounts(
 	req *nokkuv1.ListServiceAccountsRequest,
 ) (*nokkuv1.ListServiceAccountsResponse, error) {
 	var result []*db.ListServiceAccountsRow
-	count := int32(0)
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.ListServiceAccounts(ctx, &db.ListServiceAccountsParams{
 			WorkspaceID: req.GetWorkspaceId(),
@@ -142,20 +132,17 @@ func (s *ServiceAccountService) ListServiceAccounts(
 			Limit:       req.Limit,
 			Offset:      req.Offset,
 		})
-		if err != nil {
-			return err
-		}
-		if len(result) > 0 {
-			count = result[0].TotalCount
-		}
-		return nil
+		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
+	var count int32
+	if len(result) > 0 {
+		count = result[0].TotalCount
+	}
 
-	serviceAccounts := db.ServiceAccountsToProto(result)
 	return &nokkuv1.ListServiceAccountsResponse{
-		ServiceAccounts: serviceAccounts,
+		ServiceAccounts: db.ServiceAccountsToProto(result),
 		Total:           &count,
 	}, nil
 }
@@ -172,12 +159,9 @@ func (s *ServiceAccountService) DeleteServiceAccount(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	// The credential is the row's token hash: deletion revokes it.
 	return &nokkuv1.DeleteServiceAccountResponse{}, nil
 }
 
-// checkCanManageServiceAccount refuses changes to a service account whose
-// role is above the caller's.
 func checkCanManageServiceAccount(ctx context.Context, q db.Querier, id string) error {
 	sa, err := q.GetServiceAccount(ctx, id)
 	if err != nil {

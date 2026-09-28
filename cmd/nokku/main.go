@@ -73,7 +73,6 @@ func main() {
 						defer conn.Pool.Close()
 					}
 
-					// The old cipher is whatever the app currently decrypts with.
 					var oldCipher crypto.Cipher
 					if secret := os.Getenv("NOKKU_SECRET"); secret != "" {
 						oldCipher, err = crypto.NewSecretbox([]byte(secret))
@@ -84,9 +83,7 @@ func main() {
 						return fmt.Errorf("current cipher: %w", err)
 					}
 
-					// The new cipher, plus the hook that finalizes the switch
-					// inside the rotation transaction: a KMS target persists its
-					// fresh keyset, a secretbox target needs no finalization.
+					// A KMS target persists its fresh keyset inside the rotation tx.
 					var newCipher crypto.Cipher
 					var finalize func(ctx context.Context, q *db.Queries) error
 					if secret, ok := strings.CutPrefix(cmd.String("new"), "secret:"); ok &&
@@ -116,8 +113,6 @@ func main() {
 						)
 					}
 
-					// Decrypt with the old cipher, re-encrypt with the new one,
-					// in one transaction.
 					rotating, err := crypto.NewRotatingCipher(newCipher, oldCipher)
 					if err != nil {
 						return fmt.Errorf("failed to create rotating cipher: %w", err)

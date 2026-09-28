@@ -103,9 +103,6 @@ WHERE
   AND (expires_at IS NULL OR expires_at > NOW())
 `
 
-// Bearer-token authentication for service accounts: resolve by the stored
-// hash of the raw secret. A service account's token is its credential, so
-// only live, unexpired accounts match.
 func (q *Queries) GetServiceAccountByTokenHash(ctx context.Context, tokenHash *crypto.HashedToken) (*ServiceAccount, error) {
 	row := q.db.QueryRow(ctx, getServiceAccountByTokenHash, tokenHash)
 	var i ServiceAccount
@@ -234,8 +231,7 @@ WHERE
   )
 `
 
-// Throttled like the SCIM token touch, so a busy key does not turn every
-// request into a write.
+// Throttled so a busy key does not turn every request into a write.
 func (q *Queries) TouchServiceAccount(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, touchServiceAccount, id)
 	return err

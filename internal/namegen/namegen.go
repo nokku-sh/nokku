@@ -1,6 +1,5 @@
-// Package namegen produces friendly, easy-to-type daemon names like
-// "sunny-otter". Names are display labels only: the daemon UUID is the
-// stable identity, and uniqueness is enforced per workspace by the caller.
+// Package namegen produces display names like "sunny-otter". Callers enforce
+// uniqueness.
 package namegen
 
 import (
@@ -44,7 +43,6 @@ var nouns = []string{
 	"violet", "warbler", "willow", "wolf", "wren", "yarrow", "zephyr",
 }
 
-// Generate returns a lowercase "adjective-noun" name.
 func Generate() string {
 	return word(adjectives) + "-" + word(nouns)
 }

@@ -1,9 +1,5 @@
 package iam
 
-// DPoP (RFC 9449) proof verification, ported from kagi. Device and daemon
-// sessions carry the proof key's thumbprint (jkt) in sessions.binding; every
-// request must present a fresh proof signed by that key.
-
 import (
 	"context"
 	"crypto"
@@ -21,37 +17,27 @@ import (
 	"github.com/go-jose/go-jose/v4"
 )
 
-// Errors returned by DPoPVerifier.Verify are sentinels in errors.go. Map
-// ErrDPoPNonce to a fresh DPoP-Nonce response header (retry with
-// use_dpop_nonce) and everything else to an invalid-proof rejection.
-
-// allowedAlgs is the set of signature algorithms accepted for proofs.
 var allowedAlgs = []jose.SignatureAlgorithm{
 	jose.EdDSA, jose.ES256, jose.ES384, jose.ES512, jose.RS256, jose.PS256,
 }
 
 const (
-	// dpopNonceTTL is the rotation period of the server nonce.
 	dpopNonceTTL = 5 * time.Minute
-	// dpopMaxSkew bounds how far a proof's iat may be from now.
-	dpopMaxSkew = time.Minute
+	dpopMaxSkew  = time.Minute
 )
 
-// DPoPVerifier verifies DPoP proofs. The server nonce is a stateless HMAC
-// over a time bucket keyed by the shared secret, so instances validate
-// nonces without shared storage. The cache catches jti reuse.
+// DPoPVerifier nonces are a stateless HMAC over a time bucket, so instances
+// share no storage for them. The cache catches jti reuse.
 type DPoPVerifier struct {
 	secret []byte
 	replay Cache
 	now    func() time.Time
 }
 
-// CurrentNonce returns the nonce to advertise in the DPoP-Nonce header.
 func (v *DPoPVerifier) CurrentNonce() string {
 	return v.nonceFor(v.bucket(v.now()))
 }
 
-// bucket returns the nonce time bucket for t.
 func (v *DPoPVerifier) bucket(t time.Time) int64 {
 	return t.Unix() / int64(dpopNonceTTL.Seconds())
 }
@@ -62,17 +48,14 @@ func (v *DPoPVerifier) nonceFor(bucket int64) string {
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
-// nonceValid reports whether nonce is the current or previous bucket's nonce,
-// so a proof survives a rotation boundary.
+// nonceValid also accepts the previous bucket so proofs survive a rotation.
 func (v *DPoPVerifier) nonceValid(nonce string) bool {
 	bucket := v.bucket(v.now())
 	return subtle.ConstantTimeCompare([]byte(nonce), []byte(v.nonceFor(bucket))) == 1 ||
 		subtle.ConstantTimeCompare([]byte(nonce), []byte(v.nonceFor(bucket-1))) == 1
 }
 
-// Verify validates a DPoP proof bound to accessToken and the request
-// described by htm/htu, and returns the proof key's thumbprint (jkt). The
-// caller compares the jkt against the session's binding.
+// Verify returns the proof key's thumbprint (jkt) for the caller to compare.
 func (v *DPoPVerifier) Verify(
 	ctx context.Context,
 	proofJWT, accessToken, htm, htu string,
@@ -108,7 +91,6 @@ func (v *DPoPVerifier) Verify(
 	if c.HTM != htm {
 		return "", fmt.Errorf("%w: htm mismatch", ErrInvalidProof)
 	}
-	// RFC 9449 section 4.2.2: compare normalized htus.
 	if !strings.EqualFold(normalizeDPoPHTU(c.HTU), normalizeDPoPHTU(htu)) {
 		return "", fmt.Errorf("%w: htu mismatch", ErrInvalidProof)
 	}
@@ -124,8 +106,7 @@ func (v *DPoPVerifier) Verify(
 	if c.Nonce == "" || !v.nonceValid(c.Nonce) {
 		return "", ErrDPoPNonce
 	}
-	// ath is required only alongside an access token. Enrollment proofs have
-	// none yet.
+	// Enrollment proofs have no access token yet.
 	if accessToken != "" {
 		wantATH := DPoPATH(accessToken)
 		if subtle.ConstantTimeCompare([]byte(c.ATH), []byte(wantATH)) != 1 {
@@ -133,8 +114,7 @@ func (v *DPoPVerifier) Verify(
 		}
 	}
 
-	// A jti is remembered as long as its proof could still be accepted: two
-	// nonce windows plus skew.
+	// Remember the jti as long as its proof could still be accepted.
 	added, err := v.replay.SetNX(ctx, "dpop:jti:"+c.JTI, nil, 2*dpopNonceTTL+dpopMaxSkew)
 	if err != nil {
 		return "", fmt.Errorf("%w: replay store: %w", ErrInvalidProof, err)
@@ -150,8 +130,6 @@ func (v *DPoPVerifier) Verify(
 	return base64.RawURLEncoding.EncodeToString(tp), nil
 }
 
-// VerifySession verifies a proof for a bound session: the proof key's
-// thumbprint must match the session's binding.
 func (v *DPoPVerifier) VerifySession(
 	ctx context.Context,
 	proofJWT, accessToken, htm, htu, binding string,
@@ -169,7 +147,6 @@ func (v *DPoPVerifier) VerifySession(
 	return nil
 }
 
-// dpopClaims are the registered claims of a DPoP proof.
 type dpopClaims struct {
 	HTM   string `json:"htm"`
 	HTU   string `json:"htu"`
@@ -179,16 +156,13 @@ type dpopClaims struct {
 	ATH   string `json:"ath"`
 }
 
-// DPoPATH returns the base64url-encoded SHA-256 hash of token, the "ath"
-// claim a proof carries alongside the access token.
+// DPoPATH is the "ath" claim, base64url(SHA-256(token)).
 func DPoPATH(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
 
-// normalizeDPoPHTU normalizes a target URI for the RFC 9449 htu comparison
-// per RFC 3986 section 6.2.2: drops query and fragment, lowercases scheme
-// and host, strips default ports, and normalizes the path.
+// normalizeDPoPHTU follows RFC 3986 section 6.2.2.
 func normalizeDPoPHTU(htu string) string {
 	scheme, rest, ok := strings.Cut(htu, "://")
 	if !ok {
@@ -203,7 +177,6 @@ func normalizeDPoPHTU(htu string) string {
 	host = strings.ToLower(host)
 	if h, port, err := net.SplitHostPort(host); err == nil {
 		if (scheme == "https" && port == "443") || (scheme == "http" && port == "80") {
-			// Keep a bracketed IPv6 host bracketed after stripping the port.
 			if strings.Contains(h, ":") {
 				host = "[" + h + "]"
 			} else {
@@ -214,8 +187,6 @@ func normalizeDPoPHTU(htu string) string {
 	return strings.ToLower(scheme) + "://" + host + normalizeDPoPPath(p)
 }
 
-// normalizeDPoPPath applies RFC 3986 section 6.2.2 path normalization:
-// reserved percent-encodings keep their case, dot-segments are removed.
 func normalizeDPoPPath(p string) string {
 	if p == "" {
 		return p
@@ -223,9 +194,8 @@ func normalizeDPoPPath(p string) string {
 	return path.Clean(normalizePercentEncoding(p))
 }
 
-// normalizePercentEncoding decodes percent-encoded unreserved characters and
-// uppercases the hex of the encodings it keeps (RFC 3986 section 6.2.2.2), so
-// %2F stays distinct from a real "/".
+// normalizePercentEncoding only decodes unreserved characters, so %2F stays
+// distinct from a real "/".
 func normalizePercentEncoding(s string) string {
 	if !strings.Contains(s, "%") {
 		return s

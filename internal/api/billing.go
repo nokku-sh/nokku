@@ -43,7 +43,7 @@ func (s *BillingService) GetBilling(
 		if err != nil {
 			return err
 		}
-		// NotFound is fine: community workspaces have no subscription row.
+		// Community workspaces have no subscription row.
 		sub, _ = q.GetSubscription(ctx, req.GetWorkspaceId())
 		return nil
 	}); err != nil {
@@ -178,10 +178,7 @@ func (s *BillingService) requireWorkspaceOwner(ctx context.Context, workspaceID 
 	return DBError(err)
 }
 
-// featuresProto returns the full feature catalog with per-plan enablement,
-// so clients can render locked features (not just enabled ones). It iterates
-// the catalog rather than repeating it: a feature that is missing here is
-// invisible to every client whatever the plan.
+// featuresProto returns the whole catalog so clients can render locked features.
 func featuresProto(p entitlement.Plan) map[string]bool {
 	features := make(map[string]bool, len(entitlement.CatalogFeatures))
 	for _, feature := range entitlement.CatalogFeatures {
@@ -190,7 +187,7 @@ func featuresProto(p entitlement.Plan) map[string]bool {
 	return features
 }
 
-// quotasProto renders the plan's caps; -1 means unlimited.
+// quotasProto uses -1 for unlimited.
 func quotasProto(p entitlement.Plan) *nokkuv1.Quotas {
 	return &nokkuv1.Quotas{
 		Seats:                 new(p.SeatCap),

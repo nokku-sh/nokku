@@ -6,7 +6,6 @@
 	};
 	let { status, ...restProps }: Props = $props();
 
-	// Map common status strings to shadcn variants
 	let variant = $derived.by(() => {
 		const s = status.toLowerCase();
 		if (['active', 'online', 'success', 'completed', 'enabled'].includes(s)) return 'default';

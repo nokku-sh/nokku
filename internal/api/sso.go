@@ -13,16 +13,8 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// SSO provider configuration is stored by the iam SSO manager in one unified
-// table (oidc/oauth2/saml discriminated by method); this service only gates
-// it (permissions, verified domains, billing) and maps it to the API surface.
-// The provider id doubles as the workspace id, matching the tenant the
-// provider is stored under, so a workspace holds at most one provider record:
-// saving the other protocol's config overwrites it. Nothing is created by
-// default; a workspace starts with no provider, and the Get RPC reports that
-// as an unset provider rather than an error so the UI can render its setup
-// form.
-
+// SSOService keeps at most one provider per workspace. The provider id is the
+// workspace id, so saving the other protocol overwrites it.
 type SSOService struct {
 	cfg *config.Config
 }
@@ -31,10 +23,8 @@ func NewSSOService(cfg *config.Config) *SSOService {
 	return &SSOService{cfg: cfg}
 }
 
-// requireVerifiedDomain gates org-level setup on domain ownership: home
-// realm discovery only routes logins whose email domain is bound to the
-// workspace, so SSO without a verified domain can never match, and SCIM
-// without one could mint accounts on arbitrary emails.
+// requireVerifiedDomain gates SSO and SCIM. SSO without a verified domain
+// never matches a login, SCIM without one could squat arbitrary emails.
 func requireVerifiedDomain(
 	ctx context.Context,
 	svc *iam.Service,
@@ -79,52 +69,35 @@ func (s *SSOService) UpdateSSOProvider(
 		Name:        req.GetName(),
 		Enabled:     req.GetIsActive(),
 	}
+	prev, _ := s.cfg.IAM.GetWorkspaceSSOProvider(ctx, req.GetWorkspaceId())
 
 	issuerChanged := false
 	switch req.GetMethod() {
 	case "oidc":
 		p.Method = iam.MethodOIDC
+		// An empty secret keeps the stored one.
 		p.OIDC = &iam.OIDCProvider{
-			// RedirectURL stays empty: the login flow derives it from BaseURL.
 			IssuerURL:       req.GetConfig().GetIssuerUrl(),
 			ClientID:        req.GetConfig().GetClientId(),
+			ClientSecret:    req.GetClientSecret(),
 			Scopes:          req.GetConfig().GetScopes(),
 			JITProvisioning: req.GetAllowJitProvisioning(),
 			EnforceSSO:      req.GetEnforceSso(),
 		}
-		if req.GetClientSecret() != "" {
-			p.OIDC.ClientSecret = req.GetClientSecret()
-		}
-		// A changed issuer means a different IdP. Identity mappings under
-		// the old issuer are stale (sub values are only unique within an
-		// issuer), so they are purged after the update. Users and their
-		// linked credentials are global.
-		if prev, err := s.cfg.IAM.GetWorkspaceSSOProvider(ctx, req.GetWorkspaceId()); err == nil &&
-			prev.OIDC != nil &&
-			prev.OIDC.IssuerURL != p.OIDC.IssuerURL {
-			issuerChanged = true
-		}
+		// sub values are only unique per issuer, so a new issuer makes the
+		// old identity mappings stale.
+		issuerChanged = prev != nil && prev.OIDC != nil && prev.OIDC.IssuerURL != p.OIDC.IssuerURL
 	case "saml":
-		// SAML activation is gated by the entitlement guard interceptor
-		// (deactivation must always work, so the gate is conditional).
 		p.Method = iam.MethodSAML
 		p.SAML = &iam.SAMLIDP{
 			MetadataURL:     req.GetConfig().GetMetadataUrl(),
 			JITProvisioning: req.GetAllowJitProvisioning(),
 			EnforceSSO:      req.GetEnforceSso(),
 		}
-		// An update that sends no metadata keeps the stored IdP metadata, so
-		// toggling JIT provisioning or enforce-SSO never wipes a working
-		// configuration (mirrors how an empty client secret is handled).
-		if p.SAML.MetadataURL == "" {
-			if prev, err := s.cfg.IAM.GetWorkspaceSSOProvider(
-				ctx,
-				req.GetWorkspaceId(),
-			); err == nil &&
-				prev.SAML != nil {
-				p.SAML.MetadataURL = prev.SAML.MetadataURL
-				p.SAML.MetadataXML = prev.SAML.MetadataXML
-			}
+		// No metadata keeps the stored one, so toggling flags never wipes it.
+		if p.SAML.MetadataURL == "" && prev != nil && prev.SAML != nil {
+			p.SAML.MetadataURL = prev.SAML.MetadataURL
+			p.SAML.MetadataXML = prev.SAML.MetadataXML
 		}
 	default:
 		return nil, NewError(connect.CodeInvalidArgument, "method must be oidc or saml")
@@ -137,9 +110,8 @@ func (s *SSOService) UpdateSSOProvider(
 		return nil, ssoError(err)
 	}
 	if issuerChanged {
-		// The update itself succeeded, so a purge failure must not fail the
-		// call; it must however be loud: stale identities under the old
-		// issuer stay valid until this is retried.
+		// Don't fail the saved update, but be loud: stale identities stay
+		// valid until this is retried.
 		if _, err := s.cfg.IAM.PurgeProviderIdentities(ctx, iam.MethodOIDC, req.GetWorkspaceId()); err != nil {
 			slog.Error(
 				"purging identities after issuer change failed",
@@ -163,15 +135,10 @@ func ssoError(err error) error {
 	return DBError(err)
 }
 
-// providerToProto lifts the stored provider into the API shape: shared
-// settings at the top, a generic config block carrying whichever protocol
-// fields are set. Enforce/JIT live in the stored config, so they come from
-// whichever protocol is present.
 func providerToProto(p *iam.SSOProvider) *nokkuv1.SSOProvider {
-	method := string(p.Method)
 	out := &nokkuv1.SSOProvider{
 		WorkspaceId: &p.WorkspaceID,
-		Method:      &method,
+		Method:      new(string(p.Method)),
 		Name:        &p.Name,
 		IsActive:    &p.Enabled,
 		CreatedAt:   db.SafeTimestamp(&p.CreatedAt),
@@ -180,16 +147,14 @@ func providerToProto(p *iam.SSOProvider) *nokkuv1.SSOProvider {
 	cfg := &nokkuv1.SSOConfig{}
 	switch {
 	case p.OIDC != nil:
-		enforceSSO, jit := p.OIDC.EnforceSSO, p.OIDC.JITProvisioning
-		out.EnforceSso = &enforceSSO
-		out.AllowJitProvisioning = &jit
+		out.EnforceSso = new(p.OIDC.EnforceSSO)
+		out.AllowJitProvisioning = new(p.OIDC.JITProvisioning)
 		cfg.IssuerUrl = &p.OIDC.IssuerURL
 		cfg.ClientId = &p.OIDC.ClientID
 		cfg.Scopes = p.OIDC.Scopes
 	case p.SAML != nil:
-		enforceSSO, jit := p.SAML.EnforceSSO, p.SAML.JITProvisioning
-		out.EnforceSso = &enforceSSO
-		out.AllowJitProvisioning = &jit
+		out.EnforceSso = new(p.SAML.EnforceSSO)
+		out.AllowJitProvisioning = new(p.SAML.JITProvisioning)
 		cfg.MetadataUrl = &p.SAML.MetadataURL
 	default:
 		return out

@@ -16,10 +16,8 @@ import (
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
-// minPasswordLength is the floor the proto schema also enforces.
 const minPasswordLength = 8
 
-// identityMethods are the external identities the account surface manages.
 var identityMethods = []iam.Method{iam.MethodOIDC, iam.MethodOAuth2, iam.MethodSAML}
 
 type AccountService struct {
@@ -61,8 +59,7 @@ func (s *AccountService) ChangePassword(
 	req *nokkuv1.ChangePasswordRequest,
 ) (*nokkuv1.ChangePasswordResponse, error) {
 	userID := iam.UserIDFromContext(ctx)
-	// A passwordless account sets its first password without a current-
-	// password check; with a password present, the check is mandatory.
+	// A passwordless account may set its first password without a check.
 	has, err := s.cfg.IAM.Password.HasPassword(ctx, userID)
 	if err != nil {
 		return nil, ErrInternal
@@ -80,8 +77,7 @@ func (s *AccountService) ChangePassword(
 		return nil, ErrPasswordTooShort
 	}
 
-	// Replace the hash and revoke the other sessions: the current session
-	// survives a deliberate password change, everything else dies (NIST 800-63B).
+	// Keep the current session, revoke the rest (NIST 800-63B).
 	if err := s.cfg.IAM.Password.Store(ctx, userID, req.GetNewPassword()); err != nil {
 		return nil, ErrInternal
 	}
@@ -98,8 +94,6 @@ func (s *AccountService) RemovePassword(
 	if err := s.cfg.IAM.Password.CheckPassword(ctx, userID, req.GetCurrentPassword()); err != nil {
 		return nil, ErrCurrentPassword
 	}
-	// Removing the password must leave the account reachable: a passkey or a
-	// linked identity has to remain.
 	if !s.requireRemovable(ctx, iam.MethodPassword) {
 		return nil, ErrLastLoginMethod
 	}
@@ -147,8 +141,6 @@ func (s *AccountService) RemoveCredential(
 	if err != nil {
 		return nil, ErrAccountNotFound
 	}
-	// Passkeys need a fallback way in; the password and backup codes have
-	// their own RPCs.
 	if iam.Method(cred.Type) == iam.MethodPasskey {
 		if !s.requireRemovable(ctx, iam.MethodPasskey) {
 			return nil, ErrLastLoginMethod
@@ -256,9 +248,8 @@ func (s *AccountService) DeleteAccount(
 		return nil, ErrAccountNotFound
 	}
 
-	// Workspaces only the owner uses go with the account. Their billing
-	// is canceled first, while the subscription rows still exist. A shared
-	// workspace blocks the delete below until ownership moves.
+	// Solo workspaces go with the account, so cancel their billing while the
+	// subscription rows still exist. Shared ones block the delete below.
 	owned, err := s.cfg.Conn.Sys().ListOwnedWorkspaces(ctx, u.ID)
 	if err != nil {
 		return nil, DBError(err)
@@ -288,16 +279,15 @@ func (s *AccountService) DeleteAccount(
 		slog.Warn("failed to delete avatar", "error", err)
 	}
 
-	// The session cookie is HttpOnly, so only a response from the backend
-	// can clear it. Connect carries cookies on the response headers.
+	// The session cookie is HttpOnly, only a backend response can clear it.
 	if ci, ok := connect.CallInfoForHandlerContext(ctx); ok {
 		setCookie(ci, s.cfg.IAM.ClearSessionCookie())
 	}
 	return &nokkuv1.DeleteAccountResponse{}, nil
 }
 
-// requireRemovable reports whether removing one login method keeps the
-// account reachable. Backup codes are recovery, not a way in.
+// requireRemovable reports whether removing rm keeps the account reachable.
+// Backup codes are recovery, not a way in.
 func (s *AccountService) requireRemovable(ctx context.Context, rm iam.Method) bool {
 	has := func(m iam.Method) bool {
 		creds, err := s.cfg.IAM.ListCredentialsByType(ctx, m)

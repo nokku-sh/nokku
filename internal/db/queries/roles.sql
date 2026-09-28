@@ -1,6 +1,5 @@
 -- name: GetActorRole :one
--- The workspace role of a user or service account. Runs as the system role:
--- it resolves membership before any workspace is pinned.
+-- Runs as the system role, before any workspace is pinned.
 SELECT
   wm.role_name
 FROM
@@ -20,7 +19,6 @@ LIMIT
   1;
 
 -- name: ListActorRoles :many
--- Every workspace role of a user or service account, keyed by workspace.
 SELECT
   wm.workspace_id,
   wm.role_name

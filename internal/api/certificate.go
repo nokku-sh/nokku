@@ -120,7 +120,7 @@ func (s *CertificateService) GetCertificateAuthority(
 	if req.GetId() == "" && iam.DaemonIDFromContext(ctx) == "" {
 		return nil, ErrInvalidInput
 	}
-	// A daemon request resolves its own CA, which wins over a request id.
+	// A daemon always resolves its own CA, whatever id it sent.
 	daemonID := iam.DaemonIDFromContext(ctx)
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
@@ -178,16 +178,15 @@ func (s *CertificateService) UpdateCertificateAuthority(
 		UserExtensions:      userExtensions,
 		UserCriticalOptions: userCriticalOptions,
 		AllowedKeyTypes:     req.GetAllowedKeyTypes(),
-		Lifetime:            new(req.GetLifetime().AsDuration()),
-		UserDefaultTtl:      new(req.GetUserDefaultTtl().AsDuration()),
-		UserMaxTtl:          new(req.GetUserMaxTtl().AsDuration()),
-		HostDefaultTtl:      new(req.GetHostDefaultTtl().AsDuration()),
-		HostMaxTtl:          new(req.GetHostMaxTtl().AsDuration()),
+		Lifetime:            optDuration(req.GetLifetime()),
+		UserDefaultTtl:      optDuration(req.GetUserDefaultTtl()),
+		UserMaxTtl:          optDuration(req.GetUserMaxTtl()),
+		HostDefaultTtl:      optDuration(req.GetHostDefaultTtl()),
+		HostMaxTtl:          optDuration(req.GetHostMaxTtl()),
 	}
 
 	var result *db.CertificateAuthority
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		var err error
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.UpdateCA(ctx, params)
 		return err
 	}); err != nil {
@@ -233,7 +232,6 @@ func (s *CertificateService) RolloverCertificateAuthority(
 			keyBits = req.GetKeyBits()
 		}
 
-		// Generate the new root CA
 		var newCA *ssh.CAInfo
 		if ca.AuthorityType == nokkuv1.AuthorityType_AUTHORITY_TYPE_X509 {
 			newCA, err = pki.NewCA(keyType, keyBits, ca.Lifetime)
@@ -256,17 +254,9 @@ func (s *CertificateService) RolloverCertificateAuthority(
 			KeyType:      newCA.KeyType,
 			KeyBits:      newCA.KeyBits,
 		})
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 	}); err != nil {
 		return nil, DBError(err)
-	}
-
-	if result == nil {
-		return &nokkuv1.RolloverCertificateAuthorityResponse{}, nil
 	}
 
 	return &nokkuv1.RolloverCertificateAuthorityResponse{
@@ -278,44 +268,34 @@ func (s *CertificateService) SignSSHCertificate(
 	ctx context.Context,
 	req *nokkuv1.SignSSHCertificateRequest,
 ) (*nokkuv1.SignSSHCertificateResponse, error) {
-	// By default id of the actor is the principal for user certificates
 	actor, _ := iam.PrincipalFromContext(ctx)
 	keyID := fmt.Sprintf("nokku:login:%s:%s", actor.Kind, actor.ID)
 	principal := actor.ID
 	daemonID := iam.DaemonIDFromContext(ctx)
 
-	// Host certificates are minted by daemons only, backed by their
-	// DPoP-bound identity, and a daemon mints nothing else.
+	// Daemons mint host certs and nothing else, nobody else mints host certs.
 	if (req.GetType() == nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST) != (daemonID != "") {
 		return nil, NewError(connect.CodePermissionDenied, "host certificates are issued to daemons only")
 	}
 
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		//nolint:gocritic // false positive
-		if daemonID != "" {
-			// A daemon always signs under its target's CA.
+		switch {
+		case daemonID != "":
 			ca, err = q.GetCAByDaemonID(ctx, &daemonID)
-			if err != nil {
-				return err
-			}
-		} else if req.GetCaId() != "" {
+		case req.GetCaId() != "":
 			ca, err = q.GetCA(ctx, req.GetCaId())
-			if err != nil {
-				return err
-			}
-		} else if req.GetWorkspaceId() != "" {
+		case req.GetWorkspaceId() != "":
 			ca, err = q.GetDefaultCA(ctx, &db.GetDefaultCAParams{
 				WorkspaceID:   req.GetWorkspaceId(),
 				AuthorityType: nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH,
 			})
-			if err != nil {
-				return err
-			}
+		}
+		if err != nil {
+			return err
 		}
 
-		// Override principal if a host certificate was requested
-		if req.GetType() == nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST {
+		if daemonID != "" {
 			target, err := q.GetTargetByDaemon(ctx, &daemonID)
 			if err != nil {
 				return err
@@ -376,22 +356,16 @@ func (s *CertificateService) SignX509Certificate(
 ) (*nokkuv1.SignX509CertificateResponse, error) {
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		if req.GetCaId() != "" {
+		switch {
+		case req.GetCaId() != "":
 			ca, err = q.GetCA(ctx, req.GetCaId())
-			if err != nil {
-				return err
-			}
-		} else if req.GetWorkspaceId() != "" {
+		case req.GetWorkspaceId() != "":
 			ca, err = q.GetDefaultCA(ctx, &db.GetDefaultCAParams{
 				WorkspaceID:   req.GetWorkspaceId(),
 				AuthorityType: nokkuv1.AuthorityType_AUTHORITY_TYPE_X509,
 			})
-			if err != nil {
-				return err
-			}
 		}
-
-		return nil
+		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}

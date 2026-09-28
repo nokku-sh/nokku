@@ -12,9 +12,7 @@
 
 	const ws = $derived(workspace.get());
 
-	// A proper protobuf message (not a plain object) so mutations and the
-	// transport both work. defaultDaemonConfig is always present, which keeps
-	// the bindings below free of undefined-guards.
+	// A real protobuf message, not a plain object, so the transport accepts it.
 	let settings = $derived.by(() => {
 		const s = create(WorkspaceSettingsSchema, ws.data?.settings);
 		if (!s.defaultDaemonConfig) s.defaultDaemonConfig = create(DaemonConfigSchema);
@@ -32,7 +30,6 @@
 	description="The SSH server settings new daemons inherit on enrollment. Existing daemons keep their own configuration. Auto-approval is set per enroll token."
 />
 
-<!-- Default Daemon Configuration -->
 <Card.Root>
 	<Card.Header>
 		<Card.Title class="flex items-center gap-2 text-base">

@@ -95,10 +95,8 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 				return err
 			}
 		}
-
-		// Grant removal is the whole lockout. The next sync drops the
-		// subject from the principals map, so a certificate already issued
-		// matches no account.
+		// Grant removal is the whole lockout. The next sync drops the subject,
+		// so an already issued cert matches no account.
 		return nil
 	}); err != nil {
 		return nil, DBError(err)
@@ -116,17 +114,11 @@ func (s *PrincipalService) RevokeAllAccess(
 		if !ok {
 			return ErrInvalidInput
 		}
-		if err := q.RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
+		return q.RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			SubjectKind: kind,
 			SubjectID:   req.GetSubjectId(),
-		}); err != nil {
-			return err
-		}
-
-		// Grant removal is the whole lockout, same as above: the subject
-		// vanishes from every synced principals map.
-		return nil
+		})
 	}); err != nil {
 		return nil, DBError(err)
 	}
@@ -134,9 +126,8 @@ func (s *PrincipalService) RevokeAllAccess(
 	return &nokkuv1.RevokeAllAccessResponse{}, nil
 }
 
-// AddPrincipal adds one local account to a target. Manual targets have no
-// daemon to report accounts, so the operator adds them here. Idempotent: an
-// existing account is returned unchanged.
+// AddPrincipal is for manual targets, which have no daemon to report
+// accounts. An existing account is returned unchanged.
 func (s *PrincipalService) AddPrincipal(
 	ctx context.Context,
 	req *nokkuv1.AddPrincipalRequest,
@@ -156,8 +147,6 @@ func (s *PrincipalService) AddPrincipal(
 	return &nokkuv1.AddPrincipalResponse{Principal: principal.ToProto()}, nil
 }
 
-// RemovePrincipal drops one local account. Its grants cascade, so this is the
-// deliberate way to stop granting access to an account that no longer exists.
 func (s *PrincipalService) RemovePrincipal(
 	ctx context.Context,
 	req *nokkuv1.RemovePrincipalRequest,
@@ -171,7 +160,6 @@ func (s *PrincipalService) RemovePrincipal(
 	return &nokkuv1.RemovePrincipalResponse{}, nil
 }
 
-// subjectKind maps the wire subject kind to principal_grants.subject_kind.
 func subjectKind(k nokkuv1.SubjectKind) (string, bool) {
 	switch k {
 	case nokkuv1.SubjectKind_SUBJECT_KIND_USER:

@@ -10,12 +10,8 @@ import { authTransport } from './client';
 
 const authClient = createClient(AuthService, authTransport);
 
-// Home realm discovery is the Connect DiscoverSSO RPC: it answers which
-// providers cover the email's domain. The domain rides along so the login
-// buttons can hand it to the SSO flows, which resolve the provider's
-// workspace from it. A half-typed email fails the schema's email rule; that
-// is not a discovery failure, it just means "no provider yet", so it
-// resolves to the empty result like an unknown domain does.
+// A half-typed email fails the schema's email rule, which just means no
+// provider yet.
 const emptyDiscovery = (): Discovery => ({
 	hasSSO: false,
 	enforce: false,
@@ -24,10 +20,7 @@ const emptyDiscovery = (): Discovery => ({
 });
 
 export const sso = {
-	// Queries
-	// The API reports an unconfigured provider as an unset provider field
-	// (not 404), so this never errors while the workspace has no SSO set up.
-	// The oneof discriminates the protocol: config.case is 'oidc' or 'saml'.
+	// An unconfigured provider is an unset field, not an error.
 	getProvider: () =>
 		useQuery(
 			SSOService.method.getSSOProvider,
@@ -35,12 +28,10 @@ export const sso = {
 			{ select: (res) => res.provider }
 		),
 
-	// Mutations
 	updateProvider: () =>
 		useMutation(SSOService.method.updateSSOProvider, {
 			onSuccess: () => toast.success('SSO provider updated')
 		}),
-	// See emptyDiscovery note above.
 	check: () =>
 		createMutation<Discovery, Error, string>(() => ({
 			mutationFn: async (email: string) => {
@@ -73,7 +64,6 @@ interface Discovery {
 }
 
 export const domain = {
-	// Queries
 	list: () =>
 		useQuery(
 			WorkspaceDomainService.method.listWorkspaceDomains,
@@ -81,7 +71,6 @@ export const domain = {
 			{ select: (res) => res.domains }
 		),
 
-	// Mutations
 	create: () =>
 		useMutation(WorkspaceDomainService.method.createWorkspaceDomain, {
 			onSuccess: () => toast.success('Domain created')

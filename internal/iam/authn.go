@@ -1,14 +1,11 @@
 package iam
 
-// Transport credential resolution. One decision tree, in one place:
+// Credential resolution:
 //
 //   session cookie                    → user session (browser)
 //   Authorization: Bearer nokku_sa_…  → service-account API key (no session)
 //   Authorization: Bearer <token>     → session token (device cookies rejected)
-//   Authorization: DPoP <token>       → key-bound session (CLI, daemon)
-//
-// Key-bound sessions (CLI device logins, daemons) must present a DPoP proof
-// signed by the session's bound key on every request (RFC 9449).
+//   Authorization: DPoP <token>       → key-bound session, proof on every request (RFC 9449)
 
 import (
 	"context"
@@ -20,13 +17,9 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// APIKeyPrefix marks service-account bearer credentials. The remainder is
-// the raw secret; only its hash is stored.
 const APIKeyPrefix = "nokku_sa_" //nolint:gosec // a token scheme prefix, not a credential
 
-// Authenticate resolves a connect request credential into a principal and
-// the session row behind it (empty for service accounts, which have no
-// session). The caller injects both into the request context.
+// Authenticate returns an empty session for service accounts.
 func (s *Service) Authenticate(
 	ctx context.Context,
 	header http.Header,
@@ -38,16 +31,12 @@ func (s *Service) Authenticate(
 		return p, db.Session{}, err
 	}
 
-	// An empty token falls through to VerifySession, which answers
-	// ErrNoSession like any unknown credential.
 	p, sess, err := s.AuthenticateToken(ctx, token)
 	if err != nil {
 		return Principal{}, db.Session{}, err
 	}
-	// The remembered-device cookie is a device handle, not an API
-	// credential: it only ever rides the cookie path, so a header
-	// presentation means a leaked cookie being replayed. Accepting it
-	// would turn a 24-hour session leak into a 180-day one.
+	// A device cookie in a header is a leaked cookie being replayed.
+	// Accepting it would turn a 24-hour session leak into a 180-day one.
 	if fromHeader && p.Kind == KindWebDevice {
 		return Principal{}, db.Session{}, errors.New("device credentials are not API tokens")
 	}
@@ -59,9 +48,8 @@ func (s *Service) Authenticate(
 	return p, sess, nil
 }
 
-// AuthenticateToken resolves a session token to a principal. User sessions
-// load the account so inactive accounts fail closed; device sessions
-// authenticate on the session row alone.
+// AuthenticateToken loads the account for user sessions so inactive accounts
+// fail closed. Device sessions authenticate on the row alone.
 func (s *Service) AuthenticateToken(
 	ctx context.Context,
 	token string,
@@ -85,9 +73,7 @@ func (s *Service) AuthenticateToken(
 	return p, sess, nil
 }
 
-// AuthenticateAPIKey resolves a service-account bearer credential. The
-// lookup is the step that establishes the tenant, so it runs as the system
-// role instead of tenant-scoped.
+// AuthenticateAPIKey uses Sys since this lookup is what establishes the tenant.
 func (s *Service) AuthenticateAPIKey(ctx context.Context, raw string) (Principal, error) {
 	hash, err := crypto.HashToken(raw)
 	if err != nil {
@@ -108,9 +94,6 @@ func (s *Service) AuthenticateAPIKey(ctx context.Context, raw string) (Principal
 	}, nil
 }
 
-// NewAPIKey mints a service-account credential: the secret with the API key
-// prefix, and the hash of the full credential. The raw value must be
-// delivered to the caller exactly once; only its hash is stored.
 func NewAPIKey() (raw string, hash crypto.HashedToken, err error) {
 	secret, _, err := crypto.NewSecret()
 	if err != nil {
@@ -124,11 +107,6 @@ func NewAPIKey() (raw string, hash crypto.HashedToken, err error) {
 	return raw, hash, nil
 }
 
-// verifySessionProof checks the DPoP proof that must accompany every
-// request made with a key-bound session: a fresh signature by the session's
-// bound key over this procedure, carrying the hash of the token itself
-// (RFC 9449 section 7.1). Cookie sessions carry no binding and skip the
-// check.
 func (s *Service) verifySessionProof(
 	ctx context.Context,
 	header http.Header,
@@ -141,32 +119,20 @@ func (s *Service) verifySessionProof(
 	return s.DPoP.VerifySession(ctx, proof, token, http.MethodPost, s.baseURL+procedure, binding)
 }
 
-// AdvertiseDPoPNonce writes the current DPoP nonce, alongside the canonical
-// API URL, to a response header so a client recovering from a stale nonce
-// also corrects the htu it signs (RFC 9449 section 8).
+// AdvertiseDPoPNonce also sends the canonical API URL so a recovering client
+// corrects the htu it signs.
 func (s *Service) AdvertiseDPoPNonce(h http.Header) {
 	h.Set(DeviceURLHeader, s.baseURL)
 	h.Set("DPoP-Nonce", s.DPoP.CurrentNonce())
 }
 
-// requestCredential extracts the request credential and reports whether it
-// came from the Authorization header (as opposed to the session cookie).
-// Both the "Bearer" and "DPoP" schemes are accepted: DPoP-bound clients
-// (CLI and daemons) MUST use the DPoP scheme for their bound tokens
-// (RFC 9449).
 func requestCredential(h http.Header) (token string, fromHeader bool) {
 	if a := h.Get("Authorization"); a != "" {
-		// Schemes are case-insensitive (RFC 9110 section 11.1).
 		for _, scheme := range []string{"bearer ", "dpop "} {
 			if len(a) >= len(scheme) && strings.EqualFold(a[:len(scheme)], scheme) {
 				return strings.TrimSpace(a[len(scheme):]), true
 			}
 		}
 	}
-	// The session cookie doubles as the browser credential for connect
-	// calls made with credentials: include.
-	if c := cookieFromHeader(h, sessionCookieName); c != "" {
-		return c, false
-	}
-	return "", false
+	return cookieFromHeader(h, sessionCookieName), false
 }

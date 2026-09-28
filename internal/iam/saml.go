@@ -1,8 +1,5 @@
 package iam
 
-// The SAML SP-initiated flow. The SP keypair is generated once and stored
-// in the saml_keypair table, encrypted at rest.
-
 import (
 	"cmp"
 	"context"
@@ -28,7 +25,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// samlState is the cross-request payload carried in the RelayState.
 type samlState struct {
 	ProviderID string `json:"provider_id"`
 	RequestID  string `json:"request_id"`
@@ -37,8 +33,7 @@ type samlState struct {
 	FlowCookie string `json:"flow_cookie"`
 }
 
-// samlFlow serves the SAML SP-initiated flow. One SP keypair serves every
-// provider.
+// samlFlow uses one SP keypair for every provider.
 type samlFlow struct {
 	svc     *Service
 	linker  *linker
@@ -56,8 +51,8 @@ type fetchedMetadata struct {
 	at time.Time
 }
 
-// newSAMLFlow loads the SP keypair, generating it on first boot. The stored
-// pair wins, so concurrent first boots converge on one key.
+// newSAMLFlow generates the SP keypair on first boot. The stored pair wins,
+// so concurrent first boots converge on one key.
 func newSAMLFlow(ctx context.Context, svc *Service) (*samlFlow, error) {
 	keyPEM, certPEM, err := svc.samlKeypair(ctx)
 	if err != nil {
@@ -78,7 +73,6 @@ func newSAMLFlow(ctx context.Context, svc *Service) (*samlFlow, error) {
 	}, nil
 }
 
-// Login starts the SP-initiated flow for the "provider" query parameter.
 func (h *samlFlow) Login(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cfg, err := h.svc.loginProvider(ctx, r.URL.Query().Get("provider"), MethodSAML)
@@ -102,8 +96,6 @@ func (h *samlFlow) Login(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, "request creation failed")
 		return
 	}
-	// The IdP posts the assertion back cross-site, so the binding cookie
-	// must be SameSite=None, which only works over HTTPS.
 	flowCookie, err := startFlowBinding(w, h.svc.secure)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -129,8 +121,6 @@ func (h *samlFlow) Login(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirect.String(), http.StatusTemporaryRedirect)
 }
 
-// Callback is the ACS endpoint: it verifies the SAML response, resolves the
-// user, and issues a session.
 func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if err := r.ParseForm(); err != nil {
@@ -155,8 +145,7 @@ func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 	assertion, err := sp.ParseResponse(r, []string{st.RequestID})
 	if err != nil {
-		// The IdP may have rotated its signing key since the metadata was
-		// cached. Verify once more against fresh metadata.
+		// The IdP may have rotated its key since the metadata was cached.
 		if sp, err = h.serviceProvider(ctx, cfg.SAML, true); err == nil {
 			assertion, err = sp.ParseResponse(r, []string{st.RequestID})
 		}
@@ -178,9 +167,7 @@ func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	h.svc.completeSSO(w, r, h.linker, st.ReturnTo, opts)
 }
 
-// assertionAttributes flattens the assertion's attribute statements, keying
-// each attribute by both Name (often a URI/OID) and FriendlyName, since IdPs
-// use either spelling.
+// assertionAttributes keys by both Name and FriendlyName, IdPs use either.
 func assertionAttributes(a *saml.Assertion) map[string][]string {
 	attrs := make(map[string][]string)
 	for _, stmt := range a.AttributeStatements {
@@ -196,8 +183,6 @@ func assertionAttributes(a *saml.Assertion) map[string][]string {
 	return attrs
 }
 
-// identity maps the assertion onto the linker options. The linker only
-// trusts the email for the provider workspace's verified domains.
 func identity(a *saml.Assertion) flowLinkOptions {
 	attrs := assertionAttributes(a)
 
@@ -231,9 +216,7 @@ func identity(a *saml.Assertion) flowLinkOptions {
 		name = strings.TrimSpace(givenName + " " + surname)
 	}
 
-	// An IdP that sends no NameID falls back to the email attribute: NameID
-	// formats vary per IdP and the email is the only universally present
-	// identifier, so it becomes the stable linking subject.
+	// Without a NameID the email is the only universally present identifier.
 	if subject == "" {
 		subject = email
 	}
@@ -247,11 +230,9 @@ func identity(a *saml.Assertion) flowLinkOptions {
 	}
 }
 
-// idpMetadata loads the IdP metadata. Fetched metadata is reused for
-// providerCacheTTL, so IdP certificate rollovers arrive without anyone
-// touching the configuration. refresh forces a fetch, at most once a
-// minute. When the IdP's metadata endpoint is down, the last good copy
-// keeps logins working.
+// idpMetadata refetches after providerCacheTTL so IdP cert rollovers arrive
+// on their own. refresh forces a fetch at most once a minute. The last good
+// copy keeps logins working while the endpoint is down.
 func (h *samlFlow) idpMetadata(ctx context.Context, cfg *SAMLIDP, refresh bool) (*saml.EntityDescriptor, error) {
 	if len(cfg.MetadataXML) > 0 {
 		ed := &saml.EntityDescriptor{}
@@ -297,7 +278,6 @@ func validMetadata(ed *saml.EntityDescriptor) error {
 	return nil
 }
 
-// Metadata serves the SP metadata for the IdP administrator.
 func (h *samlFlow) Metadata(w http.ResponseWriter, _ *http.Request) {
 	buf, err := xml.MarshalIndent(h.sp(nil).Metadata(), "", "  ")
 	if err != nil {
@@ -309,7 +289,6 @@ func (h *samlFlow) Metadata(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(buf)
 }
 
-// Certificate serves the SP certificate as PEM.
 func (h *samlFlow) Certificate(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/x-pem-file")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -337,9 +316,6 @@ func (h *samlFlow) sp(ed *saml.EntityDescriptor) *saml.ServiceProvider {
 	}
 }
 
-// samlKeypair returns the SP keypair PEMs, generating and storing a fresh
-// self-signed pair on first boot. The key column encrypts at rest through
-// its sqlc type.
 func (s *Service) samlKeypair(ctx context.Context) (keyPEM, certPEM []byte, err error) {
 	row, err := s.sys.GetSAMLKeypair(ctx)
 	if err == nil {
@@ -376,10 +352,9 @@ func parseSAMLKeypair(keyPEM, certPEM []byte) (*rsa.PrivateKey, *x509.Certificat
 	return key, cert, nil
 }
 
-// generateSAMLKeypair returns the SP keypair as PEM. The certificate never
-// expires (RFC 5280 4.1.2.5): SAML treats metadata certificates as bare keys,
-// nokku does not sign requests, and IdPs that encrypt assertions pin this
-// key, so rotating it would only break them.
+// generateSAMLKeypair never expires the cert (RFC 5280 4.1.2.5). SAML treats
+// metadata certs as bare keys and IdPs that encrypt assertions pin this key,
+// so rotating it would only break them.
 func generateSAMLKeypair() (keyPEM, certPEM []byte, err error) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {

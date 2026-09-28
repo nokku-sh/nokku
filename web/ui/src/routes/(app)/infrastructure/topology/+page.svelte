@@ -57,23 +57,18 @@
 		const edges: Edge[] = [];
 
 		if (!selectedTarget) return { nodes, edges };
-
-		// Add target node (root)
 		nodes.push({
 			id: target.id,
 			type: 'target',
 			data: { ...selectedTarget },
 			position: { x: 0, y: 0 }
 		});
-
-		// Find all principals for this target
 		const activePrincipals = targetPrincipals.filter((p) => {
 			if (selectedPrincipals.size === 0) return true;
 			return selectedPrincipals.has(p.username);
 		});
 
 		activePrincipals.forEach((p) => {
-			// Add principal node
 			const principalId = `principal-${p.id}`;
 			nodes.push({
 				id: principalId,
@@ -81,8 +76,6 @@
 				data: { ...p },
 				position: { x: 0, y: 0 }
 			});
-
-			// Add edge from target to principal
 			edges.push({
 				id: `edge-${target.id}-${principalId}`,
 				source: target.id,
@@ -91,8 +84,6 @@
 				animated: true,
 				style: 'stroke: rgb(168 85 247); stroke-width: 2px;'
 			});
-
-			// Add user nodes
 			if (selectedSubjectTypes.size === 0 || selectedSubjectTypes.has('user')) {
 				p.userIds?.forEach((userId: string) => {
 					const user = users.find((u) => u.id === userId);
@@ -121,8 +112,6 @@
 					});
 				});
 			}
-
-			// Add team nodes
 			if (selectedSubjectTypes.size === 0 || selectedSubjectTypes.has('team')) {
 				p.teamIds?.forEach((teamId: string) => {
 					const t = teams.find((t) => t.id === teamId);
@@ -151,8 +140,6 @@
 					});
 				});
 			}
-
-			// Add service account nodes
 			if (selectedSubjectTypes.size === 0 || selectedSubjectTypes.has('service-account')) {
 				p.serviceAccountIds?.forEach((serviceAccountId: string) => {
 					const serviceAccount = serviceAccounts.find((sa) => sa.id === serviceAccountId);
@@ -205,8 +192,6 @@
 			nodesep: 20,
 			ranksep: 200
 		});
-
-		// Define node dimensions to match the actual component styling
 		const getNodeDimensions = (type?: string) => {
 			switch (type) {
 				case 'target':

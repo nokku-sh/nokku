@@ -45,7 +45,6 @@
 	<div
 		class="group relative z-10 flex w-full items-center gap-1 rounded-xl bg-background px-2 shadow-md"
 	>
-		<!-- Collapsible trigger: the target info area -->
 		<Collapsible.Trigger
 			class="flex min-w-0 flex-1 items-center gap-1 py-1.5 text-left text-sm"
 			disabled={sessions.size === 0}
@@ -66,7 +65,6 @@
 			{/if}
 
 			{#if principals.length > 1}
-				<!-- Multiple usernames: show popover -->
 				<Popover.Root bind:open={popoverOpen}>
 					<Popover.Trigger>
 						{#if createSession.isPending}
@@ -94,7 +92,6 @@
 					</Popover.Content>
 				</Popover.Root>
 			{:else}
-				<!-- Single username: direct connect -->
 				<Button
 					variant="ghost"
 					size="icon"

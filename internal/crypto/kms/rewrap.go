@@ -26,9 +26,8 @@ func (t *TinkEncryptor) Start(ctx context.Context) {
 	}()
 }
 
-// Rewrap re-encrypts the stored keyset with the current KEK version and persists it.
 func (t *TinkEncryptor) Rewrap(ctx context.Context) error {
-	// Re-fetch the KEK AEAD so a KMS-side KEK rotation is picked up.
+	// Re-fetch so a KMS-side KEK rotation is picked up.
 	kek, err := t.client.GetAEAD(t.KMSURI)
 	if err != nil {
 		return fmt.Errorf("failed to get KMS AEAD: %w", err)

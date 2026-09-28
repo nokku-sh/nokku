@@ -5,15 +5,12 @@ import { toast } from 'svelte-sonner';
 import { useMutation, useQuery } from '$lib/query';
 import { pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
 
-// A grant change also moves the subject's access snapshot
-// (TargetService.GetSubjectAccess), which the assign page and dashboard read
-// for their access badges. The global mutation cache only invalidates the
-// mutating service, so refresh the snapshot alongside it.
+// The global mutation cache only invalidates the mutating service, but grant
+// changes also move TargetService.GetSubjectAccess.
 const invalidateAccess = () =>
 	queryClient.invalidateQueries({ queryKey: ['connect-query', TargetService.typeName] });
 
 export const principal = {
-	// Queries
 	list: (
 		opts: () => {
 			targetId?: string;
@@ -36,7 +33,6 @@ export const principal = {
 			})
 		),
 
-	// Mutations
 	addAccount: () =>
 		useMutation(PrincipalService.method.addPrincipal, { onSuccess: invalidateAccess }),
 	removeAccount: () =>

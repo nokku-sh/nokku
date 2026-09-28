@@ -37,10 +37,8 @@
 		{ label: 'Offline', value: 'false', icon: WifiOff }
 	];
 
-	// Modal state
 	const daemonModal = createEntityModalState(DaemonSchema);
 
-	// Data
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
 	const daemons = $derived(

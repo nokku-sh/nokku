@@ -9,8 +9,6 @@
 	};
 	let { userId }: Props = $props();
 
-	// The member's teams: one targeted read per row, cached and refetched
-	// with the team service queries on membership changes.
 	const teamsQuery = $derived(team.listForUser(userId));
 	const teams = $derived(teamsQuery.data ?? []);
 

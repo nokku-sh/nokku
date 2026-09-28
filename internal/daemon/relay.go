@@ -13,8 +13,6 @@ import (
 const (
 	maxRelaysPerPrincipal = 64
 	relayBufferSize       = 16
-	// How long the daemon has to answer a RelayOpen before the request
-	// gives up.
 	pendingSessionTimeout = 10 * time.Second
 )
 
@@ -24,8 +22,7 @@ var (
 	ErrCAInactive       = errors.New("certificate authority is not active")
 )
 
-// Relay is the server-side handle for one relayed SSH connection. It bridges
-// the daemon's DaemonRelay bidi stream and the user's Relay bidi stream.
+// Relay bridges the daemon's DaemonRelay stream and the user's Relay stream.
 type Relay struct {
 	relayID  string
 	daemonID string
@@ -45,17 +42,13 @@ func (r *Relay) Close() {
 }
 
 type relayPending struct {
-	ready    chan struct{}
-	daemonID string
-	// releaseSlot returns the per-principal slot exactly once, whether the
-	// request fails, the relay registers, or the relay is torn down.
+	ready       chan struct{}
+	daemonID    string
 	releaseSlot func()
 }
 
-// RequestRelay pushes a RelayOpen to the daemon and waits for its
-// DaemonRelay stream to arrive. The per-principal slot acquired here is
-// owned by a release-once closure: RegisterRelay hands it to the Relay,
-// every failure path runs it directly.
+// RequestRelay releases its slot exactly once. RegisterRelay hands the
+// release to the Relay, failure paths run it directly.
 func (p *Pool) RequestRelay(
 	ctx context.Context,
 	daemonID, relayID, userID string,
@@ -79,8 +72,7 @@ func (p *Pool) RequestRelay(
 	p.mu.Unlock()
 	defer func() {
 		p.mu.Lock()
-		// Only remove our own entry: a newer request for the same relayID
-		// may have replaced it while we were waiting.
+		// A newer request for the same relayID may have replaced ours.
 		if p.pendingRelays[relayID] == pend {
 			delete(p.pendingRelays, relayID)
 		}
@@ -105,9 +97,8 @@ func (p *Pool) RequestRelay(
 		err = fmt.Errorf("%w: %w", ErrRelayUnavailable, ctx.Err())
 	}
 
-	// The daemon may have registered the relay just as the wait gave up, or
-	// it may already be gone again (daemon disconnect racing the wakeup).
-	// Registration consumed the slot, so only release when it did not.
+	// The relay may have registered just as the wait gave up, or be gone
+	// again. Registration took the slot, so only release when it did not.
 	p.mu.Lock()
 	r := p.relays[relayID]
 	p.mu.Unlock()
@@ -121,10 +112,8 @@ func (p *Pool) RequestRelay(
 	return r, nil
 }
 
-// RegisterRelay records the daemon's relay stream for relayID and releases
-// the waiting requester. It returns nil when no relay was requested under
-// this id, or when the registering daemon does not match the one the
-// request was sent to, so a rogue daemon cannot claim or fabricate a relay.
+// RegisterRelay returns nil unless this daemon was asked for this relay, so a
+// rogue daemon cannot claim or fabricate one.
 func (p *Pool) RegisterRelay(relayID, daemonID string) *Relay {
 	p.mu.Lock()
 	pend, ok := p.pendingRelays[relayID]
@@ -152,8 +141,6 @@ func (p *Pool) RegisterRelay(relayID, daemonID string) *Relay {
 	return r
 }
 
-// UnregisterRelay tears a relay down and releases its per-principal slot.
-// Safe to call more than once.
 func (p *Pool) UnregisterRelay(relayID string) {
 	p.mu.Lock()
 	r := p.relays[relayID]

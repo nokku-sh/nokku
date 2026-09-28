@@ -4,9 +4,6 @@ import { toast } from 'svelte-sonner';
 import { queryClient } from './client';
 import { account } from './account';
 
-// Password, passkeys, and backup codes ride the proto-backed AccountService.
-// The mutations keep the shapes the security page already consumes.
-
 const invalidateCredentials = () => queryClient.invalidateQueries({ queryKey: ['account'] });
 
 export const password = {
@@ -28,8 +25,6 @@ export const password = {
 		}))
 };
 
-// Passkeys -------------------------------------------------------------------
-
 export interface Passkey {
 	id: string;
 	name: string;
@@ -37,7 +32,6 @@ export interface Passkey {
 }
 
 export const passkey = {
-	// Queries
 	list: () =>
 		createQuery<Passkey[]>(() => ({
 			queryKey: ['account', 'credentials', 'passkeys'],
@@ -53,7 +47,6 @@ export const passkey = {
 			}
 		})),
 
-	// Mutations
 	delete: () =>
 		createMutation<void, Error, { id: string }>(() => ({
 			mutationFn: ({ id }) => account.removeCredential(id),
@@ -71,15 +64,12 @@ export const passkey = {
 		}))
 };
 
-// Backup Codes ---------------------------------------------------------------
-
 export interface BackupCode {
 	id: string;
 	createdAt?: Timestamp;
 }
 
 export const backupCode = {
-	// Queries
 	list: () =>
 		createQuery<BackupCode[]>(() => ({
 			queryKey: ['account', 'backup-codes'],
@@ -92,7 +82,6 @@ export const backupCode = {
 			}
 		})),
 
-	// Mutations
 	create: () =>
 		createMutation<{ codes: string[] }, Error, void>(() => ({
 			mutationFn: () => account.rotateBackupCodes().then((codes) => ({ codes })),

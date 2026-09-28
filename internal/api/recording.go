@@ -66,8 +66,7 @@ func (s *RecordingService) UploadRecording(
 			if len(data) == 0 {
 				continue
 			}
-			// Sweep past recordings so the workspace stays within its cap.
-			// Never blocks the stream, the oldest recordings are evicted.
+			// Evict the oldest recordings instead of blocking the stream.
 			if size-lastChecked >= quotaCheckInterval {
 				lastChecked = size
 				if err := s.cfg.Record.EvictForBytes(ctx, workspaceID, rec.ID, size); err != nil {
@@ -98,8 +97,7 @@ func (s *RecordingService) UploadRecording(
 		return nil, ErrInternal
 	}
 
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		var err error
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		rec, err = q.SetRecordingComplete(ctx, &db.SetRecordingCompleteParams{
 			ID:        rec.ID,
 			SizeBytes: size,
@@ -120,10 +118,7 @@ func (s *RecordingService) UploadRecording(
 	}, nil
 }
 
-// resolveUpload validates the metadata against the daemon's workspace and
-// returns the recording row to append chunks to. Uploads are always accepted:
-// the backend encrypts the stream at rest, so a daemon needs no workspace key.
-// A recording may resume when the daemon uploads its id again.
+// resolveUpload resumes the recording when the daemon uploads its id again.
 func (s *RecordingService) resolveUpload(
 	ctx context.Context,
 	daemonID string,
@@ -212,15 +207,8 @@ func (s *RecordingService) GetRecording(
 	req *nokkuv1.GetRecordingRequest,
 	stream *connect.ServerStream[nokkuv1.GetRecordingResponse],
 ) error {
-	// Streaming RPCs get no tenant from the auth interceptor (streaming
-	// requests have no single message to resolve one from; the stream
-	// carries no message at all), so a global user principal's workspace must
-	// be pinned here from the request. WithWorkspace then checks membership
-	// and scopes row-level security.
+	// Streams get no workspace from the interceptors, so pin and check here.
 	ctx = iam.AnnotateTenant(ctx, req.GetWorkspaceId())
-
-	// Streaming RPCs bypass the unary authorization interceptor, so the
-	// ProcedureRoles gate for this procedure is inert and must run here.
 	ctx, err := actorHasRole(ctx, s.cfg.Conn, db.RoleViewer)
 	if err != nil {
 		return DBError(err)
@@ -231,9 +219,6 @@ func (s *RecordingService) GetRecording(
 		rec, err = q.GetRecording(ctx, req.GetRecordingId())
 		return err
 	}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
 		return DBError(err)
 	}
 
@@ -259,7 +244,6 @@ func (s *RecordingService) GetRecording(
 	}
 	defer func() { _ = fr.Close() }()
 
-	// Bounded 32 KiB sends keep memory flat on long sessions.
 	buf := make([]byte, 32<<10)
 	for {
 		n, readErr := fr.Read(buf)
@@ -290,9 +274,7 @@ func (s *RecordingService) DeleteRecording(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	// The object is best-effort: a stray object without a row is invisible
-	// and swept by the workspace wipe. Rows are gone first so listings are
-	// right.
+	// Best effort, a stray object without a row is swept by the workspace wipe.
 	if err := s.cfg.Storage.Delete(
 		ctx,
 		storage.RecordingPath(req.GetWorkspaceId(), req.GetRecordingId()),

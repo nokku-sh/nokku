@@ -30,12 +30,10 @@
 	} from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
-	// Modal states
 	const memberModal = createModalState<WorkspaceMember>({} as WorkspaceMember);
 	const inviteModal = createModalState();
 	const transferOwnerModal = createModalState<WorkspaceMember>({} as WorkspaceMember);
 
-	// Data
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
 	const members = $derived(
@@ -67,7 +65,6 @@
 		}))
 	);
 
-	// Columns
 	const columnHelper = createAppColumnHelper<WorkspaceMember>();
 	const columns = columnHelper.columns([
 		columnHelper.accessor('name', {

@@ -1,30 +1,25 @@
 package daemon
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net"
 	"time"
 )
 
-// NewRelayConn adapts a Relay to [net.Conn] for the SSH client. Write copies
-// the caller's slice because the SSH transport reuses its packet buffers.
+// relayConn adapts a Relay to [net.Conn] for the SSH client.
 type relayConn struct {
 	relay *Relay
-
-	// buf holds the tail of a received chunk that was larger than the
-	// caller's read buffer. Only the transport's single reader goroutine
-	// touches it.
+	// buf holds the unread tail of the last chunk. Only the transport's
+	// single reader goroutine touches it.
 	buf []byte
 }
 
-// pipeAddr stands in for a network address: relays have no endpoint.
 type pipeAddr struct{}
 
 func (pipeAddr) Network() string { return "relay" }
 func (pipeAddr) String() string  { return "relay" }
-
-func NewRelayConn(relay *Relay) net.Conn { return &relayConn{relay: relay} }
 
 func (c *relayConn) Read(p []byte) (int, error) {
 	if len(c.buf) == 0 {
@@ -40,10 +35,9 @@ func (c *relayConn) Read(p []byte) (int, error) {
 }
 
 func (c *relayConn) Write(p []byte) (int, error) {
-	chunk := make([]byte, len(p))
-	copy(chunk, p)
+	// The SSH transport reuses its packet buffers.
 	select {
-	case c.relay.ToDaemon <- chunk:
+	case c.relay.ToDaemon <- bytes.Clone(p):
 		return len(p), nil
 	case <-c.relay.Done():
 		return 0, errors.New("relay closed")
@@ -55,8 +49,7 @@ func (c *relayConn) Close() error {
 	return nil
 }
 
-// Deadlines have nothing to arm: the SSH transport is aborted through
-// context cancellation and Close, never through timeouts.
+// The SSH transport is aborted through ctx and Close, never deadlines.
 func (c *relayConn) SetDeadline(time.Time) error      { return nil }
 func (c *relayConn) SetReadDeadline(time.Time) error  { return nil }
 func (c *relayConn) SetWriteDeadline(time.Time) error { return nil }
