@@ -12,8 +12,7 @@ import (
 
 var ErrNoSubscription = pgx.ErrNoRows
 
-// Mode distinguishes who operates the instance. Self-hosted and SaaS run
-// the same binary and the same catalog; only the plan source differs.
+// Mode only changes where the plan comes from.
 type Mode string
 
 const (
@@ -21,8 +20,6 @@ const (
 	ModeSaaS       Mode = "saas"
 )
 
-// Status is the provider-agnostic subscription state stored in
-// workspace_subscriptions.status.
 type Status string
 
 const (
@@ -32,15 +29,13 @@ const (
 	StatusInactive Status = "inactive"
 )
 
-// ActiveStatuses are the string values for SQL WHERE ... IN clauses.
 var ActiveStatuses = []string{
 	string(StatusActive),
 	string(StatusTrialing),
 	string(StatusPastDue),
 }
 
-// GrantsAccess is true only for active, trialing and past_due (grace
-// period). Unknown or corrupted statuses fail closed.
+// GrantsAccess fails closed on unknown statuses. past_due is a grace period.
 func (s Status) GrantsAccess() bool {
 	switch s {
 	case StatusActive, StatusTrialing, StatusPastDue:
@@ -51,7 +46,6 @@ func (s Status) GrantsAccess() bool {
 	return false
 }
 
-// Service resolves workspace plans. It is safe for concurrent use.
 type Service struct {
 	conn    txRunner
 	license string
@@ -73,15 +67,8 @@ func (s *Service) Mode() Mode {
 	return s.mode
 }
 
-// Resolve returns the effective plan for a workspace, cached per request.
-// Never returns a zero Plan: the worst case is Community.
-//
-// Order of precedence:
-//  1. Self-hosted instance with a valid license: the licensed plan
-//     (unknown names resolve to Enterprise for backward compatibility
-//     with v1 keys, which carried no plan).
-//  2. An active subscription row (SaaS, or self-hosted without license).
-//  3. Community default.
+// Resolve is cached per request and never returns a zero Plan. A self-hosted
+// license wins, then an active subscription, then Community.
 func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
 	if cache := cacheFromContext(ctx); cache != nil {
 		if plan, ok := cache.plans[workspaceID]; ok {
@@ -111,59 +98,40 @@ func (s *Service) resolve(ctx context.Context, workspaceID string) Plan {
 		switch {
 		case err == nil && Status(sub.Status).GrantsAccess():
 			plan = sub.Plan
-		case errors.Is(err, ErrNoSubscription):
-			// No subscription row is the normal community case.
-		case err == nil:
-			// Inactive subscription falls back to Community.
+		case errors.Is(err, ErrNoSubscription), err == nil:
 		default:
-			// Fail closed to Community so a billing outage never grants paid
-			// features.
+			// Fail closed so a billing outage never grants paid features.
 			slog.Warn("entitlement subscription lookup failed", "error", err, "workspace_id", workspaceID)
 		}
 	}
 
 	resolved := resolvePlan(plan)
 	if s.mode == ModeSelfHosted {
-		// Recording storage caps and resource caps protect SaaS
-		// infrastructure only. On self-hosted the disk and database are the
-		// customer's own, whatever the plan. This must also apply to the
-		// licensed branch: a valid license resolves its plan directly from
-		// the catalog and would otherwise inherit its caps.
+		// These caps protect SaaS infrastructure only, licensed plans included.
 		resolved.RecordingStorageBytes = Unlimited
 		resolved.ResourceCap = Unlimited
 	}
 	return resolved
 }
 
-// Has reports whether a feature flag is enabled for the workspace.
 func (s *Service) Has(ctx context.Context, workspaceID, feature string) bool {
 	return s.Resolve(ctx, workspaceID).Has(feature)
 }
 
-// RetentionDays returns how long audit logs and session recordings are
-// kept for the workspace.
 func (s *Service) RetentionDays(ctx context.Context, workspaceID string) int64 {
 	return s.Resolve(ctx, workspaceID).RetentionDays
 }
 
-// RecordingStorageBytes returns the workspace's session recording storage
-// cap, Unlimited on self-hosted instances whatever the plan. It protects
-// SaaS infrastructure, not the customer experience: retention is the
-// plan-level storage knob.
 func (s *Service) RecordingStorageBytes(ctx context.Context, workspaceID string) int64 {
 	return s.Resolve(ctx, workspaceID).RecordingStorageBytes
 }
 
-// requestCache holds per-request plan resolutions so a single request
-// (guard interceptor, handler, metadata rendering) triggers one Resolve.
 type requestCache struct {
 	plans map[string]Plan
 }
 
 type requestCacheKey struct{}
 
-// WithRequestCache pins a plan cache onto the request context. The guard
-// interceptor calls this; handlers downstream hit the cache.
 func WithRequestCache(ctx context.Context) context.Context {
 	return context.WithValue(ctx, requestCacheKey{}, &requestCache{
 		plans: make(map[string]Plan),

@@ -1,11 +1,5 @@
 package api
 
-// Transport authentication is iam's: the interceptor asks iam.Authenticate
-// to resolve the request credential (session cookie, bearer token, or
-// DPoP-bound token) into a principal, then injects the principal, session,
-// tenant, and request metadata into the context. Tenant resolution rides
-// the same context values (iam.AnnotateTenant).
-
 import (
 	"context"
 	"errors"
@@ -21,10 +15,8 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// publicEndpoints are the connectrpc procedures that skip authentication.
-// AuthService is the pre-session surface entirely: its RPCs establish (or
-// tear down) the session, so authn must not gate them. Logout in particular
-// must stay reachable with a stale session to clear the cookie.
+// publicEndpoints skip authentication. Logout must stay reachable with a
+// stale session so it can clear the cookie.
 var publicEndpoints = map[string]struct{}{
 	nokkuv1connect.DaemonServiceEnrollDaemonProcedure:      {},
 	nokkuv1connect.UtilServiceGetVersionProcedure:          {},
@@ -44,10 +36,6 @@ func isPublicEndpoint(procedure string) bool {
 	return ok
 }
 
-// NewAuthNInterceptor builds the connect authentication interceptor on iam.
-// It covers unary RPCs and server-side streaming handlers; streaming
-// clients pass through unauthenticated, as connect authenticates on the
-// handler side.
 func NewAuthNInterceptor(cfg *config.Config) connect.Interceptor {
 	return &authNInterceptor{cfg: cfg}
 }
@@ -65,8 +53,7 @@ func (a *authNInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		if err != nil {
 			return nil, a.fail(ctx, err)
 		}
-		// Machine principals carry their workspace in the credential; user
-		// principals resolve it from the request message.
+		// Machine principals carry their workspace in the credential.
 		workspace := p.WorkspaceID
 		if workspace == "" {
 			workspace = requestWorkspace(req)
@@ -81,12 +68,8 @@ func (a *authNInterceptor) WrapStreamingClient(
 	return next
 }
 
-// WrapStreamingHandler authenticates streaming RPCs (the daemon control
-// stream, recording uploads) with the same rules as unary calls. A
-// streaming request has no single message at authentication time, so user
-// principals resolve their workspace inside the handler from the request
-// message (see GetRecording), and machine
-// principals carry it in the credential.
+// WrapStreamingHandler has no request message yet, so user principals pin
+// their workspace inside the handler.
 func (a *authNInterceptor) WrapStreamingHandler(
 	next connect.StreamingHandlerFunc,
 ) connect.StreamingHandlerFunc {
@@ -103,8 +86,6 @@ func (a *authNInterceptor) WrapStreamingHandler(
 	}
 }
 
-// inject carries the authenticated request state: tenant for RLS, the
-// session row, transport facts for the audit sink, and the principal.
 func (a *authNInterceptor) inject(
 	ctx context.Context,
 	workspace string,
@@ -124,8 +105,6 @@ func (a *authNInterceptor) inject(
 	return iam.ContextWithPrincipal(ctx, p)
 }
 
-// fail converts an authentication error into a connect error, advertising a
-// fresh DPoP nonce when the client fixes the failure by re-signing.
 func (a *authNInterceptor) fail(ctx context.Context, err error) error {
 	if ci, ok := connect.CallInfoForHandlerContext(ctx); ok {
 		a.advertiseNonce(ci.ResponseHeader(), err)
@@ -133,9 +112,7 @@ func (a *authNInterceptor) fail(ctx context.Context, err error) error {
 	return connect.NewError(connect.CodeUnauthenticated, err)
 }
 
-// advertiseNonce writes the current DPoP nonce when the failure is one the
-// client fixes by re-signing with a fresh nonce: a stale nonce, or a bound
-// session that arrived without a proof.
+// advertiseNonce sends a fresh DPoP nonce when re-signing fixes the failure.
 func (a *authNInterceptor) advertiseNonce(header http.Header, err error) {
 	if !errors.Is(err, iam.ErrDPoPNonce) && !errors.Is(err, iam.ErrDPoPRequired) {
 		return
@@ -143,12 +120,8 @@ func (a *authNInterceptor) advertiseNonce(header http.Header, err error) {
 	a.cfg.IAM.AdvertiseDPoPNonce(header)
 }
 
-// requestWorkspace returns the conventional workspace_id protobuf field from
-// request, or "" when absent. It is the tenant resolution hook for user
-// principals: their workspace comes from the request message, never from a
-// header. Handlers that need a workspace for a message without the field
-// (or streaming handlers, which have no message here) pin it themselves
-// with iam.AnnotateTenant.
+// requestWorkspace reads the workspace_id field off the request message.
+// User principals never take their workspace from a header.
 func requestWorkspace(request connect.AnyRequest) string {
 	if request == nil {
 		return ""

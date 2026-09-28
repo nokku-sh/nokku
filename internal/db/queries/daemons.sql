@@ -1,6 +1,5 @@
 -- name: CreateDaemon :one
--- Returns no row when the name or the key is already taken, so the caller
--- can retry inside its transaction instead of aborting it.
+-- Returns no row on a taken name or key, so the caller can retry in its tx.
 WITH
   new_daemon AS (
     INSERT INTO

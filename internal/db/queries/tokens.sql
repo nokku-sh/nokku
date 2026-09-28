@@ -48,8 +48,8 @@ WHERE
   id = @id;
 
 -- name: GetLiveToken :one
--- A known, unexpired token. The use limit is enforced by RedeemToken, so a
--- token that ran out still identifies a daemon it already enrolled.
+-- Ignores the use limit, so a used-up token still identifies a daemon it
+-- already enrolled. RedeemToken enforces it.
 SELECT
   *
 FROM
@@ -64,8 +64,7 @@ WHERE
   );
 
 -- name: RedeemToken :one
--- Spends one use. The checks and the increment are one statement, so two
--- redemptions can never both take the last use.
+-- One statement, so two redemptions can never both take the last use.
 UPDATE workspace_tokens
 SET
   uses = uses + 1,

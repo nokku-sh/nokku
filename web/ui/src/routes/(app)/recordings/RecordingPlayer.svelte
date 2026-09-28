@@ -18,25 +18,20 @@
 	let { recording, open, onOpenChange }: Props = $props();
 
 	let playerEl = $state<HTMLDivElement | null>(null);
-	// The asciinema player is a foreign embed, it mounts into a wrapper div
-	// that only we touch so Svelte never sees the player's DOM.
+	// Only we touch this wrapper, so Svelte never sees the player's DOM.
 	let playerHost: HTMLDivElement | null = null;
 	let playState = $state<'loading' | 'ready' | 'error'>('loading');
 	let error = $state('');
 	let abortCtrl: AbortController | null = null;
 	let player: Player | null = null;
-	// asciinema sizes its container to the natural width at the base font
-	// (15px), with 'small' the actual player is narrower and empty dialog
-	// background shows on the sides. Watch the player and re-hug the host on
-	// every resize so the modal is exactly the video once it settles.
+	// asciinema sizes its container at the base font, so with 'small' the
+	// player is narrower. Re-hug on every resize so the modal fits the video.
 	let playerObserver: ResizeObserver | null = null;
 	let hugTimer: ReturnType<typeof setTimeout> | null = null;
 	let observeRetry: ReturnType<typeof setTimeout> | null = null;
 	let scaled = false;
 	let castText = '';
 
-	// The player container mounts in the dialog portal, the action wires it
-	// and cleans up on unmount.
 	function mountPlayer(el: HTMLDivElement) {
 		playerEl = el;
 		return {
@@ -78,8 +73,7 @@
 		}
 	}
 
-	// The published Player type only declares a subset of events, "ready" and
-	// "error" are dispatched at runtime and wired through a structural cast.
+	// The published Player type lacks the runtime "ready" and "error" events.
 	type PlayerEvents = { addEventListener(name: string, handler: () => void): void };
 
 	function wirePlayerEvents(p: Player) {
@@ -89,8 +83,6 @@
 		});
 	}
 
-	// Tear down the resize watcher so a closed dialog never resizes a host
-	// that no longer exists.
 	function cleanupPlayerObserver() {
 		playerObserver?.disconnect();
 		playerObserver = null;
@@ -110,8 +102,7 @@
 		if (!playerHost) return;
 		const video = playerHost.querySelector<HTMLElement>('.ap-player');
 		if (!video) {
-			// asciinema renders the player a moment after create, retry
-			// until it exists.
+			// asciinema renders the player a moment after create.
 			observeRetry = setTimeout(attachPlayerObserver, 100);
 			return;
 		}
@@ -120,9 +111,7 @@
 		scheduleHug();
 	}
 
-	// Size the host to the rendered player, or to a scaled copy when the
-	// terminal is too large for the viewport. Every player resize re-runs
-	// this, so the dialog follows the terminal until it settles.
+	// hug scales the host down when the terminal is too large for the viewport.
 	function hug() {
 		if (!playerHost) return;
 		const video = playerHost.querySelector<HTMLElement>('.ap-player');
@@ -137,8 +126,7 @@
 			const s = Math.min(maxW / w, maxH / h, 1);
 			playerHost.style.width = `${Math.round(w * s)}px`;
 			playerHost.style.height = `${Math.round(h * s)}px`;
-			// Re-create with fit 'both' so the terminal fills the scaled
-			// host instead of overflowing it.
+			// fit 'both' fills the scaled host instead of overflowing it.
 			player?.dispose();
 			player = createAsciinemaPlayer({ data: castText }, playerHost, {
 				autoPlay: true,
@@ -159,8 +147,6 @@
 
 	async function renderCast(gzipData: Uint8Array<ArrayBuffer>) {
 		if (!playerEl) return;
-		// The object is one gzip stream, inflate it and hand the cast text
-		// to the asciinema player, it parses the v3 header and events.
 		const stream = new Blob([gzipData]).stream().pipeThrough(new DecompressionStream('gzip'));
 		const text = await new Response(stream).text();
 		if (!text.trim()) {
@@ -174,8 +160,7 @@
 		playerHost = document.createElement('div');
 		playerEl.appendChild(playerHost);
 
-		// fit 'none' renders the terminal at its natural size (cast dims +
-		// font metrics), hug() then sizes the dialog to the player.
+		// fit 'none' renders at natural size, hug() then sizes the dialog.
 		player = createAsciinemaPlayer({ data: text }, playerHost, {
 			autoPlay: true,
 			theme: 'dracula',
@@ -204,8 +189,7 @@
 		}
 	}
 
-	// Track only the dialog state here. play() mutates $state variables and
-	// would otherwise re-trigger this effect and restart playback in a loop.
+	// Only track the dialog state, play() mutates $state and would loop.
 	$effect(() => {
 		if (!open || !recording || !playerEl) return;
 		untrack(() => void play());
@@ -224,8 +208,6 @@
 </script>
 
 <Dialog.Root bind:open onOpenChange={onDialogOpenChange}>
-	<!-- Borderless, shrink-wrapped: the modal is exactly the size of the
-	     terminal recording. -->
 	<Dialog.Content
 		class="max-h-[85vh] w-fit! max-w-[calc(100vw-2rem)]! gap-0! overflow-hidden rounded-xl p-0! ring-0! sm:max-w-[calc(100vw-2rem)]!"
 	>
@@ -245,8 +227,7 @@
 					</Button>
 				</div>
 			{/if}
-			<!-- The player stays out of flow until it is ready so the
-			     modal keeps the spinner size while loading. -->
+			<!-- Out of flow until ready so the modal keeps the spinner size. -->
 			<div class={playState === 'ready' ? '' : 'invisible absolute'} use:mountPlayer></div>
 		</div>
 	</Dialog.Content>

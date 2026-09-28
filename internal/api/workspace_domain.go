@@ -11,10 +11,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// Workspace domain storage and verification live in the iam domains manager;
-// this service only maps them to the API surface. The binding's provider is
-// the workspace itself, matching the provider id convention.
-
 type WorkspaceDomainService struct {
 	cfg *config.Config
 }
@@ -80,7 +76,6 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 	ctx context.Context,
 	req *nokkuv1.VerifyWorkspaceDomainRequest,
 ) (*nokkuv1.VerifyWorkspaceDomainResponse, error) {
-	// The iam manager resolves the TXT proof at _nokku-verify.<domain> itself.
 	result, err := s.cfg.IAM.VerifyTenantDomain(ctx, req.GetWorkspaceId(), req.GetDomain())
 	if err != nil {
 		return nil, DBError(err)
@@ -94,7 +89,7 @@ func (s *WorkspaceDomainService) RegenerateWorkspaceDomainToken(
 	ctx context.Context,
 	req *nokkuv1.RegenerateWorkspaceDomainTokenRequest,
 ) (*nokkuv1.RegenerateWorkspaceDomainTokenResponse, error) {
-	// Regenerating is a rebind: a fresh token, verification reset.
+	// A rebind issues a fresh token and resets verification.
 	result, err := s.cfg.IAM.PutTenantDomain(ctx, req.GetWorkspaceId(), req.GetDomain())
 	if err != nil {
 		return nil, DBError(err)
@@ -105,22 +100,16 @@ func (s *WorkspaceDomainService) RegenerateWorkspaceDomainToken(
 }
 
 func domainToProto(d iam.TenantDomain) *nokkuv1.WorkspaceDomain {
-	var verifiedAt *timestamppb.Timestamp
-	if !d.VerifiedAt.IsZero() {
-		verifiedAt = timestamppb.New(d.VerifiedAt)
-	}
 	return &nokkuv1.WorkspaceDomain{
 		Domain:            &d.Domain,
 		WorkspaceId:       &d.WorkspaceID,
 		VerificationToken: &d.Token,
-		VerifiedAt:        verifiedAt,
+		VerifiedAt:        domainTimestamp(d.VerifiedAt),
 		CreatedAt:         domainTimestamp(d.CreatedAt),
 		UpdatedAt:         domainTimestamp(d.UpdatedAt),
 	}
 }
 
-// domainTimestamp leaves unset timestamps out of the proto instead of
-// reporting the epoch.
 func domainTimestamp(t time.Time) *timestamppb.Timestamp {
 	if t.IsZero() {
 		return nil

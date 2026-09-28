@@ -36,7 +36,6 @@
 		</div>
 
 		<form class="mt-4 space-y-6" onsubmit={handleSubmit}>
-			<!-- Email Field -->
 			<div class="space-y-2">
 				<Label for="email">Email</Label>
 				<Input
@@ -49,11 +48,9 @@
 				/>
 			</div>
 
-			<!-- Backup Code Field -->
 			<div class="space-y-3">
 				<Label for="code">Backup Code</Label>
 
-				<!-- Centered OTP Wrapper -->
 				<div class="flex w-full justify-center py-2">
 					<InputOTP.Root
 						maxlength={16}
@@ -63,7 +60,6 @@
 					>
 						{#snippet children({ cells })}
 							<div class="flex flex-col items-center gap-3">
-								<!-- Row 1 -->
 								<div class="flex items-center gap-2 sm:gap-3">
 									<InputOTP.Group>
 										{#each cells.slice(0, 4) as cell}
@@ -77,7 +73,6 @@
 										{/each}
 									</InputOTP.Group>
 								</div>
-								<!-- Row 2 -->
 								<div class="flex items-center gap-2 sm:gap-3">
 									<InputOTP.Group>
 										{#each cells.slice(8, 12) as cell}

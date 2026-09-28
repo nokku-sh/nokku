@@ -9,8 +9,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
-// SQL to Proto ---------------------------------------------------------------
-
 func mapSlice[T, R any](in []T, fn func(T) R) []R {
 	if in == nil {
 		return nil
@@ -22,9 +20,8 @@ func mapSlice[T, R any](in []T, fn func(T) R) []R {
 	return out
 }
 
-// jsonMap decodes a JSONB object column. A malformed blob is data corruption,
-// not a request failure: the row is still readable without it, so it is logged
-// and the caller gets an empty map.
+// jsonMap logs a malformed blob and returns an empty map, the row is still
+// readable without it.
 func jsonMap(column string, raw []byte) map[string]string {
 	m := make(map[string]string)
 	if len(raw) == 0 {
@@ -195,7 +192,6 @@ func (p *GetPrincipalsByTargetIDsRow) ToProto() *nokkuv1.Principal {
 	return out
 }
 
-// ToProto shapes an identity user row for the API surface.
 func (u *User) ToProto() *nokkuv1.User {
 	return &nokkuv1.User{
 		Id:                   &u.ID,
@@ -209,11 +205,8 @@ func (u *User) ToProto() *nokkuv1.User {
 	}
 }
 
-// DaemonOnlineWindow is how recently a core instance must have seen a daemon
-// for it to count as online. The pool's heartbeat runs well inside it.
 const DaemonOnlineWindow = 30 * time.Second
 
-// SeenRecently reports whether a daemon last seen at t counts as online.
 func SeenRecently(t *time.Time) bool {
 	return t != nil && time.Since(*t) < DaemonOnlineWindow
 }
@@ -293,8 +286,7 @@ func CAsToProto(cas []*CertificateAuthority) []*nokkuv1.CertificateAuthority {
 	)
 }
 
-// ToProto converts the display subset of a CA row: the access views show which
-// authority issues a target's certificates without the private fields.
+// ToProto leaves out the private fields.
 func (r *GetCAsByIDsRow) ToProto() *nokkuv1.CertificateAuthority {
 	if r == nil {
 		return nil

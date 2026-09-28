@@ -1,7 +1,5 @@
-// Package recording owns the session recording lifecycle: the encrypted
-// on-disk format, secret scrubbing, storage-cap eviction, and retention
-// deletion. Transport concerns (Connect handlers, proto mapping) stay in
-// internal/api; this package never sees a request or response type.
+// Package recording owns the recording lifecycle. It never sees a request or
+// response type.
 package recording
 
 import (
@@ -18,21 +16,15 @@ import (
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
-// Limits is the entitlement view recording needs: how long a workspace
-// keeps its recordings and how much recording storage it may hold.
-// internal/entitlement.Service satisfies it.
 type Limits interface {
 	RetentionDays(ctx context.Context, workspaceID string) int64
 	RecordingStorageBytes(ctx context.Context, workspaceID string) int64
 }
 
-// EventSink records background failures that have no request to surface them
-// on. *audit.Service satisfies it.
 type EventSink interface {
 	Append(ctx context.Context, event *audit.Event) error
 }
 
-// Service owns recording storage operations. Safe for concurrent use.
 type Service struct {
 	conn   *db.Connection
 	store  *storage.Storage
@@ -40,8 +32,7 @@ type Service struct {
 	events EventSink
 }
 
-// Writer appends encrypted frames to one recording object.
-// The writer commits on Close, so a died daemon still leaves a partial recording.
+// Writer commits on Close, so a dead daemon still leaves a partial recording.
 type Writer struct {
 	w   io.WriteCloser
 	svc *Service
@@ -59,7 +50,6 @@ func New(
 	return s
 }
 
-// NewWriter opens a recording object for writing.
 func (s *Service) NewWriter(ctx context.Context, workspaceID, recordingID string) (*Writer, error) {
 	w, err := s.store.CreateWriter(
 		ctx,
@@ -72,7 +62,6 @@ func (s *Service) NewWriter(ctx context.Context, workspaceID, recordingID string
 	return &Writer{w: w, svc: s}, nil
 }
 
-// WriteChunk encrypts one plaintext chunk and appends it as a frame.
 func (w *Writer) WriteChunk(plaintext []byte) error {
 	framed, err := w.svc.frameEncrypted(plaintext)
 	if err != nil {
@@ -84,14 +73,10 @@ func (w *Writer) WriteChunk(plaintext []byte) error {
 	return nil
 }
 
-// Close commits the object.
 func (w *Writer) Close() error {
 	return w.w.Close()
 }
 
-// frameEncrypted encrypts one plaintext chunk with the server's cipher and
-// prefixes it with a 4-byte length so a stream of frames can be walked and
-// decrypted independently on playback.
 func (s *Service) frameEncrypted(plaintext []byte) ([]byte, error) {
 	cipher, err := crypto.Encryptor()
 	if err != nil {

@@ -13,8 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// heartbeatDeadline drops a control stream that has been silent for this
-// long. Daemons heartbeat every 30s, so this allows three missed beats.
+// heartbeatDeadline allows three missed 30s heartbeats.
 const heartbeatDeadline = 2 * time.Minute
 
 func (p *Pool) Connect(
@@ -29,8 +28,7 @@ func (p *Pool) Connect(
 		)
 	}
 
-	// The workspace is unknown until the daemon is looked up, so this
-	// cross-tenant read runs as a system transaction (bypassing RLS).
+	// System tx since the workspace is unknown until the daemon is looked up.
 	var daemon *db.Daemon
 	if err := p.conn.WithTx(ctx, func(q *db.Queries) (err error) {
 		daemon, err = q.GetDaemon(ctx, daemonID)
@@ -45,11 +43,8 @@ func (p *Pool) Connect(
 	conn := p.RegisterDaemon(ctx, daemonID, daemon.WorkspaceID)
 	defer p.UnregisterDaemon(daemonID, conn)
 
-	// Outbound: drain the daemon's session and state channels to the stream.
-	// outDone is closed once the pump stops; the handler must wait for it
-	// before returning, because a Send that lands after ServeHTTP returns
-	// panics ("Write called after Handler finished") and, running on this
-	// spawned goroutine, that panic is unrecovered and kills the process.
+	// The handler must join outDone: a Send after ServeHTTP returns panics on
+	// this goroutine, unrecovered, and kills the process.
 	outDone := make(chan struct{})
 	go func() {
 		defer close(outDone)
@@ -75,10 +70,8 @@ func (p *Pool) Connect(
 		}
 	}()
 
-	// Inbound: heartbeats carry the daemon's state version. A mismatch gets
-	// a StateUpdate, so a daemon that missed a push while disconnected
-	// catches up on its first heartbeat. A daemon that stops sending is
-	// dropped, so a half-open connection cannot stay online.
+	// A heartbeat with a stale state version gets a StateUpdate, so a daemon
+	// that missed a push catches up. Silence drops half-open connections.
 	silence := time.AfterFunc(heartbeatDeadline, conn.Cancel)
 	defer silence.Stop()
 	recvErr := make(chan error, 1)
@@ -112,9 +105,8 @@ func (p *Pool) Connect(
 	case err := <-recvErr:
 		retErr = err
 	}
-	// UnregisterDaemon (deferred) cancels conn.ctx only after we return, so
-	// stop the pump here before joining it. Receive goroutines may outlive
-	// the handler briefly; they only read the request body, which is safe.
+	// Stop the pump before joining it. The receive goroutine may outlive the
+	// handler briefly, which is safe since it only reads the body.
 	conn.Cancel()
 	<-outDone
 	return retErr
@@ -154,14 +146,10 @@ func (p *Pool) DaemonRelay(
 	}
 	defer p.UnregisterRelay(relayID)
 
-	// Cancelling on return guarantees both directions unwind even on a
-	// send/receive error.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Outbound: user bytes to the daemon stream.
-	// Joined below: a Send landing after this handler returns panics in
-	// net/http, and on a spawned goroutine that panic kills the process.
+	// Joined below, a Send after the handler returns kills the process.
 	outDone := make(chan struct{})
 	go func() {
 		defer close(outDone)
@@ -181,7 +169,6 @@ func (p *Pool) DaemonRelay(
 		}
 	}()
 
-	// Inbound: sshd bytes from the daemon, or an explicit close.
 	recvErr := make(chan error, 1)
 	go func() {
 		for {
@@ -219,8 +206,7 @@ func (p *Pool) DaemonRelay(
 	}
 	cancel()
 	<-outDone
-	// Best-effort closed notice so the daemon tears down its sshd dial even
-	// when it stopped reading.
+	// Best effort, so the daemon tears down its sshd dial even if it stopped reading.
 	_ = stream.Send(&nokkuv1.DaemonRelayResponse{
 		Msg: &nokkuv1.DaemonRelayResponse_Closed{Closed: &nokkuv1.DaemonRelayClosed{}},
 	})

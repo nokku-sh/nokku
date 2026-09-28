@@ -12,7 +12,6 @@
 	const currentUser = user.self();
 
 	$effect(() => {
-		// Only redirect if user is authenticated AND on a public-only route
 		if (currentUser.isSuccess && currentUser.data && redirectRoutes.includes(page.url.pathname)) {
 			goto('/');
 		}

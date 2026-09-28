@@ -17,11 +17,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-// SignCertificate signs a PEM-encoded PKCS#10 CSR with an X.509 certificate
-// authority and returns the PEM-encoded leaf certificate and its expiry.
-// TTL bounds follow the authority's usage: client certs use user TTLs, server
-// certs host TTLs. SANs and subject come from the CSR. Key usage derives from
-// X509Usage and the leaf key type.
+// SignCertificate uses user TTLs for client certs and host TTLs for server certs.
 func SignCertificate(
 	ca *db.CertificateAuthority,
 	csrPEM string,
@@ -91,9 +87,7 @@ func boundTTL(
 	return ttl
 }
 
-// extKeyUsageFor maps the requested usage to X.509 extended key usage.
-// Unspecified defaults to client auth, the most common case (mTLS, kubectl,
-// database clients).
+// extKeyUsageFor defaults to client auth, the most common case.
 func extKeyUsageFor(
 	usage nokkuv1.SignX509CertificateRequest_X509Usage,
 ) []x509.ExtKeyUsage {
@@ -111,8 +105,7 @@ func extKeyUsageFor(
 	}
 }
 
-// keyUsageFor returns the leaf key usage. RSA also gets key encipherment
-// for legacy TLS key transport.
+// keyUsageFor adds key encipherment for RSA, for legacy TLS key transport.
 func keyUsageFor(pub any) x509.KeyUsage {
 	usage := x509.KeyUsageDigitalSignature
 	if _, ok := pub.(*rsa.PublicKey); ok {

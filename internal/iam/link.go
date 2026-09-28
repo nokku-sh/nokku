@@ -1,8 +1,5 @@
 package iam
 
-// The identity linker: resolves a verified external identity to a local
-// user, creating the linking credential on first sight.
-
 import (
 	"context"
 	"errors"
@@ -19,37 +16,28 @@ var (
 	ErrIdentityRejected = errors.New("iam: identity rejected")
 )
 
-// flowLinkOptions describes one verified identity.
 type flowLinkOptions struct {
 	ProviderID string
-	// WorkspaceID is the provider's workspace, empty for a global social
-	// provider. An enterprise provider only vouches for accounts under its
-	// workspace's verified domains. A social provider vouches for nobody,
-	// so it needs a provider-verified email to match an account.
-	WorkspaceID string
-	Subject     string
-	Email       string
-	// EmailVerified marks the email as verified by the provider.
+	// WorkspaceID is empty for social providers. An enterprise provider only
+	// vouches for its verified domains, a social one needs a verified email.
+	WorkspaceID   string
+	Subject       string
+	Email         string
 	EmailVerified bool
-	// Name and Picture apply at provision time. Enterprise logins also
-	// refresh the name, the IdP owns it.
-	Name    string
-	Picture string
-	// JITProvisioning lets a first-time identity become a user by email.
+	// Enterprise logins refresh the name on every login, the IdP owns it.
+	Name            string
+	Picture         string
 	JITProvisioning bool
-	// LinkUserID attaches the identity to that signed-in user instead of
-	// resolving by email.
+	// LinkUserID skips the email lookup and links to that signed-in user.
 	LinkUserID string
 }
 
-// linker resolves identities of one credential type.
 type linker struct {
 	svc      *Service
 	credType Method
 }
 
-// Resolve returns the local user for a verified identity and joins them to
-// the provider's workspace. Rejections are recorded as LoginDenied events.
+// Resolve also joins the user to the provider's workspace.
 func (l *linker) Resolve(ctx context.Context, opts flowLinkOptions) (*db.User, error) {
 	u, err := l.resolve(ctx, opts)
 	if err != nil {
@@ -72,11 +60,13 @@ func (l *linker) Resolve(ctx context.Context, opts flowLinkOptions) (*db.User, e
 
 func (l *linker) resolve(ctx context.Context, opts flowLinkOptions) (*db.User, error) {
 	enterprise := opts.WorkspaceID != ""
-	// vouch rejects accounts an enterprise provider has no authority over.
-	// It runs on every path, so a workspace that loses its domain also loses
-	// its existing links.
+	// vouch runs on every path, so a workspace that loses its domain also
+	// loses its existing links.
 	vouch := func(u *db.User) (*db.User, error) {
 		if !enterprise {
+			if err := l.svc.enforceSSO(ctx, u.Email); err != nil {
+				return nil, err
+			}
 			return u, nil
 		}
 		ok, err := l.svc.managedBy(ctx, opts.WorkspaceID, u.Email)
@@ -133,9 +123,14 @@ func (l *linker) resolve(ctx context.Context, opts flowLinkOptions) (*db.User, e
 		if !ok {
 			return nil, ErrIdentityRejected
 		}
-	} else if !opts.EmailVerified {
-		// A social provider's unverified email could claim anyone's account.
-		return nil, ErrIdentityRejected
+	} else {
+		if !opts.EmailVerified {
+			return nil, ErrIdentityRejected
+		}
+		// Social logins don't satisfy a domain's enforced SSO.
+		if err := l.svc.enforceSSO(ctx, opts.Email); err != nil {
+			return nil, err
+		}
 	}
 
 	u, err := l.svc.GetUserByEmail(ctx, opts.Email)
@@ -157,16 +152,15 @@ func (l *linker) resolve(ctx context.Context, opts flowLinkOptions) (*db.User, e
 		return nil, err
 	}
 
-	// The session is valid either way, but without the link a later login
-	// fails once JIT is off, so a failure must at least leave a trace.
+	// Without the link a later login fails once JIT is off, so leave a trace.
 	if err := l.link(ctx, opts, u.ID); err != nil {
 		slog.Warn("sso identity link failed", "error", err, "provider", opts.ProviderID, "user_id", u.ID)
 	}
 	return u, nil
 }
 
-// provisionUser creates a JIT account. Its email is verified: a social
-// provider asserted it, or the enterprise workspace owns the domain.
+// provisionUser marks the email verified since the provider or the domain
+// owner already vouched for it.
 func (s *Service) provisionUser(ctx context.Context, opts flowLinkOptions) (*db.User, error) {
 	var u *db.User
 	err := s.conn.WithTx(ctx, func(q *db.Queries) (err error) {
@@ -189,8 +183,6 @@ func (s *Service) provisionUser(ctx context.Context, opts flowLinkOptions) (*db.
 	return u, nil
 }
 
-// link persists the credential that binds the external subject to the user.
-// A subject already bound to someone else fails with ErrIdentityLinked.
 func (l *linker) link(ctx context.Context, opts flowLinkOptions, userID string) error {
 	_, err := l.svc.sys.UpsertCredential(ctx, &db.UpsertCredentialParams{
 		ID:       opts.ProviderID + ":" + opts.Subject,
@@ -206,8 +198,6 @@ func (l *linker) link(ctx context.Context, opts flowLinkOptions, userID string) 
 	return err
 }
 
-// completeSSO resolves the verified identity into a local user, issues a
-// session, and redirects to returnTo (default "/").
 func (s *Service) completeSSO(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -218,8 +208,7 @@ func (s *Service) completeSSO(
 	ctx := r.Context()
 	u, err := l.Resolve(ctx, opts)
 	if err != nil {
-		// Rejections are audited, this log is the only trace of a failed
-		// workspace join.
+		// The only trace of a failed workspace join.
 		slog.Warn("sso login rejected", "error", err, "provider", opts.ProviderID)
 		fail(w, r, "identity rejected")
 		return
@@ -234,13 +223,14 @@ func (s *Service) completeSSO(
 	if s.OnUserLogin != nil {
 		s.OnUserLogin(w, r, u, l.credType)
 	}
-	// Re-sanitize at the sink: the value round-tripped through the cache.
+	// Re-sanitize, the value round-tripped through the cache.
 	returnTo = safeReturnTo(returnTo)
 	if returnTo == "" {
 		returnTo = "/"
 	}
+	// 303 so a SAML ACS POST is not replayed against the SPA.
 	// #nosec G710 -- safeReturnTo only lets same-origin absolute paths through.
-	http.Redirect(w, r, returnTo, http.StatusTemporaryRedirect)
+	http.Redirect(w, r, returnTo, http.StatusSeeOther)
 }
 
 func nonEmpty(s string) *string {

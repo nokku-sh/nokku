@@ -22,8 +22,7 @@ import (
 
 const (
 	replayBufferSize = 64 * 1024
-	// Caps how far the replay trim scans for a safe boundary.
-	replayTrimScan = 256
+	replayTrimScan   = 256
 
 	sessionTTL      = 8 * time.Hour
 	sessionIdle     = 30 * time.Minute
@@ -31,71 +30,54 @@ const (
 	sessionCertTTL  = time.Hour
 	idleCheckEvery  = 30 * time.Second
 
-	// Binds shell output toward the browser, inherited from the old PTY
-	// path. sshclient chunks at 32 KB, below the burst, so WaitN is valid.
+	// sshclient chunks at 32 KB, below the burst, so WaitN is valid.
 	webStdoutRate  = 512 << 10
 	webStdoutBurst = 64 << 10
 
-	// sendTimeout bounds how long a producer waits on a stalled consumer
-	// before closing the session. Dropping bytes corrupts a terminal, so a
-	// sustained stall means the browser is gone and closing is honest.
+	// sendTimeout closes a stalled session since dropping bytes would corrupt
+	// the terminal.
 	sendTimeout = 5 * time.Second
 )
 
-// SessionConfig carries what StartSession needs to dial the daemon's
-// sshd: the ephemeral session certificate is minted from CA on start.
 type SessionConfig struct {
 	DaemonID  string
 	SessionID string
 	Username  string
 	UserID    string
 	CA        *db.CertificateAuthority
-	// HostPrincipal is the host certificate principal to require, the
-	// daemon's target id.
+	// HostPrincipal is the daemon's target id.
 	HostPrincipal string
 }
 
-// Session is the server-side handle for one live SSH session. It bridges
-// the session's SSH channel over its relay and any attached browser
-// WebSocket. Its public shape is what the websocket handler depends on:
-// SendStdin, SendResize, AppendStdout, SnapshotForAttach, Exited.
 type Session struct {
 	sessionID string
 	daemonID  string
 	username  string
 	userID    string
 
-	stdin  chan []byte
-	resize chan [2]uint32
-	// closed is the kill switch: CloseSession closes it and the wiring
-	// tears the terminal and relay down.
+	stdin     chan []byte
+	resize    chan [2]uint32
 	closed    chan struct{}
 	closeOnce sync.Once
-	Stdout    chan []byte
-	Exited    chan struct{}
+	stdout    chan []byte
+	exited    chan struct{}
 
 	replayMu  sync.Mutex
 	replayBuf []byte
 
-	// lastActivity is unix nanos of the most recent stdin or stdout, for
-	// the idle watcher.
 	lastActivity atomic.Int64
 
 	shutdownOnce sync.Once
 }
 
-// DaemonID returns the daemon the session runs on.
 func (s *Session) DaemonID() string { return s.daemonID }
 
-// UserID returns the user who requested the session.
 func (s *Session) UserID() string { return s.userID }
 
 func (s *Session) shutdown() {
-	s.shutdownOnce.Do(func() { close(s.Exited) })
+	s.shutdownOnce.Do(func() { close(s.exited) })
 }
 
-// Close is the kill switch for CloseSession. The wiring tears the SSH
-// terminal and relay down in response.
 func (s *Session) Close() {
 	s.closeOnce.Do(func() { close(s.closed) })
 }
@@ -104,11 +86,8 @@ func (s *Session) touch() {
 	s.lastActivity.Store(time.Now().UnixNano())
 }
 
-// StartSession opens a web session: a relay to the daemon, an SSH session
-// channel over it, and the wiring between the terminal and the Session the
-// websocket attaches to. The session lives until the shell ends, CloseSession,
-// the 8h TTL, or the idle timeout. On failure the relay slot is released and
-// a typed or wrapped error is returned.
+// StartSession lives until the shell ends, CloseSession, the TTL, or the idle
+// timeout.
 func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, error) {
 	if cfg.CA == nil || !cfg.CA.IsActive {
 		return nil, ErrCAInactive
@@ -130,7 +109,7 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 
 	dialCtx, dialCancel := context.WithTimeout(ctx, sessionDialTime)
 	defer dialCancel()
-	term, err := sshclient.DialTerminal(dialCtx, NewRelayConn(relay), sshclient.Config{
+	term, err := sshclient.DialTerminal(dialCtx, &relayConn{relay: relay}, sshclient.Config{
 		HostPrincipal: cfg.HostPrincipal,
 		Username:      cfg.Username,
 		Signer:        signer,
@@ -142,36 +121,33 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 		return nil, fmt.Errorf("ssh session: %w", err)
 	}
 
-	s := p.RegisterSession(cfg.SessionID, cfg.DaemonID, cfg.Username, cfg.UserID)
+	s := p.registerSession(cfg.SessionID, cfg.DaemonID, cfg.Username, cfg.UserID)
 
-	// The TTL context is parented to the pool so a server shutdown ends
-	// every session.
+	// Parented to the pool so a server shutdown ends every session.
 	sessionCtx, cancel := context.WithTimeout(p.shutdownCtx, sessionTTL)
 	teardown := sync.OnceFunc(func() {
 		cancel()
 		term.Close()
 		p.UnregisterRelay(relayID)
-		p.UnregisterSession(cfg.SessionID)
+		p.unregisterSession(cfg.SessionID)
 		s.shutdown()
 	})
 
-	// Stdout: SSH channel output into the replay buffer and Stdout chan,
-	// throttled so a chatty shell cannot flood the websocket. Its exit
-	// (remote shell ended or transport died) is the session's end.
+	// Throttled so a chatty shell cannot flood the websocket. Its exit is
+	// the session's end.
 	go func() {
 		limiter := rate.NewLimiter(webStdoutRate, webStdoutBurst)
 		for data := range term.Stdout() {
 			if err := limiter.WaitN(sessionCtx, len(data)); err != nil {
 				break
 			}
-			s.AppendStdout(data)
+			s.appendStdout(data)
 			s.touch()
 		}
 		teardown()
 		slog.Debug("web session ended", "session_id", cfg.SessionID)
 	}()
 
-	// Input: browser stdin/resize toward the terminal, plus the exit signals.
 	go func() {
 		defer teardown()
 		idle := time.NewTicker(idleCheckEvery)
@@ -180,9 +156,7 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 			select {
 			case <-sessionCtx.Done():
 				return
-			case <-s.Exited:
-				// Killed externally: a daemon disconnect removed the session
-				// from the map, or the relay died underneath the terminal.
+			case <-s.exited:
 				return
 			case <-s.closed:
 				return
@@ -206,9 +180,6 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 	return s, nil
 }
 
-// mintSessionCert generates an ephemeral key pair and signs it as a user
-// certificate for the actor. The private key dies with the request, it is
-// only used for this session's handshake.
 func mintSessionCert(
 	ca *db.CertificateAuthority,
 	principal, sessionID string,
@@ -239,8 +210,7 @@ func mintSessionCert(
 	return ssh.NewCertSigner(cert, base)
 }
 
-// RegisterSession inserts a session into the pool map.
-func (p *Pool) RegisterSession(sessionID, daemonID, username, userID string) *Session {
+func (p *Pool) registerSession(sessionID, daemonID, username, userID string) *Session {
 	s := &Session{
 		sessionID: sessionID,
 		daemonID:  daemonID,
@@ -249,8 +219,8 @@ func (p *Pool) RegisterSession(sessionID, daemonID, username, userID string) *Se
 		stdin:     make(chan []byte, sendBufferSize),
 		resize:    make(chan [2]uint32, sendBufferSize),
 		closed:    make(chan struct{}),
-		Stdout:    make(chan []byte, sendBufferSize),
-		Exited:    make(chan struct{}),
+		stdout:    make(chan []byte, sendBufferSize),
+		exited:    make(chan struct{}),
 	}
 	s.touch()
 	p.mu.Lock()
@@ -260,16 +230,12 @@ func (p *Pool) RegisterSession(sessionID, daemonID, username, userID string) *Se
 	return s
 }
 
-// UnregisterSession removes a session from the pool map. The session wiring
-// calls it from its teardown. Idempotent.
-func (p *Pool) UnregisterSession(sessionID string) {
+func (p *Pool) unregisterSession(sessionID string) {
 	p.mu.Lock()
 	p.removeSessionLocked(sessionID)
 	p.mu.Unlock()
 }
 
-// removeSessionLocked drops a session from both indexes and returns it.
-// Caller holds p.mu.
 func (p *Pool) removeSessionLocked(sessionID string) *Session {
 	s := p.sessions[sessionID]
 	if s == nil {
@@ -307,7 +273,6 @@ func (p *Pool) ListSessions(daemonID string) []*nokkuv1.DaemonSession {
 
 func (p *Pool) CloseSession(sessionID string) {
 	p.mu.Lock()
-	// Remove from the maps immediately so ListSessions stops returning it.
 	s := p.removeSessionLocked(sessionID)
 	p.mu.Unlock()
 	if s == nil {
@@ -337,20 +302,16 @@ func (s *Session) SendResize(width, height uint32) {
 	}
 }
 
-// AppendStdout records a PTY output chunk in the replay buffer and forwards it
-// to Stdout, atomic w.r.t. SnapshotForAttach so an attaching WebSocket never
-// receives the same chunk twice.
-func (s *Session) AppendStdout(data []byte) {
+func (s *Session) appendStdout(data []byte) {
 	s.replayMu.Lock()
 	s.replayBuf = append(s.replayBuf, data...)
 	if len(s.replayBuf) > replayBufferSize*2 {
 		s.trimReplayLocked()
 	}
-	// Send while holding replayMu so SnapshotForAttach's drain sees a snapshot
-	// and channel that are mutually consistent: a chunk already captured in the
-	// replay copy is not also queued on Stdout (which would render it twice).
+	// Send under replayMu so SnapshotForAttach never sees a chunk both in the
+	// replay and still queued, which would render it twice.
 	select {
-	case s.Stdout <- data:
+	case s.stdout <- data:
 	case <-s.closed:
 	case <-time.After(sendTimeout):
 		slog.Warn("terminal stdout buffer full, closing session", "session_id", s.sessionID)
@@ -359,32 +320,25 @@ func (s *Session) AppendStdout(data []byte) {
 	s.replayMu.Unlock()
 }
 
-// SnapshotForAttach returns the replay buffer and a channel with only chunks
-// that arrived after this snapshot. Older buffered-but-unsent chunks are
-// consumed and discarded here. Callers send the replay first, then forward
-// from the returned channel. The replay is stripped of terminal query and
-// request sequences: a fresh terminal must not answer stale queries, whose
-// reply bytes would be forwarded as stdin into the session.
+// SnapshotForAttach strips terminal queries from the replay, or a fresh
+// terminal would answer them into the session's stdin.
 func (s *Session) SnapshotForAttach() (replay []byte, live <-chan []byte) {
 	s.replayMu.Lock()
 	raw := append([]byte(nil), s.replayBuf...)
-	// Drain chunks already queued on Stdout: they are already in the replay
-	// (AppendStdout appends before sending), so a new attach would otherwise
-	// render them twice. New chunks land in the channel and forward as live.
+	// Queued chunks are already in the replay.
 drain:
 	for {
 		select {
-		case <-s.Stdout:
+		case <-s.stdout:
 		default:
 			break drain
 		}
 	}
 	s.replayMu.Unlock()
-	return SanitizeReplay(raw), s.Stdout
+	return sanitizeReplay(raw), s.stdout
 }
 
-// trimReplayLocked trims replayBuf to roughly replayBufferSize by dropping the
-// oldest data up to a safe sequence boundary. Caller holds replayMu.
+// trimReplayLocked cuts at a safe sequence boundary when one is close.
 func (s *Session) trimReplayLocked() {
 	excess := len(s.replayBuf) - replayBufferSize
 	scan := min(excess+replayTrimScan, len(s.replayBuf))
@@ -395,8 +349,7 @@ func (s *Session) trimReplayLocked() {
 			return
 		}
 	}
-	// No safe boundary found within the scan window. Hard cut at excess.
 	s.replayBuf = append([]byte(nil), s.replayBuf[excess:]...)
 }
 
-func (s *Session) ExitedChan() <-chan struct{} { return s.Exited }
+func (s *Session) Exited() <-chan struct{} { return s.exited }

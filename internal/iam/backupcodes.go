@@ -15,21 +15,14 @@ import (
 )
 
 const (
-	// BackupCodeCount is the number of codes issued per generation.
 	BackupCodeCount = 10
-	// backupCodeBytes is the entropy per code: 80 bits.
-	backupCodeBytes = 10
+	backupCodeBytes = 10 // 80 bits
 )
 
-// backupEncoding is base32 with a charset that avoids visually ambiguous
-// glyphs (0/O, 1/I/L) so codes survive being read from a printout and
-// retyped.
+// backupEncoding skips ambiguous glyphs (0/O, 1/I/L) so printed codes retype cleanly.
 var backupEncoding = base32.NewEncoding("ABCDEFGHJKLMNPQRSTUVWXYZ23456789").
 	WithPadding(base32.NoPadding)
 
-// RotateBackupCodes replaces the request user's backup codes with a fresh
-// set and returns the plaintext codes, shown exactly once. Delete and insert
-// share one transaction, so a failure never leaves the user with no codes.
 func (s *Service) RotateBackupCodes(ctx context.Context) ([]string, error) {
 	fresh := make([]string, BackupCodeCount)
 	for i := range fresh {
@@ -71,18 +64,14 @@ func (s *Service) RotateBackupCodes(ctx context.Context) ([]string, error) {
 	return fresh, nil
 }
 
-// ListBackupCodes returns the request user's unspent backup codes.
 func (s *Service) ListBackupCodes(ctx context.Context) ([]*db.Credential, error) {
 	return s.ListCredentialsByType(ctx, MethodBackupCode)
 }
 
-// DeleteBackupCodes removes the request user's backup codes.
 func (s *Service) DeleteBackupCodes(ctx context.Context) error {
 	return s.UnlinkIdentity(ctx, "", MethodBackupCode)
 }
 
-// LoginWithBackupCode verifies a single-use backup code and signs the user
-// in. Consumption is atomic, so a code is never spent twice.
 func (s *Service) LoginWithBackupCode(ctx context.Context, email, code string) (*db.User, *http.Cookie, error) {
 	u, err := s.sys.GetUserByEmail(ctx, normalizeEmail(email))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -91,9 +80,7 @@ func (s *Service) LoginWithBackupCode(ctx context.Context, email, code string) (
 	if err != nil {
 		return nil, nil, err
 	}
-	// A login the account gates refuse must not burn a scarce recovery
-	// code, so they run before the code is consumed. completeLogin checks
-	// them again.
+	// Check the account gates first so a refused login doesn't burn a code.
 	switch {
 	case !u.Active:
 		return nil, nil, ErrInactive
@@ -134,9 +121,7 @@ func (s *Service) LoginWithBackupCode(ctx context.Context, email, code string) (
 	return u, cookie, nil
 }
 
-// normalizeBackupCode uppercases and strips separators, so a code retyped
-// from a printout or pasted as XXXX-XXXX-XXXX-XXXX still verifies against
-// the hash stored at generation time (which is of the bare 16 characters).
+// normalizeBackupCode accepts codes pasted as XXXX-XXXX-XXXX-XXXX or lowercase.
 func normalizeBackupCode(code string) string {
 	var b strings.Builder
 	b.Grow(len(code))

@@ -8,16 +8,9 @@ import (
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
-// EvictForBytes keeps a workspace within its plan's recording storage cap
-// by deleting the oldest recordings (rows and objects) until the workspace
-// fits, counting `inFlight` bytes for the upload in progress. The
-// in-flight recording itself is never evicted. An overage that cannot be
-// cleared (a single recording larger than the whole cap) is simply
+// EvictForBytes deletes the oldest recordings until inFlight fits. The upload
+// in progress is never evicted, and an overage that cannot be cleared is
 // accepted.
-//
-// The cap protects SaaS infrastructure; on self-hosted instances it
-// resolves to Unlimited and no eviction ever runs. Retention is the
-// customer-facing storage knob, not this cap.
 func (s *Service) EvictForBytes(
 	ctx context.Context,
 	workspaceID, recordingID string,
@@ -32,7 +25,7 @@ func (s *Service) EvictForBytes(
 		used, err = q.SumRecordingBytes(ctx, workspaceID)
 		return err
 	}); err != nil {
-		// Fail open: bookkeeping problems never block an upload.
+		// Fail open, bookkeeping problems never block an upload.
 		slog.Warn("recording storage lookup failed", "error", err, "workspace_id", workspaceID)
 		return nil
 	}
@@ -58,8 +51,7 @@ func (s *Service) EvictForBytes(
 			}); err != nil {
 				return err
 			}
-			// The object is best-effort: a stray object without a row is
-			// invisible and swept by the workspace wipe.
+			// Best effort, a stray object is swept by the workspace wipe.
 			if err := s.store.Delete(
 				ctx,
 				storage.RecordingPath(workspaceID, v.ID),

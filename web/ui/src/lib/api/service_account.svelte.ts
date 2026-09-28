@@ -4,7 +4,6 @@ import { pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
 import { toast } from 'svelte-sonner';
 
 export const serviceAccount = {
-	// Queries
 	get: (id?: string) =>
 		useQuery(
 			ServiceAccountService.method.getServiceAccount,
@@ -23,7 +22,6 @@ export const serviceAccount = {
 			{ enabled: !!workspaceID.current }
 		),
 
-	// Mutations
 	create: () =>
 		useMutation(ServiceAccountService.method.createServiceAccount, {
 			onSuccess: () => toast.success('Service account created!')

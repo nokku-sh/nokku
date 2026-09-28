@@ -79,9 +79,6 @@ DELETE FROM service_accounts
 WHERE
   id = @service_account_id;
 
--- Bearer-token authentication for service accounts: resolve by the stored
--- hash of the raw secret. A service account's token is its credential, so
--- only live, unexpired accounts match.
 -- name: GetServiceAccountByTokenHash :one
 SELECT
   *
@@ -92,8 +89,7 @@ WHERE
   AND (expires_at IS NULL OR expires_at > NOW());
 
 -- name: TouchServiceAccount :exec
--- Throttled like the SCIM token touch, so a busy key does not turn every
--- request into a write.
+-- Throttled so a busy key does not turn every request into a write.
 UPDATE service_accounts
 SET
   last_used_at = NOW()

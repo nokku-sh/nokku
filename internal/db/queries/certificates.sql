@@ -113,7 +113,6 @@ FROM
   certificate_authorities
 WHERE
   workspace_id = @workspace_id
-  -- Filters 
   AND (
     sqlc.narg('name_query')::text IS NULL
     OR name ILIKE '%' || sqlc.narg('name_query') || '%'
@@ -189,8 +188,7 @@ WHERE
 RETURNING
   *;
 
--- The enforce_single_default_ca trigger clears the previous default of the
--- same authority type before this row is written.
+-- The enforce_single_default_ca trigger clears the previous default.
 -- name: DeleteCA :one
 DELETE FROM certificate_authorities
 WHERE

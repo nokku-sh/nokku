@@ -77,7 +77,6 @@
 	}
 </script>
 
-<!-- Token Display Modal (shown after creation) -->
 <Dialog.Root bind:open={createMutation.isSuccess}>
 	<Dialog.Content class="no-scrollbar max-h-[95vh] w-125 overflow-y-auto">
 		<Dialog.Header>

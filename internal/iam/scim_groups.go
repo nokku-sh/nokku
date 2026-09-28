@@ -1,9 +1,7 @@
 package iam
 
-// SCIM Group resource handler: maps /Groups onto workspace teams. The SCIM
-// id is the team id and members reference user ids. Every call runs pinned
-// to the connector's workspace, so RLS keeps other workspaces' teams and
-// members out of reach.
+// SCIM Groups are workspace teams. The SCIM id is the team id and members
+// reference user ids.
 
 import (
 	"context"
@@ -25,8 +23,6 @@ type scimGroupHandler struct {
 	workspaceID string
 }
 
-// tx runs fn pinned to the connector's workspace and maps a missing team to
-// the SCIM 404.
 func (h scimGroupHandler) tx(ctx context.Context, id string, fn func(*db.Queries) error) error {
 	if _, err := uuid.Parse(id); id != "" && err != nil {
 		return scimerrors.ScimErrorResourceNotFound(id)
@@ -168,8 +164,7 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 					return addTeamMembers(ctx, q, h.workspaceID, id, ids)
 				}
 				if len(ids) == 0 {
-					// Okta removes with members[value eq "id"]: the id lives
-					// in the path filter.
+					// Okta puts the id in the path filter: members[value eq "id"].
 					ids = scimFilterValues(expr)
 				}
 				for _, uid := range ids {
@@ -189,8 +184,7 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 	return res, err
 }
 
-// addTeamMembers adds the ids that are members of the workspace and skips
-// the rest: a group never widens who belongs to the workspace.
+// addTeamMembers skips non-members, a group never widens the workspace.
 func addTeamMembers(ctx context.Context, q *db.Queries, workspaceID, teamID string, userIDs []string) error {
 	for _, uid := range userIDs {
 		if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
@@ -234,8 +228,6 @@ func groupResource(
 	}, nil
 }
 
-// scimFilterValues extracts the compared string of a filter expression, the
-// shape members[value eq "id"] resolves to.
 func scimFilterValues(expr filter.Expression) []string {
 	ae, ok := expr.(*filter.AttributeExpression)
 	if !ok {

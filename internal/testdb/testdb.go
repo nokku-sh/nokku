@@ -1,6 +1,5 @@
-// Package testdb gives each test binary a fresh database of its own on the
-// compose.test.yml Postgres. Tests never touch the dev database, never see
-// each other's rows, and always run the current schema.
+// Package testdb gives each test binary its own fresh database on the
+// compose.test.yml Postgres.
 package testdb
 
 import (
@@ -11,9 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Setup recreates nokku_test_<name> and points PGDATABASE at it. Call it
-// from TestMain. Without a reachable Postgres it does nothing and the
-// database tests skip.
+// Setup does nothing without a reachable Postgres, so database tests skip.
 func Setup(name string) {
 	// The defaults db.NewConnection applies, so both reach the same server.
 	for key, fallback := range map[string]string{

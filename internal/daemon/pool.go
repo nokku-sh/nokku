@@ -17,10 +17,8 @@ import (
 
 const (
 	sendBufferSize = 64
-	// Every heartbeatTick the pool stamps newly connected daemons, so they
-	// show online quickly and a reconnect storm costs one UPDATE per tick.
-	// Every heartbeatFullEvery ticks it stamps all of them, well inside
-	// db.DaemonOnlineWindow.
+	// Each tick stamps newly connected daemons, so a reconnect storm costs
+	// one UPDATE per tick. Every heartbeatFullEvery ticks stamps all of them.
 	heartbeatTick      = 2 * time.Second
 	heartbeatFullEvery = 5
 )
@@ -32,31 +30,25 @@ var stateUpdate = &nokkuv1.ConnectResponse{
 type Conn struct {
 	daemonID    string
 	workspaceID string
-	// send carries control messages to the daemon. state holds at most one
-	// pending StateUpdate, so a burst of changes coalesces into one sync. The
-	// two channels are separate so coalescing can never drop a control
-	// message.
+	// state holds at most one pending StateUpdate so bursts coalesce. It is
+	// separate from send so coalescing never drops a control message.
 	send   chan *nokkuv1.ConnectResponse
 	state  chan *nokkuv1.ConnectResponse
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
-// Cancel tears down the connection context unless a reconnect already
-// replaced this connection. Safe to call multiple times.
 func (c *Conn) Cancel() {
 	c.cancel()
 }
 
-// connection is the subset of db.Connection the daemon package needs, so
-// tests can stub it without a running Postgres.
+// connection lets tests stub db.Connection without Postgres.
 type connection interface {
 	WithTx(ctx context.Context, fn func(*db.Queries) error) error
 	WithWorkspace(ctx context.Context, fn func(*db.Queries) error) error
 }
 
-// owned indexes one daemon's sessions and relays, so a disconnect tears
-// them down without scanning the whole pool.
+// owned lets a disconnect tear down a daemon's sessions without scanning the pool.
 type owned struct {
 	sessions map[string]*Session
 	relays   map[string]struct{}
@@ -71,8 +63,7 @@ type Pool struct {
 	relays        map[string]*Relay
 	pendingRelays map[string]*relayPending
 	relayCounts   map[string]int
-	// versions caches the workspace state version for heartbeat checks. The
-	// listener refreshes an entry on every change notification.
+	// versions is refreshed by the listener on every change notification.
 	versions map[string]int64
 	// fresh holds daemons connected since the last heartbeat.
 	fresh map[string]struct{}
@@ -108,9 +99,8 @@ func New(ctx context.Context, conn connection) *Pool {
 	return p
 }
 
-// heartbeat stamps last_seen_at for the daemons connected to this instance.
-// Nothing marks a daemon offline: it simply stops being seen, which also
-// covers an instance that crashed.
+// heartbeat never marks a daemon offline, it just stops being seen. That also
+// covers a crashed instance.
 func (p *Pool) heartbeat(ctx context.Context) {
 	ticker := time.NewTicker(heartbeatTick)
 	defer ticker.Stop()
@@ -132,8 +122,6 @@ func (p *Pool) heartbeat(ctx context.Context) {
 	}
 }
 
-// heartbeatBatch returns the daemons to stamp: all connected ones on a full
-// beat, otherwise only those connected since the last beat.
 func (p *Pool) heartbeatBatch(full bool) []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -147,8 +135,7 @@ func (p *Pool) heartbeatBatch(full bool) []string {
 	return ids
 }
 
-// dropOwnedLocked detaches every session and relay of a daemon from the pool
-// and returns them for teardown outside the lock. Caller holds p.mu.
+// dropOwnedLocked returns what to tear down outside the lock.
 func (p *Pool) dropOwnedLocked(daemonID string) ([]*Session, []string) {
 	o := p.owned[daemonID]
 	if o == nil {
@@ -163,7 +150,6 @@ func (p *Pool) dropOwnedLocked(daemonID string) ([]*Session, []string) {
 	return sessions, relays
 }
 
-// ownLocked returns the daemon's index entry, creating it. Caller holds p.mu.
 func (p *Pool) ownLocked(daemonID string) *owned {
 	o := p.owned[daemonID]
 	if o == nil {
@@ -173,16 +159,13 @@ func (p *Pool) ownLocked(daemonID string) *owned {
 	return o
 }
 
-// disownLocked drops an emptied index entry. Caller holds p.mu.
 func (p *Pool) disownLocked(daemonID string) {
 	if o := p.owned[daemonID]; o != nil && len(o.sessions) == 0 && len(o.relays) == 0 {
 		delete(p.owned, daemonID)
 	}
 }
 
-// Shutdown cancels all daemon connections and signals the shutdown context so
-// long-lived handlers such as web sessions return.
-// Idempotent, safe from any goroutine.
+// Shutdown is idempotent.
 func (p *Pool) Shutdown() {
 	p.shutdownCancel()
 	p.mu.Lock()
@@ -192,7 +175,6 @@ func (p *Pool) Shutdown() {
 	p.mu.Unlock()
 }
 
-// Done returns a channel that is closed when the pool is shutting down.
 func (p *Pool) Done() <-chan struct{} {
 	return p.shutdownCtx.Done()
 }
@@ -244,8 +226,7 @@ func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 		p.mu.Unlock()
 		return
 	}
-	// If the map entry no longer points at the connection this handler owns, a
-	// reconnect replaced it.
+	// A reconnect replaced this connection.
 	if cur != c {
 		p.mu.Unlock()
 		return
@@ -260,9 +241,7 @@ func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 		}
 	}
 	delete(p.fresh, daemonID)
-	// Tear down this daemon's sessions and relays even if the stream
-	// handlers haven't noticed the control stream drop yet. shutdown() and
-	// Close() are idempotent.
+	// The stream handlers may not have noticed the drop yet.
 	sessions, relayIDs := p.dropOwnedLocked(daemonID)
 	p.mu.Unlock()
 
@@ -275,7 +254,6 @@ func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 	c.cancel()
 }
 
-// Poke tells every connected daemon of a workspace to re-sync.
 func (p *Pool) Poke(workspaceID string) {
 	p.mu.RLock()
 	daemons := make([]*Conn, 0, len(p.byWksp[workspaceID]))
@@ -290,9 +268,7 @@ func (p *Pool) Poke(workspaceID string) {
 	}
 }
 
-// Listen pokes a workspace's daemons whenever the database reports a state
-// change for it. The notifications come from triggers and arrive on commit.
-// It reconnects until ctx is done.
+// Listen pokes a workspace's daemons on every trigger notification.
 func (p *Pool) Listen(ctx context.Context, cfg *pgx.ConnConfig) {
 	for ctx.Err() == nil {
 		if err := p.listen(ctx, cfg); err != nil && ctx.Err() == nil {
@@ -324,8 +300,6 @@ func (p *Pool) listen(ctx context.Context, cfg *pgx.ConnConfig) error {
 		if err != nil {
 			return err
 		}
-		// Read after commit, so the cached version is never older than the
-		// change that fired the notification.
 		ws := n.Payload
 		var version int64
 		if err := p.conn.WithTx(ctx, func(q *db.Queries) (err error) {
@@ -347,9 +321,8 @@ func (p *Pool) listen(ctx context.Context, cfg *pgx.ConnConfig) error {
 	}
 }
 
-// stateVersion returns a workspace's state version, from the cache when the
-// listener has seen it. A miss reads the database and fills the cache only if
-// the listener did not store a fresher value meanwhile.
+// stateVersion fills the cache on a miss only if the listener did not store a
+// fresher value meanwhile.
 func (p *Pool) stateVersion(ctx context.Context, workspaceID string) (int64, error) {
 	p.mu.RLock()
 	v, ok := p.versions[workspaceID]
@@ -383,8 +356,7 @@ func (p *Pool) pokeAll() {
 	}
 }
 
-// poke queues a StateUpdate. A pending one already covers it, so a burst of
-// changes costs the daemon one sync. It never blocks the caller.
+// poke never blocks, a pending update already covers this one.
 func (c *Conn) poke() {
 	select {
 	case c.state <- stateUpdate:

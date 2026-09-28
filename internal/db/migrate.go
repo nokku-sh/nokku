@@ -20,21 +20,11 @@ const (
 	baseMigrationVersion   = 1
 )
 
-// runMigrations brings the database schema up to date with the embedded tern
-// migrations. Migrations are versioned SQL files in internal/db/migrations.
-// A schema change is a new file, never an edit to an applied one.
-//
-// Installations that predate versioned migrations (the schema exists but the
-// version table does not) are baselined automatically: the current schema is
-// stamped as migration 1 instead of being re-applied. This keeps existing
-// deployments zero-touch when upgrading to this release.
-//
-// A database can also be ahead of the migrations on disk when the migration
-// history was squashed into a new base (see the note in 001_base.sql). That
-// is stamped down to the newest available migration instead of failing.
+// runMigrations stamps pre-versioned installs as migration 1 instead of
+// re-applying, and stamps a database that is ahead after a squash down to the
+// newest migration on disk.
 func runMigrations(ctx context.Context, conn *pgx.Conn) error {
-	// The version table must be checked before creating the migrator: tern's
-	// NewMigrator creates it eagerly, which would mask pre-versioned installs.
+	// Check before NewMigrator, which creates the table eagerly.
 	tableExists, err := versionTableExists(ctx, conn, migrationsVersionTable)
 	if err != nil {
 		return fmt.Errorf("checking version table: %w", err)
@@ -47,8 +37,7 @@ func runMigrations(ctx context.Context, conn *pgx.Conn) error {
 			return fmt.Errorf("checking existing schema: %w", err)
 		}
 		if hasSchema {
-			// Same shape as tern's own version table (single row, version 1)
-			// so subsequent boots migrate normally.
+			// Same shape as tern's own table so later boots migrate normally.
 			if _, err := conn.Exec(ctx, fmt.Sprintf(`
 				create table if not exists %s(version int4 not null primary key);
 				insert into %s(version) select %d where 0=(select count(*) from %s);
@@ -71,14 +60,8 @@ func runMigrations(ctx context.Context, conn *pgx.Conn) error {
 		return fmt.Errorf("loading migrations: %w", err)
 	}
 
-	// Squashed history. The database is ahead of the migrations on disk, so
-	// the old files were replaced by a new base. tern would refuse with
-	// BadVersionError. Instead stamp down to the newest available migration,
-	// like `tern override-version`.
-	//
-	// NOTE. The version table is a single integer, so this cannot tell a
-	// deliberate squash from an accidentally deleted migration. Both look
-	// identical here. Verify the deletion was intentional before booting.
+	// Squashed history, stamp down like `tern override-version`. This cannot
+	// tell a squash from an accidentally deleted migration.
 	if current, err := m.GetCurrentVersion(ctx); err != nil {
 		return fmt.Errorf("reading migration version: %w", err)
 	} else if current > int32(len(m.Migrations)) { //#nosec

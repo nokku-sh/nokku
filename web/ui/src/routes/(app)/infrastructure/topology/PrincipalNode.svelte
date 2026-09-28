@@ -17,7 +17,6 @@
 <div class="group relative">
 	<Card.Root class="w-[280px] p-0">
 		<Card.Content class="p-0">
-			<!-- Header -->
 			<div class="rounded-t-xl border-b p-3 dark:bg-zinc-900">
 				<div class="flex items-center gap-2 font-mono">
 					<div class="rounded bg-zinc-900 p-1.5 backdrop-blur dark:bg-white/10">
@@ -28,7 +27,6 @@
 				</div>
 			</div>
 
-			<!-- Stats Row -->
 			<div class="grid grid-cols-3 divide-x divide-border/50 border-b border-border/50">
 				<div class="flex flex-col items-center py-2">
 					<span class="text-lg font-bold text-foreground">{userCount}</span>
@@ -56,7 +54,6 @@
 				</div>
 			</div>
 
-			<!-- Footer -->
 			<div class="flex items-center justify-between bg-muted/10 p-2.5 px-4 text-xs">
 				<span class="text-muted-foreground">Total Access Grants</span>
 				<Badge variant={totalSubjects > 0 ? 'default' : 'secondary'} class="h-5">

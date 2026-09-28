@@ -30,7 +30,6 @@ export const sign = {
 };
 
 export const ca = {
-	// Queries
 	get: (id?: string) =>
 		useQuery(
 			CertificateService.method.getCertificateAuthority,
@@ -44,7 +43,6 @@ export const ca = {
 			{ enabled: !!workspaceID.current, select: (res) => res.certificateAuthorities }
 		),
 
-	// Mutations
 	create: () =>
 		useMutation(CertificateService.method.createCertificateAuthority, {
 			onSuccess: () => toast.success('Certificate Authority created!')

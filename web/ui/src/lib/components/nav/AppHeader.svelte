@@ -15,7 +15,6 @@
 	const breadcrumbs = $derived.by(() => {
 		const path = page.url.pathname;
 
-		// Special case for root
 		if (path === '/') {
 			const root = flatRoutes.find((r) => r.url === '/');
 			return [{ title: root?.title || 'Home', url: '/', isLast: true }];
@@ -24,14 +23,11 @@
 		const segments = path.split('/').filter(Boolean);
 		const crumbs: Crumb[] = [{ title: 'Home', url: '/', isLast: false }];
 
-		// Find matching route for the full path first
 		const fullMatch = flatRoutes.find((r) => r.url.replace(/\/$/, '') === path.replace(/\/$/, ''));
 
 		if (fullMatch) {
-			// Direct match - just show Home > Title
 			crumbs.push({ title: fullMatch.title, url: fullMatch.url, isLast: true });
 		} else {
-			// Build path incrementally for nested routes
 			let currentPath = '';
 			for (let i = 0; i < segments.length; i++) {
 				currentPath += `/${segments[i]}`;
@@ -57,7 +53,6 @@
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mx-2 data-[orientation=vertical]:h-4" />
 
-		<!-- Breadcrumb Navigation -->
 		<Breadcrumb.Root>
 			<Breadcrumb.List>
 				{#each breadcrumbs as crumb, i (i)}

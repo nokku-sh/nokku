@@ -121,8 +121,8 @@ type GetLiveTokenParams struct {
 	TokenHash crypto.HashedToken `json:"tokenHash"`
 }
 
-// A known, unexpired token. The use limit is enforced by RedeemToken, so a
-// token that ran out still identifies a daemon it already enrolled.
+// Ignores the use limit, so a used-up token still identifies a daemon it
+// already enrolled. RedeemToken enforces it.
 func (q *Queries) GetLiveToken(ctx context.Context, arg *GetLiveTokenParams) (*WorkspaceToken, error) {
 	row := q.db.QueryRow(ctx, getLiveToken, arg.ID, arg.Kind, arg.TokenHash)
 	var i WorkspaceToken
@@ -225,8 +225,7 @@ type RedeemTokenParams struct {
 	TokenHash crypto.HashedToken `json:"tokenHash"`
 }
 
-// Spends one use. The checks and the increment are one statement, so two
-// redemptions can never both take the last use.
+// One statement, so two redemptions can never both take the last use.
 func (q *Queries) RedeemToken(ctx context.Context, arg *RedeemTokenParams) (*WorkspaceToken, error) {
 	row := q.db.QueryRow(ctx, redeemToken, arg.ID, arg.Kind, arg.TokenHash)
 	var i WorkspaceToken

@@ -1,13 +1,8 @@
-// Package iam owns nokku's identity and access management: users,
-// credentials, sessions, and one-time tokens. Identity lives in the same
-// schema as the domain so memberships, teams, and audit join it in plain SQL.
+// Package iam owns identity: users, credentials, sessions, and one-time
+// tokens. It never answers "may this actor do X".
 //
-// The package deals in identities only. Roles, permissions, workspaces, and
-// billing stay outside, iam never answers "may this actor do X".
-//
-// Users are global. A workspace gains authority over an account (SCIM
-// changes, SSO email matching, JIT provisioning) only when it has verified
-// the account's email domain. See managedBy.
+// Users are global. A workspace only gains authority over an account once it
+// has verified the account's email domain, see managedBy.
 package iam
 
 import (
@@ -22,7 +17,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// Method is how a credential or session was established.
 type Method string
 
 const (
@@ -36,7 +30,6 @@ const (
 	MethodSCIM       Method = "scim"
 )
 
-// Action identifies an auth lifecycle event for the audit sink.
 type Action string
 
 const (
@@ -51,8 +44,6 @@ const (
 	ActionCredentialAdded Action = "CredentialAdded" //nolint:gosec // an audit action name, not a credential
 )
 
-// Event is an auth lifecycle event. The audit service subscribes as a Sink,
-// iam never writes audit rows itself.
 type Event struct {
 	Action      Action
 	Kind        Kind
@@ -63,57 +54,43 @@ type Event struct {
 	Detail      string
 }
 
-// Sink receives auth events. Implementations must be fast or async: they run
-// inline on auth paths.
+// Sink implementations must be fast or async, they run inline on auth paths.
 type Sink interface {
 	Record(ctx context.Context, e Event)
 }
 
-// Deps configures the service. Conn, Cache, Secret, and BaseURL are required.
+// Deps requires Conn, Cache, Secret, and BaseURL.
 type Deps struct {
-	// BaseURL drives the cookie Secure attribute, the passkey RP ID, and the
-	// DPoP htu.
 	BaseURL string
 	Conn    txRunner
-	// Cache backs SSO flow state, passkey ceremonies, the device flow, and
-	// DPoP replay tracking.
-	Cache Cache
-	// Secret keys the DPoP server nonce. It derives from NOKKU_SECRET.
+	Cache   Cache
+	// Secret keys the DPoP server nonce.
 	Secret []byte
-	// Events receives lifecycle events. Optional.
 	Events Sink
-	// Password selects argon2id parameters. A zero value selects defaults.
+	// Password zero value selects defaults.
 	Password         PasswordParams
 	PasskeyRPOrigins []string
-	// StrictEmail rejects disposable and mail-less domains at signup. Needs
-	// DNS, so it is for the public SaaS, not air-gapped installs.
+	// StrictEmail needs DNS, so it is for the public SaaS, not air-gapped installs.
 	StrictEmail bool
-	// CanJoin gates joins on the plan's seat cap. used is the member count
-	// read in the joining transaction. Optional.
+	// CanJoin gates joins on the seat cap. used is read in the joining tx.
 	CanJoin func(ctx context.Context, workspaceID string, used int64) error
 }
 
-// egressConfig lets self-hosted installs reach an IdP on a private network.
-// Leave it off for a multi-tenant deployment: workspace admins pick the IdP
-// URLs the server fetches.
+// egressConfig must stay off in multi-tenant deployments, since workspace
+// admins pick the IdP URLs the server fetches.
 type egressConfig struct {
 	AllowPrivate bool `env:"NOKKU_SSO_ALLOW_PRIVATE_NETWORKS"`
 }
 
-// txRunner runs store reads and writes in the role the table needs: the
-// system role for global tables, the RLS-pinned role for tenant tables.
-// *db.Connection satisfies it.
+// txRunner is satisfied by *db.Connection.
 type txRunner interface {
-	// Sys runs single system statements: pre-authorization lookups that
-	// cannot be tenant-scoped, and the global identity tables.
 	Sys() db.Querier
 	WithTx(ctx context.Context, fn func(*db.Queries) error) error
 	WithWorkspace(ctx context.Context, fn func(*db.Queries) error) error
 	WithActor(ctx context.Context, actorID string, fn func(*db.Queries) error) error
 }
 
-// Service is the iam engine. Flows hang off it and share its store, cache,
-// and event sink. The hooks are set by the host after New.
+// Service hooks are set by the host after New.
 type Service struct {
 	sys     db.Querier // nokku_system, bypasses RLS
 	conn    txRunner
@@ -126,15 +103,11 @@ type Service struct {
 	strict  bool
 	idp     *http.Client // IdP egress, see newProviderClient
 
-	// OnUserLogin fires after a successful interactive browser login, after
-	// the session cookie is set: device remembering, new-login alerts.
+	// OnUserLogin fires after an interactive browser login set its cookie.
 	OnUserLogin func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
-	// OnNewDeviceLogin fires on a detached goroutine when RememberDevice
-	// issued a first session for a device.
+	// OnNewDeviceLogin fires on a detached goroutine.
 	OnNewDeviceLogin func(ctx context.Context, u *db.User, sess *db.Session, label, ip string)
-	// OnPasskeySignup fires after passkey-only signup created the account,
-	// so the host can send its verification email.
-	OnPasskeySignup func(r *http.Request, u *db.User)
+	OnPasskeySignup  func(r *http.Request, u *db.User)
 
 	Password *PasswordManager
 	DPoP     *DPoPVerifier
@@ -146,8 +119,8 @@ type Service struct {
 	SCIM     *SCIMFlow
 }
 
-// New builds the service, seeds the social providers and the bootstrap admin
-// from the environment, and loads or creates the SAML SP keypair.
+// New also seeds social providers and the bootstrap admin from the
+// environment, and loads or creates the SAML SP keypair.
 func New(ctx context.Context, d Deps) (*Service, error) {
 	if d.Conn == nil || d.Cache == nil || len(d.Secret) == 0 || d.BaseURL == "" {
 		return nil, errors.New("iam: conn, cache, secret, and base url are required")
@@ -190,8 +163,7 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 	return s, nil
 }
 
-// asSelf runs fn as the request's user under RLS. Whatever ids the caller
-// passes, fn can only reach that user's own rows.
+// asSelf runs fn under RLS so it only reaches the request user's own rows.
 func (s *Service) asSelf(ctx context.Context, fn func(*db.Queries) error) error {
 	userID := UserIDFromContext(ctx)
 	if userID == "" {
@@ -200,7 +172,6 @@ func (s *Service) asSelf(ctx context.Context, fn func(*db.Queries) error) error 
 	return s.conn.WithActor(ctx, userID, fn)
 }
 
-// record emits an event when a sink is configured.
 func (s *Service) record(ctx context.Context, e Event) {
 	if s.events != nil {
 		s.events.Record(ctx, e)

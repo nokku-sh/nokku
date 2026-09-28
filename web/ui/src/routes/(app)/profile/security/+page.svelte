@@ -208,7 +208,6 @@
 	onConfirm={() => deleteAccount.mutate({})}
 />
 
-<!-- Passkeys Panel -->
 <Card.Root>
 	<Card.Header>
 		<Card.Title class="flex items-center gap-2 text-lg">
@@ -273,7 +272,6 @@
 	</Card.Footer>
 </Card.Root>
 
-<!-- Password Panel -->
 <Card.Root>
 	<Card.Header>
 		<Card.Title class="flex items-center gap-2 text-lg">
@@ -374,7 +372,6 @@
 	</Card.Footer>
 </Card.Root>
 
-<!-- Backup Codes Panel -->
 <Card.Root>
 	<Card.Header>
 		<Card.Title class="flex items-center gap-2 text-lg">
@@ -477,7 +474,6 @@
 	</Card.Footer>
 </Card.Root>
 
-<!-- Sessions Panel -->
 <Card.Root>
 	<Card.Header>
 		<Card.Title class="flex items-center gap-2 text-lg">
@@ -548,7 +544,6 @@
 	</Card.Content>
 </Card.Root>
 
-<!-- Email Recovery Panel -->
 <Card.Root class="border border-chart-2/20">
 	<Card.Header>
 		<Card.Title class="flex items-center gap-2 text-lg text-chart-2">
@@ -577,7 +572,6 @@
 	</Card.Footer>
 </Card.Root>
 
-<!-- Danger Zone Panel -->
 <Card.Root class="border border-destructive/20">
 	<Card.Header>
 		<Card.Title class="font-medium text-destructive">Delete Account</Card.Title>

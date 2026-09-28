@@ -26,7 +26,6 @@ func RandomString(size int) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(bytes), nil
 }
 
-// RandomSerial returns a random 128-bit certificate serial number.
 func RandomSerial() (*big.Int, error) {
 	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	if err != nil {

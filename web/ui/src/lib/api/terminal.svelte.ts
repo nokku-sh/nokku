@@ -79,7 +79,6 @@ export function openTerminal(
 	term.open(containerEl);
 	fitAddon.fit();
 
-	// Re-fit on container resize so dimensions stay correct.
 	const resizeObserver = new ResizeObserver(() => fitAddon.fit());
 	resizeObserver.observe(containerEl);
 
@@ -99,7 +98,6 @@ export function openTerminal(
 
 	ws.onopen = () => {
 		setState('connected');
-		// Send initial terminal dimensions so the PTY starts with the correct size.
 		const { cols, rows } = term;
 		ws.send(JSON.stringify({ type: 'resize', cols, rows }));
 	};

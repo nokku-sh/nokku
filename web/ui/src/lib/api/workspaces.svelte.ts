@@ -7,7 +7,6 @@ import { inviteToken, pageIndex, pageSize, workspaceID } from '$lib/store.svelte
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
 
 export const workspace = {
-	// Queries
 	get: () =>
 		useQuery(
 			WorkspaceService.method.getWorkspace,
@@ -54,7 +53,6 @@ export const workspace = {
 			{ enabled: !!workspaceID.current }
 		),
 
-	// Mutations
 	create: () =>
 		useMutation(WorkspaceService.method.createWorkspace, {
 			onSuccess: (data) => {
@@ -84,7 +82,6 @@ export const workspace = {
 };
 
 export const invite = {
-	// Queries
 	get: () =>
 		useQuery(
 			InvitationService.method.getInvitation,
@@ -92,7 +89,6 @@ export const invite = {
 			{ enabled: !!inviteToken.current }
 		),
 
-	// Mutations
 	claim: () =>
 		useMutation(InvitationService.method.acceptInvitation, {
 			onSuccess: () => {
@@ -107,7 +103,6 @@ export const invite = {
 };
 
 export const util = {
-	// Queries
 	getVersion: () =>
 		useQuery(UtilService.method.getVersion, undefined, {
 			enabled: !!workspaceID.current,
@@ -124,7 +119,6 @@ export const util = {
 		limit?: number;
 		offset?: number;
 	}) => {
-		// Filter out undefined/empty values
 		const cleanFilters = Object.fromEntries(
 			Object.entries(opts ?? {}).filter(([, v]) => v !== undefined && v !== '' && v !== null)
 		);
@@ -141,11 +135,9 @@ export const util = {
 		);
 	},
 
-	// Mutations
 	exportLogs: () =>
 		useMutation(UtilService.method.exportAuditLogs, {
 			onSuccess: (data) => {
-				// Trigger browser download
 				const blob = new Blob([data.data.slice()], {
 					type: data.contentType || 'application/octet-stream'
 				});

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -35,9 +36,6 @@ func (s *TargetService) GetTarget(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	if target == nil {
-		return nil, ErrNotFound
-	}
 
 	return &nokkuv1.GetTargetResponse{
 		Target: target.ToProto(),
@@ -61,9 +59,7 @@ func (s *TargetService) CreateTarget(
 		return created, nil
 	}
 
-	// No name from the caller, which is what a manual sync sends: generate a
-	// friendly one. Names are unique per workspace, so a collision retries
-	// with a numeric suffix, the way daemon enrollment does.
+	// Generated names retry with a numeric suffix on collision.
 	for attempt := 0; ; attempt++ {
 		generated := namegen.Generate()
 		if attempt > 0 {
@@ -79,9 +75,7 @@ func (s *TargetService) CreateTarget(
 	}
 }
 
-// insertTarget creates the target and its default root principal in one
-// transaction. The name must already be resolved. The error is returned
-// unmapped so the caller can tell a name collision from a real failure.
+// insertTarget returns the raw error so the caller can spot name collisions.
 func (s *TargetService) insertTarget(
 	ctx context.Context,
 	req *nokkuv1.CreateTargetRequest,
@@ -160,7 +154,7 @@ func (s *TargetService) ListTargets(
 	req *nokkuv1.ListTargetsRequest,
 ) (*nokkuv1.ListTargetsResponse, error) {
 	var targets []*db.ListTargetsRow
-	count := int32(0)
+	var count int32
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		targets, err = q.ListTargets(ctx, &db.ListTargetsParams{
 			WorkspaceID: req.GetWorkspaceId(),
@@ -186,10 +180,7 @@ func (s *TargetService) ListTargets(
 	}, nil
 }
 
-// GetTargetPrincipals returns the per-account subject list for one target,
-// with teams expanded. It is what a daemonless host needs: the operator writes
-// it into AuthorizedPrincipalsFile, so the host's own sshd enforces the same
-// grant predicate the daemon would.
+// GetTargetPrincipals feeds AuthorizedPrincipalsFile on daemonless hosts.
 func (s *TargetService) GetTargetPrincipals(
 	ctx context.Context,
 	req *nokkuv1.GetTargetPrincipalsRequest,
@@ -204,20 +195,16 @@ func (s *TargetService) GetTargetPrincipals(
 
 	principals := make([]*nokkuv1.PrincipalUsers, 0, len(rows))
 	for _, r := range rows {
-		username := r.Username
 		principals = append(principals, &nokkuv1.PrincipalUsers{
-			Username: &username,
+			Username: &r.Username,
 			Ids:      r.Ids,
 		})
 	}
 	return &nokkuv1.GetTargetPrincipalsResponse{Principals: principals}, nil
 }
 
-// SyncTargetUsers reports a target's local accounts, host key, and endpoints.
-// Daemonless targets use it: the operator runs the report from their own
-// machine over SSH. The account list only creates anchors and never deletes,
-// so a failed report cannot lock anyone out. Each report also records
-// metadata.last_manual_sync.
+// SyncTargetUsers is the daemonless report. It never deletes accounts, so a
+// failed report cannot lock anyone out.
 func (s *TargetService) SyncTargetUsers(
 	ctx context.Context,
 	req *nokkuv1.SyncTargetUsersRequest,
@@ -238,8 +225,6 @@ func (s *TargetService) SyncTargetUsers(
 			return err
 		}
 
-		// Only the fields the report carries: the update COALESCEs, so nil
-		// leaves the stored value alone.
 		params := &db.UpdateTargetParams{TargetID: req.GetTargetId()}
 		if len(req.GetEndpoints()) > 0 {
 			params.Endpoints = req.GetEndpoints()
@@ -308,12 +293,7 @@ func (s *TargetService) GetSubjectAccess(
 		}
 
 		if len(uniqueDaemonIDs) > 0 {
-			daemonIDsArg := make([]string, 0, len(uniqueDaemonIDs))
-			for id := range uniqueDaemonIDs {
-				daemonIDsArg = append(daemonIDsArg, id)
-			}
-
-			daemonRows, err := q.GetDaemonsByIDs(ctx, daemonIDsArg)
+			daemonRows, err := q.GetDaemonsByIDs(ctx, slices.Collect(maps.Keys(uniqueDaemonIDs)))
 			if err != nil {
 				return err
 			}
@@ -327,12 +307,7 @@ func (s *TargetService) GetSubjectAccess(
 		}
 
 		if len(uniqueCAIDs) > 0 {
-			caIDsArg := make([]string, 0, len(uniqueCAIDs))
-			for id := range uniqueCAIDs {
-				caIDsArg = append(caIDsArg, id)
-			}
-
-			caRows, err := q.GetCAsByIDs(ctx, caIDsArg)
+			caRows, err := q.GetCAsByIDs(ctx, slices.Collect(maps.Keys(uniqueCAIDs)))
 			if err != nil {
 				return err
 			}
@@ -360,7 +335,7 @@ func (s *TargetService) GetMyAccess(
 	if !ok || p.ID == "" {
 		return nil, NewError(connect.CodeUnauthenticated, "not authenticated")
 	}
-	//nolint:exhaustive // daemons (and any future kind) are intentionally excluded
+	//nolint:exhaustive // daemons sync through SyncDaemon
 	switch p.Kind {
 	case iam.KindUser, iam.KindCLI, iam.KindWebDevice, iam.KindServiceAccount:
 	default:
@@ -372,8 +347,7 @@ func (s *TargetService) GetMyAccess(
 
 	resp := &nokkuv1.GetMyAccessResponse{}
 	err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
-		// The workspace set is the source of truth for "what can this actor
-		// see at all"; every query below filters against it.
+		// Every query below filters against the actor's workspaces.
 		wsIDs, err := q.GetActorWorkspaceIDs(ctx, p.ID)
 		if err != nil {
 			return err
@@ -382,7 +356,7 @@ func (s *TargetService) GetMyAccess(
 			return nil
 		}
 
-		//nolint:exhaustive // daemon was rejected above; the remaining kinds are user-like or service account
+		//nolint:exhaustive // other kinds were rejected above
 		switch p.Kind {
 		case iam.KindUser, iam.KindCLI, iam.KindWebDevice:
 			u, err := s.cfg.IAM.GetUser(ctx)
@@ -426,12 +400,10 @@ func (s *TargetService) GetMyAccess(
 			if r.CaID != nil {
 				caIDs[*r.CaID] = struct{}{}
 			}
-			target := r.ToProto()
-			targetsByWS[r.WorkspaceID] = append(targetsByWS[r.WorkspaceID], target)
+			targetsByWS[r.WorkspaceID] = append(targetsByWS[r.WorkspaceID], r.ToProto())
 		}
 
-		// Resolve the grant predicate for this one subject: the CLI needs the
-		// local accounts it may use, not the target's assignment graph.
+		// The CLI needs the accounts this subject may use, not the whole graph.
 		usernamesByTarget := make(map[string][]string)
 		uRows, err := q.ListSubjectUsernamesForTargets(
 			ctx,
@@ -448,32 +420,23 @@ func (s *TargetService) GetMyAccess(
 				usernamesByTarget[u.TargetID], u.Username,
 			)
 		}
-		for wsID, targets := range targetsByWS {
+		for _, targets := range targetsByWS {
 			for _, t := range targets {
 				t.Usernames = usernamesByTarget[t.GetId()]
 			}
-			// Row order from the query is (workspace_id, name); keep it so
-			// consumers get a deterministic snapshot.
-			slices.SortStableFunc(targets, func(a, b *nokkuv1.Target) int {
+			slices.SortFunc(targets, func(a, b *nokkuv1.Target) int {
 				return strings.Compare(a.GetName(), b.GetName())
 			})
-			targetsByWS[wsID] = targets
 		}
 
-		caArgs := make([]string, 0, len(caIDs))
-		for id := range caIDs {
-			caArgs = append(caArgs, id)
-		}
 		casByWS := make(map[string][]*nokkuv1.CertificateAuthority)
-		if len(caArgs) > 0 {
-			caRows, err := q.GetCAsByIDs(ctx, caArgs)
+		if len(caIDs) > 0 {
+			caRows, err := q.GetCAsByIDs(ctx, slices.Collect(maps.Keys(caIDs)))
 			if err != nil {
 				return err
 			}
 			for _, ca := range caRows {
-				// Only SSH authorities belong in an access snapshot; X.509
-				// CAs are listed separately and must not leak into SSH
-				// trust stores.
+				// X.509 CAs must not leak into SSH trust stores.
 				if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH {
 					continue
 				}
@@ -522,8 +485,6 @@ func (s *TargetService) GetTargetFilters(
 	}, nil
 }
 
-// validateHostPublicKey rejects malformed host keys early so a typo in a
-// provisioning script never pins an unusable identity.
 func validateHostPublicKey(key string) error {
 	if key == "" {
 		return nil
@@ -534,8 +495,7 @@ func validateHostPublicKey(key string) error {
 	return nil
 }
 
-// trimmed normalizes an optional proto string: nil stays nil, empty becomes
-// nil so COALESCE keeps the stored value.
+// trimmed turns empty into nil so COALESCE keeps the stored value.
 func trimmed(s *string) *string {
 	if s == nil {
 		return nil

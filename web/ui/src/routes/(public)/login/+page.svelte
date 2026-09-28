@@ -14,7 +14,6 @@
 	import { useDebounce } from 'runed';
 	import Logo from '$lib/assets/logo.svelte';
 
-	// State
 	let email = $state('');
 	let password = $state('');
 
@@ -22,13 +21,9 @@
 	const resendVerification = auth.resendVerification();
 	const ssoCheck = sso.check();
 
-	// Credentials verified but the account is still locked behind its email
-	// confirmation: swap the form for a check-your-inbox state with a resend.
 	const showUnverified = $derived(login.isError && isEmailUnverifiedError(login.error));
 
-	// Home Realm Discovery: probe for a workspace SSO provider as the email is
-	// typed, so the matching button appears without submitting the form.
-	// Discovery is the /auth/sso/discover endpoint.
+	// Probe for an SSO provider while the email is typed.
 	const checkSSO = useDebounce(() => {
 		if (email.includes('@')) {
 			ssoCheck.mutate(email);
@@ -38,15 +33,12 @@
 	let enforceSSO = $derived(ssoCheck.isSuccess && ssoCheck.data?.enforce);
 	let disablePasswordLogin = $derived(enforceSSO || login.isPending);
 
-	// Label for the provider button: the admin-set display name when present,
-	// otherwise the protocol name.
 	function ssoLabel(p: { method: string; name: string }) {
 		return p.name || (p.method === 'saml' ? 'SAML' : 'SSO');
 	}
 
 	function handleSSOLogin(p: { method: string; provider: string }) {
-		// The verified email domain tells the backend which workspace's provider is
-		// meant: the login itself runs without workspace context.
+		// The domain tells the backend which workspace's provider is meant.
 		const domain = ssoCheck.data?.domain ?? '';
 		const q = domain ? `&domain=${encodeURIComponent(domain)}` : '';
 		switch (p.method) {
@@ -67,8 +59,7 @@
 			await loginWithPasskey();
 			await goto('/');
 		} catch (error) {
-			// Passkey login knows no email: route to the verify screen, whose
-			// resend form takes one.
+			// Passkey login knows no email, the verify screen asks for one.
 			if (error instanceof Error && error.message === emailUnverifiedMessage) {
 				await goto('/verify?sent=true');
 				return;

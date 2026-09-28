@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"slices"
 )
 
 type constructor func(http.Handler) http.Handler
@@ -11,22 +12,16 @@ type chain struct {
 }
 
 func newChain(constructors ...constructor) chain {
-	return chain{append(([]constructor)(nil), constructors...)}
+	return chain{slices.Clone(constructors)}
 }
 
 func (c chain) Then(h http.Handler) http.Handler {
-	if h == nil {
-		h = http.DefaultServeMux
-	}
-	for i := range c.constructors {
-		h = c.constructors[len(c.constructors)-1-i](h)
+	for _, wrap := range slices.Backward(c.constructors) {
+		h = wrap(h)
 	}
 	return h
 }
 
 func (c chain) ThenFunc(fn http.HandlerFunc) http.Handler {
-	if fn == nil {
-		return c.Then(nil)
-	}
 	return c.Then(fn)
 }

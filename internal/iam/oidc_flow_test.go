@@ -1,9 +1,7 @@
 package iam
 
-// The OIDC authorization-code flow, exercised end to end against an
-// in-process mock IdP (oauth2-proxy/mockoidc) with a hand-served discovery
-// document so the tests can swap the token endpoint's id_token for a
-// crafted one on the attack paths.
+// End-to-end OIDC tests against mockoidc. Discovery is hand-served so attack
+// paths can swap the token endpoint's id_token for a crafted one.
 
 import (
 	"crypto/rand"
@@ -21,25 +19,15 @@ import (
 	"github.com/oauth2-proxy/mockoidc"
 )
 
-// oidcIDPHarness hosts mockoidc's endpoints behind a test server. The server is
-// not mockoidc's own: discovery is hand-rolled so every endpoint URL points
-// here, and the token endpoint is wrapped so a test can replace the
-// returned id_token (attack paths). mockoidc's Server.Addr is pointed at
-// this server before anything is minted, so iss claims carry this URL.
 type oidcIDPHarness struct {
 	m      *mockoidc.MockOIDC
 	ts     *httptest.Server
 	issuer string
-	// lastNonce is the nonce the flow under test sent to the authorize
-	// endpoint; crafted tokens must carry it unless they break nonce on
-	// purpose.
+	// lastNonce must be carried by crafted tokens unless they break it on purpose.
 	lastNonce string
-	// mint returns a replacement id_token for the next token call, or nil.
-	mint func() string
-	// org owns the provider, email is the IdP user's address under its
-	// verified domain.
-	org   org
-	email string
+	mint      func() string
+	org       org
+	email     string
 }
 
 func newOIDCIdP(t *testing.T) *oidcIDPHarness {
@@ -73,9 +61,7 @@ func newOIDCIdP(t *testing.T) *oidcIDPHarness {
 		})
 	})
 
-	// Point mockoidc's address bookkeeping at the test server before its
-	// first token mint, so iss claims and discovery agree. mockoidc never
-	// serves anything itself here; only Addr() is read.
+	// Set before the first mint so iss claims and discovery agree.
 	ts := httptest.NewServer(mux)
 	m.Server = &http.Server{Addr: strings.TrimPrefix(ts.URL, "http://")}
 	h.ts = ts
@@ -85,7 +71,6 @@ func newOIDCIdP(t *testing.T) *oidcIDPHarness {
 	return h
 }
 
-// token wraps mockoidc's token endpoint, optionally swapping the id_token.
 func (h *oidcIDPHarness) token(w http.ResponseWriter, r *http.Request) {
 	rec := httptest.NewRecorder()
 	h.m.Token(rec, r)
@@ -108,7 +93,6 @@ func (h *oidcIDPHarness) token(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
-// user queues the IdP user the next authorize call authenticates.
 func (h *oidcIDPHarness) user() {
 	h.m.QueueUser(&mockoidc.MockUser{
 		Subject:       oidcTestSubject,
@@ -117,22 +101,18 @@ func (h *oidcIDPHarness) user() {
 	})
 }
 
-// noRedirectClient follows exactly zero redirects.
 func noRedirectClient() *http.Client {
 	return &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}
 }
 
-// oidcFlowRun is one full flow, kept around so the replay test can re-post
-// callback.
 type oidcFlowRun struct {
 	idp        *oidcIDPHarness
 	loginRec   *httptest.ResponseRecorder
 	callbackUR string
 }
 
-// startOIDCFlow runs the login and authorize legs and returns the flow.
 func (h *oidcIDPHarness) startOIDCFlow(t *testing.T, svc *Service) *oidcFlowRun {
 	t.Helper()
 
@@ -150,7 +130,6 @@ func (h *oidcIDPHarness) startOIDCFlow(t *testing.T, svc *Service) *oidcFlowRun 
 	}
 	h.lastNonce = u.Query().Get("nonce")
 
-	// The authorize leg: one request, no redirect following.
 	resp, err := noRedirectClient().Get(authorizeURL)
 	if err != nil {
 		t.Fatalf("authorize: %v", err)
@@ -163,8 +142,6 @@ func (h *oidcIDPHarness) startOIDCFlow(t *testing.T, svc *Service) *oidcFlowRun 
 	return &oidcFlowRun{idp: h, loginRec: loginRec, callbackUR: cbURL}
 }
 
-// callback completes the flow; extraQuery is appended to the callback URL
-// verbatim (iss parameter tests). cookies carries the login-set cookies.
 func (f *oidcFlowRun) callback(t *testing.T, svc *Service, extraQuery string) *httptest.ResponseRecorder {
 	t.Helper()
 	cbURL := f.callbackUR
@@ -180,8 +157,6 @@ func (f *oidcFlowRun) callback(t *testing.T, svc *Service, extraQuery string) *h
 	return rec
 }
 
-// runOIDCFlow drives one full flow end to end and returns the callback
-// response.
 func (h *oidcIDPHarness) runOIDCFlow(
 	t *testing.T,
 	svc *Service,
@@ -192,8 +167,6 @@ func (h *oidcIDPHarness) runOIDCFlow(
 	return f.callback(t, svc, extraCallbackQuery)
 }
 
-// setup builds the service and an enterprise org whose OIDC provider points
-// at the harness.
 func (h *oidcIDPHarness) setup(t *testing.T, jit bool) (*testEnv, *Service) {
 	t.Helper()
 	e := newTestEnv(t)
@@ -365,8 +338,6 @@ func TestOIDCFlowIDTokenBadSignature(t *testing.T) {
 	wantSSOFailure(t, h.runOIDCFlow(t, svc, ""))
 }
 
-// mintBadToken swaps in a correctly signed token (the IdP key, matching
-// kid) with overrides merged over the expected claims.
 func (h *oidcIDPHarness) mintBadToken(t *testing.T, override map[string]any) {
 	t.Helper()
 	h.mint = func() string {
@@ -378,10 +349,8 @@ func (h *oidcIDPHarness) mintBadToken(t *testing.T, override map[string]any) {
 	}
 }
 
-// oidcTestSubject is the subject every mock IdP user carries.
 const oidcTestSubject = "sub-1"
 
-// tokenClaims builds a full claim set; overrides patch individual claims.
 func (h *oidcIDPHarness) tokenClaims(t *testing.T, override map[string]any) map[string]any {
 	t.Helper()
 	claims := map[string]any{
@@ -462,7 +431,6 @@ func TestOIDCFlowLinksExistingSignedInUser(t *testing.T) {
 	}
 }
 
-// wantSSOFailure asserts the redirect to the SSO error page.
 func wantSSOFailure(t *testing.T, rec *httptest.ResponseRecorder) {
 	t.Helper()
 	loc := rec.Header().Get("Location")
@@ -475,7 +443,6 @@ func wantSSOFailure(t *testing.T, rec *httptest.ResponseRecorder) {
 	}
 }
 
-// wantSSOSuccess asserts the default successful callback redirect.
 func wantSSOSuccess(t *testing.T, rec *httptest.ResponseRecorder) {
 	t.Helper()
 	if got := rec.Header().Get("Location"); got != "/" {

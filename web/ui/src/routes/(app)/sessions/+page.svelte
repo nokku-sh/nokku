@@ -16,16 +16,13 @@
 </svelte:head>
 
 <div class="flex flex-1 overflow-hidden">
-	<!-- Server panel -->
 	{#if panelOpen}
 		<div class="flex w-64 shrink-0 flex-col border-r bg-background">
 			<ServerList />
 		</div>
 	{/if}
 
-	<!-- Main terminal area -->
 	<div class="flex min-w-0 flex-1 flex-col">
-		<!-- Toolbar -->
 		<div class="flex items-center gap-2 border-b px-2 py-1">
 			<Button variant="ghost" size="icon" class="size-7" onclick={() => (panelOpen = !panelOpen)}>
 				{#if panelOpen}
@@ -39,7 +36,6 @@
 			</div>
 		</div>
 
-		<!-- Terminal views -->
 		<div class="relative min-h-0 flex-1">
 			{#if getSessions().size === 0}
 				<Empty.Root class="h-full">

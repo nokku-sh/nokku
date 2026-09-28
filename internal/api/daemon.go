@@ -41,9 +41,6 @@ func (s *DaemonService) GetDaemon(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	if result == nil {
-		return nil, ErrNotFound
-	}
 
 	return &nokkuv1.GetDaemonResponse{
 		Daemon: result.ToProto(),
@@ -59,9 +56,8 @@ func (s *DaemonService) UpdateDaemon(
 		if err != nil {
 			return err
 		}
-		// A provided config replaces the stored one wholesale: a partial merge
-		// cannot express turning a scalar off (false/0 are "unpopulated" to
-		// proto.Merge). The UI always sends the complete config it received.
+		// A config replaces the stored one wholesale, since proto.Merge cannot
+		// turn a scalar off. The UI always sends the full config.
 		config := req.GetConfig()
 		if config == nil {
 			config = base.Config
@@ -133,18 +129,13 @@ func (s *DaemonService) DeleteDaemon(
 	return &nokkuv1.DeleteDaemonResponse{}, nil
 }
 
-// Session endpoints ----------------------------------------------------------
-
-// CreateSession opens a web terminal session as a real SSH session: it
-// mints an ephemeral user certificate, opens a relay to the daemon, and has
-// the pool dial the daemon's sshd over it. The browser protocol is
-// unchanged, only the transport behind the Session swapped.
+// CreateSession mints an ephemeral user cert and has the pool dial the
+// daemon's sshd over a relay.
 func (s *DaemonService) CreateSession(
 	ctx context.Context,
 	req *nokkuv1.CreateSessionRequest,
 ) (*nokkuv1.CreateSessionResponse, error) {
-	// The session certificate's principal is the actor id, so a non-user
-	// actor could only mint a cert sshd will always refuse.
+	// The cert principal is the actor id, sshd would refuse any non-user.
 	userID := iam.UserIDFromContext(ctx)
 	if userID == "" {
 		return nil, NewError(connect.CodePermissionDenied, "web sessions require a user principal")
@@ -158,8 +149,7 @@ func (s *DaemonService) CreateSession(
 		if err != nil {
 			return err
 		}
-		// The daemon's sshd trusts exactly the CA whose public key is synced
-		// to it, so the session certificate must come from that CA.
+		// sshd only trusts the CA synced to it.
 		ca, err = q.GetCAByDaemonID(ctx, &daemon.ID)
 		if err != nil {
 			return err
@@ -226,8 +216,8 @@ func (s *DaemonService) CloseSession(
 	ctx context.Context,
 	req *nokkuv1.CloseSessionRequest,
 ) (*nokkuv1.CloseSessionResponse, error) {
-	// Sessions live in one pool for every tenant, so the session's daemon
-	// must resolve in the pinned workspace before anyone may end it.
+	// The pool is shared across tenants, so the daemon must resolve in the
+	// pinned workspace first.
 	sess := s.cfg.Pool.GetSession(req.GetSessionId())
 	if sess == nil || sess.DaemonID() != req.GetDaemonId() {
 		return nil, ErrNotFound
@@ -242,9 +232,8 @@ func (s *DaemonService) CloseSession(
 	return &nokkuv1.CloseSessionResponse{}, nil
 }
 
-// Relay bridges a user's raw byte stream to the daemon's own sshd. Streaming
-// handlers bypass the unary interceptor's permission gate, so the same check
-// CreateSession gets from ProcedureRoles runs here.
+// Relay bridges a raw byte stream to the daemon's sshd. The workspace is only
+// known from the first message, so the role check runs here.
 func (s *DaemonService) Relay(
 	ctx context.Context,
 	stream *connect.BidiStream[nokkuv1.RelayRequest, nokkuv1.RelayResponse],
@@ -269,12 +258,8 @@ func (s *DaemonService) Relay(
 		)
 	}
 
-	// Streaming handlers get no tenant from the auth interceptor, so pin the
-	// workspace from the start message before resolving membership.
 	ctx = iam.AnnotateTenant(ctx, workspaceID)
-	// Member is deliberate: the relay is only transport, like CreateSession.
-	// The real SSH gate is the daemon's synced principal list plus
-	// certificate auth inside sshd.
+	// Member is enough, the relay is only transport. sshd is the real gate.
 	ctx, err = actorHasRole(ctx, s.cfg.Conn, db.RoleMember)
 	if err != nil {
 		return DBError(err)
@@ -314,37 +299,27 @@ func (s *DaemonService) Relay(
 	return nokkudaemon.BridgeRelay(ctx, stream, relay)
 }
 
-// Daemon endpoints ------------------------------------------------------------
-
 func (s *DaemonService) EnrollDaemon(
 	ctx context.Context,
 	req *nokkuv1.EnrollDaemonRequest,
 ) (*nokkuv1.EnrollDaemonResponse, error) {
-	// The daemon proves possession of its TPM/software key with a DPoP proof
-	// bound to this enrollment request; the issued session is bound to that
-	// key (jkt), so a stolen token is useless without the key. The proof is
-	// the only machine credential: nothing secret is stored on the daemon.
-	binding, err := s.enrollBinding(ctx)
-	if err != nil {
-		return nil, err
-	}
 	ci, ok := connect.CallInfoForHandlerContext(ctx)
 	if !ok {
 		return nil, ErrInternal
 	}
-	h := ci.RequestHeader()
-	metadata, _ := json.Marshal(map[string]string{
-		"user-agent": h.Get("User-Agent"),
-		"host":       h.Get("Host"),
-	})
+	// The session is bound to the daemon's DPoP key, so a stolen token is
+	// useless without it.
+	binding, err := s.enrollBinding(ctx, ci)
+	if err != nil {
+		return nil, err
+	}
 
 	out, err := nokkudaemon.Enroll(ctx, s.cfg.Conn, nokkudaemon.EnrollInput{
 		Token:    req.GetToken(),
 		Binding:  binding,
-		Metadata: metadata,
-		// The resource cap is checked here, not in the guard: the workspace
-		// comes from the token, and only after the token verified. A known
-		// machine re-enrolls even at the cap.
+		Metadata: requestMetadata(ci.RequestHeader()),
+		// The workspace is only known once the token verified, so the
+		// resource cap is checked here instead of in the guard.
 		CanCreate: func(ctx context.Context, workspaceID string) error {
 			return s.cfg.Entitlements.CheckResources(ctx, workspaceID)
 		},
@@ -358,8 +333,7 @@ func (s *DaemonService) EnrollDaemon(
 	workspaceID := out.WorkspaceID
 	ctx = iam.AnnotateTenant(ctx, workspaceID)
 
-	// The daemon's control-plane token never expires; it is revoked by
-	// deleting the daemon (the session cascades), not by a clock.
+	// Never expires, deleting the daemon cascades to the session.
 	token, err := s.cfg.IAM.IssueDaemonSession(ctx, workspaceID, out.DaemonID, binding)
 	if err != nil {
 		return nil, ErrInternal
@@ -383,15 +357,10 @@ func (s *DaemonService) SyncDaemon(
 	if !ok {
 		return nil, ErrInternal
 	}
-	h := ci.RequestHeader()
-	metadata, _ := json.Marshal(map[string]string{
-		"user-agent": h.Get("User-Agent"),
-		"host":       h.Get("Host"),
-	})
 
 	res, err := nokkudaemon.Sync(ctx, s.cfg.Conn, nokkudaemon.SyncInput{
 		DaemonID:    iam.DaemonIDFromContext(ctx),
-		Metadata:    metadata,
+		Metadata:    requestMetadata(ci.RequestHeader()),
 		ReqMetadata: req.GetMetadata(),
 		Users:       req.GetUsers(),
 		PrivateIPs:  req.GetPrivateIps(),
@@ -408,18 +377,12 @@ func (s *DaemonService) SyncDaemon(
 	}, nil
 }
 
-// enrollBinding verifies the DPoP proof presented with the enrollment request
-// and returns its key thumbprint (jkt). It advertises a fresh nonce on
-// stale-nonce failures so the daemon can retry. A missing proof is an error:
+// enrollBinding returns the DPoP key thumbprint. A missing proof is an error,
 // daemons must enroll key-bound.
-func (s *DaemonService) enrollBinding(ctx context.Context) (string, error) {
+func (s *DaemonService) enrollBinding(ctx context.Context, ci connect.CallInfo) (string, error) {
 	svc := s.cfg.IAM
 	if svc.DPoP == nil {
 		return "", NewError(connect.CodeUnimplemented, "DPoP is not configured")
-	}
-	ci, ok := connect.CallInfoForHandlerContext(ctx)
-	if !ok {
-		return "", ErrInternal
 	}
 
 	binding, err := svc.DPoP.Verify(
@@ -437,4 +400,12 @@ func (s *DaemonService) enrollBinding(ctx context.Context) (string, error) {
 		return "", NewError(connect.CodeInvalidArgument, "invalid DPoP proof")
 	}
 	return binding, nil
+}
+
+func requestMetadata(h http.Header) []byte {
+	metadata, _ := json.Marshal(map[string]string{
+		"user-agent": h.Get("User-Agent"),
+		"host":       h.Get("Host"),
+	})
+	return metadata
 }

@@ -1,11 +1,5 @@
 package cache
 
-// The process-local memory backend: a mutex+map with per-entry expiry and a
-// bound on total entries. It backs the shared cache contract when no Redis
-// is configured; a multi-instance deployment then has per-instance state,
-// which the consumers of single-use state must tolerate (the instances
-// simply cannot share cooldowns or replay detection).
-
 import (
 	"context"
 	"maps"
@@ -13,7 +7,6 @@ import (
 	"time"
 )
 
-// Memory is a process-local mutex+map cache with per-entry expiry.
 type Memory struct {
 	mu      sync.RWMutex
 	entries map[string]memoryEntry
@@ -26,8 +19,6 @@ type memoryEntry struct {
 	hasExpiry bool
 }
 
-// NewMemory builds an in-memory cache bounded to maxSize entries (oldest
-// inserted evicted first).
 func NewMemory(maxSize int) *Memory {
 	if maxSize <= 0 {
 		maxSize = 10_000
@@ -95,8 +86,7 @@ func (m *Memory) SetNX(
 	return true, nil
 }
 
-// evictLocked makes room for one entry. Expired entries go first, only then
-// arbitrary live ones.
+// evictLocked drops expired entries before live ones.
 func (m *Memory) evictLocked() {
 	if len(m.entries) < m.max {
 		return

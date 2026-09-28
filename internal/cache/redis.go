@@ -1,10 +1,5 @@
 package cache
 
-// The Redis backend: every key is stored under a "nokku:" prefix so the
-// instance can share a database with other services. GetDel and SetNX map
-// onto Redis's own atomic commands, so single-use state stays correct across
-// instances.
-
 import (
 	"context"
 	"errors"
@@ -13,7 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Redis is a Redis-backed cache with a key prefix.
+// Redis prefixes keys so the database can be shared with other services.
 type Redis struct {
 	client *redis.Client
 	prefix string

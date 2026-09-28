@@ -9,7 +9,6 @@ export type RecordingChunkHandler = (chunk: Uint8Array) => void;
 export type RecordingMeta = { recordingId: string; username: string };
 
 export const recordings = {
-	// Queries
 	list: () =>
 		useQuery(
 			RecordingService.method.listRecordings,
@@ -24,7 +23,6 @@ export const recordings = {
 			}
 		),
 
-	// Mutations
 	delete: () =>
 		useMutation(RecordingService.method.deleteRecording, {
 			onSuccess: () => toast.success('Recording deleted')

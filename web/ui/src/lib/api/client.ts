@@ -29,14 +29,11 @@ export const queryClient = new QueryClient({
 
 			const key = query.queryKey[1] as { methodName?: string } | undefined;
 
-			// An Unauthenticated query means the session is gone (revoked,
-			// expired, or invalidated). The account layer bounces to /login
-			// itself; here we only stay quiet.
+			// The account layer bounces to /login itself.
 			if (error.code === Code.Unauthenticated) return;
 
-			// A persisted workspace id can outlive the workspace itself (deleted
-			// or membership revoked). Drop it silently and let the workspace list
-			// select a valid one instead of erroring on every load.
+			// A persisted workspace id can outlive the workspace. Drop it and let
+			// the workspace list pick a valid one.
 			if (
 				key?.methodName === WorkspaceService.method.getWorkspace.name &&
 				(error.code === Code.NotFound || error.code === Code.PermissionDenied)
@@ -65,18 +62,15 @@ export const queryClient = new QueryClient({
 			if (mutationKey && mutationKey.length >= 2 && mutationKey[0] === 'connect-query') {
 				const serviceName = mutationKey[1];
 
-				// Invalidate only queries that belong to this specific service
 				await queryClient.invalidateQueries({ queryKey: ['connect-query', serviceName] });
 			} else {
-				// Safe fallback
 				await queryClient.invalidateQueries({ queryKey: ['connect-query'] });
 			}
 		},
 		onError: (error) => {
 			if (!(error instanceof ConnectError)) return;
 			if (error.code === Code.Unauthenticated) return;
-			// The login page shows its own inline verify-your-email state with a
-			// resend affordance for this case.
+			// The login page shows its own verify-your-email state.
 			if (isEmailUnverifiedError(error)) return;
 			toast.error(formatConnectError(error).title, {
 				description: formatConnectError(error).description
@@ -87,7 +81,6 @@ export const queryClient = new QueryClient({
 
 let sessionExpiredAt = 0;
 
-// Public routes don't require a session and must not bounce the visitor to /login.
 const publicPaths = [
 	'/login',
 	'/register',
@@ -98,9 +91,6 @@ const publicPaths = [
 	'/sso-error'
 ];
 
-// The session cookie is HttpOnly, so only the backend can clear it. On an
-// expired or revoked session the backend rejects with 401; here we reset
-// local state, drop cached data and land on /login.
 export function handleSessionExpired() {
 	if (!browser || publicPaths.some((p) => window.location.pathname.startsWith(p))) return;
 
@@ -115,17 +105,14 @@ export function handleSessionExpired() {
 	toast.info('Session expired', { description: 'Please log in again.' });
 }
 
-// Workspace-scoped protobuf requests all use the conventional workspace_id field.
 export const workspaceInterceptor: Interceptor = (next) => async (req) => {
 	if (req.stream || !browser || !workspaceID.current) {
 		return await next(req);
 	}
 
 	const unaryRequest = req as UnaryRequest;
-	// UtilService is user/global scoped (getVersion, listRoles, listAuditLogs,
-	// exportAuditLogs). Its requests decide their own scope: the activity pages
-	// pass an explicit workspace_id (or empty for a personal/global read), so
-	// the blanket injection must not override it.
+	// UtilService requests decide their own scope, an empty workspace_id is a
+	// personal read.
 	const service = unaryRequest.method.parent as { typeName?: string } | undefined;
 	if (service?.typeName === 'nokku.v1.UtilService') {
 		return await next(req);

@@ -121,9 +121,7 @@ RETURNING
   *;
 
 -- name: GetTargetsBySubject :many
--- Returns every target a subject can reach. A subject is a user, a team, or a
--- service account, all identified by their UUID. For a user, access granted to
--- any of their teams is also included (via team_members).
+-- For a user, grants to their teams count too.
 SELECT DISTINCT
   t.*
 FROM
@@ -145,10 +143,8 @@ WHERE
         WHERE
           g.principal_id = p.id
           AND (
-            -- Direct grant to this subject: user, team, or service account.
-            -- Subject UUIDs are unique across the three kinds.
+            -- Subject UUIDs are unique across kinds.
             g.subject_id = sqlc.arg('subject_id')::UUID
-            -- Or the subject is a user who belongs to a granted team.
             OR (
               g.subject_kind = 'team'
               AND g.subject_id IN (
@@ -165,11 +161,8 @@ WHERE
   );
 
 -- name: GetSubjectTargetsByWorkspaces :many
--- Returns every target a subject can reach within an explicit workspace set.
--- Grant logic is identical to GetTargetsBySubject (direct user grants, team
--- grants, service-account grants, and team membership for users); the
--- workspace set constrains the result so a caller can never read beyond its
--- current memberships, even if a stale grant lingers elsewhere.
+-- Same grant logic as GetTargetsBySubject. The workspace set keeps a stale
+-- grant elsewhere from leaking past current memberships.
 SELECT DISTINCT
   t.*
 FROM
@@ -193,9 +186,7 @@ WHERE
           WHERE
             g.principal_id = p.id
             AND (
-              -- Direct grant to this subject: user, team, or service account.
               g.subject_id = sqlc.arg('subject_id')::UUID
-              -- Or the subject is a user who belongs to a granted team.
               OR (
                 g.subject_kind = 'team'
                 AND g.subject_id IN (
@@ -236,8 +227,6 @@ ORDER BY
   username ASC;
 
 -- name: TouchTargetManualSync :exec
--- A manual sync reports liveness. The timestamp rides targets.metadata so
--- nothing about the grant model changes.
 UPDATE targets
 SET
   metadata = COALESCE(metadata, '{}'::jsonb)

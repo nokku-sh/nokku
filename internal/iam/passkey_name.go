@@ -1,8 +1,5 @@
 package iam
 
-// Passkey display names, ported from kagi: a known AAGUID wins, then the
-// transport, then the attachment.
-
 import (
 	"fmt"
 
@@ -10,7 +7,6 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
-// aaguidNames maps authenticator AAGUIDs (one per model) to display names.
 var aaguidNames = map[string]string{
 	"ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4": "Google Password Manager",
 	"adce0002-35bc-c60a-648b-0b25f1f05503": "Chrome on Mac",
@@ -48,8 +44,6 @@ var aaguidNames = map[string]string{
 	"6d212b28-a2c1-4638-b375-5932070f62e9": "initial",
 }
 
-// authenticatorName derives a display name for a credential: a known AAGUID
-// wins, then the authenticator transport, then the attachment, then "Passkey".
 func authenticatorName(c *webauthn.Credential) string {
 	if c == nil {
 		return "Passkey"
@@ -79,7 +73,6 @@ func authenticatorName(c *webauthn.Credential) string {
 	return "Passkey"
 }
 
-// formatAAGUID renders an AAGUID as its canonical lowercase hyphenated form.
 func formatAAGUID(b []byte) string {
 	if len(b) != 16 {
 		return ""

@@ -97,7 +97,6 @@
 	</HoverCard.Trigger>
 	<HoverCard.Content class="max-h-120 w-96 overflow-y-auto p-4">
 		<div class="flex flex-col gap-4">
-			<!-- Header -->
 			<div class="flex items-center gap-3">
 				<div class="rounded-md bg-muted p-2">
 					<TypeIcon size={16} class="text-muted-foreground" />
@@ -123,7 +122,6 @@
 
 			<Separator />
 
-			<!-- Identity -->
 			<div class="flex flex-col gap-2">
 				<span class="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
 					Identity
@@ -146,7 +144,6 @@
 
 			<Separator />
 
-			<!-- Policy -->
 			<div class="flex flex-col gap-2">
 				<span class="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
 					Policy
@@ -180,7 +177,6 @@
 			{#if hasSshPolicies}
 				<Separator />
 
-				<!-- SSH Policies -->
 				<div class="flex flex-col gap-2">
 					<span class="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
 						User SSH Policies

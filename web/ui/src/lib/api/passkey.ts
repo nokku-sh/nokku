@@ -40,9 +40,6 @@ interface BeginLoginResponse {
 	publicKey: PublicKeyCredentialRequestOptionsJSON;
 }
 
-/**
- * Try to get authenticator info from extensions
- */
 function getAuthenticatorName(credential: PublicKeyCredential): string {
 	const extensions = credential.getClientExtensionResults();
 	if (extensions && extensions.credProps) {
@@ -54,9 +51,6 @@ function getAuthenticatorName(credential: PublicKeyCredential): string {
 	return '';
 }
 
-/**
- * Converts a base64url string to ArrayBuffer
- */
 function base64urlToBuffer(base64url: string): ArrayBuffer {
 	const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
 	const binary = atob(base64);
@@ -67,9 +61,6 @@ function base64urlToBuffer(base64url: string): ArrayBuffer {
 	return bytes.buffer;
 }
 
-/**
- * Converts ArrayBuffer to base64url string
- */
 function bufferToBase64url(buffer: ArrayBuffer): string {
 	const bytes = new Uint8Array(buffer);
 	let binary = '';
@@ -79,22 +70,14 @@ function bufferToBase64url(buffer: ArrayBuffer): string {
 	return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-/**
- * The finish endpoints answer errors as {code, message} JSON (WriteError);
- * throw the human message instead of the raw body text.
- */
+// The endpoints answer errors as {code, message} JSON.
 async function fail(response: Response, fallback: string): Promise<never> {
 	const body = (await response.json().catch(() => null)) as { message?: string } | null;
 	throw new Error(body?.message || fallback);
 }
 
-/**
- * Registers a new user with a passkey (signup flow)
- */
 export async function signupWithPasskey(params: { email: string; name?: string }): Promise<void> {
-	// The signup resolver reads email/name from request form values on both
-	// ceremony requests, so they travel as urlencoded data (begin) and a
-	// query parameter (finish), not inside the JSON bodies.
+	// Begin reads email and name as form values. Finish reads the ceremony cookie.
 	const form = new URLSearchParams({ email: params.email });
 	if (params.name) form.set('name', params.name);
 
@@ -105,13 +88,11 @@ export async function signupWithPasskey(params: { email: string; name?: string }
 	});
 
 	if (!beginResponse.ok) {
-		const error = await beginResponse.text();
-		throw new Error(error || 'Failed to begin passkey signup');
+		await fail(beginResponse, 'Failed to begin passkey signup');
 	}
 
 	const beginData = await beginResponse.json();
 
-	// Convert server response to WebAuthn format
 	const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
 		...beginData.publicKey,
 		challenge: base64urlToBuffer(beginData.publicKey.challenge),
@@ -148,24 +129,18 @@ export async function signupWithPasskey(params: { email: string; name?: string }
 		name: getAuthenticatorName(credential)
 	};
 
-	const finishResponse = await fetch(
-		`/passkey/signup/finish?email=${encodeURIComponent(params.email)}`,
-		{
-			method: 'POST',
-			credentials: 'include',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(credentialData)
-		}
-	);
+	const finishResponse = await fetch('/passkey/signup/finish', {
+		method: 'POST',
+		credentials: 'include',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(credentialData)
+	});
 
 	if (!finishResponse.ok) {
 		await fail(finishResponse, 'Failed to finish passkey signup');
 	}
 }
 
-/**
- * Registers a new passkey for the current user
- */
 export async function registerPasskey(): Promise<void> {
 	const beginResponse = await fetch('/passkey/register/begin', {
 		method: 'POST',
@@ -175,13 +150,11 @@ export async function registerPasskey(): Promise<void> {
 	});
 
 	if (!beginResponse.ok) {
-		const error = await beginResponse.text();
-		throw new Error(`Failed to begin registration: ${error}`);
+		await fail(beginResponse, 'Failed to begin registration');
 	}
 
 	const credentialCreationOptions: BeginRegistrationResponse = await beginResponse.json();
 
-	// convert server response to WebAuthn format
 	const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
 		...credentialCreationOptions.publicKey,
 		challenge: base64urlToBuffer(credentialCreationOptions.publicKey.challenge),
@@ -195,7 +168,6 @@ export async function registerPasskey(): Promise<void> {
 		}))
 	};
 
-	// create credential using browser WebAuthn API
 	const credential = (await navigator.credentials.create({
 		publicKey: publicKeyCredentialCreationOptions
 	})) as PublicKeyCredential;
@@ -206,7 +178,6 @@ export async function registerPasskey(): Promise<void> {
 
 	const attestationResponse = credential.response as AuthenticatorAttestationResponse;
 
-	// prepare credential data for server
 	const credentialData = {
 		id: credential.id,
 		rawId: bufferToBase64url(credential.rawId),
@@ -230,9 +201,6 @@ export async function registerPasskey(): Promise<void> {
 	}
 }
 
-/**
- * Authenticates user with a passkey
- */
 export async function loginWithPasskey(): Promise<void> {
 	const beginResponse = await fetch('/passkey/login/begin', {
 		method: 'POST',
@@ -240,13 +208,11 @@ export async function loginWithPasskey(): Promise<void> {
 	});
 
 	if (!beginResponse.ok) {
-		const error = await beginResponse.text();
-		throw new Error(`Failed to begin passkey login: ${error}`);
+		await fail(beginResponse, 'Failed to begin passkey login');
 	}
 
 	const loginData: BeginLoginResponse = await beginResponse.json();
 
-	// convert server response to WebAuthn format
 	const publicKeyCredentialRequestOptions: PublicKeyCredentialRequestOptions = {
 		...loginData.publicKey,
 		challenge: base64urlToBuffer(loginData.publicKey.challenge),
@@ -256,7 +222,6 @@ export async function loginWithPasskey(): Promise<void> {
 		}))
 	};
 
-	// get credential using browser WebAuthn API
 	const credential = (await navigator.credentials.get({
 		publicKey: publicKeyCredentialRequestOptions
 	})) as PublicKeyCredential;
@@ -267,7 +232,6 @@ export async function loginWithPasskey(): Promise<void> {
 
 	const assertionResponse = credential.response as AuthenticatorAssertionResponse;
 
-	// prepare credential data for server
 	const credentialData = {
 		id: credential.id,
 		rawId: bufferToBase64url(credential.rawId),

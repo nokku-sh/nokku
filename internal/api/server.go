@@ -1,4 +1,4 @@
-// Package api contains the HTTP server for the nokku API
+// Package api contains the HTTP server for the nokku API.
 package api
 
 import (
@@ -56,8 +56,7 @@ func (s *Server) Start(ctx context.Context) error {
 	proto.SetHTTP2(true)
 	proto.SetUnencryptedHTTP2(true)
 	server := &http.Server{
-		// Requests derive from the process context, so a long-lived stream
-		// exits as soon as SIGINT/SIGTERM cancels it.
+		// Long-lived streams exit as soon as shutdown cancels ctx.
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		Addr:              "0.0.0.0:" + s.cfg.Port,
 		Handler:           chain.Then(s.mux),
@@ -81,10 +80,7 @@ func (s *Server) Start(ctx context.Context) error {
 		slog.Info("shutting down server")
 		graceCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if err := server.Shutdown(graceCtx); err != nil {
-			return err
-		}
-		return nil
+		return server.Shutdown(graceCtx)
 
 	case err := <-serverErr:
 		return fmt.Errorf("server error: %w", err)
@@ -126,8 +122,6 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 func (s *Server) serviceHandlers(ctx context.Context) []func() (string, http.Handler) {
 	opts := s.withHandlerOptions(ctx)
 
-	// Each connect constructor reports its own path, which carries the service
-	// name that health checking and reflection register.
 	return []func() (string, http.Handler){
 		func() (string, http.Handler) {
 			return nokkuv1connect.NewWorkspaceServiceHandler(
@@ -237,7 +231,7 @@ func (s *Server) registerServices(ctx context.Context) error {
 		web.UIFS,
 		statigz.FSPrefix("ui/build"),
 		statigz.OnNotFound(func(w http.ResponseWriter, r *http.Request) {
-			r.URL.Path = "/" // Serve index.html for SPA routing
+			r.URL.Path = "/" // SPA fallback to index.html
 			staticHandler.ServeHTTP(w, r)
 		}),
 	)
@@ -251,27 +245,17 @@ func (s *Server) registerServices(ctx context.Context) error {
 		staticHandler.ServeHTTP(w, r)
 	})
 
-	// The browser-facing auth surface
 	registerAuthRoutes(s.mux, s.cfg)
 
-	// Auth outside audit, matching the RPC interceptor order, so audited
-	// rows see the principal and tenant iam placed on the request.
 	protec := newChain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
-
-	// Avatar handlers
 	s.mux.Handle("GET /avatars/{id}", ServeAvatar(s.cfg))
 	s.mux.Handle("POST /upload/avatar", protec.ThenFunc(UploadAvatar(s.cfg)))
+	s.mux.Handle("GET /terminal/ws", protec.ThenFunc(NewTerminalHandler(s.cfg).HandleWebSocket))
 
-	// Terminal WebSocket: proxies browser <-> daemon's StreamSession PTY stream.
-	terminal := NewTerminalHandler(s.cfg)
-	s.mux.Handle("GET /terminal/ws", protec.ThenFunc(terminal.HandleWebSocket))
-
-	// Billing provider webhook
 	if s.cfg.Billing.Enabled() {
 		s.mux.Handle("POST /webhooks/stripe", s.cfg.Billing.WebhookHandler())
 	}
 
-	// Debug
 	if s.cfg.Debug {
 		s.mux.HandleFunc("/debug/pprof/", pprof.Index)
 		s.mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
@@ -305,17 +289,5 @@ func isAPIRequest(r *http.Request) bool {
 		return true
 	}
 
-	path := r.URL.Path
-	if strings.HasPrefix(path, "/nokku.v1.") {
-		return true
-	}
-
-	apiPrefixes := []string{"/v1/"}
-
-	for _, prefix := range apiPrefixes {
-		if strings.HasPrefix(path, prefix) {
-			return true
-		}
-	}
-	return false
+	return strings.HasPrefix(r.URL.Path, "/nokku.v1.") || strings.HasPrefix(r.URL.Path, "/v1/")
 }

@@ -1,10 +1,7 @@
 package iam
 
-// End-to-end SSO flows against a real Keycloak in a Docker container. This
-// is the tier above the in-process mocks: a genuine IdP with its own
-// discovery document, JWKS, login pages, and SAML response signing. The
-// container starts once per test binary and is reaped when the process
-// exits; tests skip when Docker is unavailable.
+// End-to-end SSO tests against a real Keycloak container. It starts once per
+// test binary, and tests skip when Docker is unavailable.
 
 import (
 	"bytes"
@@ -38,18 +35,14 @@ const (
 	keycloakLogin     = "hunter2-test"
 )
 
-// keycloakOnce starts the container exactly once per test binary.
 var keycloakOnce struct {
-	once sync.Once
-	base string // http://host:port/realms/nokku-test
-	ctr  testcontainers.Container
-	// noDocker marks "environment cannot run Docker" (skip, not fail).
+	once     sync.Once
+	base     string // http://host:port/realms/nokku-test
+	ctr      testcontainers.Container
 	noDocker bool
 	err      error
 }
 
-// startKeycloak returns the realm base URL, starting the container on
-// first use.
 func startKeycloak(t *testing.T) string {
 	t.Helper()
 	keycloakOnce.once.Do(func() {
@@ -68,7 +61,6 @@ func startKeycloak(t *testing.T) string {
 	return keycloakOnce.base
 }
 
-// dockerAvailable reports whether a Docker endpoint is likely reachable.
 func dockerAvailable() bool {
 	if os.Getenv("DOCKER_HOST") != "" {
 		return true
@@ -116,8 +108,7 @@ func startKeycloakContainer() (string, testcontainers.Container, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	// The container is intentionally left running: the testcontainers
-	// reaper tears it down when the test binary exits.
+	// The testcontainers reaper tears it down when the binary exits.
 
 	host, err := ctr.Host(ctx)
 	if err != nil {
@@ -129,16 +120,14 @@ func startKeycloakContainer() (string, testcontainers.Container, error) {
 	}
 	base := "http://" + net.JoinHostPort(host, port.Port()) + "/realms/" + keycloakRealm
 
-	// Keycloak's realm import drops redirectUris on SAML clients, and the
-	// SAML login validation needs them (the ACS is otherwise rejected with
-	// invalid_redirect_uri). Patch the client through the admin API once.
+	// Keycloak's realm import drops redirectUris on SAML clients, which the
+	// ACS needs. Patch them through the admin API.
 	if err := keycloakAllowAcs(base); err != nil {
 		return "", ctr, err
 	}
 	return base, ctr, nil
 }
 
-// keycloakAllowAcs sets the SAML client's valid redirect URIs to the ACS.
 func keycloakAllowAcs(realmBase string) error {
 	root := strings.TrimSuffix(realmBase, "/realms/"+keycloakRealm)
 	clientID := "http://nokku.test/saml/metadata"
@@ -206,10 +195,6 @@ func keycloakAllowAcs(realmBase string) error {
 	return nil
 }
 
-// keycloakRealmJSON builds the realm import: one user, an OIDC client for
-// the code flow, and a SAML client whose entityID matches the SP metadata
-// the service under test serves. Redirect targets under nokku.test are
-// never connected to; the test browser stops at the 302.
 func keycloakRealmJSON() []byte {
 	mapper := func(name, protocol, mapper, userAttr, claimName, friendly string, boolean bool) map[string]any {
 		cfg := map[string]any{
@@ -306,8 +291,6 @@ func keycloakRealmJSON() []byte {
 	return out
 }
 
-// keycloakBrowser is a test browser: a cookie jar, no redirect following,
-// and helpers that return the final body for form parsing.
 type keycloakBrowser struct {
 	c *http.Client
 }
@@ -340,8 +323,6 @@ func (b *keycloakBrowser) get(t *testing.T, rawURL string) (*http.Response, stri
 	return resp, string(body)
 }
 
-// follow GETs until a non-redirect response, so tests can be agnostic
-// about how many hops Keycloak inserts before the login page.
 func (b *keycloakBrowser) follow(t *testing.T, rawURL string) (*http.Response, string) {
 	t.Helper()
 	for range 5 {
@@ -378,7 +359,6 @@ func (b *keycloakBrowser) postForm(t *testing.T, action string, vals url.Values)
 	return resp, string(body)
 }
 
-// loginFormAction finds the login form action on a Keycloak login page.
 func loginFormAction(page string) string {
 	for _, m := range reKeycloakFormAction.FindAllStringSubmatch(page, -1) {
 		if strings.Contains(m[1], "login-actions") {
@@ -390,9 +370,6 @@ func loginFormAction(page string) string {
 
 var reKeycloakFormAction = regexp.MustCompile(`<form[^>]*action="([^"]+)"`)
 
-// keycloakAuthenticate follows the flow's redirect into Keycloak, authenticates
-// alice, and returns the response that carries the browser back to the
-// SP: a 302 Location for OIDC callbacks, or the SAML auto-POST page.
 func keycloakAuthenticate(t *testing.T, b *keycloakBrowser, startURL string) (*http.Response, string) {
 	t.Helper()
 	_, page := b.follow(t, startURL)
@@ -423,7 +400,6 @@ func TestKeycloakOIDCFlow(t *testing.T) {
 	})
 	svc := e.svc
 
-	// Start the flow at the app, then authenticate at the real IdP.
 	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+o.ws, nil)
 	loginRec := httptest.NewRecorder()
 	svc.OIDC.Login(loginRec, login)
@@ -465,8 +441,6 @@ func TestKeycloakOIDCFlow(t *testing.T) {
 	wantSSOFailure(t, replayRec)
 }
 
-// keycloakEmail is the realm user's fixed address, so the org claims its
-// domain for the test.
 const keycloakEmail = "alice@example.com"
 
 func keycloakOrg(t *testing.T) (*testEnv, org) {
@@ -526,10 +500,7 @@ func TestKeycloakSAMLFlow(t *testing.T) {
 	if u == nil {
 		t.Fatal("JIT provisioned user missing after keycloak saml login")
 	}
-	// Keycloak sends the username as NameID (crewjam requests the
-	// transient policy and Keycloak answers with the username), so the
-	// linking subject is "alice" here. Email, name, and verification all
-	// come from the signed attributes.
+	// Keycloak sends the username as NameID, so the subject is "alice".
 	if c := e.credential(t, MethodSAML, o.ws, "alice"); c == nil || c.UserID != u.ID {
 		t.Error("saml credential not linked to the provisioned user")
 	}

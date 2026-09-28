@@ -12,22 +12,17 @@ import (
 )
 
 type Querier interface {
-	// Grant primitives used by AddSubjectsToPrincipal / RemoveSubjectsFromPrincipal.
-	// One row per (principal, subject kind, subject id) in principal_grants.
 	AddPrincipalGrant(ctx context.Context, arg *AddPrincipalGrantParams) error
 	AddTeamMember(ctx context.Context, arg *AddTeamMemberParams) error
 	ConsumeCredentialBySubject(ctx context.Context, arg *ConsumeCredentialBySubjectParams) (*Credential, error)
 	ConsumeToken(ctx context.Context, arg *ConsumeTokenParams) (string, error)
-	// Member counts for a set of teams in one read, for list views that show a
-	// count instead of embedding each team's members.
 	CountTeamMembers(ctx context.Context, teamIds []string) ([]*CountTeamMembersRow, error)
 	CountUserMemberships(ctx context.Context, userID string) (int32, error)
 	CountWorkspaceResources(ctx context.Context, workspaceID string) (int64, error)
 	CountWorkspaceSeats(ctx context.Context, workspaceID string) (int64, error)
 	CountWorkspacesByOwner(ctx context.Context, userID string) (int32, error)
 	CreateCA(ctx context.Context, arg *CreateCAParams) (*CertificateAuthority, error)
-	// Returns no row when the name or the key is already taken, so the caller
-	// can retry inside its transaction instead of aborting it.
+	// Returns no row on a taken name or key, so the caller can retry in its tx.
 	CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*CreateDaemonRow, error)
 	CreatePrincipal(ctx context.Context, arg *CreatePrincipalParams) (*Principal, error)
 	CreateRecording(ctx context.Context, arg *CreateRecordingParams) (*Recording, error)
@@ -40,8 +35,7 @@ type Querier interface {
 	CreateUserWithID(ctx context.Context, arg *CreateUserWithIDParams) (*User, error)
 	CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParams) (*CreateWorkspaceRow, error)
 	CreateWorkspaceToken(ctx context.Context, arg *CreateWorkspaceTokenParams) (*WorkspaceToken, error)
-	// The enforce_single_default_ca trigger clears the previous default of the
-	// same authority type before this row is written.
+	// The enforce_single_default_ca trigger clears the previous default.
 	DeleteCA(ctx context.Context, caID string) (*CertificateAuthority, error)
 	DeleteCredential(ctx context.Context, arg *DeleteCredentialParams) error
 	DeleteCredentialsByProvider(ctx context.Context, arg *DeleteCredentialsByProviderParams) (int64, error)
@@ -56,9 +50,7 @@ type Querier interface {
 	DeleteServiceAccount(ctx context.Context, serviceAccountID string) error
 	DeleteSession(ctx context.Context, tokenHash crypto.HashedToken) error
 	DeleteSessionsExcept(ctx context.Context, arg *DeleteSessionsExceptParams) (int64, error)
-	// Drops the user's other SCIM externalId mappings for the workspace, so an
-	// IdP-side identity migration never leaves two links on one account. Run
-	// before UpsertCredential, which re-adds the current subject.
+	// Run before UpsertCredential so one account never carries two links.
 	DeleteStaleUserSCIMCredentials(ctx context.Context, arg *DeleteStaleUserSCIMCredentialsParams) error
 	DeleteSubjectSessions(ctx context.Context, subjectID string) (int64, error)
 	DeleteTarget(ctx context.Context, targetID string) (*Target, error)
@@ -76,8 +68,7 @@ type Querier interface {
 	EnsureWorkspaceMember(ctx context.Context, arg *EnsureWorkspaceMemberParams) error
 	FindCredentialBySubject(ctx context.Context, arg *FindCredentialBySubjectParams) (*Credential, error)
 	GetActiveSubscription(ctx context.Context, arg *GetActiveSubscriptionParams) (*WorkspaceSubscription, error)
-	// The workspace role of a user or service account. Runs as the system role:
-	// it resolves membership before any workspace is pinned.
+	// Runs as the system role, before any workspace is pinned.
 	GetActorRole(ctx context.Context, arg *GetActorRoleParams) (string, error)
 	GetActorWorkspaceIDs(ctx context.Context, actorID string) ([]string, error)
 	GetCA(ctx context.Context, caID string) (*CertificateAuthority, error)
@@ -92,8 +83,8 @@ type Querier interface {
 	GetEncryptedCAKeys(ctx context.Context) ([]*GetEncryptedCAKeysRow, error)
 	GetExpiringCAForUpdate(ctx context.Context) (*CertificateAuthority, error)
 	GetKeysetData(ctx context.Context) ([]byte, error)
-	// A known, unexpired token. The use limit is enforced by RedeemToken, so a
-	// token that ran out still identifies a daemon it already enrolled.
+	// Ignores the use limit, so a used-up token still identifies a daemon it
+	// already enrolled. RedeemToken enforces it.
 	GetLiveToken(ctx context.Context, arg *GetLiveTokenParams) (*WorkspaceToken, error)
 	GetPrincipalWorkspace(ctx context.Context, principalID string) (string, error)
 	GetPrincipalsByTargetIDs(ctx context.Context, targetIds []string) ([]*GetPrincipalsByTargetIDsRow, error)
@@ -102,23 +93,15 @@ type Querier interface {
 	GetSCIMTokenByHash(ctx context.Context, tokenHash crypto.HashedToken) (*ScimToken, error)
 	GetSSOProvider(ctx context.Context, providerID string) (*SsoProvider, error)
 	GetServiceAccount(ctx context.Context, serviceAccountID string) (*ServiceAccount, error)
-	// Bearer-token authentication for service accounts: resolve by the stored
-	// hash of the raw secret. A service account's token is its credential, so
-	// only live, unexpired accounts match.
 	GetServiceAccountByTokenHash(ctx context.Context, tokenHash *crypto.HashedToken) (*ServiceAccount, error)
 	GetSession(ctx context.Context, tokenHash crypto.HashedToken) (*Session, error)
-	// Returns every target a subject can reach within an explicit workspace set.
-	// Grant logic is identical to GetTargetsBySubject (direct user grants, team
-	// grants, service-account grants, and team membership for users); the
-	// workspace set constrains the result so a caller can never read beyond its
-	// current memberships, even if a stale grant lingers elsewhere.
+	// Same grant logic as GetTargetsBySubject. The workspace set keeps a stale
+	// grant elsewhere from leaking past current memberships.
 	GetSubjectTargetsByWorkspaces(ctx context.Context, arg *GetSubjectTargetsByWorkspacesParams) ([]*Target, error)
 	GetSubscription(ctx context.Context, workspaceID string) (*WorkspaceSubscription, error)
 	GetTarget(ctx context.Context, targetID string) (*Target, error)
 	GetTargetByDaemon(ctx context.Context, daemonID *string) (*Target, error)
-	// Returns every target a subject can reach. A subject is a user, a team, or a
-	// service account, all identified by their UUID. For a user, access granted to
-	// any of their teams is also included (via team_members).
+	// For a user, grants to their teams count too.
 	GetTargetsBySubject(ctx context.Context, subjectID string) ([]*Target, error)
 	GetTeam(ctx context.Context, teamID string) (*Team, error)
 	GetUser(ctx context.Context, id string) (*User, error)
@@ -136,49 +119,33 @@ type Querier interface {
 	HasRecentToken(ctx context.Context, arg *HasRecentTokenParams) (bool, error)
 	InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams) error
 	InsertKeyset(ctx context.Context, data []byte) (int64, error)
-	// Creates the principal anchor for each reported account so it becomes
-	// assignable. Never deletes: a host's reported list is a hint, not authority.
+	// Never deletes, a host's reported list is a hint, not authority.
 	InsertTargetPrincipals(ctx context.Context, arg *InsertTargetPrincipalsParams) error
-	// Every workspace role of a user or service account, keyed by workspace.
 	ListActorRoles(ctx context.Context, actorID string) ([]*ListActorRolesRow, error)
-	// RLS already limits rows to the pinned workspace or the actor's own. A NULL
-	// workspace_id is the personal log: every row of the actor, any workspace.
+	// A NULL workspace_id is the personal log, RLS already limits the rows.
 	ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) ([]*ListAuditLogsRow, error)
 	ListCAs(ctx context.Context, arg *ListCAsParams) ([]*CertificateAuthority, error)
 	ListCredentialsByType(ctx context.Context, arg *ListCredentialsByTypeParams) ([]*Credential, error)
 	ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*ListDaemonsRow, error)
-	// Members whose email domain the workspace has verified: the only accounts
-	// a SCIM connector may see or change. email narrows to one account.
+	// Only members under the workspace's verified domains.
 	ListManagedMembers(ctx context.Context, arg *ListManagedMembersParams) ([]*ListManagedMembersRow, error)
-	// The user's owned workspaces with their member count, so account deletion
-	// can tell solo workspaces from ones other people still use.
 	ListOwnedWorkspaces(ctx context.Context, userID string) ([]*ListOwnedWorkspacesRow, error)
 	ListPrincipals(ctx context.Context, arg *ListPrincipalsParams) ([]*ListPrincipalsRow, error)
-	// The per-account subject list a host enforces: the daemon's synced map, or
-	// AuthorizedPrincipalsFile on a manual target. Teams are expanded to their
-	// members here, so the host needs no team knowledge.
+	// Teams are expanded so the host needs no team knowledge.
 	ListPrincipalsForTarget(ctx context.Context, targetID string) ([]*ListPrincipalsForTargetRow, error)
 	ListProviderSubscriptions(ctx context.Context, sources []string) ([]*WorkspaceSubscription, error)
 	ListRecordingWorkspaceIDs(ctx context.Context) ([]string, error)
 	ListRecordings(ctx context.Context, arg *ListRecordingsParams) ([]*ListRecordingsRow, error)
 	ListServiceAccounts(ctx context.Context, arg *ListServiceAccountsParams) ([]*ListServiceAccountsRow, error)
 	ListSessionsBySubject(ctx context.Context, subjectID string) ([]*Session, error)
-	// The local accounts a subject may log in as, per target: the grant predicate
-	// resolved for one subject, without the rest of the target's assignment graph.
-	// A team grant counts for its members, and a subject may be a user, a team, or
-	// a service account (all identified by UUID, which is unique across them).
+	// A team grant counts for its members. Subject UUIDs are unique across kinds.
 	ListSubjectUsernamesForTargets(ctx context.Context, arg *ListSubjectUsernamesForTargetsParams) ([]*ListSubjectUsernamesForTargetsRow, error)
 	ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*ListTargetsRow, error)
-	// Members of one team with their identity display fields joined in.
 	ListTeamMembers(ctx context.Context, teamID string) ([]*ListTeamMembersRow, error)
 	ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*ListTeamsRow, error)
-	// Teams one user belongs to within a workspace: the read the user-profile
-	// surface needs, without deriving it from a teams-with-members blob.
 	ListTeamsForUser(ctx context.Context, arg *ListTeamsForUserParams) ([]*Team, error)
 	ListWorkspaceAuditLogWorkspaceIDs(ctx context.Context) ([]*string, error)
-	// Destinations for the audit streaming sink. Read as nokku_system: the
-	// workspaces table is RLS-scoped to one tenant, and this is a cross-tenant
-	// read.
+	// Cross-tenant read, must run as nokku_system.
 	ListWorkspaceAuditWebhooks(ctx context.Context) ([]*ListWorkspaceAuditWebhooksRow, error)
 	ListWorkspaceDomains(ctx context.Context, workspaceID string) ([]*WorkspaceDomain, error)
 	ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error)
@@ -189,8 +156,7 @@ type Querier interface {
 	OldestRecordings(ctx context.Context, arg *OldestRecordingsParams) ([]*Recording, error)
 	PutSAMLKeypair(ctx context.Context, arg *PutSAMLKeypairParams) (*PutSAMLKeypairRow, error)
 	PutToken(ctx context.Context, arg *PutTokenParams) error
-	// Spends one use. The checks and the increment are one statement, so two
-	// redemptions can never both take the last use.
+	// One statement, so two redemptions can never both take the last use.
 	RedeemToken(ctx context.Context, arg *RedeemTokenParams) (*WorkspaceToken, error)
 	RemovePrincipalGrant(ctx context.Context, arg *RemovePrincipalGrantParams) error
 	RemoveTeamMember(ctx context.Context, arg *RemoveTeamMemberParams) error
@@ -199,21 +165,16 @@ type Querier interface {
 	ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*CertificateAuthority, error)
 	RevokeSubjectAccessInWorkspace(ctx context.Context, arg *RevokeSubjectAccessInWorkspaceParams) error
 	SetRecordingComplete(ctx context.Context, arg *SetRecordingCompleteParams) (*Recording, error)
-	// Records which Stripe customer a workspace maps to, so checkout always reuses
-	// the same customer. Status stays inactive so this row never grants
-	// entitlements on its own; the webhook promotes it to a real subscription.
+	// Status stays inactive so this row never grants entitlements until the
+	// webhook promotes it.
 	SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error
 	SumRecordingBytes(ctx context.Context, workspaceID string) (int64, error)
 	TouchDaemons(ctx context.Context, daemonIds []string) error
-	// Throttled: only writes when the stored stamp is over an hour old, so a
-	// busy provisioning client does not turn every read into a write.
+	// Only writes when the stamp is over an hour old.
 	TouchSCIMToken(ctx context.Context, id string) error
-	// Throttled like the SCIM token touch, so a busy key does not turn every
-	// request into a write.
+	// Throttled so a busy key does not turn every request into a write.
 	TouchServiceAccount(ctx context.Context, id string) error
 	TouchSession(ctx context.Context, arg *TouchSessionParams) error
-	// A manual sync reports liveness. The timestamp rides targets.metadata so
-	// nothing about the grant model changes.
 	TouchTargetManualSync(ctx context.Context, targetID string) error
 	// Single-flight for background jobs across instances. Released on commit.
 	TryAdvisoryXactLock(ctx context.Context, key string) (bool, error)
@@ -231,16 +192,12 @@ type Querier interface {
 	UpdateWorkspace(ctx context.Context, arg *UpdateWorkspaceParams) (*Workspace, error)
 	UpdateWorkspaceMember(ctx context.Context, arg *UpdateWorkspaceMemberParams) error
 	UpdateWorkspaceOwner(ctx context.Context, arg *UpdateWorkspaceOwnerParams) (*Workspace, error)
-	// One unified credential table for every login method (see 001_base.sql).
-	// A credential never moves to another account. A clash with someone else's
-	// row returns no rows.
+	// A credential never moves accounts, a clash returns no rows.
 	UpsertCredential(ctx context.Context, arg *UpsertCredentialParams) (*Credential, error)
-	// Rotation-only (rotate-secrets command): persist the target keyset
-	// atomically within the rotation transaction. Never used on the boot path.
+	// Only for rotate-secrets, never on the boot path.
 	UpsertKeysetWrappedData(ctx context.Context, data []byte) error
 	UpsertSSOProvider(ctx context.Context, arg *UpsertSSOProviderParams) (*SsoProvider, error)
-	// Note: source is only overwritten when the row is provider-managed ('stripe')
-	// or empty, so manual subscriptions survive provider syncs.
+	// Manual subscriptions survive provider syncs.
 	UpsertSubscription(ctx context.Context, arg *UpsertSubscriptionParams) error
 	UpsertWorkspaceDomain(ctx context.Context, arg *UpsertWorkspaceDomainParams) (*WorkspaceDomain, error)
 	UserWorkspaceMember(ctx context.Context, arg *UserWorkspaceMemberParams) (bool, error)

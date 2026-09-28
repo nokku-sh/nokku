@@ -22,8 +22,7 @@ WHERE
   id = 1;
 
 -- name: UpsertKeysetWrappedData :exec
--- Rotation-only (rotate-secrets command): persist the target keyset
--- atomically within the rotation transaction. Never used on the boot path.
+-- Only for rotate-secrets, never on the boot path.
 INSERT INTO
   keysets (id, data)
 VALUES

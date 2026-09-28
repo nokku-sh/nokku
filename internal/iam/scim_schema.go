@@ -1,9 +1,7 @@
 package iam
 
-// SCIM resource types: the core User and Group schemas from RFC 7643,
-// mapped onto users (workspace members) and teams. Attributes not backed by
-// a column are left out of the schemas so the library rejects or ignores
-// them instead of silently dropping data.
+// Attributes without a backing column are left out of the schemas so the
+// library rejects them instead of silently dropping data.
 
 import (
 	scim "github.com/elimity-com/scim"

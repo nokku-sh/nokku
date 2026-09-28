@@ -1,8 +1,6 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 
-// Backend sentinel: the rawMessage of api.ErrEmailUnverified. Matching on
-// rawMessage is the convention for code-level error detection here (see the
-// validation-error matching below).
+// Must match the rawMessage of api.ErrEmailUnverified.
 export const emailUnverifiedMessage = 'verify your email address before signing in';
 
 export const isEmailUnverifiedError = (error: unknown): boolean =>
@@ -38,7 +36,6 @@ const parseValidationErrors = (message: string): ValidationError[] => {
 };
 
 const formatFieldName = (field: string): string => {
-	// Convert snake_case or camelCase to Title Case
 	return field
 		.replace(/([A-Z])/g, ' $1')
 		.replace(/_/g, ' ')
@@ -165,19 +162,16 @@ export const formatConnectError = (
 ): { title: string; description?: string } => {
 	const title = getErrorTitle(error.code);
 
-	// Check if this is a validation error
 	if (error.code === Code.InvalidArgument && error.rawMessage.includes('validation error:')) {
 		const validationErrors = parseValidationErrors(error.rawMessage);
 
 		if (validationErrors.length === 1) {
-			// Single validation error
 			const { field, message } = validationErrors[0];
 			return {
 				title: formatFieldName(field),
 				description: message
 			};
 		} else if (validationErrors.length > 1) {
-			// Multiple validation errors
 			const description = validationErrors
 				.map(({ field, message }) => `${formatFieldName(field)}: ${message}`)
 				.join('\n');
@@ -189,10 +183,9 @@ export const formatConnectError = (
 		}
 	}
 
-	// Use rawMessage which doesn't have the [code] prefix
+	// rawMessage has no [code] prefix.
 	let description = error.rawMessage.trim();
 
-	// If the description is too generic, empty, or matches the title, use a better default
 	if (!description || description.length < 3 || description.toLowerCase() === title.toLowerCase()) {
 		description = getDefaultDescription(error.code) || '';
 	}

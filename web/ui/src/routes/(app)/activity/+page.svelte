@@ -24,7 +24,6 @@
 		TimeCell
 	} from '$lib/components/tables/cells';
 
-	// State
 	const modal = createModalState<EventLog>({} as EventLog);
 	let logRange = $state<DateRange>({
 		start: today(getLocalTimeZone()).subtract({ days: 14 }),
@@ -33,7 +32,6 @@
 
 	const exportMutation = util.exportLogs();
 
-	// Filter state
 	let search = $state('');
 	let selectedUsers = new SvelteSet<string>();
 	let selectedActions = new SvelteSet<string>();
@@ -50,7 +48,6 @@
 		})
 	);
 
-	// Action colors for activity types
 	const getActionColor = (action: string) => {
 		const colors: Record<string, string> = {
 			create: 'bg-chart-1',

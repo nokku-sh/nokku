@@ -10,7 +10,7 @@
 	const list = $derived(recordings.list());
 	const billingData = $derived(billing.get());
 
-	// Plan storage cap; -1 = unlimited (self-hosted or unlimited plan).
+	// -1 is unlimited.
 	let limitBytes = $derived(Number(billingData.data?.quotas?.recordingStorageBytes ?? 0));
 	const unlimited = $derived(limitBytes <= 0);
 	const usedBytes = $derived(Number(list.data?.totalBytes ?? 0));

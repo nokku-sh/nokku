@@ -128,9 +128,7 @@ WHERE
           WHERE
             g.principal_id = p.id
             AND (
-              -- Direct grant to this subject: user, team, or service account.
               g.subject_id = $2::UUID
-              -- Or the subject is a user who belongs to a granted team.
               OR (
                 g.subject_kind = 'team'
                 AND g.subject_id IN (
@@ -156,11 +154,8 @@ type GetSubjectTargetsByWorkspacesParams struct {
 	SubjectID    string   `json:"subjectId"`
 }
 
-// Returns every target a subject can reach within an explicit workspace set.
-// Grant logic is identical to GetTargetsBySubject (direct user grants, team
-// grants, service-account grants, and team membership for users); the
-// workspace set constrains the result so a caller can never read beyond its
-// current memberships, even if a stale grant lingers elsewhere.
+// Same grant logic as GetTargetsBySubject. The workspace set keeps a stale
+// grant elsewhere from leaking past current memberships.
 func (q *Queries) GetSubjectTargetsByWorkspaces(ctx context.Context, arg *GetSubjectTargetsByWorkspacesParams) ([]*Target, error) {
 	rows, err := q.db.Query(ctx, getSubjectTargetsByWorkspaces, arg.WorkspaceIds, arg.SubjectID)
 	if err != nil {
@@ -245,10 +240,8 @@ WHERE
         WHERE
           g.principal_id = p.id
           AND (
-            -- Direct grant to this subject: user, team, or service account.
-            -- Subject UUIDs are unique across the three kinds.
+            -- Subject UUIDs are unique across kinds.
             g.subject_id = $1::UUID
-            -- Or the subject is a user who belongs to a granted team.
             OR (
               g.subject_kind = 'team'
               AND g.subject_id IN (
@@ -265,9 +258,7 @@ WHERE
   )
 `
 
-// Returns every target a subject can reach. A subject is a user, a team, or a
-// service account, all identified by their UUID. For a user, access granted to
-// any of their teams is also included (via team_members).
+// For a user, grants to their teams count too.
 func (q *Queries) GetTargetsBySubject(ctx context.Context, subjectID string) ([]*Target, error) {
 	rows, err := q.db.Query(ctx, getTargetsBySubject, subjectID)
 	if err != nil {
@@ -479,8 +470,6 @@ WHERE
   id = $1
 `
 
-// A manual sync reports liveness. The timestamp rides targets.metadata so
-// nothing about the grant model changes.
 func (q *Queries) TouchTargetManualSync(ctx context.Context, targetID string) error {
 	_, err := q.db.Exec(ctx, touchTargetManualSync, targetID)
 	return err

@@ -1,13 +1,8 @@
 package iam
 
-// SCIM 2.0 provisioning for workspaces (RFC 7642-7644), served by
-// github.com/elimity-com/scim at /scim/v2/{workspace_id}.
-//
-// Auth is a workspace-scoped bearer token (scim_tokens). A verified token
-// pins the request to its workspace as a KindSCIM principal, so team and
-// membership work runs under RLS like any tenant request. Accounts are
-// global, so a connector only ever sees and changes accounts under its
-// workspace's verified domains (managedBy).
+// SCIM 2.0 at /scim/v2/{workspace_id}. A verified token pins the request to
+// its workspace, so it runs under RLS like any tenant request. A connector
+// only ever touches accounts under its workspace's verified domains.
 
 import (
 	"context"
@@ -31,16 +26,12 @@ const scimMountPath = "/scim/v2"
 
 var errSCIMUnmanaged = scimerrors.ScimErrorBadRequest("userName must be in a verified domain of this workspace")
 
-// SCIMFlow serves one SCIM endpoint per workspace. Servers are immutable per
-// workspace, so each is built once.
 type SCIMFlow struct {
 	svc     *Service
 	mu      sync.Mutex
 	servers map[string]scim.Server
 }
 
-// SCIMToken is a stored workspace connector token. The plaintext is only
-// returned by IssueSCIMToken.
 type SCIMToken struct {
 	ID         string
 	Label      string
@@ -49,13 +40,11 @@ type SCIMToken struct {
 }
 
 func newSCIMFlow(svc *Service) *SCIMFlow {
-	// Azure sends booleans as strings. The library tolerates it behind this
-	// flag, off by default because it is not spec behavior.
+	// Azure sends booleans as strings, which is not spec behavior.
 	schema.SetAllowStringValues(true)
 	return &SCIMFlow{svc: svc, servers: map[string]scim.Server{}}
 }
 
-// SCIMHandler returns the handler to mount at /scim/v2/.
 func (s *Service) SCIMHandler() http.Handler {
 	return http.HandlerFunc(s.SCIM.serve)
 }
@@ -82,7 +71,6 @@ func (f *SCIMFlow) serve(w http.ResponseWriter, r *http.Request) {
 	ctx := actor.ContextWithPrincipal(r.Context(), Principal{ID: tokenID, Kind: KindSCIM, WorkspaceID: workspaceID})
 	ctx = actor.AnnotateTenant(ctx, workspaceID)
 	ctx = actor.WithMember(ctx, workspaceID, "")
-	// The elimity server dispatches on /Users, /Groups, and so on.
 	r = r.WithContext(ctx)
 	r.URL.Path = "/" + tail
 	server.ServeHTTP(w, r)
@@ -108,8 +96,6 @@ func (f *SCIMFlow) serverFor(workspaceID string) (scim.Server, error) {
 	return s, nil
 }
 
-// verifySCIMToken checks the bearer token and pins it to the workspace in
-// the URL. It returns the token id.
 func (s *Service) verifySCIMToken(ctx context.Context, workspaceID, raw string) (string, error) {
 	parsed, err := crypto.Parse(raw)
 	if err != nil || parsed.ID != workspaceID {
@@ -127,8 +113,6 @@ func (s *Service) verifySCIMToken(ctx context.Context, workspaceID, raw string) 
 	return row.ID, nil
 }
 
-// IssueSCIMToken mints a workspace connector token. The plaintext is shown
-// once, the store keeps only its hash.
 func (s *Service) IssueSCIMToken(ctx context.Context, workspaceID, label string) (SCIMToken, string, error) {
 	tok, err := crypto.NewToken(crypto.WithID(workspaceID))
 	if err != nil {
@@ -153,7 +137,6 @@ func (s *Service) IssueSCIMToken(ctx context.Context, workspaceID, label string)
 	return out, tok.Plaintext, nil
 }
 
-// ListSCIMTokens lists the workspace's connector tokens.
 func (s *Service) ListSCIMTokens(ctx context.Context, workspaceID string) ([]SCIMToken, error) {
 	var out []SCIMToken
 	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
@@ -166,16 +149,14 @@ func (s *Service) ListSCIMTokens(ctx context.Context, workspaceID string) ([]SCI
 	return out, err
 }
 
-// RevokeSCIMToken deletes one connector token.
 func (s *Service) RevokeSCIMToken(ctx context.Context, workspaceID, tokenID string) error {
 	return s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		return q.DeleteSCIMToken(ctx, &db.DeleteSCIMTokenParams{ID: tokenID, WorkspaceID: workspaceID})
 	})
 }
 
-// scimProvisionUser creates or updates the account for a managed email and
-// makes it a member. The IdP is the source of truth for the account, so
-// active is applied to an existing account too.
+// scimProvisionUser applies active to existing accounts too, the IdP is the
+// source of truth.
 func (s *Service) scimProvisionUser(
 	ctx context.Context,
 	workspaceID, email, name string,
@@ -202,8 +183,7 @@ func (s *Service) scimProvisionUser(
 			if err := q.VerifyUserEmail(ctx, u.ID); err != nil {
 				return err
 			}
-			// Org-managed accounts sign in through the org: no self-serve
-			// password reset.
+			// Org-managed accounts get no self-serve password reset.
 			if u, err = q.UpdateUser(ctx, &db.UpdateUserParams{
 				ID:                   u.ID,
 				Active:               &active,
@@ -248,14 +228,11 @@ func (s *Service) scimProvisionUser(
 	return u, nil
 }
 
-// linkSCIMCredential maps the IdP's externalId to the account. An empty id
-// is a no-op.
 func linkSCIMCredential(ctx context.Context, q db.Querier, workspaceID, userID, externalID string) error {
 	if externalID == "" {
 		return nil
 	}
-	// IdP-side identity migrations change the externalId: drop the old
-	// mapping so one account never carries two links.
+	// IdP migrations change the externalId, so one account never carries two links.
 	if err := q.DeleteStaleUserSCIMCredentials(ctx, &db.DeleteStaleUserSCIMCredentialsParams{
 		UserID:      userID,
 		WorkspaceID: workspaceID,
@@ -277,11 +254,9 @@ func linkSCIMCredential(ctx context.Context, q db.Querier, workspaceID, userID, 
 	return err
 }
 
-// scimDeprovisionUser removes a managed account from the workspace. An
-// account left in no workspace is deleted. One still in other workspaces is
-// deactivated: the org owns the domain, so its identity is gone everywhere,
-// while the data survives for an IdP re-assignment. The owner cannot be
-// deprovisioned, ownership moves first.
+// scimDeprovisionUser deletes an account left in no workspace. One still in
+// other workspaces is deactivated everywhere, since the org owns the domain,
+// and its data survives for an IdP re-assignment.
 func (s *Service) scimDeprovisionUser(ctx context.Context, workspaceID string, u *db.User) error {
 	var deleted bool
 	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
@@ -295,8 +270,6 @@ func (s *Service) scimDeprovisionUser(ctx context.Context, workspaceID string, u
 				Detail: "the workspace owner cannot be deprovisioned, transfer ownership first",
 			}
 		}
-		// Dropping the membership cascades to every grant and team seat in
-		// this workspace.
 		if err := q.RemoveWorkspaceMember(
 			ctx,
 			&db.RemoveWorkspaceMemberParams{WorkspaceID: workspaceID, UserID: u.ID},
@@ -341,7 +314,6 @@ func (s *Service) scimDeprovisionUser(ctx context.Context, workspaceID string, u
 	return nil
 }
 
-// writeScimError emits the library's SCIM error body.
 func writeScimError(w http.ResponseWriter, e scimerrors.ScimError) {
 	w.Header().Set("Content-Type", "application/scim+json")
 	w.WriteHeader(e.Status)
@@ -362,8 +334,6 @@ func scimAttrBool(v any, def bool) bool {
 	return def
 }
 
-// scimDisplayName resolves the display name from the shapes IdPs send: a
-// displayName string, a name object with formatted, or given plus family.
 func scimDisplayName(displayName, name any) string {
 	if s := scimAttrString(displayName); s != "" {
 		return s
@@ -378,7 +348,6 @@ func scimDisplayName(displayName, name any) string {
 	return strings.TrimSpace(scimAttrString(m["givenName"]) + " " + scimAttrString(m["familyName"]))
 }
 
-// scimMemberRefs extracts the user ids a members value carries.
 func scimMemberRefs(v any) []string {
 	list, _ := v.([]any)
 	out := make([]string, 0, len(list))

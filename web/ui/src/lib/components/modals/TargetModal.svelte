@@ -37,9 +37,8 @@
 
 	const createTarget = targetApi.create();
 	const updateTarget = targetApi.update();
-	// The target's accounts come from the machine, not from this form. The
-	// daemon reports its local users and the backend keeps an anchor per
-	// account, so a stale draft can never drop an account or its grants.
+	// Accounts come from the machine, not this form, so a stale draft can
+	// never drop an account or its grants.
 	const accounts = principal.list(() => ({ targetId: model.id, limit: MAX_PAGE_SIZE }));
 	const accountList = $derived(accounts.data?.principals ?? []);
 	const accountNames = $derived(new Set(accountList.map((a) => a.username)));
@@ -48,8 +47,7 @@
 	const addAccount = principal.addAccount();
 	const removeAccount = principal.removeAccount();
 
-	// No daemon means no live reporter, so the host is read by `nk sync`
-	// and the accounts are whatever that run found.
+	// Without a daemon the accounts come from `nk sync`.
 	const isManual = $derived(!model.daemonId);
 	const syncCommand = $derived(`nk sync ${model.name || '<name>'}`);
 	const lastSynced = $derived(timeAgo(model.metadata?.['last_manual_sync']));

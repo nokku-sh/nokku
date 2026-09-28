@@ -26,7 +26,6 @@ func NewOTLPInterceptor(ctx context.Context) connect.Interceptor {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
 		return nil
 	}
-	// Reads OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_EXPORTER_OTLP_HEADERS from environment
 	traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithCompressor("gzip"))
 	if err != nil {
 		slog.Error("failed to init otlp exporter", "exporter", "trace", "error", err)

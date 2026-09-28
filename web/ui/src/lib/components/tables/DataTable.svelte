@@ -63,7 +63,6 @@
 
 	const hasSelection = $derived(enableRowSelection ?? (bulkActions && bulkActions.length > 0));
 
-	// Pagination
 	const pageSizeOptions = [2, 10, 15, 20, 30, 50];
 	let pagination = $state<PaginationState>({
 		pageIndex: 0,
@@ -88,7 +87,6 @@
 	);
 	let columnVisibility = $state<ColumnVisibilityState>(persistedVisibility.current);
 
-	// Table
 	const table = createAppTable<TData>({
 		get data() {
 			return data;
@@ -174,7 +172,6 @@
 		</Empty.Header>
 	</Empty.Root>
 {:else}
-	<!-- Table -->
 	<div class="overflow-hidden rounded-md border">
 		<TableUI.Root>
 			<TableUI.Header>
@@ -247,7 +244,6 @@
 		{/if}
 	</div>
 
-	<!-- Pagination -->
 	<div class="flex items-center justify-between px-2">
 		<div class="flex-1 text-sm text-muted-foreground">
 			{#if table.getFilteredSelectedRowModel().rows.length > 0}

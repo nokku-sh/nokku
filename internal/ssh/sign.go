@@ -16,10 +16,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
-// SignCertificate signs pubKey with the certificate authority and returns an
-// SSH user or host certificate. Host certs follow host TTLs, user certs user
-// TTLs plus configured extensions and critical options. Unspecified types
-// produce user certificates.
+// SignCertificate treats unspecified types as user certificates.
 func SignCertificate(
 	ca *db.CertificateAuthority,
 	pubKey, principal, keyID string,
@@ -44,7 +41,7 @@ func SignCertificate(
 		return nil, fmt.Errorf("failed to generate serial: %w", err)
 	}
 
-	// Adjust for clock skew
+	// Backdated for clock skew.
 	cert := &ssh.Certificate{
 		Key:             key,
 		Serial:          serial,
@@ -72,7 +69,6 @@ func SignCertificate(
 	return cert, nil
 }
 
-// boundTTL clamps ttl to (0, max], returning the default otherwise.
 func boundTTL(ttl, defaultTTL, maxTTL time.Duration) time.Duration {
 	if ttl <= 0 || ttl > maxTTL {
 		return defaultTTL
@@ -115,11 +111,9 @@ func isAllowedKeyType(
 		)
 	}
 
-	// RSA keys must be at least 2048 bits
 	if keyType == nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA {
 		if cryptoKey, ok := publicKey.(ssh.CryptoPublicKey); ok {
 			if rsaKey, ok := cryptoKey.CryptoPublicKey().(*rsa.PublicKey); ok {
-				// rsaKey.Size() returns bytes, multiply by 8 for bit length
 				if rsaKey.Size()*8 < 2048 {
 					return errors.New("weak key: RSA keys must be at least 2048 bits")
 				}
@@ -134,20 +128,18 @@ func getKeyType(publicKey ssh.PublicKey) (nokkuv1.CertificateKeyType, error) {
 	case ssh.KeyAlgoRSA:
 		return nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA, nil
 
-	// Explicitly match all valid ECDSA curves and their hardware (sk) variants
 	case ssh.KeyAlgoECDSA256,
 		ssh.KeyAlgoECDSA384,
 		ssh.KeyAlgoECDSA521,
 		ssh.KeyAlgoSKECDSA256:
 		return nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ECDSA, nil
 
-	// Explicitly match ED25519 and its hardware variant
 	case ssh.KeyAlgoED25519,
 		ssh.KeyAlgoSKED25519:
 		return nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, nil
 
 	default:
-		// Default drops DSA ("ssh-dss") and experimental types
+		// Drops DSA and experimental types.
 		return nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_UNSPECIFIED,
 			fmt.Errorf("unsupported public key type %q", publicKey.Type())
 	}

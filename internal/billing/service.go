@@ -12,19 +12,15 @@ import (
 
 var ErrDisabled = errors.New("billing provider is not configured")
 
-// Service is the single money-movement boundary used by the application:
-// Stripe checkout, portal, cancellation, and subscription reconciliation,
-// plus the instance license for self-hosted deployments. Plan resolution
-// and enforcement live in internal/entitlement; this package never decides
-// what a workspace may do.
+// Service moves money. It never decides what a workspace may do, that is
+// internal/entitlement.
 type Service struct {
 	stripe  *Stripe // nil when the STRIPE_* environment is unset (billing disabled)
 	License *licx.Claims
 }
 
-// New wires the billing layer. It never returns a nil Service: when Stripe
-// is unconfigured the service is simply disabled (Enabled() == false), and
-// an absent or invalid license yields a nil License, callers nil-check it.
+// New never returns a nil Service, an unconfigured one is just disabled.
+// License is nil when absent or invalid.
 func New(conn *db.Connection, baseURL string) (*Service, error) {
 	stripe, err := newStripe(conn, baseURL)
 	if err != nil {

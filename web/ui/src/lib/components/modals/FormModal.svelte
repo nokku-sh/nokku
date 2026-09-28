@@ -61,7 +61,6 @@
 		>
 			<div class="space-y-4">{@render children()}</div>
 
-			<!-- 2. Conditionally render with the slide transition -->
 			{#if onSubmit || saveState !== 'idle'}
 				<div transition:slide={{ duration: 100 }}>
 					<Dialog.Footer class="mt-4">

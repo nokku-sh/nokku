@@ -11,7 +11,6 @@
 
 	type DeviceVerifyResponse = { status?: string; error?: string };
 
-	// Extract code from URL, if present
 	const initialCode = (page.url.searchParams.get('user_code') ?? '').toUpperCase().trim();
 
 	let code = $state(initialCode);
@@ -85,7 +84,6 @@
 			});
 	}
 
-	// Remember the code across the sign-in round trip
 	$effect(() => {
 		if (code && !currentUser.isLoading && !currentUser.data) {
 			pendingDeviceCode.current = code;
@@ -149,7 +147,6 @@
 					</Button>
 				{:else}
 					{#if initialCode}
-						<!-- Explicit Consent View (Code pre-filled from URL) -->
 						<div class="rounded-lg border bg-muted/50 p-6 text-center">
 							<p class="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
 								Device Code
@@ -182,7 +179,6 @@
 							</Button>
 						</div>
 					{:else}
-						<!-- Manual Entry View (No code in URL) -->
 						<div class="space-y-2">
 							<label for="device-code" class="text-sm font-medium"> Enter Code </label>
 							<input

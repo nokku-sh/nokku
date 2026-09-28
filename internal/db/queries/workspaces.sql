@@ -79,8 +79,6 @@ WHERE
   created_by = @user_id;
 
 -- name: ListOwnedWorkspaces :many
--- The user's owned workspaces with their member count, so account deletion
--- can tell solo workspaces from ones other people still use.
 SELECT
   w.id,
   w.name,
@@ -267,9 +265,7 @@ VALUES
 ON CONFLICT (workspace_id, user_id) DO NOTHING;
 
 -- name: ListWorkspaceAuditWebhooks :many
--- Destinations for the audit streaming sink. Read as nokku_system: the
--- workspaces table is RLS-scoped to one tenant, and this is a cross-tenant
--- read.
+-- Cross-tenant read, must run as nokku_system.
 SELECT
   id,
   (settings ->> 'audit_webhook_url')::text AS webhook_url,

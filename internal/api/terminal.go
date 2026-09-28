@@ -35,14 +35,10 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 	}
 
 	sess := t.cfg.Pool.GetSession(sessionID)
-	if sess == nil {
+	if sess == nil || sess.DaemonID() != daemonID {
 		writeJSONError(w, http.StatusNotFound, "session not found")
 		return
 	}
-
-	// Attaching means full stdin/stdout access to a live PTY. Without this
-	// check any authenticated principal who learned a session id could
-	// watch and drive any workspace's sessions.
 	if !t.authorizeAttach(w, r, sess) {
 		return
 	}
@@ -60,9 +56,8 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
-	// Writes and pings are bounded, so a half-dead client cannot pin the
-	// handler. Reads are not: an idle terminal sends nothing for as long as
-	// the user just watches, and the pings prove the browser is still there.
+	// Reads have no timeout since an idle terminal sends nothing. Pings prove
+	// the browser is still there.
 	const wsTimeout = 15 * time.Second
 	const wsPingEvery = 20 * time.Second
 	go func() {
@@ -86,9 +81,7 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 
 	logger := slog.With("session_id", sessionID, "daemon_id", daemonID)
 
-	// Snapshot replay and live channel atomically. No screen clear: replay
-	// sequences assume the default (1,1) cursor. The snapshot drains chunks
-	// already queued on the live channel, so nothing renders twice.
+	// No screen clear, replay sequences assume the default (1,1) cursor.
 	replay, live := sess.SnapshotForAttach()
 	if len(replay) > 0 {
 		wctx, wcancel := context.WithTimeout(ctx, wsTimeout)
@@ -99,7 +92,6 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// Goroutine: live session stdout -> WebSocket.
 	go func() {
 		for {
 			select {
@@ -120,17 +112,14 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 		}
 	}()
 
-	// Session exit -> close WebSocket. Exited is closed exactly once by the
-	// session handler (or UnregisterAgent).
 	go func() {
 		select {
 		case <-ctx.Done():
-		case <-sess.ExitedChan():
+		case <-sess.Exited():
 			_ = conn.Close(websocket.StatusNormalClosure, "session ended")
 		}
 	}()
 
-	// Read loop: WebSocket -> session stdin/resize.
 	for {
 		typ, data, err := conn.Read(ctx)
 		if err != nil {
@@ -146,10 +135,8 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// authorizeAttach allows the session's initiator always, and any other
-// principal who holds daemons.edit in the daemon's workspace (every daemon
-// is enrolled into a workspace). It runs before the WebSocket upgrade so
-// rejections stay plain HTTP responses.
+// authorizeAttach allows the session's initiator and editors of the daemon's
+// workspace. It runs before the upgrade so rejections stay plain HTTP.
 func (t *TerminalHandler) authorizeAttach(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -164,8 +151,7 @@ func (t *TerminalHandler) authorizeAttach(
 		return true
 	}
 
-	// Pre-authorization lookups: the daemon's workspace cannot be pinned
-	// before the request is authorized, so they run as the system role.
+	// The workspace can't be pinned before authorization, so use Sys.
 	d, err := t.cfg.Conn.Sys().GetDaemon(r.Context(), sess.DaemonID())
 	if err != nil {
 		writeJSONError(w, http.StatusForbidden, "permission denied")

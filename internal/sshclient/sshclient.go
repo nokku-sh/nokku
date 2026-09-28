@@ -1,7 +1,4 @@
-// Package sshclient is a scoped SSH client for backend-driven terminal
-// sessions. It dials the daemon's own sshd through an existing connection
-// (the relay), verifies the host certificate against the workspace CA, and
-// opens one interactive session channel.
+// Package sshclient dials the daemon's sshd over a relay for web terminals.
 package sshclient
 
 import (
@@ -25,8 +22,7 @@ const (
 	sessionEnvVar     = "NOKKU_SESSION_ID"
 )
 
-// Config carries everything the dial needs. HostPrincipal is the host
-// certificate principal to require, the daemon's target id.
+// Config HostPrincipal is the daemon's target id.
 type Config struct {
 	HostPrincipal string
 	Username      string
@@ -37,9 +33,7 @@ type Config struct {
 	Height        uint32
 }
 
-// Terminal is one live SSH session channel. Stdout carries shell output,
-// Done closes when the shell or the connection ends, Close tears everything
-// down. It is safe to call Resize concurrently with Write.
+// Terminal is safe to Resize concurrently with Write.
 type Terminal struct {
 	client *ssh.Client
 	ch     ssh.Channel
@@ -52,16 +46,14 @@ type Terminal struct {
 	doneOnce  sync.Once
 }
 
-// Stdout returns the shell output stream. It is closed when the terminal
-// ends, so callers can range over it.
+// Stdout is closed when the terminal ends.
 func (t *Terminal) Stdout() <-chan []byte { return t.stdout }
 
-// Done is closed when the shell or the underlying connection ended.
 func (t *Terminal) Done() <-chan struct{} { return t.done }
 
 func (t *Terminal) Write(p []byte) (int, error) { return t.ch.Write(p) }
 
-// Resize sends a window-change request. Fire and forget, like OpenSSH.
+// Resize is fire and forget, like OpenSSH.
 func (t *Terminal) Resize(width, height uint32) error {
 	_, err := t.ch.SendRequest("window-change", false, ssh.Marshal(
 		struct{ Columns, Rows, WidthPx, HeightPx uint32 }{width, height, 0, 0},
@@ -69,7 +61,6 @@ func (t *Terminal) Resize(width, height uint32) error {
 	return err
 }
 
-// Close ends the session channel and the connection. Idempotent.
 func (t *Terminal) Close() {
 	t.closeOnce.Do(func() {
 		close(t.halt)
@@ -82,9 +73,7 @@ func (t *Terminal) finish() {
 	t.doneOnce.Do(func() { close(t.done) })
 }
 
-// DialTerminal runs the full handshake and channel setup. The whole dial is
-// bounded by ctx: on cancellation the transport is closed so every blocked
-// stage wakes up and cleans up after itself.
+// DialTerminal closes the transport when ctx ends, which wakes every blocked stage.
 func DialTerminal(ctx context.Context, conn net.Conn, cfg Config) (*Terminal, error) {
 	if cfg.Width == 0 {
 		cfg.Width = defaultWidth
@@ -188,8 +177,6 @@ func dial(conn net.Conn, cfg Config) (*Terminal, error) {
 	return t, nil
 }
 
-// pump forwards channel output to Stdout. It exits on remote close, local
-// Close, or transport death, closing Stdout and Done on the way out.
 func (t *Terminal) pump() {
 	defer close(t.stdout)
 	defer t.finish()
@@ -211,8 +198,7 @@ func (t *Terminal) pump() {
 	}
 }
 
-// keepalive detects a dead transport: sshd answers keepalive@openssh.com,
-// so a failed request means the relay or sshd is gone.
+// keepalive treats a failed keepalive@openssh.com as a dead relay or sshd.
 func (t *Terminal) keepalive() {
 	ticker := time.NewTicker(keepaliveInterval)
 	defer ticker.Stop()

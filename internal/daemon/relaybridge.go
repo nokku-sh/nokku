@@ -12,13 +12,11 @@ import (
 )
 
 const (
-	// Bytes per second per relay direction.
-	relayBandwidth = 32 << 20
+	relayBandwidth = 32 << 20 // bytes/s per direction
 	relayBurst     = 1 << 20
 )
 
-// waitRelayBytes drains the bucket in burst-sized steps, since WaitN
-// rejects requests larger than the burst.
+// waitRelayBytes steps in burst-sized chunks since WaitN rejects larger ones.
 func waitRelayBytes(ctx context.Context, l *rate.Limiter, n int) error {
 	for n > relayBurst {
 		if err := l.WaitN(ctx, relayBurst); err != nil {
@@ -29,9 +27,7 @@ func waitRelayBytes(ctx context.Context, l *rate.Limiter, n int) error {
 	return l.WaitN(ctx, n)
 }
 
-// BridgeRelay pumps bytes between the user's stream and the daemon side
-// until either closes. The relay is a dumb pipe: the SSH session inside is
-// end-to-end encrypted between the user's client and the daemon's sshd.
+// BridgeRelay is a dumb pipe, the SSH session inside is end-to-end encrypted.
 func BridgeRelay(
 	ctx context.Context,
 	stream *connect.BidiStream[nokkuv1.RelayRequest, nokkuv1.RelayResponse],
@@ -40,12 +36,10 @@ func BridgeRelay(
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// One bucket per direction: rsync-heavy traffic one way must not starve
-	// the other.
+	// One bucket per direction so heavy traffic one way can't starve the other.
 	outLimiter := rate.NewLimiter(relayBandwidth, relayBurst)
 	inLimiter := rate.NewLimiter(relayBandwidth, relayBurst)
 
-	// Outbound: daemon bytes to the user.
 	outDone := make(chan struct{})
 	go func() {
 		defer close(outDone)
@@ -69,8 +63,6 @@ func BridgeRelay(
 		}
 	}()
 
-	// Inbound: user bytes to the daemon. A clean client hangup (EOF) ends
-	// the relay without an error.
 	recvErr := make(chan error, 1)
 	go func() {
 		for {
@@ -103,11 +95,10 @@ func BridgeRelay(
 			retErr = err
 		}
 	}
-	// The deferred cancel only runs at return. Stop the pump now so the
-	// join below cannot deadlock if the peer stopped reading.
+	// Stop the pump now so the join cannot deadlock on a peer that stopped reading.
 	cancel()
 	<-outDone
-	// Best-effort closed notices so the peer never waits on a wedged half.
+	// Best effort, so the peer never waits on a wedged half.
 	_ = stream.Send(&nokkuv1.RelayResponse{
 		Msg: &nokkuv1.RelayResponse_Closed{Closed: &nokkuv1.RelayClosed{}},
 	})

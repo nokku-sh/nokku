@@ -11,8 +11,7 @@
 	};
 	let { teamId, memberCount = 0 }: Props = $props();
 
-	// The list response carries the count; the members themselves load when
-	// the hover card opens, so a page of teams costs no member queries.
+	// Members load when the hover card opens, so a page of teams costs no queries.
 	let open = $state(false);
 	const membersQuery = $derived(team.members(teamId, () => ({ enabled: open })));
 
@@ -39,7 +38,6 @@
 						>
 							<UserAvatar {user} />
 
-							<!-- User Info -->
 							<div class="flex-1 space-y-1 overflow-hidden">
 								<div class="flex items-center gap-2">
 									<p class="truncate text-sm leading-none font-medium">{user.name}</p>

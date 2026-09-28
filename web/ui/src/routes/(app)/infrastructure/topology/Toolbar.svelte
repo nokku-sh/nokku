@@ -24,7 +24,6 @@
 		targetPrincipals = []
 	}: Props = $props();
 
-	// Filters derived from selected target's principals
 	let principalsFilter = $derived(
 		(targetPrincipals || []).map((p) => ({
 			label: p.username,
@@ -43,7 +42,6 @@
 {#if data}
 	<div class="my-4 flex flex-col items-center justify-between gap-2 sm:flex-row">
 		<div class="flex flex-col items-center space-x-2 sm:flex-row">
-			<!-- Search -->
 			<Popover.Root>
 				<Popover.Trigger>
 					{#snippet child({ props })}

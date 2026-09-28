@@ -13,9 +13,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
-// loadOrCreateKeyset loads the wrapped keyset from the database, creating and
-// persisting one on first boot. Concurrent first boots are race-safe: the
-// insert uses ON CONFLICT DO NOTHING.
+// loadOrCreateKeyset is safe for concurrent first boots via ON CONFLICT DO NOTHING.
 func (t *TinkEncryptor) loadOrCreateKeyset(ctx context.Context) (*keyset.Handle, error) {
 	data, err := t.db.Sys().GetKeysetData(ctx)
 	switch {
@@ -42,7 +40,6 @@ func (t *TinkEncryptor) loadOrCreateKeyset(ctx context.Context) (*keyset.Handle,
 		return handle, nil
 	}
 
-	// Lost a first-boot race: another replica persisted its keyset first.
 	slog.Debug("another instance created the keyset first, loading it")
 	data, err = t.db.Sys().GetKeysetData(ctx)
 	if err != nil {
@@ -57,13 +54,10 @@ func (t *TinkEncryptor) kek() tink.AEAD {
 	return t.kekAEAD
 }
 
-// WrappedKeyset returns the keyset wrapped with the current KEK, for atomic
-// persistence inside a rotation transaction (see rotate-secrets).
 func (t *TinkEncryptor) WrappedKeyset() ([]byte, error) {
 	return wrap(t.handle, t.kek())
 }
 
-// wrap serializes a keyset and encrypts it with the KEK.
 func wrap(handle *keyset.Handle, kek tink.AEAD) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if err := handle.Write(keyset.NewBinaryWriter(buf), kek); err != nil {
@@ -72,7 +66,6 @@ func wrap(handle *keyset.Handle, kek tink.AEAD) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// unwrap decrypts and parses a wrapped keyset.
 func unwrap(data []byte, kek tink.AEAD) (*keyset.Handle, error) {
 	handle, err := keyset.Read(keyset.NewBinaryReader(bytes.NewReader(data)), kek)
 	if err != nil {

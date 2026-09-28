@@ -2,7 +2,6 @@ package email
 
 import "context"
 
-// Message is one HTML email to a single recipient.
 type Message struct {
 	From    string
 	To      string
@@ -10,7 +9,6 @@ type Message struct {
 	HTML    string
 }
 
-// Sender delivers a message. SMTP in production, a fake in tests.
 type Sender interface {
 	Send(ctx context.Context, msg Message) error
 }

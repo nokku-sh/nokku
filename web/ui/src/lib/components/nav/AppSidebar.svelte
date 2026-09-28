@@ -57,7 +57,6 @@
 <WorkspaceModal bind:open={wsModal.open} draft={wsModal.draft} />
 
 <Sidebar.Root collapsible="offcanvas" {...restProps}>
-	<!-- Workspace Selection -->
 	<Sidebar.Header>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
@@ -187,7 +186,6 @@
 				</Sidebar.Group>
 			{/each}
 		{:else}
-			<!-- Empty state when no workspace is selected -->
 			<Empty.Root>
 				<Empty.Header>
 					<Empty.Media variant="icon">
@@ -202,7 +200,6 @@
 			</Empty.Root>
 		{/if}
 
-		<!-- Bottom buttons -->
 		<Sidebar.Group class="mt-auto">
 			{#each Object.entries(SupportRoutes) as [groupName, routes] (groupName)}
 				<Sidebar.GroupContent>
@@ -226,7 +223,6 @@
 		</Sidebar.Group>
 	</Sidebar.Content>
 
-	<!-- User Profile -->
 	<Sidebar.Footer>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>

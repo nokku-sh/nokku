@@ -28,8 +28,6 @@ func (s *Service) runSweeper(ctx context.Context) {
 func (s *Service) cleanup(ctx context.Context) {
 	now := time.Now()
 
-	// Retention deletes across every workspace, so it runs as a system
-	// transaction, single-flight like audit retention.
 	var expired []string
 	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
 		locked, err := q.TryAdvisoryXactLock(ctx, "recording-retention")
@@ -63,8 +61,7 @@ func (s *Service) cleanup(ctx context.Context) {
 		return
 	}
 
-	// Objects go only after the rows are gone for good. A stray object
-	// without a row is invisible and swept by the workspace wipe.
+	// Objects go only after the rows are gone for good.
 	for _, path := range expired {
 		if err := s.store.Delete(ctx, path); err != nil {
 			slog.Warn("delete expired recording object", "error", err, "path", path)

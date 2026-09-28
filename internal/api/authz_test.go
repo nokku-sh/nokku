@@ -120,6 +120,19 @@ func TestAuthorizeUserOnDaemonProcedures(t *testing.T) {
 	}
 }
 
+func TestAuthorizeUserStreamWithoutWorkspace(t *testing.T) {
+	a := &AuthorizationInterceptor{}
+	ctx := iam.ContextWithPrincipal(t.Context(), iam.Principal{ID: "u1", Kind: iam.KindUser})
+	for _, procedure := range []string{
+		nokkuv1connect.RecordingServiceGetRecordingProcedure,
+		nokkuv1connect.DaemonServiceRelayProcedure,
+	} {
+		if _, err := a.authorize(ctx, procedure); err != nil {
+			t.Errorf("user denied %s before the handler pins a workspace: %v", procedure, err)
+		}
+	}
+}
+
 func TestAuthorizeUnknownProcedure(t *testing.T) {
 	a := &AuthorizationInterceptor{}
 	ctx := iam.ContextWithPrincipal(t.Context(), iam.Principal{ID: "u1", Kind: iam.KindUser})

@@ -26,13 +26,10 @@ import (
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
-// Server is a running test SSH server.
 type Server struct {
-	// UserPrincipal is the cert principal the server accepts, standing in
-	// for the uuid list the daemon's sshd syncs for an OS user.
+	// UserPrincipal stands in for the uuid list the daemon syncs for an OS user.
 	UserPrincipal string
-	// HostPrincipal is the principal carried by the host certificate,
-	// standing in for the daemon's target id.
+	// HostPrincipal stands in for the daemon's target id.
 	HostPrincipal string
 
 	mu            sync.Mutex
@@ -52,7 +49,6 @@ type Server struct {
 	closeOnce sync.Once
 }
 
-// NewServer starts a test SSH server on 127.0.0.1.
 func NewServer(t testing.TB) *Server {
 	t.Helper()
 	_, caPriv, err := ed25519.GenerateKey(crand.Reader)
@@ -109,14 +105,11 @@ func NewServer(t testing.TB) *Server {
 	return s
 }
 
-// Addr returns the server's TCP address.
 func (s *Server) Addr() string { return s.listener.Addr().String() }
 
-// CAKey returns the CA public key clients must pin for host verification.
 func (s *Server) CAKey() ssh.PublicKey { return s.ca.PublicKey() }
 
-// CA returns the server's CA in the row form the api layer loads, so
-// callers exercise the real certificate-minting path.
+// CA returns a row so callers exercise the real cert-minting path.
 func (s *Server) CA(t testing.TB) *db.CertificateAuthority {
 	t.Helper()
 	return caRow(t, s.caPriv)
@@ -154,7 +147,6 @@ func caRow(t testing.TB, priv ed25519.PrivateKey) *db.CertificateAuthority {
 	}
 }
 
-// UserSigner mints a user certificate signed by the test CA.
 func (s *Server) UserSigner(t testing.TB, principal string) ssh.Signer {
 	t.Helper()
 	_, priv, err := ed25519.GenerateKey(crand.Reader)
@@ -192,28 +184,24 @@ func (s *Server) UserSigner(t testing.TB, principal string) ssh.Signer {
 	return signer
 }
 
-// Env returns an environment variable sent by the client.
 func (s *Server) Env(name string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.env[name]
 }
 
-// Pty returns the recorded terminal size.
 func (s *Server) Pty() (term string, cols, rows uint32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.ptyTerm, s.ptyCols, s.ptyRows
 }
 
-// WindowChanges returns the recorded window-change sizes.
 func (s *Server) WindowChanges() []struct{ Cols, Rows uint32 } {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return slices.Clone(s.windowChanges)
 }
 
-// ConnUser returns the username the client connected with.
 func (s *Server) ConnUser() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -15,16 +15,14 @@ import (
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
-// skipPrefixes marks methods that are not audit events: reads, polling syncs,
-// and long-lived transport streams.
+// skipPrefixes are reads, polling syncs, and long-lived streams.
 var skipPrefixes = []string{
 	"Get", "List", "Whoami", "Subscribe", "Sync", "Connect", "Relay", "DaemonRelay",
 }
 
 type eventKey struct{}
 
-// SetTarget names the resource the current request acted on, for handlers
-// whose request carries no id yet, such as a create.
+// SetTarget is for requests without an id yet, like a create.
 func SetTarget(ctx context.Context, target string) {
 	if e, ok := ctx.Value(eventKey{}).(*Event); ok {
 		e.Target = target
@@ -38,8 +36,6 @@ func Set(ctx context.Context, key string, value any) {
 	}
 }
 
-// WrapUnary audits every RPC that is not a read. The action is the method
-// name and the target comes from the request's id, name, or first *_id field.
 func (s *Service) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		e := newEvent(req.Spec().Procedure)
@@ -71,8 +67,6 @@ func (s *Service) WrapStreamingHandler(next connect.StreamingHandlerFunc) connec
 	}
 }
 
-// newEvent starts the event for a procedure, or returns nil when the
-// procedure is not audited.
 func newEvent(procedure string) *Event {
 	_, method, _ := strings.Cut(strings.TrimPrefix(procedure, "/"), "/")
 	for _, prefix := range skipPrefixes {
@@ -83,9 +77,7 @@ func newEvent(procedure string) *Event {
 	return &Event{Action: method, Details: map[string]any{}}
 }
 
-// Log records an event a handler emits itself, for work the interceptor
-// cannot see, like a relay opening or recording content being read. Actor
-// and transport facts come from ctx. The event counts as a success.
+// Log is for work the interceptor cannot see, like a relay opening.
 func (s *Service) Log(ctx context.Context, e *Event) {
 	var header http.Header
 	var peer string
@@ -98,9 +90,7 @@ func (s *Service) Log(ctx context.Context, e *Event) {
 	s.finish(ctx, e, header, peer, nil)
 }
 
-// finish fills in who, where, and the outcome, then writes the event off the
-// request path. Unauthenticated calls are skipped: the auth flows record
-// their own events through the iam sink.
+// finish skips unauthenticated calls, the auth flows record their own events.
 func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer string, err error) {
 	p, _ := iam.PrincipalFromContext(ctx)
 	if p.ID == "" {
@@ -137,9 +127,8 @@ func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer
 	}()
 }
 
-// requestTarget picks the resource a request is about: its id, else its
-// name, else its first other *_id field. Only these fields are read, so no
-// secret in the request can reach the log.
+// requestTarget reads only id, name, and *_id fields, so no secret in the
+// request can reach the log.
 func requestTarget(msg protoreflect.Message) string {
 	fields := msg.Descriptor().Fields()
 	for _, name := range []protoreflect.Name{"id", "name"} {

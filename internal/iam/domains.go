@@ -1,10 +1,7 @@
 package iam
 
-// Workspace domains: verified email-domain to workspace bindings. A verified
-// domain belongs to exactly one workspace and makes that workspace the
-// authority over every account under it: home-realm discovery, SSO
-// enforcement, SSO email matching, JIT provisioning, and SCIM. Verification
-// is a DNS TXT lookup at _nokku-verify.<domain>.
+// A verified domain belongs to exactly one workspace and makes it the
+// authority over every account under it.
 
 import (
 	"context"
@@ -15,11 +12,9 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// domainTXTPrefix is the DNS label the verification token lives under.
-// Keep in sync with the UI's instructions text.
+// domainTXTPrefix must match the UI's instructions text.
 const domainTXTPrefix = "_nokku-verify."
 
-// TenantDomain is one workspace domain binding.
 type TenantDomain struct {
 	WorkspaceID string
 	Domain      string
@@ -29,13 +24,11 @@ type TenantDomain struct {
 	UpdatedAt   time.Time
 }
 
-// Verified reports whether the domain is verified. Verification is
-// permanent: a proven claim is never re-proven and never expires.
+// Verified never expires, a proven claim is never re-proven.
 func (d TenantDomain) Verified() bool {
 	return !d.VerifiedAt.IsZero()
 }
 
-// ListTenantDomains returns the workspace's domain bindings.
 func (s *Service) ListTenantDomains(
 	ctx context.Context,
 	workspaceID string,
@@ -58,7 +51,6 @@ func (s *Service) ListTenantDomains(
 	return out, nil
 }
 
-// GetTenantDomain returns one binding, or ErrNotFound.
 func (s *Service) GetTenantDomain(
 	ctx context.Context,
 	workspaceID, domain string,
@@ -81,8 +73,7 @@ func (s *Service) GetTenantDomain(
 	return out, nil
 }
 
-// PutTenantDomain creates or rebinds a domain: a fresh verification token,
-// verification reset. Regenerating is the same operation.
+// PutTenantDomain issues a fresh token and resets verification.
 func (s *Service) PutTenantDomain(
 	ctx context.Context,
 	workspaceID, domain string,
@@ -104,7 +95,6 @@ func (s *Service) PutTenantDomain(
 	return out, nil
 }
 
-// DeleteTenantDomain removes the binding.
 func (s *Service) DeleteTenantDomain(ctx context.Context, workspaceID, domain string) error {
 	return s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		return q.DeleteWorkspaceDomain(ctx, &db.DeleteWorkspaceDomainParams{
@@ -114,8 +104,6 @@ func (s *Service) DeleteTenantDomain(ctx context.Context, workspaceID, domain st
 	})
 }
 
-// VerifyTenantDomain resolves the TXT proof at _nokku-verify.<domain> and, on
-// a match, marks the binding verified.
 func (s *Service) VerifyTenantDomain(
 	ctx context.Context,
 	workspaceID, domain string,
@@ -133,8 +121,7 @@ func (s *Service) VerifyTenantDomain(
 		if rec != d.Token {
 			continue
 		}
-		// The SQL proof re-checks the token and evicts every other
-		// workspace's claim on the domain; verification is permanent.
+		// The query re-checks the token and evicts other workspaces' claims.
 		if err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
 			_, err := q.VerifyWorkspaceDomain(ctx, &db.VerifyWorkspaceDomainParams{
 				WorkspaceID: workspaceID,
@@ -150,8 +137,7 @@ func (s *Service) VerifyTenantDomain(
 	return d, nil
 }
 
-// GetVerifiedTenantDomain returns the verified binding for domain, or
-// ErrNotFound. Discovery runs pre-auth, so the read is global by design.
+// GetVerifiedTenantDomain reads globally since discovery runs pre-auth.
 func (s *Service) GetVerifiedTenantDomain(ctx context.Context, domain string) (TenantDomain, error) {
 	r, err := s.sys.GetVerifiedWorkspaceDomain(ctx, domain)
 	if err != nil {
@@ -160,10 +146,8 @@ func (s *Service) GetVerifiedTenantDomain(ctx context.Context, domain string) (T
 	return domainFromRow(r), nil
 }
 
-// managedBy reports whether workspaceID has verified the domain of email.
-// Only then may the workspace create, match, change, or delete the account
-// behind it. Anything else would let one tenant reach another tenant's
-// users, since accounts are global.
+// managedBy gates every workspace write to a global account, or one tenant
+// could reach another tenant's users.
 func (s *Service) managedBy(ctx context.Context, workspaceID, email string) (bool, error) {
 	d, err := s.GetVerifiedTenantDomain(ctx, emailDomain(email))
 	if errors.Is(err, ErrNotFound) {

@@ -26,8 +26,6 @@
 		members.data?.members?.filter((m) => !isUserInTeam(m.id)) || []
 	);
 
-	// Mutations invalidate the team service queries, so teamMembers and the
-	// teams list (member counts) refetch on their own.
 	async function addMember(member: WorkspaceMember) {
 		await addMemberMutation.mutateAsync({ teamId: data.id, userId: member.id });
 	}

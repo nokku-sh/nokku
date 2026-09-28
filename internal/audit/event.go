@@ -20,7 +20,7 @@ const (
 	maxExportRows = 100_000
 )
 
-// Event is one audit record. It is also the wire format of the webhook sink.
+// Event is also the wire format of the webhook sink.
 type Event struct {
 	ID          string         `json:"id"`
 	Timestamp   time.Time      `json:"timestamp"`
@@ -36,9 +36,7 @@ type Event struct {
 	Details     map[string]any `json:"details,omitempty"`
 }
 
-// Append fans an event out to every configured sink. A failing sink is
-// reported but never fatal: the caller is usually on a request path, and an
-// audit write must not take that down.
+// Append never fails on a sink error, the caller is usually on a request path.
 func (s *Service) Append(ctx context.Context, event *Event) error {
 	if event == nil {
 		return nil
@@ -53,9 +51,8 @@ func (s *Service) Append(ctx context.Context, event *Event) error {
 	return errors.Join(errs...)
 }
 
-// List returns one page of events and the total number of matches. A nil
-// WorkspaceID reads the personal log of the single actor in ActorIds, across
-// every workspace.
+// List reads the personal log of the single actor in ActorIds when
+// WorkspaceID is nil.
 func (s *Service) List(ctx context.Context, p *db.ListAuditLogsParams) ([]*Event, int32, error) {
 	var rows []*db.ListAuditLogsRow
 	read := func(q *db.Queries) (err error) {
@@ -100,7 +97,6 @@ func (s *Service) List(ctx context.Context, p *db.ListAuditLogsParams) ([]*Event
 	return events, total, nil
 }
 
-// Export renders every event in the range as gzipped CSV or JSON.
 func (s *Service) Export(
 	ctx context.Context,
 	p *db.ListAuditLogsParams,

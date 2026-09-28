@@ -142,8 +142,8 @@ verifying its email domain over DNS. A verified domain belongs to one
 workspace. Only that workspace's SSO provider may match, provision, or rename
 accounts under it, and only its SCIM connector may create, deactivate, or
 delete them. Every other account is reachable by invite only. SSO
-enforcement applies to every non-SSO login method (password, passkey, backup
-code) for accounts under the domain.
+enforcement applies to every other login method (password, passkey, backup
+code, social login) for accounts under the domain.
 
 A workspace has exactly one owner. An account that owns a workspace with
 other members cannot be deleted until ownership moves. Workspaces the owner

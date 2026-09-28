@@ -40,7 +40,6 @@
 		);
 	}
 
-	// Reset confirmation when modal toggles
 	$effect(() => {
 		if (open) confirmTransfer = false;
 	});

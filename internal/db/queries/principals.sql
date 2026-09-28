@@ -66,8 +66,7 @@ ORDER BY
   p.username ASC;
 
 -- name: InsertTargetPrincipals :exec
--- Creates the principal anchor for each reported account so it becomes
--- assignable. Never deletes: a host's reported list is a hint, not authority.
+-- Never deletes, a host's reported list is a hint, not authority.
 INSERT INTO
   principals (workspace_id, target_id, username)
 SELECT
@@ -94,8 +93,6 @@ FROM
 WHERE
   p.id = @principal_id;
 
--- Grant primitives used by AddSubjectsToPrincipal / RemoveSubjectsFromPrincipal.
--- One row per (principal, subject kind, subject id) in principal_grants.
 -- name: AddPrincipalGrant :exec
 INSERT INTO
   principal_grants (
@@ -161,10 +158,7 @@ ORDER BY
   p.username;
 
 -- name: ListSubjectUsernamesForTargets :many
--- The local accounts a subject may log in as, per target: the grant predicate
--- resolved for one subject, without the rest of the target's assignment graph.
--- A team grant counts for its members, and a subject may be a user, a team, or
--- a service account (all identified by UUID, which is unique across them).
+-- A team grant counts for its members. Subject UUIDs are unique across kinds.
 SELECT DISTINCT
   p.target_id,
   p.username
@@ -199,9 +193,7 @@ ORDER BY
   p.username;
 
 -- name: ListPrincipalsForTarget :many
--- The per-account subject list a host enforces: the daemon's synced map, or
--- AuthorizedPrincipalsFile on a manual target. Teams are expanded to their
--- members here, so the host needs no team knowledge.
+-- Teams are expanded so the host needs no team knowledge.
 SELECT
   p.username,
   array_agg(DISTINCT ids)::TEXT[] AS ids

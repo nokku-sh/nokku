@@ -19,8 +19,6 @@
 		ws.refetch();
 	});
 
-	// After a sign-in that was triggered from the device page, return there so
-	// the pending authorization completes.
 	$effect(() => {
 		if (page.url.pathname !== '/') return;
 		const code = pendingDeviceCode.current;

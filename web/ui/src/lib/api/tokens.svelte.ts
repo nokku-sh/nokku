@@ -4,7 +4,6 @@ import { workspaceID } from '$lib/store.svelte';
 import { toast } from 'svelte-sonner';
 
 export const token = {
-	// Queries
 	list: (kind: TokenKind) =>
 		useQuery(
 			TokenService.method.listTokens,
@@ -12,7 +11,6 @@ export const token = {
 			{ enabled: !!workspaceID.current }
 		),
 
-	// Mutations
 	create: () => useMutation(TokenService.method.createToken),
 	remove: () =>
 		useMutation(TokenService.method.deleteToken, {

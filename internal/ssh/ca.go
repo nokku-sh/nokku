@@ -28,8 +28,7 @@ type CAInfo struct {
 	KeyBits      int32
 }
 
-// Keypair is a freshly generated CA keypair with its effective policy
-// values after defaults and clamping were applied.
+// Keypair holds the effective values after defaults and clamping.
 type Keypair struct {
 	Private any
 	Public  any
@@ -37,9 +36,7 @@ type Keypair struct {
 	Bits    int32
 }
 
-// GenerateKey generates a CA keypair. Unspecified key types default to
-// ED25519, RSA bits are clamped to 2048/3072/4096 and ECDSA bits to a
-// supported curve (256/384/521).
+// GenerateKey defaults to ED25519 and clamps bits to supported sizes.
 func GenerateKey(
 	keyType nokkuv1.CertificateKeyType,
 	keyBits int32,
@@ -92,8 +89,7 @@ func GenerateKey(
 	}
 }
 
-// CAExpiry returns the expiry time for a CA lifetime, clamped to
-// 1 month..5 years and defaulting to 1 year.
+// CAExpiry clamps to 1 month..5 years, default 1 year.
 func CAExpiry(now time.Time, lifetime time.Duration) time.Time {
 	expiry := now.Add(lifetime)
 	if expiry.Before(now.AddDate(0, 1, 0)) || expiry.After(now.AddDate(5, 0, 0)) {

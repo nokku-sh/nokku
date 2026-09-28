@@ -16,8 +16,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// Generic errors
-
 var (
 	ErrInternal = connect.NewError(
 		connect.CodeInternal,
@@ -41,23 +39,18 @@ var (
 	)
 )
 
-// Validation errors
-
 var ErrInvalidInput = connect.NewError(
 	connect.CodeInvalidArgument,
 	errors.New("please check your input and try again"),
 )
 
-// Auth errors
-
-var ErrBadCredentials = connect.NewError(
-	connect.CodeInvalidArgument,
-	errors.New("incorrect email or password"),
+var ErrUserRequired = connect.NewError(
+	connect.CodePermissionDenied,
+	errors.New("only user accounts can do that"),
 )
 
-// Login flow errors. Bad credentials answers Unauthenticated: the client
-// suppresses the generic toast for that code (the login page shows its own
-// inline affordances), matching the previous 401 JSON surface.
+// ErrLoginFailed is Unauthenticated because the client skips its generic
+// toast for that code and the login page shows its own.
 var (
 	ErrLoginFailed = connect.NewError(
 		connect.CodeUnauthenticated,
@@ -76,8 +69,6 @@ var (
 		errors.New("your organization requires single sign-on"),
 	)
 )
-
-// Account errors
 
 var (
 	ErrAccountNotFound = connect.NewError(
@@ -106,10 +97,8 @@ func NewError(code connect.Code, msg string) error {
 	return connect.NewError(code, errors.New(msg))
 }
 
-// DBError maps a pgx or postgres error to a connect error with a message that
-// fits the underlying failure. It returns nil only when err is nil. Errors
-// that are already connect errors pass through unchanged, so handlers can
-// map a domain failure inside a transaction closure.
+// DBError maps a database error to a connect error. Connect errors pass
+// through, so handlers can return domain failures from a tx closure.
 func DBError(err error) error {
 	if err == nil {
 		return nil
@@ -119,9 +108,9 @@ func DBError(err error) error {
 	}
 
 	switch {
-	case errors.Is(err, db.ErrPermissionDenied), errors.Is(err, db.ErrWorkspaceNotPinned):
-		return ErrPermissionDenied
-	case errors.Is(err, db.ErrWorkspaceNotAccessible):
+	case errors.Is(err, db.ErrPermissionDenied),
+		errors.Is(err, db.ErrWorkspaceNotPinned),
+		errors.Is(err, db.ErrWorkspaceNotAccessible):
 		return ErrPermissionDenied
 	case errors.Is(err, pgx.ErrNoRows):
 		return ErrNotFound
@@ -200,11 +189,6 @@ func DBError(err error) error {
 	}
 }
 
-// Http errors
-
-// writeJSONError writes the plain-JSON error body the HTTP surfaces (avatar
-// upload, terminal) parse: {"code": <status>, "message": ...}. It shares
-// iam's JSON encoder so the wire shape stays identical everywhere.
 func writeJSONError(w http.ResponseWriter, status int, message string) {
 	iam.WriteJSON(w, status, map[string]any{"code": status, "message": message})
 }

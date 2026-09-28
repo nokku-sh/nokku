@@ -1,22 +1,15 @@
 package daemon
 
-// SanitizeReplay strips terminal query/request sequences (DSR, DA, OSC queries,
-// DCS requests, window-title/color queries, sixel queries) from raw PTY output.
-// Replaying them into a fresh terminal would make it emit reply bytes back
-// into the PTY. Regular escape sequences (colors, cursor moves, erase) are
-// preserved.
-func SanitizeReplay(data []byte) []byte {
+// sanitizeReplay strips terminal queries (DSR, DA, OSC, DCS, ...) from PTY
+// output. A fresh terminal replaying them would answer back into the PTY.
+func sanitizeReplay(data []byte) []byte {
 	out := make([]byte, 0, len(data))
-	i := 0
-	for i < len(data) {
-		if data[i] != 0x1b {
-			out = append(out, data[i])
-			i++
-			continue
-		}
-		if skip := skipRequestSequence(data[i:]); skip > 0 {
-			i += skip
-			continue
+	for i := 0; i < len(data); {
+		if data[i] == 0x1b {
+			if skip := skipRequestSequence(data[i:]); skip > 0 {
+				i += skip
+				continue
+			}
 		}
 		out = append(out, data[i])
 		i++
@@ -24,8 +17,6 @@ func SanitizeReplay(data []byte) []byte {
 	return out
 }
 
-// skipRequestSequence returns the length of a terminal request/query sequence
-// starting at p, or 0 if it isn't one we strip.
 func skipRequestSequence(p []byte) int {
 	if len(p) < 2 {
 		return 0
@@ -55,18 +46,12 @@ func skipCSIRequest(p []byte) int {
 	if i >= len(p) {
 		return 0
 	}
-	final := p[i]
-	seqLen := i + 1
-	switch final {
-	case 'n': // DSR: cursor/printer status queries
-		return seqLen
-	case 'c': // DA: primary/secondary/tertiary device attributes
-		return seqLen
-	case 't': // window-property queries
-		return seqLen
+	switch p[i] {
+	case 'n', 'c', 't': // DSR, DA, window-property queries
+		return i + 1
 	case 'S':
-		if len(p) > 2 && p[2] == '?' { // graphics query
-			return seqLen
+		if p[2] == '?' { // graphics query
+			return i + 1
 		}
 	}
 	return 0
@@ -105,8 +90,7 @@ func skipOSCQuery(p []byte) int {
 		}
 		i++
 	}
-	// Unterminated OSC at the buffer tail: strip if it carried a query, so a
-	// dangling query doesn't survive into the replay.
+	// Strip an unterminated query at the buffer tail too.
 	if hasQuery && i-start < 64 {
 		return i
 	}

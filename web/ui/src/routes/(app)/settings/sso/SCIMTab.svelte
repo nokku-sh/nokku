@@ -37,7 +37,7 @@
 			created = { token: res.token ?? '', baseUrl: res.baseUrl ?? baseURL };
 			label = '';
 		} catch {
-			// connect errors are toasted by the mutation cache
+			// The mutation cache toasts connect errors.
 		}
 	}
 

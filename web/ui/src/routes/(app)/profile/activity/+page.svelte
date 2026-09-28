@@ -99,7 +99,6 @@
 			<div
 				class="group flex justify-between gap-4 rounded-lg border bg-background/50 p-4 transition-colors hover:bg-background"
 			>
-				<!-- Status indicator -->
 				<div class="flex flex-col items-center">
 					<div class={`rounded-full p-2 ${isError ? 'bg-destructive/10' : 'bg-chart-3/10'}`}>
 						{#if isError}
@@ -111,7 +110,6 @@
 					<div class="mt-2 h-full w-px bg-border group-last:hidden"></div>
 				</div>
 
-				<!-- Event details -->
 				<div class="flex-1 space-y-2 py-1">
 					<div>
 						<p class="text-sm font-medium">

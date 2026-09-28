@@ -8,8 +8,7 @@
 
 	type ErrorInfo = { title: string; description: string };
 
-	// Keys are the error messages the backend's SSO flows append to the
-	// redirect (see the iam.Fail call sites).
+	// Keys must match the messages iam's fail() call sites send.
 	const codes: Record<string, ErrorInfo> = {
 		'login canceled': {
 			title: 'Sign-in cancelled',
@@ -73,9 +72,7 @@
 	const info = $derived(codes[code] ?? codes.unknown);
 
 	afterNavigate(() => {
-		// Strip the error param once shown: a refresh shouldn't re-show the
-		// error, and back-navigation shouldn't land on it again. Uses the
-		// SvelteKit-aware helper so the router state stays in sync.
+		// Strip the param so a refresh or back navigation doesn't re-show it.
 		replaceState('/sso-error', {});
 	});
 </script>

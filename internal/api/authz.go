@@ -14,19 +14,12 @@ import (
 	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 )
 
-// Every procedure is classified exactly once, here or in publicEndpoints.
-// Anything unclassified is denied, so a new RPC fails closed until someone
-// decides who may call it.
-
-// ProcedureRoles maps every workspace-scoped procedure to the least role that
-// may call it. This is the only place a procedure's required role is
-// resolved. Handlers run their data access with plain WithWorkspace.
+// ProcedureRoles maps each workspace-scoped procedure to the least role that
+// may call it. Unclassified procedures are denied, so new RPCs fail closed.
 var ProcedureRoles = map[string]db.Role{
-	// Billing
 	nokkuv1connect.BillingServiceGetBillingProcedure: db.RoleAdmin,
 
-	// Certificate authorities. Members read them: nk trusts the X.509 CAs of
-	// every workspace it belongs to.
+	// Members read CAs because nk trusts the X.509 CAs of every workspace it belongs to.
 	nokkuv1connect.CertificateServiceGetCertificateAuthorityProcedure:      db.RoleMember,
 	nokkuv1connect.CertificateServiceListCertificateAuthoritiesProcedure:   db.RoleMember,
 	nokkuv1connect.CertificateServiceCreateCertificateAuthorityProcedure:   db.RoleEditor,
@@ -34,8 +27,7 @@ var ProcedureRoles = map[string]db.Role{
 	nokkuv1connect.CertificateServiceDeleteCertificateAuthorityProcedure:   db.RoleEditor,
 	nokkuv1connect.CertificateServiceRolloverCertificateAuthorityProcedure: db.RoleEditor,
 
-	// Daemons. A web session only opens the transport, sshd still checks the
-	// certificate against the synced grants.
+	// A web session only opens the transport, sshd still checks the cert against synced grants.
 	nokkuv1connect.DaemonServiceCreateSessionProcedure: db.RoleMember,
 	nokkuv1connect.DaemonServiceGetDaemonProcedure:     db.RoleViewer,
 	nokkuv1connect.DaemonServiceListDaemonsProcedure:   db.RoleViewer,
@@ -44,12 +36,10 @@ var ProcedureRoles = map[string]db.Role{
 	nokkuv1connect.DaemonServiceDeleteDaemonProcedure:  db.RoleEditor,
 	nokkuv1connect.DaemonServiceCloseSessionProcedure:  db.RoleEditor,
 
-	// Join tokens (enroll and invite)
 	nokkuv1connect.TokenServiceListTokensProcedure:  db.RoleViewer,
 	nokkuv1connect.TokenServiceCreateTokenProcedure: db.RoleAdmin,
 	nokkuv1connect.TokenServiceDeleteTokenProcedure: db.RoleAdmin,
 
-	// Principals
 	nokkuv1connect.PrincipalServiceListPrincipalsProcedure:              db.RoleViewer,
 	nokkuv1connect.PrincipalServiceAddSubjectsToPrincipalProcedure:      db.RoleEditor,
 	nokkuv1connect.PrincipalServiceRemoveSubjectsFromPrincipalProcedure: db.RoleEditor,
@@ -57,23 +47,19 @@ var ProcedureRoles = map[string]db.Role{
 	nokkuv1connect.PrincipalServiceAddPrincipalProcedure:                db.RoleEditor,
 	nokkuv1connect.PrincipalServiceRemovePrincipalProcedure:             db.RoleEditor,
 
-	// Service accounts
 	nokkuv1connect.ServiceAccountServiceGetServiceAccountProcedure:    db.RoleViewer,
 	nokkuv1connect.ServiceAccountServiceListServiceAccountsProcedure:  db.RoleViewer,
 	nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure: db.RoleEditor,
 	nokkuv1connect.ServiceAccountServiceUpdateServiceAccountProcedure: db.RoleEditor,
 	nokkuv1connect.ServiceAccountServiceDeleteServiceAccountProcedure: db.RoleEditor,
 
-	// SSO
 	nokkuv1connect.SSOServiceGetSSOProviderProcedure:    db.RoleViewer,
 	nokkuv1connect.SSOServiceUpdateSSOProviderProcedure: db.RoleAdmin,
 
-	// SCIM connector tokens (the endpoint itself is token-scoped)
 	nokkuv1connect.SCIMServiceListSCIMTokensProcedure:  db.RoleViewer,
 	nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure: db.RoleAdmin,
 	nokkuv1connect.SCIMServiceDeleteSCIMTokenProcedure: db.RoleAdmin,
 
-	// Targets
 	nokkuv1connect.TargetServiceGetTargetProcedure:           db.RoleViewer,
 	nokkuv1connect.TargetServiceListTargetsProcedure:         db.RoleViewer,
 	nokkuv1connect.TargetServiceGetSubjectAccessProcedure:    db.RoleViewer,
@@ -84,7 +70,6 @@ var ProcedureRoles = map[string]db.Role{
 	nokkuv1connect.TargetServiceDeleteTargetProcedure:        db.RoleEditor,
 	nokkuv1connect.TargetServiceSyncTargetUsersProcedure:     db.RoleEditor,
 
-	// Teams
 	nokkuv1connect.TeamServiceGetTeamProcedure:          db.RoleViewer,
 	nokkuv1connect.TeamServiceListTeamsProcedure:        db.RoleViewer,
 	nokkuv1connect.TeamServiceListTeamMembersProcedure:  db.RoleViewer,
@@ -95,7 +80,6 @@ var ProcedureRoles = map[string]db.Role{
 	nokkuv1connect.TeamServiceAddTeamMemberProcedure:    db.RoleEditor,
 	nokkuv1connect.TeamServiceRemoveTeamMemberProcedure: db.RoleEditor,
 
-	// Workspaces
 	nokkuv1connect.WorkspaceServiceGetWorkspaceMemberProcedure:    db.RoleViewer,
 	nokkuv1connect.WorkspaceServiceListWorkspaceMembersProcedure:  db.RoleViewer,
 	nokkuv1connect.WorkspaceServiceUpdateWorkspaceMemberProcedure: db.RoleAdmin,
@@ -103,7 +87,6 @@ var ProcedureRoles = map[string]db.Role{
 	nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure:       db.RoleAdmin,
 	nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure:       db.RoleOwner,
 
-	// Workspace domains
 	nokkuv1connect.WorkspaceDomainServiceGetWorkspaceDomainProcedure:             db.RoleViewer,
 	nokkuv1connect.WorkspaceDomainServiceListWorkspaceDomainsProcedure:           db.RoleViewer,
 	nokkuv1connect.WorkspaceDomainServiceCreateWorkspaceDomainProcedure:          db.RoleAdmin,
@@ -111,27 +94,23 @@ var ProcedureRoles = map[string]db.Role{
 	nokkuv1connect.WorkspaceDomainServiceVerifyWorkspaceDomainProcedure:          db.RoleAdmin,
 	nokkuv1connect.WorkspaceDomainServiceRegenerateWorkspaceDomainTokenProcedure: db.RoleAdmin,
 
-	// Recordings
 	nokkuv1connect.RecordingServiceListRecordingsProcedure:  db.RoleViewer,
-	nokkuv1connect.RecordingServiceGetRecordingProcedure:    db.RoleViewer,
 	nokkuv1connect.RecordingServiceDeleteRecordingProcedure: db.RoleEditor,
 
-	// Audit
 	nokkuv1connect.UtilServiceListAuditLogsProcedure:   db.RoleViewer,
 	nokkuv1connect.UtilServiceExportAuditLogsProcedure: db.RoleViewer,
 }
 
-// personalProcedures take a workspace role only when a workspace is pinned.
-// Without one they serve the caller's own rows, like the personal activity
-// log, and the handler scopes the read to the caller.
+// personalProcedures need a workspace role only when a workspace is pinned.
+// Without one the handler serves the caller's own rows.
 var personalProcedures = map[string]struct{}{
 	nokkuv1connect.UtilServiceListAuditLogsProcedure:   {},
 	nokkuv1connect.UtilServiceExportAuditLogsProcedure: {},
 }
 
-// selfScopedProcedures are open to any authenticated user or service
-// account. Each one is scoped to the caller (their account, their
-// workspaces, their certs) or checks owner rights in the handler.
+// selfScopedProcedures are open to any authenticated caller. Each handler
+// scopes to the caller or checks rights itself. Streams belong here since
+// their workspace only arrives with the first message.
 var selfScopedProcedures = map[string]struct{}{
 	nokkuv1connect.AccountServiceChangePasswordProcedure:          {},
 	nokkuv1connect.AccountServiceDeleteAccountProcedure:           {},
@@ -156,6 +135,7 @@ var selfScopedProcedures = map[string]struct{}{
 	nokkuv1connect.DaemonServiceRelayProcedure:                    {},
 	nokkuv1connect.InvitationServiceAcceptInvitationProcedure:     {},
 	nokkuv1connect.InvitationServiceGetInvitationProcedure:        {},
+	nokkuv1connect.RecordingServiceGetRecordingProcedure:          {},
 	nokkuv1connect.TargetServiceGetMyAccessProcedure:              {},
 	nokkuv1connect.UtilServiceListRolesProcedure:                  {},
 	nokkuv1connect.UtilServiceWhoamiProcedure:                     {},
@@ -165,7 +145,6 @@ var selfScopedProcedures = map[string]struct{}{
 	nokkuv1connect.WorkspaceServiceUpdateWorkspaceOwnerProcedure:  {},
 }
 
-// daemonOnlyProcedures serve the daemon identity and nobody else.
 var daemonOnlyProcedures = map[string]struct{}{
 	nokkuv1connect.DaemonServiceSyncDaemonProcedure:         {},
 	nokkuv1connect.DaemonControlServiceConnectProcedure:     {},
@@ -173,8 +152,8 @@ var daemonOnlyProcedures = map[string]struct{}{
 	nokkuv1connect.RecordingServiceUploadRecordingProcedure: {},
 }
 
-// daemonSharedProcedures are the only other procedures a daemon may call.
-// Their handlers narrow a daemon to its own host cert and its own record.
+// daemonSharedProcedures are also open to daemons. Handlers narrow a daemon
+// to its own host cert and record.
 var daemonSharedProcedures = map[string]struct{}{
 	nokkuv1connect.CertificateServiceSignSSHCertificateProcedure: {},
 	nokkuv1connect.DaemonServiceDeleteDaemonProcedure:            {},
@@ -218,9 +197,6 @@ func (a *AuthorizationInterceptor) WrapStreamingHandler(
 	}
 }
 
-// authorize decides whether the request actor may call procedure at all. A
-// workspace permission check also marks the membership as verified on the
-// returned context, so WithWorkspace skips its own lookup.
 func (a *AuthorizationInterceptor) authorize(
 	ctx context.Context,
 	procedure string,
@@ -251,9 +227,8 @@ func (a *AuthorizationInterceptor) authorize(
 	return ctx, db.ErrPermissionDenied
 }
 
-// actorHasRole resolves the request actor's role in the pinned workspace and
-// checks it against required. The returned context records the verified
-// membership and role, so WithWorkspace and handlers skip another lookup.
+// actorHasRole records the verified membership on the returned context so
+// WithWorkspace and handlers skip another lookup.
 func actorHasRole(
 	ctx context.Context,
 	conn *db.Connection,
@@ -283,7 +258,6 @@ func actorHasRole(
 	return iam.WithMember(ctx, workspaceID, role), nil
 }
 
-// callerRole is the role authorization verified for this request.
 func callerRole(ctx context.Context) db.Role {
 	return db.Role(iam.MemberRole(ctx))
 }

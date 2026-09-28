@@ -21,23 +21,7 @@ func (l *LogInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		start := time.Now()
 		res, err := next(ctx, req)
-		duration := time.Since(start)
-
-		attrs := rpcAttrs(req.Peer().Protocol, req.Spec().Procedure, duration)
-		if err != nil {
-			attrs = append(
-				attrs,
-				slog.String("code", connect.CodeOf(err).String()),
-			)
-			if isServerError(connect.CodeOf(err)) {
-				slog.LogAttrs(ctx, slog.LevelError, "rpc failed", attrs...)
-			} else {
-				slog.LogAttrs(ctx, slog.LevelDebug, "rpc", attrs...)
-			}
-		} else if l.debug {
-			slog.LogAttrs(ctx, slog.LevelDebug, "rpc", attrs...)
-		}
-
+		l.log(ctx, "rpc", req.Peer().Protocol, req.Spec().Procedure, time.Since(start), err)
 		return res, err
 	}
 }
@@ -54,37 +38,36 @@ func (l *LogInterceptor) WrapStreamingHandler(
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		start := time.Now()
 		err := next(ctx, conn)
-		duration := time.Since(start)
-
-		attrs := rpcAttrs(conn.Peer().Protocol, conn.Spec().Procedure, duration)
-		if err != nil {
-			attrs = append(
-				attrs,
-				slog.String("code", connect.CodeOf(err).String()),
-			)
-			if isServerError(connect.CodeOf(err)) {
-				slog.LogAttrs(ctx, slog.LevelError, "stream failed", attrs...)
-			} else {
-				slog.LogAttrs(ctx, slog.LevelDebug, "stream", attrs...)
-			}
-		} else if l.debug {
-			slog.LogAttrs(ctx, slog.LevelDebug, "stream", attrs...)
-		}
-
+		l.log(ctx, "stream", conn.Peer().Protocol, conn.Spec().Procedure, time.Since(start), err)
 		return err
 	}
 }
 
-func rpcAttrs(protocol, procedure string, duration time.Duration) []slog.Attr {
+func (l *LogInterceptor) log(
+	ctx context.Context,
+	msg, protocol, procedure string,
+	duration time.Duration,
+	err error,
+) {
 	attrs := []slog.Attr{
 		slog.String("procedure", procedure),
 		slog.String("protocol", protocol),
 		slog.Duration("duration", duration),
 	}
-	return attrs
+	switch {
+	case err != nil:
+		code := connect.CodeOf(err)
+		attrs = append(attrs, slog.String("code", code.String()))
+		if isServerError(code) {
+			slog.LogAttrs(ctx, slog.LevelError, msg+" failed", attrs...)
+		} else {
+			slog.LogAttrs(ctx, slog.LevelDebug, msg, attrs...)
+		}
+	case l.debug:
+		slog.LogAttrs(ctx, slog.LevelDebug, msg, attrs...)
+	}
 }
 
-// responseWriter wraps [http.ResponseWriter] to capture the status code.
 type responseWriter struct {
 	http.ResponseWriter
 

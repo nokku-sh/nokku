@@ -51,8 +51,6 @@ type CountTeamMembersRow struct {
 	MemberCount int32  `json:"memberCount"`
 }
 
-// Member counts for a set of teams in one read, for list views that show a
-// count instead of embedding each team's members.
 func (q *Queries) CountTeamMembers(ctx context.Context, teamIds []string) ([]*CountTeamMembersRow, error) {
 	rows, err := q.db.Query(ctx, countTeamMembers, teamIds)
 	if err != nil {
@@ -189,7 +187,6 @@ type ListTeamMembersRow struct {
 	CreatedAt     time.Time `json:"createdAt"`
 }
 
-// Members of one team with their identity display fields joined in.
 func (q *Queries) ListTeamMembers(ctx context.Context, teamID string) ([]*ListTeamMembersRow, error) {
 	rows, err := q.db.Query(ctx, listTeamMembers, teamID)
 	if err != nil {
@@ -308,8 +305,6 @@ type ListTeamsForUserParams struct {
 	UserID      string `json:"userId"`
 }
 
-// Teams one user belongs to within a workspace: the read the user-profile
-// surface needs, without deriving it from a teams-with-members blob.
 func (q *Queries) ListTeamsForUser(ctx context.Context, arg *ListTeamsForUserParams) ([]*Team, error) {
 	rows, err := q.db.Query(ctx, listTeamsForUser, arg.WorkspaceID, arg.UserID)
 	if err != nil {

@@ -16,11 +16,9 @@ import (
 
 var ErrActiveSubscription = errors.New("workspace already has an active subscription")
 
-// minBillableSeats is the smallest per-seat subscription: the pricing floor
-// (5 seats × €96/user/yr = €480/yr, see §4.2 of the monetization plan).
+// minBillableSeats is the pricing floor.
 const minBillableSeats = 5
 
-// Stripe implements Provider on top of Stripe Billing (Managed Payments).
 type Stripe struct {
 	client    *stripe.Client
 	db        *db.Connection
@@ -32,8 +30,7 @@ type Stripe struct {
 	WebhookSecret  string `env:"STRIPE_WEBHOOK_SECRET"`
 }
 
-// newStripe returns nil (billing disabled) when a required Stripe env var
-// is unset.
+// newStripe returns nil when a required env var is unset.
 func newStripe(conn *db.Connection, returnURL string) (*Stripe, error) {
 	s, err := env.ParseAs[Stripe]()
 	if err != nil {
@@ -49,19 +46,14 @@ func newStripe(conn *db.Connection, returnURL string) (*Stripe, error) {
 	return &s, nil
 }
 
-// Checkout creates a Checkout Session for the workspace's Pro per-seat
-// subscription. Quantity is the current member count (never below the
-// pricing floor); seat count changes are handled by the customer in the
-// Stripe portal. There is deliberately no quantity-sync job — that would
-// reintroduce the usage-reporting machinery this design deletes. Known
-// gap: seats added between checkout and the next portal edit are unbilled
-// until the customer adjusts quantity.
+// Checkout starts at the current member count. There is deliberately no
+// quantity sync, so seats added later stay unbilled until the customer
+// adjusts them in the portal.
 func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (string, error) {
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")
 	}
 
-	// One subscription per workspace: block a new checkout while one is active.
 	if _, err := s.activeSubscription(ctx, workspaceID); err == nil {
 		return "", ErrActiveSubscription
 	}
@@ -99,9 +91,8 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (strin
 	return session.URL, nil
 }
 
-// The helpers below read and write subscription state in system
-// transactions: workspace_subscriptions is under RLS and the Stripe flows
-// (checkout, portal, webhooks, sync jobs) operate outside a tenant scope.
+// The helpers below use system transactions since Stripe flows run outside a
+// tenant scope.
 
 func (s *Stripe) subscription(
 	ctx context.Context,
@@ -144,8 +135,6 @@ func (s *Stripe) upsertSubscription(
 	})
 }
 
-// customerFor returns the workspace's Stripe customer, reusing the one on the
-// subscription row or creating one tagged with the workspace id.
 func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (string, error) {
 	if sub, err := s.subscription(ctx, workspaceID); err == nil && sub.CustomerID != "" {
 		return sub.CustomerID, nil
@@ -162,7 +151,6 @@ func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (st
 		return "", fmt.Errorf("create customer: %w", err)
 	}
 
-	// Record the mapping so later checkouts reuse the same customer.
 	if err := s.db.WithTx(ctx, func(q *db.Queries) error {
 		return q.SetSubscriptionCustomer(ctx, &db.SetSubscriptionCustomerParams{
 			WorkspaceID: workspaceID,
@@ -196,7 +184,6 @@ func (s *Stripe) Portal(ctx context.Context, workspaceID string) (string, error)
 	return session.URL, nil
 }
 
-// Cancel terminates the Stripe subscription: immediately, or at period end.
 func (s *Stripe) Cancel(
 	ctx context.Context,
 	workspaceID string,
@@ -232,7 +219,7 @@ func (s *Stripe) Cancel(
 	return nil
 }
 
-// Sync reconciles one workspace from Stripe (self-heals missed webhooks).
+// Sync self-heals missed webhooks.
 func (s *Stripe) Sync(ctx context.Context, workspaceID string) {
 	sub, err := s.subscription(ctx, workspaceID)
 	if err != nil || sub.SubscriptionID == "" || sub.Source != "stripe" {
@@ -260,7 +247,6 @@ func (s *Stripe) Sync(ctx context.Context, workspaceID string) {
 	}
 }
 
-// SyncAll reconciles every Stripe-managed row. Runs at startup.
 func (s *Stripe) SyncAll(ctx context.Context) error {
 	var subs []*db.WorkspaceSubscription
 	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
@@ -278,8 +264,6 @@ func (s *Stripe) SyncAll(ctx context.Context) error {
 	return nil
 }
 
-// billableSeats returns the quantity for the per-seat subscription: the
-// current member count, never below the pricing floor.
 func (s *Stripe) billableSeats(ctx context.Context, workspaceID string) (int64, error) {
 	var count int64
 	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
@@ -291,7 +275,6 @@ func (s *Stripe) billableSeats(ctx context.Context, workspaceID string) (int64, 
 	return max(count, minBillableSeats), nil
 }
 
-// periodEnd returns the current period end for a single-item subscription.
 func periodEnd(sub *stripe.Subscription) *time.Time {
 	if sub.Items == nil || len(sub.Items.Data) == 0 {
 		return nil

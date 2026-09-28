@@ -8,8 +8,6 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-// SyncInput is one daemon heartbeat: transport metadata for the daemon row,
-// the daemon-reported target facts, and the users its sshd sees.
 type SyncInput struct {
 	DaemonID    string
 	Metadata    []byte
@@ -18,7 +16,6 @@ type SyncInput struct {
 	PrivateIPs  []string
 }
 
-// Synced is the state a daemon's next heartbeat runs against.
 type Synced struct {
 	Version     int64
 	Status      *nokkuv1.DaemonStatus
@@ -27,8 +24,6 @@ type Synced struct {
 	CAPublicKey string
 }
 
-// Sync records a daemon heartbeat and returns the state the daemon should
-// run with: status, config, synced principals, and the signing CA.
 func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 	res := &Synced{}
 	if err := conn.WithWorkspace(ctx, func(q *db.Queries) error {
@@ -39,23 +34,20 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		res.Status = &daemon.Status
 		res.Config = daemon.Config
 
-		// A non-accepted daemon learns its status from the response instead
-		// of an error: pending daemons keep retrying, rejected ones get
-		// told to stop.
+		// Pending daemons keep retrying, rejected ones are told to stop.
 		if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
 			return nil
 		}
 
-		// Read the version before the state it covers. A change committed
-		// in between then costs one extra sync instead of a stale daemon.
+		// Read the version first, so a change in between costs one extra
+		// sync instead of a stale daemon.
 		res.Version, err = q.GetWorkspaceStateVersion(ctx, daemon.WorkspaceID)
 		if err != nil {
 			return err
 		}
 
-		// Only the heartbeat metadata is touched: the combined update's
-		// COALESCE cannot protect status from a zero value, so a sync must
-		// never write it (an admin's accept/reject must not be clobbered).
+		// Never write status here, the combined update would clobber an
+		// admin's accept or reject with a zero value.
 		if err := q.UpdateDaemonMetadata(ctx, &db.UpdateDaemonMetadataParams{
 			DaemonID: daemon.ID,
 			Metadata: in.Metadata,
@@ -68,9 +60,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			return err
 		}
 
-		// The signing CA goes into the response so the daemon can detect a
-		// rollover by comparing it against its cached copy. A daemon without
-		// a CA cannot renew host certs anyway. Leave the field empty then.
+		// Lets the daemon detect a CA rollover. Without a CA it stays empty.
 		if ca, caErr := q.GetCAByDaemonID(ctx, &daemon.ID); caErr == nil {
 			res.CAPublicKey = ca.PublicKey
 		}
@@ -87,9 +77,8 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			return err
 		}
 
-		// The reported account list only creates anchors for new accounts.
-		// It never deletes: a host that cannot enumerate users must not
-		// change who has access.
+		// Never deletes, a host that cannot enumerate users must not change
+		// who has access.
 		if err := q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
 			TargetID:  target.ID,
 			Usernames: in.Users,

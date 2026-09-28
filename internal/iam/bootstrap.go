@@ -20,61 +20,49 @@ type adminConfig struct {
 	Name     string `env:"NOKKU_ADMIN_NAME"`
 }
 
-// seedSocialProviders seeds the static social login providers from the
-// environment credentials into sso storage.
 func (s *Service) seedSocialProviders(ctx context.Context) error {
 	cfg, err := env.ParseAs[socialConfig]()
 	if err != nil {
 		return err
 	}
 
-	seed := func(providerID, name, clientID, clientSecret string) error {
-		if clientID == "" || clientSecret == "" {
-			return nil
+	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
+		if err := s.PutSSOProvider(ctx, SSOProvider{
+			ProviderID: "google",
+			Method:     MethodOIDC,
+			Name:       "Google",
+			Enabled:    true,
+			OIDC: &OIDCProvider{
+				IssuerURL:       "https://accounts.google.com",
+				ClientID:        cfg.GoogleClientID,
+				ClientSecret:    cfg.GoogleClientSecret,
+				JITProvisioning: true,
+			},
+		}); err != nil {
+			return err
 		}
-		var p SSOProvider
-		switch providerID {
-		case "google":
-			p = SSOProvider{
-				ProviderID: providerID,
-				Method:     MethodOIDC,
-				Name:       name,
-				Enabled:    true,
-				OIDC: &OIDCProvider{
-					IssuerURL:       "https://accounts.google.com",
-					ClientID:        clientID,
-					ClientSecret:    clientSecret,
-					JITProvisioning: true,
-				},
-			}
-		case "github":
-			p = SSOProvider{
-				ProviderID: providerID,
-				Method:     MethodOAuth2,
-				Name:       name,
-				Enabled:    true,
-				OAuth2: &OAuth2Provider{ //nolint:gosec // the secret comes from the environment, not hardcoded
-					ClientID:        clientID,
-					ClientSecret:    clientSecret,
-					AuthURL:         "https://github.com/login/oauth/authorize",
-					TokenURL:        "https://github.com/login/oauth/access_token",
-					UserInfoURL:     "https://api.github.com/user",
-					EmailURL:        "https://api.github.com/user/emails",
-					Scopes:          []string{"read:user", "user:email"},
-					JITProvisioning: true,
-				},
-			}
-		}
-		return s.PutSSOProvider(ctx, p)
 	}
-	if err := seed("google", "Google", cfg.GoogleClientID, cfg.GoogleClientSecret); err != nil {
-		return err
+	if cfg.GitHubClientID != "" && cfg.GitHubClientSecret != "" {
+		return s.PutSSOProvider(ctx, SSOProvider{
+			ProviderID: "github",
+			Method:     MethodOAuth2,
+			Name:       "GitHub",
+			Enabled:    true,
+			OAuth2: &OAuth2Provider{ //nolint:gosec // the secret comes from the environment
+				ClientID:        cfg.GitHubClientID,
+				ClientSecret:    cfg.GitHubClientSecret,
+				AuthURL:         "https://github.com/login/oauth/authorize",
+				TokenURL:        "https://github.com/login/oauth/access_token",
+				UserInfoURL:     "https://api.github.com/user",
+				EmailURL:        "https://api.github.com/user/emails",
+				Scopes:          []string{"read:user", "user:email"},
+				JITProvisioning: true,
+			},
+		})
 	}
-	return seed("github", "GitHub", cfg.GitHubClientID, cfg.GitHubClientSecret)
+	return nil
 }
 
-// bootstrapUser creates the first user account from the environment when
-// one does not exist yet.
 func (s *Service) bootstrapUser(ctx context.Context) error {
 	cfg, err := env.ParseAs[adminConfig]()
 	if err != nil {
@@ -86,17 +74,15 @@ func (s *Service) bootstrapUser(ctx context.Context) error {
 	}
 
 	if _, err := s.GetUserByEmail(ctx, cfg.Email); err == nil {
-		return nil // User already exists, ignore
+		return nil
 	}
 
 	user, err := s.Register(ctx, cfg.Email, cfg.Name, cfg.Password)
 	if err != nil {
 		if errors.Is(err, ErrEmailTaken) {
-			return nil // Lost a race with a concurrent boot; someone else has it.
+			return nil // lost a race with a concurrent boot
 		}
 		return err
 	}
-
-	// Bootstrap accounts are trusted: mark the email verified.
 	return s.VerifyUserEmail(ctx, user.ID)
 }

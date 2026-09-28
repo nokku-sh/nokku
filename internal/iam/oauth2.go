@@ -1,8 +1,5 @@
 package iam
 
-// The plain OAuth2 authorization-code flow for providers without OIDC
-// discovery (GitHub).
-
 import (
 	"context"
 	"encoding/json"
@@ -14,10 +11,9 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// profileBodyLimit caps the provider profile and email responses.
 const profileBodyLimit = 1 << 20
 
-// oauth2Flow serves the OAuth2 authorization-code flow.
+// oauth2Flow is for providers without OIDC discovery, like GitHub.
 type oauth2Flow struct {
 	svc    *Service
 	linker *linker
@@ -32,7 +28,6 @@ func newOAuth2Flow(svc *Service) *oauth2Flow {
 	}
 }
 
-// Login starts the authorization-code flow.
 func (h *oauth2Flow) Login(w http.ResponseWriter, r *http.Request) {
 	h.svc.startLogin(w, r, MethodOAuth2, h.state,
 		func(_ context.Context, _ *authorizeState, cfg *SSOProvider) (*oauth2.Config, []oauth2.AuthCodeOption, error) {
@@ -40,7 +35,6 @@ func (h *oauth2Flow) Login(w http.ResponseWriter, r *http.Request) {
 		})
 }
 
-// Callback fetches the profile, resolves the user, and issues a session.
 func (h *oauth2Flow) Callback(w http.ResponseWriter, r *http.Request) {
 	st, cfg, ok := h.svc.takeLogin(w, r, MethodOAuth2, h.state)
 	if !ok {
@@ -71,8 +65,7 @@ func (h *oauth2Flow) Callback(w http.ResponseWriter, r *http.Request) {
 	email := claimString(profile, "email")
 	verified := claimBool(profile, "email_verified")
 	if cfg.OAuth2.EmailURL != "" {
-		// GitHub never marks the profile email verified, the emails endpoint
-		// is the only source for that.
+		// GitHub only reports verification on the emails endpoint.
 		email, verified = fetchEmail(ctx, cfg.OAuth2, token)
 	}
 
@@ -89,9 +82,8 @@ func (h *oauth2Flow) Callback(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// fetchEmail picks the primary verified address from an email-list
-// endpoint, else any verified one. Unverified addresses never match an
-// account, so they are not worth returning.
+// fetchEmail prefers the primary verified address. Unverified ones never
+// match an account, so they are skipped.
 func fetchEmail(ctx context.Context, cfg *OAuth2Provider, tok *oauth2.Token) (string, bool) {
 	var entries []struct {
 		Email    string `json:"email"`
@@ -126,8 +118,6 @@ func (h *oauth2Flow) oauth2Config(cfg *OAuth2Provider) *oauth2.Config {
 	}
 }
 
-// oauthGet performs an authenticated GET and decodes the JSON body into
-// dst. ctx carries the guarded provider client.
 func oauthGet(ctx context.Context, tok *oauth2.Token, url string, dst any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

@@ -11,26 +11,22 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// registerAuthRoutes mounts the leftover /auth HTTP surface on mux.
 func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	svc := cfg.IAM
 	as := NewAuthService(cfg)
 
-	// Public, CSRF-guarded flows.
 	flow := newChain(svc.CSRFGuard)
 	mux.Handle("POST /passkey/login/begin", flow.ThenFunc(svc.Passkey.BeginLogin))
 	mux.Handle("POST /passkey/login/finish", flow.ThenFunc(svc.Passkey.FinishLogin))
 	mux.Handle("POST /passkey/signup/begin", flow.ThenFunc(svc.Passkey.BeginSignup))
 	mux.Handle("POST /passkey/signup/finish", flow.ThenFunc(svc.Passkey.FinishSignup))
 
-	// WebAuthn add-key needs a session; BeginRegistration checks the
-	// principal itself, so only auth middleware and CSRF wrap the route.
+	// BeginRegistration checks the principal itself, so no RequireLogin.
 	addKey := newChain(svc.Middleware, svc.CSRFGuard)
 	mux.Handle("POST /passkey/register/begin", addKey.ThenFunc(svc.Passkey.BeginRegistration))
 	mux.Handle("POST /passkey/register/finish", addKey.ThenFunc(svc.Passkey.FinishRegistration))
 
-	// Device flow: the browser page approves under a session; the CLI
-	// endpoints are public (RFC 8628).
+	// CLI device endpoints are public (RFC 8628), approval needs a session.
 	mux.HandleFunc("POST /auth/device", svc.Device.Begin)
 	mux.HandleFunc("POST /auth/device/token", svc.Device.Poll)
 	mux.HandleFunc("GET /auth/device/nonce", svc.Device.Nonce)
@@ -39,9 +35,7 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.Handle("POST /auth/device/verify", deviceGuard.ThenFunc(svc.Device.Verify))
 	mux.Handle("POST /auth/device/deny", deviceGuard.ThenFunc(svc.Device.Deny))
 
-	// The hooks give passkey logins the same device remembering and
-	// new-login alerts as password logins, and passkey signups the same
-	// verification email.
+	// Give passkey logins and signups the same side effects as password ones.
 	cfg.IAM.OnUserLogin = func(w http.ResponseWriter, r *http.Request, u *db.User, _ iam.Method) {
 		if c := cfg.IAM.RememberDevice(r.Context(), r.Header, r.RemoteAddr, u); c != nil {
 			http.SetCookie(w, c)
@@ -65,12 +59,8 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 		as.sendTokenEmail(r.Context(), u, iam.TokenVerifyEmail, true)
 	}
 
-	// SSO login flows. These are browser-redirect endpoints, so they mount
-	// at the root (the paths IdP administrators register and the UI
-	// navigates to), not under the /auth JSON API. Login endpoints run
-	// behind optional auth so a signed-in user links a provider; callbacks
-	// are public (the SAML ACS is a cross-origin IdP form post, exempt from
-	// CSRF by design).
+	// Optional auth on login lets a signed-in user link a provider.
+	// Callbacks are public, the SAML ACS is a cross-origin IdP form post.
 	optAuth := newChain(svc.Middleware, svc.CSRFGuard)
 	mux.Handle("GET /oidc/login", optAuth.ThenFunc(svc.OIDC.Login))
 	mux.Handle("POST /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
@@ -85,9 +75,7 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.Handle("GET /saml/certificate", http.HandlerFunc(svc.SAML.Certificate))
 	mux.Handle("GET /saml/certificate/{id}", http.HandlerFunc(svc.SAML.Certificate))
 
-	// SCIM 2.0 provisioning. Bearer-token surface mounted at the path IdP
-	// administrators register as the connector base URL. No session, no
-	// CSRF: the workspace-scoped token lookup is the only gate.
+	// SCIM has no session or CSRF, the workspace-scoped token is the only gate.
 	if cfg.IAM.SCIM != nil {
 		mux.Handle("/scim/v2/{workspace_id}", cfg.IAM.SCIMHandler())
 		mux.Handle("/scim/v2/{workspace_id}/", cfg.IAM.SCIMHandler())

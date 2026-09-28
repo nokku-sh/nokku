@@ -1,10 +1,7 @@
 package iam
 
-// SSO provider storage: one table, oidc/oauth2/saml discriminated by method.
-// Enterprise providers use their workspace id as provider id, social
-// providers are global rows with a NULL workspace. The whole configuration,
-// client secret included, is one JSON blob that the sqlc type override
-// (crypto.EncryptedBytes) encrypts at rest.
+// Enterprise providers use their workspace id as provider id, social ones are
+// global rows. The config, secret included, is one JSON blob encrypted at rest.
 
 import (
 	"context"
@@ -16,7 +13,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// OIDCProvider is the stored OIDC configuration.
 type OIDCProvider struct {
 	IssuerURL       string   `json:"issuer_url"`
 	ClientID        string   `json:"client_id"`
@@ -26,13 +22,11 @@ type OIDCProvider struct {
 	EnforceSSO      bool     `json:"enforce_sso,omitempty"`
 }
 
-// OAuth2Provider describes a plain OAuth2 provider without OIDC discovery,
-// such as GitHub.
 type OAuth2Provider struct {
 	AuthURL     string `json:"auth_url"`
 	TokenURL    string `json:"token_url"`
 	UserInfoURL string `json:"user_info_url"`
-	// EmailURL lists the account's addresses with their verified flag.
+	// EmailURL lists addresses with their verified flag.
 	EmailURL        string   `json:"email_url,omitempty"`
 	Scopes          []string `json:"scopes,omitempty"`
 	ClientID        string   `json:"client_id"`
@@ -41,7 +35,6 @@ type OAuth2Provider struct {
 	EnforceSSO      bool     `json:"enforce_sso,omitempty"`
 }
 
-// SAMLIDP is the stored SAML configuration.
 type SAMLIDP struct {
 	MetadataURL     string `json:"metadata_url,omitempty"`
 	MetadataXML     []byte `json:"metadata_xml,omitempty"`
@@ -49,7 +42,6 @@ type SAMLIDP struct {
 	EnforceSSO      bool   `json:"enforce_sso,omitempty"`
 }
 
-// SSOProvider is one stored SSO provider.
 type SSOProvider struct {
 	WorkspaceID string
 	ProviderID  string
@@ -63,7 +55,6 @@ type SSOProvider struct {
 	UpdatedAt   time.Time
 }
 
-// Enforced reports whether the provider requires SSO for its domains.
 func (p *SSOProvider) Enforced() bool {
 	if !p.Enabled {
 		return false
@@ -85,9 +76,8 @@ type providerConfig struct {
 	SAML   *SAMLIDP        `json:"saml,omitempty"`
 }
 
-// GetSSOProvider returns the provider stored under id, or ErrNotFound. The
-// read is global: login flows resolve providers before any principal exists.
-// Workspace admin reads go through GetWorkspaceSSOProvider.
+// GetSSOProvider reads globally since login flows run before any principal
+// exists. Admin reads go through GetWorkspaceSSOProvider.
 func (s *Service) GetSSOProvider(ctx context.Context, providerID string) (*SSOProvider, error) {
 	row, err := s.sys.GetSSOProvider(ctx, providerID)
 	if err != nil {
@@ -96,8 +86,6 @@ func (s *Service) GetSSOProvider(ctx context.Context, providerID string) (*SSOPr
 	return ssoProviderFromRow(row)
 }
 
-// GetWorkspaceSSOProvider returns the workspace's enterprise provider, or
-// ErrNotFound, pinned to the caller's workspace.
 func (s *Service) GetWorkspaceSSOProvider(ctx context.Context, workspaceID string) (*SSOProvider, error) {
 	var out *SSOProvider
 	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
@@ -114,10 +102,7 @@ func (s *Service) GetWorkspaceSSOProvider(ctx context.Context, workspaceID strin
 	return out, nil
 }
 
-// PutSSOProvider stores the provider. An empty client secret keeps the
-// stored one, so callers can update configuration without resubmitting it.
-// Social rows are global and written by the boot seeder, enterprise rows run
-// pinned to their workspace.
+// PutSSOProvider keeps the stored client secret when the new one is empty.
 func (s *Service) PutSSOProvider(ctx context.Context, p SSOProvider) error {
 	if p.WorkspaceID == "" {
 		return putSSOProvider(ctx, s.sys, p)
@@ -175,8 +160,6 @@ func ssoProviderFromRow(row *db.SsoProvider) (*SSOProvider, error) {
 	}, nil
 }
 
-// enforceSSO rejects a non-SSO login when the email's verified domain
-// belongs to a workspace whose provider enforces SSO.
 func (s *Service) enforceSSO(ctx context.Context, email string) error {
 	d, err := s.GetVerifiedTenantDomain(ctx, emailDomain(email))
 	if errors.Is(err, ErrNotFound) {

@@ -9,10 +9,7 @@ import (
 	emailverify "github.com/nokku-sh/nokku/internal/email"
 )
 
-// Register creates a user with the given email and password. The email is
-// normalized and validated (ErrEmailRejected); a duplicate returns
-// ErrEmailTaken. The account starts unverified and can only log in after
-// confirming the emailed link.
+// Register leaves the account unverified until the emailed link is confirmed.
 func (s *Service) Register(ctx context.Context, email, name, pw string) (*db.User, error) {
 	email = normalizeEmail(email)
 	if err := emailverify.Verify(email, s.strict); err != nil {
@@ -41,7 +38,6 @@ func (s *Service) Register(ctx context.Context, email, name, pw string) (*db.Use
 	return u, nil
 }
 
-// GetUser returns the request user, or ErrNotFound.
 func (s *Service) GetUser(ctx context.Context) (*db.User, error) {
 	var u *db.User
 	err := s.asSelf(ctx, func(q *db.Queries) (err error) {
@@ -62,7 +58,6 @@ func (s *Service) GetUserByID(ctx context.Context, userID string) (*db.User, err
 	return u, nil
 }
 
-// GetUserByEmail returns the user by normalized email, or ErrNotFound.
 func (s *Service) GetUserByEmail(ctx context.Context, email string) (*db.User, error) {
 	u, err := s.sys.GetUserByEmail(ctx, normalizeEmail(email))
 	if err != nil {
@@ -71,7 +66,6 @@ func (s *Service) GetUserByEmail(ctx context.Context, email string) (*db.User, e
 	return u, nil
 }
 
-// UpdateUser applies the patch to user p.ID and returns the updated user.
 func (s *Service) UpdateUser(ctx context.Context, p db.UpdateUserParams) (*db.User, error) {
 	u, err := s.sys.UpdateUser(ctx, &p)
 	if err != nil {
@@ -80,8 +74,7 @@ func (s *Service) UpdateUser(ctx context.Context, p db.UpdateUserParams) (*db.Us
 	return u, nil
 }
 
-// UpdateSelf applies the patch to the request user. Active stays untouched:
-// nobody reactivates themselves.
+// UpdateSelf never touches Active, nobody reactivates themselves.
 func (s *Service) UpdateSelf(ctx context.Context, p db.UpdateUserParams) (*db.User, error) {
 	var u *db.User
 	err := s.asSelf(ctx, func(q *db.Queries) (err error) {
@@ -99,8 +92,6 @@ func (s *Service) UpdateSelf(ctx context.Context, p db.UpdateUserParams) (*db.Us
 	return u, nil
 }
 
-// SharedWorkspacesError refuses an account deletion while the account owns
-// workspaces other people still use.
 type SharedWorkspacesError struct {
 	Names []string
 }
@@ -109,9 +100,7 @@ func (e *SharedWorkspacesError) Error() string {
 	return "iam: account owns shared workspaces: " + strings.Join(e.Names, ", ")
 }
 
-// DeleteUser deletes the request user. Workspaces the user owns alone go
-// with the account, a workspace with other members must change owner first
-// (SharedWorkspacesError). Credentials, sessions, and memberships cascade.
+// DeleteUser takes solo workspaces with it. Shared ones must change owner first.
 func (s *Service) DeleteUser(ctx context.Context) error {
 	u, err := s.GetUser(ctx)
 	if err != nil {
@@ -145,14 +134,10 @@ func (s *Service) DeleteUser(ctx context.Context) error {
 	return nil
 }
 
-// DeleteUnverifiedUsers removes accounts whose email was never verified
-// before cutoff and reports how many went. It backs a hygiene job; the grace
-// period is the caller's policy.
 func (s *Service) DeleteUnverifiedUsers(ctx context.Context, cutoff time.Time) (int64, error) {
 	return s.sys.DeleteUnverifiedUsers(ctx, cutoff)
 }
 
-// VerifyUserEmail marks the account's email as verified.
 func (s *Service) VerifyUserEmail(ctx context.Context, userID string) error {
 	return s.sys.VerifyUserEmail(ctx, userID)
 }

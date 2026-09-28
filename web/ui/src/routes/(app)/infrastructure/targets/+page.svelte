@@ -24,10 +24,8 @@
 	import { PencilIcon, Plus, Server, TagIcon, Trash2, UserIcon, IdCard } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
-	// Modal states
 	const targetModal = createEntityModalState(TargetSchema);
 
-	// Data
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
 	const targets = $derived(

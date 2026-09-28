@@ -8,15 +8,12 @@ import (
 	"fmt"
 )
 
-// EncryptedBytes automatically encrypts/decrypts byte slices.
-// Alias on []byte so raw bytes convert implicitly, no wrapper constructors.
-// String()/MarshalJSON always render "" so secrets never leak into logs or
-// API responses.
+// EncryptedBytes encrypts at rest. String and MarshalJSON render "" so
+// secrets never leak into logs or responses.
 //
 //nolint:recvcheck // Scan requires pointer receiver for sql.Scanner
 type EncryptedBytes []byte
 
-// Bytes returns a copy of the decrypted bytes.
 func (e EncryptedBytes) Bytes() []byte {
 	out := make([]byte, len(e))
 	copy(out, e)
@@ -74,9 +71,7 @@ func (e EncryptedBytes) MarshalJSON() ([]byte, error) {
 	return []byte(`""`), nil
 }
 
-// HashedToken is the hex-encoded sha256 digest of an API token.
-// String()/MarshalJSON always render "" so hashes never leak into logs or
-// API responses.
+// HashedToken renders "" from String and MarshalJSON so hashes never leak.
 //
 //nolint:recvcheck // Scan requires pointer receiver for sql.Scanner
 type HashedToken string
