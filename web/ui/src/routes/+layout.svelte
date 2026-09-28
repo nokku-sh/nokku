@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { authTransport, queryClient } from '$lib/api/client';
 	import { Toaster } from '$lib/components/ui/sonner';
+	import * as Tooltip from '$lib/components/ui/tooltip';
+	import ConfirmDialog from '$lib/components/utils/ConfirmDialog.svelte';
 	import { setTransport } from '$lib/query';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { ModeWatcher } from 'mode-watcher';
@@ -13,6 +15,11 @@
 <ModeWatcher />
 <Toaster />
 
-<QueryClientProvider client={queryClient}>
-	{@render children?.()}
-</QueryClientProvider>
+<!-- App wide, so tooltips also work outside the sidebar, e.g. in ConfirmDialog. -->
+<Tooltip.Provider>
+	<ConfirmDialog />
+
+	<QueryClientProvider client={queryClient}>
+		{@render children?.()}
+	</QueryClientProvider>
+</Tooltip.Provider>

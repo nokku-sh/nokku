@@ -9,7 +9,6 @@
 	import { daemon } from '$lib/api/daemons.svelte';
 	import { activeSessionID } from '$lib/store.svelte';
 	import { getSessions } from '$lib/api/terminal.svelte';
-	import { onMount } from 'svelte';
 
 	interface Props {
 		target: Target;
@@ -18,6 +17,9 @@
 
 	let sessions = getSessions();
 	let principals = $derived(target?.principals || []);
+
+	// Kept alive for its side effect, the select registers open sessions.
+	daemon.listSessions(() => target.daemonId);
 
 	const createSession = daemon.createSession();
 	const closeSession = daemon.closeSession();
@@ -35,10 +37,6 @@
 		createSession.mutate({ daemonId: target.daemonId, username });
 		popoverOpen = false;
 	}
-
-	onMount(() => {
-		daemon.listSessions(target.daemonId);
-	});
 </script>
 
 <Collapsible.Root class="rounded-xl" open={sessions.size > 0}>
@@ -49,7 +47,7 @@
 			class="flex min-w-0 flex-1 items-center gap-1 py-1.5 text-left text-sm"
 			disabled={sessions.size === 0}
 		>
-			<DotIcon size={28} class="shrink-0 text-emerald-500" />
+			<DotIcon size={28} class="shrink-0 text-success" />
 			<div class="min-w-0 flex-1">
 				<p class="truncate text-xs font-medium">{target?.name}</p>
 				{#if target?.metadata?.hostname}

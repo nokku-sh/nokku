@@ -3,7 +3,7 @@
 	import ModeSwitch from '$lib/components/utils/ModeSwitch.svelte';
 	import { ImprintURL, PrivacyURL, ToSURL } from '$lib/config';
 
-	const version = $derived(util.getVersion());
+	const version = util.getVersion();
 </script>
 
 <footer

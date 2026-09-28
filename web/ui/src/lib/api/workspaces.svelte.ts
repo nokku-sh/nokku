@@ -1,23 +1,26 @@
+import { MAX_PAGE_SIZE } from '$lib/config';
 import { WorkspaceService } from '$lib/gen/nokku/v1/workspace_pb';
 import { toast } from 'svelte-sonner';
-import { UtilService } from '$lib/gen/nokku/v1/util_pb';
+import { plural, useBulkMutation } from './bulk';
+import { AuditLogFilterSchema, UtilService } from '$lib/gen/nokku/v1/util_pb';
+import type { MessageInitShape } from '@bufbuild/protobuf';
 import { InvitationService } from '$lib/gen/nokku/v1/invitation_pb';
+import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '$lib/query';
-import { inviteToken, pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
-import type { Timestamp } from '@bufbuild/protobuf/wkt';
+import { inviteToken, workspaceID } from '$lib/store.svelte';
 
 export const workspace = {
 	get: () =>
 		useQuery(
 			WorkspaceService.method.getWorkspace,
-			{ workspaceId: workspaceID.current },
-			{
+			() => ({ workspaceId: workspaceID.current }),
+			() => ({
 				enabled: !!workspaceID.current,
 				select: (res) => {
 					if (!res.workspace) workspaceID.current = '';
 					return res.workspace;
 				}
-			}
+			})
 		),
 	list: () =>
 		useQuery(
@@ -33,6 +36,15 @@ export const workspace = {
 				}
 			}
 		),
+	getMember: (userId: MaybeGetter<string | undefined>) =>
+		useQuery(
+			WorkspaceService.method.getWorkspaceMember,
+			() => ({ workspaceId: workspaceID.current, userId: extract(userId) }),
+			() => ({
+				enabled: !!workspaceID.current && !!extract(userId),
+				select: (res) => res.member
+			})
+		),
 	listMembers: (
 		opts?: () => {
 			query?: string;
@@ -40,17 +52,18 @@ export const workspace = {
 			teamIds?: string[];
 			limit?: number;
 			offset?: number;
-		}
+		},
+		when?: () => boolean
 	) =>
 		useQuery(
 			WorkspaceService.method.listWorkspaceMembers,
 			() => ({
 				workspaceId: workspaceID.current,
-				limit: pageSize.current,
-				offset: pageIndex.current,
+				limit: MAX_PAGE_SIZE,
+				offset: 0,
 				...opts?.()
 			}),
-			{ enabled: !!workspaceID.current }
+			() => ({ enabled: !!workspaceID.current && (when?.() ?? true) })
 		),
 
 	create: () =>
@@ -75,6 +88,11 @@ export const workspace = {
 		useMutation(WorkspaceService.method.removeWorkspaceMember, {
 			onSuccess: () => toast.success('Member removed')
 		}),
+	removeMembers: () =>
+		useBulkMutation(
+			WorkspaceService.method.removeWorkspaceMember,
+			(n) => `${plural(n, 'member')} removed`
+		),
 	updateOwner: () =>
 		useMutation(WorkspaceService.method.updateWorkspaceOwner, {
 			onSuccess: () => toast.success('Owner updated')
@@ -85,8 +103,8 @@ export const invite = {
 	get: () =>
 		useQuery(
 			InvitationService.method.getInvitation,
-			{ token: inviteToken.current },
-			{ enabled: !!inviteToken.current }
+			() => ({ token: inviteToken.current }),
+			() => ({ enabled: !!inviteToken.current })
 		),
 
 	claim: () =>
@@ -102,38 +120,37 @@ export const invite = {
 		})
 };
 
+export type AuditFilter = MessageInitShape<typeof AuditLogFilterSchema>;
+export type AuditQuery = { filter?: AuditFilter; limit?: number; offset?: number };
+
+// Empty filters are dropped so they don't split the query cache.
+export const cleanFilters = <T extends object>(filters?: T): Partial<T> =>
+	Object.fromEntries(
+		Object.entries(filters ?? {}).filter(
+			([, v]) => v !== undefined && v !== '' && v !== null && !(Array.isArray(v) && !v.length)
+		)
+	) as Partial<T>;
+
 export const util = {
 	getVersion: () =>
-		useQuery(UtilService.method.getVersion, undefined, {
+		useQuery(UtilService.method.getVersion, undefined, () => ({
 			enabled: !!workspaceID.current,
 			select: (res) => res.version
-		}),
-	getLogs: (opts?: {
-		search?: string;
-		actorIds?: string[];
-		actorKinds?: string[];
-		actions?: string[];
-		status?: boolean;
-		startDate?: Timestamp;
-		endDate?: Timestamp;
-		limit?: number;
-		offset?: number;
-	}) => {
-		const cleanFilters = Object.fromEntries(
-			Object.entries(opts ?? {}).filter(([, v]) => v !== undefined && v !== '' && v !== null)
-		);
-
-		return useQuery(
+		})),
+	getLogs: (opts?: () => AuditQuery) =>
+		useQuery(
 			UtilService.method.listAuditLogs,
-			() => ({
-				workspaceId: workspaceID.current,
-				limit: pageSize.current,
-				offset: pageIndex.current,
-				...cleanFilters
-			}),
-			{ enabled: !!workspaceID.current }
-		);
-	},
+			() => {
+				const { filter, limit, offset } = opts?.() ?? {};
+				return {
+					workspaceId: workspaceID.current,
+					limit: limit ?? MAX_PAGE_SIZE,
+					offset: offset ?? 0,
+					filter: cleanFilters(filter) as AuditFilter
+				};
+			},
+			() => ({ enabled: !!workspaceID.current })
+		),
 
 	exportLogs: () =>
 		useMutation(UtilService.method.exportAuditLogs, {

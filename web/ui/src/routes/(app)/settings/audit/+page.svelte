@@ -14,8 +14,8 @@
 	import { UpgradeURL } from '$lib/config';
 	import { WorkspaceSettingsSchema } from '$lib/gen/nokku/v1/workspace_pb';
 
-	const ws = $derived(workspace.get());
-	const plan = $derived(billing.get());
+	const ws = workspace.get();
+	const plan = billing.get();
 	const available = $derived(plan.data?.features?.['audit_streaming'] === true);
 
 	const update = workspace.update();

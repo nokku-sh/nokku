@@ -16,8 +16,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Ellipsis, Trash2, type LucideIcon } from '@lucide/svelte';
-	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
+	import { confirm } from '$lib/hooks';
 
 	type Props = {
 		inlineActions?: InlineAction[];
@@ -25,7 +25,8 @@
 		menuActions?: ActionItem[];
 
 		deleteConfig?: {
-			onDelete: () => void;
+			/** Return the mutateAsync promise so the dialog waits for it. */
+			onDelete: () => unknown;
 			itemName?: string;
 			title?: string;
 			description?: string;
@@ -35,14 +36,23 @@
 
 	let { inlineActions = [], menuActions = [], deleteConfig }: Props = $props();
 
-	let showDeleteDialog = $state(false);
-	let hasDropdownActions = $derived(menuActions.length > 0 || !!deleteConfig);
+	const hasDropdownActions = $derived(menuActions.length > 0 || !!deleteConfig);
+
+	function askDelete() {
+		if (!deleteConfig) return;
+		void confirm({
+			title: deleteConfig.title ?? `Delete ${deleteConfig.itemName ?? 'item'}?`,
+			description: deleteConfig.description ?? 'This action cannot be undone.',
+			typeToConfirm: deleteConfig.requireTyping ? deleteConfig.itemName : undefined,
+			onConfirm: deleteConfig.onDelete
+		});
+	}
 </script>
 
 <div class="flex items-center justify-end gap-2">
 	{#if inlineActions.length > 0}
 		<ButtonGroup.Root>
-			{#each inlineActions as action}
+			{#each inlineActions as action, i (i)}
 				<Button
 					variant={action.variant || 'secondary'}
 					size={action.label ? 'sm' : 'icon-sm'}
@@ -50,7 +60,7 @@
 					onclick={action.onClick}
 				>
 					{#if action.icon}
-						<action.icon class="size-3.5" />
+						<action.icon data-icon={action.label ? 'inline-start' : undefined} />
 					{/if}
 					{#if action.label}
 						{action.label}
@@ -67,55 +77,42 @@
 				{#snippet child({ props })}
 					<Button {...props} variant="ghost" size="icon-sm">
 						<span class="sr-only">Open menu</span>
-						<Ellipsis class="size-4" />
+						<Ellipsis />
 					</Button>
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content align="end" class="w-48">
-				{#each menuActions as action}
-					<DropdownMenu.Item
-						onclick={action.onClick}
-						disabled={action.disabled}
-						class={action.isDestructive
-							? 'text-destructive focus:bg-destructive/10 focus:text-destructive'
-							: ''}
-					>
-						{#if action.icon}
-							<action.icon class="size-3.5" />
-						{/if}
-						{#if action.label}
-							{action.label}
-						{/if}
-					</DropdownMenu.Item>
-				{/each}
+				{#if menuActions.length > 0}
+					<DropdownMenu.Group>
+						{#each menuActions as action, i (i)}
+							<DropdownMenu.Item
+								onclick={action.onClick}
+								disabled={action.disabled}
+								variant={action.isDestructive ? 'destructive' : 'default'}
+							>
+								{#if action.icon}
+									<action.icon />
+								{/if}
+								{#if action.label}
+									{action.label}
+								{/if}
+							</DropdownMenu.Item>
+						{/each}
+					</DropdownMenu.Group>
+				{/if}
 
 				{#if deleteConfig}
 					{#if menuActions.length > 0}
 						<DropdownMenu.Separator />
 					{/if}
-					<DropdownMenu.Item
-						onclick={() => (showDeleteDialog = true)}
-						class="text-destructive focus:bg-destructive/10 focus:text-destructive"
-					>
-						<Trash2 class="size-3.5" />
-						Delete
-					</DropdownMenu.Item>
+					<DropdownMenu.Group>
+						<DropdownMenu.Item onclick={askDelete} variant="destructive">
+							<Trash2 />
+							Delete
+						</DropdownMenu.Item>
+					</DropdownMenu.Group>
 				{/if}
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/if}
 </div>
-
-{#if deleteConfig}
-	<DeleteConfirmationModal
-		bind:open={showDeleteDialog}
-		title={deleteConfig.title}
-		description={deleteConfig.description}
-		itemName={deleteConfig.itemName}
-		requireConfirmation={deleteConfig.requireTyping}
-		onConfirm={() => {
-			deleteConfig.onDelete();
-			showDeleteDialog = false;
-		}}
-	/>
-{/if}

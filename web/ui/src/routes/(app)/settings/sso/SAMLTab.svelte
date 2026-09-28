@@ -22,7 +22,7 @@
 		metadataUrl: ''
 	});
 
-	const provider = $derived(sso.getProvider());
+	const provider = sso.getProvider();
 	const configured = $derived(provider.data?.method === 'saml');
 	const replacesOIDC = $derived(provider.data?.method === 'oidc');
 	$effect(() => {

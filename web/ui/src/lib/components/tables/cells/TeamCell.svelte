@@ -9,7 +9,7 @@
 	};
 	let { userId }: Props = $props();
 
-	const teamsQuery = $derived(team.listForUser(userId));
+	const teamsQuery = team.listForUser(() => userId);
 	const teams = $derived(teamsQuery.data ?? []);
 
 	const teamCount = $derived(teams.length);

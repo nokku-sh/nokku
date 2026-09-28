@@ -4,7 +4,6 @@ export const NS = 'nokku';
 
 export const workspaceID = new PersistedState<string>(`${NS}:workspace:id`, '');
 
-export const pageIndex = new PersistedState<number>(`${NS}:page:index`, 0);
 export const pageSize = new PersistedState<number>(`${NS}:page:size`, 10);
 
 export const activeSessionID = new PersistedState<string>(`${NS}:session:active`, ``);
@@ -27,3 +26,6 @@ export const pendingDeviceCode = new PersistedState<string | undefined>(
 export const activeDashboardTab = new PersistedState<string>(`${NS}:tab:dashboard`, `admin`);
 
 export const activeSSOTab = new PersistedState<string>(`${NS}:tab:sso`, `oidc`);
+
+// Auditors compare timestamps with other systems, so they can pin UTC.
+export const auditUTC = new PersistedState<boolean>(`${NS}:audit:utc`, false);

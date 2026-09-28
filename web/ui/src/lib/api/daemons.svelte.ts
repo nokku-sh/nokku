@@ -1,14 +1,17 @@
+import { MAX_PAGE_SIZE } from '$lib/config';
 import { DaemonService, DaemonStatus } from '$lib/gen/nokku/v1/daemon_pb';
+import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '$lib/query';
+import { plural, useBulkMutation } from './bulk';
 import { addSession, removeSession, validateActiveSession } from './terminal.svelte';
-import { activeSessionID, pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
+import { activeSessionID, workspaceID } from '$lib/store.svelte';
 
 export const daemon = {
-	get: (id?: string) =>
+	get: (id: MaybeGetter<string | undefined>) =>
 		useQuery(
 			DaemonService.method.getDaemon,
-			{ workspaceId: workspaceID.current, id },
-			{ enabled: !!workspaceID.current && !!id }
+			() => ({ workspaceId: workspaceID.current, id: extract(id) }),
+			() => ({ enabled: !!workspaceID.current && !!extract(id) })
 		),
 	list: (
 		opts?: () => {
@@ -23,19 +26,20 @@ export const daemon = {
 			DaemonService.method.listDaemons,
 			() => ({
 				workspaceId: workspaceID.current,
-				limit: pageSize.current,
-				offset: pageIndex.current,
+				limit: MAX_PAGE_SIZE,
+				offset: 0,
 				...opts?.()
 			}),
-			{ enabled: !!workspaceID.current, refetchInterval: 15000 }
+			() => ({ enabled: !!workspaceID.current, refetchInterval: 15000 })
 		),
-	listSessions: (daemonId?: string) =>
+	listSessions: (id: MaybeGetter<string | undefined>) =>
 		useQuery(
 			DaemonService.method.listSessions,
-			{ workspaceId: workspaceID.current, daemonId },
-			{
-				enabled: !!workspaceID.current && !!daemonId,
+			() => ({ workspaceId: workspaceID.current, daemonId: extract(id) }),
+			() => ({
+				enabled: !!workspaceID.current && !!extract(id),
 				select: (res) => {
+					const daemonId = extract(id);
 					validateActiveSession(res.sessions);
 					if (!res.sessions || !daemonId) return [];
 					res.sessions.forEach((s) => {
@@ -49,7 +53,7 @@ export const daemon = {
 					return res.sessions;
 				},
 				refetchInterval: 15000
-			}
+			})
 		),
 
 	createSession: () =>
@@ -70,5 +74,9 @@ export const daemon = {
 			onSuccess: (_, vars) => vars.sessionId && removeSession(vars.sessionId)
 		}),
 	update: () => useMutation(DaemonService.method.updateDaemon),
-	delete: () => useMutation(DaemonService.method.deleteDaemon)
+	delete: () => useMutation(DaemonService.method.deleteDaemon),
+	approveMany: () =>
+		useBulkMutation(DaemonService.method.updateDaemon, (n) => `${plural(n, 'daemon')} approved`),
+	deleteMany: () =>
+		useBulkMutation(DaemonService.method.deleteDaemon, (n) => `${plural(n, 'daemon')} deleted`)
 };

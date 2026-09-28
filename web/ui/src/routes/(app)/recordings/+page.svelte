@@ -6,13 +6,16 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import StorageQuotaPill from './StorageQuotaPill.svelte';
-	import { createModalState } from '$lib/hooks';
+	import { confirm, createModalState, usePagination } from '$lib/hooks';
+	import { plural } from '$lib/api/bulk';
 	import { formatBytes } from '$lib/utils';
 	import type { Recording } from '$lib/gen/nokku/v1/recordings_pb';
 	import { Play, SearchX, Trash2, Video } from '@lucide/svelte';
 
-	const list = $derived(recordings.list());
+	const pager = usePagination();
+	const list = recordings.list(() => pager.args);
 	const deleteRecording = recordings.delete();
+	const deleteRecordings = recordings.deleteMany();
 
 	const player = createModalState<Recording>({} as Recording);
 
@@ -22,8 +25,13 @@
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: (selected) =>
-				selected.forEach(({ id }) => deleteRecording.mutate({ recordingId: id }))
+			onClick: async (selected) => {
+				const ok = await confirm({
+					title: `Delete ${plural(selected.length, 'recording')}?`,
+					description: 'This permanently deletes the recordings.'
+				});
+				if (ok) await deleteRecordings.mutateAsync(selected.map(({ id }) => ({ recordingId: id })));
+			}
 		}
 	];
 
@@ -61,9 +69,7 @@
 					deleteConfig: {
 						itemName: `recording of ${row.original.username}`,
 						description: 'This permanently deletes the recording.',
-						onDelete: () => {
-							deleteRecording.mutate({ recordingId: row.original.id });
-						}
+						onDelete: () => deleteRecording.mutateAsync({ recordingId: row.original.id })
 					}
 				})
 		})
@@ -81,6 +87,7 @@
 <DataTable
 	data={list.data?.recordings ?? []}
 	rowCount={list.data?.total ?? 0}
+	isLoading={list.isLoading}
 	{columns}
 	{bulkActions}
 	emptyState={{

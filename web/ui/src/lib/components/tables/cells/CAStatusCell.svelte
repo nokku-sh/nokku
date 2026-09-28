@@ -35,7 +35,7 @@
 			<LoaderCircle class="size-3 animate-spin text-muted-foreground" />
 			<span class="text-muted-foreground">Updating...</span>
 		{:else if enabled}
-			<Badge variant="secondary" class="text-emerald-600">Active</Badge>
+			<Badge variant="secondary" class="text-success">Active</Badge>
 		{:else}
 			<Badge variant="destructive">Inactive</Badge>
 		{/if}
@@ -44,7 +44,7 @@
 	<Select.Content class="w-48">
 		<Select.Group>
 			<Select.Item value="active" label="Active" class="cursor-pointer items-center gap-2.5 py-2">
-				<div class="flex size-5 shrink-0 items-center justify-center rounded-full text-emerald-600">
+				<div class="flex size-5 shrink-0 items-center justify-center rounded-full text-success">
 					<ShieldCheck />
 				</div>
 				<div class="flex flex-col text-left">

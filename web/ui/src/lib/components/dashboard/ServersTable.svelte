@@ -22,8 +22,8 @@
 	let pageIdx = $state(0);
 	const pageSize = 25;
 
-	const currentUser = $derived(user.self());
-	const access = $derived(target.access(currentUser.data?.id));
+	const currentUser = user.self();
+	const access = target.access(() => currentUser.data?.id);
 	const accessTargets = $derived(access.data?.targets);
 	const accessAgents = $derived(access.data?.daemons);
 
@@ -166,9 +166,7 @@
 							<td class="px-4 py-3">
 								<div class="flex items-center justify-center">
 									<span
-										class="size-2 rounded-full {online
-											? 'bg-emerald-500'
-											: 'bg-muted-foreground/30'}"
+										class="size-2 rounded-full {online ? 'bg-success' : 'bg-muted-foreground/30'}"
 										title={online ? 'Reachable' : 'Unreachable'}
 									></span>
 								</div>

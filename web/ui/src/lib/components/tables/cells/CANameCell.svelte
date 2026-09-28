@@ -85,7 +85,7 @@
 					{ca.name}
 				</span>
 				{#if ca.isDefault}
-					<Star size={12} class="shrink-0 fill-yellow-500 text-yellow-500" />
+					<Star size={12} class="shrink-0 fill-warning text-warning" />
 				{/if}
 			</div>
 			{#if ca.description}
@@ -107,13 +107,13 @@
 						<span>{typeLabel}</span>
 						<span>·</span>
 						{#if ca.isActive}
-							<span class="text-emerald-600">Active</span>
+							<span class="text-success">Active</span>
 						{:else}
 							<span class="text-destructive">Inactive</span>
 						{/if}
 						{#if ca.isDefault}
 							<span>·</span>
-							<Star size={12} class="fill-yellow-500 text-yellow-500" />
+							<Star size={12} class="fill-warning text-warning" />
 							<span>Default</span>
 						{/if}
 					</div>

@@ -42,7 +42,12 @@
 	--sidebar-accent-foreground: oklch(0.2 0.02 260);
 	--sidebar-border: transparent;
 	--sidebar-ring: oklch(0.55 0.12 200);
-	--success: oklch(0.65 0.15 150);
+	--success: oklch(0.6 0.15 150);
+	--success-foreground: oklch(0.985 0.005 260);
+	--warning: oklch(0.68 0.15 65);
+	--warning-foreground: oklch(0.22 0.04 65);
+	--info: oklch(0.58 0.14 245);
+	--info-foreground: oklch(0.985 0.005 260);
 	--radius: 1.4rem;
 	--shadow-x: 0px;
 	--shadow-y: 0px;
@@ -95,7 +100,12 @@
 	--sidebar-accent-foreground: oklch(0.95 0.01 260);
 	--sidebar-border: transparent;
 	--sidebar-ring: oklch(0.75 0.15 200);
-	--success: oklch(0.7 0.15 150);
+	--success: oklch(0.72 0.15 150);
+	--success-foreground: oklch(0.15 0.02 260);
+	--warning: oklch(0.8 0.15 75);
+	--warning-foreground: oklch(0.2 0.04 65);
+	--info: oklch(0.72 0.13 245);
+	--info-foreground: oklch(0.15 0.02 260);
 	--radius: 1.4rem;
 	--shadow-x: 0px;
 	--shadow-y: 0px;
@@ -134,6 +144,8 @@
 	--color-success-foreground: var(--success-foreground);
 	--color-warning: var(--warning);
 	--color-warning-foreground: var(--warning-foreground);
+	--color-info: var(--info);
+	--color-info-foreground: var(--info-foreground);
 	--color-border: var(--border);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
@@ -225,4 +237,11 @@
 	.xterm {
 		overflow: hidden;
 	}
+}
+
+/* A confirmation over an open sheet or dialog would double the blur and tint. */
+body:has([data-slot='sheet-overlay'], [data-slot='dialog-overlay'])
+	[data-slot='alert-dialog-overlay'] {
+	backdrop-filter: none;
+	background: transparent;
 }

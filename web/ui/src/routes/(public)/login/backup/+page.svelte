@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Alert from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -103,12 +104,11 @@
 	</div>
 
 	<div class="bg-muted/50 p-3">
-		<div class="rounded-md border border-amber-500/20 bg-amber-500/10 p-3">
-			<p class="text-center text-xs text-amber-700 dark:text-amber-400">
-				<strong>Warning:</strong> Each backup code can only be used once. Make sure to generate new codes
-				after using your last one.
-			</p>
-		</div>
+		<Alert.Root variant="warning">
+			<Alert.Description class="text-xs">
+				Each backup code works only once. Generate new codes after using your last one.
+			</Alert.Description>
+		</Alert.Root>
 
 		<Button
 			variant="link"

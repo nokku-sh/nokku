@@ -9,7 +9,7 @@
 	import { inviteToken } from '$lib/store.svelte';
 	import { formatTs, toDate } from '$lib/utils';
 
-	const invitation = $derived(invite.get());
+	const invitation = invite.get();
 	const claimInvitation = invite.claim();
 	let open = $derived(!!inviteToken.current);
 

@@ -87,6 +87,7 @@ func seedWorkspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection
 			if err := q.EnsureWorkspaceMember(ctx, &db.EnsureWorkspaceMemberParams{
 				WorkspaceID: workspace.ID,
 				UserID:      user.ID,
+				RoleName:    string(db.Roles[gofakeit.IntN(len(db.Roles)-1)]),
 			}); err != nil {
 				return fmt.Errorf("failed to add workspace member: %w", err)
 			}

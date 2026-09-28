@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { confirm } from '$lib/hooks';
 	import { page } from '$app/state';
 	import { scim } from '$lib/api/scim.svelte';
 	import { workspaceID } from '$lib/store.svelte';
@@ -12,17 +13,15 @@
 	import * as Table from '$lib/components/ui/table';
 	import { Input } from '$lib/components/ui/input';
 	import InputGroupVariants from '$lib/components/ui/input-group/input-group-variants.svelte';
-	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
 	import { CircleAlert, KeyRound, Plus, Trash2, UsersRound } from '@lucide/svelte';
 
-	const tokens = $derived(scim.listTokens());
+	const tokens = scim.listTokens();
 	const createToken = scim.createToken();
 	const deleteToken = scim.deleteToken();
 
 	let showCreate = $state(false);
 	let label = $state('');
 	let created = $state<{ token: string; baseUrl: string } | null>(null);
-	let deleteTarget = $state<{ id: string; label: string } | null>(null);
 
 	const baseURL = $derived(`${page.url.origin}/scim/v2/${workspaceID.current}`);
 
@@ -46,19 +45,6 @@
 		created = null;
 	}
 </script>
-
-<DeleteConfirmationModal
-	open={deleteTarget !== null}
-	title="Revoke Token"
-	description="The identity provider using this token will lose access immediately. Provisioning stops until a new token is configured."
-	itemName={deleteTarget?.label}
-	submitText="Revoke"
-	onConfirm={() => {
-		if (deleteTarget) {
-			deleteToken.mutate({ workspaceId: workspaceID.current, tokenId: deleteTarget.id });
-		}
-	}}
-/>
 
 <Card.Root class="mb-4">
 	<Card.Header>
@@ -142,7 +128,18 @@
 									size="sm"
 									variant="ghost"
 									class="text-destructive hover:text-destructive"
-									onclick={() => (deleteTarget = { id: t.id ?? '', label: t.label ?? '' })}
+									onclick={() =>
+										confirm({
+											title: `Revoke ${t.label || 'token'}?`,
+											description:
+												'The identity provider using this token loses access immediately. Provisioning stops until a new token is configured.',
+											confirmText: 'Revoke',
+											onConfirm: () =>
+												deleteToken.mutateAsync({
+													workspaceId: workspaceID.current,
+													tokenId: t.id ?? ''
+												})
+										})}
 									title="Revoke Token"
 								>
 									<Trash2 />

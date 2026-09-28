@@ -51,9 +51,7 @@
 						<span
 							class={cn(
 								'flex size-4 shrink-0 items-center justify-center rounded-full border',
-								step.done
-									? 'border-emerald-500 bg-emerald-500 text-white'
-									: 'border-muted-foreground/40'
+								step.done ? 'border-success bg-success text-white' : 'border-muted-foreground/40'
 							)}
 						>
 							{#if step.done}

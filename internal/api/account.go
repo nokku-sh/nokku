@@ -220,6 +220,8 @@ func (s *AccountService) ListAccountSessions(
 			Current:    new(sess.TokenHash == current.TokenHash),
 			ExpiresAt:  db.SafeTimestamp(sess.ExpiresAt),
 			LastSeenAt: db.SafeTimestamp(sess.LastSeenAt),
+			UserAgent:  new(sess.UserAgent),
+			Ip:         new(sess.Ip),
 		})
 	}
 	return &nokkuv1.ListAccountSessionsResponse{Sessions: out}, nil

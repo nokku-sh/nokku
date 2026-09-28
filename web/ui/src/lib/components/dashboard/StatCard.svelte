@@ -29,8 +29,8 @@
 
 	const tones: Record<string, string> = {
 		default: 'bg-primary/10 text-primary',
-		success: 'bg-emerald-500/10 text-emerald-500',
-		warn: 'bg-amber-500/10 text-amber-500',
+		success: 'bg-success/10 text-success',
+		warn: 'bg-warning/10 text-warning',
 		danger: 'bg-destructive/10 text-destructive'
 	};
 

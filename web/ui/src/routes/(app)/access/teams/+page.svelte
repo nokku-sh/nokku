@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { plural } from '$lib/api/bulk';
 	import { page } from '$app/state';
 	import { team } from '$lib/api/team.svelte';
-	import TeamModal from '$lib/components/modals/TeamModal.svelte';
+	import CreateTeamModal from '$lib/components/modals/CreateTeamModal.svelte';
+	import TeamSheet from '$lib/components/sheets/TeamSheet.svelte';
 	import {
 		DataTable,
 		TableToolbar,
@@ -13,24 +14,24 @@
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
 	import type { Team } from '$lib/gen/nokku/v1/team_pb';
-	import { TeamSchema } from '$lib/gen/nokku/v1/team_pb';
-	import { createEntityModalState } from '$lib/hooks';
-	import { PencilIcon, PlusIcon, Trash2, Users, UsersIcon } from '@lucide/svelte';
+	import { confirm, usePagination, useSheet } from '$lib/hooks';
+	import { PlusIcon, ShieldCheck, Trash2, Users, UsersIcon } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
-	const teamModal = createEntityModalState(TeamSchema);
+	const sheet = useSheet();
+	let createOpen = $state(false);
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
-	const teams = $derived(
-		team.list(() => ({
-			query: debounced.current
-		}))
-	);
+	const pager = usePagination();
+	const teams = team.list(() => ({
+		...pager.args,
+		query: debounced.current
+	}));
 
 	const deleteTeam = team.delete();
+	const deleteTeams = team.deleteMany();
 
 	const bulkActions: BulkAction<Team>[] = [
 		{
@@ -38,7 +39,14 @@
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: (selected) => selected.forEach(({ id }) => deleteTeam.mutate({ id }))
+			onClick: async (selected) => {
+				const ok = await confirm({
+					title: `Delete ${plural(selected.length, 'team')}?`,
+					description: 'This action cannot be undone.',
+					confirmText: 'Delete'
+				});
+				if (ok) await deleteTeams.mutateAsync(selected.map(({ id }) => ({ id })));
+			}
 		}
 	];
 
@@ -73,24 +81,18 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
-					inlineActions: [
+					menuActions: [
 						{
-							icon: PencilIcon,
-							onClick: () => teamModal.openEdit(row.original)
-						},
-						{
-							icon: PlusIcon,
-							onClick: () =>
-								goto(
-									`/access/assign?type=${SubjectKind.TEAM}&id=${row.original.id}&name=${encodeURIComponent(row.original.name)}`
-								)
+							label: 'Manage access',
+							icon: ShieldCheck,
+							onClick: () => sheet.show(row.original.id, 'access')
 						}
 					],
 
 					deleteConfig: {
 						itemName: row.original.name,
 						description: 'Are you sure you want to delete this team?',
-						onDelete: () => deleteTeam.mutate({ id: row.original.id })
+						onDelete: () => deleteTeam.mutateAsync({ id: row.original.id })
 					}
 				});
 			}
@@ -98,20 +100,23 @@
 	]);
 </script>
 
-<PageHeader title="Teams" description="Manage your workspace teams" icon={UsersIcon}>
-	<Button onclick={() => teamModal.openNew()}>
+<PageHeader title="Teams" description="Groups of people who share access" icon={UsersIcon}>
+	<Button onclick={() => (createOpen = true)}>
 		<PlusIcon data-icon="inline-start" />
-		Create Team
+		Create team
 	</Button>
 </PageHeader>
 
-<TeamModal bind:open={teamModal.open} draft={teamModal.draft} />
+<CreateTeamModal bind:open={createOpen} />
+<TeamSheet />
 
 <DataTable
 	data={teams.data?.teams ?? []}
 	rowCount={teams.data?.total ?? 0}
+	isLoading={teams.isLoading}
 	{columns}
 	{bulkActions}
+	onRowClick={(t) => sheet.show(t.id)}
 	emptyState={{
 		icon: Users,
 		title: 'No Teams',

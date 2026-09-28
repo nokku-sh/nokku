@@ -1,9 +1,10 @@
+import { MAX_PAGE_SIZE } from '$lib/config';
 import { PrincipalService, SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
 import { TargetService } from '$lib/gen/nokku/v1/target_pb';
 import { queryClient } from '$lib/api/client';
 import { toast } from 'svelte-sonner';
 import { useMutation, useQuery } from '$lib/query';
-import { pageIndex, pageSize, workspaceID } from '$lib/store.svelte';
+import { workspaceID } from '$lib/store.svelte';
 
 // The global mutation cache only invalidates the mutating service, but grant
 // changes also move TargetService.GetSubjectAccess.
@@ -24,12 +25,12 @@ export const principal = {
 			() => ({
 				targetId: opts().targetId || '',
 				query: opts().query,
-				limit: opts().limit ?? pageSize.current,
-				offset: opts().offset ?? pageIndex.current,
+				limit: opts().limit ?? MAX_PAGE_SIZE,
+				offset: opts().offset ?? 0,
 				workspaceId: workspaceID.current
 			}),
 			() => ({
-				enabled: !!opts().targetId
+				enabled: !!workspaceID.current && !!opts().targetId
 			})
 		),
 

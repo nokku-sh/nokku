@@ -1,6 +1,6 @@
 <script lang="ts">
+	import { confirm } from '$lib/hooks';
 	import { principal } from '$lib/api/principals.svelte';
-	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
@@ -23,45 +23,43 @@
 	let { data }: NodeProps = $props();
 	let subjectType = $derived(data.subjectType as SubjectKind);
 
-	let openRevokeModal = $state(false);
-
 	const config = $derived.by(() => {
 		switch (subjectType) {
 			case SubjectKind.USER:
 				return {
-					borderColor: 'border-blue-500',
-					headerBg: 'bg-blue-500/10',
-					iconColor: 'text-blue-500',
+					borderColor: 'border-chart-1',
+					headerBg: 'bg-chart-1/10',
+					iconColor: 'text-chart-1',
 					icon: CircleUserIcon,
 					label: 'User',
-					handleColor: 'bg-blue-500!'
+					handleColor: 'bg-chart-1!'
 				};
 			case SubjectKind.TEAM:
 				return {
-					borderColor: 'border-emerald-500',
-					headerBg: 'bg-emerald-500/10',
-					iconColor: 'text-emerald-500',
+					borderColor: 'border-chart-3',
+					headerBg: 'bg-chart-3/10',
+					iconColor: 'text-chart-3',
 					icon: UsersIcon,
 					label: 'Team',
-					handleColor: 'bg-emerald-500!'
+					handleColor: 'bg-chart-3!'
 				};
 			case SubjectKind.SERVICE_ACCOUNT:
 				return {
-					borderColor: 'border-purple-500',
-					headerBg: 'bg-purple-500/10',
-					iconColor: 'text-purple-500',
+					borderColor: 'border-chart-4',
+					headerBg: 'bg-chart-4/10',
+					iconColor: 'text-chart-4',
 					icon: Waypoints,
 					label: 'Service',
-					handleColor: 'bg-purple-500!'
+					handleColor: 'bg-chart-4!'
 				};
 			default:
 				return {
-					borderColor: 'border-purple-500',
-					headerBg: 'bg-purple-500/10',
-					iconColor: 'text-purple-500',
+					borderColor: 'border-chart-4',
+					headerBg: 'bg-chart-4/10',
+					iconColor: 'text-chart-4',
 					icon: Bot,
 					label: 'Service',
-					handleColor: 'bg-purple-500!'
+					handleColor: 'bg-chart-4!'
 				};
 		}
 	});
@@ -69,22 +67,20 @@
 	const revokeAccessTarget = principal.removeSubjects();
 	function handleRevokeAccess() {
 		if (!data.subjectType || !data.principalId) return;
-		let subjectID = data.id as User['id'] | Team['id'] | ServiceAccount['id'];
-		revokeAccessTarget.mutate({
-			id: data.principalId as string,
-			subjectIds: [subjectID],
-			kind: data.subjectType as SubjectKind
+		const subjectID = data.id as User['id'] | Team['id'] | ServiceAccount['id'];
+		void confirm({
+			title: 'Revoke access?',
+			description: `This revokes access for ${data.name || data.username || 'this subject'}.`,
+			confirmText: 'Revoke',
+			onConfirm: () =>
+				revokeAccessTarget.mutateAsync({
+					id: data.principalId as string,
+					subjectIds: [subjectID],
+					kind: data.subjectType as SubjectKind
+				})
 		});
 	}
 </script>
-
-<DeleteConfirmationModal
-	bind:open={openRevokeModal}
-	title="Revoke Access"
-	description="This will revoke access to {data.name}"
-	itemName={(data.name as string) || (data.username as string) || ''}
-	onConfirm={handleRevokeAccess}
-/>
 
 <div class="group relative">
 	<Card.Root
@@ -129,7 +125,7 @@
 			variant="ghost"
 			size="icon"
 			class="absolute -top-4 -right-4 rounded-full hover:text-destructive {config.handleColor} text-white"
-			onclick={() => (openRevokeModal = true)}
+			onclick={handleRevokeAccess}
 		>
 			<Trash2 size={14} />
 		</Button>

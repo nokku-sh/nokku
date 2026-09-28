@@ -1,0 +1,203 @@
+<script lang="ts">
+	import { principal as principalApi } from '$lib/api/principals.svelte';
+	import { serviceAccount as saApi } from '$lib/api/service_account.svelte';
+	import RolePicker from '$lib/components/access/RolePicker.svelte';
+	import SubjectAccess from '$lib/components/access/SubjectAccess.svelte';
+	import * as Alert from '$lib/components/ui/alert';
+	import { Badge } from '$lib/components/ui/badge';
+	import * as Field from '$lib/components/ui/field';
+	import { TagsInput } from '$lib/components/ui/tags-input';
+	import * as Tabs from '$lib/components/ui/tabs';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
+	import { ServiceAccountSchema } from '$lib/gen/nokku/v1/service_account_pb';
+	import { confirm, useAutoSave, useDraft, useSheet } from '$lib/hooks';
+	import { formatTs, toDate } from '$lib/utils';
+	import {
+		Bot,
+		FileText,
+		Info,
+		KeyRound,
+		ShieldCheck,
+		TriangleAlert,
+		UserCog
+	} from '@lucide/svelte';
+	import DangerZone from './DangerZone.svelte';
+	import DetailList from './DetailList.svelte';
+	import EntitySheet from './EntitySheet.svelte';
+	import Section from './Section.svelte';
+
+	const sheet = useSheet();
+	const query = saApi.get(() => sheet.id);
+	const entity = $derived(query.data);
+	const draft = useDraft(ServiceAccountSchema, () => query.data);
+	const model = $derived(draft.current);
+
+	const update = saApi.update();
+	const remove = saApi.delete();
+	const revokeAll = principalApi.revokeSubject();
+
+	const autoSave = useAutoSave(() => update.mutateAsync({ ...model }));
+	const save = () => autoSave.save();
+
+	const expiresAt = $derived(entity?.expiresAt ? toDate(entity.expiresAt) : undefined);
+	const expired = $derived(!!expiresAt && expiresAt.getTime() < Date.now());
+	const expiresSoon = $derived(
+		!!expiresAt && !expired && expiresAt.getTime() - Date.now() < 14 * 24 * 3600 * 1000
+	);
+
+	function askDelete() {
+		if (!entity) return;
+		void confirm({
+			title: `Delete ${entity.name}?`,
+			description: 'Its token stops working right away and every grant is removed.',
+			typeToConfirm: entity.name,
+			onConfirm: async () => {
+				await remove.mutateAsync({ id: entity.id });
+				sheet.close();
+			}
+		});
+	}
+
+	function askRevokeAll() {
+		if (!entity) return;
+		void confirm({
+			title: `Revoke all access for ${entity.name}?`,
+			description: 'It is removed from every login account on every target.',
+			confirmText: 'Revoke all',
+			onConfirm: () =>
+				revokeAll.mutateAsync({ subjectId: entity.id, kind: SubjectKind.SERVICE_ACCOUNT })
+		});
+	}
+</script>
+
+<EntitySheet
+	open={sheet.open}
+	onClose={() => sheet.close()}
+	loading={!model}
+	missing={query.isError}
+	title={model?.name ?? ''}
+	onRename={(name) => {
+		if (!model) return;
+		model.name = name;
+		save();
+	}}
+	tabs={[
+		{ value: 'overview', label: 'Overview', icon: Info },
+		{ value: 'access', label: 'Access', icon: ShieldCheck }
+	]}
+	tab={sheet.tab}
+	onTabChange={(t) => (sheet.tab = t)}
+	saveState={autoSave.saveState}
+	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
+>
+	{#snippet media()}
+		<div class="flex size-10 items-center justify-center rounded-lg bg-chart-4/15 text-chart-4">
+			<Bot class="size-5" />
+		</div>
+	{/snippet}
+
+	{#snippet subtitle()}
+		<span>
+			{entity?.lastUsedAt ? `Last used ${formatTs(entity.lastUsedAt, 'relative')}` : 'Never used'}
+		</span>
+		{#if expired}
+			<Badge variant="destructive">Expired</Badge>
+		{:else if expiresSoon}
+			<Badge variant="warning">Expires {formatTs(entity?.expiresAt, 'relative')}</Badge>
+		{/if}
+	{/snippet}
+
+	{#if model && entity}
+		<Tabs.Content value="overview" class="flex flex-col divide-y">
+			{#if expired}
+				<div class="pb-5">
+					<Alert.Root variant="destructive">
+						<TriangleAlert />
+						<Alert.Title>The token has expired</Alert.Title>
+						<Alert.Description>
+							Automation using it is failing. Create a new service account to get a fresh token.
+						</Alert.Description>
+					</Alert.Root>
+				</div>
+			{/if}
+
+			<Section title="Token" icon={KeyRound}>
+				<DetailList
+					items={[
+						{
+							label: 'Expires',
+							value: entity.expiresAt ? formatTs(entity.expiresAt) : 'Never'
+						},
+						{
+							label: 'Last used',
+							value: entity.lastUsedAt ? formatTs(entity.lastUsedAt, 'relative') : 'Never'
+						}
+					]}
+				/>
+			</Section>
+
+			<Section
+				title="Workspace role"
+				icon={UserCog}
+				description="What it may change through the API."
+			>
+				<RolePicker
+					value={model.roleName}
+					onChange={(role) => {
+						model.roleName = role;
+						save();
+					}}
+				/>
+			</Section>
+
+			<Section title="Details" icon={FileText}>
+				<Field.Group class="gap-4">
+					<Field.Field>
+						<Field.Label for="sa-description">What it's for</Field.Label>
+						<Textarea
+							id="sa-description"
+							bind:value={model.description}
+							placeholder="Deploys from the main branch"
+							rows={2}
+							oninput={save}
+						/>
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="sa-tags">Tags</Field.Label>
+						<TagsInput
+							id="sa-tags"
+							value={model.tags}
+							onValueChange={(tags) => {
+								model.tags = tags;
+								save();
+							}}
+							placeholder="ci, ansible"
+						/>
+					</Field.Field>
+				</Field.Group>
+			</Section>
+
+			<DangerZone
+				actions={[
+					{
+						title: 'Revoke all access',
+						description: 'Remove it from every login account.',
+						label: 'Revoke all',
+						onClick: askRevokeAll
+					},
+					{
+						title: 'Delete service account',
+						description: 'The token stops working immediately.',
+						label: 'Delete',
+						onClick: askDelete
+					}
+				]}
+			/>
+		</Tabs.Content>
+
+		<Tabs.Content value="access">
+			<SubjectAccess subjectId={entity.id} kind={SubjectKind.SERVICE_ACCOUNT} name={entity.name} />
+		</Tabs.Content>
+	{/if}
+</EntitySheet>

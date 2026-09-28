@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { plural } from '$lib/api/bulk';
 	import { page } from '$app/state';
 	import { serviceAccount } from '$lib/api/service_account.svelte';
-	import ServiceAccountModal from '$lib/components/modals/ServiceAccountModal.svelte';
+	import CreateServiceAccountModal from '$lib/components/modals/CreateServiceAccountModal.svelte';
+	import ServiceAccountSheet from '$lib/components/sheets/ServiceAccountSheet.svelte';
 	import {
 		DataTable,
 		TableToolbar,
@@ -13,27 +14,27 @@
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
 	import type { ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
-	import { ServiceAccountSchema } from '$lib/gen/nokku/v1/service_account_pb';
-	import { createEntityModalState } from '$lib/hooks';
-	import { PencilIcon, PlusIcon, Trash2, Waypoints } from '@lucide/svelte';
+	import { confirm, usePagination, useSheet } from '$lib/hooks';
+	import { PlusIcon, ShieldCheck, Trash2, Waypoints } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import { roles } from '$lib/api/roles.svelte';
 	import { roleIcon, roleLabel } from '$lib/roles';
 
-	const modal = createEntityModalState(ServiceAccountSchema);
+	const sheet = useSheet();
+	let createOpen = $state(false);
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
-	const saData = $derived(
-		serviceAccount.list(() => ({
-			query: debounced.current,
-			roleName: page.url.searchParams.get('role') || undefined
-		}))
-	);
+	const pager = usePagination();
+	const saData = serviceAccount.list(() => ({
+		...pager.args,
+		query: debounced.current,
+		roleName: page.url.searchParams.get('role') || undefined
+	}));
 
 	const deleteSA = serviceAccount.delete();
+	const deleteSAs = serviceAccount.deleteMany();
 	const updateSA = serviceAccount.update();
 
 	const bulkActions: BulkAction<ServiceAccount>[] = [
@@ -42,11 +43,18 @@
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: (selected) => selected.forEach(({ id }) => deleteSA.mutate({ id }))
+			onClick: async (selected) => {
+				const ok = await confirm({
+					title: `Delete ${plural(selected.length, 'service account')}?`,
+					description: 'This action cannot be undone.',
+					confirmText: 'Delete'
+				});
+				if (ok) await deleteSAs.mutateAsync(selected.map(({ id }) => ({ id })));
+			}
 		}
 	];
 
-	const rolesQuery = $derived(roles.list());
+	const rolesQuery = roles.list();
 	const roleOptions = $derived(
 		(rolesQuery.data ?? []).map((r) => ({
 			label: roleLabel(r.name),
@@ -94,24 +102,18 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
-					inlineActions: [
+					menuActions: [
 						{
-							icon: PencilIcon,
-							onClick: () => modal.openEdit(row.original)
-						},
-						{
-							icon: PlusIcon,
-							onClick: () =>
-								goto(
-									`/access/assign?type=${SubjectKind.SERVICE_ACCOUNT}&id=${row.original.id}&name=${encodeURIComponent(row.original.name)}`
-								)
+							label: 'Manage access',
+							icon: ShieldCheck,
+							onClick: () => sheet.show(row.original.id, 'access')
 						}
 					],
 
 					deleteConfig: {
 						itemName: row.original.name,
 						description: 'Are you sure you want to delete this service account?',
-						onDelete: () => deleteSA.mutate({ id: row.original.id })
+						onDelete: () => deleteSA.mutateAsync({ id: row.original.id })
 					}
 				});
 			}
@@ -121,22 +123,25 @@
 
 <PageHeader
 	title="Service Accounts"
-	description="Manage service accounts for API access, automation and CI/CD workflows"
+	description="API identities for CI, Ansible and other automation"
 	icon={Waypoints}
 >
-	<Button onclick={() => modal.openNew()}>
+	<Button onclick={() => (createOpen = true)}>
 		<PlusIcon data-icon="inline-start" />
-		Add Service Account
+		Create service account
 	</Button>
 </PageHeader>
 
-<ServiceAccountModal bind:open={modal.open} draft={modal.draft} />
+<CreateServiceAccountModal bind:open={createOpen} />
+<ServiceAccountSheet />
 
 <DataTable
 	data={saData.data?.serviceAccounts ?? []}
 	rowCount={saData.data?.total ?? 0}
+	isLoading={saData.isLoading}
 	{columns}
 	{bulkActions}
+	onRowClick={(sa) => sheet.show(sa.id)}
 	emptyState={{
 		icon: Waypoints,
 		title: 'No Service Accounts',

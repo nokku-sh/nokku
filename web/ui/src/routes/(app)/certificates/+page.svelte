@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { ca } from '$lib/api/certificates.svelte';
-	import { createEntityModalState, createModalState } from '$lib/hooks';
+	import { plural } from '$lib/api/bulk';
+	import { confirm, createModalState, useSheet } from '$lib/hooks';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import CAModal, { defaultCADraft } from '$lib/components/modals/CAModal.svelte';
+	import CreateCAModal from '$lib/components/modals/CreateCAModal.svelte';
+	import CASheet from '$lib/components/sheets/CASheet.svelte';
 	import SignModal from '$lib/components/modals/SignModal.svelte';
-	import DeleteConfirmationModal from '$lib/components/modals/DeleteConfirmationModal.svelte';
 	import {
 		DataTable,
 		TableToolbar,
@@ -23,20 +24,19 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import {
 		AuthorityType,
-		CertificateAuthoritySchema,
 		CertificateKeyType,
 		type CertificateAuthority
 	} from '$lib/gen/nokku/v1/certificates_pb';
 	import { enumLabel } from '$lib/utils';
-	import { KeyRound, Pencil, Plus, Shield, ShieldAlert, Trash2 } from '@lucide/svelte';
+	import { KeyRound, Plus, Shield, ShieldAlert, Trash2 } from '@lucide/svelte';
 
-	const caModal = createEntityModalState(CertificateAuthoritySchema, defaultCADraft);
+	const sheet = useSheet();
+	let createOpen = $state(false);
 	const signModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
-	const deleteModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
-	const rolloverModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
 
-	const caData = $derived(ca.list());
+	const caData = ca.list();
 	const deleteCA = ca.delete();
+	const deleteCAs = ca.deleteMany();
 	const rolloverAction = ca.rollover();
 
 	const search = $derived(page.url.searchParams.get('q') || '');
@@ -110,10 +110,6 @@
 				return renderComponent(ActionCell, {
 					inlineActions: [
 						{
-							icon: Pencil,
-							onClick: () => caModal.openEdit(row.original)
-						},
-						{
 							icon: item.authorityType === AuthorityType.SSH ? KeyRound : Shield,
 							onClick: () => signModal.openWith({ ...item })
 						}
@@ -123,7 +119,15 @@
 							label: 'Emergency Rollover',
 							icon: ShieldAlert,
 							isDestructive: true,
-							onClick: () => rolloverModal.openWith({ ...item })
+							onClick: () =>
+								confirm({
+									title: `Emergency rollover of ${item.name}?`,
+									description:
+										'This instantly revokes the current CA and replaces it with a new one. Connections relying on the old CA fail until they receive the new one.',
+									confirmText: 'Rollover',
+									typeToConfirm: item.name,
+									onConfirm: () => rolloverAction.mutateAsync({ id: item.id })
+								})
 						}
 					],
 					deleteConfig: {
@@ -131,7 +135,7 @@
 						title: 'Delete Certificate Authority',
 						description:
 							'This will permanently delete the CA and revoke all certificates signed by it. This action cannot be undone.',
-						onDelete: () => deleteCA.mutate({ id: row.original.id }),
+						onDelete: () => deleteCA.mutateAsync({ id: row.original.id }),
 						requireTyping: true
 					}
 				});
@@ -145,31 +149,20 @@
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: (selected) => selected.forEach(({ id }) => deleteCA.mutate({ id }))
+			onClick: async (selected) => {
+				const ok = await confirm({
+					title: `Delete ${plural(selected.length, 'certificate authority', 'certificate authorities')}?`,
+					description: 'This revokes every certificate they signed. This action cannot be undone.'
+				});
+				if (ok) await deleteCAs.mutateAsync(selected.map(({ id }) => ({ id })));
+			}
 		}
 	];
 </script>
 
-<CAModal bind:open={caModal.open} draft={caModal.draft} />
+<CreateCAModal bind:open={createOpen} />
+<CASheet />
 <SignModal bind:open={signModal.open} ca={signModal.selected} />
-
-<DeleteConfirmationModal
-	bind:open={deleteModal.open}
-	title="Delete Certificate Authority"
-	description="This will permanently delete the CA and revoke all certificates signed by it. This action cannot be undone."
-	itemName={deleteModal.selected?.name}
-	requireConfirmation={true}
-	onConfirm={() => deleteCA.mutate({ id: deleteModal.selected.id })}
-/>
-
-<DeleteConfirmationModal
-	bind:open={rolloverModal.open}
-	title="{rolloverModal.selected?.name} - Emergency Rollover"
-	description="This will instantly revoke the current CA and replace it with a new one. All active connections relying on the previous CA will fail until they receive the new CA. Are you absolutely sure?"
-	itemName={rolloverModal.selected?.name}
-	onConfirm={() => rolloverAction.mutate({ id: rolloverModal.selected.id })}
-	submitText="Rollover"
-/>
 
 <div class="container mx-auto max-w-6xl space-y-6 p-6">
 	<PageHeader
@@ -177,16 +170,18 @@
 		description="Manage SSH and X.509 certificate authorities and their signing policies"
 		icon={Shield}
 	>
-		<Button onclick={() => caModal.openNew()}>
-			<Plus size={16} />
+		<Button onclick={() => (createOpen = true)}>
+			<Plus data-icon="inline-start" />
 			Create CA
 		</Button>
 	</PageHeader>
 
 	<DataTable
 		data={filteredCAs}
+		isLoading={caData.isLoading}
 		{columns}
 		{bulkActions}
+		onRowClick={(c) => sheet.show(c.id)}
 		emptyState={{
 			icon: Shield,
 			title: 'No Certificate Authorities',

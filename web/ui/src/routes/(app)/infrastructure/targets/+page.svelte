@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { plural } from '$lib/api/bulk';
 	import { page } from '$app/state';
 	import { ca } from '$lib/api/certificates.svelte';
 	import { target } from '$lib/api/targets.svelte';
-	import TargetModal from '$lib/components/modals/TargetModal.svelte';
+	import CreateTargetModal from '$lib/components/modals/CreateTargetModal.svelte';
+	import TargetSheet from '$lib/components/sheets/TargetSheet.svelte';
 	import {
 		DataTable,
 		TableToolbar,
@@ -19,27 +21,28 @@
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { type Target, TargetSchema } from '$lib/gen/nokku/v1/target_pb';
-	import { createEntityModalState } from '$lib/hooks';
-	import { PencilIcon, Plus, Server, TagIcon, Trash2, UserIcon, IdCard } from '@lucide/svelte';
+	import type { Target } from '$lib/gen/nokku/v1/target_pb';
+	import { confirm, usePagination, useSheet } from '$lib/hooks';
+	import { IdCard, Plus, Server, ShieldCheck, TagIcon, Trash2, UserIcon } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
-	const targetModal = createEntityModalState(TargetSchema);
+	const sheet = useSheet();
+	let createOpen = $state(false);
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
-	const targets = $derived(
-		target.list(() => ({
-			query: debounced.current,
-			caId: page.url.searchParams.get('ca') || undefined,
-			tags: page.url.searchParams.get('tags')?.split(','),
-			principals: page.url.searchParams.get('principals')?.split(',')
-		}))
-	);
+	const pager = usePagination();
+	const targets = target.list(() => ({
+		...pager.args,
+		query: debounced.current,
+		caId: page.url.searchParams.get('ca') || undefined,
+		tags: page.url.searchParams.get('tags')?.split(','),
+		principals: page.url.searchParams.get('principals')?.split(',')
+	}));
 
-	const caData = $derived(ca.list());
+	const caData = ca.list();
 
-	const filterData = $derived(target.filters());
+	const filterData = target.filters();
 
 	const uniqueTags = $derived(
 		(filterData.data?.tags ?? [])
@@ -56,6 +59,7 @@
 	);
 
 	const deleteTarget = target.delete();
+	const deleteTargets = target.deleteMany();
 
 	const columnHelper = createAppColumnHelper<Target>();
 	const columns = columnHelper.columns([
@@ -99,17 +103,17 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
-					inlineActions: [
+					menuActions: [
 						{
-							icon: PencilIcon,
-							onClick: () => targetModal.openEdit(row.original)
+							label: 'Manage access',
+							icon: ShieldCheck,
+							onClick: () => sheet.show(row.original.id, 'access')
 						}
 					],
-
 					deleteConfig: {
 						itemName: row.original.name,
 						description: 'Are you sure you want to delete this target?',
-						onDelete: () => deleteTarget.mutate({ id: row.original.id })
+						onDelete: () => deleteTarget.mutateAsync({ id: row.original.id })
 					}
 				});
 			}
@@ -122,29 +126,43 @@
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: (selected) => selected.forEach(({ id }) => deleteTarget.mutate({ id }))
+			onClick: async (selected) => {
+				const ok = await confirm({
+					title: `Delete ${plural(selected.length, 'target')}?`,
+					description: 'This action cannot be undone.',
+					confirmText: 'Delete'
+				});
+				if (ok) await deleteTargets.mutateAsync(selected.map(({ id }) => ({ id })));
+			}
 		}
 	];
 </script>
 
-<TargetModal bind:open={targetModal.open} draft={targetModal.draft} />
+<CreateTargetModal bind:open={createOpen} />
+<TargetSheet />
 
-<PageHeader title="Targets" description="Manage your workspace targets" icon={Server}>
-	<Button onclick={() => targetModal.openNew()}>
+<PageHeader
+	title="Targets"
+	description="Servers people log in to, and who can use which account"
+	icon={Server}
+>
+	<Button onclick={() => (createOpen = true)}>
 		<Plus data-icon="inline-start" />
-		Create Target
+		Add target
 	</Button>
 </PageHeader>
 
 <DataTable
 	data={targets.data?.targets ?? []}
 	rowCount={targets.data?.total ?? 0}
+	isLoading={targets.isLoading}
 	{columns}
 	{bulkActions}
+	onRowClick={(t) => sheet.show(t.id)}
 	emptyState={{
 		icon: Server,
 		title: 'No Targets',
-		description: "You haven't created any targets yet. Get started by creating your first target."
+		description: 'Add a server, then pick who can log in and as which account.'
 	}}
 >
 	{#snippet toolbar(table)}

@@ -84,3 +84,10 @@ WHERE
   AND user_id = @user_id
 RETURNING
   *;
+
+-- name: TouchCredential :exec
+UPDATE credentials
+SET
+  last_used_at = NOW()
+WHERE
+  id = @id;

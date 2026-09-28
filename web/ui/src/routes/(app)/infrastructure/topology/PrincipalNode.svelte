@@ -20,10 +20,10 @@
 			<div class="rounded-t-xl border-b p-3 dark:bg-zinc-900">
 				<div class="flex items-center gap-2 font-mono">
 					<div class="rounded bg-zinc-900 p-1.5 backdrop-blur dark:bg-white/10">
-						<Terminal class="text-emerald-400" size={16} />
+						<Terminal class="text-success" size={16} />
 					</div>
 					<span class="dark:text-zinc-500">$</span>
-					<span class="text-lg font-bold tracking-wide text-emerald-400">{principal.username}</span>
+					<span class="text-lg font-bold tracking-wide text-success">{principal.username}</span>
 				</div>
 			</div>
 

@@ -18,7 +18,6 @@
 
 	const createMutation = workspace.create();
 	const updateMutation = workspace.update();
-	const isLoading = $derived(createMutation.isPending);
 
 	const autoSave = useAutoSave(() => updateMutation.mutateAsync({ ...model }));
 	function save() {
@@ -26,8 +25,7 @@
 	}
 
 	function onSubmit() {
-		createMutation.mutate({ ...model });
-		open = false;
+		return createMutation.mutateAsync({ ...model });
 	}
 </script>
 
@@ -39,7 +37,6 @@
 		: 'Workspaces isolate targets, members, and certificates.'}
 	icon={isEdit ? undefined : Layers2}
 	onSubmit={isEdit ? undefined : onSubmit}
-	{isLoading}
 	saveState={autoSave.saveState}
 >
 	<Field.Field>

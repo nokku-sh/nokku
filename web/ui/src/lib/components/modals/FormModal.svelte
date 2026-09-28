@@ -1,22 +1,27 @@
 <script lang="ts">
-	import { Check, CircleX, LoaderCircle } from '@lucide/svelte';
+	import { Check, CircleX } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import type { LucideIcon } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog/';
+	import * as Field from '$lib/components/ui/field';
+	import { Spinner } from '$lib/components/ui/spinner';
 	import type { SaveState } from '$lib/hooks';
 	import { cn } from '$lib/utils';
-	import { slide } from 'svelte/transition'; // 1. Import the slide transition
+	import { slide } from 'svelte/transition';
 
 	interface Props {
 		open?: boolean;
 		title: string;
 		description?: string;
 		icon?: LucideIcon;
-		/** When set, renders a submit footer (create flows). Omit for autosave forms. */
-		onSubmit?: () => void | Promise<void>;
+		/**
+		 * Renders a submit footer (create flows). Return the mutateAsync promise,
+		 * the modal closes when it resolves and stays open with the input if it
+		 * throws. Omit for autosave forms.
+		 */
+		onSubmit?: () => unknown;
 		submitLabel?: string;
-		isLoading?: boolean;
 		/** Inline autosave status shown when there is no submit button */
 		saveState?: SaveState;
 		classModal?: string;
@@ -30,11 +35,26 @@
 		icon: Icon,
 		onSubmit,
 		submitLabel = 'Create',
-		isLoading = false,
 		saveState = 'idle',
 		classModal,
 		children
 	}: Props = $props();
+
+	let submitting = $state(false);
+
+	async function submit(e: SubmitEvent) {
+		e.preventDefault();
+		if (!onSubmit || submitting) return;
+		submitting = true;
+		try {
+			await onSubmit();
+			open = false;
+		} catch {
+			// The global mutation handler already toasted it.
+		} finally {
+			submitting = false;
+		}
+	}
 </script>
 
 <Dialog.Root bind:open>
@@ -53,36 +73,30 @@
 			{/if}
 		</Dialog.Header>
 
-		<form
-			onsubmit={(e) => {
-				e.preventDefault();
-				onSubmit?.();
-			}}
-		>
-			<div class="space-y-4">{@render children()}</div>
+		<form onsubmit={submit}>
+			<Field.Group>{@render children()}</Field.Group>
 
 			{#if onSubmit || saveState !== 'idle'}
 				<div transition:slide={{ duration: 100 }}>
 					<Dialog.Footer class="mt-4">
 						{#if onSubmit}
-							<Button type="submit" disabled={isLoading}>
-								{#if isLoading}
-									<LoaderCircle class="animate-spin" />
+							<Button type="submit" disabled={submitting}>
+								{#if submitting}
+									<Spinner data-icon="inline-start" />
 								{/if}
 								{submitLabel}
 							</Button>
 						{:else}
 							<p
-								class="flex items-center gap-1.5 text-xs transition-colors
-									{saveState === 'saved'
-									? 'text-emerald-500'
-									: saveState === 'error'
-										? 'text-destructive'
-										: 'text-muted-foreground'}"
+								class={cn(
+									'flex items-center gap-1.5 text-xs text-muted-foreground transition-colors',
+									saveState === 'saved' && 'text-success',
+									saveState === 'error' && 'text-destructive'
+								)}
 								role="status"
 							>
 								{#if saveState === 'saving'}
-									<LoaderCircle class="size-3 animate-spin" />
+									<Spinner class="size-3" />
 									Saving&hellip;
 								{:else if saveState === 'saved'}
 									<Check class="size-3" />

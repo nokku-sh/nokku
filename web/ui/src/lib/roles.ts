@@ -6,10 +6,10 @@ export type RoleName = (typeof order)[number];
 
 const icons = { owner: Crown, admin: ShieldUser, editor: ShieldCheck, viewer: Eye, member: User };
 const colors = {
-	owner: 'text-amber-500',
-	admin: 'text-rose-500',
-	editor: 'text-indigo-500',
-	viewer: 'text-blue-500',
+	owner: 'text-chart-2',
+	admin: 'text-chart-5',
+	editor: 'text-chart-4',
+	viewer: 'text-chart-1',
 	member: 'text-muted-foreground'
 };
 

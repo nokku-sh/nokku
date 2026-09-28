@@ -92,6 +92,7 @@ func (l *linker) resolve(ctx context.Context, opts flowLinkOptions) (*db.User, e
 		if err != nil {
 			return nil, err
 		}
+		l.svc.touchCredential(ctx, cred.ID)
 		return vouch(u)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {

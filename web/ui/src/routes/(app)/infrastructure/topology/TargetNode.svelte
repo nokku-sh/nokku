@@ -3,23 +3,17 @@
 	import * as Card from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import type { Target } from '$lib/gen/nokku/v1/target_pb';
-	import { TargetSchema } from '$lib/gen/nokku/v1/target_pb';
-	import { createEntityModalState } from '$lib/hooks';
 	import { Server, Pencil, Network, Tag, Globe, Tags } from '@lucide/svelte';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
-	import TargetModal from '$lib/components/modals/TargetModal.svelte';
 
 	let { data }: NodeProps = $props();
 	let target = $derived(data as Target);
-	const targetModal = createEntityModalState(TargetSchema);
 
 	let principalCount = $derived(target.principals?.length || 0);
 	let endpoints = $derived(target.endpoints || []);
 
 	let tags = $derived(target.tags || target.metadata?.tags?.split(',') || []);
 </script>
-
-<TargetModal bind:open={targetModal.open} draft={targetModal.draft} />
 
 <div class="group relative">
 	<Card.Root class="w-[360px] p-0">
@@ -28,9 +22,9 @@
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-3">
 						<div
-							class="flex h-10 w-10 items-center justify-center rounded-md border border-blue-500/20 bg-blue-500/10"
+							class="flex h-10 w-10 items-center justify-center rounded-md border border-chart-1/20 bg-chart-1/10"
 						>
-							<Server class="text-blue-500" size={20} />
+							<Server class="text-chart-1" size={20} />
 						</div>
 						<div class="space-y-0.5">
 							<h3 class="font-mono text-sm font-bold tracking-tight uppercase">
@@ -40,11 +34,11 @@
 					</div>
 					<Button
 						variant="ghost"
-						size="icon-sm"
-						class="h-8 w-8 rounded-md"
-						onclick={() => targetModal.openEdit({ ...target })}
+						size="icon"
+						href={`/infrastructure/targets?id=${target.id}`}
+						aria-label={`Open ${target.name}`}
 					>
-						<Pencil size={14} />
+						<Pencil />
 					</Button>
 				</div>
 			</div>
@@ -121,6 +115,6 @@
 	<Handle
 		type="source"
 		position={Position.Bottom}
-		class="h-3! w-3! border-4! border-background! bg-indigo-500! transition-all hover:h-4! hover:w-4!"
+		class="h-3! w-3! border-4! border-background! bg-chart-1! transition-all hover:h-4! hover:w-4!"
 	/>
 </div>

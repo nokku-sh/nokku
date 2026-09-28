@@ -8,9 +8,9 @@
 	import { Server, WifiOff } from '@lucide/svelte';
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
 
-	const currentUser = $derived(user.self());
+	const currentUser = user.self();
 
-	const access = $derived(target.access(currentUser.data?.id));
+	const access = target.access(() => currentUser.data?.id);
 	const targets = $derived(access.data?.targets);
 	const agents = $derived(access.data?.daemons);
 

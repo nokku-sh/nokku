@@ -1,14 +1,15 @@
 import { TokenKind, TokenService } from '$lib/gen/nokku/v1/token_pb';
+import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '$lib/query';
 import { workspaceID } from '$lib/store.svelte';
 import { toast } from 'svelte-sonner';
 
 export const token = {
-	list: (kind: TokenKind) =>
+	list: (kind: MaybeGetter<TokenKind>) =>
 		useQuery(
 			TokenService.method.listTokens,
-			{ workspaceId: workspaceID.current, kind },
-			{ enabled: !!workspaceID.current }
+			() => ({ workspaceId: workspaceID.current, kind: extract(kind) }),
+			() => ({ enabled: !!workspaceID.current })
 		),
 
 	create: () => useMutation(TokenService.method.createToken),

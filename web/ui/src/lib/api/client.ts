@@ -51,6 +51,9 @@ export const queryClient = new QueryClient({
 				return;
 			}
 
+			// Views render missing entities themselves (deleted subjects, stale links).
+			if (error.code === Code.NotFound) return;
+
 			toast.error(formatConnectError(error).title, {
 				description: formatConnectError(error).description
 			});

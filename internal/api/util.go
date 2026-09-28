@@ -2,16 +2,18 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"time"
 
 	"google.golang.org/protobuf/types/known/durationpb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"connectrpc.com/connect"
 	"github.com/mizuchilabs/kata/buildinfo"
 
+	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/iam"
 
 	"github.com/nokku-sh/nokku/internal/config"
@@ -103,23 +105,8 @@ func (s *UtilService) ListAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ListAuditLogsRequest,
 ) (*nokkuv1.ListAuditLogsResponse, error) {
-	params := auditParams(ctx, req.GetWorkspaceId(), req.GetStartDate(), req.GetEndDate())
+	params := auditParams(ctx, req.GetWorkspaceId(), req.GetFilter())
 	params.Limit, params.Offset = req.GetLimit(), req.GetOffset()
-	if params.WorkspaceID != nil && len(req.GetActorIds()) > 0 {
-		params.ActorIds = req.GetActorIds()
-	}
-	if len(req.GetActorKinds()) > 0 {
-		params.ActorKinds = req.GetActorKinds()
-	}
-	if len(req.GetActions()) > 0 {
-		params.Actions = req.GetActions()
-	}
-	if req.GetTarget() != "" {
-		params.Target = req.Target
-	}
-	if req.GetSearch() != "" {
-		params.Search = req.Search
-	}
 
 	events, total, err := s.cfg.Audit.List(ctx, params)
 	if err != nil {
@@ -130,16 +117,25 @@ func (s *UtilService) ListAuditLogs(
 	for _, e := range events {
 		logs = append(logs, e.ToProto())
 	}
-	return &nokkuv1.ListAuditLogsResponse{Logs: logs, Total: &total}, nil
+	var retention int32
+	if params.WorkspaceID != nil {
+		days := s.cfg.Entitlements.RetentionDays(ctx, *params.WorkspaceID)
+		retention = int32(min(days, math.MaxInt32)) //nolint:gosec // clamped to int32 just before
+	}
+	return &nokkuv1.ListAuditLogsResponse{Logs: logs, Total: &total, RetentionDays: &retention}, nil
 }
 
 func (s *UtilService) ExportAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ExportAuditLogsRequest,
 ) (*nokkuv1.ExportAuditLogsResponse, error) {
-	params := auditParams(ctx, req.GetWorkspaceId(), req.GetStartDate(), req.GetEndDate())
+	params := auditParams(ctx, req.GetWorkspaceId(), req.GetFilter())
 	data, err := s.cfg.Audit.Export(ctx, params, req.GetFormat())
+	if errors.Is(err, audit.ErrExportLimit) {
+		return nil, NewError(connect.CodeFailedPrecondition, err.Error())
+	}
 	if err != nil {
+		slog.Error("failed to export audit logs", "error", err)
 		return nil, ErrInternal
 	}
 
@@ -154,19 +150,43 @@ func (s *UtilService) ExportAuditLogs(
 	}, nil
 }
 
+var auditOutcomes = map[nokkuv1.AuditOutcome]string{
+	nokkuv1.AuditOutcome_AUDIT_OUTCOME_UNSPECIFIED: "",
+	nokkuv1.AuditOutcome_AUDIT_OUTCOME_SUCCEEDED:   "succeeded",
+	nokkuv1.AuditOutcome_AUDIT_OUTCOME_FAILED:      "failed",
+	nokkuv1.AuditOutcome_AUDIT_OUTCOME_DENIED:      "denied",
+}
+
 // auditParams falls back to the caller's own activity without a workspace,
-// and to the last 14 days without dates.
-func auditParams(
-	ctx context.Context,
-	workspaceID string,
-	start, end *timestamppb.Timestamp,
-) *db.ListAuditLogsParams {
+// and to the last 14 days without dates. Other actors only filter a
+// workspace log, the personal log is always the caller's.
+func auditParams(ctx context.Context, workspaceID string, f *nokkuv1.AuditLogFilter) *db.ListAuditLogsParams {
 	p := &db.ListAuditLogsParams{}
 	if workspaceID != "" {
 		p.WorkspaceID = &workspaceID
+		if len(f.GetActorIds()) > 0 {
+			p.ActorIds = f.GetActorIds()
+		}
 	} else {
 		p.ActorIds = []string{iam.SubjectFromContext(ctx)}
 	}
+	if len(f.GetActorKinds()) > 0 {
+		p.ActorKinds = f.GetActorKinds()
+	}
+	if len(f.GetActions()) > 0 {
+		p.Actions = f.GetActions()
+	}
+	if f.GetTarget() != "" {
+		p.Target = new(f.GetTarget())
+	}
+	if f.GetSearch() != "" {
+		p.Search = new(f.GetSearch())
+	}
+	if outcome := auditOutcomes[f.GetOutcome()]; outcome != "" {
+		p.Outcome = &outcome
+	}
+
+	start, end := f.GetStartDate(), f.GetEndDate()
 	if start == nil && end == nil {
 		now := time.Now()
 		p.StartDate, p.EndDate = new(now.AddDate(0, 0, -14)), &now

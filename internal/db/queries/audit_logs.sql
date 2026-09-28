@@ -46,21 +46,43 @@ WHERE
     sqlc.narg('actor_kinds')::TEXT[] IS NULL
     OR actor_kind = ANY (sqlc.narg('actor_kinds')::TEXT[])
   )
-  -- Actions match by prefix, so "Delete" finds every delete.
+  -- Actions match exactly, a trailing * matches by prefix, e.g. "Delete*".
   AND (
     sqlc.narg('actions')::TEXT[] IS NULL
+    OR action = ANY (sqlc.narg('actions')::TEXT[])
     OR EXISTS (
       SELECT
         1
       FROM
         unnest(sqlc.narg('actions')::TEXT[]) AS a (v)
       WHERE
-        action ILIKE a.v || '%'
+        a.v LIKE '%*'
+        AND action LIKE rtrim(a.v, '*') || '%'
     )
   )
   AND (
     sqlc.narg('target')::TEXT IS NULL
     OR target = sqlc.narg('target')
+  )
+  -- Failed is every failed call, denied only those an auth or permission check stopped.
+  AND (
+    sqlc.narg('outcome')::TEXT IS NULL
+    OR (
+      sqlc.narg('outcome') = 'succeeded'
+      AND ok
+    )
+    OR (
+      sqlc.narg('outcome') = 'denied'
+      AND NOT ok
+      AND (
+        action = 'LoginDenied'
+        OR details ->> 'code' IN ('permission_denied', 'unauthenticated')
+      )
+    )
+    OR (
+      sqlc.narg('outcome') = 'failed'
+      AND NOT ok
+    )
   )
   AND (
     sqlc.narg('search')::TEXT IS NULL

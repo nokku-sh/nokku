@@ -42,7 +42,10 @@
 							variant={action.variant ?? 'ghost'}
 							size="sm"
 							class="h-8 {action.class ?? ''}"
-							onclick={() => action.onClick?.(items)}
+							onclick={async () => {
+								await action.onClick?.(items);
+								onClear?.();
+							}}
 							disabled={action.disabled}
 						>
 							{#if action.icon}
@@ -53,18 +56,21 @@
 					{:else if action.type === 'select' && action.options}
 						<Select.Root
 							type="single"
-							onValueChange={(value) => {
+							onValueChange={async (value) => {
 								const option = action.options?.find((o) => o.value === value);
-								option?.onClick(items, value);
+								await option?.onClick(items, value);
+								onClear?.();
 							}}
 						>
 							<Select.Trigger class="h-8">
 								{action.label}
 							</Select.Trigger>
 							<Select.Content>
-								{#each action.options as option (option.value)}
-									<Select.Item value={option.value}>{option.label}</Select.Item>
-								{/each}
+								<Select.Group>
+									{#each action.options as option (option.value)}
+										<Select.Item value={option.value}>{option.label}</Select.Item>
+									{/each}
+								</Select.Group>
 							</Select.Content>
 						</Select.Root>
 					{/if}
