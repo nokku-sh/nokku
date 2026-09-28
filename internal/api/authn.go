@@ -85,7 +85,7 @@ func (a *authNInterceptor) WrapStreamingClient(
 // stream, recording uploads) with the same rules as unary calls. A
 // streaming request has no single message at authentication time, so user
 // principals resolve their workspace inside the handler from the request
-// message (see SubscribeWorkspaceEvents and GetRecording), and machine
+// message (see GetRecording), and machine
 // principals carry it in the credential.
 func (a *authNInterceptor) WrapStreamingHandler(
 	next connect.StreamingHandlerFunc,

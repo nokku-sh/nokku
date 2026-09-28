@@ -62,12 +62,6 @@ WHERE
 ORDER BY
   w.id;
 
--- name: ListWorkspaceIDs :many
-SELECT
-  id
-FROM
-  workspaces;
-
 -- name: ListWorkspaces :many
 SELECT
   *
@@ -139,12 +133,17 @@ WHERE
 -- name: GetWorkspaceMember :one
 SELECT
   wm.workspace_id,
-  wm.user_id,
+  u.id AS user_id,
+  u.name,
+  u.email,
+  u.email_verified,
+  u.picture,
   wm.role_name,
   wm.created_at,
   wm.updated_at
 FROM
   workspace_members wm
+  JOIN users u ON u.id = wm.user_id
 WHERE
   wm.workspace_id = @workspace_id
   AND wm.user_id = @user_id;
@@ -160,7 +159,8 @@ SELECT
   u.active,
   wm.role_name,
   wm.created_at,
-  wm.updated_at
+  wm.updated_at,
+  COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   workspace_members wm
   JOIN users u ON u.id = wm.user_id
@@ -182,24 +182,6 @@ LIMIT
   sqlc.narg('limit')
 OFFSET
   sqlc.narg('offset');
-
--- name: CountWorkspaceMembers :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  workspace_members wm
-  JOIN users u ON u.id = wm.user_id
-WHERE
-  wm.workspace_id = @workspace_id
-  AND (
-    sqlc.narg('query')::TEXT IS NULL
-    OR u.name ILIKE '%' || sqlc.narg('query') || '%'
-    OR u.email ILIKE '%' || sqlc.narg('query') || '%'
-  )
-  AND (
-    sqlc.narg('role_name')::TEXT IS NULL
-    OR wm.role_name = sqlc.narg('role_name')::TEXT
-  );
 
 -- name: UpdateWorkspace :one
 UPDATE workspaces
@@ -254,7 +236,7 @@ WITH
   update_old_owner AS (
     UPDATE workspace_members
     SET
-      role_name = 'viewer'
+      role_name = 'admin'
     FROM
       old_owner
     WHERE

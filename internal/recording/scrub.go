@@ -78,13 +78,12 @@ func (s *Service) ScrubRecording(rec *db.Recording) {
 				event := &audit.Event{
 					Timestamp:   time.Now().UTC(),
 					WorkspaceID: rec.WorkspaceID,
-					Action:      "recording.scrub_failed",
-					ActorType:   "system",
-					StatusCode:  "ERROR",
+					Action:      "RecordingScrubFailed",
+					ActorKind:   "system",
+					Target:      rec.ID,
 					Details: map[string]any{
-						"recording_id": rec.ID,
-						"daemon_id":    rec.DaemonID,
-						"error":        err.Error(),
+						"daemon_id": rec.DaemonID,
+						"error":     err.Error(),
 					},
 				}
 				if appendErr := s.events.Append(ctx, event); appendErr != nil {
@@ -308,8 +307,8 @@ func secretSpans(blob []byte, det *detect.Detector) []span {
 // secret group, else gitleaks' first non-empty capture group, else the
 // full match. Redacting only the span keeps assignment keys readable.
 func secretSpan(rule config.Rule, m []int) (int, int) {
-	if rule.SecretGroup > 0 {
-		return m[2*rule.SecretGroup], m[2*rule.SecretGroup+1]
+	if g := rule.SecretGroup; g > 0 && 2*g+1 < len(m) && m[2*g] >= 0 {
+		return m[2*g], m[2*g+1]
 	}
 	for g := 1; 2*g+1 < len(m); g++ {
 		if m[2*g] >= 0 {

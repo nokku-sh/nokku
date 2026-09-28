@@ -35,8 +35,6 @@ CREATE TABLE IF NOT EXISTS one_time_tokens (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS roles (name TEXT PRIMARY KEY, description TEXT NOT NULL DEFAULT '');
-
 CREATE TABLE IF NOT EXISTS workspaces (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   name TEXT NOT NULL,
@@ -60,7 +58,7 @@ CREATE TABLE IF NOT EXISTS workspace_state (
 CREATE TABLE IF NOT EXISTS workspace_members (
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  role_name TEXT NOT NULL REFERENCES roles (name) ON DELETE CASCADE,
+  role_name TEXT NOT NULL CHECK (role_name IN ('member', 'viewer', 'editor', 'admin', 'owner')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (workspace_id, user_id)
@@ -127,7 +125,7 @@ CREATE TABLE IF NOT EXISTS service_accounts (
   name TEXT NOT NULL, -- e.g., "github-actions-deploy", "ansible-prod"
   description TEXT,
   token_hash TEXT, -- bearer credential for the service account (HashedToken)
-  role_name TEXT NOT NULL DEFAULT 'viewer' REFERENCES roles (name),
+  role_name TEXT NOT NULL DEFAULT 'member' CHECK (role_name IN ('member', 'viewer', 'editor', 'admin', 'owner')),
   last_used_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ, -- Optional expiration for temporary access
   tags TEXT[] NOT NULL DEFAULT '{}',
@@ -142,7 +140,9 @@ CREATE TABLE IF NOT EXISTS daemons (
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   status INTEGER NOT NULL DEFAULT 1, -- 1=pending, 2=accepted, 3=rejected
-  online BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Refreshed by the core instance holding the control stream. Online means
+  -- seen within the last 30 seconds, so a crashed instance needs no cleanup.
+  last_seen_at TIMESTAMPTZ,
   key_thumbprint TEXT,
   config JSONB NOT NULL DEFAULT '{}',
   metadata JSONB NOT NULL DEFAULT '{}',
@@ -246,7 +246,7 @@ CREATE TABLE IF NOT EXISTS workspace_tokens (
   uses INTEGER NOT NULL DEFAULT 0,
   auto_approve BOOLEAN NOT NULL DEFAULT FALSE, -- enroll only
   ca_id UUID, -- enroll only, NULL is the workspace default
-  role_name TEXT REFERENCES roles (name), -- invite only
+  role_name TEXT CHECK (role_name IN ('member', 'viewer', 'editor', 'admin', 'owner')), -- invite only
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_used_at TIMESTAMPTZ,
   FOREIGN KEY (workspace_id, ca_id) REFERENCES certificate_authorities (workspace_id, id) ON DELETE SET NULL (ca_id),
@@ -829,17 +829,22 @@ WITH
 -- Audit schema ---------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS audit;
 
+-- One row per thing that happened. A row with a workspace belongs to that
+-- workspace's log, and every row also shows in its actor's personal log.
+-- workspace_id has no foreign key: the log outlives a deleted workspace, and
+-- the append-only trigger would refuse an ON DELETE SET NULL anyway.
 CREATE TABLE IF NOT EXISTS audit.audit_logs (
   id UUID NOT NULL DEFAULT uuidv7(),
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  workspace_id UUID REFERENCES public.workspaces (id) ON DELETE SET NULL,
-  action TEXT NOT NULL,
-  actor_id TEXT,
-  actor_type TEXT NOT NULL,
-  actor_email TEXT,
-  ip_address TEXT,
-  user_agent TEXT,
-  status_code TEXT,
+  workspace_id UUID,
+  actor_id TEXT NOT NULL DEFAULT '',
+  actor_kind TEXT NOT NULL DEFAULT '',
+  actor_name TEXT NOT NULL DEFAULT '', -- email or name at the time
+  action TEXT NOT NULL, -- RPC method name or iam action, e.g. DeleteTarget, Login
+  target TEXT NOT NULL DEFAULT '', -- the resource the action was about
+  ok BOOLEAN NOT NULL,
+  ip TEXT NOT NULL DEFAULT '',
+  user_agent TEXT NOT NULL DEFAULT '',
   details JSONB NOT NULL DEFAULT '{}',
   PRIMARY KEY (timestamp, id)
 )
@@ -854,10 +859,7 @@ CREATE POLICY audit_logs_select ON audit.audit_logs FOR
 SELECT
   TO nokku_app USING (
     workspace_id = current_workspace_id ()
-    OR (
-      workspace_id IS NULL
-      AND actor_id = current_actor_id ()
-    )
+    OR actor_id = current_actor_id ()
   );
 
 -- Access for the application roles

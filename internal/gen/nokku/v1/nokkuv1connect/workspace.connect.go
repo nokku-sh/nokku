@@ -63,9 +63,6 @@ const (
 	// WorkspaceServiceUpdateWorkspaceOwnerProcedure is the fully-qualified name of the
 	// WorkspaceService's UpdateWorkspaceOwner RPC.
 	WorkspaceServiceUpdateWorkspaceOwnerProcedure = "/nokku.v1.WorkspaceService/UpdateWorkspaceOwner"
-	// WorkspaceServiceSubscribeWorkspaceEventsProcedure is the fully-qualified name of the
-	// WorkspaceService's SubscribeWorkspaceEvents RPC.
-	WorkspaceServiceSubscribeWorkspaceEventsProcedure = "/nokku.v1.WorkspaceService/SubscribeWorkspaceEvents"
 )
 
 // WorkspaceServiceClient is a client for the nokku.v1.WorkspaceService service.
@@ -80,7 +77,6 @@ type WorkspaceServiceClient interface {
 	RemoveWorkspaceMember(context.Context, *v1.RemoveWorkspaceMemberRequest) (*v1.RemoveWorkspaceMemberResponse, error)
 	UpdateWorkspaceMember(context.Context, *v1.UpdateWorkspaceMemberRequest) (*v1.UpdateWorkspaceMemberResponse, error)
 	UpdateWorkspaceOwner(context.Context, *v1.UpdateWorkspaceOwnerRequest) (*v1.UpdateWorkspaceOwnerResponse, error)
-	SubscribeWorkspaceEvents(context.Context, *v1.SubscribeWorkspaceEventsRequest) (*connect.ServerStreamForClient[v1.SubscribeWorkspaceEventsResponse], error)
 }
 
 // NewWorkspaceServiceClient constructs a client for the nokku.v1.WorkspaceService service. By
@@ -158,29 +154,21 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(workspaceServiceMethods.ByName("UpdateWorkspaceOwner")),
 			connect.WithClientOptions(opts...),
 		),
-		subscribeWorkspaceEvents: connect.NewClient[v1.SubscribeWorkspaceEventsRequest, v1.SubscribeWorkspaceEventsResponse](
-			httpClient,
-			baseURL+WorkspaceServiceSubscribeWorkspaceEventsProcedure,
-			connect.WithSchema(workspaceServiceMethods.ByName("SubscribeWorkspaceEvents")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
 // workspaceServiceClient implements WorkspaceServiceClient.
 type workspaceServiceClient struct {
-	getWorkspace             *connect.Client[v1.GetWorkspaceRequest, v1.GetWorkspaceResponse]
-	listWorkspaces           *connect.Client[v1.ListWorkspacesRequest, v1.ListWorkspacesResponse]
-	createWorkspace          *connect.Client[v1.CreateWorkspaceRequest, v1.CreateWorkspaceResponse]
-	updateWorkspace          *connect.Client[v1.UpdateWorkspaceRequest, v1.UpdateWorkspaceResponse]
-	deleteWorkspace          *connect.Client[v1.DeleteWorkspaceRequest, v1.DeleteWorkspaceResponse]
-	getWorkspaceMember       *connect.Client[v1.GetWorkspaceMemberRequest, v1.GetWorkspaceMemberResponse]
-	listWorkspaceMembers     *connect.Client[v1.ListWorkspaceMembersRequest, v1.ListWorkspaceMembersResponse]
-	removeWorkspaceMember    *connect.Client[v1.RemoveWorkspaceMemberRequest, v1.RemoveWorkspaceMemberResponse]
-	updateWorkspaceMember    *connect.Client[v1.UpdateWorkspaceMemberRequest, v1.UpdateWorkspaceMemberResponse]
-	updateWorkspaceOwner     *connect.Client[v1.UpdateWorkspaceOwnerRequest, v1.UpdateWorkspaceOwnerResponse]
-	subscribeWorkspaceEvents *connect.Client[v1.SubscribeWorkspaceEventsRequest, v1.SubscribeWorkspaceEventsResponse]
+	getWorkspace          *connect.Client[v1.GetWorkspaceRequest, v1.GetWorkspaceResponse]
+	listWorkspaces        *connect.Client[v1.ListWorkspacesRequest, v1.ListWorkspacesResponse]
+	createWorkspace       *connect.Client[v1.CreateWorkspaceRequest, v1.CreateWorkspaceResponse]
+	updateWorkspace       *connect.Client[v1.UpdateWorkspaceRequest, v1.UpdateWorkspaceResponse]
+	deleteWorkspace       *connect.Client[v1.DeleteWorkspaceRequest, v1.DeleteWorkspaceResponse]
+	getWorkspaceMember    *connect.Client[v1.GetWorkspaceMemberRequest, v1.GetWorkspaceMemberResponse]
+	listWorkspaceMembers  *connect.Client[v1.ListWorkspaceMembersRequest, v1.ListWorkspaceMembersResponse]
+	removeWorkspaceMember *connect.Client[v1.RemoveWorkspaceMemberRequest, v1.RemoveWorkspaceMemberResponse]
+	updateWorkspaceMember *connect.Client[v1.UpdateWorkspaceMemberRequest, v1.UpdateWorkspaceMemberResponse]
+	updateWorkspaceOwner  *connect.Client[v1.UpdateWorkspaceOwnerRequest, v1.UpdateWorkspaceOwnerResponse]
 }
 
 // GetWorkspace calls nokku.v1.WorkspaceService.GetWorkspace.
@@ -273,11 +261,6 @@ func (c *workspaceServiceClient) UpdateWorkspaceOwner(ctx context.Context, req *
 	return nil, err
 }
 
-// SubscribeWorkspaceEvents calls nokku.v1.WorkspaceService.SubscribeWorkspaceEvents.
-func (c *workspaceServiceClient) SubscribeWorkspaceEvents(ctx context.Context, req *v1.SubscribeWorkspaceEventsRequest) (*connect.ServerStreamForClient[v1.SubscribeWorkspaceEventsResponse], error) {
-	return c.subscribeWorkspaceEvents.CallServerStream(ctx, connect.NewRequest(req))
-}
-
 // WorkspaceServiceHandler is an implementation of the nokku.v1.WorkspaceService service.
 type WorkspaceServiceHandler interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
@@ -290,7 +273,6 @@ type WorkspaceServiceHandler interface {
 	RemoveWorkspaceMember(context.Context, *v1.RemoveWorkspaceMemberRequest) (*v1.RemoveWorkspaceMemberResponse, error)
 	UpdateWorkspaceMember(context.Context, *v1.UpdateWorkspaceMemberRequest) (*v1.UpdateWorkspaceMemberResponse, error)
 	UpdateWorkspaceOwner(context.Context, *v1.UpdateWorkspaceOwnerRequest) (*v1.UpdateWorkspaceOwnerResponse, error)
-	SubscribeWorkspaceEvents(context.Context, *v1.SubscribeWorkspaceEventsRequest, *connect.ServerStream[v1.SubscribeWorkspaceEventsResponse]) error
 }
 
 // NewWorkspaceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -364,13 +346,6 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 		connect.WithSchema(workspaceServiceMethods.ByName("UpdateWorkspaceOwner")),
 		connect.WithHandlerOptions(opts...),
 	)
-	workspaceServiceSubscribeWorkspaceEventsHandler := connect.NewServerStreamHandlerSimple(
-		WorkspaceServiceSubscribeWorkspaceEventsProcedure,
-		svc.SubscribeWorkspaceEvents,
-		connect.WithSchema(workspaceServiceMethods.ByName("SubscribeWorkspaceEvents")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/nokku.v1.WorkspaceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case WorkspaceServiceGetWorkspaceProcedure:
@@ -393,8 +368,6 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 			workspaceServiceUpdateWorkspaceMemberHandler.ServeHTTP(w, r)
 		case WorkspaceServiceUpdateWorkspaceOwnerProcedure:
 			workspaceServiceUpdateWorkspaceOwnerHandler.ServeHTTP(w, r)
-		case WorkspaceServiceSubscribeWorkspaceEventsProcedure:
-			workspaceServiceSubscribeWorkspaceEventsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -442,8 +415,4 @@ func (UnimplementedWorkspaceServiceHandler) UpdateWorkspaceMember(context.Contex
 
 func (UnimplementedWorkspaceServiceHandler) UpdateWorkspaceOwner(context.Context, *v1.UpdateWorkspaceOwnerRequest) (*v1.UpdateWorkspaceOwnerResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.WorkspaceService.UpdateWorkspaceOwner is not implemented"))
-}
-
-func (UnimplementedWorkspaceServiceHandler) SubscribeWorkspaceEvents(context.Context, *v1.SubscribeWorkspaceEventsRequest, *connect.ServerStream[v1.SubscribeWorkspaceEventsResponse]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.WorkspaceService.SubscribeWorkspaceEvents is not implemented"))
 }

@@ -33,4 +33,5 @@ var (
 	TenantFromContext      = actor.TenantFromContext
 	WorkspaceIDFromContext = actor.WorkspaceIDFromContext
 	WithMember             = actor.WithMember
+	MemberRole             = actor.MemberRole
 )

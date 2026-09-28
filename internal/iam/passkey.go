@@ -223,7 +223,7 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	email := normalizeEmail(r.PostFormValue("email"))
-	if err := emailverify.Verify(email); err != nil {
+	if err := emailverify.Verify(email, f.svc.strict); err != nil {
 		writeError(w, http.StatusBadRequest, "please enter a valid email address")
 		return
 	}

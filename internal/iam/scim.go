@@ -81,7 +81,7 @@ func (f *SCIMFlow) serve(w http.ResponseWriter, r *http.Request) {
 
 	ctx := actor.ContextWithPrincipal(r.Context(), Principal{ID: tokenID, Kind: KindSCIM, WorkspaceID: workspaceID})
 	ctx = actor.AnnotateTenant(ctx, workspaceID)
-	ctx = actor.WithMember(ctx, workspaceID)
+	ctx = actor.WithMember(ctx, workspaceID, "")
 	// The elimity server dispatches on /Users, /Groups, and so on.
 	r = r.WithContext(ctx)
 	r.URL.Path = "/" + tail

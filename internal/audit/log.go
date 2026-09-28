@@ -2,159 +2,165 @@ package audit
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
-	"runtime/debug"
-	"strconv"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
-func (s *Service) LogAction(
-	ctx context.Context,
-	req connect.AnyRequest,
-	reqErr error,
-) {
-	s.logAudit(ctx, req.Spec().Procedure, req.Header(), req.Peer().Addr, statusCodeOf(reqErr))
+// skipPrefixes marks methods that are not audit events: reads, polling syncs,
+// and long-lived transport streams.
+var skipPrefixes = []string{
+	"Get", "List", "Whoami", "Subscribe", "Sync", "Connect", "Relay", "DaemonRelay",
 }
 
-func (s *Service) LogStreamingAction(
-	ctx context.Context,
-	conn connect.StreamingHandlerConn,
-	reqErr error,
-) {
-	s.logAudit(
-		ctx,
-		conn.Spec().Procedure,
-		conn.RequestHeader(),
-		conn.Peer().Addr,
-		statusCodeOf(reqErr),
-	)
-}
+type eventKey struct{}
 
-func (s *Service) LogHTTPAction(ctx context.Context, r *http.Request, statusCode int) {
-	s.logAudit(ctx, r.Method+" "+r.URL.Path, r.Header, r.RemoteAddr, httpStatusStr(statusCode))
-}
-
-// httpStatusStr normalizes an HTTP status into the same audit status space as
-// RPC and auth events: any 2xx is a success ("OK"), anything else is the
-// numeric status code. This keeps the UI and SIEM rules uniform ("OK" always
-// means success) instead of mixing "200" and "OK" for the same outcome.
-func httpStatusStr(status int) string {
-	if status >= 200 && status < 300 {
-		return "OK"
+// SetTarget names the resource the current request acted on, for handlers
+// whose request carries no id yet, such as a create.
+func SetTarget(ctx context.Context, target string) {
+	if e, ok := ctx.Value(eventKey{}).(*Event); ok {
+		e.Target = target
 	}
-	return strconv.Itoa(status)
 }
 
-// statusCodeOf maps an RPC outcome to an explicit audit status: "OK" on
-// success, the connect code string otherwise.
-func statusCodeOf(err error) string {
-	code := connect.CodeOf(err)
-	if code == connect.CodeUnknown {
-		return "OK"
+// Set adds a detail to the current request's audit event. Never pass secrets.
+func Set(ctx context.Context, key string, value any) {
+	if e, ok := ctx.Value(eventKey{}).(*Event); ok {
+		e.Details[key] = value
 	}
-	return code.String()
 }
 
-func (s *Service) logAudit(
-	ctx context.Context,
-	procedure string,
-	header http.Header,
-	peerAddr string,
-	statusCode string,
-) {
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Debug(
-				"panic while writing audit log",
-				"panic", r,
-				"stack", string(debug.Stack()),
-			)
+// WrapUnary audits every RPC that is not a read. The action is the method
+// name and the target comes from the request's id, name, or first *_id field.
+func (s *Service) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+		e := newEvent(req.Spec().Procedure)
+		if e == nil {
+			return next(ctx, req)
 		}
-	}()
+		if msg, ok := req.Any().(proto.Message); ok {
+			e.Target = requestTarget(msg.ProtoReflect())
+		}
+		resp, err := next(context.WithValue(ctx, eventKey{}, e), req)
+		s.finish(ctx, e, req.Header(), req.Peer().Addr, err)
+		return resp, err
+	}
+}
 
-	if s == nil || !shouldAudit(procedure) {
+func (s *Service) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+	return next
+}
+
+func (s *Service) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		e := newEvent(conn.Spec().Procedure)
+		if e == nil {
+			return next(ctx, conn)
+		}
+		err := next(context.WithValue(ctx, eventKey{}, e), conn)
+		s.finish(ctx, e, conn.RequestHeader(), conn.Peer().Addr, err)
+		return err
+	}
+}
+
+// newEvent starts the event for a procedure, or returns nil when the
+// procedure is not audited.
+func newEvent(procedure string) *Event {
+	_, method, _ := strings.Cut(strings.TrimPrefix(procedure, "/"), "/")
+	for _, prefix := range skipPrefixes {
+		if strings.HasPrefix(method, prefix) {
+			return nil
+		}
+	}
+	return &Event{Action: method, Details: map[string]any{}}
+}
+
+// Log records an event a handler emits itself, for work the interceptor
+// cannot see, like a relay opening or recording content being read. Actor
+// and transport facts come from ctx. The event counts as a success.
+func (s *Service) Log(ctx context.Context, e *Event) {
+	var header http.Header
+	var peer string
+	if meta, ok := iam.RequestMetaFromContext(ctx); ok {
+		header, peer = meta.Header, meta.RemoteAddr
+	}
+	if e.WorkspaceID == "" {
+		e.WorkspaceID = iam.WorkspaceIDFromContext(ctx)
+	}
+	s.finish(ctx, e, header, peer, nil)
+}
+
+// finish fills in who, where, and the outcome, then writes the event off the
+// request path. Unauthenticated calls are skipped: the auth flows record
+// their own events through the iam sink.
+func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer string, err error) {
+	p, _ := iam.PrincipalFromContext(ctx)
+	if p.ID == "" {
 		return
 	}
-	principal, _ := iam.PrincipalFromContext(ctx)
-	tenant, _ := iam.TenantFromContext(ctx)
-
-	log := &Event{
-		WorkspaceID: tenant,
-		ActorID:     principal.ID,
-		ActorType:   string(principal.Kind),
-		ActorEmail:  s.actorEmail(ctx, principal),
-		Action:      procedure,
-		IPAddress:   util.SanitizeUTF8(util.GetRemoteIP(header, peerAddr)),
-		UserAgent:   util.SanitizeUTF8(header.Get("User-Agent")),
-		StatusCode:  statusCode,
+	e.Timestamp = time.Now().UTC()
+	if e.WorkspaceID == "" {
+		e.WorkspaceID = iam.WorkspaceIDFromContext(ctx)
 	}
-
-	if err := s.Append(ctx, log); err != nil {
-		slog.Warn("failed to write audit log", "error_type", fmt.Sprintf("%T", err))
+	e.ActorID, e.ActorKind, e.ActorName = p.ID, string(p.Kind), p.Email
+	if header != nil {
+		e.IP = util.SanitizeUTF8(util.GetRemoteIP(header, peer))
+		e.UserAgent = util.SanitizeUTF8(header.Get("User-Agent"))
 	}
-}
-
-// actorEmail resolves the acting human's email for display. Machine subjects
-// are not users; their rows carry no email. The lookup runs off the request
-// path (logAudit is called from a detached goroutine) and a miss simply leaves
-// the column empty.
-func (s *Service) actorEmail(ctx context.Context, p iam.Principal) string {
-	if p.Kind != iam.KindUser && p.Kind != iam.KindCLI {
-		return ""
-	}
-
-	u, err := s.conn.Sys().GetUser(ctx, p.ID)
+	e.OK = err == nil
 	if err != nil {
-		return ""
+		if e.Details == nil {
+			e.Details = map[string]any{}
+		}
+		e.Details["code"] = connect.CodeOf(err).String()
 	}
-	return u.Email
+
+	actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	go func() {
+		defer cancel()
+		if e.ActorName == "" && (p.Kind == iam.KindUser || p.Kind == iam.KindCLI) {
+			if u, err := s.conn.Sys().GetUser(actx, p.ID); err == nil {
+				e.ActorName = u.Email
+			}
+		}
+		if err := s.Append(actx, e); err != nil {
+			slog.Warn("failed to write audit log", "action", e.Action, "error", err)
+		}
+	}()
 }
 
-// shouldAudit reports whether a procedure produces an audit record. Only
-// mutating operations do: authentication flows record their own semantic
-// events (login_success, login_denied, ...) through the iam sink.
-func shouldAudit(procedure string) bool {
-	if method, _, ok := strings.Cut(procedure, " "); ok {
-		switch method {
-		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
-			return true
+// requestTarget picks the resource a request is about: its id, else its
+// name, else its first other *_id field. Only these fields are read, so no
+// secret in the request can reach the log.
+func requestTarget(msg protoreflect.Message) string {
+	fields := msg.Descriptor().Fields()
+	for _, name := range []protoreflect.Name{"id", "name"} {
+		if v := stringField(msg, fields.ByName(name)); v != "" {
+			return v
 		}
 	}
-
-	_, method, ok := strings.Cut(strings.TrimPrefix(procedure, "/"), "/")
-	if !ok {
-		return false
-	}
-
-	mutatingPrefixes := []string{
-		"Create",
-		"Update",
-		"Delete",
-		"Remove",
-		"Add",
-		"Set",
-		"Rotate",
-		"Refresh",
-		"Revoke",
-		"Enroll",
-		"Invite",
-		"Accept",
-		"Reject",
-		"Sign",
-	}
-
-	for _, prefix := range mutatingPrefixes {
-		if strings.HasPrefix(method, prefix) {
-			return true
+	for i := range fields.Len() {
+		fd := fields.Get(i)
+		if fd.Name() != "workspace_id" && strings.HasSuffix(string(fd.Name()), "_id") {
+			if v := stringField(msg, fd); v != "" {
+				return v
+			}
 		}
 	}
+	return ""
+}
 
-	return false
+func stringField(msg protoreflect.Message, fd protoreflect.FieldDescriptor) string {
+	if fd == nil || fd.Kind() != protoreflect.StringKind || fd.IsList() || !msg.Has(fd) {
+		return ""
+	}
+	return msg.Get(fd).String()
 }

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { team } from '$lib/api/team.svelte';
 	import { roles as rolesApi } from '$lib/api/roles.svelte';
-	import { assignableRoles, roleIcon, roleLabel } from '$lib/roles';
+	import { roleIcon, roleLabel } from '$lib/roles';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Item from '$lib/components/ui/item';
 	import * as Select from '$lib/components/ui/select';
@@ -21,7 +21,7 @@
 
 	const rolesQuery = $derived(rolesApi.list());
 	const roleOptions = $derived(
-		assignableRoles(rolesQuery.data ?? [], 'users').map((r) => ({
+		(rolesQuery.data ?? []).map((r) => ({
 			value: r.name,
 			label: roleLabel(r.name),
 			description: r.description,

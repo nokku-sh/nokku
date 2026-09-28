@@ -20,7 +20,7 @@ VALUES
     $1,
     $2,
     $3,
-    COALESCE($4::TEXT, 'viewer'),
+    COALESCE($4::TEXT, 'member'),
     $5,
     COALESCE($6, '{}'::TEXT[]),
     $7
@@ -123,22 +123,6 @@ func (q *Queries) GetServiceAccountByTokenHash(ctx context.Context, tokenHash *c
 		&i.UpdatedAt,
 	)
 	return &i, err
-}
-
-const getServiceAccountWorkspaceID = `-- name: GetServiceAccountWorkspaceID :one
-SELECT
-  workspace_id
-FROM
-  service_accounts
-WHERE
-  id = $1
-`
-
-func (q *Queries) GetServiceAccountWorkspaceID(ctx context.Context, serviceAccountID string) (string, error) {
-	row := q.db.QueryRow(ctx, getServiceAccountWorkspaceID, serviceAccountID)
-	var workspace_id string
-	err := row.Scan(&workspace_id)
-	return workspace_id, err
 }
 
 const listServiceAccounts = `-- name: ListServiceAccounts :many

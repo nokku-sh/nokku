@@ -5,7 +5,7 @@
 	import { getLocalTimeZone, today } from '@internationalized/date';
 	import { serviceAccount } from '$lib/api/service_account.svelte';
 	import { roles as rolesApi } from '$lib/api/roles.svelte';
-	import { assignableRoles, roleIcon, roleLabel } from '$lib/roles';
+	import { roleIcon, roleLabel } from '$lib/roles';
 	import { Button } from '$lib/components/ui/button';
 	import { Calendar } from '$lib/components/ui/calendar';
 	import * as Dialog from '$lib/components/ui/dialog/';
@@ -31,7 +31,7 @@
 
 	const rolesQuery = $derived(rolesApi.list());
 	const roleOptions = $derived(
-		assignableRoles(rolesQuery.data ?? [], 'serviceAccounts').map((r) => ({
+		(rolesQuery.data ?? []).map((r) => ({
 			value: r.name,
 			label: roleLabel(r.name),
 			description: r.description,

@@ -7,7 +7,7 @@
 	import { MAX_PAGE_SIZE } from '$lib/config';
 	import { createModalState } from '$lib/hooks';
 	import type { EventLog } from '$lib/gen/nokku/v1/util_pb';
-	import { auditStatusOk, formatTs } from '$lib/utils';
+	import { actionLabel, formatTs } from '$lib/utils';
 
 	interface Props {
 		limit?: number;
@@ -20,18 +20,13 @@
 	const logs = $derived(util.getLogs({ limit, offset: 0 }));
 	const members = $derived(workspace.listMembers(() => ({ limit: MAX_PAGE_SIZE })));
 
-	function actionLabel(action: string): string {
-		const seg = action.split('/').filter(Boolean).pop() ?? action;
-		return seg.replace(/([a-z])([A-Z])/g, '$1 $2');
-	}
-
 	function actorLabel(log: EventLog): string {
-		if (log.actorEmail) return log.actorEmail;
-		if (log.actorType === 'user') {
+		if (log.actorName) return log.actorName;
+		if (log.actorKind === 'user') {
 			const member = members.data?.members.find((m) => m.id === log.actorId);
 			if (member) return member.name;
 		}
-		return log.actorType;
+		return log.actorKind;
 	}
 </script>
 
@@ -80,7 +75,7 @@
 						class="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/40"
 						onclick={() => modal.openWith({ ...log })}
 					>
-						{#if auditStatusOk(log.statusCode)}
+						{#if log.ok}
 							<CircleCheck class="size-4 shrink-0 text-emerald-500" />
 						{:else}
 							<CircleX class="size-4 shrink-0 text-destructive" />

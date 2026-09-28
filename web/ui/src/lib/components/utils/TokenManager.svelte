@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { token } from '$lib/api/tokens.svelte';
 	import { roles as rolesApi } from '$lib/api/roles.svelte';
-	import { assignableRoles, roleLabel } from '$lib/roles';
+	import { roleLabel } from '$lib/roles';
 	import { TokenKind } from '$lib/gen/nokku/v1/token_pb';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -35,13 +35,13 @@
 	const create = token.create();
 	const remove = token.remove();
 	const rolesQuery = $derived(rolesApi.list());
-	const roleOptions = $derived(assignableRoles(rolesQuery.data ?? [], 'users'));
+	const roleOptions = $derived(rolesQuery.data ?? []);
 
 	let label = $state('');
 	let expiry = $state('86400');
 	let maxUses = $state('');
 	let autoApprove = $state(false);
-	let role = $state('viewer');
+	let role = $state('member');
 
 	function submit() {
 		create.mutate({

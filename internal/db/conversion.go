@@ -3,6 +3,7 @@ package db
 import (
 	"encoding/json"
 	"log/slog"
+	"time"
 
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/util"
@@ -66,19 +67,6 @@ func (w *CreateWorkspaceRow) ToProto() *nokkuv1.Workspace {
 		Name:        &w.Name,
 		Description: w.Description,
 		CreatedBy:   &w.CreatedBy,
-		CreatedAt:   SafeTimestamp(&w.CreatedAt),
-		UpdatedAt:   SafeTimestamp(&w.UpdatedAt),
-	}
-}
-
-func (w *WorkspaceMember) ToProto() *nokkuv1.WorkspaceMember {
-	if w == nil {
-		return nil
-	}
-	return &nokkuv1.WorkspaceMember{
-		Id:          &w.UserID,
-		WorkspaceId: &w.WorkspaceID,
-		RoleName:    &w.RoleName,
 		CreatedAt:   SafeTimestamp(&w.CreatedAt),
 		UpdatedAt:   SafeTimestamp(&w.UpdatedAt),
 	}
@@ -221,6 +209,15 @@ func (u *User) ToProto() *nokkuv1.User {
 	}
 }
 
+// DaemonOnlineWindow is how recently a core instance must have seen a daemon
+// for it to count as online. The pool's heartbeat runs well inside it.
+const DaemonOnlineWindow = 30 * time.Second
+
+// SeenRecently reports whether a daemon last seen at t counts as online.
+func SeenRecently(t *time.Time) bool {
+	return t != nil && time.Since(*t) < DaemonOnlineWindow
+}
+
 func (d *Daemon) ToProto() *nokkuv1.Daemon {
 	if d == nil {
 		return nil
@@ -232,7 +229,8 @@ func (d *Daemon) ToProto() *nokkuv1.Daemon {
 		Name:        &d.Name,
 		Status:      &d.Status,
 		Config:      d.Config,
-		Online:      &d.Online,
+		Online:      new(SeenRecently(d.LastSeenAt)),
+		LastSeenAt:  SafeTimestamp(d.LastSeenAt),
 		Metadata:    metadata,
 		UpdatedAt:   SafeTimestamp(&d.UpdatedAt),
 		CreatedAt:   SafeTimestamp(&d.CreatedAt),

@@ -158,13 +158,13 @@ func TestEnrollAutoApprove(t *testing.T) {
 	conn, pending := enrollToken(t, nil)
 	out, err := enroll(t, conn, EnrollInput{Token: pending})
 	if err != nil || out.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING {
-		t.Fatalf("plain token: status %v, err %v, want pending", out.GetStatus(), err)
+		t.Fatalf("plain token: status %v, err %v, want pending", out.Status, err)
 	}
 
 	conn, approved := enrollToken(t, func(p *db.CreateWorkspaceTokenParams) { p.AutoApprove = true })
 	out, err = enroll(t, conn, EnrollInput{Token: approved})
 	if err != nil || out.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
-		t.Fatalf("auto-approve token: status %v, err %v, want accepted", out.GetStatus(), err)
+		t.Fatalf("auto-approve token: status %v, err %v, want accepted", out.Status, err)
 	}
 }
 

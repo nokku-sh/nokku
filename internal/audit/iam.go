@@ -17,7 +17,7 @@ import (
 func (s *Service) Record(ctx context.Context, e iam.Event) {
 	event := eventFromIAM(e)
 	if meta, ok := iam.RequestMetaFromContext(ctx); ok {
-		event.IPAddress = util.SanitizeUTF8(util.GetRemoteIP(meta.Header, meta.RemoteAddr))
+		event.IP = util.SanitizeUTF8(util.GetRemoteIP(meta.Header, meta.RemoteAddr))
 		event.UserAgent = util.SanitizeUTF8(meta.Header.Get("User-Agent"))
 	}
 
@@ -44,23 +44,14 @@ func eventFromIAM(e iam.Event) *Event {
 	if e.Detail != "" {
 		details["detail"] = e.Detail
 	}
-
-	// The status column is what the UI keys on to render success vs failure.
-	// Success actions are "OK" to match the RPC convention; a denied login is
-	// the notable failure and carries "denied".
-	statusCode := "OK"
-	if e.Action == iam.ActionLoginDenied {
-		statusCode = "denied"
-	}
-
 	return &Event{
 		Timestamp:   time.Now().UTC(),
 		WorkspaceID: e.WorkspaceID,
 		Action:      string(e.Action),
 		ActorID:     e.UserID,
-		ActorType:   string(e.Kind),
-		ActorEmail:  e.Email,
-		StatusCode:  statusCode,
+		ActorKind:   string(e.Kind),
+		ActorName:   e.Email,
+		OK:          e.Action != iam.ActionLoginDenied,
 		Details:     details,
 	}
 }

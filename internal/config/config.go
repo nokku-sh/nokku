@@ -19,7 +19,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/email"
 	"github.com/nokku-sh/nokku/internal/entitlement"
-	"github.com/nokku-sh/nokku/internal/geo"
 	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/recording"
 	"github.com/nokku-sh/nokku/internal/storage"
@@ -48,7 +47,6 @@ type Config struct {
 	Record       *recording.Service
 	Billing      *billing.Service
 	Entitlements *entitlement.Service
-	Geo          *geo.Service
 }
 
 func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
@@ -65,14 +63,10 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	// The nokku-owned identity engine (docs/adr/0001). It owns the public
-	// schema's identity tables; the DB migration runs first via
-	// db.NewConnection, so no store bootstrap precedes it.
 	cfg.Conn, err = db.NewConnection(ctx)
 	if err != nil {
 		return nil, err
 	}
-	cfg.Geo = geo.New()
 	cfg.Cache, err = cache.New(ctx)
 	if err != nil {
 		return nil, err
@@ -147,6 +141,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		Cache:            cfg.Cache,
 		PasskeyRPOrigins: passkeyOrigins(&cfg),
 		CanJoin:          cfg.Entitlements.CanInvite,
+		StrictEmail:      mode == entitlement.ModeSaaS,
 	})
 	if err != nil {
 		return nil, err

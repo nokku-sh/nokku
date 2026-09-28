@@ -19,11 +19,6 @@ type Redis struct {
 	prefix string
 }
 
-// NewRedis wraps client with prefix; every key is stored as prefix+key.
-func NewRedis(client *redis.Client, prefix string) *Redis {
-	return &Redis{client: client, prefix: prefix}
-}
-
 func (r *Redis) key(key string) string {
 	return r.prefix + key
 }

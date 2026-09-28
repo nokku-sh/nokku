@@ -1,6 +1,7 @@
 // Package cache is nokku's shared cache: email cooldowns, DPoP replay
 // detection, SSO flow state, and future cross-request state. Redis when
-// REDIS_ADDR is set, process-local memory otherwise.
+// NOKKU_REDIS_URL is set, process-local memory otherwise. Run more than one
+// instance only with Redis, or single-use state is not shared.
 //
 // Two flavors live here:
 //   - Cache implementations (Memory, Redis) are shared, byte-oriented, and
@@ -15,7 +16,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -35,23 +35,19 @@ type Cache interface {
 // ErrNotFound is the sentinel for missing keys; callers match with [errors.Is].
 var ErrNotFound = errors.New("cache: not found")
 
-// New builds the shared cache from the environment: Redis when REDIS_ADDR is
-// set, memory otherwise.
+// New builds the shared cache from the environment: Redis when
+// NOKKU_REDIS_URL is set (redis://user:pass@host:6379/0, rediss:// for TLS),
+// memory otherwise.
 func New(ctx context.Context) (Cache, error) {
-	addr := os.Getenv("REDIS_ADDR")
-	if addr == "" {
+	url := os.Getenv("NOKKU_REDIS_URL")
+	if url == "" {
 		return NewMemory(10_000), nil
 	}
-
-	db, err := strconv.Atoi(os.Getenv("REDIS_DB"))
+	opts, err := redis.ParseURL(url)
 	if err != nil {
-		return nil, fmt.Errorf("cache: invalid REDIS_DB: %w", err)
+		return nil, fmt.Errorf("cache: invalid NOKKU_REDIS_URL: %w", err)
 	}
-	client := redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: os.Getenv("REDIS_PASSWORD"),
-		DB:       db,
-	})
+	client := redis.NewClient(opts)
 	if err := client.Ping(ctx).Err(); err != nil {
 		_ = client.Close()
 		return nil, fmt.Errorf("cache: ping redis: %w", err)
@@ -60,5 +56,5 @@ func New(ctx context.Context) (Cache, error) {
 		<-ctx.Done()
 		_ = client.Close()
 	}()
-	return NewRedis(client, "nokku:"), nil
+	return &Redis{client: client, prefix: "nokku:"}, nil
 }

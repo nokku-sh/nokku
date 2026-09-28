@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
+
+	"github.com/nokku-sh/nokku/internal/audit"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -353,6 +356,11 @@ func (s *CertificateService) SignSSHCertificate(
 	}
 
 	expiry := util.Uint64ToUnixTime(cert.ValidBefore)
+	audit.SetTarget(ctx, ca.ID)
+	audit.Set(ctx, "serial", strconv.FormatUint(cert.Serial, 10))
+	audit.Set(ctx, "key_id", cert.KeyId)
+	audit.Set(ctx, "principals", cert.ValidPrincipals)
+	audit.Set(ctx, "expires_at", expiry)
 	return &nokkuv1.SignSSHCertificateResponse{
 		CaId:              &ca.ID,
 		CaName:            &ca.Name,
@@ -387,6 +395,9 @@ func (s *CertificateService) SignX509Certificate(
 	}); err != nil {
 		return nil, DBError(err)
 	}
+	if ca == nil {
+		return nil, ErrNotFound
+	}
 
 	if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_X509 {
 		return nil, NewError(
@@ -411,6 +422,9 @@ func (s *CertificateService) SignX509Certificate(
 		return nil, NewError(connect.CodeInvalidArgument, err.Error())
 	}
 
+	audit.SetTarget(ctx, ca.ID)
+	audit.Set(ctx, "usage", req.GetUsage().String())
+	audit.Set(ctx, "expires_at", expiresAt)
 	return &nokkuv1.SignX509CertificateResponse{
 		CaName:      &ca.Name,
 		Certificate: new(string(certPEM)),

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nokku-sh/nokku/internal/config"
+
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 
@@ -14,59 +16,34 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-func TestProcedurePermissions(t *testing.T) {
+func TestProcedureRoles(t *testing.T) {
 	tests := []struct {
 		procedure string
-		want      db.Permission
+		want      db.Role
 	}{
-		{nokkuv1connect.TargetServiceGetTargetProcedure, db.PermTargetsView},
-		{nokkuv1connect.TargetServiceListTargetsProcedure, db.PermTargetsView},
-		{nokkuv1connect.TargetServiceCreateTargetProcedure, db.PermTargetsEdit},
-		{nokkuv1connect.TargetServiceDeleteTargetProcedure, db.PermTargetsEdit},
+		{nokkuv1connect.CertificateServiceListCertificateAuthoritiesProcedure, db.RoleMember},
+		{nokkuv1connect.DaemonServiceCreateSessionProcedure, db.RoleMember},
 
-		{nokkuv1connect.TeamServiceGetTeamProcedure, db.PermTeamsView},
-		{nokkuv1connect.TeamServiceAddTeamMemberProcedure, db.PermTeamsEdit},
+		{nokkuv1connect.TargetServiceListTargetsProcedure, db.RoleViewer},
+		{nokkuv1connect.WorkspaceServiceListWorkspaceMembersProcedure, db.RoleViewer},
+		{nokkuv1connect.UtilServiceListAuditLogsProcedure, db.RoleViewer},
 
-		{nokkuv1connect.CertificateServiceGetCertificateAuthorityProcedure, db.PermCasView},
-		{nokkuv1connect.CertificateServiceDeleteCertificateAuthorityProcedure, db.PermCasEdit},
+		{nokkuv1connect.TargetServiceDeleteTargetProcedure, db.RoleEditor},
+		{nokkuv1connect.PrincipalServiceRevokeAllAccessProcedure, db.RoleEditor},
+		{nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure, db.RoleEditor},
 
-		{nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, db.PermWorkspaceEdit},
-		{nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure, db.PermWorkspaceDelete},
-		{nokkuv1connect.WorkspaceServiceListWorkspaceMembersProcedure, db.PermMembersView},
-		{nokkuv1connect.WorkspaceServiceUpdateWorkspaceMemberProcedure, db.PermMembersEdit},
+		{nokkuv1connect.WorkspaceServiceUpdateWorkspaceMemberProcedure, db.RoleAdmin},
+		{nokkuv1connect.TokenServiceCreateTokenProcedure, db.RoleAdmin},
+		{nokkuv1connect.SSOServiceUpdateSSOProviderProcedure, db.RoleAdmin},
+		{nokkuv1connect.BillingServiceGetBillingProcedure, db.RoleAdmin},
 
-		{nokkuv1connect.PrincipalServiceListPrincipalsProcedure, db.PermPrincipalsView},
-		{nokkuv1connect.PrincipalServiceRevokeAllAccessProcedure, db.PermPrincipalsEdit},
-
-		{
-			nokkuv1connect.ServiceAccountServiceGetServiceAccountProcedure,
-			db.PermServiceAccountsView,
-		},
-		{
-			nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure,
-			db.PermServiceAccountsEdit,
-		},
-
-		{nokkuv1connect.DaemonServiceGetDaemonProcedure, db.PermDaemonsView},
-		{nokkuv1connect.DaemonServiceDeleteDaemonProcedure, db.PermDaemonsEdit},
-		{nokkuv1connect.TokenServiceCreateTokenProcedure, db.PermSettingsEdit},
-
-		{nokkuv1connect.SSOServiceGetSSOProviderProcedure, db.PermSsoView},
-		{nokkuv1connect.SSOServiceUpdateSSOProviderProcedure, db.PermSsoEdit},
-
-		{nokkuv1connect.WorkspaceDomainServiceGetWorkspaceDomainProcedure, db.PermDomainsView},
-		{nokkuv1connect.WorkspaceDomainServiceVerifyWorkspaceDomainProcedure, db.PermDomainsEdit},
-
-		{nokkuv1connect.BillingServiceGetBillingProcedure, db.PermSettingsView},
-		{nokkuv1connect.TokenServiceDeleteTokenProcedure, db.PermSettingsEdit},
+		{nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure, db.RoleOwner},
 	}
 
 	for _, test := range tests {
-		t.Run(test.procedure, func(t *testing.T) {
-			if got := ProcedurePermissions[test.procedure]; got != test.want {
-				t.Fatalf("permission = %q, want %q", got, test.want)
-			}
-		})
+		if got := ProcedureRoles[test.procedure]; got != test.want {
+			t.Errorf("%s role = %q, want %q", test.procedure, got, test.want)
+		}
 	}
 }
 
@@ -95,7 +72,7 @@ func allProcedures(t *testing.T) []string {
 func TestEveryProcedureIsClassified(t *testing.T) {
 	for _, procedure := range allProcedures(t) {
 		classes := 0
-		if _, ok := ProcedurePermissions[procedure]; ok {
+		if _, ok := ProcedureRoles[procedure]; ok {
 			classes++
 		}
 		if _, ok := selfScopedProcedures[procedure]; ok {
@@ -148,5 +125,22 @@ func TestAuthorizeUnknownProcedure(t *testing.T) {
 	ctx := iam.ContextWithPrincipal(t.Context(), iam.Principal{ID: "u1", Kind: iam.KindUser})
 	if _, err := a.authorize(ctx, "/nokku.v1.UnknownService/Unknown"); !errors.Is(err, db.ErrPermissionDenied) {
 		t.Fatalf("unknown procedure: err = %v, want permission denied", err)
+	}
+}
+
+func TestAuthorizePersonalAuditLog(t *testing.T) {
+	a := &AuthorizationInterceptor{cfg: &config.Config{}}
+	ctx := iam.ContextWithPrincipal(t.Context(), iam.Principal{ID: "u1", Kind: iam.KindUser})
+	if _, err := a.authorize(ctx, nokkuv1connect.UtilServiceListAuditLogsProcedure); err != nil {
+		t.Fatalf("personal audit log without a workspace: err = %v, want allowed", err)
+	}
+	if _, err := a.authorize(
+		ctx,
+		nokkuv1connect.TargetServiceListTargetsProcedure,
+	); !errors.Is(
+		err,
+		db.ErrWorkspaceNotPinned,
+	) {
+		t.Fatalf("workspace procedure without a workspace: err = %v, want not pinned", err)
 	}
 }

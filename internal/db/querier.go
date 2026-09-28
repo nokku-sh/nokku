@@ -18,12 +18,10 @@ type Querier interface {
 	AddTeamMember(ctx context.Context, arg *AddTeamMemberParams) error
 	ConsumeCredentialBySubject(ctx context.Context, arg *ConsumeCredentialBySubjectParams) (*Credential, error)
 	ConsumeToken(ctx context.Context, arg *ConsumeTokenParams) (string, error)
-	CountAuditLogs(ctx context.Context, arg *CountAuditLogsParams) (int32, error)
 	// Member counts for a set of teams in one read, for list views that show a
 	// count instead of embedding each team's members.
 	CountTeamMembers(ctx context.Context, teamIds []string) ([]*CountTeamMembersRow, error)
 	CountUserMemberships(ctx context.Context, userID string) (int32, error)
-	CountWorkspaceMembers(ctx context.Context, arg *CountWorkspaceMembersParams) (int32, error)
 	CountWorkspaceResources(ctx context.Context, workspaceID string) (int64, error)
 	CountWorkspaceSeats(ctx context.Context, workspaceID string) (int64, error)
 	CountWorkspacesByOwner(ctx context.Context, userID string) (int32, error)
@@ -42,6 +40,8 @@ type Querier interface {
 	CreateUserWithID(ctx context.Context, arg *CreateUserWithIDParams) (*User, error)
 	CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParams) (*CreateWorkspaceRow, error)
 	CreateWorkspaceToken(ctx context.Context, arg *CreateWorkspaceTokenParams) (*WorkspaceToken, error)
+	// The enforce_single_default_ca trigger clears the previous default of the
+	// same authority type before this row is written.
 	DeleteCA(ctx context.Context, caID string) (*CertificateAuthority, error)
 	DeleteCredential(ctx context.Context, arg *DeleteCredentialParams) error
 	DeleteCredentialsByProvider(ctx context.Context, arg *DeleteCredentialsByProviderParams) (int64, error)
@@ -73,7 +73,6 @@ type Querier interface {
 	DeleteWorkspaceToken(ctx context.Context, id string) error
 	// Opts this transaction into the audit_logs delete guard.
 	EnableAuditRetention(ctx context.Context) error
-	EnsureRole(ctx context.Context, arg *EnsureRoleParams) error
 	EnsureWorkspaceMember(ctx context.Context, arg *EnsureWorkspaceMemberParams) error
 	FindCredentialBySubject(ctx context.Context, arg *FindCredentialBySubjectParams) (*Credential, error)
 	GetActiveSubscription(ctx context.Context, arg *GetActiveSubscriptionParams) (*WorkspaceSubscription, error)
@@ -107,7 +106,6 @@ type Querier interface {
 	// hash of the raw secret. A service account's token is its credential, so
 	// only live, unexpired accounts match.
 	GetServiceAccountByTokenHash(ctx context.Context, tokenHash *crypto.HashedToken) (*ServiceAccount, error)
-	GetServiceAccountWorkspaceID(ctx context.Context, serviceAccountID string) (string, error)
 	GetSession(ctx context.Context, tokenHash crypto.HashedToken) (*Session, error)
 	// Returns every target a subject can reach within an explicit workspace set.
 	// Grant logic is identical to GetTargetsBySubject (direct user grants, team
@@ -129,7 +127,7 @@ type Querier interface {
 	GetWorkspace(ctx context.Context, workspaceID string) (*Workspace, error)
 	GetWorkspaceDomain(ctx context.Context, arg *GetWorkspaceDomainParams) (*WorkspaceDomain, error)
 	GetWorkspaceForUpdate(ctx context.Context, workspaceID string) (*Workspace, error)
-	GetWorkspaceMember(ctx context.Context, arg *GetWorkspaceMemberParams) (*WorkspaceMember, error)
+	GetWorkspaceMember(ctx context.Context, arg *GetWorkspaceMemberParams) (*GetWorkspaceMemberRow, error)
 	GetWorkspaceOwner(ctx context.Context, workspaceID string) (string, error)
 	GetWorkspacePrincipals(ctx context.Context, workspaceID string) ([]string, error)
 	GetWorkspaceStateVersion(ctx context.Context, workspaceID string) (int64, error)
@@ -141,8 +139,11 @@ type Querier interface {
 	// Creates the principal anchor for each reported account so it becomes
 	// assignable. Never deletes: a host's reported list is a hint, not authority.
 	InsertTargetPrincipals(ctx context.Context, arg *InsertTargetPrincipalsParams) error
-	ListActiveSubscriptions(ctx context.Context, arg *ListActiveSubscriptionsParams) ([]*WorkspaceSubscription, error)
-	ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) ([]*AuditAuditLog, error)
+	// Every workspace role of a user or service account, keyed by workspace.
+	ListActorRoles(ctx context.Context, actorID string) ([]*ListActorRolesRow, error)
+	// RLS already limits rows to the pinned workspace or the actor's own. A NULL
+	// workspace_id is the personal log: every row of the actor, any workspace.
+	ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) ([]*ListAuditLogsRow, error)
 	ListCAs(ctx context.Context, arg *ListCAsParams) ([]*CertificateAuthority, error)
 	ListCredentialsByType(ctx context.Context, arg *ListCredentialsByTypeParams) ([]*Credential, error)
 	ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*ListDaemonsRow, error)
@@ -180,7 +181,6 @@ type Querier interface {
 	// read.
 	ListWorkspaceAuditWebhooks(ctx context.Context) ([]*ListWorkspaceAuditWebhooksRow, error)
 	ListWorkspaceDomains(ctx context.Context, workspaceID string) ([]*WorkspaceDomain, error)
-	ListWorkspaceIDs(ctx context.Context) ([]string, error)
 	ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error)
 	ListWorkspaceSCIMTokens(ctx context.Context, workspaceID string) ([]*ListWorkspaceSCIMTokensRow, error)
 	ListWorkspaceTokens(ctx context.Context, arg *ListWorkspaceTokensParams) ([]*WorkspaceToken, error)
@@ -198,17 +198,13 @@ type Querier interface {
 	RenameCredential(ctx context.Context, arg *RenameCredentialParams) error
 	ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*CertificateAuthority, error)
 	RevokeSubjectAccessInWorkspace(ctx context.Context, arg *RevokeSubjectAccessInWorkspaceParams) error
-	SetDaemonsOffline(ctx context.Context) error
-	SetDaemonsOnline(ctx context.Context, arg *SetDaemonsOnlineParams) error
-	// The enforce_single_default_ca trigger clears the previous default of the
-	// same authority type before this row is written.
-	SetDefaultCA(ctx context.Context, arg *SetDefaultCAParams) error
 	SetRecordingComplete(ctx context.Context, arg *SetRecordingCompleteParams) (*Recording, error)
 	// Records which Stripe customer a workspace maps to, so checkout always reuses
 	// the same customer. Status stays inactive so this row never grants
 	// entitlements on its own; the webhook promotes it to a real subscription.
 	SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error
 	SumRecordingBytes(ctx context.Context, workspaceID string) (int64, error)
+	TouchDaemons(ctx context.Context, daemonIds []string) error
 	// Throttled: only writes when the stored stamp is over an hour old, so a
 	// busy provisioning client does not turn every read into a write.
 	TouchSCIMToken(ctx context.Context, id string) error
@@ -226,7 +222,6 @@ type Querier interface {
 	UpdateCAPrivateKey(ctx context.Context, arg *UpdateCAPrivateKeyParams) error
 	UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) (*Daemon, error)
 	UpdateDaemonMetadata(ctx context.Context, arg *UpdateDaemonMetadataParams) error
-	UpdateDaemonStatus(ctx context.Context, arg *UpdateDaemonStatusParams) (*Daemon, error)
 	UpdateKeysetWrappedData(ctx context.Context, data []byte) (int64, error)
 	UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (string, error)
 	UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*Target, error)

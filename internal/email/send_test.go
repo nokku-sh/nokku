@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,7 +31,7 @@ func newTestService(sender Sender) *Service {
 	return &Service{
 		sender:   sender,
 		cache:    cache.NewMemory(0),
-		Sender:   "noreply@system.nokku.sh",
+		From:     "noreply@system.nokku.sh",
 		Cooldown: time.Hour,
 	}
 }
@@ -54,20 +56,17 @@ func TestSendTemplate_CallsSender(t *testing.T) {
 		t.Fatalf("sender called %d times, want 1", len(sender.sent))
 	}
 	msg := sender.sent[0]
-	if msg.From.Email != "noreply@system.nokku.sh" {
-		t.Errorf("From = %+v, want noreply@system.nokku.sh", msg.From)
+	if msg.From != "Nokku <noreply@system.nokku.sh>" {
+		t.Errorf("From = %q", msg.From)
 	}
-	if len(msg.To) != 1 || msg.To[0].Email != "ada@example.com" {
-		t.Errorf("To = %+v, want ada@example.com", msg.To)
+	if msg.To != "ada@example.com" {
+		t.Errorf("To = %q, want ada@example.com", msg.To)
 	}
 	if msg.Subject != "Welcome to Nokku" {
 		t.Errorf("Subject = %q", msg.Subject)
 	}
-	if !strings.Contains(msg.HTMLBody, "Ada") {
+	if !strings.Contains(msg.HTML, "Ada") {
 		t.Error("HTML body missing rendered username")
-	}
-	if msg.Tags["template"] != "welcome" || msg.Headers["X-Nokku-Template"] != "welcome" {
-		t.Errorf("Tags = %v, Headers = %v", msg.Tags, msg.Headers)
 	}
 }
 
@@ -168,26 +167,12 @@ func TestSendTemplate_UnknownTemplate(t *testing.T) {
 
 	err := svc.sendTemplate(context.Background(), sendRequest{
 		userID:   "user-1",
-		to:       Address{Email: "a@b.io"},
+		to:       "a@b.io",
 		subject:  "x",
 		template: "does-not-exist",
 	})
 	if err == nil {
 		t.Fatal("unknown template: want error")
-	}
-}
-
-func TestSendTemplate_NilService(t *testing.T) {
-	var svc *Service
-	if err := svc.SendWelcomeEmail(
-		context.Background(),
-		"user-1",
-		"a@b.io",
-		"Ada",
-		"u",
-		"10m",
-	); err != nil {
-		t.Errorf("nil service: %v, want nil", err)
 	}
 }
 
@@ -202,16 +187,42 @@ func TestSendTemplate_MessageAndData(t *testing.T) {
 		"ada@example.com",
 		"device-42",
 		"Web browser",
-		"Innsbruck, Austria",
+		"203.0.113.7",
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	msg := sender.sent[0]
-	if !strings.Contains(msg.HTMLBody, "device-42") {
+	if !strings.Contains(msg.HTML, "203.0.113.7") {
+		t.Error("body missing IP address")
+	}
+	if !strings.Contains(msg.HTML, "device-42") {
 		t.Error("body missing device id")
 	}
-	if !strings.Contains(msg.HTMLBody, "https://app.nokku.sh/profile/security") {
+	if !strings.Contains(msg.HTML, "https://app.nokku.sh/profile/security") {
 		t.Error("body missing profile URL")
 	}
+}
+
+// Concurrent sends for the same user and template must deliver exactly once.
+func TestSendTemplate_ConcurrentSendsOnce(t *testing.T) {
+	sender := &countingSender{}
+	svc := newTestService(sender)
+	var wg sync.WaitGroup
+	for range 20 {
+		wg.Go(func() {
+			_ = svc.SendVerificationEmail(t.Context(), "user-1", "a@b.io", "u", "10m")
+		})
+	}
+	wg.Wait()
+	if n := sender.n.Load(); n != 1 {
+		t.Errorf("sent %d times, want 1", n)
+	}
+}
+
+type countingSender struct{ n atomic.Int32 }
+
+func (c *countingSender) Send(context.Context, Message) error {
+	c.n.Add(1)
+	return nil
 }

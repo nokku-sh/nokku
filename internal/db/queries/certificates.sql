@@ -191,15 +191,6 @@ RETURNING
 
 -- The enforce_single_default_ca trigger clears the previous default of the
 -- same authority type before this row is written.
--- name: SetDefaultCA :exec
-UPDATE certificate_authorities
-SET
-  is_default = TRUE,
-  updated_at = NOW()
-WHERE
-  id = @ca_id
-  AND workspace_id = @workspace_id;
-
 -- name: DeleteCA :one
 DELETE FROM certificate_authorities
 WHERE

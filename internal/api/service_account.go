@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"time"
 
@@ -43,12 +44,9 @@ func (s *ServiceAccountService) CreateServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.CreateServiceAccountRequest,
 ) (*nokkuv1.CreateServiceAccountResponse, error) {
-	roleName := req.GetRoleName()
-	if roleName == "" {
-		roleName = "viewer"
-	}
-	if !db.IsServiceAccountRole(roleName) {
-		return nil, ErrInvalidInput
+	roleName := cmp.Or(req.GetRoleName(), string(db.RoleMember))
+	if !callerRole(ctx).CanAssign(db.Role(roleName)) {
+		return nil, NewError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
 
 	// The service account's credential is a bearer token whose hash lives on
@@ -98,12 +96,15 @@ func (s *ServiceAccountService) UpdateServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.UpdateServiceAccountRequest,
 ) (*nokkuv1.UpdateServiceAccountResponse, error) {
-	if req.RoleName != nil && !db.IsServiceAccountRole(req.GetRoleName()) {
-		return nil, ErrInvalidInput
+	if req.RoleName != nil && !callerRole(ctx).CanAssign(db.Role(req.GetRoleName())) {
+		return nil, NewError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
 
 	var result *db.ServiceAccount
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		if err := checkCanManageServiceAccount(ctx, q, req.GetId()); err != nil {
+			return err
+		}
 		updatedID, err := q.UpdateServiceAccount(ctx, &db.UpdateServiceAccountParams{
 			ServiceAccountID: req.GetId(),
 			Name:             req.Name,
@@ -164,10 +165,26 @@ func (s *ServiceAccountService) DeleteServiceAccount(
 	req *nokkuv1.DeleteServiceAccountRequest,
 ) (*nokkuv1.DeleteServiceAccountResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		if err := checkCanManageServiceAccount(ctx, q, req.GetId()); err != nil {
+			return err
+		}
 		return q.DeleteServiceAccount(ctx, req.GetId())
 	}); err != nil {
 		return nil, DBError(err)
 	}
 	// The credential is the row's token hash: deletion revokes it.
 	return &nokkuv1.DeleteServiceAccountResponse{}, nil
+}
+
+// checkCanManageServiceAccount refuses changes to a service account whose
+// role is above the caller's.
+func checkCanManageServiceAccount(ctx context.Context, q db.Querier, id string) error {
+	sa, err := q.GetServiceAccount(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !callerRole(ctx).CanAssign(db.Role(sa.RoleName)) {
+		return db.ErrPermissionDenied
+	}
+	return nil
 }

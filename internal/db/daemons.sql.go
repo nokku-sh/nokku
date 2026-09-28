@@ -28,7 +28,7 @@ WITH
       )
     ON CONFLICT DO NOTHING
     RETURNING
-      id, workspace_id, name, status, online, key_thumbprint, config, metadata, updated_at, created_at
+      id, workspace_id, name, status, last_seen_at, key_thumbprint, config, metadata, updated_at, created_at
   ),
   new_target AS (
     INSERT INTO
@@ -44,7 +44,7 @@ WITH
       id
   )
 SELECT
-  d.id, d.workspace_id, d.name, d.status, d.online, d.key_thumbprint, d.config, d.metadata, d.updated_at, d.created_at,
+  d.id, d.workspace_id, d.name, d.status, d.last_seen_at, d.key_thumbprint, d.config, d.metadata, d.updated_at, d.created_at,
   t.id AS target_id
 FROM
   new_daemon d
@@ -62,17 +62,17 @@ type CreateDaemonParams struct {
 }
 
 type CreateDaemonRow struct {
-	ID            string    `json:"id"`
-	WorkspaceID   string    `json:"workspaceId"`
-	Name          string    `json:"name"`
-	Status        int32     `json:"status"`
-	Online        bool      `json:"online"`
-	KeyThumbprint *string   `json:"keyThumbprint"`
-	Config        []byte    `json:"config"`
-	Metadata      []byte    `json:"metadata"`
-	UpdatedAt     time.Time `json:"updatedAt"`
-	CreatedAt     time.Time `json:"createdAt"`
-	TargetID      string    `json:"targetId"`
+	ID            string     `json:"id"`
+	WorkspaceID   string     `json:"workspaceId"`
+	Name          string     `json:"name"`
+	Status        int32      `json:"status"`
+	LastSeenAt    *time.Time `json:"lastSeenAt"`
+	KeyThumbprint *string    `json:"keyThumbprint"`
+	Config        []byte     `json:"config"`
+	Metadata      []byte     `json:"metadata"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	TargetID      string     `json:"targetId"`
 }
 
 // Returns no row when the name or the key is already taken, so the caller
@@ -92,7 +92,7 @@ func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*C
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Status,
-		&i.Online,
+		&i.LastSeenAt,
 		&i.KeyThumbprint,
 		&i.Config,
 		&i.Metadata,
@@ -108,7 +108,7 @@ DELETE FROM daemons
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, name, status, online, key_thumbprint, config, metadata, updated_at, created_at
+  id, workspace_id, name, status, last_seen_at, key_thumbprint, config, metadata, updated_at, created_at
 `
 
 func (q *Queries) DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, error) {
@@ -119,7 +119,7 @@ func (q *Queries) DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, e
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Status,
-		&i.Online,
+		&i.LastSeenAt,
 		&i.KeyThumbprint,
 		&i.Config,
 		&i.Metadata,
@@ -131,7 +131,7 @@ func (q *Queries) DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, e
 
 const getDaemon = `-- name: GetDaemon :one
 SELECT
-  id, workspace_id, name, status, online, key_thumbprint, config, metadata, updated_at, created_at
+  id, workspace_id, name, status, last_seen_at, key_thumbprint, config, metadata, updated_at, created_at
 FROM
   daemons
 WHERE
@@ -146,7 +146,7 @@ func (q *Queries) GetDaemon(ctx context.Context, daemonID string) (*Daemon, erro
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Status,
-		&i.Online,
+		&i.LastSeenAt,
 		&i.KeyThumbprint,
 		&i.Config,
 		&i.Metadata,
@@ -158,7 +158,7 @@ func (q *Queries) GetDaemon(ctx context.Context, daemonID string) (*Daemon, erro
 
 const getDaemonByKeyThumbprint = `-- name: GetDaemonByKeyThumbprint :one
 SELECT
-  id, workspace_id, name, status, online, key_thumbprint, config, metadata, updated_at, created_at
+  id, workspace_id, name, status, last_seen_at, key_thumbprint, config, metadata, updated_at, created_at
 FROM
   daemons
 WHERE
@@ -179,7 +179,7 @@ func (q *Queries) GetDaemonByKeyThumbprint(ctx context.Context, arg *GetDaemonBy
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Status,
-		&i.Online,
+		&i.LastSeenAt,
 		&i.KeyThumbprint,
 		&i.Config,
 		&i.Metadata,
@@ -193,7 +193,7 @@ const getDaemonsByIDs = `-- name: GetDaemonsByIDs :many
 SELECT
   id,
   name,
-  online
+  last_seen_at
 FROM
   daemons
 WHERE
@@ -201,9 +201,9 @@ WHERE
 `
 
 type GetDaemonsByIDsRow struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Online bool   `json:"online"`
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	LastSeenAt *time.Time `json:"lastSeenAt"`
 }
 
 func (q *Queries) GetDaemonsByIDs(ctx context.Context, daemonIds []string) ([]*GetDaemonsByIDsRow, error) {
@@ -215,7 +215,7 @@ func (q *Queries) GetDaemonsByIDs(ctx context.Context, daemonIds []string) ([]*G
 	var items []*GetDaemonsByIDsRow
 	for rows.Next() {
 		var i GetDaemonsByIDsRow
-		if err := rows.Scan(&i.ID, &i.Name, &i.Online); err != nil {
+		if err := rows.Scan(&i.ID, &i.Name, &i.LastSeenAt); err != nil {
 			return nil, err
 		}
 		items = append(items, &i)
@@ -257,7 +257,7 @@ func (q *Queries) GetTargetByDaemon(ctx context.Context, daemonID *string) (*Tar
 
 const listDaemons = `-- name: ListDaemons :many
 SELECT
-  d.id, d.workspace_id, d.name, d.status, d.online, d.key_thumbprint, d.config, d.metadata, d.updated_at, d.created_at,
+  d.id, d.workspace_id, d.name, d.status, d.last_seen_at, d.key_thumbprint, d.config, d.metadata, d.updated_at, d.created_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   daemons d
@@ -273,23 +273,24 @@ WHERE
   )
   AND (
     $4::BOOLEAN IS NULL
-    OR d.online = $4
+    OR COALESCE(d.last_seen_at > $5::TIMESTAMPTZ, FALSE) = $4
   )
 ORDER BY
   d.id ASC
 LIMIT
-  $6
+  $7
 OFFSET
-  $5
+  $6
 `
 
 type ListDaemonsParams struct {
-	WorkspaceID string  `json:"workspaceId"`
-	Query       *string `json:"query"`
-	Status      *int32  `json:"status"`
-	Online      *bool   `json:"online"`
-	Offset      *int32  `json:"offset"`
-	Limit       *int32  `json:"limit"`
+	WorkspaceID string    `json:"workspaceId"`
+	Query       *string   `json:"query"`
+	Status      *int32    `json:"status"`
+	Online      *bool     `json:"online"`
+	SeenAfter   time.Time `json:"seenAfter"`
+	Offset      *int32    `json:"offset"`
+	Limit       *int32    `json:"limit"`
 }
 
 type ListDaemonsRow struct {
@@ -303,6 +304,7 @@ func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*L
 		arg.Query,
 		arg.Status,
 		arg.Online,
+		arg.SeenAfter,
 		arg.Offset,
 		arg.Limit,
 	)
@@ -318,7 +320,7 @@ func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*L
 			&i.Daemon.WorkspaceID,
 			&i.Daemon.Name,
 			&i.Daemon.Status,
-			&i.Daemon.Online,
+			&i.Daemon.LastSeenAt,
 			&i.Daemon.KeyThumbprint,
 			&i.Daemon.Config,
 			&i.Daemon.Metadata,
@@ -336,34 +338,16 @@ func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*L
 	return items, nil
 }
 
-const setDaemonsOffline = `-- name: SetDaemonsOffline :exec
+const touchDaemons = `-- name: TouchDaemons :exec
 UPDATE daemons
 SET
-  online = FALSE
+  last_seen_at = NOW()
 WHERE
-  online = TRUE
+  id = ANY ($1::UUID[])
 `
 
-func (q *Queries) SetDaemonsOffline(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, setDaemonsOffline)
-	return err
-}
-
-const setDaemonsOnline = `-- name: SetDaemonsOnline :exec
-UPDATE daemons
-SET
-  online = $1
-WHERE
-  id = ANY ($2::UUID[])
-`
-
-type SetDaemonsOnlineParams struct {
-	Online    bool     `json:"online"`
-	DaemonIds []string `json:"daemonIds"`
-}
-
-func (q *Queries) SetDaemonsOnline(ctx context.Context, arg *SetDaemonsOnlineParams) error {
-	_, err := q.db.Exec(ctx, setDaemonsOnline, arg.Online, arg.DaemonIds)
+func (q *Queries) TouchDaemons(ctx context.Context, daemonIds []string) error {
+	_, err := q.db.Exec(ctx, touchDaemons, daemonIds)
 	return err
 }
 
@@ -376,7 +360,7 @@ SET
 WHERE
   id = $4
 RETURNING
-  id, workspace_id, name, status, online, key_thumbprint, config, metadata, updated_at, created_at
+  id, workspace_id, name, status, last_seen_at, key_thumbprint, config, metadata, updated_at, created_at
 `
 
 type UpdateDaemonParams struct {
@@ -399,7 +383,7 @@ func (q *Queries) UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) (*D
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Status,
-		&i.Online,
+		&i.LastSeenAt,
 		&i.KeyThumbprint,
 		&i.Config,
 		&i.Metadata,
@@ -425,37 +409,4 @@ type UpdateDaemonMetadataParams struct {
 func (q *Queries) UpdateDaemonMetadata(ctx context.Context, arg *UpdateDaemonMetadataParams) error {
 	_, err := q.db.Exec(ctx, updateDaemonMetadata, arg.Metadata, arg.DaemonID)
 	return err
-}
-
-const updateDaemonStatus = `-- name: UpdateDaemonStatus :one
-UPDATE daemons
-SET
-  status = $1
-WHERE
-  id = $2
-RETURNING
-  id, workspace_id, name, status, online, key_thumbprint, config, metadata, updated_at, created_at
-`
-
-type UpdateDaemonStatusParams struct {
-	Status   nokku.DaemonStatus `json:"status"`
-	DaemonID string             `json:"daemonId"`
-}
-
-func (q *Queries) UpdateDaemonStatus(ctx context.Context, arg *UpdateDaemonStatusParams) (*Daemon, error) {
-	row := q.db.QueryRow(ctx, updateDaemonStatus, arg.Status, arg.DaemonID)
-	var i Daemon
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Status,
-		&i.Online,
-		&i.KeyThumbprint,
-		&i.Config,
-		&i.Metadata,
-		&i.UpdatedAt,
-		&i.CreatedAt,
-	)
-	return &i, err
 }

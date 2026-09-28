@@ -9,24 +9,6 @@ import (
 	"context"
 )
 
-const ensureRole = `-- name: EnsureRole :exec
-INSERT INTO
-  roles (name, description)
-VALUES
-  ($1, $2)
-ON CONFLICT (name) DO NOTHING
-`
-
-type EnsureRoleParams struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-func (q *Queries) EnsureRole(ctx context.Context, arg *EnsureRoleParams) error {
-	_, err := q.db.Exec(ctx, ensureRole, arg.Name, arg.Description)
-	return err
-}
-
 const getActorRole = `-- name: GetActorRole :one
 SELECT
   wm.role_name
@@ -59,4 +41,48 @@ func (q *Queries) GetActorRole(ctx context.Context, arg *GetActorRoleParams) (st
 	var role_name string
 	err := row.Scan(&role_name)
 	return role_name, err
+}
+
+const listActorRoles = `-- name: ListActorRoles :many
+SELECT
+  wm.workspace_id,
+  wm.role_name
+FROM
+  workspace_members wm
+WHERE
+  wm.user_id = $1::UUID
+UNION ALL
+SELECT
+  sa.workspace_id,
+  sa.role_name
+FROM
+  service_accounts sa
+WHERE
+  sa.id = $1::UUID
+`
+
+type ListActorRolesRow struct {
+	WorkspaceID string `json:"workspaceId"`
+	RoleName    string `json:"roleName"`
+}
+
+// Every workspace role of a user or service account, keyed by workspace.
+func (q *Queries) ListActorRoles(ctx context.Context, actorID string) ([]*ListActorRolesRow, error) {
+	rows, err := q.db.Query(ctx, listActorRoles, actorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListActorRolesRow
+	for rows.Next() {
+		var i ListActorRolesRow
+		if err := rows.Scan(&i.WorkspaceID, &i.RoleName); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

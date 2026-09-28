@@ -8,6 +8,7 @@ package cache
 
 import (
 	"context"
+	"maps"
 	"sync"
 	"time"
 )
@@ -85,6 +86,7 @@ func (m *Memory) SetNX(
 	if e, ok := m.entries[key]; ok && !expired(e) {
 		return false, nil
 	}
+	m.evictLocked()
 	m.entries[key] = memoryEntry{
 		value:     append([]byte(nil), value...),
 		expires:   time.Now().Add(ttl),
@@ -93,16 +95,18 @@ func (m *Memory) SetNX(
 	return true, nil
 }
 
+// evictLocked makes room for one entry. Expired entries go first, only then
+// arbitrary live ones.
 func (m *Memory) evictLocked() {
 	if len(m.entries) < m.max {
 		return
 	}
-	// Evict arbitrary: the map is a cache; a random victim is fine.
+	maps.DeleteFunc(m.entries, func(_ string, e memoryEntry) bool { return expired(e) })
 	for k := range m.entries {
-		delete(m.entries, k)
 		if len(m.entries) < m.max {
 			return
 		}
+		delete(m.entries, k)
 	}
 }
 

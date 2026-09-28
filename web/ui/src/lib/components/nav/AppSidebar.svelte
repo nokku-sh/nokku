@@ -18,6 +18,7 @@
 	import { WorkspaceSchema } from '$lib/gen/nokku/v1/workspace_pb';
 	import { createEntityModalState } from '$lib/hooks';
 	import NokkuCaret from '$lib/assets/nokku_caret.svelte';
+	import { atLeast } from '$lib/roles';
 
 	let { ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
 
@@ -28,6 +29,16 @@
 	const currentUser = $derived(user.self());
 	const logout = auth.logout();
 	const currentRoute = $derived(page.url.pathname);
+
+	// Show everything until the role is known, so the nav doesn't flicker.
+	const visibleRoutes = $derived(
+		Object.entries(AppRoutes)
+			.map(([group, routes]) => {
+				const allowed = routes.filter((r) => !ws.data || atLeast(ws.data.role, r.role ?? 'member'));
+				return [group, allowed] as const;
+			})
+			.filter(([, routes]) => routes.length > 0)
+	);
 
 	const wsModal = createEntityModalState(WorkspaceSchema);
 	const isRouteActive = (item: RouteItem) => {
@@ -117,7 +128,7 @@
 
 	<Sidebar.Content>
 		{#if workspaceID.current !== null && workspaceID.current !== ''}
-			{#each Object.entries(AppRoutes) as [groupName, routes] (groupName)}
+			{#each visibleRoutes as [groupName, routes] (groupName)}
 				<Sidebar.Group>
 					<Sidebar.GroupLabel>{groupName}</Sidebar.GroupLabel>
 					<Sidebar.GroupContent>

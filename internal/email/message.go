@@ -1,52 +1,20 @@
 package email
 
-import (
-	"context"
-	"strings"
-)
+import "context"
 
-type Address struct {
-	Name  string
-	Email string
-}
-
-func (a Address) String() string {
-	if a.Name == "" {
-		return a.Email
-	}
-	return a.Name + " <" + a.Email + ">"
-}
-
+// Message is one HTML email to a single recipient.
 type Message struct {
-	From     Address
-	To       []Address
-	Subject  string
-	HTMLBody string
-	TextBody string
-	Headers  map[string]string
-	Tags     map[string]string
+	From    string
+	To      string
+	Subject string
+	HTML    string
 }
 
-func (m Message) RecipientEmails() []string {
-	if len(m.To) == 0 {
-		return nil
-	}
-
-	recipients := make([]string, 0, len(m.To))
-	for _, addr := range m.To {
-		if email := strings.TrimSpace(addr.Email); email != "" {
-			recipients = append(recipients, email)
-		}
-	}
-	return recipients
-}
-
+// Sender delivers a message. SMTP in production, a fake in tests.
 type Sender interface {
 	Send(ctx context.Context, msg Message) error
 }
 
-type SenderFunc func(ctx context.Context, msg Message) error
+type noopSender struct{}
 
-func (f SenderFunc) Send(ctx context.Context, msg Message) error {
-	return f(ctx, msg)
-}
+func (noopSender) Send(context.Context, Message) error { return nil }

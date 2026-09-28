@@ -158,6 +158,8 @@ RETURNING
   id, workspace_id, name, description, certificate, private_key, public_key, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 `
 
+// The enforce_single_default_ca trigger clears the previous default of the
+// same authority type before this row is written.
 func (q *Queries) DeleteCA(ctx context.Context, caID string) (*CertificateAuthority, error) {
 	row := q.db.QueryRow(ctx, deleteCA, caID)
 	var i CertificateAuthority
@@ -681,28 +683,6 @@ func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*Certifi
 		&i.UpdatedAt,
 	)
 	return &i, err
-}
-
-const setDefaultCA = `-- name: SetDefaultCA :exec
-UPDATE certificate_authorities
-SET
-  is_default = TRUE,
-  updated_at = NOW()
-WHERE
-  id = $1
-  AND workspace_id = $2
-`
-
-type SetDefaultCAParams struct {
-	CaID        string `json:"caId"`
-	WorkspaceID string `json:"workspaceId"`
-}
-
-// The enforce_single_default_ca trigger clears the previous default of the
-// same authority type before this row is written.
-func (q *Queries) SetDefaultCA(ctx context.Context, arg *SetDefaultCAParams) error {
-	_, err := q.db.Exec(ctx, setDefaultCA, arg.CaID, arg.WorkspaceID)
-	return err
 }
 
 const updateCA = `-- name: UpdateCA :one

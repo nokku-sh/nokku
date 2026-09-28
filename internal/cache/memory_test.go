@@ -165,3 +165,26 @@ func TestMemoryNoTTL(t *testing.T) {
 		t.Fatalf("Get without TTL: %v", err)
 	}
 }
+
+// A full cache drops expired entries before live ones, and SetNX is bounded
+// too, so replay markers cannot grow the cache forever.
+func TestMemoryEvictsExpiredFirst(t *testing.T) {
+	c := NewMemory(2)
+	ctx := t.Context()
+	if _, err := c.SetNX(ctx, "old", nil, time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.SetNX(ctx, "live", nil, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * time.Millisecond)
+	if _, err := c.SetNX(ctx, "new", nil, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Get(ctx, "live"); err != nil {
+		t.Errorf("live entry evicted while an expired one was available: %v", err)
+	}
+	if n := len(c.entries); n > 2 {
+		t.Errorf("cache holds %d entries, want at most 2", n)
+	}
+}

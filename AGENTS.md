@@ -31,7 +31,7 @@ so tests never touch the dev database.
 - `cmd/nokku` - entrypoint. `cmd/seed` - demo data.
 - `internal/config` - config load.
 - `internal/api` - Connect services. The only place permissions and plan
-  gates resolve. `authz.go` holds `ProcedurePermissions`.
+  gates resolve. `authz.go` holds `ProcedureRoles`.
 - `internal/daemon` - in-memory pool of live daemon control streams, relays,
   and web sessions.
 - `internal/db` - sqlc queries and migrations. RLS-scoped. Four entry
@@ -50,8 +50,8 @@ so tests never touch the dev database.
 
 ## Conventions
 
-- Permissions are declared in exactly one place:
-  `internal/api/authz.go` `ProcedurePermissions`. Every RPC must be
+- Required roles are declared in exactly one place:
+  `internal/api/authz.go` `ProcedureRoles`. Every RPC must be
   classified there (or in `publicEndpoints`), unclassified RPCs are denied.
 - Daemon state changes notify through DB triggers. Never hand-roll a
   daemon poke in a handler.

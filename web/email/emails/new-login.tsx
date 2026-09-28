@@ -26,7 +26,7 @@ export default function NewLogin() {
           <strong>When:</strong> {CONSTANTS.EVENT_TIME}
         </Text>
         <Text className="m-0 mt-2 text-sm leading-6 text-ink">
-          <strong>Location:</strong> {CONSTANTS.LOCATION}
+          <strong>IP address:</strong> {CONSTANTS.IP_ADDRESS}
         </Text>
         <Text className="m-0 mt-2 text-sm leading-6 text-ink">
           <strong>Device ID:</strong> {CONSTANTS.DEVICE_ID}

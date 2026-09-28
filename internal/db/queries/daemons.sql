@@ -68,7 +68,7 @@ WHERE
 SELECT
   id,
   name,
-  online
+  last_seen_at
 FROM
   daemons
 WHERE
@@ -85,15 +85,6 @@ WHERE
 RETURNING
   *;
 
--- name: UpdateDaemonStatus :one
-UPDATE daemons
-SET
-  status = @status
-WHERE
-  id = @daemon_id
-RETURNING
-  *;
-
 -- name: UpdateDaemonMetadata :exec
 UPDATE daemons
 SET
@@ -101,10 +92,10 @@ SET
 WHERE
   id = @daemon_id;
 
--- name: SetDaemonsOnline :exec
+-- name: TouchDaemons :exec
 UPDATE daemons
 SET
-  online = @online
+  last_seen_at = NOW()
 WHERE
   id = ANY (@daemon_ids::UUID[]);
 
@@ -126,7 +117,7 @@ WHERE
   )
   AND (
     sqlc.narg('online')::BOOLEAN IS NULL
-    OR d.online = sqlc.narg('online')
+    OR COALESCE(d.last_seen_at > @seen_after::TIMESTAMPTZ, FALSE) = sqlc.narg('online')
   )
 ORDER BY
   d.id ASC
@@ -141,10 +132,3 @@ WHERE
   id = @daemon_id
 RETURNING
   *;
-
--- name: SetDaemonsOffline :exec
-UPDATE daemons
-SET
-  online = FALSE
-WHERE
-  online = TRUE;

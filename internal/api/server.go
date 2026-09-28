@@ -96,9 +96,10 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 		NewLogInterceptor(s.cfg.Debug),
 		NewTimeoutInterceptor(),
 		NewAuthNInterceptor(s.cfg),
+		// Audit wraps authorization so denied calls are recorded too.
+		s.cfg.Audit,
 		NewAuthZInterceptor(s.cfg),
 		entitlement.NewGuardInterceptor(s.cfg.Entitlements),
-		NewAuditInterceptor(s.cfg.Audit),
 		validate.NewInterceptor(),
 		NewOTLPInterceptor(ctx),
 	}

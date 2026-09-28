@@ -34,12 +34,6 @@ export const workspace = {
 				}
 			}
 		),
-	getMember: (userId?: string) =>
-		useQuery(
-			WorkspaceService.method.getWorkspaceMember,
-			{ workspaceId: workspaceID.current, userId },
-			{ enabled: !!workspaceID.current && !!userId, select: (res) => res.member }
-		),
 	listMembers: (
 		opts?: () => {
 			query?: string;
@@ -122,7 +116,7 @@ export const util = {
 	getLogs: (opts?: {
 		search?: string;
 		actorIds?: string[];
-		actorTypes?: string[];
+		actorKinds?: string[];
 		actions?: string[];
 		status?: boolean;
 		startDate?: Timestamp;

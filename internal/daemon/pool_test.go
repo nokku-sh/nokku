@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -88,56 +89,6 @@ func TestPool_ReconnectStorm(t *testing.T) {
 	}
 }
 
-// TestPool_EventSubscriberStorm subscribes and unsubscribes many event
-// subscribers while events are published, with subscriber goroutines draining
-// like the real handler (select on ctx.Done / channel).
-func TestPool_EventSubscriberStorm(t *testing.T) {
-	p := newTestPool(t)
-
-	const (
-		subs   = 32
-		events = 500
-	)
-	var wg sync.WaitGroup
-	for i := range subs {
-		var types []string
-		if i%2 == 0 {
-			types = []string{"daemon.accepted"}
-		}
-		ch := p.SubscribeEvents("w1", types)
-		stop := make(chan struct{})
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case <-stop:
-					return
-				case <-ch:
-				}
-			}
-		}()
-		go func() {
-			defer wg.Done()
-			for range events {
-				p.PublishWorkspaceEvent("w1", "daemon.accepted", "{}")
-				p.PublishWorkspaceEvent("w1", "daemon.removed", "{}")
-			}
-			close(stop)
-			p.UnsubscribeEvents("w1", ch)
-		}()
-	}
-	wg.Wait()
-
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	if len(p.events) != 0 {
-		t.Errorf("%d event subscribers left behind", len(p.events))
-	}
-}
-
-// TestPool_PokeStorm pokes a full workspace while daemons drop off, racing
-// Poke against UnregisterDaemon's map teardown.
 func TestPool_PokeStorm(t *testing.T) {
 	p := newTestPool(t)
 
@@ -486,22 +437,23 @@ func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 	}
 }
 
-// Presence changes coalesce per daemon until the next flush.
-func TestPool_PresenceCoalesces(t *testing.T) {
+// A beat stamps only newly connected daemons, a full beat every connected one.
+func TestPool_HeartbeatBatch(t *testing.T) {
 	p := newTestPool(t)
 	for range 3 {
-		c := p.RegisterDaemon(context.Background(), "d1", "w1")
+		c := p.RegisterDaemon(t.Context(), "d1", "w1")
 		p.UnregisterDaemon("d1", c)
 	}
-	c := p.RegisterDaemon(context.Background(), "d2", "w1")
+	c := p.RegisterDaemon(t.Context(), "d2", "w1")
 	defer p.UnregisterDaemon("d2", c)
 
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	if up, ok := p.presence["d1"]; !ok || up {
-		t.Fatalf("d1 presence = %v (queued %v), want offline", up, ok)
+	if got := p.heartbeatBatch(false); !slices.Equal(got, []string{"d2"}) {
+		t.Fatalf("beat = %v, want [d2]", got)
 	}
-	if !p.presence["d2"] {
-		t.Fatal("d2 presence not queued as online")
+	if got := p.heartbeatBatch(false); len(got) != 0 {
+		t.Fatalf("second beat = %v, want nothing new", got)
+	}
+	if got := p.heartbeatBatch(true); !slices.Equal(got, []string{"d2"}) {
+		t.Fatalf("full beat = %v, want [d2]", got)
 	}
 }

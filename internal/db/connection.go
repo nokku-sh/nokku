@@ -168,10 +168,7 @@ func (c *Connection) setupSchema(ctx context.Context) error {
 	if err := runMigrations(ctx, conn.Conn()); err != nil {
 		return err
 	}
-	if err := c.setupAppRole(ctx, conn.Conn()); err != nil {
-		return err
-	}
-	return setupRBACRoles(ctx, conn.Conn())
+	return c.setupAppRole(ctx, conn.Conn())
 }
 
 // setupAppRole grants the runtime role login rights and sets its password.

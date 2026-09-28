@@ -10,76 +10,6 @@ import (
 	"time"
 )
 
-const countAuditLogs = `-- name: CountAuditLogs :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  audit.audit_logs
-WHERE
-  (
-    (
-      NULLIF($1::TEXT, '')::UUID IS NULL
-      AND workspace_id IS NULL
-    )
-    OR workspace_id = NULLIF($1::TEXT, '')::UUID
-  )
-  AND (
-    $2::TEXT[] IS NULL
-    OR actor_id = ANY ($2::TEXT[])
-  )
-  AND (
-    $3::TEXT[] IS NULL
-    OR actor_type = ANY ($3::TEXT[])
-  )
-  AND (
-    $4::TEXT[] IS NULL
-    OR EXISTS (
-      SELECT 1 FROM unnest($4::TEXT[]) AS a(v)
-      WHERE action ILIKE '%' || a.v || '%'
-    )
-  )
-  AND (
-    $5::TEXT IS NULL
-    OR action ILIKE '%' || $5 || '%'
-    OR actor_email ILIKE '%' || $5 || '%'
-    OR actor_id::TEXT ILIKE '%' || $5 || '%'
-    OR user_agent ILIKE '%' || $5 || '%'
-  )
-  AND (
-    $6::timestamptz IS NULL
-    OR timestamp >= $6
-  )
-  AND (
-    $7::timestamptz IS NULL
-    OR timestamp < $7
-  )
-`
-
-type CountAuditLogsParams struct {
-	WorkspaceID string     `json:"workspaceId"`
-	ActorIds    []string   `json:"actorIds"`
-	ActorTypes  []string   `json:"actorTypes"`
-	Actions     []string   `json:"actions"`
-	Search      *string    `json:"search"`
-	StartDate   *time.Time `json:"startDate"`
-	EndDate     *time.Time `json:"endDate"`
-}
-
-func (q *Queries) CountAuditLogs(ctx context.Context, arg *CountAuditLogsParams) (int32, error) {
-	row := q.db.QueryRow(ctx, countAuditLogs,
-		arg.WorkspaceID,
-		arg.ActorIds,
-		arg.ActorTypes,
-		arg.Actions,
-		arg.Search,
-		arg.StartDate,
-		arg.EndDate,
-	)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const deleteOrphanAuditLogs = `-- name: DeleteOrphanAuditLogs :execrows
 DELETE FROM audit.audit_logs
 WHERE
@@ -128,43 +58,57 @@ func (q *Queries) EnableAuditRetention(ctx context.Context) error {
 
 const insertAuditLog = `-- name: InsertAuditLog :exec
 INSERT INTO
-  audit.audit_logs (workspace_id, action, actor_id, actor_type, actor_email, ip_address, user_agent, status_code, details)
+  audit.audit_logs (
+    workspace_id,
+    actor_id,
+    actor_kind,
+    actor_name,
+    action,
+    target,
+    ok,
+    ip,
+    user_agent,
+    details
+  )
 VALUES
   (
     $1::UUID,
     $2,
-    $3::UUID,
+    $3,
     $4,
     $5,
     $6,
     $7,
     $8,
-    $9::jsonb
+    $9,
+    $10::jsonb
   )
 `
 
 type InsertAuditLogParams struct {
 	WorkspaceID *string `json:"workspaceId"`
+	ActorID     string  `json:"actorId"`
+	ActorKind   string  `json:"actorKind"`
+	ActorName   string  `json:"actorName"`
 	Action      string  `json:"action"`
-	ActorID     *string `json:"actorId"`
-	ActorType   string  `json:"actorType"`
-	ActorEmail  *string `json:"actorEmail"`
-	IpAddress   *string `json:"ipAddress"`
-	UserAgent   *string `json:"userAgent"`
-	StatusCode  *string `json:"statusCode"`
+	Target      string  `json:"target"`
+	Ok          bool    `json:"ok"`
+	Ip          string  `json:"ip"`
+	UserAgent   string  `json:"userAgent"`
 	Details     []byte  `json:"details"`
 }
 
 func (q *Queries) InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams) error {
 	_, err := q.db.Exec(ctx, insertAuditLog,
 		arg.WorkspaceID,
-		arg.Action,
 		arg.ActorID,
-		arg.ActorType,
-		arg.ActorEmail,
-		arg.IpAddress,
+		arg.ActorKind,
+		arg.ActorName,
+		arg.Action,
+		arg.Target,
+		arg.Ok,
+		arg.Ip,
 		arg.UserAgent,
-		arg.StatusCode,
 		arg.Details,
 	)
 	return err
@@ -172,16 +116,14 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams)
 
 const listAuditLogs = `-- name: ListAuditLogs :many
 SELECT
-  id, timestamp, workspace_id, action, actor_id, actor_type, actor_email, ip_address, user_agent, status_code, details
+  id, timestamp, workspace_id, actor_id, actor_kind, actor_name, action, target, ok, ip, user_agent, details,
+  COUNT(*) OVER ()::INTEGER AS total
 FROM
   audit.audit_logs
 WHERE
   (
-    (
-      NULLIF($1::TEXT, '')::UUID IS NULL
-      AND workspace_id IS NULL
-    )
-    OR workspace_id = NULLIF($1::TEXT, '')::UUID
+    $1::UUID IS NULL
+    OR workspace_id = $1::UUID
   )
   AND (
     $2::TEXT[] IS NULL
@@ -189,43 +131,52 @@ WHERE
   )
   AND (
     $3::TEXT[] IS NULL
-    OR actor_type = ANY ($3::TEXT[])
+    OR actor_kind = ANY ($3::TEXT[])
   )
+  -- Actions match by prefix, so "Delete" finds every delete.
   AND (
     $4::TEXT[] IS NULL
     OR EXISTS (
-      SELECT 1 FROM unnest($4::TEXT[]) AS a(v)
-      WHERE action ILIKE '%' || a.v || '%'
+      SELECT
+        1
+      FROM
+        unnest($4::TEXT[]) AS a (v)
+      WHERE
+        action ILIKE a.v || '%'
     )
   )
   AND (
     $5::TEXT IS NULL
-    OR action ILIKE '%' || $5 || '%'
-    OR actor_email ILIKE '%' || $5 || '%'
-    OR actor_id::TEXT ILIKE '%' || $5 || '%'
-    OR user_agent ILIKE '%' || $5 || '%'
+    OR target = $5
   )
   AND (
-    $6::timestamptz IS NULL
-    OR timestamp >= $6
+    $6::TEXT IS NULL
+    OR action ILIKE '%' || $6 || '%'
+    OR actor_name ILIKE '%' || $6 || '%'
+    OR target ILIKE '%' || $6 || '%'
   )
   AND (
     $7::timestamptz IS NULL
-    OR timestamp < $7
+    OR timestamp >= $7
+  )
+  AND (
+    $8::timestamptz IS NULL
+    OR timestamp < $8
   )
 ORDER BY
   timestamp DESC
 LIMIT
-  $9
+  $10
 OFFSET
-  $8
+  $9
 `
 
 type ListAuditLogsParams struct {
-	WorkspaceID string     `json:"workspaceId"`
+	WorkspaceID *string    `json:"workspaceId"`
 	ActorIds    []string   `json:"actorIds"`
-	ActorTypes  []string   `json:"actorTypes"`
+	ActorKinds  []string   `json:"actorKinds"`
 	Actions     []string   `json:"actions"`
+	Target      *string    `json:"target"`
 	Search      *string    `json:"search"`
 	StartDate   *time.Time `json:"startDate"`
 	EndDate     *time.Time `json:"endDate"`
@@ -233,12 +184,31 @@ type ListAuditLogsParams struct {
 	Limit       int32      `json:"limit"`
 }
 
-func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) ([]*AuditAuditLog, error) {
+type ListAuditLogsRow struct {
+	ID          string    `json:"id"`
+	Timestamp   time.Time `json:"timestamp"`
+	WorkspaceID *string   `json:"workspaceId"`
+	ActorID     string    `json:"actorId"`
+	ActorKind   string    `json:"actorKind"`
+	ActorName   string    `json:"actorName"`
+	Action      string    `json:"action"`
+	Target      string    `json:"target"`
+	Ok          bool      `json:"ok"`
+	Ip          string    `json:"ip"`
+	UserAgent   string    `json:"userAgent"`
+	Details     []byte    `json:"details"`
+	Total       int32     `json:"total"`
+}
+
+// RLS already limits rows to the pinned workspace or the actor's own. A NULL
+// workspace_id is the personal log: every row of the actor, any workspace.
+func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) ([]*ListAuditLogsRow, error) {
 	rows, err := q.db.Query(ctx, listAuditLogs,
 		arg.WorkspaceID,
 		arg.ActorIds,
-		arg.ActorTypes,
+		arg.ActorKinds,
 		arg.Actions,
+		arg.Target,
 		arg.Search,
 		arg.StartDate,
 		arg.EndDate,
@@ -249,21 +219,23 @@ func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) (
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*AuditAuditLog
+	var items []*ListAuditLogsRow
 	for rows.Next() {
-		var i AuditAuditLog
+		var i ListAuditLogsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Timestamp,
 			&i.WorkspaceID,
-			&i.Action,
 			&i.ActorID,
-			&i.ActorType,
-			&i.ActorEmail,
-			&i.IpAddress,
+			&i.ActorKind,
+			&i.ActorName,
+			&i.Action,
+			&i.Target,
+			&i.Ok,
+			&i.Ip,
 			&i.UserAgent,
-			&i.StatusCode,
 			&i.Details,
+			&i.Total,
 		); err != nil {
 			return nil, err
 		}
