@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"uuid"
@@ -102,7 +103,7 @@ func TestWithWorkspaceVerifiedMember(t *testing.T) {
 
 	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: f.owner, Kind: actor.KindUser})
 	ctx = actor.AnnotateTenant(ctx, f.ws)
-	ctx = actor.WithMember(ctx, f.ws)
+	ctx = actor.WithMember(ctx, f.ws, "")
 	err := c.WithWorkspace(ctx, func(q *Queries) error {
 		if _, err := q.GetTarget(t.Context(), f.target); err != nil {
 			t.Errorf("own target not visible: %v", err)
@@ -127,10 +128,58 @@ func TestAppRoleCannotWriteAudit(t *testing.T) {
 		return q.InsertAuditLog(t.Context(), &InsertAuditLogParams{
 			WorkspaceID: &f.ws,
 			Action:      "forged",
-			ActorType:   "user",
+			ActorKind:   "user",
+			Details:     []byte("{}"),
 		})
 	})
 	if err == nil {
 		t.Fatal("app role wrote an audit row")
+	}
+}
+
+func TestAuditLogScopes(t *testing.T) {
+	c := testConnection(t)
+	a, b := newStateFixture(t, c), newStateFixture(t, c)
+	for _, row := range []struct{ ws *string }{{&a.ws}, {&b.ws}, {nil}} {
+		if err := c.Sys().InsertAuditLog(t.Context(), &InsertAuditLogParams{
+			WorkspaceID: row.ws, ActorID: a.u, Action: "Test", Ok: true, Details: []byte("{}"),
+		}); err != nil {
+			t.Fatalf("insert: %v", err)
+		}
+	}
+	if err := c.Sys().InsertAuditLog(t.Context(), &InsertAuditLogParams{
+		WorkspaceID: &b.ws, ActorID: b.owner, Action: "Test", Ok: true, Details: []byte("{}"),
+	}); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+
+	list := func(ctx context.Context, run func(context.Context, func(*Queries) error) error, ws *string) int {
+		t.Helper()
+		var rows []*ListAuditLogsRow
+		if err := run(ctx, func(q *Queries) (err error) {
+			rows, err = q.ListAuditLogs(ctx, &ListAuditLogsParams{WorkspaceID: ws, Limit: 100})
+			return err
+		}); err != nil {
+			t.Fatalf("list: %v", err)
+		}
+		return len(rows)
+	}
+
+	personal := func(ctx context.Context, fn func(*Queries) error) error { return c.WithActor(ctx, a.u, fn) }
+	if n := list(t.Context(), personal, nil); n != 3 {
+		t.Errorf("personal log has %d rows, want the actor's 3 across workspaces", n)
+	}
+
+	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: a.owner, Kind: actor.KindUser})
+	ctx = actor.AnnotateTenant(ctx, a.ws)
+	if n := list(ctx, c.WithWorkspace, &a.ws); n != 1 {
+		t.Errorf("workspace log has %d rows, want 1", n)
+	}
+	if n := list(ctx, c.WithWorkspace, &b.ws); n != 0 {
+		t.Errorf("workspace a reads %d rows of workspace b, want 0", n)
+	}
+
+	if _, err := c.sysPool.Exec(t.Context(), "DELETE FROM workspaces WHERE id = $1", a.ws); err != nil {
+		t.Fatalf("delete workspace with audit rows: %v", err)
 	}
 }

@@ -56,7 +56,7 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 			u.Email,
 			string(sess.TokenHash),
 			label,
-			cfg.Geo.Lookup(ip),
+			ip,
 		); err != nil {
 			slog.Debug("failed to send new login email", "error", err)
 		}

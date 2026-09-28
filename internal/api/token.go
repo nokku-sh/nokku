@@ -1,9 +1,12 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"time"
 	"uuid"
+
+	"github.com/nokku-sh/nokku/internal/audit"
 
 	"connectrpc.com/connect"
 
@@ -48,14 +51,12 @@ func (s *TokenService) CreateToken(
 		if req.GetAutoApprove() || req.GetCaId() != "" {
 			return nil, NewError(connect.CodeInvalidArgument, "invite tokens take only a role")
 		}
-		role := req.GetRoleName()
-		if role == "" {
-			role = "viewer"
-		}
-		if !db.IsUserRole(role) {
-			return nil, NewError(connect.CodeInvalidArgument, "role cannot be granted by invite")
+		role := cmp.Or(req.GetRoleName(), string(db.RoleMember))
+		if !callerRole(ctx).CanAssign(db.Role(role)) {
+			return nil, NewError(connect.CodePermissionDenied, "role cannot be granted by you")
 		}
 		params.RoleName = &role
+		audit.Set(ctx, "role", role)
 	case nokkuv1.TokenKind_TOKEN_KIND_UNSPECIFIED:
 		return nil, ErrInvalidInput
 	default:
@@ -75,6 +76,7 @@ func (s *TokenService) CreateToken(
 	}); err != nil {
 		return nil, DBError(err)
 	}
+	audit.SetTarget(ctx, created.ID)
 	return &nokkuv1.CreateTokenResponse{
 		Token:  created.ToProto(),
 		Secret: &token.Plaintext,

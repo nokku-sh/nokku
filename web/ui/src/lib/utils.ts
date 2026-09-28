@@ -79,11 +79,8 @@ export const DateValueStartTs = (date: DateValue | null | undefined) => {
 	return timestampFromDate(date.toDate(getLocalTimeZone()));
 };
 
-/** An audit status is successful when it is empty, "OK", or any 2xx HTTP code. */
-export const auditStatusOk = (status: string | undefined): boolean => {
-	const s = status ?? '';
-	return s === '' || s === 'OK' || /^2\d\d$/.test(s);
-};
+/** Splits an audit action like "DeleteTarget" into "Delete Target". */
+export const actionLabel = (action: string): string => action.replace(/([a-z])([A-Z])/g, '$1 $2');
 
 type DateStyle = 'full' | 'long' | 'short' | 'compact' | 'relative' | 'relative-short' | 'withTime';
 

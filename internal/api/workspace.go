@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 
+	"github.com/nokku-sh/nokku/internal/audit"
+
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
@@ -45,9 +47,16 @@ func (s *WorkspaceService) GetWorkspace(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	return &nokkuv1.GetWorkspaceResponse{
-		Workspace: workspace.ToProto(),
-	}, nil
+	role, err := s.cfg.Conn.Sys().GetActorRole(ctx, &db.GetActorRoleParams{
+		WorkspaceID: workspace.ID,
+		ActorID:     iam.SubjectFromContext(ctx),
+	})
+	if err != nil {
+		return nil, DBError(err)
+	}
+	result := workspace.ToProto()
+	result.Role = &role
+	return &nokkuv1.GetWorkspaceResponse{Workspace: result}, nil
 }
 
 func (s *WorkspaceService) CreateWorkspace(
@@ -82,6 +91,7 @@ func (s *WorkspaceService) CreateWorkspace(
 	if workspace == nil {
 		return nil, ErrInternal
 	}
+	audit.SetTarget(ctx, workspace.GetId())
 
 	return &nokkuv1.CreateWorkspaceResponse{
 		Workspace: workspace,
@@ -149,10 +159,20 @@ func (s *WorkspaceService) ListWorkspaces(
 	}); err != nil {
 		return nil, DBError(err)
 	}
+	roles, err := s.cfg.Conn.Sys().ListActorRoles(ctx, iam.SubjectFromContext(ctx))
+	if err != nil {
+		return nil, DBError(err)
+	}
 
-	return &nokkuv1.ListWorkspacesResponse{
-		Workspaces: db.WorkspacesToProto(workspaces),
-	}, nil
+	result := db.WorkspacesToProto(workspaces)
+	for _, w := range result {
+		for _, r := range roles {
+			if r.WorkspaceID == w.GetId() {
+				w.Role = &r.RoleName
+			}
+		}
+	}
+	return &nokkuv1.ListWorkspacesResponse{Workspaces: result}, nil
 }
 
 func (s *WorkspaceService) GetWorkspaceMember(
@@ -163,9 +183,9 @@ func (s *WorkspaceService) GetWorkspaceMember(
 		return nil, ErrInvalidInput
 	}
 
-	var member *db.WorkspaceMember
+	var m *db.GetWorkspaceMemberRow
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		member, err = q.GetWorkspaceMember(ctx, &db.GetWorkspaceMemberParams{
+		m, err = q.GetWorkspaceMember(ctx, &db.GetWorkspaceMemberParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			UserID:      req.GetUserId(),
 		})
@@ -173,17 +193,18 @@ func (s *WorkspaceService) GetWorkspaceMember(
 	}); err != nil {
 		return nil, DBError(err)
 	}
-	result := member.ToProto()
-
-	user, err := s.cfg.IAM.GetUser(ctx)
-	if err != nil {
-		return nil, DBError(err)
-	}
-	result.Picture = user.Picture
-	result.Email = &user.Email
-	result.EmailVerified = &user.EmailVerified
 	return &nokkuv1.GetWorkspaceMemberResponse{
-		Member: result,
+		Member: &nokkuv1.WorkspaceMember{
+			Id:            &m.UserID,
+			WorkspaceId:   &m.WorkspaceID,
+			Name:          &m.Name,
+			Email:         &m.Email,
+			EmailVerified: &m.EmailVerified,
+			Picture:       m.Picture,
+			RoleName:      &m.RoleName,
+			CreatedAt:     db.SafeTimestamp(&m.CreatedAt),
+			UpdatedAt:     db.SafeTimestamp(&m.UpdatedAt),
+		},
 	}, nil
 }
 
@@ -192,10 +213,14 @@ func (s *WorkspaceService) UpdateWorkspaceMember(
 	req *nokkuv1.UpdateWorkspaceMemberRequest,
 ) (*nokkuv1.UpdateWorkspaceMemberResponse, error) {
 	// Ownership moves only through UpdateWorkspaceOwner.
-	if !db.IsUserRole(req.GetRoleName()) {
-		return nil, NewError(connect.CodeInvalidArgument, "role cannot be assigned to a member")
+	if !callerRole(ctx).CanAssign(db.Role(req.GetRoleName())) {
+		return nil, NewError(connect.CodePermissionDenied, "role cannot be assigned by you")
 	}
+	audit.Set(ctx, "role", req.GetRoleName())
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		if err := checkCanManageMember(ctx, q, req.GetWorkspaceId(), req.GetUserId()); err != nil {
+			return err
+		}
 		return q.UpdateWorkspaceMember(ctx, &db.UpdateWorkspaceMemberParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			UserID:      req.GetUserId(),
@@ -213,16 +238,7 @@ func (s *WorkspaceService) ListWorkspaceMembers(
 	req *nokkuv1.ListWorkspaceMembersRequest,
 ) (*nokkuv1.ListWorkspaceMembersResponse, error) {
 	var members []*db.ListWorkspaceMembersRow
-	var count int32
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		count, err = q.CountWorkspaceMembers(ctx, &db.CountWorkspaceMembersParams{
-			WorkspaceID: req.GetWorkspaceId(),
-			Query:       req.Query,
-			RoleName:    req.RoleName,
-		})
-		if err != nil {
-			return err
-		}
 		members, err = q.ListWorkspaceMembers(ctx, &db.ListWorkspaceMembersParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			Query:       req.Query,
@@ -235,8 +251,10 @@ func (s *WorkspaceService) ListWorkspaceMembers(
 		return nil, DBError(err)
 	}
 
+	var count int32
 	protos := make([]*nokkuv1.WorkspaceMember, 0, len(members))
 	for _, m := range members {
+		count = m.TotalCount
 		protos = append(protos, &nokkuv1.WorkspaceMember{
 			Id:            &m.UserID,
 			WorkspaceId:   &m.WorkspaceID,
@@ -263,6 +281,9 @@ func (s *WorkspaceService) RemoveWorkspaceMember(
 	// Grants and team seats cascade from the membership, so a removed member
 	// drops out of every synced principals map.
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		if err := checkCanManageMember(ctx, q, req.GetWorkspaceId(), req.GetUserId()); err != nil {
+			return err
+		}
 		return q.RemoveWorkspaceMember(ctx, &db.RemoveWorkspaceMemberParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			UserID:      req.GetUserId(),
@@ -272,6 +293,22 @@ func (s *WorkspaceService) RemoveWorkspaceMember(
 	}
 
 	return &nokkuv1.RemoveWorkspaceMemberResponse{}, nil
+}
+
+// checkCanManageMember refuses changes to a member whose role is above the
+// caller's. The owner is above everyone, so nobody demotes or removes them.
+func checkCanManageMember(ctx context.Context, q db.Querier, workspaceID, userID string) error {
+	m, err := q.GetWorkspaceMember(ctx, &db.GetWorkspaceMemberParams{
+		WorkspaceID: workspaceID,
+		UserID:      userID,
+	})
+	if err != nil {
+		return err
+	}
+	if !callerRole(ctx).CanAssign(db.Role(m.RoleName)) {
+		return db.ErrPermissionDenied
+	}
+	return nil
 }
 
 // checkWorkspaceOwner reports whether the request actor owns the workspace.
@@ -306,46 +343,6 @@ func (s *WorkspaceService) UpdateWorkspaceOwner(
 	}
 
 	return &nokkuv1.UpdateWorkspaceOwnerResponse{}, nil
-}
-
-func (s *WorkspaceService) SubscribeWorkspaceEvents(
-	ctx context.Context,
-	req *nokkuv1.SubscribeWorkspaceEventsRequest,
-	stream *connect.ServerStream[nokkuv1.SubscribeWorkspaceEventsResponse],
-) error {
-	workspaceID := req.GetWorkspaceId()
-	// Streaming handlers bypass the unary interceptor's workspace promotion,
-	// so pin the workspace here and let the scoped transaction verify
-	// membership before events start flowing. AnnotateTenant returns a new
-	// context; discarding it would leave the pin unset and the membership
-	// check below would run against the fallback workspace instead.
-	ctx = iam.AnnotateTenant(ctx, workspaceID)
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(_ *db.Queries) error {
-		return nil
-	}); err != nil {
-		return DBError(err)
-	}
-
-	// Streaming RPCs bypass the unary permission interceptor. Every event
-	// this stream carries is daemon lifecycle, so require the same gate the
-	// daemon procedures use.
-	if err := actorHasPermission(ctx, s.cfg.Conn, db.PermDaemonsView); err != nil {
-		return DBError(err)
-	}
-
-	msgCh := s.cfg.Pool.SubscribeEvents(workspaceID, req.GetEventTypes())
-	defer s.cfg.Pool.UnsubscribeEvents(workspaceID, msgCh)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case event := <-msgCh:
-			if err := stream.Send(event); err != nil {
-				return err
-			}
-		}
-	}
 }
 
 // Helpers --------------------------------------------------------------------

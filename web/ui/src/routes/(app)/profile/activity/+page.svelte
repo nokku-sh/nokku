@@ -8,7 +8,7 @@
 	import DateRangePicker from '$lib/components/utils/DateRangePicker.svelte';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
 	import { ExportAuditLogsRequest_Format, type EventLog } from '$lib/gen/nokku/v1/util_pb';
-	import { auditStatusOk, DateValueStartTs, DateValueToTimestamp, formatTs } from '$lib/utils';
+	import { actionLabel, DateValueStartTs, DateValueToTimestamp, formatTs } from '$lib/utils';
 	import { getLocalTimeZone, today } from '@internationalized/date';
 	import {
 		ActivityIcon,
@@ -44,7 +44,7 @@
 <PageHeader
 	icon={ActivityIcon}
 	title="Personal Activity"
-	description="View your authentication history and account activity."
+	description="Everything you did, across all your workspaces."
 />
 
 <ActivityModal bind:open log={selected} />
@@ -95,7 +95,7 @@
 {:else if logs.isSuccess && logs.data?.total > 0}
 	<div class="space-y-4">
 		{#each logs.data.logs as log}
-			{@const isError = !auditStatusOk(log.statusCode)}
+			{@const isError = !log.ok}
 			<div
 				class="group flex justify-between gap-4 rounded-lg border bg-background/50 p-4 transition-colors hover:bg-background"
 			>
@@ -114,8 +114,8 @@
 				<!-- Event details -->
 				<div class="flex-1 space-y-2 py-1">
 					<div>
-						<p class="text-sm font-medium capitalize">
-							{log.action.replace('_', ' ')}
+						<p class="text-sm font-medium">
+							{actionLabel(log.action)}{log.target ? ` · ${log.target}` : ''}
 						</p>
 						<p class="mt-0.5 text-xs text-muted-foreground">
 							{formatTs(log.timestamp)} ({formatTs(log.timestamp, 'relative')})
@@ -123,10 +123,10 @@
 					</div>
 
 					<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-						{#if log.ipAddress}
+						{#if log.ip}
 							<div class="flex items-center gap-1.5 text-muted-foreground">
 								<MapPinIcon class="h-3 w-3" />
-								<span>{log.ipAddress}</span>
+								<span>{log.ip}</span>
 							</div>
 						{/if}
 						{#if log.userAgent}
@@ -158,7 +158,7 @@
 				<Calendar />
 			</Empty.Media>
 			<Empty.Title>No Activity</Empty.Title>
-			<Empty.Description>Your login and account activity will appear here</Empty.Description>
+			<Empty.Description>Everything you do, in any workspace, will appear here</Empty.Description>
 		</Empty.Header>
 	</Empty.Root>
 {/if}

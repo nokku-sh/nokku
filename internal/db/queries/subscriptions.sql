@@ -60,15 +60,6 @@ SET
 WHERE
   workspace_subscriptions.source IN ('stripe', '');
 
--- name: ListActiveSubscriptions :many
-SELECT
-  *
-FROM
-  workspace_subscriptions
-WHERE
-  status = ANY (@statuses::TEXT[])
-  AND source = ANY (@sources::TEXT[]);
-
 -- name: ListProviderSubscriptions :many
 SELECT
   *

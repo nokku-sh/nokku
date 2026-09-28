@@ -59,12 +59,13 @@ func TestRenderTemplates(t *testing.T) {
 				DeviceID:   "device-id",
 				DeviceName: "Web browser",
 				EventTime:  "just now",
-				Location:   "Innsbruck, Austria",
+				IPAddress:  "203.0.113.7",
 			},
 			contains: []string{
 				"New sign-in recorded.",
 				"https://app.nokku.sh/profile/security",
 				"Web browser",
+				"203.0.113.7",
 			},
 		},
 	}

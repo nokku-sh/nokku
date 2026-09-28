@@ -31,7 +31,7 @@ func (s *Service) EnsureMember(
 		return q.EnsureWorkspaceMember(ctx, &db.EnsureWorkspaceMemberParams{
 			UserID:      userID,
 			WorkspaceID: workspaceID,
-			RoleName:    cmp.Or(role, "viewer"),
+			RoleName:    cmp.Or(role, string(db.RoleMember)),
 		})
 	}
 
@@ -58,7 +58,7 @@ func (s *Service) EnsureMember(
 	return q.EnsureWorkspaceMember(ctx, &db.EnsureWorkspaceMemberParams{
 		UserID:      userID,
 		WorkspaceID: workspaceID,
-		RoleName:    cmp.Or(role, "viewer"),
+		RoleName:    cmp.Or(role, string(db.RoleMember)),
 	})
 }
 

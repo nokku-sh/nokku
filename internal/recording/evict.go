@@ -42,7 +42,7 @@ func (s *Service) EvictForBytes(
 		if err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 			victims, err = q.OldestRecordings(ctx, &db.OldestRecordingsParams{
 				WorkspaceID: workspaceID,
-				Limit:       &[]int32{100}[0],
+				Limit:       new(int32(100)),
 			})
 			return err
 		}); err != nil {

@@ -1,238 +1,50 @@
 package db
 
-import (
-	"context"
-	"fmt"
-	"slices"
+import "slices"
 
-	"github.com/jackc/pgx/v5"
-)
+// Role is a workspace role. Roles are ordered: each one includes everything
+// the roles before it may do, so a check is a single comparison. The
+// role_name columns hold these names, guarded by a CHECK constraint.
+type Role string
 
-// Permission is a single action a role may perform on a resource.
-//
-// Codes exist only in Go and are evaluated by HasPermission, which the API's
-// authorization interceptor consults before running any query. The roles
-// table stores names for referential integrity only. RLS policies enforce
-// tenant isolation and never inspect permission codes.
-type Permission string
-
-// Permission codes. Access levels are view < edit < delete and "edit" always
-// implies "view". workspace.view is not enforced by RLS (reading a workspace
-// is granted by membership) but it keeps the rule uniform.
 const (
-	PermWorkspaceView       Permission = "workspace.view"
-	PermWorkspaceEdit       Permission = "workspace.edit"
-	PermWorkspaceDelete     Permission = "workspace.delete"
-	PermMembersView         Permission = "members.view"
-	PermMembersEdit         Permission = "members.edit"
-	PermSettingsView        Permission = "settings.view"
-	PermSettingsEdit        Permission = "settings.edit"
-	PermDomainsView         Permission = "domains.view"
-	PermDomainsEdit         Permission = "domains.edit"
-	PermSsoView             Permission = "sso.view"
-	PermSsoEdit             Permission = "sso.edit"
-	PermCasView             Permission = "cas.view"
-	PermCasEdit             Permission = "cas.edit"
-	PermTargetsView         Permission = "targets.view"
-	PermTargetsEdit         Permission = "targets.edit"
-	PermPrincipalsView      Permission = "principals.view"
-	PermPrincipalsEdit      Permission = "principals.edit"
-	PermDaemonsView         Permission = "daemons.view"
-	PermDaemonsEdit         Permission = "daemons.edit"
-	PermAuditView           Permission = "audit.view"
-	PermTeamsView           Permission = "teams.view"
-	PermTeamsEdit           Permission = "teams.edit"
-	PermServiceAccountsView Permission = "service_accounts.view"
-	PermServiceAccountsEdit Permission = "service_accounts.edit"
+	RoleMember Role = "member"
+	RoleViewer Role = "viewer"
+	RoleEditor Role = "editor"
+	RoleAdmin  Role = "admin"
+	RoleOwner  Role = "owner"
 )
 
-// allPermissions enumerates the full vocabulary. Used by tests to validate
-// that roles only reference known codes.
-var allPermissions = []Permission{
-	PermWorkspaceView,
-	PermWorkspaceEdit,
-	PermWorkspaceDelete,
-	PermMembersView,
-	PermMembersEdit,
-	PermSettingsView,
-	PermSettingsEdit,
-	PermDomainsView,
-	PermDomainsEdit,
-	PermSsoView,
-	PermSsoEdit,
-	PermCasView,
-	PermCasEdit,
-	PermTargetsView,
-	PermTargetsEdit,
-	PermPrincipalsView,
-	PermPrincipalsEdit,
-	PermDaemonsView,
-	PermDaemonsEdit,
-	PermAuditView,
-	PermTeamsView,
-	PermTeamsEdit,
-	PermServiceAccountsView,
-	PermServiceAccountsEdit,
-}
+// Roles lists every role from least to most privileged.
+var Roles = []Role{RoleMember, RoleViewer, RoleEditor, RoleAdmin, RoleOwner}
 
-// perm expands access levels for a resource into permission codes.
-// "edit" expands to {"view", "edit"}. Every other level is kept literally.
-func perm(resource string, levels ...string) []Permission {
-	out := make([]Permission, 0, len(levels)+1)
-	for _, level := range levels {
-		if level == "edit" {
-			out = append(out, Permission(resource+".view"))
-		}
-		out = append(out, Permission(resource+"."+level))
+// Description is the one-line summary the UI shows next to a role.
+func (r Role) Description() string {
+	switch r {
+	case RoleMember:
+		return "Use the access granted to them"
+	case RoleViewer:
+		return "Read everything in the workspace, including the audit log"
+	case RoleEditor:
+		return "Manage targets, access, daemons, certificate authorities, teams, and service accounts"
+	case RoleAdmin:
+		return "Also manage members, invites, SSO, domains, and workspace settings"
+	case RoleOwner:
+		return "Also billing, ownership transfer, and deleting the workspace"
 	}
-	return out
+	return ""
 }
 
-type builtinRole struct {
-	name                        string
-	description                 string
-	permissions                 []Permission
-	assignableToUsers           bool // grantable to members via role change
-	assignableToServiceAccounts bool // grantable to service accounts
+// AtLeast reports whether r grants everything required grants. An unknown role
+// satisfies nothing.
+func (r Role) AtLeast(required Role) bool {
+	rank := slices.Index(Roles, r)
+	return rank >= 0 && rank >= slices.Index(Roles, required)
 }
 
-// builtinRoles is the source of truth for the authorization model.
-// setupRBACRoles seeds the database with their names on startup.
-var builtinRoles = []builtinRole{
-	{
-		// "owner" is granted via workspace creation and ownership transfer,
-		// never through the role-change UI, so it is not assignable.
-		name:        "owner",
-		description: "Full access to all workspace resources and settings",
-		permissions: slices.Concat(
-			perm("workspace", "edit", "delete"),
-			perm("members", "edit"),
-			perm("settings", "edit"),
-			perm("domains", "edit"),
-			perm("sso", "edit"),
-			perm("cas", "edit"),
-			perm("targets", "edit"),
-			perm("principals", "edit"),
-			perm("daemons", "edit"),
-			perm("teams", "edit"),
-			perm("service_accounts", "edit"),
-			perm("audit", "view"),
-		),
-	},
-	{
-		name:                        "editor",
-		description:                 "Manage operational resources, certificate authorities, teams, and service accounts",
-		assignableToUsers:           true,
-		assignableToServiceAccounts: true,
-		permissions: slices.Concat(
-			perm("members", "view"),
-			perm("settings", "view"),
-			perm("domains", "view"),
-			perm("sso", "view"),
-			perm("cas", "edit"),
-			perm("targets", "edit"),
-			perm("principals", "edit"),
-			perm("daemons", "edit"),
-			perm("teams", "edit"),
-			perm("service_accounts", "edit"),
-			perm("audit", "view"),
-		),
-	},
-	{
-		name:                        "viewer",
-		description:                 "View workspace resources",
-		assignableToUsers:           true,
-		assignableToServiceAccounts: true,
-		permissions: slices.Concat(
-			perm("members", "view"),
-			perm("settings", "view"),
-			perm("domains", "view"),
-			perm("sso", "view"),
-			perm("cas", "view"),
-			perm("targets", "view"),
-			perm("principals", "view"),
-			perm("daemons", "view"),
-			perm("teams", "view"),
-			perm("service_accounts", "view"),
-		),
-	},
-}
-
-// RoleInfo describes a role for API consumers.
-type RoleInfo struct {
-	Name                        string
-	Description                 string
-	Permissions                 []Permission
-	AssignableToUsers           bool
-	AssignableToServiceAccounts bool
-}
-
-// UserFacingRoles returns the roles that can be held by workspace members and
-// service accounts.
-func UserFacingRoles() []RoleInfo {
-	out := make([]RoleInfo, 0, len(builtinRoles))
-	for _, r := range builtinRoles {
-		out = append(out, RoleInfo{
-			Name:                        r.name,
-			Description:                 r.description,
-			Permissions:                 slices.Clone(r.permissions),
-			AssignableToUsers:           r.assignableToUsers,
-			AssignableToServiceAccounts: r.assignableToServiceAccounts,
-		})
-	}
-	return out
-}
-
-// IsUserRole reports whether a role may be given to a workspace member, by
-// role change or invite.
-func IsUserRole(roleName string) bool {
-	for _, r := range builtinRoles {
-		if r.name == roleName {
-			return r.assignableToUsers
-		}
-	}
-	return false
-}
-
-// IsServiceAccountRole reports whether a role may be assigned to a service
-// account.
-func IsServiceAccountRole(roleName string) bool {
-	for _, r := range builtinRoles {
-		if r.name == roleName {
-			return r.assignableToServiceAccounts
-		}
-	}
-	return false
-}
-
-// HasPermission reports whether the named role grants the permission.
-func HasPermission(roleName string, p Permission) bool {
-	for _, r := range builtinRoles {
-		if r.name == roleName {
-			return slices.Contains(r.permissions, p)
-		}
-	}
-	return false
-}
-
-// setupRBACRoles seeds the built-in role names so workspace_members and
-// service_accounts can reference them via foreign keys.
-func setupRBACRoles(ctx context.Context, conn *pgx.Conn) error {
-	tx, err := conn.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	q := New(tx)
-	for _, r := range builtinRoles {
-		if err := q.EnsureRole(ctx, &EnsureRoleParams{
-			Name:        r.name,
-			Description: r.description,
-		}); err != nil {
-			return fmt.Errorf("ensuring role %q: %w", r.name, err)
-		}
-	}
-
-	return tx.Commit(ctx)
+// CanAssign reports whether an actor holding r may give target to someone or
+// act on someone who holds it. Nobody manages above their own role, and
+// ownership only moves through a transfer.
+func (r Role) CanAssign(target Role) bool {
+	return target != RoleOwner && slices.Contains(Roles, target) && r.AtLeast(target)
 }

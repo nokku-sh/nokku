@@ -142,51 +142,6 @@ func (q *Queries) GetSubscription(ctx context.Context, workspaceID string) (*Wor
 	return &i, err
 }
 
-const listActiveSubscriptions = `-- name: ListActiveSubscriptions :many
-SELECT
-  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, updated_at
-FROM
-  workspace_subscriptions
-WHERE
-  status = ANY ($1::TEXT[])
-  AND source = ANY ($2::TEXT[])
-`
-
-type ListActiveSubscriptionsParams struct {
-	Statuses []string `json:"statuses"`
-	Sources  []string `json:"sources"`
-}
-
-func (q *Queries) ListActiveSubscriptions(ctx context.Context, arg *ListActiveSubscriptionsParams) ([]*WorkspaceSubscription, error) {
-	rows, err := q.db.Query(ctx, listActiveSubscriptions, arg.Statuses, arg.Sources)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*WorkspaceSubscription
-	for rows.Next() {
-		var i WorkspaceSubscription
-		if err := rows.Scan(
-			&i.WorkspaceID,
-			&i.Source,
-			&i.Plan,
-			&i.Status,
-			&i.CustomerID,
-			&i.SubscriptionID,
-			&i.CurrentPeriodEnd,
-			&i.CancelAtPeriodEnd,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listProviderSubscriptions = `-- name: ListProviderSubscriptions :many
 SELECT
   workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, updated_at

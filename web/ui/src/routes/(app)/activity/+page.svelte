@@ -6,7 +6,7 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import { ExportAuditLogsRequest_Format, type EventLog } from '$lib/gen/nokku/v1/util_pb';
 	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { auditStatusOk, DateValueStartTs, DateValueToTimestamp } from '$lib/utils';
+	import { actionLabel, DateValueStartTs, DateValueToTimestamp } from '$lib/utils';
 	import { Activity, Download, InfoIcon } from '@lucide/svelte';
 	import ActivityModal from '$lib/components/modals/ActivityModal.svelte';
 	import type { DateRange } from 'bits-ui';
@@ -19,6 +19,7 @@
 		ActionCell,
 		BadgeCell,
 		CheckCell,
+		CopyCell,
 		TextCell,
 		TimeCell
 	} from '$lib/components/tables/cells';
@@ -43,7 +44,7 @@
 			search,
 			actorIds: Array.from(selectedUsers),
 			actions: Array.from(selectedActions),
-			actorTypes: Array.from(selectedActorTypes),
+			actorKinds: Array.from(selectedActorTypes),
 			startDate: DateValueStartTs(logRange.start),
 			endDate: DateValueToTimestamp(logRange.end)
 		})
@@ -57,47 +58,50 @@
 			delete: 'bg-chart-2',
 			sign: 'bg-chart-3'
 		};
-		return colors[action] ?? 'bg-primary';
+		const verb = action.match(/^[A-Z][a-z]+/)?.[0].toLowerCase() ?? '';
+		return colors[verb] ?? 'bg-primary';
 	};
 
 	const columnHelper = createAppColumnHelper<EventLog>();
 	const columns = columnHelper.columns([
 		columnHelper.display({
-			id: 'status_code',
+			id: 'ok',
 			header: 'Status',
-			cell: ({ row }) =>
-				renderComponent(CheckCell, { checked: auditStatusOk(row.original.statusCode) })
+			cell: ({ row }) => renderComponent(CheckCell, { checked: row.original.ok })
 		}),
 		columnHelper.accessor('action', {
 			header: 'Action',
 			cell: ({ row }) => {
-				const label = row.original.action.split('/')[2];
 				return renderComponent(BadgeCell, {
-					value: label || 'Unknown',
+					value: actionLabel(row.original.action),
 					variant: 'secondary',
 					class: `${getActionColor(row.original.action)} text-xs text-primary-foreground`
 				});
 			}
 		}),
-		columnHelper.accessor('actorEmail', {
+		columnHelper.accessor('target', {
+			header: 'Target',
+			cell: ({ row }) => renderComponent(CopyCell, { value: row.original.target })
+		}),
+		columnHelper.accessor('actorName', {
 			header: 'Actor',
 			cell: ({ row }) => {
 				const log = row.original;
 				return renderComponent(TextCell, {
 					label:
-						log.actorEmail ||
-						(log.actorType === 'user' && log.actorId
+						log.actorName ||
+						(log.actorKind === 'user' && log.actorId
 							? `${log.actorId.slice(0, 8)}…`
-							: log.actorType),
-					subLabel: log.actorEmail ? log.actorType : ''
+							: log.actorKind),
+					subLabel: log.actorName ? log.actorKind : ''
 				});
 			}
 		}),
-		columnHelper.accessor('ipAddress', {
+		columnHelper.accessor('ip', {
 			header: 'Source',
 			cell: ({ row }) =>
 				renderComponent(TextCell, {
-					label: row.original.ipAddress || '',
+					label: row.original.ip || '',
 					subLabel: row.original.userAgent || ''
 				})
 		}),

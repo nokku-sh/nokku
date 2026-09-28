@@ -78,7 +78,7 @@
 							</p>
 						{/if}
 					</div>
-					<Badge variant="default">{roleLabel(invitation.data.roleName || 'viewer')}</Badge>
+					<Badge variant="default">{roleLabel(invitation.data.roleName || 'member')}</Badge>
 				</div>
 			</div>
 

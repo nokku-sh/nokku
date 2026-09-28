@@ -18,145 +18,151 @@ import (
 // Anything unclassified is denied, so a new RPC fails closed until someone
 // decides who may call it.
 
-// ProcedurePermissions maps every workspace-scoped procedure to the single
-// permission it requires. This is the only place permission codes are
-// resolved from a procedure. Handlers run their data access with plain
-// WithWorkspace.
-var ProcedurePermissions = map[string]db.Permission{
+// ProcedureRoles maps every workspace-scoped procedure to the least role that
+// may call it. This is the only place a procedure's required role is
+// resolved. Handlers run their data access with plain WithWorkspace.
+var ProcedureRoles = map[string]db.Role{
 	// Billing
-	nokkuv1connect.BillingServiceGetBillingProcedure: db.PermSettingsView,
+	nokkuv1connect.BillingServiceGetBillingProcedure: db.RoleAdmin,
 
-	// Certificate authorities
-	nokkuv1connect.CertificateServiceGetCertificateAuthorityProcedure:      db.PermCasView,
-	nokkuv1connect.CertificateServiceListCertificateAuthoritiesProcedure:   db.PermCasView,
-	nokkuv1connect.CertificateServiceCreateCertificateAuthorityProcedure:   db.PermCasEdit,
-	nokkuv1connect.CertificateServiceUpdateCertificateAuthorityProcedure:   db.PermCasEdit,
-	nokkuv1connect.CertificateServiceDeleteCertificateAuthorityProcedure:   db.PermCasEdit,
-	nokkuv1connect.CertificateServiceRolloverCertificateAuthorityProcedure: db.PermCasEdit,
+	// Certificate authorities. Members read them: nk trusts the X.509 CAs of
+	// every workspace it belongs to.
+	nokkuv1connect.CertificateServiceGetCertificateAuthorityProcedure:      db.RoleMember,
+	nokkuv1connect.CertificateServiceListCertificateAuthoritiesProcedure:   db.RoleMember,
+	nokkuv1connect.CertificateServiceCreateCertificateAuthorityProcedure:   db.RoleEditor,
+	nokkuv1connect.CertificateServiceUpdateCertificateAuthorityProcedure:   db.RoleEditor,
+	nokkuv1connect.CertificateServiceDeleteCertificateAuthorityProcedure:   db.RoleEditor,
+	nokkuv1connect.CertificateServiceRolloverCertificateAuthorityProcedure: db.RoleEditor,
 
-	// Daemons
-	nokkuv1connect.DaemonServiceGetDaemonProcedure:     db.PermDaemonsView,
-	nokkuv1connect.DaemonServiceListDaemonsProcedure:   db.PermDaemonsView,
-	nokkuv1connect.DaemonServiceListSessionsProcedure:  db.PermDaemonsView,
-	nokkuv1connect.DaemonServiceCreateSessionProcedure: db.PermDaemonsView,
-	nokkuv1connect.DaemonServiceUpdateDaemonProcedure:  db.PermDaemonsEdit,
-	nokkuv1connect.DaemonServiceDeleteDaemonProcedure:  db.PermDaemonsEdit,
+	// Daemons. A web session only opens the transport, sshd still checks the
+	// certificate against the synced grants.
+	nokkuv1connect.DaemonServiceCreateSessionProcedure: db.RoleMember,
+	nokkuv1connect.DaemonServiceGetDaemonProcedure:     db.RoleViewer,
+	nokkuv1connect.DaemonServiceListDaemonsProcedure:   db.RoleViewer,
+	nokkuv1connect.DaemonServiceListSessionsProcedure:  db.RoleViewer,
+	nokkuv1connect.DaemonServiceUpdateDaemonProcedure:  db.RoleEditor,
+	nokkuv1connect.DaemonServiceDeleteDaemonProcedure:  db.RoleEditor,
+	nokkuv1connect.DaemonServiceCloseSessionProcedure:  db.RoleEditor,
 
 	// Join tokens (enroll and invite)
-	nokkuv1connect.TokenServiceCreateTokenProcedure: db.PermSettingsEdit,
-	nokkuv1connect.TokenServiceListTokensProcedure:  db.PermSettingsView,
-	nokkuv1connect.TokenServiceDeleteTokenProcedure: db.PermSettingsEdit,
+	nokkuv1connect.TokenServiceListTokensProcedure:  db.RoleViewer,
+	nokkuv1connect.TokenServiceCreateTokenProcedure: db.RoleAdmin,
+	nokkuv1connect.TokenServiceDeleteTokenProcedure: db.RoleAdmin,
 
 	// Principals
-	nokkuv1connect.PrincipalServiceListPrincipalsProcedure:              db.PermPrincipalsView,
-	nokkuv1connect.PrincipalServiceAddSubjectsToPrincipalProcedure:      db.PermPrincipalsEdit,
-	nokkuv1connect.PrincipalServiceRemoveSubjectsFromPrincipalProcedure: db.PermPrincipalsEdit,
-	nokkuv1connect.PrincipalServiceRevokeAllAccessProcedure:             db.PermPrincipalsEdit,
-	nokkuv1connect.PrincipalServiceAddPrincipalProcedure:                db.PermPrincipalsEdit,
-	nokkuv1connect.PrincipalServiceRemovePrincipalProcedure:             db.PermPrincipalsEdit,
+	nokkuv1connect.PrincipalServiceListPrincipalsProcedure:              db.RoleViewer,
+	nokkuv1connect.PrincipalServiceAddSubjectsToPrincipalProcedure:      db.RoleEditor,
+	nokkuv1connect.PrincipalServiceRemoveSubjectsFromPrincipalProcedure: db.RoleEditor,
+	nokkuv1connect.PrincipalServiceRevokeAllAccessProcedure:             db.RoleEditor,
+	nokkuv1connect.PrincipalServiceAddPrincipalProcedure:                db.RoleEditor,
+	nokkuv1connect.PrincipalServiceRemovePrincipalProcedure:             db.RoleEditor,
 
 	// Service accounts
-	nokkuv1connect.ServiceAccountServiceGetServiceAccountProcedure:    db.PermServiceAccountsView,
-	nokkuv1connect.ServiceAccountServiceListServiceAccountsProcedure:  db.PermServiceAccountsView,
-	nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure: db.PermServiceAccountsEdit,
-	nokkuv1connect.ServiceAccountServiceUpdateServiceAccountProcedure: db.PermServiceAccountsEdit,
-	nokkuv1connect.ServiceAccountServiceDeleteServiceAccountProcedure: db.PermServiceAccountsEdit,
+	nokkuv1connect.ServiceAccountServiceGetServiceAccountProcedure:    db.RoleViewer,
+	nokkuv1connect.ServiceAccountServiceListServiceAccountsProcedure:  db.RoleViewer,
+	nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure: db.RoleEditor,
+	nokkuv1connect.ServiceAccountServiceUpdateServiceAccountProcedure: db.RoleEditor,
+	nokkuv1connect.ServiceAccountServiceDeleteServiceAccountProcedure: db.RoleEditor,
 
 	// SSO
-	nokkuv1connect.SSOServiceGetSSOProviderProcedure:    db.PermSsoView,
-	nokkuv1connect.SSOServiceUpdateSSOProviderProcedure: db.PermSsoEdit,
+	nokkuv1connect.SSOServiceGetSSOProviderProcedure:    db.RoleViewer,
+	nokkuv1connect.SSOServiceUpdateSSOProviderProcedure: db.RoleAdmin,
 
 	// SCIM connector tokens (the endpoint itself is token-scoped)
-	nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure: db.PermSettingsEdit,
-	nokkuv1connect.SCIMServiceListSCIMTokensProcedure:  db.PermSettingsView,
-	nokkuv1connect.SCIMServiceDeleteSCIMTokenProcedure: db.PermSettingsEdit,
+	nokkuv1connect.SCIMServiceListSCIMTokensProcedure:  db.RoleViewer,
+	nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure: db.RoleAdmin,
+	nokkuv1connect.SCIMServiceDeleteSCIMTokenProcedure: db.RoleAdmin,
 
 	// Targets
-	nokkuv1connect.TargetServiceGetTargetProcedure:           db.PermTargetsView,
-	nokkuv1connect.TargetServiceListTargetsProcedure:         db.PermTargetsView,
-	nokkuv1connect.TargetServiceGetSubjectAccessProcedure:    db.PermTargetsView,
-	nokkuv1connect.TargetServiceGetTargetFiltersProcedure:    db.PermTargetsView,
-	nokkuv1connect.TargetServiceCreateTargetProcedure:        db.PermTargetsEdit,
-	nokkuv1connect.TargetServiceUpdateTargetProcedure:        db.PermTargetsEdit,
-	nokkuv1connect.TargetServiceDeleteTargetProcedure:        db.PermTargetsEdit,
-	nokkuv1connect.TargetServiceGetTargetPrincipalsProcedure: db.PermTargetsView,
-	nokkuv1connect.TargetServiceSyncTargetUsersProcedure:     db.PermTargetsEdit,
+	nokkuv1connect.TargetServiceGetTargetProcedure:           db.RoleViewer,
+	nokkuv1connect.TargetServiceListTargetsProcedure:         db.RoleViewer,
+	nokkuv1connect.TargetServiceGetSubjectAccessProcedure:    db.RoleViewer,
+	nokkuv1connect.TargetServiceGetTargetFiltersProcedure:    db.RoleViewer,
+	nokkuv1connect.TargetServiceGetTargetPrincipalsProcedure: db.RoleViewer,
+	nokkuv1connect.TargetServiceCreateTargetProcedure:        db.RoleEditor,
+	nokkuv1connect.TargetServiceUpdateTargetProcedure:        db.RoleEditor,
+	nokkuv1connect.TargetServiceDeleteTargetProcedure:        db.RoleEditor,
+	nokkuv1connect.TargetServiceSyncTargetUsersProcedure:     db.RoleEditor,
 
 	// Teams
-	nokkuv1connect.TeamServiceGetTeamProcedure:          db.PermTeamsView,
-	nokkuv1connect.TeamServiceListTeamsProcedure:        db.PermTeamsView,
-	nokkuv1connect.TeamServiceCreateTeamProcedure:       db.PermTeamsEdit,
-	nokkuv1connect.TeamServiceUpdateTeamProcedure:       db.PermTeamsEdit,
-	nokkuv1connect.TeamServiceDeleteTeamProcedure:       db.PermTeamsEdit,
-	nokkuv1connect.TeamServiceAddTeamMemberProcedure:    db.PermTeamsEdit,
-	nokkuv1connect.TeamServiceRemoveTeamMemberProcedure: db.PermTeamsEdit,
-	nokkuv1connect.TeamServiceListTeamMembersProcedure:  db.PermTeamsView,
-
-	// Teams of one user are member-directory reads, not team-structure edits
-	nokkuv1connect.TeamServiceListTeamsForUserProcedure: db.PermMembersView,
+	nokkuv1connect.TeamServiceGetTeamProcedure:          db.RoleViewer,
+	nokkuv1connect.TeamServiceListTeamsProcedure:        db.RoleViewer,
+	nokkuv1connect.TeamServiceListTeamMembersProcedure:  db.RoleViewer,
+	nokkuv1connect.TeamServiceListTeamsForUserProcedure: db.RoleViewer,
+	nokkuv1connect.TeamServiceCreateTeamProcedure:       db.RoleEditor,
+	nokkuv1connect.TeamServiceUpdateTeamProcedure:       db.RoleEditor,
+	nokkuv1connect.TeamServiceDeleteTeamProcedure:       db.RoleEditor,
+	nokkuv1connect.TeamServiceAddTeamMemberProcedure:    db.RoleEditor,
+	nokkuv1connect.TeamServiceRemoveTeamMemberProcedure: db.RoleEditor,
 
 	// Workspaces
-	nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure:       db.PermWorkspaceEdit,
-	nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure:       db.PermWorkspaceDelete,
-	nokkuv1connect.WorkspaceServiceGetWorkspaceMemberProcedure:    db.PermMembersView,
-	nokkuv1connect.WorkspaceServiceListWorkspaceMembersProcedure:  db.PermMembersView,
-	nokkuv1connect.WorkspaceServiceUpdateWorkspaceMemberProcedure: db.PermMembersEdit,
-	nokkuv1connect.WorkspaceServiceRemoveWorkspaceMemberProcedure: db.PermMembersEdit,
+	nokkuv1connect.WorkspaceServiceGetWorkspaceMemberProcedure:    db.RoleViewer,
+	nokkuv1connect.WorkspaceServiceListWorkspaceMembersProcedure:  db.RoleViewer,
+	nokkuv1connect.WorkspaceServiceUpdateWorkspaceMemberProcedure: db.RoleAdmin,
+	nokkuv1connect.WorkspaceServiceRemoveWorkspaceMemberProcedure: db.RoleAdmin,
+	nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure:       db.RoleAdmin,
+	nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure:       db.RoleOwner,
 
 	// Workspace domains
-	nokkuv1connect.WorkspaceDomainServiceGetWorkspaceDomainProcedure:             db.PermDomainsView,
-	nokkuv1connect.WorkspaceDomainServiceListWorkspaceDomainsProcedure:           db.PermDomainsView,
-	nokkuv1connect.WorkspaceDomainServiceCreateWorkspaceDomainProcedure:          db.PermDomainsEdit,
-	nokkuv1connect.WorkspaceDomainServiceDeleteWorkspaceDomainProcedure:          db.PermDomainsEdit,
-	nokkuv1connect.WorkspaceDomainServiceVerifyWorkspaceDomainProcedure:          db.PermDomainsEdit,
-	nokkuv1connect.WorkspaceDomainServiceRegenerateWorkspaceDomainTokenProcedure: db.PermDomainsEdit,
+	nokkuv1connect.WorkspaceDomainServiceGetWorkspaceDomainProcedure:             db.RoleViewer,
+	nokkuv1connect.WorkspaceDomainServiceListWorkspaceDomainsProcedure:           db.RoleViewer,
+	nokkuv1connect.WorkspaceDomainServiceCreateWorkspaceDomainProcedure:          db.RoleAdmin,
+	nokkuv1connect.WorkspaceDomainServiceDeleteWorkspaceDomainProcedure:          db.RoleAdmin,
+	nokkuv1connect.WorkspaceDomainServiceVerifyWorkspaceDomainProcedure:          db.RoleAdmin,
+	nokkuv1connect.WorkspaceDomainServiceRegenerateWorkspaceDomainTokenProcedure: db.RoleAdmin,
 
 	// Recordings
-	nokkuv1connect.RecordingServiceListRecordingsProcedure:  db.PermDaemonsView,
-	nokkuv1connect.RecordingServiceGetRecordingProcedure:    db.PermDaemonsView,
-	nokkuv1connect.RecordingServiceDeleteRecordingProcedure: db.PermDaemonsEdit,
+	nokkuv1connect.RecordingServiceListRecordingsProcedure:  db.RoleViewer,
+	nokkuv1connect.RecordingServiceGetRecordingProcedure:    db.RoleViewer,
+	nokkuv1connect.RecordingServiceDeleteRecordingProcedure: db.RoleEditor,
 
-	nokkuv1connect.UtilServiceListAuditLogsProcedure:   db.PermAuditView,
-	nokkuv1connect.UtilServiceExportAuditLogsProcedure: db.PermAuditView,
+	// Audit
+	nokkuv1connect.UtilServiceListAuditLogsProcedure:   db.RoleViewer,
+	nokkuv1connect.UtilServiceExportAuditLogsProcedure: db.RoleViewer,
+}
 
-	nokkuv1connect.DaemonServiceCloseSessionProcedure: db.PermDaemonsEdit,
+// personalProcedures take a workspace role only when a workspace is pinned.
+// Without one they serve the caller's own rows, like the personal activity
+// log, and the handler scopes the read to the caller.
+var personalProcedures = map[string]struct{}{
+	nokkuv1connect.UtilServiceListAuditLogsProcedure:   {},
+	nokkuv1connect.UtilServiceExportAuditLogsProcedure: {},
 }
 
 // selfScopedProcedures are open to any authenticated user or service
 // account. Each one is scoped to the caller (their account, their
 // workspaces, their certs) or checks owner rights in the handler.
 var selfScopedProcedures = map[string]struct{}{
-	nokkuv1connect.AccountServiceChangePasswordProcedure:             {},
-	nokkuv1connect.AccountServiceDeleteAccountProcedure:              {},
-	nokkuv1connect.AccountServiceGetAccountProcedure:                 {},
-	nokkuv1connect.AccountServiceListAccountSessionsProcedure:        {},
-	nokkuv1connect.AccountServiceListBackupCodesProcedure:            {},
-	nokkuv1connect.AccountServiceListCredentialsProcedure:            {},
-	nokkuv1connect.AccountServiceRemoveBackupCodesProcedure:          {},
-	nokkuv1connect.AccountServiceRemoveCredentialProcedure:           {},
-	nokkuv1connect.AccountServiceRemoveIdentityProcedure:             {},
-	nokkuv1connect.AccountServiceRemovePasswordProcedure:             {},
-	nokkuv1connect.AccountServiceRemoveSessionProcedure:              {},
-	nokkuv1connect.AccountServiceRenameCredentialProcedure:           {},
-	nokkuv1connect.AccountServiceRotateBackupCodesProcedure:          {},
-	nokkuv1connect.AccountServiceUpdateAccountProcedure:              {},
-	nokkuv1connect.BillingServiceCancelSubscriptionProcedure:         {},
-	nokkuv1connect.BillingServiceCreateCheckoutProcedure:             {},
-	nokkuv1connect.BillingServiceCreatePortalProcedure:               {},
-	nokkuv1connect.BillingServiceGetLicenseProcedure:                 {},
-	nokkuv1connect.CertificateServiceSignSSHCertificateProcedure:     {},
-	nokkuv1connect.CertificateServiceSignX509CertificateProcedure:    {},
-	nokkuv1connect.DaemonServiceRelayProcedure:                       {},
-	nokkuv1connect.InvitationServiceAcceptInvitationProcedure:        {},
-	nokkuv1connect.InvitationServiceGetInvitationProcedure:           {},
-	nokkuv1connect.TargetServiceGetMyAccessProcedure:                 {},
-	nokkuv1connect.UtilServiceListRolesProcedure:                     {},
-	nokkuv1connect.UtilServiceWhoamiProcedure:                        {},
-	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure:          {},
-	nokkuv1connect.WorkspaceServiceGetWorkspaceProcedure:             {},
-	nokkuv1connect.WorkspaceServiceListWorkspacesProcedure:           {},
-	nokkuv1connect.WorkspaceServiceSubscribeWorkspaceEventsProcedure: {},
-	nokkuv1connect.WorkspaceServiceUpdateWorkspaceOwnerProcedure:     {},
+	nokkuv1connect.AccountServiceChangePasswordProcedure:          {},
+	nokkuv1connect.AccountServiceDeleteAccountProcedure:           {},
+	nokkuv1connect.AccountServiceGetAccountProcedure:              {},
+	nokkuv1connect.AccountServiceListAccountSessionsProcedure:     {},
+	nokkuv1connect.AccountServiceListBackupCodesProcedure:         {},
+	nokkuv1connect.AccountServiceListCredentialsProcedure:         {},
+	nokkuv1connect.AccountServiceRemoveBackupCodesProcedure:       {},
+	nokkuv1connect.AccountServiceRemoveCredentialProcedure:        {},
+	nokkuv1connect.AccountServiceRemoveIdentityProcedure:          {},
+	nokkuv1connect.AccountServiceRemovePasswordProcedure:          {},
+	nokkuv1connect.AccountServiceRemoveSessionProcedure:           {},
+	nokkuv1connect.AccountServiceRenameCredentialProcedure:        {},
+	nokkuv1connect.AccountServiceRotateBackupCodesProcedure:       {},
+	nokkuv1connect.AccountServiceUpdateAccountProcedure:           {},
+	nokkuv1connect.BillingServiceCancelSubscriptionProcedure:      {},
+	nokkuv1connect.BillingServiceCreateCheckoutProcedure:          {},
+	nokkuv1connect.BillingServiceCreatePortalProcedure:            {},
+	nokkuv1connect.BillingServiceGetLicenseProcedure:              {},
+	nokkuv1connect.CertificateServiceSignSSHCertificateProcedure:  {},
+	nokkuv1connect.CertificateServiceSignX509CertificateProcedure: {},
+	nokkuv1connect.DaemonServiceRelayProcedure:                    {},
+	nokkuv1connect.InvitationServiceAcceptInvitationProcedure:     {},
+	nokkuv1connect.InvitationServiceGetInvitationProcedure:        {},
+	nokkuv1connect.TargetServiceGetMyAccessProcedure:              {},
+	nokkuv1connect.UtilServiceListRolesProcedure:                  {},
+	nokkuv1connect.UtilServiceWhoamiProcedure:                     {},
+	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure:       {},
+	nokkuv1connect.WorkspaceServiceGetWorkspaceProcedure:          {},
+	nokkuv1connect.WorkspaceServiceListWorkspacesProcedure:        {},
+	nokkuv1connect.WorkspaceServiceUpdateWorkspaceOwnerProcedure:  {},
 }
 
 // daemonOnlyProcedures serve the daemon identity and nobody else.
@@ -230,11 +236,11 @@ func (a *AuthorizationInterceptor) authorize(
 	if daemonOnly {
 		return ctx, db.ErrPermissionDenied
 	}
-	if perm, ok := ProcedurePermissions[procedure]; ok {
-		if err := actorHasPermission(ctx, a.cfg.Conn, perm); err != nil {
-			return ctx, err
+	if role, ok := ProcedureRoles[procedure]; ok {
+		if _, personal := personalProcedures[procedure]; personal && iam.WorkspaceIDFromContext(ctx) == "" {
+			return ctx, nil
 		}
-		return iam.WithMember(ctx, iam.WorkspaceIDFromContext(ctx)), nil
+		return actorHasRole(ctx, a.cfg.Conn, role)
 	}
 	if _, ok := selfScopedProcedures[procedure]; ok {
 		return ctx, nil
@@ -245,33 +251,39 @@ func (a *AuthorizationInterceptor) authorize(
 	return ctx, db.ErrPermissionDenied
 }
 
-// actorHasPermission resolves the request actor's role and checks it against
-// the permission.
-func actorHasPermission(
+// actorHasRole resolves the request actor's role in the pinned workspace and
+// checks it against required. The returned context records the verified
+// membership and role, so WithWorkspace and handlers skip another lookup.
+func actorHasRole(
 	ctx context.Context,
 	conn *db.Connection,
-	perm db.Permission,
-) error {
+	required db.Role,
+) (context.Context, error) {
 	actor, _ := iam.PrincipalFromContext(ctx)
 	if actor.ID == "" {
-		return db.ErrNoActor
+		return ctx, db.ErrNoActor
 	}
 	workspaceID := iam.WorkspaceIDFromContext(ctx)
 	if workspaceID == "" {
-		return db.ErrWorkspaceNotPinned
+		return ctx, db.ErrWorkspaceNotPinned
 	}
 	role, err := conn.Sys().GetActorRole(ctx, &db.GetActorRoleParams{
 		WorkspaceID: workspaceID,
 		ActorID:     actor.ID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return db.ErrWorkspaceNotAccessible
+		return ctx, db.ErrWorkspaceNotAccessible
 	}
 	if err != nil {
-		return err
+		return ctx, err
 	}
-	if !db.HasPermission(role, perm) {
-		return db.ErrPermissionDenied
+	if !db.Role(role).AtLeast(required) {
+		return ctx, db.ErrPermissionDenied
 	}
-	return nil
+	return iam.WithMember(ctx, workspaceID, role), nil
+}
+
+// callerRole is the role authorization verified for this request.
+func callerRole(ctx context.Context) db.Role {
+	return db.Role(iam.MemberRole(ctx))
 }

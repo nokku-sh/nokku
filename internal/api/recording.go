@@ -6,6 +6,8 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/nokku-sh/nokku/internal/audit"
+
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 
@@ -196,25 +198,13 @@ func (s *RecordingService) ListRecordings(
 		}
 		recordings = append(recordings, r.Recording.ToProto())
 	}
-	s.logRecordingEvent(ctx, "recording.list", req.GetWorkspaceId(), "", "")
+	// Recordings can hold credentials, so reading them is audited too.
+	s.cfg.Audit.Log(ctx, &audit.Event{Action: "ListRecordings"})
 	return &nokkuv1.ListRecordingsResponse{
 		Recordings: recordings,
 		Total:      &total,
 		TotalBytes: &totalBytes,
 	}, nil
-}
-
-// logRecordingEvent records a recording read. The audit interceptor only
-// covers mutating procedures, so reads that expose session content (which can
-// contain credentials) emit their own rows. WithoutCancel keeps the row when
-// the peer hangs up and the request context dies first.
-func (s *RecordingService) logRecordingEvent(
-	ctx context.Context,
-	action, workspaceID, recordingID, daemonID string,
-) {
-	actor, _ := iam.PrincipalFromContext(ctx)
-	appendAuditRow(ctx, s.cfg.Audit, action, workspaceID, actor,
-		map[string]any{"recording_id": recordingID, "daemon_id": daemonID})
 }
 
 func (s *RecordingService) GetRecording(
@@ -229,9 +219,10 @@ func (s *RecordingService) GetRecording(
 	// and scopes row-level security.
 	ctx = iam.AnnotateTenant(ctx, req.GetWorkspaceId())
 
-	// Streaming RPCs bypass the unary permission interceptor, so the
-	// ProcedurePermissions gate for this procedure is inert and must run here.
-	if err := actorHasPermission(ctx, s.cfg.Conn, db.PermDaemonsView); err != nil {
+	// Streaming RPCs bypass the unary authorization interceptor, so the
+	// ProcedureRoles gate for this procedure is inert and must run here.
+	ctx, err := actorHasRole(ctx, s.cfg.Conn, db.RoleViewer)
+	if err != nil {
 		return DBError(err)
 	}
 
@@ -257,7 +248,9 @@ func (s *RecordingService) GetRecording(
 		return err
 	}
 
-	s.logRecordingEvent(ctx, "recording.download", req.GetWorkspaceId(), rec.ID, rec.DaemonID)
+	s.cfg.Audit.Log(ctx, &audit.Event{
+		Action: "GetRecording", Target: rec.ID, Details: map[string]any{"daemon_id": rec.DaemonID},
+	})
 
 	fr, err := s.cfg.Record.OpenReader(ctx, req.GetWorkspaceId(), rec.ID)
 	if err != nil {

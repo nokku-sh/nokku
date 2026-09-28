@@ -63,9 +63,9 @@
 			icon: KeyRound
 		},
 		{
-			label: 'Enroll',
-			value: 'enroll',
-			icon: Bot
+			label: 'Login',
+			value: 'login',
+			icon: CircleUser
 		}
 	];
 	let actorTypeFilter: FacetedFilter[] = [

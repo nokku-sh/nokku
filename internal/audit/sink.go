@@ -45,33 +45,25 @@ func (s *PostgresSink) Append(ctx context.Context, event *Event) error {
 	if err != nil {
 		return err
 	}
-	// The column is NOT NULL DEFAULT '{}'; marshal(nil) yields "null", so
-	// normalize an empty map to an empty JSON object before insert.
-	if len(details) == 0 || string(details) == "null" {
+	// marshal(nil) yields "null", the column wants an object.
+	if string(details) == "null" {
 		details = []byte("{}")
 	}
 
-	var workspaceID, actorID, email *string
+	var workspaceID *string
 	if event.WorkspaceID != "" {
 		workspaceID = &event.WorkspaceID
 	}
-	if event.ActorID != "" {
-		actorID = &event.ActorID
-	}
-	if event.ActorEmail != "" {
-		email = &event.ActorEmail
-	}
-	// Blind write: no read, no filter, no RLS gymnastics. The app role's audit
-	// INSERT policy is WITH CHECK (TRUE).
 	return s.q.InsertAuditLog(ctx, &db.InsertAuditLogParams{
 		WorkspaceID: workspaceID,
+		ActorID:     event.ActorID,
+		ActorKind:   event.ActorKind,
+		ActorName:   event.ActorName,
 		Action:      event.Action,
-		ActorID:     actorID,
-		ActorType:   event.ActorType,
-		ActorEmail:  email,
-		IpAddress:   &event.IPAddress,
-		UserAgent:   &event.UserAgent,
-		StatusCode:  &event.StatusCode,
+		Target:      event.Target,
+		Ok:          event.OK,
+		Ip:          event.IP,
+		UserAgent:   event.UserAgent,
 		Details:     details,
 	})
 }

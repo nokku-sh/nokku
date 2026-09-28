@@ -1,4 +1,5 @@
 import { DocsURL, SupportEmail } from '$lib/config';
+import type { RoleName } from '$lib/roles';
 import {
 	Activity,
 	BookText,
@@ -29,6 +30,8 @@ export type RouteItem = {
 	shortcut?: string;
 	icon: LucideIcon;
 	items?: RouteItem[];
+	/** Least workspace role that can use the page. Unset means every member. */
+	role?: RoleName;
 };
 
 export const AppRoutes: Record<string, RouteItem[]> = {
@@ -38,6 +41,7 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			title: 'Access',
 			url: '/access',
 			icon: CircleUser,
+			role: 'viewer',
 			items: [
 				{ title: 'Members', url: '/access/members', icon: CircleUser },
 				{ title: 'Teams', url: '/access/teams', icon: Users },
@@ -48,6 +52,7 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			title: 'Infrastructure',
 			url: '/infrastructure',
 			icon: Orbit,
+			role: 'viewer',
 			items: [
 				{ title: 'Targets', url: '/infrastructure/targets', icon: BookText },
 				{ title: 'Daemons', url: '/infrastructure/daemons', icon: CircleQuestionMark },
@@ -55,15 +60,16 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			]
 		},
 		{ title: 'Certificates', url: '/certificates', icon: IdCard, shortcut: 'c' },
-		{ title: 'Sessions', url: '/sessions', icon: SquareTerminal },
-		{ title: 'Recordings', url: '/recordings', icon: Video }
+		{ title: 'Sessions', url: '/sessions', icon: SquareTerminal, role: 'viewer' },
+		{ title: 'Recordings', url: '/recordings', icon: Video, role: 'viewer' }
 	],
 	Management: [
-		{ title: 'Activity', url: '/activity', icon: Activity, shortcut: 'a' },
+		{ title: 'Activity', url: '/activity', icon: Activity, shortcut: 'a', role: 'viewer' },
 		{
 			title: 'Settings',
 			url: '/settings',
 			icon: Settings,
+			role: 'viewer',
 			items: [
 				{ title: 'General', url: '/settings', icon: Settings, shortcut: 's' },
 				{ title: 'Daemons', url: '/settings/daemons', icon: Bot },

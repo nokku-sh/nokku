@@ -9,7 +9,7 @@
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { DaemonConfigSchema, DaemonStatus, type Daemon } from '$lib/gen/nokku/v1/daemon_pb';
 	import { useAutoSave } from '$lib/hooks';
-	import { enumLabel } from '$lib/utils';
+	import { enumLabel, formatTs } from '$lib/utils';
 	import Avatar from '../utils/Avatar.svelte';
 	import FormModal from './FormModal.svelte';
 	import MetaInfo from './MetaInfo.svelte';
@@ -60,6 +60,13 @@
 						</Badge>
 						{#if model.status}
 							<Badge variant="outline">{enumLabel(DaemonStatus[model.status])}</Badge>
+						{/if}
+						{#if !model.online}
+							<span class="text-xs text-muted-foreground">
+								{model.lastSeenAt
+									? `Last seen ${formatTs(model.lastSeenAt, 'relative')}`
+									: 'Never connected'}
+							</span>
 						{/if}
 					</Item.Description>
 				</Item.Content>

@@ -80,13 +80,11 @@ Schema migrations are embedded and applied automatically under an advisory lock;
 
 ### Cache (Redis, optional)
 
-| Variable         | Purpose                                                                |
-| ---------------- | ---------------------------------------------------------------------- |
-| `REDIS_ADDR`     | Redis address; enables a shared cache across replicas                  |
-| `REDIS_PASSWORD` | Redis password                                                         |
-| `REDIS_DB`       | Redis database number; must be set explicitly when `REDIS_ADDR` is set |
+| Variable          | Purpose                                                                          |
+| ----------------- | -------------------------------------------------------------------------------- |
+| `NOKKU_REDIS_URL` | `redis://user:pass@host:6379/0`, or `rediss://` for TLS. Enables a shared cache. |
 
-Without Redis, the core uses a bounded in-process cache. Single-use state (DPoP nonces, login flow state) is then per-instance, so run one core instance without Redis.
+Without Redis, the core uses a bounded in-process cache. Single-use state (DPoP replay markers, login flow state, email cooldowns) is then per instance, so run more than one core instance only with Redis.
 
 ### Storage (object storage, optional)
 
@@ -106,18 +104,16 @@ S3-compatible storage holds avatars and session recordings. Recordings are encry
 
 ### Email (recommended)
 
-| Variable               | Default                   | Purpose                         |
-| ---------------------- | ------------------------- | ------------------------------- |
-| `NOKKU_EMAIL_DRIVER`   | `noop`                    | `noop`, `smtp`, or `scaleway`   |
-| `NOKKU_EMAIL_SENDER`   | `noreply@system.nokku.sh` | Sender address                  |
-| `NOKKU_EMAIL_TIMEOUT`  | `10s`                     | Send timeout                    |
-| `NOKKU_EMAIL_COOLDOWN` | `15m`                     | Per-user, per-template cooldown |
-| `NOKKU_SMTP_HOST`      |                           | SMTP host (`smtp` driver)       |
-| `NOKKU_SMTP_PORT`      | `587`                     | SMTP port                       |
-| `NOKKU_SMTP_USERNAME`  |                           | SMTP username                   |
-| `NOKKU_SMTP_PASSWORD`  |                           | SMTP password                   |
+| Variable               | Default                   | Purpose                                  |
+| ---------------------- | ------------------------- | ---------------------------------------- |
+| `NOKKU_SMTP_HOST`      |                           | SMTP relay host. Mail is off when unset. |
+| `NOKKU_SMTP_PORT`      | `587`                     | 465 implicit TLS, 587 STARTTLS           |
+| `NOKKU_SMTP_USERNAME`  |                           | SMTP username                            |
+| `NOKKU_SMTP_PASSWORD`  |                           | SMTP password                            |
+| `NOKKU_EMAIL_SENDER`   | `noreply@system.nokku.sh` | Sender address                           |
+| `NOKKU_EMAIL_COOLDOWN` | `15m`                     | Per-user, per-template cooldown          |
 
-Scaleway TEM uses the standard Scaleway credentials. The `noop` driver cannot deliver password resets.
+Any SMTP relay works, for example Scaleway TEM at `smtp.tem.scw.cloud`. Without email, password resets and verification links cannot be delivered.
 
 ### SSO provider seeds (optional)
 
@@ -151,12 +147,10 @@ KMS schemes are `aws-kms://<key-id>`, `hcvault://<host>/transit/keys/<key>`, and
 
 ### Other integrations
 
-| Variable                      | Purpose                                                            |
-| ----------------------------- | ------------------------------------------------------------------ |
-| `IP2LOCATION_TOKEN`           | Download token for the IP geolocation DB used in new-device emails |
-| `IP2LOCATION_DB_PATH`         | Local path of the geolocation DB (default `data/ip2location.bin`)  |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Enable OTLP export of traces, metrics, and logs                    |
-| `OTEL_EXPORTER_OTLP_HEADERS`  | Extra headers for the OTLP exporter                                |
+| Variable                      | Purpose                                         |
+| ----------------------------- | ----------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Enable OTLP export of traces, metrics, and logs |
+| `OTEL_EXPORTER_OTLP_HEADERS`  | Extra headers for the OTLP exporter             |
 
 ## Secret rotation
 

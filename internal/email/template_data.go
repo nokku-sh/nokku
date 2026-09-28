@@ -20,6 +20,6 @@ type NewLoginTemplateData struct {
 	ProfileURL string
 	DeviceID   string
 	DeviceName string
-	Location   string
+	IPAddress  string
 	EventTime  string
 }

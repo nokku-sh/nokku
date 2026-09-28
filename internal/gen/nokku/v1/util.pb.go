@@ -282,15 +282,14 @@ func (x *WhoamiResponse) GetDaemon() *Daemon {
 	return nil
 }
 
+// Role is a workspace role. Roles are ordered, each includes the ones before
+// it. ListRoles returns the assignable ones from least to most privileged.
 type Role struct {
-	state                       protoimpl.MessageState `protogen:"open.v1"`
-	Name                        *string                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	Description                 *string                `protobuf:"bytes,2,opt,name=description" json:"description,omitempty"`
-	Permissions                 []string               `protobuf:"bytes,3,rep,name=permissions" json:"permissions,omitempty"`
-	AssignableToUsers           *bool                  `protobuf:"varint,4,opt,name=assignable_to_users,json=assignableToUsers" json:"assignable_to_users,omitempty"`
-	AssignableToServiceAccounts *bool                  `protobuf:"varint,5,opt,name=assignable_to_service_accounts,json=assignableToServiceAccounts" json:"assignable_to_service_accounts,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          *string                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,2,opt,name=description" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Role) Reset() {
@@ -335,27 +334,6 @@ func (x *Role) GetDescription() string {
 		return *x.Description
 	}
 	return ""
-}
-
-func (x *Role) GetPermissions() []string {
-	if x != nil {
-		return x.Permissions
-	}
-	return nil
-}
-
-func (x *Role) GetAssignableToUsers() bool {
-	if x != nil && x.AssignableToUsers != nil {
-		return *x.AssignableToUsers
-	}
-	return false
-}
-
-func (x *Role) GetAssignableToServiceAccounts() bool {
-	if x != nil && x.AssignableToServiceAccounts != nil {
-		return *x.AssignableToServiceAccounts
-	}
-	return false
 }
 
 type ListRolesRequest struct {
@@ -443,14 +421,15 @@ type EventLog struct {
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	WorkspaceId   *string                `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
 	ActorId       *string                `protobuf:"bytes,3,opt,name=actor_id,json=actorId" json:"actor_id,omitempty"`
-	ActorType     *string                `protobuf:"bytes,4,opt,name=actor_type,json=actorType" json:"actor_type,omitempty"`
-	ActorEmail    *string                `protobuf:"bytes,5,opt,name=actor_email,json=actorEmail" json:"actor_email,omitempty"`
+	ActorKind     *string                `protobuf:"bytes,4,opt,name=actor_kind,json=actorKind" json:"actor_kind,omitempty"`
+	ActorName     *string                `protobuf:"bytes,5,opt,name=actor_name,json=actorName" json:"actor_name,omitempty"`
 	Action        *string                `protobuf:"bytes,6,opt,name=action" json:"action,omitempty"`
-	IpAddress     *string                `protobuf:"bytes,7,opt,name=ip_address,json=ipAddress" json:"ip_address,omitempty"`
-	UserAgent     *string                `protobuf:"bytes,8,opt,name=user_agent,json=userAgent" json:"user_agent,omitempty"`
-	StatusCode    *string                `protobuf:"bytes,9,opt,name=status_code,json=statusCode" json:"status_code,omitempty"`
-	Details       *structpb.Struct       `protobuf:"bytes,10,opt,name=details" json:"details,omitempty"`
-	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=timestamp" json:"timestamp,omitempty"`
+	Target        *string                `protobuf:"bytes,7,opt,name=target" json:"target,omitempty"`
+	Ok            *bool                  `protobuf:"varint,8,opt,name=ok" json:"ok,omitempty"`
+	Ip            *string                `protobuf:"bytes,9,opt,name=ip" json:"ip,omitempty"`
+	UserAgent     *string                `protobuf:"bytes,10,opt,name=user_agent,json=userAgent" json:"user_agent,omitempty"`
+	Details       *structpb.Struct       `protobuf:"bytes,11,opt,name=details" json:"details,omitempty"`
+	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=timestamp" json:"timestamp,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -506,16 +485,16 @@ func (x *EventLog) GetActorId() string {
 	return ""
 }
 
-func (x *EventLog) GetActorType() string {
-	if x != nil && x.ActorType != nil {
-		return *x.ActorType
+func (x *EventLog) GetActorKind() string {
+	if x != nil && x.ActorKind != nil {
+		return *x.ActorKind
 	}
 	return ""
 }
 
-func (x *EventLog) GetActorEmail() string {
-	if x != nil && x.ActorEmail != nil {
-		return *x.ActorEmail
+func (x *EventLog) GetActorName() string {
+	if x != nil && x.ActorName != nil {
+		return *x.ActorName
 	}
 	return ""
 }
@@ -527,9 +506,23 @@ func (x *EventLog) GetAction() string {
 	return ""
 }
 
-func (x *EventLog) GetIpAddress() string {
-	if x != nil && x.IpAddress != nil {
-		return *x.IpAddress
+func (x *EventLog) GetTarget() string {
+	if x != nil && x.Target != nil {
+		return *x.Target
+	}
+	return ""
+}
+
+func (x *EventLog) GetOk() bool {
+	if x != nil && x.Ok != nil {
+		return *x.Ok
+	}
+	return false
+}
+
+func (x *EventLog) GetIp() string {
+	if x != nil && x.Ip != nil {
+		return *x.Ip
 	}
 	return ""
 }
@@ -537,13 +530,6 @@ func (x *EventLog) GetIpAddress() string {
 func (x *EventLog) GetUserAgent() string {
 	if x != nil && x.UserAgent != nil {
 		return *x.UserAgent
-	}
-	return ""
-}
-
-func (x *EventLog) GetStatusCode() string {
-	if x != nil && x.StatusCode != nil {
-		return *x.StatusCode
 	}
 	return ""
 }
@@ -562,6 +548,7 @@ func (x *EventLog) GetTimestamp() *timestamppb.Timestamp {
 	return nil
 }
 
+// An empty workspace_id lists the caller's own activity across workspaces.
 type ListAuditLogsRequest struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId *string                `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId" json:"workspace_id,omitempty"`
@@ -570,10 +557,11 @@ type ListAuditLogsRequest struct {
 	// Filters (optional)
 	Search        *string                `protobuf:"bytes,4,opt,name=search" json:"search,omitempty"`
 	ActorIds      []string               `protobuf:"bytes,5,rep,name=actor_ids,json=actorIds" json:"actor_ids,omitempty"`
-	ActorTypes    []string               `protobuf:"bytes,6,rep,name=actor_types,json=actorTypes" json:"actor_types,omitempty"`
+	ActorKinds    []string               `protobuf:"bytes,6,rep,name=actor_kinds,json=actorKinds" json:"actor_kinds,omitempty"`
 	Actions       []string               `protobuf:"bytes,7,rep,name=actions" json:"actions,omitempty"`
 	StartDate     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=start_date,json=startDate" json:"start_date,omitempty"`
 	EndDate       *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=end_date,json=endDate" json:"end_date,omitempty"`
+	Target        *string                `protobuf:"bytes,10,opt,name=target" json:"target,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -643,9 +631,9 @@ func (x *ListAuditLogsRequest) GetActorIds() []string {
 	return nil
 }
 
-func (x *ListAuditLogsRequest) GetActorTypes() []string {
+func (x *ListAuditLogsRequest) GetActorKinds() []string {
 	if x != nil {
-		return x.ActorTypes
+		return x.ActorKinds
 	}
 	return nil
 }
@@ -669,6 +657,13 @@ func (x *ListAuditLogsRequest) GetEndDate() *timestamppb.Timestamp {
 		return x.EndDate
 	}
 	return nil
+}
+
+func (x *ListAuditLogsRequest) GetTarget() string {
+	if x != nil && x.Target != nil {
+		return *x.Target
+	}
+	return ""
 }
 
 type ListAuditLogsResponse struct {
@@ -868,34 +863,30 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\fworkspace_id\x18\x04 \x01(\tR\vworkspaceId\x12\"\n" +
 	"\x04user\x18\x05 \x01(\v2\x0e.nokku.v1.UserR\x04user\x12A\n" +
 	"\x0fservice_account\x18\x06 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\x12(\n" +
-	"\x06daemon\x18\a \x01(\v2\x10.nokku.v1.DaemonR\x06daemon\"\xd3\x01\n" +
+	"\x06daemon\x18\a \x01(\v2\x10.nokku.v1.DaemonR\x06daemon\"<\n" +
 	"\x04Role\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x02 \x01(\tR\vdescription\x12 \n" +
-	"\vpermissions\x18\x03 \x03(\tR\vpermissions\x12.\n" +
-	"\x13assignable_to_users\x18\x04 \x01(\bR\x11assignableToUsers\x12C\n" +
-	"\x1eassignable_to_service_accounts\x18\x05 \x01(\bR\x1bassignableToServiceAccounts\"\x12\n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\"\x12\n" +
 	"\x10ListRolesRequest\"9\n" +
 	"\x11ListRolesResponse\x12$\n" +
-	"\x05roles\x18\x01 \x03(\v2\x0e.nokku.v1.RoleR\x05roles\"\xfc\x02\n" +
+	"\x05roles\x18\x01 \x03(\v2\x0e.nokku.v1.RoleR\x05roles\"\xf2\x02\n" +
 	"\bEventLog\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x19\n" +
 	"\bactor_id\x18\x03 \x01(\tR\aactorId\x12\x1d\n" +
 	"\n" +
-	"actor_type\x18\x04 \x01(\tR\tactorType\x12\x1f\n" +
-	"\vactor_email\x18\x05 \x01(\tR\n" +
-	"actorEmail\x12\x16\n" +
-	"\x06action\x18\x06 \x01(\tR\x06action\x12\x1d\n" +
+	"actor_kind\x18\x04 \x01(\tR\tactorKind\x12\x1d\n" +
 	"\n" +
-	"ip_address\x18\a \x01(\tR\tipAddress\x12\x1d\n" +
+	"actor_name\x18\x05 \x01(\tR\tactorName\x12\x16\n" +
+	"\x06action\x18\x06 \x01(\tR\x06action\x12\x16\n" +
+	"\x06target\x18\a \x01(\tR\x06target\x12\x0e\n" +
+	"\x02ok\x18\b \x01(\bR\x02ok\x12\x0e\n" +
+	"\x02ip\x18\t \x01(\tR\x02ip\x12\x1d\n" +
 	"\n" +
-	"user_agent\x18\b \x01(\tR\tuserAgent\x12\x1f\n" +
-	"\vstatus_code\x18\t \x01(\tR\n" +
-	"statusCode\x121\n" +
-	"\adetails\x18\n" +
-	" \x01(\v2\x17.google.protobuf.StructR\adetails\x128\n" +
-	"\ttimestamp\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\xec\x02\n" +
+	"user_agent\x18\n" +
+	" \x01(\tR\tuserAgent\x121\n" +
+	"\adetails\x18\v \x01(\v2\x17.google.protobuf.StructR\adetails\x128\n" +
+	"\ttimestamp\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\x84\x03\n" +
 	"\x14ListAuditLogsRequest\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1f\n" +
 	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
@@ -903,12 +894,14 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\x06search\x18\x04 \x01(\tR\x06search\x12*\n" +
 	"\tactor_ids\x18\x05 \x03(\tB\r\xbaH\n" +
 	"\x92\x01\a\"\x05r\x03\xb0\x01\x01R\bactorIds\x12\x1f\n" +
-	"\vactor_types\x18\x06 \x03(\tR\n" +
-	"actorTypes\x12\x18\n" +
+	"\vactor_kinds\x18\x06 \x03(\tR\n" +
+	"actorKinds\x12\x18\n" +
 	"\aactions\x18\a \x03(\tR\aactions\x129\n" +
 	"\n" +
 	"start_date\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tstartDate\x125\n" +
-	"\bend_date\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\aendDate\"U\n" +
+	"\bend_date\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\aendDate\x12\x16\n" +
+	"\x06target\x18\n" +
+	" \x01(\tR\x06target\"U\n" +
 	"\x15ListAuditLogsResponse\x12&\n" +
 	"\x04logs\x18\x01 \x03(\v2\x12.nokku.v1.EventLogR\x04logs\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\"\xbb\x02\n" +

@@ -49,7 +49,7 @@ type linker struct {
 }
 
 // Resolve returns the local user for a verified identity and joins them to
-// the provider's workspace. Rejections are recorded as login_denied events.
+// the provider's workspace. Rejections are recorded as LoginDenied events.
 func (l *linker) Resolve(ctx context.Context, opts flowLinkOptions) (*db.User, error) {
 	u, err := l.resolve(ctx, opts)
 	if err != nil {

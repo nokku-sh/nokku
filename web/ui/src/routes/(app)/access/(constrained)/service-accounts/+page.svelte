@@ -71,8 +71,7 @@
 			cell: ({ row }) =>
 				renderComponent(RoleCell, {
 					roleName: row.original.roleName,
-					update: (roleName) => updateSA.mutateAsync({ id: row.original.id, roleName }),
-					scope: 'serviceAccounts'
+					update: (roleName) => updateSA.mutateAsync({ id: row.original.id, roleName })
 				})
 		}),
 		columnHelper.accessor('expiresAt', {

@@ -8,39 +8,22 @@ import (
 	mail "github.com/wneessen/go-mail"
 )
 
-type smtpConfig struct {
-	Host     string
-	Port     int
-	Username string
-	Password string
-	Timeout  time.Duration
-}
-
 type smtpSender struct {
 	client *mail.Client
 }
 
-func newSMTPSender(cfg smtpConfig) (*smtpSender, error) {
-	if cfg.Host == "" {
-		return nil, fmt.Errorf("smtp host is required")
+// newSMTPSender connects to any SMTP relay. Port 465 uses implicit TLS, 587
+// requires STARTTLS, anything else upgrades when the server offers it.
+func newSMTPSender(host string, port int, username, password string) (*smtpSender, error) {
+	opts := []mail.Option{mail.WithPort(port), mail.WithTimeout(10 * time.Second)}
+	if username != "" {
+		opts = append(opts,
+			mail.WithSMTPAuth(mail.SMTPAuthAutoDiscover),
+			mail.WithUsername(username),
+			mail.WithPassword(password),
+		)
 	}
-	if cfg.Port == 0 {
-		cfg.Port = 587
-	}
-	if cfg.Timeout <= 0 {
-		cfg.Timeout = 10 * time.Second
-	}
-
-	opts := []mail.Option{
-		mail.WithPort(cfg.Port),
-		mail.WithTimeout(cfg.Timeout),
-		mail.WithSMTPAuth(mail.SMTPAuthAutoDiscover),
-	}
-	if cfg.Username != "" && cfg.Password != "" {
-		opts = append(opts, mail.WithUsername(cfg.Username), mail.WithPassword(cfg.Password))
-	}
-
-	switch cfg.Port {
+	switch port {
 	case mail.DefaultPortSSL:
 		opts = append(opts, mail.WithSSLPort(true))
 	case mail.DefaultPortTLS:
@@ -49,31 +32,25 @@ func newSMTPSender(cfg smtpConfig) (*smtpSender, error) {
 		opts = append(opts, mail.WithTLSPortPolicy(mail.TLSOpportunistic))
 	}
 
-	client, err := mail.NewClient(cfg.Host, opts...)
+	client, err := mail.NewClient(host, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create smtp client: %w", err)
+		return nil, fmt.Errorf("smtp client: %w", err)
 	}
-
 	return &smtpSender{client: client}, nil
 }
 
 func (s *smtpSender) Send(ctx context.Context, msg Message) error {
-	message := mail.NewMsg()
-	if err := message.From(msg.From.String()); err != nil {
-		return fmt.Errorf("failed to set from address: %w", err)
+	m := mail.NewMsg()
+	if err := m.From(msg.From); err != nil {
+		return fmt.Errorf("from address: %w", err)
 	}
-	if err := message.To(msg.RecipientEmails()...); err != nil {
-		return fmt.Errorf("failed to set recipients: %w", err)
+	if err := m.To(msg.To); err != nil {
+		return fmt.Errorf("to address: %w", err)
 	}
-	message.Subject(msg.Subject)
-	message.SetBodyString(mail.TypeTextHTML, msg.HTMLBody)
-
-	if msg.TextBody != "" {
-		message.AddAlternativeString(mail.TypeTextPlain, msg.TextBody)
-	}
-
-	if err := s.client.DialAndSendWithContext(ctx, message); err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
+	m.Subject(msg.Subject)
+	m.SetBodyString(mail.TypeTextHTML, msg.HTML)
+	if err := s.client.DialAndSendWithContext(ctx, m); err != nil {
+		return fmt.Errorf("smtp send: %w", err)
 	}
 	return nil
 }

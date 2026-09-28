@@ -84,6 +84,15 @@
 			cell: ({ row }) =>
 				renderComponent(StatusCell, { status: row.original.online ? 'Online' : 'Offline' })
 		}),
+		columnHelper.accessor('lastSeenAt', {
+			header: 'Last seen',
+			cell: ({ row }) =>
+				renderComponent(TimeCell, {
+					ts: row.original.lastSeenAt,
+					fallback: 'Never',
+					emphasize: 'relative'
+				})
+		}),
 		columnHelper.accessor('updatedAt', {
 			header: 'Updated',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.updatedAt })

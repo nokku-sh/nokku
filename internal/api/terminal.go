@@ -175,7 +175,7 @@ func (t *TerminalHandler) authorizeAttach(
 		WorkspaceID: d.WorkspaceID,
 		ActorID:     actor.ID,
 	})
-	if err != nil || !db.HasPermission(role, db.PermDaemonsEdit) {
+	if err != nil || !db.Role(role).AtLeast(db.RoleEditor) {
 		writeJSONError(w, http.StatusForbidden, "permission denied")
 		return false
 	}

@@ -6,10 +6,10 @@
 # Services:
 #   nokku     - the backend (your image, defaults to ghcr.io/nokku-sh/nokku)
 #   postgres  - persistent database
-#   redis     - shared cache (selected by NOKKU_REDIS_ADDR)
+#   redis     - shared cache (selected by NOKKU_REDIS_URL)
 #   caddy     - TLS-terminating reverse proxy
 #
-# To drop redis: unset NOKKU_REDIS_ADDR in .env, remove the `redis` service
+# To drop redis: remove NOKKU_REDIS_URL below, the `redis` service
 # and its `depends_on` entry below.
 name: nokku
 
@@ -82,8 +82,8 @@ services:
       PGUSER: ${POSTGRES_USER:-nokku}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
       PGSSLMODE: disable
-      REDIS_ADDR: redis:6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required in .env}
+      # REDIS_PASSWORD must be URL-safe, it is embedded in the URL.
+      NOKKU_REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required in .env}@redis:6379/0
       # Caddy runs on the same internal network; forwarded client headers are
       # only honored from peers in this range.
       NOKKU_TRUSTED_PROXIES: 172.28.0.0/16

@@ -35,15 +35,13 @@
 	import { createEntityModalState } from '$lib/hooks';
 	import { toDate } from '$lib/utils';
 	import { workspaceID } from '$lib/store.svelte';
+	import { atLeast } from '$lib/roles';
 
 	const workspaceModal = createEntityModalState(WorkspaceSchema);
 
 	const currentUser = $derived(user.self());
-	const currentMember = $derived(workspace.getMember(currentUser.data?.id));
-
-	const isAdmin = $derived(
-		currentMember.data?.roleName === 'editor' || currentMember.data?.roleName === 'owner'
-	);
+	const currentWorkspace = $derived(workspace.get());
+	const isAdmin = $derived(atLeast(currentWorkspace.data?.role, 'editor'));
 
 	const access = $derived(target.access(currentUser.data?.id));
 	const accessTargets = $derived(access.data?.targets ?? []);

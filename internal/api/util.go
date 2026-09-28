@@ -6,13 +6,13 @@ import (
 	"log/slog"
 	"time"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"connectrpc.com/connect"
 	"github.com/mizuchilabs/kata/buildinfo"
 
 	"github.com/nokku-sh/nokku/internal/iam"
-	"github.com/nokku-sh/nokku/internal/util"
 
-	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -88,20 +88,12 @@ func (s *UtilService) ListRoles(
 	_ context.Context,
 	_ *nokkuv1.ListRolesRequest,
 ) (*nokkuv1.ListRolesResponse, error) {
-	infos := db.UserFacingRoles()
-	roles := make([]*nokkuv1.Role, 0, len(infos))
-	for _, r := range infos {
-		permissions := make([]string, len(r.Permissions))
-		for i, p := range r.Permissions {
-			permissions[i] = string(p)
+	roles := make([]*nokkuv1.Role, 0, len(db.Roles))
+	for _, r := range db.Roles {
+		if r == db.RoleOwner {
+			continue
 		}
-		roles = append(roles, &nokkuv1.Role{
-			Name:                        &r.Name,
-			Description:                 &r.Description,
-			Permissions:                 permissions,
-			AssignableToUsers:           &r.AssignableToUsers,
-			AssignableToServiceAccounts: &r.AssignableToServiceAccounts,
-		})
+		roles = append(roles, &nokkuv1.Role{Name: new(string(r)), Description: new(r.Description())})
 	}
 	return &nokkuv1.ListRolesResponse{Roles: roles}, nil
 }
@@ -110,130 +102,81 @@ func (s *UtilService) ListAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ListAuditLogsRequest,
 ) (*nokkuv1.ListAuditLogsResponse, error) {
-	actor, _ := iam.PrincipalFromContext(ctx)
-	var workspaceID string
-
-	if req.GetWorkspaceId() != "" {
-		workspaceID = req.GetWorkspaceId()
-	} else {
-		req.ActorIds = []string{actor.ID}
+	params := auditParams(ctx, req.GetWorkspaceId(), req.GetStartDate(), req.GetEndDate())
+	params.Limit, params.Offset = req.GetLimit(), req.GetOffset()
+	if params.WorkspaceID != nil && len(req.GetActorIds()) > 0 {
+		params.ActorIds = req.GetActorIds()
 	}
-	if workspaceID == "" && req.ActorIds == nil {
-		return nil, NewError(connect.CodeInvalidArgument, "actor is required")
+	if len(req.GetActorKinds()) > 0 {
+		params.ActorKinds = req.GetActorKinds()
 	}
-
-	query := audit.QueryOptions{
-		WorkspaceID: workspaceID,
-		ActorIDs:    req.GetActorIds(),
-		ActorTypes:  req.GetActorTypes(),
-		Actions:     req.GetActions(),
-		Search:      req.GetSearch(),
-		Limit:       req.GetLimit(),
-		Offset:      req.GetOffset(),
+	if len(req.GetActions()) > 0 {
+		params.Actions = req.GetActions()
 	}
-	if t := req.GetStartDate(); t != nil {
-		query.StartDate = t.AsTime()
+	if req.GetTarget() != "" {
+		params.Target = req.Target
 	}
-	if t := req.GetEndDate(); t != nil {
-		query.EndDate = t.AsTime()
-	}
-	// Default to last 14 days if no dates provided
-	if req.GetStartDate() == nil && req.GetEndDate() == nil {
-		query.EndDate = time.Now()
-		query.StartDate = query.EndDate.AddDate(0, 0, -14)
+	if req.GetSearch() != "" {
+		params.Search = req.Search
 	}
 
-	events, err := s.cfg.Audit.List(ctx, query)
+	events, total, err := s.cfg.Audit.List(ctx, params)
 	if err != nil {
 		slog.Error("failed to list audit logs", "error", err)
 		return nil, ErrInternal
 	}
-
-	count, err := s.cfg.Audit.Count(ctx, query)
-	if err != nil {
-		slog.Error("failed to count audit logs", "error", err)
-		return nil, ErrInternal
+	logs := make([]*nokkuv1.EventLog, 0, len(events))
+	for _, e := range events {
+		logs = append(logs, e.ToProto())
 	}
-
-	return &nokkuv1.ListAuditLogsResponse{
-		Logs:  audit.EventsToProto(events),
-		Total: &count,
-	}, nil
+	return &nokkuv1.ListAuditLogsResponse{Logs: logs, Total: &total}, nil
 }
 
+// ExportAuditLogs is gated by the entitlement guard interceptor.
 func (s *UtilService) ExportAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ExportAuditLogsRequest,
 ) (*nokkuv1.ExportAuditLogsResponse, error) {
-	actor, _ := iam.PrincipalFromContext(ctx)
-	workspaceID := req.GetWorkspaceId()
-	// Audit export is gated by the entitlement guard interceptor.
-
-	query := audit.QueryOptions{WorkspaceID: req.GetWorkspaceId()}
-	if req.GetStartDate() != nil {
-		query.StartDate = req.GetStartDate().AsTime()
-	}
-	if req.GetEndDate() != nil {
-		query.EndDate = req.GetEndDate().AsTime()
-	}
-	// Default to last 14 days if no dates provided
-	if req.GetStartDate() == nil && req.GetEndDate() == nil {
-		query.EndDate = time.Now()
-		query.StartDate = query.EndDate.AddDate(0, 0, -14)
-	}
-
-	if workspaceID == "" {
-		query.ActorIDs = []string{actor.ID}
-	}
-
-	data, err := s.cfg.Audit.Export(ctx, query, req.GetFormat())
+	params := auditParams(ctx, req.GetWorkspaceId(), req.GetStartDate(), req.GetEndDate())
+	data, err := s.cfg.Audit.Export(ctx, params, req.GetFormat())
 	if err != nil {
 		return nil, ErrInternal
 	}
 
-	var ext string
-	switch req.GetFormat() {
-	case nokkuv1.ExportAuditLogsRequest_FORMAT_JSON:
-		ext = "json"
-	case nokkuv1.ExportAuditLogsRequest_FORMAT_CSV:
+	ext := "json"
+	if req.GetFormat() == nokkuv1.ExportAuditLogsRequest_FORMAT_CSV {
 		ext = "csv"
-	case nokkuv1.ExportAuditLogsRequest_FORMAT_UNSPECIFIED:
-		ext = "json"
 	}
-	filename := fmt.Sprintf("audit-logs-%s.%s.gz", time.Now().Format("2006-01-02"), ext)
-	contentType := "application/gzip"
-
 	return &nokkuv1.ExportAuditLogsResponse{
 		Data:        data,
-		Filename:    &filename,
-		ContentType: &contentType,
+		Filename:    new(fmt.Sprintf("audit-logs-%s.%s.gz", time.Now().Format("2006-01-02"), ext)),
+		ContentType: new("application/gzip"),
 	}, nil
 }
 
-// appendAuditRow writes an audit event for a procedure the audit interceptor
-// does not cover: streaming RPCs and content reads. WithoutCancel keeps the row
-// when the peer hangs up and the request context dies first.
-func appendAuditRow(
+// auditParams scopes an audit read: the workspace log when a workspace is
+// given, otherwise the caller's own activity. Without dates it covers the
+// last 14 days.
+func auditParams(
 	ctx context.Context,
-	auditSvc *audit.Service,
-	action, workspaceID string,
-	actor iam.Principal,
-	details map[string]any,
-) {
-	event := &audit.Event{
-		Timestamp:   time.Now().UTC(),
-		WorkspaceID: workspaceID,
-		Action:      action,
-		ActorID:     actor.ID,
-		ActorType:   string(actor.Kind),
-		StatusCode:  "OK",
-		Details:     details,
+	workspaceID string,
+	start, end *timestamppb.Timestamp,
+) *db.ListAuditLogsParams {
+	p := &db.ListAuditLogsParams{}
+	if workspaceID != "" {
+		p.WorkspaceID = &workspaceID
+	} else {
+		p.ActorIds = []string{iam.SubjectFromContext(ctx)}
 	}
-	if meta, ok := iam.RequestMetaFromContext(ctx); ok {
-		event.IPAddress = util.SanitizeUTF8(util.GetRemoteIP(meta.Header, meta.RemoteAddr))
-		event.UserAgent = util.SanitizeUTF8(meta.Header.Get("User-Agent"))
+	if start == nil && end == nil {
+		now := time.Now()
+		p.StartDate, p.EndDate = new(now.AddDate(0, 0, -14)), &now
 	}
-	if err := auditSvc.Append(context.WithoutCancel(ctx), event); err != nil {
-		slog.Warn("failed to write audit log", "action", action, "error", err)
+	if start != nil {
+		p.StartDate = new(start.AsTime())
 	}
+	if end != nil {
+		p.EndDate = new(end.AsTime())
+	}
+	return p
 }

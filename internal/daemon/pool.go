@@ -8,10 +8,8 @@ import (
 	"slices"
 	"sync"
 	"time"
-	"uuid"
 
 	"github.com/jackc/pgx/v5"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -19,9 +17,12 @@ import (
 
 const (
 	sendBufferSize = 64
-	// presenceFlushEvery batches online/offline writes, so a reconnect
-	// storm costs a few UPDATEs instead of one per daemon.
-	presenceFlushEvery = 2 * time.Second
+	// Every heartbeatTick the pool stamps newly connected daemons, so they
+	// show online quickly and a reconnect storm costs one UPDATE per tick.
+	// Every heartbeatFullEvery ticks it stamps all of them, well inside
+	// db.DaemonOnlineWindow.
+	heartbeatTick      = 2 * time.Second
+	heartbeatFullEvery = 5
 )
 
 var stateUpdate = &nokkuv1.ConnectResponse{
@@ -47,11 +48,6 @@ func (c *Conn) Cancel() {
 	c.cancel()
 }
 
-type eventSubscriber struct {
-	ch    chan *nokkuv1.SubscribeWorkspaceEventsResponse
-	types []string
-}
-
 // connection is the subset of db.Connection the daemon package needs, so
 // tests can stub it without a running Postgres.
 type connection interface {
@@ -75,13 +71,12 @@ type Pool struct {
 	relays        map[string]*Relay
 	pendingRelays map[string]*relayPending
 	relayCounts   map[string]int
-	events        map[string][]*eventSubscriber
 	// versions caches the workspace state version for heartbeat checks. The
 	// listener refreshes an entry on every change notification.
 	versions map[string]int64
-	// presence holds online flags not yet written to the database.
-	presence map[string]bool
-	conn     connection
+	// fresh holds daemons connected since the last heartbeat.
+	fresh map[string]struct{}
+	conn  connection
 
 	shutdownCtx    context.Context
 	shutdownCancel context.CancelFunc
@@ -97,9 +92,8 @@ func New(ctx context.Context, conn connection) *Pool {
 		relays:         make(map[string]*Relay),
 		pendingRelays:  make(map[string]*relayPending),
 		relayCounts:    make(map[string]int),
-		events:         make(map[string][]*eventSubscriber),
 		versions:       make(map[string]int64),
-		presence:       make(map[string]bool),
+		fresh:          make(map[string]struct{}),
 		conn:           conn,
 		shutdownCtx:    shutdownCtx,
 		shutdownCancel: shutdownCancel,
@@ -109,51 +103,48 @@ func New(ctx context.Context, conn connection) *Pool {
 		<-ctx.Done()
 		p.Shutdown()
 	}()
-	go p.writePresence(ctx)
+	go p.heartbeat(ctx)
 
 	return p
 }
 
-// writePresence flushes online flags in batches. It starts by clearing every
-// flag, because a crashed server never marked its daemons offline.
-func (p *Pool) writePresence(ctx context.Context) {
-	if err := p.conn.WithTx(ctx, func(q *db.Queries) error {
-		return q.SetDaemonsOffline(ctx)
-	}); err != nil {
-		slog.Error("reset daemon presence", "error", err)
-	}
-	ticker := time.NewTicker(presenceFlushEvery)
+// heartbeat stamps last_seen_at for the daemons connected to this instance.
+// Nothing marks a daemon offline: it simply stops being seen, which also
+// covers an instance that crashed.
+func (p *Pool) heartbeat(ctx context.Context) {
+	ticker := time.NewTicker(heartbeatTick)
 	defer ticker.Stop()
-	for {
+	for tick := 0; ; tick++ {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
 		}
-		p.mu.Lock()
-		pending := p.presence
-		p.presence = make(map[string]bool)
-		p.mu.Unlock()
-		if len(pending) == 0 {
+		ids := p.heartbeatBatch(tick%heartbeatFullEvery == 0)
+		if len(ids) == 0 {
 			continue
 		}
-		var online, offline []string
-		for id, up := range pending {
-			if up {
-				online = append(online, id)
-			} else {
-				offline = append(offline, id)
-			}
-		}
 		if err := p.conn.WithTx(ctx, func(q *db.Queries) error {
-			if err := q.SetDaemonsOnline(ctx, &db.SetDaemonsOnlineParams{Online: true, DaemonIds: online}); err != nil {
-				return err
-			}
-			return q.SetDaemonsOnline(ctx, &db.SetDaemonsOnlineParams{Online: false, DaemonIds: offline})
+			return q.TouchDaemons(ctx, ids)
 		}); err != nil {
-			slog.Error("write daemon presence", "error", err, "online", len(online), "offline", len(offline))
+			slog.Warn("daemon heartbeat", "error", err, "daemons", len(ids))
 		}
 	}
+}
+
+// heartbeatBatch returns the daemons to stamp: all connected ones on a full
+// beat, otherwise only those connected since the last beat.
+func (p *Pool) heartbeatBatch(full bool) []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	var ids []string
+	if full {
+		ids = slices.Collect(maps.Keys(p.byID))
+	} else {
+		ids = slices.Collect(maps.Keys(p.fresh))
+	}
+	clear(p.fresh)
+	return ids
 }
 
 // dropOwnedLocked detaches every session and relay of a daemon from the pool
@@ -190,7 +181,7 @@ func (p *Pool) disownLocked(daemonID string) {
 }
 
 // Shutdown cancels all daemon connections and signals the shutdown context so
-// long-lived handlers (SubscribeWorkspaceEvents, StreamCLILogin, etc.) return.
+// long-lived handlers such as web sessions return.
 // Idempotent, safe from any goroutine.
 func (p *Pool) Shutdown() {
 	p.shutdownCancel()
@@ -219,7 +210,7 @@ func (p *Pool) RegisterDaemon(ctx context.Context, daemonID, workspaceID string)
 	p.mu.Lock()
 	previous := p.byID[daemonID]
 	staleSessions, staleRelays := p.dropOwnedLocked(daemonID)
-	p.presence[daemonID] = true
+	p.fresh[daemonID] = struct{}{}
 	if previous != nil && previous.workspaceID != workspaceID {
 		if daemons := p.byWksp[previous.workspaceID]; daemons != nil {
 			delete(daemons, daemonID)
@@ -268,7 +259,7 @@ func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 			delete(p.versions, wksp)
 		}
 	}
-	p.presence[daemonID] = false
+	delete(p.fresh, daemonID)
 	// Tear down this daemon's sessions and relays even if the stream
 	// handlers haven't noticed the control stream drop yet. shutdown() and
 	// Close() are idempotent.
@@ -421,68 +412,5 @@ func (p *Pool) sendToDaemonWait(
 		return fmt.Errorf("daemon %s send timeout", daemonID)
 	case <-c.ctx.Done():
 		return fmt.Errorf("daemon %s disconnected", daemonID)
-	}
-}
-
-func (p *Pool) SubscribeEvents(
-	workspaceID string,
-	eventTypes []string,
-) chan *nokkuv1.SubscribeWorkspaceEventsResponse {
-	ch := make(chan *nokkuv1.SubscribeWorkspaceEventsResponse, 64)
-	p.mu.Lock()
-	p.events[workspaceID] = append(
-		p.events[workspaceID],
-		&eventSubscriber{ch: ch, types: eventTypes},
-	)
-	p.mu.Unlock()
-	return ch
-}
-
-func (p *Pool) UnsubscribeEvents(
-	workspaceID string,
-	ch chan *nokkuv1.SubscribeWorkspaceEventsResponse,
-) {
-	p.mu.Lock()
-	subs := p.events[workspaceID]
-	for i, sub := range subs {
-		if sub.ch == ch {
-			p.events[workspaceID] = append(subs[:i], subs[i+1:]...)
-			break
-		}
-	}
-	// Drop the workspace key once the last subscriber leaves, so the map
-	// doesn't accumulate an entry for every workspace that ever subscribed.
-	if len(p.events[workspaceID]) == 0 {
-		delete(p.events, workspaceID)
-	}
-	p.mu.Unlock()
-}
-
-func (p *Pool) PublishWorkspaceEvent(workspaceID, eventType, payloadJSON string) {
-	event := &nokkuv1.SubscribeWorkspaceEventsResponse{
-		Id:          new(uuid.NewV7().String()),
-		Type:        &eventType,
-		WorkspaceId: &workspaceID,
-		PayloadJson: &payloadJSON,
-		CreatedAt:   timestamppb.Now(),
-	}
-	p.mu.RLock()
-	// Snapshot so UnsubscribeEvents' in-place append can't race the iteration.
-	subs := slices.Clone(p.events[workspaceID])
-	p.mu.RUnlock()
-	for _, sub := range subs {
-		if len(sub.types) == 0 {
-			select {
-			case sub.ch <- event:
-			default:
-			}
-			continue
-		}
-		if slices.Contains(sub.types, eventType) {
-			select {
-			case sub.ch <- event:
-			default:
-			}
-		}
 	}
 }

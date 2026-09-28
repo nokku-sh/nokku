@@ -109,14 +109,25 @@ func WorkspaceIDFromContext(ctx context.Context) string {
 
 type memberKey struct{}
 
+type membership struct {
+	workspaceID string
+	role        string
+}
+
 // WithMember records that authorization verified the actor's membership in
-// workspaceID, so the DB layer can skip a second lookup.
-func WithMember(ctx context.Context, workspaceID string) context.Context {
-	return context.WithValue(ctx, memberKey{}, workspaceID)
+// workspaceID with role, so the DB layer and handlers skip a second lookup.
+func WithMember(ctx context.Context, workspaceID, role string) context.Context {
+	return context.WithValue(ctx, memberKey{}, membership{workspaceID, role})
 }
 
 // MemberOf returns the workspace whose membership authorization verified.
 func MemberOf(ctx context.Context) string {
-	ws, _ := ctx.Value(memberKey{}).(string)
-	return ws
+	m, _ := ctx.Value(memberKey{}).(membership)
+	return m.workspaceID
+}
+
+// MemberRole returns the role authorization verified, empty when none was.
+func MemberRole(ctx context.Context) string {
+	m, _ := ctx.Value(memberKey{}).(membership)
+	return m.role
 }

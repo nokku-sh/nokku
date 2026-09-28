@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
+	"time"
 	"uuid"
+
+	"github.com/nokku-sh/nokku/internal/audit"
 
 	"connectrpc.com/connect"
 
@@ -26,10 +28,6 @@ type DaemonService struct {
 
 func NewDaemonService(cfg *config.Config) *DaemonService {
 	return &DaemonService{cfg: cfg}
-}
-
-func daemonEventPayload(daemonID, name string) string {
-	return fmt.Sprintf(`{"daemon_id":%q,"daemon_name":%q}`, daemonID, name)
 }
 
 func (s *DaemonService) GetDaemon(
@@ -56,7 +54,6 @@ func (s *DaemonService) UpdateDaemon(
 	ctx context.Context,
 	req *nokkuv1.UpdateDaemonRequest,
 ) (*nokkuv1.UpdateDaemonResponse, error) {
-	var result *db.Daemon
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		base, err := q.GetDaemon(ctx, req.GetId())
 		if err != nil {
@@ -69,7 +66,7 @@ func (s *DaemonService) UpdateDaemon(
 		if config == nil {
 			config = base.Config
 		}
-		result, err = q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
+		_, err = q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
 			DaemonID: req.GetId(),
 			Status:   req.GetStatus(),
 			Config:   config,
@@ -79,13 +76,6 @@ func (s *DaemonService) UpdateDaemon(
 		return nil, DBError(err)
 	}
 
-	if req.GetStatus() == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
-		s.cfg.Pool.PublishWorkspaceEvent(
-			result.WorkspaceID,
-			"daemon.accepted",
-			daemonEventPayload(result.ID, result.Name),
-		)
-	}
 	return &nokkuv1.UpdateDaemonResponse{}, nil
 }
 
@@ -106,6 +96,7 @@ func (s *DaemonService) ListDaemons(
 			Query:       req.Query,
 			Status:      status,
 			Online:      req.Online,
+			SeenAfter:   time.Now().Add(-db.DaemonOnlineWindow),
 			Limit:       req.Limit,
 			Offset:      req.Offset,
 		})
@@ -132,19 +123,13 @@ func (s *DaemonService) DeleteDaemon(
 	if id == "" {
 		return nil, ErrInvalidInput
 	}
-	var result *db.Daemon
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.DeleteDaemon(ctx, id)
+		_, err = q.DeleteDaemon(ctx, id)
 		return err
 	}); err != nil {
 		return nil, DBError(err)
 	}
 
-	s.cfg.Pool.PublishWorkspaceEvent(
-		result.WorkspaceID,
-		"daemon.removed",
-		daemonEventPayload(result.ID, result.Name),
-	)
 	return &nokkuv1.DeleteDaemonResponse{}, nil
 }
 
@@ -259,7 +244,7 @@ func (s *DaemonService) CloseSession(
 
 // Relay bridges a user's raw byte stream to the daemon's own sshd. Streaming
 // handlers bypass the unary interceptor's permission gate, so the same check
-// CreateSession gets from ProcedurePermissions runs here.
+// CreateSession gets from ProcedureRoles runs here.
 func (s *DaemonService) Relay(
 	ctx context.Context,
 	stream *connect.BidiStream[nokkuv1.RelayRequest, nokkuv1.RelayResponse],
@@ -287,10 +272,11 @@ func (s *DaemonService) Relay(
 	// Streaming handlers get no tenant from the auth interceptor, so pin the
 	// workspace from the start message before resolving membership.
 	ctx = iam.AnnotateTenant(ctx, workspaceID)
-	// View is deliberate: CreateSession already grants web sessions on view,
-	// so relay transport demands no more. The real SSH gate is the daemon's
-	// synced principal list plus certificate auth inside sshd.
-	if err := actorHasPermission(ctx, s.cfg.Conn, db.PermDaemonsView); err != nil {
+	// Member is deliberate: the relay is only transport, like CreateSession.
+	// The real SSH gate is the daemon's synced principal list plus
+	// certificate auth inside sshd.
+	ctx, err = actorHasRole(ctx, s.cfg.Conn, db.RoleMember)
+	if err != nil {
 		return DBError(err)
 	}
 
@@ -313,8 +299,12 @@ func (s *DaemonService) Relay(
 	}
 	defer s.cfg.Pool.UnregisterRelay(relayID)
 
-	s.logRelayEvent(ctx, "relay.open", workspaceID, d.ID, relayID, actor)
-	defer s.logRelayEvent(ctx, "relay.close", workspaceID, d.ID, relayID, actor)
+	s.cfg.Audit.Log(ctx, &audit.Event{
+		Action: "RelayOpen", Target: d.ID, Details: map[string]any{"relay_id": relayID},
+	})
+	defer s.cfg.Audit.Log(ctx, &audit.Event{
+		Action: "RelayClose", Target: d.ID, Details: map[string]any{"relay_id": relayID},
+	})
 
 	if err := stream.Send(&nokkuv1.RelayResponse{
 		Msg: &nokkuv1.RelayResponse_Ready{Ready: &nokkuv1.RelayReady{RelayId: &relayID}},
@@ -322,20 +312,6 @@ func (s *DaemonService) Relay(
 		return err
 	}
 	return nokkudaemon.BridgeRelay(ctx, stream, relay)
-}
-
-// logRelayEvent records the semantic relay.open and relay.close events. The
-// audit interceptor skips Relay (it only logs procedures matching its
-// mutating prefixes), so the handler emits them directly, with the same
-// transport facts the interceptor rows carry. WithoutCancel keeps the row
-// when the peer hangs up and the request context dies first.
-func (s *DaemonService) logRelayEvent(
-	ctx context.Context,
-	action, workspaceID, daemonID, relayID string,
-	actor iam.Principal,
-) {
-	appendAuditRow(ctx, s.cfg.Audit, action, workspaceID, actor,
-		map[string]any{"relay_id": relayID, "daemon_id": daemonID})
 }
 
 // Daemon endpoints ------------------------------------------------------------
@@ -388,16 +364,6 @@ func (s *DaemonService) EnrollDaemon(
 	if err != nil {
 		return nil, ErrInternal
 	}
-
-	eventType := "daemon.pending"
-	if out.Status == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
-		eventType = "daemon.accepted"
-	}
-	s.cfg.Pool.PublishWorkspaceEvent(
-		workspaceID,
-		eventType,
-		daemonEventPayload(out.DaemonID, out.Name),
-	)
 
 	return &nokkuv1.EnrollDaemonResponse{
 		Id:          &out.DaemonID,

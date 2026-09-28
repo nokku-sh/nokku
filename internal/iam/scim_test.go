@@ -20,7 +20,7 @@ func (e *testEnv) scim(t *testing.T, o org) *scimClient {
 	t.Helper()
 	ctx := as(t.Context(), o.owner.ID)
 	ctx = AnnotateTenant(ctx, o.ws)
-	ctx = WithMember(ctx, o.ws)
+	ctx = WithMember(ctx, o.ws, "")
 	_, token, err := e.svc.IssueSCIMToken(ctx, o.ws, "okta")
 	if err != nil {
 		t.Fatal(err)

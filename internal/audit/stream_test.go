@@ -68,7 +68,7 @@ func TestWebhookSink_DeliverRoutesByWorkspace(t *testing.T) {
 	// No destination for this workspace: nothing is sent, nothing panics.
 	sink.deliver(ctx, &Event{WorkspaceID: "ws-2", Action: "CreateTarget"})
 	// Global events carry no workspace and have no destination.
-	sink.deliver(ctx, &Event{Action: "login_success"})
+	sink.deliver(ctx, &Event{Action: "Login"})
 
 	if got.count() != 1 {
 		t.Fatalf("delivered %d events, want 1", got.count())

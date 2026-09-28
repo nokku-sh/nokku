@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 
+	"github.com/nokku-sh/nokku/internal/audit"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
@@ -38,6 +40,7 @@ func (s *SCIMService) CreateSCIMToken(
 	}
 	token := plaintext
 	entry := scimTokenToProto(tok)
+	audit.SetTarget(ctx, entry.GetId())
 	baseURL := s.cfg.FullURL() + "/scim/v2/" + req.GetWorkspaceId()
 	return &nokkuv1.CreateSCIMTokenResponse{
 		Token:   &token,

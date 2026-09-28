@@ -40,15 +40,15 @@ const (
 type Action string
 
 const (
-	ActionUserCreated     Action = "user_created"
-	ActionUserDeleted     Action = "user_deleted"
-	ActionUserDeactivated Action = "user_deactivated"
-	ActionLoginSucceeded  Action = "login_succeeded"
-	ActionLoginDenied     Action = "login_denied"
-	ActionSessionIssued   Action = "session_issued"
-	ActionSessionRevoked  Action = "session_revoked"
-	ActionPasswordSet     Action = "password_set"
-	ActionCredentialAdded Action = "credential_added" //nolint:gosec // an audit action name, not a credential
+	ActionUserCreated     Action = "UserCreated"
+	ActionUserDeleted     Action = "UserDeleted"
+	ActionUserDeactivated Action = "UserDeactivated"
+	ActionLoginSucceeded  Action = "Login"
+	ActionLoginDenied     Action = "LoginDenied"
+	ActionSessionIssued   Action = "SessionIssued"
+	ActionSessionRevoked  Action = "SessionRevoked"
+	ActionPasswordSet     Action = "PasswordSet"
+	ActionCredentialAdded Action = "CredentialAdded" //nolint:gosec // an audit action name, not a credential
 )
 
 // Event is an auth lifecycle event. The audit service subscribes as a Sink,
@@ -85,6 +85,9 @@ type Deps struct {
 	// Password selects argon2id parameters. A zero value selects defaults.
 	Password         PasswordParams
 	PasskeyRPOrigins []string
+	// StrictEmail rejects disposable and mail-less domains at signup. Needs
+	// DNS, so it is for the public SaaS, not air-gapped installs.
+	StrictEmail bool
 	// CanJoin gates joins on the plan's seat cap. used is the member count
 	// read in the joining transaction. Optional.
 	CanJoin func(ctx context.Context, workspaceID string, used int64) error
@@ -120,6 +123,7 @@ type Service struct {
 	secure  bool
 	now     func() time.Time
 	canJoin func(ctx context.Context, workspaceID string, used int64) error
+	strict  bool
 	idp     *http.Client // IdP egress, see newProviderClient
 
 	// OnUserLogin fires after a successful interactive browser login, after
@@ -157,6 +161,7 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 		secure:  strings.HasPrefix(strings.ToLower(d.BaseURL), "https://"),
 		now:     time.Now,
 		canJoin: d.CanJoin,
+		strict:  d.StrictEmail,
 	}
 	cfg, err := env.ParseAs[egressConfig]()
 	if err != nil {

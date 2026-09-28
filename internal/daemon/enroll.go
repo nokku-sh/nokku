@@ -179,11 +179,3 @@ func enrolledDaemon(ctx context.Context, q *db.Queries, workspaceID, binding str
 		Config:      d.Config,
 	}, nil
 }
-
-// GetStatus returns the enrolled status, or unspecified for a nil result.
-func (e *Enrolled) GetStatus() nokkuv1.DaemonStatus {
-	if e == nil {
-		return nokkuv1.DaemonStatus_DAEMON_STATUS_UNSPECIFIED
-	}
-	return e.Status
-}

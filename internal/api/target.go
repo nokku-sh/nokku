@@ -321,7 +321,7 @@ func (s *TargetService) GetSubjectAccess(
 				daemons = append(daemons, &nokkuv1.Daemon{
 					Id:     &d.ID,
 					Name:   &d.Name,
-					Online: &d.Online,
+					Online: new(db.SeenRecently(d.LastSeenAt)),
 				})
 			}
 		}

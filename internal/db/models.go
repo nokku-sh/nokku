@@ -15,13 +15,14 @@ type AuditAuditLog struct {
 	ID          string    `json:"id"`
 	Timestamp   time.Time `json:"timestamp"`
 	WorkspaceID *string   `json:"workspaceId"`
+	ActorID     string    `json:"actorId"`
+	ActorKind   string    `json:"actorKind"`
+	ActorName   string    `json:"actorName"`
 	Action      string    `json:"action"`
-	ActorID     *string   `json:"actorId"`
-	ActorType   string    `json:"actorType"`
-	ActorEmail  *string   `json:"actorEmail"`
-	IpAddress   *string   `json:"ipAddress"`
-	UserAgent   *string   `json:"userAgent"`
-	StatusCode  *string   `json:"statusCode"`
+	Target      string    `json:"target"`
+	Ok          bool      `json:"ok"`
+	Ip          string    `json:"ip"`
+	UserAgent   string    `json:"userAgent"`
 	Details     []byte    `json:"details"`
 }
 
@@ -71,7 +72,7 @@ type Daemon struct {
 	WorkspaceID   string              `json:"workspaceId"`
 	Name          string              `json:"name"`
 	Status        nokku.DaemonStatus  `json:"status"`
-	Online        bool                `json:"online"`
+	LastSeenAt    *time.Time          `json:"lastSeenAt"`
 	KeyThumbprint *string             `json:"keyThumbprint"`
 	Config        *nokku.DaemonConfig `json:"config"`
 	Metadata      []byte              `json:"metadata"`
@@ -123,11 +124,6 @@ type Recording struct {
 	SizeBytes   int64      `json:"sizeBytes"`
 	Complete    bool       `json:"complete"`
 	CreatedAt   time.Time  `json:"createdAt"`
-}
-
-type Role struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
 }
 
 type SamlKeypair struct {

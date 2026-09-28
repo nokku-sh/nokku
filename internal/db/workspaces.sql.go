@@ -12,38 +12,6 @@ import (
 	nokku "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
-const countWorkspaceMembers = `-- name: CountWorkspaceMembers :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  workspace_members wm
-  JOIN users u ON u.id = wm.user_id
-WHERE
-  wm.workspace_id = $1
-  AND (
-    $2::TEXT IS NULL
-    OR u.name ILIKE '%' || $2 || '%'
-    OR u.email ILIKE '%' || $2 || '%'
-  )
-  AND (
-    $3::TEXT IS NULL
-    OR wm.role_name = $3::TEXT
-  )
-`
-
-type CountWorkspaceMembersParams struct {
-	WorkspaceID string  `json:"workspaceId"`
-	Query       *string `json:"query"`
-	RoleName    *string `json:"roleName"`
-}
-
-func (q *Queries) CountWorkspaceMembers(ctx context.Context, arg *CountWorkspaceMembersParams) (int32, error) {
-	row := q.db.QueryRow(ctx, countWorkspaceMembers, arg.WorkspaceID, arg.Query, arg.RoleName)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const countWorkspacesByOwner = `-- name: CountWorkspacesByOwner :one
 SELECT
   COUNT(*)::INTEGER
@@ -260,12 +228,17 @@ func (q *Queries) GetWorkspaceForUpdate(ctx context.Context, workspaceID string)
 const getWorkspaceMember = `-- name: GetWorkspaceMember :one
 SELECT
   wm.workspace_id,
-  wm.user_id,
+  u.id AS user_id,
+  u.name,
+  u.email,
+  u.email_verified,
+  u.picture,
   wm.role_name,
   wm.created_at,
   wm.updated_at
 FROM
   workspace_members wm
+  JOIN users u ON u.id = wm.user_id
 WHERE
   wm.workspace_id = $1
   AND wm.user_id = $2
@@ -276,12 +249,28 @@ type GetWorkspaceMemberParams struct {
 	UserID      string `json:"userId"`
 }
 
-func (q *Queries) GetWorkspaceMember(ctx context.Context, arg *GetWorkspaceMemberParams) (*WorkspaceMember, error) {
+type GetWorkspaceMemberRow struct {
+	WorkspaceID   string    `json:"workspaceId"`
+	UserID        string    `json:"userId"`
+	Name          string    `json:"name"`
+	Email         string    `json:"email"`
+	EmailVerified bool      `json:"emailVerified"`
+	Picture       *string   `json:"picture"`
+	RoleName      string    `json:"roleName"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+}
+
+func (q *Queries) GetWorkspaceMember(ctx context.Context, arg *GetWorkspaceMemberParams) (*GetWorkspaceMemberRow, error) {
 	row := q.db.QueryRow(ctx, getWorkspaceMember, arg.WorkspaceID, arg.UserID)
-	var i WorkspaceMember
+	var i GetWorkspaceMemberRow
 	err := row.Scan(
 		&i.WorkspaceID,
 		&i.UserID,
+		&i.Name,
+		&i.Email,
+		&i.EmailVerified,
+		&i.Picture,
 		&i.RoleName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -447,33 +436,6 @@ func (q *Queries) ListWorkspaceAuditWebhooks(ctx context.Context) ([]*ListWorksp
 	return items, nil
 }
 
-const listWorkspaceIDs = `-- name: ListWorkspaceIDs :many
-SELECT
-  id
-FROM
-  workspaces
-`
-
-func (q *Queries) ListWorkspaceIDs(ctx context.Context) ([]string, error) {
-	rows, err := q.db.Query(ctx, listWorkspaceIDs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listWorkspaceMembers = `-- name: ListWorkspaceMembers :many
 SELECT
   wm.workspace_id,
@@ -485,7 +447,8 @@ SELECT
   u.active,
   wm.role_name,
   wm.created_at,
-  wm.updated_at
+  wm.updated_at,
+  COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   workspace_members wm
   JOIN users u ON u.id = wm.user_id
@@ -528,6 +491,7 @@ type ListWorkspaceMembersRow struct {
 	RoleName      string    `json:"roleName"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
+	TotalCount    int32     `json:"totalCount"`
 }
 
 func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error) {
@@ -556,6 +520,7 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMe
 			&i.RoleName,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}
@@ -695,7 +660,7 @@ WITH
   update_old_owner AS (
     UPDATE workspace_members
     SET
-      role_name = 'viewer'
+      role_name = 'admin'
     FROM
       old_owner
     WHERE

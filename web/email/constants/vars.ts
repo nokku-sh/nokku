@@ -33,7 +33,7 @@ export const CONSTANTS = {
   PROFILE_URL: "{{ .ProfileURL }}",
   EVENT_TYPE: "{{ .EventType }}",
   EVENT_TIME: "{{ .EventTime }}",
-  LOCATION: "{{ .Location }}",
+  IP_ADDRESS: "{{ .IPAddress }}",
 
   // New Login / Device
   LOGIN_METHOD: "{{ .LoginMethod }}",

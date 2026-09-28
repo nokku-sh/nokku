@@ -23,7 +23,7 @@ import type { JsonObject, Message } from '@bufbuild/protobuf';
  * Describes the file nokku/v1/util.proto.
  */
 export const file_nokku_v1_util: GenFile /*@__PURE__*/ = fileDesc(
-	'ChNub2trdS92MS91dGlsLnByb3RvEghub2trdS52MSITChFHZXRWZXJzaW9uUmVxdWVzdCIlChJHZXRWZXJzaW9uUmVzcG9uc2USDwoHdmVyc2lvbhgBIAEoCSIPCg1XaG9hbWlSZXF1ZXN0IswBCg5XaG9hbWlSZXNwb25zZRIMCgRraW5kGAEgASgJEhIKCnN1YmplY3RfaWQYAiABKAkSDwoHdXNlcl9pZBgDIAEoCRIUCgx3b3Jrc3BhY2VfaWQYBCABKAkSHAoEdXNlchgFIAEoCzIOLm5va2t1LnYxLlVzZXISMQoPc2VydmljZV9hY2NvdW50GAYgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnQSIAoGZGFlbW9uGAcgASgLMhAubm9ra3UudjEuRGFlbW9uIoMBCgRSb2xlEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSEwoLcGVybWlzc2lvbnMYAyADKAkSGwoTYXNzaWduYWJsZV90b191c2VycxgEIAEoCBImCh5hc3NpZ25hYmxlX3RvX3NlcnZpY2VfYWNjb3VudHMYBSABKAgiEgoQTGlzdFJvbGVzUmVxdWVzdCIyChFMaXN0Um9sZXNSZXNwb25zZRIdCgVyb2xlcxgBIAMoCzIOLm5va2t1LnYxLlJvbGUijQIKCEV2ZW50TG9nEgoKAmlkGAEgASgJEhQKDHdvcmtzcGFjZV9pZBgCIAEoCRIQCghhY3Rvcl9pZBgDIAEoCRISCgphY3Rvcl90eXBlGAQgASgJEhMKC2FjdG9yX2VtYWlsGAUgASgJEg4KBmFjdGlvbhgGIAEoCRISCgppcF9hZGRyZXNzGAcgASgJEhIKCnVzZXJfYWdlbnQYCCABKAkSEwoLc3RhdHVzX2NvZGUYCSABKAkSKAoHZGV0YWlscxgKIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSLQoJdGltZXN0YW1wGAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKVAgoUTGlzdEF1ZGl0TG9nc1JlcXVlc3QSFAoMd29ya3NwYWNlX2lkGAEgASgJEhgKBWxpbWl0GAIgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAMgASgFQge6SAQaAigAEg4KBnNlYXJjaBgEIAEoCRIgCglhY3Rvcl9pZHMYBSADKAlCDbpICpIBByIFcgOwAQESEwoLYWN0b3JfdHlwZXMYBiADKAkSDwoHYWN0aW9ucxgHIAMoCRIuCgpzdGFydF9kYXRlGAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRfZGF0ZRgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiSAoVTGlzdEF1ZGl0TG9nc1Jlc3BvbnNlEiAKBGxvZ3MYASADKAsyEi5ub2trdS52MS5FdmVudExvZxINCgV0b3RhbBgCIAEoBSKSAgoWRXhwb3J0QXVkaXRMb2dzUmVxdWVzdBIUCgx3b3Jrc3BhY2VfaWQYASABKAkSQQoGZm9ybWF0GAIgASgOMicubm9ra3UudjEuRXhwb3J0QXVkaXRMb2dzUmVxdWVzdC5Gb3JtYXRCCLpIBYIBAhABEi4KCnN0YXJ0X2RhdGUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZF9kYXRlGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJBCgZGb3JtYXQSFgoSRk9STUFUX1VOU1BFQ0lGSUVEEAASDgoKRk9STUFUX0NTVhABEg8KC0ZPUk1BVF9KU09OEAIiTwoXRXhwb3J0QXVkaXRMb2dzUmVzcG9uc2USDAoEZGF0YRgBIAEoDBIQCghmaWxlbmFtZRgCIAEoCRIUCgxjb250ZW50X3R5cGUYAyABKAky+wMKC1V0aWxTZXJ2aWNlEl8KCkdldFZlcnNpb24SGy5ub2trdS52MS5HZXRWZXJzaW9uUmVxdWVzdBocLm5va2t1LnYxLkdldFZlcnNpb25SZXNwb25zZSIWkAIBgtPkkwINEgsvdjEvdmVyc2lvbhJSCgZXaG9hbWkSFy5ub2trdS52MS5XaG9hbWlSZXF1ZXN0Ghgubm9ra3UudjEuV2hvYW1pUmVzcG9uc2UiFZACAYLT5JMCDBIKL3YxL3dob2FtaRJaCglMaXN0Um9sZXMSGi5ub2trdS52MS5MaXN0Um9sZXNSZXF1ZXN0Ghsubm9ra3UudjEuTGlzdFJvbGVzUmVzcG9uc2UiFJACAYLT5JMCCxIJL3YxL3JvbGVzEmYKDUxpc3RBdWRpdExvZ3MSHi5ub2trdS52MS5MaXN0QXVkaXRMb2dzUmVxdWVzdBofLm5va2t1LnYxLkxpc3RBdWRpdExvZ3NSZXNwb25zZSIUkAIBgtPkkwILEgkvdjEvYXVkaXQScwoPRXhwb3J0QXVkaXRMb2dzEiAubm9ra3UudjEuRXhwb3J0QXVkaXRMb2dzUmVxdWVzdBohLm5va2t1LnYxLkV4cG9ydEF1ZGl0TG9nc1Jlc3BvbnNlIhuC0+STAhU6ASoiEC92MS9hdWRpdDpleHBvcnRCkwEKDGNvbS5ub2trdS52MUIJVXRpbFByb3RvUAFaN2dpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvaW50ZXJuYWwvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH',
+	'ChNub2trdS92MS91dGlsLnByb3RvEghub2trdS52MSITChFHZXRWZXJzaW9uUmVxdWVzdCIlChJHZXRWZXJzaW9uUmVzcG9uc2USDwoHdmVyc2lvbhgBIAEoCSIPCg1XaG9hbWlSZXF1ZXN0IswBCg5XaG9hbWlSZXNwb25zZRIMCgRraW5kGAEgASgJEhIKCnN1YmplY3RfaWQYAiABKAkSDwoHdXNlcl9pZBgDIAEoCRIUCgx3b3Jrc3BhY2VfaWQYBCABKAkSHAoEdXNlchgFIAEoCzIOLm5va2t1LnYxLlVzZXISMQoPc2VydmljZV9hY2NvdW50GAYgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnQSIAoGZGFlbW9uGAcgASgLMhAubm9ra3UudjEuRGFlbW9uIikKBFJvbGUSDAoEbmFtZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCSISChBMaXN0Um9sZXNSZXF1ZXN0IjIKEUxpc3RSb2xlc1Jlc3BvbnNlEh0KBXJvbGVzGAEgAygLMg4ubm9ra3UudjEuUm9sZSKLAgoIRXZlbnRMb2cSCgoCaWQYASABKAkSFAoMd29ya3NwYWNlX2lkGAIgASgJEhAKCGFjdG9yX2lkGAMgASgJEhIKCmFjdG9yX2tpbmQYBCABKAkSEgoKYWN0b3JfbmFtZRgFIAEoCRIOCgZhY3Rpb24YBiABKAkSDgoGdGFyZ2V0GAcgASgJEgoKAm9rGAggASgIEgoKAmlwGAkgASgJEhIKCnVzZXJfYWdlbnQYCiABKAkSKAoHZGV0YWlscxgLIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSLQoJdGltZXN0YW1wGAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKlAgoUTGlzdEF1ZGl0TG9nc1JlcXVlc3QSFAoMd29ya3NwYWNlX2lkGAEgASgJEhgKBWxpbWl0GAIgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAMgASgFQge6SAQaAigAEg4KBnNlYXJjaBgEIAEoCRIgCglhY3Rvcl9pZHMYBSADKAlCDbpICpIBByIFcgOwAQESEwoLYWN0b3Jfa2luZHMYBiADKAkSDwoHYWN0aW9ucxgHIAMoCRIuCgpzdGFydF9kYXRlGAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRfZGF0ZRgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDgoGdGFyZ2V0GAogASgJIkgKFUxpc3RBdWRpdExvZ3NSZXNwb25zZRIgCgRsb2dzGAEgAygLMhIubm9ra3UudjEuRXZlbnRMb2cSDQoFdG90YWwYAiABKAUikgIKFkV4cG9ydEF1ZGl0TG9nc1JlcXVlc3QSFAoMd29ya3NwYWNlX2lkGAEgASgJEkEKBmZvcm1hdBgCIAEoDjInLm5va2t1LnYxLkV4cG9ydEF1ZGl0TG9nc1JlcXVlc3QuRm9ybWF0Qgi6SAWCAQIQARIuCgpzdGFydF9kYXRlGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRfZGF0ZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiQQoGRm9ybWF0EhYKEkZPUk1BVF9VTlNQRUNJRklFRBAAEg4KCkZPUk1BVF9DU1YQARIPCgtGT1JNQVRfSlNPThACIk8KF0V4cG9ydEF1ZGl0TG9nc1Jlc3BvbnNlEgwKBGRhdGEYASABKAwSEAoIZmlsZW5hbWUYAiABKAkSFAoMY29udGVudF90eXBlGAMgASgJMvsDCgtVdGlsU2VydmljZRJfCgpHZXRWZXJzaW9uEhsubm9ra3UudjEuR2V0VmVyc2lvblJlcXVlc3QaHC5ub2trdS52MS5HZXRWZXJzaW9uUmVzcG9uc2UiFpACAYLT5JMCDRILL3YxL3ZlcnNpb24SUgoGV2hvYW1pEhcubm9ra3UudjEuV2hvYW1pUmVxdWVzdBoYLm5va2t1LnYxLldob2FtaVJlc3BvbnNlIhWQAgGC0+STAgwSCi92MS93aG9hbWkSWgoJTGlzdFJvbGVzEhoubm9ra3UudjEuTGlzdFJvbGVzUmVxdWVzdBobLm5va2t1LnYxLkxpc3RSb2xlc1Jlc3BvbnNlIhSQAgGC0+STAgsSCS92MS9yb2xlcxJmCg1MaXN0QXVkaXRMb2dzEh4ubm9ra3UudjEuTGlzdEF1ZGl0TG9nc1JlcXVlc3QaHy5ub2trdS52MS5MaXN0QXVkaXRMb2dzUmVzcG9uc2UiFJACAYLT5JMCCxIJL3YxL2F1ZGl0EnMKD0V4cG9ydEF1ZGl0TG9ncxIgLm5va2t1LnYxLkV4cG9ydEF1ZGl0TG9nc1JlcXVlc3QaIS5ub2trdS52MS5FeHBvcnRBdWRpdExvZ3NSZXNwb25zZSIbgtPkkwIVOgEqIhAvdjEvYXVkaXQ6ZXhwb3J0QpMBCgxjb20ubm9ra3UudjFCCVV0aWxQcm90b1ABWjdnaXRodWIuY29tL25va2t1LXNoL25va2t1L2ludGVybmFsL2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw',
 	[
 		file_buf_validate_validate,
 		file_google_api_annotations,
@@ -132,6 +132,9 @@ export const WhoamiResponseSchema: GenMessage<WhoamiResponse> /*@__PURE__*/ = me
 );
 
 /**
+ * Role is a workspace role. Roles are ordered, each includes the ones before
+ * it. ListRoles returns the assignable ones from least to most privileged.
+ *
  * @generated from message nokku.v1.Role
  */
 export type Role = Message<'nokku.v1.Role'> & {
@@ -144,21 +147,6 @@ export type Role = Message<'nokku.v1.Role'> & {
 	 * @generated from field: string description = 2;
 	 */
 	description: string;
-
-	/**
-	 * @generated from field: repeated string permissions = 3;
-	 */
-	permissions: string[];
-
-	/**
-	 * @generated from field: bool assignable_to_users = 4;
-	 */
-	assignableToUsers: boolean;
-
-	/**
-	 * @generated from field: bool assignable_to_service_accounts = 5;
-	 */
-	assignableToServiceAccounts: boolean;
 };
 
 /**
@@ -220,14 +208,14 @@ export type EventLog = Message<'nokku.v1.EventLog'> & {
 	actorId: string;
 
 	/**
-	 * @generated from field: string actor_type = 4;
+	 * @generated from field: string actor_kind = 4;
 	 */
-	actorType: string;
+	actorKind: string;
 
 	/**
-	 * @generated from field: string actor_email = 5;
+	 * @generated from field: string actor_name = 5;
 	 */
-	actorEmail: string;
+	actorName: string;
 
 	/**
 	 * @generated from field: string action = 6;
@@ -235,27 +223,32 @@ export type EventLog = Message<'nokku.v1.EventLog'> & {
 	action: string;
 
 	/**
-	 * @generated from field: string ip_address = 7;
+	 * @generated from field: string target = 7;
 	 */
-	ipAddress: string;
+	target: string;
 
 	/**
-	 * @generated from field: string user_agent = 8;
+	 * @generated from field: bool ok = 8;
+	 */
+	ok: boolean;
+
+	/**
+	 * @generated from field: string ip = 9;
+	 */
+	ip: string;
+
+	/**
+	 * @generated from field: string user_agent = 10;
 	 */
 	userAgent: string;
 
 	/**
-	 * @generated from field: string status_code = 9;
-	 */
-	statusCode: string;
-
-	/**
-	 * @generated from field: google.protobuf.Struct details = 10;
+	 * @generated from field: google.protobuf.Struct details = 11;
 	 */
 	details?: JsonObject | undefined;
 
 	/**
-	 * @generated from field: google.protobuf.Timestamp timestamp = 11;
+	 * @generated from field: google.protobuf.Timestamp timestamp = 12;
 	 */
 	timestamp?: Timestamp | undefined;
 };
@@ -270,6 +263,8 @@ export const EventLogSchema: GenMessage<EventLog> /*@__PURE__*/ = messageDesc(
 );
 
 /**
+ * An empty workspace_id lists the caller's own activity across workspaces.
+ *
  * @generated from message nokku.v1.ListAuditLogsRequest
  */
 export type ListAuditLogsRequest = Message<'nokku.v1.ListAuditLogsRequest'> & {
@@ -301,9 +296,9 @@ export type ListAuditLogsRequest = Message<'nokku.v1.ListAuditLogsRequest'> & {
 	actorIds: string[];
 
 	/**
-	 * @generated from field: repeated string actor_types = 6;
+	 * @generated from field: repeated string actor_kinds = 6;
 	 */
-	actorTypes: string[];
+	actorKinds: string[];
 
 	/**
 	 * @generated from field: repeated string actions = 7;
@@ -319,6 +314,11 @@ export type ListAuditLogsRequest = Message<'nokku.v1.ListAuditLogsRequest'> & {
 	 * @generated from field: google.protobuf.Timestamp end_date = 9;
 	 */
 	endDate?: Timestamp | undefined;
+
+	/**
+	 * @generated from field: string target = 10;
+	 */
+	target: string;
 };
 
 /**

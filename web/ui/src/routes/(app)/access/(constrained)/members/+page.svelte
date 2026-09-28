@@ -82,8 +82,7 @@
 			cell: ({ row }) =>
 				renderComponent(RoleCell, {
 					roleName: row.original.roleName,
-					update: (roleName) => updateMember.mutateAsync({ userId: row.original.id, roleName }),
-					scope: 'users'
+					update: (roleName) => updateMember.mutateAsync({ userId: row.original.id, roleName })
 				})
 		}),
 		columnHelper.display({

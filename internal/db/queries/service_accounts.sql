@@ -6,7 +6,7 @@ VALUES
     @workspace_id,
     @name,
     @description,
-    COALESCE(sqlc.narg('role_name')::TEXT, 'viewer'),
+    COALESCE(sqlc.narg('role_name')::TEXT, 'member'),
     @expires_at,
     COALESCE(@tags, '{}'::TEXT[]),
     @token_hash
@@ -17,14 +17,6 @@ RETURNING
 -- name: GetServiceAccount :one
 SELECT
   *
-FROM
-  service_accounts
-WHERE
-  id = @service_account_id;
-
--- name: GetServiceAccountWorkspaceID :one
-SELECT
-  workspace_id
 FROM
   service_accounts
 WHERE

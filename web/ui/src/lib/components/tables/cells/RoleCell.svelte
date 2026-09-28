@@ -2,17 +2,15 @@
 	import { roles as rolesApi } from '$lib/api/roles.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Select from '$lib/components/ui/select';
-	import { assignableRoles, roleColor, roleIcon, roleLabel } from '$lib/roles';
+	import { roleColor, roleIcon, roleLabel } from '$lib/roles';
 	import { Crown, LoaderCircle } from '@lucide/svelte';
 
 	type Props = {
 		roleName?: string;
 		/** Persist a role change. If omitted, the role is shown as a badge. */
 		update?: (roleName: string) => Promise<unknown> | unknown;
-		/** Which actor types this cell assigns roles to. */
-		scope?: 'users' | 'serviceAccounts';
 	};
-	let { roleName = '', update, scope = 'users' }: Props = $props();
+	let { roleName = '', update }: Props = $props();
 
 	/** Pending optimistic value while a change is being saved. */
 	let optimistic = $state<string>();
@@ -20,7 +18,7 @@
 
 	const rolesQuery = $derived(rolesApi.list());
 	const roleOptions = $derived(
-		assignableRoles(rolesQuery.data ?? [], scope).map((r) => ({
+		(rolesQuery.data ?? []).map((r) => ({
 			value: r.name,
 			label: roleLabel(r.name),
 			description: r.description,
