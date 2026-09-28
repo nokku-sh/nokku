@@ -12,9 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/caarlos0/env/v11"
-
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/util"
 )
 
 type Method string
@@ -76,12 +75,6 @@ type Deps struct {
 	CanJoin func(ctx context.Context, workspaceID string, used int64) error
 }
 
-// egressConfig must stay off in multi-tenant deployments, since workspace
-// admins pick the IdP URLs the server fetches.
-type egressConfig struct {
-	AllowPrivate bool `env:"NOKKU_SSO_ALLOW_PRIVATE_NETWORKS"`
-}
-
 // txRunner is satisfied by *db.Connection.
 type txRunner interface {
 	Sys() db.Querier
@@ -101,7 +94,7 @@ type Service struct {
 	now     func() time.Time
 	canJoin func(ctx context.Context, workspaceID string, used int64) error
 	strict  bool
-	idp     *http.Client // IdP egress, see newProviderClient
+	idp     *http.Client // guarded, see util.NewEgressClient
 
 	// OnUserLogin fires after an interactive browser login set its cookie.
 	OnUserLogin func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
@@ -136,11 +129,10 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 		canJoin: d.CanJoin,
 		strict:  d.StrictEmail,
 	}
-	cfg, err := env.ParseAs[egressConfig]()
-	if err != nil {
+	var err error
+	if s.idp, err = util.NewEgressClient(providerHTTPTimeout); err != nil {
 		return nil, err
 	}
-	s.idp = newProviderClient(cfg.AllowPrivate)
 	s.Password = newPasswordManager(s, d.Password)
 	s.DPoP = &DPoPVerifier{secret: d.Secret, replay: d.Cache, now: s.now}
 	s.Device = &DeviceFlow{svc: s}

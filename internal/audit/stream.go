@@ -18,6 +18,7 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/entitlement"
+	"github.com/nokku-sh/nokku/internal/util"
 )
 
 const (
@@ -50,15 +51,20 @@ type destination struct {
 
 var _ Sink = (*WebhookSink)(nil)
 
+// NewWebhookSink guards against private destinations, see util.NewEgressClient.
 func NewWebhookSink(
 	ctx context.Context,
 	conn *db.Connection,
 	entitlements *entitlement.Service,
-) *WebhookSink {
+) (*WebhookSink, error) {
+	client, err := util.NewEgressClient(streamTimeout)
+	if err != nil {
+		return nil, err
+	}
 	s := &WebhookSink{
 		conn:         conn,
 		entitlements: entitlements,
-		client:       &http.Client{Timeout: streamTimeout},
+		client:       client,
 		queue:        make(chan *Event, streamQueueSize),
 		backoff:      time.Second,
 	}
@@ -70,7 +76,7 @@ func NewWebhookSink(
 		go s.work(ctx)
 	}
 	go s.refreshLoop(ctx)
-	return s
+	return s, nil
 }
 
 // Append never blocks or fails the caller.
