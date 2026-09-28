@@ -101,7 +101,7 @@ Without Redis, the core uses a bounded in-process cache. Single-use state (DPoP 
 | `NOKKU_S3_USE_PATH_STYLE`    | `false`        | Path-style addressing (MinIO)                     |
 | `NOKKU_S3_PUBLIC_URL`        |                | Public base URL for objects                       |
 
-S3-compatible storage holds avatars and session recordings. Recordings are encrypted before upload regardless of the backend.
+S3-compatible storage holds avatars and session recordings. Recordings are encrypted before upload regardless of the backend. With `NOKKU_S3_PUBLIC_URL` set, grant public read on the `avatars/` prefix only, never on the whole bucket, since recordings live under `videos/`.
 
 ### Email (recommended)
 
