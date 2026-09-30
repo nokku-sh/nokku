@@ -22,7 +22,7 @@ export default function ProductUpdate() {
         the control plane handles the full rotation lifecycle for you.
       </Text>
 
-      <Section className="my-7 rounded-xl border border-[#bfe7e8] bg-mist px-5 py-4">
+      <Section className="my-7 rounded-xl border border-mistLine bg-mist px-5 py-4">
         <Text className="m-0 text-sm font-bold text-ink">What's new</Text>
         <Text className="m-0 mt-1 text-sm leading-6 text-muted">
           <strong className="text-ink">Zero-touch renewal.</strong> Host certificates are renewed

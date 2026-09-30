@@ -1,10 +1,11 @@
 <script lang="ts" generics="T">
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import * as Select from '$lib/components/ui/select/index.js';
+	import * as Select from '$lib/components/ui/select';
 	import { Separator } from '$lib/components/ui/separator';
 	import { XIcon } from '@lucide/svelte';
 	import { slide } from 'svelte/transition';
+	import { confirm } from '$lib/hooks';
 	import type { BulkAction } from './types';
 
 	type Props<TData> = {
@@ -17,12 +18,30 @@
 		onClear?: () => void;
 	};
 	let { items, actions, count, onClear }: Props<T> = $props();
+
+	// A cancelled confirm keeps the selection, so the user can try again.
+	async function run(action: BulkAction<T>) {
+		if (action.confirm) {
+			const ok = await confirm({
+				confirmText: action.label,
+				...action.confirm(items),
+				onConfirm: () => action.onClick?.(items)
+			});
+			if (ok) onClear?.();
+			return;
+		}
+		await action.onClick?.(items);
+		onClear?.();
+	}
 </script>
 
 {#if count.selected > 0}
-	<div class="fixed bottom-16 left-1/2 z-50 -translate-x-16" transition:slide={{ duration: 200 }}>
+	<div
+		class="fixed inset-x-0 bottom-16 z-50 flex justify-center px-4"
+		transition:slide={{ duration: 200 }}
+	>
 		<div
-			class="flex items-center gap-3 rounded-full border bg-background/95 px-4 py-2 shadow-lg backdrop-blur supports-backdrop-filter:bg-background/80"
+			class="flex items-center gap-3 rounded-full border bg-background/95 px-4 py-2 backdrop-blur supports-backdrop-filter:bg-background/80"
 		>
 			<div class="flex items-center gap-2 pr-3">
 				<Badge variant="secondary" class="size-7 rounded-full p-0 text-sm font-semibold">
@@ -42,10 +61,7 @@
 							variant={action.variant ?? 'ghost'}
 							size="sm"
 							class="h-8 {action.class ?? ''}"
-							onclick={async () => {
-								await action.onClick?.(items);
-								onClear?.();
-							}}
+							onclick={() => run(action)}
 							disabled={action.disabled}
 						>
 							{#if action.icon}

@@ -9,9 +9,9 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Command from '$lib/components/ui/command';
 	import * as Tabs from '$lib/components/ui/tabs';
-	import Chip from '$lib/components/utils/Chip.svelte';
-	import SearchPopover from '$lib/components/utils/SearchPopover.svelte';
-	import UserAvatar from '$lib/components/utils/UserAvatar.svelte';
+	import Chip from '$lib/components/blocks/Chip.svelte';
+	import SearchPopover from '$lib/components/blocks/SearchPopover.svelte';
+	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
 	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
 	import { confirm, useSheet } from '$lib/hooks';
 	import {
@@ -211,7 +211,7 @@
 							>
 								{#snippet leading()}
 									<span
-										class="flex size-6 items-center justify-center rounded-full bg-chart-3/15 text-chart-3"
+										class="flex size-6 items-center justify-center rounded-full bg-chart-2/15 text-chart-2"
 									>
 										<Users class="size-3" />
 									</span>

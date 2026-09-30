@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { eventLabel, outcomeLabel, outcomeOf } from '$lib/components/audit/audit';
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { Badge } from '$lib/components/ui/badge';
 	import type { EventLog } from '$lib/gen/nokku/v1/util_pb';
-	import { actionLabel, formatTs } from '$lib/utils';
+	import { formatTs } from '$lib/utils';
 	import { CircleCheckBig, CircleX, Globe, UserRound, Zap } from '@lucide/svelte';
 	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';
@@ -35,7 +36,7 @@
 	}
 </script>
 
-<EntitySheet open={!!log} {onClose} title={log ? actionLabel(log.action) : ''}>
+<EntitySheet open={!!log} {onClose} title={log ? eventLabel(log.action) : ''}>
 	{#snippet media()}
 		<div
 			class={[
@@ -50,7 +51,7 @@
 	{#snippet subtitle()}
 		<span>{formatTs(log?.timestamp, 'withTime')}</span>
 		<span>· {formatTs(log?.timestamp, 'relative')}</span>
-		{#if log && !log.ok}<Badge variant="destructive">Failed</Badge>{/if}
+		{#if log && !log.ok}<Badge variant="destructive">{outcomeLabel[outcomeOf(log)]}</Badge>{/if}
 	{/snippet}
 
 	{#if log}

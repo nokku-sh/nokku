@@ -1,10 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { loginWithPasskey } from '$lib/api/passkey';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Alert from '$lib/components/ui/alert';
+	import { Button } from '$lib/components/ui/button';
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Label } from '$lib/components/ui/label/index.js';
+	import { Input } from '$lib/components/ui/input';
+	import * as Field from '$lib/components/ui/field';
+	import { Spinner } from '$lib/components/ui/spinner';
+	import LegalConsent from '$lib/components/blocks/LegalConsent.svelte';
+	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
 	import { BinaryIcon, GlobeIcon, KeyRound, LogIn, Mail } from '@lucide/svelte';
 	import { GoogleIcon, GitHubIcon, OIDCIcon, SAMLIcon } from '$lib/assets';
 	import { toast } from 'svelte-sonner';
@@ -12,7 +16,6 @@
 	import { auth } from '$lib/api/auth.svelte';
 	import { isEmailUnverifiedError, emailUnverifiedMessage } from '$lib/api/error-formatter';
 	import { useDebounce } from 'runed';
-	import Logo from '$lib/assets/logo.svelte';
 
 	let email = $state('');
 	let password = $state('');
@@ -54,6 +57,11 @@
 		}
 	}
 
+	function submit(e: SubmitEvent) {
+		e.preventDefault();
+		if (!disablePasswordLogin) login.mutate({ password, email });
+	}
+
 	async function handlePasskeyLogin() {
 		try {
 			await loginWithPasskey();
@@ -69,152 +77,115 @@
 	}
 </script>
 
-<div
-	class="m-auto h-fit w-full max-w-sm overflow-hidden rounded-[calc(var(--radius)+.125rem)] border bg-muted shadow-md shadow-zinc-950/5 dark:[--color-muted:var(--color-zinc-900)]"
->
-	<div class="-m-px rounded-[calc(var(--radius)+.125rem)] border bg-card p-6 pb-6">
-		<div class="text-center">
-			<Logo class="mx-auto block w-10 py-2 dark:invert" />
-			<h1 class="mt-4 mb-1 text-xl font-semibold">Sign In to Nokku</h1>
-			<p class="text-sm">Welcome back! Sign in to continue</p>
-		</div>
-
-		<div class="mt-6 space-y-4">
-			<div class="space-y-2">
-				<Label for="email">Email</Label>
+<AuthCard title="Sign in to Nokku" description="Welcome back, pick up where you left off">
+	<form class="flex flex-col gap-4" onsubmit={submit}>
+		<Field.Group class="gap-4">
+			<Field.Field>
+				<Field.Label for="email">Email</Field.Label>
 				<Input
 					id="email"
 					type="email"
+					autocomplete="username webauthn"
 					bind:value={email}
 					required
 					oninput={checkSSO}
-					placeholder="Enter your email"
+					placeholder="you@company.com"
 				/>
-			</div>
+			</Field.Field>
 
-			{#if !enforceSSO}
-				{#if showUnverified}
-					<div class="space-y-3 rounded-lg bg-muted p-4">
-						<p class="text-sm font-medium">Check your email</p>
-						<p class="text-sm text-muted-foreground">
-							We sent a verification link to {email}. Confirm it to activate your account.
-						</p>
-						<Button
-							variant="outline"
-							type="button"
-							class="w-full"
-							onclick={() => resendVerification.mutate({ email })}
-						>
-							<Mail size={16} />
-							{resendVerification.isPending ? 'Sending…' : 'Resend verification email'}
-						</Button>
+			{#if !enforceSSO && !showUnverified}
+				<Field.Field>
+					<div class="flex items-center justify-between">
+						<Field.Label for="password">Password</Field.Label>
+						<a href="/recovery" class="text-xs text-primary hover:underline">Forgot it?</a>
 					</div>
-				{:else}
-					<div class="space-y-0.5">
-						<div class="flex items-center justify-between">
-							<Label for="password" class="text-sm">Password</Label>
-							<Button href="/recovery" variant="link" size="sm" class="text-sm">
-								Forgot your Password?
-							</Button>
-						</div>
-						<InputGroupVariants
-							variant="password"
-							bind:value={password}
-							placeholder="Enter your password"
-							inputProps={{ required: true }}
-						/>
-					</div>
-				{/if}
-			{/if}
-
-			<div class="space-y-2 transition-transform">
-				{#if !enforceSSO && !showUnverified}
-					<Button
-						type="submit"
-						class="w-full"
-						disabled={disablePasswordLogin}
-						onclick={() => login.mutate({ password, email })}
-					>
-						<LogIn size={16} />
-						Sign In
-					</Button>
-				{/if}
-
-				{#if ssoCheck.isSuccess && ssoCheck.data?.hasSSO}
-					{#each ssoCheck.data.providers as p (`${p.method}:${p.provider}`)}
-						<Button
-							type="button"
-							variant="secondary"
-							class="group flex w-full items-center gap-2"
-							onclick={() => handleSSOLogin(p)}
-							disabled={ssoCheck.isPending}
-						>
-							{#if p.method === 'oidc'}
-								<OIDCIcon size={16} />
-							{:else if p.method === 'saml'}
-								<SAMLIcon size={16} />
-							{:else}
-								<GlobeIcon size={16} />
-							{/if}
-							<span>{ssoLabel(p)}</span>
-						</Button>
-					{/each}
-				{/if}
-			</div>
-		</div>
-
-		<div class="my-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-			<hr class="border-solid" />
-			<span class="text-xs text-muted-foreground">Or continue with</span>
-			<hr class="border-solid" />
-		</div>
-
-		<div class="mb-3 grid grid-cols-2 gap-3">
-			<Button
-				variant="secondary"
-				onclick={() => (window.location.href = '/oidc/login?provider=google')}
-			>
-				<GoogleIcon class="size-5" />
-				<span>Google</span>
-			</Button>
-			<Button
-				variant="secondary"
-				onclick={() => (window.location.href = '/oauth/login?provider=github')}
-			>
-				<GitHubIcon class="size-5" />
-				<span>GitHub</span>
-			</Button>
-		</div>
-
-		<div class="flex flex-col gap-3">
-			<Button
-				variant="secondary"
-				class="group flex w-full items-center gap-2"
-				onclick={handlePasskeyLogin}
-			>
-				<KeyRound
-					size={16}
-					class="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12"
-				/>
-				<span>Passkey</span>
-			</Button>
-
-			{#if !enforceSSO && email && login.isError && !showUnverified}
-				<Button href="/login/backup" variant="outline" class="group flex w-full items-center gap-2">
-					<BinaryIcon
-						size={16}
-						class="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12"
+					<InputGroupVariants
+						variant="password"
+						bind:value={password}
+						placeholder="Your password"
+						inputProps={{ id: 'password', required: true, autocomplete: 'current-password' }}
 					/>
-					Sign in with a backup code
-				</Button>
+				</Field.Field>
 			{/if}
-		</div>
+		</Field.Group>
+
+		{#if showUnverified}
+			<Alert.Root variant="info">
+				<Mail />
+				<Alert.Title>Check your email</Alert.Title>
+				<Alert.Description>
+					We sent a verification link to {email}. Confirm it to activate your account.
+				</Alert.Description>
+			</Alert.Root>
+			<Button
+				variant="outline"
+				type="button"
+				disabled={resendVerification.isPending}
+				onclick={() => resendVerification.mutate({ email })}
+			>
+				{#if resendVerification.isPending}<Spinner data-icon="inline-start" />{:else}<Mail
+						data-icon="inline-start"
+					/>{/if}
+				Resend verification email
+			</Button>
+		{:else if !enforceSSO}
+			<Button type="submit" disabled={disablePasswordLogin}>
+				{#if login.isPending}<Spinner data-icon="inline-start" />{:else}<LogIn
+						data-icon="inline-start"
+					/>{/if}
+				Sign in
+			</Button>
+		{/if}
+
+		{#if ssoCheck.isSuccess && ssoCheck.data?.hasSSO}
+			{#each ssoCheck.data.providers as p (`${p.method}:${p.provider}`)}
+				<Button
+					type="button"
+					variant="secondary"
+					onclick={() => handleSSOLogin(p)}
+					disabled={ssoCheck.isPending}
+				>
+					{#if p.method === 'oidc'}
+						<OIDCIcon data-icon="inline-start" />
+					{:else if p.method === 'saml'}
+						<SAMLIcon data-icon="inline-start" />
+					{:else}
+						<GlobeIcon data-icon="inline-start" />
+					{/if}
+					{ssoLabel(p)}
+				</Button>
+			{/each}
+		{/if}
+	</form>
+
+	<Field.Separator>Or continue with</Field.Separator>
+
+	<div class="grid grid-cols-2 gap-3">
+		<Button variant="secondary" href="/oidc/login?provider=google" data-sveltekit-reload>
+			<GoogleIcon data-icon="inline-start" />
+			Google
+		</Button>
+		<Button variant="secondary" href="/oauth/login?provider=github" data-sveltekit-reload>
+			<GitHubIcon data-icon="inline-start" />
+			GitHub
+		</Button>
+		<Button variant="secondary" class="col-span-2" onclick={handlePasskeyLogin}>
+			<KeyRound data-icon="inline-start" />
+			Passkey
+		</Button>
+		{#if !enforceSSO && email && login.isError && !showUnverified}
+			<Button href="/login/backup" variant="outline" class="col-span-2">
+				<BinaryIcon data-icon="inline-start" />
+				Sign in with a backup code
+			</Button>
+		{/if}
 	</div>
 
-	<div class="p-3">
-		<p class="text-center text-sm text-accent-foreground">
-			Don't have an account?
-			<Button href="/register" variant="link" class="px-2">Sign up</Button>
-		</p>
-	</div>
-</div>
+	<LegalConsent lead="Google, GitHub and SSO create an account on first sign-in. By continuing," />
+
+	{#snippet footer()}
+		New to Nokku? <a href="/register" class="font-medium text-primary hover:underline"
+			>Create an account</a
+		>
+	{/snippet}
+</AuthCard>

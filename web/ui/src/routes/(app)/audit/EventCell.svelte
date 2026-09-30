@@ -2,28 +2,17 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import type { EventLog } from '$lib/gen/nokku/v1/util_pb';
-	import { Activity } from '@lucide/svelte';
-	import { areaOf, eventLabel, outcomeOf, setParams } from '$lib/components/audit/audit';
+	import { eventLabel, outcomeLabel, outcomeOf, setParams } from '$lib/components/audit/audit';
+	import EventIcon from '$lib/components/audit/EventIcon.svelte';
 
 	let { log }: { log: EventLog } = $props();
 
-	const area = $derived(areaOf(log.action));
 	const outcome = $derived(outcomeOf(log));
-	const Icon = $derived(area?.icon ?? Activity);
 	const code = $derived(log.details?.['code'] as string | undefined);
 </script>
 
 <div class="flex min-w-0 items-center gap-2.5">
-	<div
-		class={[
-			'flex size-7 shrink-0 items-center justify-center rounded-md',
-			outcome === 'succeeded'
-				? 'bg-muted text-muted-foreground'
-				: 'bg-destructive/10 text-destructive'
-		]}
-	>
-		<Icon class="size-3.5" />
-	</div>
+	<EventIcon {log} class="size-7 rounded-md [&_svg]:size-3.5" />
 	<div class="flex min-w-0 flex-col">
 		<span class="flex items-center gap-1.5 text-sm font-medium">
 			<span class="truncate">{eventLabel(log.action)}</span>
@@ -32,7 +21,7 @@
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
 							<Badge {...props} variant="destructive">
-								{outcome === 'denied' ? 'Denied' : 'Failed'}
+								{outcomeLabel[outcome]}
 							</Badge>
 						{/snippet}
 					</Tooltip.Trigger>

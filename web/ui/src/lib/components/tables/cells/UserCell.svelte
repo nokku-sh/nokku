@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { CopyButton } from '$lib/components/ui/copy-button';
-	import UserAvatar from '$lib/components/utils/UserAvatar.svelte';
+	import CopyText from '$lib/components/blocks/CopyText.svelte';
+	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
 	import type { User } from '$lib/gen/nokku/v1/account_pb';
 	import type { WorkspaceMember } from '$lib/gen/nokku/v1/workspace_pb';
 
@@ -21,9 +21,7 @@
 			</span>
 		{/if}
 		<span class="truncate text-xs text-muted-foreground" title={user.email}>
-			<CopyButton text={user.email} icon={false} class="p-0 hover:bg-transparent">
-				<span class="font-mono text-sm font-light">{user.email}</span>
-			</CopyButton>
+			<CopyText value={user.email} mono />
 		</span>
 	</div>
 </div>

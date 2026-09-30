@@ -15,11 +15,12 @@
 	import * as Select from '$lib/components/ui/select';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import Chip from '$lib/components/utils/Chip.svelte';
-	import CopyText from '$lib/components/utils/CopyText.svelte';
+	import Chip from '$lib/components/blocks/Chip.svelte';
+	import CopyText from '$lib/components/blocks/CopyText.svelte';
 	import { TargetSchema } from '$lib/gen/nokku/v1/target_pb';
 	import { confirm, useAutoSave, useDraft, useSheet } from '$lib/hooks';
-	import { timeAgo } from '$lib/time';
+	import { formatTs } from '$lib/utils';
+	import { timestampFromDate } from '@bufbuild/protobuf/wkt';
 	import {
 		ChevronDown,
 		Copy,
@@ -33,6 +34,7 @@
 		ShieldCheck,
 		SquareTerminal
 	} from '@lucide/svelte';
+	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
 	import { toast } from 'svelte-sonner';
 	import DangerZone from './DangerZone.svelte';
 	import DetailList from './DetailList.svelte';
@@ -61,7 +63,10 @@
 	const online = $derived(!!linkedDaemon?.online);
 	const accounts = $derived(entity?.principals ?? []);
 	const withAccess = $derived(new Set(accounts.flatMap((p) => grantsOf(p).map((g) => g.id))).size);
-	const lastSynced = $derived(timeAgo(entity?.metadata?.['last_manual_sync']));
+	const lastSynced = $derived.by(() => {
+		const at = new Date(entity?.metadata?.['last_manual_sync'] ?? '');
+		return Number.isNaN(at.getTime()) ? '' : formatTs(timestampFromDate(at), 'relative-short');
+	});
 	const syncCommand = $derived(`nk sync ${model?.name ?? '<name>'}`);
 	const systemInfo = $derived(
 		Object.entries(entity?.metadata ?? {})
@@ -153,18 +158,7 @@
 			<Badge variant="outline"><RefreshCw data-icon="inline-start" />Manual sync</Badge>
 		{:else}
 			<span class="flex items-center gap-1.5">
-				<span class="relative flex size-2">
-					{#if online}
-						<span class="absolute inline-flex size-full animate-ping rounded-full bg-success/60"
-						></span>
-					{/if}
-					<span
-						class={[
-							'relative size-2 rounded-full',
-							online ? 'bg-success' : 'bg-muted-foreground/40'
-						]}
-					></span>
-				</span>
+				<StatusDot tone={online ? 'success' : 'muted'} live={online} />
 				{online ? 'Online' : 'Offline'} via
 				<a href={`/infrastructure/daemons?id=${entity?.daemonId}`} class="hover:underline">
 					{linkedDaemon?.name ?? 'daemon'}

@@ -9,7 +9,7 @@
 	import { Switch } from '$lib/components/ui/switch';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as ToggleGroup from '$lib/components/ui/toggle-group';
-	import DurationInput from '$lib/components/utils/DurationInput.svelte';
+	import DurationInput from '$lib/components/blocks/DurationInput.svelte';
 	import {
 		AuthorityType,
 		CertificateAuthoritySchema,

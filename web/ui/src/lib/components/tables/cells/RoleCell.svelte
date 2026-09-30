@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { Spinner } from '$lib/components/ui/spinner';
 	import { roles as rolesApi } from '$lib/api/roles.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Select from '$lib/components/ui/select';
 	import { roleColor, roleIcon, roleLabel } from '$lib/roles';
-	import { Crown, LoaderCircle } from '@lucide/svelte';
+	import { Crown } from '@lucide/svelte';
 
 	type Props = {
 		roleName?: string;
@@ -44,7 +45,7 @@
 </script>
 
 {#if rolesQuery.isPending}
-	<LoaderCircle class="size-3 animate-spin text-muted-foreground"></LoaderCircle>
+	<Spinner class="size-3 text-muted-foreground" />
 {:else if !update || !selectedRole}
 	<Badge
 		variant="outline"
@@ -59,10 +60,10 @@
 	<Select.Root type="single" value={currentRole} onValueChange={handleRoleChange}>
 		<Select.Trigger
 			disabled={saving}
-			class="h-auto! w-fit cursor-pointer justify-center gap-1.5  rounded-full border border-input bg-transparent px-2 py-0.5 text-xs font-medium text-foreground shadow-none transition-all hover:bg-muted/50 focus:ring-0 disabled:opacity-70 [&>svg:last-child]:hidden"
+			class="h-auto! w-fit cursor-pointer justify-center gap-1.5 rounded-full border border-input bg-transparent px-2 py-0.5 text-xs font-medium text-foreground transition-all hover:bg-muted/50 focus:ring-0 disabled:opacity-70 [&>svg:last-child]:hidden"
 		>
 			{#if saving}
-				<LoaderCircle class="size-3 animate-spin text-muted-foreground"></LoaderCircle>
+				<Spinner class="size-3 text-muted-foreground" />
 				<span class="text-muted-foreground">Saving...</span>
 			{:else}
 				<selectedRole.icon class="size-3 {selectedRole.color}"></selectedRole.icon>

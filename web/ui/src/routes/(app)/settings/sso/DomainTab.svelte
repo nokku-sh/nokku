@@ -1,218 +1,163 @@
 <script lang="ts">
-	import { confirm } from '$lib/hooks';
 	import { domain } from '$lib/api/sso.svelte';
+	import CopyText from '$lib/components/blocks/CopyText.svelte';
+	import FormModal from '$lib/components/blocks/FormModal.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import * as Card from '$lib/components/ui/card';
 	import * as Empty from '$lib/components/ui/empty';
-	import * as Collapsible from '$lib/components/ui/collapsible';
-	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Field from '$lib/components/ui/field';
 	import { Input } from '$lib/components/ui/input';
-	import InputGroupVariants from '$lib/components/ui/input-group/input-group-variants.svelte';
-	import { Label } from '$lib/components/ui/label';
-	import {
-		ChevronRight,
-		CircleCheckBig,
-		Clock,
-		Globe,
-		Plus,
-		RefreshCw,
-		Trash2
-	} from '@lucide/svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { Spinner } from '$lib/components/ui/spinner';
+	import { confirm } from '$lib/hooks';
 	import { formatTs } from '$lib/utils';
+	import { CircleCheckBig, Clock, Globe, Plus, RefreshCw, Trash2 } from '@lucide/svelte';
 
 	const domains = domain.list();
-	let showAddDialog = $state(false);
-	let newDomain = $state('');
-
 	const createDomain = domain.create();
 	const verifyDomain = domain.verify();
 	const deleteDomain = domain.delete();
 	const regenerateToken = domain.regenerate();
-	async function handleAddDomain() {
-		if (!newDomain.trim()) return;
-		createDomain.mutate({ domain: newDomain });
-		showAddDialog = false;
+
+	let addOpen = $state(false);
+	let newDomain = $state('');
+
+	async function add() {
+		await createDomain.mutateAsync({ domain: newDomain.trim() });
 		newDomain = '';
+	}
+
+	function askRegenerate(name: string) {
+		void confirm({
+			title: `New token for ${name}?`,
+			description: 'The old TXT record stops working, so update your DNS with the new value.',
+			confirmText: 'Regenerate',
+			destructive: false,
+			onConfirm: () => regenerateToken.mutateAsync({ domain: name })
+		});
+	}
+
+	function askDelete(name: string) {
+		void confirm({
+			title: `Delete ${name}?`,
+			description: 'SSO discovery for this domain stops working.',
+			onConfirm: () => deleteDomain.mutateAsync({ domain: name })
+		});
 	}
 </script>
 
-<div class="flex flex-col gap-4">
-	{#if !domains.data?.length}
-		<Empty.Root class="border border-dashed">
-			<Empty.Header>
-				<Empty.Media variant="icon">
-					<Globe />
-				</Empty.Media>
-				<Empty.Title>No domains configured</Empty.Title>
-				<Empty.Description>Add a domain to enable custom email addresses and SSO</Empty.Description>
-			</Empty.Header>
-			<Empty.Content>
-				<Button onclick={() => (showAddDialog = true)}>
-					<Plus size={16} />
-					Add Your First Domain
-				</Button>
-			</Empty.Content>
-		</Empty.Root>
-	{:else}
-		<div class="flex items-center justify-end">
-			<Button onclick={() => (showAddDialog = true)}>
-				<Plus size={16} />
-				Add Domain
+<FormModal
+	bind:open={addOpen}
+	title="Add a domain"
+	description="You prove you own it with a DNS TXT record next."
+	icon={Globe}
+	onSubmit={add}
+	submitLabel="Add domain"
+	submitDisabled={!newDomain.trim()}
+>
+	<Field.Field>
+		<Field.Label for="domain">Domain</Field.Label>
+		<Input id="domain" bind:value={newDomain} placeholder="company.com" class="font-mono" />
+	</Field.Field>
+</FormModal>
+
+{#if domains.isLoading}
+	<div class="flex flex-col gap-3">
+		<Skeleton class="h-24 w-full rounded-xl" />
+		<Skeleton class="h-24 w-full rounded-xl" />
+	</div>
+{:else if !domains.data?.length}
+	<Empty.Root class="border border-dashed">
+		<Empty.Header>
+			<Empty.Media variant="icon"><Globe /></Empty.Media>
+			<Empty.Title>No domains yet</Empty.Title>
+			<Empty.Description
+				>SSO and SCIM only match people whose email domain you own.</Empty.Description
+			>
+		</Empty.Header>
+		<Empty.Content>
+			<Button onclick={() => (addOpen = true)}>
+				<Plus data-icon="inline-start" />
+				Add a domain
 			</Button>
-		</div>
-
-		<div class="grid gap-4">
-			{#each domains.data || [] as d (d.domain)}
-				<Collapsible.Root class="rounded-xl">
-					<Collapsible.Trigger
-						class="group relative z-10 flex w-full items-center justify-between gap-2 rounded-xl bg-muted p-3 shadow-md transition-colors"
-					>
-						<div class="flex items-center gap-2">
-							<ChevronRight
-								class="transition-transform group-data-[state=open]:rotate-90"
-								size={16}
-							/>
-							<div class="font-medium">{d.domain}</div>
-						</div>
-
-						<div class="flex items-center gap-2">
-							{#if !d.verifiedAt}
-								<Button
-									size="sm"
-									variant="outline"
-									onclick={(e) => {
-										e.stopPropagation();
-										verifyDomain.mutate({ domain: d.domain });
-									}}
-								>
-									<CircleCheckBig />
-									Verify
-								</Button>
-							{:else}
-								<Badge variant="default" class="h-7 gap-2">
-									<CircleCheckBig size={16} />
-									Verified
-								</Badge>
-							{/if}
+		</Empty.Content>
+	</Empty.Root>
+{:else}
+	<div class="flex flex-col gap-3">
+		<Button class="self-end" onclick={() => (addOpen = true)}>
+			<Plus data-icon="inline-start" />
+			Add domain
+		</Button>
+		{#each domains.data as d (d.domain)}
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="flex items-center gap-2 font-mono">
+						{d.domain}
+						{#if d.verifiedAt}
+							<Badge variant="success"><CircleCheckBig data-icon="inline-start" />Verified</Badge>
+						{:else}
+							<Badge variant="warning"><Clock data-icon="inline-start" />Pending</Badge>
+						{/if}
+					</Card.Title>
+					<Card.Description>
+						{d.verifiedAt
+							? `Verified ${formatTs(d.verifiedAt)}`
+							: `Added ${formatTs(d.createdAt)}, waiting for its DNS record`}
+					</Card.Description>
+					<Card.Action class="flex gap-1">
+						{#if !d.verifiedAt}
 							<Button
 								size="sm"
+								variant="outline"
+								disabled={verifyDomain.isPending}
+								onclick={() => verifyDomain.mutate({ domain: d.domain })}
+							>
+								{#if verifyDomain.isPending && verifyDomain.variables?.domain === d.domain}
+									<Spinner data-icon="inline-start" />
+								{:else}
+									<CircleCheckBig data-icon="inline-start" />
+								{/if}
+								Verify
+							</Button>
+							<Button
+								size="icon-sm"
 								variant="ghost"
-								onclick={(e) => {
-									e.stopPropagation();
-									regenerateToken.mutate({ domain: d.domain });
-								}}
-								title="Regenerate Verification Token"
+								aria-label="Regenerate verification token"
+								onclick={() => askRegenerate(d.domain)}
 							>
 								<RefreshCw />
 							</Button>
-							<Button
-								size="sm"
-								variant="ghost"
-								class="text-destructive hover:text-destructive"
-								onclick={(e) => {
-									e.stopPropagation();
-									confirm({
-										title: `Delete ${d.domain}?`,
-										description: 'SSO discovery for this domain stops working.',
-										onConfirm: () => deleteDomain.mutateAsync({ domain: d.domain })
-									});
-								}}
-								title="Delete Domain"
-							>
-								<Trash2 />
-							</Button>
-						</div>
-					</Collapsible.Trigger>
-
-					<Collapsible.Content
-						class="relative -mt-6 space-y-4 overflow-hidden rounded-b-xl bg-card px-6 py-4 transition-all duration-300"
-					>
-						{#if !d.verifiedAt}
-							<div class="mt-6 space-y-2">
-								<Label>Verification Token</Label>
-								<InputGroupVariants
-									variant="copy-input"
-									value={d.verificationToken}
-									readonly
-									class="font-mono text-xs"
-								/>
-
-								<p class="text-xs text-muted-foreground">
-									Add a TXT record to your DNS with name: <code
-										class="rounded bg-muted px-1 py-0.5"
-									>
-										_nokku-verify.{d.domain}
-									</code>
-									and value set to the verification token above.
-								</p>
-								<p class="text-xs text-muted-foreground">
-									Note: Some DNS providers (like Cloudflare) automatically append your domain to the
-									record name, so you may only need to enter <code
-										class="rounded bg-muted px-1 py-0.5">_nokku-verify</code
-									>
-								</p>
-							</div>
 						{/if}
-
-						<div class="mt-2 grid grid-cols-2 gap-4 text-sm">
-							<div>
-								<Label class="text-xs">Created</Label>
-								<p class="text-muted-foreground">{formatTs(d.createdAt)}</p>
-							</div>
-							{#if d.verifiedAt}
-								<div>
-									<Label class="text-xs">Verified</Label>
-									<p class="text-muted-foreground">{formatTs(d.verifiedAt)}</p>
-								</div>
-							{:else}
-								<div>
-									<Label class="text-xs">Status</Label>
-									<p class="flex items-center gap-1 text-muted-foreground">
-										<Clock size={14} />
-										Pending
-									</p>
-								</div>
-							{/if}
-						</div>
-					</Collapsible.Content>
-				</Collapsible.Root>
-			{/each}
-		</div>
-	{/if}
-</div>
-
-<Dialog.Root bind:open={showAddDialog}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Add Domain</Dialog.Title>
-			<Dialog.Description>
-				Enter the domain name you want to add. After adding, you'll need to verify ownership by
-				adding a TXT record to your DNS settings.
-			</Dialog.Description>
-		</Dialog.Header>
-		<Field.Set>
-			<Field.Group>
-				<Field.Field>
-					<Field.Label for="domain">Domain Name</Field.Label>
-					<Field.Content>
-						<Input
-							id="domain"
-							bind:value={newDomain}
-							placeholder="example.com"
-							onkeydown={(e) => {
-								if (e.key === 'Enter') {
-									e.preventDefault();
-									handleAddDomain();
-								}
-							}}
-						/>
-					</Field.Content>
-				</Field.Field>
-			</Field.Group>
-		</Field.Set>
-		<Dialog.Footer>
-			<Button size="sm" onclick={handleAddDomain} disabled={!newDomain.trim()}>Add Domain</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+						<Button
+							size="icon-sm"
+							variant="ghost"
+							aria-label={`Delete ${d.domain}`}
+							onclick={() => askDelete(d.domain)}
+						>
+							<Trash2 />
+						</Button>
+					</Card.Action>
+				</Card.Header>
+				{#if !d.verifiedAt}
+					<Card.Content class="flex flex-col gap-3">
+						<dl
+							class="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 rounded-lg border bg-muted/40 p-3 text-sm"
+						>
+							<dt class="spec-label">Type</dt>
+							<dd class="font-mono text-xs">TXT</dd>
+							<dt class="spec-label">Name</dt>
+							<dd class="min-w-0"><CopyText value={`_nokku-verify.${d.domain}`} mono /></dd>
+							<dt class="spec-label">Value</dt>
+							<dd class="min-w-0"><CopyText value={d.verificationToken} mono /></dd>
+						</dl>
+						<p class="text-xs text-muted-foreground">
+							Some DNS providers, like Cloudflare, add the domain for you. Then the name is just
+							<code class="font-mono">_nokku-verify</code>.
+						</p>
+					</Card.Content>
+				{/if}
+			</Card.Root>
+		{/each}
+	</div>
+{/if}

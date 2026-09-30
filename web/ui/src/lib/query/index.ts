@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export * from '@connectrpc/connect-query-core';
-export { useInfiniteQuery } from './use-infinite-query.js';
-export type { UseInfiniteQueryOptions } from './use-infinite-query.js';
 export { useMutation } from './use-mutation.js';
 export type { UseMutationOptions } from './use-mutation.js';
 export { useQuery } from './use-query.js';

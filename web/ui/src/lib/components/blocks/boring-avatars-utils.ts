@@ -1,3 +1,6 @@
+// Hex, since getContrast parses it. Teal and ink, on brand in both modes.
+export const avatarColors = ['#093C5D', '#3B7597', '#6FD1D7', '#5DF8D8'];
+
 export const hashCode = (name: string): number => {
 	let hash = 0;
 	for (let i = 0; i < name.length; i++) {
@@ -8,7 +11,7 @@ export const hashCode = (name: string): number => {
 	return Math.abs(hash);
 };
 
-export const getDigit = (number: number, ntn: number): number => {
+const getDigit = (number: number, ntn: number): number => {
 	return Math.floor((number / Math.pow(10, ntn)) % 10);
 };
 

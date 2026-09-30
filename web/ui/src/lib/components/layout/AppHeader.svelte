@@ -1,49 +1,19 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
+	import { Button } from '$lib/components/ui/button';
+	import * as Kbd from '$lib/components/ui/kbd';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sidebar from '$lib/components/ui/sidebar';
-	import { AppRoutes } from './routes';
+	import { Search } from '@lucide/svelte';
+	import { openPalette } from './CommandPalette.svelte';
 
-	type Crumb = {
-		title: string;
-		url: string;
-		isLast: boolean;
-	};
-	const flatRoutes = $derived(Object.values(AppRoutes).flat());
-
-	const breadcrumbs = $derived.by(() => {
-		const path = page.url.pathname;
-
-		if (path === '/') {
-			const root = flatRoutes.find((r) => r.url === '/');
-			return [{ title: root?.title || 'Home', url: '/', isLast: true }];
-		}
-
-		const segments = path.split('/').filter(Boolean);
-		const crumbs: Crumb[] = [{ title: 'Home', url: '/', isLast: false }];
-
-		const fullMatch = flatRoutes.find((r) => r.url.replace(/\/$/, '') === path.replace(/\/$/, ''));
-
-		if (fullMatch) {
-			crumbs.push({ title: fullMatch.title, url: fullMatch.url, isLast: true });
-		} else {
-			let currentPath = '';
-			for (let i = 0; i < segments.length; i++) {
-				currentPath += `/${segments[i]}`;
-				const isLast = i === segments.length - 1;
-				const match = flatRoutes.find((r) => r.url.replace(/\/$/, '') === currentPath);
-
-				crumbs.push({
-					title: match?.title || segments[i].charAt(0).toUpperCase() + segments[i].slice(1),
-					url: currentPath,
-					isLast
-				});
-			}
-		}
-
-		return crumbs;
-	});
+	// The URL as a shell path. Every prefix is a page, groups redirect to their first child.
+	const segments = $derived(
+		page.url.pathname
+			.split('/')
+			.filter(Boolean)
+			.map((name, i, all) => ({ name, url: '/' + all.slice(0, i + 1).join('/') }))
+	);
 </script>
 
 <header
@@ -53,21 +23,29 @@
 		<Sidebar.Trigger class="-ml-1" />
 		<Separator orientation="vertical" class="mx-2 data-[orientation=vertical]:h-4" />
 
-		<Breadcrumb.Root>
-			<Breadcrumb.List>
-				{#each breadcrumbs as crumb, i (i)}
-					<Breadcrumb.Item>
-						{#if !crumb.isLast}
-							<Breadcrumb.Link href={crumb.url}>{crumb.title}</Breadcrumb.Link>
-						{:else}
-							<Breadcrumb.Page>{crumb.title}</Breadcrumb.Page>
-						{/if}
-					</Breadcrumb.Item>
-					{#if i < breadcrumbs.length - 1}
-						<Breadcrumb.Separator />
-					{/if}
-				{/each}
-			</Breadcrumb.List>
-		</Breadcrumb.Root>
+		<nav aria-label="Location" class="flex min-w-0 items-center font-mono text-sm">
+			<a href="/" class="text-primary hover:underline" aria-label="Dashboard">~</a>
+			{#each segments as seg, i (seg.url)}
+				<span class="text-muted-foreground/60">/</span>
+				{#if i === segments.length - 1}
+					<span class="truncate text-foreground" aria-current="page">{seg.name}</span>
+				{:else}
+					<a href={seg.url} class="shrink-0 text-muted-foreground hover:text-foreground">
+						{seg.name}
+					</a>
+				{/if}
+			{/each}
+		</nav>
+
+		<Button
+			variant="outline"
+			size="sm"
+			class="ml-auto gap-2 text-muted-foreground"
+			onclick={openPalette}
+		>
+			<Search data-icon="inline-start" />
+			<span class="hidden sm:inline">Jump to</span>
+			<Kbd.Root class="hidden sm:inline-flex">⌘K</Kbd.Root>
+		</Button>
 	</div>
 </header>

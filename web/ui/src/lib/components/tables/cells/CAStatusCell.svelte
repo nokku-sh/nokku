@@ -3,7 +3,8 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Select from '$lib/components/ui/select';
 	import type { CertificateAuthority } from '$lib/gen/nokku/v1/certificates_pb';
-	import { LoaderCircle, ShieldCheck, ShieldOff } from '@lucide/svelte';
+	import { Spinner } from '$lib/components/ui/spinner';
+	import { ShieldCheck, ShieldOff } from '@lucide/svelte';
 
 	interface Props {
 		caItem: CertificateAuthority;
@@ -29,13 +30,13 @@
 >
 	<Select.Trigger
 		disabled={updateCA.isPending}
-		class="h-auto! w-fit cursor-pointer justify-center gap-1.5  rounded-full border-none bg-transparent! px-2.5 py-0.5 text-xs font-medium shadow-none transition-all focus:ring-0 disabled:opacity-70 [&>svg:last-child]:hidden"
+		class="h-auto! w-fit cursor-pointer justify-center gap-1.5 rounded-full border-none bg-transparent! px-2.5 py-0.5 text-xs font-medium transition-all focus:ring-0 disabled:opacity-70 [&>svg:last-child]:hidden"
 	>
 		{#if updateCA.isPending}
-			<LoaderCircle class="size-3 animate-spin text-muted-foreground" />
-			<span class="text-muted-foreground">Updating...</span>
+			<Spinner class="size-3 text-muted-foreground" />
+			<span class="text-muted-foreground">Updating&hellip;</span>
 		{:else if enabled}
-			<Badge variant="secondary" class="text-success">Active</Badge>
+			<Badge variant="success">Active</Badge>
 		{:else}
 			<Badge variant="destructive">Inactive</Badge>
 		{/if}
@@ -49,7 +50,7 @@
 				</div>
 				<div class="flex flex-col text-left">
 					<span class="text-xs font-medium">Active</span>
-					<span class="text-[10px] text-muted-foreground">Enable CA for signing</span>
+					<span class="text-2xs text-muted-foreground">Enable CA for signing</span>
 				</div>
 			</Select.Item>
 
@@ -63,7 +64,7 @@
 				</div>
 				<div class="flex flex-col text-left">
 					<span class="text-xs font-medium">Inactive</span>
-					<span class="text-[10px] text-muted-foreground">Disable signing</span>
+					<span class="text-2xs text-muted-foreground">Disable signing</span>
 				</div>
 			</Select.Item>
 		</Select.Group>

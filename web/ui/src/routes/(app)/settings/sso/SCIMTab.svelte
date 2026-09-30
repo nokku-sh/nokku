@@ -1,208 +1,157 @@
 <script lang="ts">
-	import { confirm } from '$lib/hooks';
 	import { page } from '$app/state';
 	import { scim } from '$lib/api/scim.svelte';
-	import { workspaceID } from '$lib/store.svelte';
-	import { formatTs } from '$lib/utils';
+	import FormModal from '$lib/components/blocks/FormModal.svelte';
+	import SecretReveal from '$lib/components/blocks/SecretReveal.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import * as Alert from '$lib/components/ui/alert';
 	import * as Card from '$lib/components/ui/card';
-	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Field from '$lib/components/ui/field';
-	import * as Table from '$lib/components/ui/table';
 	import { Input } from '$lib/components/ui/input';
-	import InputGroupVariants from '$lib/components/ui/input-group/input-group-variants.svelte';
-	import { CircleAlert, KeyRound, Plus, Trash2, UsersRound } from '@lucide/svelte';
+	import { InputGroupVariants } from '$lib/components/ui/input-group';
+	import * as Item from '$lib/components/ui/item';
+	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { confirm } from '$lib/hooks';
+	import { workspaceID } from '$lib/store.svelte';
+	import { formatTs } from '$lib/utils';
+	import { KeyRound, Plus, Trash2, UsersRound } from '@lucide/svelte';
 
 	const tokens = scim.listTokens();
 	const createToken = scim.createToken();
 	const deleteToken = scim.deleteToken();
 
-	let showCreate = $state(false);
+	let createOpen = $state(false);
 	let label = $state('');
-	let created = $state<{ token: string; baseUrl: string } | null>(null);
+	let created = $state<string>();
 
 	const baseURL = $derived(`${page.url.origin}/scim/v2/${workspaceID.current}`);
 
-	async function handleCreate() {
-		const trimmed = label.trim();
-		if (!trimmed) return;
-		try {
-			const res = await createToken.mutateAsync({
-				workspaceId: workspaceID.current,
-				label: trimmed
-			});
-			created = { token: res.token ?? '', baseUrl: res.baseUrl ?? baseURL };
-			label = '';
-		} catch {
-			// The mutation cache toasts connect errors.
-		}
+	// Stays open to show the secret once.
+	async function create() {
+		const res = await createToken.mutateAsync({
+			workspaceId: workspaceID.current,
+			label: label.trim()
+		});
+		created = res.token ?? '';
+		label = '';
+		return false;
 	}
 
-	function handleClose() {
-		showCreate = false;
-		created = null;
+	function revoke(id: string, name: string) {
+		void confirm({
+			title: `Revoke ${name || 'this token'}?`,
+			description:
+				'The identity provider using it loses access right away. Provisioning stops until it gets a new token.',
+			confirmText: 'Revoke',
+			onConfirm: () => deleteToken.mutateAsync({ workspaceId: workspaceID.current, tokenId: id })
+		});
 	}
 </script>
 
-<Card.Root class="mb-4">
-	<Card.Header>
-		<Card.Title>Connector</Card.Title>
-		<Card.Description>
-			Point your identity provider's SCIM client at this URL. It provisions users and groups into
-			this workspace as your IdP pushes them.
-		</Card.Description>
-	</Card.Header>
-	<Card.Content class="flex flex-col gap-4">
+<FormModal
+	bind:open={createOpen}
+	title="Create a connector token"
+	description="Your identity provider uses it to talk to the SCIM connector."
+	icon={UsersRound}
+	onOpenChange={(open) => !open && (created = undefined)}
+	onSubmit={create}
+	submitLabel="Create token"
+	submitDisabled={!label.trim()}
+>
+	{#if created}
+		<SecretReveal
+			values={[{ label: 'Bearer token', value: created }]}
+			note="Copy it now, it is only shown once. If it gets lost, revoke it and create a new one."
+		/>
+	{:else}
 		<Field.Field>
-			<Field.Label>Base URL</Field.Label>
-			<Field.Content>
+			<Field.Label for="scim-token-label">Label</Field.Label>
+			<Input id="scim-token-label" placeholder="Okta production" bind:value={label} />
+			<Field.Description>Name it after the identity provider that uses it.</Field.Description>
+		</Field.Field>
+	{/if}
+	{#snippet footer()}
+		{#if created}
+			<Button type="button" onclick={() => (createOpen = false)}>Done</Button>
+		{:else}
+			<Button type="submit" disabled={!label.trim() || createToken.isPending}>Create token</Button>
+		{/if}
+	{/snippet}
+</FormModal>
+
+<div class="flex flex-col gap-4">
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>Connector</Card.Title>
+			<Card.Description>
+				Point your identity provider's SCIM client here. It pushes users and groups into this
+				workspace.
+			</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<Field.Field>
+				<Field.Label>Base URL</Field.Label>
 				<InputGroupVariants
 					variant="copy-input"
 					value={baseURL}
 					readonly
 					class="font-mono text-xs"
 				/>
-			</Field.Content>
-		</Field.Field>
-	</Card.Content>
-</Card.Root>
+			</Field.Field>
+		</Card.Content>
+	</Card.Root>
 
-<Card.Root>
-	<Card.Header class="flex flex-row items-center justify-between">
-		<div class="flex flex-col gap-1.5">
+	<Card.Root>
+		<Card.Header>
 			<Card.Title>Connector tokens</Card.Title>
-			<Card.Description>
-				Tokens authenticate the connector. The secret is shown once at creation.
-			</Card.Description>
-		</div>
-		<Button size="sm" onclick={() => (showCreate = true)}>
-			<Plus data-icon="inline-start" />
-			Create Token
-		</Button>
-	</Card.Header>
-	<Card.Content>
-		{#if !tokens.data?.length}
-			<Empty.Root class="border border-dashed">
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<KeyRound />
-					</Empty.Media>
-					<Empty.Title>No connector tokens</Empty.Title>
-					<Empty.Description>
-						Create a token and paste it into your identity provider to start provisioning.
-					</Empty.Description>
-				</Empty.Header>
-				<Empty.Content>
-					<Button variant="outline" onclick={() => (showCreate = true)}>
-						<Plus data-icon="inline-start" />
-						Create Token
-					</Button>
-				</Empty.Content>
-			</Empty.Root>
-		{:else}
-			<Table.Root>
-				<Table.Header>
-					<Table.Row>
-						<Table.Head>Label</Table.Head>
-						<Table.Head>Created</Table.Head>
-						<Table.Head>Last used</Table.Head>
-						<Table.Head class="w-12"></Table.Head>
-					</Table.Row>
-				</Table.Header>
-				<Table.Body>
+			<Card.Description>The secret is shown once, when you create it.</Card.Description>
+			<Card.Action>
+				<Button size="sm" onclick={() => (createOpen = true)}>
+					<Plus data-icon="inline-start" />
+					Create token
+				</Button>
+			</Card.Action>
+		</Card.Header>
+		<Card.Content>
+			{#if tokens.isLoading}
+				<Skeleton class="h-16 w-full" />
+			{:else if !tokens.data?.length}
+				<Empty.Root class="border border-dashed">
+					<Empty.Header>
+						<Empty.Media variant="icon"><KeyRound /></Empty.Media>
+						<Empty.Title>No connector tokens</Empty.Title>
+						<Empty.Description>
+							Create one and paste it into your identity provider to start provisioning.
+						</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{:else}
+				<Item.Group class="divide-y rounded-lg border">
 					{#each tokens.data as t (t.id)}
-						<Table.Row>
-							<Table.Cell class="font-medium">{t.label}</Table.Cell>
-							<Table.Cell class="text-muted-foreground">{formatTs(t.createdAt)}</Table.Cell>
-							<Table.Cell class="text-muted-foreground">
-								{#if t.lastUsedAt}
-									{formatTs(t.lastUsedAt, 'withTime')}
-								{:else}
-									<span class="italic">never</span>
-								{/if}
-							</Table.Cell>
-							<Table.Cell>
+						<Item.Root size="sm" class="rounded-none">
+							<Item.Media variant="icon"><KeyRound /></Item.Media>
+							<Item.Content>
+								<Item.Title>{t.label}</Item.Title>
+								<Item.Description>
+									Created {formatTs(t.createdAt)} · {t.lastUsedAt
+										? `last used ${formatTs(t.lastUsedAt, 'relative')}`
+										: 'never used'}
+								</Item.Description>
+							</Item.Content>
+							<Item.Actions>
 								<Button
-									size="sm"
+									size="icon-sm"
 									variant="ghost"
-									class="text-destructive hover:text-destructive"
-									onclick={() =>
-										confirm({
-											title: `Revoke ${t.label || 'token'}?`,
-											description:
-												'The identity provider using this token loses access immediately. Provisioning stops until a new token is configured.',
-											confirmText: 'Revoke',
-											onConfirm: () =>
-												deleteToken.mutateAsync({
-													workspaceId: workspaceID.current,
-													tokenId: t.id ?? ''
-												})
-										})}
-									title="Revoke Token"
+									aria-label={`Revoke ${t.label}`}
+									onclick={() => revoke(t.id ?? '', t.label)}
 								>
 									<Trash2 />
 								</Button>
-							</Table.Cell>
-						</Table.Row>
+							</Item.Actions>
+						</Item.Root>
 					{/each}
-				</Table.Body>
-			</Table.Root>
-		{/if}
-	</Card.Content>
-</Card.Root>
-
-<Dialog.Root bind:open={showCreate}>
-	<Dialog.Content class="sm:max-w-lg">
-		<Dialog.Header>
-			<Dialog.Title class="flex items-center gap-2">
-				<UsersRound size={20} />
-				Create Connector Token
-			</Dialog.Title>
-			<Dialog.Description>
-				Authenticate your identity provider against the SCIM connector.
-			</Dialog.Description>
-		</Dialog.Header>
-
-		{#if !created}
-			<Field.FieldGroup>
-				<Field.Field>
-					<Field.FieldLabel for="scim-token-label">Label</Field.FieldLabel>
-					<Field.Content>
-						<Input
-							id="scim-token-label"
-							placeholder="Okta production"
-							bind:value={label}
-							onkeydown={(e) => e.key === 'Enter' && handleCreate()}
-						/>
-					</Field.Content>
-					<Field.FieldDescription>
-						Name the token after the identity provider that uses it.
-					</Field.FieldDescription>
-				</Field.Field>
-				<Button onclick={handleCreate} disabled={createToken.isPending || !label.trim()}>
-					Create Token
-				</Button>
-			</Field.FieldGroup>
-		{:else}
-			<Field.Field>
-				<Field.Label>Bearer Token</Field.Label>
-				<Field.Content>
-					<InputGroupVariants variant="copy-input" value={created.token} readonly />
-				</Field.Content>
-			</Field.Field>
-			<Alert.Root>
-				<CircleAlert size={16} />
-				<Alert.Title>Shown only once</Alert.Title>
-				<Alert.Description>
-					Copy the token now. You will not be able to see it again; revoking it is the only way out
-					if it is lost.
-				</Alert.Description>
-			</Alert.Root>
-			<Dialog.Footer>
-				<Button onclick={handleClose}>Done</Button>
-			</Dialog.Footer>
-		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+				</Item.Group>
+			{/if}
+		</Card.Content>
+	</Card.Root>
+</div>

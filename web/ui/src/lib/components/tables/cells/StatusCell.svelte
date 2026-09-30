@@ -1,22 +1,8 @@
 <script lang="ts">
-	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
+	import { Badge } from '$lib/components/ui/badge';
+	import { statusTone } from '$lib/tone';
 
-	type Props = {
-		status: string;
-	};
-	let { status, ...restProps }: Props = $props();
-
-	let variant = $derived.by(() => {
-		const s = status.toLowerCase();
-		if (['active', 'online', 'success', 'completed', 'enabled'].includes(s)) return 'default';
-		if (['error', 'failed', 'offline', 'inactive', 'disabled'].includes(s)) return 'destructive';
-		if (['warning', 'flagged', 'pending'].includes(s)) return 'outline';
-		return 'secondary'; // pending, inactive, draft, etc.
-	}) as BadgeVariant;
+	let { status }: { status: string } = $props();
 </script>
 
-<div {...restProps}>
-	<Badge {variant} class="capitalize">
-		{status}
-	</Badge>
-</div>
+<Badge variant={statusTone(status)} class="capitalize">{status}</Badge>

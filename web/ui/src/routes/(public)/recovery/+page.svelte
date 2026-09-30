@@ -1,104 +1,78 @@
 <script lang="ts">
 	import { auth } from '$lib/api/auth.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Label } from '$lib/components/ui/label/index.js';
-	import { BinaryIcon, CircleCheckBig, Mail, RefreshCw, Undo2Icon } from '@lucide/svelte';
+	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import * as Field from '$lib/components/ui/field';
+	import { Input } from '$lib/components/ui/input';
+	import { Spinner } from '$lib/components/ui/spinner';
+	import { BinaryIcon, MailCheck, Mail, Undo2Icon } from '@lucide/svelte';
 
 	let email = $state('');
 	const forgotPassword = auth.forgotPassword();
+
+	function submit(e: SubmitEvent) {
+		e.preventDefault();
+		forgotPassword.mutate({ email });
+	}
+
+	function tryAgain() {
+		email = '';
+		forgotPassword.reset();
+	}
 </script>
 
-{#if !forgotPassword.isSuccess}
-	<form
-		onsubmit={() => forgotPassword.mutate({ email })}
-		class="m-auto h-fit w-full max-w-sm overflow-hidden rounded-[calc(var(--radius)+.125rem)] border bg-muted shadow-md shadow-zinc-950/5 dark:[--color-muted:var(--color-zinc-900)]"
+{#snippet back()}
+	<a
+		href="/login"
+		class="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
 	>
-		<div class="-m-px flex flex-col gap-4 rounded-[calc(var(--radius)+.125rem)] border bg-card p-6">
-			<div class="flex flex-col items-center text-center">
-				<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-					<Mail class="text-primary" size={22} />
-				</div>
-				<h1 class="text-2xl font-bold">Reset your password</h1>
-				<p class="text-balance text-muted-foreground">
-					Enter your email address and we'll send you a recovery link
-				</p>
-			</div>
+		<Undo2Icon class="size-3.5" /> Back to sign in
+	</a>
+{/snippet}
 
-			<div class="space-y-2">
-				<Label for="email">Email address</Label>
-				<Input id="email" type="email" bind:value={email} required />
-			</div>
-
-			<Button type="submit" class="w-full" disabled={forgotPassword.isPending}>
-				{#if forgotPassword.isPending}
-					<RefreshCw class="animate-spin" size={16} />
-					Sending recovery email...
-				{:else}
-					Send recovery email
-				{/if}
-			</Button>
-
-			<div class="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-				<hr class="border-solid" />
-				<span class="text-xs text-muted-foreground">Or</span>
-				<hr class="border-solid" />
-			</div>
-
-			<Button href="/login/backup" variant="outline" class="group flex w-full items-center gap-2">
-				<BinaryIcon
-					size={16}
-					class="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12"
-				/>
-				Sign in with a backup code
-			</Button>
-		</div>
-
-		<div class="p-3">
-			<Button variant="link" class="w-full" href="/login" disabled={forgotPassword.isPending}>
-				Go back to login
-				<Undo2Icon size={16} />
-			</Button>
-		</div>
-	</form>
+{#if forgotPassword.isSuccess}
+	<AuthCard
+		title="Check your email"
+		description={`If ${email} has an account, a reset link is on its way. It works for 15 minutes.`}
+		icon={MailCheck}
+		tone="success"
+		footer={back}
+	>
+		<Button variant="outline" onclick={tryAgain}>
+			<Mail data-icon="inline-start" />
+			Use a different email
+		</Button>
+	</AuthCard>
 {:else}
-	<div
-		class="m-auto h-fit w-full max-w-sm overflow-hidden rounded-[calc(var(--radius)+.125rem)] border bg-muted shadow-md shadow-zinc-950/5 dark:[--color-muted:var(--color-zinc-900)]"
+	<AuthCard
+		title="Reset your password"
+		description="We will email you a link to set a new one"
+		icon={Mail}
+		footer={back}
 	>
-		<div
-			class="-m-px flex flex-col gap-4 rounded-[calc(var(--radius)+.125rem)] border bg-card p-6 md:p-8"
-		>
-			<div class="flex flex-col items-center text-center">
-				<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-					<CircleCheckBig class="text-primary" size={22} />
-				</div>
-				<h1 class="text-2xl font-bold">Check your email</h1>
-				<p class="text-balance text-muted-foreground">
-					We've sent a recovery link to <strong>{email}</strong>
-				</p>
-			</div>
-			<div class="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
-				<p class="mb-2 font-medium">What's next?</p>
-				<ul class="space-y-1">
-					<li>• Check your email inbox (and spam folder)</li>
-					<li>• Click the recovery link</li>
-					<li>• Follow the instructions to reset your password</li>
-					<li>• The link will expire in 24 hours</li>
-				</ul>
-			</div>
-			<div class="flex flex-col gap-2">
-				<Button variant="outline" type="button" class="w-full" onclick={() => (email = '')}>
-					<Mail size={16} />
-					Try different email
-				</Button>
-			</div>
-		</div>
-
-		<div class="p-3">
-			<Button variant="link" class="w-full" href="/login" disabled={forgotPassword.isPending}>
-				Go back to login
-				<Undo2Icon size={16} />
+		<form class="flex flex-col gap-4" onsubmit={submit}>
+			<Field.Field>
+				<Field.Label for="email">Email</Field.Label>
+				<Input
+					id="email"
+					type="email"
+					autocomplete="email"
+					bind:value={email}
+					placeholder="you@company.com"
+					required
+				/>
+			</Field.Field>
+			<Button type="submit" disabled={forgotPassword.isPending}>
+				{#if forgotPassword.isPending}<Spinner data-icon="inline-start" />{/if}
+				Send reset link
 			</Button>
-		</div>
-	</div>
+		</form>
+
+		<Field.Separator>Or</Field.Separator>
+
+		<Button href="/login/backup" variant="outline">
+			<BinaryIcon data-icon="inline-start" />
+			Sign in with a backup code
+		</Button>
+	</AuthCard>
 {/if}

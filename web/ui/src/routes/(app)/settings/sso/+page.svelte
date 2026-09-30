@@ -3,13 +3,13 @@
 	import { billing } from '$lib/api/billing.svelte';
 	import { activeSSOTab } from '$lib/store.svelte';
 	import { domain } from '$lib/api/sso.svelte';
-	import { Globe, KeyRound, UsersRound } from '@lucide/svelte';
+	import { Globe, UsersRound } from '@lucide/svelte';
 	import DomainTab from './DomainTab.svelte';
 	import OIDCTab from './OIDCTab.svelte';
 	import SCIMTab from './SCIMTab.svelte';
 	import SAMLTab from './SAMLTab.svelte';
 	import { OIDCIcon, SAMLIcon } from '$lib/assets';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import * as Empty from '$lib/components/ui/empty';
 	import { Button } from '$lib/components/ui/button';
 	import { UpgradeURL } from '$lib/config';
@@ -49,7 +49,7 @@
 			</Empty.Description>
 		</Empty.Header>
 		<Empty.Content>
-			<Button onclick={() => (activeSSOTab.current = 'domains')}>Go to Domains</Button>
+			<Button onclick={() => (activeSSOTab.current = 'domains')}>Go to domains</Button>
 		</Empty.Content>
 	</Empty.Root>
 {/snippet}
@@ -67,43 +67,39 @@
 			</Empty.Description>
 		</Empty.Header>
 		<Empty.Content>
-			<Button onclick={() => window.open(UpgradeURL, '_blank', 'noopener')}>See Plans</Button>
+			<Button href={UpgradeURL} target="_blank" rel="noopener">See plans</Button>
 		</Empty.Content>
 	</Empty.Root>
 {/snippet}
 
 <PageHeader
-	icon={KeyRound}
-	title="Single Sign-On & Provisioning"
-	description="Verify a domain, then configure an OIDC or SAML provider and SCIM provisioning. One provider per workspace."
->
-	<Tabs.Root bind:value={activeSSOTab.current}>
-		<Tabs.List class="flex items-center gap-2">
-			<Tabs.Trigger value="oidc" class="flex items-center gap-2" disabled={!hasVerifiedDomain}>
-				<OIDCIcon class="dark:invert" />
-				OIDC
-			</Tabs.Trigger>
-			<Tabs.Trigger
-				value="saml"
-				class="flex items-center gap-2"
-				disabled={!samlAvailable || !hasVerifiedDomain}
-			>
-				<SAMLIcon class="dark:invert" />
-				SAML
-			</Tabs.Trigger>
-			<Tabs.Trigger value="scim" class="flex items-center gap-2">
-				<UsersRound size={16} />
-				SCIM
-			</Tabs.Trigger>
-			<Tabs.Trigger value="domains">
-				<Globe size={16} />
-				Domains
-			</Tabs.Trigger>
-		</Tabs.List>
-	</Tabs.Root>
-</PageHeader>
+	title="Single sign-on"
+	description="Verify a domain, connect one OIDC or SAML provider, then provision people with SCIM"
+/>
 
-<Tabs.Root bind:value={activeSSOTab.current}>
+<Tabs.Root bind:value={activeSSOTab.current} class="gap-4">
+	<Tabs.List>
+		<Tabs.Trigger value="domains">
+			<Globe />
+			Domains
+		</Tabs.Trigger>
+		<Tabs.Trigger value="oidc" disabled={!hasVerifiedDomain}>
+			<OIDCIcon />
+			OIDC
+		</Tabs.Trigger>
+		<Tabs.Trigger value="saml" disabled={!samlAvailable || !hasVerifiedDomain}>
+			<SAMLIcon />
+			SAML
+		</Tabs.Trigger>
+		<Tabs.Trigger value="scim">
+			<UsersRound />
+			SCIM
+		</Tabs.Trigger>
+	</Tabs.List>
+
+	<Tabs.Content value="domains">
+		<DomainTab />
+	</Tabs.Content>
 	<Tabs.Content value="oidc">
 		{#if hasVerifiedDomain}
 			<OIDCTab />
@@ -120,7 +116,6 @@
 			{/if}
 		</Tabs.Content>
 	{/if}
-
 	<Tabs.Content value="scim">
 		{#if !scimAvailable}
 			{@render needsUpgrade()}
@@ -129,9 +124,5 @@
 		{:else}
 			<SCIMTab />
 		{/if}
-	</Tabs.Content>
-
-	<Tabs.Content value="domains">
-		<DomainTab />
 	</Tabs.Content>
 </Tabs.Root>

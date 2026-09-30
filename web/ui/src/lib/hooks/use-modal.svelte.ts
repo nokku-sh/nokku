@@ -114,13 +114,3 @@ export function createEntityModalState<Desc extends DescMessage>(
 		}
 	};
 }
-
-export function createModalStates<T extends Record<string, unknown>>(config: {
-	[K in keyof T]: T[K];
-}) {
-	const states = {} as { [K in keyof T]: ReturnType<typeof createModalState<T[K]>> };
-	for (const key in config) {
-		states[key] = createModalState<T[typeof key]>(config[key]);
-	}
-	return states;
-}

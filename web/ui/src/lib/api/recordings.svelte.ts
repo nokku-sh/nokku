@@ -11,7 +11,7 @@ export type RecordingChunkHandler = (chunk: Uint8Array) => void;
 export type RecordingMeta = { recordingId: string; username: string };
 
 export const recordings = {
-	list: (opts?: () => { limit?: number; offset?: number }) =>
+	list: (opts?: () => { limit?: number; offset?: number; daemonId?: string; username?: string }) =>
 		useQuery(
 			RecordingService.method.listRecordings,
 			() => ({

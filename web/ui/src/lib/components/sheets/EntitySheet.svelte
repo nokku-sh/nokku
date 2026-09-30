@@ -21,11 +21,11 @@
 	import { IsMobile, type SaveState } from '$lib/hooks';
 	import { Button } from '$lib/components/ui/button';
 	import * as Popover from '$lib/components/ui/popover';
-	import CopyText from '$lib/components/utils/CopyText.svelte';
+	import CopyText from '$lib/components/blocks/CopyText.svelte';
 	import { formatTs } from '$lib/utils';
 	import * as Empty from '$lib/components/ui/empty';
 	import { FileQuestion, Info } from '@lucide/svelte';
-	import SaveStatus from './SaveStatus.svelte';
+	import SaveStatus from '$lib/components/blocks/SaveStatus.svelte';
 
 	interface Props {
 		open: boolean;

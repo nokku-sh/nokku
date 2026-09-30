@@ -1,4 +1,5 @@
 <script lang="ts">
+	import StatTile from '$lib/components/blocks/StatTile.svelte';
 	import { daemon } from '$lib/api/daemons.svelte';
 	import { roles } from '$lib/api/roles.svelte';
 	import { target } from '$lib/api/targets.svelte';
@@ -6,7 +7,7 @@
 	import { workspace } from '$lib/api/workspaces.svelte';
 	import DangerZone from '$lib/components/sheets/DangerZone.svelte';
 	import DetailList from '$lib/components/sheets/DetailList.svelte';
-	import SaveStatus from '$lib/components/sheets/SaveStatus.svelte';
+	import SaveStatus from '$lib/components/blocks/SaveStatus.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Card from '$lib/components/ui/card';
 	import * as Field from '$lib/components/ui/field';
@@ -14,23 +15,14 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import Avatar from '$lib/components/utils/Avatar.svelte';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import UserAvatar from '$lib/components/utils/UserAvatar.svelte';
+	import Avatar from '$lib/components/blocks/Avatar.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
+	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
 	import { WorkspaceSchema } from '$lib/gen/nokku/v1/workspace_pb';
 	import { confirm, useAutoSave, useDraft } from '$lib/hooks';
 	import { atLeast, roleIcon, roleLabel } from '$lib/roles';
 	import { formatTs } from '$lib/utils';
-	import {
-		Bot,
-		ChevronRight,
-		CircleUser,
-		KeyRound,
-		Layers2,
-		ScrollText,
-		Server,
-		Users
-	} from '@lucide/svelte';
+	import { Bot, CircleUser, Server, Users } from '@lucide/svelte';
 
 	const ws = workspace.get();
 	const draft = useDraft(WorkspaceSchema, () => ws.data);
@@ -56,27 +48,6 @@
 		{ label: 'Daemons', icon: Bot, href: '/infrastructure/daemons', query: daemon.list(one) }
 	];
 
-	const more = [
-		{
-			title: 'Daemon defaults',
-			description: 'Session policy new daemons start with.',
-			icon: Bot,
-			href: '/settings/daemons'
-		},
-		{
-			title: 'Audit streaming',
-			description: 'Send every event to your SIEM.',
-			icon: ScrollText,
-			href: '/settings/audit'
-		},
-		{
-			title: 'Single sign-on',
-			description: 'OIDC, SAML, SCIM and verified domains.',
-			icon: KeyRound,
-			href: '/settings/sso'
-		}
-	];
-
 	const update = workspace.update();
 	const remove = workspace.delete();
 
@@ -92,9 +63,8 @@
 </script>
 
 <PageHeader
-	icon={Layers2}
 	title="Workspace"
-	description="How this workspace is named, who runs it and what's in it."
+	description="How this workspace is named, who runs it and what's in it"
 />
 
 {#if !model || !ws.data}
@@ -138,24 +108,13 @@
 
 	<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
 		{#each counts as c (c.label)}
-			<a
+			<StatTile
+				label={c.label}
+				icon={c.icon}
 				href={c.href}
-				class="group flex items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/40"
-			>
-				<div
-					class="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground"
-				>
-					<c.icon class="size-4" />
-				</div>
-				<div class="flex flex-col">
-					{#if c.query.isLoading}
-						<Skeleton class="h-6 w-8" />
-					{:else}
-						<span class="text-xl font-semibold tabular-nums">{c.query.data?.total ?? 0}</span>
-					{/if}
-					<span class="text-xs text-muted-foreground">{c.label}</span>
-				</div>
-			</a>
+				loading={c.query.isLoading}
+				value={c.query.data?.total ?? 0}
+			/>
 		{/each}
 	</div>
 
@@ -204,30 +163,6 @@
 			</Card.Content>
 		</Card.Root>
 	</div>
-
-	<Card.Root>
-		<Card.Header>
-			<Card.Title class="text-base">More settings</Card.Title>
-		</Card.Header>
-		<Card.Content>
-			<Item.Group class="divide-y rounded-lg border">
-				{#each more as link (link.href)}
-					<Item.Root size="sm" class="rounded-none">
-						{#snippet child({ props })}
-							<a href={link.href} {...props}>
-								<Item.Media variant="icon"><link.icon /></Item.Media>
-								<Item.Content>
-									<Item.Title>{link.title}</Item.Title>
-									<Item.Description>{link.description}</Item.Description>
-								</Item.Content>
-								<Item.Actions><ChevronRight class="size-4 text-muted-foreground" /></Item.Actions>
-							</a>
-						{/snippet}
-					</Item.Root>
-				{/each}
-			</Item.Group>
-		</Card.Content>
-	</Card.Root>
 
 	{#if isOwner}
 		<DangerZone

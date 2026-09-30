@@ -92,7 +92,7 @@
 	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
 	{#snippet media()}
-		<div class="flex size-10 items-center justify-center rounded-lg bg-chart-4/15 text-chart-4">
+		<div class="flex size-10 items-center justify-center rounded-lg bg-chart-5/15 text-chart-5">
 			<Bot class="size-5" />
 		</div>
 	{/snippet}

@@ -2,10 +2,14 @@
 	import { page } from '$app/state';
 	import { user } from '$lib/api/user.svelte';
 	import { pendingDeviceCode } from '$lib/store.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { Button } from '$lib/components/ui/button';
 	import * as Alert from '$lib/components/ui/alert';
-	import { Check, LoaderCircle, TriangleAlert, X, ShieldAlert } from '@lucide/svelte';
-	import Logo from '$lib/assets/logo.svelte';
+	import * as Field from '$lib/components/ui/field';
+	import * as InputOTP from '$lib/components/ui/input-otp';
+	import { Spinner } from '$lib/components/ui/spinner';
+	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
+	import { REGEXP_ONLY_DIGITS_AND_CHARS } from 'bits-ui';
+	import { Check, LogIn, MonitorSmartphone, ShieldAlert, TriangleAlert, X } from '@lucide/svelte';
 
 	const currentUser = user.self();
 
@@ -14,19 +18,12 @@
 	const initialCode = (page.url.searchParams.get('user_code') ?? '').toUpperCase().trim();
 
 	let code = $state(initialCode);
-	let input = $state(initialCode);
+	// The OTP input holds the 8 characters, the dash is only for display.
+	let input = $state(initialCode.replace(/[^A-Z0-9]/g, ''));
+	const formatted = $derived(input.length > 4 ? `${input.slice(0, 4)}-${input.slice(4)}` : input);
 	let submitting = $state(false);
 	let result = $state<'success' | 'error' | 'denied' | null>(null);
 	let message = $state('');
-
-	function normalize(value: string) {
-		const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-		return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 8)}`.replace(/-$/, '').trim();
-	}
-
-	function onInput() {
-		input = normalize(input);
-	}
 
 	function deny() {
 		result = 'denied';
@@ -37,7 +34,7 @@
 	}
 
 	function apply() {
-		code = input.trim();
+		code = formatted;
 		if (code) pendingDeviceCode.current = code;
 		history.replaceState(null, '', code ? `/device?user_code=${code}` : '/device');
 		submit();
@@ -91,125 +88,105 @@
 	});
 </script>
 
-<div
-	class="m-auto h-fit w-full max-w-sm overflow-hidden rounded-[calc(var(--radius)+.125rem)] border bg-muted shadow-md shadow-zinc-950/5 dark:[--color-muted:var(--color-zinc-900)]"
+<AuthCard
+	title="Authorize a device"
+	description={initialCode && currentUser.data && !result
+		? 'A terminal wants to sign in to your Nokku account.'
+		: 'Enter the code your terminal shows.'}
+	icon={MonitorSmartphone}
 >
-	<div class="-m-px rounded-[calc(var(--radius)+.125rem)] border bg-card p-6 pb-6">
-		<div class="text-center">
-			<Logo class="mx-auto block w-10 py-2 dark:invert" />
-			<h1 class="mt-4 mb-1 text-xl font-semibold">Authorize Device</h1>
-			<p class="text-sm text-balance text-muted-foreground">
-				{#if initialCode && currentUser.data && !result}
-					A device is requesting access to your nokku account.
-				{:else}
-					Enter the code shown in your terminal to sign in.
-				{/if}
-			</p>
+	{#if !currentUser.data}
+		<Alert.Root>
+			<TriangleAlert />
+			<Alert.Title>Sign in first</Alert.Title>
+			<Alert.Description>We bring you back here right after.</Alert.Description>
+		</Alert.Root>
+		<Button href="/login">
+			<LogIn data-icon="inline-start" />
+			Sign in
+		</Button>
+	{:else if result === 'success'}
+		<Alert.Root variant="success">
+			<Check />
+			<Alert.Title>Device authorized</Alert.Title>
+			<Alert.Description>Close this tab and head back to your terminal.</Alert.Description>
+		</Alert.Root>
+	{:else if result === 'denied'}
+		<Alert.Root variant="destructive">
+			<X />
+			<Alert.Title>Request denied</Alert.Title>
+			<Alert.Description>The terminal was not signed in.</Alert.Description>
+		</Alert.Root>
+	{:else if result === 'error'}
+		<Alert.Root variant="destructive">
+			<X />
+			<Alert.Title>Authorization failed</Alert.Title>
+			<Alert.Description>{message}</Alert.Description>
+		</Alert.Root>
+		<Button variant="outline" onclick={() => (result = null)}>Try again</Button>
+	{:else if initialCode}
+		<div class="flex flex-col items-center gap-1 rounded-lg border bg-terminal p-5">
+			<span class="spec-label">Device code</span>
+			<span class="font-mono text-3xl font-bold tracking-widest text-terminal-accent">
+				{formatted}
+			</span>
 		</div>
-
-		<div class="mt-6">
-			{#if !currentUser.data}
-				<Alert.Root variant="default">
-					<TriangleAlert class="size-4" />
-					<Alert.Title>Sign in to continue</Alert.Title>
-					<Alert.Description>
-						You need to be signed in to authorize a device. We'll bring you back here after.
-					</Alert.Description>
-				</Alert.Root>
-				<div class="mt-4">
-					<Button href="/login" class="w-full">Sign in</Button>
-				</div>
-			{:else}
-				{#if result === 'success'}
-					<div class="flex flex-col items-center gap-3 py-2 text-center">
-						<div class="flex h-12 w-12 items-center justify-center rounded-full bg-success/10">
-							<Check size={24} class="text-success" />
-						</div>
-						<p class="text-sm font-medium text-success">Success!</p>
-						<p class="text-sm text-muted-foreground">{message}</p>
-					</div>
-				{:else if result === 'denied'}
-					<div class="flex flex-col items-center gap-3 py-2 text-center">
-						<div class="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-							<X size={24} class="text-destructive" />
-						</div>
-						<p class="text-sm font-medium text-destructive">Denied</p>
-						<p class="text-sm text-muted-foreground">Authorization request denied.</p>
-					</div>
-				{:else if result === 'error'}
-					<Alert.Root variant="destructive">
-						<X class="size-4" />
-						<Alert.Title>Authorization failed</Alert.Title>
-						<Alert.Description>{message}</Alert.Description>
-					</Alert.Root>
-					<Button variant="outline" class="mt-4 w-full" onclick={() => (result = null)}>
-						Try Again
-					</Button>
-				{:else}
-					{#if initialCode}
-						<div class="rounded-lg border bg-muted/50 p-6 text-center">
-							<p class="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-								Device Code
-							</p>
-							<div class="font-mono text-3xl font-bold tracking-widest text-foreground">
-								{input}
-							</div>
-						</div>
-
-						<Alert.Root variant="warning" class="mt-4">
-							<ShieldAlert />
-							<Alert.Description class="text-xs">
-								Verify that this code exactly matches the one displayed in your terminal before
-								approving.
-							</Alert.Description>
-						</Alert.Root>
-
-						<div class="mt-6 flex flex-col gap-2">
-							<Button class="w-full" onclick={apply} disabled={submitting}>
-								{#if submitting}
-									<LoaderCircle class="mr-2 size-4 animate-spin" /> Authorizing...
-								{:else}
-									<Check class="mr-2 size-4" /> Approve Access
-								{/if}
-							</Button>
-							<Button variant="ghost" class="w-full" onclick={deny} disabled={submitting}>
-								Deny
-							</Button>
-						</div>
-					{:else}
-						<div class="space-y-2">
-							<label for="device-code" class="text-sm font-medium"> Enter Code </label>
-							<input
-								id="device-code"
-								type="text"
-								bind:value={input}
-								oninput={onInput}
-								onkeydown={(event) =>
-									event.key === 'Enter' && !submitting && input.length >= 8 && apply()}
-								placeholder="ABCD-EFGH"
-								autocomplete="off"
-								spellcheck={false}
-								maxlength={9}
-								class="w-full rounded-md border bg-transparent px-3 py-2.5 text-center font-mono text-lg tracking-widest uppercase outline-none focus:ring-2 focus:ring-ring"
-							/>
-						</div>
-
-						<Button class="mt-4 w-full" onclick={apply} disabled={submitting || input.length < 8}>
-							{#if submitting}
-								<LoaderCircle class="mr-2 size-4 animate-spin" /> Authorizing...
-							{:else}
-								Continue
-							{/if}
-						</Button>
-					{/if}
-				{/if}
-			{/if}
+		<Alert.Root variant="warning">
+			<ShieldAlert />
+			<Alert.Description>Approve only if this matches your terminal exactly.</Alert.Description>
+		</Alert.Root>
+		<div class="flex flex-col gap-2">
+			<Button onclick={apply} disabled={submitting}>
+				{#if submitting}<Spinner data-icon="inline-start" />{:else}<Check
+						data-icon="inline-start"
+					/>{/if}
+				Approve
+			</Button>
+			<Button variant="ghost" onclick={deny} disabled={submitting}>Deny</Button>
 		</div>
-	</div>
+	{:else}
+		<form
+			class="flex flex-col gap-4"
+			onsubmit={(e) => {
+				e.preventDefault();
+				if (input.length === 8) apply();
+			}}
+		>
+			<Field.Field>
+				<Field.Label for="device-code">Code</Field.Label>
+				<InputOTP.Root
+					id="device-code"
+					class="w-full"
+					maxlength={8}
+					pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
+					bind:value={() => input, (v) => (input = v.toUpperCase())}
+					pasteTransformer={(text) => text.toUpperCase().replace(/[^A-Z0-9]/g, '')}
+				>
+					{#snippet children({ cells })}
+						<div class="flex w-full items-center gap-2">
+							<InputOTP.Group class="flex-1">
+								{#each cells.slice(0, 4) as cell, i (i)}
+									<InputOTP.Slot {cell} class="h-11 flex-1 font-mono text-base" />
+								{/each}
+							</InputOTP.Group>
+							<InputOTP.Separator />
+							<InputOTP.Group class="flex-1">
+								{#each cells.slice(4, 8) as cell, i (i)}
+									<InputOTP.Slot {cell} class="h-11 flex-1 font-mono text-base" />
+								{/each}
+							</InputOTP.Group>
+						</div>
+					{/snippet}
+				</InputOTP.Root>
+			</Field.Field>
+			<Button type="submit" disabled={submitting || input.length < 8}>
+				{#if submitting}<Spinner data-icon="inline-start" />{/if}
+				Continue
+			</Button>
+		</form>
+	{/if}
 
-	<div class="p-3">
-		<p class="text-center text-sm text-accent-foreground">
-			<Button href="/login" variant="link" class="px-2">Sign in to a different account</Button>
-		</p>
-	</div>
-</div>
+	{#snippet footer()}
+		<a href="/login" class="font-medium text-primary hover:underline">Use a different account</a>
+	{/snippet}
+</AuthCard>

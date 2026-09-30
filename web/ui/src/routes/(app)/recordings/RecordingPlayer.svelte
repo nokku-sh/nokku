@@ -32,6 +32,11 @@
 	let scaled = false;
 	let castText = '';
 
+	function playerTheme() {
+		const font = getComputedStyle(document.documentElement).getPropertyValue('--terminal-font');
+		return { theme: 'nokku', terminalFontFamily: font.trim() };
+	}
+
 	function mountPlayer(el: HTMLDivElement) {
 		playerEl = el;
 		return {
@@ -130,7 +135,7 @@
 			player?.dispose();
 			player = createAsciinemaPlayer({ data: castText }, playerHost, {
 				autoPlay: true,
-				theme: 'dracula',
+				...playerTheme(),
 				idleTimeLimit: 2,
 				fit: 'both',
 				terminalFontSize: 'small',
@@ -163,7 +168,7 @@
 		// fit 'none' renders at natural size, hug() then sizes the dialog.
 		player = createAsciinemaPlayer({ data: text }, playerHost, {
 			autoPlay: true,
-			theme: 'dracula',
+			...playerTheme(),
 			idleTimeLimit: 2,
 			fit: 'none',
 			terminalFontSize: 'small',

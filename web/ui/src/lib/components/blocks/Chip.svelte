@@ -41,10 +41,10 @@
 	variant="outline"
 	{title}
 	class={cn(
-		'group/chip h-7 max-w-64 gap-1.5 rounded-full bg-background pr-2.5 pl-2.5 text-xs font-normal shadow-xs transition-colors hover:border-foreground/20',
+		'group/chip h-7 max-w-64 gap-1.5 rounded-full bg-background pr-2.5 pl-2.5 text-xs font-normal transition-colors hover:border-foreground/20',
 		leading && 'pl-0.5',
 		onRemove && 'pr-0.5',
-		muted && 'border-dashed bg-transparent text-muted-foreground shadow-none',
+		muted && 'border-dashed bg-transparent text-muted-foreground',
 		mono && 'font-mono',
 		className
 	)}

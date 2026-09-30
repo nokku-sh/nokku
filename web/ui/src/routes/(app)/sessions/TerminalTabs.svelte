@@ -1,78 +1,79 @@
 <script lang="ts">
 	import { daemon } from '$lib/api/daemons.svelte';
-	import { getSessions, type ConnectionState } from '$lib/api/terminal.svelte';
+	import { getSessions, type TerminalSession } from '$lib/api/terminal.svelte';
+	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { confirm } from '$lib/hooks';
 	import { activeSessionID } from '$lib/store.svelte';
+	import { statusTone } from '$lib/tone';
 	import { X } from '@lucide/svelte';
 
 	const sessions = $derived(getSessions());
-
 	const closeSession = daemon.closeSession();
-	function stateColor(state?: ConnectionState): string {
-		switch (state) {
-			case 'connected':
-				return 'bg-success';
-			case 'connecting':
-				return 'bg-warning animate-pulse';
-			case 'disconnected':
-				return 'bg-gray-400';
-			case 'error':
-				return 'bg-destructive';
-			default:
-				return 'bg-gray-400';
-		}
-	}
 
-	function stateLabel(state?: ConnectionState): string {
-		switch (state) {
-			case 'connected':
-				return 'Connected';
-			case 'connecting':
-				return 'Connecting...';
-			case 'disconnected':
-				return 'Disconnected';
-			case 'error':
-				return 'Error';
-			default:
-				return 'Unknown';
-		}
+	const stateLabel: Record<string, string> = {
+		connected: 'Connected',
+		connecting: 'Connecting',
+		disconnected: 'Disconnected',
+		error: 'Error'
+	};
+
+	function close(id: string, session: TerminalSession) {
+		void confirm({
+			title: `Close ${session.username}@${session.daemonName}?`,
+			description: 'The shell ends and anything still running in it stops.',
+			confirmText: 'Close session',
+			onConfirm: () => closeSession.mutateAsync({ daemonId: session.daemonID, sessionId: id })
+		});
 	}
 </script>
 
 {#if sessions.size > 0}
-	<div class="flex items-center gap-0.5 border-b bg-muted/30 px-1">
-		{#each sessions.entries() as [id, session]}
-			{@const isActive = id === activeSessionID.current}
-			<div class="group relative flex items-center">
-				<button
-					class="flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-xs transition-colors {isActive
-						? 'border-primary bg-background text-foreground'
-						: 'border-transparent text-muted-foreground hover:bg-accent hover:text-foreground'}"
+	<div class="no-scrollbar flex items-center gap-1 overflow-x-auto" role="tablist">
+		{#each sessions.entries() as [id, session] (id)}
+			{@const active = id === activeSessionID.current}
+			<div
+				class={[
+					'group flex shrink-0 items-center rounded-md border',
+					active ? 'border-border bg-background' : 'border-transparent'
+				]}
+			>
+				<Button
+					variant="ghost"
+					size="sm"
+					role="tab"
+					aria-selected={active}
+					class={['h-7 gap-2 font-mono text-xs', !active && 'text-muted-foreground']}
 					onclick={() => (activeSessionID.current = id)}
 				>
-					<Tooltip.Provider>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								<span class="size-1.5 rounded-full {stateColor(session.state)}"></span>
-							</Tooltip.Trigger>
-							<Tooltip.Content>
-								<p class="text-xs">{stateLabel(session.state)}</p>
-							</Tooltip.Content>
-						</Tooltip.Root>
-					</Tooltip.Provider>
-					<span class="max-w-30 truncate">{session.daemonName}@{session.username}</span>
-				</button>
-				<button
-					class="ml-0.5 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent hover:text-foreground {isActive
-						? 'opacity-100'
-						: ''}"
-					onclick={(e) => {
-						e.stopPropagation();
-						closeSession.mutate({ daemonId: session.daemonID, sessionId: id });
-					}}
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<span {...props}>
+									<StatusDot
+										tone={statusTone(session.state)}
+										live={session.state === 'connecting'}
+									/>
+								</span>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>{stateLabel[session.state ?? ''] ?? 'Unknown'}</Tooltip.Content>
+					</Tooltip.Root>
+					<span class="max-w-40 truncate">{session.username}@{session.daemonName}</span>
+				</Button>
+				<Button
+					variant="ghost"
+					size="icon-xs"
+					class={[
+						'mr-0.5',
+						!active && 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+					]}
+					aria-label={`Close ${session.username}@${session.daemonName}`}
+					onclick={() => close(id, session)}
 				>
-					<X class="size-3" />
-				</button>
+					<X />
+				</Button>
 			</div>
 		{/each}
 	</div>

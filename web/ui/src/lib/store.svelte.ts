@@ -1,6 +1,6 @@
 import { PersistedState } from 'runed';
 
-export const NS = 'nokku';
+const NS = 'nokku';
 
 export const workspaceID = new PersistedState<string>(`${NS}:workspace:id`, '');
 
@@ -23,7 +23,8 @@ export const pendingDeviceCode = new PersistedState<string | undefined>(
 	}
 );
 
-export const activeDashboardTab = new PersistedState<string>(`${NS}:tab:dashboard`, `admin`);
+// Targets this browser connected to last, so the dashboard lists them first.
+export const recentTargets = new PersistedState<string[]>(`${NS}:targets:recent`, []);
 
 export const activeSSOTab = new PersistedState<string>(`${NS}:tab:sso`, `oidc`);
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
-	import { CopyButton } from '$lib/components/ui/copy-button';
-	import * as HoverCard from '$lib/components/ui/hover-card/index.js';
+	import CopyText from '$lib/components/blocks/CopyText.svelte';
+	import * as HoverCard from '$lib/components/ui/hover-card';
 	import { Separator } from '$lib/components/ui/separator';
 	import {
 		AuthorityType,
@@ -38,11 +38,7 @@
 {#snippet copyRow(label: string, value: string)}
 	<div class="flex items-center gap-2">
 		<span class="w-20 shrink-0 text-xs text-muted-foreground">{label}</span>
-		<span class="min-w-0 flex-1 truncate font-mono text-xs" title={value}>{value}</span>
-		<CopyButton
-			text={value}
-			class="shrink-0 items-center justify-center gap-0 rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [&_svg]:size-3.5"
-		/>
+		<CopyText {value} mono class="flex-1" />
 	</div>
 {/snippet}
 
@@ -123,11 +119,11 @@
 			<Separator />
 
 			<div class="flex flex-col gap-2">
-				<span class="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+				<span class="text-2xs font-medium tracking-wider text-muted-foreground uppercase">
 					Identity
 				</span>
 				{#if ca.publicKey}
-					{@render copyRow('Public Key', ca.publicKey)}
+					{@render copyRow('Public key', ca.publicKey)}
 				{/if}
 				{#if ca.serialNumber}
 					{@render copyRow('Serial', ca.serialNumber)}
@@ -145,16 +141,16 @@
 			<Separator />
 
 			<div class="flex flex-col gap-2">
-				<span class="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+				<span class="text-2xs font-medium tracking-wider text-muted-foreground uppercase">
 					Policy
 				</span>
-				{@render textRow('Key Type', keyLabel)}
+				{@render textRow('Key type', keyLabel)}
 				{#if ca.allowedKeyTypes.length > 0}
 					<div class="flex items-center gap-2">
 						<span class="w-20 shrink-0 text-xs text-muted-foreground">Allowed</span>
 						<div class="flex min-w-0 flex-1 flex-wrap gap-1">
 							{#each ca.allowedKeyTypes as t (t)}
-								<Badge variant="outline" class="px-1.5 py-0.5 text-[10px] leading-none font-normal">
+								<Badge variant="outline" class="px-1.5 py-0.5 text-2xs leading-none font-normal">
 									{enumLabel(CertificateKeyType[t]).toUpperCase()}
 								</Badge>
 							{/each}
@@ -178,7 +174,7 @@
 				<Separator />
 
 				<div class="flex flex-col gap-2">
-					<span class="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+					<span class="text-2xs font-medium tracking-wider text-muted-foreground uppercase">
 						User SSH Policies
 					</span>
 					{#if extensions.length > 0}
@@ -188,7 +184,7 @@
 								{#each extensions as [k, v] (k)}
 									<Badge
 										variant="secondary"
-										class="px-1.5 py-0.5 font-mono text-[10px] leading-none font-normal"
+										class="px-1.5 py-0.5 font-mono text-2xs leading-none font-normal"
 									>
 										{v ? `${k}=${v}` : k}
 									</Badge>

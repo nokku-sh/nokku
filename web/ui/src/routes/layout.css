@@ -9,118 +9,128 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Light: compliance paper. Off-white, ink, hairline rules, signal teal. */
 :root {
-	--background: oklch(0.985 0.005 260);
-	--foreground: oklch(0.2 0.02 260);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.2 0.02 260);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.2 0.02 260);
-	--primary: oklch(0.55 0.12 200);
-	--primary-foreground: oklch(0.985 0.005 260);
-	--secondary: oklch(0.93 0.015 260);
+	--background: oklch(0.972 0.005 255);
+	--foreground: oklch(0.21 0.016 260);
+	--card: oklch(0.995 0.002 255);
+	--card-foreground: oklch(0.21 0.016 260);
+	--popover: oklch(0.995 0.002 255);
+	--popover-foreground: oklch(0.21 0.016 260);
+	--primary: oklch(0.56 0.115 205);
+	--primary-foreground: oklch(0.985 0.002 255);
+	--secondary: oklch(0.93 0.01 260);
 	--secondary-foreground: oklch(0.3 0.02 260);
-	--muted: oklch(0.95 0.01 260);
-	--muted-foreground: oklch(0.55 0.02 260);
-	--accent: oklch(0.94 0.02 200);
-	--accent-foreground: oklch(0.4 0.1 200);
-	--destructive: oklch(0.6 0.18 25);
+	--muted: oklch(0.945 0.006 260);
+	--muted-foreground: oklch(0.5 0.012 260);
+	--accent: oklch(0.935 0.02 205);
+	--accent-foreground: oklch(0.32 0.07 205);
+	--destructive: oklch(0.52 0.19 25);
 	--destructive-foreground: oklch(1 0 0);
-	--border: oklch(0.88 0.015 260);
-	--input: oklch(0.8 0.02 260);
-	--ring: oklch(0.55 0.12 200);
-	--chart-1: oklch(0.55 0.12 200);
-	--chart-2: oklch(0.7 0.15 70);
-	--chart-3: oklch(0.65 0.15 150);
-	--chart-4: oklch(0.6 0.15 280);
-	--chart-5: oklch(0.6 0.15 350);
-	--sidebar: oklch(0.95 0.01 260);
-	--sidebar-foreground: oklch(0.3 0.02 260);
-	--sidebar-primary: oklch(0.55 0.12 200);
-	--sidebar-primary-foreground: oklch(0.985 0.005 260);
-	--sidebar-accent: oklch(0.92 0.02 260);
-	--sidebar-accent-foreground: oklch(0.2 0.02 260);
-	--sidebar-border: transparent;
-	--sidebar-ring: oklch(0.55 0.12 200);
-	--success: oklch(0.6 0.15 150);
-	--success-foreground: oklch(0.985 0.005 260);
-	--warning: oklch(0.68 0.15 65);
+	--border: oklch(0.88 0.01 260);
+	--input: oklch(0.85 0.012 260);
+	--ring: oklch(0.56 0.115 205);
+	--success: oklch(0.56 0.13 150);
+	--success-foreground: oklch(0.985 0.002 255);
+	--warning: oklch(0.66 0.14 65);
 	--warning-foreground: oklch(0.22 0.04 65);
-	--info: oklch(0.58 0.14 245);
-	--info-foreground: oklch(0.985 0.005 260);
-	--radius: 1.4rem;
-	--shadow-x: 0px;
-	--shadow-y: 0px;
-	--shadow-blur: 0px;
-	--shadow-spread: 0px;
-	--shadow-opacity: 0;
-	--shadow-color: transparent;
-	--shadow-2xs: 0px 0px 0px 0px hsl(0 0% 0% / 0);
-	--shadow-xs: 0px 0px 0px 0px hsl(0 0% 0% / 0);
-	--shadow-sm: 0px 0px 0px 0px hsl(0 0% 0% / 0), 0px 1px 2px -1px hsl(0 0% 0% / 0);
-	--shadow: 0px 0px 0px 0px hsl(0 0% 0% / 0), 0px 1px 2px -1px hsl(0 0% 0% / 0);
-	--shadow-md: 0px 0px 0px 0px hsl(0 0% 0% / 0), 0px 2px 4px -1px hsl(0 0% 0% / 0);
-	--shadow-lg: 0px 0px 0px 0px hsl(0 0% 0% / 0), 0px 4px 6px -1px hsl(0 0% 0% / 0);
-	--shadow-xl: 0px 0px 0px 0px hsl(0 0% 0% / 0), 0px 8px 10px -1px hsl(0 0% 0% / 0);
-	--shadow-2xl: 0px 0px 0px 0px hsl(0 0% 0% / 0);
-	--tracking-normal: 0.01em;
-	--spacing: 0.25rem;
+	--info: oklch(0.56 0.13 245);
+	--info-foreground: oklch(0.985 0.002 255);
+	/* One hue family plus neutral steps. Data, not confetti. */
+	--chart-1: oklch(0.56 0.115 205);
+	--chart-2: oklch(0.62 0.09 230);
+	--chart-3: oklch(0.55 0.05 260);
+	--chart-4: oklch(0.6 0.03 260);
+	--chart-5: oklch(0.5 0.08 180);
+	--sidebar: oklch(0.955 0.006 255);
+	--sidebar-foreground: oklch(0.3 0.02 260);
+	--sidebar-primary: oklch(0.56 0.115 205);
+	--sidebar-primary-foreground: oklch(0.985 0.002 255);
+	--sidebar-accent: oklch(0.92 0.01 260);
+	--sidebar-accent-foreground: oklch(0.21 0.016 260);
+	--sidebar-border: transparent;
+	--sidebar-ring: oklch(0.56 0.115 205);
+
+	/* The logo's own colors, from nokku-sh/logos. Fixed, not themed. */
+	--brand-caret: #15d1aa;
+	--brand-dot: #2b2f36;
+
+	/* The console is dark in both modes. xterm needs hex. */
+	--terminal-font:
+		'JetBrains Mono Nerd Font', 'Victor Mono Variable', ui-monospace, Menlo, Consolas, monospace;
+	--terminal: #0c0f16;
+	--terminal-foreground: #dadee5;
+	--terminal-cursor: #38deda;
+	--terminal-selection: #093a3f;
+	--ansi-0: #2d333d;
+	--ansi-1: #ea6a64;
+	--ansi-2: #6fd087;
+	--ansi-3: #f2c86c;
+	--ansi-4: #5eaceb;
+	--ansi-5: #c889d7;
+	--ansi-6: #38deda;
+	--ansi-7: #cdd1d8;
+	--ansi-8: #5d646f;
+	--ansi-9: #ff847d;
+	--ansi-10: #86e79c;
+	--ansi-11: #fedf89;
+	--ansi-12: #7fc5ff;
+	--ansi-13: #e0a4ee;
+	--ansi-14: #78f2ed;
+	--ansi-15: #f3f5f9;
+
+	--radius: 0.625rem;
+	--shadow-2xs: 0 0 #0000;
+	--shadow-xs: 0 0 #0000;
+	--shadow-sm: 0 0 #0000;
+	--shadow: 0 0 #0000;
+	--shadow-md: 0 0 #0000;
+	--shadow-lg: 0 0 #0000;
+	--shadow-xl: 0 0 #0000;
+	--shadow-2xl: 0 0 #0000;
 }
 
+/* Dark: signal ink. The terminal at night, phosphor accent. */
 .dark {
-	--background: oklch(0.16 0.02 260);
-	--foreground: oklch(0.95 0.01 260);
-	--card: oklch(0.18 0.025 260);
-	--card-foreground: oklch(0.95 0.01 260);
-	--popover: oklch(0.18 0.025 260);
-	--popover-foreground: oklch(0.95 0.01 260);
-	--primary: oklch(0.75 0.15 200);
-	--primary-foreground: oklch(0.15 0.02 260);
-	--secondary: oklch(0.22 0.03 260);
-	--secondary-foreground: oklch(0.95 0.01 260);
-	--muted: oklch(0.2 0.02 260);
-	--muted-foreground: oklch(0.65 0.02 260);
-	--accent: oklch(0.25 0.04 200);
-	--accent-foreground: oklch(0.85 0.1 200);
-	--destructive: oklch(0.65 0.2 25);
+	--background: oklch(0.145 0.014 262);
+	--foreground: oklch(0.94 0.006 260);
+	--card: oklch(0.175 0.015 262);
+	--card-foreground: oklch(0.94 0.006 260);
+	--popover: oklch(0.175 0.015 262);
+	--popover-foreground: oklch(0.94 0.006 260);
+	--primary: oklch(0.82 0.13 192);
+	--primary-foreground: oklch(0.16 0.014 262);
+	--secondary: oklch(0.24 0.02 262);
+	--secondary-foreground: oklch(0.9 0.01 260);
+	--muted: oklch(0.21 0.016 262);
+	--muted-foreground: oklch(0.66 0.012 260);
+	--accent: oklch(0.25 0.03 205);
+	--accent-foreground: oklch(0.9 0.06 192);
+	--destructive: oklch(0.64 0.19 25);
 	--destructive-foreground: oklch(1 0 0);
-	--border: oklch(0.26 0.03 260);
-	--input: oklch(0.35 0.03 260);
-	--ring: oklch(0.75 0.15 200);
-	--chart-1: oklch(0.75 0.15 200);
-	--chart-2: oklch(0.75 0.18 70);
-	--chart-3: oklch(0.7 0.15 150);
-	--chart-4: oklch(0.7 0.15 280);
-	--chart-5: oklch(0.7 0.15 350);
-	--sidebar: oklch(0.13 0.02 260);
-	--sidebar-foreground: oklch(0.85 0.01 260);
-	--sidebar-primary: oklch(0.75 0.15 200);
-	--sidebar-primary-foreground: oklch(0.15 0.02 260);
-	--sidebar-accent: oklch(0.2 0.03 260);
-	--sidebar-accent-foreground: oklch(0.95 0.01 260);
-	--sidebar-border: transparent;
-	--sidebar-ring: oklch(0.75 0.15 200);
-	--success: oklch(0.72 0.15 150);
-	--success-foreground: oklch(0.15 0.02 260);
-	--warning: oklch(0.8 0.15 75);
+	--border: oklch(0.255 0.02 262);
+	--input: oklch(0.32 0.02 262);
+	--ring: oklch(0.82 0.13 192);
+	--success: oklch(0.75 0.15 150);
+	--success-foreground: oklch(0.16 0.014 262);
+	--warning: oklch(0.82 0.14 80);
 	--warning-foreground: oklch(0.2 0.04 65);
-	--info: oklch(0.72 0.13 245);
-	--info-foreground: oklch(0.15 0.02 260);
-	--radius: 1.4rem;
-	--shadow-x: 0px;
-	--shadow-y: 0px;
-	--shadow-blur: 0px;
-	--shadow-spread: 0px;
-	--shadow-opacity: 0;
-	--shadow-color: transparent;
-	--shadow-2xs: 0px 0px 0px 0px hsl(0 0% 0% / 0);
-	--shadow-xs: 0px 0px 0px 0px hsl(0 0% 0% / 0);
-	--shadow-sm: 0px 0px 0px 0px hsl(0 0% 0% / 0), 0px 1px 2px -1px hsl(0 0% 0% / 0);
-	--shadow: 0px 0px 0px 0px hsl(0 0% 0% / 0), 0px 1px 2px -1px hsl(0 0% 0% / 0);
-	--shadow-md: 0px 0px 0px 0px hsl(0 0% 0% / 0), 0px 2px 4px -1px hsl(0 0% 0% / 0);
-	--shadow-lg: 0px 0px 0px 0px hsl(0 0% 0% / 0), 0px 4px 6px -1px hsl(0 0% 0% / 0);
-	--shadow-xl: 0px 0px 0px 0px hsl(0 0% 0% / 0), 0px 8px 10px -1px hsl(0 0% 0% / 0);
-	--shadow-2xl: 0px 0px 0px 0px hsl(0 0% 0% / 0);
+	--info: oklch(0.74 0.12 245);
+	--info-foreground: oklch(0.16 0.014 262);
+	--chart-1: oklch(0.82 0.13 192);
+	--chart-2: oklch(0.72 0.09 230);
+	--chart-3: oklch(0.6 0.05 260);
+	--chart-4: oklch(0.66 0.03 260);
+	--chart-5: oklch(0.7 0.1 175);
+	--sidebar: oklch(0.125 0.012 262);
+	--sidebar-foreground: oklch(0.85 0.01 260);
+	--sidebar-primary: oklch(0.82 0.13 192);
+	--sidebar-primary-foreground: oklch(0.145 0.014 262);
+	--sidebar-accent: oklch(0.2 0.016 262);
+	--sidebar-accent-foreground: oklch(0.94 0.006 260);
+	--sidebar-border: transparent;
+	--sidebar-ring: oklch(0.82 0.13 192);
+	--brand-dot: #d6dbe4;
 }
 
 @theme inline {
@@ -162,6 +172,15 @@
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
+	--color-brand-caret: var(--brand-caret);
+	--color-brand-dot: var(--brand-dot);
+	--color-terminal: var(--terminal);
+	--color-terminal-foreground: var(--terminal-foreground);
+	--color-terminal-accent: var(--terminal-cursor);
+	--color-terminal-ok: var(--ansi-10);
+	--color-terminal-warn: var(--ansi-11);
+	--color-terminal-err: var(--ansi-9);
+	--color-terminal-dim: var(--ansi-8);
 
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
@@ -177,10 +196,20 @@
 	--shadow-xl: var(--shadow-xl);
 	--shadow-2xl: var(--shadow-2xl);
 
+	--animate-blink: blink 1.1s step-end infinite;
+	@keyframes blink {
+		50% {
+			opacity: 0;
+		}
+	}
+
+	--text-2xs: 0.6875rem;
+	--text-2xs--line-height: 1rem;
+
 	--font-sans: 'Manrope Variable', sans-serif;
-	--font-serif: Georgia, serif;
-	--font-mono: 'Victor Mono Variable', monospace;
+	--font-mono: 'Victor Mono Variable', ui-monospace, monospace;
 	--font-heading: 'Manrope Variable', sans-serif;
+	--font-terminal: var(--terminal-font);
 }
 
 @layer base {
@@ -196,6 +225,10 @@
 		-webkit-font-smoothing: antialiased;
 		-moz-osx-font-smoothing: grayscale;
 	}
+	::selection {
+		background: var(--primary);
+		color: var(--primary-foreground);
+	}
 
 	@font-face {
 		font-family: 'JetBrains Mono Nerd Font';
@@ -206,29 +239,40 @@
 	}
 }
 
+/* Small mono spec label, the certificate's voice. Same as the docs site. */
+@utility spec-label {
+	font-family: var(--font-mono);
+	font-size: var(--text-2xs);
+	line-height: var(--text-2xs--line-height);
+	font-weight: 500;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--color-muted-foreground);
+}
+
+@utility no-scrollbar {
+	-webkit-overflow-scrolling: touch;
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
 @layer utilities {
 	::-webkit-scrollbar {
 		width: 6px;
 		height: 6px;
 	}
 	::-webkit-scrollbar-thumb {
-		background-color: rgba(100, 100, 100, 0.4);
-		border-radius: 25px;
+		background-color: color-mix(in oklch, var(--muted-foreground) 40%, transparent);
+		border-radius: 9999px;
 	}
 	::-webkit-scrollbar-track {
 		background: transparent;
 	}
 	::-webkit-scrollbar-thumb:hover {
-		background-color: rgba(100, 100, 100, 0.6);
-	}
-
-	.no-scrollbar {
-		-webkit-overflow-scrolling: touch;
-		-ms-overflow-style: none;
-		scrollbar-width: none;
-	}
-	.no-scrollbar::-webkit-scrollbar {
-		display: none;
+		background-color: color-mix(in oklch, var(--muted-foreground) 60%, transparent);
 	}
 
 	.xterm-screen {
@@ -237,6 +281,28 @@
 	.xterm {
 		overflow: hidden;
 	}
+}
+
+/* asciinema reads the same console palette as the live terminal. */
+.ap-player.asciinema-player-theme-nokku {
+	--term-color-foreground: var(--terminal-foreground);
+	--term-color-background: var(--terminal);
+	--term-color-0: var(--ansi-0);
+	--term-color-1: var(--ansi-1);
+	--term-color-2: var(--ansi-2);
+	--term-color-3: var(--ansi-3);
+	--term-color-4: var(--ansi-4);
+	--term-color-5: var(--ansi-5);
+	--term-color-6: var(--ansi-6);
+	--term-color-7: var(--ansi-7);
+	--term-color-8: var(--ansi-8);
+	--term-color-9: var(--ansi-9);
+	--term-color-10: var(--ansi-10);
+	--term-color-11: var(--ansi-11);
+	--term-color-12: var(--ansi-12);
+	--term-color-13: var(--ansi-13);
+	--term-color-14: var(--ansi-14);
+	--term-color-15: var(--ansi-15);
 }
 
 /* A confirmation over an open sheet or dialog would double the blur and tint. */

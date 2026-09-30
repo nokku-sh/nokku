@@ -1,48 +1,23 @@
-import type { IconProps, LucideIcon } from '@lucide/svelte';
-
-export type Action = {
-	type: 'button' | 'dropdown' | 'popover';
-	label: string;
-	icon?: LucideIcon;
-	onClick: () => void;
-	variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-	classProps?: string;
-	iconProps?: IconProps;
-	disabled?: boolean;
-	popover?: PopoverAction;
-};
-
-export type PopoverAction = {
-	description?: string;
-	confirmLabel?: string;
-	cancelLabel?: string;
-};
+import type { LucideIcon } from '@lucide/svelte';
+import type { ButtonVariant } from '$lib/components/ui/button';
+import type { ConfirmOptions } from '$lib/hooks/use-confirm.svelte';
+import type { FilterOption } from '$lib/components/blocks/FilterPill.svelte';
 
 export type BulkAction<T> = {
 	type: 'button' | 'select';
 	label: string;
 	icon?: LucideIcon;
-	variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+	variant?: ButtonVariant;
 	class?: string;
 	disabled?: boolean;
-	onClick?: (selectedItems: T[]) => Promise<void> | void;
+	/** Asks first. The action runs inside the dialog, which shows its spinner. */
+	confirm?: (selectedItems: T[]) => ConfirmOptions;
+	onClick?: (selectedItems: T[]) => unknown;
 	options?: {
 		label: string;
 		value: string;
 		onClick: (selectedItems: T[], value: string) => Promise<void> | void;
 	}[];
-};
-
-export type FacetedFilter = {
-	label: string;
-	value: string;
-	icon?: LucideIcon;
-};
-
-export type FilterOption = {
-	label: string;
-	value: string;
-	icon?: LucideIcon;
 };
 
 export type FilterConfig = {

@@ -2,8 +2,8 @@
 	import TokenSheet from '$lib/components/sheets/TokenSheet.svelte';
 	import * as Alert from '$lib/components/ui/alert';
 	import * as Tabs from '$lib/components/ui/tabs';
-	import CodeSnippet from '$lib/components/utils/CodeSnippet.svelte';
-	import CopyText from '$lib/components/utils/CopyText.svelte';
+	import CodeSnippet from '$lib/components/blocks/CodeSnippet.svelte';
+	import CopyText from '$lib/components/blocks/CopyText.svelte';
 	import { TokenKind } from '$lib/gen/nokku/v1/token_pb';
 	import { Info, Rocket } from '@lucide/svelte';
 

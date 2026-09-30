@@ -1,15 +1,13 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Sidebar from '$lib/components/ui/sidebar';
-	import * as Empty from '$lib/components/ui/empty';
-	import { ChevronsUpDown, ChevronRight, Layers2, LogOut, Pencil, Plus } from '@lucide/svelte';
+	import { Check, ChevronsUpDown, ChevronRight, Plus, SlidersHorizontal } from '@lucide/svelte';
 	import type { ComponentProps } from 'svelte';
-	import { AppRoutes, SupportRoutes, UserRoutes, type RouteItem } from './routes';
+	import { AppRoutes, SupportRoutes, canSee, type RouteItem } from './routes';
+	import UserMenu from './UserMenu.svelte';
 	import { workspace } from '$lib/api/workspaces.svelte';
 	import { user } from '$lib/api/user.svelte';
-	import { auth } from '$lib/api/auth.svelte';
-	import UserAvatar from '../utils/UserAvatar.svelte';
+	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import * as Collapsible from '$lib/components/ui/collapsible';
@@ -18,7 +16,6 @@
 	import { WorkspaceSchema } from '$lib/gen/nokku/v1/workspace_pb';
 	import { createEntityModalState } from '$lib/hooks';
 	import NokkuCaret from '$lib/assets/nokku_caret.svelte';
-	import { atLeast } from '$lib/roles';
 
 	let { ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
 
@@ -27,16 +24,11 @@
 	const ws = workspace.get();
 	const workspaces = workspace.list();
 	const currentUser = user.self();
-	const logout = auth.logout();
 	const currentRoute = $derived(page.url.pathname);
 
-	// Show everything until the role is known, so the nav doesn't flicker.
 	const visibleRoutes = $derived(
 		Object.entries(AppRoutes)
-			.map(([group, routes]) => {
-				const allowed = routes.filter((r) => !ws.data || atLeast(ws.data.role, r.role ?? 'member'));
-				return [group, allowed] as const;
-			})
+			.map(([group, routes]) => [group, routes.filter((r) => canSee(r, ws.data?.role))] as const)
 			.filter(([, routes]) => routes.length > 0)
 	);
 
@@ -68,12 +60,12 @@
 								size="lg"
 								class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
 							>
-								<div class="rounded-full bg-sidebar-primary p-2.5">
-									<NokkuCaret class="pl-0.5 invert" />
+								<div class="rounded-lg bg-terminal p-2.5 text-brand-caret">
+									<NokkuCaret class="pl-0.5" />
 								</div>
 								<div class="grid flex-1 text-left text-sm leading-tight">
 									<span class="truncate" title={ws.data?.name}>
-										{ws.data?.name ?? 'Select Workspace'}
+										{ws.data?.name ?? 'Select workspace'}
 									</span>
 									<span class="truncate text-xs" title={ws.data?.description}>
 										{ws.data?.description ?? ''}
@@ -94,30 +86,24 @@
 						</DropdownMenu.Label>
 
 						{#each workspaces.data || [] as w (w.id)}
-							<DropdownMenu.Item
-								onSelect={() => (workspaceID.current = w.id)}
-								class="flex items-center justify-between gap-2"
-							>
-								<div class="flex min-w-0 flex-1 items-center gap-2">
-									<span class="truncate text-sm">{w.name}</span>
-								</div>
-								<Button
-									variant="ghost"
-									class="rounded-full"
-									size="icon"
-									onclick={() => goto('/settings')}
-								>
-									<Pencil />
-								</Button>
+							<DropdownMenu.Item onSelect={() => (workspaceID.current = w.id)}>
+								<span class="flex-1 truncate">{w.name}</span>
+								{#if w.id === workspaceID.current}
+									<Check class="text-primary" />
+								{/if}
 							</DropdownMenu.Item>
 						{/each}
 						<DropdownMenu.Separator />
+						<DropdownMenu.Item onSelect={() => goto('/settings')}>
+							<SlidersHorizontal />
+							Workspace settings
+						</DropdownMenu.Item>
 						<DropdownMenu.Item
 							onSelect={() => wsModal.openNew()}
 							class="flex items-center gap-2 text-muted-foreground"
 						>
 							<Plus />
-							Add Workspace
+							Add workspace
 						</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
@@ -126,79 +112,64 @@
 	</Sidebar.Header>
 
 	<Sidebar.Content>
-		{#if workspaceID.current !== null && workspaceID.current !== ''}
-			{#each visibleRoutes as [groupName, routes] (groupName)}
-				<Sidebar.Group>
-					<Sidebar.GroupLabel>{groupName}</Sidebar.GroupLabel>
-					<Sidebar.GroupContent>
-						<Sidebar.Menu>
-							{#each routes as r (r.title)}
-								{#if r.items && r.items.length > 0}
-									<Collapsible.Root open={isRouteActive(r)} class="group/collapsible">
-										<Sidebar.MenuItem>
-											<Collapsible.Trigger>
-												{#snippet child({ props })}
-													<Sidebar.MenuButton
-														{...props}
-														tooltipContent={r.title}
-														isActive={isRouteActive(r)}
-													>
-														<r.icon />
-														<span>{r.title}</span>
-														<ChevronRight
-															class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
-														/>
-													</Sidebar.MenuButton>
-												{/snippet}
-											</Collapsible.Trigger>
-											<Collapsible.Content>
-												<Sidebar.MenuSub>
-													{#each r.items as subItem (subItem.title)}
-														<Sidebar.MenuSubItem>
-															<Sidebar.MenuSubButton isActive={currentRoute === subItem.url}>
-																{#snippet child({ props })}
-																	<a href={subItem.url} {...props}>
-																		<span>{subItem.title}</span>
-																	</a>
-																{/snippet}
-															</Sidebar.MenuSubButton>
-														</Sidebar.MenuSubItem>
-													{/each}
-												</Sidebar.MenuSub>
-											</Collapsible.Content>
-										</Sidebar.MenuItem>
-									</Collapsible.Root>
-								{:else}
+		{#each visibleRoutes as [groupName, routes] (groupName)}
+			<Sidebar.Group>
+				<Sidebar.GroupLabel>{groupName}</Sidebar.GroupLabel>
+				<Sidebar.GroupContent>
+					<Sidebar.Menu>
+						{#each routes as r (r.title)}
+							{#if r.items && r.items.length > 0}
+								<Collapsible.Root open={isRouteActive(r)} class="group/collapsible">
 									<Sidebar.MenuItem>
-										<Sidebar.MenuButton tooltipContent={r.title} isActive={isRouteActive(r)}>
+										<Collapsible.Trigger>
 											{#snippet child({ props })}
-												<a href={r.url} {...props}>
+												<Sidebar.MenuButton
+													{...props}
+													tooltipContent={r.title}
+													isActive={isRouteActive(r)}
+												>
 													<r.icon />
 													<span>{r.title}</span>
-												</a>
+													<ChevronRight
+														class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+													/>
+												</Sidebar.MenuButton>
 											{/snippet}
-										</Sidebar.MenuButton>
+										</Collapsible.Trigger>
+										<Collapsible.Content>
+											<Sidebar.MenuSub>
+												{#each r.items as subItem (subItem.title)}
+													<Sidebar.MenuSubItem>
+														<Sidebar.MenuSubButton isActive={currentRoute === subItem.url}>
+															{#snippet child({ props })}
+																<a href={subItem.url} {...props}>
+																	<span>{subItem.title}</span>
+																</a>
+															{/snippet}
+														</Sidebar.MenuSubButton>
+													</Sidebar.MenuSubItem>
+												{/each}
+											</Sidebar.MenuSub>
+										</Collapsible.Content>
 									</Sidebar.MenuItem>
-								{/if}
-							{/each}
-						</Sidebar.Menu>
-					</Sidebar.GroupContent>
-				</Sidebar.Group>
-			{/each}
-		{:else}
-			<Empty.Root>
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<Layers2 />
-					</Empty.Media>
-					<Empty.Title>No Workspace Selected</Empty.Title>
-					<Empty.Description>Select or create a workspace to get started</Empty.Description>
-				</Empty.Header>
-				<Empty.Content>
-					<Button onclick={() => wsModal.openNew()}>Create Workspace</Button>
-				</Empty.Content>
-			</Empty.Root>
-		{/if}
+								</Collapsible.Root>
+							{:else}
+								<Sidebar.MenuItem>
+									<Sidebar.MenuButton tooltipContent={r.title} isActive={isRouteActive(r)}>
+										{#snippet child({ props })}
+											<a href={r.url} {...props}>
+												<r.icon />
+												<span>{r.title}</span>
+											</a>
+										{/snippet}
+									</Sidebar.MenuButton>
+								</Sidebar.MenuItem>
+							{/if}
+						{/each}
+					</Sidebar.Menu>
+				</Sidebar.GroupContent>
+			</Sidebar.Group>
+		{/each}
 
 		<Sidebar.Group class="mt-auto">
 			{#each Object.entries(SupportRoutes) as [groupName, routes] (groupName)}
@@ -226,70 +197,20 @@
 	<Sidebar.Footer>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<Sidebar.MenuButton size="lg" {...props}>
-								<UserAvatar user={currentUser.data} />
-								<div class="flex flex-col text-sm leading-tight">
-									{#if currentUser.data?.name}
-										<span class="truncate text-sm font-medium" title={currentUser.data?.name}
-											>{currentUser.data?.name}</span
-										>
-									{:else}
-										<span
-											class="truncate text-sm font-medium"
-											title={currentUser.data?.email.split('@')[0]}
-										>
-											{currentUser.data?.email.split('@')[0]}
-										</span>
-									{/if}
-									<span class="truncate text-xs opacity-70">{currentUser.data?.email}</span>
-								</div>
-								<ChevronsUpDown class="ml-auto size-4" />
-							</Sidebar.MenuButton>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content
-						class="w-[--bits-dropdown-menu-anchor-width] min-w-52 rounded-lg"
-						side={sidebar.isMobile ? 'bottom' : 'right'}
-						align="end"
-						sideOffset={4}
-					>
-						<DropdownMenu.Label class="p-0 font-normal">
-							<div class="flex items-center gap-2 px-1 py-1.5 text-sm">
-								<UserAvatar user={currentUser.data} />
-								<div class="grid flex-1 text-left text-sm leading-tight">
-									<span class="truncate font-semibold">{currentUser.data?.name}</span>
-									<span class="truncate text-xs opacity-70">{currentUser.data?.email}</span>
-								</div>
+				<UserMenu side={sidebar.isMobile ? 'bottom' : 'right'}>
+					{#snippet trigger(props)}
+						<Sidebar.MenuButton size="lg" {...props}>
+							<UserAvatar user={currentUser.data} />
+							<div class="flex min-w-0 flex-col text-sm leading-tight">
+								<span class="truncate font-medium">
+									{currentUser.data?.name || currentUser.data?.email.split('@')[0]}
+								</span>
+								<span class="truncate text-xs opacity-70">{currentUser.data?.email}</span>
 							</div>
-						</DropdownMenu.Label>
-						<DropdownMenu.Separator />
-						<DropdownMenu.Group>
-							{#each UserRoutes as r (r.title)}
-								{#if r.items}
-									{#each r.items as subItem (subItem.title)}
-										<DropdownMenu.Item onSelect={() => goto(subItem.url)}>
-											<subItem.icon />
-											<span>{subItem.title}</span>
-										</DropdownMenu.Item>
-									{/each}
-								{:else}
-									<DropdownMenu.Item onSelect={() => goto(r.url)}>
-										<r.icon />
-										<span>{r.title}</span>
-									</DropdownMenu.Item>
-								{/if}
-							{/each}
-						</DropdownMenu.Group>
-						<DropdownMenu.Separator />
-						<DropdownMenu.Item onSelect={() => logout.mutate({})}>
-							<LogOut />
-							<span>Log out</span>
-						</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+							<ChevronsUpDown class="ml-auto size-4" />
+						</Sidebar.MenuButton>
+					{/snippet}
+				</UserMenu>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Footer>

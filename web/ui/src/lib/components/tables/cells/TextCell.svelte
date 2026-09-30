@@ -1,13 +1,15 @@
 <script lang="ts">
 	type Props = {
 		label: string;
-		subLabel: string;
+		subLabel?: string;
+		/** For machine values like IPs, usernames and fingerprints. */
+		mono?: boolean;
 	};
-	let { label, subLabel }: Props = $props();
+	let { label, subLabel, mono = false }: Props = $props();
 </script>
 
 <div class="flex max-w-32 min-w-0 flex-col overflow-hidden">
-	<div class="truncate text-sm font-medium" title={label}>
+	<div class={['truncate text-sm', mono ? 'font-mono' : 'font-medium']} title={label}>
 		{label}
 	</div>
 

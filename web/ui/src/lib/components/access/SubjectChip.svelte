@@ -2,7 +2,7 @@
 	import { serviceAccount } from '$lib/api/service_account.svelte';
 	import { team } from '$lib/api/team.svelte';
 	import { workspace } from '$lib/api/workspaces.svelte';
-	import Chip from '$lib/components/utils/Chip.svelte';
+	import Chip from '$lib/components/blocks/Chip.svelte';
 	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
 	import SubjectAvatar from './SubjectAvatar.svelte';
 	import {

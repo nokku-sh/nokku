@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
-	import * as HoverCard from '$lib/components/ui/hover-card/index.js';
+	import * as HoverCard from '$lib/components/ui/hover-card';
 	import { team } from '$lib/api/team.svelte';
-	import UserAvatar from '$lib/components/utils/UserAvatar.svelte';
+	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
 	import { Users } from '@lucide/svelte';
 
 	type Props = {
@@ -45,7 +45,7 @@
 								<div class="flex items-center gap-2">
 									<p class="truncate text-sm leading-none font-medium">{user.name}</p>
 									{#if user.emailVerified}
-										<Badge variant="secondary" class="text-[10px] leading-none">verified</Badge>
+										<Badge variant="secondary" class="text-2xs leading-none">verified</Badge>
 									{/if}
 								</div>
 								<div class="flex flex-col gap-0.5 text-xs text-muted-foreground">

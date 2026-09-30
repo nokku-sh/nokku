@@ -12,7 +12,7 @@
 </script>
 
 <svelte:head>
-	<title>Sessions</title>
+	<title>Sessions · Nokku</title>
 </svelte:head>
 
 <div class="flex flex-1 overflow-hidden">
@@ -24,12 +24,13 @@
 
 	<div class="flex min-w-0 flex-1 flex-col">
 		<div class="flex items-center gap-2 border-b px-2 py-1">
-			<Button variant="ghost" size="icon" class="size-7" onclick={() => (panelOpen = !panelOpen)}>
-				{#if panelOpen}
-					<PanelLeftClose class="size-4" />
-				{:else}
-					<PanelLeftOpen class="size-4" />
-				{/if}
+			<Button
+				variant="ghost"
+				size="icon-sm"
+				aria-label={panelOpen ? 'Hide servers' : 'Show servers'}
+				onclick={() => (panelOpen = !panelOpen)}
+			>
+				{#if panelOpen}<PanelLeftClose />{:else}<PanelLeftOpen />{/if}
 			</Button>
 			<div class="flex-1">
 				<TerminalTabs />
@@ -43,26 +44,23 @@
 						<Empty.Media variant="icon">
 							<Terminal />
 						</Empty.Media>
-						<Empty.Title>No Active Sessions</Empty.Title>
+						<Empty.Title>No open sessions</Empty.Title>
 						<Empty.Description>
-							{#if panelOpen}
-								Select a server from the panel to start a terminal session.
-							{:else}
-								Open the server panel to connect to a server.
-							{/if}
+							Pick a server to open a shell right here, or list them from your own terminal.
 						</Empty.Description>
 					</Empty.Header>
-					{#if !panelOpen}
-						<Empty.Content>
+					<Empty.Content>
+						{#if !panelOpen}
 							<Button variant="outline" onclick={() => (panelOpen = true)}>
-								<PanelLeftOpen class="mr-2 size-4" />
-								Open Server Panel
+								<PanelLeftOpen data-icon="inline-start" />
+								Show servers
 							</Button>
-						</Empty.Content>
-					{/if}
+						{/if}
+						<Empty.Command>nk list</Empty.Command>
+					</Empty.Content>
 				</Empty.Root>
 			{:else}
-				{#each getSessions() as [id, session]}
+				{#each getSessions() as [id, session] (id)}
 					<TerminalView {session} visible={id === activeSessionID.current} />
 				{/each}
 			{/if}

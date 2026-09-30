@@ -59,19 +59,19 @@
 						<div class="space-y-1">
 							{#each endpoints.slice(0, 2) as endpoint}
 								<div
-									class="flex items-center gap-1.5 overflow-hidden rounded bg-background px-1.5 py-1 shadow-sm"
+									class="flex items-center gap-1.5 overflow-hidden rounded-sm bg-background px-1.5 py-1"
 								>
 									<Globe class="text-primary" size={12} />
-									<code class="w-full truncate text-[10px] font-medium">{endpoint}</code>
+									<code class="w-full truncate text-2xs font-medium">{endpoint}</code>
 								</div>
 							{/each}
 							{#if endpoints.length > 2}
-								<div class="pl-1 text-[10px] text-muted-foreground">
+								<div class="pl-1 text-2xs text-muted-foreground">
 									+{endpoints.length - 2} more
 								</div>
 							{/if}
 							{#if endpoints.length === 0}
-								<span class="text-[10px] text-muted-foreground italic">No endpoints</span>
+								<span class="text-2xs text-muted-foreground italic">No endpoints</span>
 							{/if}
 						</div>
 					</div>
@@ -84,26 +84,26 @@
 						<div class="space-y-1">
 							{#each tags.slice(0, 2) as tag}
 								<div
-									class="flex items-center gap-1.5 overflow-hidden rounded bg-background px-1.5 py-1 shadow-sm"
+									class="flex items-center gap-1.5 overflow-hidden rounded-sm bg-background px-1.5 py-1"
 								>
 									<Tag class="text-primary" size={12} />
-									<code class="w-full truncate text-[10px] font-medium">{tag}</code>
+									<code class="w-full truncate text-2xs font-medium">{tag}</code>
 								</div>
 							{/each}
 							{#if tags.length > 2}
-								<div class="pl-1 text-[10px] text-muted-foreground">
+								<div class="pl-1 text-2xs text-muted-foreground">
 									+{tags.length - 2} more
 								</div>
 							{/if}
 							{#if tags.length === 0}
-								<span class="text-[10px] text-muted-foreground italic">No tags</span>
+								<span class="text-2xs text-muted-foreground italic">No tags</span>
 							{/if}
 						</div>
 					</div>
 				</div>
 
 				<div class="flex items-center justify-between bg-muted/10 p-2.5 px-4 text-xs">
-					<span class="text-muted-foreground">Total Principals</span>
+					<span class="text-muted-foreground">Total principals</span>
 					<Badge variant={principalCount > 0 ? 'default' : 'secondary'} class="h-5">
 						{principalCount}
 					</Badge>

@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { afterNavigate, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
-	import * as Alert from '$lib/components/ui/alert';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { CircleAlert } from '@lucide/svelte';
-	import Logo from '$lib/assets/logo.svelte';
+	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import { CircleAlert, LogIn } from '@lucide/svelte';
 
 	type ErrorInfo = { title: string; description: string };
 
@@ -77,25 +76,9 @@
 	});
 </script>
 
-<div
-	class="m-auto h-fit w-full max-w-sm overflow-hidden rounded-[calc(var(--radius)+.125rem)] border bg-muted shadow-md shadow-zinc-950/5 dark:[--color-muted:var(--color-zinc-900)]"
->
-	<div class="-m-px rounded-[calc(var(--radius)+.125rem)] border bg-card p-6 pb-6">
-		<div class="text-center">
-			<Logo class="mx-auto block w-10 py-2 dark:invert" />
-			<h1 class="mt-4 mb-1 text-xl font-semibold">Sign In to Nokku</h1>
-		</div>
-
-		<div class="mt-6">
-			<Alert.Root variant="destructive">
-				<CircleAlert />
-				<Alert.Title>{info.title}</Alert.Title>
-				<Alert.Description>{info.description}</Alert.Description>
-			</Alert.Root>
-		</div>
-	</div>
-
-	<div class="p-3">
-		<Button href="/login" variant="default" class="w-full">Back to Sign In</Button>
-	</div>
-</div>
+<AuthCard title={info.title} description={info.description} icon={CircleAlert} tone="destructive">
+	<Button href="/login">
+		<LogIn data-icon="inline-start" />
+		Back to sign in
+	</Button>
+</AuthCard>
