@@ -1,0 +1,83 @@
+<script lang="ts">
+	import EventRow from '$lib/components/audit/EventRow.svelte';
+	import ActivitySheet from '$lib/components/sheets/ActivitySheet.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import * as Card from '$lib/components/ui/card';
+	import { Skeleton } from '$lib/components/ui/skeleton';
+	import type { GetDashboardResponse } from '$lib/gen/nokku/v1/dashboard_pb';
+	import type { EventLog } from '$lib/gen/nokku/v1/util_pb';
+	import { formatTs } from '$lib/utils';
+	import { ArrowRight } from '@lucide/svelte';
+
+	let { data }: { data?: GetDashboardResponse } = $props();
+
+	const events = $derived(data?.activity.reduce((a, b) => a + b, 0) ?? 0);
+	const failures = $derived(data?.failures.reduce((a, b) => a + b, 0) ?? 0);
+	const peak = $derived(Math.max(1, ...(data?.activity ?? [])));
+	const label = (i: number) => {
+		const h = 23 - i;
+		return h === 0 ? 'this hour' : `${h}h ago`;
+	};
+
+	let selected = $state<EventLog>();
+</script>
+
+<ActivitySheet log={selected} onClose={() => (selected = undefined)} />
+
+<Card.Root class="gap-4">
+	<Card.Header>
+		<Card.Title>Last 24 hours</Card.Title>
+		<Card.Description>
+			{events} audit events{failures ? `, ${failures} failed` : ''}. Changes worth knowing about
+			below.
+		</Card.Description>
+		<Card.Action>
+			<Button size="sm" variant="ghost" href="/audit">
+				Audit log
+				<ArrowRight data-icon="inline-end" />
+			</Button>
+		</Card.Action>
+	</Card.Header>
+	<Card.Content class="flex flex-col gap-4">
+		{#if !data}
+			<Skeleton class="h-16 w-full" />
+		{:else}
+			<div class="flex flex-col gap-1">
+				<div class="flex h-14 items-end gap-0.5" role="img" aria-label="Audit events per hour">
+					{#each data.activity as n, i (i)}
+						{@const failed = data.failures[i] ?? 0}
+						<div
+							class="flex flex-1 flex-col justify-end overflow-hidden rounded-xs bg-primary/15"
+							style:height="{Math.max(4, (n / peak) * 100)}%"
+							title="{label(i)}: {n} events{failed ? `, ${failed} failed` : ''}"
+						>
+							{#if failed}
+								<div class="bg-destructive" style:height="{(failed / Math.max(1, n)) * 100}%"></div>
+							{/if}
+							<div class="flex-1 bg-primary/60"></div>
+						</div>
+					{/each}
+				</div>
+				<div class="flex justify-between font-mono text-2xs text-muted-foreground">
+					<span>24h ago</span>
+					<span>now</span>
+				</div>
+			</div>
+
+			{#if data.recentChanges.length}
+				<div class="divide-y overflow-hidden rounded-lg border">
+					{#each data.recentChanges as log (log.id)}
+						<EventRow
+							{log}
+							onclick={() => (selected = log)}
+							subtitle={`by ${log.actorName || 'system'}`}
+							meta={formatTs(log.timestamp, 'relative-short')}
+						/>
+					{/each}
+				</div>
+			{:else}
+				<p class="text-sm text-muted-foreground">No changes in the last 24 hours. Quiet day.</p>
+			{/if}
+		{/if}
+	</Card.Content>
+</Card.Root>
