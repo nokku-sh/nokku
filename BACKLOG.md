@@ -8,12 +8,16 @@ this file.
 
 ## Ready
 
-- [ ] `nokku/internal/api` Characterization test for
-      `DaemonService.CreateSession`. The success path needs a fake daemon on
-      the real DaemonControl stream that answers RelayOpen by bridging a
-      DaemonRelay stream to `sshclient/sshtest`. Probably 150+ lines alone.
-      Done when: a DB-backed test covers a started session and a
-      non-user principal (PermissionDenied). (2026-10-01)
+- [ ] `nokku/internal/api` `CreateSession` success path. `TestCreateSession`
+      covers lookups, offline daemon, and the non-user denial. A live
+      session needs: the harness on TLS with HTTP/2 (bidi streams), a fake
+      daemon on the real Connect stream that answers RelayOpen by opening
+      DaemonRelay and bridging it to `sshclient/sshtest`, DPoP session
+      proofs with `ath` on both streams, the sshtest CA stored as the
+      target's CA, and sshtest taking the host and user principals (today
+      hardcoded "target-1" and "u1", 10 callers).
+      Done when: a test starts a session and sees the sshtest echo.
+      (2026-10-01)
 - [ ] `nokkud/main.go` The root command description says nokkud "replaces
       the host sshd". It runs beside it on :4022 and never touches port 22.
       Done when: the help text matches. (2026-09-30)
@@ -71,6 +75,10 @@ this file.
 
 ## Done
 
+- [x] `nokku/internal/api` `CreateSession` characterization test, first
+      part. Result: covers the daemon, CA, and target lookups, the offline
+      daemon (Unavailable), and a service account (PermissionDenied). +52
+      lines. Success path split into Ready. (loop/2026-10-01)
 - [x] `nokku/internal/api` `EnrollDaemon` characterization test. Result:
       covers enrollment through a real enroll token and DPoP proof, same-key
       re-enroll, used-up and bad tokens. +90 lines. (loop/2026-10-01)
