@@ -36,6 +36,21 @@ func (s *UtilService) GetVersion(
 	return &nokkuv1.GetVersionResponse{Version: &buildinfo.Version}, nil
 }
 
+func (s *UtilService) GetInstanceInfo(
+	_ context.Context,
+	_ *nokkuv1.GetInstanceInfoRequest,
+) (*nokkuv1.GetInstanceInfoResponse, error) {
+	op := s.cfg.Email.Operator
+	return &nokkuv1.GetInstanceInfoResponse{
+		OperatorName: &op.Name,
+		SupportEmail: &op.SupportEmail,
+		WebsiteUrl:   &op.WebsiteURL,
+		TermsUrl:     &op.TermsURL,
+		PrivacyUrl:   &op.PrivacyURL,
+		ImprintUrl:   &op.ImprintURL,
+	}, nil
+}
+
 func (s *UtilService) Whoami(
 	ctx context.Context,
 	_ *nokkuv1.WhoamiRequest,

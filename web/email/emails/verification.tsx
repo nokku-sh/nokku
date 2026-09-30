@@ -4,7 +4,7 @@ import BaseLayout from "../layouts/BaseLayout";
 
 export default function Verification() {
   return (
-    <BaseLayout preview="Verify your email address to continue to Nokku.">
+    <BaseLayout type="instance" preview="Verify your email address to continue to Nokku.">
       <Text className="m-0 text-xs font-bold uppercase tracking-[1.4px] text-brand">
         Action required
       </Text>

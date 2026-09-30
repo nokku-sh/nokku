@@ -1,4 +1,4 @@
-import { DocsURL, SupportEmail } from '$lib/config';
+import { DocsURL } from '$lib/config';
 import { atLeast, type RoleName } from '$lib/roles';
 import {
 	Activity,
@@ -99,11 +99,9 @@ export const UserRoutes: RouteItem[] = [
 	}
 ];
 
+// Support is added at runtime, only when the server has a support email.
 export const SupportRoutes: Record<string, RouteItem[]> = {
-	Support: [
-		{ title: 'Documentation', url: DocsURL, icon: BookText },
-		{ title: 'Support', url: SupportEmail, icon: Mail }
-	]
+	Support: [{ title: 'Documentation', url: DocsURL, icon: BookText }]
 };
 
 /** The pages themselves, without the groups that only hold children. */
@@ -122,4 +120,8 @@ export function routeFor(path: string): RouteItem | undefined {
 // Show everything until the role is known, so the nav doesn't flicker.
 export function canSee(route: RouteItem, role: string | undefined): boolean {
 	return role === undefined || atLeast(role, route.role ?? 'member');
+}
+
+export function supportRoute(email: string | undefined): RouteItem | undefined {
+	return email ? { title: 'Support', url: `mailto:${email}`, icon: Mail } : undefined;
 }

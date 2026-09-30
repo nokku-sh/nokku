@@ -35,6 +35,9 @@ const (
 const (
 	// UtilServiceGetVersionProcedure is the fully-qualified name of the UtilService's GetVersion RPC.
 	UtilServiceGetVersionProcedure = "/nokku.v1.UtilService/GetVersion"
+	// UtilServiceGetInstanceInfoProcedure is the fully-qualified name of the UtilService's
+	// GetInstanceInfo RPC.
+	UtilServiceGetInstanceInfoProcedure = "/nokku.v1.UtilService/GetInstanceInfo"
 	// UtilServiceWhoamiProcedure is the fully-qualified name of the UtilService's Whoami RPC.
 	UtilServiceWhoamiProcedure = "/nokku.v1.UtilService/Whoami"
 	// UtilServiceListRolesProcedure is the fully-qualified name of the UtilService's ListRoles RPC.
@@ -50,6 +53,9 @@ const (
 // UtilServiceClient is a client for the nokku.v1.UtilService service.
 type UtilServiceClient interface {
 	GetVersion(context.Context, *v1.GetVersionRequest) (*v1.GetVersionResponse, error)
+	// Who runs this server, for legal links and support contacts. Public, the
+	// login pages need it too.
+	GetInstanceInfo(context.Context, *v1.GetInstanceInfoRequest) (*v1.GetInstanceInfoResponse, error)
 	Whoami(context.Context, *v1.WhoamiRequest) (*v1.WhoamiResponse, error)
 	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error)
@@ -71,6 +77,13 @@ func NewUtilServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+UtilServiceGetVersionProcedure,
 			connect.WithSchema(utilServiceMethods.ByName("GetVersion")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		getInstanceInfo: connect.NewClient[v1.GetInstanceInfoRequest, v1.GetInstanceInfoResponse](
+			httpClient,
+			baseURL+UtilServiceGetInstanceInfoProcedure,
+			connect.WithSchema(utilServiceMethods.ByName("GetInstanceInfo")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
@@ -107,6 +120,7 @@ func NewUtilServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 // utilServiceClient implements UtilServiceClient.
 type utilServiceClient struct {
 	getVersion      *connect.Client[v1.GetVersionRequest, v1.GetVersionResponse]
+	getInstanceInfo *connect.Client[v1.GetInstanceInfoRequest, v1.GetInstanceInfoResponse]
 	whoami          *connect.Client[v1.WhoamiRequest, v1.WhoamiResponse]
 	listRoles       *connect.Client[v1.ListRolesRequest, v1.ListRolesResponse]
 	listAuditLogs   *connect.Client[v1.ListAuditLogsRequest, v1.ListAuditLogsResponse]
@@ -116,6 +130,15 @@ type utilServiceClient struct {
 // GetVersion calls nokku.v1.UtilService.GetVersion.
 func (c *utilServiceClient) GetVersion(ctx context.Context, req *v1.GetVersionRequest) (*v1.GetVersionResponse, error) {
 	response, err := c.getVersion.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// GetInstanceInfo calls nokku.v1.UtilService.GetInstanceInfo.
+func (c *utilServiceClient) GetInstanceInfo(ctx context.Context, req *v1.GetInstanceInfoRequest) (*v1.GetInstanceInfoResponse, error) {
+	response, err := c.getInstanceInfo.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
@@ -161,6 +184,9 @@ func (c *utilServiceClient) ExportAuditLogs(ctx context.Context, req *v1.ExportA
 // UtilServiceHandler is an implementation of the nokku.v1.UtilService service.
 type UtilServiceHandler interface {
 	GetVersion(context.Context, *v1.GetVersionRequest) (*v1.GetVersionResponse, error)
+	// Who runs this server, for legal links and support contacts. Public, the
+	// login pages need it too.
+	GetInstanceInfo(context.Context, *v1.GetInstanceInfoRequest) (*v1.GetInstanceInfoResponse, error)
 	Whoami(context.Context, *v1.WhoamiRequest) (*v1.WhoamiResponse, error)
 	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error)
@@ -178,6 +204,13 @@ func NewUtilServiceHandler(svc UtilServiceHandler, opts ...connect.HandlerOption
 		UtilServiceGetVersionProcedure,
 		svc.GetVersion,
 		connect.WithSchema(utilServiceMethods.ByName("GetVersion")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	utilServiceGetInstanceInfoHandler := connect.NewUnaryHandlerSimple(
+		UtilServiceGetInstanceInfoProcedure,
+		svc.GetInstanceInfo,
+		connect.WithSchema(utilServiceMethods.ByName("GetInstanceInfo")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
@@ -212,6 +245,8 @@ func NewUtilServiceHandler(svc UtilServiceHandler, opts ...connect.HandlerOption
 		switch r.URL.Path {
 		case UtilServiceGetVersionProcedure:
 			utilServiceGetVersionHandler.ServeHTTP(w, r)
+		case UtilServiceGetInstanceInfoProcedure:
+			utilServiceGetInstanceInfoHandler.ServeHTTP(w, r)
 		case UtilServiceWhoamiProcedure:
 			utilServiceWhoamiHandler.ServeHTTP(w, r)
 		case UtilServiceListRolesProcedure:
@@ -231,6 +266,10 @@ type UnimplementedUtilServiceHandler struct{}
 
 func (UnimplementedUtilServiceHandler) GetVersion(context.Context, *v1.GetVersionRequest) (*v1.GetVersionResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.UtilService.GetVersion is not implemented"))
+}
+
+func (UnimplementedUtilServiceHandler) GetInstanceInfo(context.Context, *v1.GetInstanceInfoRequest) (*v1.GetInstanceInfoResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.UtilService.GetInstanceInfo is not implemented"))
 }
 
 func (UnimplementedUtilServiceHandler) Whoami(context.Context, *v1.WhoamiRequest) (*v1.WhoamiResponse, error) {

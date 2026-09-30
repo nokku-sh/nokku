@@ -4,7 +4,7 @@ import BaseLayout from "../layouts/BaseLayout";
 
 export default function NewLogin() {
   return (
-    <BaseLayout preview="A new sign-in was recorded on your Nokku account.">
+    <BaseLayout type="instance" preview="A new sign-in was recorded on your Nokku account.">
       <Text className="m-0 text-xs font-bold uppercase tracking-[1.4px] text-brand">
         Sign-in notice
       </Text>

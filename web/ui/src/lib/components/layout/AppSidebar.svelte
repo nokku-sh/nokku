@@ -3,9 +3,9 @@
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Check, ChevronsUpDown, ChevronRight, Plus, SlidersHorizontal } from '@lucide/svelte';
 	import type { ComponentProps } from 'svelte';
-	import { AppRoutes, SupportRoutes, canSee, type RouteItem } from './routes';
+	import { AppRoutes, SupportRoutes, canSee, supportRoute, type RouteItem } from './routes';
 	import UserMenu from './UserMenu.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
+	import { util, workspace } from '$lib/api/workspaces.svelte';
 	import { user } from '$lib/api/user.svelte';
 	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
 	import { page } from '$app/state';
@@ -23,6 +23,8 @@
 
 	const ws = workspace.get();
 	const workspaces = workspace.list();
+	const info = util.instanceInfo();
+	const support = $derived(supportRoute(info.data?.supportEmail));
 	const currentUser = user.self();
 	const currentRoute = $derived(page.url.pathname);
 
@@ -176,7 +178,7 @@
 				<Sidebar.GroupContent>
 					<Sidebar.GroupLabel>{groupName}</Sidebar.GroupLabel>
 					<Sidebar.Menu>
-						{#each routes as r (r.title)}
+						{#each support ? [...routes, support] : routes as r (r.title)}
 							<Sidebar.MenuItem>
 								<Sidebar.MenuButton tooltipContent={r.title} isActive={isRouteActive(r)}>
 									{#snippet child({ props })}
