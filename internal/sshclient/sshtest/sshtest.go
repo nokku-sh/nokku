@@ -51,6 +51,13 @@ type Server struct {
 
 func NewServer(t testing.TB) *Server {
 	t.Helper()
+	return NewServerFor(t, "target-1", "u1")
+}
+
+// NewServerFor serves a host cert for hostPrincipal and admits user certs
+// naming userPrincipal, for tests that run against real target and user ids.
+func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
+	t.Helper()
 	_, caPriv, err := ed25519.GenerateKey(crand.Reader)
 	if err != nil {
 		t.Fatalf("generate CA key: %v", err)
@@ -72,7 +79,7 @@ func NewServer(t testing.TB) *Server {
 		Key:             hostSSHKey,
 		CertType:        ssh.HostCert,
 		KeyId:           "sshtest-host",
-		ValidPrincipals: []string{"target-1"},
+		ValidPrincipals: []string{hostPrincipal},
 		ValidAfter:      util.UnixTimeToUint64(time.Now().Add(-time.Minute).Unix()),
 		ValidBefore:     util.UnixTimeToUint64(time.Now().Add(time.Hour).Unix()),
 	}
@@ -91,8 +98,8 @@ func NewServer(t testing.TB) *Server {
 	}
 
 	s := &Server{
-		UserPrincipal: "u1",
-		HostPrincipal: "target-1",
+		UserPrincipal: userPrincipal,
+		HostPrincipal: hostPrincipal,
 		env:           make(map[string]string),
 		ca:            caSigner,
 		caPriv:        caPriv,
