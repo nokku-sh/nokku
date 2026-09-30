@@ -138,7 +138,7 @@ func (s *Service) IssueDaemonSession(ctx context.Context, workspaceID, daemonID,
 // fires OnNewDeviceLogin.
 func (s *Service) RememberDevice(ctx context.Context, header http.Header, remoteAddr string, u *db.User) *http.Cookie {
 	if raw := cookieFromHeader(header, webDeviceCookieName); raw != "" {
-		if sess, err := s.VerifySession(ctx, raw); err == nil &&
+		if sess, err := s.verifySession(ctx, raw); err == nil &&
 			sess.Kind == string(actor.KindWebDevice) && sess.SubjectID == u.ID {
 			now := s.now()
 			if err := s.sys.TouchSession(
@@ -170,9 +170,9 @@ func (s *Service) RememberDevice(ctx context.Context, header http.Header, remote
 	return s.newCookie(webDeviceCookieName, token, *sess.ExpiresAt)
 }
 
-func (s *Service) VerifySession(ctx context.Context, token string) (db.Session, error) {
+func (s *Service) verifySession(ctx context.Context, token string) (db.Session, error) {
 	if token == "" {
-		return db.Session{}, ErrNoSession
+		return db.Session{}, errNoSession
 	}
 	tokenHash, err := crypto.HashToken(token)
 	if err != nil {
@@ -180,14 +180,14 @@ func (s *Service) VerifySession(ctx context.Context, token string) (db.Session, 
 	}
 	sess, err := s.sys.GetSession(ctx, tokenHash)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return db.Session{}, ErrNoSession
+		return db.Session{}, errNoSession
 	}
 	if err != nil {
 		return db.Session{}, err
 	}
 	if sess.ExpiresAt != nil && !sess.ExpiresAt.After(s.now()) {
 		_ = s.sys.DeleteSession(ctx, sess.TokenHash)
-		return db.Session{}, ErrSessionExpired
+		return db.Session{}, errSessionExpired
 	}
 	return *sess, nil
 }
@@ -219,7 +219,7 @@ func (s *Service) Logout(ctx context.Context, header http.Header, procedure stri
 	return nil
 }
 
-func (s *Service) RevokeSubject(ctx context.Context, subjectID string) (int64, error) {
+func (s *Service) revokeSubject(ctx context.Context, subjectID string) (int64, error) {
 	return s.sys.DeleteSubjectSessions(ctx, subjectID)
 }
 

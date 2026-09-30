@@ -8,9 +8,6 @@ this file.
 
 ## Ready
 
-- [ ] `nokku/internal/iam` Unexport the 46 identifiers only iam uses. One
-      mechanical commit, list from the exports tool.
-      Done when: the tool reports no `internal` entries for iam. (2026-09-30)
 - [ ] `nokku` Unexport what the exports tool lists as `internal` in the
       remaining packages (entitlement, util, email, billing, crypto, audit,
       and smaller ones). Leave `api.Server` and daemon's `Enrolled`, `Relay`,
@@ -68,6 +65,12 @@ this file.
 
 ## Done
 
+- [x] `nokku/internal/iam` Unexport what only iam uses. Result: 25
+      identifiers unexported, case-only diff, 0 lines net. Kept exported:
+      types of exported fields other packages use (`DPoPVerifier`,
+      `DeviceFlow`, `SCIMFlow`, `PasswordManager`, `OAuth2Provider`, `Sink`,
+      `Action` and its consts so the enum stays whole). `linker.Resolve`
+      clashes with `linker.resolve`. (loop/2026-10-01)
 - [x] `mon` CONTRIBUTING.md and SECURITY.md. Result: both added, scoped to
       a library (consumers, tags, salts, per-package scope). ed31e99 on
       loop/2026-10-01.

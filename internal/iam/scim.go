@@ -102,15 +102,15 @@ func (f *SCIMFlow) serverFor(workspaceID string) (scim.Server, error) {
 func (s *Service) verifySCIMToken(ctx context.Context, workspaceID, raw string) (string, error) {
 	parsed, err := crypto.Parse(raw)
 	if err != nil || parsed.ID != workspaceID {
-		return "", ErrInvalidToken
+		return "", errInvalidToken
 	}
 	hash, err := crypto.HashToken(raw)
 	if err != nil {
-		return "", ErrInvalidToken
+		return "", errInvalidToken
 	}
 	row, err := s.sys.GetSCIMTokenByHash(ctx, hash)
 	if err != nil || row.WorkspaceID != workspaceID {
-		return "", ErrInvalidToken
+		return "", errInvalidToken
 	}
 	_ = s.sys.TouchSCIMToken(ctx, row.ID)
 	return row.ID, nil
@@ -203,7 +203,7 @@ func (s *Service) scimProvisionUser(
 			}
 		}
 		if err := s.EnsureMember(ctx, q, u.ID, workspaceID, ""); err != nil {
-			if errors.Is(err, ErrSeatLimit) {
+			if errors.Is(err, errSeatLimit) {
 				return scimerrors.ScimError{Status: http.StatusForbidden, Detail: err.Error()}
 			}
 			return err
@@ -224,7 +224,7 @@ func (s *Service) scimProvisionUser(
 		})
 	}
 	if !u.Active {
-		if _, err := s.RevokeSubject(ctx, u.ID); err != nil {
+		if _, err := s.revokeSubject(ctx, u.ID); err != nil {
 			return nil, err
 		}
 	}

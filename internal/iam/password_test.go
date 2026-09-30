@@ -6,7 +6,7 @@ import (
 )
 
 func TestHashVerifyPassword(t *testing.T) {
-	params := DefaultPasswordParams()
+	params := defaultPasswordParams()
 
 	h, err := hashPassword("hunter2", params)
 	if err != nil {
@@ -34,7 +34,7 @@ func TestHashVerifyPassword(t *testing.T) {
 }
 
 func TestNeedsRehash(t *testing.T) {
-	params := DefaultPasswordParams()
+	params := defaultPasswordParams()
 
 	h, err := hashPassword("hunter2", params)
 	if err != nil {
@@ -70,7 +70,7 @@ func TestNormalizeEmail(t *testing.T) {
 func TestDummyBurn(t *testing.T) {
 	// The dummy path must produce a hash and verify against it without
 	// error, so unknown-email logins burn real argon2id work.
-	m := newPasswordManager(&Service{}, PasswordParams{})
+	m := newPasswordManager(&Service{}, passwordParams{})
 	h := m.dummy()
 	if h == "" {
 		t.Fatal("dummy hash was not built")

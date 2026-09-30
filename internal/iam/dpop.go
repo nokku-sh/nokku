@@ -64,46 +64,46 @@ func (v *DPoPVerifier) Verify(
 ) (string, error) {
 	sig, err := jose.ParseSigned(proofJWT, allowedAlgs)
 	if err != nil {
-		return "", fmt.Errorf("%w: parse: %w", ErrInvalidProof, err)
+		return "", fmt.Errorf("%w: parse: %w", errInvalidProof, err)
 	}
 	if len(sig.Signatures) != 1 {
-		return "", fmt.Errorf("%w: expected a single signature", ErrInvalidProof)
+		return "", fmt.Errorf("%w: expected a single signature", errInvalidProof)
 	}
 
 	hdr := sig.Signatures[0].Protected
 	typ, _ := hdr.ExtraHeaders[jose.HeaderType].(string)
 	if !strings.EqualFold(typ, "dpop+jwt") {
-		return "", fmt.Errorf("%w: missing dpop+jwt typ", ErrInvalidProof)
+		return "", fmt.Errorf("%w: missing dpop+jwt typ", errInvalidProof)
 	}
 
 	jwk := hdr.JSONWebKey
 	if jwk == nil || !jwk.Valid() || !jwk.IsPublic() {
-		return "", fmt.Errorf("%w: missing or invalid jwk", ErrInvalidProof)
+		return "", fmt.Errorf("%w: missing or invalid jwk", errInvalidProof)
 	}
 
 	payload, err := sig.Verify(jwk.Key)
 	if err != nil {
-		return "", fmt.Errorf("%w: signature: %w", ErrInvalidProof, err)
+		return "", fmt.Errorf("%w: signature: %w", errInvalidProof, err)
 	}
 
 	var c dpopClaims
 	if err := json.Unmarshal(payload, &c); err != nil {
-		return "", fmt.Errorf("%w: claims: %w", ErrInvalidProof, err)
+		return "", fmt.Errorf("%w: claims: %w", errInvalidProof, err)
 	}
 	if c.HTM != htm {
-		return "", fmt.Errorf("%w: htm mismatch", ErrInvalidProof)
+		return "", fmt.Errorf("%w: htm mismatch", errInvalidProof)
 	}
 	if !strings.EqualFold(normalizeDPoPHTU(c.HTU), normalizeDPoPHTU(htu)) {
-		return "", fmt.Errorf("%w: htu mismatch", ErrInvalidProof)
+		return "", fmt.Errorf("%w: htu mismatch", errInvalidProof)
 	}
 	if c.JTI == "" {
-		return "", fmt.Errorf("%w: missing jti", ErrInvalidProof)
+		return "", fmt.Errorf("%w: missing jti", errInvalidProof)
 	}
 
 	now := v.now().Unix()
 	skew := int64(dpopMaxSkew.Seconds())
 	if diff := now - c.IAT; diff > skew || diff < -skew {
-		return "", fmt.Errorf("%w: stale iat", ErrInvalidProof)
+		return "", fmt.Errorf("%w: stale iat", errInvalidProof)
 	}
 	if c.Nonce == "" || !v.nonceValid(c.Nonce) {
 		return "", ErrDPoPNonce
@@ -112,39 +112,39 @@ func (v *DPoPVerifier) Verify(
 	if accessToken != "" {
 		wantATH := DPoPATH(accessToken)
 		if subtle.ConstantTimeCompare([]byte(c.ATH), []byte(wantATH)) != 1 {
-			return "", fmt.Errorf("%w: ath mismatch", ErrInvalidProof)
+			return "", fmt.Errorf("%w: ath mismatch", errInvalidProof)
 		}
 	}
 
 	// Remember the jti as long as its proof could still be accepted.
 	added, err := v.replay.SetNX(ctx, "dpop:jti:"+c.JTI, nil, 2*dpopNonceTTL+dpopMaxSkew)
 	if err != nil {
-		return "", fmt.Errorf("%w: replay store: %w", ErrInvalidProof, err)
+		return "", fmt.Errorf("%w: replay store: %w", errInvalidProof, err)
 	}
 	if !added {
-		return "", ErrReplay
+		return "", errReplay
 	}
 
 	tp, err := jwk.Thumbprint(crypto.SHA256)
 	if err != nil {
-		return "", fmt.Errorf("%w: thumbprint: %w", ErrInvalidProof, err)
+		return "", fmt.Errorf("%w: thumbprint: %w", errInvalidProof, err)
 	}
 	return base64.RawURLEncoding.EncodeToString(tp), nil
 }
 
-func (v *DPoPVerifier) VerifySession(
+func (v *DPoPVerifier) verifySession(
 	ctx context.Context,
 	proofJWT, accessToken, htm, htu, binding string,
 ) error {
 	if binding == "" {
-		return fmt.Errorf("%w: session is not DPoP-bound", ErrInvalidProof)
+		return fmt.Errorf("%w: session is not DPoP-bound", errInvalidProof)
 	}
 	jkt, err := v.Verify(ctx, proofJWT, accessToken, htm, htu)
 	if err != nil {
 		return err
 	}
 	if jkt != binding {
-		return ErrBindingMismatch
+		return errBindingMismatch
 	}
 	return nil
 }

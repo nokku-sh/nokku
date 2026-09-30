@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	ErrIdentityLinked   = errors.New("iam: identity already linked to another account")
-	ErrIdentityRejected = errors.New("iam: identity rejected")
+	errIdentityLinked   = errors.New("iam: identity already linked to another account")
+	errIdentityRejected = errors.New("iam: identity rejected")
 )
 
 type flowLinkOptions struct {
@@ -51,7 +51,7 @@ func (l *linker) Resolve(ctx context.Context, opts flowLinkOptions) (*db.User, e
 		return nil, err
 	}
 	if opts.WorkspaceID != "" {
-		if err := l.svc.JoinWorkspace(ctx, u.ID, opts.WorkspaceID); err != nil {
+		if err := l.svc.joinWorkspace(ctx, u.ID, opts.WorkspaceID); err != nil {
 			return nil, err
 		}
 	}
@@ -74,7 +74,7 @@ func (l *linker) resolve(ctx context.Context, opts flowLinkOptions) (*db.User, e
 			return nil, err
 		}
 		if !ok {
-			return nil, ErrIdentityRejected
+			return nil, errIdentityRejected
 		}
 		return u, nil
 	}
@@ -86,9 +86,9 @@ func (l *linker) resolve(ctx context.Context, opts flowLinkOptions) (*db.User, e
 	})
 	if err == nil {
 		if opts.LinkUserID != "" && cred.UserID != opts.LinkUserID {
-			return nil, ErrIdentityLinked
+			return nil, errIdentityLinked
 		}
-		u, err := l.svc.GetUserByID(ctx, cred.UserID)
+		u, err := l.svc.getUserByID(ctx, cred.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +100,7 @@ func (l *linker) resolve(ctx context.Context, opts flowLinkOptions) (*db.User, e
 	}
 
 	if opts.LinkUserID != "" {
-		u, err := l.svc.GetUserByID(ctx, opts.LinkUserID)
+		u, err := l.svc.getUserByID(ctx, opts.LinkUserID)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +114,7 @@ func (l *linker) resolve(ctx context.Context, opts flowLinkOptions) (*db.User, e
 	}
 
 	if opts.Email == "" {
-		return nil, ErrIdentityRejected
+		return nil, errIdentityRejected
 	}
 	if enterprise {
 		ok, err := l.svc.managedBy(ctx, opts.WorkspaceID, opts.Email)
@@ -122,11 +122,11 @@ func (l *linker) resolve(ctx context.Context, opts flowLinkOptions) (*db.User, e
 			return nil, err
 		}
 		if !ok {
-			return nil, ErrIdentityRejected
+			return nil, errIdentityRejected
 		}
 	} else {
 		if !opts.EmailVerified {
-			return nil, ErrIdentityRejected
+			return nil, errIdentityRejected
 		}
 		// Social logins don't satisfy a domain's enforced SSO.
 		if err := l.svc.enforceSSO(ctx, opts.Email); err != nil {
@@ -138,13 +138,13 @@ func (l *linker) resolve(ctx context.Context, opts flowLinkOptions) (*db.User, e
 	switch {
 	case err == nil:
 		if enterprise && opts.Name != "" && u.Name != opts.Name {
-			if u, err = l.svc.UpdateUser(ctx, db.UpdateUserParams{ID: u.ID, Name: &opts.Name}); err != nil {
+			if u, err = l.svc.updateUser(ctx, db.UpdateUserParams{ID: u.ID, Name: &opts.Name}); err != nil {
 				return nil, err
 			}
 		}
 	case errors.Is(err, ErrNotFound):
 		if !opts.JITProvisioning {
-			return nil, ErrIdentityRejected
+			return nil, errIdentityRejected
 		}
 		if u, err = l.svc.provisionUser(ctx, opts); err != nil {
 			return nil, err
@@ -194,7 +194,7 @@ func (l *linker) link(ctx context.Context, opts flowLinkOptions, userID string) 
 		Data:     []byte{},
 	})
 	if errors.Is(err, pgx.ErrNoRows) || db.IsUniqueViolation(err) {
-		return ErrIdentityLinked
+		return errIdentityLinked
 	}
 	return err
 }

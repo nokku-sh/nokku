@@ -18,7 +18,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-const APIKeyPrefix = "nokku_sa_" //nolint:gosec // a token scheme prefix, not a credential
+const apiKeyPrefix = "nokku_sa_" //nolint:gosec // a token scheme prefix, not a credential
 
 // Authenticate returns an empty session for service accounts.
 func (s *Service) Authenticate(
@@ -27,8 +27,8 @@ func (s *Service) Authenticate(
 	procedure string,
 ) (actor.Principal, db.Session, error) {
 	token, fromHeader := requestCredential(header)
-	if strings.HasPrefix(token, APIKeyPrefix) {
-		p, err := s.AuthenticateAPIKey(ctx, token)
+	if strings.HasPrefix(token, apiKeyPrefix) {
+		p, err := s.authenticateAPIKey(ctx, token)
 		return p, db.Session{}, err
 	}
 
@@ -55,14 +55,14 @@ func (s *Service) AuthenticateToken(
 	ctx context.Context,
 	token string,
 ) (actor.Principal, db.Session, error) {
-	sess, err := s.VerifySession(ctx, token)
+	sess, err := s.verifySession(ctx, token)
 	if err != nil {
 		return actor.Principal{}, db.Session{}, err
 	}
 	kind := actor.Kind(sess.Kind)
 	p := actor.Principal{ID: sess.SubjectID, Kind: kind, WorkspaceID: deref(sess.WorkspaceID)}
 	if kind == actor.KindUser {
-		u, err := s.GetUserByID(ctx, sess.SubjectID)
+		u, err := s.getUserByID(ctx, sess.SubjectID)
 		if err != nil {
 			return actor.Principal{}, db.Session{}, err
 		}
@@ -74,18 +74,18 @@ func (s *Service) AuthenticateToken(
 	return p, sess, nil
 }
 
-// AuthenticateAPIKey uses Sys since this lookup is what establishes the tenant.
-func (s *Service) AuthenticateAPIKey(ctx context.Context, raw string) (actor.Principal, error) {
+// authenticateAPIKey uses Sys since this lookup is what establishes the tenant.
+func (s *Service) authenticateAPIKey(ctx context.Context, raw string) (actor.Principal, error) {
 	hash, err := crypto.HashToken(raw)
 	if err != nil {
 		return actor.Principal{}, err
 	}
 	sa, err := s.sys.GetServiceAccountByTokenHash(ctx, &hash)
 	if err != nil {
-		return actor.Principal{}, ErrInvalidCredentials
+		return actor.Principal{}, errInvalidCredentials
 	}
 	if sa.ExpiresAt != nil && sa.ExpiresAt.Before(s.now()) {
-		return actor.Principal{}, ErrCredentialsExpired
+		return actor.Principal{}, errCredentialsExpired
 	}
 	_ = s.sys.TouchServiceAccount(ctx, sa.ID)
 	return actor.Principal{
@@ -100,7 +100,7 @@ func NewAPIKey() (raw string, hash crypto.HashedToken, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	raw = APIKeyPrefix + secret
+	raw = apiKeyPrefix + secret
 	hash, err = crypto.HashToken(raw)
 	if err != nil {
 		return "", "", err
@@ -117,13 +117,13 @@ func (s *Service) verifySessionProof(
 	if proof == "" {
 		return ErrDPoPRequired
 	}
-	return s.DPoP.VerifySession(ctx, proof, token, http.MethodPost, s.baseURL+procedure, binding)
+	return s.DPoP.verifySession(ctx, proof, token, http.MethodPost, s.baseURL+procedure, binding)
 }
 
 // AdvertiseDPoPNonce also sends the canonical API URL so a recovering client
 // corrects the htu it signs.
 func (s *Service) AdvertiseDPoPNonce(h http.Header) {
-	h.Set(DeviceURLHeader, s.baseURL)
+	h.Set(deviceURLHeader, s.baseURL)
 	h.Set("DPoP-Nonce", s.DPoP.CurrentNonce())
 }
 

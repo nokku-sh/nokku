@@ -45,11 +45,11 @@ func (s *Service) IssueToken(
 func (s *Service) ConsumeToken(ctx context.Context, raw, purpose string) (string, error) {
 	tokenHash, err := crypto.HashToken(raw)
 	if err != nil {
-		return "", ErrInvalidToken
+		return "", errInvalidToken
 	}
 	userID, err := s.sys.ConsumeToken(ctx, &db.ConsumeTokenParams{TokenHash: tokenHash, Purpose: purpose})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", ErrInvalidToken
+		return "", errInvalidToken
 	}
 	return userID, err
 }

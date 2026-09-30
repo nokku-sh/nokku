@@ -50,7 +50,7 @@ func (s *Service) GetUser(ctx context.Context) (*db.User, error) {
 	return u, nil
 }
 
-func (s *Service) GetUserByID(ctx context.Context, userID string) (*db.User, error) {
+func (s *Service) getUserByID(ctx context.Context, userID string) (*db.User, error) {
 	u, err := s.sys.GetUser(ctx, userID)
 	if err != nil {
 		return nil, mapNotFound(err)
@@ -66,7 +66,7 @@ func (s *Service) GetUserByEmail(ctx context.Context, email string) (*db.User, e
 	return u, nil
 }
 
-func (s *Service) UpdateUser(ctx context.Context, p db.UpdateUserParams) (*db.User, error) {
+func (s *Service) updateUser(ctx context.Context, p db.UpdateUserParams) (*db.User, error) {
 	u, err := s.sys.UpdateUser(ctx, &p)
 	if err != nil {
 		return nil, mapNotFound(err)
