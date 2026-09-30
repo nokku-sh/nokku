@@ -13,12 +13,13 @@ import (
 	"connectrpc.com/connect"
 	"github.com/mizuchilabs/kata/buildinfo"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/audit"
-	"github.com/nokku-sh/nokku/internal/iam"
+
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
 type UtilService struct {
@@ -55,7 +56,7 @@ func (s *UtilService) Whoami(
 	ctx context.Context,
 	_ *nokkuv1.WhoamiRequest,
 ) (*nokkuv1.WhoamiResponse, error) {
-	p, ok := iam.PrincipalFromContext(ctx)
+	p, ok := actor.PrincipalFromContext(ctx)
 	if !ok {
 		return nil, NewError(connect.CodeUnauthenticated, "not authenticated")
 	}
@@ -63,18 +64,18 @@ func (s *UtilService) Whoami(
 	out := &nokkuv1.WhoamiResponse{
 		Kind:        new(string(p.Kind)),
 		SubjectId:   new(p.ID),
-		UserId:      new(iam.UserIDFromContext(ctx)),
-		WorkspaceId: new(iam.WorkspaceIDFromContext(ctx)),
+		UserId:      new(actor.UserIDFromContext(ctx)),
+		WorkspaceId: new(actor.WorkspaceIDFromContext(ctx)),
 	}
 
 	switch p.Kind {
-	case iam.KindUser, iam.KindCLI, iam.KindWebDevice:
+	case actor.KindUser, actor.KindCLI, actor.KindWebDevice:
 		u, err := s.cfg.IAM.GetUser(ctx)
 		if err != nil {
-			return nil, DBError(err)
+			return nil, err
 		}
 		out.User = u.ToProto()
-	case iam.KindServiceAccount:
+	case actor.KindServiceAccount:
 		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 			sa, err := q.GetServiceAccount(ctx, p.ID)
 			if err != nil {
@@ -83,9 +84,9 @@ func (s *UtilService) Whoami(
 			out.ServiceAccount = sa.ToProto()
 			return nil
 		}); err != nil {
-			return nil, DBError(err)
+			return nil, err
 		}
-	case iam.KindDaemon:
+	case actor.KindDaemon:
 		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 			d, err := q.GetDaemon(ctx, p.ID)
 			if err != nil {
@@ -94,9 +95,9 @@ func (s *UtilService) Whoami(
 			out.Daemon = d.ToProto()
 			return nil
 		}); err != nil {
-			return nil, DBError(err)
+			return nil, err
 		}
-	case iam.KindSCIM:
+	case actor.KindSCIM:
 		// SCIM tokens never reach connect.
 	}
 	return out, nil
@@ -183,7 +184,7 @@ func auditParams(ctx context.Context, workspaceID string, f *nokkuv1.AuditLogFil
 			p.ActorIds = f.GetActorIds()
 		}
 	} else {
-		p.ActorIds = []string{iam.SubjectFromContext(ctx)}
+		p.ActorIds = []string{actor.SubjectFromContext(ctx)}
 	}
 	if len(f.GetActorKinds()) > 0 {
 		p.ActorKinds = f.GetActorKinds()

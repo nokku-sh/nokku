@@ -20,6 +20,9 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
+// ErrNotConfigured means KMS_URI is unset, secrets use NOKKU_SECRET.
+var ErrNotConfigured = errors.New("KMS_URI is not set")
+
 type TinkEncryptor struct {
 	mu        sync.RWMutex
 	client    registry.KMSClient
@@ -69,7 +72,7 @@ func newEncryptor(ctx context.Context, kmsURI string) (*TinkEncryptor, error) {
 		t.KMSURI = kmsURI
 	}
 	if t.KMSURI == "" {
-		return nil, errors.New("KMS_URI is required")
+		return nil, ErrNotConfigured
 	}
 	if err := t.setupClient(ctx); err != nil {
 		return nil, fmt.Errorf("failed to set up KMS client: %w", err)

@@ -97,9 +97,34 @@ func NewError(code connect.Code, msg string) error {
 	return connect.NewError(code, errors.New(msg))
 }
 
-// DBError maps a database error to a connect error. Connect errors pass
-// through, so handlers can return domain failures from a tx closure.
-func DBError(err error) error {
+// errorInterceptor maps every handler error onto a connect error, so handlers
+// return database errors as they come. It sits inside audit and logging so
+// both see the final code.
+type errorInterceptor struct{}
+
+func (errorInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+		res, err := next(ctx, req)
+		if err != nil {
+			return nil, toConnectError(err)
+		}
+		return res, nil
+	}
+}
+
+func (errorInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+	return next
+}
+
+func (errorInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		return toConnectError(next(ctx, conn))
+	}
+}
+
+// toConnectError passes connect errors through, so handlers can return domain
+// failures from a tx closure.
+func toConnectError(err error) error {
 	if err == nil {
 		return nil
 	}

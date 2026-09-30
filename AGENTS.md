@@ -13,7 +13,7 @@ work.
 task dev            # backend + frontend concurrently
 task backend        # go run ./cmd/nokku
 task frontend       # web/ui dev server
-task gen            # buf generate + sqlc generate
+task gen            # sqlc + web client from the pinned protos
 task lint           # tidy, fmt, vet, govulncheck, test -race, golangci-lint, web/ui fmt+lint
 task seed           # seed demo data (cmd/seed)
 task build:server   # binary into bin/
@@ -29,9 +29,11 @@ so tests never touch the dev database.
 ## Layout
 
 - `cmd/nokku` - entrypoint. `cmd/seed` - demo data.
-- `internal/config` - config load.
+- `internal/config` - wires the services together. Background jobs live in
+  the package that owns them and stop with the root ctx.
 - `internal/api` - Connect services. The only place permissions and plan
-  gates resolve. `authz.go` holds `ProcedureRoles`.
+  gates resolve. Handlers return errors as they come, `errorInterceptor`
+  maps them onto connect codes.
 - `internal/daemon` - in-memory pool of live daemon control streams, relays,
   and web sessions.
 - `internal/db` - sqlc queries and migrations. RLS-scoped. Four entry
@@ -50,19 +52,21 @@ so tests never touch the dev database.
   `lib/components/blocks`. See `web/ui/README.md` for the UI conventions.
 - `web/email` - react-email templates, exported to `web/email/out` and
   embedded. Colors are hex copies of the UI tokens.
-- `internal/gen` - generated proto code. Never hand-edit.
 
 ## Conventions
 
-- Required roles are declared in exactly one place:
-  `internal/api/authz.go` `ProcedureRoles`. Every RPC must be
-  classified there (or in `publicEndpoints`), unclassified RPCs are denied.
+- Who may call an RPC is declared on the RPC itself, `option (access)` in
+  the protos repo (`access.proto`). RPCs without it are denied.
+  `internal/api/authz.go` enforces it.
 - Daemon state changes notify through DB triggers. Never hand-roll a
   daemon poke in a handler.
 - Tenant isolation is RLS via `Conn.WithWorkspace`. Never hand-roll workspace
   filters.
-- A new RPC means a proto edit in `../protos`, then `task gen` in all three
-  app repos (nokku, nokkud, nk).
+- A new RPC means a proto edit in `../protos` with its `(access)` option, a
+  protos release, then `go get github.com/nokku-sh/protos@<version>` and
+  `task gen` here (nokkud and nk only need the `go get`). Locally a `go.work`
+  in the parent directory points all repos at the local protos, CI never
+  does. Check with `GOWORK=off go build ./...` before pushing.
 - sqlc queries live in `internal/db/queries` and are regenerated, never
   hand-edited.
 - Plan gating lives only in `internal/entitlement`.

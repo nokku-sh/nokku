@@ -14,8 +14,9 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/time/rate"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	nokkussh "github.com/nokku-sh/nokku/internal/ssh"
 	"github.com/nokku-sh/nokku/internal/sshclient"
 )

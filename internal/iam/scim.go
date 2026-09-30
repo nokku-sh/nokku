@@ -68,7 +68,10 @@ func (f *SCIMFlow) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := actor.ContextWithPrincipal(r.Context(), Principal{ID: tokenID, Kind: KindSCIM, WorkspaceID: workspaceID})
+	ctx := actor.ContextWithPrincipal(
+		r.Context(),
+		actor.Principal{ID: tokenID, Kind: actor.KindSCIM, WorkspaceID: workspaceID},
+	)
 	ctx = actor.AnnotateTenant(ctx, workspaceID)
 	ctx = actor.WithMember(ctx, workspaceID, "")
 	r = r.WithContext(ctx)
@@ -213,7 +216,7 @@ func (s *Service) scimProvisionUser(
 	if created {
 		s.record(ctx, Event{
 			Action:      ActionUserCreated,
-			Kind:        KindUser,
+			Kind:        actor.KindUser,
 			Method:      MethodSCIM,
 			UserID:      u.ID,
 			Email:       u.Email,
@@ -301,7 +304,7 @@ func (s *Service) scimDeprovisionUser(ctx context.Context, workspaceID string, u
 	}
 	e := Event{
 		Action:      ActionUserDeactivated,
-		Kind:        KindUser,
+		Kind:        actor.KindUser,
 		Method:      MethodSCIM,
 		UserID:      u.ID,
 		Email:       u.Email,

@@ -12,11 +12,10 @@ import (
 
 	"golang.org/x/oauth2"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
-
-type Cache = cache.Cache
 
 const (
 	flowStateTTL = 10 * time.Minute
@@ -79,17 +78,17 @@ func linkUserIDFor(ctx context.Context, r *http.Request) string {
 	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
 		return ""
 	}
-	return SubjectFromContext(ctx)
+	return actor.SubjectFromContext(ctx)
 }
 
 // state is single-use, Take reads and deletes atomically.
 type state[T any] struct {
-	cache  Cache
+	cache  cache.Cache
 	prefix string
 	ttl    time.Duration
 }
 
-func newState[T any](c Cache, prefix string, ttl time.Duration) *state[T] {
+func newState[T any](c cache.Cache, prefix string, ttl time.Duration) *state[T] {
 	return &state[T]{cache: c, prefix: prefix, ttl: ttl}
 }
 

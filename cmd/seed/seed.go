@@ -10,9 +10,11 @@ import (
 
 	"github.com/brianvoe/gofakeit/v7"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
@@ -61,12 +63,12 @@ func seedWorkspace(ctx context.Context, iamSvc *iam.Service, conn *db.Connection
 	}); err != nil {
 		return fmt.Errorf("failed to create workspace: %w", err)
 	}
-	ctx = iam.ContextWithPrincipal(ctx, iam.Principal{
+	ctx = actor.ContextWithPrincipal(ctx, actor.Principal{
 		ID:   owner.ID,
-		Kind: iam.KindUser,
+		Kind: actor.KindUser,
 	})
 
-	ctx = iam.AnnotateTenant(ctx, workspace.ID)
+	ctx = actor.AnnotateTenant(ctx, workspace.ID)
 	err = conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		users := make([]*db.User, cfg.NumUsers-1)
 		for i := range cfg.NumUsers - 1 {

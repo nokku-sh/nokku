@@ -3,9 +3,10 @@ package api
 import (
 	"context"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
 type TeamService struct {
@@ -25,7 +26,7 @@ func (s *TeamService) GetTeam(
 		result, err = q.GetTeam(ctx, req.GetId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.GetTeamResponse{
 		Team: result.ToProto(),
@@ -46,7 +47,7 @@ func (s *TeamService) CreateTeam(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.CreateTeamResponse{
@@ -68,7 +69,7 @@ func (s *TeamService) UpdateTeam(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.UpdateTeamResponse{
@@ -84,7 +85,7 @@ func (s *TeamService) DeleteTeam(
 		_, err := q.DeleteTeam(ctx, req.GetId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.DeleteTeamResponse{}, nil
 }
@@ -129,7 +130,7 @@ func (s *TeamService) ListTeams(
 		}
 		return nil
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.ListTeamsResponse{
@@ -147,7 +148,7 @@ func (s *TeamService) ListTeamMembers(
 		rows, err = q.ListTeamMembers(ctx, req.GetTeamId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	members := make([]*nokkuv1.WorkspaceMember, 0, len(rows))
@@ -177,7 +178,7 @@ func (s *TeamService) ListTeamsForUser(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	out := make([]*nokkuv1.Team, 0, len(teams))
@@ -197,7 +198,7 @@ func (s *TeamService) AddTeamMember(
 			UserID: req.GetUserId(),
 		})
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.AddTeamMemberResponse{}, nil
@@ -213,7 +214,7 @@ func (s *TeamService) RemoveTeamMember(
 			UserID: req.GetUserId(),
 		})
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.RemoveTeamMemberResponse{}, nil

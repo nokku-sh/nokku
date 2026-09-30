@@ -83,7 +83,8 @@ type Querier interface {
 	GetDaemonsByIDs(ctx context.Context, daemonIds []string) ([]*GetDaemonsByIDsRow, error)
 	GetDefaultCA(ctx context.Context, arg *GetDefaultCAParams) (*CertificateAuthority, error)
 	GetEncryptedCAKeys(ctx context.Context) ([]*GetEncryptedCAKeysRow, error)
-	GetExpiringCAForUpdate(ctx context.Context) (*CertificateAuthority, error)
+	// skip_ids holds CAs whose rotation already failed this pass.
+	GetExpiringCAForUpdate(ctx context.Context, skipIds []string) (*CertificateAuthority, error)
 	GetKeysetData(ctx context.Context) ([]byte, error)
 	// Ignores the use limit, so a used-up token still identifies a daemon it
 	// already enrolled. RedeemToken enforces it.

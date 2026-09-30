@@ -3,9 +3,10 @@ package api
 import (
 	"context"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
 type PrincipalService struct {
@@ -32,7 +33,7 @@ func (s *PrincipalService) ListPrincipals(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	if len(principals) > 0 {
 		count = principals[0].TotalCount
@@ -71,7 +72,7 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 		}
 		return nil
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.AddSubjectsToPrincipalResponse{}, nil
@@ -99,7 +100,7 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 		// so an already issued cert matches no account.
 		return nil
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.RemoveSubjectsFromPrincipalResponse{}, nil
@@ -120,7 +121,7 @@ func (s *PrincipalService) RevokeAllAccess(
 			SubjectID:   req.GetSubjectId(),
 		})
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.RevokeAllAccessResponse{}, nil
@@ -141,7 +142,7 @@ func (s *PrincipalService) AddPrincipal(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.AddPrincipalResponse{Principal: principal.ToProto()}, nil
@@ -154,7 +155,7 @@ func (s *PrincipalService) RemovePrincipal(
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		return q.DeletePrincipal(ctx, req.GetId())
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.RemovePrincipalResponse{}, nil

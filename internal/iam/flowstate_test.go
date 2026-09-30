@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/nokku-sh/nokku/internal/actor"
 )
 
 // TestFlowBinding covers the login CSRF flow cookie: it is set at flow
@@ -82,7 +84,7 @@ func TestFlowBinding(t *testing.T) {
 // mode, same-origin and header-less (older) clients must.
 func TestLinkUserIDFor(t *testing.T) {
 	const uid = "01a05a0f-d857-723f-a3ed-c43125834aa5"
-	ctx := ContextWithPrincipal(t.Context(), Principal{ID: uid, Kind: KindUser})
+	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: uid, Kind: actor.KindUser})
 
 	tests := []struct {
 		name    string

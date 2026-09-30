@@ -10,8 +10,9 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
 func newTestCA(t *testing.T) *db.CertificateAuthority {

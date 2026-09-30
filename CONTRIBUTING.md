@@ -38,8 +38,15 @@ Vite on port 3000.
 task gen
 ```
 
-Runs `buf generate` and `sqlc generate`. Re-run after changing `.proto` or SQL
-schema/query files.
+Runs `sqlc generate`, and regenerates the web client in `web/ui/src/lib/gen`
+from the `.proto` files of the protos version `go.mod` pins. The Go API code
+itself comes from the [nokku-sh/protos](https://github.com/nokku-sh/protos)
+module. Re-run after changing SQL or bumping that module.
+
+For cross-repo work, use a `go.work` in the parent directory so nokku builds
+against your local protos checkout. CI never sees it and uses the version in
+`go.mod`, so release and bump protos before pushing here. The protos README
+has the full workflow. `GOWORK=off go build ./...` shows what CI will see.
 
 ## Code style
 

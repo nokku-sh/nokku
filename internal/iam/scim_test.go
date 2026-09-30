@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/nokku-sh/nokku/internal/actor"
 )
 
 type scimClient struct {
@@ -19,8 +21,8 @@ type scimClient struct {
 func (e *testEnv) scim(t *testing.T, o org) *scimClient {
 	t.Helper()
 	ctx := as(t.Context(), o.owner.ID)
-	ctx = AnnotateTenant(ctx, o.ws)
-	ctx = WithMember(ctx, o.ws, "")
+	ctx = actor.AnnotateTenant(ctx, o.ws)
+	ctx = actor.WithMember(ctx, o.ws, "")
 	_, token, err := e.svc.IssueSCIMToken(ctx, o.ws, "okta")
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +126,7 @@ func TestSCIMUserLifecycle(t *testing.T) {
 
 	if _, _, err := e.svc.IssueSession(
 		t.Context(),
-		SessionParams{SubjectID: u.ID, Kind: KindUser, Method: MethodSAML},
+		SessionParams{SubjectID: u.ID, Kind: actor.KindUser, Method: MethodSAML},
 	); err != nil {
 		t.Fatal(err)
 	}

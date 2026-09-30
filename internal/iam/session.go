@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/util"
@@ -29,7 +30,7 @@ type SessionHash string
 
 type SessionParams struct {
 	SubjectID   string
-	Kind        Kind
+	Kind        actor.Kind
 	Method      Method
 	WorkspaceID string
 	// Binding is the DPoP jkt, empty for cookie sessions.
@@ -104,7 +105,7 @@ func (s *Service) completeLogin(ctx context.Context, u *db.User, method Method) 
 	}
 	sess, token, err := s.IssueSession(ctx, SessionParams{
 		SubjectID: u.ID,
-		Kind:      KindUser,
+		Kind:      actor.KindUser,
 		Method:    method,
 		TTL:       sessionTTL,
 	})
@@ -113,7 +114,7 @@ func (s *Service) completeLogin(ctx context.Context, u *db.User, method Method) 
 	}
 	s.record(ctx, Event{
 		Action: ActionLoginSucceeded,
-		Kind:   KindUser,
+		Kind:   actor.KindUser,
 		Method: method,
 		UserID: u.ID,
 		Email:  u.Email,
@@ -126,7 +127,7 @@ func (s *Service) IssueDaemonSession(ctx context.Context, workspaceID, daemonID,
 	_, token, err := s.IssueSession(ctx, SessionParams{
 		WorkspaceID: workspaceID,
 		SubjectID:   daemonID,
-		Kind:        KindDaemon,
+		Kind:        actor.KindDaemon,
 		Method:      MethodDevice,
 		Binding:     binding,
 	})
@@ -138,7 +139,7 @@ func (s *Service) IssueDaemonSession(ctx context.Context, workspaceID, daemonID,
 func (s *Service) RememberDevice(ctx context.Context, header http.Header, remoteAddr string, u *db.User) *http.Cookie {
 	if raw := cookieFromHeader(header, webDeviceCookieName); raw != "" {
 		if sess, err := s.VerifySession(ctx, raw); err == nil &&
-			sess.Kind == string(KindWebDevice) && sess.SubjectID == u.ID {
+			sess.Kind == string(actor.KindWebDevice) && sess.SubjectID == u.ID {
 			now := s.now()
 			if err := s.sys.TouchSession(
 				ctx,
@@ -153,7 +154,7 @@ func (s *Service) RememberDevice(ctx context.Context, header http.Header, remote
 	name := deviceNameFromUA(header.Get("User-Agent"))
 	sess, token, err := s.IssueSession(ctx, SessionParams{
 		SubjectID: u.ID,
-		Kind:      KindWebDevice,
+		Kind:      actor.KindWebDevice,
 		Method:    MethodDevice,
 		Label:     name,
 		TTL:       webDeviceTTL,
@@ -194,7 +195,7 @@ func (s *Service) VerifySession(ctx context.Context, token string) (db.Session, 
 func (s *Service) ListSessions(ctx context.Context) ([]*db.Session, error) {
 	var rows []*db.Session
 	err := s.asSelf(ctx, func(q *db.Queries) (err error) {
-		rows, err = q.ListSessionsBySubject(ctx, UserIDFromContext(ctx))
+		rows, err = q.ListSessionsBySubject(ctx, actor.UserIDFromContext(ctx))
 		return err
 	})
 	return rows, err
@@ -226,7 +227,7 @@ func (s *Service) RevokeOtherSessions(ctx context.Context, keep SessionHash) (in
 	var n int64
 	err := s.asSelf(ctx, func(q *db.Queries) (err error) {
 		n, err = q.DeleteSessionsExcept(ctx, &db.DeleteSessionsExceptParams{
-			SubjectID: UserIDFromContext(ctx),
+			SubjectID: actor.UserIDFromContext(ctx),
 			KeepHash:  crypto.HashedToken(keep),
 		})
 		return err
@@ -238,10 +239,6 @@ func (s *Service) DeleteOwnSession(ctx context.Context, hash SessionHash) error 
 	return s.asSelf(ctx, func(q *db.Queries) error {
 		return q.DeleteSession(ctx, crypto.HashedToken(hash))
 	})
-}
-
-func (s *Service) DeleteExpired(ctx context.Context) (int64, error) {
-	return s.sys.DeleteExpiredSessions(ctx, new(s.now()))
 }
 
 func truncate(s string, n int) string {

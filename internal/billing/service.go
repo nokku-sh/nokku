@@ -21,10 +21,13 @@ type Service struct {
 
 // New never returns a nil Service, an unconfigured one is just disabled.
 // License is nil when absent or invalid.
-func New(conn *db.Connection, baseURL string) (*Service, error) {
+func New(ctx context.Context, conn *db.Connection, baseURL string) (*Service, error) {
 	stripe, err := newStripe(conn, baseURL)
 	if err != nil {
 		return nil, err
+	}
+	if stripe != nil {
+		go stripe.reconcile(ctx)
 	}
 	return &Service{stripe: stripe, License: verifyLicense()}, nil
 }
@@ -57,13 +60,6 @@ func (s *Service) Cancel(
 		return ErrDisabled
 	}
 	return s.stripe.Cancel(ctx, workspaceID, immediate, reason)
-}
-
-func (s *Service) SyncAll(ctx context.Context) error {
-	if !s.Enabled() {
-		return nil
-	}
-	return s.stripe.SyncAll(ctx)
 }
 
 func (s *Service) WebhookHandler() http.Handler {

@@ -196,13 +196,13 @@ func TestMiddlewareOnlyTrustsCookieSessions(t *testing.T) {
 	e := newTestEnv(t)
 	u := e.user(t, "user@"+testDomain(), true)
 	_, cliToken, err := e.svc.IssueSession(t.Context(), SessionParams{
-		SubjectID: u.ID, Kind: KindCLI, Method: MethodDevice, Binding: "jkt", TTL: time.Hour,
+		SubjectID: u.ID, Kind: actor.KindCLI, Method: MethodDevice, Binding: "jkt", TTL: time.Hour,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, userToken, err := e.svc.IssueSession(t.Context(), SessionParams{
-		SubjectID: u.ID, Kind: KindUser, Method: MethodPassword, TTL: time.Hour,
+		SubjectID: u.ID, Kind: actor.KindUser, Method: MethodPassword, TTL: time.Hour,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -240,7 +240,7 @@ func TestDeleteOwnSessionOnly(t *testing.T) {
 	bob := e.user(t, "bob@"+testDomain(), true)
 	sess, _, err := e.svc.IssueSession(
 		t.Context(),
-		SessionParams{SubjectID: bob.ID, Kind: KindUser, Method: MethodPassword},
+		SessionParams{SubjectID: bob.ID, Kind: actor.KindUser, Method: MethodPassword},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -340,7 +340,7 @@ func TestLogoutRevokesBoundSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, token, err := e.svc.IssueSession(t.Context(), SessionParams{
-		SubjectID: u.ID, Kind: KindCLI, Method: MethodDevice,
+		SubjectID: u.ID, Kind: actor.KindCLI, Method: MethodDevice,
 		Binding: base64.RawURLEncoding.EncodeToString(tp), TTL: time.Hour,
 	})
 	if err != nil {
@@ -398,7 +398,7 @@ func TestSessionRecordsDevice(t *testing.T) {
 	ctx := ContextWithRequestMeta(t.Context(), RequestMeta{Header: header, RemoteAddr: "203.0.113.7:4242"})
 
 	sess, _, err := e.svc.IssueSession(ctx, SessionParams{
-		SubjectID: u.ID, Kind: KindUser, Method: MethodPassword, TTL: time.Hour,
+		SubjectID: u.ID, Kind: actor.KindUser, Method: MethodPassword, TTL: time.Hour,
 	})
 	if err != nil {
 		t.Fatal(err)

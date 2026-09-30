@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
+
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
-	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 func TestProcedureRoles(t *testing.T) {
@@ -41,7 +42,7 @@ func TestProcedureRoles(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if got := ProcedureRoles[test.procedure]; got != test.want {
+		if got := workspaceRoles[procedureAccess[test.procedure].GetRole()]; got != test.want {
 			t.Errorf("%s role = %q, want %q", test.procedure, got, test.want)
 		}
 	}
@@ -68,37 +69,52 @@ func allProcedures(t *testing.T) []string {
 	return out
 }
 
+// daemonOnly is an access with nothing but daemon set.
+func daemonOnly(a *nokkuv1.Access) bool {
+	return a.GetDaemon() && !a.GetPublic() && !a.GetSelf() &&
+		a.GetRole() == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED
+}
+
 // Every procedure must sit in exactly one class, or the interceptor denies it.
 func TestEveryProcedureIsClassified(t *testing.T) {
 	for _, procedure := range allProcedures(t) {
+		access := procedureAccess[procedure]
+		if access == nil {
+			t.Errorf("%s has no (access) option", procedure)
+			continue
+		}
 		classes := 0
-		if _, ok := ProcedureRoles[procedure]; ok {
+		if access.GetPublic() {
 			classes++
 		}
-		if _, ok := selfScopedProcedures[procedure]; ok {
+		if access.GetSelf() {
 			classes++
 		}
-		if _, ok := daemonOnlyProcedures[procedure]; ok {
+		if access.GetRole() != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED {
+			if _, ok := workspaceRoles[access.GetRole()]; !ok {
+				t.Errorf("%s has unmapped role %s", procedure, access.GetRole())
+			}
 			classes++
 		}
-		if isPublicEndpoint(procedure) {
+		if daemonOnly(access) {
 			classes++
 		}
 		if classes != 1 {
 			t.Errorf("%s is in %d authorization classes, want exactly 1", procedure, classes)
+		}
+		if access.GetPersonal() && access.GetRole() == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED {
+			t.Errorf("%s is personal without a role", procedure)
 		}
 	}
 }
 
 func TestAuthorizeDaemon(t *testing.T) {
 	a := &AuthorizationInterceptor{}
-	ctx := iam.ContextWithPrincipal(t.Context(), iam.Principal{ID: "d1", Kind: iam.KindDaemon})
+	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "d1", Kind: actor.KindDaemon})
 
 	for _, procedure := range allProcedures(t) {
-		_, only := daemonOnlyProcedures[procedure]
-		_, shared := daemonSharedProcedures[procedure]
 		_, err := a.authorize(ctx, procedure)
-		if only || shared {
+		if procedureAccess[procedure].GetDaemon() {
 			if err != nil {
 				t.Errorf("daemon denied %s: %v", procedure, err)
 			}
@@ -112,8 +128,11 @@ func TestAuthorizeDaemon(t *testing.T) {
 
 func TestAuthorizeUserOnDaemonProcedures(t *testing.T) {
 	a := &AuthorizationInterceptor{}
-	ctx := iam.ContextWithPrincipal(t.Context(), iam.Principal{ID: "u1", Kind: iam.KindUser})
-	for procedure := range daemonOnlyProcedures {
+	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser})
+	for procedure, access := range procedureAccess {
+		if !daemonOnly(access) {
+			continue
+		}
 		if _, err := a.authorize(ctx, procedure); !errors.Is(err, db.ErrPermissionDenied) {
 			t.Errorf("user allowed %s, want permission denied", procedure)
 		}
@@ -122,7 +141,7 @@ func TestAuthorizeUserOnDaemonProcedures(t *testing.T) {
 
 func TestAuthorizeUserStreamWithoutWorkspace(t *testing.T) {
 	a := &AuthorizationInterceptor{}
-	ctx := iam.ContextWithPrincipal(t.Context(), iam.Principal{ID: "u1", Kind: iam.KindUser})
+	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser})
 	for _, procedure := range []string{
 		nokkuv1connect.RecordingServiceGetRecordingProcedure,
 		nokkuv1connect.DaemonServiceRelayProcedure,
@@ -135,7 +154,7 @@ func TestAuthorizeUserStreamWithoutWorkspace(t *testing.T) {
 
 func TestAuthorizeUnknownProcedure(t *testing.T) {
 	a := &AuthorizationInterceptor{}
-	ctx := iam.ContextWithPrincipal(t.Context(), iam.Principal{ID: "u1", Kind: iam.KindUser})
+	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser})
 	if _, err := a.authorize(ctx, "/nokku.v1.UnknownService/Unknown"); !errors.Is(err, db.ErrPermissionDenied) {
 		t.Fatalf("unknown procedure: err = %v, want permission denied", err)
 	}
@@ -143,7 +162,7 @@ func TestAuthorizeUnknownProcedure(t *testing.T) {
 
 func TestAuthorizePersonalAuditLog(t *testing.T) {
 	a := &AuthorizationInterceptor{cfg: &config.Config{}}
-	ctx := iam.ContextWithPrincipal(t.Context(), iam.Principal{ID: "u1", Kind: iam.KindUser})
+	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser})
 	if _, err := a.authorize(ctx, nokkuv1connect.UtilServiceListAuditLogsProcedure); err != nil {
 		t.Fatalf("personal audit log without a workspace: err = %v, want allowed", err)
 	}

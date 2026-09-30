@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -24,7 +25,7 @@ func (s *Service) Authenticate(
 	ctx context.Context,
 	header http.Header,
 	procedure string,
-) (Principal, db.Session, error) {
+) (actor.Principal, db.Session, error) {
 	token, fromHeader := requestCredential(header)
 	if strings.HasPrefix(token, APIKeyPrefix) {
 		p, err := s.AuthenticateAPIKey(ctx, token)
@@ -33,16 +34,16 @@ func (s *Service) Authenticate(
 
 	p, sess, err := s.AuthenticateToken(ctx, token)
 	if err != nil {
-		return Principal{}, db.Session{}, err
+		return actor.Principal{}, db.Session{}, err
 	}
 	// A device cookie in a header is a leaked cookie being replayed.
 	// Accepting it would turn a 24-hour session leak into a 180-day one.
-	if fromHeader && p.Kind == KindWebDevice {
-		return Principal{}, db.Session{}, errors.New("device credentials are not API tokens")
+	if fromHeader && p.Kind == actor.KindWebDevice {
+		return actor.Principal{}, db.Session{}, errors.New("device credentials are not API tokens")
 	}
 	if sess.Binding != "" {
 		if err := s.verifySessionProof(ctx, header, procedure, token, sess.Binding); err != nil {
-			return Principal{}, db.Session{}, err
+			return actor.Principal{}, db.Session{}, err
 		}
 	}
 	return p, sess, nil
@@ -53,20 +54,20 @@ func (s *Service) Authenticate(
 func (s *Service) AuthenticateToken(
 	ctx context.Context,
 	token string,
-) (Principal, db.Session, error) {
+) (actor.Principal, db.Session, error) {
 	sess, err := s.VerifySession(ctx, token)
 	if err != nil {
-		return Principal{}, db.Session{}, err
+		return actor.Principal{}, db.Session{}, err
 	}
-	kind := Kind(sess.Kind)
-	p := Principal{ID: sess.SubjectID, Kind: kind, WorkspaceID: deref(sess.WorkspaceID)}
-	if kind == KindUser {
+	kind := actor.Kind(sess.Kind)
+	p := actor.Principal{ID: sess.SubjectID, Kind: kind, WorkspaceID: deref(sess.WorkspaceID)}
+	if kind == actor.KindUser {
 		u, err := s.GetUserByID(ctx, sess.SubjectID)
 		if err != nil {
-			return Principal{}, db.Session{}, err
+			return actor.Principal{}, db.Session{}, err
 		}
 		if !u.Active {
-			return Principal{}, db.Session{}, ErrInactive
+			return actor.Principal{}, db.Session{}, ErrInactive
 		}
 		p.Email = u.Email
 	}
@@ -74,22 +75,22 @@ func (s *Service) AuthenticateToken(
 }
 
 // AuthenticateAPIKey uses Sys since this lookup is what establishes the tenant.
-func (s *Service) AuthenticateAPIKey(ctx context.Context, raw string) (Principal, error) {
+func (s *Service) AuthenticateAPIKey(ctx context.Context, raw string) (actor.Principal, error) {
 	hash, err := crypto.HashToken(raw)
 	if err != nil {
-		return Principal{}, err
+		return actor.Principal{}, err
 	}
 	sa, err := s.sys.GetServiceAccountByTokenHash(ctx, &hash)
 	if err != nil {
-		return Principal{}, ErrInvalidCredentials
+		return actor.Principal{}, ErrInvalidCredentials
 	}
 	if sa.ExpiresAt != nil && sa.ExpiresAt.Before(s.now()) {
-		return Principal{}, ErrCredentialsExpired
+		return actor.Principal{}, ErrCredentialsExpired
 	}
 	_ = s.sys.TouchServiceAccount(ctx, sa.ID)
-	return Principal{
+	return actor.Principal{
 		ID:          sa.ID,
-		Kind:        KindServiceAccount,
+		Kind:        actor.KindServiceAccount,
 		WorkspaceID: sa.WorkspaceID,
 	}, nil
 }

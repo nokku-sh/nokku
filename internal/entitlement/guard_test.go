@@ -11,8 +11,8 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/actor"
 
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	nokkuv1connect "github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+	nokkuv1connect "github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 )
 
 // wiredFeatures lists every feature gated somewhere in the guard.

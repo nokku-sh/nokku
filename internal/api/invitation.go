@@ -7,12 +7,12 @@ import (
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/nokku-sh/nokku/internal/iam"
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
 var (
@@ -47,7 +47,7 @@ func inviteError(err error) error {
 	case errors.Is(err, errAlreadyMember):
 		return NewError(connect.CodeAborted, "you have already joined this workspace")
 	default:
-		return DBError(err)
+		return err
 	}
 }
 
@@ -55,7 +55,7 @@ func (s *InvitationService) GetInvitation(
 	ctx context.Context,
 	req *nokkuv1.GetInvitationRequest,
 ) (*nokkuv1.GetInvitationResponse, error) {
-	userID := iam.UserIDFromContext(ctx)
+	userID := actor.UserIDFromContext(ctx)
 	if userID == "" {
 		return nil, ErrUserRequired
 	}
@@ -102,7 +102,7 @@ func (s *InvitationService) AcceptInvitation(
 	ctx context.Context,
 	req *nokkuv1.AcceptInvitationRequest,
 ) (*nokkuv1.AcceptInvitationResponse, error) {
-	userID := iam.UserIDFromContext(ctx)
+	userID := actor.UserIDFromContext(ctx)
 	if userID == "" {
 		return nil, ErrUserRequired
 	}

@@ -17,7 +17,7 @@ The dev server needs a backend. Run `task backend` from the repo root and point 
 
 ## Generated code
 
-`src/lib/gen` holds the generated API client for the Nokku protos. Never edit it by hand. Regenerate with `task gen` from the repo root, which runs buf against `../protos`.
+`src/lib/gen` holds the generated API client for the Nokku protos. Never edit it by hand. Regenerate with `task gen` from the repo root, which runs buf against the protos version `go.mod` pins.
 
 ## UI conventions
 

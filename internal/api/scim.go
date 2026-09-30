@@ -5,9 +5,10 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/audit"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
@@ -28,7 +29,7 @@ func (s *SCIMService) CreateSCIMToken(
 	}
 	tok, plaintext, err := s.cfg.IAM.IssueSCIMToken(ctx, req.GetWorkspaceId(), req.GetLabel())
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	entry := scimTokenToProto(tok)
 	audit.SetTarget(ctx, entry.GetId())
@@ -45,7 +46,7 @@ func (s *SCIMService) ListSCIMTokens(
 ) (*nokkuv1.ListSCIMTokensResponse, error) {
 	tokens, err := s.cfg.IAM.ListSCIMTokens(ctx, req.GetWorkspaceId())
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	out := make([]*nokkuv1.SCIMToken, 0, len(tokens))
 	for _, t := range tokens {
@@ -59,7 +60,7 @@ func (s *SCIMService) DeleteSCIMToken(
 	req *nokkuv1.DeleteSCIMTokenRequest,
 ) (*nokkuv1.DeleteSCIMTokenResponse, error) {
 	if err := s.cfg.IAM.RevokeSCIMToken(ctx, req.GetWorkspaceId(), req.GetTokenId()); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.DeleteSCIMTokenResponse{}, nil
 }

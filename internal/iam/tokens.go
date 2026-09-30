@@ -54,10 +54,6 @@ func (s *Service) ConsumeToken(ctx context.Context, raw, purpose string) (string
 	return userID, err
 }
 
-func (s *Service) DeleteExpiredTokens(ctx context.Context) (int64, error) {
-	return s.sys.DeleteExpiredTokens(ctx, s.now())
-}
-
 func (s *Service) HasRecentToken(
 	ctx context.Context,
 	userID, purpose string,

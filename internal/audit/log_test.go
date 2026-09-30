@@ -5,7 +5,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 )
 
 func TestNewEventSkipsReads(t *testing.T) {

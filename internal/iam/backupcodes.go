@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -33,7 +34,7 @@ func (s *Service) RotateBackupCodes(ctx context.Context) ([]string, error) {
 		fresh[i] = backupEncoding.EncodeToString(raw)
 	}
 
-	userID := UserIDFromContext(ctx)
+	userID := actor.UserIDFromContext(ctx)
 	err := s.asSelf(ctx, func(q *db.Queries) error {
 		if _, err := q.DeleteUserCredentialsByProvider(ctx, &db.DeleteUserCredentialsByProviderParams{
 			UserID: userID,

@@ -20,9 +20,10 @@ import (
 	"connectrpc.com/vanguard"
 	"github.com/vearutop/statigz"
 
+	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/entitlement"
-	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/web"
 )
 
@@ -94,6 +95,7 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 		NewAuthNInterceptor(s.cfg),
 		// Audit wraps authorization so denied calls are recorded too.
 		s.cfg.Audit,
+		errorInterceptor{},
 		NewAuthZInterceptor(s.cfg),
 		entitlement.NewGuardInterceptor(s.cfg.Entitlements),
 		validate.NewInterceptor(),
@@ -119,109 +121,34 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 	}
 }
 
-func (s *Server) serviceHandlers(ctx context.Context) []func() (string, http.Handler) {
-	opts := s.withHandlerOptions(ctx)
-
-	return []func() (string, http.Handler){
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewWorkspaceServiceHandler(
-				NewWorkspaceService(s.cfg),
-				opts...,
-			)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewDashboardServiceHandler(NewDashboardService(s.cfg), opts...)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewTeamServiceHandler(NewTeamService(s.cfg), opts...)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewUtilServiceHandler(NewUtilService(s.cfg), opts...)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewTargetServiceHandler(NewTargetService(s.cfg), opts...)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewPrincipalServiceHandler(
-				NewPrincipalService(s.cfg),
-				opts...,
-			)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewDaemonServiceHandler(NewDaemonService(s.cfg), opts...)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewCertificateServiceHandler(
-				NewCertificateService(s.cfg),
-				opts...,
-			)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewInvitationServiceHandler(
-				NewInvitationService(s.cfg),
-				opts...,
-			)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewTokenServiceHandler(NewTokenService(s.cfg), opts...)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewBillingServiceHandler(NewBillingService(s.cfg), opts...)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewServiceAccountServiceHandler(
-				NewServiceAccountService(s.cfg),
-				opts...,
-			)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewAccountServiceHandler(
-				NewAccountService(s.cfg),
-				opts...,
-			)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewAuthServiceHandler(
-				NewAuthService(s.cfg),
-				opts...,
-			)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewWorkspaceDomainServiceHandler(
-				NewWorkspaceDomainService(s.cfg),
-				opts...,
-			)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewSSOServiceHandler(NewSSOService(s.cfg), opts...)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewSCIMServiceHandler(NewSCIMService(s.cfg), opts...)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewDaemonControlServiceHandler(s.cfg.Pool, opts...)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewDaemonSessionServiceHandler(s.cfg.Pool, opts...)
-		},
-		func() (string, http.Handler) {
-			return nokkuv1connect.NewRecordingServiceHandler(
-				NewRecordingService(s.cfg),
-				opts...)
-		},
-	}
-}
-
 func (s *Server) registerServices(ctx context.Context) error {
-	decls := s.serviceHandlers(ctx)
-	names := make([]string, len(decls))
-	services := make([]*vanguard.Service, len(decls))
-
-	for i, decl := range decls {
-		path, handler := decl()
-		names[i] = strings.Trim(path, "/")
-		services[i] = vanguard.NewService(path, handler)
+	var names []string
+	var services []*vanguard.Service
+	register := func(path string, handler http.Handler) {
+		names = append(names, strings.Trim(path, "/"))
+		services = append(services, vanguard.NewService(path, handler))
 	}
+	opts := s.withHandlerOptions(ctx)
+	register(nokkuv1connect.NewWorkspaceServiceHandler(NewWorkspaceService(s.cfg), opts...))
+	register(nokkuv1connect.NewDashboardServiceHandler(NewDashboardService(s.cfg), opts...))
+	register(nokkuv1connect.NewTeamServiceHandler(NewTeamService(s.cfg), opts...))
+	register(nokkuv1connect.NewUtilServiceHandler(NewUtilService(s.cfg), opts...))
+	register(nokkuv1connect.NewTargetServiceHandler(NewTargetService(s.cfg), opts...))
+	register(nokkuv1connect.NewPrincipalServiceHandler(NewPrincipalService(s.cfg), opts...))
+	register(nokkuv1connect.NewDaemonServiceHandler(NewDaemonService(s.cfg), opts...))
+	register(nokkuv1connect.NewCertificateServiceHandler(NewCertificateService(s.cfg), opts...))
+	register(nokkuv1connect.NewInvitationServiceHandler(NewInvitationService(s.cfg), opts...))
+	register(nokkuv1connect.NewTokenServiceHandler(NewTokenService(s.cfg), opts...))
+	register(nokkuv1connect.NewBillingServiceHandler(NewBillingService(s.cfg), opts...))
+	register(nokkuv1connect.NewServiceAccountServiceHandler(NewServiceAccountService(s.cfg), opts...))
+	register(nokkuv1connect.NewAccountServiceHandler(NewAccountService(s.cfg), opts...))
+	register(nokkuv1connect.NewAuthServiceHandler(NewAuthService(s.cfg), opts...))
+	register(nokkuv1connect.NewWorkspaceDomainServiceHandler(NewWorkspaceDomainService(s.cfg), opts...))
+	register(nokkuv1connect.NewSSOServiceHandler(NewSSOService(s.cfg), opts...))
+	register(nokkuv1connect.NewSCIMServiceHandler(NewSCIMService(s.cfg), opts...))
+	register(nokkuv1connect.NewDaemonControlServiceHandler(s.cfg.Pool, opts...))
+	register(nokkuv1connect.NewDaemonSessionServiceHandler(s.cfg.Pool, opts...))
+	register(nokkuv1connect.NewRecordingServiceHandler(NewRecordingService(s.cfg), opts...))
 	s.registerHealthAndReflection(names)
 
 	transcoder, err := vanguard.NewTranscoder(services)
@@ -234,6 +161,11 @@ func (s *Server) registerServices(ctx context.Context) error {
 		web.UIFS,
 		statigz.FSPrefix("ui/build"),
 		statigz.OnNotFound(func(w http.ResponseWriter, r *http.Request) {
+			// A build without the UI has no index.html to fall back to.
+			if r.URL.Path == "/" {
+				http.NotFound(w, r)
+				return
+			}
 			r.URL.Path = "/" // SPA fallback to index.html
 			staticHandler.ServeHTTP(w, r)
 		}),

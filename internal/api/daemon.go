@@ -9,6 +9,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/audit"
 
 	"connectrpc.com/connect"
@@ -16,10 +17,11 @@ import (
 	nokkudaemon "github.com/nokku-sh/nokku/internal/daemon"
 	"github.com/nokku-sh/nokku/internal/iam"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 )
 
 type DaemonService struct {
@@ -39,7 +41,7 @@ func (s *DaemonService) GetDaemon(
 		result, err = q.GetDaemon(ctx, req.GetId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.GetDaemonResponse{
@@ -69,7 +71,7 @@ func (s *DaemonService) UpdateDaemon(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.UpdateDaemonResponse{}, nil
@@ -98,7 +100,7 @@ func (s *DaemonService) ListDaemons(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	if len(result) > 0 {
 		count = result[0].TotalCount
@@ -115,7 +117,7 @@ func (s *DaemonService) DeleteDaemon(
 	req *nokkuv1.DeleteDaemonRequest,
 ) (*nokkuv1.DeleteDaemonResponse, error) {
 	// A daemon can only delete itself, whatever id it sends.
-	id := cmp.Or(iam.DaemonIDFromContext(ctx), req.GetId())
+	id := cmp.Or(actor.DaemonIDFromContext(ctx), req.GetId())
 	if id == "" {
 		return nil, ErrInvalidInput
 	}
@@ -123,7 +125,7 @@ func (s *DaemonService) DeleteDaemon(
 		_, err = q.DeleteDaemon(ctx, id)
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.DeleteDaemonResponse{}, nil
@@ -136,7 +138,7 @@ func (s *DaemonService) CreateSession(
 	req *nokkuv1.CreateSessionRequest,
 ) (*nokkuv1.CreateSessionResponse, error) {
 	// The cert principal is the actor id, sshd would refuse any non-user.
-	userID := iam.UserIDFromContext(ctx)
+	userID := actor.UserIDFromContext(ctx)
 	if userID == "" {
 		return nil, NewError(connect.CodePermissionDenied, "web sessions require a user principal")
 	}
@@ -161,7 +163,7 @@ func (s *DaemonService) CreateSession(
 		targetID = target.ID
 		return nil
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	sessionID := uuid.NewV7().String()
@@ -202,7 +204,7 @@ func (s *DaemonService) ListSessions(
 		daemon, err = q.GetDaemon(ctx, req.GetDaemonId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	sessions := s.cfg.Pool.ListSessions(daemon.ID)
@@ -226,7 +228,7 @@ func (s *DaemonService) CloseSession(
 		_, err := q.GetDaemon(ctx, sess.DaemonID())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	s.cfg.Pool.CloseSession(req.GetSessionId())
 	return &nokkuv1.CloseSessionResponse{}, nil
@@ -258,11 +260,11 @@ func (s *DaemonService) Relay(
 		)
 	}
 
-	ctx = iam.AnnotateTenant(ctx, workspaceID)
+	ctx = actor.AnnotateTenant(ctx, workspaceID)
 	// Member is enough, the relay is only transport. sshd is the real gate.
 	ctx, err = actorHasRole(ctx, s.cfg.Conn, db.RoleMember)
 	if err != nil {
-		return DBError(err)
+		return err
 	}
 
 	var d *db.Daemon
@@ -270,12 +272,12 @@ func (s *DaemonService) Relay(
 		d, err = q.GetDaemon(ctx, daemonID)
 		return err
 	}); err != nil {
-		return DBError(err)
+		return err
 	}
 
 	relayID := uuid.NewV7().String()
-	actor, _ := iam.PrincipalFromContext(ctx)
-	relay, err := s.cfg.Pool.RequestRelay(ctx, d.ID, relayID, actor.ID)
+	caller, _ := actor.PrincipalFromContext(ctx)
+	relay, err := s.cfg.Pool.RequestRelay(ctx, d.ID, relayID, caller.ID)
 	if err != nil {
 		if errors.Is(err, nokkudaemon.ErrRelayLimit) {
 			return NewError(connect.CodeResourceExhausted, "too many concurrent relays")
@@ -328,10 +330,10 @@ func (s *DaemonService) EnrollDaemon(
 		return nil, NewError(connect.CodeFailedPrecondition, err.Error())
 	}
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	workspaceID := out.WorkspaceID
-	ctx = iam.AnnotateTenant(ctx, workspaceID)
+	ctx = actor.AnnotateTenant(ctx, workspaceID)
 
 	// Never expires, deleting the daemon cascades to the session.
 	token, err := s.cfg.IAM.IssueDaemonSession(ctx, workspaceID, out.DaemonID, binding)
@@ -359,14 +361,14 @@ func (s *DaemonService) SyncDaemon(
 	}
 
 	res, err := nokkudaemon.Sync(ctx, s.cfg.Conn, nokkudaemon.SyncInput{
-		DaemonID:    iam.DaemonIDFromContext(ctx),
+		DaemonID:    actor.DaemonIDFromContext(ctx),
 		Metadata:    requestMetadata(ci.RequestHeader()),
 		ReqMetadata: req.GetMetadata(),
 		Users:       req.GetUsers(),
 		PrivateIPs:  req.GetPrivateIps(),
 	})
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.SyncDaemonResponse{
 		Status:       res.Status,

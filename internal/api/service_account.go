@@ -7,9 +7,10 @@ import (
 
 	"connectrpc.com/connect"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
@@ -30,7 +31,7 @@ func (s *ServiceAccountService) GetServiceAccount(
 		result, err = q.GetServiceAccount(ctx, req.GetId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.GetServiceAccountResponse{
 		ServiceAccount: result.ToProto(),
@@ -77,7 +78,7 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		result, err = q.GetServiceAccount(ctx, saID)
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.CreateServiceAccountResponse{
@@ -111,7 +112,7 @@ func (s *ServiceAccountService) UpdateServiceAccount(
 		result, err = q.GetServiceAccount(ctx, updatedID)
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.UpdateServiceAccountResponse{
 		ServiceAccount: result.ToProto(),
@@ -134,7 +135,7 @@ func (s *ServiceAccountService) ListServiceAccounts(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	var count int32
 	if len(result) > 0 {
@@ -157,7 +158,7 @@ func (s *ServiceAccountService) DeleteServiceAccount(
 		}
 		return q.DeleteServiceAccount(ctx, req.GetId())
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.DeleteServiceAccountResponse{}, nil
 }

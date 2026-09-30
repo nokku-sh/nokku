@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
@@ -20,7 +21,7 @@ func (s *Service) ListCredentialsByType(ctx context.Context, typ Method) ([]*db.
 	var creds []*db.Credential
 	err := s.asSelf(ctx, func(q *db.Queries) (err error) {
 		creds, err = q.ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
-			UserID: UserIDFromContext(ctx),
+			UserID: actor.UserIDFromContext(ctx),
 			Type:   string(typ),
 		})
 		return err
@@ -31,7 +32,7 @@ func (s *Service) ListCredentialsByType(ctx context.Context, typ Method) ([]*db.
 func (s *Service) GetCredential(ctx context.Context, id string) (*db.Credential, error) {
 	var c *db.Credential
 	err := s.asSelf(ctx, func(q *db.Queries) (err error) {
-		c, err = q.GetCredential(ctx, &db.GetCredentialParams{UserID: UserIDFromContext(ctx), ID: id})
+		c, err = q.GetCredential(ctx, &db.GetCredentialParams{UserID: actor.UserIDFromContext(ctx), ID: id})
 		return err
 	})
 	if err != nil {
@@ -43,7 +44,7 @@ func (s *Service) GetCredential(ctx context.Context, id string) (*db.Credential,
 func (s *Service) RenameCredential(ctx context.Context, id, label string) error {
 	return s.asSelf(ctx, func(q *db.Queries) error {
 		return q.RenameCredential(ctx, &db.RenameCredentialParams{
-			UserID: UserIDFromContext(ctx),
+			UserID: actor.UserIDFromContext(ctx),
 			ID:     id,
 			Label:  label,
 		})
@@ -52,7 +53,7 @@ func (s *Service) RenameCredential(ctx context.Context, id, label string) error 
 
 func (s *Service) DeleteCredential(ctx context.Context, id string) error {
 	return s.asSelf(ctx, func(q *db.Queries) error {
-		return q.DeleteCredential(ctx, &db.DeleteCredentialParams{UserID: UserIDFromContext(ctx), ID: id})
+		return q.DeleteCredential(ctx, &db.DeleteCredentialParams{UserID: actor.UserIDFromContext(ctx), ID: id})
 	})
 }
 
@@ -67,7 +68,7 @@ func (s *Service) UnlinkIdentity(ctx context.Context, provider string, methods .
 	return s.asSelf(ctx, func(q *db.Queries) error {
 		for _, m := range methods {
 			if _, err := q.DeleteUserCredentialsByProvider(ctx, &db.DeleteUserCredentialsByProviderParams{
-				UserID:   UserIDFromContext(ctx),
+				UserID:   actor.UserIDFromContext(ctx),
 				Type:     string(m),
 				Provider: provider,
 			}); err != nil {

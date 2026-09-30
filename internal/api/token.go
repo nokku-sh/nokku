@@ -10,10 +10,11 @@ import (
 
 	"connectrpc.com/connect"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
 type TokenService struct {
@@ -73,7 +74,7 @@ func (s *TokenService) CreateToken(
 		created, err = q.CreateWorkspaceToken(ctx, params)
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	audit.SetTarget(ctx, created.ID)
 	return &nokkuv1.CreateTokenResponse{
@@ -94,7 +95,7 @@ func (s *TokenService) ListTokens(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.ListTokensResponse{Tokens: db.TokensToProto(tokens)}, nil
 }
@@ -107,7 +108,7 @@ func (s *TokenService) DeleteToken(
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		return q.DeleteWorkspaceToken(ctx, req.GetId())
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.DeleteTokenResponse{}, nil
 }
