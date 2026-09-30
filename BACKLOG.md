@@ -9,12 +9,6 @@ this file.
 ## Ready
 
 - [ ] `nokku/internal/api` Characterization test for
-      `DaemonService.EnrollDaemon`. Use the harness in `main_test.go`. Needs
-      an enrollment token seeded and a signed DPoP proof (go-jose, see
-      `signProof` in `iam/authn_test.go`) with the server's nonce.
-      Done when: a DB-backed test covers enrollment and a bad token
-      (FailedPrecondition). (2026-10-01)
-- [ ] `nokku/internal/api` Characterization test for
       `DaemonService.CreateSession`. The success path needs a fake daemon on
       the real DaemonControl stream that answers RelayOpen by bridging a
       DaemonRelay stream to `sshclient/sshtest`. Probably 150+ lines alone.
@@ -77,6 +71,9 @@ this file.
 
 ## Done
 
+- [x] `nokku/internal/api` `EnrollDaemon` characterization test. Result:
+      covers enrollment through a real enroll token and DPoP proof, same-key
+      re-enroll, used-up and bad tokens. +90 lines. (loop/2026-10-01)
 - [x] `nokku/internal/api` Characterization tests, first part. Result:
       DB-backed api harness (`main_test.go`, real config and interceptors
       over httptest) and a `SyncTargetUsers` test for success, no-delete, and

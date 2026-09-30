@@ -47,9 +47,9 @@ func TestSyncTargetUsers(t *testing.T) {
 	require.NoError(t, err)
 	hostKey := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshPub)))
 
-	editorToken := seedMember(t, cfg, workspaceID, db.RoleEditor)
-	editor := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, bearer(editorToken))
-	principals := nokkuv1connect.NewPrincipalServiceClient(srv.Client(), srv.URL, bearer(editorToken))
+	editorAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleEditor))
+	editor := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, editorAuth)
+	principals := nokkuv1connect.NewPrincipalServiceClient(srv.Client(), srv.URL, editorAuth)
 	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		WorkspaceId:   &workspaceID,
 		TargetId:      &targetID,
@@ -94,7 +94,7 @@ func TestSyncTargetUsers(t *testing.T) {
 	assert.ElementsMatch(t, []string{"root", "deploy", "ops"}, usernames(), "earlier users are never deleted")
 
 	viewer := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL,
-		bearer(seedMember(t, cfg, workspaceID, db.RoleViewer)))
+		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleViewer)))
 	_, err = viewer.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		WorkspaceId: &workspaceID,
 		TargetId:    &targetID,
