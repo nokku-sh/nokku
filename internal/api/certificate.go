@@ -21,15 +21,15 @@ import (
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
-type CertificateService struct {
+type certificateService struct {
 	cfg *config.Config
 }
 
-func NewCertificateService(cfg *config.Config) *CertificateService {
-	return &CertificateService{cfg: cfg}
+func newCertificateService(cfg *config.Config) *certificateService {
+	return &certificateService{cfg: cfg}
 }
 
-func (s *CertificateService) CreateCertificateAuthority(
+func (s *certificateService) CreateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.CreateCertificateAuthorityRequest,
 ) (*nokkuv1.CreateCertificateAuthorityResponse, error) {
@@ -55,16 +55,16 @@ func (s *CertificateService) CreateCertificateAuthority(
 	}
 	if err != nil {
 		slog.Error("failed to generate CA", "error", err)
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 
 	userExtensions, err := util.ValidateExtensions(req.GetUserExtensions())
 	if err != nil {
-		return nil, NewError(connect.CodeInvalidArgument, "invalid extensions")
+		return nil, newError(connect.CodeInvalidArgument, "invalid extensions")
 	}
 	userCriticalOptions, err := util.ValidateCriticalOptions(req.GetUserCriticalOptions())
 	if err != nil {
-		return nil, NewError(connect.CodeInvalidArgument, "invalid critical options")
+		return nil, newError(connect.CodeInvalidArgument, "invalid critical options")
 	}
 
 	params := &db.CreateCAParams{
@@ -113,12 +113,12 @@ func (s *CertificateService) CreateCertificateAuthority(
 	}, nil
 }
 
-func (s *CertificateService) GetCertificateAuthority(
+func (s *certificateService) GetCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.GetCertificateAuthorityRequest,
 ) (*nokkuv1.GetCertificateAuthorityResponse, error) {
 	if req.GetId() == "" && actor.DaemonIDFromContext(ctx) == "" {
-		return nil, ErrInvalidInput
+		return nil, errInvalidInput
 	}
 	// A daemon always resolves its own CA, whatever id it sent.
 	daemonID := actor.DaemonIDFromContext(ctx)
@@ -139,7 +139,7 @@ func (s *CertificateService) GetCertificateAuthority(
 	}, nil
 }
 
-func (s *CertificateService) ListCertificateAuthorities(
+func (s *certificateService) ListCertificateAuthorities(
 	ctx context.Context,
 	req *nokkuv1.ListCertificateAuthoritiesRequest,
 ) (*nokkuv1.ListCertificateAuthoritiesResponse, error) {
@@ -156,17 +156,17 @@ func (s *CertificateService) ListCertificateAuthorities(
 	}, nil
 }
 
-func (s *CertificateService) UpdateCertificateAuthority(
+func (s *certificateService) UpdateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.UpdateCertificateAuthorityRequest,
 ) (*nokkuv1.UpdateCertificateAuthorityResponse, error) {
 	userExtensions, err := util.ValidateExtensions(req.GetUserExtensions())
 	if err != nil {
-		return nil, NewError(connect.CodeInvalidArgument, "invalid extensions")
+		return nil, newError(connect.CodeInvalidArgument, "invalid extensions")
 	}
 	userCriticalOptions, err := util.ValidateCriticalOptions(req.GetUserCriticalOptions())
 	if err != nil {
-		return nil, NewError(connect.CodeInvalidArgument, "invalid critical options")
+		return nil, newError(connect.CodeInvalidArgument, "invalid critical options")
 	}
 
 	params := &db.UpdateCAParams{
@@ -198,7 +198,7 @@ func (s *CertificateService) UpdateCertificateAuthority(
 	}, nil
 }
 
-func (s *CertificateService) DeleteCertificateAuthority(
+func (s *certificateService) DeleteCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.DeleteCertificateAuthorityRequest,
 ) (*nokkuv1.DeleteCertificateAuthorityResponse, error) {
@@ -212,7 +212,7 @@ func (s *CertificateService) DeleteCertificateAuthority(
 	return &nokkuv1.DeleteCertificateAuthorityResponse{}, nil
 }
 
-func (s *CertificateService) RolloverCertificateAuthority(
+func (s *certificateService) RolloverCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.RolloverCertificateAuthorityRequest,
 ) (*nokkuv1.RolloverCertificateAuthorityResponse, error) {
@@ -242,7 +242,7 @@ func (s *CertificateService) RolloverCertificateAuthority(
 	}, nil
 }
 
-func (s *CertificateService) SignSSHCertificate(
+func (s *certificateService) SignSSHCertificate(
 	ctx context.Context,
 	req *nokkuv1.SignSSHCertificateRequest,
 ) (*nokkuv1.SignSSHCertificateResponse, error) {
@@ -253,7 +253,7 @@ func (s *CertificateService) SignSSHCertificate(
 
 	// Daemons mint host certs and nothing else, nobody else mints host certs.
 	if (req.GetType() == nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST) != (daemonID != "") {
-		return nil, NewError(connect.CodePermissionDenied, "host certificates are issued to daemons only")
+		return nil, newError(connect.CodePermissionDenied, "host certificates are issued to daemons only")
 	}
 
 	var ca *db.CertificateAuthority
@@ -286,16 +286,16 @@ func (s *CertificateService) SignSSHCertificate(
 		return nil, err
 	}
 	if ca == nil {
-		return nil, ErrNotFound
+		return nil, errNotFound
 	}
 	if !ca.IsActive {
-		return nil, NewError(
+		return nil, newError(
 			connect.CodeFailedPrecondition,
 			"certificate authority is not active",
 		)
 	}
 	if ca.AuthorityType == nokkuv1.AuthorityType_AUTHORITY_TYPE_X509 {
-		return nil, NewError(
+		return nil, newError(
 			connect.CodeInvalidArgument,
 			"certificate authority is not an SSH CA",
 		)
@@ -310,7 +310,7 @@ func (s *CertificateService) SignSSHCertificate(
 		req.GetType(),
 	)
 	if err != nil {
-		return nil, NewError(connect.CodeInvalidArgument, err.Error())
+		return nil, newError(connect.CodeInvalidArgument, err.Error())
 	}
 
 	expiry := util.Uint64ToUnixTime(cert.ValidBefore)
@@ -328,7 +328,7 @@ func (s *CertificateService) SignSSHCertificate(
 	}, nil
 }
 
-func (s *CertificateService) SignX509Certificate(
+func (s *certificateService) SignX509Certificate(
 	ctx context.Context,
 	req *nokkuv1.SignX509CertificateRequest,
 ) (*nokkuv1.SignX509CertificateResponse, error) {
@@ -348,17 +348,17 @@ func (s *CertificateService) SignX509Certificate(
 		return nil, err
 	}
 	if ca == nil {
-		return nil, ErrNotFound
+		return nil, errNotFound
 	}
 
 	if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_X509 {
-		return nil, NewError(
+		return nil, newError(
 			connect.CodeInvalidArgument,
 			"certificate authority is not an X.509 CA",
 		)
 	}
 	if !ca.IsActive {
-		return nil, NewError(
+		return nil, newError(
 			connect.CodeFailedPrecondition,
 			"certificate authority is not active",
 		)
@@ -371,7 +371,7 @@ func (s *CertificateService) SignX509Certificate(
 		req.GetTtl().AsDuration(),
 	)
 	if err != nil {
-		return nil, NewError(connect.CodeInvalidArgument, err.Error())
+		return nil, newError(connect.CodeInvalidArgument, err.Error())
 	}
 
 	audit.SetTarget(ctx, ca.ID)

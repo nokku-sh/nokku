@@ -24,15 +24,15 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-type DaemonService struct {
+type daemonService struct {
 	cfg *config.Config
 }
 
-func NewDaemonService(cfg *config.Config) *DaemonService {
-	return &DaemonService{cfg: cfg}
+func newDaemonService(cfg *config.Config) *daemonService {
+	return &daemonService{cfg: cfg}
 }
 
-func (s *DaemonService) GetDaemon(
+func (s *daemonService) GetDaemon(
 	ctx context.Context,
 	req *nokkuv1.GetDaemonRequest,
 ) (*nokkuv1.GetDaemonResponse, error) {
@@ -49,7 +49,7 @@ func (s *DaemonService) GetDaemon(
 	}, nil
 }
 
-func (s *DaemonService) UpdateDaemon(
+func (s *daemonService) UpdateDaemon(
 	ctx context.Context,
 	req *nokkuv1.UpdateDaemonRequest,
 ) (*nokkuv1.UpdateDaemonResponse, error) {
@@ -77,7 +77,7 @@ func (s *DaemonService) UpdateDaemon(
 	return &nokkuv1.UpdateDaemonResponse{}, nil
 }
 
-func (s *DaemonService) ListDaemons(
+func (s *daemonService) ListDaemons(
 	ctx context.Context,
 	req *nokkuv1.ListDaemonsRequest,
 ) (*nokkuv1.ListDaemonsResponse, error) {
@@ -112,14 +112,14 @@ func (s *DaemonService) ListDaemons(
 	}, nil
 }
 
-func (s *DaemonService) DeleteDaemon(
+func (s *daemonService) DeleteDaemon(
 	ctx context.Context,
 	req *nokkuv1.DeleteDaemonRequest,
 ) (*nokkuv1.DeleteDaemonResponse, error) {
 	// A daemon can only delete itself, whatever id it sends.
 	id := cmp.Or(actor.DaemonIDFromContext(ctx), req.GetId())
 	if id == "" {
-		return nil, ErrInvalidInput
+		return nil, errInvalidInput
 	}
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		_, err = q.DeleteDaemon(ctx, id)
@@ -133,14 +133,14 @@ func (s *DaemonService) DeleteDaemon(
 
 // CreateSession mints an ephemeral user cert and has the pool dial the
 // daemon's sshd over a relay.
-func (s *DaemonService) CreateSession(
+func (s *daemonService) CreateSession(
 	ctx context.Context,
 	req *nokkuv1.CreateSessionRequest,
 ) (*nokkuv1.CreateSessionResponse, error) {
 	// The cert principal is the actor id, sshd would refuse any non-user.
 	userID := actor.UserIDFromContext(ctx)
 	if userID == "" {
-		return nil, NewError(connect.CodePermissionDenied, "web sessions require a user principal")
+		return nil, newError(connect.CodePermissionDenied, "web sessions require a user principal")
 	}
 
 	var daemon *db.Daemon
@@ -178,12 +178,12 @@ func (s *DaemonService) CreateSession(
 		HostPrincipal: targetID,
 	}); err != nil {
 		if errors.Is(err, nokkudaemon.ErrCAInactive) {
-			return nil, NewError(connect.CodeFailedPrecondition, "certificate authority is not active")
+			return nil, newError(connect.CodeFailedPrecondition, "certificate authority is not active")
 		}
 		if errors.Is(err, nokkudaemon.ErrRelayLimit) {
-			return nil, NewError(connect.CodeResourceExhausted, "too many concurrent sessions")
+			return nil, newError(connect.CodeResourceExhausted, "too many concurrent sessions")
 		}
-		return nil, NewError(connect.CodeUnavailable, err.Error())
+		return nil, newError(connect.CodeUnavailable, err.Error())
 	}
 	return &nokkuv1.CreateSessionResponse{
 		Session: &nokkuv1.DaemonSession{
@@ -195,7 +195,7 @@ func (s *DaemonService) CreateSession(
 	}, nil
 }
 
-func (s *DaemonService) ListSessions(
+func (s *daemonService) ListSessions(
 	ctx context.Context,
 	req *nokkuv1.ListSessionsRequest,
 ) (*nokkuv1.ListSessionsResponse, error) {
@@ -214,7 +214,7 @@ func (s *DaemonService) ListSessions(
 	}, nil
 }
 
-func (s *DaemonService) CloseSession(
+func (s *daemonService) CloseSession(
 	ctx context.Context,
 	req *nokkuv1.CloseSessionRequest,
 ) (*nokkuv1.CloseSessionResponse, error) {
@@ -222,7 +222,7 @@ func (s *DaemonService) CloseSession(
 	// pinned workspace first.
 	sess := s.cfg.Pool.GetSession(req.GetSessionId())
 	if sess == nil || sess.DaemonID() != req.GetDaemonId() {
-		return nil, ErrNotFound
+		return nil, errNotFound
 	}
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		_, err := q.GetDaemon(ctx, sess.DaemonID())
@@ -236,7 +236,7 @@ func (s *DaemonService) CloseSession(
 
 // Relay bridges a raw byte stream to the daemon's sshd. The workspace is only
 // known from the first message, so the role check runs here.
-func (s *DaemonService) Relay(
+func (s *daemonService) Relay(
 	ctx context.Context,
 	stream *connect.BidiStream[nokkuv1.RelayRequest, nokkuv1.RelayResponse],
 ) error {
@@ -280,9 +280,9 @@ func (s *DaemonService) Relay(
 	relay, err := s.cfg.Pool.RequestRelay(ctx, d.ID, relayID, caller.ID)
 	if err != nil {
 		if errors.Is(err, nokkudaemon.ErrRelayLimit) {
-			return NewError(connect.CodeResourceExhausted, "too many concurrent relays")
+			return newError(connect.CodeResourceExhausted, "too many concurrent relays")
 		}
-		return NewError(connect.CodeUnavailable, "daemon did not accept relay")
+		return newError(connect.CodeUnavailable, "daemon did not accept relay")
 	}
 	defer s.cfg.Pool.UnregisterRelay(relayID)
 
@@ -301,13 +301,13 @@ func (s *DaemonService) Relay(
 	return nokkudaemon.BridgeRelay(ctx, stream, relay)
 }
 
-func (s *DaemonService) EnrollDaemon(
+func (s *daemonService) EnrollDaemon(
 	ctx context.Context,
 	req *nokkuv1.EnrollDaemonRequest,
 ) (*nokkuv1.EnrollDaemonResponse, error) {
 	ci, ok := connect.CallInfoForHandlerContext(ctx)
 	if !ok {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	// The session is bound to the daemon's DPoP key, so a stolen token is
 	// useless without it.
@@ -327,7 +327,7 @@ func (s *DaemonService) EnrollDaemon(
 		},
 	})
 	if errors.Is(err, nokkudaemon.ErrEnrollToken) {
-		return nil, NewError(connect.CodeFailedPrecondition, err.Error())
+		return nil, newError(connect.CodeFailedPrecondition, err.Error())
 	}
 	if err != nil {
 		return nil, err
@@ -338,7 +338,7 @@ func (s *DaemonService) EnrollDaemon(
 	// Never expires, deleting the daemon cascades to the session.
 	token, err := s.cfg.IAM.IssueDaemonSession(ctx, workspaceID, out.DaemonID, binding)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 
 	return &nokkuv1.EnrollDaemonResponse{
@@ -351,13 +351,13 @@ func (s *DaemonService) EnrollDaemon(
 	}, nil
 }
 
-func (s *DaemonService) SyncDaemon(
+func (s *daemonService) SyncDaemon(
 	ctx context.Context,
 	req *nokkuv1.SyncDaemonRequest,
 ) (*nokkuv1.SyncDaemonResponse, error) {
 	ci, ok := connect.CallInfoForHandlerContext(ctx)
 	if !ok {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 
 	res, err := nokkudaemon.Sync(ctx, s.cfg.Conn, nokkudaemon.SyncInput{
@@ -381,10 +381,10 @@ func (s *DaemonService) SyncDaemon(
 
 // enrollBinding returns the DPoP key thumbprint. A missing proof is an error,
 // daemons must enroll key-bound.
-func (s *DaemonService) enrollBinding(ctx context.Context, ci connect.CallInfo) (string, error) {
+func (s *daemonService) enrollBinding(ctx context.Context, ci connect.CallInfo) (string, error) {
 	svc := s.cfg.IAM
 	if svc.DPoP == nil {
-		return "", NewError(connect.CodeUnimplemented, "DPoP is not configured")
+		return "", newError(connect.CodeUnimplemented, "DPoP is not configured")
 	}
 
 	binding, err := svc.DPoP.Verify(
@@ -397,9 +397,9 @@ func (s *DaemonService) enrollBinding(ctx context.Context, ci connect.CallInfo) 
 	if err != nil {
 		if errors.Is(err, iam.ErrDPoPNonce) {
 			svc.AdvertiseDPoPNonce(ci.ResponseHeader())
-			return "", NewError(connect.CodeUnauthenticated, "stale DPoP nonce")
+			return "", newError(connect.CodeUnauthenticated, "stale DPoP nonce")
 		}
-		return "", NewError(connect.CodeInvalidArgument, "invalid DPoP proof")
+		return "", newError(connect.CodeInvalidArgument, "invalid DPoP proof")
 	}
 	return binding, nil
 }

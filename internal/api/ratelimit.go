@@ -76,7 +76,7 @@ var generalStore = newRateLimiterStore(generalRPS, generalBurst)
 
 var authStore = newRateLimiterStore(authRPS, authBurst)
 
-func (s *Server) WithRateLimit(next http.Handler) http.Handler {
+func (s *Server) withRateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := util.GetRemoteIP(r.Header, r.RemoteAddr)
 		if !isAPIRoute(r.URL.Path) {

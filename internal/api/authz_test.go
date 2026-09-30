@@ -109,7 +109,7 @@ func TestEveryProcedureIsClassified(t *testing.T) {
 }
 
 func TestAuthorizeDaemon(t *testing.T) {
-	a := &AuthorizationInterceptor{}
+	a := &authorizationInterceptor{}
 	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "d1", Kind: actor.KindDaemon})
 
 	for _, procedure := range allProcedures(t) {
@@ -127,7 +127,7 @@ func TestAuthorizeDaemon(t *testing.T) {
 }
 
 func TestAuthorizeUserOnDaemonProcedures(t *testing.T) {
-	a := &AuthorizationInterceptor{}
+	a := &authorizationInterceptor{}
 	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser})
 	for procedure, access := range procedureAccess {
 		if !daemonOnly(access) {
@@ -140,7 +140,7 @@ func TestAuthorizeUserOnDaemonProcedures(t *testing.T) {
 }
 
 func TestAuthorizeUserStreamWithoutWorkspace(t *testing.T) {
-	a := &AuthorizationInterceptor{}
+	a := &authorizationInterceptor{}
 	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser})
 	for _, procedure := range []string{
 		nokkuv1connect.RecordingServiceGetRecordingProcedure,
@@ -153,7 +153,7 @@ func TestAuthorizeUserStreamWithoutWorkspace(t *testing.T) {
 }
 
 func TestAuthorizeUnknownProcedure(t *testing.T) {
-	a := &AuthorizationInterceptor{}
+	a := &authorizationInterceptor{}
 	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser})
 	if _, err := a.authorize(ctx, "/nokku.v1.UnknownService/Unknown"); !errors.Is(err, db.ErrPermissionDenied) {
 		t.Fatalf("unknown procedure: err = %v, want permission denied", err)
@@ -161,7 +161,7 @@ func TestAuthorizeUnknownProcedure(t *testing.T) {
 }
 
 func TestAuthorizePersonalAuditLog(t *testing.T) {
-	a := &AuthorizationInterceptor{cfg: &config.Config{}}
+	a := &authorizationInterceptor{cfg: &config.Config{}}
 	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser})
 	if _, err := a.authorize(ctx, nokkuv1connect.UtilServiceListAuditLogsProcedure); err != nil {
 		t.Fatalf("personal audit log without a workspace: err = %v, want allowed", err)

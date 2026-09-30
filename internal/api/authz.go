@@ -51,17 +51,17 @@ func isPublicEndpoint(procedure string) bool {
 	return procedureAccess[procedure].GetPublic()
 }
 
-type AuthorizationInterceptor struct {
+type authorizationInterceptor struct {
 	cfg *config.Config
 }
 
-func NewAuthZInterceptor(
+func newAuthZInterceptor(
 	cfg *config.Config,
-) *AuthorizationInterceptor {
-	return &AuthorizationInterceptor{cfg: cfg}
+) *authorizationInterceptor {
+	return &authorizationInterceptor{cfg: cfg}
 }
 
-func (a *AuthorizationInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+func (a *authorizationInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		ctx, err := a.authorize(ctx, req.Spec().Procedure)
 		if err != nil {
@@ -71,13 +71,13 @@ func (a *AuthorizationInterceptor) WrapUnary(next connect.UnaryFunc) connect.Una
 	}
 }
 
-func (a *AuthorizationInterceptor) WrapStreamingClient(
+func (a *authorizationInterceptor) WrapStreamingClient(
 	next connect.StreamingClientFunc,
 ) connect.StreamingClientFunc {
 	return next
 }
 
-func (a *AuthorizationInterceptor) WrapStreamingHandler(
+func (a *authorizationInterceptor) WrapStreamingHandler(
 	next connect.StreamingHandlerFunc,
 ) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
@@ -89,7 +89,7 @@ func (a *AuthorizationInterceptor) WrapStreamingHandler(
 	}
 }
 
-func (a *AuthorizationInterceptor) authorize(
+func (a *authorizationInterceptor) authorize(
 	ctx context.Context,
 	procedure string,
 ) (context.Context, error) {

@@ -45,11 +45,11 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	chain := newChain(
-		s.WithRateLimit,
-		s.WithHeaders,
-		s.WithCORS,
-		s.WithCSRF,
-		s.WithLogger,
+		s.withRateLimit,
+		s.withHeaders,
+		s.withCORS,
+		s.withCSRF,
+		s.withLogger,
 	)
 
 	proto := new(http.Protocols)
@@ -60,7 +60,7 @@ func (s *Server) Start(ctx context.Context) error {
 		// Long-lived streams exit as soon as shutdown cancels ctx.
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		Addr:              "0.0.0.0:" + s.cfg.Port,
-		Handler:           chain.Then(s.mux),
+		Handler:           chain.then(s.mux),
 		Protocols:         proto,
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       30 * time.Second,
@@ -90,16 +90,16 @@ func (s *Server) Start(ctx context.Context) error {
 
 func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption {
 	interceptors := []connect.Interceptor{
-		NewLogInterceptor(s.cfg.Debug),
-		NewTimeoutInterceptor(),
-		NewAuthNInterceptor(s.cfg),
+		newLogInterceptor(s.cfg.Debug),
+		newTimeoutInterceptor(),
+		newAuthNInterceptor(s.cfg),
 		// Audit wraps authorization so denied calls are recorded too.
 		s.cfg.Audit,
 		errorInterceptor{},
-		NewAuthZInterceptor(s.cfg),
+		newAuthZInterceptor(s.cfg),
 		entitlement.NewGuardInterceptor(s.cfg.Entitlements),
 		validate.NewInterceptor(),
-		NewOTLPInterceptor(ctx),
+		newOTLPInterceptor(ctx),
 	}
 
 	return []connect.HandlerOption{
@@ -115,7 +115,7 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 					attrs = append(attrs, slog.String("stack", string(debug.Stack())))
 				}
 				slog.LogAttrs(ctx, slog.LevelError, "rpc panic recovered", attrs...)
-				return ErrInternal
+				return errInternal
 			},
 		),
 	}
@@ -129,26 +129,26 @@ func (s *Server) registerServices(ctx context.Context) error {
 		services = append(services, vanguard.NewService(path, handler))
 	}
 	opts := s.withHandlerOptions(ctx)
-	register(nokkuv1connect.NewWorkspaceServiceHandler(NewWorkspaceService(s.cfg), opts...))
-	register(nokkuv1connect.NewDashboardServiceHandler(NewDashboardService(s.cfg), opts...))
-	register(nokkuv1connect.NewTeamServiceHandler(NewTeamService(s.cfg), opts...))
-	register(nokkuv1connect.NewUtilServiceHandler(NewUtilService(s.cfg), opts...))
-	register(nokkuv1connect.NewTargetServiceHandler(NewTargetService(s.cfg), opts...))
-	register(nokkuv1connect.NewPrincipalServiceHandler(NewPrincipalService(s.cfg), opts...))
-	register(nokkuv1connect.NewDaemonServiceHandler(NewDaemonService(s.cfg), opts...))
-	register(nokkuv1connect.NewCertificateServiceHandler(NewCertificateService(s.cfg), opts...))
-	register(nokkuv1connect.NewInvitationServiceHandler(NewInvitationService(s.cfg), opts...))
-	register(nokkuv1connect.NewTokenServiceHandler(NewTokenService(s.cfg), opts...))
-	register(nokkuv1connect.NewBillingServiceHandler(NewBillingService(s.cfg), opts...))
-	register(nokkuv1connect.NewServiceAccountServiceHandler(NewServiceAccountService(s.cfg), opts...))
-	register(nokkuv1connect.NewAccountServiceHandler(NewAccountService(s.cfg), opts...))
-	register(nokkuv1connect.NewAuthServiceHandler(NewAuthService(s.cfg), opts...))
-	register(nokkuv1connect.NewWorkspaceDomainServiceHandler(NewWorkspaceDomainService(s.cfg), opts...))
-	register(nokkuv1connect.NewSSOServiceHandler(NewSSOService(s.cfg), opts...))
-	register(nokkuv1connect.NewSCIMServiceHandler(NewSCIMService(s.cfg), opts...))
+	register(nokkuv1connect.NewWorkspaceServiceHandler(newWorkspaceService(s.cfg), opts...))
+	register(nokkuv1connect.NewDashboardServiceHandler(newDashboardService(s.cfg), opts...))
+	register(nokkuv1connect.NewTeamServiceHandler(newTeamService(s.cfg), opts...))
+	register(nokkuv1connect.NewUtilServiceHandler(newUtilService(s.cfg), opts...))
+	register(nokkuv1connect.NewTargetServiceHandler(newTargetService(s.cfg), opts...))
+	register(nokkuv1connect.NewPrincipalServiceHandler(newPrincipalService(s.cfg), opts...))
+	register(nokkuv1connect.NewDaemonServiceHandler(newDaemonService(s.cfg), opts...))
+	register(nokkuv1connect.NewCertificateServiceHandler(newCertificateService(s.cfg), opts...))
+	register(nokkuv1connect.NewInvitationServiceHandler(newInvitationService(s.cfg), opts...))
+	register(nokkuv1connect.NewTokenServiceHandler(newTokenService(s.cfg), opts...))
+	register(nokkuv1connect.NewBillingServiceHandler(newBillingService(s.cfg), opts...))
+	register(nokkuv1connect.NewServiceAccountServiceHandler(newServiceAccountService(s.cfg), opts...))
+	register(nokkuv1connect.NewAccountServiceHandler(newAccountService(s.cfg), opts...))
+	register(nokkuv1connect.NewAuthServiceHandler(newAuthService(s.cfg), opts...))
+	register(nokkuv1connect.NewWorkspaceDomainServiceHandler(newWorkspaceDomainService(s.cfg), opts...))
+	register(nokkuv1connect.NewSSOServiceHandler(newSSOService(s.cfg), opts...))
+	register(nokkuv1connect.NewSCIMServiceHandler(newSCIMService(s.cfg), opts...))
 	register(nokkuv1connect.NewDaemonControlServiceHandler(s.cfg.Pool, opts...))
 	register(nokkuv1connect.NewDaemonSessionServiceHandler(s.cfg.Pool, opts...))
-	register(nokkuv1connect.NewRecordingServiceHandler(NewRecordingService(s.cfg), opts...))
+	register(nokkuv1connect.NewRecordingServiceHandler(newRecordingService(s.cfg), opts...))
 	s.registerHealthAndReflection(names)
 
 	transcoder, err := vanguard.NewTranscoder(services)
@@ -183,9 +183,9 @@ func (s *Server) registerServices(ctx context.Context) error {
 	registerAuthRoutes(s.mux, s.cfg)
 
 	protec := newChain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
-	s.mux.Handle("GET /avatars/{id}", ServeAvatar(s.cfg))
-	s.mux.Handle("POST /upload/avatar", protec.ThenFunc(UploadAvatar(s.cfg)))
-	s.mux.Handle("GET /terminal/ws", protec.ThenFunc(NewTerminalHandler(s.cfg).HandleWebSocket))
+	s.mux.Handle("GET /avatars/{id}", serveAvatar(s.cfg))
+	s.mux.Handle("POST /upload/avatar", protec.thenFunc(uploadAvatar(s.cfg)))
+	s.mux.Handle("GET /terminal/ws", protec.thenFunc(newTerminalHandler(s.cfg).handleWebSocket))
 
 	if s.cfg.Billing.Enabled() {
 		s.mux.Handle("POST /webhooks/stripe", s.cfg.Billing.WebhookHandler())

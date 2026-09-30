@@ -9,15 +9,15 @@ import (
 	"connectrpc.com/connect"
 )
 
-type LogInterceptor struct {
+type logInterceptor struct {
 	debug bool
 }
 
-func NewLogInterceptor(debug bool) *LogInterceptor {
-	return &LogInterceptor{debug: debug}
+func newLogInterceptor(debug bool) *logInterceptor {
+	return &logInterceptor{debug: debug}
 }
 
-func (l *LogInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+func (l *logInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		start := time.Now()
 		res, err := next(ctx, req)
@@ -26,13 +26,13 @@ func (l *LogInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	}
 }
 
-func (l *LogInterceptor) WrapStreamingClient(
+func (l *logInterceptor) WrapStreamingClient(
 	next connect.StreamingClientFunc,
 ) connect.StreamingClientFunc {
 	return next
 }
 
-func (l *LogInterceptor) WrapStreamingHandler(
+func (l *logInterceptor) WrapStreamingHandler(
 	next connect.StreamingHandlerFunc,
 ) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
@@ -43,7 +43,7 @@ func (l *LogInterceptor) WrapStreamingHandler(
 	}
 }
 
-func (l *LogInterceptor) log(
+func (l *logInterceptor) log(
 	ctx context.Context,
 	msg, protocol, procedure string,
 	duration time.Duration,
@@ -88,7 +88,7 @@ func (rw *responseWriter) Flush() {
 	_ = rc.Flush()
 }
 
-func (s *Server) WithLogger(next http.Handler) http.Handler {
+func (s *Server) withLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}

@@ -30,15 +30,15 @@ var routineActions = []string{
 	"SyncTargetUsers",
 }
 
-type DashboardService struct {
+type dashboardService struct {
 	cfg *config.Config
 }
 
-func NewDashboardService(cfg *config.Config) *DashboardService {
-	return &DashboardService{cfg: cfg}
+func newDashboardService(cfg *config.Config) *dashboardService {
+	return &dashboardService{cfg: cfg}
 }
 
-func (s *DashboardService) GetDashboard(
+func (s *dashboardService) GetDashboard(
 	ctx context.Context,
 	req *nokkuv1.GetDashboardRequest,
 ) (*nokkuv1.GetDashboardResponse, error) {
@@ -135,7 +135,7 @@ func (s *DashboardService) GetDashboard(
 
 // liveSessions merges browser terminals with open recordings. A recorded
 // browser terminal shows up in both, so the recording marks it instead.
-func (s *DashboardService) liveSessions(
+func (s *dashboardService) liveSessions(
 	daemons []*db.ListDaemonsRow,
 	recordings []*db.ListOpenRecordingsRow,
 ) []*nokkuv1.LiveSession {
@@ -178,7 +178,7 @@ func (s *DashboardService) liveSessions(
 }
 
 // recentChanges is best effort, the dashboard still loads without it.
-func (s *DashboardService) recentChanges(
+func (s *dashboardService) recentChanges(
 	ctx context.Context,
 	wsID string,
 	since time.Time,

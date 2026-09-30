@@ -15,7 +15,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-func NewAuthNInterceptor(cfg *config.Config) connect.Interceptor {
+func newAuthNInterceptor(cfg *config.Config) connect.Interceptor {
 	return &authNInterceptor{cfg: cfg}
 }
 

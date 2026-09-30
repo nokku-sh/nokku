@@ -21,29 +21,29 @@ import (
 
 const quotaCheckInterval = 1 << 20 // 1 MiB
 
-type RecordingService struct {
+type recordingService struct {
 	cfg *config.Config
 }
 
-func NewRecordingService(cfg *config.Config) *RecordingService {
-	return &RecordingService{cfg: cfg}
+func newRecordingService(cfg *config.Config) *recordingService {
+	return &recordingService{cfg: cfg}
 }
 
-func (s *RecordingService) UploadRecording(
+func (s *recordingService) UploadRecording(
 	ctx context.Context,
 	stream *connect.ClientStream[nokkuv1.UploadRecordingRequest],
 ) (*nokkuv1.UploadRecordingResponse, error) {
 	daemonID := actor.DaemonIDFromContext(ctx)
 	if daemonID == "" {
-		return nil, NewError(connect.CodePermissionDenied, "only daemons can upload recordings")
+		return nil, newError(connect.CodePermissionDenied, "only daemons can upload recordings")
 	}
 
 	if !stream.Receive() {
-		return nil, NewError(connect.CodeInvalidArgument, "missing recording metadata")
+		return nil, newError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
 	meta := stream.Msg().GetMeta()
 	if meta == nil || meta.GetRecordingId() == "" {
-		return nil, NewError(connect.CodeInvalidArgument, "missing recording metadata")
+		return nil, newError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
 
 	rec, workspaceID, err := s.resolveUpload(ctx, daemonID, meta)
@@ -54,7 +54,7 @@ func (s *RecordingService) UploadRecording(
 	w, err := s.cfg.Record.NewWriter(ctx, workspaceID, rec.ID)
 	if err != nil {
 		slog.Error("open recording object", "recording_id", rec.ID, "error", err)
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 
 	var size int64
@@ -82,7 +82,7 @@ func (s *RecordingService) UploadRecording(
 			if err := w.WriteChunk(data); err != nil {
 				_ = w.Close()
 				slog.Error("write recording chunk", "recording_id", rec.ID, "error", err)
-				return nil, ErrInternal
+				return nil, errInternal
 			}
 			size += int64(len(data))
 		case *nokkuv1.UploadRecordingRequest_Final:
@@ -91,11 +91,11 @@ func (s *RecordingService) UploadRecording(
 	}
 	if err = stream.Err(); err != nil && !errors.Is(err, io.EOF) {
 		_ = w.Close()
-		return nil, NewError(connect.CodeUnknown, "recording stream interrupted")
+		return nil, newError(connect.CodeUnknown, "recording stream interrupted")
 	}
 	if err = w.Close(); err != nil {
 		slog.Error("commit recording object", "recording_id", rec.ID, "error", err)
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
@@ -120,7 +120,7 @@ func (s *RecordingService) UploadRecording(
 }
 
 // resolveUpload resumes the recording when the daemon uploads its id again.
-func (s *RecordingService) resolveUpload(
+func (s *recordingService) resolveUpload(
 	ctx context.Context,
 	daemonID string,
 	rm *nokkuv1.RecordingMeta,
@@ -140,7 +140,7 @@ func (s *RecordingService) resolveUpload(
 				return errors.New("recording belongs to another daemon")
 			}
 			if existing.Complete {
-				return NewError(connect.CodeInvalidArgument, "recording is already finalized")
+				return newError(connect.CodeInvalidArgument, "recording is already finalized")
 			}
 			rec = existing
 			return nil
@@ -161,7 +161,7 @@ func (s *RecordingService) resolveUpload(
 	return rec, workspaceID, nil
 }
 
-func (s *RecordingService) ListRecordings(
+func (s *recordingService) ListRecordings(
 	ctx context.Context,
 	req *nokkuv1.ListRecordingsRequest,
 ) (*nokkuv1.ListRecordingsResponse, error) {
@@ -201,7 +201,7 @@ func (s *RecordingService) ListRecordings(
 	}, nil
 }
 
-func (s *RecordingService) GetRecording(
+func (s *recordingService) GetRecording(
 	ctx context.Context,
 	req *nokkuv1.GetRecordingRequest,
 	stream *connect.ServerStream[nokkuv1.GetRecordingResponse],
@@ -239,7 +239,7 @@ func (s *RecordingService) GetRecording(
 	fr, err := s.cfg.Record.OpenReader(ctx, req.GetWorkspaceId(), rec.ID)
 	if err != nil {
 		slog.Error("open recording object", "recording_id", rec.ID, "error", err)
-		return ErrInternal
+		return errInternal
 	}
 	defer func() { _ = fr.Close() }()
 
@@ -260,11 +260,11 @@ func (s *RecordingService) GetRecording(
 			return nil
 		}
 		slog.Error("read recording frame", "recording_id", rec.ID, "error", readErr)
-		return ErrInternal
+		return errInternal
 	}
 }
 
-func (s *RecordingService) DeleteRecording(
+func (s *recordingService) DeleteRecording(
 	ctx context.Context,
 	req *nokkuv1.DeleteRecordingRequest,
 ) (*nokkuv1.DeleteRecordingResponse, error) {

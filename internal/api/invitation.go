@@ -20,12 +20,12 @@ var (
 	errInviteInvalid = errors.New("invalid or expired invitation")
 )
 
-type InvitationService struct {
+type invitationService struct {
 	cfg *config.Config
 }
 
-func NewInvitationService(cfg *config.Config) *InvitationService {
-	return &InvitationService{cfg: cfg}
+func newInvitationService(cfg *config.Config) *invitationService {
+	return &invitationService{cfg: cfg}
 }
 
 func inviteLookup(raw string) (*db.GetLiveTokenParams, error) {
@@ -43,21 +43,21 @@ func inviteLookup(raw string) (*db.GetLiveTokenParams, error) {
 func inviteError(err error) error {
 	switch {
 	case errors.Is(err, errInviteInvalid):
-		return NewError(connect.CodeFailedPrecondition, "invalid or expired invitation")
+		return newError(connect.CodeFailedPrecondition, "invalid or expired invitation")
 	case errors.Is(err, errAlreadyMember):
-		return NewError(connect.CodeAborted, "you have already joined this workspace")
+		return newError(connect.CodeAborted, "you have already joined this workspace")
 	default:
 		return err
 	}
 }
 
-func (s *InvitationService) GetInvitation(
+func (s *invitationService) GetInvitation(
 	ctx context.Context,
 	req *nokkuv1.GetInvitationRequest,
 ) (*nokkuv1.GetInvitationResponse, error) {
 	userID := actor.UserIDFromContext(ctx)
 	if userID == "" {
-		return nil, ErrUserRequired
+		return nil, errUserRequired
 	}
 	lookup, err := inviteLookup(req.GetToken())
 	if err != nil {
@@ -98,13 +98,13 @@ func (s *InvitationService) GetInvitation(
 	}, nil
 }
 
-func (s *InvitationService) AcceptInvitation(
+func (s *invitationService) AcceptInvitation(
 	ctx context.Context,
 	req *nokkuv1.AcceptInvitationRequest,
 ) (*nokkuv1.AcceptInvitationResponse, error) {
 	userID := actor.UserIDFromContext(ctx)
 	if userID == "" {
-		return nil, ErrUserRequired
+		return nil, errUserRequired
 	}
 	lookup, err := inviteLookup(req.GetToken())
 	if err != nil {

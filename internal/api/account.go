@@ -22,26 +22,26 @@ const minPasswordLength = 8
 
 var identityMethods = []iam.Method{iam.MethodOIDC, iam.MethodOAuth2, iam.MethodSAML}
 
-type AccountService struct {
+type accountService struct {
 	cfg *config.Config
 }
 
-func NewAccountService(cfg *config.Config) *AccountService {
-	return &AccountService{cfg: cfg}
+func newAccountService(cfg *config.Config) *accountService {
+	return &accountService{cfg: cfg}
 }
 
-func (s *AccountService) GetAccount(
+func (s *accountService) GetAccount(
 	ctx context.Context,
 	_ *nokkuv1.GetAccountRequest,
 ) (*nokkuv1.GetAccountResponse, error) {
 	u, err := s.cfg.IAM.GetUser(ctx)
 	if err != nil {
-		return nil, ErrAccountNotFound
+		return nil, errAccountNotFound
 	}
 	return &nokkuv1.GetAccountResponse{User: u.ToProto()}, nil
 }
 
-func (s *AccountService) UpdateAccount(
+func (s *accountService) UpdateAccount(
 	ctx context.Context,
 	req *nokkuv1.UpdateAccountRequest,
 ) (*nokkuv1.UpdateAccountResponse, error) {
@@ -51,12 +51,12 @@ func (s *AccountService) UpdateAccount(
 		DisablePasswordReset: req.DisablePasswordReset,
 	})
 	if err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.UpdateAccountResponse{User: u.ToProto()}, nil
 }
 
-func (s *AccountService) ChangePassword(
+func (s *accountService) ChangePassword(
 	ctx context.Context,
 	req *nokkuv1.ChangePasswordRequest,
 ) (*nokkuv1.ChangePasswordResponse, error) {
@@ -64,7 +64,7 @@ func (s *AccountService) ChangePassword(
 	// A passwordless account may set its first password without a check.
 	has, err := s.cfg.IAM.Password.HasPassword(ctx, userID)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	if has {
 		if err := s.cfg.IAM.Password.CheckPassword(
@@ -72,40 +72,40 @@ func (s *AccountService) ChangePassword(
 			userID,
 			req.GetCurrentPassword(),
 		); err != nil {
-			return nil, ErrCurrentPassword
+			return nil, errCurrentPassword
 		}
 	}
 	if len(req.GetNewPassword()) < minPasswordLength {
-		return nil, ErrPasswordTooShort
+		return nil, errPasswordTooShort
 	}
 
 	// Keep the current session, revoke the rest (NIST 800-63B).
 	if err := s.cfg.IAM.Password.Store(ctx, userID, req.GetNewPassword()); err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	current, _ := iam.CurrentSession(ctx)
 	_, _ = s.cfg.IAM.RevokeOtherSessions(ctx, iam.SessionHash(current.TokenHash))
 	return &nokkuv1.ChangePasswordResponse{}, nil
 }
 
-func (s *AccountService) RemovePassword(
+func (s *accountService) RemovePassword(
 	ctx context.Context,
 	req *nokkuv1.RemovePasswordRequest,
 ) (*nokkuv1.RemovePasswordResponse, error) {
 	userID := actor.UserIDFromContext(ctx)
 	if err := s.cfg.IAM.Password.CheckPassword(ctx, userID, req.GetCurrentPassword()); err != nil {
-		return nil, ErrCurrentPassword
+		return nil, errCurrentPassword
 	}
 	if !s.requireRemovable(ctx, iam.MethodPassword) {
-		return nil, ErrLastLoginMethod
+		return nil, errLastLoginMethod
 	}
 	if err := s.cfg.IAM.Password.DeletePassword(ctx, userID); err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.RemovePasswordResponse{}, nil
 }
 
-func (s *AccountService) ListCredentials(
+func (s *accountService) ListCredentials(
 	ctx context.Context,
 	_ *nokkuv1.ListCredentialsRequest,
 ) (*nokkuv1.ListCredentialsResponse, error) {
@@ -116,7 +116,7 @@ func (s *AccountService) ListCredentials(
 	for _, typ := range types {
 		creds, err := s.cfg.IAM.ListCredentialsByType(ctx, typ)
 		if err != nil {
-			return nil, ErrInternal
+			return nil, errInternal
 		}
 		for _, c := range creds {
 			credentials = append(credentials, c.ToProto())
@@ -125,55 +125,55 @@ func (s *AccountService) ListCredentials(
 	return &nokkuv1.ListCredentialsResponse{Credentials: credentials}, nil
 }
 
-func (s *AccountService) RenameCredential(
+func (s *accountService) RenameCredential(
 	ctx context.Context,
 	req *nokkuv1.RenameCredentialRequest,
 ) (*nokkuv1.RenameCredentialResponse, error) {
 	if err := s.cfg.IAM.RenameCredential(ctx, req.GetId(), req.GetLabel()); err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.RenameCredentialResponse{}, nil
 }
 
-func (s *AccountService) RemoveCredential(
+func (s *accountService) RemoveCredential(
 	ctx context.Context,
 	req *nokkuv1.RemoveCredentialRequest,
 ) (*nokkuv1.RemoveCredentialResponse, error) {
 	cred, err := s.cfg.IAM.GetCredential(ctx, req.GetId())
 	if err != nil {
-		return nil, ErrAccountNotFound
+		return nil, errAccountNotFound
 	}
 	if iam.Method(cred.Type) == iam.MethodPasskey {
 		if !s.requireRemovable(ctx, iam.MethodPasskey) {
-			return nil, ErrLastLoginMethod
+			return nil, errLastLoginMethod
 		}
 	}
 	if err := s.cfg.IAM.DeleteCredential(ctx, req.GetId()); err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.RemoveCredentialResponse{}, nil
 }
 
-func (s *AccountService) RemoveIdentity(
+func (s *accountService) RemoveIdentity(
 	ctx context.Context,
 	req *nokkuv1.RemoveIdentityRequest,
 ) (*nokkuv1.RemoveIdentityResponse, error) {
 	if !s.requireRemovable(ctx, iam.MethodOAuth2) {
-		return nil, ErrLastLoginMethod
+		return nil, errLastLoginMethod
 	}
 	if err := s.cfg.IAM.UnlinkIdentity(ctx, req.GetProvider(), identityMethods...); err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.RemoveIdentityResponse{}, nil
 }
 
-func (s *AccountService) ListBackupCodes(
+func (s *accountService) ListBackupCodes(
 	ctx context.Context,
 	_ *nokkuv1.ListBackupCodesRequest,
 ) (*nokkuv1.ListBackupCodesResponse, error) {
 	creds, err := s.cfg.IAM.ListBackupCodes(ctx)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	codes := make([]*nokkuv1.AccountCredential, 0, len(creds))
 	for _, c := range creds {
@@ -182,35 +182,35 @@ func (s *AccountService) ListBackupCodes(
 	return &nokkuv1.ListBackupCodesResponse{Codes: codes}, nil
 }
 
-func (s *AccountService) RotateBackupCodes(
+func (s *accountService) RotateBackupCodes(
 	ctx context.Context,
 	_ *nokkuv1.RotateBackupCodesRequest,
 ) (*nokkuv1.RotateBackupCodesResponse, error) {
 	codes, err := s.cfg.IAM.RotateBackupCodes(ctx)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.RotateBackupCodesResponse{Codes: codes}, nil
 }
 
-func (s *AccountService) RemoveBackupCodes(
+func (s *accountService) RemoveBackupCodes(
 	ctx context.Context,
 	_ *nokkuv1.RemoveBackupCodesRequest,
 ) (*nokkuv1.RemoveBackupCodesResponse, error) {
 	if err := s.cfg.IAM.DeleteBackupCodes(ctx); err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.RemoveBackupCodesResponse{}, nil
 }
 
-func (s *AccountService) ListAccountSessions(
+func (s *accountService) ListAccountSessions(
 	ctx context.Context,
 	_ *nokkuv1.ListAccountSessionsRequest,
 ) (*nokkuv1.ListAccountSessionsResponse, error) {
 	current, _ := iam.CurrentSession(ctx)
 	sessions, err := s.cfg.IAM.ListSessions(ctx)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	out := make([]*nokkuv1.AccountSession, 0, len(sessions))
 	for _, sess := range sessions {
@@ -229,27 +229,27 @@ func (s *AccountService) ListAccountSessions(
 	return &nokkuv1.ListAccountSessionsResponse{Sessions: out}, nil
 }
 
-func (s *AccountService) RemoveSession(
+func (s *accountService) RemoveSession(
 	ctx context.Context,
 	req *nokkuv1.RemoveSessionRequest,
 ) (*nokkuv1.RemoveSessionResponse, error) {
 	current, _ := iam.CurrentSession(ctx)
 	if req.GetId() == string(current.TokenHash) {
-		return nil, ErrCurrentSession
+		return nil, errCurrentSession
 	}
 	if err := s.cfg.IAM.DeleteOwnSession(ctx, iam.SessionHash(req.GetId())); err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.RemoveSessionResponse{}, nil
 }
 
-func (s *AccountService) DeleteAccount(
+func (s *accountService) DeleteAccount(
 	ctx context.Context,
 	_ *nokkuv1.DeleteAccountRequest,
 ) (*nokkuv1.DeleteAccountResponse, error) {
 	u, err := s.cfg.IAM.GetUser(ctx)
 	if err != nil {
-		return nil, ErrAccountNotFound
+		return nil, errAccountNotFound
 	}
 
 	// Solo workspaces go with the account, so cancel their billing while the
@@ -271,13 +271,13 @@ func (s *AccountService) DeleteAccount(
 
 	err = s.cfg.IAM.DeleteUser(ctx)
 	if shared, ok := errors.AsType[*iam.SharedWorkspacesError](err); ok {
-		return nil, NewError(
+		return nil, newError(
 			connect.CodeFailedPrecondition,
 			"transfer ownership of "+strings.Join(shared.Names, ", ")+" before deleting your account",
 		)
 	}
 	if err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	if err := s.cfg.Storage.Delete(ctx, storage.AvatarPath(u.ID)); err != nil {
 		slog.Warn("failed to delete avatar", "error", err)
@@ -297,7 +297,7 @@ func (s *AccountService) DeleteAccount(
 
 // requireRemovable reports whether removing rm keeps the account reachable.
 // Backup codes are recovery, not a way in.
-func (s *AccountService) requireRemovable(ctx context.Context, rm iam.Method) bool {
+func (s *accountService) requireRemovable(ctx context.Context, rm iam.Method) bool {
 	has := func(m iam.Method) bool {
 		creds, err := s.cfg.IAM.ListCredentialsByType(ctx, m)
 		return err == nil && len(creds) > 0

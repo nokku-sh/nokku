@@ -20,12 +20,12 @@ import (
 
 const tokenTTL = 15 * time.Minute
 
-type AuthService struct {
+type authService struct {
 	cfg *config.Config
 }
 
-func NewAuthService(cfg *config.Config) *AuthService {
-	return &AuthService{cfg: cfg}
+func newAuthService(cfg *config.Config) *authService {
+	return &authService{cfg: cfg}
 }
 
 func callInfo(ctx context.Context) (connect.CallInfo, error) {
@@ -43,7 +43,7 @@ func setCookie(ci connect.CallInfo, c *http.Cookie) {
 	ci.ResponseHeader().Add("Set-Cookie", c.String())
 }
 
-func (s *AuthService) Register(
+func (s *authService) Register(
 	ctx context.Context,
 	req *nokkuv1.RegisterRequest,
 ) (*nokkuv1.RegisterResponse, error) {
@@ -55,24 +55,24 @@ func (s *AuthService) Register(
 	)
 	if err != nil {
 		if errors.Is(err, iam.ErrEmailTaken) {
-			return nil, NewError(
+			return nil, newError(
 				connect.CodeAlreadyExists,
 				"an account with this email already exists",
 			)
 		}
 		if errors.Is(err, iam.ErrEmailRejected) {
-			return nil, NewError(
+			return nil, newError(
 				connect.CodeInvalidArgument,
 				"please enter a valid email address",
 			)
 		}
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	s.sendTokenEmail(ctx, u, iam.TokenVerifyEmail, true)
 	return &nokkuv1.RegisterResponse{}, nil
 }
 
-func (s *AuthService) Login(
+func (s *authService) Login(
 	ctx context.Context,
 	req *nokkuv1.LoginRequest,
 ) (*nokkuv1.LoginResponse, error) {
@@ -92,7 +92,7 @@ func (s *AuthService) Login(
 	return &nokkuv1.LoginResponse{User: u.ToProto()}, nil
 }
 
-func (s *AuthService) LoginWithBackupCode(
+func (s *authService) LoginWithBackupCode(
 	ctx context.Context,
 	req *nokkuv1.LoginWithBackupCodeRequest,
 ) (*nokkuv1.LoginWithBackupCodeResponse, error) {
@@ -114,18 +114,18 @@ func (s *AuthService) LoginWithBackupCode(
 
 func loginError(err error) error {
 	if errors.Is(err, iam.ErrInactive) {
-		return ErrAccountInactive
+		return errAccountInactive
 	}
 	if errors.Is(err, iam.ErrEmailUnverified) {
-		return ErrEmailUnverified
+		return errEmailUnverified
 	}
 	if errors.Is(err, iam.ErrSSORequired) {
-		return ErrSSORequired
+		return errSSORequired
 	}
-	return ErrLoginFailed
+	return errLoginFailed
 }
 
-func (s *AuthService) Logout(
+func (s *authService) Logout(
 	ctx context.Context,
 	_ *nokkuv1.LogoutRequest,
 ) (*nokkuv1.LogoutResponse, error) {
@@ -140,12 +140,12 @@ func (s *AuthService) Logout(
 			s.cfg.IAM.AdvertiseDPoPNonce(ci.ResponseHeader())
 			return nil, connect.NewError(connect.CodeUnauthenticated, err)
 		}
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.LogoutResponse{}, nil
 }
 
-func (s *AuthService) ForgotPassword(
+func (s *authService) ForgotPassword(
 	ctx context.Context,
 	req *nokkuv1.ForgotPasswordRequest,
 ) (*nokkuv1.ForgotPasswordResponse, error) {
@@ -157,41 +157,41 @@ func (s *AuthService) ForgotPassword(
 	return &nokkuv1.ForgotPasswordResponse{}, nil
 }
 
-func (s *AuthService) ResetPassword(
+func (s *authService) ResetPassword(
 	ctx context.Context,
 	req *nokkuv1.ResetPasswordRequest,
 ) (*nokkuv1.ResetPasswordResponse, error) {
 	userID, err := s.cfg.IAM.ConsumeToken(ctx, req.GetToken(), iam.TokenPasswordReset)
 	if err != nil {
-		return nil, NewError(
+		return nil, newError(
 			connect.CodeInvalidArgument,
 			"this reset link is invalid or expired",
 		)
 	}
 	if err := s.cfg.IAM.Password.SetPassword(ctx, userID, req.GetNewPassword()); err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.ResetPasswordResponse{}, nil
 }
 
-func (s *AuthService) VerifyEmail(
+func (s *authService) VerifyEmail(
 	ctx context.Context,
 	req *nokkuv1.VerifyEmailRequest,
 ) (*nokkuv1.VerifyEmailResponse, error) {
 	userID, err := s.cfg.IAM.ConsumeToken(ctx, req.GetToken(), iam.TokenVerifyEmail)
 	if err != nil {
-		return nil, NewError(
+		return nil, newError(
 			connect.CodeInvalidArgument,
 			"this verification link is invalid or expired",
 		)
 	}
 	if err := s.cfg.IAM.VerifyUserEmail(ctx, userID); err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.VerifyEmailResponse{}, nil
 }
 
-func (s *AuthService) ResendVerification(
+func (s *authService) ResendVerification(
 	ctx context.Context,
 	req *nokkuv1.ResendVerificationRequest,
 ) (*nokkuv1.ResendVerificationResponse, error) {
@@ -202,7 +202,7 @@ func (s *AuthService) ResendVerification(
 	return &nokkuv1.ResendVerificationResponse{}, nil
 }
 
-func (s *AuthService) DiscoverSSO(
+func (s *authService) DiscoverSSO(
 	ctx context.Context,
 	req *nokkuv1.DiscoverSSORequest,
 ) (*nokkuv1.DiscoverSSOResponse, error) {
@@ -234,7 +234,7 @@ func (s *AuthService) DiscoverSSO(
 }
 
 // sendTokenEmail skips the send when the same token went out recently.
-func (s *AuthService) sendTokenEmail(
+func (s *authService) sendTokenEmail(
 	ctx context.Context,
 	u *db.User,
 	purpose string,

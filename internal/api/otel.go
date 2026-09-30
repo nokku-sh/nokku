@@ -22,7 +22,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 )
 
-func NewOTLPInterceptor(ctx context.Context) connect.Interceptor {
+func newOTLPInterceptor(ctx context.Context) connect.Interceptor {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
 		return nil
 	}

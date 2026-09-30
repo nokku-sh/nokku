@@ -12,15 +12,15 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-type WorkspaceDomainService struct {
+type workspaceDomainService struct {
 	cfg *config.Config
 }
 
-func NewWorkspaceDomainService(cfg *config.Config) *WorkspaceDomainService {
-	return &WorkspaceDomainService{cfg: cfg}
+func newWorkspaceDomainService(cfg *config.Config) *workspaceDomainService {
+	return &workspaceDomainService{cfg: cfg}
 }
 
-func (s *WorkspaceDomainService) GetWorkspaceDomain(
+func (s *workspaceDomainService) GetWorkspaceDomain(
 	ctx context.Context,
 	req *nokkuv1.GetWorkspaceDomainRequest,
 ) (*nokkuv1.GetWorkspaceDomainResponse, error) {
@@ -33,7 +33,7 @@ func (s *WorkspaceDomainService) GetWorkspaceDomain(
 	}, nil
 }
 
-func (s *WorkspaceDomainService) CreateWorkspaceDomain(
+func (s *workspaceDomainService) CreateWorkspaceDomain(
 	ctx context.Context,
 	req *nokkuv1.CreateWorkspaceDomainRequest,
 ) (*nokkuv1.CreateWorkspaceDomainResponse, error) {
@@ -46,7 +46,7 @@ func (s *WorkspaceDomainService) CreateWorkspaceDomain(
 	}, nil
 }
 
-func (s *WorkspaceDomainService) ListWorkspaceDomains(
+func (s *workspaceDomainService) ListWorkspaceDomains(
 	ctx context.Context,
 	req *nokkuv1.ListWorkspaceDomainsRequest,
 ) (*nokkuv1.ListWorkspaceDomainsResponse, error) {
@@ -63,7 +63,7 @@ func (s *WorkspaceDomainService) ListWorkspaceDomains(
 	}, nil
 }
 
-func (s *WorkspaceDomainService) DeleteWorkspaceDomain(
+func (s *workspaceDomainService) DeleteWorkspaceDomain(
 	ctx context.Context,
 	req *nokkuv1.DeleteWorkspaceDomainRequest,
 ) (*nokkuv1.DeleteWorkspaceDomainResponse, error) {
@@ -73,7 +73,7 @@ func (s *WorkspaceDomainService) DeleteWorkspaceDomain(
 	return &nokkuv1.DeleteWorkspaceDomainResponse{}, nil
 }
 
-func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
+func (s *workspaceDomainService) VerifyWorkspaceDomain(
 	ctx context.Context,
 	req *nokkuv1.VerifyWorkspaceDomainRequest,
 ) (*nokkuv1.VerifyWorkspaceDomainResponse, error) {
@@ -86,7 +86,7 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 	}, nil
 }
 
-func (s *WorkspaceDomainService) RegenerateWorkspaceDomainToken(
+func (s *workspaceDomainService) RegenerateWorkspaceDomainToken(
 	ctx context.Context,
 	req *nokkuv1.RegenerateWorkspaceDomainTokenRequest,
 ) (*nokkuv1.RegenerateWorkspaceDomainTokenResponse, error) {
