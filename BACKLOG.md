@@ -8,8 +8,6 @@ this file.
 
 ## Ready
 
-- [ ] `nk` Unexport the 21 identifiers the exports tool lists (doctor 7,
-      manual 6, ssh 3, state 3, ui 2). (2026-09-30)
 - [ ] `nokku` Dead code: `crypto.HashedToken.Verify` and
       `sshclient.Terminal.Done` are only called from tests. Delete them and
       the tests that only cover them.
@@ -58,6 +56,11 @@ this file.
 
 ## Done
 
+- [x] `nk` Unexport package internals. Result: 8 identifiers, case-only
+      diff, 0 lines net. Kept: doctor's `Report`, `Check`, `Status` and its
+      consts (returned by `Run`, exported fields), `manual.Result` and
+      `File`, `ssh.RelayDialer`, and the state types (exported and embedded
+      fields). 25a9a10 on loop/2026-10-01.
 - [x] `nokkud` Unexport package internals. Result: 13 identifiers,
       case-only diff, 0 lines net. Kept: `audit.EventDegraded` (its enum is
       used outside), `hostcerts.SignFunc`, `recording.Uploader`,
