@@ -5,9 +5,11 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
+	"net"
 	"net/http"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 	"github.com/go-jose/go-jose/v4"
@@ -20,18 +22,25 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/iam"
+	"github.com/nokku-sh/nokku/internal/sshclient/sshtest"
 )
 
-// enrollProof signs a DPoP proof for EnrollDaemon the way nokkud does.
-func enrollProof(t *testing.T, cfg *config.Config, key *ecdsa.PrivateKey) string {
+// dpopProof signs a proof the way nokkud does. Session proofs carry the
+// access token hash, the enrollment proof has no token yet.
+func dpopProof(t *testing.T, cfg *config.Config, key *ecdsa.PrivateKey, procedure, token string) string {
 	t.Helper()
-	payload, err := json.Marshal(map[string]any{
+	claims := map[string]any{
 		"htm":   http.MethodPost,
-		"htu":   cfg.FullURL() + nokkuv1connect.DaemonServiceEnrollDaemonProcedure,
+		"htu":   cfg.FullURL() + procedure,
 		"iat":   time.Now().Unix(),
 		"jti":   rand.Text(),
 		"nonce": cfg.IAM.DPoP.CurrentNonce(),
-	})
+	}
+	if token != "" {
+		claims["ath"] = iam.DPoPATH(token)
+	}
+	payload, err := json.Marshal(claims)
 	require.NoError(t, err)
 	opts := (&jose.SignerOptions{EmbedJWK: true}).WithType("dpop+jwt")
 	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: cryptosigner.Opaque(key)}, opts)
@@ -60,7 +69,11 @@ func TestEnrollDaemon(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	enroll := func(token string, key *ecdsa.PrivateKey) (*nokkuv1.EnrollDaemonResponse, error) {
-		client := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, header("DPoP", enrollProof(t, cfg, key)))
+		client := nokkuv1connect.NewDaemonServiceClient(
+			srv.Client(),
+			srv.URL,
+			header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonServiceEnrollDaemonProcedure, "")),
+		)
 		return client.EnrollDaemon(t.Context(), &nokkuv1.EnrollDaemonRequest{Token: &token})
 	}
 
@@ -89,8 +102,6 @@ func TestEnrollDaemon(t *testing.T) {
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "bad token, got %v", err)
 }
 
-// TestCreateSession stops short of a live session: no daemon holds a control
-// stream here, so a member gets Unavailable after every lookup succeeded.
 func TestCreateSession(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -114,7 +125,8 @@ func TestCreateSession(t *testing.T) {
 	require.NoError(t, err)
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	enrolled, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, header("DPoP", enrollProof(t, cfg, key))).
+	enrollAuth := header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonServiceEnrollDaemonProcedure, ""))
+	enrolled, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, enrollAuth).
 		EnrollDaemon(t.Context(), &nokkuv1.EnrollDaemonRequest{Token: new(created.GetSecret())})
 	require.NoError(t, err)
 
@@ -123,8 +135,12 @@ func TestCreateSession(t *testing.T) {
 		DaemonId:    new(enrolled.GetId()),
 		Username:    new("root"),
 	}
-	member := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleMember)))
+	memberToken := seedMember(t, cfg, workspaceID, db.RoleMember)
+	member := nokkuv1connect.NewDaemonServiceClient(
+		srv.Client(),
+		srv.URL,
+		header("Authorization", "Bearer "+memberToken),
+	)
 	_, err = member.CreateSession(t.Context(), req)
 	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(err), "offline daemon, got %v", err)
 
@@ -139,4 +155,113 @@ func TestCreateSession(t *testing.T) {
 		header("Authorization", "Bearer "+sa.GetToken()))
 	_, err = machine.CreateSession(t.Context(), req)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "service account, got %v", err)
+
+	// The target trusts the sshtest CA, which admits the member's cert.
+	memberPrincipal, _, err := cfg.IAM.AuthenticateToken(t.Context(), memberToken)
+	require.NoError(t, err)
+	sshd := sshtest.NewServerFor(t, enrolled.GetTargetId(), memberPrincipal.ID)
+	ca := sshd.CA(t)
+	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
+		row, err := q.CreateCA(t.Context(), &db.CreateCAParams{
+			WorkspaceID:    workspaceID,
+			Name:           "sshtest",
+			Certificate:    ca.PublicKey,
+			PrivateKey:     ca.PrivateKey,
+			PublicKey:      ca.PublicKey,
+			SerialNumber:   uuid.New().String(),
+			Subject:        "sshtest",
+			NotBefore:      time.Now().Add(-time.Minute),
+			NotAfter:       time.Now().Add(time.Hour),
+			Lifetime:       time.Hour,
+			UserDefaultTtl: ca.UserDefaultTtl,
+			UserMaxTtl:     ca.UserMaxTtl,
+			UserExtensions: ca.UserExtensions,
+		})
+		if err != nil {
+			return err
+		}
+		_, err = q.UpdateTargetCA(t.Context(), &db.UpdateTargetCAParams{DaemonID: new(enrolled.GetId()), CaID: &row.ID})
+		return err
+	}))
+
+	// A fake daemon holds the control stream and bridges the relay to sshd.
+	token := enrolled.GetAccessToken()
+	controlCtx, control := connect.NewClientContext(t.Context())
+	control.RequestHeader().Set("Authorization", "DPoP "+token)
+	control.RequestHeader().Set("DPoP",
+		dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceConnectProcedure, token))
+	stream, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL).Connect(controlCtx)
+	require.NoError(t, err)
+	require.NoError(t, stream.Send(&nokkuv1.ConnectRequest{
+		Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{}},
+	}))
+	// Signed here since require must not run on the daemon goroutine.
+	relayProof := dpopProof(t, cfg, key, nokkuv1connect.DaemonSessionServiceDaemonRelayProcedure, token)
+	go func() {
+		for {
+			msg, err := stream.Receive()
+			if err != nil {
+				return
+			}
+			relayID := msg.GetRelayOpen().GetRelayId()
+			if relayID == "" {
+				continue
+			}
+			conn, err := new(net.Dialer).DialContext(t.Context(), "tcp", sshd.Addr())
+			if err != nil {
+				return
+			}
+			relayCtx, info := connect.NewClientContext(t.Context())
+			info.RequestHeader().Set("Authorization", "DPoP "+token)
+			info.RequestHeader().Set("DPoP", relayProof)
+			relay, err := nokkuv1connect.NewDaemonSessionServiceClient(srv.Client(), srv.URL).DaemonRelay(relayCtx)
+			if err != nil {
+				return
+			}
+			_ = relay.Send(&nokkuv1.DaemonRelayRequest{
+				Msg: &nokkuv1.DaemonRelayRequest_Ready{Ready: &nokkuv1.DaemonRelayReady{RelayId: &relayID}},
+			})
+			go func() {
+				buf := make([]byte, 32*1024)
+				for {
+					n, err := conn.Read(buf)
+					if n > 0 {
+						_ = relay.Send(
+							&nokkuv1.DaemonRelayRequest{Msg: &nokkuv1.DaemonRelayRequest_Data{Data: buf[:n]}},
+						)
+					}
+					if err != nil {
+						return
+					}
+				}
+			}()
+			go func() {
+				defer func() { _ = conn.Close() }()
+				for {
+					res, err := relay.Receive()
+					if err != nil {
+						return
+					}
+					if _, err := conn.Write(res.GetData()); err != nil {
+						return
+					}
+				}
+			}()
+		}
+	}()
+
+	// Unavailable until the pool has registered the control stream.
+	var res *nokkuv1.CreateSessionResponse
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		res, err = member.CreateSession(t.Context(), req)
+		if connect.CodeOf(err) != connect.CodeUnavailable || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	require.NoError(t, err)
+	assert.Equal(t, memberPrincipal.ID, res.GetSession().GetUserId())
+	assert.Equal(t, "root", sshd.ConnUser(), "sshd saw the requested OS user")
+	assert.Equal(t, res.GetSession().GetSessionId(), sshd.Env("NOKKU_SESSION_ID"), "session env reached sshd")
 }

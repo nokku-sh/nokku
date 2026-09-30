@@ -17,6 +17,14 @@ import (
 	"github.com/nokku-sh/nokku/internal/testdb"
 )
 
+// Built once per package, every config.New also alters the cluster-wide
+// nokku_app role and collides with other test packages doing the same.
+var (
+	testCfg    *config.Config
+	testServer *httptest.Server
+	errTestAPI error
+)
+
 // TestMain keeps a developer's shell env from pointing the test server at
 // real Redis, Stripe, KMS, S3, SMTP, or social providers.
 func TestMain(m *testing.M) {
@@ -37,26 +45,38 @@ func TestMain(m *testing.M) {
 		os.Unsetenv(key)
 	}
 	testdb.Setup("api")
-	os.Exit(m.Run())
+	storage, _ := os.MkdirTemp("", "nokku-api-test")
+	os.Setenv("NOKKU_SECRET", "test-secret")
+	os.Setenv("NOKKU_LOCAL_STORAGE_PATH", storage)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	testCfg, errTestAPI = config.New(ctx, nil)
+	if errTestAPI == nil {
+		s := New(testCfg)
+		errTestAPI = s.registerServices(ctx)
+		// Bidi streams need HTTP/2.
+		testServer = httptest.NewUnstartedServer(s.mux)
+		testServer.EnableHTTP2 = true
+		testServer.StartTLS()
+	}
+	code := m.Run()
+	cancel()
+	if testServer != nil {
+		testServer.Close()
+	}
+	_ = os.RemoveAll(storage)
+	os.Exit(code)
 }
 
-// newTestAPI wires the real config and serves every connect service with the
-// production interceptors. The HTTP middleware chain is left out.
+// newTestAPI returns the real config and a server running every connect
+// service with the production interceptors. The HTTP middleware chain is
+// left out.
 func newTestAPI(t *testing.T) (*config.Config, *httptest.Server) {
 	t.Helper()
-	if _, err := db.NewConnection(t.Context()); err != nil {
-		t.Skipf("no test database: %v", err)
+	if errTestAPI != nil {
+		t.Skipf("no test API, is the test database up? %v", errTestAPI)
 	}
-	t.Setenv("NOKKU_SECRET", "test-secret")
-	t.Setenv("NOKKU_LOCAL_STORAGE_PATH", t.TempDir())
-	cfg, err := config.New(t.Context(), nil)
-	require.NoError(t, err)
-
-	s := New(cfg)
-	require.NoError(t, s.registerServices(t.Context()))
-	srv := httptest.NewServer(s.mux)
-	t.Cleanup(srv.Close)
-	return cfg, srv
+	return testCfg, testServer
 }
 
 func seedWorkspace(t *testing.T, cfg *config.Config) string {

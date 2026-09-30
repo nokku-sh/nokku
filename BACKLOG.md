@@ -8,16 +8,6 @@ this file.
 
 ## Ready
 
-- [ ] `nokku/internal/api` `CreateSession` success path. `TestCreateSession`
-      covers lookups, offline daemon, and the non-user denial. A live
-      session needs: the harness on TLS with HTTP/2 (bidi streams), a fake
-      daemon on the real Connect stream that answers RelayOpen by opening
-      DaemonRelay and bridging it to `sshclient/sshtest`, DPoP session
-      proofs with `ath` on both streams, the sshtest CA stored as the
-      target's CA, and sshtest taking the host and user principals (today
-      hardcoded "target-1" and "u1", 10 callers).
-      Done when: a test starts a session and sees the sshtest echo.
-      (2026-10-01)
 - [ ] `nokkud/main.go` The root command description says nokkud "replaces
       the host sshd". It runs beside it on :4022 and never touches port 22.
       Done when: the help text matches. (2026-09-30)
@@ -42,6 +32,16 @@ this file.
       the tests that only cover them.
       Done when: the exports tool shows no `tests-only` entry for either.
       (2026-09-30)
+
+- [ ] `nokku/internal/db` Parallel test packages race on
+      `ALTER ROLE nokku_app` ("tuple concurrently updated", SQLSTATE XX000).
+      The `nokku_schema` advisory lock in `migrate` is per database, but each
+      package has its own `nokku_test_<pkg>` database and the role is
+      cluster-wide, so the comment's "serializes parallel test packages" is
+      wrong. Seen 2 of 4 full runs while api built a config per test, 0 of 4
+      after building it once.
+      Done when: a test running NewConnection against two databases in
+      parallel passes reliably, and the comment matches. (2026-10-01)
 
 ## Needs decision
 
@@ -75,6 +75,12 @@ this file.
 
 ## Done
 
+- [x] `nokku/internal/api` `CreateSession` success path. Result: a fake
+      daemon on the real Connect and DaemonRelay streams bridges to
+      `sshtest`, the test sees the session env and OS user reach sshd. The
+      api harness is now built once per package on TLS with HTTP/2, and
+      `sshtest.NewServerFor` takes real principals. Net +152 lines.
+      (loop/2026-10-01)
 - [x] `nokku/internal/api` `CreateSession` characterization test, first
       part. Result: covers the daemon, CA, and target lookups, the offline
       daemon (Unavailable), and a service account (PermissionDenied). +52
