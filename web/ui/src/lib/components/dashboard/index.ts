@@ -1,9 +1,0 @@
-export { default as ActivityFeed } from './ActivityFeed.svelte';
-export { default as HealthAlerts } from './HealthAlerts.svelte';
-export { default as MiniBars } from './MiniBars.svelte';
-export { default as OnboardingChecklist } from './OnboardingChecklist.svelte';
-export { default as SectionHeading } from './SectionHeading.svelte';
-export { default as ServersTable } from './ServersTable.svelte';
-export { default as SessionFeed } from './SessionFeed.svelte';
-export { default as StatCard } from './StatCard.svelte';
-export type { HealthIssue, SetupStep } from './types';
