@@ -8,11 +8,18 @@ this file.
 
 ## Ready
 
-- [ ] `nokku/internal/api` Characterization tests for the riskiest untested
-      handlers: `DaemonService.CreateSession`, `DaemonService.EnrollDaemon`,
-      `TargetService.SyncTargetUsers`. They protect later refactors.
-      Done when: each has a DB-backed test covering its success path and its
-      main denial. (2026-09-30)
+- [ ] `nokku/internal/api` Characterization test for
+      `DaemonService.EnrollDaemon`. Use the harness in `main_test.go`. Needs
+      an enrollment token seeded and a signed DPoP proof (go-jose, see
+      `signProof` in `iam/authn_test.go`) with the server's nonce.
+      Done when: a DB-backed test covers enrollment and a bad token
+      (FailedPrecondition). (2026-10-01)
+- [ ] `nokku/internal/api` Characterization test for
+      `DaemonService.CreateSession`. The success path needs a fake daemon on
+      the real DaemonControl stream that answers RelayOpen by bridging a
+      DaemonRelay stream to `sshclient/sshtest`. Probably 150+ lines alone.
+      Done when: a DB-backed test covers a started session and a
+      non-user principal (PermissionDenied). (2026-10-01)
 - [ ] `nokkud/main.go` The root command description says nokkud "replaces
       the host sshd". It runs beside it on :4022 and never touches port 22.
       Done when: the help text matches. (2026-09-30)
@@ -70,6 +77,11 @@ this file.
 
 ## Done
 
+- [x] `nokku/internal/api` Characterization tests, first part. Result:
+      DB-backed api harness (`main_test.go`, real config and interceptors
+      over httptest) and a `SyncTargetUsers` test for success, no-delete, and
+      viewer denial. +223 lines. Split the other two handlers into Ready.
+      (loop/2026-10-01)
 - [x] `nokku/internal/api` Resend verification sent the welcome email
       again. Welcome now goes out once at signup, resends use the
       `verification` template. No test yet, api handlers have no DB test
