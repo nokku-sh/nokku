@@ -2,17 +2,17 @@ package email
 
 import "context"
 
-type Message struct {
+type message struct {
 	From    string
 	To      string
 	Subject string
 	HTML    string
 }
 
-type Sender interface {
-	Send(ctx context.Context, msg Message) error
+type sender interface {
+	Send(ctx context.Context, msg message) error
 }
 
 type noopSender struct{}
 
-func (noopSender) Send(context.Context, Message) error { return nil }
+func (noopSender) Send(context.Context, message) error { return nil }

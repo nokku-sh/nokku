@@ -71,13 +71,13 @@ func AnnotateTenant(ctx context.Context, t TenantID) context.Context {
 	return context.WithValue(ctx, tenantKey{}, t)
 }
 
-func TenantFromContext(ctx context.Context) (TenantID, bool) {
+func tenantFromContext(ctx context.Context) (TenantID, bool) {
 	t, ok := ctx.Value(tenantKey{}).(TenantID)
 	return t, ok
 }
 
 func WorkspaceIDFromContext(ctx context.Context) string {
-	t, _ := TenantFromContext(ctx)
+	t, _ := tenantFromContext(ctx)
 	return t
 }
 

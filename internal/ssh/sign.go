@@ -24,7 +24,7 @@ func SignCertificate(
 	ttl time.Duration,
 	certType nokkuv1.SignSSHCertificateRequest_CertificateType,
 ) (*ssh.Certificate, error) {
-	signer, err := GetSigner(ca.PrivateKey.Bytes())
+	signer, err := getSigner(ca.PrivateKey.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CA signer: %w", err)
 	}

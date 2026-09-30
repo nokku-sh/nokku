@@ -7,25 +7,25 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// Sink implementations that talk to the network must queue and retry off the
+// sink implementations that talk to the network must queue and retry off the
 // request path, a dead destination must not stall a login.
-type Sink interface {
+type sink interface {
 	Append(ctx context.Context, event *Event) error
 }
 
-// PostgresSink is the durable record.
-type PostgresSink struct {
+// postgresSink is the durable record.
+type postgresSink struct {
 	q db.Querier
 }
 
-var _ Sink = (*PostgresSink)(nil)
+var _ sink = (*postgresSink)(nil)
 
-func NewPostgresSink(conn *db.Connection) *PostgresSink {
-	return &PostgresSink{q: conn.Sys()}
+func newPostgresSink(conn *db.Connection) *postgresSink {
+	return &postgresSink{q: conn.Sys()}
 }
 
 // Append runs as nokku_system, tenant transactions cannot write audit rows.
-func (s *PostgresSink) Append(ctx context.Context, event *Event) error {
+func (s *postgresSink) Append(ctx context.Context, event *Event) error {
 	if event == nil {
 		return nil
 	}

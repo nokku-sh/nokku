@@ -18,7 +18,7 @@ func (t *TinkEncryptor) Start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if err := t.Rewrap(ctx); err != nil {
+				if err := t.rewrap(ctx); err != nil {
 					slog.Error("failed to rewrap keyset", "error", err)
 				}
 			}
@@ -26,7 +26,7 @@ func (t *TinkEncryptor) Start(ctx context.Context) {
 	}()
 }
 
-func (t *TinkEncryptor) Rewrap(ctx context.Context) error {
+func (t *TinkEncryptor) rewrap(ctx context.Context) error {
 	// Re-fetch so a KMS-side KEK rotation is picked up.
 	kek, err := t.client.GetAEAD(t.KMSURI)
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 	"uuid"
 )
 
-var ErrInvalidToken = errors.New("malformed token")
+var errInvalidToken = errors.New("malformed token")
 
 type Token struct {
 	ID        string      // empty when no ID requested
@@ -77,7 +77,7 @@ func NewToken(opts ...TokenOption) (*Token, error) {
 // contain underscores.
 func Parse(raw string) (*ParsedToken, error) {
 	if raw == "" {
-		return nil, ErrInvalidToken
+		return nil, errInvalidToken
 	}
 
 	id, secret, ok := strings.Cut(raw, "_")

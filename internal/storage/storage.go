@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	ModeLocal = "local"
-	ModeS3    = "s3"
+	modeLocal = "local"
+	modeS3    = "s3"
 )
 
 type Storage struct {
@@ -51,11 +51,11 @@ func New(ctx context.Context, baseURL string) (*Storage, error) {
 	s.BaseURL = baseURL
 
 	switch s.Mode {
-	case ModeS3:
+	case modeS3:
 		if err := s.initS3(ctx); err != nil {
 			return nil, err
 		}
-	case ModeLocal:
+	case modeLocal:
 		if err := s.initLocal(); err != nil {
 			return nil, err
 		}
@@ -63,8 +63,8 @@ func New(ctx context.Context, baseURL string) (*Storage, error) {
 		return nil, fmt.Errorf(
 			"invalid NOKKU_STORAGE mode %q (must be %q or %q)",
 			s.Mode,
-			ModeLocal,
-			ModeS3,
+			modeLocal,
+			modeS3,
 		)
 	}
 

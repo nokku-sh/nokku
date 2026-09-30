@@ -33,7 +33,7 @@ func TestPlanMatrix(t *testing.T) {
 		},
 		{
 			plan:            PlanPro,
-			wantSeatCap:     Unlimited,
+			wantSeatCap:     unlimited,
 			wantResourceCap: 2000,
 			wantRetention:   90,
 			wantStorageCap:  100 << 20,
@@ -48,8 +48,8 @@ func TestPlanMatrix(t *testing.T) {
 		},
 		{
 			plan:            PlanEnterprise,
-			wantSeatCap:     Unlimited,
-			wantResourceCap: Unlimited,
+			wantSeatCap:     unlimited,
+			wantResourceCap: unlimited,
 			wantRetention:   365,
 			wantStorageCap:  1 << 30,
 			wantFeatures: map[string]bool{

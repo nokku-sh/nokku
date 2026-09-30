@@ -6,38 +6,38 @@ import (
 )
 
 type (
-	Extension      string
-	CriticalOption string
+	extension      string
+	criticalOption string
 )
 
 const (
-	ExtX11Forwarding   Extension = "permit-X11-forwarding"
-	ExtAgentForwarding Extension = "permit-agent-forwarding"
-	ExtPortForwarding  Extension = "permit-port-forwarding"
-	ExtPTY             Extension = "permit-pty"
-	ExtUserRC          Extension = "permit-user-rc"
-	ExtTouchRequired   Extension = "no-touch-required" // For FIDO/U2F keys
+	extX11Forwarding   extension = "permit-X11-forwarding"
+	extAgentForwarding extension = "permit-agent-forwarding"
+	extPortForwarding  extension = "permit-port-forwarding"
+	extPTY             extension = "permit-pty"
+	extUserRC          extension = "permit-user-rc"
+	extTouchRequired   extension = "no-touch-required" // For FIDO/U2F keys
 )
 
 const (
-	COForceCommand   CriticalOption = "force-command"
-	COSourceAddress  CriticalOption = "source-address"
-	COVerifyRequired CriticalOption = "verify-required" // For FIDO/U2F keys (requires user verification)
+	coForceCommand   criticalOption = "force-command"
+	coSourceAddress  criticalOption = "source-address"
+	coVerifyRequired criticalOption = "verify-required" // For FIDO/U2F keys (requires user verification)
 )
 
-var allowedExtensions = map[Extension]struct{}{
-	ExtX11Forwarding:   {},
-	ExtAgentForwarding: {},
-	ExtPortForwarding:  {},
-	ExtPTY:             {},
-	ExtUserRC:          {},
-	ExtTouchRequired:   {},
+var allowedExtensions = map[extension]struct{}{
+	extX11Forwarding:   {},
+	extAgentForwarding: {},
+	extPortForwarding:  {},
+	extPTY:             {},
+	extUserRC:          {},
+	extTouchRequired:   {},
 }
 
-var allowedCriticalOptions = map[CriticalOption]struct{}{
-	COForceCommand:   {},
-	COSourceAddress:  {},
-	COVerifyRequired: {},
+var allowedCriticalOptions = map[criticalOption]struct{}{
+	coForceCommand:   {},
+	coSourceAddress:  {},
+	coVerifyRequired: {},
 }
 
 func ValidateExtensions(m map[string]string) ([]byte, error) {
@@ -46,7 +46,7 @@ func ValidateExtensions(m map[string]string) ([]byte, error) {
 	}
 
 	for k, v := range m {
-		if _, ok := allowedExtensions[Extension(k)]; !ok {
+		if _, ok := allowedExtensions[extension(k)]; !ok {
 			return nil, fmt.Errorf("invalid ssh extension: %q", k)
 		}
 		if v != "" {
@@ -62,12 +62,12 @@ func ValidateCriticalOptions(m map[string]string) ([]byte, error) {
 	}
 
 	for k, v := range m {
-		if _, ok := allowedCriticalOptions[CriticalOption(k)]; !ok {
+		if _, ok := allowedCriticalOptions[criticalOption(k)]; !ok {
 			return nil, fmt.Errorf("invalid ssh critical option: %q", k)
 		}
 		// Values are checked at cert creation time.
-		if v != "" && k != string(COForceCommand) && k != string(COSourceAddress) &&
-			k != string(COVerifyRequired) {
+		if v != "" && k != string(coForceCommand) && k != string(coSourceAddress) &&
+			k != string(coVerifyRequired) {
 			return nil, fmt.Errorf("extension critical option %q must have empty value", k)
 		}
 	}

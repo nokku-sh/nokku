@@ -11,12 +11,12 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-type ResourceCapError struct {
+type resourceCapError struct {
 	Plan string
 	Cap  int64
 }
 
-func (e *ResourceCapError) Error() string {
+func (e *resourceCapError) Error() string {
 	return fmt.Sprintf(
 		"your plan includes %d managed resources; delete some or upgrade to add more",
 		e.Cap,
@@ -27,7 +27,7 @@ func (e *ResourceCapError) Error() string {
 // plan's pooled ResourceCap.
 func (s *Service) CheckResources(ctx context.Context, workspaceID string) error {
 	plan := s.Resolve(ctx, workspaceID)
-	if plan.ResourceCap == Unlimited {
+	if plan.ResourceCap == unlimited {
 		return nil
 	}
 
@@ -43,14 +43,14 @@ func (s *Service) CheckResources(ctx context.Context, workspaceID string) error 
 
 	if used >= plan.ResourceCap {
 		// Same metadata as the feature paywall so the UI can prompt an upgrade.
-		err := connect.NewError(connect.CodeResourceExhausted, &ResourceCapError{
+		err := connect.NewError(connect.CodeResourceExhausted, &resourceCapError{
 			Plan: plan.Name,
 			Cap:  plan.ResourceCap,
 		})
 		err.Meta().Set("x-nokku-plan", plan.Name)
 		err.Meta().Set("x-nokku-quota", "resources")
 		err.Meta().Set("x-nokku-limit", strconv.FormatInt(plan.ResourceCap, 10))
-		err.Meta().Set("x-nokku-upgrade", UpgradeURL)
+		err.Meta().Set("x-nokku-upgrade", upgradeURL)
 		return err
 	}
 	return nil

@@ -46,10 +46,10 @@ func newStripe(conn *db.Connection, returnURL string) (*Stripe, error) {
 	return &s, nil
 }
 
-// Checkout starts at the current member count. There is deliberately no
+// checkout starts at the current member count. There is deliberately no
 // quantity sync, so seats added later stay unbilled until the customer
 // adjusts them in the portal.
-func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (string, error) {
+func (s *Stripe) checkout(ctx context.Context, workspaceID, email string) (string, error) {
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")
 	}
@@ -162,7 +162,7 @@ func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (st
 	return customer.ID, nil
 }
 
-func (s *Stripe) Portal(ctx context.Context, workspaceID string) (string, error) {
+func (s *Stripe) portal(ctx context.Context, workspaceID string) (string, error) {
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")
 	}
@@ -184,7 +184,7 @@ func (s *Stripe) Portal(ctx context.Context, workspaceID string) (string, error)
 	return session.URL, nil
 }
 
-func (s *Stripe) Cancel(
+func (s *Stripe) cancel(
 	ctx context.Context,
 	workspaceID string,
 	immediate bool,
@@ -215,12 +215,12 @@ func (s *Stripe) Cancel(
 	if _, err = s.client.V1Subscriptions.Update(ctx, sub.SubscriptionID, params); err != nil {
 		return err
 	}
-	s.Sync(ctx, workspaceID)
+	s.sync(ctx, workspaceID)
 	return nil
 }
 
-// Sync self-heals missed webhooks.
-func (s *Stripe) Sync(ctx context.Context, workspaceID string) {
+// sync self-heals missed webhooks.
+func (s *Stripe) sync(ctx context.Context, workspaceID string) {
 	sub, err := s.subscription(ctx, workspaceID)
 	if err != nil || sub.SubscriptionID == "" || sub.Source != "stripe" {
 		return
@@ -274,7 +274,7 @@ func (s *Stripe) syncAll(ctx context.Context) error {
 		return err
 	}
 	for _, sub := range subs {
-		s.Sync(ctx, sub.WorkspaceID)
+		s.sync(ctx, sub.WorkspaceID)
 	}
 	if len(subs) > 0 {
 		slog.Info("reconciled subscriptions", "count", len(subs))

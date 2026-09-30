@@ -31,7 +31,7 @@ func (m *Memory) Get(_ context.Context, key string) ([]byte, error) {
 	e, ok := m.entries[key]
 	m.mu.RUnlock()
 	if !ok || expired(e) {
-		return nil, ErrNotFound
+		return nil, errNotFound
 	}
 	return append([]byte(nil), e.value...), nil
 }
@@ -60,7 +60,7 @@ func (m *Memory) GetDel(_ context.Context, key string) ([]byte, error) {
 	defer m.mu.Unlock()
 	e, ok := m.entries[key]
 	if !ok || expired(e) {
-		return nil, ErrNotFound
+		return nil, errNotFound
 	}
 	delete(m.entries, key)
 	return append([]byte(nil), e.value...), nil

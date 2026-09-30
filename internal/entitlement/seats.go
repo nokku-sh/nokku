@@ -8,12 +8,12 @@ import (
 	"connectrpc.com/connect"
 )
 
-type SeatLimitError struct {
+type seatLimitError struct {
 	Plan string
 	Cap  int64
 }
 
-func (e *SeatLimitError) Error() string {
+func (e *seatLimitError) Error() string {
 	return fmt.Sprintf(
 		"your plan includes %d members; upgrade to add more",
 		e.Cap,
@@ -23,7 +23,7 @@ func (e *SeatLimitError) Error() string {
 // CanInvite is shared by the invitation, SSO, and SCIM join paths.
 func (s *Service) CanInvite(ctx context.Context, workspaceID string, used int64) error {
 	plan := s.Resolve(ctx, workspaceID)
-	if plan.SeatCap != Unlimited && used >= plan.SeatCap {
+	if plan.SeatCap != unlimited && used >= plan.SeatCap {
 		slog.Warn(
 			"seat cap reached",
 			"plan",
@@ -33,7 +33,7 @@ func (s *Service) CanInvite(ctx context.Context, workspaceID string, used int64)
 			"workspace_id",
 			workspaceID,
 		)
-		return connect.NewError(connect.CodeResourceExhausted, &SeatLimitError{
+		return connect.NewError(connect.CodeResourceExhausted, &seatLimitError{
 			Plan: plan.Name,
 			Cap:  plan.SeatCap,
 		})

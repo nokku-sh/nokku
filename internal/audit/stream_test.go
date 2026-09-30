@@ -15,8 +15,8 @@ import (
 
 // newTestSink builds a sink with fixed destinations and no database or
 // refresher, so delivery behaviour can be tested on its own.
-func newTestSink(destinations map[string]destination) *WebhookSink {
-	s := &WebhookSink{
+func newTestSink(destinations map[string]destination) *webhookSink {
+	s := &webhookSink{
 		client:  &http.Client{Timeout: 5 * time.Second},
 		queue:   make(chan *Event, streamQueueSize),
 		backoff: time.Millisecond,
@@ -214,7 +214,7 @@ func TestWebhookSink_UnsignedWithoutSecret(t *testing.T) {
 func TestService_AppendFansOutToEverySink(t *testing.T) {
 	first := &stubSink{}
 	failing := &stubSink{err: errors.New("destination down")}
-	service := &Service{sinks: []Sink{first, failing}}
+	service := &Service{sinks: []sink{first, failing}}
 
 	err := service.Append(context.Background(), &Event{Action: "CreateTarget"})
 	if err == nil {

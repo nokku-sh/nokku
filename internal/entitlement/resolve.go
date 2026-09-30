@@ -35,8 +35,8 @@ var ActiveStatuses = []string{
 	string(StatusPastDue),
 }
 
-// GrantsAccess fails closed on unknown statuses. past_due is a grace period.
-func (s Status) GrantsAccess() bool {
+// grantsAccess fails closed on unknown statuses. past_due is a grace period.
+func (s Status) grantsAccess() bool {
 	switch s {
 	case StatusActive, StatusTrialing, StatusPastDue:
 		return true
@@ -96,7 +96,7 @@ func (s *Service) resolve(ctx context.Context, workspaceID string) Plan {
 		})
 
 		switch {
-		case err == nil && Status(sub.Status).GrantsAccess():
+		case err == nil && Status(sub.Status).grantsAccess():
 			plan = sub.Plan
 		case errors.Is(err, ErrNoSubscription), err == nil:
 		default:
@@ -108,8 +108,8 @@ func (s *Service) resolve(ctx context.Context, workspaceID string) Plan {
 	resolved := resolvePlan(plan)
 	if s.mode == ModeSelfHosted {
 		// These caps protect SaaS infrastructure only, licensed plans included.
-		resolved.RecordingStorageBytes = Unlimited
-		resolved.ResourceCap = Unlimited
+		resolved.RecordingStorageBytes = unlimited
+		resolved.ResourceCap = unlimited
 	}
 	return resolved
 }
@@ -132,7 +132,7 @@ type requestCache struct {
 
 type requestCacheKey struct{}
 
-func WithRequestCache(ctx context.Context) context.Context {
+func withRequestCache(ctx context.Context) context.Context {
 	return context.WithValue(ctx, requestCacheKey{}, &requestCache{
 		plans: make(map[string]Plan),
 	})

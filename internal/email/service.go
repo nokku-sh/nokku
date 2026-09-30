@@ -16,11 +16,11 @@ import (
 	"github.com/nokku-sh/nokku/web"
 )
 
-var ErrCooldown = errors.New("email cooldown active")
+var errCooldown = errors.New("email cooldown active")
 
 // Service only delivers when an SMTP host is set.
 type Service struct {
-	sender Sender
+	sender sender
 	cache  cache.Cache
 	appURL string
 
@@ -167,10 +167,10 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 		return fmt.Errorf("email cooldown: %w", err)
 	}
 	if !claimed {
-		return ErrCooldown
+		return errCooldown
 	}
 
-	err = s.sender.Send(ctx, Message{
+	err = s.sender.Send(ctx, message{
 		From:    "Nokku <" + s.From + ">",
 		To:      req.to,
 		Subject: req.subject,

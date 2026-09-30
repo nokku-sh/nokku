@@ -10,7 +10,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-var ErrDisabled = errors.New("billing provider is not configured")
+var errDisabled = errors.New("billing provider is not configured")
 
 // Service moves money. It never decides what a workspace may do, that is
 // internal/entitlement.
@@ -38,16 +38,16 @@ func (s *Service) Enabled() bool {
 
 func (s *Service) Checkout(ctx context.Context, workspaceID, email string) (string, error) {
 	if !s.Enabled() {
-		return "", ErrDisabled
+		return "", errDisabled
 	}
-	return s.stripe.Checkout(ctx, workspaceID, email)
+	return s.stripe.checkout(ctx, workspaceID, email)
 }
 
 func (s *Service) Portal(ctx context.Context, workspaceID string) (string, error) {
 	if !s.Enabled() {
-		return "", ErrDisabled
+		return "", errDisabled
 	}
-	return s.stripe.Portal(ctx, workspaceID)
+	return s.stripe.portal(ctx, workspaceID)
 }
 
 func (s *Service) Cancel(
@@ -57,16 +57,16 @@ func (s *Service) Cancel(
 	reason string,
 ) error {
 	if !s.Enabled() {
-		return ErrDisabled
+		return errDisabled
 	}
-	return s.stripe.Cancel(ctx, workspaceID, immediate, reason)
+	return s.stripe.cancel(ctx, workspaceID, immediate, reason)
 }
 
 func (s *Service) WebhookHandler() http.Handler {
 	if !s.Enabled() {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			http.Error(w, ErrDisabled.Error(), http.StatusNotFound)
+			http.Error(w, errDisabled.Error(), http.StatusNotFound)
 		})
 	}
-	return s.stripe.WebhookHandler()
+	return s.stripe.webhookHandler()
 }

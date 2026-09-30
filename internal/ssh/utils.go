@@ -10,7 +10,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func GetSigner(privDER []byte) (ssh.Signer, error) {
+func getSigner(privDER []byte) (ssh.Signer, error) {
 	key, err := parsePrivateKey(privDER)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private key: %w", err)

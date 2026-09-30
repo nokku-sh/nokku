@@ -29,10 +29,10 @@ const (
 	streamRefreshPeriod = 30 * time.Second
 )
 
-// WebhookSink POSTs each workspace event to the workspace's destination. A
+// webhookSink POSTs each workspace event to the workspace's destination. A
 // full queue drops events, since a slow destination must not stall a login or
 // grow memory. Events without a workspace have nowhere to go.
-type WebhookSink struct {
+type webhookSink struct {
 	conn         *db.Connection
 	entitlements *entitlement.Service
 	client       *http.Client
@@ -49,19 +49,19 @@ type destination struct {
 	secret string
 }
 
-var _ Sink = (*WebhookSink)(nil)
+var _ sink = (*webhookSink)(nil)
 
-// NewWebhookSink guards against private destinations, see util.NewEgressClient.
-func NewWebhookSink(
+// newWebhookSink guards against private destinations, see util.NewEgressClient.
+func newWebhookSink(
 	ctx context.Context,
 	conn *db.Connection,
 	entitlements *entitlement.Service,
-) (*WebhookSink, error) {
+) (*webhookSink, error) {
 	client, err := util.NewEgressClient(streamTimeout)
 	if err != nil {
 		return nil, err
 	}
-	s := &WebhookSink{
+	s := &webhookSink{
 		conn:         conn,
 		entitlements: entitlements,
 		client:       client,
@@ -80,7 +80,7 @@ func NewWebhookSink(
 }
 
 // Append never blocks or fails the caller.
-func (s *WebhookSink) Append(_ context.Context, event *Event) error {
+func (s *webhookSink) Append(_ context.Context, event *Event) error {
 	if event == nil || event.WorkspaceID == "" {
 		return nil
 	}
@@ -96,7 +96,7 @@ func (s *WebhookSink) Append(_ context.Context, event *Event) error {
 	return nil
 }
 
-func (s *WebhookSink) work(ctx context.Context) {
+func (s *webhookSink) work(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -108,7 +108,7 @@ func (s *WebhookSink) work(ctx context.Context) {
 }
 
 // deliver drops what it cannot deliver, Postgres holds the record anyway.
-func (s *WebhookSink) deliver(ctx context.Context, event *Event) {
+func (s *webhookSink) deliver(ctx context.Context, event *Event) {
 	dest := s.destination(event.WorkspaceID)
 	if dest.url == "" {
 		return
@@ -149,7 +149,7 @@ func (s *WebhookSink) deliver(ctx context.Context, event *Event) {
 
 // post only retries network errors, 408, 429, and 5xx. Any other 4xx would
 // fail the same way again.
-func (s *WebhookSink) post(ctx context.Context, dest destination, body []byte) (bool, error) {
+func (s *webhookSink) post(ctx context.Context, dest destination, body []byte) (bool, error) {
 	req, err := http.NewRequestWithContext(
 		ctx, http.MethodPost, dest.url, bytes.NewReader(body),
 	)
@@ -182,14 +182,14 @@ func (s *WebhookSink) post(ctx context.Context, dest destination, body []byte) (
 	return retry, &httpError{status: resp.StatusCode}
 }
 
-func (s *WebhookSink) destination(workspaceID string) destination {
+func (s *webhookSink) destination(workspaceID string) destination {
 	if m := s.destinations.Load(); m != nil {
 		return (*m)[workspaceID]
 	}
 	return destination{}
 }
 
-func (s *WebhookSink) refreshLoop(ctx context.Context) {
+func (s *webhookSink) refreshLoop(ctx context.Context) {
 	ticker := time.NewTicker(streamRefreshPeriod)
 	defer ticker.Stop()
 	for {
@@ -204,7 +204,7 @@ func (s *WebhookSink) refreshLoop(ctx context.Context) {
 
 // refresh keeps the previous destinations on failure, so a database blip
 // cannot silently stop streaming.
-func (s *WebhookSink) refresh(ctx context.Context) {
+func (s *webhookSink) refresh(ctx context.Context) {
 	next := map[string]destination{}
 	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
 		rows, err := q.ListWorkspaceAuditWebhooks(ctx)

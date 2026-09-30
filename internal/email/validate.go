@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	ErrInvalidAddress = errors.New("invalid email address")
-	ErrNoMailDomain   = errors.New("email domain does not accept mail")
+	errInvalidAddress = errors.New("invalid email address")
+	errNoMailDomain   = errors.New("email domain does not accept mail")
 )
 
 // verifier never updates its bundled list, so it works air-gapped.
@@ -19,16 +19,16 @@ var verifier = emailverifier.NewVerifier()
 func Verify(addr string, strict bool) error {
 	syntax := verifier.ParseAddress(addr)
 	if !syntax.Valid {
-		return ErrInvalidAddress
+		return errInvalidAddress
 	}
 	if !strict {
 		return nil
 	}
 	if verifier.IsDisposable(syntax.Domain) {
-		return ErrInvalidAddress
+		return errInvalidAddress
 	}
 	if mx, err := verifier.CheckMX(syntax.Domain); err != nil || !mx.HasMXRecord {
-		return ErrNoMailDomain
+		return errNoMailDomain
 	}
 	return nil
 }

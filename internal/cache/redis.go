@@ -53,7 +53,7 @@ func (r *Redis) SetNX(
 
 func mapRedisErr(err error) error {
 	if errors.Is(err, redis.Nil) {
-		return ErrNotFound
+		return errNotFound
 	}
 	return err
 }

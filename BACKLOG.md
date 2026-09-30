@@ -8,11 +8,6 @@ this file.
 
 ## Ready
 
-- [ ] `nokku` Unexport what the exports tool lists as `internal` in the
-      remaining packages (entitlement, util, email, billing, crypto, audit,
-      and smaller ones). Leave `api.Server` and daemon's `Enrolled`, `Relay`,
-      `Synced`, they are returned by exported functions.
-      Done when: only those deliberate entries remain. (2026-09-30)
 - [ ] `nokkud` Unexport the 18 identifiers the exports tool lists (recording
       8, sshd 4, audit 4, hostcerts 1, sysutil 1). (2026-09-30)
 - [ ] `nk` Unexport the 21 identifiers the exports tool lists (doctor 7,
@@ -65,6 +60,14 @@ this file.
 
 ## Done
 
+- [x] `nokku` Unexport the remaining package internals. Result: 47
+      identifiers across actor, audit, billing, cache, config, crypto, kms,
+      email, entitlement, ssh, storage, util. Case-only diff, 0 lines net.
+      Kept: types returned by or passed to exported functions, exported
+      field types, the `Feature*` consts (enum used outside), the email
+      template data group (`newLoginTemplateData` would read as a
+      constructor). `billing.Stripe` and `cache.Redis` clash with their
+      imported package names. (loop/2026-10-01)
 - [x] `nokku/internal/iam` Unexport what only iam uses. Result: 25
       identifiers unexported, case-only diff, 0 lines net. Kept exported:
       types of exported fields other packages use (`DPoPVerifier`,

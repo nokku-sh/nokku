@@ -39,7 +39,7 @@ func newSMTPSender(host string, port int, username, password string) (*smtpSende
 	return &smtpSender{client: client}, nil
 }
 
-func (s *smtpSender) Send(ctx context.Context, msg Message) error {
+func (s *smtpSender) Send(ctx context.Context, msg message) error {
 	m := mail.NewMsg()
 	if err := m.From(msg.From); err != nil {
 		return fmt.Errorf("from address: %w", err)
