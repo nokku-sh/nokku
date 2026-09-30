@@ -8,8 +8,6 @@ this file.
 
 ## Ready
 
-- [ ] `nokkud` Unexport the 18 identifiers the exports tool lists (recording
-      8, sshd 4, audit 4, hostcerts 1, sysutil 1). (2026-09-30)
 - [ ] `nk` Unexport the 21 identifiers the exports tool lists (doctor 7,
       manual 6, ssh 3, state 3, ui 2). (2026-09-30)
 - [ ] `nokku` Dead code: `crypto.HashedToken.Verify` and
@@ -60,6 +58,11 @@ this file.
 
 ## Done
 
+- [x] `nokkud` Unexport package internals. Result: 13 identifiers,
+      case-only diff, 0 lines net. Kept: `audit.EventDegraded` (its enum is
+      used outside), `hostcerts.SignFunc`, `recording.Uploader`,
+      `sshd.Policy`, `sshd.RecordingSink` (exported signatures and fields).
+      8068959 on loop/2026-10-01.
 - [x] `nokku` Unexport the remaining package internals. Result: 47
       identifiers across actor, audit, billing, cache, config, crypto, kms,
       email, entitlement, ssh, storage, util. Case-only diff, 0 lines net.
