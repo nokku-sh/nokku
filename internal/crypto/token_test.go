@@ -24,8 +24,8 @@ func TestNewToken_NoID(t *testing.T) {
 	if parsed.Secret != tok.Plaintext || parsed.ID != "" {
 		t.Errorf("Parse() = %+v, want bare secret", parsed)
 	}
-	if !tok.Hash.Verify(tok.Plaintext) {
-		t.Error("hash does not verify against plaintext")
+	if want, _ := HashToken(tok.Plaintext); tok.Hash != want {
+		t.Error("hash does not match the plaintext")
 	}
 }
 
@@ -92,25 +92,5 @@ func TestParse(t *testing.T) {
 func TestParse_Empty(t *testing.T) {
 	if _, err := Parse(""); !errors.Is(err, errInvalidToken) {
 		t.Errorf("Parse(\"\") error = %v, want errInvalidToken", err)
-	}
-}
-
-func TestTokenHash_Verification(t *testing.T) {
-	tok, err := NewToken()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if tok.Hash.IsZero() {
-		t.Error("Hash is zero")
-	}
-	if !tok.Hash.Verify(tok.Plaintext) {
-		t.Error("Verify() with correct plaintext: want true")
-	}
-	if tok.Hash.Verify("wrong") {
-		t.Error("Verify() with wrong plaintext: want false")
-	}
-	if tok.Hash.Verify(tok.Plaintext + "x") {
-		t.Error("Verify() with near-miss plaintext: want false")
 	}
 }

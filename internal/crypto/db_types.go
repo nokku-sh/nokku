@@ -2,7 +2,6 @@ package crypto
 
 import (
 	"crypto/sha256"
-	"crypto/subtle"
 	"database/sql/driver"
 	"encoding/hex"
 	"fmt"
@@ -79,18 +78,6 @@ type HashedToken string
 func HashToken(plaintext string) (HashedToken, error) {
 	sum := sha256.Sum256([]byte(plaintext))
 	return HashedToken(hex.EncodeToString(sum[:])), nil
-}
-
-func (h HashedToken) Verify(plaintext string) bool {
-	if h.IsZero() {
-		return false
-	}
-	sum := sha256.Sum256([]byte(plaintext))
-	decoded, err := hex.DecodeString(string(h))
-	if err != nil {
-		return false
-	}
-	return subtle.ConstantTimeCompare(sum[:], decoded) == 1
 }
 
 func (h HashedToken) Hash() string {

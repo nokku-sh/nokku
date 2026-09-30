@@ -2,7 +2,6 @@ package crypto
 
 import (
 	"database/sql/driver"
-	"strings"
 	"testing"
 )
 
@@ -15,24 +14,6 @@ func resetRuntime(t *testing.T) {
 	runtimeMu.Unlock()
 }
 
-func TestHashedToken_Verify(t *testing.T) {
-	resetRuntime(t)
-
-	hash, err := HashToken("nkd_abc_secret")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !hash.Verify("nkd_abc_secret") {
-		t.Error("Verify() with correct token: want true")
-	}
-	if hash.Verify("nkd_abc_wrong") {
-		t.Error("Verify() with wrong token: want false")
-	}
-	if hash.Hash() != string(hash) {
-		t.Error("Hash() should return the raw digest")
-	}
-}
-
 // TestHashToken_Digest pins the stored representation to lowercase hex of
 // the sha256 digest. Any change silently invalidates stored tokens.
 func TestHashToken_Digest(t *testing.T) {
@@ -43,25 +24,6 @@ func TestHashToken_Digest(t *testing.T) {
 	const want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 	if string(hash) != want {
 		t.Errorf("HashToken(abc) = %q, want %q", hash, want)
-	}
-}
-
-func TestHashedToken_Verify_MalformedDigests(t *testing.T) {
-	tests := []struct {
-		name   string
-		digest string
-	}{
-		{"empty", ""},
-		{"not hex", "zzzz"},
-		{"short hex", "abc"},
-		{"valid hex wrong length", strings.Repeat("ab", 31)},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if HashedToken(tt.digest).Verify("secret") {
-				t.Errorf("Verify(%q): want false", tt.digest)
-			}
-		})
 	}
 }
 
