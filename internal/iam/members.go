@@ -8,7 +8,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-var ErrSeatLimit = errors.New("seat limit reached")
+var errSeatLimit = errors.New("seat limit reached")
 
 // EnsureMember defaults role to member. It takes the caller's querier so the
 // seat count and insert share one tx, and concurrent joins serialize on the
@@ -41,7 +41,7 @@ func (s *Service) EnsureMember(
 		return err
 	}
 	if err := s.canJoin(ctx, workspaceID, used); err != nil {
-		return errors.Join(ErrSeatLimit, err)
+		return errors.Join(errSeatLimit, err)
 	}
 
 	return q.EnsureWorkspaceMember(ctx, &db.EnsureWorkspaceMemberParams{
@@ -51,7 +51,7 @@ func (s *Service) EnsureMember(
 	})
 }
 
-func (s *Service) JoinWorkspace(ctx context.Context, userID, workspaceID string) error {
+func (s *Service) joinWorkspace(ctx context.Context, userID, workspaceID string) error {
 	return s.conn.WithTx(ctx, func(q *db.Queries) error {
 		return s.EnsureMember(ctx, q, userID, workspaceID, "")
 	})

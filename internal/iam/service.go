@@ -69,7 +69,7 @@ type Deps struct {
 	Secret []byte
 	Events Sink
 	// Password zero value selects defaults.
-	Password         PasswordParams
+	Password         passwordParams
 	PasskeyRPOrigins []string
 	// StrictEmail needs DNS, so it is for the public SaaS, not air-gapped installs.
 	StrictEmail bool

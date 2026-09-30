@@ -187,7 +187,7 @@ func TestAdvertiseDPoPNonce(t *testing.T) {
 		if header.Get("DPoP-Nonce") != svc.DPoP.CurrentNonce() {
 			t.Error("AdvertiseDPoPNonce did not set the DPoP-Nonce header")
 		}
-		if header.Get(DeviceURLHeader) != svc.baseURL {
+		if header.Get(deviceURLHeader) != svc.baseURL {
 			t.Error("AdvertiseDPoPNonce did not set the canonical URL header")
 		}
 	})

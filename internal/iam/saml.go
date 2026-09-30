@@ -101,7 +101,7 @@ func (h *samlFlow) Login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	relayState, err := h.state.Put(ctx, samlState{
+	relayState, err := h.state.put(ctx, samlState{
 		ProviderID: cfg.ProviderID,
 		RequestID:  req.ID,
 		ReturnTo:   safeReturnTo(r.URL.Query().Get("return_to")),
@@ -127,7 +127,7 @@ func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad request")
 		return
 	}
-	st, err := h.state.Take(ctx, r.PostForm.Get("RelayState"))
+	st, err := h.state.take(ctx, r.PostForm.Get("RelayState"))
 	if err != nil || !checkFlowBinding(r, st.FlowCookie) {
 		fail(w, r, "invalid or expired login")
 		return

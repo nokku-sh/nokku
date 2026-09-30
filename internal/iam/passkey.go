@@ -157,7 +157,7 @@ func (f *passkeyFlow) BeginRegistration(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, "registration failed")
 		return
 	}
-	sid, err := f.state.Put(ctx, *session)
+	sid, err := f.state.put(ctx, *session)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
@@ -168,7 +168,7 @@ func (f *passkeyFlow) BeginRegistration(w http.ResponseWriter, r *http.Request) 
 
 func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	session, err := f.state.Take(ctx, cookieFromHeader(r.Header, ceremonyCookieName))
+	session, err := f.state.take(ctx, cookieFromHeader(r.Header, ceremonyCookieName))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid or expired ceremony")
 		return
@@ -225,7 +225,7 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st.Session = session
-	sid, err := f.signup.Put(ctx, st)
+	sid, err := f.signup.put(ctx, st)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
@@ -237,7 +237,7 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 // FinishSignup doesn't sign in, the account must confirm its email first.
 func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	st, err := f.signup.Take(ctx, cookieFromHeader(r.Header, ceremonyCookieName))
+	st, err := f.signup.take(ctx, cookieFromHeader(r.Header, ceremonyCookieName))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid or expired ceremony")
 		return
@@ -279,7 +279,7 @@ func (f *passkeyFlow) BeginLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "login failed")
 		return
 	}
-	sid, err := f.state.Put(r.Context(), *session)
+	sid, err := f.state.put(r.Context(), *session)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
@@ -290,7 +290,7 @@ func (f *passkeyFlow) BeginLogin(w http.ResponseWriter, r *http.Request) {
 
 func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	session, err := f.state.Take(ctx, cookieFromHeader(r.Header, ceremonyCookieName))
+	session, err := f.state.take(ctx, cookieFromHeader(r.Header, ceremonyCookieName))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid or expired ceremony")
 		return
@@ -338,7 +338,7 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 // discoverableUser treats the user handle as the account id.
 func (f *passkeyFlow) discoverableUser(ctx context.Context) webauthn.DiscoverableUserHandler {
 	return func(_, userHandle []byte) (webauthn.User, error) {
-		u, err := f.svc.GetUserByID(ctx, string(userHandle))
+		u, err := f.svc.getUserByID(ctx, string(userHandle))
 		if err != nil {
 			return nil, err
 		}

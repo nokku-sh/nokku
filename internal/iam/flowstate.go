@@ -92,7 +92,7 @@ func newState[T any](c cache.Cache, prefix string, ttl time.Duration) *state[T] 
 	return &state[T]{cache: c, prefix: prefix, ttl: ttl}
 }
 
-func (s *state[T]) Put(ctx context.Context, v T) (string, error) {
+func (s *state[T]) put(ctx context.Context, v T) (string, error) {
 	key, err := crypto.RandomString(32)
 	if err != nil {
 		return "", err
@@ -104,7 +104,7 @@ func (s *state[T]) Put(ctx context.Context, v T) (string, error) {
 	return key, s.cache.Set(ctx, s.prefix+key, b, s.ttl)
 }
 
-func (s *state[T]) Take(ctx context.Context, key string) (T, error) {
+func (s *state[T]) take(ctx context.Context, key string) (T, error) {
 	var v T
 	if key == "" {
 		return v, errors.New("missing state")

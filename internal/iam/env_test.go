@@ -46,7 +46,7 @@ func newTestEnv(t *testing.T) *testEnv {
 		Conn:             conn,
 		Cache:            cache.NewMemory(1000),
 		Secret:           []byte("test-secret"),
-		Password:         PasswordParams{Time: 1, Memory: 1024, Threads: 1, SaltLen: 16, KeyLen: 32},
+		Password:         passwordParams{Time: 1, Memory: 1024, Threads: 1, SaltLen: 16, KeyLen: 32},
 		PasskeyRPOrigins: []string{testBaseURL},
 	})
 	if err != nil {

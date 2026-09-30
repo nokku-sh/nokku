@@ -24,7 +24,7 @@ const (
 	deviceInterval   = 5 * time.Second
 	deviceSessionTTL = 7 * 24 * time.Hour
 
-	DeviceURLHeader = "Nokku-Api-Url"
+	deviceURLHeader = "Nokku-Api-Url"
 	grantPending    = "pending"
 	grantApproved   = "approved"
 	grantDenied     = "denied"
@@ -172,7 +172,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		)
 		writeOAuthError(w, "access_denied")
 	case grantApproved:
-		u, err := h.svc.GetUserByID(ctx, g.UserID)
+		u, err := h.svc.getUserByID(ctx, g.UserID)
 		if err != nil || !u.Active {
 			writeOAuthError(w, "access_denied")
 			return

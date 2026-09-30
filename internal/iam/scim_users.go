@@ -169,7 +169,7 @@ func (h scimUserHandler) apply(
 		return scim.Resource{}, err
 	}
 	if patch.Active != nil && !*patch.Active {
-		if _, err := h.svc.RevokeSubject(ctx, patch.ID); err != nil {
+		if _, err := h.svc.revokeSubject(ctx, patch.ID); err != nil {
 			return scim.Resource{}, err
 		}
 	}

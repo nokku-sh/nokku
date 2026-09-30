@@ -23,8 +23,8 @@ import (
 // #nosec G101 -- a throwaway candidate, not a credential
 const dummyPassword = "nokku-dummy-password-do-not-use"
 
-// PasswordParams Memory is in KiB.
-type PasswordParams struct {
+// passwordParams Memory is in KiB.
+type passwordParams struct {
 	Time    uint32
 	Memory  uint32
 	Threads uint8
@@ -32,8 +32,8 @@ type PasswordParams struct {
 	KeyLen  uint32
 }
 
-func DefaultPasswordParams() PasswordParams {
-	return PasswordParams{
+func defaultPasswordParams() passwordParams {
+	return passwordParams{
 		Time:    3,
 		Memory:  64 * 1024,
 		Threads: 2,
@@ -44,14 +44,14 @@ func DefaultPasswordParams() PasswordParams {
 
 type PasswordManager struct {
 	svc    *Service
-	params PasswordParams
+	params passwordParams
 	// dummy uses the real params so the work matches even with overrides.
 	dummy func() string
 }
 
-func newPasswordManager(svc *Service, params PasswordParams) *PasswordManager {
-	if params == (PasswordParams{}) {
-		params = DefaultPasswordParams()
+func newPasswordManager(svc *Service, params passwordParams) *PasswordManager {
+	if params == (passwordParams{}) {
+		params = defaultPasswordParams()
 	}
 	m := &PasswordManager{svc: svc, params: params}
 	m.dummy = sync.OnceValue(func() string {
@@ -74,7 +74,7 @@ func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User
 			ctx,
 			Event{Action: ActionLoginDenied, Method: MethodPassword, Email: email, Detail: "unknown email"},
 		)
-		return nil, nil, ErrInvalidCredentials
+		return nil, nil, errInvalidCredentials
 	}
 	if err != nil {
 		return nil, nil, err
@@ -93,7 +93,7 @@ func (m *PasswordManager) Login(ctx context.Context, email, pw string) (*db.User
 func (m *PasswordManager) CheckPassword(ctx context.Context, userID, pw string) error {
 	denied := func(detail string) error {
 		m.svc.record(ctx, Event{Action: ActionLoginDenied, Method: MethodPassword, UserID: userID, Detail: detail})
-		return ErrInvalidCredentials
+		return errInvalidCredentials
 	}
 	cred, err := m.svc.sys.GetCredential(ctx, &db.GetCredentialParams{UserID: userID, ID: passwordCredentialID(userID)})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -172,7 +172,7 @@ func normalizeEmail(email string) string {
 }
 
 // hashPassword encodes in PHC format: $argon2id$v=19$m=...,t=...,p=...$salt$hash.
-func hashPassword(password string, p PasswordParams) (string, error) {
+func hashPassword(password string, p passwordParams) (string, error) {
 	salt := make([]byte, p.SaltLen)
 	if _, err := rand.Read(salt); err != nil {
 		return "", err
@@ -198,7 +198,7 @@ func verifyPassword(password, encoded string) (bool, error) {
 	return subtle.ConstantTimeCompare(key, other) == 1, nil
 }
 
-func needsRehash(encoded string, p PasswordParams) bool {
+func needsRehash(encoded string, p passwordParams) bool {
 	got, _, _, err := decodeHash(encoded)
 	if err != nil {
 		return true
@@ -210,18 +210,18 @@ func needsRehash(encoded string, p PasswordParams) bool {
 		got.KeyLen != p.KeyLen
 }
 
-func decodeHash(encoded string) (PasswordParams, []byte, []byte, error) {
+func decodeHash(encoded string) (passwordParams, []byte, []byte, error) {
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 6 || parts[1] != "argon2id" {
-		return PasswordParams{}, nil, nil, errors.New("iam: invalid hash format")
+		return passwordParams{}, nil, nil, errors.New("iam: invalid hash format")
 	}
 
 	var version int
 	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil || version != argon2.Version {
-		return PasswordParams{}, nil, nil, errors.New("iam: incompatible argon2 version")
+		return passwordParams{}, nil, nil, errors.New("iam: incompatible argon2 version")
 	}
 
-	var p PasswordParams
+	var p passwordParams
 	if _, err := fmt.Sscanf(
 		parts[3],
 		"m=%d,t=%d,p=%d",
@@ -229,16 +229,16 @@ func decodeHash(encoded string) (PasswordParams, []byte, []byte, error) {
 		&p.Time,
 		&p.Threads,
 	); err != nil {
-		return PasswordParams{}, nil, nil, errors.New("iam: invalid parameters")
+		return passwordParams{}, nil, nil, errors.New("iam: invalid parameters")
 	}
 
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {
-		return PasswordParams{}, nil, nil, errors.New("iam: invalid salt")
+		return passwordParams{}, nil, nil, errors.New("iam: invalid salt")
 	}
 	key, err := base64.RawStdEncoding.DecodeString(parts[5])
 	if err != nil {
-		return PasswordParams{}, nil, nil, errors.New("iam: invalid hash")
+		return passwordParams{}, nil, nil, errors.New("iam: invalid hash")
 	}
 
 	p.SaltLen = uint32(len(salt)) // #nosec G115 -- decoded salt and key are small, bounded slices.

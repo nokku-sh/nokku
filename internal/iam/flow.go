@@ -82,7 +82,7 @@ func (s *Service) startLogin(
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	key, err := store.Put(ctx, *st)
+	key, err := store.put(ctx, *st)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
@@ -104,7 +104,7 @@ func (s *Service) takeLogin(
 		fail(w, r, "login canceled")
 		return nil, nil, false
 	}
-	st, err := store.Take(r.Context(), q.Get("state"))
+	st, err := store.take(r.Context(), q.Get("state"))
 	if err != nil || !checkFlowBinding(r, st.FlowCookie) {
 		fail(w, r, "invalid or expired login")
 		return nil, nil, false

@@ -43,7 +43,7 @@ func TestPasswordLoginRequiresVerifiedEmail(t *testing.T) {
 	if _, _, err := e.svc.Password.Login(t.Context(), u.Email, testPassword); err != nil {
 		t.Fatalf("verified login: %v", err)
 	}
-	if _, _, err := e.svc.Password.Login(t.Context(), u.Email, "wrong"); !errors.Is(err, ErrInvalidCredentials) {
+	if _, _, err := e.svc.Password.Login(t.Context(), u.Email, "wrong"); !errors.Is(err, errInvalidCredentials) {
 		t.Fatalf("wrong password err = %v", err)
 	}
 }
@@ -66,8 +66,8 @@ func TestBackupCodeLoginGatesBeforeSpendingCode(t *testing.T) {
 	if _, _, err := e.svc.LoginWithBackupCode(t.Context(), u.Email, codes[0]); err != nil {
 		t.Fatalf("login with the code: %v", err)
 	}
-	if _, _, err := e.svc.LoginWithBackupCode(t.Context(), u.Email, codes[0]); !errors.Is(err, ErrInvalidCredentials) {
-		t.Fatalf("second use err = %v, want ErrInvalidCredentials", err)
+	if _, _, err := e.svc.LoginWithBackupCode(t.Context(), u.Email, codes[0]); !errors.Is(err, errInvalidCredentials) {
+		t.Fatalf("second use err = %v, want errInvalidCredentials", err)
 	}
 }
 
@@ -152,8 +152,8 @@ func TestLinkerPolicy(t *testing.T) {
 			if tc.ok && err != nil {
 				t.Fatalf("want success, got %v", err)
 			}
-			if !tc.ok && !errors.Is(err, ErrIdentityRejected) {
-				t.Fatalf("err = %v, want ErrIdentityRejected", err)
+			if !tc.ok && !errors.Is(err, errIdentityRejected) {
+				t.Fatalf("err = %v, want errIdentityRejected", err)
 			}
 		})
 	}
@@ -264,14 +264,14 @@ func TestConsumeTokenChecksPurpose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.ConsumeToken(t.Context(), raw, TokenPasswordReset); !errors.Is(err, ErrInvalidToken) {
+	if _, err := e.svc.ConsumeToken(t.Context(), raw, TokenPasswordReset); !errors.Is(err, errInvalidToken) {
 		t.Fatalf("wrong purpose err = %v", err)
 	}
 	// The wrong-purpose attempt left the token usable.
 	if id, err := e.svc.ConsumeToken(t.Context(), raw, TokenVerifyEmail); err != nil || id != u.ID {
 		t.Fatalf("consume = %q, %v", id, err)
 	}
-	if _, err := e.svc.ConsumeToken(t.Context(), raw, TokenVerifyEmail); !errors.Is(err, ErrInvalidToken) {
+	if _, err := e.svc.ConsumeToken(t.Context(), raw, TokenVerifyEmail); !errors.Is(err, errInvalidToken) {
 		t.Fatal("a token was spent twice")
 	}
 }

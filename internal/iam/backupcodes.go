@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	BackupCodeCount = 10
+	backupCodeCount = 10
 	backupCodeBytes = 10 // 80 bits
 )
 
@@ -25,7 +25,7 @@ var backupEncoding = base32.NewEncoding("ABCDEFGHJKLMNPQRSTUVWXYZ23456789").
 	WithPadding(base32.NoPadding)
 
 func (s *Service) RotateBackupCodes(ctx context.Context) ([]string, error) {
-	fresh := make([]string, BackupCodeCount)
+	fresh := make([]string, backupCodeCount)
 	for i := range fresh {
 		raw := make([]byte, backupCodeBytes)
 		if _, err := rand.Read(raw); err != nil {
@@ -76,7 +76,7 @@ func (s *Service) DeleteBackupCodes(ctx context.Context) error {
 func (s *Service) LoginWithBackupCode(ctx context.Context, email, code string) (*db.User, *http.Cookie, error) {
 	u, err := s.sys.GetUserByEmail(ctx, normalizeEmail(email))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil, ErrInvalidCredentials
+		return nil, nil, errInvalidCredentials
 	}
 	if err != nil {
 		return nil, nil, err
@@ -94,7 +94,7 @@ func (s *Service) LoginWithBackupCode(ctx context.Context, email, code string) (
 
 	hash, err := crypto.HashToken(normalizeBackupCode(code))
 	if err != nil {
-		return nil, nil, ErrInvalidCredentials
+		return nil, nil, errInvalidCredentials
 	}
 	if _, err := s.sys.ConsumeCredentialBySubject(ctx, &db.ConsumeCredentialBySubjectParams{
 		Type:    string(MethodBackupCode),
@@ -111,7 +111,7 @@ func (s *Service) LoginWithBackupCode(ctx context.Context, email, code string) (
 				Detail: "unknown code",
 			},
 		)
-		return nil, nil, ErrInvalidCredentials
+		return nil, nil, errInvalidCredentials
 	} else if err != nil {
 		return nil, nil, err
 	}
