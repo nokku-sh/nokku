@@ -14,6 +14,7 @@ import (
 type Querier interface {
 	AddPrincipalGrant(ctx context.Context, arg *AddPrincipalGrantParams) error
 	AddTeamMember(ctx context.Context, arg *AddTeamMemberParams) error
+	AuditActivityByHour(ctx context.Context, arg *AuditActivityByHourParams) ([]*AuditActivityByHourRow, error)
 	ConsumeCredentialBySubject(ctx context.Context, arg *ConsumeCredentialBySubjectParams) (*Credential, error)
 	ConsumeToken(ctx context.Context, arg *ConsumeTokenParams) (string, error)
 	CountTeamMembers(ctx context.Context, teamIds []string) ([]*CountTeamMembersRow, error)
@@ -35,6 +36,7 @@ type Querier interface {
 	CreateUserWithID(ctx context.Context, arg *CreateUserWithIDParams) (*User, error)
 	CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParams) (*CreateWorkspaceRow, error)
 	CreateWorkspaceToken(ctx context.Context, arg *CreateWorkspaceTokenParams) (*WorkspaceToken, error)
+	DashboardCounts(ctx context.Context, arg *DashboardCountsParams) (*DashboardCountsRow, error)
 	// The enforce_single_default_ca trigger clears the previous default.
 	DeleteCA(ctx context.Context, caID string) (*CertificateAuthority, error)
 	DeleteCredential(ctx context.Context, arg *DeleteCredentialParams) error
@@ -129,6 +131,9 @@ type Querier interface {
 	ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*ListDaemonsRow, error)
 	// Only members under the workspace's verified domains.
 	ListManagedMembers(ctx context.Context, arg *ListManagedMembersParams) ([]*ListManagedMembersRow, error)
+	// A crashed daemon never closes its recordings, so only trust open ones
+	// behind a daemon that is still connected.
+	ListOpenRecordings(ctx context.Context, arg *ListOpenRecordingsParams) ([]*ListOpenRecordingsRow, error)
 	ListOwnedWorkspaces(ctx context.Context, userID string) ([]*ListOwnedWorkspacesRow, error)
 	ListPrincipals(ctx context.Context, arg *ListPrincipalsParams) ([]*ListPrincipalsRow, error)
 	// Teams are expanded so the host needs no team knowledge.
@@ -138,6 +143,7 @@ type Querier interface {
 	ListRecordings(ctx context.Context, arg *ListRecordingsParams) ([]*ListRecordingsRow, error)
 	ListServiceAccounts(ctx context.Context, arg *ListServiceAccountsParams) ([]*ListServiceAccountsRow, error)
 	ListSessionsBySubject(ctx context.Context, subjectID string) ([]*Session, error)
+	ListSoonestCAs(ctx context.Context, workspaceID string) ([]*CertificateAuthority, error)
 	// A team grant counts for its members. Subject UUIDs are unique across kinds.
 	ListSubjectUsernamesForTargets(ctx context.Context, arg *ListSubjectUsernamesForTargetsParams) ([]*ListSubjectUsernamesForTargetsRow, error)
 	ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*ListTargetsRow, error)

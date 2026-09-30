@@ -130,6 +130,9 @@ func (s *Server) serviceHandlers(ctx context.Context) []func() (string, http.Han
 			)
 		},
 		func() (string, http.Handler) {
+			return nokkuv1connect.NewDashboardServiceHandler(NewDashboardService(s.cfg), opts...)
+		},
+		func() (string, http.Handler) {
 			return nokkuv1connect.NewTeamServiceHandler(NewTeamService(s.cfg), opts...)
 		},
 		func() (string, http.Handler) {
