@@ -9,16 +9,6 @@ this file.
 ## Ready
 
 
-- [ ] `nokku/internal/db` Parallel test packages race on
-      `ALTER ROLE nokku_app` ("tuple concurrently updated", SQLSTATE XX000).
-      The `nokku_schema` advisory lock in `migrate` is per database, but each
-      package has its own `nokku_test_<pkg>` database and the role is
-      cluster-wide, so the comment's "serializes parallel test packages" is
-      wrong. Seen 2 of 4 full runs while api built a config per test, 0 of 4
-      after building it once.
-      Done when: a test running NewConnection against two databases in
-      parallel passes reliably, and the comment matches. (2026-10-01)
-
 ## Needs decision
 
 - [ ] `nokku/internal/daemon` Multi-instance support. The pool keeps control
@@ -48,6 +38,16 @@ this file.
       verification email to both the old and the new address, using the
       `verification` template. Needs a proto field or RPC, a pending-email
       column, and a token flow. (2026-09-30)
+
+- [ ] `nokku/internal/db` Parallel test packages race on
+      `ALTER ROLE nokku_app` ("tuple concurrently updated", SQLSTATE XX000).
+      The `nokku_schema` advisory lock is per database, each test package has
+      its own database, and the role is cluster-wide. Seen 2 of 4 full runs
+      while api built a config per test, 0 of 4 right after api started
+      building it once. Options, all touch production startup: retry the ALTER
+      on that error, try an app login first and skip the ALTER when it
+      works, or take the lock in the `postgres` maintenance database. Or
+      accept the low rate. The comment now states the limit. (2026-10-01)
 
 ## Done
 
