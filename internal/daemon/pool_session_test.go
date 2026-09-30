@@ -18,19 +18,19 @@ import (
 func bridgeToServer(relay *Relay, addr string) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		relay.Close()
+		relay.close()
 		return
 	}
 	go func() {
 		defer func() { _ = conn.Close() }()
 		for {
 			select {
-			case data := <-relay.ToDaemon:
+			case data := <-relay.toDaemon:
 				if _, err := conn.Write(data); err != nil {
-					relay.Close()
+					relay.close()
 					return
 				}
-			case <-relay.Done():
+			case <-relay.done():
 				return
 			}
 		}
@@ -44,13 +44,13 @@ func bridgeToServer(relay *Relay, addr string) {
 				chunk := make([]byte, n)
 				copy(chunk, buf[:n])
 				select {
-				case relay.ToUser <- chunk:
-				case <-relay.Done():
+				case relay.toUser <- chunk:
+				case <-relay.done():
 					return
 				}
 			}
 			if err != nil {
-				relay.Close()
+				relay.close()
 				return
 			}
 		}
@@ -58,7 +58,7 @@ func bridgeToServer(relay *Relay, addr string) {
 }
 
 // testConn returns the registered connection for d1.
-func testConn(t *testing.T, p *Pool) *Conn {
+func testConn(t *testing.T, p *Pool) *daemonConn {
 	t.Helper()
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -79,13 +79,13 @@ func slotsHeld(t *testing.T, p *Pool) (sessions, slots int) {
 // serveRelayRequests registers every RelayOpen StartSession sends, as the
 // daemon's control stream would, and bridges the relay to the test server.
 // It runs until the test ends.
-func serveRelayRequests(t *testing.T, p *Pool, c *Conn, addr string) {
+func serveRelayRequests(t *testing.T, p *Pool, c *daemonConn, addr string) {
 	t.Helper()
 	for {
 		select {
 		case msg := <-c.send:
 			if id := msg.GetRelayOpen().GetRelayId(); id != "" {
-				if relay := p.RegisterRelay(id, "d1"); relay != nil {
+				if relay := p.registerRelay(id, "d1"); relay != nil {
 					bridgeToServer(relay, addr)
 				}
 			}
@@ -136,7 +136,7 @@ func startTestSession(t *testing.T, p *Pool, srv *sshtest.Server, sessionID stri
 // browser channel, resizes arrive, and CloseSession tears everything down.
 func TestPool_StartSession(t *testing.T) {
 	p := newTestPool(t)
-	p.RegisterDaemon(t.Context(), "d1", "w1")
+	p.registerDaemon(t.Context(), "d1", "w1")
 	srv := sshtest.NewServer(t)
 
 	s := startTestSession(t, p, srv, "web-1")
@@ -239,7 +239,7 @@ func TestPool_StartSession_RejectsInactiveCA(t *testing.T) {
 // is left behind.
 func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 	p := newTestPool(t)
-	p.RegisterDaemon(t.Context(), "d1", "w1")
+	p.registerDaemon(t.Context(), "d1", "w1")
 	srv := sshtest.NewServer(t)
 
 	c := testConn(t, p)
@@ -288,7 +288,7 @@ func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 // close Exited and release the slot, mirroring a daemon disconnect.
 func TestPool_StartSession_ServerDeath(t *testing.T) {
 	p := newTestPool(t)
-	p.RegisterDaemon(t.Context(), "d1", "w1")
+	p.registerDaemon(t.Context(), "d1", "w1")
 	srv := sshtest.NewServer(t)
 
 	s := startTestSession(t, p, srv, "web-3")

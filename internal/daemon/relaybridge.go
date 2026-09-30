@@ -48,15 +48,15 @@ func BridgeRelay(
 			select {
 			case <-ctx.Done():
 				return
-			case data := <-relay.ToUser:
+			case data := <-relay.toUser:
 				if err := waitRelayBytes(ctx, outLimiter, len(data)); err != nil {
-					relay.Close()
+					relay.close()
 					return
 				}
 				if err := stream.Send(&nokkuv1.RelayResponse{
 					Msg: &nokkuv1.RelayResponse_Data{Data: data},
 				}); err != nil {
-					relay.Close()
+					relay.close()
 					return
 				}
 			}
@@ -69,18 +69,18 @@ func BridgeRelay(
 			msg, err := stream.Receive()
 			if err != nil {
 				recvErr <- err
-				relay.Close()
+				relay.close()
 				return
 			}
 			if data, ok := msg.GetMsg().(*nokkuv1.RelayRequest_Data); ok {
 				if err := waitRelayBytes(ctx, inLimiter, len(data.Data)); err != nil {
 					recvErr <- err
-					relay.Close()
+					relay.close()
 					return
 				}
 				select {
-				case relay.ToDaemon <- data.Data:
-				case <-relay.Done():
+				case relay.toDaemon <- data.Data:
+				case <-relay.done():
 					return
 				}
 			}
@@ -89,7 +89,7 @@ func BridgeRelay(
 
 	var retErr error
 	select {
-	case <-relay.Done():
+	case <-relay.done():
 	case err := <-recvErr:
 		if !errors.Is(err, io.EOF) {
 			retErr = err

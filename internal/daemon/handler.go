@@ -41,8 +41,8 @@ func (p *Pool) Connect(
 		return connect.NewError(connect.CodePermissionDenied, errors.New("daemon not accepted"))
 	}
 
-	conn := p.RegisterDaemon(ctx, daemonID, daemon.WorkspaceID)
-	defer p.UnregisterDaemon(daemonID, conn)
+	conn := p.registerDaemon(ctx, daemonID, daemon.WorkspaceID)
+	defer p.unregisterDaemon(daemonID, conn)
 
 	// The handler must join outDone: a Send after ServeHTTP returns panics on
 	// this goroutine, unrecovered, and kills the process.
@@ -73,7 +73,7 @@ func (p *Pool) Connect(
 
 	// A heartbeat with a stale state version gets a StateUpdate, so a daemon
 	// that missed a push catches up. Silence drops half-open connections.
-	silence := time.AfterFunc(heartbeatDeadline, conn.Cancel)
+	silence := time.AfterFunc(heartbeatDeadline, conn.cancel)
 	defer silence.Stop()
 	recvErr := make(chan error, 1)
 	go func() {
@@ -108,7 +108,7 @@ func (p *Pool) Connect(
 	}
 	// Stop the pump before joining it. The receive goroutine may outlive the
 	// handler briefly, which is safe since it only reads the body.
-	conn.Cancel()
+	conn.cancel()
 	<-outDone
 	return retErr
 }
@@ -141,7 +141,7 @@ func (p *Pool) DaemonRelay(
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("relay_id required"))
 	}
 
-	relay := p.RegisterRelay(relayID, daemonID)
+	relay := p.registerRelay(relayID, daemonID)
 	if relay == nil {
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("unknown relay"))
 	}
@@ -159,11 +159,11 @@ func (p *Pool) DaemonRelay(
 			select {
 			case <-ctx.Done():
 				return
-			case data := <-relay.ToDaemon:
+			case data := <-relay.toDaemon:
 				if err := stream.Send(&nokkuv1.DaemonRelayResponse{
 					Msg: &nokkuv1.DaemonRelayResponse_Data{Data: data},
 				}); err != nil {
-					relay.Close()
+					relay.close()
 					return
 				}
 			}
@@ -176,20 +176,20 @@ func (p *Pool) DaemonRelay(
 			msg, err := stream.Receive()
 			if err != nil {
 				recvErr <- err
-				relay.Close()
+				relay.close()
 				return
 			}
 			switch m := msg.GetMsg().(type) {
 			case *nokkuv1.DaemonRelayRequest_Data:
 				select {
-				case relay.ToUser <- m.Data:
-				case <-relay.Done():
+				case relay.toUser <- m.Data:
+				case <-relay.done():
 					return
 				}
 
 			case *nokkuv1.DaemonRelayRequest_Closed:
 				recvErr <- nil
-				relay.Close()
+				relay.close()
 				return
 
 			default:
@@ -199,7 +199,7 @@ func (p *Pool) DaemonRelay(
 
 	var retErr error
 	select {
-	case <-relay.Done():
+	case <-relay.done():
 	case <-ctx.Done():
 		retErr = ctx.Err()
 	case err := <-recvErr:

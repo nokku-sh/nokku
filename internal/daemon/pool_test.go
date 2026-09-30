@@ -32,7 +32,7 @@ func newTestPool(t *testing.T) *Pool {
 }
 
 // waitRelayPending blocks until the request goroutine's pending entry exists,
-// so RegisterRelay in the test cannot win the race it isn't testing.
+// so registerRelay in the test cannot win the race it isn't testing.
 func waitRelayPending(t *testing.T, p *Pool, relayID string) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)
@@ -69,8 +69,8 @@ func TestPool_ReconnectStorm(t *testing.T) {
 			wg.Go(func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				c := p.RegisterDaemon(ctx, id, wksp)
-				p.UnregisterDaemon(id, c)
+				c := p.registerDaemon(ctx, id, wksp)
+				p.unregisterDaemon(id, c)
 			})
 		}
 	}
@@ -93,7 +93,7 @@ func TestPool_PokeStorm(t *testing.T) {
 
 	const daemons = 32
 	for i := range daemons {
-		p.RegisterDaemon(context.Background(), fmt.Sprintf("d%02d", i), "w1")
+		p.registerDaemon(context.Background(), fmt.Sprintf("d%02d", i), "w1")
 	}
 
 	var wg sync.WaitGroup
@@ -101,13 +101,13 @@ func TestPool_PokeStorm(t *testing.T) {
 		id := fmt.Sprintf("d%02d", i)
 		wg.Go(func() {
 			for range 200 {
-				p.Poke("w1")
+				p.poke("w1")
 			}
 			p.mu.RLock()
 			c := p.byID[id]
 			p.mu.RUnlock()
 			if c != nil {
-				p.UnregisterDaemon(id, c)
+				p.unregisterDaemon(id, c)
 			}
 		})
 	}
@@ -118,13 +118,13 @@ func TestPool_PokeStorm(t *testing.T) {
 // StateUpdate per daemon, and only reaches the poked workspace.
 func TestPool_PokeCoalesces(t *testing.T) {
 	p := newTestPool(t)
-	c := p.RegisterDaemon(context.Background(), "d1", "w1")
-	defer p.UnregisterDaemon("d1", c)
-	other := p.RegisterDaemon(context.Background(), "d2", "w2")
-	defer p.UnregisterDaemon("d2", other)
+	c := p.registerDaemon(context.Background(), "d1", "w1")
+	defer p.unregisterDaemon("d1", c)
+	other := p.registerDaemon(context.Background(), "d2", "w2")
+	defer p.unregisterDaemon("d2", other)
 
 	for range 100 {
-		p.Poke("w1")
+		p.poke("w1")
 	}
 
 	if got := len(c.state); got != 1 {
@@ -142,8 +142,8 @@ func TestPool_PokeCoalesces(t *testing.T) {
 // drops a control message queued on the same connection.
 func TestPool_PokeKeepsControlMessages(t *testing.T) {
 	p := newTestPool(t)
-	c := p.RegisterDaemon(context.Background(), "d1", "w1")
-	defer p.UnregisterDaemon("d1", c)
+	c := p.registerDaemon(context.Background(), "d1", "w1")
+	defer p.unregisterDaemon("d1", c)
 
 	rid := "r1"
 	relayOpen := &nokkuv1.ConnectResponse{
@@ -155,7 +155,7 @@ func TestPool_PokeKeepsControlMessages(t *testing.T) {
 		t.Fatalf("queue relay open: %v", err)
 	}
 	for range 10 {
-		p.Poke("w1")
+		p.poke("w1")
 	}
 	select {
 	case msg := <-c.send:
@@ -201,7 +201,7 @@ func TestPool_SessionStdoutStorm(t *testing.T) {
 // the pending channel), the relay counterpart of the session request race.
 func TestPool_RelayRequestRace(t *testing.T) {
 	p := newTestPool(t)
-	p.RegisterDaemon(context.Background(), "d1", "w1")
+	p.registerDaemon(context.Background(), "d1", "w1")
 
 	const relays = 128
 	var wg sync.WaitGroup
@@ -213,13 +213,13 @@ func TestPool_RelayRequestRace(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 			defer cancel()
 			if r, err := p.RequestRelay(ctx, "d1", rid, "u1"); err == nil {
-				r.Close()
+				r.close()
 			}
 		}()
 		go func() {
 			defer wg.Done()
 			time.Sleep(time.Duration(i%3) * time.Millisecond)
-			if r := p.RegisterRelay(rid, "d1"); r != nil {
+			if r := p.registerRelay(rid, "d1"); r != nil {
 				p.UnregisterRelay(rid)
 			}
 		}()
@@ -244,7 +244,7 @@ func TestPool_RelayRequestRace(t *testing.T) {
 // and released slots become available again.
 func TestPool_RelayCap(t *testing.T) {
 	p := newTestPool(t)
-	p.RegisterDaemon(context.Background(), "d1", "w1")
+	p.registerDaemon(context.Background(), "d1", "w1")
 
 	var wg sync.WaitGroup
 	for i := range maxRelaysPerPrincipal {
@@ -257,7 +257,7 @@ func TestPool_RelayCap(t *testing.T) {
 			}
 		})
 		time.Sleep(time.Millisecond)
-		if r := p.RegisterRelay(rid, "d1"); r == nil {
+		if r := p.registerRelay(rid, "d1"); r == nil {
 			t.Fatalf("relay %s was not pending", rid)
 		}
 	}
@@ -291,7 +291,7 @@ func TestPool_RelayCap(t *testing.T) {
 // lifecycle and pushes bytes both directions through its channels.
 func TestPool_RelayBridging(t *testing.T) {
 	p := newTestPool(t)
-	p.RegisterDaemon(context.Background(), "d1", "w1")
+	p.registerDaemon(context.Background(), "d1", "w1")
 
 	type result struct {
 		r   *Relay
@@ -305,7 +305,7 @@ func TestPool_RelayBridging(t *testing.T) {
 		res <- result{r, err}
 	}()
 	waitRelayPending(t, p, "r1")
-	relay := p.RegisterRelay("r1", "d1")
+	relay := p.registerRelay("r1", "d1")
 	if relay == nil {
 		t.Fatal("relay was not pending")
 	}
@@ -314,28 +314,28 @@ func TestPool_RelayBridging(t *testing.T) {
 		t.Fatalf("RequestRelay: %v", got.err)
 	}
 
-	if r := p.RegisterRelay("ghost", "d1"); r != nil {
+	if r := p.registerRelay("ghost", "d1"); r != nil {
 		t.Fatal("unknown relay id must not register")
 	}
 
-	relay.ToDaemon <- []byte("ping")
-	relay.ToUser <- []byte("pong")
-	if data := <-relay.ToDaemon; string(data) != "ping" {
+	relay.toDaemon <- []byte("ping")
+	relay.toUser <- []byte("pong")
+	if data := <-relay.toDaemon; string(data) != "ping" {
 		t.Errorf("ToDaemon carried %q", data)
 	}
-	if data := <-relay.ToUser; string(data) != "pong" {
+	if data := <-relay.toUser; string(data) != "pong" {
 		t.Errorf("ToUser carried %q", data)
 	}
 
 	select {
-	case <-relay.Done():
+	case <-relay.done():
 		t.Fatal("relay closed before unregister")
 	default:
 	}
 
 	p.UnregisterRelay("r1")
 	select {
-	case <-relay.Done():
+	case <-relay.done():
 	default:
 		t.Fatal("relay not closed by UnregisterRelay")
 	}
@@ -352,7 +352,7 @@ func TestPool_RelayBridging(t *testing.T) {
 // down its relays and frees their slots.
 func TestPool_UnregisterDaemonClosesRelays(t *testing.T) {
 	p := newTestPool(t)
-	c := p.RegisterDaemon(context.Background(), "d1", "w1")
+	c := p.registerDaemon(context.Background(), "d1", "w1")
 
 	res := make(chan error, 1)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -362,14 +362,14 @@ func TestPool_UnregisterDaemonClosesRelays(t *testing.T) {
 		res <- err
 	}()
 	waitRelayPending(t, p, "r1")
-	if r := p.RegisterRelay("r1", "d1"); r == nil {
+	if r := p.registerRelay("r1", "d1"); r == nil {
 		t.Fatal("relay was not pending")
 	}
 	if err := <-res; err != nil {
 		t.Fatalf("RequestRelay: %v", err)
 	}
 
-	p.UnregisterDaemon("d1", c)
+	p.unregisterDaemon("d1", c)
 	p.mu.RLock()
 	relay := p.relays["r1"]
 	p.mu.RUnlock()
@@ -386,13 +386,13 @@ func TestPool_UnregisterDaemonClosesRelays(t *testing.T) {
 // TestPool_Shutdown verifies Shutdown is idempotent and closes Done.
 func TestPool_Shutdown(t *testing.T) {
 	p := newTestPool(t)
-	p.RegisterDaemon(context.Background(), "d1", "w1")
+	p.registerDaemon(context.Background(), "d1", "w1")
 
-	p.Shutdown()
-	p.Shutdown()
+	p.shutdown()
+	p.shutdown()
 
 	select {
-	case <-p.Done():
+	case <-p.done():
 	case <-time.After(time.Second):
 		t.Fatal("Done() not closed after Shutdown")
 	}
@@ -402,13 +402,13 @@ func TestPool_Shutdown(t *testing.T) {
 // leaves no index entry behind.
 func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 	p := newTestPool(t)
-	c1 := p.RegisterDaemon(context.Background(), "d1", "w1")
-	c2 := p.RegisterDaemon(context.Background(), "d2", "w1")
-	defer p.UnregisterDaemon("d2", c2)
+	c1 := p.registerDaemon(context.Background(), "d1", "w1")
+	c2 := p.registerDaemon(context.Background(), "d2", "w1")
+	defer p.unregisterDaemon("d2", c2)
 	mine := p.registerSession("s1", "d1", "root", "u1")
 	other := p.registerSession("s2", "d2", "root", "u1")
 
-	p.UnregisterDaemon("d1", c1)
+	p.unregisterDaemon("d1", c1)
 
 	select {
 	case <-mine.exited:
@@ -440,11 +440,11 @@ func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 func TestPool_HeartbeatBatch(t *testing.T) {
 	p := newTestPool(t)
 	for range 3 {
-		c := p.RegisterDaemon(t.Context(), "d1", "w1")
-		p.UnregisterDaemon("d1", c)
+		c := p.registerDaemon(t.Context(), "d1", "w1")
+		p.unregisterDaemon("d1", c)
 	}
-	c := p.RegisterDaemon(t.Context(), "d2", "w1")
-	defer p.UnregisterDaemon("d2", c)
+	c := p.registerDaemon(t.Context(), "d2", "w1")
+	defer p.unregisterDaemon("d2", c)
 
 	if got := p.heartbeatBatch(false); !slices.Equal(got, []string{"d2"}) {
 		t.Fatalf("beat = %v, want [d2]", got)

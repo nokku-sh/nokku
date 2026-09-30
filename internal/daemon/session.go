@@ -79,7 +79,7 @@ func (s *Session) shutdown() {
 	s.shutdownOnce.Do(func() { close(s.exited) })
 }
 
-func (s *Session) Close() {
+func (s *Session) close() {
 	s.closeOnce.Do(func() { close(s.closed) })
 }
 
@@ -280,7 +280,7 @@ func (p *Pool) CloseSession(sessionID string) {
 		return
 	}
 	s.shutdown()
-	s.Close()
+	s.close()
 }
 
 func (s *Session) SendStdin(data []byte) {
@@ -289,7 +289,7 @@ func (s *Session) SendStdin(data []byte) {
 	case <-s.closed:
 	case <-time.After(sendTimeout):
 		slog.Warn("terminal stdin buffer full, closing session", "session_id", s.sessionID)
-		s.Close()
+		s.close()
 	}
 }
 
@@ -299,7 +299,7 @@ func (s *Session) SendResize(width, height uint32) {
 	case <-s.closed:
 	case <-time.After(sendTimeout):
 		slog.Warn("terminal resize buffer full, closing session", "session_id", s.sessionID)
-		s.Close()
+		s.close()
 	}
 }
 
@@ -316,7 +316,7 @@ func (s *Session) appendStdout(data []byte) {
 	case <-s.closed:
 	case <-time.After(sendTimeout):
 		slog.Warn("terminal stdout buffer full, closing session", "session_id", s.sessionID)
-		s.Close()
+		s.close()
 	}
 	s.replayMu.Unlock()
 }
