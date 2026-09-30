@@ -16,7 +16,7 @@ import (
 
 const maxWebhookBody = 2 << 20
 
-func (s *Stripe) WebhookHandler() http.Handler {
+func (s *Stripe) webhookHandler() http.Handler {
 	return http.HandlerFunc(s.webhook)
 }
 

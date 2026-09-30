@@ -16,7 +16,7 @@ func TestLocalStorage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if s.Mode != ModeLocal {
+	if s.Mode != modeLocal {
 		t.Fatalf("expected local mode, got %q", s.Mode)
 	}
 	if _, ok := s.PublicURL("avatars/x.jpg"); ok {

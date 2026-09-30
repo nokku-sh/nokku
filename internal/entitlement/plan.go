@@ -48,11 +48,11 @@ func featureInCatalog(code string) (Feature, bool) {
 	return Feature{}, false
 }
 
-const Unlimited int64 = -1
+const unlimited int64 = -1
 
 type Plan struct {
 	Name                  string
-	SeatCap               int64 // maximum members; Unlimited = per-seat billing
+	SeatCap               int64 // maximum members; unlimited = per-seat billing
 	ResourceCap           int64 // pooled cap on managed resources
 	RetentionDays         int64 // audit log and session recording retention
 	RecordingStorageBytes int64
@@ -76,7 +76,7 @@ var catalog = map[string]Plan{
 	},
 	PlanPro: {
 		Name:                  PlanPro,
-		SeatCap:               Unlimited,
+		SeatCap:               unlimited,
 		ResourceCap:           2000,
 		RetentionDays:         90,
 		RecordingStorageBytes: 100 << 20,
@@ -89,8 +89,8 @@ var catalog = map[string]Plan{
 	},
 	PlanEnterprise: {
 		Name:                  PlanEnterprise,
-		SeatCap:               Unlimited,
-		ResourceCap:           Unlimited,
+		SeatCap:               unlimited,
+		ResourceCap:           unlimited,
 		RetentionDays:         365,
 		RecordingStorageBytes: 1 << 30,
 		Features: map[string]bool{

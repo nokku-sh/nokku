@@ -22,7 +22,7 @@ type Cache interface {
 	SetNX(ctx context.Context, key string, value []byte, ttl time.Duration) (bool, error)
 }
 
-var ErrNotFound = errors.New("cache: not found")
+var errNotFound = errors.New("cache: not found")
 
 // New uses Redis when NOKKU_REDIS_URL is set, memory otherwise.
 func New(ctx context.Context) (Cache, error) {

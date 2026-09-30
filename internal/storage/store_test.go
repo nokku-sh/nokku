@@ -24,8 +24,8 @@ func newLocal(t *testing.T) *Storage {
 
 func TestAvatarPath(t *testing.T) {
 	got := AvatarPath("user-1")
-	if !strings.HasPrefix(got, PathAvatars+"/") || !strings.HasSuffix(got, ".jpg") {
-		t.Errorf("AvatarPath = %q, want under %q with .jpg suffix", got, PathAvatars)
+	if !strings.HasPrefix(got, pathAvatars+"/") || !strings.HasSuffix(got, ".jpg") {
+		t.Errorf("AvatarPath = %q, want under %q with .jpg suffix", got, pathAvatars)
 	}
 	if path.Clean(got) != got {
 		t.Errorf("AvatarPath %q is not clean", got)

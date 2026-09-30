@@ -153,7 +153,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	return &cfg, nil
 }
 
-func (c *Config) AppURL() *url.URL {
+func (c *Config) appURL() *url.URL {
 	u, err := url.Parse(c.BaseURL)
 	if err != nil {
 		return &url.URL{}
@@ -162,7 +162,7 @@ func (c *Config) AppURL() *url.URL {
 }
 
 func (c *Config) FullURL() string {
-	u := c.AppURL()
+	u := c.appURL()
 
 	scheme := u.Scheme
 	if scheme == "" {

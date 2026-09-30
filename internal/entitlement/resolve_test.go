@@ -207,10 +207,10 @@ func TestResolve_SelfHostedLicensedPlanUnlimited(t *testing.T) {
 	if got.Name != PlanEnterprise {
 		t.Errorf("Resolve() = %q, want enterprise", got.Name)
 	}
-	if got.ResourceCap != Unlimited {
+	if got.ResourceCap != unlimited {
 		t.Errorf("self-hosted licensed ResourceCap = %d, want unlimited", got.ResourceCap)
 	}
-	if got.RecordingStorageBytes != Unlimited {
+	if got.RecordingStorageBytes != unlimited {
 		t.Errorf("self-hosted licensed storage cap = %d, want unlimited", got.RecordingStorageBytes)
 	}
 	if err := sut.CheckResources(context.Background(), "ws1"); err != nil {
@@ -229,10 +229,10 @@ func TestResolve_SelfHostedRecordingStorageUnlimited(t *testing.T) {
 	// Even with no subscription and no license: unlimited, not 10 MiB.
 	bare := NewService(&fakeDB{}, "", ModeSelfHosted)
 
-	if got := sut.RecordingStorageBytes(context.Background(), "ws1"); got != Unlimited {
+	if got := sut.RecordingStorageBytes(context.Background(), "ws1"); got != unlimited {
 		t.Errorf("self-hosted pro storage cap = %d, want unlimited", got)
 	}
-	if got := bare.RecordingStorageBytes(context.Background(), "ws1"); got != Unlimited {
+	if got := bare.RecordingStorageBytes(context.Background(), "ws1"); got != unlimited {
 		t.Errorf("self-hosted community storage cap = %d, want unlimited", got)
 	}
 }
@@ -241,7 +241,7 @@ func TestResolve_RequestCache(t *testing.T) {
 	db := &fakeDB{plan: PlanPro, status: StatusActive}
 	sut := NewService(db, "", ModeSaaS)
 
-	ctx := WithRequestCache(context.Background())
+	ctx := withRequestCache(context.Background())
 	first := sut.Resolve(ctx, "ws1")
 	db.plan = PlanCommunity // mutate behind the cache
 	second := sut.Resolve(ctx, "ws1")
@@ -308,8 +308,8 @@ func TestStatus_GrantsAccess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(string(tt.status), func(t *testing.T) {
-			if got := tt.status.GrantsAccess(); got != tt.want {
-				t.Errorf("GrantsAccess(%q) = %v, want %v", tt.status, got, tt.want)
+			if got := tt.status.grantsAccess(); got != tt.want {
+				t.Errorf("grantsAccess(%q) = %v, want %v", tt.status, got, tt.want)
 			}
 		})
 	}

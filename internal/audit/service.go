@@ -18,7 +18,7 @@ const (
 type Service struct {
 	conn         *db.Connection
 	entitlements *entitlement.Service
-	sinks        []Sink
+	sinks        []sink
 }
 
 func New(
@@ -26,14 +26,14 @@ func New(
 	conn *db.Connection,
 	entitlements *entitlement.Service,
 ) (*Service, error) {
-	webhooks, err := NewWebhookSink(ctx, conn, entitlements)
+	webhooks, err := newWebhookSink(ctx, conn, entitlements)
 	if err != nil {
 		return nil, err
 	}
 	s := &Service{
 		conn:         conn,
 		entitlements: entitlements,
-		sinks:        []Sink{NewPostgresSink(conn), webhooks},
+		sinks:        []sink{newPostgresSink(conn), webhooks},
 	}
 
 	if err := s.setupPartitions(ctx); err != nil {

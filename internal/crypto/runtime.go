@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	ErrEncryptorMissing = errors.New("encryptor not initialized")
+	errEncryptorMissing = errors.New("encryptor not initialized")
 
 	runtimeMu sync.RWMutex
 	runtime   primitives
@@ -18,7 +18,7 @@ type primitives struct {
 
 func SetEncryptor(enc Cipher) error {
 	if enc == nil {
-		return ErrEncryptorMissing
+		return errEncryptorMissing
 	}
 	runtimeMu.Lock()
 	runtime.encryptor = enc
@@ -31,7 +31,7 @@ func Encryptor() (Cipher, error) {
 	enc := runtime.encryptor
 	runtimeMu.RUnlock()
 	if enc == nil {
-		return nil, ErrEncryptorMissing
+		return nil, errEncryptorMissing
 	}
 	return enc, nil
 }

@@ -3,8 +3,8 @@ package storage
 import "path"
 
 const (
-	PathAvatars = "avatars"
-	PathVideos  = "videos"
+	pathAvatars = "avatars"
+	pathVideos  = "videos"
 )
 
 type StoreOptions struct {
@@ -13,13 +13,13 @@ type StoreOptions struct {
 }
 
 func AvatarPath(userID string) string {
-	return path.Join(PathAvatars, userID+".jpg")
+	return path.Join(pathAvatars, userID+".jpg")
 }
 
 func RecordingPath(workspaceID, recordingID string) string {
-	return path.Join(PathVideos, workspaceID, recordingID+".cast.gz")
+	return path.Join(pathVideos, workspaceID, recordingID+".cast.gz")
 }
 
 func RecordingPrefix(workspaceID string) string {
-	return path.Join(PathVideos, workspaceID) + "/"
+	return path.Join(pathVideos, workspaceID) + "/"
 }

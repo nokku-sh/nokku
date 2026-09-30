@@ -8,12 +8,12 @@ import (
 	"math/big"
 )
 
-var ErrGenerateRandom = errors.New("failed to generate random bytes")
+var errGenerateRandom = errors.New("failed to generate random bytes")
 
 func randomBytes(size int) ([]byte, error) {
 	bytes := make([]byte, size)
 	if _, err := rand.Read(bytes); err != nil {
-		return nil, ErrGenerateRandom
+		return nil, errGenerateRandom
 	}
 	return bytes, nil
 }

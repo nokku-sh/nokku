@@ -13,12 +13,12 @@ import (
 )
 
 type mockSender struct {
-	sent  []Message
+	sent  []message
 	calls int
 	err   error
 }
 
-func (m *mockSender) Send(_ context.Context, msg Message) error {
+func (m *mockSender) Send(_ context.Context, msg message) error {
 	m.calls++
 	if m.err != nil {
 		return m.err
@@ -27,7 +27,7 @@ func (m *mockSender) Send(_ context.Context, msg Message) error {
 	return nil
 }
 
-func newTestService(sender Sender) *Service {
+func newTestService(sender sender) *Service {
 	return &Service{
 		sender:   sender,
 		cache:    cache.NewMemory(0),
@@ -80,8 +80,8 @@ func TestSendTemplate_Cooldown(t *testing.T) {
 	}
 
 	err := svc.SendVerificationEmail(ctx, "user-1", "a@b.io", "url", "10m")
-	if !errors.Is(err, ErrCooldown) {
-		t.Fatalf("second send = %v, want ErrCooldown", err)
+	if !errors.Is(err, errCooldown) {
+		t.Fatalf("second send = %v, want errCooldown", err)
 	}
 	if len(sender.sent) != 1 {
 		t.Errorf("sender called %d times, want 1", len(sender.sent))
@@ -110,9 +110,9 @@ func TestSendTemplate_CooldownPerTemplate(t *testing.T) {
 		"10m",
 	); !errors.Is(
 		err,
-		ErrCooldown,
+		errCooldown,
 	) {
-		t.Errorf("repeat of same template = %v, want ErrCooldown", err)
+		t.Errorf("repeat of same template = %v, want errCooldown", err)
 	}
 	if len(sender.sent) != 2 {
 		t.Errorf("sender called %d times, want 2", len(sender.sent))
@@ -145,7 +145,7 @@ func TestSendTemplate_SendErrorPropagatesWithoutCooldown(t *testing.T) {
 
 	// Failed sends must not set the cooldown, so a retry is possible.
 	err = svc.SendVerificationEmail(ctx, "user-1", "a@b.io", "u", "10m")
-	if errors.Is(err, ErrCooldown) {
+	if errors.Is(err, errCooldown) {
 		t.Fatal("failed send set cooldown, retry impossible")
 	}
 	if sender.calls != 2 {
@@ -222,7 +222,7 @@ func TestSendTemplate_ConcurrentSendsOnce(t *testing.T) {
 
 type countingSender struct{ n atomic.Int32 }
 
-func (c *countingSender) Send(context.Context, Message) error {
+func (c *countingSender) Send(context.Context, message) error {
 	c.n.Add(1)
 	return nil
 }

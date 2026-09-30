@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	App  = "NOKKU"
-	Plan = "enterprise"
+	app  = "NOKKU"
+	plan = "enterprise"
 )
 
 func verifyLicense() *licx.Claims {
@@ -22,8 +22,8 @@ func verifyLicense() *licx.Claims {
 	if !ok {
 		return nil
 	}
-	claims, err := licx.Verify(key, App)
-	if err != nil || claims.Plan != Plan {
+	claims, err := licx.Verify(key, app)
+	if err != nil || claims.Plan != plan {
 		return nil
 	}
 	return claims

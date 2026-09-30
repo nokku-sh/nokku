@@ -219,8 +219,8 @@ func TestGuard_DeniesAndAdvertisesUpgrade(t *testing.T) {
 	if got := connectErr.Meta().Get("x-nokku-feature"); got != FeatureAuditExport {
 		t.Errorf("x-nokku-feature = %q, want %q", got, FeatureAuditExport)
 	}
-	if got := connectErr.Meta().Get("x-nokku-upgrade"); got != UpgradeURL {
-		t.Errorf("x-nokku-upgrade = %q, want %q", got, UpgradeURL)
+	if got := connectErr.Meta().Get("x-nokku-upgrade"); got != upgradeURL {
+		t.Errorf("x-nokku-upgrade = %q, want %q", got, upgradeURL)
 	}
 	if !strings.Contains(connectErr.Message(), "audit log export") {
 		t.Errorf("message %q should name the feature", connectErr.Message())
@@ -367,8 +367,8 @@ func TestGuard_ResourceCapDeniesAndAdvertisesUpgrade(t *testing.T) {
 	if got := connectErr.Meta().Get("x-nokku-quota"); got != "resources" {
 		t.Errorf("x-nokku-quota = %q, want %q", got, "resources")
 	}
-	if got := connectErr.Meta().Get("x-nokku-upgrade"); got != UpgradeURL {
-		t.Errorf("x-nokku-upgrade = %q, want %q", got, UpgradeURL)
+	if got := connectErr.Meta().Get("x-nokku-upgrade"); got != upgradeURL {
+		t.Errorf("x-nokku-upgrade = %q, want %q", got, upgradeURL)
 	}
 }
 

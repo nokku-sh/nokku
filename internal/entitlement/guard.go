@@ -12,7 +12,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/actor"
 )
 
-const UpgradeURL = "https://nokku.sh/pricing"
+const upgradeURL = "https://nokku.sh/pricing"
 
 // procedureFeatures is the only place routes are gated, handlers never import
 // plan logic. guard_test.go fails when a catalog feature has no wiring here
@@ -46,7 +46,7 @@ func NewGuardInterceptor(ent *Service) *GuardInterceptor {
 
 func (g *GuardInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		ctx = WithRequestCache(ctx)
+		ctx = withRequestCache(ctx)
 		procedure := req.Spec().Procedure
 		if err := g.check(ctx, procedure, req.Any()); err != nil {
 			return nil, err
@@ -146,7 +146,7 @@ func (g *GuardInterceptor) deny(ctx context.Context, workspaceID, feature string
 	)
 	err.Meta().Set("x-nokku-plan", plan.Name)
 	err.Meta().Set("x-nokku-feature", feature)
-	err.Meta().Set("x-nokku-upgrade", UpgradeURL)
+	err.Meta().Set("x-nokku-upgrade", upgradeURL)
 	return err
 }
 

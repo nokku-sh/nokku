@@ -65,12 +65,12 @@ func TestGetSigner(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			signer, err := GetSigner(tt.key)
+			signer, err := getSigner(tt.key)
 			if err != nil {
-				t.Fatalf("GetSigner() error: %v", err)
+				t.Fatalf("getSigner() error: %v", err)
 			}
 			if signer == nil {
-				t.Fatal("GetSigner() = nil")
+				t.Fatal("getSigner() = nil")
 			}
 			if len(signer.PublicKey().Marshal()) == 0 {
 				t.Error("signer has empty public key")
@@ -81,7 +81,7 @@ func TestGetSigner(t *testing.T) {
 
 func TestGetSigner_RejectsGarbage(t *testing.T) {
 	for _, raw := range [][]byte{nil, []byte("not a key"), []byte("-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----")} {
-		if _, err := GetSigner(raw); err == nil {
+		if _, err := getSigner(raw); err == nil {
 			t.Errorf("GetSigner(%q): want error", raw)
 		}
 	}

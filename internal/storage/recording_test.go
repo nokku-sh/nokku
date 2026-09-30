@@ -12,7 +12,7 @@ import (
 
 func TestCreateWriterRoundtrip(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("NOKKU_STORAGE", ModeLocal)
+	t.Setenv("NOKKU_STORAGE", modeLocal)
 	t.Setenv("NOKKU_LOCAL_STORAGE_PATH", dir)
 
 	s, err := New(context.Background(), "")
@@ -103,7 +103,7 @@ func TestCreateWriterRoundtrip(t *testing.T) {
 // A workspace purge must never reach another workspace's recordings, even one
 // whose id shares a prefix.
 func TestDeletePrefixStaysInsideWorkspace(t *testing.T) {
-	t.Setenv("NOKKU_STORAGE", ModeLocal)
+	t.Setenv("NOKKU_STORAGE", modeLocal)
 	t.Setenv("NOKKU_LOCAL_STORAGE_PATH", t.TempDir())
 	s, err := New(t.Context(), "")
 	if err != nil {
