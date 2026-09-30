@@ -88,3 +88,55 @@ func TestEnrollDaemon(t *testing.T) {
 	_, err = enroll("nk_not-a-token", otherKey)
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "bad token, got %v", err)
 }
+
+// TestCreateSession stops short of a live session: no daemon holds a control
+// stream here, so a member gets Unavailable after every lookup succeeded.
+func TestCreateSession(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+
+	// Enrollment falls back to the default CA, which CreateSession needs.
+	_, err := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth).
+		CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
+			WorkspaceId: &workspaceID,
+			Name:        new("default"),
+			KeyType:     nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519.Enum(),
+			IsDefault:   new(true),
+		})
+	require.NoError(t, err)
+	created, err := nokkuv1connect.NewTokenServiceClient(srv.Client(), srv.URL, adminAuth).
+		CreateToken(t.Context(), &nokkuv1.CreateTokenRequest{
+			WorkspaceId: &workspaceID,
+			Kind:        nokkuv1.TokenKind_TOKEN_KIND_ENROLL.Enum(),
+			AutoApprove: new(true),
+		})
+	require.NoError(t, err)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	enrolled, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, header("DPoP", enrollProof(t, cfg, key))).
+		EnrollDaemon(t.Context(), &nokkuv1.EnrollDaemonRequest{Token: new(created.GetSecret())})
+	require.NoError(t, err)
+
+	req := &nokkuv1.CreateSessionRequest{
+		WorkspaceId: &workspaceID,
+		DaemonId:    new(enrolled.GetId()),
+		Username:    new("root"),
+	}
+	member := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL,
+		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleMember)))
+	_, err = member.CreateSession(t.Context(), req)
+	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(err), "offline daemon, got %v", err)
+
+	sa, err := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth).
+		CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
+			WorkspaceId: &workspaceID,
+			Name:        new("ci"),
+			RoleName:    new(string(db.RoleEditor)),
+		})
+	require.NoError(t, err)
+	machine := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL,
+		header("Authorization", "Bearer "+sa.GetToken()))
+	_, err = machine.CreateSession(t.Context(), req)
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "service account, got %v", err)
+}
