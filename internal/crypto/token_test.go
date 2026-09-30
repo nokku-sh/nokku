@@ -91,7 +91,7 @@ func TestParse(t *testing.T) {
 
 func TestParse_Empty(t *testing.T) {
 	if _, err := Parse(""); !errors.Is(err, errInvalidToken) {
-		t.Errorf("Parse(\"\") error = %v, want ErrInvalidToken", err)
+		t.Errorf("Parse(\"\") error = %v, want errInvalidToken", err)
 	}
 }
 

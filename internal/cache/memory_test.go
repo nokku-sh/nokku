@@ -31,7 +31,7 @@ func TestMemory(t *testing.T) {
 	}
 
 	if _, err := c.Get(ctx, key); !errors.Is(err, errNotFound) {
-		t.Fatalf("Get after Delete = %v, want ErrNotFound", err)
+		t.Fatalf("Get after Delete = %v, want errNotFound", err)
 	}
 }
 
@@ -45,7 +45,7 @@ func TestMemoryExpiry(t *testing.T) {
 	time.Sleep(2 * time.Millisecond)
 
 	if _, err := c.Get(ctx, "k"); !errors.Is(err, errNotFound) {
-		t.Fatalf("Get after expiry = %v, want ErrNotFound", err)
+		t.Fatalf("Get after expiry = %v, want errNotFound", err)
 	}
 }
 
@@ -87,7 +87,7 @@ func TestMemoryGetDel(t *testing.T) {
 	}
 	// Second consumer finds nothing: single-use state.
 	if _, err := c.GetDel(ctx, "k"); !errors.Is(err, errNotFound) {
-		t.Fatalf("second GetDel = %v, want ErrNotFound", err)
+		t.Fatalf("second GetDel = %v, want errNotFound", err)
 	}
 }
 

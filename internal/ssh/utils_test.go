@@ -82,7 +82,7 @@ func TestGetSigner(t *testing.T) {
 func TestGetSigner_RejectsGarbage(t *testing.T) {
 	for _, raw := range [][]byte{nil, []byte("not a key"), []byte("-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----")} {
 		if _, err := getSigner(raw); err == nil {
-			t.Errorf("GetSigner(%q): want error", raw)
+			t.Errorf("getSigner(%q): want error", raw)
 		}
 	}
 }
