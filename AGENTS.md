@@ -53,6 +53,11 @@ so tests never touch the dev database.
 - `web/email` - react-email templates, exported to `web/email/out` and
   embedded. Colors are hex copies of the UI tokens.
 
+## Backlog
+
+`BACKLOG.md` is the work queue for all Nokku repos. Tick what you finish,
+add what you find. Unattended work follows the `unattended-pass` skill.
+
 ## Conventions
 
 - Who may call an RPC is declared on the RPC itself, `option (access)` in

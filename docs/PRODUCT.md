@@ -30,12 +30,9 @@ Five repos, usually checked out as siblings.
 Proto source lives only in `../protos`, in the buf module rooted at
 `protos/nokku` with package path `nokku/v1` (`protos/nokku/nokku/v1` from
 that repo's root).
-Every app repo checks in generated code under its own `internal/gen`, so the
-same protos are compiled three times: once in nokku, nokkud, and nk.
-Any proto change means editing `../protos`, then running `task gen` in all
-three app repos and committing the regenerated code in each.
-There is no CI lock-step check yet, so this is on you. See
-`docs/ROADMAP.md`.
+The generated Go code is published from that repo as the
+`github.com/nokku-sh/protos` module, and nokku, nokkud, and nk pin it in
+`go.mod`. The protos README covers the release flow and local `go.work` use.
 
 ### Backend layering
 
@@ -287,7 +284,7 @@ secrets on completion, and evicted by retention and byte caps per plan.
 2. Read the repo's `AGENTS.md`.
 3. Scout the code before editing.
 4. Verify with the repo's `task lint` before handing over.
-5. Pick work from `docs/ROADMAP.md` and mark it done there when finished.
+5. Pick work from `BACKLOG.md` and tick it there when finished.
 
 ### Verifying changes
 
