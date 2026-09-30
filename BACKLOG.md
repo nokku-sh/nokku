@@ -62,14 +62,18 @@ this file.
       empty sections, and add user TTL guidance for manual-heavy workspaces.
       (from ROADMAP)
 
-- [ ] `nokku/internal/email` `SendVerificationEmail` and the `verification`
-      template are never sent. Signup and "resend verification" both send the
-      welcome email, so a resend greets the user with "Welcome to Nokku"
-      again. Use the verification template for resends, or delete both.
-      (2026-09-30)
+- [ ] `nokku` Feature: change the account email. Today the profile says it
+      can't be changed. Spec from Roxas: the change is confirmed through a
+      verification email to both the old and the new address, using the
+      `verification` template. Needs a proto field or RPC, a pending-email
+      column, and a token flow. (2026-09-30)
 
 ## Done
 
+- [x] `nokku/internal/api` Resend verification sent the welcome email
+      again. Welcome now goes out once at signup, resends use the
+      `verification` template. No test yet, api handlers have no DB test
+      harness (see the characterization tests item). (2026-09-30)
 - [~] `nokku/internal/db` Cut the tx closure boilerplate. Skipped: tried a
       generic `InWorkspace[T]` on target.go. Only 22 blocks have the simple
       shape (the rest carry logic), each shrinks by one line, and it needs a
