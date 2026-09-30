@@ -17,7 +17,8 @@ import (
 // ProcedureRoles maps each workspace-scoped procedure to the least role that
 // may call it. Unclassified procedures are denied, so new RPCs fail closed.
 var ProcedureRoles = map[string]db.Role{
-	nokkuv1connect.BillingServiceGetBillingProcedure: db.RoleAdmin,
+	nokkuv1connect.BillingServiceGetBillingProcedure:     db.RoleAdmin,
+	nokkuv1connect.DashboardServiceGetDashboardProcedure: db.RoleViewer,
 
 	// Members read CAs because nk trusts the X.509 CAs of every workspace it belongs to.
 	nokkuv1connect.CertificateServiceGetCertificateAuthorityProcedure:      db.RoleMember,
