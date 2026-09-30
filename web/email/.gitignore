@@ -8,7 +8,8 @@ node_modules
 .react-email
 /.svelte-kit
 /build
-/out
+/out/*
+!/out/.gitkeep
 
 # OS
 .DS_Store
