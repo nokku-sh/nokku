@@ -8,10 +8,6 @@ this file.
 
 ## Ready
 
-- [ ] `nokku/internal/daemon` Unexport what only the package uses, starting
-      with `Pool.Shutdown` and `Pool.Done`.
-      Done when: the exported surface is what `api` and `config` call.
-      (2026-09-30)
 - [ ] `nokku/internal/db` Cut the tx closure boilerplate. About 47 handlers
       declare an outer var, assign it inside `WithWorkspace`, and check the
       error. A generic method returning `(T, error)` would make each a single
@@ -56,6 +52,10 @@ this file.
 
 ## Done
 
+- [x] `nokku/internal/daemon` Unexport what only the package uses. Result:
+      12 identifiers unexported, the `Conn.Cancel` wrapper removed, -4
+      lines. Kept exported: what `api` and `config` call, connect handler
+      methods, and types returned to `api`. (loop/2026-09-30)
 - [x] `nokku/internal/api` Unexport the package internals. Result: 72
       identifiers unexported, only `Server` and `New` remain. Case-only diff,
       0 lines net. (loop/2026-09-30)

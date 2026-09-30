@@ -18,7 +18,7 @@ const (
 
 var (
 	ErrRelayLimit       = errors.New("relay limit reached")
-	ErrRelayUnavailable = errors.New("relay unavailable")
+	errRelayUnavailable = errors.New("relay unavailable")
 	ErrCAInactive       = errors.New("certificate authority is not active")
 )
 
@@ -27,17 +27,17 @@ type Relay struct {
 	relayID  string
 	daemonID string
 
-	ToDaemon chan []byte
-	ToUser   chan []byte
+	toDaemon chan []byte
+	toUser   chan []byte
 
 	closed      chan struct{}
 	closeOnce   sync.Once
 	releaseSlot func()
 }
 
-func (r *Relay) Done() <-chan struct{} { return r.closed }
+func (r *Relay) done() <-chan struct{} { return r.closed }
 
-func (r *Relay) Close() {
+func (r *Relay) close() {
 	r.closeOnce.Do(func() { close(r.closed) })
 }
 
@@ -47,7 +47,7 @@ type relayPending struct {
 	releaseSlot func()
 }
 
-// RequestRelay releases its slot exactly once. RegisterRelay hands the
+// RequestRelay releases its slot exactly once. registerRelay hands the
 // release to the Relay, failure paths run it directly.
 func (p *Pool) RequestRelay(
 	ctx context.Context,
@@ -85,16 +85,16 @@ func (p *Pool) RequestRelay(
 		},
 	}, 5*time.Second); err != nil {
 		release()
-		return nil, fmt.Errorf("%w: %w", ErrRelayUnavailable, err)
+		return nil, fmt.Errorf("%w: %w", errRelayUnavailable, err)
 	}
 
 	var err error
 	select {
 	case <-pend.ready:
 	case <-time.After(pendingSessionTimeout):
-		err = fmt.Errorf("%w: relay request timed out", ErrRelayUnavailable)
+		err = fmt.Errorf("%w: relay request timed out", errRelayUnavailable)
 	case <-ctx.Done():
-		err = fmt.Errorf("%w: %w", ErrRelayUnavailable, ctx.Err())
+		err = fmt.Errorf("%w: %w", errRelayUnavailable, ctx.Err())
 	}
 
 	// The relay may have registered just as the wait gave up, or be gone
@@ -105,16 +105,16 @@ func (p *Pool) RequestRelay(
 	if r == nil {
 		release()
 		if err == nil {
-			err = fmt.Errorf("%w: relay closed before it was bridged", ErrRelayUnavailable)
+			err = fmt.Errorf("%w: relay closed before it was bridged", errRelayUnavailable)
 		}
 		return nil, err
 	}
 	return r, nil
 }
 
-// RegisterRelay returns nil unless this daemon was asked for this relay, so a
+// registerRelay returns nil unless this daemon was asked for this relay, so a
 // rogue daemon cannot claim or fabricate one.
-func (p *Pool) RegisterRelay(relayID, daemonID string) *Relay {
+func (p *Pool) registerRelay(relayID, daemonID string) *Relay {
 	p.mu.Lock()
 	pend, ok := p.pendingRelays[relayID]
 	if !ok {
@@ -129,8 +129,8 @@ func (p *Pool) RegisterRelay(relayID, daemonID string) *Relay {
 	r := &Relay{
 		relayID:     relayID,
 		daemonID:    daemonID,
-		ToDaemon:    make(chan []byte, relayBufferSize),
-		ToUser:      make(chan []byte, relayBufferSize),
+		toDaemon:    make(chan []byte, relayBufferSize),
+		toUser:      make(chan []byte, relayBufferSize),
 		closed:      make(chan struct{}),
 		releaseSlot: pend.releaseSlot,
 	}
@@ -150,7 +150,7 @@ func (p *Pool) UnregisterRelay(relayID string) {
 			delete(o.relays, relayID)
 			p.disownLocked(r.daemonID)
 		}
-		r.Close()
+		r.close()
 	}
 	p.mu.Unlock()
 	if r != nil {

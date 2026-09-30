@@ -24,8 +24,8 @@ func (pipeAddr) String() string  { return "relay" }
 func (c *relayConn) Read(p []byte) (int, error) {
 	if len(c.buf) == 0 {
 		select {
-		case c.buf = <-c.relay.ToUser:
-		case <-c.relay.Done():
+		case c.buf = <-c.relay.toUser:
+		case <-c.relay.done():
 			return 0, io.EOF
 		}
 	}
@@ -37,15 +37,15 @@ func (c *relayConn) Read(p []byte) (int, error) {
 func (c *relayConn) Write(p []byte) (int, error) {
 	// The SSH transport reuses its packet buffers.
 	select {
-	case c.relay.ToDaemon <- bytes.Clone(p):
+	case c.relay.toDaemon <- bytes.Clone(p):
 		return len(p), nil
-	case <-c.relay.Done():
+	case <-c.relay.done():
 		return 0, errors.New("relay closed")
 	}
 }
 
 func (c *relayConn) Close() error {
-	c.relay.Close()
+	c.relay.close()
 	return nil
 }
 

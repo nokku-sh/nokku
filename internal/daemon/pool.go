@@ -28,7 +28,7 @@ var stateUpdate = &nokkuv1.ConnectResponse{
 	Msg: &nokkuv1.ConnectResponse_StateUpdate{StateUpdate: &nokkuv1.StateUpdate{}},
 }
 
-type Conn struct {
+type daemonConn struct {
 	daemonID    string
 	workspaceID string
 	// state holds at most one pending StateUpdate so bursts coalesce. It is
@@ -37,10 +37,6 @@ type Conn struct {
 	state  chan *nokkuv1.ConnectResponse
 	ctx    context.Context
 	cancel context.CancelFunc
-}
-
-func (c *Conn) Cancel() {
-	c.cancel()
 }
 
 // connection lets tests stub db.Connection without Postgres.
@@ -57,7 +53,7 @@ type owned struct {
 
 type Pool struct {
 	mu            sync.RWMutex
-	byID          map[string]*Conn
+	byID          map[string]*daemonConn
 	byWksp        map[string]map[string]struct{}
 	owned         map[string]*owned
 	sessions      map[string]*Session
@@ -77,7 +73,7 @@ type Pool struct {
 func New(ctx context.Context, conn connection) *Pool {
 	shutdownCtx, shutdownCancel := context.WithCancel(ctx)
 	p := &Pool{
-		byID:           make(map[string]*Conn),
+		byID:           make(map[string]*daemonConn),
 		byWksp:         make(map[string]map[string]struct{}),
 		owned:          make(map[string]*owned),
 		sessions:       make(map[string]*Session),
@@ -91,7 +87,7 @@ func New(ctx context.Context, conn connection) *Pool {
 		shutdownCancel: shutdownCancel,
 	}
 
-	context.AfterFunc(ctx, p.Shutdown)
+	context.AfterFunc(ctx, p.shutdown)
 	go p.heartbeat(ctx)
 
 	return p
@@ -163,8 +159,8 @@ func (p *Pool) disownLocked(daemonID string) {
 	}
 }
 
-// Shutdown is idempotent.
-func (p *Pool) Shutdown() {
+// shutdown is idempotent.
+func (p *Pool) shutdown() {
 	p.shutdownCancel()
 	p.mu.Lock()
 	for _, c := range p.byID {
@@ -173,13 +169,13 @@ func (p *Pool) Shutdown() {
 	p.mu.Unlock()
 }
 
-func (p *Pool) Done() <-chan struct{} {
+func (p *Pool) done() <-chan struct{} {
 	return p.shutdownCtx.Done()
 }
 
-func (p *Pool) RegisterDaemon(ctx context.Context, daemonID, workspaceID string) *Conn {
+func (p *Pool) registerDaemon(ctx context.Context, daemonID, workspaceID string) *daemonConn {
 	ctx, cancel := context.WithCancel(ctx)
-	c := &Conn{
+	c := &daemonConn{
 		daemonID:    daemonID,
 		workspaceID: workspaceID,
 		send:        make(chan *nokkuv1.ConnectResponse, sendBufferSize),
@@ -217,7 +213,7 @@ func (p *Pool) RegisterDaemon(ctx context.Context, daemonID, workspaceID string)
 	return c
 }
 
-func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
+func (p *Pool) unregisterDaemon(daemonID string, c *daemonConn) {
 	p.mu.Lock()
 	cur, ok := p.byID[daemonID]
 	if !ok {
@@ -252,9 +248,9 @@ func (p *Pool) UnregisterDaemon(daemonID string, c *Conn) {
 	c.cancel()
 }
 
-func (p *Pool) Poke(workspaceID string) {
+func (p *Pool) poke(workspaceID string) {
 	p.mu.RLock()
-	daemons := make([]*Conn, 0, len(p.byWksp[workspaceID]))
+	daemons := make([]*daemonConn, 0, len(p.byWksp[workspaceID]))
 	for daemonID := range p.byWksp[workspaceID] {
 		if c := p.byID[daemonID]; c != nil {
 			daemons = append(daemons, c)
@@ -315,7 +311,7 @@ func (p *Pool) listen(ctx context.Context, cfg *pgx.ConnConfig) error {
 			}
 			p.mu.Unlock()
 		}
-		p.Poke(ws)
+		p.poke(ws)
 	}
 }
 
@@ -355,7 +351,7 @@ func (p *Pool) pokeAll() {
 }
 
 // poke never blocks, a pending update already covers this one.
-func (c *Conn) poke() {
+func (c *daemonConn) poke() {
 	select {
 	case c.state <- stateUpdate:
 	default:
