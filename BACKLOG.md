@@ -8,10 +8,6 @@ this file.
 
 ## Ready
 
-- [ ] `mon` Add CONTRIBUTING.md and SECURITY.md to match the other repos.
-      Done when: both exist and fit mon's scope (a library, no binaries).
-      (from ROADMAP)
-
 - [ ] `nokku/internal/iam` Unexport the 46 identifiers only iam uses. One
       mechanical commit, list from the exports tool.
       Done when: the tool reports no `internal` entries for iam. (2026-09-30)
@@ -72,6 +68,9 @@ this file.
 
 ## Done
 
+- [x] `mon` CONTRIBUTING.md and SECURITY.md. Result: both added, scoped to
+      a library (consumers, tags, salts, per-package scope). ed31e99 on
+      loop/2026-10-01.
 - [x] `nokkud/main.go` Root help said nokkud replaces the host sshd.
       Result: now says it runs beside it on :4022. aa43d70 on loop/2026-10-01.
 - [x] `nokku/internal/api` `CreateSession` success path. Result: a fake
