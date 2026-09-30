@@ -137,6 +137,9 @@ export const util = {
 			enabled: !!workspaceID.current,
 			select: (res) => res.version
 		})),
+	// Who runs this server. Empty fields mean not configured, typical for self-hosting.
+	instanceInfo: () =>
+		useQuery(UtilService.method.getInstanceInfo, undefined, () => ({ staleTime: Infinity })),
 	getLogs: (opts?: () => AuditQuery) =>
 		useQuery(
 			UtilService.method.listAuditLogs,

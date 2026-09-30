@@ -87,3 +87,50 @@ func TestRenderTemplates(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderOperatorFooter(t *testing.T) {
+	t.Parallel()
+
+	t.Run("self-hosted without operator", func(t *testing.T) {
+		t.Parallel()
+		body, err := render(
+			"verification",
+			VerificationTemplateData{VerificationURL: "https://x", Expiration: "15 minutes"},
+		)
+		if err != nil {
+			t.Fatalf("render: %v", err)
+		}
+		for _, want := range []string{"this Nokku server", "tell your administrator"} {
+			if !strings.Contains(body, want) {
+				t.Errorf("footer does not contain %q", want)
+			}
+		}
+		for _, unwanted := range []string{"Imprint", "Privacy", "mailto:", "©"} {
+			if strings.Contains(body, unwanted) {
+				t.Errorf("footer without operator contains %q", unwanted)
+			}
+		}
+	})
+
+	t.Run("operator set", func(t *testing.T) {
+		t.Parallel()
+		op := Operator{
+			Name:         "Acme GmbH",
+			Address:      "Street 1, Vienna",
+			SupportEmail: "help@acme.test",
+			ImprintURL:   "https://acme.test/imprint",
+		}
+		body, err := render("verification", VerificationTemplateData{Operator: op, VerificationURL: "https://x"})
+		if err != nil {
+			t.Fatalf("render: %v", err)
+		}
+		for _, want := range []string{"Acme GmbH", "Street 1, Vienna", "mailto:help@acme.test", "https://acme.test/imprint"} {
+			if !strings.Contains(body, want) {
+				t.Errorf("footer does not contain %q", want)
+			}
+		}
+		if strings.Contains(body, ">Terms<") {
+			t.Error("footer shows a Terms link without a terms URL")
+		}
+	})
+}

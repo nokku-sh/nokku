@@ -111,10 +111,24 @@ S3-compatible storage holds avatars and session recordings. Recordings are encry
 | `NOKKU_SMTP_PORT`      | `587`                     | 465 implicit TLS, 587 STARTTLS           |
 | `NOKKU_SMTP_USERNAME`  |                           | SMTP username                            |
 | `NOKKU_SMTP_PASSWORD`  |                           | SMTP password                            |
-| `NOKKU_EMAIL_SENDER`   | `noreply@system.nokku.sh` | Sender address                           |
+| `NOKKU_EMAIL_SENDER`   |                           | Sender address, required with SMTP       |
 | `NOKKU_EMAIL_COOLDOWN` | `15m`                     | Per-user, per-template cooldown          |
 
 Any SMTP relay works, for example Scaleway TEM at `smtp.tem.scw.cloud`. Without email, password resets and verification links cannot be delivered.
+
+### Operator details (optional)
+
+Who runs this server. The UI footer, the signup consent line and the email footer show only what is set, so a self-hosted server shows no third-party company by default.
+
+| Variable                       | Purpose                                     |
+| ------------------------------ | ------------------------------------------- |
+| `NOKKU_OPERATOR_NAME`          | Company name in the copyright and emails    |
+| `NOKKU_OPERATOR_ADDRESS`       | Postal address in the email footer          |
+| `NOKKU_OPERATOR_SUPPORT_EMAIL` | Support contact in emails and the sidebar   |
+| `NOKKU_OPERATOR_WEBSITE_URL`   | Website link                                |
+| `NOKKU_OPERATOR_TERMS_URL`     | Terms, also shown where accounts are created |
+| `NOKKU_OPERATOR_PRIVACY_URL`   | Privacy policy                              |
+| `NOKKU_OPERATOR_IMPRINT_URL`   | Imprint                                     |
 
 ### SSO provider seeds (optional)
 

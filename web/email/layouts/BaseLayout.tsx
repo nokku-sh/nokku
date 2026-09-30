@@ -12,12 +12,13 @@ import {
   Font,
   Row,
 } from "react-email";
-import { CONFIG } from "../constants/vars";
+import { CONFIG, CONSTANTS } from "../constants/vars";
 
 interface BaseEmailLayoutProps {
   children: React.ReactNode;
   preview: string;
-  type?: "transactional" | "marketing";
+  // "instance" mails come from any Nokku server, so the backend fills in whoever runs it.
+  type?: "transactional" | "marketing" | "instance";
 }
 
 export default function BaseLayout({
@@ -74,61 +75,113 @@ export default function BaseLayout({
             </Section>
             <Section className="px-8 py-8">{children}</Section>
             <Section className="border-t border-line bg-card px-8 py-7">
-              {type === "marketing" ? (
-                <Text className="m-0 text-xs leading-5 text-muted">
-                  You're receiving this because you subscribed to product updates from{" "}
-                  {CONFIG.APP_NAME}. Want to change how often you hear from us?{" "}
-                  <Link
-                    href={CONFIG.UNSUBSCRIBE_URL}
-                    className="font-medium text-brand no-underline"
-                  >
-                    Unsubscribe
-                  </Link>
-                  .
-                </Text>
-              ) : (
-                <Text className="m-0 text-xs leading-5 text-muted">
-                  This is a transactional security email about your {CONFIG.APP_NAME} account. If
-                  you did not initiate this action, contact{" "}
-                  <Link
-                    href={`mailto:${CONFIG.SUPPORT_EMAIL}`}
-                    className="font-medium text-brand no-underline"
-                  >
-                    {CONFIG.SUPPORT_EMAIL}
-                  </Link>
-                  .
-                </Text>
+              {type === "instance" ? <InstanceFooter /> : (
+                <>
+                  {type === "marketing" ? (
+                    <Text className="m-0 text-xs leading-5 text-muted">
+                      You're receiving this because you subscribed to product updates from{" "}
+                      {CONFIG.APP_NAME}. Want to change how often you hear from us?{" "}
+                      <Link
+                        href={CONFIG.UNSUBSCRIBE_URL}
+                        className="font-medium text-brand no-underline"
+                      >
+                        Unsubscribe
+                      </Link>
+                      .
+                    </Text>
+                  ) : (
+                    <Text className="m-0 text-xs leading-5 text-muted">
+                      This is a transactional security email about your {CONFIG.APP_NAME} account. If
+                      you did not initiate this action, contact{" "}
+                      <Link
+                        href={`mailto:${CONFIG.SUPPORT_EMAIL}`}
+                        className="font-medium text-brand no-underline"
+                      >
+                        {CONFIG.SUPPORT_EMAIL}
+                      </Link>
+                      .
+                    </Text>
+                  )}
+                  <Text className="m-0 mt-5 text-xs leading-5 text-muted">
+                    <Link href={CONFIG.APP_URL} className="text-muted underline">
+                      Website
+                    </Link>
+                    {"  ·  "}
+                    <Link href={CONFIG.PRIVACY_URL} className="text-muted underline">
+                      Privacy
+                    </Link>
+                    {"  ·  "}
+                    <Link href={CONFIG.TERMS_URL} className="text-muted underline">
+                      Terms
+                    </Link>
+                    {"  ·  "}
+                    <Link href={CONFIG.IMPRINT_URL} className="text-muted underline">
+                      Legal notice
+                    </Link>
+                  </Text>
+                  <Row className="flex mt-3 items-center">
+                    <Text className="text-[11px] leading-5 text-muted">
+                      © {new Date().getFullYear()} {CONFIG.COMPANY_NAME}
+                      <br />
+                      {CONFIG.SUPPORT_EMAIL}
+                      <br />
+                      {CONFIG.COMPANY_ADDRESS}
+                    </Text>
+                  </Row>
+                </>
               )}
-              <Text className="m-0 mt-5 text-xs leading-5 text-muted">
-                <Link href={CONFIG.APP_URL} className="text-muted underline">
-                  Website
-                </Link>
-                {"  ·  "}
-                <Link href={CONFIG.PRIVACY_URL} className="text-muted underline">
-                  Privacy
-                </Link>
-                {"  ·  "}
-                <Link href={CONFIG.TERMS_URL} className="text-muted underline">
-                  Terms
-                </Link>
-                {"  ·  "}
-                <Link href={CONFIG.IMPRINT_URL} className="text-muted underline">
-                  Legal notice
-                </Link>
-              </Text>
-              <Row className="flex mt-3 items-center">
-                <Text className="text-[11px] leading-5 text-muted">
-                  © {new Date().getFullYear()} {CONFIG.COMPANY_NAME}
-                  <br />
-                  {CONFIG.SUPPORT_EMAIL}
-                  <br />
-                  {CONFIG.COMPANY_ADDRESS}
-                </Text>
-              </Row>
             </Section>
           </Container>
         </Body>
       </Html>
     </Tailwind>
+  );
+}
+
+// Go template syntax, rendered by internal/email. Empty settings drop their part,
+// so a self-hosted server never shows somebody else's company.
+function InstanceFooter() {
+  const o = CONSTANTS.OPERATOR;
+  return (
+    <>
+      <Text className="m-0 text-xs leading-5 text-muted">
+        This is a security email about your account on{" "}
+        {`{{ if ${o.NAME} }}${o.NAME_VALUE}{{ else }}this Nokku server{{ end }}`}. If you did
+        not do this,{" "}
+        {`{{ if ${o.SUPPORT_EMAIL} }}`}contact{" "}
+        <Link
+          href={`mailto:${o.SUPPORT_EMAIL_VALUE}`}
+          className="font-medium text-brand no-underline"
+        >
+          {o.SUPPORT_EMAIL_VALUE}
+        </Link>
+        {"{{ else }}tell your administrator{{ end }}"}.
+      </Text>
+      {`{{ if or ${o.WEBSITE} ${o.PRIVACY} ${o.TERMS} ${o.IMPRINT} }}`}
+      <Text className="m-0 mt-5 text-xs leading-5 text-muted">
+        {`{{ if ${o.WEBSITE} }}`}
+        <Link href={o.WEBSITE_VALUE} className="mr-3 text-muted underline">Website</Link>
+        {"{{ end }}"}
+        {`{{ if ${o.PRIVACY} }}`}
+        <Link href={o.PRIVACY_VALUE} className="mr-3 text-muted underline">Privacy</Link>
+        {"{{ end }}"}
+        {`{{ if ${o.TERMS} }}`}
+        <Link href={o.TERMS_VALUE} className="mr-3 text-muted underline">Terms</Link>
+        {"{{ end }}"}
+        {`{{ if ${o.IMPRINT} }}`}
+        <Link href={o.IMPRINT_VALUE} className="mr-3 text-muted underline">Imprint</Link>
+        {"{{ end }}"}
+      </Text>
+      {"{{ end }}"}
+      {`{{ if ${o.NAME} }}`}
+      <Text className="m-0 mt-3 text-[11px] leading-5 text-muted">
+        © {new Date().getFullYear()} {o.NAME_VALUE}
+        {`{{ if ${o.ADDRESS} }}`}
+        <br />
+        {o.ADDRESS_VALUE}
+        {"{{ end }}"}
+      </Text>
+      {"{{ end }}"}
+    </>
   );
 }

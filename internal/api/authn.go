@@ -20,6 +20,7 @@ import (
 var publicEndpoints = map[string]struct{}{
 	nokkuv1connect.DaemonServiceEnrollDaemonProcedure:      {},
 	nokkuv1connect.UtilServiceGetVersionProcedure:          {},
+	nokkuv1connect.UtilServiceGetInstanceInfoProcedure:     {},
 	nokkuv1connect.AuthServiceRegisterProcedure:            {},
 	nokkuv1connect.AuthServiceLoginProcedure:               {},
 	nokkuv1connect.AuthServiceLoginWithBackupCodeProcedure: {},

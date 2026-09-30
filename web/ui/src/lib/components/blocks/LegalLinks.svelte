@@ -1,26 +1,46 @@
 <script lang="ts">
-	import { ImprintURL, PrivacyURL, ToSURL } from '$lib/config';
+	import { util } from '$lib/api/workspaces.svelte';
 	import { cn } from '$lib/utils';
 
 	let { class: className }: { class?: string } = $props();
 
-	const links = [
-		{ label: 'Terms', href: ToSURL },
-		{ label: 'Privacy', href: PrivacyURL },
-		{ label: 'Imprint', href: ImprintURL }
-	];
+	const info = util.instanceInfo();
+	const links = $derived(
+		[
+			{ label: 'Website', href: info.data?.websiteUrl },
+			{ label: 'Terms', href: info.data?.termsUrl },
+			{ label: 'Privacy', href: info.data?.privacyUrl },
+			{ label: 'Imprint', href: info.data?.imprintUrl }
+		].filter((l) => l.href)
+	);
 </script>
 
-<!-- The imprint has to stay one click away on every page, so this lives in both footers. -->
-<nav
-	aria-label="Legal"
-	class={cn('flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground', className)}
->
-	<span>&copy; {new Date().getFullYear()} Mizuchi Labs</span>
-	{#each links as l (l.label)}
-		<span aria-hidden="true" class="text-muted-foreground/40">·</span>
-		<a href={l.href} target="_blank" rel="noopener" class="transition-colors hover:text-foreground">
-			{l.label}
-		</a>
-	{/each}
-</nav>
+<!-- Whoever runs this server sets these. Self-hosted servers usually leave them out. -->
+{#if info.data?.operatorName || links.length}
+	<nav
+		aria-label="Legal"
+		class={cn(
+			'flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground',
+			className
+		)}
+	>
+		{#if info.data?.operatorName}
+			<span>&copy; {new Date().getFullYear()} {info.data.operatorName}</span>
+		{/if}
+		{#each links as l, i (l.label)}
+			{#if i > 0 || info.data?.operatorName}
+				<span aria-hidden="true" class="text-muted-foreground/40">·</span>
+			{/if}
+			<a
+				href={l.href}
+				target="_blank"
+				rel="noopener"
+				class="transition-colors hover:text-foreground"
+			>
+				{l.label}
+			</a>
+		{/each}
+	</nav>
+{:else}
+	<span class={cn('text-xs text-muted-foreground', className)}>Powered by Nokku</span>
+{/if}

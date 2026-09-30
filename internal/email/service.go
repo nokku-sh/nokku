@@ -24,13 +24,27 @@ type Service struct {
 	cache  cache.Cache
 	appURL string
 
-	From     string        `env:"NOKKU_EMAIL_SENDER"   envDefault:"noreply@system.nokku.sh"`
+	From     string        `env:"NOKKU_EMAIL_SENDER"`
 	Cooldown time.Duration `env:"NOKKU_EMAIL_COOLDOWN" envDefault:"15m"`
 
 	SMTPHost     string `env:"NOKKU_SMTP_HOST"`
 	SMTPPort     int    `env:"NOKKU_SMTP_PORT"     envDefault:"587"`
 	SMTPUsername string `env:"NOKKU_SMTP_USERNAME"`
 	SMTPPassword string `env:"NOKKU_SMTP_PASSWORD"`
+
+	Operator Operator
+}
+
+// Operator is whoever runs this server. Empty by default, so a self-hosted
+// server never shows the Nokku company in its mails or legal links.
+type Operator struct {
+	Name         string `env:"NOKKU_OPERATOR_NAME"`
+	Address      string `env:"NOKKU_OPERATOR_ADDRESS"`
+	SupportEmail string `env:"NOKKU_OPERATOR_SUPPORT_EMAIL"`
+	WebsiteURL   string `env:"NOKKU_OPERATOR_WEBSITE_URL"`
+	TermsURL     string `env:"NOKKU_OPERATOR_TERMS_URL"`
+	PrivacyURL   string `env:"NOKKU_OPERATOR_PRIVACY_URL"`
+	ImprintURL   string `env:"NOKKU_OPERATOR_IMPRINT_URL"`
 }
 
 type sendRequest struct {
@@ -52,6 +66,10 @@ func New(appURL string, cache cache.Cache) (*Service, error) {
 		slog.Info("email delivery disabled, set NOKKU_SMTP_HOST to enable it")
 		return &svc, nil
 	}
+	// A default sender would be somebody else's domain, and relays reject that.
+	if svc.From == "" {
+		return nil, errors.New("NOKKU_EMAIL_SENDER is required when NOKKU_SMTP_HOST is set")
+	}
 	svc.sender, err = newSMTPSender(svc.SMTPHost, svc.SMTPPort, svc.SMTPUsername, svc.SMTPPassword)
 	if err != nil {
 		return nil, err
@@ -70,6 +88,7 @@ func (s *Service) SendWelcomeEmail(
 		subject:  "Welcome to Nokku",
 		template: "welcome",
 		data: WelcomeTemplateData{
+			Operator:        s.Operator,
 			UserName:        username,
 			VerificationURL: verifyURL,
 			Expiration:      expiry,
@@ -87,6 +106,7 @@ func (s *Service) SendVerificationEmail(
 		subject:  "Verify your email address",
 		template: "verification",
 		data: VerificationTemplateData{
+			Operator:        s.Operator,
 			VerificationURL: verifyURL,
 			Expiration:      expiry,
 		},
@@ -103,6 +123,7 @@ func (s *Service) SendRecoveryEmail(
 		subject:  "Reset your password",
 		template: "recovery",
 		data: RecoveryTemplateData{
+			Operator:    s.Operator,
 			RecoveryURL: recoveryURL,
 			Expiration:  expiry,
 		},
@@ -119,6 +140,7 @@ func (s *Service) SendNewLoginEmail(
 		subject:  "New sign-in to your account",
 		template: "new-login",
 		data: NewLoginTemplateData{
+			Operator:   s.Operator,
 			ProfileURL: s.appURL + "/profile/security",
 			DeviceID:   deviceID,
 			DeviceName: deviceName,

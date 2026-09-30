@@ -8,13 +8,22 @@
 
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { workspace } from '$lib/api/workspaces.svelte';
+	import { util, workspace } from '$lib/api/workspaces.svelte';
 	import * as Command from '$lib/components/ui/command';
 	import * as Kbd from '$lib/components/ui/kbd';
 	import { workspaceID } from '$lib/store.svelte';
-	import { AppRoutes, SupportRoutes, UserRoutes, canSee, type RouteItem } from './routes';
+	import {
+		AppRoutes,
+		SupportRoutes,
+		UserRoutes,
+		canSee,
+		supportRoute,
+		type RouteItem
+	} from './routes';
 
 	const ws = workspace.get();
+	const info = util.instanceInfo();
+	const support = $derived(supportRoute(info.data?.supportEmail));
 
 	function leaves(items: RouteItem[], parent = ''): RouteItem[] {
 		return items.flatMap((item) =>
@@ -40,7 +49,9 @@
 		return [
 			...app,
 			['You', leaves(UserRoutes)] as const,
-			...Object.entries(SupportRoutes).map(([name, routes]) => [name, leaves(routes)] as const)
+			...Object.entries(SupportRoutes).map(
+				([name, routes]) => [name, leaves(support ? [...routes, support] : routes)] as const
+			)
 		].filter(([, items]) => items.length);
 	});
 

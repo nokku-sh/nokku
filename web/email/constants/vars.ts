@@ -12,7 +12,7 @@ export const CONFIG = {
   IMPRINT_URL: "https://nokku.sh/legal/impressum",
   SUPPORT_EMAIL: "support@mizuchi.dev",
   COMPANY_NAME: "Mizuchi Labs",
-  COMPANY_ADDRESS: "Musterstraße 1, 12345, Austria",
+  COMPANY_ADDRESS: "Sirapuit 8, 6460 Imst, Austria",
   UNSUBSCRIBE_URL: "https://nokku.sh/unsubscribe",
 } as const;
 
@@ -45,6 +45,25 @@ export const CONSTANTS = {
   OLD_ROLE: "{{ .OldRole }}",
   NEW_ROLE: "{{ .NewRole }}",
   CHANGED_BY: "{{ .ChangedBy }}",
+
+  // Who runs this server, filled by the backend from NOKKU_OPERATOR_* settings.
+  // The bare names are for {{ if }} checks, the _VALUE ones for output.
+  OPERATOR: {
+    NAME: ".Operator.Name",
+    NAME_VALUE: "{{ .Operator.Name }}",
+    ADDRESS: ".Operator.Address",
+    ADDRESS_VALUE: "{{ .Operator.Address }}",
+    SUPPORT_EMAIL: ".Operator.SupportEmail",
+    SUPPORT_EMAIL_VALUE: "{{ .Operator.SupportEmail }}",
+    WEBSITE: ".Operator.WebsiteURL",
+    WEBSITE_VALUE: "{{ .Operator.WebsiteURL }}",
+    PRIVACY: ".Operator.PrivacyURL",
+    PRIVACY_VALUE: "{{ .Operator.PrivacyURL }}",
+    TERMS: ".Operator.TermsURL",
+    TERMS_VALUE: "{{ .Operator.TermsURL }}",
+    IMPRINT: ".Operator.ImprintURL",
+    IMPRINT_VALUE: "{{ .Operator.ImprintURL }}",
+  },
 
   // License key email
   LICENSE_KEY: "{{ .Key }}",

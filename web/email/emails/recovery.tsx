@@ -4,7 +4,7 @@ import BaseLayout from "../layouts/BaseLayout";
 
 export default function Recovery() {
   return (
-    <BaseLayout preview="Reset your Nokku password. This link is time-limited.">
+    <BaseLayout type="instance" preview="Reset your Nokku password. This link is time-limited.">
       <Text className="m-0 text-xs font-bold uppercase tracking-[1.4px] text-danger">
         Security action
       </Text>

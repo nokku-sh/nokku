@@ -4,7 +4,7 @@ import BaseLayout from "../layouts/BaseLayout";
 
 export default function Welcome() {
   return (
-    <BaseLayout preview="Welcome to Nokku. Verify your email to get started.">
+    <BaseLayout type="instance" preview="Welcome to Nokku. Verify your email to get started.">
       <Text className="m-0 text-xs font-bold uppercase tracking-[1.4px] text-brand">
         Account setup
       </Text>
