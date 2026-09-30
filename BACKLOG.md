@@ -8,12 +8,6 @@ this file.
 
 ## Ready
 
-- [ ] `nokku/internal/db` Cut the tx closure boilerplate. About 47 handlers
-      declare an outer var, assign it inside `WithWorkspace`, and check the
-      error. A generic method returning `(T, error)` would make each a single
-      call. Try it on one file first and keep it only if it reads better.
-      Done when: the pattern is gone or the item is skipped with the reason.
-      (2026-09-30)
 - [ ] `nokku/internal/api` Characterization tests for the riskiest untested
       handlers: `DaemonService.CreateSession`, `DaemonService.EnrollDaemon`,
       `TargetService.SyncTargetUsers`. They protect later refactors.
@@ -52,6 +46,12 @@ this file.
 
 ## Done
 
+- [~] `nokku/internal/db` Cut the tx closure boilerplate. Skipped: tried a
+      generic `InWorkspace[T]` on target.go. Only 22 blocks have the simple
+      shape (the rest carry logic), each shrinks by one line, and it needs a
+      helper per scope. Net about zero lines, two more db entry points, and
+      the type moves into long closure signatures. Not worth it.
+      (loop/2026-09-30)
 - [x] `nokku/internal/daemon` Unexport what only the package uses. Result:
       12 identifiers unexported, the `Conn.Cancel` wrapper removed, -4
       lines. Kept exported: what `api` and `config` call, connect handler
