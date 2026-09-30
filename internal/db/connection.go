@@ -152,7 +152,8 @@ func (c *Connection) setupSchema(ctx context.Context) error {
 	}
 	defer conn.Release()
 
-	// Serializes parallel test packages and instances booting at once.
+	// Serializes instances booting at once. The lock is per database, so test
+	// packages on their own databases still race on the cluster-wide role.
 	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock(hashtext('nokku_schema'))"); err != nil {
 		return fmt.Errorf("acquiring schema lock: %w", err)
 	}
