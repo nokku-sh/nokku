@@ -8,12 +8,6 @@ this file.
 
 ## Ready
 
-- [ ] `nokku/internal/api` Unexport the package internals. Only `api.New` is
-      used outside, but services, constructors, interceptors, and `Err*`
-      vars are exported. Use `gopls rename`, change nothing else. RPC
-      methods stay exported, connect needs them.
-      Done when: nothing but `New` and the RPC methods is exported, lint and
-      tests pass. (2026-09-30)
 - [ ] `nokku/internal/daemon` Unexport what only the package uses, starting
       with `Pool.Shutdown` and `Pool.Done`.
       Done when: the exported surface is what `api` and `config` call.
@@ -62,6 +56,9 @@ this file.
 
 ## Done
 
+- [x] `nokku/internal/api` Unexport the package internals. Result: 72
+      identifiers unexported, only `Server` and `New` remain. Case-only diff,
+      0 lines net. (loop/2026-09-30)
 - [x] `protos` Proto lock-step. Solved by publishing the generated code as
       one Go module, CI checks `gen/` is current. (2026-09-30)
 - [x] Local `go.work` for cross-repo work, documented in the protos README.

@@ -16,20 +16,20 @@ import (
 	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
-type BillingService struct {
+type billingService struct {
 	cfg *config.Config
 }
 
-func NewBillingService(cfg *config.Config) *BillingService {
-	return &BillingService{cfg: cfg}
+func newBillingService(cfg *config.Config) *billingService {
+	return &billingService{cfg: cfg}
 }
 
-func (s *BillingService) GetBilling(
+func (s *billingService) GetBilling(
 	ctx context.Context,
 	req *nokkuv1.GetBillingRequest,
 ) (*nokkuv1.GetBillingResponse, error) {
 	if req.GetWorkspaceId() == "" {
-		return nil, NewError(connect.CodeInvalidArgument, "Workspace ID is required")
+		return nil, newError(connect.CodeInvalidArgument, "Workspace ID is required")
 	}
 
 	var memberCount int64
@@ -72,12 +72,12 @@ func (s *BillingService) GetBilling(
 	return resp, nil
 }
 
-func (s *BillingService) CreateCheckout(
+func (s *billingService) CreateCheckout(
 	ctx context.Context,
 	req *nokkuv1.CreateCheckoutRequest,
 ) (*nokkuv1.CreateCheckoutResponse, error) {
 	if !s.cfg.Billing.Enabled() {
-		return nil, ErrBillingDisabled
+		return nil, errBillingDisabled
 	}
 	if err := s.requireWorkspaceOwner(ctx, req.GetWorkspaceId()); err != nil {
 		return nil, err
@@ -89,45 +89,45 @@ func (s *BillingService) CreateCheckout(
 
 	url, err := s.cfg.Billing.Checkout(ctx, req.GetWorkspaceId(), user.Email)
 	if errors.Is(err, billing.ErrActiveSubscription) {
-		return nil, NewError(
+		return nil, newError(
 			connect.CodeFailedPrecondition,
 			"This workspace already has an active subscription. Manage it in the billing portal.",
 		)
 	}
 	if err != nil {
 		slog.Error("failed to create checkout", "error", err)
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.CreateCheckoutResponse{
 		Url: &url,
 	}, nil
 }
 
-func (s *BillingService) CreatePortal(
+func (s *billingService) CreatePortal(
 	ctx context.Context,
 	req *nokkuv1.CreatePortalRequest,
 ) (*nokkuv1.CreatePortalResponse, error) {
 	if !s.cfg.Billing.Enabled() {
-		return nil, ErrBillingDisabled
+		return nil, errBillingDisabled
 	}
 	if err := s.requireWorkspaceOwner(ctx, req.GetWorkspaceId()); err != nil {
 		return nil, err
 	}
 	url, err := s.cfg.Billing.Portal(ctx, req.GetWorkspaceId())
 	if err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.CreatePortalResponse{
 		Url: &url,
 	}, nil
 }
 
-func (s *BillingService) CancelSubscription(
+func (s *billingService) CancelSubscription(
 	ctx context.Context,
 	req *nokkuv1.CancelSubscriptionRequest,
 ) (*nokkuv1.CancelSubscriptionResponse, error) {
 	if !s.cfg.Billing.Enabled() {
-		return nil, ErrBillingDisabled
+		return nil, errBillingDisabled
 	}
 	if err := s.requireWorkspaceOwner(ctx, req.GetWorkspaceId()); err != nil {
 		return nil, err
@@ -138,12 +138,12 @@ func (s *BillingService) CancelSubscription(
 		req.GetImmediate(),
 		req.GetReason(),
 	); err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	return &nokkuv1.CancelSubscriptionResponse{}, nil
 }
 
-func (s *BillingService) GetLicense(
+func (s *billingService) GetLicense(
 	_ context.Context,
 	_ *nokkuv1.GetLicenseRequest,
 ) (*nokkuv1.GetLicenseResponse, error) {
@@ -166,11 +166,11 @@ func (s *BillingService) GetLicense(
 	}, nil
 }
 
-func (s *BillingService) requireWorkspaceOwner(ctx context.Context, workspaceID string) error {
+func (s *billingService) requireWorkspaceOwner(ctx context.Context, workspaceID string) error {
 	err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		return checkWorkspaceOwner(ctx, q, workspaceID)
 	})
-	if errors.Is(err, ErrPermissionDenied) {
+	if errors.Is(err, errPermissionDenied) {
 		return connect.NewError(
 			connect.CodePermissionDenied,
 			errors.New("workspace owner required"),

@@ -10,7 +10,7 @@ import (
 	"github.com/rs/cors"
 )
 
-func (s *Server) WithCORS(h http.Handler) http.Handler {
+func (s *Server) withCORS(h http.Handler) http.Handler {
 	return cors.New(cors.Options{
 		AllowedOrigins:   []string{s.cfg.FullURL()},
 		AllowedMethods:   connectcors.AllowedMethods(),
@@ -21,7 +21,7 @@ func (s *Server) WithCORS(h http.Handler) http.Handler {
 	}).Handler(h)
 }
 
-func (s *Server) WithCSRF(h http.Handler) http.Handler {
+func (s *Server) withCSRF(h http.Handler) http.Handler {
 	cop := http.NewCrossOriginProtection()
 	if err := cop.AddTrustedOrigin(s.cfg.FullURL()); err != nil {
 		panic(err)
@@ -48,7 +48,7 @@ func (s *Server) WithCSRF(h http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) WithHeaders(h http.Handler) http.Handler {
+func (s *Server) withHeaders(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")

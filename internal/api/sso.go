@@ -14,14 +14,14 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// SSOService keeps at most one provider per workspace. The provider id is the
+// sSOService keeps at most one provider per workspace. The provider id is the
 // workspace id, so saving the other protocol overwrites it.
-type SSOService struct {
+type sSOService struct {
 	cfg *config.Config
 }
 
-func NewSSOService(cfg *config.Config) *SSOService {
-	return &SSOService{cfg: cfg}
+func newSSOService(cfg *config.Config) *sSOService {
+	return &sSOService{cfg: cfg}
 }
 
 // requireVerifiedDomain gates SSO and SCIM. SSO without a verified domain
@@ -40,13 +40,13 @@ func requireVerifiedDomain(
 			return nil
 		}
 	}
-	return NewError(
+	return newError(
 		connect.CodeFailedPrecondition,
 		"Add and verify a domain before configuring "+what,
 	)
 }
 
-func (s *SSOService) GetSSOProvider(
+func (s *sSOService) GetSSOProvider(
 	ctx context.Context,
 	req *nokkuv1.GetSSOProviderRequest,
 ) (*nokkuv1.GetSSOProviderResponse, error) {
@@ -60,7 +60,7 @@ func (s *SSOService) GetSSOProvider(
 	return &nokkuv1.GetSSOProviderResponse{Provider: providerToProto(p)}, nil
 }
 
-func (s *SSOService) UpdateSSOProvider(
+func (s *sSOService) UpdateSSOProvider(
 	ctx context.Context,
 	req *nokkuv1.UpdateSSOProviderRequest,
 ) (*nokkuv1.UpdateSSOProviderResponse, error) {
@@ -101,7 +101,7 @@ func (s *SSOService) UpdateSSOProvider(
 			p.SAML.MetadataXML = prev.SAML.MetadataXML
 		}
 	default:
-		return nil, NewError(connect.CodeInvalidArgument, "method must be oidc or saml")
+		return nil, newError(connect.CodeInvalidArgument, "method must be oidc or saml")
 	}
 
 	if err := requireVerifiedDomain(ctx, s.cfg.IAM, "an SSO provider", req.GetWorkspaceId()); err != nil {
@@ -131,7 +131,7 @@ func (s *SSOService) UpdateSSOProvider(
 
 func ssoError(err error) error {
 	if errors.Is(err, iam.ErrNotFound) {
-		return ErrNotFound
+		return errNotFound
 	}
 	return err
 }

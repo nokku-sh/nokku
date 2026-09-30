@@ -13,18 +13,18 @@ import (
 
 func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	svc := cfg.IAM
-	as := NewAuthService(cfg)
+	as := newAuthService(cfg)
 
 	flow := newChain(svc.CSRFGuard)
-	mux.Handle("POST /passkey/login/begin", flow.ThenFunc(svc.Passkey.BeginLogin))
-	mux.Handle("POST /passkey/login/finish", flow.ThenFunc(svc.Passkey.FinishLogin))
-	mux.Handle("POST /passkey/signup/begin", flow.ThenFunc(svc.Passkey.BeginSignup))
-	mux.Handle("POST /passkey/signup/finish", flow.ThenFunc(svc.Passkey.FinishSignup))
+	mux.Handle("POST /passkey/login/begin", flow.thenFunc(svc.Passkey.BeginLogin))
+	mux.Handle("POST /passkey/login/finish", flow.thenFunc(svc.Passkey.FinishLogin))
+	mux.Handle("POST /passkey/signup/begin", flow.thenFunc(svc.Passkey.BeginSignup))
+	mux.Handle("POST /passkey/signup/finish", flow.thenFunc(svc.Passkey.FinishSignup))
 
 	// BeginRegistration checks the principal itself, so no RequireLogin.
 	addKey := newChain(svc.Middleware, svc.CSRFGuard)
-	mux.Handle("POST /passkey/register/begin", addKey.ThenFunc(svc.Passkey.BeginRegistration))
-	mux.Handle("POST /passkey/register/finish", addKey.ThenFunc(svc.Passkey.FinishRegistration))
+	mux.Handle("POST /passkey/register/begin", addKey.thenFunc(svc.Passkey.BeginRegistration))
+	mux.Handle("POST /passkey/register/finish", addKey.thenFunc(svc.Passkey.FinishRegistration))
 
 	// CLI device endpoints are public (RFC 8628), approval needs a session.
 	mux.HandleFunc("POST /auth/device", svc.Device.Begin)
@@ -32,8 +32,8 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.HandleFunc("GET /auth/device/nonce", svc.Device.Nonce)
 
 	deviceGuard := newChain(svc.Middleware, svc.RequireLogin)
-	mux.Handle("POST /auth/device/verify", deviceGuard.ThenFunc(svc.Device.Verify))
-	mux.Handle("POST /auth/device/deny", deviceGuard.ThenFunc(svc.Device.Deny))
+	mux.Handle("POST /auth/device/verify", deviceGuard.thenFunc(svc.Device.Verify))
+	mux.Handle("POST /auth/device/deny", deviceGuard.thenFunc(svc.Device.Deny))
 
 	// Give passkey logins and signups the same side effects as password ones.
 	cfg.IAM.OnUserLogin = func(w http.ResponseWriter, r *http.Request, u *db.User, _ iam.Method) {
@@ -62,13 +62,13 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	// Optional auth on login lets a signed-in user link a provider.
 	// Callbacks are public, the SAML ACS is a cross-origin IdP form post.
 	optAuth := newChain(svc.Middleware, svc.CSRFGuard)
-	mux.Handle("GET /oidc/login", optAuth.ThenFunc(svc.OIDC.Login))
+	mux.Handle("GET /oidc/login", optAuth.thenFunc(svc.OIDC.Login))
 	mux.Handle("POST /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
 	mux.Handle("GET /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
-	mux.Handle("GET /oauth/login", optAuth.ThenFunc(svc.OAuth2.Login))
+	mux.Handle("GET /oauth/login", optAuth.thenFunc(svc.OAuth2.Login))
 	mux.Handle("POST /oauth/callback", http.HandlerFunc(svc.OAuth2.Callback))
 	mux.Handle("GET /oauth/callback", http.HandlerFunc(svc.OAuth2.Callback))
-	mux.Handle("GET /saml/login", optAuth.ThenFunc(svc.SAML.Login))
+	mux.Handle("GET /saml/login", optAuth.thenFunc(svc.SAML.Login))
 	mux.Handle("POST /saml/acs", http.HandlerFunc(svc.SAML.Callback))
 	mux.Handle("GET /saml/metadata", http.HandlerFunc(svc.SAML.Metadata))
 	mux.Handle("GET /saml/metadata/{id}", http.HandlerFunc(svc.SAML.Metadata))

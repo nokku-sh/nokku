@@ -22,22 +22,22 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-type UtilService struct {
+type utilService struct {
 	cfg *config.Config
 }
 
-func NewUtilService(cfg *config.Config) *UtilService {
-	return &UtilService{cfg: cfg}
+func newUtilService(cfg *config.Config) *utilService {
+	return &utilService{cfg: cfg}
 }
 
-func (s *UtilService) GetVersion(
+func (s *utilService) GetVersion(
 	_ context.Context,
 	_ *nokkuv1.GetVersionRequest,
 ) (*nokkuv1.GetVersionResponse, error) {
 	return &nokkuv1.GetVersionResponse{Version: &buildinfo.Version}, nil
 }
 
-func (s *UtilService) GetInstanceInfo(
+func (s *utilService) GetInstanceInfo(
 	_ context.Context,
 	_ *nokkuv1.GetInstanceInfoRequest,
 ) (*nokkuv1.GetInstanceInfoResponse, error) {
@@ -52,13 +52,13 @@ func (s *UtilService) GetInstanceInfo(
 	}, nil
 }
 
-func (s *UtilService) Whoami(
+func (s *utilService) Whoami(
 	ctx context.Context,
 	_ *nokkuv1.WhoamiRequest,
 ) (*nokkuv1.WhoamiResponse, error) {
 	p, ok := actor.PrincipalFromContext(ctx)
 	if !ok {
-		return nil, NewError(connect.CodeUnauthenticated, "not authenticated")
+		return nil, newError(connect.CodeUnauthenticated, "not authenticated")
 	}
 
 	out := &nokkuv1.WhoamiResponse{
@@ -103,7 +103,7 @@ func (s *UtilService) Whoami(
 	return out, nil
 }
 
-func (s *UtilService) ListRoles(
+func (s *utilService) ListRoles(
 	_ context.Context,
 	_ *nokkuv1.ListRolesRequest,
 ) (*nokkuv1.ListRolesResponse, error) {
@@ -117,7 +117,7 @@ func (s *UtilService) ListRoles(
 	return &nokkuv1.ListRolesResponse{Roles: roles}, nil
 }
 
-func (s *UtilService) ListAuditLogs(
+func (s *utilService) ListAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ListAuditLogsRequest,
 ) (*nokkuv1.ListAuditLogsResponse, error) {
@@ -127,7 +127,7 @@ func (s *UtilService) ListAuditLogs(
 	events, total, err := s.cfg.Audit.List(ctx, params)
 	if err != nil {
 		slog.Error("failed to list audit logs", "error", err)
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 	logs := make([]*nokkuv1.EventLog, 0, len(events))
 	for _, e := range events {
@@ -141,18 +141,18 @@ func (s *UtilService) ListAuditLogs(
 	return &nokkuv1.ListAuditLogsResponse{Logs: logs, Total: &total, RetentionDays: &retention}, nil
 }
 
-func (s *UtilService) ExportAuditLogs(
+func (s *utilService) ExportAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ExportAuditLogsRequest,
 ) (*nokkuv1.ExportAuditLogsResponse, error) {
 	params := auditParams(ctx, req.GetWorkspaceId(), req.GetFilter())
 	data, err := s.cfg.Audit.Export(ctx, params, req.GetFormat())
 	if errors.Is(err, audit.ErrExportLimit) {
-		return nil, NewError(connect.CodeFailedPrecondition, err.Error())
+		return nil, newError(connect.CodeFailedPrecondition, err.Error())
 	}
 	if err != nil {
 		slog.Error("failed to export audit logs", "error", err)
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 
 	ext := "json"

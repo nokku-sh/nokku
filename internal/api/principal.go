@@ -9,15 +9,15 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-type PrincipalService struct {
+type principalService struct {
 	cfg *config.Config
 }
 
-func NewPrincipalService(cfg *config.Config) *PrincipalService {
-	return &PrincipalService{cfg: cfg}
+func newPrincipalService(cfg *config.Config) *principalService {
+	return &principalService{cfg: cfg}
 }
 
-func (s *PrincipalService) ListPrincipals(
+func (s *principalService) ListPrincipals(
 	ctx context.Context,
 	req *nokkuv1.ListPrincipalsRequest,
 ) (*nokkuv1.ListPrincipalsResponse, error) {
@@ -45,7 +45,7 @@ func (s *PrincipalService) ListPrincipals(
 	}, nil
 }
 
-func (s *PrincipalService) AddSubjectsToPrincipal(
+func (s *principalService) AddSubjectsToPrincipal(
 	ctx context.Context,
 	req *nokkuv1.AddSubjectsToPrincipalRequest,
 ) (*nokkuv1.AddSubjectsToPrincipalResponse, error) {
@@ -58,7 +58,7 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 
 		kind, ok := subjectKind(req.GetKind())
 		if !ok {
-			return ErrInvalidInput
+			return errInvalidInput
 		}
 		for _, subjectID := range req.GetSubjectIds() {
 			if err := q.AddPrincipalGrant(ctx, &db.AddPrincipalGrantParams{
@@ -78,14 +78,14 @@ func (s *PrincipalService) AddSubjectsToPrincipal(
 	return &nokkuv1.AddSubjectsToPrincipalResponse{}, nil
 }
 
-func (s *PrincipalService) RemoveSubjectsFromPrincipal(
+func (s *principalService) RemoveSubjectsFromPrincipal(
 	ctx context.Context,
 	req *nokkuv1.RemoveSubjectsFromPrincipalRequest,
 ) (*nokkuv1.RemoveSubjectsFromPrincipalResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		kind, ok := subjectKind(req.GetKind())
 		if !ok {
-			return ErrInvalidInput
+			return errInvalidInput
 		}
 		for _, subjectID := range req.GetSubjectIds() {
 			if err := q.RemovePrincipalGrant(ctx, &db.RemovePrincipalGrantParams{
@@ -106,14 +106,14 @@ func (s *PrincipalService) RemoveSubjectsFromPrincipal(
 	return &nokkuv1.RemoveSubjectsFromPrincipalResponse{}, nil
 }
 
-func (s *PrincipalService) RevokeAllAccess(
+func (s *principalService) RevokeAllAccess(
 	ctx context.Context,
 	req *nokkuv1.RevokeAllAccessRequest,
 ) (*nokkuv1.RevokeAllAccessResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		kind, ok := subjectKind(req.GetKind())
 		if !ok {
-			return ErrInvalidInput
+			return errInvalidInput
 		}
 		return q.RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
 			WorkspaceID: req.GetWorkspaceId(),
@@ -129,7 +129,7 @@ func (s *PrincipalService) RevokeAllAccess(
 
 // AddPrincipal is for manual targets, which have no daemon to report
 // accounts. An existing account is returned unchanged.
-func (s *PrincipalService) AddPrincipal(
+func (s *principalService) AddPrincipal(
 	ctx context.Context,
 	req *nokkuv1.AddPrincipalRequest,
 ) (*nokkuv1.AddPrincipalResponse, error) {
@@ -148,7 +148,7 @@ func (s *PrincipalService) AddPrincipal(
 	return &nokkuv1.AddPrincipalResponse{Principal: principal.ToProto()}, nil
 }
 
-func (s *PrincipalService) RemovePrincipal(
+func (s *principalService) RemovePrincipal(
 	ctx context.Context,
 	req *nokkuv1.RemovePrincipalRequest,
 ) (*nokkuv1.RemovePrincipalResponse, error) {

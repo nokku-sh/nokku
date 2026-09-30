@@ -32,7 +32,7 @@ func resizePicture(src image.Image) image.Image {
 	return dst
 }
 
-func UploadAvatar(cfg *config.Config) http.HandlerFunc {
+func uploadAvatar(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := actor.UserIDFromContext(r.Context())
 		if userID == "" {
@@ -133,7 +133,7 @@ func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 	}
 }
 
-func ServeAvatar(cfg *config.Config) http.HandlerFunc {
+func serveAvatar(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, _, ok := strings.Cut(r.PathValue("id"), ".")
 		if userID == "" || !ok {

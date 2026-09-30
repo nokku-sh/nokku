@@ -28,15 +28,15 @@ func defaultWorkspaceSettings() *nokkuv1.WorkspaceSettings {
 	}
 }
 
-type WorkspaceService struct {
+type workspaceService struct {
 	cfg *config.Config
 }
 
-func NewWorkspaceService(cfg *config.Config) *WorkspaceService {
-	return &WorkspaceService{cfg: cfg}
+func newWorkspaceService(cfg *config.Config) *workspaceService {
+	return &workspaceService{cfg: cfg}
 }
 
-func (s *WorkspaceService) GetWorkspace(
+func (s *workspaceService) GetWorkspace(
 	ctx context.Context,
 	req *nokkuv1.GetWorkspaceRequest,
 ) (*nokkuv1.GetWorkspaceResponse, error) {
@@ -59,7 +59,7 @@ func (s *WorkspaceService) GetWorkspace(
 	return &nokkuv1.GetWorkspaceResponse{Workspace: result}, nil
 }
 
-func (s *WorkspaceService) CreateWorkspace(
+func (s *workspaceService) CreateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.CreateWorkspaceRequest,
 ) (*nokkuv1.CreateWorkspaceResponse, error) {
@@ -76,7 +76,7 @@ func (s *WorkspaceService) CreateWorkspace(
 		return nil, err
 	}
 	if count >= 5 {
-		return nil, NewError(connect.CodeResourceExhausted, "maximum number of workspaces reached")
+		return nil, newError(connect.CodeResourceExhausted, "maximum number of workspaces reached")
 	}
 
 	workspace, err := s.initializeWorkspace(ctx, &db.CreateWorkspaceParams{
@@ -95,7 +95,7 @@ func (s *WorkspaceService) CreateWorkspace(
 	}, nil
 }
 
-func (s *WorkspaceService) UpdateWorkspace(
+func (s *workspaceService) UpdateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.UpdateWorkspaceRequest,
 ) (*nokkuv1.UpdateWorkspaceResponse, error) {
@@ -123,13 +123,13 @@ func (s *WorkspaceService) UpdateWorkspace(
 	}, nil
 }
 
-func (s *WorkspaceService) DeleteWorkspace(
+func (s *workspaceService) DeleteWorkspace(
 	ctx context.Context,
 	req *nokkuv1.DeleteWorkspaceRequest,
 ) (*nokkuv1.DeleteWorkspaceResponse, error) {
 	if s.cfg.Billing.Enabled() {
 		if err := s.cfg.Billing.Cancel(ctx, req.GetWorkspaceId(), true, ""); err != nil {
-			return nil, ErrInternal
+			return nil, errInternal
 		}
 	}
 
@@ -142,7 +142,7 @@ func (s *WorkspaceService) DeleteWorkspace(
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
 }
 
-func (s *WorkspaceService) ListWorkspaces(
+func (s *workspaceService) ListWorkspaces(
 	ctx context.Context,
 	_ *nokkuv1.ListWorkspacesRequest,
 ) (*nokkuv1.ListWorkspacesResponse, error) {
@@ -171,12 +171,12 @@ func (s *WorkspaceService) ListWorkspaces(
 	return &nokkuv1.ListWorkspacesResponse{Workspaces: result}, nil
 }
 
-func (s *WorkspaceService) GetWorkspaceMember(
+func (s *workspaceService) GetWorkspaceMember(
 	ctx context.Context,
 	req *nokkuv1.GetWorkspaceMemberRequest,
 ) (*nokkuv1.GetWorkspaceMemberResponse, error) {
 	if req.GetWorkspaceId() == "" {
-		return nil, ErrInvalidInput
+		return nil, errInvalidInput
 	}
 
 	var m *db.GetWorkspaceMemberRow
@@ -204,13 +204,13 @@ func (s *WorkspaceService) GetWorkspaceMember(
 	}, nil
 }
 
-func (s *WorkspaceService) UpdateWorkspaceMember(
+func (s *workspaceService) UpdateWorkspaceMember(
 	ctx context.Context,
 	req *nokkuv1.UpdateWorkspaceMemberRequest,
 ) (*nokkuv1.UpdateWorkspaceMemberResponse, error) {
 	// Ownership moves only through UpdateWorkspaceOwner.
 	if !callerRole(ctx).CanAssign(db.Role(req.GetRoleName())) {
-		return nil, NewError(connect.CodePermissionDenied, "role cannot be assigned by you")
+		return nil, newError(connect.CodePermissionDenied, "role cannot be assigned by you")
 	}
 	audit.Set(ctx, "role", req.GetRoleName())
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
@@ -229,7 +229,7 @@ func (s *WorkspaceService) UpdateWorkspaceMember(
 	return &nokkuv1.UpdateWorkspaceMemberResponse{}, nil
 }
 
-func (s *WorkspaceService) ListWorkspaceMembers(
+func (s *workspaceService) ListWorkspaceMembers(
 	ctx context.Context,
 	req *nokkuv1.ListWorkspaceMembersRequest,
 ) (*nokkuv1.ListWorkspaceMembersResponse, error) {
@@ -270,7 +270,7 @@ func (s *WorkspaceService) ListWorkspaceMembers(
 	}, nil
 }
 
-func (s *WorkspaceService) RemoveWorkspaceMember(
+func (s *workspaceService) RemoveWorkspaceMember(
 	ctx context.Context,
 	req *nokkuv1.RemoveWorkspaceMemberRequest,
 ) (*nokkuv1.RemoveWorkspaceMemberResponse, error) {
@@ -311,12 +311,12 @@ func checkWorkspaceOwner(ctx context.Context, q db.Querier, workspaceID string) 
 		return err
 	}
 	if ownerID != actor.UserIDFromContext(ctx) {
-		return ErrPermissionDenied
+		return errPermissionDenied
 	}
 	return nil
 }
 
-func (s *WorkspaceService) UpdateWorkspaceOwner(
+func (s *workspaceService) UpdateWorkspaceOwner(
 	ctx context.Context,
 	req *nokkuv1.UpdateWorkspaceOwnerRequest,
 ) (*nokkuv1.UpdateWorkspaceOwnerResponse, error) {
@@ -338,7 +338,7 @@ func (s *WorkspaceService) UpdateWorkspaceOwner(
 
 // initializeWorkspace runs as a system tx since the workspace does not exist
 // yet and cannot be pinned.
-func (s *WorkspaceService) initializeWorkspace(
+func (s *workspaceService) initializeWorkspace(
 	ctx context.Context,
 	params *db.CreateWorkspaceParams,
 ) (*nokkuv1.Workspace, error) {

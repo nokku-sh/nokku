@@ -17,15 +17,15 @@ import (
 
 const wsReadLimit = 64 * 1024
 
-type TerminalHandler struct {
+type terminalHandler struct {
 	cfg *config.Config
 }
 
-func NewTerminalHandler(cfg *config.Config) *TerminalHandler {
-	return &TerminalHandler{cfg: cfg}
+func newTerminalHandler(cfg *config.Config) *terminalHandler {
+	return &terminalHandler{cfg: cfg}
 }
 
-func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	daemonID := r.URL.Query().Get("daemon_id")
 	sessionID := r.URL.Query().Get("session_id")
 
@@ -137,7 +137,7 @@ func (t *TerminalHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request
 
 // authorizeAttach allows the session's initiator and editors of the daemon's
 // workspace. It runs before the upgrade so rejections stay plain HTTP.
-func (t *TerminalHandler) authorizeAttach(
+func (t *terminalHandler) authorizeAttach(
 	w http.ResponseWriter,
 	r *http.Request,
 	sess *daemon.Session,
@@ -168,7 +168,7 @@ func (t *TerminalHandler) authorizeAttach(
 	return true
 }
 
-func (t *TerminalHandler) handleControlMessage(
+func (t *terminalHandler) handleControlMessage(
 	logger *slog.Logger,
 	sess *daemon.Session,
 	data []byte,

@@ -14,15 +14,15 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-type ServiceAccountService struct {
+type serviceAccountService struct {
 	cfg *config.Config
 }
 
-func NewServiceAccountService(cfg *config.Config) *ServiceAccountService {
-	return &ServiceAccountService{cfg: cfg}
+func newServiceAccountService(cfg *config.Config) *serviceAccountService {
+	return &serviceAccountService{cfg: cfg}
 }
 
-func (s *ServiceAccountService) GetServiceAccount(
+func (s *serviceAccountService) GetServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.GetServiceAccountRequest,
 ) (*nokkuv1.GetServiceAccountResponse, error) {
@@ -38,18 +38,18 @@ func (s *ServiceAccountService) GetServiceAccount(
 	}, nil
 }
 
-func (s *ServiceAccountService) CreateServiceAccount(
+func (s *serviceAccountService) CreateServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.CreateServiceAccountRequest,
 ) (*nokkuv1.CreateServiceAccountResponse, error) {
 	roleName := cmp.Or(req.GetRoleName(), string(db.RoleMember))
 	if !callerRole(ctx).CanAssign(db.Role(roleName)) {
-		return nil, NewError(connect.CodePermissionDenied, "role cannot be granted by you")
+		return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
 
 	raw, tokenHash, err := iam.NewAPIKey()
 	if err != nil {
-		return nil, ErrInternal
+		return nil, errInternal
 	}
 
 	var result *db.ServiceAccount
@@ -66,7 +66,7 @@ func (s *ServiceAccountService) CreateServiceAccount(
 		if req.GetExpiresAt() != nil && !req.GetExpiresAt().AsTime().IsZero() {
 			expiry := req.GetExpiresAt().AsTime()
 			if expiry.Before(time.Now()) {
-				return NewError(connect.CodeInvalidArgument, "expires_at must be in the future")
+				return newError(connect.CodeInvalidArgument, "expires_at must be in the future")
 			}
 			params.ExpiresAt = &expiry
 		}
@@ -87,12 +87,12 @@ func (s *ServiceAccountService) CreateServiceAccount(
 	}, nil
 }
 
-func (s *ServiceAccountService) UpdateServiceAccount(
+func (s *serviceAccountService) UpdateServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.UpdateServiceAccountRequest,
 ) (*nokkuv1.UpdateServiceAccountResponse, error) {
 	if req.RoleName != nil && !callerRole(ctx).CanAssign(db.Role(req.GetRoleName())) {
-		return nil, NewError(connect.CodePermissionDenied, "role cannot be granted by you")
+		return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
 
 	var result *db.ServiceAccount
@@ -119,7 +119,7 @@ func (s *ServiceAccountService) UpdateServiceAccount(
 	}, nil
 }
 
-func (s *ServiceAccountService) ListServiceAccounts(
+func (s *serviceAccountService) ListServiceAccounts(
 	ctx context.Context,
 	req *nokkuv1.ListServiceAccountsRequest,
 ) (*nokkuv1.ListServiceAccountsResponse, error) {
@@ -148,7 +148,7 @@ func (s *ServiceAccountService) ListServiceAccounts(
 	}, nil
 }
 
-func (s *ServiceAccountService) DeleteServiceAccount(
+func (s *serviceAccountService) DeleteServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.DeleteServiceAccountRequest,
 ) (*nokkuv1.DeleteServiceAccountResponse, error) {

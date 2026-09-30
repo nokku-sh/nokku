@@ -17,83 +17,83 @@ import (
 )
 
 var (
-	ErrInternal = connect.NewError(
+	errInternal = connect.NewError(
 		connect.CodeInternal,
 		errors.New("something went wrong, please try again"),
 	)
-	ErrNotFound = connect.NewError(
+	errNotFound = connect.NewError(
 		connect.CodeNotFound,
 		errors.New("the requested resource was not found"),
 	)
-	ErrTimeout = connect.NewError(
+	errTimeout = connect.NewError(
 		connect.CodeDeadlineExceeded,
 		errors.New("the request took too long, please try again"),
 	)
-	ErrPermissionDenied = connect.NewError(
+	errPermissionDenied = connect.NewError(
 		connect.CodePermissionDenied,
 		errors.New("you don't have permission to do that"),
 	)
-	ErrBillingDisabled = connect.NewError(
+	errBillingDisabled = connect.NewError(
 		connect.CodeUnimplemented,
 		errors.New("billing is disabled"),
 	)
 )
 
-var ErrInvalidInput = connect.NewError(
+var errInvalidInput = connect.NewError(
 	connect.CodeInvalidArgument,
 	errors.New("please check your input and try again"),
 )
 
-var ErrUserRequired = connect.NewError(
+var errUserRequired = connect.NewError(
 	connect.CodePermissionDenied,
 	errors.New("only user accounts can do that"),
 )
 
-// ErrLoginFailed is Unauthenticated because the client skips its generic
+// errLoginFailed is Unauthenticated because the client skips its generic
 // toast for that code and the login page shows its own.
 var (
-	ErrLoginFailed = connect.NewError(
+	errLoginFailed = connect.NewError(
 		connect.CodeUnauthenticated,
 		errors.New("invalid email or password"),
 	)
-	ErrAccountInactive = connect.NewError(
+	errAccountInactive = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("this account has been deactivated"),
 	)
-	ErrEmailUnverified = connect.NewError(
+	errEmailUnverified = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("verify your email address before signing in"),
 	)
-	ErrSSORequired = connect.NewError(
+	errSSORequired = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("your organization requires single sign-on"),
 	)
 )
 
 var (
-	ErrAccountNotFound = connect.NewError(
+	errAccountNotFound = connect.NewError(
 		connect.CodeNotFound,
 		errors.New("account not found"),
 	)
-	ErrCurrentPassword = connect.NewError(
+	errCurrentPassword = connect.NewError(
 		connect.CodeInvalidArgument,
 		errors.New("current password is incorrect"),
 	)
-	ErrPasswordTooShort = connect.NewError(
+	errPasswordTooShort = connect.NewError(
 		connect.CodeInvalidArgument,
 		errors.New("password must be at least 8 characters"),
 	)
-	ErrLastLoginMethod = connect.NewError(
+	errLastLoginMethod = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("add another login method before removing this one"),
 	)
-	ErrCurrentSession = connect.NewError(
+	errCurrentSession = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("use logout to end the current session"),
 	)
 )
 
-func NewError(code connect.Code, msg string) error {
+func newError(code connect.Code, msg string) error {
 	return connect.NewError(code, errors.New(msg))
 }
 
@@ -136,58 +136,58 @@ func toConnectError(err error) error {
 	case errors.Is(err, db.ErrPermissionDenied),
 		errors.Is(err, db.ErrWorkspaceNotPinned),
 		errors.Is(err, db.ErrWorkspaceNotAccessible):
-		return ErrPermissionDenied
+		return errPermissionDenied
 	case errors.Is(err, pgx.ErrNoRows):
-		return ErrNotFound
+		return errNotFound
 	case errors.Is(err, context.Canceled):
-		return NewError(connect.CodeCanceled, "the request was canceled")
+		return newError(connect.CodeCanceled, "the request was canceled")
 	case errors.Is(err, context.DeadlineExceeded):
-		return ErrTimeout
+		return errTimeout
 	}
 
 	pgConnErr, ok := errors.AsType[*pgconn.PgError](err)
 	if !ok {
 		slog.Warn("unmapped database error", "error", err, "error_type", fmt.Sprintf("%T", err))
-		return ErrInternal
+		return errInternal
 	}
 
 	switch pgConnErr.Code {
 	case pgerrcode.UniqueViolation, pgerrcode.ExclusionViolation:
-		return NewError(connect.CodeAlreadyExists, "a record with this value already exists")
+		return newError(connect.CodeAlreadyExists, "a record with this value already exists")
 	case pgerrcode.ForeignKeyViolation, pgerrcode.RestrictViolation:
-		return NewError(
+		return newError(
 			connect.CodeFailedPrecondition,
 			"a related record is missing or still in use",
 		)
 	case pgerrcode.NotNullViolation, pgerrcode.CheckViolation:
-		return NewError(
+		return newError(
 			connect.CodeInvalidArgument,
 			"a required field is missing or contains invalid data",
 		)
 	case pgerrcode.StringDataRightTruncationDataException:
-		return NewError(connect.CodeInvalidArgument, "a provided value is too long")
+		return newError(connect.CodeInvalidArgument, "a provided value is too long")
 	case pgerrcode.InvalidTextRepresentation,
 		pgerrcode.NumericValueOutOfRange,
 		pgerrcode.InvalidParameterValue:
-		return NewError(connect.CodeInvalidArgument, "a provided identifier or value is not valid")
+		return newError(connect.CodeInvalidArgument, "a provided identifier or value is not valid")
 	case pgerrcode.SerializationFailure,
 		pgerrcode.DeadlockDetected,
 		pgerrcode.InvalidTransactionState,
 		pgerrcode.InFailedSQLTransaction,
 		pgerrcode.ActiveSQLTransaction:
-		return NewError(connect.CodeAborted, "the operation conflicted with another, please retry")
+		return newError(connect.CodeAborted, "the operation conflicted with another, please retry")
 	case pgerrcode.QueryCanceled:
-		return NewError(connect.CodeCanceled, "the request was canceled")
+		return newError(connect.CodeCanceled, "the request was canceled")
 	case pgerrcode.LockNotAvailable,
 		pgerrcode.ObjectInUse,
 		pgerrcode.ObjectNotInPrerequisiteState,
 		pgerrcode.CantChangeRuntimeParam:
-		return NewError(
+		return newError(
 			connect.CodeFailedPrecondition,
 			"the resource is not available in its current state",
 		)
 	case pgerrcode.TooManyConnections:
-		return NewError(
+		return newError(
 			connect.CodeResourceExhausted,
 			"the database is busy, please try again later",
 		)
@@ -195,7 +195,7 @@ func toConnectError(err error) error {
 		pgerrcode.DiskFull,
 		pgerrcode.OutOfMemory,
 		pgerrcode.ProgramLimitExceeded:
-		return NewError(
+		return newError(
 			connect.CodeResourceExhausted,
 			"the database ran out of resources, please try again later",
 		)
@@ -205,12 +205,12 @@ func toConnectError(err error) error {
 		pgerrcode.AdminShutdown,
 		pgerrcode.CrashShutdown,
 		pgerrcode.CannotConnectNow:
-		return NewError(
+		return newError(
 			connect.CodeUnavailable,
 			"the service is temporarily unavailable, please try again",
 		)
 	default:
-		return ErrInternal
+		return errInternal
 	}
 }
 

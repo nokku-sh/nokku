@@ -18,15 +18,15 @@ import (
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
-type TargetService struct {
+type targetService struct {
 	cfg *config.Config
 }
 
-func NewTargetService(cfg *config.Config) *TargetService {
-	return &TargetService{cfg: cfg}
+func newTargetService(cfg *config.Config) *targetService {
+	return &targetService{cfg: cfg}
 }
 
-func (s *TargetService) GetTarget(
+func (s *targetService) GetTarget(
 	ctx context.Context,
 	req *nokkuv1.GetTargetRequest,
 ) (*nokkuv1.GetTargetResponse, error) {
@@ -43,7 +43,7 @@ func (s *TargetService) GetTarget(
 	}, nil
 }
 
-func (s *TargetService) CreateTarget(
+func (s *targetService) CreateTarget(
 	ctx context.Context,
 	req *nokkuv1.CreateTargetRequest,
 ) (*nokkuv1.CreateTargetResponse, error) {
@@ -77,7 +77,7 @@ func (s *TargetService) CreateTarget(
 }
 
 // insertTarget returns the raw error so the caller can spot name collisions.
-func (s *TargetService) insertTarget(
+func (s *targetService) insertTarget(
 	ctx context.Context,
 	req *nokkuv1.CreateTargetRequest,
 	name string,
@@ -109,7 +109,7 @@ func (s *TargetService) insertTarget(
 	}, nil
 }
 
-func (s *TargetService) UpdateTarget(
+func (s *targetService) UpdateTarget(
 	ctx context.Context,
 	req *nokkuv1.UpdateTargetRequest,
 ) (*nokkuv1.UpdateTargetResponse, error) {
@@ -137,7 +137,7 @@ func (s *TargetService) UpdateTarget(
 	}, nil
 }
 
-func (s *TargetService) DeleteTarget(
+func (s *targetService) DeleteTarget(
 	ctx context.Context,
 	req *nokkuv1.DeleteTargetRequest,
 ) (*nokkuv1.DeleteTargetResponse, error) {
@@ -150,7 +150,7 @@ func (s *TargetService) DeleteTarget(
 	return &nokkuv1.DeleteTargetResponse{}, nil
 }
 
-func (s *TargetService) ListTargets(
+func (s *targetService) ListTargets(
 	ctx context.Context,
 	req *nokkuv1.ListTargetsRequest,
 ) (*nokkuv1.ListTargetsResponse, error) {
@@ -182,7 +182,7 @@ func (s *TargetService) ListTargets(
 }
 
 // GetTargetPrincipals feeds AuthorizedPrincipalsFile on daemonless hosts.
-func (s *TargetService) GetTargetPrincipals(
+func (s *targetService) GetTargetPrincipals(
 	ctx context.Context,
 	req *nokkuv1.GetTargetPrincipalsRequest,
 ) (*nokkuv1.GetTargetPrincipalsResponse, error) {
@@ -206,7 +206,7 @@ func (s *TargetService) GetTargetPrincipals(
 
 // SyncTargetUsers is the daemonless report. It never deletes accounts, so a
 // failed report cannot lock anyone out.
-func (s *TargetService) SyncTargetUsers(
+func (s *targetService) SyncTargetUsers(
 	ctx context.Context,
 	req *nokkuv1.SyncTargetUsersRequest,
 ) (*nokkuv1.SyncTargetUsersResponse, error) {
@@ -245,7 +245,7 @@ func (s *TargetService) SyncTargetUsers(
 	return &nokkuv1.SyncTargetUsersResponse{}, nil
 }
 
-func (s *TargetService) GetSubjectAccess(
+func (s *targetService) GetSubjectAccess(
 	ctx context.Context,
 	req *nokkuv1.GetSubjectAccessRequest,
 ) (*nokkuv1.GetSubjectAccessResponse, error) {
@@ -328,19 +328,19 @@ func (s *TargetService) GetSubjectAccess(
 	}, nil
 }
 
-func (s *TargetService) GetMyAccess(
+func (s *targetService) GetMyAccess(
 	ctx context.Context,
 	_ *nokkuv1.GetMyAccessRequest,
 ) (*nokkuv1.GetMyAccessResponse, error) {
 	p, ok := actor.PrincipalFromContext(ctx)
 	if !ok || p.ID == "" {
-		return nil, NewError(connect.CodeUnauthenticated, "not authenticated")
+		return nil, newError(connect.CodeUnauthenticated, "not authenticated")
 	}
 	//nolint:exhaustive // daemons sync through SyncDaemon
 	switch p.Kind {
 	case actor.KindUser, actor.KindCLI, actor.KindWebDevice, actor.KindServiceAccount:
 	default:
-		return nil, NewError(
+		return nil, newError(
 			connect.CodePermissionDenied,
 			"unsupported principal kind; daemons sync through SyncDaemon",
 		)
@@ -461,7 +461,7 @@ func (s *TargetService) GetMyAccess(
 	return resp, nil
 }
 
-func (s *TargetService) GetTargetFilters(
+func (s *targetService) GetTargetFilters(
 	ctx context.Context,
 	req *nokkuv1.GetTargetFiltersRequest,
 ) (*nokkuv1.GetTargetFiltersResponse, error) {
@@ -491,7 +491,7 @@ func validateHostPublicKey(key string) error {
 		return nil
 	}
 	if _, err := ssh.ParsePublicKey(key); err != nil {
-		return NewError(connect.CodeInvalidArgument, "invalid host public key")
+		return newError(connect.CodeInvalidArgument, "invalid host public key")
 	}
 	return nil
 }

@@ -9,15 +9,15 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-type TeamService struct {
+type teamService struct {
 	cfg *config.Config
 }
 
-func NewTeamService(cfg *config.Config) *TeamService {
-	return &TeamService{cfg: cfg}
+func newTeamService(cfg *config.Config) *teamService {
+	return &teamService{cfg: cfg}
 }
 
-func (s *TeamService) GetTeam(
+func (s *teamService) GetTeam(
 	ctx context.Context,
 	req *nokkuv1.GetTeamRequest,
 ) (*nokkuv1.GetTeamResponse, error) {
@@ -33,7 +33,7 @@ func (s *TeamService) GetTeam(
 	}, nil
 }
 
-func (s *TeamService) CreateTeam(
+func (s *teamService) CreateTeam(
 	ctx context.Context,
 	req *nokkuv1.CreateTeamRequest,
 ) (*nokkuv1.CreateTeamResponse, error) {
@@ -55,7 +55,7 @@ func (s *TeamService) CreateTeam(
 	}, nil
 }
 
-func (s *TeamService) UpdateTeam(
+func (s *teamService) UpdateTeam(
 	ctx context.Context,
 	req *nokkuv1.UpdateTeamRequest,
 ) (*nokkuv1.UpdateTeamResponse, error) {
@@ -77,7 +77,7 @@ func (s *TeamService) UpdateTeam(
 	}, nil
 }
 
-func (s *TeamService) DeleteTeam(
+func (s *teamService) DeleteTeam(
 	ctx context.Context,
 	req *nokkuv1.DeleteTeamRequest,
 ) (*nokkuv1.DeleteTeamResponse, error) {
@@ -90,7 +90,7 @@ func (s *TeamService) DeleteTeam(
 	return &nokkuv1.DeleteTeamResponse{}, nil
 }
 
-func (s *TeamService) ListTeams(
+func (s *teamService) ListTeams(
 	ctx context.Context,
 	req *nokkuv1.ListTeamsRequest,
 ) (*nokkuv1.ListTeamsResponse, error) {
@@ -139,7 +139,7 @@ func (s *TeamService) ListTeams(
 	}, nil
 }
 
-func (s *TeamService) ListTeamMembers(
+func (s *teamService) ListTeamMembers(
 	ctx context.Context,
 	req *nokkuv1.ListTeamMembersRequest,
 ) (*nokkuv1.ListTeamMembersResponse, error) {
@@ -166,7 +166,7 @@ func (s *TeamService) ListTeamMembers(
 	return &nokkuv1.ListTeamMembersResponse{Members: members}, nil
 }
 
-func (s *TeamService) ListTeamsForUser(
+func (s *teamService) ListTeamsForUser(
 	ctx context.Context,
 	req *nokkuv1.ListTeamsForUserRequest,
 ) (*nokkuv1.ListTeamsForUserResponse, error) {
@@ -188,7 +188,7 @@ func (s *TeamService) ListTeamsForUser(
 	return &nokkuv1.ListTeamsForUserResponse{Teams: out}, nil
 }
 
-func (s *TeamService) AddTeamMember(
+func (s *teamService) AddTeamMember(
 	ctx context.Context,
 	req *nokkuv1.AddTeamMemberRequest,
 ) (*nokkuv1.AddTeamMemberResponse, error) {
@@ -204,7 +204,7 @@ func (s *TeamService) AddTeamMember(
 	return &nokkuv1.AddTeamMemberResponse{}, nil
 }
 
-func (s *TeamService) RemoveTeamMember(
+func (s *teamService) RemoveTeamMember(
 	ctx context.Context,
 	req *nokkuv1.RemoveTeamMemberRequest,
 ) (*nokkuv1.RemoveTeamMemberResponse, error) {

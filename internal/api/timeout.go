@@ -7,7 +7,7 @@ import (
 	"connectrpc.com/connect"
 )
 
-func NewTimeoutInterceptor() connect.UnaryInterceptorFunc {
+func newTimeoutInterceptor() connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 			if _, hasDeadline := ctx.Deadline(); hasDeadline {
