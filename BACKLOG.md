@@ -20,6 +20,24 @@ this file.
       Done when: both exist and fit mon's scope (a library, no binaries).
       (from ROADMAP)
 
+- [ ] `nokku/internal/iam` Unexport the 46 identifiers only iam uses. One
+      mechanical commit, list from the exports tool.
+      Done when: the tool reports no `internal` entries for iam. (2026-09-30)
+- [ ] `nokku` Unexport what the exports tool lists as `internal` in the
+      remaining packages (entitlement, util, email, billing, crypto, audit,
+      and smaller ones). Leave `api.Server` and daemon's `Enrolled`, `Relay`,
+      `Synced`, they are returned by exported functions.
+      Done when: only those deliberate entries remain. (2026-09-30)
+- [ ] `nokkud` Unexport the 18 identifiers the exports tool lists (recording
+      8, sshd 4, audit 4, hostcerts 1, sysutil 1). (2026-09-30)
+- [ ] `nk` Unexport the 21 identifiers the exports tool lists (doctor 7,
+      manual 6, ssh 3, state 3, ui 2). (2026-09-30)
+- [ ] `nokku` Dead code: `crypto.HashedToken.Verify` and
+      `sshclient.Terminal.Done` are only called from tests. Delete them and
+      the tests that only cover them.
+      Done when: the exports tool shows no `tests-only` entry for either.
+      (2026-09-30)
+
 ## Needs decision
 
 - [ ] `nokku/internal/daemon` Multi-instance support. The pool keeps control
@@ -43,6 +61,12 @@ this file.
 - [ ] `docs` Refresh the website. Replace the `placeholder/` legal pages and
       empty sections, and add user TTL guidance for manual-heavy workspaces.
       (from ROADMAP)
+
+- [ ] `nokku/internal/email` `SendVerificationEmail` and the `verification`
+      template are never sent. Signup and "resend verification" both send the
+      welcome email, so a resend greets the user with "Welcome to Nokku"
+      again. Use the verification template for resends, or delete both.
+      (2026-09-30)
 
 ## Done
 
