@@ -9,9 +9,11 @@ import (
 
 	"connectrpc.com/connect"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/storage"
 )
@@ -58,7 +60,7 @@ func (s *AccountService) ChangePassword(
 	ctx context.Context,
 	req *nokkuv1.ChangePasswordRequest,
 ) (*nokkuv1.ChangePasswordResponse, error) {
-	userID := iam.UserIDFromContext(ctx)
+	userID := actor.UserIDFromContext(ctx)
 	// A passwordless account may set its first password without a check.
 	has, err := s.cfg.IAM.Password.HasPassword(ctx, userID)
 	if err != nil {
@@ -90,7 +92,7 @@ func (s *AccountService) RemovePassword(
 	ctx context.Context,
 	req *nokkuv1.RemovePasswordRequest,
 ) (*nokkuv1.RemovePasswordResponse, error) {
-	userID := iam.UserIDFromContext(ctx)
+	userID := actor.UserIDFromContext(ctx)
 	if err := s.cfg.IAM.Password.CheckPassword(ctx, userID, req.GetCurrentPassword()); err != nil {
 		return nil, ErrCurrentPassword
 	}
@@ -254,7 +256,7 @@ func (s *AccountService) DeleteAccount(
 	// subscription rows still exist. Shared ones block the delete below.
 	owned, err := s.cfg.Conn.Sys().ListOwnedWorkspaces(ctx, u.ID)
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	if s.cfg.Billing.Enabled() {
 		for _, w := range owned {

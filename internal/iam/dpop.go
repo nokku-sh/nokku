@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
+
+	"github.com/nokku-sh/nokku/internal/cache"
 )
 
 var allowedAlgs = []jose.SignatureAlgorithm{
@@ -30,7 +32,7 @@ const (
 // share no storage for them. The cache catches jti reuse.
 type DPoPVerifier struct {
 	secret []byte
-	replay Cache
+	replay cache.Cache
 	now    func() time.Time
 }
 

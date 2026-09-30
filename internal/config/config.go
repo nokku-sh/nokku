@@ -2,10 +2,10 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
-	"os"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/urfave/cli/v3"
@@ -20,6 +20,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/email"
 	"github.com/nokku-sh/nokku/internal/entitlement"
 	"github.com/nokku-sh/nokku/internal/iam"
+	"github.com/nokku-sh/nokku/internal/pki"
 	"github.com/nokku-sh/nokku/internal/recording"
 	"github.com/nokku-sh/nokku/internal/storage"
 	"github.com/nokku-sh/nokku/internal/util"
@@ -81,21 +82,23 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	primary, err := crypto.NewSecretbox([]byte(cfg.Secret))
-	if err != nil {
-		return nil, err
-	}
-	if err := crypto.SetEncryptor(primary); err != nil {
-		return nil, err
-	}
-
-	// KMS replaces the encryptor before anything encrypts. The DPoP nonce key
+	// KMS replaces the secretbox before anything encrypts. The DPoP nonce key
 	// still derives from NOKKU_SECRET.
-	if os.Getenv("KMS_URI") != "" {
-		enc, err := kms.New(ctx, cfg.Conn)
+	usesKMS := true
+	enc, err := kms.New(ctx, cfg.Conn)
+	switch {
+	case errors.Is(err, kms.ErrNotConfigured):
+		usesKMS = false
+		primary, err := crypto.NewSecretbox([]byte(cfg.Secret))
 		if err != nil {
 			return nil, err
 		}
+		if err := crypto.SetEncryptor(primary); err != nil {
+			return nil, err
+		}
+	case err != nil:
+		return nil, err
+	default:
 		if err := crypto.SetEncryptor(enc); err != nil {
 			return nil, err
 		}
@@ -106,7 +109,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Billing, err = billing.New(cfg.Conn, cfg.FullURL())
+	cfg.Billing, err = billing.New(ctx, cfg.Conn, cfg.FullURL())
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +125,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	}
 	cfg.Entitlements = entitlement.NewService(cfg.Conn, licensedPlan, mode)
 
-	if mode == entitlement.ModeSelfHosted && os.Getenv("KMS_URI") != "" &&
+	if mode == entitlement.ModeSelfHosted && usesKMS &&
 		(license == nil || license.IsExpired()) {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
@@ -146,7 +149,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	cfg.startBackgroundJobs(ctx)
+	go pki.RotateExpiring(ctx, cfg.Conn)
 	return &cfg, nil
 }
 

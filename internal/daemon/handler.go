@@ -8,9 +8,10 @@ import (
 
 	"connectrpc.com/connect"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 // heartbeatDeadline allows three missed 30s heartbeats.
@@ -20,7 +21,7 @@ func (p *Pool) Connect(
 	ctx context.Context,
 	stream *connect.BidiStream[nokkuv1.ConnectRequest, nokkuv1.ConnectResponse],
 ) error {
-	daemonID := iam.DaemonIDFromContext(ctx)
+	daemonID := actor.DaemonIDFromContext(ctx)
 	if daemonID == "" {
 		return connect.NewError(
 			connect.CodePermissionDenied,
@@ -116,7 +117,7 @@ func (p *Pool) DaemonRelay(
 	ctx context.Context,
 	stream *connect.BidiStream[nokkuv1.DaemonRelayRequest, nokkuv1.DaemonRelayResponse],
 ) error {
-	daemonID := iam.DaemonIDFromContext(ctx)
+	daemonID := actor.DaemonIDFromContext(ctx)
 	if daemonID == "" {
 		return connect.NewError(
 			connect.CodePermissionDenied,

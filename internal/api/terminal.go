@@ -9,10 +9,10 @@ import (
 
 	"github.com/coder/websocket"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/daemon"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 const wsReadLimit = 64 * 1024
@@ -142,12 +142,12 @@ func (t *TerminalHandler) authorizeAttach(
 	r *http.Request,
 	sess *daemon.Session,
 ) bool {
-	actor, ok := iam.PrincipalFromContext(r.Context())
-	if !ok || actor.ID == "" {
+	caller, ok := actor.PrincipalFromContext(r.Context())
+	if !ok || caller.ID == "" {
 		writeJSONError(w, http.StatusUnauthorized, "authentication required")
 		return false
 	}
-	if actor.Kind == iam.KindUser && sess.UserID() == actor.ID {
+	if caller.Kind == actor.KindUser && sess.UserID() == caller.ID {
 		return true
 	}
 
@@ -159,7 +159,7 @@ func (t *TerminalHandler) authorizeAttach(
 	}
 	role, err := t.cfg.Conn.Sys().GetActorRole(r.Context(), &db.GetActorRoleParams{
 		WorkspaceID: d.WorkspaceID,
-		ActorID:     actor.ID,
+		ActorID:     caller.ID,
 	})
 	if err != nil || !db.Role(role).AtLeast(db.RoleEditor) {
 		writeJSONError(w, http.StatusForbidden, "permission denied")

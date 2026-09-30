@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
@@ -90,8 +91,8 @@ func (h *DeviceFlow) Deny(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool) {
-	p, ok := PrincipalFromContext(r.Context())
-	if !ok || p.Kind != KindUser {
+	p, ok := actor.PrincipalFromContext(r.Context())
+	if !ok || p.Kind != actor.KindUser {
 		writeError(w, http.StatusUnauthorized, "sign in to approve a device")
 		return
 	}
@@ -198,7 +199,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 
 		sess, token, err := h.svc.IssueSession(ctx, SessionParams{
 			SubjectID: u.ID,
-			Kind:      KindCLI,
+			Kind:      actor.KindCLI,
 			Method:    MethodDevice,
 			Binding:   binding,
 			TTL:       deviceSessionTTL,
@@ -209,7 +210,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		}
 		h.svc.record(ctx, Event{
 			Action: ActionLoginSucceeded,
-			Kind:   KindCLI,
+			Kind:   actor.KindCLI,
 			Method: MethodDevice,
 			UserID: u.ID,
 			Email:  u.Email,

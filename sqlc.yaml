@@ -55,35 +55,35 @@ sql:
           # Enum overrides
           - column: "certificate_authorities.key_type"
             go_type:
-              import: "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+              import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "CertificateKeyType"
           - column: "certificate_authorities.allowed_key_types"
             go_type:
-              import: "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+              import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "CertificateKeyType"
               slice: true
           - column: "certificate_authorities.authority_type"
             go_type:
-              import: "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+              import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "AuthorityType"
           - column: "daemons.status"
             go_type:
-              import: "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+              import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "DaemonStatus"
           - column: "workspace_tokens.kind"
             go_type:
-              import: "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+              import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "TokenKind"
 
           # JSON overrides
           - column: "daemons.config"
             go_type:
-              import: "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+              import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "DaemonConfig"
               pointer: true
           - column: "workspaces.settings"
             go_type:
-              import: "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+              import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "WorkspaceSettings"
               pointer: true
 

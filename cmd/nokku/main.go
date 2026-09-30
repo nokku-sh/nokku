@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"strings"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/mizuchilabs/kata/buildinfo"
 	"github.com/mizuchilabs/kata/logx"
 	"github.com/mizuchilabs/kata/sigx"
@@ -44,8 +46,8 @@ func main() {
 				Description: "Migrates every encrypted value (CA private keys) onto a new " +
 					"cipher, in a single transaction: if anything fails, nothing " +
 					"changes and the command can simply be re-run.\n\n" +
-					"The current cipher decrypts with NOKKU_SECRET, or with KMS_URI " +
-					"when the keyset is stored in the database. The new one is " +
+					"The current cipher is the one the server runs with: KMS_URI " +
+					"when set, NOKKU_SECRET otherwise. The new one is " +
 					"specified as:\n" +
 					"  secret:<value>  secretbox key (the simple default)\n" +
 					"  kms:<uri>       KMS-backed envelope encryption (Enterprise)\n\n" +
@@ -73,11 +75,17 @@ func main() {
 						defer conn.Pool.Close()
 					}
 
+					// The current cipher is the one the server runs with.
 					var oldCipher crypto.Cipher
-					if secret := os.Getenv("NOKKU_SECRET"); secret != "" {
-						oldCipher, err = crypto.NewSecretbox([]byte(secret))
-					} else {
-						oldCipher, err = kms.New(ctx, conn)
+					enc, err := kms.New(ctx, conn)
+					switch {
+					case errors.Is(err, kms.ErrNotConfigured):
+						var ec config.EnvConfig
+						if ec, err = env.ParseAs[config.EnvConfig](); err == nil {
+							oldCipher, err = crypto.NewSecretbox([]byte(ec.Secret))
+						}
+					case err == nil:
+						oldCipher = enc
 					}
 					if err != nil {
 						return fmt.Errorf("current cipher: %w", err)

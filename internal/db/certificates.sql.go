@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/internal/crypto"
-	nokku "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	nokku "github.com/nokku-sh/protos/gen/nokku/v1"
 )
 
 const createCA = `-- name: CreateCA :one
@@ -442,6 +442,7 @@ FROM
   certificate_authorities ca
 WHERE
   ca.is_active = TRUE
+  AND ca.id <> ALL (COALESCE($1::UUID[], '{}'))
   AND NOW() BETWEEN ca.not_before AND ca.not_after
   AND EXTRACT(
     EPOCH
@@ -460,8 +461,9 @@ FOR UPDATE
   SKIP LOCKED
 `
 
-func (q *Queries) GetExpiringCAForUpdate(ctx context.Context) (*CertificateAuthority, error) {
-	row := q.db.QueryRow(ctx, getExpiringCAForUpdate)
+// skip_ids holds CAs whose rotation already failed this pass.
+func (q *Queries) GetExpiringCAForUpdate(ctx context.Context, skipIds []string) (*CertificateAuthority, error) {
+	row := q.db.QueryRow(ctx, getExpiringCAForUpdate, skipIds)
 	var i CertificateAuthority
 	err := row.Scan(
 		&i.ID,

@@ -247,7 +247,25 @@ func (s *Stripe) Sync(ctx context.Context, workspaceID string) {
 	}
 }
 
-func (s *Stripe) SyncAll(ctx context.Context) error {
+// reconcile lets missed webhooks self-heal, 5 minutes after start and then
+// every 12 hours.
+func (s *Stripe) reconcile(ctx context.Context) {
+	timer := time.NewTimer(5 * time.Minute)
+	defer timer.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
+		if err := s.syncAll(ctx); err != nil {
+			slog.Error("failed to reconcile subscriptions", "error", err)
+		}
+		timer.Reset(12 * time.Hour)
+	}
+}
+
+func (s *Stripe) syncAll(ctx context.Context) error {
 	var subs []*db.WorkspaceSubscription
 	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
 		subs, err = q.ListProviderSubscriptions(ctx, []string{"stripe"})

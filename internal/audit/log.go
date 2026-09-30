@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/util"
 )
@@ -85,20 +86,20 @@ func (s *Service) Log(ctx context.Context, e *Event) {
 		header, peer = meta.Header, meta.RemoteAddr
 	}
 	if e.WorkspaceID == "" {
-		e.WorkspaceID = iam.WorkspaceIDFromContext(ctx)
+		e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
 	}
 	s.finish(ctx, e, header, peer, nil)
 }
 
 // finish skips unauthenticated calls, the auth flows record their own events.
 func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer string, err error) {
-	p, _ := iam.PrincipalFromContext(ctx)
+	p, _ := actor.PrincipalFromContext(ctx)
 	if p.ID == "" {
 		return
 	}
 	e.Timestamp = time.Now().UTC()
 	if e.WorkspaceID == "" {
-		e.WorkspaceID = iam.WorkspaceIDFromContext(ctx)
+		e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
 	}
 	e.ActorID, e.ActorKind, e.ActorName = p.ID, string(p.Kind), p.Email
 	if header != nil {
@@ -116,7 +117,7 @@ func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer
 	actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	go func() {
 		defer cancel()
-		if e.ActorName == "" && (p.Kind == iam.KindUser || p.Kind == iam.KindCLI) {
+		if e.ActorName == "" && (p.Kind == actor.KindUser || p.Kind == actor.KindCLI) {
 			if u, err := s.conn.Sys().GetUser(actx, p.ID); err == nil {
 				e.ActorName = u.Email
 			}

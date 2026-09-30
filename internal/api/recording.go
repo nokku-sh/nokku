@@ -6,15 +6,16 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/audit"
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
@@ -32,7 +33,7 @@ func (s *RecordingService) UploadRecording(
 	ctx context.Context,
 	stream *connect.ClientStream[nokkuv1.UploadRecordingRequest],
 ) (*nokkuv1.UploadRecordingResponse, error) {
-	daemonID := iam.DaemonIDFromContext(ctx)
+	daemonID := actor.DaemonIDFromContext(ctx)
 	if daemonID == "" {
 		return nil, NewError(connect.CodePermissionDenied, "only daemons can upload recordings")
 	}
@@ -105,7 +106,7 @@ func (s *RecordingService) UploadRecording(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	if complete {
@@ -155,7 +156,7 @@ func (s *RecordingService) resolveUpload(
 		})
 		return err
 	}); err != nil {
-		return nil, "", DBError(err)
+		return nil, "", err
 	}
 	return rec, workspaceID, nil
 }
@@ -182,7 +183,7 @@ func (s *RecordingService) ListRecordings(
 		totalBytes, err = q.SumRecordingBytes(ctx, req.GetWorkspaceId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	recordings := make([]*nokkuv1.Recording, 0, len(rows))
@@ -206,10 +207,10 @@ func (s *RecordingService) GetRecording(
 	stream *connect.ServerStream[nokkuv1.GetRecordingResponse],
 ) error {
 	// Streams get no workspace from the interceptors, so pin and check here.
-	ctx = iam.AnnotateTenant(ctx, req.GetWorkspaceId())
+	ctx = actor.AnnotateTenant(ctx, req.GetWorkspaceId())
 	ctx, err := actorHasRole(ctx, s.cfg.Conn, db.RoleViewer)
 	if err != nil {
-		return DBError(err)
+		return err
 	}
 
 	var rec *db.Recording
@@ -217,7 +218,7 @@ func (s *RecordingService) GetRecording(
 		rec, err = q.GetRecording(ctx, req.GetRecordingId())
 		return err
 	}); err != nil {
-		return DBError(err)
+		return err
 	}
 
 	if err := stream.Send(&nokkuv1.GetRecordingResponse{
@@ -270,7 +271,7 @@ func (s *RecordingService) DeleteRecording(
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		return q.DeleteRecording(ctx, req.GetRecordingId())
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	// Best effort, a stray object goes with the workspace purge.
 	if err := s.cfg.Storage.Delete(

@@ -196,6 +196,7 @@ WHERE
 RETURNING
   *;
 
+-- skip_ids holds CAs whose rotation already failed this pass.
 -- name: GetExpiringCAForUpdate :one
 SELECT
   ca.*
@@ -203,6 +204,7 @@ FROM
   certificate_authorities ca
 WHERE
   ca.is_active = TRUE
+  AND ca.id <> ALL (COALESCE(@skip_ids::UUID[], '{}'))
   AND NOW() BETWEEN ca.not_before AND ca.not_after
   AND EXTRACT(
     EPOCH

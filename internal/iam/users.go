@@ -3,8 +3,8 @@ package iam
 import (
 	"context"
 	"strings"
-	"time"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
 	emailverify "github.com/nokku-sh/nokku/internal/email"
 )
@@ -29,7 +29,7 @@ func (s *Service) Register(ctx context.Context, email, name, pw string) (*db.Use
 		ctx,
 		Event{
 			Action: ActionUserCreated,
-			Kind:   KindUser,
+			Kind:   actor.KindUser,
 			Method: MethodPassword,
 			UserID: u.ID,
 			Email:  u.Email,
@@ -41,7 +41,7 @@ func (s *Service) Register(ctx context.Context, email, name, pw string) (*db.Use
 func (s *Service) GetUser(ctx context.Context) (*db.User, error) {
 	var u *db.User
 	err := s.asSelf(ctx, func(q *db.Queries) (err error) {
-		u, err = q.GetUser(ctx, UserIDFromContext(ctx))
+		u, err = q.GetUser(ctx, actor.UserIDFromContext(ctx))
 		return err
 	})
 	if err != nil {
@@ -79,7 +79,7 @@ func (s *Service) UpdateSelf(ctx context.Context, p db.UpdateUserParams) (*db.Us
 	var u *db.User
 	err := s.asSelf(ctx, func(q *db.Queries) (err error) {
 		u, err = q.UpdateUser(ctx, &db.UpdateUserParams{
-			ID:                   UserIDFromContext(ctx),
+			ID:                   actor.UserIDFromContext(ctx),
 			Name:                 p.Name,
 			Picture:              p.Picture,
 			DisablePasswordReset: p.DisablePasswordReset,
@@ -130,12 +130,8 @@ func (s *Service) DeleteUser(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	s.record(ctx, Event{Action: ActionUserDeleted, Kind: KindUser, UserID: u.ID, Email: u.Email})
+	s.record(ctx, Event{Action: ActionUserDeleted, Kind: actor.KindUser, UserID: u.ID, Email: u.Email})
 	return nil
-}
-
-func (s *Service) DeleteUnverifiedUsers(ctx context.Context, cutoff time.Time) (int64, error) {
-	return s.sys.DeleteUnverifiedUsers(ctx, cutoff)
 }
 
 func (s *Service) VerifyUserEmail(ctx context.Context, userID string) error {

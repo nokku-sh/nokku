@@ -7,9 +7,10 @@ import (
 
 	"connectrpc.com/connect"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
@@ -32,7 +33,7 @@ func requireVerifiedDomain(
 ) error {
 	domains, err := svc.ListTenantDomains(ctx, workspaceID)
 	if err != nil {
-		return DBError(err)
+		return err
 	}
 	for _, d := range domains {
 		if d.Verified() {
@@ -132,7 +133,7 @@ func ssoError(err error) error {
 	if errors.Is(err, iam.ErrNotFound) {
 		return ErrNotFound
 	}
-	return DBError(err)
+	return err
 }
 
 func providerToProto(p *iam.SSOProvider) *nokkuv1.SSOProvider {

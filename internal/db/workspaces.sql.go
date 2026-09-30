@@ -9,7 +9,7 @@ import (
 	"context"
 	"time"
 
-	nokku "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
+	nokku "github.com/nokku-sh/protos/gen/nokku/v1"
 )
 
 const countWorkspacesByOwner = `-- name: CountWorkspacesByOwner :one

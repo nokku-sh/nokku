@@ -14,6 +14,7 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
 	emailverify "github.com/nokku-sh/nokku/internal/email"
 )
@@ -188,7 +189,7 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 	}
 	f.svc.record(ctx, Event{
 		Action: ActionCredentialAdded,
-		Kind:   KindUser,
+		Kind:   actor.KindUser,
 		Method: MethodPasskey,
 		UserID: wu.user.ID,
 		Email:  wu.user.Email,
@@ -263,7 +264,7 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	}
 	f.svc.record(
 		ctx,
-		Event{Action: ActionUserCreated, Kind: KindUser, Method: MethodPasskey, UserID: u.ID, Email: u.Email},
+		Event{Action: ActionUserCreated, Kind: actor.KindUser, Method: MethodPasskey, UserID: u.ID, Email: u.Email},
 	)
 	if f.svc.OnPasskeySignup != nil {
 		f.svc.OnPasskeySignup(r, u)

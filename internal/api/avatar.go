@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/image/draw"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/storage"
@@ -33,7 +34,7 @@ func resizePicture(src image.Image) image.Image {
 
 func UploadAvatar(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := iam.UserIDFromContext(r.Context())
+		userID := actor.UserIDFromContext(r.Context())
 		if userID == "" {
 			writeJSONError(w, http.StatusUnauthorized, "authentication required")
 			return

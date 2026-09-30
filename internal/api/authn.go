@@ -9,33 +9,11 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
-
-// publicEndpoints skip authentication. Logout must stay reachable with a
-// stale session so it can clear the cookie.
-var publicEndpoints = map[string]struct{}{
-	nokkuv1connect.DaemonServiceEnrollDaemonProcedure:      {},
-	nokkuv1connect.UtilServiceGetVersionProcedure:          {},
-	nokkuv1connect.UtilServiceGetInstanceInfoProcedure:     {},
-	nokkuv1connect.AuthServiceRegisterProcedure:            {},
-	nokkuv1connect.AuthServiceLoginProcedure:               {},
-	nokkuv1connect.AuthServiceLoginWithBackupCodeProcedure: {},
-	nokkuv1connect.AuthServiceLogoutProcedure:              {},
-	nokkuv1connect.AuthServiceForgotPasswordProcedure:      {},
-	nokkuv1connect.AuthServiceResetPasswordProcedure:       {},
-	nokkuv1connect.AuthServiceVerifyEmailProcedure:         {},
-	nokkuv1connect.AuthServiceResendVerificationProcedure:  {},
-	nokkuv1connect.AuthServiceDiscoverSSOProcedure:         {},
-}
-
-func isPublicEndpoint(procedure string) bool {
-	_, ok := publicEndpoints[procedure]
-	return ok
-}
 
 func NewAuthNInterceptor(cfg *config.Config) connect.Interceptor {
 	return &authNInterceptor{cfg: cfg}
@@ -90,20 +68,20 @@ func (a *authNInterceptor) WrapStreamingHandler(
 func (a *authNInterceptor) inject(
 	ctx context.Context,
 	workspace string,
-	p iam.Principal,
+	p actor.Principal,
 	sess db.Session,
 	header http.Header,
 	remoteAddr string,
 ) context.Context {
 	if workspace != "" {
-		ctx = iam.AnnotateTenant(ctx, workspace)
+		ctx = actor.AnnotateTenant(ctx, workspace)
 	}
 	ctx = iam.ContextWithSession(ctx, sess)
 	ctx = iam.ContextWithRequestMeta(ctx, iam.RequestMeta{
 		Header:     header,
 		RemoteAddr: remoteAddr,
 	})
-	return iam.ContextWithPrincipal(ctx, p)
+	return actor.ContextWithPrincipal(ctx, p)
 }
 
 func (a *authNInterceptor) fail(ctx context.Context, err error) error {

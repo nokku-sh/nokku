@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
@@ -55,11 +56,11 @@ func cookieFromHeader(h http.Header, name string) string {
 func (s *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, sess, err := s.AuthenticateToken(r.Context(), sessionFromCookie(r.Header))
-		if err != nil || p.Kind != KindUser {
+		if err != nil || p.Kind != actor.KindUser {
 			next.ServeHTTP(w, r)
 			return
 		}
-		ctx := ContextWithPrincipal(r.Context(), p)
+		ctx := actor.ContextWithPrincipal(r.Context(), p)
 		ctx = ContextWithSession(ctx, sess)
 		ctx = ContextWithRequestMeta(ctx, RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr})
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -89,7 +90,7 @@ func RequestMetaFromContext(ctx context.Context) (RequestMeta, bool) {
 
 func (s *Service) RequireLogin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := PrincipalFromContext(r.Context()); !ok {
+		if _, ok := actor.PrincipalFromContext(r.Context()); !ok {
 			writeError(w, http.StatusUnauthorized, "sign in to continue")
 			return
 		}

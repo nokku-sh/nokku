@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nokku-sh/nokku/internal/actor"
+	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/util"
 )
@@ -45,7 +47,7 @@ const (
 
 type Event struct {
 	Action      Action
-	Kind        Kind
+	Kind        actor.Kind
 	Method      Method
 	UserID      string
 	Email       string
@@ -62,7 +64,7 @@ type Sink interface {
 type Deps struct {
 	BaseURL string
 	Conn    txRunner
-	Cache   Cache
+	Cache   cache.Cache
 	// Secret keys the DPoP server nonce.
 	Secret []byte
 	Events Sink
@@ -87,7 +89,7 @@ type txRunner interface {
 type Service struct {
 	sys     db.Querier // nokku_system, bypasses RLS
 	conn    txRunner
-	cache   Cache
+	cache   cache.Cache
 	events  Sink
 	baseURL string
 	secure  bool
@@ -152,12 +154,13 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 	if err := s.bootstrapUser(ctx); err != nil {
 		return nil, err
 	}
+	go s.cleanup(ctx)
 	return s, nil
 }
 
 // asSelf runs fn under RLS so it only reaches the request user's own rows.
 func (s *Service) asSelf(ctx context.Context, fn func(*db.Queries) error) error {
-	userID := UserIDFromContext(ctx)
+	userID := actor.UserIDFromContext(ctx)
 	if userID == "" {
 		return ErrNotFound
 	}

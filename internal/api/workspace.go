@@ -3,16 +3,16 @@ package api
 import (
 	"context"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/audit"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/nokku-sh/nokku/internal/iam"
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
@@ -45,14 +45,14 @@ func (s *WorkspaceService) GetWorkspace(
 		workspace, err = q.GetWorkspace(ctx, req.GetWorkspaceId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	role, err := s.cfg.Conn.Sys().GetActorRole(ctx, &db.GetActorRoleParams{
 		WorkspaceID: workspace.ID,
-		ActorID:     iam.SubjectFromContext(ctx),
+		ActorID:     actor.SubjectFromContext(ctx),
 	})
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	result := workspace.ToProto()
 	result.Role = &role
@@ -65,7 +65,7 @@ func (s *WorkspaceService) CreateWorkspace(
 ) (*nokkuv1.CreateWorkspaceResponse, error) {
 	user, err := s.cfg.IAM.GetUser(ctx)
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	var count int32
@@ -73,7 +73,7 @@ func (s *WorkspaceService) CreateWorkspace(
 		count, err = q.CountWorkspacesByOwner(ctx, user.ID)
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	if count >= 5 {
 		return nil, NewError(connect.CodeResourceExhausted, "maximum number of workspaces reached")
@@ -86,7 +86,7 @@ func (s *WorkspaceService) CreateWorkspace(
 		Settings:    defaultWorkspaceSettings(),
 	})
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	audit.SetTarget(ctx, workspace.GetId())
 
@@ -115,7 +115,7 @@ func (s *WorkspaceService) UpdateWorkspace(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.UpdateWorkspaceResponse{
@@ -136,7 +136,7 @@ func (s *WorkspaceService) DeleteWorkspace(
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		return q.DeleteWorkspace(ctx, req.GetWorkspaceId())
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	s.cfg.Record.PurgeWorkspace(ctx, req.GetWorkspaceId())
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
@@ -151,11 +151,11 @@ func (s *WorkspaceService) ListWorkspaces(
 		workspaces, err = q.ListWorkspaces(ctx)
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
-	roles, err := s.cfg.Conn.Sys().ListActorRoles(ctx, iam.SubjectFromContext(ctx))
+	roles, err := s.cfg.Conn.Sys().ListActorRoles(ctx, actor.SubjectFromContext(ctx))
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	roleByWorkspace := make(map[string]string, len(roles))
@@ -187,7 +187,7 @@ func (s *WorkspaceService) GetWorkspaceMember(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.GetWorkspaceMemberResponse{
 		Member: &nokkuv1.WorkspaceMember{
@@ -223,7 +223,7 @@ func (s *WorkspaceService) UpdateWorkspaceMember(
 			RoleName:    req.GetRoleName(),
 		})
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.UpdateWorkspaceMemberResponse{}, nil
@@ -244,7 +244,7 @@ func (s *WorkspaceService) ListWorkspaceMembers(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	var count int32
@@ -284,7 +284,7 @@ func (s *WorkspaceService) RemoveWorkspaceMember(
 			UserID:      req.GetUserId(),
 		})
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.RemoveWorkspaceMemberResponse{}, nil
@@ -310,7 +310,7 @@ func checkWorkspaceOwner(ctx context.Context, q db.Querier, workspaceID string) 
 	if err != nil {
 		return err
 	}
-	if ownerID != iam.UserIDFromContext(ctx) {
+	if ownerID != actor.UserIDFromContext(ctx) {
 		return ErrPermissionDenied
 	}
 	return nil
@@ -330,7 +330,7 @@ func (s *WorkspaceService) UpdateWorkspaceOwner(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.UpdateWorkspaceOwnerResponse{}, nil

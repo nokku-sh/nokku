@@ -8,9 +8,10 @@ import (
 	"time"
 	"uuid"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
 // enrollToken connects to the test database and mints an enroll token in a

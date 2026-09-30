@@ -8,9 +8,10 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
 const (
@@ -85,7 +86,7 @@ func (s *DashboardService) GetDashboard(
 		usedBytes, err = q.SumRecordingBytes(ctx, wsID)
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	res := &nokkuv1.GetDashboardResponse{

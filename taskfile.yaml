@@ -34,9 +34,9 @@ tasks:
       - cd web/email && pnpm update --latest
 
   gen:
-    desc: Generate sqlc and buf
+    desc: Generate sqlc and the web client from the pinned protos
     cmds:
-      - buf generate
+      - buf generate "$(go list -m -f '{{"{{.Dir}}"}}' github.com/nokku-sh/protos)/nokku"
       - sqlc generate
 
   build:server:

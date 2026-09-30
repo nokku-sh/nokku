@@ -8,11 +8,12 @@ import (
 
 	"connectrpc.com/connect"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/entitlement"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
 type BillingService struct {
@@ -47,7 +48,7 @@ func (s *BillingService) GetBilling(
 		sub, _ = q.GetSubscription(ctx, req.GetWorkspaceId())
 		return nil
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	plan := s.cfg.Entitlements.Resolve(ctx, req.GetWorkspaceId())
@@ -83,7 +84,7 @@ func (s *BillingService) CreateCheckout(
 	}
 	user, err := s.cfg.IAM.GetUser(ctx)
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	url, err := s.cfg.Billing.Checkout(ctx, req.GetWorkspaceId(), user.Email)
@@ -175,7 +176,7 @@ func (s *BillingService) requireWorkspaceOwner(ctx context.Context, workspaceID 
 			errors.New("workspace owner required"),
 		)
 	}
-	return DBError(err)
+	return err
 }
 
 // featuresProto returns the whole catalog so clients can render locked features.

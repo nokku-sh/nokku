@@ -12,9 +12,10 @@ import (
 	"slices"
 	"time"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
 // SignCertificate uses user TTLs for client certs and host TTLs for server certs.

@@ -6,16 +6,16 @@ import (
 	"log/slog"
 	"strconv"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/audit"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/nokku-sh/nokku/internal/iam"
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/pki"
 	"github.com/nokku-sh/nokku/internal/ssh"
 	"github.com/nokku-sh/nokku/internal/util"
@@ -105,7 +105,7 @@ func (s *CertificateService) CreateCertificateAuthority(
 		result, err = q.CreateCA(ctx, params)
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.CreateCertificateAuthorityResponse{
@@ -117,11 +117,11 @@ func (s *CertificateService) GetCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.GetCertificateAuthorityRequest,
 ) (*nokkuv1.GetCertificateAuthorityResponse, error) {
-	if req.GetId() == "" && iam.DaemonIDFromContext(ctx) == "" {
+	if req.GetId() == "" && actor.DaemonIDFromContext(ctx) == "" {
 		return nil, ErrInvalidInput
 	}
 	// A daemon always resolves its own CA, whatever id it sent.
-	daemonID := iam.DaemonIDFromContext(ctx)
+	daemonID := actor.DaemonIDFromContext(ctx)
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		if daemonID != "" {
@@ -131,7 +131,7 @@ func (s *CertificateService) GetCertificateAuthority(
 		ca, err = q.GetCA(ctx, req.GetId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.GetCertificateAuthorityResponse{
@@ -148,7 +148,7 @@ func (s *CertificateService) ListCertificateAuthorities(
 		result, err = q.ListCAs(ctx, &db.ListCAsParams{WorkspaceID: req.GetWorkspaceId()})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.ListCertificateAuthoritiesResponse{
@@ -190,7 +190,7 @@ func (s *CertificateService) UpdateCertificateAuthority(
 		result, err = q.UpdateCA(ctx, params)
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.UpdateCertificateAuthorityResponse{
@@ -206,7 +206,7 @@ func (s *CertificateService) DeleteCertificateAuthority(
 		_, err := q.DeleteCA(ctx, req.GetId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.DeleteCertificateAuthorityResponse{}, nil
@@ -231,32 +231,10 @@ func (s *CertificateService) RolloverCertificateAuthority(
 		if req.KeyBits != nil {
 			keyBits = req.GetKeyBits()
 		}
-
-		var newCA *ssh.CAInfo
-		if ca.AuthorityType == nokkuv1.AuthorityType_AUTHORITY_TYPE_X509 {
-			newCA, err = pki.NewCA(keyType, keyBits, ca.Lifetime)
-		} else {
-			newCA, err = ssh.NewCA(keyType, keyBits, ca.Lifetime)
-		}
-		if err != nil {
-			return err
-		}
-
-		result, err = q.ReplaceCA(ctx, &db.ReplaceCAParams{
-			CaID:         ca.ID,
-			Certificate:  string(newCA.Certificate),
-			PrivateKey:   newCA.PrivateKey,
-			PublicKey:    newCA.PublicKey,
-			SerialNumber: newCA.SerialNumber,
-			Subject:      newCA.Subject,
-			NotBefore:    newCA.NotBefore,
-			NotAfter:     newCA.NotAfter,
-			KeyType:      newCA.KeyType,
-			KeyBits:      newCA.KeyBits,
-		})
+		result, err = pki.Rollover(ctx, q, ca, keyType, keyBits)
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.RolloverCertificateAuthorityResponse{
@@ -268,10 +246,10 @@ func (s *CertificateService) SignSSHCertificate(
 	ctx context.Context,
 	req *nokkuv1.SignSSHCertificateRequest,
 ) (*nokkuv1.SignSSHCertificateResponse, error) {
-	actor, _ := iam.PrincipalFromContext(ctx)
-	keyID := fmt.Sprintf("nokku:login:%s:%s", actor.Kind, actor.ID)
-	principal := actor.ID
-	daemonID := iam.DaemonIDFromContext(ctx)
+	caller, _ := actor.PrincipalFromContext(ctx)
+	keyID := fmt.Sprintf("nokku:login:%s:%s", caller.Kind, caller.ID)
+	principal := caller.ID
+	daemonID := actor.DaemonIDFromContext(ctx)
 
 	// Daemons mint host certs and nothing else, nobody else mints host certs.
 	if (req.GetType() == nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST) != (daemonID != "") {
@@ -301,11 +279,11 @@ func (s *CertificateService) SignSSHCertificate(
 				return err
 			}
 			principal = target.ID
-			keyID = fmt.Sprintf("nokku:provision:%s:%s", actor.Kind, actor.ID)
+			keyID = fmt.Sprintf("nokku:provision:%s:%s", caller.Kind, caller.ID)
 		}
 		return nil
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	if ca == nil {
 		return nil, ErrNotFound
@@ -367,7 +345,7 @@ func (s *CertificateService) SignX509Certificate(
 		}
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	if ca == nil {
 		return nil, ErrNotFound

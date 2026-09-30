@@ -11,8 +11,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 )
 
 const (
@@ -74,7 +75,7 @@ type Pool struct {
 }
 
 func New(ctx context.Context, conn connection) *Pool {
-	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
+	shutdownCtx, shutdownCancel := context.WithCancel(ctx)
 	p := &Pool{
 		byID:           make(map[string]*Conn),
 		byWksp:         make(map[string]map[string]struct{}),
@@ -90,10 +91,7 @@ func New(ctx context.Context, conn connection) *Pool {
 		shutdownCancel: shutdownCancel,
 	}
 
-	go func() {
-		<-ctx.Done()
-		p.Shutdown()
-	}()
+	context.AfterFunc(ctx, p.Shutdown)
 	go p.heartbeat(ctx)
 
 	return p

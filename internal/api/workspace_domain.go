@@ -6,8 +6,9 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/config"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
@@ -25,7 +26,7 @@ func (s *WorkspaceDomainService) GetWorkspaceDomain(
 ) (*nokkuv1.GetWorkspaceDomainResponse, error) {
 	result, err := s.cfg.IAM.GetTenantDomain(ctx, req.GetWorkspaceId(), req.GetDomain())
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.GetWorkspaceDomainResponse{
 		Domain: domainToProto(result),
@@ -38,7 +39,7 @@ func (s *WorkspaceDomainService) CreateWorkspaceDomain(
 ) (*nokkuv1.CreateWorkspaceDomainResponse, error) {
 	result, err := s.cfg.IAM.PutTenantDomain(ctx, req.GetWorkspaceId(), req.GetDomain())
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.CreateWorkspaceDomainResponse{
 		Domain: domainToProto(result),
@@ -51,7 +52,7 @@ func (s *WorkspaceDomainService) ListWorkspaceDomains(
 ) (*nokkuv1.ListWorkspaceDomainsResponse, error) {
 	result, err := s.cfg.IAM.ListTenantDomains(ctx, req.GetWorkspaceId())
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	domains := make([]*nokkuv1.WorkspaceDomain, 0, len(result))
 	for _, d := range result {
@@ -67,7 +68,7 @@ func (s *WorkspaceDomainService) DeleteWorkspaceDomain(
 	req *nokkuv1.DeleteWorkspaceDomainRequest,
 ) (*nokkuv1.DeleteWorkspaceDomainResponse, error) {
 	if err := s.cfg.IAM.DeleteTenantDomain(ctx, req.GetWorkspaceId(), req.GetDomain()); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.DeleteWorkspaceDomainResponse{}, nil
 }
@@ -78,7 +79,7 @@ func (s *WorkspaceDomainService) VerifyWorkspaceDomain(
 ) (*nokkuv1.VerifyWorkspaceDomainResponse, error) {
 	result, err := s.cfg.IAM.VerifyTenantDomain(ctx, req.GetWorkspaceId(), req.GetDomain())
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.VerifyWorkspaceDomainResponse{
 		Domain: domainToProto(result),
@@ -92,7 +93,7 @@ func (s *WorkspaceDomainService) RegenerateWorkspaceDomainToken(
 	// A rebind issues a fresh token and resets verification.
 	result, err := s.cfg.IAM.PutTenantDomain(ctx, req.GetWorkspaceId(), req.GetDomain())
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.RegenerateWorkspaceDomainTokenResponse{
 		Domain: domainToProto(result),

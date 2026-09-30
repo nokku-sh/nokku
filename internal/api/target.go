@@ -9,10 +9,11 @@ import (
 
 	"connectrpc.com/connect"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	nokkuv1 "github.com/nokku-sh/nokku/internal/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/namegen"
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
@@ -34,7 +35,7 @@ func (s *TargetService) GetTarget(
 		target, err = q.GetTarget(ctx, req.GetId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.GetTargetResponse{
@@ -54,7 +55,7 @@ func (s *TargetService) CreateTarget(
 	if name != "" {
 		created, err := s.insertTarget(ctx, req, name)
 		if err != nil {
-			return nil, DBError(err)
+			return nil, err
 		}
 		return created, nil
 	}
@@ -70,7 +71,7 @@ func (s *TargetService) CreateTarget(
 			return created, nil
 		}
 		if !db.IsUniqueViolation(err) {
-			return nil, DBError(err)
+			return nil, err
 		}
 	}
 }
@@ -128,7 +129,7 @@ func (s *TargetService) UpdateTarget(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.UpdateTargetResponse{
@@ -144,7 +145,7 @@ func (s *TargetService) DeleteTarget(
 		_, err := q.DeleteTarget(ctx, req.GetId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return &nokkuv1.DeleteTargetResponse{}, nil
 }
@@ -168,7 +169,7 @@ func (s *TargetService) ListTargets(
 		})
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	if len(targets) > 0 {
 		count = targets[0].TotalCount
@@ -190,7 +191,7 @@ func (s *TargetService) GetTargetPrincipals(
 		rows, err = q.ListPrincipalsForTarget(ctx, req.GetTargetId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	principals := make([]*nokkuv1.PrincipalUsers, 0, len(rows))
@@ -238,7 +239,7 @@ func (s *TargetService) SyncTargetUsers(
 		_, err := q.UpdateTarget(ctx, params)
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.SyncTargetUsersResponse{}, nil
@@ -317,7 +318,7 @@ func (s *TargetService) GetSubjectAccess(
 		}
 		return nil
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.GetSubjectAccessResponse{
@@ -331,13 +332,13 @@ func (s *TargetService) GetMyAccess(
 	ctx context.Context,
 	_ *nokkuv1.GetMyAccessRequest,
 ) (*nokkuv1.GetMyAccessResponse, error) {
-	p, ok := iam.PrincipalFromContext(ctx)
+	p, ok := actor.PrincipalFromContext(ctx)
 	if !ok || p.ID == "" {
 		return nil, NewError(connect.CodeUnauthenticated, "not authenticated")
 	}
 	//nolint:exhaustive // daemons sync through SyncDaemon
 	switch p.Kind {
-	case iam.KindUser, iam.KindCLI, iam.KindWebDevice, iam.KindServiceAccount:
+	case actor.KindUser, actor.KindCLI, actor.KindWebDevice, actor.KindServiceAccount:
 	default:
 		return nil, NewError(
 			connect.CodePermissionDenied,
@@ -358,13 +359,13 @@ func (s *TargetService) GetMyAccess(
 
 		//nolint:exhaustive // other kinds were rejected above
 		switch p.Kind {
-		case iam.KindUser, iam.KindCLI, iam.KindWebDevice:
+		case actor.KindUser, actor.KindCLI, actor.KindWebDevice:
 			u, err := s.cfg.IAM.GetUser(ctx)
 			if err != nil {
 				return err
 			}
 			resp.Subject = &nokkuv1.GetMyAccessResponse_User{User: u.ToProto()}
-		case iam.KindServiceAccount:
+		case actor.KindServiceAccount:
 			sa, err := q.GetServiceAccount(ctx, p.ID)
 			if err != nil {
 				return err
@@ -455,7 +456,7 @@ func (s *TargetService) GetMyAccess(
 		return nil
 	})
 	if err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 	return resp, nil
 }
@@ -476,7 +477,7 @@ func (s *TargetService) GetTargetFilters(
 		principals, err = q.GetWorkspacePrincipals(ctx, req.GetWorkspaceId())
 		return err
 	}); err != nil {
-		return nil, DBError(err)
+		return nil, err
 	}
 
 	return &nokkuv1.GetTargetFiltersResponse{
