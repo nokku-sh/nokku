@@ -6,9 +6,9 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Field from '$lib/components/ui/field';
 	import { Input } from '$lib/components/ui/input';
-	import InputGroupVariants from '$lib/components/ui/input-group/input-group-variants.svelte';
+	import { InputGroupVariants } from '$lib/components/ui/input-group';
 	import { Label } from '$lib/components/ui/label';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
+	import { Separator } from '$lib/components/ui/separator';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Switch } from '$lib/components/ui/switch';
 	import { workspaceID } from '$lib/store.svelte';
@@ -210,16 +210,11 @@
 	</Card.Content>
 
 	<Card.Footer class="flex justify-end">
-		<Button
-			variant="default"
-			size="sm"
-			onclick={handleSubmit}
-			disabled={updateProvider.isPending}
-			class="w-full sm:w-auto"
-		>
-			<Save class={updateProvider.isPending ? 'hidden' : ''} />
-			<Spinner class={updateProvider.isPending ? '' : 'hidden'} />
-			{configured ? 'Save' : 'Add Provider'}
+		<Button onclick={handleSubmit} disabled={updateProvider.isPending} class="w-full sm:w-auto">
+			{#if updateProvider.isPending}<Spinner data-icon="inline-start" />{:else}<Save
+					data-icon="inline-start"
+				/>{/if}
+			{configured ? 'Save' : 'Add provider'}
 		</Button>
 	</Card.Footer>
 </Card.Root>

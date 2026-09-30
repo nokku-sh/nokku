@@ -1,128 +1,116 @@
 <script lang="ts">
 	import { workspace } from '$lib/api/workspaces.svelte';
+	import SaveStatus from '$lib/components/blocks/SaveStatus.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import * as Card from '$lib/components/ui/card';
 	import * as Item from '$lib/components/ui/item';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Switch } from '$lib/components/ui/switch';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { Bot, Terminal } from '@lucide/svelte';
-	import { useDebounce } from 'runed';
-	import { create } from '@bufbuild/protobuf';
+	import { DaemonConfigSchema, type DaemonConfig } from '$lib/gen/nokku/v1/daemon_pb';
 	import { WorkspaceSettingsSchema } from '$lib/gen/nokku/v1/workspace_pb';
-	import { DaemonConfigSchema } from '$lib/gen/nokku/v1/daemon_pb';
+	import { useAutoSave } from '$lib/hooks';
+	import { atLeast } from '$lib/roles';
+	import { create } from '@bufbuild/protobuf';
 
 	const ws = workspace.get();
+	const update = workspace.update();
+	const canEdit = $derived(atLeast(ws.data?.role, 'admin'));
 
 	// A real protobuf message, not a plain object, so the transport accepts it.
-	let settings = $derived.by(() => {
+	const settings = $derived.by(() => {
 		const s = create(WorkspaceSettingsSchema, ws.data?.settings);
 		if (!s.defaultDaemonConfig) s.defaultDaemonConfig = create(DaemonConfigSchema);
 		return s;
 	});
-	const daemonConfig = $derived(settings.defaultDaemonConfig!);
+	const config = $derived(settings.defaultDaemonConfig!);
 
-	const update = workspace.update();
-	const set = useDebounce(() => update.mutate({ settings: settings }), 500);
+	const autoSave = useAutoSave(() => update.mutateAsync({ settings }));
+
+	type Toggle = {
+		key: keyof Pick<
+			DaemonConfig,
+			| 'recordSessions'
+			| 'allowForwarding'
+			| 'allowAgentForwarding'
+			| 'gatewayPorts'
+			| 'dropRetiredCa'
+		>;
+		title: string;
+		description: string;
+	};
+
+	const toggles: Toggle[] = [
+		{
+			key: 'recordSessions',
+			title: 'Session recording',
+			description: 'Record every SSH session for later playback.'
+		},
+		{
+			key: 'allowForwarding',
+			title: 'Port forwarding',
+			description: 'Allow -L, -D and -R port forwards from sessions.'
+		},
+		{
+			key: 'allowAgentForwarding',
+			title: 'Agent forwarding',
+			description: "Expose the client's ssh-agent to sessions through SSH_AUTH_SOCK."
+		},
+		{
+			key: 'gatewayPorts',
+			title: 'Gateway ports',
+			description: 'Let remote (-R) forwards bind to addresses other than loopback.'
+		},
+		{
+			key: 'dropRetiredCa',
+			title: 'Drop retired CA',
+			description: 'Stop trusting the previous CA right after a rollover.'
+		}
+	];
 </script>
 
 <PageHeader
-	icon={Bot}
-	title="Daemon Defaults"
-	description="The SSH server settings new daemons inherit on enrollment. Existing daemons keep their own configuration. Auto-approval is set per enroll token."
+	title="Daemon defaults"
+	description="SSH server settings new daemons inherit when they enroll, existing daemons keep their own"
 />
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title class="flex items-center gap-2 text-base">
-			<Terminal size={18} />
-			Default Configuration
-		</Card.Title>
-		<Card.Description>SSH server settings applied to daemons when they enroll.</Card.Description>
+		<Card.Title>New daemons start with</Card.Title>
+		<Card.Description
+			>Auto-approval is not here, it is set on each enrollment token.</Card.Description
+		>
 	</Card.Header>
-	<Card.Content class="flex flex-col gap-4">
-		<Item.Root variant="outline">
-			<Item.Content>
-				<Item.Title>Session recording</Item.Title>
-				<Item.Description>Record every SSH session for later playback.</Item.Description>
-			</Item.Content>
-			<Item.Actions>
-				<Switch
-					checked={daemonConfig.recordSessions}
-					onCheckedChange={(v) => {
-						daemonConfig.recordSessions = v;
-						set();
-					}}
-				/>
-			</Item.Actions>
-		</Item.Root>
-
-		<Item.Root variant="outline">
-			<Item.Content>
-				<Item.Title>Port forwarding</Item.Title>
-				<Item.Description>Allow -L, -D and -R port forwards from sessions.</Item.Description>
-			</Item.Content>
-			<Item.Actions>
-				<Switch
-					checked={daemonConfig.allowForwarding}
-					onCheckedChange={(v) => {
-						daemonConfig.allowForwarding = v;
-						set();
-					}}
-				/>
-			</Item.Actions>
-		</Item.Root>
-
-		<Item.Root variant="outline">
-			<Item.Content>
-				<Item.Title>Agent forwarding</Item.Title>
-				<Item.Description
-					>Expose the client's ssh-agent to sessions via SSH_AUTH_SOCK.</Item.Description
-				>
-			</Item.Content>
-			<Item.Actions>
-				<Switch
-					checked={daemonConfig.allowAgentForwarding}
-					onCheckedChange={(v) => {
-						daemonConfig.allowAgentForwarding = v;
-						set();
-					}}
-				/>
-			</Item.Actions>
-		</Item.Root>
-
-		<Item.Root variant="outline">
-			<Item.Content>
-				<Item.Title>Gateway ports</Item.Title>
-				<Item.Description>
-					Allow remote (-R) forwards to bind addresses other than loopback.
-				</Item.Description>
-			</Item.Content>
-			<Item.Actions>
-				<Switch
-					checked={daemonConfig.gatewayPorts}
-					onCheckedChange={(v) => {
-						daemonConfig.gatewayPorts = v;
-						set();
-					}}
-				/>
-			</Item.Actions>
-		</Item.Root>
-
-		<Item.Root variant="outline">
-			<Item.Content>
-				<Item.Title>Drop retired CA</Item.Title>
-				<Item.Description>
-					Stop trusting the previously rotated CA immediately after a rollover.
-				</Item.Description>
-			</Item.Content>
-			<Item.Actions>
-				<Switch
-					checked={daemonConfig.dropRetiredCa}
-					onCheckedChange={(v) => {
-						daemonConfig.dropRetiredCa = v;
-						set();
-					}}
-				/>
-			</Item.Actions>
-		</Item.Root>
+	<Card.Content>
+		<Item.Group class="gap-3">
+			{#each toggles as t (t.key)}
+				<Item.Root variant="outline">
+					<Item.Content>
+						<Item.Title>{t.title}</Item.Title>
+						<Item.Description>{t.description}</Item.Description>
+					</Item.Content>
+					<Item.Actions>
+						{#if ws.isLoading}
+							<Skeleton class="h-5 w-9 rounded-full" />
+						{:else}
+							<Switch
+								aria-label={t.title}
+								checked={config[t.key]}
+								disabled={!canEdit}
+								onCheckedChange={(v) => {
+									config[t.key] = v;
+									autoSave.save();
+								}}
+							/>
+						{/if}
+					</Item.Actions>
+				</Item.Root>
+			{/each}
+		</Item.Group>
 	</Card.Content>
+	<Card.Footer>
+		<SaveStatus
+			state={autoSave.saveState}
+			idleText={canEdit ? 'Changes save automatically' : 'Only admins can change this'}
+		/>
+	</Card.Footer>
 </Card.Root>

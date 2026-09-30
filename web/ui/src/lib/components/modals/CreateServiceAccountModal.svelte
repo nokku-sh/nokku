@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SecretReveal from '$lib/components/blocks/SecretReveal.svelte';
 	import { create } from '@bufbuild/protobuf';
 	import { timestampFromDate } from '@bufbuild/protobuf/wkt';
 	import { getLocalTimeZone, today, type DateValue } from '@internationalized/date';
@@ -11,14 +12,13 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Field from '$lib/components/ui/field';
 	import { Input } from '$lib/components/ui/input';
-	import InputGroupVariants from '$lib/components/ui/input-group/input-group-variants.svelte';
 	import * as Popover from '$lib/components/ui/popover';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as ToggleGroup from '$lib/components/ui/toggle-group';
 	import { ServiceAccountSchema } from '$lib/gen/nokku/v1/service_account_pb';
 	import { useSheet } from '$lib/hooks';
 	import { DateValueFormat } from '$lib/utils';
-	import FormModal from './FormModal.svelte';
+	import FormModal from '$lib/components/blocks/FormModal.svelte';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
@@ -149,10 +149,11 @@
 				<KeyRound class="size-4" />
 				Copy the token now
 			</Dialog.Title>
-			<Dialog.Description>It is shown once. Store it in your CI secrets.</Dialog.Description>
+			<Dialog.Description>Store it in your CI secrets.</Dialog.Description>
 		</Dialog.Header>
-		<InputGroupVariants variant="copy-input" value={token} readonly />
-		<InputGroupVariants variant="copy-input" value={`export NK_TOKEN=${token}`} readonly />
+		<SecretReveal
+			values={[{ value: token }, { label: 'As an env var', value: `export NK_TOKEN=${token}` }]}
+		/>
 		<Alert.Root variant="info">
 			<KeyRound />
 			<Alert.Description>

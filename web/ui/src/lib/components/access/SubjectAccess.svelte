@@ -6,7 +6,7 @@
 	import * as Empty from '$lib/components/ui/empty';
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import Chip from '$lib/components/utils/Chip.svelte';
+	import Chip from '$lib/components/blocks/Chip.svelte';
 	import { SubjectKind, type Principal } from '$lib/gen/nokku/v1/principal_pb';
 	import type { Target } from '$lib/gen/nokku/v1/target_pb';
 	import { Search, Server, ShieldOff, SquareTerminal, Users } from '@lucide/svelte';

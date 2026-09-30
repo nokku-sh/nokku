@@ -3,7 +3,7 @@
 	import { ca } from '$lib/api/certificates.svelte';
 	import { plural } from '$lib/api/bulk';
 	import { confirm, createModalState, useSheet } from '$lib/hooks';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import CreateCAModal from '$lib/components/modals/CreateCAModal.svelte';
 	import CASheet from '$lib/components/sheets/CASheet.svelte';
 	import SignModal from '$lib/components/modals/SignModal.svelte';
@@ -92,7 +92,7 @@
 			}
 		}),
 		columnHelper.accessor('notAfter', {
-			header: 'Valid Until',
+			header: 'Valid until',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.notAfter })
 		}),
 		columnHelper.accessor('createdAt', {
@@ -116,7 +116,7 @@
 					],
 					menuActions: [
 						{
-							label: 'Emergency Rollover',
+							label: 'Emergency rollover',
 							icon: ShieldAlert,
 							isDestructive: true,
 							onClick: () =>
@@ -132,11 +132,9 @@
 					],
 					deleteConfig: {
 						itemName: row.original.name,
-						title: 'Delete Certificate Authority',
-						description:
-							'This will permanently delete the CA and revoke all certificates signed by it. This action cannot be undone.',
-						onDelete: () => deleteCA.mutateAsync({ id: row.original.id }),
-						requireTyping: true
+						description: 'Every certificate it signed stops being trusted. This cannot be undone.',
+						typeToConfirm: row.original.name,
+						onDelete: () => deleteCA.mutateAsync({ id: row.original.id })
 					}
 				});
 			}
@@ -149,13 +147,11 @@
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: async (selected) => {
-				const ok = await confirm({
-					title: `Delete ${plural(selected.length, 'certificate authority', 'certificate authorities')}?`,
-					description: 'This revokes every certificate they signed. This action cannot be undone.'
-				});
-				if (ok) await deleteCAs.mutateAsync(selected.map(({ id }) => ({ id })));
-			}
+			confirm: (selected) => ({
+				title: `Delete ${plural(selected.length, 'certificate authority', 'certificate authorities')}?`,
+				description: 'This revokes every certificate they signed. This action cannot be undone.'
+			}),
+			onClick: (selected) => deleteCAs.mutateAsync(selected.map(({ id }) => ({ id })))
 		}
 	];
 </script>
@@ -164,43 +160,40 @@
 <CASheet />
 <SignModal bind:open={signModal.open} ca={signModal.selected} />
 
-<div class="container mx-auto max-w-6xl space-y-6 p-6">
-	<PageHeader
-		title="Certificate Authorities"
-		description="Manage SSH and X.509 certificate authorities and their signing policies"
-		icon={Shield}
-	>
-		<Button onclick={() => (createOpen = true)}>
-			<Plus data-icon="inline-start" />
-			Create CA
-		</Button>
-	</PageHeader>
+<PageHeader
+	title="Certificate authorities"
+	description="The SSH and X.509 CAs that sign every login, and their policies"
+>
+	<Button onclick={() => (createOpen = true)}>
+		<Plus data-icon="inline-start" />
+		Create CA
+	</Button>
+</PageHeader>
 
-	<DataTable
-		data={filteredCAs}
-		isLoading={caData.isLoading}
-		{columns}
-		{bulkActions}
-		onRowClick={(c) => sheet.show(c.id)}
-		emptyState={{
-			icon: Shield,
-			title: 'No Certificate Authorities',
-			description: 'Create your first CA to start signing certificates.'
-		}}
-	>
-		{#snippet toolbar(table)}
-			<TableToolbar
-				search
-				searchResultCount={filteredCAs.length}
-				{table}
-				filters={[
-					{
-						title: 'Type',
-						options: authorityTypeOptions,
-						param: 'type'
-					}
-				]}
-			/>
-		{/snippet}
-	</DataTable>
-</div>
+<DataTable
+	data={filteredCAs}
+	isLoading={caData.isLoading}
+	{columns}
+	{bulkActions}
+	onRowClick={(c) => sheet.show(c.id)}
+	emptyState={{
+		icon: Shield,
+		title: 'No certificate authorities yet',
+		description: 'Create your first CA to start signing certificates.'
+	}}
+>
+	{#snippet toolbar(table)}
+		<TableToolbar
+			search
+			searchResultCount={filteredCAs.length}
+			{table}
+			filters={[
+				{
+					title: 'Type',
+					options: authorityTypeOptions,
+					param: 'type'
+				}
+			]}
+		/>
+	{/snippet}
+</DataTable>

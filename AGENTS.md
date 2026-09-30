@@ -45,7 +45,11 @@ so tests never touch the dev database.
 - `internal/ssh` - SSH CA signing. `internal/pki` - X.509.
 - `internal/recording`, `internal/storage` - encrypted recording ingest and
   blob storage.
-- `web/ui` - SvelteKit UI, embedded via `web/embed.go`. See `web/ui/README.md`.
+- `web/ui` - SvelteKit UI, embedded via `web/embed.go`. Tokens in
+  `src/routes/layout.css`, shell in `lib/components/layout`, shared blocks in
+  `lib/components/blocks`. See `web/ui/README.md` for the UI conventions.
+- `web/email` - react-email templates, exported to `web/email/out` and
+  embedded. Colors are hex copies of the UI tokens.
 - `internal/gen` - generated proto code. Never hand-edit.
 
 ## Conventions

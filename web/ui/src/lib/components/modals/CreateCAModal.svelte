@@ -32,10 +32,10 @@
 </script>
 
 <script lang="ts">
+	import FormModal from '$lib/components/blocks/FormModal.svelte';
 	import { ca as caApi } from '$lib/api/certificates.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Field from '$lib/components/ui/field';
 	import { Input } from '$lib/components/ui/input';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
@@ -44,7 +44,7 @@
 	import { Switch } from '$lib/components/ui/switch';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as ToggleGroup from '$lib/components/ui/toggle-group';
-	import DurationInput from '$lib/components/utils/DurationInput.svelte';
+	import DurationInput from '$lib/components/blocks/DurationInput.svelte';
 	import { useSheet } from '$lib/hooks';
 	import { Check, Shield } from '@lucide/svelte';
 
@@ -107,26 +107,29 @@
 		step = 1;
 	}
 
-	async function submit() {
+	// Enter moves through the steps, the last one creates the CA.
+	async function next() {
+		if (!canContinue) return false;
+		if (step < steps.length) {
+			step++;
+			return false;
+		}
 		const res = await createCA.mutateAsync({ ...model });
-		open = false;
 		reset();
 		if (res.certificateAuthority) sheet.show(res.certificateAuthority.id);
 	}
 </script>
 
-<Dialog.Root bind:open onOpenChange={(v) => !v && reset()}>
-	<Dialog.Content class="no-scrollbar max-h-[95vh] overflow-y-auto sm:max-w-lg">
-		<Dialog.Header>
-			<Dialog.Title class="flex items-center gap-2">
-				<span class="rounded-md bg-primary/10 p-1.5 text-primary"><Shield class="size-4" /></span>
-				Create a certificate authority
-			</Dialog.Title>
-			<Dialog.Description
-				>The key is generated on the server and never leaves it.</Dialog.Description
-			>
-		</Dialog.Header>
-
+<FormModal
+	bind:open
+	title="Create a certificate authority"
+	description="The key is generated on the server and never leaves it."
+	icon={Shield}
+	classModal="sm:max-w-lg"
+	onOpenChange={(v) => !v && reset()}
+	onSubmit={next}
+>
+	{#snippet before()}
 		<Stepper.Root bind:step>
 			<Stepper.Nav class="mb-2">
 				{#each steps as s, i (s.title)}
@@ -144,138 +147,127 @@
 				{/each}
 			</Stepper.Nav>
 		</Stepper.Root>
+	{/snippet}
 
-		<form
-			class="flex flex-col gap-5"
-			onsubmit={(e) => {
-				e.preventDefault();
-				if (!canContinue) return;
-				if (step < steps.length) step++;
-				else void submit();
-			}}
-		>
-			{#if step === 1}
-				<Field.Set>
-					<Field.Legend variant="label">What will it sign?</Field.Legend>
-					<RadioGroup.Root
-						value={String(model.authorityType)}
-						onValueChange={(v) => (model.authorityType = Number(v) as AuthorityType)}
-						class="grid gap-2 sm:grid-cols-2"
-					>
-						{#each types as t (t.value)}
-							<Field.Label for={`${uid}-type-${t.value}`}>
-								<Field.Field orientation="horizontal">
-									<Field.Content>
-										<Field.Title>{t.title}</Field.Title>
-										<Field.Description>{t.description}</Field.Description>
-									</Field.Content>
-									<RadioGroup.Item value={String(t.value)} id={`${uid}-type-${t.value}`} />
-								</Field.Field>
-							</Field.Label>
-						{/each}
-					</RadioGroup.Root>
-				</Field.Set>
-				<Field.Field>
-					<Field.Label for="new-ca-name">Name</Field.Label>
-					<Input id="new-ca-name" bind:value={model.name} placeholder="production-ssh" required />
-				</Field.Field>
-				<Field.Field>
-					<Field.Label for="new-ca-description">Description</Field.Label>
-					<Textarea
-						id="new-ca-description"
-						bind:value={model.description}
-						placeholder={isSSH ? 'Signs production SSH logins' : 'Internal PKI for service mTLS'}
-						rows={2}
-					/>
-				</Field.Field>
-			{:else if step === 2}
-				<Field.Field>
-					<Field.Label>Algorithm</Field.Label>
-					<ToggleGroup.Root
-						type="single"
-						variant="outline"
-						value={String(model.keyType)}
-						onValueChange={(v) => {
-							if (!v) return;
-							model.keyType = Number(v) as CertificateKeyType;
-							model.keyBits = recommendedBits[model.keyType] ?? 0;
-						}}
-						class="w-full"
-					>
-						{#each algorithms as a (a.value)}
-							<ToggleGroup.Item value={String(a.value)} class="flex-1 gap-1.5">
-								{a.label}
-								{#if a.recommended}<Badge variant="success">Best</Badge>{/if}
-							</ToggleGroup.Item>
-						{/each}
-					</ToggleGroup.Root>
-					<Field.Description>
-						Ed25519 is fast, small and supported by every modern OpenSSH. Pick RSA only for very old
-						clients.
-					</Field.Description>
-				</Field.Field>
-				{#if sizes[model.keyType]}
-					<Field.Field>
-						<Field.Label>Key size</Field.Label>
-						<ToggleGroup.Root
-							type="single"
-							variant="outline"
-							size="sm"
-							value={String(model.keyBits)}
-							onValueChange={(v) => v && (model.keyBits = Number(v))}
-							class="w-full"
-						>
-							{#each sizes[model.keyType] ?? [] as s (s.value)}
-								<ToggleGroup.Item value={String(s.value)} class="flex-1">{s.label}</ToggleGroup.Item
-								>
-							{/each}
-						</ToggleGroup.Root>
-					</Field.Field>
-				{/if}
-				<Field.Field orientation="horizontal">
-					<Field.Content>
-						<Field.Label for="new-ca-default">Make it the default</Field.Label>
-						<Field.Description>New targets use it unless you pick another CA.</Field.Description>
-					</Field.Content>
-					<Switch id="new-ca-default" bind:checked={model.isDefault} />
-				</Field.Field>
-			{:else}
-				<Field.Field>
-					<Field.Label>The CA expires after</Field.Label>
-					<DurationInput bind:value={model.lifetime} />
-				</Field.Field>
-				<div class="grid grid-cols-2 gap-4">
-					<Field.Field>
-						<Field.Label>{isSSH ? 'User' : 'Client'} certs by default</Field.Label>
-						<DurationInput bind:value={model.userDefaultTtl} />
-					</Field.Field>
-					<Field.Field>
-						<Field.Label>At most</Field.Label>
-						<DurationInput bind:value={model.userMaxTtl} />
-					</Field.Field>
-					<Field.Field>
-						<Field.Label>{isSSH ? 'Host' : 'Server'} certs by default</Field.Label>
-						<DurationInput bind:value={model.hostDefaultTtl} />
-					</Field.Field>
-					<Field.Field>
-						<Field.Label>At most</Field.Label>
-						<DurationInput bind:value={model.hostMaxTtl} />
-					</Field.Field>
-				</div>
-				<Field.Description>
-					The defaults suit most teams. Everything here can be changed later.
-				</Field.Description>
-			{/if}
+	{#if step === 1}
+		<Field.Set>
+			<Field.Legend variant="label">What will it sign?</Field.Legend>
+			<RadioGroup.Root
+				value={String(model.authorityType)}
+				onValueChange={(v) => (model.authorityType = Number(v) as AuthorityType)}
+				class="grid gap-2 sm:grid-cols-2"
+			>
+				{#each types as t (t.value)}
+					<Field.Label for={`${uid}-type-${t.value}`}>
+						<Field.Field orientation="horizontal">
+							<Field.Content>
+								<Field.Title>{t.title}</Field.Title>
+								<Field.Description>{t.description}</Field.Description>
+							</Field.Content>
+							<RadioGroup.Item value={String(t.value)} id={`${uid}-type-${t.value}`} />
+						</Field.Field>
+					</Field.Label>
+				{/each}
+			</RadioGroup.Root>
+		</Field.Set>
+		<Field.Field>
+			<Field.Label for="new-ca-name">Name</Field.Label>
+			<Input id="new-ca-name" bind:value={model.name} placeholder="production-ssh" required />
+		</Field.Field>
+		<Field.Field>
+			<Field.Label for="new-ca-description">Description</Field.Label>
+			<Textarea
+				id="new-ca-description"
+				bind:value={model.description}
+				placeholder={isSSH ? 'Signs production SSH logins' : 'Internal PKI for service mTLS'}
+				rows={2}
+			/>
+		</Field.Field>
+	{:else if step === 2}
+		<Field.Field>
+			<Field.Label>Algorithm</Field.Label>
+			<ToggleGroup.Root
+				type="single"
+				variant="outline"
+				value={String(model.keyType)}
+				onValueChange={(v) => {
+					if (!v) return;
+					model.keyType = Number(v) as CertificateKeyType;
+					model.keyBits = recommendedBits[model.keyType] ?? 0;
+				}}
+				class="w-full"
+			>
+				{#each algorithms as a (a.value)}
+					<ToggleGroup.Item value={String(a.value)} class="flex-1 gap-1.5">
+						{a.label}
+						{#if a.recommended}<Badge variant="success">Best</Badge>{/if}
+					</ToggleGroup.Item>
+				{/each}
+			</ToggleGroup.Root>
+			<Field.Description>
+				Ed25519 is fast, small and supported by every modern OpenSSH. Pick RSA only for very old
+				clients.
+			</Field.Description>
+		</Field.Field>
+		{#if sizes[model.keyType]}
+			<Field.Field>
+				<Field.Label>Key size</Field.Label>
+				<ToggleGroup.Root
+					type="single"
+					variant="outline"
+					size="sm"
+					value={String(model.keyBits)}
+					onValueChange={(v) => v && (model.keyBits = Number(v))}
+					class="w-full"
+				>
+					{#each sizes[model.keyType] ?? [] as s (s.value)}
+						<ToggleGroup.Item value={String(s.value)} class="flex-1">{s.label}</ToggleGroup.Item>
+					{/each}
+				</ToggleGroup.Root>
+			</Field.Field>
+		{/if}
+		<Field.Field orientation="horizontal">
+			<Field.Content>
+				<Field.Label for="new-ca-default">Make it the default</Field.Label>
+				<Field.Description>New targets use it unless you pick another CA.</Field.Description>
+			</Field.Content>
+			<Switch id="new-ca-default" bind:checked={model.isDefault} />
+		</Field.Field>
+	{:else}
+		<Field.Field>
+			<Field.Label>The CA expires after</Field.Label>
+			<DurationInput bind:value={model.lifetime} />
+		</Field.Field>
+		<div class="grid grid-cols-2 gap-4">
+			<Field.Field>
+				<Field.Label>{isSSH ? 'User' : 'Client'} certs by default</Field.Label>
+				<DurationInput bind:value={model.userDefaultTtl} />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label>At most</Field.Label>
+				<DurationInput bind:value={model.userMaxTtl} />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label>{isSSH ? 'Host' : 'Server'} certs by default</Field.Label>
+				<DurationInput bind:value={model.hostDefaultTtl} />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label>At most</Field.Label>
+				<DurationInput bind:value={model.hostMaxTtl} />
+			</Field.Field>
+		</div>
+		<Field.Description>
+			The defaults suit most teams. Everything here can be changed later.
+		</Field.Description>
+	{/if}
 
-			<Dialog.Footer class="gap-2">
-				{#if step > 1}
-					<Button type="button" variant="outline" onclick={() => step--}>Back</Button>
-				{/if}
-				<Button type="submit" disabled={!canContinue || createCA.isPending}>
-					{#if createCA.isPending}<Spinner data-icon="inline-start" />{/if}
-					{step < steps.length ? 'Continue' : 'Create CA'}
-				</Button>
-			</Dialog.Footer>
-		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	{#snippet footer()}
+		{#if step > 1}
+			<Button type="button" variant="outline" onclick={() => step--}>Back</Button>
+		{/if}
+		<Button type="submit" disabled={!canContinue || createCA.isPending}>
+			{#if createCA.isPending}<Spinner data-icon="inline-start" />{/if}
+			{step < steps.length ? 'Continue' : 'Create CA'}
+		</Button>
+	{/snippet}
+</FormModal>

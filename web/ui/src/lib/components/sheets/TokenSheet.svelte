@@ -1,9 +1,9 @@
 <script lang="ts">
+	import SecretReveal from '$lib/components/blocks/SecretReveal.svelte';
 	import { untrack, type Snippet } from 'svelte';
 	import { ca } from '$lib/api/certificates.svelte';
 	import { token as tokenApi } from '$lib/api/tokens.svelte';
 	import RolePicker from '$lib/components/access/RolePicker.svelte';
-	import * as Alert from '$lib/components/ui/alert';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Empty from '$lib/components/ui/empty';
@@ -16,7 +16,7 @@
 	import * as Select from '$lib/components/ui/select';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import * as ToggleGroup from '$lib/components/ui/toggle-group';
-	import CopyText from '$lib/components/utils/CopyText.svelte';
+	import CopyText from '$lib/components/blocks/CopyText.svelte';
 	import { AuthorityType } from '$lib/gen/nokku/v1/certificates_pb';
 	import { TokenKind, type Token } from '$lib/gen/nokku/v1/token_pb';
 	import { confirm } from '$lib/hooks';
@@ -160,13 +160,11 @@
 	<Tabs.Content value="new" class="flex flex-col divide-y">
 		{#if createToken.isSuccess}
 			<Section title={`${isEnroll ? 'Token' : 'Invite link'} created`} icon={CircleCheck}>
-				<Alert.Root variant="warning">
-					<KeyRound />
-					<Alert.Description>
-						Copy it now, it is only shown once. Revoke it under Active if it leaks.
-					</Alert.Description>
-				</Alert.Root>
-				{@render reveal(createToken.data.secret, createToken.data.token)}
+				<SecretReveal
+					note="Copy it now, it is only shown once. Revoke it under Active if it leaks."
+				>
+					{@render reveal(createToken.data.secret, createToken.data.token)}
+				</SecretReveal>
 				<Button variant="outline" size="sm" class="self-start" onclick={another}>
 					<Plus data-icon="inline-start" />
 					Create another

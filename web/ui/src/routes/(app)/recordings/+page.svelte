@@ -1,19 +1,35 @@
 <script lang="ts">
 	import { recordings } from '$lib/api/recordings.svelte';
 	import RecordingPlayer from './RecordingPlayer.svelte';
-	import { DataTable, createAppColumnHelper, type BulkAction } from '$lib/components/tables';
-	import { ActionCell, StatusCell, TimeCell } from '$lib/components/tables/cells';
+	import {
+		DataTable,
+		TableToolbar,
+		createAppColumnHelper,
+		type BulkAction
+	} from '$lib/components/tables';
+	import { page } from '$app/state';
+	import { daemon } from '$lib/api/daemons.svelte';
+	import { ActionCell, StatusCell, TextCell, TimeCell } from '$lib/components/tables/cells';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import StorageQuotaPill from './StorageQuotaPill.svelte';
 	import { confirm, createModalState, usePagination } from '$lib/hooks';
 	import { plural } from '$lib/api/bulk';
 	import { formatBytes } from '$lib/utils';
 	import type { Recording } from '$lib/gen/nokku/v1/recordings_pb';
-	import { Play, SearchX, Trash2, Video } from '@lucide/svelte';
+	import { Bot, Play, Trash2, Video } from '@lucide/svelte';
 
 	const pager = usePagination();
-	const list = recordings.list(() => pager.args);
+	const list = recordings.list(() => ({
+		...pager.args,
+		daemonId: page.url.searchParams.get('daemon') || undefined,
+		username: page.url.searchParams.get('user') || undefined
+	}));
+	const daemons = daemon.list();
+	const daemonName = $derived(new Map((daemons.data?.daemons ?? []).map((d) => [d.id, d.name])));
+	const daemonOptions = $derived(
+		(daemons.data?.daemons ?? []).map((d) => ({ label: d.name, value: d.id, icon: Bot }))
+	);
 	const deleteRecording = recordings.delete();
 	const deleteRecordings = recordings.deleteMany();
 
@@ -25,13 +41,12 @@
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: async (selected) => {
-				const ok = await confirm({
-					title: `Delete ${plural(selected.length, 'recording')}?`,
-					description: 'This permanently deletes the recordings.'
-				});
-				if (ok) await deleteRecordings.mutateAsync(selected.map(({ id }) => ({ recordingId: id })));
-			}
+			confirm: (selected) => ({
+				title: `Delete ${plural(selected.length, 'recording')}?`,
+				description: 'This permanently deletes the recordings.'
+			}),
+			onClick: (selected) =>
+				deleteRecordings.mutateAsync(selected.map(({ id }) => ({ recordingId: id })))
 		}
 	];
 
@@ -41,9 +56,15 @@
 			header: 'Started',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.startedAt })
 		}),
+		columnHelper.accessor('daemonId', {
+			header: 'Daemon',
+			cell: ({ row }) =>
+				renderComponent(TextCell, { label: daemonName.get(row.original.daemonId) ?? '—' })
+		}),
 		columnHelper.accessor('username', {
 			header: 'User',
-			cell: ({ row }) => renderComponent(StatusCell, { status: row.original.username || '—' })
+			cell: ({ row }) =>
+				renderComponent(TextCell, { label: row.original.username || '—', mono: true })
 		}),
 		columnHelper.accessor('sizeBytes', {
 			header: 'Size',
@@ -76,11 +97,7 @@
 	]);
 </script>
 
-<PageHeader
-	icon={Video}
-	title="Recordings"
-	description="Encrypted session recordings from your daemons."
->
+<PageHeader title="Recordings" description="Encrypted session recordings from your daemons">
 	<StorageQuotaPill />
 </PageHeader>
 
@@ -90,12 +107,22 @@
 	isLoading={list.isLoading}
 	{columns}
 	{bulkActions}
+	onRowClick={(r) => player.openWith({ ...r })}
 	emptyState={{
-		icon: SearchX,
+		icon: Video,
 		title: 'No recordings yet',
-		description: 'Recordings appear here once a daemon records a session.'
+		description: 'Turn on REC for a daemon, then every new session it serves lands here.'
 	}}
-></DataTable>
+>
+	{#snippet toolbar(table)}
+		<TableToolbar
+			search="user"
+			searchPlaceholder="Exact account, e.g. deploy"
+			{table}
+			filters={[{ title: 'Daemon', options: daemonOptions, param: 'daemon', mode: 'single' }]}
+		/>
+	{/snippet}
+</DataTable>
 
 {#if player.selected.id}
 	<RecordingPlayer

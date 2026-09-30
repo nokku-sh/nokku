@@ -36,21 +36,21 @@
 				};
 			case SubjectKind.TEAM:
 				return {
-					borderColor: 'border-chart-3',
-					headerBg: 'bg-chart-3/10',
-					iconColor: 'text-chart-3',
+					borderColor: 'border-chart-2',
+					headerBg: 'bg-chart-2/10',
+					iconColor: 'text-chart-2',
 					icon: UsersIcon,
 					label: 'Team',
-					handleColor: 'bg-chart-3!'
+					handleColor: 'bg-chart-2!'
 				};
 			case SubjectKind.SERVICE_ACCOUNT:
 				return {
-					borderColor: 'border-chart-4',
-					headerBg: 'bg-chart-4/10',
-					iconColor: 'text-chart-4',
+					borderColor: 'border-chart-5',
+					headerBg: 'bg-chart-5/10',
+					iconColor: 'text-chart-5',
 					icon: Waypoints,
 					label: 'Service',
-					handleColor: 'bg-chart-4!'
+					handleColor: 'bg-chart-5!'
 				};
 			default:
 				return {
@@ -84,7 +84,7 @@
 
 <div class="group relative">
 	<Card.Root
-		class="w-[250px] overflow-hidden border-l-4 border-border/60 bg-card transition-all duration-300 hover:shadow-lg {config.borderColor}"
+		class="w-[250px] overflow-hidden border-l-4 border-border/60 bg-card transition-all duration-300 {config.borderColor}"
 	>
 		<div class="flex items-center justify-between px-4">
 			<div class="flex items-center gap-3 overflow-hidden">
@@ -109,10 +109,7 @@
 							{@const sa = data as ServiceAccount}
 							<Clock class="h-3 w-3 shrink-0" />
 
-							<span
-								class="truncate font-mono text-[10px]"
-								title={formatTs(sa.expiresAt, 'relative')}
-							>
+							<span class="truncate font-mono text-2xs" title={formatTs(sa.expiresAt, 'relative')}>
 								expires
 								{formatTs(sa.expiresAt, 'relative')}
 							</span>
@@ -124,7 +121,7 @@
 		<Button
 			variant="ghost"
 			size="icon"
-			class="absolute -top-4 -right-4 rounded-full hover:text-destructive {config.handleColor} text-white"
+			class="absolute -top-4 -right-4 rounded-full hover:text-destructive {config.handleColor} text-primary-foreground"
 			onclick={handleRevokeAccess}
 		>
 			<Trash2 size={14} />

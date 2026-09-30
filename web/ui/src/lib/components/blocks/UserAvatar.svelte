@@ -4,6 +4,7 @@
 	import type { WorkspaceMember } from '$lib/gen/nokku/v1/workspace_pb';
 	import type { ComponentProps } from 'svelte';
 	import {
+		avatarColors,
 		getBoolean,
 		getContrast,
 		getRandomColor,
@@ -15,11 +16,7 @@
 		user?: User | WorkspaceMember;
 		colors?: string[];
 	}
-	let {
-		user,
-		colors = ['#093C5D', '#3B7597', '#6FD1D7', '#5DF8D8'],
-		...restProps
-	}: Props = $props();
+	let { user, colors = avatarColors, ...restProps }: Props = $props();
 
 	const SIZE = 32;
 

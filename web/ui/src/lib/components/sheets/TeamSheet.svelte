@@ -10,9 +10,9 @@
 	import { TagsInput } from '$lib/components/ui/tags-input';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import Chip from '$lib/components/utils/Chip.svelte';
-	import SearchPopover from '$lib/components/utils/SearchPopover.svelte';
-	import UserAvatar from '$lib/components/utils/UserAvatar.svelte';
+	import Chip from '$lib/components/blocks/Chip.svelte';
+	import SearchPopover from '$lib/components/blocks/SearchPopover.svelte';
+	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
 	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
 	import { TeamSchema } from '$lib/gen/nokku/v1/team_pb';
 	import { confirm, useAutoSave, useDraft, useSheet } from '$lib/hooks';
@@ -102,7 +102,7 @@
 	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
 	{#snippet media()}
-		<div class="flex size-10 items-center justify-center rounded-lg bg-chart-3/15 text-chart-3">
+		<div class="flex size-10 items-center justify-center rounded-lg bg-chart-2/15 text-chart-2">
 			<Users class="size-5" />
 		</div>
 	{/snippet}

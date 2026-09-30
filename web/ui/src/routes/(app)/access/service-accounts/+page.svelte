@@ -13,7 +13,7 @@
 	import { ActionCell, AvatarCell, RoleCell, TimeCell } from '$lib/components/tables/cells';
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import type { ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
 	import { confirm, usePagination, useSheet } from '$lib/hooks';
 	import { PlusIcon, ShieldCheck, Trash2, Waypoints } from '@lucide/svelte';
@@ -43,14 +43,12 @@
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: async (selected) => {
-				const ok = await confirm({
-					title: `Delete ${plural(selected.length, 'service account')}?`,
-					description: 'This action cannot be undone.',
-					confirmText: 'Delete'
-				});
-				if (ok) await deleteSAs.mutateAsync(selected.map(({ id }) => ({ id })));
-			}
+			confirm: (selected) => ({
+				title: `Delete ${plural(selected.length, 'service account')}?`,
+				description: 'This action cannot be undone.',
+				confirmText: 'Delete'
+			}),
+			onClick: (selected) => deleteSAs.mutateAsync(selected.map(({ id }) => ({ id })))
 		}
 	];
 
@@ -87,7 +85,7 @@
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.expiresAt })
 		}),
 		columnHelper.accessor('lastUsedAt', {
-			header: 'Last Used',
+			header: 'Last used',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.lastUsedAt })
 		}),
 		columnHelper.accessor('updatedAt', {
@@ -112,7 +110,8 @@
 
 					deleteConfig: {
 						itemName: row.original.name,
-						description: 'Are you sure you want to delete this service account?',
+						description: 'Its token stops working right away and every grant is removed.',
+						typeToConfirm: row.original.name,
 						onDelete: () => deleteSA.mutateAsync({ id: row.original.id })
 					}
 				});
@@ -122,9 +121,8 @@
 </script>
 
 <PageHeader
-	title="Service Accounts"
+	title="Service accounts"
 	description="API identities for CI, Ansible and other automation"
-	icon={Waypoints}
 >
 	<Button onclick={() => (createOpen = true)}>
 		<PlusIcon data-icon="inline-start" />
@@ -144,8 +142,8 @@
 	onRowClick={(sa) => sheet.show(sa.id)}
 	emptyState={{
 		icon: Waypoints,
-		title: 'No Service Accounts',
-		description: 'Create your first service account to enable API access and automation'
+		title: 'No service accounts yet',
+		description: 'Give CI and automation their own identity and token.'
 	}}
 >
 	{#snippet toolbar(table)}

@@ -6,7 +6,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import { Globe, Save, Info, TriangleAlert } from '@lucide/svelte';
 	import { Switch } from '$lib/components/ui/switch';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
+	import { Separator } from '$lib/components/ui/separator';
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
 	import { TagsInput } from '$lib/components/ui/tags-input';
 	import { Spinner } from '$lib/components/ui/spinner';
@@ -254,16 +254,11 @@
 	</Card.Content>
 
 	<Card.Footer class="flex justify-end">
-		<Button
-			variant="default"
-			size="sm"
-			onclick={handleSubmit}
-			disabled={updateProvider.isPending}
-			class="w-full sm:w-auto"
-		>
-			<Save class={updateProvider.isPending ? 'hidden' : ''} />
-			<Spinner class={updateProvider.isPending ? '' : 'hidden'} />
-			{configured ? 'Save' : 'Add Provider'}
+		<Button onclick={handleSubmit} disabled={updateProvider.isPending} class="w-full sm:w-auto">
+			{#if updateProvider.isPending}<Spinner data-icon="inline-start" />{:else}<Save
+					data-icon="inline-start"
+				/>{/if}
+			{configured ? 'Save' : 'Add provider'}
 		</Button>
 	</Card.Footer>
 </Card.Root>

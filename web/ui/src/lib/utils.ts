@@ -4,12 +4,10 @@ import {
 	durationFromMs,
 	durationMs,
 	timestampDate,
-	timestampFromDate,
 	type Duration,
 	type Timestamp
 } from '@bufbuild/protobuf/wkt';
 import { type DateValue, DateFormatter, getLocalTimeZone } from '@internationalized/date';
-import type { DateRange } from 'bits-ui';
 
 export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
@@ -32,10 +30,6 @@ export function formatBytes(bytes: number): string {
 export const toDate = (ts: Timestamp | null | undefined): Date =>
 	ts ? timestampDate(ts) : new Date();
 
-export const fromDate = (date: Date): Timestamp => timestampFromDate(date);
-
-export const now = (): Timestamp => fromDate(new Date());
-
 export const DateValueFormat = (date: DateValue | null | undefined) => {
 	const format = new DateFormatter('en-US', {
 		dateStyle: 'long',
@@ -43,35 +37,28 @@ export const DateValueFormat = (date: DateValue | null | undefined) => {
 	});
 	return date ? format.format(date.toDate(getLocalTimeZone())) : '';
 };
-export const DateRangeFormat = (date: DateRange | null | undefined) => {
-	const format = new DateFormatter('en-US', {
-		dateStyle: 'long'
-	});
+type DateStyle =
+	| 'full'
+	| 'long'
+	| 'short'
+	| 'compact'
+	| 'relative'
+	| 'relative-short'
+	| 'withTime'
+	| 'time'
+	| 'precise'
+	| 'precise-utc';
 
-	const start = date?.start?.toDate(getLocalTimeZone());
-	const end = date?.end?.toDate(getLocalTimeZone());
-	if (start && end) {
-		return format.format(start) + ' - ' + format.format(end);
-	}
-	return '';
-};
-
-export const DateValueToTimestamp = (date: DateValue | null | undefined) => {
-	if (!date) return undefined;
-	const nextDay = date.add({ days: 1 });
-	return timestampFromDate(nextDay.toDate(getLocalTimeZone()));
-};
-
-/** Convert a DateValue to a Timestamp at the start of that day (local time). */
-export const DateValueStartTs = (date: DateValue | null | undefined) => {
-	if (!date) return undefined;
-	return timestampFromDate(date.toDate(getLocalTimeZone()));
-};
-
-/** Splits an audit action like "DeleteTarget" into "Delete Target". */
-export const actionLabel = (action: string): string => action.replace(/([a-z])([A-Z])/g, '$1 $2');
-
-type DateStyle = 'full' | 'long' | 'short' | 'compact' | 'relative' | 'relative-short' | 'withTime';
+// Audit grade: 24h clock with seconds, so events line up with server logs.
+const precise = {
+	month: 'short',
+	day: 'numeric',
+	year: 'numeric',
+	hour: '2-digit',
+	minute: '2-digit',
+	second: '2-digit',
+	hour12: false
+} as const;
 
 const formatters = {
 	full: new Intl.DateTimeFormat(undefined, {
@@ -103,6 +90,13 @@ const formatters = {
 		day: 'numeric',
 		hour: 'numeric',
 		minute: '2-digit'
+	}),
+	time: new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }),
+	precise: new Intl.DateTimeFormat(undefined, precise),
+	'precise-utc': new Intl.DateTimeFormat(undefined, {
+		...precise,
+		timeZone: 'UTC',
+		timeZoneName: 'short'
 	})
 };
 
@@ -147,9 +141,7 @@ function formatRelative(ts: Timestamp, short = false): string {
 
 export const secToD = (sec: number): Duration => durationFromMs(sec * 1000);
 
-export const dToMs = (d: Duration | null | undefined): number => (d ? durationMs(d) : 0);
-
-export const dToSec = (d: Duration | null | undefined): number => dToMs(d) / 1000;
+const dToMs = (d: Duration | null | undefined): number => (d ? durationMs(d) : 0);
 
 type DurationStyle = 'short' | 'long' | 'compact' | 'clock';
 
@@ -200,46 +192,6 @@ export function formatD(
 }
 
 const pad = (n: number) => n.toString().padStart(2, '0');
-
-const PARSE_UNITS: Record<string, number> = {
-	y: 365 * 24 * 60 * 60 * 1000,
-	mo: 30 * 24 * 60 * 60 * 1000,
-	w: 7 * 24 * 60 * 60 * 1000,
-	d: 24 * 60 * 60 * 1000,
-	h: 60 * 60 * 1000,
-	m: 60 * 1000,
-	s: 1000,
-	ms: 1
-};
-
-// parseD accepts "1h30m", "2d", "1h 30m 15s", "90s", "1.5h", or plain seconds.
-export function parseD(input: string): Duration | null {
-	const str = input.trim().toLowerCase();
-	if (!str) return null;
-
-	const regex = /(-?\d+\.?\d*)\s*(y|mo|w|d|h|m(?!s)|s|ms)/g;
-	let totalMs = 0;
-	let matched = false;
-
-	let match;
-	while ((match = regex.exec(str)) !== null) {
-		const value = parseFloat(match[1]);
-		const unit = match[2];
-		if (isNaN(value) || !(unit in PARSE_UNITS)) continue;
-		totalMs += value * PARSE_UNITS[unit];
-		matched = true;
-	}
-
-	if (!matched) {
-		const num = parseFloat(str);
-		if (!isNaN(num)) {
-			totalMs = num * 1000;
-			matched = true;
-		}
-	}
-
-	return matched ? durationFromMs(Math.round(totalMs)) : null;
-}
 
 /** Excludes 0/UNSPECIFIED. */
 export function enumToArray<T extends object>(e: T): { name: string; value: number }[] {

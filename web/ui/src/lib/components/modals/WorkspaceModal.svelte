@@ -6,7 +6,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import type { Workspace } from '$lib/gen/nokku/v1/workspace_pb';
 	import { useAutoSave } from '$lib/hooks';
-	import FormModal from './FormModal.svelte';
+	import FormModal from '$lib/components/blocks/FormModal.svelte';
 
 	interface Props {
 		draft: Workspace;
@@ -31,7 +31,7 @@
 
 <FormModal
 	bind:open
-	title={isEdit ? 'Edit Workspace' : 'Create Workspace'}
+	title={isEdit ? 'Edit workspace' : 'Create workspace'}
 	description={isEdit
 		? 'Changes save automatically.'
 		: 'Workspaces isolate targets, members, and certificates.'}

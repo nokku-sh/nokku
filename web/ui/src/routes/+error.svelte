@@ -1,17 +1,29 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
+	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import * as Empty from '$lib/components/ui/empty';
+	import { House, SquareTerminal, TriangleAlert } from '@lucide/svelte';
 
-	$effect(() => {
-		if (page.status === 404) {
-			goto('/');
-		}
-	});
+	const missing = $derived(page.status === 404);
+	const command = $derived(page.url.pathname.split('/').filter(Boolean).join(' ') || 'nokku');
 </script>
 
-{#if page.status !== 404}
-	<div class="flex h-dvh flex-col items-center justify-center gap-4">
-		<h1 class="text-4xl font-bold">{page.status}</h1>
-		<p class="text-muted-foreground">{page.error?.message ?? 'Something went wrong'}</p>
-	</div>
-{/if}
+<main class="flex min-h-dvh items-center justify-center p-4">
+	<AuthCard
+		title={missing ? 'Page not found' : 'Something went wrong'}
+		description={missing
+			? 'That page does not exist, or it moved.'
+			: (page.error?.message ?? `The server answered ${page.status}.`)}
+		icon={missing ? SquareTerminal : TriangleAlert}
+		tone={missing ? undefined : 'destructive'}
+	>
+		{#if missing}
+			<Empty.Command class="self-center">{command}: command not found</Empty.Command>
+		{/if}
+		<Button href="/" class="w-full">
+			<House data-icon="inline-start" />
+			Back to the dashboard
+		</Button>
+	</AuthCard>
+</main>

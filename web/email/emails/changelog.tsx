@@ -49,7 +49,7 @@ export default function Changelog() {
         </Text>
       </Section>
 
-      <Section className="rounded-xl border border-[#bfe7e8] bg-mist px-5 py-4">
+      <Section className="rounded-xl border border-mistLine bg-mist px-5 py-4">
         <Text className="m-0 text-sm font-bold text-ink">Upgrade notes</Text>
         <Text className="m-0 mt-1 text-sm leading-6 text-muted">
           Self-hosted: update the control plane and{" "}

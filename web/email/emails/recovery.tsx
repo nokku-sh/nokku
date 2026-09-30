@@ -23,7 +23,7 @@ export default function Recovery() {
           Reset password
         </Button>
       </Section>
-      <Section className="rounded-xl border border-[#f5c7c2] bg-dangerSoft px-5 py-4">
+      <Section className="rounded-xl border border-dangerLine bg-dangerSoft px-5 py-4">
         <Text className="m-0 text-sm font-bold text-ink">Did not request this?</Text>
         <Text className="m-0 mt-1 text-sm leading-6 text-muted">
           You can safely ignore this email. Your current password will remain unchanged. This link

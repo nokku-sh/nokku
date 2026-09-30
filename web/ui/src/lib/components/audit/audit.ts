@@ -2,8 +2,6 @@ import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { AuditOutcome, type EventLog } from '$lib/gen/nokku/v1/util_pb';
 import { PAGE_PARAM } from '$lib/hooks';
-import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import { timestampDate } from '@bufbuild/protobuf/wkt';
 import {
 	Bot,
 	CircleCheck,
@@ -161,7 +159,7 @@ export const actorKinds: { value: string; label: string; icon: LucideIcon }[] = 
 export const kindOf = (kind: string) => actorKinds.find((k) => k.value === kind);
 
 /** Params owned by the quick views, clicking one replaces all of them. */
-export const filterParams = ['q', 'area', 'outcome', 'kind', 'actor', 'target'];
+const filterParams = ['q', 'area', 'outcome', 'kind', 'actor', 'target'];
 
 export const quickViews: { label: string; params: Record<string, string> }[] = [
 	{ label: 'Everything', params: {} },
@@ -201,28 +199,15 @@ export function eventLabel(action: string) {
 	return words.map((w, i) => (i === 0 || /^[A-Z0-9]{2,}$/.test(w) ? w : w.toLowerCase())).join(' ');
 }
 
-export function outcomeOf(log: EventLog): 'succeeded' | 'failed' | 'denied' {
+export type Outcome = 'succeeded' | 'failed' | 'denied';
+
+export function outcomeOf(log: EventLog): Outcome {
 	if (log.ok) return 'succeeded';
 	const code = log.details?.['code'];
 	if (log.action === 'LoginDenied' || code === 'permission_denied' || code === 'unauthenticated') {
 		return 'denied';
 	}
 	return 'failed';
-}
-
-export function formatTime(ts: Timestamp | undefined, utc: boolean) {
-	if (!ts) return '';
-	return new Intl.DateTimeFormat(undefined, {
-		month: 'short',
-		day: 'numeric',
-		year: 'numeric',
-		hour: '2-digit',
-		minute: '2-digit',
-		second: '2-digit',
-		hour12: false,
-		timeZone: utc ? 'UTC' : undefined,
-		timeZoneName: utc ? 'short' : undefined
-	}).format(timestampDate(ts));
 }
 
 export const csv = (param: string) =>
@@ -241,3 +226,10 @@ export function setParams(params: Record<string, string | undefined>, replaceFil
 }
 
 export const kindIcon = (kind: string): LucideIcon => kindOf(kind)?.icon ?? KeyRound;
+
+/** Failures and denials read as destructive, successes stay quiet. */
+export const outcomeLabel: Record<Outcome, string> = {
+	succeeded: 'Succeeded',
+	failed: 'Failed',
+	denied: 'Denied'
+};

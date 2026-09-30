@@ -11,7 +11,7 @@
 </script>
 
 <script lang="ts">
-	import CopyText from '$lib/components/utils/CopyText.svelte';
+	import CopyText from '$lib/components/blocks/CopyText.svelte';
 	import { cn } from '$lib/utils';
 
 	interface Props {
@@ -43,7 +43,7 @@
 	>
 		{#each tiles as item (item.label)}
 			<div class={cn('flex min-w-0 flex-col gap-0.5 bg-card px-3 py-2', item.wide && 'col-span-2')}>
-				<dt class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+				<dt class="text-2xs font-medium tracking-wide text-muted-foreground uppercase">
 					{item.label}
 				</dt>
 				<dd class={cn('flex min-w-0', item.mono && 'font-mono text-xs leading-5')}>

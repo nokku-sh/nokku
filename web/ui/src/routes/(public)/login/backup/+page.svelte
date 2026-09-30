@@ -1,12 +1,13 @@
 <script lang="ts">
-	import * as Alert from '$lib/components/ui/alert';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Label } from '$lib/components/ui/label/index.js';
-	import * as InputOTP from '$lib/components/ui/input-otp/index.js';
+	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import * as Field from '$lib/components/ui/field';
+	import { Spinner } from '$lib/components/ui/spinner';
+	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
+	import * as InputOTP from '$lib/components/ui/input-otp';
 	import { auth } from '$lib/api/auth.svelte';
 	import { BinaryIcon, ShieldCheck, Undo2Icon } from '@lucide/svelte';
-	import { REGEXP_ONLY_DIGITS_AND_CHARS } from 'bits-ui';
+	import { REGEXP_ONLY_DIGITS_AND_CHARS, type PinInputCell } from 'bits-ui';
 
 	let email = $state('');
 	let code = $state('');
@@ -22,102 +23,75 @@
 	}
 </script>
 
-<div
-	class="m-auto h-fit max-w-98 overflow-hidden rounded-[calc(var(--radius)+.125rem)] border bg-muted shadow-md shadow-zinc-950/5 dark:[--color-muted:var(--color-zinc-900)]"
->
-	<div class="-m-px rounded-[calc(var(--radius)+.125rem)] border bg-card p-6 pb-6">
-		<div class="text-center">
-			<div class="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-primary/10">
-				<BinaryIcon class="size-6 text-primary" />
-			</div>
-			<h1 class="mt-4 mb-1 text-xl font-semibold">Use Backup Code</h1>
-			<p class="text-sm text-muted-foreground">
-				Enter your email and one of your backup codes to sign in
-			</p>
-		</div>
+{#snippet slots(cells: PinInputCell[])}
+	<InputOTP.Group class="flex-1">
+		{#each cells as cell, i (i)}
+			<InputOTP.Slot {cell} class="h-10 flex-1 font-mono" />
+		{/each}
+	</InputOTP.Group>
+{/snippet}
 
-		<form class="mt-4 space-y-6" onsubmit={handleSubmit}>
-			<div class="space-y-2">
-				<Label for="email">Email</Label>
+<AuthCard
+	title="Sign in with a backup code"
+	description="Your email and one of the codes you saved"
+	icon={BinaryIcon}
+>
+	<form class="flex flex-col gap-6" onsubmit={handleSubmit}>
+		<Field.Group class="gap-4">
+			<Field.Field>
+				<Field.Label for="email">Email</Field.Label>
 				<Input
 					id="email"
 					type="email"
+					autocomplete="username"
 					bind:value={email}
 					required
-					placeholder="name@example.com"
-					autofocus
+					placeholder="you@company.com"
 				/>
-			</div>
-
-			<div class="space-y-3">
-				<Label for="code">Backup Code</Label>
-
-				<div class="flex w-full justify-center py-2">
-					<InputOTP.Root
-						maxlength={16}
-						pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
-						bind:value={code}
-						pasteTransformer={(text) => text.replace(/-/g, '')}
-					>
-						{#snippet children({ cells })}
-							<div class="flex flex-col items-center gap-3">
-								<div class="flex items-center gap-2 sm:gap-3">
-									<InputOTP.Group>
-										{#each cells.slice(0, 4) as cell}
-											<InputOTP.Slot {cell} />
-										{/each}
-									</InputOTP.Group>
-									<InputOTP.Separator />
-									<InputOTP.Group>
-										{#each cells.slice(4, 8) as cell}
-											<InputOTP.Slot {cell} />
-										{/each}
-									</InputOTP.Group>
-								</div>
-								<div class="flex items-center gap-2 sm:gap-3">
-									<InputOTP.Group>
-										{#each cells.slice(8, 12) as cell}
-											<InputOTP.Slot {cell} />
-										{/each}
-									</InputOTP.Group>
-									<InputOTP.Separator />
-									<InputOTP.Group>
-										{#each cells.slice(12, 16) as cell}
-											<InputOTP.Slot {cell} />
-										{/each}
-									</InputOTP.Group>
-								</div>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="code">Backup code</Field.Label>
+				<InputOTP.Root
+					id="code"
+					class="w-full"
+					maxlength={16}
+					pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
+					bind:value={code}
+					pasteTransformer={(text) => text.replace(/-/g, '')}
+				>
+					{#snippet children({ cells })}
+						<div class="flex w-full flex-col gap-3">
+							<div class="flex w-full items-center gap-2">
+								{@render slots(cells.slice(0, 4))}
+								<InputOTP.Separator />
+								{@render slots(cells.slice(4, 8))}
 							</div>
-						{/snippet}
-					</InputOTP.Root>
-				</div>
-				<p class="text-xs text-muted-foreground">
-					Enter the 16-character backup code from your saved list.
-				</p>
-			</div>
+							<div class="flex w-full items-center gap-2">
+								{@render slots(cells.slice(8, 12))}
+								<InputOTP.Separator />
+								{@render slots(cells.slice(12, 16))}
+							</div>
+						</div>
+					{/snippet}
+				</InputOTP.Root>
+				<Field.Description>Each code works once. Dashes are optional.</Field.Description>
+			</Field.Field>
+		</Field.Group>
 
-			<Button type="submit" class="w-full" disabled={isDisabled}>
-				<ShieldCheck class="mr-2 size-4" />
-				Sign In with Backup Code
-			</Button>
-		</form>
-	</div>
-
-	<div class="bg-muted/50 p-3">
-		<Alert.Root variant="warning">
-			<Alert.Description class="text-xs">
-				Each backup code works only once. Generate new codes after using your last one.
-			</Alert.Description>
-		</Alert.Root>
-
-		<Button
-			variant="link"
-			class="mt-3 w-full"
-			href="/login"
-			disabled={loginWithBackupCode.isPending}
-		>
-			Go back to login
-			<Undo2Icon size={16} />
+		<Button type="submit" disabled={isDisabled}>
+			{#if loginWithBackupCode.isPending}<Spinner data-icon="inline-start" />{:else}<ShieldCheck
+					data-icon="inline-start"
+				/>{/if}
+			Sign in
 		</Button>
-	</div>
-</div>
+	</form>
+
+	{#snippet footer()}
+		<a
+			href="/login"
+			class="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
+		>
+			<Undo2Icon class="size-3.5" /> Back to sign in
+		</a>
+	{/snippet}
+</AuthCard>

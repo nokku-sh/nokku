@@ -1,22 +1,22 @@
 <script lang="ts">
-	import * as Popover from '$lib/components/ui/popover';
-	import * as Collapsible from '$lib/components/ui/collapsible';
-	import { Button } from '$lib/components/ui/button';
+	import { daemon } from '$lib/api/daemons.svelte';
+	import { getSessions } from '$lib/api/terminal.svelte';
+	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
 	import { Badge } from '$lib/components/ui/badge';
-	import { ChevronRight, DotIcon, Plus, TerminalIcon, User, XIcon } from '@lucide/svelte';
+	import { Button } from '$lib/components/ui/button';
+	import * as Collapsible from '$lib/components/ui/collapsible';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import type { Target } from '$lib/gen/nokku/v1/target_pb';
-	import { daemon } from '$lib/api/daemons.svelte';
 	import { activeSessionID } from '$lib/store.svelte';
-	import { getSessions } from '$lib/api/terminal.svelte';
+	import { ChevronRight, Plus, SquareTerminal, User, X } from '@lucide/svelte';
 
-	interface Props {
-		target: Target;
-	}
-	let { target }: Props = $props();
+	let { target }: { target: Target } = $props();
 
-	let sessions = getSessions();
-	let principals = $derived(target?.principals || []);
+	const usernames = $derived((target.principals ?? []).map((p) => p.username).filter(Boolean));
+	const mine = $derived(
+		[...getSessions().entries()].filter(([, s]) => s.daemonID === target.daemonId)
+	);
 
 	// Kept alive for its side effect, the select registers open sessions.
 	daemon.listSessions(() => target.daemonId);
@@ -24,111 +24,95 @@
 	const createSession = daemon.createSession();
 	const closeSession = daemon.closeSession();
 
-	let popoverOpen = $state(false);
-
-	function connectDefault() {
-		const username = principals[0].username;
-		if (username) {
-			createSession.mutate({ daemonId: target.daemonId, username });
-		}
-	}
-
-	function connectAs(username: string) {
+	function connect(username: string) {
 		createSession.mutate({ daemonId: target.daemonId, username });
-		popoverOpen = false;
 	}
 </script>
 
-<Collapsible.Root class="rounded-xl" open={sessions.size > 0}>
-	<div
-		class="group relative z-10 flex w-full items-center gap-1 rounded-xl bg-background px-2 shadow-md"
-	>
-		<Collapsible.Trigger
-			class="flex min-w-0 flex-1 items-center gap-1 py-1.5 text-left text-sm"
-			disabled={sessions.size === 0}
-		>
-			<DotIcon size={28} class="shrink-0 text-success" />
-			<div class="min-w-0 flex-1">
-				<p class="truncate text-xs font-medium">{target?.name}</p>
-				{#if target?.metadata?.hostname}
-					<p class="truncate text-[10px] text-muted-foreground">{target.metadata.hostname}</p>
-				{/if}
-			</div>
+<Collapsible.Root open={mine.length > 0}>
+	<div class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
+		<StatusDot tone="success" class="size-1.5" />
+		<Collapsible.Trigger class="min-w-0 flex-1 text-left" disabled={!mine.length}>
+			<p class="truncate text-xs font-medium">{target.name}</p>
+			{#if target.metadata?.hostname}
+				<p class="truncate font-mono text-2xs text-muted-foreground">{target.metadata.hostname}</p>
+			{/if}
 		</Collapsible.Trigger>
+		{#if mine.length}
+			<Badge variant="secondary">{mine.length}</Badge>
+		{/if}
 
-		<!-- Right side: session count + connect button -->
-		<div class="flex shrink-0 items-center gap-1.5">
-			{#if sessions.size > 0}
-				<Badge variant="secondary" class="text-[10px]">{sessions.size}</Badge>
-			{/if}
-
-			{#if principals.length > 1}
-				<Popover.Root bind:open={popoverOpen}>
-					<Popover.Trigger>
-						{#if createSession.isPending}
-							<Spinner class="size-3.5" />
-						{:else}
-							<Button variant="ghost" size="icon" class="size-7">
-								<Plus size={14} />
-							</Button>
-						{/if}
-					</Popover.Trigger>
-					<Popover.Content side="right" align="start" class="w-48 p-1">
-						<p class="px-2 py-1.5 text-xs font-medium text-muted-foreground">Connect as</p>
-						{#each principals.map((p) => p.username) || [] as username}
-							<Button
-								variant="ghost"
-								size="sm"
-								class="w-full justify-start gap-2 text-xs"
-								disabled={createSession.isPending}
-								onclick={() => connectAs(username)}
-							>
-								<User class="size-3" />
+		{#if usernames.length > 1}
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							variant="ghost"
+							size="icon-xs"
+							aria-label={`Connect to ${target.name}`}
+							disabled={createSession.isPending}
+						>
+							{#if createSession.isPending}<Spinner />{:else}<Plus />{/if}
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content side="right" align="start" class="w-48">
+					<DropdownMenu.Group>
+						<DropdownMenu.Label>Connect as</DropdownMenu.Label>
+						{#each usernames as username (username)}
+							<DropdownMenu.Item class="font-mono text-xs" onSelect={() => connect(username)}>
+								<User />
 								{username}
-							</Button>
+							</DropdownMenu.Item>
 						{/each}
-					</Popover.Content>
-				</Popover.Root>
-			{:else}
-				<Button
-					variant="ghost"
-					size="icon"
-					class="size-7"
-					disabled={createSession.isPending}
-					onclick={connectDefault}
-				>
-					{#if createSession.isPending}
-						<Spinner class="size-3.5" />
-					{:else}
-						<Plus size={14} />
-					{/if}
-				</Button>
-			{/if}
+					</DropdownMenu.Group>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+		{:else if usernames.length === 1}
+			<Button
+				variant="ghost"
+				size="icon-xs"
+				aria-label={`Connect to ${target.name} as ${usernames[0]}`}
+				disabled={createSession.isPending}
+				onclick={() => connect(usernames[0])}
+			>
+				{#if createSession.isPending}<Spinner />{:else}<Plus />{/if}
+			</Button>
+		{/if}
 
-			{#if sessions.size > 0}
-				<ChevronRight class="transition-transform group-has-[state=open]:rotate-90" size={16} />
-			{/if}
-		</div>
+		{#if mine.length}
+			<ChevronRight
+				class="size-4 text-muted-foreground transition-transform in-data-[state=open]:rotate-90"
+			/>
+		{/if}
 	</div>
 
-	<Collapsible.Content class="-mt-2 rounded-b-xl bg-card text-sm transition-all duration-300">
-		<div class="ml-6 border-l border-border pt-4 pb-2" hidden={sessions.size === 0}>
-			{#each getSessions().entries() as [id, session]}
-				<div class="flex items-center justify-between rounded-lg px-4 py-2 hover:bg-muted">
-					<button
-						class="flex w-full items-center gap-1.5 rounded text-[11px] text-muted-foreground"
+	<Collapsible.Content>
+		<div class="ml-3 flex flex-col border-l py-1 pl-2">
+			{#each mine as [id, session] (id)}
+				<div class="group flex items-center gap-1">
+					<Button
+						variant="ghost"
+						size="sm"
+						class={[
+							'h-7 flex-1 justify-start font-mono text-xs',
+							id === activeSessionID.current ? 'text-foreground' : 'text-muted-foreground'
+						]}
 						onclick={() => (activeSessionID.current = id)}
 					>
-						<TerminalIcon size={14} />
-						<span class="truncate">{session.username}</span>
-					</button>
-
-					<button
-						class="hover:text-destructive"
+						<SquareTerminal data-icon="inline-start" />
+						{session.username}
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-xs"
+						class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+						aria-label={`Close ${session.username}`}
 						onclick={() => closeSession.mutate({ daemonId: target.daemonId, sessionId: id })}
 					>
-						<XIcon size={14} />
-					</button>
+						<X />
+					</Button>
 				</div>
 			{/each}
 		</div>

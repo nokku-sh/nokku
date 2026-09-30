@@ -1,4 +1,4 @@
-import { Terminal } from '@xterm/xterm';
+import { Terminal, type ITerminalOptions, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SvelteMap } from 'svelte/reactivity';
 import { activeSessionID } from '$lib/store.svelte';
@@ -44,6 +44,40 @@ export function validateActiveSession(sessions: DaemonSession[]) {
 	if (!isValid) activeSessionID.current = '';
 }
 
+const ansiNames = [
+	'black',
+	'red',
+	'green',
+	'yellow',
+	'blue',
+	'magenta',
+	'cyan',
+	'white',
+	'brightBlack',
+	'brightRed',
+	'brightGreen',
+	'brightYellow',
+	'brightBlue',
+	'brightMagenta',
+	'brightCyan',
+	'brightWhite'
+] as const;
+
+// The palette lives in layout.css so the live terminal and recordings match.
+function terminalTheme(): Pick<ITerminalOptions, 'fontFamily' | 'theme'> {
+	const css = getComputedStyle(document.documentElement);
+	const v = (name: string) => css.getPropertyValue(`--${name}`).trim();
+	const theme: ITheme = {
+		background: v('terminal'),
+		foreground: v('terminal-foreground'),
+		cursor: v('terminal-cursor'),
+		cursorAccent: v('terminal'),
+		selectionBackground: v('terminal-selection')
+	};
+	ansiNames.forEach((name, i) => (theme[name] = v(`ansi-${i}`)));
+	return { fontFamily: v('terminal-font'), theme };
+}
+
 export function openTerminal(
 	daemonID: string,
 	sessionID: string,
@@ -52,28 +86,7 @@ export function openTerminal(
 	const ws = new WebSocket(`/terminal/ws?daemon_id=${daemonID}&session_id=${sessionID}`);
 	ws.binaryType = 'arraybuffer';
 
-	const term = new Terminal({
-		cursorBlink: true,
-		fontSize: 14,
-		fontFamily:
-			'"JetBrainsMono Nerd Font", ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace',
-		theme: {
-			background: '#24273a',
-			foreground: '#cad3f5',
-			cursor: '#f4dbd6',
-			selectionForeground: '#24273a',
-			selectionBackground: '#f4dbd6',
-			cursorAccent: '#f4dbd6',
-			black: '#494d64',
-			red: '#ed8796',
-			green: '#a6da95',
-			yellow: '#eed49f',
-			blue: '#8aadf4',
-			magenta: '#f5bde6',
-			cyan: '#8bd5ca',
-			white: '#b8c0e0'
-		}
-	});
+	const term = new Terminal({ cursorBlink: true, fontSize: 14, ...terminalTheme() });
 	const fitAddon = new FitAddon();
 	term.loadAddon(fitAddon);
 	term.open(containerEl);

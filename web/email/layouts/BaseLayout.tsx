@@ -31,15 +31,21 @@ export default function BaseLayout({
         presets: [pixelBasedPreset],
         theme: {
           extend: {
+            // Hex copies of the web UI tokens in web/ui/src/routes/layout.css.
             colors: {
-              ink: "#172033",
-              brand: "#087e8b",
-              mist: "#edf8f9",
-              cloud: "#f4f7fb",
-              line: "#dce4ed",
-              muted: "#607086",
-              danger: "#b42318",
-              dangerSoft: "#fff1f0",
+              ink: "#141920",
+              brand: "#008794",
+              mist: "#e5f8fa",
+              mistLine: "#b2e2e7",
+              cloud: "#f3f6f9",
+              card: "#fcfdff",
+              line: "#d4d8de",
+              muted: "#5f636a",
+              danger: "#be222a",
+              dangerSoft: "#fff0ee",
+              dangerLine: "#fac6c1",
+              terminal: "#0c0f16",
+              caret: "#15d1aa",
             },
           },
         },
@@ -48,10 +54,11 @@ export default function BaseLayout({
       <Html lang="en">
         <Head />
         <Font
-          fontFamily="Public Sans Variable"
-          fallbackFontFamily="sans-serif"
+          fontFamily="Manrope Variable"
+          // Gmail and Outlook drop web fonts, so they land here.
+          fallbackFontFamily={["Helvetica", "Arial", "sans-serif"]}
           webFont={{
-            url: "https://cdn.jsdelivr.net/fontsource/fonts/public-sans:vf@5.3.0/latin-wght-normal.woff2",
+            url: "https://cdn.jsdelivr.net/fontsource/fonts/manrope:vf@latest/latin-wght-normal.woff2",
             format: "woff2",
           }}
           fontWeight={400}
@@ -60,13 +67,13 @@ export default function BaseLayout({
         <Body className="m-0 bg-cloud py-10 font-sans text-ink">
           <Preview>{preview}</Preview>
           <Container className="mx-auto max-w-[600px] overflow-hidden rounded-2xl border border-line bg-white">
-            <Section className="border-b border-line bg-ink px-8 py-7">
-              <Text className="m-0 text-[22px] font-bold tracking-[-0.4px] text-white">
-                nokku<span className="text-[#65d6da]">.</span>
+            <Section className="border-b border-line bg-terminal px-8 py-7">
+              <Text className="m-0 font-mono text-[22px] font-bold tracking-[-0.4px] text-white">
+                <span className="text-caret">&gt;</span> nokku
               </Text>
             </Section>
             <Section className="px-8 py-8">{children}</Section>
-            <Section className="border-t border-line bg-[#fafcfe] px-8 py-7">
+            <Section className="border-t border-line bg-card px-8 py-7">
               {type === "marketing" ? (
                 <Text className="m-0 text-xs leading-5 text-muted">
                   You're receiving this because you subscribed to product updates from{" "}
@@ -110,7 +117,7 @@ export default function BaseLayout({
                 </Link>
               </Text>
               <Row className="flex mt-3 items-center">
-                <Text className="text-[11px] leading-5 text-gray-500">
+                <Text className="text-[11px] leading-5 text-muted">
                   © {new Date().getFullYear()} {CONFIG.COMPANY_NAME}
                   <br />
                   {CONFIG.SUPPORT_EMAIL}

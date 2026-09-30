@@ -23,7 +23,7 @@ export default function Welcome() {
         </Button>
       </Section>
       <Hr className="my-7 border-line" />
-      <Section className="rounded-xl border border-[#bfe7e8] bg-mist px-5 py-4">
+      <Section className="rounded-xl border border-mistLine bg-mist px-5 py-4">
         <Text className="m-0 text-sm font-bold text-ink">A secure start</Text>
         <Text className="m-0 mt-1 text-sm leading-6 text-muted">
           This verification link expires in <strong>{CONSTANTS.EXPIRATION}</strong>. If you did not

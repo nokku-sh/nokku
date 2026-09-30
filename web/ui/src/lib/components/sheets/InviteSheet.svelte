@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { workspace } from '$lib/api/workspaces.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import CopyText from '$lib/components/utils/CopyText.svelte';
+	import CopyText from '$lib/components/blocks/CopyText.svelte';
 	import { TokenKind } from '$lib/gen/nokku/v1/token_pb';
 	import { roleLabel } from '$lib/roles';
 	import { formatTs } from '$lib/utils';

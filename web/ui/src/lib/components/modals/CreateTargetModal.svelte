@@ -10,7 +10,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { TargetSchema } from '$lib/gen/nokku/v1/target_pb';
 	import { useSheet } from '$lib/hooks';
-	import FormModal from './FormModal.svelte';
+	import FormModal from '$lib/components/blocks/FormModal.svelte';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 

@@ -1,32 +1,28 @@
 <script lang="ts">
+	import ExportMenu from '$lib/components/audit/ExportMenu.svelte';
+	import EventRow from '$lib/components/audit/EventRow.svelte';
+	import StatTile from '$lib/components/blocks/StatTile.svelte';
 	import { page } from '$app/state';
 	import { sessionMethodLabel, session } from '$lib/api/session.svelte';
 	import { user } from '$lib/api/user.svelte';
-	import { util, workspace } from '$lib/api/workspaces.svelte';
-	import { areaOf, areas, eventLabel, outcomeOf, setParams } from '$lib/components/audit/audit';
+	import { workspace } from '$lib/api/workspaces.svelte';
+	import { areas, setParams } from '$lib/components/audit/audit';
 	import RangePicker, { currentRange } from '$lib/components/audit/RangePicker.svelte';
 	import ActivitySheet from '$lib/components/sheets/ActivitySheet.svelte';
 	import * as Alert from '$lib/components/ui/alert';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Empty from '$lib/components/ui/empty';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import * as ToggleGroup from '$lib/components/ui/toggle-group';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import { describeAgent } from '$lib/agent';
-	import {
-		AuditOutcome,
-		ExportAuditLogsRequest_Format,
-		type EventLog
-	} from '$lib/gen/nokku/v1/util_pb';
+	import { AuditOutcome, type EventLog } from '$lib/gen/nokku/v1/util_pb';
 	import { formatTs } from '$lib/utils';
 	import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt';
 	import {
 		Activity,
-		Download,
-		KeyRound,
 		Layers2,
 		LogIn,
 		MonitorSmartphone,
@@ -83,15 +79,6 @@
 	const last = $derived(lastLogin.data?.logs[0]);
 	const failed = $derived(failedLogins.data?.total ?? 0);
 
-	const exportLogs = util.exportLogs();
-	function exportAs(format: ExportAuditLogsRequest_Format) {
-		exportLogs.mutate({
-			format,
-			workspaceId: '',
-			filter: { ...rangeFilter, endDate: rangeFilter.endDate ?? timestampFromDate(new Date()) }
-		});
-	}
-
 	function dayLabel(date: Date) {
 		const yesterday = new Date(Date.now() - 24 * 3600_000);
 		if (date.toDateString() === new Date().toDateString()) return 'Today';
@@ -119,86 +106,45 @@
 </script>
 
 <PageHeader
-	icon={Activity}
 	title="Your activity"
-	description="Your sign-ins and the changes you made, across all your workspaces."
+	description="Your sign-ins and the changes you made, across all your workspaces"
 >
-	<DropdownMenu.Root>
-		<DropdownMenu.Trigger>
-			{#snippet child({ props })}
-				<Button {...props} variant="outline" disabled={exportLogs.isPending}>
-					{#if exportLogs.isPending}
-						<Spinner data-icon="inline-start" />
-					{:else}
-						<Download data-icon="inline-start" />
-					{/if}
-					Export
-				</Button>
-			{/snippet}
-		</DropdownMenu.Trigger>
-		<DropdownMenu.Content align="end">
-			<DropdownMenu.Group>
-				<DropdownMenu.Item onclick={() => exportAs(ExportAuditLogsRequest_Format.CSV)}>
-					CSV
-				</DropdownMenu.Item>
-				<DropdownMenu.Item onclick={() => exportAs(ExportAuditLogsRequest_Format.JSON)}>
-					JSON
-				</DropdownMenu.Item>
-			</DropdownMenu.Group>
-		</DropdownMenu.Content>
-	</DropdownMenu.Root>
+	<ExportMenu filter={rangeFilter} workspaceId="" />
 </PageHeader>
 
 <ActivitySheet log={selected} onClose={() => (selected = undefined)} />
 
 <div class="grid gap-3 md:grid-cols-3">
-	<div class="flex flex-col gap-1 rounded-xl border bg-card p-4">
-		<span class="flex items-center gap-1.5 text-xs text-muted-foreground">
-			<LogIn class="size-3.5" /> Last sign-in
-		</span>
-		{#if lastLogin.isLoading}
-			<Skeleton class="h-10 w-full" />
-		{:else if last}
+	<StatTile
+		label="Last sign-in"
+		icon={LogIn}
+		loading={lastLogin.isLoading}
+		hint={last ? `${describeAgent(last.userAgent)}${last.ip ? ` · ${last.ip}` : ''}` : undefined}
+	>
+		{#if last}
 			<span class="flex items-center gap-2 text-sm font-medium">
 				{formatTs(last.timestamp, 'relative')}
 				{#if method(last)}<Badge variant="secondary">{method(last)}</Badge>{/if}
 			</span>
-			<span class="truncate text-xs text-muted-foreground">
-				{describeAgent(last.userAgent)}{last.ip ? ` · ${last.ip}` : ''}
-			</span>
 		{:else}
 			<span class="text-sm text-muted-foreground">None in the last 90 days</span>
 		{/if}
-	</div>
-
-	<a
+	</StatTile>
+	<StatTile
+		label="Failed sign-ins"
+		icon={ShieldAlert}
 		href="/profile/security"
-		class={[
-			'flex flex-col gap-1 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/40',
-			failed && 'border-destructive/40'
-		]}
-	>
-		<span class="flex items-center gap-1.5 text-xs text-muted-foreground">
-			<ShieldAlert class={['size-3.5', failed && 'text-destructive']} /> Failed sign-ins
-		</span>
-		<span class={['text-xl font-semibold tabular-nums', failed && 'text-destructive']}>
-			{failed}
-		</span>
-		<span class="text-xs text-muted-foreground">{range.label.toLowerCase()}</span>
-	</a>
-
-	<a
+		value={failed}
+		tone={failed ? 'destructive' : undefined}
+		hint={range.label.toLowerCase()}
+	/>
+	<StatTile
+		label="Signed in on"
+		icon={MonitorSmartphone}
 		href="/profile/security"
-		class="flex flex-col gap-1 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/40"
-	>
-		<span class="flex items-center gap-1.5 text-xs text-muted-foreground">
-			<MonitorSmartphone class="size-3.5" /> Signed in on
-		</span>
-		<span class="text-xl font-semibold tabular-nums">{sessions.data?.length ?? '–'}</span>
-		<span class="text-xs text-muted-foreground">
-			{sessions.data?.length === 1 ? 'device' : 'devices'}, manage them under Security
-		</span>
-	</a>
+		value={sessions.data?.length ?? '–'}
+		hint={`${sessions.data?.length === 1 ? 'device' : 'devices'}, manage them under Security`}
+	/>
 </div>
 
 {#if failed}
@@ -248,56 +194,21 @@
 	<div class="flex flex-col gap-5">
 		{#each days as day (day.label)}
 			<section class="flex flex-col gap-2">
-				<h3 class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+				<h3 class="spec-label">
 					{day.label}
 				</h3>
 				<div class="divide-y overflow-hidden rounded-xl border bg-card">
 					{#each day.events as e (e.id)}
-						{@const outcome = outcomeOf(e)}
-						{@const Icon = areaOf(e.action)?.icon ?? KeyRound}
-						<button
-							type="button"
-							class="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/40"
-							onclick={() => (selected = e)}
-						>
-							<div
-								class={[
-									'flex size-8 shrink-0 items-center justify-center rounded-lg',
-									outcome === 'succeeded'
-										? 'bg-muted text-muted-foreground'
-										: 'bg-destructive/10 text-destructive'
-								]}
-							>
-								<Icon class="size-4" />
-							</div>
-							<div class="flex min-w-0 flex-1 flex-col gap-0.5">
-								<span class="flex flex-wrap items-center gap-1.5 text-sm font-medium">
-									{eventLabel(e.action)}
-									{#if method(e)}<Badge variant="secondary">{method(e)}</Badge>{/if}
-									{#if outcome !== 'succeeded'}
-										<Badge variant="destructive">{outcome === 'denied' ? 'Denied' : 'Failed'}</Badge
-										>
-									{/if}
-									{#if e.workspaceId && workspaceName.get(e.workspaceId)}
-										<Badge variant="outline">
-											<Layers2 data-icon="inline-start" />
-											{workspaceName.get(e.workspaceId)}
-										</Badge>
-									{/if}
-								</span>
-								<span class="truncate text-xs text-muted-foreground">
-									{describeAgent(e.userAgent)}{e.ip ? ` · ${e.ip}` : ''}
-								</span>
-							</div>
-							<span class="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
-								{e.timestamp
-									? timestampDate(e.timestamp).toLocaleTimeString(undefined, {
-											hour: '2-digit',
-											minute: '2-digit'
-										})
-									: ''}
-							</span>
-						</button>
+						<EventRow log={e} onclick={() => (selected = e)} meta={formatTs(e.timestamp, 'time')}>
+							{#snippet badges()}
+								{#if e.workspaceId && workspaceName.get(e.workspaceId)}
+									<Badge variant="outline">
+										<Layers2 data-icon="inline-start" />
+										{workspaceName.get(e.workspaceId)}
+									</Badge>
+								{/if}
+							{/snippet}
+						</EventRow>
 					{/each}
 				</div>
 			</section>

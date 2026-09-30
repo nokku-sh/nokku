@@ -13,10 +13,10 @@
 	import { ActionCell, AvatarCell, MemberCell, TimeCell } from '$lib/components/tables/cells';
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import type { Team } from '$lib/gen/nokku/v1/team_pb';
 	import { confirm, usePagination, useSheet } from '$lib/hooks';
-	import { PlusIcon, ShieldCheck, Trash2, Users, UsersIcon } from '@lucide/svelte';
+	import { PlusIcon, ShieldCheck, Trash2, Users } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const sheet = useSheet();
@@ -39,14 +39,12 @@
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: async (selected) => {
-				const ok = await confirm({
-					title: `Delete ${plural(selected.length, 'team')}?`,
-					description: 'This action cannot be undone.',
-					confirmText: 'Delete'
-				});
-				if (ok) await deleteTeams.mutateAsync(selected.map(({ id }) => ({ id })));
-			}
+			confirm: (selected) => ({
+				title: `Delete ${plural(selected.length, 'team')}?`,
+				description: 'This action cannot be undone.',
+				confirmText: 'Delete'
+			}),
+			onClick: (selected) => deleteTeams.mutateAsync(selected.map(({ id }) => ({ id })))
 		}
 	];
 
@@ -91,7 +89,9 @@
 
 					deleteConfig: {
 						itemName: row.original.name,
-						description: 'Are you sure you want to delete this team?',
+						description:
+							'Members keep their own access, but lose everything granted through this team.',
+						typeToConfirm: row.original.name,
 						onDelete: () => deleteTeam.mutateAsync({ id: row.original.id })
 					}
 				});
@@ -100,7 +100,7 @@
 	]);
 </script>
 
-<PageHeader title="Teams" description="Groups of people who share access" icon={UsersIcon}>
+<PageHeader title="Teams" description="Groups of people who share access">
 	<Button onclick={() => (createOpen = true)}>
 		<PlusIcon data-icon="inline-start" />
 		Create team
@@ -119,8 +119,8 @@
 	onRowClick={(t) => sheet.show(t.id)}
 	emptyState={{
 		icon: Users,
-		title: 'No Teams',
-		description: 'Get started by creating your first team.'
+		title: 'No teams yet',
+		description: 'Group people, then grant access to the whole team at once.'
 	}}
 >
 	{#snippet toolbar(table)}

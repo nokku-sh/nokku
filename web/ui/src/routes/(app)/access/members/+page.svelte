@@ -15,10 +15,10 @@
 	import { ActionCell, RoleCell, TeamCell, UserCell } from '$lib/components/tables/cells';
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import { type WorkspaceMember } from '$lib/gen/nokku/v1/workspace_pb';
 	import { confirm, usePagination, useSheet } from '$lib/hooks';
-	import { CircleUser, CircleUserIcon, PlusIcon, ShieldCheck, Trash2 } from '@lucide/svelte';
+	import { CircleUser, PlusIcon, ShieldCheck, Trash2 } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const sheet = useSheet();
@@ -43,14 +43,12 @@
 			label: 'Remove',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: async (selected) => {
-				const ok = await confirm({
-					title: `Remove ${plural(selected.length, 'member')}?`,
-					description: 'This action cannot be undone.',
-					confirmText: 'Remove'
-				});
-				if (ok) await removeMembers.mutateAsync(selected.map(({ id }) => ({ userId: id })));
-			}
+			confirm: (selected) => ({
+				title: `Remove ${plural(selected.length, 'member')}?`,
+				description: 'This action cannot be undone.',
+				confirmText: 'Remove'
+			}),
+			onClick: (selected) => removeMembers.mutateAsync(selected.map(({ id }) => ({ userId: id })))
 		}
 	];
 
@@ -98,10 +96,11 @@
 					],
 
 					deleteConfig: {
-						itemName: row.original.name,
-						description: 'Are you sure you want to remove this member from your workspace?',
-						onDelete: () => removeMember.mutateAsync({ userId: row.original.id }),
-						requireTyping: true
+						title: `Remove ${row.original.name}?`,
+						description: 'All their access here is revoked right away.',
+						confirmText: 'Remove',
+						typeToConfirm: row.original.email,
+						onDelete: () => removeMember.mutateAsync({ userId: row.original.id })
 					}
 				});
 			}
@@ -112,11 +111,7 @@
 <MemberSheet />
 <InviteSheet bind:open={inviteOpen} />
 
-<PageHeader
-	title="Members"
-	description="People in this workspace, their role and their teams"
-	icon={CircleUserIcon}
->
+<PageHeader title="Members" description="People in this workspace, their role and their teams">
 	<Button onclick={() => (inviteOpen = true)}>
 		<PlusIcon data-icon="inline-start" />
 		Invite people
@@ -132,8 +127,8 @@
 	onRowClick={(m) => sheet.show(m.id)}
 	emptyState={{
 		icon: CircleUser,
-		title: 'No Members',
-		description: 'Get started by inviting a new member.'
+		title: 'No members yet',
+		description: 'Invite people to this workspace.'
 	}}
 >
 	{#snippet toolbar(table)}

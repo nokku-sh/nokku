@@ -20,7 +20,7 @@
 	} from '$lib/components/tables/cells';
 	import { Button } from '$lib/components/ui/button';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import type { Target } from '$lib/gen/nokku/v1/target_pb';
 	import { confirm, usePagination, useSheet } from '$lib/hooks';
 	import { IdCard, Plus, Server, ShieldCheck, TagIcon, Trash2, UserIcon } from '@lucide/svelte';
@@ -112,7 +112,9 @@
 					],
 					deleteConfig: {
 						itemName: row.original.name,
-						description: 'Are you sure you want to delete this target?',
+						description:
+							'Everyone loses access to this target. Its login accounts and grants are removed.',
+						typeToConfirm: row.original.name,
 						onDelete: () => deleteTarget.mutateAsync({ id: row.original.id })
 					}
 				});
@@ -126,14 +128,12 @@
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: async (selected) => {
-				const ok = await confirm({
-					title: `Delete ${plural(selected.length, 'target')}?`,
-					description: 'This action cannot be undone.',
-					confirmText: 'Delete'
-				});
-				if (ok) await deleteTargets.mutateAsync(selected.map(({ id }) => ({ id })));
-			}
+			confirm: (selected) => ({
+				title: `Delete ${plural(selected.length, 'target')}?`,
+				description: 'This action cannot be undone.',
+				confirmText: 'Delete'
+			}),
+			onClick: (selected) => deleteTargets.mutateAsync(selected.map(({ id }) => ({ id })))
 		}
 	];
 </script>
@@ -141,11 +141,7 @@
 <CreateTargetModal bind:open={createOpen} />
 <TargetSheet />
 
-<PageHeader
-	title="Targets"
-	description="Servers people log in to, and who can use which account"
-	icon={Server}
->
+<PageHeader title="Targets" description="Servers people log in to, and who can use which account">
 	<Button onclick={() => (createOpen = true)}>
 		<Plus data-icon="inline-start" />
 		Add target
@@ -161,8 +157,9 @@
 	onRowClick={(t) => sheet.show(t.id)}
 	emptyState={{
 		icon: Server,
-		title: 'No Targets',
-		description: 'Add a server, then pick who can log in and as which account.'
+		title: 'No targets yet',
+		description: 'Add a server, then pick who can log in and as which account.',
+		command: 'nk sync root@host'
 	}}
 >
 	{#snippet toolbar(table)}

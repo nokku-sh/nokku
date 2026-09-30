@@ -16,7 +16,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Ellipsis, Trash2, type LucideIcon } from '@lucide/svelte';
-	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
+	import * as ButtonGroup from '$lib/components/ui/button-group';
 	import { confirm } from '$lib/hooks';
 
 	type Props = {
@@ -30,7 +30,9 @@
 			itemName?: string;
 			title?: string;
 			description?: string;
-			requireTyping?: boolean;
+			confirmText?: string;
+			/** Asks the user to type this first, for deletes that are hard to undo. */
+			typeToConfirm?: string;
 		};
 	};
 
@@ -43,7 +45,8 @@
 		void confirm({
 			title: deleteConfig.title ?? `Delete ${deleteConfig.itemName ?? 'item'}?`,
 			description: deleteConfig.description ?? 'This action cannot be undone.',
-			typeToConfirm: deleteConfig.requireTyping ? deleteConfig.itemName : undefined,
+			confirmText: deleteConfig.confirmText,
+			typeToConfirm: deleteConfig.typeToConfirm,
 			onConfirm: deleteConfig.onDelete
 		});
 	}
@@ -108,7 +111,7 @@
 					<DropdownMenu.Group>
 						<DropdownMenu.Item onclick={askDelete} variant="destructive">
 							<Trash2 />
-							Delete
+							{deleteConfig.confirmText ?? 'Delete'}
 						</DropdownMenu.Item>
 					</DropdownMenu.Group>
 				{/if}

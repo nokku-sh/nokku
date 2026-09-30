@@ -18,21 +18,12 @@
 		TimeCell
 	} from '$lib/components/tables/cells';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import { DaemonStatus, type Daemon } from '$lib/gen/nokku/v1/daemon_pb';
 	import { confirm, usePagination, useSheet } from '$lib/hooks';
-	import EnrollSheet from './EnrollSheet.svelte';
+	import EnrollSheet from '$lib/components/sheets/EnrollSheet.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import {
-		Bot,
-		BotOff,
-		CircleCheckBig,
-		Clock,
-		Rocket,
-		Trash2,
-		Wifi,
-		WifiOff
-	} from '@lucide/svelte';
+	import { BotOff, CircleCheckBig, Clock, Rocket, Trash2, Wifi, WifiOff } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const statusOptions = [
@@ -111,7 +102,9 @@
 				return renderComponent(ActionCell, {
 					deleteConfig: {
 						itemName: row.original.name,
-						description: 'Are you sure you want to delete this daemon?',
+						description:
+							'Targets behind this daemon become unreachable until another daemon serves them.',
+						typeToConfirm: row.original.name,
 						onDelete: () => deleteDaemon.mutateAsync({ id: row.original.id })
 					}
 				});
@@ -125,6 +118,11 @@
 			label: 'Approve',
 			icon: CircleCheckBig,
 			variant: 'default',
+			confirm: (selected) => ({
+				title: `Approve ${plural(selected.length, 'daemon')}?`,
+				description: 'Approved daemons can register targets and open sessions.',
+				destructive: false
+			}),
 			onClick: async (selected) => {
 				const pending = selected.filter((d) => d.status === DaemonStatus.PENDING);
 				if (!pending.length) return;
@@ -138,14 +136,12 @@
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',
-			onClick: async (selected) => {
-				const ok = await confirm({
-					title: `Delete ${plural(selected.length, 'daemon')}?`,
-					description: 'This action cannot be undone.',
-					confirmText: 'Delete'
-				});
-				if (ok) await deleteDaemons.mutateAsync(selected.map(({ id }) => ({ id })));
-			}
+			confirm: (selected) => ({
+				title: `Delete ${plural(selected.length, 'daemon')}?`,
+				description: 'This action cannot be undone.',
+				confirmText: 'Delete'
+			}),
+			onClick: (selected) => deleteDaemons.mutateAsync(selected.map(({ id }) => ({ id })))
 		}
 	];
 </script>
@@ -153,10 +149,10 @@
 <DaemonSheet />
 <EnrollSheet bind:open={enrollOpen} />
 
-<PageHeader title="Daemons" description="Edge agents that connect your servers to Nokku" icon={Bot}>
+<PageHeader title="Daemons" description="Edge agents that connect your servers to Nokku">
 	<Button onclick={() => (enrollOpen = true)}>
 		<Rocket data-icon="inline-start" />
-		Enroll daemons
+		Enroll a daemon
 	</Button>
 </PageHeader>
 
@@ -169,8 +165,9 @@
 	onRowClick={(d) => sheet.show(d.id)}
 	emptyState={{
 		icon: BotOff,
-		title: 'No Daemons',
-		description: 'Generate an enrollment token to deploy your first daemon.'
+		title: 'No daemons yet',
+		description: 'Create an enrollment token, then run this on the server.',
+		command: 'nokkud enroll'
 	}}
 >
 	{#snippet toolbar(table)}

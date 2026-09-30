@@ -1,4 +1,5 @@
 <script lang="ts">
+	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
 	import { create } from '@bufbuild/protobuf';
 	import { daemon as daemonApi } from '$lib/api/daemons.svelte';
 	import { target as targetApi } from '$lib/api/targets.svelte';
@@ -8,7 +9,7 @@
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Item from '$lib/components/ui/item';
 	import { Switch } from '$lib/components/ui/switch';
-	import Avatar from '$lib/components/utils/Avatar.svelte';
+	import Avatar from '$lib/components/blocks/Avatar.svelte';
 	import {
 		DaemonConfigSchema,
 		DaemonSchema,
@@ -22,7 +23,7 @@
 	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';
 	import Section from './Section.svelte';
-	import Chip from '$lib/components/utils/Chip.svelte';
+	import Chip from '$lib/components/blocks/Chip.svelte';
 
 	const sheet = useSheet();
 	const query = daemonApi.get(() => sheet.id);
@@ -118,18 +119,7 @@
 
 	{#snippet subtitle()}
 		<span class="flex items-center gap-1.5">
-			<span class="relative flex size-2">
-				{#if entity?.online}
-					<span class="absolute inline-flex size-full animate-ping rounded-full bg-success/60"
-					></span>
-				{/if}
-				<span
-					class={[
-						'relative size-2 rounded-full',
-						entity?.online ? 'bg-success' : 'bg-muted-foreground/40'
-					]}
-				></span>
-			</span>
+			<StatusDot tone={entity?.online ? 'success' : 'muted'} live={entity?.online} />
 			{#if entity?.online}
 				Online
 			{:else}

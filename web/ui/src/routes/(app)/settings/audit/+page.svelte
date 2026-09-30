@@ -10,7 +10,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Spinner } from '$lib/components/ui/spinner';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import { UpgradeURL } from '$lib/config';
 	import { WorkspaceSettingsSchema } from '$lib/gen/nokku/v1/workspace_pb';
 
@@ -43,9 +43,8 @@
 </script>
 
 <PageHeader
-	icon={ScrollText}
-	title="Audit Streaming"
-	description="Send this workspace's audit events to your own system as they happen."
+	title="Audit streaming"
+	description="Send this workspace's audit events to your own system as they happen"
 />
 
 {#snippet needsUpgrade()}
@@ -61,7 +60,7 @@
 			</Empty.Description>
 		</Empty.Header>
 		<Empty.Content>
-			<Button onclick={() => window.open(UpgradeURL, '_blank', 'noopener')}>See Plans</Button>
+			<Button onclick={() => window.open(UpgradeURL, '_blank', 'noopener')}>See plans</Button>
 		</Empty.Content>
 	</Empty.Root>
 {/snippet}
@@ -86,7 +85,7 @@
 {:else if !available}
 	{@render needsUpgrade()}
 {:else}
-	<Card.Root class="overflow-hidden rounded-xl border shadow-sm">
+	<Card.Root class="overflow-hidden rounded-xl border">
 		<Card.Header>
 			<Card.Title class="flex items-center gap-2 text-base">
 				<ScrollText size={18} />

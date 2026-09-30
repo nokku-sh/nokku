@@ -1,4 +1,7 @@
 <script lang="ts">
+	import * as Empty from '$lib/components/ui/empty';
+	import { Spinner } from '$lib/components/ui/spinner';
+	import { VectorSquare } from '@lucide/svelte';
 	import { target } from '$lib/api/targets.svelte';
 	import { team } from '$lib/api/team.svelte';
 	import { workspace } from '$lib/api/workspaces.svelte';
@@ -24,9 +27,7 @@
 	import { serviceAccount } from '$lib/api/service_account.svelte';
 	import Toolbar from './Toolbar.svelte';
 	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
-	import { VectorSquare } from '@lucide/svelte';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
-	import { SvelteSet } from 'svelte/reactivity';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 
 	const nodeTypes = {
 		target: TargetNode,
@@ -38,8 +39,8 @@
 	let edges = $state<Edge[]>([]);
 	let colorMode: ColorMode = $derived(mode.current === 'dark' ? 'dark' : 'light');
 	let selectedTarget = $state<Target | undefined>(undefined);
-	let selectedPrincipals = $state(new SvelteSet<string>());
-	let selectedSubjectTypes = $state(new SvelteSet<string>());
+	let selectedPrincipals = $state<string[]>([]);
+	let selectedSubjectTypes = $state<string[]>([]);
 
 	const targetData = target.list();
 	const teamData = team.list();
@@ -64,8 +65,8 @@
 			position: { x: 0, y: 0 }
 		});
 		const activePrincipals = targetPrincipals.filter((p) => {
-			if (selectedPrincipals.size === 0) return true;
-			return selectedPrincipals.has(p.username);
+			if (selectedPrincipals.length === 0) return true;
+			return selectedPrincipals.includes(p.username);
 		});
 
 		activePrincipals.forEach((p) => {
@@ -82,9 +83,9 @@
 				target: principalId,
 				type: 'smoothstep',
 				animated: true,
-				style: 'stroke: rgb(168 85 247); stroke-width: 2px;'
+				style: 'stroke: var(--muted-foreground); stroke-width: 2px;'
 			});
-			if (selectedSubjectTypes.size === 0 || selectedSubjectTypes.has('user')) {
+			if (selectedSubjectTypes.length === 0 || selectedSubjectTypes.includes('user')) {
 				p.userIds?.forEach((userId: string) => {
 					const user = users.find((u) => u.id === userId);
 					if (!user) return;
@@ -108,11 +109,11 @@
 						target: subjectId,
 						type: 'smoothstep',
 						animated: true,
-						style: 'stroke: rgb(59 130 246); stroke-width: 2px;'
+						style: 'stroke: var(--chart-1); stroke-width: 2px;'
 					});
 				});
 			}
-			if (selectedSubjectTypes.size === 0 || selectedSubjectTypes.has('team')) {
+			if (selectedSubjectTypes.length === 0 || selectedSubjectTypes.includes('team')) {
 				p.teamIds?.forEach((teamId: string) => {
 					const t = teams.find((t) => t.id === teamId);
 					if (!t) return;
@@ -136,11 +137,11 @@
 						target: subjectId,
 						type: 'smoothstep',
 						animated: true,
-						style: 'stroke: rgb(34 197 94); stroke-width: 2px;'
+						style: 'stroke: var(--chart-2); stroke-width: 2px;'
 					});
 				});
 			}
-			if (selectedSubjectTypes.size === 0 || selectedSubjectTypes.has('service-account')) {
+			if (selectedSubjectTypes.length === 0 || selectedSubjectTypes.includes('service-account')) {
 				p.serviceAccountIds?.forEach((serviceAccountId: string) => {
 					const serviceAccount = serviceAccounts.find((sa) => sa.id === serviceAccountId);
 					if (!serviceAccount) return;
@@ -164,23 +165,12 @@
 						target: subjectId,
 						type: 'smoothstep',
 						animated: true,
-						style: 'stroke: rgb(168 85 247); stroke-width: 2px;'
+						style: 'stroke: var(--chart-5); stroke-width: 2px;'
 					});
 				});
 			}
 		});
 
-		console.log('Topology target:', target.id, 'principals:', targetPrincipals);
-		console.log(
-			'Available subjects - users:',
-			users.length,
-			'teams:',
-			teams.length,
-			'SAs:',
-			serviceAccounts.length
-		);
-		console.log('Generated nodes:', nodes);
-		console.log('Generated edges:', edges);
 		return { nodes, edges };
 	}
 
@@ -249,39 +239,48 @@
 	});
 </script>
 
-<PageHeader
-	icon={VectorSquare}
-	title="Topology"
-	description="View the infrastructure topology for your workspace"
+<PageHeader title="Topology" description="Who can reach which account on a target, as a graph" />
+
+<Toolbar
+	bind:selectedTarget
+	bind:selectedPrincipals
+	bind:selectedSubjectTypes
+	{targetPrincipals}
+	data={targetData.data?.targets}
 />
 
-<div class="space-y-4">
-	<Toolbar
-		bind:selectedTarget
-		bind:selectedPrincipals
-		bind:selectedSubjectTypes
-		{targetPrincipals}
-		data={targetData.data?.targets}
-	/>
-
-	<div style:height="calc(90vh - 200px)" class="rounded-lg border border-border bg-muted/20">
-		{#key selectedTarget?.id}
-			<SvelteFlow
-				{nodeTypes}
-				bind:nodes
-				bind:edges
-				{colorMode}
-				nodesConnectable={false}
-				nodesDraggable={true}
-				fitView
-			>
-				<Background variant={BackgroundVariant.Dots} class="bg-background" />
-				<MiniMap
-					maskColor={colorMode === 'dark' ? 'rgb(15, 23, 42, 0.85)' : 'rgb(241, 245, 249, 0.85)'}
-					nodeStrokeWidth={3}
-				/>
-				<Controls />
-			</SvelteFlow>
-		{/key}
-	</div>
+<div class="relative h-[70dvh] min-h-96 overflow-hidden rounded-xl border bg-card">
+	{#if !selectedTarget}
+		<Empty.Root class="absolute inset-0 z-10">
+			<Empty.Header>
+				<Empty.Media variant="icon"><VectorSquare /></Empty.Media>
+				<Empty.Title>Pick a target</Empty.Title>
+				<Empty.Description>
+					See its login accounts and every person, team and service account that can use them.
+				</Empty.Description>
+			</Empty.Header>
+		</Empty.Root>
+	{:else if principalData.isLoading}
+		<div class="absolute inset-0 z-10 flex items-center justify-center bg-card/80">
+			<Spinner class="size-6 text-primary" />
+		</div>
+	{/if}
+	{#key selectedTarget?.id}
+		<SvelteFlow
+			{nodeTypes}
+			bind:nodes
+			bind:edges
+			{colorMode}
+			nodesConnectable={false}
+			nodesDraggable={true}
+			fitView
+		>
+			<Background variant={BackgroundVariant.Dots} class="bg-background" />
+			<MiniMap
+				maskColor="color-mix(in oklch, var(--background) 85%, transparent)"
+				nodeStrokeWidth={3}
+			/>
+			<Controls />
+		</SvelteFlow>
+	{/key}
 </div>

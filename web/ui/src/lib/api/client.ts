@@ -108,7 +108,7 @@ export function handleSessionExpired() {
 	toast.info('Session expired', { description: 'Please log in again.' });
 }
 
-export const workspaceInterceptor: Interceptor = (next) => async (req) => {
+const workspaceInterceptor: Interceptor = (next) => async (req) => {
 	if (req.stream || !browser || !workspaceID.current) {
 		return await next(req);
 	}
@@ -147,10 +147,6 @@ export const authTransport = createConnectTransport({
 	jsonOptions: { ignoreUnknownFields: true },
 	interceptors: [workspaceInterceptor]
 });
-
-export interface CallUnaryOptions {
-	signal?: AbortSignal;
-}
 
 export async function httpFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
 	const response = await fetch(input, { credentials: 'include', ...init });

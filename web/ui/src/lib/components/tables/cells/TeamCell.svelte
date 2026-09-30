@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
-	import * as HoverCard from '$lib/components/ui/hover-card/index.js';
+	import * as HoverCard from '$lib/components/ui/hover-card';
 	import { team } from '$lib/api/team.svelte';
 	import { Users } from '@lucide/svelte';
 
@@ -41,7 +41,7 @@
 							<div class="flex items-center gap-2">
 								<p class="truncate text-sm leading-none font-medium">{team.name}</p>
 								{#if team.memberCount && team.memberCount > 0}
-									<Badge variant="outline" class="text-[10px] leading-none">
+									<Badge variant="outline" class="text-2xs leading-none">
 										{team.memberCount}
 										{team.memberCount === 1 ? 'member' : 'members'}
 									</Badge>

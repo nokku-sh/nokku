@@ -2,7 +2,7 @@
 	import { authTransport, queryClient } from '$lib/api/client';
 	import { Toaster } from '$lib/components/ui/sonner';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import ConfirmDialog from '$lib/components/utils/ConfirmDialog.svelte';
+	import ConfirmDialog from '$lib/components/blocks/ConfirmDialog.svelte';
 	import { setTransport } from '$lib/query';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { ModeWatcher } from 'mode-watcher';

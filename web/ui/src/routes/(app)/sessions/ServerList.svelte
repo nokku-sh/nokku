@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as Empty from '$lib/components/ui/empty';
+	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
 	import { target } from '$lib/api/targets.svelte';
 	import { user } from '$lib/api/user.svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -47,7 +49,7 @@
 	<div class="flex-1 overflow-y-auto">
 		{#if access.isPending}
 			<div class="space-y-1 p-2">
-				{#each Array(5) as _}
+				{#each { length: 5 }, i (i)}
 					<div class="flex items-center gap-2 rounded-md p-2">
 						<Skeleton class="size-2 rounded-full" />
 						<Skeleton class="h-4 flex-1" />
@@ -55,15 +57,15 @@
 				{/each}
 			</div>
 		{:else if filtered.length === 0}
-			<div class="flex flex-col items-center justify-center py-8 text-center">
-				<Server class="mb-2 size-8 text-muted-foreground/30" />
-				<p class="text-xs text-muted-foreground">
-					{searchQuery ? 'No matches' : 'No servers available'}
-				</p>
-			</div>
+			<Empty.Root class="py-8">
+				<Empty.Header>
+					<Empty.Media variant="icon"><Server /></Empty.Media>
+					<Empty.Title class="text-sm">{searchQuery ? 'No matches' : 'No servers yet'}</Empty.Title>
+				</Empty.Header>
+			</Empty.Root>
 		{:else}
 			<div class="space-y-0.5 p-1.5">
-				{#each filtered as target}
+				{#each filtered as target (target.id)}
 					{@const isOnline = agents?.some((a) => a.id === target.daemonId && a.online)}
 
 					<div class="group relative">
@@ -76,11 +78,11 @@
 										<div
 											class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm opacity-50"
 										>
-											<span class="size-1.5 shrink-0 rounded-full bg-gray-400"></span>
+											<StatusDot class="size-1.5" />
 											<div class="min-w-0 flex-1">
 												<p class="truncate text-xs font-medium">{target.name}</p>
 												{#if target.metadata?.hostname}
-													<p class="truncate text-[10px] text-muted-foreground">
+													<p class="truncate text-2xs text-muted-foreground">
 														{target.metadata.hostname}
 													</p>
 												{/if}

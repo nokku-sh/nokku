@@ -1,10 +1,11 @@
 <script lang="ts">
+	import { Spinner } from '$lib/components/ui/spinner';
 	import { roleLabel } from '$lib/roles';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Badge } from '$lib/components/ui/badge';
-	import { PartyPopper, CircleX, LoaderCircle, Users, Clock } from '@lucide/svelte';
+	import { PartyPopper, CircleX, Users, Clock } from '@lucide/svelte';
 	import { invite } from '$lib/api/workspaces.svelte';
 	import { inviteToken } from '$lib/store.svelte';
 	import { formatTs, toDate } from '$lib/utils';
@@ -37,7 +38,7 @@
 	<Dialog.Content class="max-w-sm">
 		{#if invitation.isPending}
 			<div class="flex flex-col items-center justify-center gap-4 py-8">
-				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+				<Spinner class="size-8 text-muted-foreground" />
 				<p class="text-sm text-muted-foreground">Verifying invitation…</p>
 			</div>
 		{:else if invitation.isError || expired}
@@ -47,13 +48,13 @@
 				>
 					<CircleX class="h-6 w-6 text-destructive" />
 				</div>
-				<Dialog.Title>Invitation Unavailable</Dialog.Title>
+				<Dialog.Title>Invitation unavailable</Dialog.Title>
 				<Dialog.Description>
 					This invitation link is expired or invalid. Please ask the workspace owner for a new one.
 				</Dialog.Description>
 			</Dialog.Header>
 			<div class="flex justify-center pt-2">
-				<Button variant="outline" onclick={clearTokens}>Go Home</Button>
+				<Button variant="outline" onclick={clearTokens}>Go home</Button>
 			</div>
 		{:else if invitation.isSuccess}
 			<Dialog.Header class="items-center text-center">
@@ -92,7 +93,7 @@
 				<Button variant="outline" class="flex-1" onclick={clearTokens}>Decline</Button>
 				<Button class="flex-1" onclick={handleAccept} disabled={claimInvitation.isPending}>
 					{#if claimInvitation.isPending}
-						<LoaderCircle class="h-4 w-4 animate-spin" />
+						<Spinner data-icon="inline-start" />
 					{/if}
 					Join Workspace
 				</Button>

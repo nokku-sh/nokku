@@ -2,10 +2,15 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { auth } from '$lib/api/auth.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { formatConnectError } from '$lib/api/error-formatter';
+	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
+	import * as Alert from '$lib/components/ui/alert';
+	import { Button } from '$lib/components/ui/button';
+	import * as Field from '$lib/components/ui/field';
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
-	import { Label } from '$lib/components/ui/label/index.js';
-	import { CircleAlert, CircleCheckBig, KeyRound, RefreshCw, Undo2Icon } from '@lucide/svelte';
+	import { Spinner } from '$lib/components/ui/spinner';
+	import { ConnectError } from '@connectrpc/connect';
+	import { CircleAlert, CircleCheckBig, KeyRound, LogIn } from '@lucide/svelte';
 
 	const token = page.url.searchParams.get('token');
 	let newPassword = $state('');
@@ -19,110 +24,71 @@
 	const passwordsMatch = $derived(newPassword === confirmPassword && newPassword.length > 0);
 	const isPasswordValid = $derived(newPassword.length >= 8);
 	const canSubmit = $derived(passwordsMatch && isPasswordValid && !resetPassword.isPending);
+	const error = $derived(
+		resetPassword.error ? formatConnectError(ConnectError.from(resetPassword.error)) : undefined
+	);
 
-	async function handleResetPassword() {
+	function submit(e: SubmitEvent) {
+		e.preventDefault();
 		if (!canSubmit || !token) return;
 		resetPassword.mutate({ token, newPassword });
 	}
 </script>
 
-{#if !resetPassword.isSuccess}
-	<form
-		onsubmit={handleResetPassword}
-		class="m-auto h-fit w-full max-w-sm overflow-hidden rounded-[calc(var(--radius)+.125rem)] border bg-muted shadow-md shadow-zinc-950/5 dark:[--color-muted:var(--color-zinc-900)]"
+{#if resetPassword.isSuccess}
+	<AuthCard
+		title="Password updated"
+		description="Sign in with your new password. Other sessions stay signed in until they expire."
+		icon={CircleCheckBig}
+		tone="success"
 	>
-		<div class="-m-px flex flex-col gap-4 rounded-[calc(var(--radius)+.125rem)] border bg-card p-6">
-			<div class="flex flex-col items-center text-center">
-				<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-					<KeyRound size={24} class="text-primary" />
-				</div>
-				<h1 class="text-2xl font-bold">Set new password</h1>
-				<p class="text-balance text-muted-foreground">Enter your new password below</p>
-			</div>
-
-			{#if resetPassword.isError}
-				<div class="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
-					<div class="flex items-center gap-2 text-sm text-destructive">
-						<CircleAlert size={16} />
-						{resetPassword.error}
-					</div>
-				</div>
-			{/if}
-
-			<div class="space-y-2">
-				<Label for="password">New password</Label>
-				<InputGroupVariants
-					variant="password"
-					bind:value={newPassword}
-					placeholder="Enter new password"
-					inputProps={{ required: true, autocomplete: 'new-password' }}
-				/>
-				{#if newPassword.length > 0 && !isPasswordValid}
-					<p class="text-sm text-destructive">Password must be at least 8 characters</p>
-				{/if}
-			</div>
-
-			<div class="space-y-2">
-				<Label for="confirmPassword">Confirm password</Label>
-				<InputGroupVariants
-					variant="password"
-					bind:value={confirmPassword}
-					placeholder="Confirm new password"
-					inputProps={{ required: true, autocomplete: 'new-password' }}
-				/>
-				{#if confirmPassword.length > 0 && !passwordsMatch}
-					<p class="text-sm text-destructive">Passwords do not match</p>
-				{/if}
-			</div>
-
-			<Button type="submit" class="w-full" disabled={!canSubmit}>
-				{#if resetPassword.isPending}
-					<RefreshCw size={16} class="animate-spin" />
-					Resetting password...
-				{:else}
-					Reset password
-				{/if}
-			</Button>
-		</div>
-
-		<div class="p-3">
-			<Button variant="link" class="w-full" href="/login" disabled={resetPassword.isPending}>
-				Go back to login
-				<Undo2Icon size={16} />
-			</Button>
-		</div>
-	</form>
+		<Button href="/login">
+			<LogIn data-icon="inline-start" />
+			Sign in
+		</Button>
+	</AuthCard>
 {:else}
-	<div
-		class="m-auto h-fit w-full max-w-sm overflow-hidden rounded-[calc(var(--radius)+.125rem)] border bg-muted shadow-md shadow-zinc-950/5 dark:[--color-muted:var(--color-zinc-900)]"
-	>
-		<div
-			class="-m-px flex flex-col gap-4 rounded-[calc(var(--radius)+.125rem)] border bg-card p-6 md:p-8"
-		>
-			<div class="flex flex-col items-center text-center">
-				<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-					<CircleCheckBig class="text-primary" size={22} />
-				</div>
-				<h1 class="text-2xl font-bold">Success</h1>
-				<p class="text-balance text-muted-foreground">
-					Your password has been successfully updated
-				</p>
-			</div>
-			<div class="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
-				<p class="mb-2 font-medium">What's next?</p>
-				<ul class="space-y-1">
-					<li>• You can now log in with your new password</li>
-					<li>• Make sure to keep your password secure</li>
-					<li>• Consider enabling two-factor authentication</li>
-				</ul>
-			</div>
-		</div>
-
-		<div class="p-3">
-			<Button variant="link" class="w-full" href="/login" disabled={resetPassword.isPending}>
-				Continue to login
-				<Undo2Icon size={16} />
+	<AuthCard title="Set a new password" description="At least 8 characters" icon={KeyRound}>
+		<form class="flex flex-col gap-4" onsubmit={submit}>
+			{#if error}
+				<Alert.Root variant="destructive">
+					<CircleAlert />
+					<Alert.Title>{error.title}</Alert.Title>
+					{#if error.description}<Alert.Description>{error.description}</Alert.Description>{/if}
+				</Alert.Root>
+			{/if}
+			<Field.Group class="gap-4">
+				<Field.Field data-invalid={newPassword.length > 0 && !isPasswordValid ? true : undefined}>
+					<Field.Label for="password">New password</Field.Label>
+					<InputGroupVariants
+						variant="password"
+						bind:value={newPassword}
+						placeholder="At least 8 characters"
+						inputProps={{ id: 'password', required: true, autocomplete: 'new-password' }}
+					/>
+					{#if newPassword.length > 0 && !isPasswordValid}
+						<Field.Error>Use at least 8 characters.</Field.Error>
+					{/if}
+				</Field.Field>
+				<Field.Field
+					data-invalid={confirmPassword.length > 0 && !passwordsMatch ? true : undefined}
+				>
+					<Field.Label for="confirm-password">Confirm password</Field.Label>
+					<InputGroupVariants
+						variant="password"
+						bind:value={confirmPassword}
+						placeholder="Same again"
+						inputProps={{ id: 'confirm-password', required: true, autocomplete: 'new-password' }}
+					/>
+					{#if confirmPassword.length > 0 && !passwordsMatch}
+						<Field.Error>The passwords do not match.</Field.Error>
+					{/if}
+				</Field.Field>
+			</Field.Group>
+			<Button type="submit" disabled={!canSubmit}>
+				{#if resetPassword.isPending}<Spinner data-icon="inline-start" />{/if}
+				Set password
 			</Button>
-		</div>
-	</div>
+		</form>
+	</AuthCard>
 {/if}

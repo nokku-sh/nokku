@@ -21,7 +21,7 @@ const fallbackTransportError = new ConnectError(
 );
 
 // istanbul ignore next
-export const fallbackTransport: Transport = {
+const fallbackTransport: Transport = {
 	unary: () => {
 		throw fallbackTransportError;
 	},

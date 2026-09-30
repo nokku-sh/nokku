@@ -1,13 +1,11 @@
 <script lang="ts">
 	import { serviceAccount } from '$lib/api/service_account.svelte';
 	import { workspace } from '$lib/api/workspaces.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
 	import * as Command from '$lib/components/ui/command';
-	import { Separator } from '$lib/components/ui/separator';
-	import SearchPopover from '$lib/components/utils/SearchPopover.svelte';
-	import UserAvatar from '$lib/components/utils/UserAvatar.svelte';
-	import { Bot, Check, CirclePlus } from '@lucide/svelte';
+	import FilterButton from '$lib/components/blocks/FilterButton.svelte';
+	import SearchPopover from '$lib/components/blocks/SearchPopover.svelte';
+	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
+	import { Bot, Check } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import { csv, setParams } from '$lib/components/audit/audit';
 
@@ -34,16 +32,11 @@
 	loading={members.isLoading || serviceAccounts.isLoading}
 >
 	{#snippet trigger(props)}
-		<Button {...props} variant="outline" size="sm" class="h-8 rounded-full border-dashed">
-			<CirclePlus />
-			Actor
-			{#if selected.length}
-				<Separator orientation="vertical" class="mx-1 h-4" />
-				<Badge variant="secondary" class="rounded-sm px-1 font-normal">
-					{selected.length} selected
-				</Badge>
-			{/if}
-		</Button>
+		<FilterButton
+			{...props}
+			title="Actor"
+			selected={selected.length ? [`${selected.length}`] : []}
+		/>
 	{/snippet}
 
 	{#if members.data?.members.length}

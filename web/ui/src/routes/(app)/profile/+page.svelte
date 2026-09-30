@@ -5,7 +5,7 @@
 	import { user } from '$lib/api/user.svelte';
 	import { workspace } from '$lib/api/workspaces.svelte';
 	import DangerZone from '$lib/components/sheets/DangerZone.svelte';
-	import SaveStatus from '$lib/components/sheets/SaveStatus.svelte';
+	import SaveStatus from '$lib/components/blocks/SaveStatus.svelte';
 	import * as Alert from '$lib/components/ui/alert';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -17,14 +17,14 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Spinner } from '$lib/components/ui/spinner';
-	import Avatar from '$lib/components/utils/Avatar.svelte';
-	import PageHeader from '$lib/components/utils/PageHeader.svelte';
+	import Avatar from '$lib/components/blocks/Avatar.svelte';
+	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import { UserSchema } from '$lib/gen/nokku/v1/account_pb';
 	import { confirm, useAutoSave, useDraft } from '$lib/hooks';
 	import { roleLabel } from '$lib/roles';
 	import { workspaceID } from '$lib/store.svelte';
 	import { formatTs } from '$lib/utils';
-	import { BadgeCheck, Mail, Send, ShieldCheck, Trash2, TriangleAlert, User } from '@lucide/svelte';
+	import { BadgeCheck, Mail, Send, ShieldCheck, Trash2, TriangleAlert } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 
 	const me = user.self();
@@ -59,7 +59,7 @@
 	}
 </script>
 
-<PageHeader title="Profile" description="Who you are across Nokku." icon={User} />
+<PageHeader title="Profile" description="Who you are across Nokku" />
 
 {#if !model}
 	<Skeleton class="h-48 w-full rounded-xl" />

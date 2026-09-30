@@ -1,14 +1,18 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Label } from '$lib/components/ui/label/index.js';
-	import { Logo, GoogleIcon, GitHubIcon } from '$lib/assets';
+	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import * as Collapsible from '$lib/components/ui/collapsible';
+	import * as Field from '$lib/components/ui/field';
+	import { Spinner } from '$lib/components/ui/spinner';
+	import { GoogleIcon, GitHubIcon } from '$lib/assets';
+	import LegalConsent from '$lib/components/blocks/LegalConsent.svelte';
+	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
 	import { InputGroupVariants } from '$lib/components/ui/input-group';
 	import { auth } from '$lib/api/auth.svelte';
 	import { signupWithPasskey } from '$lib/api/passkey';
 	import { toast } from 'svelte-sonner';
-	import { KeyRound, ChevronDown, ChevronUp } from '@lucide/svelte';
+	import { ChevronDown, KeyRound, UserPlus } from '@lucide/svelte';
 
 	let name = $state('');
 	let email = $state('');
@@ -21,8 +25,10 @@
 
 	const register = auth.register();
 	let isPasskeySignup = $state(false);
+	const busy = $derived(register.isPending || isPasskeySignup);
 
-	async function handleRegistration() {
+	function handleRegistration(e: SubmitEvent) {
+		e.preventDefault();
 		if (!passwordsMatch || !isPasswordValid) return;
 		register.mutate({ name, email, password });
 	}
@@ -45,133 +51,111 @@
 	}
 </script>
 
-<div
-	class="m-auto h-fit w-full max-w-md overflow-hidden rounded-[calc(var(--radius)+.125rem)] border bg-muted shadow-md shadow-zinc-950/5 dark:[--color-muted:var(--color-zinc-900)]"
+<AuthCard
+	title="Create your Nokku account"
+	description="Passkeys first, passwords if you must"
+	wide
 >
-	<div class="-m-px rounded-[calc(var(--radius)+.125rem)] border bg-card p-6">
-		<div class="text-center">
-			<Logo class="mx-auto block w-10 py-2 dark:invert" />
-			<h1 class="mt-4 mb-1 text-xl font-semibold">Welcome to Nokku!</h1>
-			<p class="text-balance text-muted-foreground">Create an account to get started</p>
-		</div>
+	<Field.Group class="gap-4">
+		<Field.Field>
+			<Field.Label for="name">Full name</Field.Label>
+			<Input
+				id="name"
+				autocomplete="name"
+				bind:value={name}
+				placeholder="Ada Lovelace"
+				disabled={busy}
+			/>
+		</Field.Field>
+		<Field.Field>
+			<Field.Label for="email">Email</Field.Label>
+			<Input
+				id="email"
+				type="email"
+				autocomplete="email"
+				bind:value={email}
+				placeholder="you@company.com"
+				required
+				disabled={busy}
+			/>
+		</Field.Field>
+	</Field.Group>
 
-		<div class="mt-4 space-y-4">
-			<div class="space-y-2">
-				<Label for="name" class="block text-sm">Full Name</Label>
-				<Input
-					id="name"
-					type="text"
-					bind:value={name}
-					placeholder="John Doe"
-					disabled={register.isPending || isPasskeySignup}
-				/>
-			</div>
+	<Button type="button" onclick={handlePasskeySignup} disabled={busy}>
+		{#if isPasskeySignup}<Spinner data-icon="inline-start" />{:else}<KeyRound
+				data-icon="inline-start"
+			/>{/if}
+		Sign up with a passkey
+	</Button>
 
-			<div class="space-y-2">
-				<Label for="email" class="block text-sm">Email</Label>
-				<Input
-					id="email"
-					type="email"
-					bind:value={email}
-					placeholder="johndoe@example.com"
-					required
-					disabled={register.isPending || isPasskeySignup}
-				/>
-			</div>
-
-			<Button
-				type="button"
-				class="w-full"
-				onclick={handlePasskeySignup}
-				disabled={register.isPending || isPasskeySignup}
-			>
-				<KeyRound size={16} />
-				{isPasskeySignup ? 'Creating Account...' : 'Register with Passkey'}
-			</Button>
-
-			<div class="text-center">
-				<button
-					type="button"
-					class="inline-flex cursor-pointer items-center gap-1 text-sm text-muted-foreground underline underline-offset-4 hover:text-primary"
-					onclick={() => (showPassword = !showPassword)}
-				>
-					{#if showPassword}
-						<ChevronUp size={14} /> Hide password fields
-					{:else}
-						<ChevronDown size={14} /> Set a password instead
-					{/if}
-				</button>
-			</div>
-
-			{#if showPassword}
-				<form onsubmit={handleRegistration} class="space-y-4">
-					<hr class="border-solid" />
-
-					<div class="space-y-2">
-						<Label for="password">Password</Label>
+	<Collapsible.Root bind:open={showPassword} class="flex flex-col gap-4">
+		<Collapsible.Trigger>
+			{#snippet child({ props })}
+				<Button {...props} variant="link" size="sm" class="self-center text-muted-foreground">
+					<ChevronDown
+						class={['transition-transform', showPassword && 'rotate-180']}
+						data-icon="inline-start"
+					/>
+					{showPassword ? 'Hide password fields' : 'Set a password instead'}
+				</Button>
+			{/snippet}
+		</Collapsible.Trigger>
+		<Collapsible.Content>
+			<form onsubmit={handleRegistration} class="flex flex-col gap-4">
+				<Field.Group class="gap-4">
+					<Field.Field data-invalid={password.length > 0 && !isPasswordValid ? true : undefined}>
+						<Field.Label for="password">Password</Field.Label>
 						<InputGroupVariants
 							variant="password"
 							bind:value={password}
-							placeholder="Enter new password"
-							inputProps={{ required: true, autocomplete: 'new-password' }}
+							placeholder="At least 8 characters"
+							inputProps={{ id: 'password', required: true, autocomplete: 'new-password' }}
 						/>
 						{#if password.length > 0 && !isPasswordValid}
-							<p class="text-sm text-destructive">Password must be at least 8 characters</p>
+							<Field.Error>Use at least 8 characters.</Field.Error>
 						{/if}
-					</div>
-
-					<div class="space-y-2">
-						<Label for="confirmPassword">Confirm Password</Label>
+					</Field.Field>
+					<Field.Field
+						data-invalid={confirmPassword.length > 0 && !passwordsMatch ? true : undefined}
+					>
+						<Field.Label for="confirm-password">Confirm password</Field.Label>
 						<InputGroupVariants
 							variant="password"
 							bind:value={confirmPassword}
-							placeholder="Confirm your password"
-							inputProps={{ required: true, autocomplete: 'new-password' }}
+							placeholder="Same again"
+							inputProps={{ id: 'confirm-password', required: true, autocomplete: 'new-password' }}
 						/>
 						{#if confirmPassword.length > 0 && !passwordsMatch}
-							<p class="text-sm text-destructive">Passwords do not match</p>
+							<Field.Error>The passwords do not match.</Field.Error>
 						{/if}
-					</div>
+					</Field.Field>
+				</Field.Group>
+				<Button type="submit" variant="secondary" disabled={busy}>
+					{#if register.isPending}<Spinner data-icon="inline-start" />{:else}<UserPlus
+							data-icon="inline-start"
+						/>{/if}
+					Sign up with a password
+				</Button>
+			</form>
+		</Collapsible.Content>
+	</Collapsible.Root>
 
-					<Button type="submit" class="mt-2 w-full" disabled={register.isPending}>
-						{register.isPending ? 'Creating Account...' : 'Sign Up'}
-					</Button>
-				</form>
-			{/if}
-		</div>
+	<Field.Separator>Or sign up with</Field.Separator>
 
-		<div class="my-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-			<hr class="border-solid" />
-			<span class="text-xs text-muted-foreground">Or sign up with</span>
-			<hr class="border-solid" />
-		</div>
-
-		<div class="grid grid-cols-2 gap-3">
-			<Button
-				type="button"
-				variant="secondary"
-				onclick={() => (window.location.href = '/oidc/login?provider=google')}
-				disabled={register.isPending || isPasskeySignup}
-			>
-				<GoogleIcon class="size-5" />
-				<span>Google</span>
-			</Button>
-			<Button
-				type="button"
-				variant="secondary"
-				onclick={() => (window.location.href = '/oauth/login?provider=github')}
-				disabled={register.isPending || isPasskeySignup}
-			>
-				<GitHubIcon class="size-5" />
-				<span>GitHub</span>
-			</Button>
-		</div>
+	<div class="grid grid-cols-2 gap-3">
+		<Button variant="secondary" href="/oidc/login?provider=google" data-sveltekit-reload>
+			<GoogleIcon data-icon="inline-start" />
+			Google
+		</Button>
+		<Button variant="secondary" href="/oauth/login?provider=github" data-sveltekit-reload>
+			<GitHubIcon data-icon="inline-start" />
+			GitHub
+		</Button>
 	</div>
 
-	<div class="p-3">
-		<p class="text-center text-sm text-accent-foreground">
-			Already have an account?
-			<Button href="/login" variant="link" class="px-2">Sign In</Button>
-		</p>
-	</div>
-</div>
+	<LegalConsent lead="By signing up," />
+
+	{#snippet footer()}
+		Have an account? <a href="/login" class="font-medium text-primary hover:underline">Sign in</a>
+	{/snippet}
+</AuthCard>
