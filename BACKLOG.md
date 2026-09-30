@@ -8,9 +8,6 @@ this file.
 
 ## Ready
 
-- [ ] `nokkud/main.go` The root command description says nokkud "replaces
-      the host sshd". It runs beside it on :4022 and never touches port 22.
-      Done when: the help text matches. (2026-09-30)
 - [ ] `mon` Add CONTRIBUTING.md and SECURITY.md to match the other repos.
       Done when: both exist and fit mon's scope (a library, no binaries).
       (from ROADMAP)
@@ -75,6 +72,8 @@ this file.
 
 ## Done
 
+- [x] `nokkud/main.go` Root help said nokkud replaces the host sshd.
+      Result: now says it runs beside it on :4022. aa43d70 on loop/2026-10-01.
 - [x] `nokku/internal/api` `CreateSession` success path. Result: a fake
       daemon on the real Connect and DaemonRelay streams bridges to
       `sshtest`, the test sees the session env and OS user reach sshd. The
