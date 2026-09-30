@@ -196,8 +196,9 @@ func (s *authService) ResendVerification(
 	req *nokkuv1.ResendVerificationRequest,
 ) (*nokkuv1.ResendVerificationResponse, error) {
 	// Always answer OK so the endpoint cannot enumerate accounts.
+	// Welcome goes out once at signup, a resend is a plain verification.
 	if u, err := s.cfg.IAM.GetUserByEmail(ctx, req.GetEmail()); err == nil && !u.EmailVerified {
-		s.sendTokenEmail(ctx, u, iam.TokenVerifyEmail, true)
+		s.sendTokenEmail(ctx, u, iam.TokenVerifyEmail, false)
 	}
 	return &nokkuv1.ResendVerificationResponse{}, nil
 }
@@ -257,11 +258,14 @@ func (s *authService) sendTokenEmail(
 	}
 	link := s.cfg.FullURL() + path + "?token=" + raw
 
-	name, _, _ := strings.Cut(u.Email, "@")
-	if welcome {
+	switch {
+	case welcome:
+		name, _, _ := strings.Cut(u.Email, "@")
 		err = s.cfg.Email.SendWelcomeEmail(ctx, u.ID, u.Email, name, link, tokenTTL.String())
-	} else {
+	case purpose == iam.TokenPasswordReset:
 		err = s.cfg.Email.SendRecoveryEmail(ctx, u.ID, u.Email, link, tokenTTL.String())
+	default:
+		err = s.cfg.Email.SendVerificationEmail(ctx, u.ID, u.Email, link, tokenTTL.String())
 	}
 	if err != nil {
 		slog.Error("send auth email", "error", err)
