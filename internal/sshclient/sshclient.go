@@ -49,8 +49,6 @@ type Terminal struct {
 // Stdout is closed when the terminal ends.
 func (t *Terminal) Stdout() <-chan []byte { return t.stdout }
 
-func (t *Terminal) Done() <-chan struct{} { return t.done }
-
 func (t *Terminal) Write(p []byte) (int, error) { return t.ch.Write(p) }
 
 // Resize is fire and forget, like OpenSSH.

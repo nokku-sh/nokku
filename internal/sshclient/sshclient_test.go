@@ -186,19 +186,14 @@ func TestDialTerminal_CtxCancel(t *testing.T) {
 	}
 }
 
-// TestTerminal_CloseTeardown verifies Close ends the output stream and Done
-// fires, so the session wiring can exit.
+// TestTerminal_CloseTeardown verifies Close ends the output stream, so the
+// session wiring can exit.
 func TestTerminal_CloseTeardown(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	term := dialForTest(t, srv, testConfig(t, srv))
 	waitForShell(t, srv)
 
 	term.Close()
-	select {
-	case <-term.Done():
-	case <-time.After(2 * time.Second):
-		t.Fatal("Done not closed after Close")
-	}
 	select {
 	case _, ok := <-term.Stdout():
 		if ok {
@@ -210,16 +205,22 @@ func TestTerminal_CloseTeardown(t *testing.T) {
 }
 
 // TestTerminal_TransportDeath: when the server drops the connection the
-// terminal reports Done, which is how the pool wiring notices a dead relay.
+// terminal closes Stdout, which is how the pool wiring notices a dead relay.
 func TestTerminal_TransportDeath(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	term := dialForTest(t, srv, testConfig(t, srv))
 	waitForShell(t, srv)
 
 	srv.Close()
-	select {
-	case <-term.Done():
-	case <-time.After(2 * time.Second):
-		t.Fatal("Done not closed after the server dropped the connection")
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case _, ok := <-term.Stdout():
+			if !ok {
+				return
+			}
+		case <-deadline:
+			t.Fatal("stdout not closed after the server dropped the connection")
+		}
 	}
 }

@@ -8,11 +8,6 @@ this file.
 
 ## Ready
 
-- [ ] `nokku` Dead code: `crypto.HashedToken.Verify` and
-      `sshclient.Terminal.Done` are only called from tests. Delete them and
-      the tests that only cover them.
-      Done when: the exports tool shows no `tests-only` entry for either.
-      (2026-09-30)
 
 - [ ] `nokku/internal/db` Parallel test packages race on
       `ALTER ROLE nokku_app` ("tuple concurrently updated", SQLSTATE XX000).
@@ -56,6 +51,10 @@ this file.
 
 ## Done
 
+- [x] `nokku` Dead code `crypto.HashedToken.Verify` and
+      `sshclient.Terminal.Done`. Result: both deleted with the Verify-only
+      tests, the Terminal teardown tests now wait on Stdout closing like the
+      pool does. -72 lines. (loop/2026-10-01)
 - [x] `nk` Unexport package internals. Result: 8 identifiers, case-only
       diff, 0 lines net. Kept: doctor's `Report`, `Check`, `Status` and its
       consts (returned by `Run`, exported fields), `manual.Result` and
