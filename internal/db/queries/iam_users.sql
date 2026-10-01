@@ -49,6 +49,16 @@ SET
 WHERE
   id = @id;
 
+-- name: SetUserEmail :one
+UPDATE users
+SET
+  email = @email,
+  email_verified = TRUE
+WHERE
+  id = @id
+RETURNING
+  *;
+
 -- name: DeleteUser :exec
 DELETE FROM users
 WHERE

@@ -12,6 +12,35 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
+const consumeEmailToken = `-- name: ConsumeEmailToken :one
+DELETE FROM one_time_tokens
+WHERE
+  token_hash = $1
+  AND purpose = $2
+  AND expires_at > NOW()
+  AND email IS NOT NULL
+RETURNING
+  user_id,
+  email
+`
+
+type ConsumeEmailTokenParams struct {
+	TokenHash crypto.HashedToken `json:"tokenHash"`
+	Purpose   string             `json:"purpose"`
+}
+
+type ConsumeEmailTokenRow struct {
+	UserID string  `json:"userId"`
+	Email  *string `json:"email"`
+}
+
+func (q *Queries) ConsumeEmailToken(ctx context.Context, arg *ConsumeEmailTokenParams) (*ConsumeEmailTokenRow, error) {
+	row := q.db.QueryRow(ctx, consumeEmailToken, arg.TokenHash, arg.Purpose)
+	var i ConsumeEmailTokenRow
+	err := row.Scan(&i.UserID, &i.Email)
+	return &i, err
+}
+
 const consumeToken = `-- name: ConsumeToken :one
 DELETE FROM one_time_tokens
 WHERE
@@ -48,6 +77,51 @@ func (q *Queries) DeleteExpiredTokens(ctx context.Context, now time.Time) (int64
 	return result.RowsAffected(), nil
 }
 
+const deleteUserTokens = `-- name: DeleteUserTokens :exec
+DELETE FROM one_time_tokens
+WHERE
+  user_id = $1
+  AND purpose = $2
+`
+
+type DeleteUserTokensParams struct {
+	UserID  string `json:"userId"`
+	Purpose string `json:"purpose"`
+}
+
+func (q *Queries) DeleteUserTokens(ctx context.Context, arg *DeleteUserTokensParams) error {
+	_, err := q.db.Exec(ctx, deleteUserTokens, arg.UserID, arg.Purpose)
+	return err
+}
+
+const getPendingTokenEmail = `-- name: GetPendingTokenEmail :one
+SELECT
+  email
+FROM
+  one_time_tokens
+WHERE
+  user_id = $1
+  AND purpose = $2
+  AND expires_at > NOW()
+  AND email IS NOT NULL
+ORDER BY
+  created_at DESC
+LIMIT
+  1
+`
+
+type GetPendingTokenEmailParams struct {
+	UserID  string `json:"userId"`
+	Purpose string `json:"purpose"`
+}
+
+func (q *Queries) GetPendingTokenEmail(ctx context.Context, arg *GetPendingTokenEmailParams) (*string, error) {
+	row := q.db.QueryRow(ctx, getPendingTokenEmail, arg.UserID, arg.Purpose)
+	var email *string
+	err := row.Scan(&email)
+	return email, err
+}
+
 const hasRecentToken = `-- name: HasRecentToken :one
 SELECT EXISTS (
   SELECT 1
@@ -74,9 +148,9 @@ func (q *Queries) HasRecentToken(ctx context.Context, arg *HasRecentTokenParams)
 
 const putToken = `-- name: PutToken :exec
 INSERT INTO
-  one_time_tokens (token_hash, user_id, purpose, expires_at)
+  one_time_tokens (token_hash, user_id, purpose, expires_at, email)
 VALUES
-  ($1, $2, $3, $4)
+  ($1, $2, $3, $4, $5)
 `
 
 type PutTokenParams struct {
@@ -84,6 +158,7 @@ type PutTokenParams struct {
 	UserID    string             `json:"userId"`
 	Purpose   string             `json:"purpose"`
 	ExpiresAt time.Time          `json:"expiresAt"`
+	Email     *string            `json:"email"`
 }
 
 func (q *Queries) PutToken(ctx context.Context, arg *PutTokenParams) error {
@@ -92,6 +167,7 @@ func (q *Queries) PutToken(ctx context.Context, arg *PutTokenParams) error {
 		arg.UserID,
 		arg.Purpose,
 		arg.ExpiresAt,
+		arg.Email,
 	)
 	return err
 }
