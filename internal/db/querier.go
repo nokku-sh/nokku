@@ -16,6 +16,7 @@ type Querier interface {
 	AddTeamMember(ctx context.Context, arg *AddTeamMemberParams) error
 	AuditActivityByHour(ctx context.Context, arg *AuditActivityByHourParams) ([]*AuditActivityByHourRow, error)
 	ConsumeCredentialBySubject(ctx context.Context, arg *ConsumeCredentialBySubjectParams) (*Credential, error)
+	ConsumeEmailToken(ctx context.Context, arg *ConsumeEmailTokenParams) (*ConsumeEmailTokenRow, error)
 	ConsumeToken(ctx context.Context, arg *ConsumeTokenParams) (string, error)
 	CountTeamMembers(ctx context.Context, teamIds []string) ([]*CountTeamMembersRow, error)
 	CountUserMemberships(ctx context.Context, userID string) (int32, error)
@@ -61,6 +62,7 @@ type Querier interface {
 	DeleteUser(ctx context.Context, id string) error
 	DeleteUserCredentialsByProvider(ctx context.Context, arg *DeleteUserCredentialsByProviderParams) (int64, error)
 	DeleteUserSCIMCredentials(ctx context.Context, arg *DeleteUserSCIMCredentialsParams) error
+	DeleteUserTokens(ctx context.Context, arg *DeleteUserTokensParams) error
 	DeleteWorkspace(ctx context.Context, workspaceID string) error
 	DeleteWorkspaceAuditLogs(ctx context.Context, arg *DeleteWorkspaceAuditLogsParams) (int64, error)
 	DeleteWorkspaceDomain(ctx context.Context, arg *DeleteWorkspaceDomainParams) error
@@ -89,6 +91,7 @@ type Querier interface {
 	// Ignores the use limit, so a used-up token still identifies a daemon it
 	// already enrolled. RedeemToken enforces it.
 	GetLiveToken(ctx context.Context, arg *GetLiveTokenParams) (*WorkspaceToken, error)
+	GetPendingTokenEmail(ctx context.Context, arg *GetPendingTokenEmailParams) (*string, error)
 	GetPrincipalWorkspace(ctx context.Context, principalID string) (string, error)
 	GetPrincipalsByTargetIDs(ctx context.Context, targetIds []string) ([]*GetPrincipalsByTargetIDsRow, error)
 	GetRecording(ctx context.Context, id string) (*Recording, error)
@@ -175,6 +178,7 @@ type Querier interface {
 	// Status stays inactive so this row never grants entitlements until the
 	// webhook promotes it.
 	SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error
+	SetUserEmail(ctx context.Context, arg *SetUserEmailParams) (*User, error)
 	SumRecordingBytes(ctx context.Context, workspaceID string) (int64, error)
 	TouchCredential(ctx context.Context, id string) error
 	TouchDaemons(ctx context.Context, daemonIds []string) error

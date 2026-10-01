@@ -1,8 +1,8 @@
 -- name: PutToken :exec
 INSERT INTO
-  one_time_tokens (token_hash, user_id, purpose, expires_at)
+  one_time_tokens (token_hash, user_id, purpose, expires_at, email)
 VALUES
-  (@token_hash, @user_id, @purpose, @expires_at);
+  (@token_hash, @user_id, @purpose, @expires_at, sqlc.narg('email'));
 
 -- name: ConsumeToken :one
 DELETE FROM one_time_tokens
@@ -12,6 +12,38 @@ WHERE
   AND expires_at > NOW()
 RETURNING
   user_id;
+
+-- name: ConsumeEmailToken :one
+DELETE FROM one_time_tokens
+WHERE
+  token_hash = @token_hash
+  AND purpose = @purpose
+  AND expires_at > NOW()
+  AND email IS NOT NULL
+RETURNING
+  user_id,
+  email;
+
+-- name: DeleteUserTokens :exec
+DELETE FROM one_time_tokens
+WHERE
+  user_id = @user_id
+  AND purpose = @purpose;
+
+-- name: GetPendingTokenEmail :one
+SELECT
+  email
+FROM
+  one_time_tokens
+WHERE
+  user_id = @user_id
+  AND purpose = @purpose
+  AND expires_at > NOW()
+  AND email IS NOT NULL
+ORDER BY
+  created_at DESC
+LIMIT
+  1;
 
 -- name: HasRecentToken :one
 SELECT EXISTS (
