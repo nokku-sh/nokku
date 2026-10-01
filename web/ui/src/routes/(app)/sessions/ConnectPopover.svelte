@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { daemon } from '$lib/api/daemons.svelte';
-	import { getSessions } from '$lib/api/terminal.svelte';
+	import { getSessions, removeSession } from '$lib/api/terminal.svelte';
 	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -18,11 +18,7 @@
 		[...getSessions().entries()].filter(([, s]) => s.daemonID === target.daemonId)
 	);
 
-	// Kept alive for its side effect, the select registers open sessions.
-	daemon.listSessions(() => target.daemonId);
-
 	const createSession = daemon.createSession();
-	const closeSession = daemon.closeSession();
 
 	function connect(username: string) {
 		createSession.mutate({ daemonId: target.daemonId, username });
@@ -109,7 +105,7 @@
 						size="icon-xs"
 						class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
 						aria-label={`Close ${session.username}`}
-						onclick={() => closeSession.mutate({ daemonId: target.daemonId, sessionId: id })}
+						onclick={() => removeSession(id)}
 					>
 						<X />
 					</Button>

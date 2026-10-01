@@ -3,8 +3,8 @@ import { DaemonService, DaemonStatus } from '$lib/gen/nokku/v1/daemon_pb';
 import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '$lib/query';
 import { plural, useBulkMutation } from './bulk';
-import { addSession, removeSession, validateActiveSession } from './terminal.svelte';
-import { activeSessionID, workspaceID } from '$lib/store.svelte';
+import { addSession, TerminalSession } from './terminal.svelte';
+import { workspaceID } from '$lib/store.svelte';
 
 export const daemon = {
 	get: (id: MaybeGetter<string | undefined>) =>
@@ -32,46 +32,19 @@ export const daemon = {
 			}),
 			() => ({ enabled: !!workspaceID.current, refetchInterval: 15000 })
 		),
-	listSessions: (id: MaybeGetter<string | undefined>) =>
-		useQuery(
-			DaemonService.method.listSessions,
-			() => ({ workspaceId: workspaceID.current, daemonId: extract(id) }),
-			() => ({
-				enabled: !!workspaceID.current && !!extract(id),
-				select: (res) => {
-					const daemonId = extract(id);
-					validateActiveSession(res.sessions);
-					if (!res.sessions || !daemonId) return [];
-					res.sessions.forEach((s) => {
-						addSession({
-							id: s.sessionId,
-							daemonID: daemonId,
-							daemonName: res.daemonName,
-							username: s.username
-						});
-					});
-					return res.sessions;
-				},
-				refetchInterval: 15000
-			})
-		),
-
 	createSession: () =>
 		useMutation(DaemonService.method.createSession, {
 			onSuccess: (data, vars) => {
 				if (!data.session || !vars.daemonId) return;
-				addSession({
-					id: data.session.sessionId,
-					daemonID: vars.daemonId,
-					daemonName: data.daemonName,
-					username: data.session.username
-				});
-				activeSessionID.current = data.session.sessionId;
+				addSession(
+					new TerminalSession(
+						data.session.sessionId,
+						vars.daemonId,
+						data.daemonName,
+						data.session.username
+					)
+				);
 			}
-		}),
-	closeSession: () =>
-		useMutation(DaemonService.method.closeSession, {
-			onSuccess: (_, vars) => vars.sessionId && removeSession(vars.sessionId)
 		}),
 	update: () => useMutation(DaemonService.method.updateDaemon),
 	delete: () => useMutation(DaemonService.method.deleteDaemon),

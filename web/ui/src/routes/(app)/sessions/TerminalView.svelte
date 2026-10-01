@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { openTerminal } from '$lib/api/terminal.svelte';
-	import type { TerminalHandle, TerminalSession } from '$lib/api/terminal.svelte';
+	import type { TerminalSession } from '$lib/api/terminal.svelte';
 	import '@xterm/xterm/css/xterm.css';
 
 	interface Props {
@@ -10,38 +8,25 @@
 	}
 	let { session, visible = true }: Props = $props();
 
-	let containerEl: HTMLDivElement | undefined = $state();
-	let handle: TerminalHandle | undefined = $state();
-
-	onMount(() => {
-		if (!containerEl) return;
-
-		handle = openTerminal(session.daemonID, session.id, containerEl);
-
-		const observer = new ResizeObserver(() => {
-			handle?.fitAddon.fit();
-		});
-		observer.observe(containerEl);
-
-		return () => {
-			observer.disconnect();
-			handle?.dispose();
-		};
-	});
+	function mount(el: HTMLElement) {
+		session.attach(el);
+		const observer = new ResizeObserver(() => session.fit());
+		observer.observe(el);
+		return () => observer.disconnect();
+	}
 
 	$effect(() => {
-		if (visible && handle) {
+		if (visible) {
 			// Let the DOM settle after the display change.
 			requestAnimationFrame(() => {
-				handle?.fitAddon.fit();
-				handle?.terminal.focus();
+				session.fit();
+				session.focus();
 			});
 		}
 	});
 </script>
 
 <div
-	class="h-full w-full overflow-hidden rounded-b-lg"
-	class:hidden={!visible}
-	bind:this={containerEl}
+	class={['h-full w-full overflow-hidden rounded-b-lg', !visible && 'hidden']}
+	{@attach mount}
 ></div>

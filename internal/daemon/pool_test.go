@@ -167,35 +167,6 @@ func TestPool_PokeKeepsControlMessages(t *testing.T) {
 	}
 }
 
-// TestPool_SessionStdoutStorm hammers appendStdout against SnapshotForAttach
-// (both take replayMu) and CloseSession, exercising the replay buffer and the
-// shared Stdout channel under contention.
-func TestPool_SessionStdoutStorm(t *testing.T) {
-	p := newTestPool(t)
-	s := p.registerSession("s1", "d1", "user", "u1")
-	defer p.unregisterSession("s1")
-	defer s.shutdown()
-
-	var wg sync.WaitGroup
-	for range 4 {
-		wg.Go(func() {
-			for range 2000 {
-				s.appendStdout([]byte("chunk"))
-			}
-		})
-		wg.Go(func() {
-			for range 500 {
-				_, live := s.SnapshotForAttach()
-				select {
-				case <-live:
-				default:
-				}
-			}
-		})
-	}
-	wg.Wait()
-}
-
 // TestPool_RelayRequestRace races RequestRelay (which may time out and
 // clean up its pending entry and slot) against RegisterRelay (which closes
 // the pending channel), the relay counterpart of the session request race.
@@ -405,20 +376,23 @@ func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 	c1 := p.registerDaemon(context.Background(), "d1", "w1")
 	c2 := p.registerDaemon(context.Background(), "d2", "w1")
 	defer p.unregisterDaemon("d2", c2)
-	mine := p.registerSession("s1", "d1", "root", "u1")
-	other := p.registerSession("s2", "d2", "root", "u1")
+	// Bare sessions, the teardown only needs the index and close.
+	closed := map[string]bool{}
+	for id, daemonID := range map[string]string{"s1": "d1", "s2": "d2"} {
+		s := &Session{sessionID: id, daemonID: daemonID, close: func() { closed[id] = true }}
+		p.mu.Lock()
+		p.sessions[id] = s
+		p.ownLocked(daemonID).sessions[id] = s
+		p.mu.Unlock()
+	}
 
 	p.unregisterDaemon("d1", c1)
 
-	select {
-	case <-mine.exited:
-	default:
+	if !closed["s1"] {
 		t.Fatal("session of the disconnected daemon is still running")
 	}
-	select {
-	case <-other.exited:
+	if closed["s2"] {
 		t.Fatal("session of another daemon was torn down")
-	default:
 	}
 	if p.GetSession("s1") != nil || p.GetSession("s2") == nil {
 		t.Fatal("session map out of sync with the teardown")
@@ -428,11 +402,6 @@ func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 	}
 	if got := len(p.ListSessions("d2")); got != 1 {
 		t.Fatalf("ListSessions(d2) = %d, want 1", got)
-	}
-
-	p.unregisterSession("s2")
-	if _, ok := p.owned["d2"]; ok {
-		t.Fatal("empty index entry was not dropped")
 	}
 }
 

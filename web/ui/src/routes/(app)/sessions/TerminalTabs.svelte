@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { daemon } from '$lib/api/daemons.svelte';
-	import { getSessions, type TerminalSession } from '$lib/api/terminal.svelte';
+	import { getSessions, removeSession, type TerminalSession } from '$lib/api/terminal.svelte';
 	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -10,7 +9,6 @@
 	import { X } from '@lucide/svelte';
 
 	const sessions = $derived(getSessions());
-	const closeSession = daemon.closeSession();
 
 	const stateLabel: Record<string, string> = {
 		connected: 'Connected',
@@ -24,7 +22,7 @@
 			title: `Close ${session.username}@${session.daemonName}?`,
 			description: 'The shell ends and anything still running in it stops.',
 			confirmText: 'Close session',
-			onConfirm: () => closeSession.mutateAsync({ daemonId: session.daemonID, sessionId: id })
+			onConfirm: () => removeSession(id)
 		});
 	}
 </script>

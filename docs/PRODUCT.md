@@ -77,7 +77,8 @@ The request path through nokku is strictly layered:
   reach a daemon behind NAT. The backend is a byte pipe, sessions stay
   end-to-end encrypted.
 - **Web terminal**: a browser SSH session. The backend mints an ephemeral
-  user cert and connects through a relay like any other client.
+  user cert and connects through a relay like any other client. The shell
+  lives exactly as long as its websocket.
 - **Join token**: a `workspace_tokens` row, `<token-id>_<32-byte-secret>`,
   stored hashed, with an optional expiry and use limit. Enroll tokens bring
   daemons in (with per-token auto-approve and CA), invite tokens bring people
@@ -249,10 +250,16 @@ ciphertext.
 
 ### Web terminal
 
-`nokku/internal/api/daemon.go` `DaemonService.CreateSession` mints an
+`nokku/internal/api/daemon.go` `DaemonService.CreateSession` checks access
+and stores a single-use ticket in the cache for 30s. The browser opens
+`/terminal/ws` with it. `nokku/internal/api/terminal.go` then mints an
 ephemeral 1h user cert (principal is the actor id), opens a relay, and has
-the pool dial the daemon's sshd over it. Sessions cap at 8h TTL with a 30m
-idle timeout.
+the pool dial the daemon's sshd over it.
+
+The shell belongs to that websocket. A reload, a dropped connection or a
+closed tab ends it, and there is no reattach and no replay buffer. Sessions
+also cap at 8h TTL with a 30m idle timeout. The UI keeps the socket in a
+module-level store so navigating inside the app does not close it.
 
 ### Recording
 

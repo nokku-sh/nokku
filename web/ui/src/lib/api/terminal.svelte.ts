@@ -2,23 +2,8 @@ import { Terminal, type ITerminalOptions, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SvelteMap } from 'svelte/reactivity';
 import { activeSessionID } from '$lib/store.svelte';
-import type { DaemonSession } from '$lib/gen/nokku/v1/daemon_pb';
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error';
-
-export type TerminalHandle = {
-	dispose: () => void;
-	terminal: Terminal;
-	fitAddon: FitAddon;
-};
-
-export type TerminalSession = {
-	id: string;
-	daemonID: string;
-	daemonName: string;
-	username: string;
-	state?: ConnectionState;
-};
 
 let sessions = new SvelteMap<string, TerminalSession>();
 
@@ -27,21 +12,14 @@ export function getSessions() {
 }
 export function addSession(session: TerminalSession) {
 	sessions.set(session.id, session);
-	if (activeSessionID.current === '') {
-		activeSessionID.current = session.id;
-	}
+	activeSessionID.current = session.id;
 }
 export function removeSession(id: string) {
 	if (activeSessionID.current === id) {
 		activeSessionID.current = '';
 	}
+	sessions.get(id)?.dispose();
 	sessions.delete(id);
-}
-export function validateActiveSession(sessions: DaemonSession[]) {
-	if (!activeSessionID.current) return;
-
-	const isValid = sessions.some((s) => s.sessionId === activeSessionID.current);
-	if (!isValid) activeSessionID.current = '';
 }
 
 const ansiNames = [
@@ -78,68 +56,68 @@ function terminalTheme(): Pick<ITerminalOptions, 'fontFamily' | 'theme'> {
 	return { fontFamily: v('terminal-font'), theme };
 }
 
-export function openTerminal(
-	daemonID: string,
-	sessionID: string,
-	containerEl: HTMLElement
-): TerminalHandle {
-	const ws = new WebSocket(`/terminal/ws?daemon_id=${daemonID}&session_id=${sessionID}`);
-	ws.binaryType = 'arraybuffer';
+// TerminalSession owns the socket and the terminal, so a shell survives
+// navigation. The shell on the server lives exactly as long as the socket.
+export class TerminalSession {
+	state = $state<ConnectionState>('connecting');
 
-	const term = new Terminal({ cursorBlink: true, fontSize: 14, ...terminalTheme() });
-	const fitAddon = new FitAddon();
-	term.loadAddon(fitAddon);
-	term.open(containerEl);
-	fitAddon.fit();
+	readonly #ws: WebSocket;
+	readonly #term = new Terminal({ cursorBlink: true, fontSize: 14, ...terminalTheme() });
+	readonly #fit = new FitAddon();
+	// xterm opens into its own node, which each view mount adopts.
+	readonly #el = document.createElement('div');
 
-	const resizeObserver = new ResizeObserver(() => fitAddon.fit());
-	resizeObserver.observe(containerEl);
+	constructor(
+		readonly id: string,
+		readonly daemonID: string,
+		readonly daemonName: string,
+		readonly username: string
+	) {
+		this.#el.className = 'h-full w-full';
+		this.#term.loadAddon(this.#fit);
 
-	const handle: TerminalHandle = {
-		dispose: () => {},
-		terminal: term,
-		fitAddon
-	};
+		const ws = new WebSocket(`/terminal/ws?session_id=${id}`);
+		ws.binaryType = 'arraybuffer';
+		this.#ws = ws;
 
-	const setState = (s: ConnectionState) => {
-		let session = sessions.get(sessionID);
-		if (!session) return;
-		session.state = s;
-	};
+		const sendSize = () => {
+			if (ws.readyState !== WebSocket.OPEN) return;
+			ws.send(JSON.stringify({ type: 'resize', cols: this.#term.cols, rows: this.#term.rows }));
+		};
+		ws.onopen = () => {
+			this.state = 'connected';
+			sendSize();
+		};
+		ws.onmessage = (e) => this.#term.write(new Uint8Array(e.data));
+		ws.onclose = (e) => {
+			this.state = e.code === 1000 ? 'disconnected' : 'error';
+			this.#term.write(`\r\n\x1b[2m${e.reason || 'connection lost'}\x1b[0m\r\n`);
+		};
 
-	setState('connecting');
+		const encoder = new TextEncoder();
+		this.#term.onData((data) => {
+			if (ws.readyState === WebSocket.OPEN) ws.send(encoder.encode(data));
+		});
+		this.#term.onResize(sendSize);
+	}
 
-	ws.onopen = () => {
-		setState('connected');
-		const { cols, rows } = term;
-		ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-	};
+	attach(container: HTMLElement) {
+		container.appendChild(this.#el);
+		if (!this.#term.element) this.#term.open(this.#el);
+		this.#fit.fit();
+	}
 
-	ws.onmessage = (e) => term.write(new Uint8Array(e.data));
+	fit() {
+		this.#fit.fit();
+	}
 
-	ws.onerror = () => setState('error');
+	focus() {
+		this.#term.focus();
+	}
 
-	ws.onclose = () => setState('disconnected');
-
-	const encoder = new TextEncoder();
-	term.onData((data) => {
-		if (ws.readyState === WebSocket.OPEN) {
-			ws.send(encoder.encode(data));
-		}
-	});
-
-	term.onResize(({ cols, rows }) => {
-		if (ws.readyState === WebSocket.OPEN) {
-			ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-		}
-	});
-
-	handle.dispose = () => {
-		if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-			ws.close();
-		}
-		term.dispose();
-	};
-
-	return handle;
+	dispose() {
+		this.#ws.onclose = null;
+		this.#ws.close();
+		this.#term.dispose();
+	}
 }
