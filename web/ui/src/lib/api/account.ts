@@ -35,6 +35,9 @@ export const account = {
 	changePassword: (currentPassword: string, newPassword: string): Promise<void> =>
 		guard(client.changePassword({ currentPassword, newPassword })).then(() => undefined),
 
+	requestEmailChange: (newEmail: string, currentPassword: string): Promise<void> =>
+		guard(client.requestEmailChange({ newEmail, currentPassword })).then(() => undefined),
+
 	removePassword: (currentPassword: string): Promise<void> =>
 		guard(client.removePassword({ currentPassword })).then(() => undefined),
 

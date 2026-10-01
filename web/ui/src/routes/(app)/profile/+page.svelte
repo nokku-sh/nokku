@@ -5,6 +5,7 @@
 	import { user } from '$lib/api/user.svelte';
 	import { workspace } from '$lib/api/workspaces.svelte';
 	import DangerZone from '$lib/components/sheets/DangerZone.svelte';
+	import FormModal from '$lib/components/blocks/FormModal.svelte';
 	import SaveStatus from '$lib/components/blocks/SaveStatus.svelte';
 	import * as Alert from '$lib/components/ui/alert';
 	import { Badge } from '$lib/components/ui/badge';
@@ -14,6 +15,7 @@
 	import * as ImageCropper from '$lib/components/ui/image-cropper';
 	import { Input } from '$lib/components/ui/input';
 	import * as InputGroup from '$lib/components/ui/input-group';
+	import { InputGroupVariants } from '$lib/components/ui/input-group';
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Spinner } from '$lib/components/ui/spinner';
@@ -24,7 +26,15 @@
 	import { roleLabel } from '$lib/roles';
 	import { workspaceID } from '$lib/store.svelte';
 	import { formatTs } from '$lib/utils';
-	import { BadgeCheck, Mail, Send, ShieldCheck, Trash2, TriangleAlert } from '@lucide/svelte';
+	import {
+		BadgeCheck,
+		Mail,
+		MailQuestion,
+		Send,
+		ShieldCheck,
+		Trash2,
+		TriangleAlert
+	} from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 
 	const me = user.self();
@@ -34,6 +44,20 @@
 	const updateProfile = user.updateProfile();
 	const resendVerification = auth.resendVerification();
 	const deleteAccount = user.deleteAccount();
+	const requestEmailChange = user.requestEmailChange();
+
+	let emailOpen = $state(false);
+	let newEmail = $state('');
+	let currentPassword = $state('');
+
+	async function submitEmailChange() {
+		await requestEmailChange.mutateAsync({ newEmail, currentPassword });
+		toast.success('Check your new inbox', {
+			description: 'The address changes once you click the link we sent there.'
+		});
+		newEmail = '';
+		currentPassword = '';
+	}
 	const workspaces = workspace.list();
 
 	const autoSave = useAutoSave(() => updateProfile.mutateAsync({ name: model?.name }));
@@ -133,9 +157,24 @@
 								<span class="text-xs text-success">Verified</span>
 							</InputGroup.Addon>
 						{/if}
+						<InputGroup.Addon align="inline-end">
+							<InputGroup.Button onclick={() => (emailOpen = true)}>Change</InputGroup.Button>
+						</InputGroup.Addon>
 					</InputGroup.Root>
-					<Field.Description>Your sign-in email. It can't be changed here.</Field.Description>
+					<Field.Description>
+						Your sign-in email. A change needs your password and a click in the new inbox.
+					</Field.Description>
 				</Field.Field>
+				{#if model.pendingEmail}
+					<Alert.Root>
+						<MailQuestion />
+						<Alert.Title>Waiting for {model.pendingEmail}</Alert.Title>
+						<Alert.Description>
+							Click the link we sent there to finish the change. Until then you sign in with your
+							current address.
+						</Alert.Description>
+					</Alert.Root>
+				{/if}
 				{#if !model.emailVerified}
 					<Alert.Root variant="warning">
 						<TriangleAlert />
@@ -212,6 +251,40 @@
 			{/if}
 		</Card.Content>
 	</Card.Root>
+
+	<FormModal
+		bind:open={emailOpen}
+		title="Change your email address"
+		description="We send a link to the new address. Your current address gets a notice and can cancel the change."
+		icon={Mail}
+		submitLabel="Send the link"
+		submitDisabled={!newEmail || !currentPassword}
+		onSubmit={submitEmailChange}
+	>
+		<Field.Field>
+			<Field.Label for="new-email">New email</Field.Label>
+			<Input
+				id="new-email"
+				type="email"
+				autocomplete="email"
+				bind:value={newEmail}
+				placeholder="you@company.com"
+				required
+			/>
+		</Field.Field>
+		<Field.Field>
+			<Field.Label for="email-current-password">Current password</Field.Label>
+			<InputGroupVariants
+				variant="password"
+				bind:value={currentPassword}
+				inputProps={{ id: 'email-current-password', autocomplete: 'current-password' }}
+			/>
+			<Field.Description>
+				No password yet? Set one under Security first. Accounts that sign in through an identity
+				provider change the address there.
+			</Field.Description>
+		</Field.Field>
+	</FormModal>
 
 	<DangerZone
 		actions={[

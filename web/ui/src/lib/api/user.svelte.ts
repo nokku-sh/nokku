@@ -99,6 +99,12 @@ export const user = {
 				queryClient.setQueryData(['account'], updated);
 			}
 		})),
+	requestEmailChange: () =>
+		createMutation<void, Error, { newEmail: string; currentPassword: string }>(() => ({
+			mutationFn: ({ newEmail, currentPassword }) =>
+				account.requestEmailChange(newEmail, currentPassword),
+			onSuccess: invalidateAccount
+		})),
 	deleteAccount: () =>
 		createMutation<void, Error, Record<string, never>>(() => ({
 			mutationFn: () => account.deleteAccount(),

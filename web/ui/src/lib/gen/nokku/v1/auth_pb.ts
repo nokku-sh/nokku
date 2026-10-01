@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/auth.proto.
  */
 export const file_nokku_v1_auth: GenFile = /*@__PURE__*/
-  fileDesc("ChNub2trdS92MS9hdXRoLnByb3RvEghub2trdS52MSJfCg9SZWdpc3RlclJlcXVlc3QSFgoEbmFtZRgBIAEoCUIIukgFcgMYgAISFgoFZW1haWwYAiABKAlCB7pIBHICYAESHAoIcGFzc3dvcmQYAyABKAlCCrpIB3IFEAgYgAEiEgoQUmVnaXN0ZXJSZXNwb25zZSJECgxMb2dpblJlcXVlc3QSFgoFZW1haWwYASABKAlCB7pIBHICYAESHAoIcGFzc3dvcmQYAiABKAlCCrpIB3IFEAEYgAEiLQoNTG9naW5SZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlciJLChpMb2dpbldpdGhCYWNrdXBDb2RlUmVxdWVzdBIWCgVlbWFpbBgBIAEoCUIHukgEcgJgARIVCgRjb2RlGAIgASgJQge6SARyAhABIjsKG0xvZ2luV2l0aEJhY2t1cENvZGVSZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlciIPCg1Mb2dvdXRSZXF1ZXN0IhAKDkxvZ291dFJlc3BvbnNlIi8KFUZvcmdvdFBhc3N3b3JkUmVxdWVzdBIWCgVlbWFpbBgBIAEoCUIHukgEcgJgASIYChZGb3Jnb3RQYXNzd29yZFJlc3BvbnNlIlAKFFJlc2V0UGFzc3dvcmRSZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABEiAKDG5ld19wYXNzd29yZBgCIAEoCUIKukgHcgUQCBiAASIXChVSZXNldFBhc3N3b3JkUmVzcG9uc2UiLAoSVmVyaWZ5RW1haWxSZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABIhUKE1ZlcmlmeUVtYWlsUmVzcG9uc2UiMwoZUmVzZW5kVmVyaWZpY2F0aW9uUmVxdWVzdBIWCgVlbWFpbBgBIAEoCUIHukgEcgJgASIcChpSZXNlbmRWZXJpZmljYXRpb25SZXNwb25zZSIsChJEaXNjb3ZlclNTT1JlcXVlc3QSFgoFZW1haWwYASABKAlCB7pIBHICYAEiZQoTRGlzY292ZXJTU09SZXNwb25zZRIPCgdoYXNfc3NvGAEgASgIEg8KB2VuZm9yY2UYAiABKAgSLAoJcHJvdmlkZXJzGAMgAygLMhkubm9ra3UudjEuU1NPUHJvdmlkZXJJbmZvIkEKD1NTT1Byb3ZpZGVySW5mbxIOCgZtZXRob2QYASABKAkSEAoIcHJvdmlkZXIYAiABKAkSDAoEbmFtZRgDIAEoCTKWBgoLQXV0aFNlcnZpY2USSQoIUmVnaXN0ZXISGS5ub2trdS52MS5SZWdpc3RlclJlcXVlc3QaGi5ub2trdS52MS5SZWdpc3RlclJlc3BvbnNlIgbC8xgCCAESQAoFTG9naW4SFi5ub2trdS52MS5Mb2dpblJlcXVlc3QaFy5ub2trdS52MS5Mb2dpblJlc3BvbnNlIgbC8xgCCAESagoTTG9naW5XaXRoQmFja3VwQ29kZRIkLm5va2t1LnYxLkxvZ2luV2l0aEJhY2t1cENvZGVSZXF1ZXN0GiUubm9ra3UudjEuTG9naW5XaXRoQmFja3VwQ29kZVJlc3BvbnNlIgbC8xgCCAESQwoGTG9nb3V0Ehcubm9ra3UudjEuTG9nb3V0UmVxdWVzdBoYLm5va2t1LnYxLkxvZ291dFJlc3BvbnNlIgbC8xgCCAESWwoORm9yZ290UGFzc3dvcmQSHy5ub2trdS52MS5Gb3Jnb3RQYXNzd29yZFJlcXVlc3QaIC5ub2trdS52MS5Gb3Jnb3RQYXNzd29yZFJlc3BvbnNlIgbC8xgCCAESWAoNUmVzZXRQYXNzd29yZBIeLm5va2t1LnYxLlJlc2V0UGFzc3dvcmRSZXF1ZXN0Gh8ubm9ra3UudjEuUmVzZXRQYXNzd29yZFJlc3BvbnNlIgbC8xgCCAESUgoLVmVyaWZ5RW1haWwSHC5ub2trdS52MS5WZXJpZnlFbWFpbFJlcXVlc3QaHS5ub2trdS52MS5WZXJpZnlFbWFpbFJlc3BvbnNlIgbC8xgCCAESZwoSUmVzZW5kVmVyaWZpY2F0aW9uEiMubm9ra3UudjEuUmVzZW5kVmVyaWZpY2F0aW9uUmVxdWVzdBokLm5va2t1LnYxLlJlc2VuZFZlcmlmaWNhdGlvblJlc3BvbnNlIgbC8xgCCAESVQoLRGlzY292ZXJTU08SHC5ub2trdS52MS5EaXNjb3ZlclNTT1JlcXVlc3QaHS5ub2trdS52MS5EaXNjb3ZlclNTT1Jlc3BvbnNlIgmQAgHC8xgCCAFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_nokku_v1_access, file_nokku_v1_account]);
+  fileDesc("ChNub2trdS92MS9hdXRoLnByb3RvEghub2trdS52MSJfCg9SZWdpc3RlclJlcXVlc3QSFgoEbmFtZRgBIAEoCUIIukgFcgMYgAISFgoFZW1haWwYAiABKAlCB7pIBHICYAESHAoIcGFzc3dvcmQYAyABKAlCCrpIB3IFEAgYgAEiEgoQUmVnaXN0ZXJSZXNwb25zZSJECgxMb2dpblJlcXVlc3QSFgoFZW1haWwYASABKAlCB7pIBHICYAESHAoIcGFzc3dvcmQYAiABKAlCCrpIB3IFEAEYgAEiLQoNTG9naW5SZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlciJLChpMb2dpbldpdGhCYWNrdXBDb2RlUmVxdWVzdBIWCgVlbWFpbBgBIAEoCUIHukgEcgJgARIVCgRjb2RlGAIgASgJQge6SARyAhABIjsKG0xvZ2luV2l0aEJhY2t1cENvZGVSZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlciIPCg1Mb2dvdXRSZXF1ZXN0IhAKDkxvZ291dFJlc3BvbnNlIi8KFUZvcmdvdFBhc3N3b3JkUmVxdWVzdBIWCgVlbWFpbBgBIAEoCUIHukgEcgJgASIYChZGb3Jnb3RQYXNzd29yZFJlc3BvbnNlIlAKFFJlc2V0UGFzc3dvcmRSZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABEiAKDG5ld19wYXNzd29yZBgCIAEoCUIKukgHcgUQCBiAASIXChVSZXNldFBhc3N3b3JkUmVzcG9uc2UiLAoSVmVyaWZ5RW1haWxSZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABIhUKE1ZlcmlmeUVtYWlsUmVzcG9uc2UiMwoZQ29uZmlybUVtYWlsQ2hhbmdlUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQASIcChpDb25maXJtRW1haWxDaGFuZ2VSZXNwb25zZSIyChhDYW5jZWxFbWFpbENoYW5nZVJlcXVlc3QSFgoFdG9rZW4YASABKAlCB7pIBHICEAEiGwoZQ2FuY2VsRW1haWxDaGFuZ2VSZXNwb25zZSIzChlSZXNlbmRWZXJpZmljYXRpb25SZXF1ZXN0EhYKBWVtYWlsGAEgASgJQge6SARyAmABIhwKGlJlc2VuZFZlcmlmaWNhdGlvblJlc3BvbnNlIiwKEkRpc2NvdmVyU1NPUmVxdWVzdBIWCgVlbWFpbBgBIAEoCUIHukgEcgJgASJlChNEaXNjb3ZlclNTT1Jlc3BvbnNlEg8KB2hhc19zc28YASABKAgSDwoHZW5mb3JjZRgCIAEoCBIsCglwcm92aWRlcnMYAyADKAsyGS5ub2trdS52MS5TU09Qcm92aWRlckluZm8iQQoPU1NPUHJvdmlkZXJJbmZvEg4KBm1ldGhvZBgBIAEoCRIQCghwcm92aWRlchgCIAEoCRIMCgRuYW1lGAMgASgJMuUHCgtBdXRoU2VydmljZRJJCghSZWdpc3RlchIZLm5va2t1LnYxLlJlZ2lzdGVyUmVxdWVzdBoaLm5va2t1LnYxLlJlZ2lzdGVyUmVzcG9uc2UiBsLzGAIIARJACgVMb2dpbhIWLm5va2t1LnYxLkxvZ2luUmVxdWVzdBoXLm5va2t1LnYxLkxvZ2luUmVzcG9uc2UiBsLzGAIIARJqChNMb2dpbldpdGhCYWNrdXBDb2RlEiQubm9ra3UudjEuTG9naW5XaXRoQmFja3VwQ29kZVJlcXVlc3QaJS5ub2trdS52MS5Mb2dpbldpdGhCYWNrdXBDb2RlUmVzcG9uc2UiBsLzGAIIARJDCgZMb2dvdXQSFy5ub2trdS52MS5Mb2dvdXRSZXF1ZXN0Ghgubm9ra3UudjEuTG9nb3V0UmVzcG9uc2UiBsLzGAIIARJbCg5Gb3Jnb3RQYXNzd29yZBIfLm5va2t1LnYxLkZvcmdvdFBhc3N3b3JkUmVxdWVzdBogLm5va2t1LnYxLkZvcmdvdFBhc3N3b3JkUmVzcG9uc2UiBsLzGAIIARJYCg1SZXNldFBhc3N3b3JkEh4ubm9ra3UudjEuUmVzZXRQYXNzd29yZFJlcXVlc3QaHy5ub2trdS52MS5SZXNldFBhc3N3b3JkUmVzcG9uc2UiBsLzGAIIARJSCgtWZXJpZnlFbWFpbBIcLm5va2t1LnYxLlZlcmlmeUVtYWlsUmVxdWVzdBodLm5va2t1LnYxLlZlcmlmeUVtYWlsUmVzcG9uc2UiBsLzGAIIARJnChJSZXNlbmRWZXJpZmljYXRpb24SIy5ub2trdS52MS5SZXNlbmRWZXJpZmljYXRpb25SZXF1ZXN0GiQubm9ra3UudjEuUmVzZW5kVmVyaWZpY2F0aW9uUmVzcG9uc2UiBsLzGAIIARJnChJDb25maXJtRW1haWxDaGFuZ2USIy5ub2trdS52MS5Db25maXJtRW1haWxDaGFuZ2VSZXF1ZXN0GiQubm9ra3UudjEuQ29uZmlybUVtYWlsQ2hhbmdlUmVzcG9uc2UiBsLzGAIIARJkChFDYW5jZWxFbWFpbENoYW5nZRIiLm5va2t1LnYxLkNhbmNlbEVtYWlsQ2hhbmdlUmVxdWVzdBojLm5va2t1LnYxLkNhbmNlbEVtYWlsQ2hhbmdlUmVzcG9uc2UiBsLzGAIIARJVCgtEaXNjb3ZlclNTTxIcLm5va2t1LnYxLkRpc2NvdmVyU1NPUmVxdWVzdBodLm5va2t1LnYxLkRpc2NvdmVyU1NPUmVzcG9uc2UiCZACAcLzGAIIAWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_nokku_v1_access, file_nokku_v1_account]);
 
 /**
  * @generated from message nokku.v1.RegisterRequest
@@ -256,6 +256,66 @@ export const VerifyEmailResponseSchema: GenMessage<VerifyEmailResponse> = /*@__P
   messageDesc(file_nokku_v1_auth, 13);
 
 /**
+ * @generated from message nokku.v1.ConfirmEmailChangeRequest
+ */
+export type ConfirmEmailChangeRequest = Message<"nokku.v1.ConfirmEmailChangeRequest"> & {
+  /**
+   * @generated from field: string token = 1;
+   */
+  token: string;
+};
+
+/**
+ * Describes the message nokku.v1.ConfirmEmailChangeRequest.
+ * Use `create(ConfirmEmailChangeRequestSchema)` to create a new message.
+ */
+export const ConfirmEmailChangeRequestSchema: GenMessage<ConfirmEmailChangeRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_auth, 14);
+
+/**
+ * @generated from message nokku.v1.ConfirmEmailChangeResponse
+ */
+export type ConfirmEmailChangeResponse = Message<"nokku.v1.ConfirmEmailChangeResponse"> & {
+};
+
+/**
+ * Describes the message nokku.v1.ConfirmEmailChangeResponse.
+ * Use `create(ConfirmEmailChangeResponseSchema)` to create a new message.
+ */
+export const ConfirmEmailChangeResponseSchema: GenMessage<ConfirmEmailChangeResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_auth, 15);
+
+/**
+ * @generated from message nokku.v1.CancelEmailChangeRequest
+ */
+export type CancelEmailChangeRequest = Message<"nokku.v1.CancelEmailChangeRequest"> & {
+  /**
+   * @generated from field: string token = 1;
+   */
+  token: string;
+};
+
+/**
+ * Describes the message nokku.v1.CancelEmailChangeRequest.
+ * Use `create(CancelEmailChangeRequestSchema)` to create a new message.
+ */
+export const CancelEmailChangeRequestSchema: GenMessage<CancelEmailChangeRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_auth, 16);
+
+/**
+ * @generated from message nokku.v1.CancelEmailChangeResponse
+ */
+export type CancelEmailChangeResponse = Message<"nokku.v1.CancelEmailChangeResponse"> & {
+};
+
+/**
+ * Describes the message nokku.v1.CancelEmailChangeResponse.
+ * Use `create(CancelEmailChangeResponseSchema)` to create a new message.
+ */
+export const CancelEmailChangeResponseSchema: GenMessage<CancelEmailChangeResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_auth, 17);
+
+/**
  * @generated from message nokku.v1.ResendVerificationRequest
  */
 export type ResendVerificationRequest = Message<"nokku.v1.ResendVerificationRequest"> & {
@@ -270,7 +330,7 @@ export type ResendVerificationRequest = Message<"nokku.v1.ResendVerificationRequ
  * Use `create(ResendVerificationRequestSchema)` to create a new message.
  */
 export const ResendVerificationRequestSchema: GenMessage<ResendVerificationRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 14);
+  messageDesc(file_nokku_v1_auth, 18);
 
 /**
  * @generated from message nokku.v1.ResendVerificationResponse
@@ -283,7 +343,7 @@ export type ResendVerificationResponse = Message<"nokku.v1.ResendVerificationRes
  * Use `create(ResendVerificationResponseSchema)` to create a new message.
  */
 export const ResendVerificationResponseSchema: GenMessage<ResendVerificationResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 15);
+  messageDesc(file_nokku_v1_auth, 19);
 
 /**
  * @generated from message nokku.v1.DiscoverSSORequest
@@ -300,7 +360,7 @@ export type DiscoverSSORequest = Message<"nokku.v1.DiscoverSSORequest"> & {
  * Use `create(DiscoverSSORequestSchema)` to create a new message.
  */
 export const DiscoverSSORequestSchema: GenMessage<DiscoverSSORequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 16);
+  messageDesc(file_nokku_v1_auth, 20);
 
 /**
  * @generated from message nokku.v1.DiscoverSSOResponse
@@ -327,7 +387,7 @@ export type DiscoverSSOResponse = Message<"nokku.v1.DiscoverSSOResponse"> & {
  * Use `create(DiscoverSSOResponseSchema)` to create a new message.
  */
 export const DiscoverSSOResponseSchema: GenMessage<DiscoverSSOResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 17);
+  messageDesc(file_nokku_v1_auth, 21);
 
 /**
  * @generated from message nokku.v1.SSOProviderInfo
@@ -354,7 +414,7 @@ export type SSOProviderInfo = Message<"nokku.v1.SSOProviderInfo"> & {
  * Use `create(SSOProviderInfoSchema)` to create a new message.
  */
 export const SSOProviderInfoSchema: GenMessage<SSOProviderInfo> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 18);
+  messageDesc(file_nokku_v1_auth, 22);
 
 /**
  * @generated from service nokku.v1.AuthService
@@ -425,6 +485,27 @@ export const AuthService: GenService<{
     methodKind: "unary";
     input: typeof ResendVerificationRequestSchema;
     output: typeof ResendVerificationResponseSchema;
+  },
+  /**
+   * Takes the token mailed to the new address and switches the account to it.
+   *
+   * @generated from rpc nokku.v1.AuthService.ConfirmEmailChange
+   */
+  confirmEmailChange: {
+    methodKind: "unary";
+    input: typeof ConfirmEmailChangeRequestSchema;
+    output: typeof ConfirmEmailChangeResponseSchema;
+  },
+  /**
+   * Takes the token mailed to the old address. Drops a pending change, or
+   * puts the old address back when the change already happened.
+   *
+   * @generated from rpc nokku.v1.AuthService.CancelEmailChange
+   */
+  cancelEmailChange: {
+    methodKind: "unary";
+    input: typeof CancelEmailChangeRequestSchema;
+    output: typeof CancelEmailChangeResponseSchema;
   },
   /**
    * @generated from rpc nokku.v1.AuthService.DiscoverSSO
