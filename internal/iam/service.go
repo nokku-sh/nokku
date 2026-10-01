@@ -42,6 +42,7 @@ const (
 	ActionSessionIssued   Action = "SessionIssued"
 	ActionSessionRevoked  Action = "SessionRevoked"
 	ActionPasswordSet     Action = "PasswordSet"
+	ActionEmailChanged    Action = "EmailChanged"
 	ActionCredentialAdded Action = "CredentialAdded" //nolint:gosec // an audit action name, not a credential
 )
 

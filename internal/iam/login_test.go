@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -437,5 +438,115 @@ func TestPasswordLoginMarksCredentialUsed(t *testing.T) {
 	}
 	if stored().LastUsedAt == nil {
 		t.Error("a successful sign-in did not mark the password used")
+	}
+}
+
+func TestEmailChange(t *testing.T) {
+	e := newTestEnv(t)
+	ctx := t.Context()
+	oldEmail, newEmail := "old@"+testDomain(), "new@"+testDomain()
+	u := e.user(t, oldEmail, true)
+	taken := e.user(t, "taken@"+testDomain(), true)
+
+	if _, _, err := e.svc.RequestEmailChange(ctx, u, oldEmail); !errors.Is(err, ErrSameEmail) {
+		t.Fatalf("same address err = %v, want ErrSameEmail", err)
+	}
+	if _, _, err := e.svc.RequestEmailChange(ctx, u, taken.Email); !errors.Is(err, ErrEmailTaken) {
+		t.Fatalf("taken address err = %v, want ErrEmailTaken", err)
+	}
+
+	// A second request replaces the first, its link confirms nothing.
+	stale, _, err := e.svc.RequestEmailChange(ctx, u, "typo@"+testDomain())
+	if err != nil {
+		t.Fatal(err)
+	}
+	confirm, cancel, err := e.svc.RequestEmailChange(ctx, u, " "+strings.ToUpper(newEmail))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = e.svc.ConfirmEmailChange(ctx, stale); !errors.Is(err, errInvalidToken) {
+		t.Fatalf("stale link err = %v, want errInvalidToken", err)
+	}
+	if got := e.svc.PendingEmail(ctx, u.ID); got != newEmail {
+		t.Fatalf("pending = %q, want %q", got, newEmail)
+	}
+	if got := e.userByEmail(t, oldEmail); got == nil {
+		t.Fatal("the address changed before the new one was confirmed")
+	}
+	// The cancel link is not a confirm link.
+	if err = e.svc.ConfirmEmailChange(ctx, cancel); !errors.Is(err, errInvalidToken) {
+		t.Fatalf("cancel token as confirm err = %v, want errInvalidToken", err)
+	}
+
+	reset, err := e.svc.IssueToken(ctx, u.ID, TokenPasswordReset, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = e.svc.ConfirmEmailChange(ctx, confirm); err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+	if got := e.userByEmail(t, newEmail); got == nil || got.ID != u.ID || !got.EmailVerified {
+		t.Fatalf("after confirm the new address resolves to %+v", got)
+	}
+	if got := e.svc.PendingEmail(ctx, u.ID); got != "" {
+		t.Fatalf("pending after confirm = %q", got)
+	}
+	if err = e.svc.ConfirmEmailChange(ctx, confirm); !errors.Is(err, errInvalidToken) {
+		t.Fatalf("second confirm err = %v, want errInvalidToken", err)
+	}
+	if _, err = e.svc.ConsumeToken(ctx, reset, TokenPasswordReset); !errors.Is(err, errInvalidToken) {
+		t.Fatalf("reset link for the old address survived: %v", err)
+	}
+
+	// The old inbox undoes the change and signs everyone out.
+	_, session, err := e.svc.IssueSession(
+		ctx,
+		SessionParams{SubjectID: u.ID, Kind: actor.KindUser, Method: MethodPassword},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = e.svc.CancelEmailChange(ctx, cancel); err != nil {
+		t.Fatalf("revert: %v", err)
+	}
+	if got := e.userByEmail(t, oldEmail); got == nil || got.ID != u.ID {
+		t.Fatalf("after revert the old address resolves to %+v", got)
+	}
+	if _, err = e.svc.verifySession(ctx, session); err == nil {
+		t.Fatal("a session survived the revert")
+	}
+	if err = e.svc.CancelEmailChange(ctx, cancel); !errors.Is(err, errInvalidToken) {
+		t.Fatalf("second revert err = %v, want errInvalidToken", err)
+	}
+}
+
+func TestEmailChangeCancelBeforeConfirm(t *testing.T) {
+	e := newTestEnv(t)
+	ctx := t.Context()
+	u := e.user(t, "old@"+testDomain(), true)
+	confirm, cancel, err := e.svc.RequestEmailChange(ctx, u, "new@"+testDomain())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, session, err := e.svc.IssueSession(
+		ctx,
+		SessionParams{SubjectID: u.ID, Kind: actor.KindUser, Method: MethodPassword},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = e.svc.CancelEmailChange(ctx, cancel); err != nil {
+		t.Fatalf("cancel: %v", err)
+	}
+	if err = e.svc.ConfirmEmailChange(ctx, confirm); !errors.Is(err, errInvalidToken) {
+		t.Fatalf("confirm after cancel err = %v, want errInvalidToken", err)
+	}
+	if got := e.userByEmail(t, u.Email); got == nil {
+		t.Fatal("cancel changed the address")
+	}
+	// Nothing changed yet, so nobody is signed out.
+	if _, err = e.svc.verifySession(ctx, session); err != nil {
+		t.Fatalf("cancel of a pending change ended the session: %v", err)
 	}
 }
