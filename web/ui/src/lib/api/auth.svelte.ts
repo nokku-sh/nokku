@@ -71,6 +71,16 @@ export const auth = {
 			(body: { token: string }) => client.verifyEmail({ token: body.token }),
 			() => toast.success('Email verified')
 		),
+	confirmEmailChange: () =>
+		authMutation(
+			(body: { token: string }) => client.confirmEmailChange({ token: body.token }),
+			() => void queryClient.invalidateQueries({ queryKey: ['account'] })
+		),
+	cancelEmailChange: () =>
+		authMutation(
+			(body: { token: string }) => client.cancelEmailChange({ token: body.token }),
+			() => void queryClient.invalidateQueries({ queryKey: ['account'] })
+		),
 	resendVerification: () =>
 		authMutation(
 			(body: { email: string }) => client.resendVerification({ email: body.email }),

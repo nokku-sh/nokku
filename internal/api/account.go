@@ -132,13 +132,13 @@ func (s *accountService) RequestEmailChange(
 		return nil, errInternal
 	}
 
-	base := s.cfg.FullURL() + "/email-change/"
+	base := s.cfg.FullURL() + "/email-change?"
 	newEmail := strings.ToLower(strings.TrimSpace(req.GetNewEmail()))
 	err = s.cfg.Email.SendVerificationEmail(
-		ctx, u.ID, newEmail, base+"confirm?token="+confirm, iam.EmailChangeTTL.String(),
+		ctx, u.ID, newEmail, base+"token="+confirm, iam.EmailChangeTTL.String(),
 	)
 	if err == nil {
-		err = s.cfg.Email.SendEmailChangeNotice(ctx, u.ID, u.Email, newEmail, base+"cancel?token="+cancel, "7 days")
+		err = s.cfg.Email.SendEmailChangeNotice(ctx, u.ID, u.Email, newEmail, base+"cancel=1&token="+cancel, "7 days")
 	}
 	if err != nil {
 		// Without both mails the change must not stay pending.
