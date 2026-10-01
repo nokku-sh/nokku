@@ -2,20 +2,52 @@ package api
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/coder/websocket"
+	"golang.org/x/time/rate"
 
 	"github.com/nokku-sh/nokku/internal/actor"
+	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/daemon"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-const wsReadLimit = 64 * 1024
+const (
+	wsReadLimit = 64 * 1024
+	wsTimeout   = 15 * time.Second
+	wsPingEvery = 20 * time.Second
+
+	// The browser opens the socket right after CreateSession.
+	sessionTicketTTL = 30 * time.Second
+	sessionIdle      = 30 * time.Minute
+
+	// sshclient chunks at 32 KB, below the burst, so WaitN is valid.
+	webStdoutRate  = 512 << 10
+	webStdoutBurst = 64 << 10
+)
+
+// sessionTicket is what CreateSession authorized. It lives in the shared
+// cache, so the websocket may land on any instance.
+type sessionTicket struct {
+	WorkspaceID string `json:"workspace_id"`
+	DaemonID    string `json:"daemon_id"`
+	UserID      string `json:"user_id"`
+	Username    string `json:"username"`
+}
+
+func putSessionTicket(ctx context.Context, c cache.Cache, sessionID string, t sessionTicket) error {
+	b, err := json.Marshal(t)
+	if err != nil {
+		return err
+	}
+	return c.Set(ctx, "websession:"+sessionID, b, sessionTicketTTL)
+}
 
 type terminalHandler struct {
 	cfg *config.Config
@@ -25,21 +57,49 @@ func newTerminalHandler(cfg *config.Config) *terminalHandler {
 	return &terminalHandler{cfg: cfg}
 }
 
+// handleWebSocket runs one shell for as long as the socket is open. A reload
+// or a dropped connection ends it.
 func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	daemonID := r.URL.Query().Get("daemon_id")
 	sessionID := r.URL.Query().Get("session_id")
-
-	if daemonID == "" || sessionID == "" {
-		writeJSONError(w, http.StatusBadRequest, "daemon_id and session_id are required")
+	if sessionID == "" {
+		writeJSONError(w, http.StatusBadRequest, "session_id is required")
 		return
 	}
 
-	sess := t.cfg.Pool.GetSession(sessionID)
-	if sess == nil || sess.DaemonID() != daemonID {
+	// GetDel makes the ticket single use.
+	var ticket sessionTicket
+	raw, err := t.cfg.Cache.GetDel(r.Context(), "websession:"+sessionID)
+	if err != nil || json.Unmarshal(raw, &ticket) != nil {
 		writeJSONError(w, http.StatusNotFound, "session not found")
 		return
 	}
-	if !t.authorizeAttach(w, r, sess) {
+	if caller, _ := actor.PrincipalFromContext(r.Context()); caller.ID != ticket.UserID {
+		writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+
+	ctx, err := actorHasRole(
+		actor.AnnotateTenant(r.Context(), ticket.WorkspaceID), t.cfg.Conn, db.RoleMember,
+	)
+	if err != nil {
+		writeJSONError(w, http.StatusForbidden, "permission denied")
+		return
+	}
+	var ca *db.CertificateAuthority
+	var targetID string
+	if err := t.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		ca, err = q.GetCAByDaemonID(ctx, &ticket.DaemonID)
+		if err != nil {
+			return err
+		}
+		target, err := q.GetTargetByDaemon(ctx, &ticket.DaemonID)
+		if err != nil {
+			return err
+		}
+		targetID = target.ID
+		return nil
+	}); err != nil {
+		writeJSONError(w, http.StatusNotFound, "session not found")
 		return
 	}
 
@@ -53,13 +113,38 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 	defer func() { _ = conn.CloseNow() }()
 	conn.SetReadLimit(wsReadLimit)
 
-	ctx, cancel := context.WithCancel(r.Context())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	logger := slog.With("session_id", sessionID, "daemon_id", ticket.DaemonID)
+
+	// The dial runs after the upgrade so the browser can show why it failed.
+	sess, err := t.cfg.Pool.StartSession(ctx, daemon.SessionConfig{
+		DaemonID:      ticket.DaemonID,
+		SessionID:     sessionID,
+		Username:      ticket.Username,
+		UserID:        ticket.UserID,
+		CA:            ca,
+		HostPrincipal: targetID,
+	})
+	if err != nil {
+		logger.Warn("web session failed to start", "error", err)
+		reason := "could not reach the server"
+		switch {
+		case errors.Is(err, daemon.ErrRelayLimit):
+			reason = "too many concurrent sessions"
+		case errors.Is(err, daemon.ErrCAInactive):
+			reason = "certificate authority is not active"
+		}
+		_ = conn.Close(websocket.StatusInternalError, reason)
+		return
+	}
+	defer sess.Close()
+
+	idle := time.AfterFunc(sessionIdle, sess.Close)
+	defer idle.Stop()
 
 	// Reads have no timeout since an idle terminal sends nothing. Pings prove
 	// the browser is still there.
-	const wsTimeout = 15 * time.Second
-	const wsPingEvery = 20 * time.Second
 	go func() {
 		ticker := time.NewTicker(wsPingEvery)
 		defer ticker.Stop()
@@ -79,110 +164,50 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 		}
 	}()
 
-	logger := slog.With("session_id", sessionID, "daemon_id", daemonID)
-
-	// No screen clear, replay sequences assume the default (1,1) cursor.
-	replay, live := sess.SnapshotForAttach()
-	if len(replay) > 0 {
-		wctx, wcancel := context.WithTimeout(ctx, wsTimeout)
-		err := conn.Write(wctx, websocket.MessageBinary, replay)
-		wcancel()
-		if err != nil {
-			logger.Debug("replay write failed", "error", err)
-		}
-	}
-
+	// Throttled so a chatty shell cannot flood the websocket. Stdout closing
+	// is the session's end.
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
+		limiter := rate.NewLimiter(webStdoutRate, webStdoutBurst)
+		for data := range sess.Stdout() {
+			if err := limiter.WaitN(ctx, len(data)); err != nil {
 				return
-			case data, ok := <-live:
-				if !ok {
-					_ = conn.Close(websocket.StatusNormalClosure, "session ended")
-					return
-				}
-				wctx, wcancel := context.WithTimeout(ctx, wsTimeout)
-				err := conn.Write(wctx, websocket.MessageBinary, data)
-				wcancel()
-				if err != nil {
-					return
-				}
+			}
+			idle.Reset(sessionIdle)
+			wctx, wcancel := context.WithTimeout(ctx, wsTimeout)
+			err := conn.Write(wctx, websocket.MessageBinary, data)
+			wcancel()
+			if err != nil {
+				cancel()
+				return
 			}
 		}
-	}()
-
-	go func() {
-		select {
-		case <-ctx.Done():
-		case <-sess.Exited():
-			_ = conn.Close(websocket.StatusNormalClosure, "session ended")
-		}
+		_ = conn.Close(websocket.StatusNormalClosure, "session ended")
 	}()
 
 	for {
 		typ, data, err := conn.Read(ctx)
 		if err != nil {
-			break
+			return
 		}
-
 		switch typ {
 		case websocket.MessageBinary:
-			sess.SendStdin(data)
+			idle.Reset(sessionIdle)
+			if err := sess.Write(data); err != nil {
+				return
+			}
 		case websocket.MessageText:
-			t.handleControlMessage(logger, sess, data)
+			var msg struct {
+				Type string `json:"type"`
+				Cols uint32 `json:"cols"`
+				Rows uint32 `json:"rows"`
+			}
+			if err := json.Unmarshal(data, &msg); err != nil {
+				logger.Debug("invalid control message", "error", err)
+				continue
+			}
+			if msg.Type == "resize" {
+				_ = sess.Resize(msg.Cols, msg.Rows)
+			}
 		}
-	}
-}
-
-// authorizeAttach allows the session's initiator and editors of the daemon's
-// workspace. It runs before the upgrade so rejections stay plain HTTP.
-func (t *terminalHandler) authorizeAttach(
-	w http.ResponseWriter,
-	r *http.Request,
-	sess *daemon.Session,
-) bool {
-	caller, ok := actor.PrincipalFromContext(r.Context())
-	if !ok || caller.ID == "" {
-		writeJSONError(w, http.StatusUnauthorized, "authentication required")
-		return false
-	}
-	if caller.Kind == actor.KindUser && sess.UserID() == caller.ID {
-		return true
-	}
-
-	// The workspace can't be pinned before authorization, so use Sys.
-	d, err := t.cfg.Conn.Sys().GetDaemon(r.Context(), sess.DaemonID())
-	if err != nil {
-		writeJSONError(w, http.StatusForbidden, "permission denied")
-		return false
-	}
-	role, err := t.cfg.Conn.Sys().GetActorRole(r.Context(), &db.GetActorRoleParams{
-		WorkspaceID: d.WorkspaceID,
-		ActorID:     caller.ID,
-	})
-	if err != nil || !db.Role(role).AtLeast(db.RoleEditor) {
-		writeJSONError(w, http.StatusForbidden, "permission denied")
-		return false
-	}
-	return true
-}
-
-func (t *terminalHandler) handleControlMessage(
-	logger *slog.Logger,
-	sess *daemon.Session,
-	data []byte,
-) {
-	var msg struct {
-		Type string `json:"type"`
-		Cols uint32 `json:"cols"`
-		Rows uint32 `json:"rows"`
-	}
-	if err := json.Unmarshal(data, &msg); err != nil {
-		logger.Debug("invalid control message", "error", err)
-		return
-	}
-	if msg.Type == "resize" {
-		sess.SendResize(msg.Cols, msg.Rows)
 	}
 }

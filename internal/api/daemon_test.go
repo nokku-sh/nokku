@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -12,6 +13,7 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect"
+	"github.com/coder/websocket"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/cryptosigner"
 	"github.com/stretchr/testify/assert"
@@ -141,9 +143,6 @@ func TestCreateSession(t *testing.T) {
 		srv.URL,
 		header("Authorization", "Bearer "+memberToken),
 	)
-	_, err = member.CreateSession(t.Context(), req)
-	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(err), "offline daemon, got %v", err)
-
 	sa, err := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth).
 		CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
 			WorkspaceId: &workspaceID,
@@ -183,6 +182,27 @@ func TestCreateSession(t *testing.T) {
 		_, err = q.UpdateTargetCA(t.Context(), &db.UpdateTargetCAParams{DaemonID: new(enrolled.GetId()), CaID: &row.ID})
 		return err
 	}))
+
+	// openShell trades a fresh ticket for the terminal websocket.
+	openShell := func() (string, *websocket.Conn) {
+		res, err := member.CreateSession(t.Context(), req)
+		require.NoError(t, err)
+		assert.Equal(t, memberPrincipal.ID, res.GetSession().GetUserId())
+		ws, _, err := websocket.Dial(
+			t.Context(),
+			srv.URL+"/terminal/ws?session_id="+res.GetSession().GetSessionId(),
+			&websocket.DialOptions{
+				HTTPClient: srv.Client(),
+				HTTPHeader: http.Header{"Cookie": {"nokku_session=" + memberToken}},
+			},
+		)
+		require.NoError(t, err)
+		return res.GetSession().GetSessionId(), ws
+	}
+
+	_, ws := openShell()
+	_, _, err = ws.Read(t.Context())
+	assert.Equal(t, websocket.StatusInternalError, websocket.CloseStatus(err), "offline daemon, got %v", err)
 
 	// A fake daemon holds the control stream and bridges the relay to sshd.
 	token := enrolled.GetAccessToken()
@@ -250,18 +270,37 @@ func TestCreateSession(t *testing.T) {
 		}
 	}()
 
-	// Unavailable until the pool has registered the control stream.
-	var res *nokkuv1.CreateSessionResponse
+	// The dial fails until the pool has registered the control stream.
+	var sessionID string
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		res, err = member.CreateSession(t.Context(), req)
-		if connect.CodeOf(err) != connect.CodeUnavailable || time.Now().After(deadline) {
+		sessionID, ws = openShell()
+		// The test sshd echoes stdin, a failed dial closes the socket instead.
+		_ = ws.Write(t.Context(), websocket.MessageBinary, []byte("ping\n"))
+		readCtx, stop := context.WithTimeout(t.Context(), 3*time.Second)
+		_, _, err = ws.Read(readCtx)
+		stop()
+		if err == nil || time.Now().After(deadline) {
 			break
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	require.NoError(t, err)
-	assert.Equal(t, memberPrincipal.ID, res.GetSession().GetUserId())
+	require.NoError(t, err, "shell output never arrived")
 	assert.Equal(t, "root", sshd.ConnUser(), "sshd saw the requested OS user")
-	assert.Equal(t, res.GetSession().GetSessionId(), sshd.Env("NOKKU_SESSION_ID"), "session env reached sshd")
+	assert.Equal(t, sessionID, sshd.Env("NOKKU_SESSION_ID"), "session env reached sshd")
+	assert.Len(t, cfg.Pool.ListSessions(enrolled.GetId()), 1)
+
+	_, res, err := websocket.Dial(t.Context(), srv.URL+"/terminal/ws?session_id="+sessionID,
+		&websocket.DialOptions{
+			HTTPClient: srv.Client(),
+			HTTPHeader: http.Header{"Cookie": {"nokku_session=" + memberToken}},
+		})
+	require.Error(t, err, "a ticket opens one socket")
+	assert.Equal(t, http.StatusNotFound, res.StatusCode)
+
+	// The shell belongs to the socket, closing it is the whole cleanup.
+	require.NoError(t, ws.CloseNow())
+	assert.Eventually(t, func() bool {
+		return len(cfg.Pool.ListSessions(enrolled.GetId())) == 0
+	}, 5*time.Second, 20*time.Millisecond, "session outlived its socket")
 }

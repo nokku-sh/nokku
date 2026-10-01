@@ -131,8 +131,8 @@ func (s *daemonService) DeleteDaemon(
 	return &nokkuv1.DeleteDaemonResponse{}, nil
 }
 
-// CreateSession mints an ephemeral user cert and has the pool dial the
-// daemon's sshd over a relay.
+// CreateSession only hands out a ticket. The shell starts when the browser
+// opens the terminal websocket with it, and ends with that socket.
 func (s *daemonService) CreateSession(
 	ctx context.Context,
 	req *nokkuv1.CreateSessionRequest,
@@ -144,23 +144,19 @@ func (s *daemonService) CreateSession(
 	}
 
 	var daemon *db.Daemon
-	var ca *db.CertificateAuthority
-	var targetID string
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		daemon, err = q.GetDaemon(ctx, req.GetDaemonId())
 		if err != nil {
 			return err
 		}
 		// sshd only trusts the CA synced to it.
-		ca, err = q.GetCAByDaemonID(ctx, &daemon.ID)
+		ca, err := q.GetCAByDaemonID(ctx, &daemon.ID)
 		if err != nil {
 			return err
 		}
-		target, err := q.GetTargetByDaemon(ctx, &daemon.ID)
-		if err != nil {
-			return err
+		if !ca.IsActive {
+			return newError(connect.CodeFailedPrecondition, "certificate authority is not active")
 		}
-		targetID = target.ID
 		return nil
 	}); err != nil {
 		return nil, err
@@ -168,22 +164,13 @@ func (s *daemonService) CreateSession(
 
 	sessionID := uuid.NewV7().String()
 	username := req.GetUsername()
-
-	if _, err := s.cfg.Pool.StartSession(ctx, nokkudaemon.SessionConfig{
-		DaemonID:      daemon.ID,
-		SessionID:     sessionID,
-		Username:      username,
-		UserID:        userID,
-		CA:            ca,
-		HostPrincipal: targetID,
+	if err := putSessionTicket(ctx, s.cfg.Cache, sessionID, sessionTicket{
+		WorkspaceID: daemon.WorkspaceID,
+		DaemonID:    daemon.ID,
+		UserID:      userID,
+		Username:    username,
 	}); err != nil {
-		if errors.Is(err, nokkudaemon.ErrCAInactive) {
-			return nil, newError(connect.CodeFailedPrecondition, "certificate authority is not active")
-		}
-		if errors.Is(err, nokkudaemon.ErrRelayLimit) {
-			return nil, newError(connect.CodeResourceExhausted, "too many concurrent sessions")
-		}
-		return nil, newError(connect.CodeUnavailable, err.Error())
+		return nil, err
 	}
 	return &nokkuv1.CreateSessionResponse{
 		Session: &nokkuv1.DaemonSession{

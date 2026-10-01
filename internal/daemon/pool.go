@@ -205,7 +205,7 @@ func (p *Pool) registerDaemon(ctx context.Context, daemonID, workspaceID string)
 		previous.cancel()
 	}
 	for _, session := range staleSessions {
-		session.shutdown()
+		session.close()
 	}
 	for _, relayID := range staleRelays {
 		p.UnregisterRelay(relayID)
@@ -240,7 +240,7 @@ func (p *Pool) unregisterDaemon(daemonID string, c *daemonConn) {
 	p.mu.Unlock()
 
 	for _, s := range sessions {
-		s.shutdown()
+		s.close()
 	}
 	for _, id := range relayIDs {
 		p.UnregisterRelay(id)

@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"errors"
 	"net"
 	"strings"
@@ -69,11 +70,13 @@ func testConn(t *testing.T, p *Pool) *daemonConn {
 	return c
 }
 
+// slotsHeld counts the index entries with the sessions, so a leak there
+// fails the same checks.
 func slotsHeld(t *testing.T, p *Pool) (sessions, slots int) {
 	t.Helper()
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return len(p.sessions), len(p.relayCounts)
+	return len(p.sessions) + len(p.owned), len(p.relayCounts)
 }
 
 // serveRelayRequests registers every RelayOpen StartSession sends, as the
@@ -131,9 +134,67 @@ func startTestSession(t *testing.T, p *Pool, srv *sshtest.Server, sessionID stri
 	}
 }
 
+func waitStdoutClosed(t *testing.T, s *Session, after string) {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case _, ok := <-s.Stdout():
+			if !ok {
+				return
+			}
+		case <-deadline:
+			t.Fatalf("Stdout not closed after %s", after)
+		}
+	}
+}
+
+// TestPool_StartSession_EndsWithContext: the session belongs to its caller,
+// so the caller's ctx ending must tear it down without an explicit Close.
+func TestPool_StartSession_EndsWithContext(t *testing.T) {
+	p := newTestPool(t)
+	p.registerDaemon(t.Context(), "d1", "w1")
+	srv := sshtest.NewServer(t)
+	c := testConn(t, p)
+	go serveRelayRequests(t, p, c, srv.Addr())
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	s, err := p.StartSession(ctx, SessionConfig{
+		DaemonID:      "d1",
+		SessionID:     "web-ctx",
+		Username:      "user",
+		UserID:        "u1",
+		CA:            srv.CA(t),
+		HostPrincipal: srv.HostPrincipal,
+	})
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	if got := len(p.ListSessions("d1")); got != 1 {
+		t.Fatalf("ListSessions(d1) = %d, want 1", got)
+	}
+
+	cancel()
+	waitStdoutClosed(t, s, "the caller's ctx ended")
+	deadline := time.After(2 * time.Second)
+	for {
+		sessions, slots := slotsHeld(t, p)
+		if sessions == 0 && slots == 0 {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("leak after ctx end: %d sessions, %d slots held", sessions, slots)
+		default:
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 // TestPool_StartSession walks a full web session over a real in-process SSH
-// server: env and pty reach sshd through the relay, stdin echoes to the
-// browser channel, resizes arrive, and CloseSession tears everything down.
+// server: env and pty reach sshd through the relay, stdin echoes back on
+// Stdout, resizes arrive, and CloseSession tears everything down.
 func TestPool_StartSession(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -155,12 +216,14 @@ func TestPool_StartSession(t *testing.T) {
 	}
 
 	// Stdin goes to the shell and the echo comes out on Stdout.
-	s.SendStdin([]byte("ping\n"))
+	if err := s.Write([]byte("ping\n")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
 	var got []byte
 collect:
 	for {
 		select {
-		case chunk := <-s.stdout:
+		case chunk := <-s.Stdout():
 			got = append(got, chunk...)
 			if strings.Contains(string(got), "ping") {
 				break collect
@@ -170,7 +233,9 @@ collect:
 		}
 	}
 
-	s.SendResize(100, 40)
+	if err := s.Resize(100, 40); err != nil {
+		t.Fatalf("Resize: %v", err)
+	}
 	deadline = time.After(2 * time.Second)
 	for {
 		select {
@@ -190,11 +255,7 @@ collect:
 	// CloseSession must end the session, clean the map, and free the relay
 	// slot.
 	p.CloseSession("web-1")
-	select {
-	case <-s.exited:
-	case <-time.After(2 * time.Second):
-		t.Fatal("Exited not closed after CloseSession")
-	}
+	waitStdoutClosed(t, s, "CloseSession")
 	deadline = time.After(2 * time.Second)
 	for {
 		sessions, slots := slotsHeld(t, p)
@@ -285,7 +346,7 @@ func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 }
 
 // TestPool_StartSession_ServerDeath: the sshd side dying mid-session must
-// close Exited and release the slot, mirroring a daemon disconnect.
+// close Stdout, and the owner's Close then releases the slot.
 func TestPool_StartSession_ServerDeath(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -294,11 +355,8 @@ func TestPool_StartSession_ServerDeath(t *testing.T) {
 	s := startTestSession(t, p, srv, "web-3")
 	srv.Close()
 
-	select {
-	case <-s.exited:
-	case <-time.After(2 * time.Second):
-		t.Fatal("Exited not closed after the ssh server died")
-	}
+	waitStdoutClosed(t, s, "the ssh server died")
+	s.Close()
 	deadline := time.After(2 * time.Second)
 	for {
 		sessions, slots := slotsHeld(t, p)
