@@ -85,7 +85,9 @@ Schema migrations are embedded and applied automatically under an advisory lock;
 | ----------------- | -------------------------------------------------------------------------------- |
 | `NOKKU_REDIS_URL` | `redis://user:pass@host:6379/0`, or `rediss://` for TLS. Enables a shared cache. |
 
-Without Redis, the core uses a bounded in-process cache. Single-use state (DPoP replay markers, login flow state, email cooldowns) is then per instance, so run more than one core instance only with Redis.
+Without Redis, the core uses a bounded in-process cache for single-use state (DPoP replay markers, login flow state, email cooldowns, web session tickets). That state is then lost on a restart.
+
+Nokku runs as a single instance. Daemon control streams and relays live in the process, so a second instance would not see them, with or without Redis.
 
 ### Storage (object storage, optional)
 
