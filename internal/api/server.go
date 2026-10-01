@@ -50,6 +50,7 @@ func (s *Server) Start(ctx context.Context) error {
 		s.withCORS,
 		s.withCSRF,
 		s.withLogger,
+		s.withRecover,
 	)
 
 	proto := new(http.Protocols)
@@ -93,8 +94,7 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 		newLogInterceptor(s.cfg.Debug),
 		newTimeoutInterceptor(),
 		newAuthNInterceptor(s.cfg),
-		// Audit wraps authorization so denied calls are recorded too.
-		s.cfg.Audit,
+		s.cfg.Audit, // Audit wraps authorization so denied calls are recorded too.
 		errorInterceptor{},
 		newAuthZInterceptor(s.cfg),
 		entitlement.NewGuardInterceptor(s.cfg.Entitlements),

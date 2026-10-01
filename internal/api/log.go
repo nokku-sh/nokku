@@ -2,8 +2,11 @@ package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"connectrpc.com/connect"
@@ -108,6 +111,34 @@ func (s *Server) withLogger(next http.Handler) http.Handler {
 		case s.cfg.Debug:
 			slog.LogAttrs(r.Context(), slog.LevelDebug, "http", attrs...)
 		}
+	})
+}
+
+// withRecover covers the plain HTTP routes, connect handlers recover on
+// their own. It sits inside withLogger so the 500 is logged like any other.
+func (s *Server) withRecover(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			p := recover()
+			if p == nil {
+				return
+			}
+			// net/http uses this to abort a response on purpose.
+			if err, ok := p.(error); ok && errors.Is(err, http.ErrAbortHandler) {
+				panic(p)
+			}
+			attrs := []slog.Attr{
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+				slog.String("panic_type", fmt.Sprintf("%T", p)),
+			}
+			if s.cfg.Debug {
+				attrs = append(attrs, slog.String("stack", string(debug.Stack())))
+			}
+			slog.LogAttrs(r.Context(), slog.LevelError, "http panic recovered", attrs...)
+			writeJSONError(w, http.StatusInternalServerError, "internal error")
+		}()
+		next.ServeHTTP(w, r)
 	})
 }
 
