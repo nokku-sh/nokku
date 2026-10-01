@@ -5,9 +5,11 @@ metadata:
   labels:
     {{- include "nokku.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
+  # Nokku runs as one instance. Daemon streams, relays and web sessions live
+  # in its memory, so two pods would split them.
+  replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "nokku.selectorLabels" . | nindent 6 }}
