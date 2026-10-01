@@ -79,6 +79,14 @@ var (
 		connect.CodeInvalidArgument,
 		errors.New("current password is incorrect"),
 	)
+	errPasswordNeeded = connect.NewError(
+		connect.CodeFailedPrecondition,
+		errors.New("set a password first, it is needed to change the email address"),
+	)
+	errEmailManaged = connect.NewError(
+		connect.CodeFailedPrecondition,
+		errors.New("this account signs in through an identity provider, change the email address there"),
+	)
 	errPasswordTooShort = connect.NewError(
 		connect.CodeInvalidArgument,
 		errors.New("password must be at least 8 characters"),

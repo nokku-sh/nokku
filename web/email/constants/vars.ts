@@ -28,6 +28,8 @@ export const CONSTANTS = {
   // Auth related
   VERIFICATION_URL: "{{ .VerificationURL }}",
   RECOVERY_URL: "{{ .RecoveryURL }}",
+  NEW_EMAIL: "{{ .NewEmail }}",
+  CANCEL_URL: "{{ .CancelURL }}",
 
   // Security alert
   PROFILE_URL: "{{ .ProfileURL }}",

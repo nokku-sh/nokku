@@ -22,6 +22,14 @@ type RecoveryTemplateData struct {
 	Expiration  string
 }
 
+type ChangeNoticeTemplateData struct {
+	Operator Operator
+
+	NewEmail   string
+	CancelURL  string
+	Expiration string
+}
+
 type NewLoginTemplateData struct {
 	Operator Operator
 

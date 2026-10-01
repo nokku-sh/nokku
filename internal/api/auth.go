@@ -203,6 +203,37 @@ func (s *authService) ResendVerification(
 	return &nokkuv1.ResendVerificationResponse{}, nil
 }
 
+func (s *authService) ConfirmEmailChange(
+	ctx context.Context,
+	req *nokkuv1.ConfirmEmailChangeRequest,
+) (*nokkuv1.ConfirmEmailChangeResponse, error) {
+	err := s.cfg.IAM.ConfirmEmailChange(ctx, req.GetToken())
+	if errors.Is(err, iam.ErrEmailTaken) {
+		return nil, newError(connect.CodeAlreadyExists, "an account with this email already exists")
+	}
+	if err != nil {
+		return nil, newError(connect.CodeInvalidArgument, "this confirmation link is invalid or expired")
+	}
+	return &nokkuv1.ConfirmEmailChangeResponse{}, nil
+}
+
+func (s *authService) CancelEmailChange(
+	ctx context.Context,
+	req *nokkuv1.CancelEmailChangeRequest,
+) (*nokkuv1.CancelEmailChangeResponse, error) {
+	err := s.cfg.IAM.CancelEmailChange(ctx, req.GetToken())
+	if errors.Is(err, iam.ErrEmailTaken) {
+		return nil, newError(
+			connect.CodeAlreadyExists,
+			"another account uses the old address by now, contact support",
+		)
+	}
+	if err != nil {
+		return nil, newError(connect.CodeInvalidArgument, "this link is invalid or expired")
+	}
+	return &nokkuv1.CancelEmailChangeResponse{}, nil
+}
+
 func (s *authService) DiscoverSSO(
 	ctx context.Context,
 	req *nokkuv1.DiscoverSSORequest,

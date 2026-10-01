@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -126,6 +127,27 @@ func (s *Service) SendRecoveryEmail(
 			Operator:    s.Operator,
 			RecoveryURL: recoveryURL,
 			Expiration:  expiry,
+		},
+	})
+}
+
+// SendEmailChangeNotice goes to the current address and only shows the new
+// one masked, the reader may not be the one who asked.
+func (s *Service) SendEmailChangeNotice(
+	ctx context.Context,
+	userID, email, newEmail, cancelURL, expiry string,
+) error {
+	local, domain, _ := strings.Cut(newEmail, "@")
+	return s.sendTemplate(ctx, sendRequest{
+		userID:   userID,
+		to:       email,
+		subject:  "Your email address is being changed",
+		template: "email-change",
+		data: ChangeNoticeTemplateData{
+			Operator:   s.Operator,
+			NewEmail:   local[:min(1, len(local))] + "***@" + domain,
+			CancelURL:  cancelURL,
+			Expiration: expiry,
 		},
 	})
 }
