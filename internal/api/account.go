@@ -38,7 +38,11 @@ func (s *accountService) GetAccount(
 	if err != nil {
 		return nil, errAccountNotFound
 	}
-	return &nokkuv1.GetAccountResponse{User: u.ToProto()}, nil
+	user := u.ToProto()
+	if pending := s.cfg.IAM.PendingEmail(ctx, u.ID); pending != "" {
+		user.PendingEmail = &pending
+	}
+	return &nokkuv1.GetAccountResponse{User: user}, nil
 }
 
 func (s *accountService) UpdateAccount(
@@ -86,6 +90,66 @@ func (s *accountService) ChangePassword(
 	current, _ := iam.CurrentSession(ctx)
 	_, _ = s.cfg.IAM.RevokeOtherSessions(ctx, iam.SessionHash(current.TokenHash))
 	return &nokkuv1.ChangePasswordResponse{}, nil
+}
+
+// RequestEmailChange asks for the password again, so a hijacked session alone
+// cannot move the account. The new address gets the confirm link, the
+// current one a notice with the cancel link.
+func (s *accountService) RequestEmailChange(
+	ctx context.Context,
+	req *nokkuv1.RequestEmailChangeRequest,
+) (*nokkuv1.RequestEmailChangeResponse, error) {
+	u, err := s.cfg.IAM.GetUser(ctx)
+	if err != nil {
+		return nil, errAccountNotFound
+	}
+	// The identity provider owns the address of an account it signs in.
+	for _, m := range append(slices.Clone(identityMethods), iam.MethodSCIM) {
+		if creds, err := s.cfg.IAM.ListCredentialsByType(ctx, m); err != nil {
+			return nil, errInternal
+		} else if len(creds) > 0 {
+			return nil, errEmailManaged
+		}
+	}
+	if has, err := s.cfg.IAM.Password.HasPassword(ctx, u.ID); err != nil {
+		return nil, errInternal
+	} else if !has {
+		return nil, errPasswordNeeded
+	}
+	if err := s.cfg.IAM.Password.CheckPassword(ctx, u.ID, req.GetCurrentPassword()); err != nil {
+		return nil, errCurrentPassword
+	}
+
+	confirm, cancel, err := s.cfg.IAM.RequestEmailChange(ctx, u, req.GetNewEmail())
+	switch {
+	case errors.Is(err, iam.ErrSameEmail):
+		return nil, newError(connect.CodeInvalidArgument, "this is already your email address")
+	case errors.Is(err, iam.ErrEmailTaken):
+		return nil, newError(connect.CodeAlreadyExists, "an account with this email already exists")
+	case errors.Is(err, iam.ErrEmailRejected):
+		return nil, newError(connect.CodeInvalidArgument, "please enter a valid email address")
+	case err != nil:
+		return nil, errInternal
+	}
+
+	base := s.cfg.FullURL() + "/email-change/"
+	newEmail := strings.ToLower(strings.TrimSpace(req.GetNewEmail()))
+	err = s.cfg.Email.SendVerificationEmail(
+		ctx, u.ID, newEmail, base+"confirm?token="+confirm, iam.EmailChangeTTL.String(),
+	)
+	if err == nil {
+		err = s.cfg.Email.SendEmailChangeNotice(ctx, u.ID, u.Email, newEmail, base+"cancel?token="+cancel, "7 days")
+	}
+	if err != nil {
+		// Without both mails the change must not stay pending.
+		slog.Error("send email change mails", "error", err)
+		_ = s.cfg.IAM.DropEmailChange(ctx, u.ID)
+		return nil, newError(
+			connect.CodeUnavailable,
+			"the emails could not be sent, try again in a few minutes",
+		)
+	}
+	return &nokkuv1.RequestEmailChangeResponse{}, nil
 }
 
 func (s *accountService) RemovePassword(

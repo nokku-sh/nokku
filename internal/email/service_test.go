@@ -68,6 +68,20 @@ func TestRenderTemplates(t *testing.T) {
 				"203.0.113.7",
 			},
 		},
+		{
+			name: "email-change",
+			data: ChangeNoticeTemplateData{
+				NewEmail:   "j***@example.com",
+				CancelURL:  "https://app.nokku.sh/email-change/cancel?token=t",
+				Expiration: "7 days",
+			},
+			contains: []string{
+				"Your email address is being changed.",
+				"j***@example.com",
+				"https://app.nokku.sh/email-change/cancel?token=t",
+				"7 days",
+			},
+		},
 	}
 
 	for _, tt := range tests {
