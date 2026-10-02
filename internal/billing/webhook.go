@@ -1,17 +1,12 @@
 package billing
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 
-	stripe "github.com/stripe/stripe-go/v86"
 	"github.com/stripe/stripe-go/v86/webhook"
-
-	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
 const maxWebhookBody = 2 << 20
@@ -35,69 +30,30 @@ func (s *Stripe) webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := r.Context()
 	switch string(event.Type) {
 	case "customer.subscription.created",
 		"customer.subscription.updated",
 		"customer.subscription.deleted":
-		var sub stripe.Subscription
-		if err := json.Unmarshal(event.Data.Raw, &sub); err != nil {
+		// Events can arrive late or out of order, so the payload only says
+		// which subscription to read again.
+		var sub struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(event.Data.Raw, &sub); err != nil || sub.ID == "" {
 			http.Error(w, "invalid payload", http.StatusBadRequest)
 			return
 		}
-		s.handleSubscription(ctx, &sub)
+		// A 500 makes Stripe retry, so a failed write is not lost.
+		if err := s.sync(r.Context(), sub.ID); err != nil {
+			slog.Error("failed to apply Stripe subscription event", "error", err,
+				"event_type", event.Type, "subscription_id", sub.ID)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
 
 	default:
 		slog.Debug("ignoring unhandled Stripe webhook event", "event_type", event.Type)
 	}
 
 	w.WriteHeader(http.StatusOK)
-}
-
-func (s *Stripe) handleSubscription(ctx context.Context, sub *stripe.Subscription) {
-	workspaceID := sub.Metadata["workspace_id"]
-	if workspaceID == "" {
-		return
-	}
-
-	if sub.Status == stripe.SubscriptionStatusCanceled {
-		if err := s.upsertSubscription(ctx, &db.UpsertSubscriptionParams{
-			WorkspaceID:       workspaceID,
-			Source:            "stripe",
-			Plan:              "",
-			Status:            string(entitlement.StatusInactive),
-			CustomerID:        sub.Customer.ID,
-			SubscriptionID:    sub.ID,
-			CurrentPeriodEnd:  periodEnd(sub),
-			CancelAtPeriodEnd: sub.CancelAtPeriodEnd,
-		}); err != nil {
-			slog.Warn("failed to clear subscription", "error", err, "workspace_id", workspaceID)
-		}
-		return
-	}
-
-	// Backstop so a workspace never ends up with two active subscriptions.
-	if existing, err := s.activeSubscription(ctx, workspaceID); err == nil &&
-		existing.SubscriptionID != "" && existing.SubscriptionID != sub.ID {
-		slog.Warn("cancelling duplicate subscription",
-			"workspace_id", workspaceID, "keep", existing.SubscriptionID, "duplicate", sub.ID)
-		if _, err := s.client.V1Subscriptions.Cancel(ctx, sub.ID, nil); err != nil {
-			slog.Warn("failed to cancel duplicate subscription", "error", err,
-				"workspace_id", workspaceID, "subscription_id", sub.ID)
-		}
-		return
-	}
-
-	if err := s.upsertSubscription(ctx, &db.UpsertSubscriptionParams{
-		WorkspaceID:       workspaceID,
-		Source:            "stripe",
-		Plan:              entitlement.PlanPro,
-		Status:            string(mapStatus(sub.Status)),
-		CustomerID:        sub.Customer.ID,
-		SubscriptionID:    sub.ID,
-		CurrentPeriodEnd:  periodEnd(sub),
-		CancelAtPeriodEnd: sub.CancelAtPeriodEnd,
-	}); err != nil {
-		slog.Warn("failed to upsert subscription", "error", err, "workspace_id", workspaceID)
-	}
 }
