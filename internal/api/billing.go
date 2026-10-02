@@ -143,11 +143,13 @@ func (s *billingService) CancelSubscription(
 	return &nokkuv1.CancelSubscriptionResponse{}, nil
 }
 
+// GetLicense keeps reporting an expired license with its expiry, so the UI
+// can ask for the renewal instead of showing a plain Community instance.
 func (s *billingService) GetLicense(
 	_ context.Context,
 	_ *nokkuv1.GetLicenseRequest,
 ) (*nokkuv1.GetLicenseResponse, error) {
-	license := s.cfg.Billing.License
+	license := s.cfg.Entitlements.License()
 	active := s.cfg.Entitlements.Mode() == entitlement.ModeSelfHosted &&
 		license != nil && !license.IsExpired()
 	plan := entitlement.PlanCommunity
@@ -155,15 +157,39 @@ func (s *billingService) GetLicense(
 		plan = license.Plan
 	}
 	var expiry *time.Time
-	if license != nil {
-		t := time.Unix(license.ExpiresAt, 0)
-		expiry = &t
+	if license != nil && license.ExpiresAt != 0 {
+		expiry = new(time.Unix(license.ExpiresAt, 0))
 	}
 	return &nokkuv1.GetLicenseResponse{
 		Plan:      new(plan),
 		Active:    new(active),
 		ExpiresAt: db.SafeTimestamp(expiry),
 	}, nil
+}
+
+func (s *billingService) ActivateLicense(
+	ctx context.Context,
+	req *nokkuv1.ActivateLicenseRequest,
+) (*nokkuv1.ActivateLicenseResponse, error) {
+	err := s.cfg.Entitlements.ActivateLicense(ctx, req.GetKey())
+	switch {
+	case errors.Is(err, entitlement.ErrLicenseInvalid):
+		return nil, newError(connect.CodeInvalidArgument,
+			"This license key is not valid. Paste it exactly as it came in the email.")
+	case errors.Is(err, entitlement.ErrLicenseExpired):
+		return nil, newError(connect.CodeInvalidArgument,
+			"This license key has already expired. Use the key from your latest renewal email.")
+	case errors.Is(err, entitlement.ErrLicenseShorter):
+		return nil, newError(connect.CodeFailedPrecondition,
+			"The active license is valid for longer than this key.")
+	case errors.Is(err, entitlement.ErrNotSelfHosted),
+		errors.Is(err, entitlement.ErrLicenseUnsupported):
+		return nil, newError(connect.CodeFailedPrecondition, err.Error())
+	case err != nil:
+		slog.Error("failed to activate license", "error", err)
+		return nil, errInternal
+	}
+	return &nokkuv1.ActivateLicenseResponse{}, nil
 }
 
 func (s *billingService) requireWorkspaceOwner(ctx context.Context, workspaceID string) error {

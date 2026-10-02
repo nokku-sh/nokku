@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/nokku-sh/nokku/internal/actor"
@@ -39,6 +40,7 @@ func TestProcedureRoles(t *testing.T) {
 		{nokkuv1connect.BillingServiceGetBillingProcedure, db.RoleAdmin},
 
 		{nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure, db.RoleOwner},
+		{nokkuv1connect.BillingServiceActivateLicenseProcedure, db.RoleOwner},
 	}
 
 	for _, test := range tests {
@@ -104,6 +106,26 @@ func TestEveryProcedureIsClassified(t *testing.T) {
 		}
 		if access.GetPersonal() && access.GetRole() == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED {
 			t.Errorf("%s is personal without a role", procedure)
+		}
+	}
+}
+
+// The workspace a role is checked against comes from the request, so a
+// role-gated RPC without the field is denied for everyone.
+func TestRoleGatedRequestsCarryTheWorkspace(t *testing.T) {
+	for _, procedure := range allProcedures(t) {
+		access := procedureAccess[procedure]
+		if access.GetRole() == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED || access.GetPersonal() {
+			continue
+		}
+		name := protoreflect.FullName(strings.ReplaceAll(strings.TrimPrefix(procedure, "/"), "/", "."))
+		desc, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
+		if err != nil {
+			t.Errorf("%s: %v", procedure, err)
+			continue
+		}
+		if desc.(protoreflect.MethodDescriptor).Input().Fields().ByName("workspace_id") == nil {
+			t.Errorf("%s needs a role but its request has no workspace_id", procedure)
 		}
 	}
 }

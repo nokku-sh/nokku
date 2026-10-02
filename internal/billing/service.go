@@ -5,8 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/mizuchilabs/kata/licx"
-
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
@@ -15,12 +13,10 @@ var errDisabled = errors.New("billing provider is not configured")
 // Service moves money. It never decides what a workspace may do, that is
 // internal/entitlement.
 type Service struct {
-	stripe  *Stripe // nil when the STRIPE_* environment is unset (billing disabled)
-	License *licx.Claims
+	stripe *Stripe // nil when the STRIPE_* environment is unset (billing disabled)
 }
 
 // New never returns a nil Service, an unconfigured one is just disabled.
-// License is nil when absent or invalid.
 func New(ctx context.Context, conn *db.Connection, baseURL string) (*Service, error) {
 	stripe, err := newStripe(conn, baseURL)
 	if err != nil {
@@ -29,7 +25,7 @@ func New(ctx context.Context, conn *db.Connection, baseURL string) (*Service, er
 	if stripe != nil {
 		go stripe.reconcile(ctx)
 	}
-	return &Service{stripe: stripe, License: verifyLicense()}, nil
+	return &Service{stripe: stripe}, nil
 }
 
 func (s *Service) Enabled() bool {

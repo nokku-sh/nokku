@@ -69,12 +69,14 @@ CREATE TABLE IF NOT EXISTS workspace_members (
 CREATE TABLE IF NOT EXISTS workspace_subscriptions (
   workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
   source TEXT NOT NULL DEFAULT '', -- stripe, manual, ...
-  plan TEXT NOT NULL DEFAULT '', -- community, flex, enterprise
+  plan TEXT NOT NULL DEFAULT '', -- community, pro, enterprise
   status TEXT NOT NULL DEFAULT '',
   customer_id TEXT NOT NULL DEFAULT '', -- stripe customer id, opaque
   subscription_id TEXT NOT NULL DEFAULT '', -- stripe subscription id, opaque
   current_period_end TIMESTAMPTZ,
   cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
+  seats BIGINT NOT NULL DEFAULT 0, -- paid quantity, 0 = the plan's own cap
+  ended_at TIMESTAMPTZ, -- set once the subscription is over, starts the retention hold
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -324,6 +326,14 @@ CREATE TABLE IF NOT EXISTS saml_keypair (
 CREATE TABLE IF NOT EXISTS keysets (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   data BYTEA NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- License key activated in the UI (singleton). NOKKU_LICENSE_KEY still works,
+-- the key that is valid longest wins.
+CREATE TABLE IF NOT EXISTS instance_license (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  key TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -799,6 +809,10 @@ ALTER TABLE keysets FORCE ROW LEVEL SECURITY;
 ALTER TABLE saml_keypair ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE saml_keypair FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE instance_license ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE instance_license FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY users_select ON users FOR
 SELECT

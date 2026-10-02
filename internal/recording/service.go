@@ -19,8 +19,8 @@ import (
 )
 
 type Limits interface {
-	RetentionDays(ctx context.Context, workspaceID string) int64
-	RecordingStorageBytes(ctx context.Context, workspaceID string) int64
+	RetentionDays(ctx context.Context, workspaceID string) (int64, error)
+	RecordingStorageBytes(ctx context.Context, workspaceID string) (int64, error)
 }
 
 type EventSink interface {

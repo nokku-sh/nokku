@@ -16,7 +16,12 @@ func (s *Service) EvictForBytes(
 	workspaceID, recordingID string,
 	inFlight int64,
 ) error {
-	capBytes := s.limits.RecordingStorageBytes(ctx, workspaceID)
+	capBytes, err := s.limits.RecordingStorageBytes(ctx, workspaceID)
+	if err != nil {
+		// Fail open, a failed plan lookup never evicts recordings.
+		slog.Warn("recording storage cap lookup failed", "error", err, "workspace_id", workspaceID)
+		return nil
+	}
 	if capBytes <= 0 {
 		return nil
 	}

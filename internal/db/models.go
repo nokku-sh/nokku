@@ -81,6 +81,12 @@ type Daemon struct {
 	CreatedAt     time.Time           `json:"createdAt"`
 }
 
+type InstanceLicense struct {
+	ID        int32     `json:"id"`
+	Key       string    `json:"key"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
 type Keyset struct {
 	ID        int32     `json:"id"`
 	Data      []byte    `json:"data"`
@@ -268,6 +274,8 @@ type WorkspaceSubscription struct {
 	SubscriptionID    string     `json:"subscriptionId"`
 	CurrentPeriodEnd  *time.Time `json:"currentPeriodEnd"`
 	CancelAtPeriodEnd bool       `json:"cancelAtPeriodEnd"`
+	Seats             int64      `json:"seats"`
+	EndedAt           *time.Time `json:"endedAt"`
 	UpdatedAt         time.Time  `json:"updatedAt"`
 }
 

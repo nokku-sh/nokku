@@ -14,10 +14,10 @@ type seatLimitError struct {
 }
 
 func (e *seatLimitError) Error() string {
-	return fmt.Sprintf(
-		"your plan includes %d members; upgrade to add more",
-		e.Cap,
-	)
+	if e.Plan == PlanCommunity {
+		return fmt.Sprintf("your plan includes %d members; upgrade to add more", e.Cap)
+	}
+	return fmt.Sprintf("all %d seats are in use; add seats under Billing to invite more", e.Cap)
 }
 
 // CanInvite is shared by the invitation, SSO, and SCIM join paths.
