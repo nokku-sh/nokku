@@ -7,6 +7,7 @@
 	import AppHeader from '$lib/components/layout/AppHeader.svelte';
 	import AppSidebar from '$lib/components/layout/AppSidebar.svelte';
 	import CommandPalette from '$lib/components/layout/CommandPalette.svelte';
+	import LicenseBanner from '$lib/components/layout/LicenseBanner.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { user } from '$lib/api/user.svelte';
 	import { workspace } from '$lib/api/workspaces.svelte';
@@ -109,6 +110,7 @@
 			<AppSidebar variant="inset" />
 			<Sidebar.Inset class="flex min-w-0 flex-1 flex-col overflow-hidden">
 				<AppHeader />
+				<LicenseBanner />
 
 				<main class="flex min-h-0 flex-1 flex-col overflow-auto">
 					{#key page.url.pathname}

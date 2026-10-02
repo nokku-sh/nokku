@@ -55,7 +55,7 @@
 <FormModal
 	bind:open={cancelOpen}
 	title="Cancel your subscription?"
-	description={`It runs until ${formatTs(sub?.currentPeriodEnd)}, then the workspace drops to Free.`}
+	description={`It runs until ${formatTs(sub?.currentPeriodEnd)}, then the workspace drops to Free. Recordings and audit logs beyond the Free limits are kept for 30 more days.`}
 	icon={CalendarX}
 	onSubmit={submitCancel}
 >
@@ -85,6 +85,7 @@
 		<Alert.Title>Cancellation pending</Alert.Title>
 		<Alert.Description>
 			Your plan ends on {formatTs(sub?.currentPeriodEnd)}, then the workspace drops to Free.
+			Recordings and audit logs beyond the Free limits are kept for 30 more days.
 		</Alert.Description>
 	</Alert.Root>
 {/if}
