@@ -19,7 +19,7 @@ func TestIsAPIRoute(t *testing.T) {
 		{"/avatars/user/1", true},
 		{"/upload/thing", true},
 		{"/terminal/foo", true},
-		{"/stripe/webhook", true},
+		{"/webhooks/stripe", true},
 		{"/healthz", true},
 		{"/debug/pprof", true},
 		{"/v1/something", true},
@@ -38,7 +38,7 @@ func TestIsAPIRoute(t *testing.T) {
 		{"/nokku.", false},
 		{"/grpcx", false},
 		{"/v2/x", false},
-		{"/stripex", false},
+		{"/webhooksx", false},
 	}
 
 	for _, tt := range tests {
