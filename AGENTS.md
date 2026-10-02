@@ -42,7 +42,10 @@ so tests never touch the dev database.
   owner role only migrates at startup.
 - `internal/iam` - identity: passwords, passkeys, OIDC, SAML, device flow,
   DPoP, SCIM. Never answers may-X.
-- `internal/entitlement` - plan gating.
+- `internal/entitlement` - plan gating, the self-hosted license, and the 30
+  day hold on data limits after a plan or license ends.
+- `internal/billing` - Stripe. One `sync` writer mirrors a subscription into
+  `workspace_subscriptions`, Stripe stays the source of truth.
 - `internal/crypto` - at-rest crypto, tokens, Tink/KMS.
 - `internal/ssh` - SSH CA signing. `internal/pki` - X.509.
 - `internal/recording`, `internal/storage` - encrypted recording ingest and
@@ -75,6 +78,11 @@ add what you find. Unattended work follows the `unattended-pass` skill.
 - sqlc queries live in `internal/db/queries` and are regenerated, never
   hand-edited.
 - Plan gating lives only in `internal/entitlement`.
+- Three plans (`community`, `pro`, `enterprise`) and two modes: self-hosted,
+  where the plan comes from the license, and SaaS (the `STRIPE_*` settings
+  are present), where it comes from the workspace subscription.
+- Prices are stated only on the docs pricing page (`../docs/src/pages/pricing.astro`).
+  Never in code, UI copy, emails, READMEs, or other docs pages.
 - Authorization is `internal/db/roles.go` plus `internal/api/authz.go`.
   `internal/iam` answers who, never may.
 

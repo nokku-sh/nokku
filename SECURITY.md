@@ -85,10 +85,11 @@ that governs access to every target.
   recording is unredacted (but still encrypted at rest). Scrubbing is best
   effort: a failed scrub is logged and the recording is kept as uploaded, and
   scrubbing is heuristic, so it cannot catch every secret.
-- Self-hosted instances default to the Community plan; Enterprise licensing is
+- Self-hosted instances default to the Community plan. Enterprise licensing is
   verified offline via Ed25519-signed license keys and falls back to Community
-  when a key expires or is revoked. External KMS configuration is an Enterprise
-  feature; Community deployments use `NOKKU_SECRET`.
+  when a key expires. An expired key never stops the core, and data beyond the
+  Community limits is kept for 30 more days. External KMS configuration is an
+  Enterprise feature, Community deployments use `NOKKU_SECRET`.
 - **Database roles and RLS**: the owner role (`PGUSER`) only migrates at
   startup. Runtime traffic uses `nokku_app`, under row-level security, and
   `nokku_system` (BYPASSRLS) for login, global account changes, and
