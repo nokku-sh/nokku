@@ -16,6 +16,8 @@
 		cap: Number(billing.quotas?.seats ?? -1)
 	});
 	const seatPct = $derived(seats.cap > 0 ? Math.min((seats.used / seats.cap) * 100, 100) : 0);
+	// On a paid plan the cap is the number of seats bought.
+	const paidSeats = $derived(seats.cap > 0 && billing.plan !== 'community');
 	const retentionDays = $derived(Number(billing.quotas?.retentionDays ?? 7));
 	const storageBytes = $derived(Number(billing.quotas?.recordingStorageBytes ?? -1));
 	const resources = $derived({
@@ -28,6 +30,8 @@
 		{ key: 'enforce_sso', label: 'Enforced SSO', unlocks: 'Pro' },
 		{ key: 'saml', label: 'SAML SSO', unlocks: 'Pro' },
 		{ key: 'audit_export', label: 'Audit log export', unlocks: 'Pro' },
+		{ key: 'scim', label: 'SCIM provisioning', unlocks: 'Enterprise' },
+		{ key: 'audit_streaming', label: 'Audit log streaming', unlocks: 'Enterprise' },
 		{ key: 'external_kms', label: 'External KMS', unlocks: 'Enterprise' }
 	];
 </script>
@@ -40,10 +44,10 @@
 	<Card.Content class="flex flex-col gap-4">
 		<div class="flex flex-col gap-2">
 			<div class="flex items-center justify-between text-sm">
-				<span class="text-muted-foreground">Members</span>
+				<span class="text-muted-foreground">{paidSeats ? 'Seats in use' : 'Members'}</span>
 				<span class="font-medium tabular-nums">
 					{seats.used}<span class="text-muted-foreground"
-						>{seats.cap < 0 ? ' · billed per seat' : `/${seats.cap}`}</span
+						>{seats.cap < 0 ? ' · unlimited' : `/${seats.cap}`}</span
 					>
 				</span>
 			</div>
@@ -55,6 +59,11 @@
 						seatPct >= 90 && seatPct < 100 && '**:data-[slot=progress-indicator]:bg-warning'
 					]}
 				/>
+			{/if}
+			{#if paidSeats && seatPct >= 100}
+				<p class="text-xs text-muted-foreground">
+					Every seat is taken. Add seats under Manage plan and payment to invite more people.
+				</p>
 			{/if}
 		</div>
 		<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
