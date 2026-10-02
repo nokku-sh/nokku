@@ -120,7 +120,7 @@ func isAPIRoute(path string) bool {
 		strings.HasPrefix(path, "/avatars/") ||
 		strings.HasPrefix(path, "/upload/") ||
 		strings.HasPrefix(path, "/terminal/") ||
-		strings.HasPrefix(path, "/stripe/") ||
+		strings.HasPrefix(path, "/webhooks/") ||
 		strings.HasPrefix(path, "/healthz") ||
 		strings.HasPrefix(path, "/debug/") ||
 		strings.HasPrefix(path, "/v1/")
