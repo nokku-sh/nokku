@@ -36,8 +36,14 @@ Nokku is the control plane for certificate-based access to SSH targets and X.509
 
 ## Editions & Licensing
 
-Self-hosted instances default to the **Community** plan.
-For unlimited quotas, SAML, and SSO enforcement, we offer an **Enterprise** plan. Enterprise license keys are Ed25519-signed and verified offline against a public key compiled directly into the binary, ensuring fully air-gapped activation.
+Nokku has three plans: **Community** (free), **Pro**, and **Enterprise**. What each includes and what it costs is on the [pricing page](https://nokku.sh/pricing).
+
+The core runs in one of two modes:
+
+- **Self-hosted** is the default. Every instance starts on Community, and an Enterprise license key unlocks the rest. Keys are Ed25519-signed and verified offline against a public key compiled directly into the binary, ensuring fully air-gapped activation.
+- **SaaS** is how the hosted service runs. Each workspace gets its plan from its subscription.
+
+A license key is activated in the UI under Billing or set as `NOKKU_LICENSE_KEY`. A renewed key applies without a restart. An expired key never stops the core: licensed features turn off, and data beyond the Community limits is kept for 30 more days.
 
 > **For in-depth documentation, advanced configuration, and production deployment guides, please visit our [Official Documentation (Link)](https://nokku.sh/docs)**
 
@@ -59,7 +65,7 @@ The backend reads configuration from environment variables. Only `NOKKU_SECRET` 
 | `NOKKU_TRUSTED_PROXIES` | Comma-separated reverse-proxy IPs/CIDRs (e.g. Traefik) whose forwarded client-IP headers are honored |
 | `NOKKU_ALLOWED_ORIGINS` | Additional allowed CORS origins                                                                      |
 | `NOKKU_DEBUG`           | Debug logging (`--debug`)                                                                            |
-| `NOKKU_LICENSE_KEY`     | License key activating licensed self-host features                                                   |
+| `NOKKU_LICENSE_KEY`     | License key activating licensed self-host features. Optional, a key can also be activated in the UI  |
 | `NOKKU_ALLOW_PRIVATE_NETWORKS` | Let SSO providers and audit webhooks reach private addresses (default `false`). Keep it off when hosting for other people. |
 
 ### Database (PostgreSQL, required)

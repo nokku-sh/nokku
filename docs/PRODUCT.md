@@ -123,6 +123,25 @@ uses alone are deleted with the account.
 7. Account lists only ever create anchors, never delete. A failed report must
    not be able to lock anyone out.
 
+## Plans and modes
+
+Three plans: `community` (shown as Free in the hosted UI), `pro`, and
+`enterprise`. The catalog with features and limits is
+`nokku/internal/entitlement/plan.go`. Prices are only on the docs pricing page.
+
+Two modes, picked at startup (`nokku/internal/config`):
+
+- **Self-hosted** is the default. The plan comes from the license key, from
+  `NOKKU_LICENSE_KEY` or activated in the UI (`ActivateLicense`), verified
+  offline. The key that is valid longest wins and applies without a restart.
+  Without a valid key the instance is on Community.
+- **SaaS** when the `STRIPE_*` settings are present. The plan comes from
+  `workspace_subscriptions`, a cache of Stripe that only
+  `nokku/internal/billing` `sync` writes. The paid quantity is the seat cap.
+
+When a plan or license ends, paid features turn off at once, and the data
+limits (retention, recording storage) hold for 30 more days.
+
 ## Flows
 
 Each flow names its entry point. Paths are relative to their repo.
@@ -233,4 +252,6 @@ module-level store so navigating inside the app does not close it.
 chunks to `nokku/internal/api/recording.go` `UploadRecording`. Frames are
 stored encrypted in blob storage (`nokku/internal/recording`,
 `nokku/internal/storage`), scrubbed for detected secrets on completion, and
-evicted by retention and byte caps per plan.
+evicted by retention and byte caps per plan. A plan or license that ended
+keeps its limits for 30 more days (`nokku/internal/entitlement` `holdDays`),
+so a late payment or renewal never deletes data right away.
