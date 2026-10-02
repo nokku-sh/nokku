@@ -31,9 +31,10 @@ export default function LicenseKey() {
           {CONSTANTS.LICENSE_KEY}
         </Text>
         <Text className="m-0 mt-3 text-xs leading-5 text-muted">
-          Valid until <strong className="text-ink">{CONSTANTS.LICENSE_EXPIRES}</strong>. Set it as
-          the <code className="rounded bg-cloud px-1 font-mono">NOKKU_LICENSE_KEY</code> environment
-          variable on your server and restart. Renewals are emailed automatically each year.
+          Valid until <strong className="text-ink">{CONSTANTS.LICENSE_EXPIRES}</strong>. Paste it
+          under Billing in the web UI, it applies at once without a restart. Setting the{" "}
+          <code className="rounded bg-cloud px-1 font-mono">NOKKU_LICENSE_KEY</code> environment
+          variable works too. Renewals are emailed automatically each year.
         </Text>
       </Section>
 
