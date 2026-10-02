@@ -87,6 +87,7 @@ type Querier interface {
 	GetEncryptedCAKeys(ctx context.Context) ([]*GetEncryptedCAKeysRow, error)
 	// skip_ids holds CAs whose rotation already failed this pass.
 	GetExpiringCAForUpdate(ctx context.Context, skipIds []string) (*CertificateAuthority, error)
+	GetInstanceLicense(ctx context.Context) (string, error)
 	GetKeysetData(ctx context.Context) ([]byte, error)
 	// Ignores the use limit, so a used-up token still identifies a daemon it
 	// already enrolled. RedeemToken enforces it.
@@ -142,6 +143,7 @@ type Querier interface {
 	ListPrincipals(ctx context.Context, arg *ListPrincipalsParams) ([]*ListPrincipalsRow, error)
 	// Teams are expanded so the host needs no team knowledge.
 	ListPrincipalsForTarget(ctx context.Context, targetID string) ([]*ListPrincipalsForTargetRow, error)
+	// Ended subscriptions are final at the provider, so they need no more syncs.
 	ListProviderSubscriptions(ctx context.Context, sources []string) ([]*WorkspaceSubscription, error)
 	ListRecordingWorkspaceIDs(ctx context.Context) ([]string, error)
 	ListRecordings(ctx context.Context, arg *ListRecordingsParams) ([]*ListRecordingsRow, error)
@@ -174,6 +176,7 @@ type Querier interface {
 	RenameCredential(ctx context.Context, arg *RenameCredentialParams) error
 	ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*CertificateAuthority, error)
 	RevokeSubjectAccessInWorkspace(ctx context.Context, arg *RevokeSubjectAccessInWorkspaceParams) error
+	SetInstanceLicense(ctx context.Context, key string) error
 	SetRecordingComplete(ctx context.Context, arg *SetRecordingCompleteParams) (*Recording, error)
 	// Status stays inactive so this row never grants entitlements until the
 	// webhook promotes it.

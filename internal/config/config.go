@@ -118,15 +118,16 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if cfg.Billing.Enabled() {
 		mode = entitlement.ModeSaaS
 	}
-	license := cfg.Billing.License
-	var licensedPlan string
-	if license != nil {
-		licensedPlan = license.Plan
+	if mode == entitlement.ModeSelfHosted {
+		cfg.Entitlements = entitlement.NewService(cfg.Conn, entitlement.EnvLicense(), mode)
+		cfg.Entitlements.WatchLicense(ctx)
+	} else {
+		cfg.Entitlements = entitlement.NewService(cfg.Conn, nil, mode)
 	}
-	cfg.Entitlements = entitlement.NewService(cfg.Conn, licensedPlan, mode)
 
-	if mode == entitlement.ModeSelfHosted && usesKMS &&
-		(license == nil || license.IsExpired()) {
+	// An expired license still starts. The data is encrypted under the KMS
+	// key, so refusing here would turn a late renewal into an outage.
+	if mode == entitlement.ModeSelfHosted && usesKMS && cfg.Entitlements.License() == nil {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
 	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Entitlements)

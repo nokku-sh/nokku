@@ -42,10 +42,12 @@ INSERT INTO
     customer_id,
     subscription_id,
     current_period_end,
-    cancel_at_period_end
+    cancel_at_period_end,
+    seats,
+    ended_at
   )
 VALUES
-  ($1, $2, $3, $4, $5, $6, $7, $8)
+  ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (workspace_id) DO UPDATE
 SET
   source = EXCLUDED.source,
@@ -54,17 +56,41 @@ SET
   customer_id = EXCLUDED.customer_id,
   subscription_id = EXCLUDED.subscription_id,
   current_period_end = EXCLUDED.current_period_end,
-  cancel_at_period_end = EXCLUDED.cancel_at_period_end
+  cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+  seats = EXCLUDED.seats,
+  ended_at = EXCLUDED.ended_at,
+  updated_at = NOW()
 WHERE
   workspace_subscriptions.source IN ('stripe', '');
 
 -- name: ListProviderSubscriptions :many
+-- Ended subscriptions are final at the provider, so they need no more syncs.
 SELECT
   *
 FROM
   workspace_subscriptions
 WHERE
-  source = ANY (@sources::TEXT[]);
+  source = ANY (@sources::TEXT[])
+  AND subscription_id <> ''
+  AND ended_at IS NULL;
+
+-- name: GetInstanceLicense :one
+SELECT
+  key
+FROM
+  instance_license
+WHERE
+  id = 1;
+
+-- name: SetInstanceLicense :exec
+INSERT INTO
+  instance_license (id, key)
+VALUES
+  (1, @key)
+ON CONFLICT (id) DO UPDATE
+SET
+  key = EXCLUDED.key,
+  updated_at = NOW();
 
 -- name: CountWorkspaceSeats :one
 SELECT

@@ -89,7 +89,13 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 			if wsID == nil {
 				continue
 			}
-			retentionDays := min(s.entitlements.RetentionDays(ctx, *wsID), maxRetentionDays)
+			retentionDays, err := s.entitlements.RetentionDays(ctx, *wsID)
+			if err != nil {
+				slog.Warn("audit retention skipped, plan lookup failed",
+					"error", err, "workspace_id", *wsID)
+				continue
+			}
+			retentionDays = min(retentionDays, maxRetentionDays)
 			deleted, err := q.DeleteWorkspaceAuditLogs(ctx, &db.DeleteWorkspaceAuditLogsParams{
 				WorkspaceID: wsID,
 				Cutoff:      now.AddDate(0, 0, -int(retentionDays)),

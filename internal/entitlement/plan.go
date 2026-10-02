@@ -3,7 +3,8 @@
 //
 //   - Fail open on quotas, billing data problems never block daily work.
 //   - Fail closed on features, resolution errors fall back to Community.
-//   - Downgrades never destroy data.
+//   - Downgrades never destroy data right away. An ended plan or license
+//     keeps its data limits for holdDays.
 package entitlement
 
 import "maps"

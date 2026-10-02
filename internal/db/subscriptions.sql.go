@@ -84,7 +84,7 @@ func (q *Queries) CountWorkspaceSeats(ctx context.Context, workspaceID string) (
 
 const getActiveSubscription = `-- name: GetActiveSubscription :one
 SELECT
-  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, updated_at
+  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, seats, ended_at, updated_at
 FROM
   workspace_subscriptions
 WHERE
@@ -111,14 +111,32 @@ func (q *Queries) GetActiveSubscription(ctx context.Context, arg *GetActiveSubsc
 		&i.SubscriptionID,
 		&i.CurrentPeriodEnd,
 		&i.CancelAtPeriodEnd,
+		&i.Seats,
+		&i.EndedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
 }
 
+const getInstanceLicense = `-- name: GetInstanceLicense :one
+SELECT
+  key
+FROM
+  instance_license
+WHERE
+  id = 1
+`
+
+func (q *Queries) GetInstanceLicense(ctx context.Context) (string, error) {
+	row := q.db.QueryRow(ctx, getInstanceLicense)
+	var key string
+	err := row.Scan(&key)
+	return key, err
+}
+
 const getSubscription = `-- name: GetSubscription :one
 SELECT
-  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, updated_at
+  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, seats, ended_at, updated_at
 FROM
   workspace_subscriptions
 WHERE
@@ -137,6 +155,8 @@ func (q *Queries) GetSubscription(ctx context.Context, workspaceID string) (*Wor
 		&i.SubscriptionID,
 		&i.CurrentPeriodEnd,
 		&i.CancelAtPeriodEnd,
+		&i.Seats,
+		&i.EndedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
@@ -144,13 +164,16 @@ func (q *Queries) GetSubscription(ctx context.Context, workspaceID string) (*Wor
 
 const listProviderSubscriptions = `-- name: ListProviderSubscriptions :many
 SELECT
-  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, updated_at
+  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, seats, ended_at, updated_at
 FROM
   workspace_subscriptions
 WHERE
   source = ANY ($1::TEXT[])
+  AND subscription_id <> ''
+  AND ended_at IS NULL
 `
 
+// Ended subscriptions are final at the provider, so they need no more syncs.
 func (q *Queries) ListProviderSubscriptions(ctx context.Context, sources []string) ([]*WorkspaceSubscription, error) {
 	rows, err := q.db.Query(ctx, listProviderSubscriptions, sources)
 	if err != nil {
@@ -169,6 +192,8 @@ func (q *Queries) ListProviderSubscriptions(ctx context.Context, sources []strin
 			&i.SubscriptionID,
 			&i.CurrentPeriodEnd,
 			&i.CancelAtPeriodEnd,
+			&i.Seats,
+			&i.EndedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -179,6 +204,22 @@ func (q *Queries) ListProviderSubscriptions(ctx context.Context, sources []strin
 		return nil, err
 	}
 	return items, nil
+}
+
+const setInstanceLicense = `-- name: SetInstanceLicense :exec
+INSERT INTO
+  instance_license (id, key)
+VALUES
+  (1, $1)
+ON CONFLICT (id) DO UPDATE
+SET
+  key = EXCLUDED.key,
+  updated_at = NOW()
+`
+
+func (q *Queries) SetInstanceLicense(ctx context.Context, key string) error {
+	_, err := q.db.Exec(ctx, setInstanceLicense, key)
+	return err
 }
 
 const setSubscriptionCustomer = `-- name: SetSubscriptionCustomer :exec
@@ -217,10 +258,12 @@ INSERT INTO
     customer_id,
     subscription_id,
     current_period_end,
-    cancel_at_period_end
+    cancel_at_period_end,
+    seats,
+    ended_at
   )
 VALUES
-  ($1, $2, $3, $4, $5, $6, $7, $8)
+  ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (workspace_id) DO UPDATE
 SET
   source = EXCLUDED.source,
@@ -229,7 +272,10 @@ SET
   customer_id = EXCLUDED.customer_id,
   subscription_id = EXCLUDED.subscription_id,
   current_period_end = EXCLUDED.current_period_end,
-  cancel_at_period_end = EXCLUDED.cancel_at_period_end
+  cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+  seats = EXCLUDED.seats,
+  ended_at = EXCLUDED.ended_at,
+  updated_at = NOW()
 WHERE
   workspace_subscriptions.source IN ('stripe', '')
 `
@@ -243,6 +289,8 @@ type UpsertSubscriptionParams struct {
 	SubscriptionID    string     `json:"subscriptionId"`
 	CurrentPeriodEnd  *time.Time `json:"currentPeriodEnd"`
 	CancelAtPeriodEnd bool       `json:"cancelAtPeriodEnd"`
+	Seats             int64      `json:"seats"`
+	EndedAt           *time.Time `json:"endedAt"`
 }
 
 // Manual subscriptions survive provider syncs.
@@ -256,6 +304,8 @@ func (q *Queries) UpsertSubscription(ctx context.Context, arg *UpsertSubscriptio
 		arg.SubscriptionID,
 		arg.CurrentPeriodEnd,
 		arg.CancelAtPeriodEnd,
+		arg.Seats,
+		arg.EndedAt,
 	)
 	return err
 }

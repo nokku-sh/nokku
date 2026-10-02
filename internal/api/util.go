@@ -135,7 +135,7 @@ func (s *utilService) ListAuditLogs(
 	}
 	var retention int32
 	if params.WorkspaceID != nil {
-		days := s.cfg.Entitlements.RetentionDays(ctx, *params.WorkspaceID)
+		days := s.cfg.Entitlements.Resolve(ctx, *params.WorkspaceID).RetentionDays
 		retention = int32(min(days, math.MaxInt32)) //nolint:gosec // clamped to int32 just before
 	}
 	return &nokkuv1.ListAuditLogsResponse{Logs: logs, Total: &total, RetentionDays: &retention}, nil

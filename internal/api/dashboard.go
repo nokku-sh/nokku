@@ -96,7 +96,7 @@ func (s *dashboardService) GetDashboard(
 		Members:             &counts.Members,
 		Daemons:             new(int32(len(daemons))), //nolint:gosec // a workspace has far fewer daemons
 		RecordingBytes:      &usedBytes,
-		RecordingQuotaBytes: new(s.cfg.Entitlements.RecordingStorageBytes(ctx, wsID)),
+		RecordingQuotaBytes: new(s.cfg.Entitlements.Resolve(ctx, wsID).RecordingStorageBytes),
 		SoonestCas:          db.CAsToProto(cas),
 		Activity:            make([]int32, 24),
 		Failures:            make([]int32, 24),

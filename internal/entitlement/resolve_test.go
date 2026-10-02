@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/mizuchilabs/kata/licx"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -20,6 +21,9 @@ import (
 type fakeDB struct {
 	plan        string
 	status      Status
+	seats       int64
+	endedAt     *time.Time
+	licenseKey  string
 	subErr      error
 	resources   int64
 	resourceErr error
@@ -46,8 +50,14 @@ func (f *fakeDB) QueryRow(_ context.Context, sql string, _ ...any) pgx.Row {
 		return rowVals{vals: []any{
 			"ws1", "stripe", f.plan, string(f.status),
 			"cus_1", "sub_1", nil, false,
+			f.seats, f.endedAt,
 			time.Time{},
 		}}
+	case strings.Contains(sql, "instance_license"):
+		if f.licenseKey == "" {
+			return errRow{pgx.ErrNoRows}
+		}
+		return rowVals{vals: []any{f.licenseKey}}
 	case strings.Contains(sql, "resource_count"):
 		if f.resourceErr != nil {
 			return errRow{f.resourceErr}
@@ -80,7 +90,7 @@ func (r rowVals) Scan(dest ...any) error {
 		case *time.Time:
 			*out = r.vals[i].(time.Time)
 		case **time.Time:
-			*out = nil
+			*out, _ = r.vals[i].(*time.Time)
 		case *int64:
 			*out = r.vals[i].(int64)
 		default:
@@ -88,6 +98,14 @@ func (r rowVals) Scan(dest ...any) error {
 		}
 	}
 	return nil
+}
+
+// licensed is an unexpired license for plan, or none for "".
+func licensed(plan string) *licx.Claims {
+	if plan == "" {
+		return nil
+	}
+	return &licx.Claims{Plan: plan}
 }
 
 func TestResolve(t *testing.T) {
@@ -167,7 +185,7 @@ func TestResolve(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sut := NewService(tt.db, tt.license, tt.mode)
+			sut := NewService(tt.db, licensed(tt.license), tt.mode)
 			got := sut.Resolve(context.Background(), "ws1")
 			if got.Name != tt.want {
 				t.Errorf("Resolve() = %q, want %q", got.Name, tt.want)
@@ -180,7 +198,7 @@ func TestResolve_FailClosedOnDBError(t *testing.T) {
 	// A billing outage must never hand out paid features (§5.2).
 	sut := NewService(
 		&fakeDB{subErr: errors.New("connection refused")},
-		"",
+		nil,
 		ModeSaaS,
 	)
 	got := sut.Resolve(context.Background(), "ws1")
@@ -192,6 +210,20 @@ func TestResolve_FailClosedOnDBError(t *testing.T) {
 	}
 }
 
+func TestRetentionDays_ErrorsOnDBError(t *testing.T) {
+	// The purge jobs skip on error, a billing outage must never delete data.
+	broken := NewService(&fakeDB{subErr: errors.New("connection refused")}, nil, ModeSaaS)
+	if _, err := broken.RetentionDays(context.Background(), "ws1"); err == nil {
+		t.Error("DB error returned a retention window instead of an error")
+	}
+
+	free := NewService(&fakeDB{subErr: pgx.ErrNoRows}, nil, ModeSaaS)
+	days, err := free.RetentionDays(context.Background(), "ws1")
+	if err != nil || days != 7 {
+		t.Errorf("no subscription row = %d, %v, want 7 days and no error", days, err)
+	}
+}
+
 func TestResolve_SelfHostedLicensedPlanUnlimited(t *testing.T) {
 	// The licensed self-hosted branch resolves its plan straight from the
 	// catalog, but the caps still protect SaaS infrastructure only. An
@@ -199,7 +231,7 @@ func TestResolve_SelfHostedLicensedPlanUnlimited(t *testing.T) {
 	// catalog entry.
 	sut := NewService(
 		&fakeDB{},
-		PlanEnterprise,
+		licensed(PlanEnterprise),
 		ModeSelfHosted,
 	)
 	got := sut.Resolve(context.Background(), "ws1")
@@ -223,23 +255,23 @@ func TestResolve_SelfHostedRecordingStorageUnlimited(t *testing.T) {
 	// self-hosted, the disk is the customer's own whatever the plan says.
 	sut := NewService(
 		&fakeDB{plan: PlanEnterprise, status: StatusActive},
-		"",
+		nil,
 		ModeSelfHosted,
 	)
 	// Even with no subscription and no license: unlimited, not 10 MiB.
-	bare := NewService(&fakeDB{}, "", ModeSelfHosted)
+	bare := NewService(&fakeDB{}, nil, ModeSelfHosted)
 
-	if got := sut.RecordingStorageBytes(context.Background(), "ws1"); got != unlimited {
+	if got, _ := sut.RecordingStorageBytes(context.Background(), "ws1"); got != unlimited {
 		t.Errorf("self-hosted pro storage cap = %d, want unlimited", got)
 	}
-	if got := bare.RecordingStorageBytes(context.Background(), "ws1"); got != unlimited {
+	if got, _ := bare.RecordingStorageBytes(context.Background(), "ws1"); got != unlimited {
 		t.Errorf("self-hosted community storage cap = %d, want unlimited", got)
 	}
 }
 
 func TestResolve_RequestCache(t *testing.T) {
 	db := &fakeDB{plan: PlanPro, status: StatusActive}
-	sut := NewService(db, "", ModeSaaS)
+	sut := NewService(db, nil, ModeSaaS)
 
 	ctx := withRequestCache(context.Background())
 	first := sut.Resolve(ctx, "ws1")
@@ -284,7 +316,7 @@ func TestCanInvite(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sut := NewService(tt.db, "", ModeSaaS)
+			sut := NewService(tt.db, nil, ModeSaaS)
 			err := sut.CanInvite(context.Background(), "ws1", tt.members)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CanInvite() error = %v, wantErr %v", err, tt.wantErr)
