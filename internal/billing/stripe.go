@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	stripe "github.com/stripe/stripe-go/v86"
 
 	"github.com/nokku-sh/nokku/internal/db"
@@ -16,18 +18,21 @@ import (
 
 var ErrActiveSubscription = errors.New("workspace already has an active subscription")
 
-// minBillableSeats is the pricing floor.
-const minBillableSeats = 5
+const (
+	// minBillableSeats is the pricing floor.
+	minBillableSeats = 5
+	// Stripe defaults the checkout quantity picker to 99.
+	maxCheckoutSeats = 10000
+)
 
 type Stripe struct {
 	client    *stripe.Client
 	db        *db.Connection
 	returnURL string
 
-	ProPriceID     string `env:"STRIPE_PRO_PRICE_ID"`
-	LicensePriceID string `env:"STRIPE_LICENSE_PRICE_ID"`
-	SecretKey      string `env:"STRIPE_SECRET_KEY"`
-	WebhookSecret  string `env:"STRIPE_WEBHOOK_SECRET"`
+	ProPriceID    string `env:"STRIPE_PRO_PRICE_ID"`
+	SecretKey     string `env:"STRIPE_SECRET_KEY"`
+	WebhookSecret string `env:"STRIPE_WEBHOOK_SECRET"`
 }
 
 // newStripe returns nil when a required env var is unset.
@@ -46,9 +51,9 @@ func newStripe(conn *db.Connection, returnURL string) (*Stripe, error) {
 	return &s, nil
 }
 
-// checkout starts at the current member count. There is deliberately no
-// quantity sync, so seats added later stay unbilled until the customer
-// adjusts them in the portal.
+// checkout starts at the current member count and lets the buyer add
+// headroom. The paid quantity becomes the seat cap, more seats are bought in
+// the portal.
 func (s *Stripe) checkout(ctx context.Context, workspaceID, email string) (string, error) {
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")
@@ -73,12 +78,16 @@ func (s *Stripe) checkout(ctx context.Context, workspaceID, email string) (strin
 		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{{
 			Price:    stripe.String(s.ProPriceID),
 			Quantity: new(quantity),
+			AdjustableQuantity: &stripe.CheckoutSessionCreateLineItemAdjustableQuantityParams{
+				Enabled: new(true),
+				Minimum: new(quantity),
+				Maximum: new(int64(maxCheckoutSeats)),
+			},
 		}},
 		SuccessURL:        stripe.String(s.returnURL + "/profile/billing"),
 		CancelURL:         stripe.String(s.returnURL + "/profile/billing"),
 		ClientReferenceID: stripe.String(workspaceID),
 		Customer:          stripe.String(customerID),
-		CustomerEmail:     stripe.String(email),
 		SubscriptionData: &stripe.CheckoutSessionCreateSubscriptionDataParams{
 			Metadata: map[string]string{"workspace_id": workspaceID},
 		},
@@ -126,15 +135,6 @@ func (s *Stripe) activeSubscription(
 	return sub, nil
 }
 
-func (s *Stripe) upsertSubscription(
-	ctx context.Context,
-	params *db.UpsertSubscriptionParams,
-) error {
-	return s.db.WithTx(ctx, func(q *db.Queries) error {
-		return q.UpsertSubscription(ctx, params)
-	})
-}
-
 func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (string, error) {
 	if sub, err := s.subscription(ctx, workspaceID); err == nil && sub.CustomerID != "" {
 		return sub.CustomerID, nil
@@ -162,6 +162,8 @@ func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (st
 	return customer.ID, nil
 }
 
+// portal is where seats are bought, so the Stripe portal configuration must
+// allow quantity updates.
 func (s *Stripe) portal(ctx context.Context, workspaceID string) (string, error) {
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")
@@ -194,6 +196,9 @@ func (s *Stripe) cancel(
 		return errors.New("missing workspace ID")
 	}
 	sub, err := s.activeSubscription(ctx, workspaceID)
+	if errors.Is(err, entitlement.ErrNoSubscription) {
+		return nil // free workspaces have nothing to cancel
+	}
 	if err != nil {
 		return fmt.Errorf("get active subscription: %w", err)
 	}
@@ -203,48 +208,99 @@ func (s *Stripe) cancel(
 
 	if immediate {
 		_, err = s.client.V1Subscriptions.Cancel(ctx, sub.SubscriptionID, nil)
-		return err
-	}
-
-	params := &stripe.SubscriptionUpdateParams{CancelAtPeriodEnd: new(true)}
-	if reason != "" {
-		params.CancellationDetails = &stripe.SubscriptionUpdateCancellationDetailsParams{
-			Comment: stripe.String(reason),
+	} else {
+		params := &stripe.SubscriptionUpdateParams{CancelAtPeriodEnd: new(true)}
+		if reason != "" {
+			params.CancellationDetails = &stripe.SubscriptionUpdateCancellationDetailsParams{
+				Comment: stripe.String(reason),
+			}
 		}
+		_, err = s.client.V1Subscriptions.Update(ctx, sub.SubscriptionID, params)
 	}
-	if _, err = s.client.V1Subscriptions.Update(ctx, sub.SubscriptionID, params); err != nil {
+	if err != nil {
 		return err
 	}
-	s.sync(ctx, workspaceID)
+	// The webhook delivers the same state, this only makes it show at once.
+	if err := s.sync(ctx, sub.SubscriptionID); err != nil {
+		slog.Warn("failed to sync cancelled subscription", "error", err, "workspace_id", workspaceID)
+	}
 	return nil
 }
 
-// sync self-heals missed webhooks.
-func (s *Stripe) sync(ctx context.Context, workspaceID string) {
-	sub, err := s.subscription(ctx, workspaceID)
-	if err != nil || sub.SubscriptionID == "" || sub.Source != "stripe" {
-		return
-	}
+// sync mirrors one Stripe subscription into the database. Stripe is the
+// source of truth and this is the only writer of its state, so the webhook,
+// the cancel path, and the reconcile loop can never disagree.
+func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 	remote, err := s.client.V1Subscriptions.Retrieve(
-		ctx, sub.SubscriptionID,
+		ctx, subscriptionID,
 		&stripe.SubscriptionRetrieveParams{},
 	)
 	if err != nil {
-		slog.Warn("failed to fetch Stripe subscription", "error", err, "workspace_id", workspaceID)
-		return
+		return fmt.Errorf("fetch subscription: %w", err)
 	}
-	if err := s.upsertSubscription(ctx, &db.UpsertSubscriptionParams{
-		WorkspaceID:       workspaceID,
-		Source:            "stripe",
-		Plan:              entitlement.PlanPro,
-		Status:            string(mapStatus(remote.Status)),
-		CustomerID:        remote.Customer.ID,
-		SubscriptionID:    remote.ID,
-		CurrentPeriodEnd:  periodEnd(remote),
-		CancelAtPeriodEnd: sub.CancelAtPeriodEnd,
-	}); err != nil {
-		slog.Warn("failed to upsert subscription", "error", err, "workspace_id", workspaceID)
+	// License subscriptions carry no workspace, the license worker owns them.
+	workspaceID := remote.Metadata["workspace_id"]
+	if workspaceID == "" {
+		return nil
 	}
+
+	active, err := s.activeSubscription(ctx, workspaceID)
+	if err != nil && !errors.Is(err, entitlement.ErrNoSubscription) {
+		return err
+	}
+	if err == nil && active.SubscriptionID != "" && active.SubscriptionID != remote.ID {
+		// A late event for an old subscription must not downgrade the live one.
+		if remote.Status == stripe.SubscriptionStatusCanceled {
+			return nil
+		}
+		// The stored one may have ended without us hearing of it yet.
+		live, err := s.client.V1Subscriptions.Retrieve(
+			ctx, active.SubscriptionID,
+			&stripe.SubscriptionRetrieveParams{},
+		)
+		if err != nil {
+			return fmt.Errorf("fetch stored subscription: %w", err)
+		}
+		if live.Status != stripe.SubscriptionStatusCanceled {
+			// Backstop so a workspace never ends up with two active subscriptions.
+			slog.Warn("cancelling duplicate subscription",
+				"workspace_id", workspaceID, "keep", active.SubscriptionID, "duplicate", remote.ID)
+			if _, err := s.client.V1Subscriptions.Cancel(ctx, remote.ID, nil); err != nil {
+				return fmt.Errorf("cancel duplicate subscription: %w", err)
+			}
+			return nil
+		}
+	}
+
+	var seats int64
+	if remote.Items != nil && len(remote.Items.Data) > 0 {
+		seats = remote.Items.Data[0].Quantity
+	}
+	var endedAt *time.Time
+	if remote.EndedAt != 0 {
+		endedAt = new(time.Unix(remote.EndedAt, 0).UTC())
+	}
+	// The plan stays on an ended row, the retention hold reads it.
+	err = s.db.WithTx(ctx, func(q *db.Queries) error {
+		return q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
+			WorkspaceID:       workspaceID,
+			Source:            "stripe",
+			Plan:              entitlement.PlanPro,
+			Status:            string(mapStatus(remote.Status)),
+			CustomerID:        remote.Customer.ID,
+			SubscriptionID:    remote.ID,
+			CurrentPeriodEnd:  periodEnd(remote),
+			CancelAtPeriodEnd: remote.CancelAtPeriodEnd,
+			Seats:             seats,
+			EndedAt:           endedAt,
+		})
+	})
+	// The workspace was deleted, there is nothing left to mirror.
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok &&
+		pgErr.Code == pgerrcode.ForeignKeyViolation {
+		return nil
+	}
+	return err
 }
 
 // reconcile lets missed webhooks self-heal, 5 minutes after start and then
@@ -274,7 +330,9 @@ func (s *Stripe) syncAll(ctx context.Context) error {
 		return err
 	}
 	for _, sub := range subs {
-		s.sync(ctx, sub.WorkspaceID)
+		if err := s.sync(ctx, sub.SubscriptionID); err != nil {
+			slog.Warn("failed to sync subscription", "error", err, "workspace_id", sub.WorkspaceID)
+		}
 	}
 	if len(subs) > 0 {
 		slog.Info("reconciled subscriptions", "count", len(subs))
