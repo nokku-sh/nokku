@@ -7,14 +7,18 @@ on:
       - "**/*.ts"
       - "**/*.svelte"
       - "**/*.go"
+      - "**/*.sql"
       - "go.mod"
       - "go.sum"
+      - ".github/workflows/test.yaml"
   pull_request:
     branches: [main]
     paths:
       - "**/*.ts"
       - "**/*.svelte"
       - "**/*.go"
+      - "**/*.sql"
+      - ".github/workflows/test.yaml"
       - "**/package.json"
       - "**/pnpm-lock.yaml"
       - "go.mod"
@@ -28,6 +32,19 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Without it every database test skips, testdb fails the run instead.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
         with:
@@ -68,12 +85,16 @@ jobs:
       - name: Build
         run: go build -ldflags="-s -w" -o bin/nokku ./cmd/nokku
 
+      # A pull request must never overwrite the nightly image.
       - uses: ko-build/setup-ko@v0.10
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
 
       - name: Publish Nightly Container
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         run: ko build ./cmd/nokku --bare --tags=nightly
 
       - name: Clean up old nightly releases
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: dataaxiom/ghcr-cleanup-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
