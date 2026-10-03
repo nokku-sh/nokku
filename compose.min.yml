@@ -38,7 +38,7 @@ services:
     environment:
       PGHOST: postgres
       PGPORT: "5432"
-      PGNAME: ${POSTGRES_DB:-nokku}
+      PGDATABASE: ${POSTGRES_DB:-nokku}
       PGUSER: ${POSTGRES_USER:-nokku}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
       PGSSLMODE: disable

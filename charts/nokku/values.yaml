@@ -83,11 +83,11 @@ persistence:
   mountPath: /var/lib/nokku
 
 app:
+  # The public URL people and daemons reach, like https://nokku.example.com.
   baseUrl: http://localhost
   debug: false
+  # Sets OTEL_EXPORTER_OTLP_ENDPOINT. Other OTEL_* settings go in extraEnv.
   otlpEndpoint: ""
-  otlpApiKey: ""
-  otlpTrustRemote: false
   database:
     host: ""
     port: "5432"
@@ -102,9 +102,10 @@ app:
 secrets:
   # Set existingSecret to re-use an already managed secret.
   existingSecret: ""
-  # Master secret used for at-rest encryption (secretbox with HKDF-derived
-  # purpose keys: SSO secrets, SAML keys, DPoP nonce, CA keys).
-  secret: "0123456789abcdefghijklmnopqrstuv"
+  # Master secret for at-rest encryption, exactly 32 characters. There is no
+  # default, a shared one would let anyone with a database dump read the CA
+  # keys. Generate with: openssl rand -hex 16
+  secret: ""
   # Used only when bundled PostgreSQL is disabled or custom credentials are needed.
   databasePassword: ""
 
