@@ -15,7 +15,6 @@ import (
 
 	"connectrpc.com/connect"
 	"connectrpc.com/validate"
-	"connectrpc.com/vanguard"
 	"github.com/vearutop/statigz"
 
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
@@ -42,9 +41,7 @@ func New(cfg *config.Config) *Server {
 }
 
 func (s *Server) Start(ctx context.Context) error {
-	if err := s.registerServices(ctx); err != nil {
-		return err
-	}
+	s.registerServices(ctx)
 
 	chain := newChain(
 		s.withRateLimit,
@@ -123,40 +120,31 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 	}
 }
 
-func (s *Server) registerServices(ctx context.Context) error {
-	var services []*vanguard.Service
-	register := func(path string, handler http.Handler) {
-		services = append(services, vanguard.NewService(path, handler))
-	}
+func (s *Server) registerServices(ctx context.Context) {
 	opts := s.withHandlerOptions(ctx)
-	register(nokkuv1connect.NewWorkspaceServiceHandler(newWorkspaceService(s.cfg), opts...))
-	register(nokkuv1connect.NewDashboardServiceHandler(newDashboardService(s.cfg), opts...))
-	register(nokkuv1connect.NewTeamServiceHandler(newTeamService(s.cfg), opts...))
-	register(nokkuv1connect.NewUtilServiceHandler(newUtilService(s.cfg), opts...))
-	register(nokkuv1connect.NewTargetServiceHandler(newTargetService(s.cfg), opts...))
-	register(nokkuv1connect.NewPrincipalServiceHandler(newPrincipalService(s.cfg), opts...))
-	register(nokkuv1connect.NewDaemonServiceHandler(newDaemonService(s.cfg), opts...))
-	register(nokkuv1connect.NewCertificateServiceHandler(newCertificateService(s.cfg), opts...))
-	register(nokkuv1connect.NewInvitationServiceHandler(newInvitationService(s.cfg), opts...))
-	register(nokkuv1connect.NewTokenServiceHandler(newTokenService(s.cfg), opts...))
-	register(nokkuv1connect.NewBillingServiceHandler(newBillingService(s.cfg), opts...))
-	register(nokkuv1connect.NewServiceAccountServiceHandler(newServiceAccountService(s.cfg), opts...))
-	register(nokkuv1connect.NewAccountServiceHandler(newAccountService(s.cfg), opts...))
-	register(nokkuv1connect.NewAuthServiceHandler(newAuthService(s.cfg), opts...))
-	register(nokkuv1connect.NewWorkspaceDomainServiceHandler(newWorkspaceDomainService(s.cfg), opts...))
-	register(nokkuv1connect.NewSSOServiceHandler(newSSOService(s.cfg), opts...))
-	register(nokkuv1connect.NewSCIMServiceHandler(newSCIMService(s.cfg), opts...))
-	register(nokkuv1connect.NewDaemonControlServiceHandler(s.cfg.Pool, opts...))
-	register(nokkuv1connect.NewDaemonSessionServiceHandler(s.cfg.Pool, opts...))
-	register(nokkuv1connect.NewRecordingServiceHandler(newRecordingService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewWorkspaceServiceHandler(newWorkspaceService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewDashboardServiceHandler(newDashboardService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewTeamServiceHandler(newTeamService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewUtilServiceHandler(newUtilService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewTargetServiceHandler(newTargetService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewPrincipalServiceHandler(newPrincipalService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewDaemonServiceHandler(newDaemonService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewCertificateServiceHandler(newCertificateService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewInvitationServiceHandler(newInvitationService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewTokenServiceHandler(newTokenService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewBillingServiceHandler(newBillingService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewServiceAccountServiceHandler(newServiceAccountService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewAccountServiceHandler(newAccountService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewAuthServiceHandler(newAuthService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewWorkspaceDomainServiceHandler(newWorkspaceDomainService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewSSOServiceHandler(newSSOService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewSCIMServiceHandler(newSCIMService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(s.cfg.Pool, opts...))
+	s.mux.Handle(nokkuv1connect.NewDaemonSessionServiceHandler(s.cfg.Pool, opts...))
+	s.mux.Handle(nokkuv1connect.NewRecordingServiceHandler(newRecordingService(s.cfg), opts...))
 	s.mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-
-	transcoder, err := vanguard.NewTranscoder(services)
-	if err != nil {
-		return err
-	}
 
 	var staticHandler http.Handler
 	staticHandler = statigz.FileServer(
@@ -174,11 +162,12 @@ func (s *Server) registerServices(ctx context.Context) error {
 	)
 
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if isAPIRequest(r) {
-			transcoder.ServeHTTP(w, r)
+		// A service this build does not have, from a newer client. The SPA
+		// fallback would answer it with HTML.
+		if strings.HasPrefix(r.URL.Path, "/nokku.v1.") {
+			http.NotFound(w, r)
 			return
 		}
-
 		staticHandler.ServeHTTP(w, r)
 	})
 
@@ -200,19 +189,4 @@ func (s *Server) registerServices(ctx context.Context) error {
 		s.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		s.mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	}
-	return nil
-}
-
-func isAPIRequest(r *http.Request) bool {
-	if r.Header.Get("Content-Type") == "application/json" &&
-		r.Header.Get("Connect-Protocol-Version") != "" {
-		return true
-	}
-
-	if contentType := r.Header.Get("Content-Type"); contentType == "application/grpc" ||
-		contentType == "application/grpc+proto" {
-		return true
-	}
-
-	return strings.HasPrefix(r.URL.Path, "/nokku.v1.") || strings.HasPrefix(r.URL.Path, "/v1/")
 }
