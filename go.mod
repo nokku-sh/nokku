@@ -4,9 +4,6 @@ go 1.27.0
 
 require (
 	connectrpc.com/connect v1.21.0
-	connectrpc.com/cors v0.1.0
-	connectrpc.com/grpchealth v1.5.0
-	connectrpc.com/grpcreflect v1.3.0
 	connectrpc.com/otelconnect v0.9.0
 	connectrpc.com/validate v0.7.0
 	connectrpc.com/vanguard v0.4.0
@@ -31,7 +28,6 @@ require (
 	github.com/nokku-sh/protos v0.2.0
 	github.com/oauth2-proxy/mockoidc v0.0.0-20240214162133-caebfff84d25
 	github.com/redis/go-redis/v9 v9.22.0
-	github.com/rs/cors v1.11.1
 	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.37
 	github.com/scaleway/tink-go-scwkms v0.1.2

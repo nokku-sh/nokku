@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -104,43 +103,6 @@ func CurrentSession(ctx context.Context) (db.Session, bool) {
 }
 
 type sessionKey struct{}
-
-// CSRFGuard covers sibling subdomains, which SameSite=Lax treats as same-site.
-func (s *Service) CSRFGuard(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			if _, err := r.Cookie(sessionCookieName); err == nil && !sameOrigin(r) {
-				writeError(w, http.StatusForbidden, "cross-origin request rejected")
-				return
-			}
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-// sameOrigin passes requests without Origin and Referer, browsers always send
-// one on POST. The "null" origin fails since sandboxed iframes send it while
-// Lax still delivers the cookie.
-func sameOrigin(r *http.Request) bool {
-	if origin := strings.TrimSpace(r.Header.Get("Origin")); origin != "" {
-		if strings.EqualFold(origin, "null") {
-			return false
-		}
-		return strings.EqualFold(originHost(origin), r.Host)
-	}
-	if referer := r.Header.Get("Referer"); referer != "" {
-		return strings.EqualFold(originHost(referer), r.Host)
-	}
-	return true
-}
-
-func originHost(header string) string {
-	u, err := url.Parse(header)
-	if err != nil {
-		return header
-	}
-	return u.Host
-}
 
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

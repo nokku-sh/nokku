@@ -14,8 +14,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"connectrpc.com/grpchealth"
-	"connectrpc.com/grpcreflect"
 	"connectrpc.com/validate"
 	"connectrpc.com/vanguard"
 	"github.com/vearutop/statigz"
@@ -51,7 +49,6 @@ func (s *Server) Start(ctx context.Context) error {
 	chain := newChain(
 		s.withRateLimit,
 		s.withHeaders,
-		s.withCORS,
 		s.withCSRF,
 		s.withLogger,
 		s.withRecover,
@@ -127,10 +124,8 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 }
 
 func (s *Server) registerServices(ctx context.Context) error {
-	var names []string
 	var services []*vanguard.Service
 	register := func(path string, handler http.Handler) {
-		names = append(names, strings.Trim(path, "/"))
 		services = append(services, vanguard.NewService(path, handler))
 	}
 	opts := s.withHandlerOptions(ctx)
@@ -154,7 +149,9 @@ func (s *Server) registerServices(ctx context.Context) error {
 	register(nokkuv1connect.NewDaemonControlServiceHandler(s.cfg.Pool, opts...))
 	register(nokkuv1connect.NewDaemonSessionServiceHandler(s.cfg.Pool, opts...))
 	register(nokkuv1connect.NewRecordingServiceHandler(newRecordingService(s.cfg), opts...))
-	s.registerHealthAndReflection(names)
+	s.mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 
 	transcoder, err := vanguard.NewTranscoder(services)
 	if err != nil {
@@ -204,18 +201,6 @@ func (s *Server) registerServices(ctx context.Context) error {
 		s.mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	}
 	return nil
-}
-
-func (s *Server) registerHealthAndReflection(serviceNames []string) {
-	checker := grpchealth.NewStaticChecker(serviceNames...)
-	reflector := grpcreflect.NewStaticReflector(serviceNames...)
-
-	s.mux.Handle(grpchealth.NewHandler(checker))
-	s.mux.Handle(grpcreflect.NewHandlerV1(reflector))
-	s.mux.Handle(grpcreflect.NewHandlerV1Alpha(reflector))
-	s.mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
 }
 
 func isAPIRequest(r *http.Request) bool {
