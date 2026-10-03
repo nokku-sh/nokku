@@ -141,7 +141,8 @@ type Querier interface {
 	ListOpenRecordings(ctx context.Context, arg *ListOpenRecordingsParams) ([]*ListOpenRecordingsRow, error)
 	ListOwnedWorkspaces(ctx context.Context, userID string) ([]*ListOwnedWorkspacesRow, error)
 	ListPrincipals(ctx context.Context, arg *ListPrincipalsParams) ([]*ListPrincipalsRow, error)
-	// Teams are expanded so the host needs no team knowledge.
+	// Teams are expanded so the host needs no team knowledge. Users are joined,
+	// not filtered, so an account that is inactive or not visible drops out.
 	ListPrincipalsForTarget(ctx context.Context, targetID string) ([]*ListPrincipalsForTargetRow, error)
 	// Ended subscriptions are final at the provider, so they need no more syncs.
 	ListProviderSubscriptions(ctx context.Context, sources []string) ([]*WorkspaceSubscription, error)

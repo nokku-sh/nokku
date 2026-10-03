@@ -159,6 +159,36 @@ func TestStateVersionBumpsOnAccessChanges(t *testing.T) {
 	}
 }
 
+// A deactivated account must leave every daemon's map at once, a cert it
+// already holds would otherwise work until it expires.
+func TestDeactivatedUserLosesAccess(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	conn := listen(t, c)
+
+	setActive := func(active bool) {
+		if _, err := c.Sys().UpdateUser(t.Context(), &UpdateUserParams{ID: f.u, Active: &active}); err != nil {
+			t.Fatalf("set active=%v: %v", active, err)
+		}
+	}
+
+	before := stateVersion(t, c, f.ws)
+	setActive(false)
+	waitNotify(t, conn, f.ws)
+	if after := stateVersion(t, c, f.ws); after <= before {
+		t.Fatalf("deactivation: version %d -> %d, want a bump", before, after)
+	}
+	if got := grantedIDs(t, c, f.target); len(got) != 0 {
+		t.Fatalf("deactivated user still granted: %v", got)
+	}
+
+	setActive(true)
+	waitNotify(t, conn, f.ws)
+	if got := grantedIDs(t, c, f.target); len(got) != 1 || got[0] != f.u {
+		t.Fatalf("reactivated user: granted ids = %v, want [%s]", got, f.u)
+	}
+}
+
 func TestStateVersionIgnoresHeartbeatWrites(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
