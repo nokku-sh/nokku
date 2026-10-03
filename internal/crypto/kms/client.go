@@ -28,12 +28,10 @@ func (t *TinkEncryptor) kmsKEK(uri string) (tink.AEAD, error) {
 			return nil, errors.New("VAULT_TOKEN required for hcvault")
 		}
 		hostPort, _, _ := strings.Cut(strings.TrimPrefix(uri, "hcvault://"), "/")
-		scheme := "https://"
-		if t.VaultSkipVerify {
-			scheme = "http://"
-		}
+		// DefaultConfig reads VAULT_SKIP_VERIFY itself and then skips the
+		// certificate check. The address is always https.
 		vaultClient, vaultErr := api.NewClient(&api.Config{
-			Address:    scheme + hostPort,
+			Address:    "https://" + hostPort,
 			HttpClient: api.DefaultConfig().HttpClient,
 		})
 		if vaultErr != nil {

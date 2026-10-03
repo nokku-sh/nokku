@@ -40,10 +40,9 @@ type TinkEncryptor struct {
 	kek       tink.AEAD
 	primitive tink.AEAD
 
-	KMSURI          string        `env:"KMS_URI"`
-	VaultToken      string        `env:"VAULT_TOKEN"`
-	VaultSkipVerify bool          `env:"VAULT_SKIP_VERIFY"      envDefault:"false"`
-	RewrapInterval  time.Duration `env:"KEYSET_REWRAP_INTERVAL" envDefault:"12h"`
+	KMSURI         string        `env:"KMS_URI"`
+	VaultToken     string        `env:"VAULT_TOKEN"`
+	RewrapInterval time.Duration `env:"KEYSET_REWRAP_INTERVAL" envDefault:"12h"`
 	// RotateInterval is how old the primary key may get with a KMS. Zero
 	// turns the timed rotation off.
 	RotateInterval time.Duration `env:"KEYSET_ROTATE_INTERVAL" envDefault:"2160h"`
