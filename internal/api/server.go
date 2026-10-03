@@ -3,7 +3,6 @@ package api
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"net"
@@ -64,7 +63,6 @@ func (s *Server) Start(ctx context.Context) error {
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       30 * time.Second,
 		MaxHeaderBytes:    1 << 14, // 16 KiB
-		TLSConfig:         &tls.Config{MinVersion: tls.VersionTLS13},
 	}
 
 	serverErr := make(chan error, 1)
