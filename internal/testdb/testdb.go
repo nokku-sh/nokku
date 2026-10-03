@@ -40,8 +40,7 @@ func Setup(name string) {
 	if err != nil {
 		// CI must not pass by skipping every database test.
 		if os.Getenv("CI") != "" {
-			fmt.Fprintln(os.Stderr, "testdb: no Postgres in CI:", err)
-			os.Exit(1)
+			panic(fmt.Sprintf("testdb: no Postgres in CI: %v", err))
 		}
 		return
 	}
