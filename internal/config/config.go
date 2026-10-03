@@ -3,7 +3,8 @@ package config
 import (
 	"cmp"
 	"context"
-	"errors"
+	"crypto/hkdf"
+	"crypto/sha256"
 	"fmt"
 	"net/url"
 
@@ -55,8 +56,8 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if cfg.Secret == "" {
-		return nil, fmt.Errorf("NOKKU_SECRET is required")
+	if err := kms.ValidSecret(cfg.Secret); err != nil {
+		return nil, err
 	}
 
 	if cmd != nil {
@@ -79,28 +80,16 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	// KMS replaces the secretbox before anything encrypts. The DPoP nonce key
-	// still derives from NOKKU_SECRET.
-	usesKMS := true
-	enc, err := kms.New(ctx, cfg.Conn)
-	switch {
-	case errors.Is(err, kms.ErrNotConfigured):
-		usesKMS = false
-		primary, err := crypto.NewSecretbox([]byte(cfg.Secret))
-		if err != nil {
-			return nil, err
-		}
-		if err := crypto.SetEncryptor(primary); err != nil {
-			return nil, err
-		}
-	case err != nil:
+	// Set before anything encrypts. The keyset is wrapped by the KMS key, or
+	// by a key derived from NOKKU_SECRET.
+	enc, err := kms.New(ctx, cfg.Conn, cfg.Secret)
+	if err != nil {
 		return nil, err
-	default:
-		if err := crypto.SetEncryptor(enc); err != nil {
-			return nil, err
-		}
-		enc.Start(ctx)
 	}
+	if err := crypto.SetEncryptor(enc); err != nil {
+		return nil, err
+	}
+	enc.Start(ctx)
 
 	cfg.Storage, err = storage.New(ctx, cfg.FullURL())
 	if err != nil {
@@ -124,7 +113,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 
 	// An expired license still starts. The data is encrypted under the KMS
 	// key, so refusing here would turn a late renewal into an outage.
-	if mode == entitlement.ModeSelfHosted && usesKMS && cfg.Entitlements.License() == nil {
+	if mode == entitlement.ModeSelfHosted && enc.UsesKMS() && cfg.Entitlements.License() == nil {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
 	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Entitlements)
@@ -133,11 +122,17 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	}
 	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Storage, cfg.Entitlements, cfg.Audit)
 
+	// Its own derived key, so the DPoP nonce HMAC never shares one with the
+	// keyset wrap.
+	nonceKey, err := hkdf.Key(sha256.New, []byte(cfg.Secret), nil, "nokku dpop nonce v1", 32)
+	if err != nil {
+		return nil, err
+	}
 	cfg.IAM, err = iam.New(ctx, iam.Deps{
 		Conn:             cfg.Conn,
 		BaseURL:          cfg.FullURL(),
 		Events:           cfg.Audit,
-		Secret:           []byte(cfg.Secret),
+		Secret:           nonceKey,
 		Cache:            cfg.Cache,
 		PasskeyRPOrigins: passkeyOrigins(&cfg),
 		CanJoin:          cfg.Entitlements.CanInvite,

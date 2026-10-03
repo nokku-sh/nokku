@@ -13,42 +13,22 @@ VALUES
   (1, @data)
 ON CONFLICT (id) DO NOTHING;
 
--- name: UpdateKeysetWrappedData :execrows
+-- name: LockKeyset :one
+-- The row lock keeps two rotations from running at once.
+SELECT
+  data,
+  rotated_at
+FROM
+  keysets
+WHERE
+  id = 1
+FOR UPDATE;
+
+-- name: UpdateKeyset :exec
 UPDATE keysets
 SET
   data = @data,
+  rotated_at = @rotated_at,
   updated_at = NOW()
 WHERE
   id = 1;
-
--- name: UpsertKeysetWrappedData :exec
--- Only for rotate-secrets, never on the boot path.
-INSERT INTO
-  keysets (id, data)
-VALUES
-  (1, @data)
-ON CONFLICT (id) DO UPDATE
-SET
-  data = @data,
-  updated_at = NOW();
-
--- name: TrySecretRotationLock :one
-SELECT
-  pg_try_advisory_xact_lock(hashtext ('global-secret-rotation'));
-
--- name: GetEncryptedCAKeys :many
-SELECT
-  id,
-  private_key
-FROM
-  certificate_authorities
-WHERE
-  private_key IS NOT NULL;
-
--- name: UpdateCAPrivateKey :exec
-UPDATE certificate_authorities
-SET
-  private_key = @private_key
-WHERE
-  id = @id;
-

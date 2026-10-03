@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/mizuchilabs/kata/buildinfo"
@@ -16,7 +14,6 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/api"
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -42,26 +39,26 @@ func main() {
 		Commands: []*cli.Command{
 			{
 				Name:  "rotate-secrets",
-				Usage: "Re-encrypt all DB secrets onto a new cipher",
-				Description: "Migrates every encrypted value (CA private keys) onto a new " +
-					"cipher, in a single transaction: if anything fails, nothing " +
-					"changes and the command can simply be re-run.\n\n" +
-					"The current cipher is the one the server runs with: KMS_URI " +
-					"when set, NOKKU_SECRET otherwise. The new one is " +
-					"specified as:\n" +
-					"  secret:<value>  secretbox key (the simple default)\n" +
-					"  kms:<uri>       KMS-backed envelope encryption (Enterprise)\n\n" +
+				Usage: "Move the encryption keys under a new secret or KMS key",
+				Description: "Everything at rest is encrypted by one keyset in the database, " +
+					"which is wrapped by NOKKU_SECRET or by a KMS key. This command " +
+					"wraps it with a new one and adds a fresh data key, in a single " +
+					"transaction. No data is re-encrypted, older keys stay for " +
+					"reading, so recordings stay readable.\n\n" +
+					"The current key is the one the server runs with: KMS_URI when " +
+					"set, NOKKU_SECRET otherwise. The new one is specified as:\n" +
+					"  secret:<value>  a new NOKKU_SECRET (at least 32 characters)\n" +
+					"  kms:<uri>       hcvault:// or scw-kms:// (Enterprise)\n\n" +
 					"Examples:\n" +
 					"  nokku rotate-secrets --new secret:NEW\n" +
 					"  nokku rotate-secrets --new kms:hcvault://vault:8200/transit/keys/nokku\n\n" +
 					"KMS credentials (VAULT_TOKEN, ...) are read from the environment. " +
-					"SSO client secrets and the SAML SP private key follow the active " +
-					"cipher via the iam store, not this command. " +
-					"Run this with the app stopped, then update the environment and start again.",
+					"Afterwards set NOKKU_SECRET or KMS_URI to the new value and restart. " +
+					"The server refuses to start with the old one.",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:     "new",
-						Usage:    "Cipher to migrate to: secret:<value> or kms:<uri>",
+						Usage:    "Key to move to: secret:<value> or kms:<uri>",
 						Required: true,
 						Sources:  cli.EnvVars("NOKKU_NEW_SECRET"),
 					},
@@ -74,65 +71,18 @@ func main() {
 					if conn.Pool != nil {
 						defer conn.Pool.Close()
 					}
-
-					// The current cipher is the one the server runs with.
-					var oldCipher crypto.Cipher
-					enc, err := kms.New(ctx, conn)
-					switch {
-					case errors.Is(err, kms.ErrNotConfigured):
-						var ec config.EnvConfig
-						if ec, err = env.ParseAs[config.EnvConfig](); err == nil {
-							oldCipher, err = crypto.NewSecretbox([]byte(ec.Secret))
-						}
-					case err == nil:
-						oldCipher = enc
-					}
+					ec, err := env.ParseAs[config.EnvConfig]()
 					if err != nil {
-						return fmt.Errorf("current cipher: %w", err)
-					}
-
-					// A KMS target persists its fresh keyset inside the rotation tx.
-					var newCipher crypto.Cipher
-					var finalize func(ctx context.Context, q *db.Queries) error
-					if secret, ok := strings.CutPrefix(cmd.String("new"), "secret:"); ok &&
-						secret != "" {
-						newCipher, err = crypto.NewSecretbox([]byte(secret))
-						if err != nil {
-							return fmt.Errorf("new cipher: %w", err)
-						}
-					} else if uri, ok := strings.CutPrefix(cmd.String("new"), "kms:"); ok &&
-						uri != "" {
-						enc, err := kms.NewForRotation(ctx, uri)
-						if err != nil {
-							return fmt.Errorf("new cipher: %w", err)
-						}
-						data, err := enc.WrappedKeyset()
-						if err != nil {
-							return fmt.Errorf("new cipher: %w", err)
-						}
-						newCipher = enc
-						finalize = func(ctx context.Context, q *db.Queries) error {
-							return q.UpsertKeysetWrappedData(ctx, data)
-						}
-					} else {
-						return fmt.Errorf(
-							"invalid cipher %q: must be secret:<value> or kms:<uri>",
-							cmd.String("new"),
-						)
-					}
-
-					rotating, err := crypto.NewRotatingCipher(newCipher, oldCipher)
-					if err != nil {
-						return fmt.Errorf("failed to create rotating cipher: %w", err)
-					}
-					if err := crypto.SetEncryptor(rotating); err != nil {
 						return err
 					}
-					if err := db.RotateSecrets(ctx, conn, finalize); err != nil {
-						return fmt.Errorf("failed to rotate secrets: %w", err)
+					enc, err := kms.New(ctx, conn, ec.Secret)
+					if err != nil {
+						return fmt.Errorf("current keys: %w", err)
 					}
-
-					slog.Info("secrets rotated, update the environment and restart")
+					if err := enc.Rotate(ctx, cmd.String("new")); err != nil {
+						return fmt.Errorf("failed to rotate: %w", err)
+					}
+					slog.Info("keys rotated, set NOKKU_SECRET or KMS_URI to the new value and restart")
 					return nil
 				},
 			},

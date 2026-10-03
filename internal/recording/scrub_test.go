@@ -32,14 +32,26 @@ func newScrubTestService(t *testing.T) *Service {
 	if err != nil {
 		t.Fatalf("storage.New: %v", err)
 	}
-	cipher, err := crypto.NewSecretbox([]byte("test-secret"))
-	if err != nil {
-		t.Fatalf("NewSecretbox: %v", err)
-	}
-	if err := crypto.SetEncryptor(cipher); err != nil {
+	if err := crypto.SetEncryptor(testCipher{}); err != nil {
 		t.Fatalf("SetEncryptor: %v", err)
 	}
 	return &Service{store: st}
+}
+
+// testCipher marks its output, the frame format around it is what the tests
+// are about.
+type testCipher struct{}
+
+func (testCipher) Encrypt(plaintext []byte) ([]byte, error) {
+	return append([]byte("enc:"), plaintext...), nil
+}
+
+func (testCipher) Decrypt(ciphertext []byte) ([]byte, error) {
+	plaintext, ok := bytes.CutPrefix(ciphertext, []byte("enc:"))
+	if !ok {
+		return nil, errors.New("not a ciphertext")
+	}
+	return plaintext, nil
 }
 
 // writeRecordingObject frames and encrypts a gzipped cast the way

@@ -16,6 +16,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/crypto"
+	"github.com/nokku-sh/nokku/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
@@ -30,16 +31,16 @@ func newTestEnv(t *testing.T) *testEnv {
 	t.Helper()
 	// The mock IdPs listen on loopback.
 	t.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "true")
-	cipher, err := crypto.NewSecretbox([]byte("0123456789abcdef0123456789abcdef"))
+	conn, err := db.NewConnection(t.Context())
+	if err != nil {
+		t.Skipf("no test database: %v", err)
+	}
+	cipher, err := kms.New(t.Context(), conn, "test-secret-0123456789-0123456789")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := crypto.SetEncryptor(cipher); err != nil {
 		t.Fatal(err)
-	}
-	conn, err := db.NewConnection(t.Context())
-	if err != nil {
-		t.Skipf("no test database: %v", err)
 	}
 	svc, err := New(t.Context(), Deps{
 		BaseURL:          testBaseURL,

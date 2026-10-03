@@ -2,36 +2,32 @@ package crypto
 
 import (
 	"errors"
-	"sync"
+	"sync/atomic"
 )
 
-var (
-	errEncryptorMissing = errors.New("encryptor not initialized")
-
-	runtimeMu sync.RWMutex
-	runtime   primitives
-)
-
-type primitives struct {
-	encryptor Cipher
+// Cipher encrypts what is stored at rest. The server sets one at startup,
+// the encrypted column types and the recording frames use it.
+type Cipher interface {
+	Encrypt(plaintext []byte) ([]byte, error)
+	Decrypt(ciphertext []byte) ([]byte, error)
 }
+
+var errEncryptorMissing = errors.New("encryptor not initialized")
+
+var encryptor atomic.Pointer[Cipher]
 
 func SetEncryptor(enc Cipher) error {
 	if enc == nil {
 		return errEncryptorMissing
 	}
-	runtimeMu.Lock()
-	runtime.encryptor = enc
-	runtimeMu.Unlock()
+	encryptor.Store(&enc)
 	return nil
 }
 
 func Encryptor() (Cipher, error) {
-	runtimeMu.RLock()
-	enc := runtime.encryptor
-	runtimeMu.RUnlock()
+	enc := encryptor.Load()
 	if enc == nil {
 		return nil, errEncryptorMissing
 	}
-	return enc, nil
+	return *enc, nil
 }

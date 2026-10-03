@@ -88,8 +88,6 @@ github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.3 h1:bON1rJf67
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.3/go.mod h1:c5BBpjJcQXpfeq9iASyVKA3T6vX6B6LEXY4mL/gklDY=
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.3 h1:L8vIOxylma91TcR96NFTEC07G3JDwSl+CvK2b+IODms=
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.3/go.mod h1:fmPIZQzTExYuBNWFyi1P7IoDjvskgphXqK1yObMzusM=
-github.com/aws/aws-sdk-go-v2/service/kms v1.61.0 h1:Ux0dqd8Pj64DcFk/HLtPyaDgwv6M6GhipSAsMd9YxbM=
-github.com/aws/aws-sdk-go-v2/service/kms v1.61.0/go.mod h1:/eZ9xj8IZyb7fj+/t3HO7x89X+7Vn+gCDDbQ2NHCVtM=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.113.1 h1:cFHmwLxZPvtoAlo79MboURL2+7b0TMHycnrcf5VZNXk=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.113.1/go.mod h1:/uA+2Qj4jd5qBWagVC1AyzzDFXVK997E7U04w7Kw0wI=
 github.com/aws/aws-sdk-go-v2/service/signin v1.10.0 h1:ZD5qFpWcaOKdTuhBi431pIDkCgrMkMlMT6jlpSPoIRI=
@@ -447,8 +445,6 @@ github.com/testcontainers/testcontainers-go v0.44.0 h1:/Fwh6HY1mIikhnm9e7HwoxGyc
 github.com/testcontainers/testcontainers-go v0.44.0/go.mod h1:IcnwQrYTO86xHXu5bvMaBH7ATlbS3Qn1M1QWW3c66rE=
 github.com/tetratelabs/wazero v1.12.0 h1:DuWcpNu/FzgEXgGBDp8J1Spc+CWOvvtvVyjKlaZopYU=
 github.com/tetratelabs/wazero v1.12.0/go.mod h1:LvKtzl2RqO4gyF27BiXU+nKAjcV8f38U+kP/q2vgxh0=
-github.com/tink-crypto/tink-go-awskms/v3 v3.0.0 h1:XSohRhCkXAVI0iaCnWB/GS05TEmpnKurQmzaY1jzt3Y=
-github.com/tink-crypto/tink-go-awskms/v3 v3.0.0/go.mod h1:+7MXsShLzVbSQ6dI0Pe4JuZM52jD1jQ1itAygd/MDsA=
 github.com/tink-crypto/tink-go-hcvault/v2 v2.5.0 h1:eXuNqgrcYelxU1MVikOJDP3wTS5lvihM4ntoAbAMfvs=
 github.com/tink-crypto/tink-go-hcvault/v2 v2.5.0/go.mod h1:3RhcxAqek6xUlRFmJifvU4CYLZN60KMQdIKqpZAZJG0=
 github.com/tink-crypto/tink-go/v2 v2.8.0 h1:1zODq1bZDqOQdNPjhvwGYLDw9On7mDWPnQf+4xXlpAc=

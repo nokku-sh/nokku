@@ -84,7 +84,6 @@ type Querier interface {
 	GetDaemonByKeyThumbprint(ctx context.Context, arg *GetDaemonByKeyThumbprintParams) (*Daemon, error)
 	GetDaemonsByIDs(ctx context.Context, daemonIds []string) ([]*GetDaemonsByIDsRow, error)
 	GetDefaultCA(ctx context.Context, arg *GetDefaultCAParams) (*CertificateAuthority, error)
-	GetEncryptedCAKeys(ctx context.Context) ([]*GetEncryptedCAKeysRow, error)
 	// skip_ids holds CAs whose rotation already failed this pass.
 	GetExpiringCAForUpdate(ctx context.Context, skipIds []string) (*CertificateAuthority, error)
 	GetInstanceLicense(ctx context.Context) (string, error)
@@ -165,6 +164,8 @@ type Querier interface {
 	ListWorkspaceSCIMTokens(ctx context.Context, workspaceID string) ([]*ListWorkspaceSCIMTokensRow, error)
 	ListWorkspaceTokens(ctx context.Context, arg *ListWorkspaceTokensParams) ([]*WorkspaceToken, error)
 	ListWorkspaces(ctx context.Context) ([]*Workspace, error)
+	// The row lock keeps two rotations from running at once.
+	LockKeyset(ctx context.Context) (*LockKeysetRow, error)
 	MaintainAuditPartitions(ctx context.Context) error
 	OldestRecordings(ctx context.Context, arg *OldestRecordingsParams) ([]*Recording, error)
 	PutSAMLKeypair(ctx context.Context, arg *PutSAMLKeypairParams) (*PutSAMLKeypairRow, error)
@@ -194,12 +195,10 @@ type Querier interface {
 	TouchTargetManualSync(ctx context.Context, targetID string) error
 	// Single-flight for background jobs across instances. Released on commit.
 	TryAdvisoryXactLock(ctx context.Context, key string) (bool, error)
-	TrySecretRotationLock(ctx context.Context) (bool, error)
 	UpdateCA(ctx context.Context, arg *UpdateCAParams) (*CertificateAuthority, error)
-	UpdateCAPrivateKey(ctx context.Context, arg *UpdateCAPrivateKeyParams) error
 	UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) (*Daemon, error)
 	UpdateDaemonMetadata(ctx context.Context, arg *UpdateDaemonMetadataParams) error
-	UpdateKeysetWrappedData(ctx context.Context, data []byte) (int64, error)
+	UpdateKeyset(ctx context.Context, arg *UpdateKeysetParams) error
 	UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (string, error)
 	UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*Target, error)
 	UpdateTargetCA(ctx context.Context, arg *UpdateTargetCAParams) (*Target, error)
@@ -210,8 +209,6 @@ type Querier interface {
 	UpdateWorkspaceOwner(ctx context.Context, arg *UpdateWorkspaceOwnerParams) (*Workspace, error)
 	// A credential never moves accounts, a clash returns no rows.
 	UpsertCredential(ctx context.Context, arg *UpsertCredentialParams) (*Credential, error)
-	// Only for rotate-secrets, never on the boot path.
-	UpsertKeysetWrappedData(ctx context.Context, data []byte) error
 	UpsertSSOProvider(ctx context.Context, arg *UpsertSSOProviderParams) (*SsoProvider, error)
 	// Manual subscriptions survive provider syncs.
 	UpsertSubscription(ctx context.Context, arg *UpsertSubscriptionParams) error

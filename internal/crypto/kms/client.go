@@ -1,7 +1,7 @@
 package kms
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -9,68 +9,49 @@ import (
 	"github.com/hashicorp/vault/api"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"github.com/scaleway/tink-go-scwkms/integration/scwkms"
-	"github.com/tink-crypto/tink-go-awskms/v3/integration/awskms"
 	"github.com/tink-crypto/tink-go-hcvault/v2/integration/hcvault"
+	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
-func (t *TinkEncryptor) setupClient(ctx context.Context) (err error) {
-	slog.Debug("setting up kms client", "provider", kmsProvider(t.KMSURI))
-	switch {
-	case strings.HasPrefix(t.KMSURI, "aws-kms://"):
-		t.client, err = awskms.NewClientWithOptions(ctx, t.KMSURI)
-	// TODO: gcp-kms support disabled until upstream genproto is fixed
-	case strings.HasPrefix(t.KMSURI, "hcvault://"):
-		if t.VaultToken == "" {
-			return fmt.Errorf("VAULT_TOKEN required for hcvault")
-		}
-		uriWithoutScheme := strings.TrimPrefix(t.KMSURI, "hcvault://")
-		hostPort, _, _ := strings.Cut(uriWithoutScheme, "/")
+// kmsKEK returns the key encryption key behind uri. The key never leaves the
+// KMS, every wrap and unwrap is a call to it.
+func (t *TinkEncryptor) kmsKEK(uri string) (tink.AEAD, error) {
+	provider, _, _ := strings.Cut(uri, "://")
+	slog.Debug("setting up kms client", "provider", provider)
 
+	var client registry.KMSClient
+	var err error
+	switch provider {
+	case "hcvault":
+		if t.VaultToken == "" {
+			return nil, errors.New("VAULT_TOKEN required for hcvault")
+		}
+		hostPort, _, _ := strings.Cut(strings.TrimPrefix(uri, "hcvault://"), "/")
 		scheme := "https://"
 		if t.VaultSkipVerify {
 			scheme = "http://"
 		}
-
-		vaultClient, err := api.NewClient(&api.Config{
+		vaultClient, vaultErr := api.NewClient(&api.Config{
 			Address:    scheme + hostPort,
 			HttpClient: api.DefaultConfig().HttpClient,
 		})
-		if err != nil {
-			return err
+		if vaultErr != nil {
+			return nil, vaultErr
 		}
 		vaultClient.SetToken(t.VaultToken)
-		uriPrefix := "hcvault://" + hostPort
-		t.client, err = hcvault.NewClientWithAEADOptions(uriPrefix, vaultClient.Logical())
-		if err != nil {
-			return err
-		}
-	case strings.HasPrefix(t.KMSURI, "scw-kms://"):
-		rest := strings.TrimPrefix(t.KMSURI, "scw-kms://regions/")
-		region, _, ok := strings.Cut(rest, "/keys/")
+		client, err = hcvault.NewClientWithAEADOptions("hcvault://"+hostPort, vaultClient.Logical())
+	case "scw-kms":
+		region, _, ok := strings.Cut(strings.TrimPrefix(uri, "scw-kms://regions/"), "/keys/")
 		if !ok || region == "" {
-			return fmt.Errorf("invalid scw-kms URI")
+			return nil, errors.New("invalid scw-kms URI")
 		}
-
-		prefix := "scw-kms://regions/" + region + "/keys/"
-		t.client, err = scwkms.NewClientWithOptions(prefix, scw.WithEnv())
-		if err != nil {
-			return err
-		}
+		client, err = scwkms.NewClientWithOptions("scw-kms://regions/"+region+"/keys/", scw.WithEnv())
 	default:
-		return fmt.Errorf("unsupported KMS provider")
+		return nil, fmt.Errorf("unsupported KMS provider %q, use hcvault:// or scw-kms://", provider)
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	t.kekAEAD, err = t.client.GetAEAD(t.KMSURI)
-	return err
-}
-
-func kmsProvider(uri string) string {
-	provider, _, ok := strings.Cut(uri, "://")
-	if !ok || provider == "" {
-		return "unknown"
-	}
-	return provider
+	return client.GetAEAD(uri)
 }
