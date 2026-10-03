@@ -63,7 +63,6 @@ The backend reads configuration from environment variables. Only `NOKKU_SECRET` 
 | `NOKKU_PORT`            | Port the backend listens on (default `3000`)                                                         |
 | `NOKKU_SECRET`          | **Required**, at least 32 characters. Wraps the at-rest keyset and keys the DPoP nonces              |
 | `NOKKU_TRUSTED_PROXIES` | Comma-separated reverse-proxy IPs/CIDRs (e.g. Traefik) whose forwarded client-IP headers are honored |
-| `NOKKU_ALLOWED_ORIGINS` | Additional allowed CORS origins                                                                      |
 | `NOKKU_DEBUG`           | Debug logging (`--debug`)                                                                            |
 | `NOKKU_LICENSE_KEY`     | License key activating licensed self-host features. Optional, a key can also be activated in the UI  |
 | `NOKKU_ALLOW_PRIVATE_NETWORKS` | Let SSO providers and audit webhooks reach private addresses (default `false`). Keep it off when hosting for other people. |

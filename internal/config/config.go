@@ -33,7 +33,6 @@ type EnvConfig struct {
 	Secret         string `env:"NOKKU_SECRET"`
 	Debug          bool
 	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
-	AllowedOrigins []string `env:"NOKKU_ALLOWED_ORIGINS"`
 }
 
 type Config struct {
@@ -158,12 +157,6 @@ func (c *Config) FullURL() string {
 		return "http://localhost:" + c.Port
 	}
 	return cmp.Or(u.Scheme, "http") + "://" + cmp.Or(u.Host, "localhost")
-}
-
-func (c *Config) WSOrigins() []string {
-	origins := make([]string, 0, len(c.AllowedOrigins)+1)
-	origins = append(origins, c.FullURL())
-	return append(origins, c.AllowedOrigins...)
 }
 
 func passkeyOrigins(c *Config) []string {

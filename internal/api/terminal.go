@@ -104,7 +104,7 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 	}
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: t.cfg.WSOrigins(),
+		OriginPatterns: []string{t.cfg.FullURL()},
 	})
 	if err != nil {
 		slog.Error("websocket upgrade failed", "error", err)
