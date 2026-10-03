@@ -151,7 +151,7 @@ Per-workspace OIDC and SAML providers are configured in the web application, not
 | `VAULT_TOKEN`            | Token for `hcvault://`                                                                          |
 | `VAULT_SKIP_VERIFY`      | Skip Vault TLS verification (testing only)                                                      |
 | `KEYSET_REWRAP_INTERVAL` | With a KMS, how often the keyset is wrapped again (minimum 1h, default 12h)                     |
-| `KEYSET_ROTATE_INTERVAL` | With a KMS, how old the data key may get before a new one is added (default 2160h, 0 is off)    |
+| `KEYSET_ROTATE_INTERVAL` | With a KMS, how old the data key may get before the server rotates (default 2160h, 0 is off)    |
 
 KMS schemes are `hcvault://<host>/transit/keys/<key>` and `scw-kms://regions/<region>/keys/<key-id>`.
 
@@ -172,9 +172,11 @@ KMS schemes are `hcvault://<host>/transit/keys/<key>` and `scw-kms://regions/<re
 
 ## Secret rotation
 
-Everything at rest (CA private keys, SSO client secrets, the SAML signing key, recordings) is encrypted by one keyset stored in the database. The keyset is wrapped by a key derived from `NOKKU_SECRET`, or by the KMS key when `KMS_URI` is set.
+The secrets in the database (CA private keys, SSO client secrets, the SAML signing key) are encrypted by one keyset, which is stored in the database too. The keyset is wrapped by a key derived from `NOKKU_SECRET`, or by the KMS key when `KMS_URI` is set. Each recording is encrypted with its own key, and that key is one more secret in the database.
 
-To change `NOKKU_SECRET`, or to move to a KMS:
+A rotation adds a new data key to the keyset, re-encrypts the secrets in the database with it, and drops the older keys, all in one transaction. The keyset never holds more than two keys. Recordings are not re-encrypted, only their keys are.
+
+To change `NOKKU_SECRET`, or to move to a KMS, stop the server and run:
 
 ```bash
 ./nokku rotate-secrets --new secret:NEW_SECRET
@@ -182,8 +184,8 @@ To change `NOKKU_SECRET`, or to move to a KMS:
 ./nokku rotate-secrets --new kms:hcvault://vault:8200/transit/keys/nokku
 ```
 
-The command wraps the keyset with the new key and adds a fresh data key, in one transaction. No data is re-encrypted and older data keys stay for reading, so everything written before stays readable. Afterwards set `NOKKU_SECRET` or `KMS_URI` to the new value and restart. The server refuses to start with the old one.
+Then set `NOKKU_SECRET` or `KMS_URI` to the new value and start the server. It refuses to start with the old one.
 
-With a KMS nothing has to be run by hand. The server wraps the keyset again every `KEYSET_REWRAP_INTERVAL`, which follows a key rotation inside the KMS, and adds a new data key every `KEYSET_ROTATE_INTERVAL`.
+With a KMS nothing has to be run by hand. The server rotates every `KEYSET_ROTATE_INTERVAL` while it runs, and wraps the keyset again every `KEYSET_REWRAP_INTERVAL`, which follows a key rotation inside the KMS.
 
-A rotation protects what is written after it. If the old secret and an old database dump both leaked, roll over the CAs as well.
+A rotation does not un-leak anything. If the old secret and an old database dump both leaked, roll over the CAs as well.
