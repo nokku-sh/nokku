@@ -401,6 +401,7 @@ func (s *certificateService) SignX509Certificate(
 		}
 	}
 	return &nokkuv1.SignX509CertificateResponse{
+		CaId:        &ca.ID,
 		CaName:      &ca.Name,
 		Certificate: new(string(certPEM)),
 		CaChain:     &ca.Certificate,
