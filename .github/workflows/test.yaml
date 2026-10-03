@@ -50,6 +50,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The SSO and KMS tests need them. They skip locally and fail in CI
+      # when nothing answers.
+      - name: Start Keycloak and Vault
+        run: docker compose -f compose.test.yml up -d keycloak vault
+
       - uses: actions/setup-node@v7
         with:
           node-version: "lts/*"
@@ -69,6 +74,11 @@ jobs:
       - name: Build email templates
         working-directory: web/email
         run: pnpm install && pnpm export
+
+      - name: Wait for Keycloak and Vault
+        run: |
+          timeout 180 sh -c 'until curl -sf http://localhost:8080/realms/master >/dev/null; do sleep 2; done'
+          timeout 60 sh -c 'until curl -skf https://localhost:8200/v1/sys/health >/dev/null; do sleep 1; done'
 
       - name: Lint and test
         run: |

@@ -14,6 +14,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -50,6 +51,9 @@ func startKeycloak(t *testing.T) string {
 		keycloakOnce.err = keycloakSetupRealm(base)
 	})
 	if keycloakOnce.skip {
+		if os.Getenv("CI") != "" {
+			t.Fatal("no test Keycloak in CI")
+		}
 		t.Skip("no test Keycloak, start it with compose.test.yml")
 	}
 	if keycloakOnce.err != nil {
@@ -100,7 +104,12 @@ func keycloakSetupRealm(realmBase string) error {
 	if _, err := admin(http.MethodDelete, "/admin/realms/"+keycloakRealm, nil); err != nil {
 		return err
 	}
-	if code, err := admin(http.MethodPost, "/admin/realms", keycloakRealmJSON()); err != nil || code != http.StatusCreated {
+	if code, err := admin(
+		http.MethodPost,
+		"/admin/realms",
+		keycloakRealmJSON(),
+	); err != nil ||
+		code != http.StatusCreated {
 		return fmt.Errorf("keycloak: create realm: %d %w", code, err)
 	}
 

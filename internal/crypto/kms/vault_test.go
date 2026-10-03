@@ -1,6 +1,7 @@
 package kms
 
 import (
+	"os"
 	"testing"
 	"time"
 	"uuid"
@@ -24,6 +25,9 @@ func testVaultKey(t *testing.T) (*api.Client, string, string) {
 	client, err := api.NewClient(cfg)
 	require.NoError(t, err)
 	if _, err := client.Sys().HealthWithContext(t.Context()); err != nil {
+		if os.Getenv("CI") != "" {
+			t.Fatalf("no test Vault in CI: %v", err)
+		}
 		t.Skipf("no test Vault: %v", err)
 	}
 
