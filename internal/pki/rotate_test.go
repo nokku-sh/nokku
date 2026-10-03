@@ -12,6 +12,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/internal/crypto"
+	"github.com/nokku-sh/nokku/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/ssh"
 	"github.com/nokku-sh/nokku/internal/testdb"
@@ -28,9 +29,9 @@ func rotationConn(t *testing.T) *db.Connection {
 	if err != nil {
 		t.Skipf("no test database: %v", err)
 	}
-	box, err := crypto.NewSecretbox([]byte("test-secret"))
+	enc, err := kms.New(t.Context(), conn, "test-secret-0123456789-0123456789")
 	require.NoError(t, err)
-	require.NoError(t, crypto.SetEncryptor(box))
+	require.NoError(t, crypto.SetEncryptor(enc))
 	return conn
 }
 

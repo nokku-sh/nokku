@@ -102,9 +102,9 @@ app:
 secrets:
   # Set existingSecret to re-use an already managed secret.
   existingSecret: ""
-  # Master secret for at-rest encryption, exactly 32 characters. There is no
+  # Master secret for at-rest encryption, at least 32 characters. There is no
   # default, a shared one would let anyone with a database dump read the CA
-  # keys. Generate with: openssl rand -hex 16
+  # keys. Generate with: openssl rand -hex 32
   secret: ""
   # Used only when bundled PostgreSQL is disabled or custom credentials are needed.
   databasePassword: ""

@@ -2,61 +2,11 @@ package kms
 
 import (
 	"bytes"
-	"context"
-	"errors"
 	"fmt"
-	"log/slog"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
-
-// loadOrCreateKeyset is safe for concurrent first boots via ON CONFLICT DO NOTHING.
-func (t *TinkEncryptor) loadOrCreateKeyset(ctx context.Context) (*keyset.Handle, error) {
-	data, err := t.db.Sys().GetKeysetData(ctx)
-	switch {
-	case err == nil:
-		return unwrap(data, t.kek())
-	case !errors.Is(err, pgx.ErrNoRows):
-		return nil, fmt.Errorf("failed to load keyset: %w", err)
-	}
-
-	slog.Debug("no keyset found, creating initial keyset")
-	handle, err := keyset.NewHandle(aead.AES256GCMKeyTemplate())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create keyset: %w", err)
-	}
-	data, err = wrap(handle, t.kek())
-	if err != nil {
-		return nil, err
-	}
-	inserted, err := t.db.Sys().InsertKeyset(ctx, data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to persist initial keyset: %w", err)
-	}
-	if inserted == 1 {
-		return handle, nil
-	}
-
-	slog.Debug("another instance created the keyset first, loading it")
-	data, err = t.db.Sys().GetKeysetData(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to reload keyset after first-boot race: %w", err)
-	}
-	return unwrap(data, t.kek())
-}
-
-func (t *TinkEncryptor) kek() tink.AEAD {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-	return t.kekAEAD
-}
-
-func (t *TinkEncryptor) WrappedKeyset() ([]byte, error) {
-	return wrap(t.handle, t.kek())
-}
 
 func wrap(handle *keyset.Handle, kek tink.AEAD) ([]byte, error) {
 	buf := new(bytes.Buffer)
@@ -69,7 +19,10 @@ func wrap(handle *keyset.Handle, kek tink.AEAD) ([]byte, error) {
 func unwrap(data []byte, kek tink.AEAD) (*keyset.Handle, error) {
 	handle, err := keyset.Read(keyset.NewBinaryReader(bytes.NewReader(data)), kek)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unwrap keyset (wrong KEK or corrupt data): %w", err)
+		return nil, fmt.Errorf(
+			"failed to unwrap keyset, NOKKU_SECRET or KMS_URI does not match the stored keys: %w",
+			err,
+		)
 	}
 	return handle, nil
 }

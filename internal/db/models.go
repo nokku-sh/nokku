@@ -90,6 +90,7 @@ type InstanceLicense struct {
 type Keyset struct {
 	ID        int32     `json:"id"`
 	Data      []byte    `json:"data"`
+	RotatedAt time.Time `json:"rotatedAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 

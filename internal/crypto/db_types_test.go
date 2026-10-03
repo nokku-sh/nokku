@@ -1,7 +1,9 @@
 package crypto
 
 import (
+	"bytes"
 	"database/sql/driver"
+	"errors"
 	"testing"
 )
 
@@ -9,9 +11,22 @@ import (
 // order-independent.
 func resetRuntime(t *testing.T) {
 	t.Helper()
-	runtimeMu.Lock()
-	runtime = primitives{}
-	runtimeMu.Unlock()
+	encryptor.Store(nil)
+}
+
+// testCipher marks its output, so a foreign blob fails to decrypt.
+type testCipher struct{}
+
+func (testCipher) Encrypt(plaintext []byte) ([]byte, error) {
+	return append([]byte("enc:"), plaintext...), nil
+}
+
+func (testCipher) Decrypt(ciphertext []byte) ([]byte, error) {
+	plaintext, ok := bytes.CutPrefix(ciphertext, []byte("enc:"))
+	if !ok {
+		return nil, errors.New("not a ciphertext")
+	}
+	return plaintext, nil
 }
 
 // TestHashToken_Digest pins the stored representation to lowercase hex of
@@ -51,11 +66,7 @@ func TestHashedToken_ScanAndValue(t *testing.T) {
 func TestEncryptedBytes_RoundTrip(t *testing.T) {
 	resetRuntime(t)
 
-	cipher, err := NewSecretbox([]byte("0123456789abcdef0123456789abcdef"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := SetEncryptor(cipher); err != nil {
+	if err := SetEncryptor(testCipher{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -89,7 +100,7 @@ func TestEncryptedBytes_RoundTrip(t *testing.T) {
 func TestEncryptedBytes_ScanCases(t *testing.T) {
 	resetRuntime(t)
 
-	cipher, _ := NewSecretbox([]byte("0123456789abcdef0123456789abcdef"))
+	cipher := testCipher{}
 	_ = SetEncryptor(cipher)
 
 	var e EncryptedBytes
@@ -123,8 +134,7 @@ func TestEncryptedBytes_ScanCases(t *testing.T) {
 func TestEncryptedBytes_EmptyValueIsNil(t *testing.T) {
 	resetRuntime(t)
 
-	cipher, _ := NewSecretbox([]byte("0123456789abcdef0123456789abcdef"))
-	_ = SetEncryptor(cipher)
+	_ = SetEncryptor(testCipher{})
 
 	e := EncryptedBytes{}
 	v, err := e.Value()

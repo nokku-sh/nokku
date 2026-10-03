@@ -61,7 +61,7 @@ The backend reads configuration from environment variables. Only `NOKKU_SECRET` 
 | ----------------------- | ---------------------------------------------------------------------------------------------------- |
 | `NOKKU_BASE_URL`        | Public URL, used as given for links, cookies, and WebAuthn (default `http://localhost:<NOKKU_PORT>`) |
 | `NOKKU_PORT`            | Port the backend listens on (default `3000`)                                                         |
-| `NOKKU_SECRET`          | **Required.** Keys at-rest encryption (SSO secrets, SAML keys, CA keys) and DPoP nonces              |
+| `NOKKU_SECRET`          | **Required**, at least 32 characters. Wraps the at-rest keyset and keys the DPoP nonces              |
 | `NOKKU_TRUSTED_PROXIES` | Comma-separated reverse-proxy IPs/CIDRs (e.g. Traefik) whose forwarded client-IP headers are honored |
 | `NOKKU_ALLOWED_ORIGINS` | Additional allowed CORS origins                                                                      |
 | `NOKKU_DEBUG`           | Debug logging (`--debug`)                                                                            |
@@ -147,12 +147,13 @@ Per-workspace OIDC and SAML providers are configured in the web application, not
 
 | Variable                 | Purpose                                                                                         |
 | ------------------------ | ----------------------------------------------------------------------------------------------- |
-| `KMS_URI`                | Envelope encryption through `aws-kms://`, `hcvault://`, or `scw-kms://`. Requires a license key |
+| `KMS_URI`                | Wrap the keyset with a KMS key, `hcvault://` or `scw-kms://`. Requires a license key            |
 | `VAULT_TOKEN`            | Token for `hcvault://`                                                                          |
 | `VAULT_SKIP_VERIFY`      | Skip Vault TLS verification (testing only)                                                      |
-| `KEYSET_REWRAP_INTERVAL` | How often the wrapped keyset is re-wrapped (minimum 1h, default 12h)                            |
+| `KEYSET_REWRAP_INTERVAL` | With a KMS, how often the keyset is wrapped again (minimum 1h, default 12h)                     |
+| `KEYSET_ROTATE_INTERVAL` | With a KMS, how old the data key may get before a new one is added (default 2160h, 0 is off)    |
 
-KMS schemes are `aws-kms://<key-id>`, `hcvault://<host>/transit/keys/<key>`, and `scw-kms://<key-id>`. Google Cloud KMS is not currently supported.
+KMS schemes are `hcvault://<host>/transit/keys/<key>` and `scw-kms://regions/<region>/keys/<key-id>`.
 
 ### Admin bootstrap (optional)
 
@@ -171,12 +172,18 @@ KMS schemes are `aws-kms://<key-id>`, `hcvault://<host>/transit/keys/<key>`, and
 
 ## Secret rotation
 
-Stop the backend before rotating encrypted data:
+Everything at rest (CA private keys, SSO client secrets, the SAML signing key, recordings) is encrypted by one keyset stored in the database. The keyset is wrapped by a key derived from `NOKKU_SECRET`, or by the KMS key when `KMS_URI` is set.
+
+To change `NOKKU_SECRET`, or to move to a KMS:
 
 ```bash
 ./nokku rotate-secrets --new secret:NEW_SECRET
-# or, in KMS mode:
+# or, to a KMS:
 ./nokku rotate-secrets --new kms:hcvault://vault:8200/transit/keys/nokku
 ```
 
-The command re-encrypts every stored secret (CA private keys, SSO client secrets, the SAML signing key) in one transaction. Update the runtime environment (NOKKU_SECRET, or the KMS keyset reference) after a successful rotation, then start the core.
+The command wraps the keyset with the new key and adds a fresh data key, in one transaction. No data is re-encrypted and older data keys stay for reading, so everything written before stays readable. Afterwards set `NOKKU_SECRET` or `KMS_URI` to the new value and restart. The server refuses to start with the old one.
+
+With a KMS nothing has to be run by hand. The server wraps the keyset again every `KEYSET_REWRAP_INTERVAL`, which follows a key rotation inside the KMS, and adds a new data key every `KEYSET_ROTATE_INTERVAL`.
+
+A rotation protects what is written after it. If the old secret and an old database dump both leaked, roll over the CAs as well.

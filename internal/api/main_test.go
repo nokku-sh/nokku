@@ -45,7 +45,7 @@ func TestMain(m *testing.M) {
 	}
 	testdb.Setup("api")
 	storage, _ := os.MkdirTemp("", "nokku-api-test")
-	os.Setenv("NOKKU_SECRET", "test-secret")
+	os.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
 	os.Setenv("NOKKU_LOCAL_STORAGE_PATH", storage)
 
 	ctx, cancel := context.WithCancel(context.Background())

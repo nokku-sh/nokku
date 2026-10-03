@@ -7,44 +7,8 @@ package db
 
 import (
 	"context"
-
-	"github.com/nokku-sh/nokku/internal/crypto"
+	"time"
 )
-
-const getEncryptedCAKeys = `-- name: GetEncryptedCAKeys :many
-SELECT
-  id,
-  private_key
-FROM
-  certificate_authorities
-WHERE
-  private_key IS NOT NULL
-`
-
-type GetEncryptedCAKeysRow struct {
-	ID         string                `json:"id"`
-	PrivateKey crypto.EncryptedBytes `json:"privateKey"`
-}
-
-func (q *Queries) GetEncryptedCAKeys(ctx context.Context) ([]*GetEncryptedCAKeysRow, error) {
-	rows, err := q.db.Query(ctx, getEncryptedCAKeys)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*GetEncryptedCAKeysRow
-	for rows.Next() {
-		var i GetEncryptedCAKeysRow
-		if err := rows.Scan(&i.ID, &i.PrivateKey); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
 
 const getKeysetData = `-- name: GetKeysetData :one
 SELECT
@@ -78,66 +42,46 @@ func (q *Queries) InsertKeyset(ctx context.Context, data []byte) (int64, error) 
 	return result.RowsAffected(), nil
 }
 
-const trySecretRotationLock = `-- name: TrySecretRotationLock :one
+const lockKeyset = `-- name: LockKeyset :one
 SELECT
-  pg_try_advisory_xact_lock(hashtext ('global-secret-rotation'))
-`
-
-func (q *Queries) TrySecretRotationLock(ctx context.Context) (bool, error) {
-	row := q.db.QueryRow(ctx, trySecretRotationLock)
-	var pg_try_advisory_xact_lock bool
-	err := row.Scan(&pg_try_advisory_xact_lock)
-	return pg_try_advisory_xact_lock, err
-}
-
-const updateCAPrivateKey = `-- name: UpdateCAPrivateKey :exec
-UPDATE certificate_authorities
-SET
-  private_key = $1
+  data,
+  rotated_at
+FROM
+  keysets
 WHERE
-  id = $2
+  id = 1
+FOR UPDATE
 `
 
-type UpdateCAPrivateKeyParams struct {
-	PrivateKey crypto.EncryptedBytes `json:"privateKey"`
-	ID         string                `json:"id"`
+type LockKeysetRow struct {
+	Data      []byte    `json:"data"`
+	RotatedAt time.Time `json:"rotatedAt"`
 }
 
-func (q *Queries) UpdateCAPrivateKey(ctx context.Context, arg *UpdateCAPrivateKeyParams) error {
-	_, err := q.db.Exec(ctx, updateCAPrivateKey, arg.PrivateKey, arg.ID)
-	return err
+// The row lock keeps two rotations from running at once.
+func (q *Queries) LockKeyset(ctx context.Context) (*LockKeysetRow, error) {
+	row := q.db.QueryRow(ctx, lockKeyset)
+	var i LockKeysetRow
+	err := row.Scan(&i.Data, &i.RotatedAt)
+	return &i, err
 }
 
-const updateKeysetWrappedData = `-- name: UpdateKeysetWrappedData :execrows
+const updateKeyset = `-- name: UpdateKeyset :exec
 UPDATE keysets
 SET
   data = $1,
+  rotated_at = $2,
   updated_at = NOW()
 WHERE
   id = 1
 `
 
-func (q *Queries) UpdateKeysetWrappedData(ctx context.Context, data []byte) (int64, error) {
-	result, err := q.db.Exec(ctx, updateKeysetWrappedData, data)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+type UpdateKeysetParams struct {
+	Data      []byte    `json:"data"`
+	RotatedAt time.Time `json:"rotatedAt"`
 }
 
-const upsertKeysetWrappedData = `-- name: UpsertKeysetWrappedData :exec
-INSERT INTO
-  keysets (id, data)
-VALUES
-  (1, $1)
-ON CONFLICT (id) DO UPDATE
-SET
-  data = $1,
-  updated_at = NOW()
-`
-
-// Only for rotate-secrets, never on the boot path.
-func (q *Queries) UpsertKeysetWrappedData(ctx context.Context, data []byte) error {
-	_, err := q.db.Exec(ctx, upsertKeysetWrappedData, data)
+func (q *Queries) UpdateKeyset(ctx context.Context, arg *UpdateKeysetParams) error {
+	_, err := q.db.Exec(ctx, updateKeyset, arg.Data, arg.RotatedAt)
 	return err
 }

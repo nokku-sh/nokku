@@ -75,9 +75,10 @@ that governs access to every target.
   link-local addresses. Set `NOKKU_ALLOW_PRIVATE_NETWORKS=true` only when
   every workspace admin is trusted, such as a self-hosted install sending
   audit events to an internal SIEM.
-- Set a strong `NOKKU_SECRET` (32 bytes) and rotate secrets by stopping the
-  backend before running `rotate-secrets` to avoid encrypting data with
-  different keys.
+- Set a strong `NOKKU_SECRET` (at least 32 characters, the server refuses
+  less). Change it with `rotate-secrets`, which rewraps the keyset and adds a
+  new data key without re-encrypting anything. With a KMS the server rotates
+  by itself.
 - **Session recordings**: daemons stream terminal recordings to the backend,
   where they are encrypted at rest. Credential scrubbing runs asynchronously
   after an upload completes and replaces the stored recording with a redacted
