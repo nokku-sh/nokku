@@ -360,7 +360,13 @@ func TestPendingDaemonIsDenied(t *testing.T) {
 		SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
 			Type: nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST.Enum(),
 		})
-	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "pending daemon reached the handler, got %v", err)
+	assert.Equal(
+		t,
+		connect.CodePermissionDenied,
+		connect.CodeOf(err),
+		"pending daemon reached the handler, got %v",
+		err,
+	)
 }
 
 // A deleted daemon is told to stop, so its host drops the cached principals.

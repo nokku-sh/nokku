@@ -20,7 +20,7 @@ func TestFullURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Config{EnvConfig: EnvConfig{BaseURL: tt.baseURL, Port: "3000"}}
+			c := &Config{BaseURL: tt.baseURL, Port: "3000"}
 			assert.Equal(t, tt.want, c.FullURL())
 		})
 	}
