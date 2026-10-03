@@ -178,6 +178,12 @@ func (s *Service) scimProvisionUser(
 	var created bool
 	err = s.conn.WithTx(ctx, func(q *db.Queries) error {
 		u, err = q.GetUserByEmail(ctx, email)
+		// Same as SSO linking: never adopt a row nobody proved.
+		if err == nil && !u.EmailVerified {
+			if err = q.DeleteUser(ctx, u.ID); err == nil {
+				err = pgx.ErrNoRows
+			}
+		}
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
 			if u, err = q.CreateUser(ctx, &db.CreateUserParams{Email: email, Name: name}); err != nil {

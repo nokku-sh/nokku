@@ -135,6 +135,13 @@ func (l *linker) resolve(ctx context.Context, opts flowLinkOptions) (*db.User, e
 	}
 
 	u, err := l.svc.GetUserByEmail(ctx, opts.Email)
+	// An unverified row may be someone else's signup, with their password or
+	// passkey on it. The provider proved this address, so that row goes.
+	if err == nil && !u.EmailVerified {
+		if err = l.svc.sys.DeleteUser(ctx, u.ID); err == nil {
+			err = ErrNotFound
+		}
+	}
 	switch {
 	case err == nil:
 		if enterprise && opts.Name != "" && u.Name != opts.Name {

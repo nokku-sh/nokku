@@ -567,3 +567,52 @@ func TestDeviceCookieIsNotASession(t *testing.T) {
 		t.Fatal("device cookie authenticated as a session")
 	}
 }
+
+// Whoever signs up first with someone else's address leaves a password on an
+// unverified row. A provider that proves the address must not adopt that row.
+func TestSSODoesNotAdoptUnverifiedAccount(t *testing.T) {
+	e := newTestEnv(t)
+	email := "victim@" + testDomain()
+	squatter := e.user(t, email, false)
+	e.withPassword(t, squatter)
+
+	social := &linker{svc: e.svc, credType: MethodOAuth2}
+	u, err := social.Resolve(t.Context(), flowLinkOptions{
+		ProviderID:      "google",
+		Subject:         "sub-victim",
+		Email:           email,
+		EmailVerified:   true,
+		JITProvisioning: true,
+	})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if u.ID == squatter.ID {
+		t.Fatal("the provider login adopted the unverified account")
+	}
+	if !u.EmailVerified {
+		t.Fatal("the fresh account is not verified")
+	}
+	if _, _, err := e.svc.Password.Login(t.Context(), email, testPassword); !errors.Is(err, errInvalidCredentials) {
+		t.Fatalf("the squatter's password still signs in, err = %v", err)
+	}
+}
+
+func TestSCIMDoesNotAdoptUnverifiedAccount(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	email := "victim@" + o.domain
+	squatter := e.user(t, email, false)
+	e.withPassword(t, squatter)
+
+	u, err := e.svc.scimProvisionUser(t.Context(), o.ws, email, "Victim", true, "ext-1")
+	if err != nil {
+		t.Fatalf("provision: %v", err)
+	}
+	if u.ID == squatter.ID {
+		t.Fatal("SCIM adopted the unverified account")
+	}
+	if !u.EmailVerified {
+		t.Fatal("the provisioned account is not verified")
+	}
+}
