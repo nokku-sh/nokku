@@ -4,7 +4,6 @@ import { browser } from '$app/environment';
 import { Code, ConnectError, type Interceptor, type UnaryRequest } from '@connectrpc/connect';
 import { toast } from 'svelte-sonner';
 import { formatConnectError, parseHTTPError, isEmailUnverifiedError } from './error-formatter';
-import { goto } from '$app/navigation';
 import { WorkspaceService } from '$lib/gen/nokku/v1/workspace_pb';
 import { workspaceID } from '$lib/store.svelte';
 
@@ -82,8 +81,6 @@ export const queryClient = new QueryClient({
 	})
 });
 
-let sessionExpiredAt = 0;
-
 const publicPaths = [
 	'/login',
 	'/register',
@@ -91,21 +88,16 @@ const publicPaths = [
 	'/recovery',
 	'/reset',
 	'/device',
+	'/email-change',
 	'/sso-error'
 ];
 
 export function handleSessionExpired() {
 	if (!browser || publicPaths.some((p) => window.location.pathname.startsWith(p))) return;
 
-	const now = Date.now();
-	if (now - sessionExpiredAt < 5000) return; // dedupe concurrent failures
-	sessionExpiredAt = now;
-
 	workspaceID.current = '';
-	void queryClient.cancelQueries();
-	queryClient.clear();
-	void goto('/login');
-	toast.info('Session expired', { description: 'Please log in again.' });
+	// A full load, so this tab's web shells and cached data end with the session.
+	window.location.assign('/login');
 }
 
 const workspaceInterceptor: Interceptor = (next) => async (req) => {
