@@ -1,10 +1,10 @@
 package config
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 
 	"github.com/caarlos0/env/v11"
@@ -27,7 +27,7 @@ import (
 )
 
 type EnvConfig struct {
-	BaseURL        string `env:"NOKKU_BASE_URL"        envDefault:"http://localhost"`
+	BaseURL        string `env:"NOKKU_BASE_URL"`
 	Port           string `env:"NOKKU_PORT"            envDefault:"3000"`
 	Secret         string `env:"NOKKU_SECRET"`
 	Debug          bool
@@ -154,42 +154,18 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	return &cfg, nil
 }
 
-func (c *Config) appURL() *url.URL {
+// FullURL is NOKKU_BASE_URL as given, the public address. The listen port is
+// not part of it, a reverse proxy usually sits in between. Unset, it is the
+// local listener.
+func (c *Config) FullURL() string {
+	if c.BaseURL == "" {
+		return "http://localhost:" + c.Port
+	}
 	u, err := url.Parse(c.BaseURL)
 	if err != nil {
-		return &url.URL{}
+		return "http://localhost:" + c.Port
 	}
-	return u
-}
-
-func (c *Config) FullURL() string {
-	u := c.appURL()
-
-	scheme := u.Scheme
-	if scheme == "" {
-		scheme = "http"
-	}
-
-	host := u.Host
-	if host == "" {
-		host = "localhost"
-	}
-
-	// Skip default ports so https://host:443 stays canonical.
-	if _, _, err := net.SplitHostPort(host); err != nil {
-		if port := c.Port; port != "" && port != defaultPort(scheme) {
-			host = net.JoinHostPort(host, port)
-		}
-	}
-
-	return scheme + "://" + host
-}
-
-func defaultPort(scheme string) string {
-	if scheme == "https" {
-		return "443"
-	}
-	return "80"
+	return cmp.Or(u.Scheme, "http") + "://" + cmp.Or(u.Host, "localhost")
 }
 
 func (c *Config) WSOrigins() []string {
