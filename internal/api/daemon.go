@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"time"
 	"uuid"
 
@@ -157,6 +158,15 @@ func (s *daemonService) CreateSession(
 		if !ca.IsActive {
 			return newError(connect.CodeFailedPrecondition, "certificate authority is not active")
 		}
+		// The same grant sshd will ask for, so nobody gets a shell ticket
+		// for an account they cannot use.
+		accounts, err := grantedAccounts(ctx, q, daemon.ID, userID)
+		if err != nil {
+			return err
+		}
+		if !slices.Contains(accounts, req.GetUsername()) {
+			return db.ErrPermissionDenied
+		}
 		return nil
 	}); err != nil {
 		return nil, err
@@ -180,6 +190,27 @@ func (s *daemonService) CreateSession(
 		},
 		DaemonName: &daemon.Name,
 	}, nil
+}
+
+// grantedAccounts lists the accounts on the daemon's host that subject may
+// log in to, directly or through a team.
+func grantedAccounts(ctx context.Context, q *db.Queries, daemonID, subject string) ([]string, error) {
+	target, err := q.GetTargetByDaemon(ctx, &daemonID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
+		TargetIds: []string{target.ID},
+		SubjectID: &subject,
+	})
+	if err != nil {
+		return nil, err
+	}
+	accounts := make([]string, 0, len(rows))
+	for _, r := range rows {
+		accounts = append(accounts, r.Username)
+	}
+	return accounts, nil
 }
 
 func (s *daemonService) ListSessions(
@@ -248,22 +279,32 @@ func (s *daemonService) Relay(
 	}
 
 	ctx = actor.AnnotateTenant(ctx, workspaceID)
-	// Member is enough, the relay is only transport. sshd is the real gate.
 	ctx, err = actorHasRole(ctx, s.cfg.Conn, db.RoleMember)
 	if err != nil {
 		return err
 	}
 
+	// sshd is the real gate, but the pipe itself reaches hosts behind NAT
+	// and holds a pre-auth slot there. It needs a grant on the target.
+	caller, _ := actor.PrincipalFromContext(ctx)
 	var d *db.Daemon
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		d, err = q.GetDaemon(ctx, daemonID)
-		return err
+		if d, err = q.GetDaemon(ctx, daemonID); err != nil {
+			return err
+		}
+		accounts, err := grantedAccounts(ctx, q, d.ID, caller.ID)
+		if err != nil {
+			return err
+		}
+		if len(accounts) == 0 {
+			return db.ErrPermissionDenied
+		}
+		return nil
 	}); err != nil {
 		return err
 	}
 
 	relayID := uuid.NewV7().String()
-	caller, _ := actor.PrincipalFromContext(ctx)
 	relay, err := s.cfg.Pool.RequestRelay(ctx, d.ID, relayID, caller.ID)
 	if err != nil {
 		if errors.Is(err, nokkudaemon.ErrRelayLimit) {

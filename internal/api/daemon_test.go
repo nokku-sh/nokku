@@ -156,9 +156,51 @@ func TestCreateSession(t *testing.T) {
 	_, err = machine.CreateSession(t.Context(), req)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "service account, got %v", err)
 
-	// The target trusts the sshtest CA, which admits the member's cert.
 	memberPrincipal, _, err := cfg.IAM.AuthenticateToken(t.Context(), memberToken)
 	require.NoError(t, err)
+
+	// Membership alone opens nothing. A web shell and a relay need a grant on
+	// the target, like sshd asks for.
+	openRelay := func() error {
+		relayCtx, info := connect.NewClientContext(t.Context())
+		info.RequestHeader().Set("Authorization", "Bearer "+memberToken)
+		relay, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL).Relay(relayCtx)
+		if err != nil {
+			return err
+		}
+		if err := relay.Send(&nokkuv1.RelayRequest{Msg: &nokkuv1.RelayRequest_Start{
+			Start: &nokkuv1.RelayStart{WorkspaceId: &workspaceID, DaemonId: new(enrolled.GetId())},
+		}}); err != nil {
+			return err
+		}
+		_, err = relay.Receive()
+		return err
+	}
+	_, err = member.CreateSession(t.Context(), req)
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "web session without a grant, got %v", err)
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(openRelay()), "relay without a grant")
+
+	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
+		p, err := q.CreatePrincipal(t.Context(), &db.CreatePrincipalParams{
+			WorkspaceID: workspaceID, TargetID: enrolled.GetTargetId(), Username: "root",
+		})
+		if err != nil {
+			return err
+		}
+		return q.AddPrincipalGrant(t.Context(), &db.AddPrincipalGrantParams{
+			PrincipalID: p.ID, WorkspaceID: workspaceID, SubjectKind: "user", SubjectID: memberPrincipal.ID,
+		})
+	}))
+	// With the grant the relay gets past the check, the daemon is just offline.
+	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(openRelay()), "relay with a grant")
+	_, err = member.CreateSession(t.Context(), &nokkuv1.CreateSessionRequest{
+		WorkspaceId: &workspaceID,
+		DaemonId:    new(enrolled.GetId()),
+		Username:    new("postgres"),
+	})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "another account on the host, got %v", err)
+
+	// The target trusts the sshtest CA, which admits the member's cert.
 	sshd := sshtest.NewServerFor(t, enrolled.GetTargetId(), memberPrincipal.ID)
 	ca := sshd.CA(t)
 	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
