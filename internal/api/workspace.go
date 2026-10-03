@@ -56,6 +56,11 @@ func (s *workspaceService) GetWorkspace(
 	}
 	result := workspace.ToProto()
 	result.Role = &role
+	// The webhook secret signs events to the customer's SIEM, only the
+	// roles that manage it read it back.
+	if settings := result.GetSettings(); settings != nil && !db.Role(role).AtLeast(db.RoleAdmin) {
+		settings.AuditWebhookUrl, settings.AuditWebhookSecret = nil, nil
+	}
 	return &nokkuv1.GetWorkspaceResponse{Workspace: result}, nil
 }
 
@@ -166,6 +171,9 @@ func (s *workspaceService) ListWorkspaces(
 	for _, w := range result {
 		if role, ok := roleByWorkspace[w.GetId()]; ok {
 			w.Role = &role
+		}
+		if settings := w.GetSettings(); settings != nil && !db.Role(w.GetRole()).AtLeast(db.RoleAdmin) {
+			settings.AuditWebhookUrl, settings.AuditWebhookSecret = nil, nil
 		}
 	}
 	return &nokkuv1.ListWorkspacesResponse{Workspaces: result}, nil
