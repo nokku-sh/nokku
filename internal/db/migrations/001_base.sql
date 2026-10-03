@@ -309,6 +309,7 @@ CREATE TABLE IF NOT EXISTS recordings (
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
   daemon_id UUID NOT NULL REFERENCES daemons (id) ON DELETE CASCADE,
   username TEXT NOT NULL,
+  key BYTEA NOT NULL, -- encrypts this recording's frames, stored encrypted
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   ended_at TIMESTAMPTZ,
   size_bytes BIGINT NOT NULL DEFAULT 0,

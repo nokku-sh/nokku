@@ -5,12 +5,12 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 
-	"github.com/nokku-sh/nokku/internal/crypto"
+	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
@@ -32,31 +32,33 @@ func newScrubTestService(t *testing.T) *Service {
 	if err != nil {
 		t.Fatalf("storage.New: %v", err)
 	}
-	if err := crypto.SetEncryptor(testCipher{}); err != nil {
-		t.Fatalf("SetEncryptor: %v", err)
-	}
 	return &Service{store: st}
 }
 
-// testCipher marks its output, the frame format around it is what the tests
-// are about.
-type testCipher struct{}
-
-func (testCipher) Encrypt(plaintext []byte) ([]byte, error) {
-	return append([]byte("enc:"), plaintext...), nil
+func testRecording() *db.Recording {
+	return &db.Recording{ID: "rec1", WorkspaceID: "ws1", Key: NewKey()}
 }
 
-func (testCipher) Decrypt(ciphertext []byte) ([]byte, error) {
-	plaintext, ok := bytes.CutPrefix(ciphertext, []byte("enc:"))
-	if !ok {
-		return nil, errors.New("not a ciphertext")
+// writeFrames stores plaintext as one recording object, in small chunks to
+// force many frames.
+func writeFrames(t *testing.T, s *Service, rec *db.Recording, plaintext []byte) {
+	t.Helper()
+	w, err := s.NewWriter(context.Background(), rec)
+	if err != nil {
+		t.Fatalf("NewWriter: %v", err)
 	}
-	return plaintext, nil
+	for chunk := range slices.Chunk(plaintext, 16) {
+		if err := w.WriteChunk(chunk); err != nil {
+			t.Fatalf("write frame: %v", err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("commit object: %v", err)
+	}
 }
 
-// writeRecordingObject frames and encrypts a gzipped cast the way
-// UploadRecording does, in small chunks to force multi-frame objects.
-func writeRecordingObject(t *testing.T, s *Service, workspaceID, recordingID string, cast []byte) {
+// writeRecordingObject stores a gzipped cast the way UploadRecording does.
+func writeRecordingObject(t *testing.T, s *Service, rec *db.Recording, cast []byte) {
 	t.Helper()
 	var gz bytes.Buffer
 	zw := gzip.NewWriter(&gz)
@@ -66,35 +68,14 @@ func writeRecordingObject(t *testing.T, s *Service, workspaceID, recordingID str
 	if err := zw.Close(); err != nil {
 		t.Fatalf("close gzip: %v", err)
 	}
-	w, err := s.store.CreateWriter(context.Background(),
-		storage.RecordingPath(workspaceID, recordingID),
-		storage.StoreOptions{ContentType: "application/octet-stream"})
-	if err != nil {
-		t.Fatalf("CreateWriter: %v", err)
-	}
-	payload := gz.Bytes()
-	for len(payload) > 0 {
-		n := min(16, len(payload))
-		framed, encErr := s.frameEncrypted(payload[:n])
-		if encErr != nil {
-			t.Fatalf("frameEncrypted: %v", encErr)
-		}
-		if _, err = w.Write(framed); err != nil {
-			t.Fatalf("write frame: %v", err)
-		}
-		payload = payload[n:]
-	}
-	if err := w.Close(); err != nil {
-		t.Fatalf("commit object: %v", err)
-	}
+	writeFrames(t, s, rec, gz.Bytes())
 }
 
-func readRecordingObject(t *testing.T, s *Service, workspaceID, recordingID string) []byte {
+func readRecordingObject(t *testing.T, s *Service, rec *db.Recording) []byte {
 	t.Helper()
-	fr, err := s.openReader(context.Background(),
-		storage.RecordingPath(workspaceID, recordingID))
+	fr, err := s.OpenReader(context.Background(), rec)
 	if err != nil {
-		t.Fatalf("openFrameReader: %v", err)
+		t.Fatalf("OpenReader: %v", err)
 	}
 	defer func() { _ = fr.Close() }()
 
@@ -147,14 +128,14 @@ func parseCastEvents(t *testing.T, cast []byte) []scrubTestEvent {
 // gitleaks' private-key rule requires that much between the BEGIN/END markers.
 func TestScrubRemovesSecrets(t *testing.T) {
 	s := newScrubTestService(t)
-	const ws, id = "ws1", "rec1"
-	writeRecordingObject(t, s, ws, id, []byte(scrubTestCast))
+	rec := testRecording()
+	writeRecordingObject(t, s, rec, []byte(scrubTestCast))
 
-	if err := s.scrub(context.Background(), ws, id); err != nil {
+	if err := s.scrub(context.Background(), rec); err != nil {
 		t.Fatalf("scrub: %v", err)
 	}
 
-	events := parseCastEvents(t, readRecordingObject(t, s, ws, id))
+	events := parseCastEvents(t, readRecordingObject(t, s, rec))
 	if len(events) != 5 {
 		t.Fatalf("got %d events, want 5", len(events))
 	}
@@ -186,17 +167,17 @@ func TestScrubRemovesSecrets(t *testing.T) {
 // TestScrubWithoutSecretsIsNoop verifies a clean recording is not rewritten.
 func TestScrubWithoutSecretsIsNoop(t *testing.T) {
 	s := newScrubTestService(t)
-	const ws, id = "ws1", "rec1"
+	rec := testRecording()
 
 	clean := scrubTestCast[:strings.Index(scrubTestCast, "\n")+1] +
 		"[0.0, \"o\", \"just a build log\\n\"]\n"
-	writeRecordingObject(t, s, ws, id, []byte(clean))
+	writeRecordingObject(t, s, rec, []byte(clean))
 
-	if err := s.scrub(context.Background(), ws, id); err != nil {
+	if err := s.scrub(context.Background(), rec); err != nil {
 		t.Fatalf("scrub: %v", err)
 	}
 
-	events := parseCastEvents(t, readRecordingObject(t, s, ws, id))
+	events := parseCastEvents(t, readRecordingObject(t, s, rec))
 	if len(events) != 1 || events[0].data != "just a build log\n" {
 		t.Fatalf("clean recording changed: %+v", events)
 	}
@@ -226,64 +207,5 @@ func TestScrubCastSplitsSpansAcrossEvents(t *testing.T) {
 	}
 	if !strings.Contains(events[1].data, " done\n") {
 		t.Fatalf("trailing benign output lost: %q", events[1].data)
-	}
-}
-
-// TestFrameReaderRoundTrip verifies the frame reader reconstructs the exact
-// plaintext of a multi-frame object and reports EOF at the end.
-func TestFrameReaderRoundTrip(t *testing.T) {
-	s := newScrubTestService(t)
-	const ws, id = "ws1", "rec1"
-
-	// Frame the plaintext directly, without the gzip layer, so the
-	// comparison is on the exact framed bytes.
-	var want bytes.Buffer
-	for i := range 100 {
-		want.WriteString(strings.Repeat("frame\n", 5))
-		_ = i
-	}
-	plaintext := want.Bytes()
-	w, err := s.store.CreateWriter(context.Background(),
-		storage.RecordingPath(ws, id),
-		storage.StoreOptions{ContentType: "application/octet-stream"})
-	if err != nil {
-		t.Fatalf("CreateWriter: %v", err)
-	}
-	for len(plaintext) > 0 {
-		n := min(16, len(plaintext))
-		framed, encErr := s.frameEncrypted(plaintext[:n])
-		if encErr != nil {
-			t.Fatalf("frameEncrypted: %v", encErr)
-		}
-		if _, err = w.Write(framed); err != nil {
-			t.Fatalf("write frame: %v", err)
-		}
-		plaintext = plaintext[n:]
-	}
-	if err := w.Close(); err != nil {
-		t.Fatalf("commit object: %v", err)
-	}
-
-	fr, err := s.openReader(context.Background(), storage.RecordingPath(ws, id))
-	if err != nil {
-		t.Fatalf("openFrameReader: %v", err)
-	}
-	defer func() { _ = fr.Close() }()
-
-	// Odd-sized reads to exercise frame boundaries.
-	var got bytes.Buffer
-	buf := make([]byte, 7)
-	for {
-		n, readErr := fr.Read(buf)
-		got.Write(buf[:n])
-		if readErr != nil {
-			if errors.Is(readErr, io.EOF) {
-				break
-			}
-			t.Fatalf("read frames: %v", readErr)
-		}
-	}
-	if !bytes.Equal(got.Bytes(), want.Bytes()) {
-		t.Fatalf("round trip mismatch: got %d bytes, want %d", got.Len(), want.Len())
 	}
 }

@@ -16,6 +16,7 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/recording"
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
@@ -51,7 +52,7 @@ func (s *recordingService) UploadRecording(
 		return nil, err
 	}
 
-	w, err := s.cfg.Record.NewWriter(ctx, workspaceID, rec.ID)
+	w, err := s.cfg.Record.NewWriter(ctx, rec)
 	if err != nil {
 		slog.Error("open recording object", "recording_id", rec.ID, "error", err)
 		return nil, errInternal
@@ -153,6 +154,7 @@ func (s *recordingService) resolveUpload(
 			WorkspaceID: workspaceID,
 			DaemonID:    daemonID,
 			Username:    rm.GetUsername(),
+			Key:         recording.NewKey(),
 		})
 		return err
 	}); err != nil {
@@ -236,7 +238,7 @@ func (s *recordingService) GetRecording(
 		Action: "GetRecording", Target: rec.ID, Details: map[string]any{"daemon_id": rec.DaemonID},
 	})
 
-	fr, err := s.cfg.Record.OpenReader(ctx, req.GetWorkspaceId(), rec.ID)
+	fr, err := s.cfg.Record.OpenReader(ctx, rec)
 	if err != nil {
 		slog.Error("open recording object", "recording_id", rec.ID, "error", err)
 		return errInternal
