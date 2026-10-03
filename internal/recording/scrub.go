@@ -9,15 +9,9 @@ import (
 	"io"
 	"log/slog"
 	"math"
-	"regexp"
 	"slices"
 	"sort"
-	"strings"
-	"sync"
 	"time"
-
-	"github.com/zricethezav/gitleaks/v8/config"
-	"github.com/zricethezav/gitleaks/v8/detect"
 
 	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -29,29 +23,6 @@ const (
 	scrubChunk    = 64 << 10
 	redaction     = "<redacted>"
 )
-
-var scrubDetector = sync.OnceValues(detect.NewDetectorDefaultConfig)
-
-// keywordRe replaces gitleaks' per-rule prefilter with one pass. Nil runs
-// every rule unfiltered.
-var keywordRe = sync.OnceValue(func() *regexp.Regexp {
-	det, err := scrubDetector()
-	if err != nil {
-		return nil
-	}
-	seen := make(map[string]struct{})
-	kws := make([]string, 0, 512)
-	for _, rule := range det.Config.Rules {
-		for _, kw := range rule.Keywords {
-			if _, ok := seen[kw]; ok {
-				continue
-			}
-			seen[kw] = struct{}{}
-			kws = append(kws, regexp.QuoteMeta(kw))
-		}
-	}
-	return regexp.MustCompile(`(?i)(?:` + strings.Join(kws, "|") + `)`)
-})
 
 // span is half-open.
 type span struct {
@@ -166,9 +137,9 @@ type castEvent struct {
 // scrubCast detects over each stream concatenated, so secrets split across
 // events are still caught, then maps the redactions back onto the events.
 func scrubCast(cast []byte) ([]byte, bool, error) {
-	det, err := scrubDetector()
+	rules, err := scrubRules()
 	if err != nil {
-		return nil, false, fmt.Errorf("load gitleaks config: %w", err)
+		return nil, false, err
 	}
 
 	lines := bytes.Split(cast, []byte("\n"))
@@ -191,7 +162,7 @@ func scrubCast(cast []byte) ([]byte, bool, error) {
 
 	changed := false
 	for code, blob := range blobs {
-		spans := secretSpans(blob, det)
+		spans := secretSpans(blob, rules)
 		if len(spans) == 0 {
 			continue
 		}
@@ -253,26 +224,23 @@ func marshalCastEvent(interval float64, code string, data []byte) ([]byte, error
 	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
 }
 
-func secretSpans(blob []byte, det *detect.Detector) []span {
+func secretSpans(blob []byte, rules *scrubRuleSet) []span {
 	var spans []span
-	kws := keywordRe()
-	for _, rule := range det.Config.Rules {
-		if rule.Regex == nil {
+	hasKeyword := rules.keywords.Match(blob)
+	for _, rule := range rules.rules {
+		if len(rule.keywords) > 0 && !hasKeyword {
 			continue
 		}
-		if kws != nil && len(rule.Keywords) > 0 && !kws.Match(blob) {
-			continue
-		}
-		for _, m := range rule.Regex.FindAllSubmatchIndex(blob, -1) {
+		for _, m := range rule.regex.FindAllSubmatchIndex(blob, -1) {
 			start, end := secretSpan(rule, m)
 			if start < 0 || start >= end {
 				continue
 			}
 			secret := blob[start:end]
-			if rule.Entropy > 0 && shannonEntropy(secret) < rule.Entropy {
+			if rule.entropy > 0 && shannonEntropy(secret) < rule.entropy {
 				continue
 			}
-			if allowlisted(rule, det.Config, blob[m[0]:m[1]], secret) {
+			if allowlisted(rule, rules, blob[m[0]:m[1]], secret) {
 				continue
 			}
 			spans = append(spans, span{start, end})
@@ -284,8 +252,8 @@ func secretSpans(blob []byte, det *detect.Detector) []span {
 }
 
 // secretSpan narrows the match so assignment keys stay readable.
-func secretSpan(rule config.Rule, m []int) (int, int) {
-	if g := rule.SecretGroup; g > 0 && 2*g+1 < len(m) && m[2*g] >= 0 {
+func secretSpan(rule scrubRule, m []int) (int, int) {
+	if g := rule.secretGroup; g > 0 && 2*g+1 < len(m) && m[2*g] >= 0 {
 		return m[2*g], m[2*g+1]
 	}
 	for g := 1; 2*g+1 < len(m); g++ {
@@ -324,11 +292,11 @@ func preferTightest(spans []span) []span {
 func len2(s span) int { return s.end - s.start }
 
 // allowlisted approximates "line" targets with the match.
-func allowlisted(rule config.Rule, cfg config.Config, match, secret []byte) bool {
-	for _, al := range append(rule.Allowlists, cfg.Allowlists...) {
-		for _, re := range al.Regexes {
+func allowlisted(rule scrubRule, rules *scrubRuleSet, match, secret []byte) bool {
+	for _, al := range slices.Concat(rule.allowlists, rules.allowlists) {
+		for _, re := range al.regexes {
 			target := secret
-			if al.RegexTarget == "match" || al.RegexTarget == "line" {
+			if al.target == "match" || al.target == "line" {
 				target = match
 			}
 			if re.Match(target) {
