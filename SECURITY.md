@@ -76,9 +76,9 @@ that governs access to every target.
   every workspace admin is trusted, such as a self-hosted install sending
   audit events to an internal SIEM.
 - Set a strong `NOKKU_SECRET` (at least 32 characters, the server refuses
-  less). Change it with `rotate-secrets`, which rewraps the keyset and adds a
-  new data key without re-encrypting anything. With a KMS the server rotates
-  by itself.
+  less). Change it with `rotate-secrets` while the server is stopped. A
+  rotation re-encrypts the secrets in the database with a new data key and
+  drops the older keys. With a KMS the server rotates by itself.
 - **Session recordings**: daemons stream terminal recordings to the backend,
   where they are encrypted at rest. Credential scrubbing runs asynchronously
   after an upload completes and replaces the stored recording with a redacted

@@ -3,11 +3,13 @@
 // encryption key: a KMS key when KMS_URI is set, otherwise a key derived
 // from NOKKU_SECRET.
 //
-// Rotation never re-encrypts data. A new primary key joins the keyset and
-// the older keys stay for reading. With a KMS that happens on a timer while
-// the server runs, together with a rewrap that follows a key rotation inside
-// the KMS. A new NOKKU_SECRET, or a move to another KMS, is applied with
-// `nokku rotate-secrets`.
+// A rotation adds a new primary key, re-encrypts the small secrets in the
+// database with it (see db.Reencrypt) and drops the older keys, so the
+// keyset never holds more than two. Recordings are never re-encrypted, each
+// has its own key and only that key is. With a KMS this happens on a timer
+// while the server runs, together with a rewrap that follows a key rotation
+// inside the KMS. A new NOKKU_SECRET, or a move to another KMS, is applied
+// with `nokku rotate-secrets`.
 package kms
 
 import (
@@ -25,6 +27,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/core/cryptofmt"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/tink"
 
@@ -140,8 +143,8 @@ func (t *TinkEncryptor) Start(ctx context.Context) {
 	}()
 }
 
-// Rotate moves the keyset under a new key encryption key and adds a new
-// primary key, so nothing written from now on is in reach of the old one.
+// Rotate moves the keyset under a new key encryption key and rotates its
+// keys, so nothing in the database is in reach of the old one anymore.
 // target is secret:<value> or kms:<uri>.
 func (t *TinkEncryptor) Rotate(ctx context.Context, target string) error {
 	var kek tink.AEAD
@@ -166,14 +169,15 @@ func (t *TinkEncryptor) currentKEK() tink.AEAD {
 	return t.kek
 }
 
-// update rewraps the stored keyset under kek. It first adds a new primary
-// key when rotate is set or the last one is older than RotateInterval.
-// Wrapping again with the same KMS key follows a rotation inside the KMS.
-// The row lock keeps two instances from both rotating, and reading the row
-// picks up what another one did.
+// update rewraps the stored keyset under kek. It first rotates when rotate
+// is set or the primary key is older than RotateInterval. Wrapping again with
+// the same KMS key follows a rotation inside the KMS. The row lock keeps two
+// instances from both rotating, and reading the row picks up what another
+// one did.
 func (t *TinkEncryptor) update(ctx context.Context, kek tink.AEAD, rotate bool) error {
 	current := t.currentKEK()
 	var primitive tink.AEAD
+	locked := false
 	err := t.db.WithTx(ctx, func(q *db.Queries) error {
 		row, err := q.LockKeyset(ctx)
 		if err != nil {
@@ -185,19 +189,10 @@ func (t *TinkEncryptor) update(ctx context.Context, kek tink.AEAD, rotate bool) 
 		}
 		rotatedAt := row.RotatedAt
 		if rotate || (t.RotateInterval > 0 && time.Since(rotatedAt) >= t.RotateInterval) {
-			manager := keyset.NewManagerFromHandle(handle)
-			id, err := manager.Add(aead.AES256GCMKeyTemplate())
-			if err != nil {
-				return fmt.Errorf("failed to add key: %w", err)
-			}
-			if err := manager.SetPrimary(id); err != nil {
-				return fmt.Errorf("failed to set primary key: %w", err)
-			}
-			if handle, err = manager.Handle(); err != nil {
+			if handle, err = rotateKeys(ctx, q, handle); err != nil {
 				return err
 			}
 			rotatedAt = time.Now()
-			slog.Info("keyset rotated", "keys", handle.Len())
 		}
 		data, err := wrap(handle, kek)
 		if err != nil {
@@ -206,16 +201,81 @@ func (t *TinkEncryptor) update(ctx context.Context, kek tink.AEAD, rotate bool) 
 		if primitive, err = aead.New(handle); err != nil {
 			return fmt.Errorf("failed to create AEAD primitive: %w", err)
 		}
-		return q.UpdateKeyset(ctx, &db.UpdateKeysetParams{Data: data, RotatedAt: rotatedAt})
+		if err := q.UpdateKeyset(ctx, &db.UpdateKeysetParams{Data: data, RotatedAt: rotatedAt}); err != nil {
+			return err
+		}
+		// Held across the commit, so nobody reads a re-encrypted row with
+		// the keys from before.
+		t.mu.Lock()
+		locked = true
+		return nil
 	})
+	if locked {
+		defer t.mu.Unlock()
+	}
 	if err != nil {
 		return err
 	}
-	t.mu.Lock()
 	t.kek = kek
 	t.primitive = primitive
-	t.mu.Unlock()
 	return nil
+}
+
+// rotateKeys adds a new primary key, moves every ciphertext in the database
+// to it, and drops the older keys. Two keys stay: the new one, and the one it
+// replaced, which this process may still write with until the commit.
+// Recordings are not touched, only their keys are re-encrypted.
+func rotateKeys(ctx context.Context, q *db.Queries, handle *keyset.Handle) (*keyset.Handle, error) {
+	outgoing, err := handle.Primary()
+	if err != nil {
+		return nil, err
+	}
+	manager := keyset.NewManagerFromHandle(handle)
+	id, err := manager.Add(aead.AES256GCMKeyTemplate())
+	if err != nil {
+		return nil, fmt.Errorf("failed to add key: %w", err)
+	}
+	if err := manager.SetPrimary(id); err != nil {
+		return nil, fmt.Errorf("failed to set primary key: %w", err)
+	}
+	all, err := manager.Handle()
+	if err != nil {
+		return nil, err
+	}
+	primitive, err := aead.New(all)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AEAD primitive: %w", err)
+	}
+
+	// Every ciphertext starts with the id of its key.
+	probe, err := primitive.Encrypt([]byte{0}, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := q.Reencrypt(ctx, probe[:cryptofmt.NonRawPrefixSize], func(old []byte) ([]byte, error) {
+		plaintext, err := primitive.Decrypt(old, nil)
+		if err != nil {
+			return nil, err
+		}
+		return primitive.Encrypt(plaintext, nil)
+	}); err != nil {
+		return nil, err
+	}
+
+	for i := range all.Len() {
+		entry, err := all.Entry(i)
+		if err != nil {
+			return nil, err
+		}
+		if entry.KeyID() == id || entry.KeyID() == outgoing.KeyID() {
+			continue
+		}
+		if err := manager.Delete(entry.KeyID()); err != nil {
+			return nil, fmt.Errorf("failed to drop old key: %w", err)
+		}
+	}
+	slog.Info("keyset rotated")
+	return manager.Handle()
 }
 
 // load reads the keyset or creates it on first boot. ON CONFLICT DO NOTHING

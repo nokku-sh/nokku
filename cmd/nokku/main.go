@@ -40,11 +40,11 @@ func main() {
 			{
 				Name:  "rotate-secrets",
 				Usage: "Move the encryption keys under a new secret or KMS key",
-				Description: "Everything at rest is encrypted by one keyset in the database, " +
-					"which is wrapped by NOKKU_SECRET or by a KMS key. This command " +
-					"wraps it with a new one and adds a fresh data key, in a single " +
-					"transaction. No data is re-encrypted, older keys stay for " +
-					"reading, so recordings stay readable.\n\n" +
+				Description: "The secrets in the database are encrypted by one keyset, which " +
+					"is wrapped by NOKKU_SECRET or by a KMS key. This command wraps it " +
+					"with a new one, adds a fresh data key, re-encrypts the secrets " +
+					"with it and drops the older keys, in a single transaction. " +
+					"Recordings are not re-encrypted, only their keys are.\n\n" +
 					"The current key is the one the server runs with: KMS_URI when " +
 					"set, NOKKU_SECRET otherwise. The new one is specified as:\n" +
 					"  secret:<value>  a new NOKKU_SECRET (at least 32 characters)\n" +
@@ -53,8 +53,9 @@ func main() {
 					"  nokku rotate-secrets --new secret:NEW\n" +
 					"  nokku rotate-secrets --new kms:hcvault://vault:8200/transit/keys/nokku\n\n" +
 					"KMS credentials (VAULT_TOKEN, ...) are read from the environment. " +
-					"Afterwards set NOKKU_SECRET or KMS_URI to the new value and restart. " +
-					"The server refuses to start with the old one.",
+					"Run it with the server stopped, a running one cannot read what was " +
+					"re-encrypted. Then set NOKKU_SECRET or KMS_URI to the new value and " +
+					"start it. The server refuses to start with the old one.",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:     "new",
@@ -82,7 +83,7 @@ func main() {
 					if err := enc.Rotate(ctx, cmd.String("new")); err != nil {
 						return fmt.Errorf("failed to rotate: %w", err)
 					}
-					slog.Info("keys rotated, set NOKKU_SECRET or KMS_URI to the new value and restart")
+					slog.Info("keys rotated, set NOKKU_SECRET or KMS_URI to the new value and start the server")
 					return nil
 				},
 			},

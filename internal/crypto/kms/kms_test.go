@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/testdb"
 )
@@ -35,9 +36,20 @@ func freshDB(t *testing.T) *db.Connection {
 	admin, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
 	defer func() { _ = admin.Close(t.Context()) }()
-	_, err = admin.Exec(t.Context(), "DELETE FROM keysets")
+	_, err = admin.Exec(t.Context(), "DELETE FROM keysets; DELETE FROM saml_keypair")
 	require.NoError(t, err)
 	return conn
+}
+
+// storedSAMLKey returns the SAML key column as it sits in the database.
+func storedSAMLKey(t *testing.T) []byte {
+	t.Helper()
+	admin, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	defer func() { _ = admin.Close(t.Context()) }()
+	var raw []byte
+	require.NoError(t, admin.QueryRow(t.Context(), "SELECT key_enc FROM saml_keypair").Scan(&raw))
+	return raw
 }
 
 // keyID is the Tink prefix that names the key a ciphertext was made with.
@@ -142,4 +154,49 @@ func TestValidSecret(t *testing.T) {
 	require.Error(t, ValidSecret("too-short"))
 	require.Error(t, ValidSecret("CHANGE_ME_generate_with_openssl_rand"))
 	assert.Error(t, ValidSecret("0123456789abcdefghijklmnopqrstuv"))
+}
+
+// A rotation moves what the database holds to the new key and then drops the
+// older keys, so the keyset never grows past two.
+func TestRotationReencryptsAndPrunes(t *testing.T) {
+	conn := freshDB(t)
+	enc, err := New(t.Context(), conn, secretA)
+	require.NoError(t, err)
+	require.NoError(t, crypto.SetEncryptor(enc))
+	_, err = conn.Sys().PutSAMLKeypair(t.Context(), &db.PutSAMLKeypairParams{
+		KeyEnc:  []byte("saml signing key"),
+		CertPem: []byte("cert"),
+	})
+	require.NoError(t, err)
+	detached, err := enc.Encrypt([]byte("not in the database"))
+	require.NoError(t, err)
+
+	for round := range 3 {
+		require.NoError(t, enc.Rotate(t.Context(), "secret:"+secretA), "round %d", round)
+
+		row, err := conn.Sys().GetSAMLKeypair(t.Context())
+		require.NoError(t, err, "round %d: the stored secret is unreadable", round)
+		assert.Equal(t, "saml signing key", string(row.KeyEnc))
+
+		fresh, err := enc.Encrypt([]byte("x"))
+		require.NoError(t, err)
+		assert.Equal(t, keyID(fresh), keyID(storedSAMLKey(t)), "round %d: the stored secret kept an old key", round)
+
+		data, err := conn.Sys().GetKeysetData(t.Context())
+		require.NoError(t, err)
+		handle, err := unwrap(data, enc.currentKEK())
+		require.NoError(t, err)
+		assert.LessOrEqual(t, handle.Len(), 2, "round %d: old keys were not dropped", round)
+	}
+
+	_, err = enc.Decrypt(detached)
+	require.Error(t, err, "a key from three rotations ago is still in the keyset")
+
+	// A restart sees the same thing.
+	restarted, err := New(t.Context(), conn, secretA)
+	require.NoError(t, err)
+	require.NoError(t, crypto.SetEncryptor(restarted))
+	row, err := conn.Sys().GetSAMLKeypair(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "saml signing key", string(row.KeyEnc))
 }
