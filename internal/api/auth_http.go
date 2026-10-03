@@ -15,16 +15,16 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	svc := cfg.IAM
 	as := newAuthService(cfg)
 
-	flow := newChain(svc.CSRFGuard)
-	mux.Handle("POST /passkey/login/begin", flow.thenFunc(svc.Passkey.BeginLogin))
-	mux.Handle("POST /passkey/login/finish", flow.thenFunc(svc.Passkey.FinishLogin))
-	mux.Handle("POST /passkey/signup/begin", flow.thenFunc(svc.Passkey.BeginSignup))
-	mux.Handle("POST /passkey/signup/finish", flow.thenFunc(svc.Passkey.FinishSignup))
+	// Cross-origin posts are rejected for every route by the server's withCSRF.
+	mux.HandleFunc("POST /passkey/login/begin", svc.Passkey.BeginLogin)
+	mux.HandleFunc("POST /passkey/login/finish", svc.Passkey.FinishLogin)
+	mux.HandleFunc("POST /passkey/signup/begin", svc.Passkey.BeginSignup)
+	mux.HandleFunc("POST /passkey/signup/finish", svc.Passkey.FinishSignup)
 
 	// BeginRegistration checks the principal itself, so no RequireLogin.
-	addKey := newChain(svc.Middleware, svc.CSRFGuard)
-	mux.Handle("POST /passkey/register/begin", addKey.thenFunc(svc.Passkey.BeginRegistration))
-	mux.Handle("POST /passkey/register/finish", addKey.thenFunc(svc.Passkey.FinishRegistration))
+	optAuth := newChain(svc.Middleware)
+	mux.Handle("POST /passkey/register/begin", optAuth.thenFunc(svc.Passkey.BeginRegistration))
+	mux.Handle("POST /passkey/register/finish", optAuth.thenFunc(svc.Passkey.FinishRegistration))
 
 	// CLI device endpoints are public (RFC 8628), approval needs a session.
 	mux.HandleFunc("POST /auth/device", svc.Device.Begin)
@@ -61,7 +61,6 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 
 	// Optional auth on login lets a signed-in user link a provider.
 	// Callbacks are public, the SAML ACS is a cross-origin IdP form post.
-	optAuth := newChain(svc.Middleware, svc.CSRFGuard)
 	mux.Handle("GET /oidc/login", optAuth.thenFunc(svc.OIDC.Login))
 	mux.Handle("POST /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
 	mux.Handle("GET /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))

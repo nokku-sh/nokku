@@ -4,23 +4,10 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
-
-	connectcors "connectrpc.com/cors"
-	"github.com/rs/cors"
 )
 
-func (s *Server) withCORS(h http.Handler) http.Handler {
-	return cors.New(cors.Options{
-		AllowedOrigins:   []string{s.cfg.FullURL()},
-		AllowedMethods:   connectcors.AllowedMethods(),
-		ExposedHeaders:   connectcors.ExposedHeaders(),
-		AllowedHeaders:   connectcors.AllowedHeaders(),
-		AllowCredentials: true,
-		MaxAge:           int(2 * time.Hour / time.Second),
-	}).Handler(h)
-}
-
+// withCSRF is the only cross-origin gate. The UI is served from the same
+// origin, so there is no CORS to configure.
 func (s *Server) withCSRF(h http.Handler) http.Handler {
 	cop := http.NewCrossOriginProtection()
 	if err := cop.AddTrustedOrigin(s.cfg.FullURL()); err != nil {
