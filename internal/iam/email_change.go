@@ -36,7 +36,7 @@ func (s *Service) RequestEmailChange(
 	if newEmail == u.Email {
 		return "", "", ErrSameEmail
 	}
-	if err = emailverify.Verify(newEmail, s.strict); err != nil {
+	if err = emailverify.Verify(ctx, newEmail, s.strict); err != nil {
 		return "", "", ErrEmailRejected
 	}
 	if _, err = s.sys.GetUserByEmail(ctx, newEmail); err == nil {

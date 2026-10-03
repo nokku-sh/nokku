@@ -12,7 +12,7 @@ import (
 // Register leaves the account unverified until the emailed link is confirmed.
 func (s *Service) Register(ctx context.Context, email, name, pw string) (*db.User, error) {
 	email = normalizeEmail(email)
-	if err := emailverify.Verify(email, s.strict); err != nil {
+	if err := emailverify.Verify(ctx, email, s.strict); err != nil {
 		return nil, ErrEmailRejected
 	}
 	var u *db.User
