@@ -78,11 +78,11 @@ var authStore = newRateLimiterStore(authRPS, authBurst)
 
 func (s *Server) withRateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := util.GetRemoteIP(r.Header, r.RemoteAddr)
-		if !isAPIRoute(r.URL.Path) {
+		if !rateLimited(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
+		ip := util.GetRemoteIP(r.Header, r.RemoteAddr)
 		store := generalStore
 		if isAuthRoute(r.URL.Path) {
 			store = authStore
@@ -105,23 +105,10 @@ func isAuthRoute(path string) bool {
 		strings.HasPrefix(path, "/passkey/")
 }
 
-func isAPIRoute(path string) bool {
-	// Rate limiting daemon streams would block legitimate reconnect storms.
-	if strings.HasPrefix(path, "/nokku.v1.DaemonControlService/") ||
-		strings.HasPrefix(path, "/nokku.v1.DaemonSessionService/") {
-		return false
-	}
-	return strings.HasPrefix(path, "/auth/") ||
-		strings.HasPrefix(path, "/nokku.v1.") ||
-		strings.HasPrefix(path, "/grpc.") ||
-		strings.HasPrefix(path, "/oauth/") ||
-		strings.HasPrefix(path, "/saml/") ||
-		strings.HasPrefix(path, "/passkey/") ||
-		strings.HasPrefix(path, "/avatars/") ||
-		strings.HasPrefix(path, "/upload/") ||
-		strings.HasPrefix(path, "/terminal/") ||
-		strings.HasPrefix(path, "/webhooks/") ||
-		strings.HasPrefix(path, "/healthz") ||
-		strings.HasPrefix(path, "/debug/") ||
-		strings.HasPrefix(path, "/v1/")
+// rateLimited leaves out only the daemon streams, where a limit would block
+// legitimate reconnect storms, and the hashed static assets.
+func rateLimited(path string) bool {
+	return !strings.HasPrefix(path, "/nokku.v1.DaemonControlService/") &&
+		!strings.HasPrefix(path, "/nokku.v1.DaemonSessionService/") &&
+		!strings.HasPrefix(path, "/_app/")
 }
