@@ -88,6 +88,7 @@ func (w *Writer) Close() error {
 }
 
 func (w *Writer) writeFrame(kind byte, plaintext []byte) error {
+	// #nosec G407 -- the AEAD draws a random nonce itself and takes none.
 	sealed := w.aead.Seal(nil, nil, plaintext, frameAAD(w.id, w.index, kind))
 	if len(sealed) > math.MaxUint32 {
 		return errors.New("recording chunk too large")
