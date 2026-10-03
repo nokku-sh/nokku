@@ -69,7 +69,7 @@ func (s *utilService) Whoami(
 	}
 
 	switch p.Kind {
-	case actor.KindUser, actor.KindCLI, actor.KindWebDevice:
+	case actor.KindUser, actor.KindCLI:
 		u, err := s.cfg.IAM.GetUser(ctx)
 		if err != nil {
 			return nil, err
@@ -97,8 +97,8 @@ func (s *utilService) Whoami(
 		}); err != nil {
 			return nil, err
 		}
-	case actor.KindSCIM:
-		// SCIM tokens never reach connect.
+	case actor.KindSCIM, actor.KindWebDevice:
+		// SCIM tokens and device markers never reach connect.
 	}
 	return out, nil
 }

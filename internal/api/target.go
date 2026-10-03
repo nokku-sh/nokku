@@ -338,7 +338,7 @@ func (s *targetService) GetMyAccess(
 	}
 	//nolint:exhaustive // daemons sync through SyncDaemon
 	switch p.Kind {
-	case actor.KindUser, actor.KindCLI, actor.KindWebDevice, actor.KindServiceAccount:
+	case actor.KindUser, actor.KindCLI, actor.KindServiceAccount:
 	default:
 		return nil, newError(
 			connect.CodePermissionDenied,
@@ -359,7 +359,7 @@ func (s *targetService) GetMyAccess(
 
 		//nolint:exhaustive // other kinds were rejected above
 		switch p.Kind {
-		case actor.KindUser, actor.KindCLI, actor.KindWebDevice:
+		case actor.KindUser, actor.KindCLI:
 			u, err := s.cfg.IAM.GetUser(ctx)
 			if err != nil {
 				return err

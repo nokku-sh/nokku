@@ -4,7 +4,7 @@ package iam
 //
 //   session cookie                    → user session (browser)
 //   Authorization: Bearer nokku_sa_…  → service-account API key (no session)
-//   Authorization: Bearer <token>     → session token (device cookies rejected)
+//   Authorization: Bearer <token>     → session token
 //   Authorization: DPoP <token>       → key-bound session, proof on every request (RFC 9449)
 
 import (
@@ -26,7 +26,7 @@ func (s *Service) Authenticate(
 	header http.Header,
 	procedure string,
 ) (actor.Principal, db.Session, error) {
-	token, fromHeader := requestCredential(header)
+	token := requestCredential(header)
 	if strings.HasPrefix(token, apiKeyPrefix) {
 		p, err := s.authenticateAPIKey(ctx, token)
 		return p, db.Session{}, err
@@ -36,10 +36,10 @@ func (s *Service) Authenticate(
 	if err != nil {
 		return actor.Principal{}, db.Session{}, err
 	}
-	// A device cookie in a header is a leaked cookie being replayed.
-	// Accepting it would turn a 24-hour session leak into a 180-day one.
-	if fromHeader && p.Kind == actor.KindWebDevice {
-		return actor.Principal{}, db.Session{}, errors.New("device credentials are not API tokens")
+	// A device marker only names a known browser. Accepting it anywhere
+	// would be a 180 day session that survives logout.
+	if p.Kind == actor.KindWebDevice {
+		return actor.Principal{}, db.Session{}, errors.New("device credentials are not sessions")
 	}
 	if sess.Binding != "" {
 		if err := s.verifySessionProof(ctx, header, procedure, token, sess.Binding); err != nil {
@@ -127,13 +127,13 @@ func (s *Service) AdvertiseDPoPNonce(h http.Header) {
 	h.Set("DPoP-Nonce", s.DPoP.CurrentNonce())
 }
 
-func requestCredential(h http.Header) (token string, fromHeader bool) {
+func requestCredential(h http.Header) string {
 	if a := h.Get("Authorization"); a != "" {
 		for _, scheme := range []string{"bearer ", "dpop "} {
 			if len(a) >= len(scheme) && strings.EqualFold(a[:len(scheme)], scheme) {
-				return strings.TrimSpace(a[len(scheme):]), true
+				return strings.TrimSpace(a[len(scheme):])
 			}
 		}
 	}
-	return cookieFromHeader(h, sessionCookieName), false
+	return cookieFromHeader(h, sessionCookieName)
 }

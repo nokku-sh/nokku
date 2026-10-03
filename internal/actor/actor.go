@@ -36,13 +36,13 @@ func PrincipalFromContext(ctx context.Context) (Principal, bool) {
 	return p, ok
 }
 
-// UserIDFromContext also covers CLI and device sessions, which act for a user.
+// UserIDFromContext also covers CLI sessions, which act for a user.
 func UserIDFromContext(ctx context.Context) string {
 	if p, ok := PrincipalFromContext(ctx); ok {
 		switch p.Kind {
-		case KindUser, KindCLI, KindWebDevice:
+		case KindUser, KindCLI:
 			return p.ID
-		case KindDaemon, KindServiceAccount, KindSCIM:
+		case KindDaemon, KindServiceAccount, KindSCIM, KindWebDevice:
 			return ""
 		}
 	}

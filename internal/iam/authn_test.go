@@ -24,14 +24,13 @@ func TestRequestCredential(t *testing.T) {
 	tests := []struct {
 		name          string
 		authorization string
-		wantToken     string
-		wantIsBearer  bool
+		want          string
 	}{
-		{"bearer", "Bearer tok", "tok", true},
-		{"dpop", "DPoP tok", "tok", true},
-		{"dpop lowercase", "dpop tok", "tok", true},
-		{"other scheme", "Basic tok", "", false},
-		{"empty", "", "", false},
+		{"bearer", "Bearer tok", "tok"},
+		{"dpop", "DPoP tok", "tok"},
+		{"dpop lowercase", "dpop tok", "tok"},
+		{"other scheme", "Basic tok", ""},
+		{"empty", "", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -39,10 +38,8 @@ func TestRequestCredential(t *testing.T) {
 			if tt.authorization != "" {
 				header.Set("Authorization", tt.authorization)
 			}
-			token, isBearer := requestCredential(header)
-			if token != tt.wantToken || isBearer != tt.wantIsBearer {
-				t.Fatalf("requestCredential() = (%q, %v), want (%q, %v)",
-					token, isBearer, tt.wantToken, tt.wantIsBearer)
+			if got := requestCredential(header); got != tt.want {
+				t.Fatalf("requestCredential() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -50,9 +47,8 @@ func TestRequestCredential(t *testing.T) {
 	t.Run("cookie", func(t *testing.T) {
 		header := http.Header{}
 		header.Add("Cookie", sessionCookieName+"=cookietok")
-		token, isBearer := requestCredential(header)
-		if token != "cookietok" || isBearer {
-			t.Fatalf("requestCredential() = (%q, %v), want (cookietok, false)", token, isBearer)
+		if got := requestCredential(header); got != "cookietok" {
+			t.Fatalf("requestCredential() = %q, want cookietok", got)
 		}
 	})
 }
