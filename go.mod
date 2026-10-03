@@ -27,7 +27,6 @@ require (
 	github.com/mizuchilabs/kata v0.1.11
 	github.com/nokku-sh/protos v0.2.0
 	github.com/oauth2-proxy/mockoidc v0.0.0-20240214162133-caebfff84d25
-	github.com/redis/go-redis/v9 v9.22.0
 	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.37
 	github.com/scaleway/tink-go-scwkms v0.1.2
@@ -219,7 +218,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.46.0 // indirect
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
-	go.uber.org/atomic v1.12.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go4.org v0.0.0-20260112195520-a5071408f32f // indirect
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect

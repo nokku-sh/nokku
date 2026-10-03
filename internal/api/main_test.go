@@ -26,11 +26,10 @@ var (
 )
 
 // TestMain keeps a developer's shell env from pointing the test server at
-// real Redis, Stripe, KMS, S3, SMTP, or social providers.
+// real Stripe, KMS, S3, SMTP, or social providers.
 func TestMain(m *testing.M) {
 	for _, key := range []string{
 		"NOKKU_BASE_URL",
-		"NOKKU_REDIS_URL",
 		"NOKKU_LICENSE_KEY",
 		"NOKKU_STORAGE",
 		"NOKKU_SMTP_HOST",

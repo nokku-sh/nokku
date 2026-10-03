@@ -55,6 +55,8 @@ func (m *Memory) Delete(_ context.Context, key string) error {
 	return nil
 }
 
+// GetDel is how one-time state is consumed, so two concurrent consumers can
+// never both succeed.
 func (m *Memory) GetDel(_ context.Context, key string) ([]byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

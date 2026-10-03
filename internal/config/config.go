@@ -44,7 +44,7 @@ type Config struct {
 	Email        *email.Service
 	Pool         *daemon.Pool
 	Storage      *storage.Storage
-	Cache        cache.Cache
+	Cache        *cache.Memory
 	Record       *recording.Service
 	Billing      *billing.Service
 	Entitlements *entitlement.Service
@@ -71,10 +71,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Cache, err = cache.New(ctx)
-	if err != nil {
-		return nil, err
-	}
+	cfg.Cache = cache.NewMemory(10_000)
 	cfg.Pool = daemon.New(ctx, cfg.Conn)
 	go cfg.Pool.Listen(ctx, cfg.Conn.Pool.Config().ConnConfig)
 	cfg.Email, err = email.New(cfg.FullURL(), cfg.Cache)

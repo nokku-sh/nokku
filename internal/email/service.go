@@ -22,7 +22,7 @@ var errCooldown = errors.New("email cooldown active")
 // Service only delivers when an SMTP host is set.
 type Service struct {
 	sender sender
-	cache  cache.Cache
+	cache  *cache.Memory
 	appURL string
 
 	From     string        `env:"NOKKU_EMAIL_SENDER"`
@@ -56,7 +56,7 @@ type sendRequest struct {
 	data     any
 }
 
-func New(appURL string, cache cache.Cache) (*Service, error) {
+func New(appURL string, cache *cache.Memory) (*Service, error) {
 	svc, err := env.ParseAs[Service]()
 	if err != nil {
 		return nil, err

@@ -85,15 +85,9 @@ The backend reads configuration from environment variables. Only `NOKKU_SECRET` 
 
 Schema migrations are embedded and applied automatically under an advisory lock; disable with `NOKKU_DB_AUTOMIGRATE=false` if you run migrations out of band.
 
-### Cache (Redis, optional)
+### Single instance
 
-| Variable          | Purpose                                                                          |
-| ----------------- | -------------------------------------------------------------------------------- |
-| `NOKKU_REDIS_URL` | `redis://user:pass@host:6379/0`, or `rediss://` for TLS. Enables a shared cache. |
-
-Without Redis, the core uses a bounded in-process cache for single-use state (DPoP replay markers, login flow state, email cooldowns, web session tickets). That state is then lost on a restart.
-
-Nokku runs as a single instance. Daemon control streams and relays live in the process, so a second instance would not see them, with or without Redis.
+Nokku runs as a single instance. Daemon control streams, relays and single-use state (DPoP replay markers, login flow state, email cooldowns, web session tickets) live in the process. A second instance would not see them, and the single-use state is lost on a restart.
 
 ### Storage (object storage, optional)
 

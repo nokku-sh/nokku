@@ -32,7 +32,7 @@ const (
 // share no storage for them. The cache catches jti reuse.
 type DPoPVerifier struct {
 	secret []byte
-	replay cache.Cache
+	replay *cache.Memory
 	now    func() time.Time
 }
 
