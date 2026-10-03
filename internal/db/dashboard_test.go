@@ -36,7 +36,7 @@ func TestListOpenRecordings(t *testing.T) {
 	closed := uuid.NewV7().String()
 	for _, id := range []string{open, closed} {
 		if _, err := c.Sys().CreateRecording(t.Context(), &CreateRecordingParams{
-			ID: id, WorkspaceID: f.ws, DaemonID: f.daemon, Username: "deploy",
+			ID: id, WorkspaceID: f.ws, DaemonID: f.daemon, Username: "deploy", Key: []byte("key"),
 		}); err != nil {
 			t.Fatalf("create recording: %v", err)
 		}

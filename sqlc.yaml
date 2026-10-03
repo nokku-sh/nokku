@@ -123,3 +123,7 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "EncryptedBytes"
+          - column: "recordings.key"
+            go_type:
+              import: "github.com/nokku-sh/nokku/internal/crypto"
+              type: "EncryptedBytes"

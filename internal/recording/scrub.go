@@ -21,7 +21,6 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/storage"
 )
 
 const (
@@ -65,7 +64,7 @@ func (s *Service) ScrubRecording(rec *db.Recording) {
 	ctx, cancel := context.WithTimeout(context.Background(), scrubTimeout)
 	go func() {
 		defer cancel()
-		if err := s.scrub(ctx, rec.WorkspaceID, rec.ID); err != nil {
+		if err := s.scrub(ctx, rec); err != nil {
 			slog.Error("scrub recording failed, recording kept as uploaded",
 				"recording_id", rec.ID, "workspace_id", rec.WorkspaceID, "error", err)
 			// Audit it, a failed scrub leaves secrets in the stored object.
@@ -90,8 +89,8 @@ func (s *Service) ScrubRecording(rec *db.Recording) {
 	}()
 }
 
-func (s *Service) scrub(ctx context.Context, workspaceID, recordingID string) error {
-	cast, err := s.readRecordingCast(ctx, workspaceID, recordingID)
+func (s *Service) scrub(ctx context.Context, rec *db.Recording) error {
+	cast, err := s.readRecordingCast(ctx, rec)
 	if err != nil {
 		return err
 	}
@@ -113,7 +112,7 @@ func (s *Service) scrub(ctx context.Context, workspaceID, recordingID string) er
 		return fmt.Errorf("finish gzip scrubbed cast: %w", err)
 	}
 
-	w, err := s.NewWriter(ctx, workspaceID, recordingID)
+	w, err := s.NewWriter(ctx, rec)
 	if err != nil {
 		return err
 	}
@@ -127,15 +126,12 @@ func (s *Service) scrub(ctx context.Context, workspaceID, recordingID string) er
 		return fmt.Errorf("commit scrubbed recording object: %w", err)
 	}
 
-	slog.Info("recording scrubbed", "recording_id", recordingID)
+	slog.Info("recording scrubbed", "recording_id", rec.ID)
 	return nil
 }
 
-func (s *Service) readRecordingCast(
-	ctx context.Context,
-	workspaceID, recordingID string,
-) ([]byte, error) {
-	fr, err := s.openReader(ctx, storage.RecordingPath(workspaceID, recordingID))
+func (s *Service) readRecordingCast(ctx context.Context, rec *db.Recording) ([]byte, error) {
+	fr, err := s.OpenReader(ctx, rec)
 	if err != nil {
 		return nil, err
 	}
