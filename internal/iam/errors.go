@@ -11,6 +11,7 @@ var (
 	// errInvalidCredentials never distinguishes unknown email from wrong password.
 	errInvalidCredentials = errors.New("iam: invalid credentials")
 	ErrInactive           = errors.New("iam: account inactive")
+	ErrTooManyAttempts    = errors.New("iam: too many attempts")
 	errNoSession          = errors.New("iam: no session token")
 	errSessionExpired     = errors.New("iam: session expired")
 	errInvalidToken       = errors.New("iam: invalid token")

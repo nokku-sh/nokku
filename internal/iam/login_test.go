@@ -642,3 +642,37 @@ func TestDeletedUserLosesSessions(t *testing.T) {
 		t.Fatal("the session of a deleted account still authenticates")
 	}
 }
+
+// Guessing one account's password is refused after a burst, whatever address
+// the guesses come from, and the right password does not get through either.
+func TestPasswordAttemptsAreThrottledPerAccount(t *testing.T) {
+	e := newTestEnv(t)
+	victim := e.user(t, "victim@"+testDomain(), true)
+	other := e.user(t, "other@"+testDomain(), true)
+	e.withPassword(t, victim)
+	e.withPassword(t, other)
+
+	for i := range passwordAttemptBurst {
+		_, _, err := e.svc.Password.Login(t.Context(), victim.Email, "wrong")
+		if !errors.Is(err, errInvalidCredentials) {
+			t.Fatalf("guess %d: err = %v, want errInvalidCredentials", i+1, err)
+		}
+	}
+	if _, _, err := e.svc.Password.Login(t.Context(), victim.Email, testPassword); !errors.Is(err, ErrTooManyAttempts) {
+		t.Fatalf("after the burst: err = %v, want ErrTooManyAttempts", err)
+	}
+	if _, _, err := e.svc.Password.Login(t.Context(), other.Email, testPassword); err != nil {
+		t.Fatalf("another account was throttled too: %v", err)
+	}
+
+	// A successful login gives the account its full burst back.
+	for range passwordAttemptBurst - 1 {
+		_, _, _ = e.svc.Password.Login(t.Context(), other.Email, "wrong")
+	}
+	if _, _, err := e.svc.Password.Login(t.Context(), other.Email, testPassword); err != nil {
+		t.Fatalf("last try inside the burst: %v", err)
+	}
+	if _, _, err := e.svc.Password.Login(t.Context(), other.Email, "wrong"); !errors.Is(err, errInvalidCredentials) {
+		t.Fatalf("after a good login: err = %v, want a fresh burst", err)
+	}
+}
