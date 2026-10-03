@@ -17,8 +17,8 @@
 		"shadup": "shadcn-svelte update --all",
 		"fmt": "oxfmt",
 		"fmt:check": "oxfmt --check",
-		"lint": "oxlint && eslint .",
-		"lint:fix": "oxlint --fix && eslint . --fix"
+		"lint": "oxlint",
+		"lint:fix": "oxlint --fix"
 	},
 	"dependencies": {
 		"@fontsource-variable/manrope": "^5.3.0",
