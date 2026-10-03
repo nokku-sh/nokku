@@ -59,7 +59,7 @@ The backend reads configuration from environment variables. Only `NOKKU_SECRET` 
 
 | Variable                | Purpose                                                                                              |
 | ----------------------- | ---------------------------------------------------------------------------------------------------- |
-| `NOKKU_BASE_URL`        | Public base URL (default `http://localhost`), used for links, cookies, and WebAuthn                  |
+| `NOKKU_BASE_URL`        | Public URL, used as given for links, cookies, and WebAuthn (default `http://localhost:<NOKKU_PORT>`) |
 | `NOKKU_PORT`            | Port the backend listens on (default `3000`)                                                         |
 | `NOKKU_SECRET`          | **Required.** Keys at-rest encryption (SSO secrets, SAML keys, CA keys) and DPoP nonces              |
 | `NOKKU_TRUSTED_PROXIES` | Comma-separated reverse-proxy IPs/CIDRs (e.g. Traefik) whose forwarded client-IP headers are honored |
