@@ -23,6 +23,16 @@ import (
 // #nosec G101 -- a throwaway candidate, not a credential
 const dummyPassword = "nokku-dummy-password-do-not-use"
 
+// hashSlots bounds concurrent argon2 runs. Each one takes 64 MiB, so a burst
+// of logins has to queue instead of exhausting memory.
+var hashSlots = make(chan struct{}, 4)
+
+func argon2Key(password string, salt []byte, p passwordParams) []byte {
+	hashSlots <- struct{}{}
+	defer func() { <-hashSlots }()
+	return argon2.IDKey([]byte(password), salt, p.Time, p.Memory, p.Threads, p.KeyLen)
+}
+
 // passwordParams Memory is in KiB.
 type passwordParams struct {
 	Time    uint32
@@ -177,7 +187,7 @@ func hashPassword(password string, p passwordParams) (string, error) {
 	if _, err := rand.Read(salt); err != nil {
 		return "", err
 	}
-	key := argon2.IDKey([]byte(password), salt, p.Time, p.Memory, p.Threads, p.KeyLen)
+	key := argon2Key(password, salt, p)
 	return fmt.Sprintf(
 		"$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
 		argon2.Version,
@@ -194,8 +204,7 @@ func verifyPassword(password, encoded string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	other := argon2.IDKey([]byte(password), salt, p.Time, p.Memory, p.Threads, p.KeyLen)
-	return subtle.ConstantTimeCompare(key, other) == 1, nil
+	return subtle.ConstantTimeCompare(key, argon2Key(password, salt, p)) == 1, nil
 }
 
 func needsRehash(encoded string, p passwordParams) bool {
