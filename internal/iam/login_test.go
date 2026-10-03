@@ -616,3 +616,29 @@ func TestSCIMDoesNotAdoptUnverifiedAccount(t *testing.T) {
 		t.Fatal("the provisioned account is not verified")
 	}
 }
+
+// A CLI session authenticates on its row alone, so the row has to go with
+// the account.
+func TestDeletedUserLosesSessions(t *testing.T) {
+	e := newTestEnv(t)
+	u := e.user(t, "user@"+testDomain(), true)
+	_, token, err := e.svc.IssueSession(t.Context(), SessionParams{
+		SubjectID: u.ID,
+		Kind:      actor.KindCLI,
+		Method:    MethodDevice,
+		TTL:       time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.svc.AuthenticateToken(t.Context(), token); err != nil {
+		t.Fatalf("fresh session: %v", err)
+	}
+
+	if err := e.conn.Sys().DeleteUser(t.Context(), u.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.svc.AuthenticateToken(t.Context(), token); err == nil {
+		t.Fatal("the session of a deleted account still authenticates")
+	}
+}

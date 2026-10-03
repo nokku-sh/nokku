@@ -20,8 +20,8 @@ func seedIdentity(t *testing.T, c *Connection, f stateFixture) string {
 		INSERT INTO users (id, email) VALUES ($3, $3 || '@test');
 		INSERT INTO credentials (id, user_id, type, data) VALUES ($1 || '-pw', $1, 'password', 'x');
 		INSERT INTO credentials (id, user_id, type, data) VALUES ($2 || '-pw', $2, 'password', 'x');
-		INSERT INTO sessions (token_hash, subject_id, method) VALUES ($1 || '-s', $1, 'password');
-		INSERT INTO sessions (token_hash, subject_id, method) VALUES ($2 || '-s', $2, 'password');
+		INSERT INTO sessions (token_hash, subject_id, user_id, method) VALUES ($1 || '-s', $1, $1, 'password');
+		INSERT INTO sessions (token_hash, subject_id, user_id, method) VALUES ($2 || '-s', $2, $2, 'password');
 	`, pgx.QueryExecModeSimpleProtocol, f.owner, f.u, outsider)
 	if err != nil {
 		t.Fatalf("seed identity: %v", err)
