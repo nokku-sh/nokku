@@ -20,19 +20,6 @@ func newWorkspaceDomainService(cfg *config.Config) *workspaceDomainService {
 	return &workspaceDomainService{cfg: cfg}
 }
 
-func (s *workspaceDomainService) GetWorkspaceDomain(
-	ctx context.Context,
-	req *nokkuv1.GetWorkspaceDomainRequest,
-) (*nokkuv1.GetWorkspaceDomainResponse, error) {
-	result, err := s.cfg.IAM.GetTenantDomain(ctx, req.GetWorkspaceId(), req.GetDomain())
-	if err != nil {
-		return nil, err
-	}
-	return &nokkuv1.GetWorkspaceDomainResponse{
-		Domain: domainToProto(result),
-	}, nil
-}
-
 func (s *workspaceDomainService) CreateWorkspaceDomain(
 	ctx context.Context,
 	req *nokkuv1.CreateWorkspaceDomainRequest,
