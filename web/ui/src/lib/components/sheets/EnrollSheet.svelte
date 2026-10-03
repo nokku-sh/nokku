@@ -9,7 +9,8 @@
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
-	const install = 'curl -fsSL https://get.nokku.sh/nokkud | sh';
+	// The installer needs root. Ansible and cloud-init already run as root.
+	const installer = 'curl -fsSL https://get.nokku.sh/nokkud';
 	// nokkud talks to app.nokku.sh unless told otherwise, self-hosted needs the URL.
 	const selfHosted = location.origin !== 'https://app.nokku.sh';
 	const apiEnv = selfHosted ? `NOKKUD_API_URL=${location.origin} ` : '';
@@ -21,7 +22,11 @@
 				label: 'One host',
 				language: 'bash',
 				hint: 'Paste the token when nokkud asks for it. It never ends up in your shell history.',
-				code: [install, `sudo ${apiEnv}nokkud enroll`, 'sudo systemctl restart nokkud'].join('\n')
+				code: [
+					`${installer} | sudo sh`,
+					`sudo ${apiEnv}nokkud enroll`,
+					'sudo systemctl restart nokkud'
+				].join('\n')
 			},
 			{
 				value: 'script',
@@ -29,7 +34,7 @@
 				language: 'bash',
 				hint: 'Unattended. The token goes in through the environment, never as an argument.',
 				code: [
-					install,
+					`${installer} | sudo sh`,
 					`sudo NOKKUD_ENROLL_TOKEN='${token}' ${apiEnv}nokkud enroll`,
 					'sudo systemctl restart nokkud'
 				].join('\n')
@@ -46,7 +51,7 @@
     nokkud_enroll_token: "${token}"
   tasks:
     - name: Install nokkud
-      ansible.builtin.shell: ${install}
+      ansible.builtin.shell: ${installer} | sh
       args:
         creates: /usr/bin/nokkud
 
@@ -78,7 +83,7 @@
 				hint: 'User data is readable from the instance metadata, so use a short expiry and a use limit.',
 				code: `#cloud-config
 runcmd:
-  - ${install}
+  - ${installer} | sh
   - NOKKUD_ENROLL_TOKEN='${token}' ${apiEnv}nokkud enroll
   - systemctl restart nokkud`
 			}
