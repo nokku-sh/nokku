@@ -38,6 +38,9 @@ type Querier interface {
 	CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParams) (*CreateWorkspaceRow, error)
 	CreateWorkspaceToken(ctx context.Context, arg *CreateWorkspaceTokenParams) (*WorkspaceToken, error)
 	DashboardCounts(ctx context.Context, arg *DashboardCountsParams) (*DashboardCountsRow, error)
+	// The longest retention for every row, also the ones without a workspace and
+	// the ones whose workspace is gone.
+	DeleteAuditLogsBefore(ctx context.Context, cutoff time.Time) (int64, error)
 	// The enforce_single_default_ca trigger clears the previous default.
 	DeleteCA(ctx context.Context, caID string) (*CertificateAuthority, error)
 	DeleteCredential(ctx context.Context, arg *DeleteCredentialParams) error
@@ -45,7 +48,6 @@ type Querier interface {
 	DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, error)
 	DeleteExpiredSessions(ctx context.Context, now *time.Time) (int64, error)
 	DeleteExpiredTokens(ctx context.Context, now time.Time) (int64, error)
-	DeleteOrphanAuditLogs(ctx context.Context, cutoff time.Time) (int64, error)
 	DeletePrincipal(ctx context.Context, id string) error
 	DeleteRecording(ctx context.Context, id string) error
 	DeleteRecordingsBefore(ctx context.Context, arg *DeleteRecordingsBeforeParams) ([]*DeleteRecordingsBeforeRow, error)
@@ -166,7 +168,6 @@ type Querier interface {
 	ListWorkspaces(ctx context.Context) ([]*Workspace, error)
 	// The row lock keeps two rotations from running at once.
 	LockKeyset(ctx context.Context) (*LockKeysetRow, error)
-	MaintainAuditPartitions(ctx context.Context) error
 	OldestRecordings(ctx context.Context, arg *OldestRecordingsParams) ([]*Recording, error)
 	PutSAMLKeypair(ctx context.Context, arg *PutSAMLKeypairParams) (*PutSAMLKeypairRow, error)
 	PutToken(ctx context.Context, arg *PutTokenParams) error

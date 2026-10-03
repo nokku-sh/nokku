@@ -10,15 +10,16 @@ import (
 	"time"
 )
 
-const deleteOrphanAuditLogs = `-- name: DeleteOrphanAuditLogs :execrows
+const deleteAuditLogsBefore = `-- name: DeleteAuditLogsBefore :execrows
 DELETE FROM audit.audit_logs
 WHERE
-  workspace_id IS NULL
-  AND timestamp < $1
+  timestamp < $1
 `
 
-func (q *Queries) DeleteOrphanAuditLogs(ctx context.Context, cutoff time.Time) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteOrphanAuditLogs, cutoff)
+// The longest retention for every row, also the ones without a workspace and
+// the ones whose workspace is gone.
+func (q *Queries) DeleteAuditLogsBefore(ctx context.Context, cutoff time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAuditLogsBefore, cutoff)
 	if err != nil {
 		return 0, err
 	}
@@ -297,14 +298,4 @@ func (q *Queries) ListWorkspaceAuditLogWorkspaceIDs(ctx context.Context) ([]*str
 		return nil, err
 	}
 	return items, nil
-}
-
-const maintainAuditPartitions = `-- name: MaintainAuditPartitions :exec
-SELECT
-  audit.maintain_partitions ()
-`
-
-func (q *Queries) MaintainAuditPartitions(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, maintainAuditPartitions)
-	return err
 }

@@ -36,17 +36,8 @@ func New(
 		sinks:        []sink{newPostgresSink(conn), webhooks},
 	}
 
-	if err := s.setupPartitions(ctx); err != nil {
-		return nil, err
-	}
-
 	go s.runBackgroundJobs(ctx)
 	return s, nil
-}
-
-// setupPartitions relies on audit.maintain_partitions running as the table owner.
-func (s *Service) setupPartitions(ctx context.Context) error {
-	return s.conn.Sys().MaintainAuditPartitions(ctx)
 }
 
 func (s *Service) runBackgroundJobs(ctx context.Context) {
@@ -60,9 +51,6 @@ func (s *Service) runBackgroundJobs(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := s.setupPartitions(ctx); err != nil {
-				slog.Error("audit partition job failed", "error", err)
-			}
 			s.retentionCleanup(ctx)
 		}
 	}
@@ -110,12 +98,12 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 			}
 		}
 
-		deleted, err := q.DeleteOrphanAuditLogs(ctx, now.AddDate(0, 0, -maxRetentionDays))
+		deleted, err := q.DeleteAuditLogsBefore(ctx, now.AddDate(0, 0, -maxRetentionDays))
 		if err != nil {
 			return err
 		}
 		if deleted > 0 {
-			slog.Debug("audit retention cleaned orphan logs", "deleted", deleted)
+			slog.Debug("audit retention cleaned logs past the longest retention", "deleted", deleted)
 		}
 		return nil
 	})

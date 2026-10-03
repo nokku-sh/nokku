@@ -9,9 +9,6 @@ import (
 func TestListAuditLogsFilters(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	if err := c.Sys().MaintainAuditPartitions(t.Context()); err != nil {
-		t.Fatalf("create partitions: %v", err)
-	}
 
 	for _, e := range []struct {
 		action  string
