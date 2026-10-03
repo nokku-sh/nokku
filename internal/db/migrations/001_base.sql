@@ -887,7 +887,7 @@ CREATE SCHEMA IF NOT EXISTS audit;
 -- workspace_id has no foreign key: the log outlives a deleted workspace, and
 -- the append-only trigger would refuse an ON DELETE SET NULL anyway.
 CREATE TABLE IF NOT EXISTS audit.audit_logs (
-  id UUID NOT NULL DEFAULT uuidv7(),
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   workspace_id UUID,
   actor_id TEXT NOT NULL DEFAULT '',
@@ -898,15 +898,16 @@ CREATE TABLE IF NOT EXISTS audit.audit_logs (
   ok BOOLEAN NOT NULL,
   ip TEXT NOT NULL DEFAULT '',
   user_agent TEXT NOT NULL DEFAULT '',
-  details JSONB NOT NULL DEFAULT '{}',
-  PRIMARY KEY (timestamp, id)
-)
-PARTITION BY
-  RANGE (timestamp);
+  details JSONB NOT NULL DEFAULT '{}'
+);
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_workspace_time ON audit.audit_logs (workspace_id, timestamp DESC);
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit.audit_logs (actor_id, timestamp DESC);
+
+-- For the retention delete. Rows arrive in time order, so a block range
+-- index stays tiny.
+CREATE INDEX IF NOT EXISTS idx_audit_logs_time ON audit.audit_logs USING brin (timestamp);
 
 CREATE POLICY audit_logs_select ON audit.audit_logs FOR
 SELECT
@@ -924,25 +925,12 @@ GRANT
 SELECT
   ON ALL TABLES IN SCHEMA audit TO nokku_app;
 
--- nokku_system additionally can DELETE (partition cleanup)
+-- nokku_system additionally can DELETE, for the retention job.
 GRANT
 SELECT
 ,
   INSERT,
   DELETE ON ALL TABLES IN SCHEMA audit TO nokku_system;
-
--- Partitions created later by the retention job inherit these.
-ALTER DEFAULT PRIVILEGES IN SCHEMA audit
-GRANT
-SELECT
-  ON TABLES TO nokku_app;
-
-ALTER DEFAULT PRIVILEGES IN SCHEMA audit
-GRANT
-SELECT
-,
-  INSERT,
-  DELETE ON TABLES TO nokku_system;
 
 ALTER TABLE audit.audit_logs ENABLE ROW LEVEL SECURITY;
 
@@ -961,9 +949,6 @@ ALTER TABLE audit.audit_logs FORCE ROW LEVEL SECURITY;
 --   table and there is no DELETE policy, so a DELETE from nokku_app matches
 --   zero rows regardless of privilege. Do not add a DELETE policy. If one is
 --   ever needed, the trigger's opt-in must stop being a plain GUC.
---
--- The trigger sits on the partitioned parent, so every partition, including
--- the ones the retention job creates later, inherits it.
 CREATE OR REPLACE FUNCTION audit.audit_logs_immutable () RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP = 'UPDATE' THEN
@@ -979,52 +964,3 @@ CREATE TRIGGER audit_logs_immutable BEFORE
 UPDATE
 OR DELETE ON audit.audit_logs FOR EACH ROW
 EXECUTE FUNCTION audit.audit_logs_immutable ();
-
--- Audit partitions ------------------------------------------------------------
--- Monthly partitions are DDL, which needs the table owner. This function runs
--- as the owner so the runtime roles never need owner rights. It keeps the
--- previous, current, and next UTC month, and drops partitions older than 14
--- months (the longest retention plus margin).
-CREATE OR REPLACE FUNCTION audit.maintain_partitions () RETURNS VOID AS $$
-DECLARE
-  this_month TIMESTAMP := date_trunc('month', now() AT TIME ZONE 'UTC');
-  m TIMESTAMP;
-  part TEXT;
-BEGIN
-  IF NOT pg_try_advisory_xact_lock(hashtext('audit-partitions')) THEN
-    RETURN;
-  END IF;
-  FOR i IN -1..1 LOOP
-    m := this_month + make_interval(months => i);
-    EXECUTE format(
-      'CREATE TABLE IF NOT EXISTS audit.%I PARTITION OF audit.audit_logs FOR VALUES FROM (%L) TO (%L)',
-      to_char(m, '"audit_logs_y"YYYY"m"MM'),
-      m AT TIME ZONE 'UTC',
-      (m + INTERVAL '1 month') AT TIME ZONE 'UTC'
-    );
-  END LOOP;
-  FOR part IN
-    SELECT c.relname
-    FROM pg_inherits inh
-      JOIN pg_class c ON c.oid = inh.inhrelid
-    WHERE inh.inhparent = 'audit.audit_logs'::REGCLASS
-      AND c.relname < to_char(this_month - INTERVAL '14 months', '"audit_logs_y"YYYY"m"MM')
-  LOOP
-    EXECUTE format('DROP TABLE IF EXISTS audit.%I', part);
-  END LOOP;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER
-SET
-  search_path = audit,
-  public,
-  pg_temp;
-
-REVOKE ALL ON FUNCTION audit.maintain_partitions ()
-FROM
-  PUBLIC;
-
-GRANT
-EXECUTE ON FUNCTION audit.maintain_partitions () TO nokku_system;
-
-SELECT
-  audit.maintain_partitions ();

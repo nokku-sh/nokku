@@ -119,15 +119,12 @@ WHERE
   workspace_id = @workspace_id
   AND timestamp < @cutoff; 
 
--- name: DeleteOrphanAuditLogs :execrows
+-- name: DeleteAuditLogsBefore :execrows
+-- The longest retention for every row, also the ones without a workspace and
+-- the ones whose workspace is gone.
 DELETE FROM audit.audit_logs
 WHERE
-  workspace_id IS NULL
-  AND timestamp < @cutoff;
-
--- name: MaintainAuditPartitions :exec
-SELECT
-  audit.maintain_partitions ();
+  timestamp < @cutoff;
 
 -- name: EnableAuditRetention :exec
 -- Opts this transaction into the audit_logs delete guard.

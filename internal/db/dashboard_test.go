@@ -69,9 +69,6 @@ func TestListOpenRecordings(t *testing.T) {
 func TestAuditActivityByHour(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	if err := c.Sys().MaintainAuditPartitions(t.Context()); err != nil {
-		t.Fatalf("create partitions: %v", err)
-	}
 	for _, ok := range []bool{true, true, false} {
 		if err := c.Sys().InsertAuditLog(t.Context(), &InsertAuditLogParams{
 			WorkspaceID: &f.ws,
