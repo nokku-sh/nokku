@@ -77,6 +77,8 @@ add what you find. Unattended work follows the `unattended-pass` skill.
   does. Check with `GOWORK=off go build ./...` before pushing.
 - sqlc queries live in `internal/db/queries` and are regenerated, never
   hand-edited.
+- Schema changes go straight into `internal/db/migrations/001_base.sql`
+  while there is no release. No new migration files.
 - Plan gating lives only in `internal/entitlement`.
 - Three plans (`community`, `pro`, `enterprise`) and two modes: self-hosted,
   where the plan comes from the license, and SaaS (the `STRIPE_*` settings
