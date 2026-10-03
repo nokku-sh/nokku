@@ -550,3 +550,20 @@ func TestEmailChangeCancelBeforeConfirm(t *testing.T) {
 		t.Fatalf("cancel of a pending change ended the session: %v", err)
 	}
 }
+
+// A device marker only names a known browser. It must never sign in, not even
+// when it arrives in the session cookie.
+func TestDeviceCookieIsNotASession(t *testing.T) {
+	e := newTestEnv(t)
+	u := e.user(t, "user@"+testDomain(), true)
+
+	device := e.svc.RememberDevice(t.Context(), http.Header{}, "198.51.100.1:1234", u)
+	if device == nil {
+		t.Fatal("no device cookie issued")
+	}
+	header := http.Header{}
+	header.Add("Cookie", sessionCookieName+"="+device.Value)
+	if _, _, err := e.svc.Authenticate(t.Context(), header, "/nokku.v1.UtilService/Whoami"); err == nil {
+		t.Fatal("device cookie authenticated as a session")
+	}
+}
