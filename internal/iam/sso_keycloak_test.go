@@ -1,34 +1,29 @@
 package iam
 
-// End-to-end SSO tests against a real Keycloak container. It starts once per
-// test binary, and tests skip when Docker is unavailable.
+// End-to-end SSO tests against the Keycloak from compose.test.yml. The test
+// realm is created once per test binary, and tests skip when no Keycloak
+// answers.
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"html"
 	"io"
-	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 const (
+	keycloakRoot      = "http://localhost:8080"
 	keycloakRealm     = "nokku-test"
-	keycloakImage     = "quay.io/keycloak/keycloak:26.3"
 	keycloakClientID  = "nokku-test"
 	keycloakClientSec = "nokku-test-exchange"
 	keycloakUsername  = "alice"
@@ -36,99 +31,36 @@ const (
 )
 
 var keycloakOnce struct {
-	once     sync.Once
-	base     string // http://host:port/realms/nokku-test
-	ctr      testcontainers.Container
-	noDocker bool
-	err      error
+	once sync.Once
+	skip bool
+	err  error
 }
 
 func startKeycloak(t *testing.T) string {
 	t.Helper()
+	base := keycloakRoot + "/realms/" + keycloakRealm
 	keycloakOnce.once.Do(func() {
-		if !dockerAvailable() {
-			keycloakOnce.noDocker = true
+		client := http.Client{Timeout: 2 * time.Second}
+		resp, err := client.Get(keycloakRoot + "/realms/master")
+		if err != nil {
+			keycloakOnce.skip = true
 			return
 		}
-		keycloakOnce.base, keycloakOnce.ctr, keycloakOnce.err = startKeycloakContainer()
+		resp.Body.Close()
+		keycloakOnce.err = keycloakSetupRealm(base)
 	})
-	if keycloakOnce.noDocker {
-		t.Skip("docker not available, skipping keycloak integration tests")
+	if keycloakOnce.skip {
+		t.Skip("no test Keycloak, start it with compose.test.yml")
 	}
 	if keycloakOnce.err != nil {
-		t.Fatalf("start keycloak: %v", keycloakOnce.err)
+		t.Fatalf("set up keycloak realm: %v", keycloakOnce.err)
 	}
-	return keycloakOnce.base
+	return base
 }
 
-func dockerAvailable() bool {
-	if os.Getenv("DOCKER_HOST") != "" {
-		return true
-	}
-	_, err := os.Stat("/var/run/docker.sock")
-	return err == nil
-}
-
-func startKeycloakContainer() (string, testcontainers.Container, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	realm, err := os.CreateTemp("", "nokku-keycloak-realm-*.json")
-	if err != nil {
-		return "", nil, err
-	}
-	defer os.Remove(realm.Name())
-	if _, err := realm.Write(keycloakRealmJSON()); err != nil {
-		return "", nil, err
-	}
-	if err := realm.Close(); err != nil {
-		return "", nil, err
-	}
-
-	ctr, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		Started:      true,
-		Image:        keycloakImage,
-		ExposedPorts: []string{"8080/tcp"},
-		Env: map[string]string{
-			"KC_BOOTSTRAP_ADMIN_USERNAME": "admin",
-			"KC_BOOTSTRAP_ADMIN_PASSWORD": "admin",
-			"KC_HOSTNAME_STRICT":          "false",
-		},
-		Cmd: []string{"start-dev", "--import-realm"},
-		Files: []testcontainers.ContainerFile{{
-			HostFilePath:      realm.Name(),
-			ContainerFilePath: "/opt/keycloak/data/import/realm.json",
-			FileMode:          0o644,
-		}},
-		WaitingFor: wait.ForHTTP("/realms/" + keycloakRealm + "/.well-known/openid-configuration").
-			WithPort("8080/tcp").
-			WithStatusCodeMatcher(func(code int) bool { return code == http.StatusOK }).
-			WithStartupTimeout(3 * time.Minute),
-	})
-	if err != nil {
-		return "", nil, err
-	}
-	// The testcontainers reaper tears it down when the binary exits.
-
-	host, err := ctr.Host(ctx)
-	if err != nil {
-		return "", ctr, err
-	}
-	port, err := ctr.MappedPort(ctx, "8080/tcp")
-	if err != nil {
-		return "", ctr, err
-	}
-	base := "http://" + net.JoinHostPort(host, port.Port()) + "/realms/" + keycloakRealm
-
-	// Keycloak's realm import drops redirectUris on SAML clients, which the
-	// ACS needs. Patch them through the admin API.
-	if err := keycloakAllowAcs(base); err != nil {
-		return "", ctr, err
-	}
-	return base, ctr, nil
-}
-
-func keycloakAllowAcs(realmBase string) error {
+// keycloakSetupRealm creates the test realm from scratch, the compose
+// Keycloak outlives the tests.
+func keycloakSetupRealm(realmBase string) error {
 	root := strings.TrimSuffix(realmBase, "/realms/"+keycloakRealm)
 	clientID := "http://nokku.test/saml/metadata"
 
@@ -151,6 +83,29 @@ func keycloakAllowAcs(realmBase string) error {
 	}
 	auth := "Bearer " + tok.AccessToken
 
+	admin := func(method, path string, body []byte) (int, error) {
+		req, err := http.NewRequest(method, root+path, bytes.NewReader(body))
+		if err != nil {
+			return 0, err
+		}
+		req.Header.Set("Authorization", auth)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0, err
+		}
+		resp.Body.Close()
+		return resp.StatusCode, nil
+	}
+	if _, err := admin(http.MethodDelete, "/admin/realms/"+keycloakRealm, nil); err != nil {
+		return err
+	}
+	if code, err := admin(http.MethodPost, "/admin/realms", keycloakRealmJSON()); err != nil || code != http.StatusCreated {
+		return fmt.Errorf("keycloak: create realm: %d %w", code, err)
+	}
+
+	// Keycloak drops redirectUris on imported SAML clients, which the ACS
+	// needs. Patch them in.
 	req, err := http.NewRequest(http.MethodGet,
 		root+"/admin/realms/"+keycloakRealm+"/clients?clientId="+url.QueryEscape(clientID), nil)
 	if err != nil {
