@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import * as Field from '$lib/components/ui/field';
-	import { Label } from '$lib/components/ui/label';
-	import * as Card from '$lib/components/ui/card';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Label } from '#lib/components/ui/label/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
 	import { Globe, Save, Info, TriangleAlert } from '@lucide/svelte';
-	import { Switch } from '$lib/components/ui/switch';
-	import { Separator } from '$lib/components/ui/separator';
-	import { InputGroupVariants } from '$lib/components/ui/input-group';
-	import { TagsInput } from '$lib/components/ui/tags-input';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import * as Alert from '$lib/components/ui/alert';
-	import { sso } from '$lib/api/sso.svelte';
-	import { workspaceID } from '$lib/store.svelte';
+	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { Separator } from '#lib/components/ui/separator/index.js';
+	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
+	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import * as Alert from '#lib/components/ui/alert/index.js';
+	import { sso } from '#lib/api/sso.svelte.js';
+	import { workspaceID } from '#lib/store.svelte.js';
 	import { page } from '$app/state';
 
 	const standardScopes = ['openid', 'profile', 'email', 'groups', 'offline_access'];

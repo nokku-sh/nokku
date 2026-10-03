@@ -1,11 +1,11 @@
 <script lang="ts">
-	import EnrollSheet from '$lib/components/sheets/EnrollSheet.svelte';
-	import InviteSheet from '$lib/components/sheets/InviteSheet.svelte';
-	import CodeSnippet from '$lib/components/blocks/CodeSnippet.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import { DocsURL } from '$lib/config';
+	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
+	import InviteSheet from '#lib/components/sheets/InviteSheet.svelte';
+	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Tabs from '#lib/components/ui/tabs/index.js';
+	import { DocsURL } from '#lib/config.js';
 	import { Check, Rocket, UserPlus } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 

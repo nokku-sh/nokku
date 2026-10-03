@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import * as HoverCard from '$lib/components/ui/hover-card';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as HoverCard from '#lib/components/ui/hover-card/index.js';
 
 	type Props = {
 		tags: string[];

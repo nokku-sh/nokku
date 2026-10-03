@@ -1,11 +1,11 @@
 <script lang="ts">
-	import EventRow from '$lib/components/audit/EventRow.svelte';
-	import { user } from '$lib/api/user.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { AuditOutcome } from '$lib/gen/nokku/v1/util_pb';
-	import { formatTs } from '$lib/utils';
+	import EventRow from '#lib/components/audit/EventRow.svelte';
+	import { user } from '#lib/api/user.svelte.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { AuditOutcome } from '#lib/gen/nokku/v1/util_pb.js';
+	import { formatTs } from '#lib/utils.js';
 	import { MonitorSmartphone } from '@lucide/svelte';
 
 	const me = user.self();

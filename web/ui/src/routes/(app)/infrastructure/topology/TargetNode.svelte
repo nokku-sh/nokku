@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import type { Target } from '$lib/gen/nokku/v1/target_pb';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { Server, Pencil, Network, Tag, Globe, Tags } from '@lucide/svelte';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 

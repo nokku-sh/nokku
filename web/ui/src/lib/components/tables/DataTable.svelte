@@ -2,13 +2,13 @@
 	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Button } from '$lib/components/ui/button';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import * as Empty from '$lib/components/ui/empty';
-	import * as Select from '$lib/components/ui/select';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import * as TableUI from '$lib/components/ui/table';
-	import { PAGE_PARAM, SHEET_PARAMS, usePagination } from '$lib/hooks';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
+	import * as Empty from '#lib/components/ext/empty/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import * as TableUI from '#lib/components/ui/table/index.js';
+	import { PAGE_PARAM, SHEET_PARAMS, usePagination } from '#lib/hooks/index.js';
 	import {
 		ArrowDown,
 		ArrowUp,
@@ -98,14 +98,14 @@
 	);
 
 	function clearFilters() {
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		const kept = new URLSearchParams();
 		for (const key of SHEET_PARAMS) {
 			const value = url.searchParams.get(key);
 			if (value) kept.set(key, value);
 		}
 		url.search = kept.toString();
-		void goto(url, { replaceState: true, keepFocus: true });
+		void goto(url, { replace: true, reset: false });
 	}
 
 	const defaultVisibility: ColumnVisibilityState = {

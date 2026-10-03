@@ -1,10 +1,10 @@
 import { create } from '@bufbuild/protobuf';
-import { RecordingService } from '$lib/gen/nokku/v1/recordings_pb';
-import { useMutation, useQuery } from '$lib/query';
-import { workspaceID } from '$lib/store.svelte';
+import { RecordingService } from '#lib/gen/nokku/v1/recordings_pb.js';
+import { useMutation, useQuery } from '#lib/query/index.js';
+import { workspaceID } from '#lib/store.svelte.js';
 import { authTransport } from './client';
 import { toast } from 'svelte-sonner';
-import { MAX_PAGE_SIZE } from '$lib/config';
+import { MAX_PAGE_SIZE } from '#lib/config.js';
 import { plural, useBulkMutation } from './bulk';
 
 export type RecordingChunkHandler = (chunk: Uint8Array) => void;

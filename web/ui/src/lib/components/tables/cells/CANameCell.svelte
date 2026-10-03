@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import CopyText from '$lib/components/blocks/CopyText.svelte';
-	import * as HoverCard from '$lib/components/ui/hover-card';
-	import { Separator } from '$lib/components/ui/separator';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import CopyText from '#lib/components/blocks/CopyText.svelte';
+	import * as HoverCard from '#lib/components/ui/hover-card/index.js';
+	import { Separator } from '#lib/components/ui/separator/index.js';
 	import {
 		AuthorityType,
 		CertificateKeyType,
 		type CertificateAuthority
-	} from '$lib/gen/nokku/v1/certificates_pb';
-	import { enumLabel, formatD, formatTs } from '$lib/utils';
+	} from '#lib/gen/nokku/v1/certificates_pb.js';
+	import { enumLabel, formatD, formatTs } from '#lib/utils.js';
 	import { type Timestamp } from '@bufbuild/protobuf/wkt';
 	import { ArrowRight, Dot, KeyRound, Shield, Star } from '@lucide/svelte';
 

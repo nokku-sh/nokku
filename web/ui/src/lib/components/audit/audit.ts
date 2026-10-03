@@ -1,7 +1,7 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
-import { AuditOutcome, type EventLog } from '$lib/gen/nokku/v1/util_pb';
-import { PAGE_PARAM } from '$lib/hooks';
+import { AuditOutcome, type EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+import { PAGE_PARAM } from '#lib/hooks/index.js';
 import {
 	Bot,
 	CircleCheck,
@@ -215,14 +215,14 @@ export const csv = (param: string) =>
 
 // setParams changes filters and goes back to page 1, since the result set moved.
 export function setParams(params: Record<string, string | undefined>, replaceFilters = false) {
-	const url = new URL(page.url);
+	const url = new URL(page.url.href);
 	if (replaceFilters) filterParams.forEach((p) => url.searchParams.delete(p));
 	for (const [key, value] of Object.entries(params)) {
 		if (value) url.searchParams.set(key, value);
 		else url.searchParams.delete(key);
 	}
 	url.searchParams.delete(PAGE_PARAM);
-	void goto(url, { replaceState: true, keepFocus: true, noScroll: true });
+	void goto(url, { replace: true, reset: false });
 }
 
 export const kindIcon = (kind: string): LucideIcon => kindOf(kind)?.icon ?? KeyRound;

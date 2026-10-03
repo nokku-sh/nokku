@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { eventLabel, outcomeLabel, outcomeOf } from '$lib/components/audit/audit';
+	import { eventLabel, outcomeLabel, outcomeOf } from '#lib/components/audit/audit.js';
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import { Badge } from '$lib/components/ui/badge';
-	import type { EventLog } from '$lib/gen/nokku/v1/util_pb';
-	import { formatTs } from '$lib/utils';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { formatTs } from '#lib/utils.js';
 	import { CircleCheckBig, CircleX, Globe, UserRound, Zap } from '@lucide/svelte';
 	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';

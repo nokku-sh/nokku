@@ -1,19 +1,19 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { daemon as daemonApi } from '$lib/api/daemons.svelte';
-	import { target } from '$lib/api/targets.svelte';
-	import { user } from '$lib/api/user.svelte';
-	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Empty from '$lib/components/ui/empty';
-	import * as InputGroup from '$lib/components/ui/input-group';
-	import * as Kbd from '$lib/components/ui/kbd';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import * as Tooltip from '$lib/components/ui/tooltip';
-	import type { Target } from '$lib/gen/nokku/v1/target_pb';
-	import { recentTargets } from '$lib/store.svelte';
+	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
+	import { target } from '#lib/api/targets.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
+	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import * as InputGroup from '#lib/components/ui/input-group/index.js';
+	import * as Kbd from '#lib/components/ui/kbd/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
+	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
+	import { recentTargets } from '#lib/store.svelte.js';
 	import { Search, Server } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { BotIcon, CircleUserIcon, UserIcon, UsersIcon, XIcon } from '@lucide/svelte';
-	import * as Popover from '$lib/components/ui/popover';
-	import * as Command from '$lib/components/ui/command';
-	import { Button } from '$lib/components/ui/button';
+	import * as Popover from '#lib/components/ui/popover/index.js';
+	import * as Command from '#lib/components/ui/command/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import { CheckIcon, ChevronsUpDownIcon } from '@lucide/svelte';
-	import FilterPill from '$lib/components/blocks/FilterPill.svelte';
-	import type { Target } from '$lib/gen/nokku/v1/target_pb';
+	import FilterPill from '#lib/components/blocks/FilterPill.svelte';
+	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 
 	type Props = {
 		data?: Target[];

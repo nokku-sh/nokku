@@ -1,10 +1,10 @@
 <script lang="ts">
-	import * as Empty from '$lib/components/ui/empty';
-	import { Spinner } from '$lib/components/ui/spinner';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { VectorSquare } from '@lucide/svelte';
-	import { target } from '$lib/api/targets.svelte';
-	import { team } from '$lib/api/team.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
+	import { target } from '#lib/api/targets.svelte.js';
+	import { team } from '#lib/api/team.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
 	import {
 		Background,
 		BackgroundVariant,
@@ -22,12 +22,12 @@
 	import TargetNode from './TargetNode.svelte';
 	import PrincipalNode from './PrincipalNode.svelte';
 	import SubjectNode from './SubjectNode.svelte';
-	import type { Target } from '$lib/gen/nokku/v1/target_pb';
-	import { principal } from '$lib/api/principals.svelte';
-	import { serviceAccount } from '$lib/api/service_account.svelte';
+	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
+	import { principal } from '#lib/api/principals.svelte.js';
+	import { serviceAccount } from '#lib/api/service_account.svelte.js';
 	import Toolbar from './Toolbar.svelte';
-	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
+	import { SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 
 	const nodeTypes = {
 		target: TargetNode,

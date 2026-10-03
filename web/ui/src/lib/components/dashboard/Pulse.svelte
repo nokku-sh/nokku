@@ -1,12 +1,12 @@
 <script lang="ts">
-	import EventRow from '$lib/components/audit/EventRow.svelte';
-	import ActivitySheet from '$lib/components/sheets/ActivitySheet.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import type { GetDashboardResponse } from '$lib/gen/nokku/v1/dashboard_pb';
-	import type { EventLog } from '$lib/gen/nokku/v1/util_pb';
-	import { formatTs } from '$lib/utils';
+	import EventRow from '#lib/components/audit/EventRow.svelte';
+	import ActivitySheet from '#lib/components/sheets/ActivitySheet.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import type { GetDashboardResponse } from '#lib/gen/nokku/v1/dashboard_pb.js';
+	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { formatTs } from '#lib/utils.js';
 	import { ArrowRight } from '@lucide/svelte';
 
 	let { data }: { data?: GetDashboardResponse } = $props();

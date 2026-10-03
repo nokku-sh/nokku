@@ -1,22 +1,22 @@
 <script lang="ts">
-	import { ca as caApi } from '$lib/api/certificates.svelte';
-	import SignModal from '$lib/components/modals/SignModal.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
-	import * as Item from '$lib/components/ui/item';
-	import { Switch } from '$lib/components/ui/switch';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import * as ToggleGroup from '$lib/components/ui/toggle-group';
-	import DurationInput from '$lib/components/blocks/DurationInput.svelte';
+	import { ca as caApi } from '#lib/api/certificates.svelte.js';
+	import SignModal from '#lib/components/modals/SignModal.svelte';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
 	import {
 		AuthorityType,
 		CertificateAuthoritySchema,
 		CertificateKeyType
-	} from '$lib/gen/nokku/v1/certificates_pb';
-	import { confirm, useAutoSave, useDraft, useSheet } from '$lib/hooks';
-	import { enumToArray, formatTs } from '$lib/utils';
+	} from '#lib/gen/nokku/v1/certificates_pb.js';
+	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
+	import { enumToArray, formatTs } from '#lib/utils.js';
 	import type { Duration } from '@bufbuild/protobuf/wkt';
 	import {
 		Ban,

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import * as InputGroup from '$lib/components/ui/input-group';
+	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import {
 		CheckIcon,
 		CopyIcon,
@@ -11,10 +11,10 @@
 		DownloadIcon,
 		type LucideIcon
 	} from '@lucide/svelte';
-	import { UseClipboard } from '$lib/hooks/use-clipboard.svelte.js';
+	import { UseClipboard } from '#lib/hooks/use-clipboard.svelte.js';
 	import type { ComponentProps } from 'svelte';
-	import type { Textarea } from '../textarea';
-	import Input from '../input/input.svelte';
+	import type { Textarea } from '#lib/components/ui/textarea/index.js';
+	import type { Input } from '#lib/components/ui/input/index.js';
 
 	type Variant = 'copy-input' | 'code-area' | 'search' | 'password';
 

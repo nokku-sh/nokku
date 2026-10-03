@@ -311,3 +311,18 @@ body:has([data-slot='sheet-overlay'], [data-slot='dialog-overlay'])
 	backdrop-filter: none;
 	background: transparent;
 }
+
+/* One layer above sheets and dialogs, a confirmation always interrupts them. */
+[data-slot='alert-dialog-overlay'],
+[data-slot='alert-dialog-content'] {
+	z-index: 60;
+}
+
+/* shadcn centers dialogs with a 50% translate. That lands between device pixels on a scaled or zoomed screen, and the browser blurs everything inside. */
+[data-slot='dialog-content'],
+[data-slot='alert-dialog-content'] {
+	inset: 0;
+	margin: auto;
+	height: fit-content;
+	translate: none;
+}

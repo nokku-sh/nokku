@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { LucideIcon } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
-	import { Logo } from '$lib/assets';
-	import { toneSoft, type Tone } from '$lib/tone';
+	import { Logo } from '#lib/assets/index.js';
+	import { toneSoft, type Tone } from '#lib/tone.js';
 
 	interface Props {
 		title: string;

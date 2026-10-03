@@ -1,20 +1,20 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { loginWithPasskey } from '$lib/api/passkey';
-	import * as Alert from '$lib/components/ui/alert';
-	import { Button } from '$lib/components/ui/button';
-	import { InputGroupVariants } from '$lib/components/ui/input-group';
-	import { Input } from '$lib/components/ui/input';
-	import * as Field from '$lib/components/ui/field';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import LegalConsent from '$lib/components/blocks/LegalConsent.svelte';
-	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
+	import { loginWithPasskey } from '#lib/api/passkey.js';
+	import * as Alert from '#lib/components/ext/alert/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import LegalConsent from '#lib/components/blocks/LegalConsent.svelte';
+	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
 	import { BinaryIcon, GlobeIcon, KeyRound, LogIn, Mail } from '@lucide/svelte';
-	import { GoogleIcon, GitHubIcon, OIDCIcon, SAMLIcon } from '$lib/assets';
+	import { GoogleIcon, GitHubIcon, OIDCIcon, SAMLIcon } from '#lib/assets/index.js';
 	import { toast } from 'svelte-sonner';
-	import { sso } from '$lib/api/sso.svelte';
-	import { auth } from '$lib/api/auth.svelte';
-	import { isEmailUnverifiedError, emailUnverifiedMessage } from '$lib/api/error-formatter';
+	import { sso } from '#lib/api/sso.svelte.js';
+	import { auth } from '#lib/api/auth.svelte.js';
+	import { isEmailUnverifiedError, emailUnverifiedMessage } from '#lib/api/error-formatter.js';
 	import { useDebounce } from 'runed';
 
 	let email = $state('');

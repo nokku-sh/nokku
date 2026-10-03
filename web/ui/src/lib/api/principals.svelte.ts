@@ -1,10 +1,10 @@
-import { MAX_PAGE_SIZE } from '$lib/config';
-import { PrincipalService, SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
-import { TargetService } from '$lib/gen/nokku/v1/target_pb';
-import { queryClient } from '$lib/api/client';
+import { MAX_PAGE_SIZE } from '#lib/config.js';
+import { PrincipalService, SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+import { TargetService } from '#lib/gen/nokku/v1/target_pb.js';
+import { queryClient } from '#lib/api/client.js';
 import { toast } from 'svelte-sonner';
-import { useMutation, useQuery } from '$lib/query';
-import { workspaceID } from '$lib/store.svelte';
+import { useMutation, useQuery } from '#lib/query/index.js';
+import { workspaceID } from '#lib/store.svelte.js';
 
 // The global mutation cache only invalidates the mutating service, but grant
 // changes also move TargetService.GetSubjectAccess.

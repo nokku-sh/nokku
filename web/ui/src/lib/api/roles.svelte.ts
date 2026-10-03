@@ -1,5 +1,5 @@
-import { UtilService } from '$lib/gen/nokku/v1/util_pb';
-import { useQuery } from '$lib/query';
+import { UtilService } from '#lib/gen/nokku/v1/util_pb.js';
+import { useQuery } from '#lib/query/index.js';
 
 export const roles = {
 	list: () =>

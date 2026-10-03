@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { EventLog } from '$lib/gen/nokku/v1/util_pb';
-	import { cn } from '$lib/utils';
+	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { cn } from '#lib/utils.js';
 	import { Activity } from '@lucide/svelte';
 	import { areaOf, outcomeOf } from './audit';
 

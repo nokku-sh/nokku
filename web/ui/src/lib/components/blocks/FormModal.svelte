@@ -2,12 +2,12 @@
 	import SaveStatus from './SaveStatus.svelte';
 	import type { Snippet } from 'svelte';
 	import type { LucideIcon } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Field from '$lib/components/ui/field';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import type { SaveState } from '$lib/hooks';
-	import { cn } from '$lib/utils';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import type { SaveState } from '#lib/hooks/index.js';
+	import { cn } from '#lib/utils.js';
 	import { slide } from 'svelte/transition';
 
 	interface Props {

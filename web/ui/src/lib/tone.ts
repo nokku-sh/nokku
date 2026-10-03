@@ -1,4 +1,4 @@
-/** Status colors. Names match Badge variants, so `<Badge variant={tone}>` works. */
+/** Status colors. Names match the ext Badge variants, so `<Badge variant={tone}>` works. */
 export type Tone = 'success' | 'warning' | 'info' | 'destructive' | 'muted';
 
 const statusWords: Record<string, Tone> = {

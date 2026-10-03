@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { auth } from '$lib/api/auth.svelte';
-	import { formatConnectError } from '$lib/api/error-formatter';
-	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import { Button } from '$lib/components/ui/button';
-	import * as Field from '$lib/components/ui/field';
-	import { InputGroupVariants } from '$lib/components/ui/input-group';
-	import { Spinner } from '$lib/components/ui/spinner';
+	import { auth } from '#lib/api/auth.svelte.js';
+	import { formatConnectError } from '#lib/api/error-formatter.js';
+	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
+	import * as Alert from '#lib/components/ui/alert/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { ConnectError } from '@connectrpc/connect';
 	import { CircleAlert, CircleCheckBig, KeyRound, LogIn } from '@lucide/svelte';
 

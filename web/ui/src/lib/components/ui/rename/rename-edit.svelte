@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import Button, { type ButtonProps } from '$lib/components/ui/button/button.svelte';
+	import Button, { type ButtonProps } from '#lib/components/ui/button/button.svelte';
 	import { useRenameEdit } from './rename.svelte.js';
 
 	const editState = useRenameEdit();

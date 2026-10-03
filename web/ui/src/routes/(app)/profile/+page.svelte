@@ -1,31 +1,31 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { auth } from '$lib/api/auth.svelte';
-	import { httpFetch } from '$lib/api/client';
-	import { user } from '$lib/api/user.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import DangerZone from '$lib/components/sheets/DangerZone.svelte';
-	import FormModal from '$lib/components/blocks/FormModal.svelte';
-	import SaveStatus from '$lib/components/blocks/SaveStatus.svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Field from '$lib/components/ui/field';
-	import * as ImageCropper from '$lib/components/ui/image-cropper';
-	import { Input } from '$lib/components/ui/input';
-	import * as InputGroup from '$lib/components/ui/input-group';
-	import { InputGroupVariants } from '$lib/components/ui/input-group';
-	import * as Item from '$lib/components/ui/item';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import Avatar from '$lib/components/blocks/Avatar.svelte';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import { UserSchema } from '$lib/gen/nokku/v1/account_pb';
-	import { confirm, useAutoSave, useDraft } from '$lib/hooks';
-	import { roleLabel } from '$lib/roles';
-	import { workspaceID } from '$lib/store.svelte';
-	import { formatTs } from '$lib/utils';
+	import { auth } from '#lib/api/auth.svelte.js';
+	import { httpFetch } from '#lib/api/client.js';
+	import { user } from '#lib/api/user.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import DangerZone from '#lib/components/sheets/DangerZone.svelte';
+	import FormModal from '#lib/components/blocks/FormModal.svelte';
+	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
+	import * as Alert from '#lib/components/ext/alert/index.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import * as ImageCropper from '#lib/components/ui/image-cropper/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import * as InputGroup from '#lib/components/ui/input-group/index.js';
+	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import Avatar from '#lib/components/blocks/Avatar.svelte';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import { UserSchema } from '#lib/gen/nokku/v1/account_pb.js';
+	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
+	import { roleLabel } from '#lib/roles.js';
+	import { workspaceID } from '#lib/store.svelte.js';
+	import { formatTs } from '#lib/utils.js';
 	import {
 		BadgeCheck,
 		Mail,

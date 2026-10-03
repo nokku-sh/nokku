@@ -1,10 +1,10 @@
-import { MAX_PAGE_SIZE } from '$lib/config';
-import { DaemonService, DaemonStatus } from '$lib/gen/nokku/v1/daemon_pb';
+import { MAX_PAGE_SIZE } from '#lib/config.js';
+import { DaemonService, DaemonStatus } from '#lib/gen/nokku/v1/daemon_pb.js';
 import { extract, type MaybeGetter } from 'runed';
-import { useMutation, useQuery } from '$lib/query';
+import { useMutation, useQuery } from '#lib/query/index.js';
 import { plural, useBulkMutation } from './bulk';
 import { addSession, TerminalSession } from './terminal.svelte';
-import { workspaceID } from '$lib/store.svelte';
+import { workspaceID } from '#lib/store.svelte.js';
 
 export const daemon = {
 	get: (id: MaybeGetter<string | undefined>) =>

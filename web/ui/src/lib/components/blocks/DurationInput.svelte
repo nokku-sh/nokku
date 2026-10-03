@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { durationFromMs, durationMs, type Duration } from '@bufbuild/protobuf/wkt';
 	import { ChevronDown, Clock } from '@lucide/svelte';
-	import * as InputGroup from '$lib/components/ui/input-group';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { cn } from '$lib/utils';
+	import * as InputGroup from '#lib/components/ui/input-group/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import { cn } from '#lib/utils.js';
 
 	type Unit = 'minutes' | 'hours' | 'days' | 'years';
 

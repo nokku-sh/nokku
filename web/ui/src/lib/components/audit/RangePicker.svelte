@@ -46,10 +46,10 @@
 </script>
 
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import * as Popover from '$lib/components/ui/popover';
-	import { RangeCalendar } from '$lib/components/ui/range-calendar';
-	import { Separator } from '$lib/components/ui/separator';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Popover from '#lib/components/ui/popover/index.js';
+	import { RangeCalendar } from '#lib/components/ui/range-calendar/index.js';
+	import { Separator } from '#lib/components/ui/separator/index.js';
 	import type { DateRange } from 'bits-ui';
 	import { CalendarDays, ChevronDown } from '@lucide/svelte';
 	import { setParams } from './audit';

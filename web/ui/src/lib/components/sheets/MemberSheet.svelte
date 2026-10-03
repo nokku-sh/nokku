@@ -1,19 +1,19 @@
 <script lang="ts">
-	import { principal as principalApi } from '$lib/api/principals.svelte';
-	import { team as teamApi } from '$lib/api/team.svelte';
-	import { user } from '$lib/api/user.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import RolePicker from '$lib/components/access/RolePicker.svelte';
-	import SubjectAccess from '$lib/components/access/SubjectAccess.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Command from '$lib/components/ui/command';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import Chip from '$lib/components/blocks/Chip.svelte';
-	import SearchPopover from '$lib/components/blocks/SearchPopover.svelte';
-	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
-	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
-	import { confirm, useSheet } from '$lib/hooks';
+	import { principal as principalApi } from '#lib/api/principals.svelte.js';
+	import { team as teamApi } from '#lib/api/team.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import RolePicker from '#lib/components/access/RolePicker.svelte';
+	import SubjectAccess from '#lib/components/access/SubjectAccess.svelte';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Command from '#lib/components/ui/command/index.js';
+	import * as Tabs from '#lib/components/ui/tabs/index.js';
+	import Chip from '#lib/components/blocks/Chip.svelte';
+	import SearchPopover from '#lib/components/blocks/SearchPopover.svelte';
+	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
+	import { SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+	import { confirm, useSheet } from '#lib/hooks/index.js';
 	import {
 		BadgeCheck,
 		Check,

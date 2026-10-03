@@ -1,8 +1,8 @@
 <script lang="ts" generics="TData extends RowData">
 	import Settings2Icon from '@lucide/svelte/icons/settings-2';
 	import type { RowData, Table } from '@tanstack/svelte-table';
-	import { buttonVariants } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { buttonVariants } from '#lib/components/ui/button/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import type { DataTableFeatures } from './data-table-features.js';
 
 	let { table }: { table: Table<DataTableFeatures, TData> } = $props();

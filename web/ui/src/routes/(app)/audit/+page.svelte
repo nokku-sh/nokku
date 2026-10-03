@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import ExportMenu from '$lib/components/audit/ExportMenu.svelte';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import ExportMenu from '#lib/components/audit/ExportMenu.svelte';
 	import { page } from '$app/state';
-	import { util, workspace } from '$lib/api/workspaces.svelte';
-	import ActivitySheet from '$lib/components/sheets/ActivitySheet.svelte';
-	import { DataTable, TableToolbar, createAppColumnHelper } from '$lib/components/tables';
-	import { TextCell, TimeCell } from '$lib/components/tables/cells';
-	import * as ToggleGroup from '$lib/components/ui/toggle-group';
-	import Chip from '$lib/components/blocks/Chip.svelte';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import { AuditOutcome, type EventLog } from '$lib/gen/nokku/v1/util_pb';
-	import { usePagination } from '$lib/hooks';
-	import { auditUTC } from '$lib/store.svelte';
+	import { util, workspace } from '#lib/api/workspaces.svelte.js';
+	import ActivitySheet from '#lib/components/sheets/ActivitySheet.svelte';
+	import { DataTable, TableToolbar, createAppColumnHelper } from '#lib/components/tables/index.js';
+	import { TextCell, TimeCell } from '#lib/components/tables/cells/index.js';
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import Chip from '#lib/components/blocks/Chip.svelte';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import { AuditOutcome, type EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { usePagination } from '#lib/hooks/index.js';
+	import { auditUTC } from '#lib/store.svelte.js';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import { Archive, FileClock, Radio, Target } from '@lucide/svelte';
 	import { Debounced } from 'runed';
@@ -24,9 +24,9 @@
 		outcomes,
 		quickViews,
 		setParams
-	} from '$lib/components/audit/audit';
+	} from '#lib/components/audit/audit.js';
 	import EventCell from './EventCell.svelte';
-	import RangePicker, { currentRange } from '$lib/components/audit/RangePicker.svelte';
+	import RangePicker, { currentRange } from '#lib/components/audit/RangePicker.svelte';
 
 	let selected = $state<EventLog>();
 

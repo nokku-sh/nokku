@@ -1,6 +1,6 @@
 # Nokku web UI
 
-The control plane UI for Nokku. SvelteKit 5 with shadcn-svelte components and Tailwind CSS 4. The production build is embedded into the Go binary by `../web/embed.go`, so the backend serves it with no separate deployment.
+The control plane UI for Nokku. SvelteKit 3 and Svelte 5 with shadcn-svelte components and Tailwind CSS 4. The production build is embedded into the Go binary by `../web/embed.go`, so the backend serves it with no separate deployment.
 
 ## Commands
 
@@ -26,14 +26,15 @@ The look is terminal-native: compliance paper in light mode, a console at night 
 ### Where things live
 
 - `src/routes/layout.css` holds every token. Colors, radius, the `text-2xs` size, the `spec-label` utility, the blink animation and the console palette (`--terminal`, `--ansi-0..15`) that xterm and asciinema both read. No raw palette classes, no hex in components.
-- `lib/components/ui` is shadcn-svelte plus a few registry extras. Our own variants live in place: `Badge` has `success`, `warning`, `info` and `muted`, and `Empty.Command` renders a `$ prompt` hint.
+- `lib/components/ui` is shadcn-svelte plus a few registry extras. `pnpm shadup` overwrites it, so never edit it by hand.
+- `lib/components/ext` holds our additions to those components. Each folder re-exports the `ui` one and adds to it: `Badge` and `Alert` get the tone variants (`success`, `warning`, `info`, and `muted` for Badge), and `Empty.Command` renders a `$ prompt` hint. Import from `ext` when you need one of these. Small style overrides go in `layout.css` by `data-slot`.
 - `lib/components/layout` is the app shell: sidebar, header, footer, command palette, `PageHeader` and `routes.ts`, the single source for titles, icons, roles and `g` shortcuts.
-- `lib/components/blocks` holds generic compositions used in more than one place: `FormModal`, `ConfirmDialog`, `AuthCard`, `StatTile`, `StatusDot`, `SecretReveal`, `FilterPill`, `CopyText`, `SaveStatus` and friends.
+- `lib/components/blocks` holds generic compositions used in more than one place: `FormModal`, `ConfirmDialog`, `AuthCard`, `StatTile`, `StatusDot`, `SecretReveal`, `InputGroupVariants`, `FilterPill`, `CopyText`, `SaveStatus` and friends.
 - Feature folders (`access`, `audit`, `sheets`, `modals`, `tables`, `dashboard`) hold domain pieces. A component with one user stays next to its route.
 
 ### Status colors
 
-`lib/tone.ts` defines one `Tone` (`success`, `warning`, `info`, `destructive`, `muted`) and maps status words to it with `statusTone()`. Tone names match Badge variants, so `<Badge variant={tone}>` works. Use `StatusDot` for live state and `toneText`, `toneSoft` or `toneBg` when a class is needed.
+`lib/tone.ts` defines one `Tone` (`success`, `warning`, `info`, `destructive`, `muted`) and maps status words to it with `statusTone()`. Tone names match the `ext` Badge variants, so `<Badge variant={tone}>` works. Use `StatusDot` for live state and `toneText`, `toneSoft` or `toneBg` when a class is needed.
 
 ### Which block for what
 

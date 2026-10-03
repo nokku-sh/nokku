@@ -1,9 +1,9 @@
 <script lang="ts">
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import { confirmState } from '$lib/hooks';
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { confirmState } from '#lib/hooks/index.js';
 	import { TriangleAlert } from '@lucide/svelte';
 	import CopyText from './CopyText.svelte';
 

@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { confirm } from '$lib/hooks';
-	import { principal } from '$lib/api/principals.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
-	import { type ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
-	import type { Team } from '$lib/gen/nokku/v1/team_pb';
-	import type { User } from '$lib/gen/nokku/v1/account_pb';
-	import { formatTs } from '$lib/utils';
+	import { confirm } from '#lib/hooks/index.js';
+	import { principal } from '#lib/api/principals.svelte.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+	import { type ServiceAccount } from '#lib/gen/nokku/v1/service_account_pb.js';
+	import type { Team } from '#lib/gen/nokku/v1/team_pb.js';
+	import type { User } from '#lib/gen/nokku/v1/account_pb.js';
+	import { formatTs } from '#lib/utils.js';
 	import {
 		Users,
 		Bot,

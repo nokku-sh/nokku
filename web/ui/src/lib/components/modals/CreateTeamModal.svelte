@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { create } from '@bufbuild/protobuf';
 	import { Users } from '@lucide/svelte';
-	import { team as teamApi } from '$lib/api/team.svelte';
-	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { TeamSchema } from '$lib/gen/nokku/v1/team_pb';
-	import { useSheet } from '$lib/hooks';
-	import FormModal from '$lib/components/blocks/FormModal.svelte';
+	import { team as teamApi } from '#lib/api/team.svelte.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { TeamSchema } from '#lib/gen/nokku/v1/team_pb.js';
+	import { useSheet } from '#lib/hooks/index.js';
+	import FormModal from '#lib/components/blocks/FormModal.svelte';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 

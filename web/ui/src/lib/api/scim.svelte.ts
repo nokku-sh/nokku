@@ -1,7 +1,7 @@
 import { toast } from 'svelte-sonner';
-import { useMutation, useQuery } from '$lib/query';
-import { SCIMService } from '$lib/gen/nokku/v1/scim_pb';
-import { workspaceID } from '$lib/store.svelte';
+import { useMutation, useQuery } from '#lib/query/index.js';
+import { SCIMService } from '#lib/gen/nokku/v1/scim_pb.js';
+import { workspaceID } from '#lib/store.svelte.js';
 
 export const scim = {
 	listTokens: () =>

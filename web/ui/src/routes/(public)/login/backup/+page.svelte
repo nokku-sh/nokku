@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import * as Field from '$lib/components/ui/field';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
-	import * as InputOTP from '$lib/components/ui/input-otp';
-	import { auth } from '$lib/api/auth.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
+	import * as InputOTP from '#lib/components/ui/input-otp/index.js';
+	import { auth } from '#lib/api/auth.svelte.js';
 	import { BinaryIcon, ShieldCheck, Undo2Icon } from '@lucide/svelte';
 	import { REGEXP_ONLY_DIGITS_AND_CHARS, type PinInputCell } from 'bits-ui';
 

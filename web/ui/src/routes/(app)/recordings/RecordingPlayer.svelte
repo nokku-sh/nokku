@@ -2,11 +2,11 @@
 	import { untrack } from 'svelte';
 	import { create as createAsciinemaPlayer, type Player } from 'asciinema-player';
 	import 'asciinema-player/dist/bundle/asciinema-player.css';
-	import { recordings } from '$lib/api/recordings.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import type { Recording } from '$lib/gen/nokku/v1/recordings_pb';
+	import { recordings } from '#lib/api/recordings.svelte.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import type { Recording } from '#lib/gen/nokku/v1/recordings_pb.js';
 	import { TriangleAlert, RefreshCw } from '@lucide/svelte';
 
 	interface Props {

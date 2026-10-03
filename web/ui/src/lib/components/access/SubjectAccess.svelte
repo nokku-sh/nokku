@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { principal as principalApi } from '$lib/api/principals.svelte';
-	import { target as targetApi } from '$lib/api/targets.svelte';
-	import { team as teamApi } from '$lib/api/team.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Empty from '$lib/components/ui/empty';
-	import * as InputGroup from '$lib/components/ui/input-group';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import Chip from '$lib/components/blocks/Chip.svelte';
-	import { SubjectKind, type Principal } from '$lib/gen/nokku/v1/principal_pb';
-	import type { Target } from '$lib/gen/nokku/v1/target_pb';
+	import { principal as principalApi } from '#lib/api/principals.svelte.js';
+	import { target as targetApi } from '#lib/api/targets.svelte.js';
+	import { team as teamApi } from '#lib/api/team.svelte.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import * as InputGroup from '#lib/components/ui/input-group/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import Chip from '#lib/components/blocks/Chip.svelte';
+	import { SubjectKind, type Principal } from '#lib/gen/nokku/v1/principal_pb.js';
+	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { Search, Server, ShieldOff, SquareTerminal, Users } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import GrantPopover from './GrantPopover.svelte';

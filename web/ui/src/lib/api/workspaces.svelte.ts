@@ -1,13 +1,13 @@
-import { MAX_PAGE_SIZE } from '$lib/config';
-import { WorkspaceService } from '$lib/gen/nokku/v1/workspace_pb';
+import { MAX_PAGE_SIZE } from '#lib/config.js';
+import { WorkspaceService } from '#lib/gen/nokku/v1/workspace_pb.js';
 import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
-import { AuditLogFilterSchema, UtilService } from '$lib/gen/nokku/v1/util_pb';
+import { AuditLogFilterSchema, UtilService } from '#lib/gen/nokku/v1/util_pb.js';
 import type { MessageInitShape } from '@bufbuild/protobuf';
-import { InvitationService } from '$lib/gen/nokku/v1/invitation_pb';
+import { InvitationService } from '#lib/gen/nokku/v1/invitation_pb.js';
 import { extract, type MaybeGetter } from 'runed';
-import { useMutation, useQuery } from '$lib/query';
-import { inviteToken, workspaceID } from '$lib/store.svelte';
+import { useMutation, useQuery } from '#lib/query/index.js';
+import { inviteToken, workspaceID } from '#lib/store.svelte.js';
 
 export const workspace = {
 	get: () =>

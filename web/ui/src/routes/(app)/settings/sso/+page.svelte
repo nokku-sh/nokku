@@ -1,18 +1,18 @@
 <script lang="ts">
-	import * as Tabs from '$lib/components/ui/tabs';
-	import { billing } from '$lib/api/billing.svelte';
-	import { activeSSOTab } from '$lib/store.svelte';
-	import { domain } from '$lib/api/sso.svelte';
+	import * as Tabs from '#lib/components/ui/tabs/index.js';
+	import { billing } from '#lib/api/billing.svelte.js';
+	import { activeSSOTab } from '#lib/store.svelte.js';
+	import { domain } from '#lib/api/sso.svelte.js';
 	import { Globe, UsersRound } from '@lucide/svelte';
 	import DomainTab from './DomainTab.svelte';
 	import OIDCTab from './OIDCTab.svelte';
 	import SCIMTab from './SCIMTab.svelte';
 	import SAMLTab from './SAMLTab.svelte';
-	import { OIDCIcon, SAMLIcon } from '$lib/assets';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import * as Empty from '$lib/components/ui/empty';
-	import { Button } from '$lib/components/ui/button';
-	import { UpgradeURL } from '$lib/config';
+	import { OIDCIcon, SAMLIcon } from '#lib/assets/index.js';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { UpgradeURL } from '#lib/config.js';
 
 	const billingData = billing.get();
 	const samlAvailable = $derived(billingData.data?.features?.['saml'] === true);

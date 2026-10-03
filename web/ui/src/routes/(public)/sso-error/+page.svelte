@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { afterNavigate, replaceState } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
-	import { Button } from '$lib/components/ui/button';
+	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import { CircleAlert, LogIn } from '@lucide/svelte';
 
 	type ErrorInfo = { title: string; description: string };
@@ -70,9 +70,11 @@
 	const code = page.url.searchParams.get('error') ?? 'unknown';
 	const info = $derived(codes[code] ?? codes.unknown);
 
-	afterNavigate(() => {
+	afterNavigate(({ shallow }) => {
+		if (shallow) return;
+
 		// Strip the param so a refresh or back navigation doesn't re-show it.
-		replaceState('/sso-error', {});
+		goto('/sso-error', { shallow: true, replace: true });
 	});
 </script>
 

@@ -3,8 +3,8 @@
 		AuthorityType,
 		CertificateAuthoritySchema,
 		CertificateKeyType
-	} from '$lib/gen/nokku/v1/certificates_pb';
-	import { secToD } from '$lib/utils';
+	} from '#lib/gen/nokku/v1/certificates_pb.js';
+	import { secToD } from '#lib/utils.js';
 	import { create, type MessageInitShape } from '@bufbuild/protobuf';
 
 	function defaultCADraft(): MessageInitShape<typeof CertificateAuthoritySchema> {
@@ -32,20 +32,20 @@
 </script>
 
 <script lang="ts">
-	import FormModal from '$lib/components/blocks/FormModal.svelte';
-	import { ca as caApi } from '$lib/api/certificates.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
-	import * as RadioGroup from '$lib/components/ui/radio-group';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import * as Stepper from '$lib/components/ui/stepper';
-	import { Switch } from '$lib/components/ui/switch';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import * as ToggleGroup from '$lib/components/ui/toggle-group';
-	import DurationInput from '$lib/components/blocks/DurationInput.svelte';
-	import { useSheet } from '$lib/hooks';
+	import FormModal from '#lib/components/blocks/FormModal.svelte';
+	import { ca as caApi } from '#lib/api/certificates.svelte.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import * as RadioGroup from '#lib/components/ui/radio-group/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import * as Stepper from '#lib/components/ui/stepper/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
+	import { useSheet } from '#lib/hooks/index.js';
 	import { Check, Shield } from '@lucide/svelte';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();

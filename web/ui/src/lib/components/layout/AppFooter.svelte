@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { util } from '$lib/api/workspaces.svelte';
-	import ModeSwitch from '$lib/components/blocks/ModeSwitch.svelte';
-	import LegalLinks from '$lib/components/blocks/LegalLinks.svelte';
+	import { util } from '#lib/api/workspaces.svelte.js';
+	import ModeSwitch from '#lib/components/blocks/ModeSwitch.svelte';
+	import LegalLinks from '#lib/components/blocks/LegalLinks.svelte';
 
 	const version = util.getVersion();
 </script>

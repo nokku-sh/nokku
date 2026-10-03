@@ -1,26 +1,26 @@
 <script lang="ts">
-	import { credentials, passkey, password } from '$lib/api/credential.svelte';
-	import { registerPasskey } from '$lib/api/passkey';
-	import { user, type LinkedAccount } from '$lib/api/user.svelte';
-	import { GitHubIcon, GoogleIcon, OIDCIcon, SAMLIcon } from '$lib/assets';
-	import Section from '$lib/components/sheets/Section.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Collapsible from '$lib/components/ui/collapsible';
-	import * as Field from '$lib/components/ui/field';
-	import { InputGroupVariants } from '$lib/components/ui/input-group';
-	import * as Item from '$lib/components/ui/item';
-	import { Progress } from '$lib/components/ui/progress';
-	import { Rename } from '$lib/components/ui/rename';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { formatTs } from '$lib/utils';
+	import { credentials, passkey, password } from '#lib/api/credential.svelte.js';
+	import { registerPasskey } from '#lib/api/passkey.js';
+	import { user, type LinkedAccount } from '#lib/api/user.svelte.js';
+	import { GitHubIcon, GoogleIcon, OIDCIcon, SAMLIcon } from '#lib/assets/index.js';
+	import Section from '#lib/components/sheets/Section.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import { Progress } from '#lib/components/ui/progress/index.js';
+	import { Rename } from '#lib/components/ui/rename/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
+	import { formatTs } from '#lib/utils.js';
 	import type { Timestamp } from '@bufbuild/protobuf/wkt';
 	import { KeyRound, Link, Lock, Plus, Trash2, Unlink } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
-	import { confirm } from '$lib/hooks';
+	import { confirm } from '#lib/hooks/index.js';
 
 	const all = credentials.all();
 

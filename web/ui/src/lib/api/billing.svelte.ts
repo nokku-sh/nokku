@@ -1,6 +1,6 @@
-import { BillingService } from '$lib/gen/nokku/v1/billing_pb';
-import { useMutation, useQuery } from '$lib/query';
-import { workspaceID } from '$lib/store.svelte';
+import { BillingService } from '#lib/gen/nokku/v1/billing_pb.js';
+import { useMutation, useQuery } from '#lib/query/index.js';
+import { workspaceID } from '#lib/store.svelte.js';
 import { toast } from 'svelte-sonner';
 
 export const billing = {

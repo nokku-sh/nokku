@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { getSessions, removeSession, type TerminalSession } from '$lib/api/terminal.svelte';
-	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { confirm } from '$lib/hooks';
-	import { activeSessionID } from '$lib/store.svelte';
-	import { statusTone } from '$lib/tone';
+	import { getSessions, removeSession, type TerminalSession } from '#lib/api/terminal.svelte.js';
+	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
+	import { confirm } from '#lib/hooks/index.js';
+	import { activeSessionID } from '#lib/store.svelte.js';
+	import { statusTone } from '#lib/tone.js';
 	import { X } from '@lucide/svelte';
 
 	const sessions = $derived(getSessions());

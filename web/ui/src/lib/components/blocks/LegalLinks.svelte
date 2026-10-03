@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { util } from '$lib/api/workspaces.svelte';
-	import { cn } from '$lib/utils';
+	import { util } from '#lib/api/workspaces.svelte.js';
+	import { cn } from '#lib/utils.js';
 
 	let { class: className }: { class?: string } = $props();
 

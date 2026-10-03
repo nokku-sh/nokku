@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatTs } from '$lib/utils';
+	import { formatTs } from '#lib/utils.js';
 	import type { Timestamp } from '@bufbuild/protobuf/wkt';
 
 	type Props = {

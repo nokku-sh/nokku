@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Button, type ButtonSize, type ButtonVariant } from '$lib/components/ui/button';
-	import * as Command from '$lib/components/ui/command';
-	import SearchPopover from '$lib/components/blocks/SearchPopover.svelte';
+	import { Button, type ButtonSize, type ButtonVariant } from '#lib/components/ui/button/index.js';
+	import * as Command from '#lib/components/ui/command/index.js';
+	import SearchPopover from '#lib/components/blocks/SearchPopover.svelte';
 	import { Check, UserPlus } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import SubjectAvatar from './SubjectAvatar.svelte';

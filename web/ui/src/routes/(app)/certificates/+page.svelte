@@ -1,33 +1,33 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { ca } from '$lib/api/certificates.svelte';
-	import { plural } from '$lib/api/bulk';
-	import { confirm, createModalState, useSheet } from '$lib/hooks';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import CreateCAModal from '$lib/components/modals/CreateCAModal.svelte';
-	import CASheet from '$lib/components/sheets/CASheet.svelte';
-	import SignModal from '$lib/components/modals/SignModal.svelte';
+	import { ca } from '#lib/api/certificates.svelte.js';
+	import { plural } from '#lib/api/bulk.js';
+	import { confirm, createModalState, useSheet } from '#lib/hooks/index.js';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import CreateCAModal from '#lib/components/modals/CreateCAModal.svelte';
+	import CASheet from '#lib/components/sheets/CASheet.svelte';
+	import SignModal from '#lib/components/modals/SignModal.svelte';
 	import {
 		DataTable,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
-	} from '$lib/components/tables';
+	} from '#lib/components/tables/index.js';
 	import {
 		ActionCell,
 		BadgeCell,
 		CANameCell,
 		CAStatusCell,
 		TimeCell
-	} from '$lib/components/tables/cells';
-	import { Button } from '$lib/components/ui/button';
+	} from '#lib/components/tables/cells/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import {
 		AuthorityType,
 		CertificateKeyType,
 		type CertificateAuthority
-	} from '$lib/gen/nokku/v1/certificates_pb';
-	import { enumLabel } from '$lib/utils';
+	} from '#lib/gen/nokku/v1/certificates_pb.js';
+	import { enumLabel } from '#lib/utils.js';
 	import { KeyRound, Plus, Shield, ShieldAlert, Trash2 } from '@lucide/svelte';
 
 	const sheet = useSheet();

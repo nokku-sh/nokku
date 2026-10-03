@@ -1,22 +1,27 @@
 <script lang="ts">
-	import { recordings } from '$lib/api/recordings.svelte';
+	import { recordings } from '#lib/api/recordings.svelte.js';
 	import RecordingPlayer from './RecordingPlayer.svelte';
 	import {
 		DataTable,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
-	} from '$lib/components/tables';
+	} from '#lib/components/tables/index.js';
 	import { page } from '$app/state';
-	import { daemon } from '$lib/api/daemons.svelte';
-	import { ActionCell, StatusCell, TextCell, TimeCell } from '$lib/components/tables/cells';
+	import { daemon } from '#lib/api/daemons.svelte.js';
+	import {
+		ActionCell,
+		StatusCell,
+		TextCell,
+		TimeCell
+	} from '#lib/components/tables/cells/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import StorageQuotaPill from './StorageQuotaPill.svelte';
-	import { confirm, createModalState, usePagination } from '$lib/hooks';
-	import { plural } from '$lib/api/bulk';
-	import { formatBytes } from '$lib/utils';
-	import type { Recording } from '$lib/gen/nokku/v1/recordings_pb';
+	import { confirm, createModalState, usePagination } from '#lib/hooks/index.js';
+	import { plural } from '#lib/api/bulk.js';
+	import { formatBytes } from '#lib/utils.js';
+	import type { Recording } from '#lib/gen/nokku/v1/recordings_pb.js';
 	import { Bot, Play, Trash2, Video } from '@lucide/svelte';
 
 	const pager = usePagination();

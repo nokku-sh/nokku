@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { describeAgent } from '$lib/agent';
-	import { session, sessionKindLabel, sessionMethodLabel } from '$lib/api/session.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Item from '$lib/components/ui/item';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { formatTs } from '$lib/utils';
+	import { describeAgent } from '#lib/agent.js';
+	import { session, sessionKindLabel, sessionMethodLabel } from '#lib/api/session.svelte.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { formatTs } from '#lib/utils.js';
 	import { LogOut, Monitor, Smartphone, Terminal } from '@lucide/svelte';
-	import { confirm } from '$lib/hooks';
+	import { confirm } from '#lib/hooks/index.js';
 
 	const sessions = session.list();
 

@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { billing as billingApi } from '$lib/api/billing.svelte';
-	import FormModal from '$lib/components/blocks/FormModal.svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Field from '$lib/components/ui/field';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import { Switch } from '$lib/components/ui/switch';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import type { GetBillingResponse } from '$lib/gen/nokku/v1/billing_pb';
-	import type { Tone } from '$lib/tone';
-	import { formatTs } from '$lib/utils';
+	import { billing as billingApi } from '#lib/api/billing.svelte.js';
+	import FormModal from '#lib/components/blocks/FormModal.svelte';
+	import * as Alert from '#lib/components/ext/alert/index.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import type { GetBillingResponse } from '#lib/gen/nokku/v1/billing_pb.js';
+	import type { Tone } from '#lib/tone.js';
+	import { formatTs } from '#lib/utils.js';
 	import { CalendarX, CreditCard, ExternalLink, ShieldAlert } from '@lucide/svelte';
 
 	let { billing }: { billing: GetBillingResponse } = $props();

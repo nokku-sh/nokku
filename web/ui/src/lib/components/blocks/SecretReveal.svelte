@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import * as Field from '$lib/components/ui/field';
-	import { InputGroupVariants } from '$lib/components/ui/input-group';
+	import * as Alert from '#lib/components/ext/alert/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
 	import { KeyRound } from '@lucide/svelte';
 
 	interface Props {

@@ -1,11 +1,11 @@
 <script lang="ts">
-	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Card from '$lib/components/ui/card';
-	import * as Item from '$lib/components/ui/item';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import type { LiveSession } from '$lib/gen/nokku/v1/dashboard_pb';
-	import { formatTs } from '$lib/utils';
+	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import type { LiveSession } from '#lib/gen/nokku/v1/dashboard_pb.js';
+	import { formatTs } from '#lib/utils.js';
 
 	let { sessions, loading }: { sessions: LiveSession[]; loading: boolean } = $props();
 </script>

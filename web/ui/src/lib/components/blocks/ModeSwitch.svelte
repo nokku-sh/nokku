@@ -2,7 +2,7 @@
 	import { mode, toggleMode } from 'mode-watcher';
 	import { tick } from 'svelte';
 	import { Sun, Moon } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.js';
 
 	let { ...restProps } = $props();
 

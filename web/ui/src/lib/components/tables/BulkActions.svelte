@@ -1,11 +1,11 @@
 <script lang="ts" generics="T">
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Select from '$lib/components/ui/select';
-	import { Separator } from '$lib/components/ui/separator';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
+	import { Separator } from '#lib/components/ui/separator/index.js';
 	import { XIcon } from '@lucide/svelte';
 	import { slide } from 'svelte/transition';
-	import { confirm } from '$lib/hooks';
+	import { confirm } from '#lib/hooks/index.js';
 	import type { BulkAction } from './types';
 
 	type Props<TData> = {

@@ -1,7 +1,7 @@
 import { Terminal, type ITerminalOptions, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SvelteMap } from 'svelte/reactivity';
-import { activeSessionID } from '$lib/store.svelte';
+import { activeSessionID } from '#lib/store.svelte.js';
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error';
 

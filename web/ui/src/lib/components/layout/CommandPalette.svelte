@@ -8,10 +8,10 @@
 
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { util, workspace } from '$lib/api/workspaces.svelte';
-	import * as Command from '$lib/components/ui/command';
-	import * as Kbd from '$lib/components/ui/kbd';
-	import { workspaceID } from '$lib/store.svelte';
+	import { util, workspace } from '#lib/api/workspaces.svelte.js';
+	import * as Command from '#lib/components/ui/command/index.js';
+	import * as Kbd from '#lib/components/ui/kbd/index.js';
+	import { workspaceID } from '#lib/store.svelte.js';
 	import {
 		AppRoutes,
 		SupportRoutes,

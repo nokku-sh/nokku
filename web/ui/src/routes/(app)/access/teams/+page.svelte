@@ -1,21 +1,26 @@
 <script lang="ts">
-	import { plural } from '$lib/api/bulk';
+	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
-	import { team } from '$lib/api/team.svelte';
-	import CreateTeamModal from '$lib/components/modals/CreateTeamModal.svelte';
-	import TeamSheet from '$lib/components/sheets/TeamSheet.svelte';
+	import { team } from '#lib/api/team.svelte.js';
+	import CreateTeamModal from '#lib/components/modals/CreateTeamModal.svelte';
+	import TeamSheet from '#lib/components/sheets/TeamSheet.svelte';
 	import {
 		DataTable,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
-	} from '$lib/components/tables';
-	import { ActionCell, AvatarCell, MemberCell, TimeCell } from '$lib/components/tables/cells';
-	import { Button } from '$lib/components/ui/button';
+	} from '#lib/components/tables/index.js';
+	import {
+		ActionCell,
+		AvatarCell,
+		MemberCell,
+		TimeCell
+	} from '#lib/components/tables/cells/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import type { Team } from '$lib/gen/nokku/v1/team_pb';
-	import { confirm, usePagination, useSheet } from '$lib/hooks';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import type { Team } from '#lib/gen/nokku/v1/team_pb.js';
+	import { confirm, usePagination, useSheet } from '#lib/hooks/index.js';
 	import { PlusIcon, ShieldCheck, Trash2, Users } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 

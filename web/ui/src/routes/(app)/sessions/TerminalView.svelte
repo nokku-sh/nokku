@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TerminalSession } from '$lib/api/terminal.svelte';
+	import type { TerminalSession } from '#lib/api/terminal.svelte.js';
 	import '@xterm/xterm/css/xterm.css';
 
 	interface Props {

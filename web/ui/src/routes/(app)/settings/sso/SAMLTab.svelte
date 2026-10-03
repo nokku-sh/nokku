@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { sso } from '$lib/api/sso.svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
-	import { InputGroupVariants } from '$lib/components/ui/input-group';
-	import { Label } from '$lib/components/ui/label';
-	import { Separator } from '$lib/components/ui/separator';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import { Switch } from '$lib/components/ui/switch';
-	import { workspaceID } from '$lib/store.svelte';
+	import { sso } from '#lib/api/sso.svelte.js';
+	import * as Alert from '#lib/components/ui/alert/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
+	import { Label } from '#lib/components/ui/label/index.js';
+	import { Separator } from '#lib/components/ui/separator/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { workspaceID } from '#lib/store.svelte.js';
 	import { Download, Info, Save, TriangleAlert } from '@lucide/svelte';
 
 	let change = $state({

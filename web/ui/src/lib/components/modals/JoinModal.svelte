@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { Spinner } from '$lib/components/ui/spinner';
-	import { roleLabel } from '$lib/roles';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { roleLabel } from '#lib/roles.js';
 	import { goto } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { PartyPopper, CircleX, Users, Clock } from '@lucide/svelte';
-	import { invite } from '$lib/api/workspaces.svelte';
-	import { inviteToken } from '$lib/store.svelte';
-	import { formatTs, toDate } from '$lib/utils';
+	import { invite } from '#lib/api/workspaces.svelte.js';
+	import { inviteToken } from '#lib/store.svelte.js';
+	import { formatTs, toDate } from '#lib/utils.js';
 
 	const invitation = invite.get();
 	const claimInvitation = invite.claim();

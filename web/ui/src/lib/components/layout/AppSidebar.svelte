@@ -1,21 +1,21 @@
 <script lang="ts">
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import * as Sidebar from '$lib/components/ui/sidebar';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { Check, ChevronsUpDown, ChevronRight, Plus, SlidersHorizontal } from '@lucide/svelte';
 	import type { ComponentProps } from 'svelte';
 	import { AppRoutes, SupportRoutes, canSee, supportRoute, type RouteItem } from './routes';
 	import UserMenu from './UserMenu.svelte';
-	import { util, workspace } from '$lib/api/workspaces.svelte';
-	import { user } from '$lib/api/user.svelte';
-	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
+	import { util, workspace } from '#lib/api/workspaces.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
+	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import * as Collapsible from '$lib/components/ui/collapsible';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
 	import WorkspaceModal from '../modals/WorkspaceModal.svelte';
-	import { workspaceID } from '$lib/store.svelte';
-	import { WorkspaceSchema } from '$lib/gen/nokku/v1/workspace_pb';
-	import { createEntityModalState } from '$lib/hooks';
-	import NokkuCaret from '$lib/assets/nokku_caret.svelte';
+	import { workspaceID } from '#lib/store.svelte.js';
+	import { WorkspaceSchema } from '#lib/gen/nokku/v1/workspace_pb.js';
+	import { createEntityModalState } from '#lib/hooks/index.js';
+	import NokkuCaret from '#lib/assets/nokku_caret.svelte';
 
 	let { ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
 

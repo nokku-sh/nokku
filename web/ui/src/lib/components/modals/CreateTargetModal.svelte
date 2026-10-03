@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { create } from '@bufbuild/protobuf';
 	import { Server } from '@lucide/svelte';
-	import { ca } from '$lib/api/certificates.svelte';
-	import { target as targetApi } from '$lib/api/targets.svelte';
-	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
-	import { TagsInput } from '$lib/components/ui/tags-input';
-	import * as Select from '$lib/components/ui/select';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { TargetSchema } from '$lib/gen/nokku/v1/target_pb';
-	import { useSheet } from '$lib/hooks';
-	import FormModal from '$lib/components/blocks/FormModal.svelte';
+	import { ca } from '#lib/api/certificates.svelte.js';
+	import { target as targetApi } from '#lib/api/targets.svelte.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
+	import { useSheet } from '#lib/hooks/index.js';
+	import FormModal from '#lib/components/blocks/FormModal.svelte';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 

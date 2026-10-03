@@ -1,10 +1,10 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { auth } from '$lib/api/auth.svelte';
-	import { user } from '$lib/api/user.svelte';
-	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { auth } from '#lib/api/auth.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
+	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { LogOut } from '@lucide/svelte';
 	import { UserRoutes } from './routes';
 

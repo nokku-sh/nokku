@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { billing } from '$lib/api/billing.svelte';
-	import { recordings } from '$lib/api/recordings.svelte';
-	import * as HoverCard from '$lib/components/ui/hover-card';
-	import { Progress } from '$lib/components/ui/progress';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { cn, formatBytes } from '$lib/utils';
+	import { billing } from '#lib/api/billing.svelte.js';
+	import { recordings } from '#lib/api/recordings.svelte.js';
+	import * as HoverCard from '#lib/components/ui/hover-card/index.js';
+	import { Progress } from '#lib/components/ui/progress/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { cn, formatBytes } from '#lib/utils.js';
 	import { Database, TriangleAlert } from '@lucide/svelte';
 
 	const list = recordings.list();

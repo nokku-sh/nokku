@@ -1,10 +1,10 @@
-import { MAX_PAGE_SIZE } from '$lib/config';
-import { TeamService } from '$lib/gen/nokku/v1/team_pb';
+import { MAX_PAGE_SIZE } from '#lib/config.js';
+import { TeamService } from '#lib/gen/nokku/v1/team_pb.js';
 import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
 import { extract, type MaybeGetter } from 'runed';
-import { useMutation, useQuery } from '$lib/query';
-import { workspaceID } from '$lib/store.svelte';
+import { useMutation, useQuery } from '#lib/query/index.js';
+import { workspaceID } from '#lib/store.svelte.js';
 
 export const team = {
 	get: (id: MaybeGetter<string | undefined>) =>

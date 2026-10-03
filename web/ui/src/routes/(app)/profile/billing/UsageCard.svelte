@@ -1,11 +1,11 @@
 <script lang="ts">
-	import StatTile from '$lib/components/blocks/StatTile.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Card from '$lib/components/ui/card';
-	import * as Item from '$lib/components/ui/item';
-	import { Progress } from '$lib/components/ui/progress';
-	import type { GetBillingResponse } from '$lib/gen/nokku/v1/billing_pb';
-	import { formatBytes } from '$lib/utils';
+	import StatTile from '#lib/components/blocks/StatTile.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import { Progress } from '#lib/components/ui/progress/index.js';
+	import type { GetBillingResponse } from '#lib/gen/nokku/v1/billing_pb.js';
+	import { formatBytes } from '#lib/utils.js';
 	import { Boxes, Check, Clock, Database, Lock } from '@lucide/svelte';
 
 	let { billing }: { billing: GetBillingResponse } = $props();

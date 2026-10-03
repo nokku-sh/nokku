@@ -1,7 +1,7 @@
 import type { LucideIcon } from '@lucide/svelte';
-import type { ButtonVariant } from '$lib/components/ui/button';
-import type { ConfirmOptions } from '$lib/hooks/use-confirm.svelte';
-import type { FilterOption } from '$lib/components/blocks/FilterPill.svelte';
+import type { ButtonVariant } from '#lib/components/ui/button/index.js';
+import type { ConfirmOptions } from '#lib/hooks/use-confirm.svelte.js';
+import type { FilterOption } from '#lib/components/blocks/FilterPill.svelte';
 
 export type BulkAction<T> = {
 	type: 'button' | 'select';

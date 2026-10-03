@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { EventLog } from '$lib/gen/nokku/v1/util_pb';
-	import { kindIcon, kindOf, setParams } from '$lib/components/audit/audit';
+	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { kindIcon, kindOf, setParams } from '#lib/components/audit/audit.js';
 
 	let { log }: { log: EventLog } = $props();
 

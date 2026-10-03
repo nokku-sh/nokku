@@ -1,5 +1,5 @@
-import { DocsURL } from '$lib/config';
-import { atLeast, type RoleName } from '$lib/roles';
+import { DocsURL } from '#lib/config.js';
+import { atLeast, type RoleName } from '#lib/roles.js';
 import {
 	Activity,
 	BookText,

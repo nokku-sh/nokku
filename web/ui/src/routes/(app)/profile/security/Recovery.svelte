@@ -1,17 +1,17 @@
 <script lang="ts">
-	import SecretReveal from '$lib/components/blocks/SecretReveal.svelte';
-	import { UseClipboard } from '$lib/hooks/use-clipboard.svelte';
+	import SecretReveal from '#lib/components/blocks/SecretReveal.svelte';
+	import { UseClipboard } from '#lib/hooks/use-clipboard.svelte.js';
 	import { Check } from '@lucide/svelte';
-	import { backupCode, password } from '$lib/api/credential.svelte';
-	import { user } from '$lib/api/user.svelte';
-	import Section from '$lib/components/sheets/Section.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Field from '$lib/components/ui/field';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import { Switch } from '$lib/components/ui/switch';
+	import { backupCode, password } from '#lib/api/credential.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
+	import Section from '#lib/components/sheets/Section.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Binary, Copy, Download, Mail } from '@lucide/svelte';
-	import { confirm } from '$lib/hooks';
+	import { confirm } from '#lib/hooks/index.js';
 
 	const me = user.self();
 

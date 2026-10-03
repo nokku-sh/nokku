@@ -1,10 +1,10 @@
-import { serviceAccount } from '$lib/api/service_account.svelte';
-import { team } from '$lib/api/team.svelte';
-import { workspace } from '$lib/api/workspaces.svelte';
-import { SubjectKind, type Principal } from '$lib/gen/nokku/v1/principal_pb';
-import type { ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
-import type { Team } from '$lib/gen/nokku/v1/team_pb';
-import type { WorkspaceMember } from '$lib/gen/nokku/v1/workspace_pb';
+import { serviceAccount } from '#lib/api/service_account.svelte.js';
+import { team } from '#lib/api/team.svelte.js';
+import { workspace } from '#lib/api/workspaces.svelte.js';
+import { SubjectKind, type Principal } from '#lib/gen/nokku/v1/principal_pb.js';
+import type { ServiceAccount } from '#lib/gen/nokku/v1/service_account_pb.js';
+import type { Team } from '#lib/gen/nokku/v1/team_pb.js';
+import type { WorkspaceMember } from '#lib/gen/nokku/v1/workspace_pb.js';
 
 export type Subject = {
 	id: string;

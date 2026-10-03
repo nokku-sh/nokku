@@ -1,20 +1,20 @@
 <script lang="ts">
-	import { dashboard } from '$lib/api/dashboard.svelte';
-	import { user } from '$lib/api/user.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import GetStarted from '$lib/components/dashboard/GetStarted.svelte';
-	import LiveNow from '$lib/components/dashboard/LiveNow.svelte';
-	import NeedsYou from '$lib/components/dashboard/NeedsYou.svelte';
-	import Pulse from '$lib/components/dashboard/Pulse.svelte';
-	import SetupWorkspace from '$lib/components/dashboard/SetupWorkspace.svelte';
-	import StatusLine from '$lib/components/dashboard/StatusLine.svelte';
-	import YourServers from '$lib/components/dashboard/YourServers.svelte';
-	import { issuesOf } from '$lib/components/dashboard/issues';
-	import JoinModal from '$lib/components/modals/JoinModal.svelte';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { atLeast } from '$lib/roles';
-	import { workspaceID } from '$lib/store.svelte';
+	import { dashboard } from '#lib/api/dashboard.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import GetStarted from '#lib/components/dashboard/GetStarted.svelte';
+	import LiveNow from '#lib/components/dashboard/LiveNow.svelte';
+	import NeedsYou from '#lib/components/dashboard/NeedsYou.svelte';
+	import Pulse from '#lib/components/dashboard/Pulse.svelte';
+	import SetupWorkspace from '#lib/components/dashboard/SetupWorkspace.svelte';
+	import StatusLine from '#lib/components/dashboard/StatusLine.svelte';
+	import YourServers from '#lib/components/dashboard/YourServers.svelte';
+	import { issuesOf } from '#lib/components/dashboard/issues.js';
+	import JoinModal from '#lib/components/modals/JoinModal.svelte';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { atLeast } from '#lib/roles.js';
+	import { workspaceID } from '#lib/store.svelte.js';
 	import { SquareTerminal } from '@lucide/svelte';
 
 	const me = user.self();
