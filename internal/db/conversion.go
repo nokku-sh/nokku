@@ -132,6 +132,7 @@ func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
 		RoleName:    &s.RoleName,
 		Tags:        s.Tags,
 		ExpiresAt:   SafeTimestamp(s.ExpiresAt),
+		LastUsedAt:  SafeTimestamp(s.LastUsedAt),
 		CreatedAt:   SafeTimestamp(&s.CreatedAt),
 		UpdatedAt:   SafeTimestamp(&s.UpdatedAt),
 	}
