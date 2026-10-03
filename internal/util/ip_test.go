@@ -69,7 +69,7 @@ func TestGetRemoteIP_TrustedProxyHeaders(t *testing.T) {
 	header := func(pairs ...string) http.Header {
 		h := http.Header{}
 		for i := 0; i < len(pairs); i += 2 {
-			h.Set(pairs[i], pairs[i+1])
+			h.Add(pairs[i], pairs[i+1])
 		}
 		return h
 	}
@@ -81,53 +81,62 @@ func TestGetRemoteIP_TrustedProxyHeaders(t *testing.T) {
 		want       string
 	}{
 		{
-			name: "trusted proxy: True-Client-Ip wins",
+			name: "client-sent True-Client-Ip and X-Real-IP are never read",
 			header: header(
-				"True-Client-Ip",
-				"203.0.113.1",
-				"X-Real-IP",
-				"203.0.113.2",
-				"X-Forwarded-For",
-				"203.0.113.3",
+				"True-Client-Ip", "203.0.113.1",
+				"X-Real-IP", "203.0.113.2",
+				"X-Forwarded-For", "203.0.113.3",
 			),
 			remoteAddr: "10.1.2.3:5555",
-			want:       "203.0.113.1",
+			want:       "203.0.113.3",
 		},
 		{
-			name:       "trusted proxy: X-Real-IP fallback",
-			header:     header("X-Real-IP", "203.0.113.2", "X-Forwarded-For", "203.0.113.3"),
+			name:       "without XFF the other headers do not count",
+			header:     header("True-Client-Ip", "203.0.113.1", "X-Real-IP", "203.0.113.2"),
 			remoteAddr: "10.1.2.3:5555",
-			want:       "203.0.113.2",
+			want:       "10.1.2.3",
 		},
 		{
-			name:       "trusted proxy: XFF first entry",
+			name:       "rightmost hop that is not a trusted proxy",
 			header:     header("X-Forwarded-For", "203.0.113.4, 10.1.2.3, 10.0.0.1"),
 			remoteAddr: "10.1.2.3:5555",
 			want:       "203.0.113.4",
 		},
 		{
-			name:       "trusted proxy: empty headers fall back to peer",
-			header:     header("X-Real-IP", ""),
+			name:       "a client-sent left entry is not the client",
+			header:     header("X-Forwarded-For", "198.51.100.99, 203.0.113.4"),
+			remoteAddr: "10.1.2.3:5555",
+			want:       "203.0.113.4",
+		},
+		{
+			name:       "several XFF header lines are one list",
+			header:     header("X-Forwarded-For", "198.51.100.99", "X-Forwarded-For", "203.0.113.4"),
+			remoteAddr: "10.1.2.3:5555",
+			want:       "203.0.113.4",
+		},
+		{
+			name:       "only trusted hops fall back to the peer",
+			header:     header("X-Forwarded-For", "10.0.0.9"),
 			remoteAddr: "10.1.2.3:5555",
 			want:       "10.1.2.3",
 		},
 		{
-			name:       "whitespace-only XFF yields empty ip (documented behavior)",
+			name:       "an entry that is not an IP falls back to the peer",
+			header:     header("X-Forwarded-For", "203.0.113.4, not-an-ip"),
+			remoteAddr: "10.1.2.3:5555",
+			want:       "10.1.2.3",
+		},
+		{
+			name:       "empty XFF falls back to the peer",
 			header:     header("X-Forwarded-For", "  "),
 			remoteAddr: "10.1.2.3:5555",
-			want:       "",
+			want:       "10.1.2.3",
 		},
 		{
 			name:       "untrusted peer: spoofed header ignored",
-			header:     header("True-Client-Ip", "203.0.113.66"),
+			header:     header("X-Forwarded-For", "203.0.113.66"),
 			remoteAddr: "198.51.100.7:5555",
 			want:       "198.51.100.7",
-		},
-		{
-			name:       "peer outside trusted CIDR: header ignored",
-			header:     header("X-Forwarded-For", "203.0.113.66"),
-			remoteAddr: "172.16.5.5:5555",
-			want:       "172.16.5.5",
 		},
 	}
 
@@ -177,17 +186,14 @@ func TestGetRemoteIP_HeaderIPCanonicalization(t *testing.T) {
 		want   string
 	}{
 		{"v4-mapped v6 normalized to v4", "::ffff:203.0.113.1", "203.0.113.1"},
-		{"port in header value passes through verbatim", "203.0.113.1:8080", "203.0.113.1:8080"},
 		{"v6 collapsed to /64", "2001:db8:abcd:1234:5678:9abc:def0:1234", "2001:db8:abcd:1234::"},
-		{"garbage header passed through", "not-an-ip", "not-an-ip"},
+		{"a port is not an IP, the peer wins", "203.0.113.1:8080", "10.1.2.3"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Build via Set so the key is canonicalized (Header.Get
-			// canonicalizes lookups, literal map keys would be missed).
 			h := http.Header{}
-			h.Set("X-Real-IP", tt.header)
+			h.Set("X-Forwarded-For", tt.header)
 			if got := GetRemoteIP(h, "10.1.2.3:80"); got != tt.want {
 				t.Errorf("GetRemoteIP() = %q, want %q", got, tt.want)
 			}

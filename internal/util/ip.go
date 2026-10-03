@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 )
 
@@ -41,18 +42,7 @@ func parseProxy(entry string) (*net.IPNet, error) {
 	return ipNet, nil
 }
 
-func isTrustedProxy(remoteAddr string) bool {
-	if len(trustedProxies) == 0 {
-		return false
-	}
-	host := remoteAddr
-	if h, _, err := net.SplitHostPort(remoteAddr); err == nil {
-		host = h
-	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return false
-	}
+func isTrustedProxy(ip net.IP) bool {
 	for _, ipNet := range trustedProxies {
 		if ipNet.Contains(ip) {
 			return true
@@ -61,24 +51,30 @@ func isTrustedProxy(remoteAddr string) bool {
 	return false
 }
 
+// GetRemoteIP reads only X-Forwarded-For, and only from a trusted proxy. The
+// client is the rightmost hop that is not a trusted proxy, everything left of
+// it is client-controlled. Other client IP headers pass through proxies
+// untouched, so they are never read.
 func GetRemoteIP(header http.Header, remoteAddr string) string {
-	if isTrustedProxy(remoteAddr) {
-		if tcip := header.Get("True-Client-Ip"); tcip != "" {
-			return canonicalizeIP(tcip)
+	peer := remoteAddr
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		peer = host
+	}
+	peerIP := net.ParseIP(peer)
+	if peerIP == nil || !isTrustedProxy(peerIP) {
+		return canonicalizeIP(peer)
+	}
+	hops := strings.Split(strings.Join(header.Values("X-Forwarded-For"), ","), ",")
+	for _, hop := range slices.Backward(hops) {
+		ip := net.ParseIP(strings.TrimSpace(hop))
+		if ip == nil {
+			break
 		}
-		if xrip := header.Get("X-Real-IP"); xrip != "" {
-			return canonicalizeIP(xrip)
-		}
-		if xff := header.Get("X-Forwarded-For"); xff != "" {
-			first, _, _ := strings.Cut(xff, ",")
-			return canonicalizeIP(strings.TrimSpace(first))
+		if !isTrustedProxy(ip) {
+			return canonicalizeIP(ip.String())
 		}
 	}
-	ip, _, err := net.SplitHostPort(remoteAddr)
-	if err != nil {
-		return remoteAddr
-	}
-	return canonicalizeIP(ip)
+	return canonicalizeIP(peer)
 }
 
 func canonicalizeIP(ip string) string {
