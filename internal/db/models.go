@@ -168,6 +168,7 @@ type ServiceAccount struct {
 type Session struct {
 	TokenHash   crypto.HashedToken `json:"tokenHash"`
 	SubjectID   string             `json:"subjectId"`
+	UserID      *string            `json:"userId"`
 	Kind        string             `json:"kind"`
 	Method      string             `json:"method"`
 	WorkspaceID *string            `json:"workspaceId"`

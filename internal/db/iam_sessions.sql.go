@@ -17,6 +17,7 @@ INSERT INTO
   sessions (
     token_hash,
     subject_id,
+    user_id,
     kind,
     method,
     workspace_id,
@@ -30,8 +31,11 @@ INSERT INTO
 VALUES
   (
     $1,
-    $2,
-    $3,
+    $2::TEXT,
+    CASE
+      WHEN $3::TEXT <> 'daemon' THEN ($2::TEXT)::UUID
+    END,
+    $3::TEXT,
     $4,
     $5,
     $6,
@@ -42,7 +46,7 @@ VALUES
     $11
   )
 RETURNING
-  token_hash, subject_id, kind, method, workspace_id, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
+  token_hash, subject_id, user_id, kind, method, workspace_id, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
 `
 
 type CreateSessionParams struct {
@@ -77,6 +81,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg *CreateSessionParams) (
 	err := row.Scan(
 		&i.TokenHash,
 		&i.SubjectID,
+		&i.UserID,
 		&i.Kind,
 		&i.Method,
 		&i.WorkspaceID,
@@ -153,7 +158,7 @@ func (q *Queries) DeleteSubjectSessions(ctx context.Context, subjectID string) (
 
 const getSession = `-- name: GetSession :one
 SELECT
-  token_hash, subject_id, kind, method, workspace_id, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
+  token_hash, subject_id, user_id, kind, method, workspace_id, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
 FROM
   sessions
 WHERE
@@ -166,6 +171,7 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash crypto.HashedToken) 
 	err := row.Scan(
 		&i.TokenHash,
 		&i.SubjectID,
+		&i.UserID,
 		&i.Kind,
 		&i.Method,
 		&i.WorkspaceID,
@@ -182,7 +188,7 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash crypto.HashedToken) 
 
 const listSessionsBySubject = `-- name: ListSessionsBySubject :many
 SELECT
-  token_hash, subject_id, kind, method, workspace_id, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
+  token_hash, subject_id, user_id, kind, method, workspace_id, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
 FROM
   sessions
 WHERE
@@ -203,6 +209,7 @@ func (q *Queries) ListSessionsBySubject(ctx context.Context, subjectID string) (
 		if err := rows.Scan(
 			&i.TokenHash,
 			&i.SubjectID,
+			&i.UserID,
 			&i.Kind,
 			&i.Method,
 			&i.WorkspaceID,

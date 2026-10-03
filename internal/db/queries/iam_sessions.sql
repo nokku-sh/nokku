@@ -3,6 +3,7 @@ INSERT INTO
   sessions (
     token_hash,
     subject_id,
+    user_id,
     kind,
     method,
     workspace_id,
@@ -16,8 +17,11 @@ INSERT INTO
 VALUES
   (
     @token_hash,
-    @subject_id,
-    @kind,
+    @subject_id::TEXT,
+    CASE
+      WHEN @kind::TEXT <> 'daemon' THEN (@subject_id::TEXT)::UUID
+    END,
+    @kind::TEXT,
     @method,
     sqlc.narg('workspace_id'),
     @binding,
