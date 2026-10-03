@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { create } from '@bufbuild/protobuf';
 	import { Dices, ScrollText } from '@lucide/svelte';
-	import { billing } from '$lib/api/billing.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Empty from '$lib/components/ui/empty';
-	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import { UpgradeURL } from '$lib/config';
-	import { WorkspaceSettingsSchema } from '$lib/gen/nokku/v1/workspace_pb';
+	import { billing } from '#lib/api/billing.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import { UpgradeURL } from '#lib/config.js';
+	import { WorkspaceSettingsSchema } from '#lib/gen/nokku/v1/workspace_pb.js';
 
 	const ws = workspace.get();
 	const plan = billing.get();

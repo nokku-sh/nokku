@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Avatar from '$lib/components/blocks/Avatar.svelte';
+	import Avatar from '#lib/components/blocks/Avatar.svelte';
 
 	type Props = {
 		id: string;

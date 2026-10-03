@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Tooltip from '$lib/components/ui/tooltip';
-	import type { EventLog } from '$lib/gen/nokku/v1/util_pb';
-	import { eventLabel, outcomeLabel, outcomeOf, setParams } from '$lib/components/audit/audit';
-	import EventIcon from '$lib/components/audit/EventIcon.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
+	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { eventLabel, outcomeLabel, outcomeOf, setParams } from '#lib/components/audit/audit.js';
+	import EventIcon from '#lib/components/audit/EventIcon.svelte';
 
 	let { log }: { log: EventLog } = $props();
 

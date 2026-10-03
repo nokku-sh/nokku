@@ -1,12 +1,12 @@
 import {
 	CertificateService,
 	SignSSHCertificateRequest_CertificateType
-} from '$lib/gen/nokku/v1/certificates_pb';
+} from '#lib/gen/nokku/v1/certificates_pb.js';
 import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
 import { extract, type MaybeGetter } from 'runed';
-import { useMutation, useQuery } from '$lib/query';
-import { workspaceID } from '$lib/store.svelte';
+import { useMutation, useQuery } from '#lib/query/index.js';
+import { workspaceID } from '#lib/store.svelte.js';
 
 export const sign = {
 	user: () =>

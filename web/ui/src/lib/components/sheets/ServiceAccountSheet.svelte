@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { principal as principalApi } from '$lib/api/principals.svelte';
-	import { serviceAccount as saApi } from '$lib/api/service_account.svelte';
-	import RolePicker from '$lib/components/access/RolePicker.svelte';
-	import SubjectAccess from '$lib/components/access/SubjectAccess.svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Field from '$lib/components/ui/field';
-	import { TagsInput } from '$lib/components/ui/tags-input';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
-	import { ServiceAccountSchema } from '$lib/gen/nokku/v1/service_account_pb';
-	import { confirm, useAutoSave, useDraft, useSheet } from '$lib/hooks';
-	import { formatTs, toDate } from '$lib/utils';
+	import { principal as principalApi } from '#lib/api/principals.svelte.js';
+	import { serviceAccount as saApi } from '#lib/api/service_account.svelte.js';
+	import RolePicker from '#lib/components/access/RolePicker.svelte';
+	import SubjectAccess from '#lib/components/access/SubjectAccess.svelte';
+	import * as Alert from '#lib/components/ui/alert/index.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
+	import * as Tabs from '#lib/components/ui/tabs/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+	import { ServiceAccountSchema } from '#lib/gen/nokku/v1/service_account_pb.js';
+	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
+	import { formatTs, toDate } from '#lib/utils.js';
 	import {
 		Bot,
 		FileText,

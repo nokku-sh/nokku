@@ -1,7 +1,7 @@
 <script lang="ts">
-	import * as Card from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import type { Principal } from '$lib/gen/nokku/v1/principal_pb';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import type { Principal } from '#lib/gen/nokku/v1/principal_pb.js';
 	import { Users, Bot, Terminal, CircleUser } from '@lucide/svelte';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 

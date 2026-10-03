@@ -1,14 +1,14 @@
 <script lang="ts">
-	import * as Empty from '$lib/components/ui/empty';
-	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
-	import { target } from '$lib/api/targets.svelte';
-	import { user } from '$lib/api/user.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
+	import { target } from '#lib/api/targets.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
 	import ConnectPopover from './ConnectPopover.svelte';
 	import { Server, WifiOff } from '@lucide/svelte';
-	import { InputGroupVariants } from '$lib/components/ui/input-group';
+	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
 
 	const currentUser = user.self();
 

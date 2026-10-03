@@ -1,25 +1,25 @@
 <script lang="ts">
-	import ExportMenu from '$lib/components/audit/ExportMenu.svelte';
-	import EventRow from '$lib/components/audit/EventRow.svelte';
-	import StatTile from '$lib/components/blocks/StatTile.svelte';
+	import ExportMenu from '#lib/components/audit/ExportMenu.svelte';
+	import EventRow from '#lib/components/audit/EventRow.svelte';
+	import StatTile from '#lib/components/blocks/StatTile.svelte';
 	import { page } from '$app/state';
-	import { sessionMethodLabel, session } from '$lib/api/session.svelte';
-	import { user } from '$lib/api/user.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import { areas, setParams } from '$lib/components/audit/audit';
-	import RangePicker, { currentRange } from '$lib/components/audit/RangePicker.svelte';
-	import ActivitySheet from '$lib/components/sheets/ActivitySheet.svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Empty from '$lib/components/ui/empty';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import * as ToggleGroup from '$lib/components/ui/toggle-group';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import { describeAgent } from '$lib/agent';
-	import { AuditOutcome, type EventLog } from '$lib/gen/nokku/v1/util_pb';
-	import { formatTs } from '$lib/utils';
+	import { sessionMethodLabel, session } from '#lib/api/session.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import { areas, setParams } from '#lib/components/audit/audit.js';
+	import RangePicker, { currentRange } from '#lib/components/audit/RangePicker.svelte';
+	import ActivitySheet from '#lib/components/sheets/ActivitySheet.svelte';
+	import * as Alert from '#lib/components/ui/alert/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import { describeAgent } from '#lib/agent.js';
+	import { AuditOutcome, type EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { formatTs } from '#lib/utils.js';
 	import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt';
 	import {
 		Activity,

@@ -1,28 +1,28 @@
 <script lang="ts">
-	import { plural } from '$lib/api/bulk';
+	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
-	import { ca } from '$lib/api/certificates.svelte';
-	import { target } from '$lib/api/targets.svelte';
-	import CreateTargetModal from '$lib/components/modals/CreateTargetModal.svelte';
-	import TargetSheet from '$lib/components/sheets/TargetSheet.svelte';
+	import { ca } from '#lib/api/certificates.svelte.js';
+	import { target } from '#lib/api/targets.svelte.js';
+	import CreateTargetModal from '#lib/components/modals/CreateTargetModal.svelte';
+	import TargetSheet from '#lib/components/sheets/TargetSheet.svelte';
 	import {
 		DataTable,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
-	} from '$lib/components/tables';
+	} from '#lib/components/tables/index.js';
 	import {
 		ActionCell,
 		AvatarCell,
 		PrincipalsCell,
 		TagsCell,
 		TimeCell
-	} from '$lib/components/tables/cells';
-	import { Button } from '$lib/components/ui/button';
+	} from '#lib/components/tables/cells/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import type { Target } from '$lib/gen/nokku/v1/target_pb';
-	import { confirm, usePagination, useSheet } from '$lib/hooks';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
+	import { confirm, usePagination, useSheet } from '#lib/hooks/index.js';
 	import { IdCard, Plus, Server, ShieldCheck, TagIcon, Trash2, UserIcon } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 

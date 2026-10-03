@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { Spinner } from '$lib/components/ui/spinner';
-	import { roles as rolesApi } from '$lib/api/roles.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Select from '$lib/components/ui/select';
-	import { roleColor, roleIcon, roleLabel } from '$lib/roles';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { roles as rolesApi } from '#lib/api/roles.svelte.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
+	import { roleColor, roleIcon, roleLabel } from '#lib/roles.js';
 	import { Crown } from '@lucide/svelte';
 
 	type Props = {

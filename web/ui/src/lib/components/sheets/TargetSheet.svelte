@@ -1,25 +1,25 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { ca } from '$lib/api/certificates.svelte';
-	import { daemon as daemonApi } from '$lib/api/daemons.svelte';
-	import { target as targetApi } from '$lib/api/targets.svelte';
-	import { grantsOf } from '$lib/components/access/subjects.svelte';
-	import TargetAccess from '$lib/components/access/TargetAccess.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import * as Empty from '$lib/components/ui/empty';
-	import * as Field from '$lib/components/ui/field';
-	import * as InputGroup from '$lib/components/ui/input-group';
-	import { TagsInput } from '$lib/components/ui/tags-input';
-	import * as Select from '$lib/components/ui/select';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import Chip from '$lib/components/blocks/Chip.svelte';
-	import CopyText from '$lib/components/blocks/CopyText.svelte';
-	import { TargetSchema } from '$lib/gen/nokku/v1/target_pb';
-	import { confirm, useAutoSave, useDraft, useSheet } from '$lib/hooks';
-	import { formatTs } from '$lib/utils';
+	import { ca } from '#lib/api/certificates.svelte.js';
+	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
+	import { target as targetApi } from '#lib/api/targets.svelte.js';
+	import { grantsOf } from '#lib/components/access/subjects.svelte.js';
+	import TargetAccess from '#lib/components/access/TargetAccess.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import * as InputGroup from '#lib/components/ui/input-group/index.js';
+	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
+	import * as Tabs from '#lib/components/ui/tabs/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import Chip from '#lib/components/blocks/Chip.svelte';
+	import CopyText from '#lib/components/blocks/CopyText.svelte';
+	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
+	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
+	import { formatTs } from '#lib/utils.js';
 	import { timestampFromDate } from '@bufbuild/protobuf/wkt';
 	import {
 		ChevronDown,
@@ -34,7 +34,7 @@
 		ShieldCheck,
 		SquareTerminal
 	} from '@lucide/svelte';
-	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
+	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
 	import { toast } from 'svelte-sonner';
 	import DangerZone from './DangerZone.svelte';
 	import DetailList from './DetailList.svelte';

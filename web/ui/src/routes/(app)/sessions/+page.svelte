@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { getSessions } from '$lib/api/terminal.svelte';
+	import { getSessions } from '#lib/api/terminal.svelte.js';
 	import ServerList from './ServerList.svelte';
 	import TerminalTabs from './TerminalTabs.svelte';
 	import TerminalView from './TerminalView.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Empty from '$lib/components/ui/empty';
-	import { activeSessionID } from '$lib/store.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Empty from '#lib/components/ext/empty/index.js';
+	import { activeSessionID } from '#lib/store.svelte.js';
 	import { PanelLeftClose, PanelLeftOpen, Terminal } from '@lucide/svelte';
 
 	let panelOpen = $state(true);

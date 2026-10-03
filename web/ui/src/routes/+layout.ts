@@ -1,4 +1,4 @@
-import { inviteToken } from '$lib/store.svelte';
+import { inviteToken } from '#lib/store.svelte.js';
 import type { LayoutLoad } from './$types';
 
 export const ssr = false;

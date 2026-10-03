@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { daemon as daemonApi } from '$lib/api/daemons.svelte';
-	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Empty from '$lib/components/ui/empty';
-	import * as Item from '$lib/components/ui/item';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import { DaemonStatus } from '$lib/gen/nokku/v1/daemon_pb';
+	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
+	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { DaemonStatus } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { Check, ChevronRight, CircleCheck } from '@lucide/svelte';
 	import type { Issue } from './issues';
 

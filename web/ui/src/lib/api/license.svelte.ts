@@ -1,5 +1,5 @@
-import { BillingService, type GetLicenseResponse } from '$lib/gen/nokku/v1/billing_pb';
-import { useMutation, useQuery } from '$lib/query';
+import { BillingService, type GetLicenseResponse } from '#lib/gen/nokku/v1/billing_pb.js';
+import { useMutation, useQuery } from '#lib/query/index.js';
 import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt';
 import { toast } from 'svelte-sonner';
 

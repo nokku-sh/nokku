@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { user } from '$lib/api/user.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import { Logo } from '$lib/assets';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Spinner } from '$lib/components/ui/spinner';
+	import { user } from '#lib/api/user.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import { Logo } from '#lib/assets/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { ArrowRight } from '@lucide/svelte';
 
 	const me = user.self();

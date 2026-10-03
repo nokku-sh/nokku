@@ -1,8 +1,8 @@
-import { MAX_PAGE_SIZE } from '$lib/config';
-import { ServiceAccountService } from '$lib/gen/nokku/v1/service_account_pb';
+import { MAX_PAGE_SIZE } from '#lib/config.js';
+import { ServiceAccountService } from '#lib/gen/nokku/v1/service_account_pb.js';
 import { extract, type MaybeGetter } from 'runed';
-import { useQuery, useMutation } from '$lib/query';
-import { workspaceID } from '$lib/store.svelte';
+import { useQuery, useMutation } from '#lib/query/index.js';
+import { workspaceID } from '#lib/store.svelte.js';
 import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
 

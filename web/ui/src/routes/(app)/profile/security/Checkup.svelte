@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { backupCode, passkey, password } from '$lib/api/credential.svelte';
-	import { user } from '$lib/api/user.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Card from '$lib/components/ui/card';
-	import { Progress } from '$lib/components/ui/progress';
+	import { backupCode, passkey, password } from '#lib/api/credential.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import { Progress } from '#lib/components/ui/progress/index.js';
 	import { Check, CircleAlert } from '@lucide/svelte';
 
 	const me = user.self();

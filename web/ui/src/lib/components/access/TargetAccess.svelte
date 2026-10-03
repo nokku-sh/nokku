@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { principal as principalApi } from '$lib/api/principals.svelte';
-	import { MAX_PAGE_SIZE } from '$lib/config';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import * as Empty from '$lib/components/ui/empty';
-	import * as InputGroup from '$lib/components/ui/input-group';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { SubjectKind, type Principal } from '$lib/gen/nokku/v1/principal_pb';
-	import { confirm } from '$lib/hooks';
+	import { principal as principalApi } from '#lib/api/principals.svelte.js';
+	import { MAX_PAGE_SIZE } from '#lib/config.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import * as InputGroup from '#lib/components/ui/input-group/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { SubjectKind, type Principal } from '#lib/gen/nokku/v1/principal_pb.js';
+	import { confirm } from '#lib/hooks/index.js';
 	import { Ellipsis, KeyRound, Plus, Search, SquareTerminal, Trash2 } from '@lucide/svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import SubjectChip from './SubjectChip.svelte';

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { GetDashboardResponse } from '$lib/gen/nokku/v1/dashboard_pb';
-	import { formatBytes, formatTs } from '$lib/utils';
+	import type { GetDashboardResponse } from '#lib/gen/nokku/v1/dashboard_pb.js';
+	import { formatBytes, formatTs } from '#lib/utils.js';
 	import type { Issue } from './issues';
 
 	interface Props {

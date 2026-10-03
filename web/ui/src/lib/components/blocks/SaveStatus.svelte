@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { Check, CircleX } from '@lucide/svelte';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import type { SaveState } from '$lib/hooks';
-	import { cn } from '$lib/utils';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import type { SaveState } from '#lib/hooks/index.js';
+	import { cn } from '#lib/utils.js';
 
 	interface Props {
 		state: SaveState;

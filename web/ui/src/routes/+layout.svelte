@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { authTransport, queryClient } from '$lib/api/client';
-	import { Toaster } from '$lib/components/ui/sonner';
-	import * as Tooltip from '$lib/components/ui/tooltip';
-	import ConfirmDialog from '$lib/components/blocks/ConfirmDialog.svelte';
-	import { setTransport } from '$lib/query';
+	import { authTransport, queryClient } from '#lib/api/client.js';
+	import { Toaster } from '#lib/components/ui/sonner/index.js';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
+	import ConfirmDialog from '#lib/components/blocks/ConfirmDialog.svelte';
+	import { setTransport } from '#lib/query/index.js';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { ModeWatcher } from 'mode-watcher';
 	import './layout.css';

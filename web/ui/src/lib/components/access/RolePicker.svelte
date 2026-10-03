@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { roles as rolesApi } from '$lib/api/roles.svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import * as ToggleGroup from '$lib/components/ui/toggle-group';
-	import { roleIcon, roleLabel } from '$lib/roles';
+	import { roles as rolesApi } from '#lib/api/roles.svelte.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import { roleIcon, roleLabel } from '#lib/roles.js';
 
 	interface Props {
 		value: string;

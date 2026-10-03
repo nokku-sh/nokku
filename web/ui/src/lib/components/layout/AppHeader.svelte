@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Button } from '$lib/components/ui/button';
-	import * as Kbd from '$lib/components/ui/kbd';
-	import { Separator } from '$lib/components/ui/separator';
-	import * as Sidebar from '$lib/components/ui/sidebar';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Kbd from '#lib/components/ui/kbd/index.js';
+	import { Separator } from '#lib/components/ui/separator/index.js';
+	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { Search } from '@lucide/svelte';
 	import { openPalette } from './CommandPalette.svelte';
 

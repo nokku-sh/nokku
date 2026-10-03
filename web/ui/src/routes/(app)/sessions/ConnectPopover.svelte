@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { daemon } from '$lib/api/daemons.svelte';
-	import { getSessions, removeSession } from '$lib/api/terminal.svelte';
-	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Collapsible from '$lib/components/ui/collapsible';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import type { Target } from '$lib/gen/nokku/v1/target_pb';
-	import { activeSessionID } from '$lib/store.svelte';
+	import { daemon } from '#lib/api/daemons.svelte.js';
+	import { getSessions, removeSession } from '#lib/api/terminal.svelte.js';
+	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
+	import { activeSessionID } from '#lib/store.svelte.js';
 	import { ChevronRight, Plus, SquareTerminal, User, X } from '@lucide/svelte';
 
 	let { target }: { target: Target } = $props();

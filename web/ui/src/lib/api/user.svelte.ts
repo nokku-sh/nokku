@@ -1,4 +1,4 @@
-import { MAX_PAGE_SIZE } from '$lib/config';
+import { MAX_PAGE_SIZE } from '#lib/config.js';
 import { createInfiniteQuery, createMutation, createQuery } from '@tanstack/svelte-query';
 import { callUnaryMethod } from '@connectrpc/connect-query-core';
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
@@ -6,10 +6,10 @@ import { goto } from '$app/navigation';
 import { toast } from 'svelte-sonner';
 import { queryClient } from './client';
 import { account, type AccountCredential } from './account';
-import { useQuery, useTransport } from '$lib/query';
+import { useQuery, useTransport } from '#lib/query/index.js';
 import { cleanFilters, type AuditFilter, type AuditQuery } from './workspaces.svelte';
-import { UtilService, type ListAuditLogsResponse } from '$lib/gen/nokku/v1/util_pb';
-import type { User } from '$lib/gen/nokku/v1/account_pb';
+import { UtilService, type ListAuditLogsResponse } from '#lib/gen/nokku/v1/util_pb.js';
+import type { User } from '#lib/gen/nokku/v1/account_pb.js';
 
 const invalidateAccount = () => queryClient.invalidateQueries({ queryKey: ['account'] });
 

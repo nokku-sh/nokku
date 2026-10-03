@@ -24,8 +24,8 @@
 
 <script lang="ts">
 	import { Popover } from 'bits-ui';
-	import { Badge } from '$lib/components/ui/badge';
-	import { cn } from '$lib/utils.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { cn } from '#lib/utils.js';
 	import { X } from '@lucide/svelte';
 
 	let {

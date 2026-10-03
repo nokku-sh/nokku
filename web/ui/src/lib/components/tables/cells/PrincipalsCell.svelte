@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { principal } from '$lib/api/principals.svelte';
+	import { principal } from '#lib/api/principals.svelte.js';
 	import TagsCell from './TagsCell.svelte';
 
 	let { targetId }: { targetId: string } = $props();

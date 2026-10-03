@@ -1,7 +1,7 @@
-import type { Daemon } from '$lib/gen/nokku/v1/daemon_pb';
-import type { GetDashboardResponse } from '$lib/gen/nokku/v1/dashboard_pb';
-import type { Tone } from '$lib/tone';
-import { formatTs } from '$lib/utils';
+import type { Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
+import type { GetDashboardResponse } from '#lib/gen/nokku/v1/dashboard_pb.js';
+import type { Tone } from '#lib/tone.js';
+import { formatTs } from '#lib/utils.js';
 import { timestampDate } from '@bufbuild/protobuf/wkt';
 
 export type Issue = {

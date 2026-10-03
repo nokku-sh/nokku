@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { sign } from '$lib/api/certificates.svelte';
-	import FormModal from '$lib/components/blocks/FormModal.svelte';
-	import * as Field from '$lib/components/ui/field';
-	import { InputGroupVariants } from '$lib/components/ui/input-group';
-	import * as Select from '$lib/components/ui/select';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import DurationInput from '$lib/components/blocks/DurationInput.svelte';
+	import { sign } from '#lib/api/certificates.svelte.js';
+	import FormModal from '#lib/components/blocks/FormModal.svelte';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
+	import * as Select from '#lib/components/ui/select/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
 	import {
 		AuthorityType,
 		SignSSHCertificateRequest_CertificateType,
@@ -13,8 +13,8 @@
 		SignX509CertificateRequest_X509Usage,
 		SignX509CertificateRequestSchema,
 		type CertificateAuthority
-	} from '$lib/gen/nokku/v1/certificates_pb';
-	import { formatTs } from '$lib/utils';
+	} from '#lib/gen/nokku/v1/certificates_pb.js';
+	import { formatTs } from '#lib/utils.js';
 	import { create } from '@bufbuild/protobuf';
 	import { IdCard, KeyRound, Server, Shield, User } from '@lucide/svelte';
 

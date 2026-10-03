@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import { statusTone } from '$lib/tone';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { statusTone } from '#lib/tone.js';
 
 	let { status }: { status: string } = $props();
 </script>

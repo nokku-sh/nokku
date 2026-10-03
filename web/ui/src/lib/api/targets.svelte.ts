@@ -1,10 +1,10 @@
-import { MAX_PAGE_SIZE } from '$lib/config';
-import { TargetService } from '$lib/gen/nokku/v1/target_pb';
+import { MAX_PAGE_SIZE } from '#lib/config.js';
+import { TargetService } from '#lib/gen/nokku/v1/target_pb.js';
 import { toast } from 'svelte-sonner';
 import { extract, type MaybeGetter } from 'runed';
-import { useMutation, useQuery } from '$lib/query';
+import { useMutation, useQuery } from '#lib/query/index.js';
 import { plural, useBulkMutation } from './bulk';
-import { workspaceID } from '$lib/store.svelte';
+import { workspaceID } from '#lib/store.svelte.js';
 
 export const target = {
 	get: (id: MaybeGetter<string | undefined>) =>

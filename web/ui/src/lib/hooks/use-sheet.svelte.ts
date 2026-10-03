@@ -9,7 +9,7 @@ export const SHEET_PARAMS = ['id', 'tab'];
 let pushed = false;
 
 function urlWith(params: Record<string, string | undefined>) {
-	const url = new URL(page.url);
+	const url = new URL(page.url.href);
 	for (const [key, value] of Object.entries(params)) {
 		if (value) url.searchParams.set(key, value);
 		else url.searchParams.delete(key);
@@ -37,11 +37,11 @@ export function useSheet() {
 			return tab;
 		},
 		set tab(value: string) {
-			void goto(urlWith({ tab: value }), { replaceState: true, keepFocus: true, noScroll: true });
+			void goto(urlWith({ tab: value }), { replace: true, reset: false });
 		},
 		show(entityId: string, entityTab?: string) {
 			pushed = true;
-			void goto(urlWith({ id: entityId, tab: entityTab }), { keepFocus: true, noScroll: true });
+			void goto(urlWith({ id: entityId, tab: entityTab }), { reset: false });
 		},
 		close() {
 			if (!id) return;
@@ -50,11 +50,7 @@ export function useSheet() {
 				history.back();
 				return;
 			}
-			void goto(urlWith({ id: undefined, tab: undefined }), {
-				replaceState: true,
-				keepFocus: true,
-				noScroll: true
-			});
+			void goto(urlWith({ id: undefined, tab: undefined }), { replace: true, reset: false });
 		}
 	};
 }

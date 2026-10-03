@@ -1,24 +1,24 @@
 <script lang="ts">
-	import SecretReveal from '$lib/components/blocks/SecretReveal.svelte';
+	import SecretReveal from '#lib/components/blocks/SecretReveal.svelte';
 	import { create } from '@bufbuild/protobuf';
 	import { timestampFromDate } from '@bufbuild/protobuf/wkt';
 	import { getLocalTimeZone, today, type DateValue } from '@internationalized/date';
 	import { Bot, CalendarIcon, KeyRound } from '@lucide/svelte';
-	import { serviceAccount as saApi } from '$lib/api/service_account.svelte';
-	import RolePicker from '$lib/components/access/RolePicker.svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import { Button } from '$lib/components/ui/button';
-	import { Calendar } from '$lib/components/ui/calendar';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
-	import * as Popover from '$lib/components/ui/popover';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import * as ToggleGroup from '$lib/components/ui/toggle-group';
-	import { ServiceAccountSchema } from '$lib/gen/nokku/v1/service_account_pb';
-	import { useSheet } from '$lib/hooks';
-	import { DateValueFormat } from '$lib/utils';
-	import FormModal from '$lib/components/blocks/FormModal.svelte';
+	import { serviceAccount as saApi } from '#lib/api/service_account.svelte.js';
+	import RolePicker from '#lib/components/access/RolePicker.svelte';
+	import * as Alert from '#lib/components/ext/alert/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Calendar } from '#lib/components/ui/calendar/index.js';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import * as Popover from '#lib/components/ui/popover/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import { ServiceAccountSchema } from '#lib/gen/nokku/v1/service_account_pb.js';
+	import { useSheet } from '#lib/hooks/index.js';
+	import { DateValueFormat } from '#lib/utils.js';
+	import FormModal from '#lib/components/blocks/FormModal.svelte';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 

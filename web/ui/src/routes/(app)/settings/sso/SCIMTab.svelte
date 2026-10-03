@@ -1,19 +1,19 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { scim } from '$lib/api/scim.svelte';
-	import FormModal from '$lib/components/blocks/FormModal.svelte';
-	import SecretReveal from '$lib/components/blocks/SecretReveal.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Empty from '$lib/components/ui/empty';
-	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
-	import { InputGroupVariants } from '$lib/components/ui/input-group';
-	import * as Item from '$lib/components/ui/item';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { confirm } from '$lib/hooks';
-	import { workspaceID } from '$lib/store.svelte';
-	import { formatTs } from '$lib/utils';
+	import { scim } from '#lib/api/scim.svelte.js';
+	import FormModal from '#lib/components/blocks/FormModal.svelte';
+	import SecretReveal from '#lib/components/blocks/SecretReveal.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { confirm } from '#lib/hooks/index.js';
+	import { workspaceID } from '#lib/store.svelte.js';
+	import { formatTs } from '#lib/utils.js';
 	import { KeyRound, Plus, Trash2, UsersRound } from '@lucide/svelte';
 
 	const tokens = scim.listTokens();

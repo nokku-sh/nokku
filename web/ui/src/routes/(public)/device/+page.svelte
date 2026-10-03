@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { user } from '$lib/api/user.svelte';
-	import { pendingDeviceCode } from '$lib/store.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Alert from '$lib/components/ui/alert';
-	import * as Field from '$lib/components/ui/field';
-	import * as InputOTP from '$lib/components/ui/input-otp';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
+	import { user } from '#lib/api/user.svelte.js';
+	import { pendingDeviceCode } from '#lib/store.svelte.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Alert from '#lib/components/ext/alert/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import * as InputOTP from '#lib/components/ui/input-otp/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
 	import { REGEXP_ONLY_DIGITS_AND_CHARS } from 'bits-ui';
 	import { Check, LogIn, MonitorSmartphone, ShieldAlert, TriangleAlert, X } from '@lucide/svelte';
 

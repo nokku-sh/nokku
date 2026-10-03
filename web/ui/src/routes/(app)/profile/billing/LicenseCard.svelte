@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { license, licenseStatus } from '$lib/api/license.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import FormModal from '$lib/components/blocks/FormModal.svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import * as Field from '$lib/components/ui/field';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { LicensePurchaseURL } from '$lib/config';
-	import { atLeast } from '$lib/roles';
-	import type { Tone } from '$lib/tone';
-	import { formatTs } from '$lib/utils';
+	import { license, licenseStatus } from '#lib/api/license.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import FormModal from '#lib/components/blocks/FormModal.svelte';
+	import * as Alert from '#lib/components/ext/alert/index.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { LicensePurchaseURL } from '#lib/config.js';
+	import { atLeast } from '#lib/roles.js';
+	import type { Tone } from '#lib/tone.js';
+	import { formatTs } from '#lib/utils.js';
 	import { Check, ExternalLink, KeyRound, ShieldAlert } from '@lucide/svelte';
 
 	const data = license.get();

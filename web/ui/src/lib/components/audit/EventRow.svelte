@@ -1,11 +1,11 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { describeAgent } from '$lib/agent';
-	import { sessionMethodLabel } from '$lib/api/session.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Item from '$lib/components/ui/item';
-	import type { EventLog } from '$lib/gen/nokku/v1/util_pb';
-	import { cn } from '$lib/utils';
+	import { describeAgent } from '#lib/agent.js';
+	import { sessionMethodLabel } from '#lib/api/session.svelte.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { cn } from '#lib/utils.js';
 	import EventIcon from './EventIcon.svelte';
 	import { eventLabel, outcomeLabel, outcomeOf } from './audit';
 

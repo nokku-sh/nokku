@@ -1,7 +1,7 @@
 <script lang="ts">
-	import * as Avatar from '$lib/components/ui/avatar';
-	import type { User } from '$lib/gen/nokku/v1/account_pb';
-	import type { WorkspaceMember } from '$lib/gen/nokku/v1/workspace_pb';
+	import * as Avatar from '#lib/components/ui/avatar/index.js';
+	import type { User } from '#lib/gen/nokku/v1/account_pb.js';
+	import type { WorkspaceMember } from '#lib/gen/nokku/v1/workspace_pb.js';
 	import type { ComponentProps } from 'svelte';
 	import {
 		avatarColors,

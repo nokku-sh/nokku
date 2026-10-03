@@ -1,11 +1,11 @@
 import { toast } from 'svelte-sonner';
 import { createMutation } from '@tanstack/svelte-query';
 import { createClient } from '@connectrpc/connect';
-import { useMutation, useQuery } from '$lib/query';
-import { WorkspaceDomainService } from '$lib/gen/nokku/v1/workspace_domain_pb';
-import { SSOService } from '$lib/gen/nokku/v1/sso_pb';
-import { AuthService, type DiscoverSSOResponse } from '$lib/gen/nokku/v1/auth_pb';
-import { workspaceID } from '$lib/store.svelte';
+import { useMutation, useQuery } from '#lib/query/index.js';
+import { WorkspaceDomainService } from '#lib/gen/nokku/v1/workspace_domain_pb.js';
+import { SSOService } from '#lib/gen/nokku/v1/sso_pb.js';
+import { AuthService, type DiscoverSSOResponse } from '#lib/gen/nokku/v1/auth_pb.js';
+import { workspaceID } from '#lib/store.svelte.js';
 import { authTransport } from './client';
 
 const authClient = createClient(AuthService, authTransport);

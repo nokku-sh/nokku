@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { plural } from '$lib/api/bulk';
+	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
-	import { daemon } from '$lib/api/daemons.svelte';
-	import DaemonSheet from '$lib/components/sheets/DaemonSheet.svelte';
+	import { daemon } from '#lib/api/daemons.svelte.js';
+	import DaemonSheet from '#lib/components/sheets/DaemonSheet.svelte';
 	import {
 		DataTable,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
-	} from '$lib/components/tables';
+	} from '#lib/components/tables/index.js';
 	import {
 		ActionCell,
 		AvatarCell,
@@ -16,13 +16,13 @@
 		RecordingCell,
 		StatusCell,
 		TimeCell
-	} from '$lib/components/tables/cells';
+	} from '#lib/components/tables/cells/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import { DaemonStatus, type Daemon } from '$lib/gen/nokku/v1/daemon_pb';
-	import { confirm, usePagination, useSheet } from '$lib/hooks';
-	import EnrollSheet from '$lib/components/sheets/EnrollSheet.svelte';
-	import { Button } from '$lib/components/ui/button';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import { DaemonStatus, type Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
+	import { confirm, usePagination, useSheet } from '#lib/hooks/index.js';
+	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import { BotOff, CircleCheckBig, Clock, Rocket, Trash2, Wifi, WifiOff } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 

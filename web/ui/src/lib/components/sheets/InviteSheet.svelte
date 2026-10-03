@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import CopyText from '$lib/components/blocks/CopyText.svelte';
-	import { TokenKind } from '$lib/gen/nokku/v1/token_pb';
-	import { roleLabel } from '$lib/roles';
-	import { formatTs } from '$lib/utils';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import CopyText from '#lib/components/blocks/CopyText.svelte';
+	import { TokenKind } from '#lib/gen/nokku/v1/token_pb.js';
+	import { roleLabel } from '#lib/roles.js';
+	import { formatTs } from '#lib/utils.js';
 	import { Link, Mail, UserPlus } from '@lucide/svelte';
 	import TokenSheet from './TokenSheet.svelte';
 

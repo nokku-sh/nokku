@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { billing } from '$lib/api/billing.svelte';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import * as Empty from '$lib/components/ui/empty';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { workspaceID } from '$lib/store.svelte';
+	import { billing } from '#lib/api/billing.svelte.js';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { workspaceID } from '#lib/store.svelte.js';
 	import { Layers2 } from '@lucide/svelte';
 	import LicenseCard from './LicenseCard.svelte';
 	import PlanCard from './PlanCard.svelte';

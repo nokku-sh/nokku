@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
-	import { toneBg, type Tone } from '$lib/tone';
+	import { cn } from '#lib/utils.js';
+	import { toneBg, type Tone } from '#lib/tone.js';
 
 	interface Props {
 		tone?: Tone;

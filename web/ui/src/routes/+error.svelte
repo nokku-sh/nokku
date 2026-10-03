@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Empty from '$lib/components/ui/empty';
+	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Empty from '#lib/components/ext/empty/index.js';
 	import { House, SquareTerminal, TriangleAlert } from '@lucide/svelte';
 
 	const missing = $derived(page.status === 404);

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { UseClipboard } from '$lib/hooks/use-clipboard.svelte';
-	import { cn } from '$lib/utils';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
+	import { UseClipboard } from '#lib/hooks/use-clipboard.svelte.js';
+	import { cn } from '#lib/utils.js';
 	import { Check } from '@lucide/svelte';
 
 	interface Props {

@@ -1,29 +1,29 @@
 <script lang="ts">
-	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
+	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
 	import { create } from '@bufbuild/protobuf';
-	import { daemon as daemonApi } from '$lib/api/daemons.svelte';
-	import { target as targetApi } from '$lib/api/targets.svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Empty from '$lib/components/ui/empty';
-	import * as Item from '$lib/components/ui/item';
-	import { Switch } from '$lib/components/ui/switch';
-	import Avatar from '$lib/components/blocks/Avatar.svelte';
+	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
+	import { target as targetApi } from '#lib/api/targets.svelte.js';
+	import * as Alert from '#lib/components/ext/alert/index.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
+	import Avatar from '#lib/components/blocks/Avatar.svelte';
 	import {
 		DaemonConfigSchema,
 		DaemonSchema,
 		DaemonStatus,
 		type DaemonConfig
-	} from '$lib/gen/nokku/v1/daemon_pb';
-	import { confirm, useAutoSave, useDraft, useSheet } from '$lib/hooks';
-	import { formatTs } from '$lib/utils';
+	} from '#lib/gen/nokku/v1/daemon_pb.js';
+	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
+	import { formatTs } from '#lib/utils.js';
 	import { Clock, Cpu, Server, ShieldCheck } from '@lucide/svelte';
 	import DangerZone from './DangerZone.svelte';
 	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';
 	import Section from './Section.svelte';
-	import Chip from '$lib/components/blocks/Chip.svelte';
+	import Chip from '#lib/components/blocks/Chip.svelte';
 
 	const sheet = useSheet();
 	const query = daemonApi.get(() => sheet.id);

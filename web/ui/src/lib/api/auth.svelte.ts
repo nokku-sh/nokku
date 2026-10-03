@@ -2,8 +2,8 @@ import { goto } from '$app/navigation';
 import { toast } from 'svelte-sonner';
 import { createMutation } from '@tanstack/svelte-query';
 import { createClient } from '@connectrpc/connect';
-import { AuthService } from '$lib/gen/nokku/v1/auth_pb';
-import { workspaceID } from '$lib/store.svelte';
+import { AuthService } from '#lib/gen/nokku/v1/auth_pb.js';
+import { workspaceID } from '#lib/store.svelte.js';
 import { queryClient, authTransport } from './client';
 
 const client = createClient(AuthService, authTransport);

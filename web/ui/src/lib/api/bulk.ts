@@ -3,7 +3,7 @@ import { ConnectError } from '@connectrpc/connect';
 import { callUnaryMethod } from '@connectrpc/connect-query-core';
 import { createMutation } from '@tanstack/svelte-query';
 import { toast } from 'svelte-sonner';
-import { useTransport } from '$lib/query';
+import { useTransport } from '#lib/query/index.js';
 import { formatConnectError } from './error-formatter';
 
 export const plural = (n: number, noun: string, many = `${noun}s`) =>

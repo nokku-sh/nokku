@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import * as HoverCard from '$lib/components/ui/hover-card';
-	import { team } from '$lib/api/team.svelte';
-	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as HoverCard from '#lib/components/ui/hover-card/index.js';
+	import { team } from '#lib/api/team.svelte.js';
+	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { Users } from '@lucide/svelte';
 
 	type Props = {

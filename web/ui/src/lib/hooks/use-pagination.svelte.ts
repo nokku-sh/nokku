@@ -1,6 +1,6 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
-import { pageSize } from '$lib/store.svelte';
+import { pageSize } from '#lib/store.svelte.js';
 
 export const PAGE_PARAM = 'page';
 
@@ -27,10 +27,10 @@ export function usePagination() {
 				pageSize.current = size;
 				index = 0;
 			}
-			const url = new URL(page.url);
+			const url = new URL(page.url.href);
 			if (index > 0) url.searchParams.set(PAGE_PARAM, String(index + 1));
 			else url.searchParams.delete(PAGE_PARAM);
-			void goto(url, { replaceState: true, keepFocus: true, noScroll: true });
+			void goto(url, { replace: true, reset: false });
 		}
 	};
 }

@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { auth } from '$lib/api/auth.svelte';
-	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
-	import { Spinner } from '$lib/components/ui/spinner';
+	import { auth } from '#lib/api/auth.svelte.js';
+	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { BinaryIcon, MailCheck, Mail, Undo2Icon } from '@lucide/svelte';
 
 	let email = $state('');

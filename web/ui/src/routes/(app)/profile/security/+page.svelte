@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import Checkup from './Checkup.svelte';
 	import RecentSignIns from './RecentSignIns.svelte';
 	import Recovery from './Recovery.svelte';

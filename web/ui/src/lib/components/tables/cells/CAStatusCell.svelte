@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { ca } from '$lib/api/certificates.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Select from '$lib/components/ui/select';
-	import type { CertificateAuthority } from '$lib/gen/nokku/v1/certificates_pb';
-	import { Spinner } from '$lib/components/ui/spinner';
+	import { ca } from '#lib/api/certificates.svelte.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
+	import type { CertificateAuthority } from '#lib/gen/nokku/v1/certificates_pb.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { ShieldCheck, ShieldOff } from '@lucide/svelte';
 
 	interface Props {

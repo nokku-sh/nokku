@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import * as Command from '$lib/components/ui/command';
-	import * as Popover from '$lib/components/ui/popover';
-	import { Spinner } from '$lib/components/ui/spinner';
+	import * as Command from '#lib/components/ui/command/index.js';
+	import * as Popover from '#lib/components/ui/popover/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 
 	interface Props {
 		open?: boolean;

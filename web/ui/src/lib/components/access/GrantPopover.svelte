@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { principal as principalApi } from '$lib/api/principals.svelte';
-	import { target as targetApi } from '$lib/api/targets.svelte';
-	import { MAX_PAGE_SIZE } from '$lib/config';
-	import { Button, type ButtonSize, type ButtonVariant } from '$lib/components/ui/button';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import * as Command from '$lib/components/ui/command';
-	import * as Popover from '$lib/components/ui/popover';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import type { Principal, SubjectKind } from '$lib/gen/nokku/v1/principal_pb';
-	import type { Target } from '$lib/gen/nokku/v1/target_pb';
+	import { principal as principalApi } from '#lib/api/principals.svelte.js';
+	import { target as targetApi } from '#lib/api/targets.svelte.js';
+	import { MAX_PAGE_SIZE } from '#lib/config.js';
+	import { Button, type ButtonSize, type ButtonVariant } from '#lib/components/ui/button/index.js';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
+	import * as Command from '#lib/components/ui/command/index.js';
+	import * as Popover from '#lib/components/ui/popover/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import type { Principal, SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { ChevronLeft, Plus, Server } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import { SvelteMap } from 'svelte/reactivity';

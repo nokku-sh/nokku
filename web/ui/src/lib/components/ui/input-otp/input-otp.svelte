@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { PinInput as InputOTPPrimitive } from 'bits-ui';
-	import { cn } from '$lib/utils.js';
+	import { cn } from '#lib/utils.js';
 
 	let {
 		ref = $bindable(null),
@@ -16,7 +16,8 @@
 	data-slot="input-otp"
 	spellcheck={false}
 	class={cn(
-		'cn-input-otp-input flex items-center gap-2 disabled:cursor-not-allowed has-disabled:opacity-50',
+		'cn-input-otp flex items-center has-disabled:opacity-50',
+		'disabled:cursor-not-allowed',
 		className
 	)}
 	{...restProps}

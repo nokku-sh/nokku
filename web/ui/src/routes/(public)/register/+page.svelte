@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import * as Collapsible from '$lib/components/ui/collapsible';
-	import * as Field from '$lib/components/ui/field';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import { GoogleIcon, GitHubIcon } from '$lib/assets';
-	import LegalConsent from '$lib/components/blocks/LegalConsent.svelte';
-	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
-	import { InputGroupVariants } from '$lib/components/ui/input-group';
-	import { auth } from '$lib/api/auth.svelte';
-	import { signupWithPasskey } from '$lib/api/passkey';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { GoogleIcon, GitHubIcon } from '#lib/assets/index.js';
+	import LegalConsent from '#lib/components/blocks/LegalConsent.svelte';
+	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
+	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
+	import { auth } from '#lib/api/auth.svelte.js';
+	import { signupWithPasskey } from '#lib/api/passkey.js';
 	import { toast } from 'svelte-sonner';
 	import { ChevronDown, KeyRound, UserPlus } from '@lucide/svelte';
 

@@ -1,11 +1,11 @@
 import { createConnectTransport } from '@connectrpc/connect-web';
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/svelte-query';
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { Code, ConnectError, type Interceptor, type UnaryRequest } from '@connectrpc/connect';
 import { toast } from 'svelte-sonner';
 import { formatConnectError, parseHTTPError, isEmailUnverifiedError } from './error-formatter';
-import { WorkspaceService } from '$lib/gen/nokku/v1/workspace_pb';
-import { workspaceID } from '$lib/store.svelte';
+import { WorkspaceService } from '#lib/gen/nokku/v1/workspace_pb.js';
+import { workspaceID } from '#lib/store.svelte.js';
 
 export const queryClient = new QueryClient({
 	defaultOptions: {

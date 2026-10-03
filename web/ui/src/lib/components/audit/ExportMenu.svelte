@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { timestampFromDate } from '@bufbuild/protobuf/wkt';
-	import { util } from '$lib/api/workspaces.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { Spinner } from '$lib/components/ui/spinner';
+	import { util } from '#lib/api/workspaces.svelte.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import {
 		ExportAuditLogsRequest_Format as Format,
 		type AuditLogFilter
-	} from '$lib/gen/nokku/v1/util_pb';
+	} from '#lib/gen/nokku/v1/util_pb.js';
 	import { Download } from '@lucide/svelte';
 
 	interface Props {

@@ -9,8 +9,8 @@
 </script>
 
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import * as Item from '$lib/components/ui/item';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
 	import { TriangleAlert } from '@lucide/svelte';
 	import Section from './Section.svelte';
 

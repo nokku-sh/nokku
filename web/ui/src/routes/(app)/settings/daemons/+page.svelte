@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import SaveStatus from '$lib/components/blocks/SaveStatus.svelte';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import * as Card from '$lib/components/ui/card';
-	import * as Item from '$lib/components/ui/item';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Switch } from '$lib/components/ui/switch';
-	import { DaemonConfigSchema, type DaemonConfig } from '$lib/gen/nokku/v1/daemon_pb';
-	import { WorkspaceSettingsSchema } from '$lib/gen/nokku/v1/workspace_pb';
-	import { useAutoSave } from '$lib/hooks';
-	import { atLeast } from '$lib/roles';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { DaemonConfigSchema, type DaemonConfig } from '#lib/gen/nokku/v1/daemon_pb.js';
+	import { WorkspaceSettingsSchema } from '#lib/gen/nokku/v1/workspace_pb.js';
+	import { useAutoSave } from '#lib/hooks/index.js';
+	import { atLeast } from '#lib/roles.js';
 	import { create } from '@bufbuild/protobuf';
 
 	const ws = workspace.get();

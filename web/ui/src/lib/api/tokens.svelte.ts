@@ -1,7 +1,7 @@
-import { TokenKind, TokenService } from '$lib/gen/nokku/v1/token_pb';
+import { TokenKind, TokenService } from '#lib/gen/nokku/v1/token_pb.js';
 import { extract, type MaybeGetter } from 'runed';
-import { useMutation, useQuery } from '$lib/query';
-import { workspaceID } from '$lib/store.svelte';
+import { useMutation, useQuery } from '#lib/query/index.js';
+import { workspaceID } from '#lib/store.svelte.js';
 import { toast } from 'svelte-sonner';
 
 export const token = {

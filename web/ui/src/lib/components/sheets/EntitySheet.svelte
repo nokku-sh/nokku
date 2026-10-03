@@ -14,18 +14,18 @@
 
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import * as Sheet from '$lib/components/ui/sheet';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import { Rename } from '$lib/components/ui/rename';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { IsMobile, type SaveState } from '$lib/hooks';
-	import { Button } from '$lib/components/ui/button';
-	import * as Popover from '$lib/components/ui/popover';
-	import CopyText from '$lib/components/blocks/CopyText.svelte';
-	import { formatTs } from '$lib/utils';
-	import * as Empty from '$lib/components/ui/empty';
+	import * as Sheet from '#lib/components/ui/sheet/index.js';
+	import * as Tabs from '#lib/components/ui/tabs/index.js';
+	import { Rename } from '#lib/components/ui/rename/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { IsMobile, type SaveState } from '#lib/hooks/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Popover from '#lib/components/ui/popover/index.js';
+	import CopyText from '#lib/components/blocks/CopyText.svelte';
+	import { formatTs } from '#lib/utils.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
 	import { FileQuestion, Info } from '@lucide/svelte';
-	import SaveStatus from '$lib/components/blocks/SaveStatus.svelte';
+	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
 
 	interface Props {
 		open: boolean;

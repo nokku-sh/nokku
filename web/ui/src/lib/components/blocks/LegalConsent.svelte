@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { util } from '$lib/api/workspaces.svelte';
+	import { util } from '#lib/api/workspaces.svelte.js';
 
 	/** Everything before "you agree", e.g. "By signing up,". */
 	let { lead }: { lead: string } = $props();

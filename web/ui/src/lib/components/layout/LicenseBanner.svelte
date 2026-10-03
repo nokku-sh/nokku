@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { license, licenseStatus } from '$lib/api/license.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import { atLeast } from '$lib/roles';
-	import { formatTs } from '$lib/utils';
+	import { license, licenseStatus } from '#lib/api/license.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import { atLeast } from '#lib/roles.js';
+	import { formatTs } from '#lib/utils.js';
 	import { TriangleAlert } from '@lucide/svelte';
 
 	const data = license.get();

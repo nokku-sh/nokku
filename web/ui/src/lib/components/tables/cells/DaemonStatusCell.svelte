@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { daemon as daemonApi } from '$lib/api/daemons.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { Spinner } from '$lib/components/ui/spinner';
-	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { DaemonStatus, type Daemon } from '$lib/gen/nokku/v1/daemon_pb';
-	import { confirm } from '$lib/hooks';
+	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
+	import { DaemonStatus, type Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
+	import { confirm } from '#lib/hooks/index.js';
 	import { Check, CircleCheck, Clock, X } from '@lucide/svelte';
 
 	let { daemon }: { daemon: Daemon } = $props();

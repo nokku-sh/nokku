@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { LucideIcon } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { toneText, type Tone } from '$lib/tone';
-	import { cn } from '$lib/utils';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { toneText, type Tone } from '#lib/tone.js';
+	import { cn } from '#lib/utils.js';
 
 	interface Props {
 		label: string;

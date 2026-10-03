@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { auth } from '$lib/api/auth.svelte';
-	import { formatConnectError } from '$lib/api/error-formatter';
-	import AuthCard from '$lib/components/blocks/AuthCard.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Spinner } from '$lib/components/ui/spinner';
+	import { auth } from '#lib/api/auth.svelte.js';
+	import { formatConnectError } from '#lib/api/error-formatter.js';
+	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { ConnectError } from '@connectrpc/connect';
 	import { CircleCheck, CircleX, LogIn, Mail, ShieldAlert, Undo2Icon } from '@lucide/svelte';
 

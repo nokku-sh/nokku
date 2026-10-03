@@ -13,11 +13,11 @@
 </script>
 
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Ellipsis, Trash2, type LucideIcon } from '@lucide/svelte';
-	import * as ButtonGroup from '$lib/components/ui/button-group';
-	import { confirm } from '$lib/hooks';
+	import * as ButtonGroup from '#lib/components/ui/button-group/index.js';
+	import { confirm } from '#lib/hooks/index.js';
 
 	type Props = {
 		inlineActions?: InlineAction[];

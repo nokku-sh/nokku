@@ -1,25 +1,30 @@
 <script lang="ts">
-	import { plural } from '$lib/api/bulk';
+	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
-	import { serviceAccount } from '$lib/api/service_account.svelte';
-	import CreateServiceAccountModal from '$lib/components/modals/CreateServiceAccountModal.svelte';
-	import ServiceAccountSheet from '$lib/components/sheets/ServiceAccountSheet.svelte';
+	import { serviceAccount } from '#lib/api/service_account.svelte.js';
+	import CreateServiceAccountModal from '#lib/components/modals/CreateServiceAccountModal.svelte';
+	import ServiceAccountSheet from '#lib/components/sheets/ServiceAccountSheet.svelte';
 	import {
 		DataTable,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
-	} from '$lib/components/tables';
-	import { ActionCell, AvatarCell, RoleCell, TimeCell } from '$lib/components/tables/cells';
-	import { Button } from '$lib/components/ui/button';
+	} from '#lib/components/tables/index.js';
+	import {
+		ActionCell,
+		AvatarCell,
+		RoleCell,
+		TimeCell
+	} from '#lib/components/tables/cells/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import PageHeader from '$lib/components/layout/PageHeader.svelte';
-	import type { ServiceAccount } from '$lib/gen/nokku/v1/service_account_pb';
-	import { confirm, usePagination, useSheet } from '$lib/hooks';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import type { ServiceAccount } from '#lib/gen/nokku/v1/service_account_pb.js';
+	import { confirm, usePagination, useSheet } from '#lib/hooks/index.js';
 	import { PlusIcon, ShieldCheck, Trash2, Waypoints } from '@lucide/svelte';
 	import { Debounced } from 'runed';
-	import { roles } from '$lib/api/roles.svelte';
-	import { roleIcon, roleLabel } from '$lib/roles';
+	import { roles } from '#lib/api/roles.svelte.js';
+	import { roleIcon, roleLabel } from '#lib/roles.js';
 
 	const sheet = useSheet();
 	let createOpen = $state(false);

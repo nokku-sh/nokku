@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { user } from '$lib/api/user.svelte';
-	import ModeSwitch from '$lib/components/blocks/ModeSwitch.svelte';
-	import LegalLinks from '$lib/components/blocks/LegalLinks.svelte';
+	import { user } from '#lib/api/user.svelte.js';
+	import ModeSwitch from '#lib/components/blocks/ModeSwitch.svelte';
+	import LegalLinks from '#lib/components/blocks/LegalLinks.svelte';
 	import { fade } from 'svelte/transition';
 
 	let { children } = $props();

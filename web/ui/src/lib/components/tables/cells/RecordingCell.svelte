@@ -1,10 +1,10 @@
 <script lang="ts">
-	import StatusDot from '$lib/components/blocks/StatusDot.svelte';
+	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
 	import { create } from '@bufbuild/protobuf';
-	import { daemon as daemonApi } from '$lib/api/daemons.svelte';
-	import { Toggle } from '$lib/components/ui/toggle';
-	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { DaemonConfigSchema, type Daemon } from '$lib/gen/nokku/v1/daemon_pb';
+	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
+	import { Toggle } from '#lib/components/ui/toggle/index.js';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
+	import { DaemonConfigSchema, type Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { toast } from 'svelte-sonner';
 
 	let { daemon }: { daemon: Daemon } = $props();

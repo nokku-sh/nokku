@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { cn } from '$lib/utils';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { cn } from '#lib/utils.js';
 	import { X } from '@lucide/svelte';
 	import CopyText from './CopyText.svelte';
 

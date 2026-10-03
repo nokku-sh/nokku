@@ -11,8 +11,8 @@
 </script>
 
 <script lang="ts">
-	import CopyText from '$lib/components/blocks/CopyText.svelte';
-	import { cn } from '$lib/utils';
+	import CopyText from '#lib/components/blocks/CopyText.svelte';
+	import { cn } from '#lib/utils.js';
 
 	interface Props {
 		items: Detail[];

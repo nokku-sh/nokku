@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { serviceAccount } from '$lib/api/service_account.svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import * as Command from '$lib/components/ui/command';
-	import FilterButton from '$lib/components/blocks/FilterButton.svelte';
-	import SearchPopover from '$lib/components/blocks/SearchPopover.svelte';
-	import UserAvatar from '$lib/components/blocks/UserAvatar.svelte';
+	import { serviceAccount } from '#lib/api/service_account.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import * as Command from '#lib/components/ui/command/index.js';
+	import FilterButton from '#lib/components/blocks/FilterButton.svelte';
+	import SearchPopover from '#lib/components/blocks/SearchPopover.svelte';
+	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { Bot, Check } from '@lucide/svelte';
 	import { Debounced } from 'runed';
-	import { csv, setParams } from '$lib/components/audit/audit';
+	import { csv, setParams } from '#lib/components/audit/audit.js';
 
 	let open = $state(false);
 	let query = $state('');

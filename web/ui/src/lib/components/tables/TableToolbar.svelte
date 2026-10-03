@@ -5,10 +5,10 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import { SearchIcon, DeleteIcon } from '@lucide/svelte';
 	import type { RowData, Table } from '@tanstack/svelte-table';
-	import { Button } from '$lib/components/ui/button';
-	import * as InputGroup from '$lib/components/ui/input-group';
-	import { PAGE_PARAM } from '$lib/hooks';
-	import FilterPill from '$lib/components/blocks/FilterPill.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as InputGroup from '#lib/components/ui/input-group/index.js';
+	import { PAGE_PARAM } from '#lib/hooks/index.js';
+	import FilterPill from '#lib/components/blocks/FilterPill.svelte';
 	import TableViewOptions from './TableViewOptions.svelte';
 	import type { FilterConfig } from './types';
 	import type { DataTableFeatures } from './data-table-features.js';
@@ -42,11 +42,11 @@
 
 	// A new search or filter changes the result set, so it starts at page 1.
 	function updateUrlParam(key: string, value: string | undefined) {
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		if (value) url.searchParams.set(key, value);
 		else url.searchParams.delete(key);
 		url.searchParams.delete(PAGE_PARAM);
-		goto(url, { replaceState: true, keepFocus: true });
+		goto(url, { replace: true, reset: false });
 	}
 
 	function handleSearchInput(e: Event) {
@@ -61,7 +61,7 @@
 	}
 
 	function handleReset() {
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		if (hasSearch) {
 			url.searchParams.delete(searchParamKey);
 			searchValue = '';
@@ -69,7 +69,7 @@
 		filters?.forEach((f) => url.searchParams.delete(f.param));
 		extraParams.forEach((p) => url.searchParams.delete(p));
 		url.searchParams.delete(PAGE_PARAM);
-		goto(url, { replaceState: true, keepFocus: true });
+		goto(url, { replace: true, reset: false });
 	}
 
 	const isFiltered = $derived(

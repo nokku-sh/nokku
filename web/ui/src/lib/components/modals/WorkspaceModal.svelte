@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { Layers2 } from '@lucide/svelte';
-	import { workspace } from '$lib/api/workspaces.svelte';
-	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import type { Workspace } from '$lib/gen/nokku/v1/workspace_pb';
-	import { useAutoSave } from '$lib/hooks';
-	import FormModal from '$lib/components/blocks/FormModal.svelte';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import type { Workspace } from '#lib/gen/nokku/v1/workspace_pb.js';
+	import { useAutoSave } from '#lib/hooks/index.js';
+	import FormModal from '#lib/components/blocks/FormModal.svelte';
 
 	interface Props {
 		draft: Workspace;
