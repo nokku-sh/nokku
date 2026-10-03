@@ -3,6 +3,7 @@ package iam
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestHashVerifyPassword(t *testing.T) {
@@ -78,5 +79,31 @@ func TestDummyBurn(t *testing.T) {
 	ok, err := verifyPassword(dummyPassword, h)
 	if err != nil || !ok {
 		t.Fatalf("dummy hash does not verify: ok=%v err=%v", ok, err)
+	}
+}
+
+// Each argon2 run takes 64 MiB, so hashing must queue behind the cap.
+func TestPasswordHashingIsBounded(t *testing.T) {
+	for range cap(hashSlots) {
+		hashSlots <- struct{}{}
+	}
+	done := make(chan struct{})
+	go func() {
+		_, _ = hashPassword("pw", passwordParams{Time: 1, Memory: 1024, Threads: 1, SaltLen: 16, KeyLen: 32})
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		t.Fatal("hashed while every slot was taken")
+	case <-time.After(100 * time.Millisecond):
+	}
+	for range cap(hashSlots) {
+		<-hashSlots
+	}
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("never hashed after the slots were freed")
 	}
 }
