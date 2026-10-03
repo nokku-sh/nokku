@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -133,17 +134,24 @@ func TestRoleGatedRequestsCarryTheWorkspace(t *testing.T) {
 func TestAuthorizeDaemon(t *testing.T) {
 	a := &authorizationInterceptor{}
 	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "d1", Kind: actor.KindDaemon})
+	// These answer a daemon in any state. The rest look the daemon up, see
+	// TestPendingDaemonIsDenied.
+	anyState := []string{
+		nokkuv1connect.DaemonServiceSyncDaemonProcedure,
+		nokkuv1connect.DaemonControlServiceConnectProcedure,
+		nokkuv1connect.DaemonServiceDeleteDaemonProcedure,
+	}
 
 	for _, procedure := range allProcedures(t) {
-		_, err := a.authorize(ctx, procedure)
-		if procedureAccess[procedure].GetDaemon() {
-			if err != nil {
+		switch {
+		case !procedureAccess[procedure].GetDaemon():
+			if _, err := a.authorize(ctx, procedure); !errors.Is(err, db.ErrPermissionDenied) {
+				t.Errorf("daemon allowed %s, want permission denied", procedure)
+			}
+		case slices.Contains(anyState, procedure):
+			if _, err := a.authorize(ctx, procedure); err != nil {
 				t.Errorf("daemon denied %s: %v", procedure, err)
 			}
-			continue
-		}
-		if !errors.Is(err, db.ErrPermissionDenied) {
-			t.Errorf("daemon allowed %s, want permission denied", procedure)
 		}
 	}
 }
