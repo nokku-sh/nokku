@@ -50,18 +50,16 @@ spec:
               containerPort: {{ .Values.container.port }}
               protocol: TCP
           env:
-            - name: BASE_URL
+            - name: NOKKU_BASE_URL
               value: {{ .Values.app.baseUrl | quote }}
-            - name: PORT
+            - name: NOKKU_PORT
               value: {{ .Values.container.port | quote }}
             - name: NOKKU_DEBUG
               value: {{ .Values.app.debug | quote }}
-            - name: OTLP_ENDPOINT
-              value: {{ .Values.app.otlpEndpoint | quote }}
-            - name: OTLP_API_KEY
-              value: {{ .Values.app.otlpApiKey | quote }}
-            - name: OTLP_TRUST_REMOTE
-              value: {{ .Values.app.otlpTrustRemote | quote }}
+            {{- with .Values.app.otlpEndpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
             - name: PGHOST
               value: {{ include "nokku.databaseHost" . | quote }}
             - name: PGPORT
@@ -74,14 +72,14 @@ spec:
               value: {{ .Values.app.database.sslMode | quote }}
             - name: NOKKU_DB_AUTOMIGRATE
               value: {{ .Values.app.database.autoMigrate | quote }}
-            - name: LOCAL_STORAGE_PATH
+            - name: NOKKU_LOCAL_STORAGE_PATH
               value: {{ .Values.app.localStoragePath | quote }}
             - name: NOKKU_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ include "nokku.secretName" . }}
                   key: NOKKU_SECRET
-            - name: DATABASE_PASSWORD
+            - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "nokku.secretName" . }}
