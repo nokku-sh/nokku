@@ -323,13 +323,25 @@ FROM
       principal_grants g
     WHERE
       g.principal_id = p.id
-      AND g.subject_kind IN ('user', 'service_account')
+      AND g.subject_kind = 'service_account'
     UNION
     SELECT
-      tm.user_id
+      u.id
+    FROM
+      principal_grants g
+      JOIN users u ON u.id = g.subject_id
+      AND u.active
+    WHERE
+      g.principal_id = p.id
+      AND g.subject_kind = 'user'
+    UNION
+    SELECT
+      u.id
     FROM
       principal_grants g
       JOIN team_members tm ON tm.team_id = g.subject_id
+      JOIN users u ON u.id = tm.user_id
+      AND u.active
     WHERE
       g.principal_id = p.id
       AND g.subject_kind = 'team'
@@ -347,7 +359,8 @@ type ListPrincipalsForTargetRow struct {
 	Ids      []string `json:"ids"`
 }
 
-// Teams are expanded so the host needs no team knowledge.
+// Teams are expanded so the host needs no team knowledge. Users are joined,
+// not filtered, so an account that is inactive or not visible drops out.
 func (q *Queries) ListPrincipalsForTarget(ctx context.Context, targetID string) ([]*ListPrincipalsForTargetRow, error) {
 	rows, err := q.db.Query(ctx, listPrincipalsForTarget, targetID)
 	if err != nil {
