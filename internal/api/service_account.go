@@ -105,6 +105,7 @@ func (s *serviceAccountService) UpdateServiceAccount(
 			Name:             req.Name,
 			Description:      req.Description,
 			RoleName:         req.RoleName,
+			Tags:             req.GetTags(),
 		})
 		if err != nil {
 			return err
