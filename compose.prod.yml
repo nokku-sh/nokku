@@ -6,11 +6,7 @@
 # Services:
 #   nokku     - the backend (your image, defaults to ghcr.io/nokku-sh/nokku)
 #   postgres  - persistent database
-#   redis     - shared cache (selected by NOKKU_REDIS_URL)
 #   caddy     - TLS-terminating reverse proxy
-#
-# To drop redis: remove NOKKU_REDIS_URL below, the `redis` service
-# and its `depends_on` entry below.
 name: nokku
 
 networks:
@@ -24,7 +20,6 @@ networks:
 volumes:
   pgdata:
   nokku-data:
-  redis-data:
   caddy-data:
   caddy-config:
 
@@ -47,29 +42,10 @@ services:
     networks:
       - nokku
 
-  redis:
-    image: docker.io/redis:7-alpine
-    command: ["sh", "-c", 'exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"']
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required in .env}
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test: ["CMD-SHELL", 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep -q PONG']
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 5s
-    restart: unless-stopped
-    networks:
-      - nokku
-
   nokku:
     image: ${NOKKU_IMAGE:-ghcr.io/nokku-sh/nokku:latest}
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     # All NOKKU_*, OAuth, email and storage settings come from .env.
     env_file: .env
@@ -82,8 +58,6 @@ services:
       PGUSER: ${POSTGRES_USER:-nokku}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
       PGSSLMODE: disable
-      # REDIS_PASSWORD must be URL-safe, it is embedded in the URL.
-      NOKKU_REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required in .env}@redis:6379/0
       # Caddy runs on the same internal network; forwarded client headers are
       # only honored from peers in this range.
       NOKKU_TRUSTED_PROXIES: 172.28.0.0/16

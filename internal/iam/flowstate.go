@@ -83,12 +83,12 @@ func linkUserIDFor(ctx context.Context, r *http.Request) string {
 
 // state is single-use, Take reads and deletes atomically.
 type state[T any] struct {
-	cache  cache.Cache
+	cache  *cache.Memory
 	prefix string
 	ttl    time.Duration
 }
 
-func newState[T any](c cache.Cache, prefix string, ttl time.Duration) *state[T] {
+func newState[T any](c *cache.Memory, prefix string, ttl time.Duration) *state[T] {
 	return &state[T]{cache: c, prefix: prefix, ttl: ttl}
 }
 

@@ -65,7 +65,7 @@ type Sink interface {
 type Deps struct {
 	BaseURL string
 	Conn    txRunner
-	Cache   cache.Cache
+	Cache   *cache.Memory
 	// Secret keys the DPoP server nonce.
 	Secret []byte
 	Events Sink
@@ -90,7 +90,7 @@ type txRunner interface {
 type Service struct {
 	sys     db.Querier // nokku_system, bypasses RLS
 	conn    txRunner
-	cache   cache.Cache
+	cache   *cache.Memory
 	events  Sink
 	baseURL string
 	secure  bool

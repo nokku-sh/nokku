@@ -3,8 +3,8 @@
 #   cp .env.prod.example .env   # fill in your values
 #   docker compose -f compose.min.yml up -d
 #
-# No reverse proxy, no shared cache (no NOKKU_REDIS_URL, so in-memory).
-# The app is published directly on host port 3000.
+# No reverse proxy. The app is published directly on host port 3000, so
+# NOKKU_BASE_URL needs the port, like http://192.0.2.10:3000.
 name: nokku
 
 volumes:

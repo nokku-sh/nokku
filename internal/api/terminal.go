@@ -32,8 +32,8 @@ const (
 	webStdoutBurst = 64 << 10
 )
 
-// sessionTicket is what CreateSession authorized. It lives in the shared
-// cache, so the websocket may land on any instance.
+// sessionTicket is what CreateSession authorized, kept in the cache until the
+// websocket trades it in.
 type sessionTicket struct {
 	WorkspaceID string `json:"workspace_id"`
 	DaemonID    string `json:"daemon_id"`
@@ -41,7 +41,7 @@ type sessionTicket struct {
 	Username    string `json:"username"`
 }
 
-func putSessionTicket(ctx context.Context, c cache.Cache, sessionID string, t sessionTicket) error {
+func putSessionTicket(ctx context.Context, c *cache.Memory, sessionID string, t sessionTicket) error {
 	b, err := json.Marshal(t)
 	if err != nil {
 		return err
