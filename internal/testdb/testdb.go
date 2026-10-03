@@ -4,6 +4,7 @@ package testdb
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 )
 
 // Setup does nothing without a reachable Postgres, so database tests skip.
+// In CI that is an error.
 func Setup(name string) {
 	// The defaults db.NewConnection applies, so both reach the same server.
 	for key, fallback := range map[string]string{
@@ -36,6 +38,11 @@ func Setup(name string) {
 	cfg.Database = "postgres"
 	conn, err := pgx.ConnectConfig(ctx, cfg)
 	if err != nil {
+		// CI must not pass by skipping every database test.
+		if os.Getenv("CI") != "" {
+			fmt.Fprintln(os.Stderr, "testdb: no Postgres in CI:", err)
+			os.Exit(1)
+		}
 		return
 	}
 	defer func() { _ = conn.Close(ctx) }()
