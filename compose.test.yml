@@ -29,8 +29,8 @@ services:
   vault:
     image: docker.io/hashicorp/vault:latest
     container_name: vault
-    # TLS with a self-signed cert, nokku only talks https to Vault. Clients
-    # set VAULT_SKIP_VERIFY=true.
+    # TLS with a self-signed cert, nokku only talks https to Vault.
+    # Clients set VAULT_SKIP_VERIFY=true.
     command: ["server", "-dev", "-dev-tls"]
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: "root"
