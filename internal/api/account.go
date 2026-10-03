@@ -76,7 +76,7 @@ func (s *accountService) ChangePassword(
 			userID,
 			req.GetCurrentPassword(),
 		); err != nil {
-			return nil, errCurrentPassword
+			return nil, currentPasswordError(err)
 		}
 	}
 	if len(req.GetNewPassword()) < minPasswordLength {
@@ -117,7 +117,7 @@ func (s *accountService) RequestEmailChange(
 		return nil, errPasswordNeeded
 	}
 	if err := s.cfg.IAM.Password.CheckPassword(ctx, u.ID, req.GetCurrentPassword()); err != nil {
-		return nil, errCurrentPassword
+		return nil, currentPasswordError(err)
 	}
 
 	confirm, cancel, err := s.cfg.IAM.RequestEmailChange(ctx, u, req.GetNewEmail())
@@ -152,13 +152,20 @@ func (s *accountService) RequestEmailChange(
 	return &nokkuv1.RequestEmailChangeResponse{}, nil
 }
 
+func currentPasswordError(err error) error {
+	if errors.Is(err, iam.ErrTooManyAttempts) {
+		return errTooManyAttempts
+	}
+	return errCurrentPassword
+}
+
 func (s *accountService) RemovePassword(
 	ctx context.Context,
 	req *nokkuv1.RemovePasswordRequest,
 ) (*nokkuv1.RemovePasswordResponse, error) {
 	userID := actor.UserIDFromContext(ctx)
 	if err := s.cfg.IAM.Password.CheckPassword(ctx, userID, req.GetCurrentPassword()); err != nil {
-		return nil, errCurrentPassword
+		return nil, currentPasswordError(err)
 	}
 	if !s.requireRemovable(ctx, iam.MethodPassword) {
 		return nil, errLastLoginMethod

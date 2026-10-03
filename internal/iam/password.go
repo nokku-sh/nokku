@@ -10,9 +10,11 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/argon2"
+	"golang.org/x/time/rate"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -31,6 +33,44 @@ func argon2Key(password string, salt []byte, p passwordParams) []byte {
 	hashSlots <- struct{}{}
 	defer func() { <-hashSlots }()
 	return argon2.IDKey([]byte(password), salt, p.Time, p.Memory, p.Threads, p.KeyLen)
+}
+
+// A burst of password checks per account, then one more a minute. It slows
+// guessing that is spread over many addresses, which the per-address limit
+// does not see. The price is that someone can keep a victim's password login
+// busy, passkeys and SSO are not affected.
+const (
+	passwordAttemptBurst = 10
+	passwordAttemptEvery = time.Minute
+)
+
+type attemptLimiter struct {
+	mu      sync.Mutex
+	buckets map[string]*rate.Limiter
+}
+
+func (l *attemptLimiter) allow(userID string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	// A refilled bucket is as good as none, so the map only holds accounts
+	// with recent attempts.
+	for id, b := range l.buckets {
+		if b.Tokens() >= passwordAttemptBurst {
+			delete(l.buckets, id)
+		}
+	}
+	b := l.buckets[userID]
+	if b == nil {
+		b = rate.NewLimiter(rate.Every(passwordAttemptEvery), passwordAttemptBurst)
+		l.buckets[userID] = b
+	}
+	return b.Allow()
+}
+
+func (l *attemptLimiter) reset(userID string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.buckets, userID)
 }
 
 // passwordParams Memory is in KiB.
@@ -53,8 +93,9 @@ func defaultPasswordParams() passwordParams {
 }
 
 type PasswordManager struct {
-	svc    *Service
-	params passwordParams
+	svc      *Service
+	params   passwordParams
+	attempts attemptLimiter
 	// dummy uses the real params so the work matches even with overrides.
 	dummy func() string
 }
@@ -64,6 +105,7 @@ func newPasswordManager(svc *Service, params passwordParams) *PasswordManager {
 		params = defaultPasswordParams()
 	}
 	m := &PasswordManager{svc: svc, params: params}
+	m.attempts.buckets = map[string]*rate.Limiter{}
 	m.dummy = sync.OnceValue(func() string {
 		h, err := hashPassword(dummyPassword, m.params)
 		if err != nil {
@@ -105,6 +147,10 @@ func (m *PasswordManager) CheckPassword(ctx context.Context, userID, pw string) 
 		m.svc.record(ctx, Event{Action: ActionLoginDenied, Method: MethodPassword, UserID: userID, Detail: detail})
 		return errInvalidCredentials
 	}
+	if !m.attempts.allow(userID) {
+		_ = denied("too many attempts")
+		return ErrTooManyAttempts
+	}
 	cred, err := m.svc.sys.GetCredential(ctx, &db.GetCredentialParams{UserID: userID, ID: passwordCredentialID(userID)})
 	if errors.Is(err, pgx.ErrNoRows) {
 		m.burn(pw)
@@ -117,6 +163,7 @@ func (m *PasswordManager) CheckPassword(ctx context.Context, userID, pw string) 
 	if ok, err := verifyPassword(pw, encoded); err != nil || !ok {
 		return denied("wrong password")
 	}
+	m.attempts.reset(userID)
 	if needsRehash(encoded, m.params) {
 		_ = m.Store(ctx, userID, pw)
 	}

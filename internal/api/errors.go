@@ -68,6 +68,10 @@ var (
 		connect.CodeFailedPrecondition,
 		errors.New("your organization requires single sign-on"),
 	)
+	errTooManyAttempts = connect.NewError(
+		connect.CodeResourceExhausted,
+		errors.New("too many password attempts, try again in a few minutes"),
+	)
 )
 
 var (

@@ -122,6 +122,9 @@ func loginError(err error) error {
 	if errors.Is(err, iam.ErrSSORequired) {
 		return errSSORequired
 	}
+	if errors.Is(err, iam.ErrTooManyAttempts) {
+		return errTooManyAttempts
+	}
 	return errLoginFailed
 }
 
