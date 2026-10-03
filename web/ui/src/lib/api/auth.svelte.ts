@@ -43,9 +43,8 @@ export const auth = {
 			() => client.logout({}),
 			() => {
 				workspaceID.current = '';
-				void queryClient.cancelQueries();
-				queryClient.clear();
-				void goto('/login');
+				// A full load, so this tab's web shells and cached data end with the session.
+				window.location.assign('/login');
 			}
 		),
 	register: () =>
