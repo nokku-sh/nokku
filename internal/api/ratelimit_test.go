@@ -4,47 +4,39 @@ import (
 	"testing"
 )
 
-func TestIsAPIRoute(t *testing.T) {
+func TestRateLimited(t *testing.T) {
 	tests := []struct {
 		path string
 		want bool
 	}{
-		// API routes are rate limited.
 		{"/nokku.v1.UtilService/Whoami", true},
-		{"/nokku.v1.WorkspaceService/ListWorkspaces", true},
-		{"/grpc.health.v1.Health/Check", true},
-		{"/oauth/authorize", true},
+		{"/nokku.v1.AuthService/Login", true},
+		{"/oauth/login", true},
+		{"/oidc/callback", true},
 		{"/saml/acs", true},
-		{"/passkey/register", true},
-		{"/avatars/user/1", true},
-		{"/upload/thing", true},
-		{"/terminal/foo", true},
+		{"/scim/v2/ws/Users", true},
+		{"/passkey/login/begin", true},
+		{"/auth/device", true},
+		{"/avatars/user-1", true},
+		{"/terminal/ws", true},
 		{"/webhooks/stripe", true},
-		{"/healthz", true},
-		{"/debug/pprof", true},
-		{"/v1/something", true},
+		{"/v1/workspaces", true},
+		{"/", true},
+		{"/login", true},
+		{"/totally/unknown", true},
 
-		// Streaming daemon endpoints skip rate limiting (reconnect storms).
+		// A limit here would block legitimate reconnect storms.
 		{"/nokku.v1.DaemonControlService/Connect", false},
 		{"/nokku.v1.DaemonSessionService/Stream", false},
 
-		// Static assets and unknown paths are not rate limited.
-		{"/", false},
-		{"/static/app.js", false},
-		{"/assets/logo.svg", false},
-		{"/favicon.ico", false},
-		{"/totally/unknown", false},
-		{"/nokku.v2.Foo/Bar", false},
-		{"/nokku.", false},
-		{"/grpcx", false},
-		{"/v2/x", false},
-		{"/webhooksx", false},
+		// One page load pulls many hashed assets.
+		{"/_app/immutable/chunks/app.js", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			if got := isAPIRoute(tt.path); got != tt.want {
-				t.Errorf("isAPIRoute(%q) = %v, want %v", tt.path, got, tt.want)
+			if got := rateLimited(tt.path); got != tt.want {
+				t.Errorf("rateLimited(%q) = %v, want %v", tt.path, got, tt.want)
 			}
 		})
 	}
