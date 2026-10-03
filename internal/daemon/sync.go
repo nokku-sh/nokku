@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
@@ -27,7 +28,7 @@ type Synced struct {
 
 func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 	res := &Synced{}
-	if err := conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err := conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		daemon, err := q.GetDaemon(ctx, in.DaemonID)
 		if err != nil {
 			return err
@@ -99,7 +100,19 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		}
 
 		return nil
-	}); err != nil {
+	})
+	// A deleted daemon still serves its cached principals. REJECTED makes
+	// the host drop them, and its session is spent with that answer.
+	if errors.Is(err, db.ErrWorkspaceNotAccessible) {
+		if err := conn.WithTx(ctx, func(q *db.Queries) error {
+			_, err := q.DeleteSubjectSessions(ctx, in.DaemonID)
+			return err
+		}); err != nil {
+			return nil, err
+		}
+		return &Synced{Status: new(nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED)}, nil
+	}
+	if err != nil {
 		return nil, err
 	}
 	return res, nil

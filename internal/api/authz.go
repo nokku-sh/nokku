@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
@@ -99,10 +100,10 @@ func (a *authorizationInterceptor) authorize(
 	}
 	caller, _ := actor.PrincipalFromContext(ctx)
 	if caller.Kind == actor.KindDaemon {
-		if access.GetDaemon() {
-			return ctx, nil
+		if !access.GetDaemon() {
+			return ctx, db.ErrPermissionDenied
 		}
-		return ctx, db.ErrPermissionDenied
+		return ctx, a.daemonAccepted(ctx, caller.ID, procedure)
 	}
 	if access.GetPublic() || access.GetSelf() {
 		return ctx, nil
@@ -115,6 +116,28 @@ func (a *authorizationInterceptor) authorize(
 		return ctx, nil
 	}
 	return actorHasRole(ctx, a.cfg.Conn, role)
+}
+
+// daemonAccepted keeps a pending, rejected or deleted daemon away from every
+// RPC but the ones that tell it its status, and removing itself.
+func (a *authorizationInterceptor) daemonAccepted(ctx context.Context, daemonID, procedure string) error {
+	switch procedure {
+	case nokkuv1connect.DaemonServiceSyncDaemonProcedure,
+		nokkuv1connect.DaemonControlServiceConnectProcedure,
+		nokkuv1connect.DaemonServiceDeleteDaemonProcedure:
+		return nil
+	}
+	daemon, err := a.cfg.Conn.Sys().GetDaemon(ctx, daemonID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return db.ErrPermissionDenied
+	}
+	if err != nil {
+		return err
+	}
+	if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+		return db.ErrPermissionDenied
+	}
+	return nil
 }
 
 // actorHasRole records the verified membership on the returned context so

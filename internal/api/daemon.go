@@ -322,7 +322,6 @@ func (s *daemonService) EnrollDaemon(
 	workspaceID := out.WorkspaceID
 	ctx = actor.AnnotateTenant(ctx, workspaceID)
 
-	// Never expires, deleting the daemon cascades to the session.
 	token, err := s.cfg.IAM.IssueDaemonSession(ctx, workspaceID, out.DaemonID, binding)
 	if err != nil {
 		return nil, errInternal

@@ -122,8 +122,13 @@ func (s *Service) completeLogin(ctx context.Context, u *db.User, method Method) 
 	return s.newCookie(sessionCookieName, token, *sess.ExpiresAt), nil
 }
 
-// IssueDaemonSession never expires, deleting the daemon revokes it.
+// IssueDaemonSession replaces the daemon's earlier sessions. The session
+// never expires. After the daemon is deleted it only gets the REJECTED answer
+// from SyncDaemon, which also removes it.
 func (s *Service) IssueDaemonSession(ctx context.Context, workspaceID, daemonID, binding string) (string, error) {
+	if _, err := s.sys.DeleteSubjectSessions(ctx, daemonID); err != nil {
+		return "", err
+	}
 	_, token, err := s.IssueSession(ctx, SessionParams{
 		WorkspaceID: workspaceID,
 		SubjectID:   daemonID,

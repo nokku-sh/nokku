@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 	"uuid"
@@ -303,4 +304,86 @@ func TestCreateSession(t *testing.T) {
 	assert.Eventually(t, func() bool {
 		return len(cfg.Pool.ListSessions(enrolled.GetId())) == 0
 	}, 5*time.Second, 20*time.Millisecond, "session outlived its socket")
+}
+
+// daemonAuth signs one call the way nokkud does.
+func daemonAuth(t *testing.T, cfg *config.Config, key *ecdsa.PrivateKey, token, procedure string) connect.ClientOption {
+	t.Helper()
+	return connect.WithClientOptions(
+		header("Authorization", "DPoP "+token),
+		header("DPoP", dpopProof(t, cfg, key, procedure, token)),
+	)
+}
+
+func enrollTestDaemon(
+	t *testing.T,
+	cfg *config.Config,
+	srv *httptest.Server,
+	workspaceID string,
+	autoApprove bool,
+) (*ecdsa.PrivateKey, *nokkuv1.EnrollDaemonResponse) {
+	t.Helper()
+	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	created, err := nokkuv1connect.NewTokenServiceClient(srv.Client(), srv.URL, adminAuth).
+		CreateToken(t.Context(), &nokkuv1.CreateTokenRequest{
+			WorkspaceId: &workspaceID,
+			Kind:        nokkuv1.TokenKind_TOKEN_KIND_ENROLL.Enum(),
+			AutoApprove: &autoApprove,
+		})
+	require.NoError(t, err)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	enrollAuth := header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonServiceEnrollDaemonProcedure, ""))
+	enrolled, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, enrollAuth).
+		EnrollDaemon(t.Context(), &nokkuv1.EnrollDaemonRequest{Token: new(created.GetSecret())})
+	require.NoError(t, err)
+	return key, enrolled
+}
+
+// A daemon nobody approved may ask for its status and nothing else.
+func TestPendingDaemonIsDenied(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, false)
+	require.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, enrolled.GetStatus())
+	token := enrolled.GetAccessToken()
+
+	synced, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL,
+		daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonServiceSyncDaemonProcedure)).
+		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, synced.GetStatus())
+	assert.Empty(t, synced.GetPrincipals())
+
+	_, err = nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL,
+		daemonAuth(t, cfg, key, token, nokkuv1connect.CertificateServiceSignSSHCertificateProcedure)).
+		SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
+			Type: nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST.Enum(),
+		})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "pending daemon reached the handler, got %v", err)
+}
+
+// A deleted daemon is told to stop, so its host drops the cached principals.
+func TestDeletedDaemonIsRejected(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	token := enrolled.GetAccessToken()
+
+	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	_, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, adminAuth).
+		DeleteDaemon(t.Context(), &nokkuv1.DeleteDaemonRequest{WorkspaceId: &workspaceID, Id: new(enrolled.GetId())})
+	require.NoError(t, err)
+
+	sync := func() (*nokkuv1.SyncDaemonResponse, error) {
+		return nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL,
+			daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonServiceSyncDaemonProcedure)).
+			SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
+	}
+	synced, err := sync()
+	require.NoError(t, err)
+	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED, synced.GetStatus())
+
+	_, err = sync()
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the session outlived the daemon, got %v", err)
 }
