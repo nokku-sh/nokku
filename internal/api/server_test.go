@@ -1,6 +1,8 @@
 package api
 
 import (
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -61,4 +63,30 @@ func TestWorkspaceHidesWebhookFromMembers(t *testing.T) {
 	got, err := client(db.RoleAdmin).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{WorkspaceId: &workspaceID})
 	require.NoError(t, err)
 	assert.Equal(t, "s3cret", got.GetWorkspace().GetSettings().GetAuditWebhookSecret())
+}
+
+// The API needs no client library: a procedure is a JSON POST to its path.
+func TestPlainJSONCall(t *testing.T) {
+	_, srv := newTestAPI(t)
+	resp, err := srv.Client().Post(
+		srv.URL+nokkuv1connect.AuthServiceLoginProcedure,
+		"application/json",
+		strings.NewReader(`{"email":"nobody@api.test","password":"wrong-password"}`),
+	)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	assert.Contains(t, string(body), `"code":"unauthenticated"`)
+}
+
+// A newer client may call a service this build does not have. It must get a
+// 404, not the SPA's index page.
+func TestUnknownServiceIsNotFound(t *testing.T) {
+	_, srv := newTestAPI(t)
+	resp, err := srv.Client().Post(srv.URL+"/nokku.v1.FutureService/Do", "application/json", strings.NewReader(`{}`))
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }

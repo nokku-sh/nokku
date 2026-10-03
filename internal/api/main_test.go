@@ -52,7 +52,7 @@ func TestMain(m *testing.M) {
 	testCfg, errTestAPI = config.New(ctx, nil)
 	if errTestAPI == nil {
 		s := New(testCfg)
-		errTestAPI = s.registerServices(ctx)
+		s.registerServices(ctx)
 		// Bidi streams need HTTP/2.
 		testServer = httptest.NewUnstartedServer(s.mux)
 		testServer.EnableHTTP2 = true

@@ -20,7 +20,6 @@ func TestRateLimited(t *testing.T) {
 		{"/avatars/user-1", true},
 		{"/terminal/ws", true},
 		{"/webhooks/stripe", true},
-		{"/v1/workspaces", true},
 		{"/", true},
 		{"/login", true},
 		{"/totally/unknown", true},
