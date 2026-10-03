@@ -27,6 +27,10 @@ import (
 	"github.com/nokku-sh/nokku/web"
 )
 
+// maxMessageBytes bounds one Connect message. The largest real ones are
+// recording chunks and relay frames at 32 KiB.
+const maxMessageBytes = 4 << 20
+
 type Server struct {
 	mux *http.ServeMux
 	cfg *config.Config
@@ -104,6 +108,7 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 
 	return []connect.HandlerOption{
 		connect.WithCompressMinBytes(1024),
+		connect.WithReadMaxBytes(maxMessageBytes),
 		connect.WithInterceptors(interceptors...),
 		connect.WithRecover(
 			func(ctx context.Context, spec connect.Spec, _ http.Header, p any) error {
