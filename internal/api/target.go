@@ -217,8 +217,9 @@ func (s *targetService) SyncTargetUsers(
 
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		if err := q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
-			TargetID:  req.GetTargetId(),
-			Usernames: req.GetUsernames(),
+			TargetID:      req.GetTargetId(),
+			Usernames:     req.GetUsernames(),
+			MaxPrincipals: db.MaxTargetPrincipals,
 		}); err != nil {
 			return err
 		}

@@ -393,6 +393,32 @@ func (q *Queries) GetCAsByIDs(ctx context.Context, caIds []string) ([]*GetCAsByI
 	return items, nil
 }
 
+const getDaemonCAKeys = `-- name: GetDaemonCAKeys :one
+SELECT
+  ca.public_key,
+  ca.previous_public_key,
+  ca.previous_trusted_until
+FROM
+  certificate_authorities ca
+  JOIN targets t ON t.ca_id = ca.id
+WHERE
+  t.daemon_id = $1
+`
+
+type GetDaemonCAKeysRow struct {
+	PublicKey            string     `json:"publicKey"`
+	PreviousPublicKey    *string    `json:"previousPublicKey"`
+	PreviousTrustedUntil *time.Time `json:"previousTrustedUntil"`
+}
+
+// The public half only. A daemon sync must not decrypt the private key.
+func (q *Queries) GetDaemonCAKeys(ctx context.Context, daemonID *string) (*GetDaemonCAKeysRow, error) {
+	row := q.db.QueryRow(ctx, getDaemonCAKeys, daemonID)
+	var i GetDaemonCAKeysRow
+	err := row.Scan(&i.PublicKey, &i.PreviousPublicKey, &i.PreviousTrustedUntil)
+	return &i, err
+}
+
 const getDefaultCA = `-- name: GetDefaultCA :one
 SELECT
   id, workspace_id, name, description, certificate, private_key, public_key, previous_public_key, previous_trusted_until, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at

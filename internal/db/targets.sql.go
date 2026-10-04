@@ -578,3 +578,29 @@ func (q *Queries) UpdateTargetCA(ctx context.Context, arg *UpdateTargetCAParams)
 	)
 	return &i, err
 }
+
+const updateTargetReport = `-- name: UpdateTargetReport :exec
+UPDATE targets
+SET
+  endpoints = COALESCE($1, endpoints),
+  metadata = $2
+WHERE
+  id = $3
+  AND (
+    COALESCE($1::TEXT[], endpoints) IS DISTINCT FROM endpoints
+    OR metadata IS DISTINCT FROM $2::jsonb
+  )
+`
+
+type UpdateTargetReportParams struct {
+	Endpoints []string `json:"endpoints"`
+	Metadata  []byte   `json:"metadata"`
+	TargetID  string   `json:"targetId"`
+}
+
+// What a daemon reports about its host on every sync. Unchanged values must
+// not rewrite the row.
+func (q *Queries) UpdateTargetReport(ctx context.Context, arg *UpdateTargetReportParams) error {
+	_, err := q.db.Exec(ctx, updateTargetReport, arg.Endpoints, arg.Metadata, arg.TargetID)
+	return err
+}

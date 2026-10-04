@@ -91,6 +91,8 @@ type Querier interface {
 	GetCredential(ctx context.Context, arg *GetCredentialParams) (*Credential, error)
 	GetDaemon(ctx context.Context, daemonID string) (*Daemon, error)
 	GetDaemonByKeyThumbprint(ctx context.Context, arg *GetDaemonByKeyThumbprintParams) (*Daemon, error)
+	// The public half only. A daemon sync must not decrypt the private key.
+	GetDaemonCAKeys(ctx context.Context, daemonID *string) (*GetDaemonCAKeysRow, error)
 	GetDaemonsByIDs(ctx context.Context, daemonIds []string) ([]*GetDaemonsByIDsRow, error)
 	GetDefaultCA(ctx context.Context, arg *GetDefaultCAParams) (*CertificateAuthority, error)
 	// skip_ids holds CAs whose rotation already failed this pass.
@@ -134,7 +136,9 @@ type Querier interface {
 	HasRecentToken(ctx context.Context, arg *HasRecentTokenParams) (bool, error)
 	InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams) error
 	InsertKeyset(ctx context.Context, data []byte) (int64, error)
-	// Never deletes, a host's reported list is a hint, not authority.
+	// Never deletes, a host's reported list is a hint, not authority. A target
+	// that already holds max_principals takes no more, so a host cannot grow the
+	// table without bound.
 	InsertTargetPrincipals(ctx context.Context, arg *InsertTargetPrincipalsParams) error
 	// The targets of one tag, the ones with a matching grant first. The filter is
 	// the one GetAccessGraph takes, so a tag filter only matches its own tag.
@@ -210,11 +214,15 @@ type Querier interface {
 	TryAdvisoryXactLock(ctx context.Context, key string) (bool, error)
 	UpdateCA(ctx context.Context, arg *UpdateCAParams) (*CertificateAuthority, error)
 	UpdateDaemon(ctx context.Context, arg *UpdateDaemonParams) (*Daemon, error)
+	// Every sync reports it, so an unchanged value must not rewrite the row.
 	UpdateDaemonMetadata(ctx context.Context, arg *UpdateDaemonMetadataParams) error
 	UpdateKeyset(ctx context.Context, arg *UpdateKeysetParams) error
 	UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (string, error)
 	UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*Target, error)
 	UpdateTargetCA(ctx context.Context, arg *UpdateTargetCAParams) (*Target, error)
+	// What a daemon reports about its host on every sync. Unchanged values must
+	// not rewrite the row.
+	UpdateTargetReport(ctx context.Context, arg *UpdateTargetReportParams) error
 	UpdateTeam(ctx context.Context, arg *UpdateTeamParams) (*Team, error)
 	UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User, error)
 	UpdateWorkspace(ctx context.Context, arg *UpdateWorkspaceParams) (*Workspace, error)

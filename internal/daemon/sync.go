@@ -4,8 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/netip"
+	"regexp"
+	"slices"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -65,8 +69,13 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			return err
 		}
 
-		// Lets the daemon detect a CA rollover. Without a CA it stays empty.
-		if ca, caErr := q.GetCAByDaemonID(ctx, &daemon.ID); caErr == nil {
+		// The daemon trusts exactly what it gets here, so only a target
+		// without a CA may answer empty. Any other failure fails the sync.
+		ca, err := q.GetDaemonCAKeys(ctx, &daemon.ID)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if err == nil {
 			res.CAPublicKey = ca.PublicKey
 			if ca.PreviousPublicKey != nil && ca.PreviousTrustedUntil != nil &&
 				time.Now().Before(*ca.PreviousTrustedUntil) {
@@ -81,10 +90,10 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		if err != nil {
 			return err
 		}
-		if _, err := q.UpdateTarget(ctx, &db.UpdateTargetParams{
+		if err := q.UpdateTargetReport(ctx, &db.UpdateTargetReportParams{
 			TargetID:  target.ID,
 			Metadata:  targetMeta,
-			Endpoints: in.PrivateIPs,
+			Endpoints: validEndpoints(in.PrivateIPs),
 		}); err != nil {
 			return err
 		}
@@ -92,8 +101,9 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		// Never deletes, a host that cannot enumerate users must not change
 		// who has access.
 		if err := q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
-			TargetID:  target.ID,
-			Usernames: in.Users,
+			TargetID:      target.ID,
+			Usernames:     validUsers(in.Users),
+			MaxPrincipals: db.MaxTargetPrincipals,
 		}); err != nil {
 			return err
 		}
@@ -126,4 +136,28 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		return nil, err
 	}
 	return res, nil
+}
+
+// usernameRE is the username pattern of the protos, keep them in sync.
+var usernameRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9._-]*\$?$`)
+
+// validUsers drops the names nokkud would refuse as a login anyway. The
+// report is dropped per entry, a host with one odd account must still sync.
+func validUsers(names []string) []string {
+	return slices.DeleteFunc(slices.Clone(names), func(name string) bool {
+		return len(name) > 32 || !usernameRE.MatchString(name)
+	})
+}
+
+// validEndpoints keeps what a daemon can listen on, an ip:port. Nil keeps
+// the stored endpoints.
+func validEndpoints(endpoints []string) []string {
+	valid := slices.DeleteFunc(slices.Clone(endpoints), func(ep string) bool {
+		_, err := netip.ParseAddrPort(ep)
+		return err != nil
+	})
+	if len(valid) == 0 {
+		return nil
+	}
+	return valid
 }

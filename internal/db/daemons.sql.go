@@ -398,6 +398,7 @@ SET
   metadata = $1
 WHERE
   id = $2
+  AND metadata IS DISTINCT FROM $1::jsonb
 `
 
 type UpdateDaemonMetadataParams struct {
@@ -405,6 +406,7 @@ type UpdateDaemonMetadataParams struct {
 	DaemonID string `json:"daemonId"`
 }
 
+// Every sync reports it, so an unchanged value must not rewrite the row.
 func (q *Queries) UpdateDaemonMetadata(ctx context.Context, arg *UpdateDaemonMetadataParams) error {
 	_, err := q.db.Exec(ctx, updateDaemonMetadata, arg.Metadata, arg.DaemonID)
 	return err

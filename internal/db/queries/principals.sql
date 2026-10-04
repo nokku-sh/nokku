@@ -66,22 +66,28 @@ ORDER BY
   p.username ASC;
 
 -- name: InsertTargetPrincipals :exec
--- Never deletes, a host's reported list is a hint, not authority.
+-- Never deletes, a host's reported list is a hint, not authority. A target
+-- that already holds max_principals takes no more, so a host cannot grow the
+-- table without bound.
 INSERT INTO
   principals (workspace_id, target_id, username)
 SELECT
-  (
-    SELECT
-      workspace_id
-    FROM
-      targets
-    WHERE
-      id = @target_id
-  ),
-  @target_id,
+  t.workspace_id,
+  t.id,
   d.username
 FROM
-  unnest(@usernames::TEXT[]) AS d (username)
+  targets t
+  CROSS JOIN unnest(@usernames::TEXT[]) AS d (username)
+WHERE
+  t.id = @target_id
+  AND (
+    SELECT
+      COUNT(*)
+    FROM
+      principals p
+    WHERE
+      p.target_id = t.id
+  ) < @max_principals::INTEGER
 ON CONFLICT (target_id, username) DO NOTHING;
 
 -- name: GetPrincipalWorkspace :one
