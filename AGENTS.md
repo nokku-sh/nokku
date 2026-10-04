@@ -71,11 +71,13 @@ add what you find. Unattended work follows the `unattended-pass` skill.
   daemon poke in a handler.
 - Tenant isolation is RLS via `Conn.WithWorkspace`. Never hand-roll workspace
   filters.
-- A new RPC means a proto edit in `../protos` with its `(access)` option, a
-  protos release, then `go get github.com/nokku-sh/protos@<version>` and
-  `task gen` here (nokkud and nk only need the `go get`). Locally a `go.work`
-  in the parent directory points all repos at the local protos, CI never
-  does. Check with `GOWORK=off go build ./...` before pushing.
+- A new RPC means a proto edit in `../protos` with its `(access)` option,
+  pushed, then `go get github.com/nokku-sh/protos@$(git -C ../protos rev-parse HEAD)`
+  and `task gen` here. That pins the pushed commit, tags are only for
+  published binaries. nokkud and nk only need the `go get` when they use what
+  changed. Locally a `go.work` in the parent directory points all repos at
+  the local protos, CI never does. `task lint` builds with `GOWORK=off`, so
+  an unpushed protos change shows before the push.
 - sqlc queries live in `internal/db/queries` and are regenerated, never
   hand-edited.
 - Schema changes go straight into `internal/db/migrations/001_base.sql`
