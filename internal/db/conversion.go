@@ -210,6 +210,9 @@ func (u *User) ToProto() *nokkuv1.User {
 
 const DaemonOnlineWindow = 30 * time.Second
 
+// MaxTargetPrincipals stops a host from reporting accounts without bound.
+const MaxTargetPrincipals = 1000
+
 func SeenRecently(t *time.Time) bool {
 	return t != nil && time.Since(*t) < DaemonOnlineWindow
 }

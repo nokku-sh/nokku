@@ -90,6 +90,18 @@ FROM
 WHERE
   t.daemon_id = $1;
 
+-- name: GetDaemonCAKeys :one
+-- The public half only. A daemon sync must not decrypt the private key.
+SELECT
+  ca.public_key,
+  ca.previous_public_key,
+  ca.previous_trusted_until
+FROM
+  certificate_authorities ca
+  JOIN targets t ON t.ca_id = ca.id
+WHERE
+  t.daemon_id = $1;
+
 -- name: GetCAsByIDs :many
 SELECT
   id,

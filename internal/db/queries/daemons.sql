@@ -85,11 +85,13 @@ RETURNING
   *;
 
 -- name: UpdateDaemonMetadata :exec
+-- Every sync reports it, so an unchanged value must not rewrite the row.
 UPDATE daemons
 SET
   metadata = @metadata
 WHERE
-  id = @daemon_id;
+  id = @daemon_id
+  AND metadata IS DISTINCT FROM @metadata::jsonb;
 
 -- name: TouchDaemons :exec
 UPDATE daemons

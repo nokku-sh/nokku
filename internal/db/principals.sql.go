@@ -179,29 +179,36 @@ const insertTargetPrincipals = `-- name: InsertTargetPrincipals :exec
 INSERT INTO
   principals (workspace_id, target_id, username)
 SELECT
-  (
-    SELECT
-      workspace_id
-    FROM
-      targets
-    WHERE
-      id = $1
-  ),
-  $1,
+  t.workspace_id,
+  t.id,
   d.username
 FROM
-  unnest($2::TEXT[]) AS d (username)
+  targets t
+  CROSS JOIN unnest($1::TEXT[]) AS d (username)
+WHERE
+  t.id = $2
+  AND (
+    SELECT
+      COUNT(*)
+    FROM
+      principals p
+    WHERE
+      p.target_id = t.id
+  ) < $3::INTEGER
 ON CONFLICT (target_id, username) DO NOTHING
 `
 
 type InsertTargetPrincipalsParams struct {
-	TargetID  string   `json:"targetId"`
-	Usernames []string `json:"usernames"`
+	Usernames     []string `json:"usernames"`
+	TargetID      string   `json:"targetId"`
+	MaxPrincipals int32    `json:"maxPrincipals"`
 }
 
-// Never deletes, a host's reported list is a hint, not authority.
+// Never deletes, a host's reported list is a hint, not authority. A target
+// that already holds max_principals takes no more, so a host cannot grow the
+// table without bound.
 func (q *Queries) InsertTargetPrincipals(ctx context.Context, arg *InsertTargetPrincipalsParams) error {
-	_, err := q.db.Exec(ctx, insertTargetPrincipals, arg.TargetID, arg.Usernames)
+	_, err := q.db.Exec(ctx, insertTargetPrincipals, arg.Usernames, arg.TargetID, arg.MaxPrincipals)
 	return err
 }
 

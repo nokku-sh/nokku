@@ -268,3 +268,78 @@ func TestRedeemTokenOnce(t *testing.T) {
 		t.Fatalf("%d redemptions succeeded, want 1", got)
 	}
 }
+
+// A daemon reports the same host facts on every sync. Unchanged reports must
+// not rewrite the rows, or every grant change costs a write per daemon.
+func TestSyncReportSkipsUnchangedRows(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	rowVersions := func() (daemon, target string) {
+		t.Helper()
+		err := c.sysPool.QueryRow(t.Context(), `
+			SELECT d.xmin::TEXT, t.xmin::TEXT FROM daemons d JOIN targets t ON t.daemon_id = d.id WHERE d.id = $1
+		`, f.daemon).Scan(&daemon, &target)
+		if err != nil {
+			t.Fatalf("read row versions: %v", err)
+		}
+		return daemon, target
+	}
+	report := func(endpoints []string) {
+		t.Helper()
+		if err := c.Sys().UpdateDaemonMetadata(t.Context(), &UpdateDaemonMetadataParams{
+			DaemonID: f.daemon, Metadata: []byte(`{"host": "a"}`),
+		}); err != nil {
+			t.Fatalf("report daemon metadata: %v", err)
+		}
+		if err := c.Sys().UpdateTargetReport(t.Context(), &UpdateTargetReportParams{
+			TargetID: f.target, Metadata: []byte(`{"os": "linux"}`), Endpoints: endpoints,
+		}); err != nil {
+			t.Fatalf("report target: %v", err)
+		}
+	}
+
+	report([]string{"10.0.0.5:4022"})
+	daemon, target := rowVersions()
+
+	report([]string{"10.0.0.5:4022"})
+	report(nil)
+	if d, tg := rowVersions(); d != daemon || tg != target {
+		t.Errorf("an unchanged report rewrote a row: daemon %s to %s, target %s to %s", daemon, d, target, tg)
+	}
+
+	report([]string{"10.0.0.6:4022"})
+	if _, tg := rowVersions(); tg == target {
+		t.Error("a changed endpoint was not written")
+	}
+}
+
+func TestInsertTargetPrincipalsStopsAtTheCap(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	insert := func(limit int32, names ...string) {
+		t.Helper()
+		if err := c.Sys().InsertTargetPrincipals(t.Context(), &InsertTargetPrincipalsParams{
+			TargetID: f.target, Usernames: names, MaxPrincipals: limit,
+		}); err != nil {
+			t.Fatalf("insert principals: %v", err)
+		}
+	}
+	count := func() (n int) {
+		t.Helper()
+		if err := c.sysPool.QueryRow(t.Context(),
+			`SELECT COUNT(*) FROM principals WHERE target_id = $1`, f.target).Scan(&n); err != nil {
+			t.Fatalf("count principals: %v", err)
+		}
+		return n
+	}
+
+	// The fixture holds one principal already.
+	insert(3, "a", "b")
+	if got := count(); got != 3 {
+		t.Fatalf("below the cap: %d principals, want 3", got)
+	}
+	insert(3, "c")
+	if got := count(); got != 3 {
+		t.Errorf("at the cap: %d principals, want 3", got)
+	}
+}
