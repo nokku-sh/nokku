@@ -42,6 +42,7 @@ export type RouteItem = {
 export const AppRoutes: Record<string, RouteItem[]> = {
 	Overview: [
 		{ title: 'Dashboard', url: '/', icon: Gauge, shortcut: 'd' },
+		{ title: 'Topology', url: '/topology', icon: VectorSquare, role: 'viewer', shortcut: 'o' },
 		{
 			title: 'Access',
 			url: '/access',
@@ -60,8 +61,7 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			role: 'viewer',
 			items: [
 				{ title: 'Targets', url: '/infrastructure/targets', icon: Server, shortcut: 't' },
-				{ title: 'Daemons', url: '/infrastructure/daemons', icon: Bot, shortcut: 'n' },
-				{ title: 'Topology', url: '/infrastructure/topology', icon: VectorSquare }
+				{ title: 'Daemons', url: '/infrastructure/daemons', icon: Bot, shortcut: 'n' }
 			]
 		},
 		{ title: 'Certificates', url: '/certificates', icon: IdCard, shortcut: 'c' },
