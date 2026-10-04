@@ -32,7 +32,6 @@
 		new Set((access.data?.daemons ?? []).filter((d) => d.online).map((d) => d.id))
 	);
 	const canShell = (t: Target) => !!t.daemonId && online.has(t.daemonId);
-	const accounts = (t: Target) => [...new Set((t.principals ?? []).map((p) => p.username))];
 
 	// Recent first, then reachable, then by name.
 	const servers = $derived.by(() => {
@@ -48,7 +47,7 @@
 					!q ||
 					t.name.toLowerCase().includes(q) ||
 					t.metadata?.hostname?.toLowerCase().includes(q) ||
-					accounts(t).some((a) => a.toLowerCase().includes(q))
+					t.usernames.some((a) => a.toLowerCase().includes(q))
 			)
 			.sort(
 				(a, b) =>
@@ -135,7 +134,7 @@
 							{t.metadata?.hostname || t.endpoints[0] || 'no address yet'}
 						</span>
 						<div class="flex flex-wrap gap-1">
-							{#each accounts(t) as username (username)}
+							{#each t.usernames as username (username)}
 								<Tooltip.Root>
 									<Tooltip.Trigger>
 										{#snippet child({ props })}

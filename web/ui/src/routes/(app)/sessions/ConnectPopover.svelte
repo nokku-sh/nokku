@@ -13,7 +13,7 @@
 
 	let { target }: { target: Target } = $props();
 
-	const usernames = $derived((target.principals ?? []).map((p) => p.username).filter(Boolean));
+	const usernames = $derived(target.usernames);
 	const mine = $derived(
 		[...getSessions().entries()].filter(([, s]) => s.daemonID === target.daemonId)
 	);
