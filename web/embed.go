@@ -3,12 +3,18 @@
 package web
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/base64"
 	"io/fs"
 	"mime"
 	"net/http"
 	"path"
+	"regexp"
+	"slices"
 	"strings"
+	"sync"
 
 	"github.com/vearutop/statigz"
 	"github.com/vearutop/statigz/brotli"
@@ -48,6 +54,35 @@ func Handler() http.Handler {
 		files.ServeHTTP(w, r)
 	})
 }
+
+var inlineScript = regexp.MustCompile(`(?s)<script([^>]*)>(.*?)</script>`)
+
+// InlineScriptHashes returns the CSP source of every inline script in the
+// built pages, which is SvelteKit's bootstrap. Allowing them by hash is what
+// lets the policy do without 'unsafe-inline'.
+var InlineScriptHashes = sync.OnceValue(func() []string {
+	var hashes []string
+	_ = fs.WalkDir(StaticFS, uiRoot, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".html") {
+			return err
+		}
+		page, err := StaticFS.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		for _, m := range inlineScript.FindAllSubmatch(page, -1) {
+			if bytes.Contains(m[1], []byte("src=")) {
+				continue
+			}
+			sum := sha256.Sum256(m[2])
+			if hash := "'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"; !slices.Contains(hashes, hash) {
+				hashes = append(hashes, hash)
+			}
+		}
+		return nil
+	})
+	return hashes
+})
 
 // pinMimeTypes keeps content types host independent.
 func pinMimeTypes() {
