@@ -66,9 +66,6 @@ importers:
       '@tanstack/svelte-table':
         specifier: 9.2.4
         version: 9.2.4(svelte@5.57.1)
-      '@types/dagre':
-        specifier: ^0.7.54
-        version: 0.7.54
       '@types/node':
         specifier: ^26.6.4
         version: 26.6.4
@@ -87,9 +84,6 @@ importers:
       cn:
         specifier: ^0.3.3
         version: 0.3.3
-      dagre:
-        specifier: ^0.8.5
-        version: 0.8.5
       globals:
         specifier: ^17.13.0
         version: 17.13.0
@@ -805,9 +799,6 @@ packages:
   '@types/d3-zoom@3.0.9':
     resolution: {integrity: sha512-0sE1406XBYJGiqD3AusTl9ZqC//2mIXix51tbom25gDCA8ri4xnSZg28CaSE8Srl6FClqABUKfsn0qghgdepMA==}
 
-  '@types/dagre@0.7.54':
-    resolution: {integrity: sha512-QjcRY+adGbYvBFS7cwv5txhVIwX1XXIUswWl+kSQTbI6NjgZydrZkEKX/etzVd7i+bCsCb40Z/xlBY5eoFuvWQ==}
-
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
@@ -1038,9 +1029,6 @@ packages:
     resolution: {integrity: sha512-b8AmV3kfQaqWAuacbPuNbL6vahnOJflOhexLzMMNLga62+/nh0JzvJ0aO/5a5MVgUFGS7Hu1P9P03o3fJkDCyw==}
     engines: {node: '>=12'}
 
-  dagre@0.8.5:
-    resolution: {integrity: sha512-/aTqmnRta7x7MCCpExk7HQL2O4owCT2h8NT//9I1OQ9vt29Pa0BzSAkR5lwFUcQ7491yVi/3CXU9jQ5o0Mn2Sw==}
-
   deepmerge@4.3.1:
     resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
     engines: {node: '>=0.10.0'}
@@ -1091,9 +1079,6 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
-
-  graphlib@2.1.8:
-    resolution: {integrity: sha512-jcLLfkpoVGmH7/InMC/1hIvOPSUh38oJtGhvrOFGzioE1DZ+0YW16RgmOJhHiuWTvGiJQ9Z1Ik43JvkRPRvE+A==}
 
   inline-style-parser@0.2.7:
     resolution: {integrity: sha512-Nb2ctOyNR8DqQoR0OwRG95uNWIC0C1lCgf5Naz5H6Ji72KZ8OcFZLz2P5sNgwlyoJ8Yif11oMuYs5pBQa86csA==}
@@ -1255,9 +1240,6 @@ packages:
 
   locate-character@3.0.0:
     resolution: {integrity: sha512-SW13ws7BjaeJ6p7Q6CO2nchbYEc3X3J6WrmTTDto7yMPqVSZTUyY5Tjbid+Ab8gLnATtygYtiDIJGQRRn2ZOiA==}
-
-  lodash@4.18.1:
-    resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
 
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
@@ -2009,8 +1991,6 @@ snapshots:
       '@types/d3-interpolate': 3.0.4
       '@types/d3-selection': 3.0.12
 
-  '@types/dagre@0.7.54': {}
-
   '@types/estree@1.0.9': {}
 
   '@types/node@26.6.4':
@@ -2176,11 +2156,6 @@ snapshots:
       d3-selection: 3.0.0
       d3-transition: 3.0.1(d3-selection@3.0.0)
 
-  dagre@0.8.5:
-    dependencies:
-      graphlib: 2.1.8
-      lodash: 4.18.1
-
   deepmerge@4.3.1: {}
 
   dequal@2.0.3: {}
@@ -2210,10 +2185,6 @@ snapshots:
   globals@17.13.0: {}
 
   graceful-fs@4.2.11: {}
-
-  graphlib@2.1.8:
-    dependencies:
-      lodash: 4.18.1
 
   inline-style-parser@0.2.7: {}
 
@@ -2322,8 +2293,6 @@ snapshots:
       lightningcss-win32-x64-msvc: 1.33.0
 
   locate-character@3.0.0: {}
-
-  lodash@4.18.1: {}
 
   lz-string@1.5.0: {}
 
