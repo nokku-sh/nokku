@@ -7,9 +7,12 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
+
+	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
 type logInterceptor struct {
@@ -91,27 +94,49 @@ func (rw *responseWriter) Flush() {
 	_ = rc.Flush()
 }
 
+// withLogger writes one line per request in the style of chi's httplog. It
+// logs the path only: query strings carry OAuth codes, one-time tokens and
+// Connect GET messages.
 func (s *Server) withLogger(next http.Handler) http.Handler {
+	// The SaaS logs failures only, anything more is noise across tenants. A
+	// self-hosted instance logs every request.
+	floor := slog.LevelError
+	if s.cfg.Debug || s.cfg.Entitlements.Mode() == entitlement.ModeSelfHosted {
+		floor = slog.LevelInfo
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+		// The static handler rewrites the path to the file it serves.
+		path := r.URL.Path
 
 		next.ServeHTTP(rw, r)
 		duration := time.Since(start)
 
-		attrs := []slog.Attr{
-			slog.String("method", r.Method),
-			slog.String("path", r.URL.Path),
-			slog.Int("status", rw.statusCode),
-			slog.Duration("duration", duration),
-		}
+		level := slog.LevelInfo
 		switch {
 		case rw.statusCode >= 500:
-			slog.LogAttrs(r.Context(), slog.LevelError, "http failed", attrs...)
-		case s.cfg.Debug:
-			slog.LogAttrs(r.Context(), slog.LevelDebug, "http", attrs...)
+			level = slog.LevelError
+		case rw.statusCode >= 400:
+			level = slog.LevelWarn
 		}
+		if level < floor || (level == slog.LevelInfo && !s.cfg.Debug && quietPath(path)) {
+			return
+		}
+		slog.LogAttrs(r.Context(), level,
+			fmt.Sprintf("%s %s => HTTP %d (%s)", r.Method, path, rw.statusCode, duration.Round(time.Microsecond)),
+			slog.String("method", r.Method),
+			slog.String("path", path),
+			slog.Int("status", rw.statusCode),
+			slog.Duration("duration", duration),
+		)
 	})
+}
+
+// quietPath is a request nobody wants a line for when it succeeds.
+func quietPath(path string) bool {
+	return path == "/healthz" || strings.HasPrefix(path, "/_app/")
 }
 
 // withRecover covers the plain HTTP routes, connect handlers recover on
