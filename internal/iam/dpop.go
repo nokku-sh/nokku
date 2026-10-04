@@ -9,7 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"net"
+	"net/url"
 	"path"
 	"strings"
 	"time"
@@ -93,7 +93,7 @@ func (v *DPoPVerifier) Verify(
 	if c.HTM != htm {
 		return "", fmt.Errorf("%w: htm mismatch", errInvalidProof)
 	}
-	if !strings.EqualFold(normalizeDPoPHTU(c.HTU), normalizeDPoPHTU(htu)) {
+	if !sameHTU(c.HTU, htu) {
 		return "", fmt.Errorf("%w: htu mismatch", errInvalidProof)
 	}
 	if c.JTI == "" {
@@ -164,93 +164,30 @@ func DPoPATH(token string) string {
 	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
 
-// normalizeDPoPHTU follows RFC 3986 section 6.2.2.
-func normalizeDPoPHTU(htu string) string {
-	scheme, rest, ok := strings.Cut(htu, "://")
-	if !ok {
-		return htu
+// sameHTU compares a proof's htu with the URL the request was for. The host is
+// case-insensitive and a default port may be left out. Query and fragment do
+// not count, the path does, byte for byte.
+func sameHTU(claim, want string) bool {
+	a, errA := url.Parse(claim)
+	b, errB := url.Parse(want)
+	if errA != nil || errB != nil {
+		return false
 	}
-	rest, _, _ = strings.Cut(rest, "#")
-	rest, _, _ = strings.Cut(rest, "?")
-	host, p, ok := strings.Cut(rest, "/")
-	if ok {
-		p = "/" + p
-	}
-	host = strings.ToLower(host)
-	if h, port, err := net.SplitHostPort(host); err == nil {
-		if (scheme == "https" && port == "443") || (scheme == "http" && port == "80") {
-			if strings.Contains(h, ":") {
-				host = "[" + h + "]"
-			} else {
-				host = h
-			}
-		}
-	}
-	return strings.ToLower(scheme) + "://" + host + normalizeDPoPPath(p)
+	return a.Scheme == b.Scheme &&
+		strings.EqualFold(a.Hostname(), b.Hostname()) &&
+		effectivePort(a) == effectivePort(b) &&
+		path.Clean(a.EscapedPath()) == path.Clean(b.EscapedPath())
 }
 
-func normalizeDPoPPath(p string) string {
-	if p == "" {
-		return p
+func effectivePort(u *url.URL) string {
+	if port := u.Port(); port != "" {
+		return port
 	}
-	return path.Clean(normalizePercentEncoding(p))
-}
-
-// normalizePercentEncoding only decodes unreserved characters, so %2F stays
-// distinct from a real "/".
-func normalizePercentEncoding(s string) string {
-	if !strings.Contains(s, "%") {
-		return s
+	switch u.Scheme {
+	case "https":
+		return "443"
+	case "http":
+		return "80"
 	}
-	var b strings.Builder
-	b.Grow(len(s))
-	for i := 0; i < len(s); {
-		c := s[i]
-		if c == '%' && i+2 < len(s) {
-			hi, ok1 := unhex(s[i+1])
-			lo, ok2 := unhex(s[i+2])
-			if ok1 && ok2 {
-				octet := hi<<4 | lo
-				if isUnreserved(octet) {
-					b.WriteByte(octet)
-				} else {
-					b.WriteByte('%')
-					b.WriteByte(upperHex(s[i+1]))
-					b.WriteByte(upperHex(s[i+2]))
-				}
-				i += 3
-				continue
-			}
-		}
-		b.WriteByte(c)
-		i++
-	}
-	return b.String()
-}
-
-func isUnreserved(c byte) bool {
-	switch {
-	case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
-		return true
-	}
-	return c == '-' || c == '.' || c == '_' || c == '~'
-}
-
-func upperHex(c byte) byte {
-	if c >= 'a' && c <= 'f' {
-		return c - 'a' + 'A'
-	}
-	return c
-}
-
-func unhex(c byte) (byte, bool) {
-	switch {
-	case c >= '0' && c <= '9':
-		return c - '0', true
-	case c >= 'a' && c <= 'f':
-		return c - 'a' + 10, true
-	case c >= 'A' && c <= 'F':
-		return c - 'A' + 10, true
-	}
-	return 0, false
+	return ""
 }
