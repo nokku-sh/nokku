@@ -19,7 +19,7 @@ func TestSignCertificate_UnspecifiedTypeIsUser(t *testing.T) {
 	ca := newTestCA(t)
 
 	cert, err := SignCertificate(ca, newTestKey(t), "alice", "k", time.Hour,
-		nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_UNSPECIFIED)
+		0)
 	if err != nil {
 		t.Fatalf("SignCertificate() error: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestSignCertificate_Errors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := SignCertificate(tt.ca, tt.pub, "alice", "k", time.Hour,
-				nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_USER)
+				ssh.UserCert)
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("error = %v, want containing %q", err, tt.wantErr)
 			}
@@ -168,7 +168,7 @@ func TestSignUserCertificate(t *testing.T) {
 		"user-123",
 		"nokku:login:user:alice:user-123",
 		0,
-		nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_USER,
+		ssh.UserCert,
 	)
 	if err != nil {
 		t.Fatalf("SignCertificate failed: %v", err)
@@ -199,7 +199,7 @@ func TestSignHostCertificate(t *testing.T) {
 		"target-123",
 		"nokku:provision:daemon:d:d",
 		0,
-		nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST,
+		ssh.HostCert,
 	)
 	if err != nil {
 		t.Fatalf("SignCertificate failed: %v", err)

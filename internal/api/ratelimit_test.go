@@ -33,7 +33,10 @@ func TestRateLimited(t *testing.T) {
 
 		// A limit here would block legitimate reconnect storms.
 		{"/nokku.v1.DaemonControlService/Connect", false},
-		{"/nokku.v1.DaemonSessionService/Stream", false},
+		{"/nokku.v1.DaemonControlService/DaemonRelay", false},
+		// Enrollment is public and takes a token, so it stays limited.
+		{"/nokku.v1.DaemonControlService/EnrollDaemon", true},
+		{"/nokku.v1.DaemonControlService/SyncDaemon", true},
 
 		// One page load pulls many hashed assets.
 		{"/_app/immutable/chunks/app.js", false},

@@ -16,6 +16,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/daemon"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/util"
 )
 
 const (
@@ -125,6 +126,7 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 		UserID:        ticket.UserID,
 		CA:            ca,
 		HostPrincipal: targetID,
+		ClientAddr:    util.ClientIP(r.Header, r.RemoteAddr),
 	})
 	if err != nil {
 		logger.Warn("web session failed to start", "error", err)

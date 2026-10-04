@@ -292,7 +292,7 @@ var createProcedures = []string{
 	nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure,
 	nokkuv1connect.CertificateServiceCreateCertificateAuthorityProcedure,
 	nokkuv1connect.WorkspaceDomainServiceCreateWorkspaceDomainProcedure,
-	nokkuv1connect.DaemonServiceEnrollDaemonProcedure,
+	nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure,
 	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure,
 	nokkuv1connect.DaemonServiceCreateSessionProcedure,
 }
@@ -301,8 +301,8 @@ var createProcedures = []string{
 // check happens elsewhere, with the enforcement point documented.
 var createProceduresGatedOutsideTheGuard = map[string]string{
 	// Enrollment is a public endpoint whose workspace comes from the
-	// enroll token; the handler checks the cap directly (daemon.go).
-	nokkuv1connect.DaemonServiceEnrollDaemonProcedure: "handler: CheckResources in EnrollDaemon (public endpoint, workspace from token)",
+	// enroll token; the handler checks the cap directly (daemon_control.go).
+	nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure: "handler: CheckResources in EnrollDaemon (public endpoint, workspace from token)",
 	// Pre-tenant: there is no workspace to resolve a cap for. Per-user
 	// workspace count caps are separate scope, enforced in CreateWorkspace.
 	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure: "out of scope: per-user workspace caps",

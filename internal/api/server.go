@@ -135,8 +135,7 @@ func (s *Server) registerServices(ctx context.Context) {
 	s.mux.Handle(nokkuv1connect.NewWorkspaceDomainServiceHandler(newWorkspaceDomainService(s.cfg), opts...))
 	s.mux.Handle(nokkuv1connect.NewSSOServiceHandler(newSSOService(s.cfg), opts...))
 	s.mux.Handle(nokkuv1connect.NewSCIMServiceHandler(newSCIMService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(s.cfg.Pool, opts...))
-	s.mux.Handle(nokkuv1connect.NewDaemonSessionServiceHandler(s.cfg.Pool, opts...))
+	s.mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(newDaemonControlService(s.cfg), opts...))
 	s.mux.Handle(nokkuv1connect.NewRecordingServiceHandler(newRecordingService(s.cfg), opts...))
 
 	static := web.Handler()

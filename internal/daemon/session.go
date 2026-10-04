@@ -32,6 +32,8 @@ type SessionConfig struct {
 	CA        *db.CertificateAuthority
 	// HostPrincipal is the daemon's target id.
 	HostPrincipal string
+	// ClientAddr is the browser's address, reported to the daemon's sshd.
+	ClientAddr string
 }
 
 // Session is one browser terminal. It belongs to the websocket that started
@@ -79,7 +81,7 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 	}
 
 	relayID := uuid.NewV7().String()
-	relay, err := p.RequestRelay(ctx, cfg.DaemonID, relayID, cfg.UserID)
+	relay, err := p.RequestRelay(ctx, cfg.DaemonID, relayID, cfg.UserID, cfg.ClientAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +151,7 @@ func mintSessionCert(
 		principal,
 		"nokku:web:session:"+sessionID,
 		sessionCertTTL,
-		nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_USER,
+		ssh.UserCert,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("sign session certificate: %w", err)

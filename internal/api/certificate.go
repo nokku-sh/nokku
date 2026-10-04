@@ -13,6 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/audit"
 
 	"connectrpc.com/connect"
+	gossh "golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
@@ -120,17 +121,8 @@ func (s *certificateService) GetCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.GetCertificateAuthorityRequest,
 ) (*nokkuv1.GetCertificateAuthorityResponse, error) {
-	if req.GetId() == "" && actor.DaemonIDFromContext(ctx) == "" {
-		return nil, errInvalidInput
-	}
-	// A daemon always resolves its own CA, whatever id it sent.
-	daemonID := actor.DaemonIDFromContext(ctx)
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		if daemonID != "" {
-			ca, err = q.GetCAByDaemonID(ctx, &daemonID)
-			return err
-		}
 		ca, err = q.GetCA(ctx, req.GetId())
 		return err
 	}); err != nil {
@@ -246,25 +238,17 @@ func (s *certificateService) RolloverCertificateAuthority(
 	}, nil
 }
 
+// SignSSHCertificate signs a user certificate for the caller. The principal
+// is the caller's own id, so membership in the workspace is all it takes.
 func (s *certificateService) SignSSHCertificate(
 	ctx context.Context,
 	req *nokkuv1.SignSSHCertificateRequest,
 ) (*nokkuv1.SignSSHCertificateResponse, error) {
 	caller, _ := actor.PrincipalFromContext(ctx)
-	keyID := fmt.Sprintf("nokku:login:%s:%s", caller.Kind, caller.ID)
-	principal := caller.ID
-	daemonID := actor.DaemonIDFromContext(ctx)
-
-	// Daemons mint host certs and nothing else, nobody else mints host certs.
-	if (req.GetType() == nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST) != (daemonID != "") {
-		return nil, newError(connect.CodePermissionDenied, "host certificates are issued to daemons only")
-	}
 
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		switch {
-		case daemonID != "":
-			ca, err = q.GetCAByDaemonID(ctx, &daemonID)
 		case req.GetCaId() != "":
 			ca, err = q.GetCA(ctx, req.GetCaId())
 		case req.GetWorkspaceId() != "":
@@ -273,19 +257,7 @@ func (s *certificateService) SignSSHCertificate(
 				AuthorityType: nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH,
 			})
 		}
-		if err != nil {
-			return err
-		}
-
-		if daemonID != "" {
-			target, err := q.GetTargetByDaemon(ctx, &daemonID)
-			if err != nil {
-				return err
-			}
-			principal = target.ID
-			keyID = fmt.Sprintf("nokku:provision:%s:%s", caller.Kind, caller.ID)
-		}
-		return nil
+		return err
 	}); err != nil {
 		return nil, err
 	}
@@ -308,10 +280,10 @@ func (s *certificateService) SignSSHCertificate(
 	cert, err := ssh.SignCertificate(
 		ca,
 		req.GetPublicKey(),
-		principal,
-		keyID,
+		caller.ID,
+		fmt.Sprintf("nokku:login:%s:%s", caller.Kind, caller.ID),
 		req.GetTtl().AsDuration(),
-		req.GetType(),
+		gossh.UserCert,
 	)
 	if err != nil {
 		return nil, newError(connect.CodeInvalidArgument, err.Error())

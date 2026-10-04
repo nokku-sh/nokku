@@ -19,6 +19,7 @@ import (
 	"github.com/go-jose/go-jose/v4/cryptosigner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/ssh"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
@@ -72,10 +73,10 @@ func TestEnrollDaemon(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	enroll := func(token string, key *ecdsa.PrivateKey) (*nokkuv1.EnrollDaemonResponse, error) {
-		client := nokkuv1connect.NewDaemonServiceClient(
+		client := nokkuv1connect.NewDaemonControlServiceClient(
 			srv.Client(),
 			srv.URL,
-			header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonServiceEnrollDaemonProcedure, "")),
+			header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure, "")),
 		)
 		return client.EnrollDaemon(t.Context(), &nokkuv1.EnrollDaemonRequest{Token: &token})
 	}
@@ -128,8 +129,8 @@ func TestCreateSession(t *testing.T) {
 	require.NoError(t, err)
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	enrollAuth := header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonServiceEnrollDaemonProcedure, ""))
-	enrolled, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, enrollAuth).
+	enrollAuth := header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure, ""))
+	enrolled, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL, enrollAuth).
 		EnrollDaemon(t.Context(), &nokkuv1.EnrollDaemonRequest{Token: new(created.GetSecret())})
 	require.NoError(t, err)
 
@@ -259,7 +260,7 @@ func TestCreateSession(t *testing.T) {
 		Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{}},
 	}))
 	// Signed here since require must not run on the daemon goroutine.
-	relayProof := dpopProof(t, cfg, key, nokkuv1connect.DaemonSessionServiceDaemonRelayProcedure, token)
+	relayProof := dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceDaemonRelayProcedure, token)
 	go func() {
 		for {
 			msg, err := stream.Receive()
@@ -277,7 +278,7 @@ func TestCreateSession(t *testing.T) {
 			relayCtx, info := connect.NewClientContext(t.Context())
 			info.RequestHeader().Set("Authorization", "DPoP "+token)
 			info.RequestHeader().Set("DPoP", relayProof)
-			relay, err := nokkuv1connect.NewDaemonSessionServiceClient(srv.Client(), srv.URL).DaemonRelay(relayCtx)
+			relay, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL).DaemonRelay(relayCtx)
 			if err != nil {
 				return
 			}
@@ -375,8 +376,8 @@ func enrollTestDaemon(
 	require.NoError(t, err)
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	enrollAuth := header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonServiceEnrollDaemonProcedure, ""))
-	enrolled, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, enrollAuth).
+	enrollAuth := header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure, ""))
+	enrolled, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL, enrollAuth).
 		EnrollDaemon(t.Context(), &nokkuv1.EnrollDaemonRequest{Token: new(created.GetSecret())})
 	require.NoError(t, err)
 	return key, enrolled
@@ -390,18 +391,16 @@ func TestPendingDaemonIsDenied(t *testing.T) {
 	require.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, enrolled.GetStatus())
 	token := enrolled.GetAccessToken()
 
-	synced, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL,
-		daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonServiceSyncDaemonProcedure)).
+	synced, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
+		daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure)).
 		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 	require.NoError(t, err)
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, synced.GetStatus())
 	assert.Empty(t, synced.GetPrincipals())
 
-	_, err = nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL,
-		daemonAuth(t, cfg, key, token, nokkuv1connect.CertificateServiceSignSSHCertificateProcedure)).
-		SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
-			Type: nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST.Enum(),
-		})
+	_, err = nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
+		daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure)).
+		SignHostCertificate(t.Context(), &nokkuv1.SignHostCertificateRequest{PublicKey: new("ssh-ed25519 AAAA")})
 	assert.Equal(
 		t,
 		connect.CodePermissionDenied,
@@ -424,8 +423,8 @@ func TestDeletedDaemonIsRejected(t *testing.T) {
 	require.NoError(t, err)
 
 	sync := func() (*nokkuv1.SyncDaemonResponse, error) {
-		return nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL,
-			daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonServiceSyncDaemonProcedure)).
+		return nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
+			daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure)).
 			SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 	}
 	synced, err := sync()
@@ -433,5 +432,113 @@ func TestDeletedDaemonIsRejected(t *testing.T) {
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED, synced.GetStatus())
 
 	_, err = sync()
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the session outlived the daemon, got %v", err)
+}
+
+// seedDefaultCA gives the workspace the CA an enrollment falls back to.
+func seedDefaultCA(t *testing.T, srv *httptest.Server, adminAuth connect.ClientOption, workspaceID string) string {
+	t.Helper()
+	created, err := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth).
+		CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
+			WorkspaceId: &workspaceID,
+			Name:        new("default"),
+			KeyType:     nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519.Enum(),
+			IsDefault:   new(true),
+		})
+	require.NoError(t, err)
+	return created.GetCertificateAuthority().GetPublicKey()
+}
+
+// The report is a hint from the host. What does not parse is dropped and the
+// rest still lands, so one odd account never blocks a sync.
+func TestSyncDaemonReport(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	caKey := seedDefaultCA(t, srv, adminAuth, workspaceID)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	token := enrolled.GetAccessToken()
+
+	synced, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
+		daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure)).
+		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{
+			Users:      []string{"root", "deploy", "bad name", `corp\john`},
+			PrivateIps: []string{"10.0.0.5:4022", "example.com:22", "nonsense"},
+		})
+	require.NoError(t, err)
+	assert.Equal(t, caKey, synced.GetCaPublicKey(), "the daemon trusts the CA of its target")
+
+	var usernames, endpoints []string
+	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
+		target, err := q.GetTargetByDaemon(t.Context(), new(enrolled.GetId()))
+		if err != nil {
+			return err
+		}
+		endpoints = target.Endpoints
+		rows, err := q.GetPrincipalsByTargetIDs(t.Context(), []string{target.ID})
+		for _, r := range rows {
+			usernames = append(usernames, r.Principal.Username)
+		}
+		return err
+	}))
+	assert.Equal(t, []string{"deploy", "root"}, usernames)
+	assert.Equal(t, []string{"10.0.0.5:4022"}, endpoints)
+}
+
+func TestSignHostCertificate(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	caKey := seedDefaultCA(t, srv, adminAuth, workspaceID)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+
+	hostKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	hostPub, err := ssh.NewPublicKey(&hostKey.PublicKey)
+	require.NoError(t, err)
+
+	res, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
+		daemonAuth(
+			t, cfg, key, enrolled.GetAccessToken(),
+			nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure,
+		)).
+		SignHostCertificate(t.Context(), &nokkuv1.SignHostCertificateRequest{
+			PublicKey: new(string(ssh.MarshalAuthorizedKey(hostPub))),
+		})
+	require.NoError(t, err)
+
+	parsed, _, _, _, err := ssh.ParseAuthorizedKey([]byte(res.GetSignedCertificate()))
+	require.NoError(t, err)
+	cert, ok := parsed.(*ssh.Certificate)
+	require.True(t, ok, "not a certificate")
+	assert.Equal(t, uint32(ssh.HostCert), cert.CertType)
+	assert.Equal(t, []string{enrolled.GetTargetId()}, cert.ValidPrincipals, "a daemon only signs for its own target")
+	ca, _, _, _, err := ssh.ParseAuthorizedKey([]byte(caKey))
+	require.NoError(t, err)
+	assert.Equal(t, ca.Marshal(), cert.SignatureKey.Marshal(), "signed by the CA of the target")
+}
+
+// Unenrolling removes the daemon and spends its session with it.
+func TestUnenrollDaemon(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	token := enrolled.GetAccessToken()
+	control := func(procedure string) nokkuv1connect.DaemonControlServiceClient {
+		return nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
+			daemonAuth(t, cfg, key, token, procedure))
+	}
+
+	_, err := control(nokkuv1connect.DaemonControlServiceUnenrollDaemonProcedure).
+		UnenrollDaemon(t.Context(), &nokkuv1.UnenrollDaemonRequest{})
+	require.NoError(t, err)
+
+	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	_, err = nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, adminAuth).
+		GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{WorkspaceId: &workspaceID, Id: new(enrolled.GetId())})
+	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "the daemon is still there, got %v", err)
+
+	_, err = control(nokkuv1connect.DaemonControlServiceSyncDaemonProcedure).
+		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the session outlived the daemon, got %v", err)
 }
