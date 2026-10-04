@@ -1,7 +1,14 @@
 package api
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/nokku-sh/nokku/internal/config"
 )
 
 func TestRateLimited(t *testing.T) {
@@ -41,44 +48,29 @@ func TestRateLimited(t *testing.T) {
 	}
 }
 
-func TestRateLimiterStore_AllowsUpToBurst(t *testing.T) {
-	store := newRateLimiterStore(1, 3) // 1 rps, burst 3
+func TestWithRateLimit(t *testing.T) {
+	s := &Server{cfg: &config.Config{}}
+	h := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	call := func(path, addr string) int {
+		r := httptest.NewRequest(http.MethodPost, path, nil)
+		r.RemoteAddr = addr
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w.Code
+	}
 
-	for i := range 3 {
-		if !store.allow("client-a") {
-			t.Fatalf("request %d: want allowed within burst", i+1)
-		}
+	const office, other = "203.0.113.7:4000", "203.0.113.8:4000"
+	for i := range authPerMinute {
+		require.Equal(t, http.StatusNoContent, call("/nokku.v1.AuthService/Login", office), "login %d", i+1)
 	}
-	if store.allow("client-a") {
-		t.Error("request beyond burst: want denied")
-	}
-}
-
-func TestRateLimiterStore_IndependentKeys(t *testing.T) {
-	store := newRateLimiterStore(1, 2)
-
-	store.allow("client-a")
-	store.allow("client-a")
-	if store.allow("client-a") {
-		t.Error("client-a exhausted: want denied")
-	}
-	if !store.allow("client-b") {
-		t.Error("client-b: want allowed (independent bucket)")
-	}
-	if !store.allow("client-b") {
-		t.Error("client-b second request: want allowed")
-	}
-}
-
-func TestRateLimiterStore_Refills(t *testing.T) {
-	store := newRateLimiterStore(100, 1) // fast refill
-
-	if !store.allow("k") {
-		t.Fatal("first request: want allowed")
-	}
-	if store.allow("k") {
-		t.Fatal("second request: want denied (burst 1)")
-	}
+	assert.Equal(t, http.StatusTooManyRequests, call("/nokku.v1.AuthService/Login", office), "one past the auth limit")
+	assert.Equal(t, http.StatusNoContent, call("/nokku.v1.TargetService/ListTargets", office),
+		"the rest of the API has its own budget")
+	assert.Equal(t, http.StatusNoContent, call("/nokku.v1.AuthService/Login", other), "another address is not affected")
+	assert.Equal(t, http.StatusNoContent, call("/nokku.v1.DaemonControlService/Connect", office),
+		"daemon streams are never limited")
 }
 
 func TestIsAuthRoute(t *testing.T) {
