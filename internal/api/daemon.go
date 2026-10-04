@@ -1,11 +1,8 @@
 package api
 
 import (
-	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
-	"net/http"
 	"slices"
 	"time"
 	"uuid"
@@ -19,10 +16,10 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
-	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/util"
 )
 
 type daemonService struct {
@@ -117,13 +114,8 @@ func (s *daemonService) DeleteDaemon(
 	ctx context.Context,
 	req *nokkuv1.DeleteDaemonRequest,
 ) (*nokkuv1.DeleteDaemonResponse, error) {
-	// A daemon can only delete itself, whatever id it sends.
-	id := cmp.Or(actor.DaemonIDFromContext(ctx), req.GetId())
-	if id == "" {
-		return nil, errInvalidInput
-	}
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		_, err = q.DeleteDaemon(ctx, id)
+		_, err = q.DeleteDaemon(ctx, req.GetId())
 		return err
 	}); err != nil {
 		return nil, err
@@ -305,7 +297,7 @@ func (s *daemonService) Relay(
 	}
 
 	relayID := uuid.NewV7().String()
-	relay, err := s.cfg.Pool.RequestRelay(ctx, d.ID, relayID, caller.ID)
+	relay, err := s.cfg.Pool.RequestRelay(ctx, d.ID, relayID, caller.ID, clientAddr(ctx))
 	if err != nil {
 		if errors.Is(err, nokkudaemon.ErrRelayLimit) {
 			return newError(connect.CodeResourceExhausted, "too many concurrent relays")
@@ -329,113 +321,13 @@ func (s *daemonService) Relay(
 	return nokkudaemon.BridgeRelay(ctx, stream, relay)
 }
 
-func (s *daemonService) EnrollDaemon(
-	ctx context.Context,
-	req *nokkuv1.EnrollDaemonRequest,
-) (*nokkuv1.EnrollDaemonResponse, error) {
-	ci, ok := connect.CallInfoForHandlerContext(ctx)
+// clientAddr is the caller's address as a relayed connection reports it to
+// the daemon's sshd. It is the exact address, a source-address option on the
+// certificate is matched against it.
+func clientAddr(ctx context.Context) string {
+	meta, ok := iam.RequestMetaFromContext(ctx)
 	if !ok {
-		return nil, errInternal
+		return ""
 	}
-	// The session is bound to the daemon's DPoP key, so a stolen token is
-	// useless without it.
-	binding, err := s.enrollBinding(ctx, ci)
-	if err != nil {
-		return nil, err
-	}
-
-	out, err := nokkudaemon.Enroll(ctx, s.cfg.Conn, nokkudaemon.EnrollInput{
-		Token:    req.GetToken(),
-		Binding:  binding,
-		Metadata: requestMetadata(ci.RequestHeader()),
-		// The workspace is only known once the token verified, so the
-		// resource cap is checked here instead of in the guard.
-		CanCreate: func(ctx context.Context, workspaceID string) error {
-			return s.cfg.Entitlements.CheckResources(ctx, workspaceID)
-		},
-	})
-	if errors.Is(err, nokkudaemon.ErrEnrollToken) {
-		return nil, newError(connect.CodeFailedPrecondition, err.Error())
-	}
-	if err != nil {
-		return nil, err
-	}
-	workspaceID := out.WorkspaceID
-	ctx = actor.AnnotateTenant(ctx, workspaceID)
-
-	token, err := s.cfg.IAM.IssueDaemonSession(ctx, workspaceID, out.DaemonID, binding)
-	if err != nil {
-		return nil, errInternal
-	}
-
-	return &nokkuv1.EnrollDaemonResponse{
-		Id:          &out.DaemonID,
-		WorkspaceId: &workspaceID,
-		TargetId:    &out.TargetID,
-		Status:      &out.Status,
-		Config:      out.Config,
-		AccessToken: &token,
-	}, nil
-}
-
-func (s *daemonService) SyncDaemon(
-	ctx context.Context,
-	req *nokkuv1.SyncDaemonRequest,
-) (*nokkuv1.SyncDaemonResponse, error) {
-	ci, ok := connect.CallInfoForHandlerContext(ctx)
-	if !ok {
-		return nil, errInternal
-	}
-
-	res, err := nokkudaemon.Sync(ctx, s.cfg.Conn, nokkudaemon.SyncInput{
-		DaemonID:    actor.DaemonIDFromContext(ctx),
-		Metadata:    requestMetadata(ci.RequestHeader()),
-		ReqMetadata: req.GetMetadata(),
-		Users:       req.GetUsers(),
-		PrivateIPs:  req.GetPrivateIps(),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &nokkuv1.SyncDaemonResponse{
-		Status:        res.Status,
-		Config:        res.Config,
-		Principals:    res.Principals,
-		CaPublicKey:   &res.CAPublicKey,
-		RetiredCaKeys: res.RetiredCAs,
-		StateVersion:  &res.Version,
-	}, nil
-}
-
-// enrollBinding returns the DPoP key thumbprint. A missing proof is an error,
-// daemons must enroll key-bound.
-func (s *daemonService) enrollBinding(ctx context.Context, ci connect.CallInfo) (string, error) {
-	svc := s.cfg.IAM
-	if svc.DPoP == nil {
-		return "", newError(connect.CodeUnimplemented, "DPoP is not configured")
-	}
-
-	binding, err := svc.DPoP.Verify(
-		ctx,
-		ci.RequestHeader().Get("DPoP"),
-		"",
-		http.MethodPost,
-		s.cfg.FullURL()+"/"+nokkuv1connect.DaemonServiceEnrollDaemonProcedure,
-	)
-	if err != nil {
-		if errors.Is(err, iam.ErrDPoPNonce) {
-			svc.AdvertiseDPoPNonce(ci.ResponseHeader())
-			return "", newError(connect.CodeUnauthenticated, "stale DPoP nonce")
-		}
-		return "", newError(connect.CodeInvalidArgument, "invalid DPoP proof")
-	}
-	return binding, nil
-}
-
-func requestMetadata(h http.Header) []byte {
-	metadata, _ := json.Marshal(map[string]string{
-		"user-agent": h.Get("User-Agent"),
-		"host":       h.Get("Host"),
-	})
-	return metadata
+	return util.ClientIP(meta.Header, meta.RemoteAddr)
 }

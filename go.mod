@@ -24,7 +24,7 @@ require (
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jackc/tern/v2 v2.4.3
 	github.com/mizuchilabs/kata v0.1.11
-	github.com/nokku-sh/protos v0.2.2-0.20261004200507-1827ddf36725
+	github.com/nokku-sh/protos v0.2.2
 	github.com/oauth2-proxy/mockoidc v0.0.0-20240214162133-caebfff84d25
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/russellhaering/goxmldsig v1.6.1

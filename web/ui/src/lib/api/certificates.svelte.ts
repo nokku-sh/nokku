@@ -1,7 +1,4 @@
-import {
-	CertificateService,
-	SignSSHCertificateRequest_CertificateType
-} from '#lib/gen/nokku/v1/certificates_pb.js';
+import { CertificateService } from '#lib/gen/nokku/v1/certificates_pb.js';
 import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
 import { extract, type MaybeGetter } from 'runed';
@@ -11,19 +8,7 @@ import { workspaceID } from '#lib/store.svelte.js';
 export const sign = {
 	user: () =>
 		useMutation(CertificateService.method.signSSHCertificate, {
-			onSuccess: () => toast.success('Certificate signed'),
-			transform: (variables) => ({
-				...variables,
-				type: SignSSHCertificateRequest_CertificateType.USER
-			})
-		}),
-	host: () =>
-		useMutation(CertificateService.method.signSSHCertificate, {
-			onSuccess: () => toast.success('Host certificate signed'),
-			transform: (variables) => ({
-				...variables,
-				type: SignSSHCertificateRequest_CertificateType.HOST
-			})
+			onSuccess: () => toast.success('Certificate signed')
 		}),
 	x509: () =>
 		useMutation(CertificateService.method.signX509Certificate, {

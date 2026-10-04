@@ -137,9 +137,9 @@ func TestAuthorizeDaemon(t *testing.T) {
 	// These answer a daemon in any state. The rest look the daemon up, see
 	// TestPendingDaemonIsDenied.
 	anyState := []string{
-		nokkuv1connect.DaemonServiceSyncDaemonProcedure,
+		nokkuv1connect.DaemonControlServiceSyncDaemonProcedure,
 		nokkuv1connect.DaemonControlServiceConnectProcedure,
-		nokkuv1connect.DaemonServiceDeleteDaemonProcedure,
+		nokkuv1connect.DaemonControlServiceUnenrollDaemonProcedure,
 	}
 
 	for _, procedure := range allProcedures(t) {
@@ -152,6 +152,20 @@ func TestAuthorizeDaemon(t *testing.T) {
 			if _, err := a.authorize(ctx, procedure); err != nil {
 				t.Errorf("daemon denied %s: %v", procedure, err)
 			}
+		}
+	}
+}
+
+// A daemon's whole surface is one service, and nothing else lives there but
+// the public enrollment.
+func TestDaemonProceduresLiveInControlService(t *testing.T) {
+	for procedure, access := range procedureAccess {
+		inService := strings.HasPrefix(procedure, "/nokku.v1.DaemonControlService/")
+		if procedure == nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure {
+			continue
+		}
+		if inService != daemonOnly(access) || inService != access.GetDaemon() {
+			t.Errorf("%s: daemon procedures and DaemonControlService must be the same set", procedure)
 		}
 	}
 }

@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-chi/httprate"
 
+	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
+
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
@@ -53,7 +55,7 @@ func isAuthRoute(path string) bool {
 // rateLimited leaves out only the daemon streams, where a limit would block
 // legitimate reconnect storms, and the hashed static assets.
 func rateLimited(path string) bool {
-	return !strings.HasPrefix(path, "/nokku.v1.DaemonControlService/") &&
-		!strings.HasPrefix(path, "/nokku.v1.DaemonSessionService/") &&
+	return path != nokkuv1connect.DaemonControlServiceConnectProcedure &&
+		path != nokkuv1connect.DaemonControlServiceDaemonRelayProcedure &&
 		!strings.HasPrefix(path, "/_app/")
 }

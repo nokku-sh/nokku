@@ -8,7 +8,6 @@
 	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
 	import {
 		AuthorityType,
-		SignSSHCertificateRequest_CertificateType,
 		SignSSHCertificateRequestSchema,
 		SignX509CertificateRequest_X509Usage,
 		SignX509CertificateRequestSchema,
@@ -27,20 +26,16 @@
 	let sshPayload = $state(create(SignSSHCertificateRequestSchema));
 	let x509Payload = $state(create(SignX509CertificateRequestSchema));
 
-	let sshCertType = $state<SignSSHCertificateRequest_CertificateType>(
-		SignSSHCertificateRequest_CertificateType.USER
-	);
 	let x509Usage = $state<SignX509CertificateRequest_X509Usage>(
 		SignX509CertificateRequest_X509Usage.CLIENT_AUTH
 	);
 
 	const signUser = sign.user();
-	const signHost = sign.host();
 	const signX509 = sign.x509();
 
 	let isSSH = $derived(ca?.authorityType === AuthorityType.SSH);
 
-	let isPending = $derived(signUser.isPending || signHost.isPending || signX509.isPending);
+	let isPending = $derived(signUser.isPending || signX509.isPending);
 
 	$effect(() => {
 		if (ca?.id) {
@@ -52,10 +47,8 @@
 	function resetModal() {
 		sshPayload = create(SignSSHCertificateRequestSchema);
 		x509Payload = create(SignX509CertificateRequestSchema);
-		sshCertType = SignSSHCertificateRequest_CertificateType.USER;
 		x509Usage = SignX509CertificateRequest_X509Usage.CLIENT_AUTH;
 		signUser.reset?.();
-		signHost.reset?.();
 		signX509.reset?.();
 	}
 
@@ -67,11 +60,7 @@
 	async function handleSubmit() {
 		if (isSSH) {
 			sshPayload.caId = ca?.id || '';
-			if (sshCertType === SignSSHCertificateRequest_CertificateType.HOST) {
-				await signHost.mutateAsync(sshPayload);
-			} else {
-				await signUser.mutateAsync(sshPayload);
-			}
+			await signUser.mutateAsync(sshPayload);
 		} else {
 			x509Payload.caId = ca?.id || '';
 			x509Payload.usage = x509Usage;
@@ -93,11 +82,11 @@
 					chain: signX509.data.caChain,
 					expiresAt: signX509.data.expiresAt
 				}
-			: (signHost.data ?? signUser.data)
+			: signUser.data
 				? {
-						pem: (signHost.data ?? signUser.data)?.signedCertificate ?? '',
+						pem: signUser.data.signedCertificate,
 						chain: '',
-						expiresAt: (signHost.data ?? signUser.data)?.expiresAt
+						expiresAt: signUser.data.expiresAt
 					}
 				: undefined
 	);
@@ -107,7 +96,7 @@
 	bind:open
 	title={`Sign ${isSSH ? 'an SSH' : 'an X.509'} certificate`}
 	description={isSSH
-		? 'Paste a public key, get back a certificate signed by this CA.'
+		? 'Paste a public key, get back a user certificate for your account signed by this CA.'
 		: 'Paste a PKCS#10 CSR, get back a certificate signed by this CA.'}
 	icon={isSSH ? KeyRound : Shield}
 	classModal="sm:max-w-xl"
@@ -116,37 +105,6 @@
 	submitDisabled={isPending}
 >
 	{#if isSSH}
-		<Field.Field>
-			<Field.Label for="ssh-cert-type">Certificate type</Field.Label>
-			<Select.Root
-				type="single"
-				value={sshCertType.toString()}
-				onValueChange={(v) =>
-					(sshCertType = parseInt(v) as SignSSHCertificateRequest_CertificateType)}
-			>
-				<Select.Trigger id="ssh-cert-type" class="w-full">
-					{#if sshCertType === SignSSHCertificateRequest_CertificateType.USER}
-						<User />
-						User certificate
-					{:else}
-						<Server />
-						Host certificate
-					{/if}
-				</Select.Trigger>
-				<Select.Content>
-					<Select.Group>
-						<Select.Item value={SignSSHCertificateRequest_CertificateType.USER.toString()}>
-							<User />
-							User certificate
-						</Select.Item>
-						<Select.Item value={SignSSHCertificateRequest_CertificateType.HOST.toString()}>
-							<Server />
-							Host certificate
-						</Select.Item>
-					</Select.Group>
-				</Select.Content>
-			</Select.Root>
-		</Field.Field>
 		<Field.Field>
 			<Field.Label for="public-key">Public key</Field.Label>
 			<Textarea

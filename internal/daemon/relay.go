@@ -48,10 +48,11 @@ type relayPending struct {
 }
 
 // RequestRelay releases its slot exactly once. registerRelay hands the
-// release to the Relay, failure paths run it directly.
+// release to the Relay, failure paths run it directly. clientAddr is what the
+// daemon's sshd reports as the remote address.
 func (p *Pool) RequestRelay(
 	ctx context.Context,
-	daemonID, relayID, userID string,
+	daemonID, relayID, userID, clientAddr string,
 ) (*Relay, error) {
 	p.mu.Lock()
 	if p.relayCounts[userID] >= maxRelaysPerPrincipal {
@@ -81,7 +82,7 @@ func (p *Pool) RequestRelay(
 
 	if err := p.sendToDaemonWait(daemonID, &nokkuv1.ConnectResponse{
 		Msg: &nokkuv1.ConnectResponse_RelayOpen{
-			RelayOpen: &nokkuv1.RelayOpen{RelayId: &relayID},
+			RelayOpen: &nokkuv1.RelayOpen{RelayId: &relayID, ClientAddr: &clientAddr},
 		},
 	}, 5*time.Second); err != nil {
 		release()

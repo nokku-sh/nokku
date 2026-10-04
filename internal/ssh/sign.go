@@ -17,12 +17,12 @@ import (
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
-// SignCertificate treats unspecified types as user certificates.
+// SignCertificate signs a user certificate unless certType is ssh.HostCert.
 func SignCertificate(
 	ca *db.CertificateAuthority,
 	pubKey, principal, keyID string,
 	ttl time.Duration,
-	certType nokkuv1.SignSSHCertificateRequest_CertificateType,
+	certType uint32,
 ) (*ssh.Certificate, error) {
 	signer, err := getSigner(ca.PrivateKey.Bytes())
 	if err != nil {
@@ -51,7 +51,7 @@ func SignCertificate(
 		ValidAfter:      util.UnixTimeToUint64(time.Now().Add(-time.Minute).Unix()),
 	}
 
-	if certType == nokkuv1.SignSSHCertificateRequest_CERTIFICATE_TYPE_HOST {
+	if certType == ssh.HostCert {
 		cert.CertType = ssh.HostCert
 		ttl = boundTTL(ttl, ca.HostDefaultTtl, ca.HostMaxTtl)
 	} else {

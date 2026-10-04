@@ -122,9 +122,9 @@ func (a *authorizationInterceptor) authorize(
 // RPC but the ones that tell it its status, and removing itself.
 func (a *authorizationInterceptor) daemonAccepted(ctx context.Context, daemonID, procedure string) error {
 	switch procedure {
-	case nokkuv1connect.DaemonServiceSyncDaemonProcedure,
+	case nokkuv1connect.DaemonControlServiceSyncDaemonProcedure,
 		nokkuv1connect.DaemonControlServiceConnectProcedure,
-		nokkuv1connect.DaemonServiceDeleteDaemonProcedure:
+		nokkuv1connect.DaemonControlServiceUnenrollDaemonProcedure:
 		return nil
 	}
 	daemon, err := a.cfg.Conn.Sys().GetDaemon(ctx, daemonID)

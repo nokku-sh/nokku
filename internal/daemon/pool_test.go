@@ -183,7 +183,7 @@ func TestPool_RelayRequestRace(t *testing.T) {
 			defer wg.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 			defer cancel()
-			if r, err := p.RequestRelay(ctx, "d1", rid, "u1"); err == nil {
+			if r, err := p.RequestRelay(ctx, "d1", rid, "u1", ""); err == nil {
 				r.close()
 			}
 		}()
@@ -223,7 +223,7 @@ func TestPool_RelayCap(t *testing.T) {
 		wg.Go(func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			if _, err := p.RequestRelay(ctx, "d1", rid, "u1"); err != nil {
+			if _, err := p.RequestRelay(ctx, "d1", rid, "u1", ""); err != nil {
 				t.Errorf("RequestRelay %s: %v", rid, err)
 			}
 		})
@@ -234,7 +234,7 @@ func TestPool_RelayCap(t *testing.T) {
 	}
 	wg.Wait()
 
-	if _, err := p.RequestRelay(context.Background(), "d1", "over", "u1"); !errors.Is(err, ErrRelayLimit) {
+	if _, err := p.RequestRelay(context.Background(), "d1", "over", "u1", ""); !errors.Is(err, ErrRelayLimit) {
 		t.Fatalf("over-cap request: err=%v, want ErrRelayLimit", err)
 	}
 
@@ -242,7 +242,7 @@ func TestPool_RelayCap(t *testing.T) {
 	// fails on the (never registered) pending wait instead.
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	if _, err := p.RequestRelay(ctx, "d1", "other", "u2"); errors.Is(err, ErrRelayLimit) {
+	if _, err := p.RequestRelay(ctx, "d1", "other", "u2", ""); errors.Is(err, ErrRelayLimit) {
 		t.Fatal("u2 must not be blocked by u1's cap")
 	}
 
@@ -253,7 +253,7 @@ func TestPool_RelayCap(t *testing.T) {
 	// register this relay.
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel2()
-	if _, err := p.RequestRelay(ctx2, "d1", "again", "u1"); errors.Is(err, ErrRelayLimit) {
+	if _, err := p.RequestRelay(ctx2, "d1", "again", "u1", ""); errors.Is(err, ErrRelayLimit) {
 		t.Fatal("released slots must be reusable")
 	}
 }
@@ -272,7 +272,7 @@ func TestPool_RelayBridging(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	go func() {
-		r, err := p.RequestRelay(ctx, "d1", "r1", "u1")
+		r, err := p.RequestRelay(ctx, "d1", "r1", "u1", "")
 		res <- result{r, err}
 	}()
 	waitRelayPending(t, p, "r1")
@@ -329,7 +329,7 @@ func TestPool_UnregisterDaemonClosesRelays(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	go func() {
-		_, err := p.RequestRelay(ctx, "d1", "r1", "u1")
+		_, err := p.RequestRelay(ctx, "d1", "r1", "u1", "")
 		res <- err
 	}()
 	waitRelayPending(t, p, "r1")
