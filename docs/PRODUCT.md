@@ -81,8 +81,8 @@ One workspace SSH CA signs both user and host certificates.
 - Manual targets pin a raw host public key instead. The pin is read over the
   operator's own ssh on first sync and updated on every sync.
 - Sessions are DPoP-bound (RFC 9449). Daemon sessions never expire, they are
-  revoked by deleting the daemon. User sessions follow the workspace CA TTL
-  rules.
+  revoked by deleting the daemon. A terminal stays signed in for 30 days
+  (`nokku/internal/iam/device.go` `deviceSessionTTL`), a browser for 7.
 - Machine signing identities come from `mon/tpm`, TPM-backed when available,
   otherwise a machine-wrapped software key. Salts namespace the derived keys
   and are a registry documented in `mon/README.md`: `nokku-daemon`,
@@ -105,6 +105,12 @@ accounts under it, and only its SCIM connector may create, deactivate, or
 delete them. Every other account is reachable by invite only. SSO
 enforcement applies to every other login method (password, passkey, backup
 code, social login) for accounts under the domain.
+
+The device flow tells the approver who asked. The grant records the address
+and user agent of the terminal that started it, the approval page shows both
+before anything is approved. A sign-in from a key the account has not used
+before is mailed, a known terminal is remembered for 180 days like a browser.
+A phished code shows up as a terminal the user does not know.
 
 A workspace has exactly one owner. An account that owns a workspace with
 other members cannot be deleted until ownership moves. Workspaces the owner
@@ -156,8 +162,8 @@ An admin mints an enroll token in the UI through
 `nokku/internal/api/token.go` `CreateToken`. One token can enroll a fleet:
 it may never expire and may cap its uses. On the host, `sudo nokkud enroll`
 (the token at its prompt, or `NOKKUD_ENROLL_TOKEN` in its environment)
-carries the token to `nokku/internal/api/daemon.go` `EnrollDaemon`, a public
-endpoint that still demands a DPoP proof. `nokku/internal/daemon/enroll.go`
+carries the token to `nokku/internal/api/daemon_control.go` `EnrollDaemon`, a
+public endpoint that still demands a DPoP proof. `nokku/internal/daemon/enroll.go`
 `Enroll` does the work. Identity is the key thumbprint, so a known machine
 re-enrolls onto its existing daemon without spending a use, even with a
 used-up token. The daemon starts PENDING unless the token auto-approves.
@@ -171,7 +177,15 @@ holds a session, but `SyncDaemon` gives it nothing until it is accepted.
 `DaemonControlService.Connect`, served by `nokku/internal/daemon/handler.go`
 `Pool.Connect`. `SyncDaemon` returns the principals map, the CA public key,
 daemon config, and the workspace state version. The daemon caches all of it
-under `/var/lib/nokkud` so auth decisions survive a backend outage.
+in one file, `/var/lib/nokkud/cache.json`, so auth decisions survive a
+backend outage. A sync applies that state first and whole. The host
+certificate is renewed apart from it, so a certificate that cannot be signed
+never holds back a revoke.
+
+The sync also carries what the host reports about itself: its local accounts
+and where its sshd listens. That report is a hint. The backend drops entries
+that are not valid usernames or `ip:port`, writes nothing when the report did
+not change, and stops adding accounts at `db.MaxTargetPrincipals`.
 
 The state version lives in `workspace_state` and is bumped by database
 triggers on every change that alters what a daemon enforces (grants, team
@@ -184,7 +198,11 @@ disconnected.
 
 Daemons authenticate as themselves, never through a workspace role. They may
 call only RPCs whose `option (access)` in the protos sets `daemon: true`,
-enforced in `nokku/internal/api/authz.go`.
+enforced in `nokku/internal/api/authz.go`. All of those live in
+`DaemonControlService` (`nokku/internal/api/daemon_control.go`), and nothing
+but the public `EnrollDaemon` lives there besides. A daemon gets its host
+certificate from `SignHostCertificate` and removes itself with
+`UnenrollDaemon`. `SignSSHCertificate` only signs user certificates.
 
 ### CA rollover
 
@@ -193,7 +211,9 @@ enforced in `nokku/internal/api/authz.go`.
 `RolloverCertificateAuthority` in the UI. The core owns how long the replaced
 key stays trusted. `SyncDaemon` sends it as `retired_ca_keys` with its
 deadline, the daemon caches the list and
-`nokkud/internal/sshd/auth.go` `trustedCA` honors the deadline offline. nk gets
+`nokkud/internal/sshd/auth.go` `trustedCA` honors the deadline offline. A
+sync also closes the open connections whose certificate came from a CA that
+is no longer trusted, which is what an emergency rollover leaves behind. nk gets
 both keys with `GetMyAccess`. It writes both into `known_hosts`, and `nk sync`
 writes both into `/etc/ssh/nokku_ca.pub`.
 
@@ -230,11 +250,16 @@ target sheet names the same paths in its help text.
 and `known_hosts`. Each target gets a Host block with
 `ProxyCommand nk proxy <targetID> %p`, the cert file, the agent socket,
 `HostKeyAlias <targetID>`, and a `Match exec nk prepare <targetID>` that
-renews the cert through `EnsureCert` before ssh reads it.
+renews the cert through `EnsureCert` before ssh reads it. A certificate is
+renewed once half of its life is over (`nk/internal/ssh/certs.go`
+`CertFresh`), and the daemon does the same for its host certificate
+(`nokkud/internal/hostcerts`). So a backend outage finds an active user and
+every daemon with at least half a certificate lifetime left.
 
 `nk/internal/cmd/proxy.go` `proxyCMD` (hidden) re-syncs with the backend when
 its snapshot is older than a minute or lacks the target, so new grants show
-up quickly. Revocation does not depend on it, the daemon enforces that
+up quickly. A backend that was out of reach is left alone for 30 seconds, so
+an outage costs one timeout and not one per connection. Revocation does not depend on it, the daemon enforces that
 itself. The proxy starts a background `nk agent` that serves the `mon/tpm`
 signer on a unix socket, or a named pipe on Windows, and exits after 30 idle
 minutes. `nk/internal/ssh/proxy.go` `Proxy` then dials every endpoint at once
@@ -249,8 +274,10 @@ the pinned raw key. The cache and valid certs cover backend outages.
 `nokku/internal/daemon/relay.go` `Pool.RequestRelay` and `handler.go`
 `Pool.DaemonRelay` pair two bidi Connect streams: the user's `RelayService`
 stream and the daemon's own dial-back. `nokku/internal/daemon/relaybridge.go`
-`BridgeRelay` splices the bytes. The daemon dials its own loopback sshd. The
-backend sees ciphertext.
+`BridgeRelay` splices the bytes. The daemon hands its stream to its sshd as a
+connection (`nokkud/internal/client/relay.go` `relayConn`), with the user's
+address as the backend saw it, so audit lines, `SSH_CLIENT` and
+`source-address` options see the user. The backend sees ciphertext.
 
 ### Web terminal
 
@@ -269,7 +296,7 @@ module-level store so navigating inside the app does not close it.
 ### Recording
 
 `nokkud/internal/recording` records asciicast v3 gz locally and streams
-chunks to `nokku/internal/api/recording.go` `UploadRecording`. Frames are
+chunks to `nokku/internal/api/daemon_control.go` `UploadRecording`. Frames are
 stored encrypted in blob storage (`nokku/internal/recording`,
 `nokku/internal/storage`), scrubbed for detected secrets on completion, and
 evicted by retention and byte caps per plan. A plan or license that ended
