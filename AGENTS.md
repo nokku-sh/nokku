@@ -67,6 +67,10 @@ add what you find. Unattended work follows the `unattended-pass` skill.
 - Who may call an RPC is declared on the RPC itself, `option (access)` in
   the protos repo (`access.proto`). RPCs without it are denied.
   `internal/api/authz.go` enforces it.
+- Everything a daemon calls lives in `DaemonControlService`
+  (`internal/api/daemon_control.go`), and nothing else does but the public
+  `EnrollDaemon`. A new daemon RPC goes there, never as a second mode of a
+  user RPC. `authz_test.go` checks it.
 - Daemon state changes notify through DB triggers. Never hand-roll a
   daemon poke in a handler.
 - Tenant isolation is RLS via `Conn.WithWorkspace`. Never hand-roll workspace
