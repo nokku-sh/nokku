@@ -32,6 +32,7 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.HandleFunc("GET /auth/device/nonce", svc.Device.Nonce)
 
 	deviceGuard := newChain(svc.Middleware, svc.RequireLogin)
+	mux.Handle("GET /auth/device/info", deviceGuard.thenFunc(svc.Device.Info))
 	mux.Handle("POST /auth/device/verify", deviceGuard.thenFunc(svc.Device.Verify))
 	mux.Handle("POST /auth/device/deny", deviceGuard.thenFunc(svc.Device.Deny))
 

@@ -97,7 +97,7 @@ func (s *utilService) Whoami(
 		}); err != nil {
 			return nil, err
 		}
-	case actor.KindSCIM, actor.KindWebDevice:
+	case actor.KindSCIM, actor.KindDevice:
 		// SCIM tokens and device markers never reach connect.
 	}
 	return out, nil

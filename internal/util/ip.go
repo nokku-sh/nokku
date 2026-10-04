@@ -51,18 +51,25 @@ func isTrustedProxy(ip net.IP) bool {
 	return false
 }
 
-// GetRemoteIP reads only X-Forwarded-For, and only from a trusted proxy. The
-// client is the rightmost hop that is not a trusted proxy, everything left of
-// it is client-controlled. Other client IP headers pass through proxies
-// untouched, so they are never read.
+// GetRemoteIP is ClientIP as a key for rate limits and logs, where one IPv6
+// /64 counts as one client.
 func GetRemoteIP(header http.Header, remoteAddr string) string {
+	return canonicalizeIP(ClientIP(header, remoteAddr))
+}
+
+// ClientIP is the address of the client itself. It reads only
+// X-Forwarded-For, and only from a trusted proxy. The client is the rightmost
+// hop that is not a trusted proxy, everything left of it is
+// client-controlled. Other client IP headers pass through proxies untouched,
+// so they are never read.
+func ClientIP(header http.Header, remoteAddr string) string {
 	peer := remoteAddr
 	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
 		peer = host
 	}
 	peerIP := net.ParseIP(peer)
 	if peerIP == nil || !isTrustedProxy(peerIP) {
-		return canonicalizeIP(peer)
+		return peer
 	}
 	hops := strings.Split(strings.Join(header.Values("X-Forwarded-For"), ","), ",")
 	for _, hop := range slices.Backward(hops) {
@@ -71,10 +78,10 @@ func GetRemoteIP(header http.Header, remoteAddr string) string {
 			break
 		}
 		if !isTrustedProxy(ip) {
-			return canonicalizeIP(ip.String())
+			return ip.String()
 		}
 	}
-	return canonicalizeIP(peer)
+	return peer
 }
 
 func canonicalizeIP(ip string) string {

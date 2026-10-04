@@ -566,6 +566,20 @@ func TestDeviceCookieIsNotASession(t *testing.T) {
 	if _, _, err := e.svc.Authenticate(t.Context(), header, "/nokku.v1.UtilService/Whoami"); err == nil {
 		t.Fatal("device cookie authenticated as a session")
 	}
+
+	// A marker written under the kind's old name, or any kind this build
+	// does not know, is no credential either.
+	_, old, err := e.svc.IssueSession(t.Context(), SessionParams{
+		SubjectID: u.ID, Kind: "web_device", Method: MethodDevice, TTL: time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	header = http.Header{}
+	header.Set("Authorization", "Bearer "+old)
+	if _, _, err := e.svc.Authenticate(t.Context(), header, "/nokku.v1.UtilService/Whoami"); err == nil {
+		t.Fatal("a session of an unknown kind authenticated")
+	}
 }
 
 // Whoever signs up first with someone else's address leaves a password on an
@@ -617,8 +631,33 @@ func TestSCIMDoesNotAdoptUnverifiedAccount(t *testing.T) {
 	}
 }
 
-// A CLI session authenticates on its row alone, so the row has to go with
-// the account.
+// A deactivation that forgot to revoke sessions must not leave the CLI able
+// to mint certificates.
+func TestInactiveUserLosesCLISession(t *testing.T) {
+	e := newTestEnv(t)
+	u := e.user(t, "user@"+testDomain(), true)
+	_, token, err := e.svc.IssueSession(t.Context(), SessionParams{
+		SubjectID: u.ID,
+		Kind:      actor.KindCLI,
+		Method:    MethodDevice,
+		TTL:       time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.svc.AuthenticateToken(t.Context(), token); err != nil {
+		t.Fatalf("fresh session: %v", err)
+	}
+
+	if _, err := e.conn.Sys().UpdateUser(t.Context(), &db.UpdateUserParams{ID: u.ID, Active: new(false)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.svc.AuthenticateToken(t.Context(), token); !errors.Is(err, ErrInactive) {
+		t.Fatalf("CLI session of an inactive account: err = %v, want ErrInactive", err)
+	}
+}
+
+// The session row has to go with the account.
 func TestDeletedUserLosesSessions(t *testing.T) {
 	e := newTestEnv(t)
 	u := e.user(t, "user@"+testDomain(), true)

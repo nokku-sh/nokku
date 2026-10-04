@@ -36,10 +36,11 @@ func (s *Service) Authenticate(
 	if err != nil {
 		return actor.Principal{}, db.Session{}, err
 	}
-	// A device marker only names a known browser. Accepting it anywhere
+	// Only these kinds are credentials. A device marker only names a known
+	// browser or terminal. Accepting it, or a kind this build does not know,
 	// would be a 180 day session that survives logout.
-	if p.Kind == actor.KindWebDevice {
-		return actor.Principal{}, db.Session{}, errors.New("device credentials are not sessions")
+	if p.Kind != actor.KindUser && p.Kind != actor.KindCLI && p.Kind != actor.KindDaemon {
+		return actor.Principal{}, db.Session{}, errors.New("not a session credential")
 	}
 	if sess.Binding != "" {
 		if err := s.verifySessionProof(ctx, header, procedure, token, sess.Binding); err != nil {
@@ -49,8 +50,9 @@ func (s *Service) Authenticate(
 	return p, sess, nil
 }
 
-// AuthenticateToken loads the account for user sessions so inactive accounts
-// fail closed. Device sessions authenticate on the row alone.
+// AuthenticateToken loads the account for user and CLI sessions so inactive
+// accounts fail closed. Daemon and device sessions authenticate on the row
+// alone.
 func (s *Service) AuthenticateToken(
 	ctx context.Context,
 	token string,
@@ -61,7 +63,7 @@ func (s *Service) AuthenticateToken(
 	}
 	kind := actor.Kind(sess.Kind)
 	p := actor.Principal{ID: sess.SubjectID, Kind: kind, WorkspaceID: deref(sess.WorkspaceID)}
-	if kind == actor.KindUser {
+	if kind == actor.KindUser || kind == actor.KindCLI {
 		u, err := s.getUserByID(ctx, sess.SubjectID)
 		if err != nil {
 			return actor.Principal{}, db.Session{}, err

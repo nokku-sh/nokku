@@ -19,7 +19,7 @@
 	const otherSessions = $derived((sessions.data ?? []).filter((s) => !s.current));
 
 	const kindIcon = (kind: string) =>
-		kind === 'cli' ? Terminal : kind === 'web_device' ? Smartphone : Monitor;
+		kind === 'cli' ? Terminal : kind === 'device' ? Smartphone : Monitor;
 </script>
 
 <Card.Root>

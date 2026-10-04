@@ -11,7 +11,7 @@ type Kind string
 const (
 	KindUser           Kind = "user"
 	KindCLI            Kind = "cli"
-	KindWebDevice      Kind = "web_device"
+	KindDevice         Kind = "device"
 	KindDaemon         Kind = "daemon"
 	KindServiceAccount Kind = "service_account"
 	KindSCIM           Kind = "scim"
@@ -42,7 +42,7 @@ func UserIDFromContext(ctx context.Context) string {
 		switch p.Kind {
 		case KindUser, KindCLI:
 			return p.ID
-		case KindDaemon, KindServiceAccount, KindSCIM, KindWebDevice:
+		case KindDaemon, KindServiceAccount, KindSCIM, KindDevice:
 			return ""
 		}
 	}

@@ -4,10 +4,12 @@ package iam
 // browser, and the CLI polls for a DPoP-bound session.
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"strconv"
@@ -16,13 +18,22 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/crypto"
+	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/util"
 )
 
 const (
-	grantTTL         = 15 * time.Minute
-	slowDownPenalty  = 5 * time.Second
-	deviceInterval   = 5 * time.Second
-	deviceSessionTTL = 7 * 24 * time.Hour
+	// maxLabel keeps a terminal's user agent readable in the sessions list.
+	maxLabel = 64
+
+	grantTTL        = 15 * time.Minute
+	slowDownPenalty = 5 * time.Second
+	deviceInterval  = 5 * time.Second
+	// deviceSessionTTL is how long a terminal stays signed in. The session
+	// only works with the key of its machine, so what this bounds is a
+	// machine nobody noticed was lost: it can mint certificates for this
+	// long, and use the last one for its lifetime on top.
+	deviceSessionTTL = 30 * 24 * time.Hour
 
 	deviceURLHeader = "Nokku-Api-Url"
 	grantPending    = "pending"
@@ -41,6 +52,10 @@ type deviceGrant struct {
 	UserCode   string `json:"user_code"`
 	Status     string `json:"status"`
 	UserID     string `json:"user_id,omitempty"`
+	// Who asked. The approval page shows it, so a code someone else started
+	// stands out.
+	IP        string `json:"ip,omitempty"`
+	UserAgent string `json:"user_agent,omitempty"`
 }
 
 type pollState struct {
@@ -64,6 +79,8 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 		DeviceCode: deviceCode,
 		UserCode:   userCode,
 		Status:     grantPending,
+		IP:         util.SanitizeUTF8(util.ClientIP(r.Header, r.RemoteAddr)),
+		UserAgent:  truncate(util.SanitizeUTF8(r.Header.Get("User-Agent")), maxUserAgent),
 	}
 	b, _ := json.Marshal(g)
 	if err := h.svc.cache.Set(r.Context(), "device:code:"+deviceCode, b, grantTTL); err != nil ||
@@ -80,6 +97,18 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 		"expires_in":                int(grantTTL.Seconds()),
 		"interval":                  int(deviceInterval.Seconds()),
 	})
+}
+
+// Info tells the approver who asked for a code. It does not spend the code.
+func (h *DeviceFlow) Info(w http.ResponseWriter, r *http.Request) {
+	userCode := normalizeUserCode(r.URL.Query().Get("user_code"))
+	var g deviceGrant
+	b, err := h.svc.cache.Get(r.Context(), "device:user:"+userCode)
+	if err != nil || json.Unmarshal(b, &g) != nil || g.Status != grantPending {
+		writeError(w, http.StatusNotFound, "invalid or expired code")
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]string{"ip": g.IP, "user_agent": g.UserAgent})
 }
 
 func (h *DeviceFlow) Verify(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +159,8 @@ func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool
 }
 
 func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	// The session and its audit events carry the terminal's address.
+	ctx := ContextWithRequestMeta(r.Context(), RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr})
 	deviceCode := r.FormValue("device_code")
 	if deviceCode == "" {
 		writeOAuthError(w, "invalid_request")
@@ -202,11 +232,18 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			Kind:      actor.KindCLI,
 			Method:    MethodDevice,
 			Binding:   binding,
+			Label:     cmp.Or(truncate(util.SanitizeUTF8(r.Header.Get("User-Agent")), maxLabel), "Terminal"),
 			TTL:       deviceSessionTTL,
 		})
 		if err != nil {
 			writeOAuthError(w, "server_error")
 			return
+		}
+		// Only a key the account has not signed in with before is mailed, so
+		// the mail stays rare enough to be read. An approval the user was
+		// tricked into always comes from such a key.
+		if h.svc.rememberTerminal(ctx, u.ID, binding, sess.Label) && h.svc.OnNewDeviceLogin != nil {
+			go h.svc.OnNewDeviceLogin(context.WithoutCancel(ctx), u, sess, sess.Label, sess.Ip)
 		}
 		h.svc.record(ctx, Event{
 			Action: ActionLoginSucceeded,
@@ -226,6 +263,45 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		}
 		WriteJSON(w, http.StatusOK, resp)
 	}
+}
+
+// rememberTerminal reports whether binding is a key the account has not
+// signed in with before, and remembers it. The marker is the one a browser
+// gets from RememberDevice, with the key in place of the cookie.
+func (s *Service) rememberTerminal(ctx context.Context, userID, binding, label string) bool {
+	sessions, err := s.sys.ListSessionsBySubject(ctx, userID)
+	if err != nil {
+		slog.Error("failed to look up remembered terminals", "error", err)
+		return true
+	}
+	now := s.now()
+	for _, sess := range sessions {
+		if sess.Kind != string(actor.KindDevice) || sess.Binding != binding {
+			continue
+		}
+		if sess.ExpiresAt != nil && !sess.ExpiresAt.After(now) {
+			continue
+		}
+		if err := s.sys.TouchSession(
+			ctx,
+			&db.TouchSessionParams{TokenHash: sess.TokenHash, LastSeenAt: &now},
+		); err != nil {
+			slog.Debug("failed to touch device session", "error", err)
+		}
+		return false
+	}
+	// The marker's token goes nowhere, nothing can present it.
+	if _, _, err := s.IssueSession(ctx, SessionParams{
+		SubjectID: userID,
+		Kind:      actor.KindDevice,
+		Method:    MethodDevice,
+		Binding:   binding,
+		Label:     label,
+		TTL:       deviceMarkerTTL,
+	}); err != nil {
+		slog.Error("failed to remember terminal", "error", err)
+	}
+	return true
 }
 
 // Nonce lets devices fetch a nonce before their first proof.

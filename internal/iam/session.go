@@ -17,10 +17,11 @@ import (
 )
 
 const (
-	// The device cookie powers the sessions list and new-login alerts. It is
-	// never an API credential.
-	webDeviceCookieName = "nokku_device"
-	webDeviceTTL        = 180 * 24 * time.Hour
+	// A device marker remembers a browser by its cookie and a terminal by its
+	// signing key, see RememberDevice and rememberTerminal. It powers the
+	// sessions list and new-login alerts and is never an API credential.
+	deviceCookieName = "nokku_device"
+	deviceMarkerTTL  = 180 * 24 * time.Hour
 	// maxUserAgent keeps a hostile header from bloating the sessions table.
 	maxUserAgent = 512
 )
@@ -142,9 +143,9 @@ func (s *Service) IssueDaemonSession(ctx context.Context, workspaceID, daemonID,
 // RememberDevice returns nil for a known device. A new one gets a cookie and
 // fires OnNewDeviceLogin.
 func (s *Service) RememberDevice(ctx context.Context, header http.Header, remoteAddr string, u *db.User) *http.Cookie {
-	if raw := cookieFromHeader(header, webDeviceCookieName); raw != "" {
+	if raw := cookieFromHeader(header, deviceCookieName); raw != "" {
 		if sess, err := s.verifySession(ctx, raw); err == nil &&
-			sess.Kind == string(actor.KindWebDevice) && sess.SubjectID == u.ID {
+			sess.Kind == string(actor.KindDevice) && sess.SubjectID == u.ID {
 			now := s.now()
 			if err := s.sys.TouchSession(
 				ctx,
@@ -159,10 +160,10 @@ func (s *Service) RememberDevice(ctx context.Context, header http.Header, remote
 	name := deviceNameFromUA(header.Get("User-Agent"))
 	sess, token, err := s.IssueSession(ctx, SessionParams{
 		SubjectID: u.ID,
-		Kind:      actor.KindWebDevice,
+		Kind:      actor.KindDevice,
 		Method:    MethodDevice,
 		Label:     name,
-		TTL:       webDeviceTTL,
+		TTL:       deviceMarkerTTL,
 	})
 	if err != nil {
 		slog.Error("failed to register device session", "error", err)
@@ -172,7 +173,7 @@ func (s *Service) RememberDevice(ctx context.Context, header http.Header, remote
 		ip := util.GetRemoteIP(header, remoteAddr)
 		go s.OnNewDeviceLogin(context.WithoutCancel(ctx), u, sess, name, ip)
 	}
-	return s.newCookie(webDeviceCookieName, token, *sess.ExpiresAt)
+	return s.newCookie(deviceCookieName, token, *sess.ExpiresAt)
 }
 
 func (s *Service) verifySession(ctx context.Context, token string) (db.Session, error) {
