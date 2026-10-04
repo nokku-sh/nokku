@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/nokku-sh/nokku/web"
 )
 
 // withCSRF is the only cross-origin gate. The UI is served from the same
@@ -36,13 +38,18 @@ func (s *Server) withCSRF(h http.Handler) http.Handler {
 }
 
 func (s *Server) withHeaders(h http.Handler) http.Handler {
+	// No inline script runs but the bootstrap of the built pages. A script
+	// injected into the UI would otherwise reach the web terminal.
+	scripts := strings.Join(append([]string{"'self'"}, web.InlineScriptHashes()...), " ")
+	csp := "default-src 'self'; script-src " + scripts +
+		"; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:;"
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		w.Header().
-			Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:;")
+		w.Header().Set("Content-Security-Policy", csp)
 
 		// The UI reads over GET, and no API response may be cached. The static
 		// handler and the avatars set their own policy.
