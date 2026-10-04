@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -24,6 +26,7 @@ type Synced struct {
 	Config      *nokkuv1.DaemonConfig
 	Principals  []*nokkuv1.PrincipalUsers
 	CAPublicKey string
+	RetiredCAs  []*nokkuv1.RetiredCAKey
 }
 
 func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
@@ -65,6 +68,13 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		// Lets the daemon detect a CA rollover. Without a CA it stays empty.
 		if ca, caErr := q.GetCAByDaemonID(ctx, &daemon.ID); caErr == nil {
 			res.CAPublicKey = ca.PublicKey
+			if ca.PreviousPublicKey != nil && ca.PreviousTrustedUntil != nil &&
+				time.Now().Before(*ca.PreviousTrustedUntil) {
+				res.RetiredCAs = []*nokkuv1.RetiredCAKey{{
+					PublicKey:    ca.PreviousPublicKey,
+					TrustedUntil: timestamppb.New(*ca.PreviousTrustedUntil),
+				}}
+			}
 		}
 
 		targetMeta, err := json.Marshal(in.ReqMetadata)

@@ -398,11 +398,12 @@ func (s *daemonService) SyncDaemon(
 		return nil, err
 	}
 	return &nokkuv1.SyncDaemonResponse{
-		Status:       res.Status,
-		Config:       res.Config,
-		Principals:   res.Principals,
-		CaPublicKey:  &res.CAPublicKey,
-		StateVersion: &res.Version,
+		Status:        res.Status,
+		Config:        res.Config,
+		Principals:    res.Principals,
+		CaPublicKey:   &res.CAPublicKey,
+		RetiredCaKeys: res.RetiredCAs,
+		StateVersion:  &res.Version,
 	}, nil
 }
 

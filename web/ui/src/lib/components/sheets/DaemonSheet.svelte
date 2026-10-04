@@ -70,11 +70,6 @@
 			key: 'gatewayPorts',
 			title: 'Public remote forwards',
 			description: 'Let -R forwards listen on addresses other than localhost.'
-		},
-		{
-			key: 'dropRetiredCa',
-			title: 'Drop the old CA right away',
-			description: 'Stop trusting the previous CA immediately after a rollover.'
 		}
 	];
 

@@ -15,12 +15,15 @@ import (
 )
 
 // Rollover gives ca a fresh key and certificate, keeping its id and lifetime.
+// The replaced key stays trusted until the certificates it signed have
+// expired, unless revokePrevious drops it at once.
 func Rollover(
 	ctx context.Context,
 	q *db.Queries,
 	ca *db.CertificateAuthority,
 	keyType nokkuv1.CertificateKeyType,
 	keyBits int32,
+	revokePrevious bool,
 ) (*db.CertificateAuthority, error) {
 	// Older CAs have no stored lifetime.
 	lifetime := ca.Lifetime
@@ -40,16 +43,17 @@ func Rollover(
 	}
 
 	return q.ReplaceCA(ctx, &db.ReplaceCAParams{
-		CaID:         ca.ID,
-		Certificate:  string(next.Certificate),
-		PrivateKey:   next.PrivateKey,
-		PublicKey:    next.PublicKey,
-		SerialNumber: next.SerialNumber,
-		Subject:      next.Subject,
-		NotBefore:    next.NotBefore,
-		NotAfter:     next.NotAfter,
-		KeyType:      next.KeyType,
-		KeyBits:      next.KeyBits,
+		CaID:           ca.ID,
+		Certificate:    string(next.Certificate),
+		PrivateKey:     next.PrivateKey,
+		PublicKey:      next.PublicKey,
+		SerialNumber:   next.SerialNumber,
+		Subject:        next.Subject,
+		NotBefore:      next.NotBefore,
+		NotAfter:       next.NotAfter,
+		KeyType:        next.KeyType,
+		KeyBits:        next.KeyBits,
+		RevokePrevious: revokePrevious,
 	})
 }
 
@@ -81,7 +85,7 @@ func rotateExpiring(ctx context.Context, conn *db.Connection) {
 			if picked, err = q.GetExpiringCAForUpdate(ctx, failed); err != nil {
 				return err
 			}
-			rotated, err = Rollover(ctx, q, picked, picked.KeyType, picked.KeyBits)
+			rotated, err = Rollover(ctx, q, picked, picked.KeyType, picked.KeyBits, false)
 			return err
 		})
 		switch {
