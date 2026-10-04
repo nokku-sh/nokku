@@ -3,97 +3,42 @@ package api
 import (
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
-	"golang.org/x/time/rate"
+	"github.com/go-chi/httprate"
 
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
+// Limits count per client IP and minute. A whole office can sit behind one
+// address, or behind a proxy nobody listed in NOKKU_TRUSTED_PROXIES, so they
+// are sized for a few hundred people sharing it. They stop one source from
+// flooding the server. A real DDoS is the reverse proxy's job.
 const (
-	generalRPS   = 30
-	generalBurst = 50
+	generalPerMinute = 6000
 
-	// Auth endpoints are the brute-force and enumeration surface.
-	authRPS   = 5
-	authBurst = 10
-
-	cleanupInterval = 5 * time.Minute
-	entryTTL        = 10 * time.Minute
+	// Auth endpoints are the spraying and enumeration surface. Guessing one
+	// account's password is capped per account in iam.
+	authPerMinute = 300
 )
 
-type limiterEntry struct {
-	limiter  *rate.Limiter
-	lastSeen time.Time
-}
-
-type rateLimiterStore struct {
-	mu      sync.Mutex
-	entries map[string]*limiterEntry
-	rps     int
-	burst   int
-}
-
-func newRateLimiterStore(rps, burst int) *rateLimiterStore {
-	s := &rateLimiterStore{
-		entries: make(map[string]*limiterEntry),
-		rps:     rps,
-		burst:   burst,
-	}
-	go s.cleanup()
-	return s
-}
-
-func (s *rateLimiterStore) allow(key string) bool {
-	s.mu.Lock()
-	e, ok := s.entries[key]
-	if !ok {
-		e = &limiterEntry{limiter: rate.NewLimiter(rate.Limit(s.rps), s.burst)}
-		s.entries[key] = e
-	}
-	e.lastSeen = time.Now()
-	s.mu.Unlock()
-	return e.limiter.Allow()
-}
-
-func (s *rateLimiterStore) cleanup() {
-	ticker := time.NewTicker(cleanupInterval)
-	defer ticker.Stop()
-	for range ticker.C {
-		s.mu.Lock()
-		now := time.Now()
-		for key, e := range s.entries {
-			if now.Sub(e.lastSeen) > entryTTL {
-				delete(s.entries, key)
-			}
-		}
-		s.mu.Unlock()
-	}
-}
-
-var generalStore = newRateLimiterStore(generalRPS, generalBurst)
-
-var authStore = newRateLimiterStore(authRPS, authBurst)
-
 func (s *Server) withRateLimit(next http.Handler) http.Handler {
+	general := httprate.LimitBy(generalPerMinute, time.Minute, clientIP)(next)
+	auth := httprate.LimitBy(authPerMinute, time.Minute, clientIP)(next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !rateLimited(r.URL.Path) {
+		switch {
+		case !rateLimited(r.URL.Path):
 			next.ServeHTTP(w, r)
-			return
+		case isAuthRoute(r.URL.Path):
+			auth.ServeHTTP(w, r)
+		default:
+			general.ServeHTTP(w, r)
 		}
-		ip := util.GetRemoteIP(r.Header, r.RemoteAddr)
-		store := generalStore
-		if isAuthRoute(r.URL.Path) {
-			store = authStore
-		}
-		if !store.allow(ip) {
-			w.Header().Set("Retry-After", "1")
-			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
-			return
-		}
-		next.ServeHTTP(w, r)
 	})
+}
+
+func clientIP(r *http.Request) (string, error) {
+	return util.GetRemoteIP(r.Header, r.RemoteAddr), nil
 }
 
 func isAuthRoute(path string) bool {
