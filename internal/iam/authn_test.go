@@ -172,6 +172,38 @@ func TestVerifySessionProof(t *testing.T) {
 	})
 }
 
+func TestSameHTU(t *testing.T) {
+	const want = "https://nokku.example.com/nokku.v1.TargetService/GetMyAccess"
+	tests := []struct {
+		name  string
+		claim string
+		same  bool
+	}{
+		{"exact", want, true},
+		{"host case and default port", "https://NOKKU.example.com:443/nokku.v1.TargetService/GetMyAccess", true},
+		{"query and fragment do not count", want + "?x=1#y", true},
+		{
+			"doubled slash from a base with a trailing slash",
+			"https://nokku.example.com//nokku.v1.TargetService/GetMyAccess",
+			true,
+		},
+		{"other procedure", "https://nokku.example.com/nokku.v1.TargetService/ListTargets", false},
+		{"path case", "https://nokku.example.com/nokku.v1.targetservice/getmyaccess", false},
+		{"encoded slash", "https://nokku.example.com/nokku.v1.TargetService%2FGetMyAccess", false},
+		{"other host", "https://evil.example.com/nokku.v1.TargetService/GetMyAccess", false},
+		{"other port", "https://nokku.example.com:8443/nokku.v1.TargetService/GetMyAccess", false},
+		{"other scheme", "http://nokku.example.com/nokku.v1.TargetService/GetMyAccess", false},
+		{"not a url", "::", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sameHTU(tt.claim, want); got != tt.same {
+				t.Fatalf("sameHTU(%q) = %v, want %v", tt.claim, got, tt.same)
+			}
+		})
+	}
+}
+
 func TestAdvertiseDPoPNonce(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	svc := &Service{baseURL: "https://nokku.example.com"}
