@@ -78,9 +78,9 @@
 					{#snippet trigger(props)}
 						<Button {...props} variant="ghost" size="sm" class="gap-2">
 							<UserAvatar user={me.data} class="size-6" />
-							<span class="hidden max-w-40 truncate sm:inline"
-								>{me.data?.name || me.data?.email}</span
-							>
+							<span class="hidden max-w-40 truncate sm:inline">
+								{me.data?.name || me.data?.email}
+							</span>
 							<ChevronDown data-icon="inline-end" />
 						</Button>
 					{/snippet}
