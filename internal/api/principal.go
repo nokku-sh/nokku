@@ -161,6 +161,12 @@ func (s *principalService) RemovePrincipal(
 	return &nokkuv1.RemovePrincipalResponse{}, nil
 }
 
+var subjectKinds = map[string]nokkuv1.SubjectKind{
+	db.SubjectKindUser:           nokkuv1.SubjectKind_SUBJECT_KIND_USER,
+	db.SubjectKindTeam:           nokkuv1.SubjectKind_SUBJECT_KIND_TEAM,
+	db.SubjectKindServiceAccount: nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT,
+}
+
 func subjectKind(k nokkuv1.SubjectKind) (string, bool) {
 	switch k {
 	case nokkuv1.SubjectKind_SUBJECT_KIND_USER:

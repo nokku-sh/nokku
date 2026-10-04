@@ -18,6 +18,7 @@ type Querier interface {
 	ConsumeCredentialBySubject(ctx context.Context, arg *ConsumeCredentialBySubjectParams) (*Credential, error)
 	ConsumeEmailToken(ctx context.Context, arg *ConsumeEmailTokenParams) (*ConsumeEmailTokenRow, error)
 	ConsumeToken(ctx context.Context, arg *ConsumeTokenParams) (string, error)
+	CountTargetsByTag(ctx context.Context) ([]*CountTargetsByTagRow, error)
 	CountTeamMembers(ctx context.Context, teamIds []string) ([]*CountTeamMembersRow, error)
 	CountUserMemberships(ctx context.Context, userID string) (int32, error)
 	CountWorkspaceResources(ctx context.Context, workspaceID string) (int64, error)
@@ -73,6 +74,12 @@ type Querier interface {
 	EnableAuditRetention(ctx context.Context) error
 	EnsureWorkspaceMember(ctx context.Context, arg *EnsureWorkspaceMemberParams) error
 	FindCredentialBySubject(ctx context.Context, arg *FindCredentialBySubjectParams) (*Credential, error)
+	// One row per node and edge of the graph, told apart by the by_ flags. The
+	// row with none set is the total. A target with several tags counts under
+	// each of them, an untagged one under ''.
+	GetAccessGraph(ctx context.Context, arg *GetAccessGraphParams) ([]*GetAccessGraphRow, error)
+	// Subject UUIDs are unique across kinds, so at most one branch matches an id.
+	GetAccessGraphSubjects(ctx context.Context, ids []string) ([]*GetAccessGraphSubjectsRow, error)
 	GetActiveSubscription(ctx context.Context, arg *GetActiveSubscriptionParams) (*WorkspaceSubscription, error)
 	// Runs as the system role, before any workspace is pinned.
 	GetActorRole(ctx context.Context, arg *GetActorRoleParams) (string, error)
@@ -129,6 +136,9 @@ type Querier interface {
 	InsertKeyset(ctx context.Context, data []byte) (int64, error)
 	// Never deletes, a host's reported list is a hint, not authority.
 	InsertTargetPrincipals(ctx context.Context, arg *InsertTargetPrincipalsParams) error
+	// The targets of one tag, the ones with a matching grant first. The filter is
+	// the one GetAccessGraph takes, so a tag filter only matches its own tag.
+	ListAccessGraphTargets(ctx context.Context, arg *ListAccessGraphTargetsParams) ([]*ListAccessGraphTargetsRow, error)
 	ListActorRoles(ctx context.Context, actorID string) ([]*ListActorRolesRow, error)
 	// A NULL workspace_id is the personal log, RLS already limits the rows.
 	ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) ([]*ListAuditLogsRow, error)

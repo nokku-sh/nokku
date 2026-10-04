@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"strings"
 	"testing"
+	"uuid"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
@@ -101,4 +102,272 @@ func TestSyncTargetUsers(t *testing.T) {
 		Usernames:   []string{"intruder"},
 	})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "viewer may not sync, got %v", err)
+}
+
+type accessFixture struct {
+	workspaceID       string
+	alice, bob, carol string
+	platform, ci      string
+	web1              string
+	outsider          string
+	client            nokkuv1connect.TargetServiceClient
+	memberClient      nokkuv1connect.TargetServiceClient
+}
+
+// seedAccessGraph builds one workspace:
+//
+//	web-1 [prod web]  root: platform   deploy: alice, ci
+//	web-2 [prod]      root: platform
+//	db-1  []          root: bob
+//	idle  [prod]      no grants
+//
+// alice and carol are in platform. A second workspace holds a prod target
+// with a grant of its own that must never show up.
+func seedAccessGraph(t *testing.T) accessFixture {
+	t.Helper()
+	cfg, srv := newTestAPI(t)
+	f := accessFixture{workspaceID: seedWorkspace(t, cfg)}
+	other := seedWorkspace(t, cfg)
+
+	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
+		member := func(workspaceID, name string) string {
+			u, err := q.CreateUser(
+				t.Context(),
+				&db.CreateUserParams{Email: uuid.New().String() + "@api.test", Name: name},
+			)
+			require.NoError(t, err)
+			require.NoError(t, q.EnsureWorkspaceMember(t.Context(), &db.EnsureWorkspaceMemberParams{
+				WorkspaceID: workspaceID,
+				UserID:      u.ID,
+				RoleName:    string(db.RoleMember),
+			}))
+			return u.ID
+		}
+		// account creates the target on first use and returns the principal.
+		targets := map[string]string{}
+		account := func(workspaceID, name string, tags []string, username string) string {
+			key := workspaceID + name
+			if targets[key] == "" {
+				target, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{
+					WorkspaceID: workspaceID,
+					Name:        name,
+					Tags:        tags,
+				})
+				require.NoError(t, err)
+				targets[key] = target.ID
+			}
+			if username == "" {
+				return ""
+			}
+			p, err := q.CreatePrincipal(t.Context(), &db.CreatePrincipalParams{
+				WorkspaceID: workspaceID,
+				TargetID:    targets[key],
+				Username:    username,
+			})
+			require.NoError(t, err)
+			return p.ID
+		}
+		grant := func(workspaceID, principalID, kind, subjectID string) {
+			require.NoError(t, q.AddPrincipalGrant(t.Context(), &db.AddPrincipalGrantParams{
+				PrincipalID: principalID,
+				WorkspaceID: workspaceID,
+				SubjectKind: kind,
+				SubjectID:   subjectID,
+			}))
+		}
+
+		ws := f.workspaceID
+		f.alice, f.bob, f.carol = member(ws, "alice"), member(ws, "bob"), member(ws, "carol")
+		team, err := q.CreateTeam(t.Context(), &db.CreateTeamParams{WorkspaceID: ws, Name: "platform"})
+		require.NoError(t, err)
+		f.platform = team.ID
+		for _, userID := range []string{f.alice, f.carol} {
+			require.NoError(t, q.AddTeamMember(t.Context(), &db.AddTeamMemberParams{UserID: userID, TeamID: team.ID}))
+		}
+		f.ci, err = q.CreateServiceAccount(t.Context(), &db.CreateServiceAccountParams{WorkspaceID: ws, Name: "ci"})
+		require.NoError(t, err)
+
+		web1Root := account(ws, "web-1", []string{"prod", "web"}, "root")
+		web1Deploy := account(ws, "web-1", nil, "deploy")
+		f.web1 = targets[ws+"web-1"]
+		grant(ws, web1Root, db.SubjectKindTeam, f.platform)
+		grant(ws, web1Deploy, db.SubjectKindUser, f.alice)
+		grant(ws, web1Deploy, db.SubjectKindServiceAccount, f.ci)
+		grant(ws, account(ws, "web-2", []string{"prod"}, "root"), db.SubjectKindTeam, f.platform)
+		grant(ws, account(ws, "db-1", nil, "root"), db.SubjectKindUser, f.bob)
+		account(ws, "idle", []string{"prod"}, "")
+
+		f.outsider = member(other, "outsider")
+		grant(other, account(other, "web-1", []string{"prod"}, "root"), db.SubjectKindUser, f.outsider)
+		return nil
+	}))
+
+	client := func(role db.Role) nokkuv1connect.TargetServiceClient {
+		return nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL,
+			header("Authorization", "Bearer "+seedMember(t, cfg, f.workspaceID, role)))
+	}
+	f.client, f.memberClient = client(db.RoleViewer), client(db.RoleMember)
+	return f
+}
+
+func TestGetAccessGraph(t *testing.T) {
+	f := seedAccessGraph(t)
+
+	graph := func(filter *nokkuv1.AccessGraphFilter) *nokkuv1.GetAccessGraphResponse {
+		res, err := f.client.GetAccessGraph(t.Context(), &nokkuv1.GetAccessGraphRequest{
+			WorkspaceId: &f.workspaceID,
+			Filter:      filter,
+		})
+		require.NoError(t, err)
+		return res
+	}
+	held := func(res *nokkuv1.GetAccessGraphResponse) map[string]int32 {
+		out := map[string]int32{}
+		for _, s := range res.GetSubjects() {
+			out[s.GetId()] = s.GetTargets()
+		}
+		return out
+	}
+	accounts := func(res *nokkuv1.GetAccessGraphResponse) map[string]int32 {
+		out := map[string]int32{}
+		for _, a := range res.GetAccounts() {
+			out[a.GetUsername()] = a.GetTargets()
+		}
+		return out
+	}
+	// tags maps a tag to {matched, total}.
+	tags := func(res *nokkuv1.GetAccessGraphResponse) map[string][2]int32 {
+		out := map[string][2]int32{}
+		for _, tag := range res.GetTags() {
+			out[tag.GetTag()] = [2]int32{tag.GetTargets(), tag.GetTotal()}
+		}
+		return out
+	}
+	grants := func(res *nokkuv1.GetAccessGraphResponse) map[string]int32 {
+		out := map[string]int32{}
+		for _, g := range res.GetGrants() {
+			out[g.GetSubjectId()+" "+g.GetUsername()] = g.GetTargets()
+		}
+		return out
+	}
+	reach := func(res *nokkuv1.GetAccessGraphResponse) map[string]int32 {
+		out := map[string]int32{}
+		for _, r := range res.GetReach() {
+			out[r.GetUsername()+" "+r.GetTag()] = r.GetTargets()
+		}
+		return out
+	}
+
+	all := graph(nil)
+	assert.EqualValues(t, 3, all.GetTargets(), "idle has no grant and the other workspace is out of scope")
+	assert.Equal(t, map[string]int32{f.platform: 2, f.alice: 1, f.bob: 1, f.ci: 1}, held(all))
+	assert.Equal(t, map[string]int32{"root": 3, "deploy": 1}, accounts(all))
+	assert.Equal(t, map[string][2]int32{"prod": {2, 3}, "web": {1, 1}, "": {1, 1}}, tags(all))
+	assert.Equal(t, map[string]int32{
+		f.platform + " root": 2,
+		f.alice + " deploy":  1,
+		f.bob + " root":      1,
+		f.ci + " deploy":     1,
+	}, grants(all))
+	assert.Equal(t, map[string]int32{
+		"root prod": 2, "root web": 1, "root ": 1,
+		"deploy prod": 1, "deploy web": 1,
+	}, reach(all))
+	for _, s := range all.GetSubjects() {
+		if s.GetId() == f.platform {
+			assert.Equal(t, nokkuv1.SubjectKind_SUBJECT_KIND_TEAM, s.GetKind())
+			assert.Equal(t, "platform", s.GetName())
+			assert.EqualValues(t, 2, s.GetMemberCount())
+		}
+	}
+
+	// alice reaches web-1 twice over, once herself and once through platform.
+	alice := graph(&nokkuv1.AccessGraphFilter{SubjectId: &f.alice})
+	assert.EqualValues(t, 2, alice.GetTargets())
+	assert.Equal(t, map[string]int32{f.platform: 2, f.alice: 1}, held(alice))
+	assert.Equal(t, map[string]int32{"root": 2, "deploy": 1}, accounts(alice))
+	assert.Equal(t, map[string][2]int32{"prod": {2, 3}, "web": {1, 1}, "": {0, 1}}, tags(alice))
+
+	carol := graph(&nokkuv1.AccessGraphFilter{SubjectId: &f.carol})
+	assert.EqualValues(t, 2, carol.GetTargets(), "team access counts")
+	assert.Equal(t, map[string]int32{f.platform: 2, f.carol: 0}, held(carol), "carol is named though she holds nothing")
+
+	untagged := graph(&nokkuv1.AccessGraphFilter{Tag: new("")})
+	assert.EqualValues(t, 1, untagged.GetTargets())
+	assert.Equal(t, map[string]int32{f.bob: 1}, held(untagged))
+	assert.Equal(t, map[string]int32{"root ": 1}, reach(untagged))
+
+	prod := graph(&nokkuv1.AccessGraphFilter{Tag: new("prod")})
+	assert.Equal(t, map[string][2]int32{"prod": {2, 3}, "web": {0, 1}, "": {0, 1}}, tags(prod),
+		"web-1 is also tagged web, a tag filter only lights its own tag")
+
+	web1 := graph(&nokkuv1.AccessGraphFilter{TargetId: &f.web1})
+	assert.Equal(t, map[string]int32{f.platform: 1, f.alice: 1, f.ci: 1}, held(web1))
+	assert.Equal(t, map[string]int32{"root": 1, "deploy": 1}, accounts(web1))
+
+	deploy := graph(&nokkuv1.AccessGraphFilter{Username: new("deploy")})
+	assert.Equal(t, map[string]int32{f.alice: 1, f.ci: 1}, held(deploy))
+
+	outsider := graph(&nokkuv1.AccessGraphFilter{SubjectId: &f.outsider})
+	assert.Zero(t, outsider.GetTargets())
+	assert.Empty(t, outsider.GetSubjects(), "a subject of another workspace is not even named")
+
+	_, err := f.memberClient.GetAccessGraph(t.Context(), &nokkuv1.GetAccessGraphRequest{WorkspaceId: &f.workspaceID})
+	assert.Equal(
+		t,
+		connect.CodePermissionDenied,
+		connect.CodeOf(err),
+		"a plain member may not read the graph, got %v",
+		err,
+	)
+}
+
+func TestListAccessGraphTargets(t *testing.T) {
+	f := seedAccessGraph(t)
+
+	// list returns "name" for a matched target and "-name" for the rest.
+	list := func(tag string, filter *nokkuv1.AccessGraphFilter, limit int32) ([]string, int32) {
+		res, err := f.client.ListAccessGraphTargets(t.Context(), &nokkuv1.ListAccessGraphTargetsRequest{
+			WorkspaceId: &f.workspaceID,
+			Filter:      filter,
+			Tag:         &tag,
+			Limit:       &limit,
+		})
+		require.NoError(t, err)
+		var out []string
+		for _, target := range res.GetTargets() {
+			name := target.GetName()
+			if !target.GetMatched() {
+				name = "-" + name
+			}
+			out = append(out, name)
+		}
+		return out, res.GetTotal()
+	}
+
+	got, total := list("prod", nil, 100)
+	assert.Equal(t, []string{"web-1", "web-2", "-idle"}, got, "granted targets first, then by name")
+	assert.EqualValues(t, 3, total)
+
+	got, total = list("prod", nil, 2)
+	assert.Equal(t, []string{"web-1", "web-2"}, got)
+	assert.EqualValues(t, 3, total, "total ignores the page")
+
+	got, _ = list("prod", &nokkuv1.AccessGraphFilter{SubjectId: &f.carol}, 100)
+	assert.Equal(t, []string{"web-1", "web-2", "-idle"}, got, "team access counts")
+
+	got, _ = list("prod", &nokkuv1.AccessGraphFilter{SubjectId: &f.bob}, 100)
+	assert.Equal(t, []string{"-idle", "-web-1", "-web-2"}, got)
+
+	got, _ = list("prod", &nokkuv1.AccessGraphFilter{Username: new("deploy")}, 100)
+	assert.Equal(t, []string{"web-1", "-idle", "-web-2"}, got)
+
+	got, _ = list("prod", &nokkuv1.AccessGraphFilter{TargetId: &f.web1}, 100)
+	assert.Equal(t, []string{"web-1", "-idle", "-web-2"}, got)
+
+	got, _ = list("", nil, 100)
+	assert.Equal(t, []string{"db-1"}, got, "an empty tag lists the untagged targets")
+
+	got, _ = list("", &nokkuv1.AccessGraphFilter{Tag: new("prod")}, 100)
+	assert.Equal(t, []string{"-db-1"}, got, "a tag filter only matches its own tag")
 }

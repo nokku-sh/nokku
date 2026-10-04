@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"maps"
 	"slices"
@@ -484,6 +485,128 @@ func (s *targetService) GetTargetFilters(
 		Tags:       tags,
 		Principals: principals,
 	}, nil
+}
+
+// GetAccessGraph backs the topology page. Everything is counted in one
+// grouped query, so the response stays small whatever the workspace size.
+func (s *targetService) GetAccessGraph(
+	ctx context.Context,
+	req *nokkuv1.GetAccessGraphRequest,
+) (*nokkuv1.GetAccessGraphResponse, error) {
+	filter := cmp.Or(req.GetFilter(), &nokkuv1.AccessGraphFilter{})
+	resp := &nokkuv1.GetAccessGraphResponse{}
+
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		rows, err := q.GetAccessGraph(ctx, &db.GetAccessGraphParams{
+			SubjectID: filter.SubjectId,
+			TargetID:  filter.TargetId,
+			Username:  filter.Username,
+			Tag:       filter.Tag,
+		})
+		if err != nil {
+			return err
+		}
+
+		held := make(map[string]int32)
+		matched := make(map[string]int32)
+		for _, r := range rows {
+			switch {
+			case r.BySubject && r.ByUsername:
+				resp.Grants = append(resp.Grants, &nokkuv1.AccessGraphGrant{
+					SubjectId: &r.SubjectID,
+					Username:  &r.Username,
+					Targets:   &r.Targets,
+				})
+			case r.ByUsername && r.ByTag:
+				resp.Reach = append(resp.Reach, &nokkuv1.AccessGraphReach{
+					Username: &r.Username,
+					Tag:      &r.Tag,
+					Targets:  &r.Targets,
+				})
+			case r.BySubject:
+				held[r.SubjectID] = r.Targets
+			case r.ByUsername:
+				resp.Accounts = append(resp.Accounts, &nokkuv1.AccessGraphAccount{
+					Username: &r.Username,
+					Targets:  &r.Targets,
+				})
+			case r.ByTag:
+				matched[r.Tag] = r.Targets
+			default:
+				resp.Targets = &r.Targets
+			}
+		}
+
+		// A user who only has access through teams holds nothing, but the
+		// caller still needs their name.
+		if id := filter.GetSubjectId(); id != "" {
+			held[id] += 0
+		}
+		subjects, err := q.GetAccessGraphSubjects(ctx, slices.Collect(maps.Keys(held)))
+		if err != nil {
+			return err
+		}
+		for _, sub := range subjects {
+			resp.Subjects = append(resp.Subjects, &nokkuv1.AccessGraphSubject{
+				Id:          &sub.ID,
+				Kind:        subjectKinds[sub.Kind].Enum(),
+				Name:        &sub.Name,
+				Email:       &sub.Email,
+				MemberCount: &sub.MemberCount,
+				Targets:     new(held[sub.ID]),
+			})
+		}
+
+		tags, err := q.CountTargetsByTag(ctx)
+		if err != nil {
+			return err
+		}
+		for _, t := range tags {
+			resp.Tags = append(resp.Tags, &nokkuv1.AccessGraphTag{
+				Tag:     &t.Tag,
+				Targets: new(matched[t.Tag]),
+				Total:   &t.Total,
+			})
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (s *targetService) ListAccessGraphTargets(
+	ctx context.Context,
+	req *nokkuv1.ListAccessGraphTargetsRequest,
+) (*nokkuv1.ListAccessGraphTargetsResponse, error) {
+	filter := cmp.Or(req.GetFilter(), &nokkuv1.AccessGraphFilter{})
+	var rows []*db.ListAccessGraphTargetsRow
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		rows, err = q.ListAccessGraphTargets(ctx, &db.ListAccessGraphTargetsParams{
+			Tag:       req.GetTag(),
+			FilterTag: filter.Tag,
+			SubjectID: filter.SubjectId,
+			TargetID:  filter.TargetId,
+			Username:  filter.Username,
+			Limit:     req.Limit,
+			Offset:    req.Offset,
+		})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+
+	var total int32
+	targets := make([]*nokkuv1.AccessGraphTarget, 0, len(rows))
+	for _, r := range rows {
+		total = r.TotalCount
+		targets = append(targets, &nokkuv1.AccessGraphTarget{
+			Id:      &r.ID,
+			Name:    &r.Name,
+			Matched: &r.Matched,
+		})
+	}
+	return &nokkuv1.ListAccessGraphTargetsResponse{Targets: targets, Total: &total}, nil
 }
 
 func validateHostPublicKey(key string) error {
