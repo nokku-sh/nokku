@@ -154,7 +154,7 @@ export const actorKinds: { value: string; label: string; icon: LucideIcon }[] = 
 	{ value: 'service_account', label: 'Service accounts', icon: Bot },
 	{ value: 'daemon', label: 'Daemons', icon: Server },
 	{ value: 'scim', label: 'SCIM', icon: RefreshCw },
-	{ value: 'web_device', label: 'Remembered devices', icon: Monitor }
+	{ value: 'device', label: 'Remembered devices', icon: Monitor }
 ];
 export const kindOf = (kind: string) => actorKinds.find((k) => k.value === kind);
 

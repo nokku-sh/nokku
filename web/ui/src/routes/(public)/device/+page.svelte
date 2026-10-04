@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { createQuery } from '@tanstack/svelte-query';
 	import { user } from '#lib/api/user.svelte.js';
 	import { pendingDeviceCode } from '#lib/store.svelte.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Alert from '#lib/components/ext/alert/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as InputOTP from '#lib/components/ui/input-otp/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
 	import { REGEXP_ONLY_DIGITS_AND_CHARS } from 'bits-ui';
@@ -13,7 +15,8 @@
 
 	const currentUser = user.self();
 
-	type DeviceVerifyResponse = { status?: string; error?: string };
+	type DeviceVerifyResponse = { status?: string; message?: string };
+	type DeviceRequester = { ip: string; user_agent: string };
 
 	const initialCode = (page.url.searchParams.get('user_code') ?? '').toUpperCase().trim();
 
@@ -25,6 +28,20 @@
 	let result = $state<'success' | 'error' | 'denied' | null>(null);
 	let message = $state('');
 
+	// Who asked for the code. Approve waits for it, so nobody approves blind.
+	const requester = createQuery<DeviceRequester>(() => ({
+		queryKey: ['device', code],
+		queryFn: async () => {
+			const response = await fetch(`/auth/device/info?user_code=${encodeURIComponent(code)}`, {
+				credentials: 'include'
+			});
+			if (!response.ok) throw new Error('invalid or expired code');
+			return response.json();
+		},
+		enabled: !!code && !!currentUser.data && !result,
+		retry: false
+	}));
+
 	function deny() {
 		result = 'denied';
 		message = 'Authorization request denied.';
@@ -33,11 +50,16 @@
 		submit('/auth/device/deny');
 	}
 
-	function apply() {
+	function review() {
 		code = formatted;
-		if (code) pendingDeviceCode.current = code;
-		history.replaceState(null, '', code ? `/device?user_code=${code}` : '/device');
-		submit();
+		history.replaceState(null, '', `/device?user_code=${code}`);
+	}
+
+	function reset() {
+		result = null;
+		code = '';
+		input = '';
+		history.replaceState(null, '', '/device');
 	}
 
 	function submit(path = '/auth/device/verify') {
@@ -67,9 +89,9 @@
 				} else {
 					result = 'error';
 					message =
-						body.error === 'invalid or expired code'
-							? 'This code is invalid or has expired. Start the login again in your CLI.'
-							: (body.error ?? 'Something went wrong. Please try again.');
+						body.message === 'invalid or expired code'
+							? 'This code is invalid or has expired. Start the login again in your terminal.'
+							: (body.message ?? 'Something went wrong. Please try again.');
 				}
 			})
 			.catch(() => {
@@ -90,7 +112,7 @@
 
 <AuthCard
 	title="Authorize a device"
-	description={initialCode && currentUser.data && !result
+	description={code && currentUser.data && !result
 		? 'A terminal wants to sign in to your Nokku account.'
 		: 'Enter the code your terminal shows.'}
 	icon={MonitorSmartphone}
@@ -123,33 +145,60 @@
 			<Alert.Title>Authorization failed</Alert.Title>
 			<Alert.Description>{message}</Alert.Description>
 		</Alert.Root>
-		<Button variant="outline" onclick={() => (result = null)}>Try again</Button>
-	{:else if initialCode}
+		<Button variant="outline" onclick={reset}>Try again</Button>
+	{:else if code}
 		<div class="flex flex-col items-center gap-1 rounded-lg border bg-terminal p-5">
 			<span class="spec-label">Device code</span>
 			<span class="font-mono text-3xl font-bold tracking-widest text-terminal-accent">
-				{formatted}
+				{code}
 			</span>
 		</div>
-		<Alert.Root variant="warning">
-			<ShieldAlert />
-			<Alert.Description>Approve only if this matches your terminal exactly.</Alert.Description>
-		</Alert.Root>
-		<div class="flex flex-col gap-2">
-			<Button onclick={apply} disabled={submitting}>
-				{#if submitting}<Spinner data-icon="inline-start" />{:else}<Check
-						data-icon="inline-start"
-					/>{/if}
-				Approve
-			</Button>
-			<Button variant="ghost" onclick={deny} disabled={submitting}>Deny</Button>
-		</div>
+		{#if requester.isError}
+			<Alert.Root variant="destructive">
+				<X />
+				<Alert.Title>Code not found</Alert.Title>
+				<Alert.Description>
+					This code is invalid or has expired. Start the login again in your terminal.
+				</Alert.Description>
+			</Alert.Root>
+			<Button variant="outline" onclick={reset}>Enter another code</Button>
+		{:else}
+			{#if requester.data}
+				<dl class="flex flex-col gap-2 rounded-lg border p-4 text-sm">
+					<div class="flex justify-between gap-4">
+						<dt class="text-muted-foreground">Requested from</dt>
+						<dd class="font-mono">{requester.data.ip || 'unknown'}</dd>
+					</div>
+					<div class="flex justify-between gap-4">
+						<dt class="text-muted-foreground">Client</dt>
+						<dd class="truncate font-mono">{requester.data.user_agent || 'unknown'}</dd>
+					</div>
+				</dl>
+			{:else}
+				<Skeleton class="h-20 w-full" />
+			{/if}
+			<Alert.Root variant="warning">
+				<ShieldAlert />
+				<Alert.Description>
+					Approve only if you started this sign-in and the code matches your terminal exactly.
+				</Alert.Description>
+			</Alert.Root>
+			<div class="flex flex-col gap-2">
+				<Button onclick={() => submit()} disabled={submitting || !requester.data}>
+					{#if submitting}<Spinner data-icon="inline-start" />{:else}<Check
+							data-icon="inline-start"
+						/>{/if}
+					Approve
+				</Button>
+				<Button variant="ghost" onclick={deny} disabled={submitting}>Deny</Button>
+			</div>
+		{/if}
 	{:else}
 		<form
 			class="flex flex-col gap-4"
 			onsubmit={(e) => {
 				e.preventDefault();
-				if (input.length === 8) apply();
+				if (input.length === 8) review();
 			}}
 		>
 			<Field.Field>
@@ -179,10 +228,7 @@
 					{/snippet}
 				</InputOTP.Root>
 			</Field.Field>
-			<Button type="submit" disabled={submitting || input.length < 8}>
-				{#if submitting}<Spinner data-icon="inline-start" />{/if}
-				Continue
-			</Button>
+			<Button type="submit" disabled={input.length < 8}>Continue</Button>
 		</form>
 	{/if}
 

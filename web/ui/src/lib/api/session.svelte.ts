@@ -41,7 +41,7 @@ export function sessionKindLabel(kind: string): string {
 			return 'Browser';
 		case 'cli':
 			return 'CLI';
-		case 'web_device':
+		case 'device':
 			return 'Remembered device';
 		default:
 			return kind;

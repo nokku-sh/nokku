@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   -- A daemon's session has to outlive the daemon: it is what the host gets
   -- its REJECTED answer through, and SyncDaemon removes it with that answer.
   user_id UUID REFERENCES users (id) ON DELETE CASCADE,
-  kind TEXT NOT NULL DEFAULT 'user', -- user, cli, web_device, daemon
+  kind TEXT NOT NULL DEFAULT 'user', -- user, cli, device, daemon
   CHECK ((kind = 'daemon') = (user_id IS NULL)),
   method TEXT NOT NULL, -- password, passkey, oidc, oauth2, saml, backup_code, device
   workspace_id UUID REFERENCES workspaces (id) ON DELETE CASCADE, -- tenant pin for daemons; NULL for global users

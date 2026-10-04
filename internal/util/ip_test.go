@@ -230,3 +230,33 @@ func TestSetTrustedProxies(t *testing.T) {
 		})
 	}
 }
+
+// A relay reports the client itself, so the address must not be collapsed to
+// its /64 like the rate limit key is.
+func TestClientIPKeepsTheHost(t *testing.T) {
+	setProxies(t, "10.0.0.1")
+	tests := []struct {
+		name       string
+		forwarded  string
+		remoteAddr string
+		want       string
+	}{
+		{"ipv6 peer", "", "[2001:db8::7]:5000", "2001:db8::7"},
+		{"ipv4 peer", "", "203.0.113.7:5000", "203.0.113.7"},
+		{"ipv6 behind a trusted proxy", "2001:db8::7", "10.0.0.1:5000", "2001:db8::7"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			header := http.Header{}
+			if tt.forwarded != "" {
+				header.Set("X-Forwarded-For", tt.forwarded)
+			}
+			if got := ClientIP(header, tt.remoteAddr); got != tt.want {
+				t.Errorf("ClientIP() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+	if got := GetRemoteIP(http.Header{}, "[2001:db8::7]:5000"); got != "2001:db8::" {
+		t.Errorf("GetRemoteIP() = %q, want the /64", got)
+	}
+}
