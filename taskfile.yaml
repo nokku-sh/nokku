@@ -12,7 +12,7 @@ tasks:
   backend:
     desc: Run backend
     cmds:
-      - go run ./cmd/nokku
+      - go run {{ if .NOKKU_LICENSE_PUBLIC_KEY }}-ldflags="-X github.com/mizuchilabs/kata/licx.pubkey={{ .NOKKU_LICENSE_PUBLIC_KEY }}"{{ end }} ./cmd/nokku
 
   frontend:
     desc: Run frontend
@@ -39,22 +39,28 @@ tasks:
       - buf generate "$(go list -m -f '{{"{{.Dir}}"}}' github.com/nokku-sh/protos)/nokku"
       - sqlc generate
 
-  build:server:
+  build:
     desc: Build binary
+    deps: [build:ui]
     cmds:
-      - go build -ldflags="-s -w" -trimpath -o bin/nokku ./cmd/nokku
+      - go build -ldflags="-s -w{{ if .NOKKU_LICENSE_PUBLIC_KEY }} -X github.com/mizuchilabs/kata/licx.pubkey={{ .NOKKU_LICENSE_PUBLIC_KEY }}{{ end }}" -trimpath -o bin/nokku ./cmd/nokku
 
   seed:
     desc: Seed the database with demo data (separate binary, not shipped)
     cmds:
       - go run ./cmd/seed {{.CLI_ARGS}}
 
-  build:web:
+  build:ui:
     desc: Build frontends
-    dir: web
+    dir: web/ui
     cmds:
-      - cd ui; pnpm install; pnpm build
-      - cd email; pnpm install; pnpm export
+      - pnpm install; pnpm build
+
+  build:email:
+    desc: Build email templates
+    dir: web/email
+    cmds:
+      - pnpm install; pnpm export
 
   lint:
     desc: Run go vet & lint

@@ -16,8 +16,9 @@ task frontend       # web/ui dev server
 task gen            # sqlc + web client from the pinned protos
 task lint           # tidy, fmt, vet, govulncheck, test -race, golangci-lint, web/ui fmt+lint
 task seed           # seed demo data (cmd/seed)
-task build:server   # binary into bin/
-task build:web      # both web frontends
+task build          # UI build, then the binary into bin/
+task build:ui       # web/ui into web/ui/build
+task build:email    # email templates into web/email/out
 task migrate:up     # apply migrations (tern, dev only, production auto-migrates)
 ```
 
