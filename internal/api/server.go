@@ -14,7 +14,6 @@ import (
 
 	"connectrpc.com/connect"
 	"connectrpc.com/validate"
-	"github.com/vearutop/statigz"
 
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
@@ -55,7 +54,6 @@ func (s *Server) Start(ctx context.Context) error {
 	proto.SetHTTP2(true)
 	proto.SetUnencryptedHTTP2(true)
 	server := &http.Server{
-		// Long-lived streams exit as soon as shutdown cancels ctx.
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		Addr:              "0.0.0.0:" + s.cfg.Port,
 		Handler:           chain.then(s.mux),
@@ -140,25 +138,8 @@ func (s *Server) registerServices(ctx context.Context) {
 	s.mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(s.cfg.Pool, opts...))
 	s.mux.Handle(nokkuv1connect.NewDaemonSessionServiceHandler(s.cfg.Pool, opts...))
 	s.mux.Handle(nokkuv1connect.NewRecordingServiceHandler(newRecordingService(s.cfg), opts...))
-	s.mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
 
-	var staticHandler http.Handler
-	staticHandler = statigz.FileServer(
-		web.UIFS,
-		statigz.FSPrefix("ui/build"),
-		statigz.OnNotFound(func(w http.ResponseWriter, r *http.Request) {
-			// A build without the UI has no index.html to fall back to.
-			if r.URL.Path == "/" {
-				http.NotFound(w, r)
-				return
-			}
-			r.URL.Path = "/" // SPA fallback to index.html
-			staticHandler.ServeHTTP(w, r)
-		}),
-	)
-
+	static := web.Handler()
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// A service this build does not have, from a newer client. The SPA
 		// fallback would answer it with HTML.
@@ -166,7 +147,7 @@ func (s *Server) registerServices(ctx context.Context) {
 			http.NotFound(w, r)
 			return
 		}
-		staticHandler.ServeHTTP(w, r)
+		static.ServeHTTP(w, r)
 	})
 
 	registerAuthRoutes(s.mux, s.cfg)
@@ -179,6 +160,11 @@ func (s *Server) registerServices(ctx context.Context) {
 	if s.cfg.Billing.Enabled() {
 		s.mux.Handle("POST /webhooks/stripe", s.cfg.Billing.WebhookHandler())
 	}
+
+	s.mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
 
 	if s.cfg.Debug {
 		s.mux.HandleFunc("/debug/pprof/", pprof.Index)

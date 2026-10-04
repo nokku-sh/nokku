@@ -44,12 +44,10 @@ func (s *Server) withHeaders(h http.Handler) http.Handler {
 		w.Header().
 			Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:;")
 
+		// The UI reads over GET, and no API response may be cached. The static
+		// handler and the avatars set their own policy.
 		if r.Method == http.MethodGet {
-			if strings.HasPrefix(r.URL.Path, "/_app/") {
-				w.Header().Set("Cache-Control", "public, max-age=604800, immutable")
-			} else {
-				w.Header().Set("Cache-Control", "no-store")
-			}
+			w.Header().Set("Cache-Control", "no-store")
 		}
 
 		if r.Header.Get("X-Forwarded-Proto") == "https" || r.TLS != nil {
