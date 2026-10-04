@@ -145,3 +145,33 @@ func TestExpiringCAQuerySkipsFailed(t *testing.T) {
 		}
 	}))
 }
+
+func TestRolloverKeepsOrRevokesPreviousKey(t *testing.T) {
+	conn := rotationConn(t)
+	ca := seedCA(t, conn, seedWorkspace(t, conn), 24*time.Hour)
+
+	rollover := func(revoke bool) *db.CertificateAuthority {
+		var next *db.CertificateAuthority
+		require.NoError(t, conn.WithTx(t.Context(), func(q *db.Queries) (err error) {
+			current, err := q.GetCAForUpdate(t.Context(), ca.ID)
+			if err != nil {
+				return err
+			}
+			next, err = Rollover(t.Context(), q, current, current.KeyType, current.KeyBits, revoke)
+			return err
+		}))
+		return next
+	}
+
+	planned := rollover(false)
+	require.NotNil(t, planned.PreviousPublicKey, "a planned rollover keeps the replaced key")
+	assert.Equal(t, ca.PublicKey, *planned.PreviousPublicKey)
+	require.NotNil(t, planned.PreviousTrustedUntil)
+	assert.WithinDuration(t, time.Now().Add(planned.UserMaxTtl), *planned.PreviousTrustedUntil, time.Minute,
+		"the replaced key is trusted for as long as its certificates can live")
+
+	emergency := rollover(true)
+	assert.NotEqual(t, planned.PublicKey, emergency.PublicKey)
+	assert.Nil(t, emergency.PreviousPublicKey, "an emergency rollover trusts no older key")
+	assert.Nil(t, emergency.PreviousTrustedUntil)
+}

@@ -171,9 +171,19 @@ WHERE
 RETURNING
   *;
 
+-- The replaced key stays trusted for as long as a certificate it signed can
+-- live, unless revoke_previous drops it at once.
 -- name: ReplaceCA :one
 UPDATE certificate_authorities
 SET
+  previous_public_key = CASE
+    WHEN @revoke_previous::BOOLEAN THEN NULL
+    ELSE public_key
+  END,
+  previous_trusted_until = CASE
+    WHEN @revoke_previous::BOOLEAN THEN NULL
+    ELSE NOW() + user_max_ttl
+  END,
   certificate = @certificate,
   private_key = @private_key,
   public_key = @public_key,

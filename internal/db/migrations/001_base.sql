@@ -194,6 +194,8 @@ CREATE TABLE IF NOT EXISTS certificate_authorities (
   certificate TEXT NOT NULL, -- PEM encoded certificate
   private_key BYTEA NOT NULL, -- Encrypted private key
   public_key TEXT NOT NULL, -- OpenSSH wire format
+  previous_public_key TEXT, -- the key before the last rollover
+  previous_trusted_until TIMESTAMPTZ, -- its certificates are trusted until then
   serial_number TEXT NOT NULL UNIQUE,
   subject TEXT NOT NULL,
   not_before TIMESTAMPTZ NOT NULL,

@@ -234,11 +234,12 @@ func (s *certificateService) RolloverCertificateAuthority(
 		if req.KeyBits != nil {
 			keyBits = req.GetKeyBits()
 		}
-		result, err = pki.Rollover(ctx, q, ca, keyType, keyBits)
+		result, err = pki.Rollover(ctx, q, ca, keyType, keyBits, req.GetRevokePrevious())
 		return err
 	}); err != nil {
 		return nil, err
 	}
+	audit.Set(ctx, "revoke_previous", req.GetRevokePrevious())
 
 	return &nokkuv1.RolloverCertificateAuthorityResponse{
 		CertificateAuthority: result.ToProto(),

@@ -20,7 +20,7 @@
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
-	import { timestampFromDate } from '@bufbuild/protobuf/wkt';
+	import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt';
 	import {
 		ChevronDown,
 		Copy,
@@ -63,9 +63,19 @@
 	const online = $derived(!!linkedDaemon?.online);
 	const accounts = $derived(entity?.principals ?? []);
 	const withAccess = $derived(new Set(accounts.flatMap((p) => grantsOf(p).map((g) => g.id))).size);
-	const lastSynced = $derived.by(() => {
+	const lastSyncAt = $derived.by(() => {
 		const at = new Date(entity?.metadata?.['last_manual_sync'] ?? '');
-		return Number.isNaN(at.getTime()) ? '' : formatTs(timestampFromDate(at), 'relative-short');
+		return Number.isNaN(at.getTime()) ? undefined : at;
+	});
+	const lastSynced = $derived(
+		lastSyncAt ? formatTs(timestampFromDate(lastSyncAt), 'relative-short') : ''
+	);
+	// The server only learns a new CA key from nk sync.
+	const caRotated = $derived.by(() => {
+		const rotatedAt = (
+			cas.data?.find((c) => c.id === entity?.caId) ?? cas.data?.find((c) => c.isDefault)
+		)?.notBefore;
+		return !!lastSyncAt && !!rotatedAt && timestampDate(rotatedAt) > lastSyncAt;
 	});
 	const syncCommand = $derived(`nk sync ${model?.name ?? '<name>'}`);
 	const systemInfo = $derived(
@@ -337,6 +347,12 @@
 					icon={RefreshCw}
 					description={lastSynced ? `Last synced ${lastSynced}.` : 'Not synced yet.'}
 				>
+					{#if caRotated}
+						<p class="text-sm text-warning">
+							The certificate authority was rotated after the last sync. Sync again, or this server
+							rejects new certificates.
+						</p>
+					{/if}
 					<div class="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
 						<SquareTerminal class="size-4 shrink-0 text-muted-foreground" />
 						<CopyText value={syncCommand} mono class="text-sm" />

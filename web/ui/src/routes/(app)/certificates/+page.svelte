@@ -123,10 +123,10 @@
 								confirm({
 									title: `Emergency rollover of ${item.name}?`,
 									description:
-										'This instantly revokes the current CA and replaces it with a new one. Connections relying on the old CA fail until they receive the new one.',
+										'The current key stops being trusted at once and a new one replaces it. People get a new certificate at their next connection. Servers without the daemon trust the old key until the next nk sync.',
 									confirmText: 'Rollover',
 									typeToConfirm: item.name,
-									onConfirm: () => rolloverAction.mutateAsync({ id: item.id })
+									onConfirm: () => rolloverAction.mutateAsync({ id: item.id, revokePrevious: true })
 								})
 						}
 					],

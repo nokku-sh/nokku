@@ -35,6 +35,10 @@ Five repos, usually checked out as siblings.
   SSH certificate carries as its principal.
 - **CA**: a workspace SSH certificate authority. One CA signs both user and
   host certs for the workspace.
+- **Rollover**: a CA gets a new key and keeps its id. The CA row keeps the
+  replaced key (`previous_public_key`) and trusts it until
+  `previous_trusted_until`, which is the rollover time plus `user_max_ttl`. An
+  emergency rollover (`revoke_previous`) keeps no previous key.
 - **Daemon**: short for nokkud, the edge agent.
 - **Relay**: two bidi Connect streams spliced in the backend so a user can
   reach a daemon behind NAT. The backend is a byte pipe, sessions stay
@@ -181,6 +185,22 @@ disconnected.
 Daemons authenticate as themselves, never through a workspace role. They may
 call only RPCs whose `option (access)` in the protos sets `daemon: true`,
 enforced in `nokku/internal/api/authz.go`.
+
+### CA rollover
+
+`nokku/internal/pki/rotate.go` `Rollover` replaces the key, from the hourly
+`RotateExpiring` job once a CA is past 80% of its lifetime, or from
+`RolloverCertificateAuthority` in the UI. The core owns how long the replaced
+key stays trusted. `SyncDaemon` sends it as `retired_ca_keys` with its
+deadline, the daemon caches the list and
+`nokkud/internal/sshd/auth.go` `trustedCA` honors the deadline offline. nk gets
+both keys with `GetMyAccess`. It writes both into `known_hosts`, and `nk sync`
+writes both into `/etc/ssh/nokku_ca.pub`.
+
+A manual host only learns a new key from `nk sync`. Until then it rejects
+certificates from the new key. `nk ls` and the target sheet flag a manual
+target whose CA key is newer than its `last_manual_sync`. Publishing the next
+key before signing with it would close that gap and is not built yet.
 
 ### Manual sync (`nk sync`)
 

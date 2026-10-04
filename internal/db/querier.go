@@ -187,6 +187,8 @@ type Querier interface {
 	RemoveTeamMember(ctx context.Context, arg *RemoveTeamMemberParams) error
 	RemoveWorkspaceMember(ctx context.Context, arg *RemoveWorkspaceMemberParams) error
 	RenameCredential(ctx context.Context, arg *RenameCredentialParams) error
+	// The replaced key stays trusted for as long as a certificate it signed can
+	// live, unless revoke_previous drops it at once.
 	ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*CertificateAuthority, error)
 	RevokeSubjectAccessInWorkspace(ctx context.Context, arg *RevokeSubjectAccessInWorkspaceParams) error
 	SetInstanceLicense(ctx context.Context, key string) error

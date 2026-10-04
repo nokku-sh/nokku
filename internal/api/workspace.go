@@ -23,7 +23,6 @@ func defaultWorkspaceSettings() *nokkuv1.WorkspaceSettings {
 			AllowForwarding:      new(true),
 			AllowAgentForwarding: new(true),
 			GatewayPorts:         new(false),
-			DropRetiredCa:        new(false),
 		},
 	}
 }

@@ -29,11 +29,7 @@
 	type Toggle = {
 		key: keyof Pick<
 			DaemonConfig,
-			| 'recordSessions'
-			| 'allowForwarding'
-			| 'allowAgentForwarding'
-			| 'gatewayPorts'
-			| 'dropRetiredCa'
+			'recordSessions' | 'allowForwarding' | 'allowAgentForwarding' | 'gatewayPorts'
 		>;
 		title: string;
 		description: string;
@@ -59,11 +55,6 @@
 			key: 'gatewayPorts',
 			title: 'Gateway ports',
 			description: 'Let remote (-R) forwards bind to addresses other than loopback.'
-		},
-		{
-			key: 'dropRetiredCa',
-			title: 'Drop retired CA',
-			description: 'Stop trusting the previous CA right after a rollover.'
 		}
 	];
 </script>

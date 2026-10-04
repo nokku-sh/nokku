@@ -188,7 +188,7 @@ func (q *Queries) ListOpenRecordings(ctx context.Context, arg *ListOpenRecording
 
 const listSoonestCAs = `-- name: ListSoonestCAs :many
 SELECT
-  id, workspace_id, name, description, certificate, private_key, public_key, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, certificate, private_key, public_key, previous_public_key, previous_trusted_until, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 FROM
   certificate_authorities
 WHERE
@@ -218,6 +218,8 @@ func (q *Queries) ListSoonestCAs(ctx context.Context, workspaceID string) ([]*Ce
 			&i.Certificate,
 			&i.PrivateKey,
 			&i.PublicKey,
+			&i.PreviousPublicKey,
+			&i.PreviousTrustedUntil,
 			&i.SerialNumber,
 			&i.Subject,
 			&i.NotBefore,

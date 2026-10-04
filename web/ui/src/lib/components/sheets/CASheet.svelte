@@ -122,10 +122,10 @@
 		void confirm({
 			title: `Emergency rollover of ${entity.name}?`,
 			description:
-				'The current CA is revoked at once and replaced by a new key. Sessions relying on the old CA fail until daemons pick up the new one.',
+				'The current key stops being trusted at once and a new one replaces it. People get a new certificate at their next connection. Servers without the daemon trust the old key until the next nk sync.',
 			confirmText: 'Roll over',
 			typeToConfirm: entity.name,
-			onConfirm: () => rollover.mutateAsync({ id: entity.id })
+			onConfirm: () => rollover.mutateAsync({ id: entity.id, revokePrevious: true })
 		});
 	}
 
@@ -237,7 +237,15 @@
 						{ label: 'Subject', value: entity.subject, mono: true },
 						{ label: 'Serial', value: entity.serialNumber, mono: true, copy: true },
 						{ label: 'Valid from', value: formatTs(entity.notBefore) },
-						{ label: 'Valid until', value: formatTs(entity.notAfter) }
+						{ label: 'Valid until', value: formatTs(entity.notAfter) },
+						...(entity.previousTrustedUntil
+							? [
+									{
+										label: 'Previous key trusted until',
+										value: formatTs(entity.previousTrustedUntil)
+									}
+								]
+							: [])
 					]}
 				/>
 				<Field.Field>
