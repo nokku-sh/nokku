@@ -15,8 +15,10 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 func seedTarget(t *testing.T, cfg *config.Config, workspaceID string) string {
@@ -112,6 +114,8 @@ type accessFixture struct {
 	outsider          string
 	client            nokkuv1connect.TargetServiceClient
 	memberClient      nokkuv1connect.TargetServiceClient
+	// as signs in as one of the seeded users.
+	as func(userID string) nokkuv1connect.TargetServiceClient
 }
 
 // seedAccessGraph builds one workspace:
@@ -207,7 +211,55 @@ func seedAccessGraph(t *testing.T) accessFixture {
 			header("Authorization", "Bearer "+seedMember(t, cfg, f.workspaceID, role)))
 	}
 	f.client, f.memberClient = client(db.RoleViewer), client(db.RoleMember)
+	f.as = func(userID string) nokkuv1connect.TargetServiceClient {
+		_, token, err := cfg.IAM.IssueSession(t.Context(), iam.SessionParams{
+			SubjectID: userID,
+			Kind:      actor.KindUser,
+			Method:    iam.MethodPassword,
+		})
+		require.NoError(t, err)
+		return nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+token))
+	}
 	return f
+}
+
+func TestGetSubjectAccess(t *testing.T) {
+	f := seedAccessGraph(t)
+
+	// access returns the accounts per target name and the principal count.
+	access := func(client nokkuv1connect.TargetServiceClient, subjectID string) (map[string][]string, int) {
+		res, err := client.GetSubjectAccess(t.Context(), &nokkuv1.GetSubjectAccessRequest{
+			WorkspaceId: &f.workspaceID,
+			SubjectId:   &subjectID,
+		})
+		require.NoError(t, err)
+		accounts, principals := map[string][]string{}, 0
+		for _, target := range res.GetTargets() {
+			accounts[target.GetName()] = target.GetUsernames()
+			principals += len(target.GetPrincipals())
+		}
+		return accounts, principals
+	}
+
+	got, principals := access(f.as(f.carol), f.carol)
+	assert.Equal(t, map[string][]string{"web-1": {"root"}, "web-2": {"root"}}, got,
+		"a member reads its own access, deploy on web-1 is not carol's")
+	assert.Zero(t, principals, "the grants of others are for viewers")
+
+	got, _ = access(f.as(f.alice), f.alice)
+	assert.Equal(t, map[string][]string{"web-1": {"deploy", "root"}, "web-2": {"root"}}, got,
+		"direct and team grants")
+
+	_, err := f.as(f.carol).GetSubjectAccess(t.Context(), &nokkuv1.GetSubjectAccessRequest{
+		WorkspaceId: &f.workspaceID,
+		SubjectId:   &f.bob,
+	})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err),
+		"a member may not read another subject, got %v", err)
+
+	got, principals = access(f.client, f.carol)
+	assert.Equal(t, map[string][]string{"web-1": {"root"}, "web-2": {"root"}}, got)
+	assert.Equal(t, 3, principals, "a viewer gets every account on those targets")
 }
 
 func TestGetAccessGraph(t *testing.T) {

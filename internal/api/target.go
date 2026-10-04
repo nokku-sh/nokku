@@ -250,6 +250,13 @@ func (s *targetService) GetSubjectAccess(
 	ctx context.Context,
 	req *nokkuv1.GetSubjectAccessRequest,
 ) (*nokkuv1.GetSubjectAccessResponse, error) {
+	// A member reads its own access. Who else holds an account is for viewers.
+	caller, _ := actor.PrincipalFromContext(ctx)
+	canView := callerRole(ctx).AtLeast(db.RoleViewer)
+	if !canView && req.GetSubjectId() != caller.ID {
+		return nil, db.ErrPermissionDenied
+	}
+
 	var targets []*nokkuv1.Target
 	var daemons []*nokkuv1.Daemon
 	var cas []*nokkuv1.CertificateAuthority
@@ -278,18 +285,33 @@ func (s *targetService) GetSubjectAccess(
 			}
 		}
 
-		principalsByTarget := make(map[string][]*nokkuv1.Principal)
-		pRows, err := q.GetPrincipalsByTargetIDs(ctx, targetIDs)
+		usernamesByTarget := make(map[string][]string)
+		uRows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
+			TargetIds: targetIDs,
+			SubjectID: new(req.GetSubjectId()),
+		})
 		if err != nil {
 			return err
 		}
-		for _, p := range pRows {
-			targetID := p.Principal.TargetID
-			principalsByTarget[targetID] = append(principalsByTarget[targetID], p.ToProto())
+		for _, u := range uRows {
+			usernamesByTarget[u.TargetID] = append(usernamesByTarget[u.TargetID], u.Username)
+		}
+
+		principalsByTarget := make(map[string][]*nokkuv1.Principal)
+		if canView {
+			pRows, err := q.GetPrincipalsByTargetIDs(ctx, targetIDs)
+			if err != nil {
+				return err
+			}
+			for _, p := range pRows {
+				targetID := p.Principal.TargetID
+				principalsByTarget[targetID] = append(principalsByTarget[targetID], p.ToProto())
+			}
 		}
 
 		for _, r := range rows {
 			target := r.ToProto()
+			target.Usernames = usernamesByTarget[r.ID]
 			target.Principals = principalsByTarget[r.ID]
 			targets = append(targets, target)
 		}
