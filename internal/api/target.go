@@ -120,12 +120,13 @@ func (s *targetService) UpdateTarget(
 	var result *db.Target
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.UpdateTarget(ctx, &db.UpdateTargetParams{
-			TargetID:      req.GetId(),
-			Name:          req.Name,
-			Description:   req.Description,
-			Endpoints:     req.GetEndpoints(),
+			TargetID:    req.GetId(),
+			Name:        req.Name,
+			Description: req.Description,
+			// An update replaces both lists. The query keeps the old one for nil.
+			Endpoints:     append([]string{}, req.GetEndpoints()...),
 			CaID:          req.CaId,
-			Tags:          req.GetTags(),
+			Tags:          append([]string{}, req.GetTags()...),
 			HostPublicKey: trimmed(req.HostPublicKey),
 		})
 		return err

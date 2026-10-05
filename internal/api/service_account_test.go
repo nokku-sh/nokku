@@ -34,4 +34,11 @@ func TestUpdateServiceAccount(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"ci", "prod"}, updated.GetServiceAccount().GetTags(), "tags must be saved")
 	assert.Equal(t, "deploy", updated.GetServiceAccount().GetName(), "unset fields stay as they are")
+
+	cleared, err := client.UpdateServiceAccount(t.Context(), &nokkuv1.UpdateServiceAccountRequest{
+		WorkspaceId: &workspaceID,
+		Id:          &id,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, cleared.GetServiceAccount().GetTags(), "an update replaces the tags, the last one can go")
 }
