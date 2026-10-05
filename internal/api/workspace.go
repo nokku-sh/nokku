@@ -18,12 +18,7 @@ import (
 
 func defaultWorkspaceSettings() *nokkuv1.WorkspaceSettings {
 	return &nokkuv1.WorkspaceSettings{
-		DefaultDaemonConfig: &nokkuv1.DaemonConfig{
-			RecordSessions:       new(true),
-			AllowForwarding:      new(true),
-			AllowAgentForwarding: new(true),
-			GatewayPorts:         new(false),
-		},
+		DefaultDaemonConfig: db.DefaultDaemonConfig(),
 	}
 }
 

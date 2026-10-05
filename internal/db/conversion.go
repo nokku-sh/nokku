@@ -6,6 +6,7 @@ import (
 	"time"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/nokku-sh/nokku/internal/util"
@@ -39,11 +40,17 @@ func (w *Workspace) ToProto() *nokkuv1.Workspace {
 	if w == nil {
 		return nil
 	}
+	// A copy, so the stored row keeps what the admin actually set.
+	settings := &nokkuv1.WorkspaceSettings{}
+	if w.Settings != nil {
+		settings = proto.CloneOf(w.Settings)
+	}
+	settings.DefaultDaemonConfig = ResolveDaemonConfig(settings.GetDefaultDaemonConfig())
 	return &nokkuv1.Workspace{
 		Id:          &w.ID,
 		Name:        &w.Name,
 		Description: w.Description,
-		Settings:    w.Settings,
+		Settings:    settings,
 		CreatedBy:   &w.CreatedBy,
 		CreatedAt:   SafeTimestamp(&w.CreatedAt),
 		UpdatedAt:   SafeTimestamp(&w.UpdatedAt),
@@ -215,6 +222,28 @@ func SeenRecently(t *time.Time) bool {
 	return t != nil && time.Since(*t) < DaemonOnlineWindow
 }
 
+// DefaultDaemonConfig is what a daemon enforces when nothing says otherwise.
+// nokkud's DefaultPolicy holds the same values for the time before its first
+// sync.
+func DefaultDaemonConfig() *nokkuv1.DaemonConfig {
+	return &nokkuv1.DaemonConfig{
+		RecordSessions:       new(true),
+		AllowForwarding:      new(true),
+		AllowAgentForwarding: new(true),
+		GatewayPorts:         new(false),
+	}
+}
+
+// ResolveDaemonConfig fills the fields cfg leaves unset with the defaults, so
+// the daemon, the API and the UI never read an unset field differently.
+func ResolveDaemonConfig(cfg *nokkuv1.DaemonConfig) *nokkuv1.DaemonConfig {
+	resolved := DefaultDaemonConfig()
+	if cfg != nil {
+		proto.Merge(resolved, cfg)
+	}
+	return resolved
+}
+
 func (d *Daemon) ToProto() *nokkuv1.Daemon {
 	if d == nil {
 		return nil
@@ -225,7 +254,7 @@ func (d *Daemon) ToProto() *nokkuv1.Daemon {
 		WorkspaceId: &d.WorkspaceID,
 		Name:        &d.Name,
 		Status:      &d.Status,
-		Config:      d.Config,
+		Config:      ResolveDaemonConfig(d.Config),
 		Online:      new(SeenRecently(d.LastSeenAt)),
 		LastSeenAt:  SafeTimestamp(d.LastSeenAt),
 		Metadata:    metadata,
