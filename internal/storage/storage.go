@@ -68,12 +68,7 @@ func New(ctx context.Context, baseURL string) (*Storage, error) {
 		)
 	}
 
-	go func() {
-		<-ctx.Done()
-		if s.bucket != nil {
-			_ = s.bucket.Close()
-		}
-	}()
+	context.AfterFunc(ctx, func() { _ = s.bucket.Close() })
 	return &s, nil
 }
 
