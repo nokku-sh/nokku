@@ -211,6 +211,8 @@ export type UpdateServiceAccountRequest = Message<"nokku.v1.UpdateServiceAccount
   roleName: string;
 
   /**
+   * Tags are replaced as sent. Leaving them out clears them.
+   *
    * @generated from field: repeated string tags = 6;
    */
   tags: string[];

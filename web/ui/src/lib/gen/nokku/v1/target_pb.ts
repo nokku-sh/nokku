@@ -339,6 +339,8 @@ export type UpdateTargetRequest = Message<"nokku.v1.UpdateTargetRequest"> & {
   hostPublicKey: string;
 
   /**
+   * Endpoints and tags are replaced as sent. Leaving one out clears it.
+   *
    * @generated from field: repeated string endpoints = 7;
    */
   endpoints: string[];
