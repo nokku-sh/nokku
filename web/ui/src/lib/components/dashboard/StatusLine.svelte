@@ -99,6 +99,4 @@
 			{/each}
 		</div>
 	{/if}
-
-	<span class="h-4 w-2 bg-terminal-accent motion-safe:animate-blink" aria-hidden="true"></span>
 </section>
