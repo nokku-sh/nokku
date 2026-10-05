@@ -5,6 +5,9 @@ import { activeSessionID } from '#lib/store.svelte.js';
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error';
 
+// The backend closes with this when the shell ended on its own (exit, Ctrl+D).
+const SHELL_EXITED = 4000;
+
 let sessions = new SvelteMap<string, TerminalSession>();
 
 export function getSessions() {
@@ -15,11 +18,11 @@ export function addSession(session: TerminalSession) {
 	activeSessionID.current = session.id;
 }
 export function removeSession(id: string) {
-	if (activeSessionID.current === id) {
-		activeSessionID.current = '';
-	}
 	sessions.get(id)?.dispose();
 	sessions.delete(id);
+	if (activeSessionID.current === id) {
+		activeSessionID.current = [...sessions.keys()].at(-1) ?? '';
+	}
 }
 
 const ansiNames = [
@@ -90,6 +93,10 @@ export class TerminalSession {
 		};
 		ws.onmessage = (e) => this.#term.write(new Uint8Array(e.data));
 		ws.onclose = (e) => {
+			if (e.code === SHELL_EXITED) {
+				removeSession(id);
+				return;
+			}
 			this.state = e.code === 1000 ? 'disconnected' : 'error';
 			this.#term.write(`\r\n\x1b[2m${e.reason || 'connection lost'}\x1b[0m\r\n`);
 		};
