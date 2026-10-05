@@ -5,4 +5,7 @@ package cache
 
 import "errors"
 
-var errNotFound = errors.New("cache: not found")
+var (
+	errNotFound = errors.New("cache: not found")
+	errFull     = errors.New("cache: full")
+)

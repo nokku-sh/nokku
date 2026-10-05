@@ -137,7 +137,7 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 		return nil, err
 	}
 	s.Password = newPasswordManager(s, d.Password)
-	s.DPoP = &DPoPVerifier{secret: d.Secret, replay: d.Cache, now: s.now}
+	s.DPoP = &DPoPVerifier{secret: d.Secret, replay: cache.NewMemory(dpopReplayEntries), now: s.now}
 	s.Device = &DeviceFlow{svc: s}
 	s.OIDC = newOIDCFlow(s)
 	s.OAuth2 = newOAuth2Flow(s)

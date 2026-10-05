@@ -220,3 +220,12 @@ func TestAdvertiseDPoPNonce(t *testing.T) {
 		}
 	})
 }
+
+// Anonymous callers can fill the shared cache, so replay markers must not
+// live there.
+func TestDPoPReplayStoreIsNotShared(t *testing.T) {
+	env := newTestEnv(t)
+	if env.svc.DPoP.replay == env.svc.cache {
+		t.Fatal("DPoP replay markers share the cache anonymous callers write to")
+	}
+}
