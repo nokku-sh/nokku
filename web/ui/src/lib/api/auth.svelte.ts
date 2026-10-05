@@ -35,7 +35,9 @@ export const auth = {
 				client.loginWithBackupCode({ email: body.email, code: body.code }),
 			() => {
 				void goto('/');
-				toast.success('Welcome back 👋', { description: 'Make sure to change your password!' });
+				toast.success('Signed in with a backup code', {
+					description: 'Change your password if you lost it.'
+				});
 			}
 		),
 	logout: () =>
