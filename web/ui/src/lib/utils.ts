@@ -1,7 +1,6 @@
 export { cn } from 'cn';
 import {
 	durationFromMs,
-	durationMs,
 	timestampDate,
 	type Duration,
 	type Timestamp
@@ -33,10 +32,8 @@ export const DateValueFormat = (date: DateValue | null | undefined) => {
 	return date ? format.format(date.toDate(getLocalTimeZone())) : '';
 };
 type DateStyle =
-	| 'full'
 	| 'long'
 	| 'short'
-	| 'compact'
 	| 'relative'
 	| 'relative-short'
 	| 'withTime'
@@ -56,14 +53,6 @@ const precise = {
 } as const;
 
 const formatters = {
-	full: new Intl.DateTimeFormat(undefined, {
-		year: 'numeric',
-		month: 'long',
-		day: 'numeric',
-		hour: 'numeric',
-		minute: 'numeric',
-		second: 'numeric'
-	}),
 	long: new Intl.DateTimeFormat(undefined, {
 		year: 'numeric',
 		month: 'long',
@@ -72,11 +61,6 @@ const formatters = {
 	short: new Intl.DateTimeFormat(undefined, {
 		year: 'numeric',
 		month: 'short',
-		day: 'numeric'
-	}),
-	compact: new Intl.DateTimeFormat(undefined, {
-		year: '2-digit',
-		month: 'numeric',
 		day: 'numeric'
 	}),
 	withTime: new Intl.DateTimeFormat(undefined, {
@@ -135,58 +119,6 @@ function formatRelative(ts: Timestamp, short = false): string {
 }
 
 export const secToD = (sec: number): Duration => durationFromMs(sec * 1000);
-
-const dToMs = (d: Duration | null | undefined): number => (d ? durationMs(d) : 0);
-
-type DurationStyle = 'short' | 'long' | 'compact' | 'clock';
-
-const UNITS = [
-	{ s: 'y', l: 'year', ms: 365 * 24 * 60 * 60 * 1000 },
-	{ s: 'mo', l: 'month', ms: 30 * 24 * 60 * 60 * 1000 },
-	{ s: 'w', l: 'week', ms: 7 * 24 * 60 * 60 * 1000 },
-	{ s: 'd', l: 'day', ms: 24 * 60 * 60 * 1000 },
-	{ s: 'h', l: 'hour', ms: 60 * 60 * 1000 },
-	{ s: 'm', l: 'minute', ms: 60 * 1000 },
-	{ s: 's', l: 'second', ms: 1000 }
-] as const;
-
-export function formatD(
-	d: Duration | null | undefined,
-	style: DurationStyle = 'short',
-	maxUnits = 2
-): string {
-	const ms = dToMs(d);
-	if (ms === 0) return style === 'long' ? '0 seconds' : '0s';
-
-	const neg = ms < 0;
-	let remaining = Math.abs(ms);
-
-	if (style === 'clock') {
-		const h = Math.floor(remaining / 3600000);
-		const m = Math.floor((remaining % 3600000) / 60000);
-		const s = Math.floor((remaining % 60000) / 1000);
-		const result = h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
-		return neg ? `-${result}` : result;
-	}
-
-	const parts: string[] = [];
-	for (const u of UNITS) {
-		if (parts.length >= maxUnits) break;
-		const count = Math.floor(remaining / u.ms);
-		if (count > 0) {
-			remaining %= u.ms;
-			parts.push(style === 'long' ? `${count} ${u.l}${count !== 1 ? 's' : ''}` : `${count}${u.s}`);
-		}
-	}
-
-	if (parts.length === 0) return style === 'long' ? '0 seconds' : '0s';
-
-	const sep = style === 'compact' ? '' : style === 'long' ? ', ' : ' ';
-	const result = parts.join(sep);
-	return neg ? `-${result}` : result;
-}
-
-const pad = (n: number) => n.toString().padStart(2, '0');
 
 /** Excludes 0/UNSPECIFIED. */
 export function enumToArray<T extends object>(e: T): { name: string; value: number }[] {
