@@ -24,15 +24,15 @@ import (
 var EmailFS embed.FS
 
 //go:embed all:ui/build
-var StaticFS embed.FS
+var staticFS embed.FS
 
-// Where the UI sits inside StaticFS.
+// Where the UI sits inside staticFS.
 const uiRoot = "ui/build"
 
 // Handler serves the embedded SPA.
 func Handler() http.Handler {
 	pinMimeTypes()
-	files := statigz.FileServer(StaticFS, brotli.AddEncoding, statigz.FSPrefix(uiRoot))
+	files := statigz.FileServer(staticFS, brotli.AddEncoding, statigz.FSPrefix(uiRoot))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
 		if p != "/" && !exists(p) {
@@ -62,11 +62,11 @@ var inlineScript = regexp.MustCompile(`(?s)<script([^>]*)>(.*?)</script>`)
 // lets the policy do without 'unsafe-inline'.
 var InlineScriptHashes = sync.OnceValue(func() []string {
 	var hashes []string
-	_ = fs.WalkDir(StaticFS, uiRoot, func(p string, d fs.DirEntry, err error) error {
+	_ = fs.WalkDir(staticFS, uiRoot, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".html") {
 			return err
 		}
-		page, err := StaticFS.ReadFile(p)
+		page, err := staticFS.ReadFile(p)
 		if err != nil {
 			return err
 		}
@@ -94,7 +94,7 @@ func pinMimeTypes() {
 }
 
 func exists(p string) bool {
-	st, err := fs.Stat(StaticFS, path.Join(uiRoot, p))
+	st, err := fs.Stat(staticFS, path.Join(uiRoot, p))
 	return err == nil && !st.IsDir()
 }
 
