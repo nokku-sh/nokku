@@ -62,6 +62,10 @@ func (s *Session) Resize(width, height uint32) error {
 	return s.term.Resize(width, height)
 }
 
+// Exited reports whether the shell ended on its own. It is final once Stdout
+// is closed.
+func (s *Session) Exited() bool { return s.term.Exited() }
+
 // Close is idempotent.
 func (s *Session) Close() { s.close() }
 

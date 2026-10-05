@@ -259,8 +259,12 @@ func TestCreateSession(t *testing.T) {
 	require.NoError(t, stream.Send(&nokkuv1.ConnectRequest{
 		Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{}},
 	}))
-	// Signed here since require must not run on the daemon goroutine.
-	relayProof := dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceDaemonRelayProcedure, token)
+	// Signed here since require must not run on the daemon goroutine. A proof
+	// is single use, so every relay takes its own.
+	relayProofs := make(chan string, 3)
+	for range cap(relayProofs) {
+		relayProofs <- dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceDaemonRelayProcedure, token)
+	}
 	go func() {
 		for {
 			msg, err := stream.Receive()
@@ -277,7 +281,12 @@ func TestCreateSession(t *testing.T) {
 			}
 			relayCtx, info := connect.NewClientContext(t.Context())
 			info.RequestHeader().Set("Authorization", "DPoP "+token)
-			info.RequestHeader().Set("DPoP", relayProof)
+			select {
+			case proof := <-relayProofs:
+				info.RequestHeader().Set("DPoP", proof)
+			case <-t.Context().Done():
+				return
+			}
 			relay, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL).DaemonRelay(relayCtx)
 			if err != nil {
 				return
@@ -347,6 +356,19 @@ func TestCreateSession(t *testing.T) {
 	assert.Eventually(t, func() bool {
 		return len(cfg.Pool.ListSessions(enrolled.GetId())) == 0
 	}, 5*time.Second, 20*time.Millisecond, "session outlived its socket")
+
+	// Ctrl+D ends the shell, and the socket says so with its own close code.
+	_, ws = openShell()
+	require.NoError(t, ws.Write(t.Context(), websocket.MessageBinary, []byte{0x04}))
+	readCtx, stop := context.WithTimeout(t.Context(), 5*time.Second)
+	defer stop()
+	for err = nil; err == nil; {
+		_, _, err = ws.Read(readCtx)
+	}
+	assert.Equal(t, wsShellExited, websocket.CloseStatus(err), "shell exit, got %v", err)
+	assert.Eventually(t, func() bool {
+		return len(cfg.Pool.ListSessions(enrolled.GetId())) == 0
+	}, 5*time.Second, 20*time.Millisecond, "session outlived its shell")
 }
 
 // daemonAuth signs one call the way nokkud does.

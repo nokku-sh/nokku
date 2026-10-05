@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -37,6 +38,8 @@ type Config struct {
 type Terminal struct {
 	client *ssh.Client
 	ch     ssh.Channel
+	reqs   <-chan *ssh.Request
+	exited atomic.Bool
 
 	stdout chan []byte
 	halt   chan struct{}
@@ -48,6 +51,10 @@ type Terminal struct {
 
 // Stdout is closed when the terminal ends.
 func (t *Terminal) Stdout() <-chan []byte { return t.stdout }
+
+// Exited reports whether the remote shell ended on its own, e.g. exit or
+// Ctrl+D. It is final once Stdout is closed.
+func (t *Terminal) Exited() bool { return t.exited.Load() }
 
 func (t *Terminal) Write(p []byte) (int, error) { return t.ch.Write(p) }
 
@@ -129,7 +136,7 @@ func dial(conn net.Conn, cfg Config) (*Terminal, error) {
 		return nil, fmt.Errorf("%s: %w", stage, err)
 	}
 
-	ch, _, err := client.OpenChannel("session", nil)
+	ch, reqs, err := client.OpenChannel("session", nil)
 	if err != nil {
 		return fail("open session channel", err)
 	}
@@ -166,6 +173,7 @@ func dial(conn net.Conn, cfg Config) (*Terminal, error) {
 	t := &Terminal{
 		client: client,
 		ch:     ch,
+		reqs:   reqs,
 		stdout: make(chan []byte, 16),
 		halt:   make(chan struct{}),
 		done:   make(chan struct{}),
@@ -181,6 +189,7 @@ func (t *Terminal) pump() {
 	buf := make([]byte, chunkSize)
 	for {
 		n, err := t.ch.Read(buf)
+		t.drainRequests()
 		if n > 0 {
 			chunk := make([]byte, n)
 			copy(chunk, buf[:n])
@@ -191,6 +200,28 @@ func (t *Terminal) pump() {
 			}
 		}
 		if err != nil {
+			return
+		}
+	}
+}
+
+// drainRequests takes what the remote queued without blocking. The exit
+// status is sent before the channel closes, so it is queued by the time Read
+// reports the end.
+func (t *Terminal) drainRequests() {
+	for {
+		select {
+		case req, ok := <-t.reqs:
+			if !ok {
+				return
+			}
+			if req.Type == "exit-status" {
+				t.exited.Store(true)
+			}
+			if req.WantReply {
+				_ = req.Reply(false, nil)
+			}
+		default:
 			return
 		}
 	}
