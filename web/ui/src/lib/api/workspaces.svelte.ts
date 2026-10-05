@@ -69,7 +69,7 @@ export const workspace = {
 		useMutation(WorkspaceService.method.createWorkspace, {
 			onSuccess: (data) => {
 				if (data.workspace) workspaceID.current = data.workspace.id;
-				toast.success('Workspace created!');
+				toast.success('Workspace created');
 			}
 		}),
 	update: () => useMutation(WorkspaceService.method.updateWorkspace),
@@ -110,7 +110,7 @@ export const invite = {
 		useMutation(InvitationService.method.acceptInvitation, {
 			onSuccess: () => {
 				inviteToken.current = '';
-				return toast.success('Welcome!');
+				return toast.success('Welcome');
 			},
 			onError: () => {
 				inviteToken.current = '';
@@ -169,7 +169,7 @@ export const util = {
 				document.body.removeChild(link);
 				URL.revokeObjectURL(url);
 
-				toast.success('Audit logs exported successfully');
+				toast.success('Audit logs exported');
 			},
 			onError: (error) => {
 				toast.error(`Export failed: ${error.message}`);

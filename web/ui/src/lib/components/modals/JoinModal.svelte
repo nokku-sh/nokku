@@ -61,7 +61,7 @@
 				<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
 					<PartyPopper class="h-6 w-6 text-primary" />
 				</div>
-				<Dialog.Title>You're Invited!</Dialog.Title>
+				<Dialog.Title>You're invited</Dialog.Title>
 				<Dialog.Description>You've been invited to join a workspace</Dialog.Description>
 			</Dialog.Header>
 
@@ -95,7 +95,7 @@
 					{#if claimInvitation.isPending}
 						<Spinner data-icon="inline-start" />
 					{/if}
-					Join Workspace
+					Join workspace
 				</Button>
 			</div>
 		{/if}
