@@ -20,22 +20,12 @@ export function createModalState<T>(defaultValue: T = {} as T) {
 		get selected() {
 			return selected;
 		},
-		set selected(value: T) {
-			selected = value;
-		},
 		openWith(item: T) {
 			selected = item;
 			open = true;
 		},
-		openNew() {
-			selected = defaultValue;
-			open = true;
-		},
-		close(resetSelection = false) {
+		close() {
 			open = false;
-			if (resetSelection) {
-				selected = defaultValue;
-			}
 		}
 	};
 }
@@ -98,19 +88,9 @@ export function createEntityModalState<Desc extends DescMessage>(
 		get draft() {
 			return draft;
 		},
-		set draft(value: Entity) {
-			draft = value;
-		},
 		openNew() {
 			draft = clone(create(schema, newInit?.()));
 			open = true;
-		},
-		openEdit(entity: Entity) {
-			draft = clone(create(schema, entity));
-			open = true;
-		},
-		close() {
-			open = false;
 		}
 	};
 }

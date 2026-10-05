@@ -29,10 +29,6 @@ export function useAutoSave(save: () => Promise<unknown>, wait = 600) {
 			inFlight = true;
 			void run();
 		},
-		cancel: () => {
-			run.cancel();
-			inFlight = false;
-		},
 		get saveState(): SaveState {
 			if (inFlight) return 'saving';
 			if (failed) return 'error';
