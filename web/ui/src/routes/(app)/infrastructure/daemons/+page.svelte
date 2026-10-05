@@ -48,7 +48,9 @@
 		status: page.url.searchParams.get('status')
 			? Number(page.url.searchParams.get('status'))
 			: undefined,
-		online: page.url.searchParams.get('online') === 'true' || undefined
+		online: page.url.searchParams.has('online')
+			? page.url.searchParams.get('online') === 'true'
+			: undefined
 	}));
 
 	const deleteDaemon = daemon.delete();
