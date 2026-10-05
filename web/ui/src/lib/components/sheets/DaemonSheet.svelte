@@ -101,6 +101,7 @@
 	missing={query.isError}
 	title={entity?.name ?? ''}
 	saveState={pending ? undefined : autoSave.saveState}
+	saveHint
 	meta={{
 		id: entity?.id,
 		createdAt: entity?.createdAt,
@@ -123,9 +124,6 @@
 					: 'Never connected'}
 			{/if}
 		</span>
-		{#if entity?.metadata?.version}
-			<Badge variant="outline" class="font-mono">{entity.metadata.version}</Badge>
-		{/if}
 		{#if pending}
 			<Badge variant="warning">Waiting for approval</Badge>
 		{/if}
@@ -162,71 +160,72 @@
 				</Section>
 			{/if}
 
-			<Section
-				title="Session policy"
-				icon={ShieldCheck}
-				description="Pushed to the daemon on its next sync. Running sessions keep their current rules."
-			>
-				<Item.Group class="divide-y rounded-lg border">
-					{#each policy as rule (rule.key)}
-						<Item.Root size="sm" class="rounded-none">
-							<Item.Content>
-								<Item.Title>
-									<label for={`policy-${rule.key}`}>{rule.title}</label>
-								</Item.Title>
-								<Item.Description>{rule.description}</Item.Description>
-							</Item.Content>
-							<Item.Actions>
-								<Switch
-									id={`policy-${rule.key}`}
-									checked={cfg?.[rule.key] ?? false}
-									disabled={pending}
-									onCheckedChange={(v) => setRule(rule.key, v)}
-								/>
-							</Item.Actions>
-						</Item.Root>
-					{/each}
-				</Item.Group>
-			</Section>
-
-			<Section title="Targets" icon={Server} count={targets.data?.total}>
-				{#if targets.data?.targets.length}
-					<div class="flex flex-wrap gap-1.5">
-						{#each targets.data.targets as t (t.id)}
-							<Chip
-								label={t.name}
-								href={`/infrastructure/targets?id=${t.id}`}
-								title={t.description}
-							>
-								{#snippet leading()}
-									<Server class="ml-2 size-3 text-muted-foreground" />
-								{/snippet}
-							</Chip>
+			{#if !pending}
+				<Section
+					title="Session policy"
+					icon={ShieldCheck}
+					description="Pushed to the daemon on its next sync. Running sessions keep their current rules."
+				>
+					<Item.Group class="divide-y rounded-lg border">
+						{#each policy as rule (rule.key)}
+							<Item.Root size="sm" class="rounded-none">
+								<Item.Content>
+									<Item.Title>
+										<label for={`policy-${rule.key}`}>{rule.title}</label>
+									</Item.Title>
+									<Item.Description>{rule.description}</Item.Description>
+								</Item.Content>
+								<Item.Actions>
+									<Switch
+										id={`policy-${rule.key}`}
+										checked={cfg?.[rule.key] ?? false}
+										onCheckedChange={(v) => setRule(rule.key, v)}
+									/>
+								</Item.Actions>
+							</Item.Root>
 						{/each}
-						{#if targets.data.total > targets.data.targets.length}
-							<Chip label={`+${targets.data.total - targets.data.targets.length} more`} muted />
-						{/if}
-					</div>
-				{:else if !targets.isLoading}
-					<Empty.Root class="border border-dashed p-6">
-						<Empty.Header>
-							<Empty.Media variant="icon"><Server /></Empty.Media>
-							<Empty.Description>No targets behind this daemon yet.</Empty.Description>
-						</Empty.Header>
-					</Empty.Root>
-				{/if}
-			</Section>
+					</Item.Group>
+				</Section>
 
-			<DangerZone
-				actions={[
-					{
-						title: 'Delete daemon',
-						description: 'Its targets stay, but nobody reaches them through this daemon anymore.',
-						label: 'Delete',
-						onClick: () => askDelete()
-					}
-				]}
-			/>
+				<Section title="Targets" icon={Server} count={targets.data?.total}>
+					{#if targets.data?.targets.length}
+						<div class="flex flex-wrap gap-1.5">
+							{#each targets.data.targets as t (t.id)}
+								<Chip
+									label={t.name}
+									href={`/infrastructure/targets?id=${t.id}`}
+									title={t.description}
+								>
+									{#snippet leading()}
+										<Server class="ml-2 size-3 text-muted-foreground" />
+									{/snippet}
+								</Chip>
+							{/each}
+							{#if targets.data.total > targets.data.targets.length}
+								<Chip label={`+${targets.data.total - targets.data.targets.length} more`} muted />
+							{/if}
+						</div>
+					{:else if !targets.isLoading}
+						<Empty.Root class="border border-dashed p-6">
+							<Empty.Header>
+								<Empty.Media variant="icon"><Server /></Empty.Media>
+								<Empty.Description>No targets behind this daemon yet.</Empty.Description>
+							</Empty.Header>
+						</Empty.Root>
+					{/if}
+				</Section>
+
+				<DangerZone
+					actions={[
+						{
+							title: 'Delete daemon',
+							description: 'Its targets stay, but nobody reaches them through this daemon anymore.',
+							label: 'Delete',
+							onClick: () => askDelete()
+						}
+					]}
+				/>
+			{/if}
 		</div>
 	{/if}
 </EntitySheet>
