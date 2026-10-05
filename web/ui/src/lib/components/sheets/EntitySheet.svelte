@@ -81,6 +81,7 @@
 	const loading = $derived(loadingProp && !missing);
 	const mobile = new IsMobile();
 	const activeTab = $derived(tabs?.some((t) => t.value === tab) ? tab : tabs?.[0]?.value);
+	const tabbed = $derived(!!tabs?.length && !missing);
 </script>
 
 <Sheet.Root {open} onOpenChange={(value) => !value && onClose()}>
@@ -88,7 +89,8 @@
 		side={mobile.current ? 'bottom' : 'right'}
 		class="w-full gap-0 p-0 data-[side=bottom]:max-h-[92dvh] data-[side=bottom]:rounded-t-2xl data-[side=right]:sm:max-w-xl"
 	>
-		<Sheet.Header class="gap-3 border-b px-5 pt-5 pb-4">
+		<!-- With tabs the rule sits under the tab row, so the header drops its own. -->
+		<Sheet.Header class={['gap-3 px-5 pt-5', tabbed ? 'pb-2' : 'border-b pb-4']}>
 			<div class="flex items-start gap-3 pr-20">
 				{#if media}
 					<div class="shrink-0">{@render media()}</div>
@@ -183,9 +185,15 @@
 			</div>
 		{:else if tabs?.length}
 			<Tabs.Root value={activeTab} onValueChange={onTabChange} class="min-h-0 flex-1 gap-0">
-				<Tabs.List variant="line" class="w-full justify-start border-b px-3">
+				<Tabs.List
+					variant="line"
+					class="w-full justify-start gap-5 border-b px-5 py-0 group-data-horizontal/tabs:h-[45px]"
+				>
 					{#each tabs as t (t.value)}
-						<Tabs.Trigger value={t.value} class="flex-none">
+						<Tabs.Trigger
+							value={t.value}
+							class="-mx-1.5 h-8 flex-none border-0 px-1.5 after:bg-primary group-data-horizontal/tabs:after:inset-x-1.5 group-data-horizontal/tabs:after:bottom-[-7px]"
+						>
 							{#if t.icon}
 								<t.icon />
 							{/if}
