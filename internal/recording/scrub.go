@@ -83,17 +83,28 @@ func (s *Service) scrub(ctx context.Context, rec *db.Recording) error {
 		return fmt.Errorf("finish gzip scrubbed cast: %w", err)
 	}
 
-	w, err := s.NewWriter(ctx, rec)
+	wctx, abort := context.WithCancel(ctx)
+	defer abort()
+	w, err := s.NewWriter(wctx, rec)
 	if err != nil {
 		return err
 	}
 	for chunk := range slices.Chunk(gz.Bytes(), scrubChunk) {
-		if err := w.WriteChunk(chunk); err != nil {
-			_ = w.Close()
-			return fmt.Errorf("write scrubbed recording object: %w", err)
+		if err = w.WriteChunk(chunk); err != nil {
+			break
 		}
 	}
-	if err = w.Close(); err != nil {
+	if err == nil {
+		err = w.writeFrame(frameEnd, nil)
+	}
+	if err != nil {
+		// The blob writer commits on Close unless its ctx is canceled, and
+		// a partial object would replace the original.
+		abort()
+		_ = w.w.Close()
+		return fmt.Errorf("write scrubbed recording object: %w", err)
+	}
+	if err = w.w.Close(); err != nil {
 		return fmt.Errorf("commit scrubbed recording object: %w", err)
 	}
 
