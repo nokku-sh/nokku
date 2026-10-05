@@ -8,7 +8,7 @@ bit more tooling than the CLI repos.
 
 - Go 1.x (see `go.mod`)
 - [Task](https://taskfile.dev)
-- PostgreSQL (16+) — `docker compose up -d` brings up a dev instance
+- PostgreSQL (16+) — `docker compose -f compose.test.yml up -d` brings up a dev instance
 - Node.js + `pnpm` (frontends)
 - [`buf`](https://buf.build) and [`sqlc`](https://sqlc.dev) (codegen)
 - [`golangci-lint`](https://golangci-lint.run), [`govulncheck`](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck), `golines`
@@ -30,7 +30,7 @@ task dev
 ```
 
 This runs the backend (`go run ./cmd/nokku`) and the `web/ui` frontend via
-Vite on port 3000.
+Vite on port 5173.
 
 ## Regenerating generated code
 
