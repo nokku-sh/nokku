@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { principal } from '#lib/api/principals.svelte.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import TagsCell from './TagsCell.svelte';
 
 	let { targetId }: { targetId: string } = $props();
@@ -10,7 +11,7 @@
 </script>
 
 {#if pData.isLoading}
-	<span class="text-sm text-muted-foreground">Loading...</span>
+	<Skeleton class="h-5 w-16" />
 {:else if tags.length > 0}
 	<TagsCell {tags} />
 {:else}

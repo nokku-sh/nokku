@@ -3,6 +3,7 @@
 	import * as HoverCard from '#lib/components/ui/hover-card/index.js';
 	import { team } from '#lib/api/team.svelte.js';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { Users } from '@lucide/svelte';
 
 	type Props = {
@@ -33,7 +34,7 @@
 		<HoverCard.Content class="max-h-96 w-80 overflow-y-auto p-3">
 			<div class="space-y-2">
 				{#if membersQuery.isPending}
-					<p class="p-3 text-center text-xs text-muted-foreground">Loading members…</p>
+					<div class="flex justify-center p-3"><Spinner /></div>
 				{:else}
 					{#each membersQuery.data ?? [] as user (user.id)}
 						<div
