@@ -27,16 +27,20 @@ const (
 	dpopNonceTTL = 5 * time.Minute
 	dpopMaxSkew  = time.Minute
 	// A marker lives 11 minutes, so this is room for about 150 proofs a second.
-	dpopReplayEntries = 100_000
+	dpopReplayEntries     = 100_000
+	dpopAnonReplayEntries = 10_000
 )
 
 // DPoPVerifier nonces are a stateless HMAC over a time bucket, so instances
 // share no storage for them. The cache catches jti reuse. It is the
 // verifier's own, so nothing else can fill it and get a marker refused.
+// Proofs without an access token come from anyone, so their markers go to
+// anonReplay and a flood of them only blocks enrollment and device login.
 type DPoPVerifier struct {
-	secret []byte
-	replay *cache.Memory
-	now    func() time.Time
+	secret     []byte
+	replay     *cache.Memory
+	anonReplay *cache.Memory
+	now        func() time.Time
 }
 
 func (v *DPoPVerifier) CurrentNonce() string {
@@ -112,7 +116,9 @@ func (v *DPoPVerifier) Verify(
 		return "", ErrDPoPNonce
 	}
 	// Enrollment proofs have no access token yet.
+	replay := v.anonReplay
 	if accessToken != "" {
+		replay = v.replay
 		wantATH := DPoPATH(accessToken)
 		if subtle.ConstantTimeCompare([]byte(c.ATH), []byte(wantATH)) != 1 {
 			return "", fmt.Errorf("%w: ath mismatch", errInvalidProof)
@@ -122,7 +128,7 @@ func (v *DPoPVerifier) Verify(
 	// Remember the jti as long as its proof could still be accepted.
 	// Hashed so a long jti cannot bloat the store.
 	jti := sha256.Sum256([]byte(c.JTI))
-	added, err := v.replay.SetNX(ctx, string(jti[:]), nil, 2*dpopNonceTTL+dpopMaxSkew)
+	added, err := replay.SetNX(ctx, string(jti[:]), nil, 2*dpopNonceTTL+dpopMaxSkew)
 	if err != nil {
 		return "", fmt.Errorf("%w: replay store: %w", errInvalidProof, err)
 	}

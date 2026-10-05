@@ -56,7 +56,12 @@ func TestRequestCredential(t *testing.T) {
 // newTestVerifier builds a DPoP verifier with a fixed secret and clock.
 func newTestVerifier(t *testing.T, now func() time.Time) *DPoPVerifier {
 	t.Helper()
-	return &DPoPVerifier{secret: []byte("test-secret"), replay: cache.NewMemory(100), now: now}
+	return &DPoPVerifier{
+		secret:     []byte("test-secret"),
+		replay:     cache.NewMemory(100),
+		anonReplay: cache.NewMemory(2),
+		now:        now,
+	}
 }
 
 // signProof produces a client-style DPoP proof with an ES256 key.
@@ -227,5 +232,38 @@ func TestDPoPReplayStoreIsNotShared(t *testing.T) {
 	env := newTestEnv(t)
 	if env.svc.DPoP.replay == env.svc.cache {
 		t.Fatal("DPoP replay markers share the cache anonymous callers write to")
+	}
+}
+
+// Anyone can send a proof without an access token, so a flood of them must
+// not get the proofs of signed-in callers refused.
+func TestDPoPAnonymousProofsCannotFillTheSessionStore(t *testing.T) {
+	const htu = "https://nokku.example.com/x"
+	now := time.Unix(1_800_000_000, 0)
+	v := newTestVerifier(t, func() time.Time { return now })
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	verify := func(token string) error {
+		ath := ""
+		if token != "" {
+			ath = DPoPATH(token)
+		}
+		proof := signProof(t, key, htu, ath, v.CurrentNonce(), now)
+		_, err := v.Verify(t.Context(), proof, token, http.MethodPost, htu)
+		return err
+	}
+
+	for range 2 {
+		if err := verify(""); err != nil {
+			t.Fatalf("anonymous proof: %v", err)
+		}
+	}
+	if err := verify(""); err == nil {
+		t.Fatal("anonymous proof accepted with a full anonymous store")
+	}
+	if err := verify("session-token"); err != nil {
+		t.Fatalf("session proof refused after an anonymous flood: %v", err)
 	}
 }
