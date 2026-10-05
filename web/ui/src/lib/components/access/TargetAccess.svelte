@@ -199,7 +199,8 @@
 				aria-label="New login account"
 			/>
 			<InputGroup.Addon align="inline-end">
-				<InputGroup.Button type="submit" variant="secondary" size="xs" disabled={!canAdd}>
+				<!-- Never disabled, InputGroup greys out the whole field for a disabled child. -->
+				<InputGroup.Button type="submit" variant="secondary" size="xs">
 					<Plus data-icon="inline-start" />
 					Add
 				</InputGroup.Button>
