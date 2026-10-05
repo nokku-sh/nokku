@@ -43,7 +43,7 @@
 
 							<div class="flex-1 space-y-1 overflow-hidden">
 								<div class="flex items-center gap-2">
-									<p class="truncate text-sm leading-none font-medium">{user.name}</p>
+									<p class="truncate text-sm font-medium">{user.name}</p>
 									{#if user.emailVerified}
 										<Badge variant="secondary" class="text-2xs leading-none">verified</Badge>
 									{/if}
