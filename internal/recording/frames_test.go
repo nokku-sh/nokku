@@ -87,6 +87,12 @@ func TestFramesAreBoundToTheirRecording(t *testing.T) {
 		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 	})
 
+	t.Run("cut right after a frame header", func(t *testing.T) {
+		storeFrames(t, s, rec, [][]byte{frames[0], frames[1], frames[2][:5]})
+		_, err := readAll(t, s, rec)
+		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+	})
+
 	t.Run("a frame removed from the middle", func(t *testing.T) {
 		storeFrames(t, s, rec, append([][]byte{frames[0]}, frames[2:]...))
 		_, err := readAll(t, s, rec)
