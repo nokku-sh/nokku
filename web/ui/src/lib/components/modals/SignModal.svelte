@@ -37,13 +37,6 @@
 
 	let isPending = $derived(signUser.isPending || signX509.isPending);
 
-	$effect(() => {
-		if (ca?.id) {
-			sshPayload.caId = ca.id;
-			x509Payload.caId = ca.id;
-		}
-	});
-
 	function resetModal() {
 		sshPayload = create(SignSSHCertificateRequestSchema);
 		x509Payload = create(SignX509CertificateRequestSchema);
