@@ -18,7 +18,7 @@
 	} from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
-	import { Clock, Cpu, Server, ShieldCheck } from '@lucide/svelte';
+	import { Ban, Clock, Cpu, Server, ShieldCheck } from '@lucide/svelte';
 	import DangerZone from './DangerZone.svelte';
 	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';
@@ -35,6 +35,8 @@
 	const update = daemonApi.update();
 	const remove = daemonApi.delete();
 
+	// Only an accepted daemon connects. Every other state gets the approve card.
+	const accepted = $derived(entity?.status === DaemonStatus.ACCEPTED);
 	const pending = $derived(entity?.status === DaemonStatus.PENDING);
 
 	const autoSave = useAutoSave(() =>
@@ -100,7 +102,7 @@
 	loading={!entity}
 	missing={query.isError}
 	title={entity?.name ?? ''}
-	saveState={pending ? undefined : autoSave.saveState}
+	saveState={accepted ? autoSave.saveState : undefined}
 	saveHint
 	meta={{
 		id: entity?.id,
@@ -126,22 +128,32 @@
 		</span>
 		{#if pending}
 			<Badge variant="warning">Waiting for approval</Badge>
+		{:else if entity && !accepted}
+			<Badge variant="destructive">
+				{entity.status === DaemonStatus.REJECTED ? 'Rejected' : 'Not accepted'}
+			</Badge>
 		{/if}
 	{/snippet}
 
 	{#if entity && draft.current}
 		<div class="flex flex-col divide-y">
-			{#if pending}
+			{#if !accepted}
 				<div class="pb-5">
-					<Alert.Root variant="warning">
-						<Clock />
-						<Alert.Title>This daemon wants to join</Alert.Title>
+					<Alert.Root variant={pending ? 'warning' : 'destructive'}>
+						{#if pending}<Clock />{:else}<Ban />{/if}
+						<Alert.Title>
+							{pending ? 'This daemon wants to join' : 'This daemon is not accepted'}
+						</Alert.Title>
 						<Alert.Description>
-							Approve it only if you started it. It can serve targets once approved.
+							{pending
+								? 'Approve it only if you started it. It can serve targets once approved.'
+								: 'It cannot connect or serve targets until you approve it.'}
 						</Alert.Description>
 						<div class="col-start-2 mt-2 flex gap-2">
 							<Button size="sm" onclick={approve} disabled={update.isPending}>Approve</Button>
-							<Button size="sm" variant="outline" onclick={() => askDelete(true)}>Reject</Button>
+							<Button size="sm" variant="outline" onclick={() => askDelete(pending)}>
+								{pending ? 'Reject' : 'Delete'}
+							</Button>
 						</div>
 					</Alert.Root>
 				</div>
@@ -160,7 +172,7 @@
 				</Section>
 			{/if}
 
-			{#if !pending}
+			{#if accepted}
 				<Section
 					title="Session policy"
 					icon={ShieldCheck}

@@ -6,7 +6,7 @@
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
 	import { DaemonStatus, type Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
-	import { Check, CircleCheck, Clock, X } from '@lucide/svelte';
+	import { Ban, Check, CircleCheck, Clock, X } from '@lucide/svelte';
 
 	let { daemon }: { daemon: Daemon } = $props();
 
@@ -23,9 +23,20 @@
 	}
 </script>
 
-{#if daemon.status === DaemonStatus.PENDING}
+<!-- Anything but accepted keeps the daemon out, so every such state offers Approve. -->
+{#if daemon.status === DaemonStatus.ACCEPTED}
+	<Badge variant="success"><CircleCheck data-icon="inline-start" />Accepted</Badge>
+{:else}
+	{@const pending = daemon.status === DaemonStatus.PENDING}
 	<div class="flex items-center gap-1">
-		<Badge variant="warning"><Clock data-icon="inline-start" />Pending</Badge>
+		{#if pending}
+			<Badge variant="warning"><Clock data-icon="inline-start" />Pending</Badge>
+		{:else}
+			<Badge variant="destructive">
+				<Ban data-icon="inline-start" />
+				{daemon.status === DaemonStatus.REJECTED ? 'Rejected' : 'Not accepted'}
+			</Badge>
+		{/if}
 		<Button
 			size="xs"
 			disabled={update.isPending}
@@ -38,23 +49,23 @@
 			{/if}
 			Approve
 		</Button>
-		<Tooltip.Root>
-			<Tooltip.Trigger>
-				{#snippet child({ props })}
-					<Button
-						{...props}
-						size="icon-xs"
-						variant="ghost"
-						aria-label={`Reject ${daemon.name}`}
-						onclick={reject}
-					>
-						<X />
-					</Button>
-				{/snippet}
-			</Tooltip.Trigger>
-			<Tooltip.Content>Reject</Tooltip.Content>
-		</Tooltip.Root>
+		{#if pending}
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							size="icon-xs"
+							variant="ghost"
+							aria-label={`Reject ${daemon.name}`}
+							onclick={reject}
+						>
+							<X />
+						</Button>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content>Reject</Tooltip.Content>
+			</Tooltip.Root>
+		{/if}
 	</div>
-{:else}
-	<Badge variant="success"><CircleCheck data-icon="inline-start" />Accepted</Badge>
 {/if}

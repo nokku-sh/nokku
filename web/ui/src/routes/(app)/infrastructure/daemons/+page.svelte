@@ -125,7 +125,7 @@
 				destructive: false
 			}),
 			onClick: async (selected) => {
-				const pending = selected.filter((d) => d.status === DaemonStatus.PENDING);
+				const pending = selected.filter((d) => d.status !== DaemonStatus.ACCEPTED);
 				if (!pending.length) return;
 				await approveDaemons.mutateAsync(
 					pending.map(({ id }) => ({ id, status: DaemonStatus.ACCEPTED }))
