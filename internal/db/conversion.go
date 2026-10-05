@@ -169,10 +169,6 @@ func (t *Target) ToProto() *nokkuv1.Target {
 	}
 }
 
-func TargetsToProto(rows []*ListTargetsRow) []*nokkuv1.Target {
-	return mapSlice(rows, func(r *ListTargetsRow) *nokkuv1.Target { return r.Target.ToProto() })
-}
-
 func (p *Principal) ToProto() *nokkuv1.Principal {
 	if p == nil {
 		return nil
