@@ -26,7 +26,8 @@
 		const shown = items.filter((i) => i.value);
 		let column = 0;
 		return shown.map((item, i) => {
-			const nextWide = shown[i + 1]?.wide ?? true;
+			const next = shown[i + 1];
+			const nextWide = !next || !!next.wide;
 			const wide = item.wide || (column === 0 && nextWide);
 			column = wide ? 0 : (column + 1) % 2;
 			return { ...item, wide };
@@ -46,7 +47,7 @@
 				<dt class="text-2xs font-medium tracking-wide text-muted-foreground uppercase">
 					{item.label}
 				</dt>
-				<dd class={cn('flex min-w-0', item.mono && 'font-mono text-xs leading-5')}>
+				<dd class={cn('flex min-h-5 min-w-0 items-center', item.mono && 'font-mono text-xs')}>
 					{#if item.copy && item.value}
 						<CopyText value={item.value} mono={item.mono} />
 					{:else if item.href}

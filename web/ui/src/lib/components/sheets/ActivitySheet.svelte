@@ -69,7 +69,7 @@
 				<DetailList
 					items={[
 						{ label: 'Action', value: log.action, mono: true },
-						{ label: 'Target', value: log.target, mono: true, copy: true },
+						{ label: 'Target', value: log.target, mono: true, copy: true, wide: true },
 						...details
 					]}
 				/>
@@ -78,7 +78,7 @@
 				<DetailList
 					items={[
 						{ label: 'IP address', value: log.ip || 'unknown', mono: true, copy: !!log.ip },
-						{ label: 'Event ID', value: log.id, mono: true, copy: true },
+						{ label: 'Event ID', value: log.id, mono: true, copy: true, wide: true },
 						{ label: 'User agent', value: log.userAgent, mono: true, wide: true }
 					]}
 				/>
