@@ -6,6 +6,7 @@ import (
 	"time"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/nokku-sh/nokku/internal/util"
 )
@@ -275,14 +276,14 @@ func (r *CertificateAuthority) ToProto() *nokkuv1.CertificateAuthority {
 		KeyBits:              &r.KeyBits,
 		CreatedAt:            SafeTimestamp(&r.CreatedAt),
 		UpdatedAt:            SafeTimestamp(&r.UpdatedAt),
-		UserDefaultTtl:       SafeDuration(&r.UserDefaultTtl),
-		UserMaxTtl:           SafeDuration(&r.UserMaxTtl),
+		UserDefaultTtl:       durationpb.New(r.UserDefaultTtl),
+		UserMaxTtl:           durationpb.New(r.UserMaxTtl),
 		UserExtensions:       extensions,
 		UserCriticalOptions:  criticalOptions,
 		AllowedKeyTypes:      r.AllowedKeyTypes,
-		Lifetime:             SafeDuration(&r.Lifetime),
-		HostDefaultTtl:       SafeDuration(&r.HostDefaultTtl),
-		HostMaxTtl:           SafeDuration(&r.HostMaxTtl),
+		Lifetime:             durationpb.New(r.Lifetime),
+		HostDefaultTtl:       durationpb.New(r.HostDefaultTtl),
+		HostMaxTtl:           durationpb.New(r.HostMaxTtl),
 		PreviousPublicKey:    r.PreviousPublicKey,
 		PreviousTrustedUntil: SafeTimestamp(r.PreviousTrustedUntil),
 	}
@@ -308,8 +309,8 @@ func (r *GetCAsByIDsRow) ToProto() *nokkuv1.CertificateAuthority {
 		IsDefault:      &r.IsDefault,
 		AuthorityType:  &r.AuthorityType,
 		Certificate:    &r.Certificate,
-		UserDefaultTtl: SafeDuration(&r.UserDefaultTtl),
-		UserMaxTtl:     SafeDuration(&r.UserMaxTtl),
+		UserDefaultTtl: durationpb.New(r.UserDefaultTtl),
+		UserMaxTtl:     durationpb.New(r.UserMaxTtl),
 	}
 }
 

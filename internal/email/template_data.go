@@ -1,6 +1,6 @@
 package email
 
-type WelcomeTemplateData struct {
+type welcomeTemplateData struct {
 	Operator Operator
 
 	UserName        string
@@ -8,21 +8,21 @@ type WelcomeTemplateData struct {
 	Expiration      string
 }
 
-type VerificationTemplateData struct {
+type verificationTemplateData struct {
 	Operator Operator
 
 	VerificationURL string
 	Expiration      string
 }
 
-type RecoveryTemplateData struct {
+type recoveryTemplateData struct {
 	Operator Operator
 
 	RecoveryURL string
 	Expiration  string
 }
 
-type ChangeNoticeTemplateData struct {
+type changeNoticeTemplateData struct {
 	Operator Operator
 
 	NewEmail   string
@@ -30,7 +30,7 @@ type ChangeNoticeTemplateData struct {
 	Expiration string
 }
 
-type NewLoginTemplateData struct {
+type newLoginTemplateData struct {
 	Operator Operator
 
 	ProfileURL string

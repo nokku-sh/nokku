@@ -15,7 +15,7 @@ func TestRenderTemplates(t *testing.T) {
 	}{
 		{
 			name: "welcome",
-			data: WelcomeTemplateData{
+			data: welcomeTemplateData{
 				UserName:        "Ada",
 				VerificationURL: "https://app.nokku.sh/verify/token",
 				Expiration:      "15 minutes",
@@ -29,7 +29,7 @@ func TestRenderTemplates(t *testing.T) {
 		},
 		{
 			name: "verification",
-			data: VerificationTemplateData{
+			data: verificationTemplateData{
 				VerificationURL: "https://app.nokku.sh/verify/token",
 				Expiration:      "15 minutes",
 			},
@@ -41,7 +41,7 @@ func TestRenderTemplates(t *testing.T) {
 		},
 		{
 			name: "recovery",
-			data: RecoveryTemplateData{
+			data: recoveryTemplateData{
 				RecoveryURL: "https://app.nokku.sh/reset/token",
 				Expiration:  "15 minutes",
 			},
@@ -54,7 +54,7 @@ func TestRenderTemplates(t *testing.T) {
 
 		{
 			name: "new-login",
-			data: NewLoginTemplateData{
+			data: newLoginTemplateData{
 				ProfileURL: "https://app.nokku.sh/profile/security",
 				DeviceID:   "device-id",
 				DeviceName: "Web browser",
@@ -70,7 +70,7 @@ func TestRenderTemplates(t *testing.T) {
 		},
 		{
 			name: "email-change",
-			data: ChangeNoticeTemplateData{
+			data: changeNoticeTemplateData{
 				NewEmail:   "j***@example.com",
 				CancelURL:  "https://app.nokku.sh/email-change?cancel=1&token=t",
 				Expiration: "7 days",
@@ -109,7 +109,7 @@ func TestRenderOperatorFooter(t *testing.T) {
 		t.Parallel()
 		body, err := render(
 			"verification",
-			VerificationTemplateData{VerificationURL: "https://x", Expiration: "15 minutes"},
+			verificationTemplateData{VerificationURL: "https://x", Expiration: "15 minutes"},
 		)
 		if err != nil {
 			t.Fatalf("render: %v", err)
@@ -134,7 +134,7 @@ func TestRenderOperatorFooter(t *testing.T) {
 			SupportEmail: "help@acme.test",
 			ImprintURL:   "https://acme.test/imprint",
 		}
-		body, err := render("verification", VerificationTemplateData{Operator: op, VerificationURL: "https://x"})
+		body, err := render("verification", verificationTemplateData{Operator: op, VerificationURL: "https://x"})
 		if err != nil {
 			t.Fatalf("render: %v", err)
 		}

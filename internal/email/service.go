@@ -88,7 +88,7 @@ func (s *Service) SendWelcomeEmail(
 		to:       email,
 		subject:  "Welcome to Nokku",
 		template: "welcome",
-		data: WelcomeTemplateData{
+		data: welcomeTemplateData{
 			Operator:        s.Operator,
 			UserName:        username,
 			VerificationURL: verifyURL,
@@ -106,7 +106,7 @@ func (s *Service) SendVerificationEmail(
 		to:       email,
 		subject:  "Verify your email address",
 		template: "verification",
-		data: VerificationTemplateData{
+		data: verificationTemplateData{
 			Operator:        s.Operator,
 			VerificationURL: verifyURL,
 			Expiration:      expiry,
@@ -123,7 +123,7 @@ func (s *Service) SendRecoveryEmail(
 		to:       email,
 		subject:  "Reset your password",
 		template: "recovery",
-		data: RecoveryTemplateData{
+		data: recoveryTemplateData{
 			Operator:    s.Operator,
 			RecoveryURL: recoveryURL,
 			Expiration:  expiry,
@@ -143,7 +143,7 @@ func (s *Service) SendEmailChangeNotice(
 		to:       email,
 		subject:  "Your email address is being changed",
 		template: "email-change",
-		data: ChangeNoticeTemplateData{
+		data: changeNoticeTemplateData{
 			Operator:   s.Operator,
 			NewEmail:   local[:min(1, len(local))] + "***@" + domain,
 			CancelURL:  cancelURL,
@@ -161,7 +161,7 @@ func (s *Service) SendNewLoginEmail(
 		to:       email,
 		subject:  "New sign-in to your account",
 		template: "new-login",
-		data: NewLoginTemplateData{
+		data: newLoginTemplateData{
 			Operator:   s.Operator,
 			ProfileURL: s.appURL + "/profile/security",
 			DeviceID:   deviceID,

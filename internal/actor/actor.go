@@ -63,16 +63,14 @@ func SubjectFromContext(ctx context.Context) string {
 	return ""
 }
 
-type TenantID = string
-
 type tenantKey struct{}
 
-func AnnotateTenant(ctx context.Context, t TenantID) context.Context {
+func AnnotateTenant(ctx context.Context, t string) context.Context {
 	return context.WithValue(ctx, tenantKey{}, t)
 }
 
-func tenantFromContext(ctx context.Context) (TenantID, bool) {
-	t, ok := ctx.Value(tenantKey{}).(TenantID)
+func tenantFromContext(ctx context.Context) (string, bool) {
+	t, ok := ctx.Value(tenantKey{}).(string)
 	return t, ok
 }
 

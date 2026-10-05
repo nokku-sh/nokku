@@ -23,7 +23,7 @@ func TestMissingAssetIsNotFound(t *testing.T) {
 
 func TestAssetIsServedAsItself(t *testing.T) {
 	var chunk string
-	err := fs.WalkDir(StaticFS, uiRoot, func(p string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(staticFS, uiRoot, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -46,7 +46,7 @@ func TestAssetIsServedAsItself(t *testing.T) {
 // The policy has no 'unsafe-inline', so a page whose inline script is not in
 // the list would not start.
 func TestInlineScriptHashesCoverThePages(t *testing.T) {
-	index, err := StaticFS.ReadFile(uiRoot + "/index.html")
+	index, err := staticFS.ReadFile(uiRoot + "/index.html")
 	if err != nil {
 		t.Skip("frontend not built, run task build:ui")
 	}

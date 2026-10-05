@@ -51,7 +51,7 @@ func (s *Service) ListTenantDomains(
 	return out, nil
 }
 
-func (s *Service) GetTenantDomain(
+func (s *Service) getTenantDomain(
 	ctx context.Context,
 	workspaceID, domain string,
 ) (TenantDomain, error) {
@@ -108,7 +108,7 @@ func (s *Service) VerifyTenantDomain(
 	ctx context.Context,
 	workspaceID, domain string,
 ) (TenantDomain, error) {
-	d, err := s.GetTenantDomain(ctx, workspaceID, domain)
+	d, err := s.getTenantDomain(ctx, workspaceID, domain)
 	if err != nil {
 		return TenantDomain{}, err
 	}
@@ -132,7 +132,7 @@ func (s *Service) VerifyTenantDomain(
 		}); err != nil {
 			return TenantDomain{}, err
 		}
-		return s.GetTenantDomain(ctx, workspaceID, domain)
+		return s.getTenantDomain(ctx, workspaceID, domain)
 	}
 	return d, nil
 }
