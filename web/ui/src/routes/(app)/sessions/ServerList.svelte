@@ -48,7 +48,7 @@
 
 	<div class="flex-1 overflow-y-auto">
 		{#if access.isPending}
-			<div class="space-y-1 p-2">
+			<div class="flex flex-col gap-1 p-2">
 				{#each { length: 5 }, i (i)}
 					<div class="flex items-center gap-2 rounded-md p-2">
 						<Skeleton class="size-2 rounded-full" />
@@ -64,7 +64,7 @@
 				</Empty.Header>
 			</Empty.Root>
 		{:else}
-			<div class="space-y-0.5 p-1.5">
+			<div class="flex flex-col gap-0.5 p-1.5">
 				{#each filtered as target (target.id)}
 					{@const isOnline = agents?.some((a) => a.id === target.daemonId && a.online)}
 

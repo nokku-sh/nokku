@@ -76,7 +76,7 @@
 		</Card.Description>
 	</Card.Header>
 
-	<Card.Content class="space-y-8">
+	<Card.Content class="flex flex-col gap-8">
 		{#if replacesSAML}
 			<Alert.Root>
 				<TriangleAlert class="size-4" />
@@ -183,7 +183,7 @@
 		<Separator />
 
 		<Field.Set>
-			<div class="space-y-1">
+			<div>
 				<Field.Legend>Security & Access Options</Field.Legend>
 				<Field.Description>Configure how users authenticate and are provisioned</Field.Description>
 			</div>
@@ -192,7 +192,7 @@
 				<div
 					class="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50"
 				>
-					<div class="flex flex-col space-y-1">
+					<div class="flex flex-col gap-1">
 						<Label class="text-base font-medium">Enable Provider</Label>
 						<p class="text-sm text-muted-foreground">
 							Activate this OIDC provider for user authentication
@@ -204,7 +204,7 @@
 				<div
 					class="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50"
 				>
-					<div class="flex flex-col space-y-1">
+					<div class="flex flex-col gap-1">
 						<Label class="text-base font-medium">Enforce SSO</Label>
 						<p class="text-sm text-muted-foreground">
 							Require all users to authenticate through this identity provider. Disables local
@@ -217,7 +217,7 @@
 				<div
 					class="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50"
 				>
-					<div class="flex flex-col space-y-1">
+					<div class="flex flex-col gap-1">
 						<Label class="text-base font-medium">Just-In-Time Provisioning</Label>
 						<p class="text-sm text-muted-foreground">
 							Automatically create new user accounts when someone logs in for the first time
@@ -231,7 +231,7 @@
 		<Separator />
 
 		<Field.Set>
-			<div class="space-y-1">
+			<div>
 				<Field.Legend>Service Provider Information</Field.Legend>
 				<Field.Description>
 					Use these values when configuring this application in your identity provider
@@ -254,7 +254,11 @@
 	</Card.Content>
 
 	<Card.Footer class="flex justify-end">
-		<Button onclick={handleSubmit} disabled={updateProvider.isPending} class="w-full sm:w-auto">
+		<Button
+			onclick={handleSubmit}
+			disabled={updateProvider.isPending}
+			class="w-full sm:w-auto sm:self-start"
+		>
 			{#if updateProvider.isPending}<Spinner data-icon="inline-start" />{:else}<Save
 					data-icon="inline-start"
 				/>{/if}
