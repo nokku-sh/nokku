@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
+	"google.golang.org/protobuf/proto"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
@@ -88,10 +89,37 @@ func TestEnrollDaemon(t *testing.T) {
 	assert.NotEmpty(t, res.GetAccessToken())
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, res.GetStatus(), "auto approve token")
 
-	got, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, adminAuth).
-		GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{WorkspaceId: &workspaceID, Id: new(res.GetId())})
+	daemons := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, adminAuth)
+	got, err := daemons.GetDaemon(
+		t.Context(),
+		&nokkuv1.GetDaemonRequest{WorkspaceId: &workspaceID, Id: new(res.GetId())},
+	)
 	require.NoError(t, err)
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, got.GetDaemon().GetStatus())
+
+	// The workspace has no defaults of its own, so the built-in ones apply and
+	// the daemon and the API agree on every field.
+	assert.True(t, proto.Equal(db.DefaultDaemonConfig(), res.GetConfig()),
+		"enroll answers with a complete config, got %v", res.GetConfig())
+	assert.True(t, proto.Equal(db.DefaultDaemonConfig(), got.GetDaemon().GetConfig()),
+		"the API reads the same config back, got %v", got.GetDaemon().GetConfig())
+
+	// One switch off keeps the others where they were.
+	_, err = daemons.UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
+		WorkspaceId: &workspaceID,
+		Id:          new(res.GetId()),
+		Config:      &nokkuv1.DaemonConfig{RecordSessions: new(false)},
+	})
+	require.NoError(t, err)
+	got, err = daemons.GetDaemon(
+		t.Context(),
+		&nokkuv1.GetDaemonRequest{WorkspaceId: &workspaceID, Id: new(res.GetId())},
+	)
+	require.NoError(t, err)
+	want := db.DefaultDaemonConfig()
+	want.RecordSessions = new(false)
+	assert.True(t, proto.Equal(want, got.GetDaemon().GetConfig()),
+		"an explicit off survives, unset fields read as the defaults, got %v", got.GetDaemon().GetConfig())
 
 	// The same key enrolls into the same daemon, even with the token used up.
 	again, err := enroll(created.GetSecret(), key)
@@ -489,6 +517,8 @@ func TestSyncDaemonReport(t *testing.T) {
 		})
 	require.NoError(t, err)
 	assert.Equal(t, caKey, synced.GetCaPublicKey(), "the daemon trusts the CA of its target")
+	assert.True(t, proto.Equal(db.DefaultDaemonConfig(), synced.GetConfig()),
+		"the daemon is told every setting, got %v", synced.GetConfig())
 
 	var usernames, endpoints []string
 	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {

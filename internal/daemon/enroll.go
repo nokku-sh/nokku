@@ -88,7 +88,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 	if token.AutoApprove {
 		status = nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
 	}
-	config := workspace.Settings.GetDefaultDaemonConfig()
+	config := db.ResolveDaemonConfig(workspace.Settings.GetDefaultDaemonConfig())
 
 	err = conn.WithTx(ctx, func(q *db.Queries) error {
 		for range maxNameAttempts {
@@ -169,6 +169,6 @@ func enrolledDaemon(ctx context.Context, q *db.Queries, workspaceID, binding str
 		Name:        d.Name,
 		TargetID:    target.ID,
 		Status:      d.Status,
-		Config:      d.Config,
+		Config:      db.ResolveDaemonConfig(d.Config),
 	}, nil
 }

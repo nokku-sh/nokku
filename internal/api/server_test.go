@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
@@ -63,6 +64,9 @@ func TestWorkspaceHidesWebhookFromMembers(t *testing.T) {
 	got, err := client(db.RoleAdmin).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{WorkspaceId: &workspaceID})
 	require.NoError(t, err)
 	assert.Equal(t, "s3cret", got.GetWorkspace().GetSettings().GetAuditWebhookSecret())
+	assert.True(t,
+		proto.Equal(db.DefaultDaemonConfig(), got.GetWorkspace().GetSettings().GetDefaultDaemonConfig()),
+		"daemon defaults nobody set read as the built-in ones")
 }
 
 // The API needs no client library: a procedure is a JSON POST to its path.
