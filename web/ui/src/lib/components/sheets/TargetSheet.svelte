@@ -31,6 +31,7 @@
 		Plus,
 		RefreshCw,
 		Server,
+		Settings2,
 		ShieldCheck,
 		SquareTerminal
 	} from '@lucide/svelte';
@@ -87,7 +88,7 @@
 	const glance = $derived([
 		{ label: 'Login accounts', value: accounts.length, tab: 'access' },
 		{ label: 'With access', value: withAccess, tab: 'access' },
-		{ label: 'Endpoints', value: model?.endpoints.length ?? 0 }
+		{ label: 'Endpoints', value: model?.endpoints.length ?? 0, tab: 'settings' }
 	]);
 
 	let newEndpoint = $state('');
@@ -132,6 +133,46 @@
 	}
 </script>
 
+{#snippet connect()}
+	<DropdownMenu.Root>
+		<DropdownMenu.Trigger>
+			{#snippet child({ props })}
+				<Button {...props} size="sm">
+					<SquareTerminal data-icon="inline-start" />
+					Connect
+					<ChevronDown data-icon="inline-end" />
+				</Button>
+			{/snippet}
+		</DropdownMenu.Trigger>
+		<DropdownMenu.Content align="start" class="w-60">
+			<DropdownMenu.Group>
+				<DropdownMenu.Label>
+					{online ? 'Open a web terminal as' : 'Web terminal needs an online daemon'}
+				</DropdownMenu.Label>
+				{#each accounts as account (account.id)}
+					<DropdownMenu.Item
+						disabled={!online || createSession.isPending}
+						onclick={() => openTerminal(account.username)}
+					>
+						<SquareTerminal />
+						<span class="font-mono">{account.username}</span>
+					</DropdownMenu.Item>
+				{/each}
+			</DropdownMenu.Group>
+			<DropdownMenu.Separator />
+			<DropdownMenu.Group>
+				<DropdownMenu.Label>Copy SSH command</DropdownMenu.Label>
+				{#each accounts as account (account.id)}
+					<DropdownMenu.Item onclick={() => copySSH(account.username)}>
+						<Copy />
+						<span class="truncate font-mono">ssh {account.username}@{entity?.name}</span>
+					</DropdownMenu.Item>
+				{/each}
+			</DropdownMenu.Group>
+		</DropdownMenu.Content>
+	</DropdownMenu.Root>
+{/snippet}
+
 <EntitySheet
 	open={sheet.open}
 	onClose={() => sheet.close()}
@@ -145,11 +186,14 @@
 	}}
 	tabs={[
 		{ value: 'overview', label: 'Overview', icon: Info },
-		{ value: 'access', label: 'Access', icon: ShieldCheck, count: accounts.length }
+		{ value: 'access', label: 'Access', icon: ShieldCheck, count: accounts.length },
+		{ value: 'settings', label: 'Settings', icon: Settings2 }
 	]}
 	tab={sheet.tab}
 	onTabChange={(t) => (sheet.tab = t)}
 	saveState={autoSave.saveState}
+	saveHint={sheet.tab === 'settings'}
+	actions={accounts.length ? connect : undefined}
 	meta={{
 		id: entity?.id,
 		createdAt: entity?.createdAt,
@@ -180,61 +224,14 @@
 		{/each}
 	{/snippet}
 
-	{#snippet actions()}
-		{#if accounts.length}
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
-					{#snippet child({ props })}
-						<Button {...props} size="sm">
-							<SquareTerminal data-icon="inline-start" />
-							Connect
-							<ChevronDown data-icon="inline-end" />
-						</Button>
-					{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="start" class="w-60">
-					<DropdownMenu.Group>
-						<DropdownMenu.Label>
-							{online ? 'Open a web terminal as' : 'Web terminal needs an online daemon'}
-						</DropdownMenu.Label>
-						{#each accounts as account (account.id)}
-							<DropdownMenu.Item
-								disabled={!online || createSession.isPending}
-								onclick={() => openTerminal(account.username)}
-							>
-								<SquareTerminal />
-								<span class="font-mono">{account.username}</span>
-							</DropdownMenu.Item>
-						{/each}
-					</DropdownMenu.Group>
-					<DropdownMenu.Separator />
-					<DropdownMenu.Group>
-						<DropdownMenu.Label>Copy SSH command</DropdownMenu.Label>
-						{#each accounts as account (account.id)}
-							<DropdownMenu.Item onclick={() => copySSH(account.username)}>
-								<Copy />
-								<span class="truncate font-mono">ssh {account.username}@{entity?.name}</span>
-							</DropdownMenu.Item>
-						{/each}
-					</DropdownMenu.Group>
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
-		{/if}
-		<Button variant="outline" size="sm" onclick={() => (sheet.tab = 'access')}>
-			<ShieldCheck data-icon="inline-start" />
-			Manage access
-		</Button>
-	{/snippet}
-
 	{#if model && entity}
 		<Tabs.Content value="overview" class="flex flex-col divide-y">
 			<div class="grid grid-cols-3 gap-2 pb-5">
 				{#each glance as stat (stat.label)}
 					<button
 						type="button"
-						disabled={!stat.tab}
-						onclick={() => stat.tab && (sheet.tab = stat.tab)}
-						class="flex flex-col items-start rounded-lg border bg-card px-3 py-2 text-left transition-colors enabled:hover:bg-muted/50"
+						onclick={() => (sheet.tab = stat.tab)}
+						class="flex flex-col items-start rounded-lg border bg-card px-3 py-2 text-left transition-colors hover:bg-muted/50"
 					>
 						<span class="text-xl font-semibold tabular-nums">{stat.value}</span>
 						<span class="text-xs text-muted-foreground">{stat.label}</span>
@@ -242,6 +239,57 @@
 				{/each}
 			</div>
 
+			{#if isManual}
+				<Section
+					title="Manual sync"
+					icon={RefreshCw}
+					description={lastSynced ? `Last synced ${lastSynced}.` : 'Not synced yet.'}
+				>
+					{#if caRotated}
+						<p class="text-sm text-warning">
+							The certificate authority was rotated after the last sync. Sync again, or this server
+							rejects new certificates.
+						</p>
+					{/if}
+					<div class="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+						<SquareTerminal class="size-4 shrink-0 text-muted-foreground" />
+						<CopyText value={syncCommand} mono class="text-sm" />
+					</div>
+					<p class="text-xs text-muted-foreground">
+						Run it on the host. It installs the CA key and the principal files under
+						/etc/ssh/nokku_principals, checks sshd and reloads it.
+					</p>
+				</Section>
+			{/if}
+
+			<Section title="System" icon={Cpu}>
+				{#if systemInfo.length || entity.hostPublicKey}
+					<DetailList
+						items={[
+							...systemInfo,
+							{
+								label: 'Host key',
+								value: entity.hostPublicKey,
+								mono: true,
+								copy: true,
+								wide: true
+							}
+						]}
+					/>
+				{:else}
+					<Empty.Root class="border border-dashed p-6">
+						<Empty.Header>
+							<Empty.Media variant="icon"><Cpu /></Empty.Media>
+							<Empty.Description>
+								Host details show up once {isManual ? 'nk sync runs' : 'the daemon connects'}.
+							</Empty.Description>
+						</Empty.Header>
+					</Empty.Root>
+				{/if}
+			</Section>
+		</Tabs.Content>
+
+		<Tabs.Content value="settings" class="flex flex-col divide-y">
 			<Section
 				title="Endpoints"
 				icon={Globe}
@@ -335,55 +383,6 @@
 						</Field.Field>
 					</div>
 				</Field.Group>
-			</Section>
-
-			{#if isManual}
-				<Section
-					title="Manual sync"
-					icon={RefreshCw}
-					description={lastSynced ? `Last synced ${lastSynced}.` : 'Not synced yet.'}
-				>
-					{#if caRotated}
-						<p class="text-sm text-warning">
-							The certificate authority was rotated after the last sync. Sync again, or this server
-							rejects new certificates.
-						</p>
-					{/if}
-					<div class="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
-						<SquareTerminal class="size-4 shrink-0 text-muted-foreground" />
-						<CopyText value={syncCommand} mono class="text-sm" />
-					</div>
-					<p class="text-xs text-muted-foreground">
-						Run it on the host. It installs the CA key and the principal files under
-						/etc/ssh/nokku_principals, checks sshd and reloads it.
-					</p>
-				</Section>
-			{/if}
-
-			<Section title="System" icon={Cpu}>
-				{#if systemInfo.length || entity.hostPublicKey}
-					<DetailList
-						items={[
-							...systemInfo,
-							{
-								label: 'Host key',
-								value: entity.hostPublicKey,
-								mono: true,
-								copy: true,
-								wide: true
-							}
-						]}
-					/>
-				{:else}
-					<Empty.Root class="border border-dashed p-6">
-						<Empty.Header>
-							<Empty.Media variant="icon"><Cpu /></Empty.Media>
-							<Empty.Description>
-								Host details show up once {isManual ? 'nk sync runs' : 'the daemon connects'}.
-							</Empty.Description>
-						</Empty.Header>
-					</Empty.Root>
-				{/if}
 			</Section>
 
 			<DangerZone
