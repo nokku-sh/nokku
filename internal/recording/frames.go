@@ -156,6 +156,10 @@ func (r *Reader) nextFrame() error {
 
 	sealed := make([]byte, size)
 	if _, err := io.ReadFull(r.rc, sealed); err != nil {
+		// ReadFull reports a cut right after the header as a plain EOF.
+		if errors.Is(err, io.EOF) {
+			return fmt.Errorf("recording frame %d is cut short: %w", r.index, io.ErrUnexpectedEOF)
+		}
 		return err
 	}
 	plain, err := r.aead.Open(nil, nil, sealed, frameAAD(r.id, r.index, kind))
