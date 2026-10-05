@@ -124,7 +124,7 @@
 									title: `Emergency rollover of ${item.name}?`,
 									description:
 										'The current key stops being trusted at once and a new one replaces it. People get a new certificate at their next connection. Servers without the daemon trust the old key until the next nk sync.',
-									confirmText: 'Rollover',
+									confirmText: 'Roll over',
 									typeToConfirm: item.name,
 									onConfirm: () => rolloverAction.mutateAsync({ id: item.id, revokePrevious: true })
 								})
