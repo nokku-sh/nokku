@@ -314,6 +314,13 @@
 	background: rgb(0 0 0 / 0.2);
 }
 
+/* The forms plugin borders every text input. This one already sits inside its own field. */
+[data-slot='tags-input'] input {
+	border: 0;
+	padding-block: 0;
+	box-shadow: none;
+}
+
 /* A confirmation over an open sheet or dialog would double the blur and tint. */
 body:has([data-slot='sheet-overlay'], [data-slot='dialog-overlay'])
 	[data-slot='alert-dialog-overlay'] {
