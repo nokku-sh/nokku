@@ -61,8 +61,11 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 			Kind:      nokkuv1.TokenKind_TOKEN_KIND_ENROLL,
 			TokenHash: hash,
 		})
-		if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrEnrollToken
+		}
+		if err != nil {
+			return err
 		}
 		workspace, err = q.GetWorkspace(ctx, token.WorkspaceID)
 		if err != nil {
