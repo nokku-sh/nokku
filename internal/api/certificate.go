@@ -308,13 +308,6 @@ func (s *certificateService) SignX509Certificate(
 	ctx context.Context,
 	req *nokkuv1.SignX509CertificateRequest,
 ) (*nokkuv1.SignX509CertificateResponse, error) {
-	// Subject and SANs come from the CSR untouched, so signing equals holding
-	// the CA. The RPC is still self in the protos, see BACKLOG.
-	ctx, err := actorHasRole(ctx, s.cfg.Conn, db.RoleEditor)
-	if err != nil {
-		return nil, err
-	}
-
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		switch {
