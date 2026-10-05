@@ -52,7 +52,7 @@
 		{/snippet}
 	</HoverCard.Trigger>
 
-	<HoverCard.Content align="end" side="bottom" class="w-64 space-y-2">
+	<HoverCard.Content align="end" side="bottom" class="flex w-64 flex-col gap-2">
 		<p class="text-xs font-medium">Recording storage</p>
 		{#if list.isPending}
 			<Skeleton class="h-4 w-full" />
