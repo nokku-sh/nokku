@@ -2,7 +2,7 @@
 	import { sign } from '#lib/api/certificates.svelte.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
 	import * as Field from '#lib/components/ui/field/index.js';
-	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
+	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
@@ -15,7 +15,7 @@
 	} from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { formatTs } from '#lib/utils.js';
 	import { create } from '@bufbuild/protobuf';
-	import { IdCard, KeyRound, Server, Shield, User } from '@lucide/svelte';
+	import { KeyRound, Server, Shield, User } from '@lucide/svelte';
 
 	interface Props {
 		open?: boolean;
@@ -171,21 +171,21 @@
 
 	{#if signed}
 		<Field.Separator />
-		<InputGroupVariants
-			variant="code-area"
-			value={signed.pem}
-			icon={IdCard}
-			codeHeader={`Signed certificate · expires ${formatTs(signed.expiresAt, 'withTime')}`}
-			downloadFilename={`${ca?.id}-cert.pem`}
-		/>
-		{#if signed.chain}
-			<InputGroupVariants
-				variant="code-area"
-				value={signed.chain}
-				icon={Shield}
-				codeHeader="CA chain"
-				downloadFilename={`${ca?.id}-chain.pem`}
+		<Field.Field>
+			<Field.Label>Signed certificate</Field.Label>
+			<CodeSnippet
+				code={signed.pem}
+				language={isSSH ? 'openssh' : 'pem'}
+				wrap={isSSH}
+				download={`${ca?.id}-cert.pem`}
 			/>
+			<Field.Description>Expires {formatTs(signed.expiresAt, 'withTime')}</Field.Description>
+		</Field.Field>
+		{#if signed.chain}
+			<Field.Field>
+				<Field.Label>CA chain</Field.Label>
+				<CodeSnippet code={signed.chain} language="pem" download={`${ca?.id}-chain.pem`} />
+			</Field.Field>
 		{/if}
 	{/if}
 </FormModal>

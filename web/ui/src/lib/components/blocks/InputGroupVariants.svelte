@@ -1,33 +1,19 @@
 <script lang="ts">
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
-	import {
-		CheckIcon,
-		CopyIcon,
-		SearchIcon,
-		DeleteIcon,
-		CodeIcon,
-		EyeOffIcon,
-		EyeIcon,
-		DownloadIcon,
-		type LucideIcon
-	} from '@lucide/svelte';
+	import { CheckIcon, CopyIcon, SearchIcon, DeleteIcon, EyeOffIcon, EyeIcon } from '@lucide/svelte';
 	import { UseClipboard } from '#lib/hooks/use-clipboard.svelte.js';
 	import type { ComponentProps } from 'svelte';
 	import type { Input } from '#lib/components/ui/input/index.js';
 
-	type Variant = 'copy-input' | 'code-area' | 'search' | 'password';
+	type Variant = 'copy-input' | 'search' | 'password';
 
 	interface Props {
 		variant: Variant;
 		value?: string;
 		placeholder?: string;
 		readonly?: boolean;
-		/** Header icon of the code area. */
-		icon?: LucideIcon;
-		codeHeader?: string;
 		class?: string;
 		searchResults?: number;
-		downloadFilename?: string;
 		inputProps?: ComponentProps<typeof Input>;
 	}
 
@@ -36,31 +22,14 @@
 		value = $bindable(''),
 		placeholder = '',
 		readonly = false,
-		icon: Icon = CodeIcon,
-		codeHeader = 'bash',
 		class: className = '',
 		searchResults,
-		downloadFilename,
 		inputProps = {}
 	}: Props = $props();
 
 	const clipboard = new UseClipboard();
 
 	let showPassword = $state(false);
-
-	function handleDownload() {
-		if (!downloadFilename || !value) return;
-
-		const blob = new Blob([value], { type: 'text/plain' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = downloadFilename;
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
-		URL.revokeObjectURL(url);
-	}
 </script>
 
 {#if variant === 'copy-input'}
@@ -80,45 +49,6 @@
 				{/if}
 			</InputGroup.Button>
 		</InputGroup.Addon>
-	</InputGroup.Root>
-{:else if variant === 'code-area'}
-	<InputGroup.Root>
-		<InputGroup.Addon align="block-start" class="flex h-10 items-center justify-between border-b">
-			<InputGroup.Text class="font-sm font-mono">
-				<Icon />
-				{codeHeader}
-			</InputGroup.Text>
-			<div class="flex items-center gap-2">
-				<InputGroup.Button
-					aria-label="Copy"
-					title="Copy"
-					size="icon-xs"
-					onclick={() => clipboard.copy(value)}
-				>
-					{#if clipboard.copied}
-						<CheckIcon />
-					{:else}
-						<CopyIcon />
-					{/if}
-				</InputGroup.Button>
-				{#if downloadFilename}
-					<InputGroup.Button
-						aria-label="Download"
-						title="Download"
-						size="icon-xs"
-						onclick={handleDownload}
-					>
-						<DownloadIcon />
-					</InputGroup.Button>
-				{/if}
-			</div>
-		</InputGroup.Addon>
-		<InputGroup.Textarea
-			bind:value
-			class="max-w-full overflow-x-hidden pb-8 font-mono break-all whitespace-pre-wrap"
-			{placeholder}
-			{readonly}
-		/>
 	</InputGroup.Root>
 {:else if variant === 'search'}
 	<InputGroup.Root class={className}>
