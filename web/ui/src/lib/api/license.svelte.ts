@@ -9,7 +9,7 @@ const DAY = 86_400_000;
 const WARN_DAYS = 30;
 const HOLD_DAYS = 30;
 
-export type LicenseState = 'none' | 'active' | 'expiring' | 'expired';
+type LicenseState = 'none' | 'active' | 'expiring' | 'expired';
 
 export function licenseStatus(res: GetLicenseResponse | undefined) {
 	const expires = res?.expiresAt ? timestampDate(res.expiresAt) : undefined;
