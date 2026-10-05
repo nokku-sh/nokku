@@ -35,17 +35,8 @@
 	);
 
 	const wsModal = createEntityModalState(WorkspaceSchema);
-	const isRouteActive = (item: RouteItem) => {
-		if (item.url === '/') {
-			return currentRoute === '/';
-		}
-		const cleanUrl = item.url.replace(/\/$/, '');
-		return (
-			currentRoute === cleanUrl ||
-			currentRoute === item.url ||
-			currentRoute.startsWith(item.url + '/')
-		);
-	};
+	const isRouteActive = (item: RouteItem) =>
+		currentRoute === item.url || (item.url !== '/' && currentRoute.startsWith(item.url + '/'));
 </script>
 
 <WorkspaceModal bind:open={wsModal.open} draft={wsModal.draft} />
