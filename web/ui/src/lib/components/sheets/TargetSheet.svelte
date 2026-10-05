@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { ca } from '#lib/api/certificates.svelte.js';
+	import { MAX_PAGE_SIZE } from '#lib/config.js';
 	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
+	import { principal as principalApi } from '#lib/api/principals.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
 	import { grantsOf } from '#lib/components/access/subjects.svelte.js';
 	import TargetAccess from '#lib/components/access/TargetAccess.svelte';
@@ -62,7 +64,9 @@
 
 	const isManual = $derived(!entity?.daemonId);
 	const online = $derived(!!linkedDaemon?.online);
-	const accounts = $derived(entity?.principals ?? []);
+	// GetTarget carries no principals. The Access tab reads the same query, so it is cached.
+	const accountsQuery = principalApi.list(() => ({ targetId: sheet.id, limit: MAX_PAGE_SIZE }));
+	const accounts = $derived(accountsQuery.data?.principals ?? []);
 	const withAccess = $derived(new Set(accounts.flatMap((p) => grantsOf(p).map((g) => g.id))).size);
 	const lastSyncAt = $derived.by(() => {
 		const at = new Date(entity?.metadata?.['last_manual_sync'] ?? '');
