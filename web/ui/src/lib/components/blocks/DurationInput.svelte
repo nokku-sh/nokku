@@ -10,22 +10,10 @@
 	interface Props {
 		value?: Duration | null;
 		onchange?: (value: Duration) => void;
-		placeholder?: string;
-		disabled?: boolean;
 		class?: string;
-		min?: number;
-		max?: number;
 	}
 
-	let {
-		value = $bindable(),
-		onchange,
-		placeholder = 'Enter duration',
-		disabled = false,
-		class: className,
-		min,
-		max
-	}: Props = $props();
+	let { value = $bindable(), onchange, class: className }: Props = $props();
 
 	const units: { value: Unit; label: string; ms: number }[] = [
 		{ value: 'minutes', label: 'Minutes', ms: 60 * 1000 },
@@ -72,23 +60,9 @@
 			return;
 		}
 
-		let ms = num * getUnitMs(selectedUnit);
-
-		if (min !== undefined) ms = Math.max(ms, min);
-		if (max !== undefined) ms = Math.min(ms, max);
-
-		const newDuration = durationFromMs(Math.round(ms));
+		const newDuration = durationFromMs(Math.round(num * getUnitMs(selectedUnit)));
 		value = newDuration;
 		onchange?.(newDuration);
-	}
-
-	function handleUnitChange(unit: Unit) {
-		if (!value) {
-			selectedUnit = unit;
-			return;
-		}
-
-		selectedUnit = unit;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -96,19 +70,13 @@
 			e.preventDefault();
 			const current = value ? durationMs(value) : 0;
 			const step = getUnitMs(selectedUnit);
-			const newMs = e.key === 'ArrowUp' ? current + step : Math.max(0, current - step);
-
-			let ms = newMs;
-			if (min !== undefined) ms = Math.max(ms, min);
-			if (max !== undefined) ms = Math.min(ms, max);
+			const ms = e.key === 'ArrowUp' ? current + step : Math.max(0, current - step);
 
 			const newDuration = durationFromMs(Math.round(ms));
 			value = newDuration;
 			onchange?.(newDuration);
 		}
 	}
-
-	const currentUnitLabel = $derived(units.find((u) => u.value === selectedUnit)?.value ?? 'hours');
 </script>
 
 <InputGroup.Root class={cn('w-full', className)}>
@@ -120,8 +88,7 @@
 		value={inputValue}
 		oninput={handleInput}
 		onkeydown={handleKeydown}
-		{placeholder}
-		{disabled}
+		placeholder="Enter duration"
 		class="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 	/>
 	<InputGroup.Addon align="inline-end">
@@ -132,18 +99,17 @@
 						{...props}
 						variant="ghost"
 						class="rounded-full bg-accent pe-1.5! text-xs font-medium"
-						{disabled}
 					>
-						{currentUnitLabel}
+						{selectedUnit}
 						<ChevronDown class="ml-1 size-3" />
 					</InputGroup.Button>
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content align="end" class="min-w-24">
-				{#each units as unit}
+				{#each units as unit (unit.value)}
 					<DropdownMenu.Item
 						class={cn(selectedUnit === unit.value && 'bg-accent')}
-						onclick={() => handleUnitChange(unit.value)}
+						onclick={() => (selectedUnit = unit.value)}
 					>
 						{unit.label}
 					</DropdownMenu.Item>
