@@ -305,6 +305,12 @@
 	--term-color-15: var(--ansi-15);
 }
 
+/* A viewport-sized backdrop blur tears into bands on fractionally scaled screens, so sheets only dim. */
+[data-slot='sheet-overlay'] {
+	backdrop-filter: none;
+	background: rgb(0 0 0 / 0.2);
+}
+
 /* A confirmation over an open sheet or dialog would double the blur and tint. */
 body:has([data-slot='sheet-overlay'], [data-slot='dialog-overlay'])
 	[data-slot='alert-dialog-overlay'] {
