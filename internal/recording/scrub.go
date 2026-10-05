@@ -51,7 +51,10 @@ func (s *Service) ScrubRecording(rec *db.Recording) {
 						"error":     err.Error(),
 					},
 				}
-				if appendErr := s.events.Append(ctx, event); appendErr != nil {
+				// The scrub ctx may have expired, that is one way to get here.
+				appendCtx, appendCancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+				defer appendCancel()
+				if appendErr := s.events.Append(appendCtx, event); appendErr != nil {
 					slog.Warn("failed to write scrub failure audit log",
 						"recording_id", rec.ID, "error", appendErr)
 				}
