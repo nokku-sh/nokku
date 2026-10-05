@@ -22,7 +22,7 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
-	import { confirm, usePagination, useSheet } from '#lib/hooks/index.js';
+	import { usePagination, useSheet } from '#lib/hooks/index.js';
 	import { IdCard, Plus, Server, ShieldCheck, TagIcon, Trash2, UserIcon } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 

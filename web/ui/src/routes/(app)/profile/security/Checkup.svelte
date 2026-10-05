@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { backupCode, passkey, password } from '#lib/api/credential.svelte.js';
+	import { backupCode, passkey } from '#lib/api/credential.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';

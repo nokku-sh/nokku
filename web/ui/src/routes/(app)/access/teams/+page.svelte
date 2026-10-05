@@ -20,7 +20,7 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import type { Team } from '#lib/gen/nokku/v1/team_pb.js';
-	import { confirm, usePagination, useSheet } from '#lib/hooks/index.js';
+	import { usePagination, useSheet } from '#lib/hooks/index.js';
 	import { PlusIcon, ShieldCheck, Trash2, Users } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
