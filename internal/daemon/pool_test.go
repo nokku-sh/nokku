@@ -363,7 +363,7 @@ func TestPool_Shutdown(t *testing.T) {
 	p.shutdown()
 
 	select {
-	case <-p.done():
+	case <-p.shutdownCtx.Done():
 	case <-time.After(time.Second):
 		t.Fatal("Done() not closed after Shutdown")
 	}

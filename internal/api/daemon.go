@@ -240,7 +240,7 @@ func (s *daemonService) CloseSession(
 	}); err != nil {
 		return nil, err
 	}
-	s.cfg.Pool.CloseSession(req.GetSessionId())
+	sess.Close()
 	return &nokkuv1.CloseSessionResponse{}, nil
 }
 
