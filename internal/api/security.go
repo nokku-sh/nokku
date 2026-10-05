@@ -40,7 +40,8 @@ func (s *Server) withCSRF(h http.Handler) http.Handler {
 func (s *Server) withHeaders(h http.Handler) http.Handler {
 	// No inline script runs but the bootstrap of the built pages. A script
 	// injected into the UI would otherwise reach the web terminal.
-	scripts := strings.Join(append([]string{"'self'"}, web.InlineScriptHashes()...), " ")
+	// The recording player compiles WebAssembly, which needs its own source.
+	scripts := strings.Join(append([]string{"'self'", "'wasm-unsafe-eval'"}, web.InlineScriptHashes()...), " ")
 	csp := "default-src 'self'; script-src " + scripts +
 		"; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:;"
 
