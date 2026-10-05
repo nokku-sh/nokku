@@ -106,6 +106,33 @@ func TestSyncTargetUsers(t *testing.T) {
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "viewer may not sync, got %v", err)
 }
 
+func TestUpdateTargetReplacesLists(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	targetID := seedTarget(t, cfg, workspaceID)
+	editor := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL,
+		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleEditor)))
+
+	updated, err := editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
+		WorkspaceId: &workspaceID,
+		Id:          &targetID,
+		Endpoints:   []string{"10.0.0.1:22"},
+		Tags:        []string{"prod"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"prod"}, updated.GetTarget().GetTags())
+
+	updated, err = editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
+		WorkspaceId: &workspaceID,
+		Id:          &targetID,
+		Endpoints:   []string{"10.0.0.9:22"},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, updated.GetTarget().GetTags(), "an update replaces the tags, the last one can go")
+	assert.Equal(t, []string{"10.0.0.9:22"}, updated.GetTarget().GetEndpoints())
+	assert.Equal(t, "web-1", updated.GetTarget().GetName(), "unset fields stay as they are")
+}
+
 type accessFixture struct {
 	workspaceID       string
 	alice, bob, carol string

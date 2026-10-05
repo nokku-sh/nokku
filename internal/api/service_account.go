@@ -105,7 +105,8 @@ func (s *serviceAccountService) UpdateServiceAccount(
 			Name:             req.Name,
 			Description:      req.Description,
 			RoleName:         req.RoleName,
-			Tags:             req.GetTags(),
+			// An update replaces the tags. The query keeps the old ones for nil.
+			Tags: append([]string{}, req.GetTags()...),
 		})
 		if err != nil {
 			return err
