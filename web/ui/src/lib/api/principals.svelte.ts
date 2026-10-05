@@ -1,15 +1,8 @@
 import { MAX_PAGE_SIZE } from '#lib/config.js';
 import { PrincipalService, SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
-import { TargetService } from '#lib/gen/nokku/v1/target_pb.js';
-import { queryClient } from '#lib/api/client.js';
 import { toast } from 'svelte-sonner';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { workspaceID } from '#lib/store.svelte.js';
-
-// The global mutation cache only invalidates the mutating service, but grant
-// changes also move TargetService.GetSubjectAccess.
-const invalidateAccess = () =>
-	queryClient.invalidateQueries({ queryKey: ['connect-query', TargetService.typeName] });
 
 export const principal = {
 	list: (
@@ -34,20 +27,13 @@ export const principal = {
 			})
 		),
 
-	addAccount: () =>
-		useMutation(PrincipalService.method.addPrincipal, { onSuccess: invalidateAccess }),
-	removeAccount: () =>
-		useMutation(PrincipalService.method.removePrincipal, { onSuccess: invalidateAccess }),
-	addSubjects: () =>
-		useMutation(PrincipalService.method.addSubjectsToPrincipal, { onSuccess: invalidateAccess }),
-	removeSubjects: () =>
-		useMutation(PrincipalService.method.removeSubjectsFromPrincipal, {
-			onSuccess: invalidateAccess
-		}),
+	addAccount: () => useMutation(PrincipalService.method.addPrincipal),
+	removeAccount: () => useMutation(PrincipalService.method.removePrincipal),
+	addSubjects: () => useMutation(PrincipalService.method.addSubjectsToPrincipal),
+	removeSubjects: () => useMutation(PrincipalService.method.removeSubjectsFromPrincipal),
 	revokeSubject: () =>
 		useMutation(PrincipalService.method.revokeAllAccess, {
 			onSuccess: (_, variables) => {
-				invalidateAccess();
 				switch (variables.kind) {
 					case SubjectKind.USER:
 						toast.success('User access revoked');
