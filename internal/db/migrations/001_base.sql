@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS daemons (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  status INTEGER NOT NULL DEFAULT 1, -- 1=pending, 2=accepted, 3=rejected
+  status INTEGER NOT NULL DEFAULT 1 CHECK (status IN (1, 2, 3)), -- 1=pending, 2=accepted, 3=rejected
   -- Refreshed by the core instance holding the control stream. Online means
   -- seen within the last 30 seconds, so a crashed instance needs no cleanup.
   last_seen_at TIMESTAMPTZ,

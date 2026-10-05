@@ -231,6 +231,18 @@ func TestGrantRejectsForeignTeam(t *testing.T) {
 	}
 }
 
+// An unspecified status locks a daemon out of its control stream, so the
+// schema refuses it.
+func TestDaemonStatusRejectsUnspecified(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+
+	_, err := c.sysPool.Exec(t.Context(), `UPDATE daemons SET status = 0 WHERE id = $1`, f.daemon)
+	if err == nil {
+		t.Fatal("stored a daemon with status 0")
+	}
+}
+
 // Parallel redemptions of a one-use token spend it exactly once.
 func TestRedeemTokenOnce(t *testing.T) {
 	c := testConnection(t)
