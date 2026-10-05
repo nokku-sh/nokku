@@ -289,6 +289,38 @@ func TestGetSubjectAccess(t *testing.T) {
 	assert.Equal(t, 3, principals, "a viewer gets every account on those targets")
 }
 
+func TestTargetsCarryPrincipals(t *testing.T) {
+	f := seedAccessGraph(t)
+
+	list, err := f.client.ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{
+		WorkspaceId: &f.workspaceID,
+		Limit:       new(int32(50)),
+	})
+	require.NoError(t, err)
+	accounts := map[string][]string{}
+	for _, target := range list.GetTargets() {
+		for _, p := range target.GetPrincipals() {
+			accounts[target.GetName()] = append(accounts[target.GetName()], p.GetUsername())
+		}
+	}
+	assert.Equal(t,
+		map[string][]string{"web-1": {"deploy", "root"}, "web-2": {"root"}, "db-1": {"root"}},
+		accounts, "every account by username, idle has none, the other workspace stays out")
+
+	got, err := f.client.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{
+		WorkspaceId: &f.workspaceID,
+		Id:          &f.web1,
+	})
+	require.NoError(t, err)
+	principals := got.GetTarget().GetPrincipals()
+	require.Len(t, principals, 2, "web-1 has deploy and root")
+	assert.Equal(t, "deploy", principals[0].GetUsername())
+	assert.Equal(t, []string{f.alice}, principals[0].GetUserIds())
+	assert.Equal(t, []string{f.ci}, principals[0].GetServiceAccountIds())
+	assert.Equal(t, "root", principals[1].GetUsername())
+	assert.Equal(t, []string{f.platform}, principals[1].GetTeamIds())
+}
+
 func TestGetAccessGraph(t *testing.T) {
 	f := seedAccessGraph(t)
 

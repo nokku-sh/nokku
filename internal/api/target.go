@@ -31,17 +31,42 @@ func (s *targetService) GetTarget(
 	ctx context.Context,
 	req *nokkuv1.GetTargetRequest,
 ) (*nokkuv1.GetTargetResponse, error) {
-	var target *db.Target
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		target, err = q.GetTarget(ctx, req.GetId())
-		return err
+	var target *nokkuv1.Target
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		row, err := q.GetTarget(ctx, req.GetId())
+		if err != nil {
+			return err
+		}
+		principals, err := principalsByTarget(ctx, q, []string{row.ID})
+		if err != nil {
+			return err
+		}
+		target = row.ToProto()
+		target.Principals = principals[row.ID]
+		return nil
 	}); err != nil {
 		return nil, err
 	}
 
-	return &nokkuv1.GetTargetResponse{
-		Target: target.ToProto(),
-	}, nil
+	return &nokkuv1.GetTargetResponse{Target: target}, nil
+}
+
+// principalsByTarget groups the login accounts of the targets, each with its grants.
+func principalsByTarget(
+	ctx context.Context,
+	q *db.Queries,
+	targetIDs []string,
+) (map[string][]*nokkuv1.Principal, error) {
+	rows, err := q.GetPrincipalsByTargetIDs(ctx, targetIDs)
+	if err != nil {
+		return nil, err
+	}
+	principals := make(map[string][]*nokkuv1.Principal)
+	for _, p := range rows {
+		targetID := p.Principal.TargetID
+		principals[targetID] = append(principals[targetID], p.ToProto())
+	}
+	return principals, nil
 }
 
 func (s *targetService) CreateTarget(
@@ -156,10 +181,10 @@ func (s *targetService) ListTargets(
 	ctx context.Context,
 	req *nokkuv1.ListTargetsRequest,
 ) (*nokkuv1.ListTargetsResponse, error) {
-	var targets []*db.ListTargetsRow
+	var targets []*nokkuv1.Target
 	var count int32
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		targets, err = q.ListTargets(ctx, &db.ListTargetsParams{
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		rows, err := q.ListTargets(ctx, &db.ListTargetsParams{
 			WorkspaceID: req.GetWorkspaceId(),
 			Query:       req.Query,
 			DaemonID:    req.DaemonId,
@@ -169,16 +194,32 @@ func (s *targetService) ListTargets(
 			Limit:       req.Limit,
 			Offset:      req.Offset,
 		})
-		return err
+		if err != nil || len(rows) == 0 {
+			return err
+		}
+		count = rows[0].TotalCount
+
+		targetIDs := make([]string, 0, len(rows))
+		for _, r := range rows {
+			targetIDs = append(targetIDs, r.Target.ID)
+		}
+		principals, err := principalsByTarget(ctx, q, targetIDs)
+		if err != nil {
+			return err
+		}
+		targets = make([]*nokkuv1.Target, 0, len(rows))
+		for _, r := range rows {
+			target := r.Target.ToProto()
+			target.Principals = principals[r.Target.ID]
+			targets = append(targets, target)
+		}
+		return nil
 	}); err != nil {
 		return nil, err
 	}
-	if len(targets) > 0 {
-		count = targets[0].TotalCount
-	}
 
 	return &nokkuv1.ListTargetsResponse{
-		Targets: db.TargetsToProto(targets),
+		Targets: targets,
 		Total:   &count,
 	}, nil
 }
@@ -299,22 +340,17 @@ func (s *targetService) GetSubjectAccess(
 			usernamesByTarget[u.TargetID] = append(usernamesByTarget[u.TargetID], u.Username)
 		}
 
-		principalsByTarget := make(map[string][]*nokkuv1.Principal)
+		var principals map[string][]*nokkuv1.Principal
 		if canView {
-			pRows, err := q.GetPrincipalsByTargetIDs(ctx, targetIDs)
-			if err != nil {
+			if principals, err = principalsByTarget(ctx, q, targetIDs); err != nil {
 				return err
-			}
-			for _, p := range pRows {
-				targetID := p.Principal.TargetID
-				principalsByTarget[targetID] = append(principalsByTarget[targetID], p.ToProto())
 			}
 		}
 
 		for _, r := range rows {
 			target := r.ToProto()
 			target.Usernames = usernamesByTarget[r.ID]
-			target.Principals = principalsByTarget[r.ID]
+			target.Principals = principals[r.ID]
 			targets = append(targets, target)
 		}
 
