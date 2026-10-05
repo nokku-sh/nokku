@@ -6,7 +6,8 @@
     ":disableDependencyDashboard",
     "security:minimumReleaseAgeNpm",
     ":maintainLockFilesWeekly",
-    "helpers:pinGitHubActionDigests"
+    "helpers:pinGitHubActionDigests",
+    "customManagers:githubActionsVersions"
   ],
   "minimumReleaseAge": "7 days",
   "timezone": "Europe/Vienna",
