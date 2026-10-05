@@ -44,9 +44,9 @@
 		{:else if invitation.isError || expired}
 			<Dialog.Header class="items-center text-center">
 				<div
-					class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10"
+					class="mx-auto flex size-12 items-center justify-center rounded-full bg-destructive/10"
 				>
-					<CircleX class="h-6 w-6 text-destructive" />
+					<CircleX class="size-6 text-destructive" />
 				</div>
 				<Dialog.Title>Invitation unavailable</Dialog.Title>
 				<Dialog.Description>
@@ -58,8 +58,8 @@
 			</div>
 		{:else if invitation.isSuccess}
 			<Dialog.Header class="items-center text-center">
-				<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-					<PartyPopper class="h-6 w-6 text-primary" />
+				<div class="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10">
+					<PartyPopper class="size-6 text-primary" />
 				</div>
 				<Dialog.Title>You're invited</Dialog.Title>
 				<Dialog.Description>You've been invited to join a workspace</Dialog.Description>
@@ -67,8 +67,8 @@
 
 			<div class="rounded-lg bg-muted/50 p-4">
 				<div class="flex items-center gap-3">
-					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-						<Users class="h-5 w-5 text-primary" />
+					<div class="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+						<Users class="size-5 text-primary" />
 					</div>
 					<div class="flex-1">
 						<p class="font-semibold">{invitation.data.workspaceName}</p>
@@ -84,7 +84,7 @@
 
 			{#if invitation.data.expiresAt}
 				<div class="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-					<Clock class="h-3 w-3" />
+					<Clock class="size-3" />
 					Expires {formatTs(invitation.data.expiresAt, 'relative')}
 				</div>
 			{/if}

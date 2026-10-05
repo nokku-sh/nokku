@@ -68,7 +68,7 @@
 	<Card.Content class="space-y-8">
 		{#if replacesOIDC}
 			<Alert.Root>
-				<TriangleAlert class="h-4 w-4" />
+				<TriangleAlert class="size-4" />
 				<Alert.Title>Replaces the OIDC provider</Alert.Title>
 				<Alert.Description>
 					Only one SSO provider is allowed per workspace. Saving this SAML provider replaces the
