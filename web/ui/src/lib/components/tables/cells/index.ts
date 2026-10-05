@@ -4,6 +4,7 @@ export { default as BadgeCell } from './BadgeCell.svelte';
 export { default as CANameCell } from './CANameCell.svelte';
 export { default as CAStatusCell } from './CAStatusCell.svelte';
 export { default as MemberCell } from './MemberCell.svelte';
+export { default as PrincipalsCell } from './PrincipalsCell.svelte';
 export { default as RoleCell } from './RoleCell.svelte';
 export { default as StatusCell } from './StatusCell.svelte';
 export { default as TagsCell } from './TagsCell.svelte';
