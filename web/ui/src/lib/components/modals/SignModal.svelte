@@ -181,7 +181,7 @@
 		<InputGroupVariants
 			variant="code-area"
 			value={signed.pem}
-			icon={{ code: IdCard }}
+			icon={IdCard}
 			codeHeader={`Signed certificate · expires ${formatTs(signed.expiresAt, 'withTime')}`}
 			downloadFilename={`${ca?.id}-cert.pem`}
 		/>
@@ -189,7 +189,7 @@
 			<InputGroupVariants
 				variant="code-area"
 				value={signed.chain}
-				icon={{ code: Shield }}
+				icon={Shield}
 				codeHeader="CA chain"
 				downloadFilename={`${ca?.id}-chain.pem`}
 			/>
