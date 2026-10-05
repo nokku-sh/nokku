@@ -26,7 +26,12 @@ func (c *relayConn) Read(p []byte) (int, error) {
 		select {
 		case c.buf = <-c.relay.toUser:
 		case <-c.relay.done():
-			return 0, io.EOF
+			// What the daemon sent before it closed is still queued.
+			select {
+			case c.buf = <-c.relay.toUser:
+			default:
+				return 0, io.EOF
+			}
 		}
 	}
 	n := copy(p, c.buf)
