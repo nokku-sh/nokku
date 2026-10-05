@@ -8,10 +8,12 @@
 		code: string;
 		/** Shown in the header, e.g. "bash" or "yaml". */
 		language?: string;
+		/** Breaks long lines instead of scrolling, for keys. */
+		wrap?: boolean;
 		class?: string;
 	}
 
-	let { code, language, class: className }: Props = $props();
+	let { code, language, wrap = false, class: className }: Props = $props();
 
 	const clipboard = new UseClipboard({ delay: 1500 });
 </script>
@@ -29,5 +31,9 @@
 			{/if}
 		</Button>
 	</div>
-	<pre class="overflow-x-auto p-3 font-mono text-xs leading-relaxed"><code>{code}</code></pre>
+	<pre
+		class={[
+			'p-3 font-mono text-xs leading-relaxed',
+			wrap ? 'break-all whitespace-pre-wrap' : 'overflow-x-auto'
+		]}><code>{code}</code></pre>
 </div>

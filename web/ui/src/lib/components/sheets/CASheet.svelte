@@ -7,8 +7,10 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as Item from '#lib/components/ui/item/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
+	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
 	import {
 		AuthorityType,
@@ -21,15 +23,18 @@
 	import {
 		Ban,
 		Clock,
-		Copy,
+		FileBadge,
 		FileText,
+		Fingerprint,
+		History,
+		Info,
 		KeyRound,
 		PenLine,
+		Settings2,
 		Shield,
 		ShieldCheck,
 		Star
 	} from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
 	import DangerZone from './DangerZone.svelte';
 	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';
@@ -111,12 +116,6 @@
 		save();
 	}
 
-	async function copyPublicKey() {
-		if (!entity?.publicKey) return;
-		await navigator.clipboard.writeText(entity.publicKey);
-		toast.success('Public key copied');
-	}
-
 	function askRollover() {
 		if (!entity) return;
 		void confirm({
@@ -157,14 +156,15 @@
 		model.name = name;
 		save();
 	}}
+	tabs={[
+		{ value: 'overview', label: 'Overview', icon: Info },
+		{ value: 'settings', label: 'Settings', icon: Settings2 }
+	]}
+	tab={sheet.tab}
+	onTabChange={(t) => (sheet.tab = t)}
 	saveState={autoSave.saveState}
 	missing={query.isError}
-	meta={{
-		id: entity?.id,
-		createdAt: entity?.createdAt,
-		updatedAt: entity?.updatedAt,
-		extra: [{ label: 'Serial', value: entity?.serialNumber, copy: true }]
-	}}
+	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
 	{#snippet media()}
 		<div class="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -177,8 +177,8 @@
 		{#if model?.isDefault}
 			<Badge variant="warning"><Star data-icon="inline-start" />Default</Badge>
 		{/if}
-		{#if entity?.notAfter}
-			<span>Valid until {formatTs(entity.notAfter, 'short')}</span>
+		{#if entity && !entity.isActive}
+			<Badge variant="destructive">Inactive</Badge>
 		{/if}
 	{/snippet}
 
@@ -187,16 +187,68 @@
 			<PenLine data-icon="inline-start" />
 			Sign a certificate
 		</Button>
-		{#if entity?.publicKey}
-			<Button size="sm" variant="outline" onclick={copyPublicKey}>
-				<Copy data-icon="inline-start" />
-				Copy public key
-			</Button>
-		{/if}
 	{/snippet}
 
 	{#if model && entity}
-		<div class="flex flex-col divide-y">
+		<Tabs.Content value="overview" class="flex flex-col divide-y">
+			{#if isSSH}
+				<Section
+					title="Public key"
+					icon={KeyRound}
+					description="Servers trust certificates signed by this key."
+				>
+					<CodeSnippet code={entity.publicKey} language="openssh" wrap />
+				</Section>
+			{:else}
+				<Section
+					title="Certificate"
+					icon={FileBadge}
+					description="Add it to a trust store to verify certificates signed by this CA."
+				>
+					<CodeSnippet code={entity.certificate} language="pem" />
+				</Section>
+			{/if}
+
+			{#if entity.previousPublicKey}
+				<Section
+					title="Previous key"
+					icon={History}
+					description={entity.previousTrustedUntil
+						? `Replaced by a rollover. Still trusted until ${formatTs(entity.previousTrustedUntil)}.`
+						: 'Replaced by a rollover.'}
+				>
+					<CodeSnippet
+						code={entity.previousPublicKey}
+						language={isSSH ? 'openssh' : 'pem'}
+						wrap={isSSH}
+					/>
+				</Section>
+			{/if}
+
+			<Section title="Identity" icon={Fingerprint}>
+				<DetailList
+					items={[
+						{
+							label: 'Algorithm',
+							value: `${CertificateKeyType[entity.keyType]}${entity.keyBits ? ` ${entity.keyBits}` : ''}`
+						},
+						{ label: 'Subject', value: entity.subject, mono: true, copy: true, wide: true },
+						{ label: 'Serial', value: entity.serialNumber, mono: true, copy: true, wide: true },
+						{
+							label: 'Public key',
+							value: isSSH ? undefined : entity.publicKey,
+							mono: true,
+							copy: true,
+							wide: true
+						},
+						{ label: 'Valid from', value: formatTs(entity.notBefore) },
+						{ label: 'Valid until', value: formatTs(entity.notAfter) }
+					]}
+				/>
+			</Section>
+		</Tabs.Content>
+
+		<Tabs.Content value="settings" class="flex flex-col divide-y">
 			<Section title="Details" icon={FileText}>
 				<Field.Group class="gap-4">
 					<Field.Field>
@@ -227,47 +279,26 @@
 				</Field.Group>
 			</Section>
 
-			<Section title="Key" icon={KeyRound}>
-				<DetailList
-					items={[
-						{
-							label: 'Algorithm',
-							value: `${CertificateKeyType[entity.keyType]}${entity.keyBits ? ` ${entity.keyBits}` : ''}`
-						},
-						{ label: 'Subject', value: entity.subject, mono: true },
-						{ label: 'Serial', value: entity.serialNumber, mono: true, copy: true },
-						{ label: 'Valid from', value: formatTs(entity.notBefore) },
-						{ label: 'Valid until', value: formatTs(entity.notAfter) },
-						...(entity.previousTrustedUntil
-							? [
-									{
-										label: 'Previous key trusted until',
-										value: formatTs(entity.previousTrustedUntil)
-									}
-								]
-							: [])
-					]}
-				/>
-				<Field.Field>
-					<Field.Label>Accepted {isSSH ? 'client' : 'requester'} keys</Field.Label>
-					<ToggleGroup.Root
-						type="multiple"
-						variant="outline"
-						size="sm"
-						value={model.allowedKeyTypes.map(String)}
-						onValueChange={(v) => {
-							model.allowedKeyTypes = v.map(Number) as CertificateKeyType[];
-							save();
-						}}
-					>
-						{#each keyTypes as k (k.value)}
-							<ToggleGroup.Item value={String(k.value)}>{k.name}</ToggleGroup.Item>
-						{/each}
-					</ToggleGroup.Root>
-					<Field.Description
-						>Only these key types can get a certificate from this CA.</Field.Description
-					>
-				</Field.Field>
+			<Section
+				title="Accepted {isSSH ? 'client' : 'requester'} keys"
+				icon={KeyRound}
+				description="Only these key types can get a certificate from this CA."
+			>
+				<ToggleGroup.Root
+					type="multiple"
+					variant="outline"
+					size="sm"
+					aria-label="Accepted key types"
+					value={model.allowedKeyTypes.map(String)}
+					onValueChange={(v) => {
+						model.allowedKeyTypes = v.map(Number) as CertificateKeyType[];
+						save();
+					}}
+				>
+					{#each keyTypes as k (k.value)}
+						<ToggleGroup.Item value={String(k.value)}>{k.name}</ToggleGroup.Item>
+					{/each}
+				</ToggleGroup.Root>
 			</Section>
 
 			<Section title="Certificate lifetime" icon={Clock}>
@@ -382,6 +413,6 @@
 					}
 				]}
 			/>
-		</div>
+		</Tabs.Content>
 	{/if}
 </EntitySheet>
