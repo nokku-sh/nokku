@@ -18,6 +18,11 @@
 	};
 
 	function close(id: string, session: TerminalSession) {
+		// Nothing left to lose once the shell is gone.
+		if (session.state === 'disconnected' || session.state === 'error') {
+			removeSession(id);
+			return;
+		}
 		void confirm({
 			title: `Close ${session.username}@${session.daemonName}?`,
 			description: 'The shell ends and anything still running in it stops.',
