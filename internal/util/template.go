@@ -61,14 +61,10 @@ func ValidateCriticalOptions(m map[string]string) ([]byte, error) {
 		return []byte("{}"), nil
 	}
 
-	for k, v := range m {
+	// Values are checked at cert creation time.
+	for k := range m {
 		if _, ok := allowedCriticalOptions[criticalOption(k)]; !ok {
 			return nil, fmt.Errorf("invalid ssh critical option: %q", k)
-		}
-		// Values are checked at cert creation time.
-		if v != "" && k != string(coForceCommand) && k != string(coSourceAddress) &&
-			k != string(coVerifyRequired) {
-			return nil, fmt.Errorf("extension critical option %q must have empty value", k)
 		}
 	}
 	return json.Marshal(m)
