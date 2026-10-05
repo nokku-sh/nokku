@@ -3,6 +3,7 @@ package pki
 import (
 	"context"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -97,7 +98,8 @@ func TestRotateExpiringDrainsEveryDueCA(t *testing.T) {
 	// Another instance holds dueC, the pass must skip it instead of waiting.
 	dueC := seedCA(t, conn, ws, 320*24*time.Hour)
 	locked, release := make(chan struct{}), make(chan struct{})
-	go func() {
+	var holder sync.WaitGroup
+	holder.Go(func() {
 		_ = conn.WithTx(context.WithoutCancel(t.Context()), func(q *db.Queries) error {
 			if _, err := q.GetCAForUpdate(t.Context(), dueC.ID); err != nil {
 				return err
@@ -106,13 +108,15 @@ func TestRotateExpiringDrainsEveryDueCA(t *testing.T) {
 			<-release
 			return nil
 		})
-	}()
+	})
 	<-locked
 
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 	rotateExpiring(ctx, conn)
 	close(release)
+	// The lock is only gone once the holder has committed.
+	holder.Wait()
 	require.NoError(t, ctx.Err(), "a pass must finish on its own")
 
 	for _, ca := range []*db.CertificateAuthority{dueA, dueB} {
