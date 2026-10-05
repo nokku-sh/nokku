@@ -163,6 +163,7 @@
 	tab={sheet.tab}
 	onTabChange={(t) => (sheet.tab = t)}
 	saveState={autoSave.saveState}
+	saveHint={sheet.tab === 'settings'}
 	missing={query.isError}
 	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
