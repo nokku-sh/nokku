@@ -32,7 +32,9 @@
 			<div class="flex items-center gap-2 px-1 py-1.5">
 				<UserAvatar user={me.data} />
 				<div class="grid flex-1 text-sm leading-tight">
-					<span class="truncate font-semibold">{me.data?.name}</span>
+					<span class="truncate font-semibold">
+						{me.data?.name || me.data?.email.split('@')[0]}
+					</span>
 					<span class="truncate text-xs text-muted-foreground">{me.data?.email}</span>
 				</div>
 			</div>

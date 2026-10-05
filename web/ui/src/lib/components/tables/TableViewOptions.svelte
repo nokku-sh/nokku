@@ -24,12 +24,12 @@
 			{#each table
 				.getAllColumns()
 				.filter((col) => typeof col.accessorFn !== 'undefined' && col.getCanHide() && !['id', 'userId'].includes(col.id)) as column (column)}
+				{@const header = column.columnDef.header}
 				<DropdownMenu.CheckboxItem
 					bind:checked={() => column.getIsVisible(), (v) => column.toggleVisibility(!!v)}
-					class="capitalize"
 					closeOnSelect={false}
 				>
-					{column.id}
+					{typeof header === 'string' ? header : column.id}
 				</DropdownMenu.CheckboxItem>
 			{/each}
 		</DropdownMenu.Group>
