@@ -127,7 +127,7 @@ func (q *Queries) DashboardCounts(ctx context.Context, arg *DashboardCountsParam
 const listOpenRecordings = `-- name: ListOpenRecordings :many
 SELECT
   r.id,
-  r.daemon_id,
+  d.id AS daemon_id,
   r.username,
   r.started_at,
   d.name AS daemon_name

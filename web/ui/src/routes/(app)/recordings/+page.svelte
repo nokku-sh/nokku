@@ -64,7 +64,9 @@
 		columnHelper.accessor('daemonId', {
 			header: 'Daemon',
 			cell: ({ row }) =>
-				renderComponent(TextCell, { label: daemonName.get(row.original.daemonId) ?? '—' })
+				renderComponent(TextCell, {
+					label: daemonName.get(row.original.daemonId) ?? (row.original.daemonName || '—')
+				})
 		}),
 		columnHelper.accessor('username', {
 			header: 'User',

@@ -128,7 +128,8 @@ type PrincipalGrant struct {
 type Recording struct {
 	ID          string                `json:"id"`
 	WorkspaceID string                `json:"workspaceId"`
-	DaemonID    string                `json:"daemonId"`
+	DaemonID    *string               `json:"daemonId"`
+	DaemonName  string                `json:"daemonName"`
 	Username    string                `json:"username"`
 	Key         crypto.EncryptedBytes `json:"key"`
 	StartedAt   time.Time             `json:"startedAt"`
