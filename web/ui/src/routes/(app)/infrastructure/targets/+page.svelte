@@ -14,7 +14,6 @@
 	import {
 		ActionCell,
 		AvatarCell,
-		PrincipalsCell,
 		TagsCell,
 		TimeCell
 	} from '#lib/components/tables/cells/index.js';
@@ -81,9 +80,8 @@
 		columnHelper.display({
 			id: 'principals',
 			header: 'Principals',
-			cell: ({ row }) => {
-				return renderComponent(PrincipalsCell, { targetId: row.original.id });
-			}
+			cell: ({ row }) =>
+				renderComponent(TagsCell, { tags: row.original.principals.map((p) => p.username) })
 		}),
 		columnHelper.accessor('tags', {
 			header: 'Tags',
