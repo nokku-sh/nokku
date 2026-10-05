@@ -92,7 +92,8 @@ func (r *Recording) ToProto() *nokkuv1.Recording {
 	return &nokkuv1.Recording{
 		Id:          &r.ID,
 		WorkspaceId: &r.WorkspaceID,
-		DaemonId:    &r.DaemonID,
+		DaemonId:    r.DaemonID,
+		DaemonName:  &r.DaemonName,
 		Username:    &r.Username,
 		StartedAt:   SafeTimestamp(&r.StartedAt),
 		EndedAt:     SafeTimestamp(r.EndedAt),

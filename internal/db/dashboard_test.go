@@ -105,3 +105,25 @@ func touchDaemon(t *testing.T, c *Connection, id string, at time.Time) {
 		t.Fatalf("touch daemon: %v", err)
 	}
 }
+
+// A deleted server must not take the record of what was done on it along.
+func TestRecordingOutlivesDaemon(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	id := uuid.NewV7().String()
+	if _, err := c.Sys().CreateRecording(t.Context(), &CreateRecordingParams{
+		ID: id, WorkspaceID: f.ws, DaemonID: f.daemon, Username: "deploy", Key: []byte("key"),
+	}); err != nil {
+		t.Fatalf("create recording: %v", err)
+	}
+	if _, err := c.Sys().DeleteDaemon(t.Context(), f.daemon); err != nil {
+		t.Fatalf("delete daemon: %v", err)
+	}
+	rec, err := c.Sys().GetRecording(t.Context(), id)
+	if err != nil {
+		t.Fatalf("the recording went with its daemon: %v", err)
+	}
+	if rec.DaemonID != nil || rec.DaemonName != "d" {
+		t.Errorf("got daemon %v named %q, want none named d", rec.DaemonID, rec.DaemonName)
+	}
+}

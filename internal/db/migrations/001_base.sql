@@ -314,7 +314,9 @@ CREATE TABLE IF NOT EXISTS principal_grants (
 CREATE TABLE IF NOT EXISTS recordings (
   id UUID PRIMARY KEY DEFAULT uuidv7(), -- the session id
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  daemon_id UUID NOT NULL REFERENCES daemons (id) ON DELETE CASCADE,
+  -- A recording outlives its daemon, only retention deletes it.
+  daemon_id UUID REFERENCES daemons (id) ON DELETE SET NULL,
+  daemon_name TEXT NOT NULL, -- as it was when the session ran
   username TEXT NOT NULL,
   key BYTEA NOT NULL, -- encrypts this recording's frames, stored encrypted
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

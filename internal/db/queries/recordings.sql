@@ -1,8 +1,17 @@
 -- name: CreateRecording :one
 INSERT INTO
-  recordings (id, workspace_id, daemon_id, username, key)
-VALUES
-  (@id, @workspace_id, @daemon_id, @username, @key)
+  recordings (id, workspace_id, daemon_id, daemon_name, username, key)
+SELECT
+  @id,
+  @workspace_id,
+  d.id,
+  d.name,
+  @username,
+  @key
+FROM
+  daemons d
+WHERE
+  d.id = @daemon_id
 RETURNING
   *;
 

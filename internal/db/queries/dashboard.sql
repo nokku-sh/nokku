@@ -56,7 +56,7 @@ LIMIT
 -- behind a daemon that is still connected.
 SELECT
   r.id,
-  r.daemon_id,
+  d.id AS daemon_id,
   r.username,
   r.started_at,
   d.name AS daemon_name

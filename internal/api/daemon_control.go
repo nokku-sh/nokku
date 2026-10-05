@@ -271,7 +271,7 @@ func (s *daemonControlService) resolveUpload(
 
 		existing, err := q.GetRecording(ctx, rm.GetRecordingId())
 		if err == nil {
-			if existing.DaemonID != daemonID {
+			if existing.DaemonID == nil || *existing.DaemonID != daemonID {
 				return errors.New("recording belongs to another daemon")
 			}
 			if existing.Complete {
