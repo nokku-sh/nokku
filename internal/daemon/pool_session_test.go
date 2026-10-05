@@ -194,7 +194,7 @@ func TestPool_StartSession_EndsWithContext(t *testing.T) {
 
 // TestPool_StartSession walks a full web session over a real in-process SSH
 // server: env and pty reach sshd through the relay, stdin echoes back on
-// Stdout, resizes arrive, and CloseSession tears everything down.
+// Stdout, resizes arrive, and Close tears everything down.
 func TestPool_StartSession(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -252,10 +252,10 @@ collect:
 		time.Sleep(time.Millisecond)
 	}
 
-	// CloseSession must end the session, clean the map, and free the relay
+	// Close must end the session, clean the map, and free the relay
 	// slot.
-	p.CloseSession("web-1")
-	waitStdoutClosed(t, s, "CloseSession")
+	s.Close()
+	waitStdoutClosed(t, s, "Close")
 	deadline = time.After(2 * time.Second)
 	for {
 		sessions, slots := slotsHeld(t, p)
@@ -264,7 +264,7 @@ collect:
 		}
 		select {
 		case <-deadline:
-			t.Fatalf("leak after CloseSession: %d sessions, %d slots held", sessions, slots)
+			t.Fatalf("leak after Close: %d sessions, %d slots held", sessions, slots)
 		default:
 		}
 		time.Sleep(time.Millisecond)

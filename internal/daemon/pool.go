@@ -169,10 +169,6 @@ func (p *Pool) shutdown() {
 	p.mu.Unlock()
 }
 
-func (p *Pool) done() <-chan struct{} {
-	return p.shutdownCtx.Done()
-}
-
 func (p *Pool) registerDaemon(ctx context.Context, daemonID, workspaceID string) *daemonConn {
 	ctx, cancel := context.WithCancel(ctx)
 	c := &daemonConn{

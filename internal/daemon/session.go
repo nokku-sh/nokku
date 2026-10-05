@@ -66,7 +66,7 @@ func (s *Session) Resize(width, height uint32) error {
 func (s *Session) Close() { s.close() }
 
 // StartSession lives until ctx ends, the shell ends, the daemon drops,
-// CloseSession, or the TTL.
+// Close, or the TTL.
 func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, error) {
 	if cfg.CA == nil || !cfg.CA.IsActive {
 		return nil, ErrCAInactive
@@ -183,10 +183,4 @@ func (p *Pool) ListSessions(daemonID string) []*nokkuv1.DaemonSession {
 		}
 	}
 	return result
-}
-
-func (p *Pool) CloseSession(sessionID string) {
-	if s := p.GetSession(sessionID); s != nil {
-		s.close()
-	}
 }
