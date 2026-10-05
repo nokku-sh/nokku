@@ -65,11 +65,7 @@
 		}),
 		columnHelper.accessor('memberCount', {
 			header: 'Members',
-			cell: ({ row }) =>
-				renderComponent(MemberCell, {
-					teamId: row.original.id,
-					memberCount: row.original.memberCount
-				})
+			cell: ({ row }) => renderComponent(MemberCell, { memberCount: row.original.memberCount })
 		}),
 		columnHelper.accessor('updatedAt', {
 			header: 'Updated',
