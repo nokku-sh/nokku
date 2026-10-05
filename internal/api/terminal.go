@@ -23,6 +23,9 @@ const (
 	wsReadLimit = 64 * 1024
 	wsTimeout   = 15 * time.Second
 	wsPingEvery = 20 * time.Second
+	// Tells the browser the shell ended on its own (exit, Ctrl+D), so it drops
+	// the tab. Timeouts and dropped daemons close normally and keep it.
+	wsShellExited websocket.StatusCode = 4000
 
 	// The browser opens the socket right after CreateSession.
 	sessionTicketTTL = 30 * time.Second
@@ -183,7 +186,11 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 				return
 			}
 		}
-		_ = conn.Close(websocket.StatusNormalClosure, "session ended")
+		code, reason := websocket.StatusNormalClosure, "session ended"
+		if sess.Exited() {
+			code, reason = wsShellExited, "shell exited"
+		}
+		_ = conn.Close(code, reason)
 	}()
 
 	for {

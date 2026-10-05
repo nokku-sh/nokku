@@ -204,6 +204,34 @@ func TestTerminal_CloseTeardown(t *testing.T) {
 	}
 }
 
+// TestTerminal_ShellExit: Ctrl+D ends the remote shell, which reports its exit
+// status. That is the only ending the web terminal closes its tab for.
+func TestTerminal_ShellExit(t *testing.T) {
+	srv := sshtest.NewServer(t)
+	term := dialForTest(t, srv, testConfig(t, srv))
+	defer term.Close()
+	waitForShell(t, srv)
+
+	if _, err := term.Write([]byte{0x04}); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case _, ok := <-term.Stdout():
+			if ok {
+				continue
+			}
+			if !term.Exited() {
+				t.Error("Exited should be true after the shell reported its exit status")
+			}
+			return
+		case <-deadline:
+			t.Fatal("stdout not closed after the shell exited")
+		}
+	}
+}
+
 // TestTerminal_TransportDeath: when the server drops the connection the
 // terminal closes Stdout, which is how the pool wiring notices a dead relay.
 func TestTerminal_TransportDeath(t *testing.T) {
@@ -217,6 +245,9 @@ func TestTerminal_TransportDeath(t *testing.T) {
 		select {
 		case _, ok := <-term.Stdout():
 			if !ok {
+				if term.Exited() {
+					t.Error("a dropped connection is not a shell exit")
+				}
 				return
 			}
 		case <-deadline:

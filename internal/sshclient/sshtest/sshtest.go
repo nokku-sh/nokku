@@ -11,7 +11,6 @@ import (
 	crand "crypto/rand"
 	"encoding/pem"
 	"errors"
-	"io"
 	"net"
 	"slices"
 	"sync"
@@ -353,9 +352,20 @@ func (s *Server) handleSession(newCh ssh.NewChannel) {
 	}
 }
 
+// echo is the fake shell. Ctrl+D ends it with exit status 0, like a real one.
 func echo(ch ssh.Channel) {
 	defer func() { _ = ch.Close() }()
-	_, _ = io.Copy(ch, ch)
+	buf := make([]byte, 1024)
+	for {
+		n, err := ch.Read(buf)
+		if bytes.IndexByte(buf[:n], 0x04) >= 0 {
+			_, _ = ch.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{0}))
+			return
+		}
+		if _, werr := ch.Write(buf[:n]); werr != nil || err != nil {
+			return
+		}
+	}
 }
 
 func mustSigner(t testing.TB, priv ed25519.PrivateKey) ssh.Signer {
