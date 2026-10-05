@@ -109,7 +109,7 @@ function leaves(items: RouteItem[]): RouteItem[] {
 	return items.flatMap((item) => (item.items?.length ? leaves(item.items) : [item]));
 }
 
-export const pageRoutes = [...leaves(Object.values(AppRoutes).flat()), ...leaves(UserRoutes)];
+const pageRoutes = [...leaves(Object.values(AppRoutes).flat()), ...leaves(UserRoutes)];
 
 /** The nav entry for a path, used for titles, icons and crumbs. */
 export function routeFor(path: string): RouteItem | undefined {
