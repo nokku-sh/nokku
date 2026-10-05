@@ -2,7 +2,7 @@
 	import SecretReveal from '#lib/components/blocks/SecretReveal.svelte';
 	import { UseClipboard } from '#lib/hooks/use-clipboard.svelte.js';
 	import { Check } from '@lucide/svelte';
-	import { backupCode, password } from '#lib/api/credential.svelte.js';
+	import { backupCode } from '#lib/api/credential.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import Section from '#lib/components/sheets/Section.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';

@@ -20,7 +20,7 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import { DaemonStatus, type Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
-	import { confirm, usePagination, useSheet } from '#lib/hooks/index.js';
+	import { usePagination, useSheet } from '#lib/hooks/index.js';
 	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { BotOff, CircleCheckBig, Clock, Rocket, Trash2, Wifi, WifiOff } from '@lucide/svelte';

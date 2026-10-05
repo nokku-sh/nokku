@@ -18,7 +18,7 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import StorageQuotaPill from './StorageQuotaPill.svelte';
-	import { confirm, createModalState, usePagination } from '#lib/hooks/index.js';
+	import { createModalState, usePagination } from '#lib/hooks/index.js';
 	import { plural } from '#lib/api/bulk.js';
 	import { formatBytes } from '#lib/utils.js';
 	import type { Recording } from '#lib/gen/nokku/v1/recordings_pb.js';
