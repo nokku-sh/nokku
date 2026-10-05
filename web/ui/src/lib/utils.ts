@@ -25,10 +25,7 @@ export const toDate = (ts: Timestamp | null | undefined): Date =>
 	ts ? timestampDate(ts) : new Date();
 
 export const DateValueFormat = (date: DateValue | null | undefined) => {
-	const format = new DateFormatter('en-US', {
-		dateStyle: 'long',
-		timeStyle: 'short'
-	});
+	const format = new DateFormatter('en-US', { dateStyle: 'long' });
 	return date ? format.format(date.toDate(getLocalTimeZone())) : '';
 };
 type DateStyle =
