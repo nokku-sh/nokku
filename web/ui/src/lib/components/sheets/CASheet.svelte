@@ -177,7 +177,7 @@
 		{#if model?.isDefault}
 			<Badge variant="warning"><Star data-icon="inline-start" />Default</Badge>
 		{/if}
-		{#if entity && !entity.isActive}
+		{#if model && !model.isActive}
 			<Badge variant="destructive">Inactive</Badge>
 		{/if}
 	{/snippet}
@@ -272,6 +272,20 @@
 							checked={model.isDefault}
 							onCheckedChange={(v) => {
 								model.isDefault = v;
+								save();
+							}}
+						/>
+					</Field.Field>
+					<Field.Field orientation="horizontal">
+						<Field.Content>
+							<Field.Label for="ca-active">Active</Field.Label>
+							<Field.Description>An inactive CA signs no new certificates.</Field.Description>
+						</Field.Content>
+						<Switch
+							id="ca-active"
+							checked={model.isActive}
+							onCheckedChange={(v) => {
+								model.isActive = v;
 								save();
 							}}
 						/>
