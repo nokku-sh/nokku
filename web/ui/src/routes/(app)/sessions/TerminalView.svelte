@@ -26,7 +26,8 @@
 	});
 </script>
 
+<!-- xterm only fills whole rows, the terminal color covers the rest. -->
 <div
-	class={['h-full w-full overflow-hidden rounded-b-lg', !visible && 'hidden']}
+	class={['h-full w-full overflow-hidden bg-terminal', !visible && 'hidden']}
 	{@attach mount}
 ></div>

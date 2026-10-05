@@ -275,11 +275,14 @@
 		background-color: color-mix(in oklch, var(--muted-foreground) 60%, transparent);
 	}
 
-	.xterm-screen {
-		padding: 4px !important;
-	}
+	/* The fit addon only subtracts padding set on .xterm itself. Anywhere else clips the last row. */
 	.xterm {
+		padding: 4px;
 		overflow: hidden;
+	}
+	/* xterm.css paints this black, and it sits behind the padding. */
+	.xterm .xterm-viewport {
+		background-color: var(--terminal) !important;
 	}
 }
 
