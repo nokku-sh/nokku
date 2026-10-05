@@ -6,7 +6,6 @@
 		ts: Timestamp | null | undefined;
 		fallback?: string;
 		emphasize?: 'absolute' | 'relative';
-		align?: 'left' | 'right';
 		/** Audit grade time with seconds, in mono. */
 		precise?: boolean;
 		utc?: boolean;
@@ -16,7 +15,6 @@
 		ts,
 		fallback = '-',
 		emphasize = 'absolute',
-		align = 'left',
 		precise = false,
 		utc = false
 	}: Props = $props();
@@ -30,12 +28,7 @@
 	const secondaryText = $derived(emphasize === 'absolute' ? relativeText : absoluteText);
 </script>
 
-<div
-	class={[
-		'flex flex-col whitespace-nowrap',
-		align === 'right' ? 'items-end text-right' : 'items-start'
-	]}
->
+<div class="flex flex-col items-start whitespace-nowrap">
 	{#if !ts}
 		<span class="text-sm text-muted-foreground">{fallback}</span>
 	{:else}

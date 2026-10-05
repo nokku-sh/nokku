@@ -124,7 +124,6 @@
 
 	const bulkActions: BulkAction<Target>[] = [
 		{
-			type: 'button',
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',

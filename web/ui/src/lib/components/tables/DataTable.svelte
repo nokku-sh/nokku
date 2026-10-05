@@ -40,7 +40,6 @@
 		data?: TData[];
 		columns: ColumnDef<DataTableFeatures, TData>[];
 		bulkActions?: BulkAction<TData>[] | undefined;
-		enableRowSelection?: boolean;
 		/** Set for server-side pagination, the query then reads `usePagination().args`. */
 		rowCount?: number;
 		isLoading?: boolean;
@@ -60,7 +59,6 @@
 		data = [],
 		columns,
 		bulkActions,
-		enableRowSelection,
 		rowCount,
 		isLoading = false,
 		emptyState = {
@@ -86,7 +84,7 @@
 		onRowClick(row);
 	}
 
-	const hasSelection = $derived(enableRowSelection ?? (bulkActions && bulkActions.length > 0));
+	const hasSelection = $derived(!!bulkActions?.length);
 
 	const pageSizeOptions = [10, 15, 20, 30, 50, 100];
 	const pager = usePagination();

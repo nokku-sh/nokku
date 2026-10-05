@@ -4,7 +4,7 @@
 	type Props = {
 		value: string;
 	};
-	let { value = $bindable(''), ...restProps }: Props = $props();
+	let { value, ...restProps }: Props = $props();
 </script>
 
 <Badge {...restProps}>

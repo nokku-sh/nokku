@@ -44,7 +44,6 @@
 
 	const bulkActions: BulkAction<ServiceAccount>[] = [
 		{
-			type: 'button',
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',
