@@ -46,7 +46,7 @@ export const team = {
 
 	create: () =>
 		useMutation(TeamService.method.createTeam, {
-			onSuccess: () => toast.success('Team created!')
+			onSuccess: () => toast.success('Team created')
 		}),
 	update: () => useMutation(TeamService.method.updateTeam),
 	delete: () =>

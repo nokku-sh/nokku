@@ -77,7 +77,7 @@ export const target = {
 
 	create: () =>
 		useMutation(TargetService.method.createTarget, {
-			onSuccess: () => toast.success('Target created!')
+			onSuccess: () => toast.success('Target created')
 		}),
 	update: () => useMutation(TargetService.method.updateTarget),
 	delete: () =>

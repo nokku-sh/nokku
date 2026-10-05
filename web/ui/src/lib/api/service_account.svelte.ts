@@ -33,7 +33,7 @@ export const serviceAccount = {
 
 	create: () =>
 		useMutation(ServiceAccountService.method.createServiceAccount, {
-			onSuccess: () => toast.success('Service account created!')
+			onSuccess: () => toast.success('Service account created')
 		}),
 	update: () => useMutation(ServiceAccountService.method.updateServiceAccount),
 	delete: () => useMutation(ServiceAccountService.method.deleteServiceAccount),

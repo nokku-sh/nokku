@@ -35,7 +35,7 @@ export const ca = {
 
 	create: () =>
 		useMutation(CertificateService.method.createCertificateAuthority, {
-			onSuccess: () => toast.success('Certificate Authority created!')
+			onSuccess: () => toast.success('Certificate authority created')
 		}),
 	update: () => useMutation(CertificateService.method.updateCertificateAuthority),
 	delete: () => useMutation(CertificateService.method.deleteCertificateAuthority),
@@ -51,7 +51,7 @@ export const ca = {
 					toast.success('Rollover skipped');
 					return;
 				}
-				toast.success('Certificate Authority rolled over');
+				toast.success('Certificate authority rolled over');
 			}
 		})
 };
