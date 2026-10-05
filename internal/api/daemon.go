@@ -62,9 +62,15 @@ func (s *daemonService) UpdateDaemon(
 		if config == nil {
 			config = base.Config
 		}
+		// The query takes the status as a value, so an unset one would
+		// overwrite an accept or reject with zero.
+		status := req.GetStatus()
+		if status == nokkuv1.DaemonStatus_DAEMON_STATUS_UNSPECIFIED {
+			status = base.Status
+		}
 		_, err = q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
 			DaemonID: req.GetId(),
-			Status:   req.GetStatus(),
+			Status:   status,
 			Config:   config,
 		})
 		return err

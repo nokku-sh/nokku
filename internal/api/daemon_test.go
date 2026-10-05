@@ -120,6 +120,8 @@ func TestEnrollDaemon(t *testing.T) {
 	want.RecordSessions = new(false)
 	assert.True(t, proto.Equal(want, got.GetDaemon().GetConfig()),
 		"an explicit off survives, unset fields read as the defaults, got %v", got.GetDaemon().GetConfig())
+	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, got.GetDaemon().GetStatus(),
+		"a config change leaves the status alone")
 
 	// The same key enrolls into the same daemon, even with the token used up.
 	again, err := enroll(created.GetSecret(), key)
