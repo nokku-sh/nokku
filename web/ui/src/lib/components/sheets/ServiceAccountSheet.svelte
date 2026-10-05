@@ -13,17 +13,8 @@
 	import { ServiceAccountSchema } from '#lib/gen/nokku/v1/service_account_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs, toDate } from '#lib/utils.js';
-	import {
-		Bot,
-		FileText,
-		Info,
-		KeyRound,
-		ShieldCheck,
-		TriangleAlert,
-		UserCog
-	} from '@lucide/svelte';
+	import { Bot, FileText, Settings2, ShieldCheck, TriangleAlert, UserCog } from '@lucide/svelte';
 	import DangerZone from './DangerZone.svelte';
-	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';
 	import Section from './Section.svelte';
 
@@ -83,12 +74,13 @@
 		save();
 	}}
 	tabs={[
-		{ value: 'overview', label: 'Overview', icon: Info },
-		{ value: 'access', label: 'Access', icon: ShieldCheck }
+		{ value: 'access', label: 'Access', icon: ShieldCheck },
+		{ value: 'settings', label: 'Settings', icon: Settings2 }
 	]}
 	tab={sheet.tab}
 	onTabChange={(t) => (sheet.tab = t)}
 	saveState={autoSave.saveState}
+	saveHint={sheet.tab === 'settings'}
 	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
 	{#snippet media()}
@@ -104,39 +96,31 @@
 		{#if expired}
 			<Badge variant="destructive">Expired</Badge>
 		{:else if expiresSoon}
-			<Badge variant="warning">Expires {formatTs(entity?.expiresAt, 'relative')}</Badge>
+			<Badge variant="warning" title={formatTs(entity?.expiresAt)}>
+				Expires {formatTs(entity?.expiresAt, 'relative')}
+			</Badge>
+		{:else}
+			<span>
+				· {entity?.expiresAt ? `Expires ${formatTs(entity.expiresAt)}` : 'Never expires'}
+			</span>
 		{/if}
 	{/snippet}
 
 	{#if model && entity}
-		<Tabs.Content value="overview" class="flex flex-col divide-y">
+		<Tabs.Content value="access" class="flex flex-col gap-5">
 			{#if expired}
-				<div class="pb-5">
-					<Alert.Root variant="destructive">
-						<TriangleAlert />
-						<Alert.Title>The token has expired</Alert.Title>
-						<Alert.Description>
-							Automation using it is failing. Create a new service account to get a fresh token.
-						</Alert.Description>
-					</Alert.Root>
-				</div>
+				<Alert.Root variant="destructive">
+					<TriangleAlert />
+					<Alert.Title>The token has expired</Alert.Title>
+					<Alert.Description>
+						Automation using it is failing. Create a new service account to get a fresh token.
+					</Alert.Description>
+				</Alert.Root>
 			{/if}
+			<SubjectAccess subjectId={entity.id} kind={SubjectKind.SERVICE_ACCOUNT} name={entity.name} />
+		</Tabs.Content>
 
-			<Section title="Token" icon={KeyRound}>
-				<DetailList
-					items={[
-						{
-							label: 'Expires',
-							value: entity.expiresAt ? formatTs(entity.expiresAt) : 'Never'
-						},
-						{
-							label: 'Last used',
-							value: entity.lastUsedAt ? formatTs(entity.lastUsedAt, 'relative') : 'Never'
-						}
-					]}
-				/>
-			</Section>
-
+		<Tabs.Content value="settings" class="flex flex-col divide-y">
 			<Section
 				title="Workspace role"
 				icon={UserCog}
@@ -194,10 +178,6 @@
 					}
 				]}
 			/>
-		</Tabs.Content>
-
-		<Tabs.Content value="access">
-			<SubjectAccess subjectId={entity.id} kind={SubjectKind.SERVICE_ACCOUNT} name={entity.name} />
 		</Tabs.Content>
 	{/if}
 </EntitySheet>
