@@ -39,8 +39,10 @@
 		tabs?: SheetTab[];
 		tab?: string;
 		onTabChange?: (tab: string) => void;
-		/** Shows the autosave footer. */
+		/** Shows the autosave footer while something is saving or just saved. */
 		saveState?: SaveState;
+		/** Keeps the footer up with a hint while idle. For tabs that hold autosaved fields. */
+		saveHint?: boolean;
 		media?: Snippet;
 		subtitle?: Snippet;
 		/** Primary actions under the title. */
@@ -63,6 +65,7 @@
 		tab,
 		onTabChange,
 		saveState,
+		saveHint = false,
 		media,
 		subtitle,
 		actions,
@@ -214,7 +217,7 @@
 			</div>
 		{/if}
 
-		{#if saveState !== undefined && !loading && !missing}
+		{#if saveState !== undefined && !loading && !missing && (saveHint || saveState !== 'idle')}
 			<Sheet.Footer class="border-t px-5 py-3">
 				<SaveStatus state={saveState} idleText="Changes save automatically" />
 			</Sheet.Footer>
