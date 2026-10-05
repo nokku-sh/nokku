@@ -8,16 +8,11 @@
 	import { PartyPopper, CircleX, Users, Clock } from '@lucide/svelte';
 	import { invite } from '#lib/api/workspaces.svelte.js';
 	import { inviteToken } from '#lib/store.svelte.js';
-	import { formatTs, toDate } from '#lib/utils.js';
+	import { formatTs } from '#lib/utils.js';
 
 	const invitation = invite.get();
 	const claimInvitation = invite.claim();
 	let open = $derived(!!inviteToken.current);
-
-	let expired = $derived.by(() => {
-		if (invitation.isSuccess && invitation.data !== undefined) return false;
-		return toDate(invitation.data?.expiresAt) < new Date();
-	});
 
 	$effect(() => {
 		if (!open) clearTokens();
@@ -41,7 +36,7 @@
 				<Spinner class="size-8 text-muted-foreground" />
 				<p class="text-sm text-muted-foreground">Verifying invitation…</p>
 			</div>
-		{:else if invitation.isError || expired}
+		{:else if invitation.isError}
 			<Dialog.Header class="items-center text-center">
 				<div
 					class="mx-auto flex size-12 items-center justify-center rounded-full bg-destructive/10"
