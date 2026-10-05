@@ -8,6 +8,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/jackc/pgx/v5"
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/internal/crypto"
@@ -184,5 +185,35 @@ func TestEnrollRejectsBadToken(t *testing.T) {
 	}
 	if quota {
 		t.Fatal("quota checked before the token verified")
+	}
+}
+
+type failingConn struct{}
+
+func (failingConn) WithTx(_ context.Context, fn func(*db.Queries) error) error {
+	return fn(db.New(failingTx{}))
+}
+
+func (c failingConn) WithWorkspace(ctx context.Context, fn func(*db.Queries) error) error {
+	return c.WithTx(ctx, fn)
+}
+
+type failingTx struct{ db.DBTX }
+
+func (failingTx) QueryRow(context.Context, string, ...any) pgx.Row { return failingRow{} }
+
+type failingRow struct{}
+
+func (failingRow) Scan(...any) error { return errors.New("connection lost") }
+
+// A database failure is not a verdict on the token.
+func TestEnroll_LookupFailureIsNotABadToken(t *testing.T) {
+	token, err := crypto.NewToken(crypto.WithID(uuid.NewV7().String()))
+	if err != nil {
+		t.Fatalf("new token: %v", err)
+	}
+	_, err = Enroll(t.Context(), failingConn{}, EnrollInput{Token: token.Plaintext})
+	if err == nil || errors.Is(err, ErrEnrollToken) {
+		t.Fatalf("err = %v, want the lookup failure", err)
 	}
 }
