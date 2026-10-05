@@ -26,10 +26,13 @@ var allowedAlgs = []jose.SignatureAlgorithm{
 const (
 	dpopNonceTTL = 5 * time.Minute
 	dpopMaxSkew  = time.Minute
+	// A marker lives 11 minutes, so this is room for about 150 proofs a second.
+	dpopReplayEntries = 100_000
 )
 
 // DPoPVerifier nonces are a stateless HMAC over a time bucket, so instances
-// share no storage for them. The cache catches jti reuse.
+// share no storage for them. The cache catches jti reuse. It is the
+// verifier's own, so nothing else can fill it and get a marker refused.
 type DPoPVerifier struct {
 	secret []byte
 	replay *cache.Memory
@@ -117,7 +120,9 @@ func (v *DPoPVerifier) Verify(
 	}
 
 	// Remember the jti as long as its proof could still be accepted.
-	added, err := v.replay.SetNX(ctx, "dpop:jti:"+c.JTI, nil, 2*dpopNonceTTL+dpopMaxSkew)
+	// Hashed so a long jti cannot bloat the store.
+	jti := sha256.Sum256([]byte(c.JTI))
+	added, err := v.replay.SetNX(ctx, string(jti[:]), nil, 2*dpopNonceTTL+dpopMaxSkew)
 	if err != nil {
 		return "", fmt.Errorf("%w: replay store: %w", errInvalidProof, err)
 	}

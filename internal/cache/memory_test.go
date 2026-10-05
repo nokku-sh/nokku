@@ -139,17 +139,37 @@ func TestMemorySetNXAfterExpiry(t *testing.T) {
 	}
 }
 
-func TestMemoryEviction(t *testing.T) {
+// A cache full of live entries refuses new keys instead of evicting, so no
+// caller can push out someone else's state.
+func TestMemoryFullRefusesNewKeys(t *testing.T) {
 	c := NewMemory(2)
-	ctx := context.Background()
+	ctx := t.Context()
 
-	for _, k := range []string{"a", "b", "c"} {
+	for _, k := range []string{"a", "b"} {
 		if err := c.Set(ctx, k, []byte(k), time.Minute); err != nil {
 			t.Fatalf("Set %q: %v", k, err)
 		}
 	}
-	if n := len(c.entries); n > 2 {
-		t.Fatalf("cache holds %d entries, want at most 2", n)
+	if err := c.Set(ctx, "c", nil, time.Minute); !errors.Is(err, errFull) {
+		t.Fatalf("Set on a full cache: err = %v, want errFull", err)
+	}
+	if added, err := c.SetNX(ctx, "c", nil, time.Minute); added || !errors.Is(err, errFull) {
+		t.Fatalf("SetNX on a full cache = %v, %v, want false, errFull", added, err)
+	}
+	for _, k := range []string{"a", "b"} {
+		if _, err := c.Get(ctx, k); err != nil {
+			t.Errorf("live entry %q gone: %v", k, err)
+		}
+	}
+	// An existing key needs no room.
+	if err := c.Set(ctx, "a", []byte("new"), time.Minute); err != nil {
+		t.Fatalf("overwrite on a full cache: %v", err)
+	}
+	if err := c.Delete(ctx, "b"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Set(ctx, "c", nil, time.Minute); err != nil {
+		t.Fatalf("Set after a delete made room: %v", err)
 	}
 }
 
@@ -166,8 +186,8 @@ func TestMemoryNoTTL(t *testing.T) {
 	}
 }
 
-// A full cache drops expired entries before live ones, and SetNX is bounded
-// too, so replay markers cannot grow the cache forever.
+// A full cache makes room from expired entries, and SetNX is bounded too, so
+// replay markers cannot grow the cache forever.
 func TestMemoryEvictsExpiredFirst(t *testing.T) {
 	c := NewMemory(2)
 	ctx := t.Context()

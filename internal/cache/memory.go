@@ -39,7 +39,9 @@ func (m *Memory) Get(_ context.Context, key string) ([]byte, error) {
 func (m *Memory) Set(_ context.Context, key string, value []byte, ttl time.Duration) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.evictLocked()
+	if _, ok := m.entries[key]; !ok && !m.makeRoomLocked() {
+		return errFull
+	}
 	m.entries[key] = memoryEntry{
 		value:     append([]byte(nil), value...),
 		expires:   time.Now().Add(ttl),
@@ -76,10 +78,13 @@ func (m *Memory) SetNX(
 ) (bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if e, ok := m.entries[key]; ok && !expired(e) {
+	e, ok := m.entries[key]
+	if ok && !expired(e) {
 		return false, nil
 	}
-	m.evictLocked()
+	if !ok && !m.makeRoomLocked() {
+		return false, errFull
+	}
 	m.entries[key] = memoryEntry{
 		value:     append([]byte(nil), value...),
 		expires:   time.Now().Add(ttl),
@@ -88,18 +93,15 @@ func (m *Memory) SetNX(
 	return true, nil
 }
 
-// evictLocked drops expired entries before live ones.
-func (m *Memory) evictLocked() {
+// makeRoomLocked only drops expired entries. A cache full of live ones
+// refuses the write, evicting would let any caller push out someone else's
+// state.
+func (m *Memory) makeRoomLocked() bool {
 	if len(m.entries) < m.max {
-		return
+		return true
 	}
 	maps.DeleteFunc(m.entries, func(_ string, e memoryEntry) bool { return expired(e) })
-	for k := range m.entries {
-		if len(m.entries) < m.max {
-			return
-		}
-		delete(m.entries, k)
-	}
+	return len(m.entries) < m.max
 }
 
 func expired(e memoryEntry) bool {
