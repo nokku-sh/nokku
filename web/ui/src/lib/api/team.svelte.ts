@@ -24,13 +24,12 @@ export const team = {
 			}),
 			() => ({ enabled: !!workspaceID.current && (when?.() ?? true) })
 		),
-	// Pass enabled to defer the fetch, e.g. until a hover card opens.
-	members: (teamId: MaybeGetter<string | undefined>, opts?: () => { enabled?: boolean }) =>
+	members: (teamId: MaybeGetter<string | undefined>) =>
 		useQuery(
 			TeamService.method.listTeamMembers,
 			() => ({ workspaceId: workspaceID.current, teamId: extract(teamId) }),
 			() => ({
-				enabled: !!workspaceID.current && !!extract(teamId) && (opts?.().enabled ?? true),
+				enabled: !!workspaceID.current && !!extract(teamId),
 				select: (res) => res.members
 			})
 		),
