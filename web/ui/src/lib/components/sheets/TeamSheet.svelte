@@ -16,7 +16,7 @@
 	import { SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
 	import { TeamSchema } from '#lib/gen/nokku/v1/team_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
-	import { Check, FileText, Info, ShieldCheck, UserPlus, Users } from '@lucide/svelte';
+	import { Check, FileText, Info, Settings2, ShieldCheck, UserPlus, Users } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import DangerZone from './DangerZone.svelte';
 	import EntitySheet from './EntitySheet.svelte';
@@ -94,11 +94,13 @@
 	}}
 	tabs={[
 		{ value: 'overview', label: 'Overview', icon: Info },
-		{ value: 'access', label: 'Access', icon: ShieldCheck }
+		{ value: 'access', label: 'Access', icon: ShieldCheck },
+		{ value: 'settings', label: 'Settings', icon: Settings2 }
 	]}
 	tab={sheet.tab}
 	onTabChange={(t) => (sheet.tab = t)}
 	saveState={autoSave.saveState}
+	saveHint={sheet.tab === 'settings'}
 	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
 	{#snippet media()}
@@ -112,9 +114,6 @@
 			{members.data?.length ?? entity?.memberCount ?? 0}
 			{(members.data?.length ?? entity?.memberCount) === 1 ? 'member' : 'members'}
 		</span>
-		{#if model?.description}
-			<span class="truncate">· {model.description}</span>
-		{/if}
 	{/snippet}
 
 	{#if model && entity}
@@ -184,7 +183,9 @@
 					</Empty.Root>
 				{/if}
 			</Section>
+		</Tabs.Content>
 
+		<Tabs.Content value="settings" class="flex flex-col divide-y">
 			<Section title="Details" icon={FileText}>
 				<Field.Group class="gap-4">
 					<Field.Field>
