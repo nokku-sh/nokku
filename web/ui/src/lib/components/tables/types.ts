@@ -4,7 +4,6 @@ import type { ConfirmOptions } from '#lib/hooks/use-confirm.svelte.js';
 import type { FilterOption } from '#lib/components/blocks/FilterPill.svelte';
 
 export type BulkAction<T> = {
-	type: 'button' | 'select';
 	label: string;
 	icon?: LucideIcon;
 	variant?: ButtonVariant;
@@ -13,11 +12,6 @@ export type BulkAction<T> = {
 	/** Asks first. The action runs inside the dialog, which shows its spinner. */
 	confirm?: (selectedItems: T[]) => ConfirmOptions;
 	onClick?: (selectedItems: T[]) => unknown;
-	options?: {
-		label: string;
-		value: string;
-		onClick: (selectedItems: T[], value: string) => Promise<void> | void;
-	}[];
 };
 
 export type FilterConfig = {

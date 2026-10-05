@@ -8,18 +8,14 @@
 		user: User | WorkspaceMember;
 	};
 	let { user, ...restProps }: Props = $props();
+
+	const name = $derived(user.name || user.email.split('@')[0]);
 </script>
 
 <div class="flex items-center gap-3" {...restProps}>
 	<UserAvatar {user} />
 	<div class="flex flex-col">
-		{#if user.name}
-			<span class="truncate text-sm font-medium" title={user.name}>{user.name}</span>
-		{:else}
-			<span class="truncate text-sm font-medium" title={user.email.split('@')[0]}>
-				{user.email.split('@')[0]}
-			</span>
-		{/if}
+		<span class="truncate text-sm font-medium" title={name}>{name}</span>
 		<span class="truncate text-xs text-muted-foreground" title={user.email}>
 			<CopyText value={user.email} mono />
 		</span>

@@ -143,7 +143,6 @@
 
 	const bulkActions: BulkAction<CertificateAuthority>[] = [
 		{
-			type: 'button',
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',

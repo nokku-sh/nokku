@@ -114,7 +114,6 @@
 
 	const bulkActions: BulkAction<Daemon>[] = [
 		{
-			type: 'button',
 			label: 'Approve',
 			icon: CircleCheckBig,
 			variant: 'default',
@@ -132,7 +131,6 @@
 			}
 		},
 		{
-			type: 'button',
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',

@@ -42,7 +42,6 @@
 
 	const bulkActions: BulkAction<Recording>[] = [
 		{
-			type: 'button',
 			label: 'Delete',
 			icon: Trash2,
 			variant: 'destructive',

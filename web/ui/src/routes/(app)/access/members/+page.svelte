@@ -39,7 +39,6 @@
 
 	const bulkActions: BulkAction<WorkspaceMember>[] = [
 		{
-			type: 'button',
 			label: 'Remove',
 			icon: Trash2,
 			variant: 'destructive',

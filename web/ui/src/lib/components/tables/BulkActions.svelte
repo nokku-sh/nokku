@@ -1,7 +1,6 @@
 <script lang="ts" generics="T">
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import * as Select from '#lib/components/ui/select/index.js';
 	import { Separator } from '#lib/components/ui/separator/index.js';
 	import { XIcon } from '@lucide/svelte';
 	import { slide } from 'svelte/transition';
@@ -56,40 +55,18 @@
 
 			<div class="flex flex-1 items-center gap-2 overflow-x-auto">
 				{#each actions as action (action.label)}
-					{#if action.type === 'button'}
-						<Button
-							variant={action.variant ?? 'ghost'}
-							size="sm"
-							class="h-8 {action.class ?? ''}"
-							onclick={() => run(action)}
-							disabled={action.disabled}
-						>
-							{#if action.icon}
-								<action.icon data-icon="inline-start" />
-							{/if}
-							{action.label}
-						</Button>
-					{:else if action.type === 'select' && action.options}
-						<Select.Root
-							type="single"
-							onValueChange={async (value) => {
-								const option = action.options?.find((o) => o.value === value);
-								await option?.onClick(items, value);
-								onClear?.();
-							}}
-						>
-							<Select.Trigger class="h-8">
-								{action.label}
-							</Select.Trigger>
-							<Select.Content>
-								<Select.Group>
-									{#each action.options as option (option.value)}
-										<Select.Item value={option.value}>{option.label}</Select.Item>
-									{/each}
-								</Select.Group>
-							</Select.Content>
-						</Select.Root>
-					{/if}
+					<Button
+						variant={action.variant ?? 'ghost'}
+						size="sm"
+						class="h-8 {action.class ?? ''}"
+						onclick={() => run(action)}
+						disabled={action.disabled}
+					>
+						{#if action.icon}
+							<action.icon data-icon="inline-start" />
+						{/if}
+						{action.label}
+					</Button>
 				{/each}
 			</div>
 
