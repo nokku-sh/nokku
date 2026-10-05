@@ -25,7 +25,7 @@
 	<HoverCard.Root bind:open openDelay={200}>
 		<HoverCard.Trigger>
 			<Badge variant="secondary" class="cursor-pointer gap-1.5 text-xs font-medium">
-				<Users class="h-3 w-3" />
+				<Users class="size-3" />
 				{memberCount}
 				{memberCount === 1 ? 'Member' : 'Members'}
 			</Badge>
@@ -60,7 +60,7 @@
 	</HoverCard.Root>
 {:else}
 	<Badge variant="outline" class="gap-1.5 text-xs">
-		<Users class="h-3 w-3" />
+		<Users class="size-3" />
 		No Members
 	</Badge>
 {/if}

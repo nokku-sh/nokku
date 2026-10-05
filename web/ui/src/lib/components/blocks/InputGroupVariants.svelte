@@ -154,7 +154,7 @@
 				title="Show password"
 				variant="ghost"
 				size="icon-xs"
-				class="h-7 w-7"
+				class="size-7"
 				onclick={() => (showPassword = !showPassword)}
 			>
 				{#if showPassword}
