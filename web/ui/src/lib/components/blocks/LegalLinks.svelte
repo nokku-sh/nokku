@@ -42,5 +42,14 @@
 		{/each}
 	</nav>
 {:else}
-	<span class={cn('text-xs text-muted-foreground', className)}>Powered by Nokku</span>
+	<span class={cn('text-xs text-muted-foreground', className)}>
+		Powered by <a
+			href="https://github.com/nokku-sh/nokku"
+			target="_blank"
+			rel="noopener"
+			class="transition-colors hover:text-foreground"
+		>
+			Nokku
+		</a>
+	</span>
 {/if}
