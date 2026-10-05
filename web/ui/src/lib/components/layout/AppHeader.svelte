@@ -21,7 +21,11 @@
 >
 	<div class="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
 		<Sidebar.Trigger class="-ml-1" />
-		<Separator orientation="vertical" class="mx-2 data-[orientation=vertical]:h-4" />
+		<!-- The trigger pads its icon, so the left margin is smaller to look centered. -->
+		<Separator
+			orientation="vertical"
+			class="mr-2 ml-px data-vertical:h-4 data-vertical:self-center"
+		/>
 
 		<nav aria-label="Location" class="flex min-w-0 items-center font-mono text-sm">
 			<a href="/" class="text-primary hover:underline" aria-label="Dashboard">~</a>
