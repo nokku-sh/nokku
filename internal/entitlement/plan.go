@@ -52,10 +52,12 @@ func featureInCatalog(code string) (Feature, bool) {
 const unlimited int64 = -1
 
 type Plan struct {
-	Name                  string
-	SeatCap               int64 // maximum members; unlimited = per-seat billing
-	ResourceCap           int64 // pooled cap on managed resources
-	RetentionDays         int64 // audit log and session recording retention
+	Name          string
+	SeatCap       int64 // maximum members; unlimited = per-seat billing
+	ResourceCap   int64 // pooled cap on managed resources
+	RetentionDays int64 // audit log and session recording retention
+	// RecordingStorageBytes is a stop for abuse, sized so that normal use
+	// runs into the retention first.
 	RecordingStorageBytes int64
 	Features              map[string]bool
 }
@@ -70,7 +72,7 @@ var catalog = map[string]Plan{
 		SeatCap:               5,
 		ResourceCap:           50,
 		RetentionDays:         7,
-		RecordingStorageBytes: 10 << 20,
+		RecordingStorageBytes: 1 << 30,
 		Features: map[string]bool{
 			FeatureOIDC: true,
 		},
@@ -80,7 +82,7 @@ var catalog = map[string]Plan{
 		SeatCap:               unlimited,
 		ResourceCap:           2000,
 		RetentionDays:         90,
-		RecordingStorageBytes: 100 << 20,
+		RecordingStorageBytes: 50 << 30,
 		Features: map[string]bool{
 			FeatureOIDC:        true,
 			FeatureEnforceSSO:  true,
@@ -93,7 +95,7 @@ var catalog = map[string]Plan{
 		SeatCap:               unlimited,
 		ResourceCap:           unlimited,
 		RetentionDays:         365,
-		RecordingStorageBytes: 1 << 30,
+		RecordingStorageBytes: 500 << 30,
 		Features: map[string]bool{
 			FeatureOIDC:           true,
 			FeatureEnforceSSO:     true,
