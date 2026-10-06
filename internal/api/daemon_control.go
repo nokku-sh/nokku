@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
@@ -192,7 +193,11 @@ func (s *daemonControlService) UploadRecording(
 		return nil, err
 	}
 
-	w, err := s.cfg.Record.NewWriter(ctx, rec)
+	// A daemon that dies takes ctx with it, and a canceled ctx would drop the
+	// object. What arrived by then is the evidence, so the writer outlives it.
+	wctx, abort := context.WithCancel(context.WithoutCancel(ctx))
+	defer abort()
+	w, err := s.cfg.Record.NewWriter(wctx, rec)
 	if err != nil {
 		slog.Error("open recording object", "recording_id", rec.ID, "error", err)
 		return nil, errInternal
@@ -235,17 +240,18 @@ receive:
 			complete = true
 		}
 	}
-	if err = stream.Err(); err != nil && !errors.Is(err, io.EOF) {
-		_ = w.Close()
-		return nil, newError(connect.CodeUnknown, "recording stream interrupted")
-	}
+	interrupted := stream.Err() != nil && !errors.Is(stream.Err(), io.EOF)
 	if err = w.Close(); err != nil {
 		slog.Error("commit recording object", "recording_id", rec.ID, "error", err)
 		return nil, errInternal
 	}
 
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		rec, err = q.SetRecordingComplete(ctx, &db.SetRecordingCompleteParams{
+	// The row is closed for an interrupted upload too, or it would count as
+	// a live session and as no bytes.
+	rowCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+	if err := s.cfg.Conn.WithWorkspace(rowCtx, func(q *db.Queries) (err error) {
+		rec, err = q.SetRecordingComplete(rowCtx, &db.SetRecordingCompleteParams{
 			ID:        rec.ID,
 			SizeBytes: size,
 			Complete:  complete,
@@ -255,13 +261,15 @@ receive:
 		return nil, err
 	}
 
-	if tooLarge {
+	switch {
+	case tooLarge:
 		// What arrived is kept as a cut recording. This code tells the daemon
 		// not to send it again.
 		return nil, newError(connect.CodeInvalidArgument, "recording is too large, the rest is cut")
-	}
-	if complete {
+	case complete:
 		s.cfg.Record.ScrubRecording(rec)
+	case interrupted:
+		return nil, newError(connect.CodeUnknown, "recording stream interrupted")
 	}
 
 	return &nokkuv1.UploadRecordingResponse{

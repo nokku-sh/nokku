@@ -52,6 +52,7 @@ func frameAAD(recordingID string, index uint64, kind byte) []byte {
 }
 
 // Writer commits on Close, so a dead daemon still leaves a partial recording.
+// A canceled ctx drops the object, an upload must not hand in the request's.
 type Writer struct {
 	w     io.WriteCloser
 	aead  cipher.AEAD

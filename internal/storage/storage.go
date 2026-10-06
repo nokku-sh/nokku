@@ -201,6 +201,7 @@ func (s *Storage) DeletePrefix(ctx context.Context, prefix string) error {
 }
 
 // CreateWriter commits on Close, so a truncated upload leaves a partial object.
+// Canceling ctx before that drops it.
 func (s *Storage) CreateWriter(
 	ctx context.Context,
 	name string,
