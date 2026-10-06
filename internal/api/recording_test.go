@@ -1,11 +1,14 @@
 package api
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/ecdsa"
 	"io"
 	"net/http/httptest"
 	"testing"
+	"time"
 	"uuid"
 
 	"connectrpc.com/connect"
@@ -89,6 +92,57 @@ func TestUploadRecordingEndsAtTheLimit(t *testing.T) {
 	assert.False(t, rec.Complete, "a cut recording is not a complete one")
 	assert.NotNil(t, rec.EndedAt)
 	assert.EqualValues(t, maxUploadBytes, storedBytes(t, cfg, id), "what arrived before the limit is kept")
+}
+
+// A daemon that dies in the middle leaves what it sent so far.
+func TestUploadRecordingKeepsWhatADeadDaemonSent(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	id := uuid.NewV7().String()
+
+	ctx, die := context.WithCancel(t.Context())
+	stream := openUpload(ctx, t, cfg, srv, key, enrolled.GetAccessToken(), id)
+	const sent = 3 * (32 << 10)
+	for range 3 {
+		require.NoError(t, sendChunk(stream, make([]byte, 32<<10)))
+	}
+	// The row shows up once the first chunk went through the handler.
+	require.Eventually(t, func() bool {
+		_, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+		return err == nil
+	}, 5*time.Second, 20*time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
+	die()
+
+	require.Eventually(t, func() bool {
+		rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+		return err == nil && rec.EndedAt != nil
+	}, 5*time.Second, 20*time.Millisecond, "the recording was never closed")
+	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+	require.NoError(t, err)
+	assert.EqualValues(t, sent, rec.SizeBytes)
+	assert.False(t, rec.Complete)
+	assert.EqualValues(t, sent, storedBytes(t, cfg, id))
+
+	// Back up, the daemon sends its whole file and that replaces the part.
+	var whole bytes.Buffer
+	zw := gzip.NewWriter(&whole)
+	_, err = zw.Write([]byte(`{"version":3,"term":{"cols":80,"rows":24}}` + "\n" + `[0.1,"o","done\r\n"]` + "\n"))
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+	stream = openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
+	require.NoError(t, sendChunk(stream, whole.Bytes()))
+	require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{
+		Msg: &nokkuv1.UploadRecordingRequest_Final{Final: &nokkuv1.RecordingFinal{}},
+	}))
+	_, err = stream.CloseAndReceive()
+	require.NoError(t, err)
+	rec, err = cfg.Conn.Sys().GetRecording(t.Context(), id)
+	require.NoError(t, err)
+	assert.True(t, rec.Complete)
+	assert.EqualValues(t, whole.Len(), rec.SizeBytes)
+	assert.EqualValues(t, whole.Len(), storedBytes(t, cfg, id))
 }
 
 // cappedStorage is the SaaS storage cap, a self-hosted instance has none.
