@@ -3,7 +3,7 @@ import { CONFIG } from "../constants/vars";
 import BaseLayout from "../layouts/BaseLayout";
 
 /**
- * Marketing email for announcing a new feature. Static HTML by design — the
+ * Marketing email for announcing a new feature. Static HTML by design. The
  * exported file (out/product-update.html) is meant to be uploaded to Resend
  * as-is, no template variables. Tweak the copy, re-export, and paste.
  */
@@ -17,7 +17,7 @@ export default function ProductUpdate() {
         Automated certificate rotation is here.
       </Heading>
       <Text className="m-0 mt-4 text-base leading-7 text-muted">
-        Short-lived certificates are the core of Nokku — but rotating them by hand across
+        Short-lived certificates are the core of Nokku, but rotating them by hand across
         hundreds of hosts is exactly the busywork you built this system to avoid. Starting today,
         the control plane handles the full rotation lifecycle for you.
       </Text>
@@ -34,7 +34,7 @@ export default function ProductUpdate() {
           <br />
           <br />
           <strong className="text-ink">Full audit trail.</strong> Every rotation is recorded with
-          the CA that signed it — enterprise audit retention included.
+          the CA that signed it, enterprise audit retention included.
         </Text>
       </Section>
 

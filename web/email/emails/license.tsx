@@ -6,7 +6,7 @@ import BaseLayout from "../layouts/BaseLayout";
  * Enterprise license key email, sent by the license worker (a separate repo)
  * when a Stripe license subscription is purchased or renewed. The exported
  * HTML (web/email/out/license.html) is embedded in the Go worker and rendered
- * with html/template — adjust copy here, re-export, and copy it over.
+ * with html/template. Adjust copy here, re-export, and copy it over.
  */
 export default function LicenseKey() {
   return (

@@ -3,7 +3,7 @@ import { CONFIG } from "../constants/vars";
 import BaseLayout from "../layouts/BaseLayout";
 
 /**
- * Marketing email for release digests. Static HTML by design — the exported
+ * Marketing email for release digests. Static HTML by design. The exported
  * file (out/changelog.html) is meant to be uploaded to Resend as-is, no
  * template variables. Update the version/date and list, re-export, and paste.
  */
@@ -25,7 +25,7 @@ export default function Changelog() {
         <Text className="m-0 text-xs font-bold uppercase tracking-[1.4px] text-brand">New</Text>
         <Text className="m-0 mt-2 text-sm leading-6 text-muted">
           <strong className="text-ink">SAML SSO</strong> for enterprise domains, alongside the
-          existing OIDC support — map any IdP attribute to your groups.
+          existing OIDC support. Map any IdP attribute to your groups.
           <br />
           <br />
           <strong className="text-ink">Policy dry-run mode</strong> on the CLI: preview which
@@ -53,7 +53,7 @@ export default function Changelog() {
         <Text className="m-0 text-sm font-bold text-ink">Upgrade notes</Text>
         <Text className="m-0 mt-1 text-sm leading-6 text-muted">
           Self-hosted: update the control plane and{" "}
-          <code className="rounded bg-cloud px-1 font-mono">nokkud</code> together — the new sync
+          <code className="rounded bg-cloud px-1 font-mono">nokkud</code> together. The new sync
           protocol requires both sides. No config changes needed.
         </Text>
       </Section>
