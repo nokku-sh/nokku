@@ -1,14 +1,22 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { auth } from '#lib/api/auth.svelte.js';
-	import { formatConnectError } from '#lib/api/error-formatter.js';
+	import { formatConnectError, isOtherBrowserError } from '#lib/api/error-formatter.js';
 	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { ConnectError } from '@connectrpc/connect';
-	import { CircleCheck, CircleX, LogIn, Mail, Undo2Icon } from '@lucide/svelte';
+	import {
+		CircleCheck,
+		CircleX,
+		KeyRound,
+		LogIn,
+		Mail,
+		MonitorSmartphone,
+		Undo2Icon
+	} from '@lucide/svelte';
 
 	const token = page.url.searchParams.get('token');
 	let email = $state(page.url.searchParams.get('email') ?? '');
@@ -75,6 +83,19 @@
 		<Button href="/login">
 			<LogIn data-icon="inline-start" />
 			Sign in
+		</Button>
+	</AuthCard>
+{:else if isOtherBrowserError(verifyEmail.error)}
+	<AuthCard
+		title="Open this link where you signed up"
+		description="It only works in the browser the account was created in. To finish on this device instead, reset your password."
+		icon={MonitorSmartphone}
+		tone="warning"
+		footer={back}
+	>
+		<Button href="/recovery">
+			<KeyRound data-icon="inline-start" />
+			Reset password
 		</Button>
 	</AuthCard>
 {:else if verifyEmail.isError}

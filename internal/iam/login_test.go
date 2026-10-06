@@ -277,6 +277,79 @@ func TestConsumeTokenChecksPurpose(t *testing.T) {
 	}
 }
 
+func TestVerifyLinkNeedsSignupBrowser(t *testing.T) {
+	e := newTestEnv(t)
+	u := e.user(t, "user@"+testDomain(), false)
+	stranger := e.user(t, "stranger@"+testDomain(), false)
+	raw, err := e.svc.IssueToken(t.Context(), u.ID, TokenVerifyEmail, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	browser := func(userID string) http.Header {
+		c := e.svc.SignupCookie(userID)
+		return http.Header{"Cookie": {c.Name + "=" + c.Value}}
+	}
+
+	if _, err := e.svc.ConsumeVerifyToken(t.Context(), http.Header{}, raw); !errors.Is(err, ErrOtherBrowser) {
+		t.Fatalf("link opened without the signup cookie: err = %v, want ErrOtherBrowser", err)
+	}
+	if _, err := e.svc.ConsumeVerifyToken(t.Context(), browser(stranger.ID), raw); !errors.Is(err, ErrOtherBrowser) {
+		t.Fatalf("link opened with another signup's cookie: err = %v, want ErrOtherBrowser", err)
+	}
+	// The refused attempts left the link usable where the account was made.
+	if id, err := e.svc.ConsumeVerifyToken(t.Context(), browser(u.ID), raw); err != nil || id != u.ID {
+		t.Fatalf("link opened in the signup browser = %q, %v", id, err)
+	}
+	if _, err := e.svc.ConsumeVerifyToken(t.Context(), browser(u.ID), raw); !errors.Is(err, errInvalidToken) {
+		t.Fatal("a verify link was spent twice")
+	}
+}
+
+// A passkey signup with someone else's address leaves a passkey on an
+// unverified account. The owner of the inbox must not inherit it.
+func TestResetDropsCredentialsFromSignup(t *testing.T) {
+	e := newTestEnv(t)
+	plant := func(u *db.User) string {
+		cred, err := e.conn.Sys().UpsertCredential(t.Context(), &db.UpsertCredentialParams{
+			ID:      "passkey:" + u.ID,
+			UserID:  u.ID,
+			Type:    string(MethodPasskey),
+			Subject: u.ID,
+			Data:    []byte("{}"),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cred.ID
+	}
+	has := func(u *db.User, id string) bool {
+		_, err := e.conn.Sys().GetCredential(t.Context(), &db.GetCredentialParams{UserID: u.ID, ID: id})
+		return err == nil
+	}
+
+	claimed := e.user(t, "claimed@"+testDomain(), false)
+	planted := plant(claimed)
+	if err := e.svc.Password.SetPassword(t.Context(), claimed.ID, testPassword); err != nil {
+		t.Fatal(err)
+	}
+	if has(claimed, planted) {
+		t.Fatal("a passkey from before the reset still signs in to the unverified account")
+	}
+	// The reset link proved the inbox, so the new password works right away.
+	if _, _, err := e.svc.Password.Login(t.Context(), claimed.Email, testPassword); err != nil {
+		t.Fatalf("login after the reset: %v", err)
+	}
+
+	verified := e.user(t, "verified@"+testDomain(), true)
+	own := plant(verified)
+	if err := e.svc.Password.SetPassword(t.Context(), verified.ID, testPassword); err != nil {
+		t.Fatal(err)
+	}
+	if !has(verified, own) {
+		t.Fatal("a reset removed the passkey of a verified account")
+	}
+}
+
 func TestHasRecentToken(t *testing.T) {
 	e := newTestEnv(t)
 	u := e.user(t, "user@"+testDomain(), false)

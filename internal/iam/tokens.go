@@ -2,7 +2,9 @@ package iam
 
 import (
 	"context"
+	"crypto/hmac"
 	"errors"
+	"net/http"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -52,6 +54,27 @@ func (s *Service) ConsumeToken(ctx context.Context, raw, purpose string) (string
 		return "", errInvalidToken
 	}
 	return userID, err
+}
+
+// ConsumeVerifyToken only takes the link in the browser that signed up. Until
+// then the account may hold a stranger's password or passkey, and a link
+// opened anywhere else must not make those work. Such a link stays unspent.
+func (s *Service) ConsumeVerifyToken(ctx context.Context, header http.Header, raw string) (string, error) {
+	tokenHash, err := crypto.HashToken(raw)
+	if err != nil {
+		return "", errInvalidToken
+	}
+	userID, err := s.sys.GetTokenUser(ctx, &db.GetTokenUserParams{TokenHash: tokenHash, Purpose: TokenVerifyEmail})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", errInvalidToken
+	}
+	if err != nil {
+		return "", err
+	}
+	if !hmac.Equal([]byte(cookieFromHeader(header, signupCookieName)), []byte(s.signupMAC(userID))) {
+		return "", ErrOtherBrowser
+	}
+	return s.ConsumeToken(ctx, raw, TokenVerifyEmail)
 }
 
 func (s *Service) HasRecentToken(

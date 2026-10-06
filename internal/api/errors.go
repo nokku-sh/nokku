@@ -64,6 +64,11 @@ var (
 		connect.CodeFailedPrecondition,
 		errors.New("verify your email address before signing in"),
 	)
+	// The UI matches this message, see error-formatter.ts.
+	errOtherBrowser = connect.NewError(
+		connect.CodeFailedPrecondition,
+		errors.New("open this link in the browser you signed up in"),
+	)
 	errSSORequired = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("your organization requires single sign-on"),

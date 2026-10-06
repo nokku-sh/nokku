@@ -87,6 +87,23 @@ func (q *Queries) DeleteCredentialsByProvider(ctx context.Context, arg *DeleteCr
 	return result.RowsAffected(), nil
 }
 
+const deleteOtherCredentials = `-- name: DeleteOtherCredentials :exec
+DELETE FROM credentials
+WHERE
+  user_id = $1
+  AND id <> $2
+`
+
+type DeleteOtherCredentialsParams struct {
+	UserID string `json:"userId"`
+	KeepID string `json:"keepId"`
+}
+
+func (q *Queries) DeleteOtherCredentials(ctx context.Context, arg *DeleteOtherCredentialsParams) error {
+	_, err := q.db.Exec(ctx, deleteOtherCredentials, arg.UserID, arg.KeepID)
+	return err
+}
+
 const deleteUserCredentialsByProvider = `-- name: DeleteUserCredentialsByProvider :execrows
 DELETE FROM credentials
 WHERE

@@ -178,12 +178,33 @@ func (m *PasswordManager) HasPassword(ctx context.Context, userID string) (bool,
 	return err == nil, err
 }
 
-// SetPassword revokes every session so a stolen one cannot outlive a reset.
+// SetPassword is the reset. It revokes every session so a stolen one cannot
+// outlive it. On an unverified account the reset link is the first proof of
+// the inbox, so whatever signup put there goes and the address is verified.
 func (m *PasswordManager) SetPassword(ctx context.Context, userID, pw string) error {
-	if err := m.Store(ctx, userID, pw); err != nil {
+	err := m.svc.conn.WithTx(ctx, func(q *db.Queries) error {
+		u, err := q.GetUser(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if err := m.store(ctx, q, userID, pw); err != nil {
+			return err
+		}
+		if !u.EmailVerified {
+			if err := q.DeleteOtherCredentials(ctx, &db.DeleteOtherCredentialsParams{
+				UserID: userID,
+				KeepID: passwordCredentialID(userID),
+			}); err != nil {
+				return err
+			}
+			if err := q.VerifyUserEmail(ctx, userID); err != nil {
+				return err
+			}
+		}
+		_, err = q.DeleteSubjectSessions(ctx, userID)
 		return err
-	}
-	if _, err := m.svc.sys.DeleteSubjectSessions(ctx, userID); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 	m.svc.record(ctx, Event{Action: ActionPasswordSet, Method: MethodPassword, UserID: userID})
