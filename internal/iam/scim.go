@@ -204,6 +204,11 @@ func (s *Service) scimProvisionUser(
 		case err != nil:
 			return err
 		case u.Active != active:
+			if !active {
+				if err := keepOwner(ctx, q, workspaceID, u.ID); err != nil {
+					return err
+				}
+			}
 			if u, err = q.UpdateUser(ctx, &db.UpdateUserParams{ID: u.ID, Active: &active}); err != nil {
 				return err
 			}
@@ -263,21 +268,30 @@ func linkSCIMCredential(ctx context.Context, q db.Querier, workspaceID, userID, 
 	return err
 }
 
+// keepOwner refuses to switch off or remove the owner. Nobody else can hand
+// the workspace on.
+func keepOwner(ctx context.Context, q db.Querier, workspaceID, userID string) error {
+	owner, err := q.GetWorkspaceOwner(ctx, workspaceID)
+	if err != nil {
+		return err
+	}
+	if owner == userID {
+		return scimerrors.ScimError{
+			Status: http.StatusConflict,
+			Detail: "the workspace owner cannot be deactivated or deprovisioned, transfer ownership first",
+		}
+	}
+	return nil
+}
+
 // scimDeprovisionUser deletes an account left in no workspace. One still in
 // other workspaces is deactivated everywhere, since the org owns the domain,
 // and its data survives for an IdP re-assignment.
 func (s *Service) scimDeprovisionUser(ctx context.Context, workspaceID string, u *db.User) error {
 	var deleted bool
 	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
-		owner, err := q.GetWorkspaceOwner(ctx, workspaceID)
-		if err != nil {
+		if err := keepOwner(ctx, q, workspaceID, u.ID); err != nil {
 			return err
-		}
-		if owner == u.ID {
-			return scimerrors.ScimError{
-				Status: http.StatusConflict,
-				Detail: "the workspace owner cannot be deprovisioned, transfer ownership first",
-			}
 		}
 		if err := q.RemoveWorkspaceMember(
 			ctx,
