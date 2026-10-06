@@ -42,8 +42,9 @@ const (
 	grantDenied     = "denied"
 )
 
-// deviceGrantEntries bounds the grants waiting for an approval, two entries
-// each. Anyone can start one, so they have a store nothing else lives in.
+// deviceGrantEntries bounds the grants waiting for an approval, up to three
+// entries each. Anyone can start one, so they have a store nothing else
+// lives in.
 const deviceGrantEntries = 10_000
 
 type DeviceFlow struct {
