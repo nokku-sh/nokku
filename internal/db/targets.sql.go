@@ -543,6 +543,7 @@ SET
         certificate_authorities
       WHERE
         workspace_id = targets.workspace_id
+        AND authority_type = 1
         AND is_default = TRUE
       LIMIT
         1
@@ -559,6 +560,7 @@ type UpdateTargetCAParams struct {
 	DaemonID *string `json:"daemonId"`
 }
 
+// A workspace has a default per authority type, a target takes the SSH one (1).
 func (q *Queries) UpdateTargetCA(ctx context.Context, arg *UpdateTargetCAParams) (*Target, error) {
 	row := q.db.QueryRow(ctx, updateTargetCA, arg.CaID, arg.DaemonID)
 	var i Target

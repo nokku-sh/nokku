@@ -222,6 +222,7 @@ type Querier interface {
 	UpdateKeyset(ctx context.Context, arg *UpdateKeysetParams) error
 	UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (string, error)
 	UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*Target, error)
+	// A workspace has a default per authority type, a target takes the SSH one (1).
 	UpdateTargetCA(ctx context.Context, arg *UpdateTargetCAParams) (*Target, error)
 	// What a daemon reports about its host on every sync. Unchanged values must
 	// not rewrite the row.

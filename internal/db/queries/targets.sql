@@ -113,6 +113,7 @@ RETURNING
   *;
 
 -- name: UpdateTargetCA :one
+-- A workspace has a default per authority type, a target takes the SSH one (1).
 UPDATE targets
 SET
   ca_id = COALESCE(
@@ -124,6 +125,7 @@ SET
         certificate_authorities
       WHERE
         workspace_id = targets.workspace_id
+        AND authority_type = 1
         AND is_default = TRUE
       LIMIT
         1

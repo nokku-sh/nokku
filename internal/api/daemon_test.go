@@ -501,6 +501,40 @@ func seedDefaultCA(t *testing.T, srv *httptest.Server, adminAuth connect.ClientO
 	return created.GetCertificateAuthority().GetPublicKey()
 }
 
+// A workspace has one default CA per kind. An enrollment that names none
+// falls back to the SSH one, the X.509 default signs no SSH certificates.
+func TestEnrollFallsBackToSSHDefaultCA(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	createDefault := func(name string, kind nokkuv1.AuthorityType) string {
+		res, err := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth).
+			CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
+				WorkspaceId:   &workspaceID,
+				Name:          &name,
+				KeyType:       nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ECDSA.Enum(),
+				AuthorityType: kind.Enum(),
+				IsDefault:     new(true),
+			})
+		require.NoError(t, err)
+		return res.GetCertificateAuthority().GetId()
+	}
+	enrolledCA := func() *string {
+		_, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+		target, err := cfg.Conn.Sys().GetTarget(t.Context(), enrolled.GetTargetId())
+		require.NoError(t, err)
+		return target.CaID
+	}
+
+	createDefault("x509", nokkuv1.AuthorityType_AUTHORITY_TYPE_X509)
+	assert.Nil(t, enrolledCA(), "with no SSH CA the server gets none")
+
+	sshCA := createDefault("ssh", nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH)
+	got := enrolledCA()
+	require.NotNil(t, got)
+	assert.Equal(t, sshCA, *got, "the SSH default, with both kinds present")
+}
+
 // The report is a hint from the host. What does not parse is dropped and the
 // rest still lands, so one odd account never blocks a sync.
 func TestSyncDaemonReport(t *testing.T) {
