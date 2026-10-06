@@ -2,8 +2,11 @@ package iam
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -13,53 +16,33 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/nokku-sh/nokku/internal/actor"
-	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
 const (
 	flowStateTTL = 10 * time.Minute
-	// flowCookieName binds the callback to the browser that started the flow,
-	// which blocks login CSRF.
-	flowCookieName      = "nokku_flow"
+	// flowCookieName holds the state of an SSO login. Only the browser that
+	// started the flow has it, which blocks login CSRF.
+	flowCookieName = "nokku_flow"
+	// Browsers drop a cookie past 4096 bytes, name and attributes included.
+	maxFlowCookie = 3800
+	// A longer return path would not fit the cookie next to the rest.
+	maxReturnTo = 1024
+	// One marker per login in the last flowStateTTL.
+	spentFlowEntries    = 10_000
 	ssoErrorPath        = "/sso-error"
 	providerHTTPTimeout = 15 * time.Second
 	providerCacheTTL    = 10 * time.Minute
 )
 
-var ErrSSORequired = errors.New("iam: single sign-on is required for this account")
+var (
+	ErrSSORequired = errors.New("iam: single sign-on is required for this account")
+	errFlowState   = errors.New("iam: invalid or expired flow state")
+)
 
 // providerContext is how oauth2 and go-oidc pick up the guarded client.
 func (s *Service) providerContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, oauth2.HTTPClient, s.idp)
-}
-
-// startFlowBinding takes none=true for SAML, whose cross-site POST callback
-// Lax cookies don't accompany. SameSite=None requires HTTPS.
-func startFlowBinding(w http.ResponseWriter, none bool) (string, error) {
-	v, err := crypto.RandomString(32)
-	if err != nil {
-		return "", err
-	}
-	c := &http.Cookie{
-		Name:     flowCookieName,
-		Value:    v,
-		Path:     "/",
-		MaxAge:   int(flowStateTTL.Seconds()),
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	}
-	if none {
-		c.SameSite = http.SameSiteNoneMode
-		c.Secure = true
-	}
-	http.SetCookie(w, c)
-	return v, nil
-}
-
-func checkFlowBinding(r *http.Request, expected string) bool {
-	c, err := r.Cookie(flowCookieName)
-	return err == nil && expected != "" && c.Value == expected
 }
 
 func endFlowBinding() *http.Cookie {
@@ -81,39 +64,86 @@ func linkUserIDFor(ctx context.Context, r *http.Request) string {
 	return actor.SubjectFromContext(ctx)
 }
 
-// state is single-use, Take reads and deletes atomically.
-type state[T any] struct {
-	cache  *cache.Memory
-	prefix string
-	ttl    time.Duration
+// sealed keeps the state of a browser flow in an encrypted cookie. Starting a
+// flow stores nothing on the server, so nobody can exhaust it. Only a flow
+// that ended in a login leaves a marker behind, see spendFlow.
+type sealed[T any] struct {
+	svc    *Service
+	cookie string
+	// use is bound into the seal, so the state of one flow never opens as
+	// another's.
+	use string
+	ttl time.Duration
+	// crossSite lets the cookie ride on a form post from the IdP (SAML).
+	crossSite bool
 }
 
-func newState[T any](c *cache.Memory, prefix string, ttl time.Duration) *state[T] {
-	return &state[T]{cache: c, prefix: prefix, ttl: ttl}
+type envelope[T any] struct {
+	ID      string `json:"id"`
+	Expires int64  `json:"exp"`
+	State   T      `json:"state"`
 }
 
-func (s *state[T]) put(ctx context.Context, v T) (string, error) {
-	key, err := crypto.RandomString(32)
+// put seals v into the cookie and returns the id of this run of the flow.
+// The browser binding is the cookie itself, the id is for whatever value
+// travels through the provider and has to match on the way back.
+func (s *sealed[T]) put(w http.ResponseWriter, v T) (string, error) {
+	id, err := crypto.RandomString(32)
 	if err != nil {
 		return "", err
 	}
-	b, err := json.Marshal(v)
+	expires := s.svc.now().Add(s.ttl)
+	plain, err := json.Marshal(envelope[T]{ID: id, Expires: expires.Unix(), State: v})
 	if err != nil {
 		return "", err
 	}
-	return key, s.cache.Set(ctx, s.prefix+key, b, s.ttl)
+	nonce := make([]byte, s.svc.flowAEAD.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return "", err
+	}
+	value := base64.RawURLEncoding.EncodeToString(s.svc.flowAEAD.Seal(nonce, nonce, plain, []byte(s.use)))
+	if len(value) > maxFlowCookie {
+		return "", errors.New("iam: flow state does not fit a cookie")
+	}
+	c := s.svc.newCookie(s.cookie, value, expires) //nolint:gosec // None is only set together with Secure
+	// None needs Secure, so plain HTTP keeps Lax and only same-site IdPs work.
+	if s.crossSite && s.svc.secure {
+		c.SameSite = http.SameSiteNoneMode
+	}
+	http.SetCookie(w, c)
+	return id, nil
 }
 
-func (s *state[T]) take(ctx context.Context, key string) (T, error) {
-	var v T
-	if key == "" {
-		return v, errors.New("missing state")
+// take opens the state this browser carries and returns it with its id. It
+// refuses a state of another flow, an expired one, and one whose flow
+// already ended in a login.
+func (s *sealed[T]) take(r *http.Request) (T, string, error) {
+	var e envelope[T]
+	raw, err := base64.RawURLEncoding.DecodeString(cookieFromHeader(r.Header, s.cookie))
+	n := s.svc.flowAEAD.NonceSize()
+	if err != nil || len(raw) <= n {
+		return e.State, "", errFlowState
 	}
-	b, err := s.cache.GetDel(ctx, s.prefix+key)
-	if err != nil {
-		return v, err
+	plain, err := s.svc.flowAEAD.Open(nil, raw[:n], raw[n:], []byte(s.use))
+	if err != nil || json.Unmarshal(plain, &e) != nil {
+		return e.State, "", errFlowState
 	}
-	return v, json.Unmarshal(b, &v)
+	if s.svc.now().Unix() >= e.Expires {
+		return e.State, "", errFlowState
+	}
+	if _, err := s.svc.spent.Get(r.Context(), e.ID); err == nil {
+		return e.State, "", errFlowState
+	}
+	return e.State, e.ID, nil
+}
+
+// spendFlow makes the state of a finished flow single use. Only a flow that
+// proved an identity gets here, so the markers cannot be piled up from
+// outside. A full store is logged and skipped, it must never block a login.
+func (s *Service) spendFlow(ctx context.Context, id string) {
+	if err := s.spent.Set(ctx, id, nil, flowStateTTL); err != nil {
+		slog.Warn("flow state not marked as spent", "error", err)
+	}
 }
 
 // claimString also stringifies numeric claims like GitHub's "id".
@@ -158,7 +188,7 @@ func attrValue(attrs map[string][]string, names ...string) string {
 
 // safeReturnTo only lets same-origin absolute paths through.
 func safeReturnTo(p string) string {
-	if !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") ||
+	if !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") || len(p) > maxReturnTo ||
 		strings.HasPrefix(p, "/\\") || strings.ContainsAny(p, "\r\n") {
 		return ""
 	}

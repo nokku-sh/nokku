@@ -3,79 +3,124 @@ package iam
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
+
+	"golang.org/x/crypto/chacha20poly1305"
 
 	"github.com/nokku-sh/nokku/internal/actor"
+	"github.com/nokku-sh/nokku/internal/cache"
 )
 
-// TestFlowBinding covers the login CSRF flow cookie: it is set at flow
-// start, required (matching) at callback, and its SAML None variant carries
-// Secure, since the IdP posts back cross-site.
-func TestFlowBinding(t *testing.T) {
+// newSealedTestService is enough of a Service to seal flow state, with a
+// clock the test moves.
+func newSealedTestService(t *testing.T, secure bool) (*Service, *time.Time) {
+	t.Helper()
+	aead, err := chacha20poly1305.NewX(make([]byte, chacha20poly1305.KeySize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	return &Service{
+		secure:   secure,
+		flowAEAD: aead,
+		spent:    cache.NewMemory(10),
+		now:      func() time.Time { return now },
+	}, &now
+}
+
+// TestSealedFlowState covers the cookie that carries a flow. Only the browser
+// that got it can continue, only in the same flow, only while it is fresh,
+// and not once the flow ended in a login.
+func TestSealedFlowState(t *testing.T) {
+	svc, now := newSealedTestService(t, false)
+	store := &sealed[authorizeState]{svc: svc, cookie: flowCookieName, use: "oidc", ttl: flowStateTTL}
+
 	rec := httptest.NewRecorder()
-	value, err := startFlowBinding(rec, false)
-	if err != nil || value == "" {
-		t.Fatal("startFlowBinding returned no value")
+	id, err := store.put(rec, authorizeState{ProviderID: "p1", LinkUserID: "u1"})
+	if err != nil || id == "" {
+		t.Fatalf("put = %q, %v", id, err)
+	}
+	cookies := rec.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != flowCookieName {
+		t.Fatalf("cookies = %v, want the flow cookie", cookies)
+	}
+	cookie := cookies[0]
+	if !cookie.HttpOnly || cookie.SameSite != http.SameSiteLaxMode || cookie.Secure {
+		t.Errorf("flow cookie HttpOnly=%v SameSite=%v Secure=%v, want HttpOnly, Lax and no Secure on plain HTTP",
+			cookie.HttpOnly, cookie.SameSite, cookie.Secure)
+	}
+	if strings.Contains(cookie.Value, "p1") {
+		t.Error("the state is readable in the cookie")
 	}
 
-	var cookie *http.Cookie
-	for _, c := range rec.Result().Cookies() {
-		if c.Name == flowCookieName {
-			cookie = c
-		}
-	}
-	if cookie == nil {
-		t.Fatal("flow cookie not set")
-	}
-	if !cookie.HttpOnly {
-		t.Error("flow cookie is not HttpOnly")
-	}
-	if cookie.SameSite != http.SameSiteLaxMode {
-		t.Errorf("SameSite = %v, want Lax", cookie.SameSite)
-	}
-	if cookie.Secure {
-		t.Error("GET-callback flows must not set Secure on a non-HTTPS binding")
-	}
-
-	reqWith := func(cookieValue string) *http.Request {
+	reqWith := func(value string) *http.Request {
 		r := httptest.NewRequest(http.MethodGet, "/oidc/callback", nil)
-		if cookieValue != "" {
-			r.AddCookie(&http.Cookie{Name: flowCookieName, Value: cookieValue})
+		if value != "" {
+			r.AddCookie(&http.Cookie{Name: flowCookieName, Value: value})
 		}
 		return r
 	}
 
-	if !checkFlowBinding(reqWith(value), value) {
-		t.Error("matching flow cookie was rejected")
+	got, gotID, err := store.take(reqWith(cookie.Value))
+	if err != nil || gotID != id || got.ProviderID != "p1" || got.LinkUserID != "u1" {
+		t.Fatalf("take = %+v, %q, %v", got, gotID, err)
 	}
-	if checkFlowBinding(reqWith("wrong"), value) {
-		t.Error("mismatched flow cookie was accepted")
+	if _, _, err := store.take(reqWith("stolen")); err == nil {
+		t.Error("a made up cookie was accepted")
 	}
-	if checkFlowBinding(reqWith(""), value) {
-		t.Error("missing flow cookie was accepted")
+	if _, _, err := store.take(reqWith("")); err == nil {
+		t.Error("a browser without the cookie was accepted")
 	}
-	if checkFlowBinding(reqWith(value), "") {
-		t.Error("a flow without a recorded binding must fail closed")
+	tampered := cookie.Value[:len(cookie.Value)-2] + "AA"
+	if _, _, err := store.take(reqWith(tampered)); err == nil {
+		t.Error("a tampered cookie was accepted")
+	}
+	other := &sealed[authorizeState]{svc: svc, cookie: flowCookieName, use: "oauth2", ttl: flowStateTTL}
+	if _, _, err := other.take(reqWith(cookie.Value)); err == nil {
+		t.Error("the state of one flow opened in another")
 	}
 
-	// SAML: cross-site IdP form POST needs a None cookie, which requires
-	// Secure.
-	rec2 := httptest.NewRecorder()
-	if v, err := startFlowBinding(rec2, true); err != nil || v == "" {
-		t.Fatal("startFlowBinding returned no value")
+	svc.spendFlow(t.Context(), id)
+	if _, _, err := store.take(reqWith(cookie.Value)); err == nil {
+		t.Error("the state of a finished login was accepted again")
 	}
-	var samlCookie *http.Cookie
-	for _, c := range rec2.Result().Cookies() {
-		if c.Name == flowCookieName {
-			samlCookie = c
+
+	rec = httptest.NewRecorder()
+	if _, err := store.put(rec, authorizeState{ProviderID: "p2"}); err != nil {
+		t.Fatal(err)
+	}
+	fresh := rec.Result().Cookies()[0].Value
+	*now = now.Add(flowStateTTL + time.Second)
+	if _, _, err := store.take(reqWith(fresh)); err == nil {
+		t.Error("an expired state was accepted")
+	}
+
+	if _, err := store.put(httptest.NewRecorder(), authorizeState{ReturnTo: strings.Repeat("x", 4096)}); err == nil {
+		t.Error("a state too large for a cookie was set anyway")
+	}
+}
+
+// TestSealedFlowStateCrossSite covers SAML, where the IdP posts the answer
+// from its own site. That needs a None cookie, which needs Secure.
+func TestSealedFlowStateCrossSite(t *testing.T) {
+	for _, secure := range []bool{true, false} {
+		svc, _ := newSealedTestService(t, secure)
+		store := &sealed[samlState]{svc: svc, cookie: flowCookieName, use: "saml", ttl: flowStateTTL, crossSite: true}
+		rec := httptest.NewRecorder()
+		if _, err := store.put(rec, samlState{ProviderID: "p1"}); err != nil {
+			t.Fatal(err)
 		}
-	}
-	if samlCookie == nil {
-		t.Fatal("saml flow cookie not set")
-	}
-	if samlCookie.SameSite != http.SameSiteNoneMode || !samlCookie.Secure {
-		t.Errorf("saml cookie SameSite=%v Secure=%v, want None+Secure",
-			samlCookie.SameSite, samlCookie.Secure)
+		cookie := rec.Result().Cookies()[0]
+		want := http.SameSiteLaxMode
+		if secure {
+			want = http.SameSiteNoneMode
+		}
+		if cookie.SameSite != want || cookie.Secure != secure {
+			t.Errorf("secure=%v: SameSite=%v Secure=%v, want %v and Secure=%v",
+				secure, cookie.SameSite, cookie.Secure, want, secure)
+		}
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/subtle"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -30,14 +31,13 @@ type samlState struct {
 	RequestID  string `json:"request_id"`
 	ReturnTo   string `json:"return_to,omitempty"`
 	LinkUserID string `json:"link_user_id,omitempty"`
-	FlowCookie string `json:"flow_cookie"`
 }
 
 // samlFlow uses one SP keypair for every provider.
 type samlFlow struct {
 	svc     *Service
 	linker  *linker
-	state   *state[samlState]
+	state   *sealed[samlState]
 	spKey   *rsa.PrivateKey
 	spCert  *x509.Certificate
 	certPEM []byte
@@ -63,9 +63,12 @@ func newSAMLFlow(ctx context.Context, svc *Service) (*samlFlow, error) {
 		return nil, err
 	}
 	return &samlFlow{
-		svc:     svc,
-		linker:  &linker{svc: svc, credType: MethodSAML},
-		state:   newState[samlState](svc.cache, "saml:state:", flowStateTTL),
+		svc:    svc,
+		linker: &linker{svc: svc, credType: MethodSAML},
+		// The IdP posts the answer back cross-site, a Lax cookie would stay home.
+		state: &sealed[samlState]{
+			svc: svc, cookie: flowCookieName, use: "saml", ttl: flowStateTTL, crossSite: true,
+		},
 		spKey:   key,
 		spCert:  cert,
 		certPEM: certPEM,
@@ -96,17 +99,11 @@ func (h *samlFlow) Login(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, "request creation failed")
 		return
 	}
-	flowCookie, err := startFlowBinding(w, h.svc.secure)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	relayState, err := h.state.put(ctx, samlState{
+	relayState, err := h.state.put(w, samlState{
 		ProviderID: cfg.ProviderID,
 		RequestID:  req.ID,
 		ReturnTo:   safeReturnTo(r.URL.Query().Get("return_to")),
 		LinkUserID: linkUserIDFor(ctx, r),
-		FlowCookie: flowCookie,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -127,8 +124,8 @@ func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad request")
 		return
 	}
-	st, err := h.state.take(ctx, r.PostForm.Get("RelayState"))
-	if err != nil || !checkFlowBinding(r, st.FlowCookie) {
+	st, flowID, err := h.state.take(r)
+	if err != nil || subtle.ConstantTimeCompare([]byte(flowID), []byte(r.PostForm.Get("RelayState"))) != 1 {
 		fail(w, r, "invalid or expired login")
 		return
 	}
@@ -164,7 +161,7 @@ func (h *samlFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	opts.WorkspaceID = cfg.WorkspaceID
 	opts.JITProvisioning = cfg.SAML.JITProvisioning
 	opts.LinkUserID = st.LinkUserID
-	h.svc.completeSSO(w, r, h.linker, st.ReturnTo, opts)
+	h.svc.completeSSO(w, r, h.linker, flowID, st.ReturnTo, opts)
 }
 
 // assertionAttributes keys by both Name and FriendlyName, IdPs use either.

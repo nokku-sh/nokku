@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -347,6 +348,53 @@ func TestResetDropsCredentialsFromSignup(t *testing.T) {
 	}
 	if !has(verified, own) {
 		t.Fatal("a reset removed the passkey of a verified account")
+	}
+}
+
+// A passkey ceremony keeps its challenge in the browser, not on the server.
+func TestPasskeyCeremonyTravelsInCookie(t *testing.T) {
+	e := newTestEnv(t)
+	rec := httptest.NewRecorder()
+	e.svc.Passkey.BeginLogin(rec, httptest.NewRequest(http.MethodPost, "/passkey/login/begin", nil))
+	var options struct {
+		PublicKey struct {
+			Challenge string `json:"challenge"`
+		} `json:"publicKey"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &options); err != nil || options.PublicKey.Challenge == "" {
+		t.Fatalf("begin login answered %d %s", rec.Code, rec.Body.String())
+	}
+
+	finish := httptest.NewRequest(http.MethodPost, "/passkey/login/finish", strings.NewReader("{}"))
+	for _, c := range rec.Result().Cookies() {
+		finish.AddCookie(c)
+	}
+	session, _, err := e.svc.Passkey.state.take(finish)
+	if err != nil || session.Challenge != options.PublicKey.Challenge {
+		t.Fatalf("the cookie carries challenge %q, %v, want %q", session.Challenge, err, options.PublicKey.Challenge)
+	}
+	if _, _, err := e.svc.Passkey.signup.take(finish); err == nil {
+		t.Error("a login ceremony opened as a signup")
+	}
+
+	// Without the cookie there is no ceremony to finish.
+	rec = httptest.NewRecorder()
+	e.svc.Passkey.FinishLogin(
+		rec,
+		httptest.NewRequest(http.MethodPost, "/passkey/login/finish", strings.NewReader("{}")),
+	)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "ceremony") {
+		t.Errorf("finish without the cookie = %d %s", rec.Code, rec.Body.String())
+	}
+
+	// A signup that could not fit the cookie is refused up front.
+	form := url.Values{"email": {"new@" + testDomain()}, "name": {strings.Repeat("n", maxSignupName+1)}}
+	signup := httptest.NewRequest(http.MethodPost, "/passkey/signup/begin", strings.NewReader(form.Encode()))
+	signup.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec = httptest.NewRecorder()
+	e.svc.Passkey.BeginSignup(rec, signup)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("signup with an oversized name = %d %s", rec.Code, rec.Body.String())
 	}
 }
 

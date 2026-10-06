@@ -18,7 +18,7 @@ import (
 type oidcFlow struct {
 	svc       *Service
 	linker    *linker
-	state     *state[authorizeState]
+	state     *sealed[authorizeState]
 	providers *cache.Local[*oidc.Provider]
 }
 
@@ -28,14 +28,13 @@ type authorizeState struct {
 	PKCEVerifier string `json:"pkce_verifier"`
 	ReturnTo     string `json:"return_to,omitempty"`
 	LinkUserID   string `json:"link_user_id,omitempty"`
-	FlowCookie   string `json:"flow_cookie"`
 }
 
 func newOIDCFlow(svc *Service) *oidcFlow {
 	return &oidcFlow{
 		svc:       svc,
 		linker:    &linker{svc: svc, credType: MethodOIDC},
-		state:     newState[authorizeState](svc.cache, "oidc:authorize:", flowStateTTL),
+		state:     &sealed[authorizeState]{svc: svc, cookie: flowCookieName, use: "oidc", ttl: flowStateTTL},
 		providers: cache.NewLocal[*oidc.Provider](providerCacheTTL),
 	}
 }
@@ -57,7 +56,7 @@ func (s *Service) startLogin(
 	w http.ResponseWriter,
 	r *http.Request,
 	m Method,
-	store *state[authorizeState],
+	store *sealed[authorizeState],
 	prepare authorizePrepare,
 ) {
 	ctx := r.Context()
@@ -78,11 +77,7 @@ func (s *Service) startLogin(
 		fail(w, r, "provider unavailable")
 		return
 	}
-	if st.FlowCookie, err = startFlowBinding(w, false); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	key, err := store.put(ctx, *st)
+	key, err := store.put(w, *st)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
@@ -92,29 +87,30 @@ func (s *Service) startLogin(
 	http.Redirect(w, r, conf.AuthCodeURL(key, opts...), http.StatusTemporaryRedirect)
 }
 
-// takeLogin writes the failure response itself.
+// takeLogin writes the failure response itself. The state parameter has to
+// name the flow this browser started, or the answer belongs to someone else.
 func (s *Service) takeLogin(
 	w http.ResponseWriter,
 	r *http.Request,
 	m Method,
-	store *state[authorizeState],
-) (*authorizeState, *SSOProvider, bool) {
+	store *sealed[authorizeState],
+) (st *authorizeState, flowID string, cfg *SSOProvider, ok bool) {
 	q := r.URL.Query()
 	if q.Get("error") != "" {
 		fail(w, r, "login canceled")
-		return nil, nil, false
+		return nil, "", nil, false
 	}
-	st, err := store.take(r.Context(), q.Get("state"))
-	if err != nil || !checkFlowBinding(r, st.FlowCookie) {
+	state, flowID, err := store.take(r)
+	if err != nil || subtle.ConstantTimeCompare([]byte(flowID), []byte(q.Get("state"))) != 1 {
 		fail(w, r, "invalid or expired login")
-		return nil, nil, false
+		return nil, "", nil, false
 	}
-	cfg, err := s.loginProvider(r.Context(), st.ProviderID, m)
+	cfg, err = s.loginProvider(r.Context(), state.ProviderID, m)
 	if err != nil {
 		fail(w, r, "provider not configured")
-		return nil, nil, false
+		return nil, "", nil, false
 	}
-	return &st, cfg, true
+	return &state, flowID, cfg, true
 }
 
 // Login links the identity to the signed-in user when there is one.
@@ -138,7 +134,7 @@ func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
-	st, cfg, ok := h.svc.takeLogin(w, r, MethodOIDC, h.state)
+	st, flowID, cfg, ok := h.svc.takeLogin(w, r, MethodOIDC, h.state)
 	if !ok {
 		return
 	}
@@ -192,7 +188,7 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.svc.completeSSO(w, r, h.linker, st.ReturnTo, flowLinkOptions{
+	h.svc.completeSSO(w, r, h.linker, flowID, st.ReturnTo, flowLinkOptions{
 		ProviderID:      cfg.ProviderID,
 		WorkspaceID:     cfg.WorkspaceID,
 		Subject:         idToken.Subject,

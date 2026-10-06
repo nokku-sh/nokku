@@ -7,12 +7,15 @@ package iam
 
 import (
 	"context"
+	"crypto/cipher"
 	"crypto/hkdf"
 	"crypto/sha256"
 	"errors"
 	"net/http"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/chacha20poly1305"
 
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/cache"
@@ -68,7 +71,7 @@ type Deps struct {
 	BaseURL string
 	Conn    txRunner
 	Cache   *cache.Memory
-	// Secret keys the DPoP server nonce and the signup cookie.
+	// Secret keys the DPoP server nonce and the signup and flow cookies.
 	Secret []byte
 	Events Sink
 	// Password zero value selects defaults.
@@ -102,6 +105,11 @@ type Service struct {
 	idp     *http.Client // guarded, see util.NewEgressClient
 	// signupKey signs the cookie that marks the browser of a signup.
 	signupKey []byte
+	// flowAEAD seals the state of browser flows into their cookie. XChaCha,
+	// since anyone can start a flow and random nonces must never run out.
+	flowAEAD cipher.AEAD
+	// spent holds the ids of flows that ended in a login, see spendFlow.
+	spent *cache.Memory
 
 	// OnUserLogin fires after an interactive browser login set its cookie.
 	OnUserLogin func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
@@ -143,6 +151,14 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 	if s.signupKey, err = hkdf.Key(sha256.New, d.Secret, nil, "nokku signup browser v1", 32); err != nil {
 		return nil, err
 	}
+	flowKey, err := hkdf.Key(sha256.New, d.Secret, nil, "nokku flow cookie v1", chacha20poly1305.KeySize)
+	if err != nil {
+		return nil, err
+	}
+	if s.flowAEAD, err = chacha20poly1305.NewX(flowKey); err != nil {
+		return nil, err
+	}
+	s.spent = cache.NewMemory(spentFlowEntries)
 	s.Password = newPasswordManager(s, d.Password)
 	s.DPoP = &DPoPVerifier{
 		secret:     d.Secret,

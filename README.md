@@ -86,7 +86,7 @@ Schema migrations are embedded and applied automatically under an advisory lock;
 
 ### Single instance
 
-Nokku runs as a single instance. Daemon control streams, relays and single-use state (DPoP replay markers, login flow state, email cooldowns, web session tickets) live in the process. A second instance would not see them, and the single-use state is lost on a restart.
+Nokku runs as a single instance. Daemon control streams, relays and single-use state (DPoP replay markers, pending CLI logins, email cooldowns, web session tickets) live in the process. A second instance would not see them, and the single-use state is lost on a restart. A browser login keeps its state in an encrypted cookie, so it survives one.
 
 ### Storage (object storage, optional)
 

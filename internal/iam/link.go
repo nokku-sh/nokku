@@ -210,7 +210,7 @@ func (s *Service) completeSSO(
 	w http.ResponseWriter,
 	r *http.Request,
 	l *linker,
-	returnTo string,
+	flowID, returnTo string,
 	opts flowLinkOptions,
 ) {
 	ctx := r.Context()
@@ -226,6 +226,7 @@ func (s *Service) completeSSO(
 		fail(w, r, "login refused")
 		return
 	}
+	s.spendFlow(ctx, flowID)
 	http.SetCookie(w, endFlowBinding())
 	http.SetCookie(w, cookie)
 	if s.OnUserLogin != nil {
