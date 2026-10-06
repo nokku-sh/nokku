@@ -17,14 +17,14 @@ const profileBodyLimit = 1 << 20
 type oauth2Flow struct {
 	svc    *Service
 	linker *linker
-	state  *state[authorizeState]
+	state  *sealed[authorizeState]
 }
 
 func newOAuth2Flow(svc *Service) *oauth2Flow {
 	return &oauth2Flow{
 		svc:    svc,
 		linker: &linker{svc: svc, credType: MethodOAuth2},
-		state:  newState[authorizeState](svc.cache, "oauth2:authorize:", flowStateTTL),
+		state:  &sealed[authorizeState]{svc: svc, cookie: flowCookieName, use: "oauth2", ttl: flowStateTTL},
 	}
 }
 
@@ -36,7 +36,7 @@ func (h *oauth2Flow) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *oauth2Flow) Callback(w http.ResponseWriter, r *http.Request) {
-	st, cfg, ok := h.svc.takeLogin(w, r, MethodOAuth2, h.state)
+	st, flowID, cfg, ok := h.svc.takeLogin(w, r, MethodOAuth2, h.state)
 	if !ok {
 		return
 	}
@@ -69,7 +69,7 @@ func (h *oauth2Flow) Callback(w http.ResponseWriter, r *http.Request) {
 		email, verified = fetchEmail(ctx, cfg.OAuth2, token)
 	}
 
-	h.svc.completeSSO(w, r, h.linker, st.ReturnTo, flowLinkOptions{
+	h.svc.completeSSO(w, r, h.linker, flowID, st.ReturnTo, flowLinkOptions{
 		ProviderID:      cfg.ProviderID,
 		WorkspaceID:     cfg.WorkspaceID,
 		Subject:         subject,

@@ -22,6 +22,8 @@ import (
 const (
 	challengeTTL       = 5 * time.Minute
 	ceremonyCookieName = "webauthn_session"
+	maxSignupEmail     = 254
+	maxSignupName      = 256
 )
 
 // passkeySignupState reserves the account so the user row only exists once
@@ -46,8 +48,8 @@ func (u *webUser) WebAuthnCredentials() []webauthn.Credential { return u.creds }
 type passkeyFlow struct {
 	svc    *Service
 	wa     *webauthn.WebAuthn
-	state  *state[webauthn.SessionData]
-	signup *state[passkeySignupState]
+	state  *sealed[webauthn.SessionData]
+	signup *sealed[passkeySignupState]
 }
 
 func newPasskeyFlow(svc *Service, rpOrigins []string) (*passkeyFlow, error) {
@@ -69,15 +71,15 @@ func newPasskeyFlow(svc *Service, rpOrigins []string) (*passkeyFlow, error) {
 		return nil, err
 	}
 	return &passkeyFlow{
-		svc:    svc,
-		wa:     wa,
-		state:  newState[webauthn.SessionData](svc.cache, "webauthn:session:", challengeTTL),
-		signup: newState[passkeySignupState](svc.cache, "webauthn:signup:", challengeTTL),
+		svc: svc,
+		wa:  wa,
+		state: &sealed[webauthn.SessionData]{
+			svc: svc, cookie: ceremonyCookieName, use: "webauthn:session", ttl: challengeTTL,
+		},
+		signup: &sealed[passkeySignupState]{
+			svc: svc, cookie: ceremonyCookieName, use: "webauthn:signup", ttl: challengeTTL,
+		},
 	}, nil
-}
-
-func (f *passkeyFlow) ceremonyCookie(id string) *http.Cookie {
-	return f.svc.newCookie(ceremonyCookieName, id, time.Now().Add(challengeTTL))
 }
 
 func (f *passkeyFlow) clearedCeremonyCookie() *http.Cookie {
@@ -157,18 +159,16 @@ func (f *passkeyFlow) BeginRegistration(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, "registration failed")
 		return
 	}
-	sid, err := f.state.put(ctx, *session)
-	if err != nil {
+	if _, err := f.state.put(w, *session); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	http.SetCookie(w, f.ceremonyCookie(sid))
 	WriteJSON(w, http.StatusOK, creation)
 }
 
 func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	session, err := f.state.take(ctx, cookieFromHeader(r.Header, ceremonyCookieName))
+	session, flowID, err := f.state.take(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid or expired ceremony")
 		return
@@ -187,6 +187,7 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "this passkey cannot be registered")
 		return
 	}
+	f.svc.spendFlow(ctx, flowID)
 	f.svc.record(ctx, Event{
 		Action: ActionCredentialAdded,
 		Kind:   actor.KindUser,
@@ -213,6 +214,11 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 	if name == "" {
 		name, _, _ = strings.Cut(email, "@")
 	}
+	// Both travel in the ceremony cookie, the same bounds as a password signup.
+	if len(email) > maxSignupEmail || len(name) > maxSignupName {
+		writeError(w, http.StatusBadRequest, "name or email is too long")
+		return
+	}
 	if _, err := f.svc.GetUserByEmail(ctx, email); err == nil {
 		writeError(w, http.StatusConflict, "an account with this email already exists")
 		return
@@ -225,19 +231,17 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st.Session = session
-	sid, err := f.signup.put(ctx, st)
-	if err != nil {
+	if _, err := f.signup.put(w, st); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	http.SetCookie(w, f.ceremonyCookie(sid))
 	WriteJSON(w, http.StatusOK, creation)
 }
 
 // FinishSignup doesn't sign in, the account must confirm its email first.
 func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	st, err := f.signup.take(ctx, cookieFromHeader(r.Header, ceremonyCookieName))
+	st, flowID, err := f.signup.take(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid or expired ceremony")
 		return
@@ -269,29 +273,28 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	if f.svc.OnPasskeySignup != nil {
 		f.svc.OnPasskeySignup(r, u)
 	}
+	f.svc.spendFlow(ctx, flowID)
 	http.SetCookie(w, f.svc.SignupCookie(u.ID))
 	http.SetCookie(w, f.clearedCeremonyCookie())
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "verification_required"})
 }
 
-func (f *passkeyFlow) BeginLogin(w http.ResponseWriter, r *http.Request) {
+func (f *passkeyFlow) BeginLogin(w http.ResponseWriter, _ *http.Request) {
 	assertion, session, err := f.wa.BeginDiscoverableLogin(webauthn.WithUserVerification(protocol.VerificationRequired))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "login failed")
 		return
 	}
-	sid, err := f.state.put(r.Context(), *session)
-	if err != nil {
+	if _, err := f.state.put(w, *session); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	http.SetCookie(w, f.ceremonyCookie(sid))
 	WriteJSON(w, http.StatusOK, assertion)
 }
 
 func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	session, err := f.state.take(ctx, cookieFromHeader(r.Header, ceremonyCookieName))
+	session, flowID, err := f.state.take(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid or expired ceremony")
 		return
@@ -328,6 +331,7 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	f.svc.spendFlow(ctx, flowID)
 	f.svc.touchCredential(ctx, "passkey:"+base64.RawURLEncoding.EncodeToString(cred.ID))
 	http.SetCookie(w, cookie)
 	if f.svc.OnUserLogin != nil {
