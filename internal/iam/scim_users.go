@@ -160,6 +160,11 @@ func (h scimUserHandler) apply(
 	externalID string,
 ) (scim.Resource, error) {
 	err := h.svc.conn.WithTx(ctx, func(q *db.Queries) error {
+		if patch.Active != nil && !*patch.Active {
+			if err := keepOwner(ctx, q, h.workspaceID, patch.ID); err != nil {
+				return err
+			}
+		}
 		if _, err := q.UpdateUser(ctx, &patch); err != nil {
 			return err
 		}

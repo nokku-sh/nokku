@@ -8,6 +8,9 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/nokku-sh/nokku/internal/actor"
 )
 
@@ -219,6 +222,37 @@ func TestSCIMDeprovision(t *testing.T) {
 	if code := c.do(http.MethodDelete, "/Users/"+o.owner.ID, nil, nil); code != http.StatusConflict {
 		t.Errorf("owner delete: code %d, want 409", code)
 	}
+}
+
+// The IdP cannot switch the workspace owner off. Okta and Entra deactivate
+// with PATCH, PUT and POST carry the same flag.
+func TestSCIMKeepsTheOwnerActive(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	c := e.scim(t, o)
+	_, _, err := e.svc.IssueSession(
+		t.Context(),
+		SessionParams{SubjectID: o.owner.ID, Kind: actor.KindUser, Method: MethodSAML},
+	)
+	require.NoError(t, err)
+
+	off := scimUser(o.owner.Email, "")
+	off["active"] = false
+	for name, req := range map[string]struct {
+		method, path string
+		body         any
+	}{
+		"patch": {http.MethodPatch, "/Users/" + o.owner.ID, patchOp("replace", "active", false)},
+		"put":   {http.MethodPut, "/Users/" + o.owner.ID, off},
+		"post":  {http.MethodPost, "/Users", off},
+	} {
+		assert.Equal(t, http.StatusConflict, c.do(req.method, req.path, req.body, nil), name)
+		assert.True(t, e.userByEmail(t, o.owner.Email).Active, "%s switched the owner off", name)
+	}
+	assert.Equal(t, 1, e.sessions(t, o.owner.ID), "the owner was signed out")
+
+	on := scimUser(o.owner.Email, "okta-1")
+	assert.Equal(t, http.StatusOK, c.do(http.MethodPut, "/Users/"+o.owner.ID, on, nil), "an active owner is fine")
 }
 
 func TestSCIMGroupsStayInWorkspace(t *testing.T) {
