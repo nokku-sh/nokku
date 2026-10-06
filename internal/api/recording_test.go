@@ -177,14 +177,15 @@ func capStorage(t *testing.T, cfg *config.Config) {
 	t.Cleanup(func() { cfg.Record = uncapped })
 }
 
-// backdate makes a recording two days old. Only the owner role may rewrite
-// a start time.
-func backdate(t *testing.T, id string) {
+// backdate makes a recording that many days old. Only the owner role may
+// rewrite a start time.
+func backdate(t *testing.T, id string, days int) {
 	t.Helper()
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
 	defer func() { _ = owner.Close(t.Context()) }()
-	_, err = owner.Exec(t.Context(), "UPDATE recordings SET started_at = NOW() - INTERVAL '2 days' WHERE id = $1", id)
+	_, err = owner.Exec(t.Context(),
+		"UPDATE recordings SET started_at = NOW() - make_interval(days => $2) WHERE id = $1", id, days)
 	require.NoError(t, err)
 }
 
@@ -212,7 +213,7 @@ func TestRecordingStorageCap(t *testing.T) {
 			String()
 
 	require.NoError(t, upload(old, 6))
-	backdate(t, old)
+	backdate(t, old, 2)
 	require.NoError(t, upload(recent, 6), "an old recording is in the way, not a reason to refuse")
 	_, err := stored(old)
 	require.ErrorIs(t, err, pgx.ErrNoRows, "the old recording makes room")
@@ -243,12 +244,38 @@ func TestRecordingStorageCap(t *testing.T) {
 	require.ErrorIs(t, err, pgx.ErrNoRows, "a refused upload leaves no recording behind")
 
 	// A day later there is room again, and the daemon's next try gets through.
-	backdate(t, recent)
+	backdate(t, recent, 2)
 	require.NoError(t, upload(cut, 6))
 	rec, err = stored(cut)
 	require.NoError(t, err)
 	assert.EqualValues(t, 6<<20, rec.SizeBytes)
 	assert.EqualValues(t, 6<<20, storedBytes(t, cfg, cut), "the whole file replaced the part")
+}
+
+// Eviction takes the oldest recordings and stops as soon as the upload fits.
+func TestRecordingEvictionTakesNoMoreThanNeeded(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	capStorage(t, cfg)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	upload := func(mib int) string {
+		id := uuid.NewV7().String()
+		require.NoError(t, uploadMiB(t, cfg, srv, key, enrolled.GetAccessToken(), id, mib))
+		return id
+	}
+
+	oldest, older, old := upload(3), upload(3), upload(3)
+	backdate(t, oldest, 4)
+	backdate(t, older, 3)
+	backdate(t, old, 2)
+	upload(3)
+
+	_, err := cfg.Conn.Sys().GetRecording(t.Context(), oldest)
+	require.ErrorIs(t, err, pgx.ErrNoRows, "the oldest recording makes room")
+	for _, id := range []string{older, old} {
+		_, err = cfg.Conn.Sys().GetRecording(t.Context(), id)
+		require.NoError(t, err, "one recording was enough, a second one went too")
+	}
 }
 
 // Uploads that run side by side fill the cap together. Without that a
