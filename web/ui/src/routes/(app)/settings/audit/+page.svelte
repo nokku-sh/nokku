@@ -10,6 +10,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import { UpgradeURL } from '#lib/config.js';
 	import { WorkspaceSettingsSchema } from '#lib/gen/nokku/v1/workspace_pb.js';
@@ -112,12 +113,12 @@
 					<Field.Label for="audit-secret">Signing secret</Field.Label>
 					<Field.Content>
 						<div class="flex items-center gap-2">
-							<Input
-								id="audit-secret"
-								type="password"
+							<InputGroupVariants
+								variant="password"
 								placeholder="Optional"
 								class="font-mono"
 								bind:value={secret}
+								inputProps={{ id: 'audit-secret', autocomplete: 'off' }}
 							/>
 							<Button variant="outline" onclick={generateSecret}>
 								<Dices data-icon="inline-start" />
