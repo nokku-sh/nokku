@@ -27,7 +27,13 @@ import (
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
-const quotaCheckInterval = 1 << 20 // 1 MiB
+const (
+	quotaCheckInterval = 1 << 20 // 1 MiB
+
+	// maxUploadBytes ends an upload. nokkud stops a recording at 50 MB, so
+	// only a daemon that ignores that gets this far.
+	maxUploadBytes = 64 << 20
+)
 
 // daemonControlService is everything a daemon calls. Authorization only lets
 // daemons in, except for EnrollDaemon. Connect and DaemonRelay come from the
@@ -193,14 +199,19 @@ func (s *daemonControlService) UploadRecording(
 	}
 
 	var size int64
-	var complete bool
+	var complete, tooLarge bool
 	lastChecked := int64(0)
+receive:
 	for stream.Receive() {
 		switch m := stream.Msg().GetMsg().(type) {
 		case *nokkuv1.UploadRecordingRequest_Chunk:
 			data := m.Chunk
 			if len(data) == 0 {
 				continue
+			}
+			if size+int64(len(data)) > maxUploadBytes {
+				tooLarge = true
+				break receive
 			}
 			// Evict the oldest recordings instead of blocking the stream.
 			if size-lastChecked >= quotaCheckInterval {
@@ -244,6 +255,11 @@ func (s *daemonControlService) UploadRecording(
 		return nil, err
 	}
 
+	if tooLarge {
+		// What arrived is kept as a cut recording. This code tells the daemon
+		// not to send it again.
+		return nil, newError(connect.CodeInvalidArgument, "recording is too large, the rest is cut")
+	}
 	if complete {
 		s.cfg.Record.ScrubRecording(rec)
 	}
