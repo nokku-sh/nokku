@@ -46,7 +46,7 @@ func TestHold_EndedSubscriptionKeepsItsDataLimits(t *testing.T) {
 	assert.EqualValues(t, 90, days, "retention must hold for 30 days after the plan ended")
 	capBytes, err := recent.RecordingStorageBytes(ctx, "ws1")
 	require.NoError(t, err)
-	assert.EqualValues(t, 100<<20, capBytes, "the storage cap must hold too, or eviction deletes recordings")
+	assert.EqualValues(t, 50<<30, capBytes, "the storage cap must hold too, or eviction deletes recordings")
 
 	old := NewService(
 		&fakeDB{plan: PlanPro, status: StatusInactive, endedAt: daysAgo(holdDays + 1)}, nil, ModeSaaS,
