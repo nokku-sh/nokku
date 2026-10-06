@@ -7,6 +7,8 @@ import (
 	"crypto/ecdsa"
 	"io"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 	"uuid"
@@ -22,6 +24,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/recording"
+	"github.com/nokku-sh/nokku/internal/storage"
 )
 
 type uploadStream = connect.ClientStreamForClientSimple[nokkuv1.UploadRecordingRequest, nokkuv1.UploadRecordingResponse]
@@ -157,6 +160,34 @@ func TestUploadRecordingKeepsWhatADeadDaemonSent(t *testing.T) {
 	assert.True(t, rec.Complete)
 	assert.EqualValues(t, whole.Len(), rec.SizeBytes)
 	assert.EqualValues(t, whole.Len(), storedBytes(t, cfg, id))
+}
+
+// When storage fails the daemon is told so, and the recording is closed with
+// nothing stored. Left open it would count as a live session.
+func TestUploadRecordingIsClosedWhenStorageFails(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	id := uuid.NewV7().String()
+
+	stream := openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
+	require.NoError(t, sendChunk(stream, make([]byte, 32<<10)))
+	// The object is written next to where it ends up. Without that directory
+	// the commit fails.
+	dir := filepath.Join(os.Getenv("NOKKU_LOCAL_STORAGE_PATH"), filepath.Dir(storage.RecordingPath(workspaceID, id)))
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(dir)
+		return err == nil
+	}, 5*time.Second, 20*time.Millisecond, "the upload never opened its object")
+	require.NoError(t, os.RemoveAll(dir))
+
+	_, err := stream.CloseAndReceive()
+	assert.Equal(t, connect.CodeInternal, connect.CodeOf(err), "an upload storage could not keep, got %v", err)
+	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+	require.NoError(t, err)
+	assert.NotNil(t, rec.EndedAt, "the recording stayed open")
+	assert.False(t, rec.Complete)
+	assert.Zero(t, rec.SizeBytes, "nothing was stored")
 }
 
 // cappedStorage is the storage cap of a hosted plan, a self-hosted instance
