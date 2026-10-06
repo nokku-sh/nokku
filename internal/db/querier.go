@@ -200,6 +200,8 @@ type Querier interface {
 	RevokeSubjectAccessInWorkspace(ctx context.Context, arg *RevokeSubjectAccessInWorkspaceParams) error
 	SetInstanceLicense(ctx context.Context, key string) error
 	SetRecordingComplete(ctx context.Context, arg *SetRecordingCompleteParams) (*Recording, error)
+	// An upload in progress counts toward the storage cap by its row.
+	SetRecordingSize(ctx context.Context, arg *SetRecordingSizeParams) error
 	// Status stays inactive so this row never grants entitlements until the
 	// webhook promotes it.
 	SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error

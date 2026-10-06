@@ -39,6 +39,12 @@ var (
 	)
 )
 
+// errRecordingStorageFull is not InvalidArgument, a daemon gives up on that.
+var errRecordingStorageFull = connect.NewError(
+	connect.CodeResourceExhausted,
+	errors.New("the recording storage of this workspace is full"),
+)
+
 var errInvalidInput = connect.NewError(
 	connect.CodeInvalidArgument,
 	errors.New("please check your input and try again"),

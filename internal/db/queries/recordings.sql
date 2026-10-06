@@ -54,6 +54,14 @@ FROM
 WHERE
   workspace_id = @workspace_id;
 
+-- name: SetRecordingSize :exec
+-- An upload in progress counts toward the storage cap by its row.
+UPDATE recordings
+SET
+  size_bytes = @size_bytes
+WHERE
+  id = @id;
+
 -- name: SetRecordingComplete :one
 UPDATE recordings
 SET
