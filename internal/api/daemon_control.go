@@ -210,7 +210,8 @@ func (s *daemonControlService) UploadRecording(
 
 	var size int64
 	var complete bool
-	var refused error
+	// ended is the answer for an upload that was not taken whole.
+	var ended error
 	lastChecked := int64(0)
 receive:
 	for stream.Receive() {
@@ -222,20 +223,20 @@ receive:
 			}
 			if size+int64(len(data)) > maxUploadBytes {
 				// This code tells the daemon not to send the file again.
-				refused = newError(connect.CodeInvalidArgument, "recording is too large, the rest is cut")
+				ended = newError(connect.CodeInvalidArgument, "recording is too large, the rest is cut")
 				break receive
 			}
 			if size-lastChecked >= quotaCheckInterval {
 				lastChecked = size
 				if !s.cfg.Record.MakeRoom(ctx, workspaceID, rec.ID, size) {
-					refused = errRecordingStorageFull
+					ended = errRecordingStorageFull
 					break receive
 				}
 			}
 			if err := w.WriteChunk(data); err != nil {
-				_ = w.Close()
 				slog.Error("write recording chunk", "recording_id", rec.ID, "error", err)
-				return nil, errInternal
+				ended = errInternal
+				break receive
 			}
 			size += int64(len(data))
 		case *nokkuv1.UploadRecordingRequest_Final:
@@ -245,11 +246,12 @@ receive:
 	interrupted := stream.Err() != nil && !errors.Is(stream.Err(), io.EOF)
 	if err = w.Close(); err != nil {
 		slog.Error("commit recording object", "recording_id", rec.ID, "error", err)
-		return nil, errInternal
+		// Nothing of this upload is stored, what an earlier try left still is.
+		ended, size, complete = errInternal, rec.SizeBytes, false
 	}
 
-	// The row is closed for an interrupted upload too, or it would count as
-	// a live session and as no bytes.
+	// The row is closed however the upload went, or it would count as a live
+	// session and as no bytes.
 	rowCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	defer cancel()
 	if err := s.cfg.Conn.WithWorkspace(rowCtx, func(q *db.Queries) (err error) {
@@ -264,9 +266,9 @@ receive:
 	}
 
 	switch {
-	case refused != nil:
-		// What arrived is kept as a cut recording.
-		return nil, refused
+	case ended != nil:
+		// What was stored is kept as a cut recording.
+		return nil, ended
 	case complete:
 		s.cfg.Record.ScrubRecording(rec)
 	case interrupted:
