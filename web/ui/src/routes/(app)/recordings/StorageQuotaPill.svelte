@@ -59,7 +59,7 @@
 			<Skeleton class="h-1 w-full" />
 		{:else if unlimited}
 			<p class="text-xs text-muted-foreground">
-				{formatBytes(usedBytes)} stored — no quota on your plan.
+				{formatBytes(usedBytes)} stored, no quota on your plan.
 			</p>
 		{:else}
 			<div class="flex items-baseline justify-between text-xs">
