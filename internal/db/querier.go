@@ -49,6 +49,7 @@ type Querier interface {
 	DeleteDaemon(ctx context.Context, daemonID string) (*Daemon, error)
 	DeleteExpiredSessions(ctx context.Context, now *time.Time) (int64, error)
 	DeleteExpiredTokens(ctx context.Context, now time.Time) (int64, error)
+	DeleteOtherCredentials(ctx context.Context, arg *DeleteOtherCredentialsParams) error
 	DeletePrincipal(ctx context.Context, id string) error
 	DeleteRecording(ctx context.Context, id string) error
 	DeleteRecordingsBefore(ctx context.Context, arg *DeleteRecordingsBeforeParams) ([]*DeleteRecordingsBeforeRow, error)
@@ -121,6 +122,8 @@ type Querier interface {
 	// For a user, grants to their teams count too.
 	GetTargetsBySubject(ctx context.Context, subjectID string) ([]*Target, error)
 	GetTeam(ctx context.Context, teamID string) (*Team, error)
+	// Reads a token without spending it.
+	GetTokenUser(ctx context.Context, arg *GetTokenUserParams) (string, error)
 	GetUser(ctx context.Context, id string) (*User, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	GetVerifiedWorkspaceDomain(ctx context.Context, domain string) (*WorkspaceDomain, error)

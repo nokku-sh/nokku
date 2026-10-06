@@ -7,6 +7,8 @@ package iam
 
 import (
 	"context"
+	"crypto/hkdf"
+	"crypto/sha256"
 	"errors"
 	"net/http"
 	"strings"
@@ -66,7 +68,7 @@ type Deps struct {
 	BaseURL string
 	Conn    txRunner
 	Cache   *cache.Memory
-	// Secret keys the DPoP server nonce.
+	// Secret keys the DPoP server nonce and the signup cookie.
 	Secret []byte
 	Events Sink
 	// Password zero value selects defaults.
@@ -98,6 +100,8 @@ type Service struct {
 	canJoin func(ctx context.Context, workspaceID string, used int64) error
 	strict  bool
 	idp     *http.Client // guarded, see util.NewEgressClient
+	// signupKey signs the cookie that marks the browser of a signup.
+	signupKey []byte
 
 	// OnUserLogin fires after an interactive browser login set its cookie.
 	OnUserLogin func(w http.ResponseWriter, r *http.Request, u *db.User, method Method)
@@ -134,6 +138,9 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 	}
 	var err error
 	if s.idp, err = util.NewEgressClient(providerHTTPTimeout); err != nil {
+		return nil, err
+	}
+	if s.signupKey, err = hkdf.Key(sha256.New, d.Secret, nil, "nokku signup browser v1", 32); err != nil {
 		return nil, err
 	}
 	s.Password = newPasswordManager(s, d.Password)

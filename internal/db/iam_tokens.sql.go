@@ -122,6 +122,30 @@ func (q *Queries) GetPendingTokenEmail(ctx context.Context, arg *GetPendingToken
 	return email, err
 }
 
+const getTokenUser = `-- name: GetTokenUser :one
+SELECT
+  user_id
+FROM
+  one_time_tokens
+WHERE
+  token_hash = $1
+  AND purpose = $2
+  AND expires_at > NOW()
+`
+
+type GetTokenUserParams struct {
+	TokenHash crypto.HashedToken `json:"tokenHash"`
+	Purpose   string             `json:"purpose"`
+}
+
+// Reads a token without spending it.
+func (q *Queries) GetTokenUser(ctx context.Context, arg *GetTokenUserParams) (string, error) {
+	row := q.db.QueryRow(ctx, getTokenUser, arg.TokenHash, arg.Purpose)
+	var user_id string
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
 const hasRecentToken = `-- name: HasRecentToken :one
 SELECT EXISTS (
   SELECT 1

@@ -269,6 +269,7 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	if f.svc.OnPasskeySignup != nil {
 		f.svc.OnPasskeySignup(r, u)
 	}
+	http.SetCookie(w, f.svc.SignupCookie(u.ID))
 	http.SetCookie(w, f.clearedCeremonyCookie())
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "verification_required"})
 }

@@ -13,6 +13,17 @@ WHERE
 RETURNING
   user_id;
 
+-- name: GetTokenUser :one
+-- Reads a token without spending it.
+SELECT
+  user_id
+FROM
+  one_time_tokens
+WHERE
+  token_hash = @token_hash
+  AND purpose = @purpose
+  AND expires_at > NOW();
+
 -- name: ConsumeEmailToken :one
 DELETE FROM one_time_tokens
 WHERE

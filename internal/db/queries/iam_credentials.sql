@@ -75,6 +75,12 @@ WHERE
   AND type = @type
   AND provider = @provider;
 
+-- name: DeleteOtherCredentials :exec
+DELETE FROM credentials
+WHERE
+  user_id = @user_id
+  AND id <> @keep_id;
+
 -- name: ConsumeCredentialBySubject :one
 DELETE FROM credentials
 WHERE

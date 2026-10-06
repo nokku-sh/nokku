@@ -16,6 +16,7 @@ var (
 	errSessionExpired     = errors.New("iam: session expired")
 	errInvalidToken       = errors.New("iam: invalid token")
 	ErrEmailUnverified    = errors.New("iam: email not verified")
+	ErrOtherBrowser       = errors.New("iam: not the browser that signed up")
 	ErrEmailRejected      = errors.New("iam: email rejected")
 	errCredentialsExpired = errors.New("iam: credentials expired")
 	// ErrDPoPRequired is advertised with a DPoP-Nonce header so the client

@@ -47,6 +47,10 @@ func (s *authService) Register(
 	ctx context.Context,
 	req *nokkuv1.RegisterRequest,
 ) (*nokkuv1.RegisterResponse, error) {
+	ci, err := callInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
 	u, err := s.cfg.IAM.Register(
 		ctx,
 		strings.ToLower(strings.TrimSpace(req.GetEmail())),
@@ -68,6 +72,7 @@ func (s *authService) Register(
 		}
 		return nil, errInternal
 	}
+	setCookie(ci, s.cfg.IAM.SignupCookie(u.ID))
 	s.sendTokenEmail(ctx, u, iam.TokenVerifyEmail, true)
 	return &nokkuv1.RegisterResponse{}, nil
 }
@@ -181,7 +186,14 @@ func (s *authService) VerifyEmail(
 	ctx context.Context,
 	req *nokkuv1.VerifyEmailRequest,
 ) (*nokkuv1.VerifyEmailResponse, error) {
-	userID, err := s.cfg.IAM.ConsumeToken(ctx, req.GetToken(), iam.TokenVerifyEmail)
+	ci, err := callInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	userID, err := s.cfg.IAM.ConsumeVerifyToken(ctx, ci.RequestHeader(), req.GetToken())
+	if errors.Is(err, iam.ErrOtherBrowser) {
+		return nil, errOtherBrowser
+	}
 	if err != nil {
 		return nil, newError(
 			connect.CodeInvalidArgument,
