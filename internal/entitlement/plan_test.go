@@ -21,7 +21,7 @@ func TestPlanMatrix(t *testing.T) {
 			wantSeatCap:     5,
 			wantResourceCap: 50,
 			wantRetention:   7,
-			wantStorageCap:  10 << 20,
+			wantStorageCap:  1 << 30,
 			wantFeatures: map[string]bool{
 				FeatureOIDC:           true,
 				FeatureEnforceSSO:     false,
@@ -36,7 +36,7 @@ func TestPlanMatrix(t *testing.T) {
 			wantSeatCap:     unlimited,
 			wantResourceCap: 2000,
 			wantRetention:   90,
-			wantStorageCap:  100 << 20,
+			wantStorageCap:  50 << 30,
 			wantFeatures: map[string]bool{
 				FeatureOIDC:           true,
 				FeatureEnforceSSO:     true,
@@ -51,7 +51,7 @@ func TestPlanMatrix(t *testing.T) {
 			wantSeatCap:     unlimited,
 			wantResourceCap: unlimited,
 			wantRetention:   365,
-			wantStorageCap:  1 << 30,
+			wantStorageCap:  500 << 30,
 			wantFeatures: map[string]bool{
 				FeatureOIDC:           true,
 				FeatureEnforceSSO:     true,
