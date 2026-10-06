@@ -1,6 +1,8 @@
 package iam
 
 import (
+	"bytes"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -37,8 +39,9 @@ func TestSealedFlowState(t *testing.T) {
 	svc, now := newSealedTestService(t, false)
 	store := &sealed[authorizeState]{svc: svc, cookie: flowCookieName, use: "oidc", ttl: flowStateTTL}
 
+	const provider = "provider-kept-out-of-sight"
 	rec := httptest.NewRecorder()
-	id, err := store.put(rec, authorizeState{ProviderID: "p1", LinkUserID: "u1"})
+	id, err := store.put(rec, authorizeState{ProviderID: provider, LinkUserID: "u1"})
 	if err != nil || id == "" {
 		t.Fatalf("put = %q, %v", id, err)
 	}
@@ -51,8 +54,11 @@ func TestSealedFlowState(t *testing.T) {
 		t.Errorf("flow cookie HttpOnly=%v SameSite=%v Secure=%v, want HttpOnly, Lax and no Secure on plain HTTP",
 			cookie.HttpOnly, cookie.SameSite, cookie.Secure)
 	}
-	if strings.Contains(cookie.Value, "p1") {
-		t.Error("the state is readable in the cookie")
+	if raw, err := base64.RawURLEncoding.DecodeString(
+		cookie.Value,
+	); err != nil ||
+		bytes.Contains(raw, []byte(provider)) {
+		t.Errorf("the state is readable in the cookie, decoding it gave %v", err)
 	}
 
 	reqWith := func(value string) *http.Request {
@@ -64,7 +70,7 @@ func TestSealedFlowState(t *testing.T) {
 	}
 
 	got, gotID, err := store.take(reqWith(cookie.Value))
-	if err != nil || gotID != id || got.ProviderID != "p1" || got.LinkUserID != "u1" {
+	if err != nil || gotID != id || got.ProviderID != provider || got.LinkUserID != "u1" {
 		t.Fatalf("take = %+v, %q, %v", got, gotID, err)
 	}
 	if _, _, err := store.take(reqWith("stolen")); err == nil {
