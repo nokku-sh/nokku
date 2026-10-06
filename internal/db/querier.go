@@ -227,6 +227,8 @@ type Querier interface {
 	UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User, error)
 	UpdateWorkspace(ctx context.Context, arg *UpdateWorkspaceParams) (*Workspace, error)
 	UpdateWorkspaceMember(ctx context.Context, arg *UpdateWorkspaceMemberParams) error
+	// Only a member can take over. Every statement joins new_owner, so anyone
+	// else changes nothing and gets no row.
 	UpdateWorkspaceOwner(ctx context.Context, arg *UpdateWorkspaceOwnerParams) (*Workspace, error)
 	// A credential never moves accounts, a clash returns no rows.
 	UpsertCredential(ctx context.Context, arg *UpsertCredentialParams) (*Credential, error)
