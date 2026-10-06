@@ -14,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/nokku-sh/nokku/internal/actor"
-	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -45,7 +44,6 @@ func newTestEnv(t *testing.T) *testEnv {
 	svc, err := New(t.Context(), Deps{
 		BaseURL:          testBaseURL,
 		Conn:             conn,
-		Cache:            cache.NewMemory(1000),
 		Secret:           []byte("test-secret"),
 		Password:         passwordParams{Time: 1, Memory: 1024, Threads: 1, SaltLen: 16, KeyLen: 32},
 		PasskeyRPOrigins: []string{testBaseURL},

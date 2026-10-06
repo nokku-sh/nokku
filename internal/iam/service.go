@@ -66,11 +66,10 @@ type Sink interface {
 	Record(ctx context.Context, e Event)
 }
 
-// Deps requires Conn, Cache, Secret, and BaseURL.
+// Deps requires Conn, Secret, and BaseURL.
 type Deps struct {
 	BaseURL string
 	Conn    txRunner
-	Cache   *cache.Memory
 	// Secret keys the DPoP server nonce and the signup and flow cookies.
 	Secret []byte
 	Events Sink
@@ -95,7 +94,6 @@ type txRunner interface {
 type Service struct {
 	sys     db.Querier // nokku_system, bypasses RLS
 	conn    txRunner
-	cache   *cache.Memory
 	events  Sink
 	baseURL string
 	secure  bool
@@ -130,13 +128,12 @@ type Service struct {
 // New also seeds social providers and the bootstrap admin from the
 // environment, and loads or creates the SAML SP keypair.
 func New(ctx context.Context, d Deps) (*Service, error) {
-	if d.Conn == nil || d.Cache == nil || len(d.Secret) == 0 || d.BaseURL == "" {
-		return nil, errors.New("iam: conn, cache, secret, and base url are required")
+	if d.Conn == nil || len(d.Secret) == 0 || d.BaseURL == "" {
+		return nil, errors.New("iam: conn, secret, and base url are required")
 	}
 	s := &Service{
 		sys:     d.Conn.Sys(),
 		conn:    d.Conn,
-		cache:   d.Cache,
 		events:  d.Events,
 		baseURL: d.BaseURL,
 		secure:  strings.HasPrefix(strings.ToLower(d.BaseURL), "https://"),
@@ -166,7 +163,7 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 		anonReplay: cache.NewMemory(dpopAnonReplayEntries),
 		now:        s.now,
 	}
-	s.Device = &DeviceFlow{svc: s}
+	s.Device = &DeviceFlow{svc: s, grants: cache.NewMemory(deviceGrantEntries)}
 	s.OIDC = newOIDCFlow(s)
 	s.OAuth2 = newOAuth2Flow(s)
 	if s.SAML, err = newSAMLFlow(ctx, s); err != nil {

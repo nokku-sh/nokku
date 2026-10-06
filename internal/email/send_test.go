@@ -153,6 +153,27 @@ func TestSendTemplate_SendErrorPropagatesWithoutCooldown(t *testing.T) {
 	}
 }
 
+// A cooldown store someone filled must not hold back a reset or an alert.
+func TestSendTemplate_FullCooldownStoreSendsAnyway(t *testing.T) {
+	sender := &mockSender{}
+	svc := newTestService(sender)
+	svc.cache = cache.NewMemory(1)
+	if _, err := svc.cache.SetNX(context.Background(), "taken", nil, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+
+	for range 2 {
+		if err := svc.SendRecoveryEmail(
+			context.Background(), "user-1", "ada@example.com", "https://app.nokku.sh/reset/token", "15 minutes",
+		); err != nil {
+			t.Fatalf("SendRecoveryEmail with a full cooldown store: %v", err)
+		}
+	}
+	if len(sender.sent) != 2 {
+		t.Fatalf("sender called %d times, want 2", len(sender.sent))
+	}
+}
+
 func TestSendTemplate_MissingUserID(t *testing.T) {
 	svc := newTestService(&mockSender{})
 

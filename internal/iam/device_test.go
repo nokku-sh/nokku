@@ -150,3 +150,33 @@ func TestTerminalSignInMailsOnlyNewKeys(t *testing.T) {
 	terminalSignIn(t, e, u, laptop)
 	wantMail(true, "a forgotten key is mailed again")
 }
+
+// Anyone can start device logins. Filling their store must not stop a
+// browser from signing in.
+func TestDeviceFloodStaysInItsStore(t *testing.T) {
+	e := newTestEnv(t)
+	begin := func() int {
+		rec := httptest.NewRecorder()
+		e.svc.Device.Begin(rec, httptest.NewRequest(http.MethodPost, "/auth/device", nil))
+		return rec.Code
+	}
+	// Two entries per grant.
+	for range deviceGrantEntries / 2 {
+		require.Equal(t, http.StatusOK, begin())
+	}
+	require.NotEqual(t, http.StatusOK, begin(), "the device store takes grants without bound")
+
+	rec := httptest.NewRecorder()
+	e.svc.Passkey.BeginLogin(rec, httptest.NewRequest(http.MethodPost, "/passkey/login/begin", nil))
+	assert.Equal(t, http.StatusOK, rec.Code, "a passkey login could not start: %s", rec.Body.String())
+
+	login := httptest.NewRequest(http.MethodPost, "/passkey/login/finish", nil)
+	for _, c := range rec.Result().Cookies() {
+		login.AddCookie(c)
+	}
+	_, flowID, err := e.svc.Passkey.state.take(login)
+	require.NoError(t, err)
+	e.svc.spendFlow(t.Context(), flowID)
+	_, _, err = e.svc.Passkey.state.take(login)
+	assert.Error(t, err, "a finished login could not be marked as spent")
+}

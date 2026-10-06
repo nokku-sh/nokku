@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/internal/actor"
+	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/util"
@@ -41,8 +42,13 @@ const (
 	grantDenied     = "denied"
 )
 
+// deviceGrantEntries bounds the grants waiting for an approval, two entries
+// each. Anyone can start one, so they have a store nothing else lives in.
+const deviceGrantEntries = 10_000
+
 type DeviceFlow struct {
-	svc *Service
+	svc    *Service
+	grants *cache.Memory
 }
 
 // deviceGrant is stored under the device code, and under the user code until
@@ -83,8 +89,8 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 		UserAgent:  truncate(util.SanitizeUTF8(r.Header.Get("User-Agent")), maxUserAgent),
 	}
 	b, _ := json.Marshal(g)
-	if err := h.svc.cache.Set(r.Context(), "device:code:"+deviceCode, b, grantTTL); err != nil ||
-		h.svc.cache.Set(r.Context(), "device:user:"+userCode, b, grantTTL) != nil {
+	if err := h.grants.Set(r.Context(), "device:code:"+deviceCode, b, grantTTL); err != nil ||
+		h.grants.Set(r.Context(), "device:user:"+userCode, b, grantTTL) != nil {
 		writeOAuthError(w, "server_error")
 		return
 	}
@@ -103,7 +109,7 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 func (h *DeviceFlow) Info(w http.ResponseWriter, r *http.Request) {
 	userCode := normalizeUserCode(r.URL.Query().Get("user_code"))
 	var g deviceGrant
-	b, err := h.svc.cache.Get(r.Context(), "device:user:"+userCode)
+	b, err := h.grants.Get(r.Context(), "device:user:"+userCode)
 	if err != nil || json.Unmarshal(b, &g) != nil || g.Status != grantPending {
 		writeError(w, http.StatusNotFound, "invalid or expired code")
 		return
@@ -133,7 +139,7 @@ func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool
 	}
 
 	// Consuming the user code makes the decision single-use.
-	b, err := h.svc.cache.GetDel(r.Context(), "device:user:"+userCode)
+	b, err := h.grants.GetDel(r.Context(), "device:user:"+userCode)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid or expired code")
 		return
@@ -151,7 +157,7 @@ func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool
 	}
 	g.UserID = p.ID
 	b, _ = json.Marshal(g)
-	if err := h.svc.cache.Set(r.Context(), "device:code:"+g.DeviceCode, b, grantTTL); err != nil {
+	if err := h.grants.Set(r.Context(), "device:code:"+g.DeviceCode, b, grantTTL); err != nil {
 		writeOAuthError(w, "server_error")
 		return
 	}
@@ -167,7 +173,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, err := h.svc.cache.Get(ctx, "device:code:"+deviceCode)
+	b, err := h.grants.Get(ctx, "device:code:"+deviceCode)
 	if err != nil {
 		writeOAuthError(w, "expired_token")
 		return
@@ -187,7 +193,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		writeOAuthError(w, "authorization_pending")
 	case grantDenied:
 		// Consume it so a CLI left polling doesn't audit the denial every poll.
-		if _, err := h.svc.cache.GetDel(ctx, "device:code:"+deviceCode); err != nil {
+		if _, err := h.grants.GetDel(ctx, "device:code:"+deviceCode); err != nil {
 			writeOAuthError(w, "expired_token") // a concurrent poll consumed it
 			return
 		}
@@ -222,7 +228,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Consume before issuing so racing polls never yield two sessions.
-		if _, err := h.svc.cache.GetDel(ctx, "device:code:"+deviceCode); err != nil {
+		if _, err := h.grants.GetDel(ctx, "device:code:"+deviceCode); err != nil {
 			writeOAuthError(w, "expired_token") // a concurrent poll consumed it
 			return
 		}
@@ -323,7 +329,7 @@ func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string
 func (h *DeviceFlow) pollTrack(ctx context.Context, deviceCode string) bool {
 	key := "device:poll:" + deviceCode
 	var st pollState
-	if b, err := h.svc.cache.Get(ctx, key); err == nil {
+	if b, err := h.grants.Get(ctx, key); err == nil {
 		st = decodePollState(b)
 	}
 
@@ -331,11 +337,11 @@ func (h *DeviceFlow) pollTrack(ctx context.Context, deviceCode string) bool {
 	now := time.Now()
 	if !st.last.IsZero() && now.Sub(st.last) < required {
 		st.violations++
-		_ = h.svc.cache.Set(ctx, key, encodePollState(st), grantTTL)
+		_ = h.grants.Set(ctx, key, encodePollState(st), grantTTL)
 		return true
 	}
 	st.last = now
-	_ = h.svc.cache.Set(ctx, key, encodePollState(st), grantTTL)
+	_ = h.grants.Set(ctx, key, encodePollState(st), grantTTL)
 	return false
 }
 

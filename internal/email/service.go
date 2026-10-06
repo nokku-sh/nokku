@@ -19,6 +19,9 @@ import (
 
 var errCooldown = errors.New("email cooldown active")
 
+// cooldownEntries bounds the cooldown store, one entry per user and template.
+const cooldownEntries = 10_000
+
 // Service only delivers when an SMTP host is set.
 type Service struct {
 	sender sender
@@ -56,12 +59,12 @@ type sendRequest struct {
 	data     any
 }
 
-func New(appURL string, cache *cache.Memory) (*Service, error) {
+func New(appURL string) (*Service, error) {
 	svc, err := env.ParseAs[Service]()
 	if err != nil {
 		return nil, err
 	}
-	svc.appURL, svc.cache, svc.sender = appURL, cache, noopSender{}
+	svc.appURL, svc.cache, svc.sender = appURL, cache.NewMemory(cooldownEntries), noopSender{}
 
 	if svc.SMTPHost == "" {
 		slog.Info("email delivery disabled, set NOKKU_SMTP_HOST to enable it")
@@ -185,10 +188,11 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 
 	key := "email_cooldown:" + req.userID + ":" + req.template
 	claimed, err := s.cache.SetNX(ctx, key, nil, s.Cooldown)
+	// A full store must not hold back a reset or a sign-in alert. Every signup
+	// adds an entry, so it can be filled from outside.
 	if err != nil {
-		return fmt.Errorf("email cooldown: %w", err)
-	}
-	if !claimed {
+		slog.Warn("email cooldown not recorded, sending anyway", "error", err)
+	} else if !claimed {
 		return errCooldown
 	}
 
