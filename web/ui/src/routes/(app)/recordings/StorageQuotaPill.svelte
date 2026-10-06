@@ -72,7 +72,8 @@
 			{#if pct >= 90}
 				<p class="flex items-start gap-1 text-xs text-destructive">
 					<TriangleAlert size={12} class="mt-0.5 shrink-0" />
-					Oldest recordings are deleted automatically to keep new ones flowing.
+					Recordings older than a day are deleted to make room. If that is not enough, new ones wait on
+					their server.
 				</p>
 			{/if}
 		{/if}

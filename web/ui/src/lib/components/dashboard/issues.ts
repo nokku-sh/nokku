@@ -71,7 +71,8 @@ export function issuesOf(d: GetDashboardResponse): Issue[] {
 			id: 'storage',
 			tone: 'warning',
 			title: `Recording storage is ${Math.round((used / quota) * 100)}% full`,
-			detail: 'The oldest recordings get evicted to make room for new ones.',
+			detail:
+				'Recordings older than a day are deleted to make room. If that is not enough, new ones wait on their server.',
 			href: '/recordings'
 		});
 	}
