@@ -3,14 +3,20 @@ package recording
 import (
 	"context"
 	"log/slog"
+	"time"
 
+	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
+// minEvictAge keeps a recording whatever the cap says. Without it a user
+// could fill the cap to push out the recording of what they just did.
+const minEvictAge = 24 * time.Hour
+
 // EvictForBytes deletes the oldest recordings until inFlight fits. The upload
-// in progress is never evicted, and an overage that cannot be cleared is
-// accepted.
+// in progress and anything younger than minEvictAge are never evicted, and an
+// overage that cannot be cleared is accepted.
 func (s *Service) EvictForBytes(
 	ctx context.Context,
 	workspaceID, recordingID string,
@@ -48,7 +54,7 @@ func (s *Service) EvictForBytes(
 		}
 		var freed int64
 		for _, v := range victims {
-			if v.ID == recordingID {
+			if v.ID == recordingID || time.Since(v.StartedAt) < minEvictAge {
 				continue
 			}
 			if err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
@@ -68,6 +74,26 @@ func (s *Service) EvictForBytes(
 				"size",
 				v.SizeBytes,
 			)
+			// Audit it, an eviction removes evidence before its retention is up.
+			if s.events != nil {
+				if err := s.events.Append(ctx, &audit.Event{
+					Timestamp:   time.Now().UTC(),
+					WorkspaceID: workspaceID,
+					Action:      "RecordingEvicted",
+					ActorKind:   "system",
+					Target:      v.ID,
+					OK:          true,
+					Details: map[string]any{
+						"daemon_id":  v.DaemonID,
+						"username":   v.Username,
+						"started_at": v.StartedAt,
+						"size_bytes": v.SizeBytes,
+						"upload":     recordingID,
+					},
+				}); err != nil {
+					slog.Warn("failed to write eviction audit log", "recording_id", v.ID, "error", err)
+				}
+			}
 		}
 		if freed == 0 {
 			return nil
