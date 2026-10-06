@@ -14,6 +14,8 @@
 	import { formatTs } from '#lib/utils.js';
 	import { CircleCheckBig, Clock, Globe, Plus, RefreshCw, Trash2 } from '@lucide/svelte';
 
+	let { readonly = false }: { readonly?: boolean } = $props();
+
 	const domains = domain.list();
 	const createDomain = domain.create();
 	const verifyDomain = domain.verify();
@@ -77,7 +79,7 @@
 			>
 		</Empty.Header>
 		<Empty.Content>
-			<Button onclick={() => (addOpen = true)}>
+			<Button disabled={readonly} onclick={() => (addOpen = true)}>
 				<Plus data-icon="inline-start" />
 				Add a domain
 			</Button>
@@ -85,7 +87,7 @@
 	</Empty.Root>
 {:else}
 	<div class="flex flex-col gap-3">
-		<Button class="self-end" onclick={() => (addOpen = true)}>
+		<Button class="self-end" disabled={readonly} onclick={() => (addOpen = true)}>
 			<Plus data-icon="inline-start" />
 			Add domain
 		</Button>
@@ -110,7 +112,7 @@
 							<Button
 								size="sm"
 								variant="outline"
-								disabled={verifyDomain.isPending}
+								disabled={readonly || verifyDomain.isPending}
 								onclick={() => verifyDomain.mutate({ domain: d.domain })}
 							>
 								{#if verifyDomain.isPending && verifyDomain.variables?.domain === d.domain}
@@ -124,6 +126,7 @@
 								size="icon-sm"
 								variant="ghost"
 								aria-label="Regenerate verification token"
+								disabled={readonly}
 								onclick={() => askRegenerate(d.domain)}
 							>
 								<RefreshCw />
@@ -133,6 +136,7 @@
 							size="icon-sm"
 							variant="ghost"
 							aria-label={`Delete ${d.domain}`}
+							disabled={readonly}
 							onclick={() => askDelete(d.domain)}
 						>
 							<Trash2 />

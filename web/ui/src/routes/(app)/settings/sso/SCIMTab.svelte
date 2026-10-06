@@ -16,6 +16,8 @@
 	import { formatTs } from '#lib/utils.js';
 	import { KeyRound, Plus, Trash2, UsersRound } from '@lucide/svelte';
 
+	let { readonly = false }: { readonly?: boolean } = $props();
+
 	const tokens = scim.listTokens();
 	const createToken = scim.createToken();
 	const deleteToken = scim.deleteToken();
@@ -106,7 +108,7 @@
 			<Card.Title>Connector tokens</Card.Title>
 			<Card.Description>The secret is shown once, when you create it.</Card.Description>
 			<Card.Action>
-				<Button size="sm" onclick={() => (createOpen = true)}>
+				<Button size="sm" disabled={readonly} onclick={() => (createOpen = true)}>
 					<Plus data-icon="inline-start" />
 					Create token
 				</Button>
@@ -143,6 +145,7 @@
 									size="icon-sm"
 									variant="ghost"
 									aria-label={`Revoke ${t.label}`}
+									disabled={readonly}
 									onclick={() => revoke(t.id ?? '', t.label)}
 								>
 									<Trash2 />

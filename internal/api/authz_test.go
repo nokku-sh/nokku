@@ -37,11 +37,17 @@ func TestProcedureRoles(t *testing.T) {
 
 		{nokkuv1connect.WorkspaceServiceUpdateWorkspaceMemberProcedure, db.RoleAdmin},
 		{nokkuv1connect.TokenServiceCreateTokenProcedure, db.RoleAdmin},
-		{nokkuv1connect.SSOServiceUpdateSSOProviderProcedure, db.RoleAdmin},
 		{nokkuv1connect.BillingServiceGetBillingProcedure, db.RoleAdmin},
 
 		{nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure, db.RoleOwner},
 		{nokkuv1connect.BillingServiceActivateLicenseProcedure, db.RoleOwner},
+		{nokkuv1connect.SSOServiceUpdateSSOProviderProcedure, db.RoleOwner},
+		{nokkuv1connect.WorkspaceDomainServiceCreateWorkspaceDomainProcedure, db.RoleOwner},
+		{nokkuv1connect.WorkspaceDomainServiceVerifyWorkspaceDomainProcedure, db.RoleOwner},
+		{nokkuv1connect.WorkspaceDomainServiceDeleteWorkspaceDomainProcedure, db.RoleOwner},
+		{nokkuv1connect.WorkspaceDomainServiceRegenerateWorkspaceDomainTokenProcedure, db.RoleOwner},
+		{nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure, db.RoleOwner},
+		{nokkuv1connect.SCIMServiceDeleteSCIMTokenProcedure, db.RoleOwner},
 	}
 
 	for _, test := range tests {
