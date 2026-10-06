@@ -71,10 +71,12 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Web terminal tickets only, written by signed-in members. Everything an
+	// anonymous caller can write to has a store of its own.
 	cfg.Cache = cache.NewMemory(10_000)
 	cfg.Pool = daemon.New(ctx, cfg.Conn)
 	go cfg.Pool.Listen(ctx, cfg.Conn.Pool.Config().ConnConfig)
-	cfg.Email, err = email.New(cfg.FullURL(), cfg.Cache)
+	cfg.Email, err = email.New(cfg.FullURL())
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +134,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		BaseURL:          cfg.FullURL(),
 		Events:           cfg.Audit,
 		Secret:           nonceKey,
-		Cache:            cfg.Cache,
 		PasskeyRPOrigins: passkeyOrigins(&cfg),
 		CanJoin:          cfg.Entitlements.CanInvite,
 		StrictEmail:      mode == entitlement.ModeSaaS,
