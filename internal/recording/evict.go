@@ -58,6 +58,9 @@ func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string,
 		}
 		evicted := 0
 		for _, v := range victims {
+			if over <= 0 {
+				break
+			}
 			if v.ID == recordingID || time.Since(v.StartedAt) < minEvictAge {
 				continue
 			}
