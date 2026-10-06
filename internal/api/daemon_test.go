@@ -630,3 +630,96 @@ func TestUnenrollDaemon(t *testing.T) {
 		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the session outlived the daemon, got %v", err)
 }
+
+func seedCA(
+	t *testing.T,
+	srv *httptest.Server,
+	adminAuth connect.ClientOption,
+	workspaceID, name string,
+	kind nokkuv1.AuthorityType,
+) string {
+	t.Helper()
+	created, err := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth).
+		CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
+			WorkspaceId:   &workspaceID,
+			Name:          &name,
+			KeyType:       nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ECDSA.Enum(),
+			AuthorityType: kind.Enum(),
+		})
+	require.NoError(t, err)
+	return created.GetCertificateAuthority().GetId()
+}
+
+// X.509 CAs sit in the same table as SSH ones. A server and an enroll token
+// only take an SSH one, also when it is named by id.
+func TestServersOnlyTakeSSHCAs(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	ctx := t.Context()
+	workspaceID := seedWorkspace(t, cfg)
+	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	x509CA := seedCA(t, srv, adminAuth, workspaceID, "x509", nokkuv1.AuthorityType_AUTHORITY_TYPE_X509)
+	sshCA := seedCA(t, srv, adminAuth, workspaceID, "ssh", nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH)
+	targets := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, adminAuth)
+	tokens := nokkuv1connect.NewTokenServiceClient(srv.Client(), srv.URL, adminAuth)
+
+	_, err := targets.CreateTarget(ctx, &nokkuv1.CreateTargetRequest{
+		WorkspaceId: &workspaceID, Name: new("web"), CaId: &x509CA,
+	})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a server created with an X.509 CA: %v", err)
+
+	created, err := targets.CreateTarget(ctx, &nokkuv1.CreateTargetRequest{
+		WorkspaceId: &workspaceID, Name: new("web"), CaId: &sshCA,
+	})
+	require.NoError(t, err)
+	targetID := created.GetTarget().GetId()
+
+	_, err = targets.UpdateTarget(ctx, &nokkuv1.UpdateTargetRequest{
+		WorkspaceId: &workspaceID, Id: &targetID, CaId: &x509CA,
+	})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a server moved to an X.509 CA: %v", err)
+	target, err := cfg.Conn.Sys().GetTarget(ctx, targetID)
+	require.NoError(t, err)
+	require.NotNil(t, target.CaID)
+	assert.Equal(t, sshCA, *target.CaID, "the server kept its CA")
+
+	enroll := func(caID string) error {
+		_, err := tokens.CreateToken(ctx, &nokkuv1.CreateTokenRequest{
+			WorkspaceId: &workspaceID,
+			Kind:        nokkuv1.TokenKind_TOKEN_KIND_ENROLL.Enum(),
+			CaId:        &caID,
+		})
+		return err
+	}
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(enroll(x509CA)), "an enroll token for an X.509 CA")
+	require.NoError(t, enroll(sshCA))
+}
+
+// A row that carries an X.509 CA anyway never gets its key to sign an SSH
+// host certificate.
+func TestSignHostCertificateNeedsAnSSHCA(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	x509CA := seedCA(t, srv, adminAuth, workspaceID, "x509", nokkuv1.AuthorityType_AUTHORITY_TYPE_X509)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	_, err := cfg.Conn.Sys().UpdateTarget(t.Context(), &db.UpdateTargetParams{
+		TargetID: enrolled.GetTargetId(),
+		CaID:     &x509CA,
+	})
+	require.NoError(t, err)
+
+	hostKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	hostPub, err := ssh.NewPublicKey(&hostKey.PublicKey)
+	require.NoError(t, err)
+	res, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
+		daemonAuth(
+			t, cfg, key, enrolled.GetAccessToken(),
+			nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure,
+		)).
+		SignHostCertificate(t.Context(), &nokkuv1.SignHostCertificateRequest{
+			PublicKey: new(string(ssh.MarshalAuthorizedKey(hostPub))),
+		})
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "signed with an X.509 key: %v", err)
+	assert.Empty(t, res.GetSignedCertificate())
+}
