@@ -645,48 +645,64 @@ func (q *Queries) UpdateWorkspaceMember(ctx context.Context, arg *UpdateWorkspac
 
 const updateWorkspaceOwner = `-- name: UpdateWorkspaceOwner :one
 WITH
+  new_owner AS (
+    SELECT
+      wm.user_id
+    FROM
+      workspace_members wm
+    WHERE
+      wm.workspace_id = $1
+      AND wm.user_id = $2
+  ),
   old_owner AS (
     SELECT
       created_by
     FROM
       workspaces
     WHERE
-      id = $2
+      id = $1
   ),
   update_old_owner AS (
     UPDATE workspace_members
     SET
       role_name = 'admin'
     FROM
-      old_owner
+      old_owner,
+      new_owner
     WHERE
-      workspace_members.workspace_id = $2
+      workspace_members.workspace_id = $1
       AND workspace_members.user_id = old_owner.created_by
   ),
   update_new_owner AS (
     UPDATE workspace_members
     SET
       role_name = 'owner'
+    FROM
+      new_owner
     WHERE
-      workspace_members.workspace_id = $2
-      AND workspace_members.user_id = $1
+      workspace_members.workspace_id = $1
+      AND workspace_members.user_id = new_owner.user_id
   )
 UPDATE workspaces
 SET
-  created_by = $1
+  created_by = new_owner.user_id
+FROM
+  new_owner
 WHERE
-  workspaces.id = $2
+  workspaces.id = $1
 RETURNING
-  id, name, description, settings, created_by, created_at, updated_at
+  workspaces.id, workspaces.name, workspaces.description, workspaces.settings, workspaces.created_by, workspaces.created_at, workspaces.updated_at
 `
 
 type UpdateWorkspaceOwnerParams struct {
-	NewOwnerID  string `json:"newOwnerId"`
 	WorkspaceID string `json:"workspaceId"`
+	NewOwnerID  string `json:"newOwnerId"`
 }
 
+// Only a member can take over. Every statement joins new_owner, so anyone
+// else changes nothing and gets no row.
 func (q *Queries) UpdateWorkspaceOwner(ctx context.Context, arg *UpdateWorkspaceOwnerParams) (*Workspace, error) {
-	row := q.db.QueryRow(ctx, updateWorkspaceOwner, arg.NewOwnerID, arg.WorkspaceID)
+	row := q.db.QueryRow(ctx, updateWorkspaceOwner, arg.WorkspaceID, arg.NewOwnerID)
 	var i Workspace
 	err := row.Scan(
 		&i.ID,

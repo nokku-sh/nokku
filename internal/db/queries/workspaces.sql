@@ -222,7 +222,18 @@ WHERE
   AND user_id = @user_id;
 
 -- name: UpdateWorkspaceOwner :one
+-- Only a member can take over. Every statement joins new_owner, so anyone
+-- else changes nothing and gets no row.
 WITH
+  new_owner AS (
+    SELECT
+      wm.user_id
+    FROM
+      workspace_members wm
+    WHERE
+      wm.workspace_id = @workspace_id
+      AND wm.user_id = @new_owner_id
+  ),
   old_owner AS (
     SELECT
       created_by
@@ -236,7 +247,8 @@ WITH
     SET
       role_name = 'admin'
     FROM
-      old_owner
+      old_owner,
+      new_owner
     WHERE
       workspace_members.workspace_id = @workspace_id
       AND workspace_members.user_id = old_owner.created_by
@@ -245,17 +257,21 @@ WITH
     UPDATE workspace_members
     SET
       role_name = 'owner'
+    FROM
+      new_owner
     WHERE
       workspace_members.workspace_id = @workspace_id
-      AND workspace_members.user_id = @new_owner_id
+      AND workspace_members.user_id = new_owner.user_id
   )
 UPDATE workspaces
 SET
-  created_by = @new_owner_id
+  created_by = new_owner.user_id
+FROM
+  new_owner
 WHERE
   workspaces.id = @workspace_id
 RETURNING
-  *;
+  workspaces.*;
 
 -- name: EnsureWorkspaceMember :exec
 INSERT INTO
