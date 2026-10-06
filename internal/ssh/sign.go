@@ -17,13 +17,29 @@ import (
 	"github.com/nokku-sh/nokku/internal/util"
 )
 
+// maxPrincipals is how many principals OpenSSH reads from one certificate.
+const maxPrincipals = 256
+
+// LoginPrincipal is the certificate principal that lets one subject log in as
+// one account on one server. Hosts compare it as a whole string, so a
+// certificate signed for another server or account opens nothing.
+func LoginPrincipal(subjectID, targetID, username string) string {
+	return subjectID + "@" + targetID + ":" + username
+}
+
 // SignCertificate signs a user certificate unless certType is ssh.HostCert.
+// It refuses an empty principal list, such a certificate is valid for anyone.
 func SignCertificate(
 	ca *db.CertificateAuthority,
-	pubKey, principal, keyID string,
+	pubKey string,
+	principals []string,
+	keyID string,
 	ttl time.Duration,
 	certType uint32,
 ) (*ssh.Certificate, error) {
+	if len(principals) == 0 || len(principals) > maxPrincipals {
+		return nil, fmt.Errorf("a certificate takes 1 to %d principals, got %d", maxPrincipals, len(principals))
+	}
 	signer, err := getSigner(ca.PrivateKey.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CA signer: %w", err)
@@ -47,7 +63,7 @@ func SignCertificate(
 		Key:             key,
 		Serial:          serial,
 		KeyId:           keyID,
-		ValidPrincipals: []string{principal},
+		ValidPrincipals: principals,
 		ValidAfter:      util.UnixTimeToUint64(time.Now().Add(-time.Minute).Unix()),
 	}
 

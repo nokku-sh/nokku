@@ -237,11 +237,16 @@ func (s *targetService) GetTargetPrincipals(
 		return nil, err
 	}
 
+	// sshd compares these as they are, see ssh.LoginPrincipal.
 	principals := make([]*nokkuv1.PrincipalUsers, 0, len(rows))
 	for _, r := range rows {
+		certPrincipals := make([]string, 0, len(r.Ids))
+		for _, id := range r.Ids {
+			certPrincipals = append(certPrincipals, ssh.LoginPrincipal(id, req.GetTargetId(), r.Username))
+		}
 		principals = append(principals, &nokkuv1.PrincipalUsers{
-			Username: &r.Username,
-			Ids:      r.Ids,
+			Username:       &r.Username,
+			CertPrincipals: certPrincipals,
 		})
 	}
 	return &nokkuv1.GetTargetPrincipalsResponse{Principals: principals}, nil

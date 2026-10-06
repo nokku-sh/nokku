@@ -15,7 +15,7 @@ func testConfig(t *testing.T, srv *sshtest.Server) Config {
 	return Config{
 		HostPrincipal: srv.HostPrincipal,
 		Username:      "user",
-		Signer:        srv.UserSigner(t, srv.UserPrincipal),
+		Signer:        srv.UserSigner(t, srv.UserPrincipal, "user"),
 		CAKey:         srv.CAKey(),
 		SessionID:     "web-123",
 	}
@@ -138,7 +138,7 @@ func TestDialTerminal_BadUserCert(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	cfg := testConfig(t, srv)
 	// A cert for a principal the server does not accept.
-	cfg.Signer = srv.UserSigner(t, "someone-else")
+	cfg.Signer = srv.UserSigner(t, "someone-else", "user")
 
 	conn, err := net.Dial("tcp", srv.Addr())
 	if err != nil {

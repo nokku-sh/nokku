@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/internal/db"
+	nokkussh "github.com/nokku-sh/nokku/internal/ssh"
 )
 
 type SyncInput struct {
@@ -112,10 +113,15 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		if err != nil {
 			return err
 		}
+		// The host compares these as they are, see ssh.LoginPrincipal.
 		for _, p := range result {
+			principals := make([]string, 0, len(p.Ids))
+			for _, id := range p.Ids {
+				principals = append(principals, nokkussh.LoginPrincipal(id, target.ID, p.Username))
+			}
 			res.Principals = append(res.Principals, &nokkuv1.PrincipalUsers{
-				Username: &p.Username,
-				Ids:      p.Ids,
+				Username:       &p.Username,
+				CertPrincipals: principals,
 			})
 		}
 

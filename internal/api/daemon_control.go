@@ -145,7 +145,7 @@ func (s *daemonControlService) SignHostCertificate(
 	cert, err := ssh.SignCertificate(
 		ca,
 		req.GetPublicKey(),
-		target.ID,
+		[]string{target.ID},
 		"nokku:provision:daemon:"+daemonID,
 		0,
 		gossh.HostCert,

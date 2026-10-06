@@ -238,8 +238,10 @@ func (s *certificateService) RolloverCertificateAuthority(
 	}, nil
 }
 
-// SignSSHCertificate signs a user certificate for the caller. The principal
-// is the caller's own id, so membership in the workspace is all it takes.
+// SignSSHCertificate signs a user certificate for the caller, for one server.
+// It names the accounts the caller is granted there right now, so it works
+// nowhere else and a revoked grant ends with it, even on a host that never
+// hears of the revoke.
 func (s *certificateService) SignSSHCertificate(
 	ctx context.Context,
 	req *nokkuv1.SignSSHCertificateRequest,
@@ -247,22 +249,45 @@ func (s *certificateService) SignSSHCertificate(
 	caller, _ := actor.PrincipalFromContext(ctx)
 
 	var ca *db.CertificateAuthority
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		switch {
-		case req.GetCaId() != "":
-			ca, err = q.GetCA(ctx, req.GetCaId())
-		case req.GetWorkspaceId() != "":
-			ca, err = q.GetDefaultCA(ctx, &db.GetDefaultCAParams{
-				WorkspaceID:   req.GetWorkspaceId(),
-				AuthorityType: nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH,
-			})
+	var principals []string
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		target, err := q.GetTarget(ctx, req.GetTargetId())
+		if err != nil {
+			return err
 		}
+		// The grant comes first, so a member without one learns nothing
+		// about the server.
+		accounts, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
+			TargetIds: []string{target.ID},
+			SubjectID: &caller.ID,
+		})
+		if err != nil {
+			return err
+		}
+		if len(accounts) == 0 {
+			return newError(connect.CodePermissionDenied, "you have no access to this server")
+		}
+		for _, a := range accounts {
+			principals = append(principals, ssh.LoginPrincipal(caller.ID, target.ID, a.Username))
+		}
+		// A daemon that is not approved, or no longer, may still hold the
+		// principals of its last sync. It gets no new certificates to match.
+		if target.DaemonID != nil {
+			daemon, err := q.GetDaemon(ctx, *target.DaemonID)
+			if err != nil {
+				return err
+			}
+			if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+				return newError(connect.CodeFailedPrecondition, "the daemon of this server is not approved")
+			}
+		}
+		if target.CaID == nil {
+			return newError(connect.CodeFailedPrecondition, "this server has no certificate authority")
+		}
+		ca, err = q.GetCA(ctx, *target.CaID)
 		return err
 	}); err != nil {
 		return nil, err
-	}
-	if ca == nil {
-		return nil, errNotFound
 	}
 	if !ca.IsActive {
 		return nil, newError(
@@ -280,7 +305,7 @@ func (s *certificateService) SignSSHCertificate(
 	cert, err := ssh.SignCertificate(
 		ca,
 		req.GetPublicKey(),
-		caller.ID,
+		principals,
 		fmt.Sprintf("nokku:login:%s:%s", caller.Kind, caller.ID),
 		req.GetTtl().AsDuration(),
 		gossh.UserCert,
