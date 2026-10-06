@@ -87,7 +87,7 @@
 					confirm({
 						title: `Make ${member.name} the owner?`,
 						description:
-							'They get full control, including billing and deleting the workspace. You become an admin, and only they can hand it back.',
+							'They get full control, including single sign-on, billing and deleting the workspace. You become an admin, and only they can hand it back.',
 						confirmText: 'Transfer ownership',
 						typeToConfirm: member.email,
 						onConfirm: () => updateOwner.mutateAsync({ newOwner: member.id })

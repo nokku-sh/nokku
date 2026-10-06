@@ -14,6 +14,8 @@
 	import { workspaceID } from '#lib/store.svelte.js';
 	import { Download, Info, Save, TriangleAlert } from '@lucide/svelte';
 
+	let { readonly = false }: { readonly?: boolean } = $props();
+
 	let change = $state({
 		isActive: false,
 		enforceSso: false,
@@ -212,7 +214,7 @@
 	<Card.Footer class="flex justify-end">
 		<Button
 			onclick={handleSubmit}
-			disabled={updateProvider.isPending}
+			disabled={readonly || updateProvider.isPending}
 			class="w-full sm:w-auto sm:self-start"
 		>
 			{#if updateProvider.isPending}<Spinner data-icon="inline-start" />{:else}<Save

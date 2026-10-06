@@ -70,11 +70,12 @@ that governs access to every target.
 - Operate the backend behind a TLS-terminating reverse proxy and set
   `NOKKU_TRUSTED_PROXIES` to the exact set of proxy IPs/CIDRs whose forwarded
   client-IP headers should be honored.
-- SSO provider URLs and audit webhook destinations are chosen by workspace
-  admins, so the backend refuses to connect to private, loopback, and
-  link-local addresses. Set `NOKKU_ALLOW_PRIVATE_NETWORKS=true` only when
-  every workspace admin is trusted, such as a self-hosted install sending
-  audit events to an internal SIEM.
+- SSO provider URLs are chosen by workspace owners and audit webhook
+  destinations by admins, so the backend refuses to connect to private,
+  loopback, and link-local addresses. Set
+  `NOKKU_ALLOW_PRIVATE_NETWORKS=true` only when every one of them is
+  trusted, such as a self-hosted install sending audit events to an
+  internal SIEM.
 - Set a strong `NOKKU_SECRET` (at least 32 characters, the server refuses
   less). Change it with `rotate-secrets` while the server is stopped. A
   rotation re-encrypts the secrets in the database with a new data key and

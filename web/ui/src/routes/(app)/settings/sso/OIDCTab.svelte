@@ -15,6 +15,8 @@
 	import { workspaceID } from '#lib/store.svelte.js';
 	import { page } from '$app/state';
 
+	let { readonly = false }: { readonly?: boolean } = $props();
+
 	const standardScopes = ['openid', 'profile', 'email', 'groups', 'offline_access'];
 
 	let change = $state({
@@ -256,7 +258,7 @@
 	<Card.Footer class="flex justify-end">
 		<Button
 			onclick={handleSubmit}
-			disabled={updateProvider.isPending}
+			disabled={readonly || updateProvider.isPending}
 			class="w-full sm:w-auto sm:self-start"
 		>
 			{#if updateProvider.isPending}<Spinner data-icon="inline-start" />{:else}<Save
