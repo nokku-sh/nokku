@@ -64,13 +64,13 @@
 			header: 'Daemon',
 			cell: ({ row }) =>
 				renderComponent(TextCell, {
-					label: daemonName.get(row.original.daemonId) ?? (row.original.daemonName || '—')
+					label: daemonName.get(row.original.daemonId) ?? (row.original.daemonName || '-')
 				})
 		}),
 		columnHelper.accessor('username', {
 			header: 'User',
 			cell: ({ row }) =>
-				renderComponent(TextCell, { label: row.original.username || '—', mono: true })
+				renderComponent(TextCell, { label: row.original.username || '-', mono: true })
 		}),
 		columnHelper.accessor('sizeBytes', {
 			header: 'Size',

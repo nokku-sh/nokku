@@ -87,7 +87,7 @@
 		}),
 		columnHelper.accessor('ip', {
 			header: 'Source',
-			cell: ({ row }) => renderComponent(TextCell, { label: row.original.ip || '—', mono: true })
+			cell: ({ row }) => renderComponent(TextCell, { label: row.original.ip || '-', mono: true })
 		})
 	]);
 </script>
