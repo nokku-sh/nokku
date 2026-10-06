@@ -15,7 +15,7 @@ func (s *Service) Record(ctx context.Context, e iam.Event) {
 	event := eventFromIAM(e)
 	if meta, ok := iam.RequestMetaFromContext(ctx); ok {
 		event.IP = util.SanitizeUTF8(util.GetRemoteIP(meta.Header, meta.RemoteAddr))
-		event.UserAgent = util.SanitizeUTF8(meta.Header.Get("User-Agent"))
+		event.UserAgent = cut(util.SanitizeUTF8(meta.Header.Get("User-Agent")), maxUserAgent)
 	}
 
 	// Detached so a slow DB cannot stall a login.
