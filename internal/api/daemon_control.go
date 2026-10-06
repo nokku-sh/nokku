@@ -188,6 +188,11 @@ func (s *daemonControlService) UploadRecording(
 		return nil, newError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
 
+	// Asked before the row exists, so a refused upload leaves nothing behind.
+	// The daemon keeps its file and tries again later.
+	if !s.cfg.Record.MakeRoom(ctx, actor.WorkspaceIDFromContext(ctx), meta.GetRecordingId(), 0) {
+		return nil, errRecordingStorageFull
+	}
 	rec, workspaceID, err := s.resolveUpload(ctx, daemonID, meta)
 	if err != nil {
 		return nil, err
@@ -204,7 +209,8 @@ func (s *daemonControlService) UploadRecording(
 	}
 
 	var size int64
-	var complete, tooLarge bool
+	var complete bool
+	var refused error
 	lastChecked := int64(0)
 receive:
 	for stream.Receive() {
@@ -215,19 +221,15 @@ receive:
 				continue
 			}
 			if size+int64(len(data)) > maxUploadBytes {
-				tooLarge = true
+				// This code tells the daemon not to send the file again.
+				refused = newError(connect.CodeInvalidArgument, "recording is too large, the rest is cut")
 				break receive
 			}
-			// Evict the oldest recordings instead of blocking the stream.
 			if size-lastChecked >= quotaCheckInterval {
 				lastChecked = size
-				if err := s.cfg.Record.EvictForBytes(ctx, workspaceID, rec.ID, size); err != nil {
-					slog.Warn(
-						"recording eviction sweep failed",
-						"workspace_id", workspaceID,
-						"recording_id", rec.ID,
-						"error", err,
-					)
+				if !s.cfg.Record.MakeRoom(ctx, workspaceID, rec.ID, size) {
+					refused = errRecordingStorageFull
+					break receive
 				}
 			}
 			if err := w.WriteChunk(data); err != nil {
@@ -262,10 +264,9 @@ receive:
 	}
 
 	switch {
-	case tooLarge:
-		// What arrived is kept as a cut recording. This code tells the daemon
-		// not to send it again.
-		return nil, newError(connect.CodeInvalidArgument, "recording is too large, the rest is cut")
+	case refused != nil:
+		// What arrived is kept as a cut recording.
+		return nil, refused
 	case complete:
 		s.cfg.Record.ScrubRecording(rec)
 	case interrupted:

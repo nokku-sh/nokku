@@ -14,33 +14,36 @@ import (
 // could fill the cap to push out the recording of what they just did.
 const minEvictAge = 24 * time.Hour
 
-// EvictForBytes deletes the oldest recordings until inFlight fits. The upload
-// in progress and anything younger than minEvictAge are never evicted, and an
-// overage that cannot be cleared is accepted.
-func (s *Service) EvictForBytes(
-	ctx context.Context,
-	workspaceID, recordingID string,
-	inFlight int64,
-) error {
+// MakeRoom reports whether the workspace can take an upload that is size
+// bytes so far. Over the cap the oldest recordings are deleted first. The
+// upload itself and anything younger than minEvictAge stay, so a workspace
+// that took in more than its cap within that time is full and gets false.
+// A failed lookup never refuses an upload.
+func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string, size int64) bool {
 	capBytes, err := s.limits.RecordingStorageBytes(ctx, workspaceID)
 	if err != nil {
-		// Fail open, a failed plan lookup never evicts recordings.
 		slog.Warn("recording storage cap lookup failed", "error", err, "workspace_id", workspaceID)
-		return nil
+		return true
 	}
 	if capBytes <= 0 {
-		return nil
+		return true
 	}
 	var used int64
 	if err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		// Uploads running side by side see each other through their rows.
+		if size > 0 {
+			err = q.SetRecordingSize(ctx, &db.SetRecordingSizeParams{ID: recordingID, SizeBytes: size})
+			if err != nil {
+				return err
+			}
+		}
 		used, err = q.SumRecordingBytes(ctx, workspaceID)
 		return err
 	}); err != nil {
-		// Fail open, bookkeeping problems never block an upload.
 		slog.Warn("recording storage lookup failed", "error", err, "workspace_id", workspaceID)
-		return nil
+		return true
 	}
-	over := max(used+inFlight-capBytes, 0)
+	over := used - capBytes
 	for over > 0 {
 		var victims []*db.Recording
 		if err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
@@ -50,9 +53,10 @@ func (s *Service) EvictForBytes(
 			})
 			return err
 		}); err != nil {
-			return err
+			slog.Warn("recording eviction failed", "error", err, "workspace_id", workspaceID)
+			return true
 		}
-		var freed int64
+		evicted := 0
 		for _, v := range victims {
 			if v.ID == recordingID || time.Since(v.StartedAt) < minEvictAge {
 				continue
@@ -60,13 +64,15 @@ func (s *Service) EvictForBytes(
 			if err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
 				return q.DeleteRecording(ctx, v.ID)
 			}); err != nil {
-				return err
+				slog.Warn("recording eviction failed", "error", err, "workspace_id", workspaceID)
+				return true
 			}
 			// Best effort, a stray object goes with the workspace purge.
 			if err := s.store.Delete(ctx, storage.RecordingPath(workspaceID, v.ID)); err != nil {
 				slog.Warn("delete evicted recording object", "recording_id", v.ID, "error", err)
 			}
-			freed += v.SizeBytes
+			over -= v.SizeBytes
+			evicted++
 			slog.Info(
 				"evicted recording over storage cap",
 				"recording_id",
@@ -95,10 +101,9 @@ func (s *Service) EvictForBytes(
 				}
 			}
 		}
-		if freed == 0 {
-			return nil
+		if evicted == 0 {
+			return false
 		}
-		over -= freed
 	}
-	return nil
+	return true
 }

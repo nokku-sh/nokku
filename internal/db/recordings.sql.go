@@ -332,6 +332,25 @@ func (q *Queries) SetRecordingComplete(ctx context.Context, arg *SetRecordingCom
 	return &i, err
 }
 
+const setRecordingSize = `-- name: SetRecordingSize :exec
+UPDATE recordings
+SET
+  size_bytes = $1
+WHERE
+  id = $2
+`
+
+type SetRecordingSizeParams struct {
+	SizeBytes int64  `json:"sizeBytes"`
+	ID        string `json:"id"`
+}
+
+// An upload in progress counts toward the storage cap by its row.
+func (q *Queries) SetRecordingSize(ctx context.Context, arg *SetRecordingSizeParams) error {
+	_, err := q.db.Exec(ctx, setRecordingSize, arg.SizeBytes, arg.ID)
+	return err
+}
+
 const sumRecordingBytes = `-- name: SumRecordingBytes :one
 SELECT
   COALESCE(SUM(size_bytes), 0)::BIGINT
