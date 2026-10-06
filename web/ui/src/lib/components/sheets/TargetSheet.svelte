@@ -17,6 +17,7 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
+	import { AuthorityType } from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
@@ -50,7 +51,9 @@
 
 	const daemonQuery = daemonApi.get(() => entity?.daemonId);
 	const linkedDaemon = $derived(daemonQuery.data?.daemon);
+	// A server only takes an SSH CA, and each kind has its own default.
 	const cas = ca.list();
+	const sshCAs = $derived((cas.data ?? []).filter((c) => c.authorityType === AuthorityType.SSH));
 	const tagFilters = targetApi.filters();
 
 	const update = targetApi.update();
@@ -73,9 +76,8 @@
 	);
 	// The server only learns a new CA key from nk sync.
 	const caRotated = $derived.by(() => {
-		const rotatedAt = (
-			cas.data?.find((c) => c.id === entity?.caId) ?? cas.data?.find((c) => c.isDefault)
-		)?.notBefore;
+		const rotatedAt = (sshCAs.find((c) => c.id === entity?.caId) ?? sshCAs.find((c) => c.isDefault))
+			?.notBefore;
 		return !!lastSyncAt && !!rotatedAt && timestampDate(rotatedAt) > lastSyncAt;
 	});
 	const syncCommand = $derived(`nk sync ${model?.name ?? '<name>'}`);
@@ -357,11 +359,11 @@
 								}}
 							>
 								<Select.Trigger id="target-ca" class="w-full">
-									{cas.data?.find((c) => c.id === model.caId)?.name ?? 'Default CA'}
+									{sshCAs.find((c) => c.id === model.caId)?.name ?? 'Default CA'}
 								</Select.Trigger>
 								<Select.Content>
 									<Select.Group>
-										{#each cas.data ?? [] as c (c.id)}
+										{#each sshCAs as c (c.id)}
 											<Select.Item value={c.id}>{c.name}</Select.Item>
 										{/each}
 									</Select.Group>

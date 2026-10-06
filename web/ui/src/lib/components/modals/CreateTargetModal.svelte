@@ -8,6 +8,7 @@
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { AuthorityType } from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
 	import { useSheet } from '#lib/hooks/index.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
@@ -15,12 +16,14 @@
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
 	const sheet = useSheet();
+	// A server only takes an SSH CA, and each kind has its own default.
 	const cas = ca.list();
+	const sshCAs = $derived((cas.data ?? []).filter((c) => c.authorityType === AuthorityType.SSH));
 	const tagFilters = targetApi.filters();
 	const createTarget = targetApi.create();
 
 	let model = $state(create(TargetSchema));
-	const caId = $derived(model.caId || cas.data?.find((c) => c.isDefault)?.id || '');
+	const caId = $derived(model.caId || sshCAs.find((c) => c.isDefault)?.id || '');
 
 	async function onSubmit() {
 		const res = await createTarget.mutateAsync({ ...model, caId });
@@ -47,11 +50,11 @@
 		<Field.Label for="new-target-ca">Certificate authority</Field.Label>
 		<Select.Root type="single" value={caId} onValueChange={(v) => (model.caId = v)}>
 			<Select.Trigger id="new-target-ca" class="w-full">
-				{cas.data?.find((c) => c.id === caId)?.name ?? 'Choose a CA'}
+				{sshCAs.find((c) => c.id === caId)?.name ?? 'Choose a CA'}
 			</Select.Trigger>
 			<Select.Content>
 				<Select.Group>
-					{#each cas.data ?? [] as c (c.id)}
+					{#each sshCAs as c (c.id)}
 						<Select.Item value={c.id}>{c.name}</Select.Item>
 					{/each}
 				</Select.Group>

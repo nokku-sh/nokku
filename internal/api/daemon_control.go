@@ -148,6 +148,10 @@ func (s *daemonControlService) SignHostCertificate(
 	if !ca.IsActive {
 		return nil, newError(connect.CodeFailedPrecondition, "certificate authority is not active")
 	}
+	// The key would sign, an X.509 CA holds the same kind of key.
+	if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH {
+		return nil, newError(connect.CodeFailedPrecondition, "certificate authority is not an SSH CA")
+	}
 
 	cert, err := ssh.SignCertificate(
 		ca,

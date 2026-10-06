@@ -45,6 +45,12 @@ var errRecordingStorageFull = connect.NewError(
 	errors.New("the recording storage of this workspace is full"),
 )
 
+// errNotSSHCA answers for an X.509 CA, which sits in the same table.
+var errNotSSHCA = connect.NewError(
+	connect.CodeInvalidArgument,
+	errors.New("certificate authority is not an SSH CA"),
+)
+
 var errInvalidInput = connect.NewError(
 	connect.CodeInvalidArgument,
 	errors.New("please check your input and try again"),

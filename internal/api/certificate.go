@@ -295,11 +295,8 @@ func (s *certificateService) SignSSHCertificate(
 			"certificate authority is not active",
 		)
 	}
-	if ca.AuthorityType == nokkuv1.AuthorityType_AUTHORITY_TYPE_X509 {
-		return nil, newError(
-			connect.CodeInvalidArgument,
-			"certificate authority is not an SSH CA",
-		)
+	if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH {
+		return nil, errNotSSHCA
 	}
 
 	cert, err := ssh.SignCertificate(
@@ -398,4 +395,20 @@ func (s *certificateService) SignX509Certificate(
 		CaChain:     &ca.Certificate,
 		ExpiresAt:   timestamppb.New(expiresAt),
 	}, nil
+}
+
+// requireSSHCA keeps an X.509 CA off a server or an enroll token. No id means
+// the workspace default, which is picked by kind.
+func requireSSHCA(ctx context.Context, q *db.Queries, caID string) error {
+	if caID == "" {
+		return nil
+	}
+	ca, err := q.GetCA(ctx, caID)
+	if err != nil {
+		return err
+	}
+	if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH {
+		return errNotSSHCA
+	}
+	return nil
 }

@@ -110,6 +110,9 @@ func (s *targetService) insertTarget(
 ) (*nokkuv1.CreateTargetResponse, error) {
 	var result *db.Target
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		if err = requireSSHCA(ctx, q, req.GetCaId()); err != nil {
+			return err
+		}
 		result, err = q.CreateTarget(ctx, &db.CreateTargetParams{
 			WorkspaceID:   req.GetWorkspaceId(),
 			Name:          name,
@@ -144,6 +147,9 @@ func (s *targetService) UpdateTarget(
 	}
 	var result *db.Target
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		if err = requireSSHCA(ctx, q, req.GetCaId()); err != nil {
+			return err
+		}
 		result, err = q.UpdateTarget(ctx, &db.UpdateTargetParams{
 			TargetID:    req.GetId(),
 			Name:        req.Name,

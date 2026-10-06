@@ -71,6 +71,9 @@ func (s *tokenService) CreateToken(
 
 	var created *db.WorkspaceToken
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		if err = requireSSHCA(ctx, q, req.GetCaId()); err != nil {
+			return err
+		}
 		created, err = q.CreateWorkspaceToken(ctx, params)
 		return err
 	}); err != nil {
