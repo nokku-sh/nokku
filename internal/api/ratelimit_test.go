@@ -76,6 +76,31 @@ func TestWithRateLimit(t *testing.T) {
 		"daemon streams are never limited")
 }
 
+// Anyone can start a device login, and every start parks a grant.
+func TestWithRateLimitDeviceStart(t *testing.T) {
+	s := &Server{cfg: &config.Config{}}
+	h := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	call := func(path, addr string) int {
+		r := httptest.NewRequest(http.MethodPost, path, nil)
+		r.RemoteAddr = addr
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w.Code
+	}
+
+	const flood, other = "203.0.113.7:4000", "203.0.113.8:4000"
+	for i := range deviceStartsPerWindow {
+		require.Equal(t, http.StatusNoContent, call("/auth/device", flood), "start %d", i+1)
+	}
+	assert.Equal(t, http.StatusTooManyRequests, call("/auth/device", flood), "one past the limit")
+	assert.Equal(t, http.StatusNoContent, call("/auth/device", other), "another address still gets a grant")
+	assert.Equal(t, http.StatusNoContent, call("/auth/device/token", flood),
+		"a login that is already waiting keeps polling")
+	assert.Equal(t, http.StatusNoContent, call("/auth/device/verify", flood), "and can still be approved")
+}
+
 func TestIsAuthRoute(t *testing.T) {
 	tests := []struct {
 		path string
