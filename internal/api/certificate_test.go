@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
@@ -12,12 +13,119 @@ import (
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	gossh "golang.org/x/crypto/ssh"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
+
+// A user certificate is signed for one server and names the accounts the
+// caller is granted there. Without a grant nothing is signed, so a revoke
+// ends with the last certificate even on a host that never hears of it. The
+// daemon and nk sync are handed the very same principals.
+func TestSignSSHCertificate(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	seedDefaultCA(t, srv, adminAuth, workspaceID)
+	daemonKey, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, false)
+	targetID := enrolled.GetTargetId()
+	otherID := seedTarget(t, cfg, workspaceID)
+
+	memberToken := seedMember(t, cfg, workspaceID, db.RoleMember)
+	member, _, err := cfg.IAM.AuthenticateToken(t.Context(), memberToken)
+	require.NoError(t, err)
+	wantPrincipal := member.ID + "@" + targetID + ":root"
+
+	principals := nokkuv1connect.NewPrincipalServiceClient(srv.Client(), srv.URL, adminAuth)
+	root, err := principals.AddPrincipal(t.Context(), &nokkuv1.AddPrincipalRequest{
+		WorkspaceId: &workspaceID,
+		TargetId:    &targetID,
+		Username:    new("root"),
+	})
+	require.NoError(t, err)
+	grant := &nokkuv1.AddSubjectsToPrincipalRequest{
+		WorkspaceId: &workspaceID,
+		Id:          new(root.GetPrincipal().GetId()),
+		Kind:        nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
+		SubjectIds:  []string{member.ID},
+	}
+	_, err = principals.AddSubjectsToPrincipal(t.Context(), grant)
+	require.NoError(t, err)
+
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	sshPub, err := gossh.NewPublicKey(pub)
+	require.NoError(t, err)
+	sign := func(target string) ([]string, error) {
+		res, err := nokkuv1connect.NewCertificateServiceClient(
+			srv.Client(), srv.URL, header("Authorization", "Bearer "+memberToken),
+		).SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
+			WorkspaceId: &workspaceID,
+			TargetId:    &target,
+			PublicKey:   new(string(gossh.MarshalAuthorizedKey(sshPub))),
+		})
+		if err != nil {
+			return nil, err
+		}
+		key, _, _, _, err := gossh.ParseAuthorizedKey([]byte(res.GetSignedCertificate()))
+		require.NoError(t, err)
+		cert, ok := key.(*gossh.Certificate)
+		require.True(t, ok, "the answer is not a certificate")
+		return cert.ValidPrincipals, nil
+	}
+
+	_, err = sign(targetID)
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err),
+		"a daemon nobody approved got a certificate signed, %v", err)
+	_, err = nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, adminAuth).
+		UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
+			WorkspaceId: &workspaceID,
+			Id:          new(enrolled.GetId()),
+			Status:      nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
+		})
+	require.NoError(t, err)
+
+	signed, err := sign(targetID)
+	require.NoError(t, err)
+	assert.Equal(t, []string{wantPrincipal}, signed, "the certificate names subject, server and account")
+
+	_, err = sign(otherID)
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err),
+		"a server without a grant got a certificate signed, %v", err)
+
+	synced, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
+		daemonAuth(t, cfg, daemonKey, enrolled.GetAccessToken(),
+			nokkuv1connect.DaemonControlServiceSyncDaemonProcedure)).
+		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
+	require.NoError(t, err)
+	require.Len(t, synced.GetPrincipals(), 1)
+	assert.Equal(t, []string{wantPrincipal}, synced.GetPrincipals()[0].GetCertPrincipals(),
+		"the daemon must be told the principal the certificate carries")
+
+	listed, err := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, adminAuth).
+		GetTargetPrincipals(t.Context(), &nokkuv1.GetTargetPrincipalsRequest{
+			WorkspaceId: &workspaceID,
+			TargetId:    &targetID,
+		})
+	require.NoError(t, err)
+	require.Len(t, listed.GetPrincipals(), 1)
+	assert.Equal(t, []string{wantPrincipal}, listed.GetPrincipals()[0].GetCertPrincipals(),
+		"nk sync must write the principal the certificate carries")
+
+	_, err = principals.RemoveSubjectsFromPrincipal(t.Context(), &nokkuv1.RemoveSubjectsFromPrincipalRequest{
+		WorkspaceId: grant.WorkspaceId,
+		Id:          grant.Id,
+		Kind:        grant.Kind,
+		SubjectIds:  grant.GetSubjectIds(),
+	})
+	require.NoError(t, err)
+	_, err = sign(targetID)
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err),
+		"a revoked grant still got a certificate signed, %v", err)
+}
 
 // The subject and SANs are copied from the CSR, so signing is as powerful as
 // holding the CA. Only the roles that manage CAs may do it.

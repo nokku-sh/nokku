@@ -130,11 +130,18 @@ calls `SyncDaemon`.
 
 ## Product invariants
 
-- The SSH certificate principal is the subject UUID (user, team, or service
-  account), never a username.
+- An SSH certificate principal is `<subject uuid>@<target uuid>:<account>`,
+  built only by `ssh.LoginPrincipal`. The subject is a user or a service
+  account, a team grant resolves to its members. A bare username or a bare
+  subject id is never a principal, either would open every host that trusts
+  the CA.
+- A user certificate is signed for one target and only with a grant on it.
+  Hosts compare principals as whole strings and never parse them.
 - The backend being down never takes down the data plane. Daemons serve from
   cached principals, the CLI from cached state and valid certs.
-- Revocation is grant removal plus daemon sync. Manual (daemonless) targets
-  are bounded by cert TTL and the operator's next `nk sync`. The backend
-  never pushes to manual hosts.
+- Revocation is grant removal plus daemon sync, which is immediate. A host
+  that misses the sync (offline, a daemon that is unapproved or deleted, a
+  manual target before its next `nk sync`) is bounded by the certificate
+  lifetime, since nothing is signed without the grant. The backend never
+  pushes to manual hosts.
 - Tokens and secrets never appear on argv or in URLs.

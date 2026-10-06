@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { sign } from '#lib/api/certificates.svelte.js';
+	import { target } from '#lib/api/targets.svelte.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
@@ -37,10 +38,19 @@
 
 	let isPending = $derived(signUser.isPending || signX509.isPending);
 
+	// An SSH certificate is signed for one server of this CA.
+	let targetId = $state('');
+	const targets = target.list(
+		() => ({ caId: ca?.id }),
+		() => open && isSSH
+	);
+	const servers = $derived(targets.data?.targets ?? []);
+
 	function resetModal() {
 		sshPayload = create(SignSSHCertificateRequestSchema);
 		x509Payload = create(SignX509CertificateRequestSchema);
 		x509Usage = SignX509CertificateRequest_X509Usage.CLIENT_AUTH;
+		targetId = '';
 		signUser.reset?.();
 		signX509.reset?.();
 	}
@@ -52,7 +62,7 @@
 	// Stays open to show the signed certificate.
 	async function handleSubmit() {
 		if (isSSH) {
-			sshPayload.caId = ca?.id || '';
+			sshPayload.targetId = targetId;
 			await signUser.mutateAsync(sshPayload);
 		} else {
 			x509Payload.caId = ca?.id || '';
@@ -89,15 +99,36 @@
 	bind:open
 	title={`Sign ${isSSH ? 'an SSH' : 'an X.509'} certificate`}
 	description={isSSH
-		? 'Paste a public key, get back a user certificate for your account signed by this CA.'
+		? 'Paste a public key, get back a user certificate for your accounts on one server.'
 		: 'Paste a PKCS#10 CSR, get back a certificate signed by this CA.'}
 	icon={isSSH ? KeyRound : Shield}
 	classModal="sm:max-w-xl"
 	onSubmit={handleSubmit}
 	submitLabel="Sign"
-	submitDisabled={isPending}
+	submitDisabled={isPending || (isSSH && !targetId)}
 >
 	{#if isSSH}
+		<Field.Field>
+			<Field.Label for="sign-target">Server</Field.Label>
+			<Select.Root type="single" bind:value={targetId}>
+				<Select.Trigger id="sign-target" class="w-full">
+					{servers.find((t) => t.id === targetId)?.name ?? 'Pick a server'}
+				</Select.Trigger>
+				<Select.Content>
+					<Select.Group>
+						{#each servers as t (t.id)}
+							<Select.Item value={t.id}>
+								<Server />
+								{t.name}
+							</Select.Item>
+						{/each}
+					</Select.Group>
+				</Select.Content>
+			</Select.Root>
+			<Field.Description>
+				The certificate works on this server only, for the accounts you are granted there.
+			</Field.Description>
+		</Field.Field>
 		<Field.Field>
 			<Field.Label for="public-key">Public key</Field.Label>
 			<Textarea

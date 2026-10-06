@@ -26,7 +26,8 @@ import (
 )
 
 type Server struct {
-	// UserPrincipal stands in for the uuid list the daemon syncs for an OS user.
+	// UserPrincipal is the one subject the server lets in, as any account. A
+	// daemon gets a list of login principals per account instead.
 	UserPrincipal string
 	// HostPrincipal stands in for the daemon's target id.
 	HostPrincipal string
@@ -153,7 +154,9 @@ func caRow(t testing.TB, priv ed25519.PrivateKey) *db.CertificateAuthority {
 	}
 }
 
-func (s *Server) UserSigner(t testing.TB, principal string) ssh.Signer {
+// UserSigner is a certificate for subject to log in as username here, the
+// way the backend signs one.
+func (s *Server) UserSigner(t testing.TB, subject, username string) ssh.Signer {
 	t.Helper()
 	_, priv, err := ed25519.GenerateKey(crand.Reader)
 	if err != nil {
@@ -167,7 +170,7 @@ func (s *Server) UserSigner(t testing.TB, principal string) ssh.Signer {
 		Key:             pub,
 		CertType:        ssh.UserCert,
 		KeyId:           "sshtest-user",
-		ValidPrincipals: []string{principal},
+		ValidPrincipals: []string{nokkussh.LoginPrincipal(subject, s.HostPrincipal, username)},
 		ValidAfter:      util.UnixTimeToUint64(time.Now().Add(-time.Minute).Unix()),
 		ValidBefore:     util.UnixTimeToUint64(time.Now().Add(time.Hour).Unix()),
 		Extensions: map[string]string{
@@ -256,7 +259,8 @@ func (s *Server) handle(c net.Conn) {
 			if !bytes.Equal(cert.SignatureKey.Marshal(), s.ca.PublicKey().Marshal()) {
 				return nil, errors.New("certificate not signed by the test CA")
 			}
-			if !slices.Contains(cert.ValidPrincipals, s.UserPrincipal) {
+			want := nokkussh.LoginPrincipal(s.UserPrincipal, s.HostPrincipal, conn.User())
+			if !slices.Contains(cert.ValidPrincipals, want) {
 				return nil, errors.New("principal not authorized")
 			}
 			s.mu.Lock()

@@ -75,7 +75,8 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 	if cfg.CA == nil || !cfg.CA.IsActive {
 		return nil, ErrCAInactive
 	}
-	signer, err := mintSessionCert(cfg.CA, cfg.UserID, cfg.SessionID)
+	principal := nokkussh.LoginPrincipal(cfg.UserID, cfg.HostPrincipal, cfg.Username)
+	signer, err := mintSessionCert(cfg.CA, principal, cfg.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("mint session certificate: %w", err)
 	}
@@ -152,7 +153,7 @@ func mintSessionCert(
 	cert, err := nokkussh.SignCertificate(
 		ca,
 		nokkussh.MarshalKey(pub),
-		principal,
+		[]string{principal},
 		"nokku:web:session:"+sessionID,
 		sessionCertTTL,
 		ssh.UserCert,
