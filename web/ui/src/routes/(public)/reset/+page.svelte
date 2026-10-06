@@ -38,7 +38,7 @@
 {#if resetPassword.isSuccess}
 	<AuthCard
 		title="Password updated"
-		description="Sign in with your new password. Other sessions stay signed in until they expire."
+		description="Sign in with your new password. Every session was signed out, including nk."
 		icon={CircleCheckBig}
 		tone="success"
 	>
