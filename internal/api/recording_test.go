@@ -2,17 +2,94 @@ package api
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"io"
+	"net/http/httptest"
 	"testing"
 	"uuid"
 
+	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
+
 	"github.com/nokku-sh/nokku/internal/actor"
+	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/recording"
 )
+
+type uploadStream = connect.ClientStreamForClientSimple[nokkuv1.UploadRecordingRequest, nokkuv1.UploadRecordingResponse]
+
+// openUpload starts a recording upload the way nokkud does and sends the
+// metadata. Canceling ctx is a daemon that dies.
+func openUpload(
+	ctx context.Context,
+	t *testing.T,
+	cfg *config.Config,
+	srv *httptest.Server,
+	key *ecdsa.PrivateKey,
+	token, id string,
+) *uploadStream {
+	t.Helper()
+	ctx, call := connect.NewClientContext(ctx)
+	call.RequestHeader().Set("Authorization", "DPoP "+token)
+	call.RequestHeader().Set("DPoP",
+		dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceUploadRecordingProcedure, token))
+	stream, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL).UploadRecording(ctx)
+	require.NoError(t, err)
+	require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Meta{
+		Meta: &nokkuv1.RecordingMeta{RecordingId: &id, Username: new("root")},
+	}}))
+	return stream
+}
+
+func sendChunk(stream *uploadStream, chunk []byte) error {
+	return stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Chunk{Chunk: chunk}})
+}
+
+// storedBytes is how much of a recording can be read back from storage.
+func storedBytes(t *testing.T, cfg *config.Config, id string) int64 {
+	t.Helper()
+	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+	require.NoError(t, err)
+	r, err := cfg.Record.OpenReader(t.Context(), rec)
+	if err != nil {
+		return 0
+	}
+	defer func() { _ = r.Close() }()
+	n, _ := io.Copy(io.Discard, r)
+	return n
+}
+
+// An upload ends at the limit, whatever the daemon sends. What arrived is
+// kept and the daemon is told not to try again.
+func TestUploadRecordingEndsAtTheLimit(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	id := uuid.NewV7().String()
+
+	stream := openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
+	chunk := make([]byte, 1<<20)
+	for range maxUploadBytes/len(chunk) + 8 {
+		if sendChunk(stream, chunk) != nil {
+			break
+		}
+	}
+	_, err := stream.CloseAndReceive()
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "an oversized upload, got %v", err)
+
+	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+	require.NoError(t, err)
+	assert.EqualValues(t, maxUploadBytes, rec.SizeBytes)
+	assert.False(t, rec.Complete, "a cut recording is not a complete one")
+	assert.NotNil(t, rec.EndedAt)
+	assert.EqualValues(t, maxUploadBytes, storedBytes(t, cfg, id), "what arrived before the limit is kept")
+}
 
 // cappedStorage is the SaaS storage cap, a self-hosted instance has none.
 type cappedStorage struct{ recording.Limits }
