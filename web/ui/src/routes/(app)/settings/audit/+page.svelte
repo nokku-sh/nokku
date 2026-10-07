@@ -2,6 +2,7 @@
 	import { create } from '@bufbuild/protobuf';
 	import { Dices, ScrollText } from '@lucide/svelte';
 	import { billing } from '#lib/api/billing.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import { workspace } from '#lib/api/workspaces.svelte.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
@@ -16,10 +17,11 @@
 	import { WorkspaceSettingsSchema } from '#lib/gen/nokku/v1/workspace_pb.js';
 
 	const ws = workspace.get();
-	const plan = billing.get();
-	const available = $derived(plan.data?.features?.['audit_streaming'] === true);
 
 	const update = workspace.update();
+	const can = user.can();
+	const plan = billing.get(() => can.admin);
+	const available = $derived(plan.data?.features?.['audit_streaming'] === true);
 
 	let url = $state('');
 	let secret = $state('');
@@ -66,7 +68,19 @@
 	</Empty.Root>
 {/snippet}
 
-{#if plan.isPending}
+{#if !can.admin}
+	<Empty.Root class="border border-dashed">
+		<Empty.Header>
+			<Empty.Media variant="icon">
+				<ScrollText />
+			</Empty.Media>
+			<Empty.Title>Admins only</Empty.Title>
+			<Empty.Description>
+				The destination and its signing secret are only shown to workspace admins.
+			</Empty.Description>
+		</Empty.Header>
+	</Empty.Root>
+{:else if plan.isPending}
 	<Skeleton class="h-64 w-full rounded-xl" />
 {:else if plan.isError || !plan.data}
 	<Empty.Root class="border border-dashed">

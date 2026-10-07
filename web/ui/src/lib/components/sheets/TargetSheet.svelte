@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { ca } from '#lib/api/certificates.svelte.js';
+	import { useConnect } from '#lib/api/connect.svelte.js';
 	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import { grantsOf } from '#lib/components/access/subjects.svelte.js';
 	import TargetAccess from '#lib/components/access/TargetAccess.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -37,13 +38,13 @@
 		SquareTerminal
 	} from '@lucide/svelte';
 	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
-	import { toast } from 'svelte-sonner';
 	import DangerZone from './DangerZone.svelte';
 	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';
 	import Section from './Section.svelte';
 
 	const sheet = useSheet();
+	const can = user.can();
 	const query = targetApi.get(() => sheet.id);
 	const entity = $derived(query.data);
 	const draft = useDraft(TargetSchema, () => query.data);
@@ -58,7 +59,7 @@
 
 	const update = targetApi.update();
 	const remove = targetApi.delete();
-	const createSession = daemonApi.createSession();
+	const connect = useConnect();
 
 	const autoSave = useAutoSave(() => update.mutateAsync({ ...model }));
 	const save = () => autoSave.save();
@@ -109,17 +110,6 @@
 		save();
 	}
 
-	async function openTerminal(username: string) {
-		if (!entity?.daemonId) return;
-		await createSession.mutateAsync({ daemonId: entity.daemonId, username });
-		await goto('/sessions');
-	}
-
-	async function copySSH(username: string) {
-		await navigator.clipboard.writeText(`ssh ${username}@${entity?.name}`);
-		toast.success('SSH command copied', { description: 'Run nk login first on a new machine.' });
-	}
-
 	function askDelete() {
 		if (!entity) return;
 		void confirm({
@@ -135,7 +125,7 @@
 	}
 </script>
 
-{#snippet connect()}
+{#snippet connectMenu()}
 	<DropdownMenu.Root>
 		<DropdownMenu.Trigger>
 			{#snippet child({ props })}
@@ -153,8 +143,8 @@
 				</DropdownMenu.Label>
 				{#each accounts as account (account.id)}
 					<DropdownMenu.Item
-						disabled={!online || createSession.isPending}
-						onclick={() => openTerminal(account.username)}
+						disabled={!online || connect.pending}
+						onclick={() => entity && connect.shell(entity, account.username)}
 					>
 						<SquareTerminal />
 						<span class="font-mono">{account.username}</span>
@@ -165,7 +155,7 @@
 			<DropdownMenu.Group>
 				<DropdownMenu.Label>Copy SSH command</DropdownMenu.Label>
 				{#each accounts as account (account.id)}
-					<DropdownMenu.Item onclick={() => copySSH(account.username)}>
+					<DropdownMenu.Item onclick={() => entity && connect.copy(entity, account.username)}>
 						<Copy />
 						<span class="truncate font-mono">ssh {account.username}@{entity?.name}</span>
 					</DropdownMenu.Item>
@@ -181,11 +171,13 @@
 	loading={!model}
 	missing={query.isError}
 	title={model?.name ?? ''}
-	onRename={(name) => {
-		if (!model) return;
-		model.name = name;
-		save();
-	}}
+	onRename={can.edit
+		? (name) => {
+				if (!model) return;
+				model.name = name;
+				save();
+			}
+		: undefined}
 	tabs={[
 		{ value: 'overview', label: 'Overview', icon: Info },
 		{ value: 'access', label: 'Access', icon: ShieldCheck, count: accounts.length },
@@ -195,7 +187,8 @@
 	onTabChange={(t) => (sheet.tab = t)}
 	saveState={autoSave.saveState}
 	saveHint={sheet.tab === 'settings'}
-	actions={accounts.length ? connect : undefined}
+	readonly={!can.edit}
+	actions={accounts.length ? connectMenu : undefined}
 	meta={{
 		id: entity?.id,
 		createdAt: entity?.createdAt,
@@ -305,34 +298,36 @@
 								label={endpoint}
 								copy={endpoint}
 								mono
-								onRemove={() => removeEndpoint(endpoint)}
+								onRemove={can.edit ? () => removeEndpoint(endpoint) : undefined}
 							/>
 						{/each}
 					</div>
 				{/if}
-				<form
-					onsubmit={(e) => {
-						e.preventDefault();
-						addEndpoint();
-					}}
-				>
-					<InputGroup.Root class="h-8">
-						<InputGroup.Addon><Globe /></InputGroup.Addon>
-						<InputGroup.Input
-							bind:value={newEndpoint}
-							placeholder="10.0.4.12 or web-1.internal:2222"
-							aria-label="New endpoint"
-							class="font-mono text-xs"
-						/>
-						<InputGroup.Addon align="inline-end">
-							<!-- Never disabled, InputGroup greys out the whole field for a disabled child. -->
-							<InputGroup.Button type="submit" variant="secondary" size="xs">
-								<Plus data-icon="inline-start" />
-								Add
-							</InputGroup.Button>
-						</InputGroup.Addon>
-					</InputGroup.Root>
-				</form>
+				{#if can.edit}
+					<form
+						onsubmit={(e) => {
+							e.preventDefault();
+							addEndpoint();
+						}}
+					>
+						<InputGroup.Root class="h-8">
+							<InputGroup.Addon><Globe /></InputGroup.Addon>
+							<InputGroup.Input
+								bind:value={newEndpoint}
+								placeholder="10.0.4.12 or web-1.internal:2222"
+								aria-label="New endpoint"
+								class="font-mono text-xs"
+							/>
+							<InputGroup.Addon align="inline-end">
+								<!-- Never disabled, InputGroup greys out the whole field for a disabled child. -->
+								<InputGroup.Button type="submit" variant="secondary" size="xs">
+									<Plus data-icon="inline-start" />
+									Add
+								</InputGroup.Button>
+							</InputGroup.Addon>
+						</InputGroup.Root>
+					</form>
+				{/if}
 			</Section>
 
 			<Section title="Details" icon={FileText}>
@@ -344,6 +339,7 @@
 							bind:value={model.description}
 							placeholder="Production web server, Frankfurt"
 							rows={2}
+							disabled={!can.edit}
 							oninput={save}
 						/>
 					</Field.Field>
@@ -353,6 +349,7 @@
 							<Select.Root
 								type="single"
 								value={model.caId}
+								disabled={!can.edit}
 								onValueChange={(v) => {
 									model.caId = v;
 									save();
@@ -376,6 +373,7 @@
 								id="target-tags"
 								value={model.tags}
 								suggestions={tagFilters.data?.tags}
+								disabled={!can.edit}
 								onValueChange={(tags) => {
 									model.tags = tags;
 									save();
@@ -387,16 +385,18 @@
 				</Field.Group>
 			</Section>
 
-			<DangerZone
-				actions={[
-					{
-						title: 'Delete target',
-						description: 'Removes the target, its login accounts and every grant.',
-						label: 'Delete',
-						onClick: askDelete
-					}
-				]}
-			/>
+			{#if can.edit}
+				<DangerZone
+					actions={[
+						{
+							title: 'Delete target',
+							description: 'Removes the target, its login accounts and every grant.',
+							label: 'Delete',
+							onClick: askDelete
+						}
+					]}
+				/>
+			{/if}
 		</Tabs.Content>
 
 		<Tabs.Content value="access">

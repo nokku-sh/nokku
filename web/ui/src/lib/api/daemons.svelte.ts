@@ -19,7 +19,8 @@ export const daemon = {
 			online?: boolean;
 			limit?: number;
 			offset?: number;
-		}
+		},
+		when?: () => boolean
 	) =>
 		useQuery(
 			DaemonService.method.listDaemons,
@@ -28,7 +29,7 @@ export const daemon = {
 				offset: 0,
 				...opts?.()
 			}),
-			() => ({ refetchInterval: 15000 })
+			() => ({ enabled: when?.() ?? true, refetchInterval: 15000 })
 		),
 	createSession: () =>
 		useMutation(DaemonService.method.createSession, {

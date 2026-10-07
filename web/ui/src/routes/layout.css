@@ -203,6 +203,14 @@
 		}
 	}
 
+	/* The calm one, for things that are live. Blink is for cursors only. */
+	--animate-breathe: breathe 3.6s ease-in-out infinite;
+	@keyframes breathe {
+		50% {
+			opacity: var(--breathe-to, 0.35);
+		}
+	}
+
 	--text-2xs: 0.6875rem;
 	--text-2xs--line-height: 1rem;
 

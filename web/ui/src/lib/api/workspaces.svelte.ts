@@ -2,6 +2,7 @@ import { MAX_PAGE_SIZE } from '#lib/config.js';
 import { WorkspaceService } from '#lib/gen/nokku/v1/workspace_pb.js';
 import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
+import { leave } from './client';
 import { AuditLogFilterSchema, UtilService } from '#lib/gen/nokku/v1/util_pb.js';
 import type { MessageInitShape } from '@bufbuild/protobuf';
 import { InvitationService } from '#lib/gen/nokku/v1/invitation_pb.js';
@@ -17,7 +18,7 @@ export const workspace = {
 		useMutation(WorkspaceService.method.deleteWorkspace, {
 			onSuccess: () => {
 				toast.success('Workspace deleted');
-				window.location.assign('/login');
+				leave();
 			}
 		}),
 	// Public, only on the root host of a hosted Nokku.
@@ -86,9 +87,11 @@ export const cleanFilters = <T extends object>(filters?: T): Partial<T> =>
 	) as Partial<T>;
 
 export const util = {
-	getVersion: () =>
+	// Public and cheap, so with an interval it doubles as the heartbeat.
+	getVersion: (interval?: () => number) =>
 		useQuery(UtilService.method.getVersion, undefined, () => ({
-			select: (res) => res.version
+			select: (res) => res.version,
+			...(interval && { refetchInterval: interval() })
 		})),
 	// Who runs this server. Empty fields mean not configured, typical for self-hosting.
 	instanceInfo: () =>

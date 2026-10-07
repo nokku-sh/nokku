@@ -10,10 +10,11 @@
 	interface Props {
 		value?: Duration | null;
 		onchange?: (value: Duration) => void;
+		disabled?: boolean;
 		class?: string;
 	}
 
-	let { value = $bindable(), onchange, class: className }: Props = $props();
+	let { value = $bindable(), onchange, disabled = false, class: className }: Props = $props();
 
 	const units: { value: Unit; label: string; ms: number }[] = [
 		{ value: 'minutes', label: 'Minutes', ms: 60 * 1000 },
@@ -88,6 +89,7 @@
 		value={inputValue}
 		oninput={handleInput}
 		onkeydown={handleKeydown}
+		{disabled}
 		placeholder="Enter duration"
 		class="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 	/>
@@ -97,6 +99,7 @@
 				{#snippet child({ props })}
 					<InputGroup.Button
 						{...props}
+						{disabled}
 						variant="ghost"
 						class="rounded-full bg-accent pe-1.5! text-xs font-medium"
 					>

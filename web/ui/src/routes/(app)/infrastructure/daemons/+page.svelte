@@ -2,6 +2,7 @@
 	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
 	import { daemon } from '#lib/api/daemons.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import DaemonSheet from '#lib/components/sheets/DaemonSheet.svelte';
 	import {
 		DataTable,
@@ -20,7 +21,7 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import { DaemonStatus, type Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
-	import { usePagination, useSheet } from '#lib/hooks/index.js';
+	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { BotOff, CircleCheckBig, Clock, Rocket, Trash2, Wifi, WifiOff } from '@lucide/svelte';
@@ -37,7 +38,8 @@
 	];
 
 	const sheet = useSheet();
-	let enrollOpen = $state(false);
+	const can = user.can();
+	const create = useCreate();
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
@@ -102,13 +104,15 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
-					deleteConfig: {
-						itemName: row.original.name,
-						description:
-							'Targets behind this daemon become unreachable until another daemon serves them.',
-						typeToConfirm: row.original.name,
-						onDelete: () => deleteDaemon.mutateAsync({ id: row.original.id })
-					}
+					deleteConfig: can.edit
+						? {
+								itemName: row.original.name,
+								description:
+									'Targets behind this daemon become unreachable until another daemon serves them.',
+								typeToConfirm: row.original.name,
+								onDelete: () => deleteDaemon.mutateAsync({ id: row.original.id })
+							}
+						: undefined
 				});
 			}
 		})
@@ -147,13 +151,15 @@
 </script>
 
 <DaemonSheet />
-<EnrollSheet bind:open={enrollOpen} />
+<EnrollSheet bind:open={create.open} />
 
 <PageHeader title="Daemons" description="Edge agents that connect your servers to Nokku">
-	<Button onclick={() => (enrollOpen = true)}>
-		<Rocket data-icon="inline-start" />
-		Enroll a daemon
-	</Button>
+	{#if can.admin}
+		<Button onclick={() => (create.open = true)}>
+			<Rocket data-icon="inline-start" />
+			Enroll a daemon
+		</Button>
+	{/if}
 </PageHeader>
 
 <DataTable
@@ -161,7 +167,7 @@
 	rowCount={daemons.data?.total ?? 0}
 	isLoading={daemons.isLoading}
 	{columns}
-	{bulkActions}
+	bulkActions={can.edit ? bulkActions : []}
 	onRowClick={(d) => sheet.show(d.id)}
 	emptyState={{
 		icon: BotOff,

@@ -29,50 +29,50 @@ const parseValidationErrors = (message: string): ValidationError[] => {
 	return errors;
 };
 
+// displayName and display_name both read "Display name".
 const formatFieldName = (field: string): string => {
-	return field
+	const words = field
 		.replace(/([A-Z])/g, ' $1')
 		.replace(/_/g, ' ')
-		.split(' ')
-		.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-		.join(' ')
-		.trim();
+		.trim()
+		.toLowerCase();
+	return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
 const getErrorTitle = (code: Code): string => {
 	switch (code) {
 		case Code.Canceled:
-			return 'Request Canceled';
+			return 'Request canceled';
 		case Code.Unknown:
-			return 'Unknown Error';
+			return 'Something went wrong';
 		case Code.InvalidArgument:
-			return 'Invalid Input';
+			return 'Invalid input';
 		case Code.DeadlineExceeded:
-			return 'Request Timeout';
+			return 'Timed out';
 		case Code.NotFound:
-			return 'Not Found';
+			return 'Not found';
 		case Code.AlreadyExists:
-			return 'Already Exists';
+			return 'Already exists';
 		case Code.PermissionDenied:
-			return 'Permission Denied';
+			return 'Not allowed';
 		case Code.ResourceExhausted:
-			return 'Quota Exceeded';
+			return 'Limit reached';
 		case Code.FailedPrecondition:
-			return 'Action Not Allowed';
+			return 'Not possible right now';
 		case Code.Aborted:
-			return 'Request Aborted';
+			return 'Request aborted';
 		case Code.OutOfRange:
-			return 'Out of Range';
+			return 'Out of range';
 		case Code.Unimplemented:
-			return 'Not Implemented';
+			return 'Not available';
 		case Code.Internal:
-			return 'Server Error';
+			return 'Server error';
 		case Code.Unavailable:
-			return 'Service Unavailable';
+			return "Can't reach Nokku";
 		case Code.DataLoss:
-			return 'Data Loss';
+			return 'Data loss';
 		case Code.Unauthenticated:
-			return 'Authentication Required';
+			return 'Signed out';
 		default:
 			return 'Error';
 	}
@@ -87,21 +87,21 @@ const getDefaultDescription = (code: Code): string | undefined => {
 		case Code.DeadlineExceeded:
 			return 'The request took too long to complete.';
 		case Code.ResourceExhausted:
-			return 'Too many requests. Please try again later.';
+			return 'Too many requests. Try again in a moment.';
 		case Code.Internal:
-			return 'An unexpected error occurred. Please try again.';
+			return 'An unexpected error occurred. Try again.';
 		case Code.Unavailable:
-			return 'The service is temporarily unavailable. Please try again later.';
+			return 'The control plane does not answer. Try again in a moment.';
 		case Code.PermissionDenied:
-			return 'You do not have permission to perform this action.';
+			return 'Your role cannot do this.';
 		case Code.Unauthenticated:
-			return 'Please log in to continue.';
+			return 'Sign in to continue.';
 		case Code.NotFound:
 			return 'The requested resource could not be found.';
 		case Code.AlreadyExists:
 			return 'A resource with this identifier already exists.';
 		case Code.Aborted:
-			return 'The request was aborted. Please try again.';
+			return 'The request was aborted. Try again.';
 		case Code.Unimplemented:
 			return 'This feature is not yet available.';
 		case Code.DataLoss:
@@ -171,7 +171,7 @@ export const formatConnectError = (
 				.join('\n');
 
 			return {
-				title: 'Validation Failed',
+				title: 'Invalid input',
 				description
 			};
 		}

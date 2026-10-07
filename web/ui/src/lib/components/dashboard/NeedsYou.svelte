@@ -47,7 +47,7 @@
 			<Item.Group class="gap-2">
 				{#each issues as issue (issue.id)}
 					<Item.Root variant="outline" size="sm" class="items-start">
-						<Item.Media class="pt-1.5"><StatusDot tone={issue.tone} live /></Item.Media>
+						<Item.Media class="pt-1.5"><StatusDot tone={issue.tone} /></Item.Media>
 						<Item.Content>
 							<Item.Title>{issue.title}</Item.Title>
 							<Item.Description>{issue.detail}</Item.Description>

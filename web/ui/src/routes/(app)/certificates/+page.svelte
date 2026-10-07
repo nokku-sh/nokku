@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { ca } from '#lib/api/certificates.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import { plural } from '#lib/api/bulk.js';
-	import { confirm, createModalState, useSheet } from '#lib/hooks/index.js';
+	import { confirm, createModalState, useCreate, useSheet } from '#lib/hooks/index.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import CreateCAModal from '#lib/components/modals/CreateCAModal.svelte';
 	import CASheet from '#lib/components/sheets/CASheet.svelte';
@@ -31,7 +32,8 @@
 	import { KeyRound, Plus, Shield, ShieldAlert, Trash2 } from '@lucide/svelte';
 
 	const sheet = useSheet();
-	let createOpen = $state(false);
+	const can = user.can();
+	const create = useCreate();
 	const signModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
 
 	const caData = ca.list();
@@ -107,35 +109,47 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				const item = row.original;
+				const ssh = item.authorityType === AuthorityType.SSH;
 				return renderComponent(ActionCell, {
-					inlineActions: [
-						{
-							icon: item.authorityType === AuthorityType.SSH ? KeyRound : Shield,
-							onClick: () => signModal.openWith({ ...item })
-						}
-					],
-					menuActions: [
-						{
-							label: 'Emergency rollover',
-							icon: ShieldAlert,
-							isDestructive: true,
-							onClick: () =>
-								confirm({
-									title: `Emergency rollover of ${item.name}?`,
-									description:
-										'The current key stops being trusted at once and a new one replaces it. People get a new certificate at their next connection. Servers without the daemon trust the old key until the next nk sync.',
-									confirmText: 'Roll over',
-									typeToConfirm: item.name,
-									onConfirm: () => rolloverAction.mutateAsync({ id: item.id, revokePrevious: true })
-								})
-						}
-					],
-					deleteConfig: {
-						itemName: row.original.name,
-						description: 'Every certificate it signed stops being trusted. This cannot be undone.',
-						typeToConfirm: row.original.name,
-						onDelete: () => deleteCA.mutateAsync({ id: row.original.id })
-					}
+					// Everyone signs their own SSH key, X.509 leaves are for editors.
+					inlineActions:
+						ssh || can.edit
+							? [
+									{
+										label: 'Sign',
+										icon: ssh ? KeyRound : Shield,
+										onClick: () => signModal.openWith({ ...item })
+									}
+								]
+							: [],
+					menuActions: !can.edit
+						? []
+						: [
+								{
+									label: 'Emergency rollover',
+									icon: ShieldAlert,
+									isDestructive: true,
+									onClick: () =>
+										confirm({
+											title: `Emergency rollover of ${item.name}?`,
+											description:
+												'The current key stops being trusted at once and a new one replaces it. People get a new certificate at their next connection. Servers without the daemon trust the old key until the next nk sync.',
+											confirmText: 'Roll over',
+											typeToConfirm: item.name,
+											onConfirm: () =>
+												rolloverAction.mutateAsync({ id: item.id, revokePrevious: true })
+										})
+								}
+							],
+					deleteConfig: can.edit
+						? {
+								itemName: row.original.name,
+								description:
+									'Every certificate it signed stops being trusted. This cannot be undone.',
+								typeToConfirm: row.original.name,
+								onDelete: () => deleteCA.mutateAsync({ id: row.original.id })
+							}
+						: undefined
 				});
 			}
 		})
@@ -155,7 +169,7 @@
 	];
 </script>
 
-<CreateCAModal bind:open={createOpen} />
+<CreateCAModal bind:open={create.open} />
 <CASheet />
 <SignModal bind:open={signModal.open} ca={signModal.selected} />
 
@@ -163,17 +177,19 @@
 	title="Certificate authorities"
 	description="The SSH and X.509 CAs that sign every login, and their policies"
 >
-	<Button onclick={() => (createOpen = true)}>
-		<Plus data-icon="inline-start" />
-		Create CA
-	</Button>
+	{#if can.edit}
+		<Button onclick={() => (create.open = true)}>
+			<Plus data-icon="inline-start" />
+			Create CA
+		</Button>
+	{/if}
 </PageHeader>
 
 <DataTable
 	data={filteredCAs}
 	isLoading={caData.isLoading}
 	{columns}
-	{bulkActions}
+	bulkActions={can.edit ? bulkActions : []}
 	onRowClick={(c) => sheet.show(c.id)}
 	emptyState={{
 		icon: Shield,

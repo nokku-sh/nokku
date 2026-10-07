@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { principal as principalApi } from '#lib/api/principals.svelte.js';
 	import { serviceAccount as saApi } from '#lib/api/service_account.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import RolePicker from '#lib/components/access/RolePicker.svelte';
 	import SubjectAccess from '#lib/components/access/SubjectAccess.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
@@ -19,6 +20,7 @@
 	import Section from './Section.svelte';
 
 	const sheet = useSheet();
+	const can = user.can();
 	const query = saApi.get(() => sheet.id);
 	const entity = $derived(query.data);
 	const draft = useDraft(ServiceAccountSchema, () => query.data);
@@ -68,11 +70,13 @@
 	loading={!model}
 	missing={query.isError}
 	title={model?.name ?? ''}
-	onRename={(name) => {
-		if (!model) return;
-		model.name = name;
-		save();
-	}}
+	onRename={can.edit
+		? (name) => {
+				if (!model) return;
+				model.name = name;
+				save();
+			}
+		: undefined}
 	tabs={[
 		{ value: 'access', label: 'Access', icon: ShieldCheck },
 		{ value: 'settings', label: 'Settings', icon: Settings2 }
@@ -81,6 +85,7 @@
 	onTabChange={(t) => (sheet.tab = t)}
 	saveState={autoSave.saveState}
 	saveHint={sheet.tab === 'settings'}
+	readonly={!can.edit}
 	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
 	{#snippet media()}
@@ -128,6 +133,7 @@
 			>
 				<RolePicker
 					value={model.roleName}
+					disabled={!can.edit}
 					onChange={(role) => {
 						model.roleName = role;
 						save();
@@ -144,6 +150,7 @@
 							bind:value={model.description}
 							placeholder="Deploys from the main branch"
 							rows={2}
+							disabled={!can.edit}
 							oninput={save}
 						/>
 					</Field.Field>
@@ -152,6 +159,7 @@
 						<TagsInput
 							id="sa-tags"
 							value={model.tags}
+							disabled={!can.edit}
 							onValueChange={(tags) => {
 								model.tags = tags;
 								save();
@@ -163,20 +171,22 @@
 			</Section>
 
 			<DangerZone
-				actions={[
-					{
-						title: 'Revoke all access',
-						description: 'Remove it from every login account.',
-						label: 'Revoke all',
-						onClick: askRevokeAll
-					},
-					{
-						title: 'Delete service account',
-						description: 'The token stops working immediately.',
-						label: 'Delete',
-						onClick: askDelete
-					}
-				]}
+				actions={can.edit
+					? [
+							{
+								title: 'Revoke all access',
+								description: 'Remove it from every login account.',
+								label: 'Revoke all',
+								onClick: askRevokeAll
+							},
+							{
+								title: 'Delete service account',
+								description: 'The token stops working immediately.',
+								label: 'Delete',
+								onClick: askDelete
+							}
+						]
+					: []}
 			/>
 		</Tabs.Content>
 	{/if}

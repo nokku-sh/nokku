@@ -3,6 +3,7 @@
 	import { create } from '@bufbuild/protobuf';
 	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import * as Alert from '#lib/components/ext/alert/index.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -26,6 +27,7 @@
 	import Chip from '#lib/components/blocks/Chip.svelte';
 
 	const sheet = useSheet();
+	const can = user.can();
 	const query = daemonApi.get(() => sheet.id);
 	const entity = $derived(query.data?.daemon);
 	const draft = useDraft(DaemonSchema, () => query.data?.daemon);
@@ -104,6 +106,7 @@
 	title={entity?.name ?? ''}
 	saveState={accepted ? autoSave.saveState : undefined}
 	saveHint
+	readonly={!can.edit}
 	meta={{
 		id: entity?.id,
 		createdAt: entity?.createdAt,
@@ -145,16 +148,22 @@
 							{pending ? 'This daemon wants to join' : 'This daemon is not accepted'}
 						</Alert.Title>
 						<Alert.Description>
-							{pending
-								? 'Approve it only if you started it. It can serve targets once approved.'
-								: 'It cannot connect or serve targets until you approve it.'}
+							{#if !can.edit}
+								It cannot connect or serve targets until an editor approves it.
+							{:else if pending}
+								Approve it only if you started it. It can serve targets once approved.
+							{:else}
+								It cannot connect or serve targets until you approve it.
+							{/if}
 						</Alert.Description>
-						<div class="col-start-2 mt-2 flex gap-2">
-							<Button size="sm" onclick={approve} disabled={update.isPending}>Approve</Button>
-							<Button size="sm" variant="outline" onclick={() => askDelete(pending)}>
-								{pending ? 'Reject' : 'Delete'}
-							</Button>
-						</div>
+						{#if can.edit}
+							<div class="col-start-2 mt-2 flex gap-2">
+								<Button size="sm" onclick={approve} disabled={update.isPending}>Approve</Button>
+								<Button size="sm" variant="outline" onclick={() => askDelete(pending)}>
+									{pending ? 'Reject' : 'Delete'}
+								</Button>
+							</div>
+						{/if}
 					</Alert.Root>
 				</div>
 			{/if}
@@ -191,6 +200,7 @@
 									<Switch
 										id={`policy-${rule.key}`}
 										checked={cfg?.[rule.key] ?? false}
+										disabled={!can.edit}
 										onCheckedChange={(v) => setRule(rule.key, v)}
 									/>
 								</Item.Actions>
@@ -227,16 +237,19 @@
 					{/if}
 				</Section>
 
-				<DangerZone
-					actions={[
-						{
-							title: 'Delete daemon',
-							description: 'Its targets stay, but nobody reaches them through this daemon anymore.',
-							label: 'Delete',
-							onClick: () => askDelete()
-						}
-					]}
-				/>
+				{#if can.edit}
+					<DangerZone
+						actions={[
+							{
+								title: 'Delete daemon',
+								description:
+									'Its targets stay, but nobody reaches them through this daemon anymore.',
+								label: 'Delete',
+								onClick: () => askDelete()
+							}
+						]}
+					/>
+				{/if}
 			{/if}
 		</div>
 	{/if}

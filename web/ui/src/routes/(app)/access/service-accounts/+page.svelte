@@ -2,6 +2,7 @@
 	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
 	import { serviceAccount } from '#lib/api/service_account.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import CreateServiceAccountModal from '#lib/components/modals/CreateServiceAccountModal.svelte';
 	import ServiceAccountSheet from '#lib/components/sheets/ServiceAccountSheet.svelte';
 	import {
@@ -20,14 +21,15 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import type { ServiceAccount } from '#lib/gen/nokku/v1/service_account_pb.js';
-	import { usePagination, useSheet } from '#lib/hooks/index.js';
+	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import { PlusIcon, ShieldCheck, Trash2, Waypoints } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import { roles } from '#lib/api/roles.svelte.js';
 	import { roleIcon, roleLabel } from '#lib/roles.js';
 
 	const sheet = useSheet();
-	let createOpen = $state(false);
+	const can = user.can();
+	const create = useCreate();
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
@@ -81,7 +83,9 @@
 			cell: ({ row }) =>
 				renderComponent(RoleCell, {
 					roleName: row.original.roleName,
-					update: (roleName) => updateSA.mutateAsync({ id: row.original.id, roleName })
+					update: can.edit
+						? (roleName) => updateSA.mutateAsync({ id: row.original.id, roleName })
+						: undefined
 				})
 		}),
 		columnHelper.accessor('expiresAt', {
@@ -106,18 +110,20 @@
 				return renderComponent(ActionCell, {
 					menuActions: [
 						{
-							label: 'Manage access',
+							label: can.edit ? 'Manage access' : 'View access',
 							icon: ShieldCheck,
 							onClick: () => sheet.show(row.original.id, 'access')
 						}
 					],
 
-					deleteConfig: {
-						itemName: row.original.name,
-						description: 'Its token stops working right away and every grant is removed.',
-						typeToConfirm: row.original.name,
-						onDelete: () => deleteSA.mutateAsync({ id: row.original.id })
-					}
+					deleteConfig: can.edit
+						? {
+								itemName: row.original.name,
+								description: 'Its token stops working right away and every grant is removed.',
+								typeToConfirm: row.original.name,
+								onDelete: () => deleteSA.mutateAsync({ id: row.original.id })
+							}
+						: undefined
 				});
 			}
 		})
@@ -128,13 +134,15 @@
 	title="Service accounts"
 	description="API identities for CI, Ansible and other automation"
 >
-	<Button onclick={() => (createOpen = true)}>
-		<PlusIcon data-icon="inline-start" />
-		Create service account
-	</Button>
+	{#if can.edit}
+		<Button onclick={() => (create.open = true)}>
+			<PlusIcon data-icon="inline-start" />
+			Create service account
+		</Button>
+	{/if}
 </PageHeader>
 
-<CreateServiceAccountModal bind:open={createOpen} />
+<CreateServiceAccountModal bind:open={create.open} />
 <ServiceAccountSheet />
 
 <DataTable
@@ -142,7 +150,7 @@
 	rowCount={saData.data?.total ?? 0}
 	isLoading={saData.isLoading}
 	{columns}
-	{bulkActions}
+	bulkActions={can.edit ? bulkActions : []}
 	onRowClick={(sa) => sheet.show(sa.id)}
 	emptyState={{
 		icon: Waypoints,

@@ -2,6 +2,7 @@
 	import { principal as principalApi } from '#lib/api/principals.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
 	import { team as teamApi } from '#lib/api/team.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
@@ -23,6 +24,7 @@
 	let { subjectId, kind, name }: Props = $props();
 
 	const PAGE = 30;
+	const can = user.can();
 
 	const access = targetApi.access(() => subjectId);
 	const userTeams = teamApi.listForUser(() => (kind === SubjectKind.USER ? subjectId : undefined));
@@ -86,7 +88,7 @@
 				Every member gets this access.
 			{/if}
 		</p>
-		<GrantPopover {subjectId} {kind} />
+		{#if can.edit}<GrantPopover {subjectId} {kind} />{/if}
 	</div>
 
 	{#if targets.length > 6}
@@ -109,7 +111,9 @@
 				<Empty.Media variant="icon"><ShieldOff /></Empty.Media>
 				<Empty.Title>No access yet</Empty.Title>
 				<Empty.Description>
-					Grant this {kindLabels[kind].one} a login account on a target to let them in.
+					{can.edit
+						? `Grant this ${kindLabels[kind].one} a login account on a target to let them in.`
+						: `Nobody granted this ${kindLabels[kind].one} a login account yet.`}
 				</Empty.Description>
 			</Empty.Header>
 		</Empty.Root>
@@ -134,7 +138,9 @@
 							{summary(list) || t.description}
 						</p>
 					</div>
-					<GrantPopover {subjectId} {kind} targetId={t.id} label="Edit" variant="ghost" />
+					{#if can.edit}
+						<GrantPopover {subjectId} {kind} targetId={t.id} label="Edit" variant="ghost" />
+					{/if}
 				</div>
 				<div class="flex flex-wrap gap-1.5 border-t bg-muted/40 px-3 py-2.5">
 					{#each list as g (g.principal.id)}
@@ -143,7 +149,7 @@
 							mono
 							muted={!g.direct}
 							title={g.direct ? undefined : `Through ${g.via.join(', ')}`}
-							onRemove={g.direct ? () => revoke(g.principal) : undefined}
+							onRemove={g.direct && can.edit ? () => revoke(g.principal) : undefined}
 							removeLabel={`Revoke ${g.principal.username}`}
 						>
 							{#snippet leading()}

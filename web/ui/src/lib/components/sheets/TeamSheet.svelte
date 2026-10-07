@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { principal as principalApi } from '#lib/api/principals.svelte.js';
 	import { team as teamApi } from '#lib/api/team.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import { users } from '#lib/api/workspaces.svelte.js';
 	import SubjectAccess from '#lib/components/access/SubjectAccess.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -25,6 +26,7 @@
 	const PREVIEW = 40;
 
 	const sheet = useSheet();
+	const can = user.can();
 	const query = teamApi.get(() => sheet.id);
 	const entity = $derived(query.data);
 	const draft = useDraft(TeamSchema, () => query.data);
@@ -87,11 +89,13 @@
 	loading={!model}
 	missing={query.isError}
 	title={model?.name ?? ''}
-	onRename={(name) => {
-		if (!model) return;
-		model.name = name;
-		save();
-	}}
+	onRename={can.edit
+		? (name) => {
+				if (!model) return;
+				model.name = name;
+				save();
+			}
+		: undefined}
 	tabs={[
 		{ value: 'overview', label: 'Overview', icon: Info },
 		{ value: 'access', label: 'Access', icon: ShieldCheck },
@@ -101,6 +105,7 @@
 	onTabChange={(t) => (sheet.tab = t)}
 	saveState={autoSave.saveState}
 	saveHint={sheet.tab === 'settings'}
+	readonly={!can.edit}
 	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
 	{#snippet media()}
@@ -125,33 +130,35 @@
 				description="Members get every login account granted to the team."
 			>
 				{#snippet action()}
-					<SearchPopover
-						bind:open={pickerOpen}
-						bind:query={search}
-						placeholder="Search members..."
-						empty="Nobody matches."
-						loading={candidates.isLoading}
-						align="end"
-					>
-						{#snippet trigger(props)}
-							<Button {...props} variant="ghost" size="sm">
-								<UserPlus data-icon="inline-start" />
-								Add
-							</Button>
-						{/snippet}
-						<Command.Group>
-							{#each candidates.data?.users ?? [] as m (m.id)}
-								<Command.Item value={m.id} onSelect={() => toggleMember(m.id)}>
-									<UserAvatar user={m} class="size-6" />
-									<div class="flex min-w-0 flex-1 flex-col">
-										<span class="truncate">{m.name}</span>
-										<span class="truncate text-xs text-muted-foreground">{m.email}</span>
-									</div>
-									<Check class={memberIds.has(m.id) ? 'text-primary' : 'invisible'} />
-								</Command.Item>
-							{/each}
-						</Command.Group>
-					</SearchPopover>
+					{#if can.edit}
+						<SearchPopover
+							bind:open={pickerOpen}
+							bind:query={search}
+							placeholder="Search members..."
+							empty="Nobody matches."
+							loading={candidates.isLoading}
+							align="end"
+						>
+							{#snippet trigger(props)}
+								<Button {...props} variant="ghost" size="sm">
+									<UserPlus data-icon="inline-start" />
+									Add
+								</Button>
+							{/snippet}
+							<Command.Group>
+								{#each candidates.data?.users ?? [] as m (m.id)}
+									<Command.Item value={m.id} onSelect={() => toggleMember(m.id)}>
+										<UserAvatar user={m} class="size-6" />
+										<div class="flex min-w-0 flex-1 flex-col">
+											<span class="truncate">{m.name}</span>
+											<span class="truncate text-xs text-muted-foreground">{m.email}</span>
+										</div>
+										<Check class={memberIds.has(m.id) ? 'text-primary' : 'invisible'} />
+									</Command.Item>
+								{/each}
+							</Command.Group>
+						</SearchPopover>
+					{/if}
 				{/snippet}
 
 				{#if shownMembers?.length}
@@ -161,7 +168,9 @@
 								label={m.name || m.email}
 								href={`/access/users?id=${m.id}`}
 								title={m.email}
-								onRemove={() => removeMember.mutate({ teamId: entity.id, userId: m.id })}
+								onRemove={can.edit
+									? () => removeMember.mutate({ teamId: entity.id, userId: m.id })
+									: undefined}
 							>
 								{#snippet leading()}
 									<UserAvatar user={m} class="size-6" />
@@ -178,7 +187,9 @@
 					<Empty.Root class="border border-dashed p-6">
 						<Empty.Header>
 							<Empty.Media variant="icon"><Users /></Empty.Media>
-							<Empty.Description>No members yet. Add people to share access.</Empty.Description>
+							<Empty.Description>
+								{can.edit ? 'No members yet. Add people to share access.' : 'No members yet.'}
+							</Empty.Description>
 						</Empty.Header>
 					</Empty.Root>
 				{/if}
@@ -195,6 +206,7 @@
 							bind:value={model.description}
 							placeholder="Owns production infrastructure"
 							rows={2}
+							disabled={!can.edit}
 							oninput={save}
 						/>
 					</Field.Field>
@@ -203,6 +215,7 @@
 						<TagsInput
 							id="team-tags"
 							value={model.tags}
+							disabled={!can.edit}
 							onValueChange={(tags) => {
 								model.tags = tags;
 								save();
@@ -214,20 +227,22 @@
 			</Section>
 
 			<DangerZone
-				actions={[
-					{
-						title: 'Revoke all access',
-						description: 'Remove the team from every login account.',
-						label: 'Revoke all',
-						onClick: askRevokeAll
-					},
-					{
-						title: 'Delete team',
-						description: 'Members lose what they had through this team.',
-						label: 'Delete',
-						onClick: askDelete
-					}
-				]}
+				actions={can.edit
+					? [
+							{
+								title: 'Revoke all access',
+								description: 'Remove the team from every login account.',
+								label: 'Revoke all',
+								onClick: askRevokeAll
+							},
+							{
+								title: 'Delete team',
+								description: 'Members lose what they had through this team.',
+								label: 'Delete',
+								onClick: askDelete
+							}
+						]
+					: []}
 			/>
 		</Tabs.Content>
 

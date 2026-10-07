@@ -3,9 +3,9 @@ import { useQuery } from '#lib/query/index.js';
 
 export const dashboard = {
 	// Polls, the status line should not go stale while the tab stays open.
-	get: (enabled: () => boolean) =>
+	get: (enabled: () => boolean, interval = 15_000) =>
 		useQuery(DashboardService.method.getDashboard, {}, () => ({
 			enabled: enabled(),
-			refetchInterval: 15_000
+			refetchInterval: interval
 		}))
 };

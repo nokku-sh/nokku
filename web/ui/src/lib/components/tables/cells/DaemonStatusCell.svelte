@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
@@ -12,6 +13,7 @@
 
 	const update = daemonApi.update();
 	const remove = daemonApi.delete();
+	const can = user.can();
 
 	function reject() {
 		void confirm({
@@ -37,35 +39,37 @@
 				{daemon.status === DaemonStatus.REJECTED ? 'Rejected' : 'Not accepted'}
 			</Badge>
 		{/if}
-		<Button
-			size="xs"
-			disabled={update.isPending}
-			onclick={() => update.mutate({ id: daemon.id, status: DaemonStatus.ACCEPTED })}
-		>
-			{#if update.isPending}
-				<Spinner data-icon="inline-start" />
-			{:else}
-				<Check data-icon="inline-start" />
+		{#if can.edit}
+			<Button
+				size="xs"
+				disabled={update.isPending}
+				onclick={() => update.mutate({ id: daemon.id, status: DaemonStatus.ACCEPTED })}
+			>
+				{#if update.isPending}
+					<Spinner data-icon="inline-start" />
+				{:else}
+					<Check data-icon="inline-start" />
+				{/if}
+				Approve
+			</Button>
+			{#if pending}
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								size="icon-xs"
+								variant="ghost"
+								aria-label={`Reject ${daemon.name}`}
+								onclick={reject}
+							>
+								<X />
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>Reject</Tooltip.Content>
+				</Tooltip.Root>
 			{/if}
-			Approve
-		</Button>
-		{#if pending}
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<Button
-							{...props}
-							size="icon-xs"
-							variant="ghost"
-							aria-label={`Reject ${daemon.name}`}
-							onclick={reject}
-						>
-							<X />
-						</Button>
-					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content>Reject</Tooltip.Content>
-			</Tooltip.Root>
 		{/if}
 	</div>
 {/if}

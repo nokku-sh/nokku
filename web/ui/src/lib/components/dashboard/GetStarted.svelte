@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { session } from '#lib/api/session.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
 	import InviteSheet from '#lib/components/sheets/InviteSheet.svelte';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
@@ -6,16 +8,27 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { DocsURL } from '#lib/config.js';
+	import { setupDismissed } from '#lib/store.svelte.js';
 	import { Check, Rocket, UserPlus } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 
 	interface Props {
 		workspace: string;
+		/** A target or a daemon exists. Until then the card is the whole dashboard. */
+		connected: boolean;
 		users: number;
-		canEdit: boolean;
 	}
 
-	let { workspace, users, canEdit }: Props = $props();
+	let { workspace, connected, users }: Props = $props();
+
+	const can = user.can();
+	// A CLI session is what nk login leaves behind.
+	const sessions = session.list();
+	const signedIn = $derived((sessions.data ?? []).some((s) => s.kind === 'cli'));
+
+	const done = $derived([true, connected, signedIn, users > 1]);
+	const left = $derived(done.filter((d) => !d).length);
+	const show = $derived(!connected || (left > 0 && !sessions.isLoading && !setupDismissed.current));
 
 	let enrollOpen = $state(false);
 	let inviteOpen = $state(false);
@@ -24,27 +37,23 @@
 <EnrollSheet bind:open={enrollOpen} />
 <InviteSheet bind:open={inviteOpen} />
 
-{#snippet step(n: number, done: boolean, title: string, body: Snippet)}
+<!-- Done steps fold to their title, so the card shrinks as the setup goes on. -->
+{#snippet step(n: number, title: string, body?: Snippet)}
+	{@const ok = done[n - 1]}
 	<li class="grid grid-cols-[2rem_1fr] gap-4">
 		<span
 			class={[
 				'flex size-8 items-center justify-center rounded-full border font-mono text-sm',
-				done ? 'border-success bg-success text-success-foreground' : 'bg-background'
+				ok ? 'border-success bg-success text-success-foreground' : 'bg-background'
 			]}
 		>
-			{#if done}<Check class="size-4" />{:else}{n}{/if}
+			{#if ok}<Check class="size-4" />{:else}{n}{/if}
 		</span>
 		<div class="flex min-w-0 flex-col gap-3 pb-2">
-			<h3 class={['font-medium', done && 'text-muted-foreground line-through']}>{title}</h3>
-			{@render body()}
+			<h3 class={['pt-1 font-medium', ok && 'text-muted-foreground line-through']}>{title}</h3>
+			{#if !ok}{@render body?.()}{/if}
 		</div>
 	</li>
-{/snippet}
-
-{#snippet created()}
-	<p class="text-sm text-muted-foreground">
-		{workspace} comes with a default CA, so every login is a short-lived certificate from day one.
-	</p>
 {/snippet}
 
 {#snippet server()}
@@ -63,11 +72,13 @@
 				<li>Install nokkud on the server and run the command below. It asks for the token.</li>
 			</ol>
 			<CodeSnippet code="sudo nokkud enroll" language="bash" />
-			{#if canEdit}
+			{#if can.admin}
 				<Button class="self-start" onclick={() => (enrollOpen = true)}>
 					<Rocket data-icon="inline-start" />
 					Create enrollment token
 				</Button>
+			{:else}
+				<p class="text-sm text-muted-foreground">An admin creates the token for you.</p>
 			{/if}
 		</Tabs.Content>
 		<Tabs.Content value="sync" class="flex flex-col gap-3">
@@ -93,7 +104,7 @@
 	<p class="text-sm text-muted-foreground">
 		Grant access per server account, to people or whole teams.
 	</p>
-	{#if canEdit}
+	{#if can.admin}
 		<Button variant="outline" class="self-start" onclick={() => (inviteOpen = true)}>
 			<UserPlus data-icon="inline-start" />
 			Invite people
@@ -101,18 +112,36 @@
 	{/if}
 {/snippet}
 
-<Card.Root>
-	<Card.Header>
-		<span class="spec-label">Getting started</span>
-		<Card.Title class="text-2xl font-semibold tracking-tight">Connect your first server</Card.Title>
-		<Card.Description>Four steps, most of them one command.</Card.Description>
-	</Card.Header>
-	<Card.Content>
-		<ol class="flex flex-col gap-6">
-			{@render step(1, true, 'Your workspace is ready', created)}
-			{@render step(2, false, 'Connect a server', server)}
-			{@render step(3, false, 'Sign in from your terminal', terminal)}
-			{@render step(4, users > 1, 'Bring your team', team)}
-		</ol>
-	</Card.Content>
-</Card.Root>
+{#if show}
+	<Card.Root>
+		<Card.Header>
+			<span class="spec-label">Getting started</span>
+			<Card.Title class="text-2xl font-semibold tracking-tight">
+				{connected ? 'Finish setting up' : 'Connect your first server'}
+			</Card.Title>
+			<Card.Description>
+				{#if connected}
+					{left} of 4 steps left.
+				{:else}
+					Four steps, most of them one command. {workspace} already has a default CA, so every login is
+					a short-lived certificate from day one.
+				{/if}
+			</Card.Description>
+			{#if connected}
+				<Card.Action>
+					<Button variant="ghost" size="sm" onclick={() => (setupDismissed.current = true)}>
+						Dismiss
+					</Button>
+				</Card.Action>
+			{/if}
+		</Card.Header>
+		<Card.Content>
+			<ol class="flex flex-col gap-6">
+				{@render step(1, 'Your workspace is ready')}
+				{@render step(2, 'Connect a server', server)}
+				{@render step(3, 'Sign in from your terminal', terminal)}
+				{@render step(4, 'Bring your team', team)}
+			</ol>
+		</Card.Content>
+	</Card.Root>
+{/if}

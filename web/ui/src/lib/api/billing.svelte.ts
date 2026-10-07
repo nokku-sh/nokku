@@ -3,7 +3,9 @@ import { useMutation, useQuery } from '#lib/query/index.js';
 import { toast } from 'svelte-sonner';
 
 export const billing = {
-	get: () => useQuery(BillingService.method.getBilling, {}),
+	// Admins only, pass when for pages other roles can open.
+	get: (when?: () => boolean) =>
+		useQuery(BillingService.method.getBilling, {}, () => ({ enabled: when?.() ?? true })),
 
 	checkout: () =>
 		useMutation(BillingService.method.createCheckout, {

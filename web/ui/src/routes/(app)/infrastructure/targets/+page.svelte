@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { ca } from '#lib/api/certificates.svelte.js';
 	import { target } from '#lib/api/targets.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import CreateTargetModal from '#lib/components/modals/CreateTargetModal.svelte';
 	import TargetSheet from '#lib/components/sheets/TargetSheet.svelte';
 	import {
@@ -21,12 +22,13 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
-	import { usePagination, useSheet } from '#lib/hooks/index.js';
+	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import { IdCard, Plus, Server, ShieldCheck, TagIcon, Trash2, UserIcon } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const sheet = useSheet();
-	let createOpen = $state(false);
+	const can = user.can();
+	const create = useCreate();
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
@@ -103,18 +105,20 @@
 				return renderComponent(ActionCell, {
 					menuActions: [
 						{
-							label: 'Manage access',
+							label: can.edit ? 'Manage access' : 'View access',
 							icon: ShieldCheck,
 							onClick: () => sheet.show(row.original.id, 'access')
 						}
 					],
-					deleteConfig: {
-						itemName: row.original.name,
-						description:
-							'Everyone loses access to this target. Its login accounts and grants are removed.',
-						typeToConfirm: row.original.name,
-						onDelete: () => deleteTarget.mutateAsync({ id: row.original.id })
-					}
+					deleteConfig: can.edit
+						? {
+								itemName: row.original.name,
+								description:
+									'Everyone loses access to this target. Its login accounts and grants are removed.',
+								typeToConfirm: row.original.name,
+								onDelete: () => deleteTarget.mutateAsync({ id: row.original.id })
+							}
+						: undefined
 				});
 			}
 		})
@@ -135,14 +139,16 @@
 	];
 </script>
 
-<CreateTargetModal bind:open={createOpen} />
+<CreateTargetModal bind:open={create.open} />
 <TargetSheet />
 
 <PageHeader title="Targets" description="Servers people log in to, and who can use which account">
-	<Button onclick={() => (createOpen = true)}>
-		<Plus data-icon="inline-start" />
-		Add target
-	</Button>
+	{#if can.edit}
+		<Button onclick={() => (create.open = true)}>
+			<Plus data-icon="inline-start" />
+			Add target
+		</Button>
+	{/if}
 </PageHeader>
 
 <DataTable
@@ -150,7 +156,7 @@
 	rowCount={targets.data?.total ?? 0}
 	isLoading={targets.isLoading}
 	{columns}
-	{bulkActions}
+	bulkActions={can.edit ? bulkActions : []}
 	onRowClick={(t) => sheet.show(t.id)}
 	emptyState={{
 		icon: Server,

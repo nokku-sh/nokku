@@ -7,6 +7,8 @@
 	import type { RowData, Table } from '@tanstack/svelte-table';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
+	import * as Kbd from '#lib/components/ui/kbd/index.js';
+	import { focusOnSlash } from '#lib/hooks/index.js';
 	import { PAGE_PARAM } from '#lib/hooks/index.js';
 	import FilterPill from '#lib/components/blocks/FilterPill.svelte';
 	import TableViewOptions from './TableViewOptions.svelte';
@@ -92,7 +94,9 @@
 				<InputGroup.Input
 					value={searchValue}
 					placeholder={searchPlaceholder}
+					aria-label="Search"
 					oninput={handleSearchInput}
+					{@attach focusOnSlash}
 				/>
 				<InputGroup.Addon align="inline-end">
 					{#if searchValue}
@@ -102,9 +106,16 @@
 								{searchResultCount === 1 ? 'result' : 'results'}
 							</span>
 						{/if}
-						<InputGroup.Button variant="ghost" size="icon-xs" onclick={handleSearchClear}>
+						<InputGroup.Button
+							variant="ghost"
+							size="icon-xs"
+							aria-label="Clear search"
+							onclick={handleSearchClear}
+						>
 							<DeleteIcon />
 						</InputGroup.Button>
+					{:else}
+						<Kbd.Root class="hidden sm:inline-flex">/</Kbd.Root>
 					{/if}
 				</InputGroup.Addon>
 				<InputGroup.Addon>
@@ -126,7 +137,12 @@
 		{@render children?.()}
 
 		{#if isFiltered}
-			<Button variant="ghost" onclick={handleReset} title="Reset filters">
+			<Button
+				variant="ghost"
+				onclick={handleReset}
+				title="Reset filters"
+				aria-label="Reset filters"
+			>
 				<XIcon />
 			</Button>
 		{/if}

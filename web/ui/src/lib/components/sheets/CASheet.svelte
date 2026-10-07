@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ca as caApi } from '#lib/api/certificates.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import SignModal from '#lib/components/modals/SignModal.svelte';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -41,6 +42,7 @@
 	import Section from './Section.svelte';
 
 	const sheet = useSheet();
+	const can = user.can();
 	const query = caApi.get(() => sheet.id);
 	const entity = $derived(query.data);
 	const draft = useDraft(CertificateAuthoritySchema, () => query.data);
@@ -54,6 +56,8 @@
 	const save = () => autoSave.save();
 
 	const isSSH = $derived(model?.authorityType === AuthorityType.SSH);
+	// Everyone signs their own SSH key, X.509 leaves are for editors.
+	const canSign = $derived(isSSH || can.edit);
 	const keyTypes = enumToArray(CertificateKeyType);
 	let signOpen = $state(false);
 
@@ -151,11 +155,13 @@
 	onClose={() => sheet.close()}
 	loading={!model}
 	title={model?.name ?? ''}
-	onRename={(name) => {
-		if (!model) return;
-		model.name = name;
-		save();
-	}}
+	onRename={can.edit
+		? (name) => {
+				if (!model) return;
+				model.name = name;
+				save();
+			}
+		: undefined}
 	tabs={[
 		{ value: 'overview', label: 'Overview', icon: Info },
 		{ value: 'settings', label: 'Settings', icon: Settings2 }
@@ -164,6 +170,7 @@
 	onTabChange={(t) => (sheet.tab = t)}
 	saveState={autoSave.saveState}
 	saveHint={sheet.tab === 'settings'}
+	readonly={!can.edit}
 	missing={query.isError}
 	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
@@ -184,10 +191,12 @@
 	{/snippet}
 
 	{#snippet actions()}
-		<Button size="sm" onclick={() => (signOpen = true)}>
-			<PenLine data-icon="inline-start" />
-			Sign a certificate
-		</Button>
+		{#if canSign}
+			<Button size="sm" onclick={() => (signOpen = true)}>
+				<PenLine data-icon="inline-start" />
+				Sign a certificate
+			</Button>
+		{/if}
 	{/snippet}
 
 	{#if model && entity}
@@ -258,6 +267,7 @@
 							id="ca-description"
 							bind:value={model.description}
 							placeholder="Signs production SSH certificates"
+							disabled={!can.edit}
 							oninput={save}
 						/>
 					</Field.Field>
@@ -271,6 +281,7 @@
 						<Switch
 							id="ca-default"
 							checked={model.isDefault}
+							disabled={!can.edit}
 							onCheckedChange={(v) => {
 								model.isDefault = v;
 								save();
@@ -285,6 +296,7 @@
 						<Switch
 							id="ca-active"
 							checked={model.isActive}
+							disabled={!can.edit}
 							onCheckedChange={(v) => {
 								model.isActive = v;
 								save();
@@ -304,6 +316,7 @@
 					variant="outline"
 					size="sm"
 					aria-label="Accepted key types"
+					disabled={!can.edit}
 					value={model.allowedKeyTypes.map(String)}
 					onValueChange={(v) => {
 						model.allowedKeyTypes = v.map(Number) as CertificateKeyType[];
@@ -319,7 +332,11 @@
 			<Section title="Certificate lifetime" icon={Clock}>
 				<Field.Field>
 					<Field.Label>The CA itself expires after</Field.Label>
-					<DurationInput value={model.lifetime} onchange={(v) => setLifetime('lifetime', v)} />
+					<DurationInput
+						value={model.lifetime}
+						disabled={!can.edit}
+						onchange={(v) => setLifetime('lifetime', v)}
+					/>
 				</Field.Field>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<Field.Field>
@@ -328,7 +345,11 @@
 							{#each lifetimes.slice(0, 2) as l (l.key)}
 								<div class="flex flex-col gap-1">
 									<span class="text-xs text-muted-foreground">{l.label}</span>
-									<DurationInput value={model[l.key]} onchange={(v) => setLifetime(l.key, v)} />
+									<DurationInput
+										value={model[l.key]}
+										disabled={!can.edit}
+										onchange={(v) => setLifetime(l.key, v)}
+									/>
 								</div>
 							{/each}
 						</div>
@@ -339,7 +360,11 @@
 							{#each lifetimes.slice(2) as l (l.key)}
 								<div class="flex flex-col gap-1">
 									<span class="text-xs text-muted-foreground">{l.label}</span>
-									<DurationInput value={model[l.key]} onchange={(v) => setLifetime(l.key, v)} />
+									<DurationInput
+										value={model[l.key]}
+										disabled={!can.edit}
+										onchange={(v) => setLifetime(l.key, v)}
+									/>
 								</div>
 							{/each}
 						</div>
@@ -363,6 +388,7 @@
 									<Switch
 										id={`ext-${ext.id}`}
 										checked={model.userExtensions[ext.id] !== undefined}
+										disabled={!can.edit}
 										onCheckedChange={(v) => toggleExtension(ext.id, v)}
 									/>
 								</Item.Actions>
@@ -379,6 +405,7 @@
 								id="ca-force-command"
 								class="font-mono"
 								value={model.userCriticalOptions['force-command'] ?? ''}
+								disabled={!can.edit}
 								oninput={(e) => setOption('force-command', e.currentTarget.value)}
 								placeholder="/usr/local/bin/backup"
 							/>
@@ -391,6 +418,7 @@
 								id="ca-source-address"
 								class="font-mono"
 								value={model.userCriticalOptions['source-address'] ?? ''}
+								disabled={!can.edit}
 								oninput={(e) => setOption('source-address', e.currentTarget.value)}
 								placeholder="10.0.0.0/8, 192.168.1.10"
 							/>
@@ -405,6 +433,7 @@
 							<Switch
 								id="ca-verify"
 								checked={model.userCriticalOptions['verify-required'] !== undefined}
+								disabled={!can.edit}
 								onCheckedChange={(v) => setOption('verify-required', v ? '' : undefined)}
 							/>
 						</Field.Field>
@@ -413,20 +442,22 @@
 			{/if}
 
 			<DangerZone
-				actions={[
-					{
-						title: 'Emergency rollover',
-						description: 'Revoke the key now and replace it. Use when it may have leaked.',
-						label: 'Roll over',
-						onClick: askRollover
-					},
-					{
-						title: 'Delete CA',
-						description: 'Everything it signed stops being trusted.',
-						label: 'Delete',
-						onClick: askDelete
-					}
-				]}
+				actions={can.edit
+					? [
+							{
+								title: 'Emergency rollover',
+								description: 'Revoke the key now and replace it. Use when it may have leaked.',
+								label: 'Roll over',
+								onClick: askRollover
+							},
+							{
+								title: 'Delete CA',
+								description: 'Everything it signed stops being trusted.',
+								label: 'Delete',
+								onClick: askDelete
+							}
+						]
+					: []}
 			/>
 		</Tabs.Content>
 	{/if}

@@ -2,9 +2,12 @@
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { auth } from '#lib/api/auth.svelte.js';
+	import { plural } from '#lib/api/bulk.js';
+	import { liveSessions } from '#lib/api/terminal.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import { confirm } from '#lib/hooks/index.js';
 	import { LogOut } from '@lucide/svelte';
 	import { UserRoutes } from './routes';
 
@@ -19,6 +22,20 @@
 	const me = user.self();
 	const logout = auth.logout();
 	const pages = UserRoutes.flatMap((r) => r.items ?? [r]);
+
+	function logOut() {
+		const shells = liveSessions();
+		if (!shells) {
+			logout.mutate();
+			return;
+		}
+		void confirm({
+			title: 'Log out?',
+			description: `${plural(shells, 'open shell')} in this tab ${shells === 1 ? 'ends' : 'end'} with it.`,
+			confirmText: 'Log out',
+			onConfirm: () => logout.mutateAsync()
+		});
+	}
 </script>
 
 <DropdownMenu.Root>
@@ -49,7 +66,7 @@
 			{/each}
 		</DropdownMenu.Group>
 		<DropdownMenu.Separator />
-		<DropdownMenu.Item onSelect={() => logout.mutate()}>
+		<DropdownMenu.Item onSelect={logOut}>
 			<LogOut />
 			Log out
 		</DropdownMenu.Item>

@@ -9,6 +9,7 @@
 	} from '#lib/components/tables/index.js';
 	import { page } from '$app/state';
 	import { daemon } from '#lib/api/daemons.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import {
 		ActionCell,
 		StatusCell,
@@ -25,6 +26,7 @@
 	import { Bot, Play, Trash2, Video } from '@lucide/svelte';
 
 	const pager = usePagination();
+	const can = user.can();
 	const list = recordings.list(() => ({
 		...pager.args,
 		daemonId: page.url.searchParams.get('daemon') || undefined,
@@ -89,15 +91,18 @@
 				renderComponent(ActionCell, {
 					inlineActions: [
 						{
+							label: 'Play',
 							icon: Play,
 							onClick: () => player.openWith({ ...row.original })
 						}
 					],
-					deleteConfig: {
-						itemName: `recording of ${row.original.username}`,
-						description: 'This permanently deletes the recording.',
-						onDelete: () => deleteRecording.mutateAsync({ recordingId: row.original.id })
-					}
+					deleteConfig: can.edit
+						? {
+								itemName: `recording of ${row.original.username}`,
+								description: 'This permanently deletes the recording.',
+								onDelete: () => deleteRecording.mutateAsync({ recordingId: row.original.id })
+							}
+						: undefined
 				})
 		})
 	]);
@@ -112,7 +117,7 @@
 	rowCount={list.data?.total ?? 0}
 	isLoading={list.isLoading}
 	{columns}
-	{bulkActions}
+	bulkActions={can.edit ? bulkActions : []}
 	onRowClick={(r) => player.openWith({ ...r })}
 	emptyState={{
 		icon: Video,

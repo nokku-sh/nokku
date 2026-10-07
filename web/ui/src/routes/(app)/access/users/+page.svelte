@@ -24,17 +24,18 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import type { User } from '#lib/gen/nokku/v1/account_pb.js';
-	import { usePagination, useSheet } from '#lib/hooks/index.js';
+	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import { CircleUser, PlusIcon, ShieldCheck, Trash2, UserRoundX } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const sheet = useSheet();
-	let inviteOpen = $state(false);
+	const create = useCreate();
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
 	const me = user.self();
 	const canManage = $derived(atLeast(me.data?.role, 'admin'));
+	const can = user.can();
 
 	const pager = usePagination();
 	const list = users.list(() => ({
@@ -116,7 +117,7 @@
 				return renderComponent(ActionCell, {
 					menuActions: [
 						{
-							label: 'Manage access',
+							label: can.edit ? 'Manage access' : 'View access',
 							icon: ShieldCheck,
 							onClick: () => sheet.show(u.id, 'access')
 						},
@@ -146,11 +147,11 @@
 </script>
 
 <UserSheet />
-<InviteSheet bind:open={inviteOpen} />
+<InviteSheet bind:open={create.open} />
 
 <PageHeader title="Users" description="Everyone in this workspace, their role and their teams">
 	{#if canManage}
-		<Button onclick={() => (inviteOpen = true)}>
+		<Button onclick={() => (create.open = true)}>
 			<PlusIcon data-icon="inline-start" />
 			Invite people
 		</Button>

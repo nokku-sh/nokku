@@ -45,10 +45,11 @@
 			variant="outline"
 			size="sm"
 			class="ml-auto gap-2 text-muted-foreground"
+			aria-label="Search and commands"
 			onclick={openPalette}
 		>
 			<Search data-icon="inline-start" />
-			<span class="hidden sm:inline">Jump to</span>
+			<span class="hidden sm:inline">Search</span>
 			<Kbd.Root class="hidden sm:inline-flex">⌘K</Kbd.Root>
 		</Button>
 	</div>

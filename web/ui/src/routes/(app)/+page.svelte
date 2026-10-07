@@ -56,9 +56,11 @@
 	</div>
 {/if}
 
-{#if fresh}
-	<GetStarted workspace={ws.data?.name ?? ''} users={data.data?.users ?? 0} {canEdit} />
-{:else}
+{#if data.data}
+	<GetStarted workspace={ws.data?.name ?? ''} connected={!fresh} users={data.data.users} />
+{/if}
+
+{#if !fresh}
 	<div class="grid gap-6 lg:grid-cols-3">
 		<div class="lg:col-span-2">
 			<YourServers showAll={canView} />
