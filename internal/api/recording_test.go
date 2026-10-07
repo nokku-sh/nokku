@@ -286,8 +286,10 @@ func TestRecordingStorageCap(t *testing.T) {
 	require.ErrorIs(t, err, pgx.ErrNoRows, "the old recording makes room")
 	var events []*db.ListAuditLogsRow
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
+		// Other tests evict in the same workspace, in any order.
 		events, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
 			Actions: []string{"RecordingEvicted"},
+			Target:  &old,
 			Limit:   10,
 		})
 		return err
