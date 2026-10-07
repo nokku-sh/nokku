@@ -1,107 +1,131 @@
-# Security Policy
+# Security
 
-## Supported Versions
+This file has two parts. The first is for reporting a vulnerability. The second is for people who run Nokku and want to do it safely.
 
-Only the latest release of Nokku is supported for security fixes. Older
-releases are not patched; if you are affected by a vulnerability, upgrade to
-the newest tagged release. For self-hosted deployments, apply fixes by pulling
-the latest release and restarting the backend.
+## Reporting a vulnerability
 
-## Reporting a Vulnerability
-
-Please **do not** open a public issue for a suspected security vulnerability.
-Use GitHub's private vulnerability reporting instead:
+Please do not open a public issue for a suspected vulnerability. Use GitHub's private reporting instead:
 
 1. Open the repository's **Security** tab.
 2. Select **Report a vulnerability**.
-3. Provide as much of the following as you can:
+3. Tell us as much of this as you can:
+   - The Nokku version and how it runs (self-hosted or hosted, which plan)
+   - What the issue is and what an attacker gains
+   - Steps to reproduce, or a minimal proof of concept
+   - Logs that help, with secrets and tokens removed
 
-   - Affected Nokku version and deployment (self-hosted vs. SaaS, Enterprise
-     vs. Community)
-   - A description of the issue and its security impact
-   - Steps to reproduce, or a minimal patch/poc
-   - Any supporting logs (redact secrets and tokens)
+Reports are handled confidentially. If you would like credit in the advisory or the changelog, say so.
 
-Reports are handled confidentially. We will acknowledge receipt, and if you
-would like to be credited in the release advisory or changelog, let us know —
-this is optional but appreciated.
+What to expect:
 
-### Response timeline
+- **Acknowledgement** within 48 hours
+- **Triage** and a severity within 5 business days
+- **A fix or clear guidance** within 30 days, depending on complexity and impact
 
-- **Acknowledge** the report: within 48 hours
-- **Triage** and classify severity: within 5 business days
-- **Fix / mitigation / response**: we aim to provide a fix or clear guidance
-  within 30 days, depending on the complexity and impact.
+### Supported versions
 
-## Scope
+Only the latest release gets security fixes. Older releases are not patched. On a self-hosted install, pull the newest release and restart the core.
 
-The following are in scope for security reports:
+### In scope
 
-- The Nokku **backend** (control plane) — authentication and OIDC, workspace
-  and access-control authorization, SSH and X.509 certificate signing, daemon
-  enrollment and synchronization, entitlement/licensing, audit logging, and
-  secret management.
-- The bundled **web application**, including browser authentication and
-  terminal sessions.
-- Support for external integrations the backend uses (email, OIDC providers,
-  KMS, billing) **as they are exercised by the backend**, and the Helm
-  chart / deployment configuration shipped in this repository.
+- The **core**: sign-in and OIDC, authorization, SSH and X.509 certificate signing, daemon enrollment and sync, licensing, the audit log and secret management
+- The bundled **web app**, including browser sign-in and terminal sessions
+- External integrations **as the core uses them** (email, OIDC providers, KMS, billing)
+- The Helm chart and the deployment files in this repository
 
 ### Out of scope
 
-- The [`nk`](https://github.com/nokku-sh/nk) CLI and
-  [`nokkud`](https://github.com/nokku-sh/nokkud) daemon — these have their own
-  security policies in their respective repositories.
-- The SSH protocol itself and vulnerabilities in OpenSSH / `sshd`.
-- OS/distribution, container-runtime, and database-engine issues.
-- The infrastructure that hosts the managed Nokku SaaS, or third-party
-  provider outages.
+- The [`nk`](https://github.com/nokku-sh/nk) CLI and the [`nokkud`](https://github.com/nokku-sh/nokkud) daemon. Each has its own policy in its repository.
+- The SSH protocol itself, and vulnerabilities in OpenSSH or `sshd`
+- Operating system, container runtime and database engine issues
+- The infrastructure behind the hosted service, and outages of third-party providers
 
-## Security Notes / Threat Model
+## Running Nokku securely
 
-Nokku is the control plane. It holds signing keys for SSH and X.509
-certificate authorities, encrypted secrets, and the enrollment / access data
-that governs access to every target.
+The core holds the signing keys of your SSH and X.509 certificate authorities. Whoever controls it controls access to every server. These are the settings that deserve care. Setup and the full list of settings are in the [README](./README.md).
 
-- Sensitive material (encrypted secrets, CA signing keys, OIDC credentials)
-  is managed via `NOKKU_SECRET`/KMS and keyed to external key management when
-  configured. Do not expose `NOKKU_SECRET`, license keys, or OIDC client
-  secrets.
-- Operate the backend behind a TLS-terminating reverse proxy and set
-  `NOKKU_TRUSTED_PROXIES` to the exact set of proxy IPs/CIDRs whose forwarded
-  client-IP headers should be honored.
-- SSO provider URLs are chosen by workspace owners and audit webhook
-  destinations by admins, so the backend refuses to connect to private,
-  loopback, and link-local addresses. Set
-  `NOKKU_ALLOW_PRIVATE_NETWORKS=true` only when every one of them is
-  trusted, such as a self-hosted install sending audit events to an
-  internal SIEM.
-- Set a strong `NOKKU_SECRET` (at least 32 characters, the server refuses
-  less). Change it with `rotate-secrets` while the server is stopped. A
-  rotation re-encrypts the secrets in the database with a new data key and
-  drops the older keys. With a KMS the server rotates by itself.
-- **Session recordings**: daemons stream terminal recordings to the backend,
-  where they are encrypted at rest. Credential scrubbing runs asynchronously
-  after an upload completes and replaces the stored recording with a redacted
-  copy in place. Between upload completion and scrub completion the stored
-  recording is unredacted (but still encrypted at rest). Scrubbing is best
-  effort: a failed scrub is logged and the recording is kept as uploaded, and
-  scrubbing is heuristic, so it cannot catch every secret.
-- Self-hosted instances default to the Community plan. Enterprise licensing is
-  verified offline via Ed25519-signed license keys and falls back to Community
-  when a key expires. An expired key never stops the core, and data beyond the
-  Community limits is kept for 30 more days. External KMS configuration is an
-  Enterprise feature, Community deployments use `NOKKU_SECRET`.
-- **Database roles and RLS**: the owner role (`PGUSER`) only migrates at
-  startup. Runtime traffic uses `nokku_app`, under row-level security, and
-  `nokku_system` (BYPASSRLS) for login, global account changes, and
-  background jobs. SCIM team work runs pinned to the connector's workspace.
-  Tenant rows are scoped to the pinned workspace. Users are visible only to
-  themselves and to fellow members of the pinned workspace. Credentials and
-  sessions are visible only to their owner. RLS is a safety net against
-  application bugs, such as a query that forgets its workspace filter. It is
-  not a boundary against a compromised backend: `nokku_app` can assume
-  `nokku_system`, and the scoping settings are ordinary session variables.
-  Queries are parameterized through sqlc, which is the injection defense.
-- Releases are built via GoReleaser and signed/checksummed — verify downloads
-  against the published checksums and signatures.
+### The secret
+
+`NOKKU_SECRET` protects everything the core encrypts at rest: CA private keys, SSO client secrets and the keys of session recordings.
+
+- Use at least 32 random characters, for example `openssl rand -hex 32`. The core refuses less.
+- Keep it in a secret manager, never in the repository or an image.
+- Back it up together with the database. One is useless without the other.
+- Treat license keys and OIDC client secrets the same way.
+
+How it works: the secrets in the database are encrypted by one keyset, which is stored in the database too. The keyset is wrapped by a key derived from `NOKKU_SECRET`, or by a KMS key when `KMS_URI` is set. Each recording is encrypted with its own key, and that key is one more secret in the database.
+
+### Rotating the secret
+
+Stop the core, then run the rotation with the same environment the core runs with:
+
+```bash
+NOKKU_NEW_SECRET="secret:$(cat new-secret.txt)" ./nokku rotate-secrets
+```
+
+Then set `NOKKU_SECRET` to the new value and start the core. It refuses to start with the old one.
+
+The new secret can also be passed as `--new secret:...`. The environment variable keeps it out of the process list and your shell history.
+
+A rotation adds a new data key to the keyset, re-encrypts the secrets in the database with it and drops the older keys, all in one transaction. The keyset never holds more than two keys. Recordings are not re-encrypted, only their keys are.
+
+A rotation does not un-leak anything. If the old secret and an old database dump both leaked, roll over the CAs as well.
+
+### Using a KMS
+
+With a KMS, the key that unlocks everything lives in the KMS and not in an environment variable. This needs an Enterprise license. Community installs use `NOKKU_SECRET`.
+
+| Variable                 | Purpose                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| `KMS_URI`                | The KMS key that wraps the keyset                                                   |
+| `VAULT_TOKEN`            | Token for `hcvault://`                                                              |
+| `VAULT_SKIP_VERIFY`      | Skips Vault TLS verification. For testing only                                      |
+| `KEYSET_REWRAP_INTERVAL` | How often the keyset is wrapped again. Default 12h, at least 1h                     |
+| `KEYSET_ROTATE_INTERVAL` | How old the data key may get before the core rotates it. Default 2160h, 0 turns it off |
+
+`KMS_URI` takes one of:
+
+- `hcvault://<host>/transit/keys/<key>` for HashiCorp Vault
+- `scw-kms://regions/<region>/keys/<key-id>` for Scaleway
+
+To move an existing install to a KMS, stop the core and run:
+
+```bash
+./nokku rotate-secrets --new kms:hcvault://vault:8200/transit/keys/nokku
+```
+
+Then set `KMS_URI` to the same value and start the core.
+
+With a KMS nothing has to be rotated by hand. The core rotates the data key every `KEYSET_ROTATE_INTERVAL`, and wraps the keyset again every `KEYSET_REWRAP_INTERVAL`, which picks up a key rotation inside the KMS.
+
+### Network
+
+- **Terminate TLS in front of the core.** It listens with plain HTTP. `compose.prod.yml` runs Caddy for this.
+- **Set `NOKKU_TRUSTED_PROXIES` to exactly your proxy.** The core only believes forwarded client-IP headers from these addresses. Too wide a range lets a client fake its address in the audit log and dodge rate limits.
+- **Leave `NOKKU_ALLOW_PRIVATE_NETWORKS` off unless you need it.** Workspace owners choose SSO provider URLs and admins choose audit webhook destinations, so the core refuses to connect to private, loopback and link-local addresses. Set it to `true` only when every such address is trusted, like a self-hosted install with its identity provider or SIEM on an internal network. Never turn it on when you host for other people.
+
+### File storage
+
+Recordings are encrypted before they are stored, on local disk and on S3 alike.
+
+If you set `NOKKU_S3_PUBLIC_URL` to serve avatars straight from the bucket, grant public read on the `avatars/` prefix only. Never make the whole bucket public. Recordings live under `videos/`.
+
+### Database
+
+- The core uses three roles. The owner (`PGUSER`) only runs migrations at start. Requests run as `nokku_app`, under row-level security. Work that spans workspaces, like the first start, billing webhooks and background jobs, runs as `nokku_system`, which bypasses it.
+- Set `NOKKU_DB_APP_PASSWORD` to give the request role its own password instead of sharing the owner's.
+- Use `PGSSLMODE=verify-full` when PostgreSQL is on another host.
+
+### Releases
+
+Releases are built with GoReleaser and come with checksums and signatures. Verify a download before you run it.
+
+## What to know about the design
+
+**The core is down, access is not.** Daemons enforce the access they last synced, and a certificate stays valid until it expires. Revoking access is immediate on servers that are in sync. A server that missed the sync is bounded by the certificate lifetime, so keep user certificates short.
+
+**Session recordings.** Daemons stream recordings to the core, where they are encrypted at rest. Credential scrubbing runs after an upload completes and replaces the recording with a redacted copy. Between upload and scrub the stored recording is unredacted, though still encrypted. Scrubbing is best effort. A failed scrub is logged and the recording is kept as uploaded, and the matching is heuristic, so it cannot catch every secret.
+
+**Row-level security is a safety net, not a wall.** Every tenant row belongs to one workspace, and a request only sees the rows of its own. The policy is the only workspace filter, queries name none. A connection with no workspace set sees nothing. This protects against application bugs. It does not protect against a compromised core: `nokku_app` can assume `nokku_system`, and the workspace setting is an ordinary session variable. Queries are parameterized through sqlc, which is the defense against injection.
+
+**Licensing.** A self-hosted core starts on the Community plan. License keys are Ed25519-signed and verified offline against a public key compiled into the binary. An expired key never stops the core. Licensed features turn off, and data beyond the Community limits is kept for 30 more days.
