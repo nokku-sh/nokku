@@ -3,33 +3,21 @@ package crypto
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
-	"fmt"
 	"math/big"
 )
 
-var errGenerateRandom = errors.New("failed to generate random bytes")
+// crypto/rand never fails, it stops the program when the system has no
+// randomness to give. So nothing here returns an error.
 
-func randomBytes(size int) ([]byte, error) {
-	bytes := make([]byte, size)
-	if _, err := rand.Read(bytes); err != nil {
-		return nil, errGenerateRandom
-	}
-	return bytes, nil
+func RandomString(size int) string {
+	b := make([]byte, size)
+	_, _ = rand.Read(b)
+	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-func RandomString(size int) (string, error) {
-	bytes, err := randomBytes(size)
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(bytes), nil
-}
-
-func RandomSerial() (*big.Int, error) {
-	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate random serial: %w", err)
-	}
-	return serial, nil
+// RandomSerial is 128 random bits, a certificate serial number.
+func RandomSerial() *big.Int {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return new(big.Int).SetBytes(b)
 }

@@ -1,9 +1,11 @@
-// Package actor carries the request identity and its workspace through
-// contexts. It has no dependencies so db can use it without import cycles.
+// Package actor carries the request identity, its workspace and its
+// transport facts through contexts. It imports no sibling, so db can use it
+// without import cycles.
 package actor
 
 import (
 	"context"
+	"net/http"
 )
 
 type Kind string
@@ -11,7 +13,6 @@ type Kind string
 const (
 	KindUser           Kind = "user"
 	KindCLI            Kind = "cli"
-	KindDevice         Kind = "device"
 	KindDaemon         Kind = "daemon"
 	KindServiceAccount Kind = "service_account"
 	KindSCIM           Kind = "scim"
@@ -26,11 +27,11 @@ type Principal struct {
 }
 
 // Workspace is the tenant a request runs in. The host names it before any
-// authentication happens.
+// authentication happens. It only holds what never changes, the name is
+// read from the row.
 type Workspace struct {
 	ID   string
 	Slug string
-	Name string
 	// BaseURL is scheme and host with no path. Cookies, links, the passkey
 	// RP ID and the DPoP htu all derive from it.
 	BaseURL string
@@ -53,7 +54,7 @@ func UserIDFromContext(ctx context.Context) string {
 		switch p.Kind {
 		case KindUser, KindCLI:
 			return p.ID
-		case KindDaemon, KindServiceAccount, KindSCIM, KindDevice:
+		case KindDaemon, KindServiceAccount, KindSCIM:
 			return ""
 		}
 	}
@@ -72,6 +73,23 @@ func SubjectFromContext(ctx context.Context) string {
 		return p.ID
 	}
 	return ""
+}
+
+// RequestMeta is what audit events and session rows take from the transport.
+type RequestMeta struct {
+	Header     http.Header
+	RemoteAddr string
+}
+
+type requestMetaKey struct{}
+
+func ContextWithRequestMeta(ctx context.Context, meta RequestMeta) context.Context {
+	return context.WithValue(ctx, requestMetaKey{}, meta)
+}
+
+func RequestMetaFromContext(ctx context.Context) (RequestMeta, bool) {
+	m, ok := ctx.Value(requestMetaKey{}).(RequestMeta)
+	return m, ok
 }
 
 type workspaceKey struct{}

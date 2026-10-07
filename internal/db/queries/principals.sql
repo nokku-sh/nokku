@@ -1,8 +1,7 @@
 -- name: CreatePrincipal :one
 INSERT INTO
-  principals (workspace_id, target_id, username)
+  principals (target_id, username)
 SELECT
-  @workspace_id,
   @target_id,
   @username
 ON CONFLICT (target_id, username) DO UPDATE
@@ -103,7 +102,6 @@ WHERE
 INSERT INTO
   principal_grants (
     principal_id,
-    workspace_id,
     user_id,
     team_id,
     service_account_id
@@ -111,7 +109,6 @@ INSERT INTO
 VALUES
   (
     @principal_id,
-    @workspace_id,
     CASE
       WHEN @subject_kind::TEXT = 'user' THEN @subject_id::UUID
     END,
@@ -134,8 +131,7 @@ WHERE
 -- name: RevokeSubjectAccessInWorkspace :exec
 DELETE FROM principal_grants
 WHERE
-  workspace_id = @workspace_id
-  AND subject_kind = @subject_kind::TEXT
+  subject_kind = @subject_kind::TEXT
   AND subject_id = @subject_id::UUID;
 
 -- name: GetPrincipalsByTargetIDs :many

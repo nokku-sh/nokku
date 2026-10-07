@@ -2,7 +2,6 @@
 INSERT INTO
   sessions (
     token_hash,
-    workspace_id,
     subject_id,
     user_id,
     kind,
@@ -17,7 +16,6 @@ INSERT INTO
 VALUES
   (
     @token_hash,
-    @workspace_id,
     @subject_id::TEXT,
     CASE
       WHEN @kind::TEXT <> 'daemon' THEN (@subject_id::TEXT)::UUID
@@ -40,8 +38,7 @@ SELECT
 FROM
   sessions
 WHERE
-  workspace_id = @workspace_id
-  AND token_hash = @token_hash;
+  token_hash = @token_hash;
 
 -- name: ListSessionsBySubject :many
 SELECT
@@ -49,8 +46,7 @@ SELECT
 FROM
   sessions
 WHERE
-  workspace_id = @workspace_id
-  AND subject_id = @subject_id
+  subject_id = @subject_id
 ORDER BY
   last_seen_at DESC NULLS LAST;
 
@@ -59,26 +55,30 @@ UPDATE sessions
 SET
   last_seen_at = @last_seen_at
 WHERE
-  workspace_id = @workspace_id
-  AND token_hash = @token_hash;
+  token_hash = @token_hash;
 
 -- name: DeleteSession :exec
 DELETE FROM sessions
 WHERE
-  workspace_id = @workspace_id
-  AND token_hash = @token_hash;
+  token_hash = @token_hash;
 
 -- name: DeleteSubjectSessions :execrows
+-- Signs the subject out everywhere. A user's devices are forgotten with it,
+-- so whoever got in from one of them is not waved through quietly again.
+WITH
+  forgotten AS (
+    DELETE FROM known_devices
+    WHERE
+      user_id::TEXT = @subject_id::TEXT
+  )
 DELETE FROM sessions
 WHERE
-  workspace_id = @workspace_id
-  AND subject_id = @subject_id;
+  subject_id = @subject_id::TEXT;
 
 -- name: DeleteSessionsExcept :execrows
 DELETE FROM sessions
 WHERE
-  workspace_id = @workspace_id
-  AND subject_id = @subject_id
+  subject_id = @subject_id
   AND token_hash <> @keep_hash;
 
 -- name: DeleteExpiredSessions :execrows

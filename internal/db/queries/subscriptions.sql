@@ -1,4 +1,6 @@
 -- name: GetSubscription :one
+-- The queries here name the workspace, billing and the plan lookup run as
+-- nokku_system.
 SELECT
   *
 FROM

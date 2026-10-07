@@ -32,7 +32,7 @@ func (a *authNInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		if err != nil {
 			return nil, a.fail(ctx, err)
 		}
-		return next(inject(ctx, p, sess, req.Header(), req.Peer().Addr), req)
+		return next(inject(ctx, p, sess), req)
 	}
 }
 
@@ -54,23 +54,12 @@ func (a *authNInterceptor) WrapStreamingHandler(
 			a.advertiseNonce(ctx, conn.ResponseHeader(), err)
 			return connect.NewError(connect.CodeUnauthenticated, err)
 		}
-		return next(inject(ctx, p, sess, conn.RequestHeader(), conn.Peer().Addr), conn)
+		return next(inject(ctx, p, sess), conn)
 	}
 }
 
-func inject(
-	ctx context.Context,
-	p actor.Principal,
-	sess db.Session,
-	header http.Header,
-	remoteAddr string,
-) context.Context {
-	ctx = iam.ContextWithSession(ctx, sess)
-	ctx = iam.ContextWithRequestMeta(ctx, iam.RequestMeta{
-		Header:     header,
-		RemoteAddr: remoteAddr,
-	})
-	return actor.ContextWithPrincipal(ctx, p)
+func inject(ctx context.Context, p actor.Principal, sess db.Session) context.Context {
+	return actor.ContextWithPrincipal(iam.ContextWithSession(ctx, sess), p)
 }
 
 func (a *authNInterceptor) fail(ctx context.Context, err error) error {

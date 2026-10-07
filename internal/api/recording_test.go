@@ -162,6 +162,31 @@ func TestUploadRecordingKeepsWhatADeadDaemonSent(t *testing.T) {
 	assert.EqualValues(t, whole.Len(), storedBytes(t, cfg, id))
 }
 
+// The same when storage cannot even open the object. The row exists by then,
+// and it used to stay open.
+func TestUploadRecordingIsClosedWhenStorageCannotOpen(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	id := uuid.NewV7().String()
+
+	// A file where the workspace's directory belongs, before the upload starts.
+	dir := filepath.Join(os.Getenv("NOKKU_LOCAL_STORAGE_PATH"), filepath.Dir(storage.RecordingPath(workspaceID, id)))
+	require.NoError(t, os.RemoveAll(dir))
+	require.NoError(t, os.MkdirAll(filepath.Dir(dir), 0o700))
+	require.NoError(t, os.WriteFile(dir, nil, 0o600))
+	t.Cleanup(func() { _ = os.Remove(dir) })
+
+	stream := openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
+	_, err := stream.CloseAndReceive()
+	assert.Equal(t, connect.CodeInternal, connect.CodeOf(err), "an upload storage could not open, got %v", err)
+	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+	require.NoError(t, err)
+	assert.NotNil(t, rec.EndedAt, "the recording stayed open")
+	assert.False(t, rec.Complete)
+	assert.Zero(t, rec.SizeBytes, "nothing was stored")
+}
+
 // When storage fails the daemon is told so, and the recording is closed with
 // nothing stored. Left open it would count as a live session.
 func TestUploadRecordingIsClosedWhenStorageFails(t *testing.T) {
@@ -259,12 +284,14 @@ func TestRecordingStorageCap(t *testing.T) {
 	require.NoError(t, upload(recent, 6), "an old recording is in the way, not a reason to refuse")
 	_, err := stored(old)
 	require.ErrorIs(t, err, pgx.ErrNoRows, "the old recording makes room")
-	events, err := cfg.Conn.Sys().ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
-		WorkspaceID: workspaceID,
-		Actions:     []string{"RecordingEvicted"},
-		Limit:       10,
+	var events []*db.ListAuditLogsRow
+	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
+		events, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
+			Actions: []string{"RecordingEvicted"},
+			Limit:   10,
+		})
+		return err
 	})
-	require.NoError(t, err)
 	require.Len(t, events, 1, "every eviction is audited")
 	assert.Equal(t, old, events[0].Target)
 	assert.Contains(t, string(events[0].Details), recent, "the event names the upload that needed the room")

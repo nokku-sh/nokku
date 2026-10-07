@@ -1,9 +1,8 @@
 -- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (workspace_id, name, description, role_name, expires_at, tags, token_hash)
+  service_accounts (name, description, role_name, expires_at, tags, token_hash)
 VALUES
   (
-    @workspace_id,
     @name,
     @description,
     COALESCE(sqlc.narg('role_name')::TEXT, 'member'),
@@ -29,8 +28,7 @@ SELECT
 FROM
   service_accounts sa
 WHERE
-  sa.workspace_id = @workspace_id
-  AND (
+  (
     sqlc.narg('query')::TEXT IS NULL
     OR sa.name ILIKE '%' || sqlc.narg('query') || '%'
     OR COALESCE(sa.description, '') ILIKE '%' || sqlc.narg('query') || '%'
@@ -85,8 +83,7 @@ SELECT
 FROM
   service_accounts
 WHERE
-  workspace_id = @workspace_id
-  AND token_hash = @token_hash
+  token_hash = @token_hash
   AND (expires_at IS NULL OR expires_at > NOW());
 
 -- name: TouchServiceAccount :exec

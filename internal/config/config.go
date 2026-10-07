@@ -30,9 +30,13 @@ import (
 )
 
 type EnvConfig struct {
-	BaseURL        string `env:"NOKKU_BASE_URL"`
-	Port           string `env:"NOKKU_PORT"            envDefault:"3000"`
-	Secret         string `env:"NOKKU_SECRET"`
+	BaseURL string `env:"NOKKU_BASE_URL"`
+	Port    string `env:"NOKKU_PORT"     envDefault:"3000"`
+	Secret  string `env:"NOKKU_SECRET"`
+	// SaaS runs the hosted service: a workspace per subdomain, plans from
+	// Stripe subscriptions. Unset, the server is self-hosted with one
+	// workspace and its plan from the license key.
+	SaaS           bool `env:"NOKKU_SAAS"`
 	Debug          bool
 	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
 }
@@ -48,7 +52,7 @@ type Config struct {
 	Storage      *storage.Storage
 	Cache        *cache.Memory
 	Record       *recording.Service
-	Billing      *billing.Service
+	Billing      *billing.Stripe
 	Entitlements *entitlement.Service
 	Tenant       *tenant.Resolver
 
@@ -103,30 +107,26 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Billing, err = billing.New(ctx, cfg.Conn, cfg.FullURL())
+	cfg.Billing, err = billing.New(ctx, cfg.Conn, cfg.FullURL(), cfg.SaaS)
 	if err != nil {
 		return nil, err
 	}
 
-	mode := entitlement.ModeSelfHosted
-	if cfg.Billing.Enabled() {
-		mode = entitlement.ModeSaaS
-	}
-	if mode == entitlement.ModeSelfHosted {
-		cfg.Entitlements = entitlement.NewService(cfg.Conn, entitlement.EnvLicense(), mode)
-		cfg.Entitlements.WatchLicense(ctx)
+	if cfg.SaaS {
+		cfg.Entitlements = entitlement.NewService(cfg.Conn, nil, cfg.SaaS)
 	} else {
-		cfg.Entitlements = entitlement.NewService(cfg.Conn, nil, mode)
+		cfg.Entitlements = entitlement.NewService(cfg.Conn, entitlement.EnvLicense(), cfg.SaaS)
+		cfg.Entitlements.WatchLicense(ctx)
 	}
 
 	// An expired license still starts. The data is encrypted under the KMS
 	// key, so refusing here would turn a late renewal into an outage.
-	if mode == entitlement.ModeSelfHosted && enc.UsesKMS() && cfg.Entitlements.License() == nil {
+	if !cfg.SaaS && enc.UsesKMS() && cfg.Entitlements.License() == nil {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
 	// The resolver runs before every request. Self-host makes its one
 	// workspace here, the hosted service reads it off the subdomain.
-	cfg.Tenant, err = tenant.New(ctx, cfg.Conn, cfg.FullURL(), mode == entitlement.ModeSaaS)
+	cfg.Tenant, err = tenant.New(ctx, cfg.Conn, cfg.FullURL(), cfg.SaaS)
 	if err != nil {
 		return nil, err
 	}
@@ -142,19 +142,27 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.IAM, err = iam.New(ctx, iam.Deps{
-		Conn:        cfg.Conn,
-		Events:      cfg.Audit,
-		Secret:      nonceKey,
-		Secure:      strings.HasPrefix(cfg.FullURL(), "https://"),
-		Debug:       cfg.Debug,
-		CanJoin:     cfg.Entitlements.CanInvite,
-		StrictEmail: mode == entitlement.ModeSaaS,
-	})
+	deps := iam.Deps{
+		Conn:         cfg.Conn,
+		Audit:        cfg.Audit,
+		Secret:       nonceKey,
+		Secure:       strings.HasPrefix(cfg.FullURL(), "https://"),
+		Debug:        cfg.Debug,
+		CanJoin:      cfg.Entitlements.CanInvite,
+		StrictEmail:  cfg.SaaS,
+		SendNewLogin: cfg.Email.SendNewLoginEmail,
+	}
+	// Without mail there are no links, the login page then offers passkeys
+	// and the workspace's providers only.
+	if cfg.Email.HasSMTP() {
+		deps.SendMagicLink = cfg.Email.SendMagicLinkEmail
+		deps.SendSignupLink = cfg.Email.SendSignupLinkEmail
+	}
+	cfg.IAM, err = iam.New(ctx, deps)
 	if err != nil {
 		return nil, err
 	}
-	if mode == entitlement.ModeSelfHosted {
+	if !cfg.SaaS {
 		if cfg.BootstrapLink, err = cfg.IAM.Bootstrap(ctx, cfg.Tenant.Single()); err != nil {
 			return nil, err
 		}
@@ -164,10 +172,18 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	return &cfg, nil
 }
 
+// Mode is the name the API reports for the mode, the UI switches on it.
+func (c *EnvConfig) Mode() string {
+	if c.SaaS {
+		return "saas"
+	}
+	return "self_hosted"
+}
+
 // FullURL is NOKKU_BASE_URL as given, the public address. The listen port is
 // not part of it, a reverse proxy usually sits in between. Unset, it is the
 // local listener.
-func (c *Config) FullURL() string {
+func (c *EnvConfig) FullURL() string {
 	if c.BaseURL == "" {
 		return "http://localhost:" + c.Port
 	}

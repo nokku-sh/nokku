@@ -14,12 +14,12 @@ import (
 func TestEmailChangeTokens(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	q := c.Sys()
+	q := New(pinnedConn(t, c, f.ws))
 	ctx := t.Context()
 	id := uuid.NewV7().String()
 	oldEmail, newEmail := id+"@old.test", id+"@new.test"
 	if _, err := q.CreateUserWithID(ctx, &CreateUserWithIDParams{
-		ID: id, WorkspaceID: f.ws, Email: oldEmail, Name: "u", Role: "member",
+		ID: id, Email: oldEmail, Name: "u", Role: "member",
 	}); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -28,22 +28,22 @@ func TestEmailChangeTokens(t *testing.T) {
 	put := func(hash crypto.HashedToken, purpose, email string) {
 		t.Helper()
 		if err := q.PutToken(ctx, &PutTokenParams{
-			TokenHash: hash, WorkspaceID: f.ws, UserID: &id, Purpose: purpose,
+			TokenHash: hash, UserID: &id, Purpose: purpose,
 			ExpiresAt: time.Now().Add(time.Hour), Email: &email,
 		}); err != nil {
 			t.Fatalf("put %s token: %v", purpose, err)
 		}
 	}
 	consume := func(hash crypto.HashedToken, purpose string) (*ConsumeEmailTokenRow, error) {
-		return q.ConsumeEmailToken(ctx, &ConsumeEmailTokenParams{WorkspaceID: f.ws, TokenHash: hash, Purpose: purpose})
+		return q.ConsumeEmailToken(ctx, &ConsumeEmailTokenParams{TokenHash: hash, Purpose: purpose})
 	}
-	pendingParams := &GetPendingTokenEmailParams{WorkspaceID: f.ws, UserID: &id, Purpose: "email_change"}
+	pendingParams := &GetPendingTokenEmailParams{UserID: &id, Purpose: "email_change"}
 
 	// Request: a second one replaces the first, so a stale link confirms nothing.
 	put(stale, "email_change", id+"@typo.test")
 	if err := q.DeleteUserTokens(
 		ctx,
-		&DeleteUserTokensParams{WorkspaceID: f.ws, UserID: &id, Purpose: "email_change"},
+		&DeleteUserTokensParams{UserID: &id, Purpose: "email_change"},
 	); err != nil {
 		t.Fatalf("delete tokens: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestEmailChangeTokens(t *testing.T) {
 	if err != nil || row.UserID != id || row.Email != newEmail {
 		t.Fatalf("confirm = %+v, %v", row, err)
 	}
-	u, err := q.SetUserEmail(ctx, &SetUserEmailParams{WorkspaceID: f.ws, ID: id, Email: row.Email})
+	u, err := q.SetUserEmail(ctx, &SetUserEmailParams{ID: id, Email: row.Email})
 	if err != nil || u.Email != newEmail {
 		t.Fatalf("set email = %+v, %v", u, err)
 	}
@@ -82,7 +82,7 @@ func TestEmailChangeTokens(t *testing.T) {
 	if err != nil || row.Email != oldEmail {
 		t.Fatalf("revert = %+v, %v", row, err)
 	}
-	if u, err = q.SetUserEmail(ctx, &SetUserEmailParams{WorkspaceID: f.ws, ID: id, Email: row.Email}); err != nil ||
+	if u, err = q.SetUserEmail(ctx, &SetUserEmailParams{ID: id, Email: row.Email}); err != nil ||
 		u.Email != oldEmail {
 		t.Fatalf("restore email = %+v, %v", u, err)
 	}
@@ -90,11 +90,11 @@ func TestEmailChangeTokens(t *testing.T) {
 	// An address somebody else in the workspace holds is refused.
 	other := uuid.NewV7().String()
 	if _, err = q.CreateUserWithID(ctx, &CreateUserWithIDParams{
-		ID: other, WorkspaceID: f.ws, Email: newEmail, Name: "o", Role: "member",
+		ID: other, Email: newEmail, Name: "o", Role: "member",
 	}); err != nil {
 		t.Fatalf("create other user: %v", err)
 	}
-	if _, err = q.SetUserEmail(ctx, &SetUserEmailParams{WorkspaceID: f.ws, ID: id, Email: newEmail}); err == nil {
+	if _, err = q.SetUserEmail(ctx, &SetUserEmailParams{ID: id, Email: newEmail}); err == nil {
 		t.Fatal("taking a used address succeeded")
 	}
 }

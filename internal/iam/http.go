@@ -14,6 +14,9 @@ import (
 const (
 	sessionTTL        = 168 * time.Hour
 	sessionCookieName = "nokku_session"
+	// sessionSeenEvery is how exact "last active" in the sessions list is.
+	// A busy session must not turn every request into a write.
+	sessionSeenEvery = time.Minute
 )
 
 func (s *Service) newCookie(name, value string, expires time.Time) *http.Cookie {
@@ -59,32 +62,15 @@ func (s *Service) Middleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		s.noteSeen(r.Context(), sess)
 		ctx := actor.ContextWithPrincipal(r.Context(), p)
 		ctx = ContextWithSession(ctx, sess)
-		ctx = ContextWithRequestMeta(ctx, RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 func ContextWithSession(ctx context.Context, sess db.Session) context.Context {
 	return context.WithValue(ctx, sessionKey{}, sess)
-}
-
-func ContextWithRequestMeta(ctx context.Context, meta RequestMeta) context.Context {
-	return context.WithValue(ctx, requestMetaKey{}, meta)
-}
-
-// RequestMeta gives audit events their IP and user agent.
-type RequestMeta struct {
-	Header     http.Header
-	RemoteAddr string
-}
-
-type requestMetaKey struct{}
-
-func RequestMetaFromContext(ctx context.Context) (RequestMeta, bool) {
-	m, ok := ctx.Value(requestMetaKey{}).(RequestMeta)
-	return m, ok
 }
 
 func (s *Service) RequireLogin(next http.Handler) http.Handler {

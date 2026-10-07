@@ -1,7 +1,6 @@
 -- name: CreateTarget :one
 INSERT INTO
   targets (
-    workspace_id,
     ca_id,
     name,
     description,
@@ -12,7 +11,6 @@ INSERT INTO
   )
 VALUES
   (
-    @workspace_id,
     @ca_id,
     @name,
     @description,
@@ -39,8 +37,7 @@ SELECT
 FROM
   targets t
 WHERE
-  t.workspace_id = @workspace_id
-  AND (
+  (
     sqlc.narg('query')::TEXT IS NULL
     OR t.name ILIKE '%' || sqlc.narg('query') || '%'
     OR COALESCE(t.description, '') ILIKE '%' || sqlc.narg('query') || '%'
@@ -181,8 +178,6 @@ SELECT DISTINCT
   unnest(tags)::TEXT AS tag
 FROM
   targets
-WHERE
-  workspace_id = @workspace_id
 ORDER BY
   tag ASC;
 
@@ -191,8 +186,6 @@ SELECT DISTINCT
   username
 FROM
   principals
-WHERE
-  workspace_id = @workspace_id
 ORDER BY
   username ASC;
 

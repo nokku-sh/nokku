@@ -28,10 +28,6 @@ type certificateService struct {
 	cfg *config.Config
 }
 
-func newCertificateService(cfg *config.Config) *certificateService {
-	return &certificateService{cfg: cfg}
-}
-
 func (s *certificateService) CreateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.CreateCertificateAuthorityRequest,
@@ -71,7 +67,6 @@ func (s *certificateService) CreateCertificateAuthority(
 	}
 
 	params := &db.CreateCAParams{
-		WorkspaceID:         actor.WorkspaceIDFromContext(ctx),
 		Name:                req.GetName(),
 		Description:         req.Description,
 		IsDefault:           req.GetIsDefault(),
@@ -103,11 +98,8 @@ func (s *certificateService) CreateCertificateAuthority(
 		params.HostMaxTtl = req.GetHostMaxTtl().AsDuration()
 	}
 
-	var result *db.CertificateAuthority
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		result, err = q.CreateCA(ctx, params)
-		return err
-	}); err != nil {
+	result, err := s.cfg.Conn.Tenant().CreateCA(ctx, params)
+	if err != nil {
 		return nil, err
 	}
 
@@ -120,11 +112,8 @@ func (s *certificateService) GetCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.GetCertificateAuthorityRequest,
 ) (*nokkuv1.GetCertificateAuthorityResponse, error) {
-	var ca *db.CertificateAuthority
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		ca, err = q.GetCA(ctx, req.GetId())
-		return err
-	}); err != nil {
+	ca, err := s.cfg.Conn.Tenant().GetCA(ctx, req.GetId())
+	if err != nil {
 		return nil, err
 	}
 
@@ -137,11 +126,8 @@ func (s *certificateService) ListCertificateAuthorities(
 	ctx context.Context,
 	_ *nokkuv1.ListCertificateAuthoritiesRequest,
 ) (*nokkuv1.ListCertificateAuthoritiesResponse, error) {
-	var result []*db.CertificateAuthority
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.ListCAs(ctx, &db.ListCAsParams{WorkspaceID: actor.WorkspaceIDFromContext(ctx)})
-		return err
-	}); err != nil {
+	result, err := s.cfg.Conn.Tenant().ListCAs(ctx, &db.ListCAsParams{})
+	if err != nil {
 		return nil, err
 	}
 
@@ -179,11 +165,8 @@ func (s *certificateService) UpdateCertificateAuthority(
 		HostMaxTtl:          optDuration(req.GetHostMaxTtl()),
 	}
 
-	var result *db.CertificateAuthority
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.UpdateCA(ctx, params)
-		return err
-	}); err != nil {
+	result, err := s.cfg.Conn.Tenant().UpdateCA(ctx, params)
+	if err != nil {
 		return nil, err
 	}
 
@@ -196,10 +179,7 @@ func (s *certificateService) DeleteCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.DeleteCertificateAuthorityRequest,
 ) (*nokkuv1.DeleteCertificateAuthorityResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		_, err := q.DeleteCA(ctx, req.GetId())
-		return err
-	}); err != nil {
+	if _, err := s.cfg.Conn.Tenant().DeleteCA(ctx, req.GetId()); err != nil {
 		return nil, err
 	}
 
@@ -335,10 +315,7 @@ func (s *certificateService) SignX509Certificate(
 			ca, err = q.GetCA(ctx, req.GetCaId())
 			return err
 		}
-		ca, err = q.GetDefaultCA(ctx, &db.GetDefaultCAParams{
-			WorkspaceID:   actor.WorkspaceIDFromContext(ctx),
-			AuthorityType: nokkuv1.AuthorityType_AUTHORITY_TYPE_X509,
-		})
+		ca, err = q.GetDefaultCA(ctx, nokkuv1.AuthorityType_AUTHORITY_TYPE_X509)
 		return err
 	}); err != nil {
 		return nil, err

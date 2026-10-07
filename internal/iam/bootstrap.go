@@ -74,14 +74,13 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 		return "", nil
 	}
 	var owner *db.User
-	err = s.inWorkspace(ctx, func(q *db.Queries, wsID string) (err error) {
-		owner, err = q.GetOwner(ctx, wsID)
+	err = s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		owner, err = q.GetOwner(ctx)
 		if errors.Is(err, pgx.ErrNoRows) {
 			owner, err = s.createUser(ctx, q, db.CreateUserWithIDParams{
-				WorkspaceID: wsID,
-				Email:       cfg.AdminEmail,
-				Name:        cfg.AdminName,
-				Role:        string(db.RoleOwner),
+				Email: cfg.AdminEmail,
+				Name:  cfg.AdminName,
+				Role:  string(db.RoleOwner),
 			}, "")
 		}
 		return err
@@ -89,11 +88,8 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 	if err != nil {
 		return "", err
 	}
-	var creds []*db.Credential
-	if err := s.inWorkspace(ctx, func(q *db.Queries, wsID string) (err error) {
-		creds, err = q.ListUserCredentials(ctx, &db.ListUserCredentialsParams{WorkspaceID: wsID, UserID: owner.ID})
-		return err
-	}); err != nil {
+	creds, err := s.conn.Tenant().ListUserCredentials(ctx, owner.ID)
+	if err != nil {
 		return "", err
 	}
 	for _, c := range creds {
@@ -108,11 +104,7 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 // in when every passkey is gone. It replaces earlier links.
 func (s *Service) AdminLink(ctx context.Context, ws actor.Workspace) (*db.User, string, error) {
 	ctx = actor.WithWorkspace(ctx, ws)
-	var owner *db.User
-	err := s.inWorkspace(ctx, func(q *db.Queries, wsID string) (err error) {
-		owner, err = q.GetOwner(ctx, wsID)
-		return err
-	})
+	owner, err := s.conn.Tenant().GetOwner(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, "", errors.New("iam: the workspace has no owner, set NOKKU_ADMIN_EMAIL and start the server once")
 	}

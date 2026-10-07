@@ -15,6 +15,9 @@ import (
 	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
+// The mode entitlement.NewService takes, named so the calls read.
+const modeSelfHosted = false
+
 // TestFeaturesProto_CoversTheCatalog guards the defect where a feature is
 // enforced by the guard but absent from the billing payload, which leaves
 // every client unable to show it whatever the plan.
@@ -36,7 +39,7 @@ func TestFeaturesProto_EnterpriseLicenseEnablesStreaming(t *testing.T) {
 	licensed := entitlement.NewService(
 		noSubscription{},
 		&licx.Claims{Plan: entitlement.PlanEnterprise},
-		entitlement.ModeSelfHosted,
+		modeSelfHosted,
 	)
 	if !featuresProto(licensed.Resolve(ctx, "ws1"))[entitlement.FeatureAuditStreaming] {
 		t.Error("audit_streaming is false with a valid Enterprise license")
@@ -44,7 +47,7 @@ func TestFeaturesProto_EnterpriseLicenseEnablesStreaming(t *testing.T) {
 
 	// Without a license the same instance resolves to Community, which does
 	// not include streaming.
-	unlicensed := entitlement.NewService(noSubscription{}, nil, entitlement.ModeSelfHosted)
+	unlicensed := entitlement.NewService(noSubscription{}, nil, modeSelfHosted)
 	if featuresProto(unlicensed.Resolve(ctx, "ws1"))[entitlement.FeatureAuditStreaming] {
 		t.Error("audit_streaming is true without any license")
 	}
@@ -79,8 +82,8 @@ func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 
 	// Its own entitlement service, so the shared test server stays unlicensed.
 	local := *cfg
-	local.Entitlements = entitlement.NewService(cfg.Conn, nil, entitlement.ModeSelfHosted)
-	sut := newBillingService(&local)
+	local.Entitlements = entitlement.NewService(cfg.Conn, nil, modeSelfHosted)
+	sut := &billingService{cfg: &local}
 
 	before, err := sut.GetLicense(ctx, &nokkuv1.GetLicenseRequest{})
 	require.NoError(t, err)
@@ -94,7 +97,7 @@ func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	assert.True(t, after.GetActive(), "the key must apply without a restart")
 	assert.Equal(t, entitlement.PlanEnterprise, after.GetPlan())
 
-	replica := entitlement.NewService(cfg.Conn, nil, entitlement.ModeSelfHosted)
+	replica := entitlement.NewService(cfg.Conn, nil, modeSelfHosted)
 	replica.WatchLicense(ctx)
 	require.NotNil(t, replica.License(), "another replica must find the stored key")
 	assert.False(t, replica.License().IsExpired())

@@ -1,8 +1,8 @@
 -- name: CreateTeam :one
 INSERT INTO
-  teams (workspace_id, name, description, tags)
+  teams (name, description, tags)
 VALUES
-  (@workspace_id, @name, @description, COALESCE(@tags, '{}'::TEXT[]))
+  (@name, @description, COALESCE(@tags, '{}'::TEXT[]))
 RETURNING
   *;
 
@@ -21,8 +21,7 @@ SELECT
 FROM
   teams te
 WHERE
-  te.workspace_id = @workspace_id
-  AND (
+  (
     sqlc.narg('query')::TEXT IS NULL
     OR te.name ILIKE '%' || sqlc.narg('query') || '%'
     OR COALESCE(te.description, '') ILIKE '%' || sqlc.narg('query') || '%'
@@ -104,7 +103,6 @@ FROM
   teams t
   JOIN team_members tm ON tm.team_id = t.id
 WHERE
-  tm.workspace_id = @workspace_id
-  AND tm.user_id = @user_id
+  tm.user_id = @user_id
 ORDER BY
   t.id ASC;

@@ -26,10 +26,6 @@ type utilService struct {
 	cfg *config.Config
 }
 
-func newUtilService(cfg *config.Config) *utilService {
-	return &utilService{cfg: cfg}
-}
-
 func (s *utilService) GetVersion(
 	_ context.Context,
 	_ *nokkuv1.GetVersionRequest,
@@ -42,7 +38,7 @@ func (s *utilService) GetInstanceInfo(
 	_ *nokkuv1.GetInstanceInfoRequest,
 ) (*nokkuv1.GetInstanceInfoResponse, error) {
 	op := s.cfg.Email.Operator
-	saas := s.cfg.Tenant.SaaS()
+	saas := s.cfg.SaaS
 	return &nokkuv1.GetInstanceInfoResponse{
 		OperatorName: &op.Name,
 		SupportEmail: &op.SupportEmail,
@@ -50,7 +46,7 @@ func (s *utilService) GetInstanceInfo(
 		TermsUrl:     &op.TermsURL,
 		PrivacyUrl:   &op.PrivacyURL,
 		ImprintUrl:   &op.ImprintURL,
-		Mode:         new(string(s.cfg.Entitlements.Mode())),
+		Mode:         new(s.cfg.Mode()),
 		Signup:       new(saas && actor.WorkspaceIDFromContext(ctx) == ""),
 	}, nil
 }
@@ -77,29 +73,19 @@ func (s *utilService) Whoami(
 		}
 		out.User = u.ToProto()
 	case actor.KindServiceAccount:
-		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-			sa, err := q.GetServiceAccount(ctx, p.ID)
-			if err != nil {
-				return err
-			}
-			out.ServiceAccount = sa.ToProto()
-			return nil
-		}); err != nil {
+		sa, err := s.cfg.Conn.Tenant().GetServiceAccount(ctx, p.ID)
+		if err != nil {
 			return nil, err
 		}
+		out.ServiceAccount = sa.ToProto()
 	case actor.KindDaemon:
-		if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-			d, err := q.GetDaemon(ctx, p.ID)
-			if err != nil {
-				return err
-			}
-			out.Daemon = d.ToProto()
-			return nil
-		}); err != nil {
+		d, err := s.cfg.Conn.Tenant().GetDaemon(ctx, p.ID)
+		if err != nil {
 			return nil, err
 		}
-	case actor.KindSCIM, actor.KindDevice:
-		// SCIM tokens and device markers never reach connect.
+		out.Daemon = d.ToProto()
+	case actor.KindSCIM:
+		// SCIM tokens never reach connect.
 	}
 	return out, nil
 }

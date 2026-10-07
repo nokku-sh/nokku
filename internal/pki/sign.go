@@ -43,10 +43,7 @@ func SignCertificate(
 	}
 
 	ttl = boundTTL(ca, usage, ttl)
-	serial, err := crypto.RandomSerial()
-	if err != nil {
-		return nil, time.Time{}, err
-	}
+	serial := crypto.RandomSerial()
 
 	notAfter := time.Now().Add(ttl)
 	template := &x509.Certificate{

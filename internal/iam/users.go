@@ -40,11 +40,7 @@ func (s *Service) GetUser(ctx context.Context) (*db.User, error) {
 }
 
 func (s *Service) getUser(ctx context.Context, id string) (*db.User, error) {
-	var u *db.User
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		u, err = q.GetUser(ctx, &db.GetUserParams{WorkspaceID: ws, ID: id})
-		return err
-	})
+	u, err := s.conn.Tenant().GetUser(ctx, id)
 	if err != nil {
 		return nil, mapNotFound(err)
 	}
@@ -52,11 +48,7 @@ func (s *Service) getUser(ctx context.Context, id string) (*db.User, error) {
 }
 
 func (s *Service) GetUserByEmail(ctx context.Context, email string) (*db.User, error) {
-	var u *db.User
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		u, err = q.GetUserByEmail(ctx, &db.GetUserByEmailParams{WorkspaceID: ws, Email: normalizeEmail(email)})
-		return err
-	})
+	u, err := s.conn.Tenant().GetUserByEmail(ctx, normalizeEmail(email))
 	if err != nil {
 		return nil, mapNotFound(err)
 	}
@@ -64,15 +56,10 @@ func (s *Service) GetUserByEmail(ctx context.Context, email string) (*db.User, e
 }
 
 func (s *Service) UpdateSelf(ctx context.Context, name, picture *string) (*db.User, error) {
-	var u *db.User
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		u, err = q.UpdateUser(ctx, &db.UpdateUserParams{
-			WorkspaceID: ws,
-			ID:          actor.UserIDFromContext(ctx),
-			Name:        name,
-			Picture:     picture,
-		})
-		return err
+	u, err := s.conn.Tenant().UpdateUser(ctx, &db.UpdateUserParams{
+		ID:      actor.UserIDFromContext(ctx),
+		Name:    name,
+		Picture: picture,
 	})
 	if err != nil {
 		return nil, mapNotFound(err)
@@ -89,12 +76,10 @@ func (s *Service) DeleteSelf(ctx context.Context) error {
 	if u.Role == string(db.RoleOwner) {
 		return ErrOwner
 	}
-	if err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		return q.DeleteUser(ctx, &db.DeleteUserParams{WorkspaceID: ws, ID: u.ID})
-	}); err != nil {
+	if err := s.conn.Tenant().DeleteUser(ctx, u.ID); err != nil {
 		return err
 	}
-	s.record(ctx, Event{Action: ActionUserDeleted, Kind: actor.KindUser, UserID: u.ID, Email: u.Email})
+	s.record(ctx, event{Action: actionUserDeleted, Kind: actor.KindUser, UserID: u.ID, Email: u.Email})
 	return nil
 }
 
@@ -102,7 +87,7 @@ func (s *Service) DeleteSelf(ctx context.Context) error {
 func (s *Service) RevokeUser(ctx context.Context, userID string) (int64, error) {
 	n, err := s.revokeSubject(ctx, userID)
 	if err == nil && n > 0 {
-		s.record(ctx, Event{Action: ActionSessionRevoked, Kind: actor.KindUser, UserID: userID})
+		s.record(ctx, event{Action: actionSessionRevoked, Kind: actor.KindUser, UserID: userID})
 	}
 	return n, err
 }

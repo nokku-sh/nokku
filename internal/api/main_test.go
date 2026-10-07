@@ -41,7 +41,10 @@ func TestMain(m *testing.M) {
 		"NOKKU_ADMIN_NAME",
 		"NOKKU_WORKSPACE_NAME",
 		"KMS_URI",
+		"NOKKU_SAAS",
 		"STRIPE_SECRET_KEY",
+		"STRIPE_WEBHOOK_SECRET",
+		"STRIPE_PRO_PRICE_ID",
 		"GOOGLE_CLIENT_ID",
 		"MICROSOFT_CLIENT_ID",
 		"OTEL_EXPORTER_OTLP_ENDPOINT",
@@ -60,7 +63,7 @@ func TestMain(m *testing.M) {
 		s.registerServices(ctx)
 		// Self-host mode: every request lands in the one workspace the boot
 		// made, whatever the host. Bidi streams need HTTP/2.
-		testServer = httptest.NewUnstartedServer(s.withTenant(s.mux))
+		testServer = httptest.NewUnstartedServer(s.withRequestMeta(s.withTenant(s.mux)))
 		testServer.EnableHTTP2 = true
 		testServer.StartTLS()
 	}
@@ -75,7 +78,7 @@ func TestMain(m *testing.M) {
 
 // newTestAPI returns the real config and a server running every connect
 // service with the production interceptors. The HTTP middleware chain is
-// left out, except for the tenant resolver.
+// left out, except for the request facts and the tenant resolver.
 func newTestAPI(t *testing.T) (*config.Config, *httptest.Server) {
 	t.Helper()
 	if errTestAPI != nil {
@@ -95,16 +98,17 @@ func seedWorkspace(t *testing.T, cfg *config.Config) string {
 // it must never show up through the API.
 func seedOtherWorkspace(t *testing.T, cfg *config.Config) string {
 	t.Helper()
-	var id string
-	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
-		ws, err := tenant.Create(t.Context(), q, uuid.NewV7().String(), "other")
-		if err != nil {
-			return err
-		}
-		id = ws.ID
-		return nil
-	}))
-	return id
+	ws, err := tenant.Create(t.Context(), cfg.Conn, uuid.NewV7().String(), "other")
+	require.NoError(t, err)
+	return ws.ID
+}
+
+// inWorkspace runs fn the way a request does: nokku_app, pinned to the
+// workspace. Seeds go through it, so each lands in the workspace it names.
+func inWorkspace(t *testing.T, cfg *config.Config, workspaceID string, fn func(q *db.Queries) error) {
+	t.Helper()
+	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: workspaceID})
+	require.NoError(t, cfg.Conn.WithWorkspace(ctx, fn))
 }
 
 // wsCtx is a request context on the host of the test workspace.
@@ -115,20 +119,26 @@ func wsCtx(t *testing.T, cfg *config.Config) context.Context {
 
 func seedUser(t *testing.T, cfg *config.Config, workspaceID string, role db.Role) *db.User {
 	t.Helper()
-	u, err := cfg.Conn.Sys().CreateUser(t.Context(), &db.CreateUserParams{
-		WorkspaceID: workspaceID,
-		Email:       strings.ReplaceAll(uuid.New().String(), "-", "") + "@api.test",
-		Name:        string(role),
-		Role:        string(role),
+	var u *db.User
+	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
+		u, err = q.CreateUser(t.Context(), &db.CreateUserParams{
+			Email: strings.ReplaceAll(uuid.New().String(), "-", "") + "@api.test",
+			Name:  string(role),
+			Role:  string(role),
+		})
+		return err
 	})
-	require.NoError(t, err)
 	return u
 }
 
 // seedOwner is the owner of the test workspace, made on first use.
 func seedOwner(t *testing.T, cfg *config.Config) *db.User {
 	t.Helper()
-	owner, err := cfg.Conn.Sys().GetOwner(t.Context(), cfg.Tenant.Single().ID)
+	var owner *db.User
+	err := cfg.Conn.WithWorkspace(wsCtx(t, cfg), func(q *db.Queries) (err error) {
+		owner, err = q.GetOwner(t.Context())
+		return err
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return seedUser(t, cfg, cfg.Tenant.Single().ID, db.RoleOwner)
 	}

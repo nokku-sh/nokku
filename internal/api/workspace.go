@@ -26,10 +26,6 @@ type workspaceService struct {
 	cfg *config.Config
 }
 
-func newWorkspaceService(cfg *config.Config) *workspaceService {
-	return &workspaceService{cfg: cfg}
-}
-
 var errSingleWorkspace = connect.NewError(
 	connect.CodeFailedPrecondition,
 	errors.New("a self-hosted server keeps its workspace"),
@@ -39,11 +35,8 @@ func (s *workspaceService) GetWorkspace(
 	ctx context.Context,
 	_ *nokkuv1.GetWorkspaceRequest,
 ) (*nokkuv1.GetWorkspaceResponse, error) {
-	var workspace *db.Workspace
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		workspace, err = q.GetWorkspace(ctx, actor.WorkspaceIDFromContext(ctx))
-		return err
-	}); err != nil {
+	workspace, err := s.cfg.Conn.Tenant().GetWorkspace(ctx)
+	if err != nil {
 		return nil, err
 	}
 	result := workspace.ToProto()
@@ -61,14 +54,12 @@ func (s *workspaceService) UpdateWorkspace(
 ) (*nokkuv1.UpdateWorkspaceResponse, error) {
 	var workspace *db.Workspace
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		ws := actor.WorkspaceIDFromContext(ctx)
-		base, err := q.GetWorkspace(ctx, ws)
+		base, err := q.GetWorkspace(ctx)
 		if err != nil {
 			return err
 		}
 		proto.Merge(base.Settings, req.GetSettings())
 		workspace, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
-			WorkspaceID: ws,
 			Name:        req.Name,
 			Description: req.Description,
 			Settings:    base.Settings,
@@ -86,16 +77,14 @@ func (s *workspaceService) DeleteWorkspace(
 	ctx context.Context,
 	_ *nokkuv1.DeleteWorkspaceRequest,
 ) (*nokkuv1.DeleteWorkspaceResponse, error) {
-	if !s.cfg.Tenant.SaaS() {
+	if !s.cfg.SaaS {
 		return nil, errSingleWorkspace
 	}
 	ws := actor.WorkspaceIDFromContext(ctx)
 	if err := s.cfg.Billing.Cancel(ctx, ws, true, ""); err != nil {
 		return nil, errInternal
 	}
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		return q.DeleteWorkspace(ctx, ws)
-	}); err != nil {
+	if err := s.cfg.Conn.Tenant().DeleteWorkspace(ctx, ws); err != nil {
 		return nil, err
 	}
 	s.cfg.Record.PurgeWorkspace(ctx, ws)
@@ -108,17 +97,13 @@ func (s *workspaceService) CreateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.CreateWorkspaceRequest,
 ) (*nokkuv1.CreateWorkspaceResponse, error) {
-	if !s.cfg.Tenant.SaaS() || actor.WorkspaceIDFromContext(ctx) != "" {
+	if !s.cfg.SaaS || actor.WorkspaceIDFromContext(ctx) != "" {
 		return nil, newError(connect.CodeFailedPrecondition, "signup only happens on the root host")
 	}
 	if tenant.Forbidden(req.GetSlug()) {
 		return nil, newError(connect.CodeInvalidArgument, "this name is not available")
 	}
-	var ws *db.Workspace
-	err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
-		ws, err = tenant.Create(ctx, q, req.GetSlug(), strings.TrimSpace(req.GetName()))
-		return err
-	})
+	ws, err := tenant.Create(ctx, s.cfg.Conn, req.GetSlug(), strings.TrimSpace(req.GetName()))
 	if db.IsUniqueViolation(err) {
 		return nil, newError(connect.CodeAlreadyExists, "this name is taken")
 	}
@@ -128,7 +113,7 @@ func (s *workspaceService) CreateWorkspace(
 	audit.SetTarget(ctx, ws.ID)
 
 	wsCtx := actor.WithWorkspace(ctx, actor.Workspace{
-		ID: ws.ID, Slug: ws.Slug, Name: ws.Name, BaseURL: s.cfg.Tenant.BaseURL(ws.Slug),
+		ID: ws.ID, Slug: ws.Slug, BaseURL: s.cfg.Tenant.BaseURL(ws.Slug),
 	})
 	owner, err := s.cfg.IAM.CreateOwner(wsCtx, req.GetOwnerEmail(), req.GetOwnerName())
 	if err != nil {
@@ -151,17 +136,13 @@ func (s *workspaceService) ListUsers(
 	ctx context.Context,
 	req *nokkuv1.ListUsersRequest,
 ) (*nokkuv1.ListUsersResponse, error) {
-	var rows []*db.ListUsersRow
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		rows, err = q.ListUsers(ctx, &db.ListUsersParams{
-			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
-			Query:       req.Query,
-			Role:        req.Role,
-			Limit:       req.Limit,
-			Offset:      req.Offset,
-		})
-		return err
-	}); err != nil {
+	rows, err := s.cfg.Conn.Tenant().ListUsers(ctx, &db.ListUsersParams{
+		Query:  req.Query,
+		Role:   req.Role,
+		Limit:  req.Limit,
+		Offset: req.Offset,
+	})
+	if err != nil {
 		return nil, err
 	}
 	var total int32
@@ -175,11 +156,8 @@ func (s *workspaceService) GetUser(
 	ctx context.Context,
 	req *nokkuv1.GetUserRequest,
 ) (*nokkuv1.GetUserResponse, error) {
-	var u *db.User
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		u, err = q.GetUser(ctx, &db.GetUserParams{WorkspaceID: actor.WorkspaceIDFromContext(ctx), ID: req.GetUserId()})
-		return err
-	}); err != nil {
+	u, err := s.cfg.Conn.Tenant().GetUser(ctx, req.GetUserId())
+	if err != nil {
 		return nil, err
 	}
 	return &nokkuv1.GetUserResponse{User: u.ToProto()}, nil
@@ -195,13 +173,12 @@ func (s *workspaceService) UpdateUserRole(
 	}
 	audit.Set(ctx, "role", req.GetRole())
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		ws := actor.WorkspaceIDFromContext(ctx)
-		if err := checkCanManageUser(ctx, q, ws, req.GetUserId()); err != nil {
+		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
 			return err
 		}
 		return q.UpdateUserRole(
 			ctx,
-			&db.UpdateUserRoleParams{WorkspaceID: ws, ID: req.GetUserId(), Role: req.GetRole()},
+			&db.UpdateUserRoleParams{ID: req.GetUserId(), Role: req.GetRole()},
 		)
 	}); err != nil {
 		return nil, err
@@ -217,13 +194,12 @@ func (s *workspaceService) SetUserActive(
 ) (*nokkuv1.SetUserActiveResponse, error) {
 	audit.Set(ctx, "active", req.GetActive())
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		ws := actor.WorkspaceIDFromContext(ctx)
-		if err := checkCanManageUser(ctx, q, ws, req.GetUserId()); err != nil {
+		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
 			return err
 		}
 		return q.SetUserActive(
 			ctx,
-			&db.SetUserActiveParams{WorkspaceID: ws, ID: req.GetUserId(), Active: req.GetActive()},
+			&db.SetUserActiveParams{ID: req.GetUserId(), Active: req.GetActive()},
 		)
 	}); err != nil {
 		return nil, err
@@ -242,11 +218,10 @@ func (s *workspaceService) DeleteUser(
 	req *nokkuv1.DeleteUserRequest,
 ) (*nokkuv1.DeleteUserResponse, error) {
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		ws := actor.WorkspaceIDFromContext(ctx)
-		if err := checkCanManageUser(ctx, q, ws, req.GetUserId()); err != nil {
+		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
 			return err
 		}
-		return q.DeleteUser(ctx, &db.DeleteUserParams{WorkspaceID: ws, ID: req.GetUserId()})
+		return q.DeleteUser(ctx, req.GetUserId())
 	}); err != nil {
 		return nil, err
 	}
@@ -255,11 +230,11 @@ func (s *workspaceService) DeleteUser(
 
 // checkCanManageUser also protects the owner, who is above everyone, and
 // keeps people from managing themselves.
-func checkCanManageUser(ctx context.Context, q *db.Queries, ws, userID string) error {
+func checkCanManageUser(ctx context.Context, q *db.Queries, userID string) error {
 	if userID == actor.UserIDFromContext(ctx) {
 		return newError(connect.CodeFailedPrecondition, "you cannot change your own account here")
 	}
-	u, err := q.GetUser(ctx, &db.GetUserParams{WorkspaceID: ws, ID: userID})
+	u, err := q.GetUser(ctx, userID)
 	if err != nil {
 		return err
 	}
@@ -277,11 +252,10 @@ func (s *workspaceService) TransferOwnership(
 	if req.GetNewOwnerId() == actor.UserIDFromContext(ctx) {
 		return nil, newError(connect.CodeInvalidArgument, "you are the owner already")
 	}
+	// A transaction on purpose. When the new owner does not exist the update
+	// already took the old one's role, and the rollback gives it back.
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		n, err := q.TransferOwnership(ctx, &db.TransferOwnershipParams{
-			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
-			NewOwnerID:  req.GetNewOwnerId(),
-		})
+		n, err := q.TransferOwnership(ctx, req.GetNewOwnerId())
 		if err != nil {
 			return err
 		}

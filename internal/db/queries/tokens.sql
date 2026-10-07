@@ -2,7 +2,6 @@
 INSERT INTO
   workspace_tokens (
     id,
-    workspace_id,
     kind,
     label,
     token_hash,
@@ -15,7 +14,6 @@ INSERT INTO
 VALUES
   (
     @id,
-    @workspace_id,
     @kind,
     @label,
     @token_hash,
@@ -34,8 +32,7 @@ SELECT
 FROM
   workspace_tokens
 WHERE
-  workspace_id = @workspace_id
-  AND (
+  (
     kind = @kind
     OR @kind = 0
   )
@@ -92,8 +89,7 @@ SET
   uses = uses + 1,
   last_used_at = NOW()
 WHERE
-  workspace_id = @workspace_id
-  AND id = @id
+  id = @id
   AND kind = @kind
   AND (
     expires_at IS NULL

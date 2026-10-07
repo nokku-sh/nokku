@@ -8,7 +8,6 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
-	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/iam"
@@ -18,10 +17,6 @@ import (
 // goes through /passkey/signup with the same invite.
 type invitationService struct {
 	cfg *config.Config
-}
-
-func newInvitationService(cfg *config.Config) *invitationService {
-	return &invitationService{cfg: cfg}
 }
 
 var errInviteInvalid = connect.NewError(
@@ -40,12 +35,24 @@ func (s *invitationService) GetInvitation(
 	if err != nil {
 		return nil, err
 	}
-	ws, _ := actor.WorkspaceFromContext(ctx)
+	name, err := workspaceName(ctx, s.cfg.Conn)
+	if err != nil {
+		return nil, err
+	}
 	return &nokkuv1.GetInvitationResponse{
-		WorkspaceName: &ws.Name,
+		WorkspaceName: &name,
 		Role:          token.RoleName,
 		ExpiresAt:     db.SafeTimestamp(token.ExpiresAt),
 	}, nil
+}
+
+// workspaceName reads the name from the row, so a rename shows at once.
+func workspaceName(ctx context.Context, conn *db.Connection) (string, error) {
+	ws, err := conn.Tenant().GetWorkspace(ctx)
+	if err != nil {
+		return "", err
+	}
+	return ws.Name, nil
 }
 
 // AcceptInvitation mails a signup link. The account exists once it is used.

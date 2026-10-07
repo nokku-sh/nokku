@@ -13,7 +13,6 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
-	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
@@ -58,12 +57,7 @@ func (s *Service) Append(ctx context.Context, event *Event) error {
 
 // List reads the log of the request's workspace.
 func (s *Service) List(ctx context.Context, p *db.ListAuditLogsParams) ([]*Event, int32, error) {
-	var rows []*db.ListAuditLogsRow
-	p.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		rows, err = q.ListAuditLogs(ctx, p)
-		return err
-	})
+	rows, err := s.conn.Tenant().ListAuditLogs(ctx, p)
 	if err != nil {
 		return nil, 0, fmt.Errorf("querying events: %w", err)
 	}

@@ -12,8 +12,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/nokku-sh/nokku/internal/actor"
-	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/realip"
 )
 
@@ -91,7 +89,7 @@ func newEvent(procedure string) *Event {
 func (s *Service) Log(ctx context.Context, e *Event) {
 	var header http.Header
 	var peer string
-	if meta, ok := iam.RequestMetaFromContext(ctx); ok {
+	if meta, ok := actor.RequestMetaFromContext(ctx); ok {
 		header, peer = meta.Header, meta.RemoteAddr
 	}
 	if e.WorkspaceID == "" {
@@ -100,7 +98,31 @@ func (s *Service) Log(ctx context.Context, e *Event) {
 	s.finish(ctx, e, header, peer, nil)
 }
 
-// finish skips unauthenticated calls, the auth flows record their own
+// Record is the audit trail of the sign-in flows. They run before there is a
+// principal, so the caller names the actor and whether it went well. The
+// workspace and the transport facts come from ctx.
+func (s *Service) Record(ctx context.Context, e *Event) {
+	e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
+	if e.WorkspaceID == "" {
+		return
+	}
+	e.Timestamp = time.Now().UTC()
+	if meta, ok := actor.RequestMetaFromContext(ctx); ok {
+		e.IP = strings.ToValidUTF8(realip.Bucket(meta.Header, meta.RemoteAddr), "")
+		e.UserAgent = cut(strings.ToValidUTF8(meta.Header.Get("User-Agent"), ""), maxUserAgent)
+	}
+
+	// Detached so a slow DB cannot stall a login.
+	actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	go func() {
+		defer cancel()
+		if err := s.Append(actx, e); err != nil {
+			slog.Warn("failed to write auth audit log", "action", e.Action, "error", err)
+		}
+	}()
+}
+
+// finish skips unauthenticated calls, the sign-in flows record their own
 // events, and calls outside a workspace, which only the public root host
 // serves.
 func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer string, err error) {
@@ -126,12 +148,9 @@ func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer
 	go func() {
 		defer cancel()
 		if e.ActorName == "" && (p.Kind == actor.KindUser || p.Kind == actor.KindCLI) {
-			_ = s.conn.WithWorkspace(actx, func(q *db.Queries) error {
-				if u, err := q.GetUser(actx, &db.GetUserParams{WorkspaceID: e.WorkspaceID, ID: p.ID}); err == nil {
-					e.ActorName = u.Email
-				}
-				return nil
-			})
+			if u, err := s.conn.Tenant().GetUser(actx, p.ID); err == nil {
+				e.ActorName = u.Email
+			}
 		}
 		if err := s.Append(actx, e); err != nil {
 			slog.Warn("failed to write audit log", "action", e.Action, "error", err)

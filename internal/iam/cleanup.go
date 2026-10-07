@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// cleanup hourly deletes expired sessions and one-time tokens of every
-// workspace.
+// cleanup hourly deletes expired sessions, known devices and one-time tokens
+// of every workspace.
 func (s *Service) cleanup(ctx context.Context) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
@@ -23,6 +23,9 @@ func (s *Service) cleanup(ctx context.Context) {
 		}
 		if _, err := s.conn.Sys().DeleteExpiredSessions(ctx, &now); err != nil {
 			slog.Error("failed to cleanup expired sessions", "error", err)
+		}
+		if _, err := s.conn.Sys().DeleteExpiredKnownDevices(ctx, now); err != nil {
+			slog.Error("failed to cleanup known devices", "error", err)
 		}
 	}
 }

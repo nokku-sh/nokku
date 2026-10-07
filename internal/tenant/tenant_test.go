@@ -31,9 +31,6 @@ func testConnection(t *testing.T) *db.Connection {
 	if err != nil {
 		t.Skipf("no test database: %v", err)
 	}
-	if err := c.Pool.Ping(ctx); err != nil {
-		t.Skipf("no test database: %v", err)
-	}
 	cipher, err := kms.New(ctx, c, "test-secret-0123456789-0123456789")
 	require.NoError(t, err)
 	require.NoError(t, crypto.SetEncryptor(cipher))
@@ -42,7 +39,7 @@ func testConnection(t *testing.T) *db.Connection {
 
 func TestFromHostParsesWithoutTheDatabase(t *testing.T) {
 	r := &Resolver{saas: true, scheme: "https", host: "nokku.sh", slugs: cache.NewLocal[actor.Workspace](time.Minute)}
-	cached := actor.Workspace{ID: "1", Slug: "acme", Name: "Acme", BaseURL: "https://acme.nokku.sh"}
+	cached := actor.Workspace{ID: "1", Slug: "acme", BaseURL: "https://acme.nokku.sh"}
 	r.slugs.Put("acme", cached)
 
 	root, err := r.FromHost(t.Context(), "nokku.sh")
@@ -73,7 +70,6 @@ func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
 	first, err := New(t.Context(), c, "http://localhost:3000", false)
 	require.NoError(t, err)
 	ws := first.Single()
-	assert.Equal(t, "Lab", ws.Name)
 	assert.Equal(t, "http://localhost:3000", ws.BaseURL)
 
 	second, err := New(t.Context(), c, "http://localhost:3000", false)
@@ -85,11 +81,16 @@ func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
 	assert.Equal(t, ws.ID, got.ID, "self-host ignores the host")
 
 	var cas int
-	require.NoError(t, c.Pool.QueryRow(t.Context(),
-		`SELECT COUNT(*) FROM certificate_authorities WHERE workspace_id = $1 AND is_default`, ws.ID).Scan(&cas))
-	assert.Equal(t, 0, cas, "nokku_app sees nothing unpinned")
+	require.ErrorIs(t, c.Pool.QueryRow(t.Context(),
+		`SELECT COUNT(*) FROM certificate_authorities WHERE workspace_id = $1 AND is_default`, ws.ID).Scan(&cas),
+		db.ErrWorkspaceNotPinned, "nokku_app reaches nothing unpinned")
 	require.NoError(t, c.WithWorkspace(actor.WithWorkspace(t.Context(), ws), func(q *db.Queries) error {
-		rows, err := q.ListCAs(t.Context(), &db.ListCAsParams{WorkspaceID: ws.ID})
+		row, err := q.GetWorkspace(t.Context())
+		if err != nil {
+			return err
+		}
+		assert.Equal(t, "Lab", row.Name)
+		rows, err := q.ListCAs(t.Context(), &db.ListCAsParams{})
 		if err != nil {
 			return err
 		}
@@ -104,11 +105,8 @@ func TestSaaSResolvesBySlug(t *testing.T) {
 	require.NoError(t, err)
 
 	slug := "w" + uuid.New().String()[:8]
-	var created *db.Workspace
-	require.NoError(t, c.WithTx(t.Context(), func(q *db.Queries) (err error) {
-		created, err = Create(t.Context(), q, slug, "Acme")
-		return err
-	}))
+	created, err := Create(t.Context(), c, slug, "Acme")
+	require.NoError(t, err)
 
 	ws, err := r.FromHost(t.Context(), slug+".nokku.test")
 	require.NoError(t, err)
@@ -135,10 +133,8 @@ func TestPurgeUnclaimed(t *testing.T) {
 	require.NoError(t, err)
 
 	slug := "w" + uuid.New().String()[:8]
-	require.NoError(t, c.WithTx(t.Context(), func(q *db.Queries) (err error) {
-		_, err = Create(t.Context(), q, slug, "Squat")
-		return err
-	}))
+	_, err = Create(t.Context(), c, slug, "Squat")
+	require.NoError(t, err)
 	_, err = r.FromHost(t.Context(), slug+".nokku.test")
 	require.NoError(t, err, "the fresh signup resolves")
 

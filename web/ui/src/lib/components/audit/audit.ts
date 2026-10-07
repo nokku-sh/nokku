@@ -9,7 +9,6 @@ import {
 	CircleX,
 	KeyRound,
 	LogIn,
-	Monitor,
 	RefreshCw,
 	Server,
 	Settings,
@@ -151,8 +150,7 @@ export const actorKinds: { value: string; label: string; icon: LucideIcon }[] = 
 	{ value: 'cli', label: 'CLI', icon: Terminal },
 	{ value: 'service_account', label: 'Service accounts', icon: Bot },
 	{ value: 'daemon', label: 'Daemons', icon: Server },
-	{ value: 'scim', label: 'SCIM', icon: RefreshCw },
-	{ value: 'device', label: 'Remembered devices', icon: Monitor }
+	{ value: 'scim', label: 'SCIM', icon: RefreshCw }
 ];
 export const kindOf = (kind: string) => actorKinds.find((k) => k.value === kind);
 

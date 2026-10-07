@@ -83,10 +83,7 @@ type envelope[T any] struct {
 // The browser binding is the cookie itself, the id is for whatever value
 // travels through the provider and has to match on the way back.
 func (s *sealed[T]) put(w http.ResponseWriter, v T) (string, error) {
-	id, err := crypto.RandomString(32)
-	if err != nil {
-		return "", err
-	}
+	id := crypto.RandomString(32)
 	expires := s.svc.now().Add(s.ttl)
 	plain, err := json.Marshal(envelope[T]{ID: id, Expires: expires.Unix(), State: v})
 	if err != nil {

@@ -13,6 +13,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -46,9 +47,8 @@ func seedCA(t *testing.T, conn *db.Connection, workspaceID string, age time.Dura
 	require.NoError(t, err)
 	notBefore := time.Now().Add(-age)
 	var ca *db.CertificateAuthority
-	require.NoError(t, conn.WithTx(t.Context(), func(q *db.Queries) (err error) {
+	require.NoError(t, conn.WithWorkspace(pinned(t, workspaceID), func(q *db.Queries) (err error) {
 		ca, err = q.CreateCA(t.Context(), &db.CreateCAParams{
-			WorkspaceID:  workspaceID,
 			Name:         "ca-" + notBefore.Format(time.RFC3339Nano),
 			Certificate:  string(info.Certificate),
 			PrivateKey:   info.PrivateKey,
@@ -64,19 +64,20 @@ func seedCA(t *testing.T, conn *db.Connection, workspaceID string, age time.Dura
 	return ca
 }
 
+func pinned(t *testing.T, workspaceID string) context.Context {
+	t.Helper()
+	return actor.WithWorkspace(t.Context(), actor.Workspace{ID: workspaceID})
+}
+
 func seedWorkspace(t *testing.T, conn *db.Connection) string {
 	t.Helper()
-	var workspaceID string
-	require.NoError(t, conn.WithTx(t.Context(), func(q *db.Queries) error {
-		ws, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
-			Slug: uuid.NewV7().String(), Name: "rotate",
+	workspaceID := uuid.NewV7().String()
+	require.NoError(t, conn.WithWorkspace(pinned(t, workspaceID), func(q *db.Queries) error {
+		_, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
+			ID: workspaceID, Slug: uuid.NewV7().String(), Name: "rotate",
 			Settings: &nokkuv1.WorkspaceSettings{},
 		})
-		if err != nil {
-			return err
-		}
-		workspaceID = ws.ID
-		return nil
+		return err
 	}))
 	return workspaceID
 }

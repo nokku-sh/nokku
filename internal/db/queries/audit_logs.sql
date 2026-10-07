@@ -33,8 +33,7 @@ SELECT
 FROM
   audit.audit_logs
 WHERE
-  workspace_id = @workspace_id
-  AND (
+  (
     sqlc.narg('actor_ids')::TEXT[] IS NULL
     OR actor_id = ANY (sqlc.narg('actor_ids')::TEXT[])
   )

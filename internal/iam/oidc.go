@@ -69,11 +69,7 @@ func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, "provider unavailable")
 		return
 	}
-	nonce, err := crypto.RandomString(32)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
+	nonce := crypto.RandomString(32)
 	st := authorizeState{
 		ProviderID:   cfg.ProviderID,
 		Nonce:        nonce,
@@ -174,8 +170,8 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := h.resolve(r.Context(), id)
 	if err != nil {
-		h.svc.record(r.Context(), Event{
-			Action: ActionLoginDenied, Method: MethodOIDC, UserID: id.LinkUserID, Email: id.Email, Detail: err.Error(),
+		h.svc.record(r.Context(), event{
+			Action: actionLoginDenied, Method: MethodOIDC, UserID: id.LinkUserID, Email: id.Email, Detail: err.Error(),
 		})
 		slog.Warn("sso login rejected", "error", err, "provider", cfg.ProviderID)
 		fail(w, r, "identity rejected")
@@ -189,8 +185,8 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	h.svc.spendFlow(r.Context(), flowID)
 	http.SetCookie(w, endFlowBinding())
 	http.SetCookie(w, cookie)
-	if h.svc.OnUserLogin != nil {
-		h.svc.OnUserLogin(w, r, u, MethodOIDC)
+	if c := h.svc.RememberDevice(r.Context(), r.Header, r.RemoteAddr, u); c != nil {
+		http.SetCookie(w, c)
 	}
 	// Re-sanitize, the value round-tripped through the cookie.
 	returnTo := safeReturnTo(st.ReturnTo)
@@ -207,70 +203,69 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, error) {
 	var u *db.User
 	created := false
-	err := h.svc.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+	err := h.svc.conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		cred, err := q.FindCredentialBySubject(ctx, &db.FindCredentialBySubjectParams{
-			WorkspaceID: ws, Type: string(MethodOIDC), Provider: id.ProviderID, Subject: id.Subject,
+			Type: string(MethodOIDC), Provider: id.ProviderID, Subject: id.Subject,
 		})
 		switch {
 		case err == nil:
 			if id.LinkUserID != "" && cred.UserID != id.LinkUserID {
 				return errIdentityLinked
 			}
-			if u, err = q.GetUser(ctx, &db.GetUserParams{WorkspaceID: ws, ID: cred.UserID}); err != nil {
+			if u, err = q.GetUser(ctx, cred.UserID); err != nil {
 				return err
 			}
-			return q.TouchCredential(ctx, &db.TouchCredentialParams{WorkspaceID: ws, ID: cred.ID})
+			return q.TouchCredential(ctx, cred.ID)
 		case !errors.Is(err, pgx.ErrNoRows):
 			return err
 		}
 
 		switch {
 		case id.LinkUserID != "":
-			u, err = q.GetUser(ctx, &db.GetUserParams{WorkspaceID: ws, ID: id.LinkUserID})
+			u, err = q.GetUser(ctx, id.LinkUserID)
 		case id.Email == "":
 			return errIdentityRejected
 		default:
 			email := normalizeEmail(id.Email)
-			u, err = q.GetUserByEmail(ctx, &db.GetUserByEmailParams{WorkspaceID: ws, Email: email})
+			u, err = q.GetUserByEmail(ctx, email)
 			switch {
 			case errors.Is(err, pgx.ErrNoRows):
 				if !id.JITProvisioning {
 					return errIdentityRejected
 				}
 				u, err = h.svc.createUser(ctx, q, db.CreateUserWithIDParams{
-					WorkspaceID: ws, Email: email, Name: id.Name, Picture: nonEmpty(id.Picture),
+					Email: email, Name: id.Name, Picture: nonEmpty(id.Picture),
 				}, "")
 				created = err == nil
 			case err == nil && id.Name != "" && u.Name != id.Name:
 				// The provider owns the name.
-				u, err = q.UpdateUser(ctx, &db.UpdateUserParams{WorkspaceID: ws, ID: u.ID, Name: &id.Name})
+				u, err = q.UpdateUser(ctx, &db.UpdateUserParams{ID: u.ID, Name: &id.Name})
 			}
 		}
 		if err != nil {
 			return err
 		}
-		return link(ctx, q, ws, id, u.ID)
+		return link(ctx, q, id, u.ID)
 	})
 	if err != nil {
 		return nil, mapNotFound(err)
 	}
 	if created {
-		h.svc.record(ctx, Event{
-			Action: ActionUserCreated, Kind: actor.KindUser, Method: MethodOIDC, UserID: u.ID, Email: u.Email,
+		h.svc.record(ctx, event{
+			Action: actionUserCreated, Kind: actor.KindUser, Method: MethodOIDC, UserID: u.ID, Email: u.Email,
 		})
 	}
 	return u, nil
 }
 
-func link(ctx context.Context, q *db.Queries, ws string, id oidcIdentity, userID string) error {
+func link(ctx context.Context, q *db.Queries, id oidcIdentity, userID string) error {
 	_, err := q.UpsertCredential(ctx, &db.UpsertCredentialParams{
-		ID:          ws + ":" + id.ProviderID + ":" + id.Subject,
-		WorkspaceID: ws,
-		UserID:      userID,
-		Type:        string(MethodOIDC),
-		Provider:    id.ProviderID,
-		Subject:     id.Subject,
-		Data:        []byte{},
+		ID:       actor.WorkspaceIDFromContext(ctx) + ":" + id.ProviderID + ":" + id.Subject,
+		UserID:   userID,
+		Type:     string(MethodOIDC),
+		Provider: id.ProviderID,
+		Subject:  id.Subject,
+		Data:     []byte{},
 	})
 	if errors.Is(err, pgx.ErrNoRows) || db.IsUniqueViolation(err) {
 		return errIdentityLinked

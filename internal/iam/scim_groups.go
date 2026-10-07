@@ -46,11 +46,11 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 	}
 	var res scim.Resource
 	err := h.tx(r.Context(), "", func(q *db.Queries) error {
-		team, err := q.CreateTeam(r.Context(), &db.CreateTeamParams{WorkspaceID: h.ws.ID, Name: name})
+		team, err := q.CreateTeam(r.Context(), &db.CreateTeamParams{Name: name})
 		if err != nil {
 			return err
 		}
-		if err := addTeamMembers(r.Context(), q, h.ws.ID, team.ID, scimMemberRefs(attrs["members"])); err != nil {
+		if err := addTeamMembers(r.Context(), q, team.ID, scimMemberRefs(attrs["members"])); err != nil {
 			return err
 		}
 		res, err = groupResource(r.Context(), q, h.ws, team)
@@ -75,7 +75,7 @@ func (h scimGroupHandler) Get(r *http.Request, id string) (scim.Resource, error)
 func (h scimGroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
 	var all []scim.Resource
 	err := h.tx(r.Context(), "", func(q *db.Queries) error {
-		rows, err := q.ListTeams(r.Context(), &db.ListTeamsParams{WorkspaceID: h.ws.ID})
+		rows, err := q.ListTeams(r.Context(), &db.ListTeamsParams{})
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 				}
 			}
 		}
-		if err := addTeamMembers(ctx, q, h.ws.ID, id, next); err != nil {
+		if err := addTeamMembers(ctx, q, id, next); err != nil {
 			return err
 		}
 		res, err = groupResource(ctx, q, h.ws, team)
@@ -162,7 +162,7 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 				changed = true
 				ids := scimMemberRefs(value)
 				if opName != "remove" {
-					return addTeamMembers(ctx, q, h.ws.ID, id, ids)
+					return addTeamMembers(ctx, q, id, ids)
 				}
 				if len(ids) == 0 {
 					// Okta puts the id in the path filter: members[value eq "id"].
@@ -186,12 +186,9 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 }
 
 // addTeamMembers skips non-members, a group never widens the workspace.
-func addTeamMembers(ctx context.Context, q *db.Queries, workspaceID, teamID string, userIDs []string) error {
+func addTeamMembers(ctx context.Context, q *db.Queries, teamID string, userIDs []string) error {
 	for _, uid := range userIDs {
-		if _, err := q.GetUser(ctx, &db.GetUserParams{
-			WorkspaceID: workspaceID,
-			ID:          uid,
-		}); errors.Is(err, pgx.ErrNoRows) {
+		if _, err := q.GetUser(ctx, uid); errors.Is(err, pgx.ErrNoRows) {
 			continue
 		} else if err != nil {
 			return err

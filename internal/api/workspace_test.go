@@ -27,7 +27,7 @@ func TestTransferOwnership(t *testing.T) {
 		return err
 	}
 	role := func(u *db.User) string {
-		got, err := cfg.Conn.Sys().GetUser(t.Context(), &db.GetUserParams{WorkspaceID: u.WorkspaceID, ID: u.ID})
+		got, err := cfg.Conn.Sys().GetUser(t.Context(), u.ID)
 		require.NoError(t, err)
 		return got.Role
 	}

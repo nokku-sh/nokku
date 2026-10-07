@@ -120,6 +120,8 @@ WHERE
   workspace_id = $1
 `
 
+// The queries here name the workspace, billing and the plan lookup run as
+// nokku_system.
 func (q *Queries) GetSubscription(ctx context.Context, workspaceID string) (*WorkspaceSubscription, error) {
 	row := q.db.QueryRow(ctx, getSubscription, workspaceID)
 	var i WorkspaceSubscription

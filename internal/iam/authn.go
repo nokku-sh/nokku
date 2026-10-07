@@ -12,7 +12,6 @@ package iam
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strings"
 
@@ -39,23 +38,17 @@ func (s *Service) Authenticate(
 	if err != nil {
 		return actor.Principal{}, db.Session{}, err
 	}
-	// Only these kinds are credentials. A device marker only names a known
-	// browser or terminal. Accepting it, or a kind this build does not know,
-	// would be a 180 day session that survives logout.
-	if p.Kind != actor.KindUser && p.Kind != actor.KindCLI && p.Kind != actor.KindDaemon {
-		return actor.Principal{}, db.Session{}, errors.New("not a session credential")
-	}
 	if sess.Binding != "" {
 		if err := s.verifySessionProof(ctx, header, procedure, token, sess.Binding); err != nil {
 			return actor.Principal{}, db.Session{}, err
 		}
 	}
+	s.noteSeen(ctx, sess)
 	return p, sess, nil
 }
 
 // AuthenticateToken loads the account for user and CLI sessions so inactive
-// accounts fail closed. Daemon and device sessions authenticate on the row
-// alone.
+// accounts fail closed. A daemon session authenticates on the row alone.
 func (s *Service) AuthenticateToken(
 	ctx context.Context,
 	token string,
@@ -81,16 +74,10 @@ func (s *Service) AuthenticateToken(
 }
 
 func (s *Service) authenticateAPIKey(ctx context.Context, raw string) (actor.Principal, error) {
-	hash, err := crypto.HashToken(raw)
-	if err != nil {
-		return actor.Principal{}, err
-	}
+	hash := crypto.HashToken(raw)
 	var sa *db.ServiceAccount
-	err = s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		sa, err = q.GetServiceAccountByTokenHash(ctx, &db.GetServiceAccountByTokenHashParams{
-			WorkspaceID: ws,
-			TokenHash:   &hash,
-		})
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		sa, err = q.GetServiceAccountByTokenHash(ctx, &hash)
 		if err != nil {
 			return err
 		}
@@ -105,17 +92,9 @@ func (s *Service) authenticateAPIKey(ctx context.Context, raw string) (actor.Pri
 	return actor.Principal{ID: sa.ID, Kind: actor.KindServiceAccount, Role: sa.RoleName}, nil
 }
 
-func NewAPIKey() (raw string, hash crypto.HashedToken, err error) {
-	secret, _, err := crypto.NewSecret()
-	if err != nil {
-		return "", "", err
-	}
-	raw = apiKeyPrefix + secret
-	hash, err = crypto.HashToken(raw)
-	if err != nil {
-		return "", "", err
-	}
-	return raw, hash, nil
+func NewAPIKey() (raw string, hash crypto.HashedToken) {
+	raw = apiKeyPrefix + crypto.RandomString(32)
+	return raw, crypto.HashToken(raw)
 }
 
 func (s *Service) verifySessionProof(

@@ -17,6 +17,7 @@ import (
 
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/entitlement"
 	"github.com/nokku-sh/nokku/web"
@@ -41,15 +42,6 @@ func New(cfg *config.Config) *Server {
 func (s *Server) Start(ctx context.Context) error {
 	s.registerServices(ctx)
 
-	chain := newChain(
-		s.withRateLimit,
-		s.withHeaders,
-		s.withCSRF,
-		s.withLogger,
-		s.withRecover,
-		s.withTenant,
-	)
-
 	proto := new(http.Protocols)
 	proto.SetHTTP1(true)
 	proto.SetHTTP2(true)
@@ -57,7 +49,7 @@ func (s *Server) Start(ctx context.Context) error {
 	server := &http.Server{
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		Addr:              "0.0.0.0:" + s.cfg.Port,
-		Handler:           chain.then(s.mux),
+		Handler:           s.handler(),
 		Protocols:         proto,
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       30 * time.Second,
@@ -119,6 +111,29 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 	}
 }
 
+// handler is the mux behind the middleware every request passes through.
+func (s *Server) handler() http.Handler {
+	return newChain(
+		s.withRateLimit,
+		s.withHeaders,
+		s.withCSRF,
+		s.withLogger,
+		s.withRecover,
+		s.withRequestMeta,
+		s.withTenant,
+	).then(s.mux)
+}
+
+// withRequestMeta puts the address and headers of the request on its
+// context. Session rows and audit events take the IP and the user agent from
+// there, whichever route writes them. This is the one place that sets it.
+func (s *Server) withRequestMeta(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := actor.ContextWithRequestMeta(r.Context(), actor.RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr})
+		h.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // withTenant puts the workspace on the context. The health check and
 // provider webhooks are not tied to a workspace host.
 func (s *Server) withTenant(h http.Handler) http.Handler {
@@ -134,24 +149,24 @@ func (s *Server) withTenant(h http.Handler) http.Handler {
 
 func (s *Server) registerServices(ctx context.Context) {
 	opts := s.withHandlerOptions(ctx)
-	s.mux.Handle(nokkuv1connect.NewWorkspaceServiceHandler(newWorkspaceService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewDashboardServiceHandler(newDashboardService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewTeamServiceHandler(newTeamService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewUtilServiceHandler(newUtilService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewTargetServiceHandler(newTargetService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewPrincipalServiceHandler(newPrincipalService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewDaemonServiceHandler(newDaemonService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewCertificateServiceHandler(newCertificateService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewInvitationServiceHandler(newInvitationService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewTokenServiceHandler(newTokenService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewBillingServiceHandler(newBillingService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewServiceAccountServiceHandler(newServiceAccountService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewAccountServiceHandler(newAccountService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewAuthServiceHandler(newAuthService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewSSOServiceHandler(newSSOService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewSCIMServiceHandler(newSCIMService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewWorkspaceServiceHandler(&workspaceService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewDashboardServiceHandler(&dashboardService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewTeamServiceHandler(&teamService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewUtilServiceHandler(&utilService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewTargetServiceHandler(&targetService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewPrincipalServiceHandler(&principalService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewDaemonServiceHandler(&daemonService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewCertificateServiceHandler(&certificateService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewInvitationServiceHandler(&invitationService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewTokenServiceHandler(&tokenService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewBillingServiceHandler(&billingService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewServiceAccountServiceHandler(&serviceAccountService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewAccountServiceHandler(&accountService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewAuthServiceHandler(&authService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewSSOServiceHandler(&sSOService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewSCIMServiceHandler(&sCIMService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(newDaemonControlService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewRecordingServiceHandler(newRecordingService(s.cfg), opts...))
+	s.mux.Handle(nokkuv1connect.NewRecordingServiceHandler(&recordingService{cfg: s.cfg}, opts...))
 
 	static := web.Handler()
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -169,9 +184,9 @@ func (s *Server) registerServices(ctx context.Context) {
 	protec := newChain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
 	s.mux.Handle("GET /avatars/{id}", serveAvatar(s.cfg))
 	s.mux.Handle("POST /upload/avatar", protec.thenFunc(uploadAvatar(s.cfg)))
-	s.mux.Handle("GET /terminal/ws", protec.thenFunc(newTerminalHandler(s.cfg).handleWebSocket))
+	s.mux.Handle("GET /terminal/ws", protec.thenFunc((&terminalHandler{cfg: s.cfg}).handleWebSocket))
 
-	if s.cfg.Billing.Enabled() {
+	if s.cfg.SaaS {
 		s.mux.Handle("POST /webhooks/stripe", s.cfg.Billing.WebhookHandler())
 	}
 

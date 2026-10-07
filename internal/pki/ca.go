@@ -27,10 +27,7 @@ func NewCA(
 		return nil, err
 	}
 
-	serial, err := crypto.RandomSerial()
-	if err != nil {
-		return nil, err
-	}
+	serial := crypto.RandomSerial()
 
 	now := time.Now()
 	expiry := ssh.CAExpiry(now, lifetime)

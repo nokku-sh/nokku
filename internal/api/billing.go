@@ -21,10 +21,6 @@ type billingService struct {
 	cfg *config.Config
 }
 
-func newBillingService(cfg *config.Config) *billingService {
-	return &billingService{cfg: cfg}
-}
-
 func (s *billingService) GetBilling(
 	ctx context.Context,
 	_ *nokkuv1.GetBillingRequest,
@@ -52,7 +48,7 @@ func (s *billingService) GetBilling(
 	plan := s.cfg.Entitlements.Resolve(ctx, ws)
 	resp := &nokkuv1.GetBillingResponse{
 		Plan:          new(plan.Name),
-		Mode:          new(string(s.cfg.Entitlements.Mode())),
+		Mode:          new(s.cfg.Mode()),
 		Features:      featuresProto(plan),
 		Quotas:        quotasProto(plan),
 		UserCount:     new(userCount),
@@ -74,7 +70,7 @@ func (s *billingService) CreateCheckout(
 	ctx context.Context,
 	_ *nokkuv1.CreateCheckoutRequest,
 ) (*nokkuv1.CreateCheckoutResponse, error) {
-	if !s.cfg.Billing.Enabled() {
+	if !s.cfg.SaaS {
 		return nil, errBillingDisabled
 	}
 	if err := requireOwner(ctx); err != nil {
@@ -105,7 +101,7 @@ func (s *billingService) CreatePortal(
 	ctx context.Context,
 	_ *nokkuv1.CreatePortalRequest,
 ) (*nokkuv1.CreatePortalResponse, error) {
-	if !s.cfg.Billing.Enabled() {
+	if !s.cfg.SaaS {
 		return nil, errBillingDisabled
 	}
 	if err := requireOwner(ctx); err != nil {
@@ -124,7 +120,7 @@ func (s *billingService) CancelSubscription(
 	ctx context.Context,
 	req *nokkuv1.CancelSubscriptionRequest,
 ) (*nokkuv1.CancelSubscriptionResponse, error) {
-	if !s.cfg.Billing.Enabled() {
+	if !s.cfg.SaaS {
 		return nil, errBillingDisabled
 	}
 	if err := requireOwner(ctx); err != nil {
@@ -148,8 +144,7 @@ func (s *billingService) GetLicense(
 	_ *nokkuv1.GetLicenseRequest,
 ) (*nokkuv1.GetLicenseResponse, error) {
 	license := s.cfg.Entitlements.License()
-	active := s.cfg.Entitlements.Mode() == entitlement.ModeSelfHosted &&
-		license != nil && !license.IsExpired()
+	active := !s.cfg.SaaS && license != nil && !license.IsExpired()
 	plan := entitlement.PlanCommunity
 	if active {
 		plan = license.Plan

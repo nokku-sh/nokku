@@ -49,7 +49,9 @@ committed `.gitkeep` and are embedded by `web/embed.go`.
 
 ## Architecture
 
-- `cmd/nokku` is the entrypoint, plus the `rotate-secrets` subcommand.
+- `cmd/nokku` is the entrypoint, plus the `admin-link` and `rotate-secrets`
+  subcommands. They wire only what they need and never call `config.New`,
+  the server may be running next to them.
 - `internal/config` wires every service together in `config.New`. Background
   jobs live in the package that owns them and stop with the root ctx.
 - `internal/api` holds the Connect services and the plain HTTP routes
@@ -60,23 +62,26 @@ committed `.gitkeep` and are embedded by `web/embed.go`.
   entitlement guard, validation. Audit wraps authz so denied calls are
   recorded.
 - `internal/db` is sqlc queries plus migrations, all RLS-scoped. Pick the
-  entry point by what the query may see: `WithWorkspace` (tenant rows, the
-  request path), `WithTx` and `Sys()` (role `nokku_system`, BYPASSRLS, only
-  boot, SaaS signup, webhooks and jobs). The owner role only migrates at
-  startup.
+  entry point by what the query may see: `Tenant()` and `WithWorkspace`
+  (tenant rows, the request path), `Sys()` and `WithTx` (role
+  `nokku_system`, BYPASSRLS, only boot, webhooks and jobs). The owner role
+  only migrates at startup.
 - `internal/tenant` resolves the workspace from the request host before
   authentication. Self-hosted serves one workspace created at boot. SaaS
-  (billing on) gives each workspace a subdomain of `NOKKU_BASE_URL`.
+  (`NOKKU_SAAS`) gives each workspace a subdomain of `NOKKU_BASE_URL`.
+  `tenant.Create` is the one way a workspace comes to be.
 - `internal/iam` is identity: passkeys, email links, OIDC, device flow, DPoP,
   SCIM. Accounts live inside a workspace, there are no global users. It
-  answers who, never may.
+  answers who, never may. `iam.New` gets everything it calls out to in
+  `iam.Deps` (audit, the mail functions), nothing is set on it afterwards.
 - `internal/daemon` is the in-memory pool of live daemon control streams,
   relays (two bidi streams spliced, the backend only sees ciphertext), and
   web terminal sessions.
 - `internal/entitlement` is plan gating, the self-hosted license, and the 30
   day hold on data limits after a plan or license ends.
-- `internal/billing` is Stripe. One `sync` writer mirrors a subscription into
-  `workspace_subscriptions`. Stripe stays the source of truth.
+- `internal/billing` is Stripe, nil on a self-hosted server. One `sync` writer
+  mirrors a subscription into `workspace_subscriptions`. Stripe stays the
+  source of truth.
 - `internal/crypto` is at-rest crypto, tokens, and the Tink keyset with
   optional KMS wrap. `EncryptedBytes` and `HashedToken` column types are
   mapped in `sqlc.yaml`.
@@ -90,10 +95,11 @@ committed `.gitkeep` and are embedded by `web/embed.go`.
 - `web/email` is react-email templates, exported to `web/email/out`. Colors
   are hex copies of the UI tokens.
 
-Two modes, picked at startup in `internal/config`. Self-hosted is the
-default and the plan comes from the license key. SaaS is on when the
-`STRIPE_*` settings are present and the plan comes from the workspace
-subscription. Three plans: `community`, `pro`, `enterprise`. The catalog is
+Two modes, set by `NOKKU_SAAS` and read as `cfg.SaaS`. Self-hosted is the
+default and the plan comes from the license key. SaaS is the hosted service,
+it needs every `STRIPE_*` setting and the plan comes from the workspace
+subscription. The mode is never guessed: Stripe settings that do not fit it
+fail the start. Three plans: `community`, `pro`, `enterprise`. The catalog is
 `internal/entitlement/plan.go`.
 
 Daemon sync: DB triggers bump `workspace_state` on every change that alters
@@ -112,15 +118,42 @@ calls `SyncDaemon`.
   user RPC. `authz_test.go` checks it.
 - Daemon state changes notify through the DB triggers. Never hand-roll a
   daemon poke in a handler.
-- Tenant isolation is RLS via `Conn.WithWorkspace`. Never hand-roll workspace
-  filters, never bypass RLS for tenant data.
+- Tenant isolation is RLS, and nothing else. The request pool pins the
+  workspace of the context every time a connection leaves it
+  (`pinWorkspace` in `internal/db/connection.go`) and refuses a context
+  without one. A tenant query has no `workspace_id` filter and a tenant
+  insert no `workspace_id` column, the column default takes it from the pin.
+  Never hand-roll workspace filters, never bypass RLS for tenant data.
+- One statement is a plain call, `cfg.Conn.Tenant().GetTeam(ctx, id)`.
+  `WithWorkspace` is for statements that belong together: several writes, a
+  read the write depends on, or a write whose result decides a rollback
+  (`TransferOwnership`). Never wrap a single statement in it.
+- The pin and the system role are session state, so the server needs direct
+  connections to Postgres. A pooler in transaction mode would hand a pinned
+  or a system connection to the wrong query.
+- A query names the workspace only when system code calls it (billing, the
+  plan lookup, retention jobs). Those say so in a comment. System code
+  (`WithTx`, `Sys()`) must never call a query that does not: with RLS
+  bypassed it would reach every workspace.
+- Work outside a request that belongs to one workspace pins it with
+  `actor.WithWorkspace` and uses `WithWorkspace`, like `iam.Bootstrap` and
+  `tenant.Create` do. Tests seed the same way.
+- A new tenant table needs `workspace_id UUID NOT NULL DEFAULT
+  current_workspace_id ()`, its name in the policy list in `001_base.sql`,
+  and a seed row in `seedEveryTable`. `internal/db/rls_test.go` reads the
+  tables from the catalog and fails on a table that misses any of them.
+- The workspace on the context (`actor.Workspace`) only holds what never
+  changes: id, slug, base URL. Read the name and the settings from the row.
+- Every row in `sessions` is a credential. What only remembers something
+  about an account, like the browsers and terminals in `known_devices`, gets
+  a table of its own, so nothing has to tell it apart from a login.
 - A new RPC means a proto edit in `../protos` with its `(access)` option,
   pushed, then
   `go get github.com/nokku-sh/protos@$(git -C ../protos rev-parse HEAD)` and
   `task gen` here. That pins the pushed commit. `task lint` builds with
   `GOWORK=off`, so an unpushed protos change shows before the push.
 - sqlc queries live in `internal/db/queries`. The `*.sql.go` files,
-  `models.go`, `querier.go` and `web/ui/src/lib/gen` are generated, never
+  `models.go` and `web/ui/src/lib/gen` are generated, never
   hand-edited.
 - Schema changes go straight into `internal/db/migrations/001_base.sql`
   while there is no release. No new migration files.

@@ -37,7 +37,7 @@ func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string,
 				return err
 			}
 		}
-		used, err = q.SumRecordingBytes(ctx, workspaceID)
+		used, err = q.SumRecordingBytes(ctx)
 		return err
 	}); err != nil {
 		slog.Warn("recording storage lookup failed", "error", err, "workspace_id", workspaceID)
@@ -45,14 +45,8 @@ func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string,
 	}
 	over := used - capBytes
 	for over > 0 {
-		var victims []*db.Recording
-		if err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-			victims, err = q.OldestRecordings(ctx, &db.OldestRecordingsParams{
-				WorkspaceID: workspaceID,
-				Limit:       new(int32(100)),
-			})
-			return err
-		}); err != nil {
+		victims, err := s.conn.Tenant().OldestRecordings(ctx, new(int32(100)))
+		if err != nil {
 			slog.Warn("recording eviction failed", "error", err, "workspace_id", workspaceID)
 			return true
 		}
@@ -64,9 +58,7 @@ func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string,
 			if v.ID == recordingID || time.Since(v.StartedAt) < minEvictAge {
 				continue
 			}
-			if err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
-				return q.DeleteRecording(ctx, v.ID)
-			}); err != nil {
+			if err := s.conn.Tenant().DeleteRecording(ctx, v.ID); err != nil {
 				slog.Warn("recording eviction failed", "error", err, "workspace_id", workspaceID)
 				return true
 			}

@@ -57,10 +57,6 @@ type terminalHandler struct {
 	cfg *config.Config
 }
 
-func newTerminalHandler(cfg *config.Config) *terminalHandler {
-	return &terminalHandler{cfg: cfg}
-}
-
 // handleWebSocket runs one shell for as long as the socket is open. A reload
 // or a dropped connection ends it.
 func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request) {

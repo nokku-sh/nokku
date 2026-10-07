@@ -19,58 +19,19 @@ type ParsedToken struct {
 	Secret string
 }
 
-type TokenOption func(*tokenConfig)
-
-type tokenConfig struct {
-	id string
+func NewSecret() (raw string, hash HashedToken) {
+	raw = RandomString(32)
+	return raw, HashToken(raw)
 }
 
-// WithID makes the plaintext "id_secret" so Parse can recover the id.
-func WithID(id string) TokenOption {
-	return func(c *tokenConfig) {
-		c.id = id
+// NewToken with an id makes the plaintext "id_secret", so Parse can recover
+// the id. An empty id gives a bare secret.
+func NewToken(id string) *Token {
+	plaintext := RandomString(32)
+	if id != "" {
+		plaintext = id + "_" + plaintext
 	}
-}
-
-func NewSecret() (raw string, hash HashedToken, err error) {
-	raw, err = RandomString(32)
-	if err != nil {
-		return "", "", err
-	}
-	hash, err = HashToken(raw)
-	if err != nil {
-		return "", "", err
-	}
-	return raw, hash, nil
-}
-
-func NewToken(opts ...TokenOption) (*Token, error) {
-	cfg := &tokenConfig{}
-	for _, o := range opts {
-		o(cfg)
-	}
-
-	secret, err := RandomString(32)
-	if err != nil {
-		return nil, err
-	}
-
-	t := &Token{ID: cfg.id}
-
-	var b strings.Builder
-	if t.ID != "" {
-		b.WriteString(t.ID)
-		b.WriteByte('_')
-	}
-	b.WriteString(secret)
-
-	t.Plaintext = b.String()
-	t.Hash, err = HashToken(t.Plaintext)
-	if err != nil {
-		return nil, err
-	}
-
-	return t, nil
+	return &Token{ID: id, Plaintext: plaintext, Hash: HashToken(plaintext)}
 }
 
 // Parse handles "uuid_secret" and bare "secret". The secret may itself

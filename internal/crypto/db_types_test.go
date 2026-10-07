@@ -32,10 +32,7 @@ func (testCipher) Decrypt(ciphertext []byte) ([]byte, error) {
 // TestHashToken_Digest pins the stored representation to lowercase hex of
 // the sha256 digest. Any change silently invalidates stored tokens.
 func TestHashToken_Digest(t *testing.T) {
-	hash, err := HashToken("abc")
-	if err != nil {
-		t.Fatal(err)
-	}
+	hash := HashToken("abc")
 	const want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 	if string(hash) != want {
 		t.Errorf("HashToken(abc) = %q, want %q", hash, want)

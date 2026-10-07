@@ -13,7 +13,6 @@ const addPrincipalGrant = `-- name: AddPrincipalGrant :exec
 INSERT INTO
   principal_grants (
     principal_id,
-    workspace_id,
     user_id,
     team_id,
     service_account_id
@@ -21,15 +20,14 @@ INSERT INTO
 VALUES
   (
     $1,
-    $2,
     CASE
-      WHEN $3::TEXT = 'user' THEN $4::UUID
+      WHEN $2::TEXT = 'user' THEN $3::UUID
     END,
     CASE
-      WHEN $3::TEXT = 'team' THEN $4::UUID
+      WHEN $2::TEXT = 'team' THEN $3::UUID
     END,
     CASE
-      WHEN $3::TEXT = 'service_account' THEN $4::UUID
+      WHEN $2::TEXT = 'service_account' THEN $3::UUID
     END
   )
 ON CONFLICT DO NOTHING
@@ -37,28 +35,21 @@ ON CONFLICT DO NOTHING
 
 type AddPrincipalGrantParams struct {
 	PrincipalID string `json:"principalId"`
-	WorkspaceID string `json:"workspaceId"`
 	SubjectKind string `json:"subjectKind"`
 	SubjectID   string `json:"subjectId"`
 }
 
 func (q *Queries) AddPrincipalGrant(ctx context.Context, arg *AddPrincipalGrantParams) error {
-	_, err := q.db.Exec(ctx, addPrincipalGrant,
-		arg.PrincipalID,
-		arg.WorkspaceID,
-		arg.SubjectKind,
-		arg.SubjectID,
-	)
+	_, err := q.db.Exec(ctx, addPrincipalGrant, arg.PrincipalID, arg.SubjectKind, arg.SubjectID)
 	return err
 }
 
 const createPrincipal = `-- name: CreatePrincipal :one
 INSERT INTO
-  principals (workspace_id, target_id, username)
+  principals (target_id, username)
 SELECT
   $1,
-  $2,
-  $3
+  $2
 ON CONFLICT (target_id, username) DO UPDATE
 SET
   username = EXCLUDED.username
@@ -67,13 +58,12 @@ RETURNING
 `
 
 type CreatePrincipalParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	TargetID    string `json:"targetId"`
-	Username    string `json:"username"`
+	TargetID string `json:"targetId"`
+	Username string `json:"username"`
 }
 
 func (q *Queries) CreatePrincipal(ctx context.Context, arg *CreatePrincipalParams) (*Principal, error) {
-	row := q.db.QueryRow(ctx, createPrincipal, arg.WorkspaceID, arg.TargetID, arg.Username)
+	row := q.db.QueryRow(ctx, createPrincipal, arg.TargetID, arg.Username)
 	var i Principal
 	err := row.Scan(
 		&i.ID,
@@ -476,18 +466,16 @@ func (q *Queries) RemovePrincipalGrant(ctx context.Context, arg *RemovePrincipal
 const revokeSubjectAccessInWorkspace = `-- name: RevokeSubjectAccessInWorkspace :exec
 DELETE FROM principal_grants
 WHERE
-  workspace_id = $1
-  AND subject_kind = $2::TEXT
-  AND subject_id = $3::UUID
+  subject_kind = $1::TEXT
+  AND subject_id = $2::UUID
 `
 
 type RevokeSubjectAccessInWorkspaceParams struct {
-	WorkspaceID string `json:"workspaceId"`
 	SubjectKind string `json:"subjectKind"`
 	SubjectID   string `json:"subjectId"`
 }
 
 func (q *Queries) RevokeSubjectAccessInWorkspace(ctx context.Context, arg *RevokeSubjectAccessInWorkspaceParams) error {
-	_, err := q.db.Exec(ctx, revokeSubjectAccessInWorkspace, arg.WorkspaceID, arg.SubjectKind, arg.SubjectID)
+	_, err := q.db.Exec(ctx, revokeSubjectAccessInWorkspace, arg.SubjectKind, arg.SubjectID)
 	return err
 }

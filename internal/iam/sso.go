@@ -33,39 +33,27 @@ type SSOProvider struct {
 }
 
 func (s *Service) ListSSOProviders(ctx context.Context) ([]SSOProvider, error) {
-	var out []SSOProvider
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		rows, err := q.ListSSOProviders(ctx, ws)
+	rows, err := s.conn.Tenant().ListSSOProviders(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]SSOProvider, 0, len(rows))
+	for _, row := range rows {
+		p, err := ssoProviderFromRow(row)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		out = make([]SSOProvider, 0, len(rows))
-		for _, row := range rows {
-			p, err := ssoProviderFromRow(row)
-			if err != nil {
-				return err
-			}
-			out = append(out, *p)
-		}
-		return nil
-	})
-	return out, err
+		out = append(out, *p)
+	}
+	return out, nil
 }
 
 func (s *Service) GetSSOProvider(ctx context.Context, providerID string) (*SSOProvider, error) {
-	var out *SSOProvider
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		row, err := q.GetSSOProvider(ctx, &db.GetSSOProviderParams{WorkspaceID: ws, ProviderID: providerID})
-		if err != nil {
-			return err
-		}
-		out, err = ssoProviderFromRow(row)
-		return err
-	})
+	row, err := s.conn.Tenant().GetSSOProvider(ctx, providerID)
 	if err != nil {
 		return nil, mapNotFound(err)
 	}
-	return out, nil
+	return ssoProviderFromRow(row)
 }
 
 // loginProvider is a provider that may sign people in right now.
@@ -83,16 +71,16 @@ func (s *Service) loginProvider(ctx context.Context, providerID string) (*SSOPro
 // PutSSOProvider keeps the stored client secret when the new one is empty.
 func (s *Service) PutSSOProvider(ctx context.Context, p SSOProvider) (*SSOProvider, error) {
 	var out *SSOProvider
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		out, err = putSSOProvider(ctx, q, ws, p)
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		out, err = putSSOProvider(ctx, q, p)
 		return err
 	})
 	return out, err
 }
 
-func putSSOProvider(ctx context.Context, q db.Querier, ws string, p SSOProvider) (*SSOProvider, error) {
+func putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvider) (*SSOProvider, error) {
 	if p.OIDC.ClientSecret == "" {
-		row, err := q.GetSSOProvider(ctx, &db.GetSSOProviderParams{WorkspaceID: ws, ProviderID: p.ProviderID})
+		row, err := q.GetSSOProvider(ctx, p.ProviderID)
 		if err == nil {
 			if prev, err := ssoProviderFromRow(row); err == nil {
 				p.OIDC.ClientSecret = prev.OIDC.ClientSecret
@@ -106,11 +94,10 @@ func putSSOProvider(ctx context.Context, q db.Querier, ws string, p SSOProvider)
 		return nil, err
 	}
 	row, err := q.UpsertSSOProvider(ctx, &db.UpsertSSOProviderParams{
-		WorkspaceID: ws,
-		ProviderID:  p.ProviderID,
-		Name:        p.Name,
-		Enabled:     p.Enabled,
-		Config:      crypto.EncryptedBytes(cfg),
+		ProviderID: p.ProviderID,
+		Name:       p.Name,
+		Enabled:    p.Enabled,
+		Config:     crypto.EncryptedBytes(cfg),
 	})
 	if err != nil {
 		return nil, err
@@ -120,8 +107,8 @@ func putSSOProvider(ctx context.Context, q db.Querier, ws string, p SSOProvider)
 
 // DeleteSSOProvider also unlinks every identity the provider vouched for.
 func (s *Service) DeleteSSOProvider(ctx context.Context, providerID string) error {
-	return s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		n, err := q.DeleteSSOProvider(ctx, &db.DeleteSSOProviderParams{WorkspaceID: ws, ProviderID: providerID})
+	return s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		n, err := q.DeleteSSOProvider(ctx, providerID)
 		if err != nil {
 			return err
 		}
@@ -129,7 +116,7 @@ func (s *Service) DeleteSSOProvider(ctx context.Context, providerID string) erro
 			return ErrNotFound
 		}
 		_, err = q.DeleteCredentialsByProvider(ctx, &db.DeleteCredentialsByProviderParams{
-			WorkspaceID: ws, Type: string(MethodOIDC), Provider: providerID,
+			Type: string(MethodOIDC), Provider: providerID,
 		})
 		return err
 	})

@@ -95,18 +95,15 @@ func (s *Service) verifySCIMToken(ctx context.Context, workspaceID, raw string) 
 	if err != nil || parsed.ID != workspaceID {
 		return "", ErrInvalidToken
 	}
-	hash, err := crypto.HashToken(raw)
-	if err != nil {
-		return "", ErrInvalidToken
-	}
+	hash := crypto.HashToken(raw)
 	var id string
-	err = s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		row, err := q.GetSCIMTokenByHash(ctx, &db.GetSCIMTokenByHashParams{WorkspaceID: ws, TokenHash: hash})
+	err = s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		row, err := q.GetSCIMTokenByHash(ctx, hash)
 		if err != nil {
 			return err
 		}
 		id = row.ID
-		return q.TouchSCIMToken(ctx, &db.TouchSCIMTokenParams{WorkspaceID: ws, ID: row.ID})
+		return q.TouchSCIMToken(ctx, row.ID)
 	})
 	if err != nil {
 		return "", ErrInvalidToken
@@ -115,45 +112,31 @@ func (s *Service) verifySCIMToken(ctx context.Context, workspaceID, raw string) 
 }
 
 func (s *Service) IssueSCIMToken(ctx context.Context, label string) (SCIMToken, string, error) {
-	tok, err := crypto.NewToken(crypto.WithID(actor.WorkspaceIDFromContext(ctx)))
-	if err != nil {
-		return SCIMToken{}, "", err
-	}
-	var out SCIMToken
-	err = s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		row, err := q.CreateSCIMToken(ctx, &db.CreateSCIMTokenParams{
-			WorkspaceID: ws,
-			TokenHash:   tok.Hash,
-			Label:       label,
-		})
-		if err != nil {
-			return err
-		}
-		out = SCIMToken{ID: row.ID, Label: row.Label, CreatedAt: row.CreatedAt}
-		return nil
+	tok := crypto.NewToken(actor.WorkspaceIDFromContext(ctx))
+	row, err := s.conn.Tenant().CreateSCIMToken(ctx, &db.CreateSCIMTokenParams{
+		TokenHash: tok.Hash,
+		Label:     label,
 	})
 	if err != nil {
 		return SCIMToken{}, "", err
 	}
-	return out, tok.Plaintext, nil
+	return SCIMToken{ID: row.ID, Label: row.Label, CreatedAt: row.CreatedAt}, tok.Plaintext, nil
 }
 
 func (s *Service) ListSCIMTokens(ctx context.Context) ([]SCIMToken, error) {
+	rows, err := s.conn.Tenant().ListWorkspaceSCIMTokens(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var out []SCIMToken
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		rows, err := q.ListWorkspaceSCIMTokens(ctx, ws)
-		for _, r := range rows {
-			out = append(out, SCIMToken{ID: r.ID, Label: r.Label, CreatedAt: r.CreatedAt, LastUsedAt: r.LastUsedAt})
-		}
-		return err
-	})
-	return out, err
+	for _, r := range rows {
+		out = append(out, SCIMToken{ID: r.ID, Label: r.Label, CreatedAt: r.CreatedAt, LastUsedAt: r.LastUsedAt})
+	}
+	return out, nil
 }
 
 func (s *Service) RevokeSCIMToken(ctx context.Context, tokenID string) error {
-	return s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		return q.DeleteSCIMToken(ctx, &db.DeleteSCIMTokenParams{WorkspaceID: ws, ID: tokenID})
-	})
+	return s.conn.Tenant().DeleteSCIMToken(ctx, tokenID)
 }
 
 // scimProvisionUser applies active to existing accounts too, the IdP is the
@@ -166,11 +149,11 @@ func (s *Service) scimProvisionUser(
 ) (*db.User, error) {
 	var u *db.User
 	var created bool
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		u, err = q.GetUserByEmail(ctx, &db.GetUserByEmailParams{WorkspaceID: ws, Email: email})
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		u, err = q.GetUserByEmail(ctx, email)
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
-			u, err = s.createUser(ctx, q, db.CreateUserWithIDParams{WorkspaceID: ws, Email: email, Name: name}, "")
+			u, err = s.createUser(ctx, q, db.CreateUserWithIDParams{Email: email, Name: name}, "")
 			if errors.Is(err, ErrSeatLimit) {
 				return scimerrors.ScimError{Status: http.StatusForbidden, Detail: err.Error()}
 			}
@@ -179,7 +162,7 @@ func (s *Service) scimProvisionUser(
 			}
 			created = true
 			if !active {
-				if u, err = setUserActive(ctx, q, ws, u.ID, false); err != nil {
+				if u, err = setUserActive(ctx, q, u.ID, false); err != nil {
 					return err
 				}
 			}
@@ -187,22 +170,22 @@ func (s *Service) scimProvisionUser(
 			return err
 		case u.Active != active:
 			if !active {
-				if err := keepOwner(ctx, q, ws, u.ID); err != nil {
+				if err := keepOwner(ctx, q, u.ID); err != nil {
 					return err
 				}
 			}
-			if u, err = setUserActive(ctx, q, ws, u.ID, active); err != nil {
+			if u, err = setUserActive(ctx, q, u.ID, active); err != nil {
 				return err
 			}
 		}
-		return linkSCIMCredential(ctx, q, ws, u.ID, externalID)
+		return linkSCIMCredential(ctx, q, u.ID, externalID)
 	})
 	if err != nil {
 		return nil, mapUserError(err)
 	}
 	if created {
-		s.record(ctx, Event{
-			Action: ActionUserCreated, Kind: actor.KindUser, Method: MethodSCIM, UserID: u.ID, Email: u.Email,
+		s.record(ctx, event{
+			Action: actionUserCreated, Kind: actor.KindUser, Method: MethodSCIM, UserID: u.ID, Email: u.Email,
 		})
 	}
 	if !u.Active {
@@ -213,32 +196,30 @@ func (s *Service) scimProvisionUser(
 	return u, nil
 }
 
-func setUserActive(ctx context.Context, q *db.Queries, ws, userID string, active bool) (*db.User, error) {
-	if err := q.SetUserActive(ctx, &db.SetUserActiveParams{WorkspaceID: ws, ID: userID, Active: active}); err != nil {
+func setUserActive(ctx context.Context, q *db.Queries, userID string, active bool) (*db.User, error) {
+	if err := q.SetUserActive(ctx, &db.SetUserActiveParams{ID: userID, Active: active}); err != nil {
 		return nil, err
 	}
-	return q.GetUser(ctx, &db.GetUserParams{WorkspaceID: ws, ID: userID})
+	return q.GetUser(ctx, userID)
 }
 
-func linkSCIMCredential(ctx context.Context, q *db.Queries, ws, userID, externalID string) error {
+func linkSCIMCredential(ctx context.Context, q *db.Queries, userID, externalID string) error {
 	if externalID == "" {
 		return nil
 	}
 	// IdP migrations change the externalId, so one account never carries two links.
 	if err := q.DeleteStaleUserSCIMCredentials(ctx, &db.DeleteStaleUserSCIMCredentialsParams{
-		WorkspaceID: ws,
-		UserID:      userID,
-		Subject:     externalID,
+		UserID:  userID,
+		Subject: externalID,
 	}); err != nil {
 		return err
 	}
 	_, err := q.UpsertCredential(ctx, &db.UpsertCredentialParams{
-		ID:          "scim:" + ws + ":" + externalID,
-		WorkspaceID: ws,
-		UserID:      userID,
-		Type:        string(MethodSCIM),
-		Subject:     externalID,
-		Data:        []byte{},
+		ID:      "scim:" + actor.WorkspaceIDFromContext(ctx) + ":" + externalID,
+		UserID:  userID,
+		Type:    string(MethodSCIM),
+		Subject: externalID,
+		Data:    []byte{},
 	})
 	if errors.Is(err, pgx.ErrNoRows) || db.IsUniqueViolation(err) {
 		return scimerrors.ScimErrorBadRequest("externalId is already linked to another user")
@@ -248,8 +229,8 @@ func linkSCIMCredential(ctx context.Context, q *db.Queries, ws, userID, external
 
 // keepOwner refuses to switch off or remove the owner. Nobody else can hand
 // the workspace on.
-func keepOwner(ctx context.Context, q *db.Queries, ws, userID string) error {
-	owner, err := q.GetOwner(ctx, ws)
+func keepOwner(ctx context.Context, q *db.Queries, userID string) error {
+	owner, err := q.GetOwner(ctx)
 	if err != nil {
 		return err
 	}
@@ -265,26 +246,24 @@ func keepOwner(ctx context.Context, q *db.Queries, ws, userID string) error {
 // scimDeprovisionUser deactivates the account and drops its IdP link. The
 // data survives for an IdP re-assignment.
 func (s *Service) scimDeprovisionUser(ctx context.Context, u *db.User) error {
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		if err := keepOwner(ctx, q, ws, u.ID); err != nil {
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		if err := keepOwner(ctx, q, u.ID); err != nil {
 			return err
 		}
-		if _, err := setUserActive(ctx, q, ws, u.ID, false); err != nil {
+		if _, err := setUserActive(ctx, q, u.ID, false); err != nil {
 			return err
 		}
-		if err := q.DeleteUserSCIMCredentials(ctx, &db.DeleteUserSCIMCredentialsParams{
-			WorkspaceID: ws, UserID: u.ID,
-		}); err != nil {
+		if err := q.DeleteUserSCIMCredentials(ctx, u.ID); err != nil {
 			return err
 		}
-		_, err := q.DeleteSubjectSessions(ctx, &db.DeleteSubjectSessionsParams{WorkspaceID: ws, SubjectID: u.ID})
+		_, err := q.DeleteSubjectSessions(ctx, u.ID)
 		return err
 	})
 	if err != nil {
 		return err
 	}
-	s.record(ctx, Event{
-		Action: ActionUserDeactivated, Kind: actor.KindUser, Method: MethodSCIM, UserID: u.ID, Email: u.Email,
+	s.record(ctx, event{
+		Action: actionUserDeactivated, Kind: actor.KindUser, Method: MethodSCIM, UserID: u.ID, Email: u.Email,
 	})
 	return nil
 }

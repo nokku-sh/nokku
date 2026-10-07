@@ -41,7 +41,7 @@ Nokku has three plans: **Community** (free), **Pro**, and **Enterprise**. What e
 The core runs in one of two modes:
 
 - **Self-hosted** is the default. Every instance starts on Community, and an Enterprise license key unlocks the rest. Keys are Ed25519-signed and verified offline against a public key compiled directly into the binary, ensuring fully air-gapped activation.
-- **SaaS** is how the hosted service runs. Each workspace gets its plan from its subscription.
+- **SaaS** is how the hosted service runs, switched on with `NOKKU_SAAS=true`. Each workspace gets its plan from its subscription.
 
 A license key is activated in the UI under Billing or set as `NOKKU_LICENSE_KEY`. A renewed key applies without a restart. An expired key never stops the core: licensed features turn off, and data beyond the Community limits is kept for 30 more days.
 
@@ -69,20 +69,22 @@ The backend reads configuration from environment variables. Only `NOKKU_SECRET` 
 
 ### Database (PostgreSQL, required)
 
-| Variable                | Default     | Purpose                                                      |
-| ----------------------- | ----------- | ------------------------------------------------------------ |
-| `PGHOST`                | `localhost` | Database host                                                |
-| `PGPORT`                | `5432`      | Database port                                                |
-| `PGDATABASE`            | `nokku`     | Database name                                                |
-| `PGUSER`                | `postgres`  | Database user                                                |
-| `PGPASSWORD`            | `postgres`  | Database password                                            |
-| `PGSSLMODE`             | `disable`   | libpq SSL mode                                               |
-| `NOKKU_DB_APP_PASSWORD` | generated   | Password for the RLS-constrained app role, set on first boot |
-| `NOKKU_DB_MAX_CONNS`    | `10`        | Max pool size                                                |
-| `NOKKU_DB_MIN_CONNS`    | `0`         | Min pool size                                                |
-| `NOKKU_DB_AUTOMIGRATE`  | `true`      | Apply embedded migrations at boot                            |
+| Variable                | Default      | Purpose                                                                                                    |
+| ----------------------- | ------------ | ---------------------------------------------------------------------------------------------------------- |
+| `PGHOST`                | `localhost`  | Database host                                                                                              |
+| `PGPORT`                | `5432`       | Database port                                                                                              |
+| `PGDATABASE`            | `nokku`      | Database name                                                                                              |
+| `PGUSER`                | `postgres`   | Database user                                                                                              |
+| `PGPASSWORD`            | `postgres`   | Database password                                                                                          |
+| `PGSSLMODE`             | `disable`    | libpq SSL mode                                                                                             |
+| `NOKKU_DB_APP_PASSWORD` | `PGPASSWORD` | Password of the app role `nokku_app`, applied at boot. Requests run as that role, under row-level security |
+| `NOKKU_DB_MAX_CONNS`    | `10`         | Max pool size                                                                                              |
+| `NOKKU_DB_MIN_CONNS`    | `0`          | Min pool size                                                                                              |
+| `NOKKU_DB_AUTOMIGRATE`  | `true`       | Apply embedded migrations at boot                                                                          |
 
 Schema migrations are embedded and applied automatically under an advisory lock; disable with `NOKKU_DB_AUTOMIGRATE=false` if you run migrations out of band.
+
+Connect to PostgreSQL directly, or through a pooler in session mode. A pooler in transaction mode, such as PgBouncer with `pool_mode = transaction`, is not supported. Tenant isolation and the change notifications to daemons rely on state that lives on the connection.
 
 ### Single instance
 

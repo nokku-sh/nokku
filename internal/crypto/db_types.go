@@ -75,9 +75,9 @@ func (e EncryptedBytes) MarshalJSON() ([]byte, error) {
 //nolint:recvcheck // Scan requires pointer receiver for sql.Scanner
 type HashedToken string
 
-func HashToken(plaintext string) (HashedToken, error) {
+func HashToken(plaintext string) HashedToken {
 	sum := sha256.Sum256([]byte(plaintext))
-	return HashedToken(hex.EncodeToString(sum[:])), nil
+	return HashedToken(hex.EncodeToString(sum[:]))
 }
 
 func (h HashedToken) Hash() string {

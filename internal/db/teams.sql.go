@@ -72,27 +72,21 @@ func (q *Queries) CountTeamMembers(ctx context.Context, teamIds []string) ([]*Co
 
 const createTeam = `-- name: CreateTeam :one
 INSERT INTO
-  teams (workspace_id, name, description, tags)
+  teams (name, description, tags)
 VALUES
-  ($1, $2, $3, COALESCE($4, '{}'::TEXT[]))
+  ($1, $2, COALESCE($3, '{}'::TEXT[]))
 RETURNING
   id, workspace_id, name, description, tags, created_at, updated_at
 `
 
 type CreateTeamParams struct {
-	WorkspaceID string      `json:"workspaceId"`
 	Name        string      `json:"name"`
 	Description *string     `json:"description"`
 	Tags        interface{} `json:"tags"`
 }
 
 func (q *Queries) CreateTeam(ctx context.Context, arg *CreateTeamParams) (*Team, error) {
-	row := q.db.QueryRow(ctx, createTeam,
-		arg.WorkspaceID,
-		arg.Name,
-		arg.Description,
-		arg.Tags,
-	)
+	row := q.db.QueryRow(ctx, createTeam, arg.Name, arg.Description, arg.Tags)
 	var i Team
 	err := row.Scan(
 		&i.ID,
@@ -211,27 +205,25 @@ SELECT
 FROM
   teams te
 WHERE
-  te.workspace_id = $1
-  AND (
-    $2::TEXT IS NULL
-    OR te.name ILIKE '%' || $2 || '%'
-    OR COALESCE(te.description, '') ILIKE '%' || $2 || '%'
+  (
+    $1::TEXT IS NULL
+    OR te.name ILIKE '%' || $1 || '%'
+    OR COALESCE(te.description, '') ILIKE '%' || $1 || '%'
   )
-  AND te.tags @> COALESCE($3, '{}'::TEXT[])
+  AND te.tags @> COALESCE($2, '{}'::TEXT[])
 ORDER BY
   te.id ASC
 LIMIT
-  $5
-OFFSET
   $4
+OFFSET
+  $3
 `
 
 type ListTeamsParams struct {
-	WorkspaceID string   `json:"workspaceId"`
-	Query       *string  `json:"query"`
-	Tags        []string `json:"tags"`
-	Offset      *int32   `json:"offset"`
-	Limit       *int32   `json:"limit"`
+	Query  *string  `json:"query"`
+	Tags   []string `json:"tags"`
+	Offset *int32   `json:"offset"`
+	Limit  *int32   `json:"limit"`
 }
 
 type ListTeamsRow struct {
@@ -241,7 +233,6 @@ type ListTeamsRow struct {
 
 func (q *Queries) ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*ListTeamsRow, error) {
 	rows, err := q.db.Query(ctx, listTeams,
-		arg.WorkspaceID,
 		arg.Query,
 		arg.Tags,
 		arg.Offset,
@@ -281,19 +272,13 @@ FROM
   teams t
   JOIN team_members tm ON tm.team_id = t.id
 WHERE
-  tm.workspace_id = $1
-  AND tm.user_id = $2
+  tm.user_id = $1
 ORDER BY
   t.id ASC
 `
 
-type ListTeamsForUserParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-}
-
-func (q *Queries) ListTeamsForUser(ctx context.Context, arg *ListTeamsForUserParams) ([]*Team, error) {
-	rows, err := q.db.Query(ctx, listTeamsForUser, arg.WorkspaceID, arg.UserID)
+func (q *Queries) ListTeamsForUser(ctx context.Context, userID string) ([]*Team, error) {
+	rows, err := q.db.Query(ctx, listTeamsForUser, userID)
 	if err != nil {
 		return nil, err
 	}

@@ -1,7 +1,7 @@
 // Package tenant resolves the workspace a request runs in. A self-hosted
-// server has one, created at boot. The hosted service reads it off the
-// subdomain. Either way the workspace is on the context before anything
-// authenticates, so nothing downstream ever guesses it.
+// server has one, created at boot. The hosted service (NOKKU_SAAS) reads it
+// off the subdomain. Either way the workspace is on the context before
+// anything authenticates, so nothing downstream ever guesses it.
 package tenant
 
 import (
@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"uuid"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/jackc/pgx/v5"
@@ -88,21 +89,16 @@ func New(ctx context.Context, conn *db.Connection, baseURL string, saas bool) (*
 	if err != nil {
 		return nil, err
 	}
-	var ws *db.Workspace
-	if err := conn.WithTx(ctx, func(q *db.Queries) (err error) {
-		ws, err = q.GetFirstWorkspace(ctx)
-		if errors.Is(err, pgx.ErrNoRows) {
-			ws, err = Create(ctx, q, "default", cfg.WorkspaceName)
-		}
-		return err
-	}); err != nil {
+	ws, err := conn.Sys().GetFirstWorkspace(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		ws, err = Create(ctx, conn, "default", cfg.WorkspaceName)
+	}
+	if err != nil {
 		return nil, err
 	}
 	r.single = r.workspace(ws)
 	return r, nil
 }
-
-func (r *Resolver) SaaS() bool { return r.saas }
 
 // Single is the self-host workspace, empty on the hosted service.
 func (r *Resolver) Single() actor.Workspace { return r.single }
@@ -172,7 +168,7 @@ func (r *Resolver) Middleware(next http.Handler) http.Handler {
 }
 
 func (r *Resolver) workspace(row *db.Workspace) actor.Workspace {
-	return actor.Workspace{ID: row.ID, Slug: row.Slug, Name: row.Name, BaseURL: r.BaseURL(row.Slug)}
+	return actor.Workspace{ID: row.ID, Slug: row.Slug, BaseURL: r.BaseURL(row.Slug)}
 }
 
 // Forbidden reports whether a slug may not be signed up with: a reserved
@@ -222,39 +218,46 @@ func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
 	})
 }
 
-// Create makes a workspace with its subscription row and default SSH CA.
-// It runs in the caller's system transaction, the workspace cannot be
-// pinned before it exists.
-func Create(ctx context.Context, q *db.Queries, slug, name string) (*db.Workspace, error) {
-	ws, err := q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
-		Slug:     slug,
-		Name:     name,
-		Settings: &nokkuv1.WorkspaceSettings{DefaultDaemonConfig: db.DefaultDaemonConfig()},
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err := q.InitSubscription(ctx, ws.ID); err != nil {
-		return nil, err
-	}
+// Create makes a workspace with its subscription row and default SSH CA. The
+// transaction is pinned to the id the workspace is about to get, so even this
+// runs under RLS and needs no system role.
+func Create(ctx context.Context, conn *db.Connection, slug, name string) (*db.Workspace, error) {
 	ca, err := ssh.NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0, 0)
 	if err != nil {
 		return nil, err
 	}
-	_, err = q.CreateCA(ctx, &db.CreateCAParams{
-		WorkspaceID:  ws.ID,
-		Name:         "Default CA",
-		Description:  new("Default CA for " + ws.Name),
-		Certificate:  string(ca.Certificate),
-		PrivateKey:   ca.PrivateKey,
-		PublicKey:    ca.PublicKey,
-		SerialNumber: ca.SerialNumber,
-		Subject:      ca.Subject,
-		IsDefault:    true,
-		NotBefore:    ca.NotBefore,
-		NotAfter:     ca.NotAfter,
-		KeyType:      ca.KeyType,
-		KeyBits:      ca.KeyBits,
+	id := uuid.NewV7().String()
+	ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: id})
+
+	var ws *db.Workspace
+	err = conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		ws, err = q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
+			ID:       id,
+			Slug:     slug,
+			Name:     name,
+			Settings: &nokkuv1.WorkspaceSettings{DefaultDaemonConfig: db.DefaultDaemonConfig()},
+		})
+		if err != nil {
+			return err
+		}
+		if err := q.InitSubscription(ctx); err != nil {
+			return err
+		}
+		_, err = q.CreateCA(ctx, &db.CreateCAParams{
+			Name:         "Default CA",
+			Description:  new("Default CA for " + ws.Name),
+			Certificate:  string(ca.Certificate),
+			PrivateKey:   ca.PrivateKey,
+			PublicKey:    ca.PublicKey,
+			SerialNumber: ca.SerialNumber,
+			Subject:      ca.Subject,
+			IsDefault:    true,
+			NotBefore:    ca.NotBefore,
+			NotAfter:     ca.NotAfter,
+			KeyType:      ca.KeyType,
+			KeyBits:      ca.KeyBits,
+		})
+		return err
 	})
 	if err != nil {
 		return nil, err

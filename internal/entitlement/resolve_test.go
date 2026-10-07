@@ -18,6 +18,12 @@ import (
 // fakeDB fakes the transactional surface the resolver reads through. It
 // doubles as the sqlc DBTX underneath, serving the two queries entitlement
 // issues: the workspace subscription row and the pooled resource count.
+// The mode NewService takes, named so the calls read.
+const (
+	modeSaaS       = true
+	modeSelfHosted = false
+)
+
 type fakeDB struct {
 	plan        string
 	status      Status
@@ -113,71 +119,71 @@ func TestResolve(t *testing.T) {
 		name    string
 		db      *fakeDB
 		license string
-		mode    Mode
+		mode    bool
 		want    string
 	}{
 		{
-			name: "saas active subscription",
+			name: "modeSaaS active subscription",
 			db:   &fakeDB{plan: PlanPro, status: StatusActive},
-			mode: ModeSaaS,
+			mode: modeSaaS,
 			want: PlanPro,
 		},
 		{
 			name: "trialing grants access",
 			db:   &fakeDB{plan: PlanEnterprise, status: StatusTrialing},
-			mode: ModeSaaS,
+			mode: modeSaaS,
 			want: PlanEnterprise,
 		},
 		{
 			name: "past due keeps access (grace period)",
 			db:   &fakeDB{plan: PlanPro, status: StatusPastDue},
-			mode: ModeSaaS,
+			mode: modeSaaS,
 			want: PlanPro,
 		},
 		{
 			name: "canceled subscription falls back to community",
 			db:   &fakeDB{plan: PlanPro, status: StatusInactive},
-			mode: ModeSaaS,
+			mode: modeSaaS,
 			want: PlanCommunity,
 		},
 		{
 			name: "no subscription row falls back to community",
 			db:   &fakeDB{subErr: errors.New("no rows")},
-			mode: ModeSaaS,
+			mode: modeSaaS,
 			want: PlanCommunity,
 		},
 		{
 			// pgx.ErrNoRows is the normal community case, not a failure.
 			name: "pgx ErrNoRows is the quiet community path",
 			db:   &fakeDB{subErr: pgx.ErrNoRows},
-			mode: ModeSaaS,
+			mode: modeSaaS,
 			want: PlanCommunity,
 		},
 		{
 			name:    "self-hosted valid license grants licensed plan",
 			db:      &fakeDB{},
-			mode:    ModeSelfHosted,
+			mode:    modeSelfHosted,
 			license: PlanEnterprise,
 			want:    PlanEnterprise,
 		},
 		{
 			name:    "self-hosted license with unknown plan resolves to community",
 			db:      &fakeDB{},
-			mode:    ModeSelfHosted,
+			mode:    modeSelfHosted,
 			license: "ultimate",
 			want:    PlanCommunity,
 		},
 		{
 			name:    "invalid license ignores subscription-less workspace",
 			db:      &fakeDB{subErr: errors.New("no rows")},
-			mode:    ModeSelfHosted,
+			mode:    modeSelfHosted,
 			license: "",
 			want:    PlanCommunity,
 		},
 		{
 			name:    "subscription wins over invalid license",
 			db:      &fakeDB{plan: PlanPro, status: StatusActive},
-			mode:    ModeSelfHosted,
+			mode:    modeSelfHosted,
 			license: "",
 			want:    PlanPro,
 		},
@@ -199,7 +205,7 @@ func TestResolve_FailClosedOnDBError(t *testing.T) {
 	sut := NewService(
 		&fakeDB{subErr: errors.New("connection refused")},
 		nil,
-		ModeSaaS,
+		modeSaaS,
 	)
 	got := sut.Resolve(context.Background(), "ws1")
 	if got.Has(FeatureSCIM) || got.Has(FeatureAuditExport) || got.Has(FeatureEnforceSSO) {
@@ -212,12 +218,12 @@ func TestResolve_FailClosedOnDBError(t *testing.T) {
 
 func TestRetentionDays_ErrorsOnDBError(t *testing.T) {
 	// The purge jobs skip on error, a billing outage must never delete data.
-	broken := NewService(&fakeDB{subErr: errors.New("connection refused")}, nil, ModeSaaS)
+	broken := NewService(&fakeDB{subErr: errors.New("connection refused")}, nil, modeSaaS)
 	if _, err := broken.RetentionDays(context.Background(), "ws1"); err == nil {
 		t.Error("DB error returned a retention window instead of an error")
 	}
 
-	free := NewService(&fakeDB{subErr: pgx.ErrNoRows}, nil, ModeSaaS)
+	free := NewService(&fakeDB{subErr: pgx.ErrNoRows}, nil, modeSaaS)
 	days, err := free.RetentionDays(context.Background(), "ws1")
 	if err != nil || days != 7 {
 		t.Errorf("no subscription row = %d, %v, want 7 days and no error", days, err)
@@ -232,7 +238,7 @@ func TestResolve_SelfHostedLicensedPlanUnlimited(t *testing.T) {
 	sut := NewService(
 		&fakeDB{},
 		licensed(PlanEnterprise),
-		ModeSelfHosted,
+		modeSelfHosted,
 	)
 	got := sut.Resolve(context.Background(), "ws1")
 
@@ -256,10 +262,10 @@ func TestResolve_SelfHostedRecordingStorageUnlimited(t *testing.T) {
 	sut := NewService(
 		&fakeDB{plan: PlanEnterprise, status: StatusActive},
 		nil,
-		ModeSelfHosted,
+		modeSelfHosted,
 	)
 	// Even with no subscription and no license: unlimited, not 10 MiB.
-	bare := NewService(&fakeDB{}, nil, ModeSelfHosted)
+	bare := NewService(&fakeDB{}, nil, modeSelfHosted)
 
 	if got, _ := sut.RecordingStorageBytes(context.Background(), "ws1"); got != unlimited {
 		t.Errorf("self-hosted pro storage cap = %d, want unlimited", got)
@@ -271,7 +277,7 @@ func TestResolve_SelfHostedRecordingStorageUnlimited(t *testing.T) {
 
 func TestResolve_RequestCache(t *testing.T) {
 	db := &fakeDB{plan: PlanPro, status: StatusActive}
-	sut := NewService(db, nil, ModeSaaS)
+	sut := NewService(db, nil, modeSaaS)
 
 	ctx := withRequestCache(context.Background())
 	first := sut.Resolve(ctx, "ws1")
@@ -316,7 +322,7 @@ func TestCanInvite(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sut := NewService(tt.db, nil, ModeSaaS)
+			sut := NewService(tt.db, nil, modeSaaS)
 			err := sut.CanInvite(context.Background(), "ws1", tt.members)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CanInvite() error = %v, wantErr %v", err, tt.wantErr)

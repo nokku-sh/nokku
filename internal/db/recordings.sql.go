@@ -14,34 +14,31 @@ import (
 
 const createRecording = `-- name: CreateRecording :one
 INSERT INTO
-  recordings (id, workspace_id, daemon_id, daemon_name, username, key)
+  recordings (id, daemon_id, daemon_name, username, key)
 SELECT
   $1,
-  $2,
   d.id,
   d.name,
-  $3,
-  $4
+  $2,
+  $3
 FROM
   daemons d
 WHERE
-  d.id = $5
+  d.id = $4
 RETURNING
   id, workspace_id, daemon_id, daemon_name, username, key, started_at, ended_at, size_bytes, complete, created_at
 `
 
 type CreateRecordingParams struct {
-	ID          string                `json:"id"`
-	WorkspaceID string                `json:"workspaceId"`
-	Username    string                `json:"username"`
-	Key         crypto.EncryptedBytes `json:"key"`
-	DaemonID    string                `json:"daemonId"`
+	ID       string                `json:"id"`
+	Username string                `json:"username"`
+	Key      crypto.EncryptedBytes `json:"key"`
+	DaemonID string                `json:"daemonId"`
 }
 
 func (q *Queries) CreateRecording(ctx context.Context, arg *CreateRecordingParams) (*Recording, error) {
 	row := q.db.QueryRow(ctx, createRecording,
 		arg.ID,
-		arg.WorkspaceID,
 		arg.Username,
 		arg.Key,
 		arg.DaemonID,
@@ -176,29 +173,27 @@ SELECT
 FROM
   recordings r
 WHERE
-  r.workspace_id = $1
-  AND (
-    $2::UUID IS NULL
-    OR r.daemon_id = $2
+  (
+    $1::UUID IS NULL
+    OR r.daemon_id = $1
   )
   AND (
-    $3::TEXT IS NULL
-    OR r.username = $3
+    $2::TEXT IS NULL
+    OR r.username = $2
   )
 ORDER BY
   r.started_at DESC
 LIMIT
-  $5
-OFFSET
   $4
+OFFSET
+  $3
 `
 
 type ListRecordingsParams struct {
-	WorkspaceID string  `json:"workspaceId"`
-	DaemonID    *string `json:"daemonId"`
-	Username    *string `json:"username"`
-	Offset      *int32  `json:"offset"`
-	Limit       *int32  `json:"limit"`
+	DaemonID *string `json:"daemonId"`
+	Username *string `json:"username"`
+	Offset   *int32  `json:"offset"`
+	Limit    *int32  `json:"limit"`
 }
 
 type ListRecordingsRow struct {
@@ -208,7 +203,6 @@ type ListRecordingsRow struct {
 
 func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams) ([]*ListRecordingsRow, error) {
 	rows, err := q.db.Query(ctx, listRecordings,
-		arg.WorkspaceID,
 		arg.DaemonID,
 		arg.Username,
 		arg.Offset,
@@ -250,21 +244,14 @@ SELECT
   id, workspace_id, daemon_id, daemon_name, username, key, started_at, ended_at, size_bytes, complete, created_at
 FROM
   recordings
-WHERE
-  workspace_id = $1
 ORDER BY
   started_at ASC
 LIMIT
-  $2
+  $1
 `
 
-type OldestRecordingsParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	Limit       *int32 `json:"limit"`
-}
-
-func (q *Queries) OldestRecordings(ctx context.Context, arg *OldestRecordingsParams) ([]*Recording, error) {
-	rows, err := q.db.Query(ctx, oldestRecordings, arg.WorkspaceID, arg.Limit)
+func (q *Queries) OldestRecordings(ctx context.Context, limit *int32) ([]*Recording, error) {
+	rows, err := q.db.Query(ctx, oldestRecordings, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -356,12 +343,10 @@ SELECT
   COALESCE(SUM(size_bytes), 0)::BIGINT
 FROM
   recordings
-WHERE
-  workspace_id = $1
 `
 
-func (q *Queries) SumRecordingBytes(ctx context.Context, workspaceID string) (int64, error) {
-	row := q.db.QueryRow(ctx, sumRecordingBytes, workspaceID)
+func (q *Queries) SumRecordingBytes(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, sumRecordingBytes)
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err

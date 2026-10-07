@@ -14,14 +14,15 @@ import (
 
 const createWorkspace = `-- name: CreateWorkspace :one
 INSERT INTO
-  workspaces (slug, name, description, settings)
+  workspaces (id, slug, name, description, settings)
 VALUES
-  ($1, $2, $3, $4)
+  ($1, $2, $3, $4, $5)
 RETURNING
   id, slug, name, description, settings, created_at, updated_at
 `
 
 type CreateWorkspaceParams struct {
+	ID          string                   `json:"id"`
 	Slug        string                   `json:"slug"`
 	Name        string                   `json:"name"`
 	Description *string                  `json:"description"`
@@ -30,6 +31,7 @@ type CreateWorkspaceParams struct {
 
 func (q *Queries) CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParams) (*Workspace, error) {
 	row := q.db.QueryRow(ctx, createWorkspace,
+		arg.ID,
 		arg.Slug,
 		arg.Name,
 		arg.Description,
@@ -54,6 +56,7 @@ WHERE
   id = $1
 `
 
+// Names the workspace, the purge of unclaimed signups runs as nokku_system.
 func (q *Queries) DeleteWorkspace(ctx context.Context, workspaceID string) error {
 	_, err := q.db.Exec(ctx, deleteWorkspace, workspaceID)
 	return err
@@ -93,11 +96,12 @@ SELECT
 FROM
   workspaces
 WHERE
-  id = $1
+  id = current_workspace_id ()
 `
 
-func (q *Queries) GetWorkspace(ctx context.Context, workspaceID string) (*Workspace, error) {
-	row := q.db.QueryRow(ctx, getWorkspace, workspaceID)
+// The workspace the transaction is pinned to.
+func (q *Queries) GetWorkspace(ctx context.Context) (*Workspace, error) {
+	row := q.db.QueryRow(ctx, getWorkspace)
 	var i Workspace
 	err := row.Scan(
 		&i.ID,
@@ -141,12 +145,12 @@ SELECT
 FROM
   workspaces
 WHERE
-  id = $1
+  id = current_workspace_id ()
 FOR UPDATE
 `
 
-func (q *Queries) GetWorkspaceForUpdate(ctx context.Context, workspaceID string) (*Workspace, error) {
-	row := q.db.QueryRow(ctx, getWorkspaceForUpdate, workspaceID)
+func (q *Queries) GetWorkspaceForUpdate(ctx context.Context) (*Workspace, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceForUpdate)
 	var i Workspace
 	err := row.Scan(
 		&i.ID,
@@ -178,14 +182,13 @@ func (q *Queries) GetWorkspaceStateVersion(ctx context.Context, workspaceID stri
 
 const initSubscription = `-- name: InitSubscription :exec
 INSERT INTO
-  workspace_subscriptions (workspace_id)
+  workspace_subscriptions DEFAULT
 VALUES
-  ($1)
 ON CONFLICT (workspace_id) DO NOTHING
 `
 
-func (q *Queries) InitSubscription(ctx context.Context, workspaceID string) error {
-	_, err := q.db.Exec(ctx, initSubscription, workspaceID)
+func (q *Queries) InitSubscription(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, initSubscription)
 	return err
 }
 
@@ -211,6 +214,14 @@ WHERE
       credentials c
     WHERE
       c.workspace_id = w.id
+  )
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      known_devices d
+    WHERE
+      d.workspace_id = w.id
   )
 `
 
@@ -288,7 +299,7 @@ SET
   settings = $3,
   updated_at = NOW()
 WHERE
-  id = $4
+  id = current_workspace_id ()
 RETURNING
   id, slug, name, description, settings, created_at, updated_at
 `
@@ -297,16 +308,10 @@ type UpdateWorkspaceParams struct {
 	Name        *string                  `json:"name"`
 	Description *string                  `json:"description"`
 	Settings    *nokku.WorkspaceSettings `json:"settings"`
-	WorkspaceID string                   `json:"workspaceId"`
 }
 
 func (q *Queries) UpdateWorkspace(ctx context.Context, arg *UpdateWorkspaceParams) (*Workspace, error) {
-	row := q.db.QueryRow(ctx, updateWorkspace,
-		arg.Name,
-		arg.Description,
-		arg.Settings,
-		arg.WorkspaceID,
-	)
+	row := q.db.QueryRow(ctx, updateWorkspace, arg.Name, arg.Description, arg.Settings)
 	var i Workspace
 	err := row.Scan(
 		&i.ID,

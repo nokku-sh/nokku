@@ -14,23 +14,21 @@ import (
 
 const createServiceAccount = `-- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (workspace_id, name, description, role_name, expires_at, tags, token_hash)
+  service_accounts (name, description, role_name, expires_at, tags, token_hash)
 VALUES
   (
     $1,
     $2,
-    $3,
-    COALESCE($4::TEXT, 'member'),
-    $5,
-    COALESCE($6, '{}'::TEXT[]),
-    $7
+    COALESCE($3::TEXT, 'member'),
+    $4,
+    COALESCE($5, '{}'::TEXT[]),
+    $6
   )
 RETURNING
   id
 `
 
 type CreateServiceAccountParams struct {
-	WorkspaceID string              `json:"workspaceId"`
 	Name        string              `json:"name"`
 	Description *string             `json:"description"`
 	RoleName    *string             `json:"roleName"`
@@ -41,7 +39,6 @@ type CreateServiceAccountParams struct {
 
 func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (string, error) {
 	row := q.db.QueryRow(ctx, createServiceAccount,
-		arg.WorkspaceID,
 		arg.Name,
 		arg.Description,
 		arg.RoleName,
@@ -99,18 +96,12 @@ SELECT
 FROM
   service_accounts
 WHERE
-  workspace_id = $1
-  AND token_hash = $2
+  token_hash = $1
   AND (expires_at IS NULL OR expires_at > NOW())
 `
 
-type GetServiceAccountByTokenHashParams struct {
-	WorkspaceID string              `json:"workspaceId"`
-	TokenHash   *crypto.HashedToken `json:"tokenHash"`
-}
-
-func (q *Queries) GetServiceAccountByTokenHash(ctx context.Context, arg *GetServiceAccountByTokenHashParams) (*ServiceAccount, error) {
-	row := q.db.QueryRow(ctx, getServiceAccountByTokenHash, arg.WorkspaceID, arg.TokenHash)
+func (q *Queries) GetServiceAccountByTokenHash(ctx context.Context, tokenHash *crypto.HashedToken) (*ServiceAccount, error) {
+	row := q.db.QueryRow(ctx, getServiceAccountByTokenHash, tokenHash)
 	var i ServiceAccount
 	err := row.Scan(
 		&i.ID,
@@ -135,48 +126,46 @@ SELECT
 FROM
   service_accounts sa
 WHERE
-  sa.workspace_id = $1
-  AND (
-    $2::TEXT IS NULL
-    OR sa.name ILIKE '%' || $2 || '%'
-    OR COALESCE(sa.description, '') ILIKE '%' || $2 || '%'
+  (
+    $1::TEXT IS NULL
+    OR sa.name ILIKE '%' || $1 || '%'
+    OR COALESCE(sa.description, '') ILIKE '%' || $1 || '%'
   )
-  AND sa.tags @> COALESCE($3, '{}'::TEXT[])
+  AND sa.tags @> COALESCE($2, '{}'::TEXT[])
   AND (
-    $4::BOOLEAN IS NULL
+    $3::BOOLEAN IS NULL
     OR (
-      $4 = TRUE
+      $3 = TRUE
       AND (
         sa.expires_at IS NULL
         OR sa.expires_at > NOW()
       )
     )
     OR (
-      $4 = FALSE
+      $3 = FALSE
       AND sa.expires_at IS NOT NULL
       AND sa.expires_at <= NOW()
     )
   )
   AND (
-    $5::TEXT IS NULL
-    OR sa.role_name = $5::TEXT
+    $4::TEXT IS NULL
+    OR sa.role_name = $4::TEXT
   )
 ORDER BY
   sa.id ASC
 LIMIT
-  $7
-OFFSET
   $6
+OFFSET
+  $5
 `
 
 type ListServiceAccountsParams struct {
-	WorkspaceID string   `json:"workspaceId"`
-	Query       *string  `json:"query"`
-	Tags        []string `json:"tags"`
-	IsActive    *bool    `json:"isActive"`
-	RoleName    *string  `json:"roleName"`
-	Offset      *int32   `json:"offset"`
-	Limit       *int32   `json:"limit"`
+	Query    *string  `json:"query"`
+	Tags     []string `json:"tags"`
+	IsActive *bool    `json:"isActive"`
+	RoleName *string  `json:"roleName"`
+	Offset   *int32   `json:"offset"`
+	Limit    *int32   `json:"limit"`
 }
 
 type ListServiceAccountsRow struct {
@@ -186,7 +175,6 @@ type ListServiceAccountsRow struct {
 
 func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccountsParams) ([]*ListServiceAccountsRow, error) {
 	rows, err := q.db.Query(ctx, listServiceAccounts,
-		arg.WorkspaceID,
 		arg.Query,
 		arg.Tags,
 		arg.IsActive,
