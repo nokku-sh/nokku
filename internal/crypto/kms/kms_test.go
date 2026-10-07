@@ -1,6 +1,7 @@
 package kms
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/testdb"
@@ -59,21 +61,33 @@ func storedConfig(t *testing.T, ws string) []byte {
 // seedProvider stores one encrypted provider config and returns its workspace.
 func seedProvider(t *testing.T, conn *db.Connection, secret string) string {
 	t.Helper()
-	ws, err := conn.Sys().CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
-		Slug: uuid.NewV7().String(), Name: "kms", Settings: &nokkuv1.WorkspaceSettings{},
-	})
-	require.NoError(t, err)
-	_, err = conn.Sys().UpsertSSOProvider(t.Context(), &db.UpsertSSOProviderParams{
-		WorkspaceID: ws.ID, ProviderID: "p", Name: "p", Enabled: true, Config: crypto.EncryptedBytes(secret),
-	})
-	require.NoError(t, err)
-	return ws.ID
+	ws := uuid.NewV7().String()
+	require.NoError(t, conn.WithWorkspace(pinned(t, ws), func(q *db.Queries) error {
+		if _, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
+			ID: ws, Slug: uuid.NewV7().String(), Name: "kms", Settings: &nokkuv1.WorkspaceSettings{},
+		}); err != nil {
+			return err
+		}
+		_, err := q.UpsertSSOProvider(t.Context(), &db.UpsertSSOProviderParams{
+			ProviderID: "p", Name: "p", Enabled: true, Config: crypto.EncryptedBytes(secret),
+		})
+		return err
+	}))
+	return ws
+}
+
+func pinned(t *testing.T, ws string) context.Context {
+	t.Helper()
+	return actor.WithWorkspace(t.Context(), actor.Workspace{ID: ws})
 }
 
 func readConfig(t *testing.T, conn *db.Connection, ws string) string {
 	t.Helper()
-	row, err := conn.Sys().GetSSOProvider(t.Context(), &db.GetSSOProviderParams{WorkspaceID: ws, ProviderID: "p"})
-	require.NoError(t, err)
+	var row *db.SsoProvider
+	require.NoError(t, conn.WithWorkspace(pinned(t, ws), func(q *db.Queries) (err error) {
+		row, err = q.GetSSOProvider(t.Context(), "p")
+		return err
+	}))
 	return string(row.Config)
 }
 

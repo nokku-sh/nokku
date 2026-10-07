@@ -71,7 +71,7 @@ func (s *Service) License() *licx.Claims {
 // ActivateLicense applies a key at once, no restart. A key that would
 // shorten the active license is refused, so an old key cannot undo a renewal.
 func (s *Service) ActivateLicense(ctx context.Context, key string) error {
-	if s.mode != ModeSelfHosted {
+	if s.saas {
 		return ErrNotSelfHosted
 	}
 	if !licx.HasPublicKey() {

@@ -51,13 +51,8 @@ func (h scimUserHandler) Get(r *http.Request, id string) (scim.Resource, error) 
 
 // GetAll turns the connectors' userName eq "..." lookups into an indexed query.
 func (h scimUserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
-	var rows []*db.ListSCIMUsersRow
-	err := h.svc.inWorkspace(r.Context(), func(q *db.Queries, ws string) (err error) {
-		rows, err = q.ListSCIMUsers(r.Context(), &db.ListSCIMUsersParams{
-			WorkspaceID: ws,
-			Email:       userNameFilter(params.FilterValidator),
-		})
-		return err
+	rows, err := h.svc.conn.Tenant().ListSCIMUsers(r.Context(), &db.ListSCIMUsersParams{
+		Email: userNameFilter(params.FilterValidator),
 	})
 	if err != nil {
 		return scim.Page{}, err
@@ -147,11 +142,7 @@ func (h scimUserHandler) user(ctx context.Context, id string) (*db.ListSCIMUsers
 	if _, err := uuid.Parse(id); err != nil {
 		return nil, scimerrors.ScimErrorResourceNotFound(id)
 	}
-	var rows []*db.ListSCIMUsersRow
-	err := h.svc.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		rows, err = q.ListSCIMUsers(ctx, &db.ListSCIMUsersParams{WorkspaceID: ws, UserID: &id})
-		return err
-	})
+	rows, err := h.svc.conn.Tenant().ListSCIMUsers(ctx, &db.ListSCIMUsersParams{UserID: &id})
 	if err != nil {
 		return nil, err
 	}
@@ -168,23 +159,23 @@ func (h scimUserHandler) apply(
 	active *bool,
 	externalID string,
 ) (scim.Resource, error) {
-	err := h.svc.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+	err := h.svc.conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		if active != nil && !*active {
-			if err := keepOwner(ctx, q, ws, id); err != nil {
+			if err := keepOwner(ctx, q, id); err != nil {
 				return err
 			}
 		}
 		if name != nil {
-			if _, err := q.UpdateUser(ctx, &db.UpdateUserParams{WorkspaceID: ws, ID: id, Name: name}); err != nil {
+			if _, err := q.UpdateUser(ctx, &db.UpdateUserParams{ID: id, Name: name}); err != nil {
 				return err
 			}
 		}
 		if active != nil {
-			if _, err := setUserActive(ctx, q, ws, id, *active); err != nil {
+			if _, err := setUserActive(ctx, q, id, *active); err != nil {
 				return err
 			}
 		}
-		return linkSCIMCredential(ctx, q, ws, id, externalID)
+		return linkSCIMCredential(ctx, q, id, externalID)
 	})
 	if err != nil {
 		return scim.Resource{}, err

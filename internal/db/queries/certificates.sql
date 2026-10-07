@@ -1,7 +1,6 @@
 -- name: CreateCA :one
 INSERT INTO
   certificate_authorities (
-    workspace_id,
     name,
     description,
     certificate,
@@ -26,7 +25,6 @@ INSERT INTO
   )
 VALUES
   (
-    @workspace_id,
     @name,
     @description,
     @certificate,
@@ -75,8 +73,7 @@ SELECT
 FROM
   certificate_authorities
 WHERE
-  workspace_id = @workspace_id
-  AND authority_type = @authority_type
+  authority_type = @authority_type
   AND is_default = TRUE
   AND is_active = TRUE
   AND NOW() BETWEEN not_before AND not_after;
@@ -124,8 +121,7 @@ SELECT
 FROM
   certificate_authorities
 WHERE
-  workspace_id = @workspace_id
-  AND (
+  (
     sqlc.narg('name_query')::text IS NULL
     OR name ILIKE '%' || sqlc.narg('name_query') || '%'
   )

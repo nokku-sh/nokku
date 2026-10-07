@@ -1,16 +1,16 @@
 -- name: CreateUser :one
 INSERT INTO
-  users (workspace_id, email, name, role, picture)
+  users (email, name, role, picture)
 VALUES
-  (@workspace_id, @email, @name, @role, sqlc.narg('picture'))
+  (@email, @name, @role, sqlc.narg('picture'))
 RETURNING
   *;
 
 -- name: CreateUserWithID :one
 INSERT INTO
-  users (id, workspace_id, email, name, role, picture)
+  users (id, email, name, role, picture)
 VALUES
-  (@id, @workspace_id, @email, @name, @role, sqlc.narg('picture'))
+  (@id, @email, @name, @role, sqlc.narg('picture'))
 RETURNING
   *;
 
@@ -20,8 +20,7 @@ SELECT
 FROM
   users
 WHERE
-  workspace_id = @workspace_id
-  AND id = @id;
+  id = @id;
 
 -- name: GetUserByEmail :one
 SELECT
@@ -29,8 +28,7 @@ SELECT
 FROM
   users
 WHERE
-  workspace_id = @workspace_id
-  AND email = @email;
+  email = @email;
 
 -- name: GetOwner :one
 SELECT
@@ -38,8 +36,7 @@ SELECT
 FROM
   users
 WHERE
-  workspace_id = @workspace_id
-  AND role = 'owner';
+  role = 'owner';
 
 -- name: ListUsers :many
 SELECT
@@ -48,8 +45,7 @@ SELECT
 FROM
   users u
 WHERE
-  u.workspace_id = @workspace_id
-  AND (
+  (
     sqlc.narg('query')::TEXT IS NULL
     OR u.name ILIKE '%' || sqlc.narg('query') || '%'
     OR u.email ILIKE '%' || sqlc.narg('query') || '%'
@@ -67,6 +63,7 @@ OFFSET
   sqlc.narg('offset');
 
 -- name: CountActiveUsers :one
+-- Names the workspace, billing counts seats as nokku_system.
 SELECT
   COUNT(*)
 FROM
@@ -82,8 +79,7 @@ SET
   picture = COALESCE(sqlc.narg('picture'), picture),
   updated_at = NOW()
 WHERE
-  workspace_id = @workspace_id
-  AND id = @id
+  id = @id
 RETURNING
   *;
 
@@ -94,8 +90,7 @@ SET
   role = @role,
   updated_at = NOW()
 WHERE
-  workspace_id = @workspace_id
-  AND id = @id
+  id = @id
   AND role <> 'owner';
 
 -- name: SetUserActive :exec
@@ -104,8 +99,7 @@ SET
   active = @active,
   updated_at = NOW()
 WHERE
-  workspace_id = @workspace_id
-  AND id = @id
+  id = @id
   AND role <> 'owner';
 
 -- name: TransferOwnership :execrows
@@ -118,8 +112,7 @@ SET
   END,
   updated_at = NOW()
 WHERE
-  workspace_id = @workspace_id
-  AND (
+  (
     role = 'owner'
     OR (
       id = @new_owner_id
@@ -133,14 +126,12 @@ SET
   email = @email,
   updated_at = NOW()
 WHERE
-  workspace_id = @workspace_id
-  AND id = @id
+  id = @id
 RETURNING
   *;
 
 -- name: DeleteUser :exec
 DELETE FROM users
 WHERE
-  workspace_id = @workspace_id
-  AND id = @id
+  id = @id
   AND role <> 'owner';

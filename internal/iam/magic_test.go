@@ -20,11 +20,11 @@ type mailbox struct {
 
 func (e *testEnv) mailbox() *mailbox {
 	m := &mailbox{links: make(chan string, 8)}
-	e.svc.SendMagicLink = func(_ context.Context, _ *db.User, link string, _ time.Duration) error {
+	e.svc.sendMagicLink = func(_ context.Context, _, _, link, _ string) error {
 		m.links <- link
 		return nil
 	}
-	e.svc.SendSignupLink = func(_ context.Context, _, _, link string, _ time.Duration) error {
+	e.svc.sendSignupLink = func(_ context.Context, _, _, _, link, _ string) error {
 		m.links <- link
 		return nil
 	}
@@ -178,10 +178,9 @@ func TestLastCredentialStays(t *testing.T) {
 	o := e.org(t)
 	ctx := as(t.Context(), o.ws, o.owner)
 	for _, id := range []string{"passkey:a", "passkey:b"} {
-		_, err := e.conn.Sys().UpsertCredential(t.Context(), &db.UpsertCredentialParams{
-			ID: id, WorkspaceID: o.ws.ID, UserID: o.owner.ID, Type: string(MethodPasskey), Subject: id, Data: []byte{},
+		e.putCredential(t, o.ws, db.UpsertCredentialParams{
+			ID: id, UserID: o.owner.ID, Type: string(MethodPasskey), Subject: id, Data: []byte{},
 		})
-		require.NoError(t, err)
 	}
 	require.NoError(t, e.svc.DeleteCredential(ctx, "passkey:a"))
 	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "passkey:b"), ErrLastCredential)
@@ -193,15 +192,13 @@ func TestLastCredentialStays(t *testing.T) {
 	assert.Zero(t, e.passkeys(t, o.ws, o.owner.ID))
 
 	other := e.user(t, o.ws, "other@"+testDomain(), "member")
-	_, err := e.conn.Sys().UpsertCredential(t.Context(), &db.UpsertCredentialParams{
-		ID:          "passkey:c",
-		WorkspaceID: o.ws.ID,
-		UserID:      other.ID,
-		Type:        string(MethodPasskey),
-		Subject:     "c",
-		Data:        []byte{},
+	e.putCredential(t, o.ws, db.UpsertCredentialParams{
+		ID:      "passkey:c",
+		UserID:  other.ID,
+		Type:    string(MethodPasskey),
+		Subject: "c",
+		Data:    []byte{},
 	})
-	require.NoError(t, err)
 	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "passkey:c"), ErrNotFound, "deleted another user's passkey")
 	_ = actor.KindUser
 }

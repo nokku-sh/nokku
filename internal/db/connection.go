@@ -28,6 +28,7 @@ type Connection struct {
 
 	// Pool serves request traffic as nokku_app, under RLS.
 	Pool    *pgxpool.Pool
+	tenant  *Queries
 	sys     *Queries
 	sysPool *pgxpool.Pool
 }
@@ -96,15 +97,20 @@ func (c *Connection) createPools(ctx context.Context) error {
 	}
 	appConfig.ConnConfig.User = "nokku_app"
 	appConfig.ConnConfig.Password = c.AppPassword
+	appConfig.PrepareConn = pinWorkspace
 
 	c.Pool, err = pgxpool.NewWithConfig(ctx, appConfig)
 	if err != nil {
 		return fmt.Errorf("creating app pool: %w", err)
 	}
+	c.tenant = New(c.Pool)
 
 	// The system pool logs in as nokku_app too and switches every
 	// connection to nokku_system, so no runtime path holds owner rights.
 	sysConfig := appConfig.Copy()
+	// Never pinned. A pin left on a system connection would send an insert
+	// that names no workspace into whatever workspace was pinned last.
+	sysConfig.PrepareConn = nil
 	sysConfig.MaxConns = min(c.MaxConns, 4)
 	sysConfig.MinConns = min(c.MinConns, sysConfig.MaxConns)
 	sysConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
@@ -180,9 +186,28 @@ func (c *Connection) setupAppRole(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
+// pinWorkspace runs every time a connection leaves the request pool. It pins
+// the workspace of the caller's context for as long as the caller holds the
+// connection. Without a workspace the caller gets an error, so a connection
+// is never used under the pin its last user left behind.
+func pinWorkspace(ctx context.Context, conn *pgx.Conn) (bool, error) {
+	ws := actor.WorkspaceIDFromContext(ctx)
+	if ws == "" {
+		return true, ErrWorkspaceNotPinned
+	}
+	if _, err := conn.Exec(ctx, `SELECT set_config('nokku.workspace_id', $1, false)`, ws); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// Tenant runs single statements as nokku_app, each pinned to the workspace
+// on its context. Statements that belong together go through WithWorkspace.
+func (c *Connection) Tenant() *Queries { return c.tenant }
+
 // Sys runs single statements as nokku_system (BYPASSRLS), for pre-auth
 // lookups and jobs.
-func (c *Connection) Sys() Querier { return c.sys }
+func (c *Connection) Sys() *Queries { return c.sys }
 
 func withTx(
 	ctx context.Context,
@@ -210,9 +235,15 @@ func withTx(
 
 // Pick the scope by what the query may see, never by convenience:
 //
-//	WithWorkspace  tenant rows of the request's workspace, RLS enforced
-//	WithTx         every tenant, RLS bypassed, only boot, signup, webhooks and jobs
-//	Sys            WithTx for a single statement
+//	Tenant         tenant rows of the pinned workspace, RLS enforced
+//	WithWorkspace  Tenant for statements that belong in one transaction
+//	Sys            every tenant, RLS bypassed, only boot, webhooks and jobs
+//	WithTx         Sys for statements that belong in one transaction
+//
+// Tenant queries carry no workspace filter and tenant inserts no workspace
+// id, the pin is the only scope they have. Run as system they would reach
+// every workspace, so system code only calls queries that name the workspace
+// or are cross-tenant on purpose.
 
 // WithTx bypasses RLS, only cross-tenant work belongs here.
 func (c *Connection) WithTx(
@@ -224,20 +255,15 @@ func (c *Connection) WithTx(
 	})
 }
 
-// WithWorkspace pins the transaction to the workspace on the context. The
+// WithWorkspace runs fn in a transaction of the workspace on the context. The
 // tenant middleware put it there, so a request without one fails closed.
+// Work outside a request pins one with actor.WithWorkspace. The pin itself
+// happens when the connection leaves the pool, see pinWorkspace.
 func (c *Connection) WithWorkspace(
 	ctx context.Context,
 	fn func(*Queries) error,
 ) error {
-	ws := actor.WorkspaceIDFromContext(ctx)
-	if ws == "" {
-		return ErrWorkspaceNotPinned
-	}
-	return withTx(ctx, c.Pool, func(ctx context.Context, tx pgx.Tx, q *Queries) error {
-		if _, err := tx.Exec(ctx, `SELECT set_config('nokku.workspace_id', $1, true)`, ws); err != nil {
-			return err
-		}
+	return withTx(ctx, c.Pool, func(_ context.Context, _ pgx.Tx, q *Queries) error {
 		return fn(q)
 	})
 }

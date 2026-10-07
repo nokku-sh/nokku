@@ -12,38 +12,34 @@ import (
 const deleteCredential = `-- name: DeleteCredential :exec
 DELETE FROM credentials
 WHERE
-  workspace_id = $1
-  AND user_id = $2
-  AND id = $3
+  user_id = $1
+  AND id = $2
 `
 
 type DeleteCredentialParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-	ID          string `json:"id"`
+	UserID string `json:"userId"`
+	ID     string `json:"id"`
 }
 
 func (q *Queries) DeleteCredential(ctx context.Context, arg *DeleteCredentialParams) error {
-	_, err := q.db.Exec(ctx, deleteCredential, arg.WorkspaceID, arg.UserID, arg.ID)
+	_, err := q.db.Exec(ctx, deleteCredential, arg.UserID, arg.ID)
 	return err
 }
 
 const deleteCredentialsByProvider = `-- name: DeleteCredentialsByProvider :execrows
 DELETE FROM credentials
 WHERE
-  workspace_id = $1
-  AND type = $2
-  AND provider = $3
+  type = $1
+  AND provider = $2
 `
 
 type DeleteCredentialsByProviderParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	Type        string `json:"type"`
-	Provider    string `json:"provider"`
+	Type     string `json:"type"`
+	Provider string `json:"provider"`
 }
 
 func (q *Queries) DeleteCredentialsByProvider(ctx context.Context, arg *DeleteCredentialsByProviderParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteCredentialsByProvider, arg.WorkspaceID, arg.Type, arg.Provider)
+	result, err := q.db.Exec(ctx, deleteCredentialsByProvider, arg.Type, arg.Provider)
 	if err != nil {
 		return 0, err
 	}
@@ -56,26 +52,19 @@ SELECT
 FROM
   credentials
 WHERE
-  workspace_id = $1
-  AND type = $2
-  AND provider = $3
-  AND subject = $4
+  type = $1
+  AND provider = $2
+  AND subject = $3
 `
 
 type FindCredentialBySubjectParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	Type        string `json:"type"`
-	Provider    string `json:"provider"`
-	Subject     string `json:"subject"`
+	Type     string `json:"type"`
+	Provider string `json:"provider"`
+	Subject  string `json:"subject"`
 }
 
 func (q *Queries) FindCredentialBySubject(ctx context.Context, arg *FindCredentialBySubjectParams) (*Credential, error) {
-	row := q.db.QueryRow(ctx, findCredentialBySubject,
-		arg.WorkspaceID,
-		arg.Type,
-		arg.Provider,
-		arg.Subject,
-	)
+	row := q.db.QueryRow(ctx, findCredentialBySubject, arg.Type, arg.Provider, arg.Subject)
 	var i Credential
 	err := row.Scan(
 		&i.ID,
@@ -99,21 +88,19 @@ SELECT
 FROM
   credentials
 WHERE
-  workspace_id = $1
-  AND user_id = $2
-  AND type = $3
+  user_id = $1
+  AND type = $2
 ORDER BY
   created_at ASC
 `
 
 type ListCredentialsByTypeParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-	Type        string `json:"type"`
+	UserID string `json:"userId"`
+	Type   string `json:"type"`
 }
 
 func (q *Queries) ListCredentialsByType(ctx context.Context, arg *ListCredentialsByTypeParams) ([]*Credential, error) {
-	rows, err := q.db.Query(ctx, listCredentialsByType, arg.WorkspaceID, arg.UserID, arg.Type)
+	rows, err := q.db.Query(ctx, listCredentialsByType, arg.UserID, arg.Type)
 	if err != nil {
 		return nil, err
 	}
@@ -150,20 +137,14 @@ SELECT
 FROM
   credentials
 WHERE
-  workspace_id = $1
-  AND user_id = $2
+  user_id = $1
 ORDER BY
   type ASC,
   created_at ASC
 `
 
-type ListUserCredentialsParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-}
-
-func (q *Queries) ListUserCredentials(ctx context.Context, arg *ListUserCredentialsParams) ([]*Credential, error) {
-	rows, err := q.db.Query(ctx, listUserCredentials, arg.WorkspaceID, arg.UserID)
+func (q *Queries) ListUserCredentials(ctx context.Context, userID string) ([]*Credential, error) {
+	rows, err := q.db.Query(ctx, listUserCredentials, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -200,25 +181,18 @@ SET
   label = $1,
   updated_at = NOW()
 WHERE
-  workspace_id = $2
-  AND user_id = $3
-  AND id = $4
+  user_id = $2
+  AND id = $3
 `
 
 type RenameCredentialParams struct {
-	Label       string `json:"label"`
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-	ID          string `json:"id"`
+	Label  string `json:"label"`
+	UserID string `json:"userId"`
+	ID     string `json:"id"`
 }
 
 func (q *Queries) RenameCredential(ctx context.Context, arg *RenameCredentialParams) error {
-	_, err := q.db.Exec(ctx, renameCredential,
-		arg.Label,
-		arg.WorkspaceID,
-		arg.UserID,
-		arg.ID,
-	)
+	_, err := q.db.Exec(ctx, renameCredential, arg.Label, arg.UserID, arg.ID)
 	return err
 }
 
@@ -227,25 +201,19 @@ UPDATE credentials
 SET
   last_used_at = NOW()
 WHERE
-  workspace_id = $1
-  AND id = $2
+  id = $1
 `
 
-type TouchCredentialParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	ID          string `json:"id"`
-}
-
-func (q *Queries) TouchCredential(ctx context.Context, arg *TouchCredentialParams) error {
-	_, err := q.db.Exec(ctx, touchCredential, arg.WorkspaceID, arg.ID)
+func (q *Queries) TouchCredential(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, touchCredential, id)
 	return err
 }
 
 const upsertCredential = `-- name: UpsertCredential :one
 INSERT INTO
-  credentials (id, workspace_id, user_id, type, provider, subject, data, label)
+  credentials (id, user_id, type, provider, subject, data, label)
 VALUES
-  ($1, $2, $3, $4, $5, $6, $7, $8)
+  ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (id) DO UPDATE
 SET
   type = EXCLUDED.type,
@@ -261,21 +229,19 @@ RETURNING
 `
 
 type UpsertCredentialParams struct {
-	ID          string `json:"id"`
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-	Type        string `json:"type"`
-	Provider    string `json:"provider"`
-	Subject     string `json:"subject"`
-	Data        []byte `json:"data"`
-	Label       string `json:"label"`
+	ID       string `json:"id"`
+	UserID   string `json:"userId"`
+	Type     string `json:"type"`
+	Provider string `json:"provider"`
+	Subject  string `json:"subject"`
+	Data     []byte `json:"data"`
+	Label    string `json:"label"`
 }
 
 // A credential never moves accounts, a clash returns no rows.
 func (q *Queries) UpsertCredential(ctx context.Context, arg *UpsertCredentialParams) (*Credential, error) {
 	row := q.db.QueryRow(ctx, upsertCredential,
 		arg.ID,
-		arg.WorkspaceID,
 		arg.UserID,
 		arg.Type,
 		arg.Provider,

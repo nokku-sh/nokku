@@ -121,42 +121,41 @@ SELECT
 FROM
   audit.audit_logs
 WHERE
-  workspace_id = $1
-  AND (
-    $2::TEXT[] IS NULL
-    OR actor_id = ANY ($2::TEXT[])
+  (
+    $1::TEXT[] IS NULL
+    OR actor_id = ANY ($1::TEXT[])
   )
   AND (
-    $3::TEXT[] IS NULL
-    OR actor_kind = ANY ($3::TEXT[])
+    $2::TEXT[] IS NULL
+    OR actor_kind = ANY ($2::TEXT[])
   )
   -- Actions match exactly, a trailing * matches by prefix, e.g. "Delete*".
   AND (
-    $4::TEXT[] IS NULL
-    OR action = ANY ($4::TEXT[])
+    $3::TEXT[] IS NULL
+    OR action = ANY ($3::TEXT[])
     OR EXISTS (
       SELECT
         1
       FROM
-        unnest($4::TEXT[]) AS a (v)
+        unnest($3::TEXT[]) AS a (v)
       WHERE
         a.v LIKE '%*'
         AND action LIKE rtrim(a.v, '*') || '%'
     )
   )
   AND (
-    $5::TEXT IS NULL
-    OR target = $5
+    $4::TEXT IS NULL
+    OR target = $4
   )
   -- Failed is every failed call, denied only those an auth or permission check stopped.
   AND (
-    $6::TEXT IS NULL
+    $5::TEXT IS NULL
     OR (
-      $6 = 'succeeded'
+      $5 = 'succeeded'
       AND ok
     )
     OR (
-      $6 = 'denied'
+      $5 = 'denied'
       AND NOT ok
       AND (
         action = 'LoginDenied'
@@ -164,44 +163,43 @@ WHERE
       )
     )
     OR (
-      $6 = 'failed'
+      $5 = 'failed'
       AND NOT ok
     )
   )
   AND (
-    $7::TEXT IS NULL
-    OR action ILIKE '%' || $7 || '%'
-    OR actor_name ILIKE '%' || $7 || '%'
-    OR target ILIKE '%' || $7 || '%'
+    $6::TEXT IS NULL
+    OR action ILIKE '%' || $6 || '%'
+    OR actor_name ILIKE '%' || $6 || '%'
+    OR target ILIKE '%' || $6 || '%'
+  )
+  AND (
+    $7::timestamptz IS NULL
+    OR timestamp >= $7
   )
   AND (
     $8::timestamptz IS NULL
-    OR timestamp >= $8
-  )
-  AND (
-    $9::timestamptz IS NULL
-    OR timestamp < $9
+    OR timestamp < $8
   )
 ORDER BY
   timestamp DESC
 LIMIT
-  $11
-OFFSET
   $10
+OFFSET
+  $9
 `
 
 type ListAuditLogsParams struct {
-	WorkspaceID string     `json:"workspaceId"`
-	ActorIds    []string   `json:"actorIds"`
-	ActorKinds  []string   `json:"actorKinds"`
-	Actions     []string   `json:"actions"`
-	Target      *string    `json:"target"`
-	Outcome     *string    `json:"outcome"`
-	Search      *string    `json:"search"`
-	StartDate   *time.Time `json:"startDate"`
-	EndDate     *time.Time `json:"endDate"`
-	Offset      int32      `json:"offset"`
-	Limit       int32      `json:"limit"`
+	ActorIds   []string   `json:"actorIds"`
+	ActorKinds []string   `json:"actorKinds"`
+	Actions    []string   `json:"actions"`
+	Target     *string    `json:"target"`
+	Outcome    *string    `json:"outcome"`
+	Search     *string    `json:"search"`
+	StartDate  *time.Time `json:"startDate"`
+	EndDate    *time.Time `json:"endDate"`
+	Offset     int32      `json:"offset"`
+	Limit      int32      `json:"limit"`
 }
 
 type ListAuditLogsRow struct {
@@ -222,7 +220,6 @@ type ListAuditLogsRow struct {
 
 func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) ([]*ListAuditLogsRow, error) {
 	rows, err := q.db.Query(ctx, listAuditLogs,
-		arg.WorkspaceID,
 		arg.ActorIds,
 		arg.ActorKinds,
 		arg.Actions,

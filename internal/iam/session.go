@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"uuid"
 
 	"github.com/jackc/pgx/v5"
 
@@ -17,11 +18,12 @@ import (
 )
 
 const (
-	// A device marker remembers a browser by its cookie and a terminal by its
-	// signing key, see RememberDevice and rememberTerminal. It powers the
-	// sessions list and new-login alerts and is never an API credential.
+	// A known device is a browser remembered by its cookie or a terminal by
+	// its signing key. It shows in the sessions list, and a sign-in from one
+	// the account has not used before is mailed. It lives in its own table
+	// and never signs anyone in.
 	deviceCookieName = "nokku_device"
-	deviceMarkerTTL  = 180 * 24 * time.Hour
+	deviceTTL        = 180 * 24 * time.Hour
 	// maxUserAgent keeps a hostile header from bloating the sessions table.
 	maxUserAgent = 512
 )
@@ -42,10 +44,7 @@ type SessionParams struct {
 
 // IssueSession pins the session to the request's workspace.
 func (s *Service) IssueSession(ctx context.Context, p SessionParams) (*db.Session, string, error) {
-	token, tokenHash, err := crypto.NewSecret()
-	if err != nil {
-		return nil, "", err
-	}
+	token, tokenHash := crypto.NewSecret()
 	now := s.now()
 	params := &db.CreateSessionParams{
 		TokenHash:  tokenHash,
@@ -56,30 +55,25 @@ func (s *Service) IssueSession(ctx context.Context, p SessionParams) (*db.Sessio
 		Label:      p.Label,
 		LastSeenAt: &now,
 	}
-	if meta, ok := RequestMetaFromContext(ctx); ok {
+	if meta, ok := actor.RequestMetaFromContext(ctx); ok {
 		params.UserAgent = truncate(strings.ToValidUTF8(meta.Header.Get("User-Agent"), ""), maxUserAgent)
 		params.Ip = strings.ToValidUTF8(realip.Bucket(meta.Header, meta.RemoteAddr), "")
 	}
 	if p.TTL > 0 {
 		params.ExpiresAt = new(now.Add(p.TTL))
 	}
-	var sess *db.Session
-	err = s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		params.WorkspaceID = ws
-		sess, err = q.CreateSession(ctx, params)
-		return err
-	})
+	sess, err := s.conn.Tenant().CreateSession(ctx, params)
 	if err != nil {
 		return nil, "", err
 	}
-	s.record(ctx, Event{Action: ActionSessionIssued, Kind: p.Kind, Method: p.Method, UserID: p.SubjectID})
+	s.record(ctx, event{Action: actionSessionIssued, Kind: p.Kind, Method: p.Method, UserID: p.SubjectID})
 	return sess, token, nil
 }
 
 // completeLogin applies the gates every login method shares.
 func (s *Service) completeLogin(ctx context.Context, u *db.User, method Method) (*http.Cookie, error) {
 	deny := func(err error, detail string) (*http.Cookie, error) {
-		s.record(ctx, Event{Action: ActionLoginDenied, Method: method, UserID: u.ID, Email: u.Email, Detail: detail})
+		s.record(ctx, event{Action: actionLoginDenied, Method: method, UserID: u.ID, Email: u.Email, Detail: detail})
 		return nil, err
 	}
 	if !u.Active {
@@ -105,22 +99,17 @@ func (s *Service) completeLogin(ctx context.Context, u *db.User, method Method) 
 	}
 	s.record(
 		ctx,
-		Event{Action: ActionLoginSucceeded, Kind: actor.KindUser, Method: method, UserID: u.ID, Email: u.Email},
+		event{Action: actionLoginSucceeded, Kind: actor.KindUser, Method: method, UserID: u.ID, Email: u.Email},
 	)
 	return s.newCookie(sessionCookieName, token, *sess.ExpiresAt), nil
 }
 
 func (s *Service) ssoEnforced(ctx context.Context) (bool, error) {
-	var enforced bool
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		w, err := q.GetWorkspace(ctx, ws)
-		if err != nil {
-			return err
-		}
-		enforced = w.Settings.GetEnforceSso()
-		return nil
-	})
-	return enforced, err
+	w, err := s.conn.Tenant().GetWorkspace(ctx)
+	if err != nil {
+		return false, err
+	}
+	return w.Settings.GetEnforceSso(), nil
 }
 
 // IssueDaemonSession replaces the daemon's earlier sessions. The session
@@ -139,42 +128,77 @@ func (s *Service) IssueDaemonSession(ctx context.Context, daemonID, binding stri
 	return token, err
 }
 
-// RememberDevice returns nil for a known device. A new one gets a cookie and
-// fires OnNewDeviceLogin.
+// RememberDevice returns nil for a browser the account has signed in from
+// before. A new one gets a cookie, and the account a mail.
 func (s *Service) RememberDevice(ctx context.Context, header http.Header, remoteAddr string, u *db.User) *http.Cookie {
-	if raw := cookieFromHeader(header, deviceCookieName); raw != "" {
-		if sess, err := s.verifySession(ctx, raw); err == nil &&
-			sess.Kind == string(actor.KindDevice) && sess.SubjectID == u.ID {
-			s.touchSession(ctx, sess.TokenHash)
-			return nil
-		}
-	}
-
-	name := deviceNameFromUA(header.Get("User-Agent"))
-	sess, token, err := s.IssueSession(ctx, SessionParams{
-		SubjectID: u.ID,
-		Kind:      actor.KindDevice,
-		Method:    MethodDevice,
-		Label:     name,
-		TTL:       deviceMarkerTTL,
-	})
-	if err != nil {
-		slog.Error("failed to register device session", "error", err)
+	if raw := cookieFromHeader(header, deviceCookieName); raw != "" && s.seenDevice(ctx, u.ID, deviceKey(raw)) {
 		return nil
 	}
-	if s.OnNewDeviceLogin != nil {
-		ip := realip.Bucket(header, remoteAddr)
-		go s.OnNewDeviceLogin(context.WithoutCancel(ctx), u, sess, name, ip)
+	token := crypto.RandomString(32)
+	userAgent := header.Get("User-Agent")
+	d, err := s.addDevice(
+		ctx,
+		u,
+		deviceKey(token),
+		userAgent,
+		deviceNameFromUA(userAgent),
+		realip.Bucket(header, remoteAddr),
+	)
+	if err != nil {
+		slog.Error("failed to remember device", "error", err)
+		return nil
 	}
-	return s.newCookie(deviceCookieName, token, *sess.ExpiresAt)
+	return s.newCookie(deviceCookieName, token, d.ExpiresAt)
 }
 
-func (s *Service) touchSession(ctx context.Context, hash crypto.HashedToken) {
+// deviceKey is what a browser is recognized by, the hash of its cookie.
+func deviceKey(cookie string) string {
+	return crypto.HashToken(cookie).Hash()
+}
+
+// seenDevice reports whether the account has signed in from the device
+// before, and notes the visit. A failed lookup counts as new, a mail too
+// many beats a missed one.
+func (s *Service) seenDevice(ctx context.Context, userID, key string) bool {
+	_, err := s.conn.Tenant().SeenKnownDevice(ctx, &db.SeenKnownDeviceParams{UserID: userID, Key: key, Now: s.now()})
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		slog.Error("failed to look up known devices", "error", err)
+	}
+	return err == nil
+}
+
+// addDevice remembers a device the account has not signed in from before
+// and mails the account about it. name is what the mail calls the device.
+func (s *Service) addDevice(ctx context.Context, u *db.User, key, userAgent, name, ip string) (*db.KnownDevice, error) {
 	now := s.now()
-	// Best effort, last_seen_at is a hint.
-	_ = s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		return q.TouchSession(ctx, &db.TouchSessionParams{WorkspaceID: ws, TokenHash: hash, LastSeenAt: &now})
+	d, err := s.conn.Tenant().AddKnownDevice(ctx, &db.AddKnownDeviceParams{
+		UserID:    u.ID,
+		Key:       key,
+		Ip:        strings.ToValidUTF8(ip, ""),
+		UserAgent: truncate(strings.ToValidUTF8(userAgent, ""), maxUserAgent),
+		ExpiresAt: now.Add(deviceTTL),
+		Now:       now,
 	})
+	if err != nil {
+		return nil, err
+	}
+	s.notifyNewDevice(ctx, u, d.ID, name, ip)
+	return d, nil
+}
+
+// ListDevices is every device the signed-in user is remembered on.
+func (s *Service) ListDevices(ctx context.Context) ([]*db.KnownDevice, error) {
+	return s.conn.Tenant().ListKnownDevices(ctx, actor.UserIDFromContext(ctx))
+}
+
+// ForgetDevice only reaches the caller's own devices. The next sign-in from
+// that device is mailed again.
+func (s *Service) ForgetDevice(ctx context.Context, id string) error {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil
+	}
+	return s.conn.Tenant().
+		DeleteKnownDevice(ctx, &db.DeleteKnownDeviceParams{UserID: actor.UserIDFromContext(ctx), ID: id})
 }
 
 // verifySession only finds sessions of the request's workspace.
@@ -182,15 +206,8 @@ func (s *Service) verifySession(ctx context.Context, token string) (db.Session, 
 	if token == "" {
 		return db.Session{}, errNoSession
 	}
-	tokenHash, err := crypto.HashToken(token)
-	if err != nil {
-		return db.Session{}, err
-	}
-	var sess *db.Session
-	err = s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		sess, err = q.GetSession(ctx, &db.GetSessionParams{WorkspaceID: ws, TokenHash: tokenHash})
-		return err
-	})
+	tokenHash := crypto.HashToken(token)
+	sess, err := s.conn.Tenant().GetSession(ctx, tokenHash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return db.Session{}, errNoSession
 	}
@@ -204,22 +221,25 @@ func (s *Service) verifySession(ctx context.Context, token string) (db.Session, 
 	return *sess, nil
 }
 
+// noteSeen records that an authenticated request used the session. It never
+// fails the request, the stamp is only what the sessions list shows.
+func (s *Service) noteSeen(ctx context.Context, sess db.Session) {
+	now := s.now()
+	if sess.LastSeenAt != nil && now.Sub(*sess.LastSeenAt) < sessionSeenEvery {
+		return
+	}
+	err := s.conn.Tenant().TouchSession(ctx, &db.TouchSessionParams{TokenHash: sess.TokenHash, LastSeenAt: &now})
+	if err != nil {
+		slog.Warn("failed to note session activity", "error", err)
+	}
+}
+
 func (s *Service) deleteSession(ctx context.Context, hash crypto.HashedToken) error {
-	return s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		return q.DeleteSession(ctx, &db.DeleteSessionParams{WorkspaceID: ws, TokenHash: hash})
-	})
+	return s.conn.Tenant().DeleteSession(ctx, hash)
 }
 
 func (s *Service) ListSessions(ctx context.Context) ([]*db.Session, error) {
-	var rows []*db.Session
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		rows, err = q.ListSessionsBySubject(ctx, &db.ListSessionsBySubjectParams{
-			WorkspaceID: ws,
-			SubjectID:   actor.UserIDFromContext(ctx),
-		})
-		return err
-	})
-	return rows, err
+	return s.conn.Tenant().ListSessionsBySubject(ctx, actor.UserIDFromContext(ctx))
 }
 
 // Logout needs the DPoP proof for header tokens, so a leaked token alone
@@ -236,45 +256,31 @@ func (s *Service) Logout(ctx context.Context, header http.Header, procedure stri
 	if err := s.deleteSession(ctx, sess.TokenHash); err != nil {
 		return err
 	}
-	s.record(ctx, Event{Action: ActionSessionRevoked, Kind: p.Kind, Method: Method(sess.Method), UserID: p.ID})
+	s.record(ctx, event{Action: actionSessionRevoked, Kind: p.Kind, Method: Method(sess.Method), UserID: p.ID})
 	return nil
 }
 
 func (s *Service) revokeSubject(ctx context.Context, subjectID string) (int64, error) {
-	var n int64
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		n, err = q.DeleteSubjectSessions(ctx, &db.DeleteSubjectSessionsParams{WorkspaceID: ws, SubjectID: subjectID})
-		return err
-	})
-	return n, err
+	return s.conn.Tenant().DeleteSubjectSessions(ctx, subjectID)
 }
 
 func (s *Service) RevokeOtherSessions(ctx context.Context, keep SessionHash) (int64, error) {
-	var n int64
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		n, err = q.DeleteSessionsExcept(ctx, &db.DeleteSessionsExceptParams{
-			WorkspaceID: ws,
-			SubjectID:   actor.UserIDFromContext(ctx),
-			KeepHash:    crypto.HashedToken(keep),
-		})
-		return err
+	return s.conn.Tenant().DeleteSessionsExcept(ctx, &db.DeleteSessionsExceptParams{
+		SubjectID: actor.UserIDFromContext(ctx),
+		KeepHash:  crypto.HashedToken(keep),
 	})
-	return n, err
 }
 
 // DeleteOwnSession only reaches the caller's own sessions.
 func (s *Service) DeleteOwnSession(ctx context.Context, hash SessionHash) error {
-	return s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		rows, err := q.ListSessionsBySubject(ctx, &db.ListSessionsBySubjectParams{
-			WorkspaceID: ws,
-			SubjectID:   actor.UserIDFromContext(ctx),
-		})
+	return s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		rows, err := q.ListSessionsBySubject(ctx, actor.UserIDFromContext(ctx))
 		if err != nil {
 			return err
 		}
 		for _, sess := range rows {
 			if sess.TokenHash == crypto.HashedToken(hash) {
-				return q.DeleteSession(ctx, &db.DeleteSessionParams{WorkspaceID: ws, TokenHash: sess.TokenHash})
+				return q.DeleteSession(ctx, sess.TokenHash)
 			}
 		}
 		return nil
@@ -291,9 +297,7 @@ func truncate(s string, n int) string {
 // touchCredential marks a credential as used by a sign-in. It never fails
 // the sign-in, "last used" is only a hint for the owner.
 func (s *Service) touchCredential(ctx context.Context, id string) {
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		return q.TouchCredential(ctx, &db.TouchCredentialParams{WorkspaceID: ws, ID: id})
-	})
+	err := s.conn.Tenant().TouchCredential(ctx, id)
 	if err != nil {
 		slog.Warn("failed to mark credential used", "error", err)
 	}

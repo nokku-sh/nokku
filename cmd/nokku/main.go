@@ -7,15 +7,18 @@ import (
 	"os"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/jackc/pgx/v5"
 	"github.com/mizuchilabs/kata/buildinfo"
 	"github.com/mizuchilabs/kata/logx"
 	"github.com/mizuchilabs/kata/sigx"
 	"github.com/urfave/cli/v3"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/api"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 func main() {
@@ -43,15 +46,35 @@ func main() {
 				Description: "The way back in when the owner lost every passkey and no mail " +
 					"goes out. The link works for 24 hours and replaces earlier ones. " +
 					"Run it on the server with the same environment the server has.",
-				Action: func(ctx context.Context, cmd *cli.Command) error {
-					cfg, err := config.New(ctx, cmd)
+				// Only the database and iam. The server may be running next to
+				// this, so nothing of what it does at boot happens here.
+				Action: func(ctx context.Context, _ *cli.Command) error {
+					ec, err := env.ParseAs[config.EnvConfig]()
 					if err != nil {
-						return fmt.Errorf("failed to load configuration: %w", err)
+						return err
 					}
-					if cfg.Tenant.SaaS() {
+					if ec.SaaS {
 						return errors.New("admin-link is for a self-hosted server")
 					}
-					owner, link, err := cfg.IAM.AdminLink(ctx, cfg.Tenant.Single())
+					conn, err := db.NewConnection(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to connect to database: %w", err)
+					}
+					ws, err := conn.Sys().GetFirstWorkspace(ctx)
+					if errors.Is(err, pgx.ErrNoRows) {
+						return errors.New("there is no workspace yet, start the server once")
+					}
+					if err != nil {
+						return err
+					}
+					svc, err := iam.New(ctx, iam.Deps{Conn: conn, Secret: []byte(ec.Secret)})
+					if err != nil {
+						return err
+					}
+					owner, link, err := svc.AdminLink(
+						ctx,
+						actor.Workspace{ID: ws.ID, Slug: ws.Slug, BaseURL: ec.FullURL()},
+					)
 					if err != nil {
 						return err
 					}

@@ -34,24 +34,20 @@ func enrollToken(t *testing.T, tweak func(*db.CreateWorkspaceTokenParams)) (fixt
 		t.Skipf("no test database: %v", err)
 	}
 
-	var plaintext, workspaceID string
-	err = conn.WithTx(ctx, func(q *db.Queries) error {
-		ws, err := q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
-			Slug: uuid.NewV7().String(), Name: "ws", Settings: &nokkuv1.WorkspaceSettings{},
-		})
-		if err != nil {
+	var plaintext string
+	workspaceID := uuid.NewV7().String()
+	pinned := actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID})
+	err = conn.WithWorkspace(pinned, func(q *db.Queries) error {
+		if _, err := q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
+			ID: workspaceID, Slug: uuid.NewV7().String(), Name: "ws", Settings: &nokkuv1.WorkspaceSettings{},
+		}); err != nil {
 			return err
 		}
-		workspaceID = ws.ID
 		params := &db.CreateWorkspaceTokenParams{
-			ID:          uuid.NewV7().String(),
-			WorkspaceID: ws.ID,
-			Kind:        nokkuv1.TokenKind_TOKEN_KIND_ENROLL,
+			ID:   uuid.NewV7().String(),
+			Kind: nokkuv1.TokenKind_TOKEN_KIND_ENROLL,
 		}
-		token, err := crypto.NewToken(crypto.WithID(params.ID))
-		if err != nil {
-			return err
-		}
+		token := crypto.NewToken(params.ID)
 		params.TokenHash = token.Hash
 		plaintext = token.Plaintext
 		if tweak != nil {
@@ -63,7 +59,7 @@ func enrollToken(t *testing.T, tweak func(*db.CreateWorkspaceTokenParams)) (fixt
 	if err != nil {
 		t.Fatalf("seed token: %v", err)
 	}
-	return fixture{conn: conn, ctx: actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID})}, plaintext
+	return fixture{conn: conn, ctx: pinned}, plaintext
 }
 
 func enroll(t *testing.T, f fixture, in EnrollInput) (*Enrolled, error) {
@@ -215,11 +211,8 @@ func (failingRow) Scan(...any) error { return errors.New("connection lost") }
 
 // A database failure is not a verdict on the token.
 func TestEnroll_LookupFailureIsNotABadToken(t *testing.T) {
-	token, err := crypto.NewToken(crypto.WithID(uuid.NewV7().String()))
-	if err != nil {
-		t.Fatalf("new token: %v", err)
-	}
-	_, err = Enroll(t.Context(), failingConn{}, EnrollInput{Token: token.Plaintext})
+	token := crypto.NewToken(uuid.NewV7().String())
+	_, err := Enroll(t.Context(), failingConn{}, EnrollInput{Token: token.Plaintext})
 	if err == nil || errors.Is(err, ErrEnrollToken) {
 		t.Fatalf("err = %v, want the lookup failure", err)
 	}

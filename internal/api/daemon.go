@@ -14,7 +14,6 @@ import (
 	"connectrpc.com/connect"
 
 	nokkudaemon "github.com/nokku-sh/nokku/internal/daemon"
-	"github.com/nokku-sh/nokku/internal/iam"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
@@ -26,19 +25,12 @@ type daemonService struct {
 	cfg *config.Config
 }
 
-func newDaemonService(cfg *config.Config) *daemonService {
-	return &daemonService{cfg: cfg}
-}
-
 func (s *daemonService) GetDaemon(
 	ctx context.Context,
 	req *nokkuv1.GetDaemonRequest,
 ) (*nokkuv1.GetDaemonResponse, error) {
-	var result *db.Daemon
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.GetDaemon(ctx, req.GetId())
-		return err
-	}); err != nil {
+	result, err := s.cfg.Conn.Tenant().GetDaemon(ctx, req.GetId())
+	if err != nil {
 		return nil, err
 	}
 
@@ -85,27 +77,22 @@ func (s *daemonService) ListDaemons(
 	ctx context.Context,
 	req *nokkuv1.ListDaemonsRequest,
 ) (*nokkuv1.ListDaemonsResponse, error) {
-	var result []*db.ListDaemonsRow
-	count := int32(0)
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		var status *int32
-		if req.GetStatus() != 0 {
-			status = new(int32(req.GetStatus()))
-		}
-
-		result, err = q.ListDaemons(ctx, &db.ListDaemonsParams{
-			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
-			Query:       req.Query,
-			Status:      status,
-			Online:      req.Online,
-			SeenAfter:   time.Now().Add(-db.DaemonOnlineWindow),
-			Limit:       req.Limit,
-			Offset:      req.Offset,
-		})
-		return err
-	}); err != nil {
+	var status *int32
+	if req.GetStatus() != 0 {
+		status = new(int32(req.GetStatus()))
+	}
+	result, err := s.cfg.Conn.Tenant().ListDaemons(ctx, &db.ListDaemonsParams{
+		Query:     req.Query,
+		Status:    status,
+		Online:    req.Online,
+		SeenAfter: time.Now().Add(-db.DaemonOnlineWindow),
+		Limit:     req.Limit,
+		Offset:    req.Offset,
+	})
+	if err != nil {
 		return nil, err
 	}
+	count := int32(0)
 	if len(result) > 0 {
 		count = result[0].TotalCount
 	}
@@ -120,10 +107,7 @@ func (s *daemonService) DeleteDaemon(
 	ctx context.Context,
 	req *nokkuv1.DeleteDaemonRequest,
 ) (*nokkuv1.DeleteDaemonResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		_, err = q.DeleteDaemon(ctx, req.GetId())
-		return err
-	}); err != nil {
+	if _, err := s.cfg.Conn.Tenant().DeleteDaemon(ctx, req.GetId()); err != nil {
 		return nil, err
 	}
 
@@ -215,11 +199,8 @@ func (s *daemonService) ListSessions(
 	ctx context.Context,
 	req *nokkuv1.ListSessionsRequest,
 ) (*nokkuv1.ListSessionsResponse, error) {
-	var daemon *db.Daemon
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		daemon, err = q.GetDaemon(ctx, req.GetDaemonId())
-		return err
-	}); err != nil {
+	daemon, err := s.cfg.Conn.Tenant().GetDaemon(ctx, req.GetDaemonId())
+	if err != nil {
 		return nil, err
 	}
 
@@ -240,10 +221,7 @@ func (s *daemonService) CloseSession(
 	if sess == nil || sess.DaemonID() != req.GetDaemonId() {
 		return nil, errNotFound
 	}
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		_, err := q.GetDaemon(ctx, sess.DaemonID())
-		return err
-	}); err != nil {
+	if _, err := s.cfg.Conn.Tenant().GetDaemon(ctx, sess.DaemonID()); err != nil {
 		return nil, err
 	}
 	sess.Close()
@@ -320,7 +298,7 @@ func (s *daemonService) Relay(
 // the daemon's sshd. It is the exact address, a source-address option on the
 // certificate is matched against it.
 func clientAddr(ctx context.Context) string {
-	meta, ok := iam.RequestMetaFromContext(ctx)
+	meta, ok := actor.RequestMetaFromContext(ctx)
 	if !ok {
 		return ""
 	}

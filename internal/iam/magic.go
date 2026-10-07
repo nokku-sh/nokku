@@ -30,14 +30,14 @@ const (
 // RequestMagicLink mails a sign-in link to a user of the workspace. It never
 // tells the caller whether the address exists.
 func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
-	if s.SendMagicLink == nil {
+	if s.sendMagicLink == nil {
 		return nil
 	}
 	email = normalizeEmail(email)
 	var u *db.User
 	var link string
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		found, err := q.GetUserByEmail(ctx, &db.GetUserByEmailParams{WorkspaceID: ws, Email: email})
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		found, err := q.GetUserByEmail(ctx, email)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -48,12 +48,12 @@ func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
 			return nil
 		}
 		recent, err := q.HasRecentToken(ctx, &db.HasRecentTokenParams{
-			WorkspaceID: ws, UserID: &found.ID, Purpose: tokenLogin, Since: s.now().Add(-resendCooldown),
+			UserID: &found.ID, Purpose: tokenLogin, Since: s.now().Add(-resendCooldown),
 		})
 		if err != nil || recent {
 			return err
 		}
-		link, err = s.putLoginToken(ctx, q, ws, found.ID, magicLinkTTL)
+		link, err = s.putLoginToken(ctx, q, found.ID, magicLinkTTL)
 		u = found
 		return err
 	})
@@ -61,13 +61,13 @@ func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
 		return err
 	}
 	if u == nil {
-		s.record(ctx, Event{Action: ActionLoginDenied, Method: MethodMagicLink, Email: email, Detail: "unknown email"})
+		s.record(ctx, event{Action: actionLoginDenied, Method: MethodMagicLink, Email: email, Detail: "unknown email"})
 		return nil
 	}
 	if link == "" {
 		return nil
 	}
-	if err := s.SendMagicLink(ctx, u, link, magicLinkTTL); err != nil {
+	if err := s.sendMagicLink(ctx, u.ID, u.Email, link, magicLinkTTL.String()); err != nil {
 		slog.Warn("magic link not sent", "error", err)
 	}
 	return nil
@@ -76,19 +76,15 @@ func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
 func (s *Service) putLoginToken(
 	ctx context.Context,
 	q *db.Queries,
-	ws, userID string,
+	userID string,
 	ttl time.Duration,
 ) (string, error) {
-	raw, hash, err := crypto.NewSecret()
-	if err != nil {
-		return "", err
-	}
-	err = q.PutToken(ctx, &db.PutTokenParams{
-		TokenHash:   hash,
-		WorkspaceID: ws,
-		UserID:      &userID,
-		Purpose:     tokenLogin,
-		ExpiresAt:   s.now().Add(ttl),
+	raw, hash := crypto.NewSecret()
+	err := q.PutToken(ctx, &db.PutTokenParams{
+		TokenHash: hash,
+		UserID:    &userID,
+		Purpose:   tokenLogin,
+		ExpiresAt: s.now().Add(ttl),
 	})
 	if err != nil {
 		return "", err
@@ -100,13 +96,13 @@ func (s *Service) putLoginToken(
 // exists. It replaces earlier links and lasts a day.
 func (s *Service) IssueBootstrapLink(ctx context.Context, u *db.User) (string, error) {
 	var link string
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		if err := q.DeleteUserTokens(ctx, &db.DeleteUserTokensParams{
-			WorkspaceID: ws, UserID: &u.ID, Purpose: tokenLogin,
+			UserID: &u.ID, Purpose: tokenLogin,
 		}); err != nil {
 			return err
 		}
-		link, err = s.putLoginToken(ctx, q, ws, u.ID, bootstrapTTL)
+		link, err = s.putLoginToken(ctx, q, u.ID, bootstrapTTL)
 		return err
 	})
 	return link, err
@@ -115,7 +111,7 @@ func (s *Service) IssueBootstrapLink(ctx context.Context, u *db.User) (string, e
 // RequestSignupLink mails the link that creates an invited account. The
 // invite is checked now and spent when the link is used.
 func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name string) error {
-	if s.SendSignupLink == nil {
+	if s.sendSignupLink == nil {
 		return errors.New("iam: mail is not configured")
 	}
 	email = normalizeEmail(email)
@@ -123,19 +119,24 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 		return ErrEmailRejected
 	}
 	name = strings.TrimSpace(name)
-	var link string
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+	var link, workspace string
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		tok, err := lookupInvite(ctx, q, invite)
 		if err != nil {
 			return err
 		}
-		if _, err := q.GetUserByEmail(ctx, &db.GetUserByEmailParams{WorkspaceID: ws, Email: email}); err == nil {
+		ws, err := q.GetWorkspace(ctx)
+		if err != nil {
+			return err
+		}
+		workspace = ws.Name
+		if _, err := q.GetUserByEmail(ctx, email); err == nil {
 			return ErrEmailTaken
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
 		recent, err := q.HasRecentToken(ctx, &db.HasRecentTokenParams{
-			WorkspaceID: ws, Email: &email, Purpose: tokenSignup, Since: s.now().Add(-resendCooldown),
+			Email: &email, Purpose: tokenSignup, Since: s.now().Add(-resendCooldown),
 		})
 		if err != nil || recent {
 			return err
@@ -144,16 +145,12 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 		if err != nil {
 			return err
 		}
-		raw, hash, err := crypto.NewSecret()
-		if err != nil {
-			return err
-		}
+		raw, hash := crypto.NewSecret()
 		if err := q.PutSignupToken(ctx, &db.PutSignupTokenParams{
-			TokenHash:   hash,
-			WorkspaceID: ws,
-			ExpiresAt:   s.now().Add(magicLinkTTL),
-			Email:       &email,
-			Data:        data,
+			TokenHash: hash,
+			ExpiresAt: s.now().Add(magicLinkTTL),
+			Email:     &email,
+			Data:      data,
 		}); err != nil {
 			return err
 		}
@@ -163,7 +160,7 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 	if err != nil || link == "" {
 		return err
 	}
-	if err := s.SendSignupLink(ctx, email, name, link, magicLinkTTL); err != nil {
+	if err := s.sendSignupLink(ctx, email, name, workspace, link, magicLinkTTL.String()); err != nil {
 		slog.Warn("signup link not sent", "error", err)
 	}
 	return nil
@@ -172,25 +169,22 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 // ConsumeMagicLink spends a sign-in or signup link and signs the browser
 // in. A signup link creates the account first.
 func (s *Service) ConsumeMagicLink(ctx context.Context, raw string) (*db.User, *http.Cookie, error) {
-	hash, err := crypto.HashToken(raw)
-	if err != nil {
-		return nil, nil, ErrInvalidToken
-	}
+	hash := crypto.HashToken(raw)
 	var u *db.User
 	created := false
-	err = s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		userID, err := q.ConsumeToken(
 			ctx,
-			&db.ConsumeTokenParams{WorkspaceID: ws, TokenHash: hash, Purpose: tokenLogin},
+			&db.ConsumeTokenParams{TokenHash: hash, Purpose: tokenLogin},
 		)
 		if err == nil {
-			u, err = q.GetUser(ctx, &db.GetUserParams{WorkspaceID: ws, ID: userID})
+			u, err = q.GetUser(ctx, userID)
 			return err
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
-		row, err := q.ConsumeSignupToken(ctx, &db.ConsumeSignupTokenParams{WorkspaceID: ws, TokenHash: hash})
+		row, err := q.ConsumeSignupToken(ctx, hash)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrInvalidToken
 		}
@@ -202,7 +196,7 @@ func (s *Service) ConsumeMagicLink(ctx context.Context, raw string) (*db.User, *
 			return err
 		}
 		u, err = s.createUser(ctx, q, db.CreateUserWithIDParams{
-			WorkspaceID: ws, Email: row.Email, Name: data.Name, Role: data.Role,
+			Email: row.Email, Name: data.Name, Role: data.Role,
 		}, data.InviteID)
 		created = err == nil
 		return err
@@ -211,8 +205,8 @@ func (s *Service) ConsumeMagicLink(ctx context.Context, raw string) (*db.User, *
 		return nil, nil, err
 	}
 	if created {
-		s.record(ctx, Event{
-			Action: ActionUserCreated, Kind: actor.KindUser, Method: MethodMagicLink, UserID: u.ID, Email: u.Email,
+		s.record(ctx, event{
+			Action: actionUserCreated, Kind: actor.KindUser, Method: MethodMagicLink, UserID: u.ID, Email: u.Email,
 		})
 	}
 	cookie, err := s.completeLogin(ctx, u, MethodMagicLink)

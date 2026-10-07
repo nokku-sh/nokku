@@ -205,17 +205,17 @@ func TestCreateSession(t *testing.T) {
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "web session without a grant, got %v", err)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(openRelay()), "relay without a grant")
 
-	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
+	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
 		p, err := q.CreatePrincipal(t.Context(), &db.CreatePrincipalParams{
-			WorkspaceID: workspaceID, TargetID: enrolled.GetTargetId(), Username: "root",
+			TargetID: enrolled.GetTargetId(), Username: "root",
 		})
 		if err != nil {
 			return err
 		}
 		return q.AddPrincipalGrant(t.Context(), &db.AddPrincipalGrantParams{
-			PrincipalID: p.ID, WorkspaceID: workspaceID, SubjectKind: "user", SubjectID: memberPrincipal.ID,
+			PrincipalID: p.ID, SubjectKind: "user", SubjectID: memberPrincipal.ID,
 		})
-	}))
+	})
 	// With the grant the relay gets past the check, the daemon is just offline.
 	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(openRelay()), "relay with a grant")
 	_, err = member.CreateSession(t.Context(), &nokkuv1.CreateSessionRequest{
@@ -227,9 +227,8 @@ func TestCreateSession(t *testing.T) {
 	// The target trusts the sshtest CA, which admits the member's cert.
 	sshd := sshtest.NewServerFor(t, enrolled.GetTargetId(), memberPrincipal.ID)
 	ca := sshd.CA(t)
-	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
+	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
 		row, err := q.CreateCA(t.Context(), &db.CreateCAParams{
-			WorkspaceID:    workspaceID,
 			Name:           "sshtest",
 			Certificate:    ca.PublicKey,
 			PrivateKey:     ca.PrivateKey,
@@ -248,7 +247,7 @@ func TestCreateSession(t *testing.T) {
 		}
 		_, err = q.UpdateTargetCA(t.Context(), &db.UpdateTargetCAParams{DaemonID: new(enrolled.GetId()), CaID: &row.ID})
 		return err
-	}))
+	})
 
 	// openShell trades a fresh ticket for the terminal websocket.
 	openShell := func() (string, *websocket.Conn) {

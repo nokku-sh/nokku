@@ -59,11 +59,10 @@ func TestListAuditLogsFilters(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			p := &ListAuditLogsParams{
-				WorkspaceID: f.ws,
-				Actions:     tc.actions,
-				StartDate:   &start,
-				EndDate:     &end,
-				Limit:       100,
+				Actions:   tc.actions,
+				StartDate: &start,
+				EndDate:   &end,
+				Limit:     100,
 			}
 			if tc.outcome != "" {
 				p.Outcome = &tc.outcome

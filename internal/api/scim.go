@@ -16,10 +16,6 @@ type sCIMService struct {
 	cfg *config.Config
 }
 
-func newSCIMService(cfg *config.Config) *sCIMService {
-	return &sCIMService{cfg: cfg}
-}
-
 func (s *sCIMService) CreateSCIMToken(
 	ctx context.Context,
 	req *nokkuv1.CreateSCIMTokenRequest,

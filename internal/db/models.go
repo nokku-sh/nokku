@@ -97,6 +97,18 @@ type Keyset struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
+type KnownDevice struct {
+	ID          string    `json:"id"`
+	WorkspaceID string    `json:"workspaceId"`
+	UserID      string    `json:"userId"`
+	Key         string    `json:"key"`
+	Ip          string    `json:"ip"`
+	UserAgent   string    `json:"userAgent"`
+	ExpiresAt   time.Time `json:"expiresAt"`
+	LastSeenAt  time.Time `json:"lastSeenAt"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
 type OneTimeToken struct {
 	TokenHash   crypto.HashedToken `json:"tokenHash"`
 	WorkspaceID string             `json:"workspaceId"`

@@ -5,6 +5,14 @@
 -- self-hosted server has exactly one workspace.
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
+-- The workspace a connection is pinned to, NULL when none is. The row-level
+-- security policies compare against it, and every tenant table takes its
+-- workspace_id from it by default, so an insert never names the workspace.
+-- Unpinned, the default is NULL and the insert fails on NOT NULL.
+CREATE OR REPLACE FUNCTION current_workspace_id () RETURNS UUID AS $$
+  SELECT NULLIF(current_setting('nokku.workspace_id', TRUE), '')::UUID
+$$ LANGUAGE sql STABLE;
+
 CREATE TABLE IF NOT EXISTS workspaces (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   -- The subdomain on the hosted service. Self-host has one workspace and
@@ -26,7 +34,7 @@ CREATE TABLE IF NOT EXISTS workspace_state (
 );
 
 CREATE TABLE IF NOT EXISTS workspace_subscriptions (
-  workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID PRIMARY KEY DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   source TEXT NOT NULL DEFAULT '', -- stripe, manual, ...
   plan TEXT NOT NULL DEFAULT '', -- community, pro, enterprise
   status TEXT NOT NULL DEFAULT '',
@@ -44,7 +52,7 @@ CREATE TABLE IF NOT EXISTS workspace_subscriptions (
 -- rows, one per workspace, and each company fully owns theirs.
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   email TEXT NOT NULL CHECK (email = lower(email)),
   name TEXT NOT NULL DEFAULT '',
   picture TEXT,
@@ -64,7 +72,7 @@ WHERE
 
 CREATE TABLE IF NOT EXISTS credentials (
   id TEXT PRIMARY KEY, -- webauthn credential id, or uuidv7
-  workspace_id UUID NOT NULL,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id (),
   user_id UUID NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('passkey', 'oidc', 'scim')),
   provider TEXT NOT NULL DEFAULT '', -- the sso provider id for oidc
@@ -88,7 +96,7 @@ CREATE INDEX idx_credentials_user ON credentials (user_id, type);
 -- when it is spent.
 CREATE TABLE IF NOT EXISTS one_time_tokens (
   token_hash TEXT PRIMARY KEY,
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   user_id UUID,
   purpose TEXT NOT NULL CHECK (purpose IN ('login', 'signup', 'email_change', 'email_revert')),
   email TEXT CHECK (email = lower(email)),
@@ -103,18 +111,20 @@ CREATE INDEX idx_one_time_tokens_expiry ON one_time_tokens (expires_at);
 
 CREATE INDEX idx_one_time_tokens_user ON one_time_tokens (user_id, purpose);
 
+-- Every row is a credential. What only remembers a device lives in
+-- known_devices, so nothing here ever has to be told apart from a login.
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT NOT NULL PRIMARY KEY,
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   subject_id TEXT NOT NULL, -- user id, or daemon id
   -- A daemon's session has to outlive the daemon: it is what the host gets
   -- its REJECTED answer through, and SyncDaemon removes it with that answer.
   user_id UUID,
-  kind TEXT NOT NULL CHECK (kind IN ('user', 'cli', 'device', 'daemon')),
+  kind TEXT NOT NULL CHECK (kind IN ('user', 'cli', 'daemon')),
   CHECK ((kind = 'daemon') = (user_id IS NULL)),
   method TEXT NOT NULL, -- passkey, magic_link, oidc, device
   binding TEXT NOT NULL DEFAULT '', -- DPoP JWK thumbprint, empty for cookie sessions
-  label TEXT NOT NULL DEFAULT '', -- display name for "your devices" listings
+  label TEXT NOT NULL DEFAULT '', -- the name the new sign-in mail gives a terminal
   ip TEXT NOT NULL DEFAULT '', -- of the request that created the session
   user_agent TEXT NOT NULL DEFAULT '', -- of the request that created the session
   expires_at TIMESTAMPTZ, -- NULL = non-expiring (daemons re-auth via DPoP proofs)
@@ -127,10 +137,31 @@ CREATE INDEX idx_sessions_subject ON sessions (subject_id);
 
 CREATE INDEX idx_sessions_workspace ON sessions (workspace_id);
 
+-- Browsers and terminals an account has signed in from. They show in the
+-- "where you're signed in" list, and a sign-in from one that is not here
+-- yet is mailed to the account. A row never signs anyone in.
+CREATE TABLE IF NOT EXISTS known_devices (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
+  -- What the device is recognized by: the hash of a browser's device
+  -- cookie, or the DPoP key thumbprint of a terminal.
+  key TEXT NOT NULL,
+  ip TEXT NOT NULL DEFAULT '', -- of the sign-in that added it
+  user_agent TEXT NOT NULL DEFAULT '', -- of the sign-in that added it
+  expires_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (workspace_id, user_id, key),
+  FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_known_devices_expiry ON known_devices (expires_at);
+
 -- OIDC providers of the workspace. The config, secret included, is one JSON
 -- blob encrypted at rest.
 CREATE TABLE IF NOT EXISTS sso_providers (
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   provider_id TEXT NOT NULL CHECK (provider_id ~ '^[a-z0-9-]{1,64}$'),
   name TEXT NOT NULL DEFAULT '',
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
@@ -142,7 +173,7 @@ CREATE TABLE IF NOT EXISTS sso_providers (
 
 CREATE TABLE IF NOT EXISTS scim_tokens (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
   label TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -154,7 +185,7 @@ CREATE INDEX idx_scim_tokens_workspace_id ON scim_tokens (workspace_id);
 -- Access ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS service_accounts (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL, -- e.g., "github-actions-deploy", "ansible-prod"
   description TEXT,
   token_hash TEXT, -- bearer credential for the service account (HashedToken)
@@ -170,7 +201,7 @@ CREATE TABLE IF NOT EXISTS service_accounts (
 
 CREATE TABLE IF NOT EXISTS daemons (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   status INTEGER NOT NULL DEFAULT 1 CHECK (status IN (1, 2, 3)), -- 1=pending, 2=accepted, 3=rejected
   -- Refreshed by the core instance holding the control stream. Online means
@@ -189,7 +220,7 @@ CREATE TABLE IF NOT EXISTS daemons (
 
 CREATE TABLE IF NOT EXISTS teams (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
   tags TEXT[] NOT NULL DEFAULT '{}',
@@ -199,7 +230,7 @@ CREATE TABLE IF NOT EXISTS teams (
 );
 
 CREATE TABLE IF NOT EXISTS team_members (
-  workspace_id UUID NOT NULL,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id (),
   user_id UUID NOT NULL,
   team_id UUID NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -210,7 +241,7 @@ CREATE TABLE IF NOT EXISTS team_members (
 
 CREATE TABLE IF NOT EXISTS certificate_authorities (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
   certificate TEXT NOT NULL, -- PEM encoded certificate
@@ -250,7 +281,7 @@ CREATE TABLE IF NOT EXISTS certificate_authorities (
 
 CREATE TABLE IF NOT EXISTS targets (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   ca_id UUID,
   daemon_id UUID,
   name TEXT NOT NULL,
@@ -272,7 +303,7 @@ CREATE TABLE IF NOT EXISTS targets (
 -- and compares the hash of the whole token.
 CREATE TABLE IF NOT EXISTS workspace_tokens (
   id UUID PRIMARY KEY,
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   kind INTEGER NOT NULL CHECK (kind IN (1, 2)), -- 1=enroll, 2=invite
   label TEXT NOT NULL DEFAULT '',
   token_hash TEXT NOT NULL,
@@ -297,7 +328,7 @@ CREATE TABLE IF NOT EXISTS workspace_tokens (
 
 CREATE TABLE IF NOT EXISTS principals (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   target_id UUID NOT NULL,
   username TEXT NOT NULL DEFAULT 'root', -- e.g. "root", "ubuntu", "ec2-user"
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -312,7 +343,7 @@ CREATE TABLE IF NOT EXISTS principals (
 CREATE TABLE IF NOT EXISTS principal_grants (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   principal_id UUID NOT NULL,
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   user_id UUID,
   team_id UUID,
   service_account_id UUID,
@@ -335,7 +366,7 @@ CREATE TABLE IF NOT EXISTS principal_grants (
 
 CREATE TABLE IF NOT EXISTS recordings (
   id UUID PRIMARY KEY DEFAULT uuidv7(), -- the session id
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   -- A recording outlives its daemon, only retention deletes it.
   daemon_id UUID REFERENCES daemons (id) ON DELETE SET NULL,
   daemon_name TEXT NOT NULL, -- as it was when the session ran
@@ -427,11 +458,6 @@ CREATE INDEX idx_principal_grants_subject ON principal_grants (subject_id);
 CREATE INDEX idx_principal_grants_workspace_id ON principal_grants (workspace_id);
 
 CREATE INDEX idx_recordings_workspace_started ON recordings (workspace_id, started_at DESC);
-
--- Functions ------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION current_workspace_id () RETURNS UUID AS $$
-  SELECT NULLIF(current_setting('nokku.workspace_id', TRUE), '')::UUID
-$$ LANGUAGE sql STABLE;
 
 -- Triggers -------------------------------------------------------------------
 -- Ensure only one default CA per workspace and authority type
@@ -600,8 +626,10 @@ FROM
 
 -- Row-level security ---------------------------------------------------------
 -- One policy on every tenant table: a row is visible and writable only when
--- the transaction pinned its workspace in the GUC "nokku.workspace_id". The
--- backend sets it per transaction (see internal/db/connection.go).
+-- the connection is pinned to its workspace in the GUC "nokku.workspace_id".
+-- The backend sets it every time a connection leaves the request pool (see
+-- pinWorkspace in internal/db/connection.go). That is session state, so the
+-- backend needs direct connections, not a pooler in transaction mode.
 --
 -- Fail-closed properties:
 --   - The application connects as nokku_app, which does not own the tables,
@@ -610,11 +638,16 @@ FROM
 --   - An unset GUC makes current_workspace_id() return NULL, and
 --     "workspace_id = NULL" matches nothing, so tenant tables are empty by
 --     default.
---   - Cross-tenant work (boot, signup, billing webhooks, background jobs)
---     runs through nokku_system, which has BYPASSRLS; that role switch is
+--   - Cross-tenant work (boot, billing webhooks, background jobs) runs
+--     through nokku_system, which has BYPASSRLS; that role switch is
 --     explicit in code (Connection.WithTx).
 --
--- A new tenant table only needs its name in the list below. References to
+-- The policy is the only tenant filter there is. Tenant queries name no
+-- workspace, and inserts take workspace_id from its column default. A new
+-- workspace is created in a transaction pinned to the id it is about to get.
+--
+-- A new tenant table needs its name in the list below and the default on
+-- workspace_id, internal/db/rls_test.go fails without either. References to
 -- other tenant tables use composite (workspace_id, id) foreign keys, so no
 -- policy needs a subquery to keep a row inside its workspace. keysets,
 -- instance_license and workspace_state have no app policy, nokku_system
@@ -627,6 +660,7 @@ BEGIN
     'users',
     'credentials',
     'sessions',
+    'known_devices',
     'one_time_tokens',
     'sso_providers',
     'scim_tokens',

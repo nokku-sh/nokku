@@ -5,7 +5,6 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
-	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -14,28 +13,20 @@ type principalService struct {
 	cfg *config.Config
 }
 
-func newPrincipalService(cfg *config.Config) *principalService {
-	return &principalService{cfg: cfg}
-}
-
 func (s *principalService) ListPrincipals(
 	ctx context.Context,
 	req *nokkuv1.ListPrincipalsRequest,
 ) (*nokkuv1.ListPrincipalsResponse, error) {
-	var principals []*db.ListPrincipalsRow
-	count := int32(0)
-
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		principals, err = q.ListPrincipals(ctx, &db.ListPrincipalsParams{
-			TargetID: req.GetTargetId(),
-			Query:    req.Query,
-			Limit:    req.Limit,
-			Offset:   req.Offset,
-		})
-		return err
-	}); err != nil {
+	principals, err := s.cfg.Conn.Tenant().ListPrincipals(ctx, &db.ListPrincipalsParams{
+		TargetID: req.GetTargetId(),
+		Query:    req.Query,
+		Limit:    req.Limit,
+		Offset:   req.Offset,
+	})
+	if err != nil {
 		return nil, err
 	}
+	count := int32(0)
 	if len(principals) > 0 {
 		count = principals[0].TotalCount
 	}
@@ -50,10 +41,9 @@ func (s *principalService) AddSubjectsToPrincipal(
 	ctx context.Context,
 	req *nokkuv1.AddSubjectsToPrincipalRequest,
 ) (*nokkuv1.AddSubjectsToPrincipalResponse, error) {
-	var workspaceID string
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		workspaceID, err = q.GetPrincipalWorkspace(ctx, req.GetId())
-		if err != nil {
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		// A principal of another workspace does not exist here.
+		if _, err := q.GetPrincipalWorkspace(ctx, req.GetId()); err != nil {
 			return err
 		}
 
@@ -64,7 +54,6 @@ func (s *principalService) AddSubjectsToPrincipal(
 		for _, subjectID := range req.GetSubjectIds() {
 			if err := q.AddPrincipalGrant(ctx, &db.AddPrincipalGrantParams{
 				PrincipalID: req.GetId(),
-				WorkspaceID: workspaceID,
 				SubjectKind: kind,
 				SubjectID:   subjectID,
 			}); err != nil {
@@ -111,16 +100,13 @@ func (s *principalService) RevokeAllAccess(
 	ctx context.Context,
 	req *nokkuv1.RevokeAllAccessRequest,
 ) (*nokkuv1.RevokeAllAccessResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		kind, ok := subjectKind(req.GetKind())
-		if !ok {
-			return errInvalidInput
-		}
-		return q.RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
-			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
-			SubjectKind: kind,
-			SubjectID:   req.GetSubjectId(),
-		})
+	kind, ok := subjectKind(req.GetKind())
+	if !ok {
+		return nil, errInvalidInput
+	}
+	if err := s.cfg.Conn.Tenant().RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
+		SubjectKind: kind,
+		SubjectID:   req.GetSubjectId(),
 	}); err != nil {
 		return nil, err
 	}
@@ -134,15 +120,11 @@ func (s *principalService) AddPrincipal(
 	ctx context.Context,
 	req *nokkuv1.AddPrincipalRequest,
 ) (*nokkuv1.AddPrincipalResponse, error) {
-	var principal *db.Principal
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		principal, err = q.CreatePrincipal(ctx, &db.CreatePrincipalParams{
-			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
-			TargetID:    req.GetTargetId(),
-			Username:    req.GetUsername(),
-		})
-		return err
-	}); err != nil {
+	principal, err := s.cfg.Conn.Tenant().CreatePrincipal(ctx, &db.CreatePrincipalParams{
+		TargetID: req.GetTargetId(),
+		Username: req.GetUsername(),
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -153,9 +135,7 @@ func (s *principalService) RemovePrincipal(
 	ctx context.Context,
 	req *nokkuv1.RemovePrincipalRequest,
 ) (*nokkuv1.RemovePrincipalResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		return q.DeletePrincipal(ctx, req.GetId())
-	}); err != nil {
+	if err := s.cfg.Conn.Tenant().DeletePrincipal(ctx, req.GetId()); err != nil {
 		return nil, err
 	}
 

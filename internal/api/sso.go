@@ -17,10 +17,6 @@ type sSOService struct {
 	cfg *config.Config
 }
 
-func newSSOService(cfg *config.Config) *sSOService {
-	return &sSOService{cfg: cfg}
-}
-
 func (s *sSOService) ListSSOProviders(
 	ctx context.Context,
 	_ *nokkuv1.ListSSOProvidersRequest,

@@ -16,7 +16,10 @@ import (
 	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
-var ErrActiveSubscription = errors.New("workspace already has an active subscription")
+var (
+	ErrActiveSubscription = errors.New("workspace already has an active subscription")
+	errDisabled           = errors.New("billing provider is not configured")
+)
 
 const (
 	// minBillableSeats is the pricing floor.
@@ -25,6 +28,9 @@ const (
 	maxCheckoutSeats = 10000
 )
 
+// Stripe moves money. It never decides what a workspace may do, that is
+// internal/entitlement. A nil Stripe is a self-hosted server: callers gate
+// on the mode, and a missed gate gets an error instead of a nil dereference.
 type Stripe struct {
 	client    *stripe.Client
 	db        *db.Connection
@@ -35,14 +41,35 @@ type Stripe struct {
 	WebhookSecret string `env:"STRIPE_WEBHOOK_SECRET"`
 }
 
-// newStripe returns nil when a required env var is unset.
-func newStripe(conn *db.Connection, returnURL string) (*Stripe, error) {
+// New returns nil on a self-hosted server, see newStripe.
+func New(ctx context.Context, conn *db.Connection, baseURL string, saas bool) (*Stripe, error) {
+	s, err := newStripe(conn, baseURL, saas)
+	if err != nil || s == nil {
+		return nil, err
+	}
+	go s.reconcile(ctx)
+	return s, nil
+}
+
+// newStripe returns nil on a self-hosted server. The mode is never guessed
+// from these settings: the hosted service needs all of them, and a
+// self-hosted server with any of them set is a mistake that fails the start.
+func newStripe(conn *db.Connection, returnURL string, saas bool) (*Stripe, error) {
 	s, err := env.ParseAs[Stripe]()
 	if err != nil {
 		return nil, err
 	}
-	if s.SecretKey == "" || s.WebhookSecret == "" || s.ProPriceID == "" {
-		return nil, nil // billing disabled
+	complete := s.SecretKey != "" && s.WebhookSecret != "" && s.ProPriceID != ""
+	unset := s.SecretKey == "" && s.WebhookSecret == "" && s.ProPriceID == ""
+	switch {
+	case saas && !complete:
+		return nil, errors.New("NOKKU_SAAS needs STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PRO_PRICE_ID")
+	case !saas && !unset:
+		return nil, errors.New(
+			"STRIPE_* is set on a self-hosted server, set NOKKU_SAAS=true for the hosted service or remove it",
+		)
+	case !saas:
+		return nil, nil
 	}
 
 	s.db = conn
@@ -51,10 +78,13 @@ func newStripe(conn *db.Connection, returnURL string) (*Stripe, error) {
 	return &s, nil
 }
 
-// checkout starts at the current member count and lets the buyer add
+// Checkout starts at the current member count and lets the buyer add
 // headroom. The paid quantity becomes the seat cap, more seats are bought in
 // the portal.
-func (s *Stripe) checkout(ctx context.Context, workspaceID, email string) (string, error) {
+func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (string, error) {
+	if s == nil {
+		return "", errDisabled
+	}
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")
 	}
@@ -162,9 +192,12 @@ func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (st
 	return customer.ID, nil
 }
 
-// portal is where seats are bought, so the Stripe portal configuration must
+// Portal is where seats are bought, so the Stripe portal configuration must
 // allow quantity updates.
-func (s *Stripe) portal(ctx context.Context, workspaceID string) (string, error) {
+func (s *Stripe) Portal(ctx context.Context, workspaceID string) (string, error) {
+	if s == nil {
+		return "", errDisabled
+	}
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")
 	}
@@ -186,12 +219,15 @@ func (s *Stripe) portal(ctx context.Context, workspaceID string) (string, error)
 	return session.URL, nil
 }
 
-func (s *Stripe) cancel(
+func (s *Stripe) Cancel(
 	ctx context.Context,
 	workspaceID string,
 	immediate bool,
 	reason string,
 ) error {
+	if s == nil {
+		return errDisabled
+	}
 	if workspaceID == "" {
 		return errors.New("missing workspace ID")
 	}

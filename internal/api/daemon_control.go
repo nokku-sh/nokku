@@ -204,6 +204,10 @@ func (s *daemonControlService) UploadRecording(
 	w, err := s.cfg.Record.NewWriter(wctx, rec)
 	if err != nil {
 		slog.Error("open recording object", "recording_id", rec.ID, "error", err)
+		// Nothing of this upload is stored, what an earlier try left still is.
+		if _, err := s.closeRecording(ctx, rec.ID, rec.SizeBytes, false); err != nil {
+			slog.Error("close recording", "recording_id", rec.ID, "error", err)
+		}
 		return nil, errInternal
 	}
 
@@ -249,18 +253,8 @@ receive:
 		ended, size, complete = errInternal, rec.SizeBytes, false
 	}
 
-	// The row is closed however the upload went, or it would count as a live
-	// session and as no bytes.
-	rowCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
-	defer cancel()
-	if err := s.cfg.Conn.WithWorkspace(rowCtx, func(q *db.Queries) (err error) {
-		rec, err = q.SetRecordingComplete(rowCtx, &db.SetRecordingCompleteParams{
-			ID:        rec.ID,
-			SizeBytes: size,
-			Complete:  complete,
-		})
-		return err
-	}); err != nil {
+	rec, err = s.closeRecording(ctx, rec.ID, size, complete)
+	if err != nil {
 		return nil, err
 	}
 
@@ -278,6 +272,24 @@ receive:
 		RecordingId: &rec.ID,
 		SizeBytes:   &size,
 	}, nil
+}
+
+// closeRecording ends the row however the upload went, or it would count as
+// a live session and as no bytes. A daemon that died took ctx with it, so
+// the write does not hang on it.
+func (s *daemonControlService) closeRecording(
+	ctx context.Context,
+	id string,
+	size int64,
+	complete bool,
+) (*db.Recording, error) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+	return s.cfg.Conn.Tenant().SetRecordingComplete(ctx, &db.SetRecordingCompleteParams{
+		ID:        id,
+		SizeBytes: size,
+		Complete:  complete,
+	})
 }
 
 // resolveUpload resumes the recording when the daemon uploads its id again.
@@ -310,11 +322,10 @@ func (s *daemonControlService) resolveUpload(
 			return err
 		}
 		rec, err = q.CreateRecording(ctx, &db.CreateRecordingParams{
-			ID:          rm.GetRecordingId(),
-			WorkspaceID: workspaceID,
-			DaemonID:    daemonID,
-			Username:    rm.GetUsername(),
-			Key:         recording.NewKey(),
+			ID:       rm.GetRecordingId(),
+			DaemonID: daemonID,
+			Username: rm.GetUsername(),
+			Key:      recording.NewKey(),
 		})
 		return err
 	}); err != nil {
@@ -333,10 +344,7 @@ func (s *daemonControlService) UnenrollDaemon(
 		if _, err := q.DeleteDaemon(ctx, daemonID); err != nil {
 			return err
 		}
-		_, err := q.DeleteSubjectSessions(ctx, &db.DeleteSubjectSessionsParams{
-			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
-			SubjectID:   daemonID,
-		})
+		_, err := q.DeleteSubjectSessions(ctx, daemonID)
 		return err
 	}); err != nil {
 		return nil, err

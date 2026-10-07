@@ -21,18 +21,12 @@ SELECT
 FROM
   audit.audit_logs
 WHERE
-  workspace_id = $1
-  AND timestamp >= $2::TIMESTAMPTZ
+  timestamp >= $1::TIMESTAMPTZ
 GROUP BY
   1
 ORDER BY
   1
 `
-
-type AuditActivityByHourParams struct {
-	WorkspaceID string    `json:"workspaceId"`
-	Since       time.Time `json:"since"`
-}
 
 type AuditActivityByHourRow struct {
 	Hour     time.Time `json:"hour"`
@@ -40,8 +34,8 @@ type AuditActivityByHourRow struct {
 	Failures int32     `json:"failures"`
 }
 
-func (q *Queries) AuditActivityByHour(ctx context.Context, arg *AuditActivityByHourParams) ([]*AuditActivityByHourRow, error) {
-	rows, err := q.db.Query(ctx, auditActivityByHour, arg.WorkspaceID, arg.Since)
+func (q *Queries) AuditActivityByHour(ctx context.Context, since time.Time) ([]*AuditActivityByHourRow, error) {
+	rows, err := q.db.Query(ctx, auditActivityByHour, since)
 	if err != nil {
 		return nil, err
 	}
@@ -67,8 +61,6 @@ SELECT
       COUNT(*)
     FROM
       targets t
-    WHERE
-      t.workspace_id = $1
   )::INTEGER AS targets,
   (
     SELECT
@@ -78,8 +70,7 @@ SELECT
       JOIN daemons d ON d.workspace_id = t.workspace_id
       AND d.id = t.daemon_id
     WHERE
-      t.workspace_id = $1
-      AND d.last_seen_at > $2::TIMESTAMPTZ
+      d.last_seen_at > $1::TIMESTAMPTZ
   )::INTEGER AS targets_online,
   (
     SELECT
@@ -87,8 +78,7 @@ SELECT
     FROM
       targets t
     WHERE
-      t.workspace_id = $1
-      AND t.daemon_id IS NULL
+      t.daemon_id IS NULL
   )::INTEGER AS targets_manual,
   (
     SELECT
@@ -96,15 +86,9 @@ SELECT
     FROM
       users u
     WHERE
-      u.workspace_id = $1
-      AND u.active
+      u.active
   )::INTEGER AS users
 `
-
-type DashboardCountsParams struct {
-	WorkspaceID string    `json:"workspaceId"`
-	SeenAfter   time.Time `json:"seenAfter"`
-}
 
 type DashboardCountsRow struct {
 	Targets       int32 `json:"targets"`
@@ -113,8 +97,8 @@ type DashboardCountsRow struct {
 	Users         int32 `json:"users"`
 }
 
-func (q *Queries) DashboardCounts(ctx context.Context, arg *DashboardCountsParams) (*DashboardCountsRow, error) {
-	row := q.db.QueryRow(ctx, dashboardCounts, arg.WorkspaceID, arg.SeenAfter)
+func (q *Queries) DashboardCounts(ctx context.Context, seenAfter time.Time) (*DashboardCountsRow, error) {
+	row := q.db.QueryRow(ctx, dashboardCounts, seenAfter)
 	var i DashboardCountsRow
 	err := row.Scan(
 		&i.Targets,
@@ -136,20 +120,14 @@ FROM
   recordings r
   JOIN daemons d ON d.id = r.daemon_id
 WHERE
-  r.workspace_id = $1
-  AND r.ended_at IS NULL
+  r.ended_at IS NULL
   AND r.started_at > NOW() - INTERVAL '24 hours'
-  AND d.last_seen_at > $2::TIMESTAMPTZ
+  AND d.last_seen_at > $1::TIMESTAMPTZ
 ORDER BY
   r.started_at DESC
 LIMIT
   20
 `
-
-type ListOpenRecordingsParams struct {
-	WorkspaceID string    `json:"workspaceId"`
-	SeenAfter   time.Time `json:"seenAfter"`
-}
 
 type ListOpenRecordingsRow struct {
 	ID         string    `json:"id"`
@@ -161,8 +139,8 @@ type ListOpenRecordingsRow struct {
 
 // A crashed daemon never closes its recordings, so only trust open ones
 // behind a daemon that is still connected.
-func (q *Queries) ListOpenRecordings(ctx context.Context, arg *ListOpenRecordingsParams) ([]*ListOpenRecordingsRow, error) {
-	rows, err := q.db.Query(ctx, listOpenRecordings, arg.WorkspaceID, arg.SeenAfter)
+func (q *Queries) ListOpenRecordings(ctx context.Context, seenAfter time.Time) ([]*ListOpenRecordingsRow, error) {
+	rows, err := q.db.Query(ctx, listOpenRecordings, seenAfter)
 	if err != nil {
 		return nil, err
 	}
@@ -193,8 +171,7 @@ SELECT
 FROM
   certificate_authorities
 WHERE
-  workspace_id = $1
-  AND is_active = TRUE
+  is_active = TRUE
   AND not_after > NOW()
 ORDER BY
   not_after ASC
@@ -202,8 +179,8 @@ LIMIT
   3
 `
 
-func (q *Queries) ListSoonestCAs(ctx context.Context, workspaceID string) ([]*CertificateAuthority, error) {
-	rows, err := q.db.Query(ctx, listSoonestCAs, workspaceID)
+func (q *Queries) ListSoonestCAs(ctx context.Context) ([]*CertificateAuthority, error) {
+	rows, err := q.db.Query(ctx, listSoonestCAs)
 	if err != nil {
 		return nil, err
 	}

@@ -22,21 +22,15 @@ type recordingService struct {
 	cfg *config.Config
 }
 
-func newRecordingService(cfg *config.Config) *recordingService {
-	return &recordingService{cfg: cfg}
-}
-
 func (s *recordingService) ListRecordings(
 	ctx context.Context,
 	req *nokkuv1.ListRecordingsRequest,
 ) (*nokkuv1.ListRecordingsResponse, error) {
-	ws := actor.WorkspaceIDFromContext(ctx)
 	params := &db.ListRecordingsParams{
-		WorkspaceID: ws,
-		DaemonID:    req.DaemonId,
-		Username:    req.Username,
-		Limit:       req.Limit,
-		Offset:      req.Offset,
+		DaemonID: req.DaemonId,
+		Username: req.Username,
+		Limit:    req.Limit,
+		Offset:   req.Offset,
 	}
 
 	var rows []*db.ListRecordingsRow
@@ -46,7 +40,7 @@ func (s *recordingService) ListRecordings(
 		if err != nil {
 			return err
 		}
-		totalBytes, err = q.SumRecordingBytes(ctx, ws)
+		totalBytes, err = q.SumRecordingBytes(ctx)
 		return err
 	}); err != nil {
 		return nil, err
@@ -72,11 +66,8 @@ func (s *recordingService) GetRecording(
 	req *nokkuv1.GetRecordingRequest,
 	stream *connect.ServerStream[nokkuv1.GetRecordingResponse],
 ) error {
-	var rec *db.Recording
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		rec, err = q.GetRecording(ctx, req.GetRecordingId())
-		return err
-	}); err != nil {
+	rec, err := s.cfg.Conn.Tenant().GetRecording(ctx, req.GetRecordingId())
+	if err != nil {
 		return err
 	}
 
@@ -127,9 +118,7 @@ func (s *recordingService) DeleteRecording(
 	ctx context.Context,
 	req *nokkuv1.DeleteRecordingRequest,
 ) (*nokkuv1.DeleteRecordingResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		return q.DeleteRecording(ctx, req.GetRecordingId())
-	}); err != nil {
+	if err := s.cfg.Conn.Tenant().DeleteRecording(ctx, req.GetRecordingId()); err != nil {
 		return nil, err
 	}
 	// Best effort, a stray object goes with the workspace purge.

@@ -19,6 +19,7 @@ WHERE
   AND active
 `
 
+// Names the workspace, billing counts seats as nokku_system.
 func (q *Queries) CountActiveUsers(ctx context.Context, workspaceID string) (int64, error) {
 	row := q.db.QueryRow(ctx, countActiveUsers, workspaceID)
 	var count int64
@@ -28,24 +29,22 @@ func (q *Queries) CountActiveUsers(ctx context.Context, workspaceID string) (int
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO
-  users (workspace_id, email, name, role, picture)
+  users (email, name, role, picture)
 VALUES
-  ($1, $2, $3, $4, $5)
+  ($1, $2, $3, $4)
 RETURNING
   id, workspace_id, email, name, picture, role, active, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	WorkspaceID string  `json:"workspaceId"`
-	Email       string  `json:"email"`
-	Name        string  `json:"name"`
-	Role        string  `json:"role"`
-	Picture     *string `json:"picture"`
+	Email   string  `json:"email"`
+	Name    string  `json:"name"`
+	Role    string  `json:"role"`
+	Picture *string `json:"picture"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User, error) {
 	row := q.db.QueryRow(ctx, createUser,
-		arg.WorkspaceID,
 		arg.Email,
 		arg.Name,
 		arg.Role,
@@ -68,26 +67,24 @@ func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User,
 
 const createUserWithID = `-- name: CreateUserWithID :one
 INSERT INTO
-  users (id, workspace_id, email, name, role, picture)
+  users (id, email, name, role, picture)
 VALUES
-  ($1, $2, $3, $4, $5, $6)
+  ($1, $2, $3, $4, $5)
 RETURNING
   id, workspace_id, email, name, picture, role, active, created_at, updated_at
 `
 
 type CreateUserWithIDParams struct {
-	ID          string  `json:"id"`
-	WorkspaceID string  `json:"workspaceId"`
-	Email       string  `json:"email"`
-	Name        string  `json:"name"`
-	Role        string  `json:"role"`
-	Picture     *string `json:"picture"`
+	ID      string  `json:"id"`
+	Email   string  `json:"email"`
+	Name    string  `json:"name"`
+	Role    string  `json:"role"`
+	Picture *string `json:"picture"`
 }
 
 func (q *Queries) CreateUserWithID(ctx context.Context, arg *CreateUserWithIDParams) (*User, error) {
 	row := q.db.QueryRow(ctx, createUserWithID,
 		arg.ID,
-		arg.WorkspaceID,
 		arg.Email,
 		arg.Name,
 		arg.Role,
@@ -111,18 +108,12 @@ func (q *Queries) CreateUserWithID(ctx context.Context, arg *CreateUserWithIDPar
 const deleteUser = `-- name: DeleteUser :exec
 DELETE FROM users
 WHERE
-  workspace_id = $1
-  AND id = $2
+  id = $1
   AND role <> 'owner'
 `
 
-type DeleteUserParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	ID          string `json:"id"`
-}
-
-func (q *Queries) DeleteUser(ctx context.Context, arg *DeleteUserParams) error {
-	_, err := q.db.Exec(ctx, deleteUser, arg.WorkspaceID, arg.ID)
+func (q *Queries) DeleteUser(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteUser, id)
 	return err
 }
 
@@ -132,12 +123,11 @@ SELECT
 FROM
   users
 WHERE
-  workspace_id = $1
-  AND role = 'owner'
+  role = 'owner'
 `
 
-func (q *Queries) GetOwner(ctx context.Context, workspaceID string) (*User, error) {
-	row := q.db.QueryRow(ctx, getOwner, workspaceID)
+func (q *Queries) GetOwner(ctx context.Context) (*User, error) {
+	row := q.db.QueryRow(ctx, getOwner)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -159,17 +149,11 @@ SELECT
 FROM
   users
 WHERE
-  workspace_id = $1
-  AND id = $2
+  id = $1
 `
 
-type GetUserParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	ID          string `json:"id"`
-}
-
-func (q *Queries) GetUser(ctx context.Context, arg *GetUserParams) (*User, error) {
-	row := q.db.QueryRow(ctx, getUser, arg.WorkspaceID, arg.ID)
+func (q *Queries) GetUser(ctx context.Context, id string) (*User, error) {
+	row := q.db.QueryRow(ctx, getUser, id)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -191,17 +175,11 @@ SELECT
 FROM
   users
 WHERE
-  workspace_id = $1
-  AND email = $2
+  email = $1
 `
 
-type GetUserByEmailParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	Email       string `json:"email"`
-}
-
-func (q *Queries) GetUserByEmail(ctx context.Context, arg *GetUserByEmailParams) (*User, error) {
-	row := q.db.QueryRow(ctx, getUserByEmail, arg.WorkspaceID, arg.Email)
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -224,31 +202,29 @@ SELECT
 FROM
   users u
 WHERE
-  u.workspace_id = $1
-  AND (
-    $2::TEXT IS NULL
-    OR u.name ILIKE '%' || $2 || '%'
-    OR u.email ILIKE '%' || $2 || '%'
+  (
+    $1::TEXT IS NULL
+    OR u.name ILIKE '%' || $1 || '%'
+    OR u.email ILIKE '%' || $1 || '%'
   )
   AND (
-    $3::TEXT IS NULL
-    OR u.role = $3::TEXT
+    $2::TEXT IS NULL
+    OR u.role = $2::TEXT
   )
 ORDER BY
   u.name ASC,
   u.email ASC
 LIMIT
-  $5
-OFFSET
   $4
+OFFSET
+  $3
 `
 
 type ListUsersParams struct {
-	WorkspaceID string  `json:"workspaceId"`
-	Query       *string `json:"query"`
-	Role        *string `json:"role"`
-	Offset      *int32  `json:"offset"`
-	Limit       *int32  `json:"limit"`
+	Query  *string `json:"query"`
+	Role   *string `json:"role"`
+	Offset *int32  `json:"offset"`
+	Limit  *int32  `json:"limit"`
 }
 
 type ListUsersRow struct {
@@ -258,7 +234,6 @@ type ListUsersRow struct {
 
 func (q *Queries) ListUsers(ctx context.Context, arg *ListUsersParams) ([]*ListUsersRow, error) {
 	rows, err := q.db.Query(ctx, listUsers,
-		arg.WorkspaceID,
 		arg.Query,
 		arg.Role,
 		arg.Offset,
@@ -299,19 +274,17 @@ SET
   active = $1,
   updated_at = NOW()
 WHERE
-  workspace_id = $2
-  AND id = $3
+  id = $2
   AND role <> 'owner'
 `
 
 type SetUserActiveParams struct {
-	Active      bool   `json:"active"`
-	WorkspaceID string `json:"workspaceId"`
-	ID          string `json:"id"`
+	Active bool   `json:"active"`
+	ID     string `json:"id"`
 }
 
 func (q *Queries) SetUserActive(ctx context.Context, arg *SetUserActiveParams) error {
-	_, err := q.db.Exec(ctx, setUserActive, arg.Active, arg.WorkspaceID, arg.ID)
+	_, err := q.db.Exec(ctx, setUserActive, arg.Active, arg.ID)
 	return err
 }
 
@@ -321,20 +294,18 @@ SET
   email = $1,
   updated_at = NOW()
 WHERE
-  workspace_id = $2
-  AND id = $3
+  id = $2
 RETURNING
   id, workspace_id, email, name, picture, role, active, created_at, updated_at
 `
 
 type SetUserEmailParams struct {
-	Email       string `json:"email"`
-	WorkspaceID string `json:"workspaceId"`
-	ID          string `json:"id"`
+	Email string `json:"email"`
+	ID    string `json:"id"`
 }
 
 func (q *Queries) SetUserEmail(ctx context.Context, arg *SetUserEmailParams) (*User, error) {
-	row := q.db.QueryRow(ctx, setUserEmail, arg.Email, arg.WorkspaceID, arg.ID)
+	row := q.db.QueryRow(ctx, setUserEmail, arg.Email, arg.ID)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -359,8 +330,7 @@ SET
   END,
   updated_at = NOW()
 WHERE
-  workspace_id = $2
-  AND (
+  (
     role = 'owner'
     OR (
       id = $1
@@ -369,14 +339,9 @@ WHERE
   )
 `
 
-type TransferOwnershipParams struct {
-	NewOwnerID  string `json:"newOwnerId"`
-	WorkspaceID string `json:"workspaceId"`
-}
-
 // One statement, so the partial unique index on the owner never sees two.
-func (q *Queries) TransferOwnership(ctx context.Context, arg *TransferOwnershipParams) (int64, error) {
-	result, err := q.db.Exec(ctx, transferOwnership, arg.NewOwnerID, arg.WorkspaceID)
+func (q *Queries) TransferOwnership(ctx context.Context, newOwnerID string) (int64, error) {
+	result, err := q.db.Exec(ctx, transferOwnership, newOwnerID)
 	if err != nil {
 		return 0, err
 	}
@@ -390,26 +355,19 @@ SET
   picture = COALESCE($2, picture),
   updated_at = NOW()
 WHERE
-  workspace_id = $3
-  AND id = $4
+  id = $3
 RETURNING
   id, workspace_id, email, name, picture, role, active, created_at, updated_at
 `
 
 type UpdateUserParams struct {
-	Name        *string `json:"name"`
-	Picture     *string `json:"picture"`
-	WorkspaceID string  `json:"workspaceId"`
-	ID          string  `json:"id"`
+	Name    *string `json:"name"`
+	Picture *string `json:"picture"`
+	ID      string  `json:"id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User, error) {
-	row := q.db.QueryRow(ctx, updateUser,
-		arg.Name,
-		arg.Picture,
-		arg.WorkspaceID,
-		arg.ID,
-	)
+	row := q.db.QueryRow(ctx, updateUser, arg.Name, arg.Picture, arg.ID)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -431,19 +389,17 @@ SET
   role = $1,
   updated_at = NOW()
 WHERE
-  workspace_id = $2
-  AND id = $3
+  id = $2
   AND role <> 'owner'
 `
 
 type UpdateUserRoleParams struct {
-	Role        string `json:"role"`
-	WorkspaceID string `json:"workspaceId"`
-	ID          string `json:"id"`
+	Role string `json:"role"`
+	ID   string `json:"id"`
 }
 
 // Never touches the owner, see TransferOwnership.
 func (q *Queries) UpdateUserRole(ctx context.Context, arg *UpdateUserRoleParams) error {
-	_, err := q.db.Exec(ctx, updateUserRole, arg.Role, arg.WorkspaceID, arg.ID)
+	_, err := q.db.Exec(ctx, updateUserRole, arg.Role, arg.ID)
 	return err
 }

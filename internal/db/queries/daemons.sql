@@ -3,10 +3,9 @@
 WITH
   new_daemon AS (
     INSERT INTO
-      daemons (workspace_id, name, status, config, metadata, key_thumbprint)
+      daemons (name, status, config, metadata, key_thumbprint)
     VALUES
       (
-        @workspace_id,
         @name,
         @status,
         COALESCE(@config, '{}'::jsonb),
@@ -19,9 +18,8 @@ WITH
   ),
   new_target AS (
     INSERT INTO
-      targets (workspace_id, daemon_id, name, metadata)
+      targets (daemon_id, name, metadata)
     SELECT
-      workspace_id,
       id,
       name,
       COALESCE(sqlc.narg('metadata'), '{}'::jsonb)
@@ -44,8 +42,7 @@ SELECT
 FROM
   daemons
 WHERE
-  workspace_id = @workspace_id
-  AND key_thumbprint = @key_thumbprint;
+  key_thumbprint = @key_thumbprint;
 
 -- name: GetDaemon :one
 SELECT
@@ -107,8 +104,7 @@ SELECT
 FROM
   daemons d
 WHERE
-  d.workspace_id = @workspace_id
-  AND (
+  (
     sqlc.narg('query')::TEXT IS NULL
     OR d.name ILIKE '%' || sqlc.narg('query') || '%'
   )

@@ -17,6 +17,8 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/oauth2-proxy/mockoidc"
+
+	"github.com/nokku-sh/nokku/internal/db"
 )
 
 type oidcIDPHarness struct {
@@ -240,7 +242,10 @@ func TestOIDCFlowDisabledProvider(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.Enabled = false
-	if _, err := putSSOProvider(t.Context(), e.conn.Sys(), h.org.ws.ID, *p); err != nil {
+	if err := e.in(t, h.org.ws, func(q *db.Queries) error {
+		_, err := putSSOProvider(t.Context(), q, *p)
+		return err
+	}); err != nil {
 		t.Fatal(err)
 	}
 

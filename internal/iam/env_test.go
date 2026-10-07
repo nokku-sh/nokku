@@ -56,15 +56,17 @@ func testDomain() string {
 func (e *testEnv) workspace(t *testing.T) actor.Workspace {
 	t.Helper()
 	slug := "w" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")[:12]
-	var ws *db.Workspace
-	err := e.conn.WithTx(t.Context(), func(q *db.Queries) (err error) {
-		ws, err = tenant.Create(t.Context(), q, slug, "Test")
-		return err
-	})
+	ws, err := tenant.Create(t.Context(), e.conn, slug, "Test")
 	if err != nil {
 		t.Fatalf("create workspace: %v", err)
 	}
-	return actor.Workspace{ID: ws.ID, Slug: ws.Slug, Name: ws.Name, BaseURL: testBaseURL}
+	return actor.Workspace{ID: ws.ID, Slug: ws.Slug, BaseURL: testBaseURL}
+}
+
+// in runs fn the way a request does: nokku_app, pinned to ws.
+func (e *testEnv) in(t *testing.T, ws actor.Workspace, fn func(q *db.Queries) error) error {
+	t.Helper()
+	return e.conn.WithWorkspace(anon(t.Context(), ws), fn)
 }
 
 // org is a workspace with its owner.
@@ -81,8 +83,12 @@ func (e *testEnv) org(t *testing.T) org {
 
 func (e *testEnv) user(t *testing.T, ws actor.Workspace, email, role string) *db.User {
 	t.Helper()
-	u, err := e.conn.Sys().CreateUser(t.Context(), &db.CreateUserParams{
-		WorkspaceID: ws.ID, Email: normalizeEmail(email), Name: "Test", Role: role,
+	var u *db.User
+	err := e.in(t, ws, func(q *db.Queries) (err error) {
+		u, err = q.CreateUser(t.Context(), &db.CreateUserParams{
+			Email: normalizeEmail(email), Name: "Test", Role: role,
+		})
+		return err
 	})
 	if err != nil {
 		t.Fatalf("create user %s: %v", email, err)
@@ -94,21 +100,20 @@ func (e *testEnv) user(t *testing.T, ws actor.Workspace, email, role string) *db
 func (e *testEnv) invite(t *testing.T, ws actor.Workspace, role string, maxUses int32) string {
 	t.Helper()
 	id := uuid.NewV7().String()
-	tok, err := crypto.NewToken(crypto.WithID(id))
-	if err != nil {
-		t.Fatal(err)
-	}
+	tok := crypto.NewToken(id)
 	params := &db.CreateWorkspaceTokenParams{
-		ID:          id,
-		WorkspaceID: ws.ID,
-		Kind:        nokkuv1.TokenKind_TOKEN_KIND_INVITE,
-		TokenHash:   tok.Hash,
-		RoleName:    &role,
+		ID:        id,
+		Kind:      nokkuv1.TokenKind_TOKEN_KIND_INVITE,
+		TokenHash: tok.Hash,
+		RoleName:  &role,
 	}
 	if maxUses > 0 {
 		params.MaxUses = &maxUses
 	}
-	if _, err := e.conn.Sys().CreateWorkspaceToken(t.Context(), params); err != nil {
+	if err := e.in(t, ws, func(q *db.Queries) error {
+		_, err := q.CreateWorkspaceToken(t.Context(), params)
+		return err
+	}); err != nil {
 		t.Fatalf("create invite: %v", err)
 	}
 	return tok.Plaintext
@@ -118,20 +123,35 @@ func (e *testEnv) invite(t *testing.T, ws actor.Workspace, role string, maxUses 
 func (e *testEnv) provider(t *testing.T, ws actor.Workspace, p SSOProvider) {
 	t.Helper()
 	p.Enabled = true
-	if _, err := putSSOProvider(t.Context(), e.conn.Sys(), ws.ID, p); err != nil {
+	if err := e.in(t, ws, func(q *db.Queries) error {
+		_, err := putSSOProvider(t.Context(), q, p)
+		return err
+	}); err != nil {
 		t.Fatalf("store provider: %v", err)
+	}
+}
+
+// putCredential stores a credential of a user in ws.
+func (e *testEnv) putCredential(t *testing.T, ws actor.Workspace, p db.UpsertCredentialParams) {
+	t.Helper()
+	if err := e.in(t, ws, func(q *db.Queries) error {
+		_, err := q.UpsertCredential(t.Context(), &p)
+		return err
+	}); err != nil {
+		t.Fatalf("store credential %s: %v", p.ID, err)
 	}
 }
 
 func (e *testEnv) setEnforceSSO(t *testing.T, ws actor.Workspace, on bool) {
 	t.Helper()
-	w, err := e.conn.Sys().GetWorkspace(t.Context(), ws.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.Settings.EnforceSso = new(on)
-	if _, err := e.conn.Sys().UpdateWorkspace(t.Context(), &db.UpdateWorkspaceParams{
-		WorkspaceID: ws.ID, Settings: w.Settings,
+	if err := e.in(t, ws, func(q *db.Queries) error {
+		w, err := q.GetWorkspace(t.Context())
+		if err != nil {
+			return err
+		}
+		w.Settings.EnforceSso = new(on)
+		_, err = q.UpdateWorkspace(t.Context(), &db.UpdateWorkspaceParams{Settings: w.Settings})
+		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -139,8 +159,10 @@ func (e *testEnv) setEnforceSSO(t *testing.T, ws actor.Workspace, on bool) {
 
 func (e *testEnv) userByEmail(t *testing.T, ws actor.Workspace, email string) *db.User {
 	t.Helper()
-	u, err := e.conn.Sys().GetUserByEmail(t.Context(), &db.GetUserByEmailParams{
-		WorkspaceID: ws.ID, Email: normalizeEmail(email),
+	var u *db.User
+	err := e.in(t, ws, func(q *db.Queries) (err error) {
+		u, err = q.GetUserByEmail(t.Context(), normalizeEmail(email))
+		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
@@ -153,11 +175,14 @@ func (e *testEnv) userByEmail(t *testing.T, ws actor.Workspace, email string) *d
 
 func (e *testEnv) credential(t *testing.T, ws actor.Workspace, typ Method, provider, subject string) *db.Credential {
 	t.Helper()
-	c, err := e.conn.Sys().FindCredentialBySubject(t.Context(), &db.FindCredentialBySubjectParams{
-		WorkspaceID: ws.ID,
-		Type:        string(typ),
-		Provider:    provider,
-		Subject:     subject,
+	var c *db.Credential
+	err := e.in(t, ws, func(q *db.Queries) (err error) {
+		c, err = q.FindCredentialBySubject(t.Context(), &db.FindCredentialBySubjectParams{
+			Type:     string(typ),
+			Provider: provider,
+			Subject:  subject,
+		})
+		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
@@ -170,10 +195,11 @@ func (e *testEnv) credential(t *testing.T, ws actor.Workspace, typ Method, provi
 
 func (e *testEnv) sessions(t *testing.T, ws actor.Workspace, subjectID string) int {
 	t.Helper()
-	rows, err := e.conn.Sys().ListSessionsBySubject(t.Context(), &db.ListSessionsBySubjectParams{
-		WorkspaceID: ws.ID, SubjectID: subjectID,
-	})
-	if err != nil {
+	var rows []*db.Session
+	if err := e.in(t, ws, func(q *db.Queries) (err error) {
+		rows, err = q.ListSessionsBySubject(t.Context(), subjectID)
+		return err
+	}); err != nil {
 		t.Fatal(err)
 	}
 	return len(rows)
@@ -181,10 +207,13 @@ func (e *testEnv) sessions(t *testing.T, ws actor.Workspace, subjectID string) i
 
 func (e *testEnv) passkeys(t *testing.T, ws actor.Workspace, userID string) int {
 	t.Helper()
-	rows, err := e.conn.Sys().ListCredentialsByType(t.Context(), &db.ListCredentialsByTypeParams{
-		WorkspaceID: ws.ID, UserID: userID, Type: string(MethodPasskey),
-	})
-	if err != nil {
+	var rows []*db.Credential
+	if err := e.in(t, ws, func(q *db.Queries) (err error) {
+		rows, err = q.ListCredentialsByType(t.Context(), &db.ListCredentialsByTypeParams{
+			UserID: userID, Type: string(MethodPasskey),
+		})
+		return err
+	}); err != nil {
 		t.Fatal(err)
 	}
 	return len(rows)

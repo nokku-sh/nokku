@@ -9,7 +9,6 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
-	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/iam"
@@ -19,19 +18,12 @@ type serviceAccountService struct {
 	cfg *config.Config
 }
 
-func newServiceAccountService(cfg *config.Config) *serviceAccountService {
-	return &serviceAccountService{cfg: cfg}
-}
-
 func (s *serviceAccountService) GetServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.GetServiceAccountRequest,
 ) (*nokkuv1.GetServiceAccountResponse, error) {
-	var result *db.ServiceAccount
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.GetServiceAccount(ctx, req.GetId())
-		return err
-	}); err != nil {
+	result, err := s.cfg.Conn.Tenant().GetServiceAccount(ctx, req.GetId())
+	if err != nil {
 		return nil, err
 	}
 	return &nokkuv1.GetServiceAccountResponse{
@@ -48,15 +40,11 @@ func (s *serviceAccountService) CreateServiceAccount(
 		return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
 
-	raw, tokenHash, err := iam.NewAPIKey()
-	if err != nil {
-		return nil, errInternal
-	}
+	raw, tokenHash := iam.NewAPIKey()
 
 	var result *db.ServiceAccount
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		params := &db.CreateServiceAccountParams{
-			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
 			Name:        req.GetName(),
 			Description: req.Description,
 			Tags:        req.GetTags(),
@@ -126,18 +114,14 @@ func (s *serviceAccountService) ListServiceAccounts(
 	ctx context.Context,
 	req *nokkuv1.ListServiceAccountsRequest,
 ) (*nokkuv1.ListServiceAccountsResponse, error) {
-	var result []*db.ListServiceAccountsRow
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.ListServiceAccounts(ctx, &db.ListServiceAccountsParams{
-			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
-			Query:       req.Query,
-			Tags:        req.GetTags(),
-			RoleName:    req.RoleName,
-			Limit:       req.Limit,
-			Offset:      req.Offset,
-		})
-		return err
-	}); err != nil {
+	result, err := s.cfg.Conn.Tenant().ListServiceAccounts(ctx, &db.ListServiceAccountsParams{
+		Query:    req.Query,
+		Tags:     req.GetTags(),
+		RoleName: req.RoleName,
+		Limit:    req.Limit,
+		Offset:   req.Offset,
+	})
+	if err != nil {
 		return nil, err
 	}
 	var count int32
@@ -166,7 +150,7 @@ func (s *serviceAccountService) DeleteServiceAccount(
 	return &nokkuv1.DeleteServiceAccountResponse{}, nil
 }
 
-func checkCanManageServiceAccount(ctx context.Context, q db.Querier, id string) error {
+func checkCanManageServiceAccount(ctx context.Context, q *db.Queries, id string) error {
 	sa, err := q.GetServiceAccount(ctx, id)
 	if err != nil {
 		return err

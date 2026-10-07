@@ -8,6 +8,8 @@ import (
 
 	"connectrpc.com/connect"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/internal/actor"
@@ -19,10 +21,6 @@ import (
 
 type accountService struct {
 	cfg *config.Config
-}
-
-func newAccountService(cfg *config.Config) *accountService {
-	return &accountService{cfg: cfg}
 }
 
 func (s *accountService) GetAccount(
@@ -165,6 +163,25 @@ func (s *accountService) ListAccountSessions(
 			Ip:         new(sess.Ip),
 		})
 	}
+	// The list also shows where the account is remembered. Those rows are
+	// no sessions, they only carry the kind the UI lists them under.
+	devices, err := s.cfg.IAM.ListDevices(ctx)
+	if err != nil {
+		return nil, errInternal
+	}
+	for _, d := range devices {
+		out = append(out, &nokkuv1.AccountSession{
+			Id:         new(d.ID),
+			Kind:       new("device"),
+			Method:     new(string(iam.MethodDevice)),
+			Binding:    new(""),
+			Current:    new(false),
+			ExpiresAt:  timestamppb.New(d.ExpiresAt),
+			LastSeenAt: timestamppb.New(d.LastSeenAt),
+			UserAgent:  new(d.UserAgent),
+			Ip:         new(d.Ip),
+		})
+	}
 	return &nokkuv1.ListAccountSessionsResponse{Sessions: out}, nil
 }
 
@@ -176,7 +193,11 @@ func (s *accountService) RemoveSession(
 	if req.GetId() == string(current.TokenHash) {
 		return nil, errCurrentSession
 	}
+	// The id names a session or a remembered device, the list mixes both.
 	if err := s.cfg.IAM.DeleteOwnSession(ctx, iam.SessionHash(req.GetId())); err != nil {
+		return nil, errInternal
+	}
+	if err := s.cfg.IAM.ForgetDevice(ctx, req.GetId()); err != nil {
 		return nil, errInternal
 	}
 	return &nokkuv1.RemoveSessionResponse{}, nil

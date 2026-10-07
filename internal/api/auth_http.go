@@ -1,14 +1,9 @@
 package api
 
 import (
-	"context"
-	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
@@ -44,28 +39,4 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	// SCIM has no session or CSRF, the workspace-scoped token is the only gate.
 	mux.Handle("/scim/v2", cfg.IAM.SCIMHandler())
 	mux.Handle("/scim/v2/", cfg.IAM.SCIMHandler())
-
-	cfg.IAM.OnUserLogin = func(w http.ResponseWriter, r *http.Request, u *db.User, _ iam.Method) {
-		if c := cfg.IAM.RememberDevice(r.Context(), r.Header, r.RemoteAddr, u); c != nil {
-			http.SetCookie(w, c)
-		}
-	}
-	cfg.IAM.OnNewDeviceLogin = func(ctx context.Context, u *db.User, sess *db.Session, label, ip string) {
-		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		if err := cfg.Email.SendNewLoginEmail(ctx, u.ID, u.Email, string(sess.TokenHash), label, ip); err != nil {
-			slog.Warn("new login email not sent", "error", err)
-		}
-	}
-	// Without mail there are no links, the login page then offers passkeys
-	// and the workspace's providers only.
-	if !cfg.Email.HasSMTP() {
-		return
-	}
-	cfg.IAM.SendMagicLink = func(ctx context.Context, u *db.User, link string, ttl time.Duration) error {
-		return cfg.Email.SendMagicLinkEmail(ctx, u.ID, u.Email, link, ttl.String())
-	}
-	cfg.IAM.SendSignupLink = func(ctx context.Context, email, name, link string, ttl time.Duration) error {
-		return cfg.Email.SendSignupLinkEmail(ctx, email, name, cfg.Tenant.Single().Name, link, ttl.String())
-	}
 }

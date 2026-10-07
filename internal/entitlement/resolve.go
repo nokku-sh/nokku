@@ -15,14 +15,6 @@ import (
 
 var ErrNoSubscription = pgx.ErrNoRows
 
-// Mode only changes where the plan comes from.
-type Mode string
-
-const (
-	ModeSelfHosted Mode = "self_hosted"
-	ModeSaaS       Mode = "saas"
-)
-
 type Status string
 
 const (
@@ -54,8 +46,9 @@ func (s Status) grantsAccess() bool {
 const holdDays = 30
 
 type Service struct {
-	conn    txRunner
-	mode    Mode
+	conn txRunner
+	// saas only changes where the plan comes from.
+	saas    bool
 	license atomic.Pointer[licx.Claims] // self-hosted only, may be expired
 }
 
@@ -64,18 +57,12 @@ type txRunner interface {
 }
 
 // NewService takes the license from the environment, see EnvLicense.
-// WatchLicense adds a key activated in the UI.
-func NewService(conn txRunner, license *licx.Claims, mode Mode) *Service {
-	if mode == "" {
-		mode = ModeSelfHosted
-	}
-	s := &Service{conn: conn, mode: mode}
+// WatchLicense adds a key activated in the UI. saas is the hosted service,
+// where the plan comes from the subscription and a license counts for nothing.
+func NewService(conn txRunner, license *licx.Claims, saas bool) *Service {
+	s := &Service{conn: conn, saas: saas}
 	s.license.Store(license)
 	return s
-}
-
-func (s *Service) Mode() Mode {
-	return s.mode
 }
 
 // Resolve is cached per request and never returns a zero Plan. A self-hosted
@@ -107,7 +94,7 @@ func (s *Service) lookup(ctx context.Context, workspaceID string) (plan, keep Pl
 	var seats int64
 
 	license := s.license.Load()
-	if s.mode != ModeSelfHosted {
+	if s.saas {
 		license = nil
 	}
 	if license != nil && !license.IsExpired() {
@@ -145,7 +132,7 @@ func (s *Service) lookup(ctx context.Context, workspaceID string) (plan, keep Pl
 
 func (s *Service) plan(name string) Plan {
 	plan := resolvePlan(name)
-	if s.mode == ModeSelfHosted {
+	if !s.saas {
 		// These caps protect SaaS infrastructure only, licensed plans included.
 		plan.RecordingStorageBytes = unlimited
 		plan.ResourceCap = unlimited

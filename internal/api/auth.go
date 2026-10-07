@@ -10,18 +10,12 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 type authService struct {
 	cfg *config.Config
-}
-
-func newAuthService(cfg *config.Config) *authService {
-	return &authService{cfg: cfg}
 }
 
 func callInfo(ctx context.Context) (connect.CallInfo, error) {
@@ -44,21 +38,11 @@ func (s *authService) GetLoginOptions(
 	ctx context.Context,
 	_ *nokkuv1.GetLoginOptionsRequest,
 ) (*nokkuv1.GetLoginOptionsResponse, error) {
-	ws, ok := actor.WorkspaceFromContext(ctx)
-	if !ok {
-		return nil, errNoWorkspace
-	}
-	var enforced bool
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		w, err := q.GetWorkspace(ctx, ws.ID)
-		if err != nil {
-			return err
-		}
-		enforced = w.Settings.GetEnforceSso()
-		return nil
-	}); err != nil {
+	ws, err := s.cfg.Conn.Tenant().GetWorkspace(ctx)
+	if err != nil {
 		return nil, err
 	}
+	enforced := ws.Settings.GetEnforceSso()
 	providers, err := s.cfg.IAM.ListSSOProviders(ctx)
 	if err != nil {
 		return nil, err

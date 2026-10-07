@@ -19,7 +19,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/crypto"
-	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/realip"
 )
 
@@ -72,11 +71,7 @@ type pollState struct {
 }
 
 func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
-	deviceCode, err := crypto.RandomString(32)
-	if err != nil {
-		writeOAuthError(w, "server_error")
-		return
-	}
+	deviceCode := crypto.RandomString(32)
 	userCode, err := randomUserCode()
 	if err != nil {
 		writeOAuthError(w, "server_error")
@@ -172,8 +167,7 @@ func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool
 }
 
 func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
-	// The session and its audit events carry the terminal's address.
-	ctx := ContextWithRequestMeta(r.Context(), RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr})
+	ctx := r.Context()
 	deviceCode := r.FormValue("device_code")
 	if deviceCode == "" {
 		writeOAuthError(w, "invalid_request")
@@ -206,8 +200,8 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		}
 		h.svc.record(
 			ctx,
-			Event{
-				Action: ActionLoginDenied,
+			event{
+				Action: actionLoginDenied,
 				Method: MethodDevice,
 				UserID: g.UserID,
 				Detail: "access denied",
@@ -255,11 +249,13 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		// Only a key the account has not signed in with before is mailed, so
 		// the mail stays rare enough to be read. An approval the user was
 		// tricked into always comes from such a key.
-		if h.svc.rememberTerminal(ctx, u.ID, binding, sess.Label) && h.svc.OnNewDeviceLogin != nil {
-			go h.svc.OnNewDeviceLogin(context.WithoutCancel(ctx), u, sess, sess.Label, sess.Ip)
+		if !h.svc.seenDevice(ctx, u.ID, binding) {
+			if _, err := h.svc.addDevice(ctx, u, binding, sess.UserAgent, sess.Label, sess.Ip); err != nil {
+				slog.Error("failed to remember terminal", "error", err)
+			}
 		}
-		h.svc.record(ctx, Event{
-			Action: ActionLoginSucceeded,
+		h.svc.record(ctx, event{
+			Action: actionLoginSucceeded,
 			Kind:   actor.KindCLI,
 			Method: MethodDevice,
 			UserID: u.ID,
@@ -276,47 +272,6 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		}
 		WriteJSON(w, http.StatusOK, resp)
 	}
-}
-
-// rememberTerminal reports whether binding is a key the account has not
-// signed in with before, and remembers it. The marker is the one a browser
-// gets from RememberDevice, with the key in place of the cookie.
-func (s *Service) rememberTerminal(ctx context.Context, userID, binding, label string) bool {
-	var sessions []*db.Session
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		sessions, err = q.ListSessionsBySubject(
-			ctx,
-			&db.ListSessionsBySubjectParams{WorkspaceID: ws, SubjectID: userID},
-		)
-		return err
-	})
-	if err != nil {
-		slog.Error("failed to look up remembered terminals", "error", err)
-		return true
-	}
-	now := s.now()
-	for _, sess := range sessions {
-		if sess.Kind != string(actor.KindDevice) || sess.Binding != binding {
-			continue
-		}
-		if sess.ExpiresAt != nil && !sess.ExpiresAt.After(now) {
-			continue
-		}
-		s.touchSession(ctx, sess.TokenHash)
-		return false
-	}
-	// The marker's token goes nowhere, nothing can present it.
-	if _, _, err := s.IssueSession(ctx, SessionParams{
-		SubjectID: userID,
-		Kind:      actor.KindDevice,
-		Method:    MethodDevice,
-		Binding:   binding,
-		Label:     label,
-		TTL:       deviceMarkerTTL,
-	}); err != nil {
-		slog.Error("failed to remember terminal", "error", err)
-	}
-	return true
 }
 
 // Nonce lets devices fetch a nonce before their first proof.

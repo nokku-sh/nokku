@@ -90,8 +90,12 @@ func (f *passkeyFlow) rp(ctx context.Context) (*webauthn.WebAuthn, error) {
 	if f.svc.debug {
 		origins = append(origins, devOrigin)
 	}
+	row, err := f.svc.conn.Tenant().GetWorkspace(ctx)
+	if err != nil {
+		return nil, err
+	}
 	wa, err := webauthn.New(&webauthn.Config{
-		RPDisplayName: cmp.Or(ws.Name, "Nokku"),
+		RPDisplayName: cmp.Or(row.Name, "Nokku"),
 		RPID:          u.Hostname(),
 		RPOrigins:     origins,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
@@ -112,14 +116,9 @@ func (f *passkeyFlow) clearedCeremonyCookie() *http.Cookie {
 }
 
 func (f *passkeyFlow) webUserFor(ctx context.Context, u *db.User) (*webUser, error) {
-	var creds []*db.Credential
-	err := f.svc.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		creds, err = q.ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
-			WorkspaceID: ws,
-			UserID:      u.ID,
-			Type:        string(MethodPasskey),
-		})
-		return err
+	creds, err := f.svc.conn.Tenant().ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
+		UserID: u.ID,
+		Type:   string(MethodPasskey),
 	})
 	if err != nil {
 		return nil, err
@@ -158,7 +157,7 @@ func passkeyCredentialID(cred *webauthn.Credential) string {
 
 // savePasskey keeps the existing label on a refresh. The upsert never moves a
 // credential id to another account.
-func savePasskey(ctx context.Context, q *db.Queries, ws, userID string, cred *webauthn.Credential) (string, error) {
+func savePasskey(ctx context.Context, q *db.Queries, userID string, cred *webauthn.Credential) (string, error) {
 	data, err := json.Marshal(cred)
 	if err != nil {
 		return "", err
@@ -166,20 +165,18 @@ func savePasskey(ctx context.Context, q *db.Queries, ws, userID string, cred *we
 	subject := base64.RawURLEncoding.EncodeToString(cred.ID)
 	label := authenticatorName(cred)
 	if existing, err := q.FindCredentialBySubject(ctx, &db.FindCredentialBySubjectParams{
-		WorkspaceID: ws,
-		Type:        string(MethodPasskey),
-		Subject:     subject,
+		Type:    string(MethodPasskey),
+		Subject: subject,
 	}); err == nil && existing.Label != "" {
 		label = existing.Label
 	}
 	_, err = q.UpsertCredential(ctx, &db.UpsertCredentialParams{
-		ID:          passkeyCredentialID(cred),
-		WorkspaceID: ws,
-		UserID:      userID,
-		Type:        string(MethodPasskey),
-		Subject:     subject,
-		Data:        data,
-		Label:       label,
+		ID:      passkeyCredentialID(cred),
+		UserID:  userID,
+		Type:    string(MethodPasskey),
+		Subject: subject,
+		Data:    data,
+		Label:   label,
 	})
 	return label, err
 }
@@ -229,8 +226,8 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var name string
-	err = f.svc.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		name, err = savePasskey(ctx, q, ws, wu.user.ID, cred)
+	err = f.svc.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		name, err = savePasskey(ctx, q, wu.user.ID, cred)
 		return err
 	})
 	if err != nil {
@@ -238,8 +235,8 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	f.svc.spendFlow(ctx, flowID)
-	f.svc.record(ctx, Event{
-		Action: ActionCredentialAdded,
+	f.svc.record(ctx, event{
+		Action: actionCredentialAdded,
 		Kind:   actor.KindUser,
 		Method: MethodPasskey,
 		UserID: wu.user.ID,
@@ -322,14 +319,14 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var u *db.User
-	err = f.svc.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
+	err = f.svc.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		u, err = f.svc.createUser(ctx, q, db.CreateUserWithIDParams{
-			ID: st.ID, WorkspaceID: ws, Email: st.Email, Name: st.Name, Role: st.Role,
+			ID: st.ID, Email: st.Email, Name: st.Name, Role: st.Role,
 		}, st.InviteID)
 		if err != nil {
 			return err
 		}
-		_, err = savePasskey(ctx, q, ws, u.ID, cred)
+		_, err = savePasskey(ctx, q, u.ID, cred)
 		return err
 	})
 	switch {
@@ -348,7 +345,7 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	}
 	f.svc.record(
 		ctx,
-		Event{Action: ActionUserCreated, Kind: actor.KindUser, Method: MethodPasskey, UserID: u.ID, Email: u.Email},
+		event{Action: actionUserCreated, Kind: actor.KindUser, Method: MethodPasskey, UserID: u.ID, Email: u.Email},
 	)
 	f.svc.spendFlow(ctx, flowID)
 	http.SetCookie(w, f.clearedCeremonyCookie())
@@ -395,8 +392,8 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	err = f.svc.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		_, err = savePasskey(ctx, q, ws, wu.user.ID, cred)
+	err = f.svc.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		_, err = savePasskey(ctx, q, wu.user.ID, cred)
 		return err
 	})
 	if err != nil {
@@ -424,8 +421,8 @@ func (f *passkeyFlow) signIn(w http.ResponseWriter, r *http.Request, u *db.User,
 		return
 	}
 	http.SetCookie(w, cookie)
-	if f.svc.OnUserLogin != nil {
-		f.svc.OnUserLogin(w, r, u, MethodPasskey)
+	if c := f.svc.RememberDevice(ctx, r.Header, r.RemoteAddr, u); c != nil {
+		http.SetCookie(w, c)
 	}
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

@@ -124,11 +124,7 @@ func (a *authorizationInterceptor) daemonAccepted(ctx context.Context, daemonID,
 		nokkuv1connect.DaemonControlServiceUnenrollDaemonProcedure:
 		return nil
 	}
-	var daemon *db.Daemon
-	err := a.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		daemon, err = q.GetDaemon(ctx, daemonID)
-		return err
-	})
+	daemon, err := a.cfg.Conn.Tenant().GetDaemon(ctx, daemonID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return db.ErrPermissionDenied
 	}

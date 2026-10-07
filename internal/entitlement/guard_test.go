@@ -181,7 +181,7 @@ func TestGuard_DeniesAndAdvertisesUpgrade(t *testing.T) {
 	sut := NewGuardInterceptor(NewService(
 		&fakeDB{},
 		nil,
-		ModeSaaS,
+		modeSaaS,
 	))
 
 	ctx := actor.WithWorkspace(context.Background(), actor.Workspace{ID: "ws1"})
@@ -212,7 +212,7 @@ func TestGuard_DeniesAndAdvertisesUpgrade(t *testing.T) {
 }
 
 func TestGuard_DeniesAuditStreamingOnCommunity(t *testing.T) {
-	sut := NewGuardInterceptor(NewService(&fakeDB{}, nil, ModeSaaS))
+	sut := NewGuardInterceptor(NewService(&fakeDB{}, nil, modeSaaS))
 	ctx := actor.WithWorkspace(context.Background(), actor.Workspace{ID: "ws1"})
 
 	req := &nokkuv1.UpdateWorkspaceRequest{
@@ -246,7 +246,7 @@ func TestGuard_AllowsPaidPlanAndUnpinnedContext(t *testing.T) {
 	sut := NewGuardInterceptor(NewService(
 		&fakeDB{plan: PlanPro, status: StatusActive},
 		nil,
-		ModeSaaS,
+		modeSaaS,
 	))
 
 	// Pro workspace passes.
@@ -328,7 +328,7 @@ func TestGuard_ResourceCapDeniesAndAdvertisesUpgrade(t *testing.T) {
 	sut := NewGuardInterceptor(NewService(
 		&fakeDB{resources: 50},
 		nil,
-		ModeSaaS,
+		modeSaaS,
 	))
 
 	ctx := actor.WithWorkspace(context.Background(), actor.Workspace{ID: "ws1"})
@@ -359,30 +359,30 @@ func TestCheckResources(t *testing.T) {
 	tests := []struct {
 		name    string
 		db      *fakeDB
-		mode    Mode
+		mode    bool
 		wantErr bool
 	}{
 		{
 			name:    "below cap passes",
 			db:      &fakeDB{resources: 10},
-			mode:    ModeSaaS,
+			mode:    modeSaaS,
 			wantErr: false,
 		},
 		{
 			name:    "at cap denies",
 			db:      &fakeDB{resources: 50},
-			mode:    ModeSaaS,
+			mode:    modeSaaS,
 			wantErr: true,
 		},
 		{
 			name: "count lookup fails open",
 			db:   &fakeDB{resourceErr: errors.New("db down")},
-			mode: ModeSaaS,
+			mode: modeSaaS,
 		},
 		{
 			name: "self-hosted is never capped",
 			db:   &fakeDB{resources: 1 << 20},
-			mode: ModeSelfHosted,
+			mode: modeSelfHosted,
 		},
 	}
 

@@ -16,15 +16,14 @@ const createDaemon = `-- name: CreateDaemon :one
 WITH
   new_daemon AS (
     INSERT INTO
-      daemons (workspace_id, name, status, config, metadata, key_thumbprint)
+      daemons (name, status, config, metadata, key_thumbprint)
     VALUES
       (
         $1,
         $2,
-        $3,
+        COALESCE($3, '{}'::jsonb),
         COALESCE($4, '{}'::jsonb),
-        COALESCE($5, '{}'::jsonb),
-        $6
+        $5
       )
     ON CONFLICT DO NOTHING
     RETURNING
@@ -32,12 +31,11 @@ WITH
   ),
   new_target AS (
     INSERT INTO
-      targets (workspace_id, daemon_id, name, metadata)
+      targets (daemon_id, name, metadata)
     SELECT
-      workspace_id,
       id,
       name,
-      COALESCE($5, '{}'::jsonb)
+      COALESCE($4, '{}'::jsonb)
     FROM
       new_daemon
     RETURNING
@@ -53,7 +51,6 @@ CROSS JOIN
 `
 
 type CreateDaemonParams struct {
-	WorkspaceID   string             `json:"workspaceId"`
 	Name          string             `json:"name"`
 	Status        nokku.DaemonStatus `json:"status"`
 	Config        interface{}        `json:"config"`
@@ -78,7 +75,6 @@ type CreateDaemonRow struct {
 // Returns no row on a taken name or key, so the caller can retry in its tx.
 func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*CreateDaemonRow, error) {
 	row := q.db.QueryRow(ctx, createDaemon,
-		arg.WorkspaceID,
 		arg.Name,
 		arg.Status,
 		arg.Config,
@@ -161,17 +157,11 @@ SELECT
 FROM
   daemons
 WHERE
-  workspace_id = $1
-  AND key_thumbprint = $2
+  key_thumbprint = $1
 `
 
-type GetDaemonByKeyThumbprintParams struct {
-	WorkspaceID   string  `json:"workspaceId"`
-	KeyThumbprint *string `json:"keyThumbprint"`
-}
-
-func (q *Queries) GetDaemonByKeyThumbprint(ctx context.Context, arg *GetDaemonByKeyThumbprintParams) (*Daemon, error) {
-	row := q.db.QueryRow(ctx, getDaemonByKeyThumbprint, arg.WorkspaceID, arg.KeyThumbprint)
+func (q *Queries) GetDaemonByKeyThumbprint(ctx context.Context, keyThumbprint *string) (*Daemon, error) {
+	row := q.db.QueryRow(ctx, getDaemonByKeyThumbprint, keyThumbprint)
 	var i Daemon
 	err := row.Scan(
 		&i.ID,
@@ -261,35 +251,33 @@ SELECT
 FROM
   daemons d
 WHERE
-  d.workspace_id = $1
-  AND (
-    $2::TEXT IS NULL
-    OR d.name ILIKE '%' || $2 || '%'
+  (
+    $1::TEXT IS NULL
+    OR d.name ILIKE '%' || $1 || '%'
   )
   AND (
-    $3::INTEGER IS NULL
-    OR d.status = $3::INTEGER
+    $2::INTEGER IS NULL
+    OR d.status = $2::INTEGER
   )
   AND (
-    $4::BOOLEAN IS NULL
-    OR COALESCE(d.last_seen_at > $5::TIMESTAMPTZ, FALSE) = $4
+    $3::BOOLEAN IS NULL
+    OR COALESCE(d.last_seen_at > $4::TIMESTAMPTZ, FALSE) = $3
   )
 ORDER BY
   d.id ASC
 LIMIT
-  $7
-OFFSET
   $6
+OFFSET
+  $5
 `
 
 type ListDaemonsParams struct {
-	WorkspaceID string    `json:"workspaceId"`
-	Query       *string   `json:"query"`
-	Status      *int32    `json:"status"`
-	Online      *bool     `json:"online"`
-	SeenAfter   time.Time `json:"seenAfter"`
-	Offset      *int32    `json:"offset"`
-	Limit       *int32    `json:"limit"`
+	Query     *string   `json:"query"`
+	Status    *int32    `json:"status"`
+	Online    *bool     `json:"online"`
+	SeenAfter time.Time `json:"seenAfter"`
+	Offset    *int32    `json:"offset"`
+	Limit     *int32    `json:"limit"`
 }
 
 type ListDaemonsRow struct {
@@ -299,7 +287,6 @@ type ListDaemonsRow struct {
 
 func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*ListDaemonsRow, error) {
 	rows, err := q.db.Query(ctx, listDaemons,
-		arg.WorkspaceID,
 		arg.Query,
 		arg.Status,
 		arg.Online,

@@ -1,6 +1,7 @@
 package iam
 
 import (
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -128,7 +129,10 @@ func TestSessionRecordsDevice(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	header := http.Header{"User-Agent": {"Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0"}}
-	ctx := ContextWithRequestMeta(anon(t.Context(), o.ws), RequestMeta{Header: header, RemoteAddr: "203.0.113.7:4242"})
+	ctx := actor.ContextWithRequestMeta(
+		anon(t.Context(), o.ws),
+		actor.RequestMeta{Header: header, RemoteAddr: "203.0.113.7:4242"},
+	)
 
 	sess, _, err := e.svc.IssueSession(ctx, SessionParams{
 		SubjectID: o.owner.ID, Kind: actor.KindUser, Method: MethodPasskey, TTL: time.Hour,
@@ -148,9 +152,7 @@ func TestInactiveUserLosesCLISession(t *testing.T) {
 	_, _, err := e.svc.AuthenticateToken(ctx, token)
 	require.NoError(t, err)
 
-	require.NoError(t, e.conn.Sys().SetUserActive(t.Context(), &db.SetUserActiveParams{
-		WorkspaceID: o.ws.ID, ID: u.ID, Active: false,
-	}))
+	require.NoError(t, e.conn.Sys().SetUserActive(t.Context(), &db.SetUserActiveParams{ID: u.ID, Active: false}))
 	_, _, err = e.svc.AuthenticateToken(ctx, token)
 	require.ErrorIs(t, err, ErrInactive)
 }
@@ -165,7 +167,7 @@ func TestDeletedUserLosesSessions(t *testing.T) {
 	_, _, err := e.svc.AuthenticateToken(ctx, token)
 	require.NoError(t, err)
 
-	require.NoError(t, e.conn.Sys().DeleteUser(t.Context(), &db.DeleteUserParams{WorkspaceID: o.ws.ID, ID: u.ID}))
+	require.NoError(t, e.conn.Sys().DeleteUser(t.Context(), u.ID))
 	_, _, err = e.svc.AuthenticateToken(ctx, token)
 	require.Error(t, err, "the session of a deleted account still authenticates")
 }
@@ -242,11 +244,105 @@ func TestEmailChangeRefusedForManagedAccounts(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	u := e.user(t, o.ws, "managed@"+testDomain(), "member")
-	_, err := e.conn.Sys().UpsertCredential(t.Context(), &db.UpsertCredentialParams{
-		ID: "okta:sub", WorkspaceID: o.ws.ID, UserID: u.ID, Type: string(MethodOIDC), Provider: "okta", Subject: "sub",
-		Data: []byte{},
+	e.putCredential(t, o.ws, db.UpsertCredentialParams{
+		ID: "okta:sub", UserID: u.ID, Type: string(MethodOIDC), Provider: "okta", Subject: "sub", Data: []byte{},
 	})
-	require.NoError(t, err)
-	_, _, err = e.svc.RequestEmailChange(as(t.Context(), o.ws, u), u, "other@"+testDomain())
+	_, _, err := e.svc.RequestEmailChange(as(t.Context(), o.ws, u), u, "other@"+testDomain())
 	require.ErrorIs(t, err, ErrManagedAccount)
+}
+
+// A browser is mailed once, when it is new to the account, and what
+// remembers it is no way to sign in.
+func TestBrowserIsRememberedAndNeverSignsIn(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	u := o.owner
+	mailed := make(chan string, 4)
+	e.svc.sendNewLogin = func(_ context.Context, userID, _, _, name, ip string) error {
+		mailed <- userID + " " + name + " " + ip
+		return nil
+	}
+	wantMail := func(want bool, msg string) {
+		t.Helper()
+		select {
+		case got := <-mailed:
+			require.True(t, want, "%s, but got a mail", msg)
+			assert.Equal(t, u.ID+" Firefox on Linux 203.0.113.7", got)
+		case <-time.After(300 * time.Millisecond):
+			require.False(t, want, "%s, but got no mail", msg)
+		}
+	}
+	ctx := anon(t.Context(), o.ws)
+	header := http.Header{"User-Agent": {"Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0"}}
+	const addr = "203.0.113.7:4242"
+
+	cookie := e.svc.RememberDevice(ctx, header, addr, u)
+	require.NotNil(t, cookie, "a new browser gets the device cookie")
+	wantMail(true, "the first sign-in of a browser is mailed")
+
+	header.Set("Cookie", cookie.Name+"="+cookie.Value)
+	assert.Nil(t, e.svc.RememberDevice(ctx, header, addr, u), "a known browser keeps its cookie")
+	wantMail(false, "the same browser signing in again is not mailed")
+
+	devices, err := e.svc.ListDevices(as(ctx, o.ws, u))
+	require.NoError(t, err)
+	require.Len(t, devices, 1)
+	assert.Equal(t, header.Get("User-Agent"), devices[0].UserAgent)
+	assert.Equal(t, "203.0.113.7", devices[0].Ip)
+
+	// The cookie only names the device, it opens nothing.
+	assert.Zero(t, e.sessions(t, o.ws, u.ID), "remembering a device issued a session")
+	for _, h := range []http.Header{
+		{"Authorization": {"Bearer " + cookie.Value}},
+		{"Cookie": {sessionCookieName + "=" + cookie.Value}},
+	} {
+		_, _, err := e.svc.Authenticate(ctx, h, "/nokku.v1.UtilService/Whoami")
+		require.Error(t, err, "the device cookie signed in")
+	}
+
+	// Another account on the same browser is new there.
+	other := e.user(t, o.ws, "other@"+testDomain(), "member")
+	e.svc.sendNewLogin = nil
+	assert.NotNil(t, e.svc.RememberDevice(ctx, header, addr, other), "a device of one account is known to another")
+
+	// Signing the account out everywhere forgets its devices too.
+	_, err = e.svc.RevokeUser(ctx, u.ID)
+	require.NoError(t, err)
+	devices, err = e.svc.ListDevices(as(ctx, o.ws, u))
+	require.NoError(t, err)
+	assert.Empty(t, devices)
+	assert.NotNil(t, e.svc.RememberDevice(ctx, header, addr, u), "a forgotten browser is new again")
+}
+
+// The sessions list shows when a session was last used. The stamp moves with
+// authenticated requests, at most once a minute.
+func TestSessionActivityIsNotedOnceAMinute(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	now := time.Now()
+	e.svc.now = func() time.Time { return now }
+	sess, token := e.session(t, o.ws, o.owner, actor.KindUser)
+	ctx := anon(t.Context(), o.ws)
+	header := http.Header{"Authorization": {"Bearer " + token}}
+	lastSeen := func() time.Time {
+		t.Helper()
+		var row *db.Session
+		require.NoError(t, e.in(t, o.ws, func(q *db.Queries) (err error) {
+			row, err = q.GetSession(t.Context(), sess.TokenHash)
+			return err
+		}))
+		require.NotNil(t, row.LastSeenAt)
+		return *row.LastSeenAt
+	}
+	issued := lastSeen()
+
+	now = now.Add(30 * time.Second)
+	_, _, err := e.svc.Authenticate(ctx, header, "/nokku.v1.UtilService/Whoami")
+	require.NoError(t, err)
+	assert.Equal(t, issued, lastSeen(), "a request within the minute wrote the stamp")
+
+	now = now.Add(time.Minute)
+	_, _, err = e.svc.Authenticate(ctx, header, "/nokku.v1.UtilService/Whoami")
+	require.NoError(t, err)
+	assert.WithinDuration(t, now, lastSeen(), time.Millisecond, "a later request did not move the stamp")
 }

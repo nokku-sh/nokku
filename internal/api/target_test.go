@@ -23,18 +23,17 @@ import (
 func seedTarget(t *testing.T, cfg *config.Config, workspaceID string) string {
 	t.Helper()
 	var targetID string
-	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
+	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
 		target, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{
-			WorkspaceID: workspaceID,
-			Name:        uniq("web"),
-			Endpoints:   []string{"10.0.0.1:22"},
+			Name:      uniq("web"),
+			Endpoints: []string{"10.0.0.1:22"},
 		})
 		if err != nil {
 			return err
 		}
 		targetID = target.ID
 		return nil
-	}))
+	})
 	return targetID
 }
 
@@ -148,6 +147,47 @@ type accessFixture struct {
 //
 // alice and carol are in platform. A second workspace holds a prod target
 // with a grant of its own that must never show up.
+// graphSeed writes into the workspace q is pinned to.
+type graphSeed struct {
+	t       *testing.T
+	q       *db.Queries
+	targets map[string]string
+}
+
+func (s graphSeed) member(name string) string {
+	u, err := s.q.CreateUser(s.t.Context(), &db.CreateUserParams{
+		Email: uuid.New().String() + "@api.test", Name: name, Role: "member",
+	})
+	require.NoError(s.t, err)
+	return u.ID
+}
+
+// account creates the target on first use and returns the principal.
+func (s graphSeed) account(name string, tags []string, username string) string {
+	if s.targets[name] == "" {
+		target, err := s.q.CreateTarget(s.t.Context(), &db.CreateTargetParams{Name: name, Tags: tags})
+		require.NoError(s.t, err)
+		s.targets[name] = target.ID
+	}
+	if username == "" {
+		return ""
+	}
+	p, err := s.q.CreatePrincipal(s.t.Context(), &db.CreatePrincipalParams{
+		TargetID: s.targets[name],
+		Username: username,
+	})
+	require.NoError(s.t, err)
+	return p.ID
+}
+
+func (s graphSeed) grant(principalID, kind, subjectID string) {
+	require.NoError(s.t, s.q.AddPrincipalGrant(s.t.Context(), &db.AddPrincipalGrantParams{
+		PrincipalID: principalID,
+		SubjectKind: kind,
+		SubjectID:   subjectID,
+	}))
+}
+
 func seedAccessGraph(t *testing.T) accessFixture {
 	t.Helper()
 	cfg, srv := newTestAPI(t)
@@ -165,50 +205,10 @@ func seedAccessGraph(t *testing.T) accessFixture {
 	}
 	require.NoError(t, owner.Close(t.Context()))
 
-	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
-		member := func(workspaceID, name string) string {
-			u, err := q.CreateUser(t.Context(), &db.CreateUserParams{
-				WorkspaceID: workspaceID, Email: uuid.New().String() + "@api.test", Name: name, Role: "member",
-			})
-			require.NoError(t, err)
-			return u.ID
-		}
-		// account creates the target on first use and returns the principal.
-		targets := map[string]string{}
-		account := func(workspaceID, name string, tags []string, username string) string {
-			key := workspaceID + name
-			if targets[key] == "" {
-				target, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{
-					WorkspaceID: workspaceID,
-					Name:        name,
-					Tags:        tags,
-				})
-				require.NoError(t, err)
-				targets[key] = target.ID
-			}
-			if username == "" {
-				return ""
-			}
-			p, err := q.CreatePrincipal(t.Context(), &db.CreatePrincipalParams{
-				WorkspaceID: workspaceID,
-				TargetID:    targets[key],
-				Username:    username,
-			})
-			require.NoError(t, err)
-			return p.ID
-		}
-		grant := func(workspaceID, principalID, kind, subjectID string) {
-			require.NoError(t, q.AddPrincipalGrant(t.Context(), &db.AddPrincipalGrantParams{
-				PrincipalID: principalID,
-				WorkspaceID: workspaceID,
-				SubjectKind: kind,
-				SubjectID:   subjectID,
-			}))
-		}
-
-		ws := f.workspaceID
-		f.alice, f.bob, f.carol = member(ws, "alice"), member(ws, "bob"), member(ws, "carol")
-		team, err := q.CreateTeam(t.Context(), &db.CreateTeamParams{WorkspaceID: ws, Name: "platform"})
+	inWorkspace(t, cfg, f.workspaceID, func(q *db.Queries) error {
+		s := graphSeed{t: t, q: q, targets: map[string]string{}}
+		f.alice, f.bob, f.carol = s.member("alice"), s.member("bob"), s.member("carol")
+		team, err := q.CreateTeam(t.Context(), &db.CreateTeamParams{Name: "platform"})
 		require.NoError(t, err)
 		f.platform = team.ID
 		for _, userID := range []string{f.alice, f.carol} {
@@ -216,24 +216,27 @@ func seedAccessGraph(t *testing.T) accessFixture {
 		}
 		f.ci, err = q.CreateServiceAccount(
 			t.Context(),
-			&db.CreateServiceAccountParams{WorkspaceID: ws, Name: uniq("ci")},
+			&db.CreateServiceAccountParams{Name: uniq("ci")},
 		)
 		require.NoError(t, err)
 
-		web1Root := account(ws, "web-1", []string{"prod", "web"}, "root")
-		web1Deploy := account(ws, "web-1", nil, "deploy")
-		f.web1 = targets[ws+"web-1"]
-		grant(ws, web1Root, db.SubjectKindTeam, f.platform)
-		grant(ws, web1Deploy, db.SubjectKindUser, f.alice)
-		grant(ws, web1Deploy, db.SubjectKindServiceAccount, f.ci)
-		grant(ws, account(ws, "web-2", []string{"prod"}, "root"), db.SubjectKindTeam, f.platform)
-		grant(ws, account(ws, "db-1", nil, "root"), db.SubjectKindUser, f.bob)
-		account(ws, "idle", []string{"prod"}, "")
-
-		f.outsider = member(other, "outsider")
-		grant(other, account(other, "web-1", []string{"prod"}, "root"), db.SubjectKindUser, f.outsider)
+		web1Root := s.account("web-1", []string{"prod", "web"}, "root")
+		web1Deploy := s.account("web-1", nil, "deploy")
+		f.web1 = s.targets["web-1"]
+		s.grant(web1Root, db.SubjectKindTeam, f.platform)
+		s.grant(web1Deploy, db.SubjectKindUser, f.alice)
+		s.grant(web1Deploy, db.SubjectKindServiceAccount, f.ci)
+		s.grant(s.account("web-2", []string{"prod"}, "root"), db.SubjectKindTeam, f.platform)
+		s.grant(s.account("db-1", nil, "root"), db.SubjectKindUser, f.bob)
+		s.account("idle", []string{"prod"}, "")
 		return nil
-	}))
+	})
+	inWorkspace(t, cfg, other, func(q *db.Queries) error {
+		s := graphSeed{t: t, q: q, targets: map[string]string{}}
+		f.outsider = s.member("outsider")
+		s.grant(s.account("web-1", []string{"prod"}, "root"), db.SubjectKindUser, f.outsider)
+		return nil
+	})
 
 	client := func(role db.Role) nokkuv1connect.TargetServiceClient {
 		return nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL,

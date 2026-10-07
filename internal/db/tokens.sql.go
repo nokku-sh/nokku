@@ -17,7 +17,6 @@ const createWorkspaceToken = `-- name: CreateWorkspaceToken :one
 INSERT INTO
   workspace_tokens (
     id,
-    workspace_id,
     kind,
     label,
     token_hash,
@@ -37,8 +36,7 @@ VALUES
     $6,
     $7,
     $8,
-    $9,
-    $10
+    $9
   )
 RETURNING
   id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role_name, created_at, last_used_at
@@ -46,7 +44,6 @@ RETURNING
 
 type CreateWorkspaceTokenParams struct {
 	ID          string             `json:"id"`
-	WorkspaceID string             `json:"workspaceId"`
 	Kind        nokku.TokenKind    `json:"kind"`
 	Label       string             `json:"label"`
 	TokenHash   crypto.HashedToken `json:"tokenHash"`
@@ -60,7 +57,6 @@ type CreateWorkspaceTokenParams struct {
 func (q *Queries) CreateWorkspaceToken(ctx context.Context, arg *CreateWorkspaceTokenParams) (*WorkspaceToken, error) {
 	row := q.db.QueryRow(ctx, createWorkspaceToken,
 		arg.ID,
-		arg.WorkspaceID,
 		arg.Kind,
 		arg.Label,
 		arg.TokenHash,
@@ -150,22 +146,16 @@ SELECT
 FROM
   workspace_tokens
 WHERE
-  workspace_id = $1
-  AND (
-    kind = $2
-    OR $2 = 0
+  (
+    kind = $1
+    OR $1 = 0
   )
 ORDER BY
   created_at DESC
 `
 
-type ListWorkspaceTokensParams struct {
-	WorkspaceID string          `json:"workspaceId"`
-	Kind        nokku.TokenKind `json:"kind"`
-}
-
-func (q *Queries) ListWorkspaceTokens(ctx context.Context, arg *ListWorkspaceTokensParams) ([]*WorkspaceToken, error) {
-	rows, err := q.db.Query(ctx, listWorkspaceTokens, arg.WorkspaceID, arg.Kind)
+func (q *Queries) ListWorkspaceTokens(ctx context.Context, kind nokku.TokenKind) ([]*WorkspaceToken, error) {
+	rows, err := q.db.Query(ctx, listWorkspaceTokens, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -253,9 +243,8 @@ SET
   uses = uses + 1,
   last_used_at = NOW()
 WHERE
-  workspace_id = $1
-  AND id = $2
-  AND kind = $3
+  id = $1
+  AND kind = $2
   AND (
     expires_at IS NULL
     OR expires_at > NOW()
@@ -269,15 +258,14 @@ RETURNING
 `
 
 type RedeemTokenByIDParams struct {
-	WorkspaceID string          `json:"workspaceId"`
-	ID          string          `json:"id"`
-	Kind        nokku.TokenKind `json:"kind"`
+	ID   string          `json:"id"`
+	Kind nokku.TokenKind `json:"kind"`
 }
 
 // For a signup whose invite link was checked earlier. The mailed link or
 // the passkey ceremony is the proof by then.
 func (q *Queries) RedeemTokenByID(ctx context.Context, arg *RedeemTokenByIDParams) (*WorkspaceToken, error) {
-	row := q.db.QueryRow(ctx, redeemTokenByID, arg.WorkspaceID, arg.ID, arg.Kind)
+	row := q.db.QueryRow(ctx, redeemTokenByID, arg.ID, arg.Kind)
 	var i WorkspaceToken
 	err := row.Scan(
 		&i.ID,

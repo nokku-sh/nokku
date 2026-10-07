@@ -16,7 +16,7 @@ type sink interface {
 
 // postgresSink is the durable record.
 type postgresSink struct {
-	q db.Querier
+	q *db.Queries
 }
 
 var _ sink = (*postgresSink)(nil)

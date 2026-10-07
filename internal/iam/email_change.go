@@ -40,8 +40,8 @@ func (s *Service) RequestEmailChange(
 	if err = emailverify.Verify(ctx, newEmail, s.strict); err != nil {
 		return "", "", ErrEmailRejected
 	}
-	err = s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		creds, err := q.ListUserCredentials(ctx, &db.ListUserCredentialsParams{WorkspaceID: ws, UserID: u.ID})
+	err = s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		creds, err := q.ListUserCredentials(ctx, u.ID)
 		if err != nil {
 			return err
 		}
@@ -50,21 +50,21 @@ func (s *Service) RequestEmailChange(
 				return ErrManagedAccount
 			}
 		}
-		if _, err = q.GetUserByEmail(ctx, &db.GetUserByEmailParams{WorkspaceID: ws, Email: newEmail}); err == nil {
+		if _, err = q.GetUserByEmail(ctx, newEmail); err == nil {
 			return ErrEmailTaken
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
 		if err := q.DeleteUserTokens(ctx, &db.DeleteUserTokensParams{
-			WorkspaceID: ws, UserID: &u.ID, Purpose: tokenEmailChange,
+			UserID: &u.ID, Purpose: tokenEmailChange,
 		}); err != nil {
 			return err
 		}
 		// The cancel token goes first, a change must never exist without its undo.
-		if cancel, err = s.putEmailToken(ctx, q, ws, u.ID, tokenEmailRevert, u.Email, EmailRevertTTL); err != nil {
+		if cancel, err = s.putEmailToken(ctx, q, u.ID, tokenEmailRevert, u.Email, EmailRevertTTL); err != nil {
 			return err
 		}
-		confirm, err = s.putEmailToken(ctx, q, ws, u.ID, tokenEmailChange, newEmail, EmailChangeTTL)
+		confirm, err = s.putEmailToken(ctx, q, u.ID, tokenEmailChange, newEmail, EmailChangeTTL)
 		return err
 	})
 	if err != nil {
@@ -76,40 +76,30 @@ func (s *Service) RequestEmailChange(
 func (s *Service) putEmailToken(
 	ctx context.Context,
 	q *db.Queries,
-	ws, userID, purpose, email string,
+	userID, purpose, email string,
 	ttl time.Duration,
 ) (string, error) {
-	raw, hash, err := crypto.NewSecret()
-	if err != nil {
-		return "", err
-	}
+	raw, hash := crypto.NewSecret()
 	return raw, q.PutToken(ctx, &db.PutTokenParams{
-		TokenHash:   hash,
-		WorkspaceID: ws,
-		UserID:      &userID,
-		Purpose:     purpose,
-		ExpiresAt:   s.now().Add(ttl),
-		Email:       &email,
+		TokenHash: hash,
+		UserID:    &userID,
+		Purpose:   purpose,
+		ExpiresAt: s.now().Add(ttl),
+		Email:     &email,
 	})
 }
 
 // DropEmailChange forgets the pending change of userID.
 func (s *Service) DropEmailChange(ctx context.Context, userID string) error {
-	return s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		return q.DeleteUserTokens(ctx, &db.DeleteUserTokensParams{
-			WorkspaceID: ws, UserID: &userID, Purpose: tokenEmailChange,
-		})
+	return s.conn.Tenant().DeleteUserTokens(ctx, &db.DeleteUserTokensParams{
+		UserID: &userID, Purpose: tokenEmailChange,
 	})
 }
 
 // PendingEmail returns the address a change is waiting on, or "".
 func (s *Service) PendingEmail(ctx context.Context, userID string) string {
-	var email string
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
-		email, err = q.GetPendingTokenEmail(ctx, &db.GetPendingTokenEmailParams{
-			WorkspaceID: ws, UserID: &userID, Purpose: tokenEmailChange,
-		})
-		return err
+	email, err := s.conn.Tenant().GetPendingTokenEmail(ctx, &db.GetPendingTokenEmailParams{
+		UserID: &userID, Purpose: tokenEmailChange,
 	})
 	if err != nil {
 		return ""
@@ -120,18 +110,18 @@ func (s *Service) PendingEmail(ctx context.Context, userID string) string {
 // ConfirmEmailChange switches the account to the address the token carries.
 func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 	var u *db.User
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		row, err := consumeEmailToken(ctx, q, ws, raw, tokenEmailChange)
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		row, err := consumeEmailToken(ctx, q, raw, tokenEmailChange)
 		if err != nil {
 			return err
 		}
-		u, err = q.SetUserEmail(ctx, &db.SetUserEmailParams{WorkspaceID: ws, ID: row.UserID, Email: row.Email})
+		u, err = q.SetUserEmail(ctx, &db.SetUserEmailParams{ID: row.UserID, Email: row.Email})
 		return mapUserError(err)
 	})
 	if err != nil {
 		return err
 	}
-	s.record(ctx, Event{Action: ActionEmailChanged, Kind: actor.KindUser, UserID: u.ID, Email: u.Email})
+	s.record(ctx, event{Action: actionEmailChanged, Kind: actor.KindUser, UserID: u.ID, Email: u.Email})
 	return nil
 }
 
@@ -141,17 +131,17 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 	var u *db.User
 	reverted := false
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
-		row, err := consumeEmailToken(ctx, q, ws, raw, tokenEmailRevert)
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		row, err := consumeEmailToken(ctx, q, raw, tokenEmailRevert)
 		if err != nil {
 			return err
 		}
 		if err := q.DeleteUserTokens(ctx, &db.DeleteUserTokensParams{
-			WorkspaceID: ws, UserID: &row.UserID, Purpose: tokenEmailChange,
+			UserID: &row.UserID, Purpose: tokenEmailChange,
 		}); err != nil {
 			return err
 		}
-		if u, err = q.GetUser(ctx, &db.GetUserParams{WorkspaceID: ws, ID: row.UserID}); err != nil {
+		if u, err = q.GetUser(ctx, row.UserID); err != nil {
 			return err
 		}
 		if u.Email == row.Email {
@@ -159,12 +149,12 @@ func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 		}
 		if u, err = q.SetUserEmail(
 			ctx,
-			&db.SetUserEmailParams{WorkspaceID: ws, ID: u.ID, Email: row.Email},
+			&db.SetUserEmailParams{ID: u.ID, Email: row.Email},
 		); err != nil {
 			return mapUserError(err)
 		}
 		reverted = true
-		_, err = q.DeleteSubjectSessions(ctx, &db.DeleteSubjectSessionsParams{WorkspaceID: ws, SubjectID: u.ID})
+		_, err = q.DeleteSubjectSessions(ctx, u.ID)
 		return err
 	})
 	if err != nil || !reverted {
@@ -172,7 +162,7 @@ func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 	}
 	s.record(
 		ctx,
-		Event{Action: ActionEmailChanged, Kind: actor.KindUser, UserID: u.ID, Email: u.Email, Detail: "reverted"},
+		event{Action: actionEmailChanged, Kind: actor.KindUser, UserID: u.ID, Email: u.Email, Detail: "reverted"},
 	)
 	return nil
 }
@@ -180,15 +170,12 @@ func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 func consumeEmailToken(
 	ctx context.Context,
 	q *db.Queries,
-	ws, raw, purpose string,
+	raw, purpose string,
 ) (*db.ConsumeEmailTokenRow, error) {
-	hash, err := crypto.HashToken(raw)
-	if err != nil {
-		return nil, ErrInvalidToken
-	}
+	hash := crypto.HashToken(raw)
 	row, err := q.ConsumeEmailToken(
 		ctx,
-		&db.ConsumeEmailTokenParams{WorkspaceID: ws, TokenHash: hash, Purpose: purpose},
+		&db.ConsumeEmailTokenParams{TokenHash: hash, Purpose: purpose},
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrInvalidToken

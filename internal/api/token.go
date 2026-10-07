@@ -6,7 +6,6 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/audit"
 
 	"connectrpc.com/connect"
@@ -22,21 +21,16 @@ type tokenService struct {
 	cfg *config.Config
 }
 
-func newTokenService(cfg *config.Config) *tokenService {
-	return &tokenService{cfg: cfg}
-}
-
 // CreateToken returns the "<id>_<secret>" plaintext once, only its hash is stored.
 func (s *tokenService) CreateToken(
 	ctx context.Context,
 	req *nokkuv1.CreateTokenRequest,
 ) (*nokkuv1.CreateTokenResponse, error) {
 	params := &db.CreateWorkspaceTokenParams{
-		ID:          uuid.NewV7().String(),
-		WorkspaceID: actor.WorkspaceIDFromContext(ctx),
-		Kind:        req.GetKind(),
-		Label:       req.GetLabel(),
-		MaxUses:     req.MaxUses,
+		ID:      uuid.NewV7().String(),
+		Kind:    req.GetKind(),
+		Label:   req.GetLabel(),
+		MaxUses: req.MaxUses,
 	}
 	if req.GetTtl() != nil {
 		params.ExpiresAt = new(time.Now().Add(req.GetTtl().AsDuration()))
@@ -64,10 +58,7 @@ func (s *tokenService) CreateToken(
 		return nil, errInvalidInput
 	}
 
-	token, err := crypto.NewToken(crypto.WithID(params.ID))
-	if err != nil {
-		return nil, errInternal
-	}
+	token := crypto.NewToken(params.ID)
 	params.TokenHash = token.Hash
 
 	var created *db.WorkspaceToken
@@ -91,14 +82,8 @@ func (s *tokenService) ListTokens(
 	ctx context.Context,
 	req *nokkuv1.ListTokensRequest,
 ) (*nokkuv1.ListTokensResponse, error) {
-	var tokens []*db.WorkspaceToken
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		tokens, err = q.ListWorkspaceTokens(ctx, &db.ListWorkspaceTokensParams{
-			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
-			Kind:        req.GetKind(),
-		})
-		return err
-	}); err != nil {
+	tokens, err := s.cfg.Conn.Tenant().ListWorkspaceTokens(ctx, req.GetKind())
+	if err != nil {
 		return nil, err
 	}
 	return &nokkuv1.ListTokensResponse{Tokens: db.TokensToProto(tokens)}, nil
@@ -109,9 +94,7 @@ func (s *tokenService) DeleteToken(
 	ctx context.Context,
 	req *nokkuv1.DeleteTokenRequest,
 ) (*nokkuv1.DeleteTokenResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		return q.DeleteWorkspaceToken(ctx, req.GetId())
-	}); err != nil {
+	if err := s.cfg.Conn.Tenant().DeleteWorkspaceToken(ctx, req.GetId()); err != nil {
 		return nil, err
 	}
 	return &nokkuv1.DeleteTokenResponse{}, nil

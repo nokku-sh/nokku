@@ -26,7 +26,7 @@ type signupData struct {
 // LookupInvite resolves an invite link in this workspace without spending it.
 func (s *Service) LookupInvite(ctx context.Context, raw string) (*db.WorkspaceToken, error) {
 	var tok *db.WorkspaceToken
-	err := s.inWorkspace(ctx, func(q *db.Queries, _ string) (err error) {
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		tok, err = lookupInvite(ctx, q, raw)
 		return err
 	})
@@ -38,10 +38,7 @@ func lookupInvite(ctx context.Context, q *db.Queries, raw string) (*db.Workspace
 	if err != nil || parsed.ID == "" {
 		return nil, ErrInviteSpent
 	}
-	hash, err := crypto.HashToken(raw)
-	if err != nil {
-		return nil, ErrInviteSpent
-	}
+	hash := crypto.HashToken(raw)
 	tok, err := q.GetLiveToken(ctx, &db.GetLiveTokenParams{
 		ID:        parsed.ID,
 		Kind:      nokkuv1.TokenKind_TOKEN_KIND_INVITE,
@@ -74,9 +71,8 @@ func (s *Service) createUser(
 	p.Role = cmp.Or(p.Role, string(db.RoleMember))
 	if inviteID != "" {
 		tok, err := q.RedeemTokenByID(ctx, &db.RedeemTokenByIDParams{
-			WorkspaceID: p.WorkspaceID,
-			ID:          inviteID,
-			Kind:        nokkuv1.TokenKind_TOKEN_KIND_INVITE,
+			ID:   inviteID,
+			Kind: nokkuv1.TokenKind_TOKEN_KIND_INVITE,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInviteSpent
@@ -87,14 +83,15 @@ func (s *Service) createUser(
 		p.Role = cmp.Or(deref(tok.RoleName), p.Role)
 	}
 	if s.canJoin != nil && p.Role != string(db.RoleOwner) {
-		if _, err := q.GetWorkspaceForUpdate(ctx, p.WorkspaceID); err != nil {
+		if _, err := q.GetWorkspaceForUpdate(ctx); err != nil {
 			return nil, err
 		}
-		used, err := q.CountActiveUsers(ctx, p.WorkspaceID)
+		ws := actor.WorkspaceIDFromContext(ctx)
+		used, err := q.CountActiveUsers(ctx, ws)
 		if err != nil {
 			return nil, err
 		}
-		if err := s.canJoin(ctx, p.WorkspaceID, used); err != nil {
+		if err := s.canJoin(ctx, ws, used); err != nil {
 			return nil, errors.Join(ErrSeatLimit, err)
 		}
 	}
@@ -109,15 +106,15 @@ func (s *Service) createUser(
 // not apply, there is nobody to count yet.
 func (s *Service) CreateOwner(ctx context.Context, email, name string) (*db.User, error) {
 	var u *db.User
-	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		u, err = s.createUser(ctx, q, db.CreateUserWithIDParams{
-			WorkspaceID: ws, Email: email, Name: name, Role: string(db.RoleOwner),
+			Email: email, Name: name, Role: string(db.RoleOwner),
 		}, "")
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	s.record(ctx, Event{Action: ActionUserCreated, Kind: actor.KindUser, UserID: u.ID, Email: u.Email})
+	s.record(ctx, event{Action: actionUserCreated, Kind: actor.KindUser, UserID: u.ID, Email: u.Email})
 	return u, nil
 }

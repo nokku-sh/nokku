@@ -147,7 +147,7 @@ func TestStateVersionBumpsOnAccessChanges(t *testing.T) {
 
 	before = stateVersion(t, c, f.ws)
 	asOwner(t, c, f, func(q *Queries) error {
-		return q.DeleteUser(t.Context(), &DeleteUserParams{WorkspaceID: f.ws, ID: f.u})
+		return q.DeleteUser(t.Context(), f.u)
 	})
 	waitNotify(t, conn, f.ws)
 	if after := stateVersion(t, c, f.ws); after <= before {
@@ -167,7 +167,7 @@ func TestDeactivatedUserLosesAccess(t *testing.T) {
 
 	setActive := func(active bool) {
 		if err := c.Sys().
-			SetUserActive(t.Context(), &SetUserActiveParams{WorkspaceID: f.ws, ID: f.u, Active: active}); err != nil {
+			SetUserActive(t.Context(), &SetUserActiveParams{ID: f.u, Active: active}); err != nil {
 			t.Fatalf("set active=%v: %v", active, err)
 		}
 	}
@@ -249,16 +249,16 @@ func TestRedeemTokenOnce(t *testing.T) {
 	f := newStateFixture(t, c)
 	id := uuid.NewV7().String()
 	hash := crypto.HashedToken("h-" + id)
-	if _, err := c.Sys().CreateWorkspaceToken(t.Context(), &CreateWorkspaceTokenParams{
-		ID:          id,
-		WorkspaceID: f.ws,
-		Kind:        nokkuv1.TokenKind_TOKEN_KIND_INVITE,
-		TokenHash:   hash,
-		MaxUses:     new(int32(1)),
-		RoleName:    new("viewer"),
-	}); err != nil {
-		t.Fatalf("create token: %v", err)
-	}
+	asOwner(t, c, f, func(q *Queries) error {
+		_, err := q.CreateWorkspaceToken(t.Context(), &CreateWorkspaceTokenParams{
+			ID:        id,
+			Kind:      nokkuv1.TokenKind_TOKEN_KIND_INVITE,
+			TokenHash: hash,
+			MaxUses:   new(int32(1)),
+			RoleName:  new("viewer"),
+		})
+		return err
+	})
 
 	const n = 8
 	var wins atomic.Int32

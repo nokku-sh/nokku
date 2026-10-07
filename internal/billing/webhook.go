@@ -11,7 +11,8 @@ import (
 
 const maxWebhookBody = 2 << 20
 
-func (s *Stripe) webhookHandler() http.Handler {
+// WebhookHandler is only registered on the hosted service.
+func (s *Stripe) WebhookHandler() http.Handler {
 	return http.HandlerFunc(s.webhook)
 }
 

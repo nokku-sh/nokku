@@ -16,7 +16,6 @@ const createSession = `-- name: CreateSession :one
 INSERT INTO
   sessions (
     token_hash,
-    workspace_id,
     subject_id,
     user_id,
     kind,
@@ -31,42 +30,39 @@ INSERT INTO
 VALUES
   (
     $1,
-    $2,
-    $3::TEXT,
+    $2::TEXT,
     CASE
-      WHEN $4::TEXT <> 'daemon' THEN ($3::TEXT)::UUID
+      WHEN $3::TEXT <> 'daemon' THEN ($2::TEXT)::UUID
     END,
-    $4::TEXT,
+    $3::TEXT,
+    $4,
     $5,
     $6,
     $7,
     $8,
     $9,
-    $10,
-    $11
+    $10
   )
 RETURNING
   token_hash, workspace_id, subject_id, user_id, kind, method, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
 `
 
 type CreateSessionParams struct {
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-	WorkspaceID string             `json:"workspaceId"`
-	SubjectID   string             `json:"subjectId"`
-	Kind        string             `json:"kind"`
-	Method      string             `json:"method"`
-	Binding     string             `json:"binding"`
-	Label       string             `json:"label"`
-	UserAgent   string             `json:"userAgent"`
-	Ip          string             `json:"ip"`
-	ExpiresAt   *time.Time         `json:"expiresAt"`
-	LastSeenAt  *time.Time         `json:"lastSeenAt"`
+	TokenHash  crypto.HashedToken `json:"tokenHash"`
+	SubjectID  string             `json:"subjectId"`
+	Kind       string             `json:"kind"`
+	Method     string             `json:"method"`
+	Binding    string             `json:"binding"`
+	Label      string             `json:"label"`
+	UserAgent  string             `json:"userAgent"`
+	Ip         string             `json:"ip"`
+	ExpiresAt  *time.Time         `json:"expiresAt"`
+	LastSeenAt *time.Time         `json:"lastSeenAt"`
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg *CreateSessionParams) (*Session, error) {
 	row := q.db.QueryRow(ctx, createSession,
 		arg.TokenHash,
-		arg.WorkspaceID,
 		arg.SubjectID,
 		arg.Kind,
 		arg.Method,
@@ -115,36 +111,28 @@ func (q *Queries) DeleteExpiredSessions(ctx context.Context, now *time.Time) (in
 const deleteSession = `-- name: DeleteSession :exec
 DELETE FROM sessions
 WHERE
-  workspace_id = $1
-  AND token_hash = $2
+  token_hash = $1
 `
 
-type DeleteSessionParams struct {
-	WorkspaceID string             `json:"workspaceId"`
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-}
-
-func (q *Queries) DeleteSession(ctx context.Context, arg *DeleteSessionParams) error {
-	_, err := q.db.Exec(ctx, deleteSession, arg.WorkspaceID, arg.TokenHash)
+func (q *Queries) DeleteSession(ctx context.Context, tokenHash crypto.HashedToken) error {
+	_, err := q.db.Exec(ctx, deleteSession, tokenHash)
 	return err
 }
 
 const deleteSessionsExcept = `-- name: DeleteSessionsExcept :execrows
 DELETE FROM sessions
 WHERE
-  workspace_id = $1
-  AND subject_id = $2
-  AND token_hash <> $3
+  subject_id = $1
+  AND token_hash <> $2
 `
 
 type DeleteSessionsExceptParams struct {
-	WorkspaceID string             `json:"workspaceId"`
-	SubjectID   string             `json:"subjectId"`
-	KeepHash    crypto.HashedToken `json:"keepHash"`
+	SubjectID string             `json:"subjectId"`
+	KeepHash  crypto.HashedToken `json:"keepHash"`
 }
 
 func (q *Queries) DeleteSessionsExcept(ctx context.Context, arg *DeleteSessionsExceptParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteSessionsExcept, arg.WorkspaceID, arg.SubjectID, arg.KeepHash)
+	result, err := q.db.Exec(ctx, deleteSessionsExcept, arg.SubjectID, arg.KeepHash)
 	if err != nil {
 		return 0, err
 	}
@@ -152,19 +140,21 @@ func (q *Queries) DeleteSessionsExcept(ctx context.Context, arg *DeleteSessionsE
 }
 
 const deleteSubjectSessions = `-- name: DeleteSubjectSessions :execrows
+WITH
+  forgotten AS (
+    DELETE FROM known_devices
+    WHERE
+      user_id::TEXT = $1::TEXT
+  )
 DELETE FROM sessions
 WHERE
-  workspace_id = $1
-  AND subject_id = $2
+  subject_id = $1::TEXT
 `
 
-type DeleteSubjectSessionsParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	SubjectID   string `json:"subjectId"`
-}
-
-func (q *Queries) DeleteSubjectSessions(ctx context.Context, arg *DeleteSubjectSessionsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteSubjectSessions, arg.WorkspaceID, arg.SubjectID)
+// Signs the subject out everywhere. A user's devices are forgotten with it,
+// so whoever got in from one of them is not waved through quietly again.
+func (q *Queries) DeleteSubjectSessions(ctx context.Context, subjectID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSubjectSessions, subjectID)
 	if err != nil {
 		return 0, err
 	}
@@ -177,17 +167,11 @@ SELECT
 FROM
   sessions
 WHERE
-  workspace_id = $1
-  AND token_hash = $2
+  token_hash = $1
 `
 
-type GetSessionParams struct {
-	WorkspaceID string             `json:"workspaceId"`
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-}
-
-func (q *Queries) GetSession(ctx context.Context, arg *GetSessionParams) (*Session, error) {
-	row := q.db.QueryRow(ctx, getSession, arg.WorkspaceID, arg.TokenHash)
+func (q *Queries) GetSession(ctx context.Context, tokenHash crypto.HashedToken) (*Session, error) {
+	row := q.db.QueryRow(ctx, getSession, tokenHash)
 	var i Session
 	err := row.Scan(
 		&i.TokenHash,
@@ -213,19 +197,13 @@ SELECT
 FROM
   sessions
 WHERE
-  workspace_id = $1
-  AND subject_id = $2
+  subject_id = $1
 ORDER BY
   last_seen_at DESC NULLS LAST
 `
 
-type ListSessionsBySubjectParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	SubjectID   string `json:"subjectId"`
-}
-
-func (q *Queries) ListSessionsBySubject(ctx context.Context, arg *ListSessionsBySubjectParams) ([]*Session, error) {
-	rows, err := q.db.Query(ctx, listSessionsBySubject, arg.WorkspaceID, arg.SubjectID)
+func (q *Queries) ListSessionsBySubject(ctx context.Context, subjectID string) ([]*Session, error) {
+	rows, err := q.db.Query(ctx, listSessionsBySubject, subjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -263,17 +241,15 @@ UPDATE sessions
 SET
   last_seen_at = $1
 WHERE
-  workspace_id = $2
-  AND token_hash = $3
+  token_hash = $2
 `
 
 type TouchSessionParams struct {
-	LastSeenAt  *time.Time         `json:"lastSeenAt"`
-	WorkspaceID string             `json:"workspaceId"`
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
+	LastSeenAt *time.Time         `json:"lastSeenAt"`
+	TokenHash  crypto.HashedToken `json:"tokenHash"`
 }
 
 func (q *Queries) TouchSession(ctx context.Context, arg *TouchSessionParams) error {
-	_, err := q.db.Exec(ctx, touchSession, arg.LastSeenAt, arg.WorkspaceID, arg.TokenHash)
+	_, err := q.db.Exec(ctx, touchSession, arg.LastSeenAt, arg.TokenHash)
 	return err
 }

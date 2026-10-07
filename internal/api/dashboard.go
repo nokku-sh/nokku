@@ -35,10 +35,6 @@ type dashboardService struct {
 	cfg *config.Config
 }
 
-func newDashboardService(cfg *config.Config) *dashboardService {
-	return &dashboardService{cfg: cfg}
-}
-
 func (s *dashboardService) GetDashboard(
 	ctx context.Context,
 	_ *nokkuv1.GetDashboardRequest,
@@ -57,34 +53,24 @@ func (s *dashboardService) GetDashboard(
 		usedBytes  int64
 	)
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		if counts, err = q.DashboardCounts(ctx, &db.DashboardCountsParams{
-			WorkspaceID: wsID,
-			SeenAfter:   seenAfter,
-		}); err != nil {
+		if counts, err = q.DashboardCounts(ctx, seenAfter); err != nil {
 			return err
 		}
 		if daemons, err = q.ListDaemons(ctx, &db.ListDaemonsParams{
-			WorkspaceID: wsID,
-			SeenAfter:   seenAfter,
+			SeenAfter: seenAfter,
 		}); err != nil {
 			return err
 		}
-		if cas, err = q.ListSoonestCAs(ctx, wsID); err != nil {
+		if cas, err = q.ListSoonestCAs(ctx); err != nil {
 			return err
 		}
-		if recordings, err = q.ListOpenRecordings(ctx, &db.ListOpenRecordingsParams{
-			WorkspaceID: wsID,
-			SeenAfter:   seenAfter,
-		}); err != nil {
+		if recordings, err = q.ListOpenRecordings(ctx, seenAfter); err != nil {
 			return err
 		}
-		if hours, err = q.AuditActivityByHour(ctx, &db.AuditActivityByHourParams{
-			WorkspaceID: wsID,
-			Since:       since,
-		}); err != nil {
+		if hours, err = q.AuditActivityByHour(ctx, since); err != nil {
 			return err
 		}
-		usedBytes, err = q.SumRecordingBytes(ctx, wsID)
+		usedBytes, err = q.SumRecordingBytes(ctx)
 		return err
 	}); err != nil {
 		return nil, err

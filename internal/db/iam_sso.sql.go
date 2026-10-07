@@ -14,17 +14,11 @@ import (
 const deleteSSOProvider = `-- name: DeleteSSOProvider :execrows
 DELETE FROM sso_providers
 WHERE
-  workspace_id = $1
-  AND provider_id = $2
+  provider_id = $1
 `
 
-type DeleteSSOProviderParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	ProviderID  string `json:"providerId"`
-}
-
-func (q *Queries) DeleteSSOProvider(ctx context.Context, arg *DeleteSSOProviderParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteSSOProvider, arg.WorkspaceID, arg.ProviderID)
+func (q *Queries) DeleteSSOProvider(ctx context.Context, providerID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSSOProvider, providerID)
 	if err != nil {
 		return 0, err
 	}
@@ -37,17 +31,11 @@ SELECT
 FROM
   sso_providers
 WHERE
-  workspace_id = $1
-  AND provider_id = $2
+  provider_id = $1
 `
 
-type GetSSOProviderParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	ProviderID  string `json:"providerId"`
-}
-
-func (q *Queries) GetSSOProvider(ctx context.Context, arg *GetSSOProviderParams) (*SsoProvider, error) {
-	row := q.db.QueryRow(ctx, getSSOProvider, arg.WorkspaceID, arg.ProviderID)
+func (q *Queries) GetSSOProvider(ctx context.Context, providerID string) (*SsoProvider, error) {
+	row := q.db.QueryRow(ctx, getSSOProvider, providerID)
 	var i SsoProvider
 	err := row.Scan(
 		&i.WorkspaceID,
@@ -66,14 +54,12 @@ SELECT
   workspace_id, provider_id, name, enabled, config, created_at, updated_at
 FROM
   sso_providers
-WHERE
-  workspace_id = $1
 ORDER BY
   created_at ASC
 `
 
-func (q *Queries) ListSSOProviders(ctx context.Context, workspaceID string) ([]*SsoProvider, error) {
-	rows, err := q.db.Query(ctx, listSSOProviders, workspaceID)
+func (q *Queries) ListSSOProviders(ctx context.Context) ([]*SsoProvider, error) {
+	rows, err := q.db.Query(ctx, listSSOProviders)
 	if err != nil {
 		return nil, err
 	}
@@ -102,9 +88,9 @@ func (q *Queries) ListSSOProviders(ctx context.Context, workspaceID string) ([]*
 
 const upsertSSOProvider = `-- name: UpsertSSOProvider :one
 INSERT INTO
-  sso_providers (workspace_id, provider_id, name, enabled, config)
+  sso_providers (provider_id, name, enabled, config)
 VALUES
-  ($1, $2, $3, $4, $5)
+  ($1, $2, $3, $4)
 ON CONFLICT (workspace_id, provider_id) DO UPDATE
 SET
   name = EXCLUDED.name,
@@ -116,16 +102,14 @@ RETURNING
 `
 
 type UpsertSSOProviderParams struct {
-	WorkspaceID string                `json:"workspaceId"`
-	ProviderID  string                `json:"providerId"`
-	Name        string                `json:"name"`
-	Enabled     bool                  `json:"enabled"`
-	Config      crypto.EncryptedBytes `json:"config"`
+	ProviderID string                `json:"providerId"`
+	Name       string                `json:"name"`
+	Enabled    bool                  `json:"enabled"`
+	Config     crypto.EncryptedBytes `json:"config"`
 }
 
 func (q *Queries) UpsertSSOProvider(ctx context.Context, arg *UpsertSSOProviderParams) (*SsoProvider, error) {
 	row := q.db.QueryRow(ctx, upsertSSOProvider,
-		arg.WorkspaceID,
 		arg.ProviderID,
 		arg.Name,
 		arg.Enabled,

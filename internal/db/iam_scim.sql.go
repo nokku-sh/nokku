@@ -14,9 +14,9 @@ import (
 
 const createSCIMToken = `-- name: CreateSCIMToken :one
 INSERT INTO
-  scim_tokens (workspace_id, token_hash, label)
+  scim_tokens (token_hash, label)
 VALUES
-  ($1, $2, $3)
+  ($1, $2)
 RETURNING
   id,
   label,
@@ -25,9 +25,8 @@ RETURNING
 `
 
 type CreateSCIMTokenParams struct {
-	WorkspaceID string             `json:"workspaceId"`
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-	Label       string             `json:"label"`
+	TokenHash crypto.HashedToken `json:"tokenHash"`
+	Label     string             `json:"label"`
 }
 
 type CreateSCIMTokenRow struct {
@@ -38,7 +37,7 @@ type CreateSCIMTokenRow struct {
 }
 
 func (q *Queries) CreateSCIMToken(ctx context.Context, arg *CreateSCIMTokenParams) (*CreateSCIMTokenRow, error) {
-	row := q.db.QueryRow(ctx, createSCIMToken, arg.WorkspaceID, arg.TokenHash, arg.Label)
+	row := q.db.QueryRow(ctx, createSCIMToken, arg.TokenHash, arg.Label)
 	var i CreateSCIMTokenRow
 	err := row.Scan(
 		&i.ID,
@@ -52,56 +51,42 @@ func (q *Queries) CreateSCIMToken(ctx context.Context, arg *CreateSCIMTokenParam
 const deleteSCIMToken = `-- name: DeleteSCIMToken :exec
 DELETE FROM scim_tokens
 WHERE
-  workspace_id = $1
-  AND id = $2
+  id = $1
 `
 
-type DeleteSCIMTokenParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	ID          string `json:"id"`
-}
-
-func (q *Queries) DeleteSCIMToken(ctx context.Context, arg *DeleteSCIMTokenParams) error {
-	_, err := q.db.Exec(ctx, deleteSCIMToken, arg.WorkspaceID, arg.ID)
+func (q *Queries) DeleteSCIMToken(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteSCIMToken, id)
 	return err
 }
 
 const deleteStaleUserSCIMCredentials = `-- name: DeleteStaleUserSCIMCredentials :exec
 DELETE FROM credentials
 WHERE
-  workspace_id = $1
-  AND user_id = $2
+  user_id = $1
   AND type = 'scim'
-  AND subject <> $3
+  AND subject <> $2
 `
 
 type DeleteStaleUserSCIMCredentialsParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-	Subject     string `json:"subject"`
+	UserID  string `json:"userId"`
+	Subject string `json:"subject"`
 }
 
 // Run before UpsertCredential so one account never carries two links.
 func (q *Queries) DeleteStaleUserSCIMCredentials(ctx context.Context, arg *DeleteStaleUserSCIMCredentialsParams) error {
-	_, err := q.db.Exec(ctx, deleteStaleUserSCIMCredentials, arg.WorkspaceID, arg.UserID, arg.Subject)
+	_, err := q.db.Exec(ctx, deleteStaleUserSCIMCredentials, arg.UserID, arg.Subject)
 	return err
 }
 
 const deleteUserSCIMCredentials = `-- name: DeleteUserSCIMCredentials :exec
 DELETE FROM credentials
 WHERE
-  workspace_id = $1
-  AND user_id = $2
+  user_id = $1
   AND type = 'scim'
 `
 
-type DeleteUserSCIMCredentialsParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-}
-
-func (q *Queries) DeleteUserSCIMCredentials(ctx context.Context, arg *DeleteUserSCIMCredentialsParams) error {
-	_, err := q.db.Exec(ctx, deleteUserSCIMCredentials, arg.WorkspaceID, arg.UserID)
+func (q *Queries) DeleteUserSCIMCredentials(ctx context.Context, userID string) error {
+	_, err := q.db.Exec(ctx, deleteUserSCIMCredentials, userID)
 	return err
 }
 
@@ -111,17 +96,11 @@ SELECT
 FROM
   scim_tokens
 WHERE
-  workspace_id = $1
-  AND token_hash = $2
+  token_hash = $1
 `
 
-type GetSCIMTokenByHashParams struct {
-	WorkspaceID string             `json:"workspaceId"`
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-}
-
-func (q *Queries) GetSCIMTokenByHash(ctx context.Context, arg *GetSCIMTokenByHashParams) (*ScimToken, error) {
-	row := q.db.QueryRow(ctx, getSCIMTokenByHash, arg.WorkspaceID, arg.TokenHash)
+func (q *Queries) GetSCIMTokenByHash(ctx context.Context, tokenHash crypto.HashedToken) (*ScimToken, error) {
+	row := q.db.QueryRow(ctx, getSCIMTokenByHash, tokenHash)
 	var i ScimToken
 	err := row.Scan(
 		&i.ID,
@@ -144,14 +123,13 @@ FROM
   AND c.user_id = u.id
   AND c.type = 'scim'
 WHERE
-  u.workspace_id = $1
-  AND (
-    $2::UUID IS NULL
-    OR u.id = $2
+  (
+    $1::UUID IS NULL
+    OR u.id = $1
   )
   AND (
-    $3::TEXT IS NULL
-    OR u.email = $3
+    $2::TEXT IS NULL
+    OR u.email = $2
   )
 ORDER BY
   u.created_at ASC,
@@ -159,9 +137,8 @@ ORDER BY
 `
 
 type ListSCIMUsersParams struct {
-	WorkspaceID string  `json:"workspaceId"`
-	UserID      *string `json:"userId"`
-	Email       *string `json:"email"`
+	UserID *string `json:"userId"`
+	Email  *string `json:"email"`
 }
 
 type ListSCIMUsersRow struct {
@@ -170,7 +147,7 @@ type ListSCIMUsersRow struct {
 }
 
 func (q *Queries) ListSCIMUsers(ctx context.Context, arg *ListSCIMUsersParams) ([]*ListSCIMUsersRow, error) {
-	rows, err := q.db.Query(ctx, listSCIMUsers, arg.WorkspaceID, arg.UserID, arg.Email)
+	rows, err := q.db.Query(ctx, listSCIMUsers, arg.UserID, arg.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -208,8 +185,6 @@ SELECT
   last_used_at
 FROM
   scim_tokens
-WHERE
-  workspace_id = $1
 ORDER BY
   created_at ASC
 `
@@ -221,8 +196,8 @@ type ListWorkspaceSCIMTokensRow struct {
 	LastUsedAt *time.Time `json:"lastUsedAt"`
 }
 
-func (q *Queries) ListWorkspaceSCIMTokens(ctx context.Context, workspaceID string) ([]*ListWorkspaceSCIMTokensRow, error) {
-	rows, err := q.db.Query(ctx, listWorkspaceSCIMTokens, workspaceID)
+func (q *Queries) ListWorkspaceSCIMTokens(ctx context.Context) ([]*ListWorkspaceSCIMTokensRow, error) {
+	rows, err := q.db.Query(ctx, listWorkspaceSCIMTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -251,21 +226,15 @@ UPDATE scim_tokens
 SET
   last_used_at = NOW()
 WHERE
-  workspace_id = $1
-  AND id = $2
+  id = $1
   AND (
     last_used_at IS NULL
     OR last_used_at < NOW() - INTERVAL '1 hour'
   )
 `
 
-type TouchSCIMTokenParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	ID          string `json:"id"`
-}
-
 // Only writes when the stamp is over an hour old.
-func (q *Queries) TouchSCIMToken(ctx context.Context, arg *TouchSCIMTokenParams) error {
-	_, err := q.db.Exec(ctx, touchSCIMToken, arg.WorkspaceID, arg.ID)
+func (q *Queries) TouchSCIMToken(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, touchSCIMToken, id)
 	return err
 }

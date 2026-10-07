@@ -3,6 +3,7 @@ package api
 import (
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
@@ -32,16 +34,15 @@ func TestRequestSizeLimit(t *testing.T) {
 func TestWorkspaceHidesWebhookFromMembers(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
+	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
 		_, err := q.UpdateWorkspace(t.Context(), &db.UpdateWorkspaceParams{
-			WorkspaceID: workspaceID,
 			Settings: &nokkuv1.WorkspaceSettings{
 				AuditWebhookUrl:    new("https://siem.example/hook"),
 				AuditWebhookSecret: new("s3cret"),
 			},
 		})
 		return err
-	}))
+	})
 
 	client := func(role db.Role) nokkuv1connect.WorkspaceServiceClient {
 		return nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL,
@@ -87,4 +88,26 @@ func TestUnknownServiceIsNotFound(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+// Session rows and audit events take the IP and the user agent from the
+// request context. The server sets them for every route. They used to be
+// missing on the plain HTTP ones, where the passkey and SSO sign-ins live.
+func TestEveryRequestCarriesItsAddressAndHeaders(t *testing.T) {
+	cfg, _ := newTestAPI(t)
+	s := &Server{mux: http.NewServeMux(), cfg: cfg}
+	var got actor.RequestMeta
+	s.mux.HandleFunc("POST /passkey/login/finish", func(_ http.ResponseWriter, r *http.Request) {
+		got, _ = actor.RequestMetaFromContext(r.Context())
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/passkey/login/finish", nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 Firefox/140.0")
+	req.RemoteAddr = "203.0.113.7:4242"
+	rec := httptest.NewRecorder()
+	s.handler().ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "203.0.113.7:4242", got.RemoteAddr)
+	assert.Equal(t, "Mozilla/5.0 Firefox/140.0", got.Header.Get("User-Agent"))
 }

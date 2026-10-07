@@ -1,9 +1,8 @@
 -- name: CreateRecording :one
 INSERT INTO
-  recordings (id, workspace_id, daemon_id, daemon_name, username, key)
+  recordings (id, daemon_id, daemon_name, username, key)
 SELECT
   @id,
-  @workspace_id,
   d.id,
   d.name,
   @username,
@@ -30,8 +29,7 @@ SELECT
 FROM
   recordings r
 WHERE
-  r.workspace_id = @workspace_id
-  AND (
+  (
     sqlc.narg('daemon_id')::UUID IS NULL
     OR r.daemon_id = sqlc.narg('daemon_id')
   )
@@ -50,9 +48,7 @@ OFFSET
 SELECT
   COALESCE(SUM(size_bytes), 0)::BIGINT
 FROM
-  recordings
-WHERE
-  workspace_id = @workspace_id;
+  recordings;
 
 -- name: SetRecordingSize :exec
 -- An upload in progress counts toward the storage cap by its row.
@@ -83,8 +79,6 @@ SELECT
   *
 FROM
   recordings
-WHERE
-  workspace_id = @workspace_id
 ORDER BY
   started_at ASC
 LIMIT

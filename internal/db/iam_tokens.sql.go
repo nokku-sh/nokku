@@ -15,9 +15,8 @@ import (
 const consumeEmailToken = `-- name: ConsumeEmailToken :one
 DELETE FROM one_time_tokens
 WHERE
-  workspace_id = $1
-  AND token_hash = $2
-  AND purpose = $3
+  token_hash = $1
+  AND purpose = $2
   AND user_id IS NOT NULL
   AND email IS NOT NULL
   AND expires_at > NOW()
@@ -27,9 +26,8 @@ RETURNING
 `
 
 type ConsumeEmailTokenParams struct {
-	WorkspaceID string             `json:"workspaceId"`
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-	Purpose     string             `json:"purpose"`
+	TokenHash crypto.HashedToken `json:"tokenHash"`
+	Purpose   string             `json:"purpose"`
 }
 
 type ConsumeEmailTokenRow struct {
@@ -38,7 +36,7 @@ type ConsumeEmailTokenRow struct {
 }
 
 func (q *Queries) ConsumeEmailToken(ctx context.Context, arg *ConsumeEmailTokenParams) (*ConsumeEmailTokenRow, error) {
-	row := q.db.QueryRow(ctx, consumeEmailToken, arg.WorkspaceID, arg.TokenHash, arg.Purpose)
+	row := q.db.QueryRow(ctx, consumeEmailToken, arg.TokenHash, arg.Purpose)
 	var i ConsumeEmailTokenRow
 	err := row.Scan(&i.UserID, &i.Email)
 	return &i, err
@@ -47,8 +45,7 @@ func (q *Queries) ConsumeEmailToken(ctx context.Context, arg *ConsumeEmailTokenP
 const consumeSignupToken = `-- name: ConsumeSignupToken :one
 DELETE FROM one_time_tokens
 WHERE
-  workspace_id = $1
-  AND token_hash = $2
+  token_hash = $1
   AND purpose = 'signup'
   AND expires_at > NOW()
 RETURNING
@@ -56,18 +53,13 @@ RETURNING
   data
 `
 
-type ConsumeSignupTokenParams struct {
-	WorkspaceID string             `json:"workspaceId"`
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-}
-
 type ConsumeSignupTokenRow struct {
 	Email string `json:"email"`
 	Data  []byte `json:"data"`
 }
 
-func (q *Queries) ConsumeSignupToken(ctx context.Context, arg *ConsumeSignupTokenParams) (*ConsumeSignupTokenRow, error) {
-	row := q.db.QueryRow(ctx, consumeSignupToken, arg.WorkspaceID, arg.TokenHash)
+func (q *Queries) ConsumeSignupToken(ctx context.Context, tokenHash crypto.HashedToken) (*ConsumeSignupTokenRow, error) {
+	row := q.db.QueryRow(ctx, consumeSignupToken, tokenHash)
 	var i ConsumeSignupTokenRow
 	err := row.Scan(&i.Email, &i.Data)
 	return &i, err
@@ -76,9 +68,8 @@ func (q *Queries) ConsumeSignupToken(ctx context.Context, arg *ConsumeSignupToke
 const consumeToken = `-- name: ConsumeToken :one
 DELETE FROM one_time_tokens
 WHERE
-  workspace_id = $1
-  AND token_hash = $2
-  AND purpose = $3
+  token_hash = $1
+  AND purpose = $2
   AND user_id IS NOT NULL
   AND expires_at > NOW()
 RETURNING
@@ -86,14 +77,13 @@ RETURNING
 `
 
 type ConsumeTokenParams struct {
-	WorkspaceID string             `json:"workspaceId"`
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-	Purpose     string             `json:"purpose"`
+	TokenHash crypto.HashedToken `json:"tokenHash"`
+	Purpose   string             `json:"purpose"`
 }
 
 // Spends a token of a user. A signup token has none, see ConsumeSignupToken.
 func (q *Queries) ConsumeToken(ctx context.Context, arg *ConsumeTokenParams) (string, error) {
-	row := q.db.QueryRow(ctx, consumeToken, arg.WorkspaceID, arg.TokenHash, arg.Purpose)
+	row := q.db.QueryRow(ctx, consumeToken, arg.TokenHash, arg.Purpose)
 	var user_id string
 	err := row.Scan(&user_id)
 	return user_id, err
@@ -117,19 +107,17 @@ func (q *Queries) DeleteExpiredTokens(ctx context.Context, now time.Time) (int64
 const deleteUserTokens = `-- name: DeleteUserTokens :exec
 DELETE FROM one_time_tokens
 WHERE
-  workspace_id = $1
-  AND user_id = $2
-  AND purpose = $3
+  user_id = $1
+  AND purpose = $2
 `
 
 type DeleteUserTokensParams struct {
-	WorkspaceID string  `json:"workspaceId"`
-	UserID      *string `json:"userId"`
-	Purpose     string  `json:"purpose"`
+	UserID  *string `json:"userId"`
+	Purpose string  `json:"purpose"`
 }
 
 func (q *Queries) DeleteUserTokens(ctx context.Context, arg *DeleteUserTokensParams) error {
-	_, err := q.db.Exec(ctx, deleteUserTokens, arg.WorkspaceID, arg.UserID, arg.Purpose)
+	_, err := q.db.Exec(ctx, deleteUserTokens, arg.UserID, arg.Purpose)
 	return err
 }
 
@@ -139,9 +127,8 @@ SELECT
 FROM
   one_time_tokens
 WHERE
-  workspace_id = $1
-  AND user_id = $2
-  AND purpose = $3
+  user_id = $1
+  AND purpose = $2
   AND expires_at > NOW()
   AND email IS NOT NULL
 ORDER BY
@@ -151,13 +138,12 @@ LIMIT
 `
 
 type GetPendingTokenEmailParams struct {
-	WorkspaceID string  `json:"workspaceId"`
-	UserID      *string `json:"userId"`
-	Purpose     string  `json:"purpose"`
+	UserID  *string `json:"userId"`
+	Purpose string  `json:"purpose"`
 }
 
 func (q *Queries) GetPendingTokenEmail(ctx context.Context, arg *GetPendingTokenEmailParams) (string, error) {
-	row := q.db.QueryRow(ctx, getPendingTokenEmail, arg.WorkspaceID, arg.UserID, arg.Purpose)
+	row := q.db.QueryRow(ctx, getPendingTokenEmail, arg.UserID, arg.Purpose)
 	var email string
 	err := row.Scan(&email)
 	return email, err
@@ -168,27 +154,24 @@ SELECT EXISTS (
   SELECT 1
   FROM one_time_tokens
   WHERE
-    workspace_id = $1
-    AND (
-      user_id = $2
-      OR email = $3
+    (
+      user_id = $1
+      OR email = $2
     )
-    AND purpose = $4
-    AND created_at > $5
+    AND purpose = $3
+    AND created_at > $4
 )
 `
 
 type HasRecentTokenParams struct {
-	WorkspaceID string    `json:"workspaceId"`
-	UserID      *string   `json:"userId"`
-	Email       *string   `json:"email"`
-	Purpose     string    `json:"purpose"`
-	Since       time.Time `json:"since"`
+	UserID  *string   `json:"userId"`
+	Email   *string   `json:"email"`
+	Purpose string    `json:"purpose"`
+	Since   time.Time `json:"since"`
 }
 
 func (q *Queries) HasRecentToken(ctx context.Context, arg *HasRecentTokenParams) (bool, error) {
 	row := q.db.QueryRow(ctx, hasRecentToken,
-		arg.WorkspaceID,
 		arg.UserID,
 		arg.Email,
 		arg.Purpose,
@@ -201,23 +184,21 @@ func (q *Queries) HasRecentToken(ctx context.Context, arg *HasRecentTokenParams)
 
 const putSignupToken = `-- name: PutSignupToken :exec
 INSERT INTO
-  one_time_tokens (token_hash, workspace_id, purpose, expires_at, email, data)
+  one_time_tokens (token_hash, purpose, expires_at, email, data)
 VALUES
-  ($1, $2, 'signup', $3, $4, $5)
+  ($1, 'signup', $2, $3, $4)
 `
 
 type PutSignupTokenParams struct {
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-	WorkspaceID string             `json:"workspaceId"`
-	ExpiresAt   time.Time          `json:"expiresAt"`
-	Email       *string            `json:"email"`
-	Data        []byte             `json:"data"`
+	TokenHash crypto.HashedToken `json:"tokenHash"`
+	ExpiresAt time.Time          `json:"expiresAt"`
+	Email     *string            `json:"email"`
+	Data      []byte             `json:"data"`
 }
 
 func (q *Queries) PutSignupToken(ctx context.Context, arg *PutSignupTokenParams) error {
 	_, err := q.db.Exec(ctx, putSignupToken,
 		arg.TokenHash,
-		arg.WorkspaceID,
 		arg.ExpiresAt,
 		arg.Email,
 		arg.Data,
@@ -227,24 +208,22 @@ func (q *Queries) PutSignupToken(ctx context.Context, arg *PutSignupTokenParams)
 
 const putToken = `-- name: PutToken :exec
 INSERT INTO
-  one_time_tokens (token_hash, workspace_id, user_id, purpose, expires_at, email)
+  one_time_tokens (token_hash, user_id, purpose, expires_at, email)
 VALUES
-  ($1, $2, $3, $4, $5, $6)
+  ($1, $2, $3, $4, $5)
 `
 
 type PutTokenParams struct {
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-	WorkspaceID string             `json:"workspaceId"`
-	UserID      *string            `json:"userId"`
-	Purpose     string             `json:"purpose"`
-	ExpiresAt   time.Time          `json:"expiresAt"`
-	Email       *string            `json:"email"`
+	TokenHash crypto.HashedToken `json:"tokenHash"`
+	UserID    *string            `json:"userId"`
+	Purpose   string             `json:"purpose"`
+	ExpiresAt time.Time          `json:"expiresAt"`
+	Email     *string            `json:"email"`
 }
 
 func (q *Queries) PutToken(ctx context.Context, arg *PutTokenParams) error {
 	_, err := q.db.Exec(ctx, putToken,
 		arg.TokenHash,
-		arg.WorkspaceID,
 		arg.UserID,
 		arg.Purpose,
 		arg.ExpiresAt,

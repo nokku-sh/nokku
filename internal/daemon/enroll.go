@@ -44,10 +44,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 	if err != nil || parsed.ID == "" {
 		return nil, ErrEnrollToken
 	}
-	hash, err := crypto.HashToken(in.Token)
-	if err != nil {
-		return nil, ErrEnrollToken
-	}
+	hash := crypto.HashToken(in.Token)
 
 	var (
 		token     *db.WorkspaceToken
@@ -66,11 +63,11 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		if err != nil {
 			return err
 		}
-		workspace, err = q.GetWorkspace(ctx, token.WorkspaceID)
+		workspace, err = q.GetWorkspace(ctx)
 		if err != nil {
 			return err
 		}
-		out, err = enrolledDaemon(ctx, q, token.WorkspaceID, in.Binding)
+		out, err = enrolledDaemon(ctx, q, in.Binding)
 		return err
 	})
 	if err != nil || out != nil {
@@ -92,12 +89,11 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 	err = conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		for range maxNameAttempts {
 			// A racing enrollment of the same key makes the insert a no-op.
-			if out, err = enrolledDaemon(ctx, q, token.WorkspaceID, in.Binding); err != nil || out != nil {
+			if out, err = enrolledDaemon(ctx, q, in.Binding); err != nil || out != nil {
 				return err
 			}
 			// A taken name returns no row.
 			created, err := q.CreateDaemon(ctx, &db.CreateDaemonParams{
-				WorkspaceID:   token.WorkspaceID,
 				Name:          namegen.Generate(),
 				Metadata:      in.Metadata,
 				Status:        status,
@@ -146,11 +142,8 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 }
 
 // enrolledDaemon returns nil for an unknown key. The key is the machine's identity.
-func enrolledDaemon(ctx context.Context, q *db.Queries, workspaceID, binding string) (*Enrolled, error) {
-	d, err := q.GetDaemonByKeyThumbprint(ctx, &db.GetDaemonByKeyThumbprintParams{
-		WorkspaceID:   workspaceID,
-		KeyThumbprint: &binding,
-	})
+func enrolledDaemon(ctx context.Context, q *db.Queries, binding string) (*Enrolled, error) {
+	d, err := q.GetDaemonByKeyThumbprint(ctx, &binding)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

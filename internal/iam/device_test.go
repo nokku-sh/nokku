@@ -77,7 +77,12 @@ func pollDevice(
 	poll.Header.Set("DPoP", signProof(t, key, testBaseURL+pollPath, "", e.svc.DPoP.CurrentNonce(), time.Now()))
 	poll.RemoteAddr = "198.51.100.9:6000"
 	polled := httptest.NewRecorder()
-	e.svc.Device.Poll(polled, poll.WithContext(anon(poll.Context(), ws)))
+	// The server puts these on the context of every request.
+	ctx := actor.ContextWithRequestMeta(
+		anon(poll.Context(), ws),
+		actor.RequestMeta{Header: poll.Header, RemoteAddr: poll.RemoteAddr},
+	)
+	e.svc.Device.Poll(polled, poll.WithContext(ctx))
 	return polled
 }
 
@@ -175,15 +180,16 @@ func TestTerminalSignInMailsOnlyNewKeys(t *testing.T) {
 	o := e.org(t)
 	u := o.owner
 	mailed := make(chan string, 4)
-	e.svc.OnNewDeviceLogin = func(_ context.Context, to *db.User, sess *db.Session, label, ip string) {
-		mailed <- to.ID + " " + label + " " + ip + " " + sess.Kind
+	e.svc.sendNewLogin = func(_ context.Context, userID, _, _, label, ip string) error {
+		mailed <- userID + " " + label + " " + ip
+		return nil
 	}
 	wantMail := func(want bool, msg string) {
 		t.Helper()
 		select {
 		case got := <-mailed:
 			require.True(t, want, "%s, but got a mail", msg)
-			assert.Equal(t, u.ID+" "+terminalAgent+" 198.51.100.9 "+string(actor.KindCLI), got)
+			assert.Equal(t, u.ID+" "+terminalAgent+" 198.51.100.9", got)
 		case <-time.After(300 * time.Millisecond):
 			require.False(t, want, "%s, but got no mail", msg)
 		}

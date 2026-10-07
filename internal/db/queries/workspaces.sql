@@ -1,25 +1,25 @@
 -- name: CreateWorkspace :one
 INSERT INTO
-  workspaces (slug, name, description, settings)
+  workspaces (id, slug, name, description, settings)
 VALUES
-  (@slug, @name, sqlc.narg('description'), @settings)
+  (@id, @slug, @name, sqlc.narg('description'), @settings)
 RETURNING
   *;
 
 -- name: InitSubscription :exec
 INSERT INTO
-  workspace_subscriptions (workspace_id)
+  workspace_subscriptions DEFAULT
 VALUES
-  (@workspace_id)
 ON CONFLICT (workspace_id) DO NOTHING;
 
 -- name: GetWorkspace :one
+-- The workspace the transaction is pinned to.
 SELECT
   *
 FROM
   workspaces
 WHERE
-  id = @workspace_id;
+  id = current_workspace_id ();
 
 -- name: GetWorkspaceForUpdate :one
 SELECT
@@ -27,7 +27,7 @@ SELECT
 FROM
   workspaces
 WHERE
-  id = @workspace_id
+  id = current_workspace_id ()
 FOR UPDATE;
 
 -- name: GetWorkspaceBySlug :one
@@ -73,6 +73,14 @@ WHERE
       credentials c
     WHERE
       c.workspace_id = w.id
+  )
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      known_devices d
+    WHERE
+      d.workspace_id = w.id
   );
 
 -- name: UpdateWorkspace :one
@@ -83,11 +91,12 @@ SET
   settings = @settings,
   updated_at = NOW()
 WHERE
-  id = @workspace_id
+  id = current_workspace_id ()
 RETURNING
   *;
 
 -- name: DeleteWorkspace :exec
+-- Names the workspace, the purge of unclaimed signups runs as nokku_system.
 DELETE FROM workspaces
 WHERE
   id = @workspace_id;

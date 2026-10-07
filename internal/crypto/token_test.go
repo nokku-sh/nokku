@@ -7,11 +7,7 @@ import (
 )
 
 func TestNewToken_NoID(t *testing.T) {
-	tok, err := NewToken()
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	tok := NewToken("")
 	if tok.ID != "" {
 		t.Errorf("ID = %q, want empty", tok.ID)
 	}
@@ -24,17 +20,14 @@ func TestNewToken_NoID(t *testing.T) {
 	if parsed.Secret != tok.Plaintext || parsed.ID != "" {
 		t.Errorf("Parse() = %+v, want bare secret", parsed)
 	}
-	if want, _ := HashToken(tok.Plaintext); tok.Hash != want {
+	if tok.Hash != HashToken(tok.Plaintext) {
 		t.Error("hash does not match the plaintext")
 	}
 }
 
 func TestNewToken_WithID(t *testing.T) {
 	id := "123e4567-e89b-12d3-a456-426614174000" // UUID-form ID round-trips through Parse
-	tok, err := NewToken(WithID(id))
-	if err != nil {
-		t.Fatal(err)
-	}
+	tok := NewToken(id)
 	if tok.ID != id {
 		t.Errorf("ID = %q, want %q", tok.ID, id)
 	}

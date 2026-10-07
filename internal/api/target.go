@@ -23,10 +23,6 @@ type targetService struct {
 	cfg *config.Config
 }
 
-func newTargetService(cfg *config.Config) *targetService {
-	return &targetService{cfg: cfg}
-}
-
 func (s *targetService) GetTarget(
 	ctx context.Context,
 	req *nokkuv1.GetTargetRequest,
@@ -114,7 +110,6 @@ func (s *targetService) insertTarget(
 			return err
 		}
 		result, err = q.CreateTarget(ctx, &db.CreateTargetParams{
-			WorkspaceID:   actor.WorkspaceIDFromContext(ctx),
 			Name:          name,
 			Description:   req.Description,
 			CaID:          req.CaId,
@@ -174,10 +169,7 @@ func (s *targetService) DeleteTarget(
 	ctx context.Context,
 	req *nokkuv1.DeleteTargetRequest,
 ) (*nokkuv1.DeleteTargetResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		_, err := q.DeleteTarget(ctx, req.GetId())
-		return err
-	}); err != nil {
+	if _, err := s.cfg.Conn.Tenant().DeleteTarget(ctx, req.GetId()); err != nil {
 		return nil, err
 	}
 	return &nokkuv1.DeleteTargetResponse{}, nil
@@ -191,14 +183,13 @@ func (s *targetService) ListTargets(
 	var count int32
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		rows, err := q.ListTargets(ctx, &db.ListTargetsParams{
-			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
-			Query:       req.Query,
-			DaemonID:    req.DaemonId,
-			CaID:        req.CaId,
-			Principals:  req.GetPrincipals(),
-			Tags:        req.GetTags(),
-			Limit:       req.Limit,
-			Offset:      req.Offset,
+			Query:      req.Query,
+			DaemonID:   req.DaemonId,
+			CaID:       req.CaId,
+			Principals: req.GetPrincipals(),
+			Tags:       req.GetTags(),
+			Limit:      req.Limit,
+			Offset:     req.Offset,
 		})
 		if err != nil || len(rows) == 0 {
 			return err
@@ -235,11 +226,8 @@ func (s *targetService) GetTargetPrincipals(
 	ctx context.Context,
 	req *nokkuv1.GetTargetPrincipalsRequest,
 ) (*nokkuv1.GetTargetPrincipalsResponse, error) {
-	var rows []*db.ListPrincipalsForTargetRow
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		rows, err = q.ListPrincipalsForTarget(ctx, req.GetTargetId())
-		return err
-	}); err != nil {
+	rows, err := s.cfg.Conn.Tenant().ListPrincipalsForTarget(ctx, req.GetTargetId())
+	if err != nil {
 		return nil, err
 	}
 
@@ -423,7 +411,7 @@ func (s *targetService) GetMyAccess(
 		//nolint:exhaustive // other kinds were rejected above
 		switch p.Kind {
 		case actor.KindUser, actor.KindCLI:
-			u, err := q.GetUser(ctx, &db.GetUserParams{WorkspaceID: actor.WorkspaceIDFromContext(ctx), ID: p.ID})
+			u, err := q.GetUser(ctx, p.ID)
 			if err != nil {
 				return err
 			}
@@ -499,12 +487,12 @@ func (s *targetService) GetTargetFilters(
 	var principals []string
 
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		tags, err = q.GetWorkspaceTags(ctx, actor.WorkspaceIDFromContext(ctx))
+		tags, err = q.GetWorkspaceTags(ctx)
 		if err != nil {
 			return err
 		}
 
-		principals, err = q.GetWorkspacePrincipals(ctx, actor.WorkspaceIDFromContext(ctx))
+		principals, err = q.GetWorkspacePrincipals(ctx)
 		return err
 	}); err != nil {
 		return nil, err
@@ -609,19 +597,16 @@ func (s *targetService) ListAccessGraphTargets(
 	req *nokkuv1.ListAccessGraphTargetsRequest,
 ) (*nokkuv1.ListAccessGraphTargetsResponse, error) {
 	filter := cmp.Or(req.GetFilter(), &nokkuv1.AccessGraphFilter{})
-	var rows []*db.ListAccessGraphTargetsRow
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		rows, err = q.ListAccessGraphTargets(ctx, &db.ListAccessGraphTargetsParams{
-			Tag:       req.GetTag(),
-			FilterTag: filter.Tag,
-			SubjectID: filter.SubjectId,
-			TargetID:  filter.TargetId,
-			Username:  filter.Username,
-			Limit:     req.Limit,
-			Offset:    req.Offset,
-		})
-		return err
-	}); err != nil {
+	rows, err := s.cfg.Conn.Tenant().ListAccessGraphTargets(ctx, &db.ListAccessGraphTargetsParams{
+		Tag:       req.GetTag(),
+		FilterTag: filter.Tag,
+		SubjectID: filter.SubjectId,
+		TargetID:  filter.TargetId,
+		Username:  filter.Username,
+		Limit:     req.Limit,
+		Offset:    req.Offset,
+	})
+	if err != nil {
 		return nil, err
 	}
 

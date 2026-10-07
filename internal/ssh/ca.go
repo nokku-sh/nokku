@@ -109,10 +109,7 @@ func NewCA(
 		return nil, err
 	}
 
-	serial, err := crypto.RandomSerial()
-	if err != nil {
-		return nil, err
-	}
+	serial := crypto.RandomSerial()
 
 	privDER, err := x509.MarshalPKCS8PrivateKey(kp.Private)
 	if err != nil {

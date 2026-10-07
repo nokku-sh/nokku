@@ -12,7 +12,6 @@ import (
 const createTarget = `-- name: CreateTarget :one
 INSERT INTO
   targets (
-    workspace_id,
     ca_id,
     name,
     description,
@@ -27,17 +26,15 @@ VALUES
     $2,
     $3,
     $4,
-    $5,
-    COALESCE($6, '{}'::TEXT[]),
-    COALESCE($7, '{}'::JSONB),
-    $8
+    COALESCE($5, '{}'::TEXT[]),
+    COALESCE($6, '{}'::JSONB),
+    $7
   )
 RETURNING
   id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, created_at, updated_at
 `
 
 type CreateTargetParams struct {
-	WorkspaceID   string      `json:"workspaceId"`
 	CaID          *string     `json:"caId"`
 	Name          string      `json:"name"`
 	Description   *string     `json:"description"`
@@ -49,7 +46,6 @@ type CreateTargetParams struct {
 
 func (q *Queries) CreateTarget(ctx context.Context, arg *CreateTargetParams) (*Target, error) {
 	row := q.db.QueryRow(ctx, createTarget,
-		arg.WorkspaceID,
 		arg.CaID,
 		arg.Name,
 		arg.Description,
@@ -212,14 +208,12 @@ SELECT DISTINCT
   username
 FROM
   principals
-WHERE
-  workspace_id = $1
 ORDER BY
   username ASC
 `
 
-func (q *Queries) GetWorkspacePrincipals(ctx context.Context, workspaceID string) ([]string, error) {
-	rows, err := q.db.Query(ctx, getWorkspacePrincipals, workspaceID)
+func (q *Queries) GetWorkspacePrincipals(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, getWorkspacePrincipals)
 	if err != nil {
 		return nil, err
 	}
@@ -243,14 +237,12 @@ SELECT DISTINCT
   unnest(tags)::TEXT AS tag
 FROM
   targets
-WHERE
-  workspace_id = $1
 ORDER BY
   tag ASC
 `
 
-func (q *Queries) GetWorkspaceTags(ctx context.Context, workspaceID string) ([]string, error) {
-	rows, err := q.db.Query(ctx, getWorkspaceTags, workspaceID)
+func (q *Queries) GetWorkspaceTags(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, getWorkspaceTags)
 	if err != nil {
 		return nil, err
 	}
@@ -276,22 +268,21 @@ SELECT
 FROM
   targets t
 WHERE
-  t.workspace_id = $1
+  (
+    $1::TEXT IS NULL
+    OR t.name ILIKE '%' || $1 || '%'
+    OR COALESCE(t.description, '') ILIKE '%' || $1 || '%'
+  )
   AND (
-    $2::TEXT IS NULL
-    OR t.name ILIKE '%' || $2 || '%'
-    OR COALESCE(t.description, '') ILIKE '%' || $2 || '%'
+    $2::UUID IS NULL
+    OR t.daemon_id = $2::UUID
   )
   AND (
     $3::UUID IS NULL
-    OR t.daemon_id = $3::UUID
+    OR t.ca_id = $3::UUID
   )
   AND (
-    $4::UUID IS NULL
-    OR t.ca_id = $4::UUID
-  )
-  AND (
-    $5::TEXT[] IS NULL
+    $4::TEXT[] IS NULL
     OR EXISTS (
       SELECT
         1
@@ -299,30 +290,29 @@ WHERE
         principals p
       WHERE
         p.target_id = t.id
-        AND p.username = ANY ($5::TEXT[])
+        AND p.username = ANY ($4::TEXT[])
     )
   )
   AND (
-    $6::TEXT[] IS NULL
-    OR t.tags @> COALESCE($6, '{}'::TEXT[])
+    $5::TEXT[] IS NULL
+    OR t.tags @> COALESCE($5, '{}'::TEXT[])
   )
 ORDER BY
   t.id ASC
 LIMIT
-  $8
-OFFSET
   $7
+OFFSET
+  $6
 `
 
 type ListTargetsParams struct {
-	WorkspaceID string   `json:"workspaceId"`
-	Query       *string  `json:"query"`
-	DaemonID    *string  `json:"daemonId"`
-	CaID        *string  `json:"caId"`
-	Principals  []string `json:"principals"`
-	Tags        []string `json:"tags"`
-	Offset      *int32   `json:"offset"`
-	Limit       *int32   `json:"limit"`
+	Query      *string  `json:"query"`
+	DaemonID   *string  `json:"daemonId"`
+	CaID       *string  `json:"caId"`
+	Principals []string `json:"principals"`
+	Tags       []string `json:"tags"`
+	Offset     *int32   `json:"offset"`
+	Limit      *int32   `json:"limit"`
 }
 
 type ListTargetsRow struct {
@@ -332,7 +322,6 @@ type ListTargetsRow struct {
 
 func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*ListTargetsRow, error) {
 	rows, err := q.db.Query(ctx, listTargets,
-		arg.WorkspaceID,
 		arg.Query,
 		arg.DaemonID,
 		arg.CaID,

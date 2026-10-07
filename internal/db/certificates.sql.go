@@ -16,7 +16,6 @@ import (
 const createCA = `-- name: CreateCA :one
 INSERT INTO
   certificate_authorities (
-    workspace_id,
     name,
     description,
     certificate,
@@ -51,25 +50,23 @@ VALUES
     $8,
     $9,
     $10,
-    $11,
-    COALESCE($12, 3),
-    COALESCE($13, 1),
-    $14,
-    COALESCE($15, '8760 hours'::interval),
-    COALESCE($16, '120 hours'::interval),
-    COALESCE($17, '168 hours'::interval),
-    COALESCE($18, '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}'::jsonb),
-    COALESCE($19, '{}'::jsonb),
-    COALESCE($20, '2160 hours'::interval),
-    COALESCE($21, '4320 hours'::interval),
-    COALESCE($22, ARRAY[1, 2, 3])
+    COALESCE($11, 3),
+    COALESCE($12, 1),
+    $13,
+    COALESCE($14, '8760 hours'::interval),
+    COALESCE($15, '120 hours'::interval),
+    COALESCE($16, '168 hours'::interval),
+    COALESCE($17, '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}'::jsonb),
+    COALESCE($18, '{}'::jsonb),
+    COALESCE($19, '2160 hours'::interval),
+    COALESCE($20, '4320 hours'::interval),
+    COALESCE($21, ARRAY[1, 2, 3])
   )
 RETURNING
   id, workspace_id, name, description, certificate, private_key, public_key, previous_public_key, previous_trusted_until, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 `
 
 type CreateCAParams struct {
-	WorkspaceID         string                `json:"workspaceId"`
 	Name                string                `json:"name"`
 	Description         *string               `json:"description"`
 	Certificate         string                `json:"certificate"`
@@ -95,7 +92,6 @@ type CreateCAParams struct {
 
 func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*CertificateAuthority, error) {
 	row := q.db.QueryRow(ctx, createCA,
-		arg.WorkspaceID,
 		arg.Name,
 		arg.Description,
 		arg.Certificate,
@@ -425,20 +421,14 @@ SELECT
 FROM
   certificate_authorities
 WHERE
-  workspace_id = $1
-  AND authority_type = $2
+  authority_type = $1
   AND is_default = TRUE
   AND is_active = TRUE
   AND NOW() BETWEEN not_before AND not_after
 `
 
-type GetDefaultCAParams struct {
-	WorkspaceID   string              `json:"workspaceId"`
-	AuthorityType nokku.AuthorityType `json:"authorityType"`
-}
-
-func (q *Queries) GetDefaultCA(ctx context.Context, arg *GetDefaultCAParams) (*CertificateAuthority, error) {
-	row := q.db.QueryRow(ctx, getDefaultCA, arg.WorkspaceID, arg.AuthorityType)
+func (q *Queries) GetDefaultCA(ctx context.Context, authorityType nokku.AuthorityType) (*CertificateAuthority, error) {
+	row := q.db.QueryRow(ctx, getDefaultCA, authorityType)
 	var i CertificateAuthority
 	err := row.Scan(
 		&i.ID,
@@ -542,48 +532,46 @@ SELECT
 FROM
   certificate_authorities
 WHERE
-  workspace_id = $1
+  (
+    $1::text IS NULL
+    OR name ILIKE '%' || $1 || '%'
+  )
   AND (
-    $2::text IS NULL
-    OR name ILIKE '%' || $2 || '%'
+    $2::boolean IS NULL
+    OR is_active = $2
   )
   AND (
     $3::boolean IS NULL
-    OR is_active = $3
+    OR is_default = $3
   )
   AND (
-    $4::boolean IS NULL
-    OR is_default = $4
+    $4::integer IS NULL
+    OR key_type = $4
   )
   AND (
-    $5::integer IS NULL
-    OR key_type = $5
-  )
-  AND (
-    $6::text IS NULL
+    $5::text IS NULL
     OR (
-      $6 = 'valid'
+      $5 = 'valid'
       AND NOW() BETWEEN not_before AND not_after
     )
     OR (
-      $6 = 'expired'
+      $5 = 'expired'
       AND NOW() > not_after
     )
     OR (
-      $6 = 'future'
+      $5 = 'future'
       AND NOW() < not_before
     )
   )
 ORDER BY
   id ASC
 LIMIT
-  $8
-OFFSET
   $7
+OFFSET
+  $6
 `
 
 type ListCAsParams struct {
-	WorkspaceID  string  `json:"workspaceId"`
 	NameQuery    *string `json:"nameQuery"`
 	IsActive     *bool   `json:"isActive"`
 	IsDefault    *bool   `json:"isDefault"`
@@ -595,7 +583,6 @@ type ListCAsParams struct {
 
 func (q *Queries) ListCAs(ctx context.Context, arg *ListCAsParams) ([]*CertificateAuthority, error) {
 	rows, err := q.db.Query(ctx, listCAs,
-		arg.WorkspaceID,
 		arg.NameQuery,
 		arg.IsActive,
 		arg.IsDefault,

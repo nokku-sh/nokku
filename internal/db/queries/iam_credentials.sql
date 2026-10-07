@@ -1,8 +1,8 @@
 -- name: UpsertCredential :one
 INSERT INTO
-  credentials (id, workspace_id, user_id, type, provider, subject, data, label)
+  credentials (id, user_id, type, provider, subject, data, label)
 VALUES
-  (@id, @workspace_id, @user_id, @type, @provider, @subject, @data, @label)
+  (@id, @user_id, @type, @provider, @subject, @data, @label)
 ON CONFLICT (id) DO UPDATE
 SET
   type = EXCLUDED.type,
@@ -23,8 +23,7 @@ SELECT
 FROM
   credentials
 WHERE
-  workspace_id = @workspace_id
-  AND user_id = @user_id
+  user_id = @user_id
   AND type = @type
 ORDER BY
   created_at ASC;
@@ -35,8 +34,7 @@ SELECT
 FROM
   credentials
 WHERE
-  workspace_id = @workspace_id
-  AND user_id = @user_id
+  user_id = @user_id
 ORDER BY
   type ASC,
   created_at ASC;
@@ -47,8 +45,7 @@ SELECT
 FROM
   credentials
 WHERE
-  workspace_id = @workspace_id
-  AND type = @type
+  type = @type
   AND provider = @provider
   AND subject = @subject;
 
@@ -58,22 +55,19 @@ SET
   label = @label,
   updated_at = NOW()
 WHERE
-  workspace_id = @workspace_id
-  AND user_id = @user_id
+  user_id = @user_id
   AND id = @id;
 
 -- name: DeleteCredential :exec
 DELETE FROM credentials
 WHERE
-  workspace_id = @workspace_id
-  AND user_id = @user_id
+  user_id = @user_id
   AND id = @id;
 
 -- name: DeleteCredentialsByProvider :execrows
 DELETE FROM credentials
 WHERE
-  workspace_id = @workspace_id
-  AND type = @type
+  type = @type
   AND provider = @provider;
 
 -- name: TouchCredential :exec
@@ -81,5 +75,4 @@ UPDATE credentials
 SET
   last_used_at = NOW()
 WHERE
-  workspace_id = @workspace_id
-  AND id = @id;
+  id = @id;
