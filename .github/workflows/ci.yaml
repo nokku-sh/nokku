@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: nokku-sh/.github/.github/workflows/go-ci.yaml@main
+
+  # Runs on main only, a pull request must never overwrite the nightly image.
+  nightly:
+    needs: ci
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: nokku-sh/.github/.github/workflows/go-nightly.yaml@main
+    secrets:
+      NOKKU_LICENSE_PUBLIC_KEY: ${{ secrets.NOKKU_LICENSE_PUBLIC_KEY }}
