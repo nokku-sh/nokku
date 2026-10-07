@@ -66,7 +66,6 @@ func startKeycloak(t *testing.T) string {
 // Keycloak outlives the tests.
 func keycloakSetupRealm(realmBase string) error {
 	root := strings.TrimSuffix(realmBase, "/realms/"+keycloakRealm)
-	clientID := "http://nokku.test/saml/metadata"
 
 	tokResp, err := http.PostForm(root+"/realms/master/protocol/openid-connect/token", url.Values{
 		"grant_type": {"password"},
@@ -113,91 +112,35 @@ func keycloakSetupRealm(realmBase string) error {
 		return fmt.Errorf("keycloak: create realm: %d %w", code, err)
 	}
 
-	// Keycloak drops redirectUris on imported SAML clients, which the ACS
-	// needs. Patch them in.
-	req, err := http.NewRequest(http.MethodGet,
-		root+"/admin/realms/"+keycloakRealm+"/clients?clientId="+url.QueryEscape(clientID), nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", auth)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	var clients []map[string]any
-	err = json.NewDecoder(resp.Body).Decode(&clients)
-	resp.Body.Close()
-	if err != nil {
-		return err
-	}
-	if len(clients) != 1 {
-		return fmt.Errorf("keycloak: expected 1 saml client, got %d", len(clients))
-	}
-	id, _ := clients[0]["id"].(string)
-	clients[0]["redirectUris"] = []string{"http://nokku.test/saml/acs"}
-
-	body, err := json.Marshal(clients[0])
-	if err != nil {
-		return err
-	}
-	put, err := http.NewRequest(http.MethodPut,
-		root+"/admin/realms/"+keycloakRealm+"/clients/"+id, bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	put.Header.Set("Authorization", auth)
-	put.Header.Set("Content-Type", "application/json")
-	putResp, err := http.DefaultClient.Do(put)
-	if err != nil {
-		return err
-	}
-	putResp.Body.Close()
-	if putResp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("keycloak: update saml client: %s", putResp.Status)
-	}
 	return nil
 }
 
 func keycloakRealmJSON() []byte {
-	mapper := func(name, protocol, mapper, userAttr, claimName, friendly string, boolean bool) map[string]any {
+	mapper := func(name, userAttr, claimName string, boolean bool) map[string]any {
 		cfg := map[string]any{
 			"user.attribute":       userAttr,
 			"id.token.claim":       "true",
 			"access.token.claim":   "true",
 			"userinfo.token.claim": "true",
+			"claim.name":           claimName,
+			"jsonType.label":       "String",
 		}
-		if protocol == "openid-connect" {
-			cfg["claim.name"] = claimName
+		if boolean {
 			cfg["jsonType.label"] = "boolean"
-			if !boolean {
-				cfg["jsonType.label"] = "String"
-			}
-		} else {
-			cfg["attribute.name"] = claimName
-			cfg["attribute.nameformat"] = "urn:oasis:names:tc:SAML:2.0:attrname-format:uri"
-			cfg["friendly.name"] = friendly
 		}
 		return map[string]any{
 			"name":           name,
-			"protocol":       protocol,
-			"protocolMapper": mapper,
+			"protocol":       "openid-connect",
+			"protocolMapper": "oidc-usermodel-property-mapper",
 			"config":         cfg,
 		}
 	}
 
 	oidcMappers := []map[string]any{
-		mapper("email", "openid-connect", "oidc-usermodel-property-mapper", "email", "email", "", false),
-		mapper("email verified", "openid-connect",
-			"oidc-usermodel-property-mapper", "emailVerified", "email_verified", "", true),
-		mapper("name", "openid-connect", "oidc-usermodel-property-mapper", "firstName", "name", "", false),
-		mapper("preferred username", "openid-connect",
-			"oidc-usermodel-property-mapper", "username", "preferred_username", "", false),
-	}
-	samlMappers := []map[string]any{
-		mapper("email", "saml", "saml-user-property-mapper", "email", "urn:oid:1.2.840.113549.1.9.1", "email", false),
-		mapper("given name", "saml", "saml-user-property-mapper", "firstName", "urn:oid:2.5.4.42", "givenName", false),
-		mapper("surname", "saml", "saml-user-property-mapper", "lastName", "urn:oid:2.5.4.4", "sn", false),
+		mapper("email", "email", "email", false),
+		mapper("email verified", "emailVerified", "email_verified", true),
+		mapper("name", "firstName", "name", false),
+		mapper("preferred username", "username", "preferred_username", false),
 	}
 
 	out, err := json.MarshalIndent(map[string]any{
@@ -228,24 +171,6 @@ func keycloakRealmJSON() []byte {
 				"directAccessGrantsEnabled": false,
 				"redirectUris":              []string{"http://nokku.test/oidc/callback"},
 				"protocolMappers":           oidcMappers,
-			},
-			{
-				"clientId":         "http://nokku.test/saml/metadata",
-				"enabled":          true,
-				"protocol":         "saml",
-				"fullScopeAllowed": true,
-				"attributes": map[string]string{
-					"saml.client.signature":            "false",
-					"saml_assertion_signature":         "true",
-					"saml.server.signature":            "true",
-					"saml.signature.algorithm":         "RSA_SHA256",
-					"saml_assertion_consumer_url_post": "http://nokku.test/saml/acs",
-					"saml.force.post.binding":          "false",
-					"saml.encrypt":                     "false",
-					"saml_name_id_format":              "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
-					"saml_force_name_id_format":        "true",
-				},
-				"protocolMappers": samlMappers,
 			},
 		},
 	}, "", "  ")
@@ -352,10 +277,12 @@ func keycloakAuthenticate(t *testing.T, b *keycloakBrowser, startURL string) (*h
 
 func TestKeycloakOIDCFlow(t *testing.T) {
 	base := startKeycloak(t)
-	e, o := keycloakOrg(t)
-	e.provider(t, o, SSOProvider{
-		Method: MethodOIDC,
-		OIDC: &OIDCProvider{
+	e := newTestEnv(t)
+	o := e.org(t)
+	e.provider(t, o.ws, SSOProvider{
+		ProviderID: "keycloak",
+		Name:       "Keycloak",
+		OIDC: OIDCProvider{
 			IssuerURL:       base,
 			ClientID:        keycloakClientID,
 			ClientSecret:    keycloakClientSec,
@@ -364,9 +291,9 @@ func TestKeycloakOIDCFlow(t *testing.T) {
 	})
 	svc := e.svc
 
-	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+o.ws, nil)
+	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider=keycloak", nil)
 	loginRec := httptest.NewRecorder()
-	svc.OIDC.Login(loginRec, login)
+	svc.OIDC.Login(loginRec, login.WithContext(anon(login.Context(), o.ws)))
 	authURL := loginRec.Header().Get("Location")
 	if authURL == "" {
 		t.Fatalf("app login did not redirect, code=%d body=%s", loginRec.Code, loginRec.Body.String())
@@ -379,93 +306,27 @@ func TestKeycloakOIDCFlow(t *testing.T) {
 		t.Fatalf("keycloak login did not redirect back to the app")
 	}
 
-	cb := httptest.NewRequest(http.MethodGet, cbURL, nil)
-	for _, c := range loginRec.Result().Cookies() {
-		cb.AddCookie(c)
+	callback := func() *httptest.ResponseRecorder {
+		cb := httptest.NewRequest(http.MethodGet, cbURL, nil)
+		for _, c := range loginRec.Result().Cookies() {
+			cb.AddCookie(c)
+		}
+		rec := httptest.NewRecorder()
+		svc.OIDC.Callback(rec, cb.WithContext(anon(cb.Context(), o.ws)))
+		return rec
 	}
-	cbRec := httptest.NewRecorder()
-	svc.OIDC.Callback(cbRec, cb)
-	wantSSOSuccess(t, cbRec)
+	wantSSOSuccess(t, callback())
 
-	u := e.userByEmail(t, keycloakEmail)
+	u := e.userByEmail(t, o.ws, keycloakEmail)
 	if u == nil {
 		t.Fatal("JIT provisioned user missing after keycloak login")
 	}
-	if !u.EmailVerified {
-		t.Error("email_verified claim from keycloak not honored")
+	if c := e.credential(t, o.ws, MethodOIDC, "keycloak", ""); c != nil && c.UserID != u.ID {
+		t.Error("credential linked to someone else")
 	}
 
 	// The consumed state must not survive a replay.
-	replay := httptest.NewRequest(http.MethodGet, cbURL, nil)
-	for _, c := range loginRec.Result().Cookies() {
-		replay.AddCookie(c)
-	}
-	replayRec := httptest.NewRecorder()
-	svc.OIDC.Callback(replayRec, replay)
-	wantSSOFailure(t, replayRec)
+	wantSSOFailure(t, callback())
 }
 
 const keycloakEmail = "alice@example.com"
-
-func keycloakOrg(t *testing.T) (*testEnv, org) {
-	t.Helper()
-	e := newTestEnv(t)
-	o := e.org(t)
-	e.claimDomain(t, o.ws, "example.com")
-	return e, o
-}
-
-func TestKeycloakSAMLFlow(t *testing.T) {
-	base := startKeycloak(t)
-	e, o := keycloakOrg(t)
-	e.provider(t, o, SSOProvider{
-		Method: MethodSAML,
-		SAML:   &SAMLIDP{MetadataURL: base + "/protocol/saml/descriptor", JITProvisioning: true},
-	})
-	svc := e.svc
-
-	login := httptest.NewRequest(http.MethodGet, "/saml/login?provider="+o.ws, nil)
-	loginRec := httptest.NewRecorder()
-	svc.SAML.Login(loginRec, login)
-	redirect := loginRec.Header().Get("Location")
-	if redirect == "" {
-		t.Fatalf("saml login did not redirect, code=%d body=%s", loginRec.Code, loginRec.Body.String())
-	}
-
-	b := newKeycloakBrowser()
-	resp, page := keycloakAuthenticate(t, b, redirect)
-
-	// The response after login should be the auto-POST form for the ACS;
-	// tolerate one intermediate redirect before it.
-	m := reSAMLResponse.FindStringSubmatch(page)
-	if m == nil {
-		if next := resp.Header.Get("Location"); next != "" {
-			_, page = b.follow(t, next)
-			m = reSAMLResponse.FindStringSubmatch(page)
-		}
-	}
-	if m == nil {
-		t.Fatalf("keycloak returned no SAMLResponse form, body: %s", page)
-	}
-	rs := reRelayState.FindStringSubmatch(page)
-	if rs == nil {
-		t.Fatalf("keycloak returned no RelayState form, body: %s", page)
-	}
-
-	f := &samlFlowRun{
-		loginCookies: loginRec.Result().Cookies(),
-		samlResponse: html.UnescapeString(m[1]),
-		relayState:   rs[1],
-	}
-	rec := f.postACS(t, svc, f.relayState, true)
-	wantSSOSuccess(t, rec)
-
-	u := e.userByEmail(t, keycloakEmail)
-	if u == nil {
-		t.Fatal("JIT provisioned user missing after keycloak saml login")
-	}
-	// Keycloak sends the username as NameID, so the subject is "alice".
-	if c := e.credential(t, MethodSAML, o.ws, "alice"); c == nil || c.UserID != u.ID {
-		t.Error("saml credential not linked to the provisioned user")
-	}
-}

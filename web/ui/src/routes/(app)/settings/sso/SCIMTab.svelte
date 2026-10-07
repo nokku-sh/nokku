@@ -12,7 +12,6 @@
 	import * as Item from '#lib/components/ui/item/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { confirm } from '#lib/hooks/index.js';
-	import { workspaceID } from '#lib/store.svelte.js';
 	import { formatTs } from '#lib/utils.js';
 	import { KeyRound, Plus, Trash2, UsersRound } from '@lucide/svelte';
 
@@ -26,14 +25,11 @@
 	let label = $state('');
 	let created = $state<string>();
 
-	const baseURL = $derived(`${page.url.origin}/scim/v2/${workspaceID.current}`);
+	const baseURL = `${page.url.origin}/scim/v2`;
 
 	// Stays open to show the secret once.
 	async function create() {
-		const res = await createToken.mutateAsync({
-			workspaceId: workspaceID.current,
-			label: label.trim()
-		});
+		const res = await createToken.mutateAsync({ label: label.trim() });
 		created = res.token ?? '';
 		label = '';
 		return false;
@@ -45,7 +41,7 @@
 			description:
 				'The identity provider using it loses access right away. Provisioning stops until it gets a new token.',
 			confirmText: 'Revoke',
-			onConfirm: () => deleteToken.mutateAsync({ workspaceId: workspaceID.current, tokenId: id })
+			onConfirm: () => deleteToken.mutateAsync({ tokenId: id })
 		});
 	}
 </script>

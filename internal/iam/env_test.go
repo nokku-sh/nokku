@@ -1,9 +1,5 @@
 package iam
 
-// Store-backed tests run against the compose.test.yml Postgres and skip
-// without it. Accounts are global, so every test works in fresh workspaces
-// under random email domains and runs never collide.
-
 import (
 	"context"
 	"errors"
@@ -13,10 +9,13 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/tenant"
 )
 
 const testBaseURL = "http://nokku.test"
@@ -41,13 +40,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	if err := crypto.SetEncryptor(cipher); err != nil {
 		t.Fatal(err)
 	}
-	svc, err := New(t.Context(), Deps{
-		BaseURL:          testBaseURL,
-		Conn:             conn,
-		Secret:           []byte("test-secret"),
-		Password:         passwordParams{Time: 1, Memory: 1024, Threads: 1, SaltLen: 16, KeyLen: 32},
-		PasskeyRPOrigins: []string{testBaseURL},
-	})
+	svc, err := New(t.Context(), Deps{Conn: conn, Secret: []byte("test-secret")})
 	if err != nil {
 		t.Fatalf("build iam service: %v", err)
 	}
@@ -59,101 +52,96 @@ func testDomain() string {
 	return strings.ReplaceAll(uuid.NewV7().String(), "-", "") + ".test"
 }
 
-// user creates an account, verified or not.
-func (e *testEnv) user(t *testing.T, email string, verified bool) *db.User {
+// workspace is a fresh tenant with its default CA, served at testBaseURL.
+func (e *testEnv) workspace(t *testing.T) actor.Workspace {
 	t.Helper()
-	ctx := t.Context()
-	u, err := e.conn.Sys().CreateUser(ctx, &db.CreateUserParams{Email: email, Name: "Test"})
-	if err != nil {
-		t.Fatalf("create user %s: %v", email, err)
-	}
-	if verified {
-		if err := e.conn.Sys().VerifyUserEmail(ctx, u.ID); err != nil {
-			t.Fatal(err)
-		}
-		u.EmailVerified = true
-	}
-	return u
-}
-
-// workspace creates a workspace owned by owner.
-func (e *testEnv) workspace(t *testing.T, owner string) string {
-	t.Helper()
-	ws, err := e.conn.Sys().
-		CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{Name: "ws-" + owner[:8], CreatedBy: owner})
-	if err != nil {
-		t.Fatalf("create workspace: %v", err)
-	}
-	return ws.ID
-}
-
-func (e *testEnv) member(t *testing.T, ws, userID string) {
-	t.Helper()
-	if err := e.conn.Sys().EnsureWorkspaceMember(t.Context(), &db.EnsureWorkspaceMemberParams{
-		WorkspaceID: ws,
-		UserID:      userID,
-		RoleName:    "viewer",
-	}); err != nil {
-		t.Fatalf("add member: %v", err)
-	}
-}
-
-// claimDomain verifies domain for ws, evicting any other claim.
-func (e *testEnv) claimDomain(t *testing.T, ws, domain string) {
-	t.Helper()
-	err := e.conn.WithTx(t.Context(), func(q *db.Queries) error {
-		d, err := q.UpsertWorkspaceDomain(t.Context(), &db.UpsertWorkspaceDomainParams{WorkspaceID: ws, Domain: domain})
-		if err != nil {
-			return err
-		}
-		_, err = q.VerifyWorkspaceDomain(
-			t.Context(),
-			&db.VerifyWorkspaceDomainParams{WorkspaceID: ws, Domain: domain, Token: d.Token},
-		)
+	slug := "w" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")[:12]
+	var ws *db.Workspace
+	err := e.conn.WithTx(t.Context(), func(q *db.Queries) (err error) {
+		ws, err = tenant.Create(t.Context(), q, slug, "Test")
 		return err
 	})
 	if err != nil {
-		t.Fatalf("claim domain: %v", err)
+		t.Fatalf("create workspace: %v", err)
 	}
+	return actor.Workspace{ID: ws.ID, Slug: ws.Slug, Name: ws.Name, BaseURL: testBaseURL}
 }
 
-func (e *testEnv) dropDomain(t *testing.T, ws, domain string) {
-	t.Helper()
-	if err := e.conn.Sys().
-		DeleteWorkspaceDomain(t.Context(), &db.DeleteWorkspaceDomainParams{WorkspaceID: ws, Domain: domain}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// org is an enterprise workspace: an owner under a verified domain.
+// org is a workspace with its owner.
 type org struct {
-	ws, domain string
-	owner      *db.User
+	ws    actor.Workspace
+	owner *db.User
 }
 
 func (e *testEnv) org(t *testing.T) org {
 	t.Helper()
-	domain := testDomain()
-	owner := e.user(t, "owner@"+domain, true)
-	ws := e.workspace(t, owner.ID)
-	e.claimDomain(t, ws, domain)
-	return org{ws: ws, domain: domain, owner: owner}
+	ws := e.workspace(t)
+	return org{ws: ws, owner: e.user(t, ws, "owner@"+testDomain(), "owner")}
 }
 
-// provider stores an enabled enterprise provider for o.
-func (e *testEnv) provider(t *testing.T, o org, p SSOProvider) {
+func (e *testEnv) user(t *testing.T, ws actor.Workspace, email, role string) *db.User {
 	t.Helper()
-	p.WorkspaceID = o.ws
-	p.ProviderID = o.ws
+	u, err := e.conn.Sys().CreateUser(t.Context(), &db.CreateUserParams{
+		WorkspaceID: ws.ID, Email: normalizeEmail(email), Name: "Test", Role: role,
+	})
+	if err != nil {
+		t.Fatalf("create user %s: %v", email, err)
+	}
+	return u
+}
+
+// invite makes an invite link for ws. maxUses zero is unlimited.
+func (e *testEnv) invite(t *testing.T, ws actor.Workspace, role string, maxUses int32) string {
+	t.Helper()
+	id := uuid.NewV7().String()
+	tok, err := crypto.NewToken(crypto.WithID(id))
+	if err != nil {
+		t.Fatal(err)
+	}
+	params := &db.CreateWorkspaceTokenParams{
+		ID:          id,
+		WorkspaceID: ws.ID,
+		Kind:        nokkuv1.TokenKind_TOKEN_KIND_INVITE,
+		TokenHash:   tok.Hash,
+		RoleName:    &role,
+	}
+	if maxUses > 0 {
+		params.MaxUses = &maxUses
+	}
+	if _, err := e.conn.Sys().CreateWorkspaceToken(t.Context(), params); err != nil {
+		t.Fatalf("create invite: %v", err)
+	}
+	return tok.Plaintext
+}
+
+// provider stores an enabled provider for ws.
+func (e *testEnv) provider(t *testing.T, ws actor.Workspace, p SSOProvider) {
+	t.Helper()
 	p.Enabled = true
-	if err := putSSOProvider(t.Context(), e.conn.Sys(), p); err != nil {
+	if _, err := putSSOProvider(t.Context(), e.conn.Sys(), ws.ID, p); err != nil {
 		t.Fatalf("store provider: %v", err)
 	}
 }
 
-func (e *testEnv) userByEmail(t *testing.T, email string) *db.User {
+func (e *testEnv) setEnforceSSO(t *testing.T, ws actor.Workspace, on bool) {
 	t.Helper()
-	u, err := e.conn.Sys().GetUserByEmail(t.Context(), email)
+	w, err := e.conn.Sys().GetWorkspace(t.Context(), ws.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Settings.EnforceSso = new(on)
+	if _, err := e.conn.Sys().UpdateWorkspace(t.Context(), &db.UpdateWorkspaceParams{
+		WorkspaceID: ws.ID, Settings: w.Settings,
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (e *testEnv) userByEmail(t *testing.T, ws actor.Workspace, email string) *db.User {
+	t.Helper()
+	u, err := e.conn.Sys().GetUserByEmail(t.Context(), &db.GetUserByEmailParams{
+		WorkspaceID: ws.ID, Email: normalizeEmail(email),
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -163,12 +151,13 @@ func (e *testEnv) userByEmail(t *testing.T, email string) *db.User {
 	return u
 }
 
-func (e *testEnv) credential(t *testing.T, typ Method, provider, subject string) *db.Credential {
+func (e *testEnv) credential(t *testing.T, ws actor.Workspace, typ Method, provider, subject string) *db.Credential {
 	t.Helper()
 	c, err := e.conn.Sys().FindCredentialBySubject(t.Context(), &db.FindCredentialBySubjectParams{
-		Type:     string(typ),
-		Provider: provider,
-		Subject:  subject,
+		WorkspaceID: ws.ID,
+		Type:        string(typ),
+		Provider:    provider,
+		Subject:     subject,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
@@ -179,23 +168,44 @@ func (e *testEnv) credential(t *testing.T, typ Method, provider, subject string)
 	return c
 }
 
-func (e *testEnv) sessions(t *testing.T, subjectID string) int {
+func (e *testEnv) sessions(t *testing.T, ws actor.Workspace, subjectID string) int {
 	t.Helper()
-	rows, err := e.conn.Sys().ListSessionsBySubject(t.Context(), subjectID)
+	rows, err := e.conn.Sys().ListSessionsBySubject(t.Context(), &db.ListSessionsBySubjectParams{
+		WorkspaceID: ws.ID, SubjectID: subjectID,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return len(rows)
 }
 
-func (e *testEnv) isMember(t *testing.T, ws, userID string) bool {
+func (e *testEnv) passkeys(t *testing.T, ws actor.Workspace, userID string) int {
 	t.Helper()
-	_, err := e.conn.Sys().
-		UserWorkspaceMember(t.Context(), &db.UserWorkspaceMemberParams{WorkspaceID: ws, UserID: userID})
-	return err == nil
+	rows, err := e.conn.Sys().ListCredentialsByType(t.Context(), &db.ListCredentialsByTypeParams{
+		WorkspaceID: ws.ID, UserID: userID, Type: string(MethodPasskey),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return len(rows)
 }
 
-// as returns a context signed in as the user.
-func as(ctx context.Context, userID string) context.Context {
-	return actor.ContextWithPrincipal(ctx, actor.Principal{ID: userID, Kind: actor.KindUser})
+// anon is a request on the workspace's host with nobody signed in.
+func anon(ctx context.Context, ws actor.Workspace) context.Context {
+	return actor.WithWorkspace(ctx, ws)
+}
+
+// as is a request on the workspace's host signed in as u.
+func as(ctx context.Context, ws actor.Workspace, u *db.User) context.Context {
+	return actor.ContextWithPrincipal(anon(ctx, ws), actor.Principal{ID: u.ID, Kind: actor.KindUser, Role: u.Role})
+}
+
+// linkToken is the token a mailed link carries.
+func linkToken(t *testing.T, link string) string {
+	t.Helper()
+	_, token, ok := strings.Cut(link, "token=")
+	if !ok || token == "" {
+		t.Fatalf("link %q carries no token", link)
+	}
+	return token
 }

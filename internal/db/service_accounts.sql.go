@@ -99,12 +99,18 @@ SELECT
 FROM
   service_accounts
 WHERE
-  token_hash = $1
+  workspace_id = $1
+  AND token_hash = $2
   AND (expires_at IS NULL OR expires_at > NOW())
 `
 
-func (q *Queries) GetServiceAccountByTokenHash(ctx context.Context, tokenHash *crypto.HashedToken) (*ServiceAccount, error) {
-	row := q.db.QueryRow(ctx, getServiceAccountByTokenHash, tokenHash)
+type GetServiceAccountByTokenHashParams struct {
+	WorkspaceID string              `json:"workspaceId"`
+	TokenHash   *crypto.HashedToken `json:"tokenHash"`
+}
+
+func (q *Queries) GetServiceAccountByTokenHash(ctx context.Context, arg *GetServiceAccountByTokenHashParams) (*ServiceAccount, error) {
+	row := q.db.QueryRow(ctx, getServiceAccountByTokenHash, arg.WorkspaceID, arg.TokenHash)
 	var i ServiceAccount
 	err := row.Scan(
 		&i.ID,

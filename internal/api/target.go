@@ -114,7 +114,7 @@ func (s *targetService) insertTarget(
 			return err
 		}
 		result, err = q.CreateTarget(ctx, &db.CreateTargetParams{
-			WorkspaceID:   req.GetWorkspaceId(),
+			WorkspaceID:   actor.WorkspaceIDFromContext(ctx),
 			Name:          name,
 			Description:   req.Description,
 			CaID:          req.CaId,
@@ -191,7 +191,7 @@ func (s *targetService) ListTargets(
 	var count int32
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		rows, err := q.ListTargets(ctx, &db.ListTargetsParams{
-			WorkspaceID: req.GetWorkspaceId(),
+			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
 			Query:       req.Query,
 			DaemonID:    req.DaemonId,
 			CaID:        req.CaId,
@@ -419,20 +419,11 @@ func (s *targetService) GetMyAccess(
 	}
 
 	resp := &nokkuv1.GetMyAccessResponse{}
-	err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
-		// Every query below filters against the actor's workspaces.
-		wsIDs, err := q.GetActorWorkspaceIDs(ctx, p.ID)
-		if err != nil {
-			return err
-		}
-		if len(wsIDs) == 0 {
-			return nil
-		}
-
+	err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		//nolint:exhaustive // other kinds were rejected above
 		switch p.Kind {
 		case actor.KindUser, actor.KindCLI:
-			u, err := s.cfg.IAM.GetUser(ctx)
+			u, err := q.GetUser(ctx, &db.GetUserParams{WorkspaceID: actor.WorkspaceIDFromContext(ctx), ID: p.ID})
 			if err != nil {
 				return err
 			}
@@ -445,85 +436,52 @@ func (s *targetService) GetMyAccess(
 			resp.Subject = &nokkuv1.GetMyAccessResponse_ServiceAccount{ServiceAccount: sa.ToProto()}
 		}
 
-		wsRows, err := q.GetWorkspacesByIDs(ctx, wsIDs)
-		if err != nil {
+		rows, err := q.GetTargetsBySubject(ctx, p.ID)
+		if err != nil || len(rows) == 0 {
 			return err
-		}
-		wsNames := make(map[string]string, len(wsRows))
-		for _, w := range wsRows {
-			wsNames[w.ID] = w.Name
-		}
-
-		rows, err := q.GetSubjectTargetsByWorkspaces(ctx, &db.GetSubjectTargetsByWorkspacesParams{
-			WorkspaceIds: wsIDs,
-			SubjectID:    p.ID,
-		})
-		if err != nil {
-			return err
-		}
-		if len(rows) == 0 {
-			return nil
 		}
 
 		targetIDs := make([]string, 0, len(rows))
 		caIDs := make(map[string]struct{})
-		targetsByWS := make(map[string][]*nokkuv1.Target, len(wsRows))
 		for _, r := range rows {
 			targetIDs = append(targetIDs, r.ID)
 			if r.CaID != nil {
 				caIDs[*r.CaID] = struct{}{}
 			}
-			targetsByWS[r.WorkspaceID] = append(targetsByWS[r.WorkspaceID], r.ToProto())
+			resp.Targets = append(resp.Targets, r.ToProto())
 		}
 
 		// The CLI needs the accounts this subject may use, not the whole graph.
 		usernamesByTarget := make(map[string][]string)
-		uRows, err := q.ListSubjectUsernamesForTargets(
-			ctx,
-			&db.ListSubjectUsernamesForTargetsParams{
-				TargetIds: targetIDs,
-				SubjectID: &p.ID,
-			},
-		)
+		uRows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
+			TargetIds: targetIDs,
+			SubjectID: &p.ID,
+		})
 		if err != nil {
 			return err
 		}
 		for _, u := range uRows {
-			usernamesByTarget[u.TargetID] = append(
-				usernamesByTarget[u.TargetID], u.Username,
-			)
+			usernamesByTarget[u.TargetID] = append(usernamesByTarget[u.TargetID], u.Username)
 		}
-		for _, targets := range targetsByWS {
-			for _, t := range targets {
-				t.Usernames = usernamesByTarget[t.GetId()]
-			}
-			slices.SortFunc(targets, func(a, b *nokkuv1.Target) int {
-				return strings.Compare(a.GetName(), b.GetName())
-			})
+		for _, t := range resp.GetTargets() {
+			t.Usernames = usernamesByTarget[t.GetId()]
 		}
+		slices.SortFunc(resp.GetTargets(), func(a, b *nokkuv1.Target) int {
+			return strings.Compare(a.GetName(), b.GetName())
+		})
 
-		casByWS := make(map[string][]*nokkuv1.CertificateAuthority)
-		if len(caIDs) > 0 {
-			caRows, err := q.GetCAsByIDs(ctx, slices.Collect(maps.Keys(caIDs)))
-			if err != nil {
-				return err
-			}
-			for _, ca := range caRows {
-				// X.509 CAs must not leak into SSH trust stores.
-				if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH {
-					continue
-				}
-				casByWS[ca.WorkspaceID] = append(casByWS[ca.WorkspaceID], ca.ToProto())
-			}
+		if len(caIDs) == 0 {
+			return nil
 		}
-
-		for _, w := range wsRows {
-			resp.Workspaces = append(resp.Workspaces, &nokkuv1.WorkspaceAccess{
-				WorkspaceId:            &w.ID,
-				WorkspaceName:          &w.Name,
-				Targets:                targetsByWS[w.ID],
-				CertificateAuthorities: casByWS[w.ID],
-			})
+		caRows, err := q.GetCAsByIDs(ctx, slices.Collect(maps.Keys(caIDs)))
+		if err != nil {
+			return err
+		}
+		for _, ca := range caRows {
+			// X.509 CAs must not leak into SSH trust stores.
+			if ca.AuthorityType == nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH {
+				resp.CertificateAuthorities = append(resp.CertificateAuthorities, ca.ToProto())
+			}
 		}
 		return nil
 	})
@@ -535,18 +493,18 @@ func (s *targetService) GetMyAccess(
 
 func (s *targetService) GetTargetFilters(
 	ctx context.Context,
-	req *nokkuv1.GetTargetFiltersRequest,
+	_ *nokkuv1.GetTargetFiltersRequest,
 ) (*nokkuv1.GetTargetFiltersResponse, error) {
 	var tags []string
 	var principals []string
 
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		tags, err = q.GetWorkspaceTags(ctx, req.GetWorkspaceId())
+		tags, err = q.GetWorkspaceTags(ctx, actor.WorkspaceIDFromContext(ctx))
 		if err != nil {
 			return err
 		}
 
-		principals, err = q.GetWorkspacePrincipals(ctx, req.GetWorkspaceId())
+		principals, err = q.GetWorkspacePrincipals(ctx, actor.WorkspaceIDFromContext(ctx))
 		return err
 	}); err != nil {
 		return nil, err

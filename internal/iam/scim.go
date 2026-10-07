@@ -1,8 +1,7 @@
 package iam
 
-// SCIM 2.0 at /scim/v2/{workspace_id}. A verified token pins the request to
-// its workspace, so it runs under RLS like any tenant request. A connector
-// only ever touches accounts under its workspace's verified domains.
+// SCIM 2.0 at /scim/v2 of the workspace host. A verified token pins the
+// request to its workspace, so it runs under RLS like any tenant request.
 
 import (
 	"context"
@@ -23,8 +22,6 @@ import (
 )
 
 const scimMountPath = "/scim/v2"
-
-var errSCIMUnmanaged = scimerrors.ScimErrorBadRequest("userName must be in a verified domain of this workspace")
 
 type SCIMFlow struct {
 	svc     *Service
@@ -50,81 +47,82 @@ func (s *Service) SCIMHandler() http.Handler {
 }
 
 func (f *SCIMFlow) serve(w http.ResponseWriter, r *http.Request) {
-	rest, _ := strings.CutPrefix(r.URL.Path, scimMountPath+"/")
-	workspaceID, tail, _ := strings.Cut(rest, "/")
-	raw, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-	if !ok || workspaceID == "" {
+	ws, ok := actor.WorkspaceFromContext(r.Context())
+	raw, hasToken := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if !ok || !hasToken {
 		writeScimError(w, scimerrors.ScimError{Status: http.StatusUnauthorized, Detail: "authentication required"})
 		return
 	}
-	tokenID, err := f.svc.verifySCIMToken(r.Context(), workspaceID, raw)
+	tokenID, err := f.svc.verifySCIMToken(r.Context(), ws.ID, raw)
 	if err != nil {
 		writeScimError(w, scimerrors.ScimError{Status: http.StatusUnauthorized, Detail: "invalid token"})
 		return
 	}
-	server, err := f.serverFor(workspaceID)
+	server, err := f.serverFor(ws)
 	if err != nil {
 		writeScimError(w, scimerrors.ScimErrorInternal)
 		return
 	}
 
-	ctx := actor.ContextWithPrincipal(
-		r.Context(),
-		actor.Principal{ID: tokenID, Kind: actor.KindSCIM, WorkspaceID: workspaceID},
-	)
-	ctx = actor.AnnotateTenant(ctx, workspaceID)
-	ctx = actor.WithMember(ctx, workspaceID, "")
+	ctx := actor.ContextWithPrincipal(r.Context(), actor.Principal{ID: tokenID, Kind: actor.KindSCIM})
 	r = r.WithContext(ctx)
-	r.URL.Path = "/" + tail
+	r.URL.Path = "/" + strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, scimMountPath), "/")
 	server.ServeHTTP(w, r)
 }
 
-func (f *SCIMFlow) serverFor(workspaceID string) (scim.Server, error) {
+func (f *SCIMFlow) serverFor(ws actor.Workspace) (scim.Server, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if s, ok := f.servers[workspaceID]; ok {
+	if s, ok := f.servers[ws.ID]; ok {
 		return s, nil
 	}
 	s, err := scim.NewServer(
 		&scim.ServerArgs{
 			ServiceProviderConfig: &scim.ServiceProviderConfig{},
-			ResourceTypes:         scimResourceTypes(f.svc, workspaceID),
+			ResourceTypes:         scimResourceTypes(f.svc, ws),
 		},
-		scim.WithBaseURL(f.svc.baseURL+scimMountPath+"/"+workspaceID),
+		scim.WithBaseURL(ws.BaseURL+scimMountPath),
 	)
 	if err != nil {
 		return scim.Server{}, err
 	}
-	f.servers[workspaceID] = s
+	f.servers[ws.ID] = s
 	return s, nil
 }
 
 func (s *Service) verifySCIMToken(ctx context.Context, workspaceID, raw string) (string, error) {
 	parsed, err := crypto.Parse(raw)
 	if err != nil || parsed.ID != workspaceID {
-		return "", errInvalidToken
+		return "", ErrInvalidToken
 	}
 	hash, err := crypto.HashToken(raw)
 	if err != nil {
-		return "", errInvalidToken
+		return "", ErrInvalidToken
 	}
-	row, err := s.sys.GetSCIMTokenByHash(ctx, hash)
-	if err != nil || row.WorkspaceID != workspaceID {
-		return "", errInvalidToken
+	var id string
+	err = s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+		row, err := q.GetSCIMTokenByHash(ctx, &db.GetSCIMTokenByHashParams{WorkspaceID: ws, TokenHash: hash})
+		if err != nil {
+			return err
+		}
+		id = row.ID
+		return q.TouchSCIMToken(ctx, &db.TouchSCIMTokenParams{WorkspaceID: ws, ID: row.ID})
+	})
+	if err != nil {
+		return "", ErrInvalidToken
 	}
-	_ = s.sys.TouchSCIMToken(ctx, row.ID)
-	return row.ID, nil
+	return id, nil
 }
 
-func (s *Service) IssueSCIMToken(ctx context.Context, workspaceID, label string) (SCIMToken, string, error) {
-	tok, err := crypto.NewToken(crypto.WithID(workspaceID))
+func (s *Service) IssueSCIMToken(ctx context.Context, label string) (SCIMToken, string, error) {
+	tok, err := crypto.NewToken(crypto.WithID(actor.WorkspaceIDFromContext(ctx)))
 	if err != nil {
 		return SCIMToken{}, "", err
 	}
 	var out SCIMToken
-	err = s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err = s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
 		row, err := q.CreateSCIMToken(ctx, &db.CreateSCIMTokenParams{
-			WorkspaceID: workspaceID,
+			WorkspaceID: ws,
 			TokenHash:   tok.Hash,
 			Label:       label,
 		})
@@ -140,10 +138,10 @@ func (s *Service) IssueSCIMToken(ctx context.Context, workspaceID, label string)
 	return out, tok.Plaintext, nil
 }
 
-func (s *Service) ListSCIMTokens(ctx context.Context, workspaceID string) ([]SCIMToken, error) {
+func (s *Service) ListSCIMTokens(ctx context.Context) ([]SCIMToken, error) {
 	var out []SCIMToken
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		rows, err := q.ListWorkspaceSCIMTokens(ctx, workspaceID)
+	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+		rows, err := q.ListWorkspaceSCIMTokens(ctx, ws)
 		for _, r := range rows {
 			out = append(out, SCIMToken{ID: r.ID, Label: r.Label, CreatedAt: r.CreatedAt, LastUsedAt: r.LastUsedAt})
 		}
@@ -152,9 +150,9 @@ func (s *Service) ListSCIMTokens(ctx context.Context, workspaceID string) ([]SCI
 	return out, err
 }
 
-func (s *Service) RevokeSCIMToken(ctx context.Context, workspaceID, tokenID string) error {
-	return s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		return q.DeleteSCIMToken(ctx, &db.DeleteSCIMTokenParams{ID: tokenID, WorkspaceID: workspaceID})
+func (s *Service) RevokeSCIMToken(ctx context.Context, tokenID string) error {
+	return s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+		return q.DeleteSCIMToken(ctx, &db.DeleteSCIMTokenParams{WorkspaceID: ws, ID: tokenID})
 	})
 }
 
@@ -162,76 +160,49 @@ func (s *Service) RevokeSCIMToken(ctx context.Context, workspaceID, tokenID stri
 // source of truth.
 func (s *Service) scimProvisionUser(
 	ctx context.Context,
-	workspaceID, email, name string,
+	email, name string,
 	active bool,
 	externalID string,
 ) (*db.User, error) {
-	managed, err := s.managedBy(ctx, workspaceID, email)
-	if err != nil {
-		return nil, err
-	}
-	if !managed {
-		return nil, errSCIMUnmanaged
-	}
-
 	var u *db.User
 	var created bool
-	err = s.conn.WithTx(ctx, func(q *db.Queries) error {
-		u, err = q.GetUserByEmail(ctx, email)
-		// Same as SSO linking: never adopt a row nobody proved.
-		if err == nil && !u.EmailVerified {
-			if err = q.DeleteUser(ctx, u.ID); err == nil {
-				err = pgx.ErrNoRows
-			}
-		}
+	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
+		u, err = q.GetUserByEmail(ctx, &db.GetUserByEmailParams{WorkspaceID: ws, Email: email})
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
-			if u, err = q.CreateUser(ctx, &db.CreateUserParams{Email: email, Name: name}); err != nil {
-				return err
+			u, err = s.createUser(ctx, q, db.CreateUserWithIDParams{WorkspaceID: ws, Email: email, Name: name}, "")
+			if errors.Is(err, ErrSeatLimit) {
+				return scimerrors.ScimError{Status: http.StatusForbidden, Detail: err.Error()}
 			}
-			if err := q.VerifyUserEmail(ctx, u.ID); err != nil {
-				return err
-			}
-			// Org-managed accounts get no self-serve password reset.
-			if u, err = q.UpdateUser(ctx, &db.UpdateUserParams{
-				ID:                   u.ID,
-				Active:               &active,
-				DisablePasswordReset: new(true),
-			}); err != nil {
+			if err != nil {
 				return err
 			}
 			created = true
+			if !active {
+				if u, err = setUserActive(ctx, q, ws, u.ID, false); err != nil {
+					return err
+				}
+			}
 		case err != nil:
 			return err
 		case u.Active != active:
 			if !active {
-				if err := keepOwner(ctx, q, workspaceID, u.ID); err != nil {
+				if err := keepOwner(ctx, q, ws, u.ID); err != nil {
 					return err
 				}
 			}
-			if u, err = q.UpdateUser(ctx, &db.UpdateUserParams{ID: u.ID, Active: &active}); err != nil {
+			if u, err = setUserActive(ctx, q, ws, u.ID, active); err != nil {
 				return err
 			}
 		}
-		if err := s.EnsureMember(ctx, q, u.ID, workspaceID, ""); err != nil {
-			if errors.Is(err, errSeatLimit) {
-				return scimerrors.ScimError{Status: http.StatusForbidden, Detail: err.Error()}
-			}
-			return err
-		}
-		return linkSCIMCredential(ctx, q, workspaceID, u.ID, externalID)
+		return linkSCIMCredential(ctx, q, ws, u.ID, externalID)
 	})
 	if err != nil {
 		return nil, mapUserError(err)
 	}
 	if created {
 		s.record(ctx, Event{
-			Action:      ActionUserCreated,
-			Kind:        actor.KindUser,
-			Method:      MethodSCIM,
-			UserID:      u.ID,
-			Email:       u.Email,
-			WorkspaceID: workspaceID,
+			Action: ActionUserCreated, Kind: actor.KindUser, Method: MethodSCIM, UserID: u.ID, Email: u.Email,
 		})
 	}
 	if !u.Active {
@@ -242,25 +213,32 @@ func (s *Service) scimProvisionUser(
 	return u, nil
 }
 
-func linkSCIMCredential(ctx context.Context, q db.Querier, workspaceID, userID, externalID string) error {
+func setUserActive(ctx context.Context, q *db.Queries, ws, userID string, active bool) (*db.User, error) {
+	if err := q.SetUserActive(ctx, &db.SetUserActiveParams{WorkspaceID: ws, ID: userID, Active: active}); err != nil {
+		return nil, err
+	}
+	return q.GetUser(ctx, &db.GetUserParams{WorkspaceID: ws, ID: userID})
+}
+
+func linkSCIMCredential(ctx context.Context, q *db.Queries, ws, userID, externalID string) error {
 	if externalID == "" {
 		return nil
 	}
 	// IdP migrations change the externalId, so one account never carries two links.
 	if err := q.DeleteStaleUserSCIMCredentials(ctx, &db.DeleteStaleUserSCIMCredentialsParams{
+		WorkspaceID: ws,
 		UserID:      userID,
-		WorkspaceID: workspaceID,
 		Subject:     externalID,
 	}); err != nil {
 		return err
 	}
 	_, err := q.UpsertCredential(ctx, &db.UpsertCredentialParams{
-		ID:       workspaceID + ":" + externalID,
-		UserID:   userID,
-		Type:     string(MethodSCIM),
-		Provider: workspaceID,
-		Subject:  externalID,
-		Data:     []byte{},
+		ID:          "scim:" + ws + ":" + externalID,
+		WorkspaceID: ws,
+		UserID:      userID,
+		Type:        string(MethodSCIM),
+		Subject:     externalID,
+		Data:        []byte{},
 	})
 	if errors.Is(err, pgx.ErrNoRows) || db.IsUniqueViolation(err) {
 		return scimerrors.ScimErrorBadRequest("externalId is already linked to another user")
@@ -270,12 +248,12 @@ func linkSCIMCredential(ctx context.Context, q db.Querier, workspaceID, userID, 
 
 // keepOwner refuses to switch off or remove the owner. Nobody else can hand
 // the workspace on.
-func keepOwner(ctx context.Context, q db.Querier, workspaceID, userID string) error {
-	owner, err := q.GetWorkspaceOwner(ctx, workspaceID)
+func keepOwner(ctx context.Context, q *db.Queries, ws, userID string) error {
+	owner, err := q.GetOwner(ctx, ws)
 	if err != nil {
 		return err
 	}
-	if owner == userID {
+	if owner.ID == userID {
 		return scimerrors.ScimError{
 			Status: http.StatusConflict,
 			Detail: "the workspace owner cannot be deactivated or deprovisioned, transfer ownership first",
@@ -284,56 +262,30 @@ func keepOwner(ctx context.Context, q db.Querier, workspaceID, userID string) er
 	return nil
 }
 
-// scimDeprovisionUser deletes an account left in no workspace. One still in
-// other workspaces is deactivated everywhere, since the org owns the domain,
-// and its data survives for an IdP re-assignment.
-func (s *Service) scimDeprovisionUser(ctx context.Context, workspaceID string, u *db.User) error {
-	var deleted bool
-	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
-		if err := keepOwner(ctx, q, workspaceID, u.ID); err != nil {
+// scimDeprovisionUser deactivates the account and drops its IdP link. The
+// data survives for an IdP re-assignment.
+func (s *Service) scimDeprovisionUser(ctx context.Context, u *db.User) error {
+	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+		if err := keepOwner(ctx, q, ws, u.ID); err != nil {
 			return err
 		}
-		if err := q.RemoveWorkspaceMember(
-			ctx,
-			&db.RemoveWorkspaceMemberParams{WorkspaceID: workspaceID, UserID: u.ID},
-		); err != nil {
+		if _, err := setUserActive(ctx, q, ws, u.ID, false); err != nil {
 			return err
 		}
-		if err := q.DeleteUserSCIMCredentials(
-			ctx,
-			&db.DeleteUserSCIMCredentialsParams{UserID: u.ID, WorkspaceID: workspaceID},
-		); err != nil {
+		if err := q.DeleteUserSCIMCredentials(ctx, &db.DeleteUserSCIMCredentialsParams{
+			WorkspaceID: ws, UserID: u.ID,
+		}); err != nil {
 			return err
 		}
-		others, err := q.CountUserMemberships(ctx, u.ID)
-		if err != nil {
-			return err
-		}
-		if others == 0 {
-			deleted = true
-			return q.DeleteUser(ctx, u.ID)
-		}
-		if _, err := q.UpdateUser(ctx, &db.UpdateUserParams{ID: u.ID, Active: new(false)}); err != nil {
-			return err
-		}
-		_, err = q.DeleteSubjectSessions(ctx, u.ID)
+		_, err := q.DeleteSubjectSessions(ctx, &db.DeleteSubjectSessionsParams{WorkspaceID: ws, SubjectID: u.ID})
 		return err
 	})
 	if err != nil {
 		return err
 	}
-	e := Event{
-		Action:      ActionUserDeactivated,
-		Kind:        actor.KindUser,
-		Method:      MethodSCIM,
-		UserID:      u.ID,
-		Email:       u.Email,
-		WorkspaceID: workspaceID,
-	}
-	if deleted {
-		e.Action = ActionUserDeleted
-	}
-	s.record(ctx, e)
+	s.record(ctx, Event{
+		Action: ActionUserDeactivated, Kind: actor.KindUser, Method: MethodSCIM, UserID: u.ID, Email: u.Email,
+	})
 	return nil
 }
 

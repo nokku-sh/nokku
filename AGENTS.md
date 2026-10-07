@@ -23,7 +23,6 @@ task backend        # go run ./cmd/nokku
 task frontend       # web/ui dev server (Vite, :5173)
 task gen            # sqlc + the web client from the pinned protos
 task lint           # tidy, GOWORK=off build, fmt, vet, govulncheck, test -race, golangci-lint --fix, web/ui fmt+lint
-task seed           # demo data (cmd/seed, not shipped)
 task build          # UI build, then bin/nokku
 task build:ui       # web/ui into web/ui/build
 task build:email    # email templates into web/email/out
@@ -61,12 +60,16 @@ committed `.gitkeep` and are embedded by `web/embed.go`.
   entitlement guard, validation. Audit wraps authz so denied calls are
   recorded.
 - `internal/db` is sqlc queries plus migrations, all RLS-scoped. Pick the
-  entry point by what the query may see: `WithWorkspace` (tenant rows),
-  `WithActor` (the caller's own rows), `WithTx` and `Sys()` (role
-  `nokku_system`, BYPASSRLS, for pre-auth lookups and jobs). The owner role
-  only migrates at startup.
-- `internal/iam` is identity: passwords, passkeys, backup codes, OIDC, OAuth2
-  social, SAML, device flow, DPoP, SCIM. It answers who, never may.
+  entry point by what the query may see: `WithWorkspace` (tenant rows, the
+  request path), `WithTx` and `Sys()` (role `nokku_system`, BYPASSRLS, only
+  boot, SaaS signup, webhooks and jobs). The owner role only migrates at
+  startup.
+- `internal/tenant` resolves the workspace from the request host before
+  authentication. Self-hosted serves one workspace created at boot. SaaS
+  (billing on) gives each workspace a subdomain of `NOKKU_BASE_URL`.
+- `internal/iam` is identity: passkeys, email links, OIDC, device flow, DPoP,
+  SCIM. Accounts live inside a workspace, there are no global users. It
+  answers who, never may.
 - `internal/daemon` is the in-memory pool of live daemon control streams,
   relays (two bidi streams spliced, the backend only sees ciphertext), and
   web terminal sessions.

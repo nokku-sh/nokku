@@ -1,7 +1,6 @@
 <script lang="ts">
 	import * as Avatar from '#lib/components/ui/avatar/index.js';
 	import type { User } from '#lib/gen/nokku/v1/account_pb.js';
-	import type { WorkspaceMember } from '#lib/gen/nokku/v1/workspace_pb.js';
 	import type { ComponentProps } from 'svelte';
 	import {
 		avatarColors,
@@ -13,7 +12,7 @@
 	} from './boring-avatars-utils';
 
 	interface Props extends ComponentProps<typeof Avatar.Root> {
-		user?: User | WorkspaceMember;
+		user?: User;
 		colors?: string[];
 	}
 	let { user, colors = avatarColors, ...restProps }: Props = $props();

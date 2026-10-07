@@ -17,15 +17,11 @@ type Limits interface {
 	RecordingStorageBytes(ctx context.Context, workspaceID string) (int64, error)
 }
 
-type EventSink interface {
-	Append(ctx context.Context, event *audit.Event) error
-}
-
 type Service struct {
 	conn   *db.Connection
 	store  *storage.Storage
 	limits Limits
-	events EventSink
+	events *audit.Service
 }
 
 func New(
@@ -33,7 +29,7 @@ func New(
 	conn *db.Connection,
 	store *storage.Storage,
 	limits Limits,
-	events EventSink,
+	events *audit.Service,
 ) *Service {
 	s := &Service{conn: conn, store: store, limits: limits, events: events}
 	go s.runSweeper(ctx)

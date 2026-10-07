@@ -2,11 +2,11 @@
 INSERT INTO
   sessions (
     token_hash,
+    workspace_id,
     subject_id,
     user_id,
     kind,
     method,
-    workspace_id,
     binding,
     label,
     user_agent,
@@ -17,13 +17,13 @@ INSERT INTO
 VALUES
   (
     @token_hash,
+    @workspace_id,
     @subject_id::TEXT,
     CASE
       WHEN @kind::TEXT <> 'daemon' THEN (@subject_id::TEXT)::UUID
     END,
     @kind::TEXT,
     @method,
-    sqlc.narg('workspace_id'),
     @binding,
     @label,
     @user_agent,
@@ -40,7 +40,8 @@ SELECT
 FROM
   sessions
 WHERE
-  token_hash = @token_hash;
+  workspace_id = @workspace_id
+  AND token_hash = @token_hash;
 
 -- name: ListSessionsBySubject :many
 SELECT
@@ -48,7 +49,8 @@ SELECT
 FROM
   sessions
 WHERE
-  subject_id = @subject_id
+  workspace_id = @workspace_id
+  AND subject_id = @subject_id
 ORDER BY
   last_seen_at DESC NULLS LAST;
 
@@ -57,25 +59,30 @@ UPDATE sessions
 SET
   last_seen_at = @last_seen_at
 WHERE
-  token_hash = @token_hash;
+  workspace_id = @workspace_id
+  AND token_hash = @token_hash;
 
 -- name: DeleteSession :exec
 DELETE FROM sessions
 WHERE
-  token_hash = @token_hash;
+  workspace_id = @workspace_id
+  AND token_hash = @token_hash;
 
 -- name: DeleteSubjectSessions :execrows
 DELETE FROM sessions
 WHERE
-  subject_id = @subject_id;
+  workspace_id = @workspace_id
+  AND subject_id = @subject_id;
 
 -- name: DeleteSessionsExcept :execrows
 DELETE FROM sessions
 WHERE
-  subject_id = @subject_id
+  workspace_id = @workspace_id
+  AND subject_id = @subject_id
   AND token_hash <> @keep_hash;
 
 -- name: DeleteExpiredSessions :execrows
+-- Every tenant, runs as nokku_system.
 DELETE FROM sessions
 WHERE
   expires_at IS NOT NULL

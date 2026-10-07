@@ -50,18 +50,12 @@ export function sessionKindLabel(kind: string): string {
 
 export function sessionMethodLabel(method: string): string {
 	switch (method) {
-		case 'password':
-			return 'Password';
 		case 'passkey':
 			return 'Passkey';
-		case 'backup_code':
-			return 'Backup code';
+		case 'magic_link':
+			return 'Email link';
 		case 'oidc':
-			return 'OIDC';
-		case 'oauth2':
-			return 'OAuth';
-		case 'saml':
-			return 'SAML';
+			return 'Single sign-on';
 		case 'device':
 			return 'Device';
 		default:

@@ -92,14 +92,6 @@ SET
   key = EXCLUDED.key,
   updated_at = NOW();
 
--- name: CountWorkspaceSeats :one
-SELECT
-  COUNT(*)
-FROM
-  workspace_members
-WHERE
-  workspace_id = @workspace_id;
-
 -- name: CountWorkspaceResources :one
 SELECT
   (
@@ -138,12 +130,5 @@ SELECT
         daemons d
       WHERE
         d.workspace_id = $1
-    ) + (
-      SELECT
-        COUNT(*)
-      FROM
-        workspace_domains wd
-      WHERE
-        wd.workspace_id = $1
     )
   )::bigint AS resource_count;

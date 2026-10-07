@@ -334,19 +334,16 @@ func (s *Stripe) syncAll(ctx context.Context) error {
 			slog.Warn("failed to sync subscription", "error", err, "workspace_id", sub.WorkspaceID)
 		}
 	}
-	if len(subs) > 0 {
-		slog.Info("reconciled subscriptions", "count", len(subs))
-	}
 	return nil
 }
 
 func (s *Stripe) billableSeats(ctx context.Context, workspaceID string) (int64, error) {
 	var count int64
 	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
-		count, err = q.CountWorkspaceSeats(ctx, workspaceID)
+		count, err = q.CountActiveUsers(ctx, workspaceID)
 		return err
 	}); err != nil {
-		return 0, fmt.Errorf("count members for checkout: %w", err)
+		return 0, fmt.Errorf("count users for checkout: %w", err)
 	}
 	return max(count, minBillableSeats), nil
 }

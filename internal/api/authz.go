@@ -52,6 +52,8 @@ func isPublicEndpoint(procedure string) bool {
 	return procedureAccess[procedure].GetPublic()
 }
 
+// authorizationInterceptor checks the role the session carries. The user
+// and the workspace were loaded together, so no lookup happens here.
 type authorizationInterceptor struct {
 	cfg *config.Config
 }
@@ -64,8 +66,7 @@ func newAuthZInterceptor(
 
 func (a *authorizationInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		ctx, err := a.authorize(ctx, req.Spec().Procedure)
-		if err != nil {
+		if err := a.authorize(ctx, req.Spec().Procedure); err != nil {
 			return nil, err
 		}
 		return next(ctx, req)
@@ -82,40 +83,36 @@ func (a *authorizationInterceptor) WrapStreamingHandler(
 	next connect.StreamingHandlerFunc,
 ) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		ctx, err := a.authorize(ctx, conn.Spec().Procedure)
-		if err != nil {
+		if err := a.authorize(ctx, conn.Spec().Procedure); err != nil {
 			return err
 		}
 		return next(ctx, conn)
 	}
 }
 
-func (a *authorizationInterceptor) authorize(
-	ctx context.Context,
-	procedure string,
-) (context.Context, error) {
+func (a *authorizationInterceptor) authorize(ctx context.Context, procedure string) error {
 	access := procedureAccess[procedure]
 	if access == nil {
-		return ctx, db.ErrPermissionDenied
+		return db.ErrPermissionDenied
+	}
+	if access.GetPublic() {
+		return nil
 	}
 	caller, _ := actor.PrincipalFromContext(ctx)
 	if caller.Kind == actor.KindDaemon {
 		if !access.GetDaemon() {
-			return ctx, db.ErrPermissionDenied
+			return db.ErrPermissionDenied
 		}
-		return ctx, a.daemonAccepted(ctx, caller.ID, procedure)
+		return a.daemonAccepted(ctx, caller.ID, procedure)
 	}
-	if access.GetPublic() || access.GetSelf() {
-		return ctx, nil
+	if access.GetSelf() {
+		return nil
 	}
 	role, ok := workspaceRoles[access.GetRole()]
-	if !ok {
-		return ctx, db.ErrPermissionDenied
+	if !ok || !db.Role(caller.Role).AtLeast(role) {
+		return db.ErrPermissionDenied
 	}
-	if access.GetPersonal() && actor.WorkspaceIDFromContext(ctx) == "" {
-		return ctx, nil
-	}
-	return actorHasRole(ctx, a.cfg.Conn, role)
+	return nil
 }
 
 // daemonAccepted keeps a pending, rejected or deleted daemon away from every
@@ -127,7 +124,11 @@ func (a *authorizationInterceptor) daemonAccepted(ctx context.Context, daemonID,
 		nokkuv1connect.DaemonControlServiceUnenrollDaemonProcedure:
 		return nil
 	}
-	daemon, err := a.cfg.Conn.Sys().GetDaemon(ctx, daemonID)
+	var daemon *db.Daemon
+	err := a.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+		daemon, err = q.GetDaemon(ctx, daemonID)
+		return err
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return db.ErrPermissionDenied
 	}
@@ -140,37 +141,7 @@ func (a *authorizationInterceptor) daemonAccepted(ctx context.Context, daemonID,
 	return nil
 }
 
-// actorHasRole records the verified membership on the returned context so
-// WithWorkspace and handlers skip another lookup.
-func actorHasRole(
-	ctx context.Context,
-	conn *db.Connection,
-	required db.Role,
-) (context.Context, error) {
-	caller, _ := actor.PrincipalFromContext(ctx)
-	if caller.ID == "" {
-		return ctx, db.ErrNoActor
-	}
-	workspaceID := actor.WorkspaceIDFromContext(ctx)
-	if workspaceID == "" {
-		return ctx, db.ErrWorkspaceNotPinned
-	}
-	role, err := conn.Sys().GetActorRole(ctx, &db.GetActorRoleParams{
-		WorkspaceID: workspaceID,
-		ActorID:     caller.ID,
-	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return ctx, db.ErrWorkspaceNotAccessible
-	}
-	if err != nil {
-		return ctx, err
-	}
-	if !db.Role(role).AtLeast(required) {
-		return ctx, db.ErrPermissionDenied
-	}
-	return actor.WithMember(ctx, workspaceID, role), nil
-}
-
 func callerRole(ctx context.Context) db.Role {
-	return db.Role(actor.MemberRole(ctx))
+	p, _ := actor.PrincipalFromContext(ctx)
+	return db.Role(p.Role)
 }

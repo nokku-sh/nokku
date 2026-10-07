@@ -45,16 +45,13 @@ tasks:
     cmds:
       - go build -ldflags="-s -w{{ if .NOKKU_LICENSE_PUBLIC_KEY }} -X github.com/mizuchilabs/kata/licx.pubkey={{ .NOKKU_LICENSE_PUBLIC_KEY }}{{ end }}" -trimpath -o bin/nokku ./cmd/nokku
 
-  seed:
-    desc: Seed the database with demo data (separate binary, not shipped)
-    cmds:
-      - go run ./cmd/seed {{.CLI_ARGS}}
-
   build:ui:
     desc: Build frontends
     dir: web/ui
     cmds:
       - pnpm install; pnpm build
+      # The build empties the directory, the placeholder keeps go build working without node.
+      - touch build/.gitkeep
 
   build:email:
     desc: Build email templates

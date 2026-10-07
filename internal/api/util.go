@@ -38,10 +38,11 @@ func (s *utilService) GetVersion(
 }
 
 func (s *utilService) GetInstanceInfo(
-	_ context.Context,
+	ctx context.Context,
 	_ *nokkuv1.GetInstanceInfoRequest,
 ) (*nokkuv1.GetInstanceInfoResponse, error) {
 	op := s.cfg.Email.Operator
+	saas := s.cfg.Tenant.SaaS()
 	return &nokkuv1.GetInstanceInfoResponse{
 		OperatorName: &op.Name,
 		SupportEmail: &op.SupportEmail,
@@ -49,6 +50,8 @@ func (s *utilService) GetInstanceInfo(
 		TermsUrl:     &op.TermsURL,
 		PrivacyUrl:   &op.PrivacyURL,
 		ImprintUrl:   &op.ImprintURL,
+		Mode:         new(string(s.cfg.Entitlements.Mode())),
+		Signup:       new(saas && actor.WorkspaceIDFromContext(ctx) == ""),
 	}, nil
 }
 
@@ -62,10 +65,8 @@ func (s *utilService) Whoami(
 	}
 
 	out := &nokkuv1.WhoamiResponse{
-		Kind:        new(string(p.Kind)),
-		SubjectId:   new(p.ID),
-		UserId:      new(actor.UserIDFromContext(ctx)),
-		WorkspaceId: new(actor.WorkspaceIDFromContext(ctx)),
+		Kind:      new(string(p.Kind)),
+		SubjectId: new(p.ID),
 	}
 
 	switch p.Kind {
@@ -121,7 +122,7 @@ func (s *utilService) ListAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ListAuditLogsRequest,
 ) (*nokkuv1.ListAuditLogsResponse, error) {
-	params := auditParams(ctx, req.GetWorkspaceId(), req.GetFilter())
+	params := auditParams(req.GetFilter())
 	params.Limit, params.Offset = req.GetLimit(), req.GetOffset()
 
 	events, total, err := s.cfg.Audit.List(ctx, params)
@@ -129,23 +130,40 @@ func (s *utilService) ListAuditLogs(
 		slog.Error("failed to list audit logs", "error", err)
 		return nil, errInternal
 	}
+	days := s.cfg.Entitlements.Resolve(ctx, actor.WorkspaceIDFromContext(ctx)).RetentionDays
+	retention := int32(min(days, math.MaxInt32)) //nolint:gosec // clamped to int32 just before
+	return &nokkuv1.ListAuditLogsResponse{Logs: eventLogs(events), Total: &total, RetentionDays: &retention}, nil
+}
+
+// ListMyActivity is the caller's own events in this workspace.
+func (s *utilService) ListMyActivity(
+	ctx context.Context,
+	req *nokkuv1.ListMyActivityRequest,
+) (*nokkuv1.ListMyActivityResponse, error) {
+	params := auditParams(nil)
+	params.ActorIds = []string{actor.SubjectFromContext(ctx)}
+	params.Limit, params.Offset = req.GetLimit(), req.GetOffset()
+	events, total, err := s.cfg.Audit.List(ctx, params)
+	if err != nil {
+		slog.Error("failed to list activity", "error", err)
+		return nil, errInternal
+	}
+	return &nokkuv1.ListMyActivityResponse{Logs: eventLogs(events), Total: &total}, nil
+}
+
+func eventLogs(events []*audit.Event) []*nokkuv1.EventLog {
 	logs := make([]*nokkuv1.EventLog, 0, len(events))
 	for _, e := range events {
 		logs = append(logs, e.ToProto())
 	}
-	var retention int32
-	if params.WorkspaceID != nil {
-		days := s.cfg.Entitlements.Resolve(ctx, *params.WorkspaceID).RetentionDays
-		retention = int32(min(days, math.MaxInt32)) //nolint:gosec // clamped to int32 just before
-	}
-	return &nokkuv1.ListAuditLogsResponse{Logs: logs, Total: &total, RetentionDays: &retention}, nil
+	return logs
 }
 
 func (s *utilService) ExportAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ExportAuditLogsRequest,
 ) (*nokkuv1.ExportAuditLogsResponse, error) {
-	params := auditParams(ctx, req.GetWorkspaceId(), req.GetFilter())
+	params := auditParams(req.GetFilter())
 	data, err := s.cfg.Audit.Export(ctx, params, req.GetFormat())
 	if errors.Is(err, audit.ErrExportLimit) {
 		return nil, newError(connect.CodeFailedPrecondition, err.Error())
@@ -173,18 +191,12 @@ var auditOutcomes = map[nokkuv1.AuditOutcome]string{
 	nokkuv1.AuditOutcome_AUDIT_OUTCOME_DENIED:      "denied",
 }
 
-// auditParams falls back to the caller's own activity without a workspace,
-// and to the last 14 days without dates. Other actors only filter a
-// workspace log, the personal log is always the caller's.
-func auditParams(ctx context.Context, workspaceID string, f *nokkuv1.AuditLogFilter) *db.ListAuditLogsParams {
+// auditParams falls back to the last 14 days without dates. The workspace
+// is filled in by the audit service from the context.
+func auditParams(f *nokkuv1.AuditLogFilter) *db.ListAuditLogsParams {
 	p := &db.ListAuditLogsParams{}
-	if workspaceID != "" {
-		p.WorkspaceID = &workspaceID
-		if len(f.GetActorIds()) > 0 {
-			p.ActorIds = f.GetActorIds()
-		}
-	} else {
-		p.ActorIds = []string{actor.SubjectFromContext(ctx)}
+	if len(f.GetActorIds()) > 0 {
+		p.ActorIds = f.GetActorIds()
 	}
 	if len(f.GetActorKinds()) > 0 {
 		p.ActorKinds = f.GetActorKinds()

@@ -115,11 +115,11 @@ S3-compatible storage holds avatars and session recordings. Recordings are encry
 | `NOKKU_EMAIL_SENDER`   |                           | Sender address, required with SMTP       |
 | `NOKKU_EMAIL_COOLDOWN` | `15m`                     | Per-user, per-template cooldown          |
 
-Any SMTP relay works, for example Scaleway TEM at `smtp.tem.scw.cloud`. Without email, password resets and verification links cannot be delivered.
+Any SMTP relay works, for example Scaleway TEM at `smtp.tem.scw.cloud`. Email turns on sign-in links and mailed invitations. Without it, people sign in with passkeys or an identity provider, and invitations are links you hand over yourself.
 
 ### Operator details (optional)
 
-Who runs this server. The UI footer, the signup consent line and the email footer show only what is set, so a self-hosted server shows no third-party company by default.
+Who runs this server. The UI footer, the consent line where accounts are created and the email footer show only what is set, so a self-hosted server shows no third-party company by default.
 
 | Variable                       | Purpose                                     |
 | ------------------------------ | ------------------------------------------- |
@@ -131,16 +131,22 @@ Who runs this server. The UI footer, the signup consent line and the email foote
 | `NOKKU_OPERATOR_PRIVACY_URL`   | Privacy policy                              |
 | `NOKKU_OPERATOR_IMPRINT_URL`   | Imprint                                     |
 
-### SSO provider seeds (optional)
+### Workspace and owner (self-hosted)
 
-| Variable               | Purpose                                                            |
-| ---------------------- | ------------------------------------------------------------------ |
-| `GOOGLE_CLIENT_ID`     | Enables Google social login instance-wide when set with the secret |
-| `GOOGLE_CLIENT_SECRET` |                                                                    |
-| `GITHUB_CLIENT_ID`     | Enables GitHub social login instance-wide when set with the secret |
-| `GITHUB_CLIENT_SECRET` |                                                                    |
+A self-hosted server is one workspace, created on the first start together with the owner account.
 
-Per-workspace OIDC and SAML providers are configured in the web application, not via environment.
+| Variable                  | Purpose                                                                          |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| `NOKKU_WORKSPACE_NAME`    | Name of the workspace, shown on the sign-in page (default `Nokku`)               |
+| `NOKKU_ADMIN_EMAIL`       | Creates the owner account at boot when the workspace has no users yet            |
+| `NOKKU_ADMIN_NAME`        | The owner's display name                                                         |
+| `GOOGLE_CLIENT_ID`        | Seeds Google as an OIDC provider of the workspace when set with the secret       |
+| `GOOGLE_CLIENT_SECRET`    |                                                                                  |
+| `MICROSOFT_CLIENT_ID`     | Seeds Microsoft when set with the secret and tenant                              |
+| `MICROSOFT_CLIENT_SECRET` |                                                                                  |
+| `MICROSOFT_TENANT_ID`     | Your Entra tenant. `common` is refused, the issuer must be a single tenant       |
+
+Until the owner has a passkey or a linked provider, every boot ends with a sign-in link that works for 24 hours. `nokku admin-link` prints a fresh one on demand, the way back in when every passkey is lost. Other OIDC providers are configured in the web application.
 
 ### Encryption and KMS (optional)
 
@@ -154,14 +160,6 @@ Per-workspace OIDC and SAML providers are configured in the web application, not
 
 KMS schemes are `hcvault://<host>/transit/keys/<key>` and `scw-kms://regions/<region>/keys/<key-id>`.
 
-### Admin bootstrap (optional)
-
-| Variable               | Purpose                                      |
-| ---------------------- | -------------------------------------------- |
-| `NOKKU_ADMIN_EMAIL`    | Create and verify this admin account at boot |
-| `NOKKU_ADMIN_PASSWORD` | Initial admin password                       |
-| `NOKKU_ADMIN_NAME`     | Admin display name                           |
-
 ### Other integrations
 
 | Variable                      | Purpose                                         |
@@ -171,7 +169,7 @@ KMS schemes are `hcvault://<host>/transit/keys/<key>` and `scw-kms://regions/<re
 
 ## Secret rotation
 
-The secrets in the database (CA private keys, SSO client secrets, the SAML signing key) are encrypted by one keyset, which is stored in the database too. The keyset is wrapped by a key derived from `NOKKU_SECRET`, or by the KMS key when `KMS_URI` is set. Each recording is encrypted with its own key, and that key is one more secret in the database.
+The secrets in the database (CA private keys, SSO client secrets) are encrypted by one keyset, which is stored in the database too. The keyset is wrapped by a key derived from `NOKKU_SECRET`, or by the KMS key when `KMS_URI` is set. Each recording is encrypted with its own key, and that key is one more secret in the database.
 
 A rotation adds a new data key to the keyset, re-encrypts the secrets in the database with it, and drops the older keys, all in one transaction. The keyset never holds more than two keys. Recordings are not re-encrypted, only their keys are.
 

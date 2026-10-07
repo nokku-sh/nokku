@@ -32,10 +32,11 @@ SELECT
     SELECT
       COUNT(*)
     FROM
-      workspace_members m
+      users u
     WHERE
-      m.workspace_id = @workspace_id
-  )::INTEGER AS members;
+      u.workspace_id = @workspace_id
+      AND u.active
+  )::INTEGER AS users;
 
 -- name: ListSoonestCAs :many
 SELECT

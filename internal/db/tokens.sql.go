@@ -246,3 +246,53 @@ func (q *Queries) RedeemToken(ctx context.Context, arg *RedeemTokenParams) (*Wor
 	)
 	return &i, err
 }
+
+const redeemTokenByID = `-- name: RedeemTokenByID :one
+UPDATE workspace_tokens
+SET
+  uses = uses + 1,
+  last_used_at = NOW()
+WHERE
+  workspace_id = $1
+  AND id = $2
+  AND kind = $3
+  AND (
+    expires_at IS NULL
+    OR expires_at > NOW()
+  )
+  AND (
+    max_uses IS NULL
+    OR uses < max_uses
+  )
+RETURNING
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role_name, created_at, last_used_at
+`
+
+type RedeemTokenByIDParams struct {
+	WorkspaceID string          `json:"workspaceId"`
+	ID          string          `json:"id"`
+	Kind        nokku.TokenKind `json:"kind"`
+}
+
+// For a signup whose invite link was checked earlier. The mailed link or
+// the passkey ceremony is the proof by then.
+func (q *Queries) RedeemTokenByID(ctx context.Context, arg *RedeemTokenByIDParams) (*WorkspaceToken, error) {
+	row := q.db.QueryRow(ctx, redeemTokenByID, arg.WorkspaceID, arg.ID, arg.Kind)
+	var i WorkspaceToken
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Kind,
+		&i.Label,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.MaxUses,
+		&i.Uses,
+		&i.AutoApprove,
+		&i.CaID,
+		&i.RoleName,
+		&i.CreatedAt,
+		&i.LastUsedAt,
+	)
+	return &i, err
+}

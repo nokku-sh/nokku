@@ -17,12 +17,12 @@ func TestListAuditLogsFilters(t *testing.T) {
 	}{
 		{"DeleteTarget", true, `{}`},
 		{"UpdateWorkspace", true, `{}`},
-		{"UpdateWorkspaceMember", false, `{"code":"permission_denied"}`},
+		{"UpdateUserRole", false, `{"code":"permission_denied"}`},
 		{"CreateTarget", false, `{"code":"invalid_argument"}`},
 		{"LoginDenied", false, `{}`},
 	} {
 		if err := c.Sys().InsertAuditLog(t.Context(), &InsertAuditLogParams{
-			WorkspaceID: &f.ws,
+			WorkspaceID: f.ws,
 			ActorID:     f.owner,
 			ActorKind:   "user",
 			Action:      e.action,
@@ -41,13 +41,13 @@ func TestListAuditLogsFilters(t *testing.T) {
 		"succeeded": {outcome: "succeeded", want: []string{"DeleteTarget", "UpdateWorkspace"}},
 		"failed includes deny": {
 			outcome: "failed",
-			want:    []string{"CreateTarget", "LoginDenied", "UpdateWorkspaceMember"},
+			want:    []string{"CreateTarget", "LoginDenied", "UpdateUserRole"},
 		},
-		"denied only": {outcome: "denied", want: []string{"LoginDenied", "UpdateWorkspaceMember"}},
+		"denied only": {outcome: "denied", want: []string{"LoginDenied", "UpdateUserRole"}},
 		"exact name":  {actions: []string{"UpdateWorkspace"}, want: []string{"UpdateWorkspace"}},
 		"prefix with star": {
 			actions: []string{"Update*"},
-			want:    []string{"UpdateWorkspace", "UpdateWorkspaceMember"},
+			want:    []string{"UpdateUserRole", "UpdateWorkspace"},
 		},
 		"mixed": {
 			actions: []string{"Delete*", "CreateTarget"},
@@ -59,7 +59,7 @@ func TestListAuditLogsFilters(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			p := &ListAuditLogsParams{
-				WorkspaceID: &f.ws,
+				WorkspaceID: f.ws,
 				Actions:     tc.actions,
 				StartDate:   &start,
 				EndDate:     &end,

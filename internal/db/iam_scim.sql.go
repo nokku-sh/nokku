@@ -12,22 +12,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
-const countUserMemberships = `-- name: CountUserMemberships :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  workspace_members
-WHERE
-  user_id = $1
-`
-
-func (q *Queries) CountUserMemberships(ctx context.Context, userID string) (int32, error) {
-	row := q.db.QueryRow(ctx, countUserMemberships, userID)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const createSCIMToken = `-- name: CreateSCIMToken :one
 INSERT INTO
   scim_tokens (workspace_id, token_hash, label)
@@ -68,56 +52,56 @@ func (q *Queries) CreateSCIMToken(ctx context.Context, arg *CreateSCIMTokenParam
 const deleteSCIMToken = `-- name: DeleteSCIMToken :exec
 DELETE FROM scim_tokens
 WHERE
-  id = $1
-  AND workspace_id = $2
+  workspace_id = $1
+  AND id = $2
 `
 
 type DeleteSCIMTokenParams struct {
-	ID          string `json:"id"`
 	WorkspaceID string `json:"workspaceId"`
+	ID          string `json:"id"`
 }
 
 func (q *Queries) DeleteSCIMToken(ctx context.Context, arg *DeleteSCIMTokenParams) error {
-	_, err := q.db.Exec(ctx, deleteSCIMToken, arg.ID, arg.WorkspaceID)
+	_, err := q.db.Exec(ctx, deleteSCIMToken, arg.WorkspaceID, arg.ID)
 	return err
 }
 
 const deleteStaleUserSCIMCredentials = `-- name: DeleteStaleUserSCIMCredentials :exec
 DELETE FROM credentials
 WHERE
-  user_id = $1
+  workspace_id = $1
+  AND user_id = $2
   AND type = 'scim'
-  AND provider = $2
   AND subject <> $3
 `
 
 type DeleteStaleUserSCIMCredentialsParams struct {
-	UserID      string `json:"userId"`
 	WorkspaceID string `json:"workspaceId"`
+	UserID      string `json:"userId"`
 	Subject     string `json:"subject"`
 }
 
 // Run before UpsertCredential so one account never carries two links.
 func (q *Queries) DeleteStaleUserSCIMCredentials(ctx context.Context, arg *DeleteStaleUserSCIMCredentialsParams) error {
-	_, err := q.db.Exec(ctx, deleteStaleUserSCIMCredentials, arg.UserID, arg.WorkspaceID, arg.Subject)
+	_, err := q.db.Exec(ctx, deleteStaleUserSCIMCredentials, arg.WorkspaceID, arg.UserID, arg.Subject)
 	return err
 }
 
 const deleteUserSCIMCredentials = `-- name: DeleteUserSCIMCredentials :exec
 DELETE FROM credentials
 WHERE
-  user_id = $1
+  workspace_id = $1
+  AND user_id = $2
   AND type = 'scim'
-  AND provider = $2
 `
 
 type DeleteUserSCIMCredentialsParams struct {
-	UserID      string `json:"userId"`
 	WorkspaceID string `json:"workspaceId"`
+	UserID      string `json:"userId"`
 }
 
 func (q *Queries) DeleteUserSCIMCredentials(ctx context.Context, arg *DeleteUserSCIMCredentialsParams) error {
-	_, err := q.db.Exec(ctx, deleteUserSCIMCredentials, arg.UserID, arg.WorkspaceID)
+	_, err := q.db.Exec(ctx, deleteUserSCIMCredentials, arg.WorkspaceID, arg.UserID)
 	return err
 }
 
@@ -127,11 +111,17 @@ SELECT
 FROM
   scim_tokens
 WHERE
-  token_hash = $1
+  workspace_id = $1
+  AND token_hash = $2
 `
 
-func (q *Queries) GetSCIMTokenByHash(ctx context.Context, tokenHash crypto.HashedToken) (*ScimToken, error) {
-	row := q.db.QueryRow(ctx, getSCIMTokenByHash, tokenHash)
+type GetSCIMTokenByHashParams struct {
+	WorkspaceID string             `json:"workspaceId"`
+	TokenHash   crypto.HashedToken `json:"tokenHash"`
+}
+
+func (q *Queries) GetSCIMTokenByHash(ctx context.Context, arg *GetSCIMTokenByHashParams) (*ScimToken, error) {
+	row := q.db.QueryRow(ctx, getSCIMTokenByHash, arg.WorkspaceID, arg.TokenHash)
 	var i ScimToken
 	err := row.Scan(
 		&i.ID,
@@ -144,21 +134,17 @@ func (q *Queries) GetSCIMTokenByHash(ctx context.Context, tokenHash crypto.Hashe
 	return &i, err
 }
 
-const listManagedMembers = `-- name: ListManagedMembers :many
+const listSCIMUsers = `-- name: ListSCIMUsers :many
 SELECT
-  u.id, u.email, u.name, u.picture, u.active, u.email_verified, u.disable_password_reset, u.created_at, u.updated_at,
+  u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.created_at, u.updated_at,
   COALESCE(c.subject, '')::TEXT AS external_id
 FROM
-  workspace_members wm
-  JOIN users u ON u.id = wm.user_id
-  JOIN workspace_domains d ON d.workspace_id = wm.workspace_id
-  AND d.domain = split_part(u.email, '@', 2)
-  AND d.verified_at IS NOT NULL
-  LEFT JOIN credentials c ON c.user_id = u.id
+  users u
+  LEFT JOIN credentials c ON c.workspace_id = u.workspace_id
+  AND c.user_id = u.id
   AND c.type = 'scim'
-  AND c.provider = wm.workspace_id::TEXT
 WHERE
-  wm.workspace_id = $1
+  u.workspace_id = $1
   AND (
     $2::UUID IS NULL
     OR u.id = $2
@@ -172,45 +158,36 @@ ORDER BY
   u.id ASC
 `
 
-type ListManagedMembersParams struct {
+type ListSCIMUsersParams struct {
 	WorkspaceID string  `json:"workspaceId"`
 	UserID      *string `json:"userId"`
 	Email       *string `json:"email"`
 }
 
-type ListManagedMembersRow struct {
-	ID                   string    `json:"id"`
-	Email                string    `json:"email"`
-	Name                 string    `json:"name"`
-	Picture              *string   `json:"picture"`
-	Active               bool      `json:"active"`
-	EmailVerified        bool      `json:"emailVerified"`
-	DisablePasswordReset bool      `json:"disablePasswordReset"`
-	CreatedAt            time.Time `json:"createdAt"`
-	UpdatedAt            time.Time `json:"updatedAt"`
-	ExternalID           string    `json:"externalId"`
+type ListSCIMUsersRow struct {
+	User       User   `json:"user"`
+	ExternalID string `json:"externalId"`
 }
 
-// Only members under the workspace's verified domains.
-func (q *Queries) ListManagedMembers(ctx context.Context, arg *ListManagedMembersParams) ([]*ListManagedMembersRow, error) {
-	rows, err := q.db.Query(ctx, listManagedMembers, arg.WorkspaceID, arg.UserID, arg.Email)
+func (q *Queries) ListSCIMUsers(ctx context.Context, arg *ListSCIMUsersParams) ([]*ListSCIMUsersRow, error) {
+	rows, err := q.db.Query(ctx, listSCIMUsers, arg.WorkspaceID, arg.UserID, arg.Email)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*ListManagedMembersRow
+	var items []*ListSCIMUsersRow
 	for rows.Next() {
-		var i ListManagedMembersRow
+		var i ListSCIMUsersRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Email,
-			&i.Name,
-			&i.Picture,
-			&i.Active,
-			&i.EmailVerified,
-			&i.DisablePasswordReset,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.User.ID,
+			&i.User.WorkspaceID,
+			&i.User.Email,
+			&i.User.Name,
+			&i.User.Picture,
+			&i.User.Role,
+			&i.User.Active,
+			&i.User.CreatedAt,
+			&i.User.UpdatedAt,
 			&i.ExternalID,
 		); err != nil {
 			return nil, err
@@ -274,15 +251,21 @@ UPDATE scim_tokens
 SET
   last_used_at = NOW()
 WHERE
-  id = $1
+  workspace_id = $1
+  AND id = $2
   AND (
     last_used_at IS NULL
     OR last_used_at < NOW() - INTERVAL '1 hour'
   )
 `
 
+type TouchSCIMTokenParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	ID          string `json:"id"`
+}
+
 // Only writes when the stamp is over an hour old.
-func (q *Queries) TouchSCIMToken(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, touchSCIMToken, id)
+func (q *Queries) TouchSCIMToken(ctx context.Context, arg *TouchSCIMTokenParams) error {
+	_, err := q.db.Exec(ctx, touchSCIMToken, arg.WorkspaceID, arg.ID)
 	return err
 }

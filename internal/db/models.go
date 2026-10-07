@@ -14,7 +14,7 @@ import (
 type AuditAuditLog struct {
 	ID          string    `json:"id"`
 	Timestamp   time.Time `json:"timestamp"`
-	WorkspaceID *string   `json:"workspaceId"`
+	WorkspaceID string    `json:"workspaceId"`
 	ActorID     string    `json:"actorId"`
 	ActorKind   string    `json:"actorKind"`
 	ActorName   string    `json:"actorName"`
@@ -58,16 +58,17 @@ type CertificateAuthority struct {
 }
 
 type Credential struct {
-	ID         string     `json:"id"`
-	UserID     string     `json:"userId"`
-	Type       string     `json:"type"`
-	Provider   string     `json:"provider"`
-	Subject    string     `json:"subject"`
-	Data       []byte     `json:"data"`
-	Label      string     `json:"label"`
-	LastUsedAt *time.Time `json:"lastUsedAt"`
-	CreatedAt  time.Time  `json:"createdAt"`
-	UpdatedAt  time.Time  `json:"updatedAt"`
+	ID          string     `json:"id"`
+	WorkspaceID string     `json:"workspaceId"`
+	UserID      string     `json:"userId"`
+	Type        string     `json:"type"`
+	Provider    string     `json:"provider"`
+	Subject     string     `json:"subject"`
+	Data        []byte     `json:"data"`
+	Label       string     `json:"label"`
+	LastUsedAt  *time.Time `json:"lastUsedAt"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
 }
 
 type Daemon struct {
@@ -97,12 +98,14 @@ type Keyset struct {
 }
 
 type OneTimeToken struct {
-	TokenHash crypto.HashedToken `json:"tokenHash"`
-	UserID    string             `json:"userId"`
-	Email     *string            `json:"email"`
-	Purpose   string             `json:"purpose"`
-	ExpiresAt time.Time          `json:"expiresAt"`
-	CreatedAt time.Time          `json:"createdAt"`
+	TokenHash   crypto.HashedToken `json:"tokenHash"`
+	WorkspaceID string             `json:"workspaceId"`
+	UserID      *string            `json:"userId"`
+	Purpose     string             `json:"purpose"`
+	Email       *string            `json:"email"`
+	Data        []byte             `json:"data"`
+	ExpiresAt   time.Time          `json:"expiresAt"`
+	CreatedAt   time.Time          `json:"createdAt"`
 }
 
 type Principal struct {
@@ -139,12 +142,6 @@ type Recording struct {
 	CreatedAt   time.Time             `json:"createdAt"`
 }
 
-type SamlKeypair struct {
-	ID      int32                 `json:"id"`
-	KeyEnc  crypto.EncryptedBytes `json:"keyEnc"`
-	CertPem []byte                `json:"certPem"`
-}
-
 type ScimToken struct {
 	ID          string             `json:"id"`
 	WorkspaceID string             `json:"workspaceId"`
@@ -170,11 +167,11 @@ type ServiceAccount struct {
 
 type Session struct {
 	TokenHash   crypto.HashedToken `json:"tokenHash"`
+	WorkspaceID string             `json:"workspaceId"`
 	SubjectID   string             `json:"subjectId"`
 	UserID      *string            `json:"userId"`
 	Kind        string             `json:"kind"`
 	Method      string             `json:"method"`
-	WorkspaceID *string            `json:"workspaceId"`
 	Binding     string             `json:"binding"`
 	Label       string             `json:"label"`
 	Ip          string             `json:"ip"`
@@ -185,9 +182,8 @@ type Session struct {
 }
 
 type SsoProvider struct {
-	WorkspaceID *string               `json:"workspaceId"`
+	WorkspaceID string                `json:"workspaceId"`
 	ProviderID  string                `json:"providerId"`
-	Method      string                `json:"method"`
 	Name        string                `json:"name"`
 	Enabled     bool                  `json:"enabled"`
 	Config      crypto.EncryptedBytes `json:"config"`
@@ -228,42 +224,25 @@ type TeamMember struct {
 }
 
 type User struct {
-	ID                   string    `json:"id"`
-	Email                string    `json:"email"`
-	Name                 string    `json:"name"`
-	Picture              *string   `json:"picture"`
-	Active               bool      `json:"active"`
-	EmailVerified        bool      `json:"emailVerified"`
-	DisablePasswordReset bool      `json:"disablePasswordReset"`
-	CreatedAt            time.Time `json:"createdAt"`
-	UpdatedAt            time.Time `json:"updatedAt"`
+	ID          string    `json:"id"`
+	WorkspaceID string    `json:"workspaceId"`
+	Email       string    `json:"email"`
+	Name        string    `json:"name"`
+	Picture     *string   `json:"picture"`
+	Role        string    `json:"role"`
+	Active      bool      `json:"active"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Workspace struct {
 	ID          string                   `json:"id"`
+	Slug        string                   `json:"slug"`
 	Name        string                   `json:"name"`
 	Description *string                  `json:"description"`
 	Settings    *nokku.WorkspaceSettings `json:"settings"`
-	CreatedBy   string                   `json:"createdBy"`
 	CreatedAt   time.Time                `json:"createdAt"`
 	UpdatedAt   time.Time                `json:"updatedAt"`
-}
-
-type WorkspaceDomain struct {
-	WorkspaceID string     `json:"workspaceId"`
-	Domain      string     `json:"domain"`
-	Token       string     `json:"token"`
-	VerifiedAt  *time.Time `json:"verifiedAt"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	UpdatedAt   time.Time  `json:"updatedAt"`
-}
-
-type WorkspaceMember struct {
-	WorkspaceID string    `json:"workspaceId"`
-	UserID      string    `json:"userId"`
-	RoleName    string    `json:"roleName"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type WorkspaceState struct {

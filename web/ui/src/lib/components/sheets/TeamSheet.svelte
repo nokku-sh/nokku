@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { principal as principalApi } from '#lib/api/principals.svelte.js';
 	import { team as teamApi } from '#lib/api/team.svelte.js';
-	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import { users } from '#lib/api/workspaces.svelte.js';
 	import SubjectAccess from '#lib/components/access/SubjectAccess.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Command from '#lib/components/ui/command/index.js';
@@ -38,7 +38,7 @@
 	let pickerOpen = $state(false);
 	let search = $state('');
 	const debounced = new Debounced(() => search, 250);
-	const candidates = workspace.listMembers(
+	const candidates = users.list(
 		() => ({ query: debounced.current || undefined, limit: 20 }),
 		() => pickerOpen
 	);
@@ -140,7 +140,7 @@
 							</Button>
 						{/snippet}
 						<Command.Group>
-							{#each candidates.data?.members ?? [] as m (m.id)}
+							{#each candidates.data?.users ?? [] as m (m.id)}
 								<Command.Item value={m.id} onSelect={() => toggleMember(m.id)}>
 									<UserAvatar user={m} class="size-6" />
 									<div class="flex min-w-0 flex-1 flex-col">
@@ -159,7 +159,7 @@
 						{#each shownMembers as m (m.id)}
 							<Chip
 								label={m.name || m.email}
-								href={`/access/members?id=${m.id}`}
+								href={`/access/users?id=${m.id}`}
 								title={m.email}
 								onRemove={() => removeMember.mutate({ teamId: entity.id, userId: m.id })}
 							>

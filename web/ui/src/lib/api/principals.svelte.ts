@@ -2,7 +2,6 @@ import { MAX_PAGE_SIZE } from '#lib/config.js';
 import { PrincipalService, SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
 import { toast } from 'svelte-sonner';
 import { useMutation, useQuery } from '#lib/query/index.js';
-import { workspaceID } from '#lib/store.svelte.js';
 
 export const principal = {
 	list: (
@@ -19,11 +18,10 @@ export const principal = {
 				targetId: opts().targetId || '',
 				query: opts().query,
 				limit: opts().limit ?? MAX_PAGE_SIZE,
-				offset: opts().offset ?? 0,
-				workspaceId: workspaceID.current
+				offset: opts().offset ?? 0
 			}),
 			() => ({
-				enabled: !!workspaceID.current && !!opts().targetId
+				enabled: !!opts().targetId
 			})
 		),
 

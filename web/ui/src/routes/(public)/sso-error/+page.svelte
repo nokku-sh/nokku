@@ -22,9 +22,17 @@
 			description:
 				'Your workspace identity provider is not configured correctly. Contact your workspace admin.'
 		},
-		'provider discovery failed': {
+		'provider unavailable': {
 			title: 'Provider unreachable',
 			description: 'The identity provider could not be reached. Please try again later.'
+		},
+		'login refused': {
+			title: 'Sign-in not allowed',
+			description: 'This account cannot sign in here. Contact your workspace admin.'
+		},
+		'internal error': {
+			title: 'Sign-in failed',
+			description: 'Something went wrong on our side. Please try again later.'
 		},
 		'login failed': {
 			title: 'Sign-in failed',
@@ -34,32 +42,6 @@
 			title: 'Sign-in not allowed',
 			description:
 				'Your identity provider account is not set up to sign in here yet. Contact your workspace admin.'
-		},
-		'provider metadata invalid': {
-			title: 'Provider configuration error',
-			description:
-				'Your workspace identity provider is not configured correctly. Contact your workspace admin.'
-		},
-		'no SSO endpoint in metadata': {
-			title: 'Provider configuration error',
-			description:
-				'Your workspace identity provider is not configured correctly. Contact your workspace admin.'
-		},
-		'request creation failed': {
-			title: 'Sign-in failed',
-			description: 'The sign-in request could not be created. Please try again.'
-		},
-		'request signing failed': {
-			title: 'Sign-in failed',
-			description: 'The sign-in request could not be created. Please try again.'
-		},
-		'response verification failed': {
-			title: 'Could not verify your identity',
-			description: 'The identity provider response failed verification. Please try again.'
-		},
-		'assertion has no subject': {
-			title: 'Missing identity',
-			description: 'Your identity provider response did not include a user identity.'
 		},
 		unknown: {
 			title: 'Authentication failed',

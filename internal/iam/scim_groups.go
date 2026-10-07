@@ -15,12 +15,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	filter "github.com/scim2/filter-parser/v2"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
 type scimGroupHandler struct {
-	svc         *Service
-	workspaceID string
+	svc *Service
+	ws  actor.Workspace
 }
 
 func (h scimGroupHandler) tx(ctx context.Context, id string, fn func(*db.Queries) error) error {
@@ -45,14 +46,14 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 	}
 	var res scim.Resource
 	err := h.tx(r.Context(), "", func(q *db.Queries) error {
-		team, err := q.CreateTeam(r.Context(), &db.CreateTeamParams{WorkspaceID: h.workspaceID, Name: name})
+		team, err := q.CreateTeam(r.Context(), &db.CreateTeamParams{WorkspaceID: h.ws.ID, Name: name})
 		if err != nil {
 			return err
 		}
-		if err := addTeamMembers(r.Context(), q, h.workspaceID, team.ID, scimMemberRefs(attrs["members"])); err != nil {
+		if err := addTeamMembers(r.Context(), q, h.ws.ID, team.ID, scimMemberRefs(attrs["members"])); err != nil {
 			return err
 		}
-		res, err = groupResource(r.Context(), q, h.svc.baseURL, h.workspaceID, team)
+		res, err = groupResource(r.Context(), q, h.ws, team)
 		return err
 	})
 	return res, err
@@ -65,7 +66,7 @@ func (h scimGroupHandler) Get(r *http.Request, id string) (scim.Resource, error)
 		if err != nil {
 			return err
 		}
-		res, err = groupResource(r.Context(), q, h.svc.baseURL, h.workspaceID, team)
+		res, err = groupResource(r.Context(), q, h.ws, team)
 		return err
 	})
 	return res, err
@@ -74,12 +75,12 @@ func (h scimGroupHandler) Get(r *http.Request, id string) (scim.Resource, error)
 func (h scimGroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
 	var all []scim.Resource
 	err := h.tx(r.Context(), "", func(q *db.Queries) error {
-		rows, err := q.ListTeams(r.Context(), &db.ListTeamsParams{WorkspaceID: h.workspaceID})
+		rows, err := q.ListTeams(r.Context(), &db.ListTeamsParams{WorkspaceID: h.ws.ID})
 		if err != nil {
 			return err
 		}
 		for _, row := range rows {
-			res, err := groupResource(r.Context(), q, h.svc.baseURL, h.workspaceID, &row.Team)
+			res, err := groupResource(r.Context(), q, h.ws, &row.Team)
 			if err != nil {
 				return err
 			}
@@ -113,19 +114,19 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 			return err
 		}
 		for _, m := range current {
-			if !slices.Contains(next, m.UserID) {
+			if !slices.Contains(next, m.User.ID) {
 				if err := q.RemoveTeamMember(
 					ctx,
-					&db.RemoveTeamMemberParams{TeamID: id, UserID: m.UserID},
+					&db.RemoveTeamMemberParams{TeamID: id, UserID: m.User.ID},
 				); err != nil {
 					return err
 				}
 			}
 		}
-		if err := addTeamMembers(ctx, q, h.workspaceID, id, next); err != nil {
+		if err := addTeamMembers(ctx, q, h.ws.ID, id, next); err != nil {
 			return err
 		}
-		res, err = groupResource(ctx, q, h.svc.baseURL, h.workspaceID, team)
+		res, err = groupResource(ctx, q, h.ws, team)
 		return err
 	})
 	return res, err
@@ -161,7 +162,7 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 				changed = true
 				ids := scimMemberRefs(value)
 				if opName != "remove" {
-					return addTeamMembers(ctx, q, h.workspaceID, id, ids)
+					return addTeamMembers(ctx, q, h.ws.ID, id, ids)
 				}
 				if len(ids) == 0 {
 					// Okta puts the id in the path filter: members[value eq "id"].
@@ -178,7 +179,7 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 		if err != nil || !changed {
 			return err
 		}
-		res, err = groupResource(ctx, q, h.svc.baseURL, h.workspaceID, team)
+		res, err = groupResource(ctx, q, h.ws, team)
 		return err
 	})
 	return res, err
@@ -187,9 +188,9 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 // addTeamMembers skips non-members, a group never widens the workspace.
 func addTeamMembers(ctx context.Context, q *db.Queries, workspaceID, teamID string, userIDs []string) error {
 	for _, uid := range userIDs {
-		if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
+		if _, err := q.GetUser(ctx, &db.GetUserParams{
 			WorkspaceID: workspaceID,
-			UserID:      uid,
+			ID:          uid,
 		}); errors.Is(err, pgx.ErrNoRows) {
 			continue
 		} else if err != nil {
@@ -205,7 +206,7 @@ func addTeamMembers(ctx context.Context, q *db.Queries, workspaceID, teamID stri
 func groupResource(
 	ctx context.Context,
 	q *db.Queries,
-	baseURL, workspaceID string,
+	ws actor.Workspace,
 	team *db.Team,
 ) (scim.Resource, error) {
 	rows, err := q.ListTeamMembers(ctx, team.ID)
@@ -215,9 +216,9 @@ func groupResource(
 	members := make([]any, 0, len(rows))
 	for _, m := range rows {
 		members = append(members, map[string]any{
-			"value":   m.UserID,
-			"display": m.Email,
-			"$ref":    baseURL + scimMountPath + "/" + workspaceID + scimUserEndpoint + "/" + m.UserID,
+			"value":   m.User.ID,
+			"display": m.User.Email,
+			"$ref":    ws.BaseURL + scimMountPath + scimUserEndpoint + "/" + m.User.ID,
 		})
 	}
 	attrs := scim.ResourceAttributes{"members": members, "displayName": team.Name}

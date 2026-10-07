@@ -3,19 +3,25 @@ package audit
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/iam"
-	"github.com/nokku-sh/nokku/internal/util"
+	"github.com/nokku-sh/nokku/internal/realip"
 )
 
 // Record is the only audit trail for the /auth routes, so it carries the
 // transport facts too.
 func (s *Service) Record(ctx context.Context, e iam.Event) {
 	event := eventFromIAM(e)
+	event.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
+	if event.WorkspaceID == "" {
+		return
+	}
 	if meta, ok := iam.RequestMetaFromContext(ctx); ok {
-		event.IP = util.SanitizeUTF8(util.GetRemoteIP(meta.Header, meta.RemoteAddr))
-		event.UserAgent = cut(util.SanitizeUTF8(meta.Header.Get("User-Agent")), maxUserAgent)
+		event.IP = strings.ToValidUTF8(realip.Bucket(meta.Header, meta.RemoteAddr), "")
+		event.UserAgent = cut(strings.ToValidUTF8(meta.Header.Get("User-Agent"), ""), maxUserAgent)
 	}
 
 	// Detached so a slow DB cannot stall a login.
@@ -37,13 +43,12 @@ func eventFromIAM(e iam.Event) *Event {
 		details["detail"] = e.Detail
 	}
 	return &Event{
-		Timestamp:   time.Now().UTC(),
-		WorkspaceID: e.WorkspaceID,
-		Action:      string(e.Action),
-		ActorID:     e.UserID,
-		ActorKind:   string(e.Kind),
-		ActorName:   e.Email,
-		OK:          e.Action != iam.ActionLoginDenied,
-		Details:     details,
+		Timestamp: time.Now().UTC(),
+		Action:    string(e.Action),
+		ActorID:   e.UserID,
+		ActorKind: string(e.Kind),
+		ActorName: e.Email,
+		OK:        e.Action != iam.ActionLoginDenied,
+		Details:   details,
 	}
 }

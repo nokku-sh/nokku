@@ -1,25 +1,19 @@
 package email
 
-type welcomeTemplateData struct {
+type linkTemplateData struct {
 	Operator Operator
 
-	UserName        string
-	VerificationURL string
-	Expiration      string
+	LinkURL    string
+	Expiration string
 }
 
-type verificationTemplateData struct {
+type signupTemplateData struct {
 	Operator Operator
 
-	VerificationURL string
-	Expiration      string
-}
-
-type recoveryTemplateData struct {
-	Operator Operator
-
-	RecoveryURL string
-	Expiration  string
+	UserName   string
+	Workspace  string
+	LinkURL    string
+	Expiration string
 }
 
 type changeNoticeTemplateData struct {

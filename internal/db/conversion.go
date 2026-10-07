@@ -8,8 +8,6 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
-
-	"github.com/nokku-sh/nokku/internal/util"
 )
 
 func mapSlice[T, R any](in []T, fn func(T) R) []R {
@@ -48,31 +46,10 @@ func (w *Workspace) ToProto() *nokkuv1.Workspace {
 	settings.DefaultDaemonConfig = ResolveDaemonConfig(settings.GetDefaultDaemonConfig())
 	return &nokkuv1.Workspace{
 		Id:          &w.ID,
+		Slug:        &w.Slug,
 		Name:        &w.Name,
 		Description: w.Description,
 		Settings:    settings,
-		CreatedBy:   &w.CreatedBy,
-		CreatedAt:   SafeTimestamp(&w.CreatedAt),
-		UpdatedAt:   SafeTimestamp(&w.UpdatedAt),
-	}
-}
-
-func WorkspacesToProto(ws []*Workspace) []*nokkuv1.Workspace {
-	return mapSlice(
-		ws,
-		func(w *Workspace) *nokkuv1.Workspace { return w.ToProto() },
-	)
-}
-
-func (w *CreateWorkspaceRow) ToProto() *nokkuv1.Workspace {
-	if w == nil {
-		return nil
-	}
-	return &nokkuv1.Workspace{
-		Id:          &w.ID,
-		Name:        &w.Name,
-		Description: w.Description,
-		CreatedBy:   &w.CreatedBy,
 		CreatedAt:   SafeTimestamp(&w.CreatedAt),
 		UpdatedAt:   SafeTimestamp(&w.UpdatedAt),
 	}
@@ -98,15 +75,14 @@ func (r *Recording) ToProto() *nokkuv1.Recording {
 		return nil
 	}
 	return &nokkuv1.Recording{
-		Id:          &r.ID,
-		WorkspaceId: &r.WorkspaceID,
-		DaemonId:    r.DaemonID,
-		DaemonName:  &r.DaemonName,
-		Username:    &r.Username,
-		StartedAt:   SafeTimestamp(&r.StartedAt),
-		EndedAt:     SafeTimestamp(r.EndedAt),
-		SizeBytes:   &r.SizeBytes,
-		Complete:    &r.Complete,
+		Id:         &r.ID,
+		DaemonId:   r.DaemonID,
+		DaemonName: &r.DaemonName,
+		Username:   &r.Username,
+		StartedAt:  SafeTimestamp(&r.StartedAt),
+		EndedAt:    SafeTimestamp(r.EndedAt),
+		SizeBytes:  &r.SizeBytes,
+		Complete:   &r.Complete,
 	}
 }
 
@@ -116,7 +92,6 @@ func (t *Team) ToProto() *nokkuv1.Team {
 	}
 	return &nokkuv1.Team{
 		Id:          &t.ID,
-		WorkspaceId: &t.WorkspaceID,
 		Name:        &t.Name,
 		Description: t.Description,
 		Tags:        t.Tags,
@@ -135,7 +110,6 @@ func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
 	}
 	return &nokkuv1.ServiceAccount{
 		Id:          &s.ID,
-		WorkspaceId: &s.WorkspaceID,
 		Name:        &s.Name,
 		Description: s.Description,
 		RoleName:    &s.RoleName,
@@ -162,7 +136,6 @@ func (t *Target) ToProto() *nokkuv1.Target {
 	metadata := jsonMap("targets.metadata", t.Metadata)
 	return &nokkuv1.Target{
 		Id:            &t.ID,
-		WorkspaceId:   &t.WorkspaceID,
 		DaemonId:      t.DaemonID,
 		CaId:          t.CaID,
 		Description:   t.Description,
@@ -201,16 +174,23 @@ func (p *GetPrincipalsByTargetIDsRow) ToProto() *nokkuv1.Principal {
 }
 
 func (u *User) ToProto() *nokkuv1.User {
-	return &nokkuv1.User{
-		Id:                   &u.ID,
-		Name:                 &u.Name,
-		Email:                &u.Email,
-		EmailVerified:        &u.EmailVerified,
-		Picture:              u.Picture,
-		CreatedAt:            SafeTimestamp(&u.CreatedAt),
-		UpdatedAt:            SafeTimestamp(&u.UpdatedAt),
-		DisablePasswordReset: &u.DisablePasswordReset,
+	if u == nil {
+		return nil
 	}
+	return &nokkuv1.User{
+		Id:        &u.ID,
+		Name:      &u.Name,
+		Email:     &u.Email,
+		Picture:   u.Picture,
+		Role:      &u.Role,
+		Active:    &u.Active,
+		CreatedAt: SafeTimestamp(&u.CreatedAt),
+		UpdatedAt: SafeTimestamp(&u.UpdatedAt),
+	}
+}
+
+func UsersToProto(rows []*ListUsersRow) []*nokkuv1.User {
+	return mapSlice(rows, func(r *ListUsersRow) *nokkuv1.User { return r.User.ToProto() })
 }
 
 const DaemonOnlineWindow = 30 * time.Second
@@ -250,16 +230,15 @@ func (d *Daemon) ToProto() *nokkuv1.Daemon {
 	}
 	metadata := jsonMap("daemons.metadata", d.Metadata)
 	return &nokkuv1.Daemon{
-		Id:          &d.ID,
-		WorkspaceId: &d.WorkspaceID,
-		Name:        &d.Name,
-		Status:      &d.Status,
-		Config:      ResolveDaemonConfig(d.Config),
-		Online:      new(SeenRecently(d.LastSeenAt)),
-		LastSeenAt:  SafeTimestamp(d.LastSeenAt),
-		Metadata:    metadata,
-		UpdatedAt:   SafeTimestamp(&d.UpdatedAt),
-		CreatedAt:   SafeTimestamp(&d.CreatedAt),
+		Id:         &d.ID,
+		Name:       &d.Name,
+		Status:     &d.Status,
+		Config:     ResolveDaemonConfig(d.Config),
+		Online:     new(SeenRecently(d.LastSeenAt)),
+		LastSeenAt: SafeTimestamp(d.LastSeenAt),
+		Metadata:   metadata,
+		UpdatedAt:  SafeTimestamp(&d.UpdatedAt),
+		CreatedAt:  SafeTimestamp(&d.CreatedAt),
 	}
 }
 
@@ -272,12 +251,12 @@ func (r *CertificateAuthority) ToProto() *nokkuv1.CertificateAuthority {
 		return nil
 	}
 
-	extensions, err := util.ParseExtensionsMap(r.UserExtensions)
+	extensions, err := ParseExtensionsMap(r.UserExtensions)
 	if err != nil {
 		slog.Warn("failed to parse extensions", "error", err)
 		extensions = nil
 	}
-	criticalOptions, err := util.ParseCriticalOptionsMap(r.UserCriticalOptions)
+	criticalOptions, err := ParseCriticalOptionsMap(r.UserCriticalOptions)
 	if err != nil {
 		slog.Warn("failed to parse critical options", "error", err)
 		criticalOptions = nil
@@ -285,7 +264,6 @@ func (r *CertificateAuthority) ToProto() *nokkuv1.CertificateAuthority {
 
 	return &nokkuv1.CertificateAuthority{
 		Id:                   &r.ID,
-		WorkspaceId:          &r.WorkspaceID,
 		Name:                 &r.Name,
 		Description:          r.Description,
 		Certificate:          &r.Certificate,
@@ -328,7 +306,6 @@ func (r *GetCAsByIDsRow) ToProto() *nokkuv1.CertificateAuthority {
 	}
 	return &nokkuv1.CertificateAuthority{
 		Id:             &r.ID,
-		WorkspaceId:    &r.WorkspaceID,
 		Name:           &r.Name,
 		PublicKey:      &r.PublicKey,
 		IsDefault:      &r.IsDefault,

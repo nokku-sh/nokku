@@ -176,52 +176,6 @@ WHERE
       )
   );
 
--- name: GetSubjectTargetsByWorkspaces :many
--- Same grant logic as GetTargetsBySubject. The workspace set keeps a stale
--- grant elsewhere from leaking past current memberships.
-SELECT DISTINCT
-  t.*
-FROM
-  targets t
-WHERE
-  t.workspace_id = ANY (sqlc.arg('workspace_ids')::UUID[])
-  AND (
-    t.daemon_id = sqlc.arg('subject_id')::UUID
-    OR EXISTS (
-      SELECT
-        1
-      FROM
-        principals p
-      WHERE
-        p.target_id = t.id
-        AND EXISTS (
-          SELECT
-            1
-          FROM
-            principal_grants g
-          WHERE
-            g.principal_id = p.id
-            AND (
-              g.subject_id = sqlc.arg('subject_id')::UUID
-              OR (
-                g.subject_kind = 'team'
-                AND g.subject_id IN (
-                  SELECT
-                    tm.team_id
-                  FROM
-                    team_members tm
-                  WHERE
-                    tm.user_id = sqlc.arg('subject_id')::UUID
-                )
-              )
-            )
-        )
-    )
-  )
-ORDER BY
-  t.workspace_id,
-  t.name;
-
 -- name: GetWorkspaceTags :many
 SELECT DISTINCT
   unnest(tags)::TEXT AS tag

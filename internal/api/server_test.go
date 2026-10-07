@@ -21,9 +21,8 @@ import (
 func TestRequestSizeLimit(t *testing.T) {
 	_, srv := newTestAPI(t)
 	_, err := nokkuv1connect.NewAuthServiceClient(srv.Client(), srv.URL).
-		Login(t.Context(), &nokkuv1.LoginRequest{
-			Email:    new("user@api.test"),
-			Password: new(strings.Repeat("x", maxMessageBytes+1)),
+		ConsumeMagicLink(t.Context(), &nokkuv1.ConsumeMagicLinkRequest{
+			Token: new(strings.Repeat("x", maxMessageBytes+1)),
 		})
 	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err), "got %v", err)
 }
@@ -50,18 +49,13 @@ func TestWorkspaceHidesWebhookFromMembers(t *testing.T) {
 	}
 
 	for _, role := range []db.Role{db.RoleMember, db.RoleEditor} {
-		got, err := client(role).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{WorkspaceId: &workspaceID})
+		got, err := client(role).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
 		require.NoError(t, err)
 		assert.Empty(t, got.GetWorkspace().GetSettings().GetAuditWebhookSecret(), "%s reads the secret", role)
 		assert.Empty(t, got.GetWorkspace().GetSettings().GetAuditWebhookUrl(), "%s reads the url", role)
-
-		list, err := client(role).ListWorkspaces(t.Context(), &nokkuv1.ListWorkspacesRequest{})
-		require.NoError(t, err)
-		require.Len(t, list.GetWorkspaces(), 1)
-		assert.Empty(t, list.GetWorkspaces()[0].GetSettings().GetAuditWebhookSecret(), "%s lists the secret", role)
 	}
 
-	got, err := client(db.RoleAdmin).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{WorkspaceId: &workspaceID})
+	got, err := client(db.RoleAdmin).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
 	require.NoError(t, err)
 	assert.Equal(t, "s3cret", got.GetWorkspace().GetSettings().GetAuditWebhookSecret())
 	assert.True(t,
@@ -73,9 +67,9 @@ func TestWorkspaceHidesWebhookFromMembers(t *testing.T) {
 func TestPlainJSONCall(t *testing.T) {
 	_, srv := newTestAPI(t)
 	resp, err := srv.Client().Post(
-		srv.URL+nokkuv1connect.AuthServiceLoginProcedure,
+		srv.URL+nokkuv1connect.AuthServiceConsumeMagicLinkProcedure,
 		"application/json",
-		strings.NewReader(`{"email":"nobody@api.test","password":"wrong-password"}`),
+		strings.NewReader(`{"token":"not-a-link"}`),
 	)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

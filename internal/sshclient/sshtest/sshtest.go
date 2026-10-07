@@ -22,7 +22,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkussh "github.com/nokku-sh/nokku/internal/ssh"
-	"github.com/nokku-sh/nokku/internal/util"
 )
 
 type Server struct {
@@ -80,8 +79,8 @@ func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
 		CertType:        ssh.HostCert,
 		KeyId:           "sshtest-host",
 		ValidPrincipals: []string{hostPrincipal},
-		ValidAfter:      util.UnixTimeToUint64(time.Now().Add(-time.Minute).Unix()),
-		ValidBefore:     util.UnixTimeToUint64(time.Now().Add(time.Hour).Unix()),
+		ValidAfter:      nokkussh.UnixUint64(time.Now().Add(-time.Minute).Unix()),
+		ValidBefore:     nokkussh.UnixUint64(time.Now().Add(time.Hour).Unix()),
 	}
 	if err := hostCert.SignCert(crand.Reader, caSigner); err != nil {
 		t.Fatalf("sign host cert: %v", err)
@@ -171,8 +170,8 @@ func (s *Server) UserSigner(t testing.TB, subject, username string) ssh.Signer {
 		CertType:        ssh.UserCert,
 		KeyId:           "sshtest-user",
 		ValidPrincipals: []string{nokkussh.LoginPrincipal(subject, s.HostPrincipal, username)},
-		ValidAfter:      util.UnixTimeToUint64(time.Now().Add(-time.Minute).Unix()),
-		ValidBefore:     util.UnixTimeToUint64(time.Now().Add(time.Hour).Unix()),
+		ValidAfter:      nokkussh.UnixUint64(time.Now().Add(-time.Minute).Unix()),
+		ValidBefore:     nokkussh.UnixUint64(time.Now().Add(time.Hour).Unix()),
 		Extensions: map[string]string{
 			"permit-pty":              "",
 			"permit-port-forwarding":  "",

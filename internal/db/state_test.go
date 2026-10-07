@@ -37,10 +37,9 @@ func newStateFixture(t *testing.T, c *Connection) stateFixture {
 	// The simple protocol substitutes arguments client-side, which allows
 	// several statements in one Exec.
 	_, err := c.sysPool.Exec(t.Context(), `
-		INSERT INTO users (id, email) VALUES ($2, $2 || '@test'), ($3, $3 || '@test');
-		INSERT INTO workspaces (id, name, created_by) VALUES ($1, 'ws', $2);
-		INSERT INTO workspace_members (workspace_id, user_id, role_name)
-		VALUES ($1, $2, 'owner'), ($1, $3, 'viewer');
+		INSERT INTO workspaces (id, slug, name) VALUES ($1, $1, 'ws');
+		INSERT INTO users (id, workspace_id, email, role)
+		VALUES ($2, $1, $2 || '@test', 'owner'), ($3, $1, $3 || '@test', 'viewer');
 		INSERT INTO teams (id, workspace_id, name) VALUES ($4, $1, 'team');
 		INSERT INTO team_members (workspace_id, user_id, team_id) VALUES ($1, $3, $4);
 		INSERT INTO daemons (id, workspace_id, name, status) VALUES ($5, $1, 'd', 2);
@@ -93,8 +92,8 @@ func grantedIDs(t *testing.T, c *Connection, target string) []string {
 // asOwner runs fn the way API handlers do: nokku_app, pinned to the workspace.
 func asOwner(t *testing.T, c *Connection, f stateFixture, fn func(*Queries) error) {
 	t.Helper()
-	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: f.owner, Kind: actor.KindUser})
-	ctx = actor.AnnotateTenant(ctx, f.ws)
+	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: f.owner, Kind: actor.KindUser, Role: "owner"})
+	ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: f.ws})
 	if err := c.WithWorkspace(ctx, fn); err != nil {
 		t.Fatalf("workspace tx: %v", err)
 	}
@@ -148,14 +147,14 @@ func TestStateVersionBumpsOnAccessChanges(t *testing.T) {
 
 	before = stateVersion(t, c, f.ws)
 	asOwner(t, c, f, func(q *Queries) error {
-		return q.RemoveWorkspaceMember(t.Context(), &RemoveWorkspaceMemberParams{WorkspaceID: f.ws, UserID: f.u})
+		return q.DeleteUser(t.Context(), &DeleteUserParams{WorkspaceID: f.ws, ID: f.u})
 	})
 	waitNotify(t, conn, f.ws)
 	if after := stateVersion(t, c, f.ws); after <= before {
-		t.Fatalf("member removal: version %d -> %d, want a bump", before, after)
+		t.Fatalf("user removal: version %d -> %d, want a bump", before, after)
 	}
 	if got := grantedIDs(t, c, f.target); len(got) != 0 {
-		t.Fatalf("removed member still granted: %v", got)
+		t.Fatalf("removed user still granted: %v", got)
 	}
 }
 
@@ -167,7 +166,8 @@ func TestDeactivatedUserLosesAccess(t *testing.T) {
 	conn := listen(t, c)
 
 	setActive := func(active bool) {
-		if _, err := c.Sys().UpdateUser(t.Context(), &UpdateUserParams{ID: f.u, Active: &active}); err != nil {
+		if err := c.Sys().
+			SetUserActive(t.Context(), &SetUserActiveParams{WorkspaceID: f.ws, ID: f.u, Active: active}); err != nil {
 			t.Fatalf("set active=%v: %v", active, err)
 		}
 	}

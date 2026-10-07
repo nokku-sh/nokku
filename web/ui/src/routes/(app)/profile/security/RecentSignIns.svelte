@@ -4,33 +4,34 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
-	import { AuditOutcome } from '#lib/gen/nokku/v1/util_pb.js';
 	import { formatTs } from '#lib/utils.js';
 	import { MonitorSmartphone } from '@lucide/svelte';
 
 	const me = user.self();
 
-	const recentSignIns = user.activity(() => ({
-		enabled: !!me.data?.id,
-		limit: 5,
-		filter: { actions: ['Login', 'LoginDenied'], outcome: AuditOutcome.UNSPECIFIED }
-	}));
+	// The first page of the personal log holds the recent sign-ins.
+	const feed = user.activityFeed(() => !!me.data?.id);
+	const signIns = $derived(
+		(feed.data?.pages[0]?.logs ?? [])
+			.filter((e) => e.action === 'Login' || e.action === 'LoginDenied')
+			.slice(0, 5)
+	);
 </script>
 
 <Card.Root>
 	<Card.Header>
 		<Card.Title>Recent sign-ins</Card.Title>
-		<Card.Description>The last five attempts on your account.</Card.Description>
+		<Card.Description>The latest attempts on your account.</Card.Description>
 		<Card.Action>
 			<Button size="sm" variant="ghost" href="/profile/activity?view=signins">View all</Button>
 		</Card.Action>
 	</Card.Header>
 	<Card.Content>
-		{#if recentSignIns.isLoading}
+		{#if feed.isLoading}
 			<Skeleton class="h-24 w-full" />
-		{:else if recentSignIns.data?.logs.length}
+		{:else if signIns.length}
 			<div class="divide-y overflow-hidden rounded-lg border">
-				{#each recentSignIns.data.logs as e (e.id)}
+				{#each signIns as e (e.id)}
 					<EventRow
 						log={e}
 						title={e.ok ? 'Signed in' : 'Sign-in denied'}

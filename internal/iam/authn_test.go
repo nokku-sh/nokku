@@ -1,7 +1,6 @@
 package iam
 
 import (
-	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -17,6 +16,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/cryptosigner"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/cache"
 )
 
@@ -115,9 +115,10 @@ func TestVerifySessionProof(t *testing.T) {
 		binding   = "test-jkt"
 	)
 	now := time.Unix(1_800_000_000, 0)
-	svc := &Service{baseURL: "https://nokku.example.com"}
+	svc := &Service{}
 	svc.DPoP = newTestVerifier(t, func() time.Time { return now })
-	htu := svc.baseURL + procedure
+	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws", BaseURL: "https://nokku.example.com"})
+	htu := "https://nokku.example.com" + procedure
 
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -129,7 +130,7 @@ func TestVerifySessionProof(t *testing.T) {
 		header := http.Header{}
 		header.Set("Authorization", "DPoP "+token)
 		header.Set("DPoP", proof)
-		err := svc.verifySessionProof(context.Background(), header, procedure, token, binding)
+		err := svc.verifySessionProof(ctx, header, procedure, token, binding)
 		// The jkt mismatch is expected (the binding is a fixture value);
 		// anything but a binding mismatch means the proof itself failed.
 		if err == nil {
@@ -152,7 +153,7 @@ func TestVerifySessionProof(t *testing.T) {
 		proof := signProof(t, key, htu, DPoPATH(token), svc.DPoP.CurrentNonce(), now)
 		header := http.Header{}
 		header.Set("DPoP", proof)
-		if err := svc.verifySessionProof(context.Background(), header, procedure, token, realBinding); err != nil {
+		if err := svc.verifySessionProof(ctx, header, procedure, token, realBinding); err != nil {
 			t.Fatalf("verifySessionProof() = %v, want nil", err)
 		}
 	})
@@ -160,7 +161,7 @@ func TestVerifySessionProof(t *testing.T) {
 	t.Run("missing proof is ErrDPoPRequired", func(t *testing.T) {
 		header := http.Header{}
 		header.Set("Authorization", "DPoP "+token)
-		err := svc.verifySessionProof(context.Background(), header, procedure, token, binding)
+		err := svc.verifySessionProof(ctx, header, procedure, token, binding)
 		if err == nil || !errors.Is(err, ErrDPoPRequired) {
 			t.Fatalf("verifySessionProof() = %v, want ErrDPoPRequired", err)
 		}
@@ -170,7 +171,7 @@ func TestVerifySessionProof(t *testing.T) {
 		proof := signProof(t, key, htu, DPoPATH(token), "stale-nonce", now)
 		header := http.Header{}
 		header.Set("DPoP", proof)
-		err := svc.verifySessionProof(context.Background(), header, procedure, token, binding)
+		err := svc.verifySessionProof(ctx, header, procedure, token, binding)
 		if err == nil || !strings.Contains(err.Error(), "dpop nonce required") {
 			t.Fatalf("verifySessionProof() = %v, want ErrDPoPNonce", err)
 		}
@@ -211,16 +212,17 @@ func TestSameHTU(t *testing.T) {
 
 func TestAdvertiseDPoPNonce(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
-	svc := &Service{baseURL: "https://nokku.example.com"}
+	svc := &Service{}
 	svc.DPoP = newTestVerifier(t, func() time.Time { return now })
+	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws", BaseURL: "https://acme.nokku.example"})
 
-	t.Run("sets nonce and canonical url", func(t *testing.T) {
+	t.Run("sets nonce and the workspace url", func(t *testing.T) {
 		header := http.Header{}
-		svc.AdvertiseDPoPNonce(header)
+		svc.AdvertiseDPoPNonce(ctx, header)
 		if header.Get("DPoP-Nonce") != svc.DPoP.CurrentNonce() {
 			t.Error("AdvertiseDPoPNonce did not set the DPoP-Nonce header")
 		}
-		if header.Get(deviceURLHeader) != svc.baseURL {
+		if header.Get(deviceURLHeader) != "https://acme.nokku.example" {
 			t.Error("AdvertiseDPoPNonce did not set the canonical URL header")
 		}
 	})

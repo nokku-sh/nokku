@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -17,10 +16,8 @@ import (
 )
 
 var (
-	ErrNoActor                = errors.New("no actor in context")
-	ErrWorkspaceNotAccessible = errors.New("workspace is not accessible to actor")
-	ErrPermissionDenied       = errors.New("missing required permission")
-	ErrWorkspaceNotPinned     = errors.New("operation requires a workspace context")
+	ErrPermissionDenied   = errors.New("missing required permission")
+	ErrWorkspaceNotPinned = errors.New("no workspace on the request")
 )
 
 type Connection struct {
@@ -213,9 +210,8 @@ func withTx(
 
 // Pick the scope by what the query may see, never by convenience:
 //
-//	WithWorkspace  tenant rows, pinned to the request's workspace
-//	WithActor      the request's own rows, no tenant pinned
-//	WithTx         every tenant, RLS bypassed
+//	WithWorkspace  tenant rows of the request's workspace, RLS enforced
+//	WithTx         every tenant, RLS bypassed, only boot, signup, webhooks and jobs
 //	Sys            WithTx for a single statement
 
 // WithTx bypasses RLS, only cross-tenant work belongs here.
@@ -228,91 +224,18 @@ func (c *Connection) WithTx(
 	})
 }
 
+// WithWorkspace pins the transaction to the workspace on the context. The
+// tenant middleware put it there, so a request without one fails closed.
 func (c *Connection) WithWorkspace(
 	ctx context.Context,
 	fn func(*Queries) error,
 ) error {
-	return withTx(ctx, c.Pool, func(ctx context.Context, tx pgx.Tx, q *Queries) error {
-		principal, ok := actor.PrincipalFromContext(ctx)
-		if !ok || principal.ID == "" {
-			return ErrNoActor
-		}
-
-		// Authorization already verified the membership.
-		if pinned := actor.WorkspaceIDFromContext(ctx); pinned != "" && actor.MemberOf(ctx) == pinned {
-			if _, err := tx.Exec(
-				ctx,
-				`SELECT
-					set_config('nokku.actor_id', $1, true),
-					set_config('nokku.workspace_id', $2, true)
-				`,
-				principal.ID,
-				pinned,
-			); err != nil {
-				return err
-			}
-			return fn(q)
-		}
-
-		// Membership lookup must see every workspace, so it runs as
-		// nokku_system and drops to nokku_app before any caller query.
-		// Transaction-local GUCs survive the role switch.
-		if _, err := tx.Exec(
-			ctx,
-			`SELECT
-				set_config('role', 'nokku_system', true),
-				set_config('nokku.actor_id', $1, true)
-			`,
-			principal.ID,
-		); err != nil {
-			return err
-		}
-
-		wsIDs, err := q.GetActorWorkspaceIDs(ctx, principal.ID)
-		if err != nil {
-			return err
-		}
-
-		workspaceID := ""
-		if pinned := actor.WorkspaceIDFromContext(ctx); pinned != "" {
-			if !slices.Contains(wsIDs, pinned) {
-				return ErrWorkspaceNotAccessible
-			}
-			workspaceID = pinned
-		} else if len(wsIDs) == 1 {
-			workspaceID = wsIDs[0]
-		}
-
-		if _, err := tx.Exec(
-			ctx,
-			`SELECT
-				set_config('nokku.workspace_id', $1, true),
-				set_config('role', 'nokku_app', true)
-			`,
-			workspaceID,
-		); err != nil {
-			return err
-		}
-		return fn(q)
-	})
-}
-
-// WithActor stays nokku_app the whole time, so every query is RLS-filtered.
-func (c *Connection) WithActor(
-	ctx context.Context,
-	actorID string,
-	fn func(*Queries) error,
-) error {
-	if actorID == "" {
-		return ErrNoActor
+	ws := actor.WorkspaceIDFromContext(ctx)
+	if ws == "" {
+		return ErrWorkspaceNotPinned
 	}
-
 	return withTx(ctx, c.Pool, func(ctx context.Context, tx pgx.Tx, q *Queries) error {
-		if _, err := tx.Exec(
-			ctx,
-			`SELECT set_config('nokku.actor_id', $1, true)`,
-			actorID,
-		); err != nil {
+		if _, err := tx.Exec(ctx, `SELECT set_config('nokku.workspace_id', $1, true)`, ws); err != nil {
 			return err
 		}
 		return fn(q)

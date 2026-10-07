@@ -179,7 +179,12 @@ func TestUploadRecordingIsClosedWhenStorageFails(t *testing.T) {
 		_, err := os.Stat(dir)
 		return err == nil
 	}, 5*time.Second, 20*time.Millisecond, "the upload never opened its object")
-	require.NoError(t, os.RemoveAll(dir))
+	// The upload keeps writing while the directory goes, so this may need
+	// another go. A file in its place keeps it from coming back.
+	require.Eventually(t, func() bool { return os.RemoveAll(dir) == nil },
+		5*time.Second, 20*time.Millisecond, "the storage directory would not go")
+	require.NoError(t, os.WriteFile(dir, nil, 0o600))
+	t.Cleanup(func() { _ = os.Remove(dir) })
 
 	_, err := stream.CloseAndReceive()
 	assert.Equal(t, connect.CodeInternal, connect.CodeOf(err), "an upload storage could not keep, got %v", err)
@@ -200,9 +205,15 @@ func (cappedStorage) RecordingStorageBytes(context.Context, string) (int64, erro
 	return testStorageCap, nil
 }
 
-// capStorage runs the test server with that cap.
+// capStorage runs the test server with that cap. Recordings of earlier
+// tests would fill it, so they go first.
 func capStorage(t *testing.T, cfg *config.Config) {
 	t.Helper()
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	_, err = owner.Exec(t.Context(), "DELETE FROM recordings")
+	require.NoError(t, err)
+	require.NoError(t, owner.Close(t.Context()))
 	uncapped := cfg.Record
 	cfg.Record = recording.New(t.Context(), cfg.Conn, cfg.Storage, cappedStorage{cfg.Entitlements}, cfg.Audit)
 	t.Cleanup(func() { cfg.Record = uncapped })
@@ -249,7 +260,7 @@ func TestRecordingStorageCap(t *testing.T) {
 	_, err := stored(old)
 	require.ErrorIs(t, err, pgx.ErrNoRows, "the old recording makes room")
 	events, err := cfg.Conn.Sys().ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
-		WorkspaceID: &workspaceID,
+		WorkspaceID: workspaceID,
 		Actions:     []string{"RecordingEvicted"},
 		Limit:       10,
 	})

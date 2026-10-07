@@ -83,3 +83,25 @@ WHERE
   )
 RETURNING
   *;
+
+-- name: RedeemTokenByID :one
+-- For a signup whose invite link was checked earlier. The mailed link or
+-- the passkey ceremony is the proof by then.
+UPDATE workspace_tokens
+SET
+  uses = uses + 1,
+  last_used_at = NOW()
+WHERE
+  workspace_id = @workspace_id
+  AND id = @id
+  AND kind = @kind
+  AND (
+    expires_at IS NULL
+    OR expires_at > NOW()
+  )
+  AND (
+    max_uses IS NULL
+    OR uses < max_uses
+  )
+RETURNING
+  *;

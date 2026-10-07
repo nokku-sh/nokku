@@ -1,42 +1,41 @@
 <script lang="ts">
-	import { backupCode, passkey } from '#lib/api/credential.svelte.js';
-	import { user } from '#lib/api/user.svelte.js';
+	import { credentials } from '#lib/api/credential.svelte.js';
+	import { session } from '#lib/api/session.svelte.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { Progress } from '#lib/components/ui/progress/index.js';
 	import { Check, CircleAlert } from '@lucide/svelte';
 
-	const me = user.self();
+	const creds = credentials.all();
+	const sessions = session.list();
 
-	const passkeys = passkey.list();
-
-	const codes = backupCode.list();
-
-	const passkeyCount = $derived(passkeys.data?.length ?? 0);
-
-	const codeCount = $derived(codes.data?.length ?? 0);
+	const passkeyCount = $derived((creds.data ?? []).filter((c) => c.type === 'passkey').length);
+	const linkCount = $derived((creds.data ?? []).filter((c) => c.type === 'oidc').length);
+	const strangers = $derived((sessions.data ?? []).filter((s) => !s.current).length);
 
 	const checks = $derived([
 		{
 			done: passkeyCount > 0,
 			label: 'Add a passkey',
 			doneLabel: `${passkeyCount} ${passkeyCount === 1 ? 'passkey' : 'passkeys'}`,
-			hint: 'Phishing proof, and faster than a password.',
+			hint: 'Phishing proof, and no link to wait for.',
 			href: '#sign-in'
 		},
 		{
-			done: codeCount > 0,
-			label: 'Create backup codes',
-			doneLabel: `${codeCount} backup codes left`,
-			hint: 'Your way back in if you lose every device.',
-			href: '#recovery'
+			done: passkeyCount + linkCount > 1,
+			label: 'Add a second way in',
+			doneLabel: 'Two or more ways in',
+			hint: 'Losing one device never locks you out.',
+			href: '#sign-in'
 		},
 		{
-			done: !!me.data?.emailVerified,
-			label: 'Verify your email',
-			doneLabel: 'Email verified',
-			hint: 'Needed for password resets and important notices.',
-			href: '/profile'
+			done: strangers === 0,
+			label: 'Review signed-in devices',
+			doneLabel: 'Only this device',
+			hint: strangers
+				? `${strangers} other ${strangers === 1 ? 'device is' : 'devices are'} signed in.`
+				: 'Sign out what you do not recognize.',
+			href: '#sessions'
 		}
 	]);
 

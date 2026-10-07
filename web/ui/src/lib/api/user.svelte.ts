@@ -1,39 +1,15 @@
-import { MAX_PAGE_SIZE } from '#lib/config.js';
 import { createInfiniteQuery, createMutation, createQuery } from '@tanstack/svelte-query';
 import { callUnaryMethod } from '@connectrpc/connect-query-core';
-import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import { goto } from '$app/navigation';
 import { toast } from 'svelte-sonner';
 import { queryClient } from './client';
-import { account, type AccountCredential } from './account';
-import { useQuery, useTransport } from '#lib/query/index.js';
-import { cleanFilters, type AuditFilter, type AuditQuery } from './workspaces.svelte';
-import { UtilService, type ListAuditLogsResponse } from '#lib/gen/nokku/v1/util_pb.js';
+import { account } from './account';
+import { useTransport } from '#lib/query/index.js';
+import { UtilService, type ListMyActivityResponse } from '#lib/gen/nokku/v1/util_pb.js';
 import type { User } from '#lib/gen/nokku/v1/account_pb.js';
 
 const invalidateAccount = () => queryClient.invalidateQueries({ queryKey: ['account'] });
 
 const FEED_PAGE = 25;
-
-const identityTypes = ['oidc', 'oauth2', 'saml'];
-
-export interface LinkedAccount {
-	providerId: string;
-	provider: string;
-	protocol: string;
-	createdAt?: Timestamp;
-	lastUsedAt?: Timestamp;
-}
-
-function toLinkedAccount(c: AccountCredential): LinkedAccount {
-	return {
-		providerId: c.subject ?? '',
-		provider: c.provider ?? '',
-		protocol: c.type,
-		createdAt: c.createdAt,
-		lastUsedAt: c.lastUsedAt
-	};
-}
 
 export const user = {
 	self: () =>
@@ -41,68 +17,36 @@ export const user = {
 			queryKey: ['account'],
 			queryFn: () => account.user()
 		})),
-	listLinkedAccounts: () =>
-		createQuery<LinkedAccount[]>(() => ({
-			queryKey: ['account', 'credentials', 'linked'],
-			queryFn: async () => {
-				const credentials = await account.credentials();
-				return credentials.filter((c) => identityTypes.includes(c.type)).map(toLinkedAccount);
-			}
-		})),
-	// The personal log is always the caller's own, across workspaces.
-	activity: (opts: () => AuditQuery & { enabled: boolean }) =>
-		useQuery(
-			UtilService.method.listAuditLogs,
-			() => {
-				const { filter, limit, offset } = opts();
-				return {
-					// Empty opts out of the workspace interceptor, a personal read.
-					workspaceId: '',
-					limit: limit ?? MAX_PAGE_SIZE,
-					offset: offset ?? 0,
-					filter: cleanFilters(filter) as AuditFilter
-				};
-			},
-			() => ({ enabled: opts().enabled })
-		),
 
-	// Pages by offset for "Load more". The key is plain strings, timestamps
-	// hold bigints that can't be hashed into a query key.
-	activityFeed: (opts: () => { enabled: boolean; filter: AuditFilter; key: string[] }) => {
+	// The caller's own events, newest first. Pages by offset for "Load more".
+	activityFeed: (enabled: () => boolean) => {
 		const transport = useTransport();
 		return createInfiniteQuery(() => ({
-			queryKey: ['account', 'activity', ...opts().key],
+			queryKey: ['account', 'activity'],
 			queryFn: ({ pageParam }: { pageParam: number }) =>
-				callUnaryMethod(transport, UtilService.method.listAuditLogs, {
-					workspaceId: '',
+				callUnaryMethod(transport, UtilService.method.listMyActivity, {
 					limit: FEED_PAGE,
-					offset: pageParam,
-					filter: cleanFilters(opts().filter) as AuditFilter
+					offset: pageParam
 				}),
 			initialPageParam: 0,
-			getNextPageParam: (last: ListAuditLogsResponse, pages: ListAuditLogsResponse[]) => {
+			getNextPageParam: (last: ListMyActivityResponse, pages: ListMyActivityResponse[]) => {
 				const loaded = pages.reduce((n, p) => n + p.logs.length, 0);
 				return loaded < last.total ? loaded : undefined;
 			},
-			enabled: opts().enabled
+			enabled: enabled()
 		}));
 	},
 
 	updateProfile: () =>
-		createMutation<User, Error, { name?: string; picture?: string; email?: string }>(() => ({
-			mutationFn: (variables) =>
-				account.update({
-					displayName: variables.name,
-					picture: variables.picture
-				}),
+		createMutation<User, Error, { name?: string; picture?: string }>(() => ({
+			mutationFn: (variables) => account.update(variables),
 			onSuccess: (updated) => {
 				queryClient.setQueryData(['account'], updated);
 			}
 		})),
 	requestEmailChange: () =>
-		createMutation<void, Error, { newEmail: string; currentPassword: string }>(() => ({
-			mutationFn: ({ newEmail, currentPassword }) =>
-				account.requestEmailChange(newEmail, currentPassword),
+		createMutation<void, Error, { newEmail: string }>(() => ({
+			mutationFn: ({ newEmail }) => account.requestEmailChange(newEmail),
 			onSuccess: invalidateAccount
 		})),
 	deleteAccount: () =>
@@ -111,21 +55,8 @@ export const user = {
 			onSuccess: () => {
 				void queryClient.cancelQueries();
 				queryClient.clear();
-				void goto('/login');
-				toast.success('Account deleted, bye 👋');
-			}
-		})),
-	unlinkAccount: () =>
-		createMutation<void, Error, { provider: string }>(() => ({
-			mutationFn: ({ provider }) => account.removeIdentity(provider),
-			onSuccess: invalidateAccount
-		})),
-	setEmailRecovery: () =>
-		createMutation<User, Error, { enable: boolean }>(() => ({
-			mutationFn: ({ enable }) => account.update({ disablePasswordReset: !enable }),
-			onSuccess: (updated) => {
-				queryClient.setQueryData(['account'], updated);
-				toast.success(`Email recovery ${updated.disablePasswordReset ? 'disabled' : 'enabled'}`);
+				toast.success('Account deleted, bye');
+				window.location.assign('/login');
 			}
 		}))
 };

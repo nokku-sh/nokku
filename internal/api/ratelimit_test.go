@@ -17,10 +17,8 @@ func TestRateLimited(t *testing.T) {
 		want bool
 	}{
 		{"/nokku.v1.UtilService/Whoami", true},
-		{"/nokku.v1.AuthService/Login", true},
-		{"/oauth/login", true},
+		{"/nokku.v1.AuthService/RequestMagicLink", true},
 		{"/oidc/callback", true},
-		{"/saml/acs", true},
 		{"/scim/v2/ws/Users", true},
 		{"/passkey/login/begin", true},
 		{"/auth/device", true},
@@ -66,12 +64,22 @@ func TestWithRateLimit(t *testing.T) {
 
 	const office, other = "203.0.113.7:4000", "203.0.113.8:4000"
 	for i := range authPerMinute {
-		require.Equal(t, http.StatusNoContent, call("/nokku.v1.AuthService/Login", office), "login %d", i+1)
+		require.Equal(t, http.StatusNoContent, call("/nokku.v1.AuthService/RequestMagicLink", office), "login %d", i+1)
 	}
-	assert.Equal(t, http.StatusTooManyRequests, call("/nokku.v1.AuthService/Login", office), "one past the auth limit")
+	assert.Equal(
+		t,
+		http.StatusTooManyRequests,
+		call("/nokku.v1.AuthService/RequestMagicLink", office),
+		"one past the auth limit",
+	)
 	assert.Equal(t, http.StatusNoContent, call("/nokku.v1.TargetService/ListTargets", office),
 		"the rest of the API has its own budget")
-	assert.Equal(t, http.StatusNoContent, call("/nokku.v1.AuthService/Login", other), "another address is not affected")
+	assert.Equal(
+		t,
+		http.StatusNoContent,
+		call("/nokku.v1.AuthService/RequestMagicLink", other),
+		"another address is not affected",
+	)
 	assert.Equal(t, http.StatusNoContent, call("/nokku.v1.DaemonControlService/Connect", office),
 		"daemon streams are never limited")
 }
@@ -106,19 +114,20 @@ func TestIsAuthRoute(t *testing.T) {
 		path string
 		want bool
 	}{
-		// The pre-session AuthService gets the strict brute-force limit.
-		{"/nokku.v1.AuthService/Login", true},
-		{"/nokku.v1.AuthService/Register", true},
-		{"/nokku.v1.AuthService/DiscoverSSO", true},
+		// Everything that mints or spends a link gets the strict limit.
+		{"/nokku.v1.AuthService/RequestMagicLink", true},
+		{"/nokku.v1.AuthService/ConsumeMagicLink", true},
+		{"/nokku.v1.InvitationService/AcceptInvitation", true},
+		{"/nokku.v1.WorkspaceService/CreateWorkspace", true},
 
 		// Other RPCs stay on the general limit.
 		{"/nokku.v1.AccountService/GetAccount", false},
+		{"/nokku.v1.WorkspaceService/GetWorkspace", false},
 
-		// The legacy HTTP auth mounts keep the strict limit.
+		// The HTTP auth mounts keep the strict limit.
 		{"/auth/device", true},
 		{"/passkey/login/begin", true},
 		{"/oidc/login", true},
-		{"/saml/acs", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {

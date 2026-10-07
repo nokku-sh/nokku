@@ -20,7 +20,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/util.proto.
  */
 export const file_nokku_v1_util: GenFile = /*@__PURE__*/
-  fileDesc("ChNub2trdS92MS91dGlsLnByb3RvEghub2trdS52MSITChFHZXRWZXJzaW9uUmVxdWVzdCIlChJHZXRWZXJzaW9uUmVzcG9uc2USDwoHdmVyc2lvbhgBIAEoCSIYChZHZXRJbnN0YW5jZUluZm9SZXF1ZXN0IpkBChdHZXRJbnN0YW5jZUluZm9SZXNwb25zZRIVCg1vcGVyYXRvcl9uYW1lGAEgASgJEhUKDXN1cHBvcnRfZW1haWwYAiABKAkSEwoLd2Vic2l0ZV91cmwYAyABKAkSEQoJdGVybXNfdXJsGAQgASgJEhMKC3ByaXZhY3lfdXJsGAUgASgJEhMKC2ltcHJpbnRfdXJsGAYgASgJIg8KDVdob2FtaVJlcXVlc3QizAEKDldob2FtaVJlc3BvbnNlEgwKBGtpbmQYASABKAkSEgoKc3ViamVjdF9pZBgCIAEoCRIPCgd1c2VyX2lkGAMgASgJEhQKDHdvcmtzcGFjZV9pZBgEIAEoCRIcCgR1c2VyGAUgASgLMg4ubm9ra3UudjEuVXNlchIxCg9zZXJ2aWNlX2FjY291bnQYBiABKAsyGC5ub2trdS52MS5TZXJ2aWNlQWNjb3VudBIgCgZkYWVtb24YByABKAsyEC5ub2trdS52MS5EYWVtb24iKQoEUm9sZRIMCgRuYW1lGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJIhIKEExpc3RSb2xlc1JlcXVlc3QiMgoRTGlzdFJvbGVzUmVzcG9uc2USHQoFcm9sZXMYASADKAsyDi5ub2trdS52MS5Sb2xlIosCCghFdmVudExvZxIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSEAoIYWN0b3JfaWQYAyABKAkSEgoKYWN0b3Jfa2luZBgEIAEoCRISCgphY3Rvcl9uYW1lGAUgASgJEg4KBmFjdGlvbhgGIAEoCRIOCgZ0YXJnZXQYByABKAkSCgoCb2sYCCABKAgSCgoCaXAYCSABKAkSEgoKdXNlcl9hZ2VudBgKIAEoCRIoCgdkZXRhaWxzGAsgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBItCgl0aW1lc3RhbXAYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIokCCg5BdWRpdExvZ0ZpbHRlchIOCgZzZWFyY2gYASABKAkSIAoJYWN0b3JfaWRzGAIgAygJQg26SAqSAQciBXIDsAEBEhMKC2FjdG9yX2tpbmRzGAMgAygJEg8KB2FjdGlvbnMYBCADKAkSDgoGdGFyZ2V0GAUgASgJEjEKB291dGNvbWUYBiABKA4yFi5ub2trdS52MS5BdWRpdE91dGNvbWVCCLpIBYIBAhABEi4KCnN0YXJ0X2RhdGUYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZF9kYXRlGAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKJAQoUTGlzdEF1ZGl0TG9nc1JlcXVlc3QSFAoMd29ya3NwYWNlX2lkGAEgASgJEhgKBWxpbWl0GAIgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAMgASgFQge6SAQaAigAEigKBmZpbHRlchgEIAEoCzIYLm5va2t1LnYxLkF1ZGl0TG9nRmlsdGVyImAKFUxpc3RBdWRpdExvZ3NSZXNwb25zZRIgCgRsb2dzGAEgAygLMhIubm9ra3UudjEuRXZlbnRMb2cSDQoFdG90YWwYAiABKAUSFgoOcmV0ZW50aW9uX2RheXMYAyABKAUi3gEKFkV4cG9ydEF1ZGl0TG9nc1JlcXVlc3QSFAoMd29ya3NwYWNlX2lkGAEgASgJEkEKBmZvcm1hdBgCIAEoDjInLm5va2t1LnYxLkV4cG9ydEF1ZGl0TG9nc1JlcXVlc3QuRm9ybWF0Qgi6SAWCAQIQARIoCgZmaWx0ZXIYAyABKAsyGC5ub2trdS52MS5BdWRpdExvZ0ZpbHRlciJBCgZGb3JtYXQSFgoSRk9STUFUX1VOU1BFQ0lGSUVEEAASDgoKRk9STUFUX0NTVhABEg8KC0ZPUk1BVF9KU09OEAIiTwoXRXhwb3J0QXVkaXRMb2dzUmVzcG9uc2USDAoEZGF0YRgBIAEoDBIQCghmaWxlbmFtZRgCIAEoCRIUCgxjb250ZW50X3R5cGUYAyABKAkqfgoMQXVkaXRPdXRjb21lEh0KGUFVRElUX09VVENPTUVfVU5TUEVDSUZJRUQQABIbChdBVURJVF9PVVRDT01FX1NVQ0NFRURFRBABEhgKFEFVRElUX09VVENPTUVfRkFJTEVEEAISGAoUQVVESVRfT1VUQ09NRV9ERU5JRUQQAzKeBAoLVXRpbFNlcnZpY2USUgoKR2V0VmVyc2lvbhIbLm5va2t1LnYxLkdldFZlcnNpb25SZXF1ZXN0Ghwubm9ra3UudjEuR2V0VmVyc2lvblJlc3BvbnNlIgmQAgHC8xgCCAESYQoPR2V0SW5zdGFuY2VJbmZvEiAubm9ra3UudjEuR2V0SW5zdGFuY2VJbmZvUmVxdWVzdBohLm5va2t1LnYxLkdldEluc3RhbmNlSW5mb1Jlc3BvbnNlIgmQAgHC8xgCCAESRgoGV2hvYW1pEhcubm9ra3UudjEuV2hvYW1pUmVxdWVzdBoYLm5va2t1LnYxLldob2FtaVJlc3BvbnNlIgmQAgHC8xgCEAESTwoJTGlzdFJvbGVzEhoubm9ra3UudjEuTGlzdFJvbGVzUmVxdWVzdBobLm5va2t1LnYxLkxpc3RSb2xlc1Jlc3BvbnNlIgmQAgHC8xgCEAESXQoNTGlzdEF1ZGl0TG9ncxIeLm5va2t1LnYxLkxpc3RBdWRpdExvZ3NSZXF1ZXN0Gh8ubm9ra3UudjEuTGlzdEF1ZGl0TG9nc1Jlc3BvbnNlIguQAgHC8xgEGAIgARJgCg9FeHBvcnRBdWRpdExvZ3MSIC5ub2trdS52MS5FeHBvcnRBdWRpdExvZ3NSZXF1ZXN0GiEubm9ra3UudjEuRXhwb3J0QXVkaXRMb2dzUmVzcG9uc2UiCMLzGAQYAiABYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_struct, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account, file_nokku_v1_daemon, file_nokku_v1_service_account]);
+  fileDesc("ChNub2trdS92MS91dGlsLnByb3RvEghub2trdS52MSITChFHZXRWZXJzaW9uUmVxdWVzdCIlChJHZXRWZXJzaW9uUmVzcG9uc2USDwoHdmVyc2lvbhgBIAEoCSIYChZHZXRJbnN0YW5jZUluZm9SZXF1ZXN0IrcBChdHZXRJbnN0YW5jZUluZm9SZXNwb25zZRIVCg1vcGVyYXRvcl9uYW1lGAEgASgJEhUKDXN1cHBvcnRfZW1haWwYAiABKAkSEwoLd2Vic2l0ZV91cmwYAyABKAkSEQoJdGVybXNfdXJsGAQgASgJEhMKC3ByaXZhY3lfdXJsGAUgASgJEhMKC2ltcHJpbnRfdXJsGAYgASgJEgwKBG1vZGUYByABKAkSDgoGc2lnbnVwGAggASgIIg8KDVdob2FtaVJlcXVlc3QipQEKDldob2FtaVJlc3BvbnNlEgwKBGtpbmQYASABKAkSEgoKc3ViamVjdF9pZBgCIAEoCRIcCgR1c2VyGAMgASgLMg4ubm9ra3UudjEuVXNlchIxCg9zZXJ2aWNlX2FjY291bnQYBCABKAsyGC5ub2trdS52MS5TZXJ2aWNlQWNjb3VudBIgCgZkYWVtb24YBSABKAsyEC5ub2trdS52MS5EYWVtb24iKQoEUm9sZRIMCgRuYW1lGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJIhIKEExpc3RSb2xlc1JlcXVlc3QiMgoRTGlzdFJvbGVzUmVzcG9uc2USHQoFcm9sZXMYASADKAsyDi5ub2trdS52MS5Sb2xlIvUBCghFdmVudExvZxIKCgJpZBgBIAEoCRIQCghhY3Rvcl9pZBgCIAEoCRISCgphY3Rvcl9raW5kGAMgASgJEhIKCmFjdG9yX25hbWUYBCABKAkSDgoGYWN0aW9uGAUgASgJEg4KBnRhcmdldBgGIAEoCRIKCgJvaxgHIAEoCBIKCgJpcBgIIAEoCRISCgp1c2VyX2FnZW50GAkgASgJEigKB2RldGFpbHMYCiABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0Ei0KCXRpbWVzdGFtcBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiiQIKDkF1ZGl0TG9nRmlsdGVyEg4KBnNlYXJjaBgBIAEoCRIgCglhY3Rvcl9pZHMYAiADKAlCDbpICpIBByIFcgOwAQESEwoLYWN0b3Jfa2luZHMYAyADKAkSDwoHYWN0aW9ucxgEIAMoCRIOCgZ0YXJnZXQYBSABKAkSMQoHb3V0Y29tZRgGIAEoDjIWLm5va2t1LnYxLkF1ZGl0T3V0Y29tZUIIukgFggECEAESLgoKc3RhcnRfZGF0ZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLAoIZW5kX2RhdGUYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wInMKFExpc3RBdWRpdExvZ3NSZXF1ZXN0EhgKBWxpbWl0GAEgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAIgASgFQge6SAQaAigAEigKBmZpbHRlchgDIAEoCzIYLm5va2t1LnYxLkF1ZGl0TG9nRmlsdGVyImAKFUxpc3RBdWRpdExvZ3NSZXNwb25zZRIgCgRsb2dzGAEgAygLMhIubm9ra3UudjEuRXZlbnRMb2cSDQoFdG90YWwYAiABKAUSFgoOcmV0ZW50aW9uX2RheXMYAyABKAUiyAEKFkV4cG9ydEF1ZGl0TG9nc1JlcXVlc3QSQQoGZm9ybWF0GAEgASgOMicubm9ra3UudjEuRXhwb3J0QXVkaXRMb2dzUmVxdWVzdC5Gb3JtYXRCCLpIBYIBAhABEigKBmZpbHRlchgCIAEoCzIYLm5va2t1LnYxLkF1ZGl0TG9nRmlsdGVyIkEKBkZvcm1hdBIWChJGT1JNQVRfVU5TUEVDSUZJRUQQABIOCgpGT1JNQVRfQ1NWEAESDwoLRk9STUFUX0pTT04QAiJPChdFeHBvcnRBdWRpdExvZ3NSZXNwb25zZRIMCgRkYXRhGAEgASgMEhAKCGZpbGVuYW1lGAIgASgJEhQKDGNvbnRlbnRfdHlwZRgDIAEoCSJKChVMaXN0TXlBY3Rpdml0eVJlcXVlc3QSGAoFbGltaXQYASABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAiABKAVCB7pIBBoCKAAiSQoWTGlzdE15QWN0aXZpdHlSZXNwb25zZRIgCgRsb2dzGAEgAygLMhIubm9ra3UudjEuRXZlbnRMb2cSDQoFdG90YWwYAiABKAUqfgoMQXVkaXRPdXRjb21lEh0KGUFVRElUX09VVENPTUVfVU5TUEVDSUZJRUQQABIbChdBVURJVF9PVVRDT01FX1NVQ0NFRURFRBABEhgKFEFVRElUX09VVENPTUVfRkFJTEVEEAISGAoUQVVESVRfT1VUQ09NRV9ERU5JRUQQAzL6BAoLVXRpbFNlcnZpY2USUgoKR2V0VmVyc2lvbhIbLm5va2t1LnYxLkdldFZlcnNpb25SZXF1ZXN0Ghwubm9ra3UudjEuR2V0VmVyc2lvblJlc3BvbnNlIgmQAgHC8xgCCAESYQoPR2V0SW5zdGFuY2VJbmZvEiAubm9ra3UudjEuR2V0SW5zdGFuY2VJbmZvUmVxdWVzdBohLm5va2t1LnYxLkdldEluc3RhbmNlSW5mb1Jlc3BvbnNlIgmQAgHC8xgCCAESRgoGV2hvYW1pEhcubm9ra3UudjEuV2hvYW1pUmVxdWVzdBoYLm5va2t1LnYxLldob2FtaVJlc3BvbnNlIgmQAgHC8xgCEAESTwoJTGlzdFJvbGVzEhoubm9ra3UudjEuTGlzdFJvbGVzUmVxdWVzdBobLm5va2t1LnYxLkxpc3RSb2xlc1Jlc3BvbnNlIgmQAgHC8xgCEAESWwoNTGlzdEF1ZGl0TG9ncxIeLm5va2t1LnYxLkxpc3RBdWRpdExvZ3NSZXF1ZXN0Gh8ubm9ra3UudjEuTGlzdEF1ZGl0TG9nc1Jlc3BvbnNlIgmQAgHC8xgCGAISXgoPRXhwb3J0QXVkaXRMb2dzEiAubm9ra3UudjEuRXhwb3J0QXVkaXRMb2dzUmVxdWVzdBohLm5va2t1LnYxLkV4cG9ydEF1ZGl0TG9nc1Jlc3BvbnNlIgbC8xgCGAISXgoOTGlzdE15QWN0aXZpdHkSHy5ub2trdS52MS5MaXN0TXlBY3Rpdml0eVJlcXVlc3QaIC5ub2trdS52MS5MaXN0TXlBY3Rpdml0eVJlc3BvbnNlIgmQAgHC8xgCEAFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_struct, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account, file_nokku_v1_daemon, file_nokku_v1_service_account]);
 
 /**
  * @generated from message nokku.v1.GetVersionRequest
@@ -66,7 +66,8 @@ export const GetInstanceInfoRequestSchema: GenMessage<GetInstanceInfoRequest> = 
   messageDesc(file_nokku_v1_util, 2);
 
 /**
- * Empty fields are not configured. Self-hosted servers usually leave them all empty.
+ * Empty fields are not configured. Self-hosted servers usually leave the
+ * operator fields empty.
  *
  * @generated from message nokku.v1.GetInstanceInfoResponse
  */
@@ -100,6 +101,21 @@ export type GetInstanceInfoResponse = Message<"nokku.v1.GetInstanceInfoResponse"
    * @generated from field: string imprint_url = 6;
    */
   imprintUrl: string;
+
+  /**
+   * self_hosted or saas
+   *
+   * @generated from field: string mode = 7;
+   */
+  mode: string;
+
+  /**
+   * Whether this host offers workspace signup, true only on the hosted
+   * service's root host.
+   *
+   * @generated from field: bool signup = 8;
+   */
+  signup: boolean;
 };
 
 /**
@@ -137,27 +153,17 @@ export type WhoamiResponse = Message<"nokku.v1.WhoamiResponse"> & {
   subjectId: string;
 
   /**
-   * @generated from field: string user_id = 3;
-   */
-  userId: string;
-
-  /**
-   * @generated from field: string workspace_id = 4;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: nokku.v1.User user = 5;
+   * @generated from field: nokku.v1.User user = 3;
    */
   user?: User | undefined;
 
   /**
-   * @generated from field: nokku.v1.ServiceAccount service_account = 6;
+   * @generated from field: nokku.v1.ServiceAccount service_account = 4;
    */
   serviceAccount?: ServiceAccount | undefined;
 
   /**
-   * @generated from field: nokku.v1.Daemon daemon = 7;
+   * @generated from field: nokku.v1.Daemon daemon = 5;
    */
   daemon?: Daemon | undefined;
 };
@@ -231,57 +237,52 @@ export type EventLog = Message<"nokku.v1.EventLog"> & {
   id: string;
 
   /**
-   * @generated from field: string workspace_id = 2;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string actor_id = 3;
+   * @generated from field: string actor_id = 2;
    */
   actorId: string;
 
   /**
-   * @generated from field: string actor_kind = 4;
+   * @generated from field: string actor_kind = 3;
    */
   actorKind: string;
 
   /**
-   * @generated from field: string actor_name = 5;
+   * @generated from field: string actor_name = 4;
    */
   actorName: string;
 
   /**
-   * @generated from field: string action = 6;
+   * @generated from field: string action = 5;
    */
   action: string;
 
   /**
-   * @generated from field: string target = 7;
+   * @generated from field: string target = 6;
    */
   target: string;
 
   /**
-   * @generated from field: bool ok = 8;
+   * @generated from field: bool ok = 7;
    */
   ok: boolean;
 
   /**
-   * @generated from field: string ip = 9;
+   * @generated from field: string ip = 8;
    */
   ip: string;
 
   /**
-   * @generated from field: string user_agent = 10;
+   * @generated from field: string user_agent = 9;
    */
   userAgent: string;
 
   /**
-   * @generated from field: google.protobuf.Struct details = 11;
+   * @generated from field: google.protobuf.Struct details = 10;
    */
   details?: JsonObject | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp timestamp = 12;
+   * @generated from field: google.protobuf.Timestamp timestamp = 11;
    */
   timestamp?: Timestamp | undefined;
 };
@@ -351,28 +352,21 @@ export const AuditLogFilterSchema: GenMessage<AuditLogFilter> = /*@__PURE__*/
   messageDesc(file_nokku_v1_util, 10);
 
 /**
- * An empty workspace_id lists the caller's own activity across workspaces.
- *
  * @generated from message nokku.v1.ListAuditLogsRequest
  */
 export type ListAuditLogsRequest = Message<"nokku.v1.ListAuditLogsRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: int32 limit = 2;
+   * @generated from field: int32 limit = 1;
    */
   limit: number;
 
   /**
-   * @generated from field: int32 offset = 3;
+   * @generated from field: int32 offset = 2;
    */
   offset: number;
 
   /**
-   * @generated from field: nokku.v1.AuditLogFilter filter = 4;
+   * @generated from field: nokku.v1.AuditLogFilter filter = 3;
    */
   filter?: AuditLogFilter | undefined;
 };
@@ -399,7 +393,7 @@ export type ListAuditLogsResponse = Message<"nokku.v1.ListAuditLogsResponse"> & 
   total: number;
 
   /**
-   * How long the workspace's plan keeps events, 0 for the personal log.
+   * How long the workspace's plan keeps events.
    *
    * @generated from field: int32 retention_days = 3;
    */
@@ -418,17 +412,12 @@ export const ListAuditLogsResponseSchema: GenMessage<ListAuditLogsResponse> = /*
  */
 export type ExportAuditLogsRequest = Message<"nokku.v1.ExportAuditLogsRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: nokku.v1.ExportAuditLogsRequest.Format format = 2;
+   * @generated from field: nokku.v1.ExportAuditLogsRequest.Format format = 1;
    */
   format: ExportAuditLogsRequest_Format;
 
   /**
-   * @generated from field: nokku.v1.AuditLogFilter filter = 3;
+   * @generated from field: nokku.v1.AuditLogFilter filter = 2;
    */
   filter?: AuditLogFilter | undefined;
 };
@@ -492,6 +481,50 @@ export type ExportAuditLogsResponse = Message<"nokku.v1.ExportAuditLogsResponse"
  */
 export const ExportAuditLogsResponseSchema: GenMessage<ExportAuditLogsResponse> = /*@__PURE__*/
   messageDesc(file_nokku_v1_util, 14);
+
+/**
+ * @generated from message nokku.v1.ListMyActivityRequest
+ */
+export type ListMyActivityRequest = Message<"nokku.v1.ListMyActivityRequest"> & {
+  /**
+   * @generated from field: int32 limit = 1;
+   */
+  limit: number;
+
+  /**
+   * @generated from field: int32 offset = 2;
+   */
+  offset: number;
+};
+
+/**
+ * Describes the message nokku.v1.ListMyActivityRequest.
+ * Use `create(ListMyActivityRequestSchema)` to create a new message.
+ */
+export const ListMyActivityRequestSchema: GenMessage<ListMyActivityRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 15);
+
+/**
+ * @generated from message nokku.v1.ListMyActivityResponse
+ */
+export type ListMyActivityResponse = Message<"nokku.v1.ListMyActivityResponse"> & {
+  /**
+   * @generated from field: repeated nokku.v1.EventLog logs = 1;
+   */
+  logs: EventLog[];
+
+  /**
+   * @generated from field: int32 total = 2;
+   */
+  total: number;
+};
+
+/**
+ * Describes the message nokku.v1.ListMyActivityResponse.
+ * Use `create(ListMyActivityResponseSchema)` to create a new message.
+ */
+export const ListMyActivityResponseSchema: GenMessage<ListMyActivityResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 16);
 
 /**
  * AuditOutcome FAILED matches every failed call, DENIED only the ones an auth
@@ -581,6 +614,16 @@ export const UtilService: GenService<{
     methodKind: "unary";
     input: typeof ExportAuditLogsRequestSchema;
     output: typeof ExportAuditLogsResponseSchema;
+  },
+  /**
+   * The caller's own events.
+   *
+   * @generated from rpc nokku.v1.UtilService.ListMyActivity
+   */
+  listMyActivity: {
+    methodKind: "unary";
+    input: typeof ListMyActivityRequestSchema;
+    output: typeof ListMyActivityResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_nokku_v1_util, 0);

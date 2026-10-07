@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"log/slog"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -65,8 +64,6 @@ func runMigrations(ctx context.Context, conn *pgx.Conn) error {
 	if current, err := m.GetCurrentVersion(ctx); err != nil {
 		return fmt.Errorf("reading migration version: %w", err)
 	} else if current > int32(len(m.Migrations)) { //#nosec
-		slog.Info("migration history squashed, stamping current schema",
-			"from", current, "to", len(m.Migrations))
 		if err := m.SetVersion(ctx, int32(len(m.Migrations))); err != nil { //#nosec
 			return fmt.Errorf("stamping squashed migration history: %w", err)
 		}

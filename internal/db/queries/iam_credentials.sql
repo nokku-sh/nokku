@@ -1,8 +1,8 @@
 -- name: UpsertCredential :one
 INSERT INTO
-  credentials (id, user_id, type, provider, subject, data, label)
+  credentials (id, workspace_id, user_id, type, provider, subject, data, label)
 VALUES
-  (@id, @user_id, @type, @provider, @subject, @data, @label)
+  (@id, @workspace_id, @user_id, @type, @provider, @subject, @data, @label)
 ON CONFLICT (id) DO UPDATE
 SET
   type = EXCLUDED.type,
@@ -23,19 +23,23 @@ SELECT
 FROM
   credentials
 WHERE
-  user_id = @user_id
+  workspace_id = @workspace_id
+  AND user_id = @user_id
   AND type = @type
 ORDER BY
   created_at ASC;
 
--- name: GetCredential :one
+-- name: ListUserCredentials :many
 SELECT
   *
 FROM
   credentials
 WHERE
-  user_id = @user_id
-  AND id = @id;
+  workspace_id = @workspace_id
+  AND user_id = @user_id
+ORDER BY
+  type ASC,
+  created_at ASC;
 
 -- name: FindCredentialBySubject :one
 SELECT
@@ -43,7 +47,8 @@ SELECT
 FROM
   credentials
 WHERE
-  type = @type
+  workspace_id = @workspace_id
+  AND type = @type
   AND provider = @provider
   AND subject = @subject;
 
@@ -53,47 +58,28 @@ SET
   label = @label,
   updated_at = NOW()
 WHERE
-  user_id = @user_id
+  workspace_id = @workspace_id
+  AND user_id = @user_id
   AND id = @id;
 
 -- name: DeleteCredential :exec
 DELETE FROM credentials
 WHERE
-  user_id = @user_id
+  workspace_id = @workspace_id
+  AND user_id = @user_id
   AND id = @id;
 
 -- name: DeleteCredentialsByProvider :execrows
 DELETE FROM credentials
 WHERE
-  type = @type
-  AND provider = @provider;
-
--- name: DeleteUserCredentialsByProvider :execrows
-DELETE FROM credentials
-WHERE
-  user_id = @user_id
+  workspace_id = @workspace_id
   AND type = @type
   AND provider = @provider;
-
--- name: DeleteOtherCredentials :exec
-DELETE FROM credentials
-WHERE
-  user_id = @user_id
-  AND id <> @keep_id;
-
--- name: ConsumeCredentialBySubject :one
-DELETE FROM credentials
-WHERE
-  type = @type
-  AND provider = @provider
-  AND subject = @subject
-  AND user_id = @user_id
-RETURNING
-  *;
 
 -- name: TouchCredential :exec
 UPDATE credentials
 SET
   last_used_at = NOW()
 WHERE
-  id = @id;
+  workspace_id = @workspace_id
+  AND id = @id;

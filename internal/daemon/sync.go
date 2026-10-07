@@ -13,6 +13,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
 	nokkussh "github.com/nokku-sh/nokku/internal/ssh"
 )
@@ -129,9 +130,12 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 	})
 	// A deleted daemon still serves its cached principals. REJECTED makes
 	// the host drop them, and its session is spent with that answer.
-	if errors.Is(err, db.ErrWorkspaceNotAccessible) {
-		if err := conn.WithTx(ctx, func(q *db.Queries) error {
-			_, err := q.DeleteSubjectSessions(ctx, in.DaemonID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if err := conn.WithWorkspace(ctx, func(q *db.Queries) error {
+			_, err := q.DeleteSubjectSessions(ctx, &db.DeleteSubjectSessionsParams{
+				WorkspaceID: actor.WorkspaceIDFromContext(ctx),
+				SubjectID:   in.DaemonID,
+			})
 			return err
 		}); err != nil {
 			return nil, err

@@ -11,11 +11,11 @@
 
 	interface Props {
 		workspace: string;
-		members: number;
+		users: number;
 		canEdit: boolean;
 	}
 
-	let { workspace, members, canEdit }: Props = $props();
+	let { workspace, users, canEdit }: Props = $props();
 
 	let enrollOpen = $state(false);
 	let inviteOpen = $state(false);
@@ -109,10 +109,10 @@
 	</Card.Header>
 	<Card.Content>
 		<ol class="flex flex-col gap-6">
-			{@render step(1, true, 'Create a workspace', created)}
+			{@render step(1, true, 'Your workspace is ready', created)}
 			{@render step(2, false, 'Connect a server', server)}
 			{@render step(3, false, 'Sign in from your terminal', terminal)}
-			{@render step(4, members > 1, 'Bring your team', team)}
+			{@render step(4, users > 1, 'Bring your team', team)}
 		</ol>
 	</Card.Content>
 </Card.Root>

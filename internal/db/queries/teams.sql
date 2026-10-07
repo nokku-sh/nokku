@@ -74,18 +74,12 @@ WHERE
 
 -- name: ListTeamMembers :many
 SELECT
-  tm.workspace_id,
-  tm.team_id,
-  u.id AS user_id,
-  u.name,
-  u.email,
-  u.email_verified,
-  u.picture,
-  u.active,
-  tm.created_at
+  sqlc.embed(u),
+  tm.team_id
 FROM
   team_members tm
-  JOIN users u ON u.id = tm.user_id
+  JOIN users u ON u.workspace_id = tm.workspace_id
+  AND u.id = tm.user_id
 WHERE
   tm.team_id = @team_id
 ORDER BY

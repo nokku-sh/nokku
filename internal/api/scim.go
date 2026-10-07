@@ -3,10 +3,10 @@ package api
 import (
 	"context"
 
-	"github.com/nokku-sh/nokku/internal/audit"
-
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/internal/actor"
+	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/iam"
@@ -24,27 +24,25 @@ func (s *sCIMService) CreateSCIMToken(
 	ctx context.Context,
 	req *nokkuv1.CreateSCIMTokenRequest,
 ) (*nokkuv1.CreateSCIMTokenResponse, error) {
-	if err := requireVerifiedDomain(ctx, s.cfg.IAM, "a SCIM connector", req.GetWorkspaceId()); err != nil {
-		return nil, err
-	}
-	tok, plaintext, err := s.cfg.IAM.IssueSCIMToken(ctx, req.GetWorkspaceId(), req.GetLabel())
+	tok, plaintext, err := s.cfg.IAM.IssueSCIMToken(ctx, req.GetLabel())
 	if err != nil {
 		return nil, err
 	}
 	entry := scimTokenToProto(tok)
 	audit.SetTarget(ctx, entry.GetId())
+	ws, _ := actor.WorkspaceFromContext(ctx)
 	return &nokkuv1.CreateSCIMTokenResponse{
 		Token:   &plaintext,
 		Entry:   entry,
-		BaseUrl: new(s.cfg.FullURL() + "/scim/v2/" + req.GetWorkspaceId()),
+		BaseUrl: new(ws.BaseURL + "/scim/v2"),
 	}, nil
 }
 
 func (s *sCIMService) ListSCIMTokens(
 	ctx context.Context,
-	req *nokkuv1.ListSCIMTokensRequest,
+	_ *nokkuv1.ListSCIMTokensRequest,
 ) (*nokkuv1.ListSCIMTokensResponse, error) {
-	tokens, err := s.cfg.IAM.ListSCIMTokens(ctx, req.GetWorkspaceId())
+	tokens, err := s.cfg.IAM.ListSCIMTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +57,7 @@ func (s *sCIMService) DeleteSCIMToken(
 	ctx context.Context,
 	req *nokkuv1.DeleteSCIMTokenRequest,
 ) (*nokkuv1.DeleteSCIMTokenResponse, error) {
-	if err := s.cfg.IAM.RevokeSCIMToken(ctx, req.GetWorkspaceId(), req.GetTokenId()); err != nil {
+	if err := s.cfg.IAM.RevokeSCIMToken(ctx, req.GetTokenId()); err != nil {
 		return nil, err
 	}
 	return &nokkuv1.DeleteSCIMTokenResponse{}, nil

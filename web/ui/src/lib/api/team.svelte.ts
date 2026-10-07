@@ -4,41 +4,39 @@ import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
 import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
-import { workspaceID } from '#lib/store.svelte.js';
 
 export const team = {
 	get: (id: MaybeGetter<string | undefined>) =>
 		useQuery(
 			TeamService.method.getTeam,
-			() => ({ workspaceId: workspaceID.current, id: extract(id) }),
-			() => ({ enabled: !!workspaceID.current && !!extract(id), select: (res) => res.team })
+			() => ({ id: extract(id) }),
+			() => ({ enabled: !!extract(id), select: (res) => res.team })
 		),
 	list: (opts?: () => { query?: string; limit?: number; offset?: number }, when?: () => boolean) =>
 		useQuery(
 			TeamService.method.listTeams,
 			() => ({
-				workspaceId: workspaceID.current,
 				limit: MAX_PAGE_SIZE,
 				offset: 0,
 				...opts?.()
 			}),
-			() => ({ enabled: !!workspaceID.current && (when?.() ?? true) })
+			() => ({ enabled: when?.() ?? true })
 		),
 	members: (teamId: MaybeGetter<string | undefined>) =>
 		useQuery(
 			TeamService.method.listTeamMembers,
-			() => ({ workspaceId: workspaceID.current, teamId: extract(teamId) }),
+			() => ({ teamId: extract(teamId) }),
 			() => ({
-				enabled: !!workspaceID.current && !!extract(teamId),
+				enabled: !!extract(teamId),
 				select: (res) => res.members
 			})
 		),
 	listForUser: (userId: MaybeGetter<string | undefined>) =>
 		useQuery(
 			TeamService.method.listTeamsForUser,
-			() => ({ workspaceId: workspaceID.current, userId: extract(userId) }),
+			() => ({ userId: extract(userId) }),
 			() => ({
-				enabled: !!workspaceID.current && !!extract(userId),
+				enabled: !!extract(userId),
 				select: (res) => res.teams
 			})
 		),

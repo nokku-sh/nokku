@@ -1,16 +1,16 @@
 -- name: CreateUser :one
 INSERT INTO
-  users (email, name, picture)
+  users (workspace_id, email, name, role, picture)
 VALUES
-  (@email, @name, sqlc.narg('picture'))
+  (@workspace_id, @email, @name, @role, sqlc.narg('picture'))
 RETURNING
   *;
 
 -- name: CreateUserWithID :one
 INSERT INTO
-  users (id, email, name, picture)
+  users (id, workspace_id, email, name, role, picture)
 VALUES
-  (@id, @email, @name, sqlc.narg('picture'))
+  (@id, @workspace_id, @email, @name, @role, sqlc.narg('picture'))
 RETURNING
   *;
 
@@ -20,7 +20,8 @@ SELECT
 FROM
   users
 WHERE
-  id = @id;
+  workspace_id = @workspace_id
+  AND id = @id;
 
 -- name: GetUserByEmail :one
 SELECT
@@ -28,44 +29,118 @@ SELECT
 FROM
   users
 WHERE
-  email = @email;
+  workspace_id = @workspace_id
+  AND email = @email;
+
+-- name: GetOwner :one
+SELECT
+  *
+FROM
+  users
+WHERE
+  workspace_id = @workspace_id
+  AND role = 'owner';
+
+-- name: ListUsers :many
+SELECT
+  sqlc.embed(u),
+  COUNT(*) OVER ()::INTEGER AS total_count
+FROM
+  users u
+WHERE
+  u.workspace_id = @workspace_id
+  AND (
+    sqlc.narg('query')::TEXT IS NULL
+    OR u.name ILIKE '%' || sqlc.narg('query') || '%'
+    OR u.email ILIKE '%' || sqlc.narg('query') || '%'
+  )
+  AND (
+    sqlc.narg('role')::TEXT IS NULL
+    OR u.role = sqlc.narg('role')::TEXT
+  )
+ORDER BY
+  u.name ASC,
+  u.email ASC
+LIMIT
+  sqlc.narg('limit')
+OFFSET
+  sqlc.narg('offset');
+
+-- name: CountActiveUsers :one
+SELECT
+  COUNT(*)
+FROM
+  users
+WHERE
+  workspace_id = @workspace_id
+  AND active;
 
 -- name: UpdateUser :one
 UPDATE users
 SET
   name = COALESCE(sqlc.narg('name'), name),
   picture = COALESCE(sqlc.narg('picture'), picture),
-  active = COALESCE(sqlc.narg('active'), active),
-  disable_password_reset = COALESCE(sqlc.narg('disable_password_reset'), disable_password_reset)
+  updated_at = NOW()
 WHERE
-  id = @id
+  workspace_id = @workspace_id
+  AND id = @id
 RETURNING
   *;
 
--- name: VerifyUserEmail :exec
+-- name: UpdateUserRole :exec
+-- Never touches the owner, see TransferOwnership.
 UPDATE users
 SET
-  email_verified = TRUE
+  role = @role,
+  updated_at = NOW()
 WHERE
-  id = @id;
+  workspace_id = @workspace_id
+  AND id = @id
+  AND role <> 'owner';
+
+-- name: SetUserActive :exec
+UPDATE users
+SET
+  active = @active,
+  updated_at = NOW()
+WHERE
+  workspace_id = @workspace_id
+  AND id = @id
+  AND role <> 'owner';
+
+-- name: TransferOwnership :execrows
+-- One statement, so the partial unique index on the owner never sees two.
+UPDATE users
+SET
+  role = CASE
+    WHEN id = @new_owner_id THEN 'owner'
+    ELSE 'admin'
+  END,
+  updated_at = NOW()
+WHERE
+  workspace_id = @workspace_id
+  AND (
+    role = 'owner'
+    OR (
+      id = @new_owner_id
+      AND active
+    )
+  );
 
 -- name: SetUserEmail :one
 UPDATE users
 SET
   email = @email,
-  email_verified = TRUE
+  updated_at = NOW()
 WHERE
-  id = @id
+  workspace_id = @workspace_id
+  AND id = @id
 RETURNING
   *;
 
 -- name: DeleteUser :exec
 DELETE FROM users
 WHERE
-  id = @id;
-
--- name: DeleteUnverifiedUsers :execrows
-DELETE FROM users
-WHERE
-  NOT email_verified
-  AND created_at < @cutoff;
+  workspace_id = @workspace_id
+  AND id = @id
+  AND role <> 'owner';

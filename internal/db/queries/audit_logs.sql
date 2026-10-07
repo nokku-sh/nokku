@@ -14,7 +14,7 @@ INSERT INTO
   )
 VALUES
   (
-    sqlc.narg('workspace_id')::UUID,
+    @workspace_id,
     @actor_id,
     @actor_kind,
     @actor_name,
@@ -27,17 +27,13 @@ VALUES
   );
 
 -- name: ListAuditLogs :many
--- A NULL workspace_id is the personal log, RLS already limits the rows.
 SELECT
   *,
   COUNT(*) OVER ()::INTEGER AS total
 FROM
   audit.audit_logs
 WHERE
-  (
-    sqlc.narg('workspace_id')::UUID IS NULL
-    OR workspace_id = sqlc.narg('workspace_id')::UUID
-  )
+  workspace_id = @workspace_id
   AND (
     sqlc.narg('actor_ids')::TEXT[] IS NULL
     OR actor_id = ANY (sqlc.narg('actor_ids')::TEXT[])
@@ -109,19 +105,16 @@ OFFSET
 SELECT DISTINCT
   workspace_id
 FROM
-  audit.audit_logs
-WHERE
-  workspace_id IS NOT NULL;
+  audit.audit_logs;
 
 -- name: DeleteWorkspaceAuditLogs :execrows
 DELETE FROM audit.audit_logs
 WHERE
   workspace_id = @workspace_id
-  AND timestamp < @cutoff; 
+  AND timestamp < @cutoff;
 
 -- name: DeleteAuditLogsBefore :execrows
--- The longest retention for every row, also the ones without a workspace and
--- the ones whose workspace is gone.
+-- The longest retention for every row, also the ones whose workspace is gone.
 DELETE FROM audit.audit_logs
 WHERE
   timestamp < @cutoff;

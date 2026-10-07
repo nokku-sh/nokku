@@ -16,8 +16,7 @@ WHERE
   timestamp < $1
 `
 
-// The longest retention for every row, also the ones without a workspace and
-// the ones whose workspace is gone.
+// The longest retention for every row, also the ones whose workspace is gone.
 func (q *Queries) DeleteAuditLogsBefore(ctx context.Context, cutoff time.Time) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteAuditLogsBefore, cutoff)
 	if err != nil {
@@ -34,7 +33,7 @@ WHERE
 `
 
 type DeleteWorkspaceAuditLogsParams struct {
-	WorkspaceID *string   `json:"workspaceId"`
+	WorkspaceID string    `json:"workspaceId"`
 	Cutoff      time.Time `json:"cutoff"`
 }
 
@@ -73,7 +72,7 @@ INSERT INTO
   )
 VALUES
   (
-    $1::UUID,
+    $1,
     $2,
     $3,
     $4,
@@ -87,16 +86,16 @@ VALUES
 `
 
 type InsertAuditLogParams struct {
-	WorkspaceID *string `json:"workspaceId"`
-	ActorID     string  `json:"actorId"`
-	ActorKind   string  `json:"actorKind"`
-	ActorName   string  `json:"actorName"`
-	Action      string  `json:"action"`
-	Target      string  `json:"target"`
-	Ok          bool    `json:"ok"`
-	Ip          string  `json:"ip"`
-	UserAgent   string  `json:"userAgent"`
-	Details     []byte  `json:"details"`
+	WorkspaceID string `json:"workspaceId"`
+	ActorID     string `json:"actorId"`
+	ActorKind   string `json:"actorKind"`
+	ActorName   string `json:"actorName"`
+	Action      string `json:"action"`
+	Target      string `json:"target"`
+	Ok          bool   `json:"ok"`
+	Ip          string `json:"ip"`
+	UserAgent   string `json:"userAgent"`
+	Details     []byte `json:"details"`
 }
 
 func (q *Queries) InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams) error {
@@ -122,10 +121,7 @@ SELECT
 FROM
   audit.audit_logs
 WHERE
-  (
-    $1::UUID IS NULL
-    OR workspace_id = $1::UUID
-  )
+  workspace_id = $1
   AND (
     $2::TEXT[] IS NULL
     OR actor_id = ANY ($2::TEXT[])
@@ -195,7 +191,7 @@ OFFSET
 `
 
 type ListAuditLogsParams struct {
-	WorkspaceID *string    `json:"workspaceId"`
+	WorkspaceID string     `json:"workspaceId"`
 	ActorIds    []string   `json:"actorIds"`
 	ActorKinds  []string   `json:"actorKinds"`
 	Actions     []string   `json:"actions"`
@@ -211,7 +207,7 @@ type ListAuditLogsParams struct {
 type ListAuditLogsRow struct {
 	ID          string    `json:"id"`
 	Timestamp   time.Time `json:"timestamp"`
-	WorkspaceID *string   `json:"workspaceId"`
+	WorkspaceID string    `json:"workspaceId"`
 	ActorID     string    `json:"actorId"`
 	ActorKind   string    `json:"actorKind"`
 	ActorName   string    `json:"actorName"`
@@ -224,7 +220,6 @@ type ListAuditLogsRow struct {
 	Total       int32     `json:"total"`
 }
 
-// A NULL workspace_id is the personal log, RLS already limits the rows.
 func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) ([]*ListAuditLogsRow, error) {
 	rows, err := q.db.Query(ctx, listAuditLogs,
 		arg.WorkspaceID,
@@ -276,19 +271,17 @@ SELECT DISTINCT
   workspace_id
 FROM
   audit.audit_logs
-WHERE
-  workspace_id IS NOT NULL
 `
 
-func (q *Queries) ListWorkspaceAuditLogWorkspaceIDs(ctx context.Context) ([]*string, error) {
+func (q *Queries) ListWorkspaceAuditLogWorkspaceIDs(ctx context.Context) ([]string, error) {
 	rows, err := q.db.Query(ctx, listWorkspaceAuditLogWorkspaceIDs)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*string
+	var items []string
 	for rows.Next() {
-		var workspace_id *string
+		var workspace_id string
 		if err := rows.Scan(&workspace_id); err != nil {
 			return nil, err
 		}

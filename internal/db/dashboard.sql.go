@@ -30,7 +30,7 @@ ORDER BY
 `
 
 type AuditActivityByHourParams struct {
-	WorkspaceID *string   `json:"workspaceId"`
+	WorkspaceID string    `json:"workspaceId"`
 	Since       time.Time `json:"since"`
 }
 
@@ -94,10 +94,11 @@ SELECT
     SELECT
       COUNT(*)
     FROM
-      workspace_members m
+      users u
     WHERE
-      m.workspace_id = $1
-  )::INTEGER AS members
+      u.workspace_id = $1
+      AND u.active
+  )::INTEGER AS users
 `
 
 type DashboardCountsParams struct {
@@ -109,7 +110,7 @@ type DashboardCountsRow struct {
 	Targets       int32 `json:"targets"`
 	TargetsOnline int32 `json:"targetsOnline"`
 	TargetsManual int32 `json:"targetsManual"`
-	Members       int32 `json:"members"`
+	Users         int32 `json:"users"`
 }
 
 func (q *Queries) DashboardCounts(ctx context.Context, arg *DashboardCountsParams) (*DashboardCountsRow, error) {
@@ -119,7 +120,7 @@ func (q *Queries) DashboardCounts(ctx context.Context, arg *DashboardCountsParam
 		&i.Targets,
 		&i.TargetsOnline,
 		&i.TargetsManual,
-		&i.Members,
+		&i.Users,
 	)
 	return &i, err
 }

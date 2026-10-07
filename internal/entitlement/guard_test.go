@@ -31,7 +31,7 @@ func wiredFeatures() map[string]bool {
 // conditionalFeature. Kept in sync manually; the golden test below fails
 // when the switch and this list drift apart.
 func conditionalFeatures() []string {
-	return []string{FeatureSAML, FeatureEnforceSSO, FeatureAuditStreaming}
+	return []string{FeatureEnforceSSO, FeatureAuditStreaming}
 }
 
 // featuresFreeInAllPlans are catalog features that need no gate because
@@ -84,16 +84,12 @@ func TestGolden_FeaturesWired(t *testing.T) {
 }
 
 func TestConditionalFeature(t *testing.T) {
-	samlActivate := &nokkuv1.UpdateSSOProviderRequest{
-		Method:   new("saml"),
-		IsActive: new(true),
+	ssoEnforce := &nokkuv1.UpdateWorkspaceRequest{
+		Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
 	}
-	samlDeactivate := &nokkuv1.UpdateSSOProviderRequest{Method: new("saml")}
-	oidcEnforce := &nokkuv1.UpdateSSOProviderRequest{
-		Method:     new("oidc"),
-		EnforceSso: new(true),
+	ssoRelax := &nokkuv1.UpdateWorkspaceRequest{
+		Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(false)},
 	}
-	oidcPlain := &nokkuv1.UpdateSSOProviderRequest{Method: new("oidc")}
 
 	streamingOn := &nokkuv1.UpdateWorkspaceRequest{
 		Settings: &nokkuv1.WorkspaceSettings{
@@ -120,33 +116,21 @@ func TestConditionalFeature(t *testing.T) {
 		wantGated bool
 	}{
 		{
-			name:      "activating SAML is gated",
-			procedure: "/nokku.v1.SSOService/UpdateSSOProvider",
-			msg:       samlActivate,
-			wantFeat:  FeatureSAML,
-			wantGated: true,
-		},
-		{
-			name:      "deactivating SAML is never gated",
-			procedure: "/nokku.v1.SSOService/UpdateSSOProvider",
-			msg:       samlDeactivate,
-		},
-		{
-			name:      "enforcing SSO on OIDC is gated",
-			procedure: "/nokku.v1.SSOService/UpdateSSOProvider",
-			msg:       oidcEnforce,
+			name:      "enforcing SSO is gated",
+			procedure: "/nokku.v1.WorkspaceService/UpdateWorkspace",
+			msg:       ssoEnforce,
 			wantFeat:  FeatureEnforceSSO,
 			wantGated: true,
 		},
 		{
-			name:      "plain OIDC update is not gated",
-			procedure: "/nokku.v1.SSOService/UpdateSSOProvider",
-			msg:       oidcPlain,
+			name:      "relaxing SSO is never gated",
+			procedure: "/nokku.v1.WorkspaceService/UpdateWorkspace",
+			msg:       ssoRelax,
 		},
 		{
 			name:      "other procedures are not conditionally gated",
-			procedure: "/nokku.v1.SSOService/GetSSOProvider",
-			msg:       samlActivate,
+			procedure: "/nokku.v1.WorkspaceService/GetWorkspace",
+			msg:       ssoEnforce,
 		},
 		{
 			name:      "configuring audit streaming is gated",
@@ -200,7 +184,7 @@ func TestGuard_DeniesAndAdvertisesUpgrade(t *testing.T) {
 		ModeSaaS,
 	))
 
-	ctx := actor.AnnotateTenant(context.Background(), "ws1")
+	ctx := actor.WithWorkspace(context.Background(), actor.Workspace{ID: "ws1"})
 	err := sut.check(ctx, "/nokku.v1.UtilService/ExportAuditLogs", struct{}{})
 
 	if err == nil {
@@ -229,7 +213,7 @@ func TestGuard_DeniesAndAdvertisesUpgrade(t *testing.T) {
 
 func TestGuard_DeniesAuditStreamingOnCommunity(t *testing.T) {
 	sut := NewGuardInterceptor(NewService(&fakeDB{}, nil, ModeSaaS))
-	ctx := actor.AnnotateTenant(context.Background(), "ws1")
+	ctx := actor.WithWorkspace(context.Background(), actor.Workspace{ID: "ws1"})
 
 	req := &nokkuv1.UpdateWorkspaceRequest{
 		Settings: &nokkuv1.WorkspaceSettings{AuditWebhookUrl: new("https://hooks.example.com")},
@@ -266,7 +250,7 @@ func TestGuard_AllowsPaidPlanAndUnpinnedContext(t *testing.T) {
 	))
 
 	// Pro workspace passes.
-	ctx := actor.AnnotateTenant(context.Background(), "ws1")
+	ctx := actor.WithWorkspace(context.Background(), actor.Workspace{ID: "ws1"})
 	if err := sut.check(ctx, "/nokku.v1.UtilService/ExportAuditLogs", struct{}{}); err != nil {
 		t.Errorf("pro workspace denied: %v", err)
 	}
@@ -291,7 +275,6 @@ var createProcedures = []string{
 	nokkuv1connect.TeamServiceCreateTeamProcedure,
 	nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure,
 	nokkuv1connect.CertificateServiceCreateCertificateAuthorityProcedure,
-	nokkuv1connect.WorkspaceDomainServiceCreateWorkspaceDomainProcedure,
 	nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure,
 	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure,
 	nokkuv1connect.DaemonServiceCreateSessionProcedure,
@@ -303,9 +286,9 @@ var createProceduresGatedOutsideTheGuard = map[string]string{
 	// Enrollment is a public endpoint whose workspace comes from the
 	// enroll token; the handler checks the cap directly (daemon_control.go).
 	nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure: "handler: CheckResources in EnrollDaemon (public endpoint, workspace from token)",
-	// Pre-tenant: there is no workspace to resolve a cap for. Per-user
-	// workspace count caps are separate scope, enforced in CreateWorkspace.
-	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure: "out of scope: per-user workspace caps",
+	// Pre-tenant: the hosted signup makes the workspace a cap would be
+	// resolved for. The auth rate limit bounds it.
+	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure: "pre-tenant: bounded by the auth rate limit",
 	// Sessions are bounded by the recording storage cap and eviction
 	// (recording/evict.go); they produce no permanent resource rows.
 	nokkuv1connect.DaemonServiceCreateSessionProcedure: "bounded by recording storage eviction",
@@ -348,7 +331,7 @@ func TestGuard_ResourceCapDeniesAndAdvertisesUpgrade(t *testing.T) {
 		ModeSaaS,
 	))
 
-	ctx := actor.AnnotateTenant(context.Background(), "ws1")
+	ctx := actor.WithWorkspace(context.Background(), actor.Workspace{ID: "ws1"})
 	err := sut.checkResources(ctx, "/nokku.v1.TargetService/CreateTarget")
 
 	if err == nil {

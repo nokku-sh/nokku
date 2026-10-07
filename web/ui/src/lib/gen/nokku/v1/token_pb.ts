@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/token.proto.
  */
 export const file_nokku_v1_token: GenFile = /*@__PURE__*/
-  fileDesc("ChRub2trdS92MS90b2tlbi5wcm90bxIIbm9ra3UudjEirwIKBVRva2VuEgoKAmlkGAEgASgJEiEKBGtpbmQYAiABKA4yEy5ub2trdS52MS5Ub2tlbktpbmQSDQoFbGFiZWwYAyABKAkSLgoKZXhwaXJlc19hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEAoIbWF4X3VzZXMYBSABKAUSDAoEdXNlcxgGIAEoBRIUCgxhdXRvX2FwcHJvdmUYByABKAgSDQoFY2FfaWQYCCABKAkSEQoJcm9sZV9uYW1lGAkgASgJEi4KCmNyZWF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3RfdXNlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiigIKEkNyZWF0ZVRva2VuUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEi0KBGtpbmQYAiABKA4yEy5ub2trdS52MS5Ub2tlbktpbmRCCrpIB4IBBBABIAASFgoFbGFiZWwYAyABKAlCB7pIBHICGGQSMAoDdHRsGAQgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQgi6SAWqAQIqABIZCghtYXhfdXNlcxgFIAEoBUIHukgEGgIgABIUCgxhdXRvX2FwcHJvdmUYBiABKAgSFwoFY2FfaWQYByABKAlCCLpIBXIDsAEBEhEKCXJvbGVfbmFtZRgIIAEoCSJFChNDcmVhdGVUb2tlblJlc3BvbnNlEh4KBXRva2VuGAEgASgLMg8ubm9ra3UudjEuVG9rZW4SDgoGc2VjcmV0GAIgASgJImAKEUxpc3RUb2tlbnNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESKwoEa2luZBgCIAEoDjITLm5va2t1LnYxLlRva2VuS2luZEIIukgFggECEAEiNQoSTGlzdFRva2Vuc1Jlc3BvbnNlEh8KBnRva2VucxgBIAMoCzIPLm5va2t1LnYxLlRva2VuIkoKEkRlbGV0ZVRva2VuUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASIVChNEZWxldGVUb2tlblJlc3BvbnNlKlUKCVRva2VuS2luZBIaChZUT0tFTl9LSU5EX1VOU1BFQ0lGSUVEEAASFQoRVE9LRU5fS0lORF9FTlJPTEwQARIVChFUT0tFTl9LSU5EX0lOVklURRACMooCCgxUb2tlblNlcnZpY2USUgoLQ3JlYXRlVG9rZW4SHC5ub2trdS52MS5DcmVhdGVUb2tlblJlcXVlc3QaHS5ub2trdS52MS5DcmVhdGVUb2tlblJlc3BvbnNlIgbC8xgCGAQSUgoKTGlzdFRva2VucxIbLm5va2t1LnYxLkxpc3RUb2tlbnNSZXF1ZXN0Ghwubm9ra3UudjEuTGlzdFRva2Vuc1Jlc3BvbnNlIgmQAgHC8xgCGAISUgoLRGVsZXRlVG9rZW4SHC5ub2trdS52MS5EZWxldGVUb2tlblJlcXVlc3QaHS5ub2trdS52MS5EZWxldGVUb2tlblJlc3BvbnNlIgbC8xgCGARiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("ChRub2trdS92MS90b2tlbi5wcm90bxIIbm9ra3UudjEirwIKBVRva2VuEgoKAmlkGAEgASgJEiEKBGtpbmQYAiABKA4yEy5ub2trdS52MS5Ub2tlbktpbmQSDQoFbGFiZWwYAyABKAkSLgoKZXhwaXJlc19hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEAoIbWF4X3VzZXMYBSABKAUSDAoEdXNlcxgGIAEoBRIUCgxhdXRvX2FwcHJvdmUYByABKAgSDQoFY2FfaWQYCCABKAkSEQoJcm9sZV9uYW1lGAkgASgJEi4KCmNyZWF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3RfdXNlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAi6gEKEkNyZWF0ZVRva2VuUmVxdWVzdBItCgRraW5kGAEgASgOMhMubm9ra3UudjEuVG9rZW5LaW5kQgq6SAeCAQQQASAAEhYKBWxhYmVsGAIgASgJQge6SARyAhhkEjAKA3R0bBgDIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIIukgFqgECKgASGQoIbWF4X3VzZXMYBCABKAVCB7pIBBoCIAASFAoMYXV0b19hcHByb3ZlGAUgASgIEhcKBWNhX2lkGAYgASgJQgi6SAVyA7ABARIRCglyb2xlX25hbWUYByABKAkiRQoTQ3JlYXRlVG9rZW5SZXNwb25zZRIeCgV0b2tlbhgBIAEoCzIPLm5va2t1LnYxLlRva2VuEg4KBnNlY3JldBgCIAEoCSJAChFMaXN0VG9rZW5zUmVxdWVzdBIrCgRraW5kGAEgASgOMhMubm9ra3UudjEuVG9rZW5LaW5kQgi6SAWCAQIQASI1ChJMaXN0VG9rZW5zUmVzcG9uc2USHwoGdG9rZW5zGAEgAygLMg8ubm9ra3UudjEuVG9rZW4iKgoSRGVsZXRlVG9rZW5SZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIVChNEZWxldGVUb2tlblJlc3BvbnNlKlUKCVRva2VuS2luZBIaChZUT0tFTl9LSU5EX1VOU1BFQ0lGSUVEEAASFQoRVE9LRU5fS0lORF9FTlJPTEwQARIVChFUT0tFTl9LSU5EX0lOVklURRACMooCCgxUb2tlblNlcnZpY2USUgoLQ3JlYXRlVG9rZW4SHC5ub2trdS52MS5DcmVhdGVUb2tlblJlcXVlc3QaHS5ub2trdS52MS5DcmVhdGVUb2tlblJlc3BvbnNlIgbC8xgCGAQSUgoKTGlzdFRva2VucxIbLm5va2t1LnYxLkxpc3RUb2tlbnNSZXF1ZXN0Ghwubm9ra3UudjEuTGlzdFRva2Vuc1Jlc3BvbnNlIgmQAgHC8xgCGAISUgoLRGVsZXRlVG9rZW4SHC5ub2trdS52MS5EZWxldGVUb2tlblJlcXVlc3QaHS5ub2trdS52MS5EZWxldGVUb2tlblJlc3BvbnNlIgbC8xgCGARiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.Token
@@ -88,42 +88,37 @@ export const TokenSchema: GenMessage<Token> = /*@__PURE__*/
  */
 export type CreateTokenRequest = Message<"nokku.v1.CreateTokenRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: nokku.v1.TokenKind kind = 2;
+   * @generated from field: nokku.v1.TokenKind kind = 1;
    */
   kind: TokenKind;
 
   /**
-   * @generated from field: string label = 3;
+   * @generated from field: string label = 2;
    */
   label: string;
 
   /**
-   * @generated from field: google.protobuf.Duration ttl = 4;
+   * @generated from field: google.protobuf.Duration ttl = 3;
    */
   ttl?: Duration | undefined;
 
   /**
-   * @generated from field: int32 max_uses = 5;
+   * @generated from field: int32 max_uses = 4;
    */
   maxUses: number;
 
   /**
-   * @generated from field: bool auto_approve = 6;
+   * @generated from field: bool auto_approve = 5;
    */
   autoApprove: boolean;
 
   /**
-   * @generated from field: string ca_id = 7;
+   * @generated from field: string ca_id = 6;
    */
   caId: string;
 
   /**
-   * @generated from field: string role_name = 8;
+   * @generated from field: string role_name = 7;
    */
   roleName: string;
 };
@@ -162,12 +157,7 @@ export const CreateTokenResponseSchema: GenMessage<CreateTokenResponse> = /*@__P
  */
 export type ListTokensRequest = Message<"nokku.v1.ListTokensRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: nokku.v1.TokenKind kind = 2;
+   * @generated from field: nokku.v1.TokenKind kind = 1;
    */
   kind: TokenKind;
 };
@@ -201,12 +191,7 @@ export const ListTokensResponseSchema: GenMessage<ListTokensResponse> = /*@__PUR
  */
 export type DeleteTokenRequest = Message<"nokku.v1.DeleteTokenRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string id = 2;
+   * @generated from field: string id = 1;
    */
   id: string;
 };

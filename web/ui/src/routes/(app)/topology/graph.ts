@@ -5,7 +5,7 @@ import type {
 	AccessGraphTarget,
 	GetAccessGraphResponse
 } from '#lib/gen/nokku/v1/target_pb.js';
-import type { WorkspaceMember } from '#lib/gen/nokku/v1/workspace_pb.js';
+import type { User } from '#lib/gen/nokku/v1/account_pb.js';
 import type { Edge, Node } from '@xyflow/svelte';
 
 export type FocusKind = 'user' | 'team' | 'service-account' | 'target' | 'account' | 'tag';
@@ -86,7 +86,7 @@ export type View = {
 	focus?: Focus;
 	shown: Record<Section, number>;
 	openTeam?: string;
-	members?: WorkspaceMember[];
+	members?: User[];
 	openTag?: string;
 	targets?: AccessGraphTarget[];
 	targetTotal?: number;

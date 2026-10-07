@@ -6,6 +6,9 @@ package iam
 //   Authorization: Bearer nokku_sa_…  → service-account API key (no session)
 //   Authorization: Bearer <token>     → session token
 //   Authorization: DPoP <token>       → key-bound session, proof on every request (RFC 9449)
+//
+// Everything is looked up inside the request's workspace, so a credential
+// presented on another workspace's host does not exist there.
 
 import (
 	"context"
@@ -62,9 +65,9 @@ func (s *Service) AuthenticateToken(
 		return actor.Principal{}, db.Session{}, err
 	}
 	kind := actor.Kind(sess.Kind)
-	p := actor.Principal{ID: sess.SubjectID, Kind: kind, WorkspaceID: deref(sess.WorkspaceID)}
+	p := actor.Principal{ID: sess.SubjectID, Kind: kind}
 	if kind == actor.KindUser || kind == actor.KindCLI {
-		u, err := s.getUserByID(ctx, sess.SubjectID)
+		u, err := s.getUser(ctx, sess.SubjectID)
 		if err != nil {
 			return actor.Principal{}, db.Session{}, err
 		}
@@ -72,29 +75,34 @@ func (s *Service) AuthenticateToken(
 			return actor.Principal{}, db.Session{}, ErrInactive
 		}
 		p.Email = u.Email
+		p.Role = u.Role
 	}
 	return p, sess, nil
 }
 
-// authenticateAPIKey uses Sys since this lookup is what establishes the tenant.
 func (s *Service) authenticateAPIKey(ctx context.Context, raw string) (actor.Principal, error) {
 	hash, err := crypto.HashToken(raw)
 	if err != nil {
 		return actor.Principal{}, err
 	}
-	sa, err := s.sys.GetServiceAccountByTokenHash(ctx, &hash)
+	var sa *db.ServiceAccount
+	err = s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
+		sa, err = q.GetServiceAccountByTokenHash(ctx, &db.GetServiceAccountByTokenHashParams{
+			WorkspaceID: ws,
+			TokenHash:   &hash,
+		})
+		if err != nil {
+			return err
+		}
+		return q.TouchServiceAccount(ctx, sa.ID)
+	})
 	if err != nil {
 		return actor.Principal{}, errInvalidCredentials
 	}
 	if sa.ExpiresAt != nil && sa.ExpiresAt.Before(s.now()) {
 		return actor.Principal{}, errCredentialsExpired
 	}
-	_ = s.sys.TouchServiceAccount(ctx, sa.ID)
-	return actor.Principal{
-		ID:          sa.ID,
-		Kind:        actor.KindServiceAccount,
-		WorkspaceID: sa.WorkspaceID,
-	}, nil
+	return actor.Principal{ID: sa.ID, Kind: actor.KindServiceAccount, Role: sa.RoleName}, nil
 }
 
 func NewAPIKey() (raw string, hash crypto.HashedToken, err error) {
@@ -119,13 +127,13 @@ func (s *Service) verifySessionProof(
 	if proof == "" {
 		return ErrDPoPRequired
 	}
-	return s.DPoP.verifySession(ctx, proof, token, http.MethodPost, s.baseURL+procedure, binding)
+	return s.DPoP.verifySession(ctx, proof, token, http.MethodPost, baseURL(ctx)+procedure, binding)
 }
 
 // AdvertiseDPoPNonce also sends the canonical API URL so a recovering client
 // corrects the htu it signs.
-func (s *Service) AdvertiseDPoPNonce(h http.Header) {
-	h.Set(deviceURLHeader, s.baseURL)
+func (s *Service) AdvertiseDPoPNonce(ctx context.Context, h http.Header) {
+	h.Set(deviceURLHeader, baseURL(ctx))
 	h.Set("DPoP-Nonce", s.DPoP.CurrentNonce())
 }
 

@@ -22,7 +22,7 @@
 		kind === 'cli' ? Terminal : kind === 'device' ? Smartphone : Monitor;
 </script>
 
-<Card.Root>
+<Card.Root id="sessions">
 	<Card.Header>
 		<Card.Title>Where you're signed in</Card.Title>
 		<Card.Description>Browsers, the nk CLI and remembered devices.</Card.Description>

@@ -13,11 +13,11 @@ import (
 
 func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	svc := cfg.IAM
-	as := newAuthService(cfg)
 
 	// Cross-origin posts are rejected for every route by the server's withCSRF.
 	mux.HandleFunc("POST /passkey/login/begin", svc.Passkey.BeginLogin)
 	mux.HandleFunc("POST /passkey/login/finish", svc.Passkey.FinishLogin)
+	// Signup takes an invite, see InvitationService for the mailed way in.
 	mux.HandleFunc("POST /passkey/signup/begin", svc.Passkey.BeginSignup)
 	mux.HandleFunc("POST /passkey/signup/finish", svc.Passkey.FinishSignup)
 
@@ -36,7 +36,15 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.Handle("POST /auth/device/verify", deviceGuard.thenFunc(svc.Device.Verify))
 	mux.Handle("POST /auth/device/deny", deviceGuard.thenFunc(svc.Device.Deny))
 
-	// Give passkey logins and signups the same side effects as password ones.
+	// Optional auth on login lets a signed-in user link a provider.
+	mux.Handle("GET /oidc/login", optAuth.thenFunc(svc.OIDC.Login))
+	mux.Handle("POST /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
+	mux.Handle("GET /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
+
+	// SCIM has no session or CSRF, the workspace-scoped token is the only gate.
+	mux.Handle("/scim/v2", cfg.IAM.SCIMHandler())
+	mux.Handle("/scim/v2/", cfg.IAM.SCIMHandler())
+
 	cfg.IAM.OnUserLogin = func(w http.ResponseWriter, r *http.Request, u *db.User, _ iam.Method) {
 		if c := cfg.IAM.RememberDevice(r.Context(), r.Header, r.RemoteAddr, u); c != nil {
 			http.SetCookie(w, c)
@@ -45,39 +53,19 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	cfg.IAM.OnNewDeviceLogin = func(ctx context.Context, u *db.User, sess *db.Session, label, ip string) {
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
-		if err := cfg.Email.SendNewLoginEmail(
-			ctx,
-			u.ID,
-			u.Email,
-			string(sess.TokenHash),
-			label,
-			ip,
-		); err != nil {
-			slog.Debug("failed to send new login email", "error", err)
+		if err := cfg.Email.SendNewLoginEmail(ctx, u.ID, u.Email, string(sess.TokenHash), label, ip); err != nil {
+			slog.Warn("new login email not sent", "error", err)
 		}
 	}
-	cfg.IAM.OnPasskeySignup = func(r *http.Request, u *db.User) {
-		as.sendTokenEmail(r.Context(), u, iam.TokenVerifyEmail, true)
+	// Without mail there are no links, the login page then offers passkeys
+	// and the workspace's providers only.
+	if !cfg.Email.HasSMTP() {
+		return
 	}
-
-	// Optional auth on login lets a signed-in user link a provider.
-	// Callbacks are public, the SAML ACS is a cross-origin IdP form post.
-	mux.Handle("GET /oidc/login", optAuth.thenFunc(svc.OIDC.Login))
-	mux.Handle("POST /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
-	mux.Handle("GET /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
-	mux.Handle("GET /oauth/login", optAuth.thenFunc(svc.OAuth2.Login))
-	mux.Handle("POST /oauth/callback", http.HandlerFunc(svc.OAuth2.Callback))
-	mux.Handle("GET /oauth/callback", http.HandlerFunc(svc.OAuth2.Callback))
-	mux.Handle("GET /saml/login", optAuth.thenFunc(svc.SAML.Login))
-	mux.Handle("POST /saml/acs", http.HandlerFunc(svc.SAML.Callback))
-	mux.Handle("GET /saml/metadata", http.HandlerFunc(svc.SAML.Metadata))
-	mux.Handle("GET /saml/metadata/{id}", http.HandlerFunc(svc.SAML.Metadata))
-	mux.Handle("GET /saml/certificate", http.HandlerFunc(svc.SAML.Certificate))
-	mux.Handle("GET /saml/certificate/{id}", http.HandlerFunc(svc.SAML.Certificate))
-
-	// SCIM has no session or CSRF, the workspace-scoped token is the only gate.
-	if cfg.IAM.SCIM != nil {
-		mux.Handle("/scim/v2/{workspace_id}", cfg.IAM.SCIMHandler())
-		mux.Handle("/scim/v2/{workspace_id}/", cfg.IAM.SCIMHandler())
+	cfg.IAM.SendMagicLink = func(ctx context.Context, u *db.User, link string, ttl time.Duration) error {
+		return cfg.Email.SendMagicLinkEmail(ctx, u.ID, u.Email, link, ttl.String())
+	}
+	cfg.IAM.SendSignupLink = func(ctx context.Context, email, name, link string, ttl time.Duration) error {
+		return cfg.Email.SendSignupLinkEmail(ctx, email, name, cfg.Tenant.Single().Name, link, ttl.String())
 	}
 }

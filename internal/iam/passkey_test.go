@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
@@ -25,7 +26,7 @@ type passkeyDevice struct {
 
 func newPasskeyDevice() *passkeyDevice {
 	return &passkeyDevice{
-		rp:   virtualwebauthn.RelyingParty{ID: "nokku.test", Name: "Nokku", Origin: testBaseURL},
+		rp:   virtualwebauthn.RelyingParty{ID: "nokku.test", Name: "Test", Origin: testBaseURL},
 		auth: virtualwebauthn.NewAuthenticator(),
 		cred: virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2),
 	}
@@ -58,41 +59,27 @@ func (d *passkeyDevice) attest(t *testing.T, begin *httptest.ResponseRecorder) s
 	return virtualwebauthn.CreateAttestationResponse(d.rp, d.auth, d.cred, *options)
 }
 
-// assertion starts a sign-in and answers it. The cookies carry the ceremony.
-func (d *passkeyDevice) assertion(t *testing.T, svc *Service) (string, []*http.Cookie) {
+// assertion starts a sign-in on ws and answers it. The cookies carry the ceremony.
+func (d *passkeyDevice) assertion(t *testing.T, svc *Service, ws actor.Workspace) (string, []*http.Cookie) {
 	t.Helper()
-	begin := post(t.Context(), svc.Passkey.BeginLogin, "", nil)
+	begin := post(anon(t.Context(), ws), svc.Passkey.BeginLogin, "", nil)
 	require.Equal(t, http.StatusOK, begin.Code, begin.Body.String())
 	options, err := virtualwebauthn.ParseAssertionOptions(begin.Body.String())
 	require.NoError(t, err)
 	return virtualwebauthn.CreateAssertionResponse(d.rp, d.auth, d.cred, *options), begin.Result().Cookies()
 }
 
-// signUp creates an account with the device's passkey, email not verified yet.
-func (d *passkeyDevice) signUp(t *testing.T, e *testEnv) *db.User {
+// signUp takes an invite with the device's passkey and lands signed in.
+func (d *passkeyDevice) signUp(t *testing.T, e *testEnv, ws actor.Workspace, invite, email string) *db.User {
 	t.Helper()
-	email := "passkey@" + testDomain()
-	begin := post(t.Context(), e.svc.Passkey.BeginSignup, url.Values{"email": {email}}.Encode(), nil)
-	finish := post(t.Context(), e.svc.Passkey.FinishSignup, d.attest(t, begin), begin.Result().Cookies())
+	ctx := anon(t.Context(), ws)
+	form := url.Values{"invite": {invite}, "email": {email}, "name": {"New"}}.Encode()
+	begin := post(ctx, e.svc.Passkey.BeginSignup, form, nil)
+	finish := post(ctx, e.svc.Passkey.FinishSignup, d.attest(t, begin), begin.Result().Cookies())
 	require.Equal(t, http.StatusOK, finish.Code, finish.Body.String())
-	u := e.userByEmail(t, email)
+	u := e.userByEmail(t, ws, email)
 	require.NotNil(t, u, "the signup created no account")
 	return u
-}
-
-func (e *testEnv) verify(t *testing.T, u *db.User) {
-	t.Helper()
-	require.NoError(t, e.conn.Sys().VerifyUserEmail(t.Context(), u.ID))
-}
-
-func (e *testEnv) passkeys(t *testing.T, userID string) int {
-	t.Helper()
-	rows, err := e.conn.Sys().ListCredentialsByType(t.Context(), &db.ListCredentialsByTypeParams{
-		UserID: userID,
-		Type:   string(MethodPasskey),
-	})
-	require.NoError(t, err)
-	return len(rows)
 }
 
 func hasCookie(rec *httptest.ResponseRecorder, name string) bool {
@@ -104,45 +91,61 @@ func hasCookie(rec *httptest.ResponseRecorder, name string) bool {
 	return false
 }
 
-// A passkey signup makes an account that cannot sign in until the email is
-// confirmed. After that the passkey signs in, and neither ceremony can be
-// played a second time.
+// An invited person signs up with a passkey and is signed in at once. The
+// invite is spent, and neither ceremony can be played a second time.
 func TestPasskeySignupThenLogin(t *testing.T) {
 	e := newTestEnv(t)
 	d := newPasskeyDevice()
-
+	o := e.org(t)
+	ctx := anon(t.Context(), o.ws)
+	invite := e.invite(t, o.ws, "viewer", 1)
 	email := "new@" + testDomain()
-	begin := post(t.Context(), e.svc.Passkey.BeginSignup, url.Values{"email": {email}, "name": {"New"}}.Encode(), nil)
+
+	bogus := post(ctx, e.svc.Passkey.BeginSignup, url.Values{"invite": {"nope"}, "email": {email}}.Encode(), nil)
+	assert.Equal(t, http.StatusBadRequest, bogus.Code, "a signup without a valid invite started")
+
+	form := url.Values{"invite": {invite}, "email": {email}, "name": {"New"}}.Encode()
+	begin := post(ctx, e.svc.Passkey.BeginSignup, form, nil)
 	attestation := d.attest(t, begin)
-	finish := post(t.Context(), e.svc.Passkey.FinishSignup, attestation, begin.Result().Cookies())
+	finish := post(ctx, e.svc.Passkey.FinishSignup, attestation, begin.Result().Cookies())
 	require.Equal(t, http.StatusOK, finish.Code, finish.Body.String())
-	assert.True(t, hasCookie(finish, signupCookieName), "the signup marks the browser")
-	assert.False(t, hasCookie(finish, sessionCookieName), "a signup is not a sign-in")
+	assert.True(t, hasCookie(finish, sessionCookieName), "the signup signs in")
 
-	u := e.userByEmail(t, email)
+	u := e.userByEmail(t, o.ws, email)
 	require.NotNil(t, u)
-	assert.False(t, u.EmailVerified)
 	assert.Equal(t, "New", u.Name)
-	assert.Equal(t, 1, e.passkeys(t, u.ID))
+	assert.Equal(t, "viewer", u.Role, "the role comes from the invite")
+	assert.Equal(t, 1, e.passkeys(t, o.ws, u.ID))
+	assert.Equal(t, 1, e.sessions(t, o.ws, u.ID))
+	_, err := e.svc.LookupInvite(ctx, invite)
+	require.ErrorIs(t, err, ErrInviteSpent, "the one-use invite survived")
 
-	replay := post(t.Context(), e.svc.Passkey.FinishSignup, attestation, begin.Result().Cookies())
+	replay := post(ctx, e.svc.Passkey.FinishSignup, attestation, begin.Result().Cookies())
 	assert.Equal(t, http.StatusBadRequest, replay.Code, "a finished signup ran again: %s", replay.Body.String())
 
-	answer, cookies := d.assertion(t, e.svc)
-	early := post(t.Context(), e.svc.Passkey.FinishLogin, answer, cookies)
-	assert.Equal(t, http.StatusForbidden, early.Code, "sign-in before the email is confirmed: %s", early.Body.String())
-	assert.Zero(t, e.sessions(t, u.ID))
-
-	e.verify(t, u)
-	answer, cookies = d.assertion(t, e.svc)
-	login := post(t.Context(), e.svc.Passkey.FinishLogin, answer, cookies)
+	answer, cookies := d.assertion(t, e.svc, o.ws)
+	login := post(ctx, e.svc.Passkey.FinishLogin, answer, cookies)
 	require.Equal(t, http.StatusOK, login.Code, login.Body.String())
 	assert.True(t, hasCookie(login, sessionCookieName), "the sign-in sets a session")
-	assert.Equal(t, 1, e.sessions(t, u.ID))
+	assert.Equal(t, 2, e.sessions(t, o.ws, u.ID))
 
-	replay = post(t.Context(), e.svc.Passkey.FinishLogin, answer, cookies)
+	replay = post(ctx, e.svc.Passkey.FinishLogin, answer, cookies)
 	assert.Equal(t, http.StatusBadRequest, replay.Code, "a captured sign-in ran again: %s", replay.Body.String())
-	assert.Equal(t, 1, e.sessions(t, u.ID), "the replay opened a session")
+	assert.Equal(t, 2, e.sessions(t, o.ws, u.ID), "the replay opened a session")
+}
+
+// A passkey made for one workspace is unknown on another, even when both
+// workspaces answer on the same host in tests.
+func TestPasskeyStaysInItsWorkspace(t *testing.T) {
+	e := newTestEnv(t)
+	d := newPasskeyDevice()
+	a, b := e.org(t), e.org(t)
+	u := d.signUp(t, e, a.ws, e.invite(t, a.ws, "member", 0), "p@"+testDomain())
+
+	answer, cookies := d.assertion(t, e.svc, b.ws)
+	rec := post(anon(t.Context(), b.ws), e.svc.Passkey.FinishLogin, answer, cookies)
+	assert.Equal(t, http.StatusBadRequest, rec.Code, "workspace b accepted a passkey of workspace a")
+	assert.Zero(t, e.sessions(t, b.ws, u.ID))
 }
 
 // What a phishing page, another ceremony or a guessed key hands in is
@@ -150,8 +153,10 @@ func TestPasskeySignupThenLogin(t *testing.T) {
 func TestPasskeyLoginRefusesForgedAnswers(t *testing.T) {
 	e := newTestEnv(t)
 	d := newPasskeyDevice()
-	u := d.signUp(t, e)
-	e.verify(t, u)
+	o := e.org(t)
+	ctx := anon(t.Context(), o.ws)
+	u := d.signUp(t, e, o.ws, e.invite(t, o.ws, "member", 0), "forged@"+testDomain())
+	before := e.sessions(t, o.ws, u.ID)
 
 	otherSite := *d
 	otherSite.rp.Origin = "http://nokku.test.evil.example"
@@ -167,22 +172,22 @@ func TestPasskeyLoginRefusesForgedAnswers(t *testing.T) {
 		"an answer without a PIN or fingerprint": &unverified,
 		"an answer signed by another key":        &guessedKey,
 	} {
-		answer, cookies := device.assertion(t, e.svc)
-		rec := post(t.Context(), e.svc.Passkey.FinishLogin, answer, cookies)
+		answer, cookies := device.assertion(t, e.svc, o.ws)
+		rec := post(ctx, e.svc.Passkey.FinishLogin, answer, cookies)
 		assert.Equal(t, http.StatusBadRequest, rec.Code, "%s: %s", name, rec.Body.String())
 	}
 
-	answer, _ := d.assertion(t, e.svc)
-	_, cookies := d.assertion(t, e.svc)
-	rec := post(t.Context(), e.svc.Passkey.FinishLogin, answer, cookies)
+	answer, _ := d.assertion(t, e.svc, o.ws)
+	_, cookies := d.assertion(t, e.svc, o.ws)
+	rec := post(ctx, e.svc.Passkey.FinishLogin, answer, cookies)
 	assert.Equal(t, http.StatusBadRequest, rec.Code, "an answer to another ceremony: %s", rec.Body.String())
 
-	rec = post(t.Context(), e.svc.Passkey.FinishLogin, answer, nil)
+	rec = post(ctx, e.svc.Passkey.FinishLogin, answer, nil)
 	assert.Equal(t, http.StatusBadRequest, rec.Code, "an answer without its ceremony: %s", rec.Body.String())
-	assert.Zero(t, e.sessions(t, u.ID), "a refused answer opened a session")
+	assert.Equal(t, before, e.sessions(t, o.ws, u.ID), "a refused answer opened a session")
 
-	answer, cookies = d.assertion(t, e.svc)
-	rec = post(t.Context(), e.svc.Passkey.FinishLogin, answer, cookies)
+	answer, cookies = d.assertion(t, e.svc, o.ws)
+	rec = post(ctx, e.svc.Passkey.FinishLogin, answer, cookies)
 	assert.Equal(t, http.StatusOK, rec.Code, "the real device: %s", rec.Body.String())
 }
 
@@ -191,17 +196,22 @@ func TestPasskeyLoginRefusesForgedAnswers(t *testing.T) {
 func TestPasskeyRegistrationBelongsToItsAccount(t *testing.T) {
 	e := newTestEnv(t)
 	d := newPasskeyDevice()
-	domain := testDomain()
-	alice := e.user(t, "alice@"+domain, true)
-	mallory := e.user(t, "mallory@"+domain, true)
+	o := e.org(t)
+	alice := e.user(t, o.ws, "alice@"+testDomain(), "member")
+	mallory := e.user(t, o.ws, "mallory@"+testDomain(), "member")
 
-	anonymous := post(t.Context(), e.svc.Passkey.BeginRegistration, "", nil)
+	anonymous := post(anon(t.Context(), o.ws), e.svc.Passkey.BeginRegistration, "", nil)
 	assert.Equal(t, http.StatusUnauthorized, anonymous.Code, anonymous.Body.String())
 
-	begin := post(as(t.Context(), alice.ID), e.svc.Passkey.BeginRegistration, "", nil)
+	begin := post(as(t.Context(), o.ws, alice), e.svc.Passkey.BeginRegistration, "", nil)
 	attestation := d.attest(t, begin)
 
-	stolen := post(as(t.Context(), mallory.ID), e.svc.Passkey.FinishRegistration, attestation, begin.Result().Cookies())
+	stolen := post(
+		as(t.Context(), o.ws, mallory),
+		e.svc.Passkey.FinishRegistration,
+		attestation,
+		begin.Result().Cookies(),
+	)
 	assert.Equal(
 		t,
 		http.StatusBadRequest,
@@ -209,15 +219,20 @@ func TestPasskeyRegistrationBelongsToItsAccount(t *testing.T) {
 		"another account finished the ceremony: %s",
 		stolen.Body.String(),
 	)
-	assert.Zero(t, e.passkeys(t, mallory.ID))
+	assert.Zero(t, e.passkeys(t, o.ws, mallory.ID))
 
-	finish := post(as(t.Context(), alice.ID), e.svc.Passkey.FinishRegistration, attestation, begin.Result().Cookies())
+	finish := post(
+		as(t.Context(), o.ws, alice),
+		e.svc.Passkey.FinishRegistration,
+		attestation,
+		begin.Result().Cookies(),
+	)
 	require.Equal(t, http.StatusOK, finish.Code, finish.Body.String())
-	assert.Equal(t, 1, e.passkeys(t, alice.ID))
+	assert.Equal(t, 1, e.passkeys(t, o.ws, alice.ID))
 
-	answer, cookies := d.assertion(t, e.svc)
-	login := post(t.Context(), e.svc.Passkey.FinishLogin, answer, cookies)
+	answer, cookies := d.assertion(t, e.svc, o.ws)
+	login := post(anon(t.Context(), o.ws), e.svc.Passkey.FinishLogin, answer, cookies)
 	require.Equal(t, http.StatusOK, login.Code, login.Body.String())
-	assert.Equal(t, 1, e.sessions(t, alice.ID))
-	assert.Zero(t, e.sessions(t, mallory.ID))
+	assert.Equal(t, 1, e.sessions(t, o.ws, alice.ID))
+	assert.Zero(t, e.sessions(t, o.ws, mallory.ID))
 }

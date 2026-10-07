@@ -10,6 +10,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -40,9 +41,9 @@ func newDashboardService(cfg *config.Config) *dashboardService {
 
 func (s *dashboardService) GetDashboard(
 	ctx context.Context,
-	req *nokkuv1.GetDashboardRequest,
+	_ *nokkuv1.GetDashboardRequest,
 ) (*nokkuv1.GetDashboardResponse, error) {
-	wsID := req.GetWorkspaceId()
+	wsID := actor.WorkspaceIDFromContext(ctx)
 	now := time.Now()
 	seenAfter := now.Add(-db.DaemonOnlineWindow)
 	since := now.Truncate(time.Hour).Add(-23 * time.Hour)
@@ -78,7 +79,7 @@ func (s *dashboardService) GetDashboard(
 			return err
 		}
 		if hours, err = q.AuditActivityByHour(ctx, &db.AuditActivityByHourParams{
-			WorkspaceID: &wsID,
+			WorkspaceID: wsID,
 			Since:       since,
 		}); err != nil {
 			return err
@@ -93,7 +94,7 @@ func (s *dashboardService) GetDashboard(
 		Targets:             &counts.Targets,
 		TargetsOnline:       &counts.TargetsOnline,
 		TargetsManual:       &counts.TargetsManual,
-		Members:             &counts.Members,
+		Users:               &counts.Users,
 		Daemons:             new(int32(len(daemons))), //nolint:gosec // a workspace has far fewer daemons
 		RecordingBytes:      &usedBytes,
 		RecordingQuotaBytes: new(s.cfg.Entitlements.Resolve(ctx, wsID).RecordingStorageBytes),
@@ -184,10 +185,9 @@ func (s *dashboardService) recentChanges(
 	since time.Time,
 ) []*nokkuv1.EventLog {
 	events, _, err := s.cfg.Audit.List(ctx, &db.ListAuditLogsParams{
-		WorkspaceID: &wsID,
-		Outcome:     new("succeeded"),
-		StartDate:   &since,
-		Limit:       50,
+		Outcome:   new("succeeded"),
+		StartDate: &since,
+		Limit:     50,
 	})
 	if err != nil {
 		slog.Error("dashboard recent changes", "workspace_id", wsID, "error", err)

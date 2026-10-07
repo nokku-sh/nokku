@@ -1,5 +1,5 @@
-// Package actor carries the request identity through contexts. It has no
-// dependencies so db can use it without import cycles.
+// Package actor carries the request identity and its workspace through
+// contexts. It has no dependencies so db can use it without import cycles.
 package actor
 
 import (
@@ -21,8 +21,19 @@ type Principal struct {
 	ID    string
 	Kind  Kind
 	Email string
-	// WorkspaceID is set for machine principals, empty for global actors.
-	WorkspaceID string
+	// Role is the user's or service account's role, empty for daemons and SCIM.
+	Role string
+}
+
+// Workspace is the tenant a request runs in. The host names it before any
+// authentication happens.
+type Workspace struct {
+	ID   string
+	Slug string
+	Name string
+	// BaseURL is scheme and host with no path. Cookies, links, the passkey
+	// RP ID and the DPoP htu all derive from it.
+	BaseURL string
 }
 
 type principalKey struct{}
@@ -63,40 +74,18 @@ func SubjectFromContext(ctx context.Context) string {
 	return ""
 }
 
-type tenantKey struct{}
+type workspaceKey struct{}
 
-func AnnotateTenant(ctx context.Context, t string) context.Context {
-	return context.WithValue(ctx, tenantKey{}, t)
+func WithWorkspace(ctx context.Context, ws Workspace) context.Context {
+	return context.WithValue(ctx, workspaceKey{}, ws)
 }
 
-func tenantFromContext(ctx context.Context) (string, bool) {
-	t, ok := ctx.Value(tenantKey{}).(string)
-	return t, ok
+func WorkspaceFromContext(ctx context.Context) (Workspace, bool) {
+	ws, ok := ctx.Value(workspaceKey{}).(Workspace)
+	return ws, ok && ws.ID != ""
 }
 
 func WorkspaceIDFromContext(ctx context.Context) string {
-	t, _ := tenantFromContext(ctx)
-	return t
-}
-
-type memberKey struct{}
-
-type membership struct {
-	workspaceID string
-	role        string
-}
-
-// WithMember records a verified membership so later layers skip the lookup.
-func WithMember(ctx context.Context, workspaceID, role string) context.Context {
-	return context.WithValue(ctx, memberKey{}, membership{workspaceID, role})
-}
-
-func MemberOf(ctx context.Context) string {
-	m, _ := ctx.Value(memberKey{}).(membership)
-	return m.workspaceID
-}
-
-func MemberRole(ctx context.Context) string {
-	m, _ := ctx.Value(memberKey{}).(membership)
-	return m.role
+	ws, _ := WorkspaceFromContext(ctx)
+	return ws.ID
 }

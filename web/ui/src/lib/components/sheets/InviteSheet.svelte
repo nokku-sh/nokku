@@ -12,7 +12,7 @@
 
 	const ws = workspace.get();
 
-	const inviteUrl = (secret: string) => `${location.origin}/?invite=${secret}`;
+	const inviteUrl = (secret: string) => `${location.origin}/invite?token=${secret}`;
 
 	function mailto(secret: string, role?: string) {
 		const name = ws.data?.name ?? 'our workspace';
@@ -26,7 +26,7 @@
 	bind:open
 	kind={TokenKind.INVITE}
 	title="Invite people"
-	description="Anyone with the link joins with its role until it expires or runs out."
+	description="Anyone with the link creates an account with its role until it expires or runs out."
 	icon={UserPlus}
 	labelPlaceholder="Platform team onboarding"
 >

@@ -7,116 +7,71 @@ import type { MessageInitShape } from '@bufbuild/protobuf';
 import { InvitationService } from '#lib/gen/nokku/v1/invitation_pb.js';
 import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
-import { inviteToken, workspaceID } from '#lib/store.svelte.js';
 
+// The host picks the workspace, so none of these name one.
 export const workspace = {
-	get: () =>
-		useQuery(
-			WorkspaceService.method.getWorkspace,
-			() => ({ workspaceId: workspaceID.current }),
-			() => ({
-				enabled: !!workspaceID.current,
-				select: (res) => {
-					if (!res.workspace) workspaceID.current = '';
-					return res.workspace;
-				}
-			})
-		),
-	list: () =>
-		useQuery(
-			WorkspaceService.method.listWorkspaces,
-			{},
-			{
-				select: (res) => {
-					if (!workspaceID.current && res.workspaces.length > 0) {
-						workspaceID.current = res.workspaces[0].id;
-					}
-					if (!res.workspaces.length) workspaceID.current = '';
-					return res.workspaces;
-				}
+	get: () => useQuery(WorkspaceService.method.getWorkspace, {}, { select: (res) => res.workspace }),
+
+	update: () => useMutation(WorkspaceService.method.updateWorkspace),
+	delete: () =>
+		useMutation(WorkspaceService.method.deleteWorkspace, {
+			onSuccess: () => {
+				toast.success('Workspace deleted');
+				window.location.assign('/login');
 			}
-		),
-	getMember: (userId: MaybeGetter<string | undefined>) =>
+		}),
+	// Public, only on the root host of a hosted Nokku.
+	create: () => useMutation(WorkspaceService.method.createWorkspace)
+};
+
+export const users = {
+	get: (userId: MaybeGetter<string | undefined>) =>
 		useQuery(
-			WorkspaceService.method.getWorkspaceMember,
-			() => ({ workspaceId: workspaceID.current, userId: extract(userId) }),
-			() => ({
-				enabled: !!workspaceID.current && !!extract(userId),
-				select: (res) => res.member
-			})
+			WorkspaceService.method.getUser,
+			() => ({ userId: extract(userId) }),
+			() => ({ enabled: !!extract(userId), select: (res) => res.user })
 		),
-	listMembers: (
+	list: (
 		opts?: () => {
 			query?: string;
-			roleName?: string;
+			role?: string;
 			limit?: number;
 			offset?: number;
 		},
 		when?: () => boolean
 	) =>
 		useQuery(
-			WorkspaceService.method.listWorkspaceMembers,
-			() => ({
-				workspaceId: workspaceID.current,
-				limit: MAX_PAGE_SIZE,
-				offset: 0,
-				...opts?.()
-			}),
-			() => ({ enabled: !!workspaceID.current && (when?.() ?? true) })
+			WorkspaceService.method.listUsers,
+			() => ({ limit: MAX_PAGE_SIZE, offset: 0, ...opts?.() }),
+			() => ({ enabled: when?.() ?? true })
 		),
 
-	create: () =>
-		useMutation(WorkspaceService.method.createWorkspace, {
-			onSuccess: (data) => {
-				if (data.workspace) workspaceID.current = data.workspace.id;
-				toast.success('Workspace created');
-			}
+	updateRole: () => useMutation(WorkspaceService.method.updateUserRole),
+	setActive: () =>
+		useMutation(WorkspaceService.method.setUserActive, {
+			onSuccess: (_, v) => toast.success(v.active ? 'Account reactivated' : 'Account deactivated')
 		}),
-	update: () => useMutation(WorkspaceService.method.updateWorkspace),
 	delete: () =>
-		useMutation(WorkspaceService.method.deleteWorkspace, {
-			onSuccess: (_, variables) => {
-				if (variables.workspaceId === workspaceID.current) {
-					workspaceID.current = '';
-				}
-				toast.success('Workspace deleted');
-			}
+		useMutation(WorkspaceService.method.deleteUser, {
+			onSuccess: () => toast.success('Account deleted')
 		}),
-	updateMember: () => useMutation(WorkspaceService.method.updateWorkspaceMember),
-	removeMember: () =>
-		useMutation(WorkspaceService.method.removeWorkspaceMember, {
-			onSuccess: () => toast.success('Member removed')
-		}),
-	removeMembers: () =>
-		useBulkMutation(
-			WorkspaceService.method.removeWorkspaceMember,
-			(n) => `${plural(n, 'member')} removed`
-		),
-	updateOwner: () =>
-		useMutation(WorkspaceService.method.updateWorkspaceOwner, {
-			onSuccess: () => toast.success('Owner updated')
+	deleteMany: () =>
+		useBulkMutation(WorkspaceService.method.deleteUser, (n) => `${plural(n, 'account')} deleted`),
+	transferOwnership: () =>
+		useMutation(WorkspaceService.method.transferOwnership, {
+			onSuccess: () => toast.success('Ownership transferred')
 		})
 };
 
 export const invite = {
-	get: () =>
+	get: (token: MaybeGetter<string>) =>
 		useQuery(
 			InvitationService.method.getInvitation,
-			() => ({ token: inviteToken.current }),
-			() => ({ enabled: !!inviteToken.current })
+			() => ({ token: extract(token) }),
+			() => ({ enabled: !!extract(token), retry: false })
 		),
-
-	claim: () =>
-		useMutation(InvitationService.method.acceptInvitation, {
-			onSuccess: () => {
-				inviteToken.current = '';
-				return toast.success('Welcome');
-			},
-			onError: () => {
-				inviteToken.current = '';
-				return toast.error('Failed to join workspace');
-			}
-		})
+	// Always succeeds from the outside, the link lands in the inbox or not.
+	accept: () => useMutation(InvitationService.method.acceptInvitation)
 };
 
 export type AuditFilter = MessageInitShape<typeof AuditLogFilterSchema>;
@@ -133,26 +88,20 @@ export const cleanFilters = <T extends object>(filters?: T): Partial<T> =>
 export const util = {
 	getVersion: () =>
 		useQuery(UtilService.method.getVersion, undefined, () => ({
-			enabled: !!workspaceID.current,
 			select: (res) => res.version
 		})),
 	// Who runs this server. Empty fields mean not configured, typical for self-hosting.
 	instanceInfo: () =>
 		useQuery(UtilService.method.getInstanceInfo, undefined, () => ({ staleTime: Infinity })),
 	getLogs: (opts?: () => AuditQuery) =>
-		useQuery(
-			UtilService.method.listAuditLogs,
-			() => {
-				const { filter, limit, offset } = opts?.() ?? {};
-				return {
-					workspaceId: workspaceID.current,
-					limit: limit ?? MAX_PAGE_SIZE,
-					offset: offset ?? 0,
-					filter: cleanFilters(filter) as AuditFilter
-				};
-			},
-			() => ({ enabled: !!workspaceID.current })
-		),
+		useQuery(UtilService.method.listAuditLogs, () => {
+			const { filter, limit, offset } = opts?.() ?? {};
+			return {
+				limit: limit ?? MAX_PAGE_SIZE,
+				offset: offset ?? 0,
+				filter: cleanFilters(filter) as AuditFilter
+			};
+		}),
 
 	exportLogs: () =>
 		useMutation(UtilService.method.exportAuditLogs, {

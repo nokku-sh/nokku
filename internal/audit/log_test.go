@@ -37,11 +37,11 @@ func TestRequestTarget(t *testing.T) {
 		msg  proto.Message
 		want string
 	}{
-		{&nokkuv1.DeleteTargetRequest{WorkspaceId: new("ws"), Id: new("t1")}, "t1"},
-		{&nokkuv1.CreateTargetRequest{WorkspaceId: new("ws"), CaId: new("ca"), Name: new("web")}, "web"},
-		{&nokkuv1.UpdateWorkspaceMemberRequest{WorkspaceId: new("ws"), UserId: new("u1")}, "u1"},
-		{&nokkuv1.DeleteWorkspaceRequest{WorkspaceId: new("ws")}, ""},
-		{&nokkuv1.ChangePasswordRequest{CurrentPassword: new("old"), NewPassword: new("new")}, ""},
+		{&nokkuv1.DeleteTargetRequest{Id: new("t1")}, "t1"},
+		{&nokkuv1.CreateTargetRequest{CaId: new("ca"), Name: new("web")}, "web"},
+		{&nokkuv1.UpdateUserRoleRequest{UserId: new("u1"), Role: new("admin")}, "u1"},
+		{&nokkuv1.DeleteWorkspaceRequest{}, ""},
+		{&nokkuv1.ConsumeMagicLinkRequest{Token: new("secret")}, ""},
 	}
 	for _, tt := range tests {
 		if got := requestTarget(tt.msg.ProtoReflect()); got != tt.want {

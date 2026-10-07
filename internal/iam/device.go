@@ -20,7 +20,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/util"
+	"github.com/nokku-sh/nokku/internal/realip"
 )
 
 const (
@@ -55,10 +55,11 @@ type DeviceFlow struct {
 // deviceGrant is stored under the device code, and under the user code until
 // someone decides on it.
 type deviceGrant struct {
-	DeviceCode string `json:"device_code"`
-	UserCode   string `json:"user_code"`
-	Status     string `json:"status"`
-	UserID     string `json:"user_id,omitempty"`
+	DeviceCode  string `json:"device_code"`
+	UserCode    string `json:"user_code"`
+	WorkspaceID string `json:"workspace_id"`
+	Status      string `json:"status"`
+	UserID      string `json:"user_id,omitempty"`
 	// Who asked. The approval page shows it, so a code someone else started
 	// stands out.
 	IP        string `json:"ip,omitempty"`
@@ -83,11 +84,12 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	g := deviceGrant{
-		DeviceCode: deviceCode,
-		UserCode:   userCode,
-		Status:     grantPending,
-		IP:         util.SanitizeUTF8(util.ClientIP(r.Header, r.RemoteAddr)),
-		UserAgent:  truncate(util.SanitizeUTF8(r.Header.Get("User-Agent")), maxUserAgent),
+		DeviceCode:  deviceCode,
+		UserCode:    userCode,
+		WorkspaceID: actor.WorkspaceIDFromContext(r.Context()),
+		Status:      grantPending,
+		IP:          strings.ToValidUTF8(realip.Client(r.Header, r.RemoteAddr), ""),
+		UserAgent:   truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxUserAgent),
 	}
 	b, _ := json.Marshal(g)
 	if err := h.grants.Set(r.Context(), "device:code:"+deviceCode, b, grantTTL); err != nil ||
@@ -96,11 +98,12 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	base := baseURL(r.Context())
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"device_code":               deviceCode,
 		"user_code":                 userCode,
-		"verification_uri":          h.svc.baseURL + "/device",
-		"verification_uri_complete": h.svc.baseURL + "/device?user_code=" + userCode,
+		"verification_uri":          base + "/device",
+		"verification_uri_complete": base + "/device?user_code=" + userCode,
 		"expires_in":                int(grantTTL.Seconds()),
 		"interval":                  int(deviceInterval.Seconds()),
 	})
@@ -111,7 +114,8 @@ func (h *DeviceFlow) Info(w http.ResponseWriter, r *http.Request) {
 	userCode := normalizeUserCode(r.URL.Query().Get("user_code"))
 	var g deviceGrant
 	b, err := h.grants.Get(r.Context(), "device:user:"+userCode)
-	if err != nil || json.Unmarshal(b, &g) != nil || g.Status != grantPending {
+	if err != nil || json.Unmarshal(b, &g) != nil || g.Status != grantPending ||
+		g.WorkspaceID != actor.WorkspaceIDFromContext(r.Context()) {
 		writeError(w, http.StatusNotFound, "invalid or expired code")
 		return
 	}
@@ -139,14 +143,16 @@ func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool
 		return
 	}
 
-	// Consuming the user code makes the decision single-use.
-	b, err := h.grants.GetDel(r.Context(), "device:user:"+userCode)
-	if err != nil {
+	// A code of another workspace is not consumed, its own host decides it.
+	var g deviceGrant
+	b, err := h.grants.Get(r.Context(), "device:user:"+userCode)
+	if err != nil || json.Unmarshal(b, &g) != nil || g.Status != grantPending ||
+		g.WorkspaceID != actor.WorkspaceIDFromContext(r.Context()) {
 		writeError(w, http.StatusBadRequest, "invalid or expired code")
 		return
 	}
-	var g deviceGrant
-	if err := json.Unmarshal(b, &g); err != nil || g.Status != grantPending {
+	// Consuming the user code makes the decision single-use.
+	if b, err = h.grants.GetDel(r.Context(), "device:user:"+userCode); err != nil || json.Unmarshal(b, &g) != nil {
 		writeError(w, http.StatusBadRequest, "invalid or expired code")
 		return
 	}
@@ -180,7 +186,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var g deviceGrant
-	if err := json.Unmarshal(b, &g); err != nil {
+	if err := json.Unmarshal(b, &g); err != nil || g.WorkspaceID != actor.WorkspaceIDFromContext(ctx) {
 		writeOAuthError(w, "expired_token")
 		return
 	}
@@ -209,7 +215,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		)
 		writeOAuthError(w, "access_denied")
 	case grantApproved:
-		u, err := h.svc.getUserByID(ctx, g.UserID)
+		u, err := h.svc.getUser(ctx, g.UserID)
 		if err != nil || !u.Active {
 			writeOAuthError(w, "access_denied")
 			return
@@ -219,7 +225,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		if derr != nil {
 			// Retryable, the grant stays usable. The advertised URL also
 			// fixes clients that signed the wrong htu.
-			h.svc.AdvertiseDPoPNonce(w.Header())
+			h.svc.AdvertiseDPoPNonce(ctx, w.Header())
 			if errors.Is(derr, ErrDPoPNonce) {
 				writeOAuthError(w, "use_dpop_nonce")
 			} else {
@@ -239,7 +245,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			Kind:      actor.KindCLI,
 			Method:    MethodDevice,
 			Binding:   binding,
-			Label:     cmp.Or(truncate(util.SanitizeUTF8(r.Header.Get("User-Agent")), maxLabel), "Terminal"),
+			Label:     cmp.Or(truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxLabel), "Terminal"),
 			TTL:       deviceSessionTTL,
 		})
 		if err != nil {
@@ -276,7 +282,14 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 // signed in with before, and remembers it. The marker is the one a browser
 // gets from RememberDevice, with the key in place of the cookie.
 func (s *Service) rememberTerminal(ctx context.Context, userID, binding, label string) bool {
-	sessions, err := s.sys.ListSessionsBySubject(ctx, userID)
+	var sessions []*db.Session
+	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
+		sessions, err = q.ListSessionsBySubject(
+			ctx,
+			&db.ListSessionsBySubjectParams{WorkspaceID: ws, SubjectID: userID},
+		)
+		return err
+	})
 	if err != nil {
 		slog.Error("failed to look up remembered terminals", "error", err)
 		return true
@@ -289,12 +302,7 @@ func (s *Service) rememberTerminal(ctx context.Context, userID, binding, label s
 		if sess.ExpiresAt != nil && !sess.ExpiresAt.After(now) {
 			continue
 		}
-		if err := s.sys.TouchSession(
-			ctx,
-			&db.TouchSessionParams{TokenHash: sess.TokenHash, LastSeenAt: &now},
-		); err != nil {
-			slog.Debug("failed to touch device session", "error", err)
-		}
+		s.touchSession(ctx, sess.TokenHash)
 		return false
 	}
 	// The marker's token goes nowhere, nothing can present it.
@@ -312,8 +320,8 @@ func (s *Service) rememberTerminal(ctx context.Context, userID, binding, label s
 }
 
 // Nonce lets devices fetch a nonce before their first proof.
-func (h *DeviceFlow) Nonce(w http.ResponseWriter, _ *http.Request) {
-	h.svc.AdvertiseDPoPNonce(w.Header())
+func (h *DeviceFlow) Nonce(w http.ResponseWriter, r *http.Request) {
+	h.svc.AdvertiseDPoPNonce(r.Context(), w.Header())
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -322,7 +330,7 @@ func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string
 	if proof == "" {
 		return "", ErrDPoPNonce
 	}
-	return h.svc.DPoP.Verify(ctx, proof, "", r.Method, h.svc.baseURL+r.URL.Path)
+	return h.svc.DPoP.Verify(ctx, proof, "", r.Method, baseURL(ctx)+r.URL.Path)
 }
 
 // pollTrack reports a too-fast poll. The interval grows per slow_down, and a

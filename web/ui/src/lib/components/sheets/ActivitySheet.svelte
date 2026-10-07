@@ -18,7 +18,7 @@
 
 	const actorHref = $derived.by(() => {
 		if (!log?.actorId) return undefined;
-		if (log.actorKind === 'user') return `/access/members?id=${log.actorId}`;
+		if (log.actorKind === 'user') return `/access/users?id=${log.actorId}`;
 		if (log.actorKind === 'service_account') return `/access/service-accounts?id=${log.actorId}`;
 		return undefined;
 	});

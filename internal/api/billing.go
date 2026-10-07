@@ -10,6 +10,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/billing"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -26,38 +27,35 @@ func newBillingService(cfg *config.Config) *billingService {
 
 func (s *billingService) GetBilling(
 	ctx context.Context,
-	req *nokkuv1.GetBillingRequest,
+	_ *nokkuv1.GetBillingRequest,
 ) (*nokkuv1.GetBillingResponse, error) {
-	if req.GetWorkspaceId() == "" {
-		return nil, newError(connect.CodeInvalidArgument, "Workspace ID is required")
-	}
-
-	var memberCount int64
+	ws := actor.WorkspaceIDFromContext(ctx)
+	var userCount int64
 	var resourceCount int64
 	var sub *db.WorkspaceSubscription
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		memberCount, err = q.CountWorkspaceSeats(ctx, req.GetWorkspaceId())
+		userCount, err = q.CountActiveUsers(ctx, ws)
 		if err != nil {
 			return err
 		}
-		resourceCount, err = q.CountWorkspaceResources(ctx, req.GetWorkspaceId())
+		resourceCount, err = q.CountWorkspaceResources(ctx, ws)
 		if err != nil {
 			return err
 		}
 		// Community workspaces have no subscription row.
-		sub, _ = q.GetSubscription(ctx, req.GetWorkspaceId())
+		sub, _ = q.GetSubscription(ctx, ws)
 		return nil
 	}); err != nil {
 		return nil, err
 	}
 
-	plan := s.cfg.Entitlements.Resolve(ctx, req.GetWorkspaceId())
+	plan := s.cfg.Entitlements.Resolve(ctx, ws)
 	resp := &nokkuv1.GetBillingResponse{
 		Plan:          new(plan.Name),
 		Mode:          new(string(s.cfg.Entitlements.Mode())),
 		Features:      featuresProto(plan),
 		Quotas:        quotasProto(plan),
-		MemberCount:   new(memberCount),
+		UserCount:     new(userCount),
 		ResourceCount: new(resourceCount),
 	}
 
@@ -74,12 +72,12 @@ func (s *billingService) GetBilling(
 
 func (s *billingService) CreateCheckout(
 	ctx context.Context,
-	req *nokkuv1.CreateCheckoutRequest,
+	_ *nokkuv1.CreateCheckoutRequest,
 ) (*nokkuv1.CreateCheckoutResponse, error) {
 	if !s.cfg.Billing.Enabled() {
 		return nil, errBillingDisabled
 	}
-	if err := s.requireWorkspaceOwner(ctx, req.GetWorkspaceId()); err != nil {
+	if err := requireOwner(ctx); err != nil {
 		return nil, err
 	}
 	user, err := s.cfg.IAM.GetUser(ctx)
@@ -87,7 +85,7 @@ func (s *billingService) CreateCheckout(
 		return nil, err
 	}
 
-	url, err := s.cfg.Billing.Checkout(ctx, req.GetWorkspaceId(), user.Email)
+	url, err := s.cfg.Billing.Checkout(ctx, actor.WorkspaceIDFromContext(ctx), user.Email)
 	if errors.Is(err, billing.ErrActiveSubscription) {
 		return nil, newError(
 			connect.CodeFailedPrecondition,
@@ -105,15 +103,15 @@ func (s *billingService) CreateCheckout(
 
 func (s *billingService) CreatePortal(
 	ctx context.Context,
-	req *nokkuv1.CreatePortalRequest,
+	_ *nokkuv1.CreatePortalRequest,
 ) (*nokkuv1.CreatePortalResponse, error) {
 	if !s.cfg.Billing.Enabled() {
 		return nil, errBillingDisabled
 	}
-	if err := s.requireWorkspaceOwner(ctx, req.GetWorkspaceId()); err != nil {
+	if err := requireOwner(ctx); err != nil {
 		return nil, err
 	}
-	url, err := s.cfg.Billing.Portal(ctx, req.GetWorkspaceId())
+	url, err := s.cfg.Billing.Portal(ctx, actor.WorkspaceIDFromContext(ctx))
 	if err != nil {
 		return nil, errInternal
 	}
@@ -129,12 +127,12 @@ func (s *billingService) CancelSubscription(
 	if !s.cfg.Billing.Enabled() {
 		return nil, errBillingDisabled
 	}
-	if err := s.requireWorkspaceOwner(ctx, req.GetWorkspaceId()); err != nil {
+	if err := requireOwner(ctx); err != nil {
 		return nil, err
 	}
 	if err := s.cfg.Billing.Cancel(
 		ctx,
-		req.GetWorkspaceId(),
+		actor.WorkspaceIDFromContext(ctx),
 		req.GetImmediate(),
 		req.GetReason(),
 	); err != nil {
@@ -192,17 +190,11 @@ func (s *billingService) ActivateLicense(
 	return &nokkuv1.ActivateLicenseResponse{}, nil
 }
 
-func (s *billingService) requireWorkspaceOwner(ctx context.Context, workspaceID string) error {
-	err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
-		return checkWorkspaceOwner(ctx, q, workspaceID)
-	})
-	if errors.Is(err, errPermissionDenied) {
-		return connect.NewError(
-			connect.CodePermissionDenied,
-			errors.New("workspace owner required"),
-		)
+func requireOwner(ctx context.Context) error {
+	if callerRole(ctx) != db.RoleOwner {
+		return connect.NewError(connect.CodePermissionDenied, errors.New("workspace owner required"))
 	}
-	return err
+	return nil
 }
 
 // featuresProto returns the whole catalog so clients can render locked features.

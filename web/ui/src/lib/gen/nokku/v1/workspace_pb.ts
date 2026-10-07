@@ -8,6 +8,8 @@ import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import { file_nokku_v1_access } from "./access_pb";
+import type { User } from "./account_pb";
+import { file_nokku_v1_account } from "./account_pb";
 import type { DaemonConfig } from "./daemon_pb";
 import { file_nokku_v1_daemon } from "./daemon_pb";
 import type { Message } from "@bufbuild/protobuf";
@@ -16,7 +18,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/workspace.proto.
  */
 export const file_nokku_v1_workspace: GenFile = /*@__PURE__*/
-  fileDesc("Chhub2trdS92MS93b3Jrc3BhY2UucHJvdG8SCG5va2t1LnYxIusBCglXb3Jrc3BhY2USCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRISCgpjcmVhdGVkX2J5GAQgASgJEgwKBHJvbGUYBSABKAkSLQoIc2V0dGluZ3MYBiABKAsyGy5ub2trdS52MS5Xb3Jrc3BhY2VTZXR0aW5ncxIuCgpjcmVhdGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLsAQoPV29ya3NwYWNlTWVtYmVyEgoKAmlkGAEgASgJEhQKDHdvcmtzcGFjZV9pZBgCIAEoCRIMCgRuYW1lGAMgASgJEg0KBWVtYWlsGAQgASgJEhYKDmVtYWlsX3ZlcmlmaWVkGAUgASgIEg8KB3BpY3R1cmUYBiABKAkSEQoJcm9sZV9uYW1lGAcgASgJEi4KCmNyZWF0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIoMBChFXb3Jrc3BhY2VTZXR0aW5ncxI1ChVkZWZhdWx0X2RhZW1vbl9jb25maWcYASABKAsyFi5ub2trdS52MS5EYWVtb25Db25maWcSGQoRYXVkaXRfd2ViaG9va191cmwYAiABKAkSHAoUYXVkaXRfd2ViaG9va19zZWNyZXQYAyABKAkiNQoTR2V0V29ya3NwYWNlUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBIj4KFEdldFdvcmtzcGFjZVJlc3BvbnNlEiYKCXdvcmtzcGFjZRgBIAEoCzITLm5va2t1LnYxLldvcmtzcGFjZSJRChZDcmVhdGVXb3Jrc3BhY2VSZXF1ZXN0EhgKBG5hbWUYASABKAlCCrpIB3IFEAMYgAISHQoLZGVzY3JpcHRpb24YAiABKAlCCLpIBXIDGOgHIkEKF0NyZWF0ZVdvcmtzcGFjZVJlc3BvbnNlEiYKCXdvcmtzcGFjZRgBIAEoCzITLm5va2t1LnYxLldvcmtzcGFjZSKgAQoWVXBkYXRlV29ya3NwYWNlUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAiABKAlCCrpIB3IFEAMYgAISHQoLZGVzY3JpcHRpb24YAyABKAlCCLpIBXIDGOgHEi0KCHNldHRpbmdzGAQgASgLMhsubm9ra3UudjEuV29ya3NwYWNlU2V0dGluZ3MiQQoXVXBkYXRlV29ya3NwYWNlUmVzcG9uc2USJgoJd29ya3NwYWNlGAEgASgLMhMubm9ra3UudjEuV29ya3NwYWNlIjgKFkRlbGV0ZVdvcmtzcGFjZVJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABASIZChdEZWxldGVXb3Jrc3BhY2VSZXNwb25zZSIXChVMaXN0V29ya3NwYWNlc1JlcXVlc3QiQQoWTGlzdFdvcmtzcGFjZXNSZXNwb25zZRInCgp3b3Jrc3BhY2VzGAEgAygLMhMubm9ra3UudjEuV29ya3NwYWNlIlYKGUdldFdvcmtzcGFjZU1lbWJlclJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIZCgd1c2VyX2lkGAIgASgJQgi6SAVyA7ABASJHChpHZXRXb3Jrc3BhY2VNZW1iZXJSZXNwb25zZRIpCgZtZW1iZXIYASABKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VNZW1iZXIikgEKG0xpc3RXb3Jrc3BhY2VNZW1iZXJzUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAIgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAMgASgFQge6SAQaAigAEg0KBXF1ZXJ5GAQgASgJEhEKCXJvbGVfbmFtZRgFIAEoCSJZChxMaXN0V29ya3NwYWNlTWVtYmVyc1Jlc3BvbnNlEioKB21lbWJlcnMYASADKAsyGS5ub2trdS52MS5Xb3Jrc3BhY2VNZW1iZXISDQoFdG90YWwYAiABKAUiWQocUmVtb3ZlV29ya3NwYWNlTWVtYmVyUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhkKB3VzZXJfaWQYAiABKAlCCLpIBXIDsAEBIh8KHVJlbW92ZVdvcmtzcGFjZU1lbWJlclJlc3BvbnNlImwKHFVwZGF0ZVdvcmtzcGFjZU1lbWJlclJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIZCgd1c2VyX2lkGAIgASgJQgi6SAVyA7ABARIRCglyb2xlX25hbWUYAyABKAkiHwodVXBkYXRlV29ya3NwYWNlTWVtYmVyUmVzcG9uc2UiWgobVXBkYXRlV29ya3NwYWNlT3duZXJSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJbmV3X293bmVyGAIgASgJQgi6SAVyA7ABASIeChxVcGRhdGVXb3Jrc3BhY2VPd25lclJlc3BvbnNlMp0IChBXb3Jrc3BhY2VTZXJ2aWNlElgKDEdldFdvcmtzcGFjZRIdLm5va2t1LnYxLkdldFdvcmtzcGFjZVJlcXVlc3QaHi5ub2trdS52MS5HZXRXb3Jrc3BhY2VSZXNwb25zZSIJkAIBwvMYAhABEl4KDkxpc3RXb3Jrc3BhY2VzEh8ubm9ra3UudjEuTGlzdFdvcmtzcGFjZXNSZXF1ZXN0GiAubm9ra3UudjEuTGlzdFdvcmtzcGFjZXNSZXNwb25zZSIJkAIBwvMYAhABEl4KD0NyZWF0ZVdvcmtzcGFjZRIgLm5va2t1LnYxLkNyZWF0ZVdvcmtzcGFjZVJlcXVlc3QaIS5ub2trdS52MS5DcmVhdGVXb3Jrc3BhY2VSZXNwb25zZSIGwvMYAhABEl4KD1VwZGF0ZVdvcmtzcGFjZRIgLm5va2t1LnYxLlVwZGF0ZVdvcmtzcGFjZVJlcXVlc3QaIS5ub2trdS52MS5VcGRhdGVXb3Jrc3BhY2VSZXNwb25zZSIGwvMYAhgEEl4KD0RlbGV0ZVdvcmtzcGFjZRIgLm5va2t1LnYxLkRlbGV0ZVdvcmtzcGFjZVJlcXVlc3QaIS5ub2trdS52MS5EZWxldGVXb3Jrc3BhY2VSZXNwb25zZSIGwvMYAhgFEmoKEkdldFdvcmtzcGFjZU1lbWJlchIjLm5va2t1LnYxLkdldFdvcmtzcGFjZU1lbWJlclJlcXVlc3QaJC5ub2trdS52MS5HZXRXb3Jrc3BhY2VNZW1iZXJSZXNwb25zZSIJkAIBwvMYAhgCEnAKFExpc3RXb3Jrc3BhY2VNZW1iZXJzEiUubm9ra3UudjEuTGlzdFdvcmtzcGFjZU1lbWJlcnNSZXF1ZXN0GiYubm9ra3UudjEuTGlzdFdvcmtzcGFjZU1lbWJlcnNSZXNwb25zZSIJkAIBwvMYAhgCEnAKFVJlbW92ZVdvcmtzcGFjZU1lbWJlchImLm5va2t1LnYxLlJlbW92ZVdvcmtzcGFjZU1lbWJlclJlcXVlc3QaJy5ub2trdS52MS5SZW1vdmVXb3Jrc3BhY2VNZW1iZXJSZXNwb25zZSIGwvMYAhgEEnAKFVVwZGF0ZVdvcmtzcGFjZU1lbWJlchImLm5va2t1LnYxLlVwZGF0ZVdvcmtzcGFjZU1lbWJlclJlcXVlc3QaJy5ub2trdS52MS5VcGRhdGVXb3Jrc3BhY2VNZW1iZXJSZXNwb25zZSIGwvMYAhgEEm0KFFVwZGF0ZVdvcmtzcGFjZU93bmVyEiUubm9ra3UudjEuVXBkYXRlV29ya3NwYWNlT3duZXJSZXF1ZXN0GiYubm9ra3UudjEuVXBkYXRlV29ya3NwYWNlT3duZXJSZXNwb25zZSIGwvMYAhABYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_daemon]);
+  fileDesc("Chhub2trdS92MS93b3Jrc3BhY2UucHJvdG8SCG5va2t1LnYxItcBCglXb3Jrc3BhY2USCgoCaWQYASABKAkSDAoEc2x1ZxgCIAEoCRIMCgRuYW1lGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEi0KCHNldHRpbmdzGAUgASgLMhsubm9ra3UudjEuV29ya3NwYWNlU2V0dGluZ3MSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAimAEKEVdvcmtzcGFjZVNldHRpbmdzEjUKFWRlZmF1bHRfZGFlbW9uX2NvbmZpZxgBIAEoCzIWLm5va2t1LnYxLkRhZW1vbkNvbmZpZxIZChFhdWRpdF93ZWJob29rX3VybBgCIAEoCRIcChRhdWRpdF93ZWJob29rX3NlY3JldBgDIAEoCRITCgtlbmZvcmNlX3NzbxgEIAEoCCIVChNHZXRXb3Jrc3BhY2VSZXF1ZXN0Ij4KFEdldFdvcmtzcGFjZVJlc3BvbnNlEiYKCXdvcmtzcGFjZRgBIAEoCzITLm5va2t1LnYxLldvcmtzcGFjZSKAAQoWVXBkYXRlV29ya3NwYWNlUmVxdWVzdBIYCgRuYW1lGAEgASgJQgq6SAdyBRADGIACEh0KC2Rlc2NyaXB0aW9uGAIgASgJQgi6SAVyAxjoBxItCghzZXR0aW5ncxgDIAEoCzIbLm5va2t1LnYxLldvcmtzcGFjZVNldHRpbmdzIkEKF1VwZGF0ZVdvcmtzcGFjZVJlc3BvbnNlEiYKCXdvcmtzcGFjZRgBIAEoCzITLm5va2t1LnYxLldvcmtzcGFjZSIYChZEZWxldGVXb3Jrc3BhY2VSZXF1ZXN0IhkKF0RlbGV0ZVdvcmtzcGFjZVJlc3BvbnNlIq0BChZDcmVhdGVXb3Jrc3BhY2VSZXF1ZXN0Ej0KBHNsdWcYASABKAlCL7pILHIqEAEYPzIkXlthLXowLTldKFthLXowLTktXXswLDYxfVthLXowLTldKT8kEhgKBG5hbWUYAiABKAlCCrpIB3IFEAMYgAISHAoLb3duZXJfZW1haWwYAyABKAlCB7pIBHICYAESHAoKb3duZXJfbmFtZRgEIAEoCUIIukgFcgMYgAIiJgoXQ3JlYXRlV29ya3NwYWNlUmVzcG9uc2USCwoDdXJsGAEgASgJImIKEExpc3RVc2Vyc1JlcXVlc3QSGAoFbGltaXQYASABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAiABKAVCB7pIBBoCKAASDQoFcXVlcnkYAyABKAkSDAoEcm9sZRgEIAEoCSJBChFMaXN0VXNlcnNSZXNwb25zZRIdCgV1c2VycxgBIAMoCzIOLm5va2t1LnYxLlVzZXISDQoFdG90YWwYAiABKAUiKwoOR2V0VXNlclJlcXVlc3QSGQoHdXNlcl9pZBgBIAEoCUIIukgFcgOwAQEiLwoPR2V0VXNlclJlc3BvbnNlEhwKBHVzZXIYASABKAsyDi5ub2trdS52MS5Vc2VyImYKFVVwZGF0ZVVzZXJSb2xlUmVxdWVzdBIZCgd1c2VyX2lkGAEgASgJQgi6SAVyA7ABARIyCgRyb2xlGAIgASgJQiS6SCFyH1IGbWVtYmVyUgZ2aWV3ZXJSBmVkaXRvclIFYWRtaW4iGAoWVXBkYXRlVXNlclJvbGVSZXNwb25zZSJBChRTZXRVc2VyQWN0aXZlUmVxdWVzdBIZCgd1c2VyX2lkGAEgASgJQgi6SAVyA7ABARIOCgZhY3RpdmUYAiABKAgiFwoVU2V0VXNlckFjdGl2ZVJlc3BvbnNlIi4KEURlbGV0ZVVzZXJSZXF1ZXN0EhkKB3VzZXJfaWQYASABKAlCCLpIBXIDsAEBIhQKEkRlbGV0ZVVzZXJSZXNwb25zZSI6ChhUcmFuc2Zlck93bmVyc2hpcFJlcXVlc3QSHgoMbmV3X293bmVyX2lkGAEgASgJQgi6SAVyA7ABASIbChlUcmFuc2Zlck93bmVyc2hpcFJlc3BvbnNlMpYHChBXb3Jrc3BhY2VTZXJ2aWNlElgKDEdldFdvcmtzcGFjZRIdLm5va2t1LnYxLkdldFdvcmtzcGFjZVJlcXVlc3QaHi5ub2trdS52MS5HZXRXb3Jrc3BhY2VSZXNwb25zZSIJkAIBwvMYAhABEl4KD1VwZGF0ZVdvcmtzcGFjZRIgLm5va2t1LnYxLlVwZGF0ZVdvcmtzcGFjZVJlcXVlc3QaIS5ub2trdS52MS5VcGRhdGVXb3Jrc3BhY2VSZXNwb25zZSIGwvMYAhgEEl4KD0RlbGV0ZVdvcmtzcGFjZRIgLm5va2t1LnYxLkRlbGV0ZVdvcmtzcGFjZVJlcXVlc3QaIS5ub2trdS52MS5EZWxldGVXb3Jrc3BhY2VSZXNwb25zZSIGwvMYAhgFEk8KCUxpc3RVc2VycxIaLm5va2t1LnYxLkxpc3RVc2Vyc1JlcXVlc3QaGy5ub2trdS52MS5MaXN0VXNlcnNSZXNwb25zZSIJkAIBwvMYAhgCEkkKB0dldFVzZXISGC5ub2trdS52MS5HZXRVc2VyUmVxdWVzdBoZLm5va2t1LnYxLkdldFVzZXJSZXNwb25zZSIJkAIBwvMYAhgCElsKDlVwZGF0ZVVzZXJSb2xlEh8ubm9ra3UudjEuVXBkYXRlVXNlclJvbGVSZXF1ZXN0GiAubm9ra3UudjEuVXBkYXRlVXNlclJvbGVSZXNwb25zZSIGwvMYAhgEElgKDVNldFVzZXJBY3RpdmUSHi5ub2trdS52MS5TZXRVc2VyQWN0aXZlUmVxdWVzdBofLm5va2t1LnYxLlNldFVzZXJBY3RpdmVSZXNwb25zZSIGwvMYAhgEEk8KCkRlbGV0ZVVzZXISGy5ub2trdS52MS5EZWxldGVVc2VyUmVxdWVzdBocLm5va2t1LnYxLkRlbGV0ZVVzZXJSZXNwb25zZSIGwvMYAhgEEmQKEVRyYW5zZmVyT3duZXJzaGlwEiIubm9ra3UudjEuVHJhbnNmZXJPd25lcnNoaXBSZXF1ZXN0GiMubm9ra3UudjEuVHJhbnNmZXJPd25lcnNoaXBSZXNwb25zZSIGwvMYAhgFEl4KD0NyZWF0ZVdvcmtzcGFjZRIgLm5va2t1LnYxLkNyZWF0ZVdvcmtzcGFjZVJlcXVlc3QaIS5ub2trdS52MS5DcmVhdGVXb3Jrc3BhY2VSZXNwb25zZSIGwvMYAggBYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account, file_nokku_v1_daemon]);
 
 /**
  * @generated from message nokku.v1.Workspace
@@ -28,39 +30,34 @@ export type Workspace = Message<"nokku.v1.Workspace"> & {
   id: string;
 
   /**
-   * @generated from field: string name = 2;
+   * The subdomain on the hosted service.
+   *
+   * @generated from field: string slug = 2;
+   */
+  slug: string;
+
+  /**
+   * @generated from field: string name = 3;
    */
   name: string;
 
   /**
-   * @generated from field: string description = 3;
+   * @generated from field: string description = 4;
    */
   description: string;
 
   /**
-   * @generated from field: string created_by = 4;
-   */
-  createdBy: string;
-
-  /**
-   * The caller's role in this workspace.
-   *
-   * @generated from field: string role = 5;
-   */
-  role: string;
-
-  /**
-   * @generated from field: nokku.v1.WorkspaceSettings settings = 6;
+   * @generated from field: nokku.v1.WorkspaceSettings settings = 5;
    */
   settings?: WorkspaceSettings | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp created_at = 7;
+   * @generated from field: google.protobuf.Timestamp created_at = 6;
    */
   createdAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 8;
+   * @generated from field: google.protobuf.Timestamp updated_at = 7;
    */
   updatedAt?: Timestamp | undefined;
 };
@@ -71,63 +68,6 @@ export type Workspace = Message<"nokku.v1.Workspace"> & {
  */
 export const WorkspaceSchema: GenMessage<Workspace> = /*@__PURE__*/
   messageDesc(file_nokku_v1_workspace, 0);
-
-/**
- * @generated from message nokku.v1.WorkspaceMember
- */
-export type WorkspaceMember = Message<"nokku.v1.WorkspaceMember"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
-
-  /**
-   * @generated from field: string workspace_id = 2;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string name = 3;
-   */
-  name: string;
-
-  /**
-   * @generated from field: string email = 4;
-   */
-  email: string;
-
-  /**
-   * @generated from field: bool email_verified = 5;
-   */
-  emailVerified: boolean;
-
-  /**
-   * @generated from field: string picture = 6;
-   */
-  picture: string;
-
-  /**
-   * @generated from field: string role_name = 7;
-   */
-  roleName: string;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 9;
-   */
-  createdAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 10;
-   */
-  updatedAt?: Timestamp | undefined;
-};
-
-/**
- * Describes the message nokku.v1.WorkspaceMember.
- * Use `create(WorkspaceMemberSchema)` to create a new message.
- */
-export const WorkspaceMemberSchema: GenMessage<WorkspaceMember> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 1);
 
 /**
  * @generated from message nokku.v1.WorkspaceSettings
@@ -147,6 +87,13 @@ export type WorkspaceSettings = Message<"nokku.v1.WorkspaceSettings"> & {
    * @generated from field: string audit_webhook_secret = 3;
    */
   auditWebhookSecret: string;
+
+  /**
+   * Only the workspace's OIDC providers may sign users in.
+   *
+   * @generated from field: bool enforce_sso = 4;
+   */
+  enforceSso: boolean;
 };
 
 /**
@@ -154,16 +101,12 @@ export type WorkspaceSettings = Message<"nokku.v1.WorkspaceSettings"> & {
  * Use `create(WorkspaceSettingsSchema)` to create a new message.
  */
 export const WorkspaceSettingsSchema: GenMessage<WorkspaceSettings> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 2);
+  messageDesc(file_nokku_v1_workspace, 1);
 
 /**
  * @generated from message nokku.v1.GetWorkspaceRequest
  */
 export type GetWorkspaceRequest = Message<"nokku.v1.GetWorkspaceRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
 };
 
 /**
@@ -171,7 +114,7 @@ export type GetWorkspaceRequest = Message<"nokku.v1.GetWorkspaceRequest"> & {
  * Use `create(GetWorkspaceRequestSchema)` to create a new message.
  */
 export const GetWorkspaceRequestSchema: GenMessage<GetWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 3);
+  messageDesc(file_nokku_v1_workspace, 2);
 
 /**
  * @generated from message nokku.v1.GetWorkspaceResponse
@@ -188,12 +131,12 @@ export type GetWorkspaceResponse = Message<"nokku.v1.GetWorkspaceResponse"> & {
  * Use `create(GetWorkspaceResponseSchema)` to create a new message.
  */
 export const GetWorkspaceResponseSchema: GenMessage<GetWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 4);
+  messageDesc(file_nokku_v1_workspace, 3);
 
 /**
- * @generated from message nokku.v1.CreateWorkspaceRequest
+ * @generated from message nokku.v1.UpdateWorkspaceRequest
  */
-export type CreateWorkspaceRequest = Message<"nokku.v1.CreateWorkspaceRequest"> & {
+export type UpdateWorkspaceRequest = Message<"nokku.v1.UpdateWorkspaceRequest"> & {
   /**
    * @generated from field: string name = 1;
    */
@@ -203,53 +146,9 @@ export type CreateWorkspaceRequest = Message<"nokku.v1.CreateWorkspaceRequest"> 
    * @generated from field: string description = 2;
    */
   description: string;
-};
-
-/**
- * Describes the message nokku.v1.CreateWorkspaceRequest.
- * Use `create(CreateWorkspaceRequestSchema)` to create a new message.
- */
-export const CreateWorkspaceRequestSchema: GenMessage<CreateWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 5);
-
-/**
- * @generated from message nokku.v1.CreateWorkspaceResponse
- */
-export type CreateWorkspaceResponse = Message<"nokku.v1.CreateWorkspaceResponse"> & {
-  /**
-   * @generated from field: nokku.v1.Workspace workspace = 1;
-   */
-  workspace?: Workspace | undefined;
-};
-
-/**
- * Describes the message nokku.v1.CreateWorkspaceResponse.
- * Use `create(CreateWorkspaceResponseSchema)` to create a new message.
- */
-export const CreateWorkspaceResponseSchema: GenMessage<CreateWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 6);
-
-/**
- * @generated from message nokku.v1.UpdateWorkspaceRequest
- */
-export type UpdateWorkspaceRequest = Message<"nokku.v1.UpdateWorkspaceRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
 
   /**
-   * @generated from field: string name = 2;
-   */
-  name: string;
-
-  /**
-   * @generated from field: string description = 3;
-   */
-  description: string;
-
-  /**
-   * @generated from field: nokku.v1.WorkspaceSettings settings = 4;
+   * @generated from field: nokku.v1.WorkspaceSettings settings = 3;
    */
   settings?: WorkspaceSettings | undefined;
 };
@@ -259,7 +158,7 @@ export type UpdateWorkspaceRequest = Message<"nokku.v1.UpdateWorkspaceRequest"> 
  * Use `create(UpdateWorkspaceRequestSchema)` to create a new message.
  */
 export const UpdateWorkspaceRequestSchema: GenMessage<UpdateWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 7);
+  messageDesc(file_nokku_v1_workspace, 4);
 
 /**
  * @generated from message nokku.v1.UpdateWorkspaceResponse
@@ -276,16 +175,12 @@ export type UpdateWorkspaceResponse = Message<"nokku.v1.UpdateWorkspaceResponse"
  * Use `create(UpdateWorkspaceResponseSchema)` to create a new message.
  */
 export const UpdateWorkspaceResponseSchema: GenMessage<UpdateWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 8);
+  messageDesc(file_nokku_v1_workspace, 5);
 
 /**
  * @generated from message nokku.v1.DeleteWorkspaceRequest
  */
 export type DeleteWorkspaceRequest = Message<"nokku.v1.DeleteWorkspaceRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
 };
 
 /**
@@ -293,7 +188,7 @@ export type DeleteWorkspaceRequest = Message<"nokku.v1.DeleteWorkspaceRequest"> 
  * Use `create(DeleteWorkspaceRequestSchema)` to create a new message.
  */
 export const DeleteWorkspaceRequestSchema: GenMessage<DeleteWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 9);
+  messageDesc(file_nokku_v1_workspace, 6);
 
 /**
  * @generated from message nokku.v1.DeleteWorkspaceResponse
@@ -306,124 +201,101 @@ export type DeleteWorkspaceResponse = Message<"nokku.v1.DeleteWorkspaceResponse"
  * Use `create(DeleteWorkspaceResponseSchema)` to create a new message.
  */
 export const DeleteWorkspaceResponseSchema: GenMessage<DeleteWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 10);
+  messageDesc(file_nokku_v1_workspace, 7);
 
 /**
- * @generated from message nokku.v1.ListWorkspacesRequest
+ * @generated from message nokku.v1.CreateWorkspaceRequest
  */
-export type ListWorkspacesRequest = Message<"nokku.v1.ListWorkspacesRequest"> & {
-};
-
-/**
- * Describes the message nokku.v1.ListWorkspacesRequest.
- * Use `create(ListWorkspacesRequestSchema)` to create a new message.
- */
-export const ListWorkspacesRequestSchema: GenMessage<ListWorkspacesRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 11);
-
-/**
- * @generated from message nokku.v1.ListWorkspacesResponse
- */
-export type ListWorkspacesResponse = Message<"nokku.v1.ListWorkspacesResponse"> & {
+export type CreateWorkspaceRequest = Message<"nokku.v1.CreateWorkspaceRequest"> & {
   /**
-   * @generated from field: repeated nokku.v1.Workspace workspaces = 1;
+   * @generated from field: string slug = 1;
    */
-  workspaces: Workspace[];
+  slug: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string owner_email = 3;
+   */
+  ownerEmail: string;
+
+  /**
+   * @generated from field: string owner_name = 4;
+   */
+  ownerName: string;
 };
 
 /**
- * Describes the message nokku.v1.ListWorkspacesResponse.
- * Use `create(ListWorkspacesResponseSchema)` to create a new message.
+ * Describes the message nokku.v1.CreateWorkspaceRequest.
+ * Use `create(CreateWorkspaceRequestSchema)` to create a new message.
  */
-export const ListWorkspacesResponseSchema: GenMessage<ListWorkspacesResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 12);
+export const CreateWorkspaceRequestSchema: GenMessage<CreateWorkspaceRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_workspace, 8);
 
 /**
- * Members --------------------------------------------------------------------
+ * @generated from message nokku.v1.CreateWorkspaceResponse
+ */
+export type CreateWorkspaceResponse = Message<"nokku.v1.CreateWorkspaceResponse"> & {
+  /**
+   * Where the new workspace lives.
+   *
+   * @generated from field: string url = 1;
+   */
+  url: string;
+};
+
+/**
+ * Describes the message nokku.v1.CreateWorkspaceResponse.
+ * Use `create(CreateWorkspaceResponseSchema)` to create a new message.
+ */
+export const CreateWorkspaceResponseSchema: GenMessage<CreateWorkspaceResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_workspace, 9);
+
+/**
+ * Users ----------------------------------------------------------------------
  *
- * @generated from message nokku.v1.GetWorkspaceMemberRequest
+ * @generated from message nokku.v1.ListUsersRequest
  */
-export type GetWorkspaceMemberRequest = Message<"nokku.v1.GetWorkspaceMemberRequest"> & {
+export type ListUsersRequest = Message<"nokku.v1.ListUsersRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string user_id = 2;
-   */
-  userId: string;
-};
-
-/**
- * Describes the message nokku.v1.GetWorkspaceMemberRequest.
- * Use `create(GetWorkspaceMemberRequestSchema)` to create a new message.
- */
-export const GetWorkspaceMemberRequestSchema: GenMessage<GetWorkspaceMemberRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 13);
-
-/**
- * @generated from message nokku.v1.GetWorkspaceMemberResponse
- */
-export type GetWorkspaceMemberResponse = Message<"nokku.v1.GetWorkspaceMemberResponse"> & {
-  /**
-   * @generated from field: nokku.v1.WorkspaceMember member = 1;
-   */
-  member?: WorkspaceMember | undefined;
-};
-
-/**
- * Describes the message nokku.v1.GetWorkspaceMemberResponse.
- * Use `create(GetWorkspaceMemberResponseSchema)` to create a new message.
- */
-export const GetWorkspaceMemberResponseSchema: GenMessage<GetWorkspaceMemberResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 14);
-
-/**
- * @generated from message nokku.v1.ListWorkspaceMembersRequest
- */
-export type ListWorkspaceMembersRequest = Message<"nokku.v1.ListWorkspaceMembersRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: int32 limit = 2;
+   * @generated from field: int32 limit = 1;
    */
   limit: number;
 
   /**
-   * @generated from field: int32 offset = 3;
+   * @generated from field: int32 offset = 2;
    */
   offset: number;
 
   /**
-   * @generated from field: string query = 4;
+   * @generated from field: string query = 3;
    */
   query: string;
 
   /**
-   * @generated from field: string role_name = 5;
+   * @generated from field: string role = 4;
    */
-  roleName: string;
+  role: string;
 };
 
 /**
- * Describes the message nokku.v1.ListWorkspaceMembersRequest.
- * Use `create(ListWorkspaceMembersRequestSchema)` to create a new message.
+ * Describes the message nokku.v1.ListUsersRequest.
+ * Use `create(ListUsersRequestSchema)` to create a new message.
  */
-export const ListWorkspaceMembersRequestSchema: GenMessage<ListWorkspaceMembersRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 15);
+export const ListUsersRequestSchema: GenMessage<ListUsersRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_workspace, 10);
 
 /**
- * @generated from message nokku.v1.ListWorkspaceMembersResponse
+ * @generated from message nokku.v1.ListUsersResponse
  */
-export type ListWorkspaceMembersResponse = Message<"nokku.v1.ListWorkspaceMembersResponse"> & {
+export type ListUsersResponse = Message<"nokku.v1.ListUsersResponse"> & {
   /**
-   * @generated from field: repeated nokku.v1.WorkspaceMember members = 1;
+   * @generated from field: repeated nokku.v1.User users = 1;
    */
-  members: WorkspaceMember[];
+  users: User[];
 
   /**
    * @generated from field: int32 total = 2;
@@ -432,125 +304,180 @@ export type ListWorkspaceMembersResponse = Message<"nokku.v1.ListWorkspaceMember
 };
 
 /**
- * Describes the message nokku.v1.ListWorkspaceMembersResponse.
- * Use `create(ListWorkspaceMembersResponseSchema)` to create a new message.
+ * Describes the message nokku.v1.ListUsersResponse.
+ * Use `create(ListUsersResponseSchema)` to create a new message.
  */
-export const ListWorkspaceMembersResponseSchema: GenMessage<ListWorkspaceMembersResponse> = /*@__PURE__*/
+export const ListUsersResponseSchema: GenMessage<ListUsersResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_workspace, 11);
+
+/**
+ * @generated from message nokku.v1.GetUserRequest
+ */
+export type GetUserRequest = Message<"nokku.v1.GetUserRequest"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+};
+
+/**
+ * Describes the message nokku.v1.GetUserRequest.
+ * Use `create(GetUserRequestSchema)` to create a new message.
+ */
+export const GetUserRequestSchema: GenMessage<GetUserRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_workspace, 12);
+
+/**
+ * @generated from message nokku.v1.GetUserResponse
+ */
+export type GetUserResponse = Message<"nokku.v1.GetUserResponse"> & {
+  /**
+   * @generated from field: nokku.v1.User user = 1;
+   */
+  user?: User | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.GetUserResponse.
+ * Use `create(GetUserResponseSchema)` to create a new message.
+ */
+export const GetUserResponseSchema: GenMessage<GetUserResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_workspace, 13);
+
+/**
+ * @generated from message nokku.v1.UpdateUserRoleRequest
+ */
+export type UpdateUserRoleRequest = Message<"nokku.v1.UpdateUserRoleRequest"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: string role = 2;
+   */
+  role: string;
+};
+
+/**
+ * Describes the message nokku.v1.UpdateUserRoleRequest.
+ * Use `create(UpdateUserRoleRequestSchema)` to create a new message.
+ */
+export const UpdateUserRoleRequestSchema: GenMessage<UpdateUserRoleRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_workspace, 14);
+
+/**
+ * @generated from message nokku.v1.UpdateUserRoleResponse
+ */
+export type UpdateUserRoleResponse = Message<"nokku.v1.UpdateUserRoleResponse"> & {
+};
+
+/**
+ * Describes the message nokku.v1.UpdateUserRoleResponse.
+ * Use `create(UpdateUserRoleResponseSchema)` to create a new message.
+ */
+export const UpdateUserRoleResponseSchema: GenMessage<UpdateUserRoleResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_workspace, 15);
+
+/**
+ * @generated from message nokku.v1.SetUserActiveRequest
+ */
+export type SetUserActiveRequest = Message<"nokku.v1.SetUserActiveRequest"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: bool active = 2;
+   */
+  active: boolean;
+};
+
+/**
+ * Describes the message nokku.v1.SetUserActiveRequest.
+ * Use `create(SetUserActiveRequestSchema)` to create a new message.
+ */
+export const SetUserActiveRequestSchema: GenMessage<SetUserActiveRequest> = /*@__PURE__*/
   messageDesc(file_nokku_v1_workspace, 16);
 
 /**
- * @generated from message nokku.v1.RemoveWorkspaceMemberRequest
+ * @generated from message nokku.v1.SetUserActiveResponse
  */
-export type RemoveWorkspaceMemberRequest = Message<"nokku.v1.RemoveWorkspaceMemberRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string user_id = 2;
-   */
-  userId: string;
+export type SetUserActiveResponse = Message<"nokku.v1.SetUserActiveResponse"> & {
 };
 
 /**
- * Describes the message nokku.v1.RemoveWorkspaceMemberRequest.
- * Use `create(RemoveWorkspaceMemberRequestSchema)` to create a new message.
+ * Describes the message nokku.v1.SetUserActiveResponse.
+ * Use `create(SetUserActiveResponseSchema)` to create a new message.
  */
-export const RemoveWorkspaceMemberRequestSchema: GenMessage<RemoveWorkspaceMemberRequest> = /*@__PURE__*/
+export const SetUserActiveResponseSchema: GenMessage<SetUserActiveResponse> = /*@__PURE__*/
   messageDesc(file_nokku_v1_workspace, 17);
 
 /**
- * @generated from message nokku.v1.RemoveWorkspaceMemberResponse
+ * @generated from message nokku.v1.DeleteUserRequest
  */
-export type RemoveWorkspaceMemberResponse = Message<"nokku.v1.RemoveWorkspaceMemberResponse"> & {
+export type DeleteUserRequest = Message<"nokku.v1.DeleteUserRequest"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
 };
 
 /**
- * Describes the message nokku.v1.RemoveWorkspaceMemberResponse.
- * Use `create(RemoveWorkspaceMemberResponseSchema)` to create a new message.
+ * Describes the message nokku.v1.DeleteUserRequest.
+ * Use `create(DeleteUserRequestSchema)` to create a new message.
  */
-export const RemoveWorkspaceMemberResponseSchema: GenMessage<RemoveWorkspaceMemberResponse> = /*@__PURE__*/
+export const DeleteUserRequestSchema: GenMessage<DeleteUserRequest> = /*@__PURE__*/
   messageDesc(file_nokku_v1_workspace, 18);
 
 /**
- * @generated from message nokku.v1.UpdateWorkspaceMemberRequest
+ * @generated from message nokku.v1.DeleteUserResponse
  */
-export type UpdateWorkspaceMemberRequest = Message<"nokku.v1.UpdateWorkspaceMemberRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string user_id = 2;
-   */
-  userId: string;
-
-  /**
-   * @generated from field: string role_name = 3;
-   */
-  roleName: string;
+export type DeleteUserResponse = Message<"nokku.v1.DeleteUserResponse"> & {
 };
 
 /**
- * Describes the message nokku.v1.UpdateWorkspaceMemberRequest.
- * Use `create(UpdateWorkspaceMemberRequestSchema)` to create a new message.
+ * Describes the message nokku.v1.DeleteUserResponse.
+ * Use `create(DeleteUserResponseSchema)` to create a new message.
  */
-export const UpdateWorkspaceMemberRequestSchema: GenMessage<UpdateWorkspaceMemberRequest> = /*@__PURE__*/
+export const DeleteUserResponseSchema: GenMessage<DeleteUserResponse> = /*@__PURE__*/
   messageDesc(file_nokku_v1_workspace, 19);
 
 /**
- * @generated from message nokku.v1.UpdateWorkspaceMemberResponse
+ * @generated from message nokku.v1.TransferOwnershipRequest
  */
-export type UpdateWorkspaceMemberResponse = Message<"nokku.v1.UpdateWorkspaceMemberResponse"> & {
+export type TransferOwnershipRequest = Message<"nokku.v1.TransferOwnershipRequest"> & {
+  /**
+   * @generated from field: string new_owner_id = 1;
+   */
+  newOwnerId: string;
 };
 
 /**
- * Describes the message nokku.v1.UpdateWorkspaceMemberResponse.
- * Use `create(UpdateWorkspaceMemberResponseSchema)` to create a new message.
+ * Describes the message nokku.v1.TransferOwnershipRequest.
+ * Use `create(TransferOwnershipRequestSchema)` to create a new message.
  */
-export const UpdateWorkspaceMemberResponseSchema: GenMessage<UpdateWorkspaceMemberResponse> = /*@__PURE__*/
+export const TransferOwnershipRequestSchema: GenMessage<TransferOwnershipRequest> = /*@__PURE__*/
   messageDesc(file_nokku_v1_workspace, 20);
 
 /**
- * Various --------------------------------------------------------------------
- *
- * @generated from message nokku.v1.UpdateWorkspaceOwnerRequest
+ * @generated from message nokku.v1.TransferOwnershipResponse
  */
-export type UpdateWorkspaceOwnerRequest = Message<"nokku.v1.UpdateWorkspaceOwnerRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string new_owner = 2;
-   */
-  newOwner: string;
+export type TransferOwnershipResponse = Message<"nokku.v1.TransferOwnershipResponse"> & {
 };
 
 /**
- * Describes the message nokku.v1.UpdateWorkspaceOwnerRequest.
- * Use `create(UpdateWorkspaceOwnerRequestSchema)` to create a new message.
+ * Describes the message nokku.v1.TransferOwnershipResponse.
+ * Use `create(TransferOwnershipResponseSchema)` to create a new message.
  */
-export const UpdateWorkspaceOwnerRequestSchema: GenMessage<UpdateWorkspaceOwnerRequest> = /*@__PURE__*/
+export const TransferOwnershipResponseSchema: GenMessage<TransferOwnershipResponse> = /*@__PURE__*/
   messageDesc(file_nokku_v1_workspace, 21);
 
 /**
- * @generated from message nokku.v1.UpdateWorkspaceOwnerResponse
- */
-export type UpdateWorkspaceOwnerResponse = Message<"nokku.v1.UpdateWorkspaceOwnerResponse"> & {
-};
-
-/**
- * Describes the message nokku.v1.UpdateWorkspaceOwnerResponse.
- * Use `create(UpdateWorkspaceOwnerResponseSchema)` to create a new message.
- */
-export const UpdateWorkspaceOwnerResponseSchema: GenMessage<UpdateWorkspaceOwnerResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 22);
-
-/**
+ * The workspace is the tenant. Users live inside it, so this service also
+ * manages them. A self-hosted server has exactly one workspace.
+ *
  * @generated from service nokku.v1.WorkspaceService
  */
 export const WorkspaceService: GenService<{
@@ -563,22 +490,6 @@ export const WorkspaceService: GenService<{
     output: typeof GetWorkspaceResponseSchema;
   },
   /**
-   * @generated from rpc nokku.v1.WorkspaceService.ListWorkspaces
-   */
-  listWorkspaces: {
-    methodKind: "unary";
-    input: typeof ListWorkspacesRequestSchema;
-    output: typeof ListWorkspacesResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.WorkspaceService.CreateWorkspace
-   */
-  createWorkspace: {
-    methodKind: "unary";
-    input: typeof CreateWorkspaceRequestSchema;
-    output: typeof CreateWorkspaceResponseSchema;
-  },
-  /**
    * @generated from rpc nokku.v1.WorkspaceService.UpdateWorkspace
    */
   updateWorkspace: {
@@ -587,6 +498,8 @@ export const WorkspaceService: GenService<{
     output: typeof UpdateWorkspaceResponseSchema;
   },
   /**
+   * Refused on a self-hosted server.
+   *
    * @generated from rpc nokku.v1.WorkspaceService.DeleteWorkspace
    */
   deleteWorkspace: {
@@ -595,44 +508,70 @@ export const WorkspaceService: GenService<{
     output: typeof DeleteWorkspaceResponseSchema;
   },
   /**
-   * @generated from rpc nokku.v1.WorkspaceService.GetWorkspaceMember
+   * @generated from rpc nokku.v1.WorkspaceService.ListUsers
    */
-  getWorkspaceMember: {
+  listUsers: {
     methodKind: "unary";
-    input: typeof GetWorkspaceMemberRequestSchema;
-    output: typeof GetWorkspaceMemberResponseSchema;
+    input: typeof ListUsersRequestSchema;
+    output: typeof ListUsersResponseSchema;
   },
   /**
-   * @generated from rpc nokku.v1.WorkspaceService.ListWorkspaceMembers
+   * @generated from rpc nokku.v1.WorkspaceService.GetUser
    */
-  listWorkspaceMembers: {
+  getUser: {
     methodKind: "unary";
-    input: typeof ListWorkspaceMembersRequestSchema;
-    output: typeof ListWorkspaceMembersResponseSchema;
+    input: typeof GetUserRequestSchema;
+    output: typeof GetUserResponseSchema;
   },
   /**
-   * @generated from rpc nokku.v1.WorkspaceService.RemoveWorkspaceMember
+   * Never touches the owner, see TransferOwnership.
+   *
+   * @generated from rpc nokku.v1.WorkspaceService.UpdateUserRole
    */
-  removeWorkspaceMember: {
+  updateUserRole: {
     methodKind: "unary";
-    input: typeof RemoveWorkspaceMemberRequestSchema;
-    output: typeof RemoveWorkspaceMemberResponseSchema;
+    input: typeof UpdateUserRoleRequestSchema;
+    output: typeof UpdateUserRoleResponseSchema;
   },
   /**
-   * @generated from rpc nokku.v1.WorkspaceService.UpdateWorkspaceMember
+   * A deactivated user keeps their grants and history but cannot sign in or
+   * get certificates.
+   *
+   * @generated from rpc nokku.v1.WorkspaceService.SetUserActive
    */
-  updateWorkspaceMember: {
+  setUserActive: {
     methodKind: "unary";
-    input: typeof UpdateWorkspaceMemberRequestSchema;
-    output: typeof UpdateWorkspaceMemberResponseSchema;
+    input: typeof SetUserActiveRequestSchema;
+    output: typeof SetUserActiveResponseSchema;
   },
   /**
-   * @generated from rpc nokku.v1.WorkspaceService.UpdateWorkspaceOwner
+   * @generated from rpc nokku.v1.WorkspaceService.DeleteUser
    */
-  updateWorkspaceOwner: {
+  deleteUser: {
     methodKind: "unary";
-    input: typeof UpdateWorkspaceOwnerRequestSchema;
-    output: typeof UpdateWorkspaceOwnerResponseSchema;
+    input: typeof DeleteUserRequestSchema;
+    output: typeof DeleteUserResponseSchema;
+  },
+  /**
+   * The caller becomes an admin.
+   *
+   * @generated from rpc nokku.v1.WorkspaceService.TransferOwnership
+   */
+  transferOwnership: {
+    methodKind: "unary";
+    input: typeof TransferOwnershipRequestSchema;
+    output: typeof TransferOwnershipResponseSchema;
+  },
+  /**
+   * Public signup on the hosted service's root host. Creates the workspace
+   * and its owner and mails the owner a sign-in link. Refused elsewhere.
+   *
+   * @generated from rpc nokku.v1.WorkspaceService.CreateWorkspace
+   */
+  createWorkspace: {
+    methodKind: "unary";
+    input: typeof CreateWorkspaceRequestSchema;
+    output: typeof CreateWorkspaceResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_nokku_v1_workspace, 0);

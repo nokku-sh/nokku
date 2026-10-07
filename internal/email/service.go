@@ -67,7 +67,7 @@ func New(appURL string) (*Service, error) {
 	svc.appURL, svc.cache, svc.sender = appURL, cache.NewMemory(cooldownEntries), noopSender{}
 
 	if svc.SMTPHost == "" {
-		slog.Info("email delivery disabled, set NOKKU_SMTP_HOST to enable it")
+		slog.Warn("email delivery disabled, set NOKKU_SMTP_HOST to enable it")
 		return &svc, nil
 	}
 	// A default sender would be somebody else's domain, and relays reject that.
@@ -78,58 +78,42 @@ func New(appURL string) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	slog.Info("email delivery enabled", "host", svc.SMTPHost, "port", svc.SMTPPort)
 	return &svc, nil
 }
 
-func (s *Service) SendWelcomeEmail(
-	ctx context.Context,
-	userID, email, username, verifyURL, expiry string,
-) error {
+// HasSMTP is whether mail can go out at all.
+func (s *Service) HasSMTP() bool {
+	return s.SMTPHost != ""
+}
+
+func (s *Service) SendMagicLinkEmail(ctx context.Context, userID, email, link, expiry string) error {
 	return s.sendTemplate(ctx, sendRequest{
 		userID:   userID,
 		to:       email,
-		subject:  "Welcome to Nokku",
-		template: "welcome",
-		data: welcomeTemplateData{
-			Operator:        s.Operator,
-			UserName:        username,
-			VerificationURL: verifyURL,
-			Expiration:      expiry,
+		subject:  "Your sign-in link",
+		template: "magic-link",
+		data: linkTemplateData{
+			Operator:   s.Operator,
+			LinkURL:    link,
+			Expiration: expiry,
 		},
 	})
 }
 
-func (s *Service) SendVerificationEmail(
-	ctx context.Context,
-	userID, email, verifyURL, expiry string,
-) error {
+// SendSignupLinkEmail goes to someone without an account yet, so the
+// cooldown is keyed by the address.
+func (s *Service) SendSignupLinkEmail(ctx context.Context, email, name, workspace, link, expiry string) error {
 	return s.sendTemplate(ctx, sendRequest{
-		userID:   userID,
+		userID:   email,
 		to:       email,
-		subject:  "Verify your email address",
-		template: "verification",
-		data: verificationTemplateData{
-			Operator:        s.Operator,
-			VerificationURL: verifyURL,
-			Expiration:      expiry,
-		},
-	})
-}
-
-func (s *Service) SendRecoveryEmail(
-	ctx context.Context,
-	userID, email, recoveryURL, expiry string,
-) error {
-	return s.sendTemplate(ctx, sendRequest{
-		userID:   userID,
-		to:       email,
-		subject:  "Reset your password",
-		template: "recovery",
-		data: recoveryTemplateData{
-			Operator:    s.Operator,
-			RecoveryURL: recoveryURL,
-			Expiration:  expiry,
+		subject:  "Join " + workspace + " on Nokku",
+		template: "signup-link",
+		data: signupTemplateData{
+			Operator:   s.Operator,
+			UserName:   name,
+			Workspace:  workspace,
+			LinkURL:    link,
+			Expiration: expiry,
 		},
 	})
 }

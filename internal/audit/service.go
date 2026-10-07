@@ -74,38 +74,23 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 			return err
 		}
 		for _, wsID := range workspaceIDs {
-			if wsID == nil {
-				continue
-			}
-			retentionDays, err := s.entitlements.RetentionDays(ctx, *wsID)
+			retentionDays, err := s.entitlements.RetentionDays(ctx, wsID)
 			if err != nil {
 				slog.Warn("audit retention skipped, plan lookup failed",
-					"error", err, "workspace_id", *wsID)
+					"error", err, "workspace_id", wsID)
 				continue
 			}
 			retentionDays = min(retentionDays, maxRetentionDays)
-			deleted, err := q.DeleteWorkspaceAuditLogs(ctx, &db.DeleteWorkspaceAuditLogsParams{
+			if _, err := q.DeleteWorkspaceAuditLogs(ctx, &db.DeleteWorkspaceAuditLogsParams{
 				WorkspaceID: wsID,
 				Cutoff:      now.AddDate(0, 0, -int(retentionDays)),
-			})
-			if err != nil {
-				return fmt.Errorf("workspace %s: %w", *wsID, err)
-			}
-			if deleted > 0 {
-				slog.Debug("audit retention cleaned logs",
-					"workspace_id", *wsID, "deleted", deleted,
-					"retention_days", retentionDays)
+			}); err != nil {
+				return fmt.Errorf("workspace %s: %w", wsID, err)
 			}
 		}
 
-		deleted, err := q.DeleteAuditLogsBefore(ctx, now.AddDate(0, 0, -maxRetentionDays))
-		if err != nil {
-			return err
-		}
-		if deleted > 0 {
-			slog.Debug("audit retention cleaned logs past the longest retention", "deleted", deleted)
-		}
-		return nil
+		_, err = q.DeleteAuditLogsBefore(ctx, now.AddDate(0, 0, -maxRetentionDays))
+		return err
 	})
 	if err != nil {
 		slog.Error("audit retention failed", "error", err)

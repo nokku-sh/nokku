@@ -52,7 +52,7 @@ func (s *Stripe) webhook(w http.ResponseWriter, r *http.Request) {
 		}
 
 	default:
-		slog.Debug("ignoring unhandled Stripe webhook event", "event_type", event.Type)
+		// Unhandled event types are expected, Stripe sends everything subscribed.
 	}
 
 	w.WriteHeader(http.StatusOK)

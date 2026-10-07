@@ -4,14 +4,13 @@ import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { plural, useBulkMutation } from './bulk';
 import { addSession, TerminalSession } from './terminal.svelte';
-import { workspaceID } from '#lib/store.svelte.js';
 
 export const daemon = {
 	get: (id: MaybeGetter<string | undefined>) =>
 		useQuery(
 			DaemonService.method.getDaemon,
-			() => ({ workspaceId: workspaceID.current, id: extract(id) }),
-			() => ({ enabled: !!workspaceID.current && !!extract(id) })
+			() => ({ id: extract(id) }),
+			() => ({ enabled: !!extract(id) })
 		),
 	list: (
 		opts?: () => {
@@ -25,12 +24,11 @@ export const daemon = {
 		useQuery(
 			DaemonService.method.listDaemons,
 			() => ({
-				workspaceId: workspaceID.current,
 				limit: MAX_PAGE_SIZE,
 				offset: 0,
 				...opts?.()
 			}),
-			() => ({ enabled: !!workspaceID.current, refetchInterval: 15000 })
+			() => ({ refetchInterval: 15000 })
 		),
 	createSession: () =>
 		useMutation(DaemonService.method.createSession, {

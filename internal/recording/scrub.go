@@ -110,8 +110,6 @@ func (s *Service) scrub(ctx context.Context, rec *db.Recording) error {
 	if err = w.w.Close(); err != nil {
 		return fmt.Errorf("commit scrubbed recording object: %w", err)
 	}
-
-	slog.Info("recording scrubbed", "recording_id", rec.ID)
 	return nil
 }
 

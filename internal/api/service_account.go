@@ -9,6 +9,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/iam"
@@ -55,7 +56,7 @@ func (s *serviceAccountService) CreateServiceAccount(
 	var result *db.ServiceAccount
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		params := &db.CreateServiceAccountParams{
-			WorkspaceID: req.GetWorkspaceId(),
+			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
 			Name:        req.GetName(),
 			Description: req.Description,
 			Tags:        req.GetTags(),
@@ -128,7 +129,7 @@ func (s *serviceAccountService) ListServiceAccounts(
 	var result []*db.ListServiceAccountsRow
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.ListServiceAccounts(ctx, &db.ListServiceAccountsParams{
-			WorkspaceID: req.GetWorkspaceId(),
+			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
 			Query:       req.Query,
 			Tags:        req.GetTags(),
 			RoleName:    req.RoleName,

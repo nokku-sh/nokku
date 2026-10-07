@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/recordings.proto.
  */
 export const file_nokku_v1_recordings: GenFile = /*@__PURE__*/
-  fileDesc("Chlub2trdS92MS9yZWNvcmRpbmdzLnByb3RvEghub2trdS52MSLrAQoJUmVjb3JkaW5nEgoKAmlkGAEgASgJEhQKDHdvcmtzcGFjZV9pZBgCIAEoCRIRCglkYWVtb25faWQYAyABKAkSEAoIdXNlcm5hbWUYBCABKAkSEgoKc2l6ZV9ieXRlcxgFIAEoAxIQCghjb21wbGV0ZRgGIAEoCBIuCgpzdGFydGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLZGFlbW9uX25hbWUYCSABKAkihAEKFlVwbG9hZFJlY29yZGluZ1JlcXVlc3QSJwoEbWV0YRgBIAEoCzIXLm5va2t1LnYxLlJlY29yZGluZ01ldGFIABIPCgVjaHVuaxgCIAEoDEgAEikKBWZpbmFsGAMgASgLMhgubm9ra3UudjEuUmVjb3JkaW5nRmluYWxIAEIFCgNtc2ciSgoNUmVjb3JkaW5nTWV0YRIeCgxyZWNvcmRpbmdfaWQYASABKAlCCLpIBXIDsAEBEhkKCHVzZXJuYW1lGAIgASgJQge6SARyAhggIhAKDlJlY29yZGluZ0ZpbmFsIkMKF1VwbG9hZFJlY29yZGluZ1Jlc3BvbnNlEhQKDHJlY29yZGluZ19pZBgBIAEoCRISCgpzaXplX2J5dGVzGAIgASgDIpkBChVMaXN0UmVjb3JkaW5nc1JlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIbCglkYWVtb25faWQYAiABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAMgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAQgASgFQge6SAQaAigAEhAKCHVzZXJuYW1lGAUgASgJImUKFkxpc3RSZWNvcmRpbmdzUmVzcG9uc2USJwoKcmVjb3JkaW5ncxgBIAMoCzITLm5va2t1LnYxLlJlY29yZGluZxINCgV0b3RhbBgCIAEoBRITCgt0b3RhbF9ieXRlcxgDIAEoAyJVChNHZXRSZWNvcmRpbmdSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESHgoMcmVjb3JkaW5nX2lkGAIgASgJQgi6SAVyA7ABASJXChRHZXRSZWNvcmRpbmdSZXNwb25zZRInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSABCBQoDbXNnIlgKFkRlbGV0ZVJlY29yZGluZ1JlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARIeCgxyZWNvcmRpbmdfaWQYAiABKAlCCLpIBXIDsAEBIhkKF0RlbGV0ZVJlY29yZGluZ1Jlc3BvbnNlMq4CChBSZWNvcmRpbmdTZXJ2aWNlEloKDEdldFJlY29yZGluZxIdLm5va2t1LnYxLkdldFJlY29yZGluZ1JlcXVlc3QaHi5ub2trdS52MS5HZXRSZWNvcmRpbmdSZXNwb25zZSIJkAIBwvMYAhABMAESXgoOTGlzdFJlY29yZGluZ3MSHy5ub2trdS52MS5MaXN0UmVjb3JkaW5nc1JlcXVlc3QaIC5ub2trdS52MS5MaXN0UmVjb3JkaW5nc1Jlc3BvbnNlIgmQAgHC8xgCGAISXgoPRGVsZXRlUmVjb3JkaW5nEiAubm9ra3UudjEuRGVsZXRlUmVjb3JkaW5nUmVxdWVzdBohLm5va2t1LnYxLkRlbGV0ZVJlY29yZGluZ1Jlc3BvbnNlIgbC8xgCGANiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Chlub2trdS92MS9yZWNvcmRpbmdzLnByb3RvEghub2trdS52MSLVAQoJUmVjb3JkaW5nEgoKAmlkGAEgASgJEhEKCWRhZW1vbl9pZBgCIAEoCRIQCgh1c2VybmFtZRgDIAEoCRISCgpzaXplX2J5dGVzGAQgASgDEhAKCGNvbXBsZXRlGAUgASgIEi4KCnN0YXJ0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBITCgtkYWVtb25fbmFtZRgIIAEoCSKEAQoWVXBsb2FkUmVjb3JkaW5nUmVxdWVzdBInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSAASKQoFZmluYWwYAyABKAsyGC5ub2trdS52MS5SZWNvcmRpbmdGaW5hbEgAQgUKA21zZyJKCg1SZWNvcmRpbmdNZXRhEh4KDHJlY29yZGluZ19pZBgBIAEoCUIIukgFcgOwAQESGQoIdXNlcm5hbWUYAiABKAlCB7pIBHICGCAiEAoOUmVjb3JkaW5nRmluYWwiQwoXVXBsb2FkUmVjb3JkaW5nUmVzcG9uc2USFAoMcmVjb3JkaW5nX2lkGAEgASgJEhIKCnNpemVfYnl0ZXMYAiABKAMieQoVTGlzdFJlY29yZGluZ3NSZXF1ZXN0EhsKCWRhZW1vbl9pZBgBIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAiABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAyABKAVCB7pIBBoCKAASEAoIdXNlcm5hbWUYBCABKAkiZQoWTGlzdFJlY29yZGluZ3NSZXNwb25zZRInCgpyZWNvcmRpbmdzGAEgAygLMhMubm9ra3UudjEuUmVjb3JkaW5nEg0KBXRvdGFsGAIgASgFEhMKC3RvdGFsX2J5dGVzGAMgASgDIjUKE0dldFJlY29yZGluZ1JlcXVlc3QSHgoMcmVjb3JkaW5nX2lkGAEgASgJQgi6SAVyA7ABASJXChRHZXRSZWNvcmRpbmdSZXNwb25zZRInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSABCBQoDbXNnIjgKFkRlbGV0ZVJlY29yZGluZ1JlcXVlc3QSHgoMcmVjb3JkaW5nX2lkGAEgASgJQgi6SAVyA7ABASIZChdEZWxldGVSZWNvcmRpbmdSZXNwb25zZTKuAgoQUmVjb3JkaW5nU2VydmljZRJaCgxHZXRSZWNvcmRpbmcSHS5ub2trdS52MS5HZXRSZWNvcmRpbmdSZXF1ZXN0Gh4ubm9ra3UudjEuR2V0UmVjb3JkaW5nUmVzcG9uc2UiCZACAcLzGAIYAjABEl4KDkxpc3RSZWNvcmRpbmdzEh8ubm9ra3UudjEuTGlzdFJlY29yZGluZ3NSZXF1ZXN0GiAubm9ra3UudjEuTGlzdFJlY29yZGluZ3NSZXNwb25zZSIJkAIBwvMYAhgCEl4KD0RlbGV0ZVJlY29yZGluZxIgLm5va2t1LnYxLkRlbGV0ZVJlY29yZGluZ1JlcXVlc3QaIS5ub2trdS52MS5EZWxldGVSZWNvcmRpbmdSZXNwb25zZSIGwvMYAhgDYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.Recording
@@ -26,46 +26,41 @@ export type Recording = Message<"nokku.v1.Recording"> & {
   id: string;
 
   /**
-   * @generated from field: string workspace_id = 2;
-   */
-  workspaceId: string;
-
-  /**
    * Empty once the daemon is deleted, the recording stays.
    *
-   * @generated from field: string daemon_id = 3;
+   * @generated from field: string daemon_id = 2;
    */
   daemonId: string;
 
   /**
-   * @generated from field: string username = 4;
+   * @generated from field: string username = 3;
    */
   username: string;
 
   /**
-   * @generated from field: int64 size_bytes = 5;
+   * @generated from field: int64 size_bytes = 4;
    */
   sizeBytes: bigint;
 
   /**
-   * @generated from field: bool complete = 6;
+   * @generated from field: bool complete = 5;
    */
   complete: boolean;
 
   /**
-   * @generated from field: google.protobuf.Timestamp started_at = 7;
+   * @generated from field: google.protobuf.Timestamp started_at = 6;
    */
   startedAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp ended_at = 8;
+   * @generated from field: google.protobuf.Timestamp ended_at = 7;
    */
   endedAt?: Timestamp | undefined;
 
   /**
    * The daemon's name when the session ran.
    *
-   * @generated from field: string daemon_name = 9;
+   * @generated from field: string daemon_name = 8;
    */
   daemonName: string;
 };
@@ -174,27 +169,22 @@ export const UploadRecordingResponseSchema: GenMessage<UploadRecordingResponse> 
  */
 export type ListRecordingsRequest = Message<"nokku.v1.ListRecordingsRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string daemon_id = 2;
+   * @generated from field: string daemon_id = 1;
    */
   daemonId: string;
 
   /**
-   * @generated from field: int32 limit = 3;
+   * @generated from field: int32 limit = 2;
    */
   limit: number;
 
   /**
-   * @generated from field: int32 offset = 4;
+   * @generated from field: int32 offset = 3;
    */
   offset: number;
 
   /**
-   * @generated from field: string username = 5;
+   * @generated from field: string username = 4;
    */
   username: string;
 };
@@ -238,12 +228,7 @@ export const ListRecordingsResponseSchema: GenMessage<ListRecordingsResponse> = 
  */
 export type GetRecordingRequest = Message<"nokku.v1.GetRecordingRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string recording_id = 2;
+   * @generated from field: string recording_id = 1;
    */
   recordingId: string;
 };
@@ -289,12 +274,7 @@ export const GetRecordingResponseSchema: GenMessage<GetRecordingResponse> = /*@_
  */
 export type DeleteRecordingRequest = Message<"nokku.v1.DeleteRecordingRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string recording_id = 2;
+   * @generated from field: string recording_id = 1;
    */
   recordingId: string;
 };

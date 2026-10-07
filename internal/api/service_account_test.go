@@ -19,25 +19,27 @@ func TestUpdateServiceAccount(t *testing.T) {
 	client := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, auth)
 
 	created, err := client.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
-		WorkspaceId: &workspaceID,
-		Name:        new("deploy"),
-		Tags:        []string{"ci"},
+		Name: new("deploy"),
+		Tags: []string{"ci"},
 	})
 	require.NoError(t, err)
 	id := created.GetServiceAccount().GetId()
 
 	updated, err := client.UpdateServiceAccount(t.Context(), &nokkuv1.UpdateServiceAccountRequest{
-		WorkspaceId: &workspaceID,
-		Id:          &id,
-		Tags:        []string{"ci", "prod"},
+		Id:   &id,
+		Tags: []string{"ci", "prod"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"ci", "prod"}, updated.GetServiceAccount().GetTags(), "tags must be saved")
-	assert.Equal(t, "deploy", updated.GetServiceAccount().GetName(), "unset fields stay as they are")
+	assert.Equal(
+		t,
+		created.GetServiceAccount().GetName(),
+		updated.GetServiceAccount().GetName(),
+		"unset fields stay as they are",
+	)
 
 	cleared, err := client.UpdateServiceAccount(t.Context(), &nokkuv1.UpdateServiceAccountRequest{
-		WorkspaceId: &workspaceID,
-		Id:          &id,
+		Id: &id,
 	})
 	require.NoError(t, err)
 	assert.Empty(t, cleared.GetServiceAccount().GetTags(), "an update replaces the tags, the last one can go")

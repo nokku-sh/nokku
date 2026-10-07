@@ -15,7 +15,7 @@ func TestDashboardCounts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("counts: %v", err)
 	}
-	if got.Targets != 1 || got.TargetsOnline != 0 || got.TargetsManual != 0 || got.Members != 2 {
+	if got.Targets != 1 || got.TargetsOnline != 0 || got.TargetsManual != 0 || got.Users != 2 {
 		t.Fatalf("offline daemon: got %+v", got)
 	}
 
@@ -71,7 +71,7 @@ func TestAuditActivityByHour(t *testing.T) {
 	f := newStateFixture(t, c)
 	for _, ok := range []bool{true, true, false} {
 		if err := c.Sys().InsertAuditLog(t.Context(), &InsertAuditLogParams{
-			WorkspaceID: &f.ws,
+			WorkspaceID: f.ws,
 			ActorID:     f.owner,
 			ActorKind:   "user",
 			Action:      "UpdateTarget",
@@ -83,7 +83,7 @@ func TestAuditActivityByHour(t *testing.T) {
 	}
 
 	rows, err := c.Sys().AuditActivityByHour(t.Context(), &AuditActivityByHourParams{
-		WorkspaceID: &f.ws,
+		WorkspaceID: f.ws,
 		Since:       time.Now().Add(-24 * time.Hour),
 	})
 	if err != nil {

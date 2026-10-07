@@ -4,7 +4,7 @@
 	import { target } from '#lib/api/targets.svelte.js';
 	import { team } from '#lib/api/team.svelte.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
-	import MemberSheet from '#lib/components/sheets/MemberSheet.svelte';
+	import UserSheet from '#lib/components/sheets/UserSheet.svelte';
 	import ServiceAccountSheet from '#lib/components/sheets/ServiceAccountSheet.svelte';
 	import TargetSheet from '#lib/components/sheets/TargetSheet.svelte';
 	import TeamSheet from '#lib/components/sheets/TeamSheet.svelte';
@@ -177,7 +177,7 @@
 {#if focus?.kind === 'team'}
 	<TeamSheet />
 {:else if focus?.kind === 'user'}
-	<MemberSheet />
+	<UserSheet />
 {:else if focus?.kind === 'service-account'}
 	<ServiceAccountSheet />
 {:else if focus?.kind === 'target'}

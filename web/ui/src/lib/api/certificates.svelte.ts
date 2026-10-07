@@ -3,7 +3,6 @@ import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
 import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
-import { workspaceID } from '#lib/store.svelte.js';
 
 export const sign = {
 	user: () =>
@@ -20,18 +19,16 @@ export const ca = {
 	get: (id: MaybeGetter<string | undefined>) =>
 		useQuery(
 			CertificateService.method.getCertificateAuthority,
-			() => ({ workspaceId: workspaceID.current, id: extract(id) }),
+			() => ({ id: extract(id) }),
 			() => ({
-				enabled: !!workspaceID.current && !!extract(id),
+				enabled: !!extract(id),
 				select: (res) => res.certificateAuthority
 			})
 		),
 	list: () =>
-		useQuery(
-			CertificateService.method.listCertificateAuthorities,
-			() => ({ workspaceId: workspaceID.current }),
-			() => ({ enabled: !!workspaceID.current, select: (res) => res.certificateAuthorities })
-		),
+		useQuery(CertificateService.method.listCertificateAuthorities, {}, () => ({
+			select: (res) => res.certificateAuthorities
+		})),
 
 	create: () =>
 		useMutation(CertificateService.method.createCertificateAuthority, {

@@ -48,9 +48,10 @@ export const areas: Area[] = [
 		label: 'People & roles',
 		icon: Users,
 		actions: [
-			'UpdateWorkspaceMember',
-			'RemoveWorkspaceMember',
-			'UpdateWorkspaceOwner',
+			'UpdateUserRole',
+			'SetUserActive',
+			'DeleteUser',
+			'TransferOwnership',
 			'AcceptInvitation',
 			'CreateTeam',
 			'UpdateTeam',
@@ -116,8 +117,8 @@ export const areas: Area[] = [
 			'LoginDenied',
 			'SessionIssued',
 			'SessionRevoked',
-			'PasswordSet',
-			'CredentialAdded'
+			'CredentialAdded',
+			'EmailChanged'
 		]
 	},
 	{
@@ -128,11 +129,8 @@ export const areas: Area[] = [
 			'CreateWorkspace',
 			'UpdateWorkspace',
 			'DeleteWorkspace',
-			'UpdateSSOProvider',
-			'CreateWorkspaceDomain',
-			'DeleteWorkspaceDomain',
-			'VerifyWorkspaceDomain',
-			'RegenerateWorkspaceDomainToken',
+			'PutSSOProvider',
+			'DeleteSSOProvider',
 			'CreateSCIMToken',
 			'DeleteSCIMToken'
 		]
@@ -176,8 +174,8 @@ const labels: Record<string, string> = {
 	LoginDenied: 'Sign-in denied',
 	SessionIssued: 'Session started',
 	SessionRevoked: 'Session revoked',
-	PasswordSet: 'Password set',
 	CredentialAdded: 'Credential added',
+	EmailChanged: 'Email changed',
 	UserCreated: 'Account created',
 	UserDeleted: 'Account deleted',
 	UserDeactivated: 'Account deactivated',

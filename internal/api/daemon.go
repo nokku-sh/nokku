@@ -9,6 +9,7 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/audit"
+	"github.com/nokku-sh/nokku/internal/realip"
 
 	"connectrpc.com/connect"
 
@@ -19,7 +20,6 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/util"
 )
 
 type daemonService struct {
@@ -94,7 +94,7 @@ func (s *daemonService) ListDaemons(
 		}
 
 		result, err = q.ListDaemons(ctx, &db.ListDaemonsParams{
-			WorkspaceID: req.GetWorkspaceId(),
+			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
 			Query:       req.Query,
 			Status:      status,
 			Online:      req.Online,
@@ -250,8 +250,7 @@ func (s *daemonService) CloseSession(
 	return &nokkuv1.CloseSessionResponse{}, nil
 }
 
-// Relay bridges a raw byte stream to the daemon's sshd. The workspace is only
-// known from the first message, so the role check runs here.
+// Relay bridges a raw byte stream to the daemon's sshd.
 func (s *daemonService) Relay(
 	ctx context.Context,
 	stream *connect.BidiStream[nokkuv1.RelayRequest, nokkuv1.RelayResponse],
@@ -267,19 +266,9 @@ func (s *daemonService) Relay(
 			errors.New("first message must be RelayStart"),
 		)
 	}
-	workspaceID := start.Start.GetWorkspaceId()
 	daemonID := start.Start.GetDaemonId()
-	if workspaceID == "" || daemonID == "" {
-		return connect.NewError(
-			connect.CodeInvalidArgument,
-			errors.New("workspace_id and daemon_id required"),
-		)
-	}
-
-	ctx = actor.AnnotateTenant(ctx, workspaceID)
-	ctx, err = actorHasRole(ctx, s.cfg.Conn, db.RoleMember)
-	if err != nil {
-		return err
+	if daemonID == "" {
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("daemon_id required"))
 	}
 
 	// sshd is the real gate, but the pipe itself reaches hosts behind NAT
@@ -335,5 +324,5 @@ func clientAddr(ctx context.Context) string {
 	if !ok {
 		return ""
 	}
-	return util.ClientIP(meta.Header, meta.RemoteAddr)
+	return realip.Client(meta.Header, meta.RemoteAddr)
 }

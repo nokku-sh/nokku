@@ -3,7 +3,6 @@ package kms
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"github.com/hashicorp/vault/api"
@@ -18,7 +17,6 @@ import (
 // KMS, every wrap and unwrap is a call to it.
 func (t *TinkEncryptor) kmsKEK(uri string) (tink.AEAD, error) {
 	provider, _, _ := strings.Cut(uri, "://")
-	slog.Debug("setting up kms client", "provider", provider)
 
 	var client registry.KMSClient
 	var err error

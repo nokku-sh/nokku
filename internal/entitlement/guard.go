@@ -32,7 +32,6 @@ var cappedCreate = map[string]bool{
 	nokkuv1connect.TeamServiceCreateTeamProcedure:                        true,
 	nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure:    true,
 	nokkuv1connect.CertificateServiceCreateCertificateAuthorityProcedure: true,
-	nokkuv1connect.WorkspaceDomainServiceCreateWorkspaceDomainProcedure:  true,
 }
 
 // GuardInterceptor caches plan resolutions on the context for handlers to reuse.
@@ -105,29 +104,16 @@ func (g *GuardInterceptor) checkResources(ctx context.Context, procedure string)
 // conditionalFeature never gates turning a feature off, a downgraded
 // workspace must be able to clean up.
 func conditionalFeature(procedure string, msg any) (string, bool) {
-	if req, ok := msg.(*nokkuv1.UpdateWorkspaceRequest); ok &&
-		procedure == nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure {
-		settings := req.GetSettings()
-		if settings.GetAuditWebhookUrl() != "" || settings.GetAuditWebhookSecret() != "" {
-			return FeatureAuditStreaming, true
-		}
+	req, ok := msg.(*nokkuv1.UpdateWorkspaceRequest)
+	if !ok || procedure != nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure {
 		return "", false
 	}
-
-	req, ok := msg.(*nokkuv1.UpdateSSOProviderRequest)
-	if !ok || procedure != nokkuv1connect.SSOServiceUpdateSSOProviderProcedure {
-		return "", false
+	settings := req.GetSettings()
+	if settings.GetAuditWebhookUrl() != "" || settings.GetAuditWebhookSecret() != "" {
+		return FeatureAuditStreaming, true
 	}
-
-	switch req.GetMethod() {
-	case "saml":
-		if req.GetIsActive() {
-			return FeatureSAML, true
-		}
-	case "oidc":
-		if req.GetEnforceSso() {
-			return FeatureEnforceSSO, true
-		}
+	if settings.GetEnforceSso() {
+		return FeatureEnforceSSO, true
 	}
 	return "", false
 }

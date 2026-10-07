@@ -35,10 +35,7 @@ const (
 	providerCacheTTL    = 10 * time.Minute
 )
 
-var (
-	ErrSSORequired = errors.New("iam: single sign-on is required for this account")
-	errFlowState   = errors.New("iam: invalid or expired flow state")
-)
+var errFlowState = errors.New("iam: invalid or expired flow state")
 
 // providerContext is how oauth2 and go-oidc pick up the guarded client.
 func (s *Service) providerContext(ctx context.Context) context.Context {
@@ -74,8 +71,6 @@ type sealed[T any] struct {
 	// another's.
 	use string
 	ttl time.Duration
-	// crossSite lets the cookie ride on a form post from the IdP (SAML).
-	crossSite bool
 }
 
 type envelope[T any] struct {
@@ -105,12 +100,7 @@ func (s *sealed[T]) put(w http.ResponseWriter, v T) (string, error) {
 	if len(value) > maxFlowCookie {
 		return "", errors.New("iam: flow state does not fit a cookie")
 	}
-	c := s.svc.newCookie(s.cookie, value, expires) //nolint:gosec // None is only set together with Secure
-	// None needs Secure, so plain HTTP keeps Lax and only same-site IdPs work.
-	if s.crossSite && s.svc.secure {
-		c.SameSite = http.SameSiteNoneMode
-	}
-	http.SetCookie(w, c)
+	http.SetCookie(w, s.svc.newCookie(s.cookie, value, expires))
 	return id, nil
 }
 
@@ -146,7 +136,6 @@ func (s *Service) spendFlow(ctx context.Context, id string) {
 	}
 }
 
-// claimString also stringifies numeric claims like GitHub's "id".
 func claimString(m map[string]any, keys ...string) string {
 	for _, key := range keys {
 		switch v := m[key].(type) {
@@ -163,29 +152,6 @@ func claimString(m map[string]any, keys ...string) string {
 	return ""
 }
 
-func claimBool(m map[string]any, keys ...string) bool {
-	for _, key := range keys {
-		switch v := m[key].(type) {
-		case bool:
-			return v
-		case string:
-			if strings.EqualFold(v, "true") || v == "1" {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func attrValue(attrs map[string][]string, names ...string) string {
-	for _, name := range names {
-		if v := attrs[name]; len(v) > 0 && v[0] != "" {
-			return v[0]
-		}
-	}
-	return ""
-}
-
 // safeReturnTo only lets same-origin absolute paths through.
 func safeReturnTo(p string) string {
 	if !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") || len(p) > maxReturnTo ||
@@ -197,12 +163,4 @@ func safeReturnTo(p string) string {
 
 func fail(w http.ResponseWriter, r *http.Request, msg string) {
 	http.Redirect(w, r, ssoErrorPath+"?error="+url.QueryEscape(msg), http.StatusSeeOther)
-}
-
-func emailDomain(email string) string {
-	_, domain, ok := strings.Cut(email, "@")
-	if !ok {
-		return ""
-	}
-	return strings.ToLower(domain)
 }

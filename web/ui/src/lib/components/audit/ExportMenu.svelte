@@ -13,11 +13,9 @@
 	interface Props {
 		/** The same filter the page shows, so the export matches the screen. */
 		filter: Partial<Omit<AuditLogFilter, '$typeName'>>;
-		/** Empty exports the caller's own events across workspaces. */
-		workspaceId?: string;
 	}
 
-	let { filter, workspaceId }: Props = $props();
+	let { filter }: Props = $props();
 
 	const exportLogs = util.exportLogs();
 
@@ -25,7 +23,6 @@
 	function exportAs(format: Format) {
 		exportLogs.mutate({
 			format,
-			workspaceId,
 			filter: { ...filter, endDate: filter.endDate ?? timestampFromDate(new Date()) }
 		});
 	}

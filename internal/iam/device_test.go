@@ -22,36 +22,50 @@ import (
 
 const terminalAgent = "nk/1.0.0 (linux/amd64)"
 
-// devicePost sends one form request of the device flow, as u when given.
-func devicePost(handler http.HandlerFunc, path, remote string, form url.Values, u *db.User) *httptest.ResponseRecorder {
+// devicePost sends one form request of the device flow on the workspace's
+// host, as u when given.
+func devicePost(
+	ws actor.Workspace,
+	handler http.HandlerFunc,
+	path, remote string,
+	form url.Values,
+	u *db.User,
+) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Set("User-Agent", terminalAgent)
 	r.RemoteAddr = remote
+	ctx := anon(r.Context(), ws)
 	if u != nil {
-		r = r.WithContext(actor.ContextWithPrincipal(r.Context(), actor.Principal{ID: u.ID, Kind: actor.KindUser}))
+		ctx = as(ctx, ws, u)
 	}
 	w := httptest.NewRecorder()
-	handler(w, r)
+	handler(w, r.WithContext(ctx))
 	return w
 }
 
-// terminalSignIn runs a whole device login for u from the machine that holds
-// key, and returns how long the session lasts.
-func terminalSignIn(t *testing.T, e *testEnv, u *db.User, key *ecdsa.PrivateKey) time.Duration {
+type deviceGrantJSON struct {
+	DeviceCode string `json:"device_code"`
+	UserCode   string `json:"user_code"`
+}
+
+func beginDevice(t *testing.T, e *testEnv, ws actor.Workspace) deviceGrantJSON {
 	t.Helper()
-	var grant struct {
-		DeviceCode string `json:"device_code"`
-		UserCode   string `json:"user_code"`
-	}
-	begun := devicePost(e.svc.Device.Begin, "/auth/device", "198.51.100.9:6000", nil, nil)
+	var grant deviceGrantJSON
+	begun := devicePost(ws, e.svc.Device.Begin, "/auth/device", "198.51.100.9:6000", nil, nil)
 	require.Equal(t, http.StatusOK, begun.Code)
 	require.NoError(t, json.Unmarshal(begun.Body.Bytes(), &grant))
-	approved := devicePost(
-		e.svc.Device.Verify, "/auth/device/verify", "192.0.2.1:1", url.Values{"user_code": {grant.UserCode}}, u,
-	)
-	require.Equal(t, http.StatusOK, approved.Code)
+	return grant
+}
 
+func pollDevice(
+	t *testing.T,
+	e *testEnv,
+	ws actor.Workspace,
+	grant deviceGrantJSON,
+	key *ecdsa.PrivateKey,
+) *httptest.ResponseRecorder {
+	t.Helper()
 	const pollPath = "/auth/device/token"
 	poll := httptest.NewRequest(
 		http.MethodPost,
@@ -60,12 +74,25 @@ func terminalSignIn(t *testing.T, e *testEnv, u *db.User, key *ecdsa.PrivateKey)
 	)
 	poll.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	poll.Header.Set("User-Agent", terminalAgent)
-	poll.Header.Set("DPoP", signProof(t, key, e.svc.baseURL+pollPath, "", e.svc.DPoP.CurrentNonce(), time.Now()))
+	poll.Header.Set("DPoP", signProof(t, key, testBaseURL+pollPath, "", e.svc.DPoP.CurrentNonce(), time.Now()))
 	poll.RemoteAddr = "198.51.100.9:6000"
 	polled := httptest.NewRecorder()
-	e.svc.Device.Poll(polled, poll)
-	require.Equal(t, http.StatusOK, polled.Code, polled.Body.String())
+	e.svc.Device.Poll(polled, poll.WithContext(anon(poll.Context(), ws)))
+	return polled
+}
 
+// terminalSignIn runs a whole device login for u from the machine that holds
+// key, and returns how long the session lasts.
+func terminalSignIn(t *testing.T, e *testEnv, ws actor.Workspace, u *db.User, key *ecdsa.PrivateKey) time.Duration {
+	t.Helper()
+	grant := beginDevice(t, e, ws)
+	approved := devicePost(
+		ws, e.svc.Device.Verify, "/auth/device/verify", "192.0.2.1:1", url.Values{"user_code": {grant.UserCode}}, u,
+	)
+	require.Equal(t, http.StatusOK, approved.Code)
+
+	polled := pollDevice(t, e, ws, grant, key)
+	require.Equal(t, http.StatusOK, polled.Code, polled.Body.String())
 	var token struct {
 		ExpiresIn int `json:"expires_in"`
 	}
@@ -77,11 +104,12 @@ func terminalSignIn(t *testing.T, e *testEnv, u *db.User, key *ecdsa.PrivateKey)
 // is what gives a phished device code away.
 func TestDeviceFlowShowsRequester(t *testing.T) {
 	e := newTestEnv(t)
-	u := e.user(t, "user@"+testDomain(), true)
+	o := e.org(t)
 	info := func(userCode string) (int, map[string]string) {
 		t.Helper()
 		w := httptest.NewRecorder()
-		e.svc.Device.Info(w, httptest.NewRequest(http.MethodGet, "/auth/device/info?user_code="+userCode, nil))
+		r := httptest.NewRequest(http.MethodGet, "/auth/device/info?user_code="+userCode, nil)
+		e.svc.Device.Info(w, r.WithContext(anon(r.Context(), o.ws)))
 		var body map[string]string
 		if w.Code == http.StatusOK {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
@@ -89,12 +117,14 @@ func TestDeviceFlowShowsRequester(t *testing.T) {
 		return w.Code, body
 	}
 
-	var grant struct {
-		UserCode string `json:"user_code"`
-	}
-	begun := devicePost(e.svc.Device.Begin, "/auth/device", "203.0.113.7:5000", nil, nil)
+	begun := devicePost(o.ws, e.svc.Device.Begin, "/auth/device", "203.0.113.7:5000", nil, nil)
 	require.Equal(t, http.StatusOK, begun.Code)
+	var grant struct {
+		UserCode        string `json:"user_code"`
+		VerificationURI string `json:"verification_uri"`
+	}
 	require.NoError(t, json.Unmarshal(begun.Body.Bytes(), &grant))
+	assert.Equal(t, testBaseURL+"/device", grant.VerificationURI)
 
 	status, requester := info(strings.ToLower(grant.UserCode))
 	require.Equal(t, http.StatusOK, status)
@@ -103,18 +133,47 @@ func TestDeviceFlowShowsRequester(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, status, "an unknown code")
 
 	approved := devicePost(
-		e.svc.Device.Verify, "/auth/device/verify", "192.0.2.1:1", url.Values{"user_code": {grant.UserCode}}, u,
+		o.ws, e.svc.Device.Verify, "/auth/device/verify", "192.0.2.1:1", url.Values{"user_code": {grant.UserCode}},
+		o.owner,
 	)
 	require.Equal(t, http.StatusOK, approved.Code)
 	status, _ = info(grant.UserCode)
 	assert.Equal(t, http.StatusNotFound, status, "a decided code")
 }
 
+// A code started on one workspace cannot be approved or redeemed on another.
+func TestDeviceFlowStaysInItsWorkspace(t *testing.T) {
+	e := newTestEnv(t)
+	a, b := e.org(t), e.org(t)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	grant := beginDevice(t, e, a.ws)
+	foreign := devicePost(
+		b.ws, e.svc.Device.Verify, "/auth/device/verify", "192.0.2.1:1", url.Values{"user_code": {grant.UserCode}},
+		b.owner,
+	)
+	assert.Equal(t, http.StatusBadRequest, foreign.Code, "workspace b approved a code of workspace a")
+
+	approved := devicePost(
+		a.ws, e.svc.Device.Verify, "/auth/device/verify", "192.0.2.1:1", url.Values{"user_code": {grant.UserCode}},
+		a.owner,
+	)
+	require.Equal(t, http.StatusOK, approved.Code)
+	polled := pollDevice(t, e, b.ws, grant, key)
+	assert.Equal(t, http.StatusBadRequest, polled.Code, "workspace b redeemed a code of workspace a")
+	assert.Zero(t, e.sessions(t, b.ws, a.owner.ID))
+
+	polled = pollDevice(t, e, a.ws, grant, key)
+	assert.Equal(t, http.StatusOK, polled.Code, polled.Body.String())
+}
+
 // A terminal is mailed once, when its key is new to the account. Signing in
 // again from the same machine is quiet, so the mail keeps meaning something.
 func TestTerminalSignInMailsOnlyNewKeys(t *testing.T) {
 	e := newTestEnv(t)
-	u := e.user(t, "user@"+testDomain(), true)
+	o := e.org(t)
+	u := o.owner
 	mailed := make(chan string, 4)
 	e.svc.OnNewDeviceLogin = func(_ context.Context, to *db.User, sess *db.Session, label, ip string) {
 		mailed <- to.ID + " " + label + " " + ip + " " + sess.Kind
@@ -132,22 +191,22 @@ func TestTerminalSignInMailsOnlyNewKeys(t *testing.T) {
 
 	laptop, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	lasts := terminalSignIn(t, e, u, laptop)
+	lasts := terminalSignIn(t, e, o.ws, u, laptop)
 	assert.InDelta(t, deviceSessionTTL.Seconds(), lasts.Seconds(), 5, "session lifetime")
 	wantMail(true, "the first sign-in of a key is mailed")
 
-	terminalSignIn(t, e, u, laptop)
+	terminalSignIn(t, e, o.ws, u, laptop)
 	wantMail(false, "the same key signing in again is not mailed")
 
 	other, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	terminalSignIn(t, e, u, other)
+	terminalSignIn(t, e, o.ws, u, other)
 	wantMail(true, "another key is mailed")
 
 	// Signing the account out everywhere forgets its terminals too.
-	_, err = e.svc.revokeSubject(t.Context(), u.ID)
+	_, err = e.svc.revokeSubject(anon(t.Context(), o.ws), u.ID)
 	require.NoError(t, err)
-	terminalSignIn(t, e, u, laptop)
+	terminalSignIn(t, e, o.ws, u, laptop)
 	wantMail(true, "a forgotten key is mailed again")
 }
 
@@ -155,9 +214,11 @@ func TestTerminalSignInMailsOnlyNewKeys(t *testing.T) {
 // browser from signing in.
 func TestDeviceFloodStaysInItsStore(t *testing.T) {
 	e := newTestEnv(t)
+	ws := e.workspace(t)
 	begin := func() int {
 		rec := httptest.NewRecorder()
-		e.svc.Device.Begin(rec, httptest.NewRequest(http.MethodPost, "/auth/device", nil))
+		r := httptest.NewRequest(http.MethodPost, "/auth/device", nil)
+		e.svc.Device.Begin(rec, r.WithContext(anon(r.Context(), ws)))
 		return rec.Code
 	}
 	// Two entries per grant.
@@ -167,7 +228,8 @@ func TestDeviceFloodStaysInItsStore(t *testing.T) {
 	require.NotEqual(t, http.StatusOK, begin(), "the device store takes grants without bound")
 
 	rec := httptest.NewRecorder()
-	e.svc.Passkey.BeginLogin(rec, httptest.NewRequest(http.MethodPost, "/passkey/login/begin", nil))
+	r := httptest.NewRequest(http.MethodPost, "/passkey/login/begin", nil)
+	e.svc.Passkey.BeginLogin(rec, r.WithContext(anon(r.Context(), ws)))
 	assert.Equal(t, http.StatusOK, rec.Code, "a passkey login could not start: %s", rec.Body.String())
 
 	login := httptest.NewRequest(http.MethodPost, "/passkey/login/finish", nil)

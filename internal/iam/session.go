@@ -13,7 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/util"
+	"github.com/nokku-sh/nokku/internal/realip"
 )
 
 const (
@@ -30,10 +30,9 @@ const (
 type SessionHash string
 
 type SessionParams struct {
-	SubjectID   string
-	Kind        actor.Kind
-	Method      Method
-	WorkspaceID string
+	SubjectID string
+	Kind      actor.Kind
+	Method    Method
 	// Binding is the DPoP jkt, empty for cookie sessions.
 	Binding string
 	Label   string
@@ -41,6 +40,7 @@ type SessionParams struct {
 	TTL time.Duration
 }
 
+// IssueSession pins the session to the request's workspace.
 func (s *Service) IssueSession(ctx context.Context, p SessionParams) (*db.Session, string, error) {
 	token, tokenHash, err := crypto.NewSecret()
 	if err != nil {
@@ -57,51 +57,41 @@ func (s *Service) IssueSession(ctx context.Context, p SessionParams) (*db.Sessio
 		LastSeenAt: &now,
 	}
 	if meta, ok := RequestMetaFromContext(ctx); ok {
-		params.UserAgent = truncate(util.SanitizeUTF8(meta.Header.Get("User-Agent")), maxUserAgent)
-		params.Ip = util.SanitizeUTF8(util.GetRemoteIP(meta.Header, meta.RemoteAddr))
-	}
-	if p.WorkspaceID != "" {
-		params.WorkspaceID = &p.WorkspaceID
+		params.UserAgent = truncate(strings.ToValidUTF8(meta.Header.Get("User-Agent"), ""), maxUserAgent)
+		params.Ip = strings.ToValidUTF8(realip.Bucket(meta.Header, meta.RemoteAddr), "")
 	}
 	if p.TTL > 0 {
 		params.ExpiresAt = new(now.Add(p.TTL))
 	}
-	sess, err := s.sys.CreateSession(ctx, params)
+	var sess *db.Session
+	err = s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
+		params.WorkspaceID = ws
+		sess, err = q.CreateSession(ctx, params)
+		return err
+	})
 	if err != nil {
 		return nil, "", err
 	}
-	s.record(ctx, Event{
-		Action:      ActionSessionIssued,
-		Kind:        p.Kind,
-		Method:      p.Method,
-		UserID:      p.SubjectID,
-		WorkspaceID: p.WorkspaceID,
-	})
+	s.record(ctx, Event{Action: ActionSessionIssued, Kind: p.Kind, Method: p.Method, UserID: p.SubjectID})
 	return sess, token, nil
 }
 
-// completeLogin applies the gates every login method shares. The session
-// stays unpinned since users pick a workspace per request.
+// completeLogin applies the gates every login method shares.
 func (s *Service) completeLogin(ctx context.Context, u *db.User, method Method) (*http.Cookie, error) {
 	deny := func(err error, detail string) (*http.Cookie, error) {
-		s.record(ctx, Event{
-			Action: ActionLoginDenied,
-			Method: method,
-			UserID: u.ID,
-			Email:  u.Email,
-			Detail: detail,
-		})
+		s.record(ctx, Event{Action: ActionLoginDenied, Method: method, UserID: u.ID, Email: u.Email, Detail: detail})
 		return nil, err
 	}
 	if !u.Active {
 		return deny(ErrInactive, "inactive")
 	}
-	if !u.EmailVerified {
-		return deny(ErrEmailUnverified, "unverified email")
-	}
-	if !isSSOMethod(method) {
-		if err := s.enforceSSO(ctx, u.Email); err != nil {
-			return deny(err, "sso enforced")
+	if method != MethodOIDC {
+		enforced, err := s.ssoEnforced(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if enforced {
+			return deny(ErrSSORequired, "sso enforced")
 		}
 	}
 	sess, token, err := s.IssueSession(ctx, SessionParams{
@@ -113,29 +103,38 @@ func (s *Service) completeLogin(ctx context.Context, u *db.User, method Method) 
 	if err != nil {
 		return nil, err
 	}
-	s.record(ctx, Event{
-		Action: ActionLoginSucceeded,
-		Kind:   actor.KindUser,
-		Method: method,
-		UserID: u.ID,
-		Email:  u.Email,
-	})
+	s.record(
+		ctx,
+		Event{Action: ActionLoginSucceeded, Kind: actor.KindUser, Method: method, UserID: u.ID, Email: u.Email},
+	)
 	return s.newCookie(sessionCookieName, token, *sess.ExpiresAt), nil
+}
+
+func (s *Service) ssoEnforced(ctx context.Context) (bool, error) {
+	var enforced bool
+	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+		w, err := q.GetWorkspace(ctx, ws)
+		if err != nil {
+			return err
+		}
+		enforced = w.Settings.GetEnforceSso()
+		return nil
+	})
+	return enforced, err
 }
 
 // IssueDaemonSession replaces the daemon's earlier sessions. The session
 // never expires. After the daemon is deleted it only gets the REJECTED answer
 // from SyncDaemon, which also removes it.
-func (s *Service) IssueDaemonSession(ctx context.Context, workspaceID, daemonID, binding string) (string, error) {
-	if _, err := s.sys.DeleteSubjectSessions(ctx, daemonID); err != nil {
+func (s *Service) IssueDaemonSession(ctx context.Context, daemonID, binding string) (string, error) {
+	if _, err := s.revokeSubject(ctx, daemonID); err != nil {
 		return "", err
 	}
 	_, token, err := s.IssueSession(ctx, SessionParams{
-		WorkspaceID: workspaceID,
-		SubjectID:   daemonID,
-		Kind:        actor.KindDaemon,
-		Method:      MethodDevice,
-		Binding:     binding,
+		SubjectID: daemonID,
+		Kind:      actor.KindDaemon,
+		Method:    MethodDevice,
+		Binding:   binding,
 	})
 	return token, err
 }
@@ -146,13 +145,7 @@ func (s *Service) RememberDevice(ctx context.Context, header http.Header, remote
 	if raw := cookieFromHeader(header, deviceCookieName); raw != "" {
 		if sess, err := s.verifySession(ctx, raw); err == nil &&
 			sess.Kind == string(actor.KindDevice) && sess.SubjectID == u.ID {
-			now := s.now()
-			if err := s.sys.TouchSession(
-				ctx,
-				&db.TouchSessionParams{TokenHash: sess.TokenHash, LastSeenAt: &now},
-			); err != nil {
-				slog.Debug("failed to touch device session", "error", err)
-			}
+			s.touchSession(ctx, sess.TokenHash)
 			return nil
 		}
 	}
@@ -170,12 +163,21 @@ func (s *Service) RememberDevice(ctx context.Context, header http.Header, remote
 		return nil
 	}
 	if s.OnNewDeviceLogin != nil {
-		ip := util.GetRemoteIP(header, remoteAddr)
+		ip := realip.Bucket(header, remoteAddr)
 		go s.OnNewDeviceLogin(context.WithoutCancel(ctx), u, sess, name, ip)
 	}
 	return s.newCookie(deviceCookieName, token, *sess.ExpiresAt)
 }
 
+func (s *Service) touchSession(ctx context.Context, hash crypto.HashedToken) {
+	now := s.now()
+	// Best effort, last_seen_at is a hint.
+	_ = s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+		return q.TouchSession(ctx, &db.TouchSessionParams{WorkspaceID: ws, TokenHash: hash, LastSeenAt: &now})
+	})
+}
+
+// verifySession only finds sessions of the request's workspace.
 func (s *Service) verifySession(ctx context.Context, token string) (db.Session, error) {
 	if token == "" {
 		return db.Session{}, errNoSession
@@ -184,7 +186,11 @@ func (s *Service) verifySession(ctx context.Context, token string) (db.Session, 
 	if err != nil {
 		return db.Session{}, err
 	}
-	sess, err := s.sys.GetSession(ctx, tokenHash)
+	var sess *db.Session
+	err = s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
+		sess, err = q.GetSession(ctx, &db.GetSessionParams{WorkspaceID: ws, TokenHash: tokenHash})
+		return err
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return db.Session{}, errNoSession
 	}
@@ -192,16 +198,25 @@ func (s *Service) verifySession(ctx context.Context, token string) (db.Session, 
 		return db.Session{}, err
 	}
 	if sess.ExpiresAt != nil && !sess.ExpiresAt.After(s.now()) {
-		_ = s.sys.DeleteSession(ctx, sess.TokenHash)
+		_ = s.deleteSession(ctx, sess.TokenHash)
 		return db.Session{}, errSessionExpired
 	}
 	return *sess, nil
 }
 
+func (s *Service) deleteSession(ctx context.Context, hash crypto.HashedToken) error {
+	return s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+		return q.DeleteSession(ctx, &db.DeleteSessionParams{WorkspaceID: ws, TokenHash: hash})
+	})
+}
+
 func (s *Service) ListSessions(ctx context.Context) ([]*db.Session, error) {
 	var rows []*db.Session
-	err := s.asSelf(ctx, func(q *db.Queries) (err error) {
-		rows, err = q.ListSessionsBySubject(ctx, actor.UserIDFromContext(ctx))
+	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
+		rows, err = q.ListSessionsBySubject(ctx, &db.ListSessionsBySubjectParams{
+			WorkspaceID: ws,
+			SubjectID:   actor.UserIDFromContext(ctx),
+		})
 		return err
 	})
 	return rows, err
@@ -218,7 +233,7 @@ func (s *Service) Logout(ctx context.Context, header http.Header, procedure stri
 	if err != nil || sess.TokenHash == "" {
 		return nil
 	}
-	if err := s.sys.DeleteSession(ctx, sess.TokenHash); err != nil {
+	if err := s.deleteSession(ctx, sess.TokenHash); err != nil {
 		return err
 	}
 	s.record(ctx, Event{Action: ActionSessionRevoked, Kind: p.Kind, Method: Method(sess.Method), UserID: p.ID})
@@ -226,24 +241,43 @@ func (s *Service) Logout(ctx context.Context, header http.Header, procedure stri
 }
 
 func (s *Service) revokeSubject(ctx context.Context, subjectID string) (int64, error) {
-	return s.sys.DeleteSubjectSessions(ctx, subjectID)
+	var n int64
+	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
+		n, err = q.DeleteSubjectSessions(ctx, &db.DeleteSubjectSessionsParams{WorkspaceID: ws, SubjectID: subjectID})
+		return err
+	})
+	return n, err
 }
 
 func (s *Service) RevokeOtherSessions(ctx context.Context, keep SessionHash) (int64, error) {
 	var n int64
-	err := s.asSelf(ctx, func(q *db.Queries) (err error) {
+	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) (err error) {
 		n, err = q.DeleteSessionsExcept(ctx, &db.DeleteSessionsExceptParams{
-			SubjectID: actor.UserIDFromContext(ctx),
-			KeepHash:  crypto.HashedToken(keep),
+			WorkspaceID: ws,
+			SubjectID:   actor.UserIDFromContext(ctx),
+			KeepHash:    crypto.HashedToken(keep),
 		})
 		return err
 	})
 	return n, err
 }
 
+// DeleteOwnSession only reaches the caller's own sessions.
 func (s *Service) DeleteOwnSession(ctx context.Context, hash SessionHash) error {
-	return s.asSelf(ctx, func(q *db.Queries) error {
-		return q.DeleteSession(ctx, crypto.HashedToken(hash))
+	return s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+		rows, err := q.ListSessionsBySubject(ctx, &db.ListSessionsBySubjectParams{
+			WorkspaceID: ws,
+			SubjectID:   actor.UserIDFromContext(ctx),
+		})
+		if err != nil {
+			return err
+		}
+		for _, sess := range rows {
+			if sess.TokenHash == crypto.HashedToken(hash) {
+				return q.DeleteSession(ctx, &db.DeleteSessionParams{WorkspaceID: ws, TokenHash: sess.TokenHash})
+			}
+		}
+		return nil
 	})
 }
 
@@ -257,7 +291,10 @@ func truncate(s string, n int) string {
 // touchCredential marks a credential as used by a sign-in. It never fails
 // the sign-in, "last used" is only a hint for the owner.
 func (s *Service) touchCredential(ctx context.Context, id string) {
-	if err := s.sys.TouchCredential(ctx, id); err != nil {
+	err := s.inWorkspace(ctx, func(q *db.Queries, ws string) error {
+		return q.TouchCredential(ctx, &db.TouchCredentialParams{WorkspaceID: ws, ID: id})
+	})
+	if err != nil {
 		slog.Warn("failed to mark credential used", "error", err)
 	}
 }

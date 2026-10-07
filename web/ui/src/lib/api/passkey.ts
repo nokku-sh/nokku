@@ -76,9 +76,14 @@ async function fail(response: Response, fallback: string): Promise<never> {
 	throw new Error(body?.message || fallback);
 }
 
-export async function signupWithPasskey(params: { email: string; name?: string }): Promise<void> {
-	// Begin reads email and name as form values. Finish reads the ceremony cookie.
-	const form = new URLSearchParams({ email: params.email });
+export async function signupWithPasskey(params: {
+	invite: string;
+	email: string;
+	name?: string;
+}): Promise<void> {
+	// Begin reads the invite, email and name as form values. Finish reads the
+	// ceremony cookie.
+	const form = new URLSearchParams({ invite: params.invite, email: params.email });
 	if (params.name) form.set('name', params.name);
 
 	const beginResponse = await fetch('/passkey/signup/begin', {

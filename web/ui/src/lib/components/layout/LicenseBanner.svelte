@@ -1,24 +1,24 @@
 <script lang="ts">
 	import { license, licenseStatus } from '#lib/api/license.svelte.js';
-	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import { atLeast } from '#lib/roles.js';
 	import { formatTs } from '#lib/utils.js';
 	import { TriangleAlert } from '@lucide/svelte';
 
 	const data = license.get();
-	const ws = workspace.get();
+	const me = user.self();
 
 	const status = $derived(licenseStatus(data.data));
 	const expired = $derived(status.state === 'expired');
 	// Only the people who can act on it.
 	const show = $derived(
-		(expired || status.state === 'expiring') && atLeast(ws.data?.role, 'admin')
+		(expired || status.state === 'expiring') && atLeast(me.data?.role, 'admin')
 	);
 </script>
 
 {#if show}
 	<a
-		href="/profile/billing"
+		href="/settings/billing"
 		class={[
 			'flex shrink-0 items-center justify-center gap-2 border-b px-4 py-1.5 text-sm hover:underline',
 			expired ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'

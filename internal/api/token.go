@@ -6,6 +6,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/audit"
 
 	"connectrpc.com/connect"
@@ -32,7 +33,7 @@ func (s *tokenService) CreateToken(
 ) (*nokkuv1.CreateTokenResponse, error) {
 	params := &db.CreateWorkspaceTokenParams{
 		ID:          uuid.NewV7().String(),
-		WorkspaceID: req.GetWorkspaceId(),
+		WorkspaceID: actor.WorkspaceIDFromContext(ctx),
 		Kind:        req.GetKind(),
 		Label:       req.GetLabel(),
 		MaxUses:     req.MaxUses,
@@ -93,7 +94,7 @@ func (s *tokenService) ListTokens(
 	var tokens []*db.WorkspaceToken
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		tokens, err = q.ListWorkspaceTokens(ctx, &db.ListWorkspaceTokensParams{
-			WorkspaceID: req.GetWorkspaceId(),
+			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
 			Kind:        req.GetKind(),
 		})
 		return err

@@ -4,7 +4,6 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import { file_nokku_v1_access } from "./access_pb";
@@ -20,16 +19,12 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/dashboard.proto.
  */
 export const file_nokku_v1_dashboard: GenFile = /*@__PURE__*/
-  fileDesc("Chhub2trdS92MS9kYXNoYm9hcmQucHJvdG8SCG5va2t1LnYxIjUKE0dldERhc2hib2FyZFJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABASLSAwoUR2V0RGFzaGJvYXJkUmVzcG9uc2USDwoHdGFyZ2V0cxgBIAEoBRIWCg50YXJnZXRzX29ubGluZRgCIAEoBRIWCg50YXJnZXRzX21hbnVhbBgDIAEoBRIPCgdkYWVtb25zGAQgASgFEhYKDmRhZW1vbnNfb25saW5lGAUgASgFEikKD3BlbmRpbmdfZGFlbW9ucxgGIAMoCzIQLm5va2t1LnYxLkRhZW1vbhIpCg9vZmZsaW5lX2RhZW1vbnMYByADKAsyEC5ub2trdS52MS5EYWVtb24SDwoHbWVtYmVycxgIIAEoBRIzCgtzb29uZXN0X2NhcxgJIAMoCzIeLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5EhcKD3JlY29yZGluZ19ieXRlcxgKIAEoAxIdChVyZWNvcmRpbmdfcXVvdGFfYnl0ZXMYCyABKAMSLAoNbGl2ZV9zZXNzaW9ucxgMIAMoCzIVLm5va2t1LnYxLkxpdmVTZXNzaW9uEhAKCGFjdGl2aXR5GA0gAygFEhAKCGZhaWx1cmVzGA4gAygFEioKDnJlY2VudF9jaGFuZ2VzGA8gAygLMhIubm9ra3UudjEuRXZlbnRMb2citAEKC0xpdmVTZXNzaW9uEgoKAmlkGAEgASgJEhEKCWRhZW1vbl9pZBgCIAEoCRITCgtkYWVtb25fbmFtZRgDIAEoCRIQCgh1c2VybmFtZRgEIAEoCRIPCgd1c2VyX2lkGAUgASgJEi4KCnN0YXJ0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhEKCXJlY29yZGluZxgHIAEoCBILCgN3ZWIYCCABKAgybAoQRGFzaGJvYXJkU2VydmljZRJYCgxHZXREYXNoYm9hcmQSHS5ub2trdS52MS5HZXREYXNoYm9hcmRSZXF1ZXN0Gh4ubm9ra3UudjEuR2V0RGFzaGJvYXJkUmVzcG9uc2UiCZACAcLzGAIYAmIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_certificates, file_nokku_v1_daemon, file_nokku_v1_util]);
+  fileDesc("Chhub2trdS92MS9kYXNoYm9hcmQucHJvdG8SCG5va2t1LnYxIhUKE0dldERhc2hib2FyZFJlcXVlc3Qi0AMKFEdldERhc2hib2FyZFJlc3BvbnNlEg8KB3RhcmdldHMYASABKAUSFgoOdGFyZ2V0c19vbmxpbmUYAiABKAUSFgoOdGFyZ2V0c19tYW51YWwYAyABKAUSDwoHZGFlbW9ucxgEIAEoBRIWCg5kYWVtb25zX29ubGluZRgFIAEoBRIpCg9wZW5kaW5nX2RhZW1vbnMYBiADKAsyEC5ub2trdS52MS5EYWVtb24SKQoPb2ZmbGluZV9kYWVtb25zGAcgAygLMhAubm9ra3UudjEuRGFlbW9uEg0KBXVzZXJzGAggASgFEjMKC3Nvb25lc3RfY2FzGAkgAygLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkSFwoPcmVjb3JkaW5nX2J5dGVzGAogASgDEh0KFXJlY29yZGluZ19xdW90YV9ieXRlcxgLIAEoAxIsCg1saXZlX3Nlc3Npb25zGAwgAygLMhUubm9ra3UudjEuTGl2ZVNlc3Npb24SEAoIYWN0aXZpdHkYDSADKAUSEAoIZmFpbHVyZXMYDiADKAUSKgoOcmVjZW50X2NoYW5nZXMYDyADKAsyEi5ub2trdS52MS5FdmVudExvZyK0AQoLTGl2ZVNlc3Npb24SCgoCaWQYASABKAkSEQoJZGFlbW9uX2lkGAIgASgJEhMKC2RhZW1vbl9uYW1lGAMgASgJEhAKCHVzZXJuYW1lGAQgASgJEg8KB3VzZXJfaWQYBSABKAkSLgoKc3RhcnRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEQoJcmVjb3JkaW5nGAcgASgIEgsKA3dlYhgIIAEoCDJsChBEYXNoYm9hcmRTZXJ2aWNlElgKDEdldERhc2hib2FyZBIdLm5va2t1LnYxLkdldERhc2hib2FyZFJlcXVlc3QaHi5ub2trdS52MS5HZXREYXNoYm9hcmRSZXNwb25zZSIJkAIBwvMYAhgCYghlZGl0aW9uc3DoBw", [file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_certificates, file_nokku_v1_daemon, file_nokku_v1_util]);
 
 /**
  * @generated from message nokku.v1.GetDashboardRequest
  */
 export type GetDashboardRequest = Message<"nokku.v1.GetDashboardRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
 };
 
 /**
@@ -87,9 +82,9 @@ export type GetDashboardResponse = Message<"nokku.v1.GetDashboardResponse"> & {
   offlineDaemons: Daemon[];
 
   /**
-   * @generated from field: int32 members = 8;
+   * @generated from field: int32 users = 8;
    */
-  members: number;
+  users: number;
 
   /**
    * Active CAs that expire first, at most 3.
