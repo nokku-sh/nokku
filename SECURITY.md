@@ -120,6 +120,15 @@ If you set `NOKKU_S3_PUBLIC_URL` to serve avatars straight from the bucket, gran
 
 Releases are built with GoReleaser and come with checksums and signatures. Verify a download before you run it.
 
+The container image is signed with cosign and carries an SPDX SBOM. Check an image before you deploy it:
+
+```bash
+cosign verify ghcr.io/nokku-sh/nokku:<version> \
+  --certificate-identity https://github.com/nokku-sh/.github/.github/workflows/go-release.yaml@refs/heads/main \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-github-workflow-repository nokku-sh/nokku
+```
+
 ## What to know about the design
 
 **The core is down, access is not.** Daemons enforce the access they last synced, and a certificate stays valid until it expires. Revoking access is immediate on servers that are in sync. A server that missed the sync is bounded by the certificate lifetime, so keep user certificates short.
