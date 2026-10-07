@@ -7,6 +7,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -66,6 +67,14 @@ func TestBaseURL(t *testing.T) {
 func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
 	c := testConnection(t)
 	t.Setenv("NOKKU_WORKSPACE_NAME", "Lab")
+	// A self-hosted database is empty before its first boot. The other tests
+	// leave workspaces behind and run in any order, so those go first. Only
+	// the owner role deletes past RLS.
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	_, err = owner.Exec(t.Context(), "DELETE FROM workspaces")
+	require.NoError(t, err)
+	require.NoError(t, owner.Close(t.Context()))
 
 	first, err := New(t.Context(), c, "http://localhost:3000", false)
 	require.NoError(t, err)
