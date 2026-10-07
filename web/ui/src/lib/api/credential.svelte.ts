@@ -1,106 +1,30 @@
 import { createMutation, createQuery } from '@tanstack/svelte-query';
-import type { Timestamp } from '@bufbuild/protobuf/wkt';
 import { toast } from 'svelte-sonner';
 import { queryClient } from './client';
 import { account, type AccountCredential } from './account';
 
 const invalidateCredentials = () => queryClient.invalidateQueries({ queryKey: ['account'] });
 
-export const password = {
-	update: () =>
-		createMutation<void, Error, { currentPassword: string; newPassword: string }>(() => ({
-			mutationFn: ({ currentPassword, newPassword }) =>
-				account.changePassword(currentPassword, newPassword),
-			onSuccess: invalidateCredentials
-		})),
-	delete: () =>
-		createMutation<void, Error, { currentPassword: string }>(() => ({
-			mutationFn: ({ currentPassword }) => account.removePassword(currentPassword),
-			onSuccess: () => {
-				void invalidateCredentials();
-				toast.success('Password deleted', {
-					description: 'You can now only sign in with passkeys.'
-				});
-			}
-		}))
-};
-
-// all feeds the security checkup and the last-way-in guard.
+// Passkeys and identity provider links, the two ways an account signs in
+// without a mailed link.
 export const credentials = {
 	all: () =>
 		createQuery<AccountCredential[]>(() => ({
-			queryKey: ['account', 'credentials', 'all'],
+			queryKey: ['account', 'credentials'],
 			queryFn: () => account.credentials()
-		}))
-};
-
-export interface Passkey {
-	id: string;
-	name: string;
-	createdAt?: Timestamp;
-	lastUsedAt?: Timestamp;
-}
-
-export const passkey = {
-	list: () =>
-		createQuery<Passkey[]>(() => ({
-			queryKey: ['account', 'credentials', 'passkeys'],
-			queryFn: async () => {
-				const credentials = await account.credentials();
-				return credentials
-					.filter((c) => c.type === 'passkey')
-					.map((c) => ({
-						id: c.id,
-						name: c.label ?? '',
-						createdAt: c.createdAt,
-						lastUsedAt: c.lastUsedAt
-					}));
-			}
 		})),
 
-	delete: () =>
+	remove: () =>
 		createMutation<void, Error, { id: string }>(() => ({
 			mutationFn: ({ id }) => account.removeCredential(id),
 			onSuccess: invalidateCredentials
 		})),
 	rename: () =>
-		createMutation<void, Error, { id: string; name: string }>(() => ({
-			mutationFn: ({ id, name }) => account.renameCredential(id, name),
+		createMutation<void, Error, { id: string; label: string }>(() => ({
+			mutationFn: ({ id, label }) => account.renameCredential(id, label),
 			onSuccess: () => {
 				void invalidateCredentials();
-				toast.success('Passkey renamed', {
-					description: 'The display name was updated.'
-				});
+				toast.success('Passkey renamed');
 			}
-		}))
-};
-
-export interface BackupCode {
-	id: string;
-	createdAt?: Timestamp;
-}
-
-export const backupCode = {
-	list: () =>
-		createQuery<BackupCode[]>(() => ({
-			queryKey: ['account', 'backup-codes'],
-			queryFn: async () => {
-				const codes = await account.backupCodes();
-				return codes.map((c) => ({
-					id: c.id,
-					createdAt: c.createdAt
-				}));
-			}
-		})),
-
-	create: () =>
-		createMutation<{ codes: string[] }, Error, void>(() => ({
-			mutationFn: () => account.rotateBackupCodes().then((codes) => ({ codes })),
-			onSuccess: invalidateCredentials
-		})),
-	delete: () =>
-		createMutation<void, Error, Record<string, never>>(() => ({
-			mutationFn: () => account.removeBackupCodes(),
-			onSuccess: invalidateCredentials
 		}))
 };

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,16 +68,15 @@ func seedWorkspace(t *testing.T, conn *db.Connection) string {
 	t.Helper()
 	var workspaceID string
 	require.NoError(t, conn.WithTx(t.Context(), func(q *db.Queries) error {
-		u, err := q.CreateUser(t.Context(), &db.CreateUserParams{
-			Email: time.Now().Format("20060102150405.000000000") + "@rotate.test",
-			Name:  "owner",
+		ws, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
+			Slug: uuid.NewV7().String(), Name: "rotate",
+			Settings: &nokkuv1.WorkspaceSettings{},
 		})
 		if err != nil {
 			return err
 		}
-		ws, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{Name: "rotate", CreatedBy: u.ID})
 		workspaceID = ws.ID
-		return err
+		return nil
 	}))
 	return workspaceID
 }

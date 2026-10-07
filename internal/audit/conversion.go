@@ -13,17 +13,16 @@ func (e *Event) ToProto() *nokkuv1.EventLog {
 		details = &structpb.Struct{}
 	}
 	return &nokkuv1.EventLog{
-		Id:          &e.ID,
-		WorkspaceId: &e.WorkspaceID,
-		ActorId:     &e.ActorID,
-		ActorKind:   &e.ActorKind,
-		ActorName:   &e.ActorName,
-		Action:      &e.Action,
-		Target:      &e.Target,
-		Ok:          &e.OK,
-		Ip:          &e.IP,
-		UserAgent:   &e.UserAgent,
-		Details:     details,
-		Timestamp:   timestamppb.New(e.Timestamp),
+		Id:        &e.ID,
+		ActorId:   &e.ActorID,
+		ActorKind: &e.ActorKind,
+		ActorName: &e.ActorName,
+		Action:    &e.Action,
+		Target:    &e.Target,
+		Ok:        &e.OK,
+		Ip:        &e.IP,
+		UserAgent: &e.UserAgent,
+		Details:   details,
+		Timestamp: timestamppb.New(e.Timestamp),
 	}
 }

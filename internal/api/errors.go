@@ -14,6 +14,7 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/iam"
+	"github.com/nokku-sh/nokku/internal/tenant"
 )
 
 var (
@@ -56,38 +57,24 @@ var errInvalidInput = connect.NewError(
 	errors.New("please check your input and try again"),
 )
 
-var errUserRequired = connect.NewError(
-	connect.CodePermissionDenied,
-	errors.New("only user accounts can do that"),
-)
-
-// errLoginFailed is Unauthenticated because the client skips its generic
+// errLinkInvalid is Unauthenticated because the client skips its generic
 // toast for that code and the login page shows its own.
 var (
-	errLoginFailed = connect.NewError(
+	errLinkInvalid = connect.NewError(
 		connect.CodeUnauthenticated,
-		errors.New("invalid email or password"),
+		errors.New("this link is invalid or expired"),
 	)
 	errAccountInactive = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("this account has been deactivated"),
 	)
-	errEmailUnverified = connect.NewError(
-		connect.CodeFailedPrecondition,
-		errors.New("verify your email address before signing in"),
-	)
-	// The UI matches this message, see error-formatter.ts.
-	errOtherBrowser = connect.NewError(
-		connect.CodeFailedPrecondition,
-		errors.New("open this link in the browser you signed up in"),
-	)
 	errSSORequired = connect.NewError(
 		connect.CodeFailedPrecondition,
-		errors.New("your organization requires single sign-on"),
+		errors.New("this workspace requires single sign-on"),
 	)
-	errTooManyAttempts = connect.NewError(
-		connect.CodeResourceExhausted,
-		errors.New("too many password attempts, try again in a few minutes"),
+	errNoWorkspace = connect.NewError(
+		connect.CodeNotFound,
+		errors.New("no such workspace"),
 	)
 )
 
@@ -96,29 +83,21 @@ var (
 		connect.CodeNotFound,
 		errors.New("account not found"),
 	)
-	errCurrentPassword = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("current password is incorrect"),
-	)
-	errPasswordNeeded = connect.NewError(
-		connect.CodeFailedPrecondition,
-		errors.New("set a password first, it is needed to change the email address"),
-	)
 	errEmailManaged = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("this account signs in through an identity provider, change the email address there"),
 	)
-	errPasswordTooShort = connect.NewError(
-		connect.CodeInvalidArgument,
-		errors.New("password must be at least 8 characters"),
-	)
 	errLastLoginMethod = connect.NewError(
 		connect.CodeFailedPrecondition,
-		errors.New("add another login method before removing this one"),
+		errors.New("add another way to sign in before removing this one"),
 	)
 	errCurrentSession = connect.NewError(
 		connect.CodeFailedPrecondition,
 		errors.New("use logout to end the current session"),
+	)
+	errOwnerAccount = connect.NewError(
+		connect.CodeFailedPrecondition,
+		errors.New("transfer ownership of the workspace before deleting your account"),
 	)
 )
 
@@ -162,10 +141,10 @@ func toConnectError(err error) error {
 	}
 
 	switch {
-	case errors.Is(err, db.ErrPermissionDenied),
-		errors.Is(err, db.ErrWorkspaceNotPinned),
-		errors.Is(err, db.ErrWorkspaceNotAccessible):
+	case errors.Is(err, db.ErrPermissionDenied):
 		return errPermissionDenied
+	case errors.Is(err, db.ErrWorkspaceNotPinned), errors.Is(err, tenant.ErrUnknownWorkspace):
+		return errNoWorkspace
 	case errors.Is(err, pgx.ErrNoRows):
 		return errNotFound
 	case errors.Is(err, context.Canceled):

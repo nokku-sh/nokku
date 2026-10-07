@@ -8,7 +8,7 @@
 
 	let { children } = $props();
 
-	const redirectRoutes = ['/login', '/register', '/verify', '/recovery', '/reset'];
+	const redirectRoutes = ['/login', '/signup'];
 	const currentUser = user.self();
 
 	$effect(() => {

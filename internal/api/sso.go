@@ -5,8 +5,6 @@ import (
 	"errors"
 	"log/slog"
 
-	"connectrpc.com/connect"
-
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/internal/config"
@@ -14,8 +12,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// sSOService keeps at most one provider per workspace. The provider id is the
-// workspace id, so saving the other protocol overwrites it.
+// sSOService manages the OIDC providers of the workspace.
 type sSOService struct {
 	cfg *config.Config
 }
@@ -24,142 +21,80 @@ func newSSOService(cfg *config.Config) *sSOService {
 	return &sSOService{cfg: cfg}
 }
 
-// requireVerifiedDomain gates SSO and SCIM. SSO without a verified domain
-// never matches a login, SCIM without one could squat arbitrary emails.
-func requireVerifiedDomain(
+func (s *sSOService) ListSSOProviders(
 	ctx context.Context,
-	svc *iam.Service,
-	what, workspaceID string,
-) error {
-	domains, err := svc.ListTenantDomains(ctx, workspaceID)
+	_ *nokkuv1.ListSSOProvidersRequest,
+) (*nokkuv1.ListSSOProvidersResponse, error) {
+	providers, err := s.cfg.IAM.ListSSOProviders(ctx)
 	if err != nil {
-		return err
-	}
-	for _, d := range domains {
-		if d.Verified() {
-			return nil
-		}
-	}
-	return newError(
-		connect.CodeFailedPrecondition,
-		"Add and verify a domain before configuring "+what,
-	)
-}
-
-func (s *sSOService) GetSSOProvider(
-	ctx context.Context,
-	req *nokkuv1.GetSSOProviderRequest,
-) (*nokkuv1.GetSSOProviderResponse, error) {
-	p, err := s.cfg.IAM.GetWorkspaceSSOProvider(ctx, req.GetWorkspaceId())
-	if errors.Is(err, iam.ErrNotFound) {
-		return &nokkuv1.GetSSOProviderResponse{}, nil
-	}
-	if err != nil {
-		return nil, ssoError(err)
-	}
-	return &nokkuv1.GetSSOProviderResponse{Provider: providerToProto(p)}, nil
-}
-
-func (s *sSOService) UpdateSSOProvider(
-	ctx context.Context,
-	req *nokkuv1.UpdateSSOProviderRequest,
-) (*nokkuv1.UpdateSSOProviderResponse, error) {
-	p := iam.SSOProvider{
-		WorkspaceID: req.GetWorkspaceId(),
-		ProviderID:  req.GetWorkspaceId(),
-		Name:        req.GetName(),
-		Enabled:     req.GetIsActive(),
-	}
-	prev, _ := s.cfg.IAM.GetWorkspaceSSOProvider(ctx, req.GetWorkspaceId())
-
-	issuerChanged := false
-	switch req.GetMethod() {
-	case "oidc":
-		p.Method = iam.MethodOIDC
-		// An empty secret keeps the stored one.
-		p.OIDC = &iam.OIDCProvider{
-			IssuerURL:       req.GetConfig().GetIssuerUrl(),
-			ClientID:        req.GetConfig().GetClientId(),
-			ClientSecret:    req.GetClientSecret(),
-			Scopes:          req.GetConfig().GetScopes(),
-			JITProvisioning: req.GetAllowJitProvisioning(),
-			EnforceSSO:      req.GetEnforceSso(),
-		}
-		// sub values are only unique per issuer, so a new issuer makes the
-		// old identity mappings stale.
-		issuerChanged = prev != nil && prev.OIDC != nil && prev.OIDC.IssuerURL != p.OIDC.IssuerURL
-	case "saml":
-		p.Method = iam.MethodSAML
-		p.SAML = &iam.SAMLIDP{
-			MetadataURL:     req.GetConfig().GetMetadataUrl(),
-			JITProvisioning: req.GetAllowJitProvisioning(),
-			EnforceSSO:      req.GetEnforceSso(),
-		}
-		// No metadata keeps the stored one, so toggling flags never wipes it.
-		if p.SAML.MetadataURL == "" && prev != nil && prev.SAML != nil {
-			p.SAML.MetadataURL = prev.SAML.MetadataURL
-			p.SAML.MetadataXML = prev.SAML.MetadataXML
-		}
-	default:
-		return nil, newError(connect.CodeInvalidArgument, "method must be oidc or saml")
-	}
-
-	if err := requireVerifiedDomain(ctx, s.cfg.IAM, "an SSO provider", req.GetWorkspaceId()); err != nil {
 		return nil, err
 	}
-	if err := s.cfg.IAM.PutSSOProvider(ctx, p); err != nil {
-		return nil, ssoError(err)
+	out := make([]*nokkuv1.SSOProvider, 0, len(providers))
+	for i := range providers {
+		out = append(out, providerToProto(&providers[i]))
+	}
+	return &nokkuv1.ListSSOProvidersResponse{Providers: out}, nil
+}
+
+func (s *sSOService) PutSSOProvider(
+	ctx context.Context,
+	req *nokkuv1.PutSSOProviderRequest,
+) (*nokkuv1.PutSSOProviderResponse, error) {
+	// sub values are only unique per issuer, so a new issuer makes the old
+	// identity mappings stale.
+	issuerChanged := false
+	if prev, err := s.cfg.IAM.GetSSOProvider(ctx, req.GetProviderId()); err == nil {
+		issuerChanged = prev.OIDC.IssuerURL != req.GetIssuerUrl()
+	}
+	stored, err := s.cfg.IAM.PutSSOProvider(ctx, iam.SSOProvider{
+		ProviderID: req.GetProviderId(),
+		Name:       req.GetName(),
+		Enabled:    req.GetEnabled(),
+		OIDC: iam.OIDCProvider{
+			IssuerURL:       req.GetIssuerUrl(),
+			ClientID:        req.GetClientId(),
+			ClientSecret:    req.GetClientSecret(),
+			Scopes:          req.GetScopes(),
+			JITProvisioning: req.GetJitProvisioning(),
+		},
+	})
+	if err != nil {
+		return nil, err
 	}
 	if issuerChanged {
 		// Don't fail the saved update, but be loud: stale identities stay
 		// valid until this is retried.
-		if _, err := s.cfg.IAM.PurgeProviderIdentities(ctx, iam.MethodOIDC, req.GetWorkspaceId()); err != nil {
-			slog.Error(
-				"purging identities after issuer change failed",
-				"error", err,
-				"workspace_id", req.GetWorkspaceId(),
-			)
+		if _, err := s.cfg.IAM.PurgeProviderIdentities(ctx, req.GetProviderId()); err != nil {
+			slog.Error("purging identities after issuer change failed", "error", err, "provider", req.GetProviderId())
 		}
 	}
-
-	stored, err := s.cfg.IAM.GetWorkspaceSSOProvider(ctx, req.GetWorkspaceId())
-	if err != nil {
-		return nil, ssoError(err)
-	}
-	return &nokkuv1.UpdateSSOProviderResponse{Provider: providerToProto(stored)}, nil
+	return &nokkuv1.PutSSOProviderResponse{Provider: providerToProto(stored)}, nil
 }
 
-func ssoError(err error) error {
+func (s *sSOService) DeleteSSOProvider(
+	ctx context.Context,
+	req *nokkuv1.DeleteSSOProviderRequest,
+) (*nokkuv1.DeleteSSOProviderResponse, error) {
+	err := s.cfg.IAM.DeleteSSOProvider(ctx, req.GetProviderId())
 	if errors.Is(err, iam.ErrNotFound) {
-		return errNotFound
+		return nil, errNotFound
 	}
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return &nokkuv1.DeleteSSOProviderResponse{}, nil
 }
 
 func providerToProto(p *iam.SSOProvider) *nokkuv1.SSOProvider {
-	out := &nokkuv1.SSOProvider{
-		WorkspaceId: &p.WorkspaceID,
-		Method:      new(string(p.Method)),
-		Name:        &p.Name,
-		IsActive:    &p.Enabled,
-		CreatedAt:   db.SafeTimestamp(&p.CreatedAt),
-		UpdatedAt:   db.SafeTimestamp(&p.UpdatedAt),
+	return &nokkuv1.SSOProvider{
+		ProviderId:      &p.ProviderID,
+		Name:            &p.Name,
+		Enabled:         &p.Enabled,
+		IssuerUrl:       &p.OIDC.IssuerURL,
+		ClientId:        &p.OIDC.ClientID,
+		Scopes:          p.OIDC.Scopes,
+		JitProvisioning: &p.OIDC.JITProvisioning,
+		CreatedAt:       db.SafeTimestamp(&p.CreatedAt),
+		UpdatedAt:       db.SafeTimestamp(&p.UpdatedAt),
 	}
-	cfg := &nokkuv1.SSOConfig{}
-	switch {
-	case p.OIDC != nil:
-		out.EnforceSso = new(p.OIDC.EnforceSSO)
-		out.AllowJitProvisioning = new(p.OIDC.JITProvisioning)
-		cfg.IssuerUrl = &p.OIDC.IssuerURL
-		cfg.ClientId = &p.OIDC.ClientID
-		cfg.Scopes = p.OIDC.Scopes
-	case p.SAML != nil:
-		out.EnforceSso = new(p.SAML.EnforceSSO)
-		out.AllowJitProvisioning = new(p.SAML.JITProvisioning)
-		cfg.MetadataUrl = &p.SAML.MetadataURL
-	default:
-		return out
-	}
-	out.Config = cfg
-	return out
 }

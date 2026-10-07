@@ -12,91 +12,36 @@ import (
 	nokku "github.com/nokku-sh/protos/gen/nokku/v1"
 )
 
-const countWorkspacesByOwner = `-- name: CountWorkspacesByOwner :one
-SELECT
-  COUNT(*)::INTEGER
-FROM
-  workspaces
-WHERE
-  created_by = $1
-`
-
-func (q *Queries) CountWorkspacesByOwner(ctx context.Context, userID string) (int32, error) {
-	row := q.db.QueryRow(ctx, countWorkspacesByOwner, userID)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const createWorkspace = `-- name: CreateWorkspace :one
-WITH
-  new_workspace AS (
-    INSERT INTO
-      workspaces (name, description, settings, created_by)
-    VALUES
-      ($1, $2, COALESCE($3, '{}'::jsonb), $4)
-    RETURNING
-      id, name, description, settings, created_by, created_at, updated_at
-  ),
-  new_member AS (
-    INSERT INTO
-      workspace_members (workspace_id, user_id, role_name)
-    SELECT
-      id,
-      created_by,
-      'owner'
-    FROM
-      new_workspace
-    RETURNING
-      workspace_id
-  ),
-  new_subscription AS (
-    INSERT INTO
-      workspace_subscriptions (workspace_id)
-    SELECT
-      id
-    FROM
-      new_workspace
-    RETURNING
-      workspace_id
-  )
-SELECT
-  new_workspace.id, new_workspace.name, new_workspace.description, new_workspace.settings, new_workspace.created_by, new_workspace.created_at, new_workspace.updated_at
-FROM
-  new_workspace
+INSERT INTO
+  workspaces (slug, name, description, settings)
+VALUES
+  ($1, $2, $3, $4)
+RETURNING
+  id, slug, name, description, settings, created_at, updated_at
 `
 
 type CreateWorkspaceParams struct {
-	Name        string      `json:"name"`
-	Description *string     `json:"description"`
-	Settings    interface{} `json:"settings"`
-	CreatedBy   string      `json:"createdBy"`
+	Slug        string                   `json:"slug"`
+	Name        string                   `json:"name"`
+	Description *string                  `json:"description"`
+	Settings    *nokku.WorkspaceSettings `json:"settings"`
 }
 
-type CreateWorkspaceRow struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description"`
-	Settings    []byte    `json:"settings"`
-	CreatedBy   string    `json:"createdBy"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-}
-
-func (q *Queries) CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParams) (*CreateWorkspaceRow, error) {
+func (q *Queries) CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParams) (*Workspace, error) {
 	row := q.db.QueryRow(ctx, createWorkspace,
+		arg.Slug,
 		arg.Name,
 		arg.Description,
 		arg.Settings,
-		arg.CreatedBy,
 	)
-	var i CreateWorkspaceRow
+	var i Workspace
 	err := row.Scan(
 		&i.ID,
+		&i.Slug,
 		&i.Name,
 		&i.Description,
 		&i.Settings,
-		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -114,75 +59,41 @@ func (q *Queries) DeleteWorkspace(ctx context.Context, workspaceID string) error
 	return err
 }
 
-const ensureWorkspaceMember = `-- name: EnsureWorkspaceMember :exec
-INSERT INTO
-  workspace_members (workspace_id, user_id, role_name)
-VALUES
-  ($1, $2, $3)
-ON CONFLICT (workspace_id, user_id) DO NOTHING
+const getFirstWorkspace = `-- name: GetFirstWorkspace :one
+SELECT
+  id, slug, name, description, settings, created_at, updated_at
+FROM
+  workspaces
+ORDER BY
+  created_at ASC,
+  id ASC
+LIMIT
+  1
 `
 
-type EnsureWorkspaceMemberParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-	RoleName    string `json:"roleName"`
-}
-
-func (q *Queries) EnsureWorkspaceMember(ctx context.Context, arg *EnsureWorkspaceMemberParams) error {
-	_, err := q.db.Exec(ctx, ensureWorkspaceMember, arg.WorkspaceID, arg.UserID, arg.RoleName)
-	return err
-}
-
-const getActorWorkspaceIDs = `-- name: GetActorWorkspaceIDs :many
-SELECT
-  workspace_id
-FROM
-  workspace_members
-WHERE
-  user_id = $1::uuid
-UNION
-SELECT
-  workspace_id
-FROM
-  daemons
-WHERE
-  id = $1::uuid
-UNION
-SELECT
-  workspace_id
-FROM
-  service_accounts
-WHERE
-  id = $1::uuid
-`
-
-func (q *Queries) GetActorWorkspaceIDs(ctx context.Context, actorID string) ([]string, error) {
-	rows, err := q.db.Query(ctx, getActorWorkspaceIDs, actorID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var workspace_id string
-		if err := rows.Scan(&workspace_id); err != nil {
-			return nil, err
-		}
-		items = append(items, workspace_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+// The one workspace of a self-hosted server.
+func (q *Queries) GetFirstWorkspace(ctx context.Context) (*Workspace, error) {
+	row := q.db.QueryRow(ctx, getFirstWorkspace)
+	var i Workspace
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.Name,
+		&i.Description,
+		&i.Settings,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
 }
 
 const getWorkspace = `-- name: GetWorkspace :one
 SELECT
-  id, name, description, settings, created_by, created_at, updated_at
+  id, slug, name, description, settings, created_at, updated_at
 FROM
-  workspaces w
+  workspaces
 WHERE
-  w.id = $1
+  id = $1
 `
 
 func (q *Queries) GetWorkspace(ctx context.Context, workspaceID string) (*Workspace, error) {
@@ -190,10 +101,34 @@ func (q *Queries) GetWorkspace(ctx context.Context, workspaceID string) (*Worksp
 	var i Workspace
 	err := row.Scan(
 		&i.ID,
+		&i.Slug,
 		&i.Name,
 		&i.Description,
 		&i.Settings,
-		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
+const getWorkspaceBySlug = `-- name: GetWorkspaceBySlug :one
+SELECT
+  id, slug, name, description, settings, created_at, updated_at
+FROM
+  workspaces
+WHERE
+  slug = $1
+`
+
+func (q *Queries) GetWorkspaceBySlug(ctx context.Context, slug string) (*Workspace, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceBySlug, slug)
+	var i Workspace
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.Name,
+		&i.Description,
+		&i.Settings,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -202,11 +137,11 @@ func (q *Queries) GetWorkspace(ctx context.Context, workspaceID string) (*Worksp
 
 const getWorkspaceForUpdate = `-- name: GetWorkspaceForUpdate :one
 SELECT
-  id, name, description, settings, created_by, created_at, updated_at
+  id, slug, name, description, settings, created_at, updated_at
 FROM
-  workspaces w
+  workspaces
 WHERE
-  w.id = $1
+  id = $1
 FOR UPDATE
 `
 
@@ -215,83 +150,14 @@ func (q *Queries) GetWorkspaceForUpdate(ctx context.Context, workspaceID string)
 	var i Workspace
 	err := row.Scan(
 		&i.ID,
+		&i.Slug,
 		&i.Name,
 		&i.Description,
 		&i.Settings,
-		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
-}
-
-const getWorkspaceMember = `-- name: GetWorkspaceMember :one
-SELECT
-  wm.workspace_id,
-  u.id AS user_id,
-  u.name,
-  u.email,
-  u.email_verified,
-  u.picture,
-  wm.role_name,
-  wm.created_at,
-  wm.updated_at
-FROM
-  workspace_members wm
-  JOIN users u ON u.id = wm.user_id
-WHERE
-  wm.workspace_id = $1
-  AND wm.user_id = $2
-`
-
-type GetWorkspaceMemberParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-}
-
-type GetWorkspaceMemberRow struct {
-	WorkspaceID   string    `json:"workspaceId"`
-	UserID        string    `json:"userId"`
-	Name          string    `json:"name"`
-	Email         string    `json:"email"`
-	EmailVerified bool      `json:"emailVerified"`
-	Picture       *string   `json:"picture"`
-	RoleName      string    `json:"roleName"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
-}
-
-func (q *Queries) GetWorkspaceMember(ctx context.Context, arg *GetWorkspaceMemberParams) (*GetWorkspaceMemberRow, error) {
-	row := q.db.QueryRow(ctx, getWorkspaceMember, arg.WorkspaceID, arg.UserID)
-	var i GetWorkspaceMemberRow
-	err := row.Scan(
-		&i.WorkspaceID,
-		&i.UserID,
-		&i.Name,
-		&i.Email,
-		&i.EmailVerified,
-		&i.Picture,
-		&i.RoleName,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const getWorkspaceOwner = `-- name: GetWorkspaceOwner :one
-SELECT
-  created_by
-FROM
-  workspaces
-WHERE
-  id = $1
-`
-
-func (q *Queries) GetWorkspaceOwner(ctx context.Context, workspaceID string) (string, error) {
-	row := q.db.QueryRow(ctx, getWorkspaceOwner, workspaceID)
-	var created_by string
-	err := row.Scan(&created_by)
-	return created_by, err
 }
 
 const getWorkspaceStateVersion = `-- name: GetWorkspaceStateVersion :one
@@ -310,19 +176,47 @@ func (q *Queries) GetWorkspaceStateVersion(ctx context.Context, workspaceID stri
 	return version, err
 }
 
-const getWorkspacesByIDs = `-- name: GetWorkspacesByIDs :many
+const initSubscription = `-- name: InitSubscription :exec
+INSERT INTO
+  workspace_subscriptions (workspace_id)
+VALUES
+  ($1)
+ON CONFLICT (workspace_id) DO NOTHING
+`
+
+func (q *Queries) InitSubscription(ctx context.Context, workspaceID string) error {
+	_, err := q.db.Exec(ctx, initSubscription, workspaceID)
+	return err
+}
+
+const listUnclaimedWorkspaces = `-- name: ListUnclaimedWorkspaces :many
 SELECT
-  id, name, description, settings, created_by, created_at, updated_at
+  w.id, w.slug, w.name, w.description, w.settings, w.created_at, w.updated_at
 FROM
   workspaces w
 WHERE
-  w.id = ANY ($1::UUID[])
-ORDER BY
-  w.id
+  w.created_at < $1
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      sessions s
+    WHERE
+      s.workspace_id = w.id
+  )
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      credentials c
+    WHERE
+      c.workspace_id = w.id
+  )
 `
 
-func (q *Queries) GetWorkspacesByIDs(ctx context.Context, workspaceIds []string) ([]*Workspace, error) {
-	rows, err := q.db.Query(ctx, getWorkspacesByIDs, workspaceIds)
+// Signups whose owner never signed in. Runs as nokku_system.
+func (q *Queries) ListUnclaimedWorkspaces(ctx context.Context, cutoff time.Time) ([]*Workspace, error) {
+	rows, err := q.db.Query(ctx, listUnclaimedWorkspaces, cutoff)
 	if err != nil {
 		return nil, err
 	}
@@ -332,59 +226,13 @@ func (q *Queries) GetWorkspacesByIDs(ctx context.Context, workspaceIds []string)
 		var i Workspace
 		if err := rows.Scan(
 			&i.ID,
+			&i.Slug,
 			&i.Name,
 			&i.Description,
 			&i.Settings,
-			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listOwnedWorkspaces = `-- name: ListOwnedWorkspaces :many
-SELECT
-  w.id,
-  w.name,
-  (
-    SELECT
-      COUNT(*)
-    FROM
-      workspace_members wm
-    WHERE
-      wm.workspace_id = w.id
-  )::INTEGER AS member_count
-FROM
-  workspaces w
-WHERE
-  w.created_by = $1
-ORDER BY
-  w.name ASC
-`
-
-type ListOwnedWorkspacesRow struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	MemberCount int32  `json:"memberCount"`
-}
-
-func (q *Queries) ListOwnedWorkspaces(ctx context.Context, userID string) ([]*ListOwnedWorkspacesRow, error) {
-	rows, err := q.db.Query(ctx, listOwnedWorkspaces, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*ListOwnedWorkspacesRow
-	for rows.Next() {
-		var i ListOwnedWorkspacesRow
-		if err := rows.Scan(&i.ID, &i.Name, &i.MemberCount); err != nil {
 			return nil, err
 		}
 		items = append(items, &i)
@@ -432,168 +280,17 @@ func (q *Queries) ListWorkspaceAuditWebhooks(ctx context.Context) ([]*ListWorksp
 	return items, nil
 }
 
-const listWorkspaceMembers = `-- name: ListWorkspaceMembers :many
-SELECT
-  wm.workspace_id,
-  u.id AS user_id,
-  u.name,
-  u.email,
-  u.email_verified,
-  u.picture,
-  u.active,
-  wm.role_name,
-  wm.created_at,
-  wm.updated_at,
-  COUNT(*) OVER ()::INTEGER AS total_count
-FROM
-  workspace_members wm
-  JOIN users u ON u.id = wm.user_id
-WHERE
-  wm.workspace_id = $1
-  AND (
-    $2::TEXT IS NULL
-    OR u.name ILIKE '%' || $2 || '%'
-    OR u.email ILIKE '%' || $2 || '%'
-  )
-  AND (
-    $3::TEXT IS NULL
-    OR wm.role_name = $3::TEXT
-  )
-ORDER BY
-  u.name ASC,
-  u.email ASC
-LIMIT
-  $5
-OFFSET
-  $4
-`
-
-type ListWorkspaceMembersParams struct {
-	WorkspaceID string  `json:"workspaceId"`
-	Query       *string `json:"query"`
-	RoleName    *string `json:"roleName"`
-	Offset      *int32  `json:"offset"`
-	Limit       *int32  `json:"limit"`
-}
-
-type ListWorkspaceMembersRow struct {
-	WorkspaceID   string    `json:"workspaceId"`
-	UserID        string    `json:"userId"`
-	Name          string    `json:"name"`
-	Email         string    `json:"email"`
-	EmailVerified bool      `json:"emailVerified"`
-	Picture       *string   `json:"picture"`
-	Active        bool      `json:"active"`
-	RoleName      string    `json:"roleName"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
-	TotalCount    int32     `json:"totalCount"`
-}
-
-func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg *ListWorkspaceMembersParams) ([]*ListWorkspaceMembersRow, error) {
-	rows, err := q.db.Query(ctx, listWorkspaceMembers,
-		arg.WorkspaceID,
-		arg.Query,
-		arg.RoleName,
-		arg.Offset,
-		arg.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*ListWorkspaceMembersRow
-	for rows.Next() {
-		var i ListWorkspaceMembersRow
-		if err := rows.Scan(
-			&i.WorkspaceID,
-			&i.UserID,
-			&i.Name,
-			&i.Email,
-			&i.EmailVerified,
-			&i.Picture,
-			&i.Active,
-			&i.RoleName,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.TotalCount,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listWorkspaces = `-- name: ListWorkspaces :many
-SELECT
-  id, name, description, settings, created_by, created_at, updated_at
-FROM
-  workspaces
-ORDER BY
-  id ASC
-`
-
-func (q *Queries) ListWorkspaces(ctx context.Context) ([]*Workspace, error) {
-	rows, err := q.db.Query(ctx, listWorkspaces)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*Workspace
-	for rows.Next() {
-		var i Workspace
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Description,
-			&i.Settings,
-			&i.CreatedBy,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const removeWorkspaceMember = `-- name: RemoveWorkspaceMember :exec
-DELETE FROM workspace_members wm USING workspaces w
-WHERE
-  wm.workspace_id = w.id
-  AND wm.workspace_id = $1
-  AND wm.user_id = $2
-  AND wm.user_id <> w.created_by
-`
-
-type RemoveWorkspaceMemberParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-}
-
-func (q *Queries) RemoveWorkspaceMember(ctx context.Context, arg *RemoveWorkspaceMemberParams) error {
-	_, err := q.db.Exec(ctx, removeWorkspaceMember, arg.WorkspaceID, arg.UserID)
-	return err
-}
-
 const updateWorkspace = `-- name: UpdateWorkspace :one
 UPDATE workspaces
 SET
   name = COALESCE($1, name),
   description = COALESCE($2, description),
-  settings = $3
+  settings = $3,
+  updated_at = NOW()
 WHERE
   id = $4
 RETURNING
-  id, name, description, settings, created_by, created_at, updated_at
+  id, slug, name, description, settings, created_at, updated_at
 `
 
 type UpdateWorkspaceParams struct {
@@ -613,127 +310,12 @@ func (q *Queries) UpdateWorkspace(ctx context.Context, arg *UpdateWorkspaceParam
 	var i Workspace
 	err := row.Scan(
 		&i.ID,
+		&i.Slug,
 		&i.Name,
 		&i.Description,
 		&i.Settings,
-		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
-}
-
-const updateWorkspaceMember = `-- name: UpdateWorkspaceMember :exec
-UPDATE workspace_members
-SET
-  role_name = COALESCE($1, role_name)
-WHERE
-  workspace_id = $2
-  AND user_id = $3
-`
-
-type UpdateWorkspaceMemberParams struct {
-	RoleName    string `json:"roleName"`
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-}
-
-func (q *Queries) UpdateWorkspaceMember(ctx context.Context, arg *UpdateWorkspaceMemberParams) error {
-	_, err := q.db.Exec(ctx, updateWorkspaceMember, arg.RoleName, arg.WorkspaceID, arg.UserID)
-	return err
-}
-
-const updateWorkspaceOwner = `-- name: UpdateWorkspaceOwner :one
-WITH
-  new_owner AS (
-    SELECT
-      wm.user_id
-    FROM
-      workspace_members wm
-    WHERE
-      wm.workspace_id = $1
-      AND wm.user_id = $2
-  ),
-  old_owner AS (
-    SELECT
-      created_by
-    FROM
-      workspaces
-    WHERE
-      id = $1
-  ),
-  update_old_owner AS (
-    UPDATE workspace_members
-    SET
-      role_name = 'admin'
-    FROM
-      old_owner,
-      new_owner
-    WHERE
-      workspace_members.workspace_id = $1
-      AND workspace_members.user_id = old_owner.created_by
-  ),
-  update_new_owner AS (
-    UPDATE workspace_members
-    SET
-      role_name = 'owner'
-    FROM
-      new_owner
-    WHERE
-      workspace_members.workspace_id = $1
-      AND workspace_members.user_id = new_owner.user_id
-  )
-UPDATE workspaces
-SET
-  created_by = new_owner.user_id
-FROM
-  new_owner
-WHERE
-  workspaces.id = $1
-RETURNING
-  workspaces.id, workspaces.name, workspaces.description, workspaces.settings, workspaces.created_by, workspaces.created_at, workspaces.updated_at
-`
-
-type UpdateWorkspaceOwnerParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	NewOwnerID  string `json:"newOwnerId"`
-}
-
-// Only a member can take over. Every statement joins new_owner, so anyone
-// else changes nothing and gets no row.
-func (q *Queries) UpdateWorkspaceOwner(ctx context.Context, arg *UpdateWorkspaceOwnerParams) (*Workspace, error) {
-	row := q.db.QueryRow(ctx, updateWorkspaceOwner, arg.WorkspaceID, arg.NewOwnerID)
-	var i Workspace
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Description,
-		&i.Settings,
-		&i.CreatedBy,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const userWorkspaceMember = `-- name: UserWorkspaceMember :one
-SELECT
-  TRUE
-FROM
-  workspace_members
-WHERE
-  workspace_id = $1
-  AND user_id = $2
-`
-
-type UserWorkspaceMemberParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	UserID      string `json:"userId"`
-}
-
-func (q *Queries) UserWorkspaceMember(ctx context.Context, arg *UserWorkspaceMemberParams) (bool, error) {
-	row := q.db.QueryRow(ctx, userWorkspaceMember, arg.WorkspaceID, arg.UserID)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
 }

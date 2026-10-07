@@ -14,7 +14,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/iam"
-	"github.com/nokku-sh/nokku/internal/util"
+	"github.com/nokku-sh/nokku/internal/realip"
 )
 
 // skipPrefixes are reads, polling syncs, and long-lived streams.
@@ -53,7 +53,7 @@ func (s *Service) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		if msg, ok := req.Any().(proto.Message); ok {
 			e.Target = cut(requestTarget(msg.ProtoReflect()), maxTarget)
 		}
-		s.place(ctx, e)
+		e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
 		resp, err := next(context.WithValue(ctx, eventKey{}, e), req)
 		s.finish(ctx, e, req.Header(), req.Peer().Addr, err)
 		return resp, err
@@ -70,7 +70,7 @@ func (s *Service) WrapStreamingHandler(next connect.StreamingHandlerFunc) connec
 		if e == nil {
 			return next(ctx, conn)
 		}
-		s.place(ctx, e)
+		e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
 		err := next(context.WithValue(ctx, eventKey{}, e), conn)
 		s.finish(ctx, e, conn.RequestHeader(), conn.Peer().Addr, err)
 		return err
@@ -94,45 +94,25 @@ func (s *Service) Log(ctx context.Context, e *Event) {
 	if meta, ok := iam.RequestMetaFromContext(ctx); ok {
 		header, peer = meta.Header, meta.RemoteAddr
 	}
-	s.place(ctx, e)
+	if e.WorkspaceID == "" {
+		e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
+	}
 	s.finish(ctx, e, header, peer, nil)
 }
 
-// place files the event under the request's workspace, but only for a member.
-// A user names the workspace themselves, so anyone else's event stays in their
-// own log. It runs before the handler, which may end the membership.
-func (s *Service) place(ctx context.Context, e *Event) {
-	p, _ := actor.PrincipalFromContext(ctx)
-	workspaceID := actor.WorkspaceIDFromContext(ctx)
-	if p.ID == "" || workspaceID == "" || e.WorkspaceID != "" {
-		return
-	}
-	if p.WorkspaceID != workspaceID && actor.MemberOf(ctx) != workspaceID {
-		if _, err := s.conn.Sys().GetActorRole(
-			ctx,
-			&db.GetActorRoleParams{WorkspaceID: workspaceID, ActorID: p.ID},
-		); err != nil {
-			if e.Details == nil {
-				e.Details = map[string]any{}
-			}
-			e.Details["requested_workspace_id"] = workspaceID
-			return
-		}
-	}
-	e.WorkspaceID = workspaceID
-}
-
-// finish skips unauthenticated calls, the auth flows record their own events.
+// finish skips unauthenticated calls, the auth flows record their own
+// events, and calls outside a workspace, which only the public root host
+// serves.
 func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer string, err error) {
 	p, _ := actor.PrincipalFromContext(ctx)
-	if p.ID == "" {
+	if p.ID == "" || e.WorkspaceID == "" {
 		return
 	}
 	e.Timestamp = time.Now().UTC()
 	e.ActorID, e.ActorKind, e.ActorName = p.ID, string(p.Kind), p.Email
 	if header != nil {
-		e.IP = util.SanitizeUTF8(util.GetRemoteIP(header, peer))
-		e.UserAgent = cut(util.SanitizeUTF8(header.Get("User-Agent")), maxUserAgent)
+		e.IP = strings.ToValidUTF8(realip.Bucket(header, peer), "")
+		e.UserAgent = cut(strings.ToValidUTF8(header.Get("User-Agent"), ""), maxUserAgent)
 	}
 	e.OK = err == nil
 	if err != nil {
@@ -146,9 +126,12 @@ func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer
 	go func() {
 		defer cancel()
 		if e.ActorName == "" && (p.Kind == actor.KindUser || p.Kind == actor.KindCLI) {
-			if u, err := s.conn.Sys().GetUser(actx, p.ID); err == nil {
-				e.ActorName = u.Email
-			}
+			_ = s.conn.WithWorkspace(actx, func(q *db.Queries) error {
+				if u, err := q.GetUser(actx, &db.GetUserParams{WorkspaceID: e.WorkspaceID, ID: p.ID}); err == nil {
+					e.ActorName = u.Email
+				}
+				return nil
+			})
 		}
 		if err := s.Append(actx, e); err != nil {
 			slog.Warn("failed to write audit log", "action", e.Action, "error", err)

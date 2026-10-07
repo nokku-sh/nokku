@@ -10,18 +10,18 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
+// Only a failed request gets a line. The rest is traced, or audited.
 func TestWithLogger(t *testing.T) {
 	var out bytes.Buffer
 	prev := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(&out, nil)))
 	t.Cleanup(func() { slog.SetDefault(prev) })
 
-	serve := func(mode entitlement.Mode, status int, target string) string {
+	serve := func(status int, target string) string {
 		out.Reset()
-		s := &Server{cfg: &config.Config{Entitlements: entitlement.NewService(nil, nil, mode)}}
+		s := &Server{cfg: &config.Config{}}
 		s.withLogger(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			r.URL.Path = "/index.html" // what the static handler does
 			w.WriteHeader(status)
@@ -31,19 +31,12 @@ func TestWithLogger(t *testing.T) {
 
 	const callback = "/oidc/callback?code=s3cret&state=xyz"
 
-	assert.Empty(t, serve(entitlement.ModeSaaS, http.StatusOK, callback), "the SaaS logs no successful request")
-	assert.Empty(t, serve(entitlement.ModeSaaS, http.StatusNotFound, callback), "nor a client error")
-	failed := serve(entitlement.ModeSaaS, http.StatusInternalServerError, callback)
-	assert.Contains(t, failed, "GET /oidc/callback => HTTP 500", "a server error is always logged")
+	assert.Empty(t, serve(http.StatusOK, callback), "a successful request is not logged")
+	assert.Empty(t, serve(http.StatusNotFound, callback), "nor a client error")
+	failed := serve(http.StatusInternalServerError, callback)
+	assert.Contains(t, failed, "path=/oidc/callback", "a server error is logged")
+	assert.Contains(t, failed, "status=500")
 	assert.NotContains(t, failed, "s3cret", "the query string must never be logged")
-
-	line := serve(entitlement.ModeSelfHosted, http.StatusOK, callback)
-	assert.Contains(t, line, "GET /oidc/callback => HTTP 200", "a self-hosted instance logs every request")
-	assert.NotContains(t, line, "s3cret", "the query string must never be logged")
-	assert.Empty(t, serve(entitlement.ModeSelfHosted, http.StatusOK, "/_app/immutable/chunks/a.js"),
-		"served assets stay out of the log")
-	assert.Contains(t, serve(entitlement.ModeSelfHosted, http.StatusNotFound, "/_app/immutable/chunks/a.js"),
-		"HTTP 404", "a missing asset does not")
 }
 
 func TestWithRecover(t *testing.T) {

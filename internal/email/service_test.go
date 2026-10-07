@@ -14,40 +14,29 @@ func TestRenderTemplates(t *testing.T) {
 		contains []string
 	}{
 		{
-			name: "welcome",
-			data: welcomeTemplateData{
-				UserName:        "Ada",
-				VerificationURL: "https://app.nokku.sh/verify/token",
-				Expiration:      "15 minutes",
+			name: "magic-link",
+			data: linkTemplateData{
+				LinkURL:    "https://acme.nokku.sh/login/verify?token=t",
+				Expiration: "15 minutes",
 			},
 			contains: []string{
-				"Welcome aboard,",
+				"Here is your sign-in link.",
+				"https://acme.nokku.sh/login/verify?token=t",
+				"15 minutes",
+			},
+		},
+		{
+			name: "signup-link",
+			data: signupTemplateData{
+				UserName:   "Ada",
+				Workspace:  "Acme",
+				LinkURL:    "https://acme.nokku.sh/invite/verify?token=t",
+				Expiration: "15 minutes",
+			},
+			contains: []string{
+				"Acme.",
 				"Ada",
-				"https://app.nokku.sh/verify/token",
-				"15 minutes",
-			},
-		},
-		{
-			name: "verification",
-			data: verificationTemplateData{
-				VerificationURL: "https://app.nokku.sh/verify/token",
-				Expiration:      "15 minutes",
-			},
-			contains: []string{
-				"Verify your email address.",
-				"https://app.nokku.sh/verify/token",
-				"15 minutes",
-			},
-		},
-		{
-			name: "recovery",
-			data: recoveryTemplateData{
-				RecoveryURL: "https://app.nokku.sh/reset/token",
-				Expiration:  "15 minutes",
-			},
-			contains: []string{
-				"Reset your password.",
-				"https://app.nokku.sh/reset/token",
+				"https://acme.nokku.sh/invite/verify?token=t",
 				"15 minutes",
 			},
 		},
@@ -108,8 +97,8 @@ func TestRenderOperatorFooter(t *testing.T) {
 	t.Run("self-hosted without operator", func(t *testing.T) {
 		t.Parallel()
 		body, err := render(
-			"verification",
-			verificationTemplateData{VerificationURL: "https://x", Expiration: "15 minutes"},
+			"magic-link",
+			linkTemplateData{LinkURL: "https://x", Expiration: "15 minutes"},
 		)
 		if err != nil {
 			t.Fatalf("render: %v", err)
@@ -134,7 +123,7 @@ func TestRenderOperatorFooter(t *testing.T) {
 			SupportEmail: "help@acme.test",
 			ImprintURL:   "https://acme.test/imprint",
 		}
-		body, err := render("verification", verificationTemplateData{Operator: op, VerificationURL: "https://x"})
+		body, err := render("magic-link", linkTemplateData{Operator: op, LinkURL: "https://x"})
 		if err != nil {
 			t.Fatalf("render: %v", err)
 		}

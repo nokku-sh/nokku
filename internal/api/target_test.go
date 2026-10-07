@@ -8,6 +8,7 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
@@ -15,10 +16,8 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/iam"
 )
 
 func seedTarget(t *testing.T, cfg *config.Config, workspaceID string) string {
@@ -27,7 +26,7 @@ func seedTarget(t *testing.T, cfg *config.Config, workspaceID string) string {
 	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
 		target, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{
 			WorkspaceID: workspaceID,
-			Name:        "web-1",
+			Name:        uniq("web"),
 			Endpoints:   []string{"10.0.0.1:22"},
 		})
 		if err != nil {
@@ -54,7 +53,6 @@ func TestSyncTargetUsers(t *testing.T) {
 	editor := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, editorAuth)
 	principals := nokkuv1connect.NewPrincipalServiceClient(srv.Client(), srv.URL, editorAuth)
 	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
-		WorkspaceId:   &workspaceID,
 		TargetId:      &targetID,
 		HostPublicKey: &hostKey,
 		Usernames:     []string{"root", "deploy"},
@@ -62,7 +60,7 @@ func TestSyncTargetUsers(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	got, err := editor.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{WorkspaceId: &workspaceID, Id: &targetID})
+	got, err := editor.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &targetID})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"10.0.0.2:22"}, got.GetTarget().GetEndpoints(), "endpoints replaced")
 	assert.Equal(t, hostKey, got.GetTarget().GetHostPublicKey(), "host key pinned")
@@ -70,9 +68,8 @@ func TestSyncTargetUsers(t *testing.T) {
 
 	usernames := func() []string {
 		res, err := principals.ListPrincipals(t.Context(), &nokkuv1.ListPrincipalsRequest{
-			WorkspaceId: &workspaceID,
-			TargetId:    &targetID,
-			Limit:       new(int32(100)),
+			TargetId: &targetID,
+			Limit:    new(int32(100)),
 		})
 		require.NoError(t, err)
 		var out []string
@@ -85,12 +82,11 @@ func TestSyncTargetUsers(t *testing.T) {
 
 	// A report without endpoints or key adds users and keeps the rest.
 	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
-		WorkspaceId: &workspaceID,
-		TargetId:    &targetID,
-		Usernames:   []string{"ops"},
+		TargetId:  &targetID,
+		Usernames: []string{"ops"},
 	})
 	require.NoError(t, err)
-	got, err = editor.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{WorkspaceId: &workspaceID, Id: &targetID})
+	got, err = editor.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &targetID})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"10.0.0.2:22"}, got.GetTarget().GetEndpoints(), "endpoints kept")
 	assert.Equal(t, hostKey, got.GetTarget().GetHostPublicKey(), "host key kept")
@@ -99,9 +95,8 @@ func TestSyncTargetUsers(t *testing.T) {
 	viewer := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL,
 		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleViewer)))
 	_, err = viewer.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
-		WorkspaceId: &workspaceID,
-		TargetId:    &targetID,
-		Usernames:   []string{"intruder"},
+		TargetId:  &targetID,
+		Usernames: []string{"intruder"},
 	})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "viewer may not sync, got %v", err)
 }
@@ -114,23 +109,22 @@ func TestUpdateTargetReplacesLists(t *testing.T) {
 		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleEditor)))
 
 	updated, err := editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
-		WorkspaceId: &workspaceID,
-		Id:          &targetID,
-		Endpoints:   []string{"10.0.0.1:22"},
-		Tags:        []string{"prod"},
+		Id:        &targetID,
+		Endpoints: []string{"10.0.0.1:22"},
+		Tags:      []string{"prod"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"prod"}, updated.GetTarget().GetTags())
+	name := updated.GetTarget().GetName()
 
 	updated, err = editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
-		WorkspaceId: &workspaceID,
-		Id:          &targetID,
-		Endpoints:   []string{"10.0.0.9:22"},
+		Id:        &targetID,
+		Endpoints: []string{"10.0.0.9:22"},
 	})
 	require.NoError(t, err)
 	assert.Empty(t, updated.GetTarget().GetTags(), "an update replaces the tags, the last one can go")
 	assert.Equal(t, []string{"10.0.0.9:22"}, updated.GetTarget().GetEndpoints())
-	assert.Equal(t, "web-1", updated.GetTarget().GetName(), "unset fields stay as they are")
+	assert.Equal(t, name, updated.GetTarget().GetName(), "unset fields stay as they are")
 }
 
 type accessFixture struct {
@@ -158,20 +152,25 @@ func seedAccessGraph(t *testing.T) accessFixture {
 	t.Helper()
 	cfg, srv := newTestAPI(t)
 	f := accessFixture{workspaceID: seedWorkspace(t, cfg)}
-	other := seedWorkspace(t, cfg)
+	other := seedOtherWorkspace(t, cfg)
+
+	// The workspace is shared, so earlier tests' grants go first. Tests run
+	// one after the other, nobody is using them anymore. Only the owner role
+	// deletes past RLS.
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	for _, table := range []string{"targets", "teams", "service_accounts"} {
+		_, err = owner.Exec(t.Context(), "DELETE FROM "+table+" WHERE workspace_id = $1", f.workspaceID)
+		require.NoError(t, err)
+	}
+	require.NoError(t, owner.Close(t.Context()))
 
 	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
 		member := func(workspaceID, name string) string {
-			u, err := q.CreateUser(
-				t.Context(),
-				&db.CreateUserParams{Email: uuid.New().String() + "@api.test", Name: name},
-			)
+			u, err := q.CreateUser(t.Context(), &db.CreateUserParams{
+				WorkspaceID: workspaceID, Email: uuid.New().String() + "@api.test", Name: name, Role: "member",
+			})
 			require.NoError(t, err)
-			require.NoError(t, q.EnsureWorkspaceMember(t.Context(), &db.EnsureWorkspaceMemberParams{
-				WorkspaceID: workspaceID,
-				UserID:      u.ID,
-				RoleName:    string(db.RoleMember),
-			}))
 			return u.ID
 		}
 		// account creates the target on first use and returns the principal.
@@ -215,7 +214,10 @@ func seedAccessGraph(t *testing.T) accessFixture {
 		for _, userID := range []string{f.alice, f.carol} {
 			require.NoError(t, q.AddTeamMember(t.Context(), &db.AddTeamMemberParams{UserID: userID, TeamID: team.ID}))
 		}
-		f.ci, err = q.CreateServiceAccount(t.Context(), &db.CreateServiceAccountParams{WorkspaceID: ws, Name: "ci"})
+		f.ci, err = q.CreateServiceAccount(
+			t.Context(),
+			&db.CreateServiceAccountParams{WorkspaceID: ws, Name: uniq("ci")},
+		)
 		require.NoError(t, err)
 
 		web1Root := account(ws, "web-1", []string{"prod", "web"}, "root")
@@ -239,12 +241,7 @@ func seedAccessGraph(t *testing.T) accessFixture {
 	}
 	f.client, f.memberClient = client(db.RoleViewer), client(db.RoleMember)
 	f.as = func(userID string) nokkuv1connect.TargetServiceClient {
-		_, token, err := cfg.IAM.IssueSession(t.Context(), iam.SessionParams{
-			SubjectID: userID,
-			Kind:      actor.KindUser,
-			Method:    iam.MethodPassword,
-		})
-		require.NoError(t, err)
+		token := sessionFor(t, cfg, &db.User{ID: userID})
 		return nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+token))
 	}
 	return f
@@ -256,8 +253,7 @@ func TestGetSubjectAccess(t *testing.T) {
 	// access returns the accounts per target name and the principal count.
 	access := func(client nokkuv1connect.TargetServiceClient, subjectID string) (map[string][]string, int) {
 		res, err := client.GetSubjectAccess(t.Context(), &nokkuv1.GetSubjectAccessRequest{
-			WorkspaceId: &f.workspaceID,
-			SubjectId:   &subjectID,
+			SubjectId: &subjectID,
 		})
 		require.NoError(t, err)
 		accounts, principals := map[string][]string{}, 0
@@ -278,8 +274,7 @@ func TestGetSubjectAccess(t *testing.T) {
 		"direct and team grants")
 
 	_, err := f.as(f.carol).GetSubjectAccess(t.Context(), &nokkuv1.GetSubjectAccessRequest{
-		WorkspaceId: &f.workspaceID,
-		SubjectId:   &f.bob,
+		SubjectId: &f.bob,
 	})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err),
 		"a member may not read another subject, got %v", err)
@@ -293,8 +288,7 @@ func TestTargetsCarryPrincipals(t *testing.T) {
 	f := seedAccessGraph(t)
 
 	list, err := f.client.ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{
-		WorkspaceId: &f.workspaceID,
-		Limit:       new(int32(50)),
+		Limit: new(int32(50)),
 	})
 	require.NoError(t, err)
 	accounts := map[string][]string{}
@@ -308,8 +302,7 @@ func TestTargetsCarryPrincipals(t *testing.T) {
 		accounts, "every account by username, idle has none, the other workspace stays out")
 
 	got, err := f.client.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{
-		WorkspaceId: &f.workspaceID,
-		Id:          &f.web1,
+		Id: &f.web1,
 	})
 	require.NoError(t, err)
 	principals := got.GetTarget().GetPrincipals()
@@ -326,8 +319,7 @@ func TestGetAccessGraph(t *testing.T) {
 
 	graph := func(filter *nokkuv1.AccessGraphFilter) *nokkuv1.GetAccessGraphResponse {
 		res, err := f.client.GetAccessGraph(t.Context(), &nokkuv1.GetAccessGraphRequest{
-			WorkspaceId: &f.workspaceID,
-			Filter:      filter,
+			Filter: filter,
 		})
 		require.NoError(t, err)
 		return res
@@ -423,7 +415,7 @@ func TestGetAccessGraph(t *testing.T) {
 	assert.Zero(t, outsider.GetTargets())
 	assert.Empty(t, outsider.GetSubjects(), "a subject of another workspace is not even named")
 
-	_, err := f.memberClient.GetAccessGraph(t.Context(), &nokkuv1.GetAccessGraphRequest{WorkspaceId: &f.workspaceID})
+	_, err := f.memberClient.GetAccessGraph(t.Context(), &nokkuv1.GetAccessGraphRequest{})
 	assert.Equal(
 		t,
 		connect.CodePermissionDenied,
@@ -439,10 +431,9 @@ func TestListAccessGraphTargets(t *testing.T) {
 	// list returns "name" for a matched target and "-name" for the rest.
 	list := func(tag string, filter *nokkuv1.AccessGraphFilter, limit int32) ([]string, int32) {
 		res, err := f.client.ListAccessGraphTargets(t.Context(), &nokkuv1.ListAccessGraphTargetsRequest{
-			WorkspaceId: &f.workspaceID,
-			Filter:      filter,
-			Tag:         &tag,
-			Limit:       &limit,
+			Filter: filter,
+			Tag:    &tag,
+			Limit:  &limit,
 		})
 		require.NoError(t, err)
 		var out []string

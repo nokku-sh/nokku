@@ -11,44 +11,47 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto"
 )
 
-const getSAMLKeypair = `-- name: GetSAMLKeypair :one
-SELECT
-  key_enc,
-  cert_pem
-FROM
-  saml_keypair
+const deleteSSOProvider = `-- name: DeleteSSOProvider :execrows
+DELETE FROM sso_providers
 WHERE
-  id = 1
+  workspace_id = $1
+  AND provider_id = $2
 `
 
-type GetSAMLKeypairRow struct {
-	KeyEnc  crypto.EncryptedBytes `json:"keyEnc"`
-	CertPem []byte                `json:"certPem"`
+type DeleteSSOProviderParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	ProviderID  string `json:"providerId"`
 }
 
-func (q *Queries) GetSAMLKeypair(ctx context.Context) (*GetSAMLKeypairRow, error) {
-	row := q.db.QueryRow(ctx, getSAMLKeypair)
-	var i GetSAMLKeypairRow
-	err := row.Scan(&i.KeyEnc, &i.CertPem)
-	return &i, err
+func (q *Queries) DeleteSSOProvider(ctx context.Context, arg *DeleteSSOProviderParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSSOProvider, arg.WorkspaceID, arg.ProviderID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getSSOProvider = `-- name: GetSSOProvider :one
 SELECT
-  workspace_id, provider_id, method, name, enabled, config, created_at, updated_at
+  workspace_id, provider_id, name, enabled, config, created_at, updated_at
 FROM
   sso_providers
 WHERE
-  provider_id = $1
+  workspace_id = $1
+  AND provider_id = $2
 `
 
-func (q *Queries) GetSSOProvider(ctx context.Context, providerID string) (*SsoProvider, error) {
-	row := q.db.QueryRow(ctx, getSSOProvider, providerID)
+type GetSSOProviderParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	ProviderID  string `json:"providerId"`
+}
+
+func (q *Queries) GetSSOProvider(ctx context.Context, arg *GetSSOProviderParams) (*SsoProvider, error) {
+	row := q.db.QueryRow(ctx, getSSOProvider, arg.WorkspaceID, arg.ProviderID)
 	var i SsoProvider
 	err := row.Scan(
 		&i.WorkspaceID,
 		&i.ProviderID,
-		&i.Method,
 		&i.Name,
 		&i.Enabled,
 		&i.Config,
@@ -58,58 +61,63 @@ func (q *Queries) GetSSOProvider(ctx context.Context, providerID string) (*SsoPr
 	return &i, err
 }
 
-const putSAMLKeypair = `-- name: PutSAMLKeypair :one
-INSERT INTO
-  saml_keypair (id, key_enc, cert_pem)
-VALUES
-  (1, $1, $2)
-ON CONFLICT (id) DO UPDATE
-SET
-  key_enc = saml_keypair.key_enc,
-  cert_pem = saml_keypair.cert_pem
-RETURNING
-  key_enc,
-  cert_pem
+const listSSOProviders = `-- name: ListSSOProviders :many
+SELECT
+  workspace_id, provider_id, name, enabled, config, created_at, updated_at
+FROM
+  sso_providers
+WHERE
+  workspace_id = $1
+ORDER BY
+  created_at ASC
 `
 
-type PutSAMLKeypairParams struct {
-	KeyEnc  crypto.EncryptedBytes `json:"keyEnc"`
-	CertPem []byte                `json:"certPem"`
-}
-
-type PutSAMLKeypairRow struct {
-	KeyEnc  crypto.EncryptedBytes `json:"keyEnc"`
-	CertPem []byte                `json:"certPem"`
-}
-
-func (q *Queries) PutSAMLKeypair(ctx context.Context, arg *PutSAMLKeypairParams) (*PutSAMLKeypairRow, error) {
-	row := q.db.QueryRow(ctx, putSAMLKeypair, arg.KeyEnc, arg.CertPem)
-	var i PutSAMLKeypairRow
-	err := row.Scan(&i.KeyEnc, &i.CertPem)
-	return &i, err
+func (q *Queries) ListSSOProviders(ctx context.Context, workspaceID string) ([]*SsoProvider, error) {
+	rows, err := q.db.Query(ctx, listSSOProviders, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*SsoProvider
+	for rows.Next() {
+		var i SsoProvider
+		if err := rows.Scan(
+			&i.WorkspaceID,
+			&i.ProviderID,
+			&i.Name,
+			&i.Enabled,
+			&i.Config,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const upsertSSOProvider = `-- name: UpsertSSOProvider :one
 INSERT INTO
-  sso_providers (workspace_id, provider_id, method, name, enabled, config)
+  sso_providers (workspace_id, provider_id, name, enabled, config)
 VALUES
-  ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (provider_id) DO UPDATE
+  ($1, $2, $3, $4, $5)
+ON CONFLICT (workspace_id, provider_id) DO UPDATE
 SET
-  workspace_id = EXCLUDED.workspace_id,
-  method = EXCLUDED.method,
   name = EXCLUDED.name,
   enabled = EXCLUDED.enabled,
   config = EXCLUDED.config,
   updated_at = NOW()
 RETURNING
-  workspace_id, provider_id, method, name, enabled, config, created_at, updated_at
+  workspace_id, provider_id, name, enabled, config, created_at, updated_at
 `
 
 type UpsertSSOProviderParams struct {
-	WorkspaceID *string               `json:"workspaceId"`
+	WorkspaceID string                `json:"workspaceId"`
 	ProviderID  string                `json:"providerId"`
-	Method      string                `json:"method"`
 	Name        string                `json:"name"`
 	Enabled     bool                  `json:"enabled"`
 	Config      crypto.EncryptedBytes `json:"config"`
@@ -119,7 +127,6 @@ func (q *Queries) UpsertSSOProvider(ctx context.Context, arg *UpsertSSOProviderP
 	row := q.db.QueryRow(ctx, upsertSSOProvider,
 		arg.WorkspaceID,
 		arg.ProviderID,
-		arg.Method,
 		arg.Name,
 		arg.Enabled,
 		arg.Config,
@@ -128,7 +135,6 @@ func (q *Queries) UpsertSSOProvider(ctx context.Context, arg *UpsertSSOProviderP
 	err := row.Scan(
 		&i.WorkspaceID,
 		&i.ProviderID,
-		&i.Method,
 		&i.Name,
 		&i.Enabled,
 		&i.Config,

@@ -47,6 +47,7 @@ func (s *Server) Start(ctx context.Context) error {
 		s.withCSRF,
 		s.withLogger,
 		s.withRecover,
+		s.withTenant,
 	)
 
 	proto := new(http.Protocols)
@@ -66,6 +67,10 @@ func (s *Server) Start(ctx context.Context) error {
 	serverErr := make(chan error, 1)
 	go func() {
 		slog.Info("server listening", "bind_address", server.Addr, "public_url", s.cfg.FullURL())
+		if s.cfg.BootstrapLink != "" {
+			slog.Warn("the owner has no passkey yet, sign in with this link, it works for 24 hours",
+				"url", s.cfg.BootstrapLink)
+		}
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			serverErr <- err
 		}
@@ -73,7 +78,6 @@ func (s *Server) Start(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		slog.Info("shutting down server")
 		graceCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		return server.Shutdown(graceCtx)
@@ -85,7 +89,6 @@ func (s *Server) Start(ctx context.Context) error {
 
 func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption {
 	interceptors := []connect.Interceptor{
-		newLogInterceptor(s.cfg.Debug),
 		newTimeoutInterceptor(),
 		newAuthNInterceptor(s.cfg),
 		s.cfg.Audit, // Audit wraps authorization so denied calls are recorded too.
@@ -116,6 +119,19 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 	}
 }
 
+// withTenant puts the workspace on the context. The health check and
+// provider webhooks are not tied to a workspace host.
+func (s *Server) withTenant(h http.Handler) http.Handler {
+	resolved := s.cfg.Tenant.Middleware(h)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" || strings.HasPrefix(r.URL.Path, "/webhooks/") {
+			h.ServeHTTP(w, r)
+			return
+		}
+		resolved.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) registerServices(ctx context.Context) {
 	opts := s.withHandlerOptions(ctx)
 	s.mux.Handle(nokkuv1connect.NewWorkspaceServiceHandler(newWorkspaceService(s.cfg), opts...))
@@ -132,7 +148,6 @@ func (s *Server) registerServices(ctx context.Context) {
 	s.mux.Handle(nokkuv1connect.NewServiceAccountServiceHandler(newServiceAccountService(s.cfg), opts...))
 	s.mux.Handle(nokkuv1connect.NewAccountServiceHandler(newAccountService(s.cfg), opts...))
 	s.mux.Handle(nokkuv1connect.NewAuthServiceHandler(newAuthService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewWorkspaceDomainServiceHandler(newWorkspaceDomainService(s.cfg), opts...))
 	s.mux.Handle(nokkuv1connect.NewSSOServiceHandler(newSSOService(s.cfg), opts...))
 	s.mux.Handle(nokkuv1connect.NewSCIMServiceHandler(newSCIMService(s.cfg), opts...))
 	s.mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(newDaemonControlService(s.cfg), opts...))

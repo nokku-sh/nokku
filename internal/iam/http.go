@@ -2,9 +2,6 @@ package iam
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -17,7 +14,6 @@ import (
 const (
 	sessionTTL        = 168 * time.Hour
 	sessionCookieName = "nokku_session"
-	signupCookieName  = "nokku_signup"
 )
 
 func (s *Service) newCookie(name, value string, expires time.Time) *http.Cookie {
@@ -34,18 +30,6 @@ func (s *Service) newCookie(name, value string, expires time.Time) *http.Cookie 
 
 func (s *Service) ClearSessionCookie() *http.Cookie {
 	return s.newCookie(sessionCookieName, "", time.Unix(0, 0))
-}
-
-// SignupCookie marks the browser an account was created in. The mailed
-// verify link only works there, see ConsumeVerifyToken.
-func (s *Service) SignupCookie(userID string) *http.Cookie {
-	return s.newCookie(signupCookieName, s.signupMAC(userID), s.now().Add(unverifiedUserTTL))
-}
-
-func (s *Service) signupMAC(userID string) string {
-	mac := hmac.New(sha256.New, s.signupKey)
-	mac.Write([]byte(userID))
-	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
 func sessionFromCookie(h http.Header) string {

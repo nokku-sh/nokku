@@ -10,7 +10,7 @@
 </script>
 
 {#if subject.kind === SubjectKind.USER}
-	<UserAvatar user={subject.member} class={cn('size-7', className)} />
+	<UserAvatar user={subject.user} class={cn('size-7', className)} />
 {:else}
 	<Avatar.Root class={cn('size-7', className)}>
 		<Avatar.Fallback

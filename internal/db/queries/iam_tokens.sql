@@ -1,53 +1,66 @@
 -- name: PutToken :exec
 INSERT INTO
-  one_time_tokens (token_hash, user_id, purpose, expires_at, email)
+  one_time_tokens (token_hash, workspace_id, user_id, purpose, expires_at, email)
 VALUES
-  (@token_hash, @user_id, @purpose, @expires_at, sqlc.narg('email'));
+  (@token_hash, @workspace_id, @user_id, @purpose, @expires_at, sqlc.narg('email'));
+
+-- name: PutSignupToken :exec
+INSERT INTO
+  one_time_tokens (token_hash, workspace_id, purpose, expires_at, email, data)
+VALUES
+  (@token_hash, @workspace_id, 'signup', @expires_at, @email, @data);
 
 -- name: ConsumeToken :one
+-- Spends a token of a user. A signup token has none, see ConsumeSignupToken.
 DELETE FROM one_time_tokens
 WHERE
-  token_hash = @token_hash
+  workspace_id = @workspace_id
+  AND token_hash = @token_hash
   AND purpose = @purpose
+  AND user_id IS NOT NULL
   AND expires_at > NOW()
 RETURNING
-  user_id;
+  user_id::UUID AS user_id;
 
--- name: GetTokenUser :one
--- Reads a token without spending it.
-SELECT
-  user_id
-FROM
-  one_time_tokens
+-- name: ConsumeSignupToken :one
+DELETE FROM one_time_tokens
 WHERE
-  token_hash = @token_hash
-  AND purpose = @purpose
-  AND expires_at > NOW();
+  workspace_id = @workspace_id
+  AND token_hash = @token_hash
+  AND purpose = 'signup'
+  AND expires_at > NOW()
+RETURNING
+  email::TEXT AS email,
+  data;
 
 -- name: ConsumeEmailToken :one
 DELETE FROM one_time_tokens
 WHERE
-  token_hash = @token_hash
+  workspace_id = @workspace_id
+  AND token_hash = @token_hash
   AND purpose = @purpose
-  AND expires_at > NOW()
+  AND user_id IS NOT NULL
   AND email IS NOT NULL
+  AND expires_at > NOW()
 RETURNING
-  user_id,
-  email;
+  user_id::UUID AS user_id,
+  email::TEXT AS email;
 
 -- name: DeleteUserTokens :exec
 DELETE FROM one_time_tokens
 WHERE
-  user_id = @user_id
+  workspace_id = @workspace_id
+  AND user_id = @user_id
   AND purpose = @purpose;
 
 -- name: GetPendingTokenEmail :one
 SELECT
-  email
+  email::TEXT AS email
 FROM
   one_time_tokens
 WHERE
-  user_id = @user_id
+  workspace_id = @workspace_id
+  AND user_id = @user_id
   AND purpose = @purpose
   AND expires_at > NOW()
   AND email IS NOT NULL
@@ -61,12 +74,17 @@ SELECT EXISTS (
   SELECT 1
   FROM one_time_tokens
   WHERE
-    user_id = @user_id
+    workspace_id = @workspace_id
+    AND (
+      user_id = sqlc.narg('user_id')
+      OR email = sqlc.narg('email')
+    )
     AND purpose = @purpose
     AND created_at > @since
 );
 
 -- name: DeleteExpiredTokens :execrows
+-- Every tenant, runs as nokku_system.
 DELETE FROM one_time_tokens
 WHERE
   expires_at < @now;

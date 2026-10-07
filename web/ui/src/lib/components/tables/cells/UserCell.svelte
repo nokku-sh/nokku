@@ -2,10 +2,9 @@
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import type { User } from '#lib/gen/nokku/v1/account_pb.js';
-	import type { WorkspaceMember } from '#lib/gen/nokku/v1/workspace_pb.js';
 
 	type Props = {
-		user: User | WorkspaceMember;
+		user: User;
 	};
 	let { user, ...restProps }: Props = $props();
 

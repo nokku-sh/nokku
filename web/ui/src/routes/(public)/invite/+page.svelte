@@ -1,0 +1,144 @@
+<script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { auth } from '#lib/api/auth.svelte.js';
+	import { signupWithPasskey } from '#lib/api/passkey.js';
+	import { invite } from '#lib/api/workspaces.svelte.js';
+	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
+	import LegalConsent from '#lib/components/blocks/LegalConsent.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { roleLabel } from '#lib/roles.js';
+	import { formatTs } from '#lib/utils.js';
+	import { CircleX, KeyRound, LogIn, Mail, MailCheck, PartyPopper } from '@lucide/svelte';
+	import { toast } from 'svelte-sonner';
+
+	const token = page.url.searchParams.get('token') ?? '';
+	const invitation = invite.get(token);
+	const options = auth.options();
+	const accept = invite.accept();
+
+	let name = $state('');
+	let email = $state('');
+	let passkeyBusy = $state(false);
+
+	const valid = $derived(!!name.trim() && email.includes('@'));
+
+	function byEmail(e: SubmitEvent) {
+		e.preventDefault();
+		accept.mutate({ token, name: name.trim(), email: email.trim() });
+	}
+
+	async function withPasskey() {
+		if (!window.PublicKeyCredential) {
+			toast.error('Passkeys not supported', { description: 'Try a current browser.' });
+			return;
+		}
+		passkeyBusy = true;
+		try {
+			await signupWithPasskey({ invite: token, name: name.trim(), email: email.trim() });
+			await goto('/');
+		} catch (error) {
+			const cancelled = error instanceof DOMException && error.name === 'NotAllowedError';
+			if (!cancelled) toast.error(error instanceof Error ? error.message : 'Passkey signup failed');
+		} finally {
+			passkeyBusy = false;
+		}
+	}
+</script>
+
+{#if !token || invitation.isError}
+	<AuthCard
+		title="Invitation unavailable"
+		description="This link is expired, used up or invalid. Ask whoever invited you for a new one."
+		icon={CircleX}
+		tone="destructive"
+	>
+		<Button href="/login" variant="outline">
+			<LogIn data-icon="inline-start" />
+			Sign in instead
+		</Button>
+	</AuthCard>
+{:else if invitation.isLoading}
+	<AuthCard title="Checking your invitation" description="One moment">
+		<Skeleton class="h-10 w-full" />
+		<Skeleton class="h-10 w-full" />
+	</AuthCard>
+{:else if accept.isSuccess}
+	<AuthCard
+		title="Check your email"
+		description={`A link to finish creating your account is on its way to ${email}. It works for 15 minutes and may land in spam.`}
+		icon={MailCheck}
+		tone="success"
+	/>
+{:else}
+	<AuthCard
+		title={`Join ${invitation.data?.workspaceName || 'the workspace'}`}
+		description="You were invited, this creates your account"
+		icon={PartyPopper}
+		wide
+	>
+		<div class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+			<Badge variant="secondary">{roleLabel(invitation.data?.role || 'member')}</Badge>
+			{#if invitation.data?.expiresAt}
+				<span>Expires {formatTs(invitation.data.expiresAt, 'relative')}</span>
+			{/if}
+		</div>
+
+		<form class="flex flex-col gap-4" onsubmit={byEmail}>
+			<Field.Group class="gap-4">
+				<Field.Field>
+					<Field.Label for="name">Full name</Field.Label>
+					<Input
+						id="name"
+						autocomplete="name"
+						bind:value={name}
+						placeholder="Ada Lovelace"
+						required
+					/>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="email">Email</Field.Label>
+					<Input
+						id="email"
+						type="email"
+						autocomplete="email"
+						bind:value={email}
+						placeholder="you@company.com"
+						required
+					/>
+					<Field.Description>How your team and the audit log know you.</Field.Description>
+				</Field.Field>
+			</Field.Group>
+
+			<div class="flex flex-col gap-3">
+				<Button type="button" onclick={withPasskey} disabled={!valid || passkeyBusy}>
+					{#if passkeyBusy}<Spinner data-icon="inline-start" />{:else}<KeyRound
+							data-icon="inline-start"
+						/>{/if}
+					Continue with a passkey
+				</Button>
+				{#if options.data?.magicLink}
+					<Button type="submit" variant="secondary" disabled={!valid || accept.isPending}>
+						{#if accept.isPending}<Spinner data-icon="inline-start" />{:else}<Mail
+								data-icon="inline-start"
+							/>{/if}
+						Email me a link instead
+					</Button>
+				{/if}
+			</div>
+		</form>
+
+		<LegalConsent lead="By joining," />
+
+		{#snippet footer()}
+			Already have an account? <a href="/login" class="font-medium text-primary hover:underline"
+				>Sign in</a
+			>
+		{/snippet}
+	</AuthCard>
+{/if}

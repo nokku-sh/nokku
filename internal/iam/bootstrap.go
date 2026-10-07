@@ -3,86 +3,122 @@ package iam
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/jackc/pgx/v5"
+
+	"github.com/nokku-sh/nokku/internal/actor"
+	"github.com/nokku-sh/nokku/internal/db"
 )
 
-type socialConfig struct {
-	GoogleClientID     string `env:"GOOGLE_CLIENT_ID"`
-	GoogleClientSecret string `env:"GOOGLE_CLIENT_SECRET"`
-	GitHubClientID     string `env:"GITHUB_CLIENT_ID"`
-	GitHubClientSecret string `env:"GITHUB_CLIENT_SECRET"`
+type bootstrapConfig struct {
+	AdminEmail            string `env:"NOKKU_ADMIN_EMAIL"`
+	AdminName             string `env:"NOKKU_ADMIN_NAME"`
+	GoogleClientID        string `env:"GOOGLE_CLIENT_ID"`
+	GoogleClientSecret    string `env:"GOOGLE_CLIENT_SECRET"`
+	MicrosoftClientID     string `env:"MICROSOFT_CLIENT_ID"`
+	MicrosoftClientSecret string `env:"MICROSOFT_CLIENT_SECRET"`
+	MicrosoftTenantID     string `env:"MICROSOFT_TENANT_ID"`
 }
 
-type adminConfig struct {
-	Email    string `env:"NOKKU_ADMIN_EMAIL"`
-	Password string `env:"NOKKU_ADMIN_PASSWORD"`
-	Name     string `env:"NOKKU_ADMIN_NAME"`
-}
-
-func (s *Service) seedSocialProviders(ctx context.Context) error {
-	cfg, err := env.ParseAs[socialConfig]()
+// Bootstrap runs on a self-hosted server, inside its one workspace. It
+// seeds the providers from the environment and makes sure the admin can
+// get in: an owner without a passkey or linked identity gets a sign-in
+// link, returned for the host to show, at every boot until one exists.
+func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, error) {
+	cfg, err := env.ParseAs[bootstrapConfig]()
 	if err != nil {
-		return err
+		return "", err
 	}
+	ctx = actor.WithWorkspace(ctx, ws)
 
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
-		if err := s.PutSSOProvider(ctx, SSOProvider{
+		if _, err := s.PutSSOProvider(ctx, SSOProvider{
 			ProviderID: "google",
-			Method:     MethodOIDC,
 			Name:       "Google",
 			Enabled:    true,
-			OIDC: &OIDCProvider{
+			OIDC: OIDCProvider{
 				IssuerURL:       "https://accounts.google.com",
 				ClientID:        cfg.GoogleClientID,
 				ClientSecret:    cfg.GoogleClientSecret,
 				JITProvisioning: true,
 			},
 		}); err != nil {
-			return err
+			return "", err
 		}
 	}
-	if cfg.GitHubClientID != "" && cfg.GitHubClientSecret != "" {
-		return s.PutSSOProvider(ctx, SSOProvider{
-			ProviderID: "github",
-			Method:     MethodOAuth2,
-			Name:       "GitHub",
+	if cfg.MicrosoftClientID != "" && cfg.MicrosoftClientSecret != "" {
+		// The tenant-wide endpoints issue tokens whose iss names the tenant,
+		// which OIDC discovery cannot verify.
+		tenant := strings.ToLower(cfg.MicrosoftTenantID)
+		if tenant == "" || tenant == "common" || tenant == "organizations" || tenant == "consumers" {
+			return "", errors.New("iam: MICROSOFT_TENANT_ID must be a tenant id")
+		}
+		if _, err := s.PutSSOProvider(ctx, SSOProvider{
+			ProviderID: "microsoft",
+			Name:       "Microsoft",
 			Enabled:    true,
-			OAuth2: &OAuth2Provider{ //nolint:gosec // the secret comes from the environment
-				ClientID:        cfg.GitHubClientID,
-				ClientSecret:    cfg.GitHubClientSecret,
-				AuthURL:         "https://github.com/login/oauth/authorize",
-				TokenURL:        "https://github.com/login/oauth/access_token",
-				UserInfoURL:     "https://api.github.com/user",
-				EmailURL:        "https://api.github.com/user/emails",
-				Scopes:          []string{"read:user", "user:email"},
+			OIDC: OIDCProvider{
+				IssuerURL:       "https://login.microsoftonline.com/" + tenant + "/v2.0",
+				ClientID:        cfg.MicrosoftClientID,
+				ClientSecret:    cfg.MicrosoftClientSecret,
 				JITProvisioning: true,
 			},
-		})
-	}
-	return nil
-}
-
-func (s *Service) bootstrapUser(ctx context.Context) error {
-	cfg, err := env.ParseAs[adminConfig]()
-	if err != nil {
-		return err
+		}); err != nil {
+			return "", err
+		}
 	}
 
-	if cfg.Email == "" || cfg.Password == "" {
-		return nil
+	if cfg.AdminEmail == "" {
+		return "", nil
 	}
-
-	if _, err := s.GetUserByEmail(ctx, cfg.Email); err == nil {
-		return nil
-	}
-
-	user, err := s.Register(ctx, cfg.Email, cfg.Name, cfg.Password)
-	if err != nil {
-		if errors.Is(err, ErrEmailTaken) {
-			return nil // lost a race with a concurrent boot
+	var owner *db.User
+	err = s.inWorkspace(ctx, func(q *db.Queries, wsID string) (err error) {
+		owner, err = q.GetOwner(ctx, wsID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			owner, err = s.createUser(ctx, q, db.CreateUserWithIDParams{
+				WorkspaceID: wsID,
+				Email:       cfg.AdminEmail,
+				Name:        cfg.AdminName,
+				Role:        string(db.RoleOwner),
+			}, "")
 		}
 		return err
+	})
+	if err != nil {
+		return "", err
 	}
-	return s.VerifyUserEmail(ctx, user.ID)
+	var creds []*db.Credential
+	if err := s.inWorkspace(ctx, func(q *db.Queries, wsID string) (err error) {
+		creds, err = q.ListUserCredentials(ctx, &db.ListUserCredentialsParams{WorkspaceID: wsID, UserID: owner.ID})
+		return err
+	}); err != nil {
+		return "", err
+	}
+	for _, c := range creds {
+		if c.Type == string(MethodPasskey) || c.Type == string(MethodOIDC) {
+			return "", nil
+		}
+	}
+	return s.IssueBootstrapLink(ctx, owner)
+}
+
+// AdminLink issues a 24 hour sign-in link for the owner of ws, the way back
+// in when every passkey is gone. It replaces earlier links.
+func (s *Service) AdminLink(ctx context.Context, ws actor.Workspace) (*db.User, string, error) {
+	ctx = actor.WithWorkspace(ctx, ws)
+	var owner *db.User
+	err := s.inWorkspace(ctx, func(q *db.Queries, wsID string) (err error) {
+		owner, err = q.GetOwner(ctx, wsID)
+		return err
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, "", errors.New("iam: the workspace has no owner, set NOKKU_ADMIN_EMAIL and start the server once")
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	link, err := s.IssueBootstrapLink(ctx, owner)
+	return owner, link, err
 }

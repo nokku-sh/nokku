@@ -49,7 +49,7 @@
 			{/each}
 		</DropdownMenu.Group>
 		<DropdownMenu.Separator />
-		<DropdownMenu.Item onSelect={() => logout.mutate({})}>
+		<DropdownMenu.Item onSelect={() => logout.mutate()}>
 			<LogOut />
 			Log out
 		</DropdownMenu.Item>

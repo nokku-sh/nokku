@@ -14,16 +14,12 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/billing.proto.
  */
 export const file_nokku_v1_billing: GenFile = /*@__PURE__*/
-  fileDesc("ChZub2trdS92MS9iaWxsaW5nLnByb3RvEghub2trdS52MSIzChFHZXRCaWxsaW5nUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBIp0CChJHZXRCaWxsaW5nUmVzcG9uc2USDAoEcGxhbhgBIAEoCRIMCgRtb2RlGAIgASgJEjwKCGZlYXR1cmVzGAMgAygLMioubm9ra3UudjEuR2V0QmlsbGluZ1Jlc3BvbnNlLkZlYXR1cmVzRW50cnkSIAoGcXVvdGFzGAQgASgLMhAubm9ra3UudjEuUXVvdGFzEhQKDG1lbWJlcl9jb3VudBgFIAEoAxIWCg5yZXNvdXJjZV9jb3VudBgGIAEoAxIsCgxzdWJzY3JpcHRpb24YByABKAsyFi5ub2trdS52MS5TdWJzY3JpcHRpb24aLwoNRmVhdHVyZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAg6AjgBImYKBlF1b3RhcxINCgVzZWF0cxgBIAEoAxIWCg5yZXRlbnRpb25fZGF5cxgCIAEoAxIfChdyZWNvcmRpbmdfc3RvcmFnZV9ieXRlcxgDIAEoAxIUCgxyZXNvdXJjZV9jYXAYBCABKAMidAoMU3Vic2NyaXB0aW9uEg4KBnN0YXR1cxgBIAEoCRIcChRjYW5jZWxfYXRfcGVyaW9kX2VuZBgCIAEoCBI2ChJjdXJyZW50X3BlcmlvZF9lbmQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjUKE0NyZWF0ZVBvcnRhbFJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABASIjChRDcmVhdGVQb3J0YWxSZXNwb25zZRILCgN1cmwYASABKAkiNwoVQ3JlYXRlQ2hlY2tvdXRSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQEiJQoWQ3JlYXRlQ2hlY2tvdXRSZXNwb25zZRILCgN1cmwYASABKAkiaAoZQ2FuY2VsU3Vic2NyaXB0aW9uUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhEKCWltbWVkaWF0ZRgCIAEoCBIYCgZyZWFzb24YAyABKAlCCLpIBXIDGOgHIhwKGkNhbmNlbFN1YnNjcmlwdGlvblJlc3BvbnNlIhMKEUdldExpY2Vuc2VSZXF1ZXN0ImIKEkdldExpY2Vuc2VSZXNwb25zZRIMCgRwbGFuGAEgASgJEg4KBmFjdGl2ZRgCIAEoCBIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJRChZBY3RpdmF0ZUxpY2Vuc2VSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFwoDa2V5GAIgASgJQgq6SAdyBRABGIAgIhkKF0FjdGl2YXRlTGljZW5zZVJlc3BvbnNlMrUECg5CaWxsaW5nU2VydmljZRJSCgpHZXRCaWxsaW5nEhsubm9ra3UudjEuR2V0QmlsbGluZ1JlcXVlc3QaHC5ub2trdS52MS5HZXRCaWxsaW5nUmVzcG9uc2UiCZACAcLzGAIYBBJVCgxDcmVhdGVQb3J0YWwSHS5ub2trdS52MS5DcmVhdGVQb3J0YWxSZXF1ZXN0Gh4ubm9ra3UudjEuQ3JlYXRlUG9ydGFsUmVzcG9uc2UiBsLzGAIQARJbCg5DcmVhdGVDaGVja291dBIfLm5va2t1LnYxLkNyZWF0ZUNoZWNrb3V0UmVxdWVzdBogLm5va2t1LnYxLkNyZWF0ZUNoZWNrb3V0UmVzcG9uc2UiBsLzGAIQARJnChJDYW5jZWxTdWJzY3JpcHRpb24SIy5ub2trdS52MS5DYW5jZWxTdWJzY3JpcHRpb25SZXF1ZXN0GiQubm9ra3UudjEuQ2FuY2VsU3Vic2NyaXB0aW9uUmVzcG9uc2UiBsLzGAIQARJSCgpHZXRMaWNlbnNlEhsubm9ra3UudjEuR2V0TGljZW5zZVJlcXVlc3QaHC5ub2trdS52MS5HZXRMaWNlbnNlUmVzcG9uc2UiCZACAcLzGAIQARJeCg9BY3RpdmF0ZUxpY2Vuc2USIC5ub2trdS52MS5BY3RpdmF0ZUxpY2Vuc2VSZXF1ZXN0GiEubm9ra3UudjEuQWN0aXZhdGVMaWNlbnNlUmVzcG9uc2UiBsLzGAIYBWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("ChZub2trdS92MS9iaWxsaW5nLnByb3RvEghub2trdS52MSITChFHZXRCaWxsaW5nUmVxdWVzdCKbAgoSR2V0QmlsbGluZ1Jlc3BvbnNlEgwKBHBsYW4YASABKAkSDAoEbW9kZRgCIAEoCRI8CghmZWF0dXJlcxgDIAMoCzIqLm5va2t1LnYxLkdldEJpbGxpbmdSZXNwb25zZS5GZWF0dXJlc0VudHJ5EiAKBnF1b3RhcxgEIAEoCzIQLm5va2t1LnYxLlF1b3RhcxISCgp1c2VyX2NvdW50GAUgASgDEhYKDnJlc291cmNlX2NvdW50GAYgASgDEiwKDHN1YnNjcmlwdGlvbhgHIAEoCzIWLm5va2t1LnYxLlN1YnNjcmlwdGlvbhovCg1GZWF0dXJlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCDoCOAEiZgoGUXVvdGFzEg0KBXNlYXRzGAEgASgDEhYKDnJldGVudGlvbl9kYXlzGAIgASgDEh8KF3JlY29yZGluZ19zdG9yYWdlX2J5dGVzGAMgASgDEhQKDHJlc291cmNlX2NhcBgEIAEoAyJ0CgxTdWJzY3JpcHRpb24SDgoGc3RhdHVzGAEgASgJEhwKFGNhbmNlbF9hdF9wZXJpb2RfZW5kGAIgASgIEjYKEmN1cnJlbnRfcGVyaW9kX2VuZBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiFQoTQ3JlYXRlUG9ydGFsUmVxdWVzdCIjChRDcmVhdGVQb3J0YWxSZXNwb25zZRILCgN1cmwYASABKAkiFwoVQ3JlYXRlQ2hlY2tvdXRSZXF1ZXN0IiUKFkNyZWF0ZUNoZWNrb3V0UmVzcG9uc2USCwoDdXJsGAEgASgJIkgKGUNhbmNlbFN1YnNjcmlwdGlvblJlcXVlc3QSEQoJaW1tZWRpYXRlGAEgASgIEhgKBnJlYXNvbhgCIAEoCUIIukgFcgMY6AciHAoaQ2FuY2VsU3Vic2NyaXB0aW9uUmVzcG9uc2UiEwoRR2V0TGljZW5zZVJlcXVlc3QiYgoSR2V0TGljZW5zZVJlc3BvbnNlEgwKBHBsYW4YASABKAkSDgoGYWN0aXZlGAIgASgIEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjEKFkFjdGl2YXRlTGljZW5zZVJlcXVlc3QSFwoDa2V5GAEgASgJQgq6SAdyBRABGIAgIhkKF0FjdGl2YXRlTGljZW5zZVJlc3BvbnNlMrUECg5CaWxsaW5nU2VydmljZRJSCgpHZXRCaWxsaW5nEhsubm9ra3UudjEuR2V0QmlsbGluZ1JlcXVlc3QaHC5ub2trdS52MS5HZXRCaWxsaW5nUmVzcG9uc2UiCZACAcLzGAIYBBJVCgxDcmVhdGVQb3J0YWwSHS5ub2trdS52MS5DcmVhdGVQb3J0YWxSZXF1ZXN0Gh4ubm9ra3UudjEuQ3JlYXRlUG9ydGFsUmVzcG9uc2UiBsLzGAIQARJbCg5DcmVhdGVDaGVja291dBIfLm5va2t1LnYxLkNyZWF0ZUNoZWNrb3V0UmVxdWVzdBogLm5va2t1LnYxLkNyZWF0ZUNoZWNrb3V0UmVzcG9uc2UiBsLzGAIQARJnChJDYW5jZWxTdWJzY3JpcHRpb24SIy5ub2trdS52MS5DYW5jZWxTdWJzY3JpcHRpb25SZXF1ZXN0GiQubm9ra3UudjEuQ2FuY2VsU3Vic2NyaXB0aW9uUmVzcG9uc2UiBsLzGAIQARJSCgpHZXRMaWNlbnNlEhsubm9ra3UudjEuR2V0TGljZW5zZVJlcXVlc3QaHC5ub2trdS52MS5HZXRMaWNlbnNlUmVzcG9uc2UiCZACAcLzGAIQARJeCg9BY3RpdmF0ZUxpY2Vuc2USIC5ub2trdS52MS5BY3RpdmF0ZUxpY2Vuc2VSZXF1ZXN0GiEubm9ra3UudjEuQWN0aXZhdGVMaWNlbnNlUmVzcG9uc2UiBsLzGAIYBWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.GetBillingRequest
  */
 export type GetBillingRequest = Message<"nokku.v1.GetBillingRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
 };
 
 /**
@@ -58,9 +54,9 @@ export type GetBillingResponse = Message<"nokku.v1.GetBillingResponse"> & {
   quotas?: Quotas | undefined;
 
   /**
-   * @generated from field: int64 member_count = 5;
+   * @generated from field: int64 user_count = 5;
    */
-  memberCount: bigint;
+  userCount: bigint;
 
   /**
    * @generated from field: int64 resource_count = 6;
@@ -143,10 +139,6 @@ export const SubscriptionSchema: GenMessage<Subscription> = /*@__PURE__*/
  * @generated from message nokku.v1.CreatePortalRequest
  */
 export type CreatePortalRequest = Message<"nokku.v1.CreatePortalRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
 };
 
 /**
@@ -177,10 +169,6 @@ export const CreatePortalResponseSchema: GenMessage<CreatePortalResponse> = /*@_
  * @generated from message nokku.v1.CreateCheckoutRequest
  */
 export type CreateCheckoutRequest = Message<"nokku.v1.CreateCheckoutRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
 };
 
 /**
@@ -212,17 +200,12 @@ export const CreateCheckoutResponseSchema: GenMessage<CreateCheckoutResponse> = 
  */
 export type CancelSubscriptionRequest = Message<"nokku.v1.CancelSubscriptionRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: bool immediate = 2;
+   * @generated from field: bool immediate = 1;
    */
   immediate: boolean;
 
   /**
-   * @generated from field: string reason = 3;
+   * @generated from field: string reason = 2;
    */
   reason: string;
 };
@@ -288,19 +271,13 @@ export const GetLicenseResponseSchema: GenMessage<GetLicenseResponse> = /*@__PUR
   messageDesc(file_nokku_v1_billing, 11);
 
 /**
- * The license covers the whole instance. The workspace only says where the
- * caller is an owner.
+ * The license covers the whole instance.
  *
  * @generated from message nokku.v1.ActivateLicenseRequest
  */
 export type ActivateLicenseRequest = Message<"nokku.v1.ActivateLicenseRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string key = 2;
+   * @generated from field: string key = 1;
    */
   key: string;
 };

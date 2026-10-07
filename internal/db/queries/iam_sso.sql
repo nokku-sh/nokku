@@ -1,12 +1,10 @@
 -- name: UpsertSSOProvider :one
 INSERT INTO
-  sso_providers (workspace_id, provider_id, method, name, enabled, config)
+  sso_providers (workspace_id, provider_id, name, enabled, config)
 VALUES
-  (@workspace_id, @provider_id, @method, @name, @enabled, @config)
-ON CONFLICT (provider_id) DO UPDATE
+  (@workspace_id, @provider_id, @name, @enabled, @config)
+ON CONFLICT (workspace_id, provider_id) DO UPDATE
 SET
-  workspace_id = EXCLUDED.workspace_id,
-  method = EXCLUDED.method,
   name = EXCLUDED.name,
   enabled = EXCLUDED.enabled,
   config = EXCLUDED.config,
@@ -20,26 +18,21 @@ SELECT
 FROM
   sso_providers
 WHERE
-  provider_id = @provider_id;
+  workspace_id = @workspace_id
+  AND provider_id = @provider_id;
 
--- name: GetSAMLKeypair :one
+-- name: ListSSOProviders :many
 SELECT
-  key_enc,
-  cert_pem
+  *
 FROM
-  saml_keypair
+  sso_providers
 WHERE
-  id = 1;
+  workspace_id = @workspace_id
+ORDER BY
+  created_at ASC;
 
--- name: PutSAMLKeypair :one
-INSERT INTO
-  saml_keypair (id, key_enc, cert_pem)
-VALUES
-  (1, @key_enc, @cert_pem)
-ON CONFLICT (id) DO UPDATE
-SET
-  key_enc = saml_keypair.key_enc,
-  cert_pem = saml_keypair.cert_pem
-RETURNING
-  key_enc,
-  cert_pem;
+-- name: DeleteSSOProvider :execrows
+DELETE FROM sso_providers
+WHERE
+  workspace_id = @workspace_id
+  AND provider_id = @provider_id;

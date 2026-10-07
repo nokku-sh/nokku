@@ -1,9 +1,7 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { auth } from '#lib/api/auth.svelte.js';
 	import { httpFetch } from '#lib/api/client.js';
+	import { credentials } from '#lib/api/credential.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
-	import { workspace } from '#lib/api/workspaces.svelte.js';
 	import DangerZone from '#lib/components/sheets/DangerZone.svelte';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
 	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
@@ -15,75 +13,53 @@
 	import * as ImageCropper from '#lib/components/ui/image-cropper/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
-	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
-	import * as Item from '#lib/components/ui/item/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
-	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import Avatar from '#lib/components/blocks/Avatar.svelte';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import { UserSchema } from '#lib/gen/nokku/v1/account_pb.js';
 	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
-	import { roleLabel } from '#lib/roles.js';
-	import { workspaceID } from '#lib/store.svelte.js';
+	import { roleIcon, roleLabel } from '#lib/roles.js';
 	import { formatTs } from '#lib/utils.js';
-	import {
-		BadgeCheck,
-		Mail,
-		MailQuestion,
-		Send,
-		ShieldCheck,
-		Trash2,
-		TriangleAlert
-	} from '@lucide/svelte';
+	import { Mail, MailQuestion, ShieldCheck, Trash2 } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 
 	const me = user.self();
 	const draft = useDraft(UserSchema, () => me.data);
 	const model = $derived(draft.current);
+	const RoleIcon = $derived(roleIcon(me.data?.role ?? 'member'));
 
 	const updateProfile = user.updateProfile();
-	const resendVerification = auth.resendVerification();
 	const deleteAccount = user.deleteAccount();
 	const requestEmailChange = user.requestEmailChange();
+	const creds = credentials.all();
+	// An identity provider owns the address of the accounts it signs in.
+	const managed = $derived((creds.data ?? []).some((c) => c.type === 'oidc' || c.type === 'scim'));
+	const isOwner = $derived(me.data?.role === 'owner');
 
 	let emailOpen = $state(false);
 	let newEmail = $state('');
-	let currentPassword = $state('');
 
 	async function submitEmailChange() {
-		await requestEmailChange.mutateAsync({ newEmail, currentPassword });
+		await requestEmailChange.mutateAsync({ newEmail });
 		toast.success('Check your new inbox', {
 			description: 'The address changes once you click the link we sent there.'
 		});
 		newEmail = '';
-		currentPassword = '';
 	}
-	const workspaces = workspace.list();
 
 	const autoSave = useAutoSave(() => updateProfile.mutateAsync({ name: model?.name }));
-
-	const owned = $derived(
-		(workspaces.data ?? []).filter((w) => w.createdBy === me.data?.id).map((w) => w.name)
-	);
 
 	function askDelete() {
 		void confirm({
 			title: 'Delete your account?',
-			description: owned.length
-				? `This deletes your account and the workspaces you own: ${owned.join(', ')}. A workspace other people still use can't go with it, transfer its ownership first. Active subscriptions are canceled. This cannot be undone.`
-				: 'This deletes your account and removes you from every workspace. This cannot be undone.',
+			description:
+				'This deletes your account and every grant you have here. This cannot be undone.',
 			typeToConfirm: me.data?.email,
 			onConfirm: () => deleteAccount.mutateAsync({})
 		});
 	}
-
-	function switchTo(id: string) {
-		workspaceID.current = id;
-		void goto('/');
-	}
 </script>
 
-<PageHeader title="Profile" description="Who you are across Nokku" />
+<PageHeader title="Profile" description="Who you are in this workspace" />
 
 {#if !model}
 	<Skeleton class="h-48 w-full rounded-xl" />
@@ -151,18 +127,16 @@
 					<InputGroup.Root>
 						<InputGroup.Addon><Mail /></InputGroup.Addon>
 						<InputGroup.Input id="profile-email" value={model.email} readonly />
-						{#if model.emailVerified}
+						{#if !managed}
 							<InputGroup.Addon align="inline-end">
-								<BadgeCheck class="text-success" />
-								<span class="text-xs text-success">Verified</span>
+								<InputGroup.Button onclick={() => (emailOpen = true)}>Change</InputGroup.Button>
 							</InputGroup.Addon>
 						{/if}
-						<InputGroup.Addon align="inline-end">
-							<InputGroup.Button onclick={() => (emailOpen = true)}>Change</InputGroup.Button>
-						</InputGroup.Addon>
 					</InputGroup.Root>
 					<Field.Description>
-						Your sign-in email. A change needs your password and a click in the new inbox.
+						{managed
+							? 'Your identity provider owns this address. Change it there.'
+							: 'Your sign-in email. A change needs a click in the new inbox.'}
 					</Field.Description>
 				</Field.Field>
 				{#if model.pendingEmail}
@@ -175,43 +149,26 @@
 						</Alert.Description>
 					</Alert.Root>
 				{/if}
-				{#if !model.emailVerified}
-					<Alert.Root variant="warning">
-						<TriangleAlert />
-						<Alert.Title>Your email isn't verified</Alert.Title>
-						<Alert.Description>Password resets and notices need a verified email.</Alert.Description
-						>
-						<Alert.Action>
-							<Button
-								size="sm"
-								variant="outline"
-								onclick={() => resendVerification.mutate({ email: model.email })}
-								disabled={resendVerification.isPending || resendVerification.isSuccess}
-							>
-								{#if resendVerification.isPending}
-									<Spinner data-icon="inline-start" />
-								{:else if !resendVerification.isSuccess}
-									<Send data-icon="inline-start" />
-								{/if}
-								{resendVerification.isSuccess ? 'Email sent' : 'Resend'}
-							</Button>
-						</Alert.Action>
-					</Alert.Root>
-				{/if}
 			</Field.Group>
 		</Card.Content>
 		<Card.Footer class="flex justify-between gap-3 border-t">
 			<SaveStatus state={autoSave.saveState} idleText="Changes save automatically" />
-			<span class="text-xs text-muted-foreground">
-				Member since {formatTs(me.data?.createdAt, 'short')}
+			<span class="flex items-center gap-2 text-xs text-muted-foreground">
+				<Badge variant="secondary">
+					<RoleIcon data-icon="inline-start" />
+					{roleLabel(me.data?.role ?? 'member')}
+				</Badge>
+				since {formatTs(me.data?.createdAt, 'short')}
 			</span>
 		</Card.Footer>
 	</Card.Root>
 
 	<Card.Root>
 		<Card.Header>
-			<Card.Title class="text-base">Your workspaces</Card.Title>
-			<Card.Description>Where you're a member, and your role in each.</Card.Description>
+			<Card.Title class="text-base">Security</Card.Title>
+			<Card.Description
+				>Your passkeys, sign-in methods and where you are signed in.</Card.Description
+			>
 			<Card.Action>
 				<Button size="sm" variant="ghost" href="/profile/security">
 					<ShieldCheck data-icon="inline-start" />
@@ -219,37 +176,6 @@
 				</Button>
 			</Card.Action>
 		</Card.Header>
-		<Card.Content>
-			{#if workspaces.isLoading}
-				<Skeleton class="h-16 w-full" />
-			{:else if workspaces.data?.length}
-				<Item.Group class="divide-y rounded-lg border">
-					{#each workspaces.data as w (w.id)}
-						{@const current = w.id === workspaceID.current}
-						<Item.Root size="sm" class="rounded-none">
-							<Item.Media><Avatar id={w.id} class="size-8 rounded-lg" /></Item.Media>
-							<Item.Content>
-								<Item.Title class="flex items-center gap-2">
-									{w.name}
-									{#if current}<Badge variant="success">Current</Badge>{/if}
-								</Item.Title>
-								{#if w.description}
-									<Item.Description>{w.description}</Item.Description>
-								{/if}
-							</Item.Content>
-							<Item.Actions>
-								<Badge variant="secondary">{roleLabel(w.role)}</Badge>
-								{#if !current}
-									<Button size="sm" variant="ghost" onclick={() => switchTo(w.id)}>Switch</Button>
-								{/if}
-							</Item.Actions>
-						</Item.Root>
-					{/each}
-				</Item.Group>
-			{:else}
-				<p class="text-sm text-muted-foreground">You're not in a workspace yet.</p>
-			{/if}
-		</Card.Content>
 	</Card.Root>
 
 	<FormModal
@@ -258,7 +184,7 @@
 		description="We send a link to the new address. Your current address gets a notice and can cancel the change."
 		icon={Mail}
 		submitLabel="Send the link"
-		submitDisabled={!newEmail || !currentPassword}
+		submitDisabled={!newEmail}
 		onSubmit={submitEmailChange}
 	>
 		<Field.Field>
@@ -272,28 +198,17 @@
 				required
 			/>
 		</Field.Field>
-		<Field.Field>
-			<Field.Label for="email-current-password">Current password</Field.Label>
-			<InputGroupVariants
-				variant="password"
-				bind:value={currentPassword}
-				inputProps={{ id: 'email-current-password', autocomplete: 'current-password' }}
-			/>
-			<Field.Description>
-				No password yet? Set one under Security first. Accounts that sign in through an identity
-				provider change the address there.
-			</Field.Description>
-		</Field.Field>
 	</FormModal>
 
 	<DangerZone
 		actions={[
 			{
 				title: 'Delete account',
-				description: owned.length
-					? `Also deletes the workspaces you own (${owned.length}).`
-					: 'Removes you from every workspace.',
+				description: isOwner
+					? 'The owner cannot leave. Transfer ownership to someone else first.'
+					: 'Removes you from this workspace for good.',
 				label: 'Delete',
+				disabled: isOwner,
 				onClick: askDelete
 			}
 		]}

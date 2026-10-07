@@ -15,7 +15,8 @@ SELECT
 FROM
   scim_tokens
 WHERE
-  token_hash = @token_hash;
+  workspace_id = @workspace_id
+  AND token_hash = @token_hash;
 
 -- name: TouchSCIMToken :exec
 -- Only writes when the stamp is over an hour old.
@@ -23,7 +24,8 @@ UPDATE scim_tokens
 SET
   last_used_at = NOW()
 WHERE
-  id = @id
+  workspace_id = @workspace_id
+  AND id = @id
   AND (
     last_used_at IS NULL
     OR last_used_at < NOW() - INTERVAL '1 hour'
@@ -45,33 +47,20 @@ ORDER BY
 -- name: DeleteSCIMToken :exec
 DELETE FROM scim_tokens
 WHERE
-  id = @id
-  AND workspace_id = @workspace_id;
+  workspace_id = @workspace_id
+  AND id = @id;
 
--- name: CountUserMemberships :one
+-- name: ListSCIMUsers :many
 SELECT
-  COUNT(*)::INTEGER
-FROM
-  workspace_members
-WHERE
-  user_id = @user_id;
-
--- name: ListManagedMembers :many
--- Only members under the workspace's verified domains.
-SELECT
-  u.*,
+  sqlc.embed(u),
   COALESCE(c.subject, '')::TEXT AS external_id
 FROM
-  workspace_members wm
-  JOIN users u ON u.id = wm.user_id
-  JOIN workspace_domains d ON d.workspace_id = wm.workspace_id
-  AND d.domain = split_part(u.email, '@', 2)
-  AND d.verified_at IS NOT NULL
-  LEFT JOIN credentials c ON c.user_id = u.id
+  users u
+  LEFT JOIN credentials c ON c.workspace_id = u.workspace_id
+  AND c.user_id = u.id
   AND c.type = 'scim'
-  AND c.provider = wm.workspace_id::TEXT
 WHERE
-  wm.workspace_id = @workspace_id
+  u.workspace_id = @workspace_id
   AND (
     sqlc.narg('user_id')::UUID IS NULL
     OR u.id = sqlc.narg('user_id')
@@ -87,15 +76,15 @@ ORDER BY
 -- name: DeleteUserSCIMCredentials :exec
 DELETE FROM credentials
 WHERE
-  user_id = @user_id
-  AND type = 'scim'
-  AND provider = @workspace_id;
+  workspace_id = @workspace_id
+  AND user_id = @user_id
+  AND type = 'scim';
 
 -- name: DeleteStaleUserSCIMCredentials :exec
 -- Run before UpsertCredential so one account never carries two links.
 DELETE FROM credentials
 WHERE
-  user_id = @user_id
+  workspace_id = @workspace_id
+  AND user_id = @user_id
   AND type = 'scim'
-  AND provider = @workspace_id
   AND subject <> @subject;

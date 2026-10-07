@@ -39,7 +39,7 @@
 		const settings = create(WorkspaceSettingsSchema, ws.data?.settings);
 		settings.auditWebhookUrl = url;
 		settings.auditWebhookSecret = secret;
-		update.mutate({ workspaceId: ws.data?.id, settings });
+		update.mutate({ settings });
 	}
 </script>
 

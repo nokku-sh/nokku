@@ -9,7 +9,7 @@ import (
 
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/internal/util"
+	"github.com/nokku-sh/nokku/internal/realip"
 )
 
 // Limits count per client IP and minute. A whole office can sit behind one
@@ -49,15 +49,15 @@ func (s *Server) withRateLimit(next http.Handler) http.Handler {
 }
 
 func clientIP(r *http.Request) (string, error) {
-	return util.GetRemoteIP(r.Header, r.RemoteAddr), nil
+	return realip.Bucket(r.Header, r.RemoteAddr), nil
 }
 
 func isAuthRoute(path string) bool {
 	return strings.HasPrefix(path, "/nokku.v1.AuthService/") ||
+		strings.HasPrefix(path, "/nokku.v1.InvitationService/") ||
+		path == nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure ||
 		strings.HasPrefix(path, "/auth/") ||
 		strings.HasPrefix(path, "/oidc/") ||
-		strings.HasPrefix(path, "/oauth/") ||
-		strings.HasPrefix(path, "/saml/") ||
 		strings.HasPrefix(path, "/passkey/")
 }
 

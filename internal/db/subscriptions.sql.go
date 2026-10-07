@@ -48,13 +48,6 @@ SELECT
         daemons d
       WHERE
         d.workspace_id = $1
-    ) + (
-      SELECT
-        COUNT(*)
-      FROM
-        workspace_domains wd
-      WHERE
-        wd.workspace_id = $1
     )
   )::bigint AS resource_count
 `
@@ -64,22 +57,6 @@ func (q *Queries) CountWorkspaceResources(ctx context.Context, workspaceID strin
 	var resource_count int64
 	err := row.Scan(&resource_count)
 	return resource_count, err
-}
-
-const countWorkspaceSeats = `-- name: CountWorkspaceSeats :one
-SELECT
-  COUNT(*)
-FROM
-  workspace_members
-WHERE
-  workspace_id = $1
-`
-
-func (q *Queries) CountWorkspaceSeats(ctx context.Context, workspaceID string) (int64, error) {
-	row := q.db.QueryRow(ctx, countWorkspaceSeats, workspaceID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
 }
 
 const getActiveSubscription = `-- name: GetActiveSubscription :one

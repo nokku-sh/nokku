@@ -7,6 +7,8 @@ import (
 	scim "github.com/elimity-com/scim"
 	"github.com/elimity-com/scim/optional"
 	"github.com/elimity-com/scim/schema"
+
+	"github.com/nokku-sh/nokku/internal/actor"
 )
 
 const (
@@ -75,21 +77,21 @@ func scimGroupSchema() schema.Schema {
 	}
 }
 
-func scimResourceTypes(svc *Service, workspaceID string) []scim.ResourceType {
+func scimResourceTypes(svc *Service, ws actor.Workspace) []scim.ResourceType {
 	return []scim.ResourceType{
 		{
 			ID:       optional.NewString("User"),
 			Name:     "User",
 			Endpoint: scimUserEndpoint,
 			Schema:   scimUserSchema(),
-			Handler:  scimUserHandler{svc: svc, workspaceID: workspaceID},
+			Handler:  scimUserHandler{svc: svc, ws: ws},
 		},
 		{
 			ID:       optional.NewString("Group"),
 			Name:     "Group",
 			Endpoint: scimGroupEndpoint,
 			Schema:   scimGroupSchema(),
-			Handler:  scimGroupHandler{svc: svc, workspaceID: workspaceID},
+			Handler:  scimGroupHandler{svc: svc, ws: ws},
 		},
 	}
 }

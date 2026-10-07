@@ -12,11 +12,12 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/access.proto.
  */
 export const file_nokku_v1_access: GenFile = /*@__PURE__*/
-  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIm8KBkFjY2VzcxIOCgZwdWJsaWMYASABKAgSDAoEc2VsZhgCIAEoCBIlCgRyb2xlGAMgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZRIQCghwZXJzb25hbBgEIAEoCBIOCgZkYWVtb24YBSABKAgqtAEKDVdvcmtzcGFjZVJvbGUSHgoaV09SS1NQQUNFX1JPTEVfVU5TUEVDSUZJRUQQABIZChVXT1JLU1BBQ0VfUk9MRV9NRU1CRVIQARIZChVXT1JLU1BBQ0VfUk9MRV9WSUVXRVIQAhIZChVXT1JLU1BBQ0VfUk9MRV9FRElUT1IQAxIYChRXT1JLU1BBQ0VfUk9MRV9BRE1JThAEEhgKFFdPUktTUEFDRV9ST0xFX09XTkVSEAU6SgoGYWNjZXNzEh4uZ29vZ2xlLnByb3RvYnVmLk1ldGhvZE9wdGlvbnMYuI4DIAEoCzIQLm5va2t1LnYxLkFjY2Vzc1IGYWNjZXNzYghlZGl0aW9uc3DoBw", [file_google_protobuf_descriptor]);
+  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIl0KBkFjY2VzcxIOCgZwdWJsaWMYASABKAgSDAoEc2VsZhgCIAEoCBIlCgRyb2xlGAMgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZRIOCgZkYWVtb24YBCABKAgqtAEKDVdvcmtzcGFjZVJvbGUSHgoaV09SS1NQQUNFX1JPTEVfVU5TUEVDSUZJRUQQABIZChVXT1JLU1BBQ0VfUk9MRV9NRU1CRVIQARIZChVXT1JLU1BBQ0VfUk9MRV9WSUVXRVIQAhIZChVXT1JLU1BBQ0VfUk9MRV9FRElUT1IQAxIYChRXT1JLU1BBQ0VfUk9MRV9BRE1JThAEEhgKFFdPUktTUEFDRV9ST0xFX09XTkVSEAU6SgoGYWNjZXNzEh4uZ29vZ2xlLnByb3RvYnVmLk1ldGhvZE9wdGlvbnMYuI4DIAEoCzIQLm5va2t1LnYxLkFjY2Vzc1IGYWNjZXNzYghlZGl0aW9uc3DoBw", [file_google_protobuf_descriptor]);
 
 /**
  * Access declares who may call an RPC. An RPC without it is denied, so new
- * RPCs fail closed.
+ * RPCs fail closed. The workspace is always known, the request's host names
+ * it, so every check below runs inside one workspace.
  *
  * @generated from message nokku.v1.Access
  */
@@ -29,32 +30,24 @@ export type Access = Message<"nokku.v1.Access"> & {
   public: boolean;
 
   /**
-   * Open to any authenticated caller. The handler scopes to the caller or
-   * checks rights itself.
+   * Open to any authenticated caller but daemons. The handler scopes to the
+   * caller or checks rights itself.
    *
    * @generated from field: bool self = 2;
    */
   self: boolean;
 
   /**
-   * The least workspace role the caller needs.
+   * The least role the caller's user or service account needs.
    *
    * @generated from field: nokku.v1.WorkspaceRole role = 3;
    */
   role: WorkspaceRole;
 
   /**
-   * Without a pinned workspace, the role check is skipped and the handler
-   * serves the caller's own rows.
-   *
-   * @generated from field: bool personal = 4;
-   */
-  personal: boolean;
-
-  /**
    * Daemons may call it. With nothing else set, only daemons may.
    *
-   * @generated from field: bool daemon = 5;
+   * @generated from field: bool daemon = 4;
    */
   daemon: boolean;
 };

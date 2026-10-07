@@ -1,7 +1,6 @@
 import { create } from '@bufbuild/protobuf';
 import { RecordingService } from '#lib/gen/nokku/v1/recordings_pb.js';
 import { useMutation, useQuery } from '#lib/query/index.js';
-import { workspaceID } from '#lib/store.svelte.js';
 import { authTransport } from './client';
 import { toast } from 'svelte-sonner';
 import { MAX_PAGE_SIZE } from '#lib/config.js';
@@ -15,12 +14,11 @@ export const recordings = {
 		useQuery(
 			RecordingService.method.listRecordings,
 			() => ({
-				workspaceId: workspaceID.current,
 				limit: MAX_PAGE_SIZE,
 				offset: 0,
 				...opts?.()
 			}),
-			() => ({ enabled: !!workspaceID.current, refetchInterval: 30000 })
+			() => ({ refetchInterval: 30000 })
 		),
 
 	delete: () =>
@@ -41,7 +39,6 @@ export const recordings = {
 		signal?: AbortSignal
 	): Promise<void> => {
 		const input = create(RecordingService.method.getRecording.input, {
-			workspaceId: workspaceID.current,
 			recordingId
 		});
 		async function* single() {

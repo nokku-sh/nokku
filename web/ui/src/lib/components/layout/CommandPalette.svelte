@@ -8,10 +8,10 @@
 
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { util, workspace } from '#lib/api/workspaces.svelte.js';
+	import { util } from '#lib/api/workspaces.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import * as Command from '#lib/components/ui/command/index.js';
 	import * as Kbd from '#lib/components/ui/kbd/index.js';
-	import { workspaceID } from '#lib/store.svelte.js';
 	import {
 		AppRoutes,
 		SupportRoutes,
@@ -21,7 +21,7 @@
 		type RouteItem
 	} from './routes';
 
-	const ws = workspace.get();
+	const me = user.self();
 	const info = util.instanceInfo();
 	const support = $derived(supportRoute(info.data?.supportEmail));
 
@@ -38,14 +38,12 @@
 		);
 	}
 
-	// Workspace pages need a workspace, and the role that the sidebar asks for.
+	// The same role gate as the sidebar.
 	const groups = $derived.by(() => {
-		const role = ws.data?.role;
-		const app = workspaceID.current
-			? Object.entries(AppRoutes).map(
-					([name, routes]) => [name, leaves(routes.filter((r) => canSee(r, role)))] as const
-				)
-			: [];
+		const role = me.data?.role;
+		const app = Object.entries(AppRoutes).map(
+			([name, routes]) => [name, leaves(routes.filter((r) => canSee(r, role)))] as const
+		);
 		return [
 			...app,
 			['You', leaves(UserRoutes)] as const,

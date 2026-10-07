@@ -51,7 +51,7 @@ func TestReencrypt(t *testing.T) {
 		}
 		// config defaults to an empty value, which is not a ciphertext.
 		if _, err := q.db.Exec(t.Context(),
-			`INSERT INTO sso_providers (workspace_id, provider_id, method) VALUES ($1, $2, 'oidc')`,
+			`INSERT INTO sso_providers (workspace_id, provider_id) VALUES ($1, $2)`,
 			f.ws, provider); err != nil {
 			return err
 		}

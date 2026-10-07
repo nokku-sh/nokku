@@ -108,28 +108,6 @@ func TestSealedFlowState(t *testing.T) {
 	}
 }
 
-// TestSealedFlowStateCrossSite covers SAML, where the IdP posts the answer
-// from its own site. That needs a None cookie, which needs Secure.
-func TestSealedFlowStateCrossSite(t *testing.T) {
-	for _, secure := range []bool{true, false} {
-		svc, _ := newSealedTestService(t, secure)
-		store := &sealed[samlState]{svc: svc, cookie: flowCookieName, use: "saml", ttl: flowStateTTL, crossSite: true}
-		rec := httptest.NewRecorder()
-		if _, err := store.put(rec, samlState{ProviderID: "p1"}); err != nil {
-			t.Fatal(err)
-		}
-		cookie := rec.Result().Cookies()[0]
-		want := http.SameSiteLaxMode
-		if secure {
-			want = http.SameSiteNoneMode
-		}
-		if cookie.SameSite != want || cookie.Secure != secure {
-			t.Errorf("secure=%v: SameSite=%v Secure=%v, want %v and Secure=%v",
-				secure, cookie.SameSite, cookie.Secure, want, secure)
-		}
-	}
-}
-
 // TestLinkUserIDFor checks the forced-linking guard: a signed-in user
 // starting an SSO login from a cross-site navigation must not enter linking
 // mode, same-origin and header-less (older) clients must.

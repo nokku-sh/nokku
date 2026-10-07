@@ -5,6 +5,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -40,7 +41,7 @@ func (s *teamService) CreateTeam(
 	var result *db.Team
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		result, err = q.CreateTeam(ctx, &db.CreateTeamParams{
-			WorkspaceID: req.GetWorkspaceId(),
+			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
 			Name:        req.GetName(),
 			Description: req.Description,
 			Tags:        req.GetTags(),
@@ -98,7 +99,7 @@ func (s *teamService) ListTeams(
 	var count int32
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		teams, err := q.ListTeams(ctx, &db.ListTeamsParams{
-			WorkspaceID: req.GetWorkspaceId(),
+			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
 			Query:       req.Query,
 			Tags:        req.GetTags(),
 			Limit:       req.Limit,
@@ -151,17 +152,9 @@ func (s *teamService) ListTeamMembers(
 		return nil, err
 	}
 
-	members := make([]*nokkuv1.WorkspaceMember, 0, len(rows))
+	members := make([]*nokkuv1.User, 0, len(rows))
 	for _, m := range rows {
-		members = append(members, &nokkuv1.WorkspaceMember{
-			Id:            &m.UserID,
-			WorkspaceId:   &m.WorkspaceID,
-			Name:          &m.Name,
-			Email:         &m.Email,
-			EmailVerified: &m.EmailVerified,
-			Picture:       m.Picture,
-			CreatedAt:     db.SafeTimestamp(&m.CreatedAt),
-		})
+		members = append(members, m.User.ToProto())
 	}
 	return &nokkuv1.ListTeamMembersResponse{Members: members}, nil
 }
@@ -173,7 +166,7 @@ func (s *teamService) ListTeamsForUser(
 	var teams []*db.Team
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		teams, err = q.ListTeamsForUser(ctx, &db.ListTeamsForUserParams{
-			WorkspaceID: req.GetWorkspaceId(),
+			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
 			UserID:      req.GetUserId(),
 		})
 		return err

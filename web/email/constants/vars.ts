@@ -26,8 +26,8 @@ export const CONSTANTS = {
   EXPIRATION: "{{ .Expiration }}",
 
   // Auth related
-  VERIFICATION_URL: "{{ .VerificationURL }}",
-  RECOVERY_URL: "{{ .RecoveryURL }}",
+  LINK_URL: "{{ .LinkURL }}",
+  WORKSPACE: "{{ .Workspace }}",
   NEW_EMAIL: "{{ .NewEmail }}",
   CANCEL_URL: "{{ .CancelURL }}",
 

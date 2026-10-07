@@ -85,7 +85,8 @@ SELECT
 FROM
   service_accounts
 WHERE
-  token_hash = @token_hash
+  workspace_id = @workspace_id
+  AND token_hash = @token_hash
   AND (expires_at IS NULL OR expires_at > NOW());
 
 -- name: TouchServiceAccount :exec

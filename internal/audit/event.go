@@ -13,6 +13,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
@@ -55,24 +56,14 @@ func (s *Service) Append(ctx context.Context, event *Event) error {
 	return errors.Join(errs...)
 }
 
-// List reads the personal log of the single actor in ActorIds when
-// WorkspaceID is nil.
+// List reads the log of the request's workspace.
 func (s *Service) List(ctx context.Context, p *db.ListAuditLogsParams) ([]*Event, int32, error) {
 	var rows []*db.ListAuditLogsRow
-	read := func(q *db.Queries) (err error) {
+	p.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
+	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		rows, err = q.ListAuditLogs(ctx, p)
 		return err
-	}
-
-	var err error
-	switch {
-	case p.WorkspaceID != nil:
-		err = s.conn.WithWorkspace(ctx, read)
-	case len(p.ActorIds) == 1 && p.ActorIds[0] != "":
-		err = s.conn.WithActor(ctx, p.ActorIds[0], read)
-	default:
-		return nil, 0, errors.New("personal audit read requires exactly one actor")
-	}
+	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("querying events: %w", err)
 	}
@@ -86,7 +77,7 @@ func (s *Service) List(ctx context.Context, p *db.ListAuditLogsParams) ([]*Event
 		events = append(events, &Event{
 			ID:          r.ID,
 			Timestamp:   r.Timestamp,
-			WorkspaceID: deref(r.WorkspaceID),
+			WorkspaceID: r.WorkspaceID,
 			ActorID:     r.ActorID,
 			ActorKind:   r.ActorKind,
 			ActorName:   r.ActorName,
@@ -179,11 +170,4 @@ func eventsCSV(events []*Event) ([]byte, error) {
 	}
 	w.Flush()
 	return buf.Bytes(), w.Error()
-}
-
-func deref(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }

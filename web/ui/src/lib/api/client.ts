@@ -1,16 +1,9 @@
 import { createConnectTransport } from '@connectrpc/connect-web';
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/svelte-query';
 import { browser } from '$app/env';
-import { Code, ConnectError, type Interceptor, type UnaryRequest } from '@connectrpc/connect';
+import { Code, ConnectError } from '@connectrpc/connect';
 import { toast } from 'svelte-sonner';
-import {
-	formatConnectError,
-	parseHTTPError,
-	isEmailUnverifiedError,
-	isOtherBrowserError
-} from './error-formatter';
-import { WorkspaceService } from '#lib/gen/nokku/v1/workspace_pb.js';
-import { workspaceID } from '#lib/store.svelte.js';
+import { formatConnectError, parseHTTPError } from './error-formatter';
 
 export const queryClient = new QueryClient({
 	defaultOptions: {
@@ -28,32 +21,11 @@ export const queryClient = new QueryClient({
 		}
 	},
 	queryCache: new QueryCache({
-		onError: (error, query) => {
+		onError: (error) => {
 			if (!(error instanceof ConnectError)) return;
-
-			const key = query.queryKey[1] as { methodName?: string } | undefined;
 
 			// The account layer bounces to /login itself.
 			if (error.code === Code.Unauthenticated) return;
-
-			// A persisted workspace id can outlive the workspace. Drop it and let
-			// the workspace list pick a valid one.
-			if (
-				key?.methodName === WorkspaceService.method.getWorkspace.name &&
-				(error.code === Code.NotFound || error.code === Code.PermissionDenied)
-			) {
-				workspaceID.current = '';
-				void queryClient.invalidateQueries({
-					queryKey: [
-						'connect-query',
-						{
-							serviceName: WorkspaceService.typeName,
-							methodName: WorkspaceService.method.listWorkspaces.name
-						}
-					]
-				});
-				return;
-			}
 
 			// Views render missing entities themselves (deleted subjects, stale links).
 			if (error.code === Code.NotFound) return;
@@ -77,8 +49,6 @@ export const queryClient = new QueryClient({
 		onError: (error) => {
 			if (!(error instanceof ConnectError)) return;
 			if (error.code === Code.Unauthenticated) return;
-			// The login and verify pages show their own state for these.
-			if (isEmailUnverifiedError(error) || isOtherBrowserError(error)) return;
 			toast.error(formatConnectError(error).title, {
 				description: formatConnectError(error).description
 			});
@@ -86,63 +56,20 @@ export const queryClient = new QueryClient({
 	})
 });
 
-const publicPaths = [
-	'/login',
-	'/register',
-	'/verify',
-	'/recovery',
-	'/reset',
-	'/device',
-	'/email-change',
-	'/sso-error'
-];
+const publicPaths = ['/login', '/invite', '/signup', '/device', '/email-change', '/sso-error'];
 
 export function handleSessionExpired() {
 	if (!browser || publicPaths.some((p) => window.location.pathname.startsWith(p))) return;
 
-	workspaceID.current = '';
 	// A full load, so this tab's web shells and cached data end with the session.
 	window.location.assign('/login');
 }
-
-const workspaceInterceptor: Interceptor = (next) => async (req) => {
-	if (req.stream || !browser || !workspaceID.current) {
-		return await next(req);
-	}
-
-	const unaryRequest = req as UnaryRequest;
-	// UtilService requests decide their own scope, an empty workspace_id is a
-	// personal read.
-	const service = unaryRequest.method.parent as { typeName?: string } | undefined;
-	if (service?.typeName === 'nokku.v1.UtilService') {
-		return await next(req);
-	}
-
-	const hasWorkspaceField = unaryRequest.method.input.fields.some(
-		(field) => field.localName === 'workspaceId'
-	);
-	if (!hasWorkspaceField) {
-		return await next(req);
-	}
-
-	const message = unaryRequest.message as Record<string, unknown>;
-	if (message.workspaceId) {
-		return await next(req);
-	}
-
-	const updatedRequest: UnaryRequest = {
-		...unaryRequest,
-		message: { ...message, workspaceId: workspaceID.current } as unknown as UnaryRequest['message']
-	};
-	return await next(updatedRequest);
-};
 
 export const authTransport = createConnectTransport({
 	baseUrl: '/',
 	useHttpGet: true,
 	fetch: (input, init) => fetch(input, { ...init, credentials: 'include' }),
-	jsonOptions: { ignoreUnknownFields: true },
-	interceptors: [workspaceInterceptor]
+	jsonOptions: { ignoreUnknownFields: true }
 });
 
 export async function httpFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {

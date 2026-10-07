@@ -3,22 +3,18 @@ package api
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
-	"strings"
-	"time"
 
 	"connectrpc.com/connect"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
-
-const tokenTTL = 15 * time.Minute
 
 type authService struct {
 	cfg *config.Config
@@ -43,94 +39,81 @@ func setCookie(ci connect.CallInfo, c *http.Cookie) {
 	ci.ResponseHeader().Add("Set-Cookie", c.String())
 }
 
-func (s *authService) Register(
+// GetLoginOptions is what the login page may offer in this workspace.
+func (s *authService) GetLoginOptions(
 	ctx context.Context,
-	req *nokkuv1.RegisterRequest,
-) (*nokkuv1.RegisterResponse, error) {
-	ci, err := callInfo(ctx)
+	_ *nokkuv1.GetLoginOptionsRequest,
+) (*nokkuv1.GetLoginOptionsResponse, error) {
+	ws, ok := actor.WorkspaceFromContext(ctx)
+	if !ok {
+		return nil, errNoWorkspace
+	}
+	var enforced bool
+	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		w, err := q.GetWorkspace(ctx, ws.ID)
+		if err != nil {
+			return err
+		}
+		enforced = w.Settings.GetEnforceSso()
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	providers, err := s.cfg.IAM.ListSSOProviders(ctx)
 	if err != nil {
 		return nil, err
 	}
-	u, err := s.cfg.IAM.Register(
-		ctx,
-		strings.ToLower(strings.TrimSpace(req.GetEmail())),
-		strings.TrimSpace(req.GetName()),
-		req.GetPassword(),
-	)
-	if err != nil {
-		if errors.Is(err, iam.ErrEmailTaken) {
-			return nil, newError(
-				connect.CodeAlreadyExists,
-				"an account with this email already exists",
-			)
-		}
-		if errors.Is(err, iam.ErrEmailRejected) {
-			return nil, newError(
-				connect.CodeInvalidArgument,
-				"please enter a valid email address",
-			)
-		}
-		return nil, errInternal
+	out := &nokkuv1.GetLoginOptionsResponse{
+		WorkspaceName: &ws.Name,
+		MagicLink:     new(!enforced && s.cfg.IAM.MagicLinkEnabled()),
+		Passkey:       new(!enforced),
+		Providers:     []*nokkuv1.SSOProviderInfo{},
 	}
-	setCookie(ci, s.cfg.IAM.SignupCookie(u.ID))
-	s.sendTokenEmail(ctx, u, iam.TokenVerifyEmail, true)
-	return &nokkuv1.RegisterResponse{}, nil
+	for _, p := range providers {
+		if p.Enabled {
+			out.Providers = append(out.Providers, &nokkuv1.SSOProviderInfo{ProviderId: &p.ProviderID, Name: &p.Name})
+		}
+	}
+	return out, nil
 }
 
-func (s *authService) Login(
+// RequestMagicLink always answers OK so it cannot enumerate accounts.
+func (s *authService) RequestMagicLink(
 	ctx context.Context,
-	req *nokkuv1.LoginRequest,
-) (*nokkuv1.LoginResponse, error) {
+	req *nokkuv1.RequestMagicLinkRequest,
+) (*nokkuv1.RequestMagicLinkResponse, error) {
+	if err := s.cfg.IAM.RequestMagicLink(ctx, req.GetEmail()); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.RequestMagicLinkResponse{}, nil
+}
+
+func (s *authService) ConsumeMagicLink(
+	ctx context.Context,
+	req *nokkuv1.ConsumeMagicLinkRequest,
+) (*nokkuv1.ConsumeMagicLinkResponse, error) {
 	ci, err := callInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	u, cookie, err := s.cfg.IAM.Password.Login(ctx, req.GetEmail(), req.GetPassword())
-	if err != nil {
-		return nil, loginError(err)
+	u, cookie, err := s.cfg.IAM.ConsumeMagicLink(ctx, req.GetToken())
+	switch {
+	case errors.Is(err, iam.ErrInactive):
+		return nil, errAccountInactive
+	case errors.Is(err, iam.ErrSSORequired):
+		return nil, errSSORequired
+	case errors.Is(err, iam.ErrSeatLimit):
+		return nil, newError(connect.CodeResourceExhausted, "this workspace has no seats left")
+	case errors.Is(err, iam.ErrEmailTaken):
+		return nil, newError(connect.CodeAlreadyExists, "an account with this email already exists, sign in instead")
+	case err != nil:
+		return nil, errLinkInvalid
 	}
 	setCookie(ci, cookie)
 	if c := s.cfg.IAM.RememberDevice(ctx, ci.RequestHeader(), ci.Peer().Addr, u); c != nil {
 		setCookie(ci, c)
 	}
-	return &nokkuv1.LoginResponse{User: u.ToProto()}, nil
-}
-
-func (s *authService) LoginWithBackupCode(
-	ctx context.Context,
-	req *nokkuv1.LoginWithBackupCodeRequest,
-) (*nokkuv1.LoginWithBackupCodeResponse, error) {
-	ci, err := callInfo(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	u, cookie, err := s.cfg.IAM.LoginWithBackupCode(ctx, req.GetEmail(), req.GetCode())
-	if err != nil {
-		return nil, loginError(err)
-	}
-	setCookie(ci, cookie)
-	if c := s.cfg.IAM.RememberDevice(ctx, ci.RequestHeader(), ci.Peer().Addr, u); c != nil {
-		setCookie(ci, c)
-	}
-	return &nokkuv1.LoginWithBackupCodeResponse{User: u.ToProto()}, nil
-}
-
-func loginError(err error) error {
-	if errors.Is(err, iam.ErrInactive) {
-		return errAccountInactive
-	}
-	if errors.Is(err, iam.ErrEmailUnverified) {
-		return errEmailUnverified
-	}
-	if errors.Is(err, iam.ErrSSORequired) {
-		return errSSORequired
-	}
-	if errors.Is(err, iam.ErrTooManyAttempts) {
-		return errTooManyAttempts
-	}
-	return errLoginFailed
+	return &nokkuv1.ConsumeMagicLinkResponse{User: u.ToProto()}, nil
 }
 
 func (s *authService) Logout(
@@ -145,77 +128,12 @@ func (s *authService) Logout(
 	setCookie(ci, s.cfg.IAM.ClearSessionCookie())
 	if err := s.cfg.IAM.Logout(ctx, ci.RequestHeader(), nokkuv1connect.AuthServiceLogoutProcedure); err != nil {
 		if errors.Is(err, iam.ErrDPoPNonce) || errors.Is(err, iam.ErrDPoPRequired) {
-			s.cfg.IAM.AdvertiseDPoPNonce(ci.ResponseHeader())
+			s.cfg.IAM.AdvertiseDPoPNonce(ctx, ci.ResponseHeader())
 			return nil, connect.NewError(connect.CodeUnauthenticated, err)
 		}
 		return nil, errInternal
 	}
 	return &nokkuv1.LogoutResponse{}, nil
-}
-
-func (s *authService) ForgotPassword(
-	ctx context.Context,
-	req *nokkuv1.ForgotPasswordRequest,
-) (*nokkuv1.ForgotPasswordResponse, error) {
-	// Always answer OK so the endpoint cannot enumerate accounts.
-	if u, err := s.cfg.IAM.GetUserByEmail(ctx, req.GetEmail()); err == nil &&
-		u.Active && !u.DisablePasswordReset {
-		s.sendTokenEmail(ctx, u, iam.TokenPasswordReset, false)
-	}
-	return &nokkuv1.ForgotPasswordResponse{}, nil
-}
-
-func (s *authService) ResetPassword(
-	ctx context.Context,
-	req *nokkuv1.ResetPasswordRequest,
-) (*nokkuv1.ResetPasswordResponse, error) {
-	userID, err := s.cfg.IAM.ConsumeToken(ctx, req.GetToken(), iam.TokenPasswordReset)
-	if err != nil {
-		return nil, newError(
-			connect.CodeInvalidArgument,
-			"this reset link is invalid or expired",
-		)
-	}
-	if err := s.cfg.IAM.Password.SetPassword(ctx, userID, req.GetNewPassword()); err != nil {
-		return nil, errInternal
-	}
-	return &nokkuv1.ResetPasswordResponse{}, nil
-}
-
-func (s *authService) VerifyEmail(
-	ctx context.Context,
-	req *nokkuv1.VerifyEmailRequest,
-) (*nokkuv1.VerifyEmailResponse, error) {
-	ci, err := callInfo(ctx)
-	if err != nil {
-		return nil, err
-	}
-	userID, err := s.cfg.IAM.ConsumeVerifyToken(ctx, ci.RequestHeader(), req.GetToken())
-	if errors.Is(err, iam.ErrOtherBrowser) {
-		return nil, errOtherBrowser
-	}
-	if err != nil {
-		return nil, newError(
-			connect.CodeInvalidArgument,
-			"this verification link is invalid or expired",
-		)
-	}
-	if err := s.cfg.IAM.VerifyUserEmail(ctx, userID); err != nil {
-		return nil, errInternal
-	}
-	return &nokkuv1.VerifyEmailResponse{}, nil
-}
-
-func (s *authService) ResendVerification(
-	ctx context.Context,
-	req *nokkuv1.ResendVerificationRequest,
-) (*nokkuv1.ResendVerificationResponse, error) {
-	// Always answer OK so the endpoint cannot enumerate accounts.
-	// Welcome goes out once at signup, a resend is a plain verification.
-	if u, err := s.cfg.IAM.GetUserByEmail(ctx, req.GetEmail()); err == nil && !u.EmailVerified {
-		s.sendTokenEmail(ctx, u, iam.TokenVerifyEmail, false)
-	}
-	return &nokkuv1.ResendVerificationResponse{}, nil
 }
 
 func (s *authService) ConfirmEmailChange(
@@ -240,80 +158,11 @@ func (s *authService) CancelEmailChange(
 	if errors.Is(err, iam.ErrEmailTaken) {
 		return nil, newError(
 			connect.CodeAlreadyExists,
-			"another account uses the old address by now, contact support",
+			"another account uses the old address by now, contact your administrator",
 		)
 	}
 	if err != nil {
 		return nil, newError(connect.CodeInvalidArgument, "this link is invalid or expired")
 	}
 	return &nokkuv1.CancelEmailChangeResponse{}, nil
-}
-
-func (s *authService) DiscoverSSO(
-	ctx context.Context,
-	req *nokkuv1.DiscoverSSORequest,
-) (*nokkuv1.DiscoverSSOResponse, error) {
-	out := &nokkuv1.DiscoverSSOResponse{Providers: []*nokkuv1.SSOProviderInfo{}}
-
-	_, domain, ok := strings.Cut(req.GetEmail(), "@")
-	if !ok || domain == "" {
-		return out, nil
-	}
-
-	d, err := s.cfg.IAM.GetVerifiedTenantDomain(ctx, strings.ToLower(domain))
-	if err != nil {
-		return out, nil
-	}
-
-	p, err := s.cfg.IAM.GetSSOProvider(ctx, d.WorkspaceID)
-	if err != nil || !p.Enabled {
-		return out, nil
-	}
-
-	out.HasSso = new(true)
-	out.Enforce = new(p.Enforced())
-	out.Providers = []*nokkuv1.SSOProviderInfo{{
-		Method:   new(string(p.Method)),
-		Provider: new(p.ProviderID),
-		Name:     new(p.Name),
-	}}
-	return out, nil
-}
-
-// sendTokenEmail skips the send when the same token went out recently.
-func (s *authService) sendTokenEmail(
-	ctx context.Context,
-	u *db.User,
-	purpose string,
-	welcome bool,
-) {
-	recent, err := s.cfg.IAM.HasRecentToken(ctx, u.ID, purpose)
-	if err != nil {
-		// Fail open, the worst case is an extra email.
-		slog.Debug("resend cooldown check failed", "error", err)
-	} else if recent {
-		return
-	}
-	raw, err := s.cfg.IAM.IssueToken(ctx, u.ID, purpose, tokenTTL)
-	if err != nil {
-		return
-	}
-	path := "/verify"
-	if purpose == iam.TokenPasswordReset {
-		path = "/reset"
-	}
-	link := s.cfg.FullURL() + path + "?token=" + raw
-
-	switch {
-	case welcome:
-		name, _, _ := strings.Cut(u.Email, "@")
-		err = s.cfg.Email.SendWelcomeEmail(ctx, u.ID, u.Email, name, link, tokenTTL.String())
-	case purpose == iam.TokenPasswordReset:
-		err = s.cfg.Email.SendRecoveryEmail(ctx, u.ID, u.Email, link, tokenTTL.String())
-	default:
-		err = s.cfg.Email.SendVerificationEmail(ctx, u.ID, u.Email, link, tokenTTL.String())
-	}
-	if err != nil {
-		slog.Error("send auth email", "error", err)
-	}
 }

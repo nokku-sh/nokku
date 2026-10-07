@@ -38,3 +38,9 @@ func (c *Local[T]) Put(key string, v T) {
 	defer c.mu.Unlock()
 	c.entries[key] = localEntry[T]{value: v, expiresAt: time.Now().Add(c.ttl)}
 }
+
+func (c *Local[T]) Delete(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.entries, key)
+}

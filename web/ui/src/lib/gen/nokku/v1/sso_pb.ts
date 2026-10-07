@@ -14,48 +14,48 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/sso.proto.
  */
 export const file_nokku_v1_sso: GenFile = /*@__PURE__*/
-  fileDesc("ChJub2trdS92MS9zc28ucHJvdG8SCG5va2t1LnYxIo4CCgtTU09Qcm92aWRlchIUCgx3b3Jrc3BhY2VfaWQYASABKAkSDgoGbWV0aG9kGAIgASgJEgwKBG5hbWUYAyABKAkSEwoLZW5mb3JjZV9zc28YBCABKAgSHgoWYWxsb3dfaml0X3Byb3Zpc2lvbmluZxgFIAEoCBIRCglpc19hY3RpdmUYBiABKAgSIwoGY29uZmlnGAcgASgLMhMubm9ra3UudjEuU1NPQ29uZmlnEi4KCmNyZWF0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIlgKCVNTT0NvbmZpZxISCgppc3N1ZXJfdXJsGAEgASgJEhEKCWNsaWVudF9pZBgCIAEoCRIOCgZzY29wZXMYAyADKAkSFAoMbWV0YWRhdGFfdXJsGAQgASgJIjcKFUdldFNTT1Byb3ZpZGVyUmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBIkEKFkdldFNTT1Byb3ZpZGVyUmVzcG9uc2USJwoIcHJvdmlkZXIYASABKAsyFS5ub2trdS52MS5TU09Qcm92aWRlciKFAgoYVXBkYXRlU1NPUHJvdmlkZXJSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESIQoGbWV0aG9kGAIgASgJQhG6SA5yDFIEb2lkY1IEc2FtbBIYCgRuYW1lGAMgASgJQgq6SAdyBRABGIACEhMKC2VuZm9yY2Vfc3NvGAQgASgIEh4KFmFsbG93X2ppdF9wcm92aXNpb25pbmcYBSABKAgSEQoJaXNfYWN0aXZlGAYgASgIEh8KDWNsaWVudF9zZWNyZXQYByABKAlCCLpIBXIDGOgHEiMKBmNvbmZpZxgIIAEoCzITLm5va2t1LnYxLlNTT0NvbmZpZyJEChlVcGRhdGVTU09Qcm92aWRlclJlc3BvbnNlEicKCHByb3ZpZGVyGAEgASgLMhUubm9ra3UudjEuU1NPUHJvdmlkZXIy0gEKClNTT1NlcnZpY2USXgoOR2V0U1NPUHJvdmlkZXISHy5ub2trdS52MS5HZXRTU09Qcm92aWRlclJlcXVlc3QaIC5ub2trdS52MS5HZXRTU09Qcm92aWRlclJlc3BvbnNlIgmQAgHC8xgCGAISZAoRVXBkYXRlU1NPUHJvdmlkZXISIi5ub2trdS52MS5VcGRhdGVTU09Qcm92aWRlclJlcXVlc3QaIy5ub2trdS52MS5VcGRhdGVTU09Qcm92aWRlclJlc3BvbnNlIgbC8xgCGAViCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("ChJub2trdS92MS9zc28ucHJvdG8SCG5va2t1LnYxIvIBCgtTU09Qcm92aWRlchITCgtwcm92aWRlcl9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB2VuYWJsZWQYAyABKAgSEgoKaXNzdWVyX3VybBgEIAEoCRIRCgljbGllbnRfaWQYBSABKAkSDgoGc2NvcGVzGAYgAygJEhgKEGppdF9wcm92aXNpb25pbmcYByABKAgSLgoKY3JlYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiGQoXTGlzdFNTT1Byb3ZpZGVyc1JlcXVlc3QiRAoYTGlzdFNTT1Byb3ZpZGVyc1Jlc3BvbnNlEigKCXByb3ZpZGVycxgBIAMoCzIVLm5va2t1LnYxLlNTT1Byb3ZpZGVyIvgBChVQdXRTU09Qcm92aWRlclJlcXVlc3QSLAoLcHJvdmlkZXJfaWQYASABKAlCF7pIFHISEAEYQDIMXlthLXowLTktXSskEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISDwoHZW5hYmxlZBgDIAEoCBIcCgppc3N1ZXJfdXJsGAQgASgJQgi6SAVyA4gBARIdCgljbGllbnRfaWQYBSABKAlCCrpIB3IFEAEY6AcSHwoNY2xpZW50X3NlY3JldBgGIAEoCUIIukgFcgMY6AcSDgoGc2NvcGVzGAcgAygJEhgKEGppdF9wcm92aXNpb25pbmcYCCABKAgiQQoWUHV0U1NPUHJvdmlkZXJSZXNwb25zZRInCghwcm92aWRlchgBIAEoCzIVLm5va2t1LnYxLlNTT1Byb3ZpZGVyIjgKGERlbGV0ZVNTT1Byb3ZpZGVyUmVxdWVzdBIcCgtwcm92aWRlcl9pZBgBIAEoCUIHukgEcgIQASIbChlEZWxldGVTU09Qcm92aWRlclJlc3BvbnNlMrUCCgpTU09TZXJ2aWNlEmQKEExpc3RTU09Qcm92aWRlcnMSIS5ub2trdS52MS5MaXN0U1NPUHJvdmlkZXJzUmVxdWVzdBoiLm5va2t1LnYxLkxpc3RTU09Qcm92aWRlcnNSZXNwb25zZSIJkAIBwvMYAhgCElsKDlB1dFNTT1Byb3ZpZGVyEh8ubm9ra3UudjEuUHV0U1NPUHJvdmlkZXJSZXF1ZXN0GiAubm9ra3UudjEuUHV0U1NPUHJvdmlkZXJSZXNwb25zZSIGwvMYAhgFEmQKEURlbGV0ZVNTT1Byb3ZpZGVyEiIubm9ra3UudjEuRGVsZXRlU1NPUHJvdmlkZXJSZXF1ZXN0GiMubm9ra3UudjEuRGVsZXRlU1NPUHJvdmlkZXJSZXNwb25zZSIGwvMYAhgFYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.SSOProvider
  */
 export type SSOProvider = Message<"nokku.v1.SSOProvider"> & {
   /**
-   * @generated from field: string workspace_id = 1;
+   * @generated from field: string provider_id = 1;
    */
-  workspaceId: string;
+  providerId: string;
 
   /**
-   * oidc | saml
-   *
-   * @generated from field: string method = 2;
-   */
-  method: string;
-
-  /**
-   * @generated from field: string name = 3;
+   * @generated from field: string name = 2;
    */
   name: string;
 
   /**
-   * @generated from field: bool enforce_sso = 4;
+   * @generated from field: bool enabled = 3;
    */
-  enforceSso: boolean;
+  enabled: boolean;
 
   /**
-   * @generated from field: bool allow_jit_provisioning = 5;
+   * @generated from field: string issuer_url = 4;
    */
-  allowJitProvisioning: boolean;
+  issuerUrl: string;
 
   /**
-   * @generated from field: bool is_active = 6;
+   * @generated from field: string client_id = 5;
    */
-  isActive: boolean;
+  clientId: string;
 
   /**
-   * @generated from field: nokku.v1.SSOConfig config = 7;
+   * @generated from field: repeated string scopes = 6;
    */
-  config?: SSOConfig | undefined;
+  scopes: string[];
+
+  /**
+   * Create an account on first sign-in.
+   *
+   * @generated from field: bool jit_provisioning = 7;
+   */
+  jitProvisioning: boolean;
 
   /**
    * @generated from field: google.protobuf.Timestamp created_at = 8;
@@ -76,129 +76,93 @@ export const SSOProviderSchema: GenMessage<SSOProvider> = /*@__PURE__*/
   messageDesc(file_nokku_v1_sso, 0);
 
 /**
- * @generated from message nokku.v1.SSOConfig
+ * @generated from message nokku.v1.ListSSOProvidersRequest
  */
-export type SSOConfig = Message<"nokku.v1.SSOConfig"> & {
-  /**
-   * @generated from field: string issuer_url = 1;
-   */
-  issuerUrl: string;
-
-  /**
-   * @generated from field: string client_id = 2;
-   */
-  clientId: string;
-
-  /**
-   * @generated from field: repeated string scopes = 3;
-   */
-  scopes: string[];
-
-  /**
-   * @generated from field: string metadata_url = 4;
-   */
-  metadataUrl: string;
+export type ListSSOProvidersRequest = Message<"nokku.v1.ListSSOProvidersRequest"> & {
 };
 
 /**
- * Describes the message nokku.v1.SSOConfig.
- * Use `create(SSOConfigSchema)` to create a new message.
+ * Describes the message nokku.v1.ListSSOProvidersRequest.
+ * Use `create(ListSSOProvidersRequestSchema)` to create a new message.
  */
-export const SSOConfigSchema: GenMessage<SSOConfig> = /*@__PURE__*/
+export const ListSSOProvidersRequestSchema: GenMessage<ListSSOProvidersRequest> = /*@__PURE__*/
   messageDesc(file_nokku_v1_sso, 1);
 
 /**
- * @generated from message nokku.v1.GetSSOProviderRequest
+ * @generated from message nokku.v1.ListSSOProvidersResponse
  */
-export type GetSSOProviderRequest = Message<"nokku.v1.GetSSOProviderRequest"> & {
+export type ListSSOProvidersResponse = Message<"nokku.v1.ListSSOProvidersResponse"> & {
   /**
-   * @generated from field: string workspace_id = 1;
+   * @generated from field: repeated nokku.v1.SSOProvider providers = 1;
    */
-  workspaceId: string;
+  providers: SSOProvider[];
 };
 
 /**
- * Describes the message nokku.v1.GetSSOProviderRequest.
- * Use `create(GetSSOProviderRequestSchema)` to create a new message.
+ * Describes the message nokku.v1.ListSSOProvidersResponse.
+ * Use `create(ListSSOProvidersResponseSchema)` to create a new message.
  */
-export const GetSSOProviderRequestSchema: GenMessage<GetSSOProviderRequest> = /*@__PURE__*/
+export const ListSSOProvidersResponseSchema: GenMessage<ListSSOProvidersResponse> = /*@__PURE__*/
   messageDesc(file_nokku_v1_sso, 2);
 
 /**
- * @generated from message nokku.v1.GetSSOProviderResponse
+ * @generated from message nokku.v1.PutSSOProviderRequest
  */
-export type GetSSOProviderResponse = Message<"nokku.v1.GetSSOProviderResponse"> & {
+export type PutSSOProviderRequest = Message<"nokku.v1.PutSSOProviderRequest"> & {
   /**
-   * unset when the workspace has no provider
-   *
-   * @generated from field: nokku.v1.SSOProvider provider = 1;
+   * @generated from field: string provider_id = 1;
    */
-  provider?: SSOProvider | undefined;
-};
-
-/**
- * Describes the message nokku.v1.GetSSOProviderResponse.
- * Use `create(GetSSOProviderResponseSchema)` to create a new message.
- */
-export const GetSSOProviderResponseSchema: GenMessage<GetSSOProviderResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 3);
-
-/**
- * @generated from message nokku.v1.UpdateSSOProviderRequest
- */
-export type UpdateSSOProviderRequest = Message<"nokku.v1.UpdateSSOProviderRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
+  providerId: string;
 
   /**
-   * @generated from field: string method = 2;
-   */
-  method: string;
-
-  /**
-   * @generated from field: string name = 3;
+   * @generated from field: string name = 2;
    */
   name: string;
 
   /**
-   * @generated from field: bool enforce_sso = 4;
+   * @generated from field: bool enabled = 3;
    */
-  enforceSso: boolean;
+  enabled: boolean;
 
   /**
-   * @generated from field: bool allow_jit_provisioning = 5;
+   * @generated from field: string issuer_url = 4;
    */
-  allowJitProvisioning: boolean;
+  issuerUrl: string;
 
   /**
-   * @generated from field: bool is_active = 6;
+   * @generated from field: string client_id = 5;
    */
-  isActive: boolean;
+  clientId: string;
 
   /**
-   * @generated from field: string client_secret = 7;
+   * Empty keeps the stored secret.
+   *
+   * @generated from field: string client_secret = 6;
    */
   clientSecret: string;
 
   /**
-   * @generated from field: nokku.v1.SSOConfig config = 8;
+   * @generated from field: repeated string scopes = 7;
    */
-  config?: SSOConfig | undefined;
+  scopes: string[];
+
+  /**
+   * @generated from field: bool jit_provisioning = 8;
+   */
+  jitProvisioning: boolean;
 };
 
 /**
- * Describes the message nokku.v1.UpdateSSOProviderRequest.
- * Use `create(UpdateSSOProviderRequestSchema)` to create a new message.
+ * Describes the message nokku.v1.PutSSOProviderRequest.
+ * Use `create(PutSSOProviderRequestSchema)` to create a new message.
  */
-export const UpdateSSOProviderRequestSchema: GenMessage<UpdateSSOProviderRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_sso, 4);
+export const PutSSOProviderRequestSchema: GenMessage<PutSSOProviderRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_sso, 3);
 
 /**
- * @generated from message nokku.v1.UpdateSSOProviderResponse
+ * @generated from message nokku.v1.PutSSOProviderResponse
  */
-export type UpdateSSOProviderResponse = Message<"nokku.v1.UpdateSSOProviderResponse"> & {
+export type PutSSOProviderResponse = Message<"nokku.v1.PutSSOProviderResponse"> & {
   /**
    * @generated from field: nokku.v1.SSOProvider provider = 1;
    */
@@ -206,34 +170,76 @@ export type UpdateSSOProviderResponse = Message<"nokku.v1.UpdateSSOProviderRespo
 };
 
 /**
- * Describes the message nokku.v1.UpdateSSOProviderResponse.
- * Use `create(UpdateSSOProviderResponseSchema)` to create a new message.
+ * Describes the message nokku.v1.PutSSOProviderResponse.
+ * Use `create(PutSSOProviderResponseSchema)` to create a new message.
  */
-export const UpdateSSOProviderResponseSchema: GenMessage<UpdateSSOProviderResponse> = /*@__PURE__*/
+export const PutSSOProviderResponseSchema: GenMessage<PutSSOProviderResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_sso, 4);
+
+/**
+ * @generated from message nokku.v1.DeleteSSOProviderRequest
+ */
+export type DeleteSSOProviderRequest = Message<"nokku.v1.DeleteSSOProviderRequest"> & {
+  /**
+   * @generated from field: string provider_id = 1;
+   */
+  providerId: string;
+};
+
+/**
+ * Describes the message nokku.v1.DeleteSSOProviderRequest.
+ * Use `create(DeleteSSOProviderRequestSchema)` to create a new message.
+ */
+export const DeleteSSOProviderRequestSchema: GenMessage<DeleteSSOProviderRequest> = /*@__PURE__*/
   messageDesc(file_nokku_v1_sso, 5);
 
 /**
- * The provider can vouch for every account under the workspace's domains,
- * so only the owner sets it.
+ * @generated from message nokku.v1.DeleteSSOProviderResponse
+ */
+export type DeleteSSOProviderResponse = Message<"nokku.v1.DeleteSSOProviderResponse"> & {
+};
+
+/**
+ * Describes the message nokku.v1.DeleteSSOProviderResponse.
+ * Use `create(DeleteSSOProviderResponseSchema)` to create a new message.
+ */
+export const DeleteSSOProviderResponseSchema: GenMessage<DeleteSSOProviderResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_sso, 6);
+
+/**
+ * A provider signs people into this workspace and may create accounts, so
+ * only the owner changes one.
  *
  * @generated from service nokku.v1.SSOService
  */
 export const SSOService: GenService<{
   /**
-   * @generated from rpc nokku.v1.SSOService.GetSSOProvider
+   * @generated from rpc nokku.v1.SSOService.ListSSOProviders
    */
-  getSSOProvider: {
+  listSSOProviders: {
     methodKind: "unary";
-    input: typeof GetSSOProviderRequestSchema;
-    output: typeof GetSSOProviderResponseSchema;
+    input: typeof ListSSOProvidersRequestSchema;
+    output: typeof ListSSOProvidersResponseSchema;
   },
   /**
-   * @generated from rpc nokku.v1.SSOService.UpdateSSOProvider
+   * Creates or replaces the provider with that id.
+   *
+   * @generated from rpc nokku.v1.SSOService.PutSSOProvider
    */
-  updateSSOProvider: {
+  putSSOProvider: {
     methodKind: "unary";
-    input: typeof UpdateSSOProviderRequestSchema;
-    output: typeof UpdateSSOProviderResponseSchema;
+    input: typeof PutSSOProviderRequestSchema;
+    output: typeof PutSSOProviderResponseSchema;
+  },
+  /**
+   * Also unlinks every identity the provider vouched for.
+   *
+   * @generated from rpc nokku.v1.SSOService.DeleteSSOProvider
+   */
+  deleteSSOProvider: {
+    methodKind: "unary";
+    input: typeof DeleteSSOProviderRequestSchema;
+    output: typeof DeleteSSOProviderResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_nokku_v1_sso, 0);

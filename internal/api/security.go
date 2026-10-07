@@ -24,11 +24,8 @@ func (s *Server) withCSRF(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Webhooks and SSO callbacks come from external servers, their
 		// protection is the single-use flow state.
-		if r.URL.Path == "/saml/acs" ||
-			r.URL.Path == "/oauth/callback" ||
-			r.URL.Path == "/oidc/callback" ||
+		if r.URL.Path == "/oidc/callback" ||
 			strings.HasPrefix(r.URL.Path, "/webhooks/") {
-			slog.Debug("skipping CSRF check", "path", r.URL.Path)
 			h.ServeHTTP(w, r)
 			return
 		}

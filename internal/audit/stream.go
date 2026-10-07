@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/egress"
 	"github.com/nokku-sh/nokku/internal/entitlement"
-	"github.com/nokku-sh/nokku/internal/util"
 )
 
 const (
@@ -51,13 +51,13 @@ type destination struct {
 
 var _ sink = (*webhookSink)(nil)
 
-// newWebhookSink guards against private destinations, see util.NewEgressClient.
+// newWebhookSink guards against private destinations, see egress.NewClient.
 func newWebhookSink(
 	ctx context.Context,
 	conn *db.Connection,
 	entitlements *entitlement.Service,
 ) (*webhookSink, error) {
-	client, err := util.NewEgressClient(streamTimeout)
+	client, err := egress.NewClient(streamTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -214,8 +214,6 @@ func (s *webhookSink) refresh(ctx context.Context) {
 		for _, row := range rows {
 			// A downgraded workspace keeps its setting but stops streaming.
 			if !s.entitlements.Has(ctx, row.ID, entitlement.FeatureAuditStreaming) {
-				slog.Debug("audit webhook destination not streamed, plan lacks the feature",
-					"workspace_id", row.ID)
 				continue
 			}
 			url, err := validWebhookURL(row.WebhookURL)

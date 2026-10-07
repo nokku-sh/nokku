@@ -1,14 +1,12 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"testing"
-
-	"github.com/nokku-sh/nokku/internal/actor"
-	"github.com/nokku-sh/nokku/internal/config"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -16,6 +14,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
@@ -26,26 +25,28 @@ func TestProcedureRoles(t *testing.T) {
 	}{
 		{nokkuv1connect.CertificateServiceListCertificateAuthoritiesProcedure, db.RoleMember},
 		{nokkuv1connect.DaemonServiceCreateSessionProcedure, db.RoleMember},
+		{nokkuv1connect.DaemonServiceRelayProcedure, db.RoleMember},
 
 		{nokkuv1connect.TargetServiceListTargetsProcedure, db.RoleViewer},
-		{nokkuv1connect.WorkspaceServiceListWorkspaceMembersProcedure, db.RoleViewer},
+		{nokkuv1connect.WorkspaceServiceListUsersProcedure, db.RoleViewer},
 		{nokkuv1connect.UtilServiceListAuditLogsProcedure, db.RoleViewer},
+		{nokkuv1connect.RecordingServiceGetRecordingProcedure, db.RoleViewer},
 
 		{nokkuv1connect.TargetServiceDeleteTargetProcedure, db.RoleEditor},
 		{nokkuv1connect.PrincipalServiceRevokeAllAccessProcedure, db.RoleEditor},
 		{nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure, db.RoleEditor},
 
-		{nokkuv1connect.WorkspaceServiceUpdateWorkspaceMemberProcedure, db.RoleAdmin},
+		{nokkuv1connect.WorkspaceServiceUpdateUserRoleProcedure, db.RoleAdmin},
+		{nokkuv1connect.WorkspaceServiceSetUserActiveProcedure, db.RoleAdmin},
+		{nokkuv1connect.WorkspaceServiceDeleteUserProcedure, db.RoleAdmin},
 		{nokkuv1connect.TokenServiceCreateTokenProcedure, db.RoleAdmin},
 		{nokkuv1connect.BillingServiceGetBillingProcedure, db.RoleAdmin},
 
 		{nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure, db.RoleOwner},
+		{nokkuv1connect.WorkspaceServiceTransferOwnershipProcedure, db.RoleOwner},
 		{nokkuv1connect.BillingServiceActivateLicenseProcedure, db.RoleOwner},
-		{nokkuv1connect.SSOServiceUpdateSSOProviderProcedure, db.RoleOwner},
-		{nokkuv1connect.WorkspaceDomainServiceCreateWorkspaceDomainProcedure, db.RoleOwner},
-		{nokkuv1connect.WorkspaceDomainServiceVerifyWorkspaceDomainProcedure, db.RoleOwner},
-		{nokkuv1connect.WorkspaceDomainServiceDeleteWorkspaceDomainProcedure, db.RoleOwner},
-		{nokkuv1connect.WorkspaceDomainServiceRegenerateWorkspaceDomainTokenProcedure, db.RoleOwner},
+		{nokkuv1connect.SSOServicePutSSOProviderProcedure, db.RoleOwner},
+		{nokkuv1connect.SSOServiceDeleteSSOProviderProcedure, db.RoleOwner},
 		{nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure, db.RoleOwner},
 		{nokkuv1connect.SCIMServiceDeleteSCIMTokenProcedure, db.RoleOwner},
 	}
@@ -111,28 +112,20 @@ func TestEveryProcedureIsClassified(t *testing.T) {
 		if classes != 1 {
 			t.Errorf("%s is in %d authorization classes, want exactly 1", procedure, classes)
 		}
-		if access.GetPersonal() && access.GetRole() == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED {
-			t.Errorf("%s is personal without a role", procedure)
-		}
 	}
 }
 
-// The workspace a role is checked against comes from the request, so a
-// role-gated RPC without the field is denied for everyone.
-func TestRoleGatedRequestsCarryTheWorkspace(t *testing.T) {
+// No request names a workspace. The host does, before authentication.
+func TestRequestsCarryNoWorkspace(t *testing.T) {
 	for _, procedure := range allProcedures(t) {
-		access := procedureAccess[procedure]
-		if access.GetRole() == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED || access.GetPersonal() {
-			continue
-		}
 		name := protoreflect.FullName(strings.ReplaceAll(strings.TrimPrefix(procedure, "/"), "/", "."))
 		desc, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
 		if err != nil {
 			t.Errorf("%s: %v", procedure, err)
 			continue
 		}
-		if desc.(protoreflect.MethodDescriptor).Input().Fields().ByName("workspace_id") == nil {
-			t.Errorf("%s needs a role but its request has no workspace_id", procedure)
+		if desc.(protoreflect.MethodDescriptor).Input().Fields().ByName("workspace_id") != nil {
+			t.Errorf("%s names a workspace in its request", procedure)
 		}
 	}
 }
@@ -150,12 +143,13 @@ func TestAuthorizeDaemon(t *testing.T) {
 
 	for _, procedure := range allProcedures(t) {
 		switch {
+		case procedureAccess[procedure].GetPublic():
 		case !procedureAccess[procedure].GetDaemon():
-			if _, err := a.authorize(ctx, procedure); !errors.Is(err, db.ErrPermissionDenied) {
+			if err := a.authorize(ctx, procedure); !errors.Is(err, db.ErrPermissionDenied) {
 				t.Errorf("daemon allowed %s, want permission denied", procedure)
 			}
 		case slices.Contains(anyState, procedure):
-			if _, err := a.authorize(ctx, procedure); err != nil {
+			if err := a.authorize(ctx, procedure); err != nil {
 				t.Errorf("daemon denied %s: %v", procedure, err)
 			}
 		}
@@ -178,51 +172,50 @@ func TestDaemonProceduresLiveInControlService(t *testing.T) {
 
 func TestAuthorizeUserOnDaemonProcedures(t *testing.T) {
 	a := &authorizationInterceptor{}
-	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser})
+	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser, Role: "owner"})
 	for procedure, access := range procedureAccess {
 		if !daemonOnly(access) {
 			continue
 		}
-		if _, err := a.authorize(ctx, procedure); !errors.Is(err, db.ErrPermissionDenied) {
+		if err := a.authorize(ctx, procedure); !errors.Is(err, db.ErrPermissionDenied) {
 			t.Errorf("user allowed %s, want permission denied", procedure)
 		}
 	}
 }
 
-func TestAuthorizeUserStreamWithoutWorkspace(t *testing.T) {
+// The role comes with the principal, so no lookup happens here.
+func TestAuthorizeRoleFromPrincipal(t *testing.T) {
 	a := &authorizationInterceptor{}
-	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser})
-	for _, procedure := range []string{
-		nokkuv1connect.RecordingServiceGetRecordingProcedure,
-		nokkuv1connect.DaemonServiceRelayProcedure,
-	} {
-		if _, err := a.authorize(ctx, procedure); err != nil {
-			t.Errorf("user denied %s before the handler pins a workspace: %v", procedure, err)
+	as := func(role string) context.Context {
+		return actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser, Role: role})
+	}
+	tests := []struct {
+		role      string
+		procedure string
+		allowed   bool
+	}{
+		{"member", nokkuv1connect.DaemonServiceRelayProcedure, true},
+		{"member", nokkuv1connect.RecordingServiceGetRecordingProcedure, false},
+		{"viewer", nokkuv1connect.RecordingServiceGetRecordingProcedure, true},
+		{"viewer", nokkuv1connect.TargetServiceDeleteTargetProcedure, false},
+		{"editor", nokkuv1connect.TargetServiceDeleteTargetProcedure, true},
+		{"admin", nokkuv1connect.SSOServicePutSSOProviderProcedure, false},
+		{"owner", nokkuv1connect.SSOServicePutSSOProviderProcedure, true},
+		{"", nokkuv1connect.TargetServiceListTargetsProcedure, false},
+		{"", nokkuv1connect.AccountServiceGetAccountProcedure, true},
+	}
+	for _, tt := range tests {
+		err := a.authorize(as(tt.role), tt.procedure)
+		if (err == nil) != tt.allowed {
+			t.Errorf("%q on %s: err = %v, want allowed=%v", tt.role, tt.procedure, err, tt.allowed)
 		}
 	}
 }
 
 func TestAuthorizeUnknownProcedure(t *testing.T) {
 	a := &authorizationInterceptor{}
-	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser})
-	if _, err := a.authorize(ctx, "/nokku.v1.UnknownService/Unknown"); !errors.Is(err, db.ErrPermissionDenied) {
+	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser, Role: "owner"})
+	if err := a.authorize(ctx, "/nokku.v1.UnknownService/Unknown"); !errors.Is(err, db.ErrPermissionDenied) {
 		t.Fatalf("unknown procedure: err = %v, want permission denied", err)
-	}
-}
-
-func TestAuthorizePersonalAuditLog(t *testing.T) {
-	a := &authorizationInterceptor{cfg: &config.Config{}}
-	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser})
-	if _, err := a.authorize(ctx, nokkuv1connect.UtilServiceListAuditLogsProcedure); err != nil {
-		t.Fatalf("personal audit log without a workspace: err = %v, want allowed", err)
-	}
-	if _, err := a.authorize(
-		ctx,
-		nokkuv1connect.TargetServiceListTargetsProcedure,
-	); !errors.Is(
-		err,
-		db.ErrWorkspaceNotPinned,
-	) {
-		t.Fatalf("workspace procedure without a workspace: err = %v, want not pinned", err)
 	}
 }

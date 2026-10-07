@@ -30,8 +30,9 @@ func (s *recordingService) ListRecordings(
 	ctx context.Context,
 	req *nokkuv1.ListRecordingsRequest,
 ) (*nokkuv1.ListRecordingsResponse, error) {
+	ws := actor.WorkspaceIDFromContext(ctx)
 	params := &db.ListRecordingsParams{
-		WorkspaceID: req.GetWorkspaceId(),
+		WorkspaceID: ws,
 		DaemonID:    req.DaemonId,
 		Username:    req.Username,
 		Limit:       req.Limit,
@@ -45,7 +46,7 @@ func (s *recordingService) ListRecordings(
 		if err != nil {
 			return err
 		}
-		totalBytes, err = q.SumRecordingBytes(ctx, req.GetWorkspaceId())
+		totalBytes, err = q.SumRecordingBytes(ctx, ws)
 		return err
 	}); err != nil {
 		return nil, err
@@ -71,13 +72,6 @@ func (s *recordingService) GetRecording(
 	req *nokkuv1.GetRecordingRequest,
 	stream *connect.ServerStream[nokkuv1.GetRecordingResponse],
 ) error {
-	// Streams get no workspace from the interceptors, so pin and check here.
-	ctx = actor.AnnotateTenant(ctx, req.GetWorkspaceId())
-	ctx, err := actorHasRole(ctx, s.cfg.Conn, db.RoleViewer)
-	if err != nil {
-		return err
-	}
-
 	var rec *db.Recording
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		rec, err = q.GetRecording(ctx, req.GetRecordingId())
@@ -141,7 +135,7 @@ func (s *recordingService) DeleteRecording(
 	// Best effort, a stray object goes with the workspace purge.
 	if err := s.cfg.Storage.Delete(
 		ctx,
-		storage.RecordingPath(req.GetWorkspaceId(), req.GetRecordingId()),
+		storage.RecordingPath(actor.WorkspaceIDFromContext(ctx), req.GetRecordingId()),
 	); err != nil {
 		slog.Warn("delete recording object", "recording_id", req.GetRecordingId(), "error", err)
 	}

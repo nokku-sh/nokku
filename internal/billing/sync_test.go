@@ -11,6 +11,8 @@ import (
 	"time"
 	"uuid"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	stripe "github.com/stripe/stripe-go/v86"
@@ -81,15 +83,15 @@ func newSync(t *testing.T) (*Stripe, *fakeStripe) {
 
 	fake := &fakeStripe{subs: map[string]remoteSub{}}
 	require.NoError(t, conn.WithTx(t.Context(), func(q *db.Queries) error {
-		u, err := q.CreateUser(t.Context(), &db.CreateUserParams{
-			Email: uuid.New().String() + "@billing.test", Name: "owner",
+		ws, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
+			Slug: "b" + strings.ReplaceAll(uuid.New().String(), "-", ""), Name: "billing",
+			Settings: &nokkuv1.WorkspaceSettings{},
 		})
 		if err != nil {
 			return err
 		}
-		ws, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{Name: "billing", CreatedBy: u.ID})
 		fake.workspaceID = ws.ID
-		return err
+		return q.InitSubscription(t.Context(), ws.ID)
 	}))
 
 	srv := httptest.NewServer(fake)

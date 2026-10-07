@@ -3,8 +3,6 @@ package api
 import (
 	"strings"
 	"testing"
-	"time"
-	"uuid"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
@@ -13,41 +11,35 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/internal/iam"
+	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// Whoever signs up with someone else's address must not get a working
-// account when the owner of the inbox clicks the link.
-func TestVerifyEmailNeedsSignupBrowser(t *testing.T) {
+// A sign-in link works once, on the host it was made for, and sets the
+// session cookie. The test server sends no mail, so the link comes from iam.
+func TestMagicLinkSignIn(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	email := uuid.New().String() + "@api.test"
+	u := seedUser(t, cfg, seedWorkspace(t, cfg), db.RoleViewer)
+	auth := nokkuv1connect.NewAuthServiceClient(srv.Client(), srv.URL)
 
+	options, err := auth.GetLoginOptions(t.Context(), &nokkuv1.GetLoginOptionsRequest{})
+	require.NoError(t, err)
+	assert.False(t, options.GetMagicLink(), "no mail, no links on the login page")
+	assert.True(t, options.GetPasskey())
+	assert.Equal(t, cfg.Tenant.Single().Name, options.GetWorkspaceName())
+
+	_, err = auth.RequestMagicLink(t.Context(), &nokkuv1.RequestMagicLinkRequest{Email: &u.Email})
+	require.NoError(t, err, "a request without mail still answers OK")
+
+	link, err := cfg.IAM.IssueBootstrapLink(wsCtx(t, cfg), u)
+	require.NoError(t, err)
+	_, token, _ := strings.Cut(link, "token=")
 	ctx, info := connect.NewClientContext(t.Context())
-	_, err := nokkuv1connect.NewAuthServiceClient(srv.Client(), srv.URL).
-		Register(ctx, &nokkuv1.RegisterRequest{Email: &email, Password: new(accountPassword)})
+	got, err := auth.ConsumeMagicLink(ctx, &nokkuv1.ConsumeMagicLinkRequest{Token: &token})
 	require.NoError(t, err)
-	signupCookie, _, _ := strings.Cut(info.ResponseHeader().Get("Set-Cookie"), ";")
-	require.NotEmpty(t, signupCookie, "registering marks the browser")
+	assert.Equal(t, u.ID, got.GetUser().GetId())
+	assert.Equal(t, "viewer", got.GetUser().GetRole())
+	assert.Contains(t, info.ResponseHeader().Get("Set-Cookie"), "nokku_session=", "the sign-in sets a session")
 
-	u, err := cfg.IAM.GetUserByEmail(t.Context(), email)
-	require.NoError(t, err)
-	token, err := cfg.IAM.IssueToken(t.Context(), u.ID, iam.TokenVerifyEmail, time.Hour)
-	require.NoError(t, err)
-	verify := func(cookie string) error {
-		_, err := nokkuv1connect.NewAuthServiceClient(srv.Client(), srv.URL, header("Cookie", cookie)).
-			VerifyEmail(t.Context(), &nokkuv1.VerifyEmailRequest{Token: &token})
-		return err
-	}
-	verified := func() bool {
-		u, err := cfg.IAM.GetUserByEmail(t.Context(), email)
-		require.NoError(t, err)
-		return u.EmailVerified
-	}
-
-	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(verify("")),
-		"the link must be refused in a browser that did not sign up")
-	assert.False(t, verified(), "a refused link verifies nothing")
-
-	require.NoError(t, verify(signupCookie), "the refused attempt must leave the link usable")
-	assert.True(t, verified())
+	_, err = auth.ConsumeMagicLink(t.Context(), &nokkuv1.ConsumeMagicLinkRequest{Token: &token})
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "a spent link: %v", err)
 }

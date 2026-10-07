@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/urfave/cli/v3"
@@ -22,9 +23,10 @@ import (
 	"github.com/nokku-sh/nokku/internal/entitlement"
 	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/pki"
+	"github.com/nokku-sh/nokku/internal/realip"
 	"github.com/nokku-sh/nokku/internal/recording"
 	"github.com/nokku-sh/nokku/internal/storage"
-	"github.com/nokku-sh/nokku/internal/util"
+	"github.com/nokku-sh/nokku/internal/tenant"
 )
 
 type EnvConfig struct {
@@ -48,6 +50,11 @@ type Config struct {
 	Record       *recording.Service
 	Billing      *billing.Service
 	Entitlements *entitlement.Service
+	Tenant       *tenant.Resolver
+
+	// BootstrapLink signs the self-hosted owner in while they have no passkey.
+	// The server shows it once it listens, so it is the last thing in the log.
+	BootstrapLink string
 }
 
 func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
@@ -63,7 +70,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		cfg.Debug = cmd.Bool("debug")
 	}
 
-	if err := util.SetTrustedProxies(cfg.TrustedProxies); err != nil {
+	if err := realip.SetTrustedProxies(cfg.TrustedProxies); err != nil {
 		return nil, err
 	}
 
@@ -117,6 +124,12 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if mode == entitlement.ModeSelfHosted && enc.UsesKMS() && cfg.Entitlements.License() == nil {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
+	// The resolver runs before every request. Self-host makes its one
+	// workspace here, the hosted service reads it off the subdomain.
+	cfg.Tenant, err = tenant.New(ctx, cfg.Conn, cfg.FullURL(), mode == entitlement.ModeSaaS)
+	if err != nil {
+		return nil, err
+	}
 	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Entitlements)
 	if err != nil {
 		return nil, err
@@ -130,16 +143,21 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 	cfg.IAM, err = iam.New(ctx, iam.Deps{
-		Conn:             cfg.Conn,
-		BaseURL:          cfg.FullURL(),
-		Events:           cfg.Audit,
-		Secret:           nonceKey,
-		PasskeyRPOrigins: passkeyOrigins(&cfg),
-		CanJoin:          cfg.Entitlements.CanInvite,
-		StrictEmail:      mode == entitlement.ModeSaaS,
+		Conn:        cfg.Conn,
+		Events:      cfg.Audit,
+		Secret:      nonceKey,
+		Secure:      strings.HasPrefix(cfg.FullURL(), "https://"),
+		Debug:       cfg.Debug,
+		CanJoin:     cfg.Entitlements.CanInvite,
+		StrictEmail: mode == entitlement.ModeSaaS,
 	})
 	if err != nil {
 		return nil, err
+	}
+	if mode == entitlement.ModeSelfHosted {
+		if cfg.BootstrapLink, err = cfg.IAM.Bootstrap(ctx, cfg.Tenant.Single()); err != nil {
+			return nil, err
+		}
 	}
 
 	go pki.RotateExpiring(ctx, cfg.Conn)
@@ -158,12 +176,4 @@ func (c *Config) FullURL() string {
 		return "http://localhost:" + c.Port
 	}
 	return cmp.Or(u.Scheme, "http") + "://" + cmp.Or(u.Host, "localhost")
-}
-
-func passkeyOrigins(c *Config) []string {
-	origins := []string{c.FullURL()}
-	if c.Debug {
-		origins = append(origins, "http://localhost:5173")
-	}
-	return origins
 }

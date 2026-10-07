@@ -4,7 +4,8 @@
 	import { roles } from '#lib/api/roles.svelte.js';
 	import { target } from '#lib/api/targets.svelte.js';
 	import { team } from '#lib/api/team.svelte.js';
-	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
+	import { users, util, workspace } from '#lib/api/workspaces.svelte.js';
 	import DangerZone from '#lib/components/sheets/DangerZone.svelte';
 	import DetailList from '#lib/components/sheets/DetailList.svelte';
 	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
@@ -25,24 +26,24 @@
 	import { Bot, CircleUser, Server, Users } from '@lucide/svelte';
 
 	const ws = workspace.get();
+	const me = user.self();
+	const info = util.instanceInfo();
 	const draft = useDraft(WorkspaceSchema, () => ws.data);
 	const model = $derived(draft.current);
-	const canEdit = $derived(atLeast(ws.data?.role, 'admin'));
-	const isOwner = $derived(ws.data?.role === 'owner');
+	const canEdit = $derived(atLeast(me.data?.role, 'admin'));
+	const isOwner = $derived(me.data?.role === 'owner');
+	// A hosted workspace can go, a self-hosted one is the whole server.
+	const deletable = $derived(isOwner && info.data?.mode === 'saas');
 
-	const owner = workspace.getMember(() => ws.data?.createdBy);
+	const ownerQuery = users.list(() => ({ role: 'owner', limit: 1 }));
+	const owner = $derived(ownerQuery.data?.users[0]);
 	const roleList = roles.list();
-	const myRole = $derived(roleList.data?.find((r) => r.name === ws.data?.role));
-	const MyRoleIcon = $derived(roleIcon(ws.data?.role ?? 'member'));
+	const myRole = $derived(roleList.data?.find((r) => r.name === me.data?.role));
+	const MyRoleIcon = $derived(roleIcon(me.data?.role ?? 'member'));
 
 	const one = () => ({ limit: 1 });
 	const counts = [
-		{
-			label: 'Members',
-			icon: CircleUser,
-			href: '/access/members',
-			query: workspace.listMembers(one)
-		},
+		{ label: 'Users', icon: CircleUser, href: '/access/users', query: users.list(one) },
 		{ label: 'Teams', icon: Users, href: '/access/teams', query: team.list(one) },
 		{ label: 'Targets', icon: Server, href: '/infrastructure/targets', query: target.list(one) },
 		{ label: 'Daemons', icon: Bot, href: '/infrastructure/daemons', query: daemon.list(one) }
@@ -53,11 +54,7 @@
 
 	// Settings are left out on purpose, the backend keeps what isn't sent.
 	const autoSave = useAutoSave(() =>
-		update.mutateAsync({
-			workspaceId: model?.id,
-			name: model?.name,
-			description: model?.description
-		})
+		update.mutateAsync({ name: model?.name, description: model?.description })
 	);
 	const save = () => canEdit && autoSave.save();
 </script>
@@ -127,11 +124,11 @@
 			<Card.Content class="flex flex-col gap-2">
 				<Item.Root variant="muted" size="sm">
 					{#snippet child({ props })}
-						<a href={`/access/members?id=${ws.data?.createdBy}`} {...props}>
-							<Item.Media><UserAvatar user={owner.data} class="size-8" /></Item.Media>
+						<a href={`/access/users?id=${owner?.id ?? ''}`} {...props}>
+							<Item.Media><UserAvatar user={owner} class="size-8" /></Item.Media>
 							<Item.Content>
-								<Item.Title>{owner.data?.name ?? '…'}</Item.Title>
-								<Item.Description>{owner.data?.email}</Item.Description>
+								<Item.Title>{owner?.name || owner?.email || '…'}</Item.Title>
+								<Item.Description>{owner?.email}</Item.Description>
 							</Item.Content>
 							<Item.Actions><Badge variant="secondary">Owner</Badge></Item.Actions>
 						</a>
@@ -140,7 +137,7 @@
 				<Item.Root variant="muted" size="sm">
 					<Item.Media variant="icon"><MyRoleIcon /></Item.Media>
 					<Item.Content>
-						<Item.Title>You are {roleLabel(ws.data.role).toLowerCase()}</Item.Title>
+						<Item.Title>You are {roleLabel(me.data?.role ?? 'member').toLowerCase()}</Item.Title>
 						<Item.Description>{myRole?.description}</Item.Description>
 					</Item.Content>
 				</Item.Root>
@@ -156,6 +153,7 @@
 				<DetailList
 					items={[
 						{ label: 'Workspace ID', value: ws.data.id, mono: true, copy: true, wide: true },
+						{ label: 'Address', value: location.origin, mono: true, copy: true, wide: true },
 						{ label: 'Created', value: formatTs(ws.data.createdAt) },
 						{ label: 'Updated', value: formatTs(ws.data.updatedAt, 'relative') }
 					]}
@@ -164,13 +162,13 @@
 		</Card.Root>
 	</div>
 
-	{#if isOwner}
+	{#if deletable}
 		<DangerZone
 			actions={[
 				{
 					title: 'Delete workspace',
 					description:
-						'Removes every member, team, target and certificate. Active subscriptions are canceled.',
+						'Removes every user, team, target and certificate. Active subscriptions are canceled.',
 					label: 'Delete',
 					onClick: () =>
 						confirm({
@@ -178,7 +176,7 @@
 							description:
 								'This permanently deletes the workspace and all its data. Active subscriptions for it are canceled immediately. This cannot be undone.',
 							typeToConfirm: ws.data?.name,
-							onConfirm: () => remove.mutateAsync({ workspaceId: ws.data?.id })
+							onConfirm: () => remove.mutateAsync({})
 						})
 				}
 			]}

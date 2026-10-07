@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/service_account.proto.
  */
 export const file_nokku_v1_service_account: GenFile = /*@__PURE__*/
-  fileDesc("Ch5ub2trdS92MS9zZXJ2aWNlX2FjY291bnQucHJvdG8SCG5va2t1LnYxIrgCCg5TZXJ2aWNlQWNjb3VudBIKCgJpZBgBIAEoCRIUCgx3b3Jrc3BhY2VfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRITCgtkZXNjcmlwdGlvbhgEIAEoCRIRCglyb2xlX25hbWUYBSABKAkSDAoEdGFncxgGIAMoCRIuCgpleHBpcmVzX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxsYXN0X3VzZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmNyZWF0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIlAKGEdldFNlcnZpY2VBY2NvdW50UmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABASJOChlHZXRTZXJ2aWNlQWNjb3VudFJlc3BvbnNlEjEKD3NlcnZpY2VfYWNjb3VudBgBIAEoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50Iv8BChtDcmVhdGVTZXJ2aWNlQWNjb3VudFJlcXVlc3QSHgoMd29ya3NwYWNlX2lkGAEgASgJQgi6SAVyA7ABARI1CgRuYW1lGAIgASgJQie6SCRyIhABGIACMhteW2EtekEtWjAtOV1bYS16QS1aMC05LV9dKiQSHQoLZGVzY3JpcHRpb24YAyABKAlCCLpIBXIDGOgHEiwKCXJvbGVfbmFtZRgEIAEoCUIZukgWchQyEl4odmlld2VyfGVkaXRvcik/JBIMCgR0YWdzGAUgAygJEi4KCmV4cGlyZXNfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wImAKHENyZWF0ZVNlcnZpY2VBY2NvdW50UmVzcG9uc2USMQoPc2VydmljZV9hY2NvdW50GAEgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnQSDQoFdG9rZW4YAiABKAki5QEKG1VwZGF0ZVNlcnZpY2VBY2NvdW50UmVxdWVzdBIeCgx3b3Jrc3BhY2VfaWQYASABKAlCCLpIBXIDsAEBEhQKAmlkGAIgASgJQgi6SAVyA7ABARI1CgRuYW1lGAMgASgJQie6SCRyIhABGIACMhteW2EtekEtWjAtOV1bYS16QS1aMC05LV9dKiQSHQoLZGVzY3JpcHRpb24YBCABKAlCCLpIBXIDGOgHEiwKCXJvbGVfbmFtZRgFIAEoCUIZukgWchQyEl4odmlld2VyfGVkaXRvcik/JBIMCgR0YWdzGAYgAygJIlEKHFVwZGF0ZVNlcnZpY2VBY2NvdW50UmVzcG9uc2USMQoPc2VydmljZV9hY2NvdW50GAEgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnQiUwobRGVsZXRlU2VydmljZUFjY291bnRSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBIh4KHERlbGV0ZVNlcnZpY2VBY2NvdW50UmVzcG9uc2UinwEKGkxpc3RTZXJ2aWNlQWNjb3VudHNSZXF1ZXN0Eh4KDHdvcmtzcGFjZV9pZBgBIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAiABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAyABKAVCB7pIBBoCKAASDQoFcXVlcnkYBCABKAkSEQoJcm9sZV9uYW1lGAUgASgJEgwKBHRhZ3MYBiADKAkiYAobTGlzdFNlcnZpY2VBY2NvdW50c1Jlc3BvbnNlEjIKEHNlcnZpY2VfYWNjb3VudHMYASADKAsyGC5ub2trdS52MS5TZXJ2aWNlQWNjb3VudBINCgV0b3RhbBgCIAEoBTK8BAoVU2VydmljZUFjY291bnRTZXJ2aWNlEmcKEUdldFNlcnZpY2VBY2NvdW50EiIubm9ra3UudjEuR2V0U2VydmljZUFjY291bnRSZXF1ZXN0GiMubm9ra3UudjEuR2V0U2VydmljZUFjY291bnRSZXNwb25zZSIJkAIBwvMYAhgCEm0KE0xpc3RTZXJ2aWNlQWNjb3VudHMSJC5ub2trdS52MS5MaXN0U2VydmljZUFjY291bnRzUmVxdWVzdBolLm5va2t1LnYxLkxpc3RTZXJ2aWNlQWNjb3VudHNSZXNwb25zZSIJkAIBwvMYAhgCEm0KFENyZWF0ZVNlcnZpY2VBY2NvdW50EiUubm9ra3UudjEuQ3JlYXRlU2VydmljZUFjY291bnRSZXF1ZXN0GiYubm9ra3UudjEuQ3JlYXRlU2VydmljZUFjY291bnRSZXNwb25zZSIGwvMYAhgDEm0KFFVwZGF0ZVNlcnZpY2VBY2NvdW50EiUubm9ra3UudjEuVXBkYXRlU2VydmljZUFjY291bnRSZXF1ZXN0GiYubm9ra3UudjEuVXBkYXRlU2VydmljZUFjY291bnRSZXNwb25zZSIGwvMYAhgDEm0KFERlbGV0ZVNlcnZpY2VBY2NvdW50EiUubm9ra3UudjEuRGVsZXRlU2VydmljZUFjY291bnRSZXF1ZXN0GiYubm9ra3UudjEuRGVsZXRlU2VydmljZUFjY291bnRSZXNwb25zZSIGwvMYAhgDYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Ch5ub2trdS92MS9zZXJ2aWNlX2FjY291bnQucHJvdG8SCG5va2t1LnYxIqICCg5TZXJ2aWNlQWNjb3VudBIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEhEKCXJvbGVfbmFtZRgEIAEoCRIMCgR0YWdzGAUgAygJEi4KCmV4cGlyZXNfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3RfdXNlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKY3JlYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiMAoYR2V0U2VydmljZUFjY291bnRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASJOChlHZXRTZXJ2aWNlQWNjb3VudFJlc3BvbnNlEjEKD3NlcnZpY2VfYWNjb3VudBgBIAEoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50It8BChtDcmVhdGVTZXJ2aWNlQWNjb3VudFJlcXVlc3QSNQoEbmFtZRgBIAEoCUInukgkciIQARiAAjIbXlthLXpBLVowLTldW2EtekEtWjAtOS1fXSokEh0KC2Rlc2NyaXB0aW9uGAIgASgJQgi6SAVyAxjoBxIsCglyb2xlX25hbWUYAyABKAlCGbpIFnIUMhJeKHZpZXdlcnxlZGl0b3IpPyQSDAoEdGFncxgEIAMoCRIuCgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJgChxDcmVhdGVTZXJ2aWNlQWNjb3VudFJlc3BvbnNlEjEKD3NlcnZpY2VfYWNjb3VudBgBIAEoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50Eg0KBXRva2VuGAIgASgJIsUBChtVcGRhdGVTZXJ2aWNlQWNjb3VudFJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBEjUKBG5hbWUYAiABKAlCJ7pIJHIiEAEYgAIyG15bYS16QS1aMC05XVthLXpBLVowLTktX10qJBIdCgtkZXNjcmlwdGlvbhgDIAEoCUIIukgFcgMY6AcSLAoJcm9sZV9uYW1lGAQgASgJQhm6SBZyFDISXih2aWV3ZXJ8ZWRpdG9yKT8kEgwKBHRhZ3MYBSADKAkiUQocVXBkYXRlU2VydmljZUFjY291bnRSZXNwb25zZRIxCg9zZXJ2aWNlX2FjY291bnQYASABKAsyGC5ub2trdS52MS5TZXJ2aWNlQWNjb3VudCIzChtEZWxldGVTZXJ2aWNlQWNjb3VudFJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIh4KHERlbGV0ZVNlcnZpY2VBY2NvdW50UmVzcG9uc2UifwoaTGlzdFNlcnZpY2VBY2NvdW50c1JlcXVlc3QSGAoFbGltaXQYASABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAiABKAVCB7pIBBoCKAASDQoFcXVlcnkYAyABKAkSEQoJcm9sZV9uYW1lGAQgASgJEgwKBHRhZ3MYBSADKAkiYAobTGlzdFNlcnZpY2VBY2NvdW50c1Jlc3BvbnNlEjIKEHNlcnZpY2VfYWNjb3VudHMYASADKAsyGC5ub2trdS52MS5TZXJ2aWNlQWNjb3VudBINCgV0b3RhbBgCIAEoBTK8BAoVU2VydmljZUFjY291bnRTZXJ2aWNlEmcKEUdldFNlcnZpY2VBY2NvdW50EiIubm9ra3UudjEuR2V0U2VydmljZUFjY291bnRSZXF1ZXN0GiMubm9ra3UudjEuR2V0U2VydmljZUFjY291bnRSZXNwb25zZSIJkAIBwvMYAhgCEm0KE0xpc3RTZXJ2aWNlQWNjb3VudHMSJC5ub2trdS52MS5MaXN0U2VydmljZUFjY291bnRzUmVxdWVzdBolLm5va2t1LnYxLkxpc3RTZXJ2aWNlQWNjb3VudHNSZXNwb25zZSIJkAIBwvMYAhgCEm0KFENyZWF0ZVNlcnZpY2VBY2NvdW50EiUubm9ra3UudjEuQ3JlYXRlU2VydmljZUFjY291bnRSZXF1ZXN0GiYubm9ra3UudjEuQ3JlYXRlU2VydmljZUFjY291bnRSZXNwb25zZSIGwvMYAhgDEm0KFFVwZGF0ZVNlcnZpY2VBY2NvdW50EiUubm9ra3UudjEuVXBkYXRlU2VydmljZUFjY291bnRSZXF1ZXN0GiYubm9ra3UudjEuVXBkYXRlU2VydmljZUFjY291bnRSZXNwb25zZSIGwvMYAhgDEm0KFERlbGV0ZVNlcnZpY2VBY2NvdW50EiUubm9ra3UudjEuRGVsZXRlU2VydmljZUFjY291bnRSZXF1ZXN0GiYubm9ra3UudjEuRGVsZXRlU2VydmljZUFjY291bnRSZXNwb25zZSIGwvMYAhgDYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.ServiceAccount
@@ -26,47 +26,42 @@ export type ServiceAccount = Message<"nokku.v1.ServiceAccount"> & {
   id: string;
 
   /**
-   * @generated from field: string workspace_id = 2;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string name = 3;
+   * @generated from field: string name = 2;
    */
   name: string;
 
   /**
-   * @generated from field: string description = 4;
+   * @generated from field: string description = 3;
    */
   description: string;
 
   /**
-   * @generated from field: string role_name = 5;
+   * @generated from field: string role_name = 4;
    */
   roleName: string;
 
   /**
-   * @generated from field: repeated string tags = 6;
+   * @generated from field: repeated string tags = 5;
    */
   tags: string[];
 
   /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 7;
+   * @generated from field: google.protobuf.Timestamp expires_at = 6;
    */
   expiresAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp last_used_at = 8;
+   * @generated from field: google.protobuf.Timestamp last_used_at = 7;
    */
   lastUsedAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp created_at = 9;
+   * @generated from field: google.protobuf.Timestamp created_at = 8;
    */
   createdAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 10;
+   * @generated from field: google.protobuf.Timestamp updated_at = 9;
    */
   updatedAt?: Timestamp | undefined;
 };
@@ -83,12 +78,7 @@ export const ServiceAccountSchema: GenMessage<ServiceAccount> = /*@__PURE__*/
  */
 export type GetServiceAccountRequest = Message<"nokku.v1.GetServiceAccountRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string id = 2;
+   * @generated from field: string id = 1;
    */
   id: string;
 };
@@ -122,32 +112,27 @@ export const GetServiceAccountResponseSchema: GenMessage<GetServiceAccountRespon
  */
 export type CreateServiceAccountRequest = Message<"nokku.v1.CreateServiceAccountRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string name = 2;
+   * @generated from field: string name = 1;
    */
   name: string;
 
   /**
-   * @generated from field: string description = 3;
+   * @generated from field: string description = 2;
    */
   description: string;
 
   /**
-   * @generated from field: string role_name = 4;
+   * @generated from field: string role_name = 3;
    */
   roleName: string;
 
   /**
-   * @generated from field: repeated string tags = 5;
+   * @generated from field: repeated string tags = 4;
    */
   tags: string[];
 
   /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 6;
+   * @generated from field: google.protobuf.Timestamp expires_at = 5;
    */
   expiresAt?: Timestamp | undefined;
 };
@@ -186,34 +171,29 @@ export const CreateServiceAccountResponseSchema: GenMessage<CreateServiceAccount
  */
 export type UpdateServiceAccountRequest = Message<"nokku.v1.UpdateServiceAccountRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string id = 2;
+   * @generated from field: string id = 1;
    */
   id: string;
 
   /**
-   * @generated from field: string name = 3;
+   * @generated from field: string name = 2;
    */
   name: string;
 
   /**
-   * @generated from field: string description = 4;
+   * @generated from field: string description = 3;
    */
   description: string;
 
   /**
-   * @generated from field: string role_name = 5;
+   * @generated from field: string role_name = 4;
    */
   roleName: string;
 
   /**
    * Tags are replaced as sent. Leaving them out clears them.
    *
-   * @generated from field: repeated string tags = 6;
+   * @generated from field: repeated string tags = 5;
    */
   tags: string[];
 };
@@ -247,12 +227,7 @@ export const UpdateServiceAccountResponseSchema: GenMessage<UpdateServiceAccount
  */
 export type DeleteServiceAccountRequest = Message<"nokku.v1.DeleteServiceAccountRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string id = 2;
+   * @generated from field: string id = 1;
    */
   id: string;
 };
@@ -282,32 +257,27 @@ export const DeleteServiceAccountResponseSchema: GenMessage<DeleteServiceAccount
  */
 export type ListServiceAccountsRequest = Message<"nokku.v1.ListServiceAccountsRequest"> & {
   /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: int32 limit = 2;
+   * @generated from field: int32 limit = 1;
    */
   limit: number;
 
   /**
-   * @generated from field: int32 offset = 3;
+   * @generated from field: int32 offset = 2;
    */
   offset: number;
 
   /**
-   * @generated from field: string query = 4;
+   * @generated from field: string query = 3;
    */
   query: string;
 
   /**
-   * @generated from field: string role_name = 5;
+   * @generated from field: string role_name = 4;
    */
   roleName: string;
 
   /**
-   * @generated from field: repeated string tags = 6;
+   * @generated from field: repeated string tags = 5;
    */
   tags: string[];
 };

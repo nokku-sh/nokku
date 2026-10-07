@@ -26,20 +26,19 @@ type EnrollInput struct {
 }
 
 type Enrolled struct {
-	WorkspaceID string
-	DaemonID    string
-	Name        string
-	TargetID    string
-	Status      nokkuv1.DaemonStatus
-	Config      *nokkuv1.DaemonConfig
+	DaemonID string
+	Name     string
+	TargetID string
+	Status   nokkuv1.DaemonStatus
+	Config   *nokkuv1.DaemonConfig
 }
 
 const maxNameAttempts = 5
 
-// Enroll runs as the system role since the token is the only authorization.
-// Only a new daemon spends a use. The quota check runs between the two
-// transactions since nesting its own reads would let parallel enrollments
-// exhaust the pool.
+// Enroll runs pinned to the workspace of the host the daemon dialed, so a
+// token of another workspace is never found. Only a new daemon spends a use.
+// The quota check runs between the two transactions since nesting its own
+// reads would let parallel enrollments exhaust the pool.
 func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, error) {
 	parsed, err := crypto.Parse(in.Token)
 	if err != nil || parsed.ID == "" {
@@ -55,7 +54,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		workspace *db.Workspace
 		out       *Enrolled
 	)
-	err = conn.WithTx(ctx, func(q *db.Queries) (err error) {
+	err = conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		token, err = q.GetLiveToken(ctx, &db.GetLiveTokenParams{
 			ID:        parsed.ID,
 			Kind:      nokkuv1.TokenKind_TOKEN_KIND_ENROLL,
@@ -90,7 +89,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 	}
 	config := db.ResolveDaemonConfig(workspace.Settings.GetDefaultDaemonConfig())
 
-	err = conn.WithTx(ctx, func(q *db.Queries) error {
+	err = conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		for range maxNameAttempts {
 			// A racing enrollment of the same key makes the insert a no-op.
 			if out, err = enrolledDaemon(ctx, q, token.WorkspaceID, in.Binding); err != nil || out != nil {
@@ -130,12 +129,11 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 				return err
 			}
 			out = &Enrolled{
-				WorkspaceID: token.WorkspaceID,
-				DaemonID:    created.ID,
-				Name:        created.Name,
-				TargetID:    created.TargetID,
-				Status:      status,
-				Config:      config,
+				DaemonID: created.ID,
+				Name:     created.Name,
+				TargetID: created.TargetID,
+				Status:   status,
+				Config:   config,
 			}
 			return nil
 		}
@@ -164,11 +162,10 @@ func enrolledDaemon(ctx context.Context, q *db.Queries, workspaceID, binding str
 		return nil, err
 	}
 	return &Enrolled{
-		WorkspaceID: workspaceID,
-		DaemonID:    d.ID,
-		Name:        d.Name,
-		TargetID:    target.ID,
-		Status:      d.Status,
-		Config:      db.ResolveDaemonConfig(d.Config),
+		DaemonID: d.ID,
+		Name:     d.Name,
+		TargetID: target.ID,
+		Status:   d.Status,
+		Config:   db.ResolveDaemonConfig(d.Config),
 	}, nil
 }

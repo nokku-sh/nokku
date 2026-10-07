@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
 
 export const load = () => {
-	throw redirect(307, '/access/members');
+	throw redirect(307, '/access/users');
 };

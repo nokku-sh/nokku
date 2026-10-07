@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/invitation.proto.
  */
 export const file_nokku_v1_invitation: GenFile = /*@__PURE__*/
-  fileDesc("Chlub2trdS92MS9pbnZpdGF0aW9uLnByb3RvEghub2trdS52MSIuChRHZXRJbnZpdGF0aW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQASKRAQoVR2V0SW52aXRhdGlvblJlc3BvbnNlEhYKDndvcmtzcGFjZV9uYW1lGAEgASgJEh0KFXdvcmtzcGFjZV9kZXNjcmlwdGlvbhgCIAEoCRIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglyb2xlX25hbWUYBCABKAkiMQoXQWNjZXB0SW52aXRhdGlvblJlcXVlc3QSFgoFdG9rZW4YASABKAlCB7pIBHICEAEiMAoYQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlEhQKDHdvcmtzcGFjZV9pZBgBIAEoCTLTAQoRSW52aXRhdGlvblNlcnZpY2USWwoNR2V0SW52aXRhdGlvbhIeLm5va2t1LnYxLkdldEludml0YXRpb25SZXF1ZXN0Gh8ubm9ra3UudjEuR2V0SW52aXRhdGlvblJlc3BvbnNlIgmQAgHC8xgCEAESYQoQQWNjZXB0SW52aXRhdGlvbhIhLm5va2t1LnYxLkFjY2VwdEludml0YXRpb25SZXF1ZXN0GiIubm9ra3UudjEuQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlIgbC8xgCEAFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Chlub2trdS92MS9pbnZpdGF0aW9uLnByb3RvEghub2trdS52MSIuChRHZXRJbnZpdGF0aW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQASJtChVHZXRJbnZpdGF0aW9uUmVzcG9uc2USFgoOd29ya3NwYWNlX25hbWUYASABKAkSDAoEcm9sZRgCIAEoCRIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJhChdBY2NlcHRJbnZpdGF0aW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQARIWCgRuYW1lGAIgASgJQgi6SAVyAxiAAhIWCgVlbWFpbBgDIAEoCUIHukgEcgJgASIaChhBY2NlcHRJbnZpdGF0aW9uUmVzcG9uc2Uy0wEKEUludml0YXRpb25TZXJ2aWNlElsKDUdldEludml0YXRpb24SHi5ub2trdS52MS5HZXRJbnZpdGF0aW9uUmVxdWVzdBofLm5va2t1LnYxLkdldEludml0YXRpb25SZXNwb25zZSIJkAIBwvMYAggBEmEKEEFjY2VwdEludml0YXRpb24SIS5ub2trdS52MS5BY2NlcHRJbnZpdGF0aW9uUmVxdWVzdBoiLm5va2t1LnYxLkFjY2VwdEludml0YXRpb25SZXNwb25zZSIGwvMYAggBYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.GetInvitationRequest
@@ -43,19 +43,14 @@ export type GetInvitationResponse = Message<"nokku.v1.GetInvitationResponse"> & 
   workspaceName: string;
 
   /**
-   * @generated from field: string workspace_description = 2;
+   * @generated from field: string role = 2;
    */
-  workspaceDescription: string;
+  role: string;
 
   /**
    * @generated from field: google.protobuf.Timestamp expires_at = 3;
    */
   expiresAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: string role_name = 4;
-   */
-  roleName: string;
 };
 
 /**
@@ -73,6 +68,16 @@ export type AcceptInvitationRequest = Message<"nokku.v1.AcceptInvitationRequest"
    * @generated from field: string token = 1;
    */
   token: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string email = 3;
+   */
+  email: string;
 };
 
 /**
@@ -86,10 +91,6 @@ export const AcceptInvitationRequestSchema: GenMessage<AcceptInvitationRequest> 
  * @generated from message nokku.v1.AcceptInvitationResponse
  */
 export type AcceptInvitationResponse = Message<"nokku.v1.AcceptInvitationResponse"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
 };
 
 /**
@@ -100,6 +101,9 @@ export const AcceptInvitationResponseSchema: GenMessage<AcceptInvitationResponse
   messageDesc(file_nokku_v1_invitation, 3);
 
 /**
+ * An invite link is how a person gets an account in a workspace. Both calls
+ * are public, the visitor has no account yet.
+ *
  * @generated from service nokku.v1.InvitationService
  */
 export const InvitationService: GenService<{
@@ -112,6 +116,10 @@ export const InvitationService: GenService<{
     output: typeof GetInvitationResponseSchema;
   },
   /**
+   * Mails a signup link to the address. The account only exists once that
+   * link is used. A passkey signup goes through the passkey endpoints with
+   * the same fields instead. Always answers OK.
+   *
    * @generated from rpc nokku.v1.InvitationService.AcceptInvitation
    */
   acceptInvitation: {

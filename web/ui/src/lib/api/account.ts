@@ -23,23 +23,13 @@ async function guard<T>(p: Promise<T>): Promise<T> {
 export const account = {
 	user: (): Promise<User> => guard(client.getAccount({})).then((r) => r.user as User),
 
-	update: (patch: { displayName?: string; picture?: string; disablePasswordReset?: boolean }) =>
-		guard(
-			client.updateAccount({
-				name: patch.displayName,
-				picture: patch.picture,
-				disablePasswordReset: patch.disablePasswordReset
-			})
-		).then((r) => r.user as User),
+	update: (patch: { name?: string; picture?: string }) =>
+		guard(client.updateAccount({ name: patch.name, picture: patch.picture })).then(
+			(r) => r.user as User
+		),
 
-	changePassword: (currentPassword: string, newPassword: string): Promise<void> =>
-		guard(client.changePassword({ currentPassword, newPassword })).then(() => undefined),
-
-	requestEmailChange: (newEmail: string, currentPassword: string): Promise<void> =>
-		guard(client.requestEmailChange({ newEmail, currentPassword })).then(() => undefined),
-
-	removePassword: (currentPassword: string): Promise<void> =>
-		guard(client.removePassword({ currentPassword })).then(() => undefined),
+	requestEmailChange: (newEmail: string): Promise<void> =>
+		guard(client.requestEmailChange({ newEmail })).then(() => undefined),
 
 	credentials: (): Promise<AccountCredential[]> =>
 		guard(client.listCredentials({})).then((r) => r.credentials),
@@ -49,17 +39,6 @@ export const account = {
 
 	removeCredential: (id: string): Promise<void> =>
 		guard(client.removeCredential({ id })).then(() => undefined),
-
-	removeIdentity: (provider: string): Promise<void> =>
-		guard(client.removeIdentity({ provider })).then(() => undefined),
-
-	backupCodes: (): Promise<AccountCredential[]> =>
-		guard(client.listBackupCodes({})).then((r) => r.codes),
-
-	rotateBackupCodes: (): Promise<string[]> =>
-		guard(client.rotateBackupCodes({})).then((r) => r.codes),
-
-	removeBackupCodes: (): Promise<void> => guard(client.removeBackupCodes({})).then(() => undefined),
 
 	sessions: (): Promise<AccountSession[]> =>
 		guard(client.listAccountSessions({})).then((r) => r.sessions),

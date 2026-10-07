@@ -17,7 +17,6 @@ import (
 var encryptedColumns = []struct{ table, column string }{
 	{"certificate_authorities", "private_key"},
 	{"sso_providers", "config"},
-	{"saml_keypair", "key_enc"},
 	{"recordings", "key"},
 }
 

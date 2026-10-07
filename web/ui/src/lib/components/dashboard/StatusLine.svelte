@@ -81,7 +81,7 @@
 				'sessions',
 				`${data.liveSessions.length} live${recording ? ` · ${recording} recording` : ''}`
 			)}
-			{@render row('members', String(data.members))}
+			{@render row('users', String(data.users))}
 			{#if nextCA}
 				{@render row('ca', `${nextCA.name} rolls over ${formatTs(nextCA.notAfter, 'relative')}`)}
 			{/if}

@@ -25,7 +25,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/recording"
 	"github.com/nokku-sh/nokku/internal/ssh"
-	"github.com/nokku-sh/nokku/internal/util"
 )
 
 const (
@@ -68,8 +67,8 @@ func (s *daemonControlService) EnrollDaemon(
 		Token:    req.GetToken(),
 		Binding:  binding,
 		Metadata: requestMetadata(ci.RequestHeader()),
-		// The workspace is only known once the token verified, so the
-		// resource cap is checked here instead of in the guard.
+		// The token must verify before anything is spent on the cap, so it
+		// is checked here instead of in the guard.
 		CanCreate: func(ctx context.Context, workspaceID string) error {
 			return s.cfg.Entitlements.CheckResources(ctx, workspaceID)
 		},
@@ -80,17 +79,13 @@ func (s *daemonControlService) EnrollDaemon(
 	if err != nil {
 		return nil, err
 	}
-	workspaceID := out.WorkspaceID
-	ctx = actor.AnnotateTenant(ctx, workspaceID)
-
-	token, err := s.cfg.IAM.IssueDaemonSession(ctx, workspaceID, out.DaemonID, binding)
+	token, err := s.cfg.IAM.IssueDaemonSession(ctx, out.DaemonID, binding)
 	if err != nil {
 		return nil, errInternal
 	}
 
 	return &nokkuv1.EnrollDaemonResponse{
 		Id:          &out.DaemonID,
-		WorkspaceId: &workspaceID,
 		TargetId:    &out.TargetID,
 		Status:      &out.Status,
 		Config:      out.Config,
@@ -169,7 +164,7 @@ func (s *daemonControlService) SignHostCertificate(
 	audit.Set(ctx, "serial", strconv.FormatUint(cert.Serial, 10))
 	audit.Set(ctx, "key_id", cert.KeyId)
 	audit.Set(ctx, "principals", cert.ValidPrincipals)
-	audit.Set(ctx, "expires_at", util.Uint64ToUnixTime(cert.ValidBefore))
+	audit.Set(ctx, "expires_at", ssh.TimeFromUnix(cert.ValidBefore))
 	return &nokkuv1.SignHostCertificateResponse{
 		SignedCertificate: new(ssh.MarshalKey(cert)),
 	}, nil
@@ -338,7 +333,10 @@ func (s *daemonControlService) UnenrollDaemon(
 		if _, err := q.DeleteDaemon(ctx, daemonID); err != nil {
 			return err
 		}
-		_, err := q.DeleteSubjectSessions(ctx, daemonID)
+		_, err := q.DeleteSubjectSessions(ctx, &db.DeleteSubjectSessionsParams{
+			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
+			SubjectID:   daemonID,
+		})
 		return err
 	}); err != nil {
 		return nil, err
@@ -354,16 +352,17 @@ func (s *daemonControlService) enrollBinding(ctx context.Context, ci connect.Cal
 		return "", newError(connect.CodeUnimplemented, "DPoP is not configured")
 	}
 
+	ws, _ := actor.WorkspaceFromContext(ctx)
 	binding, err := svc.DPoP.Verify(
 		ctx,
 		ci.RequestHeader().Get("DPoP"),
 		"",
 		http.MethodPost,
-		s.cfg.FullURL()+nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure,
+		ws.BaseURL+nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure,
 	)
 	if err != nil {
 		if errors.Is(err, iam.ErrDPoPNonce) {
-			svc.AdvertiseDPoPNonce(ci.ResponseHeader())
+			svc.AdvertiseDPoPNonce(ctx, ci.ResponseHeader())
 			return "", newError(connect.CodeUnauthenticated, "stale DPoP nonce")
 		}
 		return "", newError(connect.CodeInvalidArgument, "invalid DPoP proof")

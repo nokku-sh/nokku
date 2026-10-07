@@ -37,7 +37,7 @@
 {:else if mutation.isSuccess && cancel}
 	<AuthCard
 		title="Change canceled"
-		description="Your account keeps this email address. If the change had already gone through, it was undone and every session was signed out. Sign in and change your password."
+		description="Your account keeps this email address. If the change had already gone through, it was undone and every session was signed out. Sign in again and check your passkeys."
 		icon={CircleCheck}
 		tone="success"
 	>

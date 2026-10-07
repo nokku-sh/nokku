@@ -76,13 +76,6 @@ func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string,
 			}
 			over -= v.SizeBytes
 			evicted++
-			slog.Info(
-				"evicted recording over storage cap",
-				"recording_id",
-				v.ID,
-				"size",
-				v.SizeBytes,
-			)
 			// Audit it, an eviction removes evidence before its retention is up.
 			if s.events != nil {
 				if err := s.events.Append(ctx, &audit.Event{

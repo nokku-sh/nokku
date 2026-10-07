@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 
 	"github.com/caarlos0/env/v11"
@@ -37,6 +37,28 @@ func main() {
 			return api.New(cfg).Start(ctx)
 		},
 		Commands: []*cli.Command{
+			{
+				Name:  "admin-link",
+				Usage: "Print a sign-in link for the workspace owner",
+				Description: "The way back in when the owner lost every passkey and no mail " +
+					"goes out. The link works for 24 hours and replaces earlier ones. " +
+					"Run it on the server with the same environment the server has.",
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					cfg, err := config.New(ctx, cmd)
+					if err != nil {
+						return fmt.Errorf("failed to load configuration: %w", err)
+					}
+					if cfg.Tenant.SaaS() {
+						return errors.New("admin-link is for a self-hosted server")
+					}
+					owner, link, err := cfg.IAM.AdminLink(ctx, cfg.Tenant.Single())
+					if err != nil {
+						return err
+					}
+					fmt.Printf("Sign in as %s within 24 hours:\n\n  %s\n", owner.Email, link)
+					return nil
+				},
+			},
 			{
 				Name:  "rotate-secrets",
 				Usage: "Move the encryption keys under a new secret or KMS key",
@@ -83,7 +105,7 @@ func main() {
 					if err := enc.Rotate(ctx, cmd.String("new")); err != nil {
 						return fmt.Errorf("failed to rotate: %w", err)
 					}
-					slog.Info("keys rotated, set NOKKU_SECRET or KMS_URI to the new value and start the server")
+					fmt.Println("keys rotated, set NOKKU_SECRET or KMS_URI to the new value and start the server")
 					return nil
 				},
 			},

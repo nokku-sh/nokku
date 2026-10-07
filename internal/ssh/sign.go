@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"time"
 
@@ -14,7 +15,6 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/util"
 )
 
 // maxPrincipals is how many principals OpenSSH reads from one certificate.
@@ -64,7 +64,7 @@ func SignCertificate(
 		Serial:          serial,
 		KeyId:           keyID,
 		ValidPrincipals: principals,
-		ValidAfter:      util.UnixTimeToUint64(time.Now().Add(-time.Minute).Unix()),
+		ValidAfter:      UnixUint64(time.Now().Add(-time.Minute).Unix()),
 	}
 
 	if certType == ssh.HostCert {
@@ -78,7 +78,7 @@ func SignCertificate(
 			return nil, err
 		}
 	}
-	cert.ValidBefore = util.UnixTimeToUint64(time.Now().Add(ttl).Unix())
+	cert.ValidBefore = UnixUint64(time.Now().Add(ttl).Unix())
 
 	if err := cert.SignCert(rand.Reader, signer); err != nil {
 		return nil, fmt.Errorf("failed to sign certificate: %w", err)
@@ -94,11 +94,11 @@ func boundTTL(ttl, defaultTTL, maxTTL time.Duration) time.Duration {
 }
 
 func userPermissions(ca *db.CertificateAuthority) (ssh.Permissions, error) {
-	extensions, err := util.ParseExtensionsMap(ca.UserExtensions)
+	extensions, err := db.ParseExtensionsMap(ca.UserExtensions)
 	if err != nil {
 		return ssh.Permissions{}, fmt.Errorf("failed to parse extensions: %w", err)
 	}
-	criticalOptions, err := util.ParseCriticalOptionsMap(ca.UserCriticalOptions)
+	criticalOptions, err := db.ParseCriticalOptionsMap(ca.UserCriticalOptions)
 	if err != nil {
 		return ssh.Permissions{}, fmt.Errorf("failed to parse critical options: %w", err)
 	}
@@ -160,4 +160,20 @@ func getKeyType(publicKey ssh.PublicKey) (nokkuv1.CertificateKeyType, error) {
 		return nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_UNSPECIFIED,
 			fmt.Errorf("unsupported public key type %q", publicKey.Type())
 	}
+}
+
+// UnixUint64 is a certificate validity bound, never before the epoch.
+func UnixUint64(t int64) uint64 {
+	if t < 0 {
+		return 0
+	}
+	return uint64(t)
+}
+
+// TimeFromUnix reads a certificate validity bound.
+func TimeFromUnix(t uint64) time.Time {
+	if t > math.MaxInt64 {
+		return time.Unix(math.MaxInt64, 0)
+	}
+	return time.Unix(int64(t), 0)
 }

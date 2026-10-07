@@ -22,7 +22,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/pki"
 	"github.com/nokku-sh/nokku/internal/ssh"
-	"github.com/nokku-sh/nokku/internal/util"
 )
 
 type certificateService struct {
@@ -62,17 +61,17 @@ func (s *certificateService) CreateCertificateAuthority(
 		return nil, errInternal
 	}
 
-	userExtensions, err := util.ValidateExtensions(req.GetUserExtensions())
+	userExtensions, err := db.ValidateExtensions(req.GetUserExtensions())
 	if err != nil {
 		return nil, newError(connect.CodeInvalidArgument, "invalid extensions")
 	}
-	userCriticalOptions, err := util.ValidateCriticalOptions(req.GetUserCriticalOptions())
+	userCriticalOptions, err := db.ValidateCriticalOptions(req.GetUserCriticalOptions())
 	if err != nil {
 		return nil, newError(connect.CodeInvalidArgument, "invalid critical options")
 	}
 
 	params := &db.CreateCAParams{
-		WorkspaceID:         req.GetWorkspaceId(),
+		WorkspaceID:         actor.WorkspaceIDFromContext(ctx),
 		Name:                req.GetName(),
 		Description:         req.Description,
 		IsDefault:           req.GetIsDefault(),
@@ -136,11 +135,11 @@ func (s *certificateService) GetCertificateAuthority(
 
 func (s *certificateService) ListCertificateAuthorities(
 	ctx context.Context,
-	req *nokkuv1.ListCertificateAuthoritiesRequest,
+	_ *nokkuv1.ListCertificateAuthoritiesRequest,
 ) (*nokkuv1.ListCertificateAuthoritiesResponse, error) {
 	var result []*db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		result, err = q.ListCAs(ctx, &db.ListCAsParams{WorkspaceID: req.GetWorkspaceId()})
+		result, err = q.ListCAs(ctx, &db.ListCAsParams{WorkspaceID: actor.WorkspaceIDFromContext(ctx)})
 		return err
 	}); err != nil {
 		return nil, err
@@ -155,11 +154,11 @@ func (s *certificateService) UpdateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.UpdateCertificateAuthorityRequest,
 ) (*nokkuv1.UpdateCertificateAuthorityResponse, error) {
-	userExtensions, err := util.ValidateExtensions(req.GetUserExtensions())
+	userExtensions, err := db.ValidateExtensions(req.GetUserExtensions())
 	if err != nil {
 		return nil, newError(connect.CodeInvalidArgument, "invalid extensions")
 	}
-	userCriticalOptions, err := util.ValidateCriticalOptions(req.GetUserCriticalOptions())
+	userCriticalOptions, err := db.ValidateCriticalOptions(req.GetUserCriticalOptions())
 	if err != nil {
 		return nil, newError(connect.CodeInvalidArgument, "invalid critical options")
 	}
@@ -311,7 +310,7 @@ func (s *certificateService) SignSSHCertificate(
 		return nil, newError(connect.CodeInvalidArgument, err.Error())
 	}
 
-	expiry := util.Uint64ToUnixTime(cert.ValidBefore)
+	expiry := ssh.TimeFromUnix(cert.ValidBefore)
 	audit.SetTarget(ctx, ca.ID)
 	audit.Set(ctx, "serial", strconv.FormatUint(cert.Serial, 10))
 	audit.Set(ctx, "key_id", cert.KeyId)
@@ -332,21 +331,17 @@ func (s *certificateService) SignX509Certificate(
 ) (*nokkuv1.SignX509CertificateResponse, error) {
 	var ca *db.CertificateAuthority
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
-		switch {
-		case req.GetCaId() != "":
+		if req.GetCaId() != "" {
 			ca, err = q.GetCA(ctx, req.GetCaId())
-		case req.GetWorkspaceId() != "":
-			ca, err = q.GetDefaultCA(ctx, &db.GetDefaultCAParams{
-				WorkspaceID:   req.GetWorkspaceId(),
-				AuthorityType: nokkuv1.AuthorityType_AUTHORITY_TYPE_X509,
-			})
+			return err
 		}
+		ca, err = q.GetDefaultCA(ctx, &db.GetDefaultCAParams{
+			WorkspaceID:   actor.WorkspaceIDFromContext(ctx),
+			AuthorityType: nokkuv1.AuthorityType_AUTHORITY_TYPE_X509,
+		})
 		return err
 	}); err != nil {
 		return nil, err
-	}
-	if ca == nil {
-		return nil, errNotFound
 	}
 
 	if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_X509 {

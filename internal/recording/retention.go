@@ -72,7 +72,4 @@ func (s *Service) cleanup(ctx context.Context) {
 			slog.Warn("delete expired recording object", "error", err, "path", path)
 		}
 	}
-	if len(expired) > 0 {
-		slog.Info("expired recordings removed", "count", len(expired))
-	}
 }

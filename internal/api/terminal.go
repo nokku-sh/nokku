@@ -16,7 +16,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/daemon"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/util"
+	"github.com/nokku-sh/nokku/internal/realip"
 )
 
 const (
@@ -82,10 +82,8 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	ctx, err := actorHasRole(
-		actor.AnnotateTenant(r.Context(), ticket.WorkspaceID), t.cfg.Conn, db.RoleMember,
-	)
-	if err != nil {
+	ctx := r.Context()
+	if ticket.WorkspaceID != actor.WorkspaceIDFromContext(ctx) || !callerRole(ctx).AtLeast(db.RoleMember) {
 		writeJSONError(w, http.StatusForbidden, "permission denied")
 		return
 	}
@@ -129,7 +127,7 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 		UserID:        ticket.UserID,
 		CA:            ca,
 		HostPrincipal: targetID,
-		ClientAddr:    util.ClientIP(r.Header, r.RemoteAddr),
+		ClientAddr:    realip.Client(r.Header, r.RemoteAddr),
 	})
 	if err != nil {
 		logger.Warn("web session failed to start", "error", err)

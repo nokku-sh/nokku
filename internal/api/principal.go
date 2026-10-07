@@ -5,6 +5,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -116,7 +117,7 @@ func (s *principalService) RevokeAllAccess(
 			return errInvalidInput
 		}
 		return q.RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
-			WorkspaceID: req.GetWorkspaceId(),
+			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
 			SubjectKind: kind,
 			SubjectID:   req.GetSubjectId(),
 		})
@@ -136,7 +137,7 @@ func (s *principalService) AddPrincipal(
 	var principal *db.Principal
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		principal, err = q.CreatePrincipal(ctx, &db.CreatePrincipalParams{
-			WorkspaceID: req.GetWorkspaceId(),
+			WorkspaceID: actor.WorkspaceIDFromContext(ctx),
 			TargetID:    req.GetTargetId(),
 			Username:    req.GetUsername(),
 		})

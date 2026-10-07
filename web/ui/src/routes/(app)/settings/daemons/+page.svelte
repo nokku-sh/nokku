@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { user } from '#lib/api/user.svelte.js';
 	import { workspace } from '#lib/api/workspaces.svelte.js';
 	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
@@ -13,8 +14,9 @@
 	import { create } from '@bufbuild/protobuf';
 
 	const ws = workspace.get();
+	const me = user.self();
 	const update = workspace.update();
-	const canEdit = $derived(atLeast(ws.data?.role, 'admin'));
+	const canEdit = $derived(atLeast(me.data?.role, 'admin'));
 
 	// A real protobuf message, not a plain object, so the transport accepts it.
 	const settings = $derived.by(() => {

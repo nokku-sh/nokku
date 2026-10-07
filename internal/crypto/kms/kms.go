@@ -274,7 +274,6 @@ func rotateKeys(ctx context.Context, q *db.Queries, handle *keyset.Handle) (*key
 			return nil, fmt.Errorf("failed to drop old key: %w", err)
 		}
 	}
-	slog.Info("keyset rotated")
 	return manager.Handle()
 }
 
@@ -283,7 +282,6 @@ func rotateKeys(ctx context.Context, q *db.Queries, handle *keyset.Handle) (*key
 func (t *TinkEncryptor) load(ctx context.Context) error {
 	data, err := t.db.Sys().GetKeysetData(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
-		slog.Debug("no keyset found, creating initial keyset")
 		fresh, newErr := keyset.NewHandle(aead.AES256GCMKeyTemplate())
 		if newErr != nil {
 			return fmt.Errorf("failed to create keyset: %w", newErr)

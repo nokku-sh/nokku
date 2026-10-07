@@ -1,54 +1,48 @@
 <script lang="ts">
-	import { credentials, passkey, password } from '#lib/api/credential.svelte.js';
+	import { auth } from '#lib/api/auth.svelte.js';
+	import { credentials } from '#lib/api/credential.svelte.js';
 	import { registerPasskey } from '#lib/api/passkey.js';
-	import { user, type LinkedAccount } from '#lib/api/user.svelte.js';
-	import { GitHubIcon, GoogleIcon, OIDCIcon, SAMLIcon } from '#lib/assets/index.js';
+	import { OIDCIcon } from '#lib/assets/index.js';
 	import Section from '#lib/components/sheets/Section.svelte';
-	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
-	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
-	import * as Field from '#lib/components/ui/field/index.js';
-	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
 	import * as Item from '#lib/components/ui/item/index.js';
-	import { Progress } from '#lib/components/ui/progress/index.js';
 	import { Rename } from '#lib/components/ui/rename/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
+	import type { AccountCredential } from '#lib/gen/nokku/v1/account_pb.js';
 	import { formatTs } from '#lib/utils.js';
 	import type { Timestamp } from '@bufbuild/protobuf/wkt';
-	import { KeyRound, Link, Lock, Plus, Trash2, Unlink } from '@lucide/svelte';
+	import { KeyRound, Link, Mail, Plus, Trash2, Unlink } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { confirm } from '#lib/hooks/index.js';
 
 	const all = credentials.all();
+	const remove = credentials.remove();
+	const rename = credentials.rename();
+	const options = auth.options();
 
-	const passkeys = passkey.list();
+	const passkeys = $derived((all.data ?? []).filter((c) => c.type === 'passkey'));
+	const linked = $derived((all.data ?? []).filter((c) => c.type === 'oidc'));
+	const scim = $derived((all.data ?? []).some((c) => c.type === 'scim'));
 
-	const renamePasskey = passkey.rename();
-
-	const deletePasskey = passkey.delete();
-
-	const linked = user.listLinkedAccounts();
-
-	const unlink = user.unlinkAccount();
-
-	const changePassword = password.update();
-
-	const deletePassword = password.delete();
-
-	const passwordCredential = $derived((all.data ?? []).find((c) => c.type === 'password'));
-
-	const hasPassword = $derived(!!passwordCredential);
+	// With email links on, a lost passkey is not a lockout. Otherwise the last
+	// method stays.
+	const magicLink = $derived(options.data?.magicLink ?? false);
+	const lastWay = $derived(!magicLink && passkeys.length + linked.length <= 1);
 
 	const usage = (added?: Timestamp, used?: Timestamp) =>
 		`Added ${formatTs(added, 'relative', 'a while ago')} · ${used ? `last used ${formatTs(used, 'relative')}` : 'not used yet'}`;
 
-	const passkeyCount = $derived(passkeys.data?.length ?? 0);
+	const providerName = (c: AccountCredential) =>
+		options.data?.providers.find((p) => p.providerId === c.provider)?.name || c.provider;
 
-	// Every way in, used to stop the last one from being removed.
-	const methodCount = $derived(passkeyCount + (hasPassword ? 1 : 0) + (linked.data?.length ?? 0));
+	// Providers of this workspace the account has not signed in through yet.
+	const linkable = $derived(
+		(options.data?.providers ?? []).filter((p) => !linked.some((c) => c.provider === p.providerId))
+	);
 
 	let adding = $state(false);
 
@@ -61,7 +55,7 @@
 		try {
 			await registerPasskey();
 			toast.success('Passkey added');
-			await passkeys.refetch();
+			await all.refetch();
 		} catch (error) {
 			const cancelled = error instanceof DOMException && error.name === 'NotAllowedError';
 			const exists = error instanceof DOMException && error.name === 'InvalidStateError';
@@ -73,60 +67,6 @@
 			adding = false;
 		}
 	}
-
-	let passwordOpen = $state(false);
-
-	let current = $state('');
-
-	let next = $state('');
-
-	let repeat = $state('');
-
-	const strength = $derived.by(() => {
-		if (!next) return undefined;
-		if (next.length < 8) return { score: 0, text: 'Too short' };
-		if (next.length < 12) return { score: 1, text: 'Weak' };
-		if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(next)) return { score: 2, text: 'Fair' };
-		return { score: 3, text: 'Strong' };
-	});
-
-	const canChange = $derived(!!current && next === repeat && (strength?.score ?? 0) >= 2);
-
-	async function submitPassword(e: SubmitEvent) {
-		e.preventDefault();
-		if (!canChange) return;
-		await changePassword.mutateAsync({ currentPassword: current, newPassword: next });
-		toast.success('Password changed');
-		current = next = repeat = '';
-		passwordOpen = false;
-	}
-
-	function providerName(a: LinkedAccount) {
-		if (a.provider === 'github') return 'GitHub';
-		if (a.provider === 'google') return 'Google';
-		return a.protocol === 'saml' ? 'SAML' : 'OIDC';
-	}
-
-	function providerIcon(a: LinkedAccount) {
-		if (a.provider === 'github') return GitHubIcon;
-		if (a.provider === 'google') return GoogleIcon;
-		return a.protocol === 'saml' ? SAMLIcon : OIDCIcon;
-	}
-
-	const linkable = [
-		{
-			provider: 'google',
-			label: 'Google',
-			icon: GoogleIcon,
-			href: '/oidc/login?provider=google&link=true'
-		},
-		{
-			provider: 'github',
-			label: 'GitHub',
-			icon: GitHubIcon,
-			href: '/oauth/login?provider=github&link=true'
-		}
-	];
 </script>
 
 {#snippet lastWayIn(disabled: boolean)}
@@ -138,11 +78,14 @@
 <Card.Root id="sign-in">
 	<Card.Header>
 		<Card.Title>Ways to sign in</Card.Title>
-		<Card.Description>Keep at least two, so losing one device never locks you out.</Card.Description
-		>
+		<Card.Description>
+			{magicLink
+				? 'A link to your email always works. Passkeys are faster and phishing proof.'
+				: 'Keep at least two, so losing one device never locks you out.'}
+		</Card.Description>
 	</Card.Header>
 	<Card.Content class="flex flex-col divide-y">
-		<Section title="Passkeys" icon={KeyRound} count={passkeyCount}>
+		<Section title="Passkeys" icon={KeyRound} count={passkeys.length}>
 			{#snippet action()}
 				<Button size="sm" variant="ghost" onclick={addPasskey} disabled={adding}>
 					{#if adding}<Spinner data-icon="inline-start" />{:else}<Plus
@@ -151,20 +94,20 @@
 					Add passkey
 				</Button>
 			{/snippet}
-			{#if passkeys.isLoading}
+			{#if all.isLoading}
 				<Skeleton class="h-12 w-full" />
-			{:else if passkeyCount}
+			{:else if passkeys.length}
 				<Item.Group class="divide-y rounded-lg border">
-					{#each passkeys.data ?? [] as pk (pk.id)}
+					{#each passkeys as pk (pk.id)}
 						<Item.Root size="sm" class="rounded-none">
 							<Item.Media variant="icon"><KeyRound /></Item.Media>
 							<Item.Content>
 								<Item.Title>
 									<Rename
 										this="span"
-										value={pk.name || 'Passkey'}
+										value={pk.label || 'Passkey'}
 										class="rounded-sm hover:bg-muted"
-										onSave={(name) => renamePasskey.mutate({ id: pk.id, name })}
+										onSave={(label) => rename.mutate({ id: pk.id, label })}
 										validate={(v) => v.trim().length > 0}
 									/>
 								</Item.Title>
@@ -178,14 +121,14 @@
 												<Button
 													variant="ghost"
 													size="icon-sm"
-													aria-label={`Remove ${pk.name || 'passkey'}`}
-													disabled={methodCount <= 1}
+													aria-label={`Remove ${pk.label || 'passkey'}`}
+													disabled={lastWay}
 													onclick={() =>
 														confirm({
-															title: `Remove ${pk.name || 'this passkey'}?`,
+															title: `Remove ${pk.label || 'this passkey'}?`,
 															description: 'You can no longer sign in with it.',
 															confirmText: 'Remove',
-															onConfirm: () => deletePasskey.mutateAsync({ id: pk.id })
+															onConfirm: () => remove.mutateAsync({ id: pk.id })
 														})}
 												>
 													<Trash2 />
@@ -193,7 +136,7 @@
 											</span>
 										{/snippet}
 									</Tooltip.Trigger>
-									{@render lastWayIn(methodCount <= 1)}
+									{@render lastWayIn(lastWay)}
 								</Tooltip.Root>
 							</Item.Actions>
 						</Item.Root>
@@ -201,134 +144,44 @@
 				</Item.Group>
 			{:else}
 				<p class="text-sm text-muted-foreground">
-					No passkey yet. Use Touch ID, Windows Hello or a security key instead of a password.
+					No passkey yet. Use Touch ID, Windows Hello or a security key and skip the email link.
 				</p>
 			{/if}
 		</Section>
 
-		<Section title="Password" icon={Lock}>
-			<Collapsible.Root bind:open={passwordOpen}>
-				<div class="flex items-center justify-between gap-3">
-					<p class="text-sm text-muted-foreground">
-						{passwordCredential
-							? usage(passwordCredential.createdAt, passwordCredential.lastUsedAt)
-							: 'No password set.'}
-					</p>
-					{#if hasPassword}
-						<div class="flex gap-1">
-							<Collapsible.Trigger>
-								{#snippet child({ props })}
-									<Button {...props} size="sm" variant="ghost">
-										{passwordOpen ? 'Cancel' : 'Change'}
-									</Button>
-								{/snippet}
-							</Collapsible.Trigger>
-							<Button
-								size="sm"
-								variant="ghost"
-								disabled={passkeyCount === 0}
-								title={passkeyCount === 0 ? 'Add a passkey first' : undefined}
-								onclick={() =>
-									confirm({
-										title: 'Remove your password?',
-										description:
-											'You will sign in with passkeys only. Make sure they work first, a removed password cannot be recovered.',
-										input: { label: 'Current password', type: 'password' },
-										confirmText: 'Remove',
-										onConfirm: (currentPassword) => deletePassword.mutateAsync({ currentPassword })
-									})}
-							>
-								Remove
-							</Button>
-						</div>
-					{/if}
-				</div>
-				<Collapsible.Content>
-					<form class="mt-3 flex flex-col gap-3 rounded-lg border p-3" onsubmit={submitPassword}>
-						<Field.Field>
-							<Field.Label for="current-password">Current password</Field.Label>
-							<InputGroupVariants
-								variant="password"
-								bind:value={current}
-								inputProps={{ id: 'current-password', autocomplete: 'current-password' }}
-							/>
-						</Field.Field>
-						<div class="grid gap-3 sm:grid-cols-2">
-							<Field.Field>
-								<Field.Label for="new-password">New password</Field.Label>
-								<InputGroupVariants
-									variant="password"
-									bind:value={next}
-									inputProps={{ id: 'new-password', autocomplete: 'new-password' }}
-								/>
-								{#if strength}
-									<div class="flex items-center gap-2">
-										<Progress value={(strength.score + 1) * 25} class="h-1 flex-1" />
-										<span
-											class={['text-xs', strength.score < 2 ? 'text-destructive' : 'text-success']}
-										>
-											{strength.text}
-										</span>
-									</div>
-								{/if}
-							</Field.Field>
-							<Field.Field data-invalid={!!repeat && repeat !== next}>
-								<Field.Label for="repeat-password">Repeat it</Field.Label>
-								<InputGroupVariants
-									variant="password"
-									bind:value={repeat}
-									inputProps={{
-										id: 'repeat-password',
-										autocomplete: 'new-password',
-										'aria-invalid': !!repeat && repeat !== next
-									}}
-								/>
-								{#if repeat && repeat !== next}
-									<Field.Description class="text-destructive">Doesn't match.</Field.Description>
-								{/if}
-							</Field.Field>
-						</div>
-						<Button
-							type="submit"
-							size="sm"
-							class="self-end"
-							disabled={!canChange || changePassword.isPending}
-						>
-							{#if changePassword.isPending}<Spinner data-icon="inline-start" />{/if}
-							Change password
-						</Button>
-					</form>
-				</Collapsible.Content>
-			</Collapsible.Root>
-		</Section>
+		{#if magicLink}
+			<Section title="Email link" icon={Mail}>
+				<p class="text-sm text-muted-foreground">
+					A sign-in link can always be sent to your address. Keep that inbox safe.
+				</p>
+			</Section>
+		{/if}
 
-		<Section title="Connected accounts" icon={Link} count={linked.data?.length}>
-			{#snippet action()}
-				{#each linkable.filter((l) => !linked.data?.some((a) => a.provider === l.provider)) as l (l.provider)}
-					<Button size="sm" variant="ghost" href={l.href}>
-						<l.icon data-icon="inline-start" />
-						Link {l.label}
-					</Button>
-				{/each}
-			{/snippet}
-			{#if linked.data?.length}
-				<Item.Group class="divide-y rounded-lg border">
-					{#each linked.data as a (a.provider + a.providerId)}
-						{@const Icon = providerIcon(a)}
-						{@const managed = a.provider !== 'github' && a.provider !== 'google'}
-						<Item.Root size="sm" class="rounded-none">
-							<Item.Media variant="icon"><Icon /></Item.Media>
-							<Item.Content>
-								<Item.Title>{providerName(a)}</Item.Title>
-								<Item.Description>
-									{usage(a.createdAt, a.lastUsedAt)}
-									{#if managed}· managed by your organization's SSO{/if}
-								</Item.Description>
-							</Item.Content>
-							<Item.Actions>
-								{#if managed}
-									<Badge variant="outline">SSO</Badge>
-								{:else}
+		{#if linked.length || linkable.length || scim}
+			<Section title="Single sign-on" icon={Link} count={linked.length}>
+				{#snippet action()}
+					{#each linkable as p (p.providerId)}
+						<Button
+							size="sm"
+							variant="ghost"
+							href={`/oidc/login?provider=${encodeURIComponent(p.providerId)}&link=true`}
+							data-sveltekit-reload
+						>
+							<OIDCIcon data-icon="inline-start" />
+							Link {p.name || p.providerId}
+						</Button>
+					{/each}
+				{/snippet}
+				{#if linked.length}
+					<Item.Group class="divide-y rounded-lg border">
+						{#each linked as a (a.id)}
+							<Item.Root size="sm" class="rounded-none">
+								<Item.Media variant="icon"><OIDCIcon /></Item.Media>
+								<Item.Content>
+									<Item.Title>{providerName(a)}</Item.Title>
+									<Item.Description>{usage(a.createdAt, a.lastUsedAt)}</Item.Description>
+								</Item.Content>
+								<Item.Actions>
 									<Tooltip.Root>
 										<Tooltip.Trigger>
 											{#snippet child({ props })}
@@ -337,13 +190,13 @@
 														variant="ghost"
 														size="icon-sm"
 														aria-label={`Unlink ${providerName(a)}`}
-														disabled={methodCount <= 1}
+														disabled={lastWay}
 														onclick={() =>
 															confirm({
 																title: `Unlink ${providerName(a)}?`,
-																description: 'You can link it again later.',
+																description: 'You can link it again by signing in through it.',
 																confirmText: 'Unlink',
-																onConfirm: () => unlink.mutateAsync({ provider: a.provider })
+																onConfirm: () => remove.mutateAsync({ id: a.id })
 															})}
 													>
 														<Unlink />
@@ -351,18 +204,22 @@
 												</span>
 											{/snippet}
 										</Tooltip.Trigger>
-										{@render lastWayIn(methodCount <= 1)}
+										{@render lastWayIn(lastWay)}
 									</Tooltip.Root>
-								{/if}
-							</Item.Actions>
-						</Item.Root>
-					{/each}
-				</Item.Group>
-			{:else if !linked.isLoading}
-				<p class="text-sm text-muted-foreground">
-					Link GitHub or Google to sign in with one click.
-				</p>
-			{/if}
-		</Section>
+								</Item.Actions>
+							</Item.Root>
+						{/each}
+					</Item.Group>
+				{:else if scim}
+					<p class="flex items-center gap-2 text-sm text-muted-foreground">
+						<Badge variant="outline">SCIM</Badge> Your account is managed by your identity provider.
+					</p>
+				{:else}
+					<p class="text-sm text-muted-foreground">
+						Sign in through your identity provider once and it shows up here.
+					</p>
+				{/if}
+			</Section>
+		{/if}
 	</Card.Content>
 </Card.Root>

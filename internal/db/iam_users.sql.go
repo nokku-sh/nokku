@@ -7,35 +7,59 @@ package db
 
 import (
 	"context"
-	"time"
 )
+
+const countActiveUsers = `-- name: CountActiveUsers :one
+SELECT
+  COUNT(*)
+FROM
+  users
+WHERE
+  workspace_id = $1
+  AND active
+`
+
+func (q *Queries) CountActiveUsers(ctx context.Context, workspaceID string) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveUsers, workspaceID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO
-  users (email, name, picture)
+  users (workspace_id, email, name, role, picture)
 VALUES
-  ($1, $2, $3)
+  ($1, $2, $3, $4, $5)
 RETURNING
-  id, email, name, picture, active, email_verified, disable_password_reset, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	Email   string  `json:"email"`
-	Name    string  `json:"name"`
-	Picture *string `json:"picture"`
+	WorkspaceID string  `json:"workspaceId"`
+	Email       string  `json:"email"`
+	Name        string  `json:"name"`
+	Role        string  `json:"role"`
+	Picture     *string `json:"picture"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.Name, arg.Picture)
+	row := q.db.QueryRow(ctx, createUser,
+		arg.WorkspaceID,
+		arg.Email,
+		arg.Name,
+		arg.Role,
+		arg.Picture,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
+		&i.WorkspaceID,
 		&i.Email,
 		&i.Name,
 		&i.Picture,
+		&i.Role,
 		&i.Active,
-		&i.EmailVerified,
-		&i.DisablePasswordReset,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -44,88 +68,117 @@ func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User,
 
 const createUserWithID = `-- name: CreateUserWithID :one
 INSERT INTO
-  users (id, email, name, picture)
+  users (id, workspace_id, email, name, role, picture)
 VALUES
-  ($1, $2, $3, $4)
+  ($1, $2, $3, $4, $5, $6)
 RETURNING
-  id, email, name, picture, active, email_verified, disable_password_reset, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, created_at, updated_at
 `
 
 type CreateUserWithIDParams struct {
-	ID      string  `json:"id"`
-	Email   string  `json:"email"`
-	Name    string  `json:"name"`
-	Picture *string `json:"picture"`
+	ID          string  `json:"id"`
+	WorkspaceID string  `json:"workspaceId"`
+	Email       string  `json:"email"`
+	Name        string  `json:"name"`
+	Role        string  `json:"role"`
+	Picture     *string `json:"picture"`
 }
 
 func (q *Queries) CreateUserWithID(ctx context.Context, arg *CreateUserWithIDParams) (*User, error) {
 	row := q.db.QueryRow(ctx, createUserWithID,
 		arg.ID,
+		arg.WorkspaceID,
 		arg.Email,
 		arg.Name,
+		arg.Role,
 		arg.Picture,
 	)
 	var i User
 	err := row.Scan(
 		&i.ID,
+		&i.WorkspaceID,
 		&i.Email,
 		&i.Name,
 		&i.Picture,
+		&i.Role,
 		&i.Active,
-		&i.EmailVerified,
-		&i.DisablePasswordReset,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
 }
 
-const deleteUnverifiedUsers = `-- name: DeleteUnverifiedUsers :execrows
-DELETE FROM users
-WHERE
-  NOT email_verified
-  AND created_at < $1
-`
-
-func (q *Queries) DeleteUnverifiedUsers(ctx context.Context, cutoff time.Time) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteUnverifiedUsers, cutoff)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const deleteUser = `-- name: DeleteUser :exec
 DELETE FROM users
 WHERE
-  id = $1
+  workspace_id = $1
+  AND id = $2
+  AND role <> 'owner'
 `
 
-func (q *Queries) DeleteUser(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, deleteUser, id)
+type DeleteUserParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	ID          string `json:"id"`
+}
+
+func (q *Queries) DeleteUser(ctx context.Context, arg *DeleteUserParams) error {
+	_, err := q.db.Exec(ctx, deleteUser, arg.WorkspaceID, arg.ID)
 	return err
+}
+
+const getOwner = `-- name: GetOwner :one
+SELECT
+  id, workspace_id, email, name, picture, role, active, created_at, updated_at
+FROM
+  users
+WHERE
+  workspace_id = $1
+  AND role = 'owner'
+`
+
+func (q *Queries) GetOwner(ctx context.Context, workspaceID string) (*User, error) {
+	row := q.db.QueryRow(ctx, getOwner, workspaceID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Email,
+		&i.Name,
+		&i.Picture,
+		&i.Role,
+		&i.Active,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
 }
 
 const getUser = `-- name: GetUser :one
 SELECT
-  id, email, name, picture, active, email_verified, disable_password_reset, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, created_at, updated_at
 FROM
   users
 WHERE
-  id = $1
+  workspace_id = $1
+  AND id = $2
 `
 
-func (q *Queries) GetUser(ctx context.Context, id string) (*User, error) {
-	row := q.db.QueryRow(ctx, getUser, id)
+type GetUserParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	ID          string `json:"id"`
+}
+
+func (q *Queries) GetUser(ctx context.Context, arg *GetUserParams) (*User, error) {
+	row := q.db.QueryRow(ctx, getUser, arg.WorkspaceID, arg.ID)
 	var i User
 	err := row.Scan(
 		&i.ID,
+		&i.WorkspaceID,
 		&i.Email,
 		&i.Name,
 		&i.Picture,
+		&i.Role,
 		&i.Active,
-		&i.EmailVerified,
-		&i.DisablePasswordReset,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -134,61 +187,200 @@ func (q *Queries) GetUser(ctx context.Context, id string) (*User, error) {
 
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT
-  id, email, name, picture, active, email_verified, disable_password_reset, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, created_at, updated_at
 FROM
   users
 WHERE
-  email = $1
+  workspace_id = $1
+  AND email = $2
 `
 
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, error) {
-	row := q.db.QueryRow(ctx, getUserByEmail, email)
+type GetUserByEmailParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	Email       string `json:"email"`
+}
+
+func (q *Queries) GetUserByEmail(ctx context.Context, arg *GetUserByEmailParams) (*User, error) {
+	row := q.db.QueryRow(ctx, getUserByEmail, arg.WorkspaceID, arg.Email)
 	var i User
 	err := row.Scan(
 		&i.ID,
+		&i.WorkspaceID,
 		&i.Email,
 		&i.Name,
 		&i.Picture,
+		&i.Role,
 		&i.Active,
-		&i.EmailVerified,
-		&i.DisablePasswordReset,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
+}
+
+const listUsers = `-- name: ListUsers :many
+SELECT
+  u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.created_at, u.updated_at,
+  COUNT(*) OVER ()::INTEGER AS total_count
+FROM
+  users u
+WHERE
+  u.workspace_id = $1
+  AND (
+    $2::TEXT IS NULL
+    OR u.name ILIKE '%' || $2 || '%'
+    OR u.email ILIKE '%' || $2 || '%'
+  )
+  AND (
+    $3::TEXT IS NULL
+    OR u.role = $3::TEXT
+  )
+ORDER BY
+  u.name ASC,
+  u.email ASC
+LIMIT
+  $5
+OFFSET
+  $4
+`
+
+type ListUsersParams struct {
+	WorkspaceID string  `json:"workspaceId"`
+	Query       *string `json:"query"`
+	Role        *string `json:"role"`
+	Offset      *int32  `json:"offset"`
+	Limit       *int32  `json:"limit"`
+}
+
+type ListUsersRow struct {
+	User       User  `json:"user"`
+	TotalCount int32 `json:"totalCount"`
+}
+
+func (q *Queries) ListUsers(ctx context.Context, arg *ListUsersParams) ([]*ListUsersRow, error) {
+	rows, err := q.db.Query(ctx, listUsers,
+		arg.WorkspaceID,
+		arg.Query,
+		arg.Role,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListUsersRow
+	for rows.Next() {
+		var i ListUsersRow
+		if err := rows.Scan(
+			&i.User.ID,
+			&i.User.WorkspaceID,
+			&i.User.Email,
+			&i.User.Name,
+			&i.User.Picture,
+			&i.User.Role,
+			&i.User.Active,
+			&i.User.CreatedAt,
+			&i.User.UpdatedAt,
+			&i.TotalCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setUserActive = `-- name: SetUserActive :exec
+UPDATE users
+SET
+  active = $1,
+  updated_at = NOW()
+WHERE
+  workspace_id = $2
+  AND id = $3
+  AND role <> 'owner'
+`
+
+type SetUserActiveParams struct {
+	Active      bool   `json:"active"`
+	WorkspaceID string `json:"workspaceId"`
+	ID          string `json:"id"`
+}
+
+func (q *Queries) SetUserActive(ctx context.Context, arg *SetUserActiveParams) error {
+	_, err := q.db.Exec(ctx, setUserActive, arg.Active, arg.WorkspaceID, arg.ID)
+	return err
 }
 
 const setUserEmail = `-- name: SetUserEmail :one
 UPDATE users
 SET
   email = $1,
-  email_verified = TRUE
+  updated_at = NOW()
 WHERE
-  id = $2
+  workspace_id = $2
+  AND id = $3
 RETURNING
-  id, email, name, picture, active, email_verified, disable_password_reset, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, created_at, updated_at
 `
 
 type SetUserEmailParams struct {
-	Email string `json:"email"`
-	ID    string `json:"id"`
+	Email       string `json:"email"`
+	WorkspaceID string `json:"workspaceId"`
+	ID          string `json:"id"`
 }
 
 func (q *Queries) SetUserEmail(ctx context.Context, arg *SetUserEmailParams) (*User, error) {
-	row := q.db.QueryRow(ctx, setUserEmail, arg.Email, arg.ID)
+	row := q.db.QueryRow(ctx, setUserEmail, arg.Email, arg.WorkspaceID, arg.ID)
 	var i User
 	err := row.Scan(
 		&i.ID,
+		&i.WorkspaceID,
 		&i.Email,
 		&i.Name,
 		&i.Picture,
+		&i.Role,
 		&i.Active,
-		&i.EmailVerified,
-		&i.DisablePasswordReset,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
+}
+
+const transferOwnership = `-- name: TransferOwnership :execrows
+UPDATE users
+SET
+  role = CASE
+    WHEN id = $1 THEN 'owner'
+    ELSE 'admin'
+  END,
+  updated_at = NOW()
+WHERE
+  workspace_id = $2
+  AND (
+    role = 'owner'
+    OR (
+      id = $1
+      AND active
+    )
+  )
+`
+
+type TransferOwnershipParams struct {
+	NewOwnerID  string `json:"newOwnerId"`
+	WorkspaceID string `json:"workspaceId"`
+}
+
+// One statement, so the partial unique index on the owner never sees two.
+func (q *Queries) TransferOwnership(ctx context.Context, arg *TransferOwnershipParams) (int64, error) {
+	result, err := q.db.Exec(ctx, transferOwnership, arg.NewOwnerID, arg.WorkspaceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateUser = `-- name: UpdateUser :one
@@ -196,54 +388,62 @@ UPDATE users
 SET
   name = COALESCE($1, name),
   picture = COALESCE($2, picture),
-  active = COALESCE($3, active),
-  disable_password_reset = COALESCE($4, disable_password_reset)
+  updated_at = NOW()
 WHERE
-  id = $5
+  workspace_id = $3
+  AND id = $4
 RETURNING
-  id, email, name, picture, active, email_verified, disable_password_reset, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, created_at, updated_at
 `
 
 type UpdateUserParams struct {
-	Name                 *string `json:"name"`
-	Picture              *string `json:"picture"`
-	Active               *bool   `json:"active"`
-	DisablePasswordReset *bool   `json:"disablePasswordReset"`
-	ID                   string  `json:"id"`
+	Name        *string `json:"name"`
+	Picture     *string `json:"picture"`
+	WorkspaceID string  `json:"workspaceId"`
+	ID          string  `json:"id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User, error) {
 	row := q.db.QueryRow(ctx, updateUser,
 		arg.Name,
 		arg.Picture,
-		arg.Active,
-		arg.DisablePasswordReset,
+		arg.WorkspaceID,
 		arg.ID,
 	)
 	var i User
 	err := row.Scan(
 		&i.ID,
+		&i.WorkspaceID,
 		&i.Email,
 		&i.Name,
 		&i.Picture,
+		&i.Role,
 		&i.Active,
-		&i.EmailVerified,
-		&i.DisablePasswordReset,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
 }
 
-const verifyUserEmail = `-- name: VerifyUserEmail :exec
+const updateUserRole = `-- name: UpdateUserRole :exec
 UPDATE users
 SET
-  email_verified = TRUE
+  role = $1,
+  updated_at = NOW()
 WHERE
-  id = $1
+  workspace_id = $2
+  AND id = $3
+  AND role <> 'owner'
 `
 
-func (q *Queries) VerifyUserEmail(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, verifyUserEmail, id)
+type UpdateUserRoleParams struct {
+	Role        string `json:"role"`
+	WorkspaceID string `json:"workspaceId"`
+	ID          string `json:"id"`
+}
+
+// Never touches the owner, see TransferOwnership.
+func (q *Queries) UpdateUserRole(ctx context.Context, arg *UpdateUserRoleParams) error {
+	_, err := q.db.Exec(ctx, updateUserRole, arg.Role, arg.WorkspaceID, arg.ID)
 	return err
 }

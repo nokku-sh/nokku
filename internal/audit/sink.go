@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
@@ -39,12 +40,11 @@ func (s *postgresSink) Append(ctx context.Context, event *Event) error {
 		details = []byte("{}")
 	}
 
-	var workspaceID *string
-	if event.WorkspaceID != "" {
-		workspaceID = &event.WorkspaceID
+	if event.WorkspaceID == "" {
+		return errors.New("audit event without a workspace")
 	}
 	return s.q.InsertAuditLog(ctx, &db.InsertAuditLogParams{
-		WorkspaceID: workspaceID,
+		WorkspaceID: event.WorkspaceID,
 		ActorID:     event.ActorID,
 		ActorKind:   event.ActorKind,
 		ActorName:   event.ActorName,

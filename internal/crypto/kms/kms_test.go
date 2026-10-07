@@ -4,6 +4,9 @@ import (
 	"os"
 	"testing"
 	"time"
+	"uuid"
+
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
@@ -36,20 +39,42 @@ func freshDB(t *testing.T) *db.Connection {
 	admin, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
 	defer func() { _ = admin.Close(t.Context()) }()
-	_, err = admin.Exec(t.Context(), "DELETE FROM keysets; DELETE FROM saml_keypair")
+	_, err = admin.Exec(t.Context(), "DELETE FROM keysets; DELETE FROM sso_providers")
 	require.NoError(t, err)
 	return conn
 }
 
-// storedSAMLKey returns the SAML key column as it sits in the database.
-func storedSAMLKey(t *testing.T) []byte {
+// storedConfig returns a provider's config column as it sits in the database.
+func storedConfig(t *testing.T, ws string) []byte {
 	t.Helper()
 	admin, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
 	defer func() { _ = admin.Close(t.Context()) }()
 	var raw []byte
-	require.NoError(t, admin.QueryRow(t.Context(), "SELECT key_enc FROM saml_keypair").Scan(&raw))
+	require.NoError(t, admin.QueryRow(t.Context(),
+		"SELECT config FROM sso_providers WHERE workspace_id = $1 AND provider_id = 'p'", ws).Scan(&raw))
 	return raw
+}
+
+// seedProvider stores one encrypted provider config and returns its workspace.
+func seedProvider(t *testing.T, conn *db.Connection, secret string) string {
+	t.Helper()
+	ws, err := conn.Sys().CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
+		Slug: uuid.NewV7().String(), Name: "kms", Settings: &nokkuv1.WorkspaceSettings{},
+	})
+	require.NoError(t, err)
+	_, err = conn.Sys().UpsertSSOProvider(t.Context(), &db.UpsertSSOProviderParams{
+		WorkspaceID: ws.ID, ProviderID: "p", Name: "p", Enabled: true, Config: crypto.EncryptedBytes(secret),
+	})
+	require.NoError(t, err)
+	return ws.ID
+}
+
+func readConfig(t *testing.T, conn *db.Connection, ws string) string {
+	t.Helper()
+	row, err := conn.Sys().GetSSOProvider(t.Context(), &db.GetSSOProviderParams{WorkspaceID: ws, ProviderID: "p"})
+	require.NoError(t, err)
+	return string(row.Config)
 }
 
 // keyID is the Tink prefix that names the key a ciphertext was made with.
@@ -163,24 +188,24 @@ func TestRotationReencryptsAndPrunes(t *testing.T) {
 	enc, err := New(t.Context(), conn, secretA)
 	require.NoError(t, err)
 	require.NoError(t, crypto.SetEncryptor(enc))
-	_, err = conn.Sys().PutSAMLKeypair(t.Context(), &db.PutSAMLKeypairParams{
-		KeyEnc:  []byte("saml signing key"),
-		CertPem: []byte("cert"),
-	})
-	require.NoError(t, err)
+	ws := seedProvider(t, conn, "sso client secret")
 	detached, err := enc.Encrypt([]byte("not in the database"))
 	require.NoError(t, err)
 
 	for round := range 3 {
 		require.NoError(t, enc.Rotate(t.Context(), "secret:"+secretA), "round %d", round)
 
-		row, err := conn.Sys().GetSAMLKeypair(t.Context())
-		require.NoError(t, err, "round %d: the stored secret is unreadable", round)
-		assert.Equal(t, "saml signing key", string(row.KeyEnc))
+		assert.Equal(
+			t,
+			"sso client secret",
+			readConfig(t, conn, ws),
+			"round %d: the stored secret is unreadable",
+			round,
+		)
 
 		fresh, err := enc.Encrypt([]byte("x"))
 		require.NoError(t, err)
-		assert.Equal(t, keyID(fresh), keyID(storedSAMLKey(t)), "round %d: the stored secret kept an old key", round)
+		assert.Equal(t, keyID(fresh), keyID(storedConfig(t, ws)), "round %d: the stored secret kept an old key", round)
 
 		data, err := conn.Sys().GetKeysetData(t.Context())
 		require.NoError(t, err)
@@ -196,7 +221,5 @@ func TestRotationReencryptsAndPrunes(t *testing.T) {
 	restarted, err := New(t.Context(), conn, secretA)
 	require.NoError(t, err)
 	require.NoError(t, crypto.SetEncryptor(restarted))
-	row, err := conn.Sys().GetSAMLKeypair(t.Context())
-	require.NoError(t, err)
-	assert.Equal(t, "saml signing key", string(row.KeyEnc))
+	assert.Equal(t, "sso client secret", readConfig(t, conn, ws))
 }

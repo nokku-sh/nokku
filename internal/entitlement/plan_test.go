@@ -25,7 +25,6 @@ func TestPlanMatrix(t *testing.T) {
 			wantFeatures: map[string]bool{
 				FeatureOIDC:           true,
 				FeatureEnforceSSO:     false,
-				FeatureSAML:           false,
 				FeatureAuditExport:    false,
 				FeatureAuditStreaming: false,
 				FeatureExternalKMS:    false,
@@ -40,7 +39,6 @@ func TestPlanMatrix(t *testing.T) {
 			wantFeatures: map[string]bool{
 				FeatureOIDC:           true,
 				FeatureEnforceSSO:     true,
-				FeatureSAML:           true,
 				FeatureAuditExport:    true,
 				FeatureAuditStreaming: false,
 				FeatureExternalKMS:    false,
@@ -55,7 +53,6 @@ func TestPlanMatrix(t *testing.T) {
 			wantFeatures: map[string]bool{
 				FeatureOIDC:           true,
 				FeatureEnforceSSO:     true,
-				FeatureSAML:           true,
 				FeatureAuditExport:    true,
 				FeatureAuditStreaming: true,
 				FeatureExternalKMS:    true,

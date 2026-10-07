@@ -5,21 +5,17 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-var (
-	errAlreadyMember = errors.New("already a member")
-	errInviteInvalid = errors.New("invalid or expired invitation")
-)
-
+// invitationService is the mailed way into a workspace. The passkey way
+// goes through /passkey/signup with the same invite.
 type invitationService struct {
 	cfg *config.Config
 }
@@ -28,117 +24,48 @@ func newInvitationService(cfg *config.Config) *invitationService {
 	return &invitationService{cfg: cfg}
 }
 
-func inviteLookup(raw string) (*db.GetLiveTokenParams, error) {
-	parsed, err := crypto.Parse(raw)
-	if err != nil || parsed.ID == "" {
-		return nil, errInviteInvalid
-	}
-	hash, err := crypto.HashToken(raw)
-	if err != nil {
-		return nil, errInviteInvalid
-	}
-	return &db.GetLiveTokenParams{ID: parsed.ID, Kind: nokkuv1.TokenKind_TOKEN_KIND_INVITE, TokenHash: hash}, nil
-}
-
-func inviteError(err error) error {
-	switch {
-	case errors.Is(err, errInviteInvalid):
-		return newError(connect.CodeFailedPrecondition, "invalid or expired invitation")
-	case errors.Is(err, errAlreadyMember):
-		return newError(connect.CodeAborted, "you have already joined this workspace")
-	default:
-		return err
-	}
-}
+var errInviteInvalid = connect.NewError(
+	connect.CodeFailedPrecondition,
+	errors.New("invalid or expired invitation"),
+)
 
 func (s *invitationService) GetInvitation(
 	ctx context.Context,
 	req *nokkuv1.GetInvitationRequest,
 ) (*nokkuv1.GetInvitationResponse, error) {
-	userID := actor.UserIDFromContext(ctx)
-	if userID == "" {
-		return nil, errUserRequired
+	token, err := s.cfg.IAM.LookupInvite(ctx, req.GetToken())
+	if errors.Is(err, iam.ErrInviteSpent) {
+		return nil, errInviteInvalid
 	}
-	lookup, err := inviteLookup(req.GetToken())
 	if err != nil {
-		return nil, inviteError(err)
+		return nil, err
 	}
-
-	// System tx since the joiner is not a member yet. The token is checked
-	// first, so nothing leaks without a valid one.
-	var (
-		token     *db.WorkspaceToken
-		workspace *db.Workspace
-	)
-	if err := s.cfg.Conn.WithTx(ctx, func(q *db.Queries) (err error) {
-		token, err = q.GetLiveToken(ctx, lookup)
-		if err != nil || (token.MaxUses != nil && token.Uses >= *token.MaxUses) {
-			return errInviteInvalid
-		}
-		workspace, err = q.GetWorkspace(ctx, token.WorkspaceID)
-		if err != nil {
-			return err
-		}
-		if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
-			WorkspaceID: token.WorkspaceID,
-			UserID:      userID,
-		}); err == nil {
-			return errAlreadyMember
-		}
-		return nil
-	}); err != nil {
-		return nil, inviteError(err)
-	}
-
+	ws, _ := actor.WorkspaceFromContext(ctx)
 	return &nokkuv1.GetInvitationResponse{
-		WorkspaceName:        &workspace.Name,
-		WorkspaceDescription: workspace.Description,
-		ExpiresAt:            db.SafeTimestamp(token.ExpiresAt),
-		RoleName:             token.RoleName,
+		WorkspaceName: &ws.Name,
+		Role:          token.RoleName,
+		ExpiresAt:     db.SafeTimestamp(token.ExpiresAt),
 	}, nil
 }
 
+// AcceptInvitation mails a signup link. The account exists once it is used.
 func (s *invitationService) AcceptInvitation(
 	ctx context.Context,
 	req *nokkuv1.AcceptInvitationRequest,
 ) (*nokkuv1.AcceptInvitationResponse, error) {
-	userID := actor.UserIDFromContext(ctx)
-	if userID == "" {
-		return nil, errUserRequired
+	if !s.cfg.Email.HasSMTP() {
+		return nil, newError(connect.CodeUnimplemented, "this server sends no mail, sign up with a passkey")
 	}
-	lookup, err := inviteLookup(req.GetToken())
-	if err != nil {
-		return nil, inviteError(err)
+	err := s.cfg.IAM.RequestSignupLink(ctx, req.GetToken(), req.GetEmail(), req.GetName())
+	switch {
+	case errors.Is(err, iam.ErrInviteSpent):
+		return nil, errInviteInvalid
+	case errors.Is(err, iam.ErrEmailTaken):
+		return nil, newError(connect.CodeAlreadyExists, "an account with this email already exists, sign in instead")
+	case errors.Is(err, iam.ErrEmailRejected):
+		return nil, newError(connect.CodeInvalidArgument, "please enter a valid email address")
+	case err != nil:
+		return nil, err
 	}
-
-	// Existing members are turned away before the token spends a use.
-	var workspaceID string
-	err = s.cfg.Conn.WithTx(ctx, func(q *db.Queries) error {
-		token, err := q.GetLiveToken(ctx, lookup)
-		if err != nil {
-			return errInviteInvalid
-		}
-		workspaceID = token.WorkspaceID
-		if _, err := q.UserWorkspaceMember(ctx, &db.UserWorkspaceMemberParams{
-			WorkspaceID: workspaceID,
-			UserID:      userID,
-		}); err == nil {
-			return errAlreadyMember
-		}
-		if _, err := q.RedeemToken(ctx, &db.RedeemTokenParams{
-			ID:        lookup.ID,
-			Kind:      lookup.Kind,
-			TokenHash: lookup.TokenHash,
-		}); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return errInviteInvalid
-			}
-			return err
-		}
-		return s.cfg.IAM.EnsureMember(ctx, q, userID, workspaceID, *token.RoleName)
-	})
-	if err != nil {
-		return nil, inviteError(err)
-	}
-	return &nokkuv1.AcceptInvitationResponse{WorkspaceId: &workspaceID}, nil
+	return &nokkuv1.AcceptInvitationResponse{}, nil
 }

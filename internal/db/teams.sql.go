@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"time"
 )
 
 const addTeamMember = `-- name: AddTeamMember :exec
@@ -156,18 +155,12 @@ func (q *Queries) GetTeam(ctx context.Context, teamID string) (*Team, error) {
 
 const listTeamMembers = `-- name: ListTeamMembers :many
 SELECT
-  tm.workspace_id,
-  tm.team_id,
-  u.id AS user_id,
-  u.name,
-  u.email,
-  u.email_verified,
-  u.picture,
-  u.active,
-  tm.created_at
+  u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.created_at, u.updated_at,
+  tm.team_id
 FROM
   team_members tm
-  JOIN users u ON u.id = tm.user_id
+  JOIN users u ON u.workspace_id = tm.workspace_id
+  AND u.id = tm.user_id
 WHERE
   tm.team_id = $1
 ORDER BY
@@ -176,15 +169,8 @@ ORDER BY
 `
 
 type ListTeamMembersRow struct {
-	WorkspaceID   string    `json:"workspaceId"`
-	TeamID        string    `json:"teamId"`
-	UserID        string    `json:"userId"`
-	Name          string    `json:"name"`
-	Email         string    `json:"email"`
-	EmailVerified bool      `json:"emailVerified"`
-	Picture       *string   `json:"picture"`
-	Active        bool      `json:"active"`
-	CreatedAt     time.Time `json:"createdAt"`
+	User   User   `json:"user"`
+	TeamID string `json:"teamId"`
 }
 
 func (q *Queries) ListTeamMembers(ctx context.Context, teamID string) ([]*ListTeamMembersRow, error) {
@@ -197,15 +183,16 @@ func (q *Queries) ListTeamMembers(ctx context.Context, teamID string) ([]*ListTe
 	for rows.Next() {
 		var i ListTeamMembersRow
 		if err := rows.Scan(
-			&i.WorkspaceID,
+			&i.User.ID,
+			&i.User.WorkspaceID,
+			&i.User.Email,
+			&i.User.Name,
+			&i.User.Picture,
+			&i.User.Role,
+			&i.User.Active,
+			&i.User.CreatedAt,
+			&i.User.UpdatedAt,
 			&i.TeamID,
-			&i.UserID,
-			&i.Name,
-			&i.Email,
-			&i.EmailVerified,
-			&i.Picture,
-			&i.Active,
-			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

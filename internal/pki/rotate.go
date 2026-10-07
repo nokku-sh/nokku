@@ -79,13 +79,12 @@ func rotateExpiring(ctx context.Context, conn *db.Connection) {
 	failed := []string{}
 	for ctx.Err() == nil {
 		var picked *db.CertificateAuthority
-		var rotated *db.CertificateAuthority
 		err := conn.WithTx(ctx, func(q *db.Queries) error {
 			var err error
 			if picked, err = q.GetExpiringCAForUpdate(ctx, failed); err != nil {
 				return err
 			}
-			rotated, err = Rollover(ctx, q, picked, picked.KeyType, picked.KeyBits, false)
+			_, err = Rollover(ctx, q, picked, picked.KeyType, picked.KeyBits, false)
 			return err
 		})
 		switch {
@@ -97,16 +96,6 @@ func rotateExpiring(ctx context.Context, conn *db.Connection) {
 		case err != nil:
 			slog.Error("ca rotation failed", "ca_id", picked.ID, "workspace_id", picked.WorkspaceID, "error", err)
 			failed = append(failed, picked.ID)
-		default:
-			slog.Info(
-				"ca rotated",
-				"ca_id",
-				rotated.ID,
-				"workspace_id",
-				rotated.WorkspaceID,
-				"not_after",
-				rotated.NotAfter,
-			)
 		}
 	}
 }

@@ -11,87 +11,28 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-const accountPassword = "correct horse battery"
-
-// seedAccount returns a verified user and an account client signed in as them.
-func seedAccount(t *testing.T, cfg *config.Config, password bool) (*db.User, nokkuv1connect.AccountServiceClient) {
+// seedAccount returns a user and an account client signed in as them.
+func seedAccount(t *testing.T, cfg *config.Config) (*db.User, nokkuv1connect.AccountServiceClient) {
 	t.Helper()
-	var u *db.User
-	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) (err error) {
-		u, err = q.CreateUser(t.Context(), &db.CreateUserParams{Email: uuid.New().String() + "@api.test", Name: "u"})
-		return err
-	}))
-	if password {
-		require.NoError(t, cfg.IAM.Password.Store(t.Context(), u.ID, accountPassword))
-	}
-	_, token, err := cfg.IAM.IssueSession(t.Context(), iam.SessionParams{
-		SubjectID: u.ID,
-		Kind:      actor.KindUser,
-		Method:    iam.MethodPassword,
-	})
-	require.NoError(t, err)
+	u := seedUser(t, cfg, seedWorkspace(t, cfg), db.RoleMember)
 	_, srv := newTestAPI(t)
-	return u, nokkuv1connect.NewAccountServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+token))
+	client := nokkuv1connect.NewAccountServiceClient(srv.Client(), srv.URL,
+		header("Authorization", "Bearer "+sessionFor(t, cfg, u)))
+	return u, client
 }
 
-func TestRequestEmailChange(t *testing.T) {
+// Without mail there is no way to confirm a new address.
+func TestRequestEmailChangeNeedsMail(t *testing.T) {
 	cfg, _ := newTestAPI(t)
-	u, account := seedAccount(t, cfg, true)
-	newEmail := uuid.New().String() + "@api.test"
-	request := func(email, password string) error {
-		_, err := account.RequestEmailChange(t.Context(), &nokkuv1.RequestEmailChangeRequest{
-			NewEmail:        &email,
-			CurrentPassword: &password,
-		})
-		return err
-	}
-
-	err := request(newEmail, "wrong")
-	require.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "wrong password: %v", err)
-	assert.Empty(t, cfg.IAM.PendingEmail(t.Context(), u.ID), "a wrong password stored a pending change")
-
-	require.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(request(u.Email, accountPassword)), "same address")
-
-	require.NoError(t, request(newEmail, accountPassword))
-	got, err := account.GetAccount(t.Context(), &nokkuv1.GetAccountRequest{})
-	require.NoError(t, err)
-	assert.Equal(t, u.Email, got.GetUser().GetEmail(), "the address changed before it was confirmed")
-	assert.Equal(t, newEmail, got.GetUser().GetPendingEmail())
-}
-
-func TestRequestEmailChangeRefused(t *testing.T) {
-	cfg, _ := newTestAPI(t)
-	newEmail := uuid.New().String() + "@api.test"
-	password := accountPassword
-	req := &nokkuv1.RequestEmailChangeRequest{NewEmail: &newEmail, CurrentPassword: &password}
-
-	_, passwordless := seedAccount(t, cfg, false)
-	_, err := passwordless.RequestEmailChange(t.Context(), req)
-	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "no password: %v", err)
-
-	// The identity provider owns the address, even with a password set.
-	u, sso := seedAccount(t, cfg, true)
-	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
-		_, err := q.UpsertCredential(t.Context(), &db.UpsertCredentialParams{
-			ID: uuid.New().
-				String(),
-			UserID:   u.ID,
-			Type:     string(iam.MethodOIDC),
-			Provider: "idp",
-			Subject:  u.ID,
-			Data:     []byte("{}"),
-		})
-		return err
-	}))
-	_, err = sso.RequestEmailChange(t.Context(), req)
-	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "sso account: %v", err)
-	assert.Empty(t, cfg.IAM.PendingEmail(t.Context(), u.ID))
+	_, account := seedAccount(t, cfg)
+	_, err := account.RequestEmailChange(t.Context(), &nokkuv1.RequestEmailChangeRequest{
+		NewEmail: new(uuid.New().String() + "@api.test"),
+	})
+	assert.Equal(t, connect.CodeUnimplemented, connect.CodeOf(err), "got %v", err)
 }
 
 // The mails carry the tokens, so the links are taken from iam directly.
@@ -104,8 +45,8 @@ func TestConfirmAndCancelEmailChange(t *testing.T) {
 	}
 
 	t.Run("cancel before confirm", func(t *testing.T) {
-		u, account := seedAccount(t, cfg, true)
-		confirm, cancel, err := cfg.IAM.RequestEmailChange(t.Context(), u, uuid.New().String()+"@api.test")
+		u, account := seedAccount(t, cfg)
+		confirm, cancel, err := cfg.IAM.RequestEmailChange(wsCtx(t, cfg), u, uuid.New().String()+"@api.test")
 		require.NoError(t, err)
 
 		_, err = auth.CancelEmailChange(t.Context(), &nokkuv1.CancelEmailChangeRequest{Token: &cancel})
@@ -119,9 +60,9 @@ func TestConfirmAndCancelEmailChange(t *testing.T) {
 	})
 
 	t.Run("confirm then revert", func(t *testing.T) {
-		u, account := seedAccount(t, cfg, true)
+		u, account := seedAccount(t, cfg)
 		newEmail := uuid.New().String() + "@api.test"
-		confirm, cancel, err := cfg.IAM.RequestEmailChange(t.Context(), u, newEmail)
+		confirm, cancel, err := cfg.IAM.RequestEmailChange(wsCtx(t, cfg), u, newEmail)
 		require.NoError(t, err)
 
 		_, err = auth.ConfirmEmailChange(t.Context(), &nokkuv1.ConfirmEmailChangeRequest{Token: &confirm})
@@ -136,8 +77,23 @@ func TestConfirmAndCancelEmailChange(t *testing.T) {
 		require.NoError(t, err)
 		_, err = email(account)
 		assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the revert signs everyone out: %v", err)
-		reverted, err := cfg.IAM.GetUserByEmail(t.Context(), u.Email)
+		reverted, err := cfg.IAM.GetUserByEmail(wsCtx(t, cfg), u.Email)
 		require.NoError(t, err)
 		assert.Equal(t, u.ID, reverted.ID)
 	})
+}
+
+// The owner hands the workspace on before leaving, anyone else just goes.
+func TestDeleteAccount(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	owner := nokkuv1connect.NewAccountServiceClient(srv.Client(), srv.URL,
+		header("Authorization", "Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), db.RoleOwner)))
+	_, err := owner.DeleteAccount(t.Context(), &nokkuv1.DeleteAccountRequest{})
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "the owner left: %v", err)
+
+	u, member := seedAccount(t, cfg)
+	_, err = member.DeleteAccount(t.Context(), &nokkuv1.DeleteAccountRequest{})
+	require.NoError(t, err)
+	_, err = cfg.IAM.GetUserByEmail(wsCtx(t, cfg), u.Email)
+	assert.Error(t, err, "the account is still there")
 }

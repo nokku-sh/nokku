@@ -1,16 +1,5 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 
-// Must match the rawMessage of api.ErrEmailUnverified.
-export const emailUnverifiedMessage = 'verify your email address before signing in';
-
-export const isEmailUnverifiedError = (error: unknown): boolean =>
-	error instanceof ConnectError && error.rawMessage === emailUnverifiedMessage;
-
-// Must match the rawMessage of api.errOtherBrowser.
-export const isOtherBrowserError = (error: unknown): boolean =>
-	error instanceof ConnectError &&
-	error.rawMessage === 'open this link in the browser you signed up in';
-
 type HTTPErrorBody = {
 	code?: number;
 	message?: string;

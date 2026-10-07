@@ -49,7 +49,7 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			icon: ShieldCheck,
 			role: 'viewer',
 			items: [
-				{ title: 'Members', url: '/access/members', icon: CircleUser, shortcut: 'm' },
+				{ title: 'Users', url: '/access/users', icon: CircleUser, shortcut: 'm' },
 				{ title: 'Teams', url: '/access/teams', icon: Users },
 				{ title: 'Service accounts', url: '/access/service-accounts', icon: Waypoints }
 			]
@@ -79,7 +79,14 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 				{ title: 'Workspace', url: '/settings', icon: SlidersHorizontal, shortcut: 's' },
 				{ title: 'Daemon defaults', url: '/settings/daemons', icon: ServerCog },
 				{ title: 'Audit streaming', url: '/settings/audit', icon: Radio },
-				{ title: 'Single sign-on', url: '/settings/sso', icon: KeyRound }
+				{ title: 'Single sign-on', url: '/settings/sso', icon: KeyRound },
+				{
+					title: 'Billing',
+					url: '/settings/billing',
+					icon: CreditCard,
+					shortcut: 'b',
+					role: 'admin'
+				}
 			]
 		}
 	]
@@ -93,8 +100,7 @@ export const UserRoutes: RouteItem[] = [
 		items: [
 			{ title: 'Profile', url: '/profile', icon: User, shortcut: 'p' },
 			{ title: 'Security', url: '/profile/security', icon: Shield },
-			{ title: 'Activity', url: '/profile/activity', icon: Activity },
-			{ title: 'Billing', url: '/profile/billing', icon: CreditCard, shortcut: 'b' }
+			{ title: 'Activity', url: '/profile/activity', icon: Activity }
 		]
 	}
 ];

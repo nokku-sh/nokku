@@ -164,7 +164,6 @@ func reportLicense(c *licx.Claims) {
 		return
 	}
 	if c.ExpiresAt == 0 {
-		slog.Info("license active", "plan", c.Plan)
 		return
 	}
 	expires := time.Unix(c.ExpiresAt, 0).UTC()
@@ -177,6 +176,5 @@ func reportLicense(c *licx.Claims) {
 		slog.Warn("license expires soon, activate the renewed key under Billing",
 			"expires_at", expires, "days_left", int(math.Ceil(left.Hours()/24)))
 	default:
-		slog.Info("license active", "plan", c.Plan, "expires_at", expires)
 	}
 }

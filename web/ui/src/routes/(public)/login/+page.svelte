@@ -1,191 +1,152 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { auth } from '#lib/api/auth.svelte.js';
 	import { loginWithPasskey } from '#lib/api/passkey.js';
+	import { OIDCIcon } from '#lib/assets/index.js';
+	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
+	import LegalConsent from '#lib/components/blocks/LegalConsent.svelte';
 	import * as Alert from '#lib/components/ext/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
-	import { Input } from '#lib/components/ui/input/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import LegalConsent from '#lib/components/blocks/LegalConsent.svelte';
-	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
-	import { BinaryIcon, GlobeIcon, KeyRound, LogIn, Mail } from '@lucide/svelte';
-	import { GoogleIcon, GitHubIcon, OIDCIcon, SAMLIcon } from '#lib/assets/index.js';
+	import { KeyRound, Mail, MailCheck } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
-	import { sso } from '#lib/api/sso.svelte.js';
-	import { auth } from '#lib/api/auth.svelte.js';
-	import { isEmailUnverifiedError, emailUnverifiedMessage } from '#lib/api/error-formatter.js';
-	import { useDebounce } from 'runed';
+
+	const options = auth.options();
+	const request = auth.requestMagicLink();
 
 	let email = $state('');
-	let password = $state('');
+	let passkeyBusy = $state(false);
 
-	const login = auth.login();
-	const resendVerification = auth.resendVerification();
-	const ssoCheck = sso.check();
-
-	const showUnverified = $derived(login.isError && isEmailUnverifiedError(login.error));
-
-	// Probe for an SSO provider while the email is typed.
-	const checkSSO = useDebounce(() => {
-		if (email.includes('@')) {
-			ssoCheck.mutate(email);
-		}
-	}, 300);
-
-	let enforceSSO = $derived(ssoCheck.isSuccess && ssoCheck.data?.enforce);
-	let disablePasswordLogin = $derived(enforceSSO || login.isPending);
-
-	function ssoLabel(p: { method: string; name: string }) {
-		return p.name || (p.method === 'saml' ? 'SAML' : 'SSO');
-	}
-
-	function handleSSOLogin(p: { method: string; provider: string }) {
-		// The domain tells the backend which workspace's provider is meant.
-		const domain = ssoCheck.data?.domain ?? '';
-		const q = domain ? `&domain=${encodeURIComponent(domain)}` : '';
-		switch (p.method) {
-			case 'oidc':
-				window.location.href = `oidc/login?provider=${p.provider}${q}`;
-				break;
-			case 'saml':
-				window.location.href = `saml/login?provider=${p.provider}${q}`;
-				break;
-			case 'oauth2':
-				window.location.href = `oauth/login?provider=${p.provider}${q}`;
-				break;
-		}
-	}
+	// The provider is the only way in once SSO is required, so the rest is
+	// left out rather than greyed out.
+	const providers = $derived(options.data?.providers ?? []);
+	const providersOnly = $derived(
+		!!options.data && !options.data.magicLink && !options.data.passkey
+	);
 
 	function submit(e: SubmitEvent) {
 		e.preventDefault();
-		if (!disablePasswordLogin) login.mutate({ password, email });
+		request.mutate({ email: email.trim() });
 	}
 
-	async function handlePasskeyLogin() {
+	async function withPasskey() {
+		if (!window.PublicKeyCredential) {
+			toast.error('Passkeys not supported', { description: 'Try a current browser.' });
+			return;
+		}
+		passkeyBusy = true;
 		try {
 			await loginWithPasskey();
 			await goto('/');
 		} catch (error) {
-			// Passkey login knows no email, the verify screen asks for one.
-			if (error instanceof Error && error.message === emailUnverifiedMessage) {
-				await goto('/verify?sent=true');
-				return;
-			}
-			toast.error(error instanceof Error ? error.message : 'Passkey login failed');
+			const cancelled = error instanceof DOMException && error.name === 'NotAllowedError';
+			if (!cancelled)
+				toast.error(error instanceof Error ? error.message : 'Passkey sign-in failed');
+		} finally {
+			passkeyBusy = false;
 		}
 	}
 </script>
 
-<AuthCard title="Sign in to Nokku" description="Welcome back, pick up where you left off">
-	<form class="flex flex-col gap-4" onsubmit={submit}>
-		<Field.Group class="gap-4">
-			<Field.Field>
-				<Field.Label for="email">Email</Field.Label>
-				<Input
-					id="email"
-					type="email"
-					autocomplete="username webauthn"
-					bind:value={email}
-					required
-					oninput={checkSSO}
-					placeholder="you@company.com"
-				/>
-			</Field.Field>
-
-			{#if !enforceSSO && !showUnverified}
+{#if options.isLoading}
+	<AuthCard title="Sign in" description="One moment">
+		<Skeleton class="h-10 w-full" />
+		<Skeleton class="h-10 w-full" />
+	</AuthCard>
+{:else if options.isError}
+	<AuthCard
+		title="No workspace here"
+		description="This address does not belong to a Nokku workspace. Check the link you were given."
+		icon={Mail}
+		tone="destructive"
+	/>
+{:else if request.isSuccess}
+	<AuthCard
+		title="Check your email"
+		description={`If ${email} has an account here, a sign-in link is on its way. It works for 15 minutes and may land in spam.`}
+		icon={MailCheck}
+		tone="success"
+	>
+		<Button variant="outline" onclick={() => request.reset()}>
+			<Mail data-icon="inline-start" />
+			Use a different email
+		</Button>
+	</AuthCard>
+{:else}
+	<AuthCard
+		title={`Sign in to ${options.data?.workspaceName || 'Nokku'}`}
+		description="Welcome back, pick up where you left off"
+	>
+		{#if options.data?.magicLink}
+			<form class="flex flex-col gap-4" onsubmit={submit}>
 				<Field.Field>
-					<div class="flex items-center justify-between">
-						<Field.Label for="password">Password</Field.Label>
-						<a href="/recovery" class="text-xs text-primary hover:underline">Forgot it?</a>
-					</div>
-					<InputGroupVariants
-						variant="password"
-						bind:value={password}
-						placeholder="Your password"
-						inputProps={{ id: 'password', required: true, autocomplete: 'current-password' }}
+					<Field.Label for="email">Email</Field.Label>
+					<Input
+						id="email"
+						type="email"
+						autocomplete="username webauthn"
+						bind:value={email}
+						required
+						placeholder="you@company.com"
 					/>
 				</Field.Field>
-			{/if}
-		</Field.Group>
-
-		{#if showUnverified}
-			<Alert.Root variant="info">
-				<Mail />
-				<Alert.Title>Check your email</Alert.Title>
-				<Alert.Description>
-					We sent a verification link to {email}. Confirm it to activate your account.
-				</Alert.Description>
-			</Alert.Root>
-			<Button
-				variant="outline"
-				type="button"
-				disabled={resendVerification.isPending}
-				onclick={() => resendVerification.mutate({ email })}
-			>
-				{#if resendVerification.isPending}<Spinner data-icon="inline-start" />{:else}<Mail
-						data-icon="inline-start"
-					/>{/if}
-				Resend verification email
-			</Button>
-		{:else if !enforceSSO}
-			<Button type="submit" disabled={disablePasswordLogin}>
-				{#if login.isPending}<Spinner data-icon="inline-start" />{:else}<LogIn
-						data-icon="inline-start"
-					/>{/if}
-				Sign in
-			</Button>
+				<Button type="submit" disabled={request.isPending || !email}>
+					{#if request.isPending}<Spinner data-icon="inline-start" />{:else}<Mail
+							data-icon="inline-start"
+						/>{/if}
+					Send me a sign-in link
+				</Button>
+			</form>
 		{/if}
 
-		{#if ssoCheck.isSuccess && ssoCheck.data?.hasSSO}
-			{#each ssoCheck.data.providers as p (`${p.method}:${p.provider}`)}
-				<Button
-					type="button"
-					variant="secondary"
-					onclick={() => handleSSOLogin(p)}
-					disabled={ssoCheck.isPending}
+		{#if options.data?.magicLink && (options.data.passkey || providers.length)}
+			<Field.Separator>Or continue with</Field.Separator>
+		{/if}
+
+		{#if providersOnly}
+			<Alert.Root variant="info">
+				<KeyRound />
+				<Alert.Title>Single sign-on required</Alert.Title>
+				<Alert.Description
+					>This workspace signs everyone in through its identity provider.</Alert.Description
 				>
-					{#if p.method === 'oidc'}
-						<OIDCIcon data-icon="inline-start" />
-					{:else if p.method === 'saml'}
-						<SAMLIcon data-icon="inline-start" />
-					{:else}
-						<GlobeIcon data-icon="inline-start" />
-					{/if}
-					{ssoLabel(p)}
+			</Alert.Root>
+		{/if}
+
+		<div class="flex flex-col gap-3">
+			{#if options.data?.passkey}
+				<Button
+					variant={options.data.magicLink ? 'secondary' : 'default'}
+					onclick={withPasskey}
+					disabled={passkeyBusy}
+				>
+					{#if passkeyBusy}<Spinner data-icon="inline-start" />{:else}<KeyRound
+							data-icon="inline-start"
+						/>{/if}
+					Passkey
+				</Button>
+			{/if}
+			{#each providers as p (p.providerId)}
+				<Button
+					variant={providersOnly ? 'default' : 'secondary'}
+					href={`/oidc/login?provider=${encodeURIComponent(p.providerId)}`}
+					data-sveltekit-reload
+				>
+					<OIDCIcon data-icon="inline-start" />
+					{p.name || p.providerId}
 				</Button>
 			{/each}
+		</div>
+
+		{#if providers.length}
+			<LegalConsent lead="Single sign-on may create an account on first sign-in. By continuing," />
 		{/if}
-	</form>
 
-	<Field.Separator>Or continue with</Field.Separator>
-
-	<div class="grid grid-cols-2 gap-3">
-		<Button variant="secondary" href="/oidc/login?provider=google" data-sveltekit-reload>
-			<GoogleIcon data-icon="inline-start" />
-			Google
-		</Button>
-		<Button variant="secondary" href="/oauth/login?provider=github" data-sveltekit-reload>
-			<GitHubIcon data-icon="inline-start" />
-			GitHub
-		</Button>
-		<Button variant="secondary" class="col-span-2" onclick={handlePasskeyLogin}>
-			<KeyRound data-icon="inline-start" />
-			Passkey
-		</Button>
-		{#if !enforceSSO && email && login.isError && !showUnverified}
-			<Button href="/login/backup" variant="outline" class="col-span-2">
-				<BinaryIcon data-icon="inline-start" />
-				Sign in with a backup code
-			</Button>
-		{/if}
-	</div>
-
-	<LegalConsent lead="Google, GitHub and SSO create an account on first sign-in. By continuing," />
-
-	{#snippet footer()}
-		New to Nokku? <a href="/register" class="font-medium text-primary hover:underline"
-			>Create an account</a
-		>
-	{/snippet}
-</AuthCard>
+		{#snippet footer()}
+			Invited? Open the link you were sent, it creates your account.
+		{/snippet}
+	</AuthCard>
+{/if}

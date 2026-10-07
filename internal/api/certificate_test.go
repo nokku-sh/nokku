@@ -29,28 +29,26 @@ func TestSignSSHCertificate(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
 	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
-	seedDefaultCA(t, srv, adminAuth, workspaceID)
+	seedDefaultCA(t, srv, adminAuth)
 	daemonKey, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, false)
 	targetID := enrolled.GetTargetId()
 	otherID := seedTarget(t, cfg, workspaceID)
 
 	memberToken := seedMember(t, cfg, workspaceID, db.RoleMember)
-	member, _, err := cfg.IAM.AuthenticateToken(t.Context(), memberToken)
+	member, _, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), memberToken)
 	require.NoError(t, err)
 	wantPrincipal := member.ID + "@" + targetID + ":root"
 
 	principals := nokkuv1connect.NewPrincipalServiceClient(srv.Client(), srv.URL, adminAuth)
 	root, err := principals.AddPrincipal(t.Context(), &nokkuv1.AddPrincipalRequest{
-		WorkspaceId: &workspaceID,
-		TargetId:    &targetID,
-		Username:    new("root"),
+		TargetId: &targetID,
+		Username: new("root"),
 	})
 	require.NoError(t, err)
 	grant := &nokkuv1.AddSubjectsToPrincipalRequest{
-		WorkspaceId: &workspaceID,
-		Id:          new(root.GetPrincipal().GetId()),
-		Kind:        nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
-		SubjectIds:  []string{member.ID},
+		Id:         new(root.GetPrincipal().GetId()),
+		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
+		SubjectIds: []string{member.ID},
 	}
 	_, err = principals.AddSubjectsToPrincipal(t.Context(), grant)
 	require.NoError(t, err)
@@ -63,9 +61,8 @@ func TestSignSSHCertificate(t *testing.T) {
 		res, err := nokkuv1connect.NewCertificateServiceClient(
 			srv.Client(), srv.URL, header("Authorization", "Bearer "+memberToken),
 		).SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
-			WorkspaceId: &workspaceID,
-			TargetId:    &target,
-			PublicKey:   new(string(gossh.MarshalAuthorizedKey(sshPub))),
+			TargetId:  &target,
+			PublicKey: new(string(gossh.MarshalAuthorizedKey(sshPub))),
 		})
 		if err != nil {
 			return nil, err
@@ -82,9 +79,8 @@ func TestSignSSHCertificate(t *testing.T) {
 		"a daemon nobody approved got a certificate signed, %v", err)
 	_, err = nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, adminAuth).
 		UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
-			WorkspaceId: &workspaceID,
-			Id:          new(enrolled.GetId()),
-			Status:      nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
+			Id:     new(enrolled.GetId()),
+			Status: nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
 		})
 	require.NoError(t, err)
 
@@ -107,8 +103,7 @@ func TestSignSSHCertificate(t *testing.T) {
 
 	listed, err := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, adminAuth).
 		GetTargetPrincipals(t.Context(), &nokkuv1.GetTargetPrincipalsRequest{
-			WorkspaceId: &workspaceID,
-			TargetId:    &targetID,
+			TargetId: &targetID,
 		})
 	require.NoError(t, err)
 	require.Len(t, listed.GetPrincipals(), 1)
@@ -116,10 +111,9 @@ func TestSignSSHCertificate(t *testing.T) {
 		"nk sync must write the principal the certificate carries")
 
 	_, err = principals.RemoveSubjectsFromPrincipal(t.Context(), &nokkuv1.RemoveSubjectsFromPrincipalRequest{
-		WorkspaceId: grant.WorkspaceId,
-		Id:          grant.Id,
-		Kind:        grant.Kind,
-		SubjectIds:  grant.GetSubjectIds(),
+		Id:         grant.Id,
+		Kind:       grant.Kind,
+		SubjectIds: grant.GetSubjectIds(),
 	})
 	require.NoError(t, err)
 	_, err = sign(targetID)
@@ -138,8 +132,7 @@ func TestSignX509NeedsEditor(t *testing.T) {
 	}
 
 	ca, err := client(db.RoleEditor).CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
-		WorkspaceId:   &workspaceID,
-		Name:          new("x509"),
+		Name:          new(uniq("x509")),
 		KeyType:       nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ECDSA.Enum(),
 		AuthorityType: nokkuv1.AuthorityType_AUTHORITY_TYPE_X509.Enum(),
 	})
@@ -153,9 +146,8 @@ func TestSignX509NeedsEditor(t *testing.T) {
 	}, key)
 	require.NoError(t, err)
 	req := &nokkuv1.SignX509CertificateRequest{
-		WorkspaceId: &workspaceID,
-		CaId:        new(ca.GetCertificateAuthority().GetId()),
-		Csr:         new(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: der}))),
+		CaId: new(ca.GetCertificateAuthority().GetId()),
+		Csr:  new(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: der}))),
 	}
 
 	for _, role := range []db.Role{db.RoleMember, db.RoleViewer} {

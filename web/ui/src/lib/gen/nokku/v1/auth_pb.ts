@@ -14,74 +14,59 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/auth.proto.
  */
 export const file_nokku_v1_auth: GenFile = /*@__PURE__*/
-  fileDesc("ChNub2trdS92MS9hdXRoLnByb3RvEghub2trdS52MSJfCg9SZWdpc3RlclJlcXVlc3QSFgoEbmFtZRgBIAEoCUIIukgFcgMYgAISFgoFZW1haWwYAiABKAlCB7pIBHICYAESHAoIcGFzc3dvcmQYAyABKAlCCrpIB3IFEAgYgAEiEgoQUmVnaXN0ZXJSZXNwb25zZSJECgxMb2dpblJlcXVlc3QSFgoFZW1haWwYASABKAlCB7pIBHICYAESHAoIcGFzc3dvcmQYAiABKAlCCrpIB3IFEAEYgAEiLQoNTG9naW5SZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlciJLChpMb2dpbldpdGhCYWNrdXBDb2RlUmVxdWVzdBIWCgVlbWFpbBgBIAEoCUIHukgEcgJgARIVCgRjb2RlGAIgASgJQge6SARyAhABIjsKG0xvZ2luV2l0aEJhY2t1cENvZGVSZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlciIPCg1Mb2dvdXRSZXF1ZXN0IhAKDkxvZ291dFJlc3BvbnNlIi8KFUZvcmdvdFBhc3N3b3JkUmVxdWVzdBIWCgVlbWFpbBgBIAEoCUIHukgEcgJgASIYChZGb3Jnb3RQYXNzd29yZFJlc3BvbnNlIlAKFFJlc2V0UGFzc3dvcmRSZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABEiAKDG5ld19wYXNzd29yZBgCIAEoCUIKukgHcgUQCBiAASIXChVSZXNldFBhc3N3b3JkUmVzcG9uc2UiLAoSVmVyaWZ5RW1haWxSZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABIhUKE1ZlcmlmeUVtYWlsUmVzcG9uc2UiMwoZQ29uZmlybUVtYWlsQ2hhbmdlUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQASIcChpDb25maXJtRW1haWxDaGFuZ2VSZXNwb25zZSIyChhDYW5jZWxFbWFpbENoYW5nZVJlcXVlc3QSFgoFdG9rZW4YASABKAlCB7pIBHICEAEiGwoZQ2FuY2VsRW1haWxDaGFuZ2VSZXNwb25zZSIzChlSZXNlbmRWZXJpZmljYXRpb25SZXF1ZXN0EhYKBWVtYWlsGAEgASgJQge6SARyAmABIhwKGlJlc2VuZFZlcmlmaWNhdGlvblJlc3BvbnNlIiwKEkRpc2NvdmVyU1NPUmVxdWVzdBIWCgVlbWFpbBgBIAEoCUIHukgEcgJgASJlChNEaXNjb3ZlclNTT1Jlc3BvbnNlEg8KB2hhc19zc28YASABKAgSDwoHZW5mb3JjZRgCIAEoCBIsCglwcm92aWRlcnMYAyADKAsyGS5ub2trdS52MS5TU09Qcm92aWRlckluZm8iQQoPU1NPUHJvdmlkZXJJbmZvEg4KBm1ldGhvZBgBIAEoCRIQCghwcm92aWRlchgCIAEoCRIMCgRuYW1lGAMgASgJMuUHCgtBdXRoU2VydmljZRJJCghSZWdpc3RlchIZLm5va2t1LnYxLlJlZ2lzdGVyUmVxdWVzdBoaLm5va2t1LnYxLlJlZ2lzdGVyUmVzcG9uc2UiBsLzGAIIARJACgVMb2dpbhIWLm5va2t1LnYxLkxvZ2luUmVxdWVzdBoXLm5va2t1LnYxLkxvZ2luUmVzcG9uc2UiBsLzGAIIARJqChNMb2dpbldpdGhCYWNrdXBDb2RlEiQubm9ra3UudjEuTG9naW5XaXRoQmFja3VwQ29kZVJlcXVlc3QaJS5ub2trdS52MS5Mb2dpbldpdGhCYWNrdXBDb2RlUmVzcG9uc2UiBsLzGAIIARJDCgZMb2dvdXQSFy5ub2trdS52MS5Mb2dvdXRSZXF1ZXN0Ghgubm9ra3UudjEuTG9nb3V0UmVzcG9uc2UiBsLzGAIIARJbCg5Gb3Jnb3RQYXNzd29yZBIfLm5va2t1LnYxLkZvcmdvdFBhc3N3b3JkUmVxdWVzdBogLm5va2t1LnYxLkZvcmdvdFBhc3N3b3JkUmVzcG9uc2UiBsLzGAIIARJYCg1SZXNldFBhc3N3b3JkEh4ubm9ra3UudjEuUmVzZXRQYXNzd29yZFJlcXVlc3QaHy5ub2trdS52MS5SZXNldFBhc3N3b3JkUmVzcG9uc2UiBsLzGAIIARJSCgtWZXJpZnlFbWFpbBIcLm5va2t1LnYxLlZlcmlmeUVtYWlsUmVxdWVzdBodLm5va2t1LnYxLlZlcmlmeUVtYWlsUmVzcG9uc2UiBsLzGAIIARJnChJSZXNlbmRWZXJpZmljYXRpb24SIy5ub2trdS52MS5SZXNlbmRWZXJpZmljYXRpb25SZXF1ZXN0GiQubm9ra3UudjEuUmVzZW5kVmVyaWZpY2F0aW9uUmVzcG9uc2UiBsLzGAIIARJnChJDb25maXJtRW1haWxDaGFuZ2USIy5ub2trdS52MS5Db25maXJtRW1haWxDaGFuZ2VSZXF1ZXN0GiQubm9ra3UudjEuQ29uZmlybUVtYWlsQ2hhbmdlUmVzcG9uc2UiBsLzGAIIARJkChFDYW5jZWxFbWFpbENoYW5nZRIiLm5va2t1LnYxLkNhbmNlbEVtYWlsQ2hhbmdlUmVxdWVzdBojLm5va2t1LnYxLkNhbmNlbEVtYWlsQ2hhbmdlUmVzcG9uc2UiBsLzGAIIARJVCgtEaXNjb3ZlclNTTxIcLm5va2t1LnYxLkRpc2NvdmVyU1NPUmVxdWVzdBodLm5va2t1LnYxLkRpc2NvdmVyU1NPUmVzcG9uc2UiCZACAcLzGAIIAWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_nokku_v1_access, file_nokku_v1_account]);
+  fileDesc("ChNub2trdS92MS9hdXRoLnByb3RvEghub2trdS52MSIxChdSZXF1ZXN0TWFnaWNMaW5rUmVxdWVzdBIWCgVlbWFpbBgBIAEoCUIHukgEcgJgASIaChhSZXF1ZXN0TWFnaWNMaW5rUmVzcG9uc2UiMQoXQ29uc3VtZU1hZ2ljTGlua1JlcXVlc3QSFgoFdG9rZW4YASABKAlCB7pIBHICEAEiOAoYQ29uc3VtZU1hZ2ljTGlua1Jlc3BvbnNlEhwKBHVzZXIYASABKAsyDi5ub2trdS52MS5Vc2VyIg8KDUxvZ291dFJlcXVlc3QiEAoOTG9nb3V0UmVzcG9uc2UiGAoWR2V0TG9naW5PcHRpb25zUmVxdWVzdCKEAQoXR2V0TG9naW5PcHRpb25zUmVzcG9uc2USFgoOd29ya3NwYWNlX25hbWUYASABKAkSEgoKbWFnaWNfbGluaxgCIAEoCBIPCgdwYXNza2V5GAMgASgIEiwKCXByb3ZpZGVycxgEIAMoCzIZLm5va2t1LnYxLlNTT1Byb3ZpZGVySW5mbyI0Cg9TU09Qcm92aWRlckluZm8SEwoLcHJvdmlkZXJfaWQYASABKAkSDAoEbmFtZRgCIAEoCSIzChlDb25maXJtRW1haWxDaGFuZ2VSZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABIhwKGkNvbmZpcm1FbWFpbENoYW5nZVJlc3BvbnNlIjIKGENhbmNlbEVtYWlsQ2hhbmdlUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQASIbChlDYW5jZWxFbWFpbENoYW5nZVJlc3BvbnNlMsoECgtBdXRoU2VydmljZRJhChBSZXF1ZXN0TWFnaWNMaW5rEiEubm9ra3UudjEuUmVxdWVzdE1hZ2ljTGlua1JlcXVlc3QaIi5ub2trdS52MS5SZXF1ZXN0TWFnaWNMaW5rUmVzcG9uc2UiBsLzGAIIARJhChBDb25zdW1lTWFnaWNMaW5rEiEubm9ra3UudjEuQ29uc3VtZU1hZ2ljTGlua1JlcXVlc3QaIi5ub2trdS52MS5Db25zdW1lTWFnaWNMaW5rUmVzcG9uc2UiBsLzGAIIARJDCgZMb2dvdXQSFy5ub2trdS52MS5Mb2dvdXRSZXF1ZXN0Ghgubm9ra3UudjEuTG9nb3V0UmVzcG9uc2UiBsLzGAIIARJhCg9HZXRMb2dpbk9wdGlvbnMSIC5ub2trdS52MS5HZXRMb2dpbk9wdGlvbnNSZXF1ZXN0GiEubm9ra3UudjEuR2V0TG9naW5PcHRpb25zUmVzcG9uc2UiCZACAcLzGAIIARJnChJDb25maXJtRW1haWxDaGFuZ2USIy5ub2trdS52MS5Db25maXJtRW1haWxDaGFuZ2VSZXF1ZXN0GiQubm9ra3UudjEuQ29uZmlybUVtYWlsQ2hhbmdlUmVzcG9uc2UiBsLzGAIIARJkChFDYW5jZWxFbWFpbENoYW5nZRIiLm5va2t1LnYxLkNhbmNlbEVtYWlsQ2hhbmdlUmVxdWVzdBojLm5va2t1LnYxLkNhbmNlbEVtYWlsQ2hhbmdlUmVzcG9uc2UiBsLzGAIIAWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_nokku_v1_access, file_nokku_v1_account]);
 
 /**
- * @generated from message nokku.v1.RegisterRequest
+ * @generated from message nokku.v1.RequestMagicLinkRequest
  */
-export type RegisterRequest = Message<"nokku.v1.RegisterRequest"> & {
+export type RequestMagicLinkRequest = Message<"nokku.v1.RequestMagicLinkRequest"> & {
   /**
-   * @generated from field: string name = 1;
-   */
-  name: string;
-
-  /**
-   * @generated from field: string email = 2;
+   * @generated from field: string email = 1;
    */
   email: string;
-
-  /**
-   * @generated from field: string password = 3;
-   */
-  password: string;
 };
 
 /**
- * Describes the message nokku.v1.RegisterRequest.
- * Use `create(RegisterRequestSchema)` to create a new message.
+ * Describes the message nokku.v1.RequestMagicLinkRequest.
+ * Use `create(RequestMagicLinkRequestSchema)` to create a new message.
  */
-export const RegisterRequestSchema: GenMessage<RegisterRequest> = /*@__PURE__*/
+export const RequestMagicLinkRequestSchema: GenMessage<RequestMagicLinkRequest> = /*@__PURE__*/
   messageDesc(file_nokku_v1_auth, 0);
 
 /**
- * @generated from message nokku.v1.RegisterResponse
+ * @generated from message nokku.v1.RequestMagicLinkResponse
  */
-export type RegisterResponse = Message<"nokku.v1.RegisterResponse"> & {
+export type RequestMagicLinkResponse = Message<"nokku.v1.RequestMagicLinkResponse"> & {
 };
 
 /**
- * Describes the message nokku.v1.RegisterResponse.
- * Use `create(RegisterResponseSchema)` to create a new message.
+ * Describes the message nokku.v1.RequestMagicLinkResponse.
+ * Use `create(RequestMagicLinkResponseSchema)` to create a new message.
  */
-export const RegisterResponseSchema: GenMessage<RegisterResponse> = /*@__PURE__*/
+export const RequestMagicLinkResponseSchema: GenMessage<RequestMagicLinkResponse> = /*@__PURE__*/
   messageDesc(file_nokku_v1_auth, 1);
 
 /**
- * @generated from message nokku.v1.LoginRequest
+ * @generated from message nokku.v1.ConsumeMagicLinkRequest
  */
-export type LoginRequest = Message<"nokku.v1.LoginRequest"> & {
+export type ConsumeMagicLinkRequest = Message<"nokku.v1.ConsumeMagicLinkRequest"> & {
   /**
-   * @generated from field: string email = 1;
+   * @generated from field: string token = 1;
    */
-  email: string;
-
-  /**
-   * @generated from field: string password = 2;
-   */
-  password: string;
+  token: string;
 };
 
 /**
- * Describes the message nokku.v1.LoginRequest.
- * Use `create(LoginRequestSchema)` to create a new message.
+ * Describes the message nokku.v1.ConsumeMagicLinkRequest.
+ * Use `create(ConsumeMagicLinkRequestSchema)` to create a new message.
  */
-export const LoginRequestSchema: GenMessage<LoginRequest> = /*@__PURE__*/
+export const ConsumeMagicLinkRequestSchema: GenMessage<ConsumeMagicLinkRequest> = /*@__PURE__*/
   messageDesc(file_nokku_v1_auth, 2);
 
 /**
- * @generated from message nokku.v1.LoginResponse
+ * @generated from message nokku.v1.ConsumeMagicLinkResponse
  */
-export type LoginResponse = Message<"nokku.v1.LoginResponse"> & {
+export type ConsumeMagicLinkResponse = Message<"nokku.v1.ConsumeMagicLinkResponse"> & {
   /**
    * @generated from field: nokku.v1.User user = 1;
    */
@@ -89,50 +74,11 @@ export type LoginResponse = Message<"nokku.v1.LoginResponse"> & {
 };
 
 /**
- * Describes the message nokku.v1.LoginResponse.
- * Use `create(LoginResponseSchema)` to create a new message.
+ * Describes the message nokku.v1.ConsumeMagicLinkResponse.
+ * Use `create(ConsumeMagicLinkResponseSchema)` to create a new message.
  */
-export const LoginResponseSchema: GenMessage<LoginResponse> = /*@__PURE__*/
+export const ConsumeMagicLinkResponseSchema: GenMessage<ConsumeMagicLinkResponse> = /*@__PURE__*/
   messageDesc(file_nokku_v1_auth, 3);
-
-/**
- * @generated from message nokku.v1.LoginWithBackupCodeRequest
- */
-export type LoginWithBackupCodeRequest = Message<"nokku.v1.LoginWithBackupCodeRequest"> & {
-  /**
-   * @generated from field: string email = 1;
-   */
-  email: string;
-
-  /**
-   * @generated from field: string code = 2;
-   */
-  code: string;
-};
-
-/**
- * Describes the message nokku.v1.LoginWithBackupCodeRequest.
- * Use `create(LoginWithBackupCodeRequestSchema)` to create a new message.
- */
-export const LoginWithBackupCodeRequestSchema: GenMessage<LoginWithBackupCodeRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 4);
-
-/**
- * @generated from message nokku.v1.LoginWithBackupCodeResponse
- */
-export type LoginWithBackupCodeResponse = Message<"nokku.v1.LoginWithBackupCodeResponse"> & {
-  /**
-   * @generated from field: nokku.v1.User user = 1;
-   */
-  user?: User | undefined;
-};
-
-/**
- * Describes the message nokku.v1.LoginWithBackupCodeResponse.
- * Use `create(LoginWithBackupCodeResponseSchema)` to create a new message.
- */
-export const LoginWithBackupCodeResponseSchema: GenMessage<LoginWithBackupCodeResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 5);
 
 /**
  * @generated from message nokku.v1.LogoutRequest
@@ -145,7 +91,7 @@ export type LogoutRequest = Message<"nokku.v1.LogoutRequest"> & {
  * Use `create(LogoutRequestSchema)` to create a new message.
  */
 export const LogoutRequestSchema: GenMessage<LogoutRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 6);
+  messageDesc(file_nokku_v1_auth, 4);
 
 /**
  * @generated from message nokku.v1.LogoutResponse
@@ -158,102 +104,78 @@ export type LogoutResponse = Message<"nokku.v1.LogoutResponse"> & {
  * Use `create(LogoutResponseSchema)` to create a new message.
  */
 export const LogoutResponseSchema: GenMessage<LogoutResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_auth, 5);
+
+/**
+ * @generated from message nokku.v1.GetLoginOptionsRequest
+ */
+export type GetLoginOptionsRequest = Message<"nokku.v1.GetLoginOptionsRequest"> & {
+};
+
+/**
+ * Describes the message nokku.v1.GetLoginOptionsRequest.
+ * Use `create(GetLoginOptionsRequestSchema)` to create a new message.
+ */
+export const GetLoginOptionsRequestSchema: GenMessage<GetLoginOptionsRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_auth, 6);
+
+/**
+ * @generated from message nokku.v1.GetLoginOptionsResponse
+ */
+export type GetLoginOptionsResponse = Message<"nokku.v1.GetLoginOptionsResponse"> & {
+  /**
+   * @generated from field: string workspace_name = 1;
+   */
+  workspaceName: string;
+
+  /**
+   * Mail is configured and SSO is not enforced.
+   *
+   * @generated from field: bool magic_link = 2;
+   */
+  magicLink: boolean;
+
+  /**
+   * SSO is not enforced.
+   *
+   * @generated from field: bool passkey = 3;
+   */
+  passkey: boolean;
+
+  /**
+   * @generated from field: repeated nokku.v1.SSOProviderInfo providers = 4;
+   */
+  providers: SSOProviderInfo[];
+};
+
+/**
+ * Describes the message nokku.v1.GetLoginOptionsResponse.
+ * Use `create(GetLoginOptionsResponseSchema)` to create a new message.
+ */
+export const GetLoginOptionsResponseSchema: GenMessage<GetLoginOptionsResponse> = /*@__PURE__*/
   messageDesc(file_nokku_v1_auth, 7);
 
 /**
- * @generated from message nokku.v1.ForgotPasswordRequest
+ * @generated from message nokku.v1.SSOProviderInfo
  */
-export type ForgotPasswordRequest = Message<"nokku.v1.ForgotPasswordRequest"> & {
+export type SSOProviderInfo = Message<"nokku.v1.SSOProviderInfo"> & {
   /**
-   * @generated from field: string email = 1;
+   * @generated from field: string provider_id = 1;
    */
-  email: string;
+  providerId: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
 };
 
 /**
- * Describes the message nokku.v1.ForgotPasswordRequest.
- * Use `create(ForgotPasswordRequestSchema)` to create a new message.
+ * Describes the message nokku.v1.SSOProviderInfo.
+ * Use `create(SSOProviderInfoSchema)` to create a new message.
  */
-export const ForgotPasswordRequestSchema: GenMessage<ForgotPasswordRequest> = /*@__PURE__*/
+export const SSOProviderInfoSchema: GenMessage<SSOProviderInfo> = /*@__PURE__*/
   messageDesc(file_nokku_v1_auth, 8);
-
-/**
- * @generated from message nokku.v1.ForgotPasswordResponse
- */
-export type ForgotPasswordResponse = Message<"nokku.v1.ForgotPasswordResponse"> & {
-};
-
-/**
- * Describes the message nokku.v1.ForgotPasswordResponse.
- * Use `create(ForgotPasswordResponseSchema)` to create a new message.
- */
-export const ForgotPasswordResponseSchema: GenMessage<ForgotPasswordResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 9);
-
-/**
- * @generated from message nokku.v1.ResetPasswordRequest
- */
-export type ResetPasswordRequest = Message<"nokku.v1.ResetPasswordRequest"> & {
-  /**
-   * @generated from field: string token = 1;
-   */
-  token: string;
-
-  /**
-   * @generated from field: string new_password = 2;
-   */
-  newPassword: string;
-};
-
-/**
- * Describes the message nokku.v1.ResetPasswordRequest.
- * Use `create(ResetPasswordRequestSchema)` to create a new message.
- */
-export const ResetPasswordRequestSchema: GenMessage<ResetPasswordRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 10);
-
-/**
- * @generated from message nokku.v1.ResetPasswordResponse
- */
-export type ResetPasswordResponse = Message<"nokku.v1.ResetPasswordResponse"> & {
-};
-
-/**
- * Describes the message nokku.v1.ResetPasswordResponse.
- * Use `create(ResetPasswordResponseSchema)` to create a new message.
- */
-export const ResetPasswordResponseSchema: GenMessage<ResetPasswordResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 11);
-
-/**
- * @generated from message nokku.v1.VerifyEmailRequest
- */
-export type VerifyEmailRequest = Message<"nokku.v1.VerifyEmailRequest"> & {
-  /**
-   * @generated from field: string token = 1;
-   */
-  token: string;
-};
-
-/**
- * Describes the message nokku.v1.VerifyEmailRequest.
- * Use `create(VerifyEmailRequestSchema)` to create a new message.
- */
-export const VerifyEmailRequestSchema: GenMessage<VerifyEmailRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 12);
-
-/**
- * @generated from message nokku.v1.VerifyEmailResponse
- */
-export type VerifyEmailResponse = Message<"nokku.v1.VerifyEmailResponse"> & {
-};
-
-/**
- * Describes the message nokku.v1.VerifyEmailResponse.
- * Use `create(VerifyEmailResponseSchema)` to create a new message.
- */
-export const VerifyEmailResponseSchema: GenMessage<VerifyEmailResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 13);
 
 /**
  * @generated from message nokku.v1.ConfirmEmailChangeRequest
@@ -270,7 +192,7 @@ export type ConfirmEmailChangeRequest = Message<"nokku.v1.ConfirmEmailChangeRequ
  * Use `create(ConfirmEmailChangeRequestSchema)` to create a new message.
  */
 export const ConfirmEmailChangeRequestSchema: GenMessage<ConfirmEmailChangeRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 14);
+  messageDesc(file_nokku_v1_auth, 9);
 
 /**
  * @generated from message nokku.v1.ConfirmEmailChangeResponse
@@ -283,7 +205,7 @@ export type ConfirmEmailChangeResponse = Message<"nokku.v1.ConfirmEmailChangeRes
  * Use `create(ConfirmEmailChangeResponseSchema)` to create a new message.
  */
 export const ConfirmEmailChangeResponseSchema: GenMessage<ConfirmEmailChangeResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 15);
+  messageDesc(file_nokku_v1_auth, 10);
 
 /**
  * @generated from message nokku.v1.CancelEmailChangeRequest
@@ -300,7 +222,7 @@ export type CancelEmailChangeRequest = Message<"nokku.v1.CancelEmailChangeReques
  * Use `create(CancelEmailChangeRequestSchema)` to create a new message.
  */
 export const CancelEmailChangeRequestSchema: GenMessage<CancelEmailChangeRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 16);
+  messageDesc(file_nokku_v1_auth, 11);
 
 /**
  * @generated from message nokku.v1.CancelEmailChangeResponse
@@ -313,136 +235,36 @@ export type CancelEmailChangeResponse = Message<"nokku.v1.CancelEmailChangeRespo
  * Use `create(CancelEmailChangeResponseSchema)` to create a new message.
  */
 export const CancelEmailChangeResponseSchema: GenMessage<CancelEmailChangeResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 17);
+  messageDesc(file_nokku_v1_auth, 12);
 
 /**
- * @generated from message nokku.v1.ResendVerificationRequest
- */
-export type ResendVerificationRequest = Message<"nokku.v1.ResendVerificationRequest"> & {
-  /**
-   * @generated from field: string email = 1;
-   */
-  email: string;
-};
-
-/**
- * Describes the message nokku.v1.ResendVerificationRequest.
- * Use `create(ResendVerificationRequestSchema)` to create a new message.
- */
-export const ResendVerificationRequestSchema: GenMessage<ResendVerificationRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 18);
-
-/**
- * @generated from message nokku.v1.ResendVerificationResponse
- */
-export type ResendVerificationResponse = Message<"nokku.v1.ResendVerificationResponse"> & {
-};
-
-/**
- * Describes the message nokku.v1.ResendVerificationResponse.
- * Use `create(ResendVerificationResponseSchema)` to create a new message.
- */
-export const ResendVerificationResponseSchema: GenMessage<ResendVerificationResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 19);
-
-/**
- * @generated from message nokku.v1.DiscoverSSORequest
- */
-export type DiscoverSSORequest = Message<"nokku.v1.DiscoverSSORequest"> & {
-  /**
-   * @generated from field: string email = 1;
-   */
-  email: string;
-};
-
-/**
- * Describes the message nokku.v1.DiscoverSSORequest.
- * Use `create(DiscoverSSORequestSchema)` to create a new message.
- */
-export const DiscoverSSORequestSchema: GenMessage<DiscoverSSORequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 20);
-
-/**
- * @generated from message nokku.v1.DiscoverSSOResponse
- */
-export type DiscoverSSOResponse = Message<"nokku.v1.DiscoverSSOResponse"> & {
-  /**
-   * @generated from field: bool has_sso = 1;
-   */
-  hasSso: boolean;
-
-  /**
-   * @generated from field: bool enforce = 2;
-   */
-  enforce: boolean;
-
-  /**
-   * @generated from field: repeated nokku.v1.SSOProviderInfo providers = 3;
-   */
-  providers: SSOProviderInfo[];
-};
-
-/**
- * Describes the message nokku.v1.DiscoverSSOResponse.
- * Use `create(DiscoverSSOResponseSchema)` to create a new message.
- */
-export const DiscoverSSOResponseSchema: GenMessage<DiscoverSSOResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 21);
-
-/**
- * @generated from message nokku.v1.SSOProviderInfo
- */
-export type SSOProviderInfo = Message<"nokku.v1.SSOProviderInfo"> & {
-  /**
-   * @generated from field: string method = 1;
-   */
-  method: string;
-
-  /**
-   * @generated from field: string provider = 2;
-   */
-  provider: string;
-
-  /**
-   * @generated from field: string name = 3;
-   */
-  name: string;
-};
-
-/**
- * Describes the message nokku.v1.SSOProviderInfo.
- * Use `create(SSOProviderInfoSchema)` to create a new message.
- */
-export const SSOProviderInfoSchema: GenMessage<SSOProviderInfo> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_auth, 22);
-
-/**
+ * Every call runs in the workspace the request's host names. There is no
+ * password: a user signs in with a passkey, a mailed link, or the
+ * workspace's OIDC provider.
+ *
  * @generated from service nokku.v1.AuthService
  */
 export const AuthService: GenService<{
   /**
-   * @generated from rpc nokku.v1.AuthService.Register
+   * Mails a sign-in link to a user of this workspace. Always answers OK, so
+   * it never tells whether an address exists.
+   *
+   * @generated from rpc nokku.v1.AuthService.RequestMagicLink
    */
-  register: {
+  requestMagicLink: {
     methodKind: "unary";
-    input: typeof RegisterRequestSchema;
-    output: typeof RegisterResponseSchema;
+    input: typeof RequestMagicLinkRequestSchema;
+    output: typeof RequestMagicLinkResponseSchema;
   },
   /**
-   * @generated from rpc nokku.v1.AuthService.Login
+   * Spends the token from a sign-in or signup link and signs this browser in.
+   *
+   * @generated from rpc nokku.v1.AuthService.ConsumeMagicLink
    */
-  login: {
+  consumeMagicLink: {
     methodKind: "unary";
-    input: typeof LoginRequestSchema;
-    output: typeof LoginResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AuthService.LoginWithBackupCode
-   */
-  loginWithBackupCode: {
-    methodKind: "unary";
-    input: typeof LoginWithBackupCodeRequestSchema;
-    output: typeof LoginWithBackupCodeResponseSchema;
+    input: typeof ConsumeMagicLinkRequestSchema;
+    output: typeof ConsumeMagicLinkResponseSchema;
   },
   /**
    * Public so a stale session can still clear its cookie.
@@ -455,36 +277,14 @@ export const AuthService: GenService<{
     output: typeof LogoutResponseSchema;
   },
   /**
-   * @generated from rpc nokku.v1.AuthService.ForgotPassword
+   * What the login page may offer in this workspace.
+   *
+   * @generated from rpc nokku.v1.AuthService.GetLoginOptions
    */
-  forgotPassword: {
+  getLoginOptions: {
     methodKind: "unary";
-    input: typeof ForgotPasswordRequestSchema;
-    output: typeof ForgotPasswordResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AuthService.ResetPassword
-   */
-  resetPassword: {
-    methodKind: "unary";
-    input: typeof ResetPasswordRequestSchema;
-    output: typeof ResetPasswordResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AuthService.VerifyEmail
-   */
-  verifyEmail: {
-    methodKind: "unary";
-    input: typeof VerifyEmailRequestSchema;
-    output: typeof VerifyEmailResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AuthService.ResendVerification
-   */
-  resendVerification: {
-    methodKind: "unary";
-    input: typeof ResendVerificationRequestSchema;
-    output: typeof ResendVerificationResponseSchema;
+    input: typeof GetLoginOptionsRequestSchema;
+    output: typeof GetLoginOptionsResponseSchema;
   },
   /**
    * Takes the token mailed to the new address and switches the account to it.
@@ -506,14 +306,6 @@ export const AuthService: GenService<{
     methodKind: "unary";
     input: typeof CancelEmailChangeRequestSchema;
     output: typeof CancelEmailChangeResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.AuthService.DiscoverSSO
-   */
-  discoverSSO: {
-    methodKind: "unary";
-    input: typeof DiscoverSSORequestSchema;
-    output: typeof DiscoverSSOResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_nokku_v1_auth, 0);

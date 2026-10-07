@@ -202,7 +202,7 @@ func TestResolve_FailClosedOnDBError(t *testing.T) {
 		ModeSaaS,
 	)
 	got := sut.Resolve(context.Background(), "ws1")
-	if got.Has(FeatureSAML) || got.Has(FeatureAuditExport) || got.Has(FeatureEnforceSSO) {
+	if got.Has(FeatureSCIM) || got.Has(FeatureAuditExport) || got.Has(FeatureEnforceSSO) {
 		t.Error("DB error granted paid features")
 	}
 	if got.Name != PlanCommunity {

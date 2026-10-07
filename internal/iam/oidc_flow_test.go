@@ -116,9 +116,9 @@ type oidcFlowRun struct {
 func (h *oidcIDPHarness) startOIDCFlow(t *testing.T, svc *Service) *oidcFlowRun {
 	t.Helper()
 
-	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+h.org.ws, nil)
+	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil)
 	loginRec := httptest.NewRecorder()
-	svc.OIDC.Login(loginRec, login)
+	svc.OIDC.Login(loginRec, login.WithContext(anon(login.Context(), h.org.ws)))
 
 	authorizeURL := loginRec.Header().Get("Location")
 	if authorizeURL == "" {
@@ -153,7 +153,7 @@ func (f *oidcFlowRun) callback(t *testing.T, svc *Service, extraQuery string) *h
 		cb.AddCookie(c)
 	}
 	rec := httptest.NewRecorder()
-	svc.OIDC.Callback(rec, cb)
+	svc.OIDC.Callback(rec, cb.WithContext(anon(cb.Context(), f.idp.org.ws)))
 	return rec
 }
 
@@ -171,11 +171,11 @@ func (h *oidcIDPHarness) setup(t *testing.T, jit bool) (*testEnv, *Service) {
 	t.Helper()
 	e := newTestEnv(t)
 	h.org = e.org(t)
-	h.email = "alice@" + h.org.domain
-	e.provider(t, h.org, SSOProvider{
-		Method: MethodOIDC,
-		Name:   "Test OIDC",
-		OIDC: &OIDCProvider{
+	h.email = "alice@" + testDomain()
+	e.provider(t, h.org.ws, SSOProvider{
+		ProviderID: testProviderID,
+		Name:       "Test OIDC",
+		OIDC: OIDCProvider{
 			IssuerURL:       h.issuer,
 			ClientID:        h.m.ClientID,
 			ClientSecret:    h.m.ClientSecret,
@@ -193,20 +193,17 @@ func TestOIDCFlowHappyPath(t *testing.T) {
 	rec := h.runOIDCFlow(t, svc, "")
 	wantSSOSuccess(t, rec)
 
-	u := e.userByEmail(t, h.email)
+	u := e.userByEmail(t, h.org.ws, h.email)
 	if u == nil {
 		t.Fatal("JIT provisioned user missing")
 	}
-	if !u.EmailVerified {
-		t.Error("JIT user under a verified domain should be verified")
+	if u.Role != "member" || u.Name != "" && u.Name != "Alice" {
+		t.Errorf("JIT user = %+v", u)
 	}
-	if c := e.credential(t, MethodOIDC, h.org.ws, oidcTestSubject); c == nil || c.UserID != u.ID {
+	if c := e.credential(t, h.org.ws, MethodOIDC, testProviderID, oidcTestSubject); c == nil || c.UserID != u.ID {
 		t.Error("oidc credential not linked")
 	}
-	if !e.isMember(t, h.org.ws, u.ID) {
-		t.Error("user did not join the provider's workspace")
-	}
-	if n := e.sessions(t, u.ID); n != 1 {
+	if n := e.sessions(t, h.org.ws, u.ID); n != 1 {
 		t.Errorf("sessions issued = %d, want 1", n)
 	}
 }
@@ -217,52 +214,39 @@ func TestOIDCFlowJITDisabledRejectsUnknownIdentity(t *testing.T) {
 	h.user()
 
 	wantSSOFailure(t, h.runOIDCFlow(t, svc, ""))
-	if e.userByEmail(t, h.email) != nil {
+	if e.userByEmail(t, h.org.ws, h.email) != nil {
 		t.Error("unknown identity was provisioned with JIT off")
 	}
 }
 
-// An enterprise IdP asserting an address outside its workspace's verified
-// domains must not reach that account, even when the IdP calls it verified.
-func TestOIDCFlowRejectsForeignDomain(t *testing.T) {
+// A provider belongs to its workspace, another workspace's host does not
+// know it.
+func TestOIDCFlowProviderStaysInItsWorkspace(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
-	victim := e.user(t, "ceo@"+testDomain(), true)
-	h.email = victim.Email
-	h.user()
+	other := e.org(t)
 
-	wantSSOFailure(t, h.runOIDCFlow(t, svc, ""))
-	if e.credential(t, MethodOIDC, h.org.ws, oidcTestSubject) != nil {
-		t.Error("foreign identity was linked")
-	}
-	if n := e.sessions(t, victim.ID); n != 0 {
-		t.Errorf("victim got %d sessions", n)
-	}
+	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil)
+	rec := httptest.NewRecorder()
+	svc.OIDC.Login(rec, login.WithContext(anon(login.Context(), other.ws)))
+	wantSSOFailure(t, rec)
 }
 
 func TestOIDCFlowDisabledProvider(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
-	p, err := svc.GetSSOProvider(t.Context(), h.org.ws)
+	p, err := svc.GetSSOProvider(anon(t.Context(), h.org.ws), testProviderID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	p.Enabled = false
-	if err := putSSOProvider(t.Context(), e.conn.Sys(), *p); err != nil {
+	if _, err := putSSOProvider(t.Context(), e.conn.Sys(), h.org.ws.ID, *p); err != nil {
 		t.Fatal(err)
 	}
 
+	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil)
 	rec := httptest.NewRecorder()
-	svc.OIDC.Login(rec, httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+h.org.ws, nil))
-	wantSSOFailure(t, rec)
-}
-
-func TestOIDCFlowWrongMethodProvider(t *testing.T) {
-	h := newOIDCIdP(t)
-	_, svc := h.setup(t, true)
-
-	rec := httptest.NewRecorder()
-	svc.OAuth2.Login(rec, httptest.NewRequest(http.MethodGet, "/oauth/login?provider="+h.org.ws, nil))
+	svc.OIDC.Login(rec, login.WithContext(anon(login.Context(), h.org.ws)))
 	wantSSOFailure(t, rec)
 }
 
@@ -287,7 +271,7 @@ func TestOIDCFlowFlowCookieMismatch(t *testing.T) {
 	cb := httptest.NewRequest(http.MethodGet, f.callbackUR, nil)
 	cb.AddCookie(&http.Cookie{Name: "nokku_flow", Value: "stolen"})
 	cbRec := httptest.NewRecorder()
-	svc.OIDC.Callback(cbRec, cb)
+	svc.OIDC.Callback(cbRec, cb.WithContext(anon(cb.Context(), h.org.ws)))
 	wantSSOFailure(t, cbRec)
 }
 
@@ -349,7 +333,10 @@ func (h *oidcIDPHarness) mintBadToken(t *testing.T, override map[string]any) {
 	}
 }
 
-const oidcTestSubject = "sub-1"
+const (
+	oidcTestSubject = "sub-1"
+	testProviderID  = "test"
+)
 
 func (h *oidcIDPHarness) tokenClaims(t *testing.T, override map[string]any) map[string]any {
 	t.Helper()
@@ -401,11 +388,11 @@ func TestOIDCFlowLinksExistingSignedInUser(t *testing.T) {
 	// account.
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
-	existing := e.user(t, "bob@"+h.org.domain, true)
+	existing := e.user(t, h.org.ws, "bob@"+testDomain(), "member")
 	h.user()
 
-	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+h.org.ws, nil).
-		WithContext(as(t.Context(), existing.ID))
+	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil).
+		WithContext(as(t.Context(), h.org.ws, existing))
 	loginRec := httptest.NewRecorder()
 	svc.OIDC.Login(loginRec, login)
 
@@ -420,13 +407,20 @@ func TestOIDCFlowLinksExistingSignedInUser(t *testing.T) {
 		cb.AddCookie(c)
 	}
 	cbRec := httptest.NewRecorder()
-	svc.OIDC.Callback(cbRec, cb)
+	svc.OIDC.Callback(cbRec, cb.WithContext(anon(cb.Context(), h.org.ws)))
 	wantSSOSuccess(t, cbRec)
 
-	if c := e.credential(t, MethodOIDC, h.org.ws, oidcTestSubject); c == nil || c.UserID != existing.ID {
+	if c := e.credential(
+		t,
+		h.org.ws,
+		MethodOIDC,
+		testProviderID,
+		oidcTestSubject,
+	); c == nil ||
+		c.UserID != existing.ID {
 		t.Errorf("credential linked to %v, want existing user %s", c, existing.ID)
 	}
-	if e.userByEmail(t, h.email) != nil {
+	if e.userByEmail(t, h.org.ws, h.email) != nil {
 		t.Error("a second account was provisioned for the linked identity")
 	}
 }

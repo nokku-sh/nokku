@@ -1,50 +1,18 @@
 -- Base schema for nokku.
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
+--
+-- The workspace is the tenant. Every other table hangs off one, users
+-- included, and one row-level security policy keeps them apart. A
+-- self-hosted server has exactly one workspace.
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
-CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
-  email TEXT NOT NULL UNIQUE CHECK (email = lower(email)),
-  name TEXT NOT NULL DEFAULT '',
-  picture TEXT,
-  active BOOLEAN NOT NULL DEFAULT TRUE,
-  email_verified BOOLEAN NOT NULL DEFAULT FALSE,
-  disable_password_reset BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS credentials (
-  id TEXT PRIMARY KEY, -- method-specific id: webauthn credential id or uuidv7
-  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  type TEXT NOT NULL, -- password, passkey, oauth2, oidc, saml, backup_code
-  provider TEXT NOT NULL DEFAULT '', -- github, google, or the sso provider id
-  subject TEXT NOT NULL DEFAULT '', -- external identity subject or code hash
-  data BYTEA NOT NULL,
-  label TEXT NOT NULL DEFAULT '',
-  last_used_at TIMESTAMPTZ, -- last successful sign-in with it
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS one_time_tokens (
-  token_hash TEXT PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  email TEXT CHECK (email = lower(email)),
-  purpose TEXT NOT NULL, -- verify_email, password_reset
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 
 CREATE TABLE IF NOT EXISTS workspaces (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
+  -- The subdomain on the hosted service. Self-host has one workspace and
+  -- never looks at it.
+  slug TEXT NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'),
   name TEXT NOT NULL,
   description TEXT,
   settings JSONB NOT NULL DEFAULT '{}',
-  -- The single owner. RESTRICT: deleting a user never takes a workspace down,
-  -- ownership moves first or the workspace is deleted explicitly.
-  created_by UUID NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -55,15 +23,6 @@ CREATE TABLE IF NOT EXISTS workspaces (
 CREATE TABLE IF NOT EXISTS workspace_state (
   workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
   version BIGINT NOT NULL DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS workspace_members (
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  role_name TEXT NOT NULL CHECK (role_name IN ('member', 'viewer', 'editor', 'admin', 'owner')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (workspace_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS workspace_subscriptions (
@@ -80,35 +39,105 @@ CREATE TABLE IF NOT EXISTS workspace_subscriptions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Identity --------------------------------------------------------------------
+-- A user belongs to one workspace. The same person at two companies has two
+-- rows, one per workspace, and each company fully owns theirs.
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  email TEXT NOT NULL CHECK (email = lower(email)),
+  name TEXT NOT NULL DEFAULT '',
+  picture TEXT,
+  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'viewer', 'editor', 'admin', 'owner')),
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (workspace_id, email),
+  UNIQUE (workspace_id, id)
+);
+
+-- Exactly one owner per workspace. TransferOwnership swaps the roles in one
+-- statement, anything else trips this index.
+CREATE UNIQUE INDEX idx_users_owner ON users (workspace_id)
+WHERE
+  role = 'owner';
+
+CREATE TABLE IF NOT EXISTS credentials (
+  id TEXT PRIMARY KEY, -- webauthn credential id, or uuidv7
+  workspace_id UUID NOT NULL,
+  user_id UUID NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('passkey', 'oidc', 'scim')),
+  provider TEXT NOT NULL DEFAULT '', -- the sso provider id for oidc
+  subject TEXT NOT NULL DEFAULT '', -- the external identity
+  data BYTEA NOT NULL DEFAULT '',
+  label TEXT NOT NULL DEFAULT '',
+  last_used_at TIMESTAMPTZ, -- last successful sign-in with it
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE
+);
+
+-- An external identity links to at most one user of the workspace.
+CREATE UNIQUE INDEX idx_credentials_external ON credentials (workspace_id, type, provider, subject)
+WHERE
+  subject <> '';
+
+CREATE INDEX idx_credentials_user ON credentials (user_id, type);
+
+-- Links sent by mail. A signup token has no user yet, the account is created
+-- when it is spent.
+CREATE TABLE IF NOT EXISTS one_time_tokens (
+  token_hash TEXT PRIMARY KEY,
+  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  user_id UUID,
+  purpose TEXT NOT NULL CHECK (purpose IN ('login', 'signup', 'email_change', 'email_revert')),
+  email TEXT CHECK (email = lower(email)),
+  data JSONB NOT NULL DEFAULT '{}', -- signup: name, role, invite id
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK ((purpose = 'signup') = (user_id IS NULL)),
+  FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_one_time_tokens_expiry ON one_time_tokens (expires_at);
+
+CREATE INDEX idx_one_time_tokens_user ON one_time_tokens (user_id, purpose);
+
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT NOT NULL PRIMARY KEY,
-  subject_id TEXT NOT NULL,
-  -- Set for every kind but daemon, so an account takes its sessions with it.
+  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  subject_id TEXT NOT NULL, -- user id, or daemon id
   -- A daemon's session has to outlive the daemon: it is what the host gets
   -- its REJECTED answer through, and SyncDaemon removes it with that answer.
-  user_id UUID REFERENCES users (id) ON DELETE CASCADE,
-  kind TEXT NOT NULL DEFAULT 'user', -- user, cli, device, daemon
+  user_id UUID,
+  kind TEXT NOT NULL CHECK (kind IN ('user', 'cli', 'device', 'daemon')),
   CHECK ((kind = 'daemon') = (user_id IS NULL)),
-  method TEXT NOT NULL, -- password, passkey, oidc, oauth2, saml, backup_code, device
-  workspace_id UUID REFERENCES workspaces (id) ON DELETE CASCADE, -- tenant pin for daemons; NULL for global users
+  method TEXT NOT NULL, -- passkey, magic_link, oidc, device
   binding TEXT NOT NULL DEFAULT '', -- DPoP JWK thumbprint, empty for cookie sessions
   label TEXT NOT NULL DEFAULT '', -- display name for "your devices" listings
   ip TEXT NOT NULL DEFAULT '', -- of the request that created the session
   user_agent TEXT NOT NULL DEFAULT '', -- of the request that created the session
   expires_at TIMESTAMPTZ, -- NULL = non-expiring (daemons re-auth via DPoP proofs)
   last_seen_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE
 );
 
+CREATE INDEX idx_sessions_subject ON sessions (subject_id);
+
+CREATE INDEX idx_sessions_workspace ON sessions (workspace_id);
+
+-- OIDC providers of the workspace. The config, secret included, is one JSON
+-- blob encrypted at rest.
 CREATE TABLE IF NOT EXISTS sso_providers (
-  workspace_id UUID REFERENCES workspaces (id) ON DELETE CASCADE,
-  provider_id TEXT NOT NULL PRIMARY KEY,
-  method TEXT NOT NULL, -- oidc, oauth2, saml
+  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+  provider_id TEXT NOT NULL CHECK (provider_id ~ '^[a-z0-9-]{1,64}$'),
   name TEXT NOT NULL DEFAULT '',
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
   config BYTEA NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (workspace_id, provider_id)
 );
 
 CREATE TABLE IF NOT EXISTS scim_tokens (
@@ -120,16 +149,9 @@ CREATE TABLE IF NOT EXISTS scim_tokens (
   last_used_at TIMESTAMPTZ
 );
 
-CREATE TABLE IF NOT EXISTS workspace_domains (
-  workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-  domain TEXT CHECK (domain = lower(domain)),
-  token TEXT NOT NULL DEFAULT encode(gen_random_bytes (16), 'hex'), -- DNS TXT verification token
-  verified_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (workspace_id, domain)
-);
+CREATE INDEX idx_scim_tokens_workspace_id ON scim_tokens (workspace_id);
 
+-- Access ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS service_accounts (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
@@ -178,11 +200,11 @@ CREATE TABLE IF NOT EXISTS teams (
 
 CREATE TABLE IF NOT EXISTS team_members (
   workspace_id UUID NOT NULL,
-  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   team_id UUID NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (user_id, team_id),
-  FOREIGN KEY (workspace_id, user_id) REFERENCES workspace_members (workspace_id, user_id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE
 );
 
@@ -206,7 +228,7 @@ CREATE TABLE IF NOT EXISTS certificate_authorities (
   authority_type INTEGER NOT NULL DEFAULT 1, -- 1 = SSH, 2 = X509
   key_bits INTEGER NOT NULL,
   lifetime INTERVAL NOT NULL DEFAULT '8760 hours',
-  -- User certificate config 
+  -- User certificate config
   user_default_ttl INTERVAL NOT NULL DEFAULT '120 hours', -- 5 days
   user_max_ttl INTERVAL NOT NULL DEFAULT '168 hours', -- 7 days
   user_extensions JSONB DEFAULT '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}',
@@ -259,7 +281,7 @@ CREATE TABLE IF NOT EXISTS workspace_tokens (
   uses INTEGER NOT NULL DEFAULT 0,
   auto_approve BOOLEAN NOT NULL DEFAULT FALSE, -- enroll only
   ca_id UUID, -- enroll only, NULL is the workspace default
-  role_name TEXT CHECK (role_name IN ('member', 'viewer', 'editor', 'admin', 'owner')), -- invite only
+  role_name TEXT CHECK (role_name IN ('member', 'viewer', 'editor', 'admin')), -- invite only
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_used_at TIMESTAMPTZ,
   FOREIGN KEY (workspace_id, ca_id) REFERENCES certificate_authorities (workspace_id, id) ON DELETE SET NULL (ca_id),
@@ -285,7 +307,7 @@ CREATE TABLE IF NOT EXISTS principals (
 );
 
 -- Exactly one subject column is set. Every reference is scoped to the same
--- workspace and cascades, so a removed member, team, or service account can
+-- workspace and cascades, so a removed user, team, or service account can
 -- never leave a grant behind, and no grant can point across tenants.
 CREATE TABLE IF NOT EXISTS principal_grants (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -304,7 +326,7 @@ CREATE TABLE IF NOT EXISTS principal_grants (
   subject_id UUID GENERATED ALWAYS AS (COALESCE(user_id, team_id, service_account_id)) STORED,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   FOREIGN KEY (workspace_id, principal_id) REFERENCES principals (workspace_id, id) ON DELETE CASCADE,
-  FOREIGN KEY (workspace_id, user_id) REFERENCES workspace_members (workspace_id, user_id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, service_account_id) REFERENCES service_accounts (workspace_id, id) ON DELETE CASCADE,
   UNIQUE NULLS NOT DISTINCT (principal_id, user_id, team_id, service_account_id),
@@ -326,13 +348,7 @@ CREATE TABLE IF NOT EXISTS recordings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS saml_keypair (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  key_enc BYTEA NOT NULL,
-  cert_pem BYTEA NOT NULL
-);
-
--- Keysets (for envelope encryption - singleton)
+-- Instance -------------------------------------------------------------------
 -- The one keyset that encrypts everything at rest, wrapped by a key derived
 -- from NOKKU_SECRET or by the KMS key. rotated_at is when it last got a new
 -- primary key.
@@ -352,12 +368,6 @@ CREATE TABLE IF NOT EXISTS instance_license (
 );
 
 -- Indexes --------------------------------------------------------------------
-CREATE INDEX idx_workspaces_created_by ON workspaces (created_by);
-
-CREATE INDEX idx_workspace_members_user_id ON workspace_members (user_id, workspace_id);
-
-CREATE INDEX idx_workspace_domains_domain ON workspace_domains (domain);
-
 CREATE INDEX idx_service_accounts_workspace_id ON service_accounts (workspace_id);
 
 CREATE INDEX idx_service_accounts_name_trgm ON service_accounts USING GIN (name gin_trgm_ops);
@@ -377,6 +387,11 @@ CREATE INDEX idx_teams_name_trgm ON teams USING GIN (name gin_trgm_ops);
 CREATE INDEX idx_teams_description_trgm ON teams USING GIN (description gin_trgm_ops);
 
 CREATE INDEX idx_teams_tags ON teams USING GIN (tags);
+
+-- SCIM group sync expects displayName to resolve to one group per
+-- workspace (RFC 7643). Without this, duplicate pushes create duplicate
+-- teams and the IdP's member updates hit the wrong one.
+CREATE UNIQUE INDEX idx_teams_workspace_name ON teams (workspace_id, name);
 
 CREATE INDEX idx_team_members_team_id ON team_members (team_id);
 
@@ -401,9 +416,9 @@ CREATE INDEX idx_targets_name_trgm ON targets USING GIN (name gin_trgm_ops);
 
 CREATE INDEX idx_targets_description_trgm ON targets USING GIN (description gin_trgm_ops);
 
-CREATE INDEX idx_principals_workspace_id ON principals (workspace_id);
-
 CREATE INDEX idx_workspace_tokens_workspace ON workspace_tokens (workspace_id, kind);
+
+CREATE INDEX idx_principals_workspace_id ON principals (workspace_id);
 
 CREATE INDEX idx_principals_target_id ON principals (target_id);
 
@@ -413,45 +428,9 @@ CREATE INDEX idx_principal_grants_workspace_id ON principal_grants (workspace_id
 
 CREATE INDEX idx_recordings_workspace_started ON recordings (workspace_id, started_at DESC);
 
--- An external identity may link to at most one user.
-CREATE UNIQUE INDEX idx_credentials_external ON credentials (type, provider, subject)
-WHERE
-  subject <> '';
-
-CREATE INDEX idx_credentials_user ON credentials (user_id, type);
-
-CREATE INDEX idx_one_time_tokens_expiry ON one_time_tokens (expires_at);
-
-CREATE INDEX idx_scim_tokens_workspace_id ON scim_tokens (workspace_id);
-
-CREATE INDEX idx_sessions_subject ON sessions (subject_id);
-
-CREATE INDEX idx_sessions_workspace ON sessions (workspace_id);
-
--- SCIM group sync expects displayName to resolve to one group per
--- workspace (RFC 7643). Without this, duplicate pushes create duplicate
--- teams and the IdP's member updates hit the wrong one.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_teams_workspace_name ON teams (workspace_id, name);
-
 -- Functions ------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION current_workspace_id () RETURNS UUID AS $$
   SELECT NULLIF(current_setting('nokku.workspace_id', TRUE), '')::UUID
-$$ LANGUAGE sql STABLE;
-
-CREATE OR REPLACE FUNCTION current_actor_id () RETURNS TEXT AS $$
-  SELECT NULLIF(current_setting('nokku.actor_id', TRUE), '')
-$$ LANGUAGE sql STABLE;
-
--- Session helpers ------------------------------------------------------------
--- Membership of the current actor in a workspace. Used for cross-tenant
--- reads users legitimately need outside a pinned workspace.
-CREATE OR REPLACE FUNCTION is_workspace_member (ws_id UUID) RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM workspace_members wm
-    WHERE wm.workspace_id = ws_id
-      AND wm.user_id = current_actor_id ()::UUID
-  )
 $$ LANGUAGE sql STABLE;
 
 -- Triggers -------------------------------------------------------------------
@@ -558,31 +537,11 @@ AFTER
 UPDATE OF ca_id ON targets FOR EACH ROW WHEN (OLD.ca_id IS DISTINCT FROM NEW.ca_id)
 EXECUTE FUNCTION bump_state_version ();
 
--- Accounts are global, so a deactivation reaches every workspace the user
--- belongs to.
-CREATE OR REPLACE FUNCTION bump_member_state_versions () RETURNS TRIGGER AS $$
-DECLARE
-  ws UUID;
-BEGIN
-  FOR ws IN
-    UPDATE workspace_state s SET version = version + 1
-    FROM workspace_members m
-    WHERE m.user_id = NEW.id AND s.workspace_id = m.workspace_id
-    RETURNING s.workspace_id
-  LOOP
-    PERFORM pg_notify('nokku_state', ws::TEXT);
-  END LOOP;
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER
-SET
-  search_path = public,
-  pg_temp;
-
+-- A deactivated account must leave every daemon's map at once.
 CREATE TRIGGER bump_state_version
 AFTER
 UPDATE OF active ON users FOR EACH ROW WHEN (OLD.active IS DISTINCT FROM NEW.active)
-EXECUTE FUNCTION bump_member_state_versions ();
+EXECUTE FUNCTION bump_state_version ();
 
 -- Roles and grants -----------------------------------------------------------
 DO $$
@@ -640,10 +599,9 @@ FROM
   nokku_system;
 
 -- Row-level security ---------------------------------------------------------
--- RLS enforces tenant isolation only. Every workspace-scoped table carries
--- one uniform policy: rows are visible and writable only when the request
--- pinned that workspace in the session GUC "nokku.workspace_id". The GUC is
--- set per transaction by the backend (see internal/db/connection.go).
+-- One policy on every tenant table: a row is visible and writable only when
+-- the transaction pinned its workspace in the GUC "nokku.workspace_id". The
+-- backend sets it per transaction (see internal/db/connection.go).
 --
 -- Fail-closed properties:
 --   - The application connects as nokku_app, which does not own the tables,
@@ -652,248 +610,75 @@ FROM
 --   - An unset GUC makes current_workspace_id() return NULL, and
 --     "workspace_id = NULL" matches nothing, so tenant tables are empty by
 --     default.
---   - Truly cross-tenant operations (bootstrap, billing webhooks, background
---     jobs, pre-auth lookups) run through the nokku_system role which has
---     BYPASSRLS; that role switch is explicit in code (Connection.WithTx).
+--   - Cross-tenant work (boot, signup, billing webhooks, background jobs)
+--     runs through nokku_system, which has BYPASSRLS; that role switch is
+--     explicit in code (Connection.WithTx).
 --
--- Adding a new tenant table requires exactly:
---   ALTER TABLE <t> ENABLE ROW LEVEL SECURITY;
---   ALTER TABLE <t> FORCE ROW LEVEL SECURITY;
---   CREATE POLICY tenant_isolation ON <t> FOR ALL TO nokku_app
---     USING (workspace_id = current_workspace_id())
---     WITH CHECK (workspace_id = current_workspace_id());
--- References to other tenant tables use composite (workspace_id, id) foreign
--- keys, so no policy needs a subquery to keep a row inside its workspace.
+-- A new tenant table only needs its name in the list below. References to
+-- other tenant tables use composite (workspace_id, id) foreign keys, so no
+-- policy needs a subquery to keep a row inside its workspace. keysets,
+-- instance_license and workspace_state have no app policy, nokku_system
+-- alone reaches them.
+DO $$
+DECLARE
+  t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'users',
+    'credentials',
+    'sessions',
+    'one_time_tokens',
+    'sso_providers',
+    'scim_tokens',
+    'workspace_subscriptions',
+    'workspace_tokens',
+    'service_accounts',
+    'daemons',
+    'teams',
+    'team_members',
+    'certificate_authorities',
+    'targets',
+    'principals',
+    'principal_grants',
+    'recordings'
+  ] LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
+    EXECUTE format(
+      'CREATE POLICY tenant_isolation ON %I FOR ALL TO nokku_app
+         USING (workspace_id = current_workspace_id())
+         WITH CHECK (workspace_id = current_workspace_id())',
+      t
+    );
+  END LOOP;
+END $$;
+
 ALTER TABLE workspaces ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE workspaces FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE workspace_members ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE workspace_members FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE workspace_subscriptions ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE workspace_subscriptions FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE service_accounts ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE service_accounts FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE daemons ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE daemons FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE teams FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE team_members FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE certificate_authorities ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE certificate_authorities FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE targets ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE targets FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE principals ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE principals FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE principal_grants ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE principal_grants FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE recordings ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE recordings FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE sso_providers ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE sso_providers FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE scim_tokens ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE scim_tokens FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE workspace_tokens ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE workspace_tokens FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE workspace_domains ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE workspace_domains FORCE ROW LEVEL SECURITY;
-
--- Workspaces -----------------------------------------------------------------
-CREATE POLICY workspaces_select ON workspaces FOR
-SELECT
-  TO nokku_app USING (
-    id = current_workspace_id ()
-    OR is_workspace_member (id)
-  );
-
-CREATE POLICY workspaces_write ON workspaces FOR ALL TO nokku_app USING (id = current_workspace_id ())
+CREATE POLICY tenant_isolation ON workspaces FOR ALL TO nokku_app USING (id = current_workspace_id ())
 WITH
   CHECK (id = current_workspace_id ());
-
--- Workspace members ----------------------------------------------------------
-CREATE POLICY workspace_members_select ON workspace_members FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id = current_workspace_id ()
-    OR user_id = current_actor_id ()::UUID
-  );
-
-CREATE POLICY workspace_members_write ON workspace_members FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
--- Pure tenant tables ---------------------------------------------------------
-CREATE POLICY tenant_isolation ON workspace_subscriptions FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON service_accounts FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON daemons FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON teams FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON certificate_authorities FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON targets FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON principals FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON recordings FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
--- Global providers (workspace_id NULL) are readable by everyone and written
--- only by nokku_system.
-CREATE POLICY sso_providers_select ON sso_providers FOR
-SELECT
-  TO nokku_app USING (
-    workspace_id IS NULL
-    OR workspace_id = current_workspace_id ()
-  );
-
-CREATE POLICY tenant_isolation ON sso_providers FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON scim_tokens FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON workspace_tokens FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON workspace_domains FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
--- Composite foreign keys keep every reference inside one workspace, so these
--- need nothing beyond the uniform policy.
-CREATE POLICY tenant_isolation ON team_members FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
-CREATE POLICY tenant_isolation ON principal_grants FOR ALL TO nokku_app USING (workspace_id = current_workspace_id ())
-WITH
-  CHECK (workspace_id = current_workspace_id ());
-
--- Identity tables ------------------------------------------------------------
--- Users are global, so the tenant GUC alone cannot scope them. The app role
--- sees a user only as themselves or as a member of the pinned workspace, and
--- writes only its own row. Credentials and sessions are private to their
--- owner. Login, signup, and SCIM run as nokku_system. Tokens and key
--- material have no app policy at all.
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE users FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE credentials ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE credentials FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE sessions FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE one_time_tokens ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE one_time_tokens FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE keysets ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE keysets FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE saml_keypair ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE saml_keypair FORCE ROW LEVEL SECURITY;
-
 ALTER TABLE instance_license ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE instance_license FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY users_select ON users FOR
-SELECT
-  TO nokku_app USING (
-    id = current_actor_id ()::UUID
-    OR EXISTS (
-      SELECT
-        1
-      FROM
-        workspace_members wm
-      WHERE
-        wm.user_id = users.id
-        AND wm.workspace_id = current_workspace_id ()
-    )
-  );
-
-CREATE POLICY users_update ON users
-FOR UPDATE
-  TO nokku_app USING (id = current_actor_id ()::UUID)
-WITH
-  CHECK (id = current_actor_id ()::UUID);
-
-CREATE POLICY credentials_owner ON credentials FOR ALL TO nokku_app USING (user_id = current_actor_id ()::UUID)
-WITH
-  CHECK (user_id = current_actor_id ()::UUID);
-
-CREATE POLICY sessions_owner ON sessions FOR ALL TO nokku_app USING (subject_id = current_actor_id ())
-WITH
-  CHECK (subject_id = current_actor_id ());
-
 -- Audit schema ---------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS audit;
 
--- One row per thing that happened. A row with a workspace belongs to that
--- workspace's log, and every row also shows in its actor's personal log.
+-- One row per thing that happened, filed under the workspace it happened in.
 -- workspace_id has no foreign key: the log outlives a deleted workspace, and
--- the append-only trigger would refuse an ON DELETE SET NULL anyway.
+-- the append-only trigger would refuse an ON DELETE anyway.
 CREATE TABLE IF NOT EXISTS audit.audit_logs (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  workspace_id UUID,
+  workspace_id UUID NOT NULL,
   actor_id TEXT NOT NULL DEFAULT '',
   actor_kind TEXT NOT NULL DEFAULT '',
   actor_name TEXT NOT NULL DEFAULT '', -- email or name at the time
@@ -907,18 +692,15 @@ CREATE TABLE IF NOT EXISTS audit.audit_logs (
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_workspace_time ON audit.audit_logs (workspace_id, timestamp DESC);
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit.audit_logs (actor_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit.audit_logs (workspace_id, actor_id, timestamp DESC);
 
 -- For the retention delete. Rows arrive in time order, so a block range
 -- index stays tiny.
 CREATE INDEX IF NOT EXISTS idx_audit_logs_time ON audit.audit_logs USING brin (timestamp);
 
-CREATE POLICY audit_logs_select ON audit.audit_logs FOR
+CREATE POLICY tenant_isolation ON audit.audit_logs FOR
 SELECT
-  TO nokku_app USING (
-    workspace_id = current_workspace_id ()
-    OR actor_id = current_actor_id ()
-  );
+  TO nokku_app USING (workspace_id = current_workspace_id ());
 
 -- Access for the application roles
 GRANT USAGE ON SCHEMA audit TO nokku_app,

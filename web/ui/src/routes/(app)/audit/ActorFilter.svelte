@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { serviceAccount } from '#lib/api/service_account.svelte.js';
-	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import { users } from '#lib/api/workspaces.svelte.js';
 	import * as Command from '#lib/components/ui/command/index.js';
 	import FilterButton from '#lib/components/blocks/FilterButton.svelte';
 	import SearchPopover from '#lib/components/blocks/SearchPopover.svelte';
@@ -13,7 +13,7 @@
 	let query = $state('');
 	const debounced = new Debounced(() => query, 250);
 	const opts = () => ({ query: debounced.current || undefined, limit: 20 });
-	const members = workspace.listMembers(opts, () => open);
+	const people = users.list(opts, () => open);
 	const serviceAccounts = serviceAccount.list(opts, () => open);
 
 	const selected = $derived(csv('actor'));
@@ -29,7 +29,7 @@
 	bind:query
 	placeholder="Search people, service accounts..."
 	empty="Nobody matches."
-	loading={members.isLoading || serviceAccounts.isLoading}
+	loading={people.isLoading || serviceAccounts.isLoading}
 >
 	{#snippet trigger(props)}
 		<FilterButton
@@ -39,9 +39,9 @@
 		/>
 	{/snippet}
 
-	{#if members.data?.members.length}
+	{#if people.data?.users.length}
 		<Command.Group heading="People">
-			{#each members.data.members as m (m.id)}
+			{#each people.data.users as m (m.id)}
 				<Command.Item value={m.id} onSelect={() => toggle(m.id)}>
 					<UserAvatar user={m} class="size-6" />
 					<div class="flex min-w-0 flex-1 flex-col">

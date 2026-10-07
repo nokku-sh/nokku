@@ -12,7 +12,6 @@ import "maps"
 const (
 	FeatureOIDC           = "oidc"
 	FeatureEnforceSSO     = "enforce_sso"
-	FeatureSAML           = "saml"
 	FeatureSCIM           = "scim"
 	FeatureAuditExport    = "audit_export"
 	FeatureAuditStreaming = "audit_streaming"
@@ -33,7 +32,6 @@ type Feature struct {
 var CatalogFeatures = []Feature{
 	{FeatureOIDC, "OIDC single sign-on"},
 	{FeatureEnforceSSO, "enforced single sign-on"},
-	{FeatureSAML, "SAML single sign-on"},
 	{FeatureSCIM, "SCIM provisioning"},
 	{FeatureAuditExport, "audit log export"},
 	{FeatureAuditStreaming, "audit log streaming"},
@@ -86,7 +84,6 @@ var catalog = map[string]Plan{
 		Features: map[string]bool{
 			FeatureOIDC:        true,
 			FeatureEnforceSSO:  true,
-			FeatureSAML:        true,
 			FeatureAuditExport: true,
 		},
 	},
@@ -99,7 +96,6 @@ var catalog = map[string]Plan{
 		Features: map[string]bool{
 			FeatureOIDC:           true,
 			FeatureEnforceSSO:     true,
-			FeatureSAML:           true,
 			FeatureSCIM:           true,
 			FeatureAuditExport:    true,
 			FeatureAuditStreaming: true,

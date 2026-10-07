@@ -2,7 +2,6 @@ package api
 
 import (
 	"testing"
-	"uuid"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
@@ -11,82 +10,97 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-func TestUpdateWorkspaceOwner(t *testing.T) {
+func TestTransferOwnership(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	var owner, member, stranger *db.User
-	var workspaceID string
-	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) (err error) {
-		for _, u := range []**db.User{&owner, &member, &stranger} {
-			if *u, err = q.CreateUser(
-				t.Context(),
-				&db.CreateUserParams{Email: uuid.New().String() + "@api.test", Name: "u"},
-			); err != nil {
-				return err
-			}
-		}
-		ws, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{Name: "owner", CreatedBy: owner.ID})
-		if err != nil {
-			return err
-		}
-		workspaceID = ws.ID
-		return q.EnsureWorkspaceMember(t.Context(), &db.EnsureWorkspaceMemberParams{
-			WorkspaceID: workspaceID,
-			UserID:      member.ID,
-			RoleName:    string(db.RoleEditor),
-		})
-	}))
-	_, token, err := cfg.IAM.IssueSession(t.Context(), iam.SessionParams{
-		SubjectID: owner.ID,
-		Kind:      actor.KindUser,
-		Method:    iam.MethodPassword,
-	})
-	require.NoError(t, err)
+	ws := seedWorkspace(t, cfg)
+	owner := seedOwner(t, cfg)
+	member := seedUser(t, cfg, ws, db.RoleEditor)
+	stranger := seedUser(t, cfg, seedOtherWorkspace(t, cfg), db.RoleOwner)
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
-		srv.Client(), srv.URL, header("Authorization", "Bearer "+token),
+		srv.Client(), srv.URL, header("Authorization", "Bearer "+sessionFor(t, cfg, owner)),
 	)
 	transfer := func(to string) error {
-		_, err := workspaces.UpdateWorkspaceOwner(
-			t.Context(),
-			&nokkuv1.UpdateWorkspaceOwnerRequest{WorkspaceId: &workspaceID, NewOwner: &to},
-		)
+		_, err := workspaces.TransferOwnership(t.Context(), &nokkuv1.TransferOwnershipRequest{NewOwnerId: &to})
 		return err
 	}
-	// state returns who owns the workspace and the role each user holds in it.
-	state := func() (ownerID string, roles map[string]string) {
-		roles = map[string]string{}
-		require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) (err error) {
-			if ownerID, err = q.GetWorkspaceOwner(t.Context(), workspaceID); err != nil {
-				return err
-			}
-			for _, u := range []*db.User{owner, member, stranger} {
-				m, err := q.GetWorkspaceMember(
-					t.Context(),
-					&db.GetWorkspaceMemberParams{WorkspaceID: workspaceID, UserID: u.ID},
-				)
-				if err == nil {
-					roles[u.ID] = m.RoleName
-				}
-			}
-			return nil
-		}))
-		return ownerID, roles
+	role := func(u *db.User) string {
+		got, err := cfg.Conn.Sys().GetUser(t.Context(), &db.GetUserParams{WorkspaceID: u.WorkspaceID, ID: u.ID})
+		require.NoError(t, err)
+		return got.Role
 	}
 
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(transfer(stranger.ID)),
-		"a user who is not a member cannot be made owner")
-	ownerID, roles := state()
-	assert.Equal(t, owner.ID, ownerID, "a refused transfer keeps the owner")
-	assert.Equal(t, map[string]string{owner.ID: "owner", member.ID: "editor"}, roles,
-		"a refused transfer changes no role")
+		"a user of another workspace cannot be made owner")
+	assert.Equal(t, "owner", role(owner), "a refused transfer keeps the owner")
+	assert.Equal(t, "editor", role(member), "a refused transfer changes no role")
 
 	require.NoError(t, transfer(member.ID))
-	ownerID, roles = state()
-	assert.Equal(t, member.ID, ownerID, "a member takes over")
-	assert.Equal(t, map[string]string{owner.ID: "admin", member.ID: "owner"}, roles,
-		"the old owner steps down to admin")
+	assert.Equal(t, "owner", role(member), "a member takes over")
+	assert.Equal(t, "admin", role(owner), "the old owner steps down to admin")
+	assert.Equal(t, member.ID, seedOwner(t, cfg).ID)
+}
+
+// Admins manage users below them and never the owner or themselves.
+func TestManageUsers(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	ws := seedWorkspace(t, cfg)
+	owner := seedOwner(t, cfg)
+	admin := seedUser(t, cfg, ws, db.RoleAdmin)
+	viewer := seedUser(t, cfg, ws, db.RoleViewer)
+	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
+		srv.Client(), srv.URL, header("Authorization", "Bearer "+sessionFor(t, cfg, admin)),
+	)
+
+	_, err := workspaces.UpdateUserRole(t.Context(), &nokkuv1.UpdateUserRoleRequest{
+		UserId: &viewer.ID, Role: new("editor"),
+	})
+	require.NoError(t, err)
+	got, err := workspaces.GetUser(t.Context(), &nokkuv1.GetUserRequest{UserId: &viewer.ID})
+	require.NoError(t, err)
+	assert.Equal(t, "editor", got.GetUser().GetRole())
+
+	_, err = workspaces.SetUserActive(t.Context(), &nokkuv1.SetUserActiveRequest{UserId: &owner.ID, Active: new(false)})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "an admin switched the owner off: %v", err)
+	_, err = workspaces.SetUserActive(t.Context(), &nokkuv1.SetUserActiveRequest{UserId: &admin.ID, Active: new(false)})
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "an admin switched themselves off: %v", err)
+
+	viewerToken := sessionFor(t, cfg, viewer)
+	_, err = workspaces.SetUserActive(
+		t.Context(),
+		&nokkuv1.SetUserActiveRequest{UserId: &viewer.ID, Active: new(false)},
+	)
+	require.NoError(t, err)
+	_, _, err = cfg.IAM.AuthenticateToken(wsCtx(t, cfg), viewerToken)
+	require.Error(t, err, "a deactivated user kept their session")
+
+	users, err := workspaces.ListUsers(
+		t.Context(),
+		&nokkuv1.ListUsersRequest{Limit: new(int32(100)), Role: new("owner")},
+	)
+	require.NoError(t, err)
+	require.Len(t, users.GetUsers(), 1, "one owner")
+	assert.Equal(t, owner.ID, users.GetUsers()[0].GetId())
+
+	_, err = workspaces.DeleteUser(t.Context(), &nokkuv1.DeleteUserRequest{UserId: &viewer.ID})
+	require.NoError(t, err)
+	_, err = workspaces.GetUser(t.Context(), &nokkuv1.GetUserRequest{UserId: &viewer.ID})
+	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err))
+}
+
+// A self-hosted server keeps its workspace, and signup is for the hosted one.
+func TestSelfHostHasOneWorkspace(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	owner := header("Authorization", "Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), db.RoleOwner))
+	_, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL, owner).
+		DeleteWorkspace(t.Context(), &nokkuv1.DeleteWorkspaceRequest{})
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "got %v", err)
+
+	_, err = nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL).
+		CreateWorkspace(t.Context(), &nokkuv1.CreateWorkspaceRequest{
+			Slug: new("acme"), Name: new("Acme"), OwnerEmail: new("o@acme.test"),
+		})
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "got %v", err)
 }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -114,7 +113,6 @@ func (s *Storage) initS3(ctx context.Context) error {
 		}
 	}
 
-	slog.Debug("using s3 bucket", "bucket", s.Bucket, "endpoint", s.Endpoint, "region", s.Region)
 	return nil
 }
 
@@ -132,7 +130,6 @@ func (s *Storage) initLocal() error {
 		return fmt.Errorf("open local bucket: %w", err)
 	}
 
-	slog.Debug("using local filesystem", "path", absPath)
 	return nil
 }
 
