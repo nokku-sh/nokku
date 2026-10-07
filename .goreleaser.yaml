@@ -26,7 +26,7 @@ kos:
     main: ./cmd/nokku
     bare: true
     preserve_import_paths: false
-    sbom: none
+    sbom: spdx
     creation_time: "{{ .CommitTimestamp }}"
     tags:
       - "{{ .Version }}"
@@ -45,11 +45,25 @@ signs:
       - "${artifact}"
       - "--yes"
 
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    args:
+      - "sign"
+      - "${artifact}@${digest}"
+      - "--yes"
+
 sboms:
   - cmd: syft
     documents:
       - "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}.sbom.json"
-    args: ["$artifact", "--output", "cyclonedx-json=$document"]
+    args:
+      - "$artifact"
+      - "--source-name={{ .ProjectName }}"
+      - "--source-version={{ .Version }}"
+      - "--select-catalogers=-file"
+      - "--output"
+      - "cyclonedx-json=$document"
     artifacts: binary
 
 archives:
