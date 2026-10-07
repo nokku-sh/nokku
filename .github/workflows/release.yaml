@@ -3,105 +3,17 @@ name: Release
 on:
   workflow_dispatch:
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
   contents: write
   packages: write
   id-token: write
 
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
-  tag:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      bump: ${{ steps.version.outputs.bump }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - uses: taiki-e/install-action@git-cliff
-
-      - name: Check version bump
-        id: version
-        run: |
-          CURRENT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          NEXT_TAG=$(git-cliff --bumped-version)
-
-          echo "current: $CURRENT_TAG"
-          echo "next:    $NEXT_TAG"
-          if [ "$CURRENT_TAG" = "$NEXT_TAG" ]; then
-            echo "No conventional commits warranting a release. Skipping."
-            echo "bump=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "Bumping $CURRENT_TAG to $NEXT_TAG"
-            echo "bump=true" >> "$GITHUB_OUTPUT"
-            echo "version=${NEXT_TAG#v}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Tag and push
-        if: steps.version.outputs.bump == 'true'
-        run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${{ steps.version.outputs.version }}" \
-            -m "v${{ steps.version.outputs.version }}"
-          git push origin "v${{ steps.version.outputs.version }}"
-
-      - name: No-op summary
-        if: steps.version.outputs.bump != 'true'
-        run: echo "No conventional commits warranting a release." >> "$GITHUB_STEP_SUMMARY"
-
   release:
-    needs: tag
-    if: needs.tag.outputs.bump == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          ref: "v${{ needs.tag.outputs.version }}"
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: "go.mod"
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "lts/*"
-
-      - uses: pnpm/action-setup@v6
-        with:
-          version: "~> v2"
-
-      - name: Build frontend
-        working-directory: web/ui
-        run: pnpm install && pnpm build
-
-      - name: Build email templates
-        working-directory: web/email
-        run: pnpm install && pnpm export
-
-      - uses: sigstore/cosign-installer@v4.1.2
-
-      - uses: anchore/sbom-action@v0
-        with:
-          upload-release-assets: false
-
-      - uses: ko-build/setup-ko@v0.10
-
-      - uses: taiki-e/install-action@git-cliff
-
-      - name: Generate release notes
-        run: git-cliff --latest --strip header --config cliff.toml -o "$RUNNER_TEMP/release-notes.md"
-
-      - uses: goreleaser/goreleaser-action@v7
-        with:
-          version: "~> v2"
-          args: release --clean --release-notes=${{ runner.temp }}/release-notes.md
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COSIGN_YES: "true"
+    uses: nokku-sh/.github/.github/workflows/go-release.yaml@main
+    secrets:
+      NOKKU_LICENSE_PUBLIC_KEY: ${{ secrets.NOKKU_LICENSE_PUBLIC_KEY }}
