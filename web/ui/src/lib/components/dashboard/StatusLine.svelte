@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { GetDashboardResponse } from '#lib/gen/nokku/v1/dashboard_pb.js';
 	import { formatBytes, formatTs } from '#lib/utils.js';
-	import type { Issue } from './issues';
+	import type { Tone } from '#lib/tone.js';
+	import { headline, type Issue } from './issues';
 
 	interface Props {
 		data?: GetDashboardResponse;
@@ -12,17 +13,14 @@
 
 	let { data, issues, workspace, updatedAt }: Props = $props();
 
-	const worst = $derived(issues[0]?.tone);
-	const headline = $derived.by(() => {
-		if (!data) return { mark: '…', text: 'checking', tone: 'text-terminal-dim' };
-		if (!issues.length) return { mark: '●', text: 'all good', tone: 'text-terminal-ok' };
-		const n = issues.length;
-		return {
-			mark: worst === 'destructive' ? '✖' : '▲',
-			text: `${n} ${n === 1 ? 'thing needs' : 'things need'} you`,
-			tone: worst === 'destructive' ? 'text-terminal-err' : 'text-terminal-warn'
-		};
-	});
+	const summary = $derived(headline(data ? issues : undefined));
+	// The same tones, in the colors that hold on the console background.
+	const onConsole: Partial<Record<Tone, string>> = {
+		muted: 'text-terminal-dim',
+		success: 'text-terminal-ok',
+		warning: 'text-terminal-warn',
+		destructive: 'text-terminal-err'
+	};
 
 	const recording = $derived(data?.liveSessions.filter((s) => s.recording).length ?? 0);
 	const quota = $derived(Number(data?.recordingQuotaBytes ?? -1));
@@ -58,9 +56,10 @@
 		{/if}
 	</div>
 
-	<p class={['flex items-center gap-2 text-lg font-bold', headline.tone]} role="status">
-		<span class={[data && !issues.length && 'motion-safe:animate-pulse']}>{headline.mark}</span>
-		{headline.text}
+	<p class={['flex items-center gap-2 text-lg font-bold', onConsole[summary.tone]]} role="status">
+		<span class={[summary.tone === 'success' && 'motion-safe:animate-breathe']}>{summary.mark}</span
+		>
+		{summary.text}
 	</p>
 
 	{#if data}

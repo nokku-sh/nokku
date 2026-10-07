@@ -2,7 +2,7 @@ import { createMutation } from '@tanstack/svelte-query';
 import { createClient } from '@connectrpc/connect';
 import { AuthService } from '#lib/gen/nokku/v1/auth_pb.js';
 import { useMutation, useQuery } from '#lib/query/index.js';
-import { queryClient, authTransport } from './client';
+import { queryClient, authTransport, leave } from './client';
 
 const client = createClient(AuthService, authTransport);
 
@@ -16,10 +16,7 @@ export const auth = {
 	logout: () =>
 		createMutation(() => ({
 			mutationFn: () => client.logout({}),
-			onSuccess: () => {
-				// A full load, so this tab's web shells and cached data end with the session.
-				window.location.assign('/login');
-			}
+			onSuccess: () => leave()
 		})),
 	confirmEmailChange: () =>
 		useMutation(AuthService.method.confirmEmailChange, {

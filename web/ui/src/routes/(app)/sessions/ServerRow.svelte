@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { daemon } from '#lib/api/daemons.svelte.js';
+	import { useConnect } from '#lib/api/connect.svelte.js';
 	import { getSessions, removeSession } from '#lib/api/terminal.svelte.js';
 	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -9,30 +9,43 @@
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { activeSessionID } from '#lib/store.svelte.js';
-	import { ChevronRight, Plus, SquareTerminal, User, X } from '@lucide/svelte';
+	import { ChevronRight, Copy, Plus, SquareTerminal, User, X } from '@lucide/svelte';
 
-	let { target }: { target: Target } = $props();
+	interface Props {
+		target: Target;
+		/** Its daemon is online, so a web shell works. Otherwise the row copies the ssh command. */
+		shell: boolean;
+	}
+
+	let { target, shell }: Props = $props();
 
 	const usernames = $derived(target.usernames);
 	const mine = $derived(
-		[...getSessions().entries()].filter(([, s]) => s.daemonID === target.daemonId)
+		[...getSessions().entries()].filter(([, s]) => !!s.daemonID && s.daemonID === target.daemonId)
 	);
+	const why = $derived(target.daemonId ? 'daemon offline' : 'nk sync');
 
-	const createSession = daemon.createSession();
-
-	function connect(username: string) {
-		createSession.mutate({ daemonId: target.daemonId, username });
-	}
+	const connect = useConnect();
+	const run = (username: string) =>
+		shell ? connect.shell(target, username) : connect.copy(target, username);
+	const label = (username: string) =>
+		shell ? `Open a shell on ${target.name} as ${username}` : `Copy ssh ${username}@${target.name}`;
 </script>
+
+{#snippet actionIcon()}
+	{#if connect.pending}<Spinner />{:else if shell}<Plus />{:else}<Copy />{/if}
+{/snippet}
 
 <Collapsible.Root open={mine.length > 0}>
 	<div class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
-		<StatusDot tone="success" class="size-1.5" />
+		<StatusDot tone={shell ? 'success' : 'muted'} class="size-1.5" />
 		<Collapsible.Trigger class="min-w-0 flex-1 text-left" disabled={!mine.length}>
-			<p class="truncate text-xs font-medium">{target.name}</p>
-			{#if target.metadata?.hostname}
-				<p class="truncate font-mono text-2xs text-muted-foreground">{target.metadata.hostname}</p>
-			{/if}
+			<p class={['truncate text-xs font-medium', !shell && 'text-muted-foreground']}>
+				{target.name}
+			</p>
+			<p class="truncate font-mono text-2xs text-muted-foreground">
+				{shell ? target.metadata?.hostname || target.endpoints[0] : why}
+			</p>
 		</Collapsible.Trigger>
 		{#if mine.length}
 			<Badge variant="secondary">{mine.length}</Badge>
@@ -46,18 +59,19 @@
 							{...props}
 							variant="ghost"
 							size="icon-xs"
-							aria-label={`Connect to ${target.name}`}
-							disabled={createSession.isPending}
+							aria-label={shell ? `Open a shell on ${target.name}` : `Copy ssh for ${target.name}`}
+							disabled={connect.pending}
 						>
-							{#if createSession.isPending}<Spinner />{:else}<Plus />{/if}
+							{@render actionIcon()}
 						</Button>
 					{/snippet}
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content side="right" align="start" class="w-48">
 					<DropdownMenu.Group>
-						<DropdownMenu.Label>Connect as</DropdownMenu.Label>
+						<DropdownMenu.Label>{shell ? 'Open a shell as' : 'Copy SSH command'}</DropdownMenu.Label
+						>
 						{#each usernames as username (username)}
-							<DropdownMenu.Item class="font-mono text-xs" onSelect={() => connect(username)}>
+							<DropdownMenu.Item class="font-mono text-xs" onSelect={() => run(username)}>
 								<User />
 								{username}
 							</DropdownMenu.Item>
@@ -69,11 +83,12 @@
 			<Button
 				variant="ghost"
 				size="icon-xs"
-				aria-label={`Connect to ${target.name} as ${usernames[0]}`}
-				disabled={createSession.isPending}
-				onclick={() => connect(usernames[0])}
+				aria-label={label(usernames[0])}
+				title={label(usernames[0])}
+				disabled={connect.pending}
+				onclick={() => run(usernames[0])}
 			>
-				{#if createSession.isPending}<Spinner />{:else}<Plus />{/if}
+				{@render actionIcon()}
 			</Button>
 		{/if}
 

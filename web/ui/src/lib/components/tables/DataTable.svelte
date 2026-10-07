@@ -168,6 +168,10 @@
 		get enableRowSelection() {
 			return hasSelection;
 		},
+		// The list RPCs take no order, so a sort would only shuffle the loaded page.
+		get enableSorting() {
+			return rowCount === undefined;
+		},
 		onPaginationChange: (updater) => {
 			const current = { pageIndex: pager.pageIndex, pageSize: pager.pageSize };
 			const next = typeof updater === 'function' ? updater(current) : updater;
@@ -238,26 +242,29 @@
 					{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
 						<TableUI.Row>
 							{#each headerGroup.headers as header (header.id)}
-								<TableUI.Head colspan={header.colSpan}>
-									{#if !header.isPlaceholder}
+								{@const sorted = header.column.getIsSorted()}
+								<TableUI.Head
+									colspan={header.colSpan}
+									aria-sort={sorted ? (sorted === 'asc' ? 'ascending' : 'descending') : undefined}
+								>
+									{#if header.column.getCanSort()}
 										<Button
 											variant="ghost"
 											size="sm"
-											class="-ml-3 h-8 data-[state=open]:bg-accent"
-											data-sortable={header.column.getCanSort()}
+											class="-ml-3 h-8"
 											onclick={() => header.column.toggleSorting()}
 										>
 											<FlexRender {header} />
-											{#if header.column.getCanSort()}
-												{#if header.column.getIsSorted() === 'asc'}
-													<ArrowUp />
-												{:else if header.column.getIsSorted() === 'desc'}
-													<ArrowDown />
-												{:else}
-													<ChevronsUpDown />
-												{/if}
+											{#if sorted === 'asc'}
+												<ArrowUp />
+											{:else if sorted === 'desc'}
+												<ArrowDown />
+											{:else}
+												<ChevronsUpDown />
 											{/if}
 										</Button>
+									{:else if !header.isPlaceholder}
+										<FlexRender {header} />
 									{/if}
 								</TableUI.Head>
 							{/each}
@@ -310,77 +317,79 @@
 		<div class="flex items-center justify-between px-2">
 			<div class="flex-1 text-sm text-muted-foreground">
 				{#if selectedCount > 0}
-					{selectedCount} of {table.getFilteredRowModel().rows.length} row(s) selected.
+					{selectedCount} of {table.getFilteredRowModel().rows.length} selected
 				{:else if total > 0}
 					{total} total
 				{/if}
 			</div>
-			<div class="flex items-center gap-2">
+			<!-- Nothing to page through below the smallest page size. -->
+			{#if total > pageSizeOptions[0]}
 				<div class="flex items-center gap-2">
-					<p class="hidden text-sm font-medium sm:block">Rows per page</p>
-					<Select.Root
-						allowDeselect={false}
-						type="single"
-						value={`${pager.pageSize}`}
-						onValueChange={(value) => table.setPageSize(Number(value))}
-					>
-						<Select.Trigger class="w-17.5" aria-label="Rows per page">
-							{pager.pageSize}
-						</Select.Trigger>
-						<Select.Content side="top">
-							<Select.Group>
-								{#each pageSizeOptions as size (size)}
-									<Select.Item value={size.toString()}>{size}</Select.Item>
-								{/each}
-							</Select.Group>
-						</Select.Content>
-					</Select.Root>
+					<div class="flex items-center gap-2">
+						<p class="hidden text-sm font-medium sm:block">Rows per page</p>
+						<Select.Root
+							allowDeselect={false}
+							type="single"
+							value={`${pager.pageSize}`}
+							onValueChange={(value) => table.setPageSize(Number(value))}
+						>
+							<Select.Trigger class="w-17.5" aria-label="Rows per page">
+								{pager.pageSize}
+							</Select.Trigger>
+							<Select.Content side="top">
+								<Select.Group>
+									{#each pageSizeOptions as size (size)}
+										<Select.Item value={size.toString()}>{size}</Select.Item>
+									{/each}
+								</Select.Group>
+							</Select.Content>
+						</Select.Root>
+					</div>
+					<div class="flex w-25 items-center justify-center text-sm font-medium tabular-nums">
+						Page {pager.pageIndex + 1} of {Math.max(1, pageCount)}
+					</div>
+					<div class="flex items-center gap-2">
+						<Button
+							variant="outline"
+							size="icon"
+							class="hidden lg:flex"
+							onclick={() => table.setPageIndex(0)}
+							disabled={!table.getCanPreviousPage()}
+						>
+							<span class="sr-only">Go to first page</span>
+							<ChevronsLeft />
+						</Button>
+						<Button
+							variant="outline"
+							size="icon"
+							onclick={() => table.previousPage()}
+							disabled={!table.getCanPreviousPage()}
+						>
+							<span class="sr-only">Go to previous page</span>
+							<ChevronLeft />
+						</Button>
+						<Button
+							variant="outline"
+							size="icon"
+							onclick={() => table.nextPage()}
+							disabled={!table.getCanNextPage()}
+						>
+							<span class="sr-only">Go to next page</span>
+							<ChevronRight />
+						</Button>
+						<Button
+							variant="outline"
+							size="icon"
+							class="hidden lg:flex"
+							onclick={() => table.setPageIndex(pageCount - 1)}
+							disabled={!table.getCanNextPage()}
+						>
+							<span class="sr-only">Go to last page</span>
+							<ChevronsRight />
+						</Button>
+					</div>
 				</div>
-				<div class="flex w-25 items-center justify-center text-sm font-medium">
-					Page {pager.pageIndex + 1}
-					{pageCount > 1 ? `of ${pageCount}` : ''}
-				</div>
-				<div class="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="icon"
-						class="hidden lg:flex"
-						onclick={() => table.setPageIndex(0)}
-						disabled={!table.getCanPreviousPage()}
-					>
-						<span class="sr-only">Go to first page</span>
-						<ChevronsLeft />
-					</Button>
-					<Button
-						variant="outline"
-						size="icon"
-						onclick={() => table.previousPage()}
-						disabled={!table.getCanPreviousPage()}
-					>
-						<span class="sr-only">Go to previous page</span>
-						<ChevronLeft />
-					</Button>
-					<Button
-						variant="outline"
-						size="icon"
-						onclick={() => table.nextPage()}
-						disabled={!table.getCanNextPage()}
-					>
-						<span class="sr-only">Go to next page</span>
-						<ChevronRight />
-					</Button>
-					<Button
-						variant="outline"
-						size="icon"
-						class="hidden lg:flex"
-						onclick={() => table.setPageIndex(pageCount - 1)}
-						disabled={!table.getCanNextPage()}
-					>
-						<span class="sr-only">Go to last page</span>
-						<ChevronsRight />
-					</Button>
-				</div>
-			</div>
+			{/if}
 		</div>
 	{/if}
 </div>

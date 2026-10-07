@@ -25,6 +25,7 @@
 	const query = users.get(() => sheet.id);
 	const person = $derived(query.data);
 	const me = user.self();
+	const can = user.can();
 
 	const userTeams = teamApi.listForUser(() => sheet.id);
 	let pickerOpen = $state(false);
@@ -58,8 +59,9 @@
 	const dangerActions = $derived.by<DangerAction[]>(() => {
 		if (!person) return [];
 		const name = person.name || person.email;
-		const actions: DangerAction[] = [
-			{
+		const actions: DangerAction[] = [];
+		if (can.edit) {
+			actions.push({
 				title: 'Revoke all access',
 				description: 'Remove them from every login account. Team access stays.',
 				label: 'Revoke all',
@@ -70,8 +72,8 @@
 						confirmText: 'Revoke all',
 						onConfirm: () => revokeAll.mutateAsync({ subjectId: person.id, kind: SubjectKind.USER })
 					})
-			}
-		];
+			});
+		}
 		if (iAmOwner && !isOwner) {
 			actions.push({
 				title: 'Make owner',
@@ -182,30 +184,32 @@
 				description="They get every login account granted to these teams."
 			>
 				{#snippet action()}
-					<SearchPopover
-						bind:open={pickerOpen}
-						bind:query={search}
-						placeholder="Search teams..."
-						empty="No team matches."
-						loading={teamResults.isLoading}
-						align="end"
-					>
-						{#snippet trigger(props)}
-							<Button {...props} variant="ghost" size="sm">
-								<Plus data-icon="inline-start" />
-								Add to team
-							</Button>
-						{/snippet}
-						<Command.Group>
-							{#each teamResults.data?.teams ?? [] as t (t.id)}
-								<Command.Item value={t.id} onSelect={() => toggleTeam(t.id)}>
-									<Users />
-									<span class="truncate">{t.name}</span>
-									<Check class={['ml-auto', teamIds.has(t.id) ? 'text-primary' : 'invisible']} />
-								</Command.Item>
-							{/each}
-						</Command.Group>
-					</SearchPopover>
+					{#if can.edit}
+						<SearchPopover
+							bind:open={pickerOpen}
+							bind:query={search}
+							placeholder="Search teams..."
+							empty="No team matches."
+							loading={teamResults.isLoading}
+							align="end"
+						>
+							{#snippet trigger(props)}
+								<Button {...props} variant="ghost" size="sm">
+									<Plus data-icon="inline-start" />
+									Add to team
+								</Button>
+							{/snippet}
+							<Command.Group>
+								{#each teamResults.data?.teams ?? [] as t (t.id)}
+									<Command.Item value={t.id} onSelect={() => toggleTeam(t.id)}>
+										<Users />
+										<span class="truncate">{t.name}</span>
+										<Check class={['ml-auto', teamIds.has(t.id) ? 'text-primary' : 'invisible']} />
+									</Command.Item>
+								{/each}
+							</Command.Group>
+						</SearchPopover>
+					{/if}
 				{/snippet}
 
 				{#if userTeams.data?.length}
@@ -214,7 +218,7 @@
 							<Chip
 								label={t.name}
 								href={`/access/teams?id=${t.id}`}
-								onRemove={() => toggleTeam(t.id)}
+								onRemove={can.edit ? () => toggleTeam(t.id) : undefined}
 								removeLabel={`Remove from ${t.name}`}
 							>
 								{#snippet leading()}

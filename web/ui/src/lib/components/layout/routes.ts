@@ -64,7 +64,7 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 				{ title: 'Daemons', url: '/infrastructure/daemons', icon: Bot, shortcut: 'n' }
 			]
 		},
-		{ title: 'Certificates', url: '/certificates', icon: IdCard, shortcut: 'c' },
+		{ title: 'Certificate authorities', url: '/certificates', icon: IdCard, shortcut: 'c' },
 		{ title: 'Sessions', url: '/sessions', icon: SquareTerminal, role: 'viewer', shortcut: 'x' },
 		{ title: 'Recordings', url: '/recordings', icon: Video, role: 'viewer', shortcut: 'r' }
 	],
@@ -78,7 +78,7 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			items: [
 				{ title: 'Workspace', url: '/settings', icon: SlidersHorizontal, shortcut: 's' },
 				{ title: 'Daemon defaults', url: '/settings/daemons', icon: ServerCog },
-				{ title: 'Audit streaming', url: '/settings/audit', icon: Radio },
+				{ title: 'Audit streaming', url: '/settings/audit', icon: Radio, role: 'admin' },
 				{ title: 'Single sign-on', url: '/settings/sso', icon: KeyRound },
 				{
 					title: 'Billing',
@@ -126,6 +126,14 @@ export function routeFor(path: string): RouteItem | undefined {
 // Show everything until the role is known, so the nav doesn't flicker.
 export function canSee(route: RouteItem, role: string | undefined): boolean {
 	return role === undefined || atLeast(role, route.role ?? 'member');
+}
+
+/** The nav for a role, without the pages it can't use and the groups that leaves empty. */
+export function visibleRoutes(routes: RouteItem[], role: string | undefined): RouteItem[] {
+	return routes
+		.filter((r) => canSee(r, role))
+		.map((r) => (r.items ? { ...r, items: visibleRoutes(r.items, role) } : r))
+		.filter((r) => !r.items || r.items.length > 0);
 }
 
 export function supportRoute(email: string | undefined): RouteItem | undefined {

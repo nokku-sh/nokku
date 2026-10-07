@@ -14,6 +14,19 @@ export type Issue = {
 	approve?: Daemon[];
 };
 
+/** The one line that sums the issues up. Undefined issues means still loading. */
+export function headline(issues: Issue[] | undefined): { mark: string; text: string; tone: Tone } {
+	if (!issues) return { mark: '…', text: 'checking', tone: 'muted' };
+	if (!issues.length) return { mark: '●', text: 'all good', tone: 'success' };
+	const n = issues.length;
+	const bad = issues[0].tone === 'destructive';
+	return {
+		mark: bad ? '✖' : '▲',
+		text: `${n} ${n === 1 ? 'thing needs' : 'things need'} you`,
+		tone: bad ? 'destructive' : 'warning'
+	};
+}
+
 const DAY = 24 * 3600_000;
 const toneRank: Record<Tone, number> = {
 	destructive: 0,

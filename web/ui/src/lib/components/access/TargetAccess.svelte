@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { principal as principalApi } from '#lib/api/principals.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import { MAX_PAGE_SIZE } from '#lib/config.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -23,6 +24,7 @@
 
 	let { targetId, manual = false }: Props = $props();
 
+	const can = user.can();
 	const accounts = principalApi.list(() => ({ targetId, limit: MAX_PAGE_SIZE }));
 	const addSubjects = principalApi.addSubjects();
 	const removeSubjects = principalApi.removeSubjects();
@@ -121,8 +123,10 @@
 				<Empty.Title>No login accounts yet</Empty.Title>
 				<Empty.Description>
 					{manual
-						? 'Run nk sync on the host to report its accounts, or add one below.'
-						: 'The daemon reports the host accounts when it connects, or add one below.'}
+						? 'Run nk sync on the host to report its accounts'
+						: 'The daemon reports the host accounts when it connects'}{can.edit
+						? ', or add one below.'
+						: '.'}
 				</Empty.Description>
 			</Empty.Header>
 		</Empty.Root>
@@ -148,34 +152,42 @@
 						</p>
 						<p class="truncate text-xs text-muted-foreground">{summary(grants)}</p>
 					</div>
-					<SubjectPicker
-						selected={grants.map((g) => g.id)}
-						onToggle={(s, grant) => toggle(account, s, grant)}
-						label="Grant"
-						variant="ghost"
-					/>
-					<DropdownMenu.Root>
-						<DropdownMenu.Trigger>
-							{#snippet child({ props })}
-								<Button {...props} variant="ghost" size="icon-sm" aria-label="More">
-									<Ellipsis />
-								</Button>
-							{/snippet}
-						</DropdownMenu.Trigger>
-						<DropdownMenu.Content align="end">
-							<DropdownMenu.Group>
-								<DropdownMenu.Item variant="destructive" onclick={() => askRemoveAccount(account)}>
-									<Trash2 />
-									Remove login account
-								</DropdownMenu.Item>
-							</DropdownMenu.Group>
-						</DropdownMenu.Content>
-					</DropdownMenu.Root>
+					{#if can.edit}
+						<SubjectPicker
+							selected={grants.map((g) => g.id)}
+							onToggle={(s, grant) => toggle(account, s, grant)}
+							label="Grant"
+							variant="ghost"
+						/>
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								{#snippet child({ props })}
+									<Button {...props} variant="ghost" size="icon-sm" aria-label="More">
+										<Ellipsis />
+									</Button>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content align="end">
+								<DropdownMenu.Group>
+									<DropdownMenu.Item
+										variant="destructive"
+										onclick={() => askRemoveAccount(account)}
+									>
+										<Trash2 />
+										Remove login account
+									</DropdownMenu.Item>
+								</DropdownMenu.Group>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
+					{/if}
 				</div>
 				{#if grants.length}
 					<div class="flex flex-wrap gap-1.5 border-t bg-muted/40 px-3 py-2.5">
 						{#each grants as grant (grant.id)}
-							<SubjectChip {grant} onRemove={() => toggle(account, grant, false)} />
+							<SubjectChip
+								{grant}
+								onRemove={can.edit ? () => toggle(account, grant, false) : undefined}
+							/>
 						{/each}
 					</div>
 				{/if}
@@ -185,26 +197,28 @@
 		{/each}
 	{/if}
 
-	<form
-		onsubmit={(e) => {
-			e.preventDefault();
-			void submitAccount();
-		}}
-	>
-		<InputGroup.Root>
-			<InputGroup.Addon><KeyRound /></InputGroup.Addon>
-			<InputGroup.Input
-				bind:value={newAccount}
-				placeholder="Add a login account, e.g. deploy"
-				aria-label="New login account"
-			/>
-			<InputGroup.Addon align="inline-end">
-				<!-- Never disabled, InputGroup greys out the whole field for a disabled child. -->
-				<InputGroup.Button type="submit" variant="secondary" size="xs">
-					<Plus data-icon="inline-start" />
-					Add
-				</InputGroup.Button>
-			</InputGroup.Addon>
-		</InputGroup.Root>
-	</form>
+	{#if can.edit}
+		<form
+			onsubmit={(e) => {
+				e.preventDefault();
+				void submitAccount();
+			}}
+		>
+			<InputGroup.Root>
+				<InputGroup.Addon><KeyRound /></InputGroup.Addon>
+				<InputGroup.Input
+					bind:value={newAccount}
+					placeholder="Add a login account, e.g. deploy"
+					aria-label="New login account"
+				/>
+				<InputGroup.Addon align="inline-end">
+					<!-- Never disabled, InputGroup greys out the whole field for a disabled child. -->
+					<InputGroup.Button type="submit" variant="secondary" size="xs">
+						<Plus data-icon="inline-start" />
+						Add
+					</InputGroup.Button>
+				</InputGroup.Addon>
+			</InputGroup.Root>
+		</form>
+	{/if}
 </div>

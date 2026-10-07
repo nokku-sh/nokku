@@ -42,6 +42,10 @@ The look is terminal-native: compliance paper in light mode, a console at night 
 - Lists use `DataTable` with `TableToolbar`. Filters are URL params, empty states set a `command` hint when a CLI way exists.
 - Editing an existing entity opens its sheet (`EntitySheet`). Creating one opens a `FormModal`. A secret shown once goes through `SecretReveal`.
 - Destructive actions call `confirm()`. Bulk actions pass `confirm` on the `BulkAction` instead. Type-to-confirm is for deletes that are hard to undo, and asks for the name (the email for members).
+- Who may do what comes from `user.can()` (`view`, `edit`, `admin`, `own`), which mirrors the `(access)` option of the RPCs. Hide what the role can't do, show the rest read-only. Never let a click end in a "not allowed" toast.
+- A create form opens through `useCreate()`, which keeps it in `?new`. That is how the command palette opens it from any page.
+- Opening a shell or copying an ssh command goes through `useConnect()`, the server list through `useServers()`.
+- Motion is calm. `animate-breathe` marks what is live, `animate-blink` is for the cursor in `Empty.Command` only. A steady state like "online" does not move.
 - Loading is `Skeleton` or `Spinner`, never a spinning icon. Settings autosave with `SaveStatus`, forms that talk to an outside system keep a Save button.
 
 ### Copy

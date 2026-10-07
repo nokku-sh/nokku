@@ -1,8 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
-	import { target } from '#lib/api/targets.svelte.js';
-	import { user } from '#lib/api/user.svelte.js';
+	import { serverMatches, useConnect, useServers } from '#lib/api/connect.svelte.js';
 	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -11,80 +8,22 @@
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import * as Kbd from '#lib/components/ui/kbd/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { focusOnSlash } from '#lib/hooks/index.js';
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
-	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
-	import { recentTargets } from '#lib/store.svelte.js';
 	import { Search, Server } from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
 
 	let { showAll = false }: { showAll?: boolean } = $props();
 
 	const LIMIT = 9;
 
-	const me = user.self();
-	const access = target.access(() => me.data?.id);
-	const createSession = daemonApi.createSession();
+	const connect = useConnect();
+	const all = useServers();
 
 	let query = $state('');
-	let input = $state<HTMLInputElement | null>(null);
 
-	const online = $derived(
-		new Set((access.data?.daemons ?? []).filter((d) => d.online).map((d) => d.id))
-	);
-	const canShell = (t: Target) => !!t.daemonId && online.has(t.daemonId);
-
-	// Recent first, then reachable, then by name.
-	const servers = $derived.by(() => {
-		const q = query.trim().toLowerCase();
-		const recent = recentTargets.current;
-		const rank = (t: Target) => {
-			const i = recent.indexOf(t.id);
-			return i < 0 ? recent.length : i;
-		};
-		return (access.data?.targets ?? [])
-			.filter(
-				(t) =>
-					!q ||
-					t.name.toLowerCase().includes(q) ||
-					t.metadata?.hostname?.toLowerCase().includes(q) ||
-					t.usernames.some((a) => a.toLowerCase().includes(q))
-			)
-			.sort(
-				(a, b) =>
-					rank(a) - rank(b) ||
-					Number(canShell(b)) - Number(canShell(a)) ||
-					a.name.localeCompare(b.name)
-			);
-	});
+	const servers = $derived(all.list.filter((t) => serverMatches(t, query)));
 	const visible = $derived(query ? servers : servers.slice(0, LIMIT));
-
-	function remember(id: string) {
-		recentTargets.current = [id, ...recentTargets.current.filter((r) => r !== id)].slice(0, 6);
-	}
-
-	async function connect(t: Target, username: string) {
-		remember(t.id);
-		if (canShell(t)) {
-			await createSession.mutateAsync({ daemonId: t.daemonId, username });
-			await goto('/sessions');
-			return;
-		}
-		await navigator.clipboard.writeText(`ssh ${username}@${t.name}`);
-		toast.success('SSH command copied', { description: 'Run nk login first on a new machine.' });
-	}
-
-	function onkeydown(e: KeyboardEvent) {
-		const typing =
-			e.target instanceof HTMLElement &&
-			(e.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName));
-		if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey) {
-			e.preventDefault();
-			input?.focus();
-		}
-	}
 </script>
-
-<svelte:window {onkeydown} />
 
 <Card.Root class="gap-3">
 	<Card.Header>
@@ -93,10 +32,10 @@
 		<Card.Action>
 			<InputGroup.Root class="w-44 sm:w-56">
 				<InputGroup.Input
-					bind:ref={input}
 					bind:value={query}
 					placeholder="Filter"
 					aria-label="Filter servers"
+					{@attach focusOnSlash}
 				/>
 				<InputGroup.Addon><Search /></InputGroup.Addon>
 				<InputGroup.Addon align="inline-end"><Kbd.Root>/</Kbd.Root></InputGroup.Addon>
@@ -104,7 +43,7 @@
 		</Card.Action>
 	</Card.Header>
 	<Card.Content>
-		{#if access.isLoading || me.isLoading}
+		{#if all.loading}
 			<div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
 				{#each { length: 6 }, i (i)}<Skeleton class="h-24 w-full" />{/each}
 			</div>
@@ -121,12 +60,12 @@
 		{:else}
 			<div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
 				{#each visible as t (t.id)}
-					{@const shell = canShell(t)}
+					{@const shell = all.canShell(t)}
 					<div
 						class="flex min-w-0 flex-col gap-2 rounded-lg border p-3 transition-colors hover:bg-muted/40"
 					>
 						<div class="flex min-w-0 items-center gap-2">
-							<StatusDot tone={shell ? 'success' : 'muted'} live={shell} />
+							<StatusDot tone={shell ? 'success' : 'muted'} />
 							<span class="truncate font-medium">{t.name}</span>
 							{#if !t.daemonId}<Badge variant="muted" class="ml-auto">nk sync</Badge>{/if}
 						</div>
@@ -143,8 +82,9 @@
 												size="xs"
 												variant="secondary"
 												class="font-mono"
-												disabled={createSession.isPending}
-												onclick={() => connect(t, username)}
+												disabled={connect.pending}
+												onclick={() =>
+													shell ? connect.shell(t, username) : connect.copy(t, username)}
 											>
 												{username}
 											</Button>

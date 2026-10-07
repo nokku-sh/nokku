@@ -13,6 +13,11 @@ let sessions = new SvelteMap<string, TerminalSession>();
 export function getSessions() {
 	return sessions;
 }
+/** Shells that a reload or a sign-out would end. */
+export function liveSessions() {
+	return [...sessions.values()].filter((s) => s.state === 'connected' || s.state === 'connecting')
+		.length;
+}
 export function addSession(session: TerminalSession) {
 	sessions.set(session.id, session);
 	activeSessionID.current = session.id;

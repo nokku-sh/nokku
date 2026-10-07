@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { billing } from '#lib/api/billing.svelte.js';
+	import { dashboard } from '#lib/api/dashboard.svelte.js';
 	import { recordings } from '#lib/api/recordings.svelte.js';
 	import * as HoverCard from '#lib/components/ui/hover-card/index.js';
 	import { Progress } from '#lib/components/ui/progress/index.js';
@@ -8,10 +8,11 @@
 	import { Database, TriangleAlert } from '@lucide/svelte';
 
 	const list = recordings.list();
-	const billingData = billing.get();
+	// The plan itself is for admins, the dashboard carries the quota for every role here.
+	const overview = dashboard.get(() => true);
 
 	// -1 is unlimited.
-	let limitBytes = $derived(Number(billingData.data?.quotas?.recordingStorageBytes ?? 0));
+	const limitBytes = $derived(Number(overview.data?.recordingQuotaBytes ?? 0));
 	const unlimited = $derived(limitBytes <= 0);
 	const usedBytes = $derived(Number(list.data?.totalBytes ?? 0));
 

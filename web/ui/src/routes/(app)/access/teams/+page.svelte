@@ -2,6 +2,7 @@
 	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
 	import { team } from '#lib/api/team.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import CreateTeamModal from '#lib/components/modals/CreateTeamModal.svelte';
 	import TeamSheet from '#lib/components/sheets/TeamSheet.svelte';
 	import {
@@ -20,12 +21,13 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import type { Team } from '#lib/gen/nokku/v1/team_pb.js';
-	import { usePagination, useSheet } from '#lib/hooks/index.js';
+	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import { PlusIcon, ShieldCheck, Trash2, Users } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const sheet = useSheet();
-	let createOpen = $state(false);
+	const can = user.can();
+	const create = useCreate();
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
@@ -81,19 +83,21 @@
 				return renderComponent(ActionCell, {
 					menuActions: [
 						{
-							label: 'Manage access',
+							label: can.edit ? 'Manage access' : 'View access',
 							icon: ShieldCheck,
 							onClick: () => sheet.show(row.original.id, 'access')
 						}
 					],
 
-					deleteConfig: {
-						itemName: row.original.name,
-						description:
-							'Members keep their own access, but lose everything granted through this team.',
-						typeToConfirm: row.original.name,
-						onDelete: () => deleteTeam.mutateAsync({ id: row.original.id })
-					}
+					deleteConfig: can.edit
+						? {
+								itemName: row.original.name,
+								description:
+									'Members keep their own access, but lose everything granted through this team.',
+								typeToConfirm: row.original.name,
+								onDelete: () => deleteTeam.mutateAsync({ id: row.original.id })
+							}
+						: undefined
 				});
 			}
 		})
@@ -101,13 +105,15 @@
 </script>
 
 <PageHeader title="Teams" description="Groups of people who share access">
-	<Button onclick={() => (createOpen = true)}>
-		<PlusIcon data-icon="inline-start" />
-		Create team
-	</Button>
+	{#if can.edit}
+		<Button onclick={() => (create.open = true)}>
+			<PlusIcon data-icon="inline-start" />
+			Create team
+		</Button>
+	{/if}
 </PageHeader>
 
-<CreateTeamModal bind:open={createOpen} />
+<CreateTeamModal bind:open={create.open} />
 <TeamSheet />
 
 <DataTable
@@ -115,7 +121,7 @@
 	rowCount={teams.data?.total ?? 0}
 	isLoading={teams.isLoading}
 	{columns}
-	{bulkActions}
+	bulkActions={can.edit ? bulkActions : []}
 	onRowClick={(t) => sheet.show(t.id)}
 	emptyState={{
 		icon: Users,

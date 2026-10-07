@@ -2,6 +2,7 @@
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import ExportMenu from '#lib/components/audit/ExportMenu.svelte';
 	import { page } from '$app/state';
+	import { user } from '#lib/api/user.svelte.js';
 	import { util, workspace } from '#lib/api/workspaces.svelte.js';
 	import ActivitySheet from '#lib/components/sheets/ActivitySheet.svelte';
 	import { DataTable, TableToolbar, createAppColumnHelper } from '#lib/components/tables/index.js';
@@ -31,6 +32,7 @@
 	let selected = $state<EventLog>();
 
 	const ws = workspace.get();
+	const can = user.can();
 	const pager = usePagination();
 	const search = new Debounced(() => page.url.searchParams.get('q') ?? '', 300);
 	const range = $derived(currentRange(auditUTC.current));
@@ -102,10 +104,13 @@
 			Kept {logs.data.retentionDays} days
 		</Badge>
 	{/if}
-	<Badge variant={streaming ? 'success' : 'outline'} href="/settings/audit">
-		<Radio data-icon="inline-start" />
-		{streaming ? 'Streaming to SIEM' : 'Not streaming'}
-	</Badge>
+	<!-- Other roles never learn the destination, so they can't tell either way. -->
+	{#if can.admin}
+		<Badge variant={streaming ? 'success' : 'outline'} href="/settings/audit">
+			<Radio data-icon="inline-start" />
+			{streaming ? 'Streaming to SIEM' : 'Not streaming'}
+		</Badge>
+	{/if}
 	<ExportMenu {filter} />
 </PageHeader>
 

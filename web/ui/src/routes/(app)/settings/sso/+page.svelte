@@ -16,8 +16,10 @@
 	const me = user.self();
 	const readonly = $derived(me.data !== undefined && me.data.role !== 'owner');
 
-	const billingData = billing.get();
-	const scimAvailable = $derived(billingData.data?.features?.['scim'] === true);
+	// Only admins read the plan. Everyone else gets the read-only tab either way.
+	const can = user.can();
+	const billingData = billing.get(() => can.admin);
+	const scimAvailable = $derived(!can.admin || billingData.data?.features?.['scim'] === true);
 
 	let tab = $state('providers');
 </script>

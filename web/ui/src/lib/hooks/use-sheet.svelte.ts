@@ -1,8 +1,8 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 
-/** Query params owned by sheets, tables don't treat them as filters. */
-export const SHEET_PARAMS = ['id', 'tab'];
+/** Query params owned by sheets and create forms, tables don't treat them as filters. */
+export const SHEET_PARAMS = ['id', 'tab', 'new'];
 
 // Set when this session pushed the history entry, so closing can go back
 // instead of leaving a dead entry that reopens the sheet on Back.
@@ -51,6 +51,22 @@ export function useSheet() {
 				return;
 			}
 			void goto(urlWith({ id: undefined, tab: undefined }), { replace: true, reset: false });
+		}
+	};
+}
+
+// useCreate keeps "the create form is open" in `?new`, so the command palette
+// can open it from any page.
+export function useCreate() {
+	const open = $derived(page.url.searchParams.has('new'));
+
+	return {
+		get open() {
+			return open;
+		},
+		set open(value: boolean) {
+			if (value === open) return;
+			void goto(urlWith({ new: value ? '1' : undefined }), { replace: true, reset: false });
 		}
 	};
 }

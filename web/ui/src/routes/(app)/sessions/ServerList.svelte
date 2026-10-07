@@ -1,34 +1,17 @@
 <script lang="ts">
-	import * as Empty from '#lib/components/ui/empty/index.js';
-	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
-	import { target } from '#lib/api/targets.svelte.js';
-	import { user } from '#lib/api/user.svelte.js';
-	import { Badge } from '#lib/components/ui/badge/index.js';
-	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
-	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
-	import ConnectPopover from './ConnectPopover.svelte';
-	import { Server, WifiOff } from '@lucide/svelte';
+	import { serverMatches, useServers } from '#lib/api/connect.svelte.js';
 	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { Server } from '@lucide/svelte';
+	import ServerRow from './ServerRow.svelte';
 
-	const currentUser = user.self();
-
-	const access = target.access(() => currentUser.data?.id);
-	const targets = $derived(access.data?.targets);
-	const agents = $derived(access.data?.daemons);
+	const servers = useServers();
 
 	let searchQuery = $state('');
 
-	const filtered = $derived.by(() => {
-		if (!targets) return [];
-		const q = searchQuery.toLowerCase();
-		return targets?.filter(
-			(s) =>
-				s.name.toLowerCase().includes(q) ||
-				s.metadata?.hostname?.toLowerCase().includes(q) ||
-				s.endpoints[0]?.toLowerCase().includes(q)
-		);
-	});
-	const onlineCount = $derived(agents?.filter((s) => s.online).length);
+	const filtered = $derived(servers.list.filter((t) => serverMatches(t, searchQuery)));
 </script>
 
 <div class="flex h-full flex-col">
@@ -36,18 +19,14 @@
 		<div class="mb-2 flex items-center justify-between">
 			<h2 class="text-sm font-semibold">Servers</h2>
 			<Badge variant="outline" class="text-xs">
-				{onlineCount} online
+				{servers.list.filter(servers.canShell).length} online
 			</Badge>
 		</div>
-		<InputGroupVariants
-			variant="search"
-			bind:value={searchQuery}
-			searchResults={filtered?.length}
-		/>
+		<InputGroupVariants variant="search" bind:value={searchQuery} searchResults={filtered.length} />
 	</div>
 
 	<div class="flex-1 overflow-y-auto">
-		{#if access.isPending}
+		{#if servers.loading}
 			<div class="flex flex-col gap-1 p-2">
 				{#each { length: 5 }, i (i)}
 					<div class="flex items-center gap-2 rounded-md p-2">
@@ -66,37 +45,7 @@
 		{:else}
 			<div class="flex flex-col gap-0.5 p-1.5">
 				{#each filtered as target (target.id)}
-					{@const isOnline = agents?.some((a) => a.id === target.daemonId && a.online)}
-
-					<div class="group relative">
-						{#if isOnline && target.daemonId}
-							<ConnectPopover {target} />
-						{:else}
-							<Tooltip.Provider>
-								<Tooltip.Root>
-									<Tooltip.Trigger>
-										<div
-											class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm opacity-50"
-										>
-											<StatusDot class="size-1.5" />
-											<div class="min-w-0 flex-1">
-												<p class="truncate text-xs font-medium">{target.name}</p>
-												{#if target.metadata?.hostname}
-													<p class="truncate text-2xs text-muted-foreground">
-														{target.metadata.hostname}
-													</p>
-												{/if}
-											</div>
-											<WifiOff class="size-3 text-muted-foreground" />
-										</div>
-									</Tooltip.Trigger>
-									<Tooltip.Content side="right">
-										<p class="text-xs">Daemon offline</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
-							</Tooltip.Provider>
-						{/if}
-					</div>
+					<ServerRow {target} shell={servers.canShell(target)} />
 				{/each}
 			</div>
 		{/if}

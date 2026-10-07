@@ -2,14 +2,23 @@
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { ChevronsUpDown, ChevronRight } from '@lucide/svelte';
 	import type { ComponentProps } from 'svelte';
-	import { AppRoutes, SupportRoutes, canSee, supportRoute, type RouteItem } from './routes';
+	import {
+		AppRoutes,
+		SupportRoutes,
+		supportRoute,
+		visibleRoutes as visible,
+		type RouteItem
+	} from './routes';
 	import UserMenu from './UserMenu.svelte';
+	import { dashboard } from '#lib/api/dashboard.svelte.js';
 	import { util, workspace } from '#lib/api/workspaces.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { page } from '$app/state';
 	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
 	import NokkuCaret from '#lib/assets/nokku_caret.svelte';
+	import { headline, issuesOf } from '#lib/components/dashboard/issues.js';
+	import { toneText } from '#lib/tone.js';
 
 	let { ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
 
@@ -21,12 +30,15 @@
 	const currentUser = user.self();
 	const currentRoute = $derived(page.url.pathname);
 
+	// A heads-up on every page. Slower than the dashboard, it only has to hint.
+	const can = user.can();
+	const overview = dashboard.get(() => can.view, 60_000);
+	const issues = $derived(overview.data && issuesOf(overview.data));
+	const status = $derived(headline(issues));
+
 	const visibleRoutes = $derived(
 		Object.entries(AppRoutes)
-			.map(
-				([group, routes]) =>
-					[group, routes.filter((r) => canSee(r, currentUser.data?.role))] as const
-			)
+			.map(([group, routes]) => [group, visible(routes, currentUser.data?.role)] as const)
 			.filter(([, routes]) => routes.length > 0)
 	);
 
@@ -40,15 +52,28 @@
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton size="lg">
 					{#snippet child({ props })}
-						<a href="/settings" {...props}>
+						<a
+							href="/"
+							{...props}
+							title={issues?.length ? issues.map((i) => i.title).join('\n') : ws.data?.description}
+						>
 							<div class="rounded-lg bg-terminal p-2.5 text-brand-caret">
 								<NokkuCaret class="pl-0.5" />
 							</div>
 							<div class="grid flex-1 text-left text-sm leading-tight">
-								<span class="truncate" title={ws.data?.name}>{ws.data?.name ?? 'Nokku'}</span>
-								<span class="truncate text-xs" title={ws.data?.description}>
-									{ws.data?.description || 'Workspace settings'}
-								</span>
+								<span class="truncate font-medium">{ws.data?.name ?? 'Nokku'}</span>
+								{#if can.view}
+									<span class={['truncate font-mono text-xs', toneText[status.tone]]}>
+										<span class={[status.tone === 'success' && 'motion-safe:animate-breathe']}>
+											{status.mark}
+										</span>
+										{status.text}
+									</span>
+								{:else}
+									<span class="truncate text-xs text-muted-foreground">
+										{ws.data?.description || 'Workspace'}
+									</span>
+								{/if}
 							</div>
 						</a>
 					{/snippet}

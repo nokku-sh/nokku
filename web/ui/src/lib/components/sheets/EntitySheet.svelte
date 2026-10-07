@@ -43,6 +43,8 @@
 		saveState?: SaveState;
 		/** Keeps the footer up with a hint while idle. For tabs that hold autosaved fields. */
 		saveHint?: boolean;
+		/** The caller's role can't change the entity, the hint says so. */
+		readonly?: boolean;
 		media?: Snippet;
 		subtitle?: Snippet;
 		/** Primary actions under the title. */
@@ -66,6 +68,7 @@
 		onTabChange,
 		saveState,
 		saveHint = false,
+		readonly = false,
 		media,
 		subtitle,
 		actions,
@@ -219,7 +222,12 @@
 
 		{#if saveState !== undefined && !loading && !missing && (saveHint || saveState !== 'idle')}
 			<Sheet.Footer class="border-t px-5 py-3">
-				<SaveStatus state={saveState} idleText="Changes save automatically" />
+				<SaveStatus
+					state={saveState}
+					idleText={readonly
+						? 'View only, your role cannot change this'
+						: 'Changes save automatically'}
+				/>
 			</Sheet.Footer>
 		{/if}
 	</Sheet.Content>
