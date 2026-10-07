@@ -113,7 +113,8 @@ postgresql:
   enabled: true
   auth:
     username: postgres
-    password: postgres
+    # No default. Generate with: openssl rand -hex 16
+    password: ""
     database: nokku
   primary:
     persistence:
