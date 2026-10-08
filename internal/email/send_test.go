@@ -146,6 +146,33 @@ func TestSendEmailChangeConfirm_OwnCooldown(t *testing.T) {
 	}
 }
 
+// Every hosted signup makes a new owner, so only the address can hold back a
+// second mail. The caller can ask before it makes the workspace.
+func TestSendOwnerLinkEmail_CooldownPerAddress(t *testing.T) {
+	sender := &mockSender{}
+	svc := newTestService(sender)
+	ctx := t.Context()
+
+	if svc.OwnerLinkOnCooldown(ctx, "a@b.io") {
+		t.Fatal("cooldown before any link went out")
+	}
+	if err := svc.SendOwnerLinkEmail(ctx, "a@b.io", "u", "24h"); err != nil {
+		t.Fatal(err)
+	}
+	if !svc.OwnerLinkOnCooldown(ctx, "a@b.io") {
+		t.Error("no cooldown after the link went out")
+	}
+	if err := svc.SendOwnerLinkEmail(ctx, "a@b.io", "u", "24h"); !errors.Is(err, ErrCooldown) {
+		t.Errorf("second link to the address = %v, want ErrCooldown", err)
+	}
+	if svc.OwnerLinkOnCooldown(ctx, "c@b.io") {
+		t.Error("another address shares the cooldown")
+	}
+	if len(sender.sent) != 1 {
+		t.Errorf("sender called %d times, want 1", len(sender.sent))
+	}
+}
+
 func TestSendTemplate_CooldownPerUser(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)

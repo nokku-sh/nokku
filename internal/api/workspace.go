@@ -15,6 +15,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/email"
 	"github.com/nokku-sh/nokku/internal/tenant"
 )
 
@@ -98,6 +99,18 @@ func (s *workspaceService) CreateWorkspace(
 	if tenant.Forbidden(req.GetSlug()) {
 		return nil, newError(connect.CodeInvalidArgument, "this name is not available")
 	}
+	// Asked before anything exists, DNS included. A workspace whose owner
+	// gets no mail would sit there until the purge.
+	addr := strings.ToLower(strings.TrimSpace(req.GetOwnerEmail()))
+	if s.cfg.Email.OwnerLinkOnCooldown(ctx, addr) {
+		return nil, newError(
+			connect.CodeResourceExhausted,
+			"a sign-in link went to this address a moment ago, try again later",
+		)
+	}
+	if err := email.Verify(ctx, addr, true); err != nil {
+		return nil, newError(connect.CodeInvalidArgument, "please enter a valid email address")
+	}
 	ws, err := tenant.Create(ctx, s.cfg.Conn, req.GetSlug(), strings.TrimSpace(req.GetName()))
 	if db.IsUniqueViolation(err) {
 		return nil, newError(connect.CodeAlreadyExists, "this name is taken")
@@ -110,7 +123,7 @@ func (s *workspaceService) CreateWorkspace(
 	wsCtx := actor.WithWorkspace(ctx, actor.Workspace{
 		ID: ws.ID, Slug: ws.Slug, BaseURL: s.cfg.Tenant.BaseURL(ws.Slug),
 	})
-	owner, err := s.cfg.IAM.CreateOwner(wsCtx, req.GetOwnerEmail(), req.GetOwnerName())
+	owner, err := s.cfg.IAM.CreateOwner(wsCtx, addr, req.GetOwnerName())
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +131,7 @@ func (s *workspaceService) CreateWorkspace(
 	if err != nil {
 		return nil, err
 	}
-	if err := s.cfg.Email.SendMagicLinkEmail(ctx, owner.ID, owner.Email, link, (24 * time.Hour).String()); err != nil {
+	if err := s.cfg.Email.SendOwnerLinkEmail(ctx, addr, link, (24 * time.Hour).String()); err != nil {
 		slog.Error("signup mail not sent", "error", err, "workspace_id", ws.ID)
 		return nil, errMailNotSent
 	}

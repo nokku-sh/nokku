@@ -25,6 +25,7 @@ const (
 	// cooldownEntries bounds the cooldown store, one entry per user and template.
 	cooldownEntries = 10_000
 	emailConfirm    = "email-confirm"
+	magicLink       = "magic-link"
 )
 
 // Service only delivers when an SMTP host is set.
@@ -107,13 +108,27 @@ func (s *Service) SendMagicLinkEmail(ctx context.Context, userID, email, link, e
 		userID:   userID,
 		to:       email,
 		subject:  "Your sign-in link",
-		template: "magic-link",
+		template: magicLink,
 		data: linkTemplateData{
 			Operator:   s.Operator,
 			LinkURL:    link,
 			Expiration: expiry,
 		},
 	})
+}
+
+// SendOwnerLinkEmail is the sign-in link for the owner of a workspace the
+// hosted signup made. Every signup makes a new owner, so the cooldown is
+// keyed by the address.
+func (s *Service) SendOwnerLinkEmail(ctx context.Context, email, link, expiry string) error {
+	return s.SendMagicLinkEmail(ctx, email, email, link, expiry)
+}
+
+// OwnerLinkOnCooldown is whether email got that link a moment ago. Asked
+// before the next workspace is made, its mail would not go out.
+func (s *Service) OwnerLinkOnCooldown(ctx context.Context, email string) bool {
+	_, err := s.cache.Get(ctx, cooldownKey(email, magicLink))
+	return err == nil
 }
 
 // SendEmailChangeConfirm goes to the new address, the account only switches

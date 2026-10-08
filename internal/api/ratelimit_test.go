@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
+
 	"github.com/nokku-sh/nokku/internal/config"
 )
 
@@ -107,6 +109,34 @@ func TestWithRateLimitDeviceStart(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, call("/auth/device/token", flood),
 		"a login that is already waiting keeps polling")
 	assert.Equal(t, http.StatusNoContent, call("/auth/device/verify", flood), "and can still be approved")
+}
+
+// Anyone can sign up on the hosted service, and every signup makes a
+// workspace and a mail.
+func TestWithRateLimitSignup(t *testing.T) {
+	s := &Server{cfg: &config.Config{}}
+	h := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	call := func(path, addr string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodPost, path, nil)
+		r.RemoteAddr = addr
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+
+	const signup = nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure
+	const flood, other = "203.0.113.7:4000", "203.0.113.8:4000"
+	for i := range signupsPerWindow {
+		require.Equal(t, http.StatusNoContent, call(signup, flood).Code, "signup %d", i+1)
+	}
+	refused := call(signup, flood)
+	assert.Equal(t, http.StatusTooManyRequests, refused.Code, "one past the limit")
+	assert.Contains(t, refused.Body.String(), "resource_exhausted", "an RPC error, the form can show it")
+	assert.Equal(t, http.StatusNoContent, call(signup, other).Code, "another address still signs up")
+	assert.Equal(t, http.StatusNoContent, call("/nokku.v1.AuthService/RequestMagicLink", flood).Code,
+		"signing in has a budget of its own")
 }
 
 func TestIsAuthRoute(t *testing.T) {
