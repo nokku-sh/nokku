@@ -73,7 +73,6 @@
 	const valid = $derived(
 		/^[a-z0-9-]{1,64}$/.test(form.providerId) &&
 			!!form.name.trim() &&
-			form.issuerUrl.startsWith('https://') &&
 			!!form.clientId.trim() &&
 			form.scopes.includes('openid') &&
 			(isEdit || !!clientSecret.trim())
@@ -121,7 +120,7 @@
 		</Field.Field>
 	</div>
 
-	<Field.Field data-invalid={!!form.issuerUrl && !form.issuerUrl.startsWith('https://')}>
+	<Field.Field data-invalid={!form.issuerUrl}>
 		<Field.Label for="sso-issuer">Issuer URL</Field.Label>
 		<Input
 			id="sso-issuer"
