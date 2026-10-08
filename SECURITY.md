@@ -133,7 +133,7 @@ cosign verify ghcr.io/nokku-sh/nokku:<version> \
 
 **The core is down, access is not.** Daemons enforce the access they last synced, and a certificate stays valid until it expires. Revoking access is immediate on servers that are in sync. A server that missed the sync is bounded by the certificate lifetime, so keep user certificates short.
 
-**Session recordings.** Daemons stream recordings to the core, where they are encrypted at rest. Credential scrubbing runs after an upload completes and replaces the recording with a redacted copy. Between upload and scrub the stored recording is unredacted, though still encrypted. Scrubbing is best effort. A failed scrub is logged and the recording is kept as uploaded, and the matching is heuristic, so it cannot catch every secret.
+**Session recordings.** Daemons stream recordings to the core, where they are encrypted at rest. Credential scrubbing runs after an upload ends, also one that broke off, and replaces what was stored with a redacted copy. Between upload and scrub the stored recording is unredacted, though still encrypted. Scrubbing is best effort. A failed scrub is logged and the recording is kept as uploaded, and the matching is heuristic, so it cannot catch every secret.
 
 **Row-level security is a safety net, not a wall.** Every tenant row belongs to one workspace, and a request only sees the rows of its own. The policy is the only workspace filter, queries name none. A connection with no workspace set sees nothing. This protects against application bugs. It does not protect against a compromised core: it holds the password of `nokku_system` too, and the workspace setting is an ordinary session variable. Queries are parameterized through sqlc, which is the defense against injection.
 

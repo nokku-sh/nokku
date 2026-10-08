@@ -80,6 +80,14 @@ func (w *Writer) WriteChunk(plaintext []byte) error {
 	return w.writeFrame(frameData, plaintext)
 }
 
+// Write is WriteChunk as an [io.Writer], every call is one frame.
+func (w *Writer) Write(p []byte) (int, error) {
+	if err := w.WriteChunk(p); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
 func (w *Writer) Close() error {
 	if err := w.writeFrame(frameEnd, nil); err != nil {
 		_ = w.w.Close()
