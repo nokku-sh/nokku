@@ -47,6 +47,11 @@ function plainClone<Desc extends DescMessage>(schema: Desc, entity: MessageShape
 	return clone as MessageShape<Desc>;
 }
 
+// newDraft is the blank model of a create form.
+export function newDraft<Desc extends DescMessage>(schema: Desc, init?: MessageInitShape<Desc>) {
+	return plainClone(schema, create(schema, init));
+}
+
 // useDraft gives an editable copy of a loaded entity. It only resets when a
 // different entity loads, so background refetches never clobber edits.
 export function useDraft<Desc extends DescMessage>(

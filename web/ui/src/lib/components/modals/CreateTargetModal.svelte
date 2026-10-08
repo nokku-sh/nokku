@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { create } from '@bufbuild/protobuf';
 	import { Server } from '@lucide/svelte';
 	import { ca } from '#lib/api/certificates.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
@@ -10,7 +9,7 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { AuthorityType } from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
-	import { useSheet } from '#lib/hooks/index.js';
+	import { newDraft, useSheet } from '#lib/hooks/index.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
@@ -22,12 +21,12 @@
 	const tagFilters = targetApi.filters();
 	const createTarget = targetApi.create();
 
-	let model = $state(create(TargetSchema));
+	let model = $state(newDraft(TargetSchema));
 	const caId = $derived(model.caId || sshCAs.find((c) => c.isDefault)?.id || '');
 
 	async function onSubmit() {
 		const res = await createTarget.mutateAsync({ ...model, caId });
-		model = create(TargetSchema);
+		model = newDraft(TargetSchema);
 		if (res.target) sheet.show(res.target.id, 'access');
 	}
 </script>

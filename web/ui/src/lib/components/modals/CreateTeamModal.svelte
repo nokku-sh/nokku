@@ -1,23 +1,22 @@
 <script lang="ts">
-	import { create } from '@bufbuild/protobuf';
 	import { Users } from '@lucide/svelte';
 	import { team as teamApi } from '#lib/api/team.svelte.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { TeamSchema } from '#lib/gen/nokku/v1/team_pb.js';
-	import { useSheet } from '#lib/hooks/index.js';
+	import { newDraft, useSheet } from '#lib/hooks/index.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
 	const sheet = useSheet();
 	const createTeam = teamApi.create();
-	let model = $state(create(TeamSchema));
+	let model = $state(newDraft(TeamSchema));
 
 	async function onSubmit() {
 		const res = await createTeam.mutateAsync({ ...model });
-		model = create(TeamSchema);
+		model = newDraft(TeamSchema);
 		if (res.team) sheet.show(res.team.id);
 	}
 </script>
