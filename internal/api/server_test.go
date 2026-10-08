@@ -30,7 +30,7 @@ func TestRequestSizeLimit(t *testing.T) {
 }
 
 // The audit webhook secret signs events to the customer's SIEM. Only the
-// people who manage it may read it back.
+// owner manages it and may read it back.
 func TestWorkspaceHidesWebhookFromMembers(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -49,14 +49,14 @@ func TestWorkspaceHidesWebhookFromMembers(t *testing.T) {
 			header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, role)))
 	}
 
-	for _, role := range []db.Role{db.RoleMember, db.RoleEditor} {
+	for _, role := range []db.Role{db.RoleMember, db.RoleEditor, db.RoleAdmin} {
 		got, err := client(role).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
 		require.NoError(t, err)
 		assert.Empty(t, got.GetWorkspace().GetSettings().GetAuditWebhookSecret(), "%s reads the secret", role)
 		assert.Empty(t, got.GetWorkspace().GetSettings().GetAuditWebhookUrl(), "%s reads the url", role)
 	}
 
-	got, err := client(db.RoleAdmin).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
+	got, err := client(db.RoleOwner).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
 	require.NoError(t, err)
 	assert.Equal(t, "s3cret", got.GetWorkspace().GetSettings().GetAuditWebhookSecret())
 	assert.True(t,

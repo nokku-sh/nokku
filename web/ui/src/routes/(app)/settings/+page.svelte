@@ -21,7 +21,7 @@
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { WorkspaceSchema } from '#lib/gen/nokku/v1/workspace_pb.js';
 	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
-	import { atLeast, roleIcon, roleLabel } from '#lib/roles.js';
+	import { roleIcon, roleLabel } from '#lib/roles.js';
 	import { formatTs } from '#lib/utils.js';
 	import { Bot, CircleUser, Server, Users } from '@lucide/svelte';
 
@@ -30,7 +30,6 @@
 	const info = util.instanceInfo();
 	const draft = useDraft(WorkspaceSchema, () => ws.data);
 	const model = $derived(draft.current);
-	const canEdit = $derived(atLeast(me.data?.role, 'admin'));
 	const isOwner = $derived(me.data?.role === 'owner');
 	// A hosted workspace can go, a self-hosted one is the whole server.
 	const deletable = $derived(isOwner && info.data?.mode === 'saas');
@@ -56,7 +55,7 @@
 	const autoSave = useAutoSave(() =>
 		update.mutateAsync({ name: model?.name, description: model?.description })
 	);
-	const save = () => canEdit && autoSave.save();
+	const save = () => isOwner && autoSave.save();
 </script>
 
 <PageHeader
@@ -78,7 +77,7 @@
 						id="ws-name"
 						bind:value={model.name}
 						oninput={save}
-						disabled={!canEdit}
+						disabled={!isOwner}
 						class="text-base font-medium"
 					/>
 				</Field.Field>
@@ -88,7 +87,7 @@
 						id="ws-description"
 						bind:value={model.description}
 						oninput={save}
-						disabled={!canEdit}
+						disabled={!isOwner}
 						rows={2}
 						placeholder="What this workspace is for, e.g. Production EU"
 					/>
@@ -98,7 +97,7 @@
 		<Card.Footer class="border-t">
 			<SaveStatus
 				state={autoSave.saveState}
-				idleText={canEdit ? 'Changes save automatically' : 'Only admins can change this'}
+				idleText={isOwner ? 'Changes save automatically' : 'Only the owner can change this'}
 			/>
 		</Card.Footer>
 	</Card.Root>

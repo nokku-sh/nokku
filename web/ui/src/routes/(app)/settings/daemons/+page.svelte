@@ -16,7 +16,7 @@
 	const ws = workspace.get();
 	const me = user.self();
 	const update = workspace.update();
-	const canEdit = $derived(atLeast(me.data?.role, 'admin'));
+	const canEdit = $derived(atLeast(me.data?.role, 'owner'));
 
 	// A real protobuf message, not a plain object, so the transport accepts it.
 	const settings = $derived.by(() => {
@@ -103,7 +103,7 @@
 	<Card.Footer>
 		<SaveStatus
 			state={autoSave.saveState}
-			idleText={canEdit ? 'Changes save automatically' : 'Only admins can change this'}
+			idleText={canEdit ? 'Changes save automatically' : 'Only the owner can change this'}
 		/>
 	</Card.Footer>
 </Card.Root>

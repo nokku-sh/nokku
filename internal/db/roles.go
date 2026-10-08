@@ -24,9 +24,9 @@ func (r Role) Description() string {
 	case RoleEditor:
 		return "Manage targets, access, daemons, certificate authorities, teams, and service accounts"
 	case RoleAdmin:
-		return "Also manage members, invites, and workspace settings"
+		return "Also manage members, invites, and tokens"
 	case RoleOwner:
-		return "Also SSO, domains, SCIM, billing, ownership transfer, and deleting the workspace"
+		return "Also workspace settings, SSO, domains, SCIM, billing, ownership transfer, and deleting the workspace"
 	}
 	return ""
 }

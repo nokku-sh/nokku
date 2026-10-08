@@ -22,7 +22,7 @@ func TestLoginPageFollowsARename(t *testing.T) {
 	before, err := workspaceName(wsCtx(t, cfg), cfg.Conn)
 	require.NoError(t, err)
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin)))
+		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleOwner)))
 	rename := func(name string) {
 		t.Helper()
 		_, err := workspaces.UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{Name: &name})

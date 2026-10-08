@@ -86,8 +86,8 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 // Enforcing SSO is a paid feature, and the test workspace is on Community.
 func TestEnforceSSOIsGated(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	admin := header("Authorization", "Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), db.RoleAdmin))
-	_, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL, admin).
+	owner := header("Authorization", "Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), db.RoleOwner))
+	_, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL, owner).
 		UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
 			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
 		})

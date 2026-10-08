@@ -42,6 +42,7 @@ func TestProcedureRoles(t *testing.T) {
 		{nokkuv1connect.TokenServiceCreateTokenProcedure, db.RoleAdmin},
 		{nokkuv1connect.BillingServiceGetBillingProcedure, db.RoleAdmin},
 
+		{nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, db.RoleOwner},
 		{nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure, db.RoleOwner},
 		{nokkuv1connect.WorkspaceServiceTransferOwnershipProcedure, db.RoleOwner},
 		{nokkuv1connect.BillingServiceActivateLicenseProcedure, db.RoleOwner},

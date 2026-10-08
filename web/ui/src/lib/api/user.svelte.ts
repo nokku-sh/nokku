@@ -32,11 +32,11 @@ export const user = {
 			get edit() {
 				return atLeast(me.data?.role, 'editor');
 			},
-			/** People, invites, tokens and workspace settings. */
+			/** People, invites and tokens. */
 			get admin() {
 				return atLeast(me.data?.role, 'admin');
 			},
-			/** SSO, SCIM, the license and the workspace itself. */
+			/** Workspace settings, SSO, SCIM, the license and the workspace itself. */
 			get own() {
 				return atLeast(me.data?.role, 'owner');
 			}
