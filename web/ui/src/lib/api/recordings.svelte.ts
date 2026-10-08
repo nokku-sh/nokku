@@ -11,15 +11,11 @@ export type RecordingMeta = { recordingId: string; username: string };
 
 export const recordings = {
 	list: (opts?: () => { limit?: number; offset?: number; daemonId?: string; username?: string }) =>
-		useQuery(
-			RecordingService.method.listRecordings,
-			() => ({
-				limit: MAX_PAGE_SIZE,
-				offset: 0,
-				...opts?.()
-			}),
-			() => ({ refetchInterval: 30000 })
-		),
+		useQuery(RecordingService.method.listRecordings, () => ({
+			limit: MAX_PAGE_SIZE,
+			offset: 0,
+			...opts?.()
+		})),
 
 	delete: () =>
 		useMutation(RecordingService.method.deleteRecording, {

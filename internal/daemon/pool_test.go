@@ -7,11 +7,17 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/nokku-sh/nokku/internal/live"
 )
 
 type stubConn struct{}
@@ -28,7 +34,7 @@ func newTestPool(t *testing.T) *Pool {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	return New(ctx, stubConn{})
+	return New(ctx, stubConn{}, live.New())
 }
 
 // waitRelayPending blocks until the request goroutine's pending entry exists,
@@ -424,4 +430,37 @@ func TestPool_HeartbeatBatch(t *testing.T) {
 	if got := p.heartbeatBatch(true); !slices.Equal(got, []string{"d2"}) {
 		t.Fatalf("full beat = %v, want [d2]", got)
 	}
+}
+
+func TestADaemonGoingOfflineIsAnnounced(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		hub := live.New()
+		p := New(ctx, stubConn{}, hub)
+		sub := hub.Subscribe("ws")
+		defer sub.Close()
+
+		gone := p.registerDaemon(ctx, "gone", "ws")
+		p.unregisterDaemon("gone", gone)
+		left := time.Now()
+		// The stream says it is alive before the window is over.
+		change, err := sub.Next(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, live.Change{}, change)
+		change, err = sub.Next(ctx)
+		require.NoError(t, err)
+		assert.Contains(t, change.Services, nokkuv1connect.DaemonServiceName)
+		assert.GreaterOrEqual(t, time.Since(left), db.DaemonOnlineWindow, "not before it shows as offline")
+
+		// One that is back within the window never showed as offline.
+		flapping := p.registerDaemon(ctx, "flapping", "ws")
+		p.unregisterDaemon("flapping", flapping)
+		p.registerDaemon(ctx, "flapping", "ws")
+		time.Sleep(db.DaemonOnlineWindow)
+		synctest.Wait()
+		change, err = sub.Next(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, live.Change{}, change)
+	})
 }

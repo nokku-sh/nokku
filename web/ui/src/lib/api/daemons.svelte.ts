@@ -29,7 +29,7 @@ export const daemon = {
 				offset: 0,
 				...opts?.()
 			}),
-			() => ({ enabled: when?.() ?? true, refetchInterval: 15000 })
+			() => ({ enabled: when?.() ?? true })
 		),
 	createSession: () =>
 		useMutation(DaemonService.method.createSession, {

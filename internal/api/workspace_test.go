@@ -104,3 +104,35 @@ func TestSelfHostHasOneWorkspace(t *testing.T) {
 		})
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "got %v", err)
 }
+
+func TestSubscribeChangesHearsAWrite(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	ws := seedWorkspace(t, cfg)
+	ctx, call := connect.NewClientContext(t.Context())
+	call.RequestHeader().Set("Authorization", "Bearer "+seedMember(t, cfg, ws, db.RoleMember))
+	stream, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL).
+		SubscribeChanges(ctx, &nokkuv1.SubscribeChangesRequest{})
+	require.NoError(t, err)
+	defer stream.Close()
+
+	require.True(t, stream.Receive(), "the first message opens the stream: %v", stream.Err())
+	assert.False(t, stream.Msg().GetEverything())
+
+	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
+		_, err := q.CreateTeam(t.Context(), &db.CreateTeamParams{Name: uniq("team"), Tags: []string{}})
+		return err
+	})
+	require.True(t, stream.Receive(), "a write is heard: %v", stream.Err())
+	assert.True(t, stream.Msg().GetEverything())
+}
+
+func TestSubscribeChangesNeedsASession(t *testing.T) {
+	_, srv := newTestAPI(t)
+	stream, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL).
+		SubscribeChanges(t.Context(), &nokkuv1.SubscribeChangesRequest{})
+	require.NoError(t, err)
+	defer stream.Close()
+
+	assert.False(t, stream.Receive())
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(stream.Err()))
+}
