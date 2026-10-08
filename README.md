@@ -236,10 +236,14 @@ Who runs this server. The web app footer, the sign-up consent line and the email
 
 The log only carries warnings and errors. Traces, metrics and request logs go to your collector.
 
-| Variable                      | Purpose                                         |
-| ----------------------------- | ----------------------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Turns on OTLP export of traces, metrics and logs |
-| `OTEL_EXPORTER_OTLP_HEADERS`  | Extra headers for the exporter                  |
+| Variable                      | Purpose                                                              |
+| ----------------------------- | -------------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Turns on OTLP export of traces, metrics and logs                     |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` by default, `grpc` for a collector that expects gRPC |
+| `OTEL_EXPORTER_OTLP_HEADERS`  | Extra headers for the exporter                                       |
+| `OTEL_TRACES_SAMPLER`         | Every request is traced by default, see below for a share            |
+
+The other standard `OTEL_*` variables work too. To trace one request in ten, set `OTEL_TRACES_SAMPLER=parentbased_traceidratio` and `OTEL_TRACES_SAMPLER_ARG=0.1`.
 
 </details>
 

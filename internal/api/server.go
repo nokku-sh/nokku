@@ -81,6 +81,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption {
 	interceptors := []connect.Interceptor{
+		newTelemetry(ctx), // Outermost, so it sees the mapped code and the calls turned down before the handler.
 		newTimeoutInterceptor(),
 		newAuthNInterceptor(s.cfg),
 		s.cfg.Audit, // Audit wraps authorization so denied calls are recorded too.
@@ -88,7 +89,6 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 		newAuthZInterceptor(s.cfg),
 		entitlement.NewGuardInterceptor(s.cfg.Entitlements),
 		validate.NewInterceptor(),
-		newOTLPInterceptor(ctx),
 	}
 
 	return []connect.HandlerOption{
