@@ -3,8 +3,10 @@
 package api_test
 
 import (
+	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
@@ -100,9 +102,25 @@ func TestServiceAccountRole(t *testing.T) {
 	assert.Error(t, err, "the table took a service account above the editor")
 }
 
-// Rotating swaps the token and nothing else. The account keeps its id, so
-// its grants and its audit trail stay with it.
-func TestRotateServiceAccountToken(t *testing.T) {
+// serviceAccountToken makes a token for the account and returns its secret.
+func serviceAccountToken(
+	t *testing.T,
+	client nokkuv1connect.ServiceAccountServiceClient,
+	id string,
+	expiresAt *timestamppb.Timestamp,
+) string {
+	t.Helper()
+	res, err := client.CreateServiceAccountToken(t.Context(), &nokkuv1.CreateServiceAccountTokenRequest{
+		ServiceAccountId: &id,
+		ExpiresAt:        expiresAt,
+	})
+	require.NoError(t, err)
+	return res.GetSecret()
+}
+
+// A service account holds any number of tokens. Each is revoked on its own,
+// so a new one can be rolled out before the old one goes.
+func TestServiceAccountTokens(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	auth := header(
 		"Authorization",
@@ -111,12 +129,27 @@ func TestRotateServiceAccountToken(t *testing.T) {
 	client := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, auth)
 
 	created, err := client.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
-		Name:           new(uniq("sa")),
-		TokenExpiresAt: timestamppb.New(time.Now().Add(time.Hour)),
+		Name: new(uniq("sa")),
 	})
 	require.NoError(t, err)
 	id := created.GetServiceAccount().GetId()
-	require.NotNil(t, created.GetServiceAccount().GetTokenExpiresAt())
+	assert.Nil(t, created.GetServiceAccount().GetLastUsedAt(), "a new account was never used")
+
+	expiry := time.Now().Add(time.Hour)
+	first, err := client.CreateServiceAccountToken(t.Context(), &nokkuv1.CreateServiceAccountTokenRequest{
+		ServiceAccountId: &id,
+		Label:            new("deploy"),
+		ExpiresAt:        timestamppb.New(expiry),
+	})
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(first.GetSecret(), "nk_sa_"), "the secret is %q", first.GetSecret())
+	assert.Equal(t, "deploy", first.GetToken().GetLabel())
+	assert.WithinDuration(t, expiry, first.GetToken().GetExpiresAt().AsTime(), time.Second)
+	second, err := client.CreateServiceAccountToken(t.Context(), &nokkuv1.CreateServiceAccountTokenRequest{
+		ServiceAccountId: &id,
+	})
+	require.NoError(t, err)
+	assert.Nil(t, second.GetToken().GetExpiresAt(), "an expiry that is left out never expires")
 
 	whoami := func(token string) (string, error) {
 		res, err := nokkuv1connect.NewUtilServiceClient(
@@ -124,26 +157,45 @@ func TestRotateServiceAccountToken(t *testing.T) {
 		).Whoami(t.Context(), &nokkuv1.WhoamiRequest{})
 		return res.GetSubjectId(), err
 	}
-	got, err := whoami(created.GetToken())
-	require.NoError(t, err)
-	require.Equal(t, id, got)
+	for _, secret := range []string{first.GetSecret(), second.GetSecret()} {
+		got, err := whoami(secret)
+		require.NoError(t, err)
+		assert.Equal(t, id, got, "every token signs in as the account")
+	}
 
-	rotated, err := client.RotateServiceAccountToken(t.Context(), &nokkuv1.RotateServiceAccountTokenRequest{Id: &id})
+	list, err := client.ListServiceAccountTokens(t.Context(), &nokkuv1.ListServiceAccountTokensRequest{
+		ServiceAccountId: &id,
+	})
 	require.NoError(t, err)
-	assert.Equal(t, id, rotated.GetServiceAccount().GetId(), "the account must stay the same one")
-	assert.Nil(t, rotated.GetServiceAccount().GetTokenExpiresAt(), "an expiry that is left out is cleared")
-
-	_, err = whoami(created.GetToken())
-	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the old token still works, got %v", err)
-	got, err = whoami(rotated.GetToken())
+	require.Len(t, list.GetTokens(), 2)
+	for _, tok := range list.GetTokens() {
+		assert.NotNil(t, tok.GetLastUsedAt(), "a used token shows when")
+	}
+	account, err := client.GetServiceAccount(t.Context(), &nokkuv1.GetServiceAccountRequest{Id: &id})
 	require.NoError(t, err)
-	assert.Equal(t, id, got, "the new token signs in as the same account")
+	assert.NotNil(t, account.GetServiceAccount().GetLastUsedAt(), "the account shows when a token was last used")
 
-	_, err = client.RotateServiceAccountToken(t.Context(), &nokkuv1.RotateServiceAccountTokenRequest{
-		Id:             &id,
-		TokenExpiresAt: timestamppb.New(time.Now().Add(-time.Minute)),
+	_, err = client.RevokeServiceAccountToken(t.Context(), &nokkuv1.RevokeServiceAccountTokenRequest{
+		ServiceAccountId: &id,
+		Id:               new(first.GetToken().GetId()),
+	})
+	require.NoError(t, err)
+	_, err = whoami(first.GetSecret())
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "a revoked token still signs in, got %v", err)
+	_, err = whoami(second.GetSecret())
+	require.NoError(t, err, "revoking one token ended another")
+
+	_, err = client.RevokeServiceAccountToken(t.Context(), &nokkuv1.RevokeServiceAccountTokenRequest{
+		ServiceAccountId: new(uuid.NewV7().String()),
+		Id:               new(second.GetToken().GetId()),
+	})
+	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "a token revoked through another account, got %v", err)
+	_, err = whoami(second.GetSecret())
+	require.NoError(t, err, "a refused revoke ended the token")
+
+	_, err = client.CreateServiceAccountToken(t.Context(), &nokkuv1.CreateServiceAccountTokenRequest{
+		ServiceAccountId: &id,
+		ExpiresAt:        timestamppb.New(time.Now().Add(-time.Minute)),
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "an expiry in the past, got %v", err)
-	_, err = whoami(rotated.GetToken())
-	assert.NoError(t, err, "a refused rotation must leave the token alone")
 }

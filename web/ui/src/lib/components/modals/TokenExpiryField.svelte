@@ -81,7 +81,7 @@
 		{#if expiry.date}
 			Stops working on {DateValueFormat(expiry.date)}.
 		{:else if expiry.preset === 'never'}
-			Never expires. Rotate it by hand if it leaks.
+			Never expires. Revoke it if it leaks.
 		{/if}
 	</Field.Description>
 </Field.Set>

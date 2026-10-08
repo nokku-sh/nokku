@@ -131,7 +131,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 	// the host drop them, and its session is spent with that answer.
 	if errors.Is(err, pgx.ErrNoRows) {
 		if err := conn.TenantTx(ctx, func(q *db.Queries) error {
-			_, err := q.DeleteSubjectSessions(ctx, in.DaemonID)
+			_, err := q.DeleteSubjectTokens(ctx, in.DaemonID)
 			return err
 		}); err != nil {
 			return nil, err

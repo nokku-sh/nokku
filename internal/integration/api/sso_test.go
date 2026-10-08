@@ -46,7 +46,7 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 			return err
 		},
 		"revoke a SCIM token": func() error {
-			_, err := scim.DeleteSCIMToken(ctx, &nokkuv1.DeleteSCIMTokenRequest{TokenId: &ws})
+			_, err := scim.DeleteSCIMToken(ctx, &nokkuv1.DeleteSCIMTokenRequest{Id: &ws})
 			return err
 		},
 	} {

@@ -60,9 +60,10 @@ export const areas: Area[] = [
 			'CreateServiceAccount',
 			'UpdateServiceAccount',
 			'DeleteServiceAccount',
-			'RotateServiceAccountToken',
-			'CreateToken',
-			'DeleteToken',
+			'CreateServiceAccountToken',
+			'RevokeServiceAccountToken',
+			'CreateJoinToken',
+			'DeleteJoinToken',
 			'UserCreated',
 			'UserDeleted',
 			'UserDeactivated'

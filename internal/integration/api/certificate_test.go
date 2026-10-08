@@ -122,8 +122,9 @@ func TestSignSSHCertificate(t *testing.T) {
 		"a revoked grant still got a certificate signed, %v", err)
 }
 
-// A service account's certificate lives an hour at most and never past its
-// token. A leaked or expired token leaves no days of access behind.
+// A service account's certificate lives an hour at most and never past the
+// token it was asked for with. A leaked or expired token leaves no days of
+// access behind.
 func TestServiceAccountCertificateLifetime(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -137,13 +138,13 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 	targetID := enrolled.GetTargetId()
 
 	accounts := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth)
-	tokenExpiry := time.Now().Add(10 * time.Minute)
 	created, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
-		Name:           new(uniq("ci")),
-		TokenExpiresAt: timestamppb.New(tokenExpiry),
+		Name: new(uniq("ci")),
 	})
 	require.NoError(t, err)
 	id := created.GetServiceAccount().GetId()
+	tokenExpiry := time.Now().Add(10 * time.Minute)
+	short := serviceAccountToken(t, accounts, id, timestamppb.New(tokenExpiry))
 
 	principals := nokkuv1connect.NewTargetAccountServiceClient(srv.Client(), srv.URL, adminAuth)
 	root, err := principals.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
@@ -175,10 +176,9 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 		return res.GetExpiresAt().AsTime()
 	}
 
-	assert.False(t, validUntil(created.GetToken()).After(tokenExpiry), "the certificate outlives the token")
+	assert.False(t, validUntil(short).After(tokenExpiry), "the certificate outlives the token")
 
-	rotated, err := accounts.RotateServiceAccountToken(t.Context(), &nokkuv1.RotateServiceAccountTokenRequest{Id: &id})
-	require.NoError(t, err)
-	assert.WithinDuration(t, time.Now().Add(time.Hour), validUntil(rotated.GetToken()), time.Minute,
-		"a token that never expires gets the hour, and the grant came along with the rotation")
+	long := serviceAccountToken(t, accounts, id, nil)
+	assert.WithinDuration(t, time.Now().Add(time.Hour), validUntil(long), time.Minute,
+		"a token that never expires gets the hour, the cap follows the token and not the account")
 }

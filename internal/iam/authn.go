@@ -1,12 +1,13 @@
 package iam
 
-// Credential resolution:
+// Credential resolution. Every bearer is one lookup in access_tokens, and
+// the kind of the row says what it is:
 //
-//   session cookie                    → user session (browser)
-//   Authorization: Bearer nokku_sa_…  → service-account API key (no session)
-//   Authorization: Bearer <token>     → session token
-//   Authorization: DPoP <token>       → key-bound session, proof on every request (RFC 9449)
+//   session cookie                → browser session
+//   Authorization: Bearer <token> → CLI session, or a service account key (nk_sa_…)
+//   Authorization: DPoP <token>   → key-bound session, proof on every request (RFC 9449)
 //
+// A SCIM token (nk_scim_…) only works on the SCIM endpoint, see scim.go.
 // Everything is looked up inside the request's workspace, so a credential
 // presented on another workspace's host does not exist there.
 
@@ -16,82 +17,67 @@ import (
 	"strings"
 
 	"github.com/nokku-sh/nokku/internal/actor"
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-const apiKeyPrefix = "nokku_sa_" //nolint:gosec // a token scheme prefix, not a credential
-
-// Authenticate returns an empty session for service accounts.
+// Authenticate resolves the credential of a connect call.
 func (s *Service) Authenticate(
 	ctx context.Context,
 	header http.Header,
 	procedure string,
-) (actor.Principal, db.Session, error) {
+) (actor.Principal, db.AccessToken, error) {
 	token := requestCredential(header)
-	if strings.HasPrefix(token, apiKeyPrefix) {
-		p, err := s.authenticateAPIKey(ctx, token)
-		return p, db.Session{}, err
-	}
-
-	p, sess, err := s.AuthenticateToken(ctx, token)
+	p, tok, err := s.AuthenticateToken(ctx, token)
 	if err != nil {
-		return actor.Principal{}, db.Session{}, err
+		return actor.Principal{}, db.AccessToken{}, err
 	}
-	if sess.Binding != "" {
-		if err := s.verifySessionProof(ctx, header, procedure, token, sess.Binding); err != nil {
-			return actor.Principal{}, db.Session{}, err
+	if p.Kind == actor.KindSCIM {
+		return actor.Principal{}, db.AccessToken{}, errInvalidCredentials
+	}
+	if tok.Binding != "" {
+		if err := s.verifySessionProof(ctx, header, procedure, token, tok.Binding); err != nil {
+			return actor.Principal{}, db.AccessToken{}, err
 		}
 	}
-	s.noteSeen(ctx, sess)
-	return p, sess, nil
+	s.noteSeen(ctx, tok)
+	return p, tok, nil
 }
 
-// AuthenticateToken loads the account for user and CLI sessions so inactive
-// accounts fail closed. A daemon session authenticates on the row alone.
+// AuthenticateToken resolves any bearer. User and CLI sessions load the
+// account so inactive accounts fail closed, a service account key loads the
+// account for its name and role. A daemon or SCIM row authenticates alone.
 func (s *Service) AuthenticateToken(
 	ctx context.Context,
 	token string,
-) (actor.Principal, db.Session, error) {
-	sess, err := s.verifySession(ctx, token)
+) (actor.Principal, db.AccessToken, error) {
+	tok, err := s.verifyToken(ctx, token)
 	if err != nil {
-		return actor.Principal{}, db.Session{}, err
+		return actor.Principal{}, db.AccessToken{}, err
 	}
-	kind := actor.Kind(sess.Kind)
-	p := actor.Principal{ID: sess.SubjectID, Kind: kind}
-	if kind == actor.KindUser || kind == actor.KindCLI {
-		u, err := s.getUser(ctx, sess.SubjectID)
+	p := actor.Principal{ID: deref(tok.SubjectID), Kind: actor.Kind(tok.Kind)}
+	switch p.Kind {
+	case actor.KindUser, actor.KindCLI:
+		u, err := s.getUser(ctx, p.ID)
 		if err != nil {
-			return actor.Principal{}, db.Session{}, err
+			return actor.Principal{}, db.AccessToken{}, err
 		}
 		if !u.Active {
-			return actor.Principal{}, db.Session{}, ErrInactive
+			return actor.Principal{}, db.AccessToken{}, ErrInactive
 		}
 		p.Email = u.Email
 		p.Role = u.Role
-	}
-	return p, sess, nil
-}
-
-func (s *Service) authenticateAPIKey(ctx context.Context, raw string) (actor.Principal, error) {
-	hash := crypto.HashToken(raw)
-	var sa *db.ServiceAccount
-	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		sa, err = q.GetServiceAccountByTokenHash(ctx, &hash)
+	case actor.KindServiceAccount:
+		sa, err := s.conn.Tenant().GetServiceAccount(ctx, p.ID)
 		if err != nil {
-			return err
+			return actor.Principal{}, db.AccessToken{}, errInvalidCredentials
 		}
-		return q.TouchServiceAccount(ctx, sa.ID)
-	})
-	if err != nil {
-		return actor.Principal{}, errInvalidCredentials
+		p.Name = sa.ServiceAccount.Name
+		p.Role = sa.ServiceAccount.Role
+	case actor.KindSCIM:
+		p.ID = tok.ID
+	case actor.KindDaemon:
 	}
-	return actor.Principal{ID: sa.ID, Kind: actor.KindServiceAccount, Name: sa.Name, Role: sa.Role}, nil
-}
-
-func NewAPIKey() (raw string, hash crypto.HashedToken) {
-	raw = apiKeyPrefix + crypto.RandomString(32)
-	return raw, crypto.HashToken(raw)
+	return p, tok, nil
 }
 
 func (s *Service) verifySessionProof(

@@ -20,18 +20,33 @@
 
 	const sheet = useSheet();
 	const createSA = saApi.create();
+	const createToken = saApi.tokens.create();
 	const expiry = new TokenExpiry();
 
 	let model = $state(newDraft(ServiceAccountSchema, { role: WorkspaceRole.VIEWER }));
+	let tokenLabel = $state('');
 
 	let token = $state('');
 	let createdId = $state('');
 
+	// The account and its first token are two calls. If the second fails the
+	// account exists, so the sheet opens on its tokens and the toast says why.
 	async function onSubmit() {
-		const res = await createSA.mutateAsync({ ...model, tokenExpiresAt: expiry.timestamp });
-		token = res.token;
-		createdId = res.serviceAccount?.id ?? '';
+		const res = await createSA.mutateAsync({ ...model });
+		const id = res.serviceAccount?.id ?? '';
+		try {
+			const tok = await createToken.mutateAsync({
+				serviceAccountId: id,
+				label: tokenLabel.trim(),
+				expiresAt: expiry.timestamp
+			});
+			token = tok.secret;
+			createdId = id;
+		} catch {
+			sheet.show(id, 'tokens');
+		}
 		model = newDraft(ServiceAccountSchema, { role: WorkspaceRole.VIEWER });
+		tokenLabel = '';
 		expiry.preset = '90';
 	}
 
@@ -74,6 +89,17 @@
 			onChange={(role) => (model.role = role)}
 		/>
 	</Field.Set>
+
+	<Field.Field>
+		<Field.Label for="new-sa-token-label">First token</Field.Label>
+		<Input
+			id="new-sa-token-label"
+			bind:value={tokenLabel}
+			placeholder="github-actions"
+			maxlength={100}
+		/>
+		<Field.Description>Where it will live. More tokens can be added later.</Field.Description>
+	</Field.Field>
 
 	<TokenExpiryField {expiry} />
 </FormModal>

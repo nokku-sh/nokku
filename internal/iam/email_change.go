@@ -154,7 +154,7 @@ func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 			return mapUserError(err)
 		}
 		reverted = true
-		_, err = q.DeleteSubjectSessions(ctx, u.ID)
+		_, err = q.DeleteSubjectTokens(ctx, u.ID)
 		return err
 	})
 	if err != nil || !reverted {

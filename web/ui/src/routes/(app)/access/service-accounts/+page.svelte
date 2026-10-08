@@ -98,10 +98,6 @@
 						: undefined
 				})
 		}),
-		columnHelper.accessor('tokenExpiresAt', {
-			header: 'Expiry',
-			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.tokenExpiresAt })
-		}),
 		columnHelper.accessor('lastUsedAt', {
 			header: 'Last used',
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.lastUsedAt })
@@ -129,7 +125,7 @@
 					deleteConfig: can.edit
 						? {
 								itemName: row.original.name,
-								description: 'Its token stops working right away and every grant is removed.',
+								description: 'Every token stops working right away and every grant is removed.',
 								typeToConfirm: row.original.name,
 								onDelete: () => deleteSA.mutateAsync({ id: row.original.id })
 							}
@@ -165,7 +161,7 @@
 	emptyState={{
 		icon: Waypoints,
 		title: 'No service accounts yet',
-		description: 'Give CI and automation their own identity and token.'
+		description: 'Give CI and automation their own identity and tokens.'
 	}}
 >
 	{#snippet toolbar(table)}

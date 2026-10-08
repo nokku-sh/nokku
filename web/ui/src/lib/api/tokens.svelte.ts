@@ -1,15 +1,15 @@
-import { TokenKind, TokenService } from '#lib/gen/nokku/v1/token_pb.js';
+import { JoinTokenKind, JoinTokenService } from '#lib/gen/nokku/v1/join_token_pb.js';
 import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { toast } from 'svelte-sonner';
 
 export const token = {
-	list: (kind: MaybeGetter<TokenKind>) =>
-		useQuery(TokenService.method.listTokens, () => ({ kind: extract(kind) })),
+	list: (kind: MaybeGetter<JoinTokenKind>) =>
+		useQuery(JoinTokenService.method.listJoinTokens, () => ({ kind: extract(kind) })),
 
-	create: () => useMutation(TokenService.method.createToken),
+	create: () => useMutation(JoinTokenService.method.createJoinToken),
 	remove: () =>
-		useMutation(TokenService.method.deleteToken, {
+		useMutation(JoinTokenService.method.deleteJoinToken, {
 			onSuccess: () => toast.success('Token revoked')
 		})
 };

@@ -1,32 +1,38 @@
 -- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (name, description, role, token_expires_at, tags, token_hash)
+  service_accounts (name, description, role, tags)
 VALUES
   (
     @name,
     @description,
     @role,
-    @token_expires_at,
-    COALESCE(@tags, '{}'::TEXT[]),
-    @token_hash
+    COALESCE(@tags, '{}'::TEXT[])
   )
 RETURNING
   id;
 
 -- name: GetServiceAccount :one
 SELECT
-  *
+  sqlc.embed(sa),
+  -- sqlc types a cast as not null, so an account never used reads as the zero time.
+  COALESCE(MAX(t.last_seen_at), '0001-01-01'::TIMESTAMPTZ)::TIMESTAMPTZ AS last_used_at
 FROM
-  service_accounts
+  service_accounts sa
+  LEFT JOIN access_tokens t ON t.service_account_id = sa.id
 WHERE
-  id = @service_account_id;
+  sa.id = @service_account_id
+GROUP BY
+  sa.id;
 
 -- name: ListServiceAccounts :many
 SELECT
   sqlc.embed(sa),
+  -- sqlc types a cast as not null, so an account never used reads as the zero time.
+  COALESCE(MAX(t.last_seen_at), '0001-01-01'::TIMESTAMPTZ)::TIMESTAMPTZ AS last_used_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa
+  LEFT JOIN access_tokens t ON t.service_account_id = sa.id
 WHERE
   (
     sqlc.narg('query')::TEXT IS NULL
@@ -35,24 +41,11 @@ WHERE
   )
   AND sa.tags @> COALESCE(sqlc.narg('tags'), '{}'::TEXT[])
   AND (
-    sqlc.narg('is_active')::BOOLEAN IS NULL
-    OR (
-      sqlc.narg('is_active') = TRUE
-      AND (
-        sa.token_expires_at IS NULL
-        OR sa.token_expires_at > NOW()
-      )
-    )
-    OR (
-      sqlc.narg('is_active') = FALSE
-      AND sa.token_expires_at IS NOT NULL
-      AND sa.token_expires_at <= NOW()
-    )
-  )
-  AND (
     sa.role = @role
     OR @role = 0 -- every role
   )
+GROUP BY
+  sa.id
 ORDER BY
   sa.id ASC
 LIMIT
@@ -78,43 +71,7 @@ WHERE
 RETURNING
   id;
 
--- name: RotateServiceAccountToken :one
--- The old hash is gone with the write, so the old token is too.
-UPDATE service_accounts
-SET
-  token_hash = @token_hash,
-  token_expires_at = @token_expires_at
-WHERE
-  id = @service_account_id
-RETURNING
-  *;
-
 -- name: DeleteServiceAccount :exec
 DELETE FROM service_accounts
 WHERE
   id = @service_account_id;
-
--- name: GetServiceAccountByTokenHash :one
--- An expired token finds nothing, this is the only place that checks.
-SELECT
-  *
-FROM
-  service_accounts
-WHERE
-  token_hash = @token_hash
-  AND (
-    token_expires_at IS NULL
-    OR token_expires_at > NOW()
-  );
-
--- name: TouchServiceAccount :exec
--- Throttled so a busy key does not turn every request into a write.
-UPDATE service_accounts
-SET
-  last_used_at = NOW()
-WHERE
-  id = @id
-  AND (
-    last_used_at IS NULL
-    OR last_used_at < NOW() - INTERVAL '1 minute'
-  );

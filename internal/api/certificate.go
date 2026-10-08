@@ -18,7 +18,7 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-
+	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
@@ -226,7 +226,6 @@ func (s *certificateService) SignSSHCertificate(
 	caller, _ := actor.PrincipalFromContext(ctx)
 
 	var ca *db.SSHCA
-	var sa *db.ServiceAccount
 	var principals []string
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		target, err := q.GetTarget(ctx, req.GetTargetId())
@@ -263,10 +262,6 @@ func (s *certificateService) SignSSHCertificate(
 			return newError(connect.CodeFailedPrecondition, "this server has no certificate authority")
 		}
 		ca, err = q.GetCA(ctx, *target.CaID)
-		if err != nil || caller.Kind != actor.KindServiceAccount {
-			return err
-		}
-		sa, err = q.GetServiceAccount(ctx, caller.ID)
 		return err
 	}); err != nil {
 		return nil, err
@@ -279,8 +274,10 @@ func (s *certificateService) SignSSHCertificate(
 	}
 
 	ttl := req.GetTtl().AsDuration()
-	if sa != nil {
-		ttl = serviceAccountTTL(ca, ttl, sa.TokenExpiresAt)
+	if caller.Kind == actor.KindServiceAccount {
+		// The cap follows the token the account called with, not the account.
+		tok, _ := iam.CurrentToken(ctx)
+		ttl = serviceAccountTTL(ca, ttl, tok.ExpiresAt)
 		// Nothing left would sign for the CA default.
 		if ttl <= 0 {
 			return nil, newError(connect.CodeUnauthenticated, "the token has expired")

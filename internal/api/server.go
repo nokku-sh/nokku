@@ -165,7 +165,7 @@ func (s *Server) registerServices(ctx context.Context) {
 	s.mux.Handle(nokkuv1connect.NewDaemonServiceHandler(&daemonService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewCertificateServiceHandler(&certificateService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewInvitationServiceHandler(&invitationService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewTokenServiceHandler(&tokenService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewJoinTokenServiceHandler(&joinTokenService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewBillingServiceHandler(&billingService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewServiceAccountServiceHandler(&serviceAccountService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewAccountServiceHandler(&accountService{cfg: s.cfg}, opts...))

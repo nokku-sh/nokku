@@ -3,7 +3,7 @@
 	import { workspace } from '#lib/api/workspaces.svelte.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
-	import { TokenKind } from '#lib/gen/nokku/v1/token_pb.js';
+	import { JoinTokenKind } from '#lib/gen/nokku/v1/join_token_pb.js';
 	import { roleLabel } from '#lib/roles.js';
 	import { formatTs } from '#lib/utils.js';
 	import { Link, Mail, UserPlus } from '@lucide/svelte';
@@ -25,7 +25,7 @@
 
 <TokenSheet
 	bind:open
-	kind={TokenKind.INVITE}
+	kind={JoinTokenKind.INVITE}
 	title="Invite people"
 	description="Anyone with the link creates an account with its role until it expires or runs out."
 	icon={UserPlus}

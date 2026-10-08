@@ -67,9 +67,9 @@ func TestEnrollDaemon(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 
-	created, err := nokkuv1connect.NewTokenServiceClient(srv.Client(), srv.URL, adminAuth).
-		CreateToken(t.Context(), &nokkuv1.CreateTokenRequest{
-			Kind:        nokkuv1.TokenKind_TOKEN_KIND_ENROLL.Enum(),
+	created, err := nokkuv1connect.NewJoinTokenServiceClient(srv.Client(), srv.URL, adminAuth).
+		CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
+			Kind:        nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),
 			MaxUses:     new(int32(1)),
 			AutoApprove: new(true),
 		})
@@ -154,9 +154,9 @@ func TestCreateSession(t *testing.T) {
 			IsDefault: new(true),
 		})
 	require.NoError(t, err)
-	created, err := nokkuv1connect.NewTokenServiceClient(srv.Client(), srv.URL, adminAuth).
-		CreateToken(t.Context(), &nokkuv1.CreateTokenRequest{
-			Kind:        nokkuv1.TokenKind_TOKEN_KIND_ENROLL.Enum(),
+	created, err := nokkuv1connect.NewJoinTokenServiceClient(srv.Client(), srv.URL, adminAuth).
+		CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
+			Kind:        nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),
 			AutoApprove: new(true),
 		})
 	require.NoError(t, err)
@@ -177,14 +177,14 @@ func TestCreateSession(t *testing.T) {
 		srv.URL,
 		header("Authorization", "Bearer "+memberToken),
 	)
-	sa, err := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth).
-		CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
-			Name: new(uniq("ci")),
-			Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
-		})
+	accounts := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth)
+	sa, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
+		Name: new(uniq("ci")),
+		Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
+	})
 	require.NoError(t, err)
 	machine := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+sa.GetToken()))
+		header("Authorization", "Bearer "+serviceAccountToken(t, accounts, sa.GetServiceAccount().GetId(), nil)))
 	_, err = machine.CreateSession(t.Context(), req)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "service account, got %v", err)
 
@@ -418,9 +418,9 @@ func enrollTestDaemon(
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	created, err := nokkuv1connect.NewTokenServiceClient(srv.Client(), srv.URL, adminAuth).
-		CreateToken(t.Context(), &nokkuv1.CreateTokenRequest{
-			Kind:        nokkuv1.TokenKind_TOKEN_KIND_ENROLL.Enum(),
+	created, err := nokkuv1connect.NewJoinTokenServiceClient(srv.Client(), srv.URL, adminAuth).
+		CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
+			Kind:        nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),
 			AutoApprove: &autoApprove,
 		})
 	require.NoError(t, err)

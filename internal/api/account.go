@@ -145,7 +145,7 @@ func (s *accountService) ListAccountSessions(
 	ctx context.Context,
 	_ *nokkuv1.ListAccountSessionsRequest,
 ) (*nokkuv1.ListAccountSessionsResponse, error) {
-	current, _ := iam.CurrentSession(ctx)
+	current, _ := iam.CurrentToken(ctx)
 	sessions, err := s.cfg.IAM.ListSessions(ctx)
 	if err != nil {
 		return nil, errInternal
@@ -153,11 +153,11 @@ func (s *accountService) ListAccountSessions(
 	out := make([]*nokkuv1.AccountSession, 0, len(sessions))
 	for _, sess := range sessions {
 		out = append(out, &nokkuv1.AccountSession{
-			Id:         new(string(sess.TokenHash)),
+			Id:         new(sess.ID),
 			Kind:       new(sess.Kind),
 			Method:     new(sess.Method),
 			Binding:    new(sess.Binding),
-			Current:    new(sess.TokenHash == current.TokenHash),
+			Current:    new(sess.ID == current.ID),
 			ExpiresAt:  db.SafeTimestamp(sess.ExpiresAt),
 			LastSeenAt: db.SafeTimestamp(sess.LastSeenAt),
 			UserAgent:  new(sess.UserAgent),
@@ -190,12 +190,12 @@ func (s *accountService) RemoveSession(
 	ctx context.Context,
 	req *nokkuv1.RemoveSessionRequest,
 ) (*nokkuv1.RemoveSessionResponse, error) {
-	current, _ := iam.CurrentSession(ctx)
-	if req.GetId() == string(current.TokenHash) {
+	current, _ := iam.CurrentToken(ctx)
+	if req.GetId() == current.ID {
 		return nil, errCurrentSession
 	}
 	// The id names a session or a remembered device, the list mixes both.
-	if err := s.cfg.IAM.DeleteOwnSession(ctx, iam.SessionHash(req.GetId())); err != nil {
+	if err := s.cfg.IAM.DeleteOwnSession(ctx, req.GetId()); err != nil {
 		return nil, errInternal
 	}
 	if err := s.cfg.IAM.ForgetDevice(ctx, req.GetId()); err != nil {

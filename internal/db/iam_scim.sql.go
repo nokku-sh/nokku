@@ -7,57 +7,7 @@ package db
 
 import (
 	"context"
-	"time"
-
-	"github.com/nokku-sh/nokku/internal/crypto"
 )
-
-const createSCIMToken = `-- name: CreateSCIMToken :one
-INSERT INTO
-  scim_tokens (token_hash, label)
-VALUES
-  ($1, $2)
-RETURNING
-  id,
-  label,
-  created_at,
-  last_used_at
-`
-
-type CreateSCIMTokenParams struct {
-	TokenHash crypto.HashedToken `json:"tokenHash"`
-	Label     string             `json:"label"`
-}
-
-type CreateSCIMTokenRow struct {
-	ID         string     `json:"id"`
-	Label      string     `json:"label"`
-	CreatedAt  time.Time  `json:"createdAt"`
-	LastUsedAt *time.Time `json:"lastUsedAt"`
-}
-
-func (q *Queries) CreateSCIMToken(ctx context.Context, arg *CreateSCIMTokenParams) (*CreateSCIMTokenRow, error) {
-	row := q.db.QueryRow(ctx, createSCIMToken, arg.TokenHash, arg.Label)
-	var i CreateSCIMTokenRow
-	err := row.Scan(
-		&i.ID,
-		&i.Label,
-		&i.CreatedAt,
-		&i.LastUsedAt,
-	)
-	return &i, err
-}
-
-const deleteSCIMToken = `-- name: DeleteSCIMToken :exec
-DELETE FROM scim_tokens
-WHERE
-  id = $1
-`
-
-func (q *Queries) DeleteSCIMToken(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, deleteSCIMToken, id)
-	return err
-}
 
 const deleteStaleUserSCIMCredentials = `-- name: DeleteStaleUserSCIMCredentials :exec
 DELETE FROM credentials
@@ -88,29 +38,6 @@ WHERE
 func (q *Queries) DeleteUserSCIMCredentials(ctx context.Context, userID string) error {
 	_, err := q.db.Exec(ctx, deleteUserSCIMCredentials, userID)
 	return err
-}
-
-const getSCIMTokenByHash = `-- name: GetSCIMTokenByHash :one
-SELECT
-  id, workspace_id, token_hash, label, created_at, last_used_at
-FROM
-  scim_tokens
-WHERE
-  token_hash = $1
-`
-
-func (q *Queries) GetSCIMTokenByHash(ctx context.Context, tokenHash crypto.HashedToken) (*ScimToken, error) {
-	row := q.db.QueryRow(ctx, getSCIMTokenByHash, tokenHash)
-	var i ScimToken
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.TokenHash,
-		&i.Label,
-		&i.CreatedAt,
-		&i.LastUsedAt,
-	)
-	return &i, err
 }
 
 const listSCIMUsers = `-- name: ListSCIMUsers :many
@@ -175,66 +102,4 @@ func (q *Queries) ListSCIMUsers(ctx context.Context, arg *ListSCIMUsersParams) (
 		return nil, err
 	}
 	return items, nil
-}
-
-const listWorkspaceSCIMTokens = `-- name: ListWorkspaceSCIMTokens :many
-SELECT
-  id,
-  label,
-  created_at,
-  last_used_at
-FROM
-  scim_tokens
-ORDER BY
-  created_at ASC
-`
-
-type ListWorkspaceSCIMTokensRow struct {
-	ID         string     `json:"id"`
-	Label      string     `json:"label"`
-	CreatedAt  time.Time  `json:"createdAt"`
-	LastUsedAt *time.Time `json:"lastUsedAt"`
-}
-
-func (q *Queries) ListWorkspaceSCIMTokens(ctx context.Context) ([]*ListWorkspaceSCIMTokensRow, error) {
-	rows, err := q.db.Query(ctx, listWorkspaceSCIMTokens)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*ListWorkspaceSCIMTokensRow
-	for rows.Next() {
-		var i ListWorkspaceSCIMTokensRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Label,
-			&i.CreatedAt,
-			&i.LastUsedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const touchSCIMToken = `-- name: TouchSCIMToken :exec
-UPDATE scim_tokens
-SET
-  last_used_at = NOW()
-WHERE
-  id = $1
-  AND (
-    last_used_at IS NULL
-    OR last_used_at < NOW() - INTERVAL '1 hour'
-  )
-`
-
-// Only writes when the stamp is over an hour old.
-func (q *Queries) TouchSCIMToken(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, touchSCIMToken, id)
-	return err
 }

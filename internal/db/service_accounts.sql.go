@@ -9,33 +9,28 @@ import (
 	"context"
 	"time"
 
-	"github.com/nokku-sh/nokku/internal/crypto"
 	nokku "github.com/nokku-sh/protos/gen/nokku/v1"
 )
 
 const createServiceAccount = `-- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (name, description, role, token_expires_at, tags, token_hash)
+  service_accounts (name, description, role, tags)
 VALUES
   (
     $1,
     $2,
     $3,
-    $4,
-    COALESCE($5, '{}'::TEXT[]),
-    $6
+    COALESCE($4, '{}'::TEXT[])
   )
 RETURNING
   id
 `
 
 type CreateServiceAccountParams struct {
-	Name           string              `json:"name"`
-	Description    *string             `json:"description"`
-	Role           nokku.WorkspaceRole `json:"role"`
-	TokenExpiresAt *time.Time          `json:"tokenExpiresAt"`
-	Tags           interface{}         `json:"tags"`
-	TokenHash      *crypto.HashedToken `json:"tokenHash"`
+	Name        string              `json:"name"`
+	Description *string             `json:"description"`
+	Role        nokku.WorkspaceRole `json:"role"`
+	Tags        interface{}         `json:"tags"`
 }
 
 func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (string, error) {
@@ -43,9 +38,7 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAc
 		arg.Name,
 		arg.Description,
 		arg.Role,
-		arg.TokenExpiresAt,
 		arg.Tags,
-		arg.TokenHash,
 	)
 	var id string
 	err := row.Scan(&id)
@@ -65,71 +58,49 @@ func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID str
 
 const getServiceAccount = `-- name: GetServiceAccount :one
 SELECT
-  id, workspace_id, name, description, token_hash, role, last_used_at, token_expires_at, tags, created_at, updated_at
+  sa.id, sa.workspace_id, sa.name, sa.description, sa.role, sa.tags, sa.created_at, sa.updated_at,
+  -- sqlc types a cast as not null, so an account never used reads as the zero time.
+  COALESCE(MAX(t.last_seen_at), '0001-01-01'::TIMESTAMPTZ)::TIMESTAMPTZ AS last_used_at
 FROM
-  service_accounts
+  service_accounts sa
+  LEFT JOIN access_tokens t ON t.service_account_id = sa.id
 WHERE
-  id = $1
+  sa.id = $1
+GROUP BY
+  sa.id
 `
 
-func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string) (*ServiceAccount, error) {
-	row := q.db.QueryRow(ctx, getServiceAccount, serviceAccountID)
-	var i ServiceAccount
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.TokenHash,
-		&i.Role,
-		&i.LastUsedAt,
-		&i.TokenExpiresAt,
-		&i.Tags,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
+type GetServiceAccountRow struct {
+	ServiceAccount ServiceAccount `json:"serviceAccount"`
+	LastUsedAt     time.Time      `json:"lastUsedAt"`
 }
 
-const getServiceAccountByTokenHash = `-- name: GetServiceAccountByTokenHash :one
-SELECT
-  id, workspace_id, name, description, token_hash, role, last_used_at, token_expires_at, tags, created_at, updated_at
-FROM
-  service_accounts
-WHERE
-  token_hash = $1
-  AND (
-    token_expires_at IS NULL
-    OR token_expires_at > NOW()
-  )
-`
-
-// An expired token finds nothing, this is the only place that checks.
-func (q *Queries) GetServiceAccountByTokenHash(ctx context.Context, tokenHash *crypto.HashedToken) (*ServiceAccount, error) {
-	row := q.db.QueryRow(ctx, getServiceAccountByTokenHash, tokenHash)
-	var i ServiceAccount
+func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string) (*GetServiceAccountRow, error) {
+	row := q.db.QueryRow(ctx, getServiceAccount, serviceAccountID)
+	var i GetServiceAccountRow
 	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.TokenHash,
-		&i.Role,
+		&i.ServiceAccount.ID,
+		&i.ServiceAccount.WorkspaceID,
+		&i.ServiceAccount.Name,
+		&i.ServiceAccount.Description,
+		&i.ServiceAccount.Role,
+		&i.ServiceAccount.Tags,
+		&i.ServiceAccount.CreatedAt,
+		&i.ServiceAccount.UpdatedAt,
 		&i.LastUsedAt,
-		&i.TokenExpiresAt,
-		&i.Tags,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return &i, err
 }
 
 const listServiceAccounts = `-- name: ListServiceAccounts :many
 SELECT
-  sa.id, sa.workspace_id, sa.name, sa.description, sa.token_hash, sa.role, sa.last_used_at, sa.token_expires_at, sa.tags, sa.created_at, sa.updated_at,
+  sa.id, sa.workspace_id, sa.name, sa.description, sa.role, sa.tags, sa.created_at, sa.updated_at,
+  -- sqlc types a cast as not null, so an account never used reads as the zero time.
+  COALESCE(MAX(t.last_seen_at), '0001-01-01'::TIMESTAMPTZ)::TIMESTAMPTZ AS last_used_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa
+  LEFT JOIN access_tokens t ON t.service_account_id = sa.id
 WHERE
   (
     $1::TEXT IS NULL
@@ -138,43 +109,30 @@ WHERE
   )
   AND sa.tags @> COALESCE($2, '{}'::TEXT[])
   AND (
-    $3::BOOLEAN IS NULL
-    OR (
-      $3 = TRUE
-      AND (
-        sa.token_expires_at IS NULL
-        OR sa.token_expires_at > NOW()
-      )
-    )
-    OR (
-      $3 = FALSE
-      AND sa.token_expires_at IS NOT NULL
-      AND sa.token_expires_at <= NOW()
-    )
+    sa.role = $3
+    OR $3 = 0 -- every role
   )
-  AND (
-    sa.role = $4
-    OR $4 = 0 -- every role
-  )
+GROUP BY
+  sa.id
 ORDER BY
   sa.id ASC
 LIMIT
-  $6
-OFFSET
   $5
+OFFSET
+  $4
 `
 
 type ListServiceAccountsParams struct {
-	Query    *string             `json:"query"`
-	Tags     []string            `json:"tags"`
-	IsActive *bool               `json:"isActive"`
-	Role     nokku.WorkspaceRole `json:"role"`
-	Offset   *int32              `json:"offset"`
-	Limit    *int32              `json:"limit"`
+	Query  *string             `json:"query"`
+	Tags   []string            `json:"tags"`
+	Role   nokku.WorkspaceRole `json:"role"`
+	Offset *int32              `json:"offset"`
+	Limit  *int32              `json:"limit"`
 }
 
 type ListServiceAccountsRow struct {
 	ServiceAccount ServiceAccount `json:"serviceAccount"`
+	LastUsedAt     time.Time      `json:"lastUsedAt"`
 	TotalCount     int32          `json:"totalCount"`
 }
 
@@ -182,7 +140,6 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 	rows, err := q.db.Query(ctx, listServiceAccounts,
 		arg.Query,
 		arg.Tags,
-		arg.IsActive,
 		arg.Role,
 		arg.Offset,
 		arg.Limit,
@@ -199,13 +156,11 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 			&i.ServiceAccount.WorkspaceID,
 			&i.ServiceAccount.Name,
 			&i.ServiceAccount.Description,
-			&i.ServiceAccount.TokenHash,
 			&i.ServiceAccount.Role,
-			&i.ServiceAccount.LastUsedAt,
-			&i.ServiceAccount.TokenExpiresAt,
 			&i.ServiceAccount.Tags,
 			&i.ServiceAccount.CreatedAt,
 			&i.ServiceAccount.UpdatedAt,
+			&i.LastUsedAt,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
@@ -216,61 +171,6 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 		return nil, err
 	}
 	return items, nil
-}
-
-const rotateServiceAccountToken = `-- name: RotateServiceAccountToken :one
-UPDATE service_accounts
-SET
-  token_hash = $1,
-  token_expires_at = $2
-WHERE
-  id = $3
-RETURNING
-  id, workspace_id, name, description, token_hash, role, last_used_at, token_expires_at, tags, created_at, updated_at
-`
-
-type RotateServiceAccountTokenParams struct {
-	TokenHash        *crypto.HashedToken `json:"tokenHash"`
-	TokenExpiresAt   *time.Time          `json:"tokenExpiresAt"`
-	ServiceAccountID string              `json:"serviceAccountId"`
-}
-
-// The old hash is gone with the write, so the old token is too.
-func (q *Queries) RotateServiceAccountToken(ctx context.Context, arg *RotateServiceAccountTokenParams) (*ServiceAccount, error) {
-	row := q.db.QueryRow(ctx, rotateServiceAccountToken, arg.TokenHash, arg.TokenExpiresAt, arg.ServiceAccountID)
-	var i ServiceAccount
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.TokenHash,
-		&i.Role,
-		&i.LastUsedAt,
-		&i.TokenExpiresAt,
-		&i.Tags,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const touchServiceAccount = `-- name: TouchServiceAccount :exec
-UPDATE service_accounts
-SET
-  last_used_at = NOW()
-WHERE
-  id = $1
-  AND (
-    last_used_at IS NULL
-    OR last_used_at < NOW() - INTERVAL '1 minute'
-  )
-`
-
-// Throttled so a busy key does not turn every request into a write.
-func (q *Queries) TouchServiceAccount(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, touchServiceAccount, id)
-	return err
 }
 
 const updateServiceAccount = `-- name: UpdateServiceAccount :one

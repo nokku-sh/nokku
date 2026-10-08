@@ -1,7 +1,8 @@
 package iam
 
-// SCIM 2.0 at /scim/v2 of the workspace host. A verified token pins the
-// request to its workspace, so it runs under RLS like any tenant request.
+// SCIM 2.0 at /scim/v2 of the workspace host. The request runs in the
+// workspace its host names, under RLS like any tenant request, and only a
+// SCIM token of that workspace gets in.
 
 import (
 	"context"
@@ -9,7 +10,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/elimity-com/scim"
 	scimerrors "github.com/elimity-com/scim/errors"
@@ -17,7 +17,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/nokku-sh/nokku/internal/actor"
-	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
@@ -27,13 +26,6 @@ type SCIMFlow struct {
 	svc     *Service
 	mu      sync.Mutex
 	servers map[string]scim.Server
-}
-
-type SCIMToken struct {
-	ID         string
-	Label      string
-	CreatedAt  time.Time
-	LastUsedAt *time.Time
 }
 
 func newSCIMFlow(svc *Service) *SCIMFlow {
@@ -53,18 +45,19 @@ func (f *SCIMFlow) serve(w http.ResponseWriter, r *http.Request) {
 		writeScimError(w, scimerrors.ScimError{Status: http.StatusUnauthorized, Detail: "authentication required"})
 		return
 	}
-	tokenID, err := f.svc.verifySCIMToken(r.Context(), ws.ID, raw)
-	if err != nil {
+	p, tok, err := f.svc.AuthenticateToken(r.Context(), raw)
+	if err != nil || p.Kind != actor.KindSCIM {
 		writeScimError(w, scimerrors.ScimError{Status: http.StatusUnauthorized, Detail: "invalid token"})
 		return
 	}
+	f.svc.noteSeen(r.Context(), tok)
 	server, err := f.serverFor(ws)
 	if err != nil {
 		writeScimError(w, scimerrors.ScimErrorInternal)
 		return
 	}
 
-	ctx := actor.ContextWithPrincipal(r.Context(), actor.Principal{ID: tokenID, Kind: actor.KindSCIM})
+	ctx := actor.ContextWithPrincipal(r.Context(), p)
 	r = r.WithContext(ctx)
 	r.URL.Path = "/" + strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, scimMountPath), "/")
 	server.ServeHTTP(w, r)
@@ -88,55 +81,6 @@ func (f *SCIMFlow) serverFor(ws actor.Workspace) (scim.Server, error) {
 	}
 	f.servers[ws.ID] = s
 	return s, nil
-}
-
-func (s *Service) verifySCIMToken(ctx context.Context, workspaceID, raw string) (string, error) {
-	parsed, err := crypto.Parse(raw)
-	if err != nil || parsed.ID != workspaceID {
-		return "", ErrInvalidToken
-	}
-	hash := crypto.HashToken(raw)
-	var id string
-	err = s.conn.TenantTx(ctx, func(q *db.Queries) error {
-		row, err := q.GetSCIMTokenByHash(ctx, hash)
-		if err != nil {
-			return err
-		}
-		id = row.ID
-		return q.TouchSCIMToken(ctx, row.ID)
-	})
-	if err != nil {
-		return "", ErrInvalidToken
-	}
-	return id, nil
-}
-
-func (s *Service) IssueSCIMToken(ctx context.Context, label string) (SCIMToken, string, error) {
-	tok := crypto.NewToken(actor.WorkspaceIDFromContext(ctx))
-	row, err := s.conn.Tenant().CreateSCIMToken(ctx, &db.CreateSCIMTokenParams{
-		TokenHash: tok.Hash,
-		Label:     label,
-	})
-	if err != nil {
-		return SCIMToken{}, "", err
-	}
-	return SCIMToken{ID: row.ID, Label: row.Label, CreatedAt: row.CreatedAt}, tok.Plaintext, nil
-}
-
-func (s *Service) ListSCIMTokens(ctx context.Context) ([]SCIMToken, error) {
-	rows, err := s.conn.Tenant().ListWorkspaceSCIMTokens(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var out []SCIMToken
-	for _, r := range rows {
-		out = append(out, SCIMToken{ID: r.ID, Label: r.Label, CreatedAt: r.CreatedAt, LastUsedAt: r.LastUsedAt})
-	}
-	return out, nil
-}
-
-func (s *Service) RevokeSCIMToken(ctx context.Context, tokenID string) error {
-	return s.conn.Tenant().DeleteSCIMToken(ctx, tokenID)
 }
 
 // scimProvisionUser applies active to existing accounts too, the IdP is the
@@ -256,7 +200,7 @@ func (s *Service) scimDeprovisionUser(ctx context.Context, u *db.User) error {
 		if err := q.DeleteUserSCIMCredentials(ctx, u.ID); err != nil {
 			return err
 		}
-		_, err := q.DeleteSubjectSessions(ctx, u.ID)
+		_, err := q.DeleteSubjectTokens(ctx, u.ID)
 		return err
 	})
 	if err != nil {

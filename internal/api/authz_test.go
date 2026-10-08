@@ -34,6 +34,10 @@ func TestProcedureRoles(t *testing.T) {
 		{nokkuv1connect.WorkspaceServiceListUsersProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
 		{nokkuv1connect.UtilServiceListAuditLogsProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
 		{nokkuv1connect.RecordingServiceGetRecordingProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
+		{
+			nokkuv1connect.ServiceAccountServiceListServiceAccountTokensProcedure,
+			nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER,
+		},
 
 		{nokkuv1connect.TargetServiceDeleteTargetProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR},
 		{nokkuv1connect.TargetAccountServiceRevokeAllAccessProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR},
@@ -41,11 +45,19 @@ func TestProcedureRoles(t *testing.T) {
 			nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure,
 			nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR,
 		},
+		{
+			nokkuv1connect.ServiceAccountServiceCreateServiceAccountTokenProcedure,
+			nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR,
+		},
+		{
+			nokkuv1connect.ServiceAccountServiceRevokeServiceAccountTokenProcedure,
+			nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR,
+		},
 
 		{nokkuv1connect.WorkspaceServiceUpdateUserRoleProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
 		{nokkuv1connect.WorkspaceServiceSetUserActiveProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
 		{nokkuv1connect.WorkspaceServiceDeleteUserProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
-		{nokkuv1connect.TokenServiceCreateTokenProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
+		{nokkuv1connect.JoinTokenServiceCreateJoinTokenProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
 		{nokkuv1connect.BillingServiceGetBillingProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
 
 		{nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
