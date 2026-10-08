@@ -29,6 +29,7 @@ task build          # UI build, then bin/nokku
 task build:ui       # web/ui into web/ui/build
 task build:email    # email templates into web/email/out
 task migrate:up     # tern, dev only. Production migrates at boot
+task seed           # fake users, teams, servers and daemons in the dev database
 ```
 
 Tests:
@@ -64,6 +65,8 @@ committed `.gitkeep` and are embedded by `web/embed.go`.
 - `cmd/nokku` is the entrypoint, plus the `admin-link` and `rotate-secrets`
   subcommands. They wire only what they need and never call `config.New`,
   the server may be running next to them.
+- `cmd/seed` fills the first workspace of a dev database with fake data. It
+  is not part of the release.
 - `internal/config` wires every service together in `config.New`. Background
   jobs live in the package that owns them and stop with the root ctx.
 - `internal/api` holds the Connect services and the plain HTTP routes
