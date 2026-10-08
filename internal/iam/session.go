@@ -22,8 +22,12 @@ const (
 	// its signing key. It shows in the sessions list, and a sign-in from one
 	// the account has not used before is mailed. It lives in its own table
 	// and never signs anyone in.
-	deviceCookieName = "nokku_device"
-	deviceTTL        = 180 * 24 * time.Hour
+	//
+	// The cookie is per account, its name ends in the user id. With one name
+	// for the browser every account that signs in replaces the cookie of the
+	// last one, and each switch counts as a new device.
+	deviceCookiePrefix = "nokku_device_"
+	deviceTTL          = 180 * 24 * time.Hour
 	// maxUserAgent keeps a hostile header from bloating the sessions table.
 	maxUserAgent = 512
 )
@@ -131,7 +135,8 @@ func (s *Service) IssueDaemonSession(ctx context.Context, daemonID, binding stri
 // RememberDevice returns nil for a browser the account has signed in from
 // before. A new one gets a cookie, and the account a mail.
 func (s *Service) RememberDevice(ctx context.Context, header http.Header, remoteAddr string, u *db.User) *http.Cookie {
-	if raw := cookieFromHeader(header, deviceCookieName); raw != "" && s.seenDevice(ctx, u.ID, deviceKey(raw)) {
+	name := deviceCookiePrefix + u.ID
+	if raw := cookieFromHeader(header, name); raw != "" && s.seenDevice(ctx, u.ID, deviceKey(raw)) {
 		return nil
 	}
 	token := crypto.RandomString(32)
@@ -148,7 +153,7 @@ func (s *Service) RememberDevice(ctx context.Context, header http.Header, remote
 		slog.Error("failed to remember device", "error", err)
 		return nil
 	}
-	return s.newCookie(deviceCookieName, token, d.ExpiresAt)
+	return s.newCookie(name, token, d.ExpiresAt)
 }
 
 // deviceKey is what a browser is recognized by, the hash of its cookie.
