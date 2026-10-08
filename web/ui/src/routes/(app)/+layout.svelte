@@ -76,13 +76,13 @@
 		if (page.url.pathname !== '/') return;
 		const code = pendingDeviceCode.current;
 		if (code) {
-			pendingDeviceCode.current = undefined;
+			pendingDeviceCode.current = null;
 			goto(`/device?user_code=${code}`);
 			return;
 		}
 		const back = returnTo.current;
 		if (back) {
-			returnTo.current = undefined;
+			returnTo.current = null;
 			if (Date.now() - back.at < RETURN_WINDOW) goto(back.path, { replace: true });
 		}
 	});
