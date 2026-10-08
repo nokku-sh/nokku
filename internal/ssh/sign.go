@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 	"time"
+	"uuid"
 
 	"golang.org/x/crypto/ssh"
 
@@ -27,10 +29,38 @@ func LoginPrincipal(subjectID, targetID, username string) string {
 	return subjectID + "@" + targetID + ":" + username
 }
 
+// Principal is a LoginPrincipal taken apart.
+type Principal struct {
+	SubjectID string
+	TargetID  string
+	Username  string
+}
+
+// ParseLoginPrincipal is for the backend, which built the string. Hosts
+// compare principals whole and never parse them. The ids are UUIDs, so a
+// username with "@" or ":" in it cannot shift the split.
+func ParseLoginPrincipal(s string) (Principal, bool) {
+	subject, rest, ok := strings.Cut(s, "@")
+	if !ok {
+		return Principal{}, false
+	}
+	target, username, ok := strings.Cut(rest, ":")
+	if !ok || username == "" {
+		return Principal{}, false
+	}
+	if _, err := uuid.Parse(subject); err != nil {
+		return Principal{}, false
+	}
+	if _, err := uuid.Parse(target); err != nil {
+		return Principal{}, false
+	}
+	return Principal{SubjectID: subject, TargetID: target, Username: username}, true
+}
+
 // SignCertificate signs a user certificate unless certType is ssh.HostCert.
 // It refuses an empty principal list, such a certificate is valid for anyone.
 func SignCertificate(
-	ca *db.CertificateAuthority,
+	ca *db.SSHCA,
 	pubKey string,
 	principals []string,
 	keyID string,
@@ -88,7 +118,7 @@ func SignCertificate(
 
 // UserTTL is how long a user certificate of ca lives when ttl is asked for.
 // Nothing asked, or more than the CA allows, gets its default.
-func UserTTL(ca *db.CertificateAuthority, ttl time.Duration) time.Duration {
+func UserTTL(ca *db.SSHCA, ttl time.Duration) time.Duration {
 	return boundTTL(ttl, ca.UserDefaultTtl, ca.UserMaxTtl)
 }
 
@@ -99,7 +129,7 @@ func boundTTL(ttl, defaultTTL, maxTTL time.Duration) time.Duration {
 	return ttl
 }
 
-func userPermissions(ca *db.CertificateAuthority) (ssh.Permissions, error) {
+func userPermissions(ca *db.SSHCA) (ssh.Permissions, error) {
 	extensions, err := db.ParseExtensionsMap(ca.UserExtensions)
 	if err != nil {
 		return ssh.Permissions{}, fmt.Errorf("failed to parse extensions: %w", err)

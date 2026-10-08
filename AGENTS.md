@@ -104,7 +104,7 @@ committed `.gitkeep` and are embedded by `web/embed.go`.
 - `internal/crypto` is at-rest crypto, tokens, and the Tink keyset with
   optional KMS wrap. `EncryptedBytes` and `HashedToken` column types are
   mapped in `sqlc.yaml`.
-- `internal/ssh` signs SSH certs. `internal/pki` is X.509 and CA rollover.
+- `internal/ssh` signs SSH certs and rolls CAs over.
 - `internal/recording` and `internal/storage` handle encrypted recording
   ingest, secret scrubbing, retention, and blob storage (local or S3).
 - `web/ui` is the SvelteKit SPA. `web/ui/README.md` has the UI conventions

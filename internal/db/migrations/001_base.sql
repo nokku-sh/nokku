@@ -118,7 +118,7 @@ CREATE INDEX idx_one_time_tokens_user ON one_time_tokens (user_id, purpose);
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT NOT NULL PRIMARY KEY,
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  subject_id TEXT NOT NULL, -- user id, or daemon id
+  subject_id UUID NOT NULL, -- user id, or daemon id
   -- A daemon's session has to outlive the daemon: it is what the host gets
   -- its REJECTED answer through, and SyncDaemon removes it with that answer.
   user_id UUID,
@@ -241,24 +241,22 @@ CREATE TABLE IF NOT EXISTS team_members (
   FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS certificate_authorities (
+-- SSH certificate authorities. An X.509 CA, when there is one, gets a table
+-- of its own: it shares the key material and nothing else.
+CREATE TABLE IF NOT EXISTS ssh_cas (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
-  certificate TEXT NOT NULL, -- PEM encoded certificate
   private_key BYTEA NOT NULL, -- Encrypted private key
   public_key TEXT NOT NULL, -- OpenSSH wire format
   previous_public_key TEXT, -- the key before the last rollover
   previous_trusted_until TIMESTAMPTZ, -- its certificates are trusted until then
-  serial_number TEXT NOT NULL UNIQUE,
-  subject TEXT NOT NULL,
   not_before TIMESTAMPTZ NOT NULL,
   not_after TIMESTAMPTZ NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   is_default BOOLEAN NOT NULL DEFAULT FALSE,
   key_type INTEGER NOT NULL DEFAULT 3, -- 1 = RSA, 2 = ECDSA, 3 = ED25519
-  authority_type INTEGER NOT NULL DEFAULT 1, -- 1 = SSH, 2 = X509
   key_bits INTEGER NOT NULL,
   lifetime INTERVAL NOT NULL DEFAULT '8760 hours',
   -- User certificate config
@@ -276,7 +274,6 @@ CREATE TABLE IF NOT EXISTS certificate_authorities (
   UNIQUE (workspace_id, name),
   UNIQUE (workspace_id, id),
   CHECK (not_before < not_after),
-  CHECK (authority_type IN (1, 2)),
   CHECK (user_default_ttl <= user_max_ttl),
   CHECK (host_default_ttl <= host_max_ttl)
 );
@@ -296,7 +293,7 @@ CREATE TABLE IF NOT EXISTS targets (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name),
   UNIQUE (workspace_id, id),
-  FOREIGN KEY (workspace_id, ca_id) REFERENCES certificate_authorities (workspace_id, id) ON DELETE SET NULL (ca_id),
+  FOREIGN KEY (workspace_id, ca_id) REFERENCES ssh_cas (workspace_id, id) ON DELETE SET NULL (ca_id),
   FOREIGN KEY (workspace_id, daemon_id) REFERENCES daemons (workspace_id, id) ON DELETE CASCADE
 );
 
@@ -317,7 +314,7 @@ CREATE TABLE IF NOT EXISTS workspace_tokens (
   role INTEGER CHECK (role BETWEEN 1 AND 4), -- invite only, like users.role, never the owner
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_used_at TIMESTAMPTZ,
-  FOREIGN KEY (workspace_id, ca_id) REFERENCES certificate_authorities (workspace_id, id) ON DELETE SET NULL (ca_id),
+  FOREIGN KEY (workspace_id, ca_id) REFERENCES ssh_cas (workspace_id, id) ON DELETE SET NULL (ca_id),
   CHECK (
     kind = 1
     OR (
@@ -328,7 +325,8 @@ CREATE TABLE IF NOT EXISTS workspace_tokens (
   CHECK ((kind = 2) = (role IS NOT NULL))
 );
 
-CREATE TABLE IF NOT EXISTS principals (
+-- A local account on a target, like root or deploy. Grants hang off it.
+CREATE TABLE IF NOT EXISTS target_accounts (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   target_id UUID NOT NULL,
@@ -342,9 +340,9 @@ CREATE TABLE IF NOT EXISTS principals (
 -- Exactly one subject column is set. Every reference is scoped to the same
 -- workspace and cascades, so a removed user, team, or service account can
 -- never leave a grant behind, and no grant can point across tenants.
-CREATE TABLE IF NOT EXISTS principal_grants (
+CREATE TABLE IF NOT EXISTS grants (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  principal_id UUID NOT NULL,
+  account_id UUID NOT NULL,
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   user_id UUID,
   team_id UUID,
@@ -358,11 +356,11 @@ CREATE TABLE IF NOT EXISTS principal_grants (
   ) STORED,
   subject_id UUID GENERATED ALWAYS AS (COALESCE(user_id, team_id, service_account_id)) STORED,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (workspace_id, principal_id) REFERENCES principals (workspace_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, account_id) REFERENCES target_accounts (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, service_account_id) REFERENCES service_accounts (workspace_id, id) ON DELETE CASCADE,
-  UNIQUE NULLS NOT DISTINCT (principal_id, user_id, team_id, service_account_id),
+  UNIQUE NULLS NOT DISTINCT (account_id, user_id, team_id, service_account_id),
   CHECK (num_nonnulls (user_id, team_id, service_account_id) = 1)
 );
 
@@ -373,6 +371,10 @@ CREATE TABLE IF NOT EXISTS recordings (
   daemon_id UUID REFERENCES daemons (id) ON DELETE SET NULL,
   daemon_name TEXT NOT NULL, -- as it was when the session ran
   username TEXT NOT NULL,
+  -- Who was logged in. The host reports the certificate principal it matched,
+  -- the subject is parsed out of it. NULL from a daemon that did not say.
+  subject_id UUID,
+  principal TEXT NOT NULL DEFAULT '',
   key BYTEA NOT NULL, -- encrypts this recording's frames, stored encrypted
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   ended_at TIMESTAMPTZ,
@@ -428,12 +430,12 @@ CREATE UNIQUE INDEX idx_teams_workspace_name ON teams (workspace_id, name);
 
 CREATE INDEX idx_team_members_team_id ON team_members (team_id);
 
-CREATE INDEX idx_ca_workspace_id ON certificate_authorities (workspace_id);
+CREATE INDEX idx_ssh_cas_workspace_id ON ssh_cas (workspace_id);
 
-CREATE INDEX idx_ca_name_trgm ON certificate_authorities USING GIN (name gin_trgm_ops);
+CREATE INDEX idx_ssh_cas_name_trgm ON ssh_cas USING GIN (name gin_trgm_ops);
 
--- One default per authority type per workspace (one SSH, one X509)
-CREATE UNIQUE INDEX idx_ca_default_per_workspace ON certificate_authorities (workspace_id, authority_type)
+-- One default per workspace. SetDefaultCA moves it in one statement.
+CREATE UNIQUE INDEX idx_ssh_cas_default ON ssh_cas (workspace_id)
 WHERE
   is_default = TRUE;
 
@@ -451,37 +453,19 @@ CREATE INDEX idx_targets_description_trgm ON targets USING GIN (description gin_
 
 CREATE INDEX idx_workspace_tokens_workspace ON workspace_tokens (workspace_id, kind);
 
-CREATE INDEX idx_principals_workspace_id ON principals (workspace_id);
+CREATE INDEX idx_target_accounts_workspace_id ON target_accounts (workspace_id);
 
-CREATE INDEX idx_principals_target_id ON principals (target_id);
+CREATE INDEX idx_target_accounts_target_id ON target_accounts (target_id);
 
-CREATE INDEX idx_principal_grants_subject ON principal_grants (subject_id);
+CREATE INDEX idx_grants_subject ON grants (subject_id);
 
-CREATE INDEX idx_principal_grants_workspace_id ON principal_grants (workspace_id);
+CREATE INDEX idx_grants_workspace_id ON grants (workspace_id);
 
 CREATE INDEX idx_recordings_workspace_started ON recordings (workspace_id, started_at DESC);
 
+CREATE INDEX idx_recordings_subject ON recordings (workspace_id, subject_id, started_at DESC);
+
 -- Triggers -------------------------------------------------------------------
--- Ensure only one default CA per workspace and authority type
-CREATE OR REPLACE FUNCTION enforce_single_default_ca () RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.is_default = TRUE THEN
-    UPDATE certificate_authorities
-    SET is_default = FALSE
-    WHERE workspace_id = NEW.workspace_id
-      AND authority_type = NEW.authority_type
-      AND id != NEW.id
-      AND is_default = TRUE;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER enforce_single_default_ca BEFORE INSERT
-OR
-UPDATE OF is_default ON certificate_authorities FOR EACH ROW WHEN (NEW.is_default = TRUE)
-EXECUTE FUNCTION enforce_single_default_ca ();
-
 -- Daemon state versioning. Any change to what a daemon enforces bumps the
 -- workspace version and notifies on commit, so no code path can forget it.
 CREATE OR REPLACE FUNCTION create_workspace_state () RETURNS TRIGGER AS $$
@@ -518,7 +502,7 @@ SET
 
 CREATE TRIGGER bump_state_version
 AFTER INSERT
-OR DELETE ON principal_grants FOR EACH ROW
+OR DELETE ON grants FOR EACH ROW
 EXECUTE FUNCTION bump_state_version ();
 
 CREATE TRIGGER bump_state_version
@@ -526,9 +510,9 @@ AFTER INSERT
 OR DELETE ON team_members FOR EACH ROW
 EXECUTE FUNCTION bump_state_version ();
 
--- A new account anchor carries no grants, so only deletes matter.
+-- A new account carries no grants, so only deletes matter.
 CREATE TRIGGER bump_state_version
-AFTER DELETE ON principals FOR EACH ROW
+AFTER DELETE ON target_accounts FOR EACH ROW
 EXECUTE FUNCTION bump_state_version ();
 
 CREATE TRIGGER bump_state_version
@@ -546,14 +530,14 @@ EXECUTE FUNCTION bump_state_version ();
 
 CREATE TRIGGER bump_state_version
 AFTER INSERT
-OR DELETE ON certificate_authorities FOR EACH ROW
+OR DELETE ON ssh_cas FOR EACH ROW
 EXECUTE FUNCTION bump_state_version ();
 
 CREATE TRIGGER bump_state_version_update
 AFTER
 UPDATE OF public_key,
 is_active,
-is_default ON certificate_authorities FOR EACH ROW WHEN (
+is_default ON ssh_cas FOR EACH ROW WHEN (
   OLD.public_key IS DISTINCT FROM NEW.public_key
   OR OLD.is_active IS DISTINCT FROM NEW.is_active
   OR OLD.is_default IS DISTINCT FROM NEW.is_default
@@ -613,10 +597,10 @@ BEGIN
     'daemons',
     'teams',
     'team_members',
-    'certificate_authorities',
+    'ssh_cas',
     'targets',
-    'principals',
-    'principal_grants',
+    'target_accounts',
+    'grants',
     'recordings'
   ] LOOP
     EXECUTE format(
@@ -747,10 +731,10 @@ BEGIN
     'daemons',
     'teams',
     'team_members',
-    'certificate_authorities',
+    'ssh_cas',
     'targets',
-    'principals',
-    'principal_grants',
+    'target_accounts',
+    'grants',
     'recordings'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);

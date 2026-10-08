@@ -14,7 +14,6 @@
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
 	import {
-		AuthorityType,
 		CertificateAuthoritySchema,
 		CertificateKeyType
 	} from '#lib/gen/nokku/v1/certificates_pb.js';
@@ -24,7 +23,6 @@
 	import {
 		Ban,
 		Clock,
-		FileBadge,
 		FileText,
 		Fingerprint,
 		History,
@@ -55,9 +53,6 @@
 	const autoSave = useAutoSave(() => update.mutateAsync({ ...model }));
 	const save = () => autoSave.save();
 
-	const isSSH = $derived(model?.authorityType === AuthorityType.SSH);
-	// Everyone signs their own SSH key, X.509 leaves are for editors.
-	const canSign = $derived(isSSH || can.edit);
 	const keyTypes = enumToArray(CertificateKeyType);
 	let signOpen = $state(false);
 
@@ -181,7 +176,6 @@
 	{/snippet}
 
 	{#snippet subtitle()}
-		<Badge variant="outline">{isSSH ? 'SSH' : 'X.509'}</Badge>
 		{#if model?.isDefault}
 			<Badge variant="warning"><Star data-icon="inline-start" />Default</Badge>
 		{/if}
@@ -191,33 +185,21 @@
 	{/snippet}
 
 	{#snippet actions()}
-		{#if canSign}
-			<Button size="sm" onclick={() => (signOpen = true)}>
-				<PenLine data-icon="inline-start" />
-				Sign a certificate
-			</Button>
-		{/if}
+		<Button size="sm" onclick={() => (signOpen = true)}>
+			<PenLine data-icon="inline-start" />
+			Sign a certificate
+		</Button>
 	{/snippet}
 
 	{#if model && entity}
 		<Tabs.Content value="overview" class="flex flex-col divide-y">
-			{#if isSSH}
-				<Section
-					title="Public key"
-					icon={KeyRound}
-					description="Servers trust certificates signed by this key."
-				>
-					<CodeSnippet code={entity.publicKey} language="openssh" wrap />
-				</Section>
-			{:else}
-				<Section
-					title="Certificate"
-					icon={FileBadge}
-					description="Add it to a trust store to verify certificates signed by this CA."
-				>
-					<CodeSnippet code={entity.certificate} language="pem" />
-				</Section>
-			{/if}
+			<Section
+				title="Public key"
+				icon={KeyRound}
+				description="Servers trust certificates signed by this key."
+			>
+				<CodeSnippet code={entity.publicKey} language="openssh" wrap />
+			</Section>
 
 			{#if entity.previousPublicKey}
 				<Section
@@ -227,11 +209,7 @@
 						? `Replaced by a rollover. Still trusted until ${formatTs(entity.previousTrustedUntil)}.`
 						: 'Replaced by a rollover.'}
 				>
-					<CodeSnippet
-						code={entity.previousPublicKey}
-						language={isSSH ? 'openssh' : 'pem'}
-						wrap={isSSH}
-					/>
+					<CodeSnippet code={entity.previousPublicKey} language="openssh" wrap />
 				</Section>
 			{/if}
 
@@ -241,15 +219,6 @@
 						{
 							label: 'Algorithm',
 							value: `${CertificateKeyType[entity.keyType]}${entity.keyBits ? ` ${entity.keyBits}` : ''}`
-						},
-						{ label: 'Subject', value: entity.subject, mono: true, copy: true, wide: true },
-						{ label: 'Serial', value: entity.serialNumber, mono: true, copy: true, wide: true },
-						{
-							label: 'Public key',
-							value: isSSH ? undefined : entity.publicKey,
-							mono: true,
-							copy: true,
-							wide: true
 						},
 						{ label: 'Valid from', value: formatTs(entity.notBefore) },
 						{ label: 'Valid until', value: formatTs(entity.notAfter) }
@@ -307,7 +276,7 @@
 			</Section>
 
 			<Section
-				title="Accepted {isSSH ? 'client' : 'requester'} keys"
+				title="Accepted client keys"
 				icon={KeyRound}
 				description="Only these key types can get a certificate from this CA."
 			>
@@ -340,7 +309,7 @@
 				</Field.Field>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<Field.Field>
-						<Field.Label>{isSSH ? 'User' : 'Client'} certificates</Field.Label>
+						<Field.Label>User certificates</Field.Label>
 						<div class="grid grid-cols-2 gap-2">
 							{#each lifetimes.slice(0, 2) as l (l.key)}
 								<div class="flex flex-col gap-1">
@@ -355,7 +324,7 @@
 						</div>
 					</Field.Field>
 					<Field.Field>
-						<Field.Label>{isSSH ? 'Host' : 'Server'} certificates</Field.Label>
+						<Field.Label>Host certificates</Field.Label>
 						<div class="grid grid-cols-2 gap-2">
 							{#each lifetimes.slice(2) as l (l.key)}
 								<div class="flex flex-col gap-1">
@@ -375,71 +344,67 @@
 				</Field.Description>
 			</Section>
 
-			{#if isSSH}
-				<Section title="What user certificates allow" icon={ShieldCheck}>
-					<Item.Group class="divide-y rounded-lg border">
-						{#each extensions as ext (ext.id)}
-							<Item.Root size="sm" class="rounded-none">
-								<Item.Content>
-									<Item.Title><label for={`ext-${ext.id}`}>{ext.title}</label></Item.Title>
-									<Item.Description>{ext.description}</Item.Description>
-								</Item.Content>
-								<Item.Actions>
-									<Switch
-										id={`ext-${ext.id}`}
-										checked={model.userExtensions[ext.id] !== undefined}
-										disabled={!can.edit}
-										onCheckedChange={(v) => toggleExtension(ext.id, v)}
-									/>
-								</Item.Actions>
-							</Item.Root>
-						{/each}
-					</Item.Group>
-				</Section>
+			<Section title="What user certificates allow" icon={ShieldCheck}>
+				<Item.Group class="divide-y rounded-lg border">
+					{#each extensions as ext (ext.id)}
+						<Item.Root size="sm" class="rounded-none">
+							<Item.Content>
+								<Item.Title><label for={`ext-${ext.id}`}>{ext.title}</label></Item.Title>
+								<Item.Description>{ext.description}</Item.Description>
+							</Item.Content>
+							<Item.Actions>
+								<Switch
+									id={`ext-${ext.id}`}
+									checked={model.userExtensions[ext.id] !== undefined}
+									disabled={!can.edit}
+									onCheckedChange={(v) => toggleExtension(ext.id, v)}
+								/>
+							</Item.Actions>
+						</Item.Root>
+					{/each}
+				</Item.Group>
+			</Section>
 
-				<Section title="Restrictions" icon={Ban}>
-					<Field.Group class="gap-4">
-						<Field.Field>
-							<Field.Label for="ca-force-command">Force a command</Field.Label>
-							<Input
-								id="ca-force-command"
-								class="font-mono"
-								value={model.userCriticalOptions['force-command'] ?? ''}
-								disabled={!can.edit}
-								oninput={(e) => setOption('force-command', e.currentTarget.value)}
-								placeholder="/usr/local/bin/backup"
-							/>
-							<Field.Description>Runs this instead of whatever the user asks for.</Field.Description
-							>
-						</Field.Field>
-						<Field.Field>
-							<Field.Label for="ca-source-address">Allowed source IPs</Field.Label>
-							<Input
-								id="ca-source-address"
-								class="font-mono"
-								value={model.userCriticalOptions['source-address'] ?? ''}
-								disabled={!can.edit}
-								oninput={(e) => setOption('source-address', e.currentTarget.value)}
-								placeholder="10.0.0.0/8, 192.168.1.10"
-							/>
-							<Field.Description>Comma separated CIDRs. Leave empty to allow any.</Field.Description
-							>
-						</Field.Field>
-						<Field.Field orientation="horizontal">
-							<Field.Content>
-								<Field.Label for="ca-verify">Require PIN or biometrics</Field.Label>
-								<Field.Description>For FIDO security keys, not just a touch.</Field.Description>
-							</Field.Content>
-							<Switch
-								id="ca-verify"
-								checked={model.userCriticalOptions['verify-required'] !== undefined}
-								disabled={!can.edit}
-								onCheckedChange={(v) => setOption('verify-required', v ? '' : undefined)}
-							/>
-						</Field.Field>
-					</Field.Group>
-				</Section>
-			{/if}
+			<Section title="Restrictions" icon={Ban}>
+				<Field.Group class="gap-4">
+					<Field.Field>
+						<Field.Label for="ca-force-command">Force a command</Field.Label>
+						<Input
+							id="ca-force-command"
+							class="font-mono"
+							value={model.userCriticalOptions['force-command'] ?? ''}
+							disabled={!can.edit}
+							oninput={(e) => setOption('force-command', e.currentTarget.value)}
+							placeholder="/usr/local/bin/backup"
+						/>
+						<Field.Description>Runs this instead of whatever the user asks for.</Field.Description>
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="ca-source-address">Allowed source IPs</Field.Label>
+						<Input
+							id="ca-source-address"
+							class="font-mono"
+							value={model.userCriticalOptions['source-address'] ?? ''}
+							disabled={!can.edit}
+							oninput={(e) => setOption('source-address', e.currentTarget.value)}
+							placeholder="10.0.0.0/8, 192.168.1.10"
+						/>
+						<Field.Description>Comma separated CIDRs. Leave empty to allow any.</Field.Description>
+					</Field.Field>
+					<Field.Field orientation="horizontal">
+						<Field.Content>
+							<Field.Label for="ca-verify">Require PIN or biometrics</Field.Label>
+							<Field.Description>For FIDO security keys, not just a touch.</Field.Description>
+						</Field.Content>
+						<Switch
+							id="ca-verify"
+							checked={model.userCriticalOptions['verify-required'] !== undefined}
+							disabled={!can.edit}
+							onCheckedChange={(v) => setOption('verify-required', v ? '' : undefined)}
+						/>
+					</Field.Field>
+				</Field.Group>
+			</Section>
 
 			<DangerZone
 				actions={can.edit

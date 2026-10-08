@@ -28,7 +28,7 @@ Only the latest release gets security fixes. Older releases are not patched. On 
 
 ### In scope
 
-- The **core**: sign-in and OIDC, authorization, SSH and X.509 certificate signing, daemon enrollment and sync, licensing, the audit log and secret management
+- The **core**: sign-in and OIDC, authorization, SSH certificate signing, daemon enrollment and sync, licensing, the audit log and secret management
 - The bundled **web app**, including browser sign-in and terminal sessions
 - External integrations **as the core uses them** (email, OIDC providers, KMS, billing)
 - The Helm chart and the deployment files in this repository
@@ -42,7 +42,7 @@ Only the latest release gets security fixes. Older releases are not patched. On 
 
 ## Running Nokku securely
 
-The core holds the signing keys of your SSH and X.509 certificate authorities. Whoever controls it controls access to every server. These are the settings that deserve care. Setup and the full list of settings are in the [README](./README.md).
+The core holds the signing keys of your SSH certificate authorities. Whoever controls it controls access to every server. These are the settings that deserve care. Setup and the full list of settings are in the [README](./README.md).
 
 ### The secret
 

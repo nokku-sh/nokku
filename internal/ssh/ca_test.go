@@ -15,14 +15,14 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-func newTestCA(t *testing.T) *db.CertificateAuthority {
+func newTestCA(t *testing.T) *db.SSHCA {
 	t.Helper()
 
 	info, err := NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0, 8760*time.Hour)
 	if err != nil {
 		t.Fatalf("NewCA failed: %v", err)
 	}
-	return &db.CertificateAuthority{
+	return &db.SSHCA{
 		PrivateKey:          info.PrivateKey,
 		PublicKey:           info.PublicKey,
 		KeyType:             info.KeyType,
@@ -50,7 +50,7 @@ func newTestKey(t *testing.T) string {
 	return pubStr
 }
 
-func checkCert(t *testing.T, ca *db.CertificateAuthority, cert *ssh.Certificate, principal string) {
+func checkCert(t *testing.T, ca *db.SSHCA, cert *ssh.Certificate, principal string) {
 	t.Helper()
 
 	caPub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(ca.PublicKey))

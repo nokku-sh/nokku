@@ -51,15 +51,15 @@ WHERE
     OR t.ca_id = sqlc.narg('ca_id')::UUID
   )
   AND (
-    sqlc.narg('principals')::TEXT[] IS NULL
+    sqlc.narg('accounts')::TEXT[] IS NULL
     OR EXISTS (
       SELECT
         1
       FROM
-        principals p
+        target_accounts p
       WHERE
         p.target_id = t.id
-        AND p.username = ANY (sqlc.narg('principals')::TEXT[])
+        AND p.username = ANY (sqlc.narg('accounts')::TEXT[])
     )
   )
   AND (
@@ -110,7 +110,7 @@ RETURNING
   *;
 
 -- name: UpdateTargetCA :one
--- A workspace has a default per authority type, a target takes the SSH one (1).
+-- No id means the workspace default.
 UPDATE targets
 SET
   ca_id = COALESCE(
@@ -119,10 +119,9 @@ SET
       SELECT
         id
       FROM
-        certificate_authorities
+        ssh_cas
       WHERE
         workspace_id = targets.workspace_id
-        AND authority_type = 1
         AND is_default = TRUE
       LIMIT
         1
@@ -145,16 +144,16 @@ WHERE
     SELECT
       1
     FROM
-      principals p
+      target_accounts p
     WHERE
       p.target_id = t.id
       AND EXISTS (
         SELECT
           1
         FROM
-          principal_grants g
+          grants g
         WHERE
-          g.principal_id = p.id
+          g.account_id = p.id
           AND (
             -- Subject UUIDs are unique across kinds.
             g.subject_id = sqlc.arg('subject_id')::UUID
@@ -181,11 +180,11 @@ FROM
 ORDER BY
   tag ASC;
 
--- name: GetWorkspacePrincipals :many
+-- name: GetWorkspaceAccounts :many
 SELECT DISTINCT
   username
 FROM
-  principals
+  target_accounts
 ORDER BY
   username ASC;
 

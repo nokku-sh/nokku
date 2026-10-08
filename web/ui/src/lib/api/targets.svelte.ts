@@ -21,7 +21,7 @@ export const target = {
 			daemonId?: string;
 			caId?: string;
 			tags?: string[];
-			principals?: string[];
+			accounts?: string[];
 			limit?: number;
 			offset?: number;
 		},

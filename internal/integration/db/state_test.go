@@ -21,22 +21,22 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// stateFixture is one workspace where user u reaches principal p on a daemon
+// stateFixture is one workspace where user u reaches account p on a daemon
 // target twice: directly and through team.
 type stateFixture struct {
-	ws, owner, u, team, daemon, target, principal string
+	ws, owner, u, team, daemon, target, account string
 }
 
 func newStateFixture(t *testing.T, c *conn) stateFixture {
 	t.Helper()
 	f := stateFixture{
-		ws:        uuid.NewV7().String(),
-		owner:     uuid.NewV7().String(),
-		u:         uuid.NewV7().String(),
-		team:      uuid.NewV7().String(),
-		daemon:    uuid.NewV7().String(),
-		target:    uuid.NewV7().String(),
-		principal: uuid.NewV7().String(),
+		ws:      uuid.NewV7().String(),
+		owner:   uuid.NewV7().String(),
+		u:       uuid.NewV7().String(),
+		team:    uuid.NewV7().String(),
+		daemon:  uuid.NewV7().String(),
+		target:  uuid.NewV7().String(),
+		account: uuid.NewV7().String(),
 	}
 	// The simple protocol substitutes arguments client-side, which allows
 	// several statements in one Exec.
@@ -48,10 +48,10 @@ func newStateFixture(t *testing.T, c *conn) stateFixture {
 		INSERT INTO team_members (workspace_id, user_id, team_id) VALUES ($1, $3, $4);
 		INSERT INTO daemons (id, workspace_id, name, status) VALUES ($5, $1, 'd', 2);
 		INSERT INTO targets (id, workspace_id, daemon_id, name) VALUES ($6, $1, $5, 't');
-		INSERT INTO principals (id, workspace_id, target_id, username) VALUES ($7, $1, $6, 'deploy');
-		INSERT INTO principal_grants (principal_id, workspace_id, user_id) VALUES ($7, $1, $3);
-		INSERT INTO principal_grants (principal_id, workspace_id, team_id) VALUES ($7, $1, $4);
-	`, pgx.QueryExecModeSimpleProtocol, f.ws, f.owner, f.u, f.team, f.daemon, f.target, f.principal)
+		INSERT INTO target_accounts (id, workspace_id, target_id, username) VALUES ($7, $1, $6, 'deploy');
+		INSERT INTO grants (account_id, workspace_id, user_id) VALUES ($7, $1, $3);
+		INSERT INTO grants (account_id, workspace_id, team_id) VALUES ($7, $1, $4);
+	`, pgx.QueryExecModeSimpleProtocol, f.ws, f.owner, f.u, f.team, f.daemon, f.target, f.account)
 	if err != nil {
 		t.Fatalf("seed fixture: %v", err)
 	}
@@ -101,7 +101,7 @@ func stateVersion(t *testing.T, c *conn, ws string) int64 {
 
 func grantedIDs(t *testing.T, c *conn, target string) []string {
 	t.Helper()
-	rows, err := c.Sys().ListPrincipalsForTarget(t.Context(), target)
+	rows, err := c.Sys().ListAccountSubjectsForTarget(t.Context(), target)
 	if err != nil {
 		t.Fatalf("list principals: %v", err)
 	}
@@ -233,7 +233,7 @@ func TestStateVersionIgnoresHeartbeatWrites(t *testing.T) {
 		}); err != nil {
 			return err
 		}
-		return q.InsertTargetPrincipals(t.Context(), &db.InsertTargetPrincipalsParams{
+		return q.InsertTargetAccounts(t.Context(), &db.InsertTargetAccountsParams{
 			TargetID:  f.target,
 			Usernames: []string{"deploy", "backup"},
 		})
@@ -249,8 +249,8 @@ func TestGrantRejectsForeignTeam(t *testing.T) {
 	b := newStateFixture(t, c)
 
 	_, err := c.sysPool.Exec(t.Context(),
-		`INSERT INTO principal_grants (principal_id, workspace_id, team_id) VALUES ($1, $2, $3)`,
-		a.principal, a.ws, b.team)
+		`INSERT INTO grants (account_id, workspace_id, team_id) VALUES ($1, $2, $3)`,
+		a.account, a.ws, b.team)
 	if err == nil {
 		t.Fatal("granted a team from another workspace")
 	}
@@ -355,8 +355,8 @@ func TestInsertTargetPrincipalsStopsAtTheCap(t *testing.T) {
 	f := newStateFixture(t, c)
 	insert := func(limit int32, names ...string) {
 		t.Helper()
-		if err := c.Sys().InsertTargetPrincipals(t.Context(), &db.InsertTargetPrincipalsParams{
-			TargetID: f.target, Usernames: names, MaxPrincipals: limit,
+		if err := c.Sys().InsertTargetAccounts(t.Context(), &db.InsertTargetAccountsParams{
+			TargetID: f.target, Usernames: names, MaxAccounts: limit,
 		}); err != nil {
 			t.Fatalf("insert principals: %v", err)
 		}
@@ -364,7 +364,7 @@ func TestInsertTargetPrincipalsStopsAtTheCap(t *testing.T) {
 	count := func() (n int) {
 		t.Helper()
 		if err := c.sysPool.QueryRow(t.Context(),
-			`SELECT COUNT(*) FROM principals WHERE target_id = $1`, f.target).Scan(&n); err != nil {
+			`SELECT COUNT(*) FROM target_accounts WHERE target_id = $1`, f.target).Scan(&n); err != nil {
 			t.Fatalf("count principals: %v", err)
 		}
 		return n

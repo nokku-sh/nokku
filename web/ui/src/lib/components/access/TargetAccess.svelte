@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { principal as principalApi } from '#lib/api/principals.svelte.js';
+	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { MAX_PAGE_SIZE } from '#lib/config.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
@@ -8,7 +8,7 @@
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
-	import { SubjectKind, type Principal } from '#lib/gen/nokku/v1/principal_pb.js';
+	import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
 	import { Ellipsis, KeyRound, Plus, Search, SquareTerminal, Trash2 } from '@lucide/svelte';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -25,17 +25,17 @@
 	let { targetId, manual = false }: Props = $props();
 
 	const can = user.can();
-	const accounts = principalApi.list(() => ({ targetId, limit: MAX_PAGE_SIZE }));
-	const addSubjects = principalApi.addSubjects();
-	const removeSubjects = principalApi.removeSubjects();
-	const addAccount = principalApi.addAccount();
-	const removeAccount = principalApi.removeAccount();
+	const accounts = accountApi.list(() => ({ targetId, limit: MAX_PAGE_SIZE }));
+	const addSubjects = accountApi.addSubjects();
+	const removeSubjects = accountApi.removeSubjects();
+	const addAccount = accountApi.addAccount();
+	const removeAccount = accountApi.removeAccount();
 
 	// Pending grants and revokes, shown right away until the refetch lands.
 	const pending = new SvelteMap<string, SubjectRef | null>();
-	const key = (p: Principal, id: string) => `${p.id}:${id}`;
+	const key = (p: TargetAccount, id: string) => `${p.id}:${id}`;
 
-	function granted(p: Principal): SubjectRef[] {
+	function granted(p: TargetAccount): SubjectRef[] {
 		const server = grantsOf(p).filter((g) => pending.get(key(p, g.id)) !== null);
 		const added = [...pending]
 			.filter(([k, g]) => g && k.startsWith(`${p.id}:`) && !server.some((s) => s.id === g.id))
@@ -43,7 +43,7 @@
 		return [...server, ...added];
 	}
 
-	async function toggle(p: Principal, subject: Pick<Subject, 'id' | 'kind'>, grant: boolean) {
+	async function toggle(p: TargetAccount, subject: Pick<Subject, 'id' | 'kind'>, grant: boolean) {
 		const k = key(p, subject.id);
 		pending.set(
 			k,
@@ -71,7 +71,7 @@
 
 	let filter = $state('');
 	let newAccount = $state('');
-	const list = $derived(accounts.data?.principals ?? []);
+	const list = $derived(accounts.data?.accounts ?? []);
 	const shown = $derived(
 		filter ? list.filter((a) => a.username.includes(filter.trim().toLowerCase())) : list
 	);
@@ -86,7 +86,7 @@
 		await addAccount.mutateAsync({ targetId, username });
 	}
 
-	function askRemoveAccount(p: Principal) {
+	function askRemoveAccount(p: TargetAccount) {
 		void confirm({
 			title: `Remove ${p.username}?`,
 			description:

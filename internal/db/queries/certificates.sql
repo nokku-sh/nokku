@@ -1,18 +1,13 @@
 -- name: CreateCA :one
 INSERT INTO
-  certificate_authorities (
+  ssh_cas (
     name,
     description,
-    certificate,
     private_key,
     public_key,
-    serial_number,
-    subject,
-    is_default,
     not_before,
     not_after,
     key_type,
-    authority_type,
     key_bits,
     lifetime,
     user_default_ttl,
@@ -27,16 +22,11 @@ VALUES
   (
     @name,
     @description,
-    @certificate,
     @private_key,
     @public_key,
-    @serial_number,
-    @subject,
-    @is_default,
     @not_before,
     @not_after,
     COALESCE(sqlc.narg('key_type'), 3),
-    COALESCE(sqlc.narg('authority_type'), 1),
     @key_bits,
     COALESCE(sqlc.narg('lifetime'), '8760 hours'::interval),
     COALESCE(sqlc.narg('user_default_ttl'), '120 hours'::interval),
@@ -54,7 +44,7 @@ RETURNING
 SELECT
   *
 FROM
-  certificate_authorities
+  ssh_cas
 WHERE
   id = @ca_id;
 
@@ -62,27 +52,16 @@ WHERE
 SELECT
   *
 FROM
-  certificate_authorities
+  ssh_cas
 WHERE
   id = @ca_id
 FOR UPDATE;
-
--- name: GetDefaultCA :one
-SELECT
-  *
-FROM
-  certificate_authorities
-WHERE
-  authority_type = @authority_type
-  AND is_default = TRUE
-  AND is_active = TRUE
-  AND NOW() BETWEEN not_before AND not_after;
 
 -- name: GetCAByDaemonID :one
 SELECT
   ca.*
 FROM
-  certificate_authorities ca
+  ssh_cas ca
   JOIN targets t ON t.ca_id = ca.id
 WHERE
   t.daemon_id = $1;
@@ -94,7 +73,7 @@ SELECT
   ca.previous_public_key,
   ca.previous_trusted_until
 FROM
-  certificate_authorities ca
+  ssh_cas ca
   JOIN targets t ON t.ca_id = ca.id
 WHERE
   t.daemon_id = $1;
@@ -106,12 +85,10 @@ SELECT
   name,
   public_key,
   is_default,
-  authority_type,
-  certificate,
   user_default_ttl,
   user_max_ttl
 FROM
-  certificate_authorities
+  ssh_cas
 WHERE
   id = ANY (sqlc.arg('ca_ids')::UUID[]);
 
@@ -119,7 +96,7 @@ WHERE
 SELECT
   *
 FROM
-  certificate_authorities
+  ssh_cas
 WHERE
   (
     sqlc.narg('name_query')::text IS NULL
@@ -160,12 +137,11 @@ OFFSET
   sqlc.narg('offset');
 
 -- name: UpdateCA :one
-UPDATE certificate_authorities
+UPDATE ssh_cas
 SET
   name = COALESCE(sqlc.narg('name'), name),
   description = COALESCE(sqlc.narg('description'), description),
   is_active = COALESCE(sqlc.narg('is_active'), is_active),
-  is_default = COALESCE(sqlc.narg('is_default'), is_default),
   lifetime = COALESCE(sqlc.narg('lifetime'), lifetime),
   user_default_ttl = COALESCE(sqlc.narg('user_default_ttl'), user_default_ttl),
   user_max_ttl = COALESCE(sqlc.narg('user_max_ttl'), user_max_ttl),
@@ -182,7 +158,7 @@ RETURNING
 -- The replaced key stays trusted for as long as a certificate it signed can
 -- live, unless revoke_previous drops it at once.
 -- name: ReplaceCA :one
-UPDATE certificate_authorities
+UPDATE ssh_cas
 SET
   previous_public_key = CASE
     WHEN @revoke_previous::BOOLEAN THEN NULL
@@ -192,11 +168,8 @@ SET
     WHEN @revoke_previous::BOOLEAN THEN NULL
     ELSE NOW() + user_max_ttl
   END,
-  certificate = @certificate,
   private_key = @private_key,
   public_key = @public_key,
-  serial_number = @serial_number,
-  subject = @subject,
   not_before = @not_before,
   not_after = @not_after,
   key_type = @key_type,
@@ -206,9 +179,17 @@ WHERE
 RETURNING
   *;
 
--- The enforce_single_default_ca trigger clears the previous default.
+-- name: SetDefaultCA :exec
+-- One statement, so the partial unique index never sees two defaults.
+UPDATE ssh_cas
+SET
+  is_default = (id = @ca_id)
+WHERE
+  id = @ca_id
+  OR is_default;
+
 -- name: DeleteCA :one
-DELETE FROM certificate_authorities
+DELETE FROM ssh_cas
 WHERE
   id = @ca_id
 RETURNING
@@ -219,7 +200,7 @@ RETURNING
 SELECT
   ca.*
 FROM
-  certificate_authorities ca
+  ssh_cas ca
 WHERE
   ca.is_active = TRUE
   AND ca.id <> ALL (COALESCE(@skip_ids::UUID[], '{}'))

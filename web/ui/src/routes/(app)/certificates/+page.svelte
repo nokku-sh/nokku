@@ -24,7 +24,6 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import {
-		AuthorityType,
 		CertificateKeyType,
 		type CertificateAuthority
 	} from '#lib/gen/nokku/v1/certificates_pb.js';
@@ -42,7 +41,6 @@
 	const rolloverAction = ca.rollover();
 
 	const search = $derived(page.url.searchParams.get('q') || '');
-	const typeFilter = $derived(page.url.searchParams.get('type')?.split(',').filter(Boolean) || []);
 
 	const filteredCAs = $derived(
 		(caData.data || []).filter((c) => {
@@ -52,32 +50,15 @@
 				!c.description?.toLowerCase().includes(search.toLowerCase())
 			)
 				return false;
-			if (typeFilter.length > 0) {
-				const typeName = AuthorityType[c.authorityType];
-				if (!typeFilter.includes(typeName)) return false;
-			}
 			return true;
 		})
 	);
-
-	const authorityTypeOptions = [
-		{ label: 'SSH', value: 'SSH', icon: KeyRound },
-		{ label: 'X.509', value: 'X509', icon: Shield }
-	];
 
 	const columnHelper = createAppColumnHelper<CertificateAuthority>();
 	const columns = columnHelper.columns([
 		columnHelper.accessor('name', {
 			header: 'Name',
 			cell: ({ row }) => renderComponent(CANameCell, { ca: row.original })
-		}),
-		columnHelper.accessor('authorityType', {
-			header: 'Type',
-			cell: ({ row }) =>
-				renderComponent(BadgeCell, {
-					value: enumLabel(AuthorityType[row.original.authorityType]).toUpperCase(),
-					variant: row.original.authorityType === AuthorityType.SSH ? 'default' : 'secondary'
-				})
 		}),
 		columnHelper.accessor('isActive', {
 			header: 'Status',
@@ -109,19 +90,14 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				const item = row.original;
-				const ssh = item.authorityType === AuthorityType.SSH;
 				return renderComponent(ActionCell, {
-					// Everyone signs their own SSH key, X.509 leaves are for editors.
-					inlineActions:
-						ssh || can.edit
-							? [
-									{
-										label: 'Sign',
-										icon: ssh ? KeyRound : Shield,
-										onClick: () => signModal.openWith({ ...item })
-									}
-								]
-							: [],
+					inlineActions: [
+						{
+							label: 'Sign',
+							icon: KeyRound,
+							onClick: () => signModal.openWith({ ...item })
+						}
+					],
 					menuActions: !can.edit
 						? []
 						: [
@@ -198,17 +174,6 @@
 	}}
 >
 	{#snippet toolbar(table)}
-		<TableToolbar
-			search
-			searchResultCount={filteredCAs.length}
-			{table}
-			filters={[
-				{
-					title: 'Type',
-					options: authorityTypeOptions,
-					param: 'type'
-				}
-			]}
-		/>
+		<TableToolbar search searchResultCount={filteredCAs.length} {table} />
 	{/snippet}
 </DataTable>

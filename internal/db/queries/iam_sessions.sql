@@ -16,9 +16,9 @@ INSERT INTO
 VALUES
   (
     @token_hash,
-    @subject_id::TEXT,
+    @subject_id::UUID,
     CASE
-      WHEN @kind::TEXT <> 'daemon' THEN (@subject_id::TEXT)::UUID
+      WHEN @kind::TEXT <> 'daemon' THEN @subject_id::UUID
     END,
     @kind::TEXT,
     @method,
@@ -69,11 +69,11 @@ WITH
   forgotten AS (
     DELETE FROM known_devices
     WHERE
-      user_id::TEXT = @subject_id::TEXT
+      user_id = @subject_id::UUID
   )
 DELETE FROM sessions
 WHERE
-  subject_id = @subject_id::TEXT;
+  subject_id = @subject_id::UUID;
 
 -- name: DeleteSessionsExcept :execrows
 DELETE FROM sessions

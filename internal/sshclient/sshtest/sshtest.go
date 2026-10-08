@@ -115,13 +115,13 @@ func (s *Server) Addr() string { return s.listener.Addr().String() }
 func (s *Server) CAKey() ssh.PublicKey { return s.ca.PublicKey() }
 
 // CA returns a row so callers exercise the real cert-minting path.
-func (s *Server) CA(t testing.TB) *db.CertificateAuthority {
+func (s *Server) CA(t testing.TB) *db.SSHCA {
 	t.Helper()
 	return caRow(t, s.caPriv)
 }
 
 // NewCA generates a CA row no server trusts, for handshake-failure tests.
-func NewCA(t testing.TB) *db.CertificateAuthority {
+func NewCA(t testing.TB) *db.SSHCA {
 	t.Helper()
 	_, priv, err := ed25519.GenerateKey(crand.Reader)
 	if err != nil {
@@ -130,7 +130,7 @@ func NewCA(t testing.TB) *db.CertificateAuthority {
 	return caRow(t, priv)
 }
 
-func caRow(t testing.TB, priv ed25519.PrivateKey) *db.CertificateAuthority {
+func caRow(t testing.TB, priv ed25519.PrivateKey) *db.SSHCA {
 	t.Helper()
 	privPEM, err := ssh.MarshalPrivateKey(priv, "")
 	if err != nil {
@@ -140,7 +140,7 @@ func caRow(t testing.TB, priv ed25519.PrivateKey) *db.CertificateAuthority {
 	if err != nil {
 		t.Fatalf("CA signer: %v", err)
 	}
-	return &db.CertificateAuthority{
+	return &db.SSHCA{
 		PrivateKey:     crypto.EncryptedBytes(pem.EncodeToMemory(privPEM)),
 		PublicKey:      nokkussh.MarshalKey(signer.PublicKey()),
 		UserDefaultTtl: time.Hour,

@@ -27,10 +27,11 @@ func (s *recordingService) ListRecordings(
 	req *nokkuv1.ListRecordingsRequest,
 ) (*nokkuv1.ListRecordingsResponse, error) {
 	params := &db.ListRecordingsParams{
-		DaemonID: req.DaemonId,
-		Username: req.Username,
-		Limit:    req.Limit,
-		Offset:   req.Offset,
+		DaemonID:  req.DaemonId,
+		Username:  req.Username,
+		SubjectID: req.SubjectId,
+		Limit:     req.Limit,
+		Offset:    req.Offset,
 	}
 
 	var rows []*db.ListRecordingsRow
@@ -76,6 +77,7 @@ func (s *recordingService) GetRecording(
 			Meta: &nokkuv1.RecordingMeta{
 				RecordingId: &rec.ID,
 				Username:    &rec.Username,
+				Principal:   &rec.Principal,
 			},
 		},
 	}); err != nil {

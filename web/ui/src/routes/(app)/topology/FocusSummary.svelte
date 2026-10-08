@@ -5,7 +5,7 @@
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import type { GetAccessGraphResponse } from '#lib/gen/nokku/v1/target_pb.js';
 	import { useSheet } from '#lib/hooks/index.js';
 	import { tagLabel, type Focus } from './graph.js';
@@ -85,7 +85,7 @@
 
 	const listHref = $derived(
 		focus.kind === 'account'
-			? `/infrastructure/targets?principals=${encodeURIComponent(focus.id)}`
+			? `/infrastructure/targets?accounts=${encodeURIComponent(focus.id)}`
 			: focus.kind === 'tag' && focus.id
 				? `/infrastructure/targets?tags=${encodeURIComponent(focus.id)}`
 				: undefined

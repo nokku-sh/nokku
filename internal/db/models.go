@@ -26,37 +26,6 @@ type AuditAuditLog struct {
 	Details     []byte    `json:"details"`
 }
 
-type CertificateAuthority struct {
-	ID                   string                     `json:"id"`
-	WorkspaceID          string                     `json:"workspaceId"`
-	Name                 string                     `json:"name"`
-	Description          *string                    `json:"description"`
-	Certificate          string                     `json:"certificate"`
-	PrivateKey           crypto.EncryptedBytes      `json:"privateKey"`
-	PublicKey            string                     `json:"publicKey"`
-	PreviousPublicKey    *string                    `json:"previousPublicKey"`
-	PreviousTrustedUntil *time.Time                 `json:"previousTrustedUntil"`
-	SerialNumber         string                     `json:"serialNumber"`
-	Subject              string                     `json:"subject"`
-	NotBefore            time.Time                  `json:"notBefore"`
-	NotAfter             time.Time                  `json:"notAfter"`
-	IsActive             bool                       `json:"isActive"`
-	IsDefault            bool                       `json:"isDefault"`
-	KeyType              nokku.CertificateKeyType   `json:"keyType"`
-	AuthorityType        nokku.AuthorityType        `json:"authorityType"`
-	KeyBits              int32                      `json:"keyBits"`
-	Lifetime             time.Duration              `json:"lifetime"`
-	UserDefaultTtl       time.Duration              `json:"userDefaultTtl"`
-	UserMaxTtl           time.Duration              `json:"userMaxTtl"`
-	UserExtensions       []byte                     `json:"userExtensions"`
-	UserCriticalOptions  []byte                     `json:"userCriticalOptions"`
-	HostDefaultTtl       time.Duration              `json:"hostDefaultTtl"`
-	HostMaxTtl           time.Duration              `json:"hostMaxTtl"`
-	AllowedKeyTypes      []nokku.CertificateKeyType `json:"allowedKeyTypes"`
-	CreatedAt            time.Time                  `json:"createdAt"`
-	UpdatedAt            time.Time                  `json:"updatedAt"`
-}
-
 type Credential struct {
 	ID          string     `json:"id"`
 	WorkspaceID string     `json:"workspaceId"`
@@ -82,6 +51,18 @@ type Daemon struct {
 	Metadata      []byte              `json:"metadata"`
 	UpdatedAt     time.Time           `json:"updatedAt"`
 	CreatedAt     time.Time           `json:"createdAt"`
+}
+
+type Grant struct {
+	ID               string    `json:"id"`
+	AccountID        string    `json:"accountId"`
+	WorkspaceID      string    `json:"workspaceId"`
+	UserID           *string   `json:"userId"`
+	TeamID           *string   `json:"teamId"`
+	ServiceAccountID *string   `json:"serviceAccountId"`
+	SubjectKind      *string   `json:"subjectKind"`
+	SubjectID        *string   `json:"subjectId"`
+	CreatedAt        time.Time `json:"createdAt"`
 }
 
 type InstanceLicense struct {
@@ -120,38 +101,47 @@ type OneTimeToken struct {
 	CreatedAt   time.Time          `json:"createdAt"`
 }
 
-type Principal struct {
-	ID          string    `json:"id"`
-	WorkspaceID string    `json:"workspaceId"`
-	TargetID    string    `json:"targetId"`
-	Username    string    `json:"username"`
-	CreatedAt   time.Time `json:"createdAt"`
-}
-
-type PrincipalGrant struct {
-	ID               string    `json:"id"`
-	PrincipalID      string    `json:"principalId"`
-	WorkspaceID      string    `json:"workspaceId"`
-	UserID           *string   `json:"userId"`
-	TeamID           *string   `json:"teamId"`
-	ServiceAccountID *string   `json:"serviceAccountId"`
-	SubjectKind      *string   `json:"subjectKind"`
-	SubjectID        *string   `json:"subjectId"`
-	CreatedAt        time.Time `json:"createdAt"`
-}
-
 type Recording struct {
 	ID          string                `json:"id"`
 	WorkspaceID string                `json:"workspaceId"`
 	DaemonID    *string               `json:"daemonId"`
 	DaemonName  string                `json:"daemonName"`
 	Username    string                `json:"username"`
+	SubjectID   *string               `json:"subjectId"`
+	Principal   string                `json:"principal"`
 	Key         crypto.EncryptedBytes `json:"key"`
 	StartedAt   time.Time             `json:"startedAt"`
 	EndedAt     *time.Time            `json:"endedAt"`
 	SizeBytes   int64                 `json:"sizeBytes"`
 	Complete    bool                  `json:"complete"`
 	CreatedAt   time.Time             `json:"createdAt"`
+}
+
+type SSHCA struct {
+	ID                   string                     `json:"id"`
+	WorkspaceID          string                     `json:"workspaceId"`
+	Name                 string                     `json:"name"`
+	Description          *string                    `json:"description"`
+	PrivateKey           crypto.EncryptedBytes      `json:"privateKey"`
+	PublicKey            string                     `json:"publicKey"`
+	PreviousPublicKey    *string                    `json:"previousPublicKey"`
+	PreviousTrustedUntil *time.Time                 `json:"previousTrustedUntil"`
+	NotBefore            time.Time                  `json:"notBefore"`
+	NotAfter             time.Time                  `json:"notAfter"`
+	IsActive             bool                       `json:"isActive"`
+	IsDefault            bool                       `json:"isDefault"`
+	KeyType              nokku.CertificateKeyType   `json:"keyType"`
+	KeyBits              int32                      `json:"keyBits"`
+	Lifetime             time.Duration              `json:"lifetime"`
+	UserDefaultTtl       time.Duration              `json:"userDefaultTtl"`
+	UserMaxTtl           time.Duration              `json:"userMaxTtl"`
+	UserExtensions       []byte                     `json:"userExtensions"`
+	UserCriticalOptions  []byte                     `json:"userCriticalOptions"`
+	HostDefaultTtl       time.Duration              `json:"hostDefaultTtl"`
+	HostMaxTtl           time.Duration              `json:"hostMaxTtl"`
+	AllowedKeyTypes      []nokku.CertificateKeyType `json:"allowedKeyTypes"`
+	CreatedAt            time.Time                  `json:"createdAt"`
+	UpdatedAt            time.Time                  `json:"updatedAt"`
 }
 
 type ScimToken struct {
@@ -216,6 +206,14 @@ type Target struct {
 	Metadata      []byte    `json:"metadata"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
+}
+
+type TargetAccount struct {
+	ID          string    `json:"id"`
+	WorkspaceID string    `json:"workspaceId"`
+	TargetID    string    `json:"targetId"`
+	Username    string    `json:"username"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 type Team struct {

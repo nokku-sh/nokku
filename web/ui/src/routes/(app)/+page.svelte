@@ -37,10 +37,12 @@
 	title={`${greeting}${first ? `, ${first}` : ''}`}
 	description={ws.data ? `Here is how ${ws.data.name} is doing` : undefined}
 >
-	<Button href="/sessions">
-		<SquareTerminal data-icon="inline-start" />
-		Open a shell
-	</Button>
+	{#if canView}
+		<Button href="/sessions">
+			<SquareTerminal data-icon="inline-start" />
+			Open a shell
+		</Button>
+	{/if}
 </PageHeader>
 
 {#if canView}

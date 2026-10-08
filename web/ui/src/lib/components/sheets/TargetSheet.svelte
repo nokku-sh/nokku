@@ -18,7 +18,6 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
-	import { AuthorityType } from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
@@ -52,9 +51,8 @@
 
 	const daemonQuery = daemonApi.get(() => entity?.daemonId);
 	const linkedDaemon = $derived(daemonQuery.data?.daemon);
-	// A server only takes an SSH CA, and each kind has its own default.
 	const cas = ca.list();
-	const sshCAs = $derived((cas.data ?? []).filter((c) => c.authorityType === AuthorityType.SSH));
+	const caList = $derived(cas.data ?? []);
 	const tagFilters = targetApi.filters();
 
 	const update = targetApi.update();
@@ -66,7 +64,7 @@
 
 	const isManual = $derived(!entity?.daemonId);
 	const online = $derived(!!linkedDaemon?.online);
-	const accounts = $derived(entity?.principals ?? []);
+	const accounts = $derived(entity?.accounts ?? []);
 	const withAccess = $derived(new Set(accounts.flatMap((p) => grantsOf(p).map((g) => g.id))).size);
 	const lastSyncAt = $derived.by(() => {
 		const at = new Date(entity?.metadata?.['last_manual_sync'] ?? '');
@@ -77,7 +75,7 @@
 	);
 	// The server only learns a new CA key from nk sync.
 	const caRotated = $derived.by(() => {
-		const rotatedAt = (sshCAs.find((c) => c.id === entity?.caId) ?? sshCAs.find((c) => c.isDefault))
+		const rotatedAt = (caList.find((c) => c.id === entity?.caId) ?? caList.find((c) => c.isDefault))
 			?.notBefore;
 		return !!lastSyncAt && !!rotatedAt && timestampDate(rotatedAt) > lastSyncAt;
 	});
@@ -356,11 +354,11 @@
 								}}
 							>
 								<Select.Trigger id="target-ca" class="w-full">
-									{sshCAs.find((c) => c.id === model.caId)?.name ?? 'Default CA'}
+									{caList.find((c) => c.id === model.caId)?.name ?? 'Default CA'}
 								</Select.Trigger>
 								<Select.Content>
 									<Select.Group>
-										{#each sshCAs as c (c.id)}
+										{#each caList as c (c.id)}
 											<Select.Item value={c.id}>{c.name}</Select.Item>
 										{/each}
 									</Select.Group>

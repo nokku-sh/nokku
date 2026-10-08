@@ -29,7 +29,7 @@ type Synced struct {
 	Version     int64
 	Status      *nokkuv1.DaemonStatus
 	Config      *nokkuv1.DaemonConfig
-	Principals  []*nokkuv1.PrincipalUsers
+	Principals  []*nokkuv1.AccountPrincipals
 	CAPublicKey string
 	RetiredCAs  []*nokkuv1.RetiredCAKey
 }
@@ -101,15 +101,15 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 
 		// Never deletes, a host that cannot enumerate users must not change
 		// who has access.
-		if err := q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
-			TargetID:      target.ID,
-			Usernames:     validUsers(in.Users),
-			MaxPrincipals: db.MaxTargetPrincipals,
+		if err := q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
+			TargetID:    target.ID,
+			Usernames:   validUsers(in.Users),
+			MaxAccounts: db.MaxTargetAccounts,
 		}); err != nil {
 			return err
 		}
 
-		result, err := q.ListPrincipalsForTarget(ctx, target.ID)
+		result, err := q.ListAccountSubjectsForTarget(ctx, target.ID)
 		if err != nil {
 			return err
 		}
@@ -119,7 +119,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			for _, id := range p.Ids {
 				principals = append(principals, nokkussh.LoginPrincipal(id, target.ID, p.Username))
 			}
-			res.Principals = append(res.Principals, &nokkuv1.PrincipalUsers{
+			res.Principals = append(res.Principals, &nokkuv1.AccountPrincipals{
 				Username:       &p.Username,
 				CertPrincipals: principals,
 			})

@@ -33,12 +33,12 @@ func (s *targetService) GetTarget(
 		if err != nil {
 			return err
 		}
-		principals, err := principalsByTarget(ctx, q, []string{row.ID})
+		accounts, err := accountsByTarget(ctx, q, []string{row.ID})
 		if err != nil {
 			return err
 		}
 		target = row.ToProto()
-		target.Principals = principals[row.ID]
+		target.Accounts = accounts[row.ID]
 		return nil
 	}); err != nil {
 		return nil, err
@@ -47,22 +47,22 @@ func (s *targetService) GetTarget(
 	return &nokkuv1.GetTargetResponse{Target: target}, nil
 }
 
-// principalsByTarget groups the login accounts of the targets, each with its grants.
-func principalsByTarget(
+// accountsByTarget groups the login accounts of the targets, each with its grants.
+func accountsByTarget(
 	ctx context.Context,
 	q *db.Queries,
 	targetIDs []string,
-) (map[string][]*nokkuv1.Principal, error) {
-	rows, err := q.GetPrincipalsByTargetIDs(ctx, targetIDs)
+) (map[string][]*nokkuv1.TargetAccount, error) {
+	rows, err := q.GetTargetAccountsByTargetIDs(ctx, targetIDs)
 	if err != nil {
 		return nil, err
 	}
-	principals := make(map[string][]*nokkuv1.Principal)
+	accounts := make(map[string][]*nokkuv1.TargetAccount)
 	for _, p := range rows {
-		targetID := p.Principal.TargetID
-		principals[targetID] = append(principals[targetID], p.ToProto())
+		targetID := p.TargetAccount.TargetID
+		accounts[targetID] = append(accounts[targetID], p.ToProto())
 	}
-	return principals, nil
+	return accounts, nil
 }
 
 func (s *targetService) CreateTarget(
@@ -106,9 +106,6 @@ func (s *targetService) insertTarget(
 ) (*nokkuv1.CreateTargetResponse, error) {
 	var result *db.Target
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if err = requireSSHCA(ctx, q, req.GetCaId()); err != nil {
-			return err
-		}
 		result, err = q.CreateTarget(ctx, &db.CreateTargetParams{
 			Name:          name,
 			Description:   req.Description,
@@ -121,10 +118,10 @@ func (s *targetService) insertTarget(
 			return err
 		}
 
-		return q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
-			TargetID:      result.ID,
-			Usernames:     []string{"root"},
-			MaxPrincipals: db.MaxTargetPrincipals,
+		return q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
+			TargetID:    result.ID,
+			Usernames:   []string{"root"},
+			MaxAccounts: db.MaxTargetAccounts,
 		})
 	}); err != nil {
 		return nil, err
@@ -141,23 +138,17 @@ func (s *targetService) UpdateTarget(
 	if err := validateHostPublicKey(req.GetHostPublicKey()); err != nil {
 		return nil, err
 	}
-	var result *db.Target
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if err = requireSSHCA(ctx, q, req.GetCaId()); err != nil {
-			return err
-		}
-		result, err = q.UpdateTarget(ctx, &db.UpdateTargetParams{
-			TargetID:    req.GetId(),
-			Name:        req.Name,
-			Description: req.Description,
-			// An update replaces both lists. The query keeps the old one for nil.
-			Endpoints:     append([]string{}, req.GetEndpoints()...),
-			CaID:          req.CaId,
-			Tags:          append([]string{}, req.GetTags()...),
-			HostPublicKey: trimmed(req.HostPublicKey),
-		})
-		return err
-	}); err != nil {
+	result, err := s.cfg.Conn.Tenant().UpdateTarget(ctx, &db.UpdateTargetParams{
+		TargetID:    req.GetId(),
+		Name:        req.Name,
+		Description: req.Description,
+		// An update replaces both lists. The query keeps the old one for nil.
+		Endpoints:     append([]string{}, req.GetEndpoints()...),
+		CaID:          req.CaId,
+		Tags:          append([]string{}, req.GetTags()...),
+		HostPublicKey: trimmed(req.HostPublicKey),
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -184,13 +175,13 @@ func (s *targetService) ListTargets(
 	var count int32
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		rows, err := q.ListTargets(ctx, &db.ListTargetsParams{
-			Query:      req.Query,
-			DaemonID:   req.DaemonId,
-			CaID:       req.CaId,
-			Principals: req.GetPrincipals(),
-			Tags:       req.GetTags(),
-			Limit:      req.Limit,
-			Offset:     req.Offset,
+			Query:    req.Query,
+			DaemonID: req.DaemonId,
+			CaID:     req.CaId,
+			Accounts: req.GetAccounts(),
+			Tags:     req.GetTags(),
+			Limit:    req.Limit,
+			Offset:   req.Offset,
 		})
 		if err != nil || len(rows) == 0 {
 			return err
@@ -201,14 +192,14 @@ func (s *targetService) ListTargets(
 		for _, r := range rows {
 			targetIDs = append(targetIDs, r.Target.ID)
 		}
-		principals, err := principalsByTarget(ctx, q, targetIDs)
+		accounts, err := accountsByTarget(ctx, q, targetIDs)
 		if err != nil {
 			return err
 		}
 		targets = make([]*nokkuv1.Target, 0, len(rows))
 		for _, r := range rows {
 			target := r.Target.ToProto()
-			target.Principals = principals[r.Target.ID]
+			target.Accounts = accounts[r.Target.ID]
 			targets = append(targets, target)
 		}
 		return nil
@@ -227,19 +218,19 @@ func (s *targetService) GetTargetPrincipals(
 	ctx context.Context,
 	req *nokkuv1.GetTargetPrincipalsRequest,
 ) (*nokkuv1.GetTargetPrincipalsResponse, error) {
-	rows, err := s.cfg.Conn.Tenant().ListPrincipalsForTarget(ctx, req.GetTargetId())
+	rows, err := s.cfg.Conn.Tenant().ListAccountSubjectsForTarget(ctx, req.GetTargetId())
 	if err != nil {
 		return nil, err
 	}
 
 	// sshd compares these as they are, see ssh.LoginPrincipal.
-	principals := make([]*nokkuv1.PrincipalUsers, 0, len(rows))
+	principals := make([]*nokkuv1.AccountPrincipals, 0, len(rows))
 	for _, r := range rows {
 		certPrincipals := make([]string, 0, len(r.Ids))
 		for _, id := range r.Ids {
 			certPrincipals = append(certPrincipals, ssh.LoginPrincipal(id, req.GetTargetId(), r.Username))
 		}
-		principals = append(principals, &nokkuv1.PrincipalUsers{
+		principals = append(principals, &nokkuv1.AccountPrincipals{
 			Username:       &r.Username,
 			CertPrincipals: certPrincipals,
 		})
@@ -258,10 +249,10 @@ func (s *targetService) SyncTargetUsers(
 	}
 
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		if err := q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
-			TargetID:      req.GetTargetId(),
-			Usernames:     req.GetUsernames(),
-			MaxPrincipals: db.MaxTargetPrincipals,
+		if err := q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
+			TargetID:    req.GetTargetId(),
+			Usernames:   req.GetUsernames(),
+			MaxAccounts: db.MaxTargetAccounts,
 		}); err != nil {
 			return err
 		}
@@ -340,9 +331,9 @@ func (s *targetService) GetSubjectAccess(
 			usernamesByTarget[u.TargetID] = append(usernamesByTarget[u.TargetID], u.Username)
 		}
 
-		var principals map[string][]*nokkuv1.Principal
+		var accounts map[string][]*nokkuv1.TargetAccount
 		if canView {
-			if principals, err = principalsByTarget(ctx, q, targetIDs); err != nil {
+			if accounts, err = accountsByTarget(ctx, q, targetIDs); err != nil {
 				return err
 			}
 		}
@@ -350,7 +341,7 @@ func (s *targetService) GetSubjectAccess(
 		for _, r := range rows {
 			target := r.ToProto()
 			target.Usernames = usernamesByTarget[r.ID]
-			target.Principals = principals[r.ID]
+			target.Accounts = accounts[r.ID]
 			targets = append(targets, target)
 		}
 
@@ -467,10 +458,7 @@ func (s *targetService) GetMyAccess(
 			return err
 		}
 		for _, ca := range caRows {
-			// X.509 CAs must not leak into SSH trust stores.
-			if ca.AuthorityType == nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH {
-				resp.CertificateAuthorities = append(resp.CertificateAuthorities, ca.ToProto())
-			}
+			resp.CertificateAuthorities = append(resp.CertificateAuthorities, ca.ToProto())
 		}
 		return nil
 	})
@@ -485,7 +473,7 @@ func (s *targetService) GetTargetFilters(
 	_ *nokkuv1.GetTargetFiltersRequest,
 ) (*nokkuv1.GetTargetFiltersResponse, error) {
 	var tags []string
-	var principals []string
+	var accounts []string
 
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		tags, err = q.GetWorkspaceTags(ctx)
@@ -493,15 +481,15 @@ func (s *targetService) GetTargetFilters(
 			return err
 		}
 
-		principals, err = q.GetWorkspacePrincipals(ctx)
+		accounts, err = q.GetWorkspaceAccounts(ctx)
 		return err
 	}); err != nil {
 		return nil, err
 	}
 
 	return &nokkuv1.GetTargetFiltersResponse{
-		Tags:       tags,
-		Principals: principals,
+		Tags:     tags,
+		Accounts: accounts,
 	}, nil
 }
 

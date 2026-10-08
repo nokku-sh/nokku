@@ -7,6 +7,7 @@
 	import AppSidebar from '#lib/components/layout/AppSidebar.svelte';
 	import CommandPalette from '#lib/components/layout/CommandPalette.svelte';
 	import ConnectionBanner from '#lib/components/layout/ConnectionBanner.svelte';
+	import { canVisit } from '#lib/components/layout/routes.js';
 	import LicenseBanner from '#lib/components/layout/LicenseBanner.svelte';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
@@ -71,6 +72,14 @@
 
 	// These lay out their own full-width canvas.
 	const fullBleed = $derived(page.url.pathname === '/sessions');
+
+	// The nav hides what the role cannot use, this covers a typed address.
+	// The backend refuses the calls either way.
+	$effect(() => {
+		if (me.data && !canVisit(page.url.pathname, me.data.role)) {
+			void goto('/', { replace: true });
+		}
+	});
 
 	$effect(() => {
 		if (page.url.pathname !== '/') return;

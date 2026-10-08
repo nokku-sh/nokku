@@ -35,11 +35,11 @@ export const areas: Area[] = [
 		label: 'Access',
 		icon: ShieldCheck,
 		actions: [
-			'AddSubjectsToPrincipal',
-			'RemoveSubjectsFromPrincipal',
+			'AddSubjects',
+			'RemoveSubjects',
 			'RevokeAllAccess',
-			'AddPrincipal',
-			'RemovePrincipal'
+			'AddTargetAccount',
+			'RemoveTargetAccount'
 		]
 	},
 	{
@@ -91,8 +91,7 @@ export const areas: Area[] = [
 			'UpdateCertificateAuthority',
 			'DeleteCertificateAuthority',
 			'RolloverCertificateAuthority',
-			'SignSSHCertificate',
-			'SignX509Certificate'
+			'SignSSHCertificate'
 		]
 	},
 	{
@@ -182,11 +181,11 @@ const labels: Record<string, string> = {
 	RelayClose: 'Relay closed',
 	GetRecording: 'Played a recording',
 	RecordingScrubFailed: 'Recording scrub failed',
-	AddSubjectsToPrincipal: 'Granted access',
-	RemoveSubjectsFromPrincipal: 'Revoked access',
+	AddSubjects: 'Granted access',
+	RemoveSubjects: 'Revoked access',
 	RevokeAllAccess: 'Revoked all access',
-	AddPrincipal: 'Added login account',
-	RemovePrincipal: 'Removed login account'
+	AddTargetAccount: 'Added login account',
+	RemoveTargetAccount: 'Removed login account'
 };
 
 /** "DeleteTarget" reads as "Delete target". */

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { principal as principalApi } from '#lib/api/principals.svelte.js';
+	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
 	import { team as teamApi } from '#lib/api/team.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { users } from '#lib/api/workspaces.svelte.js';
@@ -14,7 +14,7 @@
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import SearchPopover from '#lib/components/blocks/SearchPopover.svelte';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
-	import { SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { TeamSchema } from '#lib/gen/nokku/v1/team_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { Check, FileText, Info, Settings2, ShieldCheck, UserPlus, Users } from '@lucide/svelte';
@@ -49,7 +49,7 @@
 	const remove = teamApi.delete();
 	const addMember = teamApi.addMember();
 	const removeMember = teamApi.removeMember();
-	const revokeAll = principalApi.revokeSubject();
+	const revokeAll = accountApi.revokeSubject();
 
 	const autoSave = useAutoSave(() => update.mutateAsync({ ...model }));
 	const save = () => autoSave.save();

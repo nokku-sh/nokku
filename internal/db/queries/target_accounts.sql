@@ -1,6 +1,6 @@
--- name: CreatePrincipal :one
+-- name: CreateTargetAccount :one
 INSERT INTO
-  principals (target_id, username)
+  target_accounts (target_id, username)
 SELECT
   @target_id,
   @username
@@ -10,14 +10,14 @@ SET
 RETURNING
   *;
 
--- name: ListPrincipals :many
+-- name: ListTargetAccounts :many
 WITH
   filtered AS (
     SELECT
       p.id,
       p.username
     FROM
-      principals p
+      target_accounts p
     WHERE
       p.target_id = @target_id
       AND (
@@ -25,7 +25,7 @@ WITH
         OR p.username ILIKE '%' || sqlc.narg('query') || '%'
       )
   ),
-  paginated_principals AS (
+  paginated AS (
     SELECT
       id
     FROM
@@ -56,20 +56,20 @@ SELECT
   FROM
     filtered) AS total_count
 FROM
-  principals p
-  JOIN paginated_principals pp ON pp.id = p.id
-  LEFT JOIN principal_grants g ON g.principal_id = p.id
+  target_accounts p
+  JOIN paginated pp ON pp.id = p.id
+  LEFT JOIN grants g ON g.account_id = p.id
 GROUP BY
   p.id
 ORDER BY
   p.username ASC;
 
--- name: InsertTargetPrincipals :exec
+-- name: InsertTargetAccounts :exec
 -- Never deletes, a host's reported list is a hint, not authority. A target
--- that already holds max_principals takes no more, so a host cannot grow the
+-- that already holds max_accounts takes no more, so a host cannot grow the
 -- table without bound.
 INSERT INTO
-  principals (workspace_id, target_id, username)
+  target_accounts (workspace_id, target_id, username)
 SELECT
   t.workspace_id,
   t.id,
@@ -83,32 +83,32 @@ WHERE
     SELECT
       COUNT(*)
     FROM
-      principals p
+      target_accounts p
     WHERE
       p.target_id = t.id
-  ) < @max_principals::INTEGER
+  ) < @max_accounts::INTEGER
 ON CONFLICT (target_id, username) DO NOTHING;
 
--- name: GetPrincipalWorkspace :one
+-- name: GetTargetAccountWorkspace :one
 SELECT
   t.workspace_id
 FROM
-  principals p
+  target_accounts p
   JOIN targets t ON t.id = p.target_id
 WHERE
-  p.id = @principal_id;
+  p.id = @account_id;
 
--- name: AddPrincipalGrant :exec
+-- name: AddGrant :exec
 INSERT INTO
-  principal_grants (
-    principal_id,
+  grants (
+    account_id,
     user_id,
     team_id,
     service_account_id
   )
 VALUES
   (
-    @principal_id,
+    @account_id,
     CASE
       WHEN @subject_kind::TEXT = 'user' THEN @subject_id::UUID
     END,
@@ -121,20 +121,20 @@ VALUES
   )
 ON CONFLICT DO NOTHING;
 
--- name: RemovePrincipalGrant :exec
-DELETE FROM principal_grants
+-- name: RemoveGrant :exec
+DELETE FROM grants
 WHERE
-  principal_id = @principal_id
+  account_id = @account_id
   AND subject_kind = @subject_kind::TEXT
   AND subject_id = @subject_id::UUID;
 
 -- name: RevokeSubjectAccessInWorkspace :exec
-DELETE FROM principal_grants
+DELETE FROM grants
 WHERE
   subject_kind = @subject_kind::TEXT
   AND subject_id = @subject_id::UUID;
 
--- name: GetPrincipalsByTargetIDs :many
+-- name: GetTargetAccountsByTargetIDs :many
 SELECT
   sqlc.embed(p),
   COALESCE(
@@ -150,8 +150,8 @@ SELECT
     '{}'
   )::UUID[] AS service_account_ids
 FROM
-  principals p
-  LEFT JOIN principal_grants g ON g.principal_id = p.id
+  target_accounts p
+  LEFT JOIN grants g ON g.account_id = p.id
 WHERE
   p.target_id = ANY (@target_ids::UUID[])
 GROUP BY
@@ -165,16 +165,16 @@ SELECT DISTINCT
   p.target_id,
   p.username
 FROM
-  principals p
+  target_accounts p
 WHERE
   p.target_id = ANY (@target_ids::UUID[])
   AND EXISTS (
     SELECT
       1
     FROM
-      principal_grants g
+      grants g
     WHERE
-      g.principal_id = p.id
+      g.account_id = p.id
       AND (
         g.subject_id = @subject_id
         OR (
@@ -194,42 +194,42 @@ ORDER BY
   p.target_id,
   p.username;
 
--- name: ListPrincipalsForTarget :many
+-- name: ListAccountSubjectsForTarget :many
 -- Teams are expanded so the host needs no team knowledge. Users are joined,
 -- not filtered, so an account that is inactive or not visible drops out.
 SELECT
   p.username,
   array_agg(DISTINCT ids)::TEXT[] AS ids
 FROM
-  principals p
+  target_accounts p
   CROSS JOIN LATERAL (
     SELECT
       g.subject_id AS ids
     FROM
-      principal_grants g
+      grants g
     WHERE
-      g.principal_id = p.id
+      g.account_id = p.id
       AND g.subject_kind = 'service_account'
     UNION
     SELECT
       u.id
     FROM
-      principal_grants g
+      grants g
       JOIN users u ON u.id = g.subject_id
       AND u.active
     WHERE
-      g.principal_id = p.id
+      g.account_id = p.id
       AND g.subject_kind = 'user'
     UNION
     SELECT
       u.id
     FROM
-      principal_grants g
+      grants g
       JOIN team_members tm ON tm.team_id = g.subject_id
       JOIN users u ON u.id = tm.user_id
       AND u.active
     WHERE
-      g.principal_id = p.id
+      g.account_id = p.id
       AND g.subject_kind = 'team'
   ) AS combined (ids)
 WHERE
@@ -239,7 +239,7 @@ GROUP BY
 ORDER BY
   p.username;
 
--- name: DeletePrincipal :exec
-DELETE FROM principals
+-- name: DeleteTargetAccount :exec
+DELETE FROM target_accounts
 WHERE
   id = @id;

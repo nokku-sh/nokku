@@ -140,16 +140,16 @@ WHERE
     SELECT
       1
     FROM
-      principals p
+      target_accounts p
     WHERE
       p.target_id = t.id
       AND EXISTS (
         SELECT
           1
         FROM
-          principal_grants g
+          grants g
         WHERE
-          g.principal_id = p.id
+          g.account_id = p.id
           AND (
             -- Subject UUIDs are unique across kinds.
             g.subject_id = $1::UUID
@@ -203,17 +203,17 @@ func (q *Queries) GetTargetsBySubject(ctx context.Context, subjectID string) ([]
 	return items, nil
 }
 
-const getWorkspacePrincipals = `-- name: GetWorkspacePrincipals :many
+const getWorkspaceAccounts = `-- name: GetWorkspaceAccounts :many
 SELECT DISTINCT
   username
 FROM
-  principals
+  target_accounts
 ORDER BY
   username ASC
 `
 
-func (q *Queries) GetWorkspacePrincipals(ctx context.Context) ([]string, error) {
-	rows, err := q.db.Query(ctx, getWorkspacePrincipals)
+func (q *Queries) GetWorkspaceAccounts(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, getWorkspaceAccounts)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +287,7 @@ WHERE
       SELECT
         1
       FROM
-        principals p
+        target_accounts p
       WHERE
         p.target_id = t.id
         AND p.username = ANY ($4::TEXT[])
@@ -306,13 +306,13 @@ OFFSET
 `
 
 type ListTargetsParams struct {
-	Query      *string  `json:"query"`
-	DaemonID   *string  `json:"daemonId"`
-	CaID       *string  `json:"caId"`
-	Principals []string `json:"principals"`
-	Tags       []string `json:"tags"`
-	Offset     *int32   `json:"offset"`
-	Limit      *int32   `json:"limit"`
+	Query    *string  `json:"query"`
+	DaemonID *string  `json:"daemonId"`
+	CaID     *string  `json:"caId"`
+	Accounts []string `json:"accounts"`
+	Tags     []string `json:"tags"`
+	Offset   *int32   `json:"offset"`
+	Limit    *int32   `json:"limit"`
 }
 
 type ListTargetsRow struct {
@@ -325,7 +325,7 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*L
 		arg.Query,
 		arg.DaemonID,
 		arg.CaID,
-		arg.Principals,
+		arg.Accounts,
 		arg.Tags,
 		arg.Offset,
 		arg.Limit,
@@ -444,10 +444,9 @@ SET
       SELECT
         id
       FROM
-        certificate_authorities
+        ssh_cas
       WHERE
         workspace_id = targets.workspace_id
-        AND authority_type = 1
         AND is_default = TRUE
       LIMIT
         1
@@ -464,7 +463,7 @@ type UpdateTargetCAParams struct {
 	DaemonID *string `json:"daemonId"`
 }
 
-// A workspace has a default per authority type, a target takes the SSH one (1).
+// No id means the workspace default.
 func (q *Queries) UpdateTargetCA(ctx context.Context, arg *UpdateTargetCAParams) (*Target, error) {
 	row := q.db.QueryRow(ctx, updateTargetCA, arg.CaID, arg.DaemonID)
 	var i Target

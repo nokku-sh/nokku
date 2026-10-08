@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { principal as principalApi } from '#lib/api/principals.svelte.js';
+	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
 	import { serviceAccount as saApi } from '#lib/api/service_account.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import RolePicker from '#lib/components/access/RolePicker.svelte';
@@ -14,7 +14,7 @@
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
-	import { SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { ServiceAccountSchema } from '#lib/gen/nokku/v1/service_account_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs, toDate } from '#lib/utils.js';
@@ -40,7 +40,7 @@
 
 	const update = saApi.update();
 	const remove = saApi.delete();
-	const revokeAll = principalApi.revokeSubject();
+	const revokeAll = accountApi.revokeSubject();
 
 	const autoSave = useAutoSave(() => update.mutateAsync({ ...model }));
 	const save = () => autoSave.save();

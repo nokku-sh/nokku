@@ -275,7 +275,7 @@ collect:
 // not mint web-session certificates, whatever the rest of the config says.
 func TestPool_StartSession_RejectsInactiveCA(t *testing.T) {
 	p := newTestPool(t)
-	cases := map[string]*db.CertificateAuthority{
+	cases := map[string]*db.SSHCA{
 		"missing":  nil,
 		"inactive": {},
 	}

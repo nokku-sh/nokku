@@ -18,7 +18,6 @@
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
-	import { AuthorityType } from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { TokenKind, type Token } from '#lib/gen/nokku/v1/token_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
 	import { roleLabel } from '#lib/roles.js';
@@ -77,8 +76,8 @@
 	const tokens = tokenApi.list(() => kind);
 	// Enrolled daemons create a target, which only an SSH CA can sign for.
 	const cas = ca.list();
-	const sshCAs = $derived((cas.data ?? []).filter((c) => c.authorityType === AuthorityType.SSH));
-	const caName = (id: string) => sshCAs.find((c) => c.id === id)?.name;
+	const caList = $derived(cas.data ?? []);
+	const caName = (id: string) => caList.find((c) => c.id === id)?.name;
 	const createToken = tokenApi.create();
 	const removeToken = tokenApi.remove();
 
@@ -254,7 +253,7 @@
 								<Select.Content>
 									<Select.Group>
 										<Select.Item value="">Workspace default</Select.Item>
-										{#each sshCAs as c (c.id)}
+										{#each caList as c (c.id)}
 											<Select.Item value={c.id}>{c.name}</Select.Item>
 										{/each}
 									</Select.Group>

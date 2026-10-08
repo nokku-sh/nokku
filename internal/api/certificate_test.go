@@ -10,12 +10,12 @@ import (
 )
 
 func TestServiceAccountTTL(t *testing.T) {
-	long := &db.CertificateAuthority{UserDefaultTtl: 120 * time.Hour, UserMaxTtl: 168 * time.Hour}
-	short := &db.CertificateAuthority{UserDefaultTtl: 10 * time.Minute, UserMaxTtl: 8 * time.Hour}
+	long := &db.SSHCA{UserDefaultTtl: 120 * time.Hour, UserMaxTtl: 168 * time.Hour}
+	short := &db.SSHCA{UserDefaultTtl: 10 * time.Minute, UserMaxTtl: 8 * time.Hour}
 
 	tests := []struct {
 		name string
-		ca   *db.CertificateAuthority
+		ca   *db.SSHCA
 		ttl  time.Duration
 		want time.Duration
 	}{
@@ -33,7 +33,7 @@ func TestServiceAccountTTL(t *testing.T) {
 }
 
 func TestServiceAccountTTLEndsWithTheToken(t *testing.T) {
-	ca := &db.CertificateAuthority{UserDefaultTtl: 120 * time.Hour, UserMaxTtl: 168 * time.Hour}
+	ca := &db.SSHCA{UserDefaultTtl: 120 * time.Hour, UserMaxTtl: 168 * time.Hour}
 
 	got := serviceAccountTTL(ca, 0, new(time.Now().Add(5*time.Minute)))
 	assert.LessOrEqual(t, got, 5*time.Minute, "the certificate outlives the token")

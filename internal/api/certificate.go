@@ -2,11 +2,8 @@ package api
 
 import (
 	"context"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"log/slog"
-	"slices"
 	"strconv"
 	"time"
 
@@ -21,7 +18,7 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/db"
-	"github.com/nokku-sh/nokku/internal/pki"
+
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
@@ -38,26 +35,7 @@ func (s *certificateService) CreateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.CreateCertificateAuthorityRequest,
 ) (*nokkuv1.CreateCertificateAuthorityResponse, error) {
-	authorityType := req.GetAuthorityType()
-	if authorityType == nokkuv1.AuthorityType_AUTHORITY_TYPE_UNSPECIFIED {
-		authorityType = nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH
-	}
-
-	var ca *ssh.CAInfo
-	var err error
-	if authorityType == nokkuv1.AuthorityType_AUTHORITY_TYPE_X509 {
-		ca, err = pki.NewCA(
-			req.GetKeyType(),
-			req.GetKeyBits(),
-			req.GetLifetime().AsDuration(),
-		)
-	} else {
-		ca, err = ssh.NewCA(
-			req.GetKeyType(),
-			req.GetKeyBits(),
-			req.GetLifetime().AsDuration(),
-		)
-	}
+	ca, err := ssh.NewCA(req.GetKeyType(), req.GetKeyBits(), req.GetLifetime().AsDuration())
 	if err != nil {
 		slog.Error("failed to generate CA", "error", err)
 		return nil, errInternal
@@ -75,16 +53,11 @@ func (s *certificateService) CreateCertificateAuthority(
 	params := &db.CreateCAParams{
 		Name:                req.GetName(),
 		Description:         req.Description,
-		IsDefault:           req.GetIsDefault(),
-		Certificate:         string(ca.Certificate),
 		PrivateKey:          ca.PrivateKey,
 		PublicKey:           ca.PublicKey,
-		SerialNumber:        ca.SerialNumber,
-		Subject:             ca.Subject,
 		NotBefore:           ca.NotBefore,
 		NotAfter:            ca.NotAfter,
 		KeyType:             ca.KeyType,
-		AuthorityType:       authorityType,
 		KeyBits:             ca.KeyBits,
 		UserExtensions:      userExtensions,
 		UserCriticalOptions: userCriticalOptions,
@@ -104,8 +77,17 @@ func (s *certificateService) CreateCertificateAuthority(
 		params.HostMaxTtl = req.GetHostMaxTtl().AsDuration()
 	}
 
-	result, err := s.cfg.Conn.Tenant().CreateCA(ctx, params)
-	if err != nil {
+	var result *db.SSHCA
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
+		if result, err = q.CreateCA(ctx, params); err != nil {
+			return err
+		}
+		if !req.GetIsDefault() {
+			return nil
+		}
+		result.IsDefault = true
+		return q.SetDefaultCA(ctx, result.ID)
+	}); err != nil {
 		return nil, err
 	}
 
@@ -160,7 +142,6 @@ func (s *certificateService) UpdateCertificateAuthority(
 		Name:                req.Name,
 		Description:         req.Description,
 		IsActive:            req.IsActive,
-		IsDefault:           req.IsDefault,
 		UserExtensions:      userExtensions,
 		UserCriticalOptions: userCriticalOptions,
 		AllowedKeyTypes:     req.GetAllowedKeyTypes(),
@@ -171,8 +152,19 @@ func (s *certificateService) UpdateCertificateAuthority(
 		HostMaxTtl:          optDuration(req.GetHostMaxTtl()),
 	}
 
-	result, err := s.cfg.Conn.Tenant().UpdateCA(ctx, params)
-	if err != nil {
+	// Only becoming the default moves it. Unsetting it leaves the workspace
+	// without one, which the enroll fallback and the UI both handle.
+	var result *db.SSHCA
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
+		if result, err = q.UpdateCA(ctx, params); err != nil {
+			return err
+		}
+		if !req.GetIsDefault() || result.IsDefault {
+			return nil
+		}
+		result.IsDefault = true
+		return q.SetDefaultCA(ctx, result.ID)
+	}); err != nil {
 		return nil, err
 	}
 
@@ -196,7 +188,7 @@ func (s *certificateService) RolloverCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.RolloverCertificateAuthorityRequest,
 ) (*nokkuv1.RolloverCertificateAuthorityResponse, error) {
-	var result *db.CertificateAuthority
+	var result *db.SSHCA
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		ca, err := q.GetCAForUpdate(ctx, req.GetId())
 		if err != nil {
@@ -211,7 +203,7 @@ func (s *certificateService) RolloverCertificateAuthority(
 		if req.KeyBits != nil {
 			keyBits = req.GetKeyBits()
 		}
-		result, err = pki.Rollover(ctx, q, ca, keyType, keyBits, req.GetRevokePrevious())
+		result, err = ssh.Rollover(ctx, q, ca, keyType, keyBits, req.GetRevokePrevious())
 		return err
 	}); err != nil {
 		return nil, err
@@ -233,7 +225,7 @@ func (s *certificateService) SignSSHCertificate(
 ) (*nokkuv1.SignSSHCertificateResponse, error) {
 	caller, _ := actor.PrincipalFromContext(ctx)
 
-	var ca *db.CertificateAuthority
+	var ca *db.SSHCA
 	var sa *db.ServiceAccount
 	var principals []string
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
@@ -285,9 +277,6 @@ func (s *certificateService) SignSSHCertificate(
 			"certificate authority is not active",
 		)
 	}
-	if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH {
-		return nil, errNotSSHCA
-	}
 
 	ttl := req.GetTtl().AsDuration()
 	if sa != nil {
@@ -326,90 +315,10 @@ func (s *certificateService) SignSSHCertificate(
 }
 
 // serviceAccountTTL keeps the certificate from outliving the token.
-func serviceAccountTTL(ca *db.CertificateAuthority, ttl time.Duration, tokenExpiresAt *time.Time) time.Duration {
+func serviceAccountTTL(ca *db.SSHCA, ttl time.Duration, tokenExpiresAt *time.Time) time.Duration {
 	ttl = min(ssh.UserTTL(ca, ttl), serviceAccountCertTTL)
 	if tokenExpiresAt != nil {
 		ttl = min(ttl, time.Until(*tokenExpiresAt))
 	}
 	return ttl
-}
-
-func (s *certificateService) SignX509Certificate(
-	ctx context.Context,
-	req *nokkuv1.SignX509CertificateRequest,
-) (*nokkuv1.SignX509CertificateResponse, error) {
-	var ca *db.CertificateAuthority
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if req.GetCaId() != "" {
-			ca, err = q.GetCA(ctx, req.GetCaId())
-			return err
-		}
-		ca, err = q.GetDefaultCA(ctx, nokkuv1.AuthorityType_AUTHORITY_TYPE_X509)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_X509 {
-		return nil, newError(
-			connect.CodeInvalidArgument,
-			"certificate authority is not an X.509 CA",
-		)
-	}
-	if !ca.IsActive {
-		return nil, newError(
-			connect.CodeFailedPrecondition,
-			"certificate authority is not active",
-		)
-	}
-
-	certPEM, expiresAt, err := pki.SignCertificate(
-		ca,
-		req.GetCsr(),
-		req.GetUsage(),
-		req.GetTtl().AsDuration(),
-	)
-	if err != nil {
-		return nil, newError(connect.CodeInvalidArgument, err.Error())
-	}
-
-	audit.SetTarget(ctx, ca.ID)
-	audit.Set(ctx, "usage", req.GetUsage().String())
-	audit.Set(ctx, "expires_at", expiresAt)
-	if block, _ := pem.Decode(certPEM); block != nil {
-		if cert, err := x509.ParseCertificate(block.Bytes); err == nil {
-			sans := slices.Concat(cert.DNSNames, cert.EmailAddresses)
-			for _, ip := range cert.IPAddresses {
-				sans = append(sans, ip.String())
-			}
-			for _, uri := range cert.URIs {
-				sans = append(sans, uri.String())
-			}
-			audit.Set(ctx, "subject", cert.Subject.String())
-			audit.Set(ctx, "sans", sans)
-		}
-	}
-	return &nokkuv1.SignX509CertificateResponse{
-		CaId:        &ca.ID,
-		CaName:      &ca.Name,
-		Certificate: new(string(certPEM)),
-		CaChain:     &ca.Certificate,
-		ExpiresAt:   timestamppb.New(expiresAt),
-	}, nil
-}
-
-// requireSSHCA keeps an X.509 CA off a server or an enroll token. No id means
-// the workspace default, which is picked by kind.
-func requireSSHCA(ctx context.Context, q *db.Queries, caID string) error {
-	if caID == "" {
-		return nil
-	}
-	ca, err := q.GetCA(ctx, caID)
-	if err != nil {
-		return err
-	}
-	if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH {
-		return errNotSSHCA
-	}
-	return nil
 }

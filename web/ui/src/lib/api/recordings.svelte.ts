@@ -7,10 +7,18 @@ import { MAX_PAGE_SIZE } from '#lib/config.js';
 import { plural, useBulkMutation } from './bulk';
 
 export type RecordingChunkHandler = (chunk: Uint8Array) => void;
-export type RecordingMeta = { recordingId: string; username: string };
+export type RecordingMeta = { recordingId: string; username: string; principal: string };
 
 export const recordings = {
-	list: (opts?: () => { limit?: number; offset?: number; daemonId?: string; username?: string }) =>
+	list: (
+		opts?: () => {
+			limit?: number;
+			offset?: number;
+			daemonId?: string;
+			username?: string;
+			subjectId?: string;
+		}
+	) =>
 		useQuery(RecordingService.method.listRecordings, () => ({
 			limit: MAX_PAGE_SIZE,
 			offset: 0,
@@ -52,7 +60,8 @@ export const recordings = {
 				case 'meta':
 					onMeta({
 						recordingId: msg.msg.value.recordingId,
-						username: msg.msg.value.username
+						username: msg.msg.value.username,
+						principal: msg.msg.value.principal
 					});
 					break;
 				case 'chunk':

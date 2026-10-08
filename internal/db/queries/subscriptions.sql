@@ -122,7 +122,7 @@ SELECT
       SELECT
         COUNT(*)
       FROM
-        certificate_authorities ca
+        ssh_cas ca
       WHERE
         ca.workspace_id = $1
     ) + (

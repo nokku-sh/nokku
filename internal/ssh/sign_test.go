@@ -32,7 +32,7 @@ func TestSignCertificate_Errors(t *testing.T) {
 	ca := newTestCA(t)
 	clientKey := newTestKey(t)
 
-	badCA := &db.CertificateAuthority{PrivateKey: []byte("garbage")}
+	badCA := &db.SSHCA{PrivateKey: []byte("garbage")}
 
 	rsaOnly := newTestCA(t)
 	rsaOnly.AllowedKeyTypes = []nokkuv1.CertificateKeyType{
@@ -47,7 +47,7 @@ func TestSignCertificate_Errors(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		ca      *db.CertificateAuthority
+		ca      *db.SSHCA
 		pub     string
 		wantErr string
 	}{
@@ -283,5 +283,22 @@ func TestSignCertificatePrincipalCount(t *testing.T) {
 func TestLoginPrincipal(t *testing.T) {
 	if got := LoginPrincipal("subject", "target", "root"); got != "subject@target:root" {
 		t.Errorf("LoginPrincipal = %q", got)
+	}
+}
+
+func TestParseLoginPrincipal(t *testing.T) {
+	subject := "0192d6a0-7c1e-7c3a-8f3b-6f2a9f0b1c2d"
+	target := "0192d6a0-7c1e-7c3a-8f3b-6f2a9f0b1c2e"
+	got, ok := ParseLoginPrincipal(LoginPrincipal(subject, target, "deploy"))
+	if !ok || got != (Principal{SubjectID: subject, TargetID: target, Username: "deploy"}) {
+		t.Errorf("ParseLoginPrincipal = %+v, %v", got, ok)
+	}
+	for _, bad := range []string{
+		"", "deploy", subject + "@" + target, subject + "@" + target + ":",
+		"root@" + target + ":deploy", subject + "@host:deploy",
+	} {
+		if _, ok := ParseLoginPrincipal(bad); ok {
+			t.Errorf("ParseLoginPrincipal(%q) accepted", bad)
+		}
 	}
 }

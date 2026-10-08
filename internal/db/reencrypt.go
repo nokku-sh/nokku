@@ -15,7 +15,7 @@ import (
 // missing here loses its data. TestEncryptedColumnsMatchSqlc checks the list
 // against sqlc.yaml.
 var encryptedColumns = []struct{ table, column string }{
-	{"certificate_authorities", "private_key"},
+	{"ssh_cas", "private_key"},
 	{"sso_providers", "config"},
 	{"recordings", "key"},
 }

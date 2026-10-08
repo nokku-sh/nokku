@@ -243,8 +243,14 @@ func (s *Service) deleteSession(ctx context.Context, hash crypto.HashedToken) er
 	return s.conn.Tenant().DeleteSession(ctx, hash)
 }
 
+// ListSessions answers for a user. A service account holds no session, it
+// signs every call with its token.
 func (s *Service) ListSessions(ctx context.Context) ([]*db.Session, error) {
-	return s.conn.Tenant().ListSessionsBySubject(ctx, actor.UserIDFromContext(ctx))
+	userID := actor.UserIDFromContext(ctx)
+	if userID == "" {
+		return nil, nil
+	}
+	return s.conn.Tenant().ListSessionsBySubject(ctx, userID)
 }
 
 // Logout needs the DPoP proof for header tokens, so a leaked token alone
@@ -270,16 +276,24 @@ func (s *Service) revokeSubject(ctx context.Context, subjectID string) (int64, e
 }
 
 func (s *Service) RevokeOtherSessions(ctx context.Context, keep SessionHash) (int64, error) {
+	userID := actor.UserIDFromContext(ctx)
+	if userID == "" {
+		return 0, nil
+	}
 	return s.conn.Tenant().DeleteSessionsExcept(ctx, &db.DeleteSessionsExceptParams{
-		SubjectID: actor.UserIDFromContext(ctx),
+		SubjectID: userID,
 		KeepHash:  crypto.HashedToken(keep),
 	})
 }
 
 // DeleteOwnSession only reaches the caller's own sessions.
 func (s *Service) DeleteOwnSession(ctx context.Context, hash SessionHash) error {
+	userID := actor.UserIDFromContext(ctx)
+	if userID == "" {
+		return nil
+	}
 	return s.conn.TenantTx(ctx, func(q *db.Queries) error {
-		rows, err := q.ListSessionsBySubject(ctx, actor.UserIDFromContext(ctx))
+		rows, err := q.ListSessionsBySubject(ctx, userID)
 		if err != nil {
 			return err
 		}

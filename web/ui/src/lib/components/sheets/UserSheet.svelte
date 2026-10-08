@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
-	import { principal as principalApi } from '#lib/api/principals.svelte.js';
+	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
 	import { team as teamApi } from '#lib/api/team.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { users } from '#lib/api/workspaces.svelte.js';
@@ -13,7 +13,7 @@
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import SearchPopover from '#lib/components/blocks/SearchPopover.svelte';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
-	import { SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { confirm, useSheet } from '#lib/hooks/index.js';
 	import { atLeast } from '#lib/roles.js';
 	import { Check, Crown, Info, Plus, ShieldCheck, UserCog, Users } from '@lucide/svelte';
@@ -44,7 +44,7 @@
 	const transfer = users.transferOwnership();
 	const addToTeam = teamApi.addMember();
 	const removeFromTeam = teamApi.removeMember();
-	const revokeAll = principalApi.revokeSubject();
+	const revokeAll = accountApi.revokeSubject();
 
 	const isOwner = $derived(person?.role === WorkspaceRole.OWNER);
 	const isMe = $derived(me.data?.id === person?.id);

@@ -16,6 +16,8 @@ sql:
         emit_pointers_for_null_types: true # Pointers for null types
         emit_result_struct_pointers: true # More efficient for large result sets
         emit_params_struct_pointers: true # More efficient parameter passing
+        rename:
+          ssh_ca: "SSHCA"
         overrides:
           # UUID overrides
           - db_type: "uuid"
@@ -52,19 +54,15 @@ sql:
               pointer: true
 
           # Enum overrides
-          - column: "certificate_authorities.key_type"
+          - column: "ssh_cas.key_type"
             go_type:
               import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "CertificateKeyType"
-          - column: "certificate_authorities.allowed_key_types"
+          - column: "ssh_cas.allowed_key_types"
             go_type:
               import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "CertificateKeyType"
               slice: true
-          - column: "certificate_authorities.authority_type"
-            go_type:
-              import: "github.com/nokku-sh/protos/gen/nokku/v1"
-              type: "AuthorityType"
           - column: "daemons.status"
             go_type:
               import: "github.com/nokku-sh/protos/gen/nokku/v1"
@@ -123,7 +121,7 @@ sql:
               type: "HashedToken"
 
           # Encrypt (reversible) overrides
-          - column: "certificate_authorities.private_key"
+          - column: "ssh_cas.private_key"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "EncryptedBytes"

@@ -24,7 +24,6 @@ const (
 // changes an operator actually wants to see.
 var routineActions = []string{
 	"SignSSHCertificate",
-	"SignX509Certificate",
 	"CreateSession",
 	"CloseSession",
 	"UploadRecording",
@@ -47,7 +46,7 @@ func (s *dashboardService) GetDashboard(
 	var (
 		counts     *db.DashboardCountsRow
 		daemons    []*db.ListDaemonsRow
-		cas        []*db.CertificateAuthority
+		cas        []*db.SSHCA
 		recordings []*db.ListOpenRecordingsRow
 		hours      []*db.AuditActivityByHourRow
 		usedBytes  int64
