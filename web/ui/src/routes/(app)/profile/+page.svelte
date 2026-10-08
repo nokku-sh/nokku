@@ -20,7 +20,7 @@
 	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
 	import { roleIcon, roleLabel } from '#lib/roles.js';
 	import { formatTs } from '#lib/utils.js';
-	import { Mail, MailQuestion, ShieldCheck, Trash2 } from '@lucide/svelte';
+	import { ArrowRight, Mail, MailQuestionMarkIcon, Trash } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 
 	const me = user.self();
@@ -60,7 +60,12 @@
 	}
 </script>
 
-<PageHeader title="Profile" description="Who you are in this workspace" />
+<PageHeader title="Profile" description="Who you are in this workspace">
+	<Button href="/profile/security" variant="link">
+		Security
+		<ArrowRight />
+	</Button>
+</PageHeader>
 
 {#if !model}
 	<Skeleton class="h-48 w-full rounded-xl" />
@@ -99,7 +104,7 @@
 								updateProfile.mutate({ picture: '' });
 							}}
 						>
-							<Trash2 />
+							<Trash />
 						</Button>
 					{/if}
 				</div>
@@ -142,7 +147,7 @@
 				</Field.Field>
 				{#if model.pendingEmail}
 					<Alert.Root>
-						<MailQuestion />
+						<MailQuestionMarkIcon />
 						<Alert.Title>Waiting for {model.pendingEmail}</Alert.Title>
 						<Alert.Description>
 							Click the link we sent there to finish the change. Until then you sign in with your
@@ -162,21 +167,6 @@
 				since {formatTs(me.data?.createdAt, 'short')}
 			</span>
 		</Card.Footer>
-	</Card.Root>
-
-	<Card.Root>
-		<Card.Header>
-			<Card.Title class="text-base">Security</Card.Title>
-			<Card.Description
-				>Your passkeys, sign-in methods and where you are signed in.</Card.Description
-			>
-			<Card.Action>
-				<Button size="sm" variant="ghost" href="/profile/security">
-					<ShieldCheck data-icon="inline-start" />
-					Security
-				</Button>
-			</Card.Action>
-		</Card.Header>
 	</Card.Root>
 
 	<FormModal

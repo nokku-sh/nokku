@@ -24,7 +24,7 @@
 	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { BotOff, CircleCheckBig, Clock, Rocket, Trash2, Wifi, WifiOff } from '@lucide/svelte';
+	import { BotOff, CircleCheckBig, Clock, Rocket, Trash, Wifi, WifiOff } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const statusOptions = [
@@ -138,7 +138,7 @@
 		},
 		{
 			label: 'Delete',
-			icon: Trash2,
+			icon: Trash,
 			variant: 'destructive',
 			confirm: (selected) => ({
 				title: `Delete ${plural(selected.length, 'daemon')}?`,
