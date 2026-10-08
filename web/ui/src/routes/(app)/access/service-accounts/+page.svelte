@@ -92,8 +92,9 @@
 				renderComponent(RoleCell, {
 					role: row.original.role,
 					max: SERVICE_ACCOUNT_MAX_ROLE,
+					// An update replaces the tags, so they go along.
 					update: can.edit
-						? (role) => updateSA.mutateAsync({ id: row.original.id, role })
+						? (role) => updateSA.mutateAsync({ id: row.original.id, role, tags: row.original.tags })
 						: undefined
 				})
 		}),
