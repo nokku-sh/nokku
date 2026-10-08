@@ -102,7 +102,7 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			role: WorkspaceRole.VIEWER,
 			items: [
 				{ title: 'Workspace', url: '/settings', icon: SlidersHorizontal, shortcut: 's' },
-				{ title: 'Daemon defaults', url: '/settings/daemons', icon: ServerCog },
+				{ title: 'Daemons', url: '/settings/daemons', icon: ServerCog },
 				{
 					title: 'Audit streaming',
 					url: '/settings/audit',
