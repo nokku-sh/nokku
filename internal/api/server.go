@@ -47,6 +47,7 @@ func (s *Server) Start(ctx context.Context) error {
 	proto.SetHTTP2(true)
 	proto.SetUnencryptedHTTP2(true)
 	server := &http.Server{
+		// Streams, relays and web terminals end with the root ctx, nothing else stops them.
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		Addr:              "0.0.0.0:" + s.cfg.Port,
 		Handler:           s.handler(),

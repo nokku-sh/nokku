@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -9,7 +8,7 @@ import (
 
 func TestMemory(t *testing.T) {
 	c := NewMemory(10)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	key := "k"
 	value := []byte("hello")
@@ -37,7 +36,7 @@ func TestMemory(t *testing.T) {
 
 func TestMemoryExpiry(t *testing.T) {
 	c := NewMemory(10)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := c.Set(ctx, "k", []byte("v"), time.Millisecond); err != nil {
 		t.Fatalf("Set: %v", err)
@@ -53,7 +52,7 @@ func TestMemoryExpiry(t *testing.T) {
 // not corrupt the cached entry.
 func TestMemorySetCopies(t *testing.T) {
 	c := NewMemory(10)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	value := []byte("hello")
 	if err := c.Set(ctx, "k", value, time.Minute); err != nil {
@@ -72,7 +71,7 @@ func TestMemorySetCopies(t *testing.T) {
 
 func TestMemoryGetDel(t *testing.T) {
 	c := NewMemory(10)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := c.Set(ctx, "k", []byte("v"), time.Minute); err != nil {
 		t.Fatalf("Set: %v", err)
@@ -93,7 +92,7 @@ func TestMemoryGetDel(t *testing.T) {
 
 func TestMemorySetNX(t *testing.T) {
 	c := NewMemory(10)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	first, err := c.SetNX(ctx, "k", []byte("v1"), time.Minute)
 	if err != nil {
@@ -123,7 +122,7 @@ func TestMemorySetNX(t *testing.T) {
 // A consumed key frees its slot: SetNX after expiry must win again.
 func TestMemorySetNXAfterExpiry(t *testing.T) {
 	c := NewMemory(10)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, err := c.SetNX(ctx, "k", []byte("v"), time.Millisecond); err != nil {
 		t.Fatalf("SetNX: %v", err)
@@ -176,7 +175,7 @@ func TestMemoryFullRefusesNewKeys(t *testing.T) {
 // A zero or negative TTL means no expiry: the entry stays until deleted.
 func TestMemoryNoTTL(t *testing.T) {
 	c := NewMemory(10)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := c.Set(ctx, "k", []byte("v"), 0); err != nil {
 		t.Fatalf("Set: %v", err)

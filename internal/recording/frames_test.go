@@ -2,7 +2,6 @@ package recording
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"io"
 	"strings"
@@ -18,7 +17,7 @@ import (
 // rawObject returns the stored bytes of rec, split into frames.
 func rawFrames(t *testing.T, s *Service, rec *db.Recording) [][]byte {
 	t.Helper()
-	rc, err := s.store.Reader(context.Background(), storage.RecordingPath(rec.WorkspaceID, rec.ID))
+	rc, err := s.store.Reader(t.Context(), storage.RecordingPath(rec.WorkspaceID, rec.ID))
 	require.NoError(t, err)
 	defer func() { _ = rc.Close() }()
 	raw, err := io.ReadAll(rc)
@@ -37,7 +36,7 @@ func rawFrames(t *testing.T, s *Service, rec *db.Recording) [][]byte {
 // write access to the bucket could.
 func storeFrames(t *testing.T, s *Service, rec *db.Recording, frames [][]byte) {
 	t.Helper()
-	w, err := s.store.CreateWriter(context.Background(),
+	w, err := s.store.CreateWriter(t.Context(),
 		storage.RecordingPath(rec.WorkspaceID, rec.ID),
 		storage.StoreOptions{ContentType: "application/octet-stream"})
 	require.NoError(t, err)
@@ -48,7 +47,7 @@ func storeFrames(t *testing.T, s *Service, rec *db.Recording, frames [][]byte) {
 
 func readAll(t *testing.T, s *Service, rec *db.Recording) ([]byte, error) {
 	t.Helper()
-	fr, err := s.OpenReader(context.Background(), rec)
+	fr, err := s.OpenReader(t.Context(), rec)
 	require.NoError(t, err)
 	defer func() { _ = fr.Close() }()
 	return io.ReadAll(iotestSmallReads{fr})

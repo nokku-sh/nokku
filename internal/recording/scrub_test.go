@@ -3,7 +3,6 @@ package recording
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"encoding/json"
 	"io"
 	"slices"
@@ -26,9 +25,7 @@ func newScrubTestService(t *testing.T) *Service {
 	t.Helper()
 	t.Setenv("NOKKU_STORAGE", "local")
 	t.Setenv("NOKKU_LOCAL_STORAGE_PATH", t.TempDir())
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	st, err := storage.New(ctx, "http://localhost:3000")
+	st, err := storage.New(t.Context(), "http://localhost:3000")
 	if err != nil {
 		t.Fatalf("storage.New: %v", err)
 	}
@@ -43,7 +40,7 @@ func testRecording() *db.Recording {
 // force many frames.
 func writeFrames(t *testing.T, s *Service, rec *db.Recording, plaintext []byte) {
 	t.Helper()
-	w, err := s.NewWriter(context.Background(), rec)
+	w, err := s.NewWriter(t.Context(), rec)
 	if err != nil {
 		t.Fatalf("NewWriter: %v", err)
 	}
@@ -73,7 +70,7 @@ func writeRecordingObject(t *testing.T, s *Service, rec *db.Recording, cast []by
 
 func readRecordingObject(t *testing.T, s *Service, rec *db.Recording) []byte {
 	t.Helper()
-	fr, err := s.OpenReader(context.Background(), rec)
+	fr, err := s.OpenReader(t.Context(), rec)
 	if err != nil {
 		t.Fatalf("OpenReader: %v", err)
 	}
@@ -131,7 +128,7 @@ func TestScrubRemovesSecrets(t *testing.T) {
 	rec := testRecording()
 	writeRecordingObject(t, s, rec, []byte(scrubTestCast))
 
-	if err := s.scrub(context.Background(), rec); err != nil {
+	if err := s.scrub(t.Context(), rec); err != nil {
 		t.Fatalf("scrub: %v", err)
 	}
 
@@ -173,7 +170,7 @@ func TestScrubWithoutSecretsIsNoop(t *testing.T) {
 		"[0.0, \"o\", \"just a build log\\n\"]\n"
 	writeRecordingObject(t, s, rec, []byte(clean))
 
-	if err := s.scrub(context.Background(), rec); err != nil {
+	if err := s.scrub(t.Context(), rec); err != nil {
 		t.Fatalf("scrub: %v", err)
 	}
 

@@ -67,30 +67,23 @@ type Pool struct {
 	fresh map[string]struct{}
 	conn  connection
 	hub   *live.Hub
-
-	shutdownCtx    context.Context
-	shutdownCancel context.CancelFunc
 }
 
 func New(ctx context.Context, conn connection, hub *live.Hub) *Pool {
-	shutdownCtx, shutdownCancel := context.WithCancel(ctx)
 	p := &Pool{
-		byID:           make(map[string]*daemonConn),
-		byWksp:         make(map[string]map[string]struct{}),
-		owned:          make(map[string]*owned),
-		sessions:       make(map[string]*Session),
-		relays:         make(map[string]*Relay),
-		pendingRelays:  make(map[string]*relayPending),
-		relayCounts:    make(map[string]int),
-		versions:       make(map[string]int64),
-		fresh:          make(map[string]struct{}),
-		conn:           conn,
-		hub:            hub,
-		shutdownCtx:    shutdownCtx,
-		shutdownCancel: shutdownCancel,
+		byID:          make(map[string]*daemonConn),
+		byWksp:        make(map[string]map[string]struct{}),
+		owned:         make(map[string]*owned),
+		sessions:      make(map[string]*Session),
+		relays:        make(map[string]*Relay),
+		pendingRelays: make(map[string]*relayPending),
+		relayCounts:   make(map[string]int),
+		versions:      make(map[string]int64),
+		fresh:         make(map[string]struct{}),
+		conn:          conn,
+		hub:           hub,
 	}
 
-	context.AfterFunc(ctx, p.shutdown)
 	go p.heartbeat(ctx)
 
 	return p
@@ -160,16 +153,6 @@ func (p *Pool) disownLocked(daemonID string) {
 	if o := p.owned[daemonID]; o != nil && len(o.sessions) == 0 && len(o.relays) == 0 {
 		delete(p.owned, daemonID)
 	}
-}
-
-// shutdown is idempotent.
-func (p *Pool) shutdown() {
-	p.shutdownCancel()
-	p.mu.Lock()
-	for _, c := range p.byID {
-		c.cancel()
-	}
-	p.mu.Unlock()
 }
 
 func (p *Pool) registerDaemon(ctx context.Context, daemonID, workspaceID string) *daemonConn {

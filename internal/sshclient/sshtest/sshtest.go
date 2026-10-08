@@ -6,7 +6,6 @@ package sshtest
 
 import (
 	"bytes"
-	"context"
 	"crypto/ed25519"
 	crand "crypto/rand"
 	"encoding/pem"
@@ -91,7 +90,7 @@ func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
 	}
 
 	var lc net.ListenConfig
-	ln, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}

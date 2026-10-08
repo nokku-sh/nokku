@@ -62,7 +62,7 @@ func TestWebhookSink_DeliverRoutesByWorkspace(t *testing.T) {
 	defer server.Close()
 
 	sink := newTestSink(map[string]destination{"ws-1": {url: server.URL}})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sink.deliver(ctx, &Event{WorkspaceID: "ws-1", Action: "CreateTarget"})
 	// No destination for this workspace: nothing is sent, nothing panics.
@@ -94,7 +94,7 @@ func TestWebhookSink_RetriesTransientFailure(t *testing.T) {
 	defer server.Close()
 
 	sink := newTestSink(map[string]destination{"ws-1": {url: server.URL}})
-	sink.deliver(context.Background(), &Event{WorkspaceID: "ws-1", Action: "CreateTarget"})
+	sink.deliver(t.Context(), &Event{WorkspaceID: "ws-1", Action: "CreateTarget"})
 
 	if got.attempts != 3 {
 		t.Errorf("attempts = %d, want 3 (two failures then success)", got.attempts)
@@ -110,7 +110,7 @@ func TestWebhookSink_DoesNotRetryRejectedEvent(t *testing.T) {
 	defer server.Close()
 
 	sink := newTestSink(map[string]destination{"ws-1": {url: server.URL}})
-	sink.deliver(context.Background(), &Event{WorkspaceID: "ws-1", Action: "CreateTarget"})
+	sink.deliver(t.Context(), &Event{WorkspaceID: "ws-1", Action: "CreateTarget"})
 
 	if got.attempts != 1 {
 		t.Errorf("attempts = %d, want 1: a 4xx is not retryable", got.attempts)
@@ -124,7 +124,7 @@ func TestWebhookSink_AppendNeverBlocks(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- sink.Append(context.Background(), &Event{WorkspaceID: "ws-1", Action: "CreateTarget"})
+		done <- sink.Append(t.Context(), &Event{WorkspaceID: "ws-1", Action: "CreateTarget"})
 	}()
 
 	select {
@@ -172,7 +172,7 @@ func TestWebhookSink_SignsPayloadWhenSecretIsSet(t *testing.T) {
 	defer server.Close()
 
 	sink := newTestSink(map[string]destination{"ws-1": {url: server.URL, secret: secret}})
-	sink.deliver(context.Background(), &Event{WorkspaceID: "ws-1", Action: "CreateTarget"})
+	sink.deliver(t.Context(), &Event{WorkspaceID: "ws-1", Action: "CreateTarget"})
 
 	select {
 	case received := <-got:
@@ -199,7 +199,7 @@ func TestWebhookSink_UnsignedWithoutSecret(t *testing.T) {
 	defer server.Close()
 
 	sink := newTestSink(map[string]destination{"ws-1": {url: server.URL}})
-	sink.deliver(context.Background(), &Event{WorkspaceID: "ws-1", Action: "CreateTarget"})
+	sink.deliver(t.Context(), &Event{WorkspaceID: "ws-1", Action: "CreateTarget"})
 
 	select {
 	case header := <-headers:
@@ -216,7 +216,7 @@ func TestService_AppendFansOutToEverySink(t *testing.T) {
 	failing := &stubSink{err: errors.New("destination down")}
 	service := &Service{sinks: []sink{first, failing}}
 
-	err := service.Append(context.Background(), &Event{Action: "CreateTarget"})
+	err := service.Append(t.Context(), &Event{Action: "CreateTarget"})
 	if err == nil {
 		t.Fatal("Append returned nil, want the failing sink reported")
 	}

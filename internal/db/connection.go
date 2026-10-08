@@ -124,11 +124,10 @@ func (c *Connection) createPools(ctx context.Context) error {
 	}
 	c.sys = New(c.sysPool)
 
-	go func() {
-		<-ctx.Done()
+	context.AfterFunc(ctx, func() {
 		c.Pool.Close()
 		c.sysPool.Close()
-	}()
+	})
 	return nil
 }
 

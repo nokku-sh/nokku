@@ -192,7 +192,7 @@ func TestResolve(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sut := NewService(tt.db, licensed(tt.license), tt.mode)
-			got := sut.Resolve(context.Background(), "ws1")
+			got := sut.Resolve(t.Context(), "ws1")
 			if got.Name != tt.want {
 				t.Errorf("Resolve() = %q, want %q", got.Name, tt.want)
 			}
@@ -207,7 +207,7 @@ func TestResolve_FailClosedOnDBError(t *testing.T) {
 		nil,
 		modeSaaS,
 	)
-	got := sut.Resolve(context.Background(), "ws1")
+	got := sut.Resolve(t.Context(), "ws1")
 	if got.Has(FeatureSCIM) || got.Has(FeatureAuditExport) || got.Has(FeatureEnforceSSO) {
 		t.Error("DB error granted paid features")
 	}
@@ -219,12 +219,12 @@ func TestResolve_FailClosedOnDBError(t *testing.T) {
 func TestRetentionDays_ErrorsOnDBError(t *testing.T) {
 	// The purge jobs skip on error, a billing outage must never delete data.
 	broken := NewService(&fakeDB{subErr: errors.New("connection refused")}, nil, modeSaaS)
-	if _, err := broken.RetentionDays(context.Background(), "ws1"); err == nil {
+	if _, err := broken.RetentionDays(t.Context(), "ws1"); err == nil {
 		t.Error("DB error returned a retention window instead of an error")
 	}
 
 	free := NewService(&fakeDB{subErr: pgx.ErrNoRows}, nil, modeSaaS)
-	days, err := free.RetentionDays(context.Background(), "ws1")
+	days, err := free.RetentionDays(t.Context(), "ws1")
 	if err != nil || days != 7 {
 		t.Errorf("no subscription row = %d, %v, want 7 days and no error", days, err)
 	}
@@ -240,7 +240,7 @@ func TestResolve_SelfHostedLicensedPlanUnlimited(t *testing.T) {
 		licensed(PlanEnterprise),
 		modeSelfHosted,
 	)
-	got := sut.Resolve(context.Background(), "ws1")
+	got := sut.Resolve(t.Context(), "ws1")
 
 	if got.Name != PlanEnterprise {
 		t.Errorf("Resolve() = %q, want enterprise", got.Name)
@@ -251,7 +251,7 @@ func TestResolve_SelfHostedLicensedPlanUnlimited(t *testing.T) {
 	if got.RecordingStorageBytes != unlimited {
 		t.Errorf("self-hosted licensed storage cap = %d, want unlimited", got.RecordingStorageBytes)
 	}
-	if err := sut.CheckResources(context.Background(), "ws1"); err != nil {
+	if err := sut.CheckResources(t.Context(), "ws1"); err != nil {
 		t.Errorf("CheckResources() = %v, want nil", err)
 	}
 }
@@ -267,10 +267,10 @@ func TestResolve_SelfHostedRecordingStorageUnlimited(t *testing.T) {
 	// Even with no subscription and no license: unlimited, not 10 MiB.
 	bare := NewService(&fakeDB{}, nil, modeSelfHosted)
 
-	if got, _ := sut.RecordingStorageBytes(context.Background(), "ws1"); got != unlimited {
+	if got, _ := sut.RecordingStorageBytes(t.Context(), "ws1"); got != unlimited {
 		t.Errorf("self-hosted pro storage cap = %d, want unlimited", got)
 	}
-	if got, _ := bare.RecordingStorageBytes(context.Background(), "ws1"); got != unlimited {
+	if got, _ := bare.RecordingStorageBytes(t.Context(), "ws1"); got != unlimited {
 		t.Errorf("self-hosted community storage cap = %d, want unlimited", got)
 	}
 }
@@ -279,7 +279,7 @@ func TestResolve_RequestCache(t *testing.T) {
 	db := &fakeDB{plan: PlanPro, status: StatusActive}
 	sut := NewService(db, nil, modeSaaS)
 
-	ctx := withRequestCache(context.Background())
+	ctx := withRequestCache(t.Context())
 	first := sut.Resolve(ctx, "ws1")
 	db.plan = PlanCommunity // mutate behind the cache
 	second := sut.Resolve(ctx, "ws1")
@@ -289,7 +289,7 @@ func TestResolve_RequestCache(t *testing.T) {
 	}
 
 	// A fresh context must see the mutation.
-	fresh := sut.Resolve(context.Background(), "ws1")
+	fresh := sut.Resolve(t.Context(), "ws1")
 	if fresh.Name != PlanCommunity {
 		t.Errorf("fresh resolve = %q, want community", fresh.Name)
 	}
@@ -323,7 +323,7 @@ func TestCanInvite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sut := NewService(tt.db, nil, modeSaaS)
-			err := sut.CanInvite(context.Background(), "ws1", tt.members)
+			err := sut.CanInvite(t.Context(), "ws1", tt.members)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CanInvite() error = %v, wantErr %v", err, tt.wantErr)
 			}
