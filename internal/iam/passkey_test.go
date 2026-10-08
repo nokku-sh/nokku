@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,7 +100,7 @@ func TestPasskeySignupThenLogin(t *testing.T) {
 	d := newPasskeyDevice()
 	o := e.org(t)
 	ctx := anon(t.Context(), o.ws)
-	invite := e.invite(t, o.ws, "viewer", 1)
+	invite := e.invite(t, o.ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER, 1)
 	email := "new@" + testDomain()
 
 	bogus := post(ctx, e.svc.Passkey.BeginSignup, url.Values{"invite": {"nope"}, "email": {email}}.Encode(), nil)
@@ -114,7 +116,7 @@ func TestPasskeySignupThenLogin(t *testing.T) {
 	u := e.userByEmail(t, o.ws, email)
 	require.NotNil(t, u)
 	assert.Equal(t, "New", u.Name)
-	assert.Equal(t, "viewer", u.Role, "the role comes from the invite")
+	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER, u.Role, "the role comes from the invite")
 	assert.Equal(t, 1, e.passkeys(t, o.ws, u.ID))
 	assert.Equal(t, 1, e.sessions(t, o.ws, u.ID))
 	_, err := e.svc.LookupInvite(ctx, invite)
@@ -140,7 +142,7 @@ func TestPasskeyStaysInItsWorkspace(t *testing.T) {
 	e := newTestEnv(t)
 	d := newPasskeyDevice()
 	a, b := e.org(t), e.org(t)
-	u := d.signUp(t, e, a.ws, e.invite(t, a.ws, "member", 0), "p@"+testDomain())
+	u := d.signUp(t, e, a.ws, e.invite(t, a.ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, 0), "p@"+testDomain())
 
 	answer, cookies := d.assertion(t, e.svc, b.ws)
 	rec := post(anon(t.Context(), b.ws), e.svc.Passkey.FinishLogin, answer, cookies)
@@ -155,7 +157,7 @@ func TestPasskeyLoginRefusesForgedAnswers(t *testing.T) {
 	d := newPasskeyDevice()
 	o := e.org(t)
 	ctx := anon(t.Context(), o.ws)
-	u := d.signUp(t, e, o.ws, e.invite(t, o.ws, "member", 0), "forged@"+testDomain())
+	u := d.signUp(t, e, o.ws, e.invite(t, o.ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, 0), "forged@"+testDomain())
 	before := e.sessions(t, o.ws, u.ID)
 
 	otherSite := *d
@@ -197,8 +199,8 @@ func TestPasskeyRegistrationBelongsToItsAccount(t *testing.T) {
 	e := newTestEnv(t)
 	d := newPasskeyDevice()
 	o := e.org(t)
-	alice := e.user(t, o.ws, "alice@"+testDomain(), "member")
-	mallory := e.user(t, o.ws, "mallory@"+testDomain(), "member")
+	alice := e.user(t, o.ws, "alice@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	mallory := e.user(t, o.ws, "mallory@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 
 	anonymous := post(anon(t.Context(), o.ws), e.svc.Passkey.BeginRegistration, "", nil)
 	assert.Equal(t, http.StatusUnauthorized, anonymous.Code, anonymous.Body.String())

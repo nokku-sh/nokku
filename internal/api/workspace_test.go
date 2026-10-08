@@ -17,8 +17,8 @@ func TestTransferOwnership(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	ws := seedWorkspace(t, cfg)
 	owner := seedOwner(t, cfg)
-	member := seedUser(t, cfg, ws, db.RoleEditor)
-	stranger := seedUser(t, cfg, seedOtherWorkspace(t, cfg), db.RoleOwner)
+	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
+	stranger := seedUser(t, cfg, seedOtherWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
 		srv.Client(), srv.URL, header("Authorization", "Bearer "+sessionFor(t, cfg, owner)),
 	)
@@ -26,7 +26,7 @@ func TestTransferOwnership(t *testing.T) {
 		_, err := workspaces.TransferOwnership(t.Context(), &nokkuv1.TransferOwnershipRequest{NewOwnerId: &to})
 		return err
 	}
-	role := func(u *db.User) string {
+	role := func(u *db.User) nokkuv1.WorkspaceRole {
 		got, err := cfg.Conn.Sys().GetUser(t.Context(), u.ID)
 		require.NoError(t, err)
 		return got.Role
@@ -34,12 +34,12 @@ func TestTransferOwnership(t *testing.T) {
 
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(transfer(stranger.ID)),
 		"a user of another workspace cannot be made owner")
-	assert.Equal(t, "owner", role(owner), "a refused transfer keeps the owner")
-	assert.Equal(t, "editor", role(member), "a refused transfer changes no role")
+	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, role(owner), "a refused transfer keeps the owner")
+	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, role(member), "a refused transfer changes no role")
 
 	require.NoError(t, transfer(member.ID))
-	assert.Equal(t, "owner", role(member), "a member takes over")
-	assert.Equal(t, "admin", role(owner), "the old owner steps down to admin")
+	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, role(member), "a member takes over")
+	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN, role(owner), "the old owner steps down to admin")
 	assert.Equal(t, member.ID, seedOwner(t, cfg).ID)
 }
 
@@ -48,19 +48,19 @@ func TestManageUsers(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	ws := seedWorkspace(t, cfg)
 	owner := seedOwner(t, cfg)
-	admin := seedUser(t, cfg, ws, db.RoleAdmin)
-	viewer := seedUser(t, cfg, ws, db.RoleViewer)
+	admin := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
+	viewer := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
 		srv.Client(), srv.URL, header("Authorization", "Bearer "+sessionFor(t, cfg, admin)),
 	)
 
 	_, err := workspaces.UpdateUserRole(t.Context(), &nokkuv1.UpdateUserRoleRequest{
-		UserId: &viewer.ID, Role: new("editor"),
+		UserId: &viewer.ID, Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
 	})
 	require.NoError(t, err)
 	got, err := workspaces.GetUser(t.Context(), &nokkuv1.GetUserRequest{UserId: &viewer.ID})
 	require.NoError(t, err)
-	assert.Equal(t, "editor", got.GetUser().GetRole())
+	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, got.GetUser().GetRole())
 
 	_, err = workspaces.SetUserActive(t.Context(), &nokkuv1.SetUserActiveRequest{UserId: &owner.ID, Active: new(false)})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "an admin switched the owner off: %v", err)
@@ -78,7 +78,7 @@ func TestManageUsers(t *testing.T) {
 
 	users, err := workspaces.ListUsers(
 		t.Context(),
-		&nokkuv1.ListUsersRequest{Limit: new(int32(100)), Role: new("owner")},
+		&nokkuv1.ListUsersRequest{Limit: new(int32(100)), Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)},
 	)
 	require.NoError(t, err)
 	require.Len(t, users.GetUsers(), 1, "one owner")
@@ -93,7 +93,10 @@ func TestManageUsers(t *testing.T) {
 // A self-hosted server keeps its workspace, and signup is for the hosted one.
 func TestSelfHostHasOneWorkspace(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	owner := header("Authorization", "Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), db.RoleOwner))
+	owner := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+	)
 	_, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL, owner).
 		DeleteWorkspace(t.Context(), &nokkuv1.DeleteWorkspaceRequest{})
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "got %v", err)
@@ -109,7 +112,8 @@ func TestSubscribeChangesHearsAWrite(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	ws := seedWorkspace(t, cfg)
 	ctx, call := connect.NewClientContext(t.Context())
-	call.RequestHeader().Set("Authorization", "Bearer "+seedMember(t, cfg, ws, db.RoleMember))
+	call.RequestHeader().
+		Set("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER))
 	stream, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL).
 		SubscribeChanges(ctx, &nokkuv1.SubscribeChangesRequest{})
 	require.NoError(t, err)

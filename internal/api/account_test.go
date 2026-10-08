@@ -18,7 +18,7 @@ import (
 // seedAccount returns a user and an account client signed in as them.
 func seedAccount(t *testing.T, cfg *config.Config) (*db.User, nokkuv1connect.AccountServiceClient) {
 	t.Helper()
-	u := seedUser(t, cfg, seedWorkspace(t, cfg), db.RoleMember)
+	u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	_, srv := newTestAPI(t)
 	client := nokkuv1connect.NewAccountServiceClient(srv.Client(), srv.URL,
 		header("Authorization", "Bearer "+sessionFor(t, cfg, u)))
@@ -86,8 +86,14 @@ func TestConfirmAndCancelEmailChange(t *testing.T) {
 // The owner hands the workspace on before leaving, anyone else just goes.
 func TestDeleteAccount(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	owner := nokkuv1connect.NewAccountServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), db.RoleOwner)))
+	owner := nokkuv1connect.NewAccountServiceClient(
+		srv.Client(),
+		srv.URL,
+		header(
+			"Authorization",
+			"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+		),
+	)
 	_, err := owner.DeleteAccount(t.Context(), &nokkuv1.DeleteAccountRequest{})
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "the owner left: %v", err)
 

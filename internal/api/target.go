@@ -294,7 +294,7 @@ func (s *targetService) GetSubjectAccess(
 ) (*nokkuv1.GetSubjectAccessResponse, error) {
 	// A member reads its own access. Who else holds an account is for viewers.
 	caller, _ := actor.PrincipalFromContext(ctx)
-	canView := callerRole(ctx).AtLeast(db.RoleViewer)
+	canView := callerRole(ctx) >= nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER
 	if !canView && req.GetSubjectId() != caller.ID {
 		return nil, db.ErrPermissionDenied
 	}

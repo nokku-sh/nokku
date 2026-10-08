@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/caarlos0/env/v11"
 	"github.com/jackc/pgx/v5"
 
@@ -80,7 +82,7 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 			owner, err = s.createUser(ctx, q, db.CreateUserWithIDParams{
 				Email: cfg.AdminEmail,
 				Name:  cfg.AdminName,
-				Role:  string(db.RoleOwner),
+				Role:  nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER,
 			}, "")
 		}
 		return err

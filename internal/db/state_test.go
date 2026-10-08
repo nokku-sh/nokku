@@ -39,7 +39,7 @@ func newStateFixture(t *testing.T, c *Connection) stateFixture {
 	_, err := c.sysPool.Exec(t.Context(), `
 		INSERT INTO workspaces (id, slug, name) VALUES ($1, $1, 'ws');
 		INSERT INTO users (id, workspace_id, email, role)
-		VALUES ($2, $1, $2 || '@test', 'owner'), ($3, $1, $3 || '@test', 'viewer');
+		VALUES ($2, $1, $2 || '@test', 5), ($3, $1, $3 || '@test', 2);
 		INSERT INTO teams (id, workspace_id, name) VALUES ($4, $1, 'team');
 		INSERT INTO team_members (workspace_id, user_id, team_id) VALUES ($1, $3, $4);
 		INSERT INTO daemons (id, workspace_id, name, status) VALUES ($5, $1, 'd', 2);
@@ -92,7 +92,10 @@ func grantedIDs(t *testing.T, c *Connection, target string) []string {
 // asOwner runs fn the way API handlers do: nokku_app, pinned to the workspace.
 func asOwner(t *testing.T, c *Connection, f stateFixture, fn func(*Queries) error) {
 	t.Helper()
-	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: f.owner, Kind: actor.KindUser, Role: "owner"})
+	ctx := actor.ContextWithPrincipal(
+		t.Context(),
+		actor.Principal{ID: f.owner, Kind: actor.KindUser, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+	)
 	ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: f.ws})
 	if err := c.WithWorkspace(ctx, fn); err != nil {
 		t.Fatalf("workspace tx: %v", err)
@@ -255,7 +258,7 @@ func TestRedeemTokenOnce(t *testing.T) {
 			Kind:      nokkuv1.TokenKind_TOKEN_KIND_INVITE,
 			TokenHash: hash,
 			MaxUses:   new(int32(1)),
-			RoleName:  new("viewer"),
+			Role:      new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER),
 		})
 		return err
 	})

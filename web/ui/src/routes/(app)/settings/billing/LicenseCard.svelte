@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { license, licenseStatus } from '#lib/api/license.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
@@ -21,7 +22,7 @@
 
 	const status = $derived(licenseStatus(data.data));
 	const phase = $derived(status.state);
-	const canActivate = $derived(atLeast(me.data?.role, 'owner'));
+	const canActivate = $derived(atLeast(me.data?.role, WorkspaceRole.OWNER));
 
 	const badges: Record<typeof phase, { label: string; tone: Tone }> = {
 		none: { label: 'Free', tone: 'muted' },

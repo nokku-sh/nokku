@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import SecretReveal from '#lib/components/blocks/SecretReveal.svelte';
 	import { untrack, type Snippet } from 'svelte';
 	import { ca } from '#lib/api/certificates.svelte.js';
@@ -89,7 +90,7 @@
 	let customUses = $state('');
 	let autoApprove = $state(true);
 	let caId = $state('');
-	let role = $state('member');
+	let role = $state(WorkspaceRole.MEMBER);
 
 	const maxUses = $derived(
 		uses === 'unlimited'
@@ -107,7 +108,7 @@
 			maxUses,
 			autoApprove: isEnroll ? autoApprove : undefined,
 			caId: isEnroll && caId ? caId : undefined,
-			roleName: isEnroll ? undefined : role
+			role: isEnroll ? undefined : role
 		});
 	}
 
@@ -309,7 +310,7 @@
 								<span class="truncate">{t.label || 'Untitled'}</span>
 								{#if t.autoApprove}<Badge variant="info">Auto-approve</Badge>{/if}
 								{#if t.caId}<Badge variant="outline">CA {caName(t.caId) ?? 'unknown'}</Badge>{/if}
-								{#if t.roleName}<Badge variant="secondary">{roleLabel(t.roleName)}</Badge>{/if}
+								{#if t.role}<Badge variant="secondary">{roleLabel(t.role)}</Badge>{/if}
 							</p>
 							<p class="text-xs text-muted-foreground">
 								Created {formatTs(t.createdAt, 'relative')}

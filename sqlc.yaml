@@ -73,6 +73,19 @@ sql:
             go_type:
               import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "TokenKind"
+          - column: "users.role"
+            go_type:
+              import: "github.com/nokku-sh/protos/gen/nokku/v1"
+              type: "WorkspaceRole"
+          - column: "service_accounts.role"
+            go_type:
+              import: "github.com/nokku-sh/protos/gen/nokku/v1"
+              type: "WorkspaceRole"
+          - column: "workspace_tokens.role"
+            go_type:
+              import: "github.com/nokku-sh/protos/gen/nokku/v1"
+              type: "WorkspaceRole"
+              pointer: true
 
           # JSON overrides
           - column: "daemons.config"

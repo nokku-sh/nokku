@@ -36,7 +36,7 @@ SELECT
 FROM
   users
 WHERE
-  role = 'owner';
+  role = 5; -- owner
 
 -- name: ListUsers :many
 SELECT
@@ -51,8 +51,8 @@ WHERE
     OR u.email ILIKE '%' || sqlc.narg('query') || '%'
   )
   AND (
-    sqlc.narg('role')::TEXT IS NULL
-    OR u.role = sqlc.narg('role')::TEXT
+    u.role = @role
+    OR @role = 0 -- every role
   )
 ORDER BY
   u.name ASC,
@@ -91,7 +91,7 @@ SET
   updated_at = NOW()
 WHERE
   id = @id
-  AND role <> 'owner';
+  AND role <> 5; -- owner
 
 -- name: SetUserActive :exec
 UPDATE users
@@ -100,20 +100,20 @@ SET
   updated_at = NOW()
 WHERE
   id = @id
-  AND role <> 'owner';
+  AND role <> 5; -- owner
 
 -- name: TransferOwnership :execrows
 -- One statement, so the partial unique index on the owner never sees two.
 UPDATE users
 SET
   role = CASE
-    WHEN id = @new_owner_id THEN 'owner'
-    ELSE 'admin'
+    WHEN id = @new_owner_id THEN 5 -- owner
+    ELSE 4 -- admin
   END,
   updated_at = NOW()
 WHERE
   (
-    role = 'owner'
+    role = 5
     OR (
       id = @new_owner_id
       AND active
@@ -134,4 +134,4 @@ RETURNING
 DELETE FROM users
 WHERE
   id = @id
-  AND role <> 'owner';
+  AND role <> 5; -- owner

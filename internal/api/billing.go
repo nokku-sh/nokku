@@ -186,7 +186,7 @@ func (s *billingService) ActivateLicense(
 }
 
 func requireOwner(ctx context.Context) error {
-	if callerRole(ctx) != db.RoleOwner {
+	if callerRole(ctx) != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER {
 		return connect.NewError(connect.CodePermissionDenied, errors.New("workspace owner required"))
 	}
 	return nil

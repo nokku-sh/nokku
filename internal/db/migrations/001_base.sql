@@ -56,7 +56,9 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL CHECK (email = lower(email)),
   name TEXT NOT NULL DEFAULT '',
   picture TEXT,
-  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'viewer', 'editor', 'admin', 'owner')),
+  -- WorkspaceRole of the protos: 1=member, 2=viewer, 3=editor, 4=admin,
+  -- 5=owner. Ordered, each includes everything before it.
+  role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 5),
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -68,7 +70,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- statement, anything else trips this index.
 CREATE UNIQUE INDEX idx_users_owner ON users (workspace_id)
 WHERE
-  role = 'owner';
+  role = 5;
 
 CREATE TABLE IF NOT EXISTS credentials (
   id TEXT PRIMARY KEY, -- webauthn credential id, or uuidv7
@@ -189,7 +191,7 @@ CREATE TABLE IF NOT EXISTS service_accounts (
   name TEXT NOT NULL, -- e.g., "github-actions-deploy", "ansible-prod"
   description TEXT,
   token_hash TEXT, -- bearer credential for the service account (HashedToken)
-  role_name TEXT NOT NULL DEFAULT 'member' CHECK (role_name IN ('member', 'viewer', 'editor', 'admin', 'owner')),
+  role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 5), -- like users.role
   last_used_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ, -- Optional expiration for temporary access
   tags TEXT[] NOT NULL DEFAULT '{}',
@@ -312,7 +314,7 @@ CREATE TABLE IF NOT EXISTS workspace_tokens (
   uses INTEGER NOT NULL DEFAULT 0,
   auto_approve BOOLEAN NOT NULL DEFAULT FALSE, -- enroll only
   ca_id UUID, -- enroll only, NULL is the workspace default
-  role_name TEXT CHECK (role_name IN ('member', 'viewer', 'editor', 'admin')), -- invite only
+  role INTEGER CHECK (role BETWEEN 1 AND 4), -- invite only, like users.role, never the owner
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_used_at TIMESTAMPTZ,
   FOREIGN KEY (workspace_id, ca_id) REFERENCES certificate_authorities (workspace_id, id) ON DELETE SET NULL (ca_id),
@@ -323,7 +325,7 @@ CREATE TABLE IF NOT EXISTS workspace_tokens (
       AND ca_id IS NULL
     )
   ),
-  CHECK ((kind = 2) = (role_name IS NOT NULL))
+  CHECK ((kind = 2) = (role IS NOT NULL))
 );
 
 CREATE TABLE IF NOT EXISTS principals (

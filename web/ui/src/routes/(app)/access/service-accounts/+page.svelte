@@ -25,7 +25,13 @@
 	import { PlusIcon, ShieldCheck, Trash2, Waypoints } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import { roles } from '#lib/api/roles.svelte.js';
-	import { roleIcon, roleLabel } from '#lib/roles.js';
+	import {
+		parseRole,
+		roleIcon,
+		roleLabel,
+		roleSlug,
+		SERVICE_ACCOUNT_MAX_ROLE
+	} from '#lib/roles.js';
 
 	const sheet = useSheet();
 	const can = user.can();
@@ -37,7 +43,7 @@
 	const saData = serviceAccount.list(() => ({
 		...pager.args,
 		query: debounced.current,
-		roleName: page.url.searchParams.get('role') || undefined
+		role: parseRole(page.url.searchParams.get('role'))
 	}));
 
 	const deleteSA = serviceAccount.delete();
@@ -60,11 +66,13 @@
 
 	const rolesQuery = roles.list();
 	const roleOptions = $derived(
-		(rolesQuery.data ?? []).map((r) => ({
-			label: roleLabel(r.name),
-			value: r.name,
-			icon: roleIcon(r.name)
-		}))
+		(rolesQuery.data ?? [])
+			.filter((r) => r.role <= SERVICE_ACCOUNT_MAX_ROLE)
+			.map((r) => ({
+				label: roleLabel(r.role),
+				value: roleSlug(r.role),
+				icon: roleIcon(r.role)
+			}))
 	);
 
 	const columnHelper = createAppColumnHelper<ServiceAccount>();
@@ -78,13 +86,14 @@
 					description: row.original.description
 				})
 		}),
-		columnHelper.accessor('roleName', {
+		columnHelper.accessor('role', {
 			header: 'Role',
 			cell: ({ row }) =>
 				renderComponent(RoleCell, {
-					roleName: row.original.roleName,
+					role: row.original.role,
+					max: SERVICE_ACCOUNT_MAX_ROLE,
 					update: can.edit
-						? (roleName) => updateSA.mutateAsync({ id: row.original.id, roleName })
+						? (role) => updateSA.mutateAsync({ id: row.original.id, role })
 						: undefined
 				})
 		}),

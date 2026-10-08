@@ -37,7 +37,7 @@ func (s *tokenService) CreateToken(
 	}
 	switch req.GetKind() {
 	case nokkuv1.TokenKind_TOKEN_KIND_ENROLL:
-		if req.GetRoleName() != "" {
+		if req.GetRole() != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED {
 			return nil, newError(connect.CodeInvalidArgument, "enroll tokens take no role")
 		}
 		params.AutoApprove = req.GetAutoApprove()
@@ -46,12 +46,12 @@ func (s *tokenService) CreateToken(
 		if req.GetAutoApprove() || req.GetCaId() != "" {
 			return nil, newError(connect.CodeInvalidArgument, "invite tokens take only a role")
 		}
-		role := cmp.Or(req.GetRoleName(), string(db.RoleMember))
-		if !callerRole(ctx).CanAssign(db.Role(role)) {
+		role := cmp.Or(req.GetRole(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+		if !db.CanAssign(callerRole(ctx), role) {
 			return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
 		}
-		params.RoleName = &role
-		audit.Set(ctx, "role", role)
+		params.Role = &role
+		audit.Set(ctx, "role", db.RoleLabel(role))
 	case nokkuv1.TokenKind_TOKEN_KIND_UNSPECIFIED:
 		return nil, errInvalidInput
 	default:

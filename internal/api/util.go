@@ -94,12 +94,10 @@ func (s *utilService) ListRoles(
 	_ context.Context,
 	_ *nokkuv1.ListRolesRequest,
 ) (*nokkuv1.ListRolesResponse, error) {
-	roles := make([]*nokkuv1.Role, 0, len(db.Roles))
-	for _, r := range db.Roles {
-		if r == db.RoleOwner {
-			continue
-		}
-		roles = append(roles, &nokkuv1.Role{Name: new(string(r)), Description: new(r.Description())})
+	// Every role one can hand out. Ownership only moves through a transfer.
+	var roles []*nokkuv1.Role
+	for r := nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER; r < nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER; r++ {
+		roles = append(roles, &nokkuv1.Role{Role: new(r), Description: new(db.RoleDescription(r))})
 	}
 	return &nokkuv1.ListRolesResponse{Roles: roles}, nil
 }

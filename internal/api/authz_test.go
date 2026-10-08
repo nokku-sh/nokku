@@ -21,40 +21,46 @@ import (
 func TestProcedureRoles(t *testing.T) {
 	tests := []struct {
 		procedure string
-		want      db.Role
+		want      nokkuv1.WorkspaceRole
 	}{
-		{nokkuv1connect.CertificateServiceListCertificateAuthoritiesProcedure, db.RoleMember},
-		{nokkuv1connect.DaemonServiceCreateSessionProcedure, db.RoleMember},
-		{nokkuv1connect.DaemonServiceRelayProcedure, db.RoleMember},
+		{
+			nokkuv1connect.CertificateServiceListCertificateAuthoritiesProcedure,
+			nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
+		},
+		{nokkuv1connect.DaemonServiceCreateSessionProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER},
+		{nokkuv1connect.DaemonServiceRelayProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER},
 
-		{nokkuv1connect.TargetServiceListTargetsProcedure, db.RoleViewer},
-		{nokkuv1connect.WorkspaceServiceListUsersProcedure, db.RoleViewer},
-		{nokkuv1connect.UtilServiceListAuditLogsProcedure, db.RoleViewer},
-		{nokkuv1connect.RecordingServiceGetRecordingProcedure, db.RoleViewer},
+		{nokkuv1connect.TargetServiceListTargetsProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
+		{nokkuv1connect.WorkspaceServiceListUsersProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
+		{nokkuv1connect.UtilServiceListAuditLogsProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
+		{nokkuv1connect.RecordingServiceGetRecordingProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
 
-		{nokkuv1connect.TargetServiceDeleteTargetProcedure, db.RoleEditor},
-		{nokkuv1connect.PrincipalServiceRevokeAllAccessProcedure, db.RoleEditor},
-		{nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure, db.RoleEditor},
+		{nokkuv1connect.TargetServiceDeleteTargetProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR},
+		{nokkuv1connect.PrincipalServiceRevokeAllAccessProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR},
+		{
+			nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure,
+			nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR,
+		},
 
-		{nokkuv1connect.WorkspaceServiceUpdateUserRoleProcedure, db.RoleAdmin},
-		{nokkuv1connect.WorkspaceServiceSetUserActiveProcedure, db.RoleAdmin},
-		{nokkuv1connect.WorkspaceServiceDeleteUserProcedure, db.RoleAdmin},
-		{nokkuv1connect.TokenServiceCreateTokenProcedure, db.RoleAdmin},
-		{nokkuv1connect.BillingServiceGetBillingProcedure, db.RoleAdmin},
+		{nokkuv1connect.WorkspaceServiceUpdateUserRoleProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
+		{nokkuv1connect.WorkspaceServiceSetUserActiveProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
+		{nokkuv1connect.WorkspaceServiceDeleteUserProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
+		{nokkuv1connect.TokenServiceCreateTokenProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
+		{nokkuv1connect.BillingServiceGetBillingProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
 
-		{nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, db.RoleOwner},
-		{nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure, db.RoleOwner},
-		{nokkuv1connect.WorkspaceServiceTransferOwnershipProcedure, db.RoleOwner},
-		{nokkuv1connect.BillingServiceActivateLicenseProcedure, db.RoleOwner},
-		{nokkuv1connect.SSOServicePutSSOProviderProcedure, db.RoleOwner},
-		{nokkuv1connect.SSOServiceDeleteSSOProviderProcedure, db.RoleOwner},
-		{nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure, db.RoleOwner},
-		{nokkuv1connect.SCIMServiceDeleteSCIMTokenProcedure, db.RoleOwner},
+		{nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+		{nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+		{nokkuv1connect.WorkspaceServiceTransferOwnershipProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+		{nokkuv1connect.BillingServiceActivateLicenseProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+		{nokkuv1connect.SSOServicePutSSOProviderProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+		{nokkuv1connect.SSOServiceDeleteSSOProviderProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+		{nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+		{nokkuv1connect.SCIMServiceDeleteSCIMTokenProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 	}
 
 	for _, test := range tests {
-		if got := workspaceRoles[procedureAccess[test.procedure].GetRole()]; got != test.want {
-			t.Errorf("%s role = %q, want %q", test.procedure, got, test.want)
+		if got := procedureAccess[test.procedure].GetRole(); got != test.want {
+			t.Errorf("%s role = %s, want %s", test.procedure, got, test.want)
 		}
 	}
 }
@@ -102,8 +108,8 @@ func TestEveryProcedureIsClassified(t *testing.T) {
 			classes++
 		}
 		if access.GetRole() != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED {
-			if _, ok := workspaceRoles[access.GetRole()]; !ok {
-				t.Errorf("%s has unmapped role %s", procedure, access.GetRole())
+			if _, ok := nokkuv1.WorkspaceRole_name[int32(access.GetRole())]; !ok {
+				t.Errorf("%s has an undefined role %d", procedure, access.GetRole())
 			}
 			classes++
 		}
@@ -173,7 +179,10 @@ func TestDaemonProceduresLiveInControlService(t *testing.T) {
 
 func TestAuthorizeUserOnDaemonProcedures(t *testing.T) {
 	a := &authorizationInterceptor{}
-	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser, Role: "owner"})
+	ctx := actor.ContextWithPrincipal(
+		t.Context(),
+		actor.Principal{ID: "u1", Kind: actor.KindUser, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+	)
 	for procedure, access := range procedureAccess {
 		if !daemonOnly(access) {
 			continue
@@ -187,35 +196,38 @@ func TestAuthorizeUserOnDaemonProcedures(t *testing.T) {
 // The role comes with the principal, so no lookup happens here.
 func TestAuthorizeRoleFromPrincipal(t *testing.T) {
 	a := &authorizationInterceptor{}
-	as := func(role string) context.Context {
+	as := func(role nokkuv1.WorkspaceRole) context.Context {
 		return actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser, Role: role})
 	}
 	tests := []struct {
-		role      string
+		role      nokkuv1.WorkspaceRole
 		procedure string
 		allowed   bool
 	}{
-		{"member", nokkuv1connect.DaemonServiceRelayProcedure, true},
-		{"member", nokkuv1connect.RecordingServiceGetRecordingProcedure, false},
-		{"viewer", nokkuv1connect.RecordingServiceGetRecordingProcedure, true},
-		{"viewer", nokkuv1connect.TargetServiceDeleteTargetProcedure, false},
-		{"editor", nokkuv1connect.TargetServiceDeleteTargetProcedure, true},
-		{"admin", nokkuv1connect.SSOServicePutSSOProviderProcedure, false},
-		{"owner", nokkuv1connect.SSOServicePutSSOProviderProcedure, true},
-		{"", nokkuv1connect.TargetServiceListTargetsProcedure, false},
-		{"", nokkuv1connect.AccountServiceGetAccountProcedure, true},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, nokkuv1connect.DaemonServiceRelayProcedure, true},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, nokkuv1connect.RecordingServiceGetRecordingProcedure, false},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER, nokkuv1connect.RecordingServiceGetRecordingProcedure, true},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER, nokkuv1connect.TargetServiceDeleteTargetProcedure, false},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, nokkuv1connect.TargetServiceDeleteTargetProcedure, true},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN, nokkuv1connect.SSOServicePutSSOProviderProcedure, false},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, nokkuv1connect.SSOServicePutSSOProviderProcedure, true},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED, nokkuv1connect.TargetServiceListTargetsProcedure, false},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED, nokkuv1connect.AccountServiceGetAccountProcedure, true},
 	}
 	for _, tt := range tests {
 		err := a.authorize(as(tt.role), tt.procedure)
 		if (err == nil) != tt.allowed {
-			t.Errorf("%q on %s: err = %v, want allowed=%v", tt.role, tt.procedure, err, tt.allowed)
+			t.Errorf("%s on %s: err = %v, want allowed=%v", tt.role, tt.procedure, err, tt.allowed)
 		}
 	}
 }
 
 func TestAuthorizeUnknownProcedure(t *testing.T) {
 	a := &authorizationInterceptor{}
-	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "u1", Kind: actor.KindUser, Role: "owner"})
+	ctx := actor.ContextWithPrincipal(
+		t.Context(),
+		actor.Principal{ID: "u1", Kind: actor.KindUser, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+	)
 	if err := a.authorize(ctx, "/nokku.v1.UnknownService/Unknown"); !errors.Is(err, db.ErrPermissionDenied) {
 		t.Fatalf("unknown procedure: err = %v, want permission denied", err)
 	}

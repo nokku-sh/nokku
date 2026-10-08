@@ -23,9 +23,9 @@ import (
 func TestAuditDeniedCall(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	viewer := seedMember(t, cfg, workspaceID, db.RoleViewer)
+	viewer := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
 	other := seedOtherWorkspace(t, cfg)
-	outsider := seedUser(t, cfg, other, db.RoleAdmin)
+	outsider := seedUser(t, cfg, other, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	_, stranger, err := cfg.IAM.IssueSession(
 		actor.WithWorkspace(t.Context(), actor.Workspace{ID: other, BaseURL: cfg.FullURL()}),
 		iam.SessionParams{SubjectID: outsider.ID, Kind: actor.KindUser, Method: iam.MethodPasskey},

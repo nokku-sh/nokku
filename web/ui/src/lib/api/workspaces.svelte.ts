@@ -1,3 +1,4 @@
+import type { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 import { MAX_PAGE_SIZE } from '#lib/config.js';
 import { WorkspaceService } from '#lib/gen/nokku/v1/workspace_pb.js';
 import { toast } from 'svelte-sonner';
@@ -35,7 +36,7 @@ export const users = {
 	list: (
 		opts?: () => {
 			query?: string;
-			role?: string;
+			role?: WorkspaceRole;
 			limit?: number;
 			offset?: number;
 		},

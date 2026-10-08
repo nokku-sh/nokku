@@ -115,7 +115,11 @@ calls `SyncDaemon`.
 
 - Who may call an RPC is declared on the RPC itself, `option (access)` in the
   protos repo (`access.proto`). RPCs without it are denied.
-  `internal/api/authz.go` enforces it, with roles from `internal/db/roles.go`.
+  `internal/api/authz.go` enforces it.
+- A role is the `WorkspaceRole` enum of the protos everywhere: in the API, in
+  Go, in the UI, and as its number in the database. The values are ordered,
+  so "at least" is `>=` and the zero value passes nothing. Never keep a
+  second list of roles or compare role names as strings.
 - Everything a daemon calls lives in `DaemonControlService`
   (`internal/api/daemon_control.go`), and nothing else does but the public
   `EnrollDaemon`. A new daemon RPC goes there, never as a second mode of a

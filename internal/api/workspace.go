@@ -36,7 +36,8 @@ func (s *workspaceService) GetWorkspace(
 	result := workspace.ToProto()
 	// The webhook secret signs events to the customer's SIEM, only the
 	// owner manages it and reads it back.
-	if settings := result.GetSettings(); settings != nil && !callerRole(ctx).AtLeast(db.RoleOwner) {
+	if settings := result.GetSettings(); settings != nil &&
+		callerRole(ctx) < nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER {
 		settings.AuditWebhookUrl, settings.AuditWebhookSecret = nil, nil
 	}
 	return &nokkuv1.GetWorkspaceResponse{Workspace: result}, nil
@@ -132,7 +133,7 @@ func (s *workspaceService) ListUsers(
 ) (*nokkuv1.ListUsersResponse, error) {
 	rows, err := s.cfg.Conn.Tenant().ListUsers(ctx, &db.ListUsersParams{
 		Query:  req.Query,
-		Role:   req.Role,
+		Role:   req.GetRole(),
 		Limit:  req.Limit,
 		Offset: req.Offset,
 	})
@@ -162,10 +163,10 @@ func (s *workspaceService) UpdateUserRole(
 	ctx context.Context,
 	req *nokkuv1.UpdateUserRoleRequest,
 ) (*nokkuv1.UpdateUserRoleResponse, error) {
-	if !callerRole(ctx).CanAssign(db.Role(req.GetRole())) {
+	if !db.CanAssign(callerRole(ctx), req.GetRole()) {
 		return nil, newError(connect.CodePermissionDenied, "role cannot be assigned by you")
 	}
-	audit.Set(ctx, "role", req.GetRole())
+	audit.Set(ctx, "role", db.RoleLabel(req.GetRole()))
 	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
 			return err
@@ -232,7 +233,7 @@ func checkCanManageUser(ctx context.Context, q *db.Queries, userID string) error
 	if err != nil {
 		return err
 	}
-	if !callerRole(ctx).CanAssign(db.Role(u.Role)) {
+	if !db.CanAssign(callerRole(ctx), u.Role) {
 		return db.ErrPermissionDenied
 	}
 	return nil

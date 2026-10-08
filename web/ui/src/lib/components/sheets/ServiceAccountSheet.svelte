@@ -3,6 +3,7 @@
 	import { serviceAccount as saApi } from '#lib/api/service_account.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import RolePicker from '#lib/components/access/RolePicker.svelte';
+	import { SERVICE_ACCOUNT_MAX_ROLE } from '#lib/roles.js';
 	import SubjectAccess from '#lib/components/access/SubjectAccess.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
@@ -132,10 +133,11 @@
 				description="What it may change through the API."
 			>
 				<RolePicker
-					value={model.roleName}
+					value={model.role}
+					max={SERVICE_ACCOUNT_MAX_ROLE}
 					disabled={!can.edit}
 					onChange={(role) => {
-						model.roleName = role;
+						model.role = role;
 						save();
 					}}
 				/>

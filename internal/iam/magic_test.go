@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -118,7 +120,7 @@ func TestSignupLinkCreatesInvitedUser(t *testing.T) {
 	mail := e.mailbox()
 	o := e.org(t)
 	ctx := anon(t.Context(), o.ws)
-	invite := e.invite(t, o.ws, "editor", 1)
+	invite := e.invite(t, o.ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, 1)
 	email := "new@" + testDomain()
 
 	require.ErrorIs(t, e.svc.RequestSignupLink(ctx, invite, o.owner.Email, "Dup"), ErrEmailTaken)
@@ -131,7 +133,7 @@ func TestSignupLinkCreatesInvitedUser(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, email, u.Email)
 	assert.Equal(t, "New", u.Name)
-	assert.Equal(t, "editor", u.Role, "the role comes from the invite")
+	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, u.Role, "the role comes from the invite")
 	assert.NotNil(t, cookie)
 	assert.Equal(t, 1, e.sessions(t, o.ws, u.ID))
 
@@ -147,7 +149,7 @@ func TestUnsentSignupLinkIsAnError(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	ctx := anon(t.Context(), o.ws)
-	invite := e.invite(t, o.ws, "member", 0)
+	invite := e.invite(t, o.ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, 0)
 	var link string
 	sendErr := errors.New("smtp send: 535 Authentication Failed")
 	e.svc.sendSignupLink = func(_ context.Context, _, _, _, l, _ string) error {
@@ -175,7 +177,15 @@ func TestSeatCapStopsSignup(t *testing.T) {
 	o := e.org(t)
 	ctx := anon(t.Context(), o.ws)
 
-	require.NoError(t, e.svc.RequestSignupLink(ctx, e.invite(t, o.ws, "member", 0), "two@"+testDomain(), ""))
+	require.NoError(
+		t,
+		e.svc.RequestSignupLink(
+			ctx,
+			e.invite(t, o.ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, 0),
+			"two@"+testDomain(),
+			"",
+		),
+	)
 	_, _, err := e.svc.ConsumeMagicLink(ctx, linkToken(t, mail.link(t)))
 	require.ErrorIs(t, err, ErrSeatLimit)
 	assert.Nil(t, e.userByEmail(t, o.ws, "two@"+testDomain()))
@@ -193,7 +203,7 @@ func TestBootstrapMakesTheOwnerOnce(t *testing.T) {
 	assert.Contains(t, first, "/login/verify?token=", "an owner without a passkey gets a link")
 	owner := e.userByEmail(t, ws, email)
 	require.NotNil(t, owner)
-	assert.Equal(t, "owner", owner.Role)
+	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, owner.Role)
 
 	// The second boot keeps the owner and only re-issues the link.
 	t.Setenv("NOKKU_ADMIN_EMAIL", "other@"+testDomain())
@@ -230,7 +240,7 @@ func TestLastCredentialStays(t *testing.T) {
 	require.NoError(t, e.svc.DeleteCredential(ctx, "passkey:b"))
 	assert.Zero(t, e.passkeys(t, o.ws, o.owner.ID))
 
-	other := e.user(t, o.ws, "other@"+testDomain(), "member")
+	other := e.user(t, o.ws, "other@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	e.putCredential(t, o.ws, db.UpsertCredentialParams{
 		ID:      "passkey:c",
 		UserID:  other.ID,

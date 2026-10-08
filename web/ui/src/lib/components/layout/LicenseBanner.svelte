@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { license, licenseStatus } from '#lib/api/license.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { atLeast } from '#lib/roles.js';
@@ -12,7 +13,7 @@
 	const expired = $derived(status.state === 'expired');
 	// Only the people who can act on it.
 	const show = $derived(
-		(expired || status.state === 'expiring') && atLeast(me.data?.role, 'admin')
+		(expired || status.state === 'expiring') && atLeast(me.data?.role, WorkspaceRole.ADMIN)
 	);
 </script>
 

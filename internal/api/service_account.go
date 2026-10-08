@@ -35,8 +35,8 @@ func (s *serviceAccountService) CreateServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.CreateServiceAccountRequest,
 ) (*nokkuv1.CreateServiceAccountResponse, error) {
-	roleName := cmp.Or(req.GetRoleName(), string(db.RoleMember))
-	if !callerRole(ctx).CanAssign(db.Role(roleName)) {
+	role := cmp.Or(req.GetRole(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	if !db.CanAssign(callerRole(ctx), role) {
 		return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
 
@@ -48,7 +48,7 @@ func (s *serviceAccountService) CreateServiceAccount(
 			Name:        req.GetName(),
 			Description: req.Description,
 			Tags:        req.GetTags(),
-			RoleName:    &roleName,
+			Role:        role,
 			TokenHash:   &tokenHash,
 		}
 
@@ -80,7 +80,9 @@ func (s *serviceAccountService) UpdateServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.UpdateServiceAccountRequest,
 ) (*nokkuv1.UpdateServiceAccountResponse, error) {
-	if req.RoleName != nil && !callerRole(ctx).CanAssign(db.Role(req.GetRoleName())) {
+	// No role keeps the one it has.
+	role := req.GetRole()
+	if role != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED && !db.CanAssign(callerRole(ctx), role) {
 		return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
 
@@ -93,7 +95,7 @@ func (s *serviceAccountService) UpdateServiceAccount(
 			ServiceAccountID: req.GetId(),
 			Name:             req.Name,
 			Description:      req.Description,
-			RoleName:         req.RoleName,
+			Role:             role,
 			// An update replaces the tags. The query keeps the old ones for nil.
 			Tags: append([]string{}, req.GetTags()...),
 		})
@@ -115,11 +117,11 @@ func (s *serviceAccountService) ListServiceAccounts(
 	req *nokkuv1.ListServiceAccountsRequest,
 ) (*nokkuv1.ListServiceAccountsResponse, error) {
 	result, err := s.cfg.Conn.Tenant().ListServiceAccounts(ctx, &db.ListServiceAccountsParams{
-		Query:    req.Query,
-		Tags:     req.GetTags(),
-		RoleName: req.RoleName,
-		Limit:    req.Limit,
-		Offset:   req.Offset,
+		Query:  req.Query,
+		Tags:   req.GetTags(),
+		Role:   req.GetRole(),
+		Limit:  req.Limit,
+		Offset: req.Offset,
 	})
 	if err != nil {
 		return nil, err
@@ -155,7 +157,7 @@ func checkCanManageServiceAccount(ctx context.Context, q *db.Queries, id string)
 	if err != nil {
 		return err
 	}
-	if !callerRole(ctx).CanAssign(db.Role(sa.RoleName)) {
+	if !db.CanAssign(callerRole(ctx), sa.Role) {
 		return db.ErrPermissionDenied
 	}
 	return nil

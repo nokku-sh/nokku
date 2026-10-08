@@ -169,7 +169,7 @@ type ServiceAccount struct {
 	Name        string              `json:"name"`
 	Description *string             `json:"description"`
 	TokenHash   *crypto.HashedToken `json:"tokenHash"`
-	RoleName    string              `json:"roleName"`
+	Role        nokku.WorkspaceRole `json:"role"`
 	LastUsedAt  *time.Time          `json:"lastUsedAt"`
 	ExpiresAt   *time.Time          `json:"expiresAt"`
 	Tags        []string            `json:"tags"`
@@ -236,15 +236,15 @@ type TeamMember struct {
 }
 
 type User struct {
-	ID          string    `json:"id"`
-	WorkspaceID string    `json:"workspaceId"`
-	Email       string    `json:"email"`
-	Name        string    `json:"name"`
-	Picture     *string   `json:"picture"`
-	Role        string    `json:"role"`
-	Active      bool      `json:"active"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          string              `json:"id"`
+	WorkspaceID string              `json:"workspaceId"`
+	Email       string              `json:"email"`
+	Name        string              `json:"name"`
+	Picture     *string             `json:"picture"`
+	Role        nokku.WorkspaceRole `json:"role"`
+	Active      bool                `json:"active"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	UpdatedAt   time.Time           `json:"updatedAt"`
 }
 
 type Workspace struct {
@@ -277,17 +277,17 @@ type WorkspaceSubscription struct {
 }
 
 type WorkspaceToken struct {
-	ID          string             `json:"id"`
-	WorkspaceID string             `json:"workspaceId"`
-	Kind        nokku.TokenKind    `json:"kind"`
-	Label       string             `json:"label"`
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-	ExpiresAt   *time.Time         `json:"expiresAt"`
-	MaxUses     *int32             `json:"maxUses"`
-	Uses        int32              `json:"uses"`
-	AutoApprove bool               `json:"autoApprove"`
-	CaID        *string            `json:"caId"`
-	RoleName    *string            `json:"roleName"`
-	CreatedAt   time.Time          `json:"createdAt"`
-	LastUsedAt  *time.Time         `json:"lastUsedAt"`
+	ID          string               `json:"id"`
+	WorkspaceID string               `json:"workspaceId"`
+	Kind        nokku.TokenKind      `json:"kind"`
+	Label       string               `json:"label"`
+	TokenHash   crypto.HashedToken   `json:"tokenHash"`
+	ExpiresAt   *time.Time           `json:"expiresAt"`
+	MaxUses     *int32               `json:"maxUses"`
+	Uses        int32                `json:"uses"`
+	AutoApprove bool                 `json:"autoApprove"`
+	CaID        *string              `json:"caId"`
+	Role        *nokku.WorkspaceRole `json:"role"`
+	CreatedAt   time.Time            `json:"createdAt"`
+	LastUsedAt  *time.Time           `json:"lastUsedAt"`
 }

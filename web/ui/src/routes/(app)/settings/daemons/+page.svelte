@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { workspace } from '#lib/api/workspaces.svelte.js';
 	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
@@ -16,7 +17,7 @@
 	const ws = workspace.get();
 	const me = user.self();
 	const update = workspace.update();
-	const canEdit = $derived(atLeast(me.data?.role, 'owner'));
+	const canEdit = $derived(atLeast(me.data?.role, WorkspaceRole.OWNER));
 
 	// A real protobuf message, not a plain object, so the transport accepts it.
 	const settings = $derived.by(() => {

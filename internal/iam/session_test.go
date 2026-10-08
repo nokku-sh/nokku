@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,7 +65,7 @@ func TestMiddlewareOnlyTrustsCookieSessions(t *testing.T) {
 	p, ok := principal(cookie)
 	require.True(t, ok, "the user cookie session did not authenticate")
 	assert.Equal(t, o.owner.ID, p.ID)
-	assert.Equal(t, "owner", p.Role, "the principal carries the role")
+	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, p.Role, "the principal carries the role")
 }
 
 // A session only exists on the host of its workspace.
@@ -83,8 +85,8 @@ func TestSessionIsBoundToItsWorkspace(t *testing.T) {
 func TestDeleteOwnSessionOnly(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
-	alice := e.user(t, o.ws, "alice@"+testDomain(), "member")
-	bob := e.user(t, o.ws, "bob@"+testDomain(), "member")
+	alice := e.user(t, o.ws, "alice@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	bob := e.user(t, o.ws, "bob@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	sess, _ := e.session(t, o.ws, bob, actor.KindUser)
 
 	_ = e.svc.DeleteOwnSession(as(t.Context(), o.ws, alice), SessionHash(sess.TokenHash))
@@ -146,7 +148,7 @@ func TestSessionRecordsDevice(t *testing.T) {
 func TestInactiveUserLosesCLISession(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
-	u := e.user(t, o.ws, "user@"+testDomain(), "member")
+	u := e.user(t, o.ws, "user@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	_, token := e.session(t, o.ws, u, actor.KindCLI)
 	ctx := anon(t.Context(), o.ws)
 	_, _, err := e.svc.AuthenticateToken(ctx, token)
@@ -161,7 +163,7 @@ func TestInactiveUserLosesCLISession(t *testing.T) {
 func TestDeletedUserLosesSessions(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
-	u := e.user(t, o.ws, "user@"+testDomain(), "member")
+	u := e.user(t, o.ws, "user@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	_, token := e.session(t, o.ws, u, actor.KindCLI)
 	ctx := anon(t.Context(), o.ws)
 	_, _, err := e.svc.AuthenticateToken(ctx, token)
@@ -175,7 +177,7 @@ func TestDeletedUserLosesSessions(t *testing.T) {
 func TestOwnerCannotDeleteThemselves(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
-	member := e.user(t, o.ws, "m@"+testDomain(), "member")
+	member := e.user(t, o.ws, "m@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	require.ErrorIs(t, e.svc.DeleteSelf(as(t.Context(), o.ws, o.owner)), ErrOwner)
 	require.NoError(t, e.svc.DeleteSelf(as(t.Context(), o.ws, member)))
 	assert.Nil(t, e.userByEmail(t, o.ws, member.Email))
@@ -185,8 +187,8 @@ func TestEmailChange(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	oldEmail, newEmail := "old@"+testDomain(), "new@"+testDomain()
-	u := e.user(t, o.ws, oldEmail, "member")
-	taken := e.user(t, o.ws, "taken@"+testDomain(), "member")
+	u := e.user(t, o.ws, oldEmail, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	taken := e.user(t, o.ws, "taken@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	ctx := as(t.Context(), o.ws, u)
 
 	_, _, err := e.svc.RequestEmailChange(ctx, u, oldEmail)
@@ -225,7 +227,7 @@ func TestEmailChange(t *testing.T) {
 func TestEmailChangeCancelBeforeConfirm(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
-	u := e.user(t, o.ws, "old@"+testDomain(), "member")
+	u := e.user(t, o.ws, "old@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	ctx := as(t.Context(), o.ws, u)
 	confirm, cancel, err := e.svc.RequestEmailChange(ctx, u, "new@"+testDomain())
 	require.NoError(t, err)
@@ -243,7 +245,7 @@ func TestEmailChangeCancelBeforeConfirm(t *testing.T) {
 func TestEmailChangeRefusedForManagedAccounts(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
-	u := e.user(t, o.ws, "managed@"+testDomain(), "member")
+	u := e.user(t, o.ws, "managed@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	e.putCredential(t, o.ws, db.UpsertCredentialParams{
 		ID: "okta:sub", UserID: u.ID, Type: string(MethodOIDC), Provider: "okta", Subject: "sub", Data: []byte{},
 	})
@@ -301,7 +303,7 @@ func TestBrowserIsRememberedAndNeverSignsIn(t *testing.T) {
 	}
 
 	// Another account on the same browser is new there.
-	other := e.user(t, o.ws, "other@"+testDomain(), "member")
+	other := e.user(t, o.ws, "other@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	e.svc.sendNewLogin = nil
 	assert.NotNil(t, e.svc.RememberDevice(ctx, header, addr, other), "a device of one account is known to another")
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { billing } from '#lib/api/billing.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
@@ -14,7 +15,7 @@
 
 	// Unknown until the account loads, so the buttons don't flicker.
 	const me = user.self();
-	const readonly = $derived(me.data !== undefined && me.data.role !== 'owner');
+	const readonly = $derived(me.data !== undefined && me.data.role !== WorkspaceRole.OWNER);
 
 	// Only admins read the plan. Everyone else gets the read-only tab either way.
 	const can = user.can();

@@ -61,7 +61,10 @@ func dpopProof(t *testing.T, cfg *config.Config, key *ecdsa.PrivateKey, procedur
 func TestEnrollDaemon(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
 
 	created, err := nokkuv1connect.NewTokenServiceClient(srv.Client(), srv.URL, adminAuth).
 		CreateToken(t.Context(), &nokkuv1.CreateTokenRequest{
@@ -137,7 +140,10 @@ func TestEnrollDaemon(t *testing.T) {
 func TestCreateSession(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
 
 	// Enrollment falls back to the default CA, which CreateSession needs.
 	_, err := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth).
@@ -164,7 +170,7 @@ func TestCreateSession(t *testing.T) {
 		DaemonId: new(enrolled.GetId()),
 		Username: new("root"),
 	}
-	memberToken := seedMember(t, cfg, workspaceID, db.RoleMember)
+	memberToken := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	member := nokkuv1connect.NewDaemonServiceClient(
 		srv.Client(),
 		srv.URL,
@@ -172,8 +178,8 @@ func TestCreateSession(t *testing.T) {
 	)
 	sa, err := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth).
 		CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
-			Name:     new(uniq("ci")),
-			RoleName: new(string(db.RoleEditor)),
+			Name: new(uniq("ci")),
+			Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
 		})
 	require.NoError(t, err)
 	machine := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL,
@@ -410,7 +416,10 @@ func enrollTestDaemon(
 	autoApprove bool,
 ) (*ecdsa.PrivateKey, *nokkuv1.EnrollDaemonResponse) {
 	t.Helper()
-	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
 	created, err := nokkuv1connect.NewTokenServiceClient(srv.Client(), srv.URL, adminAuth).
 		CreateToken(t.Context(), &nokkuv1.CreateTokenRequest{
 			Kind:        nokkuv1.TokenKind_TOKEN_KIND_ENROLL.Enum(),
@@ -460,7 +469,10 @@ func TestDeletedDaemonIsRejected(t *testing.T) {
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	token := enrolled.GetAccessToken()
 
-	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
 	_, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, adminAuth).
 		DeleteDaemon(t.Context(), &nokkuv1.DeleteDaemonRequest{Id: new(enrolled.GetId())})
 	require.NoError(t, err)
@@ -496,7 +508,10 @@ func seedDefaultCA(t *testing.T, srv *httptest.Server, adminAuth connect.ClientO
 func TestEnrollFallsBackToSSHDefaultCA(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
 	// The workspace is shared and came with a default CA. Only the owner
 	// role deletes past RLS.
 	owner, err := pgx.Connect(t.Context(), "")
@@ -536,7 +551,10 @@ func TestEnrollFallsBackToSSHDefaultCA(t *testing.T) {
 func TestSyncDaemonReport(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
 	caKey := seedDefaultCA(t, srv, adminAuth)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	token := enrolled.GetAccessToken()
@@ -572,7 +590,10 @@ func TestSyncDaemonReport(t *testing.T) {
 func TestSignHostCertificate(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
 	caKey := seedDefaultCA(t, srv, adminAuth)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 
@@ -617,7 +638,10 @@ func TestUnenrollDaemon(t *testing.T) {
 		UnenrollDaemon(t.Context(), &nokkuv1.UnenrollDaemonRequest{})
 	require.NoError(t, err)
 
-	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
 	_, err = nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, adminAuth).
 		GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: new(enrolled.GetId())})
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "the daemon is still there, got %v", err)
@@ -651,7 +675,10 @@ func TestServersOnlyTakeSSHCAs(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	ctx := t.Context()
 	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
 	x509CA := seedCA(t, srv, adminAuth, "x509", nokkuv1.AuthorityType_AUTHORITY_TYPE_X509)
 	sshCA := seedCA(t, srv, adminAuth, "ssh", nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH)
 	targets := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, adminAuth)
@@ -694,7 +721,10 @@ func TestServersOnlyTakeSSHCAs(t *testing.T) {
 func TestSignHostCertificateNeedsAnSSHCA(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
 	x509CA := seedCA(t, srv, adminAuth, "x509", nokkuv1.AuthorityType_AUTHORITY_TYPE_X509)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	_, err := cfg.Conn.Sys().UpdateTarget(t.Context(), &db.UpdateTargetParams{

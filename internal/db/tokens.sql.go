@@ -24,7 +24,7 @@ INSERT INTO
     max_uses,
     auto_approve,
     ca_id,
-    role_name
+    role
   )
 VALUES
   (
@@ -39,19 +39,19 @@ VALUES
     $9
   )
 RETURNING
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role_name, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, created_at, last_used_at
 `
 
 type CreateWorkspaceTokenParams struct {
-	ID          string             `json:"id"`
-	Kind        nokku.TokenKind    `json:"kind"`
-	Label       string             `json:"label"`
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-	ExpiresAt   *time.Time         `json:"expiresAt"`
-	MaxUses     *int32             `json:"maxUses"`
-	AutoApprove bool               `json:"autoApprove"`
-	CaID        *string            `json:"caId"`
-	RoleName    *string            `json:"roleName"`
+	ID          string               `json:"id"`
+	Kind        nokku.TokenKind      `json:"kind"`
+	Label       string               `json:"label"`
+	TokenHash   crypto.HashedToken   `json:"tokenHash"`
+	ExpiresAt   *time.Time           `json:"expiresAt"`
+	MaxUses     *int32               `json:"maxUses"`
+	AutoApprove bool                 `json:"autoApprove"`
+	CaID        *string              `json:"caId"`
+	Role        *nokku.WorkspaceRole `json:"role"`
 }
 
 func (q *Queries) CreateWorkspaceToken(ctx context.Context, arg *CreateWorkspaceTokenParams) (*WorkspaceToken, error) {
@@ -64,7 +64,7 @@ func (q *Queries) CreateWorkspaceToken(ctx context.Context, arg *CreateWorkspace
 		arg.MaxUses,
 		arg.AutoApprove,
 		arg.CaID,
-		arg.RoleName,
+		arg.Role,
 	)
 	var i WorkspaceToken
 	err := row.Scan(
@@ -78,7 +78,7 @@ func (q *Queries) CreateWorkspaceToken(ctx context.Context, arg *CreateWorkspace
 		&i.Uses,
 		&i.AutoApprove,
 		&i.CaID,
-		&i.RoleName,
+		&i.Role,
 		&i.CreatedAt,
 		&i.LastUsedAt,
 	)
@@ -98,7 +98,7 @@ func (q *Queries) DeleteWorkspaceToken(ctx context.Context, id string) error {
 
 const getLiveToken = `-- name: GetLiveToken :one
 SELECT
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role_name, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, created_at, last_used_at
 FROM
   workspace_tokens
 WHERE
@@ -133,7 +133,7 @@ func (q *Queries) GetLiveToken(ctx context.Context, arg *GetLiveTokenParams) (*W
 		&i.Uses,
 		&i.AutoApprove,
 		&i.CaID,
-		&i.RoleName,
+		&i.Role,
 		&i.CreatedAt,
 		&i.LastUsedAt,
 	)
@@ -142,7 +142,7 @@ func (q *Queries) GetLiveToken(ctx context.Context, arg *GetLiveTokenParams) (*W
 
 const listWorkspaceTokens = `-- name: ListWorkspaceTokens :many
 SELECT
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role_name, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, created_at, last_used_at
 FROM
   workspace_tokens
 WHERE
@@ -174,7 +174,7 @@ func (q *Queries) ListWorkspaceTokens(ctx context.Context, kind nokku.TokenKind)
 			&i.Uses,
 			&i.AutoApprove,
 			&i.CaID,
-			&i.RoleName,
+			&i.Role,
 			&i.CreatedAt,
 			&i.LastUsedAt,
 		); err != nil {
@@ -206,7 +206,7 @@ WHERE
     OR uses < max_uses
   )
 RETURNING
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role_name, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, created_at, last_used_at
 `
 
 type RedeemTokenParams struct {
@@ -230,7 +230,7 @@ func (q *Queries) RedeemToken(ctx context.Context, arg *RedeemTokenParams) (*Wor
 		&i.Uses,
 		&i.AutoApprove,
 		&i.CaID,
-		&i.RoleName,
+		&i.Role,
 		&i.CreatedAt,
 		&i.LastUsedAt,
 	)
@@ -254,7 +254,7 @@ WHERE
     OR uses < max_uses
   )
 RETURNING
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role_name, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, created_at, last_used_at
 `
 
 type RedeemTokenByIDParams struct {
@@ -278,7 +278,7 @@ func (q *Queries) RedeemTokenByID(ctx context.Context, arg *RedeemTokenByIDParam
 		&i.Uses,
 		&i.AutoApprove,
 		&i.CaID,
-		&i.RoleName,
+		&i.Role,
 		&i.CreatedAt,
 		&i.LastUsedAt,
 	)

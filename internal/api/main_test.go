@@ -9,6 +9,8 @@ import (
 	"testing"
 	"uuid"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
@@ -117,14 +119,14 @@ func wsCtx(t *testing.T, cfg *config.Config) context.Context {
 	return actor.WithWorkspace(t.Context(), cfg.Tenant.Single())
 }
 
-func seedUser(t *testing.T, cfg *config.Config, workspaceID string, role db.Role) *db.User {
+func seedUser(t *testing.T, cfg *config.Config, workspaceID string, role nokkuv1.WorkspaceRole) *db.User {
 	t.Helper()
 	var u *db.User
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
 		u, err = q.CreateUser(t.Context(), &db.CreateUserParams{
 			Email: strings.ReplaceAll(uuid.New().String(), "-", "") + "@api.test",
-			Name:  string(role),
-			Role:  string(role),
+			Name:  db.RoleLabel(role),
+			Role:  role,
 		})
 		return err
 	})
@@ -140,7 +142,7 @@ func seedOwner(t *testing.T, cfg *config.Config) *db.User {
 		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return seedUser(t, cfg, cfg.Tenant.Single().ID, db.RoleOwner)
+		return seedUser(t, cfg, cfg.Tenant.Single().ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
 	}
 	require.NoError(t, err)
 	return owner
@@ -160,9 +162,9 @@ func sessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 
 // seedMember adds a user with role to the workspace and returns a session
 // token for them. The owner is shared, there is only one.
-func seedMember(t *testing.T, cfg *config.Config, workspaceID string, role db.Role) string {
+func seedMember(t *testing.T, cfg *config.Config, workspaceID string, role nokkuv1.WorkspaceRole) string {
 	t.Helper()
-	if role == db.RoleOwner {
+	if role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER {
 		return sessionFor(t, cfg, seedOwner(t, cfg))
 	}
 	return sessionFor(t, cfg, seedUser(t, cfg, workspaceID, role))

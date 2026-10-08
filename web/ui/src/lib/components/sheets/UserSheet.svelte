@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { principal as principalApi } from '#lib/api/principals.svelte.js';
 	import { team as teamApi } from '#lib/api/team.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
@@ -45,10 +46,10 @@
 	const removeFromTeam = teamApi.removeMember();
 	const revokeAll = principalApi.revokeSubject();
 
-	const isOwner = $derived(person?.role === 'owner');
+	const isOwner = $derived(person?.role === WorkspaceRole.OWNER);
 	const isMe = $derived(me.data?.id === person?.id);
-	const iAmOwner = $derived(me.data?.role === 'owner');
-	const canManage = $derived(atLeast(me.data?.role, 'admin') && !isOwner && !isMe);
+	const iAmOwner = $derived(me.data?.role === WorkspaceRole.OWNER);
+	const canManage = $derived(atLeast(me.data?.role, WorkspaceRole.ADMIN) && !isOwner && !isMe);
 
 	function toggleTeam(teamId: string) {
 		if (!person) return;

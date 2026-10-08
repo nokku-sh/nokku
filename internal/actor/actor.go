@@ -6,6 +6,8 @@ package actor
 import (
 	"context"
 	"net/http"
+
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 )
 
 type Kind string
@@ -22,8 +24,8 @@ type Principal struct {
 	ID    string
 	Kind  Kind
 	Email string
-	// Role is the user's or service account's role, empty for daemons and SCIM.
-	Role string
+	// Role is the user's or service account's role, unset for daemons and SCIM.
+	Role nokkuv1.WorkspaceRole
 }
 
 // Workspace is the tenant a request runs in. The host names it before any

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/coder/websocket"
 	"golang.org/x/time/rate"
 
@@ -79,7 +81,8 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 	}
 
 	ctx := r.Context()
-	if ticket.WorkspaceID != actor.WorkspaceIDFromContext(ctx) || !callerRole(ctx).AtLeast(db.RoleMember) {
+	if ticket.WorkspaceID != actor.WorkspaceIDFromContext(ctx) ||
+		callerRole(ctx) < nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER {
 		writeJSONError(w, http.StatusForbidden, "permission denied")
 		return
 	}

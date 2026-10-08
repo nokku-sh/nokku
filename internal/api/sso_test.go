@@ -9,8 +9,6 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
-
-	"github.com/nokku-sh/nokku/internal/db"
 )
 
 // A provider and the SCIM tokens decide who signs in as anyone, the owner
@@ -19,8 +17,8 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	ctx := t.Context()
 	ws := seedWorkspace(t, cfg)
-	owner := header("Authorization", "Bearer "+seedMember(t, cfg, ws, db.RoleOwner))
-	admin := header("Authorization", "Bearer "+seedMember(t, cfg, ws, db.RoleAdmin))
+	owner := header("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER))
+	admin := header("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
 
 	sso := nokkuv1connect.NewSSOServiceClient(srv.Client(), srv.URL, admin)
 	scim := nokkuv1connect.NewSCIMServiceClient(srv.Client(), srv.URL, admin)
@@ -86,7 +84,10 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 // Enforcing SSO is a paid feature, and the test workspace is on Community.
 func TestEnforceSSOIsGated(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	owner := header("Authorization", "Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), db.RoleOwner))
+	owner := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+	)
 	_, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL, owner).
 		UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
 			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
