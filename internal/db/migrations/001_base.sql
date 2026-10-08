@@ -569,6 +569,79 @@ AFTER
 UPDATE OF active ON users FOR EACH ROW WHEN (OLD.active IS DISTINCT FROM NEW.active)
 EXECUTE FUNCTION bump_state_version ();
 
+-- Console hints. A change to what the console shows is announced on commit as
+-- "<workspace id>:<table>", and internal/live tells the open consoles of that
+-- workspace to read again. It carries no data. The same payload twice in one
+-- transaction arrives once, so a bulk write is one hint.
+CREATE OR REPLACE FUNCTION notify_change () RETURNS TRIGGER AS $$
+DECLARE
+  r JSONB;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    r := to_jsonb(OLD);
+  ELSE
+    r := to_jsonb(NEW);
+  END IF;
+  -- workspaces has no workspace_id, its id is one.
+  PERFORM pg_notify('nokku_change', COALESCE(r ->> 'workspace_id', r ->> 'id') || ':' || TG_TABLE_NAME);
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Stamps that move on a timer or with every use. An update that moves
+-- nothing else is not a change anyone waits for.
+CREATE OR REPLACE FUNCTION without_stamps (r JSONB) RETURNS JSONB AS $$
+  SELECT (r - ARRAY['last_seen_at', 'last_used_at']) #- '{metadata,last_manual_sync}'
+$$ LANGUAGE sql IMMUTABLE;
+
+-- Sign-ins are left out (sessions, known_devices, credentials,
+-- one_time_tokens). They happen all day and no list shows them to others.
+DO $$
+DECLARE
+  t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'workspaces',
+    'workspace_subscriptions',
+    'users',
+    'sso_providers',
+    'scim_tokens',
+    'workspace_tokens',
+    'service_accounts',
+    'daemons',
+    'teams',
+    'team_members',
+    'certificate_authorities',
+    'targets',
+    'principals',
+    'principal_grants',
+    'recordings'
+  ] LOOP
+    EXECUTE format(
+      'CREATE TRIGGER notify_change AFTER INSERT OR DELETE ON %I
+         FOR EACH ROW EXECUTE FUNCTION notify_change ()',
+      t
+    );
+    EXECUTE format(
+      'CREATE TRIGGER notify_change_update AFTER UPDATE ON %I
+         FOR EACH ROW WHEN (without_stamps (to_jsonb(OLD)) IS DISTINCT FROM without_stamps (to_jsonb(NEW)))
+         EXECUTE FUNCTION notify_change ()',
+      t
+    );
+  END LOOP;
+END $$;
+
+-- The heartbeat stamps a connected daemon every ten seconds, so a gap wider
+-- than the online window means this stamp brings it online. Going offline is
+-- no write, the daemon pool announces that one.
+CREATE TRIGGER notify_online
+AFTER
+UPDATE OF last_seen_at ON daemons FOR EACH ROW WHEN (
+  OLD.last_seen_at IS NULL
+  OR NEW.last_seen_at - OLD.last_seen_at > INTERVAL '30 seconds'
+)
+EXECUTE FUNCTION notify_change ();
+
 -- Roles and grants -----------------------------------------------------------
 DO $$
 BEGIN

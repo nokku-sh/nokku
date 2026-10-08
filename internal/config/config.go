@@ -22,6 +22,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/email"
 	"github.com/nokku-sh/nokku/internal/entitlement"
 	"github.com/nokku-sh/nokku/internal/iam"
+	"github.com/nokku-sh/nokku/internal/live"
 	"github.com/nokku-sh/nokku/internal/pki"
 	"github.com/nokku-sh/nokku/internal/realip"
 	"github.com/nokku-sh/nokku/internal/recording"
@@ -49,6 +50,7 @@ type Config struct {
 	Audit        *audit.Service
 	Email        *email.Service
 	Pool         *daemon.Pool
+	Live         *live.Hub
 	Storage      *storage.Storage
 	Cache        *cache.Memory
 	Record       *recording.Service
@@ -85,7 +87,9 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	// Web terminal tickets only, written by signed-in members. Everything an
 	// anonymous caller can write to has a store of its own.
 	cfg.Cache = cache.NewMemory(10_000)
-	cfg.Pool = daemon.New(ctx, cfg.Conn)
+	cfg.Live = live.New()
+	go cfg.Live.Listen(ctx, cfg.Conn.Pool.Config().ConnConfig)
+	cfg.Pool = daemon.New(ctx, cfg.Conn, cfg.Live)
 	go cfg.Pool.Listen(ctx, cfg.Conn.Pool.Config().ConnConfig)
 	cfg.Email, err = email.New(ctx, cfg.FullURL())
 	if err != nil {

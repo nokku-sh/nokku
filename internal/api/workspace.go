@@ -263,3 +263,37 @@ func (s *workspaceService) TransferOwnership(
 	}
 	return &nokkuv1.TransferOwnershipResponse{}, nil
 }
+
+// streamLife ends a stream so the client comes back through authentication.
+// A session that ended meanwhile hears hints until then, never data.
+const streamLife = 10 * time.Minute
+
+// SubscribeChanges costs a goroutine per stream and no database connection.
+func (s *workspaceService) SubscribeChanges(
+	ctx context.Context,
+	_ *nokkuv1.SubscribeChangesRequest,
+	stream *connect.ServerStream[nokkuv1.SubscribeChangesResponse],
+) error {
+	ctx, cancel := context.WithTimeout(ctx, streamLife)
+	defer cancel()
+	sub := s.cfg.Live.Subscribe(actor.WorkspaceIDFromContext(ctx))
+	defer sub.Close()
+
+	// Without a first message the client cannot tell when it is subscribed.
+	if err := stream.Send(&nokkuv1.SubscribeChangesResponse{}); err != nil {
+		return err
+	}
+	for {
+		change, err := sub.Next(ctx)
+		if err != nil {
+			return nil
+		}
+		res := &nokkuv1.SubscribeChangesResponse{Services: change.Services}
+		if change.Everything {
+			res.Everything = new(true)
+		}
+		if err := stream.Send(res); err != nil {
+			return err
+		}
+	}
+}

@@ -30,9 +30,9 @@
 	const currentUser = user.self();
 	const currentRoute = $derived(page.url.pathname);
 
-	// A heads-up on every page. Slower than the dashboard, it only has to hint.
+	// A heads-up on every page.
 	const can = user.can();
-	const overview = dashboard.get(() => can.view, 60_000);
+	const overview = dashboard.get(() => can.view);
 	const issues = $derived(overview.data && issuesOf(overview.data));
 	const status = $derived(headline(issues));
 

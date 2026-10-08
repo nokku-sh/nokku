@@ -12,6 +12,7 @@
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { useLiveChanges } from '#lib/api/changes.svelte.js';
 	import { isLeaving } from '#lib/api/client.js';
 	import { connection } from '#lib/api/connection.svelte.js';
 	import { liveSessions } from '#lib/api/terminal.svelte.js';
@@ -27,11 +28,15 @@
 	// The host names the workspace, the session names the user. Both load once.
 	const ws = workspace.get();
 	const me = user.self();
-	const booting = $derived(!ws.data || !me.data);
+	// Both are read every time. svelte-query only reports a property that was
+	// read before it changed, a short-circuit drops whichever loads first.
+	const booting = $derived([ws.data, me.data].some((d) => !d));
 	// An expired session is already on its way to /login.
 	const bootFailed = $derived(
 		[ws.error, me.error].some((e) => e && ConnectError.from(e).code !== Code.Unauthenticated)
 	);
+
+	useLiveChanges(() => !booting);
 
 	const RETURN_WINDOW = 30 * 60_000;
 

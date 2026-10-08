@@ -77,6 +77,10 @@ committed `.gitkeep` and are embedded by `web/embed.go`.
 - `internal/daemon` is the in-memory pool of live daemon control streams,
   relays (two bidi streams spliced, the backend only sees ciphertext), and
   web terminal sessions.
+- `internal/live` tells the open consoles when to read again. Triggers
+  announce a changed table on `nokku_change`, the hub paces that into hints
+  on `WorkspaceService.SubscribeChanges`, and the UI refetches the queries
+  of the services a hint names. No data travels on it.
 - `internal/entitlement` is plan gating, the self-hosted license, and the 30
   day hold on data limits after a plan or license ends.
 - `internal/billing` is Stripe, nil on a self-hosted server. One `sync` writer
@@ -142,6 +146,12 @@ calls `SyncDaemon`.
   current_workspace_id ()`, its name in the policy list in `001_base.sql`,
   and a seed row in `seedEveryTable`. `internal/db/rls_test.go` reads the
   tables from the catalog and fails on a table that misses any of them.
+- A tenant table the console shows goes into the `notify_change` list in
+  `001_base.sql`, anything else into `silentTables` in
+  `internal/db/change_test.go`, which fails on a table in neither. A table
+  that changes with nobody clicking also names its readers in
+  `internal/live`, without them every console refetches everything. The UI
+  never polls a list.
 - The workspace on the context (`actor.Workspace`) only holds what never
   changes: id, slug, base URL. Read the name and the settings from the row.
 - Every row in `sessions` is a credential. What only remembers something

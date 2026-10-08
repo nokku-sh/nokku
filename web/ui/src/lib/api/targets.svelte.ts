@@ -34,10 +34,7 @@ export const target = {
 				offset: 0,
 				...opts?.()
 			}),
-			() => ({
-				enabled: when?.() ?? true,
-				refetchInterval: 15000
-			})
+			() => ({ enabled: when?.() ?? true })
 		),
 	access: (subjectId: MaybeGetter<string | undefined>) =>
 		useQuery(
