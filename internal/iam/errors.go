@@ -18,6 +18,7 @@ var (
 	ErrManagedAccount     = errors.New("iam: an identity provider manages this account")
 	ErrInvalidToken       = errors.New("iam: invalid token")
 	ErrEmailRejected      = errors.New("iam: email rejected")
+	ErrMailNotSent        = errors.New("iam: mail not sent")
 	ErrSSORequired        = errors.New("iam: single sign-on is required for this workspace")
 	errNoSession          = errors.New("iam: no session token")
 	errSessionExpired     = errors.New("iam: session expired")

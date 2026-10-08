@@ -91,10 +91,7 @@ func (s *accountService) RequestEmailChange(
 		// Without both mails the change must not stay pending.
 		slog.Error("send email change mails", "error", err)
 		_ = s.cfg.IAM.DropEmailChange(ctx, u.ID)
-		return nil, newError(
-			connect.CodeUnavailable,
-			"the emails could not be sent, try again in a few minutes",
-		)
+		return nil, errMailNotSent
 	}
 	return &nokkuv1.RequestEmailChangeResponse{}, nil
 }

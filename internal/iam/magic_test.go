@@ -141,6 +141,28 @@ func TestSignupLinkCreatesInvitedUser(t *testing.T) {
 	require.ErrorIs(t, e.svc.RequestSignupLink(ctx, invite, "late@"+testDomain(), ""), ErrInviteSpent)
 }
 
+// The invite page must not say "check your email" for a mail that failed. On
+// cooldown the earlier link is still out there, so that one stays a success.
+func TestUnsentSignupLinkIsAnError(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	ctx := anon(t.Context(), o.ws)
+	invite := e.invite(t, o.ws, "member", 0)
+	var link string
+	sendErr := errors.New("smtp send: 535 Authentication Failed")
+	e.svc.sendSignupLink = func(_ context.Context, _, _, _, l, _ string) error {
+		link = l
+		return sendErr
+	}
+
+	require.ErrorIs(t, e.svc.RequestSignupLink(ctx, invite, "lost@"+testDomain(), ""), ErrMailNotSent)
+	_, _, err := e.svc.ConsumeMagicLink(ctx, linkToken(t, link))
+	require.ErrorIs(t, err, ErrInvalidToken, "a link that was never mailed created an account")
+
+	sendErr = emailverify.ErrCooldown
+	require.NoError(t, e.svc.RequestSignupLink(ctx, invite, "lost@"+testDomain(), ""))
+}
+
 func TestSeatCapStopsSignup(t *testing.T) {
 	e := newTestEnv(t)
 	mail := e.mailbox()

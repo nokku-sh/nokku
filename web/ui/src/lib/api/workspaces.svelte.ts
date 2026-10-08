@@ -71,7 +71,7 @@ export const invite = {
 			() => ({ token: extract(token) }),
 			() => ({ enabled: !!extract(token), retry: false })
 		),
-	// Always succeeds from the outside, the link lands in the inbox or not.
+	// Fails when the mail could not go out, so the page never claims a link is on its way.
 	accept: () => useMutation(InvitationService.method.acceptInvitation)
 };
 

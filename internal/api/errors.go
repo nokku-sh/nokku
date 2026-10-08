@@ -38,6 +38,18 @@ var (
 		connect.CodeUnimplemented,
 		errors.New("billing is disabled"),
 	)
+	errInviteInvalid = connect.NewError(
+		connect.CodeFailedPrecondition,
+		errors.New("invalid or expired invitation"),
+	)
+	errInvalidInput = connect.NewError(
+		connect.CodeInvalidArgument,
+		errors.New("please check your input and try again"),
+	)
+	errSingleWorkspace = connect.NewError(
+		connect.CodeFailedPrecondition,
+		errors.New("a self-hosted server keeps its workspace"),
+	)
 )
 
 // errRecordingStorageFull is not InvalidArgument, a daemon gives up on that.
@@ -52,9 +64,11 @@ var errNotSSHCA = connect.NewError(
 	errors.New("certificate authority is not an SSH CA"),
 )
 
-var errInvalidInput = connect.NewError(
-	connect.CodeInvalidArgument,
-	errors.New("please check your input and try again"),
+// errMailNotSent is not Unavailable, the client reads that as the server
+// being gone.
+var errMailNotSent = connect.NewError(
+	connect.CodeFailedPrecondition,
+	errors.New("the email could not be sent, try again in a few minutes"),
 )
 
 // errLinkInvalid is Unauthenticated because the client skips its generic

@@ -185,7 +185,7 @@ Lost every passkey? Run `./nokku admin-link` on the server, with the same enviro
 | `NOKKU_SMTP_HOST`      |         | SMTP relay. Mail is off while this is unset |
 | `NOKKU_SMTP_PORT`      | `587`   | 465 is implicit TLS, 587 is STARTTLS      |
 | `NOKKU_SMTP_USERNAME`  |         | Username                                  |
-| `NOKKU_SMTP_PASSWORD`  |         | Password                                  |
+| `NOKKU_SMTP_PASSWORD`  |         | Password. A login the relay rejects fails the start |
 | `NOKKU_EMAIL_SENDER`   |         | From address, required with SMTP          |
 | `NOKKU_EMAIL_COOLDOWN` | `15m`   | Wait between two mails of the same kind to one person |
 

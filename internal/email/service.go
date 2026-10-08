@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"net/textproto"
 	"strings"
 	"time"
 
@@ -63,7 +64,7 @@ type sendRequest struct {
 	data     any
 }
 
-func New(appURL string) (*Service, error) {
+func New(ctx context.Context, appURL string) (*Service, error) {
 	svc, err := env.ParseAs[Service]()
 	if err != nil {
 		return nil, err
@@ -78,10 +79,21 @@ func New(appURL string) (*Service, error) {
 	if svc.From == "" {
 		return nil, errors.New("NOKKU_EMAIL_SENDER is required when NOKKU_SMTP_HOST is set")
 	}
-	svc.sender, err = newSMTPSender(svc.SMTPHost, svc.SMTPPort, svc.SMTPUsername, svc.SMTPPassword)
+	relay, err := newSMTPSender(svc.SMTPHost, svc.SMTPPort, svc.SMTPUsername, svc.SMTPPassword)
 	if err != nil {
 		return nil, err
 	}
+	if err := relay.checkLogin(ctx); err != nil {
+		// 535 is the relay saying no to the credentials, a setting that does
+		// not fit. Anything else may be an outage, the server still starts.
+		if e, ok := errors.AsType[*textproto.Error](err); ok && e.Code == 535 {
+			return nil, fmt.Errorf(
+				"%s rejected NOKKU_SMTP_USERNAME and NOKKU_SMTP_PASSWORD: %w", svc.SMTPHost, err,
+			)
+		}
+		slog.Warn("smtp relay check failed, mail may not go out", "error", err)
+	}
+	svc.sender = relay
 	return &svc, nil
 }
 
