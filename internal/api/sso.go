@@ -12,12 +12,12 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// sSOService manages the OIDC providers of the workspace.
-type sSOService struct {
+// ssoService manages the OIDC providers of the workspace.
+type ssoService struct {
 	cfg *config.Config
 }
 
-func (s *sSOService) ListSSOProviders(
+func (s *ssoService) ListSSOProviders(
 	ctx context.Context,
 	_ *nokkuv1.ListSSOProvidersRequest,
 ) (*nokkuv1.ListSSOProvidersResponse, error) {
@@ -32,7 +32,7 @@ func (s *sSOService) ListSSOProviders(
 	return &nokkuv1.ListSSOProvidersResponse{Providers: out}, nil
 }
 
-func (s *sSOService) PutSSOProvider(
+func (s *ssoService) PutSSOProvider(
 	ctx context.Context,
 	req *nokkuv1.PutSSOProviderRequest,
 ) (*nokkuv1.PutSSOProviderResponse, error) {
@@ -67,7 +67,7 @@ func (s *sSOService) PutSSOProvider(
 	return &nokkuv1.PutSSOProviderResponse{Provider: providerToProto(stored)}, nil
 }
 
-func (s *sSOService) DeleteSSOProvider(
+func (s *ssoService) DeleteSSOProvider(
 	ctx context.Context,
 	req *nokkuv1.DeleteSSOProviderRequest,
 ) (*nokkuv1.DeleteSSOProviderResponse, error) {

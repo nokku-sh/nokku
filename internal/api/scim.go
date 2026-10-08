@@ -12,11 +12,11 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-type sCIMService struct {
+type scimService struct {
 	cfg *config.Config
 }
 
-func (s *sCIMService) CreateSCIMToken(
+func (s *scimService) CreateSCIMToken(
 	ctx context.Context,
 	req *nokkuv1.CreateSCIMTokenRequest,
 ) (*nokkuv1.CreateSCIMTokenResponse, error) {
@@ -34,7 +34,7 @@ func (s *sCIMService) CreateSCIMToken(
 	}, nil
 }
 
-func (s *sCIMService) ListSCIMTokens(
+func (s *scimService) ListSCIMTokens(
 	ctx context.Context,
 	_ *nokkuv1.ListSCIMTokensRequest,
 ) (*nokkuv1.ListSCIMTokensResponse, error) {
@@ -49,7 +49,7 @@ func (s *sCIMService) ListSCIMTokens(
 	return &nokkuv1.ListSCIMTokensResponse{Tokens: out}, nil
 }
 
-func (s *sCIMService) DeleteSCIMToken(
+func (s *scimService) DeleteSCIMToken(
 	ctx context.Context,
 	req *nokkuv1.DeleteSCIMTokenRequest,
 ) (*nokkuv1.DeleteSCIMTokenResponse, error) {

@@ -13,6 +13,8 @@ import (
 	"github.com/nokku-sh/nokku/internal/namegen"
 )
 
+const maxNameAttempts = 5
+
 // ErrEnrollToken never says which way the token was invalid.
 var ErrEnrollToken = errors.New("invalid or expired enrollment token")
 
@@ -32,8 +34,6 @@ type Enrolled struct {
 	Status   nokkuv1.DaemonStatus
 	Config   *nokkuv1.DaemonConfig
 }
-
-const maxNameAttempts = 5
 
 // Enroll runs pinned to the workspace of the host the daemon dialed, so a
 // token of another workspace is never found. Only a new daemon spends a use.

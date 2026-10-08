@@ -163,8 +163,8 @@ func (s *Server) registerServices(ctx context.Context) {
 	s.mux.Handle(nokkuv1connect.NewServiceAccountServiceHandler(&serviceAccountService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewAccountServiceHandler(&accountService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewAuthServiceHandler(&authService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewSSOServiceHandler(&sSOService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewSCIMServiceHandler(&sCIMService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewSSOServiceHandler(&ssoService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewSCIMServiceHandler(&scimService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(newDaemonControlService(s.cfg), opts...))
 	s.mux.Handle(nokkuv1connect.NewRecordingServiceHandler(&recordingService{cfg: s.cfg}, opts...))
 
