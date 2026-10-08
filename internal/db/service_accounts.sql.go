@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"time"
 
 	nokku "github.com/nokku-sh/protos/gen/nokku/v1"
 )
@@ -58,49 +57,36 @@ func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID str
 
 const getServiceAccount = `-- name: GetServiceAccount :one
 SELECT
-  sa.id, sa.workspace_id, sa.name, sa.description, sa.role, sa.tags, sa.created_at, sa.updated_at,
-  -- sqlc types a cast as not null, so an account never used reads as the zero time.
-  COALESCE(MAX(t.last_seen_at), '0001-01-01'::TIMESTAMPTZ)::TIMESTAMPTZ AS last_used_at
+  id, workspace_id, name, description, role, last_used_at, tags, created_at, updated_at
 FROM
-  service_accounts sa
-  LEFT JOIN access_tokens t ON t.service_account_id = sa.id
+  service_accounts
 WHERE
-  sa.id = $1
-GROUP BY
-  sa.id
+  id = $1
 `
 
-type GetServiceAccountRow struct {
-	ServiceAccount ServiceAccount `json:"serviceAccount"`
-	LastUsedAt     time.Time      `json:"lastUsedAt"`
-}
-
-func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string) (*GetServiceAccountRow, error) {
+func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string) (*ServiceAccount, error) {
 	row := q.db.QueryRow(ctx, getServiceAccount, serviceAccountID)
-	var i GetServiceAccountRow
+	var i ServiceAccount
 	err := row.Scan(
-		&i.ServiceAccount.ID,
-		&i.ServiceAccount.WorkspaceID,
-		&i.ServiceAccount.Name,
-		&i.ServiceAccount.Description,
-		&i.ServiceAccount.Role,
-		&i.ServiceAccount.Tags,
-		&i.ServiceAccount.CreatedAt,
-		&i.ServiceAccount.UpdatedAt,
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.Description,
+		&i.Role,
 		&i.LastUsedAt,
+		&i.Tags,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return &i, err
 }
 
 const listServiceAccounts = `-- name: ListServiceAccounts :many
 SELECT
-  sa.id, sa.workspace_id, sa.name, sa.description, sa.role, sa.tags, sa.created_at, sa.updated_at,
-  -- sqlc types a cast as not null, so an account never used reads as the zero time.
-  COALESCE(MAX(t.last_seen_at), '0001-01-01'::TIMESTAMPTZ)::TIMESTAMPTZ AS last_used_at,
+  sa.id, sa.workspace_id, sa.name, sa.description, sa.role, sa.last_used_at, sa.tags, sa.created_at, sa.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa
-  LEFT JOIN access_tokens t ON t.service_account_id = sa.id
 WHERE
   (
     $1::TEXT IS NULL
@@ -112,8 +98,6 @@ WHERE
     sa.role = $3
     OR $3 = 0 -- every role
   )
-GROUP BY
-  sa.id
 ORDER BY
   sa.id ASC
 LIMIT
@@ -132,7 +116,6 @@ type ListServiceAccountsParams struct {
 
 type ListServiceAccountsRow struct {
 	ServiceAccount ServiceAccount `json:"serviceAccount"`
-	LastUsedAt     time.Time      `json:"lastUsedAt"`
 	TotalCount     int32          `json:"totalCount"`
 }
 
@@ -157,10 +140,10 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 			&i.ServiceAccount.Name,
 			&i.ServiceAccount.Description,
 			&i.ServiceAccount.Role,
+			&i.ServiceAccount.LastUsedAt,
 			&i.ServiceAccount.Tags,
 			&i.ServiceAccount.CreatedAt,
 			&i.ServiceAccount.UpdatedAt,
-			&i.LastUsedAt,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err

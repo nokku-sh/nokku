@@ -13,26 +13,18 @@ RETURNING
 
 -- name: GetServiceAccount :one
 SELECT
-  sqlc.embed(sa),
-  -- sqlc types a cast as not null, so an account never used reads as the zero time.
-  COALESCE(MAX(t.last_seen_at), '0001-01-01'::TIMESTAMPTZ)::TIMESTAMPTZ AS last_used_at
+  *
 FROM
-  service_accounts sa
-  LEFT JOIN access_tokens t ON t.service_account_id = sa.id
+  service_accounts
 WHERE
-  sa.id = @service_account_id
-GROUP BY
-  sa.id;
+  id = @service_account_id;
 
 -- name: ListServiceAccounts :many
 SELECT
   sqlc.embed(sa),
-  -- sqlc types a cast as not null, so an account never used reads as the zero time.
-  COALESCE(MAX(t.last_seen_at), '0001-01-01'::TIMESTAMPTZ)::TIMESTAMPTZ AS last_used_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa
-  LEFT JOIN access_tokens t ON t.service_account_id = sa.id
 WHERE
   (
     sqlc.narg('query')::TEXT IS NULL
@@ -44,8 +36,6 @@ WHERE
     sa.role = @role
     OR @role = 0 -- every role
   )
-GROUP BY
-  sa.id
 ORDER BY
   sa.id ASC
 LIMIT

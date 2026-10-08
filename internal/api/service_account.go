@@ -45,7 +45,7 @@ func (s *serviceAccountService) CreateServiceAccount(
 		return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
 
-	var result *db.GetServiceAccountRow
+	var result *db.ServiceAccount
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		saID, err := q.CreateServiceAccount(ctx, &db.CreateServiceAccountParams{
 			Name:        req.GetName(),
@@ -77,7 +77,7 @@ func (s *serviceAccountService) UpdateServiceAccount(
 		return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
 
-	var result *db.GetServiceAccountRow
+	var result *db.ServiceAccount
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if err := checkCanManageServiceAccount(ctx, q, req.GetId()); err != nil {
 			return err
@@ -230,7 +230,7 @@ func checkCanManageServiceAccount(ctx context.Context, q *db.Queries, id string)
 	if err != nil {
 		return err
 	}
-	if !db.CanAssign(callerRole(ctx), sa.ServiceAccount.Role) {
+	if !db.CanAssign(callerRole(ctx), sa.Role) {
 		return db.ErrPermissionDenied
 	}
 	return nil

@@ -185,6 +185,7 @@ type ServiceAccount struct {
 	Name        string              `json:"name"`
 	Description *string             `json:"description"`
 	Role        nokku.WorkspaceRole `json:"role"`
+	LastUsedAt  *time.Time          `json:"lastUsedAt"`
 	Tags        []string            `json:"tags"`
 	CreatedAt   time.Time           `json:"createdAt"`
 	UpdatedAt   time.Time           `json:"updatedAt"`

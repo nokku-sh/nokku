@@ -57,12 +57,15 @@ func (s *Service) IssueToken(ctx context.Context, p TokenParams) (*db.AccessToke
 	}
 	now := s.now()
 	params := &db.CreateAccessTokenParams{
-		TokenHash:  tokenHash,
-		Kind:       string(p.Kind),
-		Method:     string(p.Method),
-		Binding:    p.Binding,
-		Label:      p.Label,
-		LastSeenAt: &now,
+		TokenHash: tokenHash,
+		Kind:      string(p.Kind),
+		Method:    string(p.Method),
+		Binding:   p.Binding,
+		Label:     p.Label,
+	}
+	// A login is a use, a key made by hand is not used until a call carries it.
+	if p.Kind != actor.KindServiceAccount && p.Kind != actor.KindSCIM {
+		params.LastSeenAt = &now
 	}
 	if p.SubjectID != "" {
 		params.SubjectID = &p.SubjectID
