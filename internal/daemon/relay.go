@@ -80,7 +80,7 @@ func (p *Pool) RequestRelay(
 		p.mu.Unlock()
 	}()
 
-	if err := p.sendToDaemonWait(daemonID, &nokkuv1.ConnectResponse{
+	if err := p.sendToDaemonWait(ctx, daemonID, &nokkuv1.ConnectResponse{
 		Msg: &nokkuv1.ConnectResponse_RelayOpen{
 			RelayOpen: &nokkuv1.RelayOpen{RelayId: &relayID, ClientAddr: &clientAddr},
 		},

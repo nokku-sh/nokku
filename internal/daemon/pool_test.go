@@ -155,7 +155,7 @@ func TestPool_PokeKeepsControlMessages(t *testing.T) {
 			RelayOpen: &nokkuv1.RelayOpen{RelayId: &rid},
 		},
 	}
-	if err := p.sendToDaemonWait("d1", relayOpen, time.Second); err != nil {
+	if err := p.sendToDaemonWait(t.Context(), "d1", relayOpen, time.Second); err != nil {
 		t.Fatalf("queue relay open: %v", err)
 	}
 	for range 10 {
@@ -260,6 +260,31 @@ func TestPool_RelayCap(t *testing.T) {
 	if _, err := p.RequestRelay(ctx2, "d1", "again", "u1", ""); errors.Is(err, ErrRelayLimit) {
 		t.Fatal("released slots must be reusable")
 	}
+}
+
+// A daemon that reads nothing has a full send buffer. A request behind it
+// ends with its own context instead of waiting out the send timeout, and
+// leaves nothing held.
+func TestPool_RelayRequestEndsWithItsContext(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newTestPool(t)
+		c := p.registerDaemon(t.Context(), "d1", "w1")
+		for range cap(c.send) {
+			c.send <- &nokkuv1.ConnectResponse{}
+		}
+
+		ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+		defer cancel()
+		start := time.Now()
+		_, err := p.RequestRelay(ctx, "d1", "r1", "u1", "")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Equal(t, 50*time.Millisecond, time.Since(start), "the request outlived its context")
+
+		p.mu.RLock()
+		defer p.mu.RUnlock()
+		assert.Empty(t, p.pendingRelays, "the pending request was left behind")
+		assert.Empty(t, p.relayCounts, "the relay slot is still held")
+	})
 }
 
 // TestPool_RelayBridging walks a relay through the full request/register

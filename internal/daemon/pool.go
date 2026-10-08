@@ -351,7 +351,10 @@ func (c *daemonConn) poke() {
 	}
 }
 
+// sendToDaemonWait gives up with ctx, a caller that is gone must not wait out
+// the timeout behind a daemon that reads nothing.
 func (p *Pool) sendToDaemonWait(
+	ctx context.Context,
 	daemonID string,
 	msg *nokkuv1.ConnectResponse,
 	timeout time.Duration,
@@ -371,5 +374,7 @@ func (p *Pool) sendToDaemonWait(
 		return fmt.Errorf("daemon %s send timeout", daemonID)
 	case <-c.ctx.Done():
 		return fmt.Errorf("daemon %s disconnected", daemonID)
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
