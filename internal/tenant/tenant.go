@@ -32,7 +32,18 @@ var ErrUnknownWorkspace = errors.New("no such workspace")
 // reserved slugs never resolve to a workspace, so nobody can sign up as
 // app.nokku.sh.
 var reserved = map[string]bool{
-	"www": true, "app": true, "api": true, "admin": true, "mail": true, "static": true, "status": true,
+	"www":     true,
+	"app":     true,
+	"api":     true,
+	"nokku":   true,
+	"mizuchi": true,
+	"admin":   true,
+	"main":    true,
+	"mail":    true,
+	"static":  true,
+	"status":  true,
+	"cdn":     true,
+	"docs":    true,
 }
 
 //go:embed denylist.txt

@@ -38,10 +38,10 @@ func TestBaseURL(t *testing.T) {
 }
 
 func TestForbiddenSlugs(t *testing.T) {
-	for _, slug := range []string{"www", "api", "google", "my-google-sso", "acme-login", "paypal-verify", "okta"} {
+	for _, slug := range []string{"www", "api", "cdn", "google", "my-google-sso", "acme-login", "paypal-verify", "okta"} {
 		assert.True(t, Forbidden(slug), slug)
 	}
-	for _, slug := range []string{"acme", "blue-sky", "w0rkshop", "default"} {
+	for _, slug := range []string{"acme", "blue-sky", "w0rkshop", "default", "rapid", "ecstatic"} {
 		assert.False(t, Forbidden(slug), slug)
 	}
 }
