@@ -9,11 +9,10 @@ import (
 	"connectrpc.com/otelconnect"
 	"github.com/mizuchilabs/kata/buildinfo"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
+	"go.opentelemetry.io/contrib/processors/minsev"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
@@ -22,35 +21,38 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 )
 
-func newOTLPInterceptor(ctx context.Context) connect.Interceptor {
+// newTelemetry turns OTel on when an OTLP endpoint is set. Protocol, sampler
+// and service name follow the OTEL_* environment.
+func newTelemetry(ctx context.Context) connect.Interceptor {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
 		return nil
 	}
-	traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithCompressor("gzip"))
+	traceExporter, err := autoexport.NewSpanExporter(ctx)
 	if err != nil {
-		slog.Error("failed to init otlp exporter", "exporter", "trace", "error", err)
+		slog.Error("failed to init otel exporter", "exporter", "trace", "error", err)
 		return nil
 	}
-	metricExporter, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithCompressor("gzip"))
+	metricReader, err := autoexport.NewMetricReader(ctx)
 	if err != nil {
-		slog.Error("failed to init otlp exporter", "exporter", "metric", "error", err)
+		slog.Error("failed to init otel exporter", "exporter", "metric", "error", err)
 		return nil
 	}
-	logExporter, err := otlploggrpc.New(ctx, otlploggrpc.WithCompressor("gzip"))
+	logExporter, err := autoexport.NewLogExporter(ctx)
 	if err != nil {
-		slog.Error("failed to init otlp exporter", "exporter", "log", "error", err)
+		slog.Error("failed to init otel exporter", "exporter", "log", "error", err)
 		return nil
 	}
 
 	res, err := resource.New(
 		ctx,
 		resource.WithTelemetrySDK(),
-		resource.WithFromEnv(),
 		resource.WithOS(),
 		resource.WithAttributes(
 			semconv.ServiceNameKey.String("nokku"),
 			semconv.ServiceVersionKey.String(buildinfo.Version),
 		),
+		// Last, so OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES win.
+		resource.WithFromEnv(),
 	)
 	if err != nil {
 		slog.Warn("failed to create otel resource", "error", err)
@@ -59,18 +61,18 @@ func newOTLPInterceptor(ctx context.Context) connect.Interceptor {
 	tp := trace.NewTracerProvider(
 		trace.WithBatcher(traceExporter),
 		trace.WithResource(res),
-		trace.WithSampler(trace.ParentBased(trace.TraceIDRatioBased(0.1))),
 	)
 	otel.SetTracerProvider(tp)
 
 	mp := metric.NewMeterProvider(
-		metric.WithReader(metric.NewPeriodicReader(metricExporter)),
+		metric.WithReader(metricReader),
 		metric.WithResource(res),
 	)
 	otel.SetMeterProvider(mp)
 
+	// The collector gets warnings and errors, nothing below.
 	lp := log.NewLoggerProvider(
-		log.WithProcessor(log.NewBatchProcessor(logExporter)),
+		log.WithProcessor(minsev.NewLogProcessor(log.NewBatchProcessor(logExporter), minsev.SeverityWarn)),
 		log.WithResource(res),
 	)
 
@@ -89,18 +91,18 @@ func newOTLPInterceptor(ctx context.Context) connect.Interceptor {
 		slog.Warn("failed to start runtime metrics", "error", err)
 	}
 
+	// Nothing waits for the flush, the last seconds before an exit may not arrive.
+	context.AfterFunc(ctx, func() {
+		bg := context.WithoutCancel(ctx)
+		_ = lp.Shutdown(bg)
+		_ = mp.Shutdown(bg)
+		_ = tp.Shutdown(bg)
+	})
+
 	interceptor, err := otelconnect.NewInterceptor()
 	if err != nil {
 		slog.Warn("failed to create otel interceptor", "error", err)
 		return nil
 	}
-
-	go func() {
-		<-ctx.Done()
-		bg := context.WithoutCancel(ctx)
-		_ = lp.Shutdown(bg)
-		_ = mp.Shutdown(bg)
-		_ = tp.Shutdown(bg)
-	}()
 	return interceptor
 }
