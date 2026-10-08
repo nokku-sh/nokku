@@ -14,28 +14,32 @@ import (
 
 const createRecording = `-- name: CreateRecording :one
 INSERT INTO
-  recordings (id, daemon_id, daemon_name, username, key, started_at)
+  recordings (id, daemon_id, daemon_name, username, subject_id, principal, key, started_at)
 SELECT
   $1,
   d.id,
   d.name,
   $2,
   $3,
+  $4,
+  $5,
   CASE
-    WHEN $4::TIMESTAMPTZ BETWEEN d.created_at AND NOW() THEN $4::TIMESTAMPTZ
+    WHEN $6::TIMESTAMPTZ BETWEEN d.created_at AND NOW() THEN $6::TIMESTAMPTZ
     ELSE NOW()
   END
 FROM
   daemons d
 WHERE
-  d.id = $5
+  d.id = $7
 RETURNING
-  id, workspace_id, daemon_id, daemon_name, username, key, started_at, ended_at, size_bytes, complete, created_at
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, principal, key, started_at, ended_at, size_bytes, complete, created_at
 `
 
 type CreateRecordingParams struct {
 	ID        string                `json:"id"`
 	Username  string                `json:"username"`
+	SubjectID *string               `json:"subjectId"`
+	Principal string                `json:"principal"`
 	Key       crypto.EncryptedBytes `json:"key"`
 	StartedAt *time.Time            `json:"startedAt"`
 	DaemonID  string                `json:"daemonId"`
@@ -48,6 +52,8 @@ func (q *Queries) CreateRecording(ctx context.Context, arg *CreateRecordingParam
 	row := q.db.QueryRow(ctx, createRecording,
 		arg.ID,
 		arg.Username,
+		arg.SubjectID,
+		arg.Principal,
 		arg.Key,
 		arg.StartedAt,
 		arg.DaemonID,
@@ -59,6 +65,8 @@ func (q *Queries) CreateRecording(ctx context.Context, arg *CreateRecordingParam
 		&i.DaemonID,
 		&i.DaemonName,
 		&i.Username,
+		&i.SubjectID,
+		&i.Principal,
 		&i.Key,
 		&i.StartedAt,
 		&i.EndedAt,
@@ -122,7 +130,7 @@ func (q *Queries) DeleteRecordingsBefore(ctx context.Context, arg *DeleteRecordi
 
 const getRecording = `-- name: GetRecording :one
 SELECT
-  id, workspace_id, daemon_id, daemon_name, username, key, started_at, ended_at, size_bytes, complete, created_at
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, principal, key, started_at, ended_at, size_bytes, complete, created_at
 FROM
   recordings
 WHERE
@@ -138,6 +146,8 @@ func (q *Queries) GetRecording(ctx context.Context, id string) (*Recording, erro
 		&i.DaemonID,
 		&i.DaemonName,
 		&i.Username,
+		&i.SubjectID,
+		&i.Principal,
 		&i.Key,
 		&i.StartedAt,
 		&i.EndedAt,
@@ -177,7 +187,7 @@ func (q *Queries) ListRecordingWorkspaceIDs(ctx context.Context) ([]string, erro
 
 const listRecordings = `-- name: ListRecordings :many
 SELECT
-  r.id, r.workspace_id, r.daemon_id, r.daemon_name, r.username, r.key, r.started_at, r.ended_at, r.size_bytes, r.complete, r.created_at,
+  r.id, r.workspace_id, r.daemon_id, r.daemon_name, r.username, r.subject_id, r.principal, r.key, r.started_at, r.ended_at, r.size_bytes, r.complete, r.created_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   recordings r
@@ -190,19 +200,24 @@ WHERE
     $2::TEXT IS NULL
     OR r.username = $2
   )
+  AND (
+    $3::UUID IS NULL
+    OR r.subject_id = $3
+  )
 ORDER BY
   r.started_at DESC
 LIMIT
-  $4
+  $5
 OFFSET
-  $3
+  $4
 `
 
 type ListRecordingsParams struct {
-	DaemonID *string `json:"daemonId"`
-	Username *string `json:"username"`
-	Offset   *int32  `json:"offset"`
-	Limit    *int32  `json:"limit"`
+	DaemonID  *string `json:"daemonId"`
+	Username  *string `json:"username"`
+	SubjectID *string `json:"subjectId"`
+	Offset    *int32  `json:"offset"`
+	Limit     *int32  `json:"limit"`
 }
 
 type ListRecordingsRow struct {
@@ -214,6 +229,7 @@ func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams)
 	rows, err := q.db.Query(ctx, listRecordings,
 		arg.DaemonID,
 		arg.Username,
+		arg.SubjectID,
 		arg.Offset,
 		arg.Limit,
 	)
@@ -230,6 +246,8 @@ func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams)
 			&i.Recording.DaemonID,
 			&i.Recording.DaemonName,
 			&i.Recording.Username,
+			&i.Recording.SubjectID,
+			&i.Recording.Principal,
 			&i.Recording.Key,
 			&i.Recording.StartedAt,
 			&i.Recording.EndedAt,
@@ -250,7 +268,7 @@ func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams)
 
 const oldestRecordings = `-- name: OldestRecordings :many
 SELECT
-  id, workspace_id, daemon_id, daemon_name, username, key, started_at, ended_at, size_bytes, complete, created_at
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, principal, key, started_at, ended_at, size_bytes, complete, created_at
 FROM
   recordings
 ORDER BY
@@ -274,6 +292,8 @@ func (q *Queries) OldestRecordings(ctx context.Context, limit *int32) ([]*Record
 			&i.DaemonID,
 			&i.DaemonName,
 			&i.Username,
+			&i.SubjectID,
+			&i.Principal,
 			&i.Key,
 			&i.StartedAt,
 			&i.EndedAt,
@@ -300,7 +320,7 @@ SET
 WHERE
   id = $3
 RETURNING
-  id, workspace_id, daemon_id, daemon_name, username, key, started_at, ended_at, size_bytes, complete, created_at
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, principal, key, started_at, ended_at, size_bytes, complete, created_at
 `
 
 type SetRecordingCompleteParams struct {
@@ -318,6 +338,8 @@ func (q *Queries) SetRecordingComplete(ctx context.Context, arg *SetRecordingCom
 		&i.DaemonID,
 		&i.DaemonName,
 		&i.Username,
+		&i.SubjectID,
+		&i.Principal,
 		&i.Key,
 		&i.StartedAt,
 		&i.EndedAt,

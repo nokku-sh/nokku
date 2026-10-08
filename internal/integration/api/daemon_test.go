@@ -13,7 +13,6 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
-	"uuid"
 
 	"connectrpc.com/connect"
 	"github.com/coder/websocket"
@@ -214,14 +213,14 @@ func TestCreateSession(t *testing.T) {
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(openRelay()), "relay without a grant")
 
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
-		p, err := q.CreatePrincipal(t.Context(), &db.CreatePrincipalParams{
+		p, err := q.CreateTargetAccount(t.Context(), &db.CreateTargetAccountParams{
 			TargetID: enrolled.GetTargetId(), Username: "root",
 		})
 		if err != nil {
 			return err
 		}
-		return q.AddPrincipalGrant(t.Context(), &db.AddPrincipalGrantParams{
-			PrincipalID: p.ID, SubjectKind: "user", SubjectID: memberPrincipal.ID,
+		return q.AddGrant(t.Context(), &db.AddGrantParams{
+			AccountID: p.ID, SubjectKind: "user", SubjectID: memberPrincipal.ID,
 		})
 	})
 	// With the grant the relay gets past the check, the daemon is just offline.
@@ -238,11 +237,8 @@ func TestCreateSession(t *testing.T) {
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
 		row, err := q.CreateCA(t.Context(), &db.CreateCAParams{
 			Name:           "sshtest",
-			Certificate:    ca.PublicKey,
 			PrivateKey:     ca.PrivateKey,
 			PublicKey:      ca.PublicKey,
-			SerialNumber:   uuid.New().String(),
-			Subject:        "sshtest",
 			NotBefore:      time.Now().Add(-time.Minute),
 			NotAfter:       time.Now().Add(time.Hour),
 			Lifetime:       time.Hour,
@@ -505,9 +501,9 @@ func seedDefaultCA(t *testing.T, srv *httptest.Server, adminAuth connect.ClientO
 	return created.GetCertificateAuthority().GetPublicKey()
 }
 
-// A workspace has one default CA per kind. An enrollment that names none
-// falls back to the SSH one, the X.509 default signs no SSH certificates.
-func TestEnrollFallsBackToSSHDefaultCA(t *testing.T) {
+// An enrollment that names no CA falls back to the workspace default, and
+// gets none while there is no default.
+func TestEnrollFallsBackToDefaultCA(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
 	adminAuth := header(
@@ -518,17 +514,16 @@ func TestEnrollFallsBackToSSHDefaultCA(t *testing.T) {
 	// role deletes past RLS.
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
-	_, err = owner.Exec(t.Context(), "DELETE FROM certificate_authorities WHERE workspace_id = $1", workspaceID)
+	_, err = owner.Exec(t.Context(), "DELETE FROM ssh_cas WHERE workspace_id = $1", workspaceID)
 	require.NoError(t, err)
 	require.NoError(t, owner.Close(t.Context()))
-	createDefault := func(name string, kind nokkuv1.AuthorityType) string {
-		res, err := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth).
-			CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
-				Name:          new(uniq(name)),
-				KeyType:       nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ECDSA.Enum(),
-				AuthorityType: kind.Enum(),
-				IsDefault:     new(true),
-			})
+	certs := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth)
+	create := func(name string, isDefault bool) string {
+		res, err := certs.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
+			Name:      new(uniq(name)),
+			KeyType:   nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ECDSA.Enum(),
+			IsDefault: new(isDefault),
+		})
 		require.NoError(t, err)
 		return res.GetCertificateAuthority().GetId()
 	}
@@ -539,13 +534,29 @@ func TestEnrollFallsBackToSSHDefaultCA(t *testing.T) {
 		return target.CaID
 	}
 
-	createDefault("x509", nokkuv1.AuthorityType_AUTHORITY_TYPE_X509)
-	assert.Nil(t, enrolledCA(), "with no SSH CA the server gets none")
+	create("plain", false)
+	assert.Nil(t, enrolledCA(), "with no default the server gets none")
 
-	sshCA := createDefault("ssh", nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH)
+	first := create("first", true)
 	got := enrolledCA()
 	require.NotNil(t, got)
-	assert.Equal(t, sshCA, *got, "the SSH default, with both kinds present")
+	assert.Equal(t, first, *got, "the default")
+
+	// Making another CA the default moves it. The partial unique index
+	// refuses two, so a second default would fail the create.
+	second := create("second", true)
+	got = enrolledCA()
+	require.NotNil(t, got)
+	assert.Equal(t, second, *got, "the new default")
+	listed, err := certs.ListCertificateAuthorities(t.Context(), &nokkuv1.ListCertificateAuthoritiesRequest{})
+	require.NoError(t, err)
+	var defaults []string
+	for _, ca := range listed.GetCertificateAuthorities() {
+		if ca.GetIsDefault() {
+			defaults = append(defaults, ca.GetId())
+		}
+	}
+	assert.Equal(t, []string{second}, defaults, "one default")
 }
 
 // The report is a hint from the host. What does not parse is dropped and the
@@ -579,9 +590,9 @@ func TestSyncDaemonReport(t *testing.T) {
 			return err
 		}
 		endpoints = target.Endpoints
-		rows, err := q.GetPrincipalsByTargetIDs(t.Context(), []string{target.ID})
+		rows, err := q.GetTargetAccountsByTargetIDs(t.Context(), []string{target.ID})
 		for _, r := range rows {
-			usernames = append(usernames, r.Principal.Username)
+			usernames = append(usernames, r.TargetAccount.Username)
 		}
 		return err
 	}))
@@ -651,102 +662,4 @@ func TestUnenrollDaemon(t *testing.T) {
 	_, err = control(nokkuv1connect.DaemonControlServiceSyncDaemonProcedure).
 		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the session outlived the daemon, got %v", err)
-}
-
-func seedCA(
-	t *testing.T,
-	srv *httptest.Server,
-	adminAuth connect.ClientOption,
-	name string,
-	kind nokkuv1.AuthorityType,
-) string {
-	t.Helper()
-	created, err := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth).
-		CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
-			Name:          new(uniq(name)),
-			KeyType:       nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ECDSA.Enum(),
-			AuthorityType: kind.Enum(),
-		})
-	require.NoError(t, err)
-	return created.GetCertificateAuthority().GetId()
-}
-
-// X.509 CAs sit in the same table as SSH ones. A server and an enroll token
-// only take an SSH one, also when it is named by id.
-func TestServersOnlyTakeSSHCAs(t *testing.T) {
-	cfg, srv := newTestAPI(t)
-	ctx := t.Context()
-	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header(
-		"Authorization",
-		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
-	)
-	x509CA := seedCA(t, srv, adminAuth, "x509", nokkuv1.AuthorityType_AUTHORITY_TYPE_X509)
-	sshCA := seedCA(t, srv, adminAuth, "ssh", nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH)
-	targets := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, adminAuth)
-	tokens := nokkuv1connect.NewTokenServiceClient(srv.Client(), srv.URL, adminAuth)
-
-	name := uniq("web")
-	_, err := targets.CreateTarget(ctx, &nokkuv1.CreateTargetRequest{
-		Name: &name, CaId: &x509CA,
-	})
-	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a server created with an X.509 CA: %v", err)
-
-	created, err := targets.CreateTarget(ctx, &nokkuv1.CreateTargetRequest{
-		Name: &name, CaId: &sshCA,
-	})
-	require.NoError(t, err)
-	targetID := created.GetTarget().GetId()
-
-	_, err = targets.UpdateTarget(ctx, &nokkuv1.UpdateTargetRequest{
-		Id: &targetID, CaId: &x509CA,
-	})
-	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a server moved to an X.509 CA: %v", err)
-	target, err := cfg.Conn.Sys().GetTarget(ctx, targetID)
-	require.NoError(t, err)
-	require.NotNil(t, target.CaID)
-	assert.Equal(t, sshCA, *target.CaID, "the server kept its CA")
-
-	enroll := func(caID string) error {
-		_, err := tokens.CreateToken(ctx, &nokkuv1.CreateTokenRequest{
-			Kind: nokkuv1.TokenKind_TOKEN_KIND_ENROLL.Enum(),
-			CaId: &caID,
-		})
-		return err
-	}
-	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(enroll(x509CA)), "an enroll token for an X.509 CA")
-	require.NoError(t, enroll(sshCA))
-}
-
-// A row that carries an X.509 CA anyway never gets its key to sign an SSH
-// host certificate.
-func TestSignHostCertificateNeedsAnSSHCA(t *testing.T) {
-	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header(
-		"Authorization",
-		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
-	)
-	x509CA := seedCA(t, srv, adminAuth, "x509", nokkuv1.AuthorityType_AUTHORITY_TYPE_X509)
-	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
-	_, err := cfg.Conn.Sys().UpdateTarget(t.Context(), &db.UpdateTargetParams{
-		TargetID: enrolled.GetTargetId(),
-		CaID:     &x509CA,
-	})
-	require.NoError(t, err)
-
-	hostKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(t, err)
-	hostPub, err := ssh.NewPublicKey(&hostKey.PublicKey)
-	require.NoError(t, err)
-	res, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
-		daemonAuth(
-			t, cfg, key, enrolled.GetAccessToken(),
-			nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure,
-		)).
-		SignHostCertificate(t.Context(), &nokkuv1.SignHostCertificateRequest{
-			PublicKey: new(string(ssh.MarshalAuthorizedKey(hostPub))),
-		})
-	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "signed with an X.509 key: %v", err)
-	assert.Empty(t, res.GetSignedCertificate())
 }

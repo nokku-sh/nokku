@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { recordings } from '#lib/api/recordings.svelte.js';
 	import RecordingPlayer from './RecordingPlayer.svelte';
+	import WhoCell from './WhoCell.svelte';
 	import {
 		DataTable,
 		TableToolbar,
@@ -30,7 +31,8 @@
 	const list = recordings.list(() => ({
 		...pager.args,
 		daemonId: page.url.searchParams.get('daemon') || undefined,
-		username: page.url.searchParams.get('user') || undefined
+		username: page.url.searchParams.get('user') || undefined,
+		subjectId: page.url.searchParams.get('subject') || undefined
 	}));
 	const daemons = daemon.list();
 	const daemonName = $derived(new Map((daemons.data?.daemons ?? []).map((d) => [d.id, d.name])));
@@ -69,8 +71,12 @@
 					label: daemonName.get(row.original.daemonId) ?? (row.original.daemonName || '-')
 				})
 		}),
+		columnHelper.accessor('subjectId', {
+			header: 'Who',
+			cell: ({ row }) => renderComponent(WhoCell, { subjectId: row.original.subjectId })
+		}),
 		columnHelper.accessor('username', {
-			header: 'User',
+			header: 'Account',
 			cell: ({ row }) =>
 				renderComponent(TextCell, { label: row.original.username || '-', mono: true })
 		}),

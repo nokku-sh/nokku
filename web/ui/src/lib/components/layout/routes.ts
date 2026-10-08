@@ -71,7 +71,13 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 				{ title: 'Daemons', url: '/infrastructure/daemons', icon: Bot, shortcut: 'n' }
 			]
 		},
-		{ title: 'Certificate authorities', url: '/certificates', icon: IdCard, shortcut: 'c' },
+		{
+			title: 'Certificate authorities',
+			url: '/certificates',
+			icon: IdCard,
+			role: WorkspaceRole.VIEWER,
+			shortcut: 'c'
+		},
 		{
 			title: 'Sessions',
 			url: '/sessions',
@@ -140,9 +146,13 @@ export const SupportRoutes: Record<string, RouteItem[]> = {
 	Support: [{ title: 'Documentation', url: DocsURL, icon: BookText }]
 };
 
-/** The pages themselves, without the groups that only hold children. */
-function leaves(items: RouteItem[]): RouteItem[] {
-	return items.flatMap((item) => (item.items?.length ? leaves(item.items) : [item]));
+/** The pages themselves, without the groups that only hold children. A page
+ * without a role of its own takes the group's. */
+function leaves(items: RouteItem[], role?: WorkspaceRole): RouteItem[] {
+	return items.flatMap((item) => {
+		const own = item.role ?? role;
+		return item.items?.length ? leaves(item.items, own) : [{ ...item, role: own }];
+	});
 }
 
 const pageRoutes = [...leaves(Object.values(AppRoutes).flat()), ...leaves(UserRoutes)];
@@ -156,6 +166,15 @@ export function routeFor(path: string): RouteItem | undefined {
 // Show everything until the role is known, so the nav doesn't flicker.
 export function canSee(route: RouteItem, role: WorkspaceRole | undefined): boolean {
 	return role === undefined || atLeast(role, route.role ?? WorkspaceRole.MEMBER);
+}
+
+/** Whether the role may open a path. A page under a nav entry counts as that entry. */
+export function canVisit(path: string, role: WorkspaceRole | undefined): boolean {
+	const clean = path.replace(/\/$/, '') || '/';
+	const route = pageRoutes
+		.filter((r) => clean === r.url || clean.startsWith(r.url + '/'))
+		.sort((a, b) => b.url.length - a.url.length)[0];
+	return !route || canSee(route, role);
 }
 
 /** The nav for a role, without the pages it can't use and the groups that leaves empty. */

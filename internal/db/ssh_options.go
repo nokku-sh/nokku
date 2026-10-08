@@ -1,6 +1,6 @@
 package db
 
-// The two JSONB columns on certificate_authorities hold SSH certificate
+// The two JSONB columns on ssh_cas hold SSH certificate
 // extensions and critical options. Only known names are accepted.
 
 import (

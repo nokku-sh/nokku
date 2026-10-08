@@ -122,16 +122,13 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 			return err
 		}
 		row, err := q.CreateCA(ctx, &db.CreateCAParams{
-			Name:         fresh() + " CA",
-			Certificate:  string(ca.Certificate),
-			PrivateKey:   ca.PrivateKey,
-			PublicKey:    ca.PublicKey,
-			SerialNumber: ca.SerialNumber,
-			Subject:      ca.Subject,
-			NotBefore:    ca.NotBefore,
-			NotAfter:     ca.NotAfter,
-			KeyType:      ca.KeyType,
-			KeyBits:      ca.KeyBits,
+			Name:       fresh() + " CA",
+			PrivateKey: ca.PrivateKey,
+			PublicKey:  ca.PublicKey,
+			NotBefore:  ca.NotBefore,
+			NotAfter:   ca.NotAfter,
+			KeyType:    ca.KeyType,
+			KeyBits:    ca.KeyBits,
 		})
 		if err != nil {
 			return fmt.Errorf("certificate authority: %w", err)
@@ -184,7 +181,7 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 // and service accounts that may sign in as it.
 func grant(ctx context.Context, q *db.Queries, targetID string, who subjects) error {
 	for _, username := range sample(usernames, 1+roll(3)) {
-		p, err := q.CreatePrincipal(ctx, &db.CreatePrincipalParams{TargetID: targetID, Username: username})
+		p, err := q.CreateTargetAccount(ctx, &db.CreateTargetAccountParams{TargetID: targetID, Username: username})
 		if err != nil {
 			return fmt.Errorf("account: %w", err)
 		}
@@ -194,8 +191,8 @@ func grant(ctx context.Context, q *db.Queries, targetID string, who subjects) er
 			db.SubjectKindServiceAccount: sample(who.serviceAccounts, roll(2)),
 		} {
 			for _, id := range ids {
-				if err := q.AddPrincipalGrant(ctx, &db.AddPrincipalGrantParams{
-					PrincipalID: p.ID, SubjectKind: kind, SubjectID: id,
+				if err := q.AddGrant(ctx, &db.AddGrantParams{
+					AccountID: p.ID, SubjectKind: kind, SubjectID: id,
 				}); err != nil {
 					return fmt.Errorf("grant: %w", err)
 				}

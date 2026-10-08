@@ -60,8 +60,8 @@ WITH
       p.target_id,
       u.tag
     FROM
-      principal_grants g
-      JOIN principals p ON p.id = g.principal_id
+      grants g
+      JOIN target_accounts p ON p.id = g.account_id
       JOIN targets t ON t.id = p.target_id
       CROSS JOIN LATERAL unnest(
         CASE
@@ -266,8 +266,8 @@ SELECT
       SELECT
         1
       FROM
-        principal_grants g
-        JOIN principals p ON p.id = g.principal_id
+        grants g
+        JOIN target_accounts p ON p.id = g.account_id
       WHERE
         p.target_id = t.id
         AND (

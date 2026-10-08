@@ -55,7 +55,7 @@ func TestSyncTargetUsers(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
 	)
 	editor := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, editorAuth)
-	principals := nokkuv1connect.NewPrincipalServiceClient(srv.Client(), srv.URL, editorAuth)
+	principals := nokkuv1connect.NewTargetAccountServiceClient(srv.Client(), srv.URL, editorAuth)
 	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		TargetId:      &targetID,
 		HostPublicKey: &hostKey,
@@ -71,13 +71,13 @@ func TestSyncTargetUsers(t *testing.T) {
 	assert.Contains(t, got.GetTarget().GetMetadata(), "last_manual_sync", "manual sync stamped")
 
 	usernames := func() []string {
-		res, err := principals.ListPrincipals(t.Context(), &nokkuv1.ListPrincipalsRequest{
+		res, err := principals.ListTargetAccounts(t.Context(), &nokkuv1.ListTargetAccountsRequest{
 			TargetId: &targetID,
 			Limit:    new(int32(100)),
 		})
 		require.NoError(t, err)
 		var out []string
-		for _, p := range res.GetPrincipals() {
+		for _, p := range res.GetAccounts() {
 			out = append(out, p.GetUsername())
 		}
 		return out
@@ -177,7 +177,7 @@ func (s graphSeed) account(name string, tags []string, username string) string {
 	if username == "" {
 		return ""
 	}
-	p, err := s.q.CreatePrincipal(s.t.Context(), &db.CreatePrincipalParams{
+	p, err := s.q.CreateTargetAccount(s.t.Context(), &db.CreateTargetAccountParams{
 		TargetID: s.targets[name],
 		Username: username,
 	})
@@ -186,8 +186,8 @@ func (s graphSeed) account(name string, tags []string, username string) string {
 }
 
 func (s graphSeed) grant(principalID, kind, subjectID string) {
-	require.NoError(s.t, s.q.AddPrincipalGrant(s.t.Context(), &db.AddPrincipalGrantParams{
-		PrincipalID: principalID,
+	require.NoError(s.t, s.q.AddGrant(s.t.Context(), &db.AddGrantParams{
+		AccountID:   principalID,
 		SubjectKind: kind,
 		SubjectID:   subjectID,
 	}))
@@ -271,7 +271,7 @@ func TestGetSubjectAccess(t *testing.T) {
 		accounts, principals := map[string][]string{}, 0
 		for _, target := range res.GetTargets() {
 			accounts[target.GetName()] = target.GetUsernames()
-			principals += len(target.GetPrincipals())
+			principals += len(target.GetAccounts())
 		}
 		return accounts, principals
 	}
@@ -305,7 +305,7 @@ func TestTargetsCarryPrincipals(t *testing.T) {
 	require.NoError(t, err)
 	accounts := map[string][]string{}
 	for _, target := range list.GetTargets() {
-		for _, p := range target.GetPrincipals() {
+		for _, p := range target.GetAccounts() {
 			accounts[target.GetName()] = append(accounts[target.GetName()], p.GetUsername())
 		}
 	}
@@ -317,7 +317,7 @@ func TestTargetsCarryPrincipals(t *testing.T) {
 		Id: &f.web1,
 	})
 	require.NoError(t, err)
-	principals := got.GetTarget().GetPrincipals()
+	principals := got.GetTarget().GetAccounts()
 	require.Len(t, principals, 2, "web-1 has deploy and root")
 	assert.Equal(t, "deploy", principals[0].GetUsername())
 	assert.Equal(t, []string{f.alice}, principals[0].GetUserIds())
@@ -500,7 +500,7 @@ func TestNewServerHasTheRootAccount(t *testing.T) {
 	got, err := targets.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: new(created.GetTarget().GetId())})
 	require.NoError(t, err)
 	var accounts []string
-	for _, p := range got.GetTarget().GetPrincipals() {
+	for _, p := range got.GetTarget().GetAccounts() {
 		accounts = append(accounts, p.GetUsername())
 	}
 	assert.Equal(t, []string{"root"}, accounts)

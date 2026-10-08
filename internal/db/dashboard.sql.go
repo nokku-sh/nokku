@@ -167,9 +167,9 @@ func (q *Queries) ListOpenRecordings(ctx context.Context, seenAfter time.Time) (
 
 const listSoonestCAs = `-- name: ListSoonestCAs :many
 SELECT
-  id, workspace_id, name, description, certificate, private_key, public_key, previous_public_key, previous_trusted_until, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 FROM
-  certificate_authorities
+  ssh_cas
 WHERE
   is_active = TRUE
   AND not_after > NOW()
@@ -179,33 +179,29 @@ LIMIT
   3
 `
 
-func (q *Queries) ListSoonestCAs(ctx context.Context) ([]*CertificateAuthority, error) {
+func (q *Queries) ListSoonestCAs(ctx context.Context) ([]*SSHCA, error) {
 	rows, err := q.db.Query(ctx, listSoonestCAs)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*CertificateAuthority
+	var items []*SSHCA
 	for rows.Next() {
-		var i CertificateAuthority
+		var i SSHCA
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
 			&i.Name,
 			&i.Description,
-			&i.Certificate,
 			&i.PrivateKey,
 			&i.PublicKey,
 			&i.PreviousPublicKey,
 			&i.PreviousTrustedUntil,
-			&i.SerialNumber,
-			&i.Subject,
 			&i.NotBefore,
 			&i.NotAfter,
 			&i.IsActive,
 			&i.IsDefault,
 			&i.KeyType,
-			&i.AuthorityType,
 			&i.KeyBits,
 			&i.Lifetime,
 			&i.UserDefaultTtl,

@@ -1,7 +1,7 @@
 import { serviceAccount } from '#lib/api/service_account.svelte.js';
 import { team } from '#lib/api/team.svelte.js';
 import { users } from '#lib/api/workspaces.svelte.js';
-import { SubjectKind, type Principal } from '#lib/gen/nokku/v1/principal_pb.js';
+import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 import type { ServiceAccount } from '#lib/gen/nokku/v1/service_account_pb.js';
 import type { Team } from '#lib/gen/nokku/v1/team_pb.js';
 import type { User } from '#lib/gen/nokku/v1/account_pb.js';
@@ -59,7 +59,7 @@ export function subjectHref(kind: SubjectKind, id: string) {
 	}
 }
 
-export function subjectIds(p: Principal, kind: SubjectKind): string[] {
+export function subjectIds(p: TargetAccount, kind: SubjectKind): string[] {
 	switch (kind) {
 		case SubjectKind.USER:
 			return p.userIds;
@@ -72,7 +72,7 @@ export function subjectIds(p: Principal, kind: SubjectKind): string[] {
 	}
 }
 
-export function grantsOf(p: Principal): SubjectRef[] {
+export function grantsOf(p: TargetAccount): SubjectRef[] {
 	return [
 		...p.userIds.map((id) => ({ id, kind: SubjectKind.USER })),
 		...p.teamIds.map((id) => ({ id, kind: SubjectKind.TEAM })),

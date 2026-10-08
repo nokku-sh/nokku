@@ -62,9 +62,8 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 		INSERT INTO sso_providers (workspace_id, provider_id) VALUES ($1, 'idp');
 		INSERT INTO scim_tokens (workspace_id, token_hash) VALUES ($1, $2 || '-scim');
 		INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci');
-		INSERT INTO certificate_authorities
-		  (workspace_id, name, certificate, private_key, public_key, serial_number, subject, not_before, not_after, key_bits)
-		VALUES ($1, 'ca', 'cert', 'key', 'pub', $2 || '-ca', 'subject', NOW(), NOW() + INTERVAL '1 day', 256);
+		INSERT INTO ssh_cas (workspace_id, name, private_key, public_key, not_before, not_after, key_bits)
+		VALUES ($1, 'ca', 'key', 'pub', NOW(), NOW() + INTERVAL '1 day', 256);
 		INSERT INTO workspace_tokens (id, workspace_id, kind, token_hash) VALUES (uuidv7(), $1, 1, 'hash');
 		INSERT INTO recordings (workspace_id, daemon_name, username, key) VALUES ($1, 'd', 'deploy', 'key');
 		INSERT INTO workspace_subscriptions (workspace_id) VALUES ($1);

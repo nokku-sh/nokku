@@ -3,12 +3,14 @@
 -- daemon enrolled or in the future is a clock that was wrong, and counts as
 -- now, or retention would take the recording at once.
 INSERT INTO
-  recordings (id, daemon_id, daemon_name, username, key, started_at)
+  recordings (id, daemon_id, daemon_name, username, subject_id, principal, key, started_at)
 SELECT
   @id,
   d.id,
   d.name,
   @username,
+  sqlc.narg('subject_id'),
+  @principal,
   @key,
   CASE
     WHEN sqlc.narg('started_at')::TIMESTAMPTZ BETWEEN d.created_at AND NOW() THEN sqlc.narg('started_at')::TIMESTAMPTZ
@@ -43,6 +45,10 @@ WHERE
   AND (
     sqlc.narg('username')::TEXT IS NULL
     OR r.username = sqlc.narg('username')
+  )
+  AND (
+    sqlc.narg('subject_id')::UUID IS NULL
+    OR r.subject_id = sqlc.narg('subject_id')
   )
 ORDER BY
   r.started_at DESC

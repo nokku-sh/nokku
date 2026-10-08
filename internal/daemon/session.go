@@ -29,7 +29,7 @@ type SessionConfig struct {
 	SessionID string
 	Username  string
 	UserID    string
-	CA        *db.CertificateAuthority
+	CA        *db.SSHCA
 	// HostPrincipal is the daemon's target id.
 	HostPrincipal string
 	// ClientAddr is the browser's address, reported to the daemon's sshd.
@@ -137,7 +137,7 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 }
 
 func mintSessionCert(
-	ca *db.CertificateAuthority,
+	ca *db.SSHCA,
 	principal, sessionID string,
 ) (ssh.Signer, error) {
 	_, key, err := ed25519.GenerateKey(crand.Reader)

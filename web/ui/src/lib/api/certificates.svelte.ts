@@ -8,10 +8,6 @@ export const sign = {
 	user: () =>
 		useMutation(CertificateService.method.signSSHCertificate, {
 			onSuccess: () => toast.success('Certificate signed')
-		}),
-	x509: () =>
-		useMutation(CertificateService.method.signX509Certificate, {
-			onSuccess: () => toast.success('Certificate signed')
 		})
 };
 

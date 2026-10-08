@@ -58,12 +58,6 @@ var errRecordingStorageFull = connect.NewError(
 	errors.New("the recording storage of this workspace is full"),
 )
 
-// errNotSSHCA answers for an X.509 CA, which sits in the same table.
-var errNotSSHCA = connect.NewError(
-	connect.CodeInvalidArgument,
-	errors.New("certificate authority is not an SSH CA"),
-)
-
 // errMailNotSent is not Unavailable, the client reads that as the server
 // being gone.
 var errMailNotSent = connect.NewError(

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { principal as principalApi } from '#lib/api/principals.svelte.js';
+	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
 	import { team as teamApi } from '#lib/api/team.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
@@ -8,7 +8,7 @@
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
-	import { SubjectKind, type Principal } from '#lib/gen/nokku/v1/principal_pb.js';
+	import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { Search, Server, ShieldOff, SquareTerminal, Users } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -29,22 +29,22 @@
 	const access = targetApi.access(() => subjectId);
 	const userTeams = teamApi.listForUser(() => (kind === SubjectKind.USER ? subjectId : undefined));
 	const teamNames = $derived(new Map((userTeams.data ?? []).map((t) => [t.id, t.name])));
-	const removeSubjects = principalApi.removeSubjects();
+	const removeSubjects = accountApi.removeSubjects();
 	const revoking = new SvelteSet<string>();
 
-	type Grant = { principal: Principal; direct: boolean; via: string[] };
+	type Grant = { account: TargetAccount; direct: boolean; via: string[] };
 
 	function grants(t: Target): Grant[] {
-		return t.principals
+		return t.accounts
 			.map((p) => ({
-				principal: p,
+				account: p,
 				direct: subjectIds(p, kind).includes(subjectId),
 				via: p.teamIds.filter((id) => teamNames.has(id)).map((id) => teamNames.get(id)!)
 			}))
-			.filter((g) => (g.direct || g.via.length) && !revoking.has(g.principal.id));
+			.filter((g) => (g.direct || g.via.length) && !revoking.has(g.account.id));
 	}
 
-	async function revoke(p: Principal) {
+	async function revoke(p: TargetAccount) {
 		revoking.add(p.id);
 		try {
 			await removeSubjects.mutateAsync({ id: p.id, subjectIds: [subjectId], kind });
@@ -143,14 +143,14 @@
 					{/if}
 				</div>
 				<div class="flex flex-wrap gap-1.5 border-t bg-muted/40 px-3 py-2.5">
-					{#each list as g (g.principal.id)}
+					{#each list as g (g.account.id)}
 						<Chip
-							label={g.principal.username}
+							label={g.account.username}
 							mono
 							muted={!g.direct}
 							title={g.direct ? undefined : `Through ${g.via.join(', ')}`}
-							onRemove={g.direct && can.edit ? () => revoke(g.principal) : undefined}
-							removeLabel={`Revoke ${g.principal.username}`}
+							onRemove={g.direct && can.edit ? () => revoke(g.account) : undefined}
+							removeLabel={`Revoke ${g.account.username}`}
 						>
 							{#snippet leading()}
 								<SquareTerminal class="ml-2 size-3 text-muted-foreground" />

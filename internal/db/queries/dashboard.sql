@@ -37,7 +37,7 @@ SELECT
 SELECT
   *
 FROM
-  certificate_authorities
+  ssh_cas
 WHERE
   is_active = TRUE
   AND not_after > NOW()

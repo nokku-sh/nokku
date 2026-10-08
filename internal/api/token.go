@@ -61,14 +61,8 @@ func (s *tokenService) CreateToken(
 	token := crypto.NewToken(params.ID)
 	params.TokenHash = token.Hash
 
-	var created *db.WorkspaceToken
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if err = requireSSHCA(ctx, q, req.GetCaId()); err != nil {
-			return err
-		}
-		created, err = q.CreateWorkspaceToken(ctx, params)
-		return err
-	}); err != nil {
+	created, err := s.cfg.Conn.Tenant().CreateWorkspaceToken(ctx, params)
+	if err != nil {
 		return nil, err
 	}
 	audit.SetTarget(ctx, created.ID)

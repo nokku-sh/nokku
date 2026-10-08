@@ -38,7 +38,7 @@
 		query: debounced.current,
 		caId: page.url.searchParams.get('ca') || undefined,
 		tags: page.url.searchParams.get('tags')?.split(','),
-		principals: page.url.searchParams.get('principals')?.split(',')
+		accounts: page.url.searchParams.get('accounts')?.split(',')
 	}));
 
 	const caData = ca.list();
@@ -52,8 +52,8 @@
 			.map((tag) => ({ label: tag, value: tag, icon: TagIcon }))
 	);
 
-	const uniquePrincipals = $derived(
-		(filterData.data?.principals ?? [])
+	const uniqueAccounts = $derived(
+		(filterData.data?.accounts ?? [])
 			.slice()
 			.sort()
 			.map((username) => ({ label: username, value: username, icon: UserIcon }))
@@ -80,10 +80,10 @@
 			}
 		}),
 		columnHelper.display({
-			id: 'principals',
-			header: 'Principals',
+			id: 'accounts',
+			header: 'Accounts',
 			cell: ({ row }) =>
-				renderComponent(TagsCell, { tags: row.original.principals.map((p) => p.username) })
+				renderComponent(TagsCell, { tags: row.original.accounts.map((p) => p.username) })
 		}),
 		columnHelper.accessor('tags', {
 			header: 'Tags',
@@ -183,9 +183,9 @@
 					param: 'tags'
 				},
 				{
-					title: 'Principals',
-					options: uniquePrincipals,
-					param: 'principals'
+					title: 'Accounts',
+					options: uniqueAccounts,
+					param: 'accounts'
 				}
 			]}
 		/>

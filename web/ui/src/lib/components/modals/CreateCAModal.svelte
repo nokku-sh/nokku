@@ -1,6 +1,5 @@
 <script lang="ts" module>
 	import {
-		AuthorityType,
 		CertificateAuthoritySchema,
 		CertificateKeyType
 	} from '#lib/gen/nokku/v1/certificates_pb.js';
@@ -11,7 +10,6 @@
 		return {
 			name: '',
 			description: '',
-			authorityType: AuthorityType.SSH,
 			keyType: CertificateKeyType.ED25519,
 			keyBits: 0,
 			isDefault: false,
@@ -38,7 +36,6 @@
 	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
-	import * as RadioGroup from '#lib/components/ui/radio-group/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
@@ -50,24 +47,9 @@
 
 	const sheet = useSheet();
 	const createCA = caApi.create();
-	const uid = $props.id();
 
 	let model = $state(newDraft(CertificateAuthoritySchema, defaultCADraft()));
 	let advanced = $state(false);
-	const isSSH = $derived(model.authorityType === AuthorityType.SSH);
-
-	const types = [
-		{
-			value: AuthorityType.SSH,
-			title: 'SSH',
-			description: 'Signs user and host certificates for SSH logins.'
-		},
-		{
-			value: AuthorityType.X509,
-			title: 'X.509',
-			description: 'Signs certificates from CSRs for mTLS and internal HTTPS.'
-		}
-	];
 
 	const algorithms = [
 		{ value: CertificateKeyType.ED25519, label: 'Ed25519', recommended: true },
@@ -115,26 +97,6 @@
 	submitDisabled={!model.name.trim()}
 	{onSubmit}
 >
-	<Field.Set>
-		<Field.Legend variant="label">What will it sign?</Field.Legend>
-		<RadioGroup.Root
-			value={String(model.authorityType)}
-			onValueChange={(v) => (model.authorityType = Number(v) as AuthorityType)}
-			class="grid gap-2 sm:grid-cols-2"
-		>
-			{#each types as t (t.value)}
-				<Field.Label for={`${uid}-type-${t.value}`}>
-					<Field.Field orientation="horizontal">
-						<Field.Content>
-							<Field.Title>{t.title}</Field.Title>
-							<Field.Description>{t.description}</Field.Description>
-						</Field.Content>
-						<RadioGroup.Item value={String(t.value)} id={`${uid}-type-${t.value}`} />
-					</Field.Field>
-				</Field.Label>
-			{/each}
-		</RadioGroup.Root>
-	</Field.Set>
 	<Field.Field>
 		<Field.Label for="new-ca-name">Name</Field.Label>
 		<Input id="new-ca-name" bind:value={model.name} placeholder="production-ssh" required />
@@ -144,7 +106,7 @@
 		<Textarea
 			id="new-ca-description"
 			bind:value={model.description}
-			placeholder={isSSH ? 'Signs production SSH logins' : 'Internal PKI for service mTLS'}
+			placeholder="Signs production SSH logins"
 			rows={2}
 		/>
 	</Field.Field>
@@ -222,7 +184,7 @@
 				</Field.Field>
 				<div class="grid grid-cols-2 gap-4">
 					<Field.Field>
-						<Field.Label>{isSSH ? 'User' : 'Client'} certs by default</Field.Label>
+						<Field.Label>User certs by default</Field.Label>
 						<DurationInput bind:value={model.userDefaultTtl} />
 					</Field.Field>
 					<Field.Field>
@@ -230,7 +192,7 @@
 						<DurationInput bind:value={model.userMaxTtl} />
 					</Field.Field>
 					<Field.Field>
-						<Field.Label>{isSSH ? 'Host' : 'Server'} certs by default</Field.Label>
+						<Field.Label>Host certs by default</Field.Label>
 						<DurationInput bind:value={model.hostDefaultTtl} />
 					</Field.Field>
 					<Field.Field>

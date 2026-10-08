@@ -1,5 +1,5 @@
 import type { AccessGraphFilter } from '#lib/api/targets.svelte.js';
-import { SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 import type {
 	AccessGraphSubject,
 	AccessGraphTarget,

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as Avatar from '#lib/components/ui/avatar/index.js';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
-	import { SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { cn } from '#lib/utils.js';
 	import { Bot, Users } from '@lucide/svelte';
 	import type { Subject } from './subjects.svelte';

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { principal as principalApi } from '#lib/api/principals.svelte.js';
+	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
 	import { MAX_PAGE_SIZE } from '#lib/config.js';
 	import { Button, type ButtonSize, type ButtonVariant } from '#lib/components/ui/button/index.js';
@@ -7,7 +7,7 @@
 	import * as Command from '#lib/components/ui/command/index.js';
 	import * as Popover from '#lib/components/ui/popover/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import type { Principal, SubjectKind } from '#lib/gen/nokku/v1/principal_pb.js';
+	import type { SubjectKind, TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { ChevronLeft, Plus, Server } from '@lucide/svelte';
 	import { Debounced } from 'runed';
@@ -45,18 +45,19 @@
 	);
 
 	// Only fetched while open, the subject Access tab renders one popover per target.
-	const accounts = principalApi.list(() => ({
+	const accounts = accountApi.list(() => ({
 		targetId: open ? targetId : '',
 		limit: MAX_PAGE_SIZE
 	}));
 
-	const addSubjects = principalApi.addSubjects();
-	const removeSubjects = principalApi.removeSubjects();
+	const addSubjects = accountApi.addSubjects();
+	const removeSubjects = accountApi.removeSubjects();
 	const pending = new SvelteMap<string, boolean>();
 
-	const isGranted = (p: Principal) => pending.get(p.id) ?? subjectIds(p, kind).includes(subjectId);
+	const isGranted = (p: TargetAccount) =>
+		pending.get(p.id) ?? subjectIds(p, kind).includes(subjectId);
 
-	async function toggle(p: Principal, grant: boolean) {
+	async function toggle(p: TargetAccount, grant: boolean) {
 		pending.set(p.id, grant);
 		const mutation = grant ? addSubjects : removeSubjects;
 		try {
@@ -101,7 +102,7 @@
 								<Server />
 								<span class="truncate">{t.name}</span>
 								<span class="ml-auto text-xs text-muted-foreground tabular-nums">
-									{t.principals.length || ''}
+									{t.accounts.length || ''}
 								</span>
 							</Command.Item>
 						{/each}
@@ -128,7 +129,7 @@
 				{#if accounts.isLoading}
 					<div class="flex justify-center p-4"><Spinner /></div>
 				{:else}
-					{#each accounts.data?.principals ?? [] as p (p.id)}
+					{#each accounts.data?.accounts ?? [] as p (p.id)}
 						<label
 							class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
 						>

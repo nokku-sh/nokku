@@ -130,7 +130,7 @@ func (s *daemonControlService) SignHostCertificate(
 	req *nokkuv1.SignHostCertificateRequest,
 ) (*nokkuv1.SignHostCertificateResponse, error) {
 	daemonID := actor.DaemonIDFromContext(ctx)
-	var ca *db.CertificateAuthority
+	var ca *db.SSHCA
 	var target *db.Target
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if ca, err = q.GetCAByDaemonID(ctx, &daemonID); err != nil {
@@ -143,10 +143,6 @@ func (s *daemonControlService) SignHostCertificate(
 	}
 	if !ca.IsActive {
 		return nil, newError(connect.CodeFailedPrecondition, "certificate authority is not active")
-	}
-	// The key would sign, an X.509 CA holds the same kind of key.
-	if ca.AuthorityType != nokkuv1.AuthorityType_AUTHORITY_TYPE_SSH {
-		return nil, newError(connect.CodeFailedPrecondition, "certificate authority is not an SSH CA")
 	}
 
 	cert, err := ssh.SignCertificate(
@@ -332,10 +328,27 @@ func (s *daemonControlService) resolveUpload(
 		if t := rm.GetStartedAt(); t.IsValid() {
 			startedAt = new(t.AsTime())
 		}
+		// The host reports the principal it matched. It must name this
+		// daemon's target and the account of the session, or the recording
+		// would be filed under someone else.
+		var subjectID *string
+		if rm.GetPrincipal() != "" {
+			target, err := q.GetTargetByDaemon(ctx, &daemonID)
+			if err != nil {
+				return err
+			}
+			p, ok := ssh.ParseLoginPrincipal(rm.GetPrincipal())
+			if !ok || p.TargetID != target.ID || p.Username != rm.GetUsername() {
+				return newError(connect.CodeInvalidArgument, "the principal does not match the session")
+			}
+			subjectID = &p.SubjectID
+		}
 		rec, err = q.CreateRecording(ctx, &db.CreateRecordingParams{
 			ID:        rm.GetRecordingId(),
 			DaemonID:  daemonID,
 			Username:  rm.GetUsername(),
+			SubjectID: subjectID,
+			Principal: rm.GetPrincipal(),
 			Key:       recording.NewKey(),
 			StartedAt: startedAt,
 		})

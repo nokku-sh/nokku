@@ -15,19 +15,14 @@ import (
 
 const createCA = `-- name: CreateCA :one
 INSERT INTO
-  certificate_authorities (
+  ssh_cas (
     name,
     description,
-    certificate,
     private_key,
     public_key,
-    serial_number,
-    subject,
-    is_default,
     not_before,
     not_after,
     key_type,
-    authority_type,
     key_bits,
     lifetime,
     user_default_ttl,
@@ -46,39 +41,29 @@ VALUES
     $4,
     $5,
     $6,
-    $7,
+    COALESCE($7, 3),
     $8,
-    $9,
-    $10,
-    COALESCE($11, 3),
-    COALESCE($12, 1),
-    $13,
-    COALESCE($14, '8760 hours'::interval),
-    COALESCE($15, '120 hours'::interval),
-    COALESCE($16, '168 hours'::interval),
-    COALESCE($17, '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}'::jsonb),
-    COALESCE($18, '{}'::jsonb),
-    COALESCE($19, '2160 hours'::interval),
-    COALESCE($20, '4320 hours'::interval),
-    COALESCE($21, ARRAY[1, 2, 3])
+    COALESCE($9, '8760 hours'::interval),
+    COALESCE($10, '120 hours'::interval),
+    COALESCE($11, '168 hours'::interval),
+    COALESCE($12, '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}'::jsonb),
+    COALESCE($13, '{}'::jsonb),
+    COALESCE($14, '2160 hours'::interval),
+    COALESCE($15, '4320 hours'::interval),
+    COALESCE($16, ARRAY[1, 2, 3])
   )
 RETURNING
-  id, workspace_id, name, description, certificate, private_key, public_key, previous_public_key, previous_trusted_until, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 `
 
 type CreateCAParams struct {
 	Name                string                `json:"name"`
 	Description         *string               `json:"description"`
-	Certificate         string                `json:"certificate"`
 	PrivateKey          crypto.EncryptedBytes `json:"privateKey"`
 	PublicKey           string                `json:"publicKey"`
-	SerialNumber        string                `json:"serialNumber"`
-	Subject             string                `json:"subject"`
-	IsDefault           bool                  `json:"isDefault"`
 	NotBefore           time.Time             `json:"notBefore"`
 	NotAfter            time.Time             `json:"notAfter"`
 	KeyType             interface{}           `json:"keyType"`
-	AuthorityType       interface{}           `json:"authorityType"`
 	KeyBits             int32                 `json:"keyBits"`
 	Lifetime            interface{}           `json:"lifetime"`
 	UserDefaultTtl      interface{}           `json:"userDefaultTtl"`
@@ -90,20 +75,15 @@ type CreateCAParams struct {
 	AllowedKeyTypes     interface{}           `json:"allowedKeyTypes"`
 }
 
-func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*CertificateAuthority, error) {
+func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, createCA,
 		arg.Name,
 		arg.Description,
-		arg.Certificate,
 		arg.PrivateKey,
 		arg.PublicKey,
-		arg.SerialNumber,
-		arg.Subject,
-		arg.IsDefault,
 		arg.NotBefore,
 		arg.NotAfter,
 		arg.KeyType,
-		arg.AuthorityType,
 		arg.KeyBits,
 		arg.Lifetime,
 		arg.UserDefaultTtl,
@@ -114,25 +94,21 @@ func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*Certifica
 		arg.HostMaxTtl,
 		arg.AllowedKeyTypes,
 	)
-	var i CertificateAuthority
+	var i SSHCA
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Description,
-		&i.Certificate,
 		&i.PrivateKey,
 		&i.PublicKey,
 		&i.PreviousPublicKey,
 		&i.PreviousTrustedUntil,
-		&i.SerialNumber,
-		&i.Subject,
 		&i.NotBefore,
 		&i.NotAfter,
 		&i.IsActive,
 		&i.IsDefault,
 		&i.KeyType,
-		&i.AuthorityType,
 		&i.KeyBits,
 		&i.Lifetime,
 		&i.UserDefaultTtl,
@@ -149,35 +125,30 @@ func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*Certifica
 }
 
 const deleteCA = `-- name: DeleteCA :one
-DELETE FROM certificate_authorities
+DELETE FROM ssh_cas
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, name, description, certificate, private_key, public_key, previous_public_key, previous_trusted_until, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 `
 
-// The enforce_single_default_ca trigger clears the previous default.
-func (q *Queries) DeleteCA(ctx context.Context, caID string) (*CertificateAuthority, error) {
+func (q *Queries) DeleteCA(ctx context.Context, caID string) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, deleteCA, caID)
-	var i CertificateAuthority
+	var i SSHCA
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Description,
-		&i.Certificate,
 		&i.PrivateKey,
 		&i.PublicKey,
 		&i.PreviousPublicKey,
 		&i.PreviousTrustedUntil,
-		&i.SerialNumber,
-		&i.Subject,
 		&i.NotBefore,
 		&i.NotAfter,
 		&i.IsActive,
 		&i.IsDefault,
 		&i.KeyType,
-		&i.AuthorityType,
 		&i.KeyBits,
 		&i.Lifetime,
 		&i.UserDefaultTtl,
@@ -195,34 +166,30 @@ func (q *Queries) DeleteCA(ctx context.Context, caID string) (*CertificateAuthor
 
 const getCA = `-- name: GetCA :one
 SELECT
-  id, workspace_id, name, description, certificate, private_key, public_key, previous_public_key, previous_trusted_until, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 FROM
-  certificate_authorities
+  ssh_cas
 WHERE
   id = $1
 `
 
-func (q *Queries) GetCA(ctx context.Context, caID string) (*CertificateAuthority, error) {
+func (q *Queries) GetCA(ctx context.Context, caID string) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, getCA, caID)
-	var i CertificateAuthority
+	var i SSHCA
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Description,
-		&i.Certificate,
 		&i.PrivateKey,
 		&i.PublicKey,
 		&i.PreviousPublicKey,
 		&i.PreviousTrustedUntil,
-		&i.SerialNumber,
-		&i.Subject,
 		&i.NotBefore,
 		&i.NotAfter,
 		&i.IsActive,
 		&i.IsDefault,
 		&i.KeyType,
-		&i.AuthorityType,
 		&i.KeyBits,
 		&i.Lifetime,
 		&i.UserDefaultTtl,
@@ -240,35 +207,31 @@ func (q *Queries) GetCA(ctx context.Context, caID string) (*CertificateAuthority
 
 const getCAByDaemonID = `-- name: GetCAByDaemonID :one
 SELECT
-  ca.id, ca.workspace_id, ca.name, ca.description, ca.certificate, ca.private_key, ca.public_key, ca.previous_public_key, ca.previous_trusted_until, ca.serial_number, ca.subject, ca.not_before, ca.not_after, ca.is_active, ca.is_default, ca.key_type, ca.authority_type, ca.key_bits, ca.lifetime, ca.user_default_ttl, ca.user_max_ttl, ca.user_extensions, ca.user_critical_options, ca.host_default_ttl, ca.host_max_ttl, ca.allowed_key_types, ca.created_at, ca.updated_at
+  ca.id, ca.workspace_id, ca.name, ca.description, ca.private_key, ca.public_key, ca.previous_public_key, ca.previous_trusted_until, ca.not_before, ca.not_after, ca.is_active, ca.is_default, ca.key_type, ca.key_bits, ca.lifetime, ca.user_default_ttl, ca.user_max_ttl, ca.user_extensions, ca.user_critical_options, ca.host_default_ttl, ca.host_max_ttl, ca.allowed_key_types, ca.created_at, ca.updated_at
 FROM
-  certificate_authorities ca
+  ssh_cas ca
   JOIN targets t ON t.ca_id = ca.id
 WHERE
   t.daemon_id = $1
 `
 
-func (q *Queries) GetCAByDaemonID(ctx context.Context, daemonID *string) (*CertificateAuthority, error) {
+func (q *Queries) GetCAByDaemonID(ctx context.Context, daemonID *string) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, getCAByDaemonID, daemonID)
-	var i CertificateAuthority
+	var i SSHCA
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Description,
-		&i.Certificate,
 		&i.PrivateKey,
 		&i.PublicKey,
 		&i.PreviousPublicKey,
 		&i.PreviousTrustedUntil,
-		&i.SerialNumber,
-		&i.Subject,
 		&i.NotBefore,
 		&i.NotAfter,
 		&i.IsActive,
 		&i.IsDefault,
 		&i.KeyType,
-		&i.AuthorityType,
 		&i.KeyBits,
 		&i.Lifetime,
 		&i.UserDefaultTtl,
@@ -286,35 +249,31 @@ func (q *Queries) GetCAByDaemonID(ctx context.Context, daemonID *string) (*Certi
 
 const getCAForUpdate = `-- name: GetCAForUpdate :one
 SELECT
-  id, workspace_id, name, description, certificate, private_key, public_key, previous_public_key, previous_trusted_until, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 FROM
-  certificate_authorities
+  ssh_cas
 WHERE
   id = $1
 FOR UPDATE
 `
 
-func (q *Queries) GetCAForUpdate(ctx context.Context, caID string) (*CertificateAuthority, error) {
+func (q *Queries) GetCAForUpdate(ctx context.Context, caID string) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, getCAForUpdate, caID)
-	var i CertificateAuthority
+	var i SSHCA
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Description,
-		&i.Certificate,
 		&i.PrivateKey,
 		&i.PublicKey,
 		&i.PreviousPublicKey,
 		&i.PreviousTrustedUntil,
-		&i.SerialNumber,
-		&i.Subject,
 		&i.NotBefore,
 		&i.NotAfter,
 		&i.IsActive,
 		&i.IsDefault,
 		&i.KeyType,
-		&i.AuthorityType,
 		&i.KeyBits,
 		&i.Lifetime,
 		&i.UserDefaultTtl,
@@ -337,26 +296,22 @@ SELECT
   name,
   public_key,
   is_default,
-  authority_type,
-  certificate,
   user_default_ttl,
   user_max_ttl
 FROM
-  certificate_authorities
+  ssh_cas
 WHERE
   id = ANY ($1::UUID[])
 `
 
 type GetCAsByIDsRow struct {
-	ID             string              `json:"id"`
-	WorkspaceID    string              `json:"workspaceId"`
-	Name           string              `json:"name"`
-	PublicKey      string              `json:"publicKey"`
-	IsDefault      bool                `json:"isDefault"`
-	AuthorityType  nokku.AuthorityType `json:"authorityType"`
-	Certificate    string              `json:"certificate"`
-	UserDefaultTtl time.Duration       `json:"userDefaultTtl"`
-	UserMaxTtl     time.Duration       `json:"userMaxTtl"`
+	ID             string        `json:"id"`
+	WorkspaceID    string        `json:"workspaceId"`
+	Name           string        `json:"name"`
+	PublicKey      string        `json:"publicKey"`
+	IsDefault      bool          `json:"isDefault"`
+	UserDefaultTtl time.Duration `json:"userDefaultTtl"`
+	UserMaxTtl     time.Duration `json:"userMaxTtl"`
 }
 
 func (q *Queries) GetCAsByIDs(ctx context.Context, caIds []string) ([]*GetCAsByIDsRow, error) {
@@ -374,8 +329,6 @@ func (q *Queries) GetCAsByIDs(ctx context.Context, caIds []string) ([]*GetCAsByI
 			&i.Name,
 			&i.PublicKey,
 			&i.IsDefault,
-			&i.AuthorityType,
-			&i.Certificate,
 			&i.UserDefaultTtl,
 			&i.UserMaxTtl,
 		); err != nil {
@@ -395,7 +348,7 @@ SELECT
   ca.previous_public_key,
   ca.previous_trusted_until
 FROM
-  certificate_authorities ca
+  ssh_cas ca
   JOIN targets t ON t.ca_id = ca.id
 WHERE
   t.daemon_id = $1
@@ -415,59 +368,11 @@ func (q *Queries) GetDaemonCAKeys(ctx context.Context, daemonID *string) (*GetDa
 	return &i, err
 }
 
-const getDefaultCA = `-- name: GetDefaultCA :one
-SELECT
-  id, workspace_id, name, description, certificate, private_key, public_key, previous_public_key, previous_trusted_until, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
-FROM
-  certificate_authorities
-WHERE
-  authority_type = $1
-  AND is_default = TRUE
-  AND is_active = TRUE
-  AND NOW() BETWEEN not_before AND not_after
-`
-
-func (q *Queries) GetDefaultCA(ctx context.Context, authorityType nokku.AuthorityType) (*CertificateAuthority, error) {
-	row := q.db.QueryRow(ctx, getDefaultCA, authorityType)
-	var i CertificateAuthority
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.Certificate,
-		&i.PrivateKey,
-		&i.PublicKey,
-		&i.PreviousPublicKey,
-		&i.PreviousTrustedUntil,
-		&i.SerialNumber,
-		&i.Subject,
-		&i.NotBefore,
-		&i.NotAfter,
-		&i.IsActive,
-		&i.IsDefault,
-		&i.KeyType,
-		&i.AuthorityType,
-		&i.KeyBits,
-		&i.Lifetime,
-		&i.UserDefaultTtl,
-		&i.UserMaxTtl,
-		&i.UserExtensions,
-		&i.UserCriticalOptions,
-		&i.HostDefaultTtl,
-		&i.HostMaxTtl,
-		&i.AllowedKeyTypes,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
 const getExpiringCAForUpdate = `-- name: GetExpiringCAForUpdate :one
 SELECT
-  ca.id, ca.workspace_id, ca.name, ca.description, ca.certificate, ca.private_key, ca.public_key, ca.previous_public_key, ca.previous_trusted_until, ca.serial_number, ca.subject, ca.not_before, ca.not_after, ca.is_active, ca.is_default, ca.key_type, ca.authority_type, ca.key_bits, ca.lifetime, ca.user_default_ttl, ca.user_max_ttl, ca.user_extensions, ca.user_critical_options, ca.host_default_ttl, ca.host_max_ttl, ca.allowed_key_types, ca.created_at, ca.updated_at
+  ca.id, ca.workspace_id, ca.name, ca.description, ca.private_key, ca.public_key, ca.previous_public_key, ca.previous_trusted_until, ca.not_before, ca.not_after, ca.is_active, ca.is_default, ca.key_type, ca.key_bits, ca.lifetime, ca.user_default_ttl, ca.user_max_ttl, ca.user_extensions, ca.user_critical_options, ca.host_default_ttl, ca.host_max_ttl, ca.allowed_key_types, ca.created_at, ca.updated_at
 FROM
-  certificate_authorities ca
+  ssh_cas ca
 WHERE
   ca.is_active = TRUE
   AND ca.id <> ALL (COALESCE($1::UUID[], '{}'))
@@ -490,27 +395,23 @@ FOR UPDATE
 `
 
 // skip_ids holds CAs whose rotation already failed this pass.
-func (q *Queries) GetExpiringCAForUpdate(ctx context.Context, skipIds []string) (*CertificateAuthority, error) {
+func (q *Queries) GetExpiringCAForUpdate(ctx context.Context, skipIds []string) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, getExpiringCAForUpdate, skipIds)
-	var i CertificateAuthority
+	var i SSHCA
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Description,
-		&i.Certificate,
 		&i.PrivateKey,
 		&i.PublicKey,
 		&i.PreviousPublicKey,
 		&i.PreviousTrustedUntil,
-		&i.SerialNumber,
-		&i.Subject,
 		&i.NotBefore,
 		&i.NotAfter,
 		&i.IsActive,
 		&i.IsDefault,
 		&i.KeyType,
-		&i.AuthorityType,
 		&i.KeyBits,
 		&i.Lifetime,
 		&i.UserDefaultTtl,
@@ -528,9 +429,9 @@ func (q *Queries) GetExpiringCAForUpdate(ctx context.Context, skipIds []string) 
 
 const listCAs = `-- name: ListCAs :many
 SELECT
-  id, workspace_id, name, description, certificate, private_key, public_key, previous_public_key, previous_trusted_until, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 FROM
-  certificate_authorities
+  ssh_cas
 WHERE
   (
     $1::text IS NULL
@@ -581,7 +482,7 @@ type ListCAsParams struct {
 	Limit        *int32  `json:"limit"`
 }
 
-func (q *Queries) ListCAs(ctx context.Context, arg *ListCAsParams) ([]*CertificateAuthority, error) {
+func (q *Queries) ListCAs(ctx context.Context, arg *ListCAsParams) ([]*SSHCA, error) {
 	rows, err := q.db.Query(ctx, listCAs,
 		arg.NameQuery,
 		arg.IsActive,
@@ -595,27 +496,23 @@ func (q *Queries) ListCAs(ctx context.Context, arg *ListCAsParams) ([]*Certifica
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*CertificateAuthority
+	var items []*SSHCA
 	for rows.Next() {
-		var i CertificateAuthority
+		var i SSHCA
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
 			&i.Name,
 			&i.Description,
-			&i.Certificate,
 			&i.PrivateKey,
 			&i.PublicKey,
 			&i.PreviousPublicKey,
 			&i.PreviousTrustedUntil,
-			&i.SerialNumber,
-			&i.Subject,
 			&i.NotBefore,
 			&i.NotAfter,
 			&i.IsActive,
 			&i.IsDefault,
 			&i.KeyType,
-			&i.AuthorityType,
 			&i.KeyBits,
 			&i.Lifetime,
 			&i.UserDefaultTtl,
@@ -639,7 +536,7 @@ func (q *Queries) ListCAs(ctx context.Context, arg *ListCAsParams) ([]*Certifica
 }
 
 const replaceCA = `-- name: ReplaceCA :one
-UPDATE certificate_authorities
+UPDATE ssh_cas
 SET
   previous_public_key = CASE
     WHEN $1::BOOLEAN THEN NULL
@@ -649,28 +546,22 @@ SET
     WHEN $1::BOOLEAN THEN NULL
     ELSE NOW() + user_max_ttl
   END,
-  certificate = $2,
-  private_key = $3,
-  public_key = $4,
-  serial_number = $5,
-  subject = $6,
-  not_before = $7,
-  not_after = $8,
-  key_type = $9,
-  key_bits = $10
+  private_key = $2,
+  public_key = $3,
+  not_before = $4,
+  not_after = $5,
+  key_type = $6,
+  key_bits = $7
 WHERE
-  id = $11
+  id = $8
 RETURNING
-  id, workspace_id, name, description, certificate, private_key, public_key, previous_public_key, previous_trusted_until, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 `
 
 type ReplaceCAParams struct {
 	RevokePrevious bool                     `json:"revokePrevious"`
-	Certificate    string                   `json:"certificate"`
 	PrivateKey     crypto.EncryptedBytes    `json:"privateKey"`
 	PublicKey      string                   `json:"publicKey"`
-	SerialNumber   string                   `json:"serialNumber"`
-	Subject        string                   `json:"subject"`
 	NotBefore      time.Time                `json:"notBefore"`
 	NotAfter       time.Time                `json:"notAfter"`
 	KeyType        nokku.CertificateKeyType `json:"keyType"`
@@ -680,39 +571,32 @@ type ReplaceCAParams struct {
 
 // The replaced key stays trusted for as long as a certificate it signed can
 // live, unless revoke_previous drops it at once.
-func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*CertificateAuthority, error) {
+func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, replaceCA,
 		arg.RevokePrevious,
-		arg.Certificate,
 		arg.PrivateKey,
 		arg.PublicKey,
-		arg.SerialNumber,
-		arg.Subject,
 		arg.NotBefore,
 		arg.NotAfter,
 		arg.KeyType,
 		arg.KeyBits,
 		arg.CaID,
 	)
-	var i CertificateAuthority
+	var i SSHCA
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Description,
-		&i.Certificate,
 		&i.PrivateKey,
 		&i.PublicKey,
 		&i.PreviousPublicKey,
 		&i.PreviousTrustedUntil,
-		&i.SerialNumber,
-		&i.Subject,
 		&i.NotBefore,
 		&i.NotAfter,
 		&i.IsActive,
 		&i.IsDefault,
 		&i.KeyType,
-		&i.AuthorityType,
 		&i.KeyBits,
 		&i.Lifetime,
 		&i.UserDefaultTtl,
@@ -728,32 +612,45 @@ func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*Certifi
 	return &i, err
 }
 
+const setDefaultCA = `-- name: SetDefaultCA :exec
+UPDATE ssh_cas
+SET
+  is_default = (id = $1)
+WHERE
+  id = $1
+  OR is_default
+`
+
+// One statement, so the partial unique index never sees two defaults.
+func (q *Queries) SetDefaultCA(ctx context.Context, caID string) error {
+	_, err := q.db.Exec(ctx, setDefaultCA, caID)
+	return err
+}
+
 const updateCA = `-- name: UpdateCA :one
-UPDATE certificate_authorities
+UPDATE ssh_cas
 SET
   name = COALESCE($1, name),
   description = COALESCE($2, description),
   is_active = COALESCE($3, is_active),
-  is_default = COALESCE($4, is_default),
-  lifetime = COALESCE($5, lifetime),
-  user_default_ttl = COALESCE($6, user_default_ttl),
-  user_max_ttl = COALESCE($7, user_max_ttl),
-  user_extensions = COALESCE($8, user_extensions),
-  user_critical_options = COALESCE($9, user_critical_options),
-  host_default_ttl = COALESCE($10, host_default_ttl),
-  host_max_ttl = COALESCE($11, host_max_ttl),
-  allowed_key_types = COALESCE($12, allowed_key_types)
+  lifetime = COALESCE($4, lifetime),
+  user_default_ttl = COALESCE($5, user_default_ttl),
+  user_max_ttl = COALESCE($6, user_max_ttl),
+  user_extensions = COALESCE($7, user_extensions),
+  user_critical_options = COALESCE($8, user_critical_options),
+  host_default_ttl = COALESCE($9, host_default_ttl),
+  host_max_ttl = COALESCE($10, host_max_ttl),
+  allowed_key_types = COALESCE($11, allowed_key_types)
 WHERE
-  id = $13
+  id = $12
 RETURNING
-  id, workspace_id, name, description, certificate, private_key, public_key, previous_public_key, previous_trusted_until, serial_number, subject, not_before, not_after, is_active, is_default, key_type, authority_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 `
 
 type UpdateCAParams struct {
 	Name                *string                    `json:"name"`
 	Description         *string                    `json:"description"`
 	IsActive            *bool                      `json:"isActive"`
-	IsDefault           *bool                      `json:"isDefault"`
 	Lifetime            *time.Duration             `json:"lifetime"`
 	UserDefaultTtl      *time.Duration             `json:"userDefaultTtl"`
 	UserMaxTtl          *time.Duration             `json:"userMaxTtl"`
@@ -765,12 +662,11 @@ type UpdateCAParams struct {
 	CaID                string                     `json:"caId"`
 }
 
-func (q *Queries) UpdateCA(ctx context.Context, arg *UpdateCAParams) (*CertificateAuthority, error) {
+func (q *Queries) UpdateCA(ctx context.Context, arg *UpdateCAParams) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, updateCA,
 		arg.Name,
 		arg.Description,
 		arg.IsActive,
-		arg.IsDefault,
 		arg.Lifetime,
 		arg.UserDefaultTtl,
 		arg.UserMaxTtl,
@@ -781,25 +677,21 @@ func (q *Queries) UpdateCA(ctx context.Context, arg *UpdateCAParams) (*Certifica
 		arg.AllowedKeyTypes,
 		arg.CaID,
 	)
-	var i CertificateAuthority
+	var i SSHCA
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Description,
-		&i.Certificate,
 		&i.PrivateKey,
 		&i.PublicKey,
 		&i.PreviousPublicKey,
 		&i.PreviousTrustedUntil,
-		&i.SerialNumber,
-		&i.Subject,
 		&i.NotBefore,
 		&i.NotAfter,
 		&i.IsActive,
 		&i.IsDefault,
 		&i.KeyType,
-		&i.AuthorityType,
 		&i.KeyBits,
 		&i.Lifetime,
 		&i.UserDefaultTtl,

@@ -18,15 +18,12 @@ import (
 )
 
 type CAInfo struct {
-	Certificate  []byte
-	PrivateKey   crypto.EncryptedBytes
-	PublicKey    string
-	SerialNumber string
-	Subject      string
-	NotBefore    time.Time
-	NotAfter     time.Time
-	KeyType      nokkuv1.CertificateKeyType
-	KeyBits      int32
+	PrivateKey crypto.EncryptedBytes
+	PublicKey  string
+	NotBefore  time.Time
+	NotAfter   time.Time
+	KeyType    nokkuv1.CertificateKeyType
+	KeyBits    int32
 }
 
 // Keypair holds the effective values after defaults and clamping.
@@ -109,8 +106,6 @@ func NewCA(
 		return nil, err
 	}
 
-	serial := crypto.RandomSerial()
-
 	privDER, err := x509.MarshalPKCS8PrivateKey(kp.Private)
 	if err != nil {
 		return nil, err
@@ -123,13 +118,11 @@ func NewCA(
 
 	now := time.Now()
 	return &CAInfo{
-		PrivateKey:   crypto.EncryptedBytes(privDER),
-		PublicKey:    pubStr,
-		SerialNumber: serial.String(),
-		Subject:      "CN=Nokku SSH Root CA, O=Nokku",
-		NotBefore:    now,
-		NotAfter:     CAExpiry(now, lifetime),
-		KeyType:      kp.Type,
-		KeyBits:      kp.Bits,
+		PrivateKey: crypto.EncryptedBytes(privDER),
+		PublicKey:  pubStr,
+		NotBefore:  now,
+		NotAfter:   CAExpiry(now, lifetime),
+		KeyType:    kp.Type,
+		KeyBits:    kp.Bits,
 	}, nil
 }

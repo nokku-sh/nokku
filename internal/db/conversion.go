@@ -79,6 +79,8 @@ func (r *Recording) ToProto() *nokkuv1.Recording {
 		DaemonId:   r.DaemonID,
 		DaemonName: &r.DaemonName,
 		Username:   &r.Username,
+		SubjectId:  r.SubjectID,
+		Principal:  &r.Principal,
 		StartedAt:  SafeTimestamp(&r.StartedAt),
 		EndedAt:    SafeTimestamp(r.EndedAt),
 		SizeBytes:  &r.SizeBytes,
@@ -149,24 +151,24 @@ func (t *Target) ToProto() *nokkuv1.Target {
 	}
 }
 
-func (p *Principal) ToProto() *nokkuv1.Principal {
-	if p == nil {
+func (a *TargetAccount) ToProto() *nokkuv1.TargetAccount {
+	if a == nil {
 		return nil
 	}
-	return &nokkuv1.Principal{
-		Id:        &p.ID,
-		TargetId:  &p.TargetID,
-		Username:  &p.Username,
-		CreatedAt: SafeTimestamp(&p.CreatedAt),
+	return &nokkuv1.TargetAccount{
+		Id:        &a.ID,
+		TargetId:  &a.TargetID,
+		Username:  &a.Username,
+		CreatedAt: SafeTimestamp(&a.CreatedAt),
 	}
 }
 
-func (p *GetPrincipalsByTargetIDsRow) ToProto() *nokkuv1.Principal {
+func (p *GetTargetAccountsByTargetIDsRow) ToProto() *nokkuv1.TargetAccount {
 	if p == nil {
 		return nil
 	}
 
-	out := p.Principal.ToProto()
+	out := p.TargetAccount.ToProto()
 	out.UserIds = p.UserIds
 	out.TeamIds = p.TeamIds
 	out.ServiceAccountIds = p.ServiceAccountIds
@@ -195,8 +197,8 @@ func UsersToProto(rows []*ListUsersRow) []*nokkuv1.User {
 
 const DaemonOnlineWindow = 30 * time.Second
 
-// MaxTargetPrincipals stops a host from reporting accounts without bound.
-const MaxTargetPrincipals = 1000
+// MaxTargetAccounts stops a host from reporting accounts without bound.
+const MaxTargetAccounts = 1000
 
 func SeenRecently(t *time.Time) bool {
 	return t != nil && time.Since(*t) < DaemonOnlineWindow
@@ -246,7 +248,7 @@ func DaemonsToProto(rows []*ListDaemonsRow) []*nokkuv1.Daemon {
 	return mapSlice(rows, func(r *ListDaemonsRow) *nokkuv1.Daemon { return r.Daemon.ToProto() })
 }
 
-func (r *CertificateAuthority) ToProto() *nokkuv1.CertificateAuthority {
+func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 	if r == nil {
 		return nil
 	}
@@ -266,16 +268,12 @@ func (r *CertificateAuthority) ToProto() *nokkuv1.CertificateAuthority {
 		Id:                   &r.ID,
 		Name:                 &r.Name,
 		Description:          r.Description,
-		Certificate:          &r.Certificate,
 		PublicKey:            &r.PublicKey,
-		SerialNumber:         &r.SerialNumber,
-		Subject:              &r.Subject,
 		NotBefore:            SafeTimestamp(&r.NotBefore),
 		NotAfter:             SafeTimestamp(&r.NotAfter),
 		IsActive:             &r.IsActive,
 		IsDefault:            &r.IsDefault,
 		KeyType:              &r.KeyType,
-		AuthorityType:        &r.AuthorityType,
 		KeyBits:              &r.KeyBits,
 		CreatedAt:            SafeTimestamp(&r.CreatedAt),
 		UpdatedAt:            SafeTimestamp(&r.UpdatedAt),
@@ -292,11 +290,8 @@ func (r *CertificateAuthority) ToProto() *nokkuv1.CertificateAuthority {
 	}
 }
 
-func CAsToProto(cas []*CertificateAuthority) []*nokkuv1.CertificateAuthority {
-	return mapSlice(
-		cas,
-		func(rca *CertificateAuthority) *nokkuv1.CertificateAuthority { return rca.ToProto() },
-	)
+func CAsToProto(cas []*SSHCA) []*nokkuv1.CertificateAuthority {
+	return mapSlice(cas, func(ca *SSHCA) *nokkuv1.CertificateAuthority { return ca.ToProto() })
 }
 
 // ToProto leaves out the private fields.
@@ -309,27 +304,25 @@ func (r *GetCAsByIDsRow) ToProto() *nokkuv1.CertificateAuthority {
 		Name:           &r.Name,
 		PublicKey:      &r.PublicKey,
 		IsDefault:      &r.IsDefault,
-		AuthorityType:  &r.AuthorityType,
-		Certificate:    &r.Certificate,
 		UserDefaultTtl: durationpb.New(r.UserDefaultTtl),
 		UserMaxTtl:     durationpb.New(r.UserMaxTtl),
 	}
 }
 
-func (p *ListPrincipalsRow) ToProto() *nokkuv1.Principal {
+func (p *ListTargetAccountsRow) ToProto() *nokkuv1.TargetAccount {
 	if p == nil {
 		return nil
 	}
 
-	out := p.Principal.ToProto()
+	out := p.TargetAccount.ToProto()
 	out.UserIds = p.UserIds
 	out.TeamIds = p.TeamIds
 	out.ServiceAccountIds = p.ServiceAccountIds
 	return out
 }
 
-func PrincipalsToProto(ps []*ListPrincipalsRow) []*nokkuv1.Principal {
-	return mapSlice(ps, func(p *ListPrincipalsRow) *nokkuv1.Principal { return p.ToProto() })
+func TargetAccountsToProto(rows []*ListTargetAccountsRow) []*nokkuv1.TargetAccount {
+	return mapSlice(rows, func(r *ListTargetAccountsRow) *nokkuv1.TargetAccount { return r.ToProto() })
 }
 
 func (t *WorkspaceToken) ToProto() *nokkuv1.Token {

@@ -80,7 +80,7 @@ func TestChangesAreAnnounced(t *testing.T) {
 	// One transaction that writes some tables twice, each is announced once.
 	f := newStateFixture(t, c)
 	want := []string{
-		"daemons", "principal_grants", "principals", "targets", "team_members", "teams", "users", "workspaces",
+		"daemons", "grants", "target_accounts", "targets", "team_members", "teams", "users", "workspaces",
 	}
 	if got := heard(t, conn, f.ws); !slices.Equal(got, want) {
 		t.Fatalf("seeding announced %v, want %v", got, want)
@@ -91,9 +91,9 @@ func TestChangesAreAnnounced(t *testing.T) {
 		t.Errorf("a rename announced %v, want targets", got)
 	}
 
-	exec(`DELETE FROM principal_grants WHERE principal_id = $1`, f.principal)
-	if got := heard(t, conn, f.ws); !slices.Equal(got, []string{"principal_grants"}) {
-		t.Errorf("a delete announced %v, want principal_grants", got)
+	exec(`DELETE FROM grants WHERE account_id = $1`, f.account)
+	if got := heard(t, conn, f.ws); !slices.Equal(got, []string{"grants"}) {
+		t.Errorf("a delete announced %v, want grants", got)
 	}
 
 	exec(`UPDATE targets SET name = name WHERE id = $1`, f.target)

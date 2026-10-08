@@ -23,9 +23,9 @@ import (
 	"github.com/nokku-sh/nokku/internal/entitlement"
 	"github.com/nokku-sh/nokku/internal/iam"
 	"github.com/nokku-sh/nokku/internal/live"
-	"github.com/nokku-sh/nokku/internal/pki"
 	"github.com/nokku-sh/nokku/internal/realip"
 	"github.com/nokku-sh/nokku/internal/recording"
+	"github.com/nokku-sh/nokku/internal/ssh"
 	"github.com/nokku-sh/nokku/internal/storage"
 	"github.com/nokku-sh/nokku/internal/tenant"
 )
@@ -172,7 +172,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		}
 	}
 
-	go pki.RotateExpiring(ctx, cfg.Conn)
+	go ssh.RotateExpiring(ctx, cfg.Conn)
 	return &cfg, nil
 }
 

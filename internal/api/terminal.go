@@ -86,7 +86,7 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 		writeJSONError(w, http.StatusForbidden, "permission denied")
 		return
 	}
-	var ca *db.CertificateAuthority
+	var ca *db.SSHCA
 	var targetID string
 	if err := t.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		ca, err = q.GetCAByDaemonID(ctx, &ticket.DaemonID)

@@ -1,6 +1,6 @@
 //go:build integration
 
-package pki_test
+package ssh_test
 
 import (
 	"context"
@@ -20,7 +20,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/integration/testenv"
-	"github.com/nokku-sh/nokku/internal/pki"
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
@@ -44,23 +43,20 @@ func rotationConn(t *testing.T) *db.Connection {
 const caLifetime = 365 * 24 * time.Hour
 
 // seedCA stores a one year CA whose validity started age ago.
-func seedCA(t *testing.T, conn *db.Connection, workspaceID string, age time.Duration) *db.CertificateAuthority {
+func seedCA(t *testing.T, conn *db.Connection, workspaceID string, age time.Duration) *db.SSHCA {
 	t.Helper()
 	info, err := ssh.NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0, caLifetime)
 	require.NoError(t, err)
 	notBefore := time.Now().Add(-age)
-	var ca *db.CertificateAuthority
+	var ca *db.SSHCA
 	require.NoError(t, conn.TenantTx(pinned(t, workspaceID), func(q *db.Queries) (err error) {
 		ca, err = q.CreateCA(t.Context(), &db.CreateCAParams{
-			Name:         "ca-" + notBefore.Format(time.RFC3339Nano),
-			Certificate:  string(info.Certificate),
-			PrivateKey:   info.PrivateKey,
-			PublicKey:    info.PublicKey,
-			SerialNumber: info.SerialNumber,
-			Subject:      info.Subject,
-			NotBefore:    notBefore,
-			NotAfter:     notBefore.Add(caLifetime),
-			Lifetime:     caLifetime,
+			Name:       "ca-" + notBefore.Format(time.RFC3339Nano),
+			PrivateKey: info.PrivateKey,
+			PublicKey:  info.PublicKey,
+			NotBefore:  notBefore,
+			NotAfter:   notBefore.Add(caLifetime),
+			Lifetime:   caLifetime,
 		})
 		return err
 	}))
@@ -85,7 +81,7 @@ func seedWorkspace(t *testing.T, conn *db.Connection) string {
 	return workspaceID
 }
 
-func getCA(t *testing.T, conn *db.Connection, id string) *db.CertificateAuthority {
+func getCA(t *testing.T, conn *db.Connection, id string) *db.SSHCA {
 	t.Helper()
 	ca, err := conn.Sys().GetCA(t.Context(), id)
 	require.NoError(t, err)
@@ -117,24 +113,24 @@ func TestRotateExpiringDrainsEveryDueCA(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
-	pki.RotateDue(ctx, conn)
+	ssh.RotateDue(ctx, conn)
 	close(release)
 	// The lock is only gone once the holder has committed.
 	holder.Wait()
 	require.NoError(t, ctx.Err(), "a pass must finish on its own")
 
-	for _, ca := range []*db.CertificateAuthority{dueA, dueB} {
+	for _, ca := range []*db.SSHCA{dueA, dueB} {
 		got := getCA(t, conn, ca.ID)
-		assert.NotEqual(t, ca.SerialNumber, got.SerialNumber, "due CA %s was not rotated", ca.ID)
+		assert.NotEqual(t, ca.PublicKey, got.PublicKey, "due CA %s was not rotated", ca.ID)
 		assert.WithinDuration(t, time.Now(), got.NotBefore, time.Minute, "rotated CA starts now")
 		assert.Equal(t, caLifetime, got.Lifetime, "rotation keeps the lifetime")
 	}
-	assert.Equal(t, fresh.SerialNumber, getCA(t, conn, fresh.ID).SerialNumber, "fresh CA must not rotate")
-	assert.Equal(t, dueC.SerialNumber, getCA(t, conn, dueC.ID).SerialNumber, "locked CA belongs to the other instance")
+	assert.Equal(t, fresh.PublicKey, getCA(t, conn, fresh.ID).PublicKey, "fresh CA must not rotate")
+	assert.Equal(t, dueC.PublicKey, getCA(t, conn, dueC.ID).PublicKey, "locked CA belongs to the other instance")
 
 	// The next pass picks the released CA up.
-	pki.RotateDue(t.Context(), conn)
-	assert.NotEqual(t, dueC.SerialNumber, getCA(t, conn, dueC.ID).SerialNumber, "released CA rotates on the next pass")
+	ssh.RotateDue(t.Context(), conn)
+	assert.NotEqual(t, dueC.PublicKey, getCA(t, conn, dueC.ID).PublicKey, "released CA rotates on the next pass")
 }
 
 func TestExpiringCAQuerySkipsFailed(t *testing.T) {
@@ -158,14 +154,14 @@ func TestRolloverKeepsOrRevokesPreviousKey(t *testing.T) {
 	conn := rotationConn(t)
 	ca := seedCA(t, conn, seedWorkspace(t, conn), 24*time.Hour)
 
-	rollover := func(revoke bool) *db.CertificateAuthority {
-		var next *db.CertificateAuthority
+	rollover := func(revoke bool) *db.SSHCA {
+		var next *db.SSHCA
 		require.NoError(t, conn.SysTx(t.Context(), func(q *db.Queries) (err error) {
 			current, err := q.GetCAForUpdate(t.Context(), ca.ID)
 			if err != nil {
 				return err
 			}
-			next, err = pki.Rollover(t.Context(), q, current, current.KeyType, current.KeyBits, revoke)
+			next, err = ssh.Rollover(t.Context(), q, current, current.KeyType, current.KeyBits, revoke)
 			return err
 		}))
 		return next

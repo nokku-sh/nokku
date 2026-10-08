@@ -30,9 +30,9 @@ INSERT INTO
 VALUES
   (
     $1,
-    $2::TEXT,
+    $2::UUID,
     CASE
-      WHEN $3::TEXT <> 'daemon' THEN ($2::TEXT)::UUID
+      WHEN $3::TEXT <> 'daemon' THEN $2::UUID
     END,
     $3::TEXT,
     $4,
@@ -144,11 +144,11 @@ WITH
   forgotten AS (
     DELETE FROM known_devices
     WHERE
-      user_id::TEXT = $1::TEXT
+      user_id = $1::UUID
   )
 DELETE FROM sessions
 WHERE
-  subject_id = $1::TEXT
+  subject_id = $1::UUID
 `
 
 // Signs the subject out everywhere. A user's devices are forgotten with it,

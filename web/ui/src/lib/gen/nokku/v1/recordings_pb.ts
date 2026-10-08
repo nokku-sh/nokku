@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/recordings.proto.
  */
 export const file_nokku_v1_recordings: GenFile = /*@__PURE__*/
-  fileDesc("Chlub2trdS92MS9yZWNvcmRpbmdzLnByb3RvEghub2trdS52MSLVAQoJUmVjb3JkaW5nEgoKAmlkGAEgASgJEhEKCWRhZW1vbl9pZBgCIAEoCRIQCgh1c2VybmFtZRgDIAEoCRISCgpzaXplX2J5dGVzGAQgASgDEhAKCGNvbXBsZXRlGAUgASgIEi4KCnN0YXJ0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBITCgtkYWVtb25fbmFtZRgIIAEoCSKEAQoWVXBsb2FkUmVjb3JkaW5nUmVxdWVzdBInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSAASKQoFZmluYWwYAyABKAsyGC5ub2trdS52MS5SZWNvcmRpbmdGaW5hbEgAQgUKA21zZyJ6Cg1SZWNvcmRpbmdNZXRhEh4KDHJlY29yZGluZ19pZBgBIAEoCUIIukgFcgOwAQESGQoIdXNlcm5hbWUYAiABKAlCB7pIBHICGCASLgoKc3RhcnRlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiEAoOUmVjb3JkaW5nRmluYWwiQwoXVXBsb2FkUmVjb3JkaW5nUmVzcG9uc2USFAoMcmVjb3JkaW5nX2lkGAEgASgJEhIKCnNpemVfYnl0ZXMYAiABKAMieQoVTGlzdFJlY29yZGluZ3NSZXF1ZXN0EhsKCWRhZW1vbl9pZBgBIAEoCUIIukgFcgOwAQESGAoFbGltaXQYAiABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAyABKAVCB7pIBBoCKAASEAoIdXNlcm5hbWUYBCABKAkiZQoWTGlzdFJlY29yZGluZ3NSZXNwb25zZRInCgpyZWNvcmRpbmdzGAEgAygLMhMubm9ra3UudjEuUmVjb3JkaW5nEg0KBXRvdGFsGAIgASgFEhMKC3RvdGFsX2J5dGVzGAMgASgDIjUKE0dldFJlY29yZGluZ1JlcXVlc3QSHgoMcmVjb3JkaW5nX2lkGAEgASgJQgi6SAVyA7ABASJXChRHZXRSZWNvcmRpbmdSZXNwb25zZRInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSABCBQoDbXNnIjgKFkRlbGV0ZVJlY29yZGluZ1JlcXVlc3QSHgoMcmVjb3JkaW5nX2lkGAEgASgJQgi6SAVyA7ABASIZChdEZWxldGVSZWNvcmRpbmdSZXNwb25zZTKuAgoQUmVjb3JkaW5nU2VydmljZRJaCgxHZXRSZWNvcmRpbmcSHS5ub2trdS52MS5HZXRSZWNvcmRpbmdSZXF1ZXN0Gh4ubm9ra3UudjEuR2V0UmVjb3JkaW5nUmVzcG9uc2UiCZACAcLzGAIYAjABEl4KDkxpc3RSZWNvcmRpbmdzEh8ubm9ra3UudjEuTGlzdFJlY29yZGluZ3NSZXF1ZXN0GiAubm9ra3UudjEuTGlzdFJlY29yZGluZ3NSZXNwb25zZSIJkAIBwvMYAhgCEl4KD0RlbGV0ZVJlY29yZGluZxIgLm5va2t1LnYxLkRlbGV0ZVJlY29yZGluZ1JlcXVlc3QaIS5ub2trdS52MS5EZWxldGVSZWNvcmRpbmdSZXNwb25zZSIGwvMYAhgDYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Chlub2trdS92MS9yZWNvcmRpbmdzLnByb3RvEghub2trdS52MSL8AQoJUmVjb3JkaW5nEgoKAmlkGAEgASgJEhEKCWRhZW1vbl9pZBgCIAEoCRIQCgh1c2VybmFtZRgDIAEoCRISCgpzaXplX2J5dGVzGAQgASgDEhAKCGNvbXBsZXRlGAUgASgIEi4KCnN0YXJ0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBITCgtkYWVtb25fbmFtZRgIIAEoCRISCgpzdWJqZWN0X2lkGAkgASgJEhEKCXByaW5jaXBhbBgKIAEoCSKEAQoWVXBsb2FkUmVjb3JkaW5nUmVxdWVzdBInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSAASKQoFZmluYWwYAyABKAsyGC5ub2trdS52MS5SZWNvcmRpbmdGaW5hbEgAQgUKA21zZyKXAQoNUmVjb3JkaW5nTWV0YRIeCgxyZWNvcmRpbmdfaWQYASABKAlCCLpIBXIDsAEBEhkKCHVzZXJuYW1lGAIgASgJQge6SARyAhggEi4KCnN0YXJ0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhsKCXByaW5jaXBhbBgEIAEoCUIIukgFcgMYoAEiEAoOUmVjb3JkaW5nRmluYWwiQwoXVXBsb2FkUmVjb3JkaW5nUmVzcG9uc2USFAoMcmVjb3JkaW5nX2lkGAEgASgJEhIKCnNpemVfYnl0ZXMYAiABKAMilwEKFUxpc3RSZWNvcmRpbmdzUmVxdWVzdBIbCglkYWVtb25faWQYASABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAIgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAMgASgFQge6SAQaAigAEhAKCHVzZXJuYW1lGAQgASgJEhwKCnN1YmplY3RfaWQYBSABKAlCCLpIBXIDsAEBImUKFkxpc3RSZWNvcmRpbmdzUmVzcG9uc2USJwoKcmVjb3JkaW5ncxgBIAMoCzITLm5va2t1LnYxLlJlY29yZGluZxINCgV0b3RhbBgCIAEoBRITCgt0b3RhbF9ieXRlcxgDIAEoAyI1ChNHZXRSZWNvcmRpbmdSZXF1ZXN0Eh4KDHJlY29yZGluZ19pZBgBIAEoCUIIukgFcgOwAQEiVwoUR2V0UmVjb3JkaW5nUmVzcG9uc2USJwoEbWV0YRgBIAEoCzIXLm5va2t1LnYxLlJlY29yZGluZ01ldGFIABIPCgVjaHVuaxgCIAEoDEgAQgUKA21zZyI4ChZEZWxldGVSZWNvcmRpbmdSZXF1ZXN0Eh4KDHJlY29yZGluZ19pZBgBIAEoCUIIukgFcgOwAQEiGQoXRGVsZXRlUmVjb3JkaW5nUmVzcG9uc2UyrgIKEFJlY29yZGluZ1NlcnZpY2USWgoMR2V0UmVjb3JkaW5nEh0ubm9ra3UudjEuR2V0UmVjb3JkaW5nUmVxdWVzdBoeLm5va2t1LnYxLkdldFJlY29yZGluZ1Jlc3BvbnNlIgmQAgHC8xgCGAIwARJeCg5MaXN0UmVjb3JkaW5ncxIfLm5va2t1LnYxLkxpc3RSZWNvcmRpbmdzUmVxdWVzdBogLm5va2t1LnYxLkxpc3RSZWNvcmRpbmdzUmVzcG9uc2UiCZACAcLzGAIYAhJeCg9EZWxldGVSZWNvcmRpbmcSIC5ub2trdS52MS5EZWxldGVSZWNvcmRpbmdSZXF1ZXN0GiEubm9ra3UudjEuRGVsZXRlUmVjb3JkaW5nUmVzcG9uc2UiBsLzGAIYA2IIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.Recording
@@ -63,6 +63,19 @@ export type Recording = Message<"nokku.v1.Recording"> & {
    * @generated from field: string daemon_name = 8;
    */
   daemonName: string;
+
+  /**
+   * Who was logged in: the subject of the certificate principal the host
+   * matched. Empty for a recording from a daemon that did not say.
+   *
+   * @generated from field: string subject_id = 9;
+   */
+  subjectId: string;
+
+  /**
+   * @generated from field: string principal = 10;
+   */
+  principal: string;
 };
 
 /**
@@ -128,6 +141,14 @@ export type RecordingMeta = Message<"nokku.v1.RecordingMeta"> & {
    * @generated from field: google.protobuf.Timestamp started_at = 3;
    */
   startedAt?: Timestamp | undefined;
+
+  /**
+   * The certificate principal the host matched at login, as the backend built
+   * it. Empty from a daemon that predates the field.
+   *
+   * @generated from field: string principal = 4;
+   */
+  principal: string;
 };
 
 /**
@@ -195,6 +216,11 @@ export type ListRecordingsRequest = Message<"nokku.v1.ListRecordingsRequest"> & 
    * @generated from field: string username = 4;
    */
   username: string;
+
+  /**
+   * @generated from field: string subject_id = 5;
+   */
+  subjectId: string;
 };
 
 /**
