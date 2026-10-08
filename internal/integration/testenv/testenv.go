@@ -50,16 +50,29 @@ func Postgres() (stop func()) {
 			wait.ForListeningPort("5432/tcp"),
 		),
 	)
-	if err != nil {
-		fail("start postgres", err)
+	// Run hands the container back even when it did not come up.
+	stop = func() { _ = testcontainers.TerminateContainer(c) }
+	if err == nil {
+		err = pointEnvAt(ctx, c)
 	}
+	if err != nil {
+		stop()
+		// A TestMain has no t to fail.
+		fmt.Fprintf(os.Stderr, "testenv: start postgres: %v\n", err)
+		os.Exit(1)
+	}
+	return stop
+}
+
+// pointEnvAt sets the PG* environment to the server in c.
+func pointEnvAt(ctx context.Context, c *testcontainers.DockerContainer) error {
 	endpoint, err := c.PortEndpoint(ctx, "5432/tcp", "")
 	if err != nil {
-		fail("find the postgres port", err)
+		return err
 	}
 	host, port, err := net.SplitHostPort(endpoint)
 	if err != nil {
-		fail("parse the postgres endpoint", err)
+		return err
 	}
 	// Set, never defaulted. A developer's shell must not send the tests to
 	// another server.
@@ -73,7 +86,7 @@ func Postgres() (stop func()) {
 	} {
 		_ = os.Setenv(key, value)
 	}
-	return func() { _ = testcontainers.TerminateContainer(c) }
+	return nil
 }
 
 // Keycloak starts a dev server for the test and returns its root URL. The
@@ -119,10 +132,4 @@ func Vault(t *testing.T) string {
 	addr, err := c.PortEndpoint(t.Context(), "8200/tcp", "")
 	require.NoError(t, err)
 	return addr
-}
-
-// fail ends a TestMain, which has no t to fail.
-func fail(step string, err error) {
-	fmt.Fprintf(os.Stderr, "testenv: %s: %v\n", step, err)
-	os.Exit(1)
 }
