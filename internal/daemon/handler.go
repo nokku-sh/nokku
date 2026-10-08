@@ -31,7 +31,7 @@ func (p *Pool) Connect(
 
 	// System tx since the workspace is unknown until the daemon is looked up.
 	var daemon *db.Daemon
-	if err := p.conn.WithTx(ctx, func(q *db.Queries) (err error) {
+	if err := p.conn.SysTx(ctx, func(q *db.Queries) (err error) {
 		daemon, err = q.GetDaemon(ctx, daemonID)
 		return err
 	}); err != nil {

@@ -52,7 +52,7 @@ func (s *dashboardService) GetDashboard(
 		hours      []*db.AuditActivityByHourRow
 		usedBytes  int64
 	)
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if counts, err = q.DashboardCounts(ctx, seenAfter); err != nil {
 			return err
 		}

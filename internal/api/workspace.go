@@ -48,7 +48,7 @@ func (s *workspaceService) UpdateWorkspace(
 	req *nokkuv1.UpdateWorkspaceRequest,
 ) (*nokkuv1.UpdateWorkspaceResponse, error) {
 	var workspace *db.Workspace
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		base, err := q.GetWorkspace(ctx)
 		if err != nil {
 			return err
@@ -167,7 +167,7 @@ func (s *workspaceService) UpdateUserRole(
 		return nil, newError(connect.CodePermissionDenied, "role cannot be assigned by you")
 	}
 	audit.Set(ctx, "role", db.RoleLabel(req.GetRole()))
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
 			return err
 		}
@@ -188,7 +188,7 @@ func (s *workspaceService) SetUserActive(
 	req *nokkuv1.SetUserActiveRequest,
 ) (*nokkuv1.SetUserActiveResponse, error) {
 	audit.Set(ctx, "active", req.GetActive())
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
 			return err
 		}
@@ -212,7 +212,7 @@ func (s *workspaceService) DeleteUser(
 	ctx context.Context,
 	req *nokkuv1.DeleteUserRequest,
 ) (*nokkuv1.DeleteUserResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
 			return err
 		}
@@ -249,7 +249,7 @@ func (s *workspaceService) TransferOwnership(
 	}
 	// A transaction on purpose. When the new owner does not exist the update
 	// already took the old one's role, and the rollback gives it back.
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		n, err := q.TransferOwnership(ctx, req.GetNewOwnerId())
 		if err != nil {
 			return err

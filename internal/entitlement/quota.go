@@ -32,7 +32,7 @@ func (s *Service) CheckResources(ctx context.Context, workspaceID string) error 
 	}
 
 	var used int64
-	if err := s.conn.WithTx(ctx, func(q *db.Queries) (err error) {
+	if err := s.conn.SysTx(ctx, func(q *db.Queries) (err error) {
 		used, err = q.CountWorkspaceResources(ctx, workspaceID)
 		return err
 	}); err != nil {

@@ -54,7 +54,20 @@ func NewConnection(ctx context.Context) (*Connection, error) {
 		}
 	}
 
-	if err := c.createPools(ctx); err != nil {
+	config, err := c.poolConfig()
+	if err != nil {
+		return nil, err
+	}
+	// Falling back to PGPASSWORD keeps single-credential dev setups working.
+	if c.AppPassword == "" {
+		c.AppPassword = config.ConnConfig.Password
+	}
+	if c.AutoMigrate {
+		if err := c.setupSchema(ctx, config.ConnConfig); err != nil {
+			return nil, err
+		}
+	}
+	if err := c.createPools(ctx, config); err != nil {
 		return nil, err
 	}
 	return &c, nil
@@ -80,43 +93,27 @@ func (c *Connection) poolConfig() (*pgxpool.Config, error) {
 	return config, nil
 }
 
-func (c *Connection) createPools(ctx context.Context) error {
-	if c.AutoMigrate {
-		if err := c.setupSchema(ctx); err != nil {
-			return err
-		}
-	}
-
-	appConfig, err := c.poolConfig()
-	if err != nil {
-		return err
-	}
-	// Falling back to PGPASSWORD keeps single-credential dev setups working.
-	if c.AppPassword == "" {
-		c.AppPassword = appConfig.ConnConfig.Password
-	}
+// createPools logs in as the two runtime roles, so no runtime path holds
+// owner rights.
+func (c *Connection) createPools(ctx context.Context, appConfig *pgxpool.Config) error {
 	appConfig.ConnConfig.User = "nokku_app"
 	appConfig.ConnConfig.Password = c.AppPassword
 	appConfig.PrepareConn = pinWorkspace
 
+	var err error
 	c.Pool, err = pgxpool.NewWithConfig(ctx, appConfig)
 	if err != nil {
 		return fmt.Errorf("creating app pool: %w", err)
 	}
 	c.tenant = New(c.Pool)
 
-	// The system pool logs in as nokku_app too and switches every
-	// connection to nokku_system, so no runtime path holds owner rights.
 	sysConfig := appConfig.Copy()
+	sysConfig.ConnConfig.User = "nokku_system"
 	// Never pinned. A pin left on a system connection would send an insert
 	// that names no workspace into whatever workspace was pinned last.
 	sysConfig.PrepareConn = nil
 	sysConfig.MaxConns = min(c.MaxConns, 4)
 	sysConfig.MinConns = min(c.MinConns, sysConfig.MaxConns)
-	sysConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		_, err := conn.Exec(ctx, "SET ROLE nokku_system")
-		return err
-	}
 	c.sysPool, err = pgxpool.NewWithConfig(ctx, sysConfig)
 	if err != nil {
 		c.Pool.Close()
@@ -132,55 +129,41 @@ func (c *Connection) createPools(ctx context.Context) error {
 }
 
 // setupSchema is the only place the owner role (PGUSER) is used.
-func (c *Connection) setupSchema(ctx context.Context) error {
-	adminConfig, err := c.poolConfig()
+func (c *Connection) setupSchema(ctx context.Context, owner *pgx.ConnConfig) error {
+	conn, err := pgx.ConnectConfig(ctx, owner)
 	if err != nil {
-		return err
+		return fmt.Errorf("connecting as owner: %w", err)
 	}
-	adminConfig.MaxConns = 1
-	adminConfig.MinConns = 0
-	if c.AppPassword == "" {
-		c.AppPassword = adminConfig.ConnConfig.Password
-	}
-	admin, err := pgxpool.NewWithConfig(ctx, adminConfig)
-	if err != nil {
-		return fmt.Errorf("creating admin pool: %w", err)
-	}
-	defer admin.Close()
+	defer conn.Close(context.WithoutCancel(ctx))
 
-	conn, err := admin.Acquire(ctx)
-	if err != nil {
-		return fmt.Errorf("acquiring admin connection: %w", err)
-	}
-	defer conn.Release()
-
-	// Serializes instances booting at once. The lock is per database, so test
-	// packages on their own databases still race on the cluster-wide role.
+	// Serializes instances booting at once, the session holds it until it
+	// closes. The lock is per database, so test packages on their own
+	// databases still race on the cluster-wide roles.
 	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock(hashtext('nokku_schema'))"); err != nil {
 		return fmt.Errorf("acquiring schema lock: %w", err)
 	}
-	defer func() {
-		_, _ = conn.Exec(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock(hashtext('nokku_schema'))")
-	}()
-
-	if err := runMigrations(ctx, conn.Conn()); err != nil {
+	if err := runMigrations(ctx, conn); err != nil {
 		return err
 	}
-	return c.setupAppRole(ctx, conn.Conn())
+	return c.setupRoles(ctx, conn)
 }
 
-func (c *Connection) setupAppRole(ctx context.Context, conn *pgx.Conn) error {
-	// ALTER ROLE takes no bind parameters, so format() quotes it server-side.
-	var stmt string
-	if err := conn.QueryRow(
-		ctx,
-		"SELECT format('ALTER ROLE nokku_app WITH LOGIN PASSWORD %L', $1::text)",
-		c.AppPassword,
-	).Scan(&stmt); err != nil {
-		return fmt.Errorf("building role statement: %w", err)
-	}
-	if _, err := conn.Exec(ctx, stmt); err != nil {
-		return fmt.Errorf("granting login to nokku_app: %w", err)
+// setupRoles lets the two runtime roles log in, the migration creates them
+// without a password.
+func (c *Connection) setupRoles(ctx context.Context, conn *pgx.Conn) error {
+	for _, role := range []string{"nokku_app", "nokku_system"} {
+		// ALTER ROLE takes no bind parameters, so format() quotes it server-side.
+		var stmt string
+		if err := conn.QueryRow(
+			ctx,
+			"SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', $1::text, $2::text)",
+			role, c.AppPassword,
+		).Scan(&stmt); err != nil {
+			return fmt.Errorf("building role statement: %w", err)
+		}
+		if _, err := conn.Exec(ctx, stmt); err != nil {
+			return fmt.Errorf("granting login to %s: %w", role, err)
+		}
 	}
 	return nil
 }
@@ -200,69 +183,35 @@ func pinWorkspace(ctx context.Context, conn *pgx.Conn) (bool, error) {
 	return true, nil
 }
 
-// Tenant runs single statements as nokku_app, each pinned to the workspace
-// on its context. Statements that belong together go through WithWorkspace.
-func (c *Connection) Tenant() *Queries { return c.tenant }
-
-// Sys runs single statements as nokku_system (BYPASSRLS), for pre-auth
-// lookups and jobs.
-func (c *Connection) Sys() *Queries { return c.sys }
-
-func withTx(
-	ctx context.Context,
-	pool *pgxpool.Pool,
-	fn func(context.Context, pgx.Tx, *Queries) error,
-) error {
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback(ctx)
-			panic(p)
-		}
-	}()
-
-	if err := fn(ctx, tx, New(tx)); err != nil {
-		_ = tx.Rollback(ctx)
-		return err
-	}
-	return tx.Commit(ctx)
-}
-
 // Pick the scope by what the query may see, never by convenience:
 //
-//	Tenant         tenant rows of the pinned workspace, RLS enforced
-//	WithWorkspace  Tenant for statements that belong in one transaction
-//	Sys            every tenant, RLS bypassed, only boot, webhooks and jobs
-//	WithTx         Sys for statements that belong in one transaction
+//	Tenant    tenant rows of the pinned workspace, RLS enforced
+//	TenantTx  Tenant for statements that belong in one transaction
+//	Sys       every tenant, RLS bypassed, only boot, webhooks and jobs
+//	SysTx     Sys for statements that belong in one transaction
 //
 // Tenant queries carry no workspace filter and tenant inserts no workspace
 // id, the pin is the only scope they have. Run as system they would reach
 // every workspace, so system code only calls queries that name the workspace
 // or are cross-tenant on purpose.
 
-// WithTx bypasses RLS, only cross-tenant work belongs here.
-func (c *Connection) WithTx(
-	ctx context.Context,
-	fn func(*Queries) error,
-) error {
-	return withTx(ctx, c.sysPool, func(_ context.Context, _ pgx.Tx, q *Queries) error {
-		return fn(q)
-	})
-}
+// Tenant runs single statements as nokku_app, each pinned to the workspace
+// on its context. Statements that belong together go through TenantTx.
+func (c *Connection) Tenant() *Queries { return c.tenant }
 
-// WithWorkspace runs fn in a transaction of the workspace on the context. The
+// TenantTx runs fn in a transaction of the workspace on the context. The
 // tenant middleware put it there, so a request without one fails closed.
 // Work outside a request pins one with actor.WithWorkspace. The pin itself
 // happens when the connection leaves the pool, see pinWorkspace.
-func (c *Connection) WithWorkspace(
-	ctx context.Context,
-	fn func(*Queries) error,
-) error {
-	return withTx(ctx, c.Pool, func(_ context.Context, _ pgx.Tx, q *Queries) error {
-		return fn(q)
-	})
+func (c *Connection) TenantTx(ctx context.Context, fn func(*Queries) error) error {
+	return pgx.BeginFunc(ctx, c.Pool, func(tx pgx.Tx) error { return fn(New(tx)) })
+}
+
+// Sys runs single statements as nokku_system (BYPASSRLS), for pre-auth
+// lookups and jobs.
+func (c *Connection) Sys() *Queries { return c.sys }
+
+// SysTx bypasses RLS, only cross-tenant work belongs here.
+func (c *Connection) SysTx(ctx context.Context, fn func(*Queries) error) error {
+	return pgx.BeginFunc(ctx, c.sysPool, func(tx pgx.Tx) error { return fn(New(tx)) })
 }

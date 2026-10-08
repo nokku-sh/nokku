@@ -84,7 +84,7 @@ func newSync(t *testing.T) (*Stripe, *fakeStripe) {
 
 	fake := &fakeStripe{subs: map[string]remoteSub{}, workspaceID: uuid.NewV7().String()}
 	pinned := actor.WithWorkspace(t.Context(), actor.Workspace{ID: fake.workspaceID})
-	require.NoError(t, conn.WithWorkspace(pinned, func(q *db.Queries) error {
+	require.NoError(t, conn.TenantTx(pinned, func(q *db.Queries) error {
 		if _, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
 			ID:   fake.workspaceID,
 			Slug: "b" + strings.ReplaceAll(uuid.New().String(), "-", ""), Name: "billing",

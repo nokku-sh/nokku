@@ -206,7 +206,7 @@ func (s *webhookSink) refreshLoop(ctx context.Context) {
 // cannot silently stop streaming.
 func (s *webhookSink) refresh(ctx context.Context) {
 	next := map[string]destination{}
-	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
+	err := s.conn.SysTx(ctx, func(q *db.Queries) error {
 		rows, err := q.ListWorkspaceAuditWebhooks(ctx)
 		if err != nil {
 			return err

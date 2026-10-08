@@ -172,19 +172,22 @@ func TestEveryTenantTableHasThePolicy(t *testing.T) {
 	}
 }
 
-// The app role has no way to bypass row security on its own.
+// The app role has no way to bypass row security on its own, and it cannot
+// become the role that does.
 func TestAppRoleIsSubjectToRowSecurity(t *testing.T) {
 	c := testConnection(t)
 	var name string
-	var super, bypass bool
+	var super, bypass, system bool
 	f := newStateFixture(t, c)
 	if err := c.Pool.QueryRow(pinned(t, f.ws), `
-		SELECT rolname::TEXT, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user`,
-	).Scan(&name, &super, &bypass); err != nil {
+		SELECT rolname::TEXT, rolsuper, rolbypassrls, pg_has_role(rolname, 'nokku_system', 'MEMBER')
+		FROM pg_roles WHERE rolname = current_user`,
+	).Scan(&name, &super, &bypass, &system); err != nil {
 		t.Fatalf("read role: %v", err)
 	}
-	if name != "nokku_app" || super || bypass {
-		t.Fatalf("request pool runs as %s (super=%v, bypassrls=%v), want plain nokku_app", name, super, bypass)
+	if name != "nokku_app" || super || bypass || system {
+		t.Fatalf("request pool runs as %s (super=%v, bypassrls=%v, member of nokku_system=%v), want plain nokku_app",
+			name, super, bypass, system)
 	}
 }
 
@@ -328,7 +331,7 @@ func TestInsertTakesThePinnedWorkspace(t *testing.T) {
 // Nothing leaves the request pool without a workspace on the context.
 func TestUnpinnedRequestFailsClosed(t *testing.T) {
 	c := testConnection(t)
-	if err := c.WithWorkspace(
+	if err := c.TenantTx(
 		t.Context(),
 		func(*Queries) error { return nil },
 	); !errors.Is(
@@ -398,7 +401,7 @@ func TestPinHoldsUnderConcurrency(t *testing.T) {
 					t.Errorf("single statement: owner = %v, %v, want %s", owner, err, f.owner)
 					return
 				}
-				err = c.WithWorkspace(ctx, func(q *Queries) error {
+				err = c.TenantTx(ctx, func(q *Queries) error {
 					ws, err := q.GetWorkspace(ctx)
 					if err == nil && ws.ID != f.ws {
 						t.Errorf("transaction: workspace %s, want %s", ws.ID, f.ws)
@@ -448,7 +451,7 @@ func BenchmarkSingleRead(b *testing.B) {
 
 	b.Run("transaction", func(b *testing.B) {
 		for b.Loop() {
-			if err := c.WithWorkspace(ctx, func(q *Queries) error {
+			if err := c.TenantTx(ctx, func(q *Queries) error {
 				_, err := q.GetWorkspace(ctx)
 				return err
 			}); err != nil {
@@ -465,7 +468,7 @@ func BenchmarkSingleRead(b *testing.B) {
 	})
 }
 
-// The system role is the one way around row security, see Connection.WithTx.
+// The system role is the one way around row security, see Connection.SysTx.
 func TestSystemRoleSeesEveryWorkspace(t *testing.T) {
 	c := testConnection(t)
 	a, b := newStateFixture(t, c), newStateFixture(t, c)
@@ -475,11 +478,31 @@ func TestSystemRoleSeesEveryWorkspace(t *testing.T) {
 	}
 }
 
+// The app role holds no DELETE on the audit table. The system role does, and
+// the trigger still refuses it outside the retention job.
+func TestAuditLogIsAppendOnly(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	if err := c.Sys().InsertAuditLog(t.Context(), &InsertAuditLogParams{
+		WorkspaceID: f.ws, Action: "Test", Ok: true, Details: []byte("{}"),
+	}); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+
+	const del = "DELETE FROM audit.audit_logs WHERE workspace_id = $1"
+	if _, err := c.Pool.Exec(pinned(t, f.ws), del, f.ws); pgCode(err) != pgerrcode.InsufficientPrivilege {
+		t.Errorf("app role delete: err = %v, want insufficient privilege", err)
+	}
+	if _, err := c.sysPool.Exec(t.Context(), del, f.ws); err == nil {
+		t.Error("system role deleted an audit row without opting in")
+	}
+}
+
 func TestAppRoleCannotWriteAudit(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
 
-	err := c.WithWorkspace(pinned(t, f.ws), func(q *Queries) error {
+	err := c.TenantTx(pinned(t, f.ws), func(q *Queries) error {
 		return q.InsertAuditLog(t.Context(), &InsertAuditLogParams{
 			WorkspaceID: f.ws,
 			Action:      "forged",
@@ -506,7 +529,7 @@ func TestAuditLogScopes(t *testing.T) {
 	list := func(ws string) int {
 		t.Helper()
 		var rows []*ListAuditLogsRow
-		if err := c.WithWorkspace(pinned(t, ws), func(q *Queries) (err error) {
+		if err := c.TenantTx(pinned(t, ws), func(q *Queries) (err error) {
 			rows, err = q.ListAuditLogs(t.Context(), &ListAuditLogsParams{Limit: 100})
 			return err
 		}); err != nil {

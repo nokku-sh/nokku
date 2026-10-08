@@ -35,7 +35,7 @@ type fakeDB struct {
 	resourceErr error
 }
 
-func (f *fakeDB) WithTx(_ context.Context, fn func(*db.Queries) error) error {
+func (f *fakeDB) SysTx(_ context.Context, fn func(*db.Queries) error) error {
 	return fn(db.New(f))
 }
 

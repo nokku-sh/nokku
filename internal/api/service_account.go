@@ -43,7 +43,7 @@ func (s *serviceAccountService) CreateServiceAccount(
 	raw, tokenHash := iam.NewAPIKey()
 
 	var result *db.ServiceAccount
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		params := &db.CreateServiceAccountParams{
 			Name:        req.GetName(),
 			Description: req.Description,
@@ -87,7 +87,7 @@ func (s *serviceAccountService) UpdateServiceAccount(
 	}
 
 	var result *db.ServiceAccount
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if err := checkCanManageServiceAccount(ctx, q, req.GetId()); err != nil {
 			return err
 		}
@@ -141,7 +141,7 @@ func (s *serviceAccountService) DeleteServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.DeleteServiceAccountRequest,
 ) (*nokkuv1.DeleteServiceAccountResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := checkCanManageServiceAccount(ctx, q, req.GetId()); err != nil {
 			return err
 		}

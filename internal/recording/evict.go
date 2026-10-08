@@ -29,7 +29,7 @@ func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string,
 		return true
 	}
 	var used int64
-	if err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		// Uploads running side by side see each other through their rows.
 		if size > 0 {
 			err = q.SetRecordingSize(ctx, &db.SetRecordingSizeParams{ID: recordingID, SizeBytes: size})

@@ -43,7 +43,7 @@ func (s *daemonService) UpdateDaemon(
 	ctx context.Context,
 	req *nokkuv1.UpdateDaemonRequest,
 ) (*nokkuv1.UpdateDaemonResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		base, err := q.GetDaemon(ctx, req.GetId())
 		if err != nil {
 			return err
@@ -127,7 +127,7 @@ func (s *daemonService) CreateSession(
 	}
 
 	var daemon *db.Daemon
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		daemon, err = q.GetDaemon(ctx, req.GetDaemonId())
 		if err != nil {
 			return err
@@ -253,7 +253,7 @@ func (s *daemonService) Relay(
 	// and holds a pre-auth slot there. It needs a grant on the target.
 	caller, _ := actor.PrincipalFromContext(ctx)
 	var d *db.Daemon
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if d, err = q.GetDaemon(ctx, daemonID); err != nil {
 			return err
 		}

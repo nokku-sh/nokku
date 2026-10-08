@@ -228,7 +228,7 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var name string
-	err = f.svc.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	err = f.svc.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		name, err = savePasskey(ctx, q, wu.user.ID, cred)
 		return err
 	})
@@ -321,7 +321,7 @@ func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var u *db.User
-	err = f.svc.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	err = f.svc.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		u, err = f.svc.createUser(ctx, q, db.CreateUserWithIDParams{
 			ID: st.ID, Email: st.Email, Name: st.Name, Role: st.Role,
 		}, st.InviteID)
@@ -394,7 +394,7 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	err = f.svc.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	err = f.svc.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		_, err = savePasskey(ctx, q, wu.user.ID, cred)
 		return err
 	})

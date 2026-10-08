@@ -138,7 +138,7 @@ func (s *Stripe) subscription(
 	workspaceID string,
 ) (*db.WorkspaceSubscription, error) {
 	var sub *db.WorkspaceSubscription
-	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
+	if err := s.db.SysTx(ctx, func(q *db.Queries) (err error) {
 		sub, err = q.GetSubscription(ctx, workspaceID)
 		return err
 	}); err != nil {
@@ -152,7 +152,7 @@ func (s *Stripe) activeSubscription(
 	workspaceID string,
 ) (*db.WorkspaceSubscription, error) {
 	var sub *db.WorkspaceSubscription
-	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
+	if err := s.db.SysTx(ctx, func(q *db.Queries) (err error) {
 		sub, err = q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
 			WorkspaceID: workspaceID,
 			Statuses:    entitlement.ActiveStatuses,
@@ -181,7 +181,7 @@ func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (st
 		return "", fmt.Errorf("create customer: %w", err)
 	}
 
-	if err := s.db.WithTx(ctx, func(q *db.Queries) error {
+	if err := s.db.SysTx(ctx, func(q *db.Queries) error {
 		return q.SetSubscriptionCustomer(ctx, &db.SetSubscriptionCustomerParams{
 			WorkspaceID: workspaceID,
 			CustomerID:  customer.ID,
@@ -317,7 +317,7 @@ func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 		endedAt = new(time.Unix(remote.EndedAt, 0).UTC())
 	}
 	// The plan stays on an ended row, the retention hold reads it.
-	err = s.db.WithTx(ctx, func(q *db.Queries) error {
+	err = s.db.SysTx(ctx, func(q *db.Queries) error {
 		return q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
 			WorkspaceID:       workspaceID,
 			Source:            "stripe",
@@ -359,7 +359,7 @@ func (s *Stripe) reconcile(ctx context.Context) {
 
 func (s *Stripe) syncAll(ctx context.Context) error {
 	var subs []*db.WorkspaceSubscription
-	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
+	if err := s.db.SysTx(ctx, func(q *db.Queries) (err error) {
 		subs, err = q.ListProviderSubscriptions(ctx, []string{"stripe"})
 		return err
 	}); err != nil {
@@ -375,7 +375,7 @@ func (s *Stripe) syncAll(ctx context.Context) error {
 
 func (s *Stripe) billableSeats(ctx context.Context, workspaceID string) (int64, error) {
 	var count int64
-	if err := s.db.WithTx(ctx, func(q *db.Queries) (err error) {
+	if err := s.db.SysTx(ctx, func(q *db.Queries) (err error) {
 		count, err = q.CountActiveUsers(ctx, workspaceID)
 		return err
 	}); err != nil {

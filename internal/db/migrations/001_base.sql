@@ -645,6 +645,11 @@ UPDATE OF last_seen_at ON daemons FOR EACH ROW WHEN (
 EXECUTE FUNCTION notify_change ();
 
 -- Roles and grants -----------------------------------------------------------
+-- Two runtime roles, each with a pool of its own. nokku_app serves requests
+-- under row-level security, nokku_system bypasses it for work that spans
+-- workspaces. Neither is a member of the other, so a request connection
+-- cannot leave row-level security. Both get their password at start, see
+-- setupRoles in internal/db/connection.go.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nokku_app') THEN
@@ -654,9 +659,6 @@ BEGIN
     CREATE ROLE nokku_system NOLOGIN BYPASSRLS;
   END IF;
 END $$;
-
--- nokku_system bypasses RLS for internal operations
-GRANT nokku_system TO nokku_app;
 
 -- Schema permissions
 GRANT USAGE ON SCHEMA public TO nokku_app,
@@ -713,9 +715,9 @@ FROM
 --   - An unset GUC makes current_workspace_id() return NULL, and
 --     "workspace_id = NULL" matches nothing, so tenant tables are empty by
 --     default.
---   - Cross-tenant work (boot, billing webhooks, background jobs) runs
---     through nokku_system, which has BYPASSRLS; that role switch is
---     explicit in code (Connection.WithTx).
+--   - Cross-tenant work (boot, billing webhooks, background jobs) runs as
+--     nokku_system, which has BYPASSRLS. That is a pool of its own and
+--     explicit in code (Connection.Sys and SysTx).
 --
 -- The policy is the only tenant filter there is. Tenant queries name no
 -- workspace, and inserts take workspace_id from its column default. A new
@@ -833,17 +835,12 @@ ALTER TABLE audit.audit_logs FORCE ROW LEVEL SECURITY;
 
 -- Audit immutability ---------------------------------------------------------
 -- An audit row is a fact that is only ever written. Two layers keep it that
--- way, and the honest division of labour is:
+-- way:
 --
---   UPDATE is denied by privilege. No role holds UPDATE on this table.
---   DELETE is refused by this trigger unless the transaction opts in, which
---   only the retention job does. The app role inherits DELETE from
---   nokku_system, so this trigger is what actually stops a delete that can
---   reach rows.
---   The app role cannot reach rows at all: RLS is enabled and forced on this
---   table and there is no DELETE policy, so a DELETE from nokku_app matches
---   zero rows regardless of privilege. Do not add a DELETE policy. If one is
---   ever needed, the trigger's opt-in must stop being a plain GUC.
+--   Privilege. The app role holds SELECT and nothing else. nokku_system
+--   holds INSERT and DELETE. No role holds UPDATE on this table.
+--   This trigger. It refuses a DELETE unless the transaction opts in, which
+--   only the retention job does.
 CREATE OR REPLACE FUNCTION audit.audit_logs_immutable () RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP = 'UPDATE' THEN

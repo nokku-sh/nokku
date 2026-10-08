@@ -273,7 +273,7 @@ func (s *Service) RevokeOtherSessions(ctx context.Context, keep SessionHash) (in
 
 // DeleteOwnSession only reaches the caller's own sessions.
 func (s *Service) DeleteOwnSession(ctx context.Context, hash SessionHash) error {
-	return s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	return s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		rows, err := q.ListSessionsBySubject(ctx, actor.UserIDFromContext(ctx))
 		if err != nil {
 			return err

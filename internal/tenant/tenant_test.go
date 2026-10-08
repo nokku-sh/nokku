@@ -93,7 +93,7 @@ func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
 	require.ErrorIs(t, c.Pool.QueryRow(t.Context(),
 		`SELECT COUNT(*) FROM certificate_authorities WHERE workspace_id = $1 AND is_default`, ws.ID).Scan(&cas),
 		db.ErrWorkspaceNotPinned, "nokku_app reaches nothing unpinned")
-	require.NoError(t, c.WithWorkspace(actor.WithWorkspace(t.Context(), ws), func(q *db.Queries) error {
+	require.NoError(t, c.TenantTx(actor.WithWorkspace(t.Context(), ws), func(q *db.Queries) error {
 		row, err := q.GetWorkspace(t.Context())
 		if err != nil {
 			return err

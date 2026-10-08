@@ -62,9 +62,9 @@ committed `.gitkeep` and are embedded by `web/embed.go`.
   entitlement guard, validation. Audit wraps authz so denied calls are
   recorded.
 - `internal/db` is sqlc queries plus migrations, all RLS-scoped. Pick the
-  entry point by what the query may see: `Tenant()` and `WithWorkspace`
-  (tenant rows, the request path), `Sys()` and `WithTx` (role
-  `nokku_system`, BYPASSRLS, only boot, webhooks and jobs). The owner role
+  entry point by what the query may see: `Tenant()` and `TenantTx` (tenant
+  rows, the request path), `Sys()` and `SysTx` (role `nokku_system`,
+  BYPASSRLS, a pool of its own, only boot, webhooks and jobs). The owner role
   only migrates at startup.
 - `internal/tenant` resolves the workspace from the request host before
   authentication. Self-hosted serves one workspace created at boot. SaaS
@@ -133,18 +133,18 @@ calls `SyncDaemon`.
   insert no `workspace_id` column, the column default takes it from the pin.
   Never hand-roll workspace filters, never bypass RLS for tenant data.
 - One statement is a plain call, `cfg.Conn.Tenant().GetTeam(ctx, id)`.
-  `WithWorkspace` is for statements that belong together: several writes, a
-  read the write depends on, or a write whose result decides a rollback
+  `TenantTx` is for statements that belong together: several writes, a read
+  the write depends on, or a write whose result decides a rollback
   (`TransferOwnership`). Never wrap a single statement in it.
-- The pin and the system role are session state, so the server needs direct
-  connections to Postgres. A pooler in transaction mode would hand a pinned
-  or a system connection to the wrong query.
+- The pin is session state, so the server needs direct connections to
+  Postgres. A pooler in transaction mode would hand a pinned connection to
+  the wrong query.
 - A query names the workspace only when system code calls it (billing, the
   plan lookup, retention jobs). Those say so in a comment. System code
-  (`WithTx`, `Sys()`) must never call a query that does not: with RLS
+  (`SysTx`, `Sys()`) must never call a query that does not: with RLS
   bypassed it would reach every workspace.
 - Work outside a request that belongs to one workspace pins it with
-  `actor.WithWorkspace` and uses `WithWorkspace`, like `iam.Bootstrap` and
+  `actor.WithWorkspace` and uses `TenantTx`, like `iam.Bootstrap` and
   `tenant.Create` do. Tests seed the same way.
 - A new tenant table needs `workspace_id UUID NOT NULL DEFAULT
   current_workspace_id ()`, its name in the policy list in `001_base.sql`,

@@ -191,7 +191,7 @@ func (s *certificateService) RolloverCertificateAuthority(
 	req *nokkuv1.RolloverCertificateAuthorityRequest,
 ) (*nokkuv1.RolloverCertificateAuthorityResponse, error) {
 	var result *db.CertificateAuthority
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		ca, err := q.GetCAForUpdate(ctx, req.GetId())
 		if err != nil {
 			return err
@@ -229,7 +229,7 @@ func (s *certificateService) SignSSHCertificate(
 
 	var ca *db.CertificateAuthority
 	var principals []string
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		target, err := q.GetTarget(ctx, req.GetTargetId())
 		if err != nil {
 			return err
@@ -310,7 +310,7 @@ func (s *certificateService) SignX509Certificate(
 	req *nokkuv1.SignX509CertificateRequest,
 ) (*nokkuv1.SignX509CertificateResponse, error) {
 	var ca *db.CertificateAuthority
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if req.GetCaId() != "" {
 			ca, err = q.GetCA(ctx, req.GetCaId())
 			return err

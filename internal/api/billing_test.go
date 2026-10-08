@@ -58,7 +58,7 @@ func TestFeaturesProto_EnterpriseLicenseEnablesStreaming(t *testing.T) {
 // which is exactly what the resolver treats as "no row".
 type noSubscription struct{}
 
-func (noSubscription) WithTx(_ context.Context, _ func(*db.Queries) error) error {
+func (noSubscription) SysTx(_ context.Context, _ func(*db.Queries) error) error {
 	return entitlement.ErrNoSubscription
 }
 

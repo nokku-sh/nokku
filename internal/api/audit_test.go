@@ -42,7 +42,7 @@ func TestAuditDeniedCall(t *testing.T) {
 	// The write is detached from the request, so the row shows up a moment later.
 	rows := func(target string) []*db.ListAuditLogsRow {
 		var out []*db.ListAuditLogsRow
-		_ = cfg.Conn.WithWorkspace(wsCtx(t, cfg), func(q *db.Queries) (err error) {
+		_ = cfg.Conn.TenantTx(wsCtx(t, cfg), func(q *db.Queries) (err error) {
 			out, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
 				Target: &target, Limit: 2,
 			})

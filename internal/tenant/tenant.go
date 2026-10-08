@@ -203,7 +203,7 @@ func (r *Resolver) purgeUnclaimed(ctx context.Context) {
 // PurgeUnclaimed deletes every workspace created before cutoff that nobody
 // ever signed in to.
 func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
-	return r.conn.WithTx(ctx, func(q *db.Queries) error {
+	return r.conn.SysTx(ctx, func(q *db.Queries) error {
 		rows, err := q.ListUnclaimedWorkspaces(ctx, cutoff)
 		if err != nil {
 			return err
@@ -230,7 +230,7 @@ func Create(ctx context.Context, conn *db.Connection, slug, name string) (*db.Wo
 	ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: id})
 
 	var ws *db.Workspace
-	err = conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	err = conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		ws, err = q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
 			ID:       id,
 			Slug:     slug,

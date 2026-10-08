@@ -40,7 +40,7 @@ func (s *Service) RequestEmailChange(
 	if err = emailverify.Verify(ctx, newEmail, s.strict); err != nil {
 		return "", "", ErrEmailRejected
 	}
-	err = s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err = s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		creds, err := q.ListUserCredentials(ctx, u.ID)
 		if err != nil {
 			return err
@@ -110,7 +110,7 @@ func (s *Service) PendingEmail(ctx context.Context, userID string) string {
 // ConfirmEmailChange switches the account to the address the token carries.
 func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 	var u *db.User
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		row, err := consumeEmailToken(ctx, q, raw, tokenEmailChange)
 		if err != nil {
 			return err
@@ -131,7 +131,7 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 	var u *db.User
 	reverted := false
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		row, err := consumeEmailToken(ctx, q, raw, tokenEmailRevert)
 		if err != nil {
 			return err

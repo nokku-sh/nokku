@@ -178,7 +178,7 @@ func (t *TinkEncryptor) update(ctx context.Context, kek tink.AEAD, rotate bool) 
 	current := t.currentKEK()
 	var primitive tink.AEAD
 	locked := false
-	err := t.db.WithTx(ctx, func(q *db.Queries) error {
+	err := t.db.SysTx(ctx, func(q *db.Queries) error {
 		row, err := q.LockKeyset(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to load keyset: %w", err)

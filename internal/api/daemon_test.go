@@ -571,7 +571,7 @@ func TestSyncDaemonReport(t *testing.T) {
 		"the daemon is told every setting, got %v", synced.GetConfig())
 
 	var usernames, endpoints []string
-	require.NoError(t, cfg.Conn.WithTx(t.Context(), func(q *db.Queries) error {
+	require.NoError(t, cfg.Conn.SysTx(t.Context(), func(q *db.Queries) error {
 		target, err := q.GetTargetByDaemon(t.Context(), new(enrolled.GetId()))
 		if err != nil {
 			return err

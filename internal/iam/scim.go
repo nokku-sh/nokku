@@ -97,7 +97,7 @@ func (s *Service) verifySCIMToken(ctx context.Context, workspaceID, raw string) 
 	}
 	hash := crypto.HashToken(raw)
 	var id string
-	err = s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err = s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		row, err := q.GetSCIMTokenByHash(ctx, hash)
 		if err != nil {
 			return err
@@ -149,7 +149,7 @@ func (s *Service) scimProvisionUser(
 ) (*db.User, error) {
 	var u *db.User
 	var created bool
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		u, err = q.GetUserByEmail(ctx, email)
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -246,7 +246,7 @@ func keepOwner(ctx context.Context, q *db.Queries, userID string) error {
 // scimDeprovisionUser deactivates the account and drops its IdP link. The
 // data survives for an IdP re-assignment.
 func (s *Service) scimDeprovisionUser(ctx context.Context, u *db.User) error {
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := keepOwner(ctx, q, u.ID); err != nil {
 			return err
 		}

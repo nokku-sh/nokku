@@ -71,7 +71,7 @@ func (s *teamService) ListTeams(
 ) (*nokkuv1.ListTeamsResponse, error) {
 	var result []*nokkuv1.Team
 	var count int32
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		teams, err := q.ListTeams(ctx, &db.ListTeamsParams{
 			Query:  req.Query,
 			Tags:   req.GetTags(),

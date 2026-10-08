@@ -26,7 +26,7 @@ type signupData struct {
 // LookupInvite resolves an invite link in this workspace without spending it.
 func (s *Service) LookupInvite(ctx context.Context, raw string) (*db.WorkspaceToken, error) {
 	var tok *db.WorkspaceToken
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		tok, err = lookupInvite(ctx, q, raw)
 		return err
 	})
@@ -106,7 +106,7 @@ func (s *Service) createUser(
 // not apply, there is nobody to count yet.
 func (s *Service) CreateOwner(ctx context.Context, email, name string) (*db.User, error) {
 	var u *db.User
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		u, err = s.createUser(ctx, q, db.CreateUserWithIDParams{
 			Email: email, Name: name, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER,
 		}, "")

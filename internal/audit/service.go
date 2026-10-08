@@ -60,7 +60,7 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 	now := time.Now()
 
 	// The audit table refuses DELETE unless the transaction opts in.
-	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
+	err := s.conn.SysTx(ctx, func(q *db.Queries) error {
 		locked, err := q.TryAdvisoryXactLock(ctx, "audit-retention")
 		if err != nil || !locked {
 			return err

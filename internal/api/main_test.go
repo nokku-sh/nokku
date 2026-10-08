@@ -110,7 +110,7 @@ func seedOtherWorkspace(t *testing.T, cfg *config.Config) string {
 func inWorkspace(t *testing.T, cfg *config.Config, workspaceID string, fn func(q *db.Queries) error) {
 	t.Helper()
 	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: workspaceID})
-	require.NoError(t, cfg.Conn.WithWorkspace(ctx, fn))
+	require.NoError(t, cfg.Conn.TenantTx(ctx, fn))
 }
 
 // wsCtx is a request context on the host of the test workspace.
@@ -137,7 +137,7 @@ func seedUser(t *testing.T, cfg *config.Config, workspaceID string, role nokkuv1
 func seedOwner(t *testing.T, cfg *config.Config) *db.User {
 	t.Helper()
 	var owner *db.User
-	err := cfg.Conn.WithWorkspace(wsCtx(t, cfg), func(q *db.Queries) (err error) {
+	err := cfg.Conn.TenantTx(wsCtx(t, cfg), func(q *db.Queries) (err error) {
 		owner, err = q.GetOwner(t.Context())
 		return err
 	})
