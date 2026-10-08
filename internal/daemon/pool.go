@@ -42,8 +42,8 @@ type daemonConn struct {
 
 // connection lets tests stub db.Connection without Postgres.
 type connection interface {
-	WithTx(ctx context.Context, fn func(*db.Queries) error) error
-	WithWorkspace(ctx context.Context, fn func(*db.Queries) error) error
+	SysTx(ctx context.Context, fn func(*db.Queries) error) error
+	TenantTx(ctx context.Context, fn func(*db.Queries) error) error
 }
 
 // owned lets a disconnect tear down a daemon's sessions without scanning the pool.
@@ -104,7 +104,7 @@ func (p *Pool) heartbeat(ctx context.Context) {
 		if len(ids) == 0 {
 			continue
 		}
-		if err := p.conn.WithTx(ctx, func(q *db.Queries) error {
+		if err := p.conn.SysTx(ctx, func(q *db.Queries) error {
 			return q.TouchDaemons(ctx, ids)
 		}); err != nil {
 			slog.Warn("daemon heartbeat", "error", err, "daemons", len(ids))
@@ -289,7 +289,7 @@ func (p *Pool) listen(ctx context.Context, cfg *pgx.ConnConfig) error {
 		}
 		ws := n.Payload
 		var version int64
-		if err := p.conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		if err := p.conn.SysTx(ctx, func(q *db.Queries) (err error) {
 			version, err = q.GetWorkspaceStateVersion(ctx, ws)
 			return err
 		}); err != nil {
@@ -317,7 +317,7 @@ func (p *Pool) stateVersion(ctx context.Context, workspaceID string) (int64, err
 	if ok {
 		return v, nil
 	}
-	if err := p.conn.WithTx(ctx, func(q *db.Queries) (err error) {
+	if err := p.conn.SysTx(ctx, func(q *db.Queries) (err error) {
 		v, err = q.GetWorkspaceStateVersion(ctx, workspaceID)
 		return err
 	}); err != nil {

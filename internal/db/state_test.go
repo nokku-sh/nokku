@@ -97,7 +97,7 @@ func asOwner(t *testing.T, c *Connection, f stateFixture, fn func(*Queries) erro
 		actor.Principal{ID: f.owner, Kind: actor.KindUser, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 	)
 	ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: f.ws})
-	if err := c.WithWorkspace(ctx, fn); err != nil {
+	if err := c.TenantTx(ctx, fn); err != nil {
 		t.Fatalf("workspace tx: %v", err)
 	}
 }

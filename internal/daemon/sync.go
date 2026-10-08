@@ -36,7 +36,7 @@ type Synced struct {
 
 func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 	res := &Synced{}
-	err := conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err := conn.TenantTx(ctx, func(q *db.Queries) error {
 		daemon, err := q.GetDaemon(ctx, in.DaemonID)
 		if err != nil {
 			return err
@@ -130,7 +130,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 	// A deleted daemon still serves its cached principals. REJECTED makes
 	// the host drop them, and its session is spent with that answer.
 	if errors.Is(err, pgx.ErrNoRows) {
-		if err := conn.WithWorkspace(ctx, func(q *db.Queries) error {
+		if err := conn.TenantTx(ctx, func(q *db.Queries) error {
 			_, err := q.DeleteSubjectSessions(ctx, in.DaemonID)
 			return err
 		}); err != nil {

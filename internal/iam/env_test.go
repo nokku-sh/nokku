@@ -66,7 +66,7 @@ func (e *testEnv) workspace(t *testing.T) actor.Workspace {
 // in runs fn the way a request does: nokku_app, pinned to ws.
 func (e *testEnv) in(t *testing.T, ws actor.Workspace, fn func(q *db.Queries) error) error {
 	t.Helper()
-	return e.conn.WithWorkspace(anon(t.Context(), ws), fn)
+	return e.conn.TenantTx(anon(t.Context(), ws), fn)
 }
 
 // org is a workspace with its owner.

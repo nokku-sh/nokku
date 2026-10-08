@@ -35,7 +35,7 @@ func (s *recordingService) ListRecordings(
 
 	var rows []*db.ListRecordingsRow
 	var totalBytes int64
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		rows, err = q.ListRecordings(ctx, params)
 		if err != nil {
 			return err

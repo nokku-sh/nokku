@@ -29,7 +29,7 @@ func (s *billingService) GetBilling(
 	var userCount int64
 	var resourceCount int64
 	var sub *db.WorkspaceSubscription
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		userCount, err = q.CountActiveUsers(ctx, ws)
 		if err != nil {
 			return err

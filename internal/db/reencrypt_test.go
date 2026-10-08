@@ -43,7 +43,7 @@ func TestReencrypt(t *testing.T) {
 	recording := uuid.NewV7().String()
 	provider := uuid.NewV7().String()
 
-	err := c.WithTx(t.Context(), func(q *Queries) error {
+	err := c.SysTx(t.Context(), func(q *Queries) error {
 		// The seed row takes its workspace from the pin. Reencrypt itself
 		// runs across every workspace.
 		if _, err := q.db.Exec(t.Context(), `SELECT set_config('nokku.workspace_id', $1, true)`, f.ws); err != nil {

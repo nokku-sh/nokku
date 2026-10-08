@@ -71,7 +71,7 @@ func (s *Service) loginProvider(ctx context.Context, providerID string) (*SSOPro
 // PutSSOProvider keeps the stored client secret when the new one is empty.
 func (s *Service) PutSSOProvider(ctx context.Context, p SSOProvider) (*SSOProvider, error) {
 	var out *SSOProvider
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		out, err = putSSOProvider(ctx, q, p)
 		return err
 	})
@@ -107,7 +107,7 @@ func putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvider) (*SSOProv
 
 // DeleteSSOProvider also unlinks every identity the provider vouched for.
 func (s *Service) DeleteSSOProvider(ctx context.Context, providerID string) error {
-	return s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	return s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		n, err := q.DeleteSSOProvider(ctx, providerID)
 		if err != nil {
 			return err

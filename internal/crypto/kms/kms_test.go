@@ -62,7 +62,7 @@ func storedConfig(t *testing.T, ws string) []byte {
 func seedProvider(t *testing.T, conn *db.Connection, secret string) string {
 	t.Helper()
 	ws := uuid.NewV7().String()
-	require.NoError(t, conn.WithWorkspace(pinned(t, ws), func(q *db.Queries) error {
+	require.NoError(t, conn.TenantTx(pinned(t, ws), func(q *db.Queries) error {
 		if _, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
 			ID: ws, Slug: uuid.NewV7().String(), Name: "kms", Settings: &nokkuv1.WorkspaceSettings{},
 		}); err != nil {
@@ -84,7 +84,7 @@ func pinned(t *testing.T, ws string) context.Context {
 func readConfig(t *testing.T, conn *db.Connection, ws string) string {
 	t.Helper()
 	var row *db.SsoProvider
-	require.NoError(t, conn.WithWorkspace(pinned(t, ws), func(q *db.Queries) (err error) {
+	require.NoError(t, conn.TenantTx(pinned(t, ws), func(q *db.Queries) (err error) {
 		row, err = q.GetSSOProvider(t.Context(), "p")
 		return err
 	}))

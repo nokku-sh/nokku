@@ -41,7 +41,7 @@ func (s *principalService) AddSubjectsToPrincipal(
 	ctx context.Context,
 	req *nokkuv1.AddSubjectsToPrincipalRequest,
 ) (*nokkuv1.AddSubjectsToPrincipalResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		// A principal of another workspace does not exist here.
 		if _, err := q.GetPrincipalWorkspace(ctx, req.GetId()); err != nil {
 			return err
@@ -72,7 +72,7 @@ func (s *principalService) RemoveSubjectsFromPrincipal(
 	ctx context.Context,
 	req *nokkuv1.RemoveSubjectsFromPrincipalRequest,
 ) (*nokkuv1.RemoveSubjectsFromPrincipalResponse, error) {
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		kind, ok := subjectKind(req.GetKind())
 		if !ok {
 			return errInvalidInput

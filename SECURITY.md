@@ -113,7 +113,7 @@ If you set `NOKKU_S3_PUBLIC_URL` to serve avatars straight from the bucket, gran
 ### Database
 
 - The core uses three roles. The owner (`PGUSER`) only runs migrations at start. Requests run as `nokku_app`, under row-level security. Work that spans workspaces, like the first start, billing webhooks and background jobs, runs as `nokku_system`, which bypasses it.
-- Set `NOKKU_DB_APP_PASSWORD` to give the request role its own password instead of sharing the owner's.
+- Set `NOKKU_DB_APP_PASSWORD` to give the two runtime roles a password of their own instead of sharing the owner's.
 - Use `PGSSLMODE=verify-full` when PostgreSQL is on another host.
 
 ### Releases
@@ -135,6 +135,6 @@ cosign verify ghcr.io/nokku-sh/nokku:<version> \
 
 **Session recordings.** Daemons stream recordings to the core, where they are encrypted at rest. Credential scrubbing runs after an upload completes and replaces the recording with a redacted copy. Between upload and scrub the stored recording is unredacted, though still encrypted. Scrubbing is best effort. A failed scrub is logged and the recording is kept as uploaded, and the matching is heuristic, so it cannot catch every secret.
 
-**Row-level security is a safety net, not a wall.** Every tenant row belongs to one workspace, and a request only sees the rows of its own. The policy is the only workspace filter, queries name none. A connection with no workspace set sees nothing. This protects against application bugs. It does not protect against a compromised core: `nokku_app` can assume `nokku_system`, and the workspace setting is an ordinary session variable. Queries are parameterized through sqlc, which is the defense against injection.
+**Row-level security is a safety net, not a wall.** Every tenant row belongs to one workspace, and a request only sees the rows of its own. The policy is the only workspace filter, queries name none. A connection with no workspace set sees nothing. This protects against application bugs. It does not protect against a compromised core: it holds the password of `nokku_system` too, and the workspace setting is an ordinary session variable. Queries are parameterized through sqlc, which is the defense against injection.
 
 **Licensing.** A self-hosted core starts on the Community plan. License keys are Ed25519-signed and verified offline against a public key compiled into the binary. An expired key never stops the core. Licensed features turn off, and data beyond the Community limits is kept for 30 more days.

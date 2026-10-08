@@ -159,7 +159,7 @@ func (h scimUserHandler) apply(
 	active *bool,
 	externalID string,
 ) (scim.Resource, error) {
-	err := h.svc.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err := h.svc.conn.TenantTx(ctx, func(q *db.Queries) error {
 		if active != nil && !*active {
 			if err := keepOwner(ctx, q, id); err != nil {
 				return err

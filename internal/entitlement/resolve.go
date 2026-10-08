@@ -53,7 +53,7 @@ type Service struct {
 }
 
 type txRunner interface {
-	WithTx(ctx context.Context, fn func(*db.Queries) error) error
+	SysTx(ctx context.Context, fn func(*db.Queries) error) error
 }
 
 // NewService takes the license from the environment, see EnvLicense.
@@ -104,7 +104,7 @@ func (s *Service) lookup(ctx context.Context, workspaceID string) (plan, keep Pl
 			held = license.Plan
 		}
 		var sub *db.WorkspaceSubscription
-		subErr := s.conn.WithTx(ctx, func(q *db.Queries) (err error) {
+		subErr := s.conn.SysTx(ctx, func(q *db.Queries) (err error) {
 			sub, err = q.GetSubscription(ctx, workspaceID)
 			return err
 		})

@@ -51,7 +51,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		workspace *db.Workspace
 		out       *Enrolled
 	)
-	err = conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	err = conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		token, err = q.GetLiveToken(ctx, &db.GetLiveTokenParams{
 			ID:        parsed.ID,
 			Kind:      nokkuv1.TokenKind_TOKEN_KIND_ENROLL,
@@ -86,7 +86,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 	}
 	config := db.ResolveDaemonConfig(workspace.Settings.GetDefaultDaemonConfig())
 
-	err = conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err = conn.TenantTx(ctx, func(q *db.Queries) error {
 		for range maxNameAttempts {
 			// A racing enrollment of the same key makes the insert a no-op.
 			if out, err = enrolledDaemon(ctx, q, in.Binding); err != nil || out != nil {

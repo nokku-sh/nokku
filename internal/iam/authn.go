@@ -76,7 +76,7 @@ func (s *Service) AuthenticateToken(
 func (s *Service) authenticateAPIKey(ctx context.Context, raw string) (actor.Principal, error) {
 	hash := crypto.HashToken(raw)
 	var sa *db.ServiceAccount
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		sa, err = q.GetServiceAccountByTokenHash(ctx, &hash)
 		if err != nil {
 			return err

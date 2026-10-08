@@ -124,6 +124,7 @@ tasks:
         block and append the grants section from the current 001_base.sql, \
         strip pg_dump's schema_version bookkeeping table and \\restrict lines, \
         replace internal/db/migrations/001_base.sql with the result, \
-        delete the old migrations, and boot once to stamp the version."
+        and delete the old migrations. A database that is ahead needs \
+        UPDATE schema_version SET version = 1."
     env:
       PGPASSWORD: "{{ .PGPASSWORD }}"

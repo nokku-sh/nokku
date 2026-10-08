@@ -28,7 +28,7 @@ func (h scimGroupHandler) tx(ctx context.Context, id string, fn func(*db.Queries
 	if _, err := uuid.Parse(id); id != "" && err != nil {
 		return scimerrors.ScimErrorResourceNotFound(id)
 	}
-	err := h.svc.conn.WithWorkspace(ctx, fn)
+	err := h.svc.conn.TenantTx(ctx, fn)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return scimerrors.ScimErrorResourceNotFound(id)
 	}

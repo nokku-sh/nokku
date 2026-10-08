@@ -22,11 +22,11 @@ import (
 
 type stubConn struct{}
 
-func (stubConn) WithTx(context.Context, func(*db.Queries) error) error {
+func (stubConn) SysTx(context.Context, func(*db.Queries) error) error {
 	return nil
 }
 
-func (stubConn) WithWorkspace(context.Context, func(*db.Queries) error) error {
+func (stubConn) TenantTx(context.Context, func(*db.Queries) error) error {
 	return nil
 }
 

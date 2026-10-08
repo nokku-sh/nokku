@@ -37,7 +37,7 @@ func enrollToken(t *testing.T, tweak func(*db.CreateWorkspaceTokenParams)) (fixt
 	var plaintext string
 	workspaceID := uuid.NewV7().String()
 	pinned := actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID})
-	err = conn.WithWorkspace(pinned, func(q *db.Queries) error {
+	err = conn.TenantTx(pinned, func(q *db.Queries) error {
 		if _, err := q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
 			ID: workspaceID, Slug: uuid.NewV7().String(), Name: "ws", Settings: &nokkuv1.WorkspaceSettings{},
 		}); err != nil {
@@ -193,12 +193,12 @@ func TestEnrollRejectsBadToken(t *testing.T) {
 
 type failingConn struct{}
 
-func (failingConn) WithTx(_ context.Context, fn func(*db.Queries) error) error {
+func (failingConn) SysTx(_ context.Context, fn func(*db.Queries) error) error {
 	return fn(db.New(failingTx{}))
 }
 
-func (c failingConn) WithWorkspace(ctx context.Context, fn func(*db.Queries) error) error {
-	return c.WithTx(ctx, fn)
+func (c failingConn) TenantTx(ctx context.Context, fn func(*db.Queries) error) error {
+	return c.SysTx(ctx, fn)
 }
 
 type failingTx struct{ db.DBTX }

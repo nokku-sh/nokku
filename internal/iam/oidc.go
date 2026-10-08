@@ -203,7 +203,7 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, error) {
 	var u *db.User
 	created := false
-	err := h.svc.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err := h.svc.conn.TenantTx(ctx, func(q *db.Queries) error {
 		cred, err := q.FindCredentialBySubject(ctx, &db.FindCredentialBySubjectParams{
 			Type: string(MethodOIDC), Provider: id.ProviderID, Subject: id.Subject,
 		})

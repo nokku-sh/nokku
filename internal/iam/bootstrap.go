@@ -76,7 +76,7 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 		return "", nil
 	}
 	var owner *db.User
-	err = s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	err = s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		owner, err = q.GetOwner(ctx)
 		if errors.Is(err, pgx.ErrNoRows) {
 			owner, err = s.createUser(ctx, q, db.CreateUserWithIDParams{

@@ -35,7 +35,7 @@ func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
 	var u *db.User
 	var link string
 	var hash crypto.HashedToken
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		found, err := q.GetUserByEmail(ctx, email)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
@@ -100,7 +100,7 @@ func (s *Service) putLoginToken(
 // exists. It replaces earlier links and lasts a day.
 func (s *Service) IssueBootstrapLink(ctx context.Context, u *db.User) (string, error) {
 	var link string
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if err := q.DeleteUserTokens(ctx, &db.DeleteUserTokensParams{
 			UserID: &u.ID, Purpose: tokenLogin,
 		}); err != nil {
@@ -125,7 +125,7 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 	name = strings.TrimSpace(name)
 	var link, workspace string
 	var hash crypto.HashedToken
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		tok, err := lookupInvite(ctx, q, invite)
 		if err != nil {
 			return err
@@ -178,7 +178,7 @@ func (s *Service) ConsumeMagicLink(ctx context.Context, raw string) (*db.User, *
 	hash := crypto.HashToken(raw)
 	var u *db.User
 	created := false
-	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		userID, err := q.ConsumeToken(
 			ctx,
 			&db.ConsumeTokenParams{TokenHash: hash, Purpose: tokenLogin},

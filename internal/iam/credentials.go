@@ -30,7 +30,7 @@ func (s *Service) RenameCredential(ctx context.Context, id, label string) error 
 // DeleteCredential removes a passkey or a linked identity. The last way in
 // stays unless a sign-in link can replace it.
 func (s *Service) DeleteCredential(ctx context.Context, id string) error {
-	return s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	return s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		userID := actor.UserIDFromContext(ctx)
 		creds, err := q.ListUserCredentials(ctx, userID)
 		if err != nil {

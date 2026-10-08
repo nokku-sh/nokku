@@ -28,7 +28,7 @@ func (s *targetService) GetTarget(
 	req *nokkuv1.GetTargetRequest,
 ) (*nokkuv1.GetTargetResponse, error) {
 	var target *nokkuv1.Target
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		row, err := q.GetTarget(ctx, req.GetId())
 		if err != nil {
 			return err
@@ -105,7 +105,7 @@ func (s *targetService) insertTarget(
 	name string,
 ) (*nokkuv1.CreateTargetResponse, error) {
 	var result *db.Target
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if err = requireSSHCA(ctx, q, req.GetCaId()); err != nil {
 			return err
 		}
@@ -141,7 +141,7 @@ func (s *targetService) UpdateTarget(
 		return nil, err
 	}
 	var result *db.Target
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if err = requireSSHCA(ctx, q, req.GetCaId()); err != nil {
 			return err
 		}
@@ -181,7 +181,7 @@ func (s *targetService) ListTargets(
 ) (*nokkuv1.ListTargetsResponse, error) {
 	var targets []*nokkuv1.Target
 	var count int32
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		rows, err := q.ListTargets(ctx, &db.ListTargetsParams{
 			Query:      req.Query,
 			DaemonID:   req.DaemonId,
@@ -256,7 +256,7 @@ func (s *targetService) SyncTargetUsers(
 		return nil, err
 	}
 
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
 			TargetID:      req.GetTargetId(),
 			Usernames:     req.GetUsernames(),
@@ -306,7 +306,7 @@ func (s *targetService) GetSubjectAccess(
 	uniqueDaemonIDs := make(map[string]struct{})
 	uniqueCAIDs := make(map[string]struct{})
 
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		rows, err := q.GetTargetsBySubject(ctx, req.GetSubjectId())
 		if err != nil {
 			return err
@@ -407,7 +407,7 @@ func (s *targetService) GetMyAccess(
 	}
 
 	resp := &nokkuv1.GetMyAccessResponse{}
-	err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		//nolint:exhaustive // other kinds were rejected above
 		switch p.Kind {
 		case actor.KindUser, actor.KindCLI:
@@ -486,7 +486,7 @@ func (s *targetService) GetTargetFilters(
 	var tags []string
 	var principals []string
 
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		tags, err = q.GetWorkspaceTags(ctx)
 		if err != nil {
 			return err
@@ -513,7 +513,7 @@ func (s *targetService) GetAccessGraph(
 	filter := cmp.Or(req.GetFilter(), &nokkuv1.AccessGraphFilter{})
 	resp := &nokkuv1.GetAccessGraphResponse{}
 
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		rows, err := q.GetAccessGraph(ctx, &db.GetAccessGraphParams{
 			SubjectID: filter.SubjectId,
 			TargetID:  filter.TargetId,

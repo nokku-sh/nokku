@@ -79,7 +79,7 @@ func rotateExpiring(ctx context.Context, conn *db.Connection) {
 	failed := []string{}
 	for ctx.Err() == nil {
 		var picked *db.CertificateAuthority
-		err := conn.WithTx(ctx, func(q *db.Queries) error {
+		err := conn.SysTx(ctx, func(q *db.Queries) error {
 			var err error
 			if picked, err = q.GetExpiringCAForUpdate(ctx, failed); err != nil {
 				return err

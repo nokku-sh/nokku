@@ -89,7 +89,7 @@ func (s *Service) ActivateLicense(ctx context.Context, key string) error {
 		return ErrLicenseShorter
 	}
 
-	if err := s.conn.WithTx(ctx, func(q *db.Queries) error {
+	if err := s.conn.SysTx(ctx, func(q *db.Queries) error {
 		return q.SetInstanceLicense(ctx, key)
 	}); err != nil {
 		return err
@@ -131,7 +131,7 @@ func (s *Service) WatchLicense(ctx context.Context) {
 // reloadLicense keeps the current license when the database is unreachable.
 func (s *Service) reloadLicense(ctx context.Context) {
 	var key string
-	err := s.conn.WithTx(ctx, func(q *db.Queries) (err error) {
+	err := s.conn.SysTx(ctx, func(q *db.Queries) (err error) {
 		key, err = q.GetInstanceLicense(ctx)
 		return err
 	})

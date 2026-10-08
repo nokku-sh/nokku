@@ -47,7 +47,7 @@ func seedCA(t *testing.T, conn *db.Connection, workspaceID string, age time.Dura
 	require.NoError(t, err)
 	notBefore := time.Now().Add(-age)
 	var ca *db.CertificateAuthority
-	require.NoError(t, conn.WithWorkspace(pinned(t, workspaceID), func(q *db.Queries) (err error) {
+	require.NoError(t, conn.TenantTx(pinned(t, workspaceID), func(q *db.Queries) (err error) {
 		ca, err = q.CreateCA(t.Context(), &db.CreateCAParams{
 			Name:         "ca-" + notBefore.Format(time.RFC3339Nano),
 			Certificate:  string(info.Certificate),
@@ -72,7 +72,7 @@ func pinned(t *testing.T, workspaceID string) context.Context {
 func seedWorkspace(t *testing.T, conn *db.Connection) string {
 	t.Helper()
 	workspaceID := uuid.NewV7().String()
-	require.NoError(t, conn.WithWorkspace(pinned(t, workspaceID), func(q *db.Queries) error {
+	require.NoError(t, conn.TenantTx(pinned(t, workspaceID), func(q *db.Queries) error {
 		_, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
 			ID: workspaceID, Slug: uuid.NewV7().String(), Name: "rotate",
 			Settings: &nokkuv1.WorkspaceSettings{},
@@ -101,7 +101,7 @@ func TestRotateExpiringDrainsEveryDueCA(t *testing.T) {
 	locked, release := make(chan struct{}), make(chan struct{})
 	var holder sync.WaitGroup
 	holder.Go(func() {
-		_ = conn.WithTx(context.WithoutCancel(t.Context()), func(q *db.Queries) error {
+		_ = conn.SysTx(context.WithoutCancel(t.Context()), func(q *db.Queries) error {
 			if _, err := q.GetCAForUpdate(t.Context(), dueC.ID); err != nil {
 				return err
 			}
@@ -139,7 +139,7 @@ func TestExpiringCAQuerySkipsFailed(t *testing.T) {
 	due := seedCA(t, conn, seedWorkspace(t, conn), 360*24*time.Hour)
 
 	skip := []string{due.ID}
-	require.NoError(t, conn.WithTx(t.Context(), func(q *db.Queries) error {
+	require.NoError(t, conn.SysTx(t.Context(), func(q *db.Queries) error {
 		for {
 			ca, err := q.GetExpiringCAForUpdate(t.Context(), skip)
 			if err != nil {
@@ -157,7 +157,7 @@ func TestRolloverKeepsOrRevokesPreviousKey(t *testing.T) {
 
 	rollover := func(revoke bool) *db.CertificateAuthority {
 		var next *db.CertificateAuthority
-		require.NoError(t, conn.WithTx(t.Context(), func(q *db.Queries) (err error) {
+		require.NoError(t, conn.SysTx(t.Context(), func(q *db.Queries) (err error) {
 			current, err := q.GetCAForUpdate(t.Context(), ca.ID)
 			if err != nil {
 				return err

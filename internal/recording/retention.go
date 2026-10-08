@@ -29,7 +29,7 @@ func (s *Service) cleanup(ctx context.Context) {
 	now := time.Now()
 
 	var expired []string
-	err := s.conn.WithTx(ctx, func(q *db.Queries) error {
+	err := s.conn.SysTx(ctx, func(q *db.Queries) error {
 		locked, err := q.TryAdvisoryXactLock(ctx, "recording-retention")
 		if err != nil || !locked {
 			return err

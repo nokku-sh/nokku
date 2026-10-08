@@ -131,7 +131,7 @@ func (s *daemonControlService) SignHostCertificate(
 	daemonID := actor.DaemonIDFromContext(ctx)
 	var ca *db.CertificateAuthority
 	var target *db.Target
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if ca, err = q.GetCAByDaemonID(ctx, &daemonID); err != nil {
 			return err
 		}
@@ -300,7 +300,7 @@ func (s *daemonControlService) resolveUpload(
 ) (*db.Recording, string, error) {
 	var rec *db.Recording
 	var workspaceID string
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		daemon, err := q.GetDaemon(ctx, daemonID)
 		if err != nil {
 			return err
@@ -340,7 +340,7 @@ func (s *daemonControlService) UnenrollDaemon(
 	_ *nokkuv1.UnenrollDaemonRequest,
 ) (*nokkuv1.UnenrollDaemonResponse, error) {
 	daemonID := actor.DaemonIDFromContext(ctx)
-	if err := s.cfg.Conn.WithWorkspace(ctx, func(q *db.Queries) error {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		if _, err := q.DeleteDaemon(ctx, daemonID); err != nil {
 			return err
 		}
