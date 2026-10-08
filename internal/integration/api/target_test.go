@@ -485,3 +485,23 @@ func TestListAccessGraphTargets(t *testing.T) {
 	got, _ = list("", &nokkuv1.AccessGraphFilter{Tag: new("prod")}, 100)
 	assert.Equal(t, []string{"-db-1"}, got, "a tag filter only matches its own tag")
 }
+
+// A server made by hand starts with the root account, no host reports one.
+func TestNewServerHasTheRootAccount(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	admin := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
+	targets := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, admin)
+	created, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{Name: new(uniq("web"))})
+	require.NoError(t, err)
+
+	got, err := targets.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: new(created.GetTarget().GetId())})
+	require.NoError(t, err)
+	var accounts []string
+	for _, p := range got.GetTarget().GetPrincipals() {
+		accounts = append(accounts, p.GetUsername())
+	}
+	assert.Equal(t, []string{"root"}, accounts)
+}
