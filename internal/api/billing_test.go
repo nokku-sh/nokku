@@ -34,7 +34,7 @@ func TestFeaturesProto_CoversTheCatalog(t *testing.T) {
 // TestFeaturesProto_EnterpriseLicenseEnablesStreaming is the reported bug: a
 // self-hosted instance with a valid Enterprise license must see streaming.
 func TestFeaturesProto_EnterpriseLicenseEnablesStreaming(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	licensed := entitlement.NewService(
 		noSubscription{},

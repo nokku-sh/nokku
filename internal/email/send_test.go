@@ -41,7 +41,7 @@ func TestSendTemplate_CallsSender(t *testing.T) {
 	svc := newTestService(sender)
 
 	err := svc.SendSignupLinkEmail(
-		context.Background(),
+		t.Context(),
 		"ada@example.com",
 		"Ada",
 		"Acme",
@@ -73,7 +73,7 @@ func TestSendTemplate_CallsSender(t *testing.T) {
 func TestSendTemplate_Cooldown(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "url", "10m"); err != nil {
 		t.Fatalf("first send: %v", err)
@@ -91,7 +91,7 @@ func TestSendTemplate_Cooldown(t *testing.T) {
 func TestSendTemplate_CooldownPerTemplate(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Different templates for the same user must not share a cooldown key.
 	if err := svc.SendSignupLinkEmail(ctx, "a@b.io", "Ada", "Acme", "u", "10m"); err != nil {
@@ -124,7 +124,7 @@ func TestSendTemplate_CooldownPerTemplate(t *testing.T) {
 func TestSendEmailChangeConfirm_OwnCooldown(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", "10m"); err != nil {
 		t.Fatal(err)
@@ -149,7 +149,7 @@ func TestSendEmailChangeConfirm_OwnCooldown(t *testing.T) {
 func TestSendTemplate_CooldownPerUser(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", "10m"); err != nil {
 		t.Fatal(err)
@@ -163,7 +163,7 @@ func TestSendTemplate_CooldownPerUser(t *testing.T) {
 func TestSendTemplate_SendErrorPropagatesWithoutCooldown(t *testing.T) {
 	sender := &mockSender{err: errors.New("smtp down")}
 	svc := newTestService(sender)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", "10m")
 	if err == nil || !strings.Contains(err.Error(), "smtp down") {
@@ -185,13 +185,13 @@ func TestSendTemplate_FullCooldownStoreSendsAnyway(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
 	svc.cache = cache.NewMemory(1)
-	if _, err := svc.cache.SetNX(context.Background(), "taken", nil, time.Hour); err != nil {
+	if _, err := svc.cache.SetNX(t.Context(), "taken", nil, time.Hour); err != nil {
 		t.Fatal(err)
 	}
 
 	for range 2 {
 		if err := svc.SendMagicLinkEmail(
-			context.Background(), "user-1", "ada@example.com", "https://app.nokku.sh/reset/token", "15 minutes",
+			t.Context(), "user-1", "ada@example.com", "https://app.nokku.sh/reset/token", "15 minutes",
 		); err != nil {
 			t.Fatalf("SendMagicLinkEmail with a full cooldown store: %v", err)
 		}
@@ -204,7 +204,7 @@ func TestSendTemplate_FullCooldownStoreSendsAnyway(t *testing.T) {
 func TestSendTemplate_MissingUserID(t *testing.T) {
 	svc := newTestService(&mockSender{})
 
-	err := svc.SendMagicLinkEmail(context.Background(), "", "a@b.io", "u", "10m")
+	err := svc.SendMagicLinkEmail(t.Context(), "", "a@b.io", "u", "10m")
 	if err == nil {
 		t.Fatal("missing user id: want error")
 	}
@@ -213,7 +213,7 @@ func TestSendTemplate_MissingUserID(t *testing.T) {
 func TestSendTemplate_UnknownTemplate(t *testing.T) {
 	svc := newTestService(&mockSender{})
 
-	err := svc.sendTemplate(context.Background(), sendRequest{
+	err := svc.sendTemplate(t.Context(), sendRequest{
 		userID:   "user-1",
 		to:       "a@b.io",
 		subject:  "x",
@@ -230,7 +230,7 @@ func TestSendTemplate_MessageAndData(t *testing.T) {
 	svc.appURL = "https://app.nokku.sh"
 
 	err := svc.SendNewLoginEmail(
-		context.Background(),
+		t.Context(),
 		"user-1",
 		"ada@example.com",
 		"device-42",

@@ -263,7 +263,7 @@ receive:
 		// What was stored is kept as a cut recording.
 		return nil, ended
 	case complete:
-		s.cfg.Record.ScrubRecording(rec)
+		s.cfg.Record.ScrubRecording(ctx, rec)
 	case interrupted:
 		return nil, newError(connect.CodeUnknown, "recording stream interrupted")
 	}

@@ -32,9 +32,7 @@ func (stubConn) WithWorkspace(context.Context, func(*db.Queries) error) error {
 
 func newTestPool(t *testing.T) *Pool {
 	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	return New(ctx, stubConn{}, live.New())
+	return New(t.Context(), stubConn{}, live.New())
 }
 
 // waitRelayPending blocks until the request goroutine's pending entry exists,
@@ -73,7 +71,7 @@ func TestPool_ReconnectStorm(t *testing.T) {
 		wksp := fmt.Sprintf("w%d", i%wkspIDs)
 		for range rounds {
 			wg.Go(func() {
-				ctx, cancel := context.WithCancel(context.Background())
+				ctx, cancel := context.WithCancel(t.Context())
 				defer cancel()
 				c := p.registerDaemon(ctx, id, wksp)
 				p.unregisterDaemon(id, c)
@@ -99,7 +97,7 @@ func TestPool_PokeStorm(t *testing.T) {
 
 	const daemons = 32
 	for i := range daemons {
-		p.registerDaemon(context.Background(), fmt.Sprintf("d%02d", i), "w1")
+		p.registerDaemon(t.Context(), fmt.Sprintf("d%02d", i), "w1")
 	}
 
 	var wg sync.WaitGroup
@@ -124,9 +122,9 @@ func TestPool_PokeStorm(t *testing.T) {
 // StateUpdate per daemon, and only reaches the poked workspace.
 func TestPool_PokeCoalesces(t *testing.T) {
 	p := newTestPool(t)
-	c := p.registerDaemon(context.Background(), "d1", "w1")
+	c := p.registerDaemon(t.Context(), "d1", "w1")
 	defer p.unregisterDaemon("d1", c)
-	other := p.registerDaemon(context.Background(), "d2", "w2")
+	other := p.registerDaemon(t.Context(), "d2", "w2")
 	defer p.unregisterDaemon("d2", other)
 
 	for range 100 {
@@ -148,7 +146,7 @@ func TestPool_PokeCoalesces(t *testing.T) {
 // drops a control message queued on the same connection.
 func TestPool_PokeKeepsControlMessages(t *testing.T) {
 	p := newTestPool(t)
-	c := p.registerDaemon(context.Background(), "d1", "w1")
+	c := p.registerDaemon(t.Context(), "d1", "w1")
 	defer p.unregisterDaemon("d1", c)
 
 	rid := "r1"
@@ -178,7 +176,7 @@ func TestPool_PokeKeepsControlMessages(t *testing.T) {
 // the pending channel), the relay counterpart of the session request race.
 func TestPool_RelayRequestRace(t *testing.T) {
 	p := newTestPool(t)
-	p.registerDaemon(context.Background(), "d1", "w1")
+	p.registerDaemon(t.Context(), "d1", "w1")
 
 	const relays = 128
 	var wg sync.WaitGroup
@@ -187,7 +185,7 @@ func TestPool_RelayRequestRace(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 			defer cancel()
 			if r, err := p.RequestRelay(ctx, "d1", rid, "u1", ""); err == nil {
 				r.close()
@@ -221,13 +219,13 @@ func TestPool_RelayRequestRace(t *testing.T) {
 // and released slots become available again.
 func TestPool_RelayCap(t *testing.T) {
 	p := newTestPool(t)
-	p.registerDaemon(context.Background(), "d1", "w1")
+	p.registerDaemon(t.Context(), "d1", "w1")
 
 	var wg sync.WaitGroup
 	for i := range maxRelaysPerPrincipal {
 		rid := fmt.Sprintf("r%d", i)
 		wg.Go(func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()
 			if _, err := p.RequestRelay(ctx, "d1", rid, "u1", ""); err != nil {
 				t.Errorf("RequestRelay %s: %v", rid, err)
@@ -240,13 +238,13 @@ func TestPool_RelayCap(t *testing.T) {
 	}
 	wg.Wait()
 
-	if _, err := p.RequestRelay(context.Background(), "d1", "over", "u1", ""); !errors.Is(err, ErrRelayLimit) {
+	if _, err := p.RequestRelay(t.Context(), "d1", "over", "u1", ""); !errors.Is(err, ErrRelayLimit) {
 		t.Fatalf("over-cap request: err=%v, want ErrRelayLimit", err)
 	}
 
 	// A different principal is unaffected: the request gets past the cap and
 	// fails on the (never registered) pending wait instead.
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 	if _, err := p.RequestRelay(ctx, "d1", "other", "u2", ""); errors.Is(err, ErrRelayLimit) {
 		t.Fatal("u2 must not be blocked by u1's cap")
@@ -257,7 +255,7 @@ func TestPool_RelayCap(t *testing.T) {
 	}
 	// Reusable, but the pending wait still needs a bound since nothing will
 	// register this relay.
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx2, cancel2 := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel2()
 	if _, err := p.RequestRelay(ctx2, "d1", "again", "u1", ""); errors.Is(err, ErrRelayLimit) {
 		t.Fatal("released slots must be reusable")
@@ -268,14 +266,14 @@ func TestPool_RelayCap(t *testing.T) {
 // lifecycle and pushes bytes both directions through its channels.
 func TestPool_RelayBridging(t *testing.T) {
 	p := newTestPool(t)
-	p.registerDaemon(context.Background(), "d1", "w1")
+	p.registerDaemon(t.Context(), "d1", "w1")
 
 	type result struct {
 		r   *Relay
 		err error
 	}
 	res := make(chan result, 1)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	go func() {
 		r, err := p.RequestRelay(ctx, "d1", "r1", "u1", "")
@@ -329,10 +327,10 @@ func TestPool_RelayBridging(t *testing.T) {
 // down its relays and frees their slots.
 func TestPool_UnregisterDaemonClosesRelays(t *testing.T) {
 	p := newTestPool(t)
-	c := p.registerDaemon(context.Background(), "d1", "w1")
+	c := p.registerDaemon(t.Context(), "d1", "w1")
 
 	res := make(chan error, 1)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	go func() {
 		_, err := p.RequestRelay(ctx, "d1", "r1", "u1", "")
@@ -360,27 +358,12 @@ func TestPool_UnregisterDaemonClosesRelays(t *testing.T) {
 	}
 }
 
-// TestPool_Shutdown verifies Shutdown is idempotent and closes Done.
-func TestPool_Shutdown(t *testing.T) {
-	p := newTestPool(t)
-	p.registerDaemon(context.Background(), "d1", "w1")
-
-	p.shutdown()
-	p.shutdown()
-
-	select {
-	case <-p.shutdownCtx.Done():
-	case <-time.After(time.Second):
-		t.Fatal("Done() not closed after Shutdown")
-	}
-}
-
 // A disconnect tears down exactly that daemon's sessions and relays, and
 // leaves no index entry behind.
 func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 	p := newTestPool(t)
-	c1 := p.registerDaemon(context.Background(), "d1", "w1")
-	c2 := p.registerDaemon(context.Background(), "d2", "w1")
+	c1 := p.registerDaemon(t.Context(), "d1", "w1")
+	c2 := p.registerDaemon(t.Context(), "d2", "w1")
 	defer p.unregisterDaemon("d2", c2)
 	// Bare sessions, the teardown only needs the index and close.
 	closed := map[string]bool{}

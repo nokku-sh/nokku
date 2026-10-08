@@ -27,7 +27,7 @@ func dialForTest(t *testing.T, srv *sshtest.Server, cfg Config) *Terminal {
 	if err != nil {
 		t.Fatalf("dial test server: %v", err)
 	}
-	term, err := DialTerminal(context.Background(), conn, cfg)
+	term, err := DialTerminal(t.Context(), conn, cfg)
 	if err != nil {
 		_ = conn.Close()
 		t.Fatalf("DialTerminal: %v", err)
@@ -127,7 +127,7 @@ func TestDialTerminal_WrongCA(t *testing.T) {
 		t.Fatalf("dial test server: %v", err)
 	}
 	defer func() { _ = conn.Close() }()
-	if _, err := DialTerminal(context.Background(), conn, cfg); err == nil {
+	if _, err := DialTerminal(t.Context(), conn, cfg); err == nil {
 		t.Fatal("handshake with a rogue CA must fail")
 	}
 }
@@ -145,7 +145,7 @@ func TestDialTerminal_BadUserCert(t *testing.T) {
 		t.Fatalf("dial test server: %v", err)
 	}
 	defer func() { _ = conn.Close() }()
-	if _, err := DialTerminal(context.Background(), conn, cfg); err == nil {
+	if _, err := DialTerminal(t.Context(), conn, cfg); err == nil {
 		t.Fatal("handshake with an unauthorized principal must fail")
 	}
 }
@@ -179,7 +179,7 @@ func TestDialTerminal_CtxCancel(t *testing.T) {
 	defer func() { _ = conn.Close() }()
 
 	srv := sshtest.NewServer(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 150*time.Millisecond)
 	defer cancel()
 	if _, err := DialTerminal(ctx, conn, testConfig(t, srv)); err == nil {
 		t.Fatal("dial must fail when the context expires")

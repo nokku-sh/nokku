@@ -3,7 +3,6 @@ package storage
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -15,14 +14,14 @@ func TestCreateWriterRoundtrip(t *testing.T) {
 	t.Setenv("NOKKU_STORAGE", modeLocal)
 	t.Setenv("NOKKU_LOCAL_STORAGE_PATH", dir)
 
-	s, err := New(context.Background(), "")
+	s, err := New(t.Context(), "")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 
 	key := RecordingPath("ws-1", "00000000-0000-0000-0000-000000000001")
 	w, err := s.CreateWriter(
-		context.Background(),
+		t.Context(),
 		key,
 		StoreOptions{ContentType: "application/octet-stream"},
 	)
@@ -62,7 +61,7 @@ func TestCreateWriterRoundtrip(t *testing.T) {
 		t.Fatalf("object file: %v", err)
 	}
 
-	rc, err := s.Reader(context.Background(), key)
+	rc, err := s.Reader(t.Context(), key)
 	if err != nil {
 		t.Fatalf("Reader: %v", err)
 	}
@@ -77,7 +76,7 @@ func TestCreateWriterRoundtrip(t *testing.T) {
 
 	// Partial stream (daemon died) must still commit.
 	key2 := RecordingPath("ws-1", "00000000-0000-0000-0000-000000000002")
-	w2, err := s.CreateWriter(context.Background(), key2, StoreOptions{})
+	w2, err := s.CreateWriter(t.Context(), key2, StoreOptions{})
 	if err != nil {
 		t.Fatalf("CreateWriter 2: %v", err)
 	}
@@ -87,12 +86,12 @@ func TestCreateWriterRoundtrip(t *testing.T) {
 	if err = w2.Close(); err != nil {
 		t.Fatalf("close partial writer: %v", err)
 	}
-	if _, err = s.Reader(context.Background(), key2); err != nil {
+	if _, err = s.Reader(t.Context(), key2); err != nil {
 		t.Fatalf("partial object unreadable: %v", err)
 	}
 
 	// Deletion removes the object.
-	if err = s.Delete(context.Background(), key); err != nil {
+	if err = s.Delete(t.Context(), key); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if _, err = os.Stat(filepath.Join(dir, filepath.FromSlash(key))); !os.IsNotExist(err) {

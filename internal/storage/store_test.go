@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"context"
 	"os"
 	"path"
 	"path/filepath"
@@ -14,11 +13,10 @@ import (
 func newLocal(t *testing.T) *Storage {
 	t.Helper()
 	t.Setenv("NOKKU_LOCAL_STORAGE_PATH", filepath.Join(t.TempDir(), "data"))
-	s, err := New(context.Background(), "http://localhost:3000")
+	s, err := New(t.Context(), "http://localhost:3000")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	t.Cleanup(func() { s.bucket.Close() })
 	return s
 }
 
@@ -42,7 +40,7 @@ func TestStore_ConfinesTraversalNames(t *testing.T) {
 	// fileblob escapes path separators and ".." in object names. Nothing may
 	// land outside the bucket root.
 	for _, name := range []string{"../evil", "a/../../evil", "/etc/passwd"} {
-		if _, err := s.Store(context.Background(), name, []byte("x"), StoreOptions{}); err != nil {
+		if _, err := s.Store(t.Context(), name, []byte("x"), StoreOptions{}); err != nil {
 			t.Fatalf("Store(%q): %v", name, err)
 		}
 	}
@@ -76,7 +74,7 @@ func TestStore_ConfinesTraversalNames(t *testing.T) {
 
 func TestStore_EmptyName(t *testing.T) {
 	s := newLocal(t)
-	if _, err := s.Store(context.Background(), "", []byte("x"), StoreOptions{}); err == nil {
+	if _, err := s.Store(t.Context(), "", []byte("x"), StoreOptions{}); err == nil {
 		t.Error("Store with empty name: expected error")
 	}
 }
@@ -85,14 +83,14 @@ func TestStore_PersistsContentType(t *testing.T) {
 	s := newLocal(t)
 
 	name := "avatars/a.jpg"
-	if _, err := s.Store(context.Background(), name, []byte("data"), StoreOptions{
+	if _, err := s.Store(t.Context(), name, []byte("data"), StoreOptions{
 		ContentType:  "image/jpeg",
 		CacheControl: "public, max-age=31536000",
 	}); err != nil {
 		t.Fatalf("Store: %v", err)
 	}
 
-	attrs, err := s.bucket.Attributes(context.Background(), name)
+	attrs, err := s.bucket.Attributes(t.Context(), name)
 	if err != nil {
 		t.Fatalf("Attributes: %v", err)
 	}
@@ -106,7 +104,7 @@ func TestStore_PersistsContentType(t *testing.T) {
 
 func TestReader_MissingObject(t *testing.T) {
 	s := newLocal(t)
-	_, err := s.Reader(context.Background(), "nope/missing.bin")
+	_, err := s.Reader(t.Context(), "nope/missing.bin")
 	if err == nil || gcerrors.Code(err) != gcerrors.NotFound {
 		t.Errorf("Reader(missing) error = %v, want NotFound", err)
 	}

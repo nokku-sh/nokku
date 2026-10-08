@@ -1,7 +1,6 @@
 package entitlement
 
 import (
-	"context"
 	"errors"
 	"slices"
 	"strings"
@@ -184,7 +183,7 @@ func TestGuard_DeniesAndAdvertisesUpgrade(t *testing.T) {
 		modeSaaS,
 	))
 
-	ctx := actor.WithWorkspace(context.Background(), actor.Workspace{ID: "ws1"})
+	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws1"})
 	err := sut.check(ctx, "/nokku.v1.UtilService/ExportAuditLogs", struct{}{})
 
 	if err == nil {
@@ -213,7 +212,7 @@ func TestGuard_DeniesAndAdvertisesUpgrade(t *testing.T) {
 
 func TestGuard_DeniesAuditStreamingOnCommunity(t *testing.T) {
 	sut := NewGuardInterceptor(NewService(&fakeDB{}, nil, modeSaaS))
-	ctx := actor.WithWorkspace(context.Background(), actor.Workspace{ID: "ws1"})
+	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws1"})
 
 	req := &nokkuv1.UpdateWorkspaceRequest{
 		Settings: &nokkuv1.WorkspaceSettings{AuditWebhookUrl: new("https://hooks.example.com")},
@@ -250,13 +249,13 @@ func TestGuard_AllowsPaidPlanAndUnpinnedContext(t *testing.T) {
 	))
 
 	// Pro workspace passes.
-	ctx := actor.WithWorkspace(context.Background(), actor.Workspace{ID: "ws1"})
+	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws1"})
 	if err := sut.check(ctx, "/nokku.v1.UtilService/ExportAuditLogs", struct{}{}); err != nil {
 		t.Errorf("pro workspace denied: %v", err)
 	}
 
 	// Unpinned context passes (the authz interceptor owns that boundary).
-	if err := sut.check(context.Background(), "/nokku.v1.UtilService/ExportAuditLogs", struct{}{}); err != nil {
+	if err := sut.check(t.Context(), "/nokku.v1.UtilService/ExportAuditLogs", struct{}{}); err != nil {
 		t.Errorf("unpinned context denied: %v", err)
 	}
 
@@ -331,7 +330,7 @@ func TestGuard_ResourceCapDeniesAndAdvertisesUpgrade(t *testing.T) {
 		modeSaaS,
 	))
 
-	ctx := actor.WithWorkspace(context.Background(), actor.Workspace{ID: "ws1"})
+	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws1"})
 	err := sut.checkResources(ctx, "/nokku.v1.TargetService/CreateTarget")
 
 	if err == nil {
@@ -389,7 +388,7 @@ func TestCheckResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sut := NewService(tt.db, nil, tt.mode)
-			err := sut.CheckResources(context.Background(), "ws1")
+			err := sut.CheckResources(t.Context(), "ws1")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CheckResources() error = %v, wantErr %v", err, tt.wantErr)
 			}

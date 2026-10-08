@@ -106,7 +106,6 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, sessionTTL)
-	stopOnShutdown := context.AfterFunc(p.shutdownCtx, cancel)
 	s := &Session{
 		sessionID: cfg.SessionID,
 		daemonID:  cfg.DaemonID,
@@ -116,7 +115,6 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 	}
 	s.close = sync.OnceFunc(func() {
 		cancel()
-		stopOnShutdown()
 		term.Close()
 		p.UnregisterRelay(relayID)
 		p.mu.Lock()

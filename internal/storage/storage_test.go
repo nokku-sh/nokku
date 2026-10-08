@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,7 +11,7 @@ func TestLocalStorage(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("NOKKU_LOCAL_STORAGE_PATH", dir)
 
-	s, err := New(context.Background(), "http://localhost:3000")
+	s, err := New(t.Context(), "http://localhost:3000")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -24,7 +23,7 @@ func TestLocalStorage(t *testing.T) {
 	}
 
 	path := AvatarPath("user-1")
-	url, err := s.Store(context.Background(), path, []byte("avatar-data"), StoreOptions{
+	url, err := s.Store(t.Context(), path, []byte("avatar-data"), StoreOptions{
 		ContentType:  "image/jpeg",
 		CacheControl: "public, max-age=31536000, immutable",
 	})
@@ -38,7 +37,7 @@ func TestLocalStorage(t *testing.T) {
 		t.Fatalf("file not written to disk: %v", err)
 	}
 
-	rc, err := s.Reader(context.Background(), path)
+	rc, err := s.Reader(t.Context(), path)
 	if err != nil {
 		t.Fatalf("Reader: %v", err)
 	}
@@ -51,10 +50,10 @@ func TestLocalStorage(t *testing.T) {
 		t.Fatalf("unexpected data %q", data)
 	}
 
-	if err := s.Delete(context.Background(), path); err != nil {
+	if err := s.Delete(t.Context(), path); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
-	if err := s.Delete(context.Background(), path); err != nil {
+	if err := s.Delete(t.Context(), path); err != nil {
 		t.Fatalf("Delete of missing object should be a no-op: %v", err)
 	}
 	if err := s.bucket.Close(); err != nil {
@@ -64,7 +63,7 @@ func TestLocalStorage(t *testing.T) {
 
 func TestNewInvalidMode(t *testing.T) {
 	t.Setenv("NOKKU_STORAGE", "garbage")
-	if _, err := New(context.Background(), "http://localhost:3000"); err == nil {
+	if _, err := New(t.Context(), "http://localhost:3000"); err == nil {
 		t.Fatal("expected error for invalid mode")
 	}
 }
@@ -72,7 +71,7 @@ func TestNewInvalidMode(t *testing.T) {
 func TestNewS3RequiresConfig(t *testing.T) {
 	t.Setenv("NOKKU_STORAGE", "s3")
 	t.Setenv("NOKKU_S3_ENDPOINT", "")
-	if _, err := New(context.Background(), "http://localhost:3000"); err == nil {
+	if _, err := New(t.Context(), "http://localhost:3000"); err == nil {
 		t.Fatal("expected error for s3 mode without endpoint")
 	}
 }

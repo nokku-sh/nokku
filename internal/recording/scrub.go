@@ -30,9 +30,9 @@ type span struct {
 }
 
 // ScrubRecording is best effort and never retried. A failure leaves the
-// recording as uploaded.
-func (s *Service) ScrubRecording(rec *db.Recording) {
-	ctx, cancel := context.WithTimeout(context.Background(), scrubTimeout)
+// recording as uploaded. It runs detached, the upload does not wait for it.
+func (s *Service) ScrubRecording(ctx context.Context, rec *db.Recording) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), scrubTimeout)
 	go func() {
 		defer cancel()
 		if err := s.scrub(ctx, rec); err != nil {

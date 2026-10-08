@@ -87,26 +87,15 @@ func DialTerminal(ctx context.Context, conn net.Conn, cfg Config) (*Terminal, er
 		cfg.Height = defaultHeight
 	}
 
-	type result struct {
-		term *Terminal
-		err  error
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	term, err := dial(conn, cfg)
+	if stop() {
+		return term, err
 	}
-	res := make(chan result, 1)
-	go func() {
-		term, err := dial(conn, cfg)
-		res <- result{term, err}
-	}()
-	select {
-	case r := <-res:
-		return r.term, r.err
-	case <-ctx.Done():
-		_ = conn.Close()
-		r := <-res
-		if r.term != nil {
-			r.term.Close()
-		}
-		return nil, ctx.Err()
+	if term != nil {
+		term.Close()
 	}
+	return nil, ctx.Err()
 }
 
 func dial(conn net.Conn, cfg Config) (*Terminal, error) {

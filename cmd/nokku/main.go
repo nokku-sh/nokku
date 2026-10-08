@@ -114,9 +114,6 @@ func main() {
 					if err != nil {
 						return fmt.Errorf("failed to connect to database: %w", err)
 					}
-					if conn.Pool != nil {
-						defer conn.Pool.Close()
-					}
 					ec, err := env.ParseAs[config.EnvConfig]()
 					if err != nil {
 						return err
