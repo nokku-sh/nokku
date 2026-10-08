@@ -87,3 +87,39 @@ func TestParse_Empty(t *testing.T) {
 		t.Errorf("Parse(\"\") error = %v, want errInvalidToken", err)
 	}
 }
+
+func TestNewKey(t *testing.T) {
+	for _, prefix := range []string{KeyPrefixServiceAccount, KeyPrefixSCIM} {
+		raw, hash := NewKey(prefix)
+		if !strings.HasPrefix(raw, prefix) {
+			t.Errorf("%q does not start with %q", raw, prefix)
+		}
+		if len(raw) != len(prefix)+32+keyCheckLen {
+			t.Errorf("len(%q) = %d", raw, len(raw))
+		}
+		if hash != HashToken(raw) {
+			t.Error("hash does not match the plaintext")
+		}
+		if !CheckKey(raw) {
+			t.Errorf("CheckKey(%q) = false", raw)
+		}
+	}
+}
+
+func TestCheckKey_Rejects(t *testing.T) {
+	raw, _ := NewKey(KeyPrefixServiceAccount)
+	flipped := []byte(raw)
+	flipped[len(KeyPrefixServiceAccount)] ^= 1
+	for name, bad := range map[string]string{
+		"empty":        "",
+		"short":        "nk_sa_",
+		"no prefix":    strings.TrimPrefix(raw, "nk_"),
+		"truncated":    raw[:len(raw)-1],
+		"flipped char": string(flipped),
+		"bare secret":  RandomString(32),
+	} {
+		if CheckKey(bad) {
+			t.Errorf("%s: CheckKey(%q) = true", name, bad)
+		}
+	}
+}

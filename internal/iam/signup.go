@@ -24,8 +24,8 @@ type signupData struct {
 }
 
 // LookupInvite resolves an invite link in this workspace without spending it.
-func (s *Service) LookupInvite(ctx context.Context, raw string) (*db.WorkspaceToken, error) {
-	var tok *db.WorkspaceToken
+func (s *Service) LookupInvite(ctx context.Context, raw string) (*db.JoinToken, error) {
+	var tok *db.JoinToken
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		tok, err = lookupInvite(ctx, q, raw)
 		return err
@@ -33,15 +33,15 @@ func (s *Service) LookupInvite(ctx context.Context, raw string) (*db.WorkspaceTo
 	return tok, err
 }
 
-func lookupInvite(ctx context.Context, q *db.Queries, raw string) (*db.WorkspaceToken, error) {
+func lookupInvite(ctx context.Context, q *db.Queries, raw string) (*db.JoinToken, error) {
 	parsed, err := crypto.Parse(raw)
 	if err != nil || parsed.ID == "" {
 		return nil, ErrInviteSpent
 	}
 	hash := crypto.HashToken(raw)
-	tok, err := q.GetLiveToken(ctx, &db.GetLiveTokenParams{
+	tok, err := q.GetLiveJoinToken(ctx, &db.GetLiveJoinTokenParams{
 		ID:        parsed.ID,
-		Kind:      nokkuv1.TokenKind_TOKEN_KIND_INVITE,
+		Kind:      nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE,
 		TokenHash: hash,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -70,9 +70,9 @@ func (s *Service) createUser(
 	p.Email = normalizeEmail(p.Email)
 	p.Role = cmp.Or(p.Role, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	if inviteID != "" {
-		tok, err := q.RedeemTokenByID(ctx, &db.RedeemTokenByIDParams{
+		tok, err := q.RedeemJoinTokenByID(ctx, &db.RedeemJoinTokenByIDParams{
 			ID:   inviteID,
-			Kind: nokkuv1.TokenKind_TOKEN_KIND_INVITE,
+			Kind: nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInviteSpent

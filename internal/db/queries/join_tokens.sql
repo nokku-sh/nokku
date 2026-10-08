@@ -1,6 +1,6 @@
--- name: CreateWorkspaceToken :one
+-- name: CreateJoinToken :one
 INSERT INTO
-  workspace_tokens (
+  join_tokens (
     id,
     kind,
     label,
@@ -26,11 +26,11 @@ VALUES
 RETURNING
   *;
 
--- name: ListWorkspaceTokens :many
+-- name: ListJoinTokens :many
 SELECT
   *
 FROM
-  workspace_tokens
+  join_tokens
 WHERE
   (
     kind = @kind
@@ -39,18 +39,18 @@ WHERE
 ORDER BY
   created_at DESC;
 
--- name: DeleteWorkspaceToken :exec
-DELETE FROM workspace_tokens
+-- name: DeleteJoinToken :exec
+DELETE FROM join_tokens
 WHERE
   id = @id;
 
--- name: GetLiveToken :one
+-- name: GetLiveJoinToken :one
 -- Ignores the use limit, so a used-up token still identifies a daemon it
--- already enrolled. RedeemToken enforces it.
+-- already enrolled. RedeemJoinToken enforces it.
 SELECT
   *
 FROM
-  workspace_tokens
+  join_tokens
 WHERE
   id = @id
   AND kind = @kind
@@ -60,9 +60,9 @@ WHERE
     OR expires_at > NOW()
   );
 
--- name: RedeemToken :one
+-- name: RedeemJoinToken :one
 -- One statement, so two redemptions can never both take the last use.
-UPDATE workspace_tokens
+UPDATE join_tokens
 SET
   uses = uses + 1,
   last_used_at = NOW()
@@ -81,10 +81,10 @@ WHERE
 RETURNING
   *;
 
--- name: RedeemTokenByID :one
+-- name: RedeemJoinTokenByID :one
 -- For a signup whose invite link was checked earlier. The mailed link or
 -- the passkey ceremony is the proof by then.
-UPDATE workspace_tokens
+UPDATE join_tokens
 SET
   uses = uses + 1,
   last_used_at = NOW()

@@ -234,7 +234,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		sess, token, err := h.svc.IssueSession(ctx, SessionParams{
+		sess, token, err := h.svc.IssueToken(ctx, TokenParams{
 			SubjectID: u.ID,
 			Kind:      actor.KindCLI,
 			Method:    MethodDevice,

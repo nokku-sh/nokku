@@ -47,14 +47,14 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 	hash := crypto.HashToken(in.Token)
 
 	var (
-		token     *db.WorkspaceToken
+		token     *db.JoinToken
 		workspace *db.Workspace
 		out       *Enrolled
 	)
 	err = conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		token, err = q.GetLiveToken(ctx, &db.GetLiveTokenParams{
+		token, err = q.GetLiveJoinToken(ctx, &db.GetLiveJoinTokenParams{
 			ID:        parsed.ID,
-			Kind:      nokkuv1.TokenKind_TOKEN_KIND_ENROLL,
+			Kind:      nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL,
 			TokenHash: hash,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -107,9 +107,9 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 				return err
 			}
 			// A token that ran out meanwhile rolls the new daemon back.
-			if _, err := q.RedeemToken(ctx, &db.RedeemTokenParams{
+			if _, err := q.RedeemJoinToken(ctx, &db.RedeemJoinTokenParams{
 				ID:        parsed.ID,
-				Kind:      nokkuv1.TokenKind_TOKEN_KIND_ENROLL,
+				Kind:      nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL,
 				TokenHash: hash,
 			}); err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {

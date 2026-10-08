@@ -36,10 +36,26 @@ export const serviceAccount = {
 		}),
 	update: () => useMutation(ServiceAccountService.method.updateServiceAccount),
 	delete: () => useMutation(ServiceAccountService.method.deleteServiceAccount),
-	rotate: () => useMutation(ServiceAccountService.method.rotateServiceAccountToken),
 	deleteMany: () =>
 		useBulkMutation(
 			ServiceAccountService.method.deleteServiceAccount,
 			(n) => `${plural(n, 'service account')} deleted`
-		)
+		),
+
+	tokens: {
+		list: (serviceAccountId: MaybeGetter<string | undefined>) =>
+			useQuery(
+				ServiceAccountService.method.listServiceAccountTokens,
+				() => ({ serviceAccountId: extract(serviceAccountId) }),
+				() => ({
+					enabled: !!extract(serviceAccountId),
+					select: (res) => res.tokens ?? []
+				})
+			),
+		create: () => useMutation(ServiceAccountService.method.createServiceAccountToken),
+		revoke: () =>
+			useMutation(ServiceAccountService.method.revokeServiceAccountToken, {
+				onSuccess: () => toast.success('Token revoked')
+			})
+	}
 };

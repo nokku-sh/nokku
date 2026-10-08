@@ -10,6 +10,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/iam"
@@ -96,20 +97,28 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 	}
 
 	for i := range n.serviceAccounts {
-		// The key is thrown away, nobody signs in as these.
-		_, hash := iam.NewAPIKey()
-		p := &db.CreateServiceAccountParams{
-			Name:      pick(robots) + "-" + fresh(),
-			Role:      nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
-			Tags:      sample(tags, roll(3)),
-			TokenHash: &hash,
-		}
-		if i%3 == 0 {
-			p.TokenExpiresAt = new(time.Now().AddDate(0, 1+roll(6), 0))
-		}
-		id, err := q.CreateServiceAccount(ctx, p)
+		id, err := q.CreateServiceAccount(ctx, &db.CreateServiceAccountParams{
+			Name: pick(robots) + "-" + fresh(),
+			Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
+			Tags: sample(tags, roll(3)),
+		})
 		if err != nil {
 			return fmt.Errorf("service account: %w", err)
+		}
+		// The key is thrown away, nobody signs in as these.
+		_, hash := crypto.NewKey(crypto.KeyPrefixServiceAccount)
+		tok := &db.CreateAccessTokenParams{
+			TokenHash: hash,
+			Kind:      string(actor.KindServiceAccount),
+			SubjectID: &id,
+			Method:    string(iam.MethodToken),
+			Label:     "seed",
+		}
+		if i%3 == 0 {
+			tok.ExpiresAt = new(time.Now().AddDate(0, 1+roll(6), 0))
+		}
+		if _, err := q.CreateAccessToken(ctx, tok); err != nil {
+			return fmt.Errorf("service account token: %w", err)
 		}
 		who.serviceAccounts = append(who.serviceAccounts, id)
 	}

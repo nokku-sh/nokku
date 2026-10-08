@@ -4,7 +4,7 @@
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
-	import { TokenKind } from '#lib/gen/nokku/v1/token_pb.js';
+	import { JoinTokenKind } from '#lib/gen/nokku/v1/join_token_pb.js';
 	import { Info, Rocket } from '@lucide/svelte';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
@@ -93,7 +93,7 @@ runcmd:
 
 <TokenSheet
 	bind:open
-	kind={TokenKind.ENROLL}
+	kind={JoinTokenKind.ENROLL}
 	title="Enroll daemons"
 	description="Tokens let new nokkud installs join this workspace. One token can enroll a whole fleet."
 	icon={Rocket}

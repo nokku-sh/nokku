@@ -15,7 +15,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/service_account.proto.
  */
 export const file_nokku_v1_service_account: GenFile = /*@__PURE__*/
-  fileDesc("Ch5ub2trdS92MS9zZXJ2aWNlX2FjY291bnQucHJvdG8SCG5va2t1LnYxIrwCCg5TZXJ2aWNlQWNjb3VudBIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEiUKBHJvbGUYBCABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlEgwKBHRhZ3MYBSADKAkSNAoQdG9rZW5fZXhwaXJlc19hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF91c2VkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCIwChhHZXRTZXJ2aWNlQWNjb3VudFJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIk4KGUdldFNlcnZpY2VBY2NvdW50UmVzcG9uc2USMQoPc2VydmljZV9hY2NvdW50GAEgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnQi7gEKG0NyZWF0ZVNlcnZpY2VBY2NvdW50UmVxdWVzdBI1CgRuYW1lGAEgASgJQie6SCRyIhABGIACMhteW2EtekEtWjAtOV1bYS16QS1aMC05LV9dKiQSHQoLZGVzY3JpcHRpb24YAiABKAlCCLpIBXIDGOgHEjUKBHJvbGUYAyABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlQg66SAuCAQgYABgBGAIYAxIMCgR0YWdzGAQgAygJEjQKEHRva2VuX2V4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wImAKHENyZWF0ZVNlcnZpY2VBY2NvdW50UmVzcG9uc2USMQoPc2VydmljZV9hY2NvdW50GAEgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnQSDQoFdG9rZW4YAiABKAkizgEKG1VwZGF0ZVNlcnZpY2VBY2NvdW50UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQESNQoEbmFtZRgCIAEoCUInukgkciIQARiAAjIbXlthLXpBLVowLTldW2EtekEtWjAtOS1fXSokEh0KC2Rlc2NyaXB0aW9uGAMgASgJQgi6SAVyAxjoBxI1CgRyb2xlGAQgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZUIOukgLggEIGAAYARgCGAMSDAoEdGFncxgFIAMoCSJRChxVcGRhdGVTZXJ2aWNlQWNjb3VudFJlc3BvbnNlEjEKD3NlcnZpY2VfYWNjb3VudBgBIAEoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50IjMKG0RlbGV0ZVNlcnZpY2VBY2NvdW50UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiHgocRGVsZXRlU2VydmljZUFjY291bnRSZXNwb25zZSJuCiBSb3RhdGVTZXJ2aWNlQWNjb3VudFRva2VuUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQESNAoQdG9rZW5fZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiZQohUm90YXRlU2VydmljZUFjY291bnRUb2tlblJlc3BvbnNlEjEKD3NlcnZpY2VfYWNjb3VudBgBIAEoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50Eg0KBXRva2VuGAIgASgJIp0BChpMaXN0U2VydmljZUFjY291bnRzUmVxdWVzdBIYCgVsaW1pdBgBIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgCIAEoBUIHukgEGgIoABINCgVxdWVyeRgDIAEoCRIvCgRyb2xlGAQgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZUIIukgFggECEAESDAoEdGFncxgFIAMoCSJgChtMaXN0U2VydmljZUFjY291bnRzUmVzcG9uc2USMgoQc2VydmljZV9hY2NvdW50cxgBIAMoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50Eg0KBXRvdGFsGAIgASgFMroFChVTZXJ2aWNlQWNjb3VudFNlcnZpY2USZwoRR2V0U2VydmljZUFjY291bnQSIi5ub2trdS52MS5HZXRTZXJ2aWNlQWNjb3VudFJlcXVlc3QaIy5ub2trdS52MS5HZXRTZXJ2aWNlQWNjb3VudFJlc3BvbnNlIgmQAgHC8xgCGAISbQoTTGlzdFNlcnZpY2VBY2NvdW50cxIkLm5va2t1LnYxLkxpc3RTZXJ2aWNlQWNjb3VudHNSZXF1ZXN0GiUubm9ra3UudjEuTGlzdFNlcnZpY2VBY2NvdW50c1Jlc3BvbnNlIgmQAgHC8xgCGAISbQoUQ3JlYXRlU2VydmljZUFjY291bnQSJS5ub2trdS52MS5DcmVhdGVTZXJ2aWNlQWNjb3VudFJlcXVlc3QaJi5ub2trdS52MS5DcmVhdGVTZXJ2aWNlQWNjb3VudFJlc3BvbnNlIgbC8xgCGAMSbQoUVXBkYXRlU2VydmljZUFjY291bnQSJS5ub2trdS52MS5VcGRhdGVTZXJ2aWNlQWNjb3VudFJlcXVlc3QaJi5ub2trdS52MS5VcGRhdGVTZXJ2aWNlQWNjb3VudFJlc3BvbnNlIgbC8xgCGAMSbQoURGVsZXRlU2VydmljZUFjY291bnQSJS5ub2trdS52MS5EZWxldGVTZXJ2aWNlQWNjb3VudFJlcXVlc3QaJi5ub2trdS52MS5EZWxldGVTZXJ2aWNlQWNjb3VudFJlc3BvbnNlIgbC8xgCGAMSfAoZUm90YXRlU2VydmljZUFjY291bnRUb2tlbhIqLm5va2t1LnYxLlJvdGF0ZVNlcnZpY2VBY2NvdW50VG9rZW5SZXF1ZXN0Gisubm9ra3UudjEuUm90YXRlU2VydmljZUFjY291bnRUb2tlblJlc3BvbnNlIgbC8xgCGANiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Ch5ub2trdS92MS9zZXJ2aWNlX2FjY291bnQucHJvdG8SCG5va2t1LnYxIoYCCg5TZXJ2aWNlQWNjb3VudBIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEiUKBHJvbGUYBCABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlEgwKBHRhZ3MYBSADKAkSMAoMbGFzdF91c2VkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLCAQoTU2VydmljZUFjY291bnRUb2tlbhIKCgJpZBgBIAEoCRINCgVsYWJlbBgCIAEoCRIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxsYXN0X3VzZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmNyZWF0ZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjAKGEdldFNlcnZpY2VBY2NvdW50UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiTgoZR2V0U2VydmljZUFjY291bnRSZXNwb25zZRIxCg9zZXJ2aWNlX2FjY291bnQYASABKAsyGC5ub2trdS52MS5TZXJ2aWNlQWNjb3VudCK4AQobQ3JlYXRlU2VydmljZUFjY291bnRSZXF1ZXN0EjUKBG5hbWUYASABKAlCJ7pIJHIiEAEYgAIyG15bYS16QS1aMC05XVthLXpBLVowLTktX10qJBIdCgtkZXNjcmlwdGlvbhgCIAEoCUIIukgFcgMY6AcSNQoEcm9sZRgDIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGVCDrpIC4IBCBgAGAEYAhgDEgwKBHRhZ3MYBCADKAkiUQocQ3JlYXRlU2VydmljZUFjY291bnRSZXNwb25zZRIxCg9zZXJ2aWNlX2FjY291bnQYASABKAsyGC5ub2trdS52MS5TZXJ2aWNlQWNjb3VudCLOAQobVXBkYXRlU2VydmljZUFjY291bnRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARI1CgRuYW1lGAIgASgJQie6SCRyIhABGIACMhteW2EtekEtWjAtOV1bYS16QS1aMC05LV9dKiQSHQoLZGVzY3JpcHRpb24YAyABKAlCCLpIBXIDGOgHEjUKBHJvbGUYBCABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlQg66SAuCAQgYABgBGAIYAxIMCgR0YWdzGAUgAygJIlEKHFVwZGF0ZVNlcnZpY2VBY2NvdW50UmVzcG9uc2USMQoPc2VydmljZV9hY2NvdW50GAEgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnQiMwobRGVsZXRlU2VydmljZUFjY291bnRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIeChxEZWxldGVTZXJ2aWNlQWNjb3VudFJlc3BvbnNlIp0BChpMaXN0U2VydmljZUFjY291bnRzUmVxdWVzdBIYCgVsaW1pdBgBIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgCIAEoBUIHukgEGgIoABINCgVxdWVyeRgDIAEoCRIvCgRyb2xlGAQgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZUIIukgFggECEAESDAoEdGFncxgFIAMoCSJgChtMaXN0U2VydmljZUFjY291bnRzUmVzcG9uc2USMgoQc2VydmljZV9hY2NvdW50cxgBIAMoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50Eg0KBXRvdGFsGAIgASgFIpABCiBDcmVhdGVTZXJ2aWNlQWNjb3VudFRva2VuUmVxdWVzdBIkChJzZXJ2aWNlX2FjY291bnRfaWQYASABKAlCCLpIBXIDsAEBEhYKBWxhYmVsGAIgASgJQge6SARyAhhkEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wImEKIUNyZWF0ZVNlcnZpY2VBY2NvdW50VG9rZW5SZXNwb25zZRIsCgV0b2tlbhgBIAEoCzIdLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50VG9rZW4SDgoGc2VjcmV0GAIgASgJIkcKH0xpc3RTZXJ2aWNlQWNjb3VudFRva2Vuc1JlcXVlc3QSJAoSc2VydmljZV9hY2NvdW50X2lkGAEgASgJQgi6SAVyA7ABASJRCiBMaXN0U2VydmljZUFjY291bnRUb2tlbnNSZXNwb25zZRItCgZ0b2tlbnMYASADKAsyHS5ub2trdS52MS5TZXJ2aWNlQWNjb3VudFRva2VuIl4KIFJldm9rZVNlcnZpY2VBY2NvdW50VG9rZW5SZXF1ZXN0EiQKEnNlcnZpY2VfYWNjb3VudF9pZBgBIAEoCUIIukgFcgOwAQESFAoCaWQYAiABKAlCCLpIBXIDsAEBIiMKIVJldm9rZVNlcnZpY2VBY2NvdW50VG9rZW5SZXNwb25zZTK2BwoVU2VydmljZUFjY291bnRTZXJ2aWNlEmcKEUdldFNlcnZpY2VBY2NvdW50EiIubm9ra3UudjEuR2V0U2VydmljZUFjY291bnRSZXF1ZXN0GiMubm9ra3UudjEuR2V0U2VydmljZUFjY291bnRSZXNwb25zZSIJkAIBwvMYAhgCEm0KE0xpc3RTZXJ2aWNlQWNjb3VudHMSJC5ub2trdS52MS5MaXN0U2VydmljZUFjY291bnRzUmVxdWVzdBolLm5va2t1LnYxLkxpc3RTZXJ2aWNlQWNjb3VudHNSZXNwb25zZSIJkAIBwvMYAhgCEm0KFENyZWF0ZVNlcnZpY2VBY2NvdW50EiUubm9ra3UudjEuQ3JlYXRlU2VydmljZUFjY291bnRSZXF1ZXN0GiYubm9ra3UudjEuQ3JlYXRlU2VydmljZUFjY291bnRSZXNwb25zZSIGwvMYAhgDEm0KFFVwZGF0ZVNlcnZpY2VBY2NvdW50EiUubm9ra3UudjEuVXBkYXRlU2VydmljZUFjY291bnRSZXF1ZXN0GiYubm9ra3UudjEuVXBkYXRlU2VydmljZUFjY291bnRSZXNwb25zZSIGwvMYAhgDEm0KFERlbGV0ZVNlcnZpY2VBY2NvdW50EiUubm9ra3UudjEuRGVsZXRlU2VydmljZUFjY291bnRSZXF1ZXN0GiYubm9ra3UudjEuRGVsZXRlU2VydmljZUFjY291bnRSZXNwb25zZSIGwvMYAhgDEnwKGUNyZWF0ZVNlcnZpY2VBY2NvdW50VG9rZW4SKi5ub2trdS52MS5DcmVhdGVTZXJ2aWNlQWNjb3VudFRva2VuUmVxdWVzdBorLm5va2t1LnYxLkNyZWF0ZVNlcnZpY2VBY2NvdW50VG9rZW5SZXNwb25zZSIGwvMYAhgDEnwKGExpc3RTZXJ2aWNlQWNjb3VudFRva2VucxIpLm5va2t1LnYxLkxpc3RTZXJ2aWNlQWNjb3VudFRva2Vuc1JlcXVlc3QaKi5ub2trdS52MS5MaXN0U2VydmljZUFjY291bnRUb2tlbnNSZXNwb25zZSIJkAIBwvMYAhgCEnwKGVJldm9rZVNlcnZpY2VBY2NvdW50VG9rZW4SKi5ub2trdS52MS5SZXZva2VTZXJ2aWNlQWNjb3VudFRva2VuUmVxdWVzdBorLm5va2t1LnYxLlJldm9rZVNlcnZpY2VBY2NvdW50VG9rZW5SZXNwb25zZSIGwvMYAhgDYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.ServiceAccount
@@ -47,24 +47,19 @@ export type ServiceAccount = Message<"nokku.v1.ServiceAccount"> & {
   tags: string[];
 
   /**
-   * When the token stops working. Unset never expires.
+   * The last time any of its tokens was used.
    *
-   * @generated from field: google.protobuf.Timestamp token_expires_at = 6;
-   */
-  tokenExpiresAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp last_used_at = 7;
+   * @generated from field: google.protobuf.Timestamp last_used_at = 6;
    */
   lastUsedAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp created_at = 8;
+   * @generated from field: google.protobuf.Timestamp created_at = 7;
    */
   createdAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 9;
+   * @generated from field: google.protobuf.Timestamp updated_at = 8;
    */
   updatedAt?: Timestamp | undefined;
 };
@@ -75,6 +70,45 @@ export type ServiceAccount = Message<"nokku.v1.ServiceAccount"> & {
  */
 export const ServiceAccountSchema: GenMessage<ServiceAccount> = /*@__PURE__*/
   messageDesc(file_nokku_v1_service_account, 0);
+
+/**
+ * @generated from message nokku.v1.ServiceAccountToken
+ */
+export type ServiceAccountToken = Message<"nokku.v1.ServiceAccountToken"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string label = 2;
+   */
+  label: string;
+
+  /**
+   * Unset never expires.
+   *
+   * @generated from field: google.protobuf.Timestamp expires_at = 3;
+   */
+  expiresAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp last_used_at = 4;
+   */
+  lastUsedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 5;
+   */
+  createdAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.ServiceAccountToken.
+ * Use `create(ServiceAccountTokenSchema)` to create a new message.
+ */
+export const ServiceAccountTokenSchema: GenMessage<ServiceAccountToken> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_service_account, 1);
 
 /**
  * @generated from message nokku.v1.GetServiceAccountRequest
@@ -91,7 +125,7 @@ export type GetServiceAccountRequest = Message<"nokku.v1.GetServiceAccountReques
  * Use `create(GetServiceAccountRequestSchema)` to create a new message.
  */
 export const GetServiceAccountRequestSchema: GenMessage<GetServiceAccountRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_service_account, 1);
+  messageDesc(file_nokku_v1_service_account, 2);
 
 /**
  * @generated from message nokku.v1.GetServiceAccountResponse
@@ -108,7 +142,7 @@ export type GetServiceAccountResponse = Message<"nokku.v1.GetServiceAccountRespo
  * Use `create(GetServiceAccountResponseSchema)` to create a new message.
  */
 export const GetServiceAccountResponseSchema: GenMessage<GetServiceAccountResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_service_account, 2);
+  messageDesc(file_nokku_v1_service_account, 3);
 
 /**
  * @generated from message nokku.v1.CreateServiceAccountRequest
@@ -136,11 +170,6 @@ export type CreateServiceAccountRequest = Message<"nokku.v1.CreateServiceAccount
    * @generated from field: repeated string tags = 4;
    */
   tags: string[];
-
-  /**
-   * @generated from field: google.protobuf.Timestamp token_expires_at = 5;
-   */
-  tokenExpiresAt?: Timestamp | undefined;
 };
 
 /**
@@ -148,7 +177,7 @@ export type CreateServiceAccountRequest = Message<"nokku.v1.CreateServiceAccount
  * Use `create(CreateServiceAccountRequestSchema)` to create a new message.
  */
 export const CreateServiceAccountRequestSchema: GenMessage<CreateServiceAccountRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_service_account, 3);
+  messageDesc(file_nokku_v1_service_account, 4);
 
 /**
  * @generated from message nokku.v1.CreateServiceAccountResponse
@@ -158,11 +187,6 @@ export type CreateServiceAccountResponse = Message<"nokku.v1.CreateServiceAccoun
    * @generated from field: nokku.v1.ServiceAccount service_account = 1;
    */
   serviceAccount?: ServiceAccount | undefined;
-
-  /**
-   * @generated from field: string token = 2;
-   */
-  token: string;
 };
 
 /**
@@ -170,7 +194,7 @@ export type CreateServiceAccountResponse = Message<"nokku.v1.CreateServiceAccoun
  * Use `create(CreateServiceAccountResponseSchema)` to create a new message.
  */
 export const CreateServiceAccountResponseSchema: GenMessage<CreateServiceAccountResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_service_account, 4);
+  messageDesc(file_nokku_v1_service_account, 5);
 
 /**
  * @generated from message nokku.v1.UpdateServiceAccountRequest
@@ -211,7 +235,7 @@ export type UpdateServiceAccountRequest = Message<"nokku.v1.UpdateServiceAccount
  * Use `create(UpdateServiceAccountRequestSchema)` to create a new message.
  */
 export const UpdateServiceAccountRequestSchema: GenMessage<UpdateServiceAccountRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_service_account, 5);
+  messageDesc(file_nokku_v1_service_account, 6);
 
 /**
  * @generated from message nokku.v1.UpdateServiceAccountResponse
@@ -228,7 +252,7 @@ export type UpdateServiceAccountResponse = Message<"nokku.v1.UpdateServiceAccoun
  * Use `create(UpdateServiceAccountResponseSchema)` to create a new message.
  */
 export const UpdateServiceAccountResponseSchema: GenMessage<UpdateServiceAccountResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_service_account, 6);
+  messageDesc(file_nokku_v1_service_account, 7);
 
 /**
  * @generated from message nokku.v1.DeleteServiceAccountRequest
@@ -245,7 +269,7 @@ export type DeleteServiceAccountRequest = Message<"nokku.v1.DeleteServiceAccount
  * Use `create(DeleteServiceAccountRequestSchema)` to create a new message.
  */
 export const DeleteServiceAccountRequestSchema: GenMessage<DeleteServiceAccountRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_service_account, 7);
+  messageDesc(file_nokku_v1_service_account, 8);
 
 /**
  * @generated from message nokku.v1.DeleteServiceAccountResponse
@@ -258,54 +282,7 @@ export type DeleteServiceAccountResponse = Message<"nokku.v1.DeleteServiceAccoun
  * Use `create(DeleteServiceAccountResponseSchema)` to create a new message.
  */
 export const DeleteServiceAccountResponseSchema: GenMessage<DeleteServiceAccountResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_service_account, 8);
-
-/**
- * @generated from message nokku.v1.RotateServiceAccountTokenRequest
- */
-export type RotateServiceAccountTokenRequest = Message<"nokku.v1.RotateServiceAccountTokenRequest"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
-
-  /**
-   * The expiry is replaced as sent. Leaving it out means the new token never
-   * expires.
-   *
-   * @generated from field: google.protobuf.Timestamp token_expires_at = 2;
-   */
-  tokenExpiresAt?: Timestamp | undefined;
-};
-
-/**
- * Describes the message nokku.v1.RotateServiceAccountTokenRequest.
- * Use `create(RotateServiceAccountTokenRequestSchema)` to create a new message.
- */
-export const RotateServiceAccountTokenRequestSchema: GenMessage<RotateServiceAccountTokenRequest> = /*@__PURE__*/
   messageDesc(file_nokku_v1_service_account, 9);
-
-/**
- * @generated from message nokku.v1.RotateServiceAccountTokenResponse
- */
-export type RotateServiceAccountTokenResponse = Message<"nokku.v1.RotateServiceAccountTokenResponse"> & {
-  /**
-   * @generated from field: nokku.v1.ServiceAccount service_account = 1;
-   */
-  serviceAccount?: ServiceAccount | undefined;
-
-  /**
-   * @generated from field: string token = 2;
-   */
-  token: string;
-};
-
-/**
- * Describes the message nokku.v1.RotateServiceAccountTokenResponse.
- * Use `create(RotateServiceAccountTokenResponseSchema)` to create a new message.
- */
-export const RotateServiceAccountTokenResponseSchema: GenMessage<RotateServiceAccountTokenResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_service_account, 10);
 
 /**
  * @generated from message nokku.v1.ListServiceAccountsRequest
@@ -342,7 +319,7 @@ export type ListServiceAccountsRequest = Message<"nokku.v1.ListServiceAccountsRe
  * Use `create(ListServiceAccountsRequestSchema)` to create a new message.
  */
 export const ListServiceAccountsRequestSchema: GenMessage<ListServiceAccountsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_service_account, 11);
+  messageDesc(file_nokku_v1_service_account, 10);
 
 /**
  * @generated from message nokku.v1.ListServiceAccountsResponse
@@ -364,9 +341,133 @@ export type ListServiceAccountsResponse = Message<"nokku.v1.ListServiceAccountsR
  * Use `create(ListServiceAccountsResponseSchema)` to create a new message.
  */
 export const ListServiceAccountsResponseSchema: GenMessage<ListServiceAccountsResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_service_account, 11);
+
+/**
+ * @generated from message nokku.v1.CreateServiceAccountTokenRequest
+ */
+export type CreateServiceAccountTokenRequest = Message<"nokku.v1.CreateServiceAccountTokenRequest"> & {
+  /**
+   * @generated from field: string service_account_id = 1;
+   */
+  serviceAccountId: string;
+
+  /**
+   * @generated from field: string label = 2;
+   */
+  label: string;
+
+  /**
+   * Unset never expires.
+   *
+   * @generated from field: google.protobuf.Timestamp expires_at = 3;
+   */
+  expiresAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.CreateServiceAccountTokenRequest.
+ * Use `create(CreateServiceAccountTokenRequestSchema)` to create a new message.
+ */
+export const CreateServiceAccountTokenRequestSchema: GenMessage<CreateServiceAccountTokenRequest> = /*@__PURE__*/
   messageDesc(file_nokku_v1_service_account, 12);
 
 /**
+ * @generated from message nokku.v1.CreateServiceAccountTokenResponse
+ */
+export type CreateServiceAccountTokenResponse = Message<"nokku.v1.CreateServiceAccountTokenResponse"> & {
+  /**
+   * @generated from field: nokku.v1.ServiceAccountToken token = 1;
+   */
+  token?: ServiceAccountToken | undefined;
+
+  /**
+   * @generated from field: string secret = 2;
+   */
+  secret: string;
+};
+
+/**
+ * Describes the message nokku.v1.CreateServiceAccountTokenResponse.
+ * Use `create(CreateServiceAccountTokenResponseSchema)` to create a new message.
+ */
+export const CreateServiceAccountTokenResponseSchema: GenMessage<CreateServiceAccountTokenResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_service_account, 13);
+
+/**
+ * @generated from message nokku.v1.ListServiceAccountTokensRequest
+ */
+export type ListServiceAccountTokensRequest = Message<"nokku.v1.ListServiceAccountTokensRequest"> & {
+  /**
+   * @generated from field: string service_account_id = 1;
+   */
+  serviceAccountId: string;
+};
+
+/**
+ * Describes the message nokku.v1.ListServiceAccountTokensRequest.
+ * Use `create(ListServiceAccountTokensRequestSchema)` to create a new message.
+ */
+export const ListServiceAccountTokensRequestSchema: GenMessage<ListServiceAccountTokensRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_service_account, 14);
+
+/**
+ * @generated from message nokku.v1.ListServiceAccountTokensResponse
+ */
+export type ListServiceAccountTokensResponse = Message<"nokku.v1.ListServiceAccountTokensResponse"> & {
+  /**
+   * @generated from field: repeated nokku.v1.ServiceAccountToken tokens = 1;
+   */
+  tokens: ServiceAccountToken[];
+};
+
+/**
+ * Describes the message nokku.v1.ListServiceAccountTokensResponse.
+ * Use `create(ListServiceAccountTokensResponseSchema)` to create a new message.
+ */
+export const ListServiceAccountTokensResponseSchema: GenMessage<ListServiceAccountTokensResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_service_account, 15);
+
+/**
+ * @generated from message nokku.v1.RevokeServiceAccountTokenRequest
+ */
+export type RevokeServiceAccountTokenRequest = Message<"nokku.v1.RevokeServiceAccountTokenRequest"> & {
+  /**
+   * @generated from field: string service_account_id = 1;
+   */
+  serviceAccountId: string;
+
+  /**
+   * @generated from field: string id = 2;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message nokku.v1.RevokeServiceAccountTokenRequest.
+ * Use `create(RevokeServiceAccountTokenRequestSchema)` to create a new message.
+ */
+export const RevokeServiceAccountTokenRequestSchema: GenMessage<RevokeServiceAccountTokenRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_service_account, 16);
+
+/**
+ * @generated from message nokku.v1.RevokeServiceAccountTokenResponse
+ */
+export type RevokeServiceAccountTokenResponse = Message<"nokku.v1.RevokeServiceAccountTokenResponse"> & {
+};
+
+/**
+ * Describes the message nokku.v1.RevokeServiceAccountTokenResponse.
+ * Use `create(RevokeServiceAccountTokenResponseSchema)` to create a new message.
+ */
+export const RevokeServiceAccountTokenResponseSchema: GenMessage<RevokeServiceAccountTokenResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_service_account, 17);
+
+/**
+ * A service account is an identity for automation. It holds any number of
+ * tokens, each with its own label and expiry, so a new one can be rolled out
+ * before the old one is revoked.
+ *
  * @generated from service nokku.v1.ServiceAccountService
  */
 export const ServiceAccountService: GenService<{
@@ -411,14 +512,33 @@ export const ServiceAccountService: GenService<{
     output: typeof DeleteServiceAccountResponseSchema;
   },
   /**
-   * The old token stops working with the call. Grants and the id stay.
+   * The secret is shown once, in the response.
    *
-   * @generated from rpc nokku.v1.ServiceAccountService.RotateServiceAccountToken
+   * @generated from rpc nokku.v1.ServiceAccountService.CreateServiceAccountToken
    */
-  rotateServiceAccountToken: {
+  createServiceAccountToken: {
     methodKind: "unary";
-    input: typeof RotateServiceAccountTokenRequestSchema;
-    output: typeof RotateServiceAccountTokenResponseSchema;
+    input: typeof CreateServiceAccountTokenRequestSchema;
+    output: typeof CreateServiceAccountTokenResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.ServiceAccountService.ListServiceAccountTokens
+   */
+  listServiceAccountTokens: {
+    methodKind: "unary";
+    input: typeof ListServiceAccountTokensRequestSchema;
+    output: typeof ListServiceAccountTokensResponseSchema;
+  },
+  /**
+   * The token stops working with the call. The account and its other tokens
+   * stay.
+   *
+   * @generated from rpc nokku.v1.ServiceAccountService.RevokeServiceAccountToken
+   */
+  revokeServiceAccountToken: {
+    methodKind: "unary";
+    input: typeof RevokeServiceAccountTokenRequestSchema;
+    output: typeof RevokeServiceAccountTokenResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_nokku_v1_service_account, 0);

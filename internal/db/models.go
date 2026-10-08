@@ -11,6 +11,25 @@ import (
 	nokku "github.com/nokku-sh/protos/gen/nokku/v1"
 )
 
+type AccessToken struct {
+	ID               string             `json:"id"`
+	TokenHash        crypto.HashedToken `json:"tokenHash"`
+	WorkspaceID      string             `json:"workspaceId"`
+	Kind             string             `json:"kind"`
+	UserID           *string            `json:"userId"`
+	ServiceAccountID *string            `json:"serviceAccountId"`
+	DaemonID         *string            `json:"daemonId"`
+	SubjectID        *string            `json:"subjectId"`
+	Method           string             `json:"method"`
+	Binding          string             `json:"binding"`
+	Label            string             `json:"label"`
+	Ip               string             `json:"ip"`
+	UserAgent        string             `json:"userAgent"`
+	ExpiresAt        *time.Time         `json:"expiresAt"`
+	LastSeenAt       *time.Time         `json:"lastSeenAt"`
+	CreatedAt        time.Time          `json:"createdAt"`
+}
+
 type AuditAuditLog struct {
 	ID          string    `json:"id"`
 	Timestamp   time.Time `json:"timestamp"`
@@ -69,6 +88,22 @@ type InstanceLicense struct {
 	ID        int32     `json:"id"`
 	Key       string    `json:"key"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type JoinToken struct {
+	ID          string               `json:"id"`
+	WorkspaceID string               `json:"workspaceId"`
+	Kind        nokku.JoinTokenKind  `json:"kind"`
+	Label       string               `json:"label"`
+	TokenHash   crypto.HashedToken   `json:"tokenHash"`
+	ExpiresAt   *time.Time           `json:"expiresAt"`
+	MaxUses     *int32               `json:"maxUses"`
+	Uses        int32                `json:"uses"`
+	AutoApprove bool                 `json:"autoApprove"`
+	CaID        *string              `json:"caId"`
+	Role        *nokku.WorkspaceRole `json:"role"`
+	CreatedAt   time.Time            `json:"createdAt"`
+	LastUsedAt  *time.Time           `json:"lastUsedAt"`
 }
 
 type Keyset struct {
@@ -144,43 +179,15 @@ type SSHCA struct {
 	UpdatedAt            time.Time                  `json:"updatedAt"`
 }
 
-type ScimToken struct {
-	ID          string             `json:"id"`
-	WorkspaceID string             `json:"workspaceId"`
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-	Label       string             `json:"label"`
-	CreatedAt   time.Time          `json:"createdAt"`
-	LastUsedAt  *time.Time         `json:"lastUsedAt"`
-}
-
 type ServiceAccount struct {
-	ID             string              `json:"id"`
-	WorkspaceID    string              `json:"workspaceId"`
-	Name           string              `json:"name"`
-	Description    *string             `json:"description"`
-	TokenHash      *crypto.HashedToken `json:"tokenHash"`
-	Role           nokku.WorkspaceRole `json:"role"`
-	LastUsedAt     *time.Time          `json:"lastUsedAt"`
-	TokenExpiresAt *time.Time          `json:"tokenExpiresAt"`
-	Tags           []string            `json:"tags"`
-	CreatedAt      time.Time           `json:"createdAt"`
-	UpdatedAt      time.Time           `json:"updatedAt"`
-}
-
-type Session struct {
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-	WorkspaceID string             `json:"workspaceId"`
-	SubjectID   string             `json:"subjectId"`
-	UserID      *string            `json:"userId"`
-	Kind        string             `json:"kind"`
-	Method      string             `json:"method"`
-	Binding     string             `json:"binding"`
-	Label       string             `json:"label"`
-	Ip          string             `json:"ip"`
-	UserAgent   string             `json:"userAgent"`
-	ExpiresAt   *time.Time         `json:"expiresAt"`
-	LastSeenAt  *time.Time         `json:"lastSeenAt"`
-	CreatedAt   time.Time          `json:"createdAt"`
+	ID          string              `json:"id"`
+	WorkspaceID string              `json:"workspaceId"`
+	Name        string              `json:"name"`
+	Description *string             `json:"description"`
+	Role        nokku.WorkspaceRole `json:"role"`
+	Tags        []string            `json:"tags"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	UpdatedAt   time.Time           `json:"updatedAt"`
 }
 
 type SsoProvider struct {
@@ -272,20 +279,4 @@ type WorkspaceSubscription struct {
 	Seats             int64      `json:"seats"`
 	EndedAt           *time.Time `json:"endedAt"`
 	UpdatedAt         time.Time  `json:"updatedAt"`
-}
-
-type WorkspaceToken struct {
-	ID          string               `json:"id"`
-	WorkspaceID string               `json:"workspaceId"`
-	Kind        nokku.TokenKind      `json:"kind"`
-	Label       string               `json:"label"`
-	TokenHash   crypto.HashedToken   `json:"tokenHash"`
-	ExpiresAt   *time.Time           `json:"expiresAt"`
-	MaxUses     *int32               `json:"maxUses"`
-	Uses        int32                `json:"uses"`
-	AutoApprove bool                 `json:"autoApprove"`
-	CaID        *string              `json:"caId"`
-	Role        *nokku.WorkspaceRole `json:"role"`
-	CreatedAt   time.Time            `json:"createdAt"`
-	LastUsedAt  *time.Time           `json:"lastUsedAt"`
 }

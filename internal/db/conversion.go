@@ -111,23 +111,46 @@ func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
 		return nil
 	}
 	return &nokkuv1.ServiceAccount{
-		Id:             &s.ID,
-		Name:           &s.Name,
-		Description:    s.Description,
-		Role:           &s.Role,
-		Tags:           s.Tags,
-		TokenExpiresAt: SafeTimestamp(s.TokenExpiresAt),
-		LastUsedAt:     SafeTimestamp(s.LastUsedAt),
-		CreatedAt:      SafeTimestamp(&s.CreatedAt),
-		UpdatedAt:      SafeTimestamp(&s.UpdatedAt),
+		Id:          &s.ID,
+		Name:        &s.Name,
+		Description: s.Description,
+		Role:        &s.Role,
+		Tags:        s.Tags,
+		CreatedAt:   SafeTimestamp(&s.CreatedAt),
+		UpdatedAt:   SafeTimestamp(&s.UpdatedAt),
 	}
 }
 
+func (r *GetServiceAccountRow) ToProto() *nokkuv1.ServiceAccount {
+	return withLastUsed(r.ServiceAccount.ToProto(), r.LastUsedAt)
+}
+
 func ServiceAccountsToProto(rows []*ListServiceAccountsRow) []*nokkuv1.ServiceAccount {
-	return mapSlice(
-		rows,
-		func(r *ListServiceAccountsRow) *nokkuv1.ServiceAccount { return r.ServiceAccount.ToProto() },
-	)
+	return mapSlice(rows, func(r *ListServiceAccountsRow) *nokkuv1.ServiceAccount {
+		return withLastUsed(r.ServiceAccount.ToProto(), r.LastUsedAt)
+	})
+}
+
+// The query reads an account never used as the zero time.
+func withLastUsed(p *nokkuv1.ServiceAccount, t time.Time) *nokkuv1.ServiceAccount {
+	if !t.IsZero() {
+		p.LastUsedAt = SafeTimestamp(&t)
+	}
+	return p
+}
+
+func (t *AccessToken) ToServiceAccountToken() *nokkuv1.ServiceAccountToken {
+	return &nokkuv1.ServiceAccountToken{
+		Id:         &t.ID,
+		Label:      &t.Label,
+		ExpiresAt:  SafeTimestamp(t.ExpiresAt),
+		LastUsedAt: SafeTimestamp(t.LastSeenAt),
+		CreatedAt:  SafeTimestamp(&t.CreatedAt),
+	}
+}
+
+func ServiceAccountTokensToProto(ts []*AccessToken) []*nokkuv1.ServiceAccountToken {
+	return mapSlice(ts, func(t *AccessToken) *nokkuv1.ServiceAccountToken { return t.ToServiceAccountToken() })
 }
 
 func (t *Target) ToProto() *nokkuv1.Target {
@@ -325,8 +348,8 @@ func TargetAccountsToProto(rows []*ListTargetAccountsRow) []*nokkuv1.TargetAccou
 	return mapSlice(rows, func(r *ListTargetAccountsRow) *nokkuv1.TargetAccount { return r.ToProto() })
 }
 
-func (t *WorkspaceToken) ToProto() *nokkuv1.Token {
-	return &nokkuv1.Token{
+func (t *JoinToken) ToProto() *nokkuv1.JoinToken {
+	return &nokkuv1.JoinToken{
 		Id:          &t.ID,
 		Kind:        &t.Kind,
 		Label:       &t.Label,
@@ -341,6 +364,6 @@ func (t *WorkspaceToken) ToProto() *nokkuv1.Token {
 	}
 }
 
-func TokensToProto(ts []*WorkspaceToken) []*nokkuv1.Token {
-	return mapSlice(ts, func(t *WorkspaceToken) *nokkuv1.Token { return t.ToProto() })
+func JoinTokensToProto(ts []*JoinToken) []*nokkuv1.JoinToken {
+	return mapSlice(ts, func(t *JoinToken) *nokkuv1.JoinToken { return t.ToProto() })
 }

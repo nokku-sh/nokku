@@ -31,6 +31,7 @@ const (
 	MethodMagicLink Method = "magic_link"
 	MethodOIDC      Method = "oidc"
 	MethodDevice    Method = "device"
+	MethodToken     Method = "token" // a key made by hand, shown once
 	MethodSCIM      Method = "scim"
 )
 

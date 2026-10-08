@@ -275,9 +275,9 @@ func TestRedeemTokenOnce(t *testing.T) {
 	id := uuid.NewV7().String()
 	hash := crypto.HashedToken("h-" + id)
 	asOwner(t, c, f, func(q *db.Queries) error {
-		_, err := q.CreateWorkspaceToken(t.Context(), &db.CreateWorkspaceTokenParams{
+		_, err := q.CreateJoinToken(t.Context(), &db.CreateJoinTokenParams{
 			ID:        id,
-			Kind:      nokkuv1.TokenKind_TOKEN_KIND_INVITE,
+			Kind:      nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE,
 			TokenHash: hash,
 			MaxUses:   new(int32(1)),
 			Role:      new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER),
@@ -290,8 +290,8 @@ func TestRedeemTokenOnce(t *testing.T) {
 	var wg sync.WaitGroup
 	for range n {
 		wg.Go(func() {
-			_, err := c.Sys().RedeemToken(t.Context(), &db.RedeemTokenParams{
-				ID: id, Kind: nokkuv1.TokenKind_TOKEN_KIND_INVITE, TokenHash: hash,
+			_, err := c.Sys().RedeemJoinToken(t.Context(), &db.RedeemJoinTokenParams{
+				ID: id, Kind: nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE, TokenHash: hash,
 			})
 			if err == nil {
 				wins.Add(1)

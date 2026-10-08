@@ -175,7 +175,7 @@ calls `SyncDaemon`.
   never polls a list.
 - The workspace on the context (`actor.Workspace`) only holds what never
   changes: id, slug, base URL. Read the name and the settings from the row.
-- Every row in `sessions` is a credential. What only remembers something
+- Every row in `access_tokens` is a credential. What only remembers something
   about an account, like the browsers and terminals in `known_devices`, gets
   a table of its own, so nothing has to tell it apart from a login.
 - A new RPC means a proto edit in `../protos` with its `(access)` option,

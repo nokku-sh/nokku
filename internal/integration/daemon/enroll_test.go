@@ -27,7 +27,7 @@ type fixture struct {
 
 // enrollToken connects to the test database and mints an enroll token in a
 // fresh workspace. tweak adjusts the token row.
-func enrollToken(t *testing.T, tweak func(*db.CreateWorkspaceTokenParams)) (fixture, string) {
+func enrollToken(t *testing.T, tweak func(*db.CreateJoinTokenParams)) (fixture, string) {
 	t.Helper()
 	// The connection lives as long as its context, so it gets the test's.
 	ctx := t.Context()
@@ -45,9 +45,9 @@ func enrollToken(t *testing.T, tweak func(*db.CreateWorkspaceTokenParams)) (fixt
 		}); err != nil {
 			return err
 		}
-		params := &db.CreateWorkspaceTokenParams{
+		params := &db.CreateJoinTokenParams{
 			ID:   uuid.NewV7().String(),
-			Kind: nokkuv1.TokenKind_TOKEN_KIND_ENROLL,
+			Kind: nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL,
 		}
 		token := crypto.NewToken(params.ID)
 		params.TokenHash = token.Hash
@@ -55,7 +55,7 @@ func enrollToken(t *testing.T, tweak func(*db.CreateWorkspaceTokenParams)) (fixt
 		if tweak != nil {
 			tweak(params)
 		}
-		_, err = q.CreateWorkspaceToken(ctx, params)
+		_, err = q.CreateJoinToken(ctx, params)
 		return err
 	})
 	if err != nil {
@@ -137,7 +137,7 @@ func TestEnrollQuotaOnlyForNewMachines(t *testing.T) {
 // Only new daemons spend uses, so a one-use token still lets its machine
 // re-enroll but turns the next machine away.
 func TestEnrollMaxUses(t *testing.T) {
-	f, token := enrollToken(t, func(p *db.CreateWorkspaceTokenParams) {
+	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) {
 		p.MaxUses = new(int32(1))
 	})
 	first := daemon.EnrollInput{Token: token, Binding: uuid.NewV7().String()}
@@ -153,7 +153,7 @@ func TestEnrollMaxUses(t *testing.T) {
 }
 
 func TestEnrollExpiredToken(t *testing.T) {
-	f, token := enrollToken(t, func(p *db.CreateWorkspaceTokenParams) {
+	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) {
 		p.ExpiresAt = new(time.Now().Add(-time.Minute))
 	})
 	if _, err := enroll(t, f, daemon.EnrollInput{Token: token}); !errors.Is(err, daemon.ErrEnrollToken) {
@@ -168,7 +168,7 @@ func TestEnrollAutoApprove(t *testing.T) {
 		t.Fatalf("plain token: status %v, err %v, want pending", out.Status, err)
 	}
 
-	f, approved := enrollToken(t, func(p *db.CreateWorkspaceTokenParams) { p.AutoApprove = true })
+	f, approved := enrollToken(t, func(p *db.CreateJoinTokenParams) { p.AutoApprove = true })
 	out, err = enroll(t, f, daemon.EnrollInput{Token: approved})
 	if err != nil || out.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
 		t.Fatalf("auto-approve token: status %v, err %v, want accepted", out.Status, err)

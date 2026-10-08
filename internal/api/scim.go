@@ -20,16 +20,19 @@ func (s *scimService) CreateSCIMToken(
 	ctx context.Context,
 	req *nokkuv1.CreateSCIMTokenRequest,
 ) (*nokkuv1.CreateSCIMTokenResponse, error) {
-	tok, plaintext, err := s.cfg.IAM.IssueSCIMToken(ctx, req.GetLabel())
+	tok, plaintext, err := s.cfg.IAM.IssueToken(ctx, iam.TokenParams{
+		Kind:   actor.KindSCIM,
+		Method: iam.MethodSCIM,
+		Label:  req.GetLabel(),
+	})
 	if err != nil {
 		return nil, err
 	}
-	entry := scimTokenToProto(tok)
-	audit.SetTarget(ctx, entry.GetId())
+	audit.SetTarget(ctx, tok.ID)
 	ws, _ := actor.WorkspaceFromContext(ctx)
 	return &nokkuv1.CreateSCIMTokenResponse{
 		Token:   &plaintext,
-		Entry:   entry,
+		Entry:   scimTokenToProto(tok),
 		BaseUrl: new(ws.BaseURL + "/scim/v2"),
 	}, nil
 }
@@ -38,7 +41,7 @@ func (s *scimService) ListSCIMTokens(
 	ctx context.Context,
 	_ *nokkuv1.ListSCIMTokensRequest,
 ) (*nokkuv1.ListSCIMTokensResponse, error) {
-	tokens, err := s.cfg.IAM.ListSCIMTokens(ctx)
+	tokens, err := s.cfg.Conn.Tenant().ListSCIMTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -53,17 +56,17 @@ func (s *scimService) DeleteSCIMToken(
 	ctx context.Context,
 	req *nokkuv1.DeleteSCIMTokenRequest,
 ) (*nokkuv1.DeleteSCIMTokenResponse, error) {
-	if err := s.cfg.IAM.RevokeSCIMToken(ctx, req.GetTokenId()); err != nil {
+	if err := s.cfg.Conn.Tenant().DeleteSCIMToken(ctx, req.GetId()); err != nil {
 		return nil, err
 	}
 	return &nokkuv1.DeleteSCIMTokenResponse{}, nil
 }
 
-func scimTokenToProto(t iam.SCIMToken) *nokkuv1.SCIMToken {
+func scimTokenToProto(t *db.AccessToken) *nokkuv1.SCIMToken {
 	return &nokkuv1.SCIMToken{
 		Id:         &t.ID,
 		Label:      &t.Label,
 		CreatedAt:  db.SafeTimestamp(&t.CreatedAt),
-		LastUsedAt: db.SafeTimestamp(t.LastUsedAt),
+		LastUsedAt: db.SafeTimestamp(t.LastSeenAt),
 	}
 }

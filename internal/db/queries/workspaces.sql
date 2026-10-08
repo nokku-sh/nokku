@@ -62,9 +62,10 @@ WHERE
     SELECT
       1
     FROM
-      sessions s
+      access_tokens s
     WHERE
       s.workspace_id = w.id
+      AND s.kind IN ('user', 'cli')
   )
   AND NOT EXISTS (
     SELECT

@@ -28,7 +28,9 @@ type scimClient struct {
 
 func (e *testEnv) scim(t *testing.T, o org) *scimClient {
 	t.Helper()
-	_, token, err := e.svc.IssueSCIMToken(as(t.Context(), o.ws, o.owner), "okta")
+	_, token, err := e.svc.IssueToken(as(t.Context(), o.ws, o.owner), iam.TokenParams{
+		Kind: actor.KindSCIM, Method: iam.MethodSCIM, Label: "okta",
+	})
 	require.NoError(t, err)
 	return &scimClient{t: t, svc: e.svc, ws: o.ws, token: token}
 }
@@ -95,7 +97,7 @@ func TestSCIMAuth(t *testing.T) {
 
 	cb.token = ca.token // a's token presented on b's host
 	assert.Equal(t, http.StatusUnauthorized, cb.do(http.MethodGet, "/Users", nil, nil), "foreign token")
-	ca.token = "nokku_bogus"
+	ca.token = "nk_scim_bogus"
 	assert.Equal(t, http.StatusUnauthorized, ca.do(http.MethodGet, "/Users", nil, nil), "bogus token")
 }
 

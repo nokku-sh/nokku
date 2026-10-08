@@ -369,7 +369,7 @@ func (s *daemonControlService) UnenrollDaemon(
 		if _, err := q.DeleteDaemon(ctx, daemonID); err != nil {
 			return err
 		}
-		_, err := q.DeleteSubjectSessions(ctx, daemonID)
+		_, err := q.DeleteSubjectTokens(ctx, daemonID)
 		return err
 	}); err != nil {
 		return nil, err

@@ -113,32 +113,6 @@ CREATE INDEX idx_one_time_tokens_expiry ON one_time_tokens (expires_at);
 
 CREATE INDEX idx_one_time_tokens_user ON one_time_tokens (user_id, purpose);
 
--- Every row is a credential. What only remembers a device lives in
--- known_devices, so nothing here ever has to be told apart from a login.
-CREATE TABLE IF NOT EXISTS sessions (
-  token_hash TEXT NOT NULL PRIMARY KEY,
-  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  subject_id UUID NOT NULL, -- user id, or daemon id
-  -- A daemon's session has to outlive the daemon: it is what the host gets
-  -- its REJECTED answer through, and SyncDaemon removes it with that answer.
-  user_id UUID,
-  kind TEXT NOT NULL CHECK (kind IN ('user', 'cli', 'daemon')),
-  CHECK ((kind = 'daemon') = (user_id IS NULL)),
-  method TEXT NOT NULL, -- passkey, magic_link, oidc, device
-  binding TEXT NOT NULL DEFAULT '', -- DPoP JWK thumbprint, empty for cookie sessions
-  label TEXT NOT NULL DEFAULT '', -- the name the new sign-in mail gives a terminal
-  ip TEXT NOT NULL DEFAULT '', -- of the request that created the session
-  user_agent TEXT NOT NULL DEFAULT '', -- of the request that created the session
-  expires_at TIMESTAMPTZ, -- NULL = non-expiring (daemons re-auth via DPoP proofs)
-  last_seen_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_sessions_subject ON sessions (subject_id);
-
-CREATE INDEX idx_sessions_workspace ON sessions (workspace_id);
-
 -- Browsers and terminals an account has signed in from. They show in the
 -- "where you're signed in" list, and a sign-in from one that is not here
 -- yet is mailed to the account. A row never signs anyone in.
@@ -173,33 +147,60 @@ CREATE TABLE IF NOT EXISTS sso_providers (
   PRIMARY KEY (workspace_id, provider_id)
 );
 
-CREATE TABLE IF NOT EXISTS scim_tokens (
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
-  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  token_hash TEXT NOT NULL UNIQUE,
-  label TEXT NOT NULL DEFAULT '',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  last_used_at TIMESTAMPTZ
-);
-
-CREATE INDEX idx_scim_tokens_workspace_id ON scim_tokens (workspace_id);
-
 -- Access ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS service_accounts (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL, -- e.g., "github-actions-deploy", "ansible-prod"
   description TEXT,
-  token_hash TEXT UNIQUE, -- bearer credential for the service account (HashedToken)
   role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 3), -- like users.role, the editor at most
-  last_used_at TIMESTAMPTZ,
-  token_expires_at TIMESTAMPTZ, -- NULL never expires
   tags TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name),
   UNIQUE (workspace_id, id)
 );
+
+-- Everything that authenticates a call: browser and CLI sessions, daemon
+-- sessions, service account keys, SCIM tokens. Every row is a credential.
+-- What only remembers a device lives in known_devices, so nothing here ever
+-- has to be told apart from a login.
+CREATE TABLE IF NOT EXISTS access_tokens (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  token_hash TEXT NOT NULL UNIQUE,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('user', 'cli', 'daemon', 'service_account', 'scim')),
+  -- One subject column per kind, none for scim. A daemon's token has to
+  -- outlive the daemon: it is what the host gets its REJECTED answer
+  -- through, and SyncDaemon removes it with that answer, so no foreign key.
+  user_id UUID,
+  service_account_id UUID,
+  daemon_id UUID,
+  subject_id UUID GENERATED ALWAYS AS (COALESCE(user_id, service_account_id, daemon_id)) STORED,
+  method TEXT NOT NULL, -- passkey, magic_link, oidc, device, token, scim
+  binding TEXT NOT NULL DEFAULT '', -- DPoP JWK thumbprint, empty for cookie sessions and keys
+  label TEXT NOT NULL DEFAULT '', -- the name the new sign-in mail gives a terminal, or the key's label
+  ip TEXT NOT NULL DEFAULT '', -- of the request that created the token
+  user_agent TEXT NOT NULL DEFAULT '', -- of the request that created the token
+  expires_at TIMESTAMPTZ, -- NULL never expires (daemons re-auth via DPoP proofs)
+  last_seen_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, service_account_id) REFERENCES service_accounts (workspace_id, id) ON DELETE CASCADE,
+  CHECK (num_nonnulls (user_id, service_account_id, daemon_id) <= 1),
+  CHECK ((kind = 'scim') = (num_nonnulls (user_id, service_account_id, daemon_id) = 0)),
+  CHECK ((kind IN ('user', 'cli')) = (user_id IS NOT NULL)),
+  CHECK ((kind = 'daemon') = (daemon_id IS NOT NULL)),
+  CHECK ((kind = 'service_account') = (service_account_id IS NOT NULL))
+);
+
+CREATE INDEX idx_access_tokens_subject ON access_tokens (subject_id);
+
+CREATE INDEX idx_access_tokens_workspace ON access_tokens (workspace_id);
+
+CREATE INDEX idx_access_tokens_expiry ON access_tokens (expires_at)
+WHERE
+  expires_at IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS daemons (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -300,7 +301,7 @@ CREATE TABLE IF NOT EXISTS targets (
 -- Join tokens. Enroll tokens bring daemons in, invite tokens bring people
 -- in. The plaintext is "<id>_<secret>", so redemption looks the row up by id
 -- and compares the hash of the whole token.
-CREATE TABLE IF NOT EXISTS workspace_tokens (
+CREATE TABLE IF NOT EXISTS join_tokens (
   id UUID PRIMARY KEY,
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   kind INTEGER NOT NULL CHECK (kind IN (1, 2)), -- 1=enroll, 2=invite
@@ -451,7 +452,7 @@ CREATE INDEX idx_targets_name_trgm ON targets USING GIN (name gin_trgm_ops);
 
 CREATE INDEX idx_targets_description_trgm ON targets USING GIN (description gin_trgm_ops);
 
-CREATE INDEX idx_workspace_tokens_workspace ON workspace_tokens (workspace_id, kind);
+CREATE INDEX idx_join_tokens_workspace ON join_tokens (workspace_id, kind);
 
 CREATE INDEX idx_target_accounts_workspace_id ON target_accounts (workspace_id);
 
@@ -580,8 +581,10 @@ CREATE OR REPLACE FUNCTION without_stamps (r JSONB) RETURNS JSONB AS $$
   SELECT (r - ARRAY['last_seen_at', 'last_used_at']) #- '{metadata,last_manual_sync}'
 $$ LANGUAGE sql IMMUTABLE;
 
--- Sign-ins are left out (sessions, known_devices, credentials,
+-- Sign-ins are left out (access_tokens, known_devices, credentials,
 -- one_time_tokens). They happen all day and no list shows them to others.
+-- Service account keys and SCIM tokens are the exception, they are made and
+-- revoked by hand and a list shows them, see the triggers after the loop.
 DO $$
 DECLARE
   t TEXT;
@@ -591,8 +594,7 @@ BEGIN
     'workspace_subscriptions',
     'users',
     'sso_providers',
-    'scim_tokens',
-    'workspace_tokens',
+    'join_tokens',
     'service_accounts',
     'daemons',
     'teams',
@@ -616,6 +618,14 @@ BEGIN
     );
   END LOOP;
 END $$;
+
+CREATE TRIGGER notify_change_insert
+AFTER INSERT ON access_tokens FOR EACH ROW WHEN (NEW.kind IN ('service_account', 'scim'))
+EXECUTE FUNCTION notify_change ();
+
+CREATE TRIGGER notify_change_delete
+AFTER DELETE ON access_tokens FOR EACH ROW WHEN (OLD.kind IN ('service_account', 'scim'))
+EXECUTE FUNCTION notify_change ();
 
 -- The heartbeat stamps a connected daemon every ten seconds, so a gap wider
 -- than the online window means this stamp brings it online. Going offline is
@@ -720,13 +730,12 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'users',
     'credentials',
-    'sessions',
+    'access_tokens',
     'known_devices',
     'one_time_tokens',
     'sso_providers',
-    'scim_tokens',
     'workspace_subscriptions',
-    'workspace_tokens',
+    'join_tokens',
     'service_accounts',
     'daemons',
     'teams',

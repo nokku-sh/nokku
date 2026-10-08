@@ -41,7 +41,7 @@
 			description:
 				'The identity provider using it loses access right away. Provisioning stops until it gets a new token.',
 			confirmText: 'Revoke',
-			onConfirm: () => deleteToken.mutateAsync({ tokenId: id })
+			onConfirm: () => deleteToken.mutateAsync({ id })
 		});
 	}
 </script>

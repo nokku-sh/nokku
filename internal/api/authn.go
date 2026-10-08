@@ -28,11 +28,11 @@ func (a *authNInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		if isPublicEndpoint(req.Spec().Procedure) {
 			return next(ctx, req)
 		}
-		p, sess, err := a.cfg.IAM.Authenticate(ctx, req.Header(), req.Spec().Procedure)
+		p, tok, err := a.cfg.IAM.Authenticate(ctx, req.Header(), req.Spec().Procedure)
 		if err != nil {
 			return nil, a.fail(ctx, err)
 		}
-		return next(inject(ctx, p, sess), req)
+		return next(inject(ctx, p, tok), req)
 	}
 }
 
@@ -49,17 +49,17 @@ func (a *authNInterceptor) WrapStreamingHandler(
 		if isPublicEndpoint(conn.Spec().Procedure) {
 			return next(ctx, conn)
 		}
-		p, sess, err := a.cfg.IAM.Authenticate(ctx, conn.RequestHeader(), conn.Spec().Procedure)
+		p, tok, err := a.cfg.IAM.Authenticate(ctx, conn.RequestHeader(), conn.Spec().Procedure)
 		if err != nil {
 			a.advertiseNonce(ctx, conn.ResponseHeader(), err)
 			return connect.NewError(connect.CodeUnauthenticated, err)
 		}
-		return next(inject(ctx, p, sess), conn)
+		return next(inject(ctx, p, tok), conn)
 	}
 }
 
-func inject(ctx context.Context, p actor.Principal, sess db.Session) context.Context {
-	return actor.ContextWithPrincipal(iam.ContextWithSession(ctx, sess), p)
+func inject(ctx context.Context, p actor.Principal, tok db.AccessToken) context.Context {
+	return actor.ContextWithPrincipal(iam.ContextWithToken(ctx, tok), p)
 }
 
 func (a *authNInterceptor) fail(ctx context.Context, err error) error {

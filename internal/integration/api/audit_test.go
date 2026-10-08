@@ -28,9 +28,9 @@ func TestAuditDeniedCall(t *testing.T) {
 	viewer := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
 	other := seedOtherWorkspace(t, cfg)
 	outsider := seedUser(t, cfg, other, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
-	_, stranger, err := cfg.IAM.IssueSession(
+	_, stranger, err := cfg.IAM.IssueToken(
 		actor.WithWorkspace(t.Context(), actor.Workspace{ID: other, BaseURL: cfg.FullURL()}),
-		iam.SessionParams{SubjectID: outsider.ID, Kind: actor.KindUser, Method: iam.MethodPasskey},
+		iam.TokenParams{SubjectID: outsider.ID, Kind: actor.KindUser, Method: iam.MethodPasskey},
 	)
 	require.NoError(t, err)
 
@@ -75,13 +75,14 @@ func TestAuditNamesServiceAccount(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 	name := uniq("ci")
-	sa, err := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth).
-		CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{Name: &name})
+	accounts := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth)
+	sa, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{Name: &name})
 	require.NoError(t, err)
+	token := serviceAccountToken(t, accounts, sa.GetServiceAccount().GetId(), nil)
 
 	target := uuid.NewV7().String()
 	_, err = nokkuv1connect.NewTargetServiceClient(
-		srv.Client(), srv.URL, header("Authorization", "Bearer "+sa.GetToken()),
+		srv.Client(), srv.URL, header("Authorization", "Bearer "+token),
 	).DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: &target})
 	require.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
 

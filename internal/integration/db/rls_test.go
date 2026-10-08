@@ -53,18 +53,17 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 	t.Helper()
 	_, err := c.sysPool.Exec(t.Context(), `
 		INSERT INTO credentials (id, workspace_id, user_id, type, data) VALUES ($2 || '-pk', $1, $2, 'passkey', 'x');
-		INSERT INTO sessions (token_hash, workspace_id, subject_id, user_id, kind, method)
-		VALUES ($2 || '-s', $1, $2, $2, 'user', 'passkey');
+		INSERT INTO access_tokens (token_hash, workspace_id, user_id, kind, method)
+		VALUES ($2 || '-s', $1, $2, 'user', 'passkey');
 		INSERT INTO known_devices (workspace_id, user_id, key, expires_at)
 		VALUES ($1, $2, 'cookie', NOW() + INTERVAL '1 day');
 		INSERT INTO one_time_tokens (token_hash, workspace_id, user_id, purpose, expires_at)
 		VALUES ($2 || '-ott', $1, $2, 'login', NOW() + INTERVAL '1 hour');
 		INSERT INTO sso_providers (workspace_id, provider_id) VALUES ($1, 'idp');
-		INSERT INTO scim_tokens (workspace_id, token_hash) VALUES ($1, $2 || '-scim');
 		INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci');
 		INSERT INTO ssh_cas (workspace_id, name, private_key, public_key, not_before, not_after, key_bits)
 		VALUES ($1, 'ca', 'key', 'pub', NOW(), NOW() + INTERVAL '1 day', 256);
-		INSERT INTO workspace_tokens (id, workspace_id, kind, token_hash) VALUES (uuidv7(), $1, 1, 'hash');
+		INSERT INTO join_tokens (id, workspace_id, kind, token_hash) VALUES (uuidv7(), $1, 1, 'hash');
 		INSERT INTO recordings (workspace_id, daemon_name, username, key) VALUES ($1, 'd', 'deploy', 'key');
 		INSERT INTO workspace_subscriptions (workspace_id) VALUES ($1);
 	`, pgx.QueryExecModeSimpleProtocol, f.ws, f.u)
@@ -260,14 +259,14 @@ func TestQueriesAreScopedByThePin(t *testing.T) {
 		if _, err := q.GetTarget(ctx, b.target); !errors.Is(err, pgx.ErrNoRows) {
 			t.Errorf("foreign target visible: %v", err)
 		}
-		if _, err := q.GetSession(ctx, "nope"); !errors.Is(err, pgx.ErrNoRows) {
+		if _, err := q.GetAccessToken(ctx, "nope"); !errors.Is(err, pgx.ErrNoRows) {
 			t.Errorf("unknown session: %v", err)
 		}
-		own, err := q.ListSessionsBySubject(ctx, a.u)
+		own, err := q.ListUserSessions(ctx, a.u)
 		if err != nil || len(own) != 1 {
 			t.Errorf("own sessions: %d rows, err %v", len(own), err)
 		}
-		foreign, err := q.ListSessionsBySubject(ctx, b.u)
+		foreign, err := q.ListUserSessions(ctx, b.u)
 		if err != nil || len(foreign) != 0 {
 			t.Errorf("read a foreign session: %d rows, err %v", len(foreign), err)
 		}
@@ -279,7 +278,7 @@ func TestQueriesAreScopedByThePin(t *testing.T) {
 		if err != nil || len(providers) != 1 || providers[0].WorkspaceID != a.ws {
 			t.Errorf("ListSSOProviders: %d rows, err %v, want the one of this workspace", len(providers), err)
 		}
-		if n, err := q.DeleteSubjectSessions(ctx, b.u); err != nil || n != 0 {
+		if n, err := q.DeleteSubjectTokens(ctx, b.u); err != nil || n != 0 {
 			t.Errorf("deleted %d foreign sessions, err %v", n, err)
 		}
 		return nil

@@ -57,20 +57,20 @@ func cookieFromHeader(h http.Header, name string) string {
 // Header tokens belong to connect, which also checks their DPoP binding.
 func (s *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p, sess, err := s.AuthenticateToken(r.Context(), sessionFromCookie(r.Header))
+		p, tok, err := s.AuthenticateToken(r.Context(), sessionFromCookie(r.Header))
 		if err != nil || p.Kind != actor.KindUser {
 			next.ServeHTTP(w, r)
 			return
 		}
-		s.noteSeen(r.Context(), sess)
+		s.noteSeen(r.Context(), tok)
 		ctx := actor.ContextWithPrincipal(r.Context(), p)
-		ctx = ContextWithSession(ctx, sess)
+		ctx = ContextWithToken(ctx, tok)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-func ContextWithSession(ctx context.Context, sess db.Session) context.Context {
-	return context.WithValue(ctx, sessionKey{}, sess)
+func ContextWithToken(ctx context.Context, tok db.AccessToken) context.Context {
+	return context.WithValue(ctx, tokenKey{}, tok)
 }
 
 func (s *Service) RequireLogin(next http.Handler) http.Handler {
@@ -83,12 +83,13 @@ func (s *Service) RequireLogin(next http.Handler) http.Handler {
 	})
 }
 
-func CurrentSession(ctx context.Context) (db.Session, bool) {
-	sess, ok := ctx.Value(sessionKey{}).(db.Session)
-	return sess, ok
+// CurrentToken is the credential the request authenticated with.
+func CurrentToken(ctx context.Context) (db.AccessToken, bool) {
+	tok, ok := ctx.Value(tokenKey{}).(db.AccessToken)
+	return tok, ok
 }
 
-type sessionKey struct{}
+type tokenKey struct{}
 
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

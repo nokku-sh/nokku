@@ -122,9 +122,9 @@ func (e *testEnv) invite(t *testing.T, ws actor.Workspace, role nokkuv1.Workspac
 	t.Helper()
 	id := uuid.NewV7().String()
 	tok := crypto.NewToken(id)
-	params := &db.CreateWorkspaceTokenParams{
+	params := &db.CreateJoinTokenParams{
 		ID:        id,
-		Kind:      nokkuv1.TokenKind_TOKEN_KIND_INVITE,
+		Kind:      nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE,
 		TokenHash: tok.Hash,
 		Role:      &role,
 	}
@@ -132,7 +132,7 @@ func (e *testEnv) invite(t *testing.T, ws actor.Workspace, role nokkuv1.Workspac
 		params.MaxUses = &maxUses
 	}
 	if err := e.in(t, ws, func(q *db.Queries) error {
-		_, err := q.CreateWorkspaceToken(t.Context(), params)
+		_, err := q.CreateJoinToken(t.Context(), params)
 		return err
 	}); err != nil {
 		t.Fatalf("create invite: %v", err)
@@ -218,9 +218,9 @@ func (e *testEnv) credential(
 
 func (e *testEnv) sessions(t *testing.T, ws actor.Workspace, subjectID string) int {
 	t.Helper()
-	var rows []*db.Session
+	var rows []*db.AccessToken
 	if err := e.in(t, ws, func(q *db.Queries) (err error) {
-		rows, err = q.ListSessionsBySubject(t.Context(), subjectID)
+		rows, err = q.ListUserSessions(t.Context(), subjectID)
 		return err
 	}); err != nil {
 		t.Fatal(err)

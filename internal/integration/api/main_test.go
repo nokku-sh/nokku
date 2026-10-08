@@ -170,7 +170,7 @@ func seedOwner(t *testing.T, cfg *config.Config) *db.User {
 // sessionFor signs the user in and returns the session token.
 func sessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 	t.Helper()
-	_, token, err := cfg.IAM.IssueSession(wsCtx(t, cfg), iam.SessionParams{
+	_, token, err := cfg.IAM.IssueToken(wsCtx(t, cfg), iam.TokenParams{
 		SubjectID: u.ID,
 		Kind:      actor.KindUser,
 		Method:    iam.MethodPasskey,

@@ -32,32 +32,40 @@ const (
 	maxUserAgent = 512
 )
 
-// SessionHash is the only session identifier that ever leaves the server.
-type SessionHash string
-
-type SessionParams struct {
+type TokenParams struct {
+	// SubjectID is the user, service account or daemon, empty for SCIM.
 	SubjectID string
 	Kind      actor.Kind
 	Method    Method
-	// Binding is the DPoP jkt, empty for cookie sessions.
+	// Binding is the DPoP jkt, empty for cookie sessions and keys.
 	Binding string
 	Label   string
-	// TTL zero never expires, the session must be revoked explicitly.
+	// TTL zero never expires, the token must be revoked explicitly.
 	TTL time.Duration
 }
 
-// IssueSession pins the session to the request's workspace.
-func (s *Service) IssueSession(ctx context.Context, p SessionParams) (*db.Session, string, error) {
+// IssueToken pins the token to the request's workspace. The plaintext is
+// returned once, only its hash is stored.
+func (s *Service) IssueToken(ctx context.Context, p TokenParams) (*db.AccessToken, string, error) {
 	token, tokenHash := crypto.NewSecret()
+	switch p.Kind {
+	case actor.KindServiceAccount:
+		token, tokenHash = crypto.NewKey(crypto.KeyPrefixServiceAccount)
+	case actor.KindSCIM:
+		token, tokenHash = crypto.NewKey(crypto.KeyPrefixSCIM)
+	case actor.KindUser, actor.KindCLI, actor.KindDaemon:
+	}
 	now := s.now()
-	params := &db.CreateSessionParams{
+	params := &db.CreateAccessTokenParams{
 		TokenHash:  tokenHash,
-		SubjectID:  p.SubjectID,
 		Kind:       string(p.Kind),
 		Method:     string(p.Method),
 		Binding:    p.Binding,
 		Label:      p.Label,
 		LastSeenAt: &now,
+	}
+	if p.SubjectID != "" {
+		params.SubjectID = &p.SubjectID
 	}
 	if meta, ok := actor.RequestMetaFromContext(ctx); ok {
 		params.UserAgent = truncate(strings.ToValidUTF8(meta.Header.Get("User-Agent"), ""), maxUserAgent)
@@ -66,12 +74,15 @@ func (s *Service) IssueSession(ctx context.Context, p SessionParams) (*db.Sessio
 	if p.TTL > 0 {
 		params.ExpiresAt = new(now.Add(p.TTL))
 	}
-	sess, err := s.conn.Tenant().CreateSession(ctx, params)
+	tok, err := s.conn.Tenant().CreateAccessToken(ctx, params)
 	if err != nil {
 		return nil, "", err
 	}
-	s.record(ctx, event{Action: actionSessionIssued, Kind: p.Kind, Method: p.Method, UserID: p.SubjectID})
-	return sess, token, nil
+	// A key is made by an RPC the audit log already records.
+	if p.Kind != actor.KindServiceAccount && p.Kind != actor.KindSCIM {
+		s.record(ctx, event{Action: actionSessionIssued, Kind: p.Kind, Method: p.Method, UserID: p.SubjectID})
+	}
+	return tok, token, nil
 }
 
 // completeLogin applies the gates every login method shares.
@@ -92,7 +103,7 @@ func (s *Service) completeLogin(ctx context.Context, u *db.User, method Method) 
 			return deny(ErrSSORequired, "sso enforced")
 		}
 	}
-	sess, token, err := s.IssueSession(ctx, SessionParams{
+	sess, token, err := s.IssueToken(ctx, TokenParams{
 		SubjectID: u.ID,
 		Kind:      actor.KindUser,
 		Method:    method,
@@ -123,7 +134,7 @@ func (s *Service) IssueDaemonSession(ctx context.Context, daemonID, binding stri
 	if _, err := s.revokeSubject(ctx, daemonID); err != nil {
 		return "", err
 	}
-	_, token, err := s.IssueSession(ctx, SessionParams{
+	_, token, err := s.IssueToken(ctx, TokenParams{
 		SubjectID: daemonID,
 		Kind:      actor.KindDaemon,
 		Method:    MethodDevice,
@@ -206,100 +217,92 @@ func (s *Service) ForgetDevice(ctx context.Context, id string) error {
 		DeleteKnownDevice(ctx, &db.DeleteKnownDeviceParams{UserID: actor.UserIDFromContext(ctx), ID: id})
 }
 
-// verifySession only finds sessions of the request's workspace.
-func (s *Service) verifySession(ctx context.Context, token string) (db.Session, error) {
+// verifyToken only finds tokens of the request's workspace. A key with a
+// bad checksum is a typo or a lookalike, it fails before any lookup.
+func (s *Service) verifyToken(ctx context.Context, token string) (db.AccessToken, error) {
 	if token == "" {
-		return db.Session{}, errNoSession
+		return db.AccessToken{}, errNoSession
 	}
-	tokenHash := crypto.HashToken(token)
-	sess, err := s.conn.Tenant().GetSession(ctx, tokenHash)
+	if strings.HasPrefix(token, "nk_") && !crypto.CheckKey(token) {
+		return db.AccessToken{}, errInvalidCredentials
+	}
+	tok, err := s.conn.Tenant().GetAccessToken(ctx, crypto.HashToken(token))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return db.Session{}, errNoSession
+		return db.AccessToken{}, errNoSession
 	}
 	if err != nil {
-		return db.Session{}, err
+		return db.AccessToken{}, err
 	}
-	if sess.ExpiresAt != nil && !sess.ExpiresAt.After(s.now()) {
-		_ = s.deleteSession(ctx, sess.TokenHash)
-		return db.Session{}, errSessionExpired
+	if tok.ExpiresAt != nil && !tok.ExpiresAt.After(s.now()) {
+		_ = s.deleteToken(ctx, tok.ID)
+		return db.AccessToken{}, errSessionExpired
 	}
-	return *sess, nil
+	return *tok, nil
 }
 
-// noteSeen records that an authenticated request used the session. It never
-// fails the request, the stamp is only what the sessions list shows.
-func (s *Service) noteSeen(ctx context.Context, sess db.Session) {
+// noteSeen records that an authenticated request used the token. It never
+// fails the request, the stamp is only what the lists show.
+func (s *Service) noteSeen(ctx context.Context, tok db.AccessToken) {
 	now := s.now()
-	if sess.LastSeenAt != nil && now.Sub(*sess.LastSeenAt) < sessionSeenEvery {
+	if tok.LastSeenAt != nil && now.Sub(*tok.LastSeenAt) < sessionSeenEvery {
 		return
 	}
-	err := s.conn.Tenant().TouchSession(ctx, &db.TouchSessionParams{TokenHash: sess.TokenHash, LastSeenAt: &now})
+	err := s.conn.Tenant().TouchAccessToken(ctx, &db.TouchAccessTokenParams{ID: tok.ID, LastSeenAt: &now})
 	if err != nil {
-		slog.Warn("failed to note session activity", "error", err)
+		slog.Warn("failed to note token activity", "error", err)
 	}
 }
 
-func (s *Service) deleteSession(ctx context.Context, hash crypto.HashedToken) error {
-	return s.conn.Tenant().DeleteSession(ctx, hash)
+func (s *Service) deleteToken(ctx context.Context, id string) error {
+	return s.conn.Tenant().DeleteAccessToken(ctx, id)
 }
 
-// ListSessions answers for a user. A service account holds no session, it
-// signs every call with its token.
-func (s *Service) ListSessions(ctx context.Context) ([]*db.Session, error) {
+// ListSessions is the browsers and terminals the signed-in user is on.
+func (s *Service) ListSessions(ctx context.Context) ([]*db.AccessToken, error) {
 	userID := actor.UserIDFromContext(ctx)
 	if userID == "" {
 		return nil, nil
 	}
-	return s.conn.Tenant().ListSessionsBySubject(ctx, userID)
+	return s.conn.Tenant().ListUserSessions(ctx, userID)
 }
 
-// Logout needs the DPoP proof for header tokens, so a leaked token alone
-// cannot end someone's session. Unknown credentials are already gone, so only
-// errors fixed by re-signing fail.
+// Logout ends a browser or CLI session. It needs the DPoP proof for header
+// tokens, so a leaked token alone cannot end someone's session. A key is
+// not a session, a script that calls this keeps its key. Unknown credentials
+// are already gone, so only errors fixed by re-signing fail.
 func (s *Service) Logout(ctx context.Context, header http.Header, procedure string) error {
-	p, sess, err := s.Authenticate(ctx, header, procedure)
+	p, tok, err := s.Authenticate(ctx, header, procedure)
 	if errors.Is(err, ErrDPoPNonce) || errors.Is(err, ErrDPoPRequired) {
 		return err
 	}
-	if err != nil || sess.TokenHash == "" {
+	if err != nil || (p.Kind != actor.KindUser && p.Kind != actor.KindCLI) {
 		return nil
 	}
-	if err := s.deleteSession(ctx, sess.TokenHash); err != nil {
+	if err := s.deleteToken(ctx, tok.ID); err != nil {
 		return err
 	}
-	s.record(ctx, event{Action: actionSessionRevoked, Kind: p.Kind, Method: Method(sess.Method), UserID: p.ID})
+	s.record(ctx, event{Action: actionSessionRevoked, Kind: p.Kind, Method: Method(tok.Method), UserID: p.ID})
 	return nil
 }
 
 func (s *Service) revokeSubject(ctx context.Context, subjectID string) (int64, error) {
-	return s.conn.Tenant().DeleteSubjectSessions(ctx, subjectID)
-}
-
-func (s *Service) RevokeOtherSessions(ctx context.Context, keep SessionHash) (int64, error) {
-	userID := actor.UserIDFromContext(ctx)
-	if userID == "" {
-		return 0, nil
-	}
-	return s.conn.Tenant().DeleteSessionsExcept(ctx, &db.DeleteSessionsExceptParams{
-		SubjectID: userID,
-		KeepHash:  crypto.HashedToken(keep),
-	})
+	return s.conn.Tenant().DeleteSubjectTokens(ctx, subjectID)
 }
 
 // DeleteOwnSession only reaches the caller's own sessions.
-func (s *Service) DeleteOwnSession(ctx context.Context, hash SessionHash) error {
+func (s *Service) DeleteOwnSession(ctx context.Context, id string) error {
 	userID := actor.UserIDFromContext(ctx)
 	if userID == "" {
 		return nil
 	}
 	return s.conn.TenantTx(ctx, func(q *db.Queries) error {
-		rows, err := q.ListSessionsBySubject(ctx, userID)
+		rows, err := q.ListUserSessions(ctx, userID)
 		if err != nil {
 			return err
 		}
-		for _, sess := range rows {
-			if sess.TokenHash == crypto.HashedToken(hash) {
-				return q.DeleteSession(ctx, sess.TokenHash)
+		for _, tok := range rows {
+			if tok.ID == id {
+				return q.DeleteAccessToken(ctx, tok.ID)
 			}
 		}
 		return nil

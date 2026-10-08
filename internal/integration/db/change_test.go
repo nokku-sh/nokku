@@ -45,8 +45,9 @@ func heard(t *testing.T, conn *pgx.Conn, ws string) []string {
 }
 
 // silentTables are the sign-ins. They change all day and no list shows them
-// to others, so no console hears about them.
-var silentTables = []string{"credentials", "known_devices", "one_time_tokens", "sessions"}
+// to others, so no console hears about them. access_tokens announces only
+// its keys, TestChangesAreAnnounced checks that.
+var silentTables = []string{"credentials", "known_devices", "one_time_tokens"}
 
 // A new tenant table has to say whether a console hears its changes.
 func TestEveryTenantTableAnnouncesOrIsSilent(t *testing.T) {
@@ -54,7 +55,7 @@ func TestEveryTenantTableAnnouncesOrIsSilent(t *testing.T) {
 	for _, table := range tenantTables(t, c) {
 		got := count(t, c.sysPool, `
 			SELECT COUNT(*) FROM pg_trigger
-			WHERE tgrelid = ('public.' || $1)::regclass AND tgname IN ('notify_change', 'notify_change_update')`,
+			WHERE tgrelid = ('public.' || $1)::regclass AND tgname LIKE 'notify_change%'`,
 			table)
 		want := int64(2)
 		if slices.Contains(silentTables, table) {
@@ -100,6 +101,28 @@ func TestChangesAreAnnounced(t *testing.T) {
 	exec(`UPDATE targets SET metadata = metadata || '{"last_manual_sync": "now"}' WHERE id = $1`, f.target)
 	if got := heard(t, conn, f.ws); len(got) != 0 {
 		t.Errorf("updates that change nothing a console shows announced %v", got)
+	}
+
+	// A sign-in is nobody's business, a key made or revoked is.
+	exec(`INSERT INTO access_tokens (token_hash, workspace_id, user_id, kind, method)
+		VALUES ('h-user', $1, $2, 'user', 'passkey')`, f.ws, f.u)
+	if got := heard(t, conn, f.ws); len(got) != 0 {
+		t.Errorf("a sign-in announced %v", got)
+	}
+	var sa string
+	err := c.sysPool.QueryRow(t.Context(),
+		`INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci') RETURNING id`, f.ws).Scan(&sa)
+	if err != nil {
+		t.Fatalf("service account: %v", err)
+	}
+	exec(`INSERT INTO access_tokens (token_hash, workspace_id, service_account_id, kind, method)
+		VALUES ('h-key', $1, $2, 'service_account', 'token')`, f.ws, sa)
+	if got := heard(t, conn, f.ws); !slices.Equal(got, []string{"access_tokens", "service_accounts"}) {
+		t.Errorf("a new key announced %v, want access_tokens and service_accounts", got)
+	}
+	exec(`DELETE FROM access_tokens WHERE token_hash = 'h-key'`)
+	if got := heard(t, conn, f.ws); !slices.Equal(got, []string{"access_tokens"}) {
+		t.Errorf("a revoked key announced %v, want access_tokens", got)
 	}
 }
 

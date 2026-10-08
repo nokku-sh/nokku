@@ -18,7 +18,7 @@
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
-	import { TokenKind, type Token } from '#lib/gen/nokku/v1/token_pb.js';
+	import { JoinTokenKind, type JoinToken } from '#lib/gen/nokku/v1/join_token_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
 	import { roleLabel } from '#lib/roles.js';
 	import { formatTs, toDate } from '#lib/utils.js';
@@ -29,13 +29,13 @@
 
 	interface Props {
 		open: boolean;
-		kind: TokenKind;
+		kind: JoinTokenKind;
 		title: string;
 		description: string;
 		icon: LucideIcon;
 		labelPlaceholder: string;
 		/** What to do with a fresh secret: commands, a link, etc. */
-		reveal: Snippet<[string, Token | undefined]>;
+		reveal: Snippet<[string, JoinToken | undefined]>;
 	}
 
 	let {
@@ -48,7 +48,7 @@
 		reveal
 	}: Props = $props();
 
-	const isEnroll = $derived(kind === TokenKind.ENROLL);
+	const isEnroll = $derived(kind === JoinTokenKind.ENROLL);
 	const noun = $derived(isEnroll ? 'token' : 'invite link');
 
 	const expiries = [
@@ -84,7 +84,7 @@
 	let tab = $state('new');
 	let label = $state('');
 	// Hosts enroll within minutes, people take a few days to accept.
-	let expiry = $state(untrack(() => (kind === TokenKind.INVITE ? '604800' : '86400')));
+	let expiry = $state(untrack(() => (kind === JoinTokenKind.INVITE ? '604800' : '86400')));
 	let uses = $state('unlimited');
 	let customUses = $state('');
 	let autoApprove = $state(true);
@@ -116,7 +116,7 @@
 		label = '';
 	}
 
-	function askRevoke(t: Token) {
+	function askRevoke(t: JoinToken) {
 		void confirm({
 			title: `Revoke ${t.label || `this ${noun}`}?`,
 			description: isEnroll
@@ -127,7 +127,7 @@
 		});
 	}
 
-	function expiresSoon(t: Token) {
+	function expiresSoon(t: JoinToken) {
 		return !!t.expiresAt && toDate(t.expiresAt).getTime() - Date.now() < 24 * 3600 * 1000;
 	}
 

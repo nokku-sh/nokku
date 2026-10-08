@@ -67,10 +67,10 @@ sql:
             go_type:
               import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "DaemonStatus"
-          - column: "workspace_tokens.kind"
+          - column: "join_tokens.kind"
             go_type:
               import: "github.com/nokku-sh/protos/gen/nokku/v1"
-              type: "TokenKind"
+              type: "JoinTokenKind"
           - column: "users.role"
             go_type:
               import: "github.com/nokku-sh/protos/gen/nokku/v1"
@@ -79,7 +79,7 @@ sql:
             go_type:
               import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "WorkspaceRole"
-          - column: "workspace_tokens.role"
+          - column: "join_tokens.role"
             go_type:
               import: "github.com/nokku-sh/protos/gen/nokku/v1"
               type: "WorkspaceRole"
@@ -98,7 +98,7 @@ sql:
               pointer: true
 
           # Hash (one-way) overrides
-          - column: "sessions.token_hash"
+          - column: "access_tokens.token_hash"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"
@@ -106,16 +106,7 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"
-          - column: "service_accounts.token_hash"
-            go_type:
-              import: "github.com/nokku-sh/nokku/internal/crypto"
-              type: "HashedToken"
-              pointer: true
-          - column: "workspace_tokens.token_hash"
-            go_type:
-              import: "github.com/nokku-sh/nokku/internal/crypto"
-              type: "HashedToken"
-          - column: "scim_tokens.token_hash"
+          - column: "join_tokens.token_hash"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "HashedToken"

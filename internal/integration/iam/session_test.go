@@ -22,13 +22,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/internal/actor"
+	nkcrypto "github.com/nokku-sh/nokku/internal/crypto"
 	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-func (e *testEnv) session(t *testing.T, ws actor.Workspace, u *db.User, kind actor.Kind) (*db.Session, string) {
+func (e *testEnv) session(t *testing.T, ws actor.Workspace, u *db.User, kind actor.Kind) (*db.AccessToken, string) {
 	t.Helper()
-	sess, token, err := e.svc.IssueSession(anon(t.Context(), ws), iam.SessionParams{
+	sess, token, err := e.svc.IssueToken(anon(t.Context(), ws), iam.TokenParams{
 		SubjectID: u.ID, Kind: kind, Method: iam.MethodPasskey, TTL: time.Hour,
 	})
 	require.NoError(t, err)
@@ -38,7 +39,7 @@ func (e *testEnv) session(t *testing.T, ws actor.Workspace, u *db.User, kind act
 func TestMiddlewareOnlyTrustsCookieSessions(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
-	_, cliToken, err := e.svc.IssueSession(anon(t.Context(), o.ws), iam.SessionParams{
+	_, cliToken, err := e.svc.IssueToken(anon(t.Context(), o.ws), iam.TokenParams{
 		SubjectID: o.owner.ID, Kind: actor.KindCLI, Method: iam.MethodDevice, Binding: "jkt", TTL: time.Hour,
 	})
 	require.NoError(t, err)
@@ -92,9 +93,9 @@ func TestDeleteOwnSessionOnly(t *testing.T) {
 	bob := e.user(t, o.ws, "bob@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	sess, _ := e.session(t, o.ws, bob, actor.KindUser)
 
-	_ = e.svc.DeleteOwnSession(as(t.Context(), o.ws, alice), iam.SessionHash(sess.TokenHash))
+	_ = e.svc.DeleteOwnSession(as(t.Context(), o.ws, alice), sess.ID)
 	assert.Equal(t, 1, e.sessions(t, o.ws, bob.ID), "alice deleted bob's session")
-	require.NoError(t, e.svc.DeleteOwnSession(as(t.Context(), o.ws, bob), iam.SessionHash(sess.TokenHash)))
+	require.NoError(t, e.svc.DeleteOwnSession(as(t.Context(), o.ws, bob), sess.ID))
 	assert.Zero(t, e.sessions(t, o.ws, bob.ID), "bob could not delete his own session")
 }
 
@@ -106,7 +107,7 @@ func TestLogoutRevokesBoundSession(t *testing.T) {
 	require.NoError(t, err)
 	tp, err := (&jose.JSONWebKey{Key: &key.PublicKey}).Thumbprint(crypto.SHA256)
 	require.NoError(t, err)
-	_, token, err := e.svc.IssueSession(ctx, iam.SessionParams{
+	_, token, err := e.svc.IssueToken(ctx, iam.TokenParams{
 		SubjectID: o.owner.ID, Kind: actor.KindCLI, Method: iam.MethodDevice,
 		Binding: base64.RawURLEncoding.EncodeToString(tp), TTL: time.Hour,
 	})
@@ -139,7 +140,7 @@ func TestSessionRecordsDevice(t *testing.T) {
 		actor.RequestMeta{Header: header, RemoteAddr: "203.0.113.7:4242"},
 	)
 
-	sess, _, err := e.svc.IssueSession(ctx, iam.SessionParams{
+	sess, _, err := e.svc.IssueToken(ctx, iam.TokenParams{
 		SubjectID: o.owner.ID, Kind: actor.KindUser, Method: iam.MethodPasskey, TTL: time.Hour,
 	})
 	require.NoError(t, err)
@@ -338,9 +339,9 @@ func TestSessionActivityIsNotedOnceAMinute(t *testing.T) {
 	header := http.Header{"Authorization": {"Bearer " + token}}
 	lastSeen := func() time.Time {
 		t.Helper()
-		var row *db.Session
+		var row *db.AccessToken
 		require.NoError(t, e.in(t, o.ws, func(q *db.Queries) (err error) {
-			row, err = q.GetSession(t.Context(), sess.TokenHash)
+			row, err = q.GetAccessToken(t.Context(), sess.TokenHash)
 			return err
 		}))
 		require.NotNil(t, row.LastSeenAt)
@@ -352,7 +353,7 @@ func TestSessionActivityIsNotedOnceAMinute(t *testing.T) {
 		t.Helper()
 		at := time.Now().Add(-ago)
 		require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
-			return q.TouchSession(t.Context(), &db.TouchSessionParams{TokenHash: sess.TokenHash, LastSeenAt: &at})
+			return q.TouchAccessToken(t.Context(), &db.TouchAccessTokenParams{ID: sess.ID, LastSeenAt: &at})
 		}))
 		return at
 	}
@@ -366,4 +367,105 @@ func TestSessionActivityIsNotedOnceAMinute(t *testing.T) {
 	_, _, err = e.svc.Authenticate(ctx, header, "/nokku.v1.UtilService/Whoami")
 	require.NoError(t, err)
 	assert.WithinDuration(t, time.Now(), lastSeen(), 5*time.Second, "a later request did not move the stamp")
+}
+
+// serviceAccount adds an account to ws and returns its id.
+func (e *testEnv) serviceAccount(t *testing.T, ws actor.Workspace) string {
+	t.Helper()
+	var id string
+	require.NoError(t, e.in(t, ws, func(q *db.Queries) (err error) {
+		id, err = q.CreateServiceAccount(t.Context(), &db.CreateServiceAccountParams{
+			Name: "ci-" + strings.ToLower(ws.Slug),
+			Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
+		})
+		return err
+	}))
+	return id
+}
+
+func (e *testEnv) key(t *testing.T, ws actor.Workspace, saID string) (*db.AccessToken, string) {
+	t.Helper()
+	tok, secret, err := e.svc.IssueToken(anon(t.Context(), ws), iam.TokenParams{
+		SubjectID: saID, Kind: actor.KindServiceAccount, Method: iam.MethodToken, Label: "deploy",
+	})
+	require.NoError(t, err)
+	return tok, secret
+}
+
+// A key with a bad checksum is a typo or a lookalike. It fails before the
+// lookup, so with no workspace pinned the pin is never missed.
+func TestBadChecksumNeverReachesTheDatabase(t *testing.T) {
+	e := newTestEnv(t)
+	whoami := func(token string) error {
+		_, _, err := e.svc.Authenticate(
+			t.Context(), http.Header{"Authorization": {"Bearer " + token}}, "/nokku.v1.UtilService/Whoami",
+		)
+		return err
+	}
+	o := e.org(t)
+	_, secret := e.key(t, o.ws, e.serviceAccount(t, o.ws))
+	err := whoami(secret[:len(secret)-1] + "?")
+	require.Error(t, err)
+	require.NotErrorIs(t, err, db.ErrWorkspaceNotPinned, "a bad checksum was looked up")
+	require.ErrorIs(t, whoami(secret), db.ErrWorkspaceNotPinned, "a good checksum is looked up")
+}
+
+// A SCIM token provisions accounts and nothing else. On a connect call it
+// is no credential at all.
+func TestSCIMTokenIsNoConnectCredential(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	_, token, err := e.svc.IssueToken(as(t.Context(), o.ws, o.owner), iam.TokenParams{
+		Kind: actor.KindSCIM, Method: iam.MethodSCIM, Label: "okta",
+	})
+	require.NoError(t, err)
+	ctx := anon(t.Context(), o.ws)
+
+	p, _, err := e.svc.AuthenticateToken(ctx, token)
+	require.NoError(t, err)
+	assert.Equal(t, actor.KindSCIM, p.Kind)
+	_, _, err = e.svc.Authenticate(
+		ctx,
+		http.Header{"Authorization": {"Bearer " + token}},
+		"/nokku.v1.UtilService/Whoami",
+	)
+	require.Error(t, err, "a SCIM token authenticated a connect call")
+}
+
+// A key is not a session. A script that calls Logout keeps it.
+func TestLogoutLeavesServiceAccountTokenAlone(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	_, secret := e.key(t, o.ws, e.serviceAccount(t, o.ws))
+	ctx := anon(t.Context(), o.ws)
+	header := http.Header{"Authorization": {"Bearer " + secret}}
+
+	require.NoError(t, e.svc.Logout(ctx, header, "/nokku.v1.AuthService/Logout"))
+	p, _, err := e.svc.AuthenticateToken(ctx, secret)
+	require.NoError(t, err, "logout ended the key")
+	assert.Equal(t, actor.KindServiceAccount, p.Kind)
+}
+
+// An expired key fails and is gone with its first use after the expiry.
+func TestExpiredTokenIsDeletedOnUse(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	saID := e.serviceAccount(t, o.ws)
+	secret, hash := nkcrypto.NewKey(nkcrypto.KeyPrefixServiceAccount)
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
+		_, err := q.CreateAccessToken(t.Context(), &db.CreateAccessTokenParams{
+			TokenHash: hash, Kind: string(actor.KindServiceAccount), SubjectID: &saID,
+			Method: string(iam.MethodToken), ExpiresAt: new(time.Now().Add(-time.Minute)),
+		})
+		return err
+	}))
+
+	_, _, err := e.svc.AuthenticateToken(anon(t.Context(), o.ws), secret)
+	require.Error(t, err, "an expired key signed in")
+	var left []*db.AccessToken
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) (err error) {
+		left, err = q.ListServiceAccountTokens(t.Context(), saID)
+		return err
+	}))
+	assert.Empty(t, left, "the expired key is still listed")
 }
