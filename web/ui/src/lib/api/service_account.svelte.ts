@@ -36,6 +36,7 @@ export const serviceAccount = {
 		}),
 	update: () => useMutation(ServiceAccountService.method.updateServiceAccount),
 	delete: () => useMutation(ServiceAccountService.method.deleteServiceAccount),
+	rotate: () => useMutation(ServiceAccountService.method.rotateServiceAccountToken),
 	deleteMany: () =>
 		useBulkMutation(
 			ServiceAccountService.method.deleteServiceAccount,

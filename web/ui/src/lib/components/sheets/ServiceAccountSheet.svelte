@@ -5,9 +5,12 @@
 	import RolePicker from '#lib/components/access/RolePicker.svelte';
 	import { SERVICE_ACCOUNT_MAX_ROLE } from '#lib/roles.js';
 	import SubjectAccess from '#lib/components/access/SubjectAccess.svelte';
+	import RotateTokenModal from '#lib/components/modals/RotateTokenModal.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
@@ -15,7 +18,15 @@
 	import { ServiceAccountSchema } from '#lib/gen/nokku/v1/service_account_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs, toDate } from '#lib/utils.js';
-	import { Bot, FileText, Settings2, ShieldCheck, TriangleAlert, UserCog } from '@lucide/svelte';
+	import {
+		Bot,
+		FileText,
+		KeyRound,
+		Settings2,
+		ShieldCheck,
+		TriangleAlert,
+		UserCog
+	} from '@lucide/svelte';
 	import DangerZone from './DangerZone.svelte';
 	import EntitySheet from './EntitySheet.svelte';
 	import Section from './Section.svelte';
@@ -34,7 +45,9 @@
 	const autoSave = useAutoSave(() => update.mutateAsync({ ...model }));
 	const save = () => autoSave.save();
 
-	const expiresAt = $derived(entity?.expiresAt ? toDate(entity.expiresAt) : undefined);
+	let rotateOpen = $state(false);
+
+	const expiresAt = $derived(entity?.tokenExpiresAt ? toDate(entity.tokenExpiresAt) : undefined);
 	const expired = $derived(!!expiresAt && expiresAt.getTime() < Date.now());
 	const expiresSoon = $derived(
 		!!expiresAt && !expired && expiresAt.getTime() - Date.now() < 14 * 24 * 3600 * 1000
@@ -102,12 +115,12 @@
 		{#if expired}
 			<Badge variant="destructive">Expired</Badge>
 		{:else if expiresSoon}
-			<Badge variant="warning" title={formatTs(entity?.expiresAt)}>
-				Expires {formatTs(entity?.expiresAt, 'relative')}
+			<Badge variant="warning" title={formatTs(entity?.tokenExpiresAt)}>
+				Expires {formatTs(entity?.tokenExpiresAt, 'relative')}
 			</Badge>
 		{:else}
 			<span>
-				· {entity?.expiresAt ? `Expires ${formatTs(entity.expiresAt)}` : 'Never expires'}
+				· {entity?.tokenExpiresAt ? `Expires ${formatTs(entity.tokenExpiresAt)}` : 'Never expires'}
 			</span>
 		{/if}
 	{/snippet}
@@ -119,7 +132,7 @@
 					<TriangleAlert />
 					<Alert.Title>The token has expired</Alert.Title>
 					<Alert.Description>
-						Automation using it is failing. Create a new service account to get a fresh token.
+						Automation using it is failing. Rotate the token under Settings to get a fresh one.
 					</Alert.Description>
 				</Alert.Root>
 			{/if}
@@ -142,6 +155,26 @@
 					}}
 				/>
 			</Section>
+
+			{#if can.edit}
+				<Section title="Token" icon={KeyRound}>
+					<Item.Group class="rounded-lg border">
+						<Item.Root size="sm" class="rounded-none">
+							<Item.Content>
+								<Item.Title>Rotate token</Item.Title>
+								<Item.Description>
+									The current token stops working right away. Grants stay.
+								</Item.Description>
+							</Item.Content>
+							<Item.Actions>
+								<Button variant="outline" size="sm" onclick={() => (rotateOpen = true)}>
+									Rotate
+								</Button>
+							</Item.Actions>
+						</Item.Root>
+					</Item.Group>
+				</Section>
+			{/if}
 
 			<Section title="Details" icon={FileText}>
 				<Field.Group class="gap-4">
@@ -191,5 +224,7 @@
 					: []}
 			/>
 		</Tabs.Content>
+
+		<RotateTokenModal bind:open={rotateOpen} id={entity.id} name={entity.name} />
 	{/if}
 </EntitySheet>

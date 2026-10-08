@@ -15,7 +15,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/service_account.proto.
  */
 export const file_nokku_v1_service_account: GenFile = /*@__PURE__*/
-  fileDesc("Ch5ub2trdS92MS9zZXJ2aWNlX2FjY291bnQucHJvdG8SCG5va2t1LnYxIrYCCg5TZXJ2aWNlQWNjb3VudBIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEiUKBHJvbGUYBCABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlEgwKBHRhZ3MYBSADKAkSLgoKZXhwaXJlc19hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF91c2VkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCIwChhHZXRTZXJ2aWNlQWNjb3VudFJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIk4KGUdldFNlcnZpY2VBY2NvdW50UmVzcG9uc2USMQoPc2VydmljZV9hY2NvdW50GAEgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnQi6AEKG0NyZWF0ZVNlcnZpY2VBY2NvdW50UmVxdWVzdBI1CgRuYW1lGAEgASgJQie6SCRyIhABGIACMhteW2EtekEtWjAtOV1bYS16QS1aMC05LV9dKiQSHQoLZGVzY3JpcHRpb24YAiABKAlCCLpIBXIDGOgHEjUKBHJvbGUYAyABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlQg66SAuCAQgYABgBGAIYAxIMCgR0YWdzGAQgAygJEi4KCmV4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wImAKHENyZWF0ZVNlcnZpY2VBY2NvdW50UmVzcG9uc2USMQoPc2VydmljZV9hY2NvdW50GAEgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnQSDQoFdG9rZW4YAiABKAkizgEKG1VwZGF0ZVNlcnZpY2VBY2NvdW50UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQESNQoEbmFtZRgCIAEoCUInukgkciIQARiAAjIbXlthLXpBLVowLTldW2EtekEtWjAtOS1fXSokEh0KC2Rlc2NyaXB0aW9uGAMgASgJQgi6SAVyAxjoBxI1CgRyb2xlGAQgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZUIOukgLggEIGAAYARgCGAMSDAoEdGFncxgFIAMoCSJRChxVcGRhdGVTZXJ2aWNlQWNjb3VudFJlc3BvbnNlEjEKD3NlcnZpY2VfYWNjb3VudBgBIAEoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50IjMKG0RlbGV0ZVNlcnZpY2VBY2NvdW50UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiHgocRGVsZXRlU2VydmljZUFjY291bnRSZXNwb25zZSKdAQoaTGlzdFNlcnZpY2VBY2NvdW50c1JlcXVlc3QSGAoFbGltaXQYASABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAiABKAVCB7pIBBoCKAASDQoFcXVlcnkYAyABKAkSLwoEcm9sZRgEIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGVCCLpIBYIBAhABEgwKBHRhZ3MYBSADKAkiYAobTGlzdFNlcnZpY2VBY2NvdW50c1Jlc3BvbnNlEjIKEHNlcnZpY2VfYWNjb3VudHMYASADKAsyGC5ub2trdS52MS5TZXJ2aWNlQWNjb3VudBINCgV0b3RhbBgCIAEoBTK8BAoVU2VydmljZUFjY291bnRTZXJ2aWNlEmcKEUdldFNlcnZpY2VBY2NvdW50EiIubm9ra3UudjEuR2V0U2VydmljZUFjY291bnRSZXF1ZXN0GiMubm9ra3UudjEuR2V0U2VydmljZUFjY291bnRSZXNwb25zZSIJkAIBwvMYAhgCEm0KE0xpc3RTZXJ2aWNlQWNjb3VudHMSJC5ub2trdS52MS5MaXN0U2VydmljZUFjY291bnRzUmVxdWVzdBolLm5va2t1LnYxLkxpc3RTZXJ2aWNlQWNjb3VudHNSZXNwb25zZSIJkAIBwvMYAhgCEm0KFENyZWF0ZVNlcnZpY2VBY2NvdW50EiUubm9ra3UudjEuQ3JlYXRlU2VydmljZUFjY291bnRSZXF1ZXN0GiYubm9ra3UudjEuQ3JlYXRlU2VydmljZUFjY291bnRSZXNwb25zZSIGwvMYAhgDEm0KFFVwZGF0ZVNlcnZpY2VBY2NvdW50EiUubm9ra3UudjEuVXBkYXRlU2VydmljZUFjY291bnRSZXF1ZXN0GiYubm9ra3UudjEuVXBkYXRlU2VydmljZUFjY291bnRSZXNwb25zZSIGwvMYAhgDEm0KFERlbGV0ZVNlcnZpY2VBY2NvdW50EiUubm9ra3UudjEuRGVsZXRlU2VydmljZUFjY291bnRSZXF1ZXN0GiYubm9ra3UudjEuRGVsZXRlU2VydmljZUFjY291bnRSZXNwb25zZSIGwvMYAhgDYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Ch5ub2trdS92MS9zZXJ2aWNlX2FjY291bnQucHJvdG8SCG5va2t1LnYxIrwCCg5TZXJ2aWNlQWNjb3VudBIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEiUKBHJvbGUYBCABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlEgwKBHRhZ3MYBSADKAkSNAoQdG9rZW5fZXhwaXJlc19hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF91c2VkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCIwChhHZXRTZXJ2aWNlQWNjb3VudFJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIk4KGUdldFNlcnZpY2VBY2NvdW50UmVzcG9uc2USMQoPc2VydmljZV9hY2NvdW50GAEgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnQi7gEKG0NyZWF0ZVNlcnZpY2VBY2NvdW50UmVxdWVzdBI1CgRuYW1lGAEgASgJQie6SCRyIhABGIACMhteW2EtekEtWjAtOV1bYS16QS1aMC05LV9dKiQSHQoLZGVzY3JpcHRpb24YAiABKAlCCLpIBXIDGOgHEjUKBHJvbGUYAyABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlQg66SAuCAQgYABgBGAIYAxIMCgR0YWdzGAQgAygJEjQKEHRva2VuX2V4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wImAKHENyZWF0ZVNlcnZpY2VBY2NvdW50UmVzcG9uc2USMQoPc2VydmljZV9hY2NvdW50GAEgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnQSDQoFdG9rZW4YAiABKAkizgEKG1VwZGF0ZVNlcnZpY2VBY2NvdW50UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQESNQoEbmFtZRgCIAEoCUInukgkciIQARiAAjIbXlthLXpBLVowLTldW2EtekEtWjAtOS1fXSokEh0KC2Rlc2NyaXB0aW9uGAMgASgJQgi6SAVyAxjoBxI1CgRyb2xlGAQgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZUIOukgLggEIGAAYARgCGAMSDAoEdGFncxgFIAMoCSJRChxVcGRhdGVTZXJ2aWNlQWNjb3VudFJlc3BvbnNlEjEKD3NlcnZpY2VfYWNjb3VudBgBIAEoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50IjMKG0RlbGV0ZVNlcnZpY2VBY2NvdW50UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiHgocRGVsZXRlU2VydmljZUFjY291bnRSZXNwb25zZSJuCiBSb3RhdGVTZXJ2aWNlQWNjb3VudFRva2VuUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQESNAoQdG9rZW5fZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiZQohUm90YXRlU2VydmljZUFjY291bnRUb2tlblJlc3BvbnNlEjEKD3NlcnZpY2VfYWNjb3VudBgBIAEoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50Eg0KBXRva2VuGAIgASgJIp0BChpMaXN0U2VydmljZUFjY291bnRzUmVxdWVzdBIYCgVsaW1pdBgBIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgCIAEoBUIHukgEGgIoABINCgVxdWVyeRgDIAEoCRIvCgRyb2xlGAQgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZUIIukgFggECEAESDAoEdGFncxgFIAMoCSJgChtMaXN0U2VydmljZUFjY291bnRzUmVzcG9uc2USMgoQc2VydmljZV9hY2NvdW50cxgBIAMoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50Eg0KBXRvdGFsGAIgASgFMroFChVTZXJ2aWNlQWNjb3VudFNlcnZpY2USZwoRR2V0U2VydmljZUFjY291bnQSIi5ub2trdS52MS5HZXRTZXJ2aWNlQWNjb3VudFJlcXVlc3QaIy5ub2trdS52MS5HZXRTZXJ2aWNlQWNjb3VudFJlc3BvbnNlIgmQAgHC8xgCGAISbQoTTGlzdFNlcnZpY2VBY2NvdW50cxIkLm5va2t1LnYxLkxpc3RTZXJ2aWNlQWNjb3VudHNSZXF1ZXN0GiUubm9ra3UudjEuTGlzdFNlcnZpY2VBY2NvdW50c1Jlc3BvbnNlIgmQAgHC8xgCGAISbQoUQ3JlYXRlU2VydmljZUFjY291bnQSJS5ub2trdS52MS5DcmVhdGVTZXJ2aWNlQWNjb3VudFJlcXVlc3QaJi5ub2trdS52MS5DcmVhdGVTZXJ2aWNlQWNjb3VudFJlc3BvbnNlIgbC8xgCGAMSbQoUVXBkYXRlU2VydmljZUFjY291bnQSJS5ub2trdS52MS5VcGRhdGVTZXJ2aWNlQWNjb3VudFJlcXVlc3QaJi5ub2trdS52MS5VcGRhdGVTZXJ2aWNlQWNjb3VudFJlc3BvbnNlIgbC8xgCGAMSbQoURGVsZXRlU2VydmljZUFjY291bnQSJS5ub2trdS52MS5EZWxldGVTZXJ2aWNlQWNjb3VudFJlcXVlc3QaJi5ub2trdS52MS5EZWxldGVTZXJ2aWNlQWNjb3VudFJlc3BvbnNlIgbC8xgCGAMSfAoZUm90YXRlU2VydmljZUFjY291bnRUb2tlbhIqLm5va2t1LnYxLlJvdGF0ZVNlcnZpY2VBY2NvdW50VG9rZW5SZXF1ZXN0Gisubm9ra3UudjEuUm90YXRlU2VydmljZUFjY291bnRUb2tlblJlc3BvbnNlIgbC8xgCGANiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.ServiceAccount
@@ -47,9 +47,11 @@ export type ServiceAccount = Message<"nokku.v1.ServiceAccount"> & {
   tags: string[];
 
   /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 6;
+   * When the token stops working. Unset never expires.
+   *
+   * @generated from field: google.protobuf.Timestamp token_expires_at = 6;
    */
-  expiresAt?: Timestamp | undefined;
+  tokenExpiresAt?: Timestamp | undefined;
 
   /**
    * @generated from field: google.protobuf.Timestamp last_used_at = 7;
@@ -136,9 +138,9 @@ export type CreateServiceAccountRequest = Message<"nokku.v1.CreateServiceAccount
   tags: string[];
 
   /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 5;
+   * @generated from field: google.protobuf.Timestamp token_expires_at = 5;
    */
-  expiresAt?: Timestamp | undefined;
+  tokenExpiresAt?: Timestamp | undefined;
 };
 
 /**
@@ -259,6 +261,53 @@ export const DeleteServiceAccountResponseSchema: GenMessage<DeleteServiceAccount
   messageDesc(file_nokku_v1_service_account, 8);
 
 /**
+ * @generated from message nokku.v1.RotateServiceAccountTokenRequest
+ */
+export type RotateServiceAccountTokenRequest = Message<"nokku.v1.RotateServiceAccountTokenRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * The expiry is replaced as sent. Leaving it out means the new token never
+   * expires.
+   *
+   * @generated from field: google.protobuf.Timestamp token_expires_at = 2;
+   */
+  tokenExpiresAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.RotateServiceAccountTokenRequest.
+ * Use `create(RotateServiceAccountTokenRequestSchema)` to create a new message.
+ */
+export const RotateServiceAccountTokenRequestSchema: GenMessage<RotateServiceAccountTokenRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_service_account, 9);
+
+/**
+ * @generated from message nokku.v1.RotateServiceAccountTokenResponse
+ */
+export type RotateServiceAccountTokenResponse = Message<"nokku.v1.RotateServiceAccountTokenResponse"> & {
+  /**
+   * @generated from field: nokku.v1.ServiceAccount service_account = 1;
+   */
+  serviceAccount?: ServiceAccount | undefined;
+
+  /**
+   * @generated from field: string token = 2;
+   */
+  token: string;
+};
+
+/**
+ * Describes the message nokku.v1.RotateServiceAccountTokenResponse.
+ * Use `create(RotateServiceAccountTokenResponseSchema)` to create a new message.
+ */
+export const RotateServiceAccountTokenResponseSchema: GenMessage<RotateServiceAccountTokenResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_service_account, 10);
+
+/**
  * @generated from message nokku.v1.ListServiceAccountsRequest
  */
 export type ListServiceAccountsRequest = Message<"nokku.v1.ListServiceAccountsRequest"> & {
@@ -293,7 +342,7 @@ export type ListServiceAccountsRequest = Message<"nokku.v1.ListServiceAccountsRe
  * Use `create(ListServiceAccountsRequestSchema)` to create a new message.
  */
 export const ListServiceAccountsRequestSchema: GenMessage<ListServiceAccountsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_service_account, 9);
+  messageDesc(file_nokku_v1_service_account, 11);
 
 /**
  * @generated from message nokku.v1.ListServiceAccountsResponse
@@ -315,7 +364,7 @@ export type ListServiceAccountsResponse = Message<"nokku.v1.ListServiceAccountsR
  * Use `create(ListServiceAccountsResponseSchema)` to create a new message.
  */
 export const ListServiceAccountsResponseSchema: GenMessage<ListServiceAccountsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_service_account, 10);
+  messageDesc(file_nokku_v1_service_account, 12);
 
 /**
  * @generated from service nokku.v1.ServiceAccountService
@@ -360,6 +409,16 @@ export const ServiceAccountService: GenService<{
     methodKind: "unary";
     input: typeof DeleteServiceAccountRequestSchema;
     output: typeof DeleteServiceAccountResponseSchema;
+  },
+  /**
+   * The old token stops working with the call. Grants and the id stay.
+   *
+   * @generated from rpc nokku.v1.ServiceAccountService.RotateServiceAccountToken
+   */
+  rotateServiceAccountToken: {
+    methodKind: "unary";
+    input: typeof RotateServiceAccountTokenRequestSchema;
+    output: typeof RotateServiceAccountTokenResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_nokku_v1_service_account, 0);

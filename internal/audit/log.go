@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
 	"net/http"
@@ -131,7 +132,7 @@ func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer
 		return
 	}
 	e.Timestamp = time.Now().UTC()
-	e.ActorID, e.ActorKind, e.ActorName = p.ID, string(p.Kind), p.Email
+	e.ActorID, e.ActorKind, e.ActorName = p.ID, string(p.Kind), cmp.Or(p.Email, p.Name)
 	if header != nil {
 		e.IP = strings.ToValidUTF8(realip.Bucket(header, peer), "")
 		e.UserAgent = cut(strings.ToValidUTF8(header.Get("User-Agent"), ""), maxUserAgent)

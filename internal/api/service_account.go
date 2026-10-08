@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
@@ -51,13 +52,9 @@ func (s *serviceAccountService) CreateServiceAccount(
 			Role:        role,
 			TokenHash:   &tokenHash,
 		}
-
-		if req.GetExpiresAt() != nil && !req.GetExpiresAt().AsTime().IsZero() {
-			expiry := req.GetExpiresAt().AsTime()
-			if expiry.Before(time.Now()) {
-				return newError(connect.CodeInvalidArgument, "expires_at must be in the future")
-			}
-			params.ExpiresAt = &expiry
+		params.TokenExpiresAt, err = tokenExpiry(req.GetTokenExpiresAt())
+		if err != nil {
+			return err
 		}
 
 		saID, err := q.CreateServiceAccount(ctx, params)
@@ -150,6 +147,50 @@ func (s *serviceAccountService) DeleteServiceAccount(
 		return nil, err
 	}
 	return &nokkuv1.DeleteServiceAccountResponse{}, nil
+}
+
+// RotateServiceAccountToken keeps the account, its id and its grants. Only the
+// token changes, so nothing that names the account has to be set up again.
+func (s *serviceAccountService) RotateServiceAccountToken(
+	ctx context.Context,
+	req *nokkuv1.RotateServiceAccountTokenRequest,
+) (*nokkuv1.RotateServiceAccountTokenResponse, error) {
+	expiry, err := tokenExpiry(req.GetTokenExpiresAt())
+	if err != nil {
+		return nil, err
+	}
+	raw, tokenHash := iam.NewAPIKey()
+
+	var result *db.ServiceAccount
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
+		if err := checkCanManageServiceAccount(ctx, q, req.GetId()); err != nil {
+			return err
+		}
+		result, err = q.RotateServiceAccountToken(ctx, &db.RotateServiceAccountTokenParams{
+			ServiceAccountID: req.GetId(),
+			TokenHash:        &tokenHash,
+			TokenExpiresAt:   expiry,
+		})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.RotateServiceAccountTokenResponse{
+		ServiceAccount: result.ToProto(),
+		Token:          &raw,
+	}, nil
+}
+
+// tokenExpiry is nil for a token that never expires.
+func tokenExpiry(ts *timestamppb.Timestamp) (*time.Time, error) {
+	if ts == nil {
+		return nil, nil
+	}
+	expiry := ts.AsTime()
+	if expiry.Before(time.Now()) {
+		return nil, newError(connect.CodeInvalidArgument, "token_expires_at must be in the future")
+	}
+	return &expiry, nil
 }
 
 func checkCanManageServiceAccount(ctx context.Context, q *db.Queries, id string) error {

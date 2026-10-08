@@ -190,10 +190,10 @@ CREATE TABLE IF NOT EXISTS service_accounts (
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL, -- e.g., "github-actions-deploy", "ansible-prod"
   description TEXT,
-  token_hash TEXT, -- bearer credential for the service account (HashedToken)
-  role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 5), -- like users.role
+  token_hash TEXT UNIQUE, -- bearer credential for the service account (HashedToken)
+  role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 3), -- like users.role, the editor at most
   last_used_at TIMESTAMPTZ,
-  expires_at TIMESTAMPTZ, -- Optional expiration for temporary access
+  token_expires_at TIMESTAMPTZ, -- NULL never expires
   tags TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

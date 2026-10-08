@@ -164,17 +164,17 @@ type ScimToken struct {
 }
 
 type ServiceAccount struct {
-	ID          string              `json:"id"`
-	WorkspaceID string              `json:"workspaceId"`
-	Name        string              `json:"name"`
-	Description *string             `json:"description"`
-	TokenHash   *crypto.HashedToken `json:"tokenHash"`
-	Role        nokku.WorkspaceRole `json:"role"`
-	LastUsedAt  *time.Time          `json:"lastUsedAt"`
-	ExpiresAt   *time.Time          `json:"expiresAt"`
-	Tags        []string            `json:"tags"`
-	CreatedAt   time.Time           `json:"createdAt"`
-	UpdatedAt   time.Time           `json:"updatedAt"`
+	ID             string              `json:"id"`
+	WorkspaceID    string              `json:"workspaceId"`
+	Name           string              `json:"name"`
+	Description    *string             `json:"description"`
+	TokenHash      *crypto.HashedToken `json:"tokenHash"`
+	Role           nokku.WorkspaceRole `json:"role"`
+	LastUsedAt     *time.Time          `json:"lastUsedAt"`
+	TokenExpiresAt *time.Time          `json:"tokenExpiresAt"`
+	Tags           []string            `json:"tags"`
+	CreatedAt      time.Time           `json:"createdAt"`
+	UpdatedAt      time.Time           `json:"updatedAt"`
 }
 
 type Session struct {

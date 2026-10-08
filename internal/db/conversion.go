@@ -109,15 +109,15 @@ func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
 		return nil
 	}
 	return &nokkuv1.ServiceAccount{
-		Id:          &s.ID,
-		Name:        &s.Name,
-		Description: s.Description,
-		Role:        &s.Role,
-		Tags:        s.Tags,
-		ExpiresAt:   SafeTimestamp(s.ExpiresAt),
-		LastUsedAt:  SafeTimestamp(s.LastUsedAt),
-		CreatedAt:   SafeTimestamp(&s.CreatedAt),
-		UpdatedAt:   SafeTimestamp(&s.UpdatedAt),
+		Id:             &s.ID,
+		Name:           &s.Name,
+		Description:    s.Description,
+		Role:           &s.Role,
+		Tags:           s.Tags,
+		TokenExpiresAt: SafeTimestamp(s.TokenExpiresAt),
+		LastUsedAt:     SafeTimestamp(s.LastUsedAt),
+		CreatedAt:      SafeTimestamp(&s.CreatedAt),
+		UpdatedAt:      SafeTimestamp(&s.UpdatedAt),
 	}
 }
 

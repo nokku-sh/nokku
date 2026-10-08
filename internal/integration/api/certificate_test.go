@@ -11,11 +11,14 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
@@ -122,6 +125,67 @@ func TestSignSSHCertificate(t *testing.T) {
 	_, err = sign(targetID)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err),
 		"a revoked grant still got a certificate signed, %v", err)
+}
+
+// A service account's certificate lives an hour at most and never past its
+// token. A leaked or expired token leaves no days of access behind.
+func TestServiceAccountCertificateLifetime(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
+	seedDefaultCA(t, srv, adminAuth)
+	_, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	require.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, enrolled.GetStatus())
+	targetID := enrolled.GetTargetId()
+
+	accounts := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth)
+	tokenExpiry := time.Now().Add(10 * time.Minute)
+	created, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
+		Name:           new(uniq("ci")),
+		TokenExpiresAt: timestamppb.New(tokenExpiry),
+	})
+	require.NoError(t, err)
+	id := created.GetServiceAccount().GetId()
+
+	principals := nokkuv1connect.NewPrincipalServiceClient(srv.Client(), srv.URL, adminAuth)
+	root, err := principals.AddPrincipal(t.Context(), &nokkuv1.AddPrincipalRequest{
+		TargetId: &targetID,
+		Username: new("root"),
+	})
+	require.NoError(t, err)
+	_, err = principals.AddSubjectsToPrincipal(t.Context(), &nokkuv1.AddSubjectsToPrincipalRequest{
+		Id:         new(root.GetPrincipal().GetId()),
+		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT.Enum(),
+		SubjectIds: []string{id},
+	})
+	require.NoError(t, err)
+
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	sshPub, err := gossh.NewPublicKey(pub)
+	require.NoError(t, err)
+	// It asks for two days, which the CA would give a person.
+	validUntil := func(token string) time.Time {
+		res, err := nokkuv1connect.NewCertificateServiceClient(
+			srv.Client(), srv.URL, header("Authorization", "Bearer "+token),
+		).SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
+			TargetId:  &targetID,
+			PublicKey: new(string(gossh.MarshalAuthorizedKey(sshPub))),
+			Ttl:       durationpb.New(48 * time.Hour),
+		})
+		require.NoError(t, err)
+		return res.GetExpiresAt().AsTime()
+	}
+
+	assert.False(t, validUntil(created.GetToken()).After(tokenExpiry), "the certificate outlives the token")
+
+	rotated, err := accounts.RotateServiceAccountToken(t.Context(), &nokkuv1.RotateServiceAccountTokenRequest{Id: &id})
+	require.NoError(t, err)
+	assert.WithinDuration(t, time.Now().Add(time.Hour), validUntil(rotated.GetToken()), time.Minute,
+		"a token that never expires gets the hour, and the grant came along with the rotation")
 }
 
 // The subject and SANs are copied from the CSR, so signing is as powerful as

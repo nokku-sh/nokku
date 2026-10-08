@@ -72,7 +72,7 @@ func SignCertificate(
 		ttl = boundTTL(ttl, ca.HostDefaultTtl, ca.HostMaxTtl)
 	} else {
 		cert.CertType = ssh.UserCert
-		ttl = boundTTL(ttl, ca.UserDefaultTtl, ca.UserMaxTtl)
+		ttl = UserTTL(ca, ttl)
 		cert.Permissions, err = userPermissions(ca)
 		if err != nil {
 			return nil, err
@@ -84,6 +84,12 @@ func SignCertificate(
 		return nil, fmt.Errorf("failed to sign certificate: %w", err)
 	}
 	return cert, nil
+}
+
+// UserTTL is how long a user certificate of ca lives when ttl is asked for.
+// Nothing asked, or more than the CA allows, gets its default.
+func UserTTL(ca *db.CertificateAuthority, ttl time.Duration) time.Duration {
+	return boundTTL(ttl, ca.UserDefaultTtl, ca.UserMaxTtl)
 }
 
 func boundTTL(ttl, defaultTTL, maxTTL time.Duration) time.Duration {

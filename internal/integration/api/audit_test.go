@@ -65,3 +65,34 @@ func TestAuditDeniedCall(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	assert.Empty(t, rows(long[:256]), "a stranger's call reached the log")
 }
+
+// The log keeps the name of a service account. The account may be long gone
+// when somebody reads the row.
+func TestAuditNamesServiceAccount(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
+	name := uniq("ci")
+	sa, err := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth).
+		CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{Name: &name})
+	require.NoError(t, err)
+
+	target := uuid.NewV7().String()
+	_, err = nokkuv1connect.NewTargetServiceClient(
+		srv.Client(), srv.URL, header("Authorization", "Bearer "+sa.GetToken()),
+	).DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: &target})
+	require.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+
+	var rows []*db.ListAuditLogsRow
+	require.Eventually(t, func() bool {
+		_ = cfg.Conn.TenantTx(wsCtx(t, cfg), func(q *db.Queries) (err error) {
+			rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{Target: &target, Limit: 2})
+			return err
+		})
+		return len(rows) == 1
+	}, 5*time.Second, 20*time.Millisecond, "no audit row for the service account's call")
+	assert.Equal(t, string(actor.KindServiceAccount), rows[0].ActorKind)
+	assert.Equal(t, name, rows[0].ActorName, "the row must carry the name, not only the id")
+}
