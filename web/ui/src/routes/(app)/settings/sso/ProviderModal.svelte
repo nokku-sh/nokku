@@ -120,7 +120,7 @@
 		</Field.Field>
 	</div>
 
-	<Field.Field data-invalid={!form.issuerUrl}>
+	<Field.Field>
 		<Field.Label for="sso-issuer">Issuer URL</Field.Label>
 		<Input
 			id="sso-issuer"

@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/url"
+
+	"connectrpc.com/connect"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
@@ -36,6 +39,14 @@ func (s *ssoService) PutSSOProvider(
 	ctx context.Context,
 	req *nokkuv1.PutSSOProviderRequest,
 ) (*nokkuv1.PutSSOProviderResponse, error) {
+	// The hosted service only reaches a provider over TLS. On plain http
+	// whoever sits on the path answers as the provider and signs in as
+	// anyone. A self-hosted lab may run its provider without.
+	if s.cfg.SaaS {
+		if u, err := url.Parse(req.GetIssuerUrl()); err != nil || u.Scheme != "https" {
+			return nil, newError(connect.CodeInvalidArgument, "the issuer URL has to start with https://")
+		}
+	}
 	// sub values are only unique per issuer, so a new issuer makes the old
 	// identity mappings stale.
 	issuerChanged := false

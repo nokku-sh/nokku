@@ -83,6 +83,26 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "deleting it twice: %v", err)
 }
 
+// Only the hosted service insists on TLS, a lab runs its provider without.
+func TestSelfHostTakesAProviderOnPlainHTTP(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	owner := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+	)
+	sso := nokkuv1connect.NewSSOServiceClient(srv.Client(), srv.URL, owner)
+	const issuer = "http://keycloak.lab:8080/realms/master"
+	stored, err := sso.PutSSOProvider(t.Context(), &nokkuv1.PutSSOProviderRequest{
+		ProviderId: new("lab"), Name: new("Lab"), Enabled: new(true), IssuerUrl: new(issuer),
+		ClientId: new("nokku"), ClientSecret: new("s3cret"),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, issuer, stored.GetProvider().GetIssuerUrl())
+
+	_, err = sso.DeleteSSOProvider(t.Context(), &nokkuv1.DeleteSSOProviderRequest{ProviderId: new("lab")})
+	require.NoError(t, err)
+}
+
 // Enforcing SSO is a paid feature, and the test workspace is on Community.
 func TestEnforceSSOIsGated(t *testing.T) {
 	cfg, srv := newTestAPI(t)
