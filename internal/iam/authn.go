@@ -86,10 +86,7 @@ func (s *Service) authenticateAPIKey(ctx context.Context, raw string) (actor.Pri
 	if err != nil {
 		return actor.Principal{}, errInvalidCredentials
 	}
-	if sa.ExpiresAt != nil && sa.ExpiresAt.Before(s.now()) {
-		return actor.Principal{}, errCredentialsExpired
-	}
-	return actor.Principal{ID: sa.ID, Kind: actor.KindServiceAccount, Role: sa.Role}, nil
+	return actor.Principal{ID: sa.ID, Kind: actor.KindServiceAccount, Name: sa.Name, Role: sa.Role}, nil
 }
 
 func NewAPIKey() (raw string, hash crypto.HashedToken) {

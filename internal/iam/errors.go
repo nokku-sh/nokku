@@ -22,7 +22,6 @@ var (
 	ErrSSORequired        = errors.New("iam: single sign-on is required for this workspace")
 	errNoSession          = errors.New("iam: no session token")
 	errSessionExpired     = errors.New("iam: session expired")
-	errCredentialsExpired = errors.New("iam: credentials expired")
 	errIdentityLinked     = errors.New("iam: identity already linked to another account")
 	errIdentityRejected   = errors.New("iam: identity rejected")
 	// ErrDPoPRequired is advertised with a DPoP-Nonce header so the client

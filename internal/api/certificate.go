@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/audit"
@@ -23,6 +24,11 @@ import (
 	"github.com/nokku-sh/nokku/internal/pki"
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
+
+// serviceAccountCertTTL is the most a service account's certificate lives. A
+// job signs a fresh one when it runs, so a leaked token leaves an hour of
+// access behind and not days.
+const serviceAccountCertTTL = time.Hour
 
 type certificateService struct {
 	cfg *config.Config
@@ -228,6 +234,7 @@ func (s *certificateService) SignSSHCertificate(
 	caller, _ := actor.PrincipalFromContext(ctx)
 
 	var ca *db.CertificateAuthority
+	var sa *db.ServiceAccount
 	var principals []string
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		target, err := q.GetTarget(ctx, req.GetTargetId())
@@ -264,6 +271,10 @@ func (s *certificateService) SignSSHCertificate(
 			return newError(connect.CodeFailedPrecondition, "this server has no certificate authority")
 		}
 		ca, err = q.GetCA(ctx, *target.CaID)
+		if err != nil || caller.Kind != actor.KindServiceAccount {
+			return err
+		}
+		sa, err = q.GetServiceAccount(ctx, caller.ID)
 		return err
 	}); err != nil {
 		return nil, err
@@ -278,12 +289,21 @@ func (s *certificateService) SignSSHCertificate(
 		return nil, errNotSSHCA
 	}
 
+	ttl := req.GetTtl().AsDuration()
+	if sa != nil {
+		ttl = serviceAccountTTL(ca, ttl, sa.TokenExpiresAt)
+		// Nothing left would sign for the CA default.
+		if ttl <= 0 {
+			return nil, newError(connect.CodeUnauthenticated, "the token has expired")
+		}
+	}
+
 	cert, err := ssh.SignCertificate(
 		ca,
 		req.GetPublicKey(),
 		principals,
 		fmt.Sprintf("nokku:login:%s:%s", caller.Kind, caller.ID),
-		req.GetTtl().AsDuration(),
+		ttl,
 		gossh.UserCert,
 	)
 	if err != nil {
@@ -303,6 +323,15 @@ func (s *certificateService) SignSSHCertificate(
 		SignedCertificate: new(ssh.MarshalKey(cert)),
 		ExpiresAt:         timestamppb.New(expiry),
 	}, nil
+}
+
+// serviceAccountTTL keeps the certificate from outliving the token.
+func serviceAccountTTL(ca *db.CertificateAuthority, ttl time.Duration, tokenExpiresAt *time.Time) time.Duration {
+	ttl = min(ssh.UserTTL(ca, ttl), serviceAccountCertTTL)
+	if tokenExpiresAt != nil {
+		ttl = min(ttl, time.Until(*tokenExpiresAt))
+	}
+	return ttl
 }
 
 func (s *certificateService) SignX509Certificate(

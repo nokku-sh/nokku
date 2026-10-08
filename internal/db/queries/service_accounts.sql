@@ -1,12 +1,12 @@
 -- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (name, description, role, expires_at, tags, token_hash)
+  service_accounts (name, description, role, token_expires_at, tags, token_hash)
 VALUES
   (
     @name,
     @description,
     @role,
-    @expires_at,
+    @token_expires_at,
     COALESCE(@tags, '{}'::TEXT[]),
     @token_hash
   )
@@ -39,14 +39,14 @@ WHERE
     OR (
       sqlc.narg('is_active') = TRUE
       AND (
-        sa.expires_at IS NULL
-        OR sa.expires_at > NOW()
+        sa.token_expires_at IS NULL
+        OR sa.token_expires_at > NOW()
       )
     )
     OR (
       sqlc.narg('is_active') = FALSE
-      AND sa.expires_at IS NOT NULL
-      AND sa.expires_at <= NOW()
+      AND sa.token_expires_at IS NOT NULL
+      AND sa.token_expires_at <= NOW()
     )
   )
   AND (
@@ -78,19 +78,34 @@ WHERE
 RETURNING
   id;
 
+-- name: RotateServiceAccountToken :one
+-- The old hash is gone with the write, so the old token is too.
+UPDATE service_accounts
+SET
+  token_hash = @token_hash,
+  token_expires_at = @token_expires_at
+WHERE
+  id = @service_account_id
+RETURNING
+  *;
+
 -- name: DeleteServiceAccount :exec
 DELETE FROM service_accounts
 WHERE
   id = @service_account_id;
 
 -- name: GetServiceAccountByTokenHash :one
+-- An expired token finds nothing, this is the only place that checks.
 SELECT
   *
 FROM
   service_accounts
 WHERE
   token_hash = @token_hash
-  AND (expires_at IS NULL OR expires_at > NOW());
+  AND (
+    token_expires_at IS NULL
+    OR token_expires_at > NOW()
+  );
 
 -- name: TouchServiceAccount :exec
 -- Throttled so a busy key does not turn every request into a write.

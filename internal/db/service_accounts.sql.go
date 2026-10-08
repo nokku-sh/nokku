@@ -15,7 +15,7 @@ import (
 
 const createServiceAccount = `-- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (name, description, role, expires_at, tags, token_hash)
+  service_accounts (name, description, role, token_expires_at, tags, token_hash)
 VALUES
   (
     $1,
@@ -30,12 +30,12 @@ RETURNING
 `
 
 type CreateServiceAccountParams struct {
-	Name        string              `json:"name"`
-	Description *string             `json:"description"`
-	Role        nokku.WorkspaceRole `json:"role"`
-	ExpiresAt   *time.Time          `json:"expiresAt"`
-	Tags        interface{}         `json:"tags"`
-	TokenHash   *crypto.HashedToken `json:"tokenHash"`
+	Name           string              `json:"name"`
+	Description    *string             `json:"description"`
+	Role           nokku.WorkspaceRole `json:"role"`
+	TokenExpiresAt *time.Time          `json:"tokenExpiresAt"`
+	Tags           interface{}         `json:"tags"`
+	TokenHash      *crypto.HashedToken `json:"tokenHash"`
 }
 
 func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (string, error) {
@@ -43,7 +43,7 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAc
 		arg.Name,
 		arg.Description,
 		arg.Role,
-		arg.ExpiresAt,
+		arg.TokenExpiresAt,
 		arg.Tags,
 		arg.TokenHash,
 	)
@@ -65,7 +65,7 @@ func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID str
 
 const getServiceAccount = `-- name: GetServiceAccount :one
 SELECT
-  id, workspace_id, name, description, token_hash, role, last_used_at, expires_at, tags, created_at, updated_at
+  id, workspace_id, name, description, token_hash, role, last_used_at, token_expires_at, tags, created_at, updated_at
 FROM
   service_accounts
 WHERE
@@ -83,7 +83,7 @@ func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string
 		&i.TokenHash,
 		&i.Role,
 		&i.LastUsedAt,
-		&i.ExpiresAt,
+		&i.TokenExpiresAt,
 		&i.Tags,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -93,14 +93,18 @@ func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string
 
 const getServiceAccountByTokenHash = `-- name: GetServiceAccountByTokenHash :one
 SELECT
-  id, workspace_id, name, description, token_hash, role, last_used_at, expires_at, tags, created_at, updated_at
+  id, workspace_id, name, description, token_hash, role, last_used_at, token_expires_at, tags, created_at, updated_at
 FROM
   service_accounts
 WHERE
   token_hash = $1
-  AND (expires_at IS NULL OR expires_at > NOW())
+  AND (
+    token_expires_at IS NULL
+    OR token_expires_at > NOW()
+  )
 `
 
+// An expired token finds nothing, this is the only place that checks.
 func (q *Queries) GetServiceAccountByTokenHash(ctx context.Context, tokenHash *crypto.HashedToken) (*ServiceAccount, error) {
 	row := q.db.QueryRow(ctx, getServiceAccountByTokenHash, tokenHash)
 	var i ServiceAccount
@@ -112,7 +116,7 @@ func (q *Queries) GetServiceAccountByTokenHash(ctx context.Context, tokenHash *c
 		&i.TokenHash,
 		&i.Role,
 		&i.LastUsedAt,
-		&i.ExpiresAt,
+		&i.TokenExpiresAt,
 		&i.Tags,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -122,7 +126,7 @@ func (q *Queries) GetServiceAccountByTokenHash(ctx context.Context, tokenHash *c
 
 const listServiceAccounts = `-- name: ListServiceAccounts :many
 SELECT
-  sa.id, sa.workspace_id, sa.name, sa.description, sa.token_hash, sa.role, sa.last_used_at, sa.expires_at, sa.tags, sa.created_at, sa.updated_at,
+  sa.id, sa.workspace_id, sa.name, sa.description, sa.token_hash, sa.role, sa.last_used_at, sa.token_expires_at, sa.tags, sa.created_at, sa.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa
@@ -138,14 +142,14 @@ WHERE
     OR (
       $3 = TRUE
       AND (
-        sa.expires_at IS NULL
-        OR sa.expires_at > NOW()
+        sa.token_expires_at IS NULL
+        OR sa.token_expires_at > NOW()
       )
     )
     OR (
       $3 = FALSE
-      AND sa.expires_at IS NOT NULL
-      AND sa.expires_at <= NOW()
+      AND sa.token_expires_at IS NOT NULL
+      AND sa.token_expires_at <= NOW()
     )
   )
   AND (
@@ -198,7 +202,7 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 			&i.ServiceAccount.TokenHash,
 			&i.ServiceAccount.Role,
 			&i.ServiceAccount.LastUsedAt,
-			&i.ServiceAccount.ExpiresAt,
+			&i.ServiceAccount.TokenExpiresAt,
 			&i.ServiceAccount.Tags,
 			&i.ServiceAccount.CreatedAt,
 			&i.ServiceAccount.UpdatedAt,
@@ -212,6 +216,43 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 		return nil, err
 	}
 	return items, nil
+}
+
+const rotateServiceAccountToken = `-- name: RotateServiceAccountToken :one
+UPDATE service_accounts
+SET
+  token_hash = $1,
+  token_expires_at = $2
+WHERE
+  id = $3
+RETURNING
+  id, workspace_id, name, description, token_hash, role, last_used_at, token_expires_at, tags, created_at, updated_at
+`
+
+type RotateServiceAccountTokenParams struct {
+	TokenHash        *crypto.HashedToken `json:"tokenHash"`
+	TokenExpiresAt   *time.Time          `json:"tokenExpiresAt"`
+	ServiceAccountID string              `json:"serviceAccountId"`
+}
+
+// The old hash is gone with the write, so the old token is too.
+func (q *Queries) RotateServiceAccountToken(ctx context.Context, arg *RotateServiceAccountTokenParams) (*ServiceAccount, error) {
+	row := q.db.QueryRow(ctx, rotateServiceAccountToken, arg.TokenHash, arg.TokenExpiresAt, arg.ServiceAccountID)
+	var i ServiceAccount
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.Description,
+		&i.TokenHash,
+		&i.Role,
+		&i.LastUsedAt,
+		&i.TokenExpiresAt,
+		&i.Tags,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
 }
 
 const touchServiceAccount = `-- name: TouchServiceAccount :exec

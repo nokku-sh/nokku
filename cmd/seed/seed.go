@@ -105,7 +105,7 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 			TokenHash: &hash,
 		}
 		if i%3 == 0 {
-			p.ExpiresAt = new(time.Now().AddDate(0, 1+roll(6), 0))
+			p.TokenExpiresAt = new(time.Now().AddDate(0, 1+roll(6), 0))
 		}
 		id, err := q.CreateServiceAccount(ctx, p)
 		if err != nil {

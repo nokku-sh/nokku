@@ -24,6 +24,8 @@ type Principal struct {
 	ID    string
 	Kind  Kind
 	Email string
+	// Name is set for a service account, the audit log keeps it.
+	Name string
 	// Role is the user's or service account's role, unset for daemons and SCIM.
 	Role nokkuv1.WorkspaceRole
 }

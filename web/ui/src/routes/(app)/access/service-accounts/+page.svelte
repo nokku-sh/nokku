@@ -98,9 +98,9 @@
 						: undefined
 				})
 		}),
-		columnHelper.accessor('expiresAt', {
+		columnHelper.accessor('tokenExpiresAt', {
 			header: 'Expiry',
-			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.expiresAt })
+			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.tokenExpiresAt })
 		}),
 		columnHelper.accessor('lastUsedAt', {
 			header: 'Last used',
