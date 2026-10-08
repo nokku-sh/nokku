@@ -19,7 +19,6 @@ import (
 
 const (
 	tokenLogin     = "login"
-	tokenSignup    = "signup"
 	magicLinkTTL   = 15 * time.Minute
 	bootstrapTTL   = 24 * time.Hour
 	loginVerifyURL = "/login/verify?token="
@@ -161,10 +160,16 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 	if err != nil {
 		return err
 	}
-	if err := s.sendSignupLink(ctx, email, name, workspace, link, magicLinkTTL.String()); err != nil {
-		s.dropUnsent(ctx, hash, err)
+	err = s.sendSignupLink(ctx, email, name, workspace, link, magicLinkTTL.String())
+	if err == nil {
+		return nil
 	}
-	return nil
+	s.dropUnsent(ctx, hash, err)
+	// On cooldown the link from a moment ago still works, the answer stays.
+	if errors.Is(err, emailverify.ErrCooldown) {
+		return nil
+	}
+	return ErrMailNotSent
 }
 
 // ConsumeMagicLink spends a sign-in or signup link and signs the browser

@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -25,11 +24,6 @@ import (
 type workspaceService struct {
 	cfg *config.Config
 }
-
-var errSingleWorkspace = connect.NewError(
-	connect.CodeFailedPrecondition,
-	errors.New("a self-hosted server keeps its workspace"),
-)
 
 func (s *workspaceService) GetWorkspace(
 	ctx context.Context,
@@ -125,7 +119,7 @@ func (s *workspaceService) CreateWorkspace(
 	}
 	if err := s.cfg.Email.SendMagicLinkEmail(ctx, owner.ID, owner.Email, link, (24 * time.Hour).String()); err != nil {
 		slog.Error("signup mail not sent", "error", err, "workspace_id", ws.ID)
-		return nil, newError(connect.CodeUnavailable, "the email could not be sent, try again in a few minutes")
+		return nil, errMailNotSent
 	}
 	return &nokkuv1.CreateWorkspaceResponse{Url: new(s.cfg.Tenant.BaseURL(ws.Slug))}, nil
 }

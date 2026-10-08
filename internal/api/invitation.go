@@ -19,11 +19,6 @@ type invitationService struct {
 	cfg *config.Config
 }
 
-var errInviteInvalid = connect.NewError(
-	connect.CodeFailedPrecondition,
-	errors.New("invalid or expired invitation"),
-)
-
 func (s *invitationService) GetInvitation(
 	ctx context.Context,
 	req *nokkuv1.GetInvitationRequest,
@@ -71,6 +66,8 @@ func (s *invitationService) AcceptInvitation(
 		return nil, newError(connect.CodeAlreadyExists, "an account with this email already exists, sign in instead")
 	case errors.Is(err, iam.ErrEmailRejected):
 		return nil, newError(connect.CodeInvalidArgument, "please enter a valid email address")
+	case errors.Is(err, iam.ErrMailNotSent):
+		return nil, errMailNotSent
 	case err != nil:
 		return nil, err
 	}
