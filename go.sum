@@ -230,8 +230,8 @@ github.com/mitchellh/reflectwalk v1.0.2 h1:G2LzWKi524PWgd3mLHV8Y5k7s6XUvT0Gef6zx
 github.com/mitchellh/reflectwalk v1.0.2/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx0jmZXqmk4esnw=
 github.com/mizuchilabs/kata v0.1.15 h1:elUyxJghTH+Ig25IEbHwSNMm3F4bHJPQOau+2vgs9WM=
 github.com/mizuchilabs/kata v0.1.15/go.mod h1:s24K0qob5pRZAE57lWKnInhl2qGScuWmAOrLh9Zd4Oo=
-github.com/nokku-sh/protos v0.2.5-0.20261007180141-db6b2e9b48c5 h1:0I6OmtQBzOIgATDWt+sRseTcdWDvTz5NRRs/bgttsCc=
-github.com/nokku-sh/protos v0.2.5-0.20261007180141-db6b2e9b48c5/go.mod h1:3Uexr6cV9gc/zl/+mk4q32pGvFlpgR7weEp/Zv2fOw8=
+github.com/nokku-sh/protos v0.2.5-0.20261008090145-d4b56692464b h1:3Jb7GlLaidcvQatSrKB431jXawrjlZ8XmCReb2ajAds=
+github.com/nokku-sh/protos v0.2.5-0.20261008090145-d4b56692464b/go.mod h1:3Uexr6cV9gc/zl/+mk4q32pGvFlpgR7weEp/Zv2fOw8=
 github.com/oauth2-proxy/mockoidc v0.0.0-20240214162133-caebfff84d25 h1:9bCMuD3TcnjeqjPT2gSlha4asp8NvgcFRYExCaikCxk=
 github.com/oauth2-proxy/mockoidc v0.0.0-20240214162133-caebfff84d25/go.mod h1:eDjgYHYDJbPLBLsyZ6qRaugP0mX8vePOhZ5id1fdzJw=
 github.com/pelletier/go-toml/v2 v2.4.3 h1:GTRvJQutkOSftxIFD5xw9aepkYNuPWmVJpffdDPYVpY=

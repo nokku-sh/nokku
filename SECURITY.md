@@ -102,7 +102,7 @@ With a KMS nothing has to be rotated by hand. The core rotates the data key ever
 
 - **Terminate TLS in front of the core.** It listens with plain HTTP. `compose.prod.yml` runs Caddy for this.
 - **Set `NOKKU_TRUSTED_PROXIES` to exactly your proxy.** The core only believes forwarded client-IP headers from these addresses. Too wide a range lets a client fake its address in the audit log and dodge rate limits.
-- **Leave `NOKKU_ALLOW_PRIVATE_NETWORKS` off unless you need it.** Workspace owners choose SSO provider URLs and admins choose audit webhook destinations, so the core refuses to connect to private, loopback and link-local addresses. Set it to `true` only when every such address is trusted, like a self-hosted install with its identity provider or SIEM on an internal network. Never turn it on when you host for other people.
+- **Leave `NOKKU_ALLOW_PRIVATE_NETWORKS` off unless you need it.** Workspace owners choose SSO provider URLs and audit webhook destinations, so the core refuses to connect to private, loopback and link-local addresses. Set it to `true` only when every such address is trusted, like a self-hosted install with its identity provider or SIEM on an internal network. Never turn it on when you host for other people.
 
 ### File storage
 

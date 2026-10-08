@@ -20,7 +20,7 @@
 
 	const update = workspace.update();
 	const can = user.can();
-	const plan = billing.get(() => can.admin);
+	const plan = billing.get(() => can.own);
 	const available = $derived(plan.data?.features?.['audit_streaming'] === true);
 
 	let url = $state('');
@@ -68,15 +68,15 @@
 	</Empty.Root>
 {/snippet}
 
-{#if !can.admin}
+{#if !can.own}
 	<Empty.Root class="border border-dashed">
 		<Empty.Header>
 			<Empty.Media variant="icon">
 				<ScrollText />
 			</Empty.Media>
-			<Empty.Title>Admins only</Empty.Title>
+			<Empty.Title>Owner only</Empty.Title>
 			<Empty.Description>
-				The destination and its signing secret are only shown to workspace admins.
+				The destination and its signing secret are only shown to the workspace owner.
 			</Empty.Description>
 		</Empty.Header>
 	</Empty.Root>

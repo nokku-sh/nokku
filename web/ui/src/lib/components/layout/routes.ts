@@ -78,7 +78,7 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			items: [
 				{ title: 'Workspace', url: '/settings', icon: SlidersHorizontal, shortcut: 's' },
 				{ title: 'Daemon defaults', url: '/settings/daemons', icon: ServerCog },
-				{ title: 'Audit streaming', url: '/settings/audit', icon: Radio, role: 'admin' },
+				{ title: 'Audit streaming', url: '/settings/audit', icon: Radio, role: 'owner' },
 				{ title: 'Single sign-on', url: '/settings/sso', icon: KeyRound },
 				{
 					title: 'Billing',
