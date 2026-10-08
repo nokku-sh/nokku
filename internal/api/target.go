@@ -122,8 +122,9 @@ func (s *targetService) insertTarget(
 		}
 
 		return q.InsertTargetPrincipals(ctx, &db.InsertTargetPrincipalsParams{
-			TargetID:  result.ID,
-			Usernames: []string{"root"},
+			TargetID:      result.ID,
+			Usernames:     []string{"root"},
+			MaxPrincipals: db.MaxTargetPrincipals,
 		})
 	}); err != nil {
 		return nil, err
