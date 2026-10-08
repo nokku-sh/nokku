@@ -45,7 +45,7 @@
 	function deny() {
 		result = 'denied';
 		message = 'Authorization request denied.';
-		pendingDeviceCode.current = undefined;
+		pendingDeviceCode.current = null;
 		history.replaceState(null, '', '/device');
 		submit('/auth/device/deny');
 	}
@@ -78,7 +78,7 @@
 			.then(async (response) => {
 				const body = (await response.json()) as DeviceVerifyResponse;
 				if (response.ok) {
-					pendingDeviceCode.current = undefined;
+					pendingDeviceCode.current = null;
 					if (denied) {
 						result = 'denied';
 						message = 'Authorization request denied.';

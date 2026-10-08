@@ -90,7 +90,7 @@ export function handleSessionExpired() {
 	if (!browser || publicPaths.some((p) => window.location.pathname.startsWith(p))) return;
 
 	const path = window.location.pathname + window.location.search;
-	returnTo.current = path === '/' ? undefined : { path, at: Date.now() };
+	returnTo.current = path === '/' ? null : { path, at: Date.now() };
 	leave();
 }
 
