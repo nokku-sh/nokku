@@ -90,7 +90,13 @@ func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 		cookies[name], _, _ = strings.Cut(rest, ";")
 	}
 	require.NotEmpty(t, cookies["nokku_session"])
-	require.NotEmpty(t, cookies["nokku_device"], "a new browser gets the device cookie")
+	var deviceCookie string
+	for name, value := range cookies {
+		if strings.HasPrefix(name, "nokku_device_") {
+			deviceCookie = value
+		}
+	}
+	require.NotEmpty(t, deviceCookie, "a new browser gets the device cookie")
 
 	account := func(bearer string) nokkuv1connect.AccountServiceClient {
 		return nokkuv1connect.NewAccountServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+bearer))
@@ -111,7 +117,7 @@ func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 	require.Contains(t, listed, "user")
 	require.Contains(t, listed, "device")
 
-	_, err = account(cookies["nokku_device"]).ListAccountSessions(t.Context(), &nokkuv1.ListAccountSessionsRequest{})
+	_, err = account(deviceCookie).ListAccountSessions(t.Context(), &nokkuv1.ListAccountSessionsRequest{})
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the device cookie signed in: %v", err)
 
 	_, err = account(

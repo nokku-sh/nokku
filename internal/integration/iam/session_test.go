@@ -309,9 +309,15 @@ func TestBrowserIsRememberedAndNeverSignsIn(t *testing.T) {
 		require.Error(t, err, "the device cookie signed in")
 	}
 
-	// Another account on the same browser is new there.
+	// Another account on the same browser is new there and gets a cookie of
+	// its own. Under one name the browser would drop the first for it.
 	other := e.user(t, o.ws, "other@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	assert.NotNil(t, e.svc.RememberDevice(ctx, header, addr, other), "a device of one account is known to another")
+	second := e.svc.RememberDevice(ctx, header, addr, other)
+	require.NotNil(t, second, "a device of one account is known to another")
+	require.NotEqual(t, cookie.Name, second.Name, "the second account's cookie replaces the first one's")
+	header.Set("Cookie", cookie.Name+"="+cookie.Value+"; "+second.Name+"="+second.Value)
+	assert.Nil(t, e.svc.RememberDevice(ctx, header, addr, u), "another account signing in made the browser new")
+	assert.Nil(t, e.svc.RememberDevice(ctx, header, addr, other), "the second account forgot the browser")
 
 	// Signing the account out everywhere forgets its devices too.
 	_, err = e.svc.RevokeUser(ctx, u.ID)
