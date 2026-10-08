@@ -14,33 +14,42 @@ import (
 
 const createRecording = `-- name: CreateRecording :one
 INSERT INTO
-  recordings (id, daemon_id, daemon_name, username, key)
+  recordings (id, daemon_id, daemon_name, username, key, started_at)
 SELECT
   $1,
   d.id,
   d.name,
   $2,
-  $3
+  $3,
+  CASE
+    WHEN $4::TIMESTAMPTZ BETWEEN d.created_at AND NOW() THEN $4::TIMESTAMPTZ
+    ELSE NOW()
+  END
 FROM
   daemons d
 WHERE
-  d.id = $4
+  d.id = $5
 RETURNING
   id, workspace_id, daemon_id, daemon_name, username, key, started_at, ended_at, size_bytes, complete, created_at
 `
 
 type CreateRecordingParams struct {
-	ID       string                `json:"id"`
-	Username string                `json:"username"`
-	Key      crypto.EncryptedBytes `json:"key"`
-	DaemonID string                `json:"daemonId"`
+	ID        string                `json:"id"`
+	Username  string                `json:"username"`
+	Key       crypto.EncryptedBytes `json:"key"`
+	StartedAt *time.Time            `json:"startedAt"`
+	DaemonID  string                `json:"daemonId"`
 }
 
+// The daemon names the start of a session it uploads late. A start before the
+// daemon enrolled or in the future is a clock that was wrong, and counts as
+// now, or retention would take the recording at once.
 func (q *Queries) CreateRecording(ctx context.Context, arg *CreateRecordingParams) (*Recording, error) {
 	row := q.db.QueryRow(ctx, createRecording,
 		arg.ID,
 		arg.Username,
 		arg.Key,
+		arg.StartedAt,
 		arg.DaemonID,
 	)
 	var i Recording

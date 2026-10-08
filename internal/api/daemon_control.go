@@ -328,11 +328,16 @@ func (s *daemonControlService) resolveUpload(
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
+		var startedAt *time.Time
+		if t := rm.GetStartedAt(); t.IsValid() {
+			startedAt = new(t.AsTime())
+		}
 		rec, err = q.CreateRecording(ctx, &db.CreateRecordingParams{
-			ID:       rm.GetRecordingId(),
-			DaemonID: daemonID,
-			Username: rm.GetUsername(),
-			Key:      recording.NewKey(),
+			ID:        rm.GetRecordingId(),
+			DaemonID:  daemonID,
+			Username:  rm.GetUsername(),
+			Key:       recording.NewKey(),
+			StartedAt: startedAt,
 		})
 		return err
 	}); err != nil {

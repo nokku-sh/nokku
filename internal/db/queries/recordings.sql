@@ -1,12 +1,19 @@
 -- name: CreateRecording :one
+-- The daemon names the start of a session it uploads late. A start before the
+-- daemon enrolled or in the future is a clock that was wrong, and counts as
+-- now, or retention would take the recording at once.
 INSERT INTO
-  recordings (id, daemon_id, daemon_name, username, key)
+  recordings (id, daemon_id, daemon_name, username, key, started_at)
 SELECT
   @id,
   d.id,
   d.name,
   @username,
-  @key
+  @key,
+  CASE
+    WHEN sqlc.narg('started_at')::TIMESTAMPTZ BETWEEN d.created_at AND NOW() THEN sqlc.narg('started_at')::TIMESTAMPTZ
+    ELSE NOW()
+  END
 FROM
   daemons d
 WHERE
