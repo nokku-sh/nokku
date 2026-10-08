@@ -29,7 +29,7 @@ export function useLiveChanges(enabled: () => boolean) {
 }
 
 async function follow(leaving: AbortSignal) {
-	// A broken stream may have missed changes, the next one starts by reading everything.
+	// Nobody listens between two streams, the next one starts by reading everything.
 	let missed = false;
 	let failures = 0;
 	while (!leaving.aborted) {
@@ -62,10 +62,10 @@ async function follow(leaving: AbortSignal) {
 			if (leaving.aborted) return;
 			// The account layer sends an ended session to /login.
 			if (ConnectError.from(error).code === Code.Unauthenticated) return;
-			missed = true;
 			failures++;
 		} finally {
 			clearTimeout(timer);
+			missed = true;
 		}
 		if (failures) await new Promise((resolve) => setTimeout(resolve, backoff(failures)));
 	}
