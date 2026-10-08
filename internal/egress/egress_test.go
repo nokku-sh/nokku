@@ -11,6 +11,7 @@ import (
 )
 
 func TestEgressClientRefusesPrivateAddresses(t *testing.T) {
+	t.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "")
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	t.Cleanup(srv.Close)
 
