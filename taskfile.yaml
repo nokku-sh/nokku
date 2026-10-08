@@ -112,6 +112,11 @@ tasks:
     cmds:
       - tern status --migrations internal/db/migrations
 
+  seed:
+    desc: Fill the dev database with fake data, flags go after --
+    cmds:
+      - go run ./cmd/seed {{.CLI_ARGS}}
+
   migrate:up:
     desc: Apply pending migrations (dev only; production auto-migrates on boot)
     cmds:
