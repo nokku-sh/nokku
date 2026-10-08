@@ -50,7 +50,6 @@ tasks:
     dir: web/ui
     cmds:
       - pnpm install; pnpm build
-      # The build empties the directory, the placeholder keeps go build working without node.
       - touch build/.gitkeep
 
   build:email:
@@ -58,6 +57,17 @@ tasks:
     dir: web/email
     cmds:
       - pnpm install; pnpm export
+      - touch out/.gitkeep
+
+  test:
+    desc: Run the unit tests
+    cmds:
+      - go test -race -count=1 -cover ./...
+
+  test:integration:
+    desc: Run the integration tests, they start Postgres, Keycloak and Vault in Docker
+    cmds:
+      - go test -tags integration -race -count=1 -cover -coverpkg=./internal/... ./internal/integration/...
 
   lint:
     desc: Run go vet & lint
@@ -67,7 +77,8 @@ tasks:
       # CI has no go.work, an unpushed protos change fails here first
       - GOWORK=off go build ./...
       - go fmt ./...
-      - go vet ./...
+      # The tag keeps internal/integration compiling, its tests run in test:integration
+      - go vet -tags integration ./...
       - govulncheck ./...
       - go test -race -count=1 -cover ./...
       - golangci-lint run --fix

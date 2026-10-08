@@ -18,6 +18,7 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/cache"
+	"github.com/nokku-sh/nokku/internal/db"
 )
 
 func TestRequestCredential(t *testing.T) {
@@ -231,8 +232,12 @@ func TestAdvertiseDPoPNonce(t *testing.T) {
 // Anonymous callers can fill the device grant store, so replay markers must
 // not live there.
 func TestDPoPReplayStoreIsNotShared(t *testing.T) {
-	env := newTestEnv(t)
-	if env.svc.DPoP.replay == env.svc.Device.grants {
+	// New only keeps the connection, nothing here reaches the database.
+	svc, err := New(t.Context(), Deps{Conn: &db.Connection{}, Secret: []byte("test-secret")})
+	if err != nil {
+		t.Fatalf("build iam service: %v", err)
+	}
+	if svc.DPoP.replay == svc.Device.grants {
 		t.Fatal("DPoP replay markers share the store anonymous callers write to")
 	}
 }

@@ -64,7 +64,7 @@ func RotateExpiring(ctx context.Context, conn *db.Connection) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 	for {
-		rotateExpiring(ctx, conn)
+		RotateDue(ctx, conn)
 		select {
 		case <-ctx.Done():
 			return
@@ -73,9 +73,10 @@ func RotateExpiring(ctx context.Context, conn *db.Connection) {
 	}
 }
 
-// rotateExpiring drains every due CA. A CA that fails is skipped for the rest
-// of the pass, so it cannot starve the others, and retried on the next one.
-func rotateExpiring(ctx context.Context, conn *db.Connection) {
+// RotateDue is one pass of RotateExpiring, it drains every due CA. A CA that
+// fails is skipped for the rest of the pass, so it cannot starve the others,
+// and retried on the next one.
+func RotateDue(ctx context.Context, conn *db.Connection) {
 	failed := []string{}
 	for ctx.Err() == nil {
 		var picked *db.CertificateAuthority

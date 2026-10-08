@@ -135,12 +135,19 @@ func (t *TinkEncryptor) Start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if err := t.update(ctx, t.currentKEK(), false); err != nil {
+				if err := t.Refresh(ctx); err != nil {
 					slog.Error("failed to refresh keyset", "error", err)
 				}
 			}
 		}
 	}()
+}
+
+// Refresh is one tick of Start. It wraps the keyset again, which follows a
+// key rotation inside the KMS, and adds a data key once the primary is older
+// than RotateInterval.
+func (t *TinkEncryptor) Refresh(ctx context.Context) error {
+	return t.update(ctx, t.currentKEK(), false)
 }
 
 // Rotate moves the keyset under a new key encryption key and rotates its
