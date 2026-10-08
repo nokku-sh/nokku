@@ -1,0 +1,128 @@
+//go:build integration
+
+// Package testenv starts what the integration tests run against. Each
+// service is a container of its own on a random port, so nothing has to run
+// on the host and the dev database is never touched.
+package testenv
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/moby/moby/api/types/container"
+	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+)
+
+// Pinned, a new upstream release must not fail the tests on its own.
+// compose.dev.yml runs the same versions.
+const (
+	postgresImage = "docker.io/postgres:18-alpine"
+	keycloakImage = "quay.io/keycloak/keycloak:26.8.0"
+	vaultImage    = "docker.io/hashicorp/vault:2.1.2"
+
+	// VaultToken is the root token of the server Vault starts.
+	VaultToken = "root"
+)
+
+// Postgres starts an empty server for this test binary and points the PG*
+// environment at it, where db.NewConnection and pgx.Connect read it. Call it
+// from TestMain and run stop after the tests.
+func Postgres() (stop func()) {
+	ctx := context.Background()
+	c, err := testcontainers.Run(ctx, postgresImage,
+		testcontainers.WithEnv(map[string]string{
+			"POSTGRES_USER":     "postgres",
+			"POSTGRES_PASSWORD": "postgres",
+			"POSTGRES_DB":       "nokku",
+			"PGDATA":            "/inmemory-db",
+		}),
+		testcontainers.WithTmpfs(map[string]string{"/inmemory-db": "rw"}),
+		testcontainers.WithExposedPorts("5432/tcp"),
+		// The image starts the server twice, the first one only runs the init scripts.
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
+			wait.ForListeningPort("5432/tcp"),
+		),
+	)
+	if err != nil {
+		fail("start postgres", err)
+	}
+	endpoint, err := c.PortEndpoint(ctx, "5432/tcp", "")
+	if err != nil {
+		fail("find the postgres port", err)
+	}
+	host, port, err := net.SplitHostPort(endpoint)
+	if err != nil {
+		fail("parse the postgres endpoint", err)
+	}
+	// Set, never defaulted. A developer's shell must not send the tests to
+	// another server.
+	for key, value := range map[string]string{
+		"PGHOST":     host,
+		"PGPORT":     port,
+		"PGUSER":     "postgres",
+		"PGPASSWORD": "postgres",
+		"PGDATABASE": "nokku",
+		"PGSSLMODE":  "disable",
+	} {
+		_ = os.Setenv(key, value)
+	}
+	return func() { _ = testcontainers.TerminateContainer(c) }
+}
+
+// Keycloak starts a dev server for the test and returns its root URL. The
+// admin is admin with the password admin.
+func Keycloak(t *testing.T) string {
+	t.Helper()
+	c, err := testcontainers.Run(t.Context(), keycloakImage,
+		testcontainers.WithCmd("start-dev"),
+		testcontainers.WithEnv(map[string]string{
+			"KEYCLOAK_ADMIN":          "admin",
+			"KEYCLOAK_ADMIN_PASSWORD": "admin",
+		}),
+		testcontainers.WithExposedPorts("8080/tcp"),
+		testcontainers.WithWaitStrategy(
+			wait.ForHTTP("/realms/master").WithPort("8080/tcp").WithStartupTimeout(3*time.Minute),
+		),
+	)
+	testcontainers.CleanupContainer(t, c)
+	require.NoError(t, err, "start keycloak")
+	root, err := c.PortEndpoint(t.Context(), "8080/tcp", "http")
+	require.NoError(t, err)
+	return root
+}
+
+// Vault starts a dev server for the test and returns its host and port. It
+// serves TLS with a self-signed certificate, nokku only talks https to
+// Vault. The root token is VaultToken.
+func Vault(t *testing.T) string {
+	t.Helper()
+	c, err := testcontainers.Run(t.Context(), vaultImage,
+		testcontainers.WithCmd("server", "-dev", "-dev-tls"),
+		testcontainers.WithEnv(map[string]string{"VAULT_DEV_ROOT_TOKEN_ID": VaultToken}),
+		testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
+			hc.CapAdd = append(hc.CapAdd, "IPC_LOCK")
+		}),
+		testcontainers.WithExposedPorts("8200/tcp"),
+		testcontainers.WithWaitStrategy(
+			wait.ForHTTP("/v1/sys/health").WithPort("8200/tcp").WithTLS(true).WithAllowInsecure(true),
+		),
+	)
+	testcontainers.CleanupContainer(t, c)
+	require.NoError(t, err, "start vault")
+	addr, err := c.PortEndpoint(t.Context(), "8200/tcp", "")
+	require.NoError(t, err)
+	return addr
+}
+
+// fail ends a TestMain, which has no t to fail.
+func fail(step string, err error) {
+	fmt.Fprintf(os.Stderr, "testenv: %s: %v\n", step, err)
+	os.Exit(1)
+}

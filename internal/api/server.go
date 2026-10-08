@@ -40,8 +40,6 @@ func New(cfg *config.Config) *Server {
 }
 
 func (s *Server) Start(ctx context.Context) error {
-	s.registerServices(ctx)
-
 	proto := new(http.Protocols)
 	proto.SetHTTP1(true)
 	proto.SetHTTP2(true)
@@ -50,7 +48,7 @@ func (s *Server) Start(ctx context.Context) error {
 		// Streams, relays and web terminals end with the root ctx, nothing else stops them.
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		Addr:              "0.0.0.0:" + s.cfg.Port,
-		Handler:           s.handler(),
+		Handler:           s.Handler(ctx),
 		Protocols:         proto,
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       30 * time.Second,
@@ -110,6 +108,14 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 			},
 		),
 	}
+}
+
+// Handler registers every route and returns what Start serves. The telemetry
+// exporters stop with ctx. Call it once per Server, the mux takes a route
+// only once.
+func (s *Server) Handler(ctx context.Context) http.Handler {
+	s.registerServices(ctx)
+	return s.handler()
 }
 
 // handler is the mux behind the middleware every request passes through.

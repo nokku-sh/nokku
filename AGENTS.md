@@ -22,7 +22,9 @@ task dev            # backend + web/ui dev server
 task backend        # go run ./cmd/nokku
 task frontend       # web/ui dev server (Vite, :5173)
 task gen            # sqlc + the web client from the pinned protos
-task lint           # tidy, GOWORK=off build, fmt, vet, govulncheck, test -race, golangci-lint --fix, web/ui fmt+lint
+task lint           # tidy, GOWORK=off build, fmt, vet, govulncheck, unit tests -race, golangci-lint --fix, web/ui fmt+lint
+task test           # unit tests, no services
+task test:integration  # internal/integration, starts its own containers, needs Docker
 task build          # UI build, then bin/nokku
 task build:ui       # web/ui into web/ui/build
 task build:email    # email templates into web/email/out
@@ -32,15 +34,25 @@ task migrate:up     # tern, dev only. Production migrates at boot
 Tests:
 
 ```bash
-docker compose -f compose.test.yml up -d postgres   # keycloak and vault too for the SSO and KMS tests
-go test ./...
-go test ./internal/api -run TestName -count=1
+go test ./...                                          # unit tests, no services
+go test -tags integration ./internal/integration/...   # needs Docker
+go test -tags integration ./internal/integration/api -run TestName -count=1
 ```
 
-DB-backed packages call `testdb.Setup` in `TestMain` and get a fresh
-`nokku_test_<pkg>` database, so tests never touch the dev database. Without a
-reachable Postgres those tests skip locally. In CI that is a failure. The
-Keycloak and Vault tests behave the same way.
+Tests next to the code are unit tests. They call functions directly and never
+open a connection, so `go test ./...` takes about a second and needs nothing
+running.
+
+Everything that needs Postgres, Keycloak or Vault lives in
+`internal/integration/<area>`, behind the `integration` build tag. Those are
+external test packages, they only use what the package under test exports.
+`testenv.Postgres` in `TestMain` starts a container for that test binary and
+sets the `PG*` environment. `testenv.Keycloak` and `testenv.Vault` start
+theirs for the test that asks. Nothing reads `compose.dev.yml`, it is only
+the dev stack, and the dev database is never touched. The images are pinned
+in `testenv` and in `compose.dev.yml`, keep the two on the same versions. CI sets the tag in the
+prepare action, so the shared workflow lints and runs both kinds. An editor
+needs `-tags=integration` in the gopls build flags to work on that tree.
 
 Frontend, from `web/ui`: `pnpm check`, `pnpm fmt`, `pnpm lint`.
 
@@ -148,11 +160,13 @@ calls `SyncDaemon`.
   `tenant.Create` do. Tests seed the same way.
 - A new tenant table needs `workspace_id UUID NOT NULL DEFAULT
   current_workspace_id ()`, its name in the policy list in `001_base.sql`,
-  and a seed row in `seedEveryTable`. `internal/db/rls_test.go` reads the
-  tables from the catalog and fails on a table that misses any of them.
+  and a seed row in `seedEveryTable`. `internal/integration/db/rls_test.go`
+  reads the tables from the catalog and fails on a table that misses any of
+  them.
 - A tenant table the console shows goes into the `notify_change` list in
   `001_base.sql`, anything else into `silentTables` in
-  `internal/db/change_test.go`, which fails on a table in neither. A table
+  `internal/integration/db/change_test.go`, which fails on a table in
+  neither. A table
   that changes with nobody clicking also names its readers in
   `internal/live`, without them every console refetches everything. The UI
   never polls a list.
@@ -176,6 +190,10 @@ calls `SyncDaemon`.
   (`../docs/src/pages/pricing.astro`). Never in code, UI copy, emails,
   READMEs, or other docs pages.
 - Never log secrets. See `SECURITY.md`.
+- A test that needs a real service goes into `internal/integration`, never
+  next to the code. When it needs something a package does not export, reach
+  it through the public path first and export a small seam only when there is
+  none.
 - `BACKLOG.md` (gitignored, local) is the work queue when it exists.
 
 ## Product invariants

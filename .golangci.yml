@@ -1,5 +1,10 @@
 version: "2"
 
+run:
+  # The integration tree only builds with its tag.
+  build-tags:
+    - integration
+
 issues:
   max-same-issues: 50
 

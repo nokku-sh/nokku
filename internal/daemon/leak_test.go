@@ -6,8 +6,6 @@ import (
 	"os"
 	"runtime/pprof"
 	"testing"
-
-	"github.com/nokku-sh/nokku/internal/testdb"
 )
 
 // leaked skips detection when the toolchain has no goroutineleak profile.
@@ -24,7 +22,6 @@ func leaked() (string, bool) {
 // TestMain fails the suite on any provably stuck goroutine, the pool is the
 // leak-prone code.
 func TestMain(m *testing.M) {
-	testdb.Setup("daemon")
 	code := m.Run()
 	if code == 0 {
 		if report, ok := leaked(); ok {

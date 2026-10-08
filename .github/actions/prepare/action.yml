@@ -4,12 +4,13 @@ description: Runs before the shared CI, nightly and release steps.
 runs:
   using: composite
   steps:
-    # The database, SSO and KMS tests need them. They skip locally and fail in
-    # CI when nothing answers. Only the shared CI job sets RUN_TESTS.
-    - name: Start Postgres, Keycloak and Vault
+    # Only the shared CI job sets RUN_TESTS. With the tag its lint and test
+    # steps cover internal/integration too. Those tests start Postgres,
+    # Keycloak and Vault themselves, the runner only needs Docker.
+    - name: Include the integration tests
       if: env.RUN_TESTS == 'true'
       shell: bash
-      run: docker compose -f compose.test.yml up -d postgres keycloak vault
+      run: echo "GOFLAGS=-tags=integration" >> "$GITHUB_ENV"
 
     - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
       with:
@@ -28,11 +29,3 @@ runs:
       shell: bash
       working-directory: web/email
       run: pnpm install && pnpm export
-
-    - name: Wait for Postgres, Keycloak and Vault
-      if: env.RUN_TESTS == 'true'
-      shell: bash
-      run: |
-        timeout 60 sh -c 'until docker exec postgres pg_isready -U postgres >/dev/null; do sleep 1; done'
-        timeout 180 sh -c 'until curl -sf http://localhost:8080/realms/master >/dev/null; do sleep 2; done'
-        timeout 60 sh -c 'until curl -skf https://localhost:8200/v1/sys/health >/dev/null; do sleep 1; done'
