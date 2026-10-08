@@ -1,12 +1,15 @@
 package recording
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"log/slog"
 	"math"
 	"slices"
@@ -18,10 +21,14 @@ import (
 )
 
 const (
-	scrubTimeout  = 10 * time.Minute
-	maxScrubBytes = 64 << 20
-	scrubChunk    = 64 << 10
-	redaction     = "<redacted>"
+	scrubTimeout = 10 * time.Minute
+	// A stream is searched one window at a time, so a cast of any size is
+	// scrubbed in the same memory. The end of a window is searched again
+	// with the next, a secret shorter than the overlap is always seen whole.
+	scrubWindow  = 8 << 20
+	scrubOverlap = 64 << 10
+	scrubChunk   = 64 << 10
+	redaction    = "<redacted>"
 )
 
 // span is half-open.
@@ -31,60 +38,95 @@ type span struct {
 
 // ScrubRecording is best effort and never retried. A failure leaves the
 // recording as uploaded. It runs detached, the upload does not wait for it.
+// The part of a cut upload is scrubbed like a whole one, it may be all there
+// ever is.
 func (s *Service) ScrubRecording(ctx context.Context, rec *db.Recording) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), scrubTimeout)
+	run := &scrubRun{cancel: cancel, done: make(chan struct{})}
+	s.mu.Lock()
+	// An upload that writes the object right now scrubs it when it ends.
+	if s.uploads[rec.ID] > 0 {
+		s.mu.Unlock()
+		cancel()
+		return
+	}
+	earlier := s.scrubs[rec.ID]
+	s.scrubs[rec.ID] = run
+	s.mu.Unlock()
+
 	go func() {
-		defer cancel()
-		if err := s.scrub(ctx, rec); err != nil {
-			slog.Error("scrub recording failed, recording kept as uploaded",
-				"recording_id", rec.ID, "workspace_id", rec.WorkspaceID, "error", err)
-			// Audit it, a failed scrub leaves secrets in the stored object.
-			if s.events != nil {
-				event := &audit.Event{
-					Timestamp:   time.Now().UTC(),
-					WorkspaceID: rec.WorkspaceID,
-					Action:      "RecordingScrubFailed",
-					ActorKind:   "system",
-					Target:      rec.ID,
-					Details: map[string]any{
-						"daemon_id": rec.DaemonID,
-						"error":     err.Error(),
-					},
-				}
-				// The scrub ctx may have expired, that is one way to get here.
-				appendCtx, appendCancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
-				defer appendCancel()
-				if appendErr := s.events.Append(appendCtx, event); appendErr != nil {
-					slog.Warn("failed to write scrub failure audit log",
-						"recording_id", rec.ID, "error", appendErr)
-				}
+		defer func() {
+			cancel()
+			s.mu.Lock()
+			if s.scrubs[rec.ID] == run {
+				delete(s.scrubs, rec.ID)
 			}
+			s.mu.Unlock()
+			close(run.done)
+		}()
+		if earlier != nil {
+			earlier.cancel()
+			<-earlier.done
+		}
+		err := s.scrub(ctx, rec)
+		// Stopped for a new upload, which scrubs what it stores.
+		if err == nil || errors.Is(ctx.Err(), context.Canceled) {
+			return
+		}
+		slog.Error("scrub recording failed, recording kept as uploaded",
+			"recording_id", rec.ID, "workspace_id", rec.WorkspaceID, "error", err)
+		// Audit it, a failed scrub leaves secrets in the stored object.
+		if s.events == nil {
+			return
+		}
+		event := &audit.Event{
+			Timestamp:   time.Now().UTC(),
+			WorkspaceID: rec.WorkspaceID,
+			Action:      "RecordingScrubFailed",
+			ActorKind:   "system",
+			Target:      rec.ID,
+			Details: map[string]any{
+				"daemon_id": rec.DaemonID,
+				"error":     err.Error(),
+			},
+		}
+		// The scrub ctx may have expired, that is one way to get here.
+		appendCtx, appendCancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+		defer appendCancel()
+		if appendErr := s.events.Append(appendCtx, event); appendErr != nil {
+			slog.Warn("failed to write scrub failure audit log",
+				"recording_id", rec.ID, "error", appendErr)
 		}
 	}()
 }
 
+// scrub reads the stored cast twice. The first pass finds the secrets, the
+// second writes the cast back with them redacted. Nothing is held whole.
 func (s *Service) scrub(ctx context.Context, rec *db.Recording) error {
-	cast, err := s.readRecordingCast(ctx, rec)
+	rules, err := scrubRules()
 	if err != nil {
 		return err
 	}
-
-	redacted, changed, err := scrubCast(cast)
+	cast, err := s.openCast(ctx, rec)
 	if err != nil {
 		return err
 	}
-	if !changed {
+	spans, err := findSecrets(cast, rules, scrubWindow, scrubOverlap)
+	_ = cast.Close()
+	if err != nil {
+		return fmt.Errorf("search recording cast: %w", err)
+	}
+	if len(spans) == 0 {
 		return nil
 	}
 
-	var gz bytes.Buffer
-	zw := gzip.NewWriter(&gz)
-	if _, err = zw.Write(redacted); err != nil {
-		return fmt.Errorf("gzip scrubbed cast: %w", err)
+	// The store swaps the new object in on commit, so the old one can be
+	// read while the new one is written.
+	cast, err = s.openCast(ctx, rec)
+	if err != nil {
+		return err
 	}
-	if err = zw.Close(); err != nil {
-		return fmt.Errorf("finish gzip scrubbed cast: %w", err)
-	}
+	defer func() { _ = cast.Close() }()
 
 	wctx, abort := context.WithCancel(ctx)
 	defer abort()
@@ -92,10 +134,14 @@ func (s *Service) scrub(ctx context.Context, rec *db.Recording) error {
 	if err != nil {
 		return err
 	}
-	for chunk := range slices.Chunk(gz.Bytes(), scrubChunk) {
-		if err = w.WriteChunk(chunk); err != nil {
-			break
-		}
+	frames := bufio.NewWriterSize(w, scrubChunk)
+	zw := gzip.NewWriter(frames)
+	err = rewriteCast(cast, zw, spans)
+	if err == nil {
+		err = zw.Close()
+	}
+	if err == nil {
+		err = frames.Flush()
 	}
 	if err == nil {
 		err = w.writeFrame(frameEnd, nil)
@@ -113,94 +159,159 @@ func (s *Service) scrub(ctx context.Context, rec *db.Recording) error {
 	return nil
 }
 
-func (s *Service) readRecordingCast(ctx context.Context, rec *db.Recording) ([]byte, error) {
+// openCast opens the stored recording as its plain cast.
+func (s *Service) openCast(ctx context.Context, rec *db.Recording) (io.ReadCloser, error) {
 	fr, err := s.OpenReader(ctx, rec)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = fr.Close() }()
-
 	gz, err := gzip.NewReader(fr)
-	if err != nil {
+	cut := errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
+	if err != nil && (rec.Complete || !cut) {
+		_ = fr.Close()
 		return nil, fmt.Errorf("open recording gzip: %w", err)
 	}
-	defer func() { _ = gz.Close() }()
+	var cast io.Reader = gz
+	switch {
+	case err != nil:
+		// The upload broke off inside the gzip header, there is no cast yet.
+		cast = bytes.NewReader(nil)
+	case !rec.Complete:
+		cast = &cutCast{r: bufio.NewReaderSize(gz, scrubChunk)}
+	}
+	return struct {
+		io.Reader
+		io.Closer
+	}{cast, fr}, nil
+}
 
-	cast, err := io.ReadAll(io.LimitReader(gz, maxScrubBytes+1))
-	if err != nil {
-		return nil, fmt.Errorf("decompress recording cast: %w", err)
+// cutCast reads the cast of an upload that broke off. It ends after the last
+// whole line. The line the cut ran through goes, it may hold half a secret.
+type cutCast struct {
+	r    *bufio.Reader
+	line []byte
+}
+
+func (c *cutCast) Read(p []byte) (int, error) {
+	for len(c.line) == 0 {
+		line, err := c.r.ReadBytes('\n')
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return 0, io.EOF
+		}
+		if err != nil {
+			return 0, err
+		}
+		c.line = line
 	}
-	if len(cast) > maxScrubBytes {
-		return nil, fmt.Errorf("recording cast exceeds scrub limit of %d bytes", maxScrubBytes)
+	n := copy(p, c.line)
+	c.line = c.line[n:]
+	return n, nil
+}
+
+// castLines yields the lines of a cast, each with its line break.
+func castLines(cast io.Reader) iter.Seq2[[]byte, error] {
+	return func(yield func([]byte, error) bool) {
+		r := bufio.NewReaderSize(cast, scrubChunk)
+		for {
+			line, err := r.ReadBytes('\n')
+			if err != nil && !errors.Is(err, io.EOF) {
+				yield(nil, fmt.Errorf("decompress recording cast: %w", err))
+				return
+			}
+			if len(line) > 0 && !yield(line, nil) {
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
 	}
-	return cast, nil
 }
 
 type castEvent struct {
-	line      int
-	code      string
-	interval  float64
-	data      []byte
-	redacted  []byte
-	dataStart int
-	dataEnd   int
+	code     string
+	interval float64
+	data     []byte
 }
 
-// scrubCast detects over each stream concatenated, so secrets split across
-// events are still caught, then maps the redactions back onto the events.
-func scrubCast(cast []byte) ([]byte, bool, error) {
-	rules, err := scrubRules()
-	if err != nil {
-		return nil, false, err
+// findSecrets is the first pass. It returns the secrets of each stream as
+// offsets into that stream's data, all events of one kind put end to end, so
+// a secret split across events is still caught.
+func findSecrets(cast io.Reader, rules *scrubRuleSet, window, overlap int) (map[string][]span, error) {
+	type stream struct {
+		// buf is the part of the stream not searched to its end yet, base
+		// is where it starts.
+		buf   []byte
+		base  int
+		spans []span
 	}
-
-	lines := bytes.Split(cast, []byte("\n"))
-	events := make([]castEvent, 0, len(lines))
-	blobs := make(map[string][]byte)
-	for i, line := range lines {
-		if i == 0 {
-			continue // header
+	streams := map[string]*stream{}
+	search := func(st *stream) {
+		for _, sp := range secretSpans(st.buf, rules) {
+			st.spans = append(st.spans, span{st.base + sp.start, st.base + sp.end})
+		}
+	}
+	for line, err := range castLines(cast) {
+		if err != nil {
+			return nil, err
 		}
 		ev, ok := parseCastEvent(line)
 		if !ok {
 			continue
 		}
-		ev.line = i
-		ev.dataStart = len(blobs[ev.code])
-		blobs[ev.code] = append(blobs[ev.code], ev.data...)
-		ev.dataEnd = len(blobs[ev.code])
-		events = append(events, ev)
+		st := streams[ev.code]
+		if st == nil {
+			st = &stream{}
+			streams[ev.code] = st
+		}
+		st.buf = append(st.buf, ev.data...)
+		if len(st.buf) >= window {
+			search(st)
+			st.base += len(st.buf) - overlap
+			st.buf = append(st.buf[:0], st.buf[len(st.buf)-overlap:]...)
+		}
 	}
 
-	changed := false
-	for code, blob := range blobs {
-		spans := secretSpans(blob, rules)
-		if len(spans) == 0 {
+	found := map[string][]span{}
+	for code, st := range streams {
+		search(st)
+		if len(st.spans) == 0 {
 			continue
 		}
-		changed = true
-		redactEvents(events, code, blob, spans)
+		// The overlap is searched twice, its secrets come up twice.
+		slices.SortFunc(st.spans, func(a, b span) int { return a.start - b.start })
+		found[code] = mergeSpans(st.spans)
 	}
-	if !changed {
-		return cast, false, nil
-	}
+	return found, nil
+}
 
-	ei := 0
-	for i := 1; i < len(lines) && ei < len(events); i++ {
-		ev := &events[ei]
-		if ev.line != i {
-			continue
-		}
-		ei++
-		if bytes.Equal(ev.redacted, ev.data) {
-			continue
-		}
-		lines[i], err = marshalCastEvent(ev.interval, ev.code, ev.redacted)
+// rewriteCast is the second pass. It copies cast to out with the secrets
+// redacted, every other line byte for byte.
+func rewriteCast(cast io.Reader, out io.Writer, spans map[string][]span) error {
+	offset := map[string]int{}
+	for line, err := range castLines(cast) {
 		if err != nil {
-			return nil, false, fmt.Errorf("re-marshal event line %d: %w", i, err)
+			return err
+		}
+		if ev, ok := parseCastEvent(line); ok {
+			start := offset[ev.code]
+			offset[ev.code] = start + len(ev.data)
+			if redacted := applySpans(ev.data, start, spans[ev.code]); !bytes.Equal(redacted, ev.data) {
+				marshaled, err := marshalCastEvent(ev.interval, ev.code, redacted)
+				if err != nil {
+					return fmt.Errorf("re-marshal event: %w", err)
+				}
+				if bytes.HasSuffix(line, []byte("\n")) {
+					marshaled = append(marshaled, '\n')
+				}
+				line = marshaled
+			}
+		}
+		if _, err := out.Write(line); err != nil {
+			return err
 		}
 	}
-	return bytes.Join(lines, []byte("\n")), true, nil
+	return nil
 }
 
 // parseCastEvent only keeps output and input events.
@@ -221,7 +332,6 @@ func parseCastEvent(line []byte) (castEvent, bool) {
 		return castEvent{}, false
 	}
 	ev.data = []byte(data)
-	ev.redacted = ev.data
 	return ev, true
 }
 
@@ -319,19 +429,14 @@ func allowlisted(rule scrubRule, rules *scrubRuleSet, match, secret []byte) bool
 	return false
 }
 
-func redactEvents(events []castEvent, code string, blob []byte, spans []span) {
-	for i := range events {
-		ev := &events[i]
-		if ev.code != code {
-			continue
-		}
-		ev.redacted = applySpans(blob, ev.dataStart, ev.dataEnd, spans)
-	}
-}
-
-func applySpans(blob []byte, start, end int, spans []span) []byte {
-	seg := blob[start:end]
+// applySpans redacts the secrets that reach into seg, the data of one event
+// that starts at offset start of its stream.
+func applySpans(seg []byte, start int, spans []span) []byte {
+	end := start + len(seg)
 	i := sort.Search(len(spans), func(i int) bool { return spans[i].end > start })
+	if i == len(spans) || spans[i].start >= end {
+		return seg
+	}
 	out := make([]byte, 0, len(seg))
 	pos := 0
 	for ; i < len(spans) && spans[i].start < end; i++ {

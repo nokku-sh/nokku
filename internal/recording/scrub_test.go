@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"slices"
 	"strings"
@@ -29,11 +30,12 @@ func newScrubTestService(t *testing.T) *Service {
 	if err != nil {
 		t.Fatalf("storage.New: %v", err)
 	}
-	return &Service{store: st}
+	return &Service{store: st, uploads: map[string]int{}, scrubs: map[string]*scrubRun{}}
 }
 
+// testRecording is a recording whose upload went through whole.
 func testRecording() *db.Recording {
-	return &db.Recording{ID: "rec1", WorkspaceID: "ws1", Key: NewKey()}
+	return &db.Recording{ID: "rec1", WorkspaceID: "ws1", Key: NewKey(), Complete: true}
 }
 
 // writeFrames stores plaintext as one recording object, in small chunks to
@@ -118,6 +120,24 @@ func parseCastEvents(t *testing.T, cast []byte) []scrubTestEvent {
 	return events
 }
 
+// scrubBytes runs both passes over a cast in memory.
+func scrubBytes(t *testing.T, cast []byte, window, overlap int) ([]byte, bool) {
+	t.Helper()
+	rules, err := scrubRules()
+	if err != nil {
+		t.Fatalf("scrubRules: %v", err)
+	}
+	spans, err := findSecrets(bytes.NewReader(cast), rules, window, overlap)
+	if err != nil {
+		t.Fatalf("findSecrets: %v", err)
+	}
+	var out bytes.Buffer
+	if err := rewriteCast(bytes.NewReader(cast), &out, spans); err != nil {
+		t.Fatalf("rewriteCast: %v", err)
+	}
+	return out.Bytes(), len(spans) > 0
+}
+
 // TestScrubRemovesSecrets runs the full scrub pipeline over a stored
 // recording: AWS keys, private key blocks spanning events, and assignment
 // values must be masked, benign content must survive byte for byte, and the
@@ -187,10 +207,7 @@ func TestScrubCastSplitsSpansAcrossEvents(t *testing.T) {
 		"[0.0, \"o\", \"ghp_\"]\n" +
 		"[0.1, \"o\", \"abcDEF1234567890abcDEF1234567890abcDEF done\\n\"]\n"
 
-	redacted, changed, err := scrubCast([]byte(cast))
-	if err != nil {
-		t.Fatalf("scrubCast: %v", err)
-	}
+	redacted, changed := scrubBytes(t, []byte(cast), scrubWindow, scrubOverlap)
 	if !changed {
 		t.Fatal("expected the split secret to be redacted")
 	}
@@ -205,4 +222,141 @@ func TestScrubCastSplitsSpansAcrossEvents(t *testing.T) {
 	if !strings.Contains(events[1].data, " done\n") {
 		t.Fatalf("trailing benign output lost: %q", events[1].data)
 	}
+}
+
+// A cast larger than the window is scrubbed like one that fits in it. The
+// secrets are split over two events each and land at every distance from a
+// window edge as the window grows.
+func TestScrubWindowsFindTheSameSecrets(t *testing.T) {
+	secrets := []string{
+		"https://ci:AKIAABCDEFGHIJKLMNOP@github.com/x",
+		"ghp_abcDEF1234567890abcDEF1234567890abcDEF",
+		"export DB_PASSWORD=VhT9xNq2mLb4Zw",
+	}
+	var cast strings.Builder
+	cast.WriteString(scrubTestCast[:strings.Index(scrubTestCast, "\n")+1])
+	for i := range 12 {
+		secret := secrets[i%len(secrets)]
+		half := len(secret) / 2
+		for _, data := range []string{
+			fmt.Sprintf("step %d of a build log with nothing in it\r\n", i),
+			"$ " + secret[:half],
+			secret[half:] + "\r\n",
+		} {
+			line, err := json.Marshal([]any{float64(i), "o", data})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cast.Write(line)
+			cast.WriteByte('\n')
+		}
+	}
+
+	whole, changed := scrubBytes(t, []byte(cast.String()), scrubWindow, scrubOverlap)
+	if !changed {
+		t.Fatal("no secret found in one window")
+	}
+	for _, leak := range []string{"AKIA", "ghp_", "VhT9xNq2mLb4Zw"} {
+		if bytes.Contains(whole, []byte(leak)) {
+			t.Fatalf("secret fragment %q survived in one window", leak)
+		}
+	}
+	if got := bytes.Count(whole, []byte("of a build log with nothing in it")); got != 12 {
+		t.Fatalf("%d of 12 benign lines left", got)
+	}
+
+	// The longest secret here is 44 bytes, well under the overlap.
+	const overlap = 96
+	for _, window := range []int{200, 331, 487} {
+		got, _ := scrubBytes(t, []byte(cast.String()), window, overlap)
+		if !bytes.Equal(got, whole) {
+			t.Fatalf("a window of %d bytes scrubs differently:\n%s\nwant:\n%s", window, got, whole)
+		}
+	}
+}
+
+// The part of an upload that broke off is scrubbed too. The cut runs through
+// its last line, and the stored cast ends after the last whole one.
+func TestScrubTakesACutRecording(t *testing.T) {
+	s := newScrubTestService(t)
+	rec := testRecording()
+	rec.Complete = false
+
+	var gz bytes.Buffer
+	zw := gzip.NewWriter(&gz)
+	if _, err := zw.Write([]byte(scrubTestCast)); err != nil {
+		t.Fatal(err)
+	}
+	// Everything so far can be read back, whatever is lost of the rest.
+	if err := zw.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := zw.Write([]byte("[0.5, \"o\", \"the line the cut runs through 9f3kq7\\r\\n\"]\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	writeFrames(t, s, rec, gz.Bytes()[:gz.Len()-20])
+
+	// A whole upload that reads like this is broken, and is left alone.
+	whole := *rec
+	whole.Complete = true
+	if err := s.scrub(t.Context(), &whole); err == nil {
+		t.Fatal("a cut stream passed as a whole recording")
+	}
+
+	if err := s.scrub(t.Context(), rec); err != nil {
+		t.Fatalf("scrub: %v", err)
+	}
+	// readRecordingObject fails on a cut stream, the rewrite is a whole one.
+	cast := readRecordingObject(t, s, rec)
+	if events := parseCastEvents(t, cast); len(events) != 5 {
+		t.Fatalf("got %d events, want the 5 whole ones", len(events))
+	}
+	for _, leak := range []string{"AKIA", "MIIB", "VhT9xNq2mLb4Zw", "the cut runs through"} {
+		if bytes.Contains(cast, []byte(leak)) {
+			t.Fatalf("%q survived in the cut recording", leak)
+		}
+	}
+}
+
+// A scrub and an upload never write the same object at once. No scrub starts
+// while an upload runs, and an upload stops the scrub it finds.
+func TestScrubAndUploadTakeTurns(t *testing.T) {
+	s := newScrubTestService(t)
+	rec := testRecording()
+	writeRecordingObject(t, s, rec, []byte(scrubTestCast))
+	running := func() *scrubRun {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.scrubs[rec.ID]
+	}
+
+	end := s.BeginUpload(rec.ID)
+	s.ScrubRecording(t.Context(), rec)
+	if running() != nil {
+		t.Fatal("a scrub started while an upload was writing")
+	}
+	end()
+
+	s.ScrubRecording(t.Context(), rec)
+	if run := running(); run != nil {
+		<-run.done
+	}
+	if bytes.Contains(readRecordingObject(t, s, rec), []byte("AKIA")) {
+		t.Fatal("the scrub after the upload did not run")
+	}
+
+	stopped := make(chan struct{})
+	s.mu.Lock()
+	s.scrubs[rec.ID] = &scrubRun{cancel: func() { close(stopped) }, done: stopped}
+	s.mu.Unlock()
+	end = s.BeginUpload(rec.ID)
+	select {
+	case <-stopped:
+	default:
+		t.Fatal("the upload did not stop the scrub it found")
+	}
+	end()
 }

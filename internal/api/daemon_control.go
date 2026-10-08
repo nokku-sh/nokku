@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -196,6 +197,9 @@ func (s *daemonControlService) UploadRecording(
 	if err != nil {
 		return nil, err
 	}
+	// A scrub of what an earlier try left would write over this upload.
+	uploaded := sync.OnceFunc(s.cfg.Record.BeginUpload(rec.ID))
+	defer uploaded()
 
 	// A daemon that dies takes ctx with it, and a canceled ctx would drop the
 	// object. What arrived by then is the evidence, so the writer outlives it.
@@ -258,13 +262,16 @@ receive:
 		return nil, err
 	}
 
+	// Whatever is stored gets scrubbed, the part of a cut upload too.
+	uploaded()
+	if rec.SizeBytes > 0 {
+		s.cfg.Record.ScrubRecording(ctx, rec)
+	}
 	switch {
 	case ended != nil:
 		// What was stored is kept as a cut recording.
 		return nil, ended
-	case complete:
-		s.cfg.Record.ScrubRecording(ctx, rec)
-	case interrupted:
+	case !complete && interrupted:
 		return nil, newError(connect.CodeUnknown, "recording stream interrupted")
 	}
 

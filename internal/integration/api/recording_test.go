@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 	"uuid"
@@ -59,7 +60,7 @@ func sendChunk(stream *uploadStream, chunk []byte) error {
 }
 
 // uploadMiB sends a recording of that many MiB and returns the answer the
-// daemon got. No final message, so nothing is scrubbed.
+// daemon got. Zeros are no gzip stream, so the scrub gives up on them.
 func uploadMiB(
 	t *testing.T,
 	cfg *config.Config,
@@ -162,6 +163,77 @@ func TestUploadRecordingKeepsWhatADeadDaemonSent(t *testing.T) {
 	assert.True(t, rec.Complete)
 	assert.EqualValues(t, whole.Len(), rec.SizeBytes)
 	assert.EqualValues(t, whole.Len(), storedBytes(t, cfg, id))
+}
+
+// The part a dead daemon left is scrubbed, it may be all there ever is. The
+// whole file the daemon sends later replaces it and is scrubbed as well.
+func TestCutRecordingIsScrubbed(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	id := uuid.NewV7().String()
+	const cast = `{"version":3,"term":{"cols":80,"rows":24}}` + "\n" +
+		`[0.1,"o","export DB_PASSWORD=VhT9xNq2mLb4Zw\r\n"]` + "\n"
+	stored := func() string {
+		rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+		if err != nil {
+			return ""
+		}
+		r, err := cfg.Record.OpenReader(t.Context(), rec)
+		if err != nil {
+			return ""
+		}
+		defer func() { _ = r.Close() }()
+		gz, err := gzip.NewReader(r)
+		if err != nil {
+			return ""
+		}
+		// A cut stream still gives what it holds.
+		got, _ := io.ReadAll(gz)
+		return string(got)
+	}
+
+	// Flushed and never closed, like a stream that stops with its host.
+	var part bytes.Buffer
+	zw := gzip.NewWriter(&part)
+	_, err := zw.Write([]byte(cast))
+	require.NoError(t, err)
+	require.NoError(t, zw.Flush())
+	ctx, die := context.WithCancel(t.Context())
+	stream := openUpload(ctx, t, cfg, srv, key, enrolled.GetAccessToken(), id)
+	require.NoError(t, sendChunk(stream, part.Bytes()))
+	require.Eventually(t, func() bool {
+		rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+		return err == nil && rec.SizeBytes == 0
+	}, 5*time.Second, 20*time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
+	die()
+
+	require.Eventually(t, func() bool {
+		return strings.Contains(stored(), "DB_PASSWORD=<redacted>")
+	}, 10*time.Second, 20*time.Millisecond, "the part was not scrubbed")
+	assert.NotContains(t, stored(), "VhT9xNq2mLb4Zw")
+	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+	require.NoError(t, err)
+	assert.False(t, rec.Complete, "the scrub made the cut recording a whole one")
+
+	var whole bytes.Buffer
+	zw = gzip.NewWriter(&whole)
+	_, err = zw.Write([]byte(cast + `[0.2,"o","done\r\n"]` + "\n"))
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+	stream = openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
+	require.NoError(t, sendChunk(stream, whole.Bytes()))
+	require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{
+		Msg: &nokkuv1.UploadRecordingRequest_Final{Final: &nokkuv1.RecordingFinal{}},
+	}))
+	_, err = stream.CloseAndReceive()
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		got := stored()
+		return strings.Contains(got, "done") && strings.Contains(got, "DB_PASSWORD=<redacted>")
+	}, 10*time.Second, 20*time.Millisecond, "the whole file did not replace the part, or was not scrubbed")
+	assert.NotContains(t, stored(), "VhT9xNq2mLb4Zw")
 }
 
 // The same when storage cannot even open the object. The row exists by then,
