@@ -116,27 +116,16 @@ func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
 		Description: s.Description,
 		Role:        &s.Role,
 		Tags:        s.Tags,
+		LastUsedAt:  SafeTimestamp(s.LastUsedAt),
 		CreatedAt:   SafeTimestamp(&s.CreatedAt),
 		UpdatedAt:   SafeTimestamp(&s.UpdatedAt),
 	}
 }
 
-func (r *GetServiceAccountRow) ToProto() *nokkuv1.ServiceAccount {
-	return withLastUsed(r.ServiceAccount.ToProto(), r.LastUsedAt)
-}
-
 func ServiceAccountsToProto(rows []*ListServiceAccountsRow) []*nokkuv1.ServiceAccount {
 	return mapSlice(rows, func(r *ListServiceAccountsRow) *nokkuv1.ServiceAccount {
-		return withLastUsed(r.ServiceAccount.ToProto(), r.LastUsedAt)
+		return r.ServiceAccount.ToProto()
 	})
-}
-
-// The query reads an account never used as the zero time.
-func withLastUsed(p *nokkuv1.ServiceAccount, t time.Time) *nokkuv1.ServiceAccount {
-	if !t.IsZero() {
-		p.LastUsedAt = SafeTimestamp(&t)
-	}
-	return p
 }
 
 func (t *AccessToken) ToServiceAccountToken() *nokkuv1.ServiceAccountToken {

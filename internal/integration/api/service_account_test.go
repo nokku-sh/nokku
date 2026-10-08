@@ -144,6 +144,7 @@ func TestServiceAccountTokens(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(first.GetSecret(), "nk_sa_"), "the secret is %q", first.GetSecret())
 	assert.Equal(t, "deploy", first.GetToken().GetLabel())
+	assert.Nil(t, first.GetToken().GetLastUsedAt(), "a new token was never used")
 	assert.WithinDuration(t, expiry, first.GetToken().GetExpiresAt().AsTime(), time.Second)
 	second, err := client.CreateServiceAccountToken(t.Context(), &nokkuv1.CreateServiceAccountTokenRequest{
 		ServiceAccountId: &id,

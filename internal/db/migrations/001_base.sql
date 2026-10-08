@@ -154,6 +154,7 @@ CREATE TABLE IF NOT EXISTS service_accounts (
   name TEXT NOT NULL, -- e.g., "github-actions-deploy", "ansible-prod"
   description TEXT,
   role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 3), -- like users.role, the editor at most
+  last_used_at TIMESTAMPTZ, -- of any of its tokens, kept by note_service_account_used
   tags TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -201,6 +202,22 @@ CREATE INDEX idx_access_tokens_workspace ON access_tokens (workspace_id);
 CREATE INDEX idx_access_tokens_expiry ON access_tokens (expires_at)
 WHERE
   expires_at IS NOT NULL;
+
+-- The account remembers when any of its tokens was last used, so a list of
+-- accounts needs no join. The stamp moves at most once a minute per token.
+CREATE OR REPLACE FUNCTION note_service_account_used () RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE service_accounts
+  SET last_used_at = GREATEST(last_used_at, NEW.last_seen_at)
+  WHERE id = NEW.service_account_id;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER note_service_account_used
+AFTER
+UPDATE OF last_seen_at ON access_tokens FOR EACH ROW WHEN (NEW.service_account_id IS NOT NULL)
+EXECUTE FUNCTION note_service_account_used ();
 
 CREATE TABLE IF NOT EXISTS daemons (
   id UUID PRIMARY KEY DEFAULT uuidv7(),

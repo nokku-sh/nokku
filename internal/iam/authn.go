@@ -71,8 +71,8 @@ func (s *Service) AuthenticateToken(
 		if err != nil {
 			return actor.Principal{}, db.AccessToken{}, errInvalidCredentials
 		}
-		p.Name = sa.ServiceAccount.Name
-		p.Role = sa.ServiceAccount.Role
+		p.Name = sa.Name
+		p.Role = sa.Role
 	case actor.KindSCIM:
 		p.ID = tok.ID
 	case actor.KindDaemon:
