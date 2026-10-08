@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/jackc/pgx/v5"
 
 	"github.com/nokku-sh/nokku/internal/actor"
@@ -73,7 +75,7 @@ func (s *Service) DeleteSelf(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if u.Role == string(db.RoleOwner) {
+	if u.Role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER {
 		return ErrOwner
 	}
 	if err := s.conn.Tenant().DeleteUser(ctx, u.ID); err != nil {

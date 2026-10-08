@@ -60,7 +60,9 @@ export const AccessSchema: GenMessage<Access> = /*@__PURE__*/
   messageDesc(file_nokku_v1_access, 0);
 
 /**
- * WorkspaceRole values are ordered, each includes everything before it.
+ * WorkspaceRole values are ordered, each includes everything before it. The
+ * backend compares and stores the numbers, so a role added in between means
+ * renumbering the stored rows too.
  *
  * @generated from enum nokku.v1.WorkspaceRole
  */

@@ -1,3 +1,4 @@
+import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 import { createInfiniteQuery, createMutation, createQuery } from '@tanstack/svelte-query';
 import { callUnaryMethod } from '@connectrpc/connect-query-core';
 import { toast } from 'svelte-sonner';
@@ -26,19 +27,19 @@ export const user = {
 		return {
 			/** The workspace overview: lists, audit log, recordings. */
 			get view() {
-				return atLeast(me.data?.role, 'viewer');
+				return atLeast(me.data?.role, WorkspaceRole.VIEWER);
 			},
 			/** Targets, daemons, CAs, teams, service accounts and grants. */
 			get edit() {
-				return atLeast(me.data?.role, 'editor');
+				return atLeast(me.data?.role, WorkspaceRole.EDITOR);
 			},
 			/** People, invites and tokens. */
 			get admin() {
-				return atLeast(me.data?.role, 'admin');
+				return atLeast(me.data?.role, WorkspaceRole.ADMIN);
 			},
 			/** Workspace settings, SSO, SCIM, the license and the workspace itself. */
 			get own() {
-				return atLeast(me.data?.role, 'owner');
+				return atLeast(me.data?.role, WorkspaceRole.OWNER);
 			}
 		};
 	},

@@ -1,10 +1,11 @@
 <script lang="ts">
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
 	import { users } from '#lib/api/workspaces.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { roles } from '#lib/api/roles.svelte.js';
-	import { atLeast, roleIcon, roleLabel } from '#lib/roles.js';
+	import { atLeast, parseRole, roleIcon, roleLabel, roleSlug } from '#lib/roles.js';
 	import InviteSheet from '#lib/components/sheets/InviteSheet.svelte';
 	import UserSheet from '#lib/components/sheets/UserSheet.svelte';
 	import {
@@ -34,14 +35,14 @@
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
 	const me = user.self();
-	const canManage = $derived(atLeast(me.data?.role, 'admin'));
+	const canManage = $derived(atLeast(me.data?.role, WorkspaceRole.ADMIN));
 	const can = user.can();
 
 	const pager = usePagination();
 	const list = users.list(() => ({
 		...pager.args,
 		query: debounced.current,
-		role: page.url.searchParams.get('role') || undefined
+		role: parseRole(page.url.searchParams.get('role'))
 	}));
 
 	const remove = users.delete();
@@ -63,7 +64,7 @@
 			onClick: (selected) =>
 				removeMany.mutateAsync(
 					selected
-						.filter((u) => u.role !== 'owner' && u.id !== me.data?.id)
+						.filter((u) => u.role !== WorkspaceRole.OWNER && u.id !== me.data?.id)
 						.map(({ id }) => ({ userId: id }))
 				)
 		}
@@ -72,9 +73,9 @@
 	const rolesQuery = roles.list();
 	const roleOptions = $derived(
 		(rolesQuery.data ?? []).map((r) => ({
-			label: roleLabel(r.name),
-			value: r.name,
-			icon: roleIcon(r.name)
+			label: roleLabel(r.role),
+			value: roleSlug(r.role),
+			icon: roleIcon(r.role)
 		}))
 	);
 
@@ -89,9 +90,11 @@
 			enableColumnFilter: true,
 			cell: ({ row }) =>
 				renderComponent(RoleCell, {
-					roleName: row.original.role,
+					role: row.original.role,
 					update:
-						canManage && row.original.role !== 'owner' && row.original.id !== me.data?.id
+						canManage &&
+						row.original.role !== WorkspaceRole.OWNER &&
+						row.original.id !== me.data?.id
 							? (role) => updateRole.mutateAsync({ userId: row.original.id, role })
 							: undefined
 				})
@@ -113,7 +116,7 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				const u = row.original;
-				const protectedRow = u.role === 'owner' || u.id === me.data?.id || !canManage;
+				const protectedRow = u.role === WorkspaceRole.OWNER || u.id === me.data?.id || !canManage;
 				return renderComponent(ActionCell, {
 					menuActions: [
 						{

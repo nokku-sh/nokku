@@ -18,9 +18,9 @@ import (
 // signupData rides in a signup token or a passkey ceremony until the
 // account exists.
 type signupData struct {
-	Name     string `json:"name"`
-	Role     string `json:"role"`
-	InviteID string `json:"invite_id,omitempty"`
+	Name     string                `json:"name"`
+	Role     nokkuv1.WorkspaceRole `json:"role"`
+	InviteID string                `json:"invite_id,omitempty"`
 }
 
 // LookupInvite resolves an invite link in this workspace without spending it.
@@ -68,7 +68,7 @@ func (s *Service) createUser(
 ) (*db.User, error) {
 	p.ID = cmp.Or(p.ID, uuid.NewV7().String())
 	p.Email = normalizeEmail(p.Email)
-	p.Role = cmp.Or(p.Role, string(db.RoleMember))
+	p.Role = cmp.Or(p.Role, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	if inviteID != "" {
 		tok, err := q.RedeemTokenByID(ctx, &db.RedeemTokenByIDParams{
 			ID:   inviteID,
@@ -80,9 +80,9 @@ func (s *Service) createUser(
 		if err != nil {
 			return nil, err
 		}
-		p.Role = cmp.Or(deref(tok.RoleName), p.Role)
+		p.Role = cmp.Or(deref(tok.Role), p.Role)
 	}
-	if s.canJoin != nil && p.Role != string(db.RoleOwner) {
+	if s.canJoin != nil && p.Role != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER {
 		if _, err := q.GetWorkspaceForUpdate(ctx); err != nil {
 			return nil, err
 		}
@@ -108,7 +108,7 @@ func (s *Service) CreateOwner(ctx context.Context, email, name string) (*db.User
 	var u *db.User
 	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) (err error) {
 		u, err = s.createUser(ctx, q, db.CreateUserWithIDParams{
-			Email: email, Name: name, Role: string(db.RoleOwner),
+			Email: email, Name: name, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER,
 		}, "")
 		return err
 	})

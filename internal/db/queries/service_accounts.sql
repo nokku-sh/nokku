@@ -1,11 +1,11 @@
 -- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (name, description, role_name, expires_at, tags, token_hash)
+  service_accounts (name, description, role, expires_at, tags, token_hash)
 VALUES
   (
     @name,
     @description,
-    COALESCE(sqlc.narg('role_name')::TEXT, 'member'),
+    @role,
     @expires_at,
     COALESCE(@tags, '{}'::TEXT[]),
     @token_hash
@@ -50,8 +50,8 @@ WHERE
     )
   )
   AND (
-    sqlc.narg('role_name')::TEXT IS NULL
-    OR sa.role_name = sqlc.narg('role_name')::TEXT
+    sa.role = @role
+    OR @role = 0 -- every role
   )
 ORDER BY
   sa.id ASC
@@ -65,7 +65,13 @@ UPDATE service_accounts
 SET
   name = COALESCE(sqlc.narg('name'), name),
   description = COALESCE(sqlc.narg('description'), description),
-  role_name = COALESCE(sqlc.narg('role_name'), role_name),
+  -- 0 is unset and keeps the role. The column comes first in the condition,
+  -- sqlc types the parameter by its first use.
+  role = CASE
+    WHEN role = @role
+    OR @role = 0 THEN role
+    ELSE @role
+  END,
   tags = COALESCE(sqlc.narg('tags'), tags)
 WHERE
   id = @service_account_id

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { auth } from '#lib/api/auth.svelte.js';
@@ -83,7 +84,7 @@
 		wide
 	>
 		<div class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-			<Badge variant="secondary">{roleLabel(invitation.data?.role || 'member')}</Badge>
+			<Badge variant="secondary">{roleLabel(invitation.data?.role || WorkspaceRole.MEMBER)}</Badge>
 			{#if invitation.data?.expiresAt}
 				<span>Expires {formatTs(invitation.data.expiresAt, 'relative')}</span>
 			{/if}

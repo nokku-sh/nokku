@@ -17,8 +17,6 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
-
-	"github.com/nokku-sh/nokku/internal/db"
 )
 
 // A user certificate is signed for one server and names the accounts the
@@ -28,13 +26,16 @@ import (
 func TestSignSSHCertificate(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleAdmin))
+	adminAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)
 	seedDefaultCA(t, srv, adminAuth)
 	daemonKey, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, false)
 	targetID := enrolled.GetTargetId()
 	otherID := seedTarget(t, cfg, workspaceID)
 
-	memberToken := seedMember(t, cfg, workspaceID, db.RoleMember)
+	memberToken := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	member, _, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), memberToken)
 	require.NoError(t, err)
 	wantPrincipal := member.ID + "@" + targetID + ":root"
@@ -126,12 +127,14 @@ func TestSignSSHCertificate(t *testing.T) {
 func TestSignX509NeedsEditor(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	client := func(role db.Role) nokkuv1connect.CertificateServiceClient {
+	client := func(role nokkuv1.WorkspaceRole) nokkuv1connect.CertificateServiceClient {
 		return nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL,
 			header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, role)))
 	}
 
-	ca, err := client(db.RoleEditor).CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
+	ca, err := client(
+		nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR,
+	).CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
 		Name:          new(uniq("x509")),
 		KeyType:       nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ECDSA.Enum(),
 		AuthorityType: nokkuv1.AuthorityType_AUTHORITY_TYPE_X509.Enum(),
@@ -150,12 +153,12 @@ func TestSignX509NeedsEditor(t *testing.T) {
 		Csr:  new(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: der}))),
 	}
 
-	for _, role := range []db.Role{db.RoleMember, db.RoleViewer} {
+	for _, role := range []nokkuv1.WorkspaceRole{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER} {
 		_, err = client(role).SignX509Certificate(t.Context(), req)
 		assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "%s signed a certificate, got %v", role, err)
 	}
 
-	res, err := client(db.RoleEditor).SignX509Certificate(t.Context(), req)
+	res, err := client(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR).SignX509Certificate(t.Context(), req)
 	require.NoError(t, err)
 	assert.NotEmpty(t, res.GetCertificate())
 }

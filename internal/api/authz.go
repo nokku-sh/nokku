@@ -22,15 +22,6 @@ import (
 // in the protos repo. RPCs without one are denied.
 var procedureAccess = loadProcedureAccess()
 
-//nolint:exhaustive // UNSPECIFIED stays unmapped so an RPC without a role is denied
-var workspaceRoles = map[nokkuv1.WorkspaceRole]db.Role{
-	nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER: db.RoleMember,
-	nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER: db.RoleViewer,
-	nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR: db.RoleEditor,
-	nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN:  db.RoleAdmin,
-	nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER:  db.RoleOwner,
-}
-
 func loadProcedureAccess() map[string]*nokkuv1.Access {
 	out := make(map[string]*nokkuv1.Access)
 	protoregistry.GlobalFiles.RangeFilesByPackage("nokku.v1", func(fd protoreflect.FileDescriptor) bool {
@@ -108,8 +99,9 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 	if access.GetSelf() {
 		return nil
 	}
-	role, ok := workspaceRoles[access.GetRole()]
-	if !ok || !db.Role(caller.Role).AtLeast(role) {
+	// An RPC that names no role stays denied.
+	required := access.GetRole()
+	if required == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED || caller.Role < required {
 		return db.ErrPermissionDenied
 	}
 	return nil
@@ -137,7 +129,7 @@ func (a *authorizationInterceptor) daemonAccepted(ctx context.Context, daemonID,
 	return nil
 }
 
-func callerRole(ctx context.Context) db.Role {
+func callerRole(ctx context.Context) nokkuv1.WorkspaceRole {
 	p, _ := actor.PrincipalFromContext(ctx)
-	return db.Role(p.Role)
+	return p.Role
 }

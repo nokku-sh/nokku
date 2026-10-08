@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	nokku "github.com/nokku-sh/protos/gen/nokku/v1"
 )
 
 const countActiveUsers = `-- name: CountActiveUsers :one
@@ -37,10 +39,10 @@ RETURNING
 `
 
 type CreateUserParams struct {
-	Email   string  `json:"email"`
-	Name    string  `json:"name"`
-	Role    string  `json:"role"`
-	Picture *string `json:"picture"`
+	Email   string              `json:"email"`
+	Name    string              `json:"name"`
+	Role    nokku.WorkspaceRole `json:"role"`
+	Picture *string             `json:"picture"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User, error) {
@@ -75,11 +77,11 @@ RETURNING
 `
 
 type CreateUserWithIDParams struct {
-	ID      string  `json:"id"`
-	Email   string  `json:"email"`
-	Name    string  `json:"name"`
-	Role    string  `json:"role"`
-	Picture *string `json:"picture"`
+	ID      string              `json:"id"`
+	Email   string              `json:"email"`
+	Name    string              `json:"name"`
+	Role    nokku.WorkspaceRole `json:"role"`
+	Picture *string             `json:"picture"`
 }
 
 func (q *Queries) CreateUserWithID(ctx context.Context, arg *CreateUserWithIDParams) (*User, error) {
@@ -109,7 +111,7 @@ const deleteUser = `-- name: DeleteUser :exec
 DELETE FROM users
 WHERE
   id = $1
-  AND role <> 'owner'
+  AND role <> 5
 `
 
 func (q *Queries) DeleteUser(ctx context.Context, id string) error {
@@ -123,7 +125,7 @@ SELECT
 FROM
   users
 WHERE
-  role = 'owner'
+  role = 5
 `
 
 func (q *Queries) GetOwner(ctx context.Context) (*User, error) {
@@ -196,6 +198,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 }
 
 const listUsers = `-- name: ListUsers :many
+
 SELECT
   u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.created_at, u.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
@@ -208,8 +211,8 @@ WHERE
     OR u.email ILIKE '%' || $1 || '%'
   )
   AND (
-    $2::TEXT IS NULL
-    OR u.role = $2::TEXT
+    u.role = $2
+    OR $2 = 0 -- every role
   )
 ORDER BY
   u.name ASC,
@@ -221,10 +224,10 @@ OFFSET
 `
 
 type ListUsersParams struct {
-	Query  *string `json:"query"`
-	Role   *string `json:"role"`
-	Offset *int32  `json:"offset"`
-	Limit  *int32  `json:"limit"`
+	Query  *string             `json:"query"`
+	Role   nokku.WorkspaceRole `json:"role"`
+	Offset *int32              `json:"offset"`
+	Limit  *int32              `json:"limit"`
 }
 
 type ListUsersRow struct {
@@ -232,6 +235,7 @@ type ListUsersRow struct {
 	TotalCount int32 `json:"totalCount"`
 }
 
+// owner
 func (q *Queries) ListUsers(ctx context.Context, arg *ListUsersParams) ([]*ListUsersRow, error) {
 	rows, err := q.db.Query(ctx, listUsers,
 		arg.Query,
@@ -269,13 +273,14 @@ func (q *Queries) ListUsers(ctx context.Context, arg *ListUsersParams) ([]*ListU
 }
 
 const setUserActive = `-- name: SetUserActive :exec
+
 UPDATE users
 SET
   active = $1,
   updated_at = NOW()
 WHERE
   id = $2
-  AND role <> 'owner'
+  AND role <> 5
 `
 
 type SetUserActiveParams struct {
@@ -283,6 +288,7 @@ type SetUserActiveParams struct {
 	ID     string `json:"id"`
 }
 
+// owner
 func (q *Queries) SetUserActive(ctx context.Context, arg *SetUserActiveParams) error {
 	_, err := q.db.Exec(ctx, setUserActive, arg.Active, arg.ID)
 	return err
@@ -322,16 +328,17 @@ func (q *Queries) SetUserEmail(ctx context.Context, arg *SetUserEmailParams) (*U
 }
 
 const transferOwnership = `-- name: TransferOwnership :execrows
+
 UPDATE users
 SET
   role = CASE
-    WHEN id = $1 THEN 'owner'
-    ELSE 'admin'
+    WHEN id = $1 THEN 5 -- owner
+    ELSE 4 -- admin
   END,
   updated_at = NOW()
 WHERE
   (
-    role = 'owner'
+    role = 5
     OR (
       id = $1
       AND active
@@ -339,6 +346,7 @@ WHERE
   )
 `
 
+// owner
 // One statement, so the partial unique index on the owner never sees two.
 func (q *Queries) TransferOwnership(ctx context.Context, newOwnerID string) (int64, error) {
 	result, err := q.db.Exec(ctx, transferOwnership, newOwnerID)
@@ -390,12 +398,12 @@ SET
   updated_at = NOW()
 WHERE
   id = $2
-  AND role <> 'owner'
+  AND role <> 5
 `
 
 type UpdateUserRoleParams struct {
-	Role string `json:"role"`
-	ID   string `json:"id"`
+	Role nokku.WorkspaceRole `json:"role"`
+	ID   string              `json:"id"`
 }
 
 // Never touches the owner, see TransferOwnership.

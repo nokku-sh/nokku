@@ -1,32 +1,49 @@
 import { Crown, Eye, ShieldCheck, ShieldIcon, ShieldUser, User } from '@lucide/svelte';
+import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 
-/** Roles from least to most privileged. Each includes the ones before it. */
-const order = ['member', 'viewer', 'editor', 'admin', 'owner'] as const;
-export type RoleName = (typeof order)[number];
-
-const icons = { owner: Crown, admin: ShieldUser, editor: ShieldCheck, viewer: Eye, member: User };
-const colors = {
-	owner: 'text-chart-2',
-	admin: 'text-chart-5',
-	editor: 'text-chart-4',
-	viewer: 'text-chart-1',
-	member: 'text-muted-foreground'
+const icons: Partial<Record<WorkspaceRole, typeof ShieldIcon>> = {
+	[WorkspaceRole.OWNER]: Crown,
+	[WorkspaceRole.ADMIN]: ShieldUser,
+	[WorkspaceRole.EDITOR]: ShieldCheck,
+	[WorkspaceRole.VIEWER]: Eye,
+	[WorkspaceRole.MEMBER]: User
+};
+const colors: Partial<Record<WorkspaceRole, string>> = {
+	[WorkspaceRole.OWNER]: 'text-chart-2',
+	[WorkspaceRole.ADMIN]: 'text-chart-5',
+	[WorkspaceRole.EDITOR]: 'text-chart-4',
+	[WorkspaceRole.VIEWER]: 'text-chart-1',
+	[WorkspaceRole.MEMBER]: 'text-muted-foreground'
 };
 
-export function roleLabel(name: string): string {
-	return name.charAt(0).toUpperCase() + name.slice(1);
+/** A service account never manages people, the API takes nothing above the editor. */
+export const SERVICE_ACCOUNT_MAX_ROLE = WorkspaceRole.EDITOR;
+
+/** The role as a word, like "admin". URLs and string-valued inputs carry it. Empty for no role. */
+export function roleSlug(role: WorkspaceRole | undefined): string {
+	return role ? (WorkspaceRole[role] ?? '').toLowerCase() : '';
 }
 
-export function roleIcon(name: string) {
-	return icons[name as RoleName] ?? ShieldIcon;
+/** Reads a roleSlug back. */
+export function parseRole(slug: string | null | undefined): WorkspaceRole | undefined {
+	const role = WorkspaceRole[(slug ?? '').toUpperCase() as keyof typeof WorkspaceRole];
+	return typeof role === 'number' && role !== WorkspaceRole.UNSPECIFIED ? role : undefined;
 }
 
-export function roleColor(name: string): string {
-	return colors[name as RoleName] ?? 'text-foreground';
+export function roleLabel(role: WorkspaceRole | undefined): string {
+	const slug = roleSlug(role);
+	return slug.charAt(0).toUpperCase() + slug.slice(1);
 }
 
-/** Whether role grants everything required grants. Unknown roles grant nothing. */
-export function atLeast(role: string | undefined, required: RoleName): boolean {
-	const rank = order.indexOf(role as RoleName);
-	return rank >= 0 && rank >= order.indexOf(required);
+export function roleIcon(role: WorkspaceRole | undefined) {
+	return icons[role ?? WorkspaceRole.UNSPECIFIED] ?? ShieldIcon;
+}
+
+export function roleColor(role: WorkspaceRole | undefined): string {
+	return colors[role ?? WorkspaceRole.UNSPECIFIED] ?? 'text-foreground';
+}
+
+/** Whether role grants everything required grants. The roles are ordered, no role grants nothing. */
+export function atLeast(role: WorkspaceRole | undefined, required: WorkspaceRole): boolean {
+	return (role ?? WorkspaceRole.UNSPECIFIED) >= required;
 }

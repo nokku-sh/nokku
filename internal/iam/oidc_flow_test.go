@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/go-jose/go-jose/v4"
 	"github.com/oauth2-proxy/mockoidc"
 
@@ -199,7 +201,7 @@ func TestOIDCFlowHappyPath(t *testing.T) {
 	if u == nil {
 		t.Fatal("JIT provisioned user missing")
 	}
-	if u.Role != "member" || u.Name != "" && u.Name != "Alice" {
+	if u.Role != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER || u.Name != "" && u.Name != "Alice" {
 		t.Errorf("JIT user = %+v", u)
 	}
 	if c := e.credential(t, h.org.ws, MethodOIDC, testProviderID, oidcTestSubject); c == nil || c.UserID != u.ID {
@@ -393,7 +395,7 @@ func TestOIDCFlowLinksExistingSignedInUser(t *testing.T) {
 	// account.
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
-	existing := e.user(t, h.org.ws, "bob@"+testDomain(), "member")
+	existing := e.user(t, h.org.ws, "bob@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	h.user()
 
 	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil).

@@ -48,7 +48,10 @@ func TestSyncTargetUsers(t *testing.T) {
 	require.NoError(t, err)
 	hostKey := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshPub)))
 
-	editorAuth := header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleEditor))
+	editorAuth := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
+	)
 	editor := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, editorAuth)
 	principals := nokkuv1connect.NewPrincipalServiceClient(srv.Client(), srv.URL, editorAuth)
 	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
@@ -92,7 +95,7 @@ func TestSyncTargetUsers(t *testing.T) {
 	assert.ElementsMatch(t, []string{"root", "deploy", "ops"}, usernames(), "earlier users are never deleted")
 
 	viewer := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleViewer)))
+		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)))
 	_, err = viewer.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		TargetId:  &targetID,
 		Usernames: []string{"intruder"},
@@ -105,7 +108,7 @@ func TestUpdateTargetReplacesLists(t *testing.T) {
 	workspaceID := seedWorkspace(t, cfg)
 	targetID := seedTarget(t, cfg, workspaceID)
 	editor := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleEditor)))
+		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)))
 
 	updated, err := editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
 		Id:        &targetID,
@@ -156,7 +159,7 @@ type graphSeed struct {
 
 func (s graphSeed) member(name string) string {
 	u, err := s.q.CreateUser(s.t.Context(), &db.CreateUserParams{
-		Email: uuid.New().String() + "@api.test", Name: name, Role: "member",
+		Email: uuid.New().String() + "@api.test", Name: name, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
 	})
 	require.NoError(s.t, err)
 	return u.ID
@@ -216,7 +219,7 @@ func seedAccessGraph(t *testing.T) accessFixture {
 		}
 		f.ci, err = q.CreateServiceAccount(
 			t.Context(),
-			&db.CreateServiceAccountParams{Name: uniq("ci")},
+			&db.CreateServiceAccountParams{Name: uniq("ci"), Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER},
 		)
 		require.NoError(t, err)
 
@@ -238,11 +241,15 @@ func seedAccessGraph(t *testing.T) accessFixture {
 		return nil
 	})
 
-	client := func(role db.Role) nokkuv1connect.TargetServiceClient {
+	client := func(role nokkuv1.WorkspaceRole) nokkuv1connect.TargetServiceClient {
 		return nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL,
 			header("Authorization", "Bearer "+seedMember(t, cfg, f.workspaceID, role)))
 	}
-	f.client, f.memberClient = client(db.RoleViewer), client(db.RoleMember)
+	f.client, f.memberClient = client(
+		nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER,
+	), client(
+		nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
+	)
 	f.as = func(userID string) nokkuv1connect.TargetServiceClient {
 		token := sessionFor(t, cfg, &db.User{ID: userID})
 		return nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+token))

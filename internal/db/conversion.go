@@ -112,7 +112,7 @@ func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
 		Id:          &s.ID,
 		Name:        &s.Name,
 		Description: s.Description,
-		RoleName:    &s.RoleName,
+		Role:        &s.Role,
 		Tags:        s.Tags,
 		ExpiresAt:   SafeTimestamp(s.ExpiresAt),
 		LastUsedAt:  SafeTimestamp(s.LastUsedAt),
@@ -342,7 +342,7 @@ func (t *WorkspaceToken) ToProto() *nokkuv1.Token {
 		Uses:        &t.Uses,
 		AutoApprove: &t.AutoApprove,
 		CaId:        t.CaID,
-		RoleName:    t.RoleName,
+		Role:        t.Role,
 		CreatedAt:   SafeTimestamp(&t.CreatedAt),
 		LastUsedAt:  SafeTimestamp(t.LastUsedAt),
 	}

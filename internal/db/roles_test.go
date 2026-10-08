@@ -1,39 +1,41 @@
 package db
 
-import "testing"
+import (
+	"testing"
 
-func TestRoleAtLeast(t *testing.T) {
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+)
+
+func TestCanAssign(t *testing.T) {
+	const (
+		none   = nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED
+		member = nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER
+		editor = nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR
+		admin  = nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN
+		owner  = nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER
+	)
 	tests := []struct {
-		role, required Role
+		caller, target nokkuv1.WorkspaceRole
 		want           bool
 	}{
-		{RoleOwner, RoleMember, true},
-		{RoleEditor, RoleEditor, true},
-		{RoleViewer, RoleEditor, false},
-		{Role("root"), RoleMember, false},
+		{admin, admin, true},
+		{admin, member, true},
+		{editor, admin, false},
+		{admin, owner, false},
+		{owner, owner, false},
+		{owner, none, false},
+		{owner, nokkuv1.WorkspaceRole(99), false},
+		{none, member, false},
 	}
 	for _, tt := range tests {
-		if got := tt.role.AtLeast(tt.required); got != tt.want {
-			t.Errorf("%s.AtLeast(%s) = %v, want %v", tt.role, tt.required, got, tt.want)
+		if got := CanAssign(tt.caller, tt.target); got != tt.want {
+			t.Errorf("CanAssign(%s, %s) = %v, want %v", tt.caller, tt.target, got, tt.want)
 		}
 	}
 }
 
-func TestRoleCanAssign(t *testing.T) {
-	tests := []struct {
-		actor, target Role
-		want          bool
-	}{
-		{RoleAdmin, RoleAdmin, true},
-		{RoleAdmin, RoleMember, true},
-		{RoleEditor, RoleAdmin, false},
-		{RoleAdmin, RoleOwner, false},
-		{RoleOwner, RoleOwner, false},
-		{RoleOwner, Role("root"), false},
-	}
-	for _, tt := range tests {
-		if got := tt.actor.CanAssign(tt.target); got != tt.want {
-			t.Errorf("%s.CanAssign(%s) = %v, want %v", tt.actor, tt.target, got, tt.want)
-		}
+func TestRoleLabel(t *testing.T) {
+	if got := RoleLabel(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN); got != "admin" {
+		t.Errorf("RoleLabel(admin) = %q", got)
 	}
 }

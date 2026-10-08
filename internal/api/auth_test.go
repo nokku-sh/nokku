@@ -10,8 +10,6 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
-
-	"github.com/nokku-sh/nokku/internal/db"
 )
 
 // The name is read from the row. It used to be kept from boot, so the login
@@ -22,7 +20,7 @@ func TestLoginPageFollowsARename(t *testing.T) {
 	before, err := workspaceName(wsCtx(t, cfg), cfg.Conn)
 	require.NoError(t, err)
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, db.RoleOwner)))
+		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)))
 	rename := func(name string) {
 		t.Helper()
 		_, err := workspaces.UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{Name: &name})
@@ -43,7 +41,7 @@ func TestLoginPageFollowsARename(t *testing.T) {
 // session cookie. The test server sends no mail, so the link comes from iam.
 func TestMagicLinkSignIn(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	u := seedUser(t, cfg, seedWorkspace(t, cfg), db.RoleViewer)
+	u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
 	auth := nokkuv1connect.NewAuthServiceClient(srv.Client(), srv.URL)
 
 	options, err := auth.GetLoginOptions(t.Context(), &nokkuv1.GetLoginOptionsRequest{})
@@ -64,7 +62,7 @@ func TestMagicLinkSignIn(t *testing.T) {
 	got, err := auth.ConsumeMagicLink(ctx, &nokkuv1.ConsumeMagicLinkRequest{Token: &token})
 	require.NoError(t, err)
 	assert.Equal(t, u.ID, got.GetUser().GetId())
-	assert.Equal(t, "viewer", got.GetUser().GetRole())
+	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER, got.GetUser().GetRole())
 	assert.Contains(t, info.ResponseHeader().Get("Set-Cookie"), "nokku_session=", "the sign-in sets a session")
 
 	_, err = auth.ConsumeMagicLink(t.Context(), &nokkuv1.ConsumeMagicLinkRequest{Token: &token})
@@ -75,7 +73,7 @@ func TestMagicLinkSignIn(t *testing.T) {
 // devices. Removing a device forgets it, and its cookie never signs in.
 func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	u := seedUser(t, cfg, seedWorkspace(t, cfg), db.RoleViewer)
+	u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
 	link, err := cfg.IAM.IssueBootstrapLink(wsCtx(t, cfg), u)
 	require.NoError(t, err)
 	_, token, _ := strings.Cut(link, "token=")

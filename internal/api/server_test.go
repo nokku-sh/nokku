@@ -44,19 +44,21 @@ func TestWorkspaceHidesWebhookFromMembers(t *testing.T) {
 		return err
 	})
 
-	client := func(role db.Role) nokkuv1connect.WorkspaceServiceClient {
+	client := func(role nokkuv1.WorkspaceRole) nokkuv1connect.WorkspaceServiceClient {
 		return nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL,
 			header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, role)))
 	}
 
-	for _, role := range []db.Role{db.RoleMember, db.RoleEditor, db.RoleAdmin} {
+	for _, role := range []nokkuv1.WorkspaceRole{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN} {
 		got, err := client(role).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
 		require.NoError(t, err)
 		assert.Empty(t, got.GetWorkspace().GetSettings().GetAuditWebhookSecret(), "%s reads the secret", role)
 		assert.Empty(t, got.GetWorkspace().GetSettings().GetAuditWebhookUrl(), "%s reads the url", role)
 	}
 
-	got, err := client(db.RoleOwner).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
+	got, err := client(
+		nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER,
+	).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
 	require.NoError(t, err)
 	assert.Equal(t, "s3cret", got.GetWorkspace().GetSettings().GetAuditWebhookSecret())
 	assert.True(t,

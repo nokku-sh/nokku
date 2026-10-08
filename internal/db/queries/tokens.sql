@@ -9,7 +9,7 @@ INSERT INTO
     max_uses,
     auto_approve,
     ca_id,
-    role_name
+    role
   )
 VALUES
   (
@@ -21,7 +21,7 @@ VALUES
     sqlc.narg('max_uses'),
     @auto_approve,
     sqlc.narg('ca_id'),
-    sqlc.narg('role_name')
+    sqlc.narg('role')
   )
 RETURNING
   *;

@@ -78,10 +78,10 @@ type org struct {
 func (e *testEnv) org(t *testing.T) org {
 	t.Helper()
 	ws := e.workspace(t)
-	return org{ws: ws, owner: e.user(t, ws, "owner@"+testDomain(), "owner")}
+	return org{ws: ws, owner: e.user(t, ws, "owner@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)}
 }
 
-func (e *testEnv) user(t *testing.T, ws actor.Workspace, email, role string) *db.User {
+func (e *testEnv) user(t *testing.T, ws actor.Workspace, email string, role nokkuv1.WorkspaceRole) *db.User {
 	t.Helper()
 	var u *db.User
 	err := e.in(t, ws, func(q *db.Queries) (err error) {
@@ -97,7 +97,7 @@ func (e *testEnv) user(t *testing.T, ws actor.Workspace, email, role string) *db
 }
 
 // invite makes an invite link for ws. maxUses zero is unlimited.
-func (e *testEnv) invite(t *testing.T, ws actor.Workspace, role string, maxUses int32) string {
+func (e *testEnv) invite(t *testing.T, ws actor.Workspace, role nokkuv1.WorkspaceRole, maxUses int32) string {
 	t.Helper()
 	id := uuid.NewV7().String()
 	tok := crypto.NewToken(id)
@@ -105,7 +105,7 @@ func (e *testEnv) invite(t *testing.T, ws actor.Workspace, role string, maxUses 
 		ID:        id,
 		Kind:      nokkuv1.TokenKind_TOKEN_KIND_INVITE,
 		TokenHash: tok.Hash,
-		RoleName:  &role,
+		Role:      &role,
 	}
 	if maxUses > 0 {
 		params.MaxUses = &maxUses

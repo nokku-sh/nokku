@@ -140,7 +140,7 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
-		data, err := json.Marshal(signupData{Name: name, Role: deref(tok.RoleName), InviteID: tok.ID})
+		data, err := json.Marshal(signupData{Name: name, Role: deref(tok.Role), InviteID: tok.ID})
 		if err != nil {
 			return err
 		}

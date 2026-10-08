@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { dashboard } from '#lib/api/dashboard.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { workspace } from '#lib/api/workspaces.svelte.js';
@@ -18,8 +19,8 @@
 	const ws = workspace.get();
 	const role = $derived(me.data?.role);
 	// Members only see their own servers, the overview needs viewer rights.
-	const canView = $derived(atLeast(role, 'viewer'));
-	const canEdit = $derived(atLeast(role, 'editor'));
+	const canView = $derived(atLeast(role, WorkspaceRole.VIEWER));
+	const canEdit = $derived(atLeast(role, WorkspaceRole.EDITOR));
 
 	const data = dashboard.get(() => canView);
 	const issues = $derived(data.data ? issuesOf(data.data) : []);

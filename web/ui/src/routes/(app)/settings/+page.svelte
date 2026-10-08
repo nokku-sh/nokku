@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import StatTile from '#lib/components/blocks/StatTile.svelte';
 	import { daemon } from '#lib/api/daemons.svelte.js';
 	import { roles } from '#lib/api/roles.svelte.js';
@@ -30,15 +31,15 @@
 	const info = util.instanceInfo();
 	const draft = useDraft(WorkspaceSchema, () => ws.data);
 	const model = $derived(draft.current);
-	const isOwner = $derived(me.data?.role === 'owner');
+	const isOwner = $derived(me.data?.role === WorkspaceRole.OWNER);
 	// A hosted workspace can go, a self-hosted one is the whole server.
 	const deletable = $derived(isOwner && info.data?.mode === 'saas');
 
-	const ownerQuery = users.list(() => ({ role: 'owner', limit: 1 }));
+	const ownerQuery = users.list(() => ({ role: WorkspaceRole.OWNER, limit: 1 }));
 	const owner = $derived(ownerQuery.data?.users[0]);
 	const roleList = roles.list();
-	const myRole = $derived(roleList.data?.find((r) => r.name === me.data?.role));
-	const MyRoleIcon = $derived(roleIcon(me.data?.role ?? 'member'));
+	const myRole = $derived(roleList.data?.find((r) => r.role === me.data?.role));
+	const MyRoleIcon = $derived(roleIcon(me.data?.role || WorkspaceRole.MEMBER));
 
 	const one = () => ({ limit: 1 });
 	const counts = [
@@ -136,7 +137,9 @@
 				<Item.Root variant="muted" size="sm">
 					<Item.Media variant="icon"><MyRoleIcon /></Item.Media>
 					<Item.Content>
-						<Item.Title>You are {roleLabel(me.data?.role ?? 'member').toLowerCase()}</Item.Title>
+						<Item.Title
+							>You are {roleLabel(me.data?.role || WorkspaceRole.MEMBER).toLowerCase()}</Item.Title
+						>
 						<Item.Description>{myRole?.description}</Item.Description>
 					</Item.Content>
 				</Item.Root>

@@ -1,3 +1,4 @@
+import type { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 import { MAX_PAGE_SIZE } from '#lib/config.js';
 import { ServiceAccountService } from '#lib/gen/nokku/v1/service_account_pb.js';
 import { extract, type MaybeGetter } from 'runed';
@@ -16,7 +17,7 @@ export const serviceAccount = {
 			})
 		),
 	list: (
-		opts?: () => { query?: string; roleName?: string; limit?: number; offset?: number },
+		opts?: () => { query?: string; role?: WorkspaceRole; limit?: number; offset?: number },
 		when?: () => boolean
 	) =>
 		useQuery(

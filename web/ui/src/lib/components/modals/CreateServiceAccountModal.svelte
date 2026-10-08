@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import SecretReveal from '#lib/components/blocks/SecretReveal.svelte';
 	import { create } from '@bufbuild/protobuf';
 	import { timestampFromDate } from '@bufbuild/protobuf/wkt';
@@ -6,6 +7,7 @@
 	import { Bot, CalendarIcon, KeyRound } from '@lucide/svelte';
 	import { serviceAccount as saApi } from '#lib/api/service_account.svelte.js';
 	import RolePicker from '#lib/components/access/RolePicker.svelte';
+	import { SERVICE_ACCOUNT_MAX_ROLE } from '#lib/roles.js';
 	import * as Alert from '#lib/components/ext/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Calendar } from '#lib/components/ui/calendar/index.js';
@@ -25,7 +27,7 @@
 	const sheet = useSheet();
 	const createSA = saApi.create();
 
-	let model = $state(create(ServiceAccountSchema, { roleName: 'viewer' }));
+	let model = $state(create(ServiceAccountSchema, { role: WorkspaceRole.VIEWER }));
 	let preset = $state('90');
 	let customDate = $state<DateValue>();
 	let calendarOpen = $state(false);
@@ -54,7 +56,7 @@
 		});
 		token = res.token;
 		createdId = res.serviceAccount?.id ?? '';
-		model = create(ServiceAccountSchema, { roleName: 'viewer' });
+		model = create(ServiceAccountSchema, { role: WorkspaceRole.VIEWER });
 		preset = '90';
 	}
 
@@ -91,7 +93,11 @@
 
 	<Field.Set>
 		<Field.Legend variant="label">Workspace role</Field.Legend>
-		<RolePicker value={model.roleName} onChange={(role) => (model.roleName = role)} />
+		<RolePicker
+			value={model.role}
+			max={SERVICE_ACCOUNT_MAX_ROLE}
+			onChange={(role) => (model.role = role)}
+		/>
 	</Field.Set>
 
 	<Field.Set>

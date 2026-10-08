@@ -6,6 +6,8 @@ import (
 	"time"
 	"uuid"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/jackc/pgx/v5"
 
 	"github.com/nokku-sh/nokku/internal/crypto"
@@ -19,7 +21,7 @@ func TestEmailChangeTokens(t *testing.T) {
 	id := uuid.NewV7().String()
 	oldEmail, newEmail := id+"@old.test", id+"@new.test"
 	if _, err := q.CreateUserWithID(ctx, &CreateUserWithIDParams{
-		ID: id, Email: oldEmail, Name: "u", Role: "member",
+		ID: id, Email: oldEmail, Name: "u", Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
 	}); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -90,7 +92,7 @@ func TestEmailChangeTokens(t *testing.T) {
 	// An address somebody else in the workspace holds is refused.
 	other := uuid.NewV7().String()
 	if _, err = q.CreateUserWithID(ctx, &CreateUserWithIDParams{
-		ID: other, Email: newEmail, Name: "o", Role: "member",
+		ID: other, Email: newEmail, Name: "o", Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
 	}); err != nil {
 		t.Fatalf("create other user: %v", err)
 	}

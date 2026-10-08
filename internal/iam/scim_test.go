@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"testing"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -106,7 +108,7 @@ func TestSCIMUserLifecycle(t *testing.T) {
 	assert.Equal(t, "John Doe", created.DisplayName)
 	u := e.userByEmail(t, o.ws, email)
 	require.NotNil(t, u)
-	assert.Equal(t, "member", u.Role)
+	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, u.Role)
 
 	var list scimList
 	c.do(http.MethodGet, "/Users?filter="+url.QueryEscape(`userName eq "`+email+`"`), nil, &list)
@@ -165,7 +167,7 @@ func TestSCIMGroupsStayInWorkspace(t *testing.T) {
 	ca, cb := e.scim(t, a), e.scim(t, b)
 	var member scimResource
 	ca.do(http.MethodPost, "/Users", scimUser("dev@"+testDomain(), ""), &member)
-	outsider := e.user(t, b.ws, "dev@"+testDomain(), "member")
+	outsider := e.user(t, b.ws, "dev@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 
 	var group scimResource
 	code := ca.do(http.MethodPost, "/Groups", map[string]any{

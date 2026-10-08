@@ -10,16 +10,17 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/internal/crypto"
+	nokku "github.com/nokku-sh/protos/gen/nokku/v1"
 )
 
 const createServiceAccount = `-- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (name, description, role_name, expires_at, tags, token_hash)
+  service_accounts (name, description, role, expires_at, tags, token_hash)
 VALUES
   (
     $1,
     $2,
-    COALESCE($3::TEXT, 'member'),
+    $3,
     $4,
     COALESCE($5, '{}'::TEXT[]),
     $6
@@ -31,7 +32,7 @@ RETURNING
 type CreateServiceAccountParams struct {
 	Name        string              `json:"name"`
 	Description *string             `json:"description"`
-	RoleName    *string             `json:"roleName"`
+	Role        nokku.WorkspaceRole `json:"role"`
 	ExpiresAt   *time.Time          `json:"expiresAt"`
 	Tags        interface{}         `json:"tags"`
 	TokenHash   *crypto.HashedToken `json:"tokenHash"`
@@ -41,7 +42,7 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAc
 	row := q.db.QueryRow(ctx, createServiceAccount,
 		arg.Name,
 		arg.Description,
-		arg.RoleName,
+		arg.Role,
 		arg.ExpiresAt,
 		arg.Tags,
 		arg.TokenHash,
@@ -64,7 +65,7 @@ func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID str
 
 const getServiceAccount = `-- name: GetServiceAccount :one
 SELECT
-  id, workspace_id, name, description, token_hash, role_name, last_used_at, expires_at, tags, created_at, updated_at
+  id, workspace_id, name, description, token_hash, role, last_used_at, expires_at, tags, created_at, updated_at
 FROM
   service_accounts
 WHERE
@@ -80,7 +81,7 @@ func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string
 		&i.Name,
 		&i.Description,
 		&i.TokenHash,
-		&i.RoleName,
+		&i.Role,
 		&i.LastUsedAt,
 		&i.ExpiresAt,
 		&i.Tags,
@@ -92,7 +93,7 @@ func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string
 
 const getServiceAccountByTokenHash = `-- name: GetServiceAccountByTokenHash :one
 SELECT
-  id, workspace_id, name, description, token_hash, role_name, last_used_at, expires_at, tags, created_at, updated_at
+  id, workspace_id, name, description, token_hash, role, last_used_at, expires_at, tags, created_at, updated_at
 FROM
   service_accounts
 WHERE
@@ -109,7 +110,7 @@ func (q *Queries) GetServiceAccountByTokenHash(ctx context.Context, tokenHash *c
 		&i.Name,
 		&i.Description,
 		&i.TokenHash,
-		&i.RoleName,
+		&i.Role,
 		&i.LastUsedAt,
 		&i.ExpiresAt,
 		&i.Tags,
@@ -121,7 +122,7 @@ func (q *Queries) GetServiceAccountByTokenHash(ctx context.Context, tokenHash *c
 
 const listServiceAccounts = `-- name: ListServiceAccounts :many
 SELECT
-  sa.id, sa.workspace_id, sa.name, sa.description, sa.token_hash, sa.role_name, sa.last_used_at, sa.expires_at, sa.tags, sa.created_at, sa.updated_at,
+  sa.id, sa.workspace_id, sa.name, sa.description, sa.token_hash, sa.role, sa.last_used_at, sa.expires_at, sa.tags, sa.created_at, sa.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa
@@ -148,8 +149,8 @@ WHERE
     )
   )
   AND (
-    $4::TEXT IS NULL
-    OR sa.role_name = $4::TEXT
+    sa.role = $4
+    OR $4 = 0 -- every role
   )
 ORDER BY
   sa.id ASC
@@ -160,12 +161,12 @@ OFFSET
 `
 
 type ListServiceAccountsParams struct {
-	Query    *string  `json:"query"`
-	Tags     []string `json:"tags"`
-	IsActive *bool    `json:"isActive"`
-	RoleName *string  `json:"roleName"`
-	Offset   *int32   `json:"offset"`
-	Limit    *int32   `json:"limit"`
+	Query    *string             `json:"query"`
+	Tags     []string            `json:"tags"`
+	IsActive *bool               `json:"isActive"`
+	Role     nokku.WorkspaceRole `json:"role"`
+	Offset   *int32              `json:"offset"`
+	Limit    *int32              `json:"limit"`
 }
 
 type ListServiceAccountsRow struct {
@@ -178,7 +179,7 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 		arg.Query,
 		arg.Tags,
 		arg.IsActive,
-		arg.RoleName,
+		arg.Role,
 		arg.Offset,
 		arg.Limit,
 	)
@@ -195,7 +196,7 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 			&i.ServiceAccount.Name,
 			&i.ServiceAccount.Description,
 			&i.ServiceAccount.TokenHash,
-			&i.ServiceAccount.RoleName,
+			&i.ServiceAccount.Role,
 			&i.ServiceAccount.LastUsedAt,
 			&i.ServiceAccount.ExpiresAt,
 			&i.ServiceAccount.Tags,
@@ -236,7 +237,13 @@ UPDATE service_accounts
 SET
   name = COALESCE($1, name),
   description = COALESCE($2, description),
-  role_name = COALESCE($3, role_name),
+  -- 0 is unset and keeps the role. The column comes first in the condition,
+  -- sqlc types the parameter by its first use.
+  role = CASE
+    WHEN role = $3
+    OR $3 = 0 THEN role
+    ELSE $3
+  END,
   tags = COALESCE($4, tags)
 WHERE
   id = $5
@@ -245,18 +252,18 @@ RETURNING
 `
 
 type UpdateServiceAccountParams struct {
-	Name             *string  `json:"name"`
-	Description      *string  `json:"description"`
-	RoleName         *string  `json:"roleName"`
-	Tags             []string `json:"tags"`
-	ServiceAccountID string   `json:"serviceAccountId"`
+	Name             *string             `json:"name"`
+	Description      *string             `json:"description"`
+	Role             nokku.WorkspaceRole `json:"role"`
+	Tags             []string            `json:"tags"`
+	ServiceAccountID string              `json:"serviceAccountId"`
 }
 
 func (q *Queries) UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAccountParams) (string, error) {
 	row := q.db.QueryRow(ctx, updateServiceAccount,
 		arg.Name,
 		arg.Description,
-		arg.RoleName,
+		arg.Role,
 		arg.Tags,
 		arg.ServiceAccountID,
 	)

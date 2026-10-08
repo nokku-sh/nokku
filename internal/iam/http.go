@@ -100,11 +100,11 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	WriteJSON(w, status, map[string]any{"code": status, "message": msg})
 }
 
-func deref(s *string) string {
-	if s == nil {
-		return ""
+func deref[T any](p *T) (v T) {
+	if p != nil {
+		v = *p
 	}
-	return *s
+	return v
 }
 
 func deviceNameFromUA(ua string) string {

@@ -7,6 +7,7 @@ import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2
 import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { WorkspaceRole } from "./access_pb";
 import { file_nokku_v1_access } from "./access_pb";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -14,7 +15,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/invitation.proto.
  */
 export const file_nokku_v1_invitation: GenFile = /*@__PURE__*/
-  fileDesc("Chlub2trdS92MS9pbnZpdGF0aW9uLnByb3RvEghub2trdS52MSIuChRHZXRJbnZpdGF0aW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQASJtChVHZXRJbnZpdGF0aW9uUmVzcG9uc2USFgoOd29ya3NwYWNlX25hbWUYASABKAkSDAoEcm9sZRgCIAEoCRIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJhChdBY2NlcHRJbnZpdGF0aW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQARIWCgRuYW1lGAIgASgJQgi6SAVyAxiAAhIWCgVlbWFpbBgDIAEoCUIHukgEcgJgASIaChhBY2NlcHRJbnZpdGF0aW9uUmVzcG9uc2Uy0wEKEUludml0YXRpb25TZXJ2aWNlElsKDUdldEludml0YXRpb24SHi5ub2trdS52MS5HZXRJbnZpdGF0aW9uUmVxdWVzdBofLm5va2t1LnYxLkdldEludml0YXRpb25SZXNwb25zZSIJkAIBwvMYAggBEmEKEEFjY2VwdEludml0YXRpb24SIS5ub2trdS52MS5BY2NlcHRJbnZpdGF0aW9uUmVxdWVzdBoiLm5va2t1LnYxLkFjY2VwdEludml0YXRpb25SZXNwb25zZSIGwvMYAggBYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Chlub2trdS92MS9pbnZpdGF0aW9uLnByb3RvEghub2trdS52MSIuChRHZXRJbnZpdGF0aW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQASKGAQoVR2V0SW52aXRhdGlvblJlc3BvbnNlEhYKDndvcmtzcGFjZV9uYW1lGAEgASgJEiUKBHJvbGUYAiABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wImEKF0FjY2VwdEludml0YXRpb25SZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABEhYKBG5hbWUYAiABKAlCCLpIBXIDGIACEhYKBWVtYWlsGAMgASgJQge6SARyAmABIhoKGEFjY2VwdEludml0YXRpb25SZXNwb25zZTLTAQoRSW52aXRhdGlvblNlcnZpY2USWwoNR2V0SW52aXRhdGlvbhIeLm5va2t1LnYxLkdldEludml0YXRpb25SZXF1ZXN0Gh8ubm9ra3UudjEuR2V0SW52aXRhdGlvblJlc3BvbnNlIgmQAgHC8xgCCAESYQoQQWNjZXB0SW52aXRhdGlvbhIhLm5va2t1LnYxLkFjY2VwdEludml0YXRpb25SZXF1ZXN0GiIubm9ra3UudjEuQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlIgbC8xgCCAFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.GetInvitationRequest
@@ -43,9 +44,9 @@ export type GetInvitationResponse = Message<"nokku.v1.GetInvitationResponse"> & 
   workspaceName: string;
 
   /**
-   * @generated from field: string role = 2;
+   * @generated from field: nokku.v1.WorkspaceRole role = 2;
    */
-  role: string;
+  role: WorkspaceRole;
 
   /**
    * @generated from field: google.protobuf.Timestamp expires_at = 3;

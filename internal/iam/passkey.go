@@ -15,6 +15,8 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 
+	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/cache"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -38,7 +40,7 @@ type passkeySignupState struct {
 	ID       string                `json:"id"`
 	Email    string                `json:"email"`
 	Name     string                `json:"name"`
-	Role     string                `json:"role"`
+	Role     nokkuv1.WorkspaceRole `json:"role"`
 	InviteID string                `json:"invite_id"`
 }
 
@@ -284,7 +286,7 @@ func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	st := passkeySignupState{
-		ID: uuid.NewV7().String(), Email: email, Name: name, Role: deref(invite.RoleName), InviteID: invite.ID,
+		ID: uuid.NewV7().String(), Email: email, Name: name, Role: deref(invite.Role), InviteID: invite.ID,
 	}
 	creation, session, err := wa.BeginRegistration(&webUser{user: &db.User{ID: st.ID, Email: email, Name: name}})
 	if err != nil {

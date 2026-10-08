@@ -3,39 +3,47 @@
 	import { roles as rolesApi } from '#lib/api/roles.svelte.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
-	import { roleColor, roleIcon, roleLabel } from '#lib/roles.js';
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
+	import { parseRole, roleColor, roleIcon, roleLabel, roleSlug } from '#lib/roles.js';
 	import { Crown } from '@lucide/svelte';
 
 	type Props = {
-		roleName?: string;
+		role?: WorkspaceRole;
 		/** Persist a role change. If omitted, the role is shown as a badge. */
-		update?: (roleName: string) => Promise<unknown> | unknown;
+		update?: (role: WorkspaceRole) => Promise<unknown> | unknown;
+		/** The highest role on offer. */
+		max?: WorkspaceRole;
 	};
-	let { roleName = '', update }: Props = $props();
+	let { role = WorkspaceRole.UNSPECIFIED, update, max = WorkspaceRole.ADMIN }: Props = $props();
 
-	let optimistic = $state<string>();
-	const currentRole = $derived(optimistic ?? roleName);
+	let optimistic = $state<WorkspaceRole>();
+	const currentRole = $derived(optimistic ?? role);
 
 	const rolesQuery = rolesApi.list();
 	const roleOptions = $derived(
-		(rolesQuery.data ?? []).map((r) => ({
-			value: r.name,
-			label: roleLabel(r.name),
-			description: r.description,
-			icon: roleIcon(r.name),
-			color: roleColor(r.name)
-		}))
+		(rolesQuery.data ?? [])
+			.filter((r) => r.role <= max)
+			.map((r) => ({
+				role: r.role,
+				// The select speaks strings.
+				value: roleSlug(r.role),
+				label: roleLabel(r.role),
+				description: r.description,
+				icon: roleIcon(r.role),
+				color: roleColor(r.role)
+			}))
 	);
-	const selectedRole = $derived(roleOptions.find((r) => r.value === currentRole));
+	const selectedRole = $derived(roleOptions.find((r) => r.role === currentRole));
 
 	let saving = $state(false);
-	async function handleRoleChange(val: string) {
-		if (val === currentRole || !update) return;
+	async function handleRoleChange(slug: string) {
+		const picked = parseRole(slug);
+		if (!picked || picked === currentRole || !update) return;
 
-		optimistic = val; // Optimistically update the UI
+		optimistic = picked; // Optimistically update the UI
 		saving = true;
 		try {
-			await update(val);
+			await update(picked);
 		} catch {
 			optimistic = undefined; // Revert to the server value
 		} finally {
@@ -51,13 +59,13 @@
 		variant="outline"
 		class="gap-1.5 border-warning/30 bg-warning/10 text-warning hover:bg-warning/10"
 	>
-		{#if roleName === 'owner'}
+		{#if role === WorkspaceRole.OWNER}
 			<Crown />
 		{/if}
 		<span>{roleLabel(currentRole)}</span>
 	</Badge>
 {:else}
-	<Select.Root type="single" value={currentRole} onValueChange={handleRoleChange}>
+	<Select.Root type="single" value={roleSlug(currentRole)} onValueChange={handleRoleChange}>
 		<Select.Trigger
 			disabled={saving}
 			class="h-auto! w-fit cursor-pointer justify-center gap-1.5 rounded-full border border-input bg-transparent px-2 py-0.5 text-xs font-medium text-foreground transition-all hover:bg-muted/50 focus:ring-0 disabled:opacity-70 [&>svg:last-child]:hidden"

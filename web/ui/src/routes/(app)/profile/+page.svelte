@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { httpFetch } from '#lib/api/client.js';
 	import { credentials } from '#lib/api/credential.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
@@ -25,7 +26,7 @@
 	const me = user.self();
 	const draft = useDraft(UserSchema, () => me.data);
 	const model = $derived(draft.current);
-	const RoleIcon = $derived(roleIcon(me.data?.role ?? 'member'));
+	const RoleIcon = $derived(roleIcon(me.data?.role || WorkspaceRole.MEMBER));
 
 	const updateProfile = user.updateProfile();
 	const deleteAccount = user.deleteAccount();
@@ -33,7 +34,7 @@
 	const creds = credentials.all();
 	// An identity provider owns the address of the accounts it signs in.
 	const managed = $derived((creds.data ?? []).some((c) => c.type === 'oidc' || c.type === 'scim'));
-	const isOwner = $derived(me.data?.role === 'owner');
+	const isOwner = $derived(me.data?.role === WorkspaceRole.OWNER);
 
 	let emailOpen = $state(false);
 	let newEmail = $state('');
@@ -156,7 +157,7 @@
 			<span class="flex items-center gap-2 text-xs text-muted-foreground">
 				<Badge variant="secondary">
 					<RoleIcon data-icon="inline-start" />
-					{roleLabel(me.data?.role ?? 'member')}
+					{roleLabel(me.data?.role || WorkspaceRole.MEMBER)}
 				</Badge>
 				since {formatTs(me.data?.createdAt, 'short')}
 			</span>
