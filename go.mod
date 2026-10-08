@@ -23,7 +23,7 @@ require (
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jackc/tern/v2 v2.4.3
 	github.com/mizuchilabs/kata v0.1.15
-	github.com/nokku-sh/protos v0.2.5-0.20261008090145-d4b56692464b
+	github.com/nokku-sh/protos v0.2.5
 	github.com/oauth2-proxy/mockoidc v0.0.0-20240214162133-caebfff84d25
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/scaleway/scaleway-sdk-go v1.38.0
