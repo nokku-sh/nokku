@@ -5,7 +5,7 @@
 		CertificateKeyType
 	} from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { secToD } from '#lib/utils.js';
-	import { create, type MessageInitShape } from '@bufbuild/protobuf';
+	import type { MessageInitShape } from '@bufbuild/protobuf';
 
 	function defaultCADraft(): MessageInitShape<typeof CertificateAuthoritySchema> {
 		return {
@@ -43,7 +43,7 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
-	import { useSheet } from '#lib/hooks/index.js';
+	import { newDraft, useSheet } from '#lib/hooks/index.js';
 	import { ChevronDown, Shield } from '@lucide/svelte';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
@@ -52,7 +52,7 @@
 	const createCA = caApi.create();
 	const uid = $props.id();
 
-	let model = $state(create(CertificateAuthoritySchema, defaultCADraft()));
+	let model = $state(newDraft(CertificateAuthoritySchema, defaultCADraft()));
 	let advanced = $state(false);
 	const isSSH = $derived(model.authorityType === AuthorityType.SSH);
 
@@ -93,7 +93,7 @@
 	};
 
 	function reset() {
-		model = create(CertificateAuthoritySchema, defaultCADraft());
+		model = newDraft(CertificateAuthoritySchema, defaultCADraft());
 		advanced = false;
 	}
 
