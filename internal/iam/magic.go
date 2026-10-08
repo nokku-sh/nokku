@@ -22,7 +22,6 @@ const (
 	tokenSignup    = "signup"
 	magicLinkTTL   = 15 * time.Minute
 	bootstrapTTL   = 24 * time.Hour
-	resendCooldown = 5 * time.Minute
 	loginVerifyURL = "/login/verify?token="
 	inviteURL      = "/invite/verify?token="
 )
@@ -36,6 +35,7 @@ func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
 	email = normalizeEmail(email)
 	var u *db.User
 	var link string
+	var hash crypto.HashedToken
 	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		found, err := q.GetUserByEmail(ctx, email)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -47,13 +47,7 @@ func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
 		if !found.Active {
 			return nil
 		}
-		recent, err := q.HasRecentToken(ctx, &db.HasRecentTokenParams{
-			UserID: &found.ID, Purpose: tokenLogin, Since: s.now().Add(-resendCooldown),
-		})
-		if err != nil || recent {
-			return err
-		}
-		link, err = s.putLoginToken(ctx, q, found.ID, magicLinkTTL)
+		link, hash, err = s.putLoginToken(ctx, q, found.ID, magicLinkTTL)
 		u = found
 		return err
 	})
@@ -68,9 +62,20 @@ func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
 		return nil
 	}
 	if err := s.sendMagicLink(ctx, u.ID, u.Email, link, magicLinkTTL.String()); err != nil {
-		slog.Warn("magic link not sent", "error", err)
+		s.dropUnsent(ctx, hash, err)
 	}
 	return nil
+}
+
+// dropUnsent forgets a link whose mail did not go out. How often a link may
+// be asked for is the mail service's cooldown, nothing here counts as well.
+func (s *Service) dropUnsent(ctx context.Context, hash crypto.HashedToken, cause error) {
+	if !errors.Is(cause, emailverify.ErrCooldown) {
+		slog.Warn("link not sent", "error", cause)
+	}
+	if err := s.conn.Tenant().DeleteToken(ctx, hash); err != nil {
+		slog.Warn("unsent link not removed", "error", err)
+	}
 }
 
 func (s *Service) putLoginToken(
@@ -78,7 +83,7 @@ func (s *Service) putLoginToken(
 	q *db.Queries,
 	userID string,
 	ttl time.Duration,
-) (string, error) {
+) (string, crypto.HashedToken, error) {
 	raw, hash := crypto.NewSecret()
 	err := q.PutToken(ctx, &db.PutTokenParams{
 		TokenHash: hash,
@@ -87,9 +92,9 @@ func (s *Service) putLoginToken(
 		ExpiresAt: s.now().Add(ttl),
 	})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return baseURL(ctx) + loginVerifyURL + raw, nil
+	return baseURL(ctx) + loginVerifyURL + raw, hash, nil
 }
 
 // IssueBootstrapLink is how the first admin gets in before any passkey
@@ -102,7 +107,7 @@ func (s *Service) IssueBootstrapLink(ctx context.Context, u *db.User) (string, e
 		}); err != nil {
 			return err
 		}
-		link, err = s.putLoginToken(ctx, q, u.ID, bootstrapTTL)
+		link, _, err = s.putLoginToken(ctx, q, u.ID, bootstrapTTL)
 		return err
 	})
 	return link, err
@@ -120,6 +125,7 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 	}
 	name = strings.TrimSpace(name)
 	var link, workspace string
+	var hash crypto.HashedToken
 	err := s.conn.WithWorkspace(ctx, func(q *db.Queries) error {
 		tok, err := lookupInvite(ctx, q, invite)
 		if err != nil {
@@ -135,17 +141,12 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
-		recent, err := q.HasRecentToken(ctx, &db.HasRecentTokenParams{
-			Email: &email, Purpose: tokenSignup, Since: s.now().Add(-resendCooldown),
-		})
-		if err != nil || recent {
-			return err
-		}
 		data, err := json.Marshal(signupData{Name: name, Role: deref(tok.RoleName), InviteID: tok.ID})
 		if err != nil {
 			return err
 		}
-		raw, hash := crypto.NewSecret()
+		var raw string
+		raw, hash = crypto.NewSecret()
 		if err := q.PutSignupToken(ctx, &db.PutSignupTokenParams{
 			TokenHash: hash,
 			ExpiresAt: s.now().Add(magicLinkTTL),
@@ -157,11 +158,11 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 		link = baseURL(ctx) + inviteURL + raw
 		return nil
 	})
-	if err != nil || link == "" {
+	if err != nil {
 		return err
 	}
 	if err := s.sendSignupLink(ctx, email, name, workspace, link, magicLinkTTL.String()); err != nil {
-		slog.Warn("signup link not sent", "error", err)
+		s.dropUnsent(ctx, hash, err)
 	}
 	return nil
 }

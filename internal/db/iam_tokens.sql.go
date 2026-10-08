@@ -104,6 +104,17 @@ func (q *Queries) DeleteExpiredTokens(ctx context.Context, now time.Time) (int64
 	return result.RowsAffected(), nil
 }
 
+const deleteToken = `-- name: DeleteToken :exec
+DELETE FROM one_time_tokens
+WHERE
+  token_hash = $1
+`
+
+func (q *Queries) DeleteToken(ctx context.Context, tokenHash crypto.HashedToken) error {
+	_, err := q.db.Exec(ctx, deleteToken, tokenHash)
+	return err
+}
+
 const deleteUserTokens = `-- name: DeleteUserTokens :exec
 DELETE FROM one_time_tokens
 WHERE
@@ -147,39 +158,6 @@ func (q *Queries) GetPendingTokenEmail(ctx context.Context, arg *GetPendingToken
 	var email string
 	err := row.Scan(&email)
 	return email, err
-}
-
-const hasRecentToken = `-- name: HasRecentToken :one
-SELECT EXISTS (
-  SELECT 1
-  FROM one_time_tokens
-  WHERE
-    (
-      user_id = $1
-      OR email = $2
-    )
-    AND purpose = $3
-    AND created_at > $4
-)
-`
-
-type HasRecentTokenParams struct {
-	UserID  *string   `json:"userId"`
-	Email   *string   `json:"email"`
-	Purpose string    `json:"purpose"`
-	Since   time.Time `json:"since"`
-}
-
-func (q *Queries) HasRecentToken(ctx context.Context, arg *HasRecentTokenParams) (bool, error) {
-	row := q.db.QueryRow(ctx, hasRecentToken,
-		arg.UserID,
-		arg.Email,
-		arg.Purpose,
-		arg.Since,
-	)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
 }
 
 const putSignupToken = `-- name: PutSignupToken :exec
