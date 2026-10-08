@@ -39,9 +39,11 @@
 	}
 
 	// The form is reset for each open, from the provider when editing one.
-	function onOpenChange(next: boolean) {
-		if (!next) return;
+	// An effect, since the parent opens this and bits-ui only reports its own changes.
+	$effect(() => {
+		if (!open) return;
 		clientSecret = '';
+		idTouched = false;
 		form = provider
 			? {
 					providerId: provider.providerId,
@@ -53,7 +55,7 @@
 					jitProvisioning: provider.jitProvisioning
 				}
 			: blank();
-	}
+	});
 
 	// The id is derived from the name until the person edits it.
 	function slugFromName(name: string) {
@@ -87,7 +89,6 @@
 	title={isEdit ? 'Edit provider' : 'Add provider'}
 	description="An OpenID Connect provider. The redirect URI is on the previous page."
 	icon={KeyRound}
-	{onOpenChange}
 	onSubmit={submit}
 	submitLabel={isEdit ? 'Save' : 'Add provider'}
 	submitDisabled={!valid}
