@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
@@ -234,6 +235,51 @@ func TestCutRecordingIsScrubbed(t *testing.T) {
 		return strings.Contains(got, "done") && strings.Contains(got, "DB_PASSWORD=<redacted>")
 	}, 10*time.Second, 20*time.Millisecond, "the whole file did not replace the part, or was not scrubbed")
 	assert.NotContains(t, stored(), "VhT9xNq2mLb4Zw")
+}
+
+// A session that is uploaded late keeps the time it began. A start from a
+// clock that was wrong counts as now, or retention would take the recording
+// the moment it arrives.
+func TestLateUploadKeepsItsStartTime(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	// The daemon has been around for two days.
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	defer func() { _ = owner.Close(t.Context()) }()
+	_, err = owner.Exec(t.Context(),
+		"UPDATE daemons SET created_at = NOW() - INTERVAL '2 days' WHERE id = $1", enrolled.GetId())
+	require.NoError(t, err)
+
+	startOf := func(named *timestamppb.Timestamp) time.Time {
+		id := uuid.NewV7().String()
+		ctx, call := connect.NewClientContext(t.Context())
+		call.RequestHeader().Set("Authorization", "DPoP "+enrolled.GetAccessToken())
+		call.RequestHeader().Set("DPoP", dpopProof(
+			t, cfg, key, nokkuv1connect.DaemonControlServiceUploadRecordingProcedure, enrolled.GetAccessToken(),
+		))
+		stream, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL).UploadRecording(ctx)
+		require.NoError(t, err)
+		require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Meta{
+			Meta: &nokkuv1.RecordingMeta{RecordingId: &id, Username: new("root"), StartedAt: named},
+		}}))
+		_, err = stream.CloseAndReceive()
+		require.NoError(t, err)
+		rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+		require.NoError(t, err)
+		return rec.StartedAt
+	}
+
+	began := time.Now().Add(-3 * time.Hour).Truncate(time.Second)
+	assert.WithinDuration(t, began, startOf(timestamppb.New(began)), time.Second, "a late upload lost its start")
+	assert.WithinDuration(t, time.Now(), startOf(nil), time.Minute, "an upload that names no start")
+	assert.WithinDuration(t, time.Now(), startOf(timestamppb.New(time.Now().Add(time.Hour))), time.Minute,
+		"a start in the future")
+	assert.WithinDuration(t, time.Now(), startOf(timestamppb.New(time.Now().AddDate(0, 0, -5))), time.Minute,
+		"a start before the daemon enrolled")
+	assert.WithinDuration(t, time.Now(), startOf(timestamppb.New(time.Unix(0, 0))), time.Minute,
+		"a start from a clock at zero")
 }
 
 // The same when storage cannot even open the object. The row exists by then,
