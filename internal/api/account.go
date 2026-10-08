@@ -62,6 +62,10 @@ func (s *accountService) RequestEmailChange(
 	if !s.cfg.Email.HasSMTP() {
 		return nil, newError(connect.CodeUnimplemented, "this server sends no mail, ask your administrator")
 	}
+	// Asked first, a refused request must not replace the pending change.
+	if s.cfg.Email.EmailChangeOnCooldown(ctx, u.ID) {
+		return nil, newError(connect.CodeResourceExhausted, "you asked for a change a moment ago, try again later")
+	}
 	confirm, cancel, err := s.cfg.IAM.RequestEmailChange(ctx, u, req.GetNewEmail())
 	switch {
 	case errors.Is(err, iam.ErrSameEmail):
@@ -79,7 +83,7 @@ func (s *accountService) RequestEmailChange(
 	ws, _ := actor.WorkspaceFromContext(ctx)
 	base := ws.BaseURL + "/email-change?"
 	newEmail := strings.ToLower(strings.TrimSpace(req.GetNewEmail()))
-	err = s.cfg.Email.SendMagicLinkEmail(ctx, u.ID, newEmail, base+"token="+confirm, iam.EmailChangeTTL.String())
+	err = s.cfg.Email.SendEmailChangeConfirm(ctx, u.ID, newEmail, base+"token="+confirm, iam.EmailChangeTTL.String())
 	if err == nil {
 		err = s.cfg.Email.SendEmailChangeNotice(ctx, u.ID, u.Email, newEmail, base+"cancel=1&token="+cancel, "7 days")
 	}

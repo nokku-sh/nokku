@@ -64,18 +64,10 @@ ORDER BY
 LIMIT
   1;
 
--- name: HasRecentToken :one
-SELECT EXISTS (
-  SELECT 1
-  FROM one_time_tokens
-  WHERE
-    (
-      user_id = sqlc.narg('user_id')
-      OR email = sqlc.narg('email')
-    )
-    AND purpose = @purpose
-    AND created_at > @since
-);
+-- name: DeleteToken :exec
+DELETE FROM one_time_tokens
+WHERE
+  token_hash = @token_hash;
 
 -- name: DeleteExpiredTokens :execrows
 -- Every tenant, runs as nokku_system.

@@ -17,10 +17,14 @@ import (
 	"github.com/nokku-sh/nokku/web"
 )
 
-var errCooldown = errors.New("email cooldown active")
+// ErrCooldown means the same kind of mail went to this person a moment ago.
+var ErrCooldown = errors.New("email cooldown active")
 
-// cooldownEntries bounds the cooldown store, one entry per user and template.
-const cooldownEntries = 10_000
+const (
+	// cooldownEntries bounds the cooldown store, one entry per user and template.
+	cooldownEntries = 10_000
+	emailConfirm    = "email-confirm"
+)
 
 // Service only delivers when an SMTP host is set.
 type Service struct {
@@ -100,6 +104,29 @@ func (s *Service) SendMagicLinkEmail(ctx context.Context, userID, email, link, e
 	})
 }
 
+// SendEmailChangeConfirm goes to the new address, the account only switches
+// to it once the link is used.
+func (s *Service) SendEmailChangeConfirm(ctx context.Context, userID, email, link, expiry string) error {
+	return s.sendTemplate(ctx, sendRequest{
+		userID:   userID,
+		to:       email,
+		subject:  "Confirm your new email address",
+		template: emailConfirm,
+		data: linkTemplateData{
+			Operator:   s.Operator,
+			LinkURL:    link,
+			Expiration: expiry,
+		},
+	})
+}
+
+// EmailChangeOnCooldown is whether userID asked for an email change a moment
+// ago. Asked before a new change replaces the pending one.
+func (s *Service) EmailChangeOnCooldown(ctx context.Context, userID string) bool {
+	_, err := s.cache.Get(ctx, cooldownKey(userID, emailConfirm))
+	return err == nil
+}
+
 // SendSignupLinkEmail goes to someone without an account yet, so the
 // cooldown is keyed by the address.
 func (s *Service) SendSignupLinkEmail(ctx context.Context, email, name, workspace, link, expiry string) error {
@@ -170,14 +197,14 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 		return err
 	}
 
-	key := "email_cooldown:" + req.userID + ":" + req.template
+	key := cooldownKey(req.userID, req.template)
 	claimed, err := s.cache.SetNX(ctx, key, nil, s.Cooldown)
 	// A full store must not hold back a reset or a sign-in alert. Every signup
 	// adds an entry, so it can be filled from outside.
 	if err != nil {
 		slog.Warn("email cooldown not recorded, sending anyway", "error", err)
 	} else if !claimed {
-		return errCooldown
+		return ErrCooldown
 	}
 
 	err = s.sender.Send(ctx, message{
@@ -190,6 +217,10 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 		_ = s.cache.Delete(context.WithoutCancel(ctx), key)
 	}
 	return err
+}
+
+func cooldownKey(userID, template string) string {
+	return "email_cooldown:" + userID + ":" + template
 }
 
 func render(name string, data any) (string, error) {

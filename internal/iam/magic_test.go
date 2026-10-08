@@ -11,6 +11,7 @@ import (
 
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
+	emailverify "github.com/nokku-sh/nokku/internal/email"
 )
 
 // mailbox captures the links the service would mail.
@@ -61,8 +62,6 @@ func TestMagicLinkSignIn(t *testing.T) {
 	link := mail.link(t)
 	assert.Contains(t, link, testBaseURL+loginVerifyURL, "the link points at the workspace host")
 	token := linkToken(t, link)
-	require.NoError(t, e.svc.RequestMagicLink(ctx, a.owner.Email))
-	mail.empty(t, "a second request inside the cooldown gets no mail")
 
 	_, _, err := e.svc.ConsumeMagicLink(anon(t.Context(), b.ws), token)
 	require.ErrorIs(t, err, ErrInvalidToken, "a link of workspace a signed in on workspace b")
@@ -81,6 +80,24 @@ func TestMagicLinkSignIn(t *testing.T) {
 
 	require.NoError(t, e.svc.RequestMagicLink(anon(t.Context(), b.ws), a.owner.Email))
 	mail.empty(t, "an address of workspace a gets no mail from workspace b")
+}
+
+// The mail service holds back a second link inside its cooldown. A link
+// nobody got must not stay valid.
+func TestUnsentMagicLinkIsDropped(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	ctx := anon(t.Context(), o.ws)
+	var link string
+	e.svc.sendMagicLink = func(_ context.Context, _, _, l, _ string) error {
+		link = l
+		return emailverify.ErrCooldown
+	}
+
+	require.NoError(t, e.svc.RequestMagicLink(ctx, o.owner.Email))
+	require.NotEmpty(t, link, "the mail service was not asked")
+	_, _, err := e.svc.ConsumeMagicLink(ctx, linkToken(t, link))
+	require.ErrorIs(t, err, ErrInvalidToken, "a link that was never mailed signed in")
 }
 
 func TestMagicLinkHonorsEnforcedSSO(t *testing.T) {

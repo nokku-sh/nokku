@@ -80,8 +80,8 @@ func TestSendTemplate_Cooldown(t *testing.T) {
 	}
 
 	err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "url", "10m")
-	if !errors.Is(err, errCooldown) {
-		t.Fatalf("second send = %v, want errCooldown", err)
+	if !errors.Is(err, ErrCooldown) {
+		t.Fatalf("second send = %v, want ErrCooldown", err)
 	}
 	if len(sender.sent) != 1 {
 		t.Errorf("sender called %d times, want 1", len(sender.sent))
@@ -110,9 +110,36 @@ func TestSendTemplate_CooldownPerTemplate(t *testing.T) {
 		"10m",
 	); !errors.Is(
 		err,
-		errCooldown,
+		ErrCooldown,
 	) {
-		t.Errorf("repeat of same template = %v, want errCooldown", err)
+		t.Errorf("repeat of same template = %v, want ErrCooldown", err)
+	}
+	if len(sender.sent) != 2 {
+		t.Errorf("sender called %d times, want 2", len(sender.sent))
+	}
+}
+
+// A sign-in link a moment ago must not hold back an email change. A second
+// change still waits, and the caller can ask before it starts one.
+func TestSendEmailChangeConfirm_OwnCooldown(t *testing.T) {
+	sender := &mockSender{}
+	svc := newTestService(sender)
+	ctx := context.Background()
+
+	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", "10m"); err != nil {
+		t.Fatal(err)
+	}
+	if svc.EmailChangeOnCooldown(ctx, "user-1") {
+		t.Fatal("a sign-in link counts as an email change")
+	}
+	if err := svc.SendEmailChangeConfirm(ctx, "user-1", "new@b.io", "u", "1h"); err != nil {
+		t.Fatalf("confirmation blocked by the sign-in link: %v", err)
+	}
+	if !svc.EmailChangeOnCooldown(ctx, "user-1") {
+		t.Error("no cooldown after a confirmation went out")
+	}
+	if err := svc.SendEmailChangeConfirm(ctx, "user-1", "new@b.io", "u", "1h"); !errors.Is(err, ErrCooldown) {
+		t.Errorf("second confirmation = %v, want ErrCooldown", err)
 	}
 	if len(sender.sent) != 2 {
 		t.Errorf("sender called %d times, want 2", len(sender.sent))
@@ -145,7 +172,7 @@ func TestSendTemplate_SendErrorPropagatesWithoutCooldown(t *testing.T) {
 
 	// Failed sends must not set the cooldown, so a retry is possible.
 	err = svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", "10m")
-	if errors.Is(err, errCooldown) {
+	if errors.Is(err, ErrCooldown) {
 		t.Fatal("failed send set cooldown, retry impossible")
 	}
 	if sender.calls != 2 {
