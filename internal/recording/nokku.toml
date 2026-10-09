@@ -1,0 +1,42 @@
+# Rules for what a terminal shows and gitleaks has no rule for. Same format
+# as gitleaks.toml, read after it.
+
+[[rules]]
+id = "nokku-key"
+description = "A Nokku service account or SCIM key."
+regex = '''\b(nk_[a-z]{2,8}_[\w-]{38})(?:[^\w-]|$)'''
+
+[[rules]]
+id = "url-password"
+description = "A password in the user part of a URL, like a database connection string."
+regex = '''\b[a-zA-Z][a-zA-Z0-9+.-]{1,20}://[^\s:/@'"]{1,64}:([^\s@'"/]{3,256})@[\w.\[-]'''
+
+[[rules]]
+id = "discord-webhook"
+description = "A Discord webhook URL, its last part is the token."
+regex = '''(?i)https://(?:(?:canary|ptb)\.)?discord(?:app)?\.com/api/webhooks/\d{5,30}/([\w-]{30,100})'''
+
+[[rules]]
+id = "mysql-password-flag"
+description = "A password given to a MySQL client on its command line."
+regex = '''\b(?:mysql|mysqldump|mysqladmin|mariadb|mariadb-dump)\b[^\r\n]{0,200}?\s-p(?:'([^'\r\n]{3,})'|"([^"\r\n]{3,})"|([^\s'"-]\S{2,}))'''
+
+# gitleaks wants a key block from BEGIN to END. A screen that ends in the
+# middle of one shows only its head, or its tail after scrolling up. The
+# blanks between the lines may hold the prompt of a pager, ":" or "/".
+[[rules]]
+id = "private-key-head"
+description = "The first lines of a private key block."
+regex = '''-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----(?:[\s:/]{1,12}[A-Za-z0-9+/=]{16,})+'''
+
+[[rules]]
+id = "private-key-tail"
+description = "The last lines of a private key block."
+regex = '''(?:[A-Za-z0-9+/=]{16,}[\s:/]{1,12})+-----END[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----'''
+
+# gitleaks wants a token up to its signature. A program that breaks long
+# lines itself, like bat with line numbers, shows the start of one alone.
+[[rules]]
+id = "jwt-head"
+description = "A JSON Web Token cut off after the start of its payload."
+regex = '''\b(ey[a-zA-Z0-9]{17,}\.ey[a-zA-Z0-9/\\_-]{17,})'''

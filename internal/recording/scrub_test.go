@@ -120,16 +120,18 @@ func parseCastEvents(t *testing.T, cast []byte) []scrubTestEvent {
 	return events
 }
 
-// scrubBytes runs both passes over a cast in memory.
+// scrubBytes runs every pass over a cast in memory.
 func scrubBytes(t *testing.T, cast []byte, window, overlap int) ([]byte, bool) {
 	t.Helper()
 	rules, err := scrubRules()
 	if err != nil {
 		t.Fatalf("scrubRules: %v", err)
 	}
-	spans, err := findSecrets(bytes.NewReader(cast), rules, window, overlap)
+	spans, err := locateSecrets(func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(cast)), nil
+	}, rules, window, overlap)
 	if err != nil {
-		t.Fatalf("findSecrets: %v", err)
+		t.Fatalf("locateSecrets: %v", err)
 	}
 	var out bytes.Buffer
 	if err := rewriteCast(bytes.NewReader(cast), &out, spans); err != nil {
@@ -359,4 +361,210 @@ func TestScrubAndUploadTakeTurns(t *testing.T) {
 		t.Fatal("the upload did not stop the scrub it found")
 	}
 	end()
+}
+
+// scrubEvents scrubs a cast of output events and returns what is left of
+// their data, end to end.
+func scrubEvents(t *testing.T, events ...string) (string, bool) {
+	t.Helper()
+	var cast strings.Builder
+	cast.WriteString(scrubTestCast[:strings.Index(scrubTestCast, "\n")+1])
+	for i, data := range events {
+		line, err := json.Marshal([]any{float64(i), "o", data})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cast.Write(line)
+		cast.WriteByte('\n')
+	}
+	redacted, changed := scrubBytes(t, []byte(cast.String()), scrubWindow, scrubOverlap)
+	var out strings.Builder
+	for _, ev := range parseCastEvents(t, redacted) {
+		out.WriteString(ev.data)
+	}
+	return out.String(), changed
+}
+
+// A terminal puts sequences in and around what it shows, and shows a secret
+// in pieces. None of that may hide one, and the sequences stay in the stream.
+func TestScrubSeesThroughTheTerminal(t *testing.T) {
+	const (
+		token  = "ghp_abcDEF1234567890abcDEF1234567890abcDEF"
+		jwt    = "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAibm9ra3UtdGVzdCJ9.6h9DMbaBdTLULuL93KyFGXz5XYoR3w18JjZQRgd_q1g"
+		line1  = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCRokBog4Y3SG+2"
+		line2  = "/s4AOD2yorSphMR67Vgg497D60wDztGYOGTGxpGMukMcMpOkEsAZlYycVdETfOjU"
+		line3  = "FpfFXA0mXe3s8R4xaKuCR5Ie0gDpt82nqbKuhAXX0N4xOwe6rRsk38x2gWZvRCt1"
+		begin  = "-----BEGIN PRIVATE KEY-----"
+		ending = "-----END PRIVATE KEY-----"
+	)
+	var colored strings.Builder
+	for _, c := range token {
+		colored.WriteString("\x1b[4m" + string(c))
+	}
+
+	tests := []struct {
+		name   string
+		events []string
+		leaks  []string
+		keeps  []string
+	}{
+		{
+			name:   "a color reset right after the secret",
+			events: []string{"\x1b[37mNPM_TOKEN=npm_abcdefghijklmnopqrstuvwxyz0123456789\x1b[0m\r\n"},
+			leaks:  []string{"npm_abcdefgh"},
+			keeps:  []string{"\x1b[37mNPM_TOKEN=", "\x1b[0m\r\n"},
+		},
+		{
+			name: "a sequence right before the command",
+			events: []string{
+				"\r\x1b[Kcurl -H \"Authorization: Bearer uSCC5AiBLksydgNKSwZtdfoCUPgdljtm4rKknD7Q\" https://api.internal\r\n",
+			},
+			leaks: []string{"uSCC5AiBLksy"},
+			keeps: []string{"\r\x1b[Kcurl -H", "https://api.internal"},
+		},
+		{
+			name:   "a color for every character",
+			events: []string{"$ export GH=" + colored.String() + "\x1b[24m\r\n"},
+			leaks:  []string{"\x1b[4mg\x1b[4mh\x1b[4mp", "\x1b[4mD\x1b[4mE\x1b[4mF"},
+			keeps:  []string{"$ export GH=", "\x1b[4m\x1b[4m", "\x1b[24m\r\n"},
+		},
+		{
+			name:   "a sequence cut by the end of an event",
+			events: []string{"token " + token[:10] + "\x1b[3", "8;5;1m" + token[10:] + "\x1b[0m\r\n"},
+			leaks:  []string{token[:10], token[10:]},
+			keeps:  []string{"token ", "\x1b[38;5;1m", "\x1b[0m\r\n"},
+		},
+		{
+			name:   "a line the pager wrapped",
+			events: []string{"SESSION=" + jwt[:60] + " \b" + jwt[60:] + "\r\n:"},
+			leaks:  []string{jwt[:20], jwt[60:80], jwt[len(jwt)-20:]},
+			keeps:  []string{"SESSION=", "\r\n:"},
+		},
+		{
+			name:   "a page that ends at the wrap",
+			events: []string{"{\"api_key\": \"J1FLd5zohpP9bbBPAxs8 \b:\x1b[K"},
+			leaks:  []string{"J1FLd5zohpP9"},
+			keeps:  []string{"{\"api_key\": \"", "\b:\x1b[K"},
+		},
+		{
+			name: "seen whole once and cut off at the edge later",
+			events: []string{
+				"export GITHUB_TOKEN=" + token + "\r\n",
+				"\x1b[H\x1bMGITHUB_TOKEN=" + token[:30] + "\x1b[40;1H:",
+			},
+			leaks: []string{token[:30], token[:12]},
+			keeps: []string{"\x1b[H\x1bMGITHUB_TOKEN=", "\x1b[40;1H:"},
+		},
+		{
+			name: "a key block with the prompt of a pager between its lines",
+			events: []string{
+				begin + "\r\n:", "\r\x1b[K" + line1 + "\r\n:", "\r\x1b[K" + line2 + "\r\n:",
+				"\r\x1b[K" + line3 + "\r\n:", "\r\x1b[K" + ending + "\r\n:",
+			},
+			leaks: []string{"PRIVATE KEY", line1[:12], line2[:12], line3[:12], line3[40:]},
+			keeps: []string{"\r\x1b[K", "\r\n:"},
+		},
+		{
+			name:   "the head of a key block",
+			events: []string{begin + "\r\n" + line1 + "\r\n" + line2 + "\r\n:", "\r\x1b[K/\r\x1b[K" + line3 + "\r\n:"},
+			leaks:  []string{line1[:12], line2[:12], line3[:12]},
+		},
+		{
+			name:   "the tail of a key block",
+			events: []string{line2 + "\r\n" + line3 + "\r\n" + ending + "\r\n"},
+			leaks:  []string{line2[:12], line3[:12]},
+		},
+		{
+			name:   "a token cut off in its payload",
+			events: []string{"  30 │ SESSION=" + jwt[:70] + "\r\n     │ done\r\n"},
+			leaks:  []string{jwt[:20], jwt[50:70]},
+			keeps:  []string{"  30 │ SESSION=", "     │ done"},
+		},
+		{
+			name:   "a window title",
+			events: []string{"\x1b]0;export GITHUB_TOKEN=" + token + "\x07$ "},
+			leaks:  []string{token[:12]},
+			keeps:  []string{"\x1b]0;export GITHUB_TOKEN=", "\x07$ "},
+		},
+		{
+			name:   "a password in a URL",
+			events: []string{"DATABASE_URL=postgres://nokku:gPyKn3HmyTWmVWxrqFaPQDXi@db.internal:5432/nokku\r\n"},
+			leaks:  []string{"gPyKn3HmyTWm"},
+			keeps:  []string{"DATABASE_URL=postgres://nokku:", "@db.internal:5432/nokku"},
+		},
+		{
+			name:   "a password on the command line of mysql",
+			events: []string{"$ mysql -u root -p'U22tXJhb2a5yf4cj' -h 10.0.0.5\r\n"},
+			leaks:  []string{"U22tXJhb2a5y"},
+			keeps:  []string{"$ mysql -u root -p'", "' -h 10.0.0.5"},
+		},
+		{
+			name: "a Discord webhook",
+			events: []string{
+				"https://discord.com/api/webhooks/055565118294275913/4I6nL6m3bHCwVjFE8_ueyuG0y4H1mWkIbd5hPQHaPP5d0e-pE7try6y8UVoU2a13AG2r\r\n",
+			},
+			leaks: []string{"4I6nL6m3bHCw"},
+			keeps: []string{"https://discord.com/api/webhooks/"},
+		},
+		{
+			name:   "a key of our own",
+			events: []string{"nk login --token nk_sa_abcdefghijklmnopqrstuvwxyzABCDEF012345\r\n"},
+			leaks:  []string{"nk_sa_abcdef"},
+			keeps:  []string{"nk login --token "},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, _ := scrubEvents(t, tt.events...)
+			for _, leak := range tt.leaks {
+				if strings.Contains(got, leak) {
+					t.Errorf("%q survived in %q", leak, got)
+				}
+			}
+			for _, keep := range tt.keeps {
+				if !strings.Contains(got, keep) {
+					t.Errorf("%q is gone from %q", keep, got)
+				}
+			}
+			if !strings.Contains(got, redaction) {
+				t.Errorf("no redaction in %q", got)
+			}
+		})
+	}
+}
+
+// A secret typed one key at a time is one secret, and shows one redaction.
+func TestScrubMarksASecretOnce(t *testing.T) {
+	typed := strings.Split("export GITHUB_TOKEN=ghp_abcDEF1234567890abcDEF1234567890abcDEF", "")
+	got, _ := scrubEvents(t, append(typed, "\r\n")...)
+	if want := "export GITHUB_TOKEN=" + redaction + "\r\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+// Every line of a secret shows the redaction, and keeps its line break. A
+// screen that scrolls by lines stays in step.
+func TestScrubKeepsTheLinesOfASecret(t *testing.T) {
+	got, _ := scrubEvents(
+		t,
+		"-----BEGIN RSA PRIVATE KEY-----\r\n",
+		"MIIBqwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890\r\n-----END RSA PRIVATE KEY-----\r\nnext\r\n",
+	)
+	if want := strings.Repeat(redaction+"\r\n", 3) + "next\r\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+// Sequences alone are no reason to rewrite a recording.
+func TestScrubLeavesATerminalWithoutSecretsAlone(t *testing.T) {
+	events := []string{
+		"\x1b[?1049h\x1b[22;0;0t\x1b[1;40r\x1b[H\x1b[2J",
+		"\x1b[38;5;246m  12\x1b[0m \x1b[38;5;231mbuild \b step\x1b[0m\r\n",
+		"\x1b]0;make test\x07\x1b[32mok\x1b[39m  github.com/nokku-sh/nokku/internal/recording\t0.081s\r\n",
+		"\b\b\b\x1b[K\x1b[?1049l",
+	}
+	got, changed := scrubEvents(t, events...)
+	if changed || got != strings.Join(events, "") {
+		t.Fatalf("a clean recording changed: %q", got)
+	}
 }

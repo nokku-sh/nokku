@@ -18,6 +18,11 @@ import (
 //go:embed gitleaks.toml
 var gitleaksRules []byte
 
+// What gitleaks has no rule for, and a terminal shows all the time.
+//
+//go:embed nokku.toml
+var nokkuRules []byte
+
 type scrubAllowlist struct {
 	// target is what the regexes are matched against: the secret, or the
 	// whole match for "match" and "line".
@@ -47,7 +52,7 @@ var scrubRules = sync.OnceValues(func() (*scrubRuleSet, error) {
 		RegexTarget string   `toml:"regexTarget"`
 		Regexes     []string `toml:"regexes"`
 	}
-	var file struct {
+	type rules struct {
 		Allowlist  *allowlist  `toml:"allowlist"`
 		Allowlists []allowlist `toml:"allowlists"`
 		Rules      []struct {
@@ -59,9 +64,14 @@ var scrubRules = sync.OnceValues(func() (*scrubRuleSet, error) {
 			Allowlists  []allowlist `toml:"allowlists"`
 		} `toml:"rules"`
 	}
+	var file, more rules
 	if err := toml.Unmarshal(gitleaksRules, &file); err != nil {
 		return nil, fmt.Errorf("parse gitleaks rules: %w", err)
 	}
+	if err := toml.Unmarshal(nokkuRules, &more); err != nil {
+		return nil, fmt.Errorf("parse nokku rules: %w", err)
+	}
+	file.Rules = append(file.Rules, more.Rules...)
 
 	compile := func(lists []allowlist) ([]scrubAllowlist, error) {
 		var out []scrubAllowlist
