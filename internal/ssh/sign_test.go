@@ -268,8 +268,7 @@ func TestSignCertificateRespectsAllowedKeyTypes(t *testing.T) {
 	}
 }
 
-// A certificate without principals is valid for every account on every host
-// that trusts the CA, and OpenSSH reads at most 256.
+// A certificate without principals is valid for every account, and OpenSSH reads at most 256.
 func TestSignCertificatePrincipalCount(t *testing.T) {
 	ca := newTestCA(t)
 	if _, err := SignCertificate(ca, newTestKey(t), nil, "k", 0, ssh.UserCert); err == nil {

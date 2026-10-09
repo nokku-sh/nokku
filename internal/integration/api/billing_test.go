@@ -21,8 +21,7 @@ import (
 // The mode entitlement.NewService takes, named so the calls read.
 const modeSelfHosted = false
 
-// TestActivateLicense_AppliesWithoutRestart runs the real queries: the key
-// lands in the database, applies at once, and another replica finds it.
+// The real queries: the key lands in the database, applies at once, and another replica finds it.
 func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	cfg, _ := newTestAPI(t)
 	ctx := t.Context()
@@ -39,8 +38,7 @@ func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	}, priv)
 	require.NoError(t, err)
 
-	// A server with its own entitlement service, so the shared one stays
-	// unlicensed.
+	// A server with its own entitlement service, so the shared one stays unlicensed.
 	local := *cfg
 	local.Entitlements = entitlement.NewService(cfg.Conn, nil, modeSelfHosted)
 	srv := httptest.NewServer(api.New(&local).Handler(ctx))

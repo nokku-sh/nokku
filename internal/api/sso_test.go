@@ -11,8 +11,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/config"
 )
 
-// The hosted service refuses a provider on plain http before it stores
-// anything. The config has no iam, getting that far would panic.
+// Refused before anything is stored. The config has no iam, getting that far would panic.
 func TestHostedSSOProviderNeedsTLS(t *testing.T) {
 	svc := &ssoService{cfg: &config.Config{SaaS: true}}
 	_, err := svc.PutSSOProvider(t.Context(), &nokkuv1.PutSSOProviderRequest{

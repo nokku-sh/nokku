@@ -45,8 +45,7 @@ type Service struct {
 	Operator Operator
 }
 
-// Operator is whoever runs this server. Empty by default, so a self-hosted
-// server never shows the Nokku company in its mails or legal links.
+// Operator is empty by default, so a self-hosted server never shows the Nokku company in its mails.
 type Operator struct {
 	Name         string `env:"NOKKU_OPERATOR_NAME"`
 	Address      string `env:"NOKKU_OPERATOR_ADDRESS"`
@@ -85,8 +84,7 @@ func New(ctx context.Context, appURL string) (*Service, error) {
 		return nil, err
 	}
 	if err := relay.checkLogin(ctx); err != nil {
-		// 535 is the relay saying no to the credentials, a setting that does
-		// not fit. Anything else may be an outage, the server still starts.
+		// 535 is the relay refusing the credentials. Anything else may be an outage, the server still starts.
 		if e, ok := errors.AsType[*textproto.Error](err); ok && e.Code == 535 {
 			return nil, fmt.Errorf(
 				"%s rejected NOKKU_SMTP_USERNAME and NOKKU_SMTP_PASSWORD: %w", svc.SMTPHost, err,
@@ -98,7 +96,6 @@ func New(ctx context.Context, appURL string) (*Service, error) {
 	return &svc, nil
 }
 
-// HasSMTP is whether mail can go out at all.
 func (s *Service) HasSMTP() bool {
 	return s.SMTPHost != ""
 }
@@ -117,22 +114,18 @@ func (s *Service) SendMagicLinkEmail(ctx context.Context, userID, email, link, e
 	})
 }
 
-// SendOwnerLinkEmail is the sign-in link for the owner of a workspace the
-// hosted signup made. Every signup makes a new owner, so the cooldown is
-// keyed by the address.
+// SendOwnerLinkEmail keys the cooldown by the address, every hosted signup makes a new owner.
 func (s *Service) SendOwnerLinkEmail(ctx context.Context, email, link, expiry string) error {
 	return s.SendMagicLinkEmail(ctx, email, email, link, expiry)
 }
 
-// OwnerLinkOnCooldown is whether email got that link a moment ago. Asked
-// before the next workspace is made, its mail would not go out.
+// OwnerLinkOnCooldown is asked before the next workspace is made, its mail would not go out.
 func (s *Service) OwnerLinkOnCooldown(ctx context.Context, email string) bool {
 	_, err := s.cache.Get(ctx, cooldownKey(email, magicLink))
 	return err == nil
 }
 
-// SendEmailChangeConfirm goes to the new address, the account only switches
-// to it once the link is used.
+// SendEmailChangeConfirm goes to the new address, the account only switches once the link is used.
 func (s *Service) SendEmailChangeConfirm(ctx context.Context, userID, email, link, expiry string) error {
 	return s.sendTemplate(ctx, sendRequest{
 		userID:   userID,
@@ -147,15 +140,13 @@ func (s *Service) SendEmailChangeConfirm(ctx context.Context, userID, email, lin
 	})
 }
 
-// EmailChangeOnCooldown is whether userID asked for an email change a moment
-// ago. Asked before a new change replaces the pending one.
+// EmailChangeOnCooldown is asked before a new change replaces the pending one.
 func (s *Service) EmailChangeOnCooldown(ctx context.Context, userID string) bool {
 	_, err := s.cache.Get(ctx, cooldownKey(userID, emailConfirm))
 	return err == nil
 }
 
-// SendSignupLinkEmail goes to someone without an account yet, so the
-// cooldown is keyed by the address.
+// SendSignupLinkEmail goes to someone without an account yet, so the cooldown is keyed by the address.
 func (s *Service) SendSignupLinkEmail(ctx context.Context, email, name, workspace, link, expiry string) error {
 	return s.sendTemplate(ctx, sendRequest{
 		userID:   email,
@@ -172,8 +163,7 @@ func (s *Service) SendSignupLinkEmail(ctx context.Context, email, name, workspac
 	})
 }
 
-// SendEmailChangeNotice goes to the current address and only shows the new
-// one masked, the reader may not be the one who asked.
+// SendEmailChangeNotice only shows the new address masked, the reader may not be the one who asked.
 func (s *Service) SendEmailChangeNotice(
 	ctx context.Context,
 	userID, email, newEmail, cancelURL, expiry string,
@@ -213,8 +203,7 @@ func (s *Service) SendNewLoginEmail(
 	})
 }
 
-// sendTemplate claims the cooldown slot before sending and releases it on
-// failure, so concurrent requests cannot double-send.
+// sendTemplate claims the cooldown slot before sending and releases it on failure, so nothing double-sends.
 func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 	if req.userID == "" {
 		return errors.New("email user id is required")
@@ -226,8 +215,7 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 
 	key := cooldownKey(req.userID, req.template)
 	claimed, err := s.cache.SetNX(ctx, key, nil, s.Cooldown)
-	// A full store must not hold back a reset or a sign-in alert. Every signup
-	// adds an entry, so it can be filled from outside.
+	// A full store must not hold back a reset or an alert, signups can fill it from outside.
 	if err != nil {
 		slog.Warn("email cooldown not recorded, sending anyway", "error", err)
 	} else if !claimed {

@@ -5,8 +5,7 @@ import (
 	"sync/atomic"
 )
 
-// Cipher encrypts what is stored at rest. The server sets one at startup,
-// the encrypted column types and the recording frames use it.
+// Cipher encrypts what is stored at rest. The server sets one at startup.
 type Cipher interface {
 	Encrypt(plaintext []byte) ([]byte, error)
 	Decrypt(ciphertext []byte) ([]byte, error)

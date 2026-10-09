@@ -111,8 +111,7 @@ func TestWithRateLimitDeviceStart(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, call("/auth/device/verify", flood), "and can still be approved")
 }
 
-// Anyone can sign up on the hosted service, and every signup makes a
-// workspace and a mail.
+// Anyone can sign up on the hosted service, and every signup makes a workspace and a mail.
 func TestWithRateLimitSignup(t *testing.T) {
 	s := &Server{cfg: &config.Config{}}
 	h := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

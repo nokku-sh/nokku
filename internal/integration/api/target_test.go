@@ -143,16 +143,7 @@ type accessFixture struct {
 	as func(userID string) nokkuv1connect.TargetServiceClient
 }
 
-// seedAccessGraph builds one workspace:
-//
-//	web-1 [prod web]  root: platform   deploy: alice, ci
-//	web-2 [prod]      root: platform
-//	db-1  []          root: bob
-//	idle  [prod]      no grants
-//
-// alice and carol are in platform. A second workspace holds a prod target
-// with a grant of its own that must never show up.
-// graphSeed writes into the workspace q is pinned to.
+// graphSeed makes web-1 (root: platform, deploy: alice, ci), web-2 (root: platform), db-1 (root: bob) and idle.
 type graphSeed struct {
 	t       *testing.T
 	q       *db.Queries
@@ -199,9 +190,7 @@ func seedAccessGraph(t *testing.T) accessFixture {
 	f := accessFixture{workspaceID: seedWorkspace(t, cfg)}
 	other := seedOtherWorkspace(t, cfg)
 
-	// The workspace is shared, so earlier tests' grants go first. Tests run
-	// one after the other, nobody is using them anymore. Only the owner role
-	// deletes past RLS.
+	// The workspace is shared, so earlier tests' grants go first. Only the owner role deletes past RLS.
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
 	for _, table := range []string{"targets", "teams", "service_accounts"} {

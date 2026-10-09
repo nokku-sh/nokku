@@ -28,9 +28,7 @@ const (
 	maxCheckoutSeats = 10000
 )
 
-// Stripe moves money. It never decides what a workspace may do, that is
-// internal/entitlement. A nil Stripe is a self-hosted server: callers gate
-// on the mode, and a missed gate gets an error instead of a nil dereference.
+// Stripe moves money and never decides what a workspace may do. A nil Stripe is a self-hosted server.
 type Stripe struct {
 	client    *stripe.Client
 	db        *db.Connection
@@ -51,9 +49,7 @@ func New(ctx context.Context, conn *db.Connection, baseURL string, saas bool) (*
 	return s, nil
 }
 
-// newStripe returns nil on a self-hosted server. The mode is never guessed
-// from these settings: the hosted service needs all of them, and a
-// self-hosted server with any of them set is a mistake that fails the start.
+// newStripe never guesses the mode. Hosted needs every setting, self-hosted with any of them fails the start.
 func newStripe(conn *db.Connection, returnURL string, saas bool) (*Stripe, error) {
 	s, err := env.ParseAs[Stripe]()
 	if err != nil {
@@ -78,9 +74,7 @@ func newStripe(conn *db.Connection, returnURL string, saas bool) (*Stripe, error
 	return &s, nil
 }
 
-// Checkout starts at the current member count and lets the buyer add
-// headroom. The paid quantity becomes the seat cap, more seats are bought in
-// the portal.
+// Checkout starts at the current member count. The paid quantity becomes the seat cap.
 func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (string, error) {
 	if s == nil {
 		return "", errDisabled
@@ -130,8 +124,7 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (strin
 	return session.URL, nil
 }
 
-// The helpers below use system transactions since Stripe flows run outside a
-// tenant scope.
+// The helpers below use system transactions, Stripe flows run outside a tenant scope.
 
 func (s *Stripe) subscription(
 	ctx context.Context,
@@ -192,8 +185,7 @@ func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (st
 	return customer.ID, nil
 }
 
-// Portal is where seats are bought, so the Stripe portal configuration must
-// allow quantity updates.
+// Portal is where seats are bought, so the Stripe portal configuration must allow quantity updates.
 func (s *Stripe) Portal(ctx context.Context, workspaceID string) (string, error) {
 	if s == nil {
 		return "", errDisabled
@@ -263,9 +255,7 @@ func (s *Stripe) Cancel(
 	return nil
 }
 
-// sync mirrors one Stripe subscription into the database. Stripe is the
-// source of truth and this is the only writer of its state, so the webhook,
-// the cancel path, and the reconcile loop can never disagree.
+// sync is the only writer of subscription state, so the webhook, cancel and reconcile can never disagree.
 func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 	remote, err := s.client.V1Subscriptions.Retrieve(
 		ctx, subscriptionID,
@@ -339,8 +329,7 @@ func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 	return err
 }
 
-// reconcile lets missed webhooks self-heal, 5 minutes after start and then
-// every 12 hours.
+// reconcile lets missed webhooks self-heal, 5 minutes after start and then every 12 hours.
 func (s *Stripe) reconcile(ctx context.Context) {
 	timer := time.NewTimer(5 * time.Minute)
 	defer timer.Stop()

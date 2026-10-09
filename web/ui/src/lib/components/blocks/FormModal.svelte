@@ -15,12 +15,7 @@
 		title: string;
 		description?: string;
 		icon?: LucideIcon;
-		/**
-		 * Renders a submit footer (create flows). Return the mutateAsync promise,
-		 * the modal closes when it resolves and stays open with the input if it
-		 * throws. Resolve to false to stay open, e.g. for the next step. Omit for
-		 * autosave forms.
-		 */
+		/** Return the mutateAsync promise. The modal closes when it resolves, false or a throw keeps it open. */
 		onSubmit?: () => unknown;
 		submitLabel?: string;
 		submitDisabled?: boolean;

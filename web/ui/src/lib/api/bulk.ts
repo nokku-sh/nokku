@@ -11,8 +11,7 @@ export const plural = (n: number, noun: string, many = `${noun}s`) =>
 
 type Input<I extends DescMessage> = Omit<MessageInitShape<I>, '$typeName'>;
 
-// useBulkMutation runs one RPC per item as a single mutation, so a bulk action
-// gives one toast and one cache invalidation instead of one per row.
+// useBulkMutation runs one RPC per item as a single mutation, so a bulk action gives one toast and one invalidation.
 export function useBulkMutation<I extends DescMessage, O extends DescMessage>(
 	method: DescMethodUnary<I, O>,
 	successMessage: (count: number) => string

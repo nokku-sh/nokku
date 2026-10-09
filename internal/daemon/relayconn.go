@@ -11,8 +11,7 @@ import (
 // relayConn adapts a Relay to [net.Conn] for the SSH client.
 type relayConn struct {
 	relay *Relay
-	// buf holds the unread tail of the last chunk. Only the transport's
-	// single reader goroutine touches it.
+	// buf holds the unread tail of the last chunk. Only the transport's single reader goroutine touches it.
 	buf []byte
 }
 

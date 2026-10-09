@@ -24,8 +24,7 @@
 	let error = $state('');
 	let abortCtrl: AbortController | null = null;
 	let player: Player | null = null;
-	// asciinema sizes its container at the base font, so with 'small' the
-	// player is narrower. Re-hug on every resize so the modal fits the video.
+	// asciinema sizes its container at the base font. Re-hug on every resize so the modal fits the video.
 	let playerObserver: ResizeObserver | null = null;
 	let hugTimer: ReturnType<typeof setTimeout> | null = null;
 	let observeRetry: ReturnType<typeof setTimeout> | null = null;

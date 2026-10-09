@@ -5,8 +5,7 @@ import { account, type AccountCredential } from './account';
 
 const invalidateCredentials = () => queryClient.invalidateQueries({ queryKey: ['account'] });
 
-// Passkeys and identity provider links, the two ways an account signs in
-// without a mailed link.
+// Passkeys and identity provider links, the two ways an account signs in without a mailed link.
 export const credentials = {
 	all: () =>
 		createQuery<AccountCredential[]>(() => ({

@@ -120,8 +120,7 @@ WHERE
   workspace_id = $1
 `
 
-// The queries here name the workspace, billing and the plan lookup run as
-// nokku_system.
+// The queries here name the workspace, billing and the plan lookup run as nokku_system.
 func (q *Queries) GetSubscription(ctx context.Context, workspaceID string) (*WorkspaceSubscription, error) {
 	row := q.db.QueryRow(ctx, getSubscription, workspaceID)
 	var i WorkspaceSubscription
@@ -220,8 +219,7 @@ type SetSubscriptionCustomerParams struct {
 	CustomerID  string `json:"customerId"`
 }
 
-// Status stays inactive so this row never grants entitlements until the
-// webhook promotes it.
+// Status stays inactive so this row never grants entitlements until the webhook promotes it.
 func (q *Queries) SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error {
 	_, err := q.db.Exec(ctx, setSubscriptionCustomer, arg.WorkspaceID, arg.CustomerID)
 	return err

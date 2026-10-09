@@ -6,8 +6,7 @@ export const pageSize = new PersistedState<number>(`${NS}:page:size`, 10);
 
 export const activeSessionID = new PersistedState<string>(`${NS}:session:active`, ``);
 
-// Empty is null below. PersistedState skips writing undefined, so the stored
-// value would never go away.
+// Empty is null below. PersistedState skips writing undefined, so the stored value would never go away.
 
 // pendingDeviceCode brings a signed-out user back to /device after login.
 export const pendingDeviceCode = new PersistedState<string | null>(`${NS}:device:code`, null, {
@@ -15,8 +14,7 @@ export const pendingDeviceCode = new PersistedState<string | null>(`${NS}:device
 	syncTabs: false
 });
 
-// Where a session expired, so signing in again lands on the same page. Not
-// per tab, the sign-in link from the mail opens a new one.
+// Where a session expired, so signing in again lands there. Not per tab, the mailed link opens a new one.
 export const returnTo = new PersistedState<{ path: string; at: number } | null>(
 	`${NS}:return`,
 	null

@@ -58,15 +58,13 @@ var errRecordingStorageFull = connect.NewError(
 	errors.New("the recording storage of this workspace is full"),
 )
 
-// errMailNotSent is not Unavailable, the client reads that as the server
-// being gone.
+// errMailNotSent is not Unavailable, the client reads that as the server being gone.
 var errMailNotSent = connect.NewError(
 	connect.CodeFailedPrecondition,
 	errors.New("the email could not be sent, try again in a few minutes"),
 )
 
-// errLinkInvalid is Unauthenticated because the client skips its generic
-// toast for that code and the login page shows its own.
+// errLinkInvalid is Unauthenticated, the client skips its generic toast for that code.
 var (
 	errLinkInvalid = connect.NewError(
 		connect.CodeUnauthenticated,
@@ -113,9 +111,7 @@ func newError(code connect.Code, msg string) error {
 	return connect.NewError(code, errors.New(msg))
 }
 
-// errorInterceptor maps every handler error onto a connect error, so handlers
-// return database errors as they come. It sits inside audit and logging so
-// both see the final code.
+// errorInterceptor maps every handler error onto a connect error. It sits inside audit so that sees the final code.
 type errorInterceptor struct{}
 
 func (errorInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
@@ -138,8 +134,7 @@ func (errorInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) 
 	}
 }
 
-// toConnectError passes connect errors through, so handlers can return domain
-// failures from a tx closure.
+// toConnectError passes connect errors through, so handlers can return domain failures from a tx closure.
 func toConnectError(err error) error {
 	if err == nil {
 		return nil

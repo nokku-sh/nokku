@@ -35,8 +35,7 @@ func (s *Stripe) webhook(w http.ResponseWriter, r *http.Request) {
 	case "customer.subscription.created",
 		"customer.subscription.updated",
 		"customer.subscription.deleted":
-		// Events can arrive late or out of order, so the payload only says
-		// which subscription to read again.
+		// Events can arrive late or out of order, so the payload only says which subscription to read again.
 		var sub struct {
 			ID string `json:"id"`
 		}

@@ -1,6 +1,4 @@
-// Package cache holds short-lived state in the process: login flow state,
-// DPoP replay markers, mail cooldowns, and terminal tickets. It is lost on a
-// restart and not shared, the server runs as one instance.
+// Package cache holds short-lived state in the process. It is lost on a restart and not shared.
 package cache
 
 import "errors"

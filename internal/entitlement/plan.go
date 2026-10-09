@@ -1,10 +1,4 @@
-// Package entitlement is the single enforcement point for plan logic. Money
-// movement lives in internal/billing.
-//
-//   - Fail open on quotas, billing data problems never block daily work.
-//   - Fail closed on features, resolution errors fall back to Community.
-//   - Downgrades never destroy data right away. An ended plan or license
-//     keeps its data limits for holdDays.
+// Package entitlement is the only place plan logic is enforced. Quotas fail open, features fail closed.
 package entitlement
 
 import "maps"
@@ -51,11 +45,10 @@ const unlimited int64 = -1
 
 type Plan struct {
 	Name          string
-	SeatCap       int64 // maximum members; unlimited = per-seat billing
+	SeatCap       int64 // maximum members, unlimited means per-seat billing
 	ResourceCap   int64 // pooled cap on managed resources
 	RetentionDays int64 // audit log and session recording retention
-	// RecordingStorageBytes is a stop for abuse, sized so that normal use
-	// runs into the retention first.
+	// RecordingStorageBytes is a stop for abuse, sized so that normal use runs into the retention first.
 	RecordingStorageBytes int64
 	Features              map[string]bool
 }

@@ -4,8 +4,7 @@ import { page } from '$app/state';
 /** Query params owned by sheets and create forms, tables don't treat them as filters. */
 export const SHEET_PARAMS = ['id', 'tab', 'new'];
 
-// Set when this session pushed the history entry, so closing can go back
-// instead of leaving a dead entry that reopens the sheet on Back.
+// Set when this session pushed the history entry, so closing goes back instead of leaving a dead entry.
 let pushed = false;
 
 function urlWith(params: Record<string, string | undefined>) {
@@ -17,8 +16,7 @@ function urlWith(params: Record<string, string | undefined>) {
 	return url;
 }
 
-// useSheet keeps the open entity in `?id=` (and its tab in `?tab=`), so links
-// are shareable and the browser or phone back gesture closes the sheet.
+// useSheet keeps the open entity in `?id=` and its tab in `?tab=`, so links are shareable and Back closes the sheet.
 export function useSheet() {
 	const id = $derived(page.url.searchParams.get('id') ?? '');
 	const tab = $derived(page.url.searchParams.get('tab') ?? '');
@@ -55,8 +53,7 @@ export function useSheet() {
 	};
 }
 
-// useCreate keeps "the create form is open" in `?new`, so the command palette
-// can open it from any page.
+// useCreate keeps "the create form is open" in `?new`, so the command palette can open it from any page.
 export function useCreate() {
 	const open = $derived(page.url.searchParams.has('new'));
 

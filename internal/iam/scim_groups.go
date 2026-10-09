@@ -1,7 +1,6 @@
 package iam
 
-// SCIM Groups are workspace teams. The SCIM id is the team id and members
-// reference user ids.
+// SCIM Groups are workspace teams. The SCIM id is the team id and members reference user ids.
 
 import (
 	"context"

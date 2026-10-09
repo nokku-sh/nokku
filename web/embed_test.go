@@ -44,8 +44,7 @@ func TestAssetIsServedAsItself(t *testing.T) {
 	assert.Contains(t, w.Header().Get("Content-Type"), "javascript", "%s came back as a page", chunk)
 }
 
-// The policy has no 'unsafe-inline', so a page whose inline script is not in
-// the list would not start.
+// The policy has no 'unsafe-inline', so a page whose inline script is not in the list would not start.
 func TestInlineScriptHashesCoverThePages(t *testing.T) {
 	index, err := staticFS.ReadFile(uiRoot + "/index.html")
 	if err != nil {

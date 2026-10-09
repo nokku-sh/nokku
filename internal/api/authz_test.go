@@ -77,8 +77,7 @@ func TestProcedureRoles(t *testing.T) {
 	}
 }
 
-// allProcedures lists every RPC of the nokku.v1 package from the generated
-// descriptors, so a new RPC shows up here without anyone listing it.
+// allProcedures reads the generated descriptors, so a new RPC shows up here without anyone listing it.
 func allProcedures(t *testing.T) []string {
 	t.Helper()
 	_ = nokkuv1.File_nokku_v1_daemon_proto
@@ -98,7 +97,6 @@ func allProcedures(t *testing.T) []string {
 	return out
 }
 
-// daemonOnly is an access with nothing but daemon set.
 func daemonOnly(a *nokkuv1.Access) bool {
 	return a.GetDaemon() && !a.GetPublic() && !a.GetSelf() &&
 		a.GetRole() == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED
@@ -152,8 +150,7 @@ func TestRequestsCarryNoWorkspace(t *testing.T) {
 func TestAuthorizeDaemon(t *testing.T) {
 	a := &authorizationInterceptor{}
 	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "d1", Kind: actor.KindDaemon})
-	// These answer a daemon in any state. The rest look the daemon up, see
-	// TestPendingDaemonIsDenied.
+	// These answer a daemon in any state. The rest look the daemon up, see TestPendingDaemonIsDenied.
 	anyState := []string{
 		nokkuv1connect.DaemonControlServiceSyncDaemonProcedure,
 		nokkuv1connect.DaemonControlServiceConnectProcedure,
@@ -175,8 +172,7 @@ func TestAuthorizeDaemon(t *testing.T) {
 	}
 }
 
-// A daemon's whole surface is one service, and nothing else lives there but
-// the public enrollment.
+// A daemon's whole surface is one service, and nothing else lives there but the public enrollment.
 func TestDaemonProceduresLiveInControlService(t *testing.T) {
 	for procedure, access := range procedureAccess {
 		inService := strings.HasPrefix(procedure, "/nokku.v1.DaemonControlService/")

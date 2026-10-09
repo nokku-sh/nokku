@@ -17,15 +17,12 @@ var errNotPublic = errors.New("destination address is not public")
 // cgnat is internal on most clouds.
 var cgnat = netip.MustParsePrefix("100.64.0.0/10")
 
-// egressConfig must stay off in multi-tenant deployments, since workspace
-// admins pick the URLs the server fetches.
+// egressConfig must stay off in multi-tenant deployments, workspace admins pick the URLs the server fetches.
 type egressConfig struct {
 	AllowPrivate bool `env:"NOKKU_ALLOW_PRIVATE_NETWORKS"`
 }
 
-// NewClient is for URLs a workspace admin chose. It refuses non-public
-// addresses unless NOKKU_ALLOW_PRIVATE_NETWORKS is set. The check runs on the
-// dialed address, so DNS rebinding and redirects cannot slip past it.
+// NewClient checks the dialed address, so DNS rebinding and redirects cannot slip past it.
 func NewClient(timeout time.Duration) (*http.Client, error) {
 	cfg, err := env.ParseAs[egressConfig]()
 	if err != nil {

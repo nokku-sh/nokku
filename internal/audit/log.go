@@ -99,9 +99,7 @@ func (s *Service) Log(ctx context.Context, e *Event) {
 	s.finish(ctx, e, header, peer, nil)
 }
 
-// Record is the audit trail of the sign-in flows. They run before there is a
-// principal, so the caller names the actor and whether it went well. The
-// workspace and the transport facts come from ctx.
+// Record is for the sign-in flows. They run before there is a principal, so the caller names the actor.
 func (s *Service) Record(ctx context.Context, e *Event) {
 	e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
 	if e.WorkspaceID == "" {
@@ -123,9 +121,7 @@ func (s *Service) Record(ctx context.Context, e *Event) {
 	}()
 }
 
-// finish skips unauthenticated calls, the sign-in flows record their own
-// events, and calls outside a workspace, which only the public root host
-// serves.
+// finish skips unauthenticated calls and calls outside a workspace, the sign-in flows record their own.
 func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer string, err error) {
 	p, _ := actor.PrincipalFromContext(ctx)
 	if p.ID == "" || e.WorkspaceID == "" {
@@ -159,8 +155,7 @@ func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer
 	}()
 }
 
-// requestTarget reads only id, name, and *_id fields, so no secret in the
-// request can reach the log.
+// requestTarget reads only id, name and *_id fields, so no secret in the request can reach the log.
 func requestTarget(msg protoreflect.Message) string {
 	fields := msg.Descriptor().Fields()
 	for _, name := range []protoreflect.Name{"id", "name"} {

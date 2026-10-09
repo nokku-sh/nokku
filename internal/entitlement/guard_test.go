@@ -26,30 +26,20 @@ func wiredFeatures() map[string]bool {
 	return wired
 }
 
-// conditionalFeatures returns the features checked inside
-// conditionalFeature. Kept in sync manually; the golden test below fails
-// when the switch and this list drift apart.
+// conditionalFeatures is kept in sync by hand, the golden test fails when it drifts from the switch.
 func conditionalFeatures() []string {
 	return []string{FeatureEnforceSSO, FeatureAuditStreaming}
 }
 
-// featuresFreeInAllPlans are catalog features that need no gate because
-// every plan includes them. Removing a feature from this list (making it
-// paid) requires wiring it in the guard in the same change.
+// featuresFreeInAllPlans need no gate. Making one paid means wiring it in the guard in the same change.
 var featuresFreeInAllPlans = []string{FeatureOIDC}
 
-// featuresGatedOutsideTheGuard are catalog features enforced elsewhere,
-// with the enforcement point documented. External KMS is instance-level
-// configuration (KMS_URI requires a license, an expired one still starts),
-// not a per-workspace route, so the guard cannot gate it.
+// featuresGatedOutsideTheGuard are enforced elsewhere. External KMS is instance-level, not a workspace route.
 var featuresGatedOutsideTheGuard = map[string]string{
 	FeatureExternalKMS: "instance-level: KMS_URI startup check in internal/config",
 }
 
-// TestGolden_FeaturesWired fails whenever someone adds a catalog feature
-// without wiring it (or explicitly exempting it). A paid feature that no
-// route enforces is revenue leakage; a feature no plan includes is dead
-// catalog weight.
+// A paid feature that no route enforces is revenue leakage, a feature no plan includes is dead weight.
 func TestGolden_FeaturesWired(t *testing.T) {
 	allFeatures := CatalogFeatures
 
@@ -265,10 +255,7 @@ func TestGuard_AllowsPaidPlanAndUnpinnedContext(t *testing.T) {
 	}
 }
 
-// createProcedures lists every create-style procedure in the API surface
-// (Create* and Enroll* RPCs). Kept in sync manually; the golden test below
-// fails when this list and the cappedCreate map drift apart. A new resource
-// type must be added here in the same change that adds its RPC.
+// createProcedures is kept in sync by hand, the golden test fails when it drifts from cappedCreate.
 var createProcedures = []string{
 	nokkuv1connect.TargetServiceCreateTargetProcedure,
 	nokkuv1connect.TeamServiceCreateTeamProcedure,
@@ -279,25 +266,17 @@ var createProcedures = []string{
 	nokkuv1connect.DaemonServiceCreateSessionProcedure,
 }
 
-// createProceduresGatedOutsideTheGuard are create procedures whose quota
-// check happens elsewhere, with the enforcement point documented.
+// createProceduresGatedOutsideTheGuard have their quota check elsewhere, with the place named.
 var createProceduresGatedOutsideTheGuard = map[string]string{
-	// Enrollment is a public endpoint whose workspace comes from the
-	// enroll token; the handler checks the cap directly (daemon_control.go).
+	// Enrollment is public and its workspace comes from the enroll token, the handler checks the cap.
 	nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure: "handler: CheckResources in EnrollDaemon (public endpoint, workspace from token)",
-	// Pre-tenant: the hosted signup makes the workspace a cap would be
-	// resolved for. The auth rate limit bounds it.
+	// Pre-tenant: the hosted signup makes the workspace a cap would be resolved for.
 	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure: "pre-tenant: bounded by the auth rate limit",
-	// Sessions are bounded by the recording storage cap and eviction
-	// (recording/evict.go); they produce no permanent resource rows.
+	// Sessions are bounded by the recording storage cap and eviction, they leave no permanent rows.
 	nokkuv1connect.DaemonServiceCreateSessionProcedure: "bounded by recording storage eviction",
 }
 
-// TestGolden_CappedProceduresWired fails whenever a create-style procedure
-// is neither resource-capped in the guard nor explicitly exempted. An
-// uncapped create route on SaaS is an unbounded-resource hole; an exempted
-// route without a documented reason is indistinguishable from a forgotten
-// one.
+// An uncapped create route on SaaS is an unbounded-resource hole, so each is capped or exempted with a reason.
 func TestGolden_CappedProceduresWired(t *testing.T) {
 	for _, procedure := range createProcedures {
 		switch {

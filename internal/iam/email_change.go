@@ -24,10 +24,7 @@ const (
 
 var ErrSameEmail = errors.New("iam: email unchanged")
 
-// RequestEmailChange replaces any pending change of u. confirm goes to the
-// new address, cancel to the current one. The account keeps its address
-// until confirm is used. An account an identity provider manages keeps the
-// address the provider gave it.
+// RequestEmailChange replaces any pending change. The account keeps its address until confirm is used.
 func (s *Service) RequestEmailChange(
 	ctx context.Context,
 	u *db.User,
@@ -89,7 +86,6 @@ func (s *Service) putEmailToken(
 	})
 }
 
-// DropEmailChange forgets the pending change of userID.
 func (s *Service) DropEmailChange(ctx context.Context, userID string) error {
 	return s.conn.Tenant().DeleteUserTokens(ctx, &db.DeleteUserTokensParams{
 		UserID: &userID, Purpose: tokenEmailChange,
@@ -125,9 +121,7 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 	return nil
 }
 
-// CancelEmailChange drops a pending change. When the change already
-// happened it puts the old address back and signs the account out
-// everywhere, since whoever changed it held a session.
+// CancelEmailChange also undoes a finished change, and then signs the account out everywhere.
 func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 	var u *db.User
 	reverted := false

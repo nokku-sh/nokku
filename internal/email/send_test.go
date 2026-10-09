@@ -119,8 +119,7 @@ func TestSendTemplate_CooldownPerTemplate(t *testing.T) {
 	}
 }
 
-// A sign-in link a moment ago must not hold back an email change. A second
-// change still waits, and the caller can ask before it starts one.
+// A sign-in link a moment ago must not hold back an email change. A second change still waits.
 func TestSendEmailChangeConfirm_OwnCooldown(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
@@ -146,8 +145,7 @@ func TestSendEmailChangeConfirm_OwnCooldown(t *testing.T) {
 	}
 }
 
-// Every hosted signup makes a new owner, so only the address can hold back a
-// second mail. The caller can ask before it makes the workspace.
+// Every hosted signup makes a new owner, so only the address can hold back a second mail.
 func TestSendOwnerLinkEmail_CooldownPerAddress(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)

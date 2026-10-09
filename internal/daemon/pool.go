@@ -19,8 +19,7 @@ import (
 
 const (
 	sendBufferSize = 64
-	// Each tick stamps newly connected daemons, so a reconnect storm costs
-	// one UPDATE per tick. Every heartbeatFullEvery ticks stamps all of them.
+	// Each tick stamps newly connected daemons only, every heartbeatFullEvery ticks stamps all of them.
 	heartbeatTick      = 2 * time.Second
 	heartbeatFullEvery = 5
 )
@@ -32,8 +31,7 @@ var stateUpdate = &nokkuv1.ConnectResponse{
 type daemonConn struct {
 	daemonID    string
 	workspaceID string
-	// state holds at most one pending StateUpdate so bursts coalesce. It is
-	// separate from send so coalescing never drops a control message.
+	// state holds at most one pending StateUpdate, apart from send so coalescing never drops a control message.
 	send   chan *nokkuv1.ConnectResponse
 	state  chan *nokkuv1.ConnectResponse
 	ctx    context.Context
@@ -89,8 +87,7 @@ func New(ctx context.Context, conn connection, hub *live.Hub) *Pool {
 	return p
 }
 
-// heartbeat never marks a daemon offline, it just stops being seen. That also
-// covers a crashed instance.
+// heartbeat never marks a daemon offline, it just stops being seen. That also covers a crashed instance.
 func (p *Pool) heartbeat(ctx context.Context) {
 	ticker := time.NewTicker(heartbeatTick)
 	defer ticker.Stop()
@@ -229,8 +226,7 @@ func (p *Pool) unregisterDaemon(daemonID string, c *daemonConn) {
 	}
 	c.cancel()
 
-	// Offline is a stamp growing old. No write tells the consoles, so this
-	// does, unless the daemon is back by then.
+	// Offline is a stamp growing old and no write tells the consoles, so this does.
 	time.AfterFunc(db.DaemonOnlineWindow, func() {
 		p.mu.RLock()
 		_, back := p.byID[daemonID]
@@ -308,8 +304,7 @@ func (p *Pool) listen(ctx context.Context, cfg *pgx.ConnConfig) error {
 	}
 }
 
-// stateVersion fills the cache on a miss only if the listener did not store a
-// fresher value meanwhile.
+// stateVersion fills the cache on a miss only if the listener did not store a fresher value meanwhile.
 func (p *Pool) stateVersion(ctx context.Context, workspaceID string) (int64, error) {
 	p.mu.RLock()
 	v, ok := p.versions[workspaceID]
@@ -351,8 +346,7 @@ func (c *daemonConn) poke() {
 	}
 }
 
-// sendToDaemonWait gives up with ctx, a caller that is gone must not wait out
-// the timeout behind a daemon that reads nothing.
+// sendToDaemonWait gives up with ctx, a caller that is gone must not wait behind a daemon that reads nothing.
 func (p *Pool) sendToDaemonWait(
 	ctx context.Context,
 	daemonID string,

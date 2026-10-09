@@ -4,9 +4,7 @@ import { pageSize } from '#lib/store.svelte.js';
 
 export const PAGE_PARAM = 'page';
 
-// usePagination keeps the page number in the URL (1-based) so every table
-// has its own position and reloads or shared links land on the same page.
-// The page size is a persisted user preference shared by all tables.
+// usePagination keeps the page number in the URL (1-based). The page size is a persisted preference for all tables.
 export function usePagination() {
 	const pageIndex = $derived(
 		Math.max(0, Math.floor(Number(page.url.searchParams.get(PAGE_PARAM)) || 1) - 1)

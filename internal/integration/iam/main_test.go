@@ -9,8 +9,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/integration/testenv"
 )
 
-// TestMain clears the boot environment so a developer's shell (direnv) never
-// seeds providers or an admin into a test workspace.
+// TestMain clears the boot environment so a developer's shell never seeds providers or an admin.
 func TestMain(m *testing.M) {
 	for _, key := range []string{
 		"GOOGLE_CLIENT_ID",

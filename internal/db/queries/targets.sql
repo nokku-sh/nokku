@@ -89,8 +89,7 @@ RETURNING
   *;
 
 -- name: UpdateTargetReport :exec
--- What a daemon reports about its host on every sync. Unchanged values must
--- not rewrite the row.
+-- What a daemon reports about its host on every sync. Unchanged values must not rewrite the row.
 UPDATE targets
 SET
   endpoints = COALESCE(sqlc.narg('endpoints'), endpoints),

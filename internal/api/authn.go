@@ -13,8 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// authNInterceptor turns a credential into a principal. The workspace is
-// already on the context, the tenant middleware put it there from the host.
+// The workspace is already on the context, the tenant middleware put it there from the host.
 func newAuthNInterceptor(cfg *config.Config) connect.Interceptor {
 	return &authNInterceptor{cfg: cfg}
 }

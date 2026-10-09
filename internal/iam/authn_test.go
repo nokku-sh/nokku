@@ -54,7 +54,6 @@ func TestRequestCredential(t *testing.T) {
 	})
 }
 
-// newTestVerifier builds a DPoP verifier with a fixed secret and clock.
 func newTestVerifier(t *testing.T, now func() time.Time) *DPoPVerifier {
 	t.Helper()
 	return &DPoPVerifier{
@@ -132,8 +131,7 @@ func TestVerifySessionProof(t *testing.T) {
 		header.Set("Authorization", "DPoP "+token)
 		header.Set("DPoP", proof)
 		err := svc.verifySessionProof(ctx, header, procedure, token, binding)
-		// The jkt mismatch is expected (the binding is a fixture value);
-		// anything but a binding mismatch means the proof itself failed.
+		// The fixture binding cannot match. Anything but a binding mismatch means the proof itself failed.
 		if err == nil {
 			t.Fatal("expected a jkt mismatch for the fixture binding")
 		}
@@ -143,7 +141,6 @@ func TestVerifySessionProof(t *testing.T) {
 	})
 
 	t.Run("proof bound to the session key passes verification", func(t *testing.T) {
-		// Compute the real thumbprint of the test key and rebind.
 		jwk := &jose.JSONWebKey{Key: &key.PublicKey}
 		tp, err := jwk.Thumbprint(crypto.SHA256)
 		if err != nil {
@@ -229,8 +226,7 @@ func TestAdvertiseDPoPNonce(t *testing.T) {
 	})
 }
 
-// Anonymous callers can fill the device grant store, so replay markers must
-// not live there.
+// Anonymous callers can fill the device grant store, so replay markers must not live there.
 func TestDPoPReplayStoreIsNotShared(t *testing.T) {
 	// New only keeps the connection, nothing here reaches the database.
 	svc, err := New(t.Context(), Deps{Conn: &db.Connection{}, Secret: []byte("test-secret")})
@@ -242,8 +238,7 @@ func TestDPoPReplayStoreIsNotShared(t *testing.T) {
 	}
 }
 
-// Anyone can send a proof without an access token, so a flood of them must
-// not get the proofs of signed-in callers refused.
+// Anyone can send a proof without an access token, a flood must not get signed-in callers refused.
 func TestDPoPAnonymousProofsCannotFillTheSessionStore(t *testing.T) {
 	const htu = "https://nokku.example.com/x"
 	now := time.Unix(1_800_000_000, 0)

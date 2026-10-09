@@ -48,8 +48,7 @@ UPDATE service_accounts
 SET
   name = COALESCE(sqlc.narg('name'), name),
   description = COALESCE(sqlc.narg('description'), description),
-  -- 0 is unset and keeps the role. The column comes first in the condition,
-  -- sqlc types the parameter by its first use.
+  -- 0 is unset and keeps the role. The column comes first, sqlc types the parameter by its first use.
   role = CASE
     WHEN role = @role
     OR @role = 0 THEN role

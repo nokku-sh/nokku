@@ -13,25 +13,18 @@ import (
 	"github.com/nokku-sh/nokku/internal/realip"
 )
 
-// Limits count per client IP and minute. A whole office can sit behind one
-// address, or behind a proxy nobody listed in NOKKU_TRUSTED_PROXIES, so they
-// are sized for a few hundred people sharing it. They stop one source from
-// flooding the server. A real DDoS is the reverse proxy's job.
+// Limits count per client IP and minute, sized for an office behind one address. A real DDoS is the proxy's job.
 const (
 	generalPerMinute = 6000
 
-	// Auth endpoints are the spraying and enumeration surface. Guessing one
-	// account's password is capped per account in iam.
+	// Auth endpoints are the spraying and enumeration surface. Guessing one account is capped per account in iam.
 	authPerMinute = 300
 
-	// A device login can be started by anyone and parks a grant in memory
-	// until it expires. The window is the lifetime of a grant, so this is how
-	// many one address can hold open.
+	// Anyone can start a device login and it parks a grant until it expires. This is how many one address can hold.
 	deviceStartsPerWindow = 30
 	deviceStartWindow     = 15 * time.Minute
 
-	// A hosted signup makes a workspace and mails an address the caller
-	// picked. A person needs one, plus a few tries until a name is free.
+	// A hosted signup makes a workspace and a mail. A person needs one, plus a few tries until a name is free.
 	signupsPerWindow = 10
 	signupWindow     = time.Hour
 )
@@ -40,8 +33,7 @@ func (s *Server) withRateLimit(next http.Handler) http.Handler {
 	general := httprate.LimitBy(generalPerMinute, time.Minute, clientIP)(next)
 	auth := httprate.LimitBy(authPerMinute, time.Minute, clientIP)(next)
 	deviceStart := httprate.LimitBy(deviceStartsPerWindow, deviceStartWindow, clientIP)(next)
-	// Answered as an RPC error, the signup form reads a bare 429 as the
-	// server being gone.
+	// Answered as an RPC error, the signup form reads a bare 429 as the server being gone.
 	rpcErrors := connect.NewErrorWriter()
 	signup := httprate.LimitBy(signupsPerWindow, signupWindow, clientIP,
 		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
@@ -79,8 +71,7 @@ func isAuthRoute(path string) bool {
 		strings.HasPrefix(path, "/passkey/")
 }
 
-// rateLimited leaves out only the daemon streams, where a limit would block
-// legitimate reconnect storms, and the hashed static assets.
+// rateLimited leaves out the daemon streams, where a limit would block reconnect storms, and the hashed assets.
 func rateLimited(path string) bool {
 	return path != nokkuv1connect.DaemonControlServiceConnectProcedure &&
 		path != nokkuv1connect.DaemonControlServiceDaemonRelayProcedure &&

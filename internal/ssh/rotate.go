@@ -13,9 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// Rollover gives ca a fresh key and certificate, keeping its id and lifetime.
-// The replaced key stays trusted until the certificates it signed have
-// expired, unless revokePrevious drops it at once.
+// Rollover keeps the replaced key trusted until its certificates expire, unless revokePrevious drops it.
 func Rollover(
 	ctx context.Context,
 	q *db.Queries,
@@ -47,9 +45,7 @@ func Rollover(
 	})
 }
 
-// RotateExpiring rolls over every active CA past 80% of its lifetime, once
-// at start and then hourly, until ctx is done. Each CA commits on its own and
-// SKIP LOCKED lets several instances share the work.
+// RotateExpiring rolls over every active CA past 80% of its lifetime. SKIP LOCKED lets instances share the work.
 func RotateExpiring(ctx context.Context, conn *db.Connection) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
@@ -63,9 +59,7 @@ func RotateExpiring(ctx context.Context, conn *db.Connection) {
 	}
 }
 
-// RotateDue is one pass of RotateExpiring, it drains every due CA. A CA that
-// fails is skipped for the rest of the pass, so it cannot starve the others,
-// and retried on the next one.
+// RotateDue is one pass of RotateExpiring. A CA that fails is skipped for the pass, so it cannot starve the others.
 func RotateDue(ctx context.Context, conn *db.Connection) {
 	failed := []string{}
 	for ctx.Err() == nil {

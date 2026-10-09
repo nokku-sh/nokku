@@ -342,7 +342,7 @@ body:has([data-slot='sheet-overlay'], [data-slot='dialog-overlay'])
 	z-index: 60;
 }
 
-/* shadcn centers dialogs with a 50% translate. That lands between device pixels on a scaled or zoomed screen, and the browser blurs everything inside. */
+/* shadcn centers dialogs with a 50% translate. On a zoomed screen that lands between device pixels and blurs. */
 [data-slot='dialog-content'],
 [data-slot='alert-dialog-content'] {
 	inset: 0;

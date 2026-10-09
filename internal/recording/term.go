@@ -5,13 +5,9 @@ import (
 	"slices"
 )
 
-// A terminal stream is text with control sequences in it. A color change in
-// the middle of a secret, or right after it, is nothing a viewer sees, but it
-// keeps a rule from matching. So the rules search the text alone, and what
-// they find is taken out of the stream around the sequences.
+// A color change inside a secret keeps a rule from matching, so the rules search the text without the sequences.
 
-// wrapLookback is how much of a wrapped line is searched once more. A
-// secret with its name in front is shorter.
+// wrapLookback is how much of a wrapped line is searched once more. A secret with its name in front is shorter.
 const wrapLookback = 512
 
 type termClass uint8
@@ -19,13 +15,11 @@ type termClass uint8
 const (
 	// termText shows on screen.
 	termText termClass = iota
-	// termWhite is a line break or a tab, text to the rules and kept by a
-	// redaction.
+	// termWhite is a line break or a tab, text to the rules and kept by a redaction.
 	termWhite
 	// termGlue takes no room: a color change, a bell. Text goes on after it.
 	termGlue
-	// termBreak moves the cursor. Text after it does not continue the text
-	// before it.
+	// termBreak moves the cursor. Text after it does not continue the text before it.
 	termBreak
 	// termBack is a backspace.
 	termBack
@@ -42,18 +36,14 @@ const (
 	termStringEscape
 )
 
-// termScanner classes the bytes of one stream, in order, and follows the
-// cursor as far as it takes to tell where a line was wrapped.
+// termScanner classes the bytes of one stream and follows the cursor far enough to tell where a line wrapped.
 type termScanner struct {
 	state termState
-	// cols is the width of the terminal, 0 when it is not known. Nothing is
-	// a wrap then.
+	// cols is the width of the terminal, 0 when it is not known. Nothing is a wrap then.
 	cols int
-	// row and col are where the cursor is. The row is only good to tell the
-	// next row from any other, scrolling is not followed.
+	// row and col are where the cursor is. Scrolling is not followed, the row only tells the next row from any other.
 	row, col int
-	// printed says the byte just read went on screen, at printedRow and
-	// printedCol.
+	// printed says the byte just read went on screen, at printedRow and printedCol.
 	printed                bool
 	printedRow, printedCol int
 	// The first two parameters of the sequence being read.
@@ -106,8 +96,7 @@ func (s *termScanner) next(b byte) termClass {
 			return termText
 		}
 		s.state = termGround
-		// A color change or an erase leaves the cursor where it is, the
-		// text goes on. grep puts both in the middle of a line.
+		// A color change or an erase leaves the cursor where it is. grep puts both in the middle of a line.
 		if b == 'm' || b == 'K' || b == 'J' {
 			return termGlue
 		}
@@ -205,14 +194,12 @@ func (s *termScanner) move(b byte) {
 		}
 	case 'n', 'c', 'q', 't', 's':
 	default:
-		// Scrolling, inserting, restoring: where the next row is from here
-		// is anyone's guess.
+		// Scrolling, inserting, restoring: where the next row is from here is anyone's guess.
 		s.row = far
 	}
 }
 
-// control takes a byte outside a sequence. A terminal runs a control
-// character in the middle of a sequence and goes on with the sequence.
+// control takes a byte outside a sequence. A terminal runs one in the middle of a sequence and goes on.
 func (s *termScanner) control(b byte) termClass {
 	switch {
 	case b == 0x1b:
@@ -253,8 +240,7 @@ func (s *termScanner) control(b byte) termClass {
 	return termText
 }
 
-// textRun says where text sits in its stream: the bytes from offset text on,
-// up to the next run, are the stream bytes from offset raw on.
+// textRun maps text to its stream: the bytes from offset text on are the stream bytes from offset raw on.
 type textRun struct {
 	text, raw int
 }
@@ -270,29 +256,21 @@ type heldByte struct {
 type streamText struct {
 	scan termScanner
 	buf  []byte
-	// base is the text offset of buf[0], raw the stream offset of the next
-	// byte.
+	// base is the text offset of buf[0], raw the stream offset of the next byte.
 	base, raw int
 	runs      []textRun
-	// gap is set after a cursor move. The next text starts on a line of its
-	// own, so the rules do not read two places of the screen as one word.
+	// gap is set after a cursor move, so the rules do not read two places of the screen as one word.
 	gap bool
 	// wraps are the text offsets where a line was wrapped.
 	wraps []int
 	spans []span
 
-	// A row was filled to the right edge, on edgeRow. If the text goes on at
-	// the start of the next row, the program wrapped a long line, and what
-	// it put in between is not part of the line: the line break, the blanks
-	// an editor has under its line numbers, the bar of a pager. Those bytes
-	// are held until the next text tells.
+	// A row was filled to the edge. What follows is held until the next text tells whether the program wrapped a line.
 	edge    bool
 	edgeRow int
 	held    []heldByte
 	moved   bool
-	// full says the line went all the way to the edge. An editor that breaks
-	// lines at a word stops short of it, and may fill the row with blanks. A
-	// wrap counts then only when the next row starts with a mark for it.
+	// full says the line reached the edge. One broken at a word stops short, and only wraps when the next row is marked.
 	full, marked bool
 	// digits may be a line number, and the next row a line of its own.
 	digits []heldByte
@@ -311,8 +289,7 @@ func (t *streamText) write(data []byte) {
 		if !t.edge || !t.hold(class, b) {
 			t.put(class, b, t.raw)
 			if t.scan.printed && t.scan.cols > 0 && t.scan.col >= t.scan.cols-wrapShort {
-				// Blanks up to the edge are an editor painting the rest of
-				// a row, the line ended before them.
+				// Blanks up to the edge are an editor painting the rest of a row, the line ended before them.
 				t.edge, t.edgeRow, t.full = true, t.scan.printedRow, t.scan.atEdge() && b != ' '
 				t.moved, t.marked = false, false
 			}
@@ -321,8 +298,7 @@ func (t *streamText) write(data []byte) {
 	}
 }
 
-// hold takes a byte after a full row. It reports whether the byte is kept
-// back, the wrap is not decided yet then.
+// hold takes a byte after a full row. It reports whether the byte is kept back until the wrap is decided.
 func (t *streamText) hold(class termClass, b byte) bool {
 	below := t.scan.row == t.edgeRow+1
 	switch {
@@ -335,8 +311,7 @@ func (t *streamText) hold(class termClass, b byte) bool {
 		t.moved = true
 		return true
 	case class == termBack && len(t.held) > 0 && t.held[len(t.held)-1].b == ' ':
-		// A pager wraps with a blank and a backspace, and the line goes on
-		// over the blank.
+		// A pager wraps with a blank and a backspace, and the line goes on over the blank.
 		t.held = t.held[:len(t.held)-1]
 		t.moved = true
 		return true
@@ -353,8 +328,7 @@ func (t *streamText) hold(class termClass, b byte) bool {
 		case len(t.digits) > 0 && b == ' ':
 			// A line number: the next row is the next line, cut off or not.
 		case t.full || t.marked:
-			// The line goes on. Text that ran over the edge by itself was
-			// never apart, anything else leaves a wrap behind.
+			// The line goes on. Text that ran over the edge by itself was never apart, anything else leaves a wrap behind.
 			for n := len(t.buf); !t.full && n > 0 && t.buf[n-1] == ' '; n-- {
 				t.pop()
 			}
@@ -432,8 +406,7 @@ func (t *streamText) rawOf(at int) int {
 
 // search runs find over the text and keeps what it finds as stream offsets.
 func (t *streamText) search(find func(text []byte) []span) {
-	// A piece of text is several pieces of the stream when a wrap or a
-	// sequence stands in it. Only the text is taken, what stands between stays.
+	// A wrap or a sequence splits text into several pieces of the stream. Only the text is taken.
 	take := func(start, end int) {
 		at, end := t.base+start, t.base+end
 		i, found := slices.BinarySearchFunc(t.runs, at, func(r textRun, at int) int { return r.text - at })
@@ -457,10 +430,7 @@ func (t *streamText) search(find func(text []byte) []span) {
 		return
 	}
 
-	// A page can end at a wrap. The rest of the line is not on screen then,
-	// the prompt of the pager follows, and a secret that runs into the
-	// prompt matches no rule. So each wrapped line is searched once more, as
-	// far as the wrap and as a line of its own.
+	// A secret that runs into a pager's prompt at a wrap matches no rule, so each wrapped line is searched again alone.
 	type head struct {
 		// at is where the head starts in lines, text where it starts in buf.
 		at, text, size int
@@ -511,17 +481,13 @@ func isBlank(b byte) bool {
 type redactor struct {
 	scan  termScanner
 	spans []span
-	// next is the first span that ends after pos, the stream offset of the
-	// next byte.
+	// next is the first span that ends after pos, the stream offset of the next byte.
 	next, pos int
 	// col is how many characters in a row are replaced.
 	col int
 }
 
-// apply returns data with the text of the secrets in it replaced. A secret
-// keeps its width: each run of it shows the redaction and blanks for the
-// rest. A program that draws the screen cell by cell, like an editor, counts
-// on every cell it wrote. A shorter line would leave what stood there before.
+// apply keeps the width of a secret. An editor counts on every cell it wrote, a shorter line would leave old text.
 func (r *redactor) apply(data []byte) []byte {
 	r.skip()
 	if end := r.pos + len(data); r.next == len(r.spans) || r.spans[r.next].start >= end {

@@ -13,12 +13,10 @@ func TestParseExtensionsMap(t *testing.T) {
 		t.Errorf("unexpected map: %v", got)
 	}
 
-	// Maps with values must be rejected too.
 	if _, err := ParseExtensionsMap([]byte(`{"permit-pty":"x"}`)); err == nil {
 		t.Error("ParseExtensionsMap() with non-empty value: want error")
 	}
 
-	// Unknown extensions are rejected.
 	if _, err := ParseExtensionsMap([]byte(`{"permit-foo":""}`)); err == nil {
 		t.Error("ParseExtensionsMap() with unknown extension: want error")
 	}

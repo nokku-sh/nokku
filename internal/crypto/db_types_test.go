@@ -7,8 +7,7 @@ import (
 	"testing"
 )
 
-// resetRuntime clears the package-global encryptor so tests stay
-// order-independent.
+// resetRuntime clears the package-global encryptor so tests stay order-independent.
 func resetRuntime(t *testing.T) {
 	t.Helper()
 	encryptor.Store(nil)
@@ -29,8 +28,7 @@ func (testCipher) Decrypt(ciphertext []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-// TestHashToken_Digest pins the stored representation to lowercase hex of
-// the sha256 digest. Any change silently invalidates stored tokens.
+// The stored form is lowercase hex of the sha256 digest. Any change silently invalidates stored tokens.
 func TestHashToken_Digest(t *testing.T) {
 	hash := HashToken("abc")
 	const want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"

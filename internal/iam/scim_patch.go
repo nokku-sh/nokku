@@ -6,8 +6,7 @@ import (
 	filter "github.com/scim2/filter-parser/v2"
 )
 
-// eachScimOp fans a path-less add or replace out to one call per attribute.
-// expr is the path's value filter, nil for path-less operations.
+// eachScimOp fans a path-less add or replace out to one call per attribute. expr is the path's value filter.
 func eachScimOp(
 	ops []scim.PatchOperation,
 	apply func(opName, attr string, expr filter.Expression, value any) error,

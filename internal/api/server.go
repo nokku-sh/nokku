@@ -1,4 +1,3 @@
-// Package api contains the HTTP server for the nokku API.
 package api
 
 import (
@@ -25,8 +24,7 @@ import (
 	"github.com/nokku-sh/nokku/web"
 )
 
-// maxMessageBytes bounds one Connect message. The largest real ones are
-// recording chunks and relay frames at 32 KiB.
+// maxMessageBytes bounds one Connect message. The largest real ones are 32 KiB recording chunks and relay frames.
 const maxMessageBytes = 4 << 20
 
 type Server struct {
@@ -127,9 +125,7 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 	}
 }
 
-// Handler registers every route and returns what Start serves. The telemetry
-// exporters stop with ctx. Call it once per Server, the mux takes a route
-// only once.
+// Handler registers every route. Call it once per Server, the mux takes a route only once.
 func (s *Server) Handler(ctx context.Context) http.Handler {
 	s.registerServices(ctx)
 	return s.handler()
@@ -148,9 +144,7 @@ func (s *Server) handler() http.Handler {
 	).then(s.mux)
 }
 
-// withRequestMeta puts the address and headers of the request on its
-// context. Session rows and audit events take the IP and the user agent from
-// there, whichever route writes them. This is the one place that sets it.
+// withRequestMeta is the one place that sets the address and headers session rows and audit events read.
 func (s *Server) withRequestMeta(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := actor.ContextWithRequestMeta(r.Context(), actor.RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr})
@@ -158,8 +152,7 @@ func (s *Server) withRequestMeta(h http.Handler) http.Handler {
 	})
 }
 
-// withTenant puts the workspace on the context. The health check and
-// provider webhooks are not tied to a workspace host.
+// withTenant skips the health check and provider webhooks, they are not tied to a workspace host.
 func (s *Server) withTenant(h http.Handler) http.Handler {
 	resolved := s.cfg.Tenant.Middleware(h)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -194,8 +187,7 @@ func (s *Server) registerServices(ctx context.Context) {
 
 	static := web.Handler(&s.cfg.UIDev)
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// A service this build does not have, from a newer client. The SPA
-		// fallback would answer it with HTML.
+		// A service this build does not have, from a newer client. The SPA fallback would answer it with HTML.
 		if strings.HasPrefix(r.URL.Path, "/nokku.v1.") {
 			http.NotFound(w, r)
 			return

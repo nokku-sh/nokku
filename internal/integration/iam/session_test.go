@@ -262,8 +262,7 @@ func TestEmailChangeRefusedForManagedAccounts(t *testing.T) {
 	require.ErrorIs(t, err, iam.ErrManagedAccount)
 }
 
-// A browser is mailed once, when it is new to the account, and what
-// remembers it is no way to sign in.
+// A browser is mailed once, when it is new to the account, and what remembers it is no way to sign in.
 func TestBrowserIsRememberedAndNeverSignsIn(t *testing.T) {
 	mailed := make(chan string, 4)
 	e := newTestEnvWith(t, iam.Deps{SendNewLogin: func(_ context.Context, userID, _, _, name, ip string) error {
@@ -310,8 +309,7 @@ func TestBrowserIsRememberedAndNeverSignsIn(t *testing.T) {
 		require.Error(t, err, "the device cookie signed in")
 	}
 
-	// Another account on the same browser is new there and gets a cookie of
-	// its own. Under one name the browser would drop the first for it.
+	// Another account on the same browser gets a cookie of its own. Under one name the browser would drop the first.
 	other := e.user(t, o.ws, "other@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	second := e.svc.RememberDevice(ctx, header, addr, other)
 	require.NotNil(t, second, "a device of one account is known to another")
@@ -329,8 +327,7 @@ func TestBrowserIsRememberedAndNeverSignsIn(t *testing.T) {
 	assert.NotNil(t, e.svc.RememberDevice(ctx, header, addr, u), "a forgotten browser is new again")
 }
 
-// The sessions list shows when a session was last used. The stamp moves with
-// authenticated requests, at most once a minute.
+// The stamp moves with authenticated requests, at most once a minute.
 func TestSessionActivityIsNotedOnceAMinute(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
@@ -347,8 +344,7 @@ func TestSessionActivityIsNotedOnceAMinute(t *testing.T) {
 		require.NotNil(t, row.LastSeenAt)
 		return *row.LastSeenAt
 	}
-	// seen moves the stamp into the past, the clock of the service is not
-	// ours to move.
+	// seen moves the stamp into the past, the clock of the service is not ours to move.
 	seen := func(ago time.Duration) time.Time {
 		t.Helper()
 		at := time.Now().Add(-ago)
@@ -369,7 +365,6 @@ func TestSessionActivityIsNotedOnceAMinute(t *testing.T) {
 	assert.WithinDuration(t, time.Now(), lastSeen(), 5*time.Second, "a later request did not move the stamp")
 }
 
-// serviceAccount adds an account to ws and returns its id.
 func (e *testEnv) serviceAccount(t *testing.T, ws actor.Workspace) string {
 	t.Helper()
 	var id string
@@ -392,8 +387,7 @@ func (e *testEnv) key(t *testing.T, ws actor.Workspace, saID string) (*db.Access
 	return tok, secret
 }
 
-// A key with a bad checksum is a typo or a lookalike. It fails before the
-// lookup, so with no workspace pinned the pin is never missed.
+// A key with a bad checksum fails before the lookup, so with no workspace pinned the pin is never missed.
 func TestBadChecksumNeverReachesTheDatabase(t *testing.T) {
 	e := newTestEnv(t)
 	whoami := func(token string) error {
@@ -410,8 +404,7 @@ func TestBadChecksumNeverReachesTheDatabase(t *testing.T) {
 	require.ErrorIs(t, whoami(secret), db.ErrWorkspaceNotPinned, "a good checksum is looked up")
 }
 
-// A SCIM token provisions accounts and nothing else. On a connect call it
-// is no credential at all.
+// A SCIM token provisions accounts and nothing else. On a connect call it is no credential at all.
 func TestSCIMTokenIsNoConnectCredential(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)

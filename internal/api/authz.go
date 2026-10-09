@@ -18,8 +18,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// procedureAccess holds the (access) option of every RPC, see access.proto
-// in the protos repo. RPCs without one are denied.
+// procedureAccess holds the (access) option of every RPC. RPCs without one are denied.
 var procedureAccess = loadProcedureAccess()
 
 func loadProcedureAccess() map[string]*nokkuv1.Access {
@@ -43,8 +42,7 @@ func isPublicEndpoint(procedure string) bool {
 	return procedureAccess[procedure].GetPublic()
 }
 
-// authorizationInterceptor checks the role the session carries. The user
-// and the workspace were loaded together, so no lookup happens here.
+// authorizationInterceptor checks the role the session carries, so no lookup happens here.
 type authorizationInterceptor struct {
 	cfg *config.Config
 }
@@ -107,8 +105,7 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 	return nil
 }
 
-// daemonAccepted keeps a pending, rejected or deleted daemon away from every
-// RPC but the ones that tell it its status, and removing itself.
+// daemonAccepted keeps a daemon that is not accepted away from every RPC but its status and removing itself.
 func (a *authorizationInterceptor) daemonAccepted(ctx context.Context, daemonID, procedure string) error {
 	switch procedure {
 	case nokkuv1connect.DaemonControlServiceSyncDaemonProcedure,

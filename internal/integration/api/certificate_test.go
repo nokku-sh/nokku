@@ -19,10 +19,7 @@ import (
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 )
 
-// A user certificate is signed for one server and names the accounts the
-// caller is granted there. Without a grant nothing is signed, so a revoke
-// ends with the last certificate even on a host that never hears of it. The
-// daemon and nk sync are handed the very same principals.
+// Without a grant nothing is signed. The daemon and nk sync are handed the very same principals.
 func TestSignSSHCertificate(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -122,9 +119,7 @@ func TestSignSSHCertificate(t *testing.T) {
 		"a revoked grant still got a certificate signed, %v", err)
 }
 
-// A service account's certificate lives an hour at most and never past the
-// token it was asked for with. A leaked or expired token leaves no days of
-// access behind.
+// A service account's certificate lives an hour at most and never past the token it was asked for with.
 func TestServiceAccountCertificateLifetime(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)

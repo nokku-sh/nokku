@@ -18,14 +18,7 @@ import (
 )
 
 const (
-	// A known device is a browser remembered by its cookie or a terminal by
-	// its signing key. It shows in the sessions list, and a sign-in from one
-	// the account has not used before is mailed. It lives in its own table
-	// and never signs anyone in.
-	//
-	// The cookie is per account, its name ends in the user id. With one name
-	// for the browser every account that signs in replaces the cookie of the
-	// last one, and each switch counts as a new device.
+	// The device cookie is per account. With one name every account switch would count as a new device.
 	deviceCookiePrefix = "nokku_device_"
 	deviceTTL          = 180 * 24 * time.Hour
 	// maxUserAgent keeps a hostile header from bloating the sessions table.
@@ -44,8 +37,7 @@ type TokenParams struct {
 	TTL time.Duration
 }
 
-// IssueToken pins the token to the request's workspace. The plaintext is
-// returned once, only its hash is stored.
+// IssueToken pins the token to the request's workspace. The plaintext is returned once, only its hash is stored.
 func (s *Service) IssueToken(ctx context.Context, p TokenParams) (*db.AccessToken, string, error) {
 	token, tokenHash := crypto.NewSecret()
 	switch p.Kind {
@@ -130,9 +122,7 @@ func (s *Service) ssoEnforced(ctx context.Context) (bool, error) {
 	return w.Settings.GetEnforceSso(), nil
 }
 
-// IssueDaemonSession replaces the daemon's earlier sessions. The session
-// never expires. After the daemon is deleted it only gets the REJECTED answer
-// from SyncDaemon, which also removes it.
+// IssueDaemonSession replaces earlier sessions. It never expires, SyncDaemon removes it once the daemon is deleted.
 func (s *Service) IssueDaemonSession(ctx context.Context, daemonID, binding string) (string, error) {
 	if _, err := s.revokeSubject(ctx, daemonID); err != nil {
 		return "", err
@@ -146,8 +136,7 @@ func (s *Service) IssueDaemonSession(ctx context.Context, daemonID, binding stri
 	return token, err
 }
 
-// RememberDevice returns nil for a browser the account has signed in from
-// before. A new one gets a cookie, and the account a mail.
+// RememberDevice returns nil for a browser the account has used before. A new one gets a cookie and a mail.
 func (s *Service) RememberDevice(ctx context.Context, header http.Header, remoteAddr string, u *db.User) *http.Cookie {
 	name := deviceCookiePrefix + u.ID
 	if raw := cookieFromHeader(header, name); raw != "" && s.seenDevice(ctx, u.ID, deviceKey(raw)) {
@@ -175,9 +164,7 @@ func deviceKey(cookie string) string {
 	return crypto.HashToken(cookie).Hash()
 }
 
-// seenDevice reports whether the account has signed in from the device
-// before, and notes the visit. A failed lookup counts as new, a mail too
-// many beats a missed one.
+// seenDevice notes the visit. A failed lookup counts as new, a mail too many beats a missed one.
 func (s *Service) seenDevice(ctx context.Context, userID, key string) bool {
 	_, err := s.conn.Tenant().SeenKnownDevice(ctx, &db.SeenKnownDeviceParams{UserID: userID, Key: key, Now: s.now()})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -186,8 +173,7 @@ func (s *Service) seenDevice(ctx context.Context, userID, key string) bool {
 	return err == nil
 }
 
-// addDevice remembers a device the account has not signed in from before
-// and mails the account about it. name is what the mail calls the device.
+// addDevice remembers a new device and mails the account. name is what the mail calls the device.
 func (s *Service) addDevice(ctx context.Context, u *db.User, key, userAgent, name, ip string) (*db.KnownDevice, error) {
 	now := s.now()
 	d, err := s.conn.Tenant().AddKnownDevice(ctx, &db.AddKnownDeviceParams{
@@ -205,13 +191,11 @@ func (s *Service) addDevice(ctx context.Context, u *db.User, key, userAgent, nam
 	return d, nil
 }
 
-// ListDevices is every device the signed-in user is remembered on.
 func (s *Service) ListDevices(ctx context.Context) ([]*db.KnownDevice, error) {
 	return s.conn.Tenant().ListKnownDevices(ctx, actor.UserIDFromContext(ctx))
 }
 
-// ForgetDevice only reaches the caller's own devices. The next sign-in from
-// that device is mailed again.
+// ForgetDevice only reaches the caller's own devices. The next sign-in from that device is mailed again.
 func (s *Service) ForgetDevice(ctx context.Context, id string) error {
 	if _, err := uuid.Parse(id); err != nil {
 		return nil
@@ -220,8 +204,7 @@ func (s *Service) ForgetDevice(ctx context.Context, id string) error {
 		DeleteKnownDevice(ctx, &db.DeleteKnownDeviceParams{UserID: actor.UserIDFromContext(ctx), ID: id})
 }
 
-// verifyToken only finds tokens of the request's workspace. A key with a
-// bad checksum is a typo or a lookalike, it fails before any lookup.
+// verifyToken only finds tokens of the request's workspace. A key with a bad checksum fails before any lookup.
 func (s *Service) verifyToken(ctx context.Context, token string) (db.AccessToken, error) {
 	if token == "" {
 		return db.AccessToken{}, errNoSession
@@ -243,8 +226,7 @@ func (s *Service) verifyToken(ctx context.Context, token string) (db.AccessToken
 	return *tok, nil
 }
 
-// noteSeen records that an authenticated request used the token. It never
-// fails the request, the stamp is only what the lists show.
+// noteSeen never fails the request, the stamp is only what the lists show.
 func (s *Service) noteSeen(ctx context.Context, tok db.AccessToken) {
 	now := s.now()
 	if tok.LastSeenAt != nil && now.Sub(*tok.LastSeenAt) < sessionSeenEvery {
@@ -260,7 +242,6 @@ func (s *Service) deleteToken(ctx context.Context, id string) error {
 	return s.conn.Tenant().DeleteAccessToken(ctx, id)
 }
 
-// ListSessions is the browsers and terminals the signed-in user is on.
 func (s *Service) ListSessions(ctx context.Context) ([]*db.AccessToken, error) {
 	userID := actor.UserIDFromContext(ctx)
 	if userID == "" {
@@ -269,10 +250,7 @@ func (s *Service) ListSessions(ctx context.Context) ([]*db.AccessToken, error) {
 	return s.conn.Tenant().ListUserSessions(ctx, userID)
 }
 
-// Logout ends a browser or CLI session. It needs the DPoP proof for header
-// tokens, so a leaked token alone cannot end someone's session. A key is
-// not a session, a script that calls this keeps its key. Unknown credentials
-// are already gone, so only errors fixed by re-signing fail.
+// Logout needs the DPoP proof for header tokens, so a leaked token alone cannot end a session. A key is no session.
 func (s *Service) Logout(ctx context.Context, header http.Header, procedure string) error {
 	p, tok, err := s.Authenticate(ctx, header, procedure)
 	if errors.Is(err, ErrDPoPNonce) || errors.Is(err, ErrDPoPRequired) {
@@ -319,8 +297,7 @@ func truncate(s string, n int) string {
 	return strings.ToValidUTF8(s[:n], "")
 }
 
-// touchCredential marks a credential as used by a sign-in. It never fails
-// the sign-in, "last used" is only a hint for the owner.
+// touchCredential never fails the sign-in, "last used" is only a hint for the owner.
 func (s *Service) touchCredential(ctx context.Context, id string) {
 	err := s.conn.Tenant().TouchCredential(ctx, id)
 	if err != nil {

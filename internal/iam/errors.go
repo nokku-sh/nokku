@@ -24,8 +24,7 @@ var (
 	errSessionExpired     = errors.New("iam: session expired")
 	errIdentityLinked     = errors.New("iam: identity already linked to another account")
 	errIdentityRejected   = errors.New("iam: identity rejected")
-	// ErrDPoPRequired is advertised with a DPoP-Nonce header so the client
-	// signs and retries (RFC 9449 section 8).
+	// ErrDPoPRequired is advertised with a DPoP-Nonce header so the client signs and retries (RFC 9449 section 8).
 	ErrDPoPRequired    = errors.New("iam: dpop proof required")
 	errInvalidProof    = errors.New("iam: invalid dpop proof")
 	ErrDPoPNonce       = errors.New("iam: dpop nonce required")

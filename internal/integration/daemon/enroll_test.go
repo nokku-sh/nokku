@@ -18,15 +18,13 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// fixture is a connection plus a context pinned to a fresh workspace, the
-// way the tenant middleware pins a real request.
+// fixture is a connection plus a context pinned to a fresh workspace, like the tenant middleware pins a request.
 type fixture struct {
 	conn *db.Connection
 	ctx  context.Context
 }
 
-// enrollToken connects to the test database and mints an enroll token in a
-// fresh workspace. tweak adjusts the token row.
+// enrollToken mints an enroll token in a fresh workspace. tweak adjusts the token row.
 func enrollToken(t *testing.T, tweak func(*db.CreateJoinTokenParams)) (fixture, string) {
 	t.Helper()
 	// The connection lives as long as its context, so it gets the test's.
@@ -72,8 +70,7 @@ func enroll(t *testing.T, f fixture, in daemon.EnrollInput) (*daemon.Enrolled, e
 	return daemon.Enroll(f.ctx, f.conn, in)
 }
 
-// Parallel enrollments of one machine, as a retrying installer or a
-// double-run playbook produces, must converge on one daemon.
+// Parallel enrollments of one machine, as a retrying installer produces, must converge on one daemon.
 func TestEnrollSameKeyConcurrently(t *testing.T) {
 	f, token := enrollToken(t, nil)
 	in := daemon.EnrollInput{Token: token, Binding: uuid.NewV7().String()}
@@ -134,8 +131,7 @@ func TestEnrollQuotaOnlyForNewMachines(t *testing.T) {
 	}
 }
 
-// Only new daemons spend uses, so a one-use token still lets its machine
-// re-enroll but turns the next machine away.
+// Only new daemons spend uses, so a one-use token lets its machine re-enroll but turns the next one away.
 func TestEnrollMaxUses(t *testing.T) {
 	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) {
 		p.MaxUses = new(int32(1))

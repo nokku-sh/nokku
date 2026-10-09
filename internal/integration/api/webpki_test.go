@@ -15,8 +15,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/webpki"
 )
 
-// A client reads a missing CA as "nothing to pin". The SPA fallback would
-// answer the path with HTML and a 200.
+// A client reads a missing CA as "nothing to pin". The SPA fallback would answer the path with HTML and a 200.
 func TestNoCAIsAdvertisedByDefault(t *testing.T) {
 	_, srv := newTestAPI(t)
 

@@ -47,9 +47,7 @@ type relayPending struct {
 	releaseSlot func()
 }
 
-// RequestRelay releases its slot exactly once. registerRelay hands the
-// release to the Relay, failure paths run it directly. clientAddr is what the
-// daemon's sshd reports as the remote address.
+// RequestRelay releases its slot exactly once. registerRelay hands the release to the Relay, failure paths run it.
 func (p *Pool) RequestRelay(
 	ctx context.Context,
 	daemonID, relayID, userID, clientAddr string,
@@ -98,8 +96,7 @@ func (p *Pool) RequestRelay(
 		err = fmt.Errorf("%w: %w", errRelayUnavailable, ctx.Err())
 	}
 
-	// The relay may have registered just as the wait gave up, or be gone
-	// again. Registration took the slot, so only release when it did not.
+	// The relay may have registered just as the wait gave up, and then it owns the slot.
 	p.mu.Lock()
 	r := p.relays[relayID]
 	p.mu.Unlock()
@@ -113,8 +110,7 @@ func (p *Pool) RequestRelay(
 	return r, nil
 }
 
-// registerRelay returns nil unless this daemon was asked for this relay, so a
-// rogue daemon cannot claim or fabricate one.
+// registerRelay returns nil unless this daemon was asked for this relay, so a rogue daemon cannot claim one.
 func (p *Pool) registerRelay(relayID, daemonID string) *Relay {
 	p.mu.Lock()
 	pend, ok := p.pendingRelays[relayID]

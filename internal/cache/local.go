@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// Local memoizes reconstructible public data, so it needs no sharing or
-// atomicity.
+// Local memoizes reconstructible public data, so it needs no sharing or atomicity.
 type Local[T any] struct {
 	mu      sync.Mutex
 	entries map[string]localEntry[T]

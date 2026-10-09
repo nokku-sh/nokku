@@ -4,8 +4,7 @@ import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt';
 import { toast } from 'svelte-sonner';
 
 const DAY = 86_400_000;
-// The reminder starts this long before expiry. Data limits hold this long
-// after it, see holdDays in internal/entitlement.
+// The reminder starts this long before expiry, data limits hold this long after. See holdDays in internal/entitlement.
 const WARN_DAYS = 30;
 const HOLD_DAYS = 30;
 

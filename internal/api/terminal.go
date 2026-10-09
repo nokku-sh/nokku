@@ -25,8 +25,7 @@ const (
 	wsReadLimit = 64 * 1024
 	wsTimeout   = 15 * time.Second
 	wsPingEvery = 20 * time.Second
-	// Tells the browser the shell ended on its own (exit, Ctrl+D), so it drops
-	// the tab. Timeouts and dropped daemons close normally and keep it.
+	// Tells the browser the shell ended on its own, so it drops the tab. Timeouts and dropped daemons keep it.
 	wsShellExited websocket.StatusCode = 4000
 
 	// The browser opens the socket right after CreateSession.
@@ -38,8 +37,7 @@ const (
 	webStdoutBurst = 64 << 10
 )
 
-// sessionTicket is what CreateSession authorized, kept in the cache until the
-// websocket trades it in.
+// sessionTicket is what CreateSession authorized, cached until the websocket trades it in.
 type sessionTicket struct {
 	WorkspaceID string `json:"workspace_id"`
 	DaemonID    string `json:"daemon_id"`
@@ -59,8 +57,7 @@ type terminalHandler struct {
 	cfg *config.Config
 }
 
-// handleWebSocket runs one shell for as long as the socket is open. A reload
-// or a dropped connection ends it.
+// handleWebSocket runs one shell for as long as the socket is open. A reload or a dropped connection ends it.
 func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.URL.Query().Get("session_id")
 	if sessionID == "" {
@@ -145,8 +142,7 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 	idle := time.AfterFunc(sessionIdle, sess.Close)
 	defer idle.Stop()
 
-	// Reads have no timeout since an idle terminal sends nothing. Pings prove
-	// the browser is still there.
+	// Reads have no timeout since an idle terminal sends nothing. Pings prove the browser is still there.
 	go func() {
 		ticker := time.NewTicker(wsPingEvery)
 		defer ticker.Stop()
@@ -166,8 +162,7 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 		}
 	}()
 
-	// Throttled so a chatty shell cannot flood the websocket. Stdout closing
-	// is the session's end.
+	// Throttled so a chatty shell cannot flood the websocket. Stdout closing is the session's end.
 	go func() {
 		limiter := rate.NewLimiter(webStdoutRate, webStdoutBurst)
 		for data := range sess.Stdout() {

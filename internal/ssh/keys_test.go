@@ -9,7 +9,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// keyLine generates an ed25519 authorized-key line with the given comment.
 func keyLine(t *testing.T, comment string) string {
 	t.Helper()
 	_, priv, err := ed25519.GenerateKey(rand.Reader)

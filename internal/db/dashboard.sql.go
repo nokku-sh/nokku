@@ -137,8 +137,7 @@ type ListOpenRecordingsRow struct {
 	DaemonName string    `json:"daemonName"`
 }
 
-// A crashed daemon never closes its recordings, so only trust open ones
-// behind a daemon that is still connected.
+// A crashed daemon never closes its recordings, so only trust open ones behind a connected daemon.
 func (q *Queries) ListOpenRecordings(ctx context.Context, seenAfter time.Time) ([]*ListOpenRecordingsRow, error) {
 	rows, err := q.db.Query(ctx, listOpenRecordings, seenAfter)
 	if err != nil {

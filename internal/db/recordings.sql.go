@@ -45,9 +45,7 @@ type CreateRecordingParams struct {
 	DaemonID  string                `json:"daemonId"`
 }
 
-// The daemon names the start of a session it uploads late. A start before the
-// daemon enrolled or in the future is a clock that was wrong, and counts as
-// now, or retention would take the recording at once.
+// A start before the daemon enrolled or in the future is a wrong clock and counts as now, or retention would take it.
 func (q *Queries) CreateRecording(ctx context.Context, arg *CreateRecordingParams) (*Recording, error) {
 	row := q.db.QueryRow(ctx, createRecording,
 		arg.ID,

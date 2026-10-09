@@ -44,9 +44,7 @@ func heard(t *testing.T, conn *pgx.Conn, ws string) []string {
 	}
 }
 
-// silentTables are the sign-ins. They change all day and no list shows them
-// to others, so no console hears about them. access_tokens announces only
-// its keys, TestChangesAreAnnounced checks that.
+// silentTables are the sign-ins. They change all day and no list shows them to others, so no console hears of them.
 var silentTables = []string{"credentials", "known_devices", "one_time_tokens"}
 
 // A new tenant table has to say whether a console hears its changes.

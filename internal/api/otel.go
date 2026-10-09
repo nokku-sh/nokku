@@ -21,8 +21,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 )
 
-// newTelemetry turns OTel on when an OTLP endpoint is set. Protocol, sampler
-// and service name follow the OTEL_* environment.
+// newTelemetry turns OTel on when an OTLP endpoint is set. Everything else follows the OTEL_* environment.
 func newTelemetry(ctx context.Context) connect.Interceptor {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
 		return nil

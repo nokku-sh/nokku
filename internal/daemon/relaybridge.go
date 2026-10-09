@@ -98,8 +98,7 @@ func BridgeRelay(
 	// Stop the pump now so the join cannot deadlock on a peer that stopped reading.
 	cancel()
 	<-outDone
-	// What the daemon sent before it closed is still queued. The pump is
-	// gone, so nothing else receives.
+	// What the daemon sent before it closed is still queued, and the pump is gone.
 	for range len(relay.toUser) {
 		if err := stream.Send(&nokkuv1.RelayResponse{
 			Msg: &nokkuv1.RelayResponse_Data{Data: <-relay.toUser},

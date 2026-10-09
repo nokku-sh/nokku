@@ -48,14 +48,12 @@ func (s *daemonService) UpdateDaemon(
 		if err != nil {
 			return err
 		}
-		// A config replaces the stored one wholesale, since proto.Merge cannot
-		// turn a scalar off. The UI always sends the full config.
+		// A config replaces the stored one wholesale, proto.Merge cannot turn a scalar off.
 		config := req.GetConfig()
 		if config == nil {
 			config = base.Config
 		}
-		// The query takes the status as a value, so an unset one would
-		// overwrite an accept or reject with zero.
+		// The query takes the status as a value, so an unset one would overwrite an accept or reject with zero.
 		status := req.GetStatus()
 		if status == nokkuv1.DaemonStatus_DAEMON_STATUS_UNSPECIFIED {
 			status = base.Status
@@ -114,8 +112,7 @@ func (s *daemonService) DeleteDaemon(
 	return &nokkuv1.DeleteDaemonResponse{}, nil
 }
 
-// CreateSession only hands out a ticket. The shell starts when the browser
-// opens the terminal websocket with it, and ends with that socket.
+// CreateSession only hands out a ticket. The shell starts and ends with the terminal websocket.
 func (s *daemonService) CreateSession(
 	ctx context.Context,
 	req *nokkuv1.CreateSessionRequest,
@@ -140,8 +137,7 @@ func (s *daemonService) CreateSession(
 		if !ca.IsActive {
 			return newError(connect.CodeFailedPrecondition, "certificate authority is not active")
 		}
-		// The same grant sshd will ask for, so nobody gets a shell ticket
-		// for an account they cannot use.
+		// The same grant sshd will ask for, so nobody gets a shell ticket for an account they cannot use.
 		accounts, err := grantedAccounts(ctx, q, daemon.ID, userID)
 		if err != nil {
 			return err
@@ -174,8 +170,7 @@ func (s *daemonService) CreateSession(
 	}, nil
 }
 
-// grantedAccounts lists the accounts on the daemon's host that subject may
-// log in to, directly or through a team.
+// grantedAccounts lists the accounts on the daemon's host that subject may log in to, directly or through a team.
 func grantedAccounts(ctx context.Context, q *db.Queries, daemonID, subject string) ([]string, error) {
 	target, err := q.GetTargetByDaemon(ctx, &daemonID)
 	if err != nil {
@@ -215,8 +210,7 @@ func (s *daemonService) CloseSession(
 	ctx context.Context,
 	req *nokkuv1.CloseSessionRequest,
 ) (*nokkuv1.CloseSessionResponse, error) {
-	// The pool is shared across tenants, so the daemon must resolve in the
-	// pinned workspace first.
+	// The pool is shared across tenants, so the daemon must resolve in the pinned workspace first.
 	sess := s.cfg.Pool.GetSession(req.GetSessionId())
 	if sess == nil || sess.DaemonID() != req.GetDaemonId() {
 		return nil, errNotFound
@@ -249,8 +243,7 @@ func (s *daemonService) Relay(
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("daemon_id required"))
 	}
 
-	// sshd is the real gate, but the pipe itself reaches hosts behind NAT
-	// and holds a pre-auth slot there. It needs a grant on the target.
+	// sshd is the real gate, but the pipe reaches hosts behind NAT and holds a pre-auth slot. It needs a grant.
 	caller, _ := actor.PrincipalFromContext(ctx)
 	var d *db.Daemon
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
@@ -294,9 +287,7 @@ func (s *daemonService) Relay(
 	return nokkudaemon.BridgeRelay(ctx, stream, relay)
 }
 
-// clientAddr is the caller's address as a relayed connection reports it to
-// the daemon's sshd. It is the exact address, a source-address option on the
-// certificate is matched against it.
+// clientAddr is the exact address, a source-address option on the certificate is matched against it.
 func clientAddr(ctx context.Context) string {
 	meta, ok := actor.RequestMetaFromContext(ctx)
 	if !ok {

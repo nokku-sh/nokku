@@ -136,9 +136,7 @@ type GetAccessGraphRow struct {
 	Targets    int32  `json:"targets"`
 }
 
-// One row per node and edge of the graph, told apart by the by_ flags. The
-// row with none set is the total. A target with several tags counts under
-// each of them, an untagged one under ”.
+// One row per node and edge of the graph, told apart by the by_ flags. The row with none set is the total.
 func (q *Queries) GetAccessGraph(ctx context.Context, arg *GetAccessGraphParams) ([]*GetAccessGraphRow, error) {
 	rows, err := q.db.Query(ctx, getAccessGraph,
 		arg.SubjectID,
@@ -326,8 +324,7 @@ type ListAccessGraphTargetsRow struct {
 	TotalCount int32  `json:"totalCount"`
 }
 
-// The targets of one tag, the ones with a matching grant first. The filter is
-// the one GetAccessGraph takes, so a tag filter only matches its own tag.
+// The targets of one tag, the ones with a matching grant first. The filter is the one GetAccessGraph takes.
 func (q *Queries) ListAccessGraphTargets(ctx context.Context, arg *ListAccessGraphTargetsParams) ([]*ListAccessGraphTargetsRow, error) {
 	rows, err := q.db.Query(ctx, listAccessGraphTargets,
 		arg.FilterTag,

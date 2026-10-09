@@ -21,8 +21,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// passkeyDevice is a browser with a software authenticator. It answers the
-// ceremonies of the real handlers the way a device would.
+// passkeyDevice is a browser with a software authenticator, answering the real handlers the way a device would.
 type passkeyDevice struct {
 	rp   virtualwebauthn.RelyingParty
 	auth virtualwebauthn.Authenticator
@@ -96,8 +95,7 @@ func hasCookie(rec *httptest.ResponseRecorder, name string) bool {
 	return false
 }
 
-// An invited person signs up with a passkey and is signed in at once. The
-// invite is spent, and neither ceremony can be played a second time.
+// The invite is spent, and neither ceremony can be played a second time.
 func TestPasskeySignupThenLogin(t *testing.T) {
 	e := newTestEnv(t)
 	d := newPasskeyDevice()
@@ -139,8 +137,7 @@ func TestPasskeySignupThenLogin(t *testing.T) {
 	assert.Equal(t, 2, e.sessions(t, o.ws, u.ID), "the replay opened a session")
 }
 
-// A passkey made for one workspace is unknown on another, even when both
-// workspaces answer on the same host in tests.
+// A passkey made for one workspace is unknown on another, even when both answer on the same host in tests.
 func TestPasskeyStaysInItsWorkspace(t *testing.T) {
 	e := newTestEnv(t)
 	d := newPasskeyDevice()
@@ -153,8 +150,7 @@ func TestPasskeyStaysInItsWorkspace(t *testing.T) {
 	assert.Zero(t, e.sessions(t, b.ws, u.ID))
 }
 
-// What a phishing page, another ceremony or a guessed key hands in is
-// refused, and the real device still gets in afterwards.
+// What a phishing page, another ceremony or a guessed key hands in is refused, and the real device still gets in.
 func TestPasskeyLoginRefusesForgedAnswers(t *testing.T) {
 	e := newTestEnv(t)
 	d := newPasskeyDevice()
@@ -196,8 +192,7 @@ func TestPasskeyLoginRefusesForgedAnswers(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code, "the real device: %s", rec.Body.String())
 }
 
-// Adding a passkey needs a session, and the ceremony belongs to the account
-// that started it.
+// Adding a passkey needs a session, and the ceremony belongs to the account that started it.
 func TestPasskeyRegistrationBelongsToItsAccount(t *testing.T) {
 	e := newTestEnv(t)
 	d := newPasskeyDevice()

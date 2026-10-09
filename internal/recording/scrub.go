@@ -26,19 +26,14 @@ import (
 
 const (
 	scrubTimeout = 10 * time.Minute
-	// A stream is searched one window at a time, so a cast of any size is
-	// scrubbed in the same memory. The end of a window is searched again
-	// with the next, a secret shorter than the overlap is always seen whole.
+	// A stream is searched a window at a time. The overlap is searched twice, so a shorter secret is seen whole.
 	scrubWindow  = 8 << 20
 	scrubOverlap = 64 << 10
 	scrubChunk   = 64 << 10
 	redaction    = "<redacted>"
-	// A screen shows a secret in pieces: a long line is cut at the edge, a
-	// wrapped one goes on in the next row. A piece this long of a secret the
-	// rules found is taken out wherever it stands.
+	// A screen shows a secret in pieces. A piece this long of a found secret is taken out wherever it stands.
 	secretPiece = 12
-	// A secret shorter than a piece is only taken out whole, and not at all
-	// under this length.
+	// A secret shorter than a piece is only taken out whole, and not at all under this length.
 	shortSecret = 8
 	// maxSecretPieces bounds what a cast full of secrets can make the scrub hold.
 	maxSecretPieces = 1 << 20
@@ -49,10 +44,7 @@ type span struct {
 	start, end int
 }
 
-// ScrubRecording is best effort and never retried. A failure leaves the
-// recording as uploaded. It runs detached, the upload does not wait for it.
-// The part of a cut upload is scrubbed like a whole one, it may be all there
-// ever is.
+// ScrubRecording is best effort, detached and never retried. A failure leaves the recording as uploaded.
 func (s *Service) ScrubRecording(ctx context.Context, rec *db.Recording) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), scrubTimeout)
 	run := &scrubRun{cancel: cancel, done: make(chan struct{})}
@@ -113,8 +105,7 @@ func (s *Service) ScrubRecording(ctx context.Context, rec *db.Recording) {
 	}()
 }
 
-// scrub reads the stored cast three times. Two passes find the secrets, the
-// third writes the cast back with them redacted. Nothing is held whole.
+// scrub reads the stored cast three times: two passes find the secrets, the third writes it back redacted.
 func (s *Service) scrub(ctx context.Context, rec *db.Recording) error {
 	rules, err := scrubRules()
 	if err != nil {
@@ -129,8 +120,7 @@ func (s *Service) scrub(ctx context.Context, rec *db.Recording) error {
 		return nil
 	}
 
-	// The store swaps the new object in on commit, so the old one can be
-	// read while the new one is written.
+	// The store swaps the new object in on commit, so the old one can be read while the new one is written.
 	cast, err := s.openCast(ctx, rec)
 	if err != nil {
 		return err
@@ -156,8 +146,7 @@ func (s *Service) scrub(ctx context.Context, rec *db.Recording) error {
 		err = w.writeFrame(frameEnd, nil)
 	}
 	if err != nil {
-		// The blob writer commits on Close unless its ctx is canceled, and
-		// a partial object would replace the original.
+		// The blob writer commits on Close unless its ctx is canceled, and a partial object would replace the original.
 		abort()
 		_ = w.w.Close()
 		return fmt.Errorf("write scrubbed recording object: %w", err)
@@ -168,7 +157,6 @@ func (s *Service) scrub(ctx context.Context, rec *db.Recording) error {
 	return nil
 }
 
-// openCast opens the stored recording as its plain cast.
 func (s *Service) openCast(ctx context.Context, rec *db.Recording) (io.ReadCloser, error) {
 	fr, err := s.OpenReader(ctx, rec)
 	if err != nil {
@@ -194,8 +182,7 @@ func (s *Service) openCast(ctx context.Context, rec *db.Recording) (io.ReadClose
 	}{cast, fr}, nil
 }
 
-// cutCast reads the cast of an upload that broke off. It ends after the last
-// whole line. The line the cut ran through goes, it may hold half a secret.
+// cutCast ends after the last whole line. The line the cut ran through goes, it may hold half a secret.
 type cutCast struct {
 	r    *bufio.Reader
 	line []byte
@@ -243,11 +230,7 @@ type castEvent struct {
 	data     []byte
 }
 
-// locateSecrets returns the secrets of each stream as offsets into that
-// stream's data, all events of one kind put end to end. The first pass runs
-// the rules. The second looks for what they found in the places no rule
-// knows it: cut off at the edge of the screen, or without the name in front
-// that gave it away.
+// locateSecrets runs the rules, then looks for what they found where no rule knows it: cut off or without its name.
 func locateSecrets(
 	open func() (io.ReadCloser, error),
 	rules *scrubRuleSet,
@@ -289,8 +272,7 @@ func locateSecrets(
 	return spans, nil
 }
 
-// findSecrets runs find over the text of each stream, a window at a time, so
-// a secret split across events is still caught.
+// findSecrets runs find a window at a time, so a secret split across events is still caught.
 func findSecrets(
 	cast io.Reader,
 	find func(text []byte) []span,
@@ -341,16 +323,14 @@ func findSecrets(
 	return found, nil
 }
 
-// seenSecrets is what the rules found, cut into the pieces a screen may show
-// of it.
+// seenSecrets is what the rules found, cut into the pieces a screen may show of it.
 type seenSecrets struct {
 	pieces map[string]struct{}
 	short  map[string]struct{}
 }
 
 func (k *seenSecrets) add(secret []byte) {
-	// A secret is one word. What a rule finds with blanks in it has words
-	// around the secret, and those would be taken out of the whole recording.
+	// A secret is one word. A match with blanks has words around it, and those would be taken out everywhere.
 	if bytes.ContainsAny(secret, " \t\r\n") || len(secret) < shortSecret ||
 		shannonEntropy(secret) < 3 || len(k.pieces) >= maxSecretPieces {
 		return
@@ -388,8 +368,7 @@ func (k *seenSecrets) spans(text []byte) []span {
 	return out
 }
 
-// rewriteCast is the last pass. It copies cast to out with the secrets
-// redacted, every other line byte for byte.
+// rewriteCast is the last pass. Lines without secrets are copied byte for byte.
 func rewriteCast(cast io.Reader, out io.Writer, spans map[string][]span) error {
 	streams := map[string]*redactor{}
 	for line, err := range castLines(cast) {
@@ -420,8 +399,7 @@ func rewriteCast(cast io.Reader, out io.Writer, spans map[string][]span) error {
 	return nil
 }
 
-// castWidth reads the width of the terminal from the header of a cast, or
-// from a resize event.
+// castWidth reads the terminal width from the header of a cast, or from a resize event.
 func castWidth(line []byte) (int, bool) {
 	var header struct {
 		Term struct {
@@ -501,9 +479,7 @@ func secretSpans(blob []byte, rules *scrubRuleSet) []span {
 
 	spans = append(spans, keyBlockSpans(blob)...)
 
-	// Every match counts. A small one inside a large one is no reason to
-	// drop the large one: the prompt of a pager after a line of a private key
-	// reads like a key and its value.
+	// Every match counts, a small one inside a large one is no reason to drop the large one.
 	slices.SortFunc(spans, func(a, b span) int { return a.start - b.start })
 	return mergeSpans(spans)
 }
@@ -521,29 +497,19 @@ func secretSpan(rule scrubRule, m []int) (int, int) {
 	return m[0], m[1]
 }
 
-// keyBlockGap is how much may stand between two lines of a private key: a
-// line break, the prompt of a pager, the line number of an editor, or a
-// whole other line the editor redraws while it scrolls.
+// keyBlockGap is how much may stand between two lines of a private key: a prompt, a line number, a redrawn line.
 const keyBlockGap = 512
 
 var (
 	keyBlockMark = regexp.MustCompile(`-----(BEGIN|END)[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----`)
-	// A line of a key is 64 characters or more. Anything much shorter is as
-	// likely a path that happens to follow a key on screen.
+	// A line of a key is 64 characters or more. Anything much shorter is as likely a path.
 	keyBlockLine = regexp.MustCompile(`[A-Za-z0-9+/]{40,}={0,2}`)
-	// The last line is as short as it comes out. Right before the END line
-	// anything counts, the line number of an editor may stand in between.
-	// Further away it has to be long enough not to be a word.
+	// The last line is as short as it comes out. Further from the END line it has to be long enough not to be a word.
 	keyBlockLast = regexp.MustCompile(`([A-Za-z0-9+/=]{4,})[^A-Za-z0-9+/=]{0,12}(?:[0-9]{1,6}[^A-Za-z0-9+/=]{1,12})?$`)
 	keyBlockRest = regexp.MustCompile(`[A-Za-z0-9+/]{16,}={0,2}`)
 )
 
-// keyBlockSpans finds private key blocks: the BEGIN and END lines and the
-// lines of the key that follow one or lead up to the other. The gitleaks rule
-// takes everything from a BEGIN to the next END. In a terminal that is not
-// the key. An editor draws other lines of the screen in between, and a screen
-// that ends in the middle of a key shows no END at all. So a block is only
-// as long as its lines keep coming, and what stands between them stays.
+// keyBlockSpans takes only the lines of the key, not BEGIN to END. An editor draws other lines in between.
 func keyBlockSpans(blob []byte) []span {
 	marks := keyBlockMark.FindAllSubmatchIndex(blob, -1)
 	if len(marks) == 0 {
@@ -567,8 +533,7 @@ func keyBlockSpans(blob []byte) []span {
 				spans = append(spans, span{line[0], line[1]})
 				at = line[1]
 			}
-			// The last line, when an editor draws it some time after the
-			// one before it.
+			// The last line, when an editor draws it some time after the one before it.
 			if at > mark[1] {
 				spans = append(spans, keyBlockEnd(blob, at, min(len(blob), at+keyBlockGap))...)
 			}
@@ -584,8 +549,7 @@ func keyBlockSpans(blob []byte) []span {
 		if last := keyBlockLast.FindSubmatchIndex(blob[from:at]); last != nil {
 			spans = append(spans, span{from + last[2], from + last[3]})
 		}
-		// An editor that scrolls redraws its top line between the last
-		// line of the key and the END line, so no other mark bounds this.
+		// A scrolling editor redraws its top line between the last key line and END, so no other mark bounds this.
 		spans = append(spans, keyBlockEnd(blob, max(0, at-keyBlockGap), at)...)
 		before, _ := slices.BinarySearchFunc(lines, at, func(line []int, at int) int { return line[0] - at })
 		for _, line := range slices.Backward(lines[:before]) {
@@ -599,9 +563,7 @@ func keyBlockSpans(blob []byte) []span {
 	return spans
 }
 
-// keyBlockEnd finds the short last line of a key between from and to: after
-// its last full line, or before its END line. Other things may stand there
-// too, so only what has digits and both cases in it counts. A path has not.
+// keyBlockEnd finds the short last line of a key. Only what has digits and both cases counts, a path has not.
 func keyBlockEnd(blob []byte, from, to int) []span {
 	var spans []span
 	for _, rest := range keyBlockRest.FindAllIndex(blob[from:to], -1) {

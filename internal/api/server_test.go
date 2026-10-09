@@ -13,12 +13,9 @@ import (
 	"github.com/nokku-sh/nokku/internal/tenant"
 )
 
-// Session rows and audit events take the IP and the user agent from the
-// request context. The server sets them for every route. They used to be
-// missing on the plain HTTP ones, where the passkey and SSO sign-ins live.
+// The request meta used to be missing on the plain HTTP routes, where the passkey and SSO sign-ins live.
 func TestEveryRequestCarriesItsAddressAndHeaders(t *testing.T) {
-	// Self-hosted and never booted: every host is the one workspace, and
-	// nothing here reaches the database.
+	// Self-hosted and never booted: every host is the one workspace, and nothing here reaches the database.
 	cfg := &config.Config{Port: "3000", Tenant: &tenant.Resolver{}}
 	s := &Server{mux: http.NewServeMux(), cfg: cfg}
 	var got actor.RequestMeta

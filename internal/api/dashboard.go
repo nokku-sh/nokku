@@ -20,8 +20,7 @@ const (
 	dashboardChangesCap = 8
 )
 
-// routineActions happen on every login or session, they would drown the
-// changes an operator actually wants to see.
+// routineActions happen on every login or session, they would drown the changes an operator wants to see.
 var routineActions = []string{
 	"SignSSHCertificate",
 	"CreateSession",
@@ -119,8 +118,7 @@ func (s *dashboardService) GetDashboard(
 	return res, nil
 }
 
-// liveSessions merges browser terminals with open recordings. A recorded
-// browser terminal shows up in both, so the recording marks it instead.
+// liveSessions merges browser terminals with open recordings. A recorded terminal is in both, the recording marks it.
 func (s *dashboardService) liveSessions(
 	daemons []*db.ListDaemonsRow,
 	recordings []*db.ListOpenRecordingsRow,

@@ -138,8 +138,7 @@ export default function BaseLayout({
   );
 }
 
-// Go template syntax, rendered by internal/email. Empty settings drop their part,
-// so a self-hosted server never shows somebody else's company.
+// Go template syntax, rendered by internal/email. Empty settings drop their part.
 function InstanceFooter() {
   const o = CONSTANTS.OPERATOR;
   return (

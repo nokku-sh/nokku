@@ -29,8 +29,7 @@
 	let token = $state('');
 	let createdId = $state('');
 
-	// The account and its first token are two calls. If the second fails the
-	// account exists, so the sheet opens on its tokens and the toast says why.
+	// Two calls. If the token fails the account exists, so the sheet opens on its tokens and the toast says why.
 	async function onSubmit() {
 		const res = await createSA.mutateAsync({ ...model });
 		const id = res.serviceAccount?.id ?? '';

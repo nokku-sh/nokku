@@ -25,8 +25,7 @@ const (
 	inviteURL      = "/invite/verify?token="
 )
 
-// RequestMagicLink mails a sign-in link to a user of the workspace. It never
-// tells the caller whether the address exists.
+// RequestMagicLink never tells the caller whether the address exists.
 func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
 	if s.sendMagicLink == nil {
 		return nil
@@ -66,8 +65,7 @@ func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
 	return nil
 }
 
-// dropUnsent forgets a link whose mail did not go out. How often a link may
-// be asked for is the mail service's cooldown, nothing here counts as well.
+// dropUnsent forgets a link whose mail did not go out. Nothing here counts requests, the mail cooldown does.
 func (s *Service) dropUnsent(ctx context.Context, hash crypto.HashedToken, cause error) {
 	if !errors.Is(cause, emailverify.ErrCooldown) {
 		slog.Warn("link not sent", "error", cause)
@@ -96,8 +94,7 @@ func (s *Service) putLoginToken(
 	return baseURL(ctx) + loginVerifyURL + raw, hash, nil
 }
 
-// IssueBootstrapLink is how the first admin gets in before any passkey
-// exists. It replaces earlier links and lasts a day.
+// IssueBootstrapLink is how the first admin gets in before any passkey exists. It replaces earlier links.
 func (s *Service) IssueBootstrapLink(ctx context.Context, u *db.User) (string, error) {
 	var link string
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
@@ -112,8 +109,7 @@ func (s *Service) IssueBootstrapLink(ctx context.Context, u *db.User) (string, e
 	return link, err
 }
 
-// RequestSignupLink mails the link that creates an invited account. The
-// invite is checked now and spent when the link is used.
+// RequestSignupLink checks the invite now and spends it when the link is used.
 func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name string) error {
 	if s.sendSignupLink == nil {
 		return errors.New("iam: mail is not configured")
@@ -172,8 +168,7 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 	return ErrMailNotSent
 }
 
-// ConsumeMagicLink spends a sign-in or signup link and signs the browser
-// in. A signup link creates the account first.
+// ConsumeMagicLink spends a sign-in or signup link. A signup link creates the account first.
 func (s *Service) ConsumeMagicLink(ctx context.Context, raw string) (*db.User, *http.Cookie, error) {
 	hash := crypto.HashToken(raw)
 	var u *db.User

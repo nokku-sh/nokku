@@ -13,8 +13,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	// Encrypted columns need a cipher. This one makes a ciphertext readable
-	// in the tests that look at the stored bytes.
+	// Encrypted columns need a cipher. This one keeps a ciphertext readable in tests that look at the stored bytes.
 	_ = crypto.SetEncryptor(prefixCipher("enc:"))
 	stop := testenv.Postgres()
 	code := m.Run()
@@ -22,8 +21,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// prefixCipher marks its output with itself, so a blob made with another
-// prefix fails to decrypt.
+// prefixCipher marks its output with itself, so a blob made with another prefix fails to decrypt.
 type prefixCipher string
 
 func (c prefixCipher) Encrypt(plaintext []byte) ([]byte, error) {

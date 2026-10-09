@@ -21,8 +21,7 @@ func mapSlice[T, R any](in []T, fn func(T) R) []R {
 	return out
 }
 
-// jsonMap logs a malformed blob and returns an empty map, the row is still
-// readable without it.
+// jsonMap logs a malformed blob and returns an empty map, the row is still readable without it.
 func jsonMap(column string, raw []byte) map[string]string {
 	m := make(map[string]string)
 	if len(raw) == 0 {
@@ -216,9 +215,7 @@ func SeenRecently(t *time.Time) bool {
 	return t != nil && time.Since(*t) < DaemonOnlineWindow
 }
 
-// DefaultDaemonConfig is what a daemon enforces when nothing says otherwise.
-// nokkud's DefaultPolicy holds the same values for the time before its first
-// sync.
+// DefaultDaemonConfig must match nokkud's DefaultPolicy, which covers the time before its first sync.
 func DefaultDaemonConfig() *nokkuv1.DaemonConfig {
 	return &nokkuv1.DaemonConfig{
 		RecordSessions:       new(true),
@@ -228,8 +225,7 @@ func DefaultDaemonConfig() *nokkuv1.DaemonConfig {
 	}
 }
 
-// ResolveDaemonConfig fills the fields cfg leaves unset with the defaults, so
-// the daemon, the API and the UI never read an unset field differently.
+// ResolveDaemonConfig fills unset fields, so the daemon, the API and the UI never read one differently.
 func ResolveDaemonConfig(cfg *nokkuv1.DaemonConfig) *nokkuv1.DaemonConfig {
 	resolved := DefaultDaemonConfig()
 	if cfg != nil {

@@ -13,8 +13,7 @@ import (
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 )
 
-// A provider and the SCIM tokens decide who signs in as anyone, the owner
-// included. An admin who could change them could become the owner.
+// A provider and the SCIM tokens decide who signs in as anyone. An admin who could change them could become owner.
 func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	ctx := t.Context()

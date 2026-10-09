@@ -35,8 +35,7 @@ func newTestPool(t *testing.T) *Pool {
 	return New(t.Context(), stubConn{}, live.New())
 }
 
-// waitRelayPending blocks until the request goroutine's pending entry exists,
-// so registerRelay in the test cannot win the race it isn't testing.
+// waitRelayPending waits for the pending entry, so registerRelay cannot win a race the test isn't about.
 func waitRelayPending(t *testing.T, p *Pool, relayID string) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)
@@ -54,9 +53,7 @@ func waitRelayPending(t *testing.T, p *Pool, relayID string) {
 	}
 }
 
-// TestPool_ReconnectStorm hammers RegisterDaemon/UnregisterDaemon with the
-// same daemon IDs from many goroutines, as a reconnect storm would: each
-// registration cancels its predecessor's connection.
+// A reconnect storm: each registration cancels its predecessor's connection.
 func TestPool_ReconnectStorm(t *testing.T) {
 	p := newTestPool(t)
 
@@ -118,8 +115,7 @@ func TestPool_PokeStorm(t *testing.T) {
 	wg.Wait()
 }
 
-// TestPool_PokeCoalesces verifies a burst of pokes collapses into one queued
-// StateUpdate per daemon, and only reaches the poked workspace.
+// A burst of pokes collapses into one queued StateUpdate per daemon, and only reaches the poked workspace.
 func TestPool_PokeCoalesces(t *testing.T) {
 	p := newTestPool(t)
 	c := p.registerDaemon(t.Context(), "d1", "w1")
@@ -142,8 +138,7 @@ func TestPool_PokeCoalesces(t *testing.T) {
 	}
 }
 
-// TestPool_PokeKeepsControlMessages verifies coalescing state updates never
-// drops a control message queued on the same connection.
+// Coalescing state updates never drops a control message queued on the same connection.
 func TestPool_PokeKeepsControlMessages(t *testing.T) {
 	p := newTestPool(t)
 	c := p.registerDaemon(t.Context(), "d1", "w1")
@@ -171,9 +166,7 @@ func TestPool_PokeKeepsControlMessages(t *testing.T) {
 	}
 }
 
-// TestPool_RelayRequestRace races RequestRelay (which may time out and
-// clean up its pending entry and slot) against RegisterRelay (which closes
-// the pending channel), the relay counterpart of the session request race.
+// RequestRelay may time out and clean up while RegisterRelay closes the pending channel.
 func TestPool_RelayRequestRace(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -214,9 +207,7 @@ func TestPool_RelayRequestRace(t *testing.T) {
 	}
 }
 
-// TestPool_RelayCap verifies the per-principal cap: the over-limit request is
-// refused before anything reaches the daemon, other principals are unaffected,
-// and released slots become available again.
+// The over-limit request is refused before anything reaches the daemon, and released slots come back.
 func TestPool_RelayCap(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -242,8 +233,7 @@ func TestPool_RelayCap(t *testing.T) {
 		t.Fatalf("over-cap request: err=%v, want ErrRelayLimit", err)
 	}
 
-	// A different principal is unaffected: the request gets past the cap and
-	// fails on the (never registered) pending wait instead.
+	// A different principal gets past the cap and fails on the never registered pending wait instead.
 	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 	if _, err := p.RequestRelay(ctx, "d1", "other", "u2", ""); errors.Is(err, ErrRelayLimit) {
@@ -253,8 +243,7 @@ func TestPool_RelayCap(t *testing.T) {
 	for i := range maxRelaysPerPrincipal {
 		p.UnregisterRelay(fmt.Sprintf("r%d", i))
 	}
-	// Reusable, but the pending wait still needs a bound since nothing will
-	// register this relay.
+	// Reusable, but the pending wait still needs a bound since nothing will register this relay.
 	ctx2, cancel2 := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel2()
 	if _, err := p.RequestRelay(ctx2, "d1", "again", "u1", ""); errors.Is(err, ErrRelayLimit) {
@@ -262,9 +251,7 @@ func TestPool_RelayCap(t *testing.T) {
 	}
 }
 
-// A daemon that reads nothing has a full send buffer. A request behind it
-// ends with its own context instead of waiting out the send timeout, and
-// leaves nothing held.
+// A request behind a daemon that reads nothing ends with its own context and leaves nothing held.
 func TestPool_RelayRequestEndsWithItsContext(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		p := newTestPool(t)
@@ -287,8 +274,7 @@ func TestPool_RelayRequestEndsWithItsContext(t *testing.T) {
 	})
 }
 
-// TestPool_RelayBridging walks a relay through the full request/register
-// lifecycle and pushes bytes both directions through its channels.
+// A relay through the full request and register lifecycle, with bytes in both directions.
 func TestPool_RelayBridging(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -348,8 +334,7 @@ func TestPool_RelayBridging(t *testing.T) {
 	}
 }
 
-// TestPool_UnregisterDaemonClosesRelays verifies a daemon disconnect tears
-// down its relays and frees their slots.
+// A daemon disconnect tears down its relays and frees their slots.
 func TestPool_UnregisterDaemonClosesRelays(t *testing.T) {
 	p := newTestPool(t)
 	c := p.registerDaemon(t.Context(), "d1", "w1")
@@ -383,8 +368,7 @@ func TestPool_UnregisterDaemonClosesRelays(t *testing.T) {
 	}
 }
 
-// A disconnect tears down exactly that daemon's sessions and relays, and
-// leaves no index entry behind.
+// A disconnect tears down exactly that daemon's sessions and relays, and leaves no index entry behind.
 func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 	p := newTestPool(t)
 	c1 := p.registerDaemon(t.Context(), "d1", "w1")

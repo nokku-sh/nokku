@@ -2,11 +2,7 @@ import { Button, Heading, Hr, Link, Section, Text } from "react-email";
 import { CONFIG } from "../constants/vars";
 import BaseLayout from "../layouts/BaseLayout";
 
-/**
- * Marketing email for release digests. Static HTML by design. The exported
- * file (out/changelog.html) is meant to be uploaded to Resend as-is, no
- * template variables. Update the version/date and list, re-export, and paste.
- */
+/** Static HTML by design, no template variables. out/changelog.html is uploaded to Resend as-is. */
 export default function Changelog() {
   return (
     <BaseLayout preview="Nokku 0.14 is out: SAML support, faster policy sync, and more." type="marketing">

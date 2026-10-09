@@ -33,8 +33,7 @@ import (
 
 type uploadStream = connect.ClientStreamForClientSimple[nokkuv1.UploadRecordingRequest, nokkuv1.UploadRecordingResponse]
 
-// openUpload starts a recording upload the way nokkud does and sends the
-// metadata. Canceling ctx is a daemon that dies.
+// openUpload starts an upload the way nokkud does. Canceling ctx is a daemon that dies.
 func openUpload(
 	ctx context.Context,
 	t *testing.T,
@@ -60,8 +59,7 @@ func sendChunk(stream *uploadStream, chunk []byte) error {
 	return stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Chunk{Chunk: chunk}})
 }
 
-// uploadMiB sends a recording of that many MiB and returns the answer the
-// daemon got. Zeros are no gzip stream, so the scrub gives up on them.
+// uploadMiB returns the answer the daemon got. Zeros are no gzip stream, so the scrub gives up on them.
 func uploadMiB(
 	t *testing.T,
 	cfg *config.Config,
@@ -96,8 +94,7 @@ func storedBytes(t *testing.T, cfg *config.Config, id string) int64 {
 	return n
 }
 
-// An upload ends at the limit, whatever the daemon sends. What arrived is
-// kept and the daemon is told not to try again.
+// An upload ends at the limit. What arrived is kept and the daemon is told not to try again.
 func TestUploadRecordingEndsAtTheLimit(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -166,8 +163,7 @@ func TestUploadRecordingKeepsWhatADeadDaemonSent(t *testing.T) {
 	assert.EqualValues(t, whole.Len(), storedBytes(t, cfg, id))
 }
 
-// The part a dead daemon left is scrubbed, it may be all there ever is. The
-// whole file the daemon sends later replaces it and is scrubbed as well.
+// The part a dead daemon left is scrubbed, it may be all there ever is. So is the whole file that replaces it.
 func TestCutRecordingIsScrubbed(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -237,9 +233,7 @@ func TestCutRecordingIsScrubbed(t *testing.T) {
 	assert.NotContains(t, stored(), "VhT9xNq2mLb4Zw")
 }
 
-// A session that is uploaded late keeps the time it began. A start from a
-// clock that was wrong counts as now, or retention would take the recording
-// the moment it arrives.
+// A late upload keeps the time it began. A start from a wrong clock counts as now, or retention would take it at once.
 func TestLateUploadKeepsItsStartTime(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -282,8 +276,7 @@ func TestLateUploadKeepsItsStartTime(t *testing.T) {
 		"a start from a clock at zero")
 }
 
-// The same when storage cannot even open the object. The row exists by then,
-// and it used to stay open.
+// The same when storage cannot even open the object. The row exists by then, and it used to stay open.
 func TestUploadRecordingIsClosedWhenStorageCannotOpen(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -307,8 +300,7 @@ func TestUploadRecordingIsClosedWhenStorageCannotOpen(t *testing.T) {
 	assert.Zero(t, rec.SizeBytes, "nothing was stored")
 }
 
-// When storage fails the daemon is told so, and the recording is closed with
-// nothing stored. Left open it would count as a live session.
+// When storage fails the recording is closed with nothing stored. Left open it would count as a live session.
 func TestUploadRecordingIsClosedWhenStorageFails(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -317,15 +309,13 @@ func TestUploadRecordingIsClosedWhenStorageFails(t *testing.T) {
 
 	stream := openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
 	require.NoError(t, sendChunk(stream, make([]byte, 32<<10)))
-	// The object is written next to where it ends up. Without that directory
-	// the commit fails.
+	// The object is written next to where it ends up. Without that directory the commit fails.
 	dir := filepath.Join(os.Getenv("NOKKU_LOCAL_STORAGE_PATH"), filepath.Dir(storage.RecordingPath(workspaceID, id)))
 	require.Eventually(t, func() bool {
 		_, err := os.Stat(dir)
 		return err == nil
 	}, 5*time.Second, 20*time.Millisecond, "the upload never opened its object")
-	// The upload keeps writing while the directory goes, so this may need
-	// another go. A file in its place keeps it from coming back.
+	// The upload keeps writing while the directory goes, so this may need another go.
 	require.Eventually(t, func() bool { return os.RemoveAll(dir) == nil },
 		5*time.Second, 20*time.Millisecond, "the storage directory would not go")
 	require.NoError(t, os.WriteFile(dir, nil, 0o600))
@@ -340,8 +330,7 @@ func TestUploadRecordingIsClosedWhenStorageFails(t *testing.T) {
 	assert.Zero(t, rec.SizeBytes, "nothing was stored")
 }
 
-// cappedStorage is the storage cap of a hosted plan, a self-hosted instance
-// has none.
+// cappedStorage is the storage cap of a hosted plan, a self-hosted instance has none.
 type cappedStorage struct{ recording.Limits }
 
 const testStorageCap = 10 << 20
@@ -350,8 +339,7 @@ func (cappedStorage) RecordingStorageBytes(context.Context, string) (int64, erro
 	return testStorageCap, nil
 }
 
-// capStorage runs the test server with that cap. Recordings of earlier
-// tests would fill it, so they go first.
+// capStorage runs the test server with that cap. Recordings of earlier tests would fill it, so they go first.
 func capStorage(t *testing.T, cfg *config.Config) {
 	t.Helper()
 	owner, err := pgx.Connect(t.Context(), "")
@@ -364,8 +352,7 @@ func capStorage(t *testing.T, cfg *config.Config) {
 	t.Cleanup(func() { cfg.Record = uncapped })
 }
 
-// backdate makes a recording that many days old. Only the owner role may
-// rewrite a start time.
+// backdate makes a recording that many days old. Only the owner role may rewrite a start time.
 func backdate(t *testing.T, id string, days int) {
 	t.Helper()
 	owner, err := pgx.Connect(t.Context(), "")
@@ -376,9 +363,7 @@ func backdate(t *testing.T, id string, days int) {
 	require.NoError(t, err)
 }
 
-// Over the cap an upload pushes out old recordings, audited, and never one
-// from the last day. When that is not enough the workspace is full: the
-// upload is cut, the next one is refused, and both get in once there is room.
+// Over the cap an upload evicts old recordings, never one from the last day. A full workspace cuts and refuses.
 func TestRecordingStorageCap(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	capStorage(t, cfg)
@@ -469,8 +454,7 @@ func TestRecordingEvictionTakesNoMoreThanNeeded(t *testing.T) {
 	}
 }
 
-// Uploads that run side by side fill the cap together. Without that a
-// daemon could store the cap once per stream.
+// Uploads side by side fill the cap together, or a daemon could store the cap once per stream.
 func TestRecordingUploadsShareTheCap(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	capStorage(t, cfg)

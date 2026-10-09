@@ -44,8 +44,7 @@ func (p *Pool) Connect(
 	conn := p.registerDaemon(ctx, daemonID, daemon.WorkspaceID)
 	defer p.unregisterDaemon(daemonID, conn)
 
-	// The handler must join outDone: a Send after ServeHTTP returns panics on
-	// this goroutine, unrecovered, and kills the process.
+	// The handler must join outDone, a Send after ServeHTTP returns panics and kills the process.
 	outDone := make(chan struct{})
 	go func() {
 		defer close(outDone)
@@ -71,8 +70,7 @@ func (p *Pool) Connect(
 		}
 	}()
 
-	// A heartbeat with a stale state version gets a StateUpdate, so a daemon
-	// that missed a push catches up. Silence drops half-open connections.
+	// Silence drops half-open connections. A heartbeat with a stale state version gets a StateUpdate.
 	silence := time.AfterFunc(heartbeatDeadline, conn.cancel)
 	defer silence.Stop()
 	recvErr := make(chan error, 1)
@@ -106,8 +104,7 @@ func (p *Pool) Connect(
 	case err := <-recvErr:
 		retErr = err
 	}
-	// Stop the pump before joining it. The receive goroutine may outlive the
-	// handler briefly, which is safe since it only reads the body.
+	// Stop the pump before joining it. The receive goroutine may outlive the handler, it only reads the body.
 	conn.cancel()
 	<-outDone
 	return retErr

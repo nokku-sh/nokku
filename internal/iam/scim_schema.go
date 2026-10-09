@@ -1,7 +1,6 @@
 package iam
 
-// Attributes without a backing column are left out of the schemas so the
-// library rejects them instead of silently dropping data.
+// Attributes without a backing column are left out, so the library rejects them instead of dropping data.
 
 import (
 	scim "github.com/elimity-com/scim"

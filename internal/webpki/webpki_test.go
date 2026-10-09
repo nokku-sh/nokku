@@ -23,7 +23,6 @@ import (
 
 const testHost = "nokku.test"
 
-// testCA returns a CA certificate and its key.
 func testCA(t *testing.T, name string) (*x509.Certificate, *ecdsa.PrivateKey) {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -82,8 +81,7 @@ func TestBehindAProxyNothingIsServedOrAdvertised(t *testing.T) {
 	assert.Nil(t, id.TLSConfig(), "the listener stays plain for the proxy")
 }
 
-// The pin is what mon/trust computes on the client: sha256 over the public
-// key of the certificate, in hex.
+// The pin is what mon/trust computes on the client: sha256 over the public key, in hex.
 func TestPinIsOfTheFirstCertificate(t *testing.T) {
 	clearEnv(t)
 	current, _ := testCA(t, "current")
@@ -131,8 +129,7 @@ func TestModeIsCheckedOnParse(t *testing.T) {
 	require.ErrorContains(t, m.UnmarshalText([]byte("acme")), "it takes internal")
 }
 
-// The built-in CA is the one clients see, a second one would only confuse
-// which pin is right.
+// The built-in CA is the one clients see, a second one would only confuse which pin is right.
 func TestInternalModeTakesNoCAFile(t *testing.T) {
 	t.Setenv("NOKKU_TLS_CA", "/etc/nokku/ca.pem")
 	_, err := New(t.Context(), nil, ModeInternal, testHost)

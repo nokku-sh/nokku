@@ -117,9 +117,7 @@ const INDENT = 20;
 
 const fixed = { draggable: false, selectable: false, connectable: false };
 
-// Lanes are plain sorted lists, so every position is arithmetic. Whatever does
-// not fit a section folds into its "more" row, which carries the edges of the
-// rows it hides, so the overview never drops access silently.
+// Lanes are plain sorted lists. What does not fit folds into a "more" row that carries the edges of what it hides.
 export function buildGraph(view: View, actions: Actions): { nodes: Node[]; links: Link[] } {
 	const { overview, focused, focus } = view;
 	const nodes: Node[] = [];
@@ -191,8 +189,7 @@ export function buildGraph(view: View, actions: Actions): { nodes: Node[]; links
 			});
 			y += height + GAP;
 		};
-		// Splits one section into the rows that show and a "more" row for the
-		// rest. The focused row and the open ones always show.
+		// Splits a section into the rows that show and a "more" row. The focused row and the open ones always show.
 		const fold = <T>(section: Section, all: T[], key: (item: T) => string) => {
 			const visible = all.slice(0, view.shown[section]);
 			const rest = all.slice(view.shown[section]);
@@ -250,8 +247,7 @@ export function buildGraph(view: View, actions: Actions): { nodes: Node[]; links
 				continue;
 			}
 			if (view.members.length === 0) who.label(`m:${s.id}:empty`, { text: 'No members' }, true);
-			// Members inherit the team's access, so they light up with it, unless
-			// the focus is one person.
+			// Members inherit the team's access, so they light up with it, unless the focus is one person.
 			for (const m of view.members.slice(0, view.shown.members)) {
 				const isFocus = focus?.kind === 'user' && focus.id === m.id;
 				who.row(`m:${s.id}:${m.id}`, {
@@ -377,8 +373,7 @@ function subjectDetail(s: AccessGraphSubject) {
 	return s.kind === SubjectKind.USER && s.name ? s.email : undefined;
 }
 
-// Every link draws as a quiet ribbon as thick as its target count. The part
-// the focus reaches draws again on top.
+// Every link draws as a quiet ribbon as thick as its target count. The part the focus reaches draws again on top.
 export function drawEdges(links: Link[], focused: boolean, hovered?: string): Edge[] {
 	const max = Math.max(1, ...links.map((l) => l.base));
 	const width = (targets: number) => 1.5 + 8.5 * Math.sqrt(Math.min(targets, max) / max);

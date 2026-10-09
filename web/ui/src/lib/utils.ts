@@ -133,10 +133,7 @@ export function enumLabel(value: string | undefined): string {
 		.join(' ');
 }
 
-/**
- * The command that signs nk in at this server. nk goes to app.nokku.sh unless
- * told otherwise, and the pin lets it trust a server behind a private CA.
- */
+/** nk goes to app.nokku.sh unless told otherwise, and the pin lets it trust a server behind a private CA. */
 export function nkLoginCommand(caPin?: string): string {
 	return [
 		'nk login',

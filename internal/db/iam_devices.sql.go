@@ -150,8 +150,7 @@ type SeenKnownDeviceParams struct {
 	Key    string    `json:"key"`
 }
 
-// Recognizes a device of the user and notes the visit. No row means the
-// account has not signed in from it before.
+// Recognizes a device of the user and notes the visit. No row means the account has not signed in from it.
 func (q *Queries) SeenKnownDevice(ctx context.Context, arg *SeenKnownDeviceParams) (string, error) {
 	row := q.db.QueryRow(ctx, seenKnownDevice, arg.Now, arg.UserID, arg.Key)
 	var id string

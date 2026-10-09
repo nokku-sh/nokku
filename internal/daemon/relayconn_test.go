@@ -6,8 +6,7 @@ import (
 	"testing"
 )
 
-// The daemon queues its last bytes and closes right after, so a closed relay
-// must still hand them out.
+// The daemon queues its last bytes and closes right after, so a closed relay must still hand them out.
 func TestRelayConn_ReadDrainsAfterClose(t *testing.T) {
 	for range 50 {
 		relay := &Relay{toUser: make(chan []byte, relayBufferSize), closed: make(chan struct{})}

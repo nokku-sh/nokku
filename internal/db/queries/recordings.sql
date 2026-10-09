@@ -1,7 +1,5 @@
 -- name: CreateRecording :one
--- The daemon names the start of a session it uploads late. A start before the
--- daemon enrolled or in the future is a clock that was wrong, and counts as
--- now, or retention would take the recording at once.
+-- A start before the daemon enrolled or in the future is a wrong clock and counts as now, or retention would take it.
 INSERT INTO
   recordings (id, daemon_id, daemon_name, username, subject_id, principal, key, started_at)
 SELECT

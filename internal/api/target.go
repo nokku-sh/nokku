@@ -238,8 +238,7 @@ func (s *targetService) GetTargetPrincipals(
 	return &nokkuv1.GetTargetPrincipalsResponse{Principals: principals}, nil
 }
 
-// SyncTargetUsers is the daemonless report. It never deletes accounts, so a
-// failed report cannot lock anyone out.
+// SyncTargetUsers is the daemonless report. It never deletes accounts, so a failed report cannot lock anyone out.
 func (s *targetService) SyncTargetUsers(
 	ctx context.Context,
 	req *nokkuv1.SyncTargetUsersRequest,
@@ -493,8 +492,7 @@ func (s *targetService) GetTargetFilters(
 	}, nil
 }
 
-// GetAccessGraph backs the topology page. Everything is counted in one
-// grouped query, so the response stays small whatever the workspace size.
+// GetAccessGraph counts everything in one grouped query, so the response stays small whatever the workspace size.
 func (s *targetService) GetAccessGraph(
 	ctx context.Context,
 	req *nokkuv1.GetAccessGraphRequest,
@@ -543,8 +541,7 @@ func (s *targetService) GetAccessGraph(
 			}
 		}
 
-		// A user who only has access through teams holds nothing, but the
-		// caller still needs their name.
+		// A user who only has access through teams holds nothing, but the caller still needs their name.
 		if id := filter.GetSubjectId(); id != "" {
 			held[id] += 0
 		}

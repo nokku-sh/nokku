@@ -15,7 +15,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// ssoService manages the OIDC providers of the workspace.
 type ssoService struct {
 	cfg *config.Config
 }
@@ -39,16 +38,13 @@ func (s *ssoService) PutSSOProvider(
 	ctx context.Context,
 	req *nokkuv1.PutSSOProviderRequest,
 ) (*nokkuv1.PutSSOProviderResponse, error) {
-	// The hosted service only reaches a provider over TLS. On plain http
-	// whoever sits on the path answers as the provider and signs in as
-	// anyone. A self-hosted lab may run its provider without.
+	// The hosted service only reaches a provider over TLS. On plain http whoever sits on the path signs in as anyone.
 	if s.cfg.SaaS {
 		if u, err := url.Parse(req.GetIssuerUrl()); err != nil || u.Scheme != "https" {
 			return nil, newError(connect.CodeInvalidArgument, "the issuer URL has to start with https://")
 		}
 	}
-	// sub values are only unique per issuer, so a new issuer makes the old
-	// identity mappings stale.
+	// sub values are only unique per issuer, so a new issuer makes the old identity mappings stale.
 	issuerChanged := false
 	if prev, err := s.cfg.IAM.GetSSOProvider(ctx, req.GetProviderId()); err == nil {
 		issuerChanged = prev.OIDC.IssuerURL != req.GetIssuerUrl()
@@ -69,8 +65,7 @@ func (s *ssoService) PutSSOProvider(
 		return nil, err
 	}
 	if issuerChanged {
-		// Don't fail the saved update, but be loud: stale identities stay
-		// valid until this is retried.
+		// Don't fail the saved update, but be loud: stale identities stay valid until this is retried.
 		if _, err := s.cfg.IAM.PurgeProviderIdentities(ctx, req.GetProviderId()); err != nil {
 			slog.Error("purging identities after issuer change failed", "error", err, "provider", req.GetProviderId())
 		}

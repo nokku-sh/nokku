@@ -1,8 +1,4 @@
-// Package iam owns identity: users, credentials, sessions, and one-time
-// tokens. It never answers "may this actor do X".
-//
-// Every call runs inside the workspace the request's host named. A session,
-// credential or token of another workspace is simply not found.
+// Package iam owns identity and never answers "may this actor do X". Every call runs inside the request's workspace.
 package iam
 
 import (
@@ -73,7 +69,6 @@ type Deps struct {
 	// CanJoin gates new users on the seat cap. used is read in the creating tx.
 	CanJoin func(ctx context.Context, workspaceID string, used int64) error
 
-	// The mails iam sends, in the shape of the email service's methods.
 	// SendMagicLink mails a sign-in link. Unset, the login page offers none.
 	SendMagicLink func(ctx context.Context, userID, email, link, expiry string) error
 	// SendSignupLink mails the link that creates an invited account.
@@ -90,8 +85,7 @@ type Service struct {
 	canJoin func(ctx context.Context, workspaceID string, used int64) error
 	strict  bool
 	idp     *http.Client // guarded, see egress.NewClient
-	// flowAEAD seals the state of browser flows into their cookie. XChaCha,
-	// since anyone can start a flow and random nonces must never run out.
+	// flowAEAD seals flow state into its cookie. XChaCha, anyone can start a flow and random nonces must never run out.
 	flowAEAD cipher.AEAD
 	// spent holds the ids of flows that ended in a login, see spendFlow.
 	spent *cache.Memory
@@ -149,7 +143,6 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 	return s, nil
 }
 
-// MagicLinkEnabled is whether the login page may offer a sign-in link.
 func (s *Service) MagicLinkEnabled() bool {
 	return s.sendMagicLink != nil
 }
@@ -181,8 +174,7 @@ func (s *Service) record(ctx context.Context, e event) {
 	})
 }
 
-// notifyNewDevice mails the account about a sign-in from a device it has not
-// used before. Detached, the sign-in does not wait for the mail.
+// notifyNewDevice is detached, the sign-in does not wait for the mail.
 func (s *Service) notifyNewDevice(ctx context.Context, u *db.User, deviceID, name, ip string) {
 	if s.sendNewLogin == nil {
 		return

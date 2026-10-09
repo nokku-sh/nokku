@@ -35,12 +35,10 @@ import (
 	"github.com/nokku-sh/nokku/internal/webpki"
 )
 
-// BaseURL is the public address as NOKKU_BASE_URL gives it: a host name with
-// an optional port. There is no scheme to give, see FullURL.
+// BaseURL is NOKKU_BASE_URL, a host name with an optional port. There is no scheme, see FullURL.
 type BaseURL string
 
-// UnmarshalText refuses what cannot work. An IP address is one of them, a
-// browser takes no passkey for it.
+// UnmarshalText refuses an IP address too, a browser takes no passkey for it.
 func (b *BaseURL) UnmarshalText(text []byte) error {
 	raw := strings.ToLower(strings.TrimSpace(string(text)))
 	if strings.ContainsAny(raw, "/?#@ ") {
@@ -68,17 +66,11 @@ type EnvConfig struct {
 	BaseURL BaseURL `env:"NOKKU_BASE_URL"`
 	Port    string  `env:"NOKKU_PORT"     envDefault:"3000"`
 	Secret  string  `env:"NOKKU_SECRET"`
-	// TLSMode is set when the server holds the certificate itself. Unset, a
-	// proxy in front does.
+	// TLSMode is set when the server holds the certificate itself. Unset, a proxy in front does.
 	TLSMode webpki.Mode `env:"NOKKU_TLS"`
-	// UIDev is the Vite dev server the UI comes from while someone works on
-	// it, like http://localhost:5173. The browser still talks to this server
-	// only, so every address is the one a real install has. Unset, the
-	// embedded build is served.
+	// UIDev is the Vite dev server the UI comes from. The browser still only talks to this server.
 	UIDev url.URL `env:"NOKKU_UI_DEV"`
-	// SaaS runs the hosted service: a workspace per subdomain, plans from
-	// Stripe subscriptions. Unset, the server is self-hosted with one
-	// workspace and its plan from the license key.
+	// SaaS runs the hosted service. Unset, the server is self-hosted with one workspace.
 	SaaS           bool `env:"NOKKU_SAAS"`
 	Debug          bool
 	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
@@ -101,8 +93,7 @@ type Config struct {
 	Tenant       *tenant.Resolver
 	WebPKI       *webpki.Identity
 
-	// BootstrapLink signs the self-hosted owner in while they have no passkey.
-	// The server shows it once it listens, so it is the last thing in the log.
+	// BootstrapLink signs the self-hosted owner in while they have no passkey. It is logged last.
 	BootstrapLink string
 }
 
@@ -126,8 +117,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Web terminal tickets only, written by signed-in members. Everything an
-	// anonymous caller can write to has a store of its own.
+	// Web terminal tickets only. Everything an anonymous caller can write to has a store of its own.
 	cfg.Cache = cache.NewMemory(10_000)
 	cfg.Live = live.New()
 	go cfg.Live.Listen(ctx, cfg.Conn.Pool.Config().ConnConfig)
@@ -138,8 +128,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	// Set before anything encrypts. The keyset is wrapped by the KMS key, or
-	// by a key derived from NOKKU_SECRET.
+	// Set before anything encrypts. The keyset is wrapped by the KMS key or a key derived from NOKKU_SECRET.
 	enc, err := kms.New(ctx, cfg.Conn, cfg.Secret)
 	if err != nil {
 		return nil, err
@@ -170,13 +159,11 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		cfg.Entitlements.WatchLicense(ctx)
 	}
 
-	// An expired license still starts. The data is encrypted under the KMS
-	// key, so refusing here would turn a late renewal into an outage.
+	// An expired license still starts, refusing here would turn a late renewal into an outage.
 	if !cfg.SaaS && enc.UsesKMS() && cfg.Entitlements.License() == nil {
 		return nil, fmt.Errorf("external KMS requires an Enterprise license")
 	}
-	// The resolver runs before every request. Self-host makes its one
-	// workspace here, the hosted service reads it off the subdomain.
+	// Self-host makes its one workspace here, the hosted service reads it off the subdomain.
 	cfg.Tenant, err = tenant.New(ctx, cfg.Conn, cfg.FullURL(), cfg.SaaS)
 	if err != nil {
 		return nil, err
@@ -187,8 +174,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	}
 	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Storage, cfg.Entitlements, cfg.Audit)
 
-	// Its own derived key, so the DPoP nonce HMAC never shares one with the
-	// keyset wrap.
+	// Its own derived key, so the DPoP nonce HMAC never shares one with the keyset wrap.
 	nonceKey, err := hkdf.Key(sha256.New, []byte(cfg.Secret), nil, "nokku dpop nonce v1", 32)
 	if err != nil {
 		return nil, err
@@ -202,8 +188,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		StrictEmail:  cfg.SaaS,
 		SendNewLogin: cfg.Email.SendNewLoginEmail,
 	}
-	// Without mail there are no links, the login page then offers passkeys
-	// and the workspace's providers only.
+	// Without mail there are no links, the login page then offers passkeys and providers only.
 	if cfg.Email.HasSMTP() {
 		deps.SendMagicLink = cfg.Email.SendMagicLinkEmail
 		deps.SendSignupLink = cfg.Email.SendSignupLinkEmail
@@ -230,10 +215,7 @@ func (c *EnvConfig) Mode() string {
 	return "self_hosted"
 }
 
-// FullURL is the public address. NOKKU_BASE_URL names the host, and the port
-// when it is not 443. The scheme is never configured: it is https, and plain
-// http only on localhost without NOKKU_TLS, where nothing leaves the
-// machine. Unset, it is the local listener.
+// FullURL is the public address. The scheme is never configured, plain http only on localhost without NOKKU_TLS.
 func (c *EnvConfig) FullURL() string {
 	if c.Hostname() == "localhost" && c.TLSMode == webpki.ModeOff {
 		return "http://" + c.hostPort()
@@ -241,7 +223,6 @@ func (c *EnvConfig) FullURL() string {
 	return "https://" + c.hostPort()
 }
 
-// Hostname is the public host name without the port.
 func (c *EnvConfig) Hostname() string {
 	name, _, _ := strings.Cut(c.hostPort(), ":")
 	return name

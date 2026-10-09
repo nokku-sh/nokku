@@ -92,8 +92,7 @@ func TestMagicLinkSignIn(t *testing.T) {
 	mail.empty(t, "an address of workspace a gets no mail from workspace b")
 }
 
-// The mail service holds back a second link inside its cooldown. A link
-// nobody got must not stay valid.
+// The mail service holds back a second link inside its cooldown. A link nobody got must not stay valid.
 func TestUnsentMagicLinkIsDropped(t *testing.T) {
 	var link string
 	e := newTestEnvWith(t, iam.Deps{SendMagicLink: func(_ context.Context, _, _, l, _ string) error {
@@ -150,8 +149,7 @@ func TestSignupLinkCreatesInvitedUser(t *testing.T) {
 	require.ErrorIs(t, e.svc.RequestSignupLink(ctx, invite, "late@"+testDomain(), ""), iam.ErrInviteSpent)
 }
 
-// The invite page must not say "check your email" for a mail that failed. On
-// cooldown the earlier link is still out there, so that one stays a success.
+// The invite page must not say "check your email" for a mail that failed. On cooldown the earlier link still works.
 func TestUnsentSignupLinkIsAnError(t *testing.T) {
 	var link string
 	sendErr := errors.New("smtp send: 535 Authentication Failed")

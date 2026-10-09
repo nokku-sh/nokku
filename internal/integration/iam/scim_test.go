@@ -138,8 +138,7 @@ func TestSCIMUserLifecycle(t *testing.T) {
 	assert.Nil(t, e.credential(t, o.ws, iam.MethodSCIM, "", "okta-42"), "the IdP link survived deprovisioning")
 }
 
-// The IdP cannot switch the workspace owner off. Okta and Entra deactivate
-// with PATCH, PUT and POST carry the same flag.
+// The IdP cannot switch the owner off. Okta and Entra deactivate with PATCH, PUT and POST carry the same flag.
 func TestSCIMKeepsTheOwnerActive(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)

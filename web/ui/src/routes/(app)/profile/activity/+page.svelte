@@ -32,8 +32,7 @@
 	const me = user.self();
 	const view = $derived(page.url.searchParams.get('view') ?? 'all');
 
-	// The personal log has no server side filter, the views narrow what is
-	// loaded so far.
+	// The personal log has no server side filter, the views narrow what is loaded so far.
 	const feed = user.activityFeed(() => !!me.data?.id);
 	const loaded = $derived(feed.data?.pages.flatMap((p) => p.logs) ?? []);
 	const total = $derived(feed.data?.pages[0]?.total ?? 0);

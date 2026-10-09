@@ -163,7 +163,6 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 
 	config := db.ResolveDaemonConfig(ws.Settings.GetDefaultDaemonConfig())
 	for i := range n.daemons {
-		// Every fourth still waits for approval.
 		status := nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
 		if i%4 == 3 {
 			status = nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING
@@ -186,8 +185,7 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 	return nil
 }
 
-// grant gives a server a few accounts, and each account some users, teams
-// and service accounts that may sign in as it.
+// grant gives a server a few accounts, each with some subjects that may sign in as it.
 func grant(ctx context.Context, q *db.Queries, targetID string, who subjects) error {
 	for _, username := range sample(usernames, 1+roll(3)) {
 		p, err := q.CreateTargetAccount(ctx, &db.CreateTargetAccountParams{TargetID: targetID, Username: username})
@@ -211,7 +209,6 @@ func grant(ctx context.Context, q *db.Queries, targetID string, who subjects) er
 	return nil
 }
 
-// roll is a number below n.
 func roll(n int) int {
 	return rand.IntN(n) //nolint:gosec // fake data, nothing here is a secret
 }
@@ -220,8 +217,6 @@ func pick[T any](s []T) T {
 	return s[roll(len(s))]
 }
 
-// sample returns up to n elements of s in random order.
-//
 //nolint:gosec // fake data, nothing here is a secret
 func sample[T any](s []T, n int) []T {
 	out := slices.Clone(s)

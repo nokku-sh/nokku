@@ -146,8 +146,7 @@ export const SupportRoutes: Record<string, RouteItem[]> = {
 	Support: [{ title: 'Documentation', url: DocsURL, icon: BookText }]
 };
 
-/** The pages themselves, without the groups that only hold children. A page
- * without a role of its own takes the group's. */
+/** The pages without the groups that only hold children. A page without a role of its own takes the group's. */
 function leaves(items: RouteItem[], role?: WorkspaceRole): RouteItem[] {
 	return items.flatMap((item) => {
 		const own = item.role ?? role;

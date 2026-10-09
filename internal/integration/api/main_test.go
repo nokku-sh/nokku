@@ -43,8 +43,7 @@ var (
 	testServer *httptest.Server
 )
 
-// TestMain keeps a developer's shell env from pointing the test server at
-// real Stripe, KMS, S3, SMTP, or identity providers.
+// TestMain keeps a developer's shell env from pointing the test server at real Stripe, KMS, S3, SMTP or providers.
 func TestMain(m *testing.M) {
 	for _, key := range []string{
 		"NOKKU_BASE_URL",
@@ -80,8 +79,7 @@ func TestMain(m *testing.M) {
 		stop()
 		os.Exit(1)
 	}
-	// Self-host mode: every request lands in the one workspace the boot
-	// made, whatever the host. Bidi streams need HTTP/2.
+	// Self-host mode: every request lands in the one workspace, whatever the host. Bidi streams need HTTP/2.
 	testServer = httptest.NewUnstartedServer(api.New(testCfg).Handler(ctx))
 	testServer.EnableHTTP2 = true
 	testServer.StartTLS()
@@ -94,14 +92,12 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// newTestAPI returns the real config and the server a client talks to: every
-// route behind the production middleware and interceptors.
+// newTestAPI returns the real config and a server with every route behind the production middleware.
 func newTestAPI(t *testing.T) (*config.Config, *httptest.Server) {
 	t.Helper()
 	return testCfg, testServer
 }
 
-// workspaceName is the name the workspace has in the database right now.
 func workspaceName(ctx context.Context, conn *db.Connection) (string, error) {
 	ws, err := conn.Tenant().GetWorkspace(ctx)
 	if err != nil {
@@ -110,15 +106,13 @@ func workspaceName(ctx context.Context, conn *db.Connection) (string, error) {
 	return ws.Name, nil
 }
 
-// seedWorkspace is the one workspace the test server serves. Tests share it
-// and tell their rows apart by fresh ids.
+// seedWorkspace is the one workspace the test server serves. Tests tell their rows apart by fresh ids.
 func seedWorkspace(t *testing.T, cfg *config.Config) string {
 	t.Helper()
 	return cfg.Tenant.Single().ID
 }
 
-// seedOtherWorkspace makes a workspace no request can reach. What lives in
-// it must never show up through the API.
+// seedOtherWorkspace makes a workspace no request can reach. What lives in it must never show up through the API.
 func seedOtherWorkspace(t *testing.T, cfg *config.Config) string {
 	t.Helper()
 	ws, err := tenant.Create(t.Context(), cfg.Conn, uuid.NewV7().String(), "other")
@@ -126,8 +120,7 @@ func seedOtherWorkspace(t *testing.T, cfg *config.Config) string {
 	return ws.ID
 }
 
-// inWorkspace runs fn the way a request does: nokku_app, pinned to the
-// workspace. Seeds go through it, so each lands in the workspace it names.
+// inWorkspace runs fn the way a request does: nokku_app, pinned to the workspace.
 func inWorkspace(t *testing.T, cfg *config.Config, workspaceID string, fn func(q *db.Queries) error) {
 	t.Helper()
 	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: workspaceID})
@@ -169,7 +162,6 @@ func seedOwner(t *testing.T, cfg *config.Config) *db.User {
 	return owner
 }
 
-// sessionFor signs the user in and returns the session token.
 func sessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 	t.Helper()
 	_, token, err := cfg.IAM.IssueToken(wsCtx(t, cfg), iam.TokenParams{
@@ -181,8 +173,7 @@ func sessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 	return token
 }
 
-// seedMember adds a user with role to the workspace and returns a session
-// token for them. The owner is shared, there is only one.
+// seedMember adds a user with role and returns a session token for them.
 func seedMember(t *testing.T, cfg *config.Config, workspaceID string, role nokkuv1.WorkspaceRole) string {
 	t.Helper()
 	if role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER {

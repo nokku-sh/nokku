@@ -35,10 +35,7 @@ type Enrolled struct {
 	Config   *nokkuv1.DaemonConfig
 }
 
-// Enroll runs pinned to the workspace of the host the daemon dialed, so a
-// token of another workspace is never found. Only a new daemon spends a use.
-// The quota check runs between the two transactions since nesting its own
-// reads would let parallel enrollments exhaust the pool.
+// Enroll checks the quota between its two transactions. Nested, parallel enrollments could exhaust the pool.
 func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, error) {
 	parsed, err := crypto.Parse(in.Token)
 	if err != nil || parsed.ID == "" {

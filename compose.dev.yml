@@ -1,5 +1,4 @@
-# Only used for development (do not use). The tests do not read this file,
-# they start their own containers, see internal/integration/testenv.
+# Development only. The tests start their own containers, see internal/integration/testenv.
 services:
   postgres:
     image: docker.io/postgres:18-alpine
@@ -30,8 +29,7 @@ services:
   vault:
     image: docker.io/hashicorp/vault:2.1.2
     container_name: vault
-    # TLS with a self-signed cert, nokku only talks https to Vault.
-    # Clients set VAULT_SKIP_VERIFY=true.
+    # TLS with a self-signed cert, nokku only talks https to Vault. Clients set VAULT_SKIP_VERIFY=true.
     command: ["server", "-dev", "-dev-tls"]
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: "root"

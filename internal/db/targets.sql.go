@@ -503,8 +503,7 @@ type UpdateTargetReportParams struct {
 	TargetID  string   `json:"targetId"`
 }
 
-// What a daemon reports about its host on every sync. Unchanged values must
-// not rewrite the row.
+// What a daemon reports about its host on every sync. Unchanged values must not rewrite the row.
 func (q *Queries) UpdateTargetReport(ctx context.Context, arg *UpdateTargetReportParams) error {
 	_, err := q.db.Exec(ctx, updateTargetReport, arg.Endpoints, arg.Metadata, arg.TargetID)
 	return err

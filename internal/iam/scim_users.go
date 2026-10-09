@@ -1,7 +1,6 @@
 package iam
 
-// SCIM Users are the workspace's users. The SCIM id is the user id,
-// userName is the email, and externalId lives in the credentials table.
+// SCIM Users are the workspace's users: id is the user id, userName the email, externalId is in credentials.
 
 import (
 	"context"
@@ -130,8 +129,7 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 		return scim.Resource{}, err
 	}
 	if !changed {
-		// RFC 7644 3.5.2 wants no content for a no-op, which the library
-		// renders from an empty resource.
+		// RFC 7644 3.5.2 wants no content for a no-op, which the library renders from an empty resource.
 		return scim.Resource{}, nil
 	}
 	return h.apply(r.Context(), id, name, active, externalID)

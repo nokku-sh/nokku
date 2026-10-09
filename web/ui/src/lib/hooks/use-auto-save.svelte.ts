@@ -2,8 +2,7 @@ import { useDebounce } from 'runed';
 
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
-// useAutoSave only tracks state for inline indicators, errors still go
-// through the global mutation toast.
+// useAutoSave only tracks state for inline indicators, errors still go through the global mutation toast.
 export function useAutoSave(save: () => Promise<unknown>, wait = 600) {
 	let inFlight = $state(false);
 	let failed = $state(false);

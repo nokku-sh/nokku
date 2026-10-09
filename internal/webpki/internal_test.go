@@ -49,8 +49,7 @@ func TestInternalCertificateIsForTheHost(t *testing.T) {
 	require.Error(t, verify(cert.Leaf, ca.root, "other.test"))
 }
 
-// A machine that installs the root trusts it for Nokku only. Whoever gets
-// hold of the key cannot sign for the bank of the people who did.
+// Whoever gets hold of the key cannot sign for anything but Nokku.
 func TestInternalRootSignsForNothingElse(t *testing.T) {
 	ca := testIssuer(t)
 	sign := func(tmpl, parent *x509.Certificate, parentKey *ecdsa.PrivateKey) (*x509.Certificate, *ecdsa.PrivateKey) {
@@ -122,8 +121,7 @@ func TestRootFits(t *testing.T) {
 	assert.False(t, rootFits(ca.root, testHost, now.Add(rootLifetime-rootRenewBefore+time.Hour)))
 }
 
-// The next root has the key of the old one. A client that still holds the old
-// root accepts the server all the same, and its pin stays right.
+// The next root has the key of the old one, so a client holding the old root still accepts the server.
 func TestNextRootKeepsOldClientsWorking(t *testing.T) {
 	ca := testIssuer(t)
 	old := ca.root

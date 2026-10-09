@@ -8,8 +8,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// sink implementations that talk to the network must queue and retry off the
-// request path, a dead destination must not stall a login.
+// A sink that talks to the network queues and retries off the request path.
 type sink interface {
 	Append(ctx context.Context, event *Event) error
 }

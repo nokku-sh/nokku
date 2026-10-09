@@ -40,12 +40,12 @@
 		const picked = parseRole(slug);
 		if (!picked || picked === currentRole || !update) return;
 
-		optimistic = picked; // Optimistically update the UI
+		optimistic = picked;
 		saving = true;
 		try {
 			await update(picked);
 		} catch {
-			optimistic = undefined; // Revert to the server value
+			optimistic = undefined;
 		} finally {
 			saving = false;
 		}

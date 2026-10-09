@@ -1,7 +1,5 @@
 -- name: GetAccessGraph :many
--- One row per node and edge of the graph, told apart by the by_ flags. The
--- row with none set is the total. A target with several tags counts under
--- each of them, an untagged one under ''.
+-- One row per node and edge of the graph, told apart by the by_ flags. The row with none set is the total.
 WITH
   matched AS (
     SELECT
@@ -127,8 +125,7 @@ GROUP BY
   u.tag;
 
 -- name: ListAccessGraphTargets :many
--- The targets of one tag, the ones with a matching grant first. The filter is
--- the one GetAccessGraph takes, so a tag filter only matches its own tag.
+-- The targets of one tag, the ones with a matching grant first. The filter is the one GetAccessGraph takes.
 SELECT
   t.id,
   t.name,

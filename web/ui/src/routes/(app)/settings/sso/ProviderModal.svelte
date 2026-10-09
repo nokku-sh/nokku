@@ -38,8 +38,7 @@
 		};
 	}
 
-	// The form is reset for each open, from the provider when editing one.
-	// An effect, since the parent opens this and bits-ui only reports its own changes.
+	// Reset for each open. An effect, since the parent opens this and bits-ui only reports its own changes.
 	$effect(() => {
 		if (!open) return;
 		clientSecret = '';

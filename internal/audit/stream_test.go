@@ -13,8 +13,7 @@ import (
 	"time"
 )
 
-// newTestSink builds a sink with fixed destinations and no database or
-// refresher, so delivery behaviour can be tested on its own.
+// newTestSink has fixed destinations and no database or refresher.
 func newTestSink(destinations map[string]destination) *webhookSink {
 	s := &webhookSink{
 		client:  &http.Client{Timeout: 5 * time.Second},

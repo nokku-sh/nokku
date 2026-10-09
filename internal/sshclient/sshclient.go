@@ -52,8 +52,7 @@ type Terminal struct {
 // Stdout is closed when the terminal ends.
 func (t *Terminal) Stdout() <-chan []byte { return t.stdout }
 
-// Exited reports whether the remote shell ended on its own, e.g. exit or
-// Ctrl+D. It is final once Stdout is closed.
+// Exited reports whether the remote shell ended on its own. It is final once Stdout is closed.
 func (t *Terminal) Exited() bool { return t.exited.Load() }
 
 func (t *Terminal) Write(p []byte) (int, error) { return t.ch.Write(p) }
@@ -130,8 +129,7 @@ func dial(conn net.Conn, cfg Config) (*Terminal, error) {
 		return fail("open session channel", err)
 	}
 
-	// env before pty-req: the daemon's recorder starts on pty-req and reads
-	// the session id from the environment.
+	// env before pty-req: the daemon's recorder starts on pty-req and reads the session id from the environment.
 	env := struct{ Name, Value string }{sessionEnvVar, cfg.SessionID}
 	if _, err = ch.SendRequest("env", true, ssh.Marshal(env)); err != nil {
 		return fail("env request", err)
@@ -194,9 +192,7 @@ func (t *Terminal) pump() {
 	}
 }
 
-// drainRequests takes what the remote queued without blocking. The exit
-// status is sent before the channel closes, so it is queued by the time Read
-// reports the end.
+// drainRequests does not block. The exit status is queued by the time Read reports the end.
 func (t *Terminal) drainRequests() {
 	for {
 		select {

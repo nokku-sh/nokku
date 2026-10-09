@@ -5,8 +5,7 @@ import (
 	"testing"
 )
 
-// setProxies resets the package-level trusted proxy list and returns a
-// cleanup that restores the empty (secure) default.
+// setProxies restores the empty, secure default after the test.
 func setProxies(t *testing.T, proxies ...string) {
 	t.Helper()
 	if err := SetTrustedProxies(proxies); err != nil {
@@ -231,8 +230,7 @@ func TestSetTrustedProxies(t *testing.T) {
 	}
 }
 
-// A relay reports the client itself, so the address must not be collapsed to
-// its /64 like the rate limit key is.
+// A relay reports the client itself, so the address must not be collapsed to its /64.
 func TestClientIPKeepsTheHost(t *testing.T) {
 	setProxies(t, "10.0.0.1")
 	tests := []struct {

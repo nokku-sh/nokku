@@ -49,8 +49,7 @@ func (s *accountService) UpdateAccount(
 	return &nokkuv1.UpdateAccountResponse{User: u.ToProto()}, nil
 }
 
-// RequestEmailChange mails the confirm link to the new address and a notice
-// with the cancel link to the current one.
+// RequestEmailChange mails the confirm link to the new address and a cancel link to the current one.
 func (s *accountService) RequestEmailChange(
 	ctx context.Context,
 	req *nokkuv1.RequestEmailChangeRequest,
@@ -164,8 +163,7 @@ func (s *accountService) ListAccountSessions(
 			Ip:         new(sess.Ip),
 		})
 	}
-	// The list also shows where the account is remembered. Those rows are
-	// no sessions, they only carry the kind the UI lists them under.
+	// The list also shows where the account is remembered. Those rows are no sessions.
 	devices, err := s.cfg.IAM.ListDevices(ctx)
 	if err != nil {
 		return nil, errInternal

@@ -13,8 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// invitationService is the mailed way into a workspace. The passkey way
-// goes through /passkey/signup with the same invite.
+// invitationService is the mailed way into a workspace. The passkey way is /passkey/signup with the same invite.
 type invitationService struct {
 	cfg *config.Config
 }

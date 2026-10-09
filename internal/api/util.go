@@ -120,7 +120,6 @@ func (s *utilService) ListAuditLogs(
 	return &nokkuv1.ListAuditLogsResponse{Logs: eventLogs(events), Total: &total, RetentionDays: &retention}, nil
 }
 
-// ListMyActivity is the caller's own events in this workspace.
 func (s *utilService) ListMyActivity(
 	ctx context.Context,
 	req *nokkuv1.ListMyActivityRequest,
@@ -176,8 +175,7 @@ var auditOutcomes = map[nokkuv1.AuditOutcome]string{
 	nokkuv1.AuditOutcome_AUDIT_OUTCOME_DENIED:      "denied",
 }
 
-// auditParams falls back to the last 14 days without dates. The workspace
-// is filled in by the audit service from the context.
+// auditParams falls back to the last 14 days without dates. The audit service fills in the workspace.
 func auditParams(f *nokkuv1.AuditLogFilter) *db.ListAuditLogsParams {
 	p := &db.ListAuditLogsParams{}
 	if len(f.GetActorIds()) > 0 {

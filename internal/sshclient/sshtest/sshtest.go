@@ -1,7 +1,4 @@
-// Package sshtest is an in-process SSH server for tests. It presents a host
-// certificate signed by a test CA, authenticates user certificates the same
-// way the daemon's sshd does, records session requests, and echoes stdin
-// back after the shell request.
+// Package sshtest is an in-process SSH server for tests. It authenticates like the daemon's sshd and echoes stdin.
 package sshtest
 
 import (
@@ -24,8 +21,7 @@ import (
 )
 
 type Server struct {
-	// UserPrincipal is the one subject the server lets in, as any account. A
-	// daemon gets a list of login principals per account instead.
+	// UserPrincipal is the one subject the server lets in, as any account.
 	UserPrincipal string
 	// HostPrincipal stands in for the daemon's target id.
 	HostPrincipal string
@@ -52,8 +48,7 @@ func NewServer(t testing.TB) *Server {
 	return NewServerFor(t, "target-1", "u1")
 }
 
-// NewServerFor serves a host cert for hostPrincipal and admits user certs
-// naming userPrincipal, for tests that run against real target and user ids.
+// NewServerFor is for tests that run against real target and user ids.
 func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
 	t.Helper()
 	_, caPriv, err := ed25519.GenerateKey(crand.Reader)
@@ -152,8 +147,7 @@ func caRow(t testing.TB, priv ed25519.PrivateKey) *db.SSHCA {
 	}
 }
 
-// UserSigner is a certificate for subject to log in as username here, the
-// way the backend signs one.
+// UserSigner is a certificate for subject to log in as username, the way the backend signs one.
 func (s *Server) UserSigner(t testing.TB, subject, username string) ssh.Signer {
 	t.Helper()
 	_, priv, err := ed25519.GenerateKey(crand.Reader)

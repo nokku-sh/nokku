@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-// cleanup hourly deletes expired access tokens, known devices and one-time
-// tokens of every workspace.
+// cleanup hourly deletes expired tokens and known devices of every workspace.
 func (s *Service) cleanup(ctx context.Context) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()

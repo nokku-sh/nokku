@@ -42,7 +42,6 @@ func startKeycloak(t *testing.T) string {
 	return base
 }
 
-// keycloakSetupRealm creates the test realm.
 func keycloakSetupRealm(realmBase string) error {
 	root := strings.TrimSuffix(realmBase, "/realms/"+keycloakRealm)
 

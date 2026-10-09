@@ -1,5 +1,4 @@
-// Command seed fills the first workspace of a development database with fake
-// data. It is not part of the release.
+// Command seed fills the first workspace of a dev database with fake data.
 package main
 
 import (
@@ -44,8 +43,7 @@ func main() {
 	}
 }
 
-// Only the database and the keys. The server may be running next to this, so
-// nothing of what it does at boot happens here.
+// Only the database and the keys, the server may be running next to this.
 func run(ctx context.Context, cmd *cli.Command) error {
 	ec, err := env.ParseAs[config.EnvConfig]()
 	if err != nil {

@@ -65,9 +65,7 @@ ORDER BY
   p.username ASC;
 
 -- name: InsertTargetAccounts :exec
--- Never deletes, a host's reported list is a hint, not authority. A target
--- that already holds max_accounts takes no more, so a host cannot grow the
--- table without bound.
+-- Never deletes, a host's list is a hint. A target that holds max_accounts takes no more.
 INSERT INTO
   target_accounts (workspace_id, target_id, username)
 SELECT
@@ -195,8 +193,7 @@ ORDER BY
   p.username;
 
 -- name: ListAccountSubjectsForTarget :many
--- Teams are expanded so the host needs no team knowledge. Users are joined,
--- not filtered, so an account that is inactive or not visible drops out.
+-- Teams are expanded so the host needs no team knowledge. Users are joined, so an inactive account drops out.
 SELECT
   p.username,
   array_agg(DISTINCT ids)::TEXT[] AS ids

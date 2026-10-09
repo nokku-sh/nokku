@@ -10,10 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// encryptedColumns is every column that holds ciphertext of the keyset. A
-// key rotation re-encrypts them all and then drops the old keys, so a column
-// missing here loses its data. TestEncryptedColumnsMatchSqlc checks the list
-// against sqlc.yaml.
+// encryptedColumns is every column holding keyset ciphertext. One missing here loses its data on a rotation.
 var encryptedColumns = []struct{ table, column string }{
 	{"ssh_cas", "private_key"},
 	{"sso_providers", "config"},
@@ -23,9 +20,7 @@ var encryptedColumns = []struct{ table, column string }{
 
 const reencryptBatch = 1000
 
-// Reencrypt passes every stored ciphertext that does not start with prefix
-// through convert and writes the result back. It runs in the caller's
-// transaction, so a failure changes nothing.
+// Reencrypt converts every ciphertext that does not start with prefix, in the caller's transaction.
 func (q *Queries) Reencrypt(ctx context.Context, prefix []byte, convert func([]byte) ([]byte, error)) error {
 	for _, c := range encryptedColumns {
 		for {
