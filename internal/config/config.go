@@ -173,6 +173,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Storage, cfg.Entitlements, cfg.Audit)
+	go daemon.RetireLoop(ctx, cfg.Conn, cfg.Audit.Record)
 
 	// Its own derived key, so the DPoP nonce HMAC never shares one with the keyset wrap.
 	nonceKey, err := hkdf.Key(sha256.New, []byte(cfg.Secret), nil, "nokku dpop nonce v1", 32)

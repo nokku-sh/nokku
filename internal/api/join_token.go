@@ -21,6 +21,9 @@ type joinTokenService struct {
 	cfg *config.Config
 }
 
+// defaultRetireAfter is how long an ephemeral daemon may be away before the sweep deletes it.
+const defaultRetireAfter = 15 * time.Minute
+
 // CreateJoinToken returns the "<id>_<secret>" plaintext once, only its hash is stored.
 func (s *joinTokenService) CreateJoinToken(
 	ctx context.Context,
@@ -40,10 +43,25 @@ func (s *joinTokenService) CreateJoinToken(
 		if req.GetRole() != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED {
 			return nil, newError(connect.CodeInvalidArgument, "enroll tokens take no role")
 		}
+		if req.GetRetireAfter() != nil && !req.GetEphemeral() {
+			return nil, newError(connect.CodeInvalidArgument, "retire_after needs an ephemeral token")
+		}
 		params.AutoApprove = req.GetAutoApprove()
 		params.CaID = req.CaId
+		params.Tags = req.GetTags()
+		params.Ephemeral = req.GetEphemeral()
+		if req.GetEphemeral() {
+			// A pending box would retire before anyone approves it.
+			params.AutoApprove = true
+			retire := defaultRetireAfter
+			if req.GetRetireAfter() != nil {
+				retire = req.GetRetireAfter().AsDuration()
+			}
+			params.RetireAfter = &retire
+		}
 	case nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE:
-		if req.GetAutoApprove() || req.GetCaId() != "" {
+		if req.GetAutoApprove() || req.GetCaId() != "" || req.GetEphemeral() ||
+			len(req.GetTags()) > 0 || len(req.GetGrants()) > 0 {
 			return nil, newError(connect.CodeInvalidArgument, "invite tokens take only a role")
 		}
 		role := cmp.Or(req.GetRole(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
@@ -61,26 +79,70 @@ func (s *joinTokenService) CreateJoinToken(
 	token := crypto.NewToken(params.ID)
 	params.TokenHash = token.Hash
 
-	created, err := s.cfg.Conn.Tenant().CreateJoinToken(ctx, params)
+	var created *db.JoinToken
+	err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
+		if created, err = q.CreateJoinToken(ctx, params); err != nil {
+			return err
+		}
+		return addJoinTokenGrants(ctx, q, created.ID, req.GetGrants())
+	})
+	if db.IsForeignKeyViolation(err) {
+		return nil, newError(connect.CodeInvalidArgument, "a grant names a subject that does not exist")
+	}
 	if err != nil {
 		return nil, err
 	}
 	audit.SetTarget(ctx, created.ID)
+	out := created.ToProto()
+	out.Grants = req.GetGrants()
 	return &nokkuv1.CreateJoinTokenResponse{
-		Token:  created.ToProto(),
+		Token:  out,
 		Secret: &token.Plaintext,
 	}, nil
+}
+
+// addJoinTokenGrants stores one row per subject, like AddSubjects does for a target account.
+func addJoinTokenGrants(ctx context.Context, q *db.Queries, tokenID string, grants []*nokkuv1.JoinTokenGrant) error {
+	for _, g := range grants {
+		subjects := map[string][]string{
+			db.SubjectKindUser:           g.GetUserIds(),
+			db.SubjectKindTeam:           g.GetTeamIds(),
+			db.SubjectKindServiceAccount: g.GetServiceAccountIds(),
+		}
+		for kind, ids := range subjects {
+			for _, id := range ids {
+				if err := q.AddJoinTokenGrant(ctx, &db.AddJoinTokenGrantParams{
+					TokenID:     tokenID,
+					Username:    g.GetUsername(),
+					SubjectKind: kind,
+					SubjectID:   id,
+				}); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (s *joinTokenService) ListJoinTokens(
 	ctx context.Context,
 	req *nokkuv1.ListJoinTokensRequest,
 ) (*nokkuv1.ListJoinTokensResponse, error) {
-	tokens, err := s.cfg.Conn.Tenant().ListJoinTokens(ctx, req.GetKind())
-	if err != nil {
+	var (
+		tokens []*db.JoinToken
+		grants []*db.ListJoinTokenGrantsRow
+	)
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
+		if tokens, err = q.ListJoinTokens(ctx, req.GetKind()); err != nil {
+			return err
+		}
+		grants, err = q.ListJoinTokenGrants(ctx)
+		return err
+	}); err != nil {
 		return nil, err
 	}
-	return &nokkuv1.ListJoinTokensResponse{Tokens: db.JoinTokensToProto(tokens)}, nil
+	return &nokkuv1.ListJoinTokensResponse{Tokens: db.JoinTokensToProto(tokens, grants)}, nil
 }
 
 // DeleteJoinToken keeps the daemons and members the token already brought in.

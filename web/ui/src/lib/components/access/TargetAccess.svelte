@@ -8,6 +8,7 @@
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
 	import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
 	import { Ellipsis, KeyRound, Plus, Search, SquareTerminal, Trash2 } from '@lucide/svelte';
@@ -148,6 +149,19 @@
 							<span class="truncate font-mono text-sm font-medium">{account.username}</span>
 							{#if account.username === 'root'}
 								<Badge variant="warning">Superuser</Badge>
+							{/if}
+							{#if !account.seenAt}
+								<Tooltip.Root>
+									<Tooltip.Trigger>
+										{#snippet child({ props })}
+											<span {...props}><Badge variant="muted">Not on the host</Badge></span>
+										{/snippet}
+									</Tooltip.Trigger>
+									<Tooltip.Content>
+										The host has not reported this account. Grants on it open nothing until it
+										exists there.
+									</Tooltip.Content>
+								</Tooltip.Root>
 							{/if}
 						</p>
 						<p class="truncate text-xs text-muted-foreground">{summary(grants)}</p>

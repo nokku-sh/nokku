@@ -2,7 +2,9 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -23,6 +25,8 @@ type EnrollInput struct {
 	// Binding is the DPoP key thumbprint.
 	Binding  string
 	Metadata []byte
+	// ReqMetadata is the host's own report. Its hostname may become the daemon's name.
+	ReqMetadata map[string]string
 	// CanCreate only runs for new machines, so re-enrolling works at the cap.
 	CanCreate func(ctx context.Context, workspaceID string) error
 }
@@ -71,6 +75,15 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		return out, err
 	}
 
+	// An ephemeral box that comes back under its name takes over from the one that went away. Before the
+	// quota, since the old one frees what the new one takes.
+	wanted, named := namegen.FromHostname(in.ReqMetadata["hostname"])
+	if token.Ephemeral && named {
+		if err := replaceOffline(ctx, conn, token.ID, wanted); err != nil {
+			return nil, err
+		}
+	}
+
 	if in.CanCreate != nil {
 		if err := in.CanCreate(ctx, token.WorkspaceID); err != nil {
 			return nil, err
@@ -82,20 +95,32 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		status = nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
 	}
 	config := db.ResolveDaemonConfig(workspace.Settings.GetDefaultDaemonConfig())
+	// The row carries it, see db.Daemon.EffectiveConfig.
+	config.Ephemeral = nil
+	report, err := json.Marshal(in.ReqMetadata)
+	if err != nil {
+		return nil, err
+	}
 
 	err = conn.TenantTx(ctx, func(q *db.Queries) error {
-		for range maxNameAttempts {
+		for attempt := range maxNameAttempts {
 			// A racing enrollment of the same key makes the insert a no-op.
 			if out, err = enrolledDaemon(ctx, q, in.Binding); err != nil || out != nil {
 				return err
 			}
-			// A taken name returns no row.
+			// The hostname gets one try, a taken name returns no row and the generator takes over.
+			name := namegen.Generate()
+			if attempt == 0 && named {
+				name = wanted
+			}
 			created, err := q.CreateDaemon(ctx, &db.CreateDaemonParams{
-				Name:          namegen.Generate(),
+				Name:          name,
 				Metadata:      in.Metadata,
 				Status:        status,
 				Config:        config,
 				KeyThumbprint: &in.Binding,
+				JoinTokenID:   &token.ID,
+				RetireAfter:   token.RetireAfter,
 			})
 			if errors.Is(err, pgx.ErrNoRows) {
 				continue
@@ -121,12 +146,17 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 			}); err != nil {
 				return err
 			}
+			if err := seedTarget(ctx, q, token, created.TargetID, report); err != nil {
+				return err
+			}
+			cfg := db.ResolveDaemonConfig(config)
+			cfg.Ephemeral = &token.Ephemeral
 			out = &Enrolled{
 				DaemonID: created.ID,
 				Name:     created.Name,
 				TargetID: created.TargetID,
 				Status:   status,
-				Config:   config,
+				Config:   cfg,
 			}
 			return nil
 		}
@@ -136,6 +166,45 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		return nil, err
 	}
 	return out, nil
+}
+
+// seedTarget is the only place a token's tags and grants reach a target. A re-enroll never gets here.
+func seedTarget(ctx context.Context, q *db.Queries, token *db.JoinToken, targetID string, report []byte) error {
+	if err := q.UpdateTargetReport(ctx, &db.UpdateTargetReportParams{
+		TargetID: targetID,
+		Metadata: report,
+	}); err != nil {
+		return err
+	}
+	if len(token.Tags) > 0 {
+		if _, err := q.UpdateTarget(ctx, &db.UpdateTargetParams{TargetID: targetID, Tags: token.Tags}); err != nil {
+			return err
+		}
+	}
+	return q.SeedTargetAccountsFromToken(ctx, &db.SeedTargetAccountsFromTokenParams{
+		TokenID:  token.ID,
+		TargetID: targetID,
+	})
+}
+
+// replaceOffline deletes the daemon an ephemeral token enrolled under this name, if it is gone. A live one
+// keeps its name and the newcomer gets a generated one.
+func replaceOffline(ctx context.Context, conn connection, tokenID, name string) error {
+	return conn.TenantTx(ctx, func(q *db.Queries) error {
+		old, err := q.GetOfflineDaemonByTokenAndName(ctx, &db.GetOfflineDaemonByTokenAndNameParams{
+			JoinTokenID: &tokenID,
+			Name:        name,
+			SeenBefore:  time.Now().Add(-db.DaemonOnlineWindow),
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		_, err = q.DeleteDaemon(ctx, old.ID)
+		return err
+	})
 }
 
 // enrolledDaemon returns nil for an unknown key. The key is the machine's identity.
@@ -156,6 +225,6 @@ func enrolledDaemon(ctx context.Context, q *db.Queries, binding string) (*Enroll
 		Name:     d.Name,
 		TargetID: target.ID,
 		Status:   d.Status,
-		Config:   db.ResolveDaemonConfig(d.Config),
+		Config:   d.EffectiveConfig(),
 	}, nil
 }

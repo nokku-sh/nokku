@@ -58,7 +58,10 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 		INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci');
 		INSERT INTO ssh_cas (workspace_id, name, private_key, public_key, not_before, not_after, key_bits)
 		VALUES ($1, 'ca', 'key', 'pub', NOW(), NOW() + INTERVAL '1 day', 256);
-		INSERT INTO join_tokens (id, workspace_id, kind, token_hash) VALUES (uuidv7(), $1, 1, 'hash');
+		WITH t AS (
+			INSERT INTO join_tokens (id, workspace_id, kind, token_hash) VALUES (uuidv7(), $1, 1, 'hash') RETURNING id
+		)
+		INSERT INTO join_token_grants (workspace_id, token_id, username, user_id) SELECT $1, id, 'dev', $2 FROM t;
 		INSERT INTO recordings (workspace_id, daemon_name, username, key) VALUES ($1, 'd', 'deploy', 'key');
 		INSERT INTO workspace_subscriptions (workspace_id) VALUES ($1);
 	`, pgx.QueryExecModeSimpleProtocol, f.ws, f.u)

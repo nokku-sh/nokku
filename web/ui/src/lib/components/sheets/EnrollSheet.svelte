@@ -21,6 +21,14 @@
 		(selfHosted ? `NOKKUD_API_URL=${location.origin} ` : '') + (pin ? `NOKKUD_API_PIN=${pin} ` : '')
 	);
 
+	function envFlags(token: string) {
+		return [
+			`NOKKUD_ENROLL_TOKEN='${token}'`,
+			...(selfHosted ? [`NOKKUD_API_URL=${location.origin}`] : []),
+			...(pin ? [`NOKKUD_API_PIN=${pin}`] : [])
+		];
+	}
+
 	function snippets(token: string) {
 		return [
 			{
@@ -92,6 +100,18 @@ runcmd:
   - ${installer} | sh
   - NOKKUD_ENROLL_TOKEN='${token}' ${apiEnv}nokkud enroll
   - systemctl restart nokkud`
+			},
+			{
+				value: 'container',
+				label: 'Container',
+				language: 'bash',
+				hint: 'The container enrolls itself on start and is reached through the relay, no port to open. An ephemeral token removes it again when it stops.',
+				code: [
+					'docker run -d --hostname alice \\',
+					...envFlags(token).map((e) => `  -e ${e} \\`),
+					'  ghcr.io/nokku-sh/nokkud',
+					'ssh dev@alice'
+				].join('\n')
 			}
 		];
 	}

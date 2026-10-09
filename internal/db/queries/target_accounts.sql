@@ -65,13 +65,15 @@ ORDER BY
   p.username ASC;
 
 -- name: InsertTargetAccounts :exec
--- Never deletes, a host's list is a hint. A target that holds max_accounts takes no more.
+-- Never deletes, a host's list is a hint. A target that holds max_accounts takes no more. The first report
+-- of an account stamps it seen, later ones leave the row alone.
 INSERT INTO
-  target_accounts (workspace_id, target_id, username)
+  target_accounts (workspace_id, target_id, username, seen_at)
 SELECT
   t.workspace_id,
   t.id,
-  d.username
+  d.username,
+  NOW()
 FROM
   targets t
   CROSS JOIN unnest(@usernames::TEXT[]) AS d (username)
@@ -85,7 +87,46 @@ WHERE
     WHERE
       p.target_id = t.id
   ) < @max_accounts::INTEGER
-ON CONFLICT (target_id, username) DO NOTHING;
+ON CONFLICT (target_id, username) DO UPDATE
+SET
+  seen_at = NOW()
+WHERE
+  target_accounts.seen_at IS NULL;
+
+-- name: SeedTargetAccountsFromToken :exec
+-- Copies an enroll token's grants onto a fresh target. Runs once, when the daemon is created.
+WITH
+  accounts AS (
+    INSERT INTO
+      target_accounts (workspace_id, target_id, username)
+    SELECT DISTINCT
+      g.workspace_id,
+      @target_id::UUID,
+      g.username
+    FROM
+      join_token_grants g
+    WHERE
+      g.token_id = @token_id
+    ON CONFLICT (target_id, username) DO UPDATE
+    SET
+      username = EXCLUDED.username
+    RETURNING
+      id,
+      username
+  )
+INSERT INTO
+  grants (account_id, user_id, team_id, service_account_id)
+SELECT
+  a.id,
+  g.user_id,
+  g.team_id,
+  g.service_account_id
+FROM
+  join_token_grants g
+  JOIN accounts a ON a.username = g.username
+WHERE
+  g.token_id = @token_id
+ON CONFLICT DO NOTHING;
 
 -- name: GetTargetAccountWorkspace :one
 SELECT

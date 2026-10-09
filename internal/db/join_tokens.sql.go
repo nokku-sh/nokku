@@ -13,6 +13,44 @@ import (
 	nokku "github.com/nokku-sh/protos/gen/nokku/v1"
 )
 
+const addJoinTokenGrant = `-- name: AddJoinTokenGrant :exec
+INSERT INTO
+  join_token_grants (token_id, username, user_id, team_id, service_account_id)
+VALUES
+  (
+    $1,
+    $2,
+    CASE
+      WHEN $3::TEXT = 'user' THEN $4::UUID
+    END,
+    CASE
+      WHEN $3::TEXT = 'team' THEN $4::UUID
+    END,
+    CASE
+      WHEN $3::TEXT = 'service_account' THEN $4::UUID
+    END
+  )
+ON CONFLICT DO NOTHING
+`
+
+type AddJoinTokenGrantParams struct {
+	TokenID     string `json:"tokenId"`
+	Username    string `json:"username"`
+	SubjectKind string `json:"subjectKind"`
+	SubjectID   string `json:"subjectId"`
+}
+
+// One row per subject, the kind picks the column like AddGrant.
+func (q *Queries) AddJoinTokenGrant(ctx context.Context, arg *AddJoinTokenGrantParams) error {
+	_, err := q.db.Exec(ctx, addJoinTokenGrant,
+		arg.TokenID,
+		arg.Username,
+		arg.SubjectKind,
+		arg.SubjectID,
+	)
+	return err
+}
+
 const createJoinToken = `-- name: CreateJoinToken :one
 INSERT INTO
   join_tokens (
@@ -24,7 +62,10 @@ INSERT INTO
     max_uses,
     auto_approve,
     ca_id,
-    role
+    role,
+    tags,
+    ephemeral,
+    retire_after
   )
 VALUES
   (
@@ -36,10 +77,13 @@ VALUES
     $6,
     $7,
     $8,
-    $9
+    $9,
+    COALESCE($10, '{}'::TEXT[]),
+    $11,
+    $12
   )
 RETURNING
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, ephemeral, retire_after, created_at, last_used_at
 `
 
 type CreateJoinTokenParams struct {
@@ -52,6 +96,9 @@ type CreateJoinTokenParams struct {
 	AutoApprove bool                 `json:"autoApprove"`
 	CaID        *string              `json:"caId"`
 	Role        *nokku.WorkspaceRole `json:"role"`
+	Tags        interface{}          `json:"tags"`
+	Ephemeral   bool                 `json:"ephemeral"`
+	RetireAfter *time.Duration       `json:"retireAfter"`
 }
 
 func (q *Queries) CreateJoinToken(ctx context.Context, arg *CreateJoinTokenParams) (*JoinToken, error) {
@@ -65,6 +112,9 @@ func (q *Queries) CreateJoinToken(ctx context.Context, arg *CreateJoinTokenParam
 		arg.AutoApprove,
 		arg.CaID,
 		arg.Role,
+		arg.Tags,
+		arg.Ephemeral,
+		arg.RetireAfter,
 	)
 	var i JoinToken
 	err := row.Scan(
@@ -79,6 +129,9 @@ func (q *Queries) CreateJoinToken(ctx context.Context, arg *CreateJoinTokenParam
 		&i.AutoApprove,
 		&i.CaID,
 		&i.Role,
+		&i.Tags,
+		&i.Ephemeral,
+		&i.RetireAfter,
 		&i.CreatedAt,
 		&i.LastUsedAt,
 	)
@@ -98,7 +151,7 @@ func (q *Queries) DeleteJoinToken(ctx context.Context, id string) error {
 
 const getLiveJoinToken = `-- name: GetLiveJoinToken :one
 SELECT
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, ephemeral, retire_after, created_at, last_used_at
 FROM
   join_tokens
 WHERE
@@ -133,15 +186,65 @@ func (q *Queries) GetLiveJoinToken(ctx context.Context, arg *GetLiveJoinTokenPar
 		&i.AutoApprove,
 		&i.CaID,
 		&i.Role,
+		&i.Tags,
+		&i.Ephemeral,
+		&i.RetireAfter,
 		&i.CreatedAt,
 		&i.LastUsedAt,
 	)
 	return &i, err
 }
 
+const listJoinTokenGrants = `-- name: ListJoinTokenGrants :many
+SELECT
+  token_id,
+  username,
+  subject_kind,
+  subject_id
+FROM
+  join_token_grants
+ORDER BY
+  token_id,
+  username,
+  subject_kind,
+  subject_id
+`
+
+type ListJoinTokenGrantsRow struct {
+	TokenID     string  `json:"tokenId"`
+	Username    string  `json:"username"`
+	SubjectKind *string `json:"subjectKind"`
+	SubjectID   *string `json:"subjectId"`
+}
+
+func (q *Queries) ListJoinTokenGrants(ctx context.Context) ([]*ListJoinTokenGrantsRow, error) {
+	rows, err := q.db.Query(ctx, listJoinTokenGrants)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListJoinTokenGrantsRow
+	for rows.Next() {
+		var i ListJoinTokenGrantsRow
+		if err := rows.Scan(
+			&i.TokenID,
+			&i.Username,
+			&i.SubjectKind,
+			&i.SubjectID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listJoinTokens = `-- name: ListJoinTokens :many
 SELECT
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, ephemeral, retire_after, created_at, last_used_at
 FROM
   join_tokens
 WHERE
@@ -174,6 +277,9 @@ func (q *Queries) ListJoinTokens(ctx context.Context, kind nokku.JoinTokenKind) 
 			&i.AutoApprove,
 			&i.CaID,
 			&i.Role,
+			&i.Tags,
+			&i.Ephemeral,
+			&i.RetireAfter,
 			&i.CreatedAt,
 			&i.LastUsedAt,
 		); err != nil {
@@ -205,7 +311,7 @@ WHERE
     OR uses < max_uses
   )
 RETURNING
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, ephemeral, retire_after, created_at, last_used_at
 `
 
 type RedeemJoinTokenParams struct {
@@ -230,6 +336,9 @@ func (q *Queries) RedeemJoinToken(ctx context.Context, arg *RedeemJoinTokenParam
 		&i.AutoApprove,
 		&i.CaID,
 		&i.Role,
+		&i.Tags,
+		&i.Ephemeral,
+		&i.RetireAfter,
 		&i.CreatedAt,
 		&i.LastUsedAt,
 	)
@@ -253,7 +362,7 @@ WHERE
     OR uses < max_uses
   )
 RETURNING
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, ephemeral, retire_after, created_at, last_used_at
 `
 
 type RedeemJoinTokenByIDParams struct {
@@ -277,6 +386,9 @@ func (q *Queries) RedeemJoinTokenByID(ctx context.Context, arg *RedeemJoinTokenB
 		&i.AutoApprove,
 		&i.CaID,
 		&i.Role,
+		&i.Tags,
+		&i.Ephemeral,
+		&i.RetireAfter,
 		&i.CreatedAt,
 		&i.LastUsedAt,
 	)

@@ -206,6 +206,10 @@ CREATE TABLE IF NOT EXISTS daemons (
   key_thumbprint TEXT,
   config JSONB NOT NULL DEFAULT '{}',
   metadata JSONB NOT NULL DEFAULT '{}',
+  -- The enroll token that made it, kept so a replacement of the same name is only ever its own.
+  join_token_id UUID,
+  -- Set from an ephemeral token. The sweep deletes the daemon this long after it was last seen.
+  retire_after INTERVAL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name),
@@ -300,18 +304,31 @@ CREATE TABLE IF NOT EXISTS join_tokens (
   auto_approve BOOLEAN NOT NULL DEFAULT FALSE, -- enroll only
   ca_id UUID, -- enroll only, NULL is the workspace default
   role INTEGER CHECK (role BETWEEN 1 AND 4), -- invite only, like users.role, never the owner
+  -- Enroll only. Copied onto the target once, when the daemon is created.
+  tags TEXT[] NOT NULL DEFAULT '{}',
+  -- Enroll only. Daemons of an ephemeral token retire this long after they were last seen.
+  ephemeral BOOLEAN NOT NULL DEFAULT FALSE,
+  retire_after INTERVAL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_used_at TIMESTAMPTZ,
+  UNIQUE (workspace_id, id),
   FOREIGN KEY (workspace_id, ca_id) REFERENCES ssh_cas (workspace_id, id) ON DELETE SET NULL (ca_id),
   CHECK (
     kind = 1
     OR (
       NOT auto_approve
       AND ca_id IS NULL
+      AND tags = '{}'
+      AND NOT ephemeral
     )
   ),
+  CHECK ((retire_after IS NULL) = (NOT ephemeral)),
   CHECK ((kind = 2) = (role IS NOT NULL))
 );
+
+-- A deleted token leaves its daemons, they keep retiring on the interval they copied.
+ALTER TABLE daemons
+ADD FOREIGN KEY (workspace_id, join_token_id) REFERENCES join_tokens (workspace_id, id) ON DELETE SET NULL (join_token_id);
 
 -- A local account on a target, like root or deploy. Grants hang off it.
 CREATE TABLE IF NOT EXISTS target_accounts (
@@ -319,6 +336,8 @@ CREATE TABLE IF NOT EXISTS target_accounts (
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   target_id UUID NOT NULL,
   username TEXT NOT NULL DEFAULT 'root', -- e.g. "root", "ubuntu", "ec2-user"
+  -- When the host first reported it. NULL is an account an admin or a token added that the host has not shown yet.
+  seen_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (target_id, username),
   UNIQUE (workspace_id, id),
@@ -347,6 +366,32 @@ CREATE TABLE IF NOT EXISTS grants (
   FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, service_account_id) REFERENCES service_accounts (workspace_id, id) ON DELETE CASCADE,
   UNIQUE NULLS NOT DISTINCT (account_id, user_id, team_id, service_account_id),
+  CHECK (num_nonnulls (user_id, team_id, service_account_id) = 1)
+);
+
+-- The grants an enroll token seeds on every target it makes. Same shape as grants, keyed by token and username.
+CREATE TABLE IF NOT EXISTS join_token_grants (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
+  token_id UUID NOT NULL,
+  username TEXT NOT NULL,
+  user_id UUID,
+  team_id UUID,
+  service_account_id UUID,
+  subject_kind TEXT GENERATED ALWAYS AS (
+    CASE
+      WHEN user_id IS NOT NULL THEN 'user'
+      WHEN team_id IS NOT NULL THEN 'team'
+      ELSE 'service_account'
+    END
+  ) STORED,
+  subject_id UUID GENERATED ALWAYS AS (COALESCE(user_id, team_id, service_account_id)) STORED,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  FOREIGN KEY (workspace_id, token_id) REFERENCES join_tokens (workspace_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, service_account_id) REFERENCES service_accounts (workspace_id, id) ON DELETE CASCADE,
+  UNIQUE NULLS NOT DISTINCT (token_id, username, user_id, team_id, service_account_id),
   CHECK (num_nonnulls (user_id, team_id, service_account_id) = 1)
 );
 
@@ -576,6 +621,7 @@ BEGIN
     'users',
     'sso_providers',
     'join_tokens',
+    'join_token_grants',
     'service_accounts',
     'daemons',
     'teams',
@@ -684,6 +730,7 @@ BEGIN
     'sso_providers',
     'workspace_subscriptions',
     'join_tokens',
+    'join_token_grants',
     'service_accounts',
     'daemons',
     'teams',
