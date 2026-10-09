@@ -31,14 +31,11 @@ import (
 const (
 	quotaCheckInterval = 1 << 20 // 1 MiB
 
-	// maxUploadBytes ends an upload. nokkud stops a recording at 50 MB, so
-	// only a daemon that ignores that gets this far.
+	// maxUploadBytes ends an upload. nokkud stops a recording at 50 MB, so only a daemon that ignores that gets here.
 	maxUploadBytes = 64 << 20
 )
 
-// daemonControlService is everything a daemon calls. Authorization only lets
-// daemons in, except for EnrollDaemon. Connect and DaemonRelay come from the
-// embedded pool.
+// daemonControlService is everything a daemon calls. Connect and DaemonRelay come from the embedded pool.
 type daemonControlService struct {
 	*nokkudaemon.Pool
 
@@ -57,8 +54,7 @@ func (s *daemonControlService) EnrollDaemon(
 	if !ok {
 		return nil, errInternal
 	}
-	// The session is bound to the daemon's DPoP key, so a stolen token is
-	// useless without it.
+	// The session is bound to the daemon's DPoP key, so a stolen token is useless without it.
 	binding, err := s.enrollBinding(ctx, ci)
 	if err != nil {
 		return nil, err
@@ -68,8 +64,7 @@ func (s *daemonControlService) EnrollDaemon(
 		Token:    req.GetToken(),
 		Binding:  binding,
 		Metadata: requestMetadata(ci.RequestHeader()),
-		// The token must verify before anything is spent on the cap, so it
-		// is checked here instead of in the guard.
+		// The token must verify before anything is spent on the cap, so it is checked here instead of in the guard.
 		CanCreate: func(ctx context.Context, workspaceID string) error {
 			return s.cfg.Entitlements.CheckResources(ctx, workspaceID)
 		},
@@ -123,8 +118,7 @@ func (s *daemonControlService) SyncDaemon(
 	}, nil
 }
 
-// SignHostCertificate signs the daemon's host key for its own target, under
-// the CA that target uses.
+// SignHostCertificate signs the daemon's host key for its own target, under the CA that target uses.
 func (s *daemonControlService) SignHostCertificate(
 	ctx context.Context,
 	req *nokkuv1.SignHostCertificateRequest,
@@ -184,8 +178,7 @@ func (s *daemonControlService) UploadRecording(
 		return nil, newError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
 
-	// Asked before the row exists, so a refused upload leaves nothing behind.
-	// The daemon keeps its file and tries again later.
+	// Asked before the row exists, so a refused upload leaves nothing behind. The daemon tries again later.
 	if !s.cfg.Record.MakeRoom(ctx, actor.WorkspaceIDFromContext(ctx), meta.GetRecordingId(), 0) {
 		return nil, errRecordingStorageFull
 	}
@@ -197,8 +190,7 @@ func (s *daemonControlService) UploadRecording(
 	uploaded := sync.OnceFunc(s.cfg.Record.BeginUpload(rec.ID))
 	defer uploaded()
 
-	// A daemon that dies takes ctx with it, and a canceled ctx would drop the
-	// object. What arrived by then is the evidence, so the writer outlives it.
+	// A daemon that dies takes ctx with it. What arrived by then is the evidence, so the writer outlives it.
 	wctx, abort := context.WithCancel(context.WithoutCancel(ctx))
 	defer abort()
 	w, err := s.cfg.Record.NewWriter(wctx, rec)
@@ -277,9 +269,7 @@ receive:
 	}, nil
 }
 
-// closeRecording ends the row however the upload went, or it would count as
-// a live session and as no bytes. A daemon that died took ctx with it, so
-// the write does not hang on it.
+// closeRecording ends the row however the upload went, or it would count as a live session and as no bytes.
 func (s *daemonControlService) closeRecording(
 	ctx context.Context,
 	id string,
@@ -328,9 +318,7 @@ func (s *daemonControlService) resolveUpload(
 		if t := rm.GetStartedAt(); t.IsValid() {
 			startedAt = new(t.AsTime())
 		}
-		// The host reports the principal it matched. It must name this
-		// daemon's target and the account of the session, or the recording
-		// would be filed under someone else.
+		// The reported principal must name this daemon's target and the session's account, or the recording is misfiled.
 		var subjectID *string
 		if rm.GetPrincipal() != "" {
 			target, err := q.GetTargetByDaemon(ctx, &daemonID)
@@ -377,8 +365,7 @@ func (s *daemonControlService) UnenrollDaemon(
 	return &nokkuv1.UnenrollDaemonResponse{}, nil
 }
 
-// enrollBinding returns the DPoP key thumbprint. A missing proof is an error,
-// daemons must enroll key-bound.
+// enrollBinding returns the DPoP key thumbprint. A missing proof is an error, daemons must enroll key-bound.
 func (s *daemonControlService) enrollBinding(ctx context.Context, ci connect.CallInfo) (string, error) {
 	svc := s.cfg.IAM
 	if svc.DPoP == nil {

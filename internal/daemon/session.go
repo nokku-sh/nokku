@@ -36,8 +36,7 @@ type SessionConfig struct {
 	ClientAddr string
 }
 
-// Session is one browser terminal. It belongs to the websocket that started
-// it and has no life of its own.
+// Session is one browser terminal. It belongs to the websocket that started it.
 type Session struct {
 	sessionID string
 	daemonID  string
@@ -62,15 +61,13 @@ func (s *Session) Resize(width, height uint32) error {
 	return s.term.Resize(width, height)
 }
 
-// Exited reports whether the shell ended on its own. It is final once Stdout
-// is closed.
+// Exited reports whether the shell ended on its own. It is final once Stdout is closed.
 func (s *Session) Exited() bool { return s.term.Exited() }
 
 // Close is idempotent.
 func (s *Session) Close() { s.close() }
 
-// StartSession lives until ctx ends, the shell ends, the daemon drops,
-// Close, or the TTL.
+// StartSession lives until ctx ends, the shell ends, the daemon drops, Close, or the TTL.
 func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, error) {
 	if cfg.CA == nil || !cfg.CA.IsActive {
 		return nil, ErrCAInactive

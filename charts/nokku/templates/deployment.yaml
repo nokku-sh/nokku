@@ -5,8 +5,7 @@ metadata:
   labels:
     {{- include "nokku.labels" . | nindent 4 }}
 spec:
-  # Nokku runs as one instance. Daemon streams, relays and web sessions live
-  # in its memory, so two pods would split them.
+  # Nokku runs as one instance. Streams, relays and web sessions live in its memory, two pods would split them.
   replicas: 1
   strategy:
     type: Recreate

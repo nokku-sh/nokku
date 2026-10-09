@@ -58,7 +58,7 @@ services:
       PGUSER: ${POSTGRES_USER:-nokku}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
       PGSSLMODE: disable
-      # Caddy runs on the same internal network; forwarded client headers are
+      # Caddy runs on the same internal network, forwarded client headers are
       # only honored from peers in this range.
       NOKKU_TRUSTED_PROXIES: 172.28.0.0/16
       # Local object storage (default backend), persisted on a volume.

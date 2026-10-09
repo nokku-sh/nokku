@@ -161,8 +161,7 @@ UPDATE service_accounts
 SET
   name = COALESCE($1, name),
   description = COALESCE($2, description),
-  -- 0 is unset and keeps the role. The column comes first in the condition,
-  -- sqlc types the parameter by its first use.
+  -- 0 is unset and keeps the role. The column comes first, sqlc types the parameter by its first use.
   role = CASE
     WHEN role = $3
     OR $3 = 0 THEN role

@@ -14,19 +14,14 @@ import (
 
 const upgradeURL = "https://nokku.sh/pricing"
 
-// procedureFeatures is the only place routes are gated, handlers never import
-// plan logic. guard_test.go fails when a catalog feature has no wiring here
-// or in conditionalFeature.
+// procedureFeatures is the only place routes are gated. guard_test.go fails on a catalog feature with no wiring.
 var procedureFeatures = map[string]string{
 	nokkuv1connect.UtilServiceExportAuditLogsProcedure: FeatureAuditExport,
 	// Listing and revoking must keep working after a downgrade.
 	nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure: FeatureSCIM,
 }
 
-// cappedCreate is the only place resource caps are wired, guard_test.go fails
-// when a create procedure is missing without an exemption. Seats are checked
-// in CanInvite. EnrollDaemon is gated in its handler since the workspace only
-// comes from the enroll token.
+// cappedCreate is the only place resource caps are wired. Seats are checked in CanInvite, EnrollDaemon in its handler.
 var cappedCreate = map[string]bool{
 	nokkuv1connect.TargetServiceCreateTargetProcedure:                    true,
 	nokkuv1connect.TeamServiceCreateTeamProcedure:                        true,
@@ -101,8 +96,7 @@ func (g *GuardInterceptor) checkResources(ctx context.Context, procedure string)
 	return g.ent.CheckResources(ctx, workspaceID)
 }
 
-// conditionalFeature never gates turning a feature off, a downgraded
-// workspace must be able to clean up.
+// conditionalFeature never gates turning a feature off, a downgraded workspace must be able to clean up.
 func conditionalFeature(procedure string, msg any) (string, bool) {
 	req, ok := msg.(*nokkuv1.UpdateWorkspaceRequest)
 	if !ok || procedure != nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure {

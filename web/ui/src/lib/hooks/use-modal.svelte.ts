@@ -30,13 +30,11 @@ export function createModalState<T>(defaultValue: T = {} as T) {
 	};
 }
 
-// $state only deep-proxies plain objects, protobuf messages are class
-// instances and would never re-render the form.
+// $state only deep-proxies plain objects, a protobuf message instance would never re-render the form.
 function plainClone<Desc extends DescMessage>(schema: Desc, entity: MessageShape<Desc>) {
 	const message = create(schema, $state.snapshot(entity) as MessageInitShape<Desc>);
 	const clone = structuredClone($state.snapshot(message)) as Record<string, unknown>;
-	// Unset fields with explicit presence keep their defaults on the prototype,
-	// which structuredClone drops, so copy them over as own values.
+	// Explicit presence fields keep their defaults on the prototype, which structuredClone drops. Copy them over.
 	for (const field of schema.fields) {
 		const value = (message as Record<string, unknown>)[field.localName];
 		if (clone[field.localName] === undefined && value !== undefined) {
@@ -52,8 +50,7 @@ export function newDraft<Desc extends DescMessage>(schema: Desc, init?: MessageI
 	return plainClone(schema, create(schema, init));
 }
 
-// useDraft gives an editable copy of a loaded entity. It only resets when a
-// different entity loads, so background refetches never clobber edits.
+// useDraft only resets when a different entity loads, so background refetches never clobber edits.
 export function useDraft<Desc extends DescMessage>(
 	schema: Desc,
 	source: () => MessageShape<Desc> | undefined

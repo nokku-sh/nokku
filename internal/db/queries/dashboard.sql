@@ -47,8 +47,7 @@ LIMIT
   3;
 
 -- name: ListOpenRecordings :many
--- A crashed daemon never closes its recordings, so only trust open ones
--- behind a daemon that is still connected.
+-- A crashed daemon never closes its recordings, so only trust open ones behind a connected daemon.
 SELECT
   r.id,
   d.id AS daemon_id,

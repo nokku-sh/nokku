@@ -10,10 +10,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-// The secret detection rules are the gitleaks default config, embedded as
-// the file it ships. Only the parts that apply to a terminal stream are
-// read: regex, keywords, entropy, secret group and regex allowlists. Path,
-// commit and stopword allowlists have nothing to match here.
+// The gitleaks default config as shipped. Only the parts that apply to a terminal stream are read.
 //
 //go:embed gitleaks.toml
 var gitleaksRules []byte
@@ -24,8 +21,7 @@ var gitleaksRules []byte
 var nokkuRules []byte
 
 type scrubAllowlist struct {
-	// target is what the regexes are matched against: the secret, or the
-	// whole match for "match" and "line".
+	// target is what the regexes are matched against: the secret, or the whole match for "match" and "line".
 	target  string
 	regexes []*regexp.Regexp
 }
@@ -42,8 +38,7 @@ type scrubRuleSet struct {
 	rules []scrubRule
 	// allowlists apply to every rule.
 	allowlists []scrubAllowlist
-	// keywords is one prefilter for all rules. A blob without any keyword
-	// skips every rule that has keywords.
+	// keywords is one prefilter for all rules. A blob without any keyword skips every rule that has keywords.
 	keywords *regexp.Regexp
 }
 
@@ -102,8 +97,7 @@ var scrubRules = sync.OnceValues(func() (*scrubRuleSet, error) {
 	seen := map[string]struct{}{}
 	var keywords []string
 	for _, r := range file.Rules {
-		// Rules without a regex only match file paths. A private key has a
-		// matcher of its own, keyBlockSpans says why.
+		// Rules without a regex only match file paths. A private key has a matcher of its own, see keyBlockSpans.
 		if r.Regex == "" || r.ID == "private-key" {
 			continue
 		}

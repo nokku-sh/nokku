@@ -49,7 +49,6 @@ func freshDB(t *testing.T) *db.Connection {
 	return conn
 }
 
-// storedConfig returns a provider's config column as it sits in the database.
 func storedConfig(t *testing.T, ws string) []byte {
 	t.Helper()
 	admin, err := pgx.Connect(t.Context(), "")
@@ -61,7 +60,6 @@ func storedConfig(t *testing.T, ws string) []byte {
 	return raw
 }
 
-// seedProvider stores one encrypted provider config and returns its workspace.
 func seedProvider(t *testing.T, conn *db.Connection, secret string) string {
 	t.Helper()
 	ws := uuid.NewV7().String()
@@ -116,8 +114,7 @@ func TestKeysetSurvivesRestart(t *testing.T) {
 	assert.Error(t, err, "a wrong NOKKU_SECRET must fail at boot, not run with broken keys")
 }
 
-// A new secret takes one row. Everything written before stays readable, and
-// nothing written after is in reach of the old secret.
+// Everything written before stays readable, and nothing written after is in reach of the old secret.
 func TestRotateSecret(t *testing.T) {
 	conn := freshDB(t)
 	enc, err := kms.New(t.Context(), conn, secretA)
@@ -158,8 +155,7 @@ func TestRotateRefusesBadTarget(t *testing.T) {
 	assert.NoError(t, err, "a refused rotation changed the keyset")
 }
 
-// A tick of the timer adds a data key once the primary is old enough, and
-// only rewraps before that. The timer itself runs with a KMS, see TestVault.
+// A tick adds a data key once the primary is old enough, and only rewraps before that. TestVault runs the timer.
 func TestTimedRotation(t *testing.T) {
 	conn := freshDB(t)
 	enc, err := kms.New(t.Context(), conn, secretA)
@@ -191,8 +187,7 @@ func TestTimedRotation(t *testing.T) {
 	assert.Equal(t, "x", string(plaintext))
 }
 
-// A rotation moves what the database holds to the new key and then drops the
-// older keys, so the keyset never grows past two.
+// A rotation moves the database to the new key and drops the older ones, so the keyset never grows past two.
 func TestRotationReencryptsAndPrunes(t *testing.T) {
 	conn := freshDB(t)
 	enc, err := kms.New(t.Context(), conn, secretA)

@@ -20,8 +20,7 @@
 	let email = $state('');
 	let passkeyBusy = $state(false);
 
-	// The provider is the only way in once SSO is required, so the rest is
-	// left out rather than greyed out.
+	// The provider is the only way in once SSO is required, so the rest is left out rather than greyed out.
 	const providers = $derived(options.data?.providers ?? []);
 	const providersOnly = $derived(
 		!!options.data && !options.data.magicLink && !options.data.passkey

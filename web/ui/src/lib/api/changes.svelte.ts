@@ -12,11 +12,7 @@ const SILENCE = 45_000;
 const backoff = (failures: number) =>
 	Math.min(60_000, 5_000 * 2 ** (failures - 1)) * (0.2 + 1.8 * Math.random());
 
-/**
- * Keeps what the page shows current without polling. The server says which
- * services answer differently now and their queries are read again. A hidden
- * tab holds no stream, it reads again when it gets the focus back.
- */
+/** Keeps the page current without polling, the server says which services to read again. A hidden tab holds no stream. */
 export function useLiveChanges(enabled: () => boolean) {
 	const visible = new IsDocumentVisible();
 	// The stream lives outside Svelte and follows two reactive values.

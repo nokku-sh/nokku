@@ -37,8 +37,7 @@ func TestStore_ConfinesTraversalNames(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// fileblob escapes path separators and ".." in object names. Nothing may
-	// land outside the bucket root.
+	// fileblob escapes path separators and ".." in object names, nothing may land outside the bucket root.
 	for _, name := range []string{"../evil", "a/../../evil", "/etc/passwd"} {
 		if _, err := s.Store(t.Context(), name, []byte("x"), StoreOptions{}); err != nil {
 			t.Fatalf("Store(%q): %v", name, err)

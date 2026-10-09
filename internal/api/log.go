@@ -31,10 +31,7 @@ func (rw *responseWriter) Flush() {
 	_ = rc.Flush()
 }
 
-// quietHandshakes is the handler for the lines net/http writes itself. A
-// client that leaves before its first request is one of them for every
-// connection: a browser that does not trust the certificate yet, or a
-// scanner. Those go to debug.
+// quietHandshakes sends what net/http logs itself to debug, an untrusted certificate makes a line per connection.
 type quietHandshakes struct{ slog.Handler }
 
 func (h quietHandshakes) Handle(ctx context.Context, r slog.Record) error {
@@ -48,9 +45,7 @@ func (h quietHandshakes) Handle(ctx context.Context, r slog.Record) error {
 	return h.Handler.Handle(ctx, r)
 }
 
-// withLogger writes a line for a request the server failed, nothing else.
-// Traces go to OTel, denied and malformed calls land in the audit log. It
-// logs the path only: query strings carry OAuth codes and one-time tokens.
+// withLogger only writes a line for a request the server failed. It logs the path only, query strings carry tokens.
 func (s *Server) withLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -71,8 +66,7 @@ func (s *Server) withLogger(next http.Handler) http.Handler {
 	})
 }
 
-// withRecover covers the plain HTTP routes, connect handlers recover on
-// their own. It sits inside withLogger so the 500 is logged like any other.
+// withRecover covers the plain HTTP routes, connect handlers recover on their own.
 func (s *Server) withRecover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {

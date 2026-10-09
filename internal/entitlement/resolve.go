@@ -41,8 +41,7 @@ func (s Status) grantsAccess() bool {
 	return false
 }
 
-// holdDays is how long the data limits of an ended plan stay in force, so a
-// lapsed card or license never deletes data right away.
+// holdDays keeps the data limits of an ended plan in force, so a lapsed card never deletes data right away.
 const holdDays = 30
 
 type Service struct {
@@ -56,17 +55,14 @@ type txRunner interface {
 	SysTx(ctx context.Context, fn func(*db.Queries) error) error
 }
 
-// NewService takes the license from the environment, see EnvLicense.
-// WatchLicense adds a key activated in the UI. saas is the hosted service,
-// where the plan comes from the subscription and a license counts for nothing.
+// NewService takes the license from the environment. With saas the plan comes from the subscription instead.
 func NewService(conn txRunner, license *licx.Claims, saas bool) *Service {
 	s := &Service{conn: conn, saas: saas}
 	s.license.Store(license)
 	return s
 }
 
-// Resolve is cached per request and never returns a zero Plan. A self-hosted
-// license wins, then an active subscription, then Community.
+// Resolve is cached per request and never returns a zero Plan. License, then subscription, then Community.
 func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
 	if cache := cacheFromContext(ctx); cache != nil {
 		if plan, ok := cache.plans[workspaceID]; ok {
@@ -86,9 +82,7 @@ func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
 	return plan
 }
 
-// lookup returns the plan in force and the plan whose data limits the purge
-// jobs honor. They differ for holdDays after a paid plan ended. On a failed
-// subscription read both are Community, next to the error.
+// lookup returns the plan in force and the one whose data limits the purge jobs honor. They differ during the hold.
 func (s *Service) lookup(ctx context.Context, workspaceID string) (plan, keep Plan, err error) {
 	name, held := PlanCommunity, ""
 	var seats int64
@@ -148,9 +142,7 @@ func (s *Service) Has(ctx context.Context, workspaceID, feature string) bool {
 	return s.Resolve(ctx, workspaceID).Has(feature)
 }
 
-// RetentionDays and RecordingStorageBytes are for the jobs that delete data.
-// They honor the hold and error instead of falling back to Community, so
-// neither a failed lookup nor a fresh downgrade shortens what gets deleted.
+// RetentionDays honors the hold and errors instead of falling back, so a failed lookup never shortens what is kept.
 func (s *Service) RetentionDays(ctx context.Context, workspaceID string) (int64, error) {
 	_, keep, err := s.lookup(ctx, workspaceID)
 	return keep.RetentionDays, err

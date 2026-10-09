@@ -4,14 +4,7 @@ description: Runs before the shared CI, nightly and release steps.
 runs:
   using: composite
   steps:
-    # Only the shared CI job sets RUN_TESTS. With the tag its lint and test
-    # steps cover internal/integration too. Those tests start Postgres,
-    # Keycloak and Vault themselves, the runner only needs Docker.
-    #
-    # testcontainers mounts the socket of the Docker daemon into its reaper
-    # and expects it at /var/run/docker.sock. A runner whose daemon keeps it
-    # elsewhere, like a rootless one, sets TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE
-    # to that path in its own environment.
+    # RUN_TESTS adds the integration tag. A rootless Docker runner sets TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE itself.
     - name: Include the integration tests
       if: env.RUN_TESTS == 'true'
       shell: bash

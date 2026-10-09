@@ -194,9 +194,7 @@ type InsertTargetAccountsParams struct {
 	MaxAccounts int32    `json:"maxAccounts"`
 }
 
-// Never deletes, a host's reported list is a hint, not authority. A target
-// that already holds max_accounts takes no more, so a host cannot grow the
-// table without bound.
+// Never deletes, a host's list is a hint. A target that holds max_accounts takes no more.
 func (q *Queries) InsertTargetAccounts(ctx context.Context, arg *InsertTargetAccountsParams) error {
 	_, err := q.db.Exec(ctx, insertTargetAccounts, arg.Usernames, arg.TargetID, arg.MaxAccounts)
 	return err
@@ -251,8 +249,7 @@ type ListAccountSubjectsForTargetRow struct {
 	Ids      []string `json:"ids"`
 }
 
-// Teams are expanded so the host needs no team knowledge. Users are joined,
-// not filtered, so an account that is inactive or not visible drops out.
+// Teams are expanded so the host needs no team knowledge. Users are joined, so an inactive account drops out.
 func (q *Queries) ListAccountSubjectsForTarget(ctx context.Context, targetID string) ([]*ListAccountSubjectsForTargetRow, error) {
 	rows, err := q.db.Query(ctx, listAccountSubjectsForTarget, targetID)
 	if err != nil {

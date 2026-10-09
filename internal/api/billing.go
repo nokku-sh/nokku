@@ -137,8 +137,7 @@ func (s *billingService) CancelSubscription(
 	return &nokkuv1.CancelSubscriptionResponse{}, nil
 }
 
-// GetLicense keeps reporting an expired license with its expiry, so the UI
-// can ask for the renewal instead of showing a plain Community instance.
+// GetLicense keeps reporting an expired license, so the UI can ask for the renewal.
 func (s *billingService) GetLicense(
 	_ context.Context,
 	_ *nokkuv1.GetLicenseRequest,

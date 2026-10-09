@@ -20,8 +20,7 @@ export const user = {
 			queryFn: () => account.user()
 		})),
 
-	// What the caller's role allows, matching the (access) option of the RPCs.
-	// The backend enforces it, this only hides what it would refuse.
+	// What the caller's role allows. The backend enforces it, this only hides what it would refuse.
 	can: () => {
 		const me = user.self();
 		return {

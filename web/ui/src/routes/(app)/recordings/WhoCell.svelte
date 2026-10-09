@@ -7,8 +7,7 @@
 
 	let { subjectId }: { subjectId: string } = $props();
 
-	// A session is a user or a service account. The recording only holds the
-	// id, so the user is tried first and the service account on a miss.
+	// The recording only holds the id, so the user is tried first and the service account on a miss.
 	const person = users.get(() => subjectId || undefined);
 	const sa = serviceAccount.get(() => (person.isError ? subjectId : undefined));
 	const subject = $derived(

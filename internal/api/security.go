@@ -8,8 +8,7 @@ import (
 	"github.com/nokku-sh/nokku/web"
 )
 
-// withCSRF is the only cross-origin gate. The UI is served from the same
-// origin, so there is no CORS to configure.
+// withCSRF is the only cross-origin gate. The UI is same-origin, so there is no CORS to configure.
 func (s *Server) withCSRF(h http.Handler) http.Handler {
 	cop := http.NewCrossOriginProtection()
 	if err := cop.AddTrustedOrigin(s.cfg.FullURL()); err != nil {
@@ -22,8 +21,7 @@ func (s *Server) withCSRF(h http.Handler) http.Handler {
 	}))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Webhooks and SSO callbacks come from external servers, their
-		// protection is the single-use flow state.
+		// Webhooks and SSO callbacks come from external servers, their protection is the single-use flow state.
 		if r.URL.Path == "/oidc/callback" ||
 			strings.HasPrefix(r.URL.Path, "/webhooks/") {
 			h.ServeHTTP(w, r)
@@ -35,20 +33,18 @@ func (s *Server) withCSRF(h http.Handler) http.Handler {
 }
 
 func (s *Server) withHeaders(h http.Handler) http.Handler {
-	// No inline script runs but the bootstrap of the built pages. A script
-	// injected into the UI would otherwise reach the web terminal.
-	// The recording player compiles WebAssembly, which needs its own source.
+	// Only the bootstrap of the built pages runs inline, an injected script would reach the web terminal.
 	pinned := web.InlineScriptHashes()
 	if s.cfg.UIDev.Host != "" {
 		// The pages of the Vite dev server change with every edit.
 		pinned = []string{"'unsafe-inline'"}
 	}
+	// The recording player compiles WebAssembly.
 	scripts := strings.Join(append([]string{"'self'", "'wasm-unsafe-eval'"}, pinned...), " ")
 	csp := "default-src 'self'; script-src " + scripts +
 		"; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:;"
 
-	// A browser keeps HSTS for localhost on every port, which would break
-	// whatever else is developed on this machine.
+	// A browser keeps HSTS for localhost on every port, which would break whatever else is developed here.
 	hsts := s.cfg.Hostname() != "localhost"
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -58,8 +54,7 @@ func (s *Server) withHeaders(h http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Content-Security-Policy", csp)
 
-		// The UI reads over GET, and no API response may be cached. The static
-		// handler and the avatars set their own policy.
+		// No API response may be cached. The static handler and the avatars set their own policy.
 		if r.Method == http.MethodGet {
 			w.Header().Set("Cache-Control", "no-store")
 		}

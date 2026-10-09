@@ -1,9 +1,4 @@
-// Package webpki is the server's TLS identity as clients see it. Behind a
-// proxy that is nothing, or the private CA the proxy's certificate comes
-// from. With NOKKU_TLS=internal the server makes a CA of its own and answers
-// with a certificate from it. nk and nokkud fetch the CA from Path and keep
-// it once it matches the pin the web app shows them. The client side is the
-// trust package of mon.
+// Package webpki is the server's TLS identity as clients see it. The client side is the trust package of mon.
 package webpki
 
 import (
@@ -47,22 +42,18 @@ func (m *Mode) UnmarshalText(text []byte) error {
 }
 
 type envConfig struct {
-	// CAFile is the CA of the proxy's certificate in PEM, when that is a
-	// private one.
+	// CAFile is the CA of the proxy's certificate in PEM, when that is a private one.
 	CAFile string `env:"NOKKU_TLS_CA"`
 }
 
-// Identity is the certificate the server answers with and the CA it
-// advertises. The zero value does neither, which is right behind a proxy
-// with a certificate every machine trusts already.
+// Identity is the certificate the server answers with and the CA it advertises. The zero value does neither.
 type Identity struct {
 	pem  []byte
 	pin  string
 	cert func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 }
 
-// New sets up the identity for mode. host is the public host name, the one
-// the certificate is for. Only ModeInternal uses conn.
+// New sets up the identity for mode. host is the name the certificate is for, only ModeInternal uses conn.
 func New(ctx context.Context, conn *db.Connection, mode Mode, host string) (*Identity, error) {
 	cfg, err := env.ParseAs[envConfig]()
 	if err != nil {
@@ -91,8 +82,7 @@ func New(ctx context.Context, conn *db.Connection, mode Mode, host string) (*Ide
 	return id, nil
 }
 
-// readCAs returns the certificates of a PEM file that is served to anyone
-// who asks, so it refuses one with a private key in it.
+// The file is served to anyone who asks, so readCAs refuses one with a private key in it.
 func readCAs(path string) ([]*x509.Certificate, error) {
 	data, err := os.ReadFile(path) // #nosec G304 -- the operator names the file
 	if err != nil {
@@ -118,8 +108,7 @@ func readCAs(path string) ([]*x509.Certificate, error) {
 	return cas, nil
 }
 
-// advertise sets what clients are told to trust. The pin is the one of the
-// first certificate.
+// advertise sets what clients are told to trust. The pin is the one of the first certificate.
 func (i *Identity) advertise(cas ...*x509.Certificate) {
 	sum := sha256.Sum256(cas[0].RawSubjectPublicKeyInfo)
 	i.pin = "sha256:" + hex.EncodeToString(sum[:])
@@ -128,12 +117,10 @@ func (i *Identity) advertise(cas ...*x509.Certificate) {
 	}
 }
 
-// Pin names the CA new clients are told to trust: sha256 over the public key
-// of the first certificate. It is empty when nothing is advertised.
+// Pin is sha256 over the public key of the first certificate, empty when nothing is advertised.
 func (i *Identity) Pin() string { return i.pin }
 
-// TLSConfig is what the listener serves with, nil when a proxy in front does
-// that. nk and nokkud speak TLS 1.3 only, and so does every current browser.
+// TLSConfig is nil when a proxy in front serves. nk, nokkud and every current browser speak TLS 1.3.
 func (i *Identity) TLSConfig() *tls.Config {
 	if i.cert == nil {
 		return nil

@@ -1,5 +1,4 @@
-// Package recording owns the recording lifecycle. It never sees a request or
-// response type.
+// Package recording owns the recording lifecycle. It never sees a request or response type.
 package recording
 
 import (
@@ -24,8 +23,7 @@ type Service struct {
 	limits Limits
 	events *audit.Service
 
-	// A recording has one object. Its uploads write it and its scrub
-	// rewrites it, mu guards who is at it. The server is a single instance.
+	// A recording has one object. Uploads write it and the scrub rewrites it, mu guards who is at it.
 	mu      sync.Mutex
 	uploads map[string]int
 	scrubs  map[string]*scrubRun
@@ -62,9 +60,7 @@ func (s *Service) PurgeWorkspace(ctx context.Context, workspaceID string) {
 	}()
 }
 
-// BeginUpload says an upload is about to write the object of a recording. A
-// scrub still rewriting what an earlier try left is stopped first, its late
-// commit would replace this upload. The returned func ends the upload.
+// BeginUpload stops a scrub still rewriting an earlier try, its late commit would replace this upload.
 func (s *Service) BeginUpload(recordingID string) (end func()) {
 	s.mu.Lock()
 	s.uploads[recordingID]++

@@ -48,8 +48,7 @@ func TestMemoryExpiry(t *testing.T) {
 	}
 }
 
-// Set stores a copy of the value: later mutation of the caller's slice must
-// not corrupt the cached entry.
+// Mutating the caller's slice later must not corrupt the cached entry.
 func TestMemorySetCopies(t *testing.T) {
 	c := NewMemory(10)
 	ctx := t.Context()
@@ -138,8 +137,7 @@ func TestMemorySetNXAfterExpiry(t *testing.T) {
 	}
 }
 
-// A cache full of live entries refuses new keys instead of evicting, so no
-// caller can push out someone else's state.
+// A full cache refuses new keys instead of evicting, so no caller can push out someone else's state.
 func TestMemoryFullRefusesNewKeys(t *testing.T) {
 	c := NewMemory(2)
 	ctx := t.Context()
@@ -185,8 +183,7 @@ func TestMemoryNoTTL(t *testing.T) {
 	}
 }
 
-// A full cache makes room from expired entries, and SetNX is bounded too, so
-// replay markers cannot grow the cache forever.
+// SetNX is bounded too, so replay markers cannot grow the cache forever.
 func TestMemoryEvictsExpiredFirst(t *testing.T) {
 	c := NewMemory(2)
 	ctx := t.Context()

@@ -155,8 +155,7 @@ WHERE
 RETURNING
   *;
 
--- The replaced key stays trusted for as long as a certificate it signed can
--- live, unless revoke_previous drops it at once.
+-- The replaced key stays trusted for as long as a certificate it signed can live, unless revoke_previous drops it.
 -- name: ReplaceCA :one
 UPDATE ssh_cas
 SET

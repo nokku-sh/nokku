@@ -64,8 +64,7 @@ function terminalTheme(): Pick<ITerminalOptions, 'fontFamily' | 'theme'> {
 	return { fontFamily: v('terminal-font'), theme };
 }
 
-// TerminalSession owns the socket and the terminal, so a shell survives
-// navigation. The shell on the server lives exactly as long as the socket.
+// TerminalSession owns the socket and the terminal, so a shell survives navigation and ends with the socket.
 export class TerminalSession {
 	state = $state<ConnectionState>('connecting');
 

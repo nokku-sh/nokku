@@ -1,8 +1,6 @@
 package iam
 
-// SCIM 2.0 at /scim/v2 of the workspace host. The request runs in the
-// workspace its host names, under RLS like any tenant request, and only a
-// SCIM token of that workspace gets in.
+// SCIM 2.0 at /scim/v2 of the workspace host, under RLS. Only a SCIM token of that workspace gets in.
 
 import (
 	"context"
@@ -83,8 +81,7 @@ func (f *SCIMFlow) serverFor(ws actor.Workspace) (scim.Server, error) {
 	return s, nil
 }
 
-// scimProvisionUser applies active to existing accounts too, the IdP is the
-// source of truth.
+// scimProvisionUser applies active to existing accounts too, the IdP is the source of truth.
 func (s *Service) scimProvisionUser(
 	ctx context.Context,
 	email, name string,
@@ -171,8 +168,7 @@ func linkSCIMCredential(ctx context.Context, q *db.Queries, userID, externalID s
 	return err
 }
 
-// keepOwner refuses to switch off or remove the owner. Nobody else can hand
-// the workspace on.
+// keepOwner refuses to switch off or remove the owner. Nobody else can hand the workspace on.
 func keepOwner(ctx context.Context, q *db.Queries, userID string) error {
 	owner, err := q.GetOwner(ctx)
 	if err != nil {
@@ -187,8 +183,7 @@ func keepOwner(ctx context.Context, q *db.Queries, userID string) error {
 	return nil
 }
 
-// scimDeprovisionUser deactivates the account and drops its IdP link. The
-// data survives for an IdP re-assignment.
+// scimDeprovisionUser deactivates the account and drops its IdP link. The data survives for a re-assignment.
 func (s *Service) scimDeprovisionUser(ctx context.Context, u *db.User) error {
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := keepOwner(ctx, q, u.ID); err != nil {

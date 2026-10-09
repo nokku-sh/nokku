@@ -22,9 +22,7 @@ import (
 // maxPrincipals is how many principals OpenSSH reads from one certificate.
 const maxPrincipals = 256
 
-// LoginPrincipal is the certificate principal that lets one subject log in as
-// one account on one server. Hosts compare it as a whole string, so a
-// certificate signed for another server or account opens nothing.
+// LoginPrincipal lets one subject log in as one account on one server. Hosts compare it as a whole string.
 func LoginPrincipal(subjectID, targetID, username string) string {
 	return subjectID + "@" + targetID + ":" + username
 }
@@ -36,9 +34,7 @@ type Principal struct {
 	Username  string
 }
 
-// ParseLoginPrincipal is for the backend, which built the string. Hosts
-// compare principals whole and never parse them. The ids are UUIDs, so a
-// username with "@" or ":" in it cannot shift the split.
+// ParseLoginPrincipal is for the backend only. The ids are UUIDs, so "@" or ":" in a username cannot shift the split.
 func ParseLoginPrincipal(s string) (Principal, bool) {
 	subject, rest, ok := strings.Cut(s, "@")
 	if !ok {
@@ -57,8 +53,7 @@ func ParseLoginPrincipal(s string) (Principal, bool) {
 	return Principal{SubjectID: subject, TargetID: target, Username: username}, true
 }
 
-// SignCertificate signs a user certificate unless certType is ssh.HostCert.
-// It refuses an empty principal list, such a certificate is valid for anyone.
+// SignCertificate refuses an empty principal list, such a certificate is valid for anyone.
 func SignCertificate(
 	ca *db.SSHCA,
 	pubKey string,
@@ -116,8 +111,7 @@ func SignCertificate(
 	return cert, nil
 }
 
-// UserTTL is how long a user certificate of ca lives when ttl is asked for.
-// Nothing asked, or more than the CA allows, gets its default.
+// UserTTL falls back to the CA's default when nothing is asked, or more than the CA allows.
 func UserTTL(ca *db.SSHCA, ttl time.Duration) time.Duration {
 	return boundTTL(ttl, ca.UserDefaultTtl, ca.UserMaxTtl)
 }

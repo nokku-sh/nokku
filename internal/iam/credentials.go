@@ -7,7 +7,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// ListCredentials is every passkey and linked identity of the signed-in user.
 func (s *Service) ListCredentials(ctx context.Context) ([]*db.Credential, error) {
 	return s.conn.Tenant().ListUserCredentials(ctx, actor.UserIDFromContext(ctx))
 }
@@ -27,8 +26,7 @@ func (s *Service) RenameCredential(ctx context.Context, id, label string) error 
 	})
 }
 
-// DeleteCredential removes a passkey or a linked identity. The last way in
-// stays unless a sign-in link can replace it.
+// DeleteCredential keeps the last way in unless a sign-in link can replace it.
 func (s *Service) DeleteCredential(ctx context.Context, id string) error {
 	return s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		userID := actor.UserIDFromContext(ctx)
@@ -57,7 +55,6 @@ func (s *Service) DeleteCredential(ctx context.Context, id string) error {
 	})
 }
 
-// PurgeProviderIdentities unlinks every identity a provider vouched for.
 func (s *Service) PurgeProviderIdentities(ctx context.Context, provider string) (int64, error) {
 	return s.conn.Tenant().DeleteCredentialsByProvider(ctx, &db.DeleteCredentialsByProviderParams{
 		Type:     string(MethodOIDC),

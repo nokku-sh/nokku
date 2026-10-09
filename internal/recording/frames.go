@@ -15,24 +15,16 @@ import (
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
-// A recording object is a run of frames:
-//
-//	kind(1) || len(4 BE) || nonce || ciphertext || tag
-//
-// Each recording has its own key. A frame is sealed with the recording id,
-// its position and its kind as associated data, so frames cannot be moved
-// between recordings or reordered. The object ends with an end frame, so a
-// cut is not mistaken for a clean end.
+// A frame is kind(1) || len(4 BE) || sealed. Recording id, position and kind are sealed in, so frames cannot move.
 const (
 	frameData byte = 0
-	frameEnd  byte = 1
+	frameEnd  byte = 1 // closes the object, so a cut is not mistaken for a clean end
 
 	// maxRecordingFrame stops a corrupted object from forcing a huge allocation.
 	maxRecordingFrame = 256 << 20
 )
 
-// NewKey makes the key for one recording. It is stored on the recording row,
-// encrypted like every other secret.
+// NewKey makes the key for one recording. It is stored on the row, encrypted like every other secret.
 func NewKey() []byte {
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
@@ -51,8 +43,7 @@ func frameAAD(recordingID string, index uint64, kind byte) []byte {
 	return binary.BigEndian.AppendUint64(append([]byte(recordingID), kind), index)
 }
 
-// Writer commits on Close, so a dead daemon still leaves a partial recording.
-// A canceled ctx drops the object, an upload must not hand in the request's.
+// Writer commits on Close, so a dead daemon still leaves a partial recording. A canceled ctx drops the object.
 type Writer struct {
 	w     io.WriteCloser
 	aead  cipher.AEAD

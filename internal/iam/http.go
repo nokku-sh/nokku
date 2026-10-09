@@ -14,8 +14,7 @@ import (
 const (
 	sessionTTL        = 168 * time.Hour
 	sessionCookieName = "nokku_session"
-	// sessionSeenEvery is how exact "last active" in the sessions list is.
-	// A busy session must not turn every request into a write.
+	// sessionSeenEvery is how exact "last active" is. A busy session must not turn every request into a write.
 	sessionSeenEvery = time.Minute
 )
 
@@ -53,8 +52,7 @@ func cookieFromHeader(h http.Header, name string) string {
 	return ""
 }
 
-// Middleware attaches a cookie session's principal and continues either way.
-// Header tokens belong to connect, which also checks their DPoP binding.
+// Middleware attaches a cookie session's principal and continues either way. Header tokens belong to connect.
 func (s *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, tok, err := s.AuthenticateToken(r.Context(), sessionFromCookie(r.Header))

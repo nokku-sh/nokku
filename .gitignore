@@ -34,7 +34,7 @@ dist/
 data/
 artifacts/
 
-# Internal strategy docs — never publish (see idea/billing-and-monetization.md)
+# Internal strategy docs, never publish (see idea/billing-and-monetization.md)
 /idea/
 
 # Local work queue

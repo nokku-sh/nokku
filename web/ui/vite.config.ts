@@ -4,8 +4,7 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-	// The backend sits in front and takes the UI from here (NOKKU_UI_DEV), so
-	// the port has to be the one it knows.
+	// The backend sits in front and takes the UI from here (NOKKU_UI_DEV), so the port has to be the one it knows.
 	server: { strictPort: true },
 	plugins: [
 		tailwindcss(),

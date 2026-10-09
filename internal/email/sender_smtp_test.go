@@ -12,8 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fakeRelay answers every login with authReply. It offers CRAM-MD5 because
-// go-mail keeps PLAIN and LOGIN off a connection without TLS.
+// fakeRelay offers CRAM-MD5 because go-mail keeps PLAIN and LOGIN off a connection without TLS.
 func fakeRelay(t *testing.T, authReply string) (port int) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")

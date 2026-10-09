@@ -4,9 +4,7 @@ import (
 	"testing"
 )
 
-// TestPlanMatrix locks the pricing table (idea/billing-and-monetization.md
-// §3.2) into code. Changing any cell here is a pricing decision, not a
-// refactor: it must come with a docs, pricing page, and Stripe update.
+// Changing a cell here is a pricing decision. It comes with a docs, pricing page and Stripe update.
 func TestPlanMatrix(t *testing.T) {
 	tests := []struct {
 		plan            string

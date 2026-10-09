@@ -91,8 +91,7 @@ func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-// Callback writes the failure response itself. The state parameter has to
-// name the flow this browser started, or the answer belongs to someone else.
+// Callback checks that the state names the flow this browser started, or the answer belongs to someone else.
 func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	if q.Get("error") != "" {
@@ -197,9 +196,7 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, returnTo, http.StatusSeeOther)
 }
 
-// resolve finds or makes the account behind an identity. The provider
-// belongs to this workspace and its owner configured it, so a matching
-// email is trusted and JIT may create the account.
+// resolve trusts a matching email and may create the account, the workspace owner configured the provider.
 func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, error) {
 	var u *db.User
 	created := false

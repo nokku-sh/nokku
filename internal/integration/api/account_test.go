@@ -17,7 +17,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// seedAccount returns a user and an account client signed in as them.
 func seedAccount(t *testing.T, cfg *config.Config) (*db.User, nokkuv1connect.AccountServiceClient) {
 	t.Helper()
 	u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)

@@ -32,8 +32,7 @@ const (
 	relyingPartyTTL = time.Hour
 )
 
-// passkeySignupState reserves the account so the user row only exists once
-// the ceremony verifies. ID is the user handle the authenticator binds to.
+// passkeySignupState reserves the account id, the user row only exists once the ceremony verifies.
 type passkeySignupState struct {
 	Session  *webauthn.SessionData `json:"session"`
 	ID       string                `json:"id"`
@@ -73,8 +72,7 @@ func newPasskeyFlow(svc *Service) *passkeyFlow {
 	}
 }
 
-// rp is the relying party of the request's workspace. Its id is the host,
-// so a passkey made on one workspace never answers for another.
+// rp is the relying party of the workspace. Its id is the host, so a passkey never answers for another workspace.
 func (f *passkeyFlow) rp(ctx context.Context) (*webauthn.WebAuthn, error) {
 	ws, ok := actor.WorkspaceFromContext(ctx)
 	if !ok {
@@ -152,8 +150,7 @@ func passkeyCredentialID(cred *webauthn.Credential) string {
 	return "passkey:" + base64.RawURLEncoding.EncodeToString(cred.ID)
 }
 
-// savePasskey keeps the existing label on a refresh. The upsert never moves a
-// credential id to another account.
+// savePasskey keeps the label on a refresh. The upsert never moves a credential id to another account.
 func savePasskey(ctx context.Context, q *db.Queries, userID string, cred *webauthn.Credential) (string, error) {
 	data, err := json.Marshal(cred)
 	if err != nil {
@@ -243,8 +240,7 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "ok", "name": name})
 }
 
-// BeginSignup starts the passkey ceremony of an invited person. The invite
-// is spent when the ceremony finishes.
+// BeginSignup starts the passkey ceremony of an invited person. The invite is spent when it finishes.
 func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	wa, err := f.rp(ctx)

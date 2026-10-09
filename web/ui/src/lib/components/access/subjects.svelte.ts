@@ -82,8 +82,7 @@ export function grantsOf(p: TargetAccount): SubjectRef[] {
 
 const SEARCH_LIMIT = 20;
 
-// useSubjectSearch asks the server for matches, so it scales to any workspace
-// size. Nothing loads until `when` is true, e.g. while a picker is open.
+// useSubjectSearch asks the server for matches. Nothing loads until `when` is true, e.g. while a picker is open.
 export function useSubjectSearch(query: () => string, when: () => boolean) {
 	const opts = () => ({ query: query() || undefined, limit: SEARCH_LIMIT });
 	const people = users.list(opts, when);

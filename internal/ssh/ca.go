@@ -1,4 +1,3 @@
-// Package ssh manages SSH certificates.
 package ssh
 
 import (

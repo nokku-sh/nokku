@@ -117,8 +117,7 @@ type GetLiveJoinTokenParams struct {
 	TokenHash crypto.HashedToken  `json:"tokenHash"`
 }
 
-// Ignores the use limit, so a used-up token still identifies a daemon it
-// already enrolled. RedeemJoinToken enforces it.
+// Ignores the use limit, so a used-up token still identifies a daemon it enrolled. RedeemJoinToken enforces it.
 func (q *Queries) GetLiveJoinToken(ctx context.Context, arg *GetLiveJoinTokenParams) (*JoinToken, error) {
 	row := q.db.QueryRow(ctx, getLiveJoinToken, arg.ID, arg.Kind, arg.TokenHash)
 	var i JoinToken
@@ -262,8 +261,7 @@ type RedeemJoinTokenByIDParams struct {
 	Kind nokku.JoinTokenKind `json:"kind"`
 }
 
-// For a signup whose invite link was checked earlier. The mailed link or
-// the passkey ceremony is the proof by then.
+// For a signup whose invite was checked earlier. The mailed link or the passkey ceremony is the proof by then.
 func (q *Queries) RedeemJoinTokenByID(ctx context.Context, arg *RedeemJoinTokenByIDParams) (*JoinToken, error) {
 	row := q.db.QueryRow(ctx, redeemJoinTokenByID, arg.ID, arg.Kind)
 	var i JoinToken

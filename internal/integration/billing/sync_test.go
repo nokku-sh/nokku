@@ -45,8 +45,7 @@ type remoteSub struct {
 	cancelAt bool
 }
 
-// fakeStripe is the hosted service on a Stripe that serves the two
-// subscription calls a sync makes.
+// fakeStripe is the hosted service on a Stripe that serves the two subscription calls a sync makes.
 type fakeStripe struct {
 	billing *billing.Stripe
 	conn    *db.Connection
@@ -123,8 +122,7 @@ func newSync(t *testing.T) *fakeStripe {
 	return fake
 }
 
-// event delivers the webhook Stripe sends when the subscription changed and
-// returns the status Stripe gets back. Anything but 200 makes it retry.
+// event delivers the webhook and returns the status Stripe gets back. Anything but 200 makes it retry.
 func (f *fakeStripe) event(t *testing.T, subscriptionID string) int {
 	t.Helper()
 	payload := fmt.Appendf(
@@ -141,7 +139,6 @@ func (f *fakeStripe) event(t *testing.T, subscriptionID string) int {
 	return w.Code
 }
 
-// row is the subscription the workspace has in the database.
 func (f *fakeStripe) row(t *testing.T) *db.WorkspaceSubscription {
 	t.Helper()
 	row, err := f.conn.Sys().GetSubscription(t.Context(), f.workspaceID)

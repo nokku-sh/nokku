@@ -15,8 +15,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/cache"
 )
 
-// newSealedTestService is enough of a Service to seal flow state, with a
-// clock the test moves.
+// newSealedTestService is enough of a Service to seal flow state, with a clock the test moves.
 func newSealedTestService(t *testing.T, secure bool) (*Service, *time.Time) {
 	t.Helper()
 	aead, err := chacha20poly1305.NewX(make([]byte, chacha20poly1305.KeySize))
@@ -32,9 +31,7 @@ func newSealedTestService(t *testing.T, secure bool) (*Service, *time.Time) {
 	}, &now
 }
 
-// TestSealedFlowState covers the cookie that carries a flow. Only the browser
-// that got it can continue, only in the same flow, only while it is fresh,
-// and not once the flow ended in a login.
+// Only the browser that got the cookie can continue, in the same flow, while it is fresh and not after a login.
 func TestSealedFlowState(t *testing.T) {
 	svc, now := newSealedTestService(t, false)
 	store := &sealed[authorizeState]{svc: svc, cookie: flowCookieName, use: "oidc", ttl: flowStateTTL}
@@ -108,9 +105,7 @@ func TestSealedFlowState(t *testing.T) {
 	}
 }
 
-// TestLinkUserIDFor checks the forced-linking guard: a signed-in user
-// starting an SSO login from a cross-site navigation must not enter linking
-// mode, same-origin and header-less (older) clients must.
+// A signed-in user starting an SSO login from a cross-site navigation must not enter linking mode.
 func TestLinkUserIDFor(t *testing.T) {
 	const uid = "01a05a0f-d857-723f-a3ed-c43125834aa5"
 	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: uid, Kind: actor.KindUser})

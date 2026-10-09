@@ -81,8 +81,7 @@ export async function signupWithPasskey(params: {
 	email: string;
 	name?: string;
 }): Promise<void> {
-	// Begin reads the invite, email and name as form values. Finish reads the
-	// ceremony cookie.
+	// Begin reads the invite, email and name as form values. Finish reads the ceremony cookie.
 	const form = new URLSearchParams({ invite: params.invite, email: params.email });
 	if (params.name) form.set('name', params.name);
 

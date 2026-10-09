@@ -1,8 +1,6 @@
 //go:build integration
 
-// Package testenv starts what the integration tests run against. Each
-// service is a container of its own on a random port, so nothing has to run
-// on the host and the dev database is never touched.
+// Package testenv starts what the integration tests run against, each service a container on a random port.
 package testenv
 
 import (
@@ -19,8 +17,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-// Pinned, a new upstream release must not fail the tests on its own.
-// compose.dev.yml runs the same versions.
+// Pinned, a new upstream release must not fail the tests on its own. compose.dev.yml runs the same versions.
 const (
 	postgresImage = "docker.io/postgres:18-alpine"
 	keycloakImage = "quay.io/keycloak/keycloak:26.8.0"
@@ -30,9 +27,7 @@ const (
 	VaultToken = "root"
 )
 
-// Postgres starts an empty server for this test binary and points the PG*
-// environment at it, where db.NewConnection and pgx.Connect read it. Call it
-// from TestMain and run stop after the tests.
+// Postgres starts an empty server and points the PG* environment at it. Call it from TestMain, run stop after.
 func Postgres() (stop func()) {
 	ctx := context.Background()
 	c, err := testcontainers.Run(ctx, postgresImage,
@@ -64,7 +59,6 @@ func Postgres() (stop func()) {
 	return stop
 }
 
-// pointEnvAt sets the PG* environment to the server in c.
 func pointEnvAt(ctx context.Context, c *testcontainers.DockerContainer) error {
 	endpoint, err := c.PortEndpoint(ctx, "5432/tcp", "")
 	if err != nil {
@@ -74,8 +68,7 @@ func pointEnvAt(ctx context.Context, c *testcontainers.DockerContainer) error {
 	if err != nil {
 		return err
 	}
-	// Set, never defaulted. A developer's shell must not send the tests to
-	// another server.
+	// Set, never defaulted. A developer's shell must not send the tests to another server.
 	for key, value := range map[string]string{
 		"PGHOST":     host,
 		"PGPORT":     port,
@@ -89,8 +82,7 @@ func pointEnvAt(ctx context.Context, c *testcontainers.DockerContainer) error {
 	return nil
 }
 
-// Keycloak starts a dev server for the test and returns its root URL. The
-// admin is admin with the password admin.
+// Keycloak starts a dev server for the test and returns its root URL. The admin is admin with the password admin.
 func Keycloak(t *testing.T) string {
 	t.Helper()
 	c, err := testcontainers.Run(t.Context(), keycloakImage,
@@ -111,9 +103,7 @@ func Keycloak(t *testing.T) string {
 	return root
 }
 
-// Vault starts a dev server for the test and returns its host and port. It
-// serves TLS with a self-signed certificate, nokku only talks https to
-// Vault. The root token is VaultToken.
+// Vault starts a dev server and returns its host and port. It serves TLS, nokku only talks https to Vault.
 func Vault(t *testing.T) string {
 	t.Helper()
 	c, err := testcontainers.Run(t.Context(), vaultImage,

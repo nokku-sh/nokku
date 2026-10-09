@@ -29,9 +29,7 @@ const (
 	streamRefreshPeriod = 30 * time.Second
 )
 
-// webhookSink POSTs each workspace event to the workspace's destination. A
-// full queue drops events, since a slow destination must not stall a login or
-// grow memory. Events without a workspace have nowhere to go.
+// webhookSink drops events on a full queue, a slow destination must not stall a login or grow memory.
 type webhookSink struct {
 	conn         *db.Connection
 	entitlements *entitlement.Service
@@ -147,8 +145,7 @@ func (s *webhookSink) deliver(ctx context.Context, event *Event) {
 	}
 }
 
-// post only retries network errors, 408, 429, and 5xx. Any other 4xx would
-// fail the same way again.
+// post only retries network errors, 408, 429 and 5xx. Any other 4xx would fail the same way again.
 func (s *webhookSink) post(ctx context.Context, dest destination, body []byte) (bool, error) {
 	req, err := http.NewRequestWithContext(
 		ctx, http.MethodPost, dest.url, bytes.NewReader(body),
@@ -202,8 +199,7 @@ func (s *webhookSink) refreshLoop(ctx context.Context) {
 	}
 }
 
-// refresh keeps the previous destinations on failure, so a database blip
-// cannot silently stop streaming.
+// refresh keeps the previous destinations on failure, so a database blip cannot stop streaming.
 func (s *webhookSink) refresh(ctx context.Context) {
 	next := map[string]destination{}
 	err := s.conn.SysTx(ctx, func(q *db.Queries) error {
@@ -233,8 +229,7 @@ func (s *webhookSink) refresh(ctx context.Context) {
 	s.destinations.Store(&next)
 }
 
-// sign covers the timestamp so a captured request cannot be replayed with a
-// fresh one.
+// sign covers the timestamp, so a captured request cannot be replayed with a fresh one.
 func sign(secret, timestamp string, body []byte) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(timestamp))

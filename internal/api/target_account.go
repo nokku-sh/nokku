@@ -86,8 +86,7 @@ func (s *targetAccountService) RemoveSubjects(
 				return err
 			}
 		}
-		// Grant removal is the whole lockout. The next sync drops the subject,
-		// so an already issued cert matches no account.
+		// Grant removal is the whole lockout. The next sync drops the subject, so an issued cert matches no account.
 		return nil
 	}); err != nil {
 		return nil, err
@@ -114,8 +113,7 @@ func (s *targetAccountService) RevokeAllAccess(
 	return &nokkuv1.RevokeAllAccessResponse{}, nil
 }
 
-// AddTargetAccount is for manual targets, which have no daemon to report
-// accounts. An existing account is returned unchanged.
+// AddTargetAccount is for manual targets, which have no daemon to report accounts.
 func (s *targetAccountService) AddTargetAccount(
 	ctx context.Context,
 	req *nokkuv1.AddTargetAccountRequest,

@@ -14,8 +14,7 @@ import (
 	"github.com/nokku-sh/protos/gen/nokku/v1/nokkuv1connect"
 )
 
-// The name is read from the row. It used to be kept from boot, so the login
-// page showed the old one until a restart.
+// The name used to be kept from boot, so the login page showed the old one until a restart.
 func TestLoginPageFollowsARename(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -39,8 +38,7 @@ func TestLoginPageFollowsARename(t *testing.T) {
 	assert.Equal(t, renamed, options.GetWorkspaceName())
 }
 
-// A sign-in link works once, on the host it was made for, and sets the
-// session cookie. The test server sends no mail, so the link comes from iam.
+// A sign-in link works once, on the host it was made for. No mail is sent here, so the link comes from iam.
 func TestMagicLinkSignIn(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
@@ -71,8 +69,7 @@ func TestMagicLinkSignIn(t *testing.T) {
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "a spent link: %v", err)
 }
 
-// The list under "where you're signed in" shows sessions and remembered
-// devices. Removing a device forgets it, and its cookie never signs in.
+// Removing a remembered device forgets it, and its cookie never signs in.
 func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)

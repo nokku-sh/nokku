@@ -1,6 +1,5 @@
 -- name: CreateAccessToken :one
--- One subject parameter, the column it lands in follows the kind. A SCIM
--- token has no subject.
+-- One subject parameter, the column it lands in follows the kind. A SCIM token has no subject.
 INSERT INTO
   access_tokens (
     token_hash,
@@ -61,8 +60,7 @@ WHERE
   id = @id;
 
 -- name: DeleteSubjectTokens :execrows
--- Signs the subject out everywhere. A user's devices are forgotten with it,
--- so whoever got in from one of them is not waved through quietly again.
+-- Signs the subject out everywhere. A user's devices are forgotten too, so none is waved through quietly again.
 WITH
   forgotten AS (
     DELETE FROM known_devices

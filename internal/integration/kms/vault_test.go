@@ -15,8 +15,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/integration/testenv"
 )
 
-// testVaultKey starts a Vault, creates a transit key on it and returns the
-// key's KMS URI.
+// testVaultKey starts a Vault, creates a transit key on it and returns the key's KMS URI.
 func testVaultKey(t *testing.T) (*api.Client, string, string) {
 	t.Helper()
 	addr := testenv.Vault(t)
@@ -35,9 +34,7 @@ func testVaultKey(t *testing.T) (*api.Client, string, string) {
 	return client, name, "hcvault://" + addr + "/transit/keys/" + name
 }
 
-// The keyset wrapped by a real Vault transit key: boot, restart, a key
-// rotation inside Vault, the timed data key rotation, and the move between
-// Vault and NOKKU_SECRET.
+// A real Vault transit key: boot, restart, rotation in Vault, timed rotation, and the move to NOKKU_SECRET.
 func TestVault(t *testing.T) {
 	client, name, uri := testVaultKey(t)
 	conn := freshDB(t)
@@ -59,8 +56,7 @@ func TestVault(t *testing.T) {
 	}
 	readable("restart")
 
-	// Vault rotates its key. The timer's rewrap moves the keyset to the new
-	// version, so the old one can be retired in Vault.
+	// Vault rotates its key. The timer's rewrap moves the keyset to the new version, so the old one can be retired.
 	_, err = client.Logical().WriteWithContext(t.Context(), "transit/keys/"+name+"/rotate", nil)
 	require.NoError(t, err)
 	require.NoError(t, enc.Refresh(t.Context()))

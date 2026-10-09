@@ -55,7 +55,6 @@ func (s *Service) Append(ctx context.Context, event *Event) error {
 	return errors.Join(errs...)
 }
 
-// List reads the log of the request's workspace.
 func (s *Service) List(ctx context.Context, p *db.ListAuditLogsParams) ([]*Event, int32, error) {
 	rows, err := s.conn.Tenant().ListAuditLogs(ctx, p)
 	if err != nil {

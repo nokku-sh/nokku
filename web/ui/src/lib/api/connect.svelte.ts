@@ -11,8 +11,7 @@ function remember(id: string) {
 	recentTargets.current = [id, ...recentTargets.current.filter((r) => r !== id)].slice(0, 6);
 }
 
-// useConnect is the one way into a server from the UI: a web shell through
-// its daemon, or the ssh command for the user's own terminal.
+// useConnect is the one way into a server from the UI: a web shell, or the ssh command for the user's own terminal.
 export function useConnect() {
 	const createSession = daemon.createSession();
 
@@ -38,8 +37,7 @@ export function useConnect() {
 	};
 }
 
-// useServers lists what the caller can log in to, in the same order everywhere:
-// recently used first, then reachable, then by name.
+// useServers lists in the same order everywhere: recently used first, then reachable, then by name.
 export function useServers(when: () => boolean = () => true) {
 	const me = user.self();
 	const access = target.access(() => (when() ? me.data?.id : undefined));

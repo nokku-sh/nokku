@@ -66,8 +66,7 @@ type CreateAccessTokenParams struct {
 	LastSeenAt *time.Time         `json:"lastSeenAt"`
 }
 
-// One subject parameter, the column it lands in follows the kind. A SCIM
-// token has no subject.
+// One subject parameter, the column it lands in follows the kind. A SCIM token has no subject.
 func (q *Queries) CreateAccessToken(ctx context.Context, arg *CreateAccessTokenParams) (*AccessToken, error) {
 	row := q.db.QueryRow(ctx, createAccessToken,
 		arg.TokenHash,
@@ -174,8 +173,7 @@ WHERE
   subject_id = $1::UUID
 `
 
-// Signs the subject out everywhere. A user's devices are forgotten with it,
-// so whoever got in from one of them is not waved through quietly again.
+// Signs the subject out everywhere. A user's devices are forgotten too, so none is waved through quietly again.
 func (q *Queries) DeleteSubjectTokens(ctx context.Context, subjectID string) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteSubjectTokens, subjectID)
 	if err != nil {

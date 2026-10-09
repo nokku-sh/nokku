@@ -56,8 +56,7 @@ func TestWithRecover(t *testing.T) {
 	}, "an intentional abort must pass through")
 }
 
-// A browser that does not trust the certificate yet breaks off every
-// connection. That is one line each, and nothing an operator acts on.
+// A browser that does not trust the certificate yet breaks off every connection. Nothing an operator acts on.
 func TestHandshakeErrorsAreDebugLines(t *testing.T) {
 	const handshake = "http: TLS handshake error from [::1]:35370: remote error: tls: unknown certificate"
 	var out bytes.Buffer

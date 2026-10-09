@@ -21,8 +21,7 @@ import (
 
 const (
 	flowStateTTL = 10 * time.Minute
-	// flowCookieName holds the state of an SSO login. Only the browser that
-	// started the flow has it, which blocks login CSRF.
+	// flowCookieName holds the state of an SSO login. Only the browser that started the flow has it, so no login CSRF.
 	flowCookieName = "nokku_flow"
 	// Browsers drop a cookie past 4096 bytes, name and attributes included.
 	maxFlowCookie = 3800
@@ -52,8 +51,7 @@ func endFlowBinding() *http.Cookie {
 	}
 }
 
-// linkUserIDFor never links on cross-site navigations, which carry the Lax
-// session cookie past the CSRF guard.
+// linkUserIDFor never links on cross-site navigations, which carry the Lax session cookie past the CSRF guard.
 func linkUserIDFor(ctx context.Context, r *http.Request) string {
 	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
 		return ""
@@ -61,14 +59,11 @@ func linkUserIDFor(ctx context.Context, r *http.Request) string {
 	return actor.SubjectFromContext(ctx)
 }
 
-// sealed keeps the state of a browser flow in an encrypted cookie. Starting a
-// flow stores nothing on the server, so nobody can exhaust it. Only a flow
-// that ended in a login leaves a marker behind, see spendFlow.
+// sealed keeps the state of a browser flow in an encrypted cookie, so starting a flow stores nothing on the server.
 type sealed[T any] struct {
 	svc    *Service
 	cookie string
-	// use is bound into the seal, so the state of one flow never opens as
-	// another's.
+	// use is bound into the seal, so the state of one flow never opens as another's.
 	use string
 	ttl time.Duration
 }
@@ -79,9 +74,7 @@ type envelope[T any] struct {
 	State   T      `json:"state"`
 }
 
-// put seals v into the cookie and returns the id of this run of the flow.
-// The browser binding is the cookie itself, the id is for whatever value
-// travels through the provider and has to match on the way back.
+// put seals v into the cookie. The returned id is for the value that travels through the provider and back.
 func (s *sealed[T]) put(w http.ResponseWriter, v T) (string, error) {
 	id := crypto.RandomString(32)
 	expires := s.svc.now().Add(s.ttl)
@@ -101,9 +94,7 @@ func (s *sealed[T]) put(w http.ResponseWriter, v T) (string, error) {
 	return id, nil
 }
 
-// take opens the state this browser carries and returns it with its id. It
-// refuses a state of another flow, an expired one, and one whose flow
-// already ended in a login.
+// take refuses a state of another flow, an expired one, and one whose flow already ended in a login.
 func (s *sealed[T]) take(r *http.Request) (T, string, error) {
 	var e envelope[T]
 	raw, err := base64.RawURLEncoding.DecodeString(cookieFromHeader(r.Header, s.cookie))
@@ -124,9 +115,7 @@ func (s *sealed[T]) take(r *http.Request) (T, string, error) {
 	return e.State, e.ID, nil
 }
 
-// spendFlow makes the state of a finished flow single use. Only a flow that
-// proved an identity gets here, so the markers cannot be piled up from
-// outside. A full store is logged and skipped, it must never block a login.
+// spendFlow makes a finished flow single use. A full store is logged and skipped, it must never block a login.
 func (s *Service) spendFlow(ctx context.Context, id string) {
 	if err := s.spent.Set(ctx, id, nil, flowStateTTL); err != nil {
 		slog.Warn("flow state not marked as spent", "error", err)

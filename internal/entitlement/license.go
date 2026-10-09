@@ -1,8 +1,6 @@
 package entitlement
 
-// Licenses verify offline against a compiled-in Ed25519 public key, so
-// activation works air-gapped. A key comes from NOKKU_LICENSE_KEY or from
-// the UI, and the one that is valid longest wins.
+// Licenses verify offline against a compiled-in Ed25519 public key, so activation works air-gapped.
 
 import (
 	"context"
@@ -36,8 +34,7 @@ var (
 	ErrNotSelfHosted      = errors.New("licenses apply to self-hosted instances only")
 )
 
-// EnvLicense reads NOKKU_LICENSE_KEY. A rejected key is logged and ignored,
-// it never stops the core from starting.
+// EnvLicense logs and ignores a rejected key, it never stops the core from starting.
 func EnvLicense() *licx.Claims {
 	key := os.Getenv(licenseEnv)
 	if key == "" {
@@ -68,8 +65,7 @@ func (s *Service) License() *licx.Claims {
 	return s.license.Load()
 }
 
-// ActivateLicense applies a key at once, no restart. A key that would
-// shorten the active license is refused, so an old key cannot undo a renewal.
+// ActivateLicense refuses a key that would shorten the active license, so an old key cannot undo a renewal.
 func (s *Service) ActivateLicense(ctx context.Context, key string) error {
 	if s.saas {
 		return ErrNotSelfHosted
@@ -99,8 +95,7 @@ func (s *Service) ActivateLicense(ctx context.Context, key string) error {
 	return nil
 }
 
-// WatchLicense picks up a key activated in the UI, also from another
-// replica, and repeats the expiry reminder once a day.
+// WatchLicense picks up a key activated in the UI, also from another replica, and repeats the expiry reminder.
 func (s *Service) WatchLicense(ctx context.Context) {
 	if !licx.HasPublicKey() {
 		return

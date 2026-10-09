@@ -1,15 +1,4 @@
-// Package kms does envelope encryption. One Tink keyset, stored in the
-// keysets row, encrypts everything at rest. The row is wrapped by a key
-// encryption key: a KMS key when KMS_URI is set, otherwise a key derived
-// from NOKKU_SECRET.
-//
-// A rotation adds a new primary key, re-encrypts the small secrets in the
-// database with it (see db.Reencrypt) and drops the older keys, so the
-// keyset never holds more than two. Recordings are never re-encrypted, each
-// has its own key and only that key is. With a KMS this happens on a timer
-// while the server runs, together with a rewrap that follows a key rotation
-// inside the KMS. A new NOKKU_SECRET, or a move to another KMS, is applied
-// with `nokku rotate-secrets`.
+// Package kms does envelope encryption. One Tink keyset encrypts everything, a KMS key or NOKKU_SECRET wraps it.
 package kms
 
 import (
@@ -46,13 +35,11 @@ type TinkEncryptor struct {
 	KMSURI         string        `env:"KMS_URI"`
 	VaultToken     string        `env:"VAULT_TOKEN"`
 	RewrapInterval time.Duration `env:"KEYSET_REWRAP_INTERVAL" envDefault:"12h"`
-	// RotateInterval is how old the primary key may get with a KMS. Zero
-	// turns the timed rotation off.
+	// RotateInterval is how old the primary key may get with a KMS. Zero turns the timed rotation off.
 	RotateInterval time.Duration `env:"KEYSET_ROTATE_INTERVAL" envDefault:"2160h"`
 }
 
-// New loads the keyset, or creates it on first boot. secret is NOKKU_SECRET
-// and only wraps the keyset when KMS_URI is unset.
+// New loads the keyset or creates it on first boot. secret only wraps it when KMS_URI is unset.
 func New(ctx context.Context, conn *db.Connection, secret string) (*TinkEncryptor, error) {
 	t, err := env.ParseAs[TinkEncryptor]()
 	if err != nil {
@@ -73,8 +60,7 @@ func New(ctx context.Context, conn *db.Connection, secret string) (*TinkEncrypto
 	return &t, nil
 }
 
-// ValidSecret refuses a NOKKU_SECRET that is short or a known placeholder.
-// The keyset is only as safe as the key derived from it.
+// ValidSecret refuses a short or placeholder NOKKU_SECRET, the keyset is only as safe as the key from it.
 func ValidSecret(secret string) error {
 	if len(secret) < minSecretLen {
 		return fmt.Errorf(
@@ -121,8 +107,7 @@ func (t *TinkEncryptor) Decrypt(ciphertext []byte) ([]byte, error) {
 	return t.primitive.Decrypt(ciphertext, nil)
 }
 
-// Start keeps a KMS-wrapped keyset fresh until ctx is done. With NOKKU_SECRET
-// the keys only change through rotate-secrets, so there is nothing to do.
+// Start keeps a KMS-wrapped keyset fresh. With NOKKU_SECRET the keys only change through rotate-secrets.
 func (t *TinkEncryptor) Start(ctx context.Context) {
 	if !t.UsesKMS() {
 		return
@@ -143,16 +128,12 @@ func (t *TinkEncryptor) Start(ctx context.Context) {
 	}()
 }
 
-// Refresh is one tick of Start. It wraps the keyset again, which follows a
-// key rotation inside the KMS, and adds a data key once the primary is older
-// than RotateInterval.
+// Refresh is one tick of Start. Wrapping again follows a key rotation inside the KMS.
 func (t *TinkEncryptor) Refresh(ctx context.Context) error {
 	return t.update(ctx, t.currentKEK(), false)
 }
 
-// Rotate moves the keyset under a new key encryption key and rotates its
-// keys, so nothing in the database is in reach of the old one anymore.
-// target is secret:<value> or kms:<uri>.
+// Rotate moves the keyset under a new key encryption key. target is secret:<value> or kms:<uri>.
 func (t *TinkEncryptor) Rotate(ctx context.Context, target string) error {
 	var kek tink.AEAD
 	var err error
@@ -176,11 +157,7 @@ func (t *TinkEncryptor) currentKEK() tink.AEAD {
 	return t.kek
 }
 
-// update rewraps the stored keyset under kek. It first rotates when rotate
-// is set or the primary key is older than RotateInterval. Wrapping again with
-// the same KMS key follows a rotation inside the KMS. The row lock keeps two
-// instances from both rotating, and reading the row picks up what another
-// one did.
+// update rewraps the keyset under kek. The row lock keeps two instances from both rotating.
 func (t *TinkEncryptor) update(ctx context.Context, kek tink.AEAD, rotate bool) error {
 	current := t.currentKEK()
 	var primitive tink.AEAD
@@ -211,8 +188,7 @@ func (t *TinkEncryptor) update(ctx context.Context, kek tink.AEAD, rotate bool) 
 		if err := q.UpdateKeyset(ctx, &db.UpdateKeysetParams{Data: data, RotatedAt: rotatedAt}); err != nil {
 			return err
 		}
-		// Held across the commit, so nobody reads a re-encrypted row with
-		// the keys from before.
+		// Held across the commit, so nobody reads a re-encrypted row with the keys from before.
 		t.mu.Lock()
 		locked = true
 		return nil
@@ -228,10 +204,7 @@ func (t *TinkEncryptor) update(ctx context.Context, kek tink.AEAD, rotate bool) 
 	return nil
 }
 
-// rotateKeys adds a new primary key, moves every ciphertext in the database
-// to it, and drops the older keys. Two keys stay: the new one, and the one it
-// replaced, which this process may still write with until the commit.
-// Recordings are not touched, only their keys are re-encrypted.
+// rotateKeys keeps two keys: the new one, and the one it replaced, which this process may still write with.
 func rotateKeys(ctx context.Context, q *db.Queries, handle *keyset.Handle) (*keyset.Handle, error) {
 	outgoing, err := handle.Primary()
 	if err != nil {
@@ -284,8 +257,7 @@ func rotateKeys(ctx context.Context, q *db.Queries, handle *keyset.Handle) (*key
 	return manager.Handle()
 }
 
-// load reads the keyset or creates it on first boot. ON CONFLICT DO NOTHING
-// makes concurrent first boots safe.
+// load reads the keyset or creates it. ON CONFLICT DO NOTHING makes concurrent first boots safe.
 func (t *TinkEncryptor) load(ctx context.Context) error {
 	data, err := t.db.Sys().GetKeysetData(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {

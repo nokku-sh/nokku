@@ -1,7 +1,4 @@
-/**
- * Static configuration for the email templates.
- * Kept in one place so preview and production exports stay aligned.
- */
+/** Kept in one place so preview and production exports stay aligned. */
 export const CONFIG = {
   APP_NAME: "Nokku",
   APP_URL: "https://nokku.sh",
@@ -16,40 +13,31 @@ export const CONFIG = {
   UNSUBSCRIBE_URL: "https://nokku.sh/unsubscribe",
 } as const;
 
-/**
- * Template variables used in Go email templates.
- * These correspond to the variables injected by the Go backend.
- */
+/** The variables the Go backend injects into the templates. */
 export const CONSTANTS = {
-  // Common variables
   USER_NAME: "{{ .UserName }}",
   EXPIRATION: "{{ .Expiration }}",
 
-  // Auth related
   LINK_URL: "{{ .LinkURL }}",
   WORKSPACE: "{{ .Workspace }}",
   NEW_EMAIL: "{{ .NewEmail }}",
   CANCEL_URL: "{{ .CancelURL }}",
 
-  // Security alert
   PROFILE_URL: "{{ .ProfileURL }}",
   EVENT_TYPE: "{{ .EventType }}",
   EVENT_TIME: "{{ .EventTime }}",
   IP_ADDRESS: "{{ .IPAddress }}",
 
-  // New Login / Device
   LOGIN_METHOD: "{{ .LoginMethod }}",
   DEVICE_INFO: "{{ .DeviceInfo }}",
   DEVICE_NAME: "{{ .DeviceName }}",
   DEVICE_ID: "{{ .DeviceID }}",
 
-  // Role changed
   OLD_ROLE: "{{ .OldRole }}",
   NEW_ROLE: "{{ .NewRole }}",
   CHANGED_BY: "{{ .ChangedBy }}",
 
-  // Who runs this server, filled by the backend from NOKKU_OPERATOR_* settings.
-  // The bare names are for {{ if }} checks, the _VALUE ones for output.
+  // Filled by the backend from NOKKU_OPERATOR_*. The bare names are for {{ if }} checks, the _VALUE ones for output.
   OPERATOR: {
     NAME: ".Operator.Name",
     NAME_VALUE: "{{ .Operator.Name }}",
@@ -67,14 +55,10 @@ export const CONSTANTS = {
     IMPRINT_VALUE: "{{ .Operator.ImprintURL }}",
   },
 
-  // License key email
   LICENSE_KEY: "{{ .Key }}",
   CUSTOMER_EMAIL: "{{ .Email }}",
   LICENSE_EXPIRES: "{{ .ExpiresAt }}",
 } as const;
 
-/**
- * Type helper for template variables
- */
 export type Config = typeof CONFIG;
 export type Constants = typeof CONSTANTS;

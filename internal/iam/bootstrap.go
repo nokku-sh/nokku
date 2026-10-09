@@ -24,10 +24,7 @@ type bootstrapConfig struct {
 	MicrosoftTenantID     string `env:"MICROSOFT_TENANT_ID"`
 }
 
-// Bootstrap runs on a self-hosted server, inside its one workspace. It
-// seeds the providers from the environment and makes sure the admin can
-// get in: an owner without a passkey or linked identity gets a sign-in
-// link, returned for the host to show, at every boot until one exists.
+// Bootstrap seeds the providers from the environment. An owner with no way in gets a sign-in link at every boot.
 func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, error) {
 	cfg, err := env.ParseAs[bootstrapConfig]()
 	if err != nil {
@@ -51,8 +48,7 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 		}
 	}
 	if cfg.MicrosoftClientID != "" && cfg.MicrosoftClientSecret != "" {
-		// The tenant-wide endpoints issue tokens whose iss names the tenant,
-		// which OIDC discovery cannot verify.
+		// The tenant-wide endpoints issue tokens whose iss names the tenant, which OIDC discovery cannot verify.
 		tenant := strings.ToLower(cfg.MicrosoftTenantID)
 		if tenant == "" || tenant == "common" || tenant == "organizations" || tenant == "consumers" {
 			return "", errors.New("iam: MICROSOFT_TENANT_ID must be a tenant id")
@@ -102,8 +98,7 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 	return s.IssueBootstrapLink(ctx, owner)
 }
 
-// AdminLink issues a 24 hour sign-in link for the owner of ws, the way back
-// in when every passkey is gone. It replaces earlier links.
+// AdminLink issues a 24 hour sign-in link for the owner, the way back in when every passkey is gone.
 func (s *Service) AdminLink(ctx context.Context, ws actor.Workspace) (*db.User, string, error) {
 	ctx = actor.WithWorkspace(ctx, ws)
 	owner, err := s.conn.Tenant().GetOwner(ctx)

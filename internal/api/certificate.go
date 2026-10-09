@@ -22,9 +22,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/ssh"
 )
 
-// serviceAccountCertTTL is the most a service account's certificate lives. A
-// job signs a fresh one when it runs, so a leaked token leaves an hour of
-// access behind and not days.
+// serviceAccountCertTTL caps a service account's certificate, so a leaked token leaves an hour of access, not days.
 const serviceAccountCertTTL = time.Hour
 
 type certificateService struct {
@@ -152,8 +150,7 @@ func (s *certificateService) UpdateCertificateAuthority(
 		HostMaxTtl:          optDuration(req.GetHostMaxTtl()),
 	}
 
-	// Only becoming the default moves it. Unsetting it leaves the workspace
-	// without one, which the enroll fallback and the UI both handle.
+	// Only becoming the default moves it. Unsetting leaves none, which the enroll fallback and the UI handle.
 	var result *db.SSHCA
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if result, err = q.UpdateCA(ctx, params); err != nil {
@@ -215,10 +212,7 @@ func (s *certificateService) RolloverCertificateAuthority(
 	}, nil
 }
 
-// SignSSHCertificate signs a user certificate for the caller, for one server.
-// It names the accounts the caller is granted there right now, so it works
-// nowhere else and a revoked grant ends with it, even on a host that never
-// hears of the revoke.
+// SignSSHCertificate names the accounts the caller is granted on one server right now, so a revoked grant ends with it.
 func (s *certificateService) SignSSHCertificate(
 	ctx context.Context,
 	req *nokkuv1.SignSSHCertificateRequest,
@@ -232,8 +226,7 @@ func (s *certificateService) SignSSHCertificate(
 		if err != nil {
 			return err
 		}
-		// The grant comes first, so a member without one learns nothing
-		// about the server.
+		// The grant comes first, so a member without one learns nothing about the server.
 		accounts, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
 			TargetIds: []string{target.ID},
 			SubjectID: &caller.ID,
@@ -247,8 +240,7 @@ func (s *certificateService) SignSSHCertificate(
 		for _, a := range accounts {
 			principals = append(principals, ssh.LoginPrincipal(caller.ID, target.ID, a.Username))
 		}
-		// A daemon that is not approved, or no longer, may still hold the
-		// principals of its last sync. It gets no new certificates to match.
+		// A daemon that is not approved may still hold the principals of its last sync. It gets no certificates to match.
 		if target.DaemonID != nil {
 			daemon, err := q.GetDaemon(ctx, *target.DaemonID)
 			if err != nil {

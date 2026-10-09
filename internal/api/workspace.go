@@ -19,9 +19,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/tenant"
 )
 
-// workspaceService manages the workspace of the request's host and the
-// users in it. CreateWorkspace is the one call that runs outside one, on
-// the hosted service's root host.
+// workspaceService serves the workspace of the request's host. Only CreateWorkspace runs outside one.
 type workspaceService struct {
 	cfg *config.Config
 }
@@ -35,8 +33,7 @@ func (s *workspaceService) GetWorkspace(
 		return nil, err
 	}
 	result := workspace.ToProto()
-	// The webhook secret signs events to the customer's SIEM, only the
-	// owner manages it and reads it back.
+	// The webhook secret signs events to the customer's SIEM, only the owner manages it and reads it back.
 	if settings := result.GetSettings(); settings != nil &&
 		callerRole(ctx) < nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER {
 		settings.AuditWebhookUrl, settings.AuditWebhookSecret = nil, nil
@@ -67,8 +64,7 @@ func (s *workspaceService) UpdateWorkspace(
 	return &nokkuv1.UpdateWorkspaceResponse{Workspace: workspace.ToProto()}, nil
 }
 
-// DeleteWorkspace only exists on the hosted service, a self-hosted server
-// has nothing else to serve.
+// DeleteWorkspace only exists on the hosted service, a self-hosted server has nothing else to serve.
 func (s *workspaceService) DeleteWorkspace(
 	ctx context.Context,
 	_ *nokkuv1.DeleteWorkspaceRequest,
@@ -87,8 +83,7 @@ func (s *workspaceService) DeleteWorkspace(
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
 }
 
-// CreateWorkspace is the hosted signup. The owner gets a sign-in link to the
-// new workspace's host, the workspace is deleted again when nobody uses it.
+// CreateWorkspace is the hosted signup. The workspace is deleted again when nobody uses the sign-in link.
 func (s *workspaceService) CreateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.CreateWorkspaceRequest,
@@ -99,8 +94,7 @@ func (s *workspaceService) CreateWorkspace(
 	if tenant.Forbidden(req.GetSlug()) {
 		return nil, newError(connect.CodeInvalidArgument, "this name is not available")
 	}
-	// Asked before anything exists, DNS included. A workspace whose owner
-	// gets no mail would sit there until the purge.
+	// Asked before anything exists. A workspace whose owner gets no mail would sit there until the purge.
 	addr := strings.ToLower(strings.TrimSpace(req.GetOwnerEmail()))
 	if s.cfg.Email.OwnerLinkOnCooldown(ctx, addr) {
 		return nil, newError(
@@ -137,8 +131,6 @@ func (s *workspaceService) CreateWorkspace(
 	}
 	return &nokkuv1.CreateWorkspaceResponse{Url: new(s.cfg.Tenant.BaseURL(ws.Slug))}, nil
 }
-
-// Users ----------------------------------------------------------------------
 
 func (s *workspaceService) ListUsers(
 	ctx context.Context,
@@ -194,8 +186,7 @@ func (s *workspaceService) UpdateUserRole(
 	return &nokkuv1.UpdateUserRoleResponse{}, nil
 }
 
-// SetUserActive ends the user's sessions on a deactivation. Grants stay, so
-// switching the account back on restores its access.
+// SetUserActive ends the user's sessions on a deactivation. Grants stay, so switching back on restores access.
 func (s *workspaceService) SetUserActive(
 	ctx context.Context,
 	req *nokkuv1.SetUserActiveRequest,
@@ -236,8 +227,7 @@ func (s *workspaceService) DeleteUser(
 	return &nokkuv1.DeleteUserResponse{}, nil
 }
 
-// checkCanManageUser also protects the owner, who is above everyone, and
-// keeps people from managing themselves.
+// checkCanManageUser also protects the owner, and keeps people from managing themselves.
 func checkCanManageUser(ctx context.Context, q *db.Queries, userID string) error {
 	if userID == actor.UserIDFromContext(ctx) {
 		return newError(connect.CodeFailedPrecondition, "you cannot change your own account here")
@@ -260,8 +250,7 @@ func (s *workspaceService) TransferOwnership(
 	if req.GetNewOwnerId() == actor.UserIDFromContext(ctx) {
 		return nil, newError(connect.CodeInvalidArgument, "you are the owner already")
 	}
-	// A transaction on purpose. When the new owner does not exist the update
-	// already took the old one's role, and the rollback gives it back.
+	// A transaction on purpose. A missing new owner means the old one already lost the role, the rollback gives it back.
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		n, err := q.TransferOwnership(ctx, req.GetNewOwnerId())
 		if err != nil {
@@ -279,7 +268,6 @@ func (s *workspaceService) TransferOwnership(
 }
 
 // streamLife ends a stream so the client comes back through authentication.
-// A session that ended meanwhile hears hints until then, never data.
 const streamLife = 10 * time.Minute
 
 // SubscribeChanges costs a goroutine per stream and no database connection.

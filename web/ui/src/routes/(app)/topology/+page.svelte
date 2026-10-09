@@ -40,8 +40,7 @@
 	const MORE = 20;
 	const PADDING = 24;
 
-	// The focus lives in the URL, so a view is shareable and Back steps through
-	// what was looked at.
+	// The focus lives in the URL, so a view is shareable and Back steps through what was looked at.
 	const focus = $derived(parseFocus(page.url.searchParams.get('focus')));
 	function setFocus(next?: Focus) {
 		const url = new URL(page.url.href);

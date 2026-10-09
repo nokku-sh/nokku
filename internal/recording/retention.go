@@ -13,7 +13,7 @@ func (s *Service) runSweeper(ctx context.Context) {
 	ticker := time.NewTicker(12 * time.Hour)
 	defer ticker.Stop()
 
-	s.cleanup(ctx) // initial cleanup
+	s.cleanup(ctx)
 
 	for {
 		select {

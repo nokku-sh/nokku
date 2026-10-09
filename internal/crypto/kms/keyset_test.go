@@ -10,8 +10,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
-// fakeKEK stands in for a KMS KEK: it "wraps" by tagging the blob with its
-// key byte, so unwrapping with a different KEK fails loudly.
+// fakeKEK tags the blob with its key byte, so unwrapping with a different KEK fails loudly.
 type fakeKEK struct{ id byte }
 
 var _ tink.AEAD = fakeKEK{}
@@ -72,8 +71,7 @@ func TestUnwrapWrongKEKFails(t *testing.T) {
 		t.Fatalf("wrap: %v", err)
 	}
 
-	// A wrong KEK (e.g. misconfigured KMS_URI) must fail loudly at boot
-	// instead of silently running with a broken encryptor.
+	// A wrong KEK must fail loudly at boot instead of running with a broken encryptor.
 	if _, err := unwrap(data, fakeKEK{id: 2}); err == nil {
 		t.Fatal("expected unwrap with wrong KEK to fail")
 	}

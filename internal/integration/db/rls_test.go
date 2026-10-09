@@ -18,12 +18,9 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// Tenant queries carry no workspace filter. These tests are what that rests
-// on: every table with a workspace_id has the one policy, and a pinned
-// transaction reaches its own rows and nothing else.
+// Tenant queries carry no workspace filter. These tests are what that rests on.
 
-// unscoped has a workspace_id but no policy, on purpose. It holds a counter,
-// the app role cannot write it.
+// unscoped has a workspace_id but no policy, on purpose. It holds a counter the app role cannot write.
 var unscoped = []string{"workspace_state"}
 
 const tenantPolicy = "(workspace_id = current_workspace_id())"
@@ -33,8 +30,7 @@ func pinned(t *testing.T, ws string) context.Context {
 	return actor.WithWorkspace(t.Context(), actor.Workspace{ID: ws})
 }
 
-// pinnedConn is a connection of its own that runs single statements the way
-// a request does: nokku_app, pinned to ws.
+// pinnedConn runs single statements the way a request does: nokku_app, pinned to ws.
 func pinnedConn(t *testing.T, c *conn, ws string) *pgx.Conn {
 	t.Helper()
 	// Leaving the pool pins it, see pinWorkspace.
@@ -47,8 +43,7 @@ func pinnedConn(t *testing.T, c *conn, ws string) *pgx.Conn {
 	return conn
 }
 
-// seedEveryTable puts a row of the fixture's workspace into each tenant
-// table the fixture itself leaves empty.
+// seedEveryTable puts a row into each tenant table the fixture itself leaves empty.
 func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 	t.Helper()
 	_, err := c.sysPool.Exec(t.Context(), `
@@ -72,8 +67,7 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 	}
 }
 
-// tenantTables is every table in public with a workspace_id column, read
-// from the catalog so a table added later is covered without a change here.
+// tenantTables reads the catalog, so a table added later is covered without a change here.
 func tenantTables(t *testing.T, c *conn) []string {
 	t.Helper()
 	rows, err := c.sysPool.Query(t.Context(), `
@@ -113,8 +107,7 @@ func pgCode(err error) string {
 	return ""
 }
 
-// A new tenant table that misses the policy or the default fails here, not
-// in production.
+// A new tenant table that misses the policy or the default fails here, not in production.
 func TestEveryTenantTableHasThePolicy(t *testing.T) {
 	c := testConnection(t)
 	for _, table := range tenantTables(t, c) {
@@ -173,8 +166,7 @@ func TestEveryTenantTableHasThePolicy(t *testing.T) {
 	}
 }
 
-// The app role has no way to bypass row security on its own, and it cannot
-// become the role that does.
+// The app role cannot bypass row security on its own, and it cannot become the role that does.
 func TestAppRoleIsSubjectToRowSecurity(t *testing.T) {
 	c := testConnection(t)
 	var name string
@@ -350,9 +342,7 @@ func TestUnpinnedRequestFailsClosed(t *testing.T) {
 	}
 }
 
-// The pin is set each time a connection leaves the pool, so one connection
-// serves one workspace after the other without mixing them up. A pool of one
-// forces every call onto the same connection.
+// The pin is set each time a connection leaves the pool. A pool of one forces every call onto the same connection.
 func TestPinFollowsTheContext(t *testing.T) {
 	t.Setenv("NOKKU_DB_MAX_CONNS", "1")
 	c := testConnection(t)
@@ -384,8 +374,7 @@ func TestPinFollowsTheContext(t *testing.T) {
 	})
 }
 
-// Many requests of two workspaces share a small pool. Each only ever sees
-// its own workspace.
+// Many requests of two workspaces share a small pool. Each only ever sees its own workspace.
 func TestPinHoldsUnderConcurrency(t *testing.T) {
 	t.Setenv("NOKKU_DB_MAX_CONNS", "3")
 	c := testConnection(t)
@@ -419,8 +408,7 @@ func TestPinHoldsUnderConcurrency(t *testing.T) {
 	wg.Wait()
 }
 
-// A system connection is never pinned, so an insert that names no workspace
-// keeps failing there even right after pinned traffic.
+// A system connection is never pinned, so an insert that names no workspace fails even right after pinned traffic.
 func TestSystemConnectionsStayUnpinned(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
@@ -436,8 +424,7 @@ func TestSystemConnectionsStayUnpinned(t *testing.T) {
 	}
 }
 
-// One read of the pinned workspace, the way a handler does it today and the
-// way it would with the pool hook.
+// One read of the pinned workspace, the way a handler does it today and the way it would with the pool hook.
 func BenchmarkSingleRead(b *testing.B) {
 	c := testConnection(b)
 	id := uuid.NewV7().String()
@@ -476,8 +463,7 @@ func TestSystemRoleSeesEveryWorkspace(t *testing.T) {
 	}
 }
 
-// The app role holds no DELETE on the audit table. The system role does, and
-// the trigger still refuses it outside the retention job.
+// The app role holds no DELETE on the audit table. The trigger refuses the system role outside the retention job.
 func TestAuditLogIsAppendOnly(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)

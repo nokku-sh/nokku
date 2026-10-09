@@ -16,9 +16,7 @@ var (
 
 const mailDomainTimeout = 5 * time.Second
 
-// Verify checks that addr is a bare address. With strict it also asks DNS
-// whether the domain takes mail. Self-hosted installs may have no DNS, so
-// they skip that.
+// Verify asks DNS only with strict, self-hosted installs may have no DNS.
 func Verify(ctx context.Context, addr string, strict bool) error {
 	parsed, err := mail.ParseAddress(addr)
 	// ParseAddress also takes "Name <addr>", only the bare form is an account.

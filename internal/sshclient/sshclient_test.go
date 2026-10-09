@@ -47,9 +47,7 @@ func waitForShell(t *testing.T, srv *sshtest.Server) {
 	t.Fatal("session env never reached the server")
 }
 
-// TestDialTerminal_HappyPath walks the full dial: host verification against
-// the CA, env before pty, the recorded pty size, echo through the shell, and
-// window-change on Resize.
+// The full dial: host verification against the CA, env before pty, the pty size, echo and window-change.
 func TestDialTerminal_HappyPath(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	term := dialForTest(t, srv, testConfig(t, srv))
@@ -67,7 +65,6 @@ func TestDialTerminal_HappyPath(t *testing.T) {
 		t.Errorf("pty size = %dx%d, want 80x24", cols, rows)
 	}
 
-	// Stdin echoes back through the shell.
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		if _, err := term.Write([]byte("ping\n")); err != nil {
@@ -113,8 +110,7 @@ collect:
 	}
 }
 
-// TestDialTerminal_WrongCA is the security-critical assertion: a host
-// certificate signed by any other CA must fail the handshake.
+// The security-critical one: a host certificate signed by any other CA must fail the handshake.
 func TestDialTerminal_WrongCA(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	rogue := sshtest.NewServer(t)
@@ -132,8 +128,7 @@ func TestDialTerminal_WrongCA(t *testing.T) {
 	}
 }
 
-// TestDialTerminal_BadUserCert: the server rejects certificates it does not
-// know, and the dial surfaces an auth failure rather than hanging.
+// The server rejects certificates it does not know, and the dial fails instead of hanging.
 func TestDialTerminal_BadUserCert(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	cfg := testConfig(t, srv)
@@ -150,8 +145,7 @@ func TestDialTerminal_BadUserCert(t *testing.T) {
 	}
 }
 
-// TestDialTerminal_CtxCancel bounds the dial: a server that accepts TCP but
-// never speaks SSH must not hang the caller past the context deadline.
+// A server that accepts TCP but never speaks SSH must not hang the caller past the context deadline.
 func TestDialTerminal_CtxCancel(t *testing.T) {
 	stall, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -186,8 +180,7 @@ func TestDialTerminal_CtxCancel(t *testing.T) {
 	}
 }
 
-// TestTerminal_CloseTeardown verifies Close ends the output stream, so the
-// session wiring can exit.
+// Close ends the output stream, so the session wiring can exit.
 func TestTerminal_CloseTeardown(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	term := dialForTest(t, srv, testConfig(t, srv))
@@ -204,8 +197,7 @@ func TestTerminal_CloseTeardown(t *testing.T) {
 	}
 }
 
-// TestTerminal_ShellExit: Ctrl+D ends the remote shell, which reports its exit
-// status. That is the only ending the web terminal closes its tab for.
+// Ctrl+D ends the remote shell. That is the only ending the web terminal closes its tab for.
 func TestTerminal_ShellExit(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	term := dialForTest(t, srv, testConfig(t, srv))
@@ -232,8 +224,7 @@ func TestTerminal_ShellExit(t *testing.T) {
 	}
 }
 
-// TestTerminal_TransportDeath: when the server drops the connection the
-// terminal closes Stdout, which is how the pool wiring notices a dead relay.
+// A dropped connection closes Stdout, which is how the pool wiring notices a dead relay.
 func TestTerminal_TransportDeath(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	term := dialForTest(t, srv, testConfig(t, srv))

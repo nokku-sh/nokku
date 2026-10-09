@@ -2,11 +2,7 @@ import { Button, Heading, Hr, Link, Section, Text } from "react-email";
 import { CONFIG } from "../constants/vars";
 import BaseLayout from "../layouts/BaseLayout";
 
-/**
- * Marketing email for announcing a new feature. Static HTML by design. The
- * exported file (out/product-update.html) is meant to be uploaded to Resend
- * as-is, no template variables. Tweak the copy, re-export, and paste.
- */
+/** Static HTML by design, no template variables. out/product-update.html is uploaded to Resend as-is. */
 export default function ProductUpdate() {
   return (
     <BaseLayout preview="Nokku now rotates certificates automatically. Here's what that means for you." type="marketing">

@@ -29,8 +29,7 @@
 	// The host names the workspace, the session names the user. Both load once.
 	const ws = workspace.get();
 	const me = user.self();
-	// Both are read every time. svelte-query only reports a property that was
-	// read before it changed, a short-circuit drops whichever loads first.
+	// Both are read every time. svelte-query only reports a property that was read, a short-circuit drops one.
 	const booting = $derived([ws.data, me.data].some((d) => !d));
 	// An expired session is already on its way to /login.
 	const bootFailed = $derived(
@@ -41,12 +40,10 @@
 
 	const RETURN_WINDOW = 30 * 60_000;
 
-	// Most pages don't poll, so without a heartbeat an outage shows up whenever
-	// the next request happens to fail. It also brings the page back by itself.
+	// Most pages don't poll, so without a heartbeat an outage only shows on the next request.
 	util.getVersion(() => (connection.down ? 10_000 : 15_000));
 
-	// Route code loads on first visit. With the server gone that import fails and
-	// SvelteKit swaps the whole app for the error page, so try it before leaving.
+	// With the server gone a route import fails and SvelteKit swaps the app for the error page, so try it first.
 	let cleared: string | undefined;
 	beforeNavigate((nav) => {
 		const to = nav.to;
@@ -73,8 +70,7 @@
 	// These lay out their own full-width canvas.
 	const fullBleed = $derived(page.url.pathname === '/sessions');
 
-	// The nav hides what the role cannot use, this covers a typed address.
-	// The backend refuses the calls either way.
+	// The nav hides what the role cannot use, this covers a typed address. The backend refuses the calls either way.
 	$effect(() => {
 		if (me.data && !canVisit(page.url.pathname, me.data.role)) {
 			void goto('/', { replace: true });

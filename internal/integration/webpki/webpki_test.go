@@ -92,8 +92,7 @@ func TestInternalCAIsKeptAcrossStarts(t *testing.T) {
 	assert.Equal(t, advertised(t, first).Raw, advertised(t, second).Raw)
 }
 
-// The root only signs for the host name it was made for, so a new name gets a
-// new root. The key and with it the pin stay.
+// The root only signs for the host name it was made for, so a new name gets a new root. The key and the pin stay.
 func TestInternalCAFollowsANewHostName(t *testing.T) {
 	conn := freshConn(t)
 	before := start(t, conn, host)
@@ -121,9 +120,7 @@ func TestInternalCAKeyIsEncryptedAtRest(t *testing.T) {
 	require.Error(t, err, "the key sits in the database in the clear")
 }
 
-// The steps nk and nokkud take with a pin: read the CA without trusting the
-// connection, compare it to the pin, then connect with that CA as the only
-// root.
+// The steps of nk and nokkud: read the CA unverified, compare it to the pin, then connect with it as the only root.
 func TestClientReachesTheServerThroughThePin(t *testing.T) {
 	conn := freshConn(t)
 	id := start(t, conn, host)

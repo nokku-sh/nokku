@@ -23,8 +23,6 @@ func (e *resourceCapError) Error() string {
 	)
 }
 
-// CheckResources reports whether one more managed resource fits under the
-// plan's pooled ResourceCap.
 func (s *Service) CheckResources(ctx context.Context, workspaceID string) error {
 	plan := s.Resolve(ctx, workspaceID)
 	if plan.ResourceCap == unlimited {

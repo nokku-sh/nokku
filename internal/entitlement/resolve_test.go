@@ -15,9 +15,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// fakeDB fakes the transactional surface the resolver reads through. It
-// doubles as the sqlc DBTX underneath, serving the two queries entitlement
-// issues: the workspace subscription row and the pooled resource count.
 // The mode NewService takes, named so the calls read.
 const (
 	modeSaaS       = true
@@ -79,8 +76,7 @@ type errRow struct{ err error }
 
 func (r errRow) Scan(_ ...any) error { return r.err }
 
-// rowVals scans one row positionally into the sqlc-generated destinations
-// for the queries above.
+// rowVals scans one row positionally into the destinations sqlc generated.
 type rowVals struct{ vals []any }
 
 func (r rowVals) Scan(dest ...any) error {
@@ -231,10 +227,7 @@ func TestRetentionDays_ErrorsOnDBError(t *testing.T) {
 }
 
 func TestResolve_SelfHostedLicensedPlanUnlimited(t *testing.T) {
-	// The licensed self-hosted branch resolves its plan straight from the
-	// catalog, but the caps still protect SaaS infrastructure only. An
-	// enterprise key must enroll daemons, not hit ResourceCap zero from the
-	// catalog entry.
+	// The caps protect SaaS infrastructure only. An enterprise key must not hit the ResourceCap zero of the catalog.
 	sut := NewService(
 		&fakeDB{},
 		licensed(PlanEnterprise),
@@ -257,8 +250,7 @@ func TestResolve_SelfHostedLicensedPlanUnlimited(t *testing.T) {
 }
 
 func TestResolve_SelfHostedRecordingStorageUnlimited(t *testing.T) {
-	// The recording storage cap protects SaaS infrastructure only. On
-	// self-hosted, the disk is the customer's own whatever the plan says.
+	// The recording storage cap protects SaaS only, on self-hosted the disk is the customer's own.
 	sut := NewService(
 		&fakeDB{plan: PlanEnterprise, status: StatusActive},
 		nil,

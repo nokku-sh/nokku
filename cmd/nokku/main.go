@@ -46,8 +46,7 @@ func main() {
 				Description: "The way back in when the owner lost every passkey and no mail " +
 					"goes out. The link works for 24 hours and replaces earlier ones. " +
 					"Run it on the server with the same environment the server has.",
-				// Only the database and iam. The server may be running next to
-				// this, so nothing of what it does at boot happens here.
+				// Only the database and iam, the server may be running next to this.
 				Action: func(ctx context.Context, _ *cli.Command) error {
 					ec, err := env.ParseAs[config.EnvConfig]()
 					if err != nil {

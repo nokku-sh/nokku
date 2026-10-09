@@ -1,6 +1,5 @@
 -- name: SeenKnownDevice :one
--- Recognizes a device of the user and notes the visit. No row means the
--- account has not signed in from it before.
+-- Recognizes a device of the user and notes the visit. No row means the account has not signed in from it.
 UPDATE known_devices
 SET
   last_seen_at = @now

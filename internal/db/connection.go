@@ -1,4 +1,3 @@
-// Package db provides a database connection and querying utilities.
 package db
 
 import (
@@ -93,8 +92,7 @@ func (c *Connection) poolConfig() (*pgxpool.Config, error) {
 	return config, nil
 }
 
-// createPools logs in as the two runtime roles, so no runtime path holds
-// owner rights.
+// createPools logs in as the two runtime roles, so no runtime path holds owner rights.
 func (c *Connection) createPools(ctx context.Context, appConfig *pgxpool.Config) error {
 	appConfig.ConnConfig.User = "nokku_app"
 	appConfig.ConnConfig.Password = c.AppPassword
@@ -109,8 +107,7 @@ func (c *Connection) createPools(ctx context.Context, appConfig *pgxpool.Config)
 
 	sysConfig := appConfig.Copy()
 	sysConfig.ConnConfig.User = "nokku_system"
-	// Never pinned. A pin left on a system connection would send an insert
-	// that names no workspace into whatever workspace was pinned last.
+	// Never pinned. A leftover pin would send an insert that names no workspace into the wrong one.
 	sysConfig.PrepareConn = nil
 	sysConfig.MaxConns = min(c.MaxConns, 4)
 	sysConfig.MinConns = min(c.MinConns, sysConfig.MaxConns)
@@ -136,9 +133,7 @@ func (c *Connection) setupSchema(ctx context.Context, owner *pgx.ConnConfig) err
 	}
 	defer conn.Close(context.WithoutCancel(ctx))
 
-	// Serializes instances booting at once, the session holds it until it
-	// closes. The lock is per database, so test packages on their own
-	// databases still race on the cluster-wide roles.
+	// Serializes instances booting at once. The lock is per database, test packages still race on the roles.
 	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock(hashtext('nokku_schema'))"); err != nil {
 		return fmt.Errorf("acquiring schema lock: %w", err)
 	}
@@ -148,8 +143,7 @@ func (c *Connection) setupSchema(ctx context.Context, owner *pgx.ConnConfig) err
 	return c.setupRoles(ctx, conn)
 }
 
-// setupRoles lets the two runtime roles log in, the migration creates them
-// without a password.
+// setupRoles lets the two runtime roles log in, the migration creates them without a password.
 func (c *Connection) setupRoles(ctx context.Context, conn *pgx.Conn) error {
 	for _, role := range []string{"nokku_app", "nokku_system"} {
 		// ALTER ROLE takes no bind parameters, so format() quotes it server-side.
@@ -168,10 +162,7 @@ func (c *Connection) setupRoles(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
-// pinWorkspace runs every time a connection leaves the request pool. It pins
-// the workspace of the caller's context for as long as the caller holds the
-// connection. Without a workspace the caller gets an error, so a connection
-// is never used under the pin its last user left behind.
+// pinWorkspace runs every time a connection leaves the request pool. It refuses a context without a workspace.
 func pinWorkspace(ctx context.Context, conn *pgx.Conn) (bool, error) {
 	ws := actor.WorkspaceIDFromContext(ctx)
 	if ws == "" {
@@ -183,32 +174,17 @@ func pinWorkspace(ctx context.Context, conn *pgx.Conn) (bool, error) {
 	return true, nil
 }
 
-// Pick the scope by what the query may see, never by convenience:
-//
-//	Tenant    tenant rows of the pinned workspace, RLS enforced
-//	TenantTx  Tenant for statements that belong in one transaction
-//	Sys       every tenant, RLS bypassed, only boot, webhooks and jobs
-//	SysTx     Sys for statements that belong in one transaction
-//
-// Tenant queries carry no workspace filter and tenant inserts no workspace
-// id, the pin is the only scope they have. Run as system they would reach
-// every workspace, so system code only calls queries that name the workspace
-// or are cross-tenant on purpose.
+// Pick the scope by what the query may see. System code only calls queries that name the workspace.
 
-// Tenant runs single statements as nokku_app, each pinned to the workspace
-// on its context. Statements that belong together go through TenantTx.
+// Tenant runs single statements as nokku_app, each pinned to the workspace on its context.
 func (c *Connection) Tenant() *Queries { return c.tenant }
 
-// TenantTx runs fn in a transaction of the workspace on the context. The
-// tenant middleware put it there, so a request without one fails closed.
-// Work outside a request pins one with actor.WithWorkspace. The pin itself
-// happens when the connection leaves the pool, see pinWorkspace.
+// TenantTx fails closed without a workspace on the context. Outside a request, actor.WithWorkspace pins one.
 func (c *Connection) TenantTx(ctx context.Context, fn func(*Queries) error) error {
 	return pgx.BeginFunc(ctx, c.Pool, func(tx pgx.Tx) error { return fn(New(tx)) })
 }
 
-// Sys runs single statements as nokku_system (BYPASSRLS), for pre-auth
-// lookups and jobs.
+// Sys runs single statements as nokku_system (BYPASSRLS), for pre-auth lookups and jobs.
 func (c *Connection) Sys() *Queries { return c.sys }
 
 // SysTx bypasses RLS, only cross-tenant work belongs here.

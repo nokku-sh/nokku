@@ -33,8 +33,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/sshclient/sshtest"
 )
 
-// dpopProof signs a proof the way nokkud does. Session proofs carry the
-// access token hash, the enrollment proof has no token yet.
+// dpopProof signs like nokkud. Session proofs carry the access token hash, the enrollment proof has no token yet.
 func dpopProof(t *testing.T, cfg *config.Config, key *ecdsa.PrivateKey, procedure, token string) string {
 	t.Helper()
 	claims := map[string]any{
@@ -100,8 +99,7 @@ func TestEnrollDaemon(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, got.GetDaemon().GetStatus())
 
-	// The workspace has no defaults of its own, so the built-in ones apply and
-	// the daemon and the API agree on every field.
+	// The workspace has no defaults of its own, so the built-in ones apply and daemon and API agree on every field.
 	assert.True(t, proto.Equal(db.DefaultDaemonConfig(), res.GetConfig()),
 		"enroll answers with a complete config, got %v", res.GetConfig())
 	assert.True(t, proto.Equal(db.DefaultDaemonConfig(), got.GetDaemon().GetConfig()),
@@ -191,8 +189,7 @@ func TestCreateSession(t *testing.T) {
 	memberPrincipal, _, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), memberToken)
 	require.NoError(t, err)
 
-	// Membership alone opens nothing. A web shell and a relay need a grant on
-	// the target, like sshd asks for.
+	// Membership alone opens nothing. A web shell and a relay need a grant on the target, like sshd asks for.
 	openRelay := func() error {
 		relayCtx, info := connect.NewClientContext(t.Context())
 		info.RequestHeader().Set("Authorization", "Bearer "+memberToken)
@@ -285,8 +282,7 @@ func TestCreateSession(t *testing.T) {
 	require.NoError(t, stream.Send(&nokkuv1.ConnectRequest{
 		Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{}},
 	}))
-	// Signed here since require must not run on the daemon goroutine. A proof
-	// is single use, so every relay takes its own.
+	// Signed here, require must not run on the daemon goroutine. A proof is single use, each relay takes its own.
 	relayProofs := make(chan string, 3)
 	for range cap(relayProofs) {
 		relayProofs <- dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceDaemonRelayProcedure, token)
@@ -501,8 +497,7 @@ func seedDefaultCA(t *testing.T, srv *httptest.Server, adminAuth connect.ClientO
 	return created.GetCertificateAuthority().GetPublicKey()
 }
 
-// An enrollment that names no CA falls back to the workspace default, and
-// gets none while there is no default.
+// An enrollment that names no CA falls back to the workspace default, and gets none while there is no default.
 func TestEnrollFallsBackToDefaultCA(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -510,8 +505,7 @@ func TestEnrollFallsBackToDefaultCA(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	// The workspace is shared and came with a default CA. Only the owner
-	// role deletes past RLS.
+	// The workspace is shared and came with a default CA. Only the owner role deletes past RLS.
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
 	_, err = owner.Exec(t.Context(), "DELETE FROM ssh_cas WHERE workspace_id = $1", workspaceID)
@@ -542,8 +536,7 @@ func TestEnrollFallsBackToDefaultCA(t *testing.T) {
 	require.NotNil(t, got)
 	assert.Equal(t, first, *got, "the default")
 
-	// Making another CA the default moves it. The partial unique index
-	// refuses two, so a second default would fail the create.
+	// Making another CA the default moves it. The partial unique index refuses two defaults.
 	second := create("second", true)
 	got = enrolledCA()
 	require.NotNil(t, got)
@@ -559,8 +552,7 @@ func TestEnrollFallsBackToDefaultCA(t *testing.T) {
 	assert.Equal(t, []string{second}, defaults, "one default")
 }
 
-// The report is a hint from the host. What does not parse is dropped and the
-// rest still lands, so one odd account never blocks a sync.
+// The report is a hint from the host. What does not parse is dropped, so one odd account never blocks a sync.
 func TestSyncDaemonReport(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)

@@ -7,8 +7,7 @@ import (
 	"testing"
 )
 
-// A rotation drops old keys once it re-encrypted the columns it knows. An
-// encrypted column missing from the list would lose its data.
+// A rotation drops old keys, so an encrypted column missing from the list would lose its data.
 func TestEncryptedColumnsMatchSqlc(t *testing.T) {
 	raw, err := os.ReadFile("../../sqlc.yaml")
 	if err != nil {

@@ -1,5 +1,4 @@
-// Package live tells the open consoles of a workspace when to read again. It
-// carries no data, only which services answer differently now.
+// Package live tells the open consoles of a workspace when to read again. It carries no data.
 package live
 
 import (
@@ -20,23 +19,16 @@ import (
 const (
 	// settle lets the writes of one action land in one hint.
 	settle = 250 * time.Millisecond
-	// minGap is the least time between two hints on one stream. A workspace
-	// that never stops changing costs each console one round of requests per
-	// gap, however often it changes.
+	// minGap is the least time between two hints on one stream, however often the workspace changes.
 	minGap = 2 * time.Second
-	// spread is how long a hint may wait at random, per open console of the
-	// workspace, so a big workspace does not read again all at once.
+	// spread is the random wait per open console, so a big workspace does not read again all at once.
 	spread    = 10 * time.Millisecond
 	maxSpread = 15 * time.Second
-	// idle is how long a stream says nothing. Proxies cut one that is silent
-	// for a minute.
+	// idle is how long a stream says nothing. Proxies cut one that is silent for a minute.
 	idle = 20 * time.Second
 )
 
-// readers names the services that read a table, for the tables that change
-// with nobody clicking: daemons come and go, sessions get recorded. A table
-// that is not here changes when a person does something, and then the
-// consoles read everything again.
+// readers names the services that read a table that changes with nobody clicking. Any other table refetches everything.
 var readers = map[string][]string{
 	"daemons": {
 		nokkuv1connect.DaemonServiceName,
@@ -110,7 +102,6 @@ func (h *Hub) listen(ctx context.Context, cfg *pgx.ConnConfig) error {
 	}
 }
 
-// Changed tells the consoles of a workspace that a table changed.
 func (h *Hub) Changed(workspaceID, table string) {
 	services, known := readers[table]
 	h.mu.Lock()
@@ -137,8 +128,7 @@ func (h *Hub) missed() {
 	}
 }
 
-// Subscribe starts collecting the changes of a workspace. Close it when the
-// stream ends.
+// Subscribe starts collecting the changes of a workspace. Close it when the stream ends.
 func (h *Hub) Subscribe(workspaceID string) *Sub {
 	s := &Sub{
 		hub:       h,
@@ -165,9 +155,7 @@ func (s *Sub) Close() {
 	}
 }
 
-// Next waits for a change and returns it once the stream may speak again.
-// Without one for a while it returns the zero Change, so the caller can show
-// the stream is alive. It fails only when ctx is done.
+// Next returns the zero Change after a quiet while, so the caller can show the stream is alive.
 func (s *Sub) Next(ctx context.Context) (Change, error) {
 	select {
 	case <-ctx.Done():

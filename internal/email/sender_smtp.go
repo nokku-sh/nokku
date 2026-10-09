@@ -12,8 +12,7 @@ type smtpSender struct {
 	client *mail.Client
 }
 
-// newSMTPSender connects to any SMTP relay. Port 465 uses implicit TLS, 587
-// requires STARTTLS, anything else upgrades when the server offers it.
+// Port 465 uses implicit TLS, 587 requires STARTTLS, anything else upgrades when the server offers it.
 func newSMTPSender(host string, port int, username, password string) (*smtpSender, error) {
 	opts := []mail.Option{mail.WithPort(port), mail.WithTimeout(10 * time.Second)}
 	if username != "" {

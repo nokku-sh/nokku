@@ -26,13 +26,11 @@ import (
 )
 
 const (
-	terminalAgent = "nk/1.0.0 (linux/amd64)"
-	// A terminal stays signed in for 30 days.
+	terminalAgent    = "nk/1.0.0 (linux/amd64)"
 	deviceSessionTTL = 30 * 24 * time.Hour
 )
 
-// devicePost sends one form request of the device flow on the workspace's
-// host, as u when given.
+// devicePost sends one form request of the device flow on the workspace's host, as u when given.
 func devicePost(
 	ws actor.Workspace,
 	handler http.HandlerFunc,
@@ -95,8 +93,7 @@ func pollDevice(
 	return polled
 }
 
-// terminalSignIn runs a whole device login for u from the machine that holds
-// key, and returns how long the session lasts.
+// terminalSignIn runs a whole device login for u from the machine that holds key, and returns the session length.
 func terminalSignIn(t *testing.T, e *testEnv, ws actor.Workspace, u *db.User, key *ecdsa.PrivateKey) time.Duration {
 	t.Helper()
 	grant := beginDevice(t, e, ws)
@@ -114,8 +111,7 @@ func terminalSignIn(t *testing.T, e *testEnv, ws actor.Workspace, u *db.User, ke
 	return time.Duration(token.ExpiresIn) * time.Second
 }
 
-// The approver sees who asked for the code before anything is approved. That
-// is what gives a phished device code away.
+// The approver sees who asked for the code before approving. That is what gives a phished device code away.
 func TestDeviceFlowShowsRequester(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
@@ -182,8 +178,7 @@ func TestDeviceFlowStaysInItsWorkspace(t *testing.T) {
 	assert.Equal(t, http.StatusOK, polled.Code, polled.Body.String())
 }
 
-// A terminal is mailed once, when its key is new to the account. Signing in
-// again from the same machine is quiet, so the mail keeps meaning something.
+// A terminal is mailed once, when its key is new to the account, so the mail keeps meaning something.
 func TestTerminalSignInMailsOnlyNewKeys(t *testing.T) {
 	mailed := make(chan string, 4)
 	e := newTestEnvWith(t, iam.Deps{SendNewLogin: func(_ context.Context, userID, _, _, label, ip string) error {
@@ -224,8 +219,7 @@ func TestTerminalSignInMailsOnlyNewKeys(t *testing.T) {
 	wantMail(true, "a forgotten key is mailed again")
 }
 
-// Anyone can start device logins. Filling their store must not stop a
-// browser from signing in, or let a finished sign-in run again.
+// Anyone can start device logins. Filling their store must not stop a browser from signing in.
 func TestDeviceFloodStaysInItsStore(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)

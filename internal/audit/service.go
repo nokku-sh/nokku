@@ -1,4 +1,3 @@
-// Package audit contains the audit service.
 package audit
 
 import (
@@ -44,7 +43,7 @@ func (s *Service) runBackgroundJobs(ctx context.Context) {
 	ticker := time.NewTicker(12 * time.Hour)
 	defer ticker.Stop()
 
-	s.retentionCleanup(ctx) // initial cleanup
+	s.retentionCleanup(ctx)
 
 	for {
 		select {

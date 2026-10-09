@@ -13,8 +13,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
-// kmsKEK returns the key encryption key behind uri. The key never leaves the
-// KMS, every wrap and unwrap is a call to it.
+// kmsKEK returns the key encryption key behind uri. It never leaves the KMS, every wrap is a call to it.
 func (t *TinkEncryptor) kmsKEK(uri string) (tink.AEAD, error) {
 	provider, _, _ := strings.Cut(uri, "://")
 
@@ -26,8 +25,7 @@ func (t *TinkEncryptor) kmsKEK(uri string) (tink.AEAD, error) {
 			return nil, errors.New("VAULT_TOKEN required for hcvault")
 		}
 		hostPort, _, _ := strings.Cut(strings.TrimPrefix(uri, "hcvault://"), "/")
-		// DefaultConfig reads VAULT_SKIP_VERIFY itself and then skips the
-		// certificate check. The address is always https.
+		// DefaultConfig reads VAULT_SKIP_VERIFY itself and then skips the certificate check.
 		vaultClient, vaultErr := api.NewClient(&api.Config{
 			Address:    "https://" + hostPort,
 			HttpClient: api.DefaultConfig().HttpClient,

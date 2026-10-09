@@ -46,8 +46,7 @@ func TestPeriodEnd(t *testing.T) {
 	}
 }
 
-// The mode comes from NOKKU_SAAS alone. Settings that do not fit it fail the
-// start, a hosted service must never come up self-hosted.
+// Settings that do not fit NOKKU_SAAS fail the start, a hosted service must never come up self-hosted.
 func TestNewStripeNeverGuessesTheMode(t *testing.T) {
 	all := map[string]string{
 		"STRIPE_SECRET_KEY": "sk_test", "STRIPE_WEBHOOK_SECRET": "whsec", "STRIPE_PRO_PRICE_ID": "price",
@@ -88,8 +87,7 @@ func TestNewStripeNeverGuessesTheMode(t *testing.T) {
 	}
 }
 
-// A self-hosted server has no Stripe. A call that missed the mode gate gets
-// an error, not a panic.
+// A call that missed the mode gate gets an error, not a panic.
 func TestNilStripeIsDisabled(t *testing.T) {
 	var s *Stripe
 	_, err := s.Checkout(t.Context(), "ws", "owner@example.com")

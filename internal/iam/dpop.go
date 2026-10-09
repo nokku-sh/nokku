@@ -31,11 +31,7 @@ const (
 	dpopAnonReplayEntries = 10_000
 )
 
-// DPoPVerifier nonces are a stateless HMAC over a time bucket, so instances
-// share no storage for them. The cache catches jti reuse. It is the
-// verifier's own, so nothing else can fill it and get a marker refused.
-// Proofs without an access token come from anyone, so their markers go to
-// anonReplay and a flood of them only blocks enrollment and device login.
+// DPoPVerifier nonces are a stateless HMAC over a time bucket. Nothing else can fill its replay caches.
 type DPoPVerifier struct {
 	secret     []byte
 	replay     *cache.Memory
@@ -125,8 +121,7 @@ func (v *DPoPVerifier) Verify(
 		}
 	}
 
-	// Remember the jti as long as its proof could still be accepted.
-	// Hashed so a long jti cannot bloat the store.
+	// Remember the jti as long as its proof could still be accepted. Hashed so a long jti cannot bloat the store.
 	jti := sha256.Sum256([]byte(c.JTI))
 	added, err := replay.SetNX(ctx, string(jti[:]), nil, 2*dpopNonceTTL+dpopMaxSkew)
 	if err != nil {
@@ -175,9 +170,7 @@ func DPoPATH(token string) string {
 	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
 
-// sameHTU compares a proof's htu with the URL the request was for. The host is
-// case-insensitive and a default port may be left out. Query and fragment do
-// not count, the path does, byte for byte.
+// sameHTU ignores host case, a default port, query and fragment. The path counts byte for byte.
 func sameHTU(claim, want string) bool {
 	a, errA := url.Parse(claim)
 	b, errB := url.Parse(want)

@@ -34,8 +34,7 @@ func (s *serviceAccountService) GetServiceAccount(
 	}, nil
 }
 
-// CreateServiceAccount makes the identity alone. A token comes from
-// CreateServiceAccountToken.
+// CreateServiceAccount makes the identity alone. A token comes from CreateServiceAccountToken.
 func (s *serviceAccountService) CreateServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.CreateServiceAccountRequest,
@@ -188,8 +187,7 @@ func (s *serviceAccountService) ListServiceAccountTokens(
 	return &nokkuv1.ListServiceAccountTokensResponse{Tokens: db.ServiceAccountTokensToProto(rows)}, nil
 }
 
-// RevokeServiceAccountToken ends one token. The account and its other tokens
-// stay, so a new token can be rolled out before the old one goes.
+// RevokeServiceAccountToken ends one token, so a new one can be rolled out before the old one goes.
 func (s *serviceAccountService) RevokeServiceAccountToken(
 	ctx context.Context,
 	req *nokkuv1.RevokeServiceAccountTokenRequest,
@@ -223,8 +221,7 @@ func tokenExpiry(ts *timestamppb.Timestamp) (*time.Time, error) {
 	return &expiry, nil
 }
 
-// checkCanManageServiceAccount keeps an editor from touching an account
-// with a role above what they could grant.
+// checkCanManageServiceAccount keeps an editor from touching an account with a role above what they could grant.
 func checkCanManageServiceAccount(ctx context.Context, q *db.Queries, id string) error {
 	sa, err := q.GetServiceAccount(ctx, id)
 	if err != nil {

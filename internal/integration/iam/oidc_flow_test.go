@@ -2,8 +2,7 @@
 
 package iam_test
 
-// End-to-end OIDC tests against mockoidc. Discovery is hand-served so attack
-// paths can swap the token endpoint's id_token for a crafted one.
+// End-to-end OIDC against mockoidc. Discovery is hand-served so attacks can swap in a crafted id_token.
 
 import (
 	"crypto/rand"
@@ -225,8 +224,7 @@ func TestOIDCFlowJITDisabledRejectsUnknownIdentity(t *testing.T) {
 	}
 }
 
-// A provider belongs to its workspace, another workspace's host does not
-// know it.
+// A provider belongs to its workspace, another workspace's host does not know it.
 func TestOIDCFlowProviderStaysInItsWorkspace(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
@@ -289,8 +287,7 @@ func TestOIDCFlowIssParameterMismatch(t *testing.T) {
 	wantSSOFailure(t, h.runOIDCFlow(t, svc, "iss="+url.QueryEscape("http://evil.example/oidc")))
 }
 
-// The next three tests mint a structurally valid id_token with one broken
-// claim or the wrong key, swapping it into the token response.
+// The next three tests mint a valid id_token with one broken claim or the wrong key.
 
 func TestOIDCFlowIDTokenWrongNonce(t *testing.T) {
 	h := newOIDCIdP(t)
@@ -313,8 +310,7 @@ func TestOIDCFlowIDTokenWrongAudience(t *testing.T) {
 func TestOIDCFlowIDTokenBadSignature(t *testing.T) {
 	h := newOIDCIdP(t)
 	h.user()
-	// Sign with a key that is not the one JWKS advertises, keeping the kid
-	// the IdP advertises so the failure is the signature check itself.
+	// Signed with another key but the advertised kid, so the failure is the signature check itself.
 	attackerKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatalf("generate attacker key: %v", err)
@@ -390,8 +386,7 @@ func signIDToken(t *testing.T, key *rsa.PrivateKey, kid string, claims map[strin
 }
 
 func TestOIDCFlowLinksExistingSignedInUser(t *testing.T) {
-	// A signed-in user who starts the flow links the identity to their
-	// account.
+	// A signed-in user who starts the flow links the identity to their account.
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
 	existing := e.user(t, h.org.ws, "bob@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)

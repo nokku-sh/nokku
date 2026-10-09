@@ -1,22 +1,14 @@
--- Base schema for nokku.
---
--- The workspace is the tenant. Every other table hangs off one, users
--- included, and one row-level security policy keeps them apart. A
--- self-hosted server has exactly one workspace.
+-- The workspace is the tenant. Every other table hangs off one, and one row-level security policy keeps them apart.
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- The workspace a connection is pinned to, NULL when none is. The row-level
--- security policies compare against it, and every tenant table takes its
--- workspace_id from it by default, so an insert never names the workspace.
--- Unpinned, the default is NULL and the insert fails on NOT NULL.
+-- The workspace a connection is pinned to. Tenant tables default workspace_id to it, unpinned an insert fails.
 CREATE OR REPLACE FUNCTION current_workspace_id () RETURNS UUID AS $$
   SELECT NULLIF(current_setting('nokku.workspace_id', TRUE), '')::UUID
 $$ LANGUAGE sql STABLE;
 
 CREATE TABLE IF NOT EXISTS workspaces (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  -- The subdomain on the hosted service. Self-host has one workspace and
-  -- never looks at it.
+  -- The subdomain on the hosted service. Self-host has one workspace and never looks at it.
   slug TEXT NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'),
   name TEXT NOT NULL,
   description TEXT,
@@ -25,9 +17,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Bumped by triggers whenever what a daemon enforces changes. No RLS: it
--- holds a counter, not tenant data, and only the SECURITY DEFINER trigger
--- functions below may write it.
+-- Bumped by triggers whenever what a daemon enforces changes. No RLS, only the trigger functions below write it.
 CREATE TABLE IF NOT EXISTS workspace_state (
   workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
   version BIGINT NOT NULL DEFAULT 0
@@ -48,16 +38,15 @@ CREATE TABLE IF NOT EXISTS workspace_subscriptions (
 );
 
 -- Identity --------------------------------------------------------------------
--- A user belongs to one workspace. The same person at two companies has two
--- rows, one per workspace, and each company fully owns theirs.
+
+-- A user belongs to one workspace. The same person at two companies has two rows.
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   email TEXT NOT NULL CHECK (email = lower(email)),
   name TEXT NOT NULL DEFAULT '',
   picture TEXT,
-  -- WorkspaceRole of the protos: 1=member, 2=viewer, 3=editor, 4=admin,
-  -- 5=owner. Ordered, each includes everything before it.
+  -- WorkspaceRole of the protos: 1=member, 2=viewer, 3=editor, 4=admin, 5=owner. Each includes everything before it.
   role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 5),
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -66,8 +55,7 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE (workspace_id, id)
 );
 
--- Exactly one owner per workspace. TransferOwnership swaps the roles in one
--- statement, anything else trips this index.
+-- Exactly one owner per workspace. TransferOwnership swaps the roles in one statement, anything else trips this.
 CREATE UNIQUE INDEX idx_users_owner ON users (workspace_id)
 WHERE
   role = 5;
@@ -94,8 +82,7 @@ WHERE
 
 CREATE INDEX idx_credentials_user ON credentials (user_id, type);
 
--- Links sent by mail. A signup token has no user yet, the account is created
--- when it is spent.
+-- Links sent by mail. A signup token has no user yet, the account is created when it is spent.
 CREATE TABLE IF NOT EXISTS one_time_tokens (
   token_hash TEXT PRIMARY KEY,
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
@@ -113,15 +100,12 @@ CREATE INDEX idx_one_time_tokens_expiry ON one_time_tokens (expires_at);
 
 CREATE INDEX idx_one_time_tokens_user ON one_time_tokens (user_id, purpose);
 
--- Browsers and terminals an account has signed in from. They show in the
--- "where you're signed in" list, and a sign-in from one that is not here
--- yet is mailed to the account. A row never signs anyone in.
+-- Browsers and terminals an account has signed in from. A row never signs anyone in.
 CREATE TABLE IF NOT EXISTS known_devices (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   user_id UUID NOT NULL,
-  -- What the device is recognized by: the hash of a browser's device
-  -- cookie, or the DPoP key thumbprint of a terminal.
+  -- The hash of a browser's device cookie, or the DPoP key thumbprint of a terminal.
   key TEXT NOT NULL,
   ip TEXT NOT NULL DEFAULT '', -- of the sign-in that added it
   user_agent TEXT NOT NULL DEFAULT '', -- of the sign-in that added it
@@ -134,8 +118,7 @@ CREATE TABLE IF NOT EXISTS known_devices (
 
 CREATE INDEX idx_known_devices_expiry ON known_devices (expires_at);
 
--- OIDC providers of the workspace. The config, secret included, is one JSON
--- blob encrypted at rest.
+-- OIDC providers of the workspace. The config, secret included, is one JSON blob encrypted at rest.
 CREATE TABLE IF NOT EXISTS sso_providers (
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   provider_id TEXT NOT NULL CHECK (provider_id ~ '^[a-z0-9-]{1,64}$'),
@@ -162,18 +145,13 @@ CREATE TABLE IF NOT EXISTS service_accounts (
   UNIQUE (workspace_id, id)
 );
 
--- Everything that authenticates a call: browser and CLI sessions, daemon
--- sessions, service account keys, SCIM tokens. Every row is a credential.
--- What only remembers a device lives in known_devices, so nothing here ever
--- has to be told apart from a login.
+-- Everything that authenticates a call. Every row is a credential, what only remembers a device is in known_devices.
 CREATE TABLE IF NOT EXISTS access_tokens (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   token_hash TEXT NOT NULL UNIQUE,
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   kind TEXT NOT NULL CHECK (kind IN ('user', 'cli', 'daemon', 'service_account', 'scim')),
-  -- One subject column per kind, none for scim. A daemon's token has to
-  -- outlive the daemon: it is what the host gets its REJECTED answer
-  -- through, and SyncDaemon removes it with that answer, so no foreign key.
+  -- One subject column per kind, none for scim. No foreign key, a daemon's token outlives it for the REJECTED answer.
   user_id UUID,
   service_account_id UUID,
   daemon_id UUID,
@@ -203,8 +181,7 @@ CREATE INDEX idx_access_tokens_expiry ON access_tokens (expires_at)
 WHERE
   expires_at IS NOT NULL;
 
--- The account remembers when any of its tokens was last used, so a list of
--- accounts needs no join. The stamp moves at most once a minute per token.
+-- The account remembers when any of its tokens was last used, so a list of accounts needs no join.
 CREATE OR REPLACE FUNCTION note_service_account_used () RETURNS TRIGGER AS $$
 BEGIN
   UPDATE service_accounts
@@ -224,8 +201,7 @@ CREATE TABLE IF NOT EXISTS daemons (
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   status INTEGER NOT NULL DEFAULT 1 CHECK (status IN (1, 2, 3)), -- 1=pending, 2=accepted, 3=rejected
-  -- Refreshed by the core instance holding the control stream. Online means
-  -- seen within the last 30 seconds, so a crashed instance needs no cleanup.
+  -- Refreshed by the instance holding the control stream. Online means seen in the last 30 seconds.
   last_seen_at TIMESTAMPTZ,
   key_thumbprint TEXT,
   config JSONB NOT NULL DEFAULT '{}',
@@ -259,8 +235,7 @@ CREATE TABLE IF NOT EXISTS team_members (
   FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE
 );
 
--- SSH certificate authorities. An X.509 CA, when there is one, gets a table
--- of its own: it shares the key material and nothing else.
+-- SSH certificate authorities. An X.509 CA would get a table of its own, it shares the key material and nothing else.
 CREATE TABLE IF NOT EXISTS ssh_cas (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
@@ -277,15 +252,12 @@ CREATE TABLE IF NOT EXISTS ssh_cas (
   key_type INTEGER NOT NULL DEFAULT 3, -- 1 = RSA, 2 = ECDSA, 3 = ED25519
   key_bits INTEGER NOT NULL,
   lifetime INTERVAL NOT NULL DEFAULT '8760 hours',
-  -- User certificate config
   user_default_ttl INTERVAL NOT NULL DEFAULT '120 hours', -- 5 days
   user_max_ttl INTERVAL NOT NULL DEFAULT '168 hours', -- 7 days
   user_extensions JSONB DEFAULT '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}',
   user_critical_options JSONB DEFAULT '{}',
-  -- Host certificate config
   host_default_ttl INTERVAL NOT NULL DEFAULT '168 hours', -- 7 days
   host_max_ttl INTERVAL NOT NULL DEFAULT '720 hours', -- 30 days
-  -- Shared config
   allowed_key_types INTEGER[] DEFAULT ARRAY[1, 2, 3],
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -315,9 +287,7 @@ CREATE TABLE IF NOT EXISTS targets (
   FOREIGN KEY (workspace_id, daemon_id) REFERENCES daemons (workspace_id, id) ON DELETE CASCADE
 );
 
--- Join tokens. Enroll tokens bring daemons in, invite tokens bring people
--- in. The plaintext is "<id>_<secret>", so redemption looks the row up by id
--- and compares the hash of the whole token.
+-- Enroll tokens bring daemons in, invite tokens bring people in. The plaintext is "<id>_<secret>".
 CREATE TABLE IF NOT EXISTS join_tokens (
   id UUID PRIMARY KEY,
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
@@ -355,9 +325,7 @@ CREATE TABLE IF NOT EXISTS target_accounts (
   FOREIGN KEY (workspace_id, target_id) REFERENCES targets (workspace_id, id) ON DELETE CASCADE
 );
 
--- Exactly one subject column is set. Every reference is scoped to the same
--- workspace and cascades, so a removed user, team, or service account can
--- never leave a grant behind, and no grant can point across tenants.
+-- Exactly one subject column is set. Every reference is workspace-scoped and cascades, so no grant is left behind.
 CREATE TABLE IF NOT EXISTS grants (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   account_id UUID NOT NULL,
@@ -389,8 +357,7 @@ CREATE TABLE IF NOT EXISTS recordings (
   daemon_id UUID REFERENCES daemons (id) ON DELETE SET NULL,
   daemon_name TEXT NOT NULL, -- as it was when the session ran
   username TEXT NOT NULL,
-  -- Who was logged in. The host reports the certificate principal it matched,
-  -- the subject is parsed out of it. NULL from a daemon that did not say.
+  -- Who was logged in, parsed out of the principal the host matched. NULL from a daemon that did not say.
   subject_id UUID,
   principal TEXT NOT NULL DEFAULT '',
   key BYTEA NOT NULL, -- encrypts this recording's frames, stored encrypted
@@ -402,9 +369,8 @@ CREATE TABLE IF NOT EXISTS recordings (
 );
 
 -- Instance -------------------------------------------------------------------
--- The one keyset that encrypts everything at rest, wrapped by a key derived
--- from NOKKU_SECRET or by the KMS key. rotated_at is when it last got a new
--- primary key.
+
+-- The one keyset that encrypts everything at rest. rotated_at is when it last got a new primary key.
 CREATE TABLE IF NOT EXISTS keysets (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   data BYTEA NOT NULL,
@@ -412,17 +378,14 @@ CREATE TABLE IF NOT EXISTS keysets (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- License key activated in the UI (singleton). NOKKU_LICENSE_KEY still works,
--- the key that is valid longest wins.
+-- License key activated in the UI (singleton). NOKKU_LICENSE_KEY still works, the key that is valid longest wins.
 CREATE TABLE IF NOT EXISTS instance_license (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   key TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- The CA of NOKKU_TLS=internal (singleton). The key stays for good, so the
--- pin clients hold never changes. The certificate is issued again when the
--- host name changes or it nears its end.
+-- The CA of NOKKU_TLS=internal (singleton). The key stays for good, so the pin clients hold never changes.
 CREATE TABLE IF NOT EXISTS web_ca (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   private_key BYTEA NOT NULL,
@@ -451,9 +414,7 @@ CREATE INDEX idx_teams_description_trgm ON teams USING GIN (description gin_trgm
 
 CREATE INDEX idx_teams_tags ON teams USING GIN (tags);
 
--- SCIM group sync expects displayName to resolve to one group per
--- workspace (RFC 7643). Without this, duplicate pushes create duplicate
--- teams and the IdP's member updates hit the wrong one.
+-- SCIM expects displayName to resolve to one group per workspace (RFC 7643), or member updates hit the wrong team.
 CREATE UNIQUE INDEX idx_teams_workspace_name ON teams (workspace_id, name);
 
 CREATE INDEX idx_team_members_team_id ON team_members (team_id);
@@ -494,8 +455,8 @@ CREATE INDEX idx_recordings_workspace_started ON recordings (workspace_id, start
 CREATE INDEX idx_recordings_subject ON recordings (workspace_id, subject_id, started_at DESC);
 
 -- Triggers -------------------------------------------------------------------
--- Daemon state versioning. Any change to what a daemon enforces bumps the
--- workspace version and notifies on commit, so no code path can forget it.
+
+-- Any change to what a daemon enforces bumps the workspace version and notifies on commit.
 CREATE OR REPLACE FUNCTION create_workspace_state () RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO workspace_state (workspace_id) VALUES (NEW.id);
@@ -583,10 +544,7 @@ AFTER
 UPDATE OF active ON users FOR EACH ROW WHEN (OLD.active IS DISTINCT FROM NEW.active)
 EXECUTE FUNCTION bump_state_version ();
 
--- Console hints. A change to what the console shows is announced on commit as
--- "<workspace id>:<table>", and internal/live tells the open consoles of that
--- workspace to read again. It carries no data. The same payload twice in one
--- transaction arrives once, so a bulk write is one hint.
+-- Console hints. A change is announced on commit as "<workspace id>:<table>", once per transaction, with no data.
 CREATE OR REPLACE FUNCTION notify_change () RETURNS TRIGGER AS $$
 DECLARE
   r JSONB;
@@ -602,16 +560,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Stamps that move on a timer or with every use. An update that moves
--- nothing else is not a change anyone waits for.
+-- Stamps that move on a timer or with every use. An update that moves nothing else is no change anyone waits for.
 CREATE OR REPLACE FUNCTION without_stamps (r JSONB) RETURNS JSONB AS $$
   SELECT (r - ARRAY['last_seen_at', 'last_used_at']) #- '{metadata,last_manual_sync}'
 $$ LANGUAGE sql IMMUTABLE;
 
--- Sign-ins are left out (access_tokens, known_devices, credentials,
--- one_time_tokens). They happen all day and no list shows them to others.
--- Service account keys and SCIM tokens are the exception, they are made and
--- revoked by hand and a list shows them, see the triggers after the loop.
+-- Sign-ins are left out, no list shows them to others. Keys and SCIM tokens are, see the triggers after the loop.
 DO $$
 DECLARE
   t TEXT;
@@ -654,9 +608,7 @@ CREATE TRIGGER notify_change_delete
 AFTER DELETE ON access_tokens FOR EACH ROW WHEN (OLD.kind IN ('service_account', 'scim'))
 EXECUTE FUNCTION notify_change ();
 
--- The heartbeat stamps a connected daemon every ten seconds, so a gap wider
--- than the online window means this stamp brings it online. Going offline is
--- no write, the daemon pool announces that one.
+-- A gap wider than the online window means this stamp brings the daemon online. Going offline is no write.
 CREATE TRIGGER notify_online
 AFTER
 UPDATE OF last_seen_at ON daemons FOR EACH ROW WHEN (
@@ -666,11 +618,8 @@ UPDATE OF last_seen_at ON daemons FOR EACH ROW WHEN (
 EXECUTE FUNCTION notify_change ();
 
 -- Roles and grants -----------------------------------------------------------
--- Two runtime roles, each with a pool of its own. nokku_app serves requests
--- under row-level security, nokku_system bypasses it for work that spans
--- workspaces. Neither is a member of the other, so a request connection
--- cannot leave row-level security. Both get their password at start, see
--- setupRoles in internal/db/connection.go.
+
+-- nokku_app serves requests under RLS, nokku_system bypasses it. Neither is a member of the other.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nokku_app') THEN
@@ -681,11 +630,9 @@ BEGIN
   END IF;
 END $$;
 
--- Schema permissions
 GRANT USAGE ON SCHEMA public TO nokku_app,
 nokku_system;
 
--- Table grants for nokku_app and nokku_system
 GRANT
 SELECT
 ,
@@ -699,7 +646,6 @@ SELECT
   ON ALL SEQUENCES IN SCHEMA public TO nokku_app,
   nokku_system;
 
--- Default privileges for future tables
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT
 SELECT
@@ -723,33 +669,8 @@ FROM
   nokku_system;
 
 -- Row-level security ---------------------------------------------------------
--- One policy on every tenant table: a row is visible and writable only when
--- the connection is pinned to its workspace in the GUC "nokku.workspace_id".
--- The backend sets it every time a connection leaves the request pool (see
--- pinWorkspace in internal/db/connection.go). That is session state, so the
--- backend needs direct connections, not a pooler in transaction mode.
---
--- Fail-closed properties:
---   - The application connects as nokku_app, which does not own the tables,
---     so RLS applies to every query; FORCE ROW LEVEL SECURITY extends this
---     to the table owner as well.
---   - An unset GUC makes current_workspace_id() return NULL, and
---     "workspace_id = NULL" matches nothing, so tenant tables are empty by
---     default.
---   - Cross-tenant work (boot, billing webhooks, background jobs) runs as
---     nokku_system, which has BYPASSRLS. That is a pool of its own and
---     explicit in code (Connection.Sys and SysTx).
---
--- The policy is the only tenant filter there is. Tenant queries name no
--- workspace, and inserts take workspace_id from its column default. A new
--- workspace is created in a transaction pinned to the id it is about to get.
---
--- A new tenant table needs its name in the list below and the default on
--- workspace_id, internal/db/rls_test.go fails without either. References to
--- other tenant tables use composite (workspace_id, id) foreign keys, so no
--- policy needs a subquery to keep a row inside its workspace. keysets,
--- instance_license, web_ca and workspace_state have no app policy,
--- nokku_system alone reaches them.
+
+-- One policy on every tenant table, the only tenant filter there is. A new table needs its name in the list below.
 DO $$
 DECLARE
   t TEXT;
@@ -807,9 +728,7 @@ ALTER TABLE web_ca FORCE ROW LEVEL SECURITY;
 -- Audit schema ---------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS audit;
 
--- One row per thing that happened, filed under the workspace it happened in.
--- workspace_id has no foreign key: the log outlives a deleted workspace, and
--- the append-only trigger would refuse an ON DELETE anyway.
+-- One row per thing that happened. workspace_id has no foreign key, the log outlives a deleted workspace.
 CREATE TABLE IF NOT EXISTS audit.audit_logs (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -829,15 +748,13 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_workspace_time ON audit.audit_logs (wo
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit.audit_logs (workspace_id, actor_id, timestamp DESC);
 
--- For the retention delete. Rows arrive in time order, so a block range
--- index stays tiny.
+-- For the retention delete. Rows arrive in time order, so a block range index stays tiny.
 CREATE INDEX IF NOT EXISTS idx_audit_logs_time ON audit.audit_logs USING brin (timestamp);
 
 CREATE POLICY tenant_isolation ON audit.audit_logs FOR
 SELECT
   TO nokku_app USING (workspace_id = current_workspace_id ());
 
--- Access for the application roles
 GRANT USAGE ON SCHEMA audit TO nokku_app,
 nokku_system;
 
@@ -858,13 +775,8 @@ ALTER TABLE audit.audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit.audit_logs FORCE ROW LEVEL SECURITY;
 
 -- Audit immutability ---------------------------------------------------------
--- An audit row is a fact that is only ever written. Two layers keep it that
--- way:
---
---   Privilege. The app role holds SELECT and nothing else. nokku_system
---   holds INSERT and DELETE. No role holds UPDATE on this table.
---   This trigger. It refuses a DELETE unless the transaction opts in, which
---   only the retention job does.
+
+-- No role holds UPDATE, and this trigger refuses a DELETE unless the transaction opts in, as the retention job does.
 CREATE OR REPLACE FUNCTION audit.audit_logs_immutable () RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP = 'UPDATE' THEN

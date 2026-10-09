@@ -29,8 +29,7 @@ func TestRequestSizeLimit(t *testing.T) {
 	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err), "got %v", err)
 }
 
-// The audit webhook secret signs events to the customer's SIEM. Only the
-// owner manages it and may read it back.
+// The audit webhook secret signs events to the customer's SIEM. Only the owner may read it back.
 func TestWorkspaceHidesWebhookFromMembers(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -82,8 +81,7 @@ func TestPlainJSONCall(t *testing.T) {
 	assert.Contains(t, string(body), `"code":"unauthenticated"`)
 }
 
-// A newer client may call a service this build does not have. It must get a
-// 404, not the SPA's index page.
+// A newer client may call a service this build does not have. It must get a 404, not the SPA's index page.
 func TestUnknownServiceIsNotFound(t *testing.T) {
 	_, srv := newTestAPI(t)
 	resp, err := srv.Client().Post(srv.URL+"/nokku.v1.FutureService/Do", "application/json", strings.NewReader(`{}`))

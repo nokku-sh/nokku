@@ -1,7 +1,6 @@
 package iam
 
-// RFC 8628 device flow. The CLI starts a grant, the user approves it in the
-// browser, and the CLI polls for a DPoP-bound session.
+// RFC 8628 device flow. The CLI starts a grant, the user approves it in the browser, the CLI polls for a session.
 
 import (
 	"cmp"
@@ -29,10 +28,7 @@ const (
 	grantTTL        = 15 * time.Minute
 	slowDownPenalty = 5 * time.Second
 	deviceInterval  = 5 * time.Second
-	// deviceSessionTTL is how long a terminal stays signed in. The session
-	// only works with the key of its machine, so what this bounds is a
-	// machine nobody noticed was lost: it can mint certificates for this
-	// long, and use the last one for its lifetime on top.
+	// deviceSessionTTL bounds a lost machine nobody noticed, the session only works with the key of its machine.
 	deviceSessionTTL = 30 * 24 * time.Hour
 
 	deviceURLHeader = "Nokku-Api-Url"
@@ -41,9 +37,7 @@ const (
 	grantDenied     = "denied"
 )
 
-// deviceGrantEntries bounds the grants waiting for an approval, up to three
-// entries each. Anyone can start one, so they have a store nothing else
-// lives in.
+// deviceGrantEntries bounds the waiting grants. Anyone can start one, so they have a store nothing else lives in.
 const deviceGrantEntries = 10_000
 
 type DeviceFlow struct {
@@ -51,16 +45,14 @@ type DeviceFlow struct {
 	grants *cache.Memory
 }
 
-// deviceGrant is stored under the device code, and under the user code until
-// someone decides on it.
+// deviceGrant is stored under the device code, and under the user code until someone decides on it.
 type deviceGrant struct {
 	DeviceCode  string `json:"device_code"`
 	UserCode    string `json:"user_code"`
 	WorkspaceID string `json:"workspace_id"`
 	Status      string `json:"status"`
 	UserID      string `json:"user_id,omitempty"`
-	// Who asked. The approval page shows it, so a code someone else started
-	// stands out.
+	// Who asked. The approval page shows it, so a code someone else started stands out.
 	IP        string `json:"ip,omitempty"`
 	UserAgent string `json:"user_agent,omitempty"`
 }
@@ -217,8 +209,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 
 		binding, derr := h.deviceBinding(ctx, r)
 		if derr != nil {
-			// Retryable, the grant stays usable. The advertised URL also
-			// fixes clients that signed the wrong htu.
+			// Retryable, the grant stays usable. The advertised URL also fixes clients that signed the wrong htu.
 			h.svc.AdvertiseDPoPNonce(ctx, w.Header())
 			if errors.Is(derr, ErrDPoPNonce) {
 				writeOAuthError(w, "use_dpop_nonce")
@@ -246,9 +237,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			writeOAuthError(w, "server_error")
 			return
 		}
-		// Only a key the account has not signed in with before is mailed, so
-		// the mail stays rare enough to be read. An approval the user was
-		// tricked into always comes from such a key.
+		// Only a key new to the account is mailed, so the mail stays rare enough to be read.
 		if !h.svc.seenDevice(ctx, u.ID, binding) {
 			if _, err := h.svc.addDevice(ctx, u, binding, sess.UserAgent, sess.Label, sess.Ip); err != nil {
 				slog.Error("failed to remember terminal", "error", err)
@@ -288,8 +277,7 @@ func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string
 	return h.svc.DPoP.Verify(ctx, proof, "", r.Method, baseURL(ctx)+r.URL.Path)
 }
 
-// pollTrack reports a too-fast poll. The interval grows per slow_down, and a
-// cache failure allows the poll.
+// pollTrack reports a too-fast poll. The interval grows per slow_down, a cache failure allows the poll.
 func (h *DeviceFlow) pollTrack(ctx context.Context, deviceCode string) bool {
 	key := "device:poll:" + deviceCode
 	var st pollState
@@ -323,8 +311,7 @@ func decodePollState(b []byte) pollState {
 	return pollState{last: time.Unix(0, nano), violations: v}
 }
 
-// randomUserCode is a correlation handle, not a secret, since approval needs a
-// session. The charset avoids 0/O/1/I.
+// randomUserCode is a correlation handle, not a secret, approval needs a session. The charset avoids 0/O/1/I.
 func randomUserCode() (string, error) {
 	const chars = "BCDFGHJKLMNPQRSTVWXZ23456789"
 	out := make([]byte, 8)

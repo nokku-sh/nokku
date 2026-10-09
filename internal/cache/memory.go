@@ -57,8 +57,7 @@ func (m *Memory) Delete(_ context.Context, key string) error {
 	return nil
 }
 
-// GetDel is how one-time state is consumed, so two concurrent consumers can
-// never both succeed.
+// GetDel is how one-time state is consumed, two concurrent consumers can never both succeed.
 func (m *Memory) GetDel(_ context.Context, key string) ([]byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -93,9 +92,7 @@ func (m *Memory) SetNX(
 	return true, nil
 }
 
-// makeRoomLocked only drops expired entries. A cache full of live ones
-// refuses the write, evicting would let any caller push out someone else's
-// state.
+// makeRoomLocked only drops expired entries. Evicting would let a caller push out someone else's state.
 func (m *Memory) makeRoomLocked() bool {
 	if len(m.entries) < m.max {
 		return true

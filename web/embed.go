@@ -1,5 +1,4 @@
-// Package web embeds the built UI and email templates. Both directories hold
-// a committed .gitkeep so the Go build works without node.
+// Package web embeds the built UI and email templates. A committed .gitkeep lets the Go build work without node.
 package web
 
 import (
@@ -31,9 +30,7 @@ var staticFS embed.FS
 // Where the UI sits inside staticFS.
 const uiRoot = "ui/build"
 
-// Handler serves the UI. That is the embedded SPA, or what the Vite dev
-// server at dev hands out while someone works on it. Either way the browser
-// talks to this server only.
+// Handler serves the embedded SPA, or what the Vite dev server hands out. The browser only talks to this server.
 func Handler(dev *url.URL) http.Handler {
 	if dev.Host != "" {
 		return &httputil.ReverseProxy{Rewrite: func(r *httputil.ProxyRequest) { r.SetURL(dev) }}
@@ -47,8 +44,7 @@ func Handler(dev *url.URL) http.Handler {
 			case exists(p + ".html"):
 				p += ".html"
 			case strings.HasPrefix(p, "/_app/"):
-				// A build file that is gone, like a chunk from before a
-				// deploy. The index page would reach the browser as broken JS.
+				// A chunk from before a deploy is gone. The index page would reach the browser as broken JS.
 				w.Header().Set("Cache-Control", "no-store")
 				http.NotFound(w, r)
 				return
@@ -64,9 +60,7 @@ func Handler(dev *url.URL) http.Handler {
 
 var inlineScript = regexp.MustCompile(`(?s)<script([^>]*)>(.*?)</script>`)
 
-// InlineScriptHashes returns the CSP source of every inline script in the
-// built pages, which is SvelteKit's bootstrap. Allowing them by hash is what
-// lets the policy do without 'unsafe-inline'.
+// InlineScriptHashes allows SvelteKit's inline bootstrap by hash, so the policy needs no 'unsafe-inline'.
 var InlineScriptHashes = sync.OnceValue(func() []string {
 	var hashes []string
 	_ = fs.WalkDir(staticFS, uiRoot, func(p string, d fs.DirEntry, err error) error {

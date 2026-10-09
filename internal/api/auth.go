@@ -33,7 +33,6 @@ func setCookie(ci connect.CallInfo, c *http.Cookie) {
 	ci.ResponseHeader().Add("Set-Cookie", c.String())
 }
 
-// GetLoginOptions is what the login page may offer in this workspace.
 func (s *authService) GetLoginOptions(
 	ctx context.Context,
 	_ *nokkuv1.GetLoginOptionsRequest,

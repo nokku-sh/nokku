@@ -7,8 +7,7 @@ import (
 	"fmt"
 )
 
-// EncryptedBytes encrypts at rest. String and MarshalJSON render "" so
-// secrets never leak into logs or responses.
+// EncryptedBytes encrypts at rest. String and MarshalJSON render "" so secrets never leak.
 //
 //nolint:recvcheck // Scan requires pointer receiver for sql.Scanner
 type EncryptedBytes []byte

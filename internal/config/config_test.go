@@ -10,8 +10,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/webpki"
 )
 
-// NOKKU_BASE_URL names the public host. The listen port is not part of it, a
-// reverse proxy usually sits in between. The scheme is never configured.
+// NOKKU_BASE_URL names the public host. The listen port is not part of it, the scheme is never configured.
 func TestFullURL(t *testing.T) {
 	tests := []struct {
 		name, baseURL string
@@ -55,8 +54,7 @@ func TestBaseURLAccepts(t *testing.T) {
 	}
 }
 
-// A scheme would let someone ask for plain http, and an IP address takes no
-// passkey. Both fail the start instead of failing in a browser later.
+// A scheme and an IP address both fail the start instead of failing in a browser later.
 func TestBaseURLRefuses(t *testing.T) {
 	for in, want := range map[string]string{
 		"https://nokku.example.com": "Leave out the scheme",
@@ -76,8 +74,7 @@ func TestBaseURLRefuses(t *testing.T) {
 	}
 }
 
-// The check runs where the environment is read, so the server and the
-// subcommands all refuse the same values.
+// The check runs where the environment is read, so the server and the subcommands refuse the same values.
 func TestBaseURLIsCheckedOnParse(t *testing.T) {
 	t.Setenv("NOKKU_BASE_URL", "http://nokku.example.com")
 	_, err := env.ParseAs[EnvConfig]()

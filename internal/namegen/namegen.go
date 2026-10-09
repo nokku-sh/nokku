@@ -1,5 +1,4 @@
-// Package namegen produces display names like "sunny-otter". Callers enforce
-// uniqueness.
+// Package namegen produces display names like "sunny-otter". Callers enforce uniqueness.
 package namegen
 
 import (

@@ -23,8 +23,7 @@ func TestReencrypt(t *testing.T) {
 
 	err := pgx.BeginFunc(t.Context(), c.sysPool, func(tx pgx.Tx) error {
 		q := db.New(tx)
-		// The seed row takes its workspace from the pin. Reencrypt itself
-		// runs across every workspace.
+		// The seed row takes its workspace from the pin. Reencrypt itself runs across every workspace.
 		if _, err := tx.Exec(t.Context(), `SELECT set_config('nokku.workspace_id', $1, true)`, f.ws); err != nil {
 			return err
 		}

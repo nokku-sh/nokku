@@ -12,10 +12,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/sshclient/sshtest"
 )
 
-// bridgeToServer plays the daemon's DaemonRelay handler for one relay: it
-// pumps bytes between the relay channels and a TCP connection to the test
-// SSH server, including closing the relay when the server side dies, like
-// handler.go does for the gRPC stream.
+// bridgeToServer plays the daemon's DaemonRelay handler for one relay against the test SSH server.
 func bridgeToServer(relay *Relay, addr string) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -58,7 +55,6 @@ func bridgeToServer(relay *Relay, addr string) {
 	}()
 }
 
-// testConn returns the registered connection for d1.
 func testConn(t *testing.T, p *Pool) *daemonConn {
 	t.Helper()
 	p.mu.RLock()
@@ -70,8 +66,7 @@ func testConn(t *testing.T, p *Pool) *daemonConn {
 	return c
 }
 
-// slotsHeld counts the index entries with the sessions, so a leak there
-// fails the same checks.
+// slotsHeld counts the index entries with the sessions, so a leak there fails the same checks.
 func slotsHeld(t *testing.T, p *Pool) (sessions, slots int) {
 	t.Helper()
 	p.mu.RLock()
@@ -79,9 +74,7 @@ func slotsHeld(t *testing.T, p *Pool) (sessions, slots int) {
 	return len(p.sessions) + len(p.owned), len(p.relayCounts)
 }
 
-// serveRelayRequests registers every RelayOpen StartSession sends, as the
-// daemon's control stream would, and bridges the relay to the test server.
-// It runs until the test ends.
+// serveRelayRequests registers every RelayOpen as the daemon's control stream would, until the test ends.
 func serveRelayRequests(t *testing.T, p *Pool, c *daemonConn, addr string) {
 	t.Helper()
 	for {
@@ -149,8 +142,7 @@ func waitStdoutClosed(t *testing.T, s *Session, after string) {
 	}
 }
 
-// TestPool_StartSession_EndsWithContext: the session belongs to its caller,
-// so the caller's ctx ending must tear it down without an explicit Close.
+// The session belongs to its caller, so the caller's ctx ending must tear it down without a Close.
 func TestPool_StartSession_EndsWithContext(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -192,9 +184,7 @@ func TestPool_StartSession_EndsWithContext(t *testing.T) {
 	}
 }
 
-// TestPool_StartSession walks a full web session over a real in-process SSH
-// server: env and pty reach sshd through the relay, stdin echoes back on
-// Stdout, resizes arrive, and Close tears everything down.
+// A full web session over a real in-process SSH server: env, pty, stdin echo, resize and Close.
 func TestPool_StartSession(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -215,7 +205,6 @@ func TestPool_StartSession(t *testing.T) {
 		t.Errorf("pty size = %dx%d, want 80x24", cols, rows)
 	}
 
-	// Stdin goes to the shell and the echo comes out on Stdout.
 	if err := s.Write([]byte("ping\n")); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
@@ -252,8 +241,7 @@ collect:
 		time.Sleep(time.Millisecond)
 	}
 
-	// Close must end the session, clean the map, and free the relay
-	// slot.
+	// Close must end the session, clean the map and free the relay slot.
 	s.Close()
 	waitStdoutClosed(t, s, "Close")
 	deadline = time.After(2 * time.Second)
@@ -271,8 +259,7 @@ collect:
 	}
 }
 
-// TestPool_StartSession_RejectsInactiveCA: a deactivated (or missing) CA must
-// not mint web-session certificates, whatever the rest of the config says.
+// A deactivated or missing CA must not mint web-session certificates, whatever the rest of the config says.
 func TestPool_StartSession_RejectsInactiveCA(t *testing.T) {
 	p := newTestPool(t)
 	cases := map[string]*db.SSHCA{
@@ -295,9 +282,7 @@ func TestPool_StartSession_RejectsInactiveCA(t *testing.T) {
 	}
 }
 
-// TestPool_StartSession_HandshakeFailure: a CA the server does not trust
-// fails the dial, the error surfaces to the caller, and no slot or session
-// is left behind.
+// A CA the server does not trust fails the dial, and no slot or session is left behind.
 func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -345,8 +330,7 @@ func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 	}
 }
 
-// TestPool_StartSession_ServerDeath: the sshd side dying mid-session must
-// close Stdout, and the owner's Close then releases the slot.
+// The sshd side dying mid-session must close Stdout, and the owner's Close then releases the slot.
 func TestPool_StartSession_ServerDeath(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")

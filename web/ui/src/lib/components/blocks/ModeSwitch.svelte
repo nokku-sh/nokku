@@ -22,7 +22,7 @@
 
 		const transition = document.startViewTransition(async () => {
 			toggleMode();
-			await tick(); // Wait for Svelte to update the DOM
+			await tick();
 		});
 
 		transition.ready.then(() => {

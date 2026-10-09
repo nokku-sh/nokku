@@ -15,8 +15,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// signupData rides in a signup token or a passkey ceremony until the
-// account exists.
+// signupData rides in a signup token or a passkey ceremony until the account exists.
 type signupData struct {
 	Name     string                `json:"name"`
 	Role     nokkuv1.WorkspaceRole `json:"role"`
@@ -56,10 +55,7 @@ func lookupInvite(ctx context.Context, q *db.Queries, raw string) (*db.JoinToken
 	return tok, nil
 }
 
-// createUser is the one way an account comes to be. It redeems the invite
-// when one is named and checks the seat cap in the same tx, so parallel
-// joins cannot oversell the last seat. The owner is exempt from the cap. An
-// empty ID gets a fresh one, a passkey ceremony brings the id it reserved.
+// createUser is the one way an account comes to be. Invite and seat cap share its tx, so joins cannot oversell.
 func (s *Service) createUser(
 	ctx context.Context,
 	q *db.Queries,
@@ -102,8 +98,7 @@ func (s *Service) createUser(
 	return u, nil
 }
 
-// CreateOwner makes the first user of a fresh workspace. The seat cap does
-// not apply, there is nobody to count yet.
+// CreateOwner makes the first user of a fresh workspace. The seat cap does not apply, there is nobody to count yet.
 func (s *Service) CreateOwner(ctx context.Context, email, name string) (*db.User, error) {
 	var u *db.User
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {

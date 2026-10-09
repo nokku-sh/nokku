@@ -43,9 +43,7 @@ func testConnection(t *testing.T) *db.Connection {
 func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
 	c := testConnection(t)
 	t.Setenv("NOKKU_WORKSPACE_NAME", "Lab")
-	// A self-hosted database is empty before its first boot. The other tests
-	// leave workspaces behind and run in any order, so those go first. Only
-	// the owner role deletes past RLS.
+	// A self-hosted database is empty before its first boot, so workspaces of other tests go first.
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
 	_, err = owner.Exec(t.Context(), "DELETE FROM workspaces")

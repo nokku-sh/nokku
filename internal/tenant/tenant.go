@@ -1,7 +1,4 @@
-// Package tenant resolves the workspace a request runs in. A self-hosted
-// server has one, created at boot. The hosted service (NOKKU_SAAS) reads it
-// off the subdomain. Either way the workspace is on the context before
-// anything authenticates, so nothing downstream ever guesses it.
+// Package tenant puts the workspace on the context before anything authenticates, so nothing downstream guesses it.
 package tenant
 
 import (
@@ -29,8 +26,7 @@ import (
 
 var ErrUnknownWorkspace = errors.New("no such workspace")
 
-// reserved slugs never resolve to a workspace, so nobody can sign up as
-// app.nokku.sh.
+// reserved slugs never resolve to a workspace, so nobody can sign up as app.nokku.sh.
 var reserved = map[string]bool{
 	"www":     true,
 	"app":     true,
@@ -49,8 +45,7 @@ var reserved = map[string]bool{
 //go:embed denylist.txt
 var denylistFile string
 
-// denylist holds brand names and phishing words. A slug containing one of
-// them is refused at signup, see Forbidden.
+// denylist holds brand names and phishing words. A slug containing one is refused at signup.
 var denylist = func() []string {
 	var out []string
 	for line := range strings.SplitSeq(denylistFile, "\n") {
@@ -63,8 +58,7 @@ var denylist = func() []string {
 
 const (
 	slugCacheTTL = time.Minute
-	// unclaimedAfter is how long a signup may sit without its owner ever
-	// signing in before it is purged, so a squatted slug frees itself.
+	// unclaimedAfter is how long a signup may sit without a sign-in, so a squatted slug frees itself.
 	unclaimedAfter = 24 * time.Hour
 	purgeEvery     = time.Hour
 )
@@ -126,8 +120,7 @@ func (r *Resolver) BaseURL(slug string) string {
 	return r.scheme + "://" + host
 }
 
-// FromHost returns an empty workspace for the hosted service's root host,
-// the only host that serves anything outside a workspace.
+// FromHost returns an empty workspace for the hosted root host, the only host outside a workspace.
 func (r *Resolver) FromHost(ctx context.Context, host string) (actor.Workspace, error) {
 	if !r.saas {
 		return r.single, nil
@@ -158,8 +151,7 @@ func (r *Resolver) FromHost(ctx context.Context, host string) (actor.Workspace, 
 	return ws, nil
 }
 
-// Middleware puts the workspace on the context. It runs before every
-// handler but the health check and provider webhooks.
+// Middleware runs before every handler but the health check and provider webhooks.
 func (r *Resolver) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ws, err := r.FromHost(req.Context(), req.Host)
@@ -182,8 +174,7 @@ func (r *Resolver) workspace(row *db.Workspace) actor.Workspace {
 	return actor.Workspace{ID: row.ID, Slug: row.Slug, BaseURL: r.BaseURL(row.Slug)}
 }
 
-// Forbidden reports whether a slug may not be signed up with: a reserved
-// host, or one that contains a brand or a phishing word from denylist.txt.
+// Forbidden reports a reserved host, or a slug with a brand or phishing word from denylist.txt.
 func Forbidden(slug string) bool {
 	if reserved[slug] {
 		return true
@@ -196,8 +187,7 @@ func Forbidden(slug string) bool {
 	return false
 }
 
-// purgeUnclaimed deletes hosted signups whose owner never signed in. It
-// runs hourly, the signup link itself lives for a day.
+// purgeUnclaimed runs hourly, the signup link itself lives for a day.
 func (r *Resolver) purgeUnclaimed(ctx context.Context) {
 	for {
 		select {
@@ -211,8 +201,7 @@ func (r *Resolver) purgeUnclaimed(ctx context.Context) {
 	}
 }
 
-// PurgeUnclaimed deletes every workspace created before cutoff that nobody
-// ever signed in to.
+// PurgeUnclaimed deletes every workspace from before cutoff that nobody ever signed in to.
 func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
 	return r.conn.SysTx(ctx, func(q *db.Queries) error {
 		rows, err := q.ListUnclaimedWorkspaces(ctx, cutoff)
@@ -229,9 +218,7 @@ func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
 	})
 }
 
-// Create makes a workspace with its subscription row and default SSH CA. The
-// transaction is pinned to the id the workspace is about to get, so even this
-// runs under RLS and needs no system role.
+// Create pins the transaction to the id the workspace is about to get, so it runs under RLS with no system role.
 func Create(ctx context.Context, conn *db.Connection, slug, name string) (*db.Workspace, error) {
 	ca, err := ssh.NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0, 0)
 	if err != nil {

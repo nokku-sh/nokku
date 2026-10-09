@@ -9,8 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// issuer swaps in a throwaway signing key and returns a func that issues
-// Enterprise keys expiring after the given duration.
+// issuer swaps in a throwaway signing key and issues Enterprise keys.
 func issuer(t *testing.T) func(validFor time.Duration) string {
 	t.Helper()
 	privB64, pubHex, err := licx.GenerateKey()

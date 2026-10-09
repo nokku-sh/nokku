@@ -28,8 +28,7 @@
 	const linked = $derived((all.data ?? []).filter((c) => c.type === 'oidc'));
 	const scim = $derived((all.data ?? []).some((c) => c.type === 'scim'));
 
-	// With email links on, a lost passkey is not a lockout. Otherwise the last
-	// method stays.
+	// With email links on, a lost passkey is not a lockout. Otherwise the last method stays.
 	const magicLink = $derived(options.data?.magicLink ?? false);
 	const lastWay = $derived(!magicLink && passkeys.length + linked.length <= 1);
 

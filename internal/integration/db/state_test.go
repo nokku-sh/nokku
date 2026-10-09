@@ -21,8 +21,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// stateFixture is one workspace where user u reaches account p on a daemon
-// target twice: directly and through team.
+// stateFixture is one workspace where user u reaches account p on a daemon target directly and through team.
 type stateFixture struct {
 	ws, owner, u, team, daemon, target, account string
 }
@@ -38,8 +37,7 @@ func newStateFixture(t *testing.T, c *conn) stateFixture {
 		target:  uuid.NewV7().String(),
 		account: uuid.NewV7().String(),
 	}
-	// The simple protocol substitutes arguments client-side, which allows
-	// several statements in one Exec.
+	// The simple protocol substitutes arguments client-side, which allows several statements in one Exec.
 	_, err := c.sysPool.Exec(t.Context(), `
 		INSERT INTO workspaces (id, slug, name) VALUES ($1, $1, 'ws');
 		INSERT INTO users (id, workspace_id, email, role)
@@ -58,8 +56,7 @@ func newStateFixture(t *testing.T, c *conn) stateFixture {
 	return f
 }
 
-// conn is a Connection plus a raw pool as nokku_system, the role behind
-// Connection.Sys, for the SQL no query covers.
+// conn is a Connection plus a raw pool as nokku_system, for the SQL no query covers.
 type conn struct {
 	*db.Connection
 
@@ -74,8 +71,7 @@ func testConnection(t testing.TB) *conn {
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
-	// The system role logs in with the password of the app role and is
-	// never pinned.
+	// The system role logs in with the password of the app role and is never pinned.
 	cfg := c.Pool.Config()
 	cfg.ConnConfig.User = "nokku_system"
 	cfg.PrepareConn = nil
@@ -183,8 +179,7 @@ func TestStateVersionBumpsOnAccessChanges(t *testing.T) {
 	}
 }
 
-// A deactivated account must leave every daemon's map at once, a cert it
-// already holds would otherwise work until it expires.
+// A deactivated account must leave every daemon's map at once, or a cert it holds works until it expires.
 func TestDeactivatedUserLosesAccess(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
@@ -256,8 +251,7 @@ func TestGrantRejectsForeignTeam(t *testing.T) {
 	}
 }
 
-// An unspecified status locks a daemon out of its control stream, so the
-// schema refuses it.
+// An unspecified status locks a daemon out of its control stream, so the schema refuses it.
 func TestDaemonStatusRejectsUnspecified(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
@@ -306,8 +300,7 @@ func TestRedeemTokenOnce(t *testing.T) {
 	}
 }
 
-// A daemon reports the same host facts on every sync. Unchanged reports must
-// not rewrite the rows, or every grant change costs a write per daemon.
+// Unchanged reports must not rewrite the rows, or every grant change costs a write per daemon.
 func TestSyncReportSkipsUnchangedRows(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)

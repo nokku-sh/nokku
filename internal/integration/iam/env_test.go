@@ -38,8 +38,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	return newTestEnvWith(t, iam.Deps{})
 }
 
-// newTestEnvWith takes what the service calls out to: the mail functions and
-// the seat cap. Conn and Secret are filled in.
+// newTestEnvWith takes the mail functions and the seat cap. Conn and Secret are filled in.
 func newTestEnvWith(t *testing.T, deps iam.Deps) *testEnv {
 	t.Helper()
 	// The mock IdPs listen on loopback.
@@ -140,7 +139,6 @@ func (e *testEnv) invite(t *testing.T, ws actor.Workspace, role nokkuv1.Workspac
 	return tok.Plaintext
 }
 
-// provider stores an enabled provider for ws.
 func (e *testEnv) provider(t *testing.T, ws actor.Workspace, p iam.SSOProvider) {
 	t.Helper()
 	p.Enabled = true
@@ -149,7 +147,6 @@ func (e *testEnv) provider(t *testing.T, ws actor.Workspace, p iam.SSOProvider) 
 	}
 }
 
-// putCredential stores a credential of a user in ws.
 func (e *testEnv) putCredential(t *testing.T, ws actor.Workspace, p db.UpsertCredentialParams) {
 	t.Helper()
 	if err := e.in(t, ws, func(q *db.Queries) error {

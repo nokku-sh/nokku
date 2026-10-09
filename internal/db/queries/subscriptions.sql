@@ -1,6 +1,5 @@
 -- name: GetSubscription :one
--- The queries here name the workspace, billing and the plan lookup run as
--- nokku_system.
+-- The queries here name the workspace, billing and the plan lookup run as nokku_system.
 SELECT
   *
 FROM
@@ -19,8 +18,7 @@ WHERE
   AND source = ANY (@sources::TEXT[]);
 
 -- name: SetSubscriptionCustomer :exec
--- Status stays inactive so this row never grants entitlements until the
--- webhook promotes it.
+-- Status stays inactive so this row never grants entitlements until the webhook promotes it.
 INSERT INTO
   workspace_subscriptions (workspace_id, source, status, customer_id)
 VALUES

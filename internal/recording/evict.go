@@ -10,15 +10,10 @@ import (
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
-// minEvictAge keeps a recording whatever the cap says. Without it a user
-// could fill the cap to push out the recording of what they just did.
+// minEvictAge keeps a recording whatever the cap says, so nobody can push out what they just did.
 const minEvictAge = 24 * time.Hour
 
-// MakeRoom reports whether the workspace can take an upload that is size
-// bytes so far. Over the cap the oldest recordings are deleted first. The
-// upload itself and anything younger than minEvictAge stay, so a workspace
-// that took in more than its cap within that time is full and gets false.
-// A failed lookup never refuses an upload.
+// MakeRoom evicts the oldest recordings over the cap, but nothing under minEvictAge. A failed lookup never refuses.
 func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string, size int64) bool {
 	capBytes, err := s.limits.RecordingStorageBytes(ctx, workspaceID)
 	if err != nil {

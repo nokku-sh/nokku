@@ -22,8 +22,7 @@
 	const token = page.url.searchParams.get('token');
 	const consume = auth.consumeMagicLink();
 
-	// Links get consumed once. Fetched on open, not on a button, since the
-	// mailed link is the whole proof.
+	// Fetched on open, not on a button, since the mailed link is the whole proof.
 	$effect(() => {
 		if (token && consume.isIdle) {
 			consume.mutate({ token }, { onSuccess: () => void goto('/') });

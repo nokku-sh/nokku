@@ -49,15 +49,13 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			return nil
 		}
 
-		// Read the version first, so a change in between costs one extra
-		// sync instead of a stale daemon.
+		// Read the version first, so a change in between costs one extra sync instead of a stale daemon.
 		res.Version, err = q.GetWorkspaceStateVersion(ctx, daemon.WorkspaceID)
 		if err != nil {
 			return err
 		}
 
-		// Never write status here, the combined update would clobber an
-		// admin's accept or reject with a zero value.
+		// Never write status here, the combined update would clobber an admin's accept or reject.
 		if err := q.UpdateDaemonMetadata(ctx, &db.UpdateDaemonMetadataParams{
 			DaemonID: daemon.ID,
 			Metadata: in.Metadata,
@@ -70,8 +68,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			return err
 		}
 
-		// The daemon trusts exactly what it gets here, so only a target
-		// without a CA may answer empty. Any other failure fails the sync.
+		// The daemon trusts exactly what it gets here, so only a target without a CA may answer empty.
 		ca, err := q.GetDaemonCAKeys(ctx, &daemon.ID)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return err
@@ -99,8 +96,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			return err
 		}
 
-		// Never deletes, a host that cannot enumerate users must not change
-		// who has access.
+		// Never deletes, a host that cannot enumerate users must not change who has access.
 		if err := q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
 			TargetID:    target.ID,
 			Usernames:   validUsers(in.Users),
@@ -127,8 +123,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 
 		return nil
 	})
-	// A deleted daemon still serves its cached principals. REJECTED makes
-	// the host drop them, and its session is spent with that answer.
+	// A deleted daemon still serves its cached principals. REJECTED makes the host drop them.
 	if errors.Is(err, pgx.ErrNoRows) {
 		if err := conn.TenantTx(ctx, func(q *db.Queries) error {
 			_, err := q.DeleteSubjectTokens(ctx, in.DaemonID)
@@ -147,16 +142,14 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 // usernameRE is the username pattern of the protos, keep them in sync.
 var usernameRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9._-]*\$?$`)
 
-// validUsers drops the names nokkud would refuse as a login anyway. The
-// report is dropped per entry, a host with one odd account must still sync.
+// validUsers drops per entry, a host with one odd account must still sync.
 func validUsers(names []string) []string {
 	return slices.DeleteFunc(slices.Clone(names), func(name string) bool {
 		return len(name) > 32 || !usernameRE.MatchString(name)
 	})
 }
 
-// validEndpoints keeps what a daemon can listen on, an ip:port. Nil keeps
-// the stored endpoints.
+// validEndpoints keeps what a daemon can listen on, an ip:port. Nil keeps the stored endpoints.
 func validEndpoints(endpoints []string) []string {
 	valid := slices.DeleteFunc(slices.Clone(endpoints), func(ep string) bool {
 		_, err := netip.ParseAddrPort(ep)

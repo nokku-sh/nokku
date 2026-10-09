@@ -52,17 +52,12 @@ func isTrustedProxy(ip net.IP) bool {
 	return false
 }
 
-// Bucket is Client as a key for rate limits and logs, where one IPv6 /64
-// counts as one client.
+// Bucket is Client as a key for rate limits and logs, where one IPv6 /64 counts as one client.
 func Bucket(header http.Header, remoteAddr string) string {
 	return canonicalizeIP(Client(header, remoteAddr))
 }
 
-// Client is the address of the client itself. It reads only
-// X-Forwarded-For, and only from a trusted proxy. The client is the rightmost
-// hop that is not a trusted proxy, everything left of it is
-// client-controlled. Other client IP headers pass through proxies untouched,
-// so they are never read.
+// Client reads only X-Forwarded-For from a trusted proxy. It is the rightmost hop that is not a trusted proxy.
 func Client(header http.Header, remoteAddr string) string {
 	peer := remoteAddr
 	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {

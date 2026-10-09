@@ -2,12 +2,7 @@ import { Button, Heading, Hr, Link, Section, Text } from "react-email";
 import { CONFIG, CONSTANTS } from "../constants/vars";
 import BaseLayout from "../layouts/BaseLayout";
 
-/**
- * Enterprise license key email, sent by the license worker (a separate repo)
- * when a Stripe license subscription is purchased or renewed. The exported
- * HTML (web/email/out/license.html) is embedded in the Go worker and rendered
- * with html/template. Adjust copy here, re-export, and copy it over.
- */
+/** Sent by the license worker (a separate repo), which embeds out/license.html. Re-export and copy it over. */
 export default function LicenseKey() {
   return (
     <BaseLayout preview="Your Nokku Enterprise license key is ready.">

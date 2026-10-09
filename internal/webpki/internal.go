@@ -22,8 +22,7 @@ import (
 
 const (
 	rootLifetime = 10 * 365 * 24 * time.Hour
-	// A root this close to its end is issued again with the same key.
-	// Clients that pin from then on get the new one, and the pin stays.
+	// A root this close to its end is issued again with the same key, so the pin stays.
 	rootRenewBefore = 2 * 365 * 24 * time.Hour
 	leafLifetime    = 30 * 24 * time.Hour
 	leafRenewBefore = 10 * 24 * time.Hour
@@ -31,9 +30,7 @@ const (
 	backdate = time.Hour
 )
 
-// issuer is the CA of NOKKU_TLS=internal. Its key is stored encrypted and
-// stays for good, the pin is over that key. What it signs lives in memory
-// only, a restart makes a new certificate.
+// issuer is the CA of NOKKU_TLS=internal. The pin is over its key, which stays for good.
 type issuer struct {
 	host string
 	root *x509.Certificate
@@ -43,8 +40,7 @@ type issuer struct {
 	leaf *tls.Certificate
 }
 
-// loadIssuer reads the CA, makes it on the first start, and gives it a new
-// root certificate when the one it has no longer serves host.
+// loadIssuer makes the CA on the first start, and a new root when the one it has no longer serves host.
 func loadIssuer(ctx context.Context, conn *db.Connection, host string) (*issuer, error) {
 	ca := &issuer{host: host}
 	err := conn.SysTx(ctx, func(q *db.Queries) error {
@@ -87,8 +83,7 @@ func loadIssuer(ctx context.Context, conn *db.Connection, host string) (*issuer,
 	return ca, nil
 }
 
-// createCA stores a new key and root. ON CONFLICT DO NOTHING and the read
-// after it make two servers on their first start end up with the same one.
+// ON CONFLICT DO NOTHING and the read after it make two servers on their first start end up with the same CA.
 func createCA(ctx context.Context, q *db.Queries, host string) (*db.LockWebCARow, error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -113,9 +108,7 @@ func rootFits(root *x509.Certificate, host string, now time.Time) bool {
 	return slices.Contains(root.PermittedDNSDomains, host) && root.NotAfter.Sub(now) > rootRenewBefore
 }
 
-// newRoot returns a self-signed root for key in DER. It can sign server
-// certificates for host and the names below it and nothing else, so a
-// machine that installs it trusts it for Nokku only.
+// newRoot can only sign for host and the names below it, so a machine that installs it trusts it for Nokku only.
 func newRoot(key *ecdsa.PrivateKey, host string, now time.Time) ([]byte, error) {
 	serial, err := newSerial()
 	if err != nil {
@@ -141,9 +134,7 @@ func newRoot(key *ecdsa.PrivateKey, host string, now time.Time) ([]byte, error) 
 	return x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
 }
 
-// certificate is the GetCertificate of the listener. It issues the next
-// certificate when the current one runs out, so there is no job that a
-// server asleep at the wrong time could miss.
+// certificate issues the next one when the current runs out, so there is no job a sleeping server could miss.
 func (ca *issuer) certificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	ca.mu.Lock()
 	defer ca.mu.Unlock()

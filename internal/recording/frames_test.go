@@ -14,7 +14,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/storage"
 )
 
-// rawObject returns the stored bytes of rec, split into frames.
 func rawFrames(t *testing.T, s *Service, rec *db.Recording) [][]byte {
 	t.Helper()
 	rc, err := s.store.Reader(t.Context(), storage.RecordingPath(rec.WorkspaceID, rec.ID))
@@ -32,8 +31,7 @@ func rawFrames(t *testing.T, s *Service, rec *db.Recording) [][]byte {
 	return frames
 }
 
-// storeFrames overwrites rec's object with frames, the way someone with
-// write access to the bucket could.
+// storeFrames overwrites rec's object, the way someone with write access to the bucket could.
 func storeFrames(t *testing.T, s *Service, rec *db.Recording, frames [][]byte) {
 	t.Helper()
 	w, err := s.store.CreateWriter(t.Context(),
@@ -71,8 +69,7 @@ func TestFramesRoundTrip(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-// Someone with write access to the bucket must not be able to change what a
-// recording shows without the reader noticing.
+// Someone with write access to the bucket must not change what a recording shows without the reader noticing.
 func TestFramesAreBoundToTheirRecording(t *testing.T) {
 	s := newScrubTestService(t)
 	rec := testRecording()

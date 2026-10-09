@@ -102,7 +102,6 @@ func TestServiceAccountRole(t *testing.T) {
 	assert.Error(t, err, "the table took a service account above the editor")
 }
 
-// serviceAccountToken makes a token for the account and returns its secret.
 func serviceAccountToken(
 	t *testing.T,
 	client nokkuv1connect.ServiceAccountServiceClient,
@@ -118,8 +117,7 @@ func serviceAccountToken(
 	return res.GetSecret()
 }
 
-// A service account holds any number of tokens. Each is revoked on its own,
-// so a new one can be rolled out before the old one goes.
+// Each token is revoked on its own, so a new one can be rolled out before the old one goes.
 func TestServiceAccountTokens(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	auth := header(

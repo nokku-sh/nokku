@@ -20,8 +20,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
-// A denied call is audited in the workspace log. A session of another
-// workspace does not exist on this host, so it leaves nothing.
+// A denied call is audited. A session of another workspace does not exist on this host, so it leaves nothing.
 func TestAuditDeniedCall(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -66,8 +65,7 @@ func TestAuditDeniedCall(t *testing.T) {
 	assert.Empty(t, rows(long[:256]), "a stranger's call reached the log")
 }
 
-// The log keeps the name of a service account. The account may be long gone
-// when somebody reads the row.
+// The log keeps the name of a service account, the account may be long gone when somebody reads the row.
 func TestAuditNamesServiceAccount(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	adminAuth := header(

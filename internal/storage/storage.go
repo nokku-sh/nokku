@@ -174,8 +174,7 @@ func (s *Storage) Delete(ctx context.Context, name string) error {
 	return nil
 }
 
-// DeletePrefix only takes directory prefixes, so "videos/a" can never match
-// "videos/ab".
+// DeletePrefix only takes directory prefixes, so "videos/a" can never match "videos/ab".
 func (s *Storage) DeletePrefix(ctx context.Context, prefix string) error {
 	if !strings.HasSuffix(prefix, "/") || strings.Trim(prefix, "/") == "" {
 		return fmt.Errorf("refusing to delete prefix %q", prefix)
@@ -197,8 +196,7 @@ func (s *Storage) DeletePrefix(ctx context.Context, prefix string) error {
 	return errors.Join(errs...)
 }
 
-// CreateWriter commits on Close, so a truncated upload leaves a partial object.
-// Canceling ctx before that drops it.
+// CreateWriter commits on Close, so a truncated upload leaves a partial object. Canceling ctx drops it.
 func (s *Storage) CreateWriter(
 	ctx context.Context,
 	name string,

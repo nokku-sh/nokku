@@ -569,8 +569,7 @@ type ReplaceCAParams struct {
 	CaID           string                   `json:"caId"`
 }
 
-// The replaced key stays trusted for as long as a certificate it signed can
-// live, unless revoke_previous drops it at once.
+// The replaced key stays trusted for as long as a certificate it signed can live, unless revoke_previous drops it.
 func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, replaceCA,
 		arg.RevokePrevious,

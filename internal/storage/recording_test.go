@@ -90,7 +90,6 @@ func TestCreateWriterRoundtrip(t *testing.T) {
 		t.Fatalf("partial object unreadable: %v", err)
 	}
 
-	// Deletion removes the object.
 	if err = s.Delete(t.Context(), key); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
@@ -99,8 +98,7 @@ func TestCreateWriterRoundtrip(t *testing.T) {
 	}
 }
 
-// A workspace purge must never reach another workspace's recordings, even one
-// whose id shares a prefix.
+// A workspace purge must never reach another workspace's recordings, even one whose id shares a prefix.
 func TestDeletePrefixStaysInsideWorkspace(t *testing.T) {
 	t.Setenv("NOKKU_STORAGE", modeLocal)
 	t.Setenv("NOKKU_LOCAL_STORAGE_PATH", t.TempDir())

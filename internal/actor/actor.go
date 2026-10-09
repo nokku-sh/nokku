@@ -1,6 +1,4 @@
-// Package actor carries the request identity, its workspace and its
-// transport facts through contexts. It imports no sibling, so db can use it
-// without import cycles.
+// Package actor carries the request identity through contexts. It imports no sibling, so db can use it.
 package actor
 
 import (
@@ -30,14 +28,11 @@ type Principal struct {
 	Role nokkuv1.WorkspaceRole
 }
 
-// Workspace is the tenant a request runs in. The host names it before any
-// authentication happens. It only holds what never changes, the name is
-// read from the row.
+// Workspace only holds what never changes, the name is read from the row.
 type Workspace struct {
 	ID   string
 	Slug string
-	// BaseURL is scheme and host with no path. Cookies, links, the passkey
-	// RP ID and the DPoP htu all derive from it.
+	// BaseURL is scheme and host. Cookies, links, the passkey RP ID and the DPoP htu derive from it.
 	BaseURL string
 }
 

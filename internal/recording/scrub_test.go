@@ -38,8 +38,7 @@ func testRecording() *db.Recording {
 	return &db.Recording{ID: "rec1", WorkspaceID: "ws1", Key: NewKey(), Complete: true}
 }
 
-// writeFrames stores plaintext as one recording object, in small chunks to
-// force many frames.
+// writeFrames stores plaintext in small chunks to force many frames.
 func writeFrames(t *testing.T, s *Service, rec *db.Recording, plaintext []byte) {
 	t.Helper()
 	w, err := s.NewWriter(t.Context(), rec)
@@ -140,10 +139,7 @@ func scrubBytes(t *testing.T, cast []byte, window, overlap int) ([]byte, bool) {
 	return out.Bytes(), len(spans) > 0
 }
 
-// TestScrubRemovesSecrets runs the full scrub pipeline over a stored
-// recording: AWS keys, private key blocks spanning events, and assignment
-// values must be masked, benign content must survive byte for byte, and the
-// event structure must stay intact.
+// Secrets must be masked, benign content must survive byte for byte, and the event structure must stay intact.
 func TestScrubRemovesSecrets(t *testing.T) {
 	s := newScrubTestService(t)
 	rec := testRecording()
@@ -167,8 +163,7 @@ func TestScrubRemovesSecrets(t *testing.T) {
 		}
 	}
 
-	// The assignment keeps its key name, the private key block is masked
-	// across the two events it was split over.
+	// The assignment keeps its key name, the private key block is masked across both of its events.
 	if got := events[3].data; !strings.Contains(got, "DB_PASSWORD="+secret) {
 		t.Fatalf("assignment event = %q, want key kept with value masked", got)
 	}
@@ -182,7 +177,6 @@ func TestScrubRemovesSecrets(t *testing.T) {
 	}
 }
 
-// TestScrubWithoutSecretsIsNoop verifies a clean recording is not rewritten.
 func TestScrubWithoutSecretsIsNoop(t *testing.T) {
 	s := newScrubTestService(t)
 	rec := testRecording()
@@ -201,8 +195,7 @@ func TestScrubWithoutSecretsIsNoop(t *testing.T) {
 	}
 }
 
-// TestScrubCastSplitsSpansAcrossEvents verifies a secret split across event
-// boundaries is redacted in both events it touches.
+// A secret split across event boundaries is redacted in both events it touches.
 func TestScrubCastSplitsSpansAcrossEvents(t *testing.T) {
 	cast := scrubTestCast[:strings.Index(scrubTestCast, "\n")+1] +
 		"[0.0, \"o\", \"ghp_\"]\n" +
@@ -225,9 +218,7 @@ func TestScrubCastSplitsSpansAcrossEvents(t *testing.T) {
 	}
 }
 
-// A cast larger than the window is scrubbed like one that fits in it. The
-// secrets are split over two events each and land at every distance from a
-// window edge as the window grows.
+// The secrets are split over two events each and land at every distance from a window edge.
 func TestScrubWindowsFindTheSameSecrets(t *testing.T) {
 	secrets := []string{
 		"https://ci:AKIAABCDEFGHIJKLMNOP@github.com/x",
@@ -276,8 +267,7 @@ func TestScrubWindowsFindTheSameSecrets(t *testing.T) {
 	}
 }
 
-// The part of an upload that broke off is scrubbed too. The cut runs through
-// its last line, and the stored cast ends after the last whole one.
+// The part of an upload that broke off is scrubbed too, and the stored cast ends after the last whole line.
 func TestScrubTakesACutRecording(t *testing.T) {
 	s := newScrubTestService(t)
 	rec := testRecording()
@@ -322,8 +312,7 @@ func TestScrubTakesACutRecording(t *testing.T) {
 	}
 }
 
-// A scrub and an upload never write the same object at once. No scrub starts
-// while an upload runs, and an upload stops the scrub it finds.
+// No scrub starts while an upload runs, and an upload stops the scrub it finds.
 func TestScrubAndUploadTakeTurns(t *testing.T) {
 	s := newScrubTestService(t)
 	rec := testRecording()
@@ -362,8 +351,7 @@ func TestScrubAndUploadTakeTurns(t *testing.T) {
 	end()
 }
 
-// scrubEvents scrubs a cast of output events and returns what is left of
-// their data, end to end.
+// scrubEvents scrubs a cast of output events and returns what is left of their data, end to end.
 func scrubEvents(t *testing.T, events ...string) (string, bool) {
 	t.Helper()
 	var cast strings.Builder
@@ -384,8 +372,7 @@ func scrubEvents(t *testing.T, events ...string) (string, bool) {
 	return out.String(), changed
 }
 
-// A terminal puts sequences in and around what it shows, and shows a secret
-// in pieces. None of that may hide one, and the sequences stay in the stream.
+// A terminal puts sequences around what it shows, and shows a secret in pieces. None of that may hide one.
 func TestScrubSeesThroughTheTerminal(t *testing.T) {
 	const (
 		token  = "ghp_abcDEF1234567890abcDEF1234567890abcDEF"
@@ -548,8 +535,7 @@ func TestScrubMarksASecretOnce(t *testing.T) {
 	}
 }
 
-// Every line of a secret shows the redaction, and keeps its width and its
-// line break. A screen that is drawn cell by cell stays in step.
+// Every line of a secret keeps its width and its line break, so a screen drawn cell by cell stays in step.
 func TestScrubKeepsTheShapeOfASecret(t *testing.T) {
 	lines := []string{
 		"-----BEGIN RSA PRIVATE KEY-----",
@@ -566,16 +552,14 @@ func TestScrubKeepsTheShapeOfASecret(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want.String())
 	}
 
-	// An editor writes a shorter line over a longer one and clears nothing.
-	// What is left of the secret has to cover the cells the secret took.
+	// An editor writes a shorter line over a longer one and clears nothing, so the redaction covers every cell.
 	const token = "ghp_abcDEF1234567890abcDEF1234567890abcDEF"
 	got, _ = scrubEvents(t, "\x1b[7;5HGITHUB_TOKEN="+token+"\x1b[8;5HNPM=x")
 	if want := "\x1b[7;5HGITHUB_TOKEN=" + masked(len(token)) + "\x1b[8;5HNPM=x"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 
-	// A character of several bytes is one cell, and a secret shorter than
-	// the mark shows as much of the mark as fits.
+	// A character of several bytes is one cell, and a short secret shows as much of the mark as fits.
 	got, _ = scrubEvents(
 		t,
 		"postgres://nokku:p\u00e4ssw\u00f6rd12345@db.internal/x\r\n",
@@ -588,10 +572,7 @@ func TestScrubKeepsTheShapeOfASecret(t *testing.T) {
 	}
 }
 
-// An editor draws other lines of the screen between the lines of a key, and
-// its own line numbers in front of them. A key block is the lines of the key
-// and nothing else: not what was drawn in between, and not that text where it
-// shows again.
+// An editor draws other lines and its line numbers between the lines of a key. Only the key lines go.
 func TestScrubTakesOnlyTheKeyOutOfAnEditor(t *testing.T) {
 	const (
 		line1 = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCRokBog4Y3SG+2"
@@ -623,9 +604,7 @@ func TestScrubTakesOnlyTheKeyOutOfAnEditor(t *testing.T) {
 	}
 }
 
-// A program that wraps a long line itself puts its own things in front of the
-// rest: an editor the blanks under its line numbers, a pager its bar. The
-// secret is found across that, and what the program put there stays.
+// A program that wraps a long line puts its own things in front of the rest. The secret is found across that.
 func TestScrubFollowsALineTheProgramWrapped(t *testing.T) {
 	// The test cast is 80 columns wide.
 	const pat = "github_pat_11ABCDEFG0abcdefghijkl_MNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL"
@@ -666,8 +645,7 @@ func TestScrubFollowsALineTheProgramWrapped(t *testing.T) {
 		})
 	}
 
-	// An editor that breaks lines at a word stops short of the edge, and
-	// marks the rest of the line.
+	// An editor that breaks lines at a word stops short of the edge, and marks the rest of the line.
 	const jwt = "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAibm9ra3UtdGVzdCJ9.6h9DMbaBdTLULuL93KyFGXz5XYoR3w18JjZQRgd_q1g"
 	got, _ := scrubEvents(t, "\x1b[5;1H 30 S="+jwt[:70]+"\x1b[6;1H    \u21b3 "+jwt[70:]+"\x1b[7;1H 31 next")
 	if want := "\x1b[5;1H 30 S=" + masked(
@@ -678,8 +656,7 @@ func TestScrubFollowsALineTheProgramWrapped(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 
-	// The same with the rest of the row painted, as for the line the cursor
-	// is on.
+	// The same with the rest of the row painted, as for the line the cursor is on.
 	got, _ = scrubEvents(t, "\x1b[5;1H 30 S="+jwt[:70]+"    \r\n    \u21b3 "+jwt[70:]+"\r\n 31 next")
 	if want := "\x1b[5;1H 30 S=" + masked(
 		70,
@@ -689,8 +666,7 @@ func TestScrubFollowsALineTheProgramWrapped(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 
-	// A line cut off at the edge is not wrapped. The next row is the next
-	// line, and keeps its line number.
+	// A line cut off at the edge is not wrapped. The next row is the next line, and keeps its line number.
 	got, _ = scrubEvents(
 		t,
 		"\x1b[5;1H 10 X="+pat[:74]+"\x1b[6;1H 11 NPM_TOKEN=npm_abcdefghijklmnopqrstuvwxyz0123456789\x1b[7;1H 12 next",
@@ -699,8 +675,7 @@ func TestScrubFollowsALineTheProgramWrapped(t *testing.T) {
 		t.Fatalf("the line after a cut one lost its start: %q", got)
 	}
 
-	// A line that happens to be as wide as the screen is still a line, the
-	// one after it keeps its name.
+	// A line that happens to be as wide as the screen is still a line, the one after it keeps its name.
 	got, _ = scrubEvents(t, strings.Repeat("=", 80)+"\r\nexport DB_PASSWORD=VhT9xNq2mLb4Zw\r\n")
 	if want := strings.Repeat("=", 80) + "\r\nexport DB_PASSWORD=" + masked(14) + "\r\n"; got != want {
 		t.Fatalf("got %q, want %q", got, want)

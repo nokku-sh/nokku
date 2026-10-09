@@ -5,8 +5,7 @@ import (
 	"encoding/base64"
 )
 
-// crypto/rand never fails, it stops the program when the system has no
-// randomness to give. So nothing here returns an error.
+// crypto/rand never fails, it stops the program instead. So nothing here returns an error.
 
 func RandomString(size int) string {
 	b := make([]byte, size)

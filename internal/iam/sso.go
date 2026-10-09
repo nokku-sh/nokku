@@ -1,7 +1,6 @@
 package iam
 
-// OIDC providers of a workspace. The config, secret included, is one JSON
-// blob encrypted at rest.
+// OIDC providers of a workspace. The config, secret included, is one JSON blob encrypted at rest.
 
 import (
 	"context"

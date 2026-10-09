@@ -25,8 +25,7 @@ func NewSecret() (raw string, hash HashedToken) {
 	return raw, HashToken(raw)
 }
 
-// NewToken with an id makes the plaintext "id_secret", so Parse can recover
-// the id. An empty id gives a bare secret.
+// NewToken with an id makes the plaintext "id_secret", so Parse can recover the id.
 func NewToken(id string) *Token {
 	plaintext := RandomString(32)
 	if id != "" {
@@ -35,8 +34,7 @@ func NewToken(id string) *Token {
 	return &Token{ID: id, Plaintext: plaintext, Hash: HashToken(plaintext)}
 }
 
-// Parse handles "uuid_secret" and bare "secret". The secret may itself
-// contain underscores.
+// Parse handles "uuid_secret" and bare "secret". The secret may itself contain underscores.
 func Parse(raw string) (*ParsedToken, error) {
 	if raw == "" {
 		return nil, errInvalidToken
@@ -62,16 +60,14 @@ const (
 
 const base62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-// NewKey makes "<prefix><random><checksum>", like a GitHub token. The
-// checksum lets CheckKey reject a typo or a truncated paste without a lookup.
+// NewKey makes "<prefix><random><checksum>". The checksum lets CheckKey reject a typo without a lookup.
 func NewKey(prefix string) (raw string, hash HashedToken) {
 	body := prefix + RandomString(keyBodyBytes)
 	raw = body + keyCheck(body)
 	return raw, HashToken(raw)
 }
 
-// CheckKey reports whether raw has the shape NewKey makes and its checksum
-// holds. It is a format check, not authentication.
+// CheckKey is a format check, not authentication.
 func CheckKey(raw string) bool {
 	if len(raw) <= keyCheckLen || !strings.HasPrefix(raw, "nk_") {
 		return false

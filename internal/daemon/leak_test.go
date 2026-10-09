@@ -19,8 +19,7 @@ func leaked() (string, bool) {
 	return b.String(), p.Count() > 0
 }
 
-// TestMain fails the suite on any provably stuck goroutine, the pool is the
-// leak-prone code.
+// TestMain fails the suite on any provably stuck goroutine, the pool is the leak-prone code.
 func TestMain(m *testing.M) {
 	code := m.Run()
 	if code == 0 {
