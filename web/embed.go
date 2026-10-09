@@ -10,6 +10,8 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"path"
 	"regexp"
 	"slices"
@@ -29,8 +31,13 @@ var staticFS embed.FS
 // Where the UI sits inside staticFS.
 const uiRoot = "ui/build"
 
-// Handler serves the embedded SPA.
-func Handler() http.Handler {
+// Handler serves the UI. That is the embedded SPA, or what the Vite dev
+// server at dev hands out while someone works on it. Either way the browser
+// talks to this server only.
+func Handler(dev *url.URL) http.Handler {
+	if dev.Host != "" {
+		return &httputil.ReverseProxy{Rewrite: func(r *httputil.ProxyRequest) { r.SetURL(dev) }}
+	}
 	pinMimeTypes()
 	files := statigz.FileServer(staticFS, brotli.AddEncoding, statigz.FSPrefix(uiRoot))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

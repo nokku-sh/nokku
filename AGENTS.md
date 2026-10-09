@@ -18,9 +18,9 @@ them at the local protos. CI has no `go.work` and uses what `go.mod` pins.
 ## Commands
 
 ```bash
-task dev            # backend + web/ui dev server
-task backend        # go run ./cmd/nokku
-task frontend       # web/ui dev server (Vite, :5173)
+task dev            # backend + web/ui dev server, the app is on the backend's port (:3000)
+task backend        # go run ./cmd/nokku, serves the embedded UI
+task frontend       # web/ui dev server (Vite, :5173), reached through the backend
 task gen            # sqlc + the web client from the pinned protos
 task lint           # tidy, GOWORK=off build, fmt, vet, govulncheck, unit tests -race, golangci-lint --fix, web/ui fmt+lint
 task test           # unit tests, no services
@@ -81,6 +81,15 @@ committed `.gitkeep` and are embedded by `web/embed.go`.
   rows, the request path), `Sys()` and `SysTx` (role `nokku_system`,
   BYPASSRLS, a pool of its own, only boot, webhooks and jobs). The owner role
   only migrates at startup.
+- `internal/webpki` is the server's TLS identity as clients see it.
+  There are two setups and no third: unset `NOKKU_TLS` a proxy holds the
+  certificate, `internal` the server makes a CA for itself (`web_ca`, one
+  key for good, name constrained to the host). Certificates from Let's
+  Encrypt or from files are the proxy's job.
+  A private CA is served at `/ca.crt` with its pin in `GetInstanceInfo`. `nk`
+  and `nokkud` check the CA against the pin and keep it (`mon/trust`). Nothing
+  else may tell a client to skip verification. The scheme of the public URL
+  follows from the mode in `config.FullURL`, it is never configured.
 - `internal/tenant` resolves the workspace from the request host before
   authentication. Self-hosted serves one workspace created at boot. SaaS
   (`NOKKU_SAAS`) gives each workspace a subdomain of `NOKKU_BASE_URL`.

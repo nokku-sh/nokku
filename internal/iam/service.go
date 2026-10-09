@@ -70,8 +70,6 @@ type Deps struct {
 	Secure bool
 	// StrictEmail needs DNS, so it is for the public SaaS, not air-gapped installs.
 	StrictEmail bool
-	// Debug adds the Vite dev server to the passkey origins.
-	Debug bool
 	// CanJoin gates new users on the seat cap. used is read in the creating tx.
 	CanJoin func(ctx context.Context, workspaceID string, used int64) error
 
@@ -91,7 +89,6 @@ type Service struct {
 	now     func() time.Time
 	canJoin func(ctx context.Context, workspaceID string, used int64) error
 	strict  bool
-	debug   bool
 	idp     *http.Client // guarded, see egress.NewClient
 	// flowAEAD seals the state of browser flows into their cookie. XChaCha,
 	// since anyone can start a flow and random nonces must never run out.
@@ -121,7 +118,6 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 		now:            time.Now,
 		canJoin:        d.CanJoin,
 		strict:         d.StrictEmail,
-		debug:          d.Debug,
 		sendMagicLink:  d.SendMagicLink,
 		sendSignupLink: d.SendSignupLink,
 		sendNewLogin:   d.SendNewLogin,

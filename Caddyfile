@@ -1,8 +1,7 @@
 # Reverse proxy for Nokku. SITE_ADDRESS is injected by compose from
-# NOKKU_BASE_URL (see compose.prod.yml).
+# NOKKU_BASE_URL, a host name (see compose.prod.yml).
 #
-# A real domain triggers automatic HTTPS via Let's Encrypt (expose ports
-# 80/443). localhost and bare IP addresses serve plain HTTP.
+# Caddy gets the certificate for it from Let's Encrypt (expose ports 80/443).
 {$SITE_ADDRESS} {
 	# The backend serves the SPA over HTTP/1.1 and Connect/gRPC over
 	# unencrypted HTTP/2 (h2c), so advertise both to the upstream.

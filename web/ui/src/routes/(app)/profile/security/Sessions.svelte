@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { describeAgent } from '#lib/agent.js';
 	import { session, sessionKindLabel, sessionMethodLabel } from '#lib/api/session.svelte.js';
+	import { util } from '#lib/api/workspaces.svelte.js';
+	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Item from '#lib/components/ui/item/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
-	import { formatTs } from '#lib/utils.js';
+	import { formatTs, nkLoginCommand } from '#lib/utils.js';
 	import { LogOut, Monitor, Smartphone, Terminal } from '@lucide/svelte';
 	import { confirm } from '#lib/hooks/index.js';
 
@@ -20,6 +22,9 @@
 
 	const kindIcon = (kind: string) =>
 		kind === 'cli' ? Terminal : kind === 'device' ? Smartphone : Monitor;
+
+	const info = util.instanceInfo();
+	const login = $derived(nkLoginCommand(info.data?.caPin));
 </script>
 
 <Card.Root id="sessions">
@@ -46,7 +51,7 @@
 			</Card.Action>
 		{/if}
 	</Card.Header>
-	<Card.Content>
+	<Card.Content class="flex flex-col gap-4">
 		{#if sessions.isLoading}
 			<Skeleton class="h-24 w-full" />
 		{:else}
@@ -88,5 +93,11 @@
 				{/each}
 			</Item.Group>
 		{/if}
+		<div class="flex flex-col gap-2">
+			<p class="text-sm text-muted-foreground">
+				To add a terminal, run this on it. It shows up here once it is signed in.
+			</p>
+			<CodeSnippet code={login} language="bash" />
+		</div>
 	</Card.Content>
 </Card.Root>

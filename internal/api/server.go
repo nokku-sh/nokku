@@ -3,6 +3,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -20,6 +21,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/config"
 	"github.com/nokku-sh/nokku/internal/entitlement"
+	"github.com/nokku-sh/nokku/internal/webpki"
 	"github.com/nokku-sh/nokku/web"
 )
 
@@ -43,13 +45,16 @@ func (s *Server) Start(ctx context.Context) error {
 	proto := new(http.Protocols)
 	proto.SetHTTP1(true)
 	proto.SetHTTP2(true)
-	proto.SetUnencryptedHTTP2(true)
+	tlsConf := s.cfg.WebPKI.TLSConfig()
+	proto.SetUnencryptedHTTP2(tlsConf == nil)
 	server := &http.Server{
 		// Streams, relays and web terminals end with the root ctx, nothing else stops them.
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		Addr:              "0.0.0.0:" + s.cfg.Port,
 		Handler:           s.Handler(ctx),
 		Protocols:         proto,
+		TLSConfig:         tlsConf,
+		ErrorLog:          slog.NewLogLogger(quietHandshakes{slog.Default().Handler()}, slog.LevelInfo),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       30 * time.Second,
 		MaxHeaderBytes:    1 << 14, // 16 KiB
@@ -62,7 +67,19 @@ func (s *Server) Start(ctx context.Context) error {
 			slog.Warn("the owner has no passkey yet, sign in with this link, it works for 24 hours",
 				"url", s.cfg.BootstrapLink)
 		}
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if s.cfg.UIDev.Host != "" {
+			slog.Warn("the UI comes from the Vite dev server and its scripts are not pinned, this is for development",
+				"dev_server", s.cfg.UIDev.String())
+		}
+		if pin := s.cfg.WebPKI.Pin(); pin != "" {
+			slog.Info("a private CA is advertised, nk and nokkud keep it once it matches the pin",
+				"pin", pin, "ca", s.cfg.FullURL()+webpki.Path)
+		}
+		listen := server.ListenAndServe
+		if tlsConf != nil {
+			listen = func() error { return server.ListenAndServeTLS("", "") }
+		}
+		if err := listen(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 		}
 	}()
@@ -175,7 +192,7 @@ func (s *Server) registerServices(ctx context.Context) {
 	s.mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(newDaemonControlService(s.cfg), opts...))
 	s.mux.Handle(nokkuv1connect.NewRecordingServiceHandler(&recordingService{cfg: s.cfg}, opts...))
 
-	static := web.Handler()
+	static := web.Handler(&s.cfg.UIDev)
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// A service this build does not have, from a newer client. The SPA
 		// fallback would answer it with HTML.
@@ -187,6 +204,8 @@ func (s *Server) registerServices(ctx context.Context) {
 	})
 
 	registerAuthRoutes(s.mux, s.cfg)
+	// Public, a client reads it before it trusts the certificate.
+	s.mux.Handle("GET "+webpki.Path, s.cfg.WebPKI)
 
 	protec := newChain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
 	s.mux.Handle("GET /avatars/{id}", serveAvatar(s.cfg))

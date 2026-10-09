@@ -30,7 +30,6 @@ const (
 	maxSignupName      = 256
 	// A relying party is built per workspace host and kept for a while.
 	relyingPartyTTL = time.Hour
-	devOrigin       = "http://localhost:5173"
 )
 
 // passkeySignupState reserves the account so the user row only exists once
@@ -88,10 +87,6 @@ func (f *passkeyFlow) rp(ctx context.Context) (*webauthn.WebAuthn, error) {
 	if err != nil {
 		return nil, err
 	}
-	origins := []string{ws.BaseURL}
-	if f.svc.debug {
-		origins = append(origins, devOrigin)
-	}
 	row, err := f.svc.conn.Tenant().GetWorkspace(ctx)
 	if err != nil {
 		return nil, err
@@ -99,7 +94,7 @@ func (f *passkeyFlow) rp(ctx context.Context) (*webauthn.WebAuthn, error) {
 	wa, err := webauthn.New(&webauthn.Config{
 		RPDisplayName: cmp.Or(row.Name, "Nokku"),
 		RPID:          u.Hostname(),
-		RPOrigins:     origins,
+		RPOrigins:     []string{ws.BaseURL},
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
 			ResidentKey:      protocol.ResidentKeyRequirementRequired,
 			UserVerification: protocol.VerificationRequired,

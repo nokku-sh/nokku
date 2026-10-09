@@ -253,6 +253,13 @@ type User struct {
 	UpdatedAt   time.Time           `json:"updatedAt"`
 }
 
+type WebCA struct {
+	ID          int32                 `json:"id"`
+	PrivateKey  crypto.EncryptedBytes `json:"privateKey"`
+	Certificate []byte                `json:"certificate"`
+	UpdatedAt   time.Time             `json:"updatedAt"`
+}
+
 type Workspace struct {
 	ID          string                   `json:"id"`
 	Slug        string                   `json:"slug"`

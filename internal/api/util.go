@@ -48,6 +48,7 @@ func (s *utilService) GetInstanceInfo(
 		ImprintUrl:   &op.ImprintURL,
 		Mode:         new(s.cfg.Mode()),
 		Signup:       new(saas && actor.WorkspaceIDFromContext(ctx) == ""),
+		CaPin:        new(s.cfg.WebPKI.Pin()),
 	}, nil
 }
 
