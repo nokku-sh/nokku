@@ -21,19 +21,6 @@ id = "mysql-password-flag"
 description = "A password given to a MySQL client on its command line."
 regex = '''\b(?:mysql|mysqldump|mysqladmin|mariadb|mariadb-dump)\b[^\r\n]{0,200}?\s-p(?:'([^'\r\n]{3,})'|"([^"\r\n]{3,})"|([^\s'"-]\S{2,}))'''
 
-# gitleaks wants a key block from BEGIN to END. A screen that ends in the
-# middle of one shows only its head, or its tail after scrolling up. The
-# blanks between the lines may hold the prompt of a pager, ":" or "/".
-[[rules]]
-id = "private-key-head"
-description = "The first lines of a private key block."
-regex = '''-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----(?:[\s:/]{1,12}[A-Za-z0-9+/=]{16,})+'''
-
-[[rules]]
-id = "private-key-tail"
-description = "The last lines of a private key block."
-regex = '''(?:[A-Za-z0-9+/=]{16,}[\s:/]{1,12})+-----END[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----'''
-
 # gitleaks wants a token up to its signature. A program that breaks long
 # lines itself, like bat with line numbers, shows the start of one alone.
 [[rules]]

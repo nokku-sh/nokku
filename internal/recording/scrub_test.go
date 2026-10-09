@@ -17,7 +17,7 @@ import (
 const scrubTestCast = `{"version":3,"term":{"cols":80,"rows":24,"type":"xterm-256color"},"timestamp":1700000000}
 [0.0, "o", "git push https://ci:AKIAABCDEFGHIJKLMNOP@github.com/x\r\n"]
 [0.1, "o", "-----BEGIN RSA PRIVATE KEY-----\r\n"]
-[0.2, "o", "MIIB\r\nqwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890\r\n-----END RSA PRIVATE KEY-----\r\n"]
+[0.2, "o", "MIIBqwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890\r\n-----END RSA PRIVATE KEY-----\r\n"]
 [0.3, "i", "export DB_PASSWORD=VhT9xNq2mLb4Zw\r\n"]
 [0.4, "o", "ls -la < /tmp & > out\r\n"]
 `
@@ -143,8 +143,7 @@ func scrubBytes(t *testing.T, cast []byte, window, overlap int) ([]byte, bool) {
 // TestScrubRemovesSecrets runs the full scrub pipeline over a stored
 // recording: AWS keys, private key blocks spanning events, and assignment
 // values must be masked, benign content must survive byte for byte, and the
-// event structure must stay intact. The fake key body is 64+ chars because
-// gitleaks' private-key rule requires that much between the BEGIN/END markers.
+// event structure must stay intact.
 func TestScrubRemovesSecrets(t *testing.T) {
 	s := newScrubTestService(t)
 	rec := testRecording()
@@ -426,7 +425,7 @@ func TestScrubSeesThroughTheTerminal(t *testing.T) {
 			name:   "a color for every character",
 			events: []string{"$ export GH=" + colored.String() + "\x1b[24m\r\n"},
 			leaks:  []string{"\x1b[4mg\x1b[4mh\x1b[4mp", "\x1b[4mD\x1b[4mE\x1b[4mF"},
-			keeps:  []string{"$ export GH=", "\x1b[4m\x1b[4m", "\x1b[24m\r\n"},
+			keeps:  []string{"$ export GH=", "\x1b[4m<\x1b[4mr\x1b[4me", "\x1b[4m \x1b[24m\r\n"},
 		},
 		{
 			name:   "a sequence cut by the end of an event",
@@ -526,31 +525,184 @@ func TestScrubSeesThroughTheTerminal(t *testing.T) {
 					t.Errorf("%q is gone from %q", keep, got)
 				}
 			}
-			if !strings.Contains(got, redaction) {
+			// The color for every character sits between those of the mark too.
+			if !strings.Contains(strings.ReplaceAll(got, "\x1b[4m", ""), redaction) {
 				t.Errorf("no redaction in %q", got)
 			}
 		})
 	}
 }
 
+// masked is what a secret of that many characters leaves on its line.
+func masked(width int) string {
+	return redaction + strings.Repeat(" ", width-len(redaction))
+}
+
 // A secret typed one key at a time is one secret, and shows one redaction.
 func TestScrubMarksASecretOnce(t *testing.T) {
-	typed := strings.Split("export GITHUB_TOKEN=ghp_abcDEF1234567890abcDEF1234567890abcDEF", "")
+	const token = "ghp_abcDEF1234567890abcDEF1234567890abcDEF"
+	typed := strings.Split("export GITHUB_TOKEN="+token, "")
 	got, _ := scrubEvents(t, append(typed, "\r\n")...)
-	if want := "export GITHUB_TOKEN=" + redaction + "\r\n"; got != want {
+	if want := "export GITHUB_TOKEN=" + masked(len(token)) + "\r\n"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
 
-// Every line of a secret shows the redaction, and keeps its line break. A
-// screen that scrolls by lines stays in step.
-func TestScrubKeepsTheLinesOfASecret(t *testing.T) {
-	got, _ := scrubEvents(
+// Every line of a secret shows the redaction, and keeps its width and its
+// line break. A screen that is drawn cell by cell stays in step.
+func TestScrubKeepsTheShapeOfASecret(t *testing.T) {
+	lines := []string{
+		"-----BEGIN RSA PRIVATE KEY-----",
+		"MIIBqwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890",
+		"-----END RSA PRIVATE KEY-----",
+	}
+	got, _ := scrubEvents(t, lines[0]+"\r\n", lines[1]+"\r\n"+lines[2]+"\r\nnext\r\n")
+	var want strings.Builder
+	for _, line := range lines {
+		want.WriteString(masked(len(line)) + "\r\n")
+	}
+	want.WriteString("next\r\n")
+	if got != want.String() {
+		t.Fatalf("got %q, want %q", got, want.String())
+	}
+
+	// An editor writes a shorter line over a longer one and clears nothing.
+	// What is left of the secret has to cover the cells the secret took.
+	const token = "ghp_abcDEF1234567890abcDEF1234567890abcDEF"
+	got, _ = scrubEvents(t, "\x1b[7;5HGITHUB_TOKEN="+token+"\x1b[8;5HNPM=x")
+	if want := "\x1b[7;5HGITHUB_TOKEN=" + masked(len(token)) + "\x1b[8;5HNPM=x"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+
+	// A character of several bytes is one cell, and a secret shorter than
+	// the mark shows as much of the mark as fits.
+	got, _ = scrubEvents(
 		t,
-		"-----BEGIN RSA PRIVATE KEY-----\r\n",
-		"MIIBqwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890\r\n-----END RSA PRIVATE KEY-----\r\nnext\r\n",
+		"postgres://nokku:p\u00e4ssw\u00f6rd12345@db.internal/x\r\n",
+		"redis://default:s3cr3@cache/0\r\n",
 	)
-	if want := strings.Repeat(redaction+"\r\n", 3) + "next\r\n"; got != want {
+	if want := "postgres://nokku:" + masked(
+		13,
+	) + "@db.internal/x\r\nredis://default:" + redaction[:5] + "@cache/0\r\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+// An editor draws other lines of the screen between the lines of a key, and
+// its own line numbers in front of them. A key block is the lines of the key
+// and nothing else: not what was drawn in between, and not that text where it
+// shows again.
+func TestScrubTakesOnlyTheKeyOutOfAnEditor(t *testing.T) {
+	const (
+		line1 = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCRokBog4Y3SG+2"
+		line2 = "/s4AOD2yorSphMR67Vgg497D60wDztGYOGTGxpGMukMcMpOkEsAZlYycVdETfOjU"
+		last  = "+5NJFd/EuGCE/0kgjeJmNtM="
+		prose = "\x1b[3;1H 34   host: smtp.mailgun.org\x1b[4;1H 35   username: postmaster@mg.example.org" +
+			"\x1b[5;1H 42 {\"client_id\": \"nokku-cli\"}\x1b[6;1H 45 curl -H \"Accept: text/plain\" https://api.internal/v1/certs"
+	)
+	got, _ := scrubEvents(t,
+		"\x1b[20;1H 50 -----BEGIN PRIVATE KEY-----\x1b[21;1H 51 "+line1+"\x1b[22;1H 52 "+line2,
+		// Scrolled up: the lines above come back, the key is off the screen.
+		prose,
+		// Scrolled down again, to the end of the key.
+		"\x1b[20;1H 52 "+line2+"\x1b[21;1H 76 "+last+"\x1b[22;1H 77 -----END PRIVATE KEY-----",
+		prose,
+	)
+	for _, leak := range []string{line1[:12], line2[:12], line2[40:], last[:12], "PRIVATE KEY"} {
+		if strings.Contains(got, leak) {
+			t.Errorf("%q survived in %q", leak, got)
+		}
+	}
+	if n := strings.Count(got, prose); n != 2 {
+		t.Errorf("the lines drawn between the key lines were shown twice, %d are left whole in %q", n, got)
+	}
+	for _, number := range []string{"H 50 <", "H 51 <", "H 52 <", "H 76 <", "H 77 <"} {
+		if !strings.Contains(got, number) {
+			t.Errorf("line number %q is gone from %q", number, got)
+		}
+	}
+}
+
+// A program that wraps a long line itself puts its own things in front of the
+// rest: an editor the blanks under its line numbers, a pager its bar. The
+// secret is found across that, and what the program put there stays.
+func TestScrubFollowsALineTheProgramWrapped(t *testing.T) {
+	// The test cast is 80 columns wide.
+	const pat = "github_pat_11ABCDEFG0abcdefghijkl_MNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL"
+	tests := []struct {
+		name   string
+		events []string
+		keeps  []string
+	}{
+		{
+			name:   "an editor with line numbers",
+			events: []string{"\x1b[5;1H 10 X=" + pat[:74] + "\x1b[6;1H    " + pat[74:] + "\x1b[7;1H 11 next"},
+			keeps:  []string{"\x1b[5;1H 10 X=<", "\x1b[6;1H    <", "\x1b[7;1H 11 next"},
+		},
+		{
+			name:   "a pager with a bar",
+			events: []string{"  30 │ T=" + pat[:71] + "\x1b[0m\r\n     │ " + pat[71:] + "\r\n  31 │ next\r\n"},
+			keeps:  []string{"  30 │ T=<", "\x1b[0m\r\n     │ <", "\r\n  31 │ next\r\n"},
+		},
+		{
+			name:   "a mark of its own for the wrap",
+			events: []string{"\x1b[5;1H 10 X=" + pat[:74] + "\x1b[6;1H    \u21b3 " + pat[74:] + "\x1b[7;1H 11 next"},
+			keeps:  []string{"\x1b[5;1H 10 X=<", "\x1b[6;1H    \u21b3 <", "\x1b[7;1H 11 next"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, _ := scrubEvents(t, tt.events...)
+			for _, leak := range []string{pat[:20], pat[50:70], pat[74:], pat[80:]} {
+				if strings.Contains(got, leak) {
+					t.Errorf("%q survived in %q", leak, got)
+				}
+			}
+			for _, keep := range tt.keeps {
+				if !strings.Contains(got, keep) {
+					t.Errorf("%q is gone from %q", keep, got)
+				}
+			}
+		})
+	}
+
+	// An editor that breaks lines at a word stops short of the edge, and
+	// marks the rest of the line.
+	const jwt = "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAibm9ra3UtdGVzdCJ9.6h9DMbaBdTLULuL93KyFGXz5XYoR3w18JjZQRgd_q1g"
+	got, _ := scrubEvents(t, "\x1b[5;1H 30 S="+jwt[:70]+"\x1b[6;1H    \u21b3 "+jwt[70:]+"\x1b[7;1H 31 next")
+	if want := "\x1b[5;1H 30 S=" + masked(
+		70,
+	) + "\x1b[6;1H    \u21b3 " + masked(
+		len(jwt)-70,
+	) + "\x1b[7;1H 31 next"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+
+	// The same with the rest of the row painted, as for the line the cursor
+	// is on.
+	got, _ = scrubEvents(t, "\x1b[5;1H 30 S="+jwt[:70]+"    \r\n    \u21b3 "+jwt[70:]+"\r\n 31 next")
+	if want := "\x1b[5;1H 30 S=" + masked(
+		70,
+	) + "    \r\n    \u21b3 " + masked(
+		len(jwt)-70,
+	) + "\r\n 31 next"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+
+	// A line cut off at the edge is not wrapped. The next row is the next
+	// line, and keeps its line number.
+	got, _ = scrubEvents(
+		t,
+		"\x1b[5;1H 10 X="+pat[:74]+"\x1b[6;1H 11 NPM_TOKEN=npm_abcdefghijklmnopqrstuvwxyz0123456789\x1b[7;1H 12 next",
+	)
+	if !strings.Contains(got, "\x1b[6;1H 11 NPM_TOKEN=<redacted>") || !strings.Contains(got, "\x1b[7;1H 12 next") {
+		t.Fatalf("the line after a cut one lost its start: %q", got)
+	}
+
+	// A line that happens to be as wide as the screen is still a line, the
+	// one after it keeps its name.
+	got, _ = scrubEvents(t, strings.Repeat("=", 80)+"\r\nexport DB_PASSWORD=VhT9xNq2mLb4Zw\r\n")
+	if want := strings.Repeat("=", 80) + "\r\nexport DB_PASSWORD=" + masked(14) + "\r\n"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }

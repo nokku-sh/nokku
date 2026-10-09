@@ -3,6 +3,7 @@ package recording
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -12,8 +13,12 @@ import (
 	"iter"
 	"log/slog"
 	"math"
+	"regexp"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/nokku-sh/nokku/internal/audit"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -292,17 +297,28 @@ func findSecrets(
 	window, overlap int,
 ) (map[string][]span, error) {
 	streams := map[string]*streamText{}
+	width := 0
 	for line, err := range castLines(cast) {
 		if err != nil {
 			return nil, err
 		}
 		ev, ok := parseCastEvent(line)
 		if !ok {
+			if cols, ok := castWidth(line); ok {
+				width = cols
+				if out := streams["o"]; out != nil {
+					out.scan.cols = cols
+				}
+			}
 			continue
 		}
 		st := streams[ev.code]
 		if st == nil {
 			st = &streamText{}
+			// Only the output has a cursor.
+			if ev.code == "o" {
+				st.scan.cols = width
+			}
 			streams[ev.code] = st
 		}
 		st.write(ev.data)
@@ -333,19 +349,18 @@ type seenSecrets struct {
 }
 
 func (k *seenSecrets) add(secret []byte) {
-	// A key block is found as one secret, on screen it is lines.
-	for word := range bytes.FieldsSeq(secret) {
-		// The words around a key are no secret, "-----BEGIN" is in every one.
-		if len(word) < shortSecret || shannonEntropy(word) < 3 || len(k.pieces) >= maxSecretPieces {
-			continue
-		}
-		if len(word) < secretPiece {
-			k.short[string(word)] = struct{}{}
-			continue
-		}
-		for i := range len(word) - secretPiece + 1 {
-			k.pieces[string(word[i:i+secretPiece])] = struct{}{}
-		}
+	// A secret is one word. What a rule finds with blanks in it has words
+	// around the secret, and those would be taken out of the whole recording.
+	if bytes.ContainsAny(secret, " \t\r\n") || len(secret) < shortSecret ||
+		shannonEntropy(secret) < 3 || len(k.pieces) >= maxSecretPieces {
+		return
+	}
+	if len(secret) < secretPiece {
+		k.short[string(secret)] = struct{}{}
+		return
+	}
+	for i := range len(secret) - secretPiece + 1 {
+		k.pieces[string(secret[i:i+secretPiece])] = struct{}{}
 	}
 }
 
@@ -405,6 +420,30 @@ func rewriteCast(cast io.Reader, out io.Writer, spans map[string][]span) error {
 	return nil
 }
 
+// castWidth reads the width of the terminal from the header of a cast, or
+// from a resize event.
+func castWidth(line []byte) (int, bool) {
+	var header struct {
+		Term struct {
+			Cols int `json:"cols"`
+		} `json:"term"`
+		Width int `json:"width"`
+	}
+	if json.Unmarshal(line, &header) == nil {
+		cols := cmp.Or(header.Term.Cols, header.Width)
+		return cols, cols > 0
+	}
+	var raw []json.RawMessage
+	var code, size string
+	if json.Unmarshal(line, &raw) != nil || len(raw) != 3 ||
+		json.Unmarshal(raw[1], &code) != nil || code != "r" || json.Unmarshal(raw[2], &size) != nil {
+		return 0, false
+	}
+	width, _, _ := strings.Cut(size, "x")
+	cols, err := strconv.Atoi(width)
+	return cols, err == nil && cols > 0
+}
+
 // parseCastEvent only keeps output and input events.
 func parseCastEvent(line []byte) (castEvent, bool) {
 	var raw []json.RawMessage
@@ -460,6 +499,8 @@ func secretSpans(blob []byte, rules *scrubRuleSet) []span {
 		}
 	}
 
+	spans = append(spans, keyBlockSpans(blob)...)
+
 	// Every match counts. A small one inside a large one is no reason to
 	// drop the large one: the prompt of a pager after a line of a private key
 	// reads like a key and its value.
@@ -478,6 +519,99 @@ func secretSpan(rule scrubRule, m []int) (int, int) {
 		}
 	}
 	return m[0], m[1]
+}
+
+// keyBlockGap is how much may stand between two lines of a private key: a
+// line break, the prompt of a pager, the line number of an editor, or a
+// whole other line the editor redraws while it scrolls.
+const keyBlockGap = 512
+
+var (
+	keyBlockMark = regexp.MustCompile(`-----(BEGIN|END)[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----`)
+	// A line of a key is 64 characters or more. Anything much shorter is as
+	// likely a path that happens to follow a key on screen.
+	keyBlockLine = regexp.MustCompile(`[A-Za-z0-9+/]{40,}={0,2}`)
+	// The last line is as short as it comes out. Right before the END line
+	// anything counts, the line number of an editor may stand in between.
+	// Further away it has to be long enough not to be a word.
+	keyBlockLast = regexp.MustCompile(`([A-Za-z0-9+/=]{4,})[^A-Za-z0-9+/=]{0,12}(?:[0-9]{1,6}[^A-Za-z0-9+/=]{1,12})?$`)
+	keyBlockRest = regexp.MustCompile(`[A-Za-z0-9+/]{16,}={0,2}`)
+)
+
+// keyBlockSpans finds private key blocks: the BEGIN and END lines and the
+// lines of the key that follow one or lead up to the other. The gitleaks rule
+// takes everything from a BEGIN to the next END. In a terminal that is not
+// the key. An editor draws other lines of the screen in between, and a screen
+// that ends in the middle of a key shows no END at all. So a block is only
+// as long as its lines keep coming, and what stands between them stays.
+func keyBlockSpans(blob []byte) []span {
+	marks := keyBlockMark.FindAllSubmatchIndex(blob, -1)
+	if len(marks) == 0 {
+		return nil
+	}
+	lines := keyBlockLine.FindAllIndex(blob, -1)
+	var spans []span
+	for i, mark := range marks {
+		spans = append(spans, span{mark[0], mark[1]})
+		if blob[mark[2]] == 'B' {
+			limit := len(blob)
+			if i+1 < len(marks) {
+				limit = marks[i+1][0]
+			}
+			at := mark[1]
+			next, _ := slices.BinarySearchFunc(lines, at, func(line []int, at int) int { return line[0] - at })
+			for _, line := range lines[next:] {
+				if line[1] > limit || line[0]-at > keyBlockGap {
+					break
+				}
+				spans = append(spans, span{line[0], line[1]})
+				at = line[1]
+			}
+			// The last line, when an editor draws it some time after the
+			// one before it.
+			if at > mark[1] {
+				spans = append(spans, keyBlockEnd(blob, at, min(len(blob), at+keyBlockGap))...)
+			}
+			continue
+		}
+
+		limit := 0
+		if i > 0 {
+			limit = marks[i-1][1]
+		}
+		at := mark[0]
+		from := max(limit, at-keyBlockGap)
+		if last := keyBlockLast.FindSubmatchIndex(blob[from:at]); last != nil {
+			spans = append(spans, span{from + last[2], from + last[3]})
+		}
+		// An editor that scrolls redraws its top line between the last
+		// line of the key and the END line, so no other mark bounds this.
+		spans = append(spans, keyBlockEnd(blob, max(0, at-keyBlockGap), at)...)
+		before, _ := slices.BinarySearchFunc(lines, at, func(line []int, at int) int { return line[0] - at })
+		for _, line := range slices.Backward(lines[:before]) {
+			if line[0] < limit || at-line[1] > keyBlockGap {
+				break
+			}
+			spans = append(spans, span{line[0], line[1]})
+			at = line[0]
+		}
+	}
+	return spans
+}
+
+// keyBlockEnd finds the short last line of a key between from and to: after
+// its last full line, or before its END line. Other things may stand there
+// too, so only what has digits and both cases in it counts. A path has not.
+func keyBlockEnd(blob []byte, from, to int) []span {
+	var spans []span
+	for _, rest := range keyBlockRest.FindAllIndex(blob[from:to], -1) {
+		word := blob[from+rest[0] : from+rest[1]]
+		if bytes.ContainsAny(word, "0123456789") && bytes.ContainsFunc(word, unicode.IsUpper) &&
+			bytes.ContainsFunc(word, unicode.IsLower) {
+			spans = append(spans, span{from + rest[0], from + rest[1]})
+		}
+	}
+	return spans
 }
 
 // allowlisted approximates "line" targets with the match.
