@@ -102,8 +102,9 @@ var scrubRules = sync.OnceValues(func() (*scrubRuleSet, error) {
 	seen := map[string]struct{}{}
 	var keywords []string
 	for _, r := range file.Rules {
-		// Rules without a regex only match file paths.
-		if r.Regex == "" {
+		// Rules without a regex only match file paths. A private key has a
+		// matcher of its own, keyBlockSpans says why.
+		if r.Regex == "" || r.ID == "private-key" {
 			continue
 		}
 		rule := scrubRule{entropy: r.Entropy, secretGroup: r.SecretGroup}
