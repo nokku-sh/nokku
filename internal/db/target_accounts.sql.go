@@ -54,7 +54,7 @@ ON CONFLICT (target_id, username) DO UPDATE
 SET
   username = EXCLUDED.username
 RETURNING
-  id, workspace_id, target_id, username, created_at
+  id, workspace_id, target_id, username, seen_at, created_at
 `
 
 type CreateTargetAccountParams struct {
@@ -70,6 +70,7 @@ func (q *Queries) CreateTargetAccount(ctx context.Context, arg *CreateTargetAcco
 		&i.WorkspaceID,
 		&i.TargetID,
 		&i.Username,
+		&i.SeenAt,
 		&i.CreatedAt,
 	)
 	return &i, err
@@ -105,7 +106,7 @@ func (q *Queries) GetTargetAccountWorkspace(ctx context.Context, accountID strin
 
 const getTargetAccountsByTargetIDs = `-- name: GetTargetAccountsByTargetIDs :many
 SELECT
-  p.id, p.workspace_id, p.target_id, p.username, p.created_at,
+  p.id, p.workspace_id, p.target_id, p.username, p.seen_at, p.created_at,
   COALESCE(
     array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'user'),
     '{}'
@@ -150,6 +151,7 @@ func (q *Queries) GetTargetAccountsByTargetIDs(ctx context.Context, targetIds []
 			&i.TargetAccount.WorkspaceID,
 			&i.TargetAccount.TargetID,
 			&i.TargetAccount.Username,
+			&i.TargetAccount.SeenAt,
 			&i.TargetAccount.CreatedAt,
 			&i.UserIds,
 			&i.TeamIds,
@@ -167,11 +169,12 @@ func (q *Queries) GetTargetAccountsByTargetIDs(ctx context.Context, targetIds []
 
 const insertTargetAccounts = `-- name: InsertTargetAccounts :exec
 INSERT INTO
-  target_accounts (workspace_id, target_id, username)
+  target_accounts (workspace_id, target_id, username, seen_at)
 SELECT
   t.workspace_id,
   t.id,
-  d.username
+  d.username,
+  NOW()
 FROM
   targets t
   CROSS JOIN unnest($1::TEXT[]) AS d (username)
@@ -185,7 +188,11 @@ WHERE
     WHERE
       p.target_id = t.id
   ) < $3::INTEGER
-ON CONFLICT (target_id, username) DO NOTHING
+ON CONFLICT (target_id, username) DO UPDATE
+SET
+  seen_at = NOW()
+WHERE
+  target_accounts.seen_at IS NULL
 `
 
 type InsertTargetAccountsParams struct {
@@ -194,7 +201,8 @@ type InsertTargetAccountsParams struct {
 	MaxAccounts int32    `json:"maxAccounts"`
 }
 
-// Never deletes, a host's list is a hint. A target that holds max_accounts takes no more.
+// Never deletes, a host's list is a hint. A target that holds max_accounts takes no more. The first report
+// of an account stamps it seen, later ones leave the row alone.
 func (q *Queries) InsertTargetAccounts(ctx context.Context, arg *InsertTargetAccountsParams) error {
 	_, err := q.db.Exec(ctx, insertTargetAccounts, arg.Usernames, arg.TargetID, arg.MaxAccounts)
 	return err
@@ -364,7 +372,7 @@ WITH
       $3
   )
 SELECT
-  p.id, p.workspace_id, p.target_id, p.username, p.created_at,
+  p.id, p.workspace_id, p.target_id, p.username, p.seen_at, p.created_at,
   COALESCE(
     array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'user'),
     '{}'
@@ -425,6 +433,7 @@ func (q *Queries) ListTargetAccounts(ctx context.Context, arg *ListTargetAccount
 			&i.TargetAccount.WorkspaceID,
 			&i.TargetAccount.TargetID,
 			&i.TargetAccount.Username,
+			&i.TargetAccount.SeenAt,
 			&i.TargetAccount.CreatedAt,
 			&i.UserIds,
 			&i.TeamIds,
@@ -474,5 +483,51 @@ type RevokeSubjectAccessInWorkspaceParams struct {
 
 func (q *Queries) RevokeSubjectAccessInWorkspace(ctx context.Context, arg *RevokeSubjectAccessInWorkspaceParams) error {
 	_, err := q.db.Exec(ctx, revokeSubjectAccessInWorkspace, arg.SubjectKind, arg.SubjectID)
+	return err
+}
+
+const seedTargetAccountsFromToken = `-- name: SeedTargetAccountsFromToken :exec
+WITH
+  accounts AS (
+    INSERT INTO
+      target_accounts (workspace_id, target_id, username)
+    SELECT DISTINCT
+      g.workspace_id,
+      $2::UUID,
+      g.username
+    FROM
+      join_token_grants g
+    WHERE
+      g.token_id = $1
+    ON CONFLICT (target_id, username) DO UPDATE
+    SET
+      username = EXCLUDED.username
+    RETURNING
+      id,
+      username
+  )
+INSERT INTO
+  grants (account_id, user_id, team_id, service_account_id)
+SELECT
+  a.id,
+  g.user_id,
+  g.team_id,
+  g.service_account_id
+FROM
+  join_token_grants g
+  JOIN accounts a ON a.username = g.username
+WHERE
+  g.token_id = $1
+ON CONFLICT DO NOTHING
+`
+
+type SeedTargetAccountsFromTokenParams struct {
+	TokenID  string `json:"tokenId"`
+	TargetID string `json:"targetId"`
+}
+
+// Copies an enroll token's grants onto a fresh target. Runs once, when the daemon is created.
+func (q *Queries) SeedTargetAccountsFromToken(ctx context.Context, arg *SeedTargetAccountsFromTokenParams) error {
+	_, err := q.db.Exec(ctx, seedTargetAccountsFromToken, arg.TokenID, arg.TargetID)
 	return err
 }

@@ -171,6 +171,7 @@ func (a *TargetAccount) ToProto() *nokkuv1.TargetAccount {
 		TargetId:  &a.TargetID,
 		Username:  &a.Username,
 		CreatedAt: SafeTimestamp(&a.CreatedAt),
+		SeenAt:    SafeTimestamp(a.SeenAt),
 	}
 }
 
@@ -222,7 +223,16 @@ func DefaultDaemonConfig() *nokkuv1.DaemonConfig {
 		AllowForwarding:      new(true),
 		AllowAgentForwarding: new(true),
 		GatewayPorts:         new(false),
+		Ephemeral:            new(false),
 	}
+}
+
+// EffectiveConfig is what the daemon and the UI see. Ephemeral comes from the row, not the stored config,
+// so an admin's config edit cannot change it.
+func (d *Daemon) EffectiveConfig() *nokkuv1.DaemonConfig {
+	cfg := ResolveDaemonConfig(d.Config)
+	cfg.Ephemeral = new(d.RetireAfter != nil)
+	return cfg
 }
 
 // ResolveDaemonConfig fills unset fields, so the daemon, the API and the UI never read one differently.
@@ -243,7 +253,7 @@ func (d *Daemon) ToProto() *nokkuv1.Daemon {
 		Id:         &d.ID,
 		Name:       &d.Name,
 		Status:     &d.Status,
-		Config:     ResolveDaemonConfig(d.Config),
+		Config:     d.EffectiveConfig(),
 		Online:     new(SeenRecently(d.LastSeenAt)),
 		LastSeenAt: SafeTimestamp(d.LastSeenAt),
 		Metadata:   metadata,
@@ -334,7 +344,7 @@ func TargetAccountsToProto(rows []*ListTargetAccountsRow) []*nokkuv1.TargetAccou
 }
 
 func (t *JoinToken) ToProto() *nokkuv1.JoinToken {
-	return &nokkuv1.JoinToken{
+	out := &nokkuv1.JoinToken{
 		Id:          &t.ID,
 		Kind:        &t.Kind,
 		Label:       &t.Label,
@@ -344,11 +354,49 @@ func (t *JoinToken) ToProto() *nokkuv1.JoinToken {
 		AutoApprove: &t.AutoApprove,
 		CaId:        t.CaID,
 		Role:        t.Role,
+		Tags:        t.Tags,
+		Ephemeral:   &t.Ephemeral,
 		CreatedAt:   SafeTimestamp(&t.CreatedAt),
 		LastUsedAt:  SafeTimestamp(t.LastUsedAt),
 	}
+	if t.RetireAfter != nil {
+		out.RetireAfter = durationpb.New(*t.RetireAfter)
+	}
+	return out
 }
 
-func JoinTokensToProto(ts []*JoinToken) []*nokkuv1.JoinToken {
-	return mapSlice(ts, func(t *JoinToken) *nokkuv1.JoinToken { return t.ToProto() })
+// JoinTokensToProto attaches each token's grants. The rows come sorted by token and username.
+func JoinTokensToProto(ts []*JoinToken, grants []*ListJoinTokenGrantsRow) []*nokkuv1.JoinToken {
+	byToken := make(map[string][]*ListJoinTokenGrantsRow)
+	for _, g := range grants {
+		byToken[g.TokenID] = append(byToken[g.TokenID], g)
+	}
+	return mapSlice(ts, func(t *JoinToken) *nokkuv1.JoinToken {
+		out := t.ToProto()
+		out.Grants = JoinTokenGrantsToProto(byToken[t.ID])
+		return out
+	})
+}
+
+// JoinTokenGrantsToProto folds one token's rows into one grant per account.
+func JoinTokenGrantsToProto(rows []*ListJoinTokenGrantsRow) []*nokkuv1.JoinTokenGrant {
+	var out []*nokkuv1.JoinTokenGrant
+	for _, r := range rows {
+		if len(out) == 0 || out[len(out)-1].GetUsername() != r.Username {
+			out = append(out, &nokkuv1.JoinTokenGrant{Username: new(r.Username)})
+		}
+		g := out[len(out)-1]
+		if r.SubjectKind == nil || r.SubjectID == nil {
+			continue
+		}
+		switch *r.SubjectKind {
+		case SubjectKindUser:
+			g.UserIds = append(g.UserIds, *r.SubjectID)
+		case SubjectKindTeam:
+			g.TeamIds = append(g.TeamIds, *r.SubjectID)
+		case SubjectKindServiceAccount:
+			g.ServiceAccountIds = append(g.ServiceAccountIds, *r.SubjectID)
+		}
+	}
+	return out
 }

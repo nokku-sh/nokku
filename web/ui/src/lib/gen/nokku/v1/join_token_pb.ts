@@ -15,7 +15,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/join_token.proto.
  */
 export const file_nokku_v1_join_token: GenFile = /*@__PURE__*/
-  fileDesc("Chlub2trdS92MS9qb2luX3Rva2VuLnByb3RvEghub2trdS52MSLLAgoJSm9pblRva2VuEgoKAmlkGAEgASgJEiUKBGtpbmQYAiABKA4yFy5ub2trdS52MS5Kb2luVG9rZW5LaW5kEg0KBWxhYmVsGAMgASgJEi4KCmV4cGlyZXNfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhAKCG1heF91c2VzGAUgASgFEgwKBHVzZXMYBiABKAUSFAoMYXV0b19hcHByb3ZlGAcgASgIEg0KBWNhX2lkGAggASgJEiUKBHJvbGUYCSABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlEi4KCmNyZWF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3RfdXNlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAikAIKFkNyZWF0ZUpvaW5Ub2tlblJlcXVlc3QSMQoEa2luZBgBIAEoDjIXLm5va2t1LnYxLkpvaW5Ub2tlbktpbmRCCrpIB4IBBBABIAASFgoFbGFiZWwYAiABKAlCB7pIBHICGGQSMAoDdHRsGAMgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQgi6SAWqAQIqABIZCghtYXhfdXNlcxgEIAEoBUIHukgEGgIgABIUCgxhdXRvX2FwcHJvdmUYBSABKAgSFwoFY2FfaWQYBiABKAlCCLpIBXIDsAEBEi8KBHJvbGUYByABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlQgi6SAWCAQIQASJNChdDcmVhdGVKb2luVG9rZW5SZXNwb25zZRIiCgV0b2tlbhgBIAEoCzITLm5va2t1LnYxLkpvaW5Ub2tlbhIOCgZzZWNyZXQYAiABKAkiSAoVTGlzdEpvaW5Ub2tlbnNSZXF1ZXN0Ei8KBGtpbmQYASABKA4yFy5ub2trdS52MS5Kb2luVG9rZW5LaW5kQgi6SAWCAQIQASI9ChZMaXN0Sm9pblRva2Vuc1Jlc3BvbnNlEiMKBnRva2VucxgBIAMoCzITLm5va2t1LnYxLkpvaW5Ub2tlbiIuChZEZWxldGVKb2luVG9rZW5SZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIZChdEZWxldGVKb2luVG9rZW5SZXNwb25zZSpoCg1Kb2luVG9rZW5LaW5kEh8KG0pPSU5fVE9LRU5fS0lORF9VTlNQRUNJRklFRBAAEhoKFkpPSU5fVE9LRU5fS0lORF9FTlJPTEwQARIaChZKT0lOX1RPS0VOX0tJTkRfSU5WSVRFEAIysgIKEEpvaW5Ub2tlblNlcnZpY2USXgoPQ3JlYXRlSm9pblRva2VuEiAubm9ra3UudjEuQ3JlYXRlSm9pblRva2VuUmVxdWVzdBohLm5va2t1LnYxLkNyZWF0ZUpvaW5Ub2tlblJlc3BvbnNlIgbC8xgCGAQSXgoOTGlzdEpvaW5Ub2tlbnMSHy5ub2trdS52MS5MaXN0Sm9pblRva2Vuc1JlcXVlc3QaIC5ub2trdS52MS5MaXN0Sm9pblRva2Vuc1Jlc3BvbnNlIgmQAgHC8xgCGAISXgoPRGVsZXRlSm9pblRva2VuEiAubm9ra3UudjEuRGVsZXRlSm9pblRva2VuUmVxdWVzdBohLm5va2t1LnYxLkRlbGV0ZUpvaW5Ub2tlblJlc3BvbnNlIgbC8xgCGARiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Chlub2trdS92MS9qb2luX3Rva2VuLnByb3RvEghub2trdS52MSLHAwoJSm9pblRva2VuEgoKAmlkGAEgASgJEiUKBGtpbmQYAiABKA4yFy5ub2trdS52MS5Kb2luVG9rZW5LaW5kEg0KBWxhYmVsGAMgASgJEi4KCmV4cGlyZXNfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhAKCG1heF91c2VzGAUgASgFEgwKBHVzZXMYBiABKAUSFAoMYXV0b19hcHByb3ZlGAcgASgIEg0KBWNhX2lkGAggASgJEiUKBHJvbGUYCSABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlEi4KCmNyZWF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3RfdXNlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDAoEdGFncxgMIAMoCRIoCgZncmFudHMYDSADKAsyGC5ub2trdS52MS5Kb2luVG9rZW5HcmFudBIRCgllcGhlbWVyYWwYDiABKAgSLwoMcmV0aXJlX2FmdGVyGA8gASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uIsABCg5Kb2luVG9rZW5HcmFudBI6Cgh1c2VybmFtZRgBIAEoCUIoukglciMQARggMh1eW0EtWmEtel9dW0EtWmEtejAtOS5fLV0qXCQ/JBIhCgh1c2VyX2lkcxgCIAMoCUIPukgMkgEJEDIiBXIDsAEBEiEKCHRlYW1faWRzGAMgAygJQg+6SAySAQkQMiIFcgOwAQESLAoTc2VydmljZV9hY2NvdW50X2lkcxgEIAMoCUIPukgMkgEJEDIiBXIDsAEBIrgDChZDcmVhdGVKb2luVG9rZW5SZXF1ZXN0EjEKBGtpbmQYASABKA4yFy5ub2trdS52MS5Kb2luVG9rZW5LaW5kQgq6SAeCAQQQASAAEhYKBWxhYmVsGAIgASgJQge6SARyAhhkEjAKA3R0bBgDIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIIukgFqgECKgASGQoIbWF4X3VzZXMYBCABKAVCB7pIBBoCIAASFAoMYXV0b19hcHByb3ZlGAUgASgIEhcKBWNhX2lkGAYgASgJQgi6SAVyA7ABARIvCgRyb2xlGAcgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZUIIukgFggECEAESHAoEdGFncxgIIAMoCUIOukgLkgEIECAiBHICGEASMgoGZ3JhbnRzGAkgAygLMhgubm9ra3UudjEuSm9pblRva2VuR3JhbnRCCLpIBZIBAhAgEhEKCWVwaGVtZXJhbBgKIAEoCBJBCgxyZXRpcmVfYWZ0ZXIYCyABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CELpIDaoBCiIECID1JDICCDwiTQoXQ3JlYXRlSm9pblRva2VuUmVzcG9uc2USIgoFdG9rZW4YASABKAsyEy5ub2trdS52MS5Kb2luVG9rZW4SDgoGc2VjcmV0GAIgASgJIkgKFUxpc3RKb2luVG9rZW5zUmVxdWVzdBIvCgRraW5kGAEgASgOMhcubm9ra3UudjEuSm9pblRva2VuS2luZEIIukgFggECEAEiPQoWTGlzdEpvaW5Ub2tlbnNSZXNwb25zZRIjCgZ0b2tlbnMYASADKAsyEy5ub2trdS52MS5Kb2luVG9rZW4iLgoWRGVsZXRlSm9pblRva2VuUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiGQoXRGVsZXRlSm9pblRva2VuUmVzcG9uc2UqaAoNSm9pblRva2VuS2luZBIfChtKT0lOX1RPS0VOX0tJTkRfVU5TUEVDSUZJRUQQABIaChZKT0lOX1RPS0VOX0tJTkRfRU5ST0xMEAESGgoWSk9JTl9UT0tFTl9LSU5EX0lOVklURRACMrICChBKb2luVG9rZW5TZXJ2aWNlEl4KD0NyZWF0ZUpvaW5Ub2tlbhIgLm5va2t1LnYxLkNyZWF0ZUpvaW5Ub2tlblJlcXVlc3QaIS5ub2trdS52MS5DcmVhdGVKb2luVG9rZW5SZXNwb25zZSIGwvMYAhgEEl4KDkxpc3RKb2luVG9rZW5zEh8ubm9ra3UudjEuTGlzdEpvaW5Ub2tlbnNSZXF1ZXN0GiAubm9ra3UudjEuTGlzdEpvaW5Ub2tlbnNSZXNwb25zZSIJkAIBwvMYAhgCEl4KD0RlbGV0ZUpvaW5Ub2tlbhIgLm5va2t1LnYxLkRlbGV0ZUpvaW5Ub2tlblJlcXVlc3QaIS5ub2trdS52MS5EZWxldGVKb2luVG9rZW5SZXNwb25zZSIGwvMYAhgEYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.JoinToken
@@ -75,6 +75,33 @@ export type JoinToken = Message<"nokku.v1.JoinToken"> & {
    * @generated from field: google.protobuf.Timestamp last_used_at = 11;
    */
   lastUsedAt?: Timestamp | undefined;
+
+  /**
+   * Enroll tokens only. Copied onto the target once, when the daemon is
+   * created. Edits in the web app win from then on.
+   *
+   * @generated from field: repeated string tags = 12;
+   */
+  tags: string[];
+
+  /**
+   * @generated from field: repeated nokku.v1.JoinTokenGrant grants = 13;
+   */
+  grants: JoinTokenGrant[];
+
+  /**
+   * An ephemeral daemon is deleted retire_after after it was last seen, and
+   * deletes itself when stopped. A new one of the same name and token
+   * replaces one that is offline.
+   *
+   * @generated from field: bool ephemeral = 14;
+   */
+  ephemeral: boolean;
+
+  /**
+   * @generated from field: google.protobuf.Duration retire_after = 15;
+   */
+  retireAfter?: Duration | undefined;
 };
 
 /**
@@ -83,6 +110,40 @@ export type JoinToken = Message<"nokku.v1.JoinToken"> & {
  */
 export const JoinTokenSchema: GenMessage<JoinToken> = /*@__PURE__*/
   messageDesc(file_nokku_v1_join_token, 0);
+
+/**
+ * Who may log in as one Linux account on every target the token enrolls.
+ *
+ * @generated from message nokku.v1.JoinTokenGrant
+ */
+export type JoinTokenGrant = Message<"nokku.v1.JoinTokenGrant"> & {
+  /**
+   * @generated from field: string username = 1;
+   */
+  username: string;
+
+  /**
+   * @generated from field: repeated string user_ids = 2;
+   */
+  userIds: string[];
+
+  /**
+   * @generated from field: repeated string team_ids = 3;
+   */
+  teamIds: string[];
+
+  /**
+   * @generated from field: repeated string service_account_ids = 4;
+   */
+  serviceAccountIds: string[];
+};
+
+/**
+ * Describes the message nokku.v1.JoinTokenGrant.
+ * Use `create(JoinTokenGrantSchema)` to create a new message.
+ */
+export const JoinTokenGrantSchema: GenMessage<JoinTokenGrant> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_join_token, 1);
 
 /**
  * @generated from message nokku.v1.CreateJoinTokenRequest
@@ -124,6 +185,30 @@ export type CreateJoinTokenRequest = Message<"nokku.v1.CreateJoinTokenRequest"> 
    * @generated from field: nokku.v1.WorkspaceRole role = 7;
    */
   role: WorkspaceRole;
+
+  /**
+   * Enroll tokens only.
+   *
+   * @generated from field: repeated string tags = 8;
+   */
+  tags: string[];
+
+  /**
+   * @generated from field: repeated nokku.v1.JoinTokenGrant grants = 9;
+   */
+  grants: JoinTokenGrant[];
+
+  /**
+   * @generated from field: bool ephemeral = 10;
+   */
+  ephemeral: boolean;
+
+  /**
+   * Requires ephemeral. Unset is 15 minutes.
+   *
+   * @generated from field: google.protobuf.Duration retire_after = 11;
+   */
+  retireAfter?: Duration | undefined;
 };
 
 /**
@@ -131,7 +216,7 @@ export type CreateJoinTokenRequest = Message<"nokku.v1.CreateJoinTokenRequest"> 
  * Use `create(CreateJoinTokenRequestSchema)` to create a new message.
  */
 export const CreateJoinTokenRequestSchema: GenMessage<CreateJoinTokenRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_join_token, 1);
+  messageDesc(file_nokku_v1_join_token, 2);
 
 /**
  * @generated from message nokku.v1.CreateJoinTokenResponse
@@ -153,7 +238,7 @@ export type CreateJoinTokenResponse = Message<"nokku.v1.CreateJoinTokenResponse"
  * Use `create(CreateJoinTokenResponseSchema)` to create a new message.
  */
 export const CreateJoinTokenResponseSchema: GenMessage<CreateJoinTokenResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_join_token, 2);
+  messageDesc(file_nokku_v1_join_token, 3);
 
 /**
  * @generated from message nokku.v1.ListJoinTokensRequest
@@ -170,7 +255,7 @@ export type ListJoinTokensRequest = Message<"nokku.v1.ListJoinTokensRequest"> & 
  * Use `create(ListJoinTokensRequestSchema)` to create a new message.
  */
 export const ListJoinTokensRequestSchema: GenMessage<ListJoinTokensRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_join_token, 3);
+  messageDesc(file_nokku_v1_join_token, 4);
 
 /**
  * @generated from message nokku.v1.ListJoinTokensResponse
@@ -187,7 +272,7 @@ export type ListJoinTokensResponse = Message<"nokku.v1.ListJoinTokensResponse"> 
  * Use `create(ListJoinTokensResponseSchema)` to create a new message.
  */
 export const ListJoinTokensResponseSchema: GenMessage<ListJoinTokensResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_join_token, 4);
+  messageDesc(file_nokku_v1_join_token, 5);
 
 /**
  * @generated from message nokku.v1.DeleteJoinTokenRequest
@@ -204,7 +289,7 @@ export type DeleteJoinTokenRequest = Message<"nokku.v1.DeleteJoinTokenRequest"> 
  * Use `create(DeleteJoinTokenRequestSchema)` to create a new message.
  */
 export const DeleteJoinTokenRequestSchema: GenMessage<DeleteJoinTokenRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_join_token, 5);
+  messageDesc(file_nokku_v1_join_token, 6);
 
 /**
  * @generated from message nokku.v1.DeleteJoinTokenResponse
@@ -217,7 +302,7 @@ export type DeleteJoinTokenResponse = Message<"nokku.v1.DeleteJoinTokenResponse"
  * Use `create(DeleteJoinTokenResponseSchema)` to create a new message.
  */
 export const DeleteJoinTokenResponseSchema: GenMessage<DeleteJoinTokenResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_join_token, 6);
+  messageDesc(file_nokku_v1_join_token, 7);
 
 /**
  * @generated from enum nokku.v1.JoinTokenKind

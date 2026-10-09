@@ -7,7 +7,7 @@
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
 	import { DaemonStatus, type Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
-	import { Ban, Check, CircleCheck, Clock, X } from '@lucide/svelte';
+	import { Ban, Check, CircleCheck, Clock, Timer, X } from '@lucide/svelte';
 
 	let { daemon }: { daemon: Daemon } = $props();
 
@@ -27,7 +27,12 @@
 
 <!-- Anything but accepted keeps the daemon out, so every such state offers Approve. -->
 {#if daemon.status === DaemonStatus.ACCEPTED}
-	<Badge variant="success"><CircleCheck data-icon="inline-start" />Accepted</Badge>
+	<div class="flex items-center gap-1">
+		<Badge variant="success"><CircleCheck data-icon="inline-start" />Accepted</Badge>
+		{#if daemon.config?.ephemeral}
+			<Badge variant="info"><Timer data-icon="inline-start" />Ephemeral</Badge>
+		{/if}
+	</div>
 {:else}
 	{@const pending = daemon.status === DaemonStatus.PENDING}
 	<div class="flex items-center gap-1">

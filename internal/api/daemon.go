@@ -53,6 +53,8 @@ func (s *daemonService) UpdateDaemon(
 		if config == nil {
 			config = base.Config
 		}
+		// Ephemeral is the token's call, the row carries it. See Daemon.EffectiveConfig.
+		config.Ephemeral = nil
 		// The query takes the status as a value, so an unset one would overwrite an accept or reject with zero.
 		status := req.GetStatus()
 		if status == nokkuv1.DaemonStatus_DAEMON_STATUS_UNSPECIFIED {

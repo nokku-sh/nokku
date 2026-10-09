@@ -1,16 +1,26 @@
 -- name: CreateDaemon :one
--- Returns no row on a taken name or key, so the caller can retry in its tx.
+-- Returns no row on a taken name or key, so the caller can retry in its tx. A target of that name counts as
+-- taken too, checked up front because its insert would otherwise abort the tx.
 WITH
   new_daemon AS (
     INSERT INTO
-      daemons (name, status, config, metadata, key_thumbprint)
-    VALUES
-      (
-        @name,
-        @status,
-        COALESCE(@config, '{}'::jsonb),
-        COALESCE(@metadata, '{}'::jsonb),
-        @key_thumbprint
+      daemons (name, status, config, metadata, key_thumbprint, join_token_id, retire_after)
+    SELECT
+      @name AS name,
+      @status AS status,
+      COALESCE(@config, '{}'::jsonb) AS config,
+      COALESCE(@metadata, '{}'::jsonb) AS metadata,
+      @key_thumbprint AS key_thumbprint,
+      sqlc.narg('join_token_id') AS join_token_id,
+      sqlc.narg('retire_after') AS retire_after
+    WHERE
+      NOT EXISTS (
+        SELECT
+          1
+        FROM
+          targets
+        WHERE
+          name = @name
       )
     ON CONFLICT DO NOTHING
     RETURNING
@@ -129,3 +139,28 @@ WHERE
   id = @daemon_id
 RETURNING
   *;
+
+-- name: GetOfflineDaemonByTokenAndName :one
+-- The one an ephemeral enrollment of the same name may replace. A daemon that is online keeps its name.
+SELECT
+  *
+FROM
+  daemons
+WHERE
+  join_token_id = @join_token_id
+  AND name = @name
+  AND (
+    last_seen_at IS NULL
+    OR last_seen_at < @seen_before::TIMESTAMPTZ
+  );
+
+-- name: DeleteRetiredDaemons :many
+-- Across workspaces, so it runs as the system. A daemon never seen counts from its creation.
+DELETE FROM daemons
+WHERE
+  retire_after IS NOT NULL
+  AND COALESCE(last_seen_at, created_at) < NOW() - retire_after
+RETURNING
+  id,
+  workspace_id,
+  name;

@@ -4,6 +4,9 @@ package namegen
 import (
 	"crypto/rand"
 	"math/big"
+	"regexp"
+	"strings"
+	"unicode"
 )
 
 var adjectives = []string{
@@ -52,4 +55,42 @@ func word(list []string) string {
 		return list[0] // degrade to the first entry
 	}
 	return list[n.Int64()]
+}
+
+// maxHostnameLen is the DNS label limit, so a longer name was not typed by a person.
+const maxHostnameLen = 63
+
+var (
+	hostnameRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+	// defaultHostRE matches what cloud images and container runtimes hand out when nobody picked a name.
+	defaultHostRE = regexp.MustCompile(`^(` +
+		`ip-\d+-\d+-\d+-\d+` + // AWS
+		`|[0-9a-f]{12}` + // Docker
+		`|instance-\d+` + // GCP
+		`|(vps|srv|server|host|vm|node|box|machine|instance|default|localhost` +
+		`|ubuntu|debian|fedora|centos|rocky|alma|alpine|arch|linux|rhel|amazon|ec2|test)-?\d*` +
+		`)$`)
+)
+
+// FromHostname turns a hostname into a target name when a person chose it. Image and cloud defaults, and names
+// that are mostly digits, are left to Generate. Kubernetes pod names pass, they are what kubectl shows.
+func FromHostname(host string) (string, bool) {
+	name, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(host)), ".")
+	name = strings.Trim(strings.ReplaceAll(name, "_", "-"), "-")
+	if name == "" || len(name) > maxHostnameLen || !hostnameRE.MatchString(name) || defaultHostRE.MatchString(name) {
+		return "", false
+	}
+	var letters, digits int
+	for _, r := range name {
+		switch {
+		case unicode.IsLetter(r):
+			letters++
+		case unicode.IsDigit(r):
+			digits++
+		}
+	}
+	if digits > letters {
+		return "", false
+	}
+	return name, true
 }

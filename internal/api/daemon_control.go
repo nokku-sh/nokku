@@ -61,9 +61,10 @@ func (s *daemonControlService) EnrollDaemon(
 	}
 
 	out, err := nokkudaemon.Enroll(ctx, s.cfg.Conn, nokkudaemon.EnrollInput{
-		Token:    req.GetToken(),
-		Binding:  binding,
-		Metadata: requestMetadata(ci.RequestHeader()),
+		Token:       req.GetToken(),
+		Binding:     binding,
+		Metadata:    requestMetadata(ci.RequestHeader()),
+		ReqMetadata: req.GetMetadata(),
 		// The token must verify before anything is spent on the cap, so it is checked here instead of in the guard.
 		CanCreate: func(ctx context.Context, workspaceID string) error {
 			return s.cfg.Entitlements.CheckResources(ctx, workspaceID)

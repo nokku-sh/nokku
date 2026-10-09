@@ -9,7 +9,10 @@ INSERT INTO
     max_uses,
     auto_approve,
     ca_id,
-    role
+    role,
+    tags,
+    ephemeral,
+    retire_after
   )
 VALUES
   (
@@ -21,10 +24,47 @@ VALUES
     sqlc.narg('max_uses'),
     @auto_approve,
     sqlc.narg('ca_id'),
-    sqlc.narg('role')
+    sqlc.narg('role'),
+    COALESCE(@tags, '{}'::TEXT[]),
+    @ephemeral,
+    sqlc.narg('retire_after')
   )
 RETURNING
   *;
+
+-- name: AddJoinTokenGrant :exec
+-- One row per subject, the kind picks the column like AddGrant.
+INSERT INTO
+  join_token_grants (token_id, username, user_id, team_id, service_account_id)
+VALUES
+  (
+    @token_id,
+    @username,
+    CASE
+      WHEN @subject_kind::TEXT = 'user' THEN @subject_id::UUID
+    END,
+    CASE
+      WHEN @subject_kind::TEXT = 'team' THEN @subject_id::UUID
+    END,
+    CASE
+      WHEN @subject_kind::TEXT = 'service_account' THEN @subject_id::UUID
+    END
+  )
+ON CONFLICT DO NOTHING;
+
+-- name: ListJoinTokenGrants :many
+SELECT
+  token_id,
+  username,
+  subject_kind,
+  subject_id
+FROM
+  join_token_grants
+ORDER BY
+  token_id,
+  username,
+  subject_kind,
+  subject_id;
 
 -- name: ListJoinTokens :many
 SELECT

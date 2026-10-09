@@ -42,7 +42,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			return err
 		}
 		res.Status = &daemon.Status
-		res.Config = db.ResolveDaemonConfig(daemon.Config)
+		res.Config = daemon.EffectiveConfig()
 
 		// Pending daemons keep retrying, rejected ones are told to stop.
 		if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {

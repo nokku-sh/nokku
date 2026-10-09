@@ -68,6 +68,8 @@ type Daemon struct {
 	KeyThumbprint *string             `json:"keyThumbprint"`
 	Config        *nokku.DaemonConfig `json:"config"`
 	Metadata      []byte              `json:"metadata"`
+	JoinTokenID   *string             `json:"joinTokenId"`
+	RetireAfter   *time.Duration      `json:"retireAfter"`
 	UpdatedAt     time.Time           `json:"updatedAt"`
 	CreatedAt     time.Time           `json:"createdAt"`
 }
@@ -102,8 +104,24 @@ type JoinToken struct {
 	AutoApprove bool                 `json:"autoApprove"`
 	CaID        *string              `json:"caId"`
 	Role        *nokku.WorkspaceRole `json:"role"`
+	Tags        []string             `json:"tags"`
+	Ephemeral   bool                 `json:"ephemeral"`
+	RetireAfter *time.Duration       `json:"retireAfter"`
 	CreatedAt   time.Time            `json:"createdAt"`
 	LastUsedAt  *time.Time           `json:"lastUsedAt"`
+}
+
+type JoinTokenGrant struct {
+	ID               string    `json:"id"`
+	WorkspaceID      string    `json:"workspaceId"`
+	TokenID          string    `json:"tokenId"`
+	Username         string    `json:"username"`
+	UserID           *string   `json:"userId"`
+	TeamID           *string   `json:"teamId"`
+	ServiceAccountID *string   `json:"serviceAccountId"`
+	SubjectKind      *string   `json:"subjectKind"`
+	SubjectID        *string   `json:"subjectId"`
+	CreatedAt        time.Time `json:"createdAt"`
 }
 
 type Keyset struct {
@@ -217,11 +235,12 @@ type Target struct {
 }
 
 type TargetAccount struct {
-	ID          string    `json:"id"`
-	WorkspaceID string    `json:"workspaceId"`
-	TargetID    string    `json:"targetId"`
-	Username    string    `json:"username"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID          string     `json:"id"`
+	WorkspaceID string     `json:"workspaceId"`
+	TargetID    string     `json:"targetId"`
+	Username    string     `json:"username"`
+	SeenAt      *time.Time `json:"seenAt"`
+	CreatedAt   time.Time  `json:"createdAt"`
 }
 
 type Team struct {

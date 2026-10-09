@@ -585,6 +585,7 @@ func TestSyncDaemonReport(t *testing.T) {
 		rows, err := q.GetTargetAccountsByTargetIDs(t.Context(), []string{target.ID})
 		for _, r := range rows {
 			usernames = append(usernames, r.TargetAccount.Username)
+			assert.NotNil(t, r.TargetAccount.SeenAt, "%s was reported by the host", r.TargetAccount.Username)
 		}
 		return err
 	}))
