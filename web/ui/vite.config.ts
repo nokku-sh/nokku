@@ -3,20 +3,10 @@ import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
-const proxy = {
-	'^/(auth|oauth|oidc|saml|passkey|avatars|upload|nokku\\.)': {
-		target: 'http://localhost:3000',
-		secure: false
-	},
-	'/terminal': {
-		target: 'http://localhost:3000',
-		secure: false,
-		ws: true
-	}
-};
 export default defineConfig({
-	preview: { proxy },
-	server: { proxy },
+	// The backend sits in front and takes the UI from here (NOKKU_UI_DEV), so
+	// the port has to be the one it knows.
+	server: { strictPort: true },
 	plugins: [
 		tailwindcss(),
 		sveltekit({

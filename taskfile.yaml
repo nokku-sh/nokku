@@ -6,11 +6,16 @@ env:
 tasks:
   dev:
     output: prefixed
-    desc: Run backend and frontend concurrently
-    deps: [backend, frontend]
+    desc: Run backend and frontend concurrently, the app is on the backend's port
+    deps:
+      - task: backend
+        vars: { UI_DEV: "http://localhost:5173" }
+      - frontend
 
   backend:
     desc: Run backend
+    env:
+      NOKKU_UI_DEV: "{{.UI_DEV}}"
     cmds:
       - go run {{ if .NOKKU_LICENSE_PUBLIC_KEY }}-ldflags="-X github.com/mizuchilabs/kata/licx.pubkey={{ .NOKKU_LICENSE_PUBLIC_KEY }}"{{ end }} ./cmd/nokku
 

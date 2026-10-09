@@ -55,3 +55,26 @@ func TestWithRecover(t *testing.T) {
 		})).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 	}, "an intentional abort must pass through")
 }
+
+// A browser that does not trust the certificate yet breaks off every
+// connection. That is one line each, and nothing an operator acts on.
+func TestHandshakeErrorsAreDebugLines(t *testing.T) {
+	const handshake = "http: TLS handshake error from [::1]:35370: remote error: tls: unknown certificate"
+	var out bytes.Buffer
+	lines := func(level slog.Level) string {
+		out.Reset()
+		handler := slog.NewTextHandler(&out, &slog.HandlerOptions{Level: level})
+		logger := slog.NewLogLogger(quietHandshakes{handler}, slog.LevelInfo)
+		logger.Print(handshake)
+		logger.Print("http2: server: error reading preface from client [::1]:46208: connection reset by peer")
+		logger.Print("http: Accept error: too many open files")
+		return out.String()
+	}
+
+	normal := lines(slog.LevelInfo)
+	assert.NotContains(t, normal, "TLS handshake error")
+	assert.NotContains(t, normal, "reading preface")
+	assert.Contains(t, normal, "Accept error", "the other lines of the server stay")
+
+	assert.Contains(t, lines(slog.LevelDebug), `level=DEBUG msg="`+handshake)
+}

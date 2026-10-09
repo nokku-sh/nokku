@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { util } from '#lib/api/workspaces.svelte.js';
 	import TokenSheet from '#lib/components/sheets/TokenSheet.svelte';
 	import * as Alert from '#lib/components/ext/alert/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
@@ -13,7 +14,12 @@
 	const installer = 'curl -fsSL https://get.nokku.sh/nokkud';
 	// nokkud talks to app.nokku.sh unless told otherwise, self-hosted needs the URL.
 	const selfHosted = location.origin !== 'https://app.nokku.sh';
-	const apiEnv = selfHosted ? `NOKKUD_API_URL=${location.origin} ` : '';
+	// A server behind a private CA names its pin, nokkud checks the CA against it.
+	const info = util.instanceInfo();
+	const pin = $derived(info.data?.caPin ?? '');
+	const apiEnv = $derived(
+		(selfHosted ? `NOKKUD_API_URL=${location.origin} ` : '') + (pin ? `NOKKUD_API_PIN=${pin} ` : '')
+	);
 
 	function snippets(token: string) {
 		return [
@@ -60,7 +66,7 @@
       args:
         creates: /var/lib/nokkud/config.json
       environment:
-        NOKKUD_ENROLL_TOKEN: "{{ nokkud_enroll_token }}"${selfHosted ? `\n        NOKKUD_API_URL: "${location.origin}"` : ''}
+        NOKKUD_ENROLL_TOKEN: "{{ nokkud_enroll_token }}"${selfHosted ? `\n        NOKKUD_API_URL: "${location.origin}"` : ''}${pin ? `\n        NOKKUD_API_PIN: "${pin}"` : ''}
       no_log: true
       notify: Restart nokkud
 
@@ -124,6 +130,7 @@ runcmd:
 				<Info />
 				<Alert.Description>
 					Self-hosted: the commands point nokkud at {location.origin} through NOKKUD_API_URL.
+					{#if pin}NOKKUD_API_PIN lets it trust the private CA of this server.{/if}
 				</Alert.Description>
 			</Alert.Root>
 		{/if}

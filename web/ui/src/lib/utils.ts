@@ -132,3 +132,17 @@ export function enumLabel(value: string | undefined): string {
 		.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
 		.join(' ');
 }
+
+/**
+ * The command that signs nk in at this server. nk goes to app.nokku.sh unless
+ * told otherwise, and the pin lets it trust a server behind a private CA.
+ */
+export function nkLoginCommand(caPin?: string): string {
+	return [
+		'nk login',
+		location.origin !== 'https://app.nokku.sh' && `--api ${location.origin}`,
+		caPin && `--pin ${caPin}`
+	]
+		.filter(Boolean)
+		.join(' ');
+}

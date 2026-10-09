@@ -18,6 +18,7 @@ sql:
         emit_params_struct_pointers: true # More efficient parameter passing
         rename:
           ssh_ca: "SSHCA"
+          web_ca: "WebCA"
         overrides:
           # UUID overrides
           - db_type: "uuid"
@@ -121,6 +122,10 @@ sql:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "EncryptedBytes"
           - column: "recordings.key"
+            go_type:
+              import: "github.com/nokku-sh/nokku/internal/crypto"
+              type: "EncryptedBytes"
+          - column: "web_ca.private_key"
             go_type:
               import: "github.com/nokku-sh/nokku/internal/crypto"
               type: "EncryptedBytes"

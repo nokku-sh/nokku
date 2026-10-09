@@ -48,6 +48,8 @@ var (
 func TestMain(m *testing.M) {
 	for _, key := range []string{
 		"NOKKU_BASE_URL",
+		"NOKKU_TLS",
+		"NOKKU_TLS_CA",
 		"NOKKU_LICENSE_KEY",
 		"NOKKU_STORAGE",
 		"NOKKU_SMTP_HOST",

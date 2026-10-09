@@ -38,7 +38,7 @@ cp .env.prod.example .env
 Set four values in `.env`:
 
 ```bash
-NOKKU_BASE_URL=http://localhost:3000
+NOKKU_BASE_URL=localhost:3000
 NOKKU_SECRET=          # openssl rand -hex 32
 POSTGRES_PASSWORD=     # anything, it stays inside the stack
 NOKKU_ADMIN_EMAIL=you@example.com
@@ -61,7 +61,7 @@ All three options need the same three things:
 
 - **PostgreSQL.** The core creates and updates its tables on start.
 - **`NOKKU_SECRET`.** At least 32 characters. It protects the CA keys at rest.
-- **`NOKKU_BASE_URL`.** The public address, like `https://nokku.example.com`. It ends up in links, cookies and passkeys, so pick it before you invite anyone.
+- **`NOKKU_BASE_URL`.** The public host name, like `nokku.example.com`, with the port when it is not 443. No scheme, the core is always reached over https. It ends up in links, cookies and passkeys, so pick it before you invite anyone. Passkeys are bound to the name, so it has to be a name and not an IP address, and renaming it later means everyone registers a new passkey.
 
 ### Docker Compose
 
@@ -85,18 +85,51 @@ The chart ships no default secret and no default database password. Set `secrets
 Download it from the [releases page](https://github.com/nokku-sh/nokku/releases).
 
 ```bash
-export NOKKU_BASE_URL=https://nokku.example.com
+export NOKKU_BASE_URL=nokku.example.com
 export NOKKU_SECRET=...
 export PGHOST=db.internal PGUSER=nokku PGPASSWORD=...
 ./nokku
 ```
 
-It listens on port 3000 with plain HTTP, so put a reverse proxy in front for TLS. The proxy has to:
+It listens on port 3000 with plain HTTP, so put a reverse proxy in front for TLS, or let the core [serve https itself](#without-a-proxy). The proxy has to:
 
 - forward with HTTP/2 without TLS (h2c), because `nk` and `nokkud` speak gRPC
 - allow WebSockets, for the terminal in the browser
 
 The [Caddyfile](./Caddyfile) is a working example. Set `NOKKU_TRUSTED_PROXIES` to the proxy's address, or the audit log shows the proxy as the source of every request.
+
+### Without a proxy
+
+For a test or a home lab the core can serve https by itself:
+
+```bash
+export NOKKU_TLS=internal
+export NOKKU_BASE_URL=nokku.lan:3000
+```
+
+The core makes a CA of its own and issues its certificate from it. There is nothing to renew by hand. The CA key is stored encrypted in the database. The CA can only sign for the host name in `NOKKU_BASE_URL`, so a machine that installs it trusts it for Nokku and nothing else. Leave `NOKKU_TRUSTED_PROXIES` unset.
+
+No machine knows that CA at first. The start log shows its pin. The web app shows it too: the full `nk login` command is under **Profile, Security**, and the bare pin under **Settings**. Before your first sign-in, run this on your own machine with the pin from the log:
+
+```bash
+nk --api https://nokku.lan:3000 --pin sha256:... login
+```
+
+`nk` checks the CA against the pin and offers to install it for your browser. After that the sign-in link from the log opens without a warning. A passkey does not work on a page with a certificate warning, so the browser needs that step.
+
+Anything beyond a test belongs behind a reverse proxy. You can move there later without touching a client, as long as the address stays the same, host and port. A certificate from Let's Encrypt at the proxy is accepted by every `nk` and `nokkud` that pinned the built-in CA.
+
+### A proxy with a certificate from your own CA
+
+When the proxy's certificate comes from a private CA, like a company CA or Caddy's `tls internal`, machines that do not have that CA refuse the connection. Give the core the CA certificate and it hands out a pin:
+
+```bash
+export NOKKU_TLS_CA=/etc/nokku/company-ca.pem   # the certificate only, never the key
+```
+
+The web app then adds the pin to the commands it shows: `nk login --pin sha256:...` under **Profile, Security**, and `NOKKUD_API_PIN=sha256:...` in the enroll commands under **Infrastructure, Daemons**. Each tool fetches the CA from `/ca.crt`, checks it against the pin, and keeps it. `nk` also offers to install it into the system trust store for the browser.
+
+When that CA is replaced one day, give the tools the new one with `nk --ca-file` and `NOKKUD_CA_FILE`.
 
 ## Connect a server and your terminal
 
@@ -116,7 +149,7 @@ Everything is set with environment variables. Most installs only touch these:
 | Variable                                          | Purpose                                                              |
 | ------------------------------------------------- | -------------------------------------------------------------------- |
 | `NOKKU_SECRET`                                    | **Required.** At least 32 characters                                 |
-| `NOKKU_BASE_URL`                                  | Public address, used exactly as written                              |
+| `NOKKU_BASE_URL`                                  | Public host name, with the port if the proxy uses an unusual one     |
 | `PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`    | Where PostgreSQL is                                                  |
 | `NOKKU_ADMIN_EMAIL`                               | Creates the owner account on the first start                         |
 | `NOKKU_TRUSTED_PROXIES`                           | Your reverse proxy, as IPs or CIDRs                                  |
@@ -130,7 +163,9 @@ The rest is below, grouped by topic. Open what you need.
 | Variable                | Default                 | Purpose                                                              |
 | ----------------------- | ----------------------- | -------------------------------------------------------------------- |
 | `NOKKU_SECRET`          |                         | **Required**, at least 32 characters                                 |
-| `NOKKU_BASE_URL`        | `http://localhost:3000` | Public address, for links, cookies and passkeys                      |
+| `NOKKU_BASE_URL`        | `localhost:3000`        | Public host name, for links, cookies and passkeys. Never an IP       |
+| `NOKKU_TLS`             |                         | `internal` serves https with a built-in CA. Unset behind a proxy     |
+| `NOKKU_TLS_CA`          |                         | PEM file with the private CA of your proxy, so `nk` and `nokkud` can pin it |
 | `NOKKU_PORT`            | `3000`                  | Port the core listens on                                             |
 | `NOKKU_TRUSTED_PROXIES` |                         | Comma-separated proxy IPs or CIDRs whose client-IP headers count     |
 | `NOKKU_DEBUG`           | `false`                 | Debug logging, same as `--debug`                                     |

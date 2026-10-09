@@ -38,9 +38,18 @@ func (s *Server) withHeaders(h http.Handler) http.Handler {
 	// No inline script runs but the bootstrap of the built pages. A script
 	// injected into the UI would otherwise reach the web terminal.
 	// The recording player compiles WebAssembly, which needs its own source.
-	scripts := strings.Join(append([]string{"'self'", "'wasm-unsafe-eval'"}, web.InlineScriptHashes()...), " ")
+	pinned := web.InlineScriptHashes()
+	if s.cfg.UIDev.Host != "" {
+		// The pages of the Vite dev server change with every edit.
+		pinned = []string{"'unsafe-inline'"}
+	}
+	scripts := strings.Join(append([]string{"'self'", "'wasm-unsafe-eval'"}, pinned...), " ")
 	csp := "default-src 'self'; script-src " + scripts +
 		"; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:;"
+
+	// A browser keeps HSTS for localhost on every port, which would break
+	// whatever else is developed on this machine.
+	hsts := s.cfg.Hostname() != "localhost"
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -55,7 +64,7 @@ func (s *Server) withHeaders(h http.Handler) http.Handler {
 			w.Header().Set("Cache-Control", "no-store")
 		}
 
-		if r.Header.Get("X-Forwarded-Proto") == "https" || r.TLS != nil {
+		if hsts && (r.Header.Get("X-Forwarded-Proto") == "https" || r.TLS != nil) {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
 		h.ServeHTTP(w, r)

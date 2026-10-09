@@ -5,8 +5,12 @@ import (
 	"context"
 	"crypto/hkdf"
 	"crypto/sha256"
+	"errors"
 	"fmt"
+	"net"
+	"net/netip"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/caarlos0/env/v11"
@@ -28,12 +32,50 @@ import (
 	"github.com/nokku-sh/nokku/internal/ssh"
 	"github.com/nokku-sh/nokku/internal/storage"
 	"github.com/nokku-sh/nokku/internal/tenant"
+	"github.com/nokku-sh/nokku/internal/webpki"
 )
 
+// BaseURL is the public address as NOKKU_BASE_URL gives it: a host name with
+// an optional port. There is no scheme to give, see FullURL.
+type BaseURL string
+
+// UnmarshalText refuses what cannot work. An IP address is one of them, a
+// browser takes no passkey for it.
+func (b *BaseURL) UnmarshalText(text []byte) error {
+	raw := strings.ToLower(strings.TrimSpace(string(text)))
+	if strings.ContainsAny(raw, "/?#@ ") {
+		return errors.New("NOKKU_BASE_URL is a host name with an optional port, like nokku.example.com. " +
+			"Leave out the scheme and the path, the server is always reached over https")
+	}
+	host := raw
+	if strings.Contains(raw, ":") {
+		h, port, err := net.SplitHostPort(raw)
+		if _, perr := strconv.ParseUint(port, 10, 16); err != nil || perr != nil {
+			return errors.New("NOKKU_BASE_URL is a host name with an optional port, like nokku.example.com:8443")
+		}
+		host = h
+	}
+	if _, err := netip.ParseAddr(host); err == nil {
+		return fmt.Errorf("NOKKU_BASE_URL is the IP address %s. Passkeys only work on a host name, "+
+			"and the name stays for good. Give the server a name that every machine resolves: a DNS record, "+
+			"an entry in the router, or a line in /etc/hosts. localhost is fine for a try on this machine", host)
+	}
+	*b = BaseURL(raw)
+	return nil
+}
+
 type EnvConfig struct {
-	BaseURL string `env:"NOKKU_BASE_URL"`
-	Port    string `env:"NOKKU_PORT"     envDefault:"3000"`
-	Secret  string `env:"NOKKU_SECRET"`
+	BaseURL BaseURL `env:"NOKKU_BASE_URL"`
+	Port    string  `env:"NOKKU_PORT"     envDefault:"3000"`
+	Secret  string  `env:"NOKKU_SECRET"`
+	// TLSMode is set when the server holds the certificate itself. Unset, a
+	// proxy in front does.
+	TLSMode webpki.Mode `env:"NOKKU_TLS"`
+	// UIDev is the Vite dev server the UI comes from while someone works on
+	// it, like http://localhost:5173. The browser still talks to this server
+	// only, so every address is the one a real install has. Unset, the
+	// embedded build is served.
+	UIDev url.URL `env:"NOKKU_UI_DEV"`
 	// SaaS runs the hosted service: a workspace per subdomain, plans from
 	// Stripe subscriptions. Unset, the server is self-hosted with one
 	// workspace and its plan from the license key.
@@ -57,6 +99,7 @@ type Config struct {
 	Billing      *billing.Stripe
 	Entitlements *entitlement.Service
 	Tenant       *tenant.Resolver
+	WebPKI       *webpki.Identity
 
 	// BootstrapLink signs the self-hosted owner in while they have no passkey.
 	// The server shows it once it listens, so it is the last thing in the log.
@@ -79,7 +122,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err := realip.SetTrustedProxies(cfg.TrustedProxies); err != nil {
 		return nil, err
 	}
-
 	cfg.Conn, err = db.NewConnection(ctx)
 	if err != nil {
 		return nil, err
@@ -106,6 +148,11 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 	enc.Start(ctx)
+
+	cfg.WebPKI, err = webpki.New(ctx, cfg.Conn, cfg.TLSMode, cfg.Hostname())
+	if err != nil {
+		return nil, err
+	}
 
 	cfg.Storage, err = storage.New(ctx, cfg.FullURL())
 	if err != nil {
@@ -151,7 +198,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		Audit:        cfg.Audit,
 		Secret:       nonceKey,
 		Secure:       strings.HasPrefix(cfg.FullURL(), "https://"),
-		Debug:        cfg.Debug,
 		CanJoin:      cfg.Entitlements.CanInvite,
 		StrictEmail:  cfg.SaaS,
 		SendNewLogin: cfg.Email.SendNewLoginEmail,
@@ -184,16 +230,23 @@ func (c *EnvConfig) Mode() string {
 	return "self_hosted"
 }
 
-// FullURL is NOKKU_BASE_URL as given, the public address. The listen port is
-// not part of it, a reverse proxy usually sits in between. Unset, it is the
-// local listener.
+// FullURL is the public address. NOKKU_BASE_URL names the host, and the port
+// when it is not 443. The scheme is never configured: it is https, and plain
+// http only on localhost without NOKKU_TLS, where nothing leaves the
+// machine. Unset, it is the local listener.
 func (c *EnvConfig) FullURL() string {
-	if c.BaseURL == "" {
-		return "http://localhost:" + c.Port
+	if c.Hostname() == "localhost" && c.TLSMode == webpki.ModeOff {
+		return "http://" + c.hostPort()
 	}
-	u, err := url.Parse(c.BaseURL)
-	if err != nil {
-		return "http://localhost:" + c.Port
-	}
-	return cmp.Or(u.Scheme, "http") + "://" + cmp.Or(u.Host, "localhost")
+	return "https://" + c.hostPort()
+}
+
+// Hostname is the public host name without the port.
+func (c *EnvConfig) Hostname() string {
+	name, _, _ := strings.Cut(c.hostPort(), ":")
+	return name
+}
+
+func (c *EnvConfig) hostPort() string {
+	return cmp.Or(string(c.BaseURL), "localhost:"+c.Port)
 }

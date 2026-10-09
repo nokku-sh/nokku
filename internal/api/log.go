@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
 )
 
@@ -27,6 +29,23 @@ func (rw *responseWriter) Unwrap() http.ResponseWriter {
 func (rw *responseWriter) Flush() {
 	rc := http.NewResponseController(rw.ResponseWriter)
 	_ = rc.Flush()
+}
+
+// quietHandshakes is the handler for the lines net/http writes itself. A
+// client that leaves before its first request is one of them for every
+// connection: a browser that does not trust the certificate yet, or a
+// scanner. Those go to debug.
+type quietHandshakes struct{ slog.Handler }
+
+func (h quietHandshakes) Handle(ctx context.Context, r slog.Record) error {
+	if strings.HasPrefix(r.Message, "http: TLS handshake error") ||
+		strings.HasPrefix(r.Message, "http2: server: error reading preface") {
+		if !h.Enabled(ctx, slog.LevelDebug) {
+			return nil
+		}
+		r.Level = slog.LevelDebug
+	}
+	return h.Handler.Handle(ctx, r)
 }
 
 // withLogger writes a line for a request the server failed, nothing else.

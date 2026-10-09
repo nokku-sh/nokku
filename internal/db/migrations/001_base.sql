@@ -420,6 +420,16 @@ CREATE TABLE IF NOT EXISTS instance_license (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- The CA of NOKKU_TLS=internal (singleton). The key stays for good, so the
+-- pin clients hold never changes. The certificate is issued again when the
+-- host name changes or it nears its end.
+CREATE TABLE IF NOT EXISTS web_ca (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  private_key BYTEA NOT NULL,
+  certificate BYTEA NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Indexes --------------------------------------------------------------------
 CREATE INDEX idx_service_accounts_workspace_id ON service_accounts (workspace_id);
 
@@ -738,8 +748,8 @@ FROM
 -- workspace_id, internal/db/rls_test.go fails without either. References to
 -- other tenant tables use composite (workspace_id, id) foreign keys, so no
 -- policy needs a subquery to keep a row inside its workspace. keysets,
--- instance_license and workspace_state have no app policy, nokku_system
--- alone reaches them.
+-- instance_license, web_ca and workspace_state have no app policy,
+-- nokku_system alone reaches them.
 DO $$
 DECLARE
   t TEXT;
@@ -789,6 +799,10 @@ ALTER TABLE keysets FORCE ROW LEVEL SECURITY;
 ALTER TABLE instance_license ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE instance_license FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE web_ca ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE web_ca FORCE ROW LEVEL SECURITY;
 
 -- Audit schema ---------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS audit;

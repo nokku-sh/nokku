@@ -83,8 +83,9 @@ persistence:
   mountPath: /var/lib/nokku
 
 app:
-  # The public URL people and daemons reach, like https://nokku.example.com.
-  baseUrl: http://localhost
+  # The public host name people and daemons reach, like nokku.example.com.
+  # No scheme, it is always https. An IP address is refused.
+  baseUrl: localhost
   debug: false
   # Sets OTEL_EXPORTER_OTLP_ENDPOINT. Other OTEL_* settings go in extraEnv.
   otlpEndpoint: ""

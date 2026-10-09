@@ -156,6 +156,7 @@
 					items={[
 						{ label: 'Workspace ID', value: ws.data.id, mono: true, copy: true, wide: true },
 						{ label: 'Address', value: location.origin, mono: true, copy: true, wide: true },
+						{ label: 'CA pin', value: info.data?.caPin, mono: true, copy: true, wide: true },
 						{ label: 'Created', value: formatTs(ws.data.createdAt) },
 						{ label: 'Updated', value: formatTs(ws.data.updatedAt, 'relative') }
 					]}

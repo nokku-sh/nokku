@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { session } from '#lib/api/session.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
+	import { util } from '#lib/api/workspaces.svelte.js';
 	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
 	import InviteSheet from '#lib/components/sheets/InviteSheet.svelte';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
@@ -9,6 +10,7 @@
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { DocsURL } from '#lib/config.js';
 	import { setupDismissed } from '#lib/store.svelte.js';
+	import { nkLoginCommand } from '#lib/utils.js';
 	import { Check, Rocket, UserPlus } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 
@@ -25,6 +27,9 @@
 	// A CLI session is what nk login leaves behind.
 	const sessions = session.list();
 	const signedIn = $derived((sessions.data ?? []).some((s) => s.kind === 'cli'));
+
+	const info = util.instanceInfo();
+	const login = $derived(nkLoginCommand(info.data?.caPin));
 
 	const done = $derived([true, connected, signedIn, users > 1]);
 	const left = $derived(done.filter((d) => !d).length);
@@ -94,7 +99,7 @@
 	<p class="text-sm text-muted-foreground">
 		Sign the CLI in once. After that plain <code class="font-mono">ssh</code> just works.
 	</p>
-	<CodeSnippet code="nk login" language="bash" />
+	<CodeSnippet code={login} language="bash" />
 	<a href={DocsURL} target="_blank" rel="noopener" class="text-sm text-primary hover:underline">
 		Install nk
 	</a>

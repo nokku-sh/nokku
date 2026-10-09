@@ -3,8 +3,12 @@
 #   cp .env.prod.example .env   # fill in your values
 #   docker compose -f compose.min.yml up -d
 #
-# No reverse proxy. The app is published directly on host port 3000, so
-# NOKKU_BASE_URL needs the port, like http://192.0.2.10:3000.
+# No reverse proxy. The app is published on host port 3000. For a try on this
+# machine set NOKKU_BASE_URL=localhost:3000. For other machines give the host
+# a name and let the core serve https with a CA of its own:
+#   NOKKU_BASE_URL=nokku.lan:3000
+#   NOKKU_TLS=internal
+# See "Without a proxy" in the README. compose.prod.yml runs Caddy instead.
 name: nokku
 
 volumes:
