@@ -13,7 +13,6 @@ import (
 	"log/slog"
 	"math"
 	"slices"
-	"sort"
 	"time"
 
 	"github.com/nokku-sh/nokku/internal/audit"
@@ -29,6 +28,15 @@ const (
 	scrubOverlap = 64 << 10
 	scrubChunk   = 64 << 10
 	redaction    = "<redacted>"
+	// A screen shows a secret in pieces: a long line is cut at the edge, a
+	// wrapped one goes on in the next row. A piece this long of a secret the
+	// rules found is taken out wherever it stands.
+	secretPiece = 12
+	// A secret shorter than a piece is only taken out whole, and not at all
+	// under this length.
+	shortSecret = 8
+	// maxSecretPieces bounds what a cast full of secrets can make the scrub hold.
+	maxSecretPieces = 1 << 20
 )
 
 // span is half-open.
@@ -100,21 +108,17 @@ func (s *Service) ScrubRecording(ctx context.Context, rec *db.Recording) {
 	}()
 }
 
-// scrub reads the stored cast twice. The first pass finds the secrets, the
-// second writes the cast back with them redacted. Nothing is held whole.
+// scrub reads the stored cast three times. Two passes find the secrets, the
+// third writes the cast back with them redacted. Nothing is held whole.
 func (s *Service) scrub(ctx context.Context, rec *db.Recording) error {
 	rules, err := scrubRules()
 	if err != nil {
 		return err
 	}
-	cast, err := s.openCast(ctx, rec)
+	spans, err := locateSecrets(func() (io.ReadCloser, error) { return s.openCast(ctx, rec) },
+		rules, scrubWindow, scrubOverlap)
 	if err != nil {
 		return err
-	}
-	spans, err := findSecrets(cast, rules, scrubWindow, scrubOverlap)
-	_ = cast.Close()
-	if err != nil {
-		return fmt.Errorf("search recording cast: %w", err)
 	}
 	if len(spans) == 0 {
 		return nil
@@ -122,7 +126,7 @@ func (s *Service) scrub(ctx context.Context, rec *db.Recording) error {
 
 	// The store swaps the new object in on commit, so the old one can be
 	// read while the new one is written.
-	cast, err = s.openCast(ctx, rec)
+	cast, err := s.openCast(ctx, rec)
 	if err != nil {
 		return err
 	}
@@ -234,23 +238,60 @@ type castEvent struct {
 	data     []byte
 }
 
-// findSecrets is the first pass. It returns the secrets of each stream as
-// offsets into that stream's data, all events of one kind put end to end, so
-// a secret split across events is still caught.
-func findSecrets(cast io.Reader, rules *scrubRuleSet, window, overlap int) (map[string][]span, error) {
-	type stream struct {
-		// buf is the part of the stream not searched to its end yet, base
-		// is where it starts.
-		buf   []byte
-		base  int
-		spans []span
-	}
-	streams := map[string]*stream{}
-	search := func(st *stream) {
-		for _, sp := range secretSpans(st.buf, rules) {
-			st.spans = append(st.spans, span{st.base + sp.start, st.base + sp.end})
+// locateSecrets returns the secrets of each stream as offsets into that
+// stream's data, all events of one kind put end to end. The first pass runs
+// the rules. The second looks for what they found in the places no rule
+// knows it: cut off at the edge of the screen, or without the name in front
+// that gave it away.
+func locateSecrets(
+	open func() (io.ReadCloser, error),
+	rules *scrubRuleSet,
+	window, overlap int,
+) (map[string][]span, error) {
+	pass := func(find func(text []byte) []span) (map[string][]span, error) {
+		cast, err := open()
+		if err != nil {
+			return nil, err
 		}
+		defer func() { _ = cast.Close() }()
+		found, err := findSecrets(cast, find, window, overlap)
+		if err != nil {
+			return nil, fmt.Errorf("search recording cast: %w", err)
+		}
+		return found, nil
 	}
+
+	seen := &seenSecrets{pieces: map[string]struct{}{}, short: map[string]struct{}{}}
+	spans, err := pass(func(text []byte) []span {
+		found := secretSpans(text, rules)
+		for _, sp := range found {
+			seen.add(text[sp.start:sp.end])
+		}
+		return found
+	})
+	if err != nil || len(spans) == 0 {
+		return nil, err
+	}
+	again, err := pass(seen.spans)
+	if err != nil {
+		return nil, err
+	}
+	for code, more := range again {
+		spans[code] = append(spans[code], more...)
+		slices.SortFunc(spans[code], func(a, b span) int { return a.start - b.start })
+		spans[code] = mergeSpans(spans[code])
+	}
+	return spans, nil
+}
+
+// findSecrets runs find over the text of each stream, a window at a time, so
+// a secret split across events is still caught.
+func findSecrets(
+	cast io.Reader,
+	find func(text []byte) []span,
+	window, overlap int,
+) (map[string][]span, error) {
+	streams := map[string]*streamText{}
 	for line, err := range castLines(cast) {
 		if err != nil {
 			return nil, err
@@ -261,20 +302,19 @@ func findSecrets(cast io.Reader, rules *scrubRuleSet, window, overlap int) (map[
 		}
 		st := streams[ev.code]
 		if st == nil {
-			st = &stream{}
+			st = &streamText{}
 			streams[ev.code] = st
 		}
-		st.buf = append(st.buf, ev.data...)
+		st.write(ev.data)
 		if len(st.buf) >= window {
-			search(st)
-			st.base += len(st.buf) - overlap
-			st.buf = append(st.buf[:0], st.buf[len(st.buf)-overlap:]...)
+			st.search(find)
+			st.keep(overlap)
 		}
 	}
 
 	found := map[string][]span{}
 	for code, st := range streams {
-		search(st)
+		st.search(find)
 		if len(st.spans) == 0 {
 			continue
 		}
@@ -285,18 +325,69 @@ func findSecrets(cast io.Reader, rules *scrubRuleSet, window, overlap int) (map[
 	return found, nil
 }
 
-// rewriteCast is the second pass. It copies cast to out with the secrets
+// seenSecrets is what the rules found, cut into the pieces a screen may show
+// of it.
+type seenSecrets struct {
+	pieces map[string]struct{}
+	short  map[string]struct{}
+}
+
+func (k *seenSecrets) add(secret []byte) {
+	// A key block is found as one secret, on screen it is lines.
+	for word := range bytes.FieldsSeq(secret) {
+		// The words around a key are no secret, "-----BEGIN" is in every one.
+		if len(word) < shortSecret || shannonEntropy(word) < 3 || len(k.pieces) >= maxSecretPieces {
+			continue
+		}
+		if len(word) < secretPiece {
+			k.short[string(word)] = struct{}{}
+			continue
+		}
+		for i := range len(word) - secretPiece + 1 {
+			k.pieces[string(word[i:i+secretPiece])] = struct{}{}
+		}
+	}
+}
+
+func (k *seenSecrets) spans(text []byte) []span {
+	var out []span
+	take := func(start, end int) {
+		if n := len(out); n > 0 && start <= out[n-1].end {
+			out[n-1].end = max(out[n-1].end, end)
+			return
+		}
+		out = append(out, span{start, end})
+	}
+	for i := range text {
+		if end := i + secretPiece; end <= len(text) {
+			if _, ok := k.pieces[string(text[i:end])]; ok {
+				take(i, end)
+			}
+		}
+		for end := i + shortSecret; len(k.short) > 0 && end < i+secretPiece && end <= len(text); end++ {
+			if _, ok := k.short[string(text[i:end])]; ok {
+				take(i, end)
+			}
+		}
+	}
+	return out
+}
+
+// rewriteCast is the last pass. It copies cast to out with the secrets
 // redacted, every other line byte for byte.
 func rewriteCast(cast io.Reader, out io.Writer, spans map[string][]span) error {
-	offset := map[string]int{}
+	streams := map[string]*redactor{}
 	for line, err := range castLines(cast) {
 		if err != nil {
 			return err
 		}
 		if ev, ok := parseCastEvent(line); ok {
-			start := offset[ev.code]
-			offset[ev.code] = start + len(ev.data)
-			if redacted := applySpans(ev.data, start, spans[ev.code]); !bytes.Equal(redacted, ev.data) {
+			st := streams[ev.code]
+			if st == nil {
+				st = &redactor{spans: spans[ev.code]}
+				streams[ev.code] = st
+			}
+			if redacted := st.apply(ev.data); !bytes.Equal(redacted, ev.data) {
 				marshaled, err := marshalCastEvent(ev.interval, ev.code, redacted)
 				if err != nil {
 					return fmt.Errorf("re-marshal event: %w", err)
@@ -369,8 +460,11 @@ func secretSpans(blob []byte, rules *scrubRuleSet) []span {
 		}
 	}
 
+	// Every match counts. A small one inside a large one is no reason to
+	// drop the large one: the prompt of a pager after a line of a private key
+	// reads like a key and its value.
 	slices.SortFunc(spans, func(a, b span) int { return a.start - b.start })
-	return mergeSpans(preferTightest(spans))
+	return mergeSpans(spans)
 }
 
 // secretSpan narrows the match so assignment keys stay readable.
@@ -386,33 +480,6 @@ func secretSpan(rule scrubRule, m []int) (int, int) {
 	return m[0], m[1]
 }
 
-// preferTightest drops spans that contain a smaller one, so a key=value
-// redaction keeps the key readable. Huge span counts skip this.
-func preferTightest(spans []span) []span {
-	if len(spans) > 1000 {
-		return spans
-	}
-	out := make([]span, 0, len(spans))
-	for i, s := range spans {
-		container := false
-		for j, t := range spans {
-			if j == i {
-				continue
-			}
-			if s.start <= t.start && t.end <= s.end && len2(s) > len2(t) {
-				container = true
-				break
-			}
-		}
-		if !container {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-func len2(s span) int { return s.end - s.start }
-
 // allowlisted approximates "line" targets with the match.
 func allowlisted(rule scrubRule, rules *scrubRuleSet, match, secret []byte) bool {
 	for _, al := range slices.Concat(rule.allowlists, rules.allowlists) {
@@ -427,29 +494,6 @@ func allowlisted(rule scrubRule, rules *scrubRuleSet, match, secret []byte) bool
 		}
 	}
 	return false
-}
-
-// applySpans redacts the secrets that reach into seg, the data of one event
-// that starts at offset start of its stream.
-func applySpans(seg []byte, start int, spans []span) []byte {
-	end := start + len(seg)
-	i := sort.Search(len(spans), func(i int) bool { return spans[i].end > start })
-	if i == len(spans) || spans[i].start >= end {
-		return seg
-	}
-	out := make([]byte, 0, len(seg))
-	pos := 0
-	for ; i < len(spans) && spans[i].start < end; i++ {
-		lo := max(spans[i].start-start, 0)
-		hi := min(spans[i].end-start, len(seg))
-		if hi <= lo {
-			continue
-		}
-		out = append(out, seg[pos:lo]...)
-		out = append(out, redaction...)
-		pos = hi
-	}
-	return append(out, seg[pos:]...)
 }
 
 func mergeSpans(spans []span) []span {
