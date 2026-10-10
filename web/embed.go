@@ -33,7 +33,10 @@ const uiRoot = "ui/build"
 // Handler serves the embedded SPA, or what the Vite dev server hands out. The browser only talks to this server.
 func Handler(dev *url.URL) http.Handler {
 	if dev.Host != "" {
-		return &httputil.ReverseProxy{Rewrite: func(r *httputil.ProxyRequest) { r.SetURL(dev) }}
+		return &httputil.ReverseProxy{Rewrite: func(r *httputil.ProxyRequest) {
+			r.SetURL(dev)
+			r.SetXForwarded()
+		}}
 	}
 	pinMimeTypes()
 	files := statigz.FileServer(staticFS, brotli.AddEncoding, statigz.FSPrefix(uiRoot))
