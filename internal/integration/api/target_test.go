@@ -494,3 +494,43 @@ func TestNewServerHasTheRootAccount(t *testing.T) {
 	}
 	assert.Equal(t, []string{"root"}, accounts)
 }
+
+// A server made by hand can start with grants, so the first sync already lets people in.
+func TestNewServerSeedsGrants(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	member := seedUser(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	editor := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
+	)
+	targets := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, editor)
+
+	created, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
+		Name: new(uniq("web")),
+		Grants: []*nokkuv1.JoinTokenGrant{
+			{Username: new("root"), UserIds: []string{member.ID}},
+			{Username: new("deploy"), UserIds: []string{member.ID}},
+		},
+	})
+	require.NoError(t, err)
+
+	got, err := targets.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: new(created.GetTarget().GetId())})
+	require.NoError(t, err)
+	granted := map[string][]string{}
+	for _, a := range got.GetTarget().GetAccounts() {
+		granted[a.GetUsername()] = a.GetUserIds()
+	}
+	assert.Equal(t, map[string][]string{"root": {member.ID}, "deploy": {member.ID}}, granted)
+
+	name := uniq("db")
+	_, err = targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
+		Name:   new(name),
+		Grants: []*nokkuv1.JoinTokenGrant{{Username: new("root"), TeamIds: []string{member.ID}}},
+	})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a user id is not a team, got %v", err)
+
+	listed, err := targets.ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{Query: new(name)})
+	require.NoError(t, err)
+	assert.Empty(t, listed.GetTargets(), "a refused grant leaves no target behind")
+}

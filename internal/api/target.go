@@ -118,17 +118,53 @@ func (s *targetService) insertTarget(
 			return err
 		}
 
-		return q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
+		if err = q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
 			TargetID:    result.ID,
 			Usernames:   []string{"root"},
 			MaxAccounts: db.MaxTargetAccounts,
-		})
+		}); err != nil {
+			return err
+		}
+		if err = seedTargetGrants(ctx, q, result.ID, req.GetGrants()); db.IsForeignKeyViolation(err) {
+			return newError(connect.CodeInvalidArgument, "a grant names a subject that does not exist")
+		}
+		return err
 	}); err != nil {
 		return nil, err
 	}
 	return &nokkuv1.CreateTargetResponse{
 		Target: result.ToProto(),
 	}, nil
+}
+
+// seedTargetGrants runs once, with the new target. Like a token's grants, nothing reapplies them later.
+func seedTargetGrants(ctx context.Context, q *db.Queries, targetID string, grants []*nokkuv1.JoinTokenGrant) error {
+	for _, g := range grants {
+		account, err := q.CreateTargetAccount(ctx, &db.CreateTargetAccountParams{
+			TargetID: targetID,
+			Username: g.GetUsername(),
+		})
+		if err != nil {
+			return err
+		}
+		subjects := map[string][]string{
+			db.SubjectKindUser:           g.GetUserIds(),
+			db.SubjectKindTeam:           g.GetTeamIds(),
+			db.SubjectKindServiceAccount: g.GetServiceAccountIds(),
+		}
+		for kind, ids := range subjects {
+			for _, id := range ids {
+				if err := q.AddGrant(ctx, &db.AddGrantParams{
+					AccountID:   account.ID,
+					SubjectKind: kind,
+					SubjectID:   id,
+				}); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (s *targetService) UpdateTarget(
