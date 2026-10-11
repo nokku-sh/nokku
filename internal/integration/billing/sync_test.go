@@ -4,10 +4,12 @@ package billing_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -15,6 +17,7 @@ import (
 	"time"
 	"uuid"
 
+	"connectrpc.com/connect"
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -54,11 +57,18 @@ type fakeStripe struct {
 	workspaceID string
 	subs        map[string]remoteSub
 	cancelled   []string
+	checkouts   []url.Values
 }
 
 func (f *fakeStripe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if r.URL.Path == "/v1/checkout/sessions" {
+		_ = r.ParseForm()
+		f.checkouts = append(f.checkouts, r.PostForm)
+		_, _ = w.Write([]byte(`{"id":"cs_1","object":"checkout.session","url":"https://checkout.test/cs_1"}`))
+		return
+	}
 	id := strings.TrimPrefix(r.URL.Path, "/v1/subscriptions/")
 	sub, ok := f.subs[id]
 	if !ok {
@@ -146,6 +156,14 @@ func (f *fakeStripe) row(t *testing.T) *db.WorkspaceSubscription {
 	return row
 }
 
+// plans is the plan lookup of the hosted service on the same database.
+func (f *fakeStripe) plans(t *testing.T) *entitlement.Service {
+	t.Helper()
+	ent, err := entitlement.New(t.Context(), f.conn, "", true)
+	require.NoError(t, err)
+	return ent
+}
+
 func TestSync_MirrorsSeatsAndStatus(t *testing.T) {
 	fake := newSync(t)
 	fake.subs["sub_a"] = remoteSub{status: "active", seats: 7}
@@ -153,9 +171,35 @@ func TestSync_MirrorsSeatsAndStatus(t *testing.T) {
 	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
 
 	row := fake.row(t)
-	assert.Equal(t, string(entitlement.StatusActive), row.Status)
+	assert.Equal(t, "active", row.Status)
 	assert.EqualValues(t, 7, row.Seats, "the paid quantity is the seat cap")
 	assert.Nil(t, row.EndedAt)
+}
+
+// From the webhook to what the workspace may do.
+func TestSync_PaidSubscriptionIsThePlan(t *testing.T) {
+	ctx := t.Context()
+	fake := newSync(t)
+	ent := fake.plans(t)
+	assert.Equal(t, entitlement.PlanCommunity, ent.Resolve(ctx, fake.workspaceID).Name, "a new workspace is free")
+
+	fake.subs["sub_a"] = remoteSub{status: "active", seats: 7}
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+
+	plan := ent.Resolve(ctx, fake.workspaceID)
+	assert.Equal(t, entitlement.PlanPro, plan.Name)
+	assert.EqualValues(t, 7, plan.SeatCap)
+	require.NoError(t, ent.CanInvite(ctx, fake.workspaceID, 6))
+	require.ErrorContains(t, ent.CanInvite(ctx, fake.workspaceID, 7), "all 7 seats are in use",
+		"the eighth member needs an eighth seat")
+
+	fake.subs["sub_a"] = remoteSub{status: "past_due", seats: 7}
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+	assert.Equal(t, entitlement.PlanPro, ent.Resolve(ctx, fake.workspaceID).Name, "past due is a grace period")
+
+	fake.subs["sub_a"] = remoteSub{status: "unpaid", seats: 7}
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+	assert.Equal(t, entitlement.PlanCommunity, ent.Resolve(ctx, fake.workspaceID).Name)
 }
 
 func TestSync_EndedSubscriptionKeepsPlanForTheHold(t *testing.T) {
@@ -168,10 +212,20 @@ func TestSync_EndedSubscriptionKeepsPlanForTheHold(t *testing.T) {
 	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
 
 	row := fake.row(t)
-	assert.Equal(t, string(entitlement.StatusInactive), row.Status)
+	assert.Equal(t, "canceled", row.Status)
 	assert.Equal(t, entitlement.PlanPro, row.Plan, "the retention hold reads the ended plan")
 	require.NotNil(t, row.EndedAt)
 	assert.Equal(t, ended, row.EndedAt.Unix())
+
+	ent := fake.plans(t)
+	assert.Equal(t, entitlement.PlanCommunity, ent.Resolve(t.Context(), fake.workspaceID).Name,
+		"paid features end with the plan")
+	days, err := ent.RetentionDays(t.Context(), fake.workspaceID)
+	require.NoError(t, err)
+	assert.EqualValues(t, 90, days, "retention must hold for 30 days after the plan ended")
+	capBytes, err := ent.RecordingStorageBytes(t.Context(), fake.workspaceID)
+	require.NoError(t, err)
+	assert.EqualValues(t, 50<<30, capBytes, "the storage cap must hold too, or eviction deletes recordings")
 }
 
 func TestSync_LateEventForOldSubscriptionKeepsTheLiveOne(t *testing.T) {
@@ -184,7 +238,7 @@ func TestSync_LateEventForOldSubscriptionKeepsTheLiveOne(t *testing.T) {
 
 	row := fake.row(t)
 	assert.Equal(t, "sub_live", row.SubscriptionID)
-	assert.Equal(t, string(entitlement.StatusActive), row.Status, "a paying workspace must not be downgraded")
+	assert.Equal(t, "active", row.Status, "a paying workspace must not be downgraded")
 }
 
 func TestSync_DuplicateSubscriptionIsCancelled(t *testing.T) {
@@ -224,8 +278,87 @@ func TestSync_DeletedWorkspaceIsNotAnError(t *testing.T) {
 	assert.Equal(t, http.StatusOK, fake.event(t, "sub_a"), "a 500 here would make Stripe retry forever")
 }
 
+func TestCheckout_NewWorkspaceGetsItsCustomerFromCheckout(t *testing.T) {
+	ctx := t.Context()
+	fake := newSync(t)
+
+	link, err := fake.billing.Checkout(ctx, fake.workspaceID, "owner@example.com")
+	require.NoError(t, err)
+	assert.Equal(t, "https://checkout.test/cs_1", link)
+	first := fake.checkouts[0]
+	assert.Equal(t, "owner@example.com", first.Get("customer_email"))
+	assert.Empty(t, first.Get("customer"))
+	assert.Equal(t, fake.workspaceID, first.Get("subscription_data[metadata][workspace_id]"),
+		"sync finds the workspace through this")
+	assert.Equal(t, "5", first.Get("line_items[0][quantity]"), "five seats is the floor")
+
+	fake.subs["sub_a"] = remoteSub{status: "active", seats: 5}
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+	_, err = fake.billing.Checkout(ctx, fake.workspaceID, "owner@example.com")
+	require.ErrorIs(t, err, billing.ErrActiveSubscription, "a paying workspace must not get a second subscription")
+
+	fake.subs["sub_a"] = remoteSub{status: "canceled", seats: 5, endedAt: time.Now().Unix()}
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+	_, err = fake.billing.Checkout(ctx, fake.workspaceID, "owner@example.com")
+	require.NoError(t, err)
+	again := fake.checkouts[1]
+	assert.Equal(t, "cus_1", again.Get("customer"), "a workspace that paid before keeps its customer")
+	assert.Empty(t, again.Get("customer_email"), "Stripe takes one of the two")
+}
+
 func TestCancel_FreeWorkspaceHasNothingToCancel(t *testing.T) {
 	fake := newSync(t)
 	assert.NoError(t, fake.billing.Cancel(t.Context(), fake.workspaceID, true, ""),
 		"deleting a free workspace calls this and must not fail")
+}
+
+func TestCheckResources_CapsTheFreePlan(t *testing.T) {
+	ctx := t.Context()
+	fake := newSync(t)
+	ent := fake.plans(t)
+	pinned := actor.WithWorkspace(ctx, actor.Workspace{ID: fake.workspaceID})
+	addTeams := func(from, to int) {
+		require.NoError(t, fake.conn.TenantTx(pinned, func(q *db.Queries) error {
+			for i := from; i < to; i++ {
+				if _, err := q.CreateTeam(
+					pinned,
+					&db.CreateTeamParams{Name: fmt.Sprintf("team-%d", i), Tags: []string{}},
+				); err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+	}
+
+	addTeams(0, 49)
+	require.NoError(t, ent.CheckResources(ctx, fake.workspaceID), "49 of 50 leaves room for one more")
+
+	addTeams(49, 50)
+	err := ent.CheckResources(ctx, fake.workspaceID)
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err))
+	require.ErrorContains(t, err, "your plan includes 50 managed resources")
+
+	fake.subs["sub_a"] = remoteSub{status: "active", seats: 5}
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+	assert.NoError(t, ent.CheckResources(ctx, fake.workspaceID), "Pro has room for 2000")
+}
+
+// Quotas fail open, features fail closed, and the purge jobs get an error instead of a shorter window.
+func TestLookup_WhenTheDatabaseDoesNotAnswer(t *testing.T) {
+	fake := newSync(t)
+	ent := fake.plans(t)
+	fake.subs["sub_a"] = remoteSub{status: "active", seats: 5}
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+
+	down, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	plan := ent.Resolve(down, fake.workspaceID)
+	assert.Equal(t, entitlement.PlanCommunity, plan.Name, "an outage must never hand out paid features")
+	assert.False(t, plan.Has(entitlement.FeatureAuditExport))
+	_, err := ent.RetentionDays(down, fake.workspaceID)
+	require.Error(t, err, "an outage must never shorten what is kept")
+	assert.NoError(t, ent.CheckResources(down, fake.workspaceID), "a count that fails must not block a create")
 }

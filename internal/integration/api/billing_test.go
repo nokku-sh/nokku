@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mizuchilabs/kata/licx"
+	"github.com/mizuchilabs/inkan/license"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,21 +18,19 @@ import (
 	"github.com/nokku-sh/nokku/internal/entitlement"
 )
 
-// The mode entitlement.NewService takes, named so the calls read.
+// The mode entitlement.New takes, named so the calls read.
 const modeSelfHosted = false
 
-// The real queries: the key lands in the database, applies at once, and another replica finds it.
+// The real queries: the key lands in the database, applies at once, and a restart finds it.
 func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	cfg, _ := newTestAPI(t)
 	ctx := t.Context()
 
-	privB64, pubHex, err := licx.GenerateKey()
+	privB64, pubHex, err := license.GenerateKey()
 	require.NoError(t, err)
-	require.NoError(t, licx.SetPublicKey(pubHex))
-	t.Cleanup(func() { _ = licx.SetPublicKey("") })
-	priv, err := licx.ParsePrivateKey(privB64)
+	priv, err := license.ParsePrivateKey(privB64)
 	require.NoError(t, err)
-	key, err := licx.Issue("NOKKU", licx.Claims{
+	key, err := license.Issue("NOKKU", license.Claims{
 		Plan:      entitlement.PlanEnterprise,
 		ExpiresAt: time.Now().AddDate(1, 0, 0).Unix(),
 	}, priv)
@@ -40,7 +38,8 @@ func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 
 	// A server with its own entitlement service, so the shared one stays unlicensed.
 	local := *cfg
-	local.Entitlements = entitlement.NewService(cfg.Conn, nil, modeSelfHosted)
+	local.Entitlements, err = entitlement.New(ctx, cfg.Conn, pubHex, modeSelfHosted)
+	require.NoError(t, err)
 	srv := httptest.NewServer(api.New(&local).Handler(ctx))
 	t.Cleanup(srv.Close)
 	owner := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
@@ -49,6 +48,9 @@ func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	before, err := sut.GetLicense(ctx, &nokkuv1.GetLicenseRequest{})
 	require.NoError(t, err)
 	require.False(t, before.GetActive())
+	billing, err := sut.GetBilling(ctx, &nokkuv1.GetBillingRequest{})
+	require.NoError(t, err)
+	require.False(t, billing.GetFeatures()[entitlement.FeatureAuditStreaming], "Community has no streaming")
 
 	_, err = sut.ActivateLicense(ctx, &nokkuv1.ActivateLicenseRequest{Key: &key})
 	require.NoError(t, err)
@@ -57,9 +59,25 @@ func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, after.GetActive(), "the key must apply without a restart")
 	assert.Equal(t, entitlement.PlanEnterprise, after.GetPlan())
+	// The reported bug: a self-hosted instance with a valid Enterprise license must see streaming.
+	billing, err = sut.GetBilling(ctx, &nokkuv1.GetBillingRequest{})
+	require.NoError(t, err)
+	assert.True(t, billing.GetFeatures()[entitlement.FeatureAuditStreaming])
 
-	replica := entitlement.NewService(cfg.Conn, nil, modeSelfHosted)
-	replica.WatchLicense(ctx)
-	require.NotNil(t, replica.License(), "another replica must find the stored key")
-	assert.False(t, replica.License().IsExpired())
+	restarted, err := entitlement.New(ctx, cfg.Conn, pubHex, modeSelfHosted)
+	require.NoError(t, err)
+	require.NotNil(t, restarted.License(), "a restart must find the stored key")
+	assert.False(t, restarted.License().IsExpired())
+}
+
+func TestLicense_RejectedEnvKeyNeverStopsTheStart(t *testing.T) {
+	cfg, _ := newTestAPI(t)
+	_, pubHex, err := license.GenerateKey()
+	require.NoError(t, err)
+	t.Setenv("NOKKU_LICENSE_KEY", "NOKKU-AAAAA-BBBBB")
+
+	sut, err := entitlement.New(t.Context(), cfg.Conn, pubHex, modeSelfHosted)
+
+	require.NoError(t, err)
+	assert.Nil(t, sut.License(), "neither the env key nor a key of another signer may be held")
 }

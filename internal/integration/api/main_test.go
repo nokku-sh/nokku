@@ -70,6 +70,8 @@ func TestMain(m *testing.M) {
 	storage, _ := os.MkdirTemp("", "nokku-api-test")
 	os.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
 	os.Setenv("NOKKU_LOCAL_STORAGE_PATH", storage)
+	// A test that holds a license key must not ask the real license worker for a new one.
+	os.Setenv("NOKKU_LICENSE_OFFLINE", "true")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var err error

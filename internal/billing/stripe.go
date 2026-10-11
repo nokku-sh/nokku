@@ -9,6 +9,7 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	stripe "github.com/stripe/stripe-go/v86"
 
@@ -87,11 +88,6 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (strin
 		return "", ErrActiveSubscription
 	}
 
-	customerID, err := s.customerFor(ctx, workspaceID, email)
-	if err != nil {
-		return "", err
-	}
-
 	quantity, err := s.billableSeats(ctx, workspaceID)
 	if err != nil {
 		return "", err
@@ -111,10 +107,15 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (strin
 		SuccessURL:        stripe.String(s.returnURL + "/profile/billing"),
 		CancelURL:         stripe.String(s.returnURL + "/profile/billing"),
 		ClientReferenceID: stripe.String(workspaceID),
-		Customer:          stripe.String(customerID),
 		SubscriptionData: &stripe.CheckoutSessionCreateSubscriptionDataParams{
 			Metadata: map[string]string{"workspace_id": workspaceID},
 		},
+	}
+	// A workspace that paid before keeps its customer, Checkout makes one for a new workspace.
+	if sub, err := s.db.Sys().GetSubscription(ctx, workspaceID); err == nil && sub.CustomerID != "" {
+		params.Customer = stripe.String(sub.CustomerID)
+	} else if email != "" {
+		params.CustomerEmail = stripe.String(email)
 	}
 
 	session, err := s.client.V1CheckoutSessions.Create(ctx, params)
@@ -124,65 +125,19 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (strin
 	return session.URL, nil
 }
 
-// The helpers below use system transactions, Stripe flows run outside a tenant scope.
-
-func (s *Stripe) subscription(
-	ctx context.Context,
-	workspaceID string,
-) (*db.WorkspaceSubscription, error) {
-	var sub *db.WorkspaceSubscription
-	if err := s.db.SysTx(ctx, func(q *db.Queries) (err error) {
-		sub, err = q.GetSubscription(ctx, workspaceID)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-	return sub, nil
-}
-
+// activeSubscription is the row Stripe is paid for, pgx.ErrNoRows without one. Stripe flows run outside a tenant scope.
 func (s *Stripe) activeSubscription(
 	ctx context.Context,
 	workspaceID string,
 ) (*db.WorkspaceSubscription, error) {
-	var sub *db.WorkspaceSubscription
-	if err := s.db.SysTx(ctx, func(q *db.Queries) (err error) {
-		sub, err = q.GetActiveSubscription(ctx, &db.GetActiveSubscriptionParams{
-			WorkspaceID: workspaceID,
-			Statuses:    entitlement.ActiveStatuses,
-			Sources:     []string{"stripe"},
-		})
-		return err
-	}); err != nil {
+	sub, err := s.db.Sys().GetSubscription(ctx, workspaceID)
+	if err != nil {
 		return nil, err
 	}
+	if sub.Source != "stripe" || !entitlement.Active(sub.Status) {
+		return nil, pgx.ErrNoRows
+	}
 	return sub, nil
-}
-
-func (s *Stripe) customerFor(ctx context.Context, workspaceID, email string) (string, error) {
-	if sub, err := s.subscription(ctx, workspaceID); err == nil && sub.CustomerID != "" {
-		return sub.CustomerID, nil
-	}
-
-	params := &stripe.CustomerCreateParams{
-		Metadata: map[string]string{"workspace_id": workspaceID},
-	}
-	if email != "" {
-		params.Email = stripe.String(email)
-	}
-	customer, err := s.client.V1Customers.Create(ctx, params)
-	if err != nil {
-		return "", fmt.Errorf("create customer: %w", err)
-	}
-
-	if err := s.db.SysTx(ctx, func(q *db.Queries) error {
-		return q.SetSubscriptionCustomer(ctx, &db.SetSubscriptionCustomerParams{
-			WorkspaceID: workspaceID,
-			CustomerID:  customer.ID,
-		})
-	}); err != nil {
-		slog.Warn("failed to record customer mapping", "error", err, "workspace_id", workspaceID)
-	}
-	return customer.ID, nil
 }
 
 // Portal is where seats are bought, so the Stripe portal configuration must allow quantity updates.
@@ -193,7 +148,7 @@ func (s *Stripe) Portal(ctx context.Context, workspaceID string) (string, error)
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")
 	}
-	sub, err := s.subscription(ctx, workspaceID)
+	sub, err := s.db.Sys().GetSubscription(ctx, workspaceID)
 	if err != nil || sub.CustomerID == "" {
 		return "", errors.New("no Stripe customer for this workspace")
 	}
@@ -224,7 +179,7 @@ func (s *Stripe) Cancel(
 		return errors.New("missing workspace ID")
 	}
 	sub, err := s.activeSubscription(ctx, workspaceID)
-	if errors.Is(err, entitlement.ErrNoSubscription) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil // free workspaces have nothing to cancel
 	}
 	if err != nil {
@@ -271,7 +226,7 @@ func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 	}
 
 	active, err := s.activeSubscription(ctx, workspaceID)
-	if err != nil && !errors.Is(err, entitlement.ErrNoSubscription) {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
 	if err == nil && active.SubscriptionID != "" && active.SubscriptionID != remote.ID {
@@ -307,19 +262,18 @@ func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 		endedAt = new(time.Unix(remote.EndedAt, 0).UTC())
 	}
 	// The plan stays on an ended row, the retention hold reads it.
-	err = s.db.SysTx(ctx, func(q *db.Queries) error {
-		return q.UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
-			WorkspaceID:       workspaceID,
-			Source:            "stripe",
-			Plan:              entitlement.PlanPro,
-			Status:            string(mapStatus(remote.Status)),
-			CustomerID:        remote.Customer.ID,
-			SubscriptionID:    remote.ID,
-			CurrentPeriodEnd:  periodEnd(remote),
-			CancelAtPeriodEnd: remote.CancelAtPeriodEnd,
-			Seats:             seats,
-			EndedAt:           endedAt,
-		})
+	err = s.db.Sys().UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
+		WorkspaceID: workspaceID,
+		Source:      "stripe",
+		Plan:        entitlement.PlanPro,
+		// Stripe's own status, entitlement.Active reads it.
+		Status:            string(remote.Status),
+		CustomerID:        remote.Customer.ID,
+		SubscriptionID:    remote.ID,
+		CurrentPeriodEnd:  periodEnd(remote),
+		CancelAtPeriodEnd: remote.CancelAtPeriodEnd,
+		Seats:             seats,
+		EndedAt:           endedAt,
 	})
 	// The workspace was deleted, there is nothing left to mirror.
 	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok &&
@@ -347,11 +301,8 @@ func (s *Stripe) reconcile(ctx context.Context) {
 }
 
 func (s *Stripe) syncAll(ctx context.Context) error {
-	var subs []*db.WorkspaceSubscription
-	if err := s.db.SysTx(ctx, func(q *db.Queries) (err error) {
-		subs, err = q.ListProviderSubscriptions(ctx, []string{"stripe"})
-		return err
-	}); err != nil {
+	subs, err := s.db.Sys().ListProviderSubscriptions(ctx)
+	if err != nil {
 		return err
 	}
 	for _, sub := range subs {
@@ -363,11 +314,8 @@ func (s *Stripe) syncAll(ctx context.Context) error {
 }
 
 func (s *Stripe) billableSeats(ctx context.Context, workspaceID string) (int64, error) {
-	var count int64
-	if err := s.db.SysTx(ctx, func(q *db.Queries) (err error) {
-		count, err = q.CountActiveUsers(ctx, workspaceID)
-		return err
-	}); err != nil {
+	count, err := s.db.Sys().CountActiveUsers(ctx, workspaceID)
+	if err != nil {
 		return 0, fmt.Errorf("count users for checkout: %w", err)
 	}
 	return max(count, minBillableSeats), nil
@@ -383,22 +331,4 @@ func periodEnd(sub *stripe.Subscription) *time.Time {
 	}
 	t := time.Unix(end, 0).UTC()
 	return &t
-}
-
-func mapStatus(s stripe.SubscriptionStatus) entitlement.Status {
-	switch s {
-	case stripe.SubscriptionStatusActive:
-		return entitlement.StatusActive
-	case stripe.SubscriptionStatusTrialing:
-		return entitlement.StatusTrialing
-	case stripe.SubscriptionStatusPastDue:
-		return entitlement.StatusPastDue
-	case stripe.SubscriptionStatusCanceled,
-		stripe.SubscriptionStatusIncomplete,
-		stripe.SubscriptionStatusIncompleteExpired,
-		stripe.SubscriptionStatusPaused,
-		stripe.SubscriptionStatusUnpaid:
-		return entitlement.StatusInactive
-	}
-	return entitlement.StatusInactive
 }

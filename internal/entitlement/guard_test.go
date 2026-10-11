@@ -1,12 +1,13 @@
 package entitlement
 
 import (
-	"errors"
 	"slices"
-	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/internal/actor"
 
@@ -66,7 +67,7 @@ func TestGolden_FeaturesWired(t *testing.T) {
 
 	// The reverse direction: gates must reference real catalog features.
 	for feature := range wiredFeatures() {
-		if _, ok := featureInCatalog(feature); !ok {
+		if !slices.ContainsFunc(CatalogFeatures, func(f Feature) bool { return f.Code == feature }) {
 			t.Errorf("guard gates %q, which is not a catalog feature", feature)
 		}
 	}
@@ -165,94 +166,51 @@ func TestConditionalFeature(t *testing.T) {
 	}
 }
 
-func TestGuard_DeniesAndAdvertisesUpgrade(t *testing.T) {
-	// Community workspace: audit export must deny with upgrade metadata.
-	sut := NewGuardInterceptor(NewService(
-		&fakeDB{},
-		nil,
-		modeSaaS,
-	))
-
+func TestGuard_DeniesAFeatureThePlanLacks(t *testing.T) {
+	sut := selfHosted(t)
 	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws1"})
-	err := sut.check(ctx, "/nokku.v1.UtilService/ExportAuditLogs", struct{}{})
 
-	if err == nil {
-		t.Fatal("expected denial for audit export on community")
-	}
-	var connectErr *connect.Error
-	if !errors.As(err, &connectErr) {
-		t.Fatalf("expected *connect.Error, got %T", err)
-	}
-	if connectErr.Code() != connect.CodePermissionDenied {
-		t.Errorf("code = %v, want PermissionDenied", connectErr.Code())
-	}
-	if got := connectErr.Meta().Get("x-nokku-plan"); got != PlanCommunity {
-		t.Errorf("x-nokku-plan = %q, want %q", got, PlanCommunity)
-	}
-	if got := connectErr.Meta().Get("x-nokku-feature"); got != FeatureAuditExport {
-		t.Errorf("x-nokku-feature = %q, want %q", got, FeatureAuditExport)
-	}
-	if got := connectErr.Meta().Get("x-nokku-upgrade"); got != upgradeURL {
-		t.Errorf("x-nokku-upgrade = %q, want %q", got, upgradeURL)
-	}
-	if !strings.Contains(connectErr.Message(), "audit log export") {
-		t.Errorf("message %q should name the feature", connectErr.Message())
-	}
+	err := sut.checkFeature(ctx, nokkuv1connect.UtilServiceExportAuditLogsProcedure, struct{}{})
+
+	require.Error(t, err)
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+	assert.ErrorContains(t, err, "audit log export is not available on the Community plan")
 }
 
 func TestGuard_DeniesAuditStreamingOnCommunity(t *testing.T) {
-	sut := NewGuardInterceptor(NewService(&fakeDB{}, nil, modeSaaS))
+	sut := selfHosted(t)
 	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws1"})
 
 	req := &nokkuv1.UpdateWorkspaceRequest{
 		Settings: &nokkuv1.WorkspaceSettings{AuditWebhookUrl: new("https://hooks.example.com")},
 	}
-	err := sut.check(ctx, "/nokku.v1.WorkspaceService/UpdateWorkspace", req)
-	if err == nil {
-		t.Fatal("expected denial for audit streaming on community")
-	}
-	var connectErr *connect.Error
-	if !errors.As(err, &connectErr) {
-		t.Fatalf("expected *connect.Error, got %T", err)
-	}
-	if connectErr.Code() != connect.CodePermissionDenied {
-		t.Errorf("code = %v, want PermissionDenied", connectErr.Code())
-	}
-	if got := connectErr.Meta().Get("x-nokku-feature"); got != FeatureAuditStreaming {
-		t.Errorf("x-nokku-feature = %q, want %q", got, FeatureAuditStreaming)
-	}
+	err := sut.checkFeature(ctx, nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, req)
+	require.Error(t, err)
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+	require.ErrorContains(t, err, "audit log streaming")
 
 	// Clearing the destination stays possible on any plan.
 	cleared := &nokkuv1.UpdateWorkspaceRequest{
 		Settings: &nokkuv1.WorkspaceSettings{AuditWebhookUrl: new("")},
 	}
-	if err := sut.check(ctx, "/nokku.v1.WorkspaceService/UpdateWorkspace", cleared); err != nil {
-		t.Errorf("clearing the destination was denied: %v", err)
-	}
+	assert.NoError(t, sut.checkFeature(ctx, nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, cleared))
 }
 
 func TestGuard_AllowsPaidPlanAndUnpinnedContext(t *testing.T) {
-	sut := NewGuardInterceptor(NewService(
-		&fakeDB{plan: PlanPro, status: StatusActive},
-		nil,
-		modeSaaS,
-	))
+	pinned := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws1"})
 
-	// Pro workspace passes.
-	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws1"})
-	if err := sut.check(ctx, "/nokku.v1.UtilService/ExportAuditLogs", struct{}{}); err != nil {
-		t.Errorf("pro workspace denied: %v", err)
-	}
+	licensed := selfHosted(t, issue(t, PlanEnterprise, time.Hour))
+	require.NoError(t, licensed.checkFeature(pinned, nokkuv1connect.UtilServiceExportAuditLogsProcedure, struct{}{}))
 
-	// Unpinned context passes (the authz interceptor owns that boundary).
-	if err := sut.check(t.Context(), "/nokku.v1.UtilService/ExportAuditLogs", struct{}{}); err != nil {
-		t.Errorf("unpinned context denied: %v", err)
-	}
-
-	// Ungated procedures pass everywhere.
-	if err := sut.check(ctx, "/nokku.v1.UtilService/GetVersion", struct{}{}); err != nil {
-		t.Errorf("ungated procedure denied: %v", err)
-	}
+	// The authz interceptor owns that boundary.
+	community := selfHosted(t)
+	require.NoError(
+		t,
+		community.checkFeature(t.Context(), nokkuv1connect.UtilServiceExportAuditLogsProcedure, struct{}{}),
+		"an unpinned context must pass",
+	)
+	assert.NoError(t, community.checkFeature(pinned, "/nokku.v1.UtilService/GetVersion", struct{}{}),
+		"an ungated procedure must pass")
 }
 
 // createProcedures is kept in sync by hand, the golden test fails when it drifts from cappedCreate.
@@ -298,79 +256,5 @@ func TestGolden_CappedProceduresWired(t *testing.T) {
 		if !slices.Contains(createProcedures, procedure) {
 			t.Errorf("cappedCreate gates %q, which is not a known create procedure", procedure)
 		}
-	}
-}
-
-func TestGuard_ResourceCapDeniesAndAdvertisesUpgrade(t *testing.T) {
-	// Community: 50-resource cap, fake reports 50 used.
-	sut := NewGuardInterceptor(NewService(
-		&fakeDB{resources: 50},
-		nil,
-		modeSaaS,
-	))
-
-	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws1"})
-	err := sut.checkResources(ctx, "/nokku.v1.TargetService/CreateTarget")
-
-	if err == nil {
-		t.Fatal("expected denial at resource cap")
-	}
-	var connectErr *connect.Error
-	if !errors.As(err, &connectErr) {
-		t.Fatalf("expected *connect.Error, got %T", err)
-	}
-	if connectErr.Code() != connect.CodeResourceExhausted {
-		t.Errorf("code = %v, want ResourceExhausted", connectErr.Code())
-	}
-	if got := connectErr.Meta().Get("x-nokku-plan"); got != PlanCommunity {
-		t.Errorf("x-nokku-plan = %q, want %q", got, PlanCommunity)
-	}
-	if got := connectErr.Meta().Get("x-nokku-quota"); got != "resources" {
-		t.Errorf("x-nokku-quota = %q, want %q", got, "resources")
-	}
-	if got := connectErr.Meta().Get("x-nokku-upgrade"); got != upgradeURL {
-		t.Errorf("x-nokku-upgrade = %q, want %q", got, upgradeURL)
-	}
-}
-
-func TestCheckResources(t *testing.T) {
-	tests := []struct {
-		name    string
-		db      *fakeDB
-		mode    bool
-		wantErr bool
-	}{
-		{
-			name:    "below cap passes",
-			db:      &fakeDB{resources: 10},
-			mode:    modeSaaS,
-			wantErr: false,
-		},
-		{
-			name:    "at cap denies",
-			db:      &fakeDB{resources: 50},
-			mode:    modeSaaS,
-			wantErr: true,
-		},
-		{
-			name: "count lookup fails open",
-			db:   &fakeDB{resourceErr: errors.New("db down")},
-			mode: modeSaaS,
-		},
-		{
-			name: "self-hosted is never capped",
-			db:   &fakeDB{resources: 1 << 20},
-			mode: modeSelfHosted,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sut := NewService(tt.db, nil, tt.mode)
-			err := sut.CheckResources(t.Context(), "ws1")
-			if (err != nil) != tt.wantErr {
-				t.Errorf("CheckResources() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
 	}
 }

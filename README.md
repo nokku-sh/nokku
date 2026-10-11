@@ -170,6 +170,7 @@ The rest is below, grouped by topic. Open what you need.
 | `NOKKU_TRUSTED_PROXIES` |                         | Comma-separated proxy IPs or CIDRs whose client-IP headers count     |
 | `NOKKU_DEBUG`           | `false`                 | Debug logging, same as `--debug`                                     |
 | `NOKKU_LICENSE_KEY`     |                         | License key. It can also be activated in the web app                 |
+| `NOKKU_LICENSE_OFFLINE` | `false`                 | Never ask `license.nokku.sh` for the renewed key                     |
 
 </details>
 
@@ -297,6 +298,8 @@ Three things live in [SECURITY.md](./SECURITY.md#running-nokku-securely) instead
 Nokku has three plans: Community (free), Pro and Enterprise. What each includes is on the [pricing page](https://nokku.sh/pricing).
 
 A self-hosted core starts on Community. A license key unlocks the rest. Activate it in the web app under **Settings, Billing**, or set `NOKKU_LICENSE_KEY`. Keys are checked offline, so this works without internet access. An expired key never stops the core.
+
+A core that holds a key asks `license.nokku.sh` once a day for the renewed one. It sends the key and nothing else. A core without a key never asks. Set `NOKKU_LICENSE_OFFLINE=true` to turn it off and paste the renewed key yourself.
 
 ## More
 

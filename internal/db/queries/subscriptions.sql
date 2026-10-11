@@ -7,30 +7,6 @@ FROM
 WHERE
   workspace_id = $1;
 
--- name: GetActiveSubscription :one
-SELECT
-  *
-FROM
-  workspace_subscriptions
-WHERE
-  workspace_id = $1
-  AND status = ANY (@statuses::TEXT[])
-  AND source = ANY (@sources::TEXT[]);
-
--- name: SetSubscriptionCustomer :exec
--- Status stays inactive so this row never grants entitlements until the webhook promotes it.
-INSERT INTO
-  workspace_subscriptions (workspace_id, source, status, customer_id)
-VALUES
-  ($1, 'stripe', 'inactive', $2)
-ON CONFLICT (workspace_id) DO UPDATE
-SET
-  source = 'stripe',
-  status = 'inactive',
-  customer_id = EXCLUDED.customer_id
-WHERE
-  workspace_subscriptions.source IN ('stripe', '');
-
 -- name: UpsertSubscription :exec
 -- Manual subscriptions survive provider syncs.
 INSERT INTO
@@ -70,7 +46,7 @@ SELECT
 FROM
   workspace_subscriptions
 WHERE
-  source = ANY (@sources::TEXT[])
+  source = 'stripe'
   AND subscription_id <> ''
   AND ended_at IS NULL;
 

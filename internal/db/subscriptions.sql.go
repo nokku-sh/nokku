@@ -59,42 +59,6 @@ func (q *Queries) CountWorkspaceResources(ctx context.Context, workspaceID strin
 	return resource_count, err
 }
 
-const getActiveSubscription = `-- name: GetActiveSubscription :one
-SELECT
-  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, seats, ended_at, updated_at
-FROM
-  workspace_subscriptions
-WHERE
-  workspace_id = $1
-  AND status = ANY ($2::TEXT[])
-  AND source = ANY ($3::TEXT[])
-`
-
-type GetActiveSubscriptionParams struct {
-	WorkspaceID string   `json:"workspaceId"`
-	Statuses    []string `json:"statuses"`
-	Sources     []string `json:"sources"`
-}
-
-func (q *Queries) GetActiveSubscription(ctx context.Context, arg *GetActiveSubscriptionParams) (*WorkspaceSubscription, error) {
-	row := q.db.QueryRow(ctx, getActiveSubscription, arg.WorkspaceID, arg.Statuses, arg.Sources)
-	var i WorkspaceSubscription
-	err := row.Scan(
-		&i.WorkspaceID,
-		&i.Source,
-		&i.Plan,
-		&i.Status,
-		&i.CustomerID,
-		&i.SubscriptionID,
-		&i.CurrentPeriodEnd,
-		&i.CancelAtPeriodEnd,
-		&i.Seats,
-		&i.EndedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
 const getInstanceLicense = `-- name: GetInstanceLicense :one
 SELECT
   key
@@ -146,14 +110,14 @@ SELECT
 FROM
   workspace_subscriptions
 WHERE
-  source = ANY ($1::TEXT[])
+  source = 'stripe'
   AND subscription_id <> ''
   AND ended_at IS NULL
 `
 
 // Ended subscriptions are final at the provider, so they need no more syncs.
-func (q *Queries) ListProviderSubscriptions(ctx context.Context, sources []string) ([]*WorkspaceSubscription, error) {
-	rows, err := q.db.Query(ctx, listProviderSubscriptions, sources)
+func (q *Queries) ListProviderSubscriptions(ctx context.Context) ([]*WorkspaceSubscription, error) {
+	rows, err := q.db.Query(ctx, listProviderSubscriptions)
 	if err != nil {
 		return nil, err
 	}
@@ -197,31 +161,6 @@ SET
 
 func (q *Queries) SetInstanceLicense(ctx context.Context, key string) error {
 	_, err := q.db.Exec(ctx, setInstanceLicense, key)
-	return err
-}
-
-const setSubscriptionCustomer = `-- name: SetSubscriptionCustomer :exec
-INSERT INTO
-  workspace_subscriptions (workspace_id, source, status, customer_id)
-VALUES
-  ($1, 'stripe', 'inactive', $2)
-ON CONFLICT (workspace_id) DO UPDATE
-SET
-  source = 'stripe',
-  status = 'inactive',
-  customer_id = EXCLUDED.customer_id
-WHERE
-  workspace_subscriptions.source IN ('stripe', '')
-`
-
-type SetSubscriptionCustomerParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	CustomerID  string `json:"customerId"`
-}
-
-// Status stays inactive so this row never grants entitlements until the webhook promotes it.
-func (q *Queries) SetSubscriptionCustomer(ctx context.Context, arg *SetSubscriptionCustomerParams) error {
-	_, err := q.db.Exec(ctx, setSubscriptionCustomer, arg.WorkspaceID, arg.CustomerID)
 	return err
 }
 
