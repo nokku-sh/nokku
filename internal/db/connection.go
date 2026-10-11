@@ -22,7 +22,7 @@ var (
 type Connection struct {
 	AppPassword string `env:"NOKKU_DB_APP_PASSWORD"`
 	AutoMigrate bool   `env:"NOKKU_DB_AUTOMIGRATE"  envDefault:"true"`
-	MaxConns    int32  `env:"NOKKU_DB_MAX_CONNS"    envDefault:"10"`
+	MaxConns    int32  `env:"NOKKU_DB_MAX_CONNS"    envDefault:"20"`
 	MinConns    int32  `env:"NOKKU_DB_MIN_CONNS"    envDefault:"0"`
 
 	// Pool serves request traffic as nokku_app, under RLS.

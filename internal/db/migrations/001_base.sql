@@ -1,6 +1,4 @@
 -- The workspace is the tenant. Every other table hangs off one, and one row-level security policy keeps them apart.
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
 -- The workspace a connection is pinned to. Tenant tables default workspace_id to it, unpinned an insert fails.
 CREATE OR REPLACE FUNCTION current_workspace_id () RETURNS UUID AS $$
   SELECT NULLIF(current_setting('nokku.workspace_id', TRUE), '')::UUID
@@ -443,25 +441,13 @@ CREATE TABLE IF NOT EXISTS web_ca (
 );
 
 -- Indexes --------------------------------------------------------------------
+-- A search or a tag filter reads the rows of one workspace and filters them. An index on the name or the tags
+-- of every workspace is never picked for that, so there is none.
 CREATE INDEX idx_service_accounts_workspace_id ON service_accounts (workspace_id);
-
-CREATE INDEX idx_service_accounts_name_trgm ON service_accounts USING GIN (name gin_trgm_ops);
-
-CREATE INDEX idx_service_accounts_description_trgm ON service_accounts USING GIN (description gin_trgm_ops);
-
-CREATE INDEX idx_service_accounts_tags ON service_accounts USING GIN (tags);
 
 CREATE INDEX idx_daemons_workspace_id ON daemons (workspace_id);
 
-CREATE INDEX idx_daemons_name_trgm ON daemons USING GIN (name gin_trgm_ops);
-
 CREATE INDEX idx_teams_workspace_id ON teams (workspace_id);
-
-CREATE INDEX idx_teams_name_trgm ON teams USING GIN (name gin_trgm_ops);
-
-CREATE INDEX idx_teams_description_trgm ON teams USING GIN (description gin_trgm_ops);
-
-CREATE INDEX idx_teams_tags ON teams USING GIN (tags);
 
 -- SCIM expects displayName to resolve to one group per workspace (RFC 7643), or member updates hit the wrong team.
 CREATE UNIQUE INDEX idx_teams_workspace_name ON teams (workspace_id, name);
@@ -469,8 +455,6 @@ CREATE UNIQUE INDEX idx_teams_workspace_name ON teams (workspace_id, name);
 CREATE INDEX idx_team_members_team_id ON team_members (team_id);
 
 CREATE INDEX idx_ssh_cas_workspace_id ON ssh_cas (workspace_id);
-
-CREATE INDEX idx_ssh_cas_name_trgm ON ssh_cas USING GIN (name gin_trgm_ops);
 
 -- One default per workspace. SetDefaultCA moves it in one statement.
 CREATE UNIQUE INDEX idx_ssh_cas_default ON ssh_cas (workspace_id)
@@ -482,12 +466,6 @@ CREATE INDEX idx_targets_workspace_id ON targets (workspace_id);
 CREATE INDEX idx_targets_ca_id ON targets (ca_id);
 
 CREATE INDEX idx_targets_daemon_id ON targets (daemon_id);
-
-CREATE INDEX idx_targets_tags ON targets USING GIN (tags);
-
-CREATE INDEX idx_targets_name_trgm ON targets USING GIN (name gin_trgm_ops);
-
-CREATE INDEX idx_targets_description_trgm ON targets USING GIN (description gin_trgm_ops);
 
 CREATE INDEX idx_join_tokens_workspace ON join_tokens (workspace_id, kind);
 
