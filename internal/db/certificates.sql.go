@@ -432,66 +432,12 @@ SELECT
   id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 FROM
   ssh_cas
-WHERE
-  (
-    $1::text IS NULL
-    OR name ILIKE '%' || $1 || '%'
-  )
-  AND (
-    $2::boolean IS NULL
-    OR is_active = $2
-  )
-  AND (
-    $3::boolean IS NULL
-    OR is_default = $3
-  )
-  AND (
-    $4::integer IS NULL
-    OR key_type = $4
-  )
-  AND (
-    $5::text IS NULL
-    OR (
-      $5 = 'valid'
-      AND NOW() BETWEEN not_before AND not_after
-    )
-    OR (
-      $5 = 'expired'
-      AND NOW() > not_after
-    )
-    OR (
-      $5 = 'future'
-      AND NOW() < not_before
-    )
-  )
 ORDER BY
   id ASC
-LIMIT
-  $7
-OFFSET
-  $6
 `
 
-type ListCAsParams struct {
-	NameQuery    *string `json:"nameQuery"`
-	IsActive     *bool   `json:"isActive"`
-	IsDefault    *bool   `json:"isDefault"`
-	KeyType      *int32  `json:"keyType"`
-	StatusFilter *string `json:"statusFilter"`
-	Offset       *int32  `json:"offset"`
-	Limit        *int32  `json:"limit"`
-}
-
-func (q *Queries) ListCAs(ctx context.Context, arg *ListCAsParams) ([]*SSHCA, error) {
-	rows, err := q.db.Query(ctx, listCAs,
-		arg.NameQuery,
-		arg.IsActive,
-		arg.IsDefault,
-		arg.KeyType,
-		arg.StatusFilter,
-		arg.Offset,
-		arg.Limit,
-	)
+func (q *Queries) ListCAs(ctx context.Context) ([]*SSHCA, error) {
+	rows, err := q.db.Query(ctx, listCAs)
 	if err != nil {
 		return nil, err
 	}

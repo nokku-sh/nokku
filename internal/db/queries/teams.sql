@@ -26,7 +26,10 @@ WHERE
     OR te.name ILIKE '%' || sqlc.narg('query') || '%'
     OR COALESCE(te.description, '') ILIKE '%' || sqlc.narg('query') || '%'
   )
-  AND te.tags @> COALESCE(sqlc.narg('tags'), '{}'::TEXT[])
+  AND (
+    sqlc.narg('tags')::TEXT[] IS NULL
+    OR te.tags @> sqlc.narg('tags')::TEXT[]
+  )
 ORDER BY
   te.id ASC
 LIMIT

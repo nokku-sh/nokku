@@ -31,7 +31,10 @@ WHERE
     OR sa.name ILIKE '%' || sqlc.narg('query') || '%'
     OR COALESCE(sa.description, '') ILIKE '%' || sqlc.narg('query') || '%'
   )
-  AND sa.tags @> COALESCE(sqlc.narg('tags'), '{}'::TEXT[])
+  AND (
+    sqlc.narg('tags')::TEXT[] IS NULL
+    OR sa.tags @> sqlc.narg('tags')::TEXT[]
+  )
   AND (
     sa.role = @role
     OR @role = 0 -- every role

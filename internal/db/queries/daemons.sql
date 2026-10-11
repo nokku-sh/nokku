@@ -119,8 +119,8 @@ WHERE
     OR d.name ILIKE '%' || sqlc.narg('query') || '%'
   )
   AND (
-    sqlc.narg('status')::INTEGER IS NULL
-    OR d.status = sqlc.narg('status')::INTEGER
+    d.status = @status
+    OR @status = 0 -- every status
   )
   AND (
     sqlc.narg('online')::BOOLEAN IS NULL
