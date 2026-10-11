@@ -33,7 +33,7 @@
 
 	const benefits = [
 		'Unlimited users and infrastructure',
-		'SAML, SCIM, enforced SSO and audit export',
+		'SCIM, enforced SSO and audit export',
 		'365-day audit retention',
 		'Offline, air-gapped activation'
 	];

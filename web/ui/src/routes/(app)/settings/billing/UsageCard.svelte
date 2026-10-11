@@ -28,7 +28,6 @@
 	const features = [
 		{ key: 'oidc', label: 'OIDC SSO', unlocks: null },
 		{ key: 'enforce_sso', label: 'Enforced SSO', unlocks: 'Pro' },
-		{ key: 'saml', label: 'SAML SSO', unlocks: 'Pro' },
 		{ key: 'audit_export', label: 'Audit log export', unlocks: 'Pro' },
 		{ key: 'scim', label: 'SCIM provisioning', unlocks: 'Enterprise' },
 		{ key: 'audit_streaming', label: 'Audit log streaming', unlocks: 'Enterprise' },
