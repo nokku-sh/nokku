@@ -1,12 +1,9 @@
--- The workspace is the tenant. Every other table hangs off one, and one row-level security policy keeps them apart.
--- The workspace a connection is pinned to. Tenant tables default workspace_id to it, unpinned an insert fails.
 CREATE OR REPLACE FUNCTION current_workspace_id () RETURNS UUID AS $$
   SELECT NULLIF(current_setting('nokku.workspace_id', TRUE), '')::UUID
 $$ LANGUAGE sql STABLE;
 
 CREATE TABLE IF NOT EXISTS workspaces (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  -- The subdomain on the hosted service. Self-host has one workspace and never looks at it.
   slug TEXT NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'),
   name TEXT NOT NULL,
   description TEXT,
@@ -15,7 +12,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Bumped by triggers whenever what a daemon enforces changes. No RLS, only the trigger functions below write it.
+-- Bumped by triggers whenever what a daemon enforces changes. No RLS
 CREATE TABLE IF NOT EXISTS workspace_state (
   workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
   version BIGINT NOT NULL DEFAULT 0
@@ -35,17 +32,13 @@ CREATE TABLE IF NOT EXISTS workspace_subscriptions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Identity --------------------------------------------------------------------
-
--- A user belongs to one workspace. The same person at two companies has two rows.
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   email TEXT NOT NULL CHECK (email = lower(email)),
   name TEXT NOT NULL DEFAULT '',
   picture TEXT,
-  -- WorkspaceRole of the protos: 1=member, 2=viewer, 3=editor, 4=admin, 5=owner. Each includes everything before it.
-  role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 5),
+  role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 5), -- 1=member, 2=viewer, 3=editor, 4=admin, 5=owner
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -53,13 +46,12 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE (workspace_id, id)
 );
 
--- Exactly one owner per workspace. TransferOwnership swaps the roles in one statement, anything else trips this.
 CREATE UNIQUE INDEX idx_users_owner ON users (workspace_id)
 WHERE
   role = 5;
 
 CREATE TABLE IF NOT EXISTS credentials (
-  id TEXT PRIMARY KEY, -- webauthn credential id, or uuidv7
+  id TEXT PRIMARY KEY, -- webauthn credential id or uuidv7
   workspace_id UUID NOT NULL DEFAULT current_workspace_id (),
   user_id UUID NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('passkey', 'oidc', 'scim')),
@@ -80,7 +72,6 @@ WHERE
 
 CREATE INDEX idx_credentials_user ON credentials (user_id, type);
 
--- Links sent by mail. A signup token has no user yet, the account is created when it is spent.
 CREATE TABLE IF NOT EXISTS one_time_tokens (
   token_hash TEXT PRIMARY KEY,
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
@@ -98,7 +89,6 @@ CREATE INDEX idx_one_time_tokens_expiry ON one_time_tokens (expires_at);
 
 CREATE INDEX idx_one_time_tokens_user ON one_time_tokens (user_id, purpose);
 
--- Browsers and terminals an account has signed in from. A row never signs anyone in.
 CREATE TABLE IF NOT EXISTS known_devices (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
@@ -116,23 +106,21 @@ CREATE TABLE IF NOT EXISTS known_devices (
 
 CREATE INDEX idx_known_devices_expiry ON known_devices (expires_at);
 
--- OIDC providers of the workspace. The config, secret included, is one JSON blob encrypted at rest.
 CREATE TABLE IF NOT EXISTS sso_providers (
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   provider_id TEXT NOT NULL CHECK (provider_id ~ '^[a-z0-9-]{1,64}$'),
   name TEXT NOT NULL DEFAULT '',
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  config BYTEA NOT NULL DEFAULT '',
+  config BYTEA NOT NULL DEFAULT '', -- encrypted
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (workspace_id, provider_id)
 );
 
--- Access ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS service_accounts (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  name TEXT NOT NULL, -- e.g., "github-actions-deploy", "ansible-prod"
+  name TEXT NOT NULL, -- e.g. "github-actions-deploy", "ansible-prod"
   description TEXT,
   role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 3), -- like users.role, the editor at most
   last_used_at TIMESTAMPTZ, -- of any of its tokens, kept by note_service_account_used
@@ -194,32 +182,6 @@ AFTER
 UPDATE OF last_seen_at ON access_tokens FOR EACH ROW WHEN (NEW.service_account_id IS NOT NULL)
 EXECUTE FUNCTION note_service_account_used ();
 
-CREATE TABLE IF NOT EXISTS daemons (
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
-  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  status INTEGER NOT NULL DEFAULT 1 CHECK (status IN (1, 2, 3)), -- 1=pending, 2=accepted, 3=rejected
-  -- Refreshed by the instance holding the control stream. Online means seen in the last 30 seconds.
-  last_seen_at TIMESTAMPTZ,
-  key_thumbprint TEXT,
-  config JSONB NOT NULL DEFAULT '{}',
-  metadata JSONB NOT NULL DEFAULT '{}',
-  -- The enroll token that made it, kept so a replacement of the same name is only ever its own.
-  join_token_id UUID,
-  -- Set from an ephemeral token. The sweep deletes the daemon this long after it was last seen.
-  retire_after INTERVAL,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (workspace_id, name),
-  UNIQUE (workspace_id, id),
-  -- The DPoP key is the machine's identity. Re-enrolling reuses the row.
-  UNIQUE (workspace_id, key_thumbprint)
-)
--- Every connected daemon is stamped every ten seconds. Half-empty pages let the new row version stay on its page,
--- so the stamp never touches an index.
-WITH
-  (fillfactor = 50);
-
 CREATE TABLE IF NOT EXISTS teams (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
@@ -241,13 +203,12 @@ CREATE TABLE IF NOT EXISTS team_members (
   FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE
 );
 
--- SSH certificate authorities. An X.509 CA would get a table of its own, it shares the key material and nothing else.
 CREATE TABLE IF NOT EXISTS ssh_cas (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
-  private_key BYTEA NOT NULL, -- Encrypted private key
+  private_key BYTEA NOT NULL, -- encrypted
   public_key TEXT NOT NULL, -- OpenSSH wire format
   previous_public_key TEXT, -- the key before the last rollover
   previous_trusted_until TIMESTAMPTZ, -- its certificates are trusted until then
@@ -255,15 +216,15 @@ CREATE TABLE IF NOT EXISTS ssh_cas (
   not_after TIMESTAMPTZ NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   is_default BOOLEAN NOT NULL DEFAULT FALSE,
-  key_type INTEGER NOT NULL DEFAULT 3, -- 1 = RSA, 2 = ECDSA, 3 = ED25519
+  key_type INTEGER NOT NULL DEFAULT 3, -- 1=rsa, 2=ecdsa, 3=ed25519
   key_bits INTEGER NOT NULL,
   lifetime INTERVAL NOT NULL DEFAULT '8760 hours',
-  user_default_ttl INTERVAL NOT NULL DEFAULT '120 hours', -- 5 days
-  user_max_ttl INTERVAL NOT NULL DEFAULT '168 hours', -- 7 days
+  user_default_ttl INTERVAL NOT NULL DEFAULT '120 hours',
+  user_max_ttl INTERVAL NOT NULL DEFAULT '168 hours',
   user_extensions JSONB DEFAULT '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}',
   user_critical_options JSONB DEFAULT '{}',
-  host_default_ttl INTERVAL NOT NULL DEFAULT '168 hours', -- 7 days
-  host_max_ttl INTERVAL NOT NULL DEFAULT '720 hours', -- 30 days
+  host_default_ttl INTERVAL NOT NULL DEFAULT '168 hours',
+  host_max_ttl INTERVAL NOT NULL DEFAULT '720 hours',
   allowed_key_types INTEGER[] DEFAULT ARRAY[1, 2, 3],
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -273,6 +234,65 @@ CREATE TABLE IF NOT EXISTS ssh_cas (
   CHECK (user_default_ttl <= user_max_ttl),
   CHECK (host_default_ttl <= host_max_ttl)
 );
+
+-- Enroll tokens bring daemons in, invite tokens bring people in. The plaintext is "<id>_<secret>".
+CREATE TABLE IF NOT EXISTS join_tokens (
+  id UUID PRIMARY KEY,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
+  kind INTEGER NOT NULL CHECK (kind IN (1, 2)), -- 1=enroll, 2=invite
+  label TEXT NOT NULL DEFAULT '',
+  token_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ, -- NULL never expires
+  max_uses INTEGER CHECK (max_uses > 0), -- NULL is unlimited
+  uses INTEGER NOT NULL DEFAULT 0,
+  auto_approve BOOLEAN NOT NULL DEFAULT FALSE, -- enroll only
+  ca_id UUID, -- enroll only, NULL is the workspace default
+  role INTEGER CHECK (role BETWEEN 1 AND 4), -- invite only, like users.role, never the owner
+  tags TEXT[] NOT NULL DEFAULT '{}', -- enroll only
+  ephemeral BOOLEAN NOT NULL DEFAULT FALSE, -- enroll only
+  retire_after INTERVAL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_used_at TIMESTAMPTZ,
+  UNIQUE (workspace_id, id),
+  FOREIGN KEY (workspace_id, ca_id) REFERENCES ssh_cas (workspace_id, id) ON DELETE SET NULL (ca_id),
+  CHECK (
+    kind = 1
+    OR (
+      NOT auto_approve
+      AND ca_id IS NULL
+      AND tags = '{}'
+      AND NOT ephemeral
+    )
+  ),
+  CHECK ((retire_after IS NULL) = (NOT ephemeral)),
+  CHECK ((kind = 2) = (role IS NOT NULL))
+);
+
+CREATE TABLE IF NOT EXISTS daemons (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  status INTEGER NOT NULL DEFAULT 1 CHECK (status IN (1, 2, 3)), -- 1=pending, 2=accepted, 3=rejected
+  -- Refreshed by the instance holding the control stream. Online means seen in the last 30 seconds.
+  last_seen_at TIMESTAMPTZ,
+  key_thumbprint TEXT,
+  config JSONB NOT NULL DEFAULT '{}',
+  metadata JSONB NOT NULL DEFAULT '{}',
+  -- The enroll token that made it, kept so a replacement of the same name is only ever its own.
+  join_token_id UUID,
+  -- Set from an ephemeral token. The sweep deletes the daemon this long after it was last seen.
+  retire_after INTERVAL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (workspace_id, name),
+  UNIQUE (workspace_id, id),
+  UNIQUE (workspace_id, key_thumbprint),
+  FOREIGN KEY (workspace_id, join_token_id) REFERENCES join_tokens (workspace_id, id) ON DELETE SET NULL (join_token_id)
+)
+-- Every connected daemon is stamped every ten seconds. Half-empty pages let the new row version stay on its page,
+-- so the stamp never touches an index.
+WITH
+  (fillfactor = 50);
 
 CREATE TABLE IF NOT EXISTS targets (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -292,45 +312,6 @@ CREATE TABLE IF NOT EXISTS targets (
   FOREIGN KEY (workspace_id, ca_id) REFERENCES ssh_cas (workspace_id, id) ON DELETE SET NULL (ca_id),
   FOREIGN KEY (workspace_id, daemon_id) REFERENCES daemons (workspace_id, id) ON DELETE CASCADE
 );
-
--- Enroll tokens bring daemons in, invite tokens bring people in. The plaintext is "<id>_<secret>".
-CREATE TABLE IF NOT EXISTS join_tokens (
-  id UUID PRIMARY KEY,
-  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  kind INTEGER NOT NULL CHECK (kind IN (1, 2)), -- 1=enroll, 2=invite
-  label TEXT NOT NULL DEFAULT '',
-  token_hash TEXT NOT NULL,
-  expires_at TIMESTAMPTZ, -- NULL never expires
-  max_uses INTEGER CHECK (max_uses > 0), -- NULL is unlimited
-  uses INTEGER NOT NULL DEFAULT 0,
-  auto_approve BOOLEAN NOT NULL DEFAULT FALSE, -- enroll only
-  ca_id UUID, -- enroll only, NULL is the workspace default
-  role INTEGER CHECK (role BETWEEN 1 AND 4), -- invite only, like users.role, never the owner
-  -- Enroll only. Copied onto the target once, when the daemon is created.
-  tags TEXT[] NOT NULL DEFAULT '{}',
-  -- Enroll only. Daemons of an ephemeral token retire this long after they were last seen.
-  ephemeral BOOLEAN NOT NULL DEFAULT FALSE,
-  retire_after INTERVAL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  last_used_at TIMESTAMPTZ,
-  UNIQUE (workspace_id, id),
-  FOREIGN KEY (workspace_id, ca_id) REFERENCES ssh_cas (workspace_id, id) ON DELETE SET NULL (ca_id),
-  CHECK (
-    kind = 1
-    OR (
-      NOT auto_approve
-      AND ca_id IS NULL
-      AND tags = '{}'
-      AND NOT ephemeral
-    )
-  ),
-  CHECK ((retire_after IS NULL) = (NOT ephemeral)),
-  CHECK ((kind = 2) = (role IS NOT NULL))
-);
-
--- A deleted token leaves its daemons, they keep retiring on the interval they copied.
-ALTER TABLE daemons
-ADD FOREIGN KEY (workspace_id, join_token_id) REFERENCES join_tokens (workspace_id, id) ON DELETE SET NULL (join_token_id);
 
 -- A local account on a target, like root or deploy. Grants hang off it.
 CREATE TABLE IF NOT EXISTS target_accounts (
@@ -400,7 +381,6 @@ CREATE TABLE IF NOT EXISTS join_token_grants (
 CREATE TABLE IF NOT EXISTS recordings (
   id UUID PRIMARY KEY DEFAULT uuidv7(), -- the session id
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  -- A recording outlives its daemon, only retention deletes it.
   daemon_id UUID REFERENCES daemons (id) ON DELETE SET NULL,
   daemon_name TEXT NOT NULL, -- as it was when the session ran
   username TEXT NOT NULL,
@@ -415,8 +395,6 @@ CREATE TABLE IF NOT EXISTS recordings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Instance -------------------------------------------------------------------
-
 -- The one keyset that encrypts everything at rest. rotated_at is when it last got a new primary key.
 CREATE TABLE IF NOT EXISTS keysets (
   id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -425,14 +403,14 @@ CREATE TABLE IF NOT EXISTS keysets (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- License key activated in the UI (singleton). NOKKU_LICENSE_KEY still works, the key that is valid longest wins.
+-- License key activated in the UI (singleton)
 CREATE TABLE IF NOT EXISTS instance_license (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   key TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- The CA of NOKKU_TLS=internal (singleton). The key stays for good, so the pin clients hold never changes.
+-- The CA of NOKKU_TLS=internal (singleton)
 CREATE TABLE IF NOT EXISTS web_ca (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   private_key BYTEA NOT NULL,
@@ -486,7 +464,6 @@ CREATE INDEX idx_recordings_subject ON recordings (workspace_id, subject_id, sta
 CREATE INDEX idx_recordings_daemon ON recordings (daemon_id, started_at DESC);
 
 -- Triggers -------------------------------------------------------------------
-
 -- Any change to what a daemon enforces bumps the workspace version and notifies on commit.
 CREATE OR REPLACE FUNCTION create_workspace_state () RETURNS TRIGGER AS $$
 BEGIN
@@ -663,7 +640,6 @@ UPDATE OF last_seen_at ON daemons FOR EACH ROW WHEN (
 EXECUTE FUNCTION notify_change ();
 
 -- Roles and grants -----------------------------------------------------------
-
 -- nokku_app serves requests under RLS, nokku_system bypasses it. Neither is a member of the other.
 DO $$
 BEGIN
@@ -714,7 +690,6 @@ FROM
   nokku_system;
 
 -- Row-level security ---------------------------------------------------------
-
 -- One policy on every tenant table, the only tenant filter there is. A new table needs its name in the list below.
 DO $$
 DECLARE
@@ -821,7 +796,6 @@ ALTER TABLE audit.audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit.audit_logs FORCE ROW LEVEL SECURITY;
 
 -- Audit immutability ---------------------------------------------------------
-
 -- No role holds UPDATE, and this trigger refuses a DELETE unless the transaction opts in, as the retention job does.
 CREATE OR REPLACE FUNCTION audit.audit_logs_immutable () RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
