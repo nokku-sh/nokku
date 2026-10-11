@@ -5,7 +5,7 @@ import BaseLayout from "../layouts/BaseLayout";
 /** Static HTML by design, no template variables. out/changelog.html is uploaded to Resend as-is. */
 export default function Changelog() {
   return (
-    <BaseLayout preview="Nokku 0.14 is out: SAML support, faster policy sync, and more." type="marketing">
+    <BaseLayout preview="Nokku 0.14 is out: policy dry-run, faster policy sync, and more." type="marketing">
       <Text className="m-0 text-xs font-bold uppercase tracking-[1.4px] text-brand">
         Changelog
       </Text>
@@ -13,17 +13,13 @@ export default function Changelog() {
         What's new in Nokku 0.14
       </Heading>
       <Text className="m-0 mt-4 text-base leading-7 text-muted">
-        This release focuses on enterprise readiness: a new SSO protocol, a leaner policy pipeline,
-        and a handful of fixes that make day-to-day access management quieter.
+        This release focuses on enterprise readiness: a dry-run for policy changes, a leaner policy
+        pipeline, and a handful of fixes that make day-to-day access management quieter.
       </Text>
 
       <Section className="my-7">
         <Text className="m-0 text-xs font-bold uppercase tracking-[1.4px] text-brand">New</Text>
         <Text className="m-0 mt-2 text-sm leading-6 text-muted">
-          <strong className="text-ink">SAML SSO</strong> for enterprise domains, alongside the
-          existing OIDC support. Map any IdP attribute to your groups.
-          <br />
-          <br />
           <strong className="text-ink">Policy dry-run mode</strong> on the CLI: preview which
           certificates a change would issue before it lands.
         </Text>
