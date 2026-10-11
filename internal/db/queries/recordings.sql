@@ -30,30 +30,53 @@ WHERE
   id = @id;
 
 -- name: ListRecordings :many
+-- The total is counted on its own. A window count reads every matching row in full to return one page.
+WITH
+  filtered AS NOT MATERIALIZED (
+    SELECT
+      f.id,
+      f.started_at
+    FROM
+      recordings f
+    WHERE
+      (
+        sqlc.narg('daemon_id')::UUID IS NULL
+        OR f.daemon_id = sqlc.narg('daemon_id')
+      )
+      AND (
+        sqlc.narg('username')::TEXT IS NULL
+        OR f.username = sqlc.narg('username')
+      )
+      AND (
+        sqlc.narg('subject_id')::UUID IS NULL
+        OR f.subject_id = sqlc.narg('subject_id')
+      )
+  ),
+  paginated AS (
+    SELECT
+      id
+    FROM
+      filtered
+    ORDER BY
+      started_at DESC
+    LIMIT
+      sqlc.narg('limit')
+    OFFSET
+      sqlc.narg('offset')
+  )
 SELECT
   sqlc.embed(r),
-  COUNT(*) OVER ()::INTEGER AS total_count
+  (
+    SELECT
+      COUNT(*)
+    FROM
+      filtered
+  )::INTEGER AS total_count
 FROM
   recordings r
-WHERE
-  (
-    sqlc.narg('daemon_id')::UUID IS NULL
-    OR r.daemon_id = sqlc.narg('daemon_id')
-  )
-  AND (
-    sqlc.narg('username')::TEXT IS NULL
-    OR r.username = sqlc.narg('username')
-  )
-  AND (
-    sqlc.narg('subject_id')::UUID IS NULL
-    OR r.subject_id = sqlc.narg('subject_id')
-  )
+  JOIN paginated pp ON pp.id = r.id
 ORDER BY
-  r.started_at DESC
-LIMIT
-  sqlc.narg('limit')
-OFFSET
-  sqlc.narg('offset');
+  r.started_at DESC;
 
 -- name: SumRecordingBytes :one
 SELECT

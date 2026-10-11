@@ -89,6 +89,10 @@ func (c *Connection) poolConfig() (*pgxpool.Config, error) {
 	config.MaxConnIdleTime = 5 * time.Minute
 	config.HealthCheckPeriod = time.Minute
 	config.ConnConfig.ConnectTimeout = 5 * time.Second
+	// A cached plan is costed for the workspace pinned when it was built, then reused for every other one.
+	config.ConnConfig.RuntimeParams["plan_cache_mode"] = "force_custom_plan"
+	// Compiling a query costs more than it saves on requests this short.
+	config.ConnConfig.RuntimeParams["jit"] = "off"
 	return config, nil
 }
 

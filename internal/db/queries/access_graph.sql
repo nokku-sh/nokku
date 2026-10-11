@@ -21,10 +21,9 @@ WITH
     WHERE
       (
         sqlc.narg('subject_id')::UUID IS NULL
-        OR g.subject_id = sqlc.narg('subject_id')::UUID
-        OR (
-          g.subject_kind = 'team'
-          AND g.subject_id IN (
+        -- One array of ids, an OR over the teams would keep the lookup off the subject index.
+        OR g.subject_id = ANY (
+          ARRAY[sqlc.narg('subject_id')::UUID] || ARRAY(
             SELECT
               tm.team_id
             FROM
