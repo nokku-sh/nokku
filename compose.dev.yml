@@ -1,4 +1,15 @@
 # Development only. The tests start their own containers, see internal/integration/testenv.
+x-authentik-env: &authentik-env
+  AUTHENTIK_SECRET_KEY: dev-only-not-secret-at-all-please-dont-ship-this-0123456789
+  AUTHENTIK_POSTGRESQL__HOST: authentik-db
+  AUTHENTIK_POSTGRESQL__USER: authentik
+  AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+  AUTHENTIK_POSTGRESQL__NAME: authentik
+  AUTHENTIK_BOOTSTRAP_EMAIL: admin@localhost.dev
+  AUTHENTIK_BOOTSTRAP_PASSWORD: admin
+  AUTHENTIK_BOOTSTRAP_TOKEN: dev-api-token
+  AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+
 services:
   postgres:
     image: docker.io/postgres:18-alpine
@@ -42,3 +53,47 @@ services:
     ports:
       - 8200:8200
     restart: unless-stopped
+
+  authentik-db:
+    image: postgres:17-alpine
+    container_name: authentik-db
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: authentik
+      POSTGRES_DB: authentik
+    volumes:
+      - authentik-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  authentik:
+    image: ghcr.io/goauthentik/server:2026.8.0
+    container_name: authentik
+    command: server
+    environment: *authentik-env
+    ports:
+      - "9000:9000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2026.8.0
+    container_name: authentik-worker
+    command: worker
+    environment: *authentik-env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  authentik-db:
