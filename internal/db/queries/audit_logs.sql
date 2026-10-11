@@ -114,10 +114,44 @@ OFFSET
   sqlc.arg('offset');
 
 -- name: ListWorkspaceAuditLogWorkspaceIDs :many
-SELECT DISTINCT
-  workspace_id
+-- Hops from one workspace to the next in the index. A DISTINCT reads the whole log to name a few hundred ids.
+WITH RECURSIVE
+  w AS (
+    (
+      SELECT
+        workspace_id
+      FROM
+        audit.audit_logs
+      ORDER BY
+        workspace_id
+      LIMIT
+        1
+    )
+    UNION ALL
+    SELECT
+      (
+        SELECT
+          a.workspace_id
+        FROM
+          audit.audit_logs a
+        WHERE
+          a.workspace_id > w.workspace_id
+        ORDER BY
+          a.workspace_id
+        LIMIT
+          1
+      )
+    FROM
+      w
+    WHERE
+      w.workspace_id IS NOT NULL
+  )
+SELECT
+  workspace_id::UUID
 FROM
-  audit.audit_logs;
+  w
+WHERE
+  workspace_id IS NOT NULL;
 
 -- name: DeleteWorkspaceAuditLogs :execrows
 DELETE FROM audit.audit_logs

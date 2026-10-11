@@ -186,7 +186,7 @@ The rest is below, grouped by topic. Open what you need.
 | `PGPASSWORD`            | `postgres`   | Password                                                   |
 | `PGSSLMODE`             | `disable`    | libpq SSL mode                                             |
 | `NOKKU_DB_APP_PASSWORD` | `PGPASSWORD` | Password of the two runtime roles, set at start            |
-| `NOKKU_DB_MAX_CONNS`    | `10`         | Largest pool size                                          |
+| `NOKKU_DB_MAX_CONNS`    | `20`         | Largest pool size                                          |
 | `NOKKU_DB_MIN_CONNS`    | `0`          | Smallest pool size                                         |
 | `NOKKU_DB_AUTOMIGRATE`  | `true`       | Apply migrations on start. Turn off to run them yourself   |
 

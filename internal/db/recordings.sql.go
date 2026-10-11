@@ -157,12 +157,46 @@ func (q *Queries) GetRecording(ctx context.Context, id string) (*Recording, erro
 }
 
 const listRecordingWorkspaceIDs = `-- name: ListRecordingWorkspaceIDs :many
-SELECT DISTINCT
-  workspace_id
+WITH RECURSIVE
+  w AS (
+    (
+      SELECT
+        workspace_id
+      FROM
+        recordings
+      ORDER BY
+        workspace_id
+      LIMIT
+        1
+    )
+    UNION ALL
+    SELECT
+      (
+        SELECT
+          a.workspace_id
+        FROM
+          recordings a
+        WHERE
+          a.workspace_id > w.workspace_id
+        ORDER BY
+          a.workspace_id
+        LIMIT
+          1
+      )
+    FROM
+      w
+    WHERE
+      w.workspace_id IS NOT NULL
+  )
+SELECT
+  workspace_id::UUID
 FROM
-  recordings
+  w
+WHERE
+  workspace_id IS NOT NULL
 `
 
+// Hops from one workspace to the next in the index. A DISTINCT reads every recording to name a few hundred ids.
 func (q *Queries) ListRecordingWorkspaceIDs(ctx context.Context) ([]string, error) {
 	rows, err := q.db.Query(ctx, listRecordingWorkspaceIDs)
 	if err != nil {

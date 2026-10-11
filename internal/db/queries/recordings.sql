@@ -119,10 +119,44 @@ LIMIT
   sqlc.narg('limit');
 
 -- name: ListRecordingWorkspaceIDs :many
-SELECT DISTINCT
-  workspace_id
+-- Hops from one workspace to the next in the index. A DISTINCT reads every recording to name a few hundred ids.
+WITH RECURSIVE
+  w AS (
+    (
+      SELECT
+        workspace_id
+      FROM
+        recordings
+      ORDER BY
+        workspace_id
+      LIMIT
+        1
+    )
+    UNION ALL
+    SELECT
+      (
+        SELECT
+          a.workspace_id
+        FROM
+          recordings a
+        WHERE
+          a.workspace_id > w.workspace_id
+        ORDER BY
+          a.workspace_id
+        LIMIT
+          1
+      )
+    FROM
+      w
+    WHERE
+      w.workspace_id IS NOT NULL
+  )
+SELECT
+  workspace_id::UUID
 FROM
-  recordings;
+  w
+WHERE
+  workspace_id IS NOT NULL;
 
 -- name: DeleteRecordingsBefore :many
 DELETE FROM recordings
