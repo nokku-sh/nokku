@@ -1,7 +1,7 @@
 // Package entitlement is the only place plan logic is enforced. Quotas fail open, features fail closed.
 package entitlement
 
-import "maps"
+import "slices"
 
 const (
 	FeatureOIDC           = "oidc"
@@ -21,24 +21,17 @@ const (
 type Feature struct {
 	Code  string
 	Label string
+	// Plan is the smallest plan that has the feature, every larger one has it too.
+	Plan string
 }
 
 var CatalogFeatures = []Feature{
-	{FeatureOIDC, "OIDC single sign-on"},
-	{FeatureEnforceSSO, "enforced single sign-on"},
-	{FeatureSCIM, "SCIM provisioning"},
-	{FeatureAuditExport, "audit log export"},
-	{FeatureAuditStreaming, "audit log streaming"},
-	{FeatureExternalKMS, "external key management"},
-}
-
-func featureInCatalog(code string) (Feature, bool) {
-	for _, f := range CatalogFeatures {
-		if f.Code == code {
-			return f, true
-		}
-	}
-	return Feature{}, false
+	{FeatureOIDC, "OIDC single sign-on", PlanCommunity},
+	{FeatureEnforceSSO, "enforced single sign-on", PlanPro},
+	{FeatureAuditExport, "audit log export", PlanPro},
+	{FeatureSCIM, "SCIM provisioning", PlanEnterprise},
+	{FeatureAuditStreaming, "audit log streaming", PlanEnterprise},
+	{FeatureExternalKMS, "external key management", PlanEnterprise},
 }
 
 const unlimited int64 = -1
@@ -50,66 +43,48 @@ type Plan struct {
 	RetentionDays int64 // audit log and session recording retention
 	// RecordingStorageBytes is a stop for abuse, sized so that normal use runs into the retention first.
 	RecordingStorageBytes int64
-	Features              map[string]bool
 }
 
-func (p Plan) Has(feature string) bool {
-	return p.Features[feature]
-}
-
-var catalog = map[string]Plan{
-	PlanCommunity: {
+// plans go from the smallest to the largest, Has depends on the order.
+var plans = []Plan{
+	{
 		Name:                  PlanCommunity,
 		SeatCap:               5,
 		ResourceCap:           50,
 		RetentionDays:         7,
 		RecordingStorageBytes: 1 << 30,
-		Features: map[string]bool{
-			FeatureOIDC: true,
-		},
 	},
-	PlanPro: {
+	{
 		Name:                  PlanPro,
 		SeatCap:               unlimited,
 		ResourceCap:           2000,
 		RetentionDays:         90,
 		RecordingStorageBytes: 50 << 30,
-		Features: map[string]bool{
-			FeatureOIDC:        true,
-			FeatureEnforceSSO:  true,
-			FeatureAuditExport: true,
-		},
 	},
-	PlanEnterprise: {
+	{
 		Name:                  PlanEnterprise,
 		SeatCap:               unlimited,
 		ResourceCap:           unlimited,
 		RetentionDays:         365,
 		RecordingStorageBytes: 500 << 30,
-		Features: map[string]bool{
-			FeatureOIDC:           true,
-			FeatureEnforceSSO:     true,
-			FeatureSCIM:           true,
-			FeatureAuditExport:    true,
-			FeatureAuditStreaming: true,
-			FeatureExternalKMS:    true,
-		},
 	},
 }
 
+func (p Plan) Has(feature string) bool {
+	for _, f := range CatalogFeatures {
+		if f.Code == feature {
+			return planRank(p.Name) >= planRank(f.Plan)
+		}
+	}
+	return false
+}
+
+// planRank is -1 for a name that is no plan, so a zero Plan has nothing.
+func planRank(name string) int {
+	return slices.IndexFunc(plans, func(p Plan) bool { return p.Name == name })
+}
+
+// resolvePlan reads an unknown name as Community.
 func resolvePlan(name string) Plan {
-	switch name {
-	case PlanCommunity, PlanPro, PlanEnterprise:
-	default:
-		name = PlanCommunity
-	}
-	base := catalog[name]
-	return Plan{
-		Name:                  name,
-		SeatCap:               base.SeatCap,
-		ResourceCap:           base.ResourceCap,
-		RetentionDays:         base.RetentionDays,
-		RecordingStorageBytes: base.RecordingStorageBytes,
-		Features:              maps.Clone(base.Features),
-	}
+	return plans[max(planRank(name), 0)]
 }

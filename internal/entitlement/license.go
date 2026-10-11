@@ -8,22 +8,19 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"os"
-	"strings"
 	"time"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/jackc/pgx/v5"
-	"github.com/mizuchilabs/kata/licx"
-
-	"github.com/nokku-sh/nokku/internal/db"
+	"github.com/mizuchilabs/inkan/license"
 )
 
 const (
-	licenseApp    = "NOKKU"
-	licenseEnv    = "NOKKU_LICENSE_KEY"
-	licenseReload = 5 * time.Minute
+	licenseApp = "NOKKU"
 	// A renewal reminder starts this long before the key expires.
 	licenseWarnDays = 30
+	// The license worker trades a held key for the current one. The key is all that is sent.
+	licenseRefreshURL = "https://license.nokku.sh/refresh"
 )
 
 var (
@@ -34,24 +31,54 @@ var (
 	ErrNotSelfHosted      = errors.New("licenses apply to self-hosted instances only")
 )
 
-// EnvLicense logs and ignores a rejected key, it never stops the core from starting.
-func EnvLicense() *licx.Claims {
-	key := os.Getenv(licenseEnv)
-	if key == "" {
-		return nil
-	}
-	claims, err := parseLicense(key)
-	if err != nil {
-		slog.Error(licenseEnv+" rejected, running without it", "error", err)
-		return nil
-	}
-	return claims
+type licenseConfig struct {
+	Key     string `env:"NOKKU_LICENSE_KEY"`
+	Offline bool   `env:"NOKKU_LICENSE_OFFLINE"`
 }
 
-// parseLicense keeps expired keys, they still carry the retention hold.
-func parseLicense(key string) (*licx.Claims, error) {
-	claims, err := licx.Verify(key, licenseApp)
-	if err != nil && !errors.Is(err, licx.ErrExpired) {
+// loadLicense takes the key from the environment and the one activated in the UI, then keeps the held one renewed.
+func (s *Service) loadLicense(ctx context.Context) error {
+	cfg, err := env.ParseAs[licenseConfig]()
+	if err != nil {
+		return err
+	}
+	if cfg.Key != "" {
+		// A rejected key never stops the core from starting.
+		if err := s.takeLicense(cfg.Key); err != nil {
+			slog.Error("NOKKU_LICENSE_KEY rejected, running without it", "error", err)
+		}
+	}
+
+	stored, err := s.conn.Sys().GetInstanceLicense(ctx)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+	case err != nil:
+		return fmt.Errorf("loading license: %w", err)
+	default:
+		if err := s.takeLicense(stored); err != nil && !errors.Is(err, ErrLicenseShorter) {
+			slog.Warn("stored license key rejected", "error", err)
+		}
+	}
+
+	// A server without a key never asks.
+	if !cfg.Offline {
+		go s.license.Renew(ctx, licenseRefreshURL,
+			func(key string) {
+				if err := s.storeLicense(ctx, key); err != nil {
+					slog.Warn("renewed license key not stored", "error", err)
+				}
+			},
+			func(err error) { slog.Warn("license refresh failed", "error", err) },
+		)
+	}
+	go s.remindLicense(ctx)
+	return nil
+}
+
+// verifyLicense keeps expired keys, they still carry the retention hold.
+func (s *Service) verifyLicense(key string) (*license.Claims, error) {
+	claims, err := license.Verify(key, licenseApp, s.publicKey, "")
+	if err != nil && !errors.Is(err, license.ErrExpired) {
 		return nil, err
 	}
 	if claims.Plan != PlanEnterprise {
@@ -60,105 +87,81 @@ func parseLicense(key string) (*licx.Claims, error) {
 	return claims, nil
 }
 
-// License is nil without one. It may be expired, check IsExpired.
-func (s *Service) License() *licx.Claims {
-	return s.license.Load()
+// takeLicense refuses a key that would shorten the held license, so an old key cannot undo a renewal.
+func (s *Service) takeLicense(key string) error {
+	claims, err := s.verifyLicense(key)
+	if err != nil {
+		return err
+	}
+	if s.shorterLicense(claims) {
+		return ErrLicenseShorter
+	}
+	_, _ = s.license.Set(key)
+	return nil
 }
 
-// ActivateLicense refuses a key that would shorten the active license, so an old key cannot undo a renewal.
+func (s *Service) shorterLicense(claims *license.Claims) bool {
+	held := s.License()
+	return held != nil && validUntil(claims) < validUntil(held)
+}
+
+// License is nil without one. It may be expired, check IsExpired.
+func (s *Service) License() *license.Claims {
+	claims, _ := s.license.Claims()
+	return claims
+}
+
 func (s *Service) ActivateLicense(ctx context.Context, key string) error {
 	if s.saas {
 		return ErrNotSelfHosted
 	}
-	if !licx.HasPublicKey() {
+	claims, err := s.verifyLicense(key)
+	switch {
+	case errors.Is(err, license.ErrNoPublicKey):
 		return ErrLicenseUnsupported
-	}
-	key = strings.TrimSpace(key)
-	claims, err := parseLicense(key)
-	if err != nil {
+	case err != nil:
 		return ErrLicenseInvalid
-	}
-	if claims.IsExpired() {
+	case claims.IsExpired():
 		return ErrLicenseExpired
-	}
-	if current := s.license.Load(); current != nil && validUntil(claims) < validUntil(current) {
+	case s.shorterLicense(claims):
 		return ErrLicenseShorter
 	}
 
-	if err := s.conn.SysTx(ctx, func(q *db.Queries) error {
-		return q.SetInstanceLicense(ctx, key)
-	}); err != nil {
+	if err := s.storeLicense(ctx, license.Clean(key)); err != nil {
 		return err
 	}
-	s.license.Store(claims)
+	_, _ = s.license.Set(key)
 	reportLicense(claims)
 	return nil
 }
 
-// WatchLicense picks up a key activated in the UI, also from another replica, and repeats the expiry reminder.
-func (s *Service) WatchLicense(ctx context.Context) {
-	if !licx.HasPublicKey() {
-		return
-	}
-	s.reloadLicense(ctx)
-	reportLicense(s.license.Load())
+func (s *Service) storeLicense(ctx context.Context, key string) error {
+	return s.conn.Sys().SetInstanceLicense(ctx, key)
+}
 
-	go func() {
-		reported := time.Now()
-		tick := time.Tick(licenseReload)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-tick:
-			}
-			before := s.license.Load()
-			s.reloadLicense(ctx)
-			after := s.license.Load()
-			if after != before || time.Since(reported) >= 24*time.Hour {
-				reportLicense(after)
-				reported = time.Now()
-			}
+// remindLicense repeats the expiry warning once a day, a server can run for longer than its key lasts.
+func (s *Service) remindLicense(ctx context.Context) {
+	reportLicense(s.License())
+	tick := time.Tick(24 * time.Hour)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick:
+			reportLicense(s.License())
 		}
-	}()
-}
-
-// reloadLicense keeps the current license when the database is unreachable.
-func (s *Service) reloadLicense(ctx context.Context) {
-	var key string
-	err := s.conn.SysTx(ctx, func(q *db.Queries) (err error) {
-		key, err = q.GetInstanceLicense(ctx)
-		return err
-	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return
-	}
-	if err != nil {
-		slog.Warn("license lookup failed", "error", err)
-		return
-	}
-	stored, err := parseLicense(key)
-	if err != nil {
-		slog.Warn("stored license key rejected", "error", err)
-		return
-	}
-	if current := s.license.Load(); current == nil || validUntil(stored) > validUntil(current) {
-		s.license.Store(stored)
 	}
 }
 
-func validUntil(c *licx.Claims) int64 {
+func validUntil(c *license.Claims) int64 {
 	if c.ExpiresAt == 0 {
 		return math.MaxInt64 // perpetual
 	}
 	return c.ExpiresAt
 }
 
-func reportLicense(c *licx.Claims) {
-	if c == nil {
-		return
-	}
-	if c.ExpiresAt == 0 {
+func reportLicense(c *license.Claims) {
+	if c == nil || c.ExpiresAt == 0 {
 		return
 	}
 	expires := time.Unix(c.ExpiresAt, 0).UTC()

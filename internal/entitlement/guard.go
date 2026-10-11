@@ -12,8 +12,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/actor"
 )
 
-const upgradeURL = "https://nokku.sh/pricing"
-
 // procedureFeatures is the only place routes are gated. guard_test.go fails on a catalog feature with no wiring.
 var procedureFeatures = map[string]string{
 	nokkuv1connect.UtilServiceExportAuditLogsProcedure: FeatureAuditExport,
@@ -29,44 +27,24 @@ var cappedCreate = map[string]bool{
 	nokkuv1connect.CertificateServiceCreateCertificateAuthorityProcedure: true,
 }
 
-// GuardInterceptor caches plan resolutions on the context for handlers to reuse.
-type GuardInterceptor struct {
-	ent *Service
-}
-
-func NewGuardInterceptor(ent *Service) *GuardInterceptor {
-	return &GuardInterceptor{ent: ent}
-}
-
-func (g *GuardInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
-	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		ctx = withRequestCache(ctx)
-		procedure := req.Spec().Procedure
-		if err := g.check(ctx, procedure, req.Any()); err != nil {
-			return nil, err
+// NewGuardInterceptor gates features and caps creates. Every gated route is unary, streams pass through.
+func NewGuardInterceptor(ent *Service) connect.UnaryInterceptorFunc {
+	return func(next connect.UnaryFunc) connect.UnaryFunc {
+		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+			procedure := req.Spec().Procedure
+			if err := ent.checkFeature(ctx, procedure, req.Any()); err != nil {
+				return nil, err
+			}
+			if err := ent.checkCap(ctx, procedure); err != nil {
+				return nil, err
+			}
+			return next(ctx, req)
 		}
-		if err := g.checkResources(ctx, procedure); err != nil {
-			return nil, err
-		}
-		return next(ctx, req)
 	}
 }
 
-func (g *GuardInterceptor) WrapStreamingClient(
-	next connect.StreamingClientFunc,
-) connect.StreamingClientFunc {
-	return next
-}
-
-// WrapStreamingHandler passes through, every gated route is unary.
-func (g *GuardInterceptor) WrapStreamingHandler(
-	next connect.StreamingHandlerFunc,
-) connect.StreamingHandlerFunc {
-	return next
-}
-
-// check passes unpinned requests, the authz interceptor owns that boundary.
-func (g *GuardInterceptor) check(ctx context.Context, procedure string, msg any) error {
+// checkFeature passes unpinned requests, the authz interceptor owns that boundary.
+func (s *Service) checkFeature(ctx context.Context, procedure string, msg any) error {
 	feature, gated := procedureFeatures[procedure]
 	if !gated {
 		feature, gated = conditionalFeature(procedure, msg)
@@ -79,13 +57,15 @@ func (g *GuardInterceptor) check(ctx context.Context, procedure string, msg any)
 	if workspaceID == "" {
 		return nil
 	}
-	if g.ent.Has(ctx, workspaceID, feature) {
+	plan := s.Resolve(ctx, workspaceID)
+	if plan.Has(feature) {
 		return nil
 	}
-	return g.deny(ctx, workspaceID, feature)
+	return connect.NewError(connect.CodePermissionDenied, fmt.Errorf(
+		"%s is not available on the %s plan", featureLabel(feature), displayName(plan.Name)))
 }
 
-func (g *GuardInterceptor) checkResources(ctx context.Context, procedure string) error {
+func (s *Service) checkCap(ctx context.Context, procedure string) error {
 	if !cappedCreate[procedure] {
 		return nil
 	}
@@ -93,7 +73,7 @@ func (g *GuardInterceptor) checkResources(ctx context.Context, procedure string)
 	if workspaceID == "" {
 		return nil
 	}
-	return g.ent.CheckResources(ctx, workspaceID)
+	return s.CheckResources(ctx, workspaceID)
 }
 
 // conditionalFeature never gates turning a feature off, a downgraded workspace must be able to clean up.
@@ -112,27 +92,11 @@ func conditionalFeature(procedure string, msg any) (string, bool) {
 	return "", false
 }
 
-// deny carries metadata so the UI can render an upgrade prompt.
-func (g *GuardInterceptor) deny(ctx context.Context, workspaceID, feature string) error {
-	plan := g.ent.Resolve(ctx, workspaceID)
-
-	err := connect.NewError(
-		connect.CodePermissionDenied,
-		fmt.Errorf(
-			"%s is not available on the %s plan",
-			featureLabel(feature),
-			displayName(plan.Name),
-		),
-	)
-	err.Meta().Set("x-nokku-plan", plan.Name)
-	err.Meta().Set("x-nokku-feature", feature)
-	err.Meta().Set("x-nokku-upgrade", upgradeURL)
-	return err
-}
-
 func featureLabel(code string) string {
-	if f, ok := featureInCatalog(code); ok {
-		return f.Label
+	for _, f := range CatalogFeatures {
+		if f.Code == code {
+			return f.Label
+		}
 	}
 	return code
 }

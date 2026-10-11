@@ -1,358 +1,209 @@
 package entitlement
 
 import (
-	"context"
+	"crypto/ed25519"
 	"errors"
-	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/mizuchilabs/kata/licx"
+	"github.com/mizuchilabs/inkan/license"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
 
-// The mode NewService takes, named so the calls read.
-const (
-	modeSaaS       = true
-	modeSelfHosted = false
-)
-
-type fakeDB struct {
-	plan        string
-	status      Status
-	seats       int64
-	endedAt     *time.Time
-	licenseKey  string
-	subErr      error
-	resources   int64
-	resourceErr error
-}
-
-func (f *fakeDB) SysTx(_ context.Context, fn func(*db.Queries) error) error {
-	return fn(db.New(f))
-}
-
-func (f *fakeDB) Exec(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-	return pgconn.CommandTag{}, nil
-}
-
-func (f *fakeDB) Query(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
-	return nil, errors.New("entitlement test: unexpected query")
-}
-
-func (f *fakeDB) QueryRow(_ context.Context, sql string, _ ...any) pgx.Row {
-	switch {
-	case strings.Contains(sql, "workspace_subscriptions"):
-		if f.subErr != nil {
-			return errRow{f.subErr}
-		}
-		return rowVals{vals: []any{
-			"ws1", "stripe", f.plan, string(f.status),
-			"cus_1", "sub_1", nil, false,
-			f.seats, f.endedAt,
-			time.Time{},
-		}}
-	case strings.Contains(sql, "instance_license"):
-		if f.licenseKey == "" {
-			return errRow{pgx.ErrNoRows}
-		}
-		return rowVals{vals: []any{f.licenseKey}}
-	case strings.Contains(sql, "resource_count"):
-		if f.resourceErr != nil {
-			return errRow{f.resourceErr}
-		}
-		return rowVals{vals: []any{f.resources}}
-	default:
-		panic("entitlement test: unexpected query row: " + sql)
+// testSigner signs the keys of the tests, testPublicKey verifies them.
+var testSigner, testPublicKey = func() (ed25519.PrivateKey, string) {
+	privB64, pubHex, err := license.GenerateKey()
+	if err != nil {
+		panic(err)
 	}
+	priv, err := license.ParsePrivateKey(privB64)
+	if err != nil {
+		panic(err)
+	}
+	return priv, pubHex
+}()
+
+// issue signs a key of that plan. A validFor of 0 never expires.
+func issue(t *testing.T, plan string, validFor time.Duration) string {
+	t.Helper()
+	claims := license.Claims{Plan: plan}
+	if validFor != 0 {
+		claims.ExpiresAt = time.Now().Add(validFor).Unix()
+	}
+	key, err := license.Issue(licenseApp, claims, testSigner)
+	require.NoError(t, err)
+	return key
 }
 
-// errRow is a pgx.Row that always fails with err.
-type errRow struct{ err error }
-
-func (r errRow) Scan(_ ...any) error { return r.err }
-
-// rowVals scans one row positionally into the destinations sqlc generated.
-type rowVals struct{ vals []any }
-
-func (r rowVals) Scan(dest ...any) error {
-	if len(r.vals) != len(dest) {
-		return pgx.ErrNoRows
+// selfHosted is a server without a database, a self-hosted plan lookup never reads one.
+func selfHosted(t *testing.T, keys ...string) *Service {
+	t.Helper()
+	s := newService(nil, testPublicKey, false)
+	for _, key := range keys {
+		require.NoError(t, s.takeLicense(key))
 	}
-	for i, d := range dest {
-		switch out := d.(type) {
-		case *string:
-			*out = r.vals[i].(string)
-		case *bool:
-			*out = r.vals[i].(bool)
-		case *time.Time:
-			*out = r.vals[i].(time.Time)
-		case **time.Time:
-			*out, _ = r.vals[i].(*time.Time)
-		case *int64:
-			*out = r.vals[i].(int64)
-		default:
-			return fmt.Errorf("rowVals: unsupported dest %T", d)
-		}
-	}
-	return nil
+	return s
 }
 
-// licensed is an unexpired license for plan, or none for "".
-func licensed(plan string) *licx.Claims {
-	if plan == "" {
-		return nil
-	}
-	return &licx.Claims{Plan: plan}
+func daysAgo(days int) *time.Time {
+	return new(time.Now().AddDate(0, 0, -days))
 }
 
-func TestResolve(t *testing.T) {
+func TestFromSubscription(t *testing.T) {
 	tests := []struct {
-		name    string
-		db      *fakeDB
-		license string
-		mode    bool
-		want    string
+		name     string
+		sub      *db.WorkspaceSubscription
+		err      error
+		wantPlan string
+		wantKeep string
 	}{
+		{"active", &db.WorkspaceSubscription{Plan: PlanPro, Status: "active"}, nil, PlanPro, PlanPro},
 		{
-			name: "modeSaaS active subscription",
-			db:   &fakeDB{plan: PlanPro, status: StatusActive},
-			mode: modeSaaS,
-			want: PlanPro,
+			"trialing",
+			&db.WorkspaceSubscription{Plan: PlanEnterprise, Status: "trialing"},
+			nil,
+			PlanEnterprise,
+			PlanEnterprise,
 		},
 		{
-			name: "trialing grants access",
-			db:   &fakeDB{plan: PlanEnterprise, status: StatusTrialing},
-			mode: modeSaaS,
-			want: PlanEnterprise,
+			"past due is a grace period",
+			&db.WorkspaceSubscription{Plan: PlanPro, Status: "past_due"},
+			nil,
+			PlanPro,
+			PlanPro,
+		},
+		{"the row a workspace starts with", &db.WorkspaceSubscription{}, nil, PlanCommunity, PlanCommunity},
+		{"no row", nil, pgx.ErrNoRows, PlanCommunity, PlanCommunity},
+		{
+			"ended ten days ago holds its data limits",
+			&db.WorkspaceSubscription{Plan: PlanPro, Status: "canceled", EndedAt: daysAgo(10)},
+			nil, PlanCommunity, PlanPro,
 		},
 		{
-			name: "past due keeps access (grace period)",
-			db:   &fakeDB{plan: PlanPro, status: StatusPastDue},
-			mode: modeSaaS,
-			want: PlanPro,
+			"the hold ends after 30 days",
+			&db.WorkspaceSubscription{Plan: PlanPro, Status: "canceled", EndedAt: daysAgo(holdDays + 1)},
+			nil, PlanCommunity, PlanCommunity,
 		},
 		{
-			name: "canceled subscription falls back to community",
-			db:   &fakeDB{plan: PlanPro, status: StatusInactive},
-			mode: modeSaaS,
-			want: PlanCommunity,
-		},
-		{
-			name: "no subscription row falls back to community",
-			db:   &fakeDB{subErr: errors.New("no rows")},
-			mode: modeSaaS,
-			want: PlanCommunity,
-		},
-		{
-			// pgx.ErrNoRows is the normal community case, not a failure.
-			name: "pgx ErrNoRows is the quiet community path",
-			db:   &fakeDB{subErr: pgx.ErrNoRows},
-			mode: modeSaaS,
-			want: PlanCommunity,
-		},
-		{
-			name:    "self-hosted valid license grants licensed plan",
-			db:      &fakeDB{},
-			mode:    modeSelfHosted,
-			license: PlanEnterprise,
-			want:    PlanEnterprise,
-		},
-		{
-			name:    "self-hosted license with unknown plan resolves to community",
-			db:      &fakeDB{},
-			mode:    modeSelfHosted,
-			license: "ultimate",
-			want:    PlanCommunity,
-		},
-		{
-			name:    "invalid license ignores subscription-less workspace",
-			db:      &fakeDB{subErr: errors.New("no rows")},
-			mode:    modeSelfHosted,
-			license: "",
-			want:    PlanCommunity,
-		},
-		{
-			name:    "subscription wins over invalid license",
-			db:      &fakeDB{plan: PlanPro, status: StatusActive},
-			mode:    modeSelfHosted,
-			license: "",
-			want:    PlanPro,
+			// An abandoned checkout leaves a row that never ended.
+			"never paid gets no hold",
+			&db.WorkspaceSubscription{Plan: PlanPro, Status: "incomplete_expired"},
+			nil, PlanCommunity, PlanCommunity,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sut := NewService(tt.db, licensed(tt.license), tt.mode)
-			got := sut.Resolve(t.Context(), "ws1")
-			if got.Name != tt.want {
-				t.Errorf("Resolve() = %q, want %q", got.Name, tt.want)
-			}
+			plan, keep, err := fromSubscription(tt.sub, tt.err)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantPlan, plan.Name)
+			assert.Equal(t, tt.wantKeep, keep.Name)
 		})
 	}
 }
 
-func TestResolve_FailClosedOnDBError(t *testing.T) {
-	// A billing outage must never hand out paid features (§5.2).
-	sut := NewService(
-		&fakeDB{subErr: errors.New("connection refused")},
-		nil,
-		modeSaaS,
-	)
-	got := sut.Resolve(t.Context(), "ws1")
-	if got.Has(FeatureSCIM) || got.Has(FeatureAuditExport) || got.Has(FeatureEnforceSSO) {
-		t.Error("DB error granted paid features")
+func TestFromSubscription_PaidQuantityIsTheSeatCap(t *testing.T) {
+	plan, _, err := fromSubscription(&db.WorkspaceSubscription{Plan: PlanPro, Status: "active", Seats: 7}, nil)
+	require.NoError(t, err)
+	assert.EqualValues(t, 7, plan.SeatCap)
+}
+
+func TestFromSubscription_FailsClosed(t *testing.T) {
+	// The row GetSubscription hands back next to an error is not to be trusted.
+	paid := &db.WorkspaceSubscription{Plan: PlanEnterprise, Status: "active"}
+	plan, keep, err := fromSubscription(paid, errors.New("connection refused"))
+
+	require.Error(t, err, "the purge jobs skip on this error, an outage must never delete data")
+	assert.Equal(t, PlanCommunity, plan.Name, "an outage must never hand out paid features")
+	assert.Equal(t, PlanCommunity, keep.Name)
+	assert.False(t, plan.Has(FeatureSCIM) || plan.Has(FeatureAuditExport) || plan.Has(FeatureEnforceSSO))
+}
+
+func TestActive(t *testing.T) {
+	for _, status := range []string{"active", "trialing", "past_due"} {
+		assert.True(t, Active(status), status)
 	}
-	if got.Name != PlanCommunity {
-		t.Errorf("DB error resolved to %q, want community", got.Name)
+	for _, status := range []string{
+		"canceled", "unpaid", "paused", "incomplete", "incomplete_expired", "inactive", "bogus", "",
+	} {
+		assert.False(t, Active(status), "%q must not pay for a plan", status)
 	}
 }
 
-func TestRetentionDays_ErrorsOnDBError(t *testing.T) {
-	// The purge jobs skip on error, a billing outage must never delete data.
-	broken := NewService(&fakeDB{subErr: errors.New("connection refused")}, nil, modeSaaS)
-	if _, err := broken.RetentionDays(t.Context(), "ws1"); err == nil {
-		t.Error("DB error returned a retention window instead of an error")
+func TestFromLicense(t *testing.T) {
+	tests := []struct {
+		name     string
+		claims   *license.Claims
+		wantPlan string
+		wantKeep string
+	}{
+		{"no key", nil, PlanCommunity, PlanCommunity},
+		{"a key that never expires", &license.Claims{Plan: PlanEnterprise}, PlanEnterprise, PlanEnterprise},
+		{
+			"a valid key",
+			&license.Claims{Plan: PlanEnterprise, ExpiresAt: time.Now().Add(time.Hour).Unix()},
+			PlanEnterprise, PlanEnterprise,
+		},
+		{"an unknown plan", &license.Claims{Plan: "ultimate"}, PlanCommunity, PlanCommunity},
+		{
+			"expired yesterday holds its data limits",
+			&license.Claims{Plan: PlanEnterprise, ExpiresAt: daysAgo(1).Unix()},
+			PlanCommunity, PlanEnterprise,
+		},
+		{
+			"the hold ends after 30 days",
+			&license.Claims{Plan: PlanEnterprise, ExpiresAt: daysAgo(holdDays + 1).Unix()},
+			PlanCommunity, PlanCommunity,
+		},
 	}
 
-	free := NewService(&fakeDB{subErr: pgx.ErrNoRows}, nil, modeSaaS)
-	days, err := free.RetentionDays(t.Context(), "ws1")
-	if err != nil || days != 7 {
-		t.Errorf("no subscription row = %d, %v, want 7 days and no error", days, err)
-	}
-}
-
-func TestResolve_SelfHostedLicensedPlanUnlimited(t *testing.T) {
-	// The caps protect SaaS infrastructure only. An enterprise key must not hit the ResourceCap zero of the catalog.
-	sut := NewService(
-		&fakeDB{},
-		licensed(PlanEnterprise),
-		modeSelfHosted,
-	)
-	got := sut.Resolve(t.Context(), "ws1")
-
-	if got.Name != PlanEnterprise {
-		t.Errorf("Resolve() = %q, want enterprise", got.Name)
-	}
-	if got.ResourceCap != unlimited {
-		t.Errorf("self-hosted licensed ResourceCap = %d, want unlimited", got.ResourceCap)
-	}
-	if got.RecordingStorageBytes != unlimited {
-		t.Errorf("self-hosted licensed storage cap = %d, want unlimited", got.RecordingStorageBytes)
-	}
-	if err := sut.CheckResources(t.Context(), "ws1"); err != nil {
-		t.Errorf("CheckResources() = %v, want nil", err)
-	}
-}
-
-func TestResolve_SelfHostedRecordingStorageUnlimited(t *testing.T) {
-	// The recording storage cap protects SaaS only, on self-hosted the disk is the customer's own.
-	sut := NewService(
-		&fakeDB{plan: PlanEnterprise, status: StatusActive},
-		nil,
-		modeSelfHosted,
-	)
-	// Even with no subscription and no license: unlimited, not 10 MiB.
-	bare := NewService(&fakeDB{}, nil, modeSelfHosted)
-
-	if got, _ := sut.RecordingStorageBytes(t.Context(), "ws1"); got != unlimited {
-		t.Errorf("self-hosted pro storage cap = %d, want unlimited", got)
-	}
-	if got, _ := bare.RecordingStorageBytes(t.Context(), "ws1"); got != unlimited {
-		t.Errorf("self-hosted community storage cap = %d, want unlimited", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plan, keep := fromLicense(tt.claims)
+			assert.Equal(t, tt.wantPlan, plan.Name)
+			assert.Equal(t, tt.wantKeep, keep.Name)
+		})
 	}
 }
 
-func TestResolve_RequestCache(t *testing.T) {
-	db := &fakeDB{plan: PlanPro, status: StatusActive}
-	sut := NewService(db, nil, modeSaaS)
+func TestSelfHosted_ExpiredLicenseKeepsItsDataLimits(t *testing.T) {
+	ctx := t.Context()
+	sut := selfHosted(t, issue(t, PlanEnterprise, -24*time.Hour))
 
-	ctx := withRequestCache(t.Context())
-	first := sut.Resolve(ctx, "ws1")
-	db.plan = PlanCommunity // mutate behind the cache
-	second := sut.Resolve(ctx, "ws1")
+	assert.Equal(t, PlanCommunity, sut.Resolve(ctx, "ws1").Name, "licensed features end with the key")
+	days, err := sut.RetentionDays(ctx, "ws1")
+	require.NoError(t, err)
+	assert.EqualValues(t, 365, days, "an expired license must not purge data right away")
+}
 
-	if first.Name != PlanPro || second.Name != PlanPro {
-		t.Errorf("cache miss: first = %q, second = %q, want both pro", first.Name, second.Name)
-	}
+// The caps protect SaaS infrastructure only, on self-hosted the disk and the hosts are the customer's own.
+func TestSelfHosted_IsNeverCapped(t *testing.T) {
+	ctx := t.Context()
+	for name, sut := range map[string]*Service{
+		"community": selfHosted(t),
+		"licensed":  selfHosted(t, issue(t, PlanEnterprise, time.Hour)),
+	} {
+		plan := sut.Resolve(ctx, "ws1")
+		assert.Equal(t, unlimited, plan.ResourceCap, name)
+		assert.Equal(t, unlimited, plan.RecordingStorageBytes, name)
+		require.NoError(t, sut.CheckResources(ctx, "ws1"), name)
 
-	// A fresh context must see the mutation.
-	fresh := sut.Resolve(t.Context(), "ws1")
-	if fresh.Name != PlanCommunity {
-		t.Errorf("fresh resolve = %q, want community", fresh.Name)
+		capBytes, err := sut.RecordingStorageBytes(ctx, "ws1")
+		require.NoError(t, err)
+		assert.Equal(t, unlimited, capBytes, "%s: the purge jobs must see no storage cap either", name)
 	}
 }
 
 func TestCanInvite(t *testing.T) {
-	tests := []struct {
-		name    string
-		db      *fakeDB
-		members int64
-		wantErr bool
-	}{
-		{
-			name:    "under cap allows invite",
-			db:      &fakeDB{},
-			members: 4,
-		},
-		{
-			name:    "at cap denies invite",
-			db:      &fakeDB{},
-			members: 5,
-			wantErr: true,
-		},
-		{
-			name:    "unlimited plan always allows",
-			db:      &fakeDB{plan: PlanPro, status: StatusActive},
-			members: 5000,
-		},
-	}
+	ctx := t.Context()
+	community := selfHosted(t)
+	require.NoError(t, community.CanInvite(ctx, "ws1", 4))
+	require.ErrorContains(t, community.CanInvite(ctx, "ws1", 5), "your plan includes 5 members")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sut := NewService(tt.db, nil, modeSaaS)
-			err := sut.CanInvite(t.Context(), "ws1", tt.members)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("CanInvite() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestStatus_GrantsAccess(t *testing.T) {
-	tests := []struct {
-		status Status
-		want   bool
-	}{
-		{StatusActive, true},
-		{StatusTrialing, true},
-		{StatusPastDue, true},
-		{StatusInactive, false},
-		{Status("bogus"), false}, // unknown statuses fail closed
-		{Status(""), false},
-	}
-
-	for _, tt := range tests {
-		t.Run(string(tt.status), func(t *testing.T) {
-			if got := tt.status.grantsAccess(); got != tt.want {
-				t.Errorf("grantsAccess(%q) = %v, want %v", tt.status, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestActiveStatuses(t *testing.T) {
-	want := []string{"active", "trialing", "past_due"}
-	if len(ActiveStatuses) != len(want) {
-		t.Fatalf("ActiveStatuses = %v, want %v", ActiveStatuses, want)
-	}
-	for i, w := range want {
-		if ActiveStatuses[i] != w {
-			t.Errorf("ActiveStatuses[%d] = %q, want %q", i, ActiveStatuses[i], w)
-		}
-	}
+	licensed := selfHosted(t, issue(t, PlanEnterprise, time.Hour))
+	assert.NoError(t, licensed.CanInvite(ctx, "ws1", 5000), "a licensed server counts no seats")
 }

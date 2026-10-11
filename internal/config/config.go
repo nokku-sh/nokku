@@ -35,6 +35,9 @@ import (
 	"github.com/nokku-sh/nokku/internal/webpki"
 )
 
+// licensePublicKey verifies license keys. Release builds set it with -X, a build without it takes no key.
+var licensePublicKey string
+
 // BaseURL is NOKKU_BASE_URL, a host name with an optional port. There is no scheme, see FullURL.
 type BaseURL string
 
@@ -152,11 +155,9 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	if cfg.SaaS {
-		cfg.Entitlements = entitlement.NewService(cfg.Conn, nil, cfg.SaaS)
-	} else {
-		cfg.Entitlements = entitlement.NewService(cfg.Conn, entitlement.EnvLicense(), cfg.SaaS)
-		cfg.Entitlements.WatchLicense(ctx)
+	cfg.Entitlements, err = entitlement.New(ctx, cfg.Conn, licensePublicKey, cfg.SaaS)
+	if err != nil {
+		return nil, err
 	}
 
 	// An expired license still starts, refusing here would turn a late renewal into an outage.

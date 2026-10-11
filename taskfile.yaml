@@ -17,7 +17,7 @@ tasks:
     env:
       NOKKU_UI_DEV: "{{.UI_DEV}}"
     cmds:
-      - go run {{ if .NOKKU_LICENSE_PUBLIC_KEY }}-ldflags="-X github.com/mizuchilabs/kata/licx.pubkey={{ .NOKKU_LICENSE_PUBLIC_KEY }}"{{ end }} ./cmd/nokku
+      - go run {{ if .NOKKU_LICENSE_PUBLIC_KEY }}-ldflags="-X github.com/nokku-sh/nokku/internal/config.licensePublicKey={{ .NOKKU_LICENSE_PUBLIC_KEY }}"{{ end }} ./cmd/nokku
 
   frontend:
     desc: Run frontend
@@ -48,7 +48,7 @@ tasks:
     desc: Build binary
     deps: [build:ui]
     cmds:
-      - go build -ldflags="-s -w{{ if .NOKKU_LICENSE_PUBLIC_KEY }} -X github.com/mizuchilabs/kata/licx.pubkey={{ .NOKKU_LICENSE_PUBLIC_KEY }}{{ end }}" -trimpath -o bin/nokku ./cmd/nokku
+      - go build -ldflags="-s -w{{ if .NOKKU_LICENSE_PUBLIC_KEY }} -X github.com/nokku-sh/nokku/internal/config.licensePublicKey={{ .NOKKU_LICENSE_PUBLIC_KEY }}{{ end }}" -trimpath -o bin/nokku ./cmd/nokku
 
   build:ui:
     desc: Build frontends

@@ -22,6 +22,7 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jackc/tern/v2 v2.4.3
+	github.com/mizuchilabs/inkan/license v0.1.0
 	github.com/mizuchilabs/kata v0.1.15
 	github.com/moby/moby/api v1.56.1
 	github.com/nokku-sh/protos v0.2.10

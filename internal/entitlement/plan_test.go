@@ -108,12 +108,14 @@ func TestResolvePlan_LegacyAndUnknown(t *testing.T) {
 	}
 }
 
-func TestResolvePlan_ReturnsCopies(t *testing.T) {
-	plan := resolvePlan(PlanCommunity)
-	plan.Features["hacked"] = true
-
-	again := resolvePlan(PlanCommunity)
-	if again.Has("hacked") {
-		t.Error("catalog features corrupted by resolved plan mutation")
+// A plan that was never resolved has nothing, not even what Community has.
+func TestZeroPlanHasNoFeature(t *testing.T) {
+	for _, feature := range CatalogFeatures {
+		if (Plan{}).Has(feature.Code) {
+			t.Errorf("a zero Plan has %q", feature.Code)
+		}
+	}
+	if resolvePlan(PlanEnterprise).Has("no_such_feature") {
+		t.Error("Enterprise has a feature that is not in the catalog")
 	}
 }

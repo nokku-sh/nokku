@@ -265,6 +265,8 @@ github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyua
 github.com/mitchellh/mapstructure v1.5.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/mitchellh/reflectwalk v1.0.2 h1:G2LzWKi524PWgd3mLHV8Y5k7s6XUvT0Gef6zxSIeXaQ=
 github.com/mitchellh/reflectwalk v1.0.2/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx0jmZXqmk4esnw=
+github.com/mizuchilabs/inkan/license v0.1.0 h1:rMft18RwV0BC4Zgi+ku5WjhVYyuvTT5GUdJ/YWXvhaU=
+github.com/mizuchilabs/inkan/license v0.1.0/go.mod h1:2kuxX41PqVb0fOLO/Y0Zqwt52MhKglDvmj7rwtgH1fU=
 github.com/mizuchilabs/kata v0.1.15 h1:elUyxJghTH+Ig25IEbHwSNMm3F4bHJPQOau+2vgs9WM=
 github.com/mizuchilabs/kata v0.1.15/go.mod h1:s24K0qob5pRZAE57lWKnInhl2qGScuWmAOrLh9Zd4Oo=
 github.com/moby/docker-image-spec v1.3.1 h1:jMKff3w6PgbfSa69GfNg+zN/XLhfXJGnEx3Nl2EsFP0=

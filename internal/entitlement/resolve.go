@@ -4,134 +4,108 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/mizuchilabs/kata/licx"
+	"github.com/mizuchilabs/inkan/license"
 
 	"github.com/nokku-sh/nokku/internal/db"
 )
-
-var ErrNoSubscription = pgx.ErrNoRows
-
-type Status string
-
-const (
-	StatusActive   Status = "active"
-	StatusTrialing Status = "trialing"
-	StatusPastDue  Status = "past_due"
-	StatusInactive Status = "inactive"
-)
-
-var ActiveStatuses = []string{
-	string(StatusActive),
-	string(StatusTrialing),
-	string(StatusPastDue),
-}
-
-// grantsAccess fails closed on unknown statuses. past_due is a grace period.
-func (s Status) grantsAccess() bool {
-	switch s {
-	case StatusActive, StatusTrialing, StatusPastDue:
-		return true
-	case StatusInactive:
-		return false
-	}
-	return false
-}
 
 // holdDays keeps the data limits of an ended plan in force, so a lapsed card never deletes data right away.
 const holdDays = 30
 
 type Service struct {
-	conn txRunner
+	conn *db.Connection
 	// saas only changes where the plan comes from.
-	saas    bool
-	license atomic.Pointer[licx.Claims] // self-hosted only, may be expired
+	saas bool
+	// publicKey verifies license keys. A build without one takes no key.
+	publicKey string
+	license   *license.Keeper // self-hosted only, the held key may be expired
 }
 
-type txRunner interface {
-	SysTx(ctx context.Context, fn func(*db.Queries) error) error
-}
-
-// NewService takes the license from the environment. With saas the plan comes from the subscription instead.
-func NewService(conn txRunner, license *licx.Claims, saas bool) *Service {
-	s := &Service{conn: conn, saas: saas}
-	s.license.Store(license)
-	return s
-}
-
-// Resolve is cached per request and never returns a zero Plan. License, then subscription, then Community.
-func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
-	if cache := cacheFromContext(ctx); cache != nil {
-		if plan, ok := cache.plans[workspaceID]; ok {
-			return plan
-		}
+// New loads the license of a self-hosted server. With saas the plan comes from the subscription instead.
+func New(ctx context.Context, conn *db.Connection, publicKey string, saas bool) (*Service, error) {
+	s := newService(conn, publicKey, saas)
+	if saas {
+		return s, nil
 	}
+	return s, s.loadLicense(ctx)
+}
 
+func newService(conn *db.Connection, publicKey string, saas bool) *Service {
+	return &Service{
+		conn:      conn,
+		saas:      saas,
+		publicKey: publicKey,
+		license:   license.NewKeeper(licenseApp, publicKey, ""),
+	}
+}
+
+// Resolve never returns a zero Plan. A lookup that fails gives Community, so a billing outage never grants paid features.
+func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
 	plan, _, err := s.lookup(ctx, workspaceID)
 	if err != nil {
-		// Fail closed so a billing outage never grants paid features.
 		slog.Warn("entitlement subscription lookup failed", "error", err, "workspace_id", workspaceID)
-	}
-
-	if cache := cacheFromContext(ctx); cache != nil {
-		cache.plans[workspaceID] = plan
 	}
 	return plan
 }
 
 // lookup returns the plan in force and the one whose data limits the purge jobs honor. They differ during the hold.
 func (s *Service) lookup(ctx context.Context, workspaceID string) (plan, keep Plan, err error) {
-	name, held := PlanCommunity, ""
-	var seats int64
-
-	license := s.license.Load()
 	if s.saas {
-		license = nil
+		sub, subErr := s.conn.Sys().GetSubscription(ctx, workspaceID)
+		return fromSubscription(sub, subErr)
 	}
-	if license != nil && !license.IsExpired() {
-		name = license.Plan
-	} else {
-		if license != nil && inHold(time.Unix(license.ExpiresAt, 0)) {
-			held = license.Plan
-		}
-		var sub *db.WorkspaceSubscription
-		subErr := s.conn.SysTx(ctx, func(q *db.Queries) (err error) {
-			sub, err = q.GetSubscription(ctx, workspaceID)
-			return err
-		})
-		switch {
-		case errors.Is(subErr, ErrNoSubscription):
-		case subErr != nil:
-			err = subErr
-		case Status(sub.Status).grantsAccess():
-			name, seats = sub.Plan, sub.Seats
-		case held == "" && sub.EndedAt != nil && inHold(*sub.EndedAt):
-			held = sub.Plan
-		}
-	}
-
-	plan = s.plan(name)
-	if seats > 0 {
-		plan.SeatCap = seats
-	}
-	keep = plan
-	if held != "" {
-		keep = s.plan(held)
-	}
-	return plan, keep, err
+	plan, keep = fromLicense(s.License())
+	// These caps protect SaaS infrastructure only, licensed plans included.
+	plan.RecordingStorageBytes, plan.ResourceCap = unlimited, unlimited
+	keep.RecordingStorageBytes, keep.ResourceCap = unlimited, unlimited
+	return plan, keep, nil
 }
 
-func (s *Service) plan(name string) Plan {
-	plan := resolvePlan(name)
-	if !s.saas {
-		// These caps protect SaaS infrastructure only, licensed plans included.
-		plan.RecordingStorageBytes = unlimited
-		plan.ResourceCap = unlimited
+// fromSubscription takes what GetSubscription answered. A row that cannot be read is Community next to the error.
+func fromSubscription(sub *db.WorkspaceSubscription, err error) (plan, keep Plan, _ error) {
+	free := resolvePlan(PlanCommunity)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return free, free, nil
+	case err != nil:
+		return free, free, err
+	case Active(sub.Status):
+		plan = resolvePlan(sub.Plan)
+		if sub.Seats > 0 {
+			plan.SeatCap = sub.Seats
+		}
+		return plan, plan, nil
+	case sub.EndedAt != nil && inHold(*sub.EndedAt):
+		return free, resolvePlan(sub.Plan), nil
 	}
-	return plan
+	return free, free, nil
+}
+
+// fromLicense takes the held key, nil without one.
+func fromLicense(c *license.Claims) (plan, keep Plan) {
+	free := resolvePlan(PlanCommunity)
+	switch {
+	case c == nil:
+		return free, free
+	case !c.IsExpired():
+		plan = resolvePlan(c.Plan)
+		return plan, plan
+	case inHold(time.Unix(c.ExpiresAt, 0)):
+		return free, resolvePlan(c.Plan)
+	}
+	return free, free
+}
+
+// Active reports whether a subscription in this Stripe status pays for its plan. past_due is a grace period, an unknown status fails closed.
+func Active(status string) bool {
+	switch status {
+	case "active", "trialing", "past_due":
+		return true
+	}
+	return false
 }
 
 func inHold(endedAt time.Time) bool {
@@ -151,21 +125,4 @@ func (s *Service) RetentionDays(ctx context.Context, workspaceID string) (int64,
 func (s *Service) RecordingStorageBytes(ctx context.Context, workspaceID string) (int64, error) {
 	_, keep, err := s.lookup(ctx, workspaceID)
 	return keep.RecordingStorageBytes, err
-}
-
-type requestCache struct {
-	plans map[string]Plan
-}
-
-type requestCacheKey struct{}
-
-func withRequestCache(ctx context.Context) context.Context {
-	return context.WithValue(ctx, requestCacheKey{}, &requestCache{
-		plans: make(map[string]Plan),
-	})
-}
-
-func cacheFromContext(ctx context.Context) *requestCache {
-	cache, _ := ctx.Value(requestCacheKey{}).(*requestCache)
-	return cache
 }

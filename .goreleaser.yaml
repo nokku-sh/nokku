@@ -14,7 +14,7 @@ builds:
       - -X github.com/mizuchilabs/kata/buildinfo.Version={{ .Version }}
       - -X github.com/mizuchilabs/kata/buildinfo.Commit={{ .Commit }}
       - -X github.com/mizuchilabs/kata/buildinfo.Date={{ .CommitDate }}
-      - -X github.com/mizuchilabs/kata/licx.pubkey={{ .Env.NOKKU_LICENSE_PUBLIC_KEY }}
+      - -X github.com/nokku-sh/nokku/internal/config.licensePublicKey={{ .Env.NOKKU_LICENSE_PUBLIC_KEY }}
     goos:
       - linux
     goarch:
