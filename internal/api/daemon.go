@@ -77,13 +77,9 @@ func (s *daemonService) ListDaemons(
 	ctx context.Context,
 	req *nokkuv1.ListDaemonsRequest,
 ) (*nokkuv1.ListDaemonsResponse, error) {
-	var status *int32
-	if req.GetStatus() != 0 {
-		status = new(int32(req.GetStatus()))
-	}
 	result, err := s.cfg.Conn.Tenant().ListDaemons(ctx, &db.ListDaemonsParams{
 		Query:     req.Query,
-		Status:    status,
+		Status:    req.GetStatus(),
 		Online:    req.Online,
 		SeenAfter: time.Now().Add(-db.DaemonOnlineWindow),
 		Limit:     req.Limit,

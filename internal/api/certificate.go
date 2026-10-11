@@ -112,7 +112,7 @@ func (s *certificateService) ListCertificateAuthorities(
 	ctx context.Context,
 	_ *nokkuv1.ListCertificateAuthoritiesRequest,
 ) (*nokkuv1.ListCertificateAuthoritiesResponse, error) {
-	result, err := s.cfg.Conn.Tenant().ListCAs(ctx, &db.ListCAsParams{})
+	result, err := s.cfg.Conn.Tenant().ListCAs(ctx)
 	if err != nil {
 		return nil, err
 	}

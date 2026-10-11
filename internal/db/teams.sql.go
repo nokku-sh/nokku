@@ -210,7 +210,10 @@ WHERE
     OR te.name ILIKE '%' || $1 || '%'
     OR COALESCE(te.description, '') ILIKE '%' || $1 || '%'
   )
-  AND te.tags @> COALESCE($2, '{}'::TEXT[])
+  AND (
+    $2::TEXT[] IS NULL
+    OR te.tags @> $2::TEXT[]
+  )
 ORDER BY
   te.id ASC
 LIMIT

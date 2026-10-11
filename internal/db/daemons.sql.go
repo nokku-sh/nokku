@@ -359,8 +359,8 @@ WHERE
     OR d.name ILIKE '%' || $1 || '%'
   )
   AND (
-    $2::INTEGER IS NULL
-    OR d.status = $2::INTEGER
+    d.status = $2
+    OR $2 = 0 -- every status
   )
   AND (
     $3::BOOLEAN IS NULL
@@ -375,12 +375,12 @@ OFFSET
 `
 
 type ListDaemonsParams struct {
-	Query     *string   `json:"query"`
-	Status    *int32    `json:"status"`
-	Online    *bool     `json:"online"`
-	SeenAfter time.Time `json:"seenAfter"`
-	Offset    *int32    `json:"offset"`
-	Limit     *int32    `json:"limit"`
+	Query     *string            `json:"query"`
+	Status    nokku.DaemonStatus `json:"status"`
+	Online    *bool              `json:"online"`
+	SeenAfter time.Time          `json:"seenAfter"`
+	Offset    *int32             `json:"offset"`
+	Limit     *int32             `json:"limit"`
 }
 
 type ListDaemonsRow struct {

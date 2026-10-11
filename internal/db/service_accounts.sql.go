@@ -93,7 +93,10 @@ WHERE
     OR sa.name ILIKE '%' || $1 || '%'
     OR COALESCE(sa.description, '') ILIKE '%' || $1 || '%'
   )
-  AND sa.tags @> COALESCE($2, '{}'::TEXT[])
+  AND (
+    $2::TEXT[] IS NULL
+    OR sa.tags @> $2::TEXT[]
+  )
   AND (
     sa.role = $3
     OR $3 = 0 -- every role

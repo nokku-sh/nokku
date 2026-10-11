@@ -97,44 +97,8 @@ SELECT
   *
 FROM
   ssh_cas
-WHERE
-  (
-    sqlc.narg('name_query')::text IS NULL
-    OR name ILIKE '%' || sqlc.narg('name_query') || '%'
-  )
-  AND (
-    sqlc.narg('is_active')::boolean IS NULL
-    OR is_active = sqlc.narg('is_active')
-  )
-  AND (
-    sqlc.narg('is_default')::boolean IS NULL
-    OR is_default = sqlc.narg('is_default')
-  )
-  AND (
-    sqlc.narg('key_type')::integer IS NULL
-    OR key_type = sqlc.narg('key_type')
-  )
-  AND (
-    sqlc.narg('status_filter')::text IS NULL
-    OR (
-      sqlc.narg('status_filter') = 'valid'
-      AND NOW() BETWEEN not_before AND not_after
-    )
-    OR (
-      sqlc.narg('status_filter') = 'expired'
-      AND NOW() > not_after
-    )
-    OR (
-      sqlc.narg('status_filter') = 'future'
-      AND NOW() < not_before
-    )
-  )
 ORDER BY
-  id ASC
-LIMIT
-  sqlc.narg('limit')
-OFFSET
-  sqlc.narg('offset');
+  id ASC;
 
 -- name: UpdateCA :one
 UPDATE ssh_cas

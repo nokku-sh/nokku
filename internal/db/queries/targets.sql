@@ -64,7 +64,7 @@ WHERE
   )
   AND (
     sqlc.narg('tags')::TEXT[] IS NULL
-    OR t.tags @> COALESCE(sqlc.narg('tags'), '{}'::TEXT[])
+    OR t.tags @> sqlc.narg('tags')::TEXT[]
   )
 ORDER BY
   t.id ASC

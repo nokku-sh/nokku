@@ -73,7 +73,7 @@ func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
 			return err
 		}
 		assert.Equal(t, "Lab", row.Name)
-		rows, err := q.ListCAs(t.Context(), &db.ListCAsParams{})
+		rows, err := q.ListCAs(t.Context())
 		if err != nil {
 			return err
 		}

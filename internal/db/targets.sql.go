@@ -295,7 +295,7 @@ WHERE
   )
   AND (
     $5::TEXT[] IS NULL
-    OR t.tags @> COALESCE($5, '{}'::TEXT[])
+    OR t.tags @> $5::TEXT[]
   )
 ORDER BY
   t.id ASC
