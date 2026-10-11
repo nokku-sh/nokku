@@ -130,46 +130,34 @@ func (q *Queries) GetTarget(ctx context.Context, targetID string) (*Target, erro
 }
 
 const getTargetsBySubject = `-- name: GetTargetsBySubject :many
-SELECT DISTINCT
+SELECT
   t.id, t.workspace_id, t.ca_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.created_at, t.updated_at
 FROM
   targets t
 WHERE
   t.daemon_id = $1::UUID
-  OR EXISTS (
+  OR t.id IN (
     SELECT
-      1
+      p.target_id
     FROM
-      target_accounts p
+      grants g
+      JOIN target_accounts p ON p.id = g.account_id
     WHERE
-      p.target_id = t.id
-      AND EXISTS (
-        SELECT
-          1
-        FROM
-          grants g
-        WHERE
-          g.account_id = p.id
-          AND (
-            -- Subject UUIDs are unique across kinds.
-            g.subject_id = $1::UUID
-            OR (
-              g.subject_kind = 'team'
-              AND g.subject_id IN (
-                SELECT
-                  tm.team_id
-                FROM
-                  team_members tm
-                WHERE
-                  tm.user_id = $1::UUID
-              )
-            )
-          )
+      -- One array of ids, an OR over the teams would keep the lookup off the subject index.
+      g.subject_id = ANY (
+        ARRAY[$1::UUID] || ARRAY(
+          SELECT
+            tm.team_id
+          FROM
+            team_members tm
+          WHERE
+            tm.user_id = $1::UUID
+        )
       )
   )
 `
 
-// For a user, grants to their teams count too.
+// For a user, grants to their teams count too. Subject UUIDs are unique across kinds.
 func (q *Queries) GetTargetsBySubject(ctx context.Context, subjectID string) ([]*Target, error) {
 	rows, err := q.db.Query(ctx, getTargetsBySubject, subjectID)
 	if err != nil {

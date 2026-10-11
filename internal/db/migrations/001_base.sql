@@ -216,7 +216,11 @@ CREATE TABLE IF NOT EXISTS daemons (
   UNIQUE (workspace_id, id),
   -- The DPoP key is the machine's identity. Re-enrolling reuses the row.
   UNIQUE (workspace_id, key_thumbprint)
-);
+)
+-- Every connected daemon is stamped every ten seconds. Half-empty pages let the new row version stay on its page,
+-- so the stamp never touches an index.
+WITH
+  (fillfactor = 50);
 
 CREATE TABLE IF NOT EXISTS teams (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -495,9 +499,13 @@ CREATE INDEX idx_grants_subject ON grants (subject_id);
 
 CREATE INDEX idx_grants_workspace_id ON grants (workspace_id);
 
-CREATE INDEX idx_recordings_workspace_started ON recordings (workspace_id, started_at DESC);
+-- Carries the size, so the storage total of a workspace is read from the index alone.
+CREATE INDEX idx_recordings_workspace_started ON recordings (workspace_id, started_at DESC) INCLUDE (size_bytes);
 
 CREATE INDEX idx_recordings_subject ON recordings (workspace_id, subject_id, started_at DESC);
+
+-- The list of one daemon's sessions, and the foreign key: without it a deleted daemon scans every recording.
+CREATE INDEX idx_recordings_daemon ON recordings (daemon_id, started_at DESC);
 
 -- Triggers -------------------------------------------------------------------
 
@@ -637,10 +645,23 @@ BEGIN
          FOR EACH ROW EXECUTE FUNCTION notify_change ()',
       t
     );
+    -- Every column but the stamps is named, so an update that only stamps never builds the two rows as JSON.
     EXECUTE format(
-      'CREATE TRIGGER notify_change_update AFTER UPDATE ON %I
+      'CREATE TRIGGER notify_change_update AFTER UPDATE OF %s ON %I
          FOR EACH ROW WHEN (without_stamps (to_jsonb(OLD)) IS DISTINCT FROM without_stamps (to_jsonb(NEW)))
          EXECUTE FUNCTION notify_change ()',
+      (
+        SELECT
+          string_agg(quote_ident(attname), ', ' ORDER BY attnum)
+        FROM
+          pg_attribute
+        WHERE
+          attrelid = t::REGCLASS
+          AND attnum > 0
+          AND NOT attisdropped
+          AND attgenerated = ''
+          AND attname NOT IN ('last_seen_at', 'last_used_at')
+      ),
       t
     );
   END LOOP;

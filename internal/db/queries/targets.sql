@@ -132,42 +132,30 @@ RETURNING
   *;
 
 -- name: GetTargetsBySubject :many
--- For a user, grants to their teams count too.
-SELECT DISTINCT
+-- For a user, grants to their teams count too. Subject UUIDs are unique across kinds.
+SELECT
   t.*
 FROM
   targets t
 WHERE
   t.daemon_id = sqlc.arg('subject_id')::UUID
-  OR EXISTS (
+  OR t.id IN (
     SELECT
-      1
+      p.target_id
     FROM
-      target_accounts p
+      grants g
+      JOIN target_accounts p ON p.id = g.account_id
     WHERE
-      p.target_id = t.id
-      AND EXISTS (
-        SELECT
-          1
-        FROM
-          grants g
-        WHERE
-          g.account_id = p.id
-          AND (
-            -- Subject UUIDs are unique across kinds.
-            g.subject_id = sqlc.arg('subject_id')::UUID
-            OR (
-              g.subject_kind = 'team'
-              AND g.subject_id IN (
-                SELECT
-                  tm.team_id
-                FROM
-                  team_members tm
-                WHERE
-                  tm.user_id = sqlc.arg('subject_id')::UUID
-              )
-            )
-          )
+      -- One array of ids, an OR over the teams would keep the lookup off the subject index.
+      g.subject_id = ANY (
+        ARRAY[sqlc.arg('subject_id')::UUID] || ARRAY(
+          SELECT
+            tm.team_id
+          FROM
+            team_members tm
+          WHERE
+            tm.user_id = sqlc.arg('subject_id')::UUID
+        )
       )
   );
 

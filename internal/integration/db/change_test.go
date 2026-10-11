@@ -66,6 +66,32 @@ func TestEveryTenantTableAnnouncesOrIsSilent(t *testing.T) {
 	}
 }
 
+// The update trigger names its columns, so a stamp costs nothing. A column it misses would change unheard.
+func TestUpdateTriggerNamesEveryColumn(t *testing.T) {
+	c := testConnection(t)
+	for _, table := range tenantTables(t, c) {
+		if slices.Contains(silentTables, table) {
+			continue
+		}
+		var missing string
+		err := c.sysPool.QueryRow(t.Context(), `
+			SELECT COALESCE(string_agg(a.attname, ', '), '')
+			FROM pg_attribute a
+			JOIN pg_trigger tg ON tg.tgrelid = a.attrelid AND tg.tgname = 'notify_change_update'
+			WHERE a.attrelid = ('public.' || $1)::regclass
+				AND a.attnum > 0 AND NOT a.attisdropped AND a.attgenerated = ''
+				AND a.attname NOT IN ('last_seen_at', 'last_used_at')
+				AND a.attnum <> ALL (tg.tgattr::int2[])`,
+			table).Scan(&missing)
+		if err != nil {
+			t.Fatalf("%s: %v", table, err)
+		}
+		if missing != "" {
+			t.Errorf("%s: notify_change_update does not name %s, recreate the trigger", table, missing)
+		}
+	}
+}
+
 func TestChangesAreAnnounced(t *testing.T) {
 	c := testConnection(t)
 	conn := listenChanges(t, c)

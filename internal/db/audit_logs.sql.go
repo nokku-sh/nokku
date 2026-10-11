@@ -115,81 +115,95 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams)
 }
 
 const listAuditLogs = `-- name: ListAuditLogs :many
-SELECT
-  id, timestamp, workspace_id, actor_id, actor_kind, actor_name, action, target, ok, ip, user_agent, details,
-  COUNT(*) OVER ()::INTEGER AS total
-FROM
-  audit.audit_logs
-WHERE
-  (
-    $1::TEXT[] IS NULL
-    OR actor_id = ANY ($1::TEXT[])
-  )
-  AND (
-    $2::TEXT[] IS NULL
-    OR actor_kind = ANY ($2::TEXT[])
-  )
-  -- Actions match exactly, a trailing * matches by prefix, e.g. "Delete*".
-  AND (
-    $3::TEXT[] IS NULL
-    OR action = ANY ($3::TEXT[])
-    OR EXISTS (
-      SELECT
-        1
-      FROM
-        unnest($3::TEXT[]) AS a (v)
-      WHERE
-        a.v LIKE '%*'
-        AND action LIKE rtrim(a.v, '*') || '%'
-    )
-  )
-  AND (
-    $4::TEXT IS NULL
-    OR target = $4
-  )
-  -- Failed is every failed call, denied only those an auth or permission check stopped.
-  AND (
-    $5::TEXT IS NULL
-    OR (
-      $5 = 'succeeded'
-      AND ok
-    )
-    OR (
-      $5 = 'denied'
-      AND NOT ok
-      AND (
-        action = 'LoginDenied'
-        OR details ->> 'code' IN ('permission_denied', 'unauthenticated')
+WITH
+  filtered AS NOT MATERIALIZED (
+    SELECT
+      id, timestamp, workspace_id, actor_id, actor_kind, actor_name, action, target, ok, ip, user_agent, details
+    FROM
+      audit.audit_logs
+    WHERE
+      (
+        $3::TEXT[] IS NULL
+        OR actor_id = ANY ($3::TEXT[])
       )
-    )
-    OR (
-      $5 = 'failed'
-      AND NOT ok
-    )
+      AND (
+        $4::TEXT[] IS NULL
+        OR actor_kind = ANY ($4::TEXT[])
+      )
+      -- Actions match exactly, a trailing * matches by prefix, e.g. "Delete*".
+      AND (
+        $5::TEXT[] IS NULL
+        OR action = ANY ($5::TEXT[])
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            unnest($5::TEXT[]) AS a (v)
+          WHERE
+            a.v LIKE '%*'
+            AND action LIKE rtrim(a.v, '*') || '%'
+        )
+      )
+      AND (
+        $6::TEXT IS NULL
+        OR target = $6
+      )
+      -- Failed is every failed call, denied only those an auth or permission check stopped.
+      AND (
+        $7::TEXT IS NULL
+        OR (
+          $7 = 'succeeded'
+          AND ok
+        )
+        OR (
+          $7 = 'denied'
+          AND NOT ok
+          AND (
+            action = 'LoginDenied'
+            OR details ->> 'code' IN ('permission_denied', 'unauthenticated')
+          )
+        )
+        OR (
+          $7 = 'failed'
+          AND NOT ok
+        )
+      )
+      AND (
+        $8::TEXT IS NULL
+        OR action ILIKE '%' || $8 || '%'
+        OR actor_name ILIKE '%' || $8 || '%'
+        OR target ILIKE '%' || $8 || '%'
+      )
+      AND (
+        $9::timestamptz IS NULL
+        OR timestamp >= $9
+      )
+      AND (
+        $10::timestamptz IS NULL
+        OR timestamp < $10
+      )
   )
-  AND (
-    $6::TEXT IS NULL
-    OR action ILIKE '%' || $6 || '%'
-    OR actor_name ILIKE '%' || $6 || '%'
-    OR target ILIKE '%' || $6 || '%'
-  )
-  AND (
-    $7::timestamptz IS NULL
-    OR timestamp >= $7
-  )
-  AND (
-    $8::timestamptz IS NULL
-    OR timestamp < $8
-  )
+SELECT
+  f.id, f.timestamp, f.workspace_id, f.actor_id, f.actor_kind, f.actor_name, f.action, f.target, f.ok, f.ip, f.user_agent, f.details,
+  (
+    SELECT
+      COUNT(*)
+    FROM
+      filtered
+  )::INTEGER AS total
+FROM
+  filtered f
 ORDER BY
-  timestamp DESC
+  f.timestamp DESC
 LIMIT
-  $10
+  $2
 OFFSET
-  $9
+  $1
 `
 
 type ListAuditLogsParams struct {
+	Offset     int32      `json:"offset"`
+	Limit      int32      `json:"limit"`
 	ActorIds   []string   `json:"actorIds"`
 	ActorKinds []string   `json:"actorKinds"`
 	Actions    []string   `json:"actions"`
@@ -198,8 +212,6 @@ type ListAuditLogsParams struct {
 	Search     *string    `json:"search"`
 	StartDate  *time.Time `json:"startDate"`
 	EndDate    *time.Time `json:"endDate"`
-	Offset     int32      `json:"offset"`
-	Limit      int32      `json:"limit"`
 }
 
 type ListAuditLogsRow struct {
@@ -218,8 +230,11 @@ type ListAuditLogsRow struct {
 	Total       int32     `json:"total"`
 }
 
+// The total is counted on its own. A window count reads every matching row in full to return one page.
 func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) ([]*ListAuditLogsRow, error) {
 	rows, err := q.db.Query(ctx, listAuditLogs,
+		arg.Offset,
+		arg.Limit,
 		arg.ActorIds,
 		arg.ActorKinds,
 		arg.Actions,
@@ -228,8 +243,6 @@ func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) (
 		arg.Search,
 		arg.StartDate,
 		arg.EndDate,
-		arg.Offset,
-		arg.Limit,
 	)
 	if err != nil {
 		return nil, err

@@ -184,30 +184,52 @@ func (q *Queries) ListRecordingWorkspaceIDs(ctx context.Context) ([]string, erro
 }
 
 const listRecordings = `-- name: ListRecordings :many
+WITH
+  filtered AS NOT MATERIALIZED (
+    SELECT
+      f.id,
+      f.started_at
+    FROM
+      recordings f
+    WHERE
+      (
+        $1::UUID IS NULL
+        OR f.daemon_id = $1
+      )
+      AND (
+        $2::TEXT IS NULL
+        OR f.username = $2
+      )
+      AND (
+        $3::UUID IS NULL
+        OR f.subject_id = $3
+      )
+  ),
+  paginated AS (
+    SELECT
+      id
+    FROM
+      filtered
+    ORDER BY
+      started_at DESC
+    LIMIT
+      $5
+    OFFSET
+      $4
+  )
 SELECT
   r.id, r.workspace_id, r.daemon_id, r.daemon_name, r.username, r.subject_id, r.principal, r.key, r.started_at, r.ended_at, r.size_bytes, r.complete, r.created_at,
-  COUNT(*) OVER ()::INTEGER AS total_count
+  (
+    SELECT
+      COUNT(*)
+    FROM
+      filtered
+  )::INTEGER AS total_count
 FROM
   recordings r
-WHERE
-  (
-    $1::UUID IS NULL
-    OR r.daemon_id = $1
-  )
-  AND (
-    $2::TEXT IS NULL
-    OR r.username = $2
-  )
-  AND (
-    $3::UUID IS NULL
-    OR r.subject_id = $3
-  )
+  JOIN paginated pp ON pp.id = r.id
 ORDER BY
   r.started_at DESC
-LIMIT
-  $5
-OFFSET
-  $4
 `
 
 type ListRecordingsParams struct {
@@ -223,6 +245,7 @@ type ListRecordingsRow struct {
 	TotalCount int32     `json:"totalCount"`
 }
 
+// The total is counted on its own. A window count reads every matching row in full to return one page.
 func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams) ([]*ListRecordingsRow, error) {
 	rows, err := q.db.Query(ctx, listRecordings,
 		arg.DaemonID,
