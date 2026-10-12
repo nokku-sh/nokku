@@ -1,33 +1,31 @@
 package config
 
 import (
+	"net"
+	"net/http"
 	"testing"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nokku-sh/nokku/core/internal/webpki"
+	"github.com/nokku-sh/nokku/core/internal/realip"
 )
 
 // NOKKU_BASE_URL names the public host. The listen port is not part of it, the scheme is never configured.
 func TestFullURL(t *testing.T) {
 	tests := []struct {
-		name, baseURL string
-		tls           webpki.Mode
-		want          string
+		name, baseURL, want string
 	}{
-		{"unset is the local listener", "", webpki.ModeOff, "http://localhost:3000"},
-		{"a host is reached over https", "nokku.example.com", webpki.ModeOff, "https://nokku.example.com"},
-		{"another port", "nokku.example.com:8443", webpki.ModeOff, "https://nokku.example.com:8443"},
-		{"localhost stays plain", "localhost:5173", webpki.ModeOff, "http://localhost:5173"},
-		{"a name that starts like localhost", "localhost.example.com", webpki.ModeOff, "https://localhost.example.com"},
-		{"localhost with a certificate of its own", "", webpki.ModeInternal, "https://localhost:3000"},
-		{"a host with a certificate of its own", "nokku.lan:3000", webpki.ModeInternal, "https://nokku.lan:3000"},
+		{"unset is the local listener", "", "http://localhost:3000"},
+		{"a host is reached over https", "nokku.example.com", "https://nokku.example.com"},
+		{"another port", "nokku.example.com:8443", "https://nokku.example.com:8443"},
+		{"localhost stays plain", "localhost:5173", "http://localhost:5173"},
+		{"a name that starts like localhost", "localhost.example.com", "https://localhost.example.com"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Config{BaseURL: BaseURL(tt.baseURL), Port: "3000", TLSMode: tt.tls}
+			c := &Config{BaseURL: BaseURL(tt.baseURL), Port: "3000"}
 			assert.Equal(t, tt.want, c.FullURL())
 		})
 	}
@@ -86,29 +84,32 @@ func TestBaseURLIsCheckedOnParse(t *testing.T) {
 	assert.Equal(t, "https://nokku.example.com", ec.FullURL())
 }
 
-// task backend passes an empty NOKKU_UI_DEV, which has to mean the embedded UI.
-func TestDevServerIsOffUnlessNamed(t *testing.T) {
-	t.Setenv("NOKKU_BASE_URL", "")
-	t.Setenv("NOKKU_UI_DEV", "")
-	ec, err := env.ParseAs[EnvConfig]()
-	require.NoError(t, err)
-	assert.Empty(t, ec.UIDev.Host)
-
-	t.Setenv("NOKKU_UI_DEV", "http://localhost:5173")
-	ec, err = env.ParseAs[EnvConfig]()
-	require.NoError(t, err)
-	assert.Equal(t, "localhost:5173", ec.UIDev.Host)
-}
-
 func TestUnsetEnvironmentIsTheLocalListener(t *testing.T) {
 	t.Setenv("NOKKU_BASE_URL", "")
 	t.Setenv("NOKKU_PORT", "")
-	t.Setenv("NOKKU_TLS", "")
 	ec, err := env.ParseAs[EnvConfig]()
 	require.NoError(t, err)
 	assert.Equal(t, "http://localhost:3000", ec.FullURL())
+}
 
-	t.Setenv("NOKKU_TLS", "plain")
-	_, err = env.ParseAs[EnvConfig]()
-	require.ErrorContains(t, err, "it takes internal")
+// A proxy in a container network or on this machine works with nothing set. A public address never does.
+func TestProxiesTrustedByDefault(t *testing.T) {
+	t.Setenv("NOKKU_TRUSTED_PROXIES", "")
+	ec, err := env.ParseAs[EnvConfig]()
+	require.NoError(t, err)
+	require.NoError(t, realip.SetTrustedProxies(ec.TrustedProxies))
+	t.Cleanup(func() { _ = realip.SetTrustedProxies(nil) })
+
+	forwarded := http.Header{"X-Forwarded-Proto": {"https"}}
+	for _, peer := range []string{"127.0.0.1", "::1", "10.42.0.7", "172.28.0.3", "192.168.1.20", "fd00::3"} {
+		assert.Equal(t, "https", realip.Proto(forwarded, net.JoinHostPort(peer, "4242")), peer)
+	}
+	for _, peer := range []string{"203.0.113.7", "172.32.0.1", "2001:db8::1"} {
+		assert.Empty(t, realip.Proto(forwarded, net.JoinHostPort(peer, "4242")), peer)
+	}
+
+	t.Setenv("NOKKU_TRUSTED_PROXIES", "203.0.113.7")
+	ec, err = env.ParseAs[EnvConfig]()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"203.0.113.7"}, ec.TrustedProxies, "a list of your own replaces the default")
 }

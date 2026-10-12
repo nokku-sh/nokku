@@ -1,12 +1,25 @@
 import adapter from '@sveltejs/adapter-static';
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+
+// Same rule as FullURL in the core: plain http only on localhost.
+function goServerUrl(): Plugin {
+	const address = process.env.NOKKU_BASE_URL || `localhost:${process.env.NOKKU_PORT || '3000'}`;
+	const scheme = address.split(':')[0] === 'localhost' ? 'http' : 'https';
+	const url = `${scheme}://${address}`;
+	return {
+		name: 'go-server-url',
+		configureServer(server) {
+			server.printUrls = () => server.config.logger.info(`  ➜  Dashboard: ${url}`);
+		}
+	};
+}
 
 export default defineConfig({
-	// The backend sits in front and takes the UI from here (NOKKU_UI_DEV), so the port has to be the one it knows.
-	server: { strictPort: true },
+	server: { port: 5173, strictPort: true },
 	plugins: [
+		goServerUrl(),
 		tailwindcss(),
 		sveltekit({
 			compilerOptions: {

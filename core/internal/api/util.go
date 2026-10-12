@@ -39,6 +39,7 @@ func (s *utilService) GetInstanceInfo(
 ) (*nokkuv1.GetInstanceInfoResponse, error) {
 	op := s.cfg.Email.Operator
 	saas := s.cfg.SaaS
+	meta, _ := actor.RequestMetaFromContext(ctx)
 	return &nokkuv1.GetInstanceInfoResponse{
 		OperatorName: &op.Name,
 		SupportEmail: &op.SupportEmail,
@@ -48,7 +49,7 @@ func (s *utilService) GetInstanceInfo(
 		ImprintUrl:   &op.ImprintURL,
 		Mode:         new(s.cfg.Mode()),
 		Signup:       new(saas && actor.WorkspaceIDFromContext(ctx) == ""),
-		CaPin:        new(s.cfg.WebPKI.Pin()),
+		CaPin:        new(s.cfg.WebPKI.Pin(meta)),
 	}, nil
 }
 

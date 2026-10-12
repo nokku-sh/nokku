@@ -11,7 +11,7 @@ import (
 
 var trustedProxies []*net.IPNet
 
-// SetTrustedProxies with no entries ignores forwarding headers, the secure default.
+// SetTrustedProxies with no entries ignores forwarding headers. The list the server starts with is in config.
 func SetTrustedProxies(proxies []string) error {
 	trustedProxies = nil
 	for _, raw := range proxies {
@@ -78,6 +78,18 @@ func Client(header http.Header, remoteAddr string) string {
 		}
 	}
 	return peer
+}
+
+// Proto reads only X-Forwarded-Proto from a trusted proxy. It is the scheme the client reached that proxy with.
+func Proto(header http.Header, remoteAddr string) string {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	if ip := net.ParseIP(host); ip == nil || !isTrustedProxy(ip) {
+		return ""
+	}
+	return header.Get("X-Forwarded-Proto")
 }
 
 func canonicalizeIP(ip string) string {

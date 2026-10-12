@@ -30,7 +30,7 @@ const (
 	backdate = time.Hour
 )
 
-// issuer is the CA of NOKKU_TLS=internal. The pin is over its key, which stays for good.
+// issuer is the built-in CA. The pin is over its key, which stays for good.
 type issuer struct {
 	host string
 	root *x509.Certificate

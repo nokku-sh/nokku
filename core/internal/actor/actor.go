@@ -78,6 +78,8 @@ func SubjectFromContext(ctx context.Context) string {
 type RequestMeta struct {
 	Header     http.Header
 	RemoteAddr string
+	// TLS is about the connection to this server. A proxy in front reports its own in X-Forwarded-Proto.
+	TLS bool
 }
 
 type requestMetaKey struct{}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,17 +16,37 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/webpki"
 )
 
-// A client reads a missing CA as "nothing to pin". The SPA fallback would answer the path with HTML and a 200.
-func TestNoCAIsAdvertisedByDefault(t *testing.T) {
+// caSeen asks for the CA and the pin the way the web app and the tools do. viaProxy makes the request look like
+// one a proxy on this machine forwarded for a client on https.
+func caSeen(t *testing.T, viaProxy bool) (status int, pin string) {
+	t.Helper()
 	_, srv := newTestAPI(t)
-
-	res, err := srv.Client().Get(srv.URL + webpki.Path)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+webpki.Path, nil)
+	require.NoError(t, err)
+	ctx, call := connect.NewClientContext(t.Context())
+	if viaProxy {
+		req.Header.Set("X-Forwarded-Proto", "https")
+		call.RequestHeader().Set("X-Forwarded-Proto", "https")
+	}
+	res, err := srv.Client().Do(req)
 	require.NoError(t, err)
 	_ = res.Body.Close()
-	assert.Equal(t, http.StatusNotFound, res.StatusCode)
 
 	info, err := nokkuv1connect.NewUtilServiceClient(srv.Client(), srv.URL).
-		GetInstanceInfo(t.Context(), &nokkuv1.GetInstanceInfoRequest{})
+		GetInstanceInfo(ctx, &nokkuv1.GetInstanceInfoRequest{})
 	require.NoError(t, err)
-	assert.Empty(t, info.GetCaPin())
+	return res.StatusCode, info.GetCaPin()
+}
+
+// A client reads a missing CA as "nothing to pin". The SPA fallback would answer the path with HTML and a 200.
+func TestNoCAIsAdvertisedBehindAProxyWithAPublicCertificate(t *testing.T) {
+	status, pin := caSeen(t, true)
+	assert.Equal(t, http.StatusNotFound, status)
+	assert.Empty(t, pin, "the pin of the built-in CA would make nk refuse the proxy's certificate")
+}
+
+func TestBuiltInCAIsAdvertisedToAClientThatConnectsItself(t *testing.T) {
+	status, pin := caSeen(t, false)
+	assert.Equal(t, http.StatusOK, status)
+	assert.NotEmpty(t, pin)
 }

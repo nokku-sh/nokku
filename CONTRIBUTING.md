@@ -66,15 +66,18 @@ task dev
 
 This runs the backend (`go run ./cmd/nokku`) and the `web/ui` frontend via
 Vite. Open `http://localhost:3000`, the backend's address. The backend takes
-the UI from Vite (`task dev` sets `NOKKU_UI_DEV` for it), so edits show up
-at once, and links, cookies and passkeys use the same address a real install
-has. Leave `NOKKU_BASE_URL` unset.
+the UI from Vite (the `backend` task sets `NOKKU_DEV_UI` for it), so edits
+show up at once, and links, cookies and passkeys use the same address a real
+install has. Leave `NOKKU_BASE_URL` unset.
 
-`task backend` alone serves the UI that was built into the binary.
+Without `NOKKU_DEV_UI`, as in a plain `go run ./cmd/nokku`, the backend serves
+the UI that was built into the binary.
 
-To work on the built-in TLS, add `NOKKU_TLS=internal`. The app is then on
-`https://localhost:3000`. Run `nk --api https://localhost:3000 --pin ... login`
-once with the pin from the start log, it installs the CA for your browser.
+To work on the built-in TLS, give this machine a name, like a line
+`127.0.0.1 nokku.test` in `/etc/hosts`, and set `NOKKU_BASE_URL=nokku.test:3000`.
+The app is then on `https://nokku.test:3000`. Run
+`nk --api https://nokku.test:3000 --pin ... login` once with the pin from the
+start log, it installs the CA for your browser.
 
 ## Regenerating generated code
 

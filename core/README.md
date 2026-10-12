@@ -91,23 +91,25 @@ export PGHOST=db.internal PGUSER=nokku PGPASSWORD=...
 ./nokku
 ```
 
-It listens on port 3000 with plain HTTP, so put a reverse proxy in front for TLS, or let the core [serve https itself](#without-a-proxy). The proxy has to:
+It listens on port 3000 and answers https and plain HTTP there. Https is for whoever connects to it [without a proxy](#without-a-proxy). Plain HTTP is only for a reverse proxy that holds the certificate. The proxy has to:
 
+- send `X-Forwarded-Proto`, which Caddy and Traefik do by themselves
 - forward with HTTP/2 without TLS (h2c), because `nk` and `nokkud` speak gRPC
 - allow WebSockets, for the terminal in the browser
 
-The [Caddyfile](./Caddyfile) is a working example. Set `NOKKU_TRUSTED_PROXIES` to the proxy's address, or the audit log shows the proxy as the source of every request.
+The [Caddyfile](./Caddyfile) is a working example. A proxy on the same machine or in a private network, like a Docker network or a cluster, is trusted as it is. Set `NOKKU_TRUSTED_PROXIES` to the proxy's address when that is a public one, or to trust nothing but your proxy.
 
 ### Without a proxy
 
-For a test or a home lab the core can serve https by itself:
+For a test or a home lab the core serves https by itself. Give it a name and connect to its port:
 
 ```bash
-export NOKKU_TLS=internal
 export NOKKU_BASE_URL=nokku.lan:3000
 ```
 
-The core makes a CA of its own and issues its certificate from it. There is nothing to renew by hand. The CA key is stored encrypted in the database. The CA can only sign for the host name in `NOKKU_BASE_URL`, so a machine that installs it trusts it for Nokku and nothing else. Leave `NOKKU_TRUSTED_PROXIES` unset.
+The core makes a CA of its own and issues its certificate from it. There is nothing to turn on and nothing to renew by hand. The CA key is stored encrypted in the database. The CA can only sign for the host name in `NOKKU_BASE_URL`, so a machine that installs it trusts it for Nokku and nothing else. A browser that asks for `http://nokku.lan:3000` is sent to https.
+
+By default the core takes any machine in a private network for its proxy and believes the client address it names. Without a proxy, set `NOKKU_TRUSTED_PROXIES=127.0.0.1` so it believes none.
 
 No machine knows that CA at first. The start log shows its pin. The web app shows it too: the full `nk login` command is under **Profile, Security**, and the bare pin under **Settings**. Before your first sign-in, run this on your own machine with the pin from the log:
 
@@ -152,7 +154,7 @@ Everything is set with environment variables. Most installs only touch these:
 | `NOKKU_BASE_URL`                                  | Public host name, with the port if the proxy uses an unusual one     |
 | `PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`    | Where PostgreSQL is                                                  |
 | `NOKKU_ADMIN_EMAIL`                               | Creates the owner account on the first start                         |
-| `NOKKU_TRUSTED_PROXIES`                           | Your reverse proxy, as IPs or CIDRs                                  |
+| `NOKKU_TRUSTED_PROXIES`                           | Your reverse proxy as IPs or CIDRs, when it has a public address     |
 | `NOKKU_SMTP_HOST`, `NOKKU_EMAIL_SENDER`           | Turns on email sign-in links and mailed invitations                  |
 
 The rest is below, grouped by topic. Open what you need.
@@ -164,10 +166,9 @@ The rest is below, grouped by topic. Open what you need.
 | ----------------------- | ----------------------- | -------------------------------------------------------------------- |
 | `NOKKU_SECRET`          |                         | **Required**, at least 32 characters                                 |
 | `NOKKU_BASE_URL`        | `localhost:3000`        | Public host name, for links, cookies and passkeys. Never an IP       |
-| `NOKKU_TLS`             |                         | `internal` serves https with a built-in CA. Unset behind a proxy     |
 | `NOKKU_TLS_CA`          |                         | PEM file with the private CA of your proxy, so `nk` and `nokkud` can pin it |
-| `NOKKU_PORT`            | `3000`                  | Port the core listens on                                             |
-| `NOKKU_TRUSTED_PROXIES` |                         | Comma-separated proxy IPs or CIDRs whose client-IP headers count     |
+| `NOKKU_PORT`            | `3000`                  | Port the core listens on, for https and for the proxy's plain HTTP   |
+| `NOKKU_TRUSTED_PROXIES` | loopback and private    | Comma-separated proxy IPs or CIDRs that may send plain HTTP and name the client |
 | `NOKKU_DEBUG`           | `false`                 | Debug logging, same as `--debug`                                     |
 | `NOKKU_LICENSE_KEY`     |                         | License key. It can also be activated in the web app                 |
 | `NOKKU_LICENSE_OFFLINE` | `false`                 | Never ask `license.nokku.sh` for the renewed key                     |

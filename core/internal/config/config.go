@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -69,14 +68,10 @@ type EnvConfig struct {
 	BaseURL BaseURL `env:"NOKKU_BASE_URL"`
 	Port    string  `env:"NOKKU_PORT"     envDefault:"3000"`
 	Secret  string  `env:"NOKKU_SECRET"`
-	// TLSMode is set when the server holds the certificate itself. Unset, a proxy in front does.
-	TLSMode webpki.Mode `env:"NOKKU_TLS"`
-	// UIDev is the Vite dev server the UI comes from. The browser still only talks to this server.
-	UIDev url.URL `env:"NOKKU_UI_DEV"`
-	// SaaS runs the hosted service. Unset, the server is self-hosted with one workspace.
-	SaaS           bool `env:"NOKKU_SAAS"`
-	Debug          bool
-	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
+	SaaS    bool    `env:"NOKKU_SAAS"`
+	Debug   bool
+	// TrustedProxies may send plain HTTP and name the client. Unset, that is this machine and the private ranges.
+	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES" envDefault:"127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7"`
 }
 
 type Config struct {
@@ -141,7 +136,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	}
 	enc.Start(ctx)
 
-	cfg.WebPKI, err = webpki.New(ctx, cfg.Conn, cfg.TLSMode, cfg.Hostname())
+	cfg.WebPKI, err = webpki.New(ctx, cfg.Conn, cfg.Hostname())
 	if err != nil {
 		return nil, err
 	}
@@ -214,9 +209,9 @@ func (c *EnvConfig) Mode() string {
 	return "self_hosted"
 }
 
-// FullURL is the public address. The scheme is never configured, plain http only on localhost without NOKKU_TLS.
+// FullURL is the public address. The scheme is never configured, plain http only on localhost.
 func (c *EnvConfig) FullURL() string {
-	if c.Hostname() == "localhost" && c.TLSMode == webpki.ModeOff {
+	if c.Hostname() == "localhost" {
 		return "http://" + c.hostPort()
 	}
 	return "https://" + c.hostPort()

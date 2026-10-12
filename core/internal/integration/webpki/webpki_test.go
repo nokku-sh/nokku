@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -62,16 +63,21 @@ func exec(t *testing.T, sql string) {
 
 func start(t *testing.T, conn *db.Connection, name string) *webpki.Identity {
 	t.Helper()
-	id, err := webpki.New(t.Context(), conn, webpki.ModeInternal, name)
+	id, err := webpki.New(t.Context(), conn, name)
 	require.NoError(t, err)
 	return id
 }
+
+// direct is a client that connects to the server itself, the one the built-in CA is for.
+var direct = actor.RequestMeta{TLS: true}
 
 // advertised is the CA the way a client gets it.
 func advertised(t *testing.T, id *webpki.Identity) *x509.Certificate {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	id.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, webpki.Path, nil))
+	req := httptest.NewRequest(http.MethodGet, webpki.Path, nil)
+	req.TLS = &tls.ConnectionState{}
+	id.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 	block, rest := pem.Decode(rec.Body.Bytes())
 	require.NotNil(t, block)
@@ -87,8 +93,8 @@ func TestInternalCAIsKeptAcrossStarts(t *testing.T) {
 	first := start(t, conn, host)
 	second := start(t, conn, host)
 
-	require.NotEmpty(t, first.Pin())
-	assert.Equal(t, first.Pin(), second.Pin())
+	require.NotEmpty(t, first.Pin(direct))
+	assert.Equal(t, first.Pin(direct), second.Pin(direct))
 	assert.Equal(t, advertised(t, first).Raw, advertised(t, second).Raw)
 }
 
@@ -98,7 +104,7 @@ func TestInternalCAFollowsANewHostName(t *testing.T) {
 	before := start(t, conn, host)
 	after := start(t, conn, "moved.test")
 
-	assert.Equal(t, before.Pin(), after.Pin())
+	assert.Equal(t, before.Pin(direct), after.Pin(direct))
 	assert.Equal(t, []string{"moved.test"}, advertised(t, after).PermittedDNSDomains)
 
 	again := start(t, conn, "moved.test")
@@ -129,9 +135,8 @@ func TestClientReachesTheServerThroughThePin(t *testing.T) {
 	mux.Handle("GET "+webpki.Path, id)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 	srv := httptest.NewUnstartedServer(mux)
-	srv.TLS = id.TLSConfig()
-	srv.EnableHTTP2 = true
-	srv.StartTLS()
+	srv.Listener = id.Listener(srv.Listener)
+	srv.Start()
 	defer srv.Close()
 
 	// The test server listens on an address, the name is nokku.test.
@@ -157,7 +162,7 @@ func TestClientReachesTheServerThroughThePin(t *testing.T) {
 	ca, err := x509.ParseCertificate(block.Bytes)
 	require.NoError(t, err)
 	sum := sha256.Sum256(ca.RawSubjectPublicKeyInfo)
-	require.Equal(t, id.Pin(), "sha256:"+hex.EncodeToString(sum[:]))
+	require.Equal(t, id.Pin(direct), "sha256:"+hex.EncodeToString(sum[:]))
 
 	roots := x509.NewCertPool()
 	roots.AddCert(ca)

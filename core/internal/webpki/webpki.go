@@ -10,75 +10,61 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/caarlos0/env/v11"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/realip"
 )
 
 // Path is where clients look for the CA.
 const Path = "/ca.crt"
-
-// Mode is NOKKU_TLS: who holds the certificate.
-type Mode string
-
-const (
-	// ModeOff serves plain HTTP, a proxy in front holds the certificate.
-	ModeOff Mode = ""
-	// ModeInternal serves a certificate from a CA the server makes for itself.
-	ModeInternal Mode = "internal"
-)
-
-func (m *Mode) UnmarshalText(text []byte) error {
-	switch mode := Mode(strings.ToLower(strings.TrimSpace(string(text)))); mode {
-	case ModeOff, ModeInternal:
-		*m = mode
-		return nil
-	}
-	return fmt.Errorf("NOKKU_TLS is %q, it takes internal. Leave it unset behind a proxy", text)
-}
 
 type envConfig struct {
 	// CAFile is the CA of the proxy's certificate in PEM, when that is a private one.
 	CAFile string `env:"NOKKU_TLS_CA"`
 }
 
-// Identity is the certificate the server answers with and the CA it advertises. The zero value does neither.
+// Identity is the certificate the server answers with, and the CA a client is told for the certificate it saw.
 type Identity struct {
-	pem  []byte
-	pin  string
-	cert func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+	// builtin signs the server's own certificate, proxy is NOKKU_TLS_CA.
+	builtin, proxy bundle
+	cert           func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 }
 
-// New sets up the identity for mode. host is the name the certificate is for, only ModeInternal uses conn.
-func New(ctx context.Context, conn *db.Connection, mode Mode, host string) (*Identity, error) {
+// bundle is what clients are told to trust. The zero value is nothing.
+type bundle struct {
+	pem []byte
+	pin string
+}
+
+// New loads the built-in CA and makes it on the first start. host is the name its certificate is for.
+func New(ctx context.Context, conn *db.Connection, host string) (*Identity, error) {
 	cfg, err := env.ParseAs[envConfig]()
 	if err != nil {
 		return nil, err
 	}
 	id := &Identity{}
-	if mode == ModeInternal {
-		if cfg.CAFile != "" {
-			return nil, errors.New("NOKKU_TLS_CA has no use with NOKKU_TLS=internal, the server advertises its own CA")
-		}
-		ca, err := loadIssuer(ctx, conn, host)
-		if err != nil {
-			return nil, fmt.Errorf("NOKKU_TLS=internal: %w", err)
-		}
-		id.cert = ca.certificate
-		id.advertise(ca.root)
-		return id, nil
-	}
 	if cfg.CAFile != "" {
 		cas, err := readCAs(cfg.CAFile)
 		if err != nil {
 			return nil, fmt.Errorf("NOKKU_TLS_CA: %w", err)
 		}
-		id.advertise(cas...)
+		id.proxy = advertise(cas...)
+		slog.Info("a client behind the proxy is told the CA in NOKKU_TLS_CA", "pin", id.proxy.pin)
 	}
+	ca, err := loadIssuer(ctx, conn, host)
+	if err != nil {
+		return nil, fmt.Errorf("built-in CA: %w", err)
+	}
+	id.cert = ca.certificate
+	id.builtin = advertise(ca.root)
+	slog.Info("a client that connects without a proxy gets a certificate from the built-in CA", "pin", id.builtin.pin)
 	return id, nil
 }
 
@@ -108,31 +94,36 @@ func readCAs(path string) ([]*x509.Certificate, error) {
 	return cas, nil
 }
 
-// advertise sets what clients are told to trust. The pin is the one of the first certificate.
-func (i *Identity) advertise(cas ...*x509.Certificate) {
+// advertise is what clients are told to trust. The pin is the one of the first certificate.
+func advertise(cas ...*x509.Certificate) bundle {
 	sum := sha256.Sum256(cas[0].RawSubjectPublicKeyInfo)
-	i.pin = "sha256:" + hex.EncodeToString(sum[:])
+	b := bundle{pin: "sha256:" + hex.EncodeToString(sum[:])}
 	for _, ca := range cas {
-		i.pem = append(i.pem, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Raw})...)
+		b.pem = append(b.pem, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Raw})...)
 	}
+	return b
 }
 
-// Pin is sha256 over the public key of the first certificate, empty when nothing is advertised.
-func (i *Identity) Pin() string { return i.pin }
-
-// TLSConfig is nil when a proxy in front serves. nk, nokkud and every current browser speak TLS 1.3.
-func (i *Identity) TLSConfig() *tls.Config {
-	if i.cert == nil {
-		return nil
+// seen is the CA behind the certificate this client saw. A proxy with a public one and plain localhost need none.
+func (i *Identity) seen(meta actor.RequestMeta) bundle {
+	switch {
+	case realip.Proto(meta.Header, meta.RemoteAddr) == "https":
+		return i.proxy
+	case meta.TLS:
+		return i.builtin
 	}
-	return &tls.Config{MinVersion: tls.VersionTLS13, GetCertificate: i.cert}
+	return bundle{}
 }
+
+// Pin is sha256 over the public key of the CA this client has to know, empty when it needs none.
+func (i *Identity) Pin(meta actor.RequestMeta) string { return i.seen(meta).pin }
 
 func (i *Identity) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if i.pem == nil {
+	ca := i.seen(actor.RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr, TLS: r.TLS != nil})
+	if ca.pem == nil {
 		http.NotFound(w, r)
 		return
 	}
 	w.Header().Set("Content-Type", "application/x-pem-file")
-	_, _ = w.Write(i.pem)
+	_, _ = w.Write(ca.pem)
 }

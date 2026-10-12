@@ -411,7 +411,7 @@ CREATE TABLE instance_license (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- The CA of NOKKU_TLS=internal (singleton)
+-- The CA of the built-in TLS (singleton)
 CREATE TABLE web_ca (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   private_key BYTEA NOT NULL,

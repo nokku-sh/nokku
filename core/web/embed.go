@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"path"
 	"regexp"
 	"slices"
@@ -31,12 +32,9 @@ var staticFS embed.FS
 const uiRoot = "ui/build"
 
 // Handler serves the embedded SPA, or what the Vite dev server hands out. The browser only talks to this server.
-func Handler(dev *url.URL) http.Handler {
-	if dev.Host != "" {
-		return &httputil.ReverseProxy{Rewrite: func(r *httputil.ProxyRequest) {
-			r.SetURL(dev)
-			r.SetXForwarded()
-		}}
+func Handler() http.Handler {
+	if dev := os.Getenv("NOKKU_DEV_UI"); dev != "" {
+		return devProxy(dev)
 	}
 	pinMimeTypes()
 	files := statigz.FileServer(staticFS, brotli.AddEncoding, statigz.FSPrefix(uiRoot))
@@ -59,6 +57,22 @@ func Handler(dev *url.URL) http.Handler {
 		w.Header().Set("Cache-Control", cachePolicy(p))
 		files.ServeHTTP(w, r)
 	})
+}
+
+func devProxy(target string) http.Handler {
+	u, err := url.Parse(target)
+	if err != nil || u.Host == "" {
+		panic("NOKKU_DEV_UI is not a url: " + target)
+	}
+	return &httputil.ReverseProxy{
+		Rewrite: func(r *httputil.ProxyRequest) {
+			r.SetURL(u)
+			r.SetXForwarded()
+		},
+		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
+			http.Error(w, "No Vite at "+target+", run pnpm dev in web/ui. "+err.Error(), http.StatusBadGateway)
+		},
+	}
 }
 
 var inlineScript = regexp.MustCompile(`(?s)<script([^>]*)>(.*?)</script>`)

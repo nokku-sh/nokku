@@ -100,8 +100,8 @@ With a KMS nothing has to be rotated by hand. The core rotates the data key ever
 
 ### Network
 
-- **Serve the core over TLS.** Behind a proxy it listens with plain HTTP, `compose.prod.yml` runs Caddy for this. For a test without a proxy, `NOKKU_TLS=internal` lets the core serve https with a CA of its own. `nk` and `nokkud` never skip certificate verification. A private CA reaches them through a pin, see the README.
-- **Set `NOKKU_TRUSTED_PROXIES` to exactly your proxy.** The core only believes forwarded client-IP headers from these addresses. Too wide a range lets a client fake its address in the audit log and dodge rate limits.
+- **The core is only reached over TLS.** It answers https on its port with a CA of its own. Plain HTTP on the same port is served only to a trusted proxy that holds the certificate, `compose.prod.yml` runs Caddy for this. Anyone else who asks in plain HTTP is sent to https. `nk` and `nokkud` never skip certificate verification. A private CA reaches them through a pin, see the README.
+- **Set `NOKKU_TRUSTED_PROXIES` to exactly your proxy.** The core takes plain HTTP and forwarded client-IP headers from these addresses only. Unset, that is the machine itself and the private ranges, so a proxy in a container network works as it is. It also means any machine in such a network can fake its address in the audit log and dodge rate limits. Without a proxy set it to `127.0.0.1`.
 - **Leave `NOKKU_ALLOW_PRIVATE_NETWORKS` off unless you need it.** Workspace owners choose SSO provider URLs, so the core refuses to connect to private, loopback and link-local addresses. Set it to `true` only when every such address is trusted, like a self-hosted install with its identity provider on an internal network. Never turn it on when you host for other people.
 
 ### File storage

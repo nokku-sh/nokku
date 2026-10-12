@@ -5,31 +5,27 @@ env:
 
 tasks:
   dev:
-    output: prefixed
     desc: Run backend and frontend concurrently, the app is on the backend's port
-    deps:
-      - task: backend
-        vars: { UI_DEV: "http://localhost:5173" }
-      - frontend
+    deps: [backend, frontend]
 
   backend:
     desc: Run backend
     env:
-      NOKKU_UI_DEV: "{{.UI_DEV}}"
+      NOKKU_DEV_UI: "http://localhost:5173"
     cmds:
       - go run {{ if .NOKKU_LICENSE_PUBLIC_KEY }}-ldflags="-X github.com/nokku-sh/nokku/core/internal/config.licensePublicKey={{ .NOKKU_LICENSE_PUBLIC_KEY }}"{{ end }} ./cmd/nokku
 
   frontend:
     desc: Run frontend
+    dir: web/ui
     cmds:
       - pnpm run dev
-    dir: web/ui
 
   email:
     desc: Run email
+    dir: web/email
     cmds:
       - pnpm run dev
-    dir: web/email
 
   update:
     desc: Update frontend dependencies, Go modules are updated from the repo root

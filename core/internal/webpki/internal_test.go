@@ -132,8 +132,5 @@ func TestNextRootKeepsOldClientsWorking(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, verify(cert.Leaf, old, testHost))
 
-	before, after := &Identity{}, &Identity{}
-	before.advertise(old)
-	after.advertise(ca.root)
-	assert.Equal(t, before.Pin(), after.Pin())
+	assert.Equal(t, advertise(old).pin, advertise(ca.root).pin)
 }
