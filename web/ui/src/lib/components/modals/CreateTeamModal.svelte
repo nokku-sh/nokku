@@ -17,7 +17,7 @@
 	async function onSubmit() {
 		const res = await createTeam.mutateAsync({ ...model });
 		model = newDraft(TeamSchema);
-		if (res.team) sheet.show(res.team.id);
+		if (res.team) await sheet.show(res.team.id);
 	}
 </script>
 

@@ -29,37 +29,19 @@ func TestRequestSizeLimit(t *testing.T) {
 	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err), "got %v", err)
 }
 
-// The audit webhook secret signs events to the customer's SIEM. Only the owner may read it back.
-func TestWorkspaceHidesWebhookFromMembers(t *testing.T) {
+// Settings that name no daemon defaults read as the built-in ones.
+func TestWorkspaceReadsBuiltInDaemonDefaults(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
-		_, err := q.UpdateWorkspace(t.Context(), &db.UpdateWorkspaceParams{
-			Settings: &nokkuv1.WorkspaceSettings{
-				AuditWebhookUrl:    new("https://siem.example/hook"),
-				AuditWebhookSecret: new("s3cret"),
-			},
-		})
+		_, err := q.UpdateWorkspace(t.Context(), &db.UpdateWorkspaceParams{Settings: &nokkuv1.WorkspaceSettings{}})
 		return err
 	})
 
-	client := func(role nokkuv1.WorkspaceRole) nokkuv1connect.WorkspaceServiceClient {
-		return nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL,
-			header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, role)))
-	}
-
-	for _, role := range []nokkuv1.WorkspaceRole{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN} {
-		got, err := client(role).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
-		require.NoError(t, err)
-		assert.Empty(t, got.GetWorkspace().GetSettings().GetAuditWebhookSecret(), "%s reads the secret", role)
-		assert.Empty(t, got.GetWorkspace().GetSettings().GetAuditWebhookUrl(), "%s reads the url", role)
-	}
-
-	got, err := client(
-		nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER,
-	).GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
+	member := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	got, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+member)).
+		GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
 	require.NoError(t, err)
-	assert.Equal(t, "s3cret", got.GetWorkspace().GetSettings().GetAuditWebhookSecret())
 	assert.True(t,
 		proto.Equal(db.DefaultDaemonConfig(), got.GetWorkspace().GetSettings().GetDefaultDaemonConfig()),
 		"daemon defaults nobody set read as the built-in ones")

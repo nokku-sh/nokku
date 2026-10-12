@@ -74,16 +74,17 @@ func (r *Recording) ToProto() *nokkuv1.Recording {
 		return nil
 	}
 	return &nokkuv1.Recording{
-		Id:         &r.ID,
-		DaemonId:   r.DaemonID,
-		DaemonName: &r.DaemonName,
-		Username:   &r.Username,
-		SubjectId:  r.SubjectID,
-		Principal:  &r.Principal,
-		StartedAt:  SafeTimestamp(&r.StartedAt),
-		EndedAt:    SafeTimestamp(r.EndedAt),
-		SizeBytes:  &r.SizeBytes,
-		Complete:   &r.Complete,
+		Id:          &r.ID,
+		DaemonId:    r.DaemonID,
+		DaemonName:  &r.DaemonName,
+		Username:    &r.Username,
+		SubjectId:   r.SubjectID,
+		SubjectName: &r.SubjectName,
+		Principal:   &r.Principal,
+		StartedAt:   SafeTimestamp(&r.StartedAt),
+		EndedAt:     SafeTimestamp(r.EndedAt),
+		SizeBytes:   &r.SizeBytes,
+		Complete:    &r.Complete,
 	}
 }
 
@@ -159,6 +160,7 @@ func (t *Target) ToProto() *nokkuv1.Target {
 		HostPublicKey: t.HostPublicKey,
 		CreatedAt:     SafeTimestamp(&t.CreatedAt),
 		UpdatedAt:     SafeTimestamp(&t.UpdatedAt),
+		LastSyncAt:    SafeTimestamp(t.LastSyncAt),
 	}
 }
 
@@ -192,14 +194,15 @@ func (u *User) ToProto() *nokkuv1.User {
 		return nil
 	}
 	return &nokkuv1.User{
-		Id:        &u.ID,
-		Name:      &u.Name,
-		Email:     &u.Email,
-		Picture:   u.Picture,
-		Role:      &u.Role,
-		Active:    &u.Active,
-		CreatedAt: SafeTimestamp(&u.CreatedAt),
-		UpdatedAt: SafeTimestamp(&u.UpdatedAt),
+		Id:          &u.ID,
+		Name:        &u.Name,
+		Email:       &u.Email,
+		Picture:     u.Picture,
+		Role:        &u.Role,
+		Active:      &u.Active,
+		CreatedAt:   SafeTimestamp(&u.CreatedAt),
+		UpdatedAt:   SafeTimestamp(&u.UpdatedAt),
+		ScimManaged: new(u.ScimExternalID != nil),
 	}
 }
 
@@ -271,11 +274,6 @@ func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 		return nil
 	}
 
-	extensions, err := ParseExtensionsMap(r.UserExtensions)
-	if err != nil {
-		slog.Warn("failed to parse extensions", "error", err)
-		extensions = nil
-	}
 	criticalOptions, err := ParseCriticalOptionsMap(r.UserCriticalOptions)
 	if err != nil {
 		slog.Warn("failed to parse critical options", "error", err)
@@ -297,7 +295,6 @@ func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 		UpdatedAt:            SafeTimestamp(&r.UpdatedAt),
 		UserDefaultTtl:       durationpb.New(r.UserDefaultTtl),
 		UserMaxTtl:           durationpb.New(r.UserMaxTtl),
-		UserExtensions:       extensions,
 		UserCriticalOptions:  criticalOptions,
 		AllowedKeyTypes:      r.AllowedKeyTypes,
 		Lifetime:             durationpb.New(r.Lifetime),
@@ -355,7 +352,7 @@ func (t *JoinToken) ToProto() *nokkuv1.JoinToken {
 		CaId:        t.CaID,
 		Role:        t.Role,
 		Tags:        t.Tags,
-		Ephemeral:   &t.Ephemeral,
+		Ephemeral:   new(t.RetireAfter != nil),
 		CreatedAt:   SafeTimestamp(&t.CreatedAt),
 		LastUsedAt:  SafeTimestamp(t.LastUsedAt),
 	}
@@ -386,16 +383,16 @@ func JoinTokenGrantsToProto(rows []*ListJoinTokenGrantsRow) []*nokkuv1.JoinToken
 			out = append(out, &nokkuv1.JoinTokenGrant{Username: new(r.Username)})
 		}
 		g := out[len(out)-1]
-		if r.SubjectKind == nil || r.SubjectID == nil {
+		if r.SubjectKind == nil {
 			continue
 		}
 		switch *r.SubjectKind {
 		case SubjectKindUser:
-			g.UserIds = append(g.UserIds, *r.SubjectID)
+			g.UserIds = append(g.UserIds, r.SubjectID)
 		case SubjectKindTeam:
-			g.TeamIds = append(g.TeamIds, *r.SubjectID)
+			g.TeamIds = append(g.TeamIds, r.SubjectID)
 		case SubjectKindServiceAccount:
-			g.ServiceAccountIds = append(g.ServiceAccountIds, *r.SubjectID)
+			g.ServiceAccountIds = append(g.ServiceAccountIds, r.SubjectID)
 		}
 	}
 	return out

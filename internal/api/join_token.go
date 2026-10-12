@@ -49,7 +49,6 @@ func (s *joinTokenService) CreateJoinToken(
 		params.AutoApprove = req.GetAutoApprove()
 		params.CaID = req.CaId
 		params.Tags = req.GetTags()
-		params.Ephemeral = req.GetEphemeral()
 		if req.GetEphemeral() {
 			// A pending box would retire before anyone approves it.
 			params.AutoApprove = true

@@ -1,13 +1,19 @@
 -- name: CreateRecording :one
 -- A start before the daemon enrolled or in the future is a wrong clock and counts as now, or retention would take it.
 INSERT INTO
-  recordings (id, daemon_id, daemon_name, username, subject_id, principal, key, started_at)
+  recordings (id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, started_at)
 SELECT
   @id,
   d.id,
   d.name,
   @username,
   sqlc.narg('subject_id'),
+  -- Subject ids are unique across kinds, so one of the two has it.
+  COALESCE(
+    (SELECT u.email FROM users u WHERE u.id = sqlc.narg('subject_id')),
+    (SELECT sa.name FROM service_accounts sa WHERE sa.id = sqlc.narg('subject_id')),
+    ''
+  ),
   @principal,
   @key,
   CASE

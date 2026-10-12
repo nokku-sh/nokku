@@ -21,11 +21,10 @@ func TestPlanMatrix(t *testing.T) {
 			wantRetention:   7,
 			wantStorageCap:  1 << 30,
 			wantFeatures: map[string]bool{
-				FeatureOIDC:           true,
-				FeatureEnforceSSO:     false,
-				FeatureAuditExport:    false,
-				FeatureAuditStreaming: false,
-				FeatureExternalKMS:    false,
+				FeatureOIDC:        true,
+				FeatureEnforceSSO:  false,
+				FeatureAuditExport: false,
+				FeatureExternalKMS: false,
 			},
 		},
 		{
@@ -35,11 +34,10 @@ func TestPlanMatrix(t *testing.T) {
 			wantRetention:   90,
 			wantStorageCap:  50 << 30,
 			wantFeatures: map[string]bool{
-				FeatureOIDC:           true,
-				FeatureEnforceSSO:     true,
-				FeatureAuditExport:    true,
-				FeatureAuditStreaming: false,
-				FeatureExternalKMS:    false,
+				FeatureOIDC:        true,
+				FeatureEnforceSSO:  true,
+				FeatureAuditExport: true,
+				FeatureExternalKMS: false,
 			},
 		},
 		{
@@ -49,11 +47,10 @@ func TestPlanMatrix(t *testing.T) {
 			wantRetention:   365,
 			wantStorageCap:  500 << 30,
 			wantFeatures: map[string]bool{
-				FeatureOIDC:           true,
-				FeatureEnforceSSO:     true,
-				FeatureAuditExport:    true,
-				FeatureAuditStreaming: true,
-				FeatureExternalKMS:    true,
+				FeatureOIDC:        true,
+				FeatureEnforceSSO:  true,
+				FeatureAuditExport: true,
+				FeatureExternalKMS: true,
 			},
 		},
 	}

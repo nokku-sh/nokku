@@ -119,7 +119,7 @@ func (s *Service) scimProvisionUser(
 				return err
 			}
 		}
-		return linkSCIMCredential(ctx, q, u.ID, externalID)
+		return linkSCIM(ctx, q, u.ID, externalID)
 	})
 	if err != nil {
 		return nil, mapUserError(err)
@@ -144,25 +144,13 @@ func setUserActive(ctx context.Context, q *db.Queries, userID string, active boo
 	return q.GetUser(ctx, userID)
 }
 
-func linkSCIMCredential(ctx context.Context, q *db.Queries, userID, externalID string) error {
+// linkSCIM stores the identity provider's id on the account. A new id replaces the old one, IdP migrations change it.
+func linkSCIM(ctx context.Context, q *db.Queries, userID, externalID string) error {
 	if externalID == "" {
 		return nil
 	}
-	// IdP migrations change the externalId, so one account never carries two links.
-	if err := q.DeleteStaleUserSCIMCredentials(ctx, &db.DeleteStaleUserSCIMCredentialsParams{
-		UserID:  userID,
-		Subject: externalID,
-	}); err != nil {
-		return err
-	}
-	_, err := q.UpsertCredential(ctx, &db.UpsertCredentialParams{
-		ID:      "scim:" + actor.WorkspaceIDFromContext(ctx) + ":" + externalID,
-		UserID:  userID,
-		Type:    string(MethodSCIM),
-		Subject: externalID,
-		Data:    []byte{},
-	})
-	if errors.Is(err, pgx.ErrNoRows) || db.IsUniqueViolation(err) {
+	err := q.SetUserSCIMExternalID(ctx, &db.SetUserSCIMExternalIDParams{ID: userID, ExternalID: &externalID})
+	if db.IsUniqueViolation(err) {
 		return scimerrors.ScimErrorBadRequest("externalId is already linked to another user")
 	}
 	return err
@@ -192,7 +180,7 @@ func (s *Service) scimDeprovisionUser(ctx context.Context, u *db.User) error {
 		if _, err := setUserActive(ctx, q, u.ID, false); err != nil {
 			return err
 		}
-		if err := q.DeleteUserSCIMCredentials(ctx, u.ID); err != nil {
+		if err := q.SetUserSCIMExternalID(ctx, &db.SetUserSCIMExternalIDParams{ID: u.ID}); err != nil {
 			return err
 		}
 		_, err := q.DeleteSubjectTokens(ctx, u.ID)

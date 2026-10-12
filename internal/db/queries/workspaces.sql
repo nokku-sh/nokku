@@ -102,16 +102,6 @@ DELETE FROM workspaces
 WHERE
   id = @workspace_id;
 
--- name: ListWorkspaceAuditWebhooks :many
--- Cross-tenant read, must run as nokku_system.
-SELECT
-  id,
-  (settings ->> 'audit_webhook_url')::text AS webhook_url,
-  (settings ->> 'audit_webhook_secret')::text AS webhook_secret
-FROM workspaces
-WHERE
-  coalesce(settings ->> 'audit_webhook_url', '') <> '';
-
 -- name: GetWorkspaceStateVersion :one
 SELECT
   version

@@ -320,7 +320,7 @@ func (q *Queries) GetOfflineDaemonByTokenAndName(ctx context.Context, arg *GetOf
 
 const getTargetByDaemon = `-- name: GetTargetByDaemon :one
 SELECT
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, created_at, updated_at
+  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
 FROM
   targets
 WHERE
@@ -341,6 +341,7 @@ func (q *Queries) GetTargetByDaemon(ctx context.Context, daemonID *string) (*Tar
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
+		&i.LastSyncAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -447,7 +448,8 @@ UPDATE daemons
 SET
   status = COALESCE($1, status),
   config = COALESCE($2, config),
-  metadata = COALESCE($3, metadata)
+  metadata = COALESCE($3, metadata),
+  updated_at = NOW()
 WHERE
   id = $4
 RETURNING

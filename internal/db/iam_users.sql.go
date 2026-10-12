@@ -35,7 +35,7 @@ INSERT INTO
 VALUES
   ($1, $2, $3, $4)
 RETURNING
-  id, workspace_id, email, name, picture, role, active, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -61,6 +61,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User,
 		&i.Picture,
 		&i.Role,
 		&i.Active,
+		&i.ScimExternalID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -73,7 +74,7 @@ INSERT INTO
 VALUES
   ($1, $2, $3, $4, $5)
 RETURNING
-  id, workspace_id, email, name, picture, role, active, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, created_at, updated_at
 `
 
 type CreateUserWithIDParams struct {
@@ -101,6 +102,7 @@ func (q *Queries) CreateUserWithID(ctx context.Context, arg *CreateUserWithIDPar
 		&i.Picture,
 		&i.Role,
 		&i.Active,
+		&i.ScimExternalID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -121,7 +123,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id string) error {
 
 const getOwner = `-- name: GetOwner :one
 SELECT
-  id, workspace_id, email, name, picture, role, active, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, created_at, updated_at
 FROM
   users
 WHERE
@@ -139,6 +141,7 @@ func (q *Queries) GetOwner(ctx context.Context) (*User, error) {
 		&i.Picture,
 		&i.Role,
 		&i.Active,
+		&i.ScimExternalID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -147,7 +150,7 @@ func (q *Queries) GetOwner(ctx context.Context) (*User, error) {
 
 const getUser = `-- name: GetUser :one
 SELECT
-  id, workspace_id, email, name, picture, role, active, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, created_at, updated_at
 FROM
   users
 WHERE
@@ -165,6 +168,7 @@ func (q *Queries) GetUser(ctx context.Context, id string) (*User, error) {
 		&i.Picture,
 		&i.Role,
 		&i.Active,
+		&i.ScimExternalID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -173,7 +177,7 @@ func (q *Queries) GetUser(ctx context.Context, id string) (*User, error) {
 
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT
-  id, workspace_id, email, name, picture, role, active, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, created_at, updated_at
 FROM
   users
 WHERE
@@ -191,6 +195,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 		&i.Picture,
 		&i.Role,
 		&i.Active,
+		&i.ScimExternalID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -200,7 +205,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 const listUsers = `-- name: ListUsers :many
 
 SELECT
-  u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.created_at, u.updated_at,
+  u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.scim_external_id, u.created_at, u.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   users u
@@ -258,6 +263,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg *ListUsersParams) ([]*ListU
 			&i.User.Picture,
 			&i.User.Role,
 			&i.User.Active,
+			&i.User.ScimExternalID,
 			&i.User.CreatedAt,
 			&i.User.UpdatedAt,
 			&i.TotalCount,
@@ -302,7 +308,7 @@ SET
 WHERE
   id = $2
 RETURNING
-  id, workspace_id, email, name, picture, role, active, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, created_at, updated_at
 `
 
 type SetUserEmailParams struct {
@@ -321,6 +327,7 @@ func (q *Queries) SetUserEmail(ctx context.Context, arg *SetUserEmailParams) (*U
 		&i.Picture,
 		&i.Role,
 		&i.Active,
+		&i.ScimExternalID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -365,7 +372,7 @@ SET
 WHERE
   id = $3
 RETURNING
-  id, workspace_id, email, name, picture, role, active, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, created_at, updated_at
 `
 
 type UpdateUserParams struct {
@@ -385,6 +392,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User,
 		&i.Picture,
 		&i.Role,
 		&i.Active,
+		&i.ScimExternalID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

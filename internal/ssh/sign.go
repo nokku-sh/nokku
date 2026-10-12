@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"strings"
@@ -123,17 +124,22 @@ func boundTTL(ttl, defaultTTL, maxTTL time.Duration) time.Duration {
 	return ttl
 }
 
+// userExtensions is what every user certificate permits. What a session may really do is the host's call: the
+// daemon config where nokkud runs, sshd_config where it does not.
+var userExtensions = map[string]string{
+	"permit-pty":              "",
+	"permit-user-rc":          "",
+	"permit-port-forwarding":  "",
+	"permit-agent-forwarding": "",
+}
+
 func userPermissions(ca *db.SSHCA) (ssh.Permissions, error) {
-	extensions, err := db.ParseExtensionsMap(ca.UserExtensions)
-	if err != nil {
-		return ssh.Permissions{}, fmt.Errorf("failed to parse extensions: %w", err)
-	}
 	criticalOptions, err := db.ParseCriticalOptionsMap(ca.UserCriticalOptions)
 	if err != nil {
 		return ssh.Permissions{}, fmt.Errorf("failed to parse critical options: %w", err)
 	}
 	return ssh.Permissions{
-		Extensions:      extensions,
+		Extensions:      maps.Clone(userExtensions),
 		CriticalOptions: criticalOptions,
 	}, nil
 }

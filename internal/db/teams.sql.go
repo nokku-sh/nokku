@@ -74,15 +74,15 @@ const createTeam = `-- name: CreateTeam :one
 INSERT INTO
   teams (name, description, tags)
 VALUES
-  ($1, $2, COALESCE($3, '{}'::TEXT[]))
+  ($1, $2, COALESCE($3::TEXT[], '{}'))
 RETURNING
   id, workspace_id, name, description, tags, created_at, updated_at
 `
 
 type CreateTeamParams struct {
-	Name        string      `json:"name"`
-	Description *string     `json:"description"`
-	Tags        interface{} `json:"tags"`
+	Name        string   `json:"name"`
+	Description *string  `json:"description"`
+	Tags        []string `json:"tags"`
 }
 
 func (q *Queries) CreateTeam(ctx context.Context, arg *CreateTeamParams) (*Team, error) {
@@ -149,7 +149,7 @@ func (q *Queries) GetTeam(ctx context.Context, teamID string) (*Team, error) {
 
 const listTeamMembers = `-- name: ListTeamMembers :many
 SELECT
-  u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.created_at, u.updated_at,
+  u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.scim_external_id, u.created_at, u.updated_at,
   tm.team_id
 FROM
   team_members tm
@@ -184,6 +184,7 @@ func (q *Queries) ListTeamMembers(ctx context.Context, teamID string) ([]*ListTe
 			&i.User.Picture,
 			&i.User.Role,
 			&i.User.Active,
+			&i.User.ScimExternalID,
 			&i.User.CreatedAt,
 			&i.User.UpdatedAt,
 			&i.TeamID,
@@ -330,7 +331,8 @@ UPDATE teams
 SET
   name = COALESCE($1, name),
   description = COALESCE($2, description),
-  tags = COALESCE($3, tags)
+  tags = COALESCE($3, tags),
+  updated_at = NOW()
 WHERE
   id = $4
 RETURNING

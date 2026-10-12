@@ -64,7 +64,6 @@ INSERT INTO
     ca_id,
     role,
     tags,
-    ephemeral,
     retire_after
   )
 VALUES
@@ -78,12 +77,11 @@ VALUES
     $7,
     $8,
     $9,
-    COALESCE($10, '{}'::TEXT[]),
-    $11,
-    $12
+    COALESCE($10::TEXT[], '{}'),
+    $11
   )
 RETURNING
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, ephemeral, retire_after, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, retire_after, created_at, last_used_at
 `
 
 type CreateJoinTokenParams struct {
@@ -96,8 +94,7 @@ type CreateJoinTokenParams struct {
 	AutoApprove bool                 `json:"autoApprove"`
 	CaID        *string              `json:"caId"`
 	Role        *nokku.WorkspaceRole `json:"role"`
-	Tags        interface{}          `json:"tags"`
-	Ephemeral   bool                 `json:"ephemeral"`
+	Tags        []string             `json:"tags"`
 	RetireAfter *time.Duration       `json:"retireAfter"`
 }
 
@@ -113,7 +110,6 @@ func (q *Queries) CreateJoinToken(ctx context.Context, arg *CreateJoinTokenParam
 		arg.CaID,
 		arg.Role,
 		arg.Tags,
-		arg.Ephemeral,
 		arg.RetireAfter,
 	)
 	var i JoinToken
@@ -130,7 +126,6 @@ func (q *Queries) CreateJoinToken(ctx context.Context, arg *CreateJoinTokenParam
 		&i.CaID,
 		&i.Role,
 		&i.Tags,
-		&i.Ephemeral,
 		&i.RetireAfter,
 		&i.CreatedAt,
 		&i.LastUsedAt,
@@ -151,7 +146,7 @@ func (q *Queries) DeleteJoinToken(ctx context.Context, id string) error {
 
 const getLiveJoinToken = `-- name: GetLiveJoinToken :one
 SELECT
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, ephemeral, retire_after, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, retire_after, created_at, last_used_at
 FROM
   join_tokens
 WHERE
@@ -187,7 +182,6 @@ func (q *Queries) GetLiveJoinToken(ctx context.Context, arg *GetLiveJoinTokenPar
 		&i.CaID,
 		&i.Role,
 		&i.Tags,
-		&i.Ephemeral,
 		&i.RetireAfter,
 		&i.CreatedAt,
 		&i.LastUsedAt,
@@ -214,7 +208,7 @@ type ListJoinTokenGrantsRow struct {
 	TokenID     string  `json:"tokenId"`
 	Username    string  `json:"username"`
 	SubjectKind *string `json:"subjectKind"`
-	SubjectID   *string `json:"subjectId"`
+	SubjectID   string  `json:"subjectId"`
 }
 
 func (q *Queries) ListJoinTokenGrants(ctx context.Context) ([]*ListJoinTokenGrantsRow, error) {
@@ -244,7 +238,7 @@ func (q *Queries) ListJoinTokenGrants(ctx context.Context) ([]*ListJoinTokenGran
 
 const listJoinTokens = `-- name: ListJoinTokens :many
 SELECT
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, ephemeral, retire_after, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, retire_after, created_at, last_used_at
 FROM
   join_tokens
 WHERE
@@ -278,7 +272,6 @@ func (q *Queries) ListJoinTokens(ctx context.Context, kind nokku.JoinTokenKind) 
 			&i.CaID,
 			&i.Role,
 			&i.Tags,
-			&i.Ephemeral,
 			&i.RetireAfter,
 			&i.CreatedAt,
 			&i.LastUsedAt,
@@ -311,7 +304,7 @@ WHERE
     OR uses < max_uses
   )
 RETURNING
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, ephemeral, retire_after, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, retire_after, created_at, last_used_at
 `
 
 type RedeemJoinTokenParams struct {
@@ -337,7 +330,6 @@ func (q *Queries) RedeemJoinToken(ctx context.Context, arg *RedeemJoinTokenParam
 		&i.CaID,
 		&i.Role,
 		&i.Tags,
-		&i.Ephemeral,
 		&i.RetireAfter,
 		&i.CreatedAt,
 		&i.LastUsedAt,
@@ -362,7 +354,7 @@ WHERE
     OR uses < max_uses
   )
 RETURNING
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, ephemeral, retire_after, created_at, last_used_at
+  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, retire_after, created_at, last_used_at
 `
 
 type RedeemJoinTokenByIDParams struct {
@@ -387,7 +379,6 @@ func (q *Queries) RedeemJoinTokenByID(ctx context.Context, arg *RedeemJoinTokenB
 		&i.CaID,
 		&i.Role,
 		&i.Tags,
-		&i.Ephemeral,
 		&i.RetireAfter,
 		&i.CreatedAt,
 		&i.LastUsedAt,

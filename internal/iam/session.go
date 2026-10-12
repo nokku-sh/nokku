@@ -122,7 +122,8 @@ func (s *Service) ssoEnforced(ctx context.Context) (bool, error) {
 	return w.Settings.GetEnforceSso(), nil
 }
 
-// IssueDaemonSession replaces earlier sessions. It never expires, SyncDaemon removes it once the daemon is deleted.
+// IssueDaemonSession replaces earlier sessions. It does not expire while the daemon exists. Once that is deleted
+// its next sync removes the session, or the expiry the delete gave it does.
 func (s *Service) IssueDaemonSession(ctx context.Context, daemonID, binding string) (string, error) {
 	if _, err := s.revokeSubject(ctx, daemonID); err != nil {
 		return "", err

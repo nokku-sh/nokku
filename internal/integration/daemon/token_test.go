@@ -119,7 +119,6 @@ func ephemeralToken(t *testing.T, retireAfter time.Duration) (fixture, string) {
 	t.Helper()
 	return enrollToken(t, func(p *db.CreateJoinTokenParams) {
 		p.AutoApprove = true
-		p.Ephemeral = true
 		p.RetireAfter = &retireAfter
 	})
 }

@@ -151,7 +151,7 @@
 
 <PageHeader
 	title="Certificate authorities"
-	description="The SSH and X.509 CAs that sign every login, and their policies"
+	description="The SSH CAs that sign every login, and their policies"
 >
 	{#if can.edit}
 		<Button onclick={() => (create.open = true)}>

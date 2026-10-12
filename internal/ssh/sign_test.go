@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -39,9 +40,6 @@ func TestSignCertificate_Errors(t *testing.T) {
 		nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA,
 	}
 
-	badExt := newTestCA(t)
-	badExt.UserExtensions = []byte("::: not yaml")
-
 	badOpts := newTestCA(t)
 	badOpts.UserCriticalOptions = []byte("::: not yaml")
 
@@ -54,7 +52,6 @@ func TestSignCertificate_Errors(t *testing.T) {
 		{"invalid CA key", badCA, clientKey, "CA signer"},
 		{"invalid public key", ca, "not-a-key", "public key"},
 		{"disallowed key type", rsaOnly, clientKey, "not allowed"},
-		{"bad extensions", badExt, clientKey, "extensions"},
 		{"bad critical options", badOpts, clientKey, "critical options"},
 	}
 	for _, tt := range tests {
@@ -180,8 +177,9 @@ func TestSignUserCertificate(t *testing.T) {
 	if len(cert.ValidPrincipals) != 1 || cert.ValidPrincipals[0] != "user-123" {
 		t.Errorf("unexpected principals: %v", cert.ValidPrincipals)
 	}
-	if _, ok := cert.Permissions.Extensions["permit-pty"]; !ok {
-		t.Errorf("expected permit-pty extension, got %v", cert.Permissions.Extensions)
+	// The same set for every CA, a host decides what a session may do.
+	if !maps.Equal(cert.Permissions.Extensions, userExtensions) {
+		t.Errorf("extensions = %v, want %v", cert.Permissions.Extensions, userExtensions)
 	}
 	// Default user TTL is 24h (plus 1m clock-skew allowance on ValidAfter)
 	if v := validity(cert); v < 24*time.Hour || v > 24*time.Hour+2*time.Minute {

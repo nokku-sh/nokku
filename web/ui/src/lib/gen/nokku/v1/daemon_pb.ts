@@ -78,6 +78,10 @@ export const DaemonSchema: GenMessage<Daemon> = /*@__PURE__*/
   messageDesc(file_nokku_v1_daemon, 0);
 
 /**
+ * What a session on the daemon's host may do, and the one place that says so.
+ * Every user certificate permits the same things, a CA opens or closes
+ * nothing.
+ *
  * @generated from message nokku.v1.DaemonConfig
  */
 export type DaemonConfig = Message<"nokku.v1.DaemonConfig"> & {
@@ -87,6 +91,8 @@ export type DaemonConfig = Message<"nokku.v1.DaemonConfig"> & {
   recordSessions: boolean;
 
   /**
+   * Port forwarding with -L, -R and -D.
+   *
    * @generated from field: bool allow_forwarding = 2;
    */
   allowForwarding: boolean;
@@ -97,6 +103,8 @@ export type DaemonConfig = Message<"nokku.v1.DaemonConfig"> & {
   allowAgentForwarding: boolean;
 
   /**
+   * Lets a -R forward listen on more than the loopback address.
+   *
    * @generated from field: bool gateway_ports = 4;
    */
   gatewayPorts: boolean;

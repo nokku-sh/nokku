@@ -105,10 +105,6 @@ func (s *accountService) ListCredentials(
 	}
 	credentials := make([]*nokkuv1.AccountCredential, 0, len(creds))
 	for _, c := range creds {
-		// The SCIM link is the provider's, not something the user manages.
-		if c.Type == string(iam.MethodSCIM) {
-			continue
-		}
 		credentials = append(credentials, c.ToProto())
 	}
 	return &nokkuv1.ListCredentialsResponse{Credentials: credentials}, nil

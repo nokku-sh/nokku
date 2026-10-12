@@ -13,7 +13,6 @@ import {
 	KeyRound,
 	Mail,
 	Orbit,
-	Radio,
 	Server,
 	ServerCog,
 	Settings,
@@ -109,12 +108,6 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			items: [
 				{ title: 'Workspace', url: '/settings', icon: SlidersHorizontal, shortcut: 's' },
 				{ title: 'Daemons', url: '/settings/daemons', icon: ServerCog },
-				{
-					title: 'Audit streaming',
-					url: '/settings/audit',
-					icon: Radio,
-					role: WorkspaceRole.OWNER
-				},
 				{ title: 'Single sign-on', url: '/settings/sso', icon: KeyRound },
 				{
 					title: 'Billing',

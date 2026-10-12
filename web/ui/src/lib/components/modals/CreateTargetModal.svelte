@@ -25,7 +25,7 @@
 	async function onSubmit() {
 		const res = await createTarget.mutateAsync({ ...model, caId });
 		model = newDraft(TargetSchema);
-		if (res.target) sheet.show(res.target.id, 'access');
+		if (res.target) await sheet.show(res.target.id, 'access');
 	}
 </script>
 

@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"cmp"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -14,16 +15,8 @@ import (
 	nokkuv1 "github.com/nokku-sh/protos/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/internal/crypto"
+	"github.com/nokku-sh/nokku/internal/db"
 )
-
-type CAInfo struct {
-	PrivateKey crypto.EncryptedBytes
-	PublicKey  string
-	NotBefore  time.Time
-	NotAfter   time.Time
-	KeyType    nokkuv1.CertificateKeyType
-	KeyBits    int32
-}
 
 // Keypair holds the effective values after defaults and clamping.
 type Keypair struct {
@@ -86,20 +79,14 @@ func GenerateKey(
 	}
 }
 
-// CAExpiry clamps to 1 month..5 years, default 1 year.
-func CAExpiry(now time.Time, lifetime time.Duration) time.Time {
-	expiry := now.Add(lifetime)
-	if expiry.Before(now.AddDate(0, 1, 0)) || expiry.After(now.AddDate(5, 0, 0)) {
-		return now.AddDate(1, 0, 0)
-	}
-	return expiry
-}
-
+// NewCA makes the key and returns a CA with the settings every new one starts with. They are stated here and
+// nowhere else. The caller names the CA and overrides what a request asks for. No lifetime means a year, the
+// protos keep a requested one between a month and five years.
 func NewCA(
 	keyType nokkuv1.CertificateKeyType,
 	keyBits int32,
 	lifetime time.Duration,
-) (*CAInfo, error) {
+) (*db.CreateCAParams, error) {
 	kp, err := GenerateKey(keyType, keyBits)
 	if err != nil {
 		return nil, err
@@ -115,13 +102,25 @@ func NewCA(
 		return nil, err
 	}
 
+	lifetime = cmp.Or(lifetime, 365*24*time.Hour)
 	now := time.Now()
-	return &CAInfo{
-		PrivateKey: crypto.EncryptedBytes(privDER),
-		PublicKey:  pubStr,
-		NotBefore:  now,
-		NotAfter:   CAExpiry(now, lifetime),
-		KeyType:    kp.Type,
-		KeyBits:    kp.Bits,
+	return &db.CreateCAParams{
+		PrivateKey:          crypto.EncryptedBytes(privDER),
+		PublicKey:           pubStr,
+		NotBefore:           now,
+		NotAfter:            now.Add(lifetime),
+		KeyType:             kp.Type,
+		KeyBits:             kp.Bits,
+		Lifetime:            lifetime,
+		UserDefaultTtl:      5 * 24 * time.Hour,
+		UserMaxTtl:          7 * 24 * time.Hour,
+		UserCriticalOptions: []byte(`{}`),
+		HostDefaultTtl:      90 * 24 * time.Hour,
+		HostMaxTtl:          180 * 24 * time.Hour,
+		AllowedKeyTypes: []nokkuv1.CertificateKeyType{
+			nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA,
+			nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ECDSA,
+			nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519,
+		},
 	}, nil
 }

@@ -24,7 +24,7 @@ const (
 // ErrExportLimit means the caller has to narrow the export, not retry it.
 var ErrExportLimit = errors.New("export limit")
 
-// Event is also the wire format of the webhook sink.
+// Event is one row of the audit log, and its shape in a JSON export.
 type Event struct {
 	ID          string         `json:"id"`
 	Timestamp   time.Time      `json:"timestamp"`
@@ -40,19 +40,34 @@ type Event struct {
 	Details     map[string]any `json:"details,omitempty"`
 }
 
-// Append never fails on a sink error, the caller is usually on a request path.
+// Append writes the event as nokku_system, tenant transactions cannot write audit rows.
 func (s *Service) Append(ctx context.Context, event *Event) error {
 	if event == nil {
 		return nil
 	}
-
-	var errs []error
-	for _, sink := range s.sinks {
-		if err := sink.Append(ctx, event); err != nil {
-			errs = append(errs, err)
-		}
+	if event.WorkspaceID == "" {
+		return errors.New("audit event without a workspace")
 	}
-	return errors.Join(errs...)
+	details, err := json.Marshal(event.Details)
+	if err != nil {
+		return err
+	}
+	// marshal(nil) yields "null", the column wants an object.
+	if string(details) == "null" {
+		details = []byte("{}")
+	}
+	return s.conn.Sys().InsertAuditLog(ctx, &db.InsertAuditLogParams{
+		WorkspaceID: event.WorkspaceID,
+		ActorID:     event.ActorID,
+		ActorKind:   event.ActorKind,
+		ActorName:   event.ActorName,
+		Action:      event.Action,
+		Target:      event.Target,
+		Ok:          event.OK,
+		Ip:          event.IP,
+		UserAgent:   event.UserAgent,
+		Details:     details,
+	})
 }
 
 func (s *Service) List(ctx context.Context, p *db.ListAuditLogsParams) ([]*Event, int32, error) {

@@ -32,13 +32,7 @@ func (s *workspaceService) GetWorkspace(
 	if err != nil {
 		return nil, err
 	}
-	result := workspace.ToProto()
-	// The webhook secret signs events to the customer's SIEM, only the owner manages it and reads it back.
-	if settings := result.GetSettings(); settings != nil &&
-		callerRole(ctx) < nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER {
-		settings.AuditWebhookUrl, settings.AuditWebhookSecret = nil, nil
-	}
-	return &nokkuv1.GetWorkspaceResponse{Workspace: result}, nil
+	return &nokkuv1.GetWorkspaceResponse{Workspace: workspace.ToProto()}, nil
 }
 
 func (s *workspaceService) UpdateWorkspace(

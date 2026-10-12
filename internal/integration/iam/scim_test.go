@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/internal/actor"
+	"github.com/nokku-sh/nokku/internal/db"
 	"github.com/nokku-sh/nokku/internal/iam"
 )
 
@@ -114,6 +115,7 @@ func TestSCIMUserLifecycle(t *testing.T) {
 	u := e.userByEmail(t, o.ws, email)
 	require.NotNil(t, u)
 	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, u.Role)
+	assert.Equal(t, new("okta-42"), u.ScimExternalID)
 
 	var list scimList
 	c.do(http.MethodGet, "/Users?filter="+url.QueryEscape(`userName eq "`+email+`"`), nil, &list)
@@ -135,7 +137,36 @@ func TestSCIMUserLifecycle(t *testing.T) {
 	after := e.userByEmail(t, o.ws, email)
 	require.NotNil(t, after, "deprovisioning deleted the account")
 	assert.False(t, after.Active)
-	assert.Nil(t, e.credential(t, o.ws, iam.MethodSCIM, "", "okta-42"), "the IdP link survived deprovisioning")
+	assert.Nil(t, after.ScimExternalID, "the IdP link survived deprovisioning")
+}
+
+// The IdP link is no way to sign in. The account cannot list or drop it, and its address stays the IdP's.
+func TestSCIMLinkIsNoCredential(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	c := e.scim(t, o)
+	email := "jane.doe@" + testDomain()
+	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Users", scimUser(email, "okta-7"), nil))
+	u := e.userByEmail(t, o.ws, email)
+	require.NotNil(t, u)
+	ctx := as(t.Context(), o.ws, u)
+	// With a second way in, the last one is not what stops a removal.
+	e.putCredential(t, o.ws, db.UpsertCredentialParams{
+		ID: "pk-" + u.ID, UserID: u.ID, Type: string(iam.MethodPasskey), Data: []byte{},
+	})
+
+	creds, err := e.svc.ListCredentials(ctx)
+	require.NoError(t, err)
+	assert.Len(t, creds, 1, "the link is listed as a sign-in method")
+	// The id the link had while it was a row in credentials.
+	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "scim:"+o.ws.ID+":okta-7"), iam.ErrNotFound)
+
+	_, _, err = e.svc.RequestEmailChange(ctx, u, "other@"+testDomain())
+	require.ErrorIs(t, err, iam.ErrManagedAccount)
+
+	// A second account cannot take the same id.
+	other := scimUser("john.roe@"+testDomain(), "okta-7")
+	assert.Equal(t, http.StatusBadRequest, c.do(http.MethodPost, "/Users", other, nil))
 }
 
 // The IdP cannot switch the owner off. Okta and Entra deactivate with PATCH, PUT and POST carry the same flag.

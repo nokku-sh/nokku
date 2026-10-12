@@ -1,6 +1,6 @@
 package iam
 
-// SCIM Users are the workspace's users: id is the user id, userName the email, externalId is in credentials.
+// SCIM Users are the workspace's users: id is the user id, userName the email, externalId is on the row.
 
 import (
 	"context"
@@ -41,11 +41,11 @@ func (h scimUserHandler) Create(r *http.Request, attrs scim.ResourceAttributes) 
 }
 
 func (h scimUserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
-	m, err := h.user(r.Context(), id)
+	u, err := h.user(r.Context(), id)
 	if err != nil {
 		return scim.Resource{}, err
 	}
-	return userResource(m), nil
+	return userResource(u), nil
 }
 
 // GetAll turns the connectors' userName eq "..." lookups into an indexed query.
@@ -64,11 +64,11 @@ func (h scimUserHandler) GetAll(r *http.Request, params scim.ListRequestParams) 
 }
 
 func (h scimUserHandler) Replace(r *http.Request, id string, attrs scim.ResourceAttributes) (scim.Resource, error) {
-	m, err := h.user(r.Context(), id)
+	u, err := h.user(r.Context(), id)
 	if err != nil {
 		return scim.Resource{}, err
 	}
-	if requested := normalizeEmail(scimAttrString(attrs["userName"])); requested != "" && requested != m.User.Email {
+	if requested := normalizeEmail(scimAttrString(attrs["userName"])); requested != "" && requested != u.Email {
 		// userName is the login email and SCIM never renames it.
 		return scim.Resource{}, scimerrors.ScimErrorMutability
 	}
@@ -84,15 +84,15 @@ func (h scimUserHandler) Replace(r *http.Request, id string, attrs scim.Resource
 }
 
 func (h scimUserHandler) Delete(r *http.Request, id string) error {
-	m, err := h.user(r.Context(), id)
+	u, err := h.user(r.Context(), id)
 	if err != nil {
 		return err
 	}
-	return h.svc.scimDeprovisionUser(r.Context(), &m.User)
+	return h.svc.scimDeprovisionUser(r.Context(), u)
 }
 
 func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
-	m, err := h.user(r.Context(), id)
+	u, err := h.user(r.Context(), id)
 	if err != nil {
 		return scim.Resource{}, err
 	}
@@ -114,7 +114,7 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 			name = &n
 			changed = true
 		case "emails":
-			if s := scimEmailValue(value); s != "" && normalizeEmail(s) != m.User.Email {
+			if s := scimEmailValue(value); s != "" && normalizeEmail(s) != u.Email {
 				return scimerrors.ScimErrorMutability
 			}
 		case "externalId":
@@ -136,7 +136,7 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 }
 
 // user answers 404 for anything the workspace does not hold.
-func (h scimUserHandler) user(ctx context.Context, id string) (*db.ListSCIMUsersRow, error) {
+func (h scimUserHandler) user(ctx context.Context, id string) (*db.User, error) {
 	if _, err := uuid.Parse(id); err != nil {
 		return nil, scimerrors.ScimErrorResourceNotFound(id)
 	}
@@ -173,7 +173,7 @@ func (h scimUserHandler) apply(
 				return err
 			}
 		}
-		return linkSCIMCredential(ctx, q, id, externalID)
+		return linkSCIM(ctx, q, id, externalID)
 	})
 	if err != nil {
 		return scim.Resource{}, err
@@ -183,11 +183,11 @@ func (h scimUserHandler) apply(
 			return scim.Resource{}, err
 		}
 	}
-	m, err := h.user(ctx, id)
+	u, err := h.user(ctx, id)
 	if err != nil {
 		return scim.Resource{}, err
 	}
-	return userResource(m), nil
+	return userResource(u), nil
 }
 
 func userNameFilter(v *scimfilter.Validator) *string {
@@ -205,8 +205,7 @@ func userNameFilter(v *scimfilter.Validator) *string {
 	return new(normalizeEmail(s))
 }
 
-func userResource(m *db.ListSCIMUsersRow) scim.Resource {
-	u := m.User
+func userResource(u *db.User) scim.Resource {
 	attrs := scim.ResourceAttributes{
 		"userName": u.Email,
 		"active":   u.Active,
@@ -221,8 +220,8 @@ func userResource(m *db.ListSCIMUsersRow) scim.Resource {
 		Attributes: attrs,
 		Meta:       scim.Meta{Created: &u.CreatedAt, LastModified: &u.UpdatedAt},
 	}
-	if m.ExternalID != "" {
-		out.ExternalID = optional.NewString(m.ExternalID)
+	if u.ScimExternalID != nil {
+		out.ExternalID = optional.NewString(*u.ScimExternalID)
 	}
 	return out
 }

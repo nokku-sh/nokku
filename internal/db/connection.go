@@ -23,7 +23,6 @@ type Connection struct {
 	AppPassword string `env:"NOKKU_DB_APP_PASSWORD"`
 	AutoMigrate bool   `env:"NOKKU_DB_AUTOMIGRATE"  envDefault:"true"`
 	MaxConns    int32  `env:"NOKKU_DB_MAX_CONNS"    envDefault:"20"`
-	MinConns    int32  `env:"NOKKU_DB_MIN_CONNS"    envDefault:"0"`
 
 	// Pool serves request traffic as nokku_app, under RLS.
 	Pool    *pgxpool.Pool
@@ -80,11 +79,7 @@ func (c *Connection) poolConfig() (*pgxpool.Config, error) {
 	if c.MaxConns < 1 {
 		return nil, fmt.Errorf("NOKKU_DB_MAX_CONNS must be greater than zero")
 	}
-	if c.MinConns < 0 || c.MinConns > c.MaxConns {
-		return nil, fmt.Errorf("NOKKU_DB_MIN_CONNS must be between zero and NOKKU_DB_MAX_CONNS")
-	}
 	config.MaxConns = c.MaxConns
-	config.MinConns = c.MinConns
 	config.MaxConnLifetime = 30 * time.Minute
 	config.MaxConnIdleTime = 5 * time.Minute
 	config.HealthCheckPeriod = time.Minute
@@ -114,7 +109,6 @@ func (c *Connection) createPools(ctx context.Context, appConfig *pgxpool.Config)
 	// Never pinned. A leftover pin would send an insert that names no workspace into the wrong one.
 	sysConfig.PrepareConn = nil
 	sysConfig.MaxConns = min(c.MaxConns, 4)
-	sysConfig.MinConns = min(c.MinConns, sysConfig.MaxConns)
 	c.sysPool, err = pgxpool.NewWithConfig(ctx, sysConfig)
 	if err != nil {
 		c.Pool.Close()

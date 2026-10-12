@@ -73,7 +73,11 @@
 		}),
 		columnHelper.accessor('subjectId', {
 			header: 'Who',
-			cell: ({ row }) => renderComponent(WhoCell, { subjectId: row.original.subjectId })
+			cell: ({ row }) =>
+				renderComponent(WhoCell, {
+					subjectId: row.original.subjectId,
+					name: row.original.subjectName
+				})
 		}),
 		columnHelper.accessor('username', {
 			header: 'Account',

@@ -4,12 +4,11 @@ package entitlement
 import "slices"
 
 const (
-	FeatureOIDC           = "oidc"
-	FeatureEnforceSSO     = "enforce_sso"
-	FeatureSCIM           = "scim"
-	FeatureAuditExport    = "audit_export"
-	FeatureAuditStreaming = "audit_streaming"
-	FeatureExternalKMS    = "external_kms"
+	FeatureOIDC        = "oidc"
+	FeatureEnforceSSO  = "enforce_sso"
+	FeatureSCIM        = "scim"
+	FeatureAuditExport = "audit_export"
+	FeatureExternalKMS = "external_kms"
 )
 
 const (
@@ -30,7 +29,6 @@ var CatalogFeatures = []Feature{
 	{FeatureEnforceSSO, "enforced single sign-on", PlanPro},
 	{FeatureAuditExport, "audit log export", PlanPro},
 	{FeatureSCIM, "SCIM provisioning", PlanEnterprise},
-	{FeatureAuditStreaming, "audit log streaming", PlanEnterprise},
 	{FeatureExternalKMS, "external key management", PlanEnterprise},
 }
 

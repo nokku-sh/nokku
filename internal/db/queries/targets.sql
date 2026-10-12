@@ -15,8 +15,8 @@ VALUES
     @name,
     @description,
     @endpoints,
-    COALESCE(@tags, '{}'::TEXT[]),
-    COALESCE(@metadata, '{}'::JSONB),
+    COALESCE(sqlc.narg('tags')::TEXT[], '{}'),
+    COALESCE(sqlc.narg('metadata')::JSONB, '{}'),
     sqlc.narg('host_public_key')
   )
 RETURNING
@@ -82,7 +82,8 @@ SET
   endpoints = COALESCE(sqlc.narg('endpoints'), endpoints),
   tags = COALESCE(sqlc.narg('tags'), tags),
   metadata = COALESCE(sqlc.narg('metadata'), metadata),
-  host_public_key = COALESCE(sqlc.narg('host_public_key'), host_public_key)
+  host_public_key = COALESCE(sqlc.narg('host_public_key'), host_public_key),
+  updated_at = NOW()
 WHERE
   id = @target_id
 RETURNING
@@ -175,13 +176,24 @@ FROM
 ORDER BY
   username ASC;
 
--- name: TouchTargetManualSync :exec
+-- name: ReportManualSync :exec
+-- What nk sync reports about a host without a daemon. An empty value keeps what the target has, and an
+-- unchanged report writes nothing. It is no edit, so updated_at stays.
 UPDATE targets
 SET
-  metadata = COALESCE(metadata, '{}'::jsonb)
-    || jsonb_build_object(
-      'last_manual_sync',
-      to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
-    )
+  endpoints = COALESCE(NULLIF(sqlc.narg('endpoints')::TEXT[], '{}'), endpoints),
+  host_public_key = COALESCE(sqlc.narg('host_public_key'), host_public_key)
+WHERE
+  id = @target_id
+  AND (
+    COALESCE(NULLIF(sqlc.narg('endpoints')::TEXT[], '{}'), endpoints) IS DISTINCT FROM endpoints
+    OR COALESCE(sqlc.narg('host_public_key'), host_public_key) IS DISTINCT FROM host_public_key
+  );
+
+-- name: TouchTargetSync :exec
+-- On its own, a statement that sets the stamp with another column would tell every console.
+UPDATE targets
+SET
+  last_sync_at = NOW()
 WHERE
   id = @target_id;

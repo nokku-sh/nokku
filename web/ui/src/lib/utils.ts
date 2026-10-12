@@ -1,10 +1,5 @@
 export { cn } from 'cn';
-import {
-	durationFromMs,
-	timestampDate,
-	type Duration,
-	type Timestamp
-} from '@bufbuild/protobuf/wkt';
+import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
 import { type DateValue, DateFormatter, getLocalTimeZone } from '@internationalized/date';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -114,8 +109,6 @@ function formatRelative(ts: Timestamp, short = false): string {
 
 	return isFuture ? `in ${str}` : `${str} ago`;
 }
-
-export const secToD = (sec: number): Duration => durationFromMs(sec * 1000);
 
 /** Excludes 0/UNSPECIFIED. */
 export function enumToArray<T extends object>(e: T): { name: string; value: number }[] {

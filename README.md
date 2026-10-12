@@ -187,7 +187,6 @@ The rest is below, grouped by topic. Open what you need.
 | `PGSSLMODE`             | `disable`    | libpq SSL mode                                             |
 | `NOKKU_DB_APP_PASSWORD` | `PGPASSWORD` | Password of the two runtime roles, set at start            |
 | `NOKKU_DB_MAX_CONNS`    | `20`         | Largest pool size                                          |
-| `NOKKU_DB_MIN_CONNS`    | `0`          | Smallest pool size                                         |
 | `NOKKU_DB_AUTOMIGRATE`  | `true`       | Apply migrations on start. Turn off to run them yourself   |
 
 Connect directly, or through a pooler in session mode. A pooler in transaction mode, like PgBouncer with `pool_mode = transaction`, does not work. Nokku keeps state on the connection.
@@ -223,7 +222,6 @@ Lost every passkey? Run `./nokku admin-link` on the server, with the same enviro
 | `NOKKU_SMTP_USERNAME`  |         | Username                                  |
 | `NOKKU_SMTP_PASSWORD`  |         | Password. A login the relay rejects fails the start |
 | `NOKKU_EMAIL_SENDER`   |         | From address, required with SMTP          |
-| `NOKKU_EMAIL_COOLDOWN` | `15m`   | Wait between two mails of the same kind to one person |
 
 Any SMTP relay works. Without email, people sign in with passkeys or an identity provider, and invitations are links you hand over yourself.
 
@@ -283,7 +281,7 @@ The other standard `OTEL_*` variables work too. To trace one request in ten, set
 
 </details>
 
-Three things live in [SECURITY.md](./SECURITY.md#running-nokku-securely) instead: key management with a KMS, rotating the secret, and `NOKKU_ALLOW_PRIVATE_NETWORKS`, which you need when your identity provider or SIEM is on a private address.
+Three things live in [SECURITY.md](./SECURITY.md#running-nokku-securely) instead: key management with a KMS, rotating the secret, and `NOKKU_ALLOW_PRIVATE_NETWORKS`, which you need when your identity provider is on a private address.
 
 ## Before you go live
 

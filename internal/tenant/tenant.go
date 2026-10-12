@@ -241,16 +241,8 @@ func Create(ctx context.Context, conn *db.Connection, slug, name string) (*db.Wo
 		if err := q.InitSubscription(ctx); err != nil {
 			return err
 		}
-		row, err := q.CreateCA(ctx, &db.CreateCAParams{
-			Name:        "Default CA",
-			Description: new("Default CA for " + ws.Name),
-			PrivateKey:  ca.PrivateKey,
-			PublicKey:   ca.PublicKey,
-			NotBefore:   ca.NotBefore,
-			NotAfter:    ca.NotAfter,
-			KeyType:     ca.KeyType,
-			KeyBits:     ca.KeyBits,
-		})
+		ca.Name, ca.Description = "Default CA", new("Default CA for "+ws.Name)
+		row, err := q.CreateCA(ctx, ca)
 		if err != nil {
 			return err
 		}
