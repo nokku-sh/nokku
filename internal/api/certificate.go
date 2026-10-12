@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nokku-sh/nokku/internal/actor"
@@ -39,9 +40,10 @@ func (s *certificateService) CreateCertificateAuthority(
 		return nil, errInternal
 	}
 
-	if ca.UserCriticalOptions, err = db.ValidateCriticalOptions(req.GetUserCriticalOptions()); err != nil {
-		return nil, newError(connect.CodeInvalidArgument, "invalid critical options")
+	if ca.SourceAddress, err = ssh.SourceAddresses(req.GetSourceAddress()); err != nil {
+		return nil, newError(connect.CodeInvalidArgument, err.Error())
 	}
+	ca.ForceCommand = strings.TrimSpace(req.GetForceCommand())
 	ca.Name, ca.Description = req.GetName(), req.Description
 	if len(req.GetAllowedKeyTypes()) > 0 {
 		ca.AllowedKeyTypes = req.GetAllowedKeyTypes()
@@ -110,23 +112,28 @@ func (s *certificateService) UpdateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.UpdateCertificateAuthorityRequest,
 ) (*nokkuv1.UpdateCertificateAuthorityResponse, error) {
-	userCriticalOptions, err := db.ValidateCriticalOptions(req.GetUserCriticalOptions())
-	if err != nil {
-		return nil, newError(connect.CodeInvalidArgument, "invalid critical options")
-	}
-
 	params := &db.UpdateCAParams{
-		CaID:                req.GetId(),
-		Name:                req.Name,
-		Description:         req.Description,
-		IsActive:            req.IsActive,
-		UserCriticalOptions: userCriticalOptions,
-		AllowedKeyTypes:     req.GetAllowedKeyTypes(),
-		Lifetime:            optDuration(req.GetLifetime()),
-		UserDefaultTtl:      optDuration(req.GetUserDefaultTtl()),
-		UserMaxTtl:          optDuration(req.GetUserMaxTtl()),
-		HostDefaultTtl:      optDuration(req.GetHostDefaultTtl()),
-		HostMaxTtl:          optDuration(req.GetHostMaxTtl()),
+		CaID:            req.GetId(),
+		Name:            req.Name,
+		Description:     req.Description,
+		IsActive:        req.IsActive,
+		AllowedKeyTypes: req.GetAllowedKeyTypes(),
+		Lifetime:        optDuration(req.GetLifetime()),
+		UserDefaultTtl:  optDuration(req.GetUserDefaultTtl()),
+		UserMaxTtl:      optDuration(req.GetUserMaxTtl()),
+		HostDefaultTtl:  optDuration(req.GetHostDefaultTtl()),
+		HostMaxTtl:      optDuration(req.GetHostMaxTtl()),
+	}
+	// Unset keeps what the CA has, empty takes the restriction away.
+	if req.ForceCommand != nil {
+		params.ForceCommand = new(strings.TrimSpace(req.GetForceCommand()))
+	}
+	if req.SourceAddress != nil {
+		list, err := ssh.SourceAddresses(req.GetSourceAddress())
+		if err != nil {
+			return nil, newError(connect.CodeInvalidArgument, err.Error())
+		}
+		params.SourceAddress = &list
 	}
 
 	// Only becoming the default moves it. Unsetting leaves none, which the enroll fallback and the UI handle.

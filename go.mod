@@ -25,7 +25,7 @@ require (
 	github.com/mizuchilabs/inkan/license v0.1.0
 	github.com/mizuchilabs/kata v0.1.15
 	github.com/moby/moby/api v1.56.1
-	github.com/nokku-sh/protos v0.2.11
+	github.com/nokku-sh/protos v0.2.12
 	github.com/oauth2-proxy/mockoidc v0.0.0-20240214162133-caebfff84d25
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/scaleway/scaleway-sdk-go v1.38.0

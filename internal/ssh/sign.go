@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"net"
 	"slices"
 	"strings"
 	"time"
@@ -99,10 +100,7 @@ func SignCertificate(
 	} else {
 		cert.CertType = ssh.UserCert
 		ttl = UserTTL(ca, ttl)
-		cert.Permissions, err = userPermissions(ca)
-		if err != nil {
-			return nil, err
-		}
+		cert.Permissions = userPermissions(ca)
 	}
 	cert.ValidBefore = UnixUint64(time.Now().Add(ttl).Unix())
 
@@ -133,15 +131,34 @@ var userExtensions = map[string]string{
 	"permit-agent-forwarding": "",
 }
 
-func userPermissions(ca *db.SSHCA) (ssh.Permissions, error) {
-	criticalOptions, err := db.ParseCriticalOptionsMap(ca.UserCriticalOptions)
-	if err != nil {
-		return ssh.Permissions{}, fmt.Errorf("failed to parse critical options: %w", err)
+func userPermissions(ca *db.SSHCA) ssh.Permissions {
+	perms := ssh.Permissions{Extensions: maps.Clone(userExtensions), CriticalOptions: map[string]string{}}
+	if ca.ForceCommand != "" {
+		perms.CriticalOptions["force-command"] = ca.ForceCommand
 	}
-	return ssh.Permissions{
-		Extensions:      maps.Clone(userExtensions),
-		CriticalOptions: criticalOptions,
-	}, nil
+	if ca.SourceAddress != "" {
+		perms.CriticalOptions["source-address"] = ca.SourceAddress
+	}
+	return perms
+}
+
+// SourceAddresses tidies a list of addresses and CIDRs into the form a certificate carries. sshd and nokkud split
+// it on commas and trim nothing, so a space or a typo would refuse everyone the entries before it do not match.
+func SourceAddresses(list string) (string, error) {
+	var entries []string
+	for entry := range strings.SplitSeq(list, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if net.ParseIP(entry) == nil {
+			if _, _, err := net.ParseCIDR(entry); err != nil {
+				return "", fmt.Errorf("%q is neither an address nor a CIDR", entry)
+			}
+		}
+		entries = append(entries, entry)
+	}
+	return strings.Join(entries, ","), nil
 }
 
 func isAllowedKeyType(

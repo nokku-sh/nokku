@@ -274,12 +274,6 @@ func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 		return nil
 	}
 
-	criticalOptions, err := ParseCriticalOptionsMap(r.UserCriticalOptions)
-	if err != nil {
-		slog.Warn("failed to parse critical options", "error", err)
-		criticalOptions = nil
-	}
-
 	return &nokkuv1.CertificateAuthority{
 		Id:                   &r.ID,
 		Name:                 &r.Name,
@@ -295,7 +289,8 @@ func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 		UpdatedAt:            SafeTimestamp(&r.UpdatedAt),
 		UserDefaultTtl:       durationpb.New(r.UserDefaultTtl),
 		UserMaxTtl:           durationpb.New(r.UserMaxTtl),
-		UserCriticalOptions:  criticalOptions,
+		ForceCommand:         &r.ForceCommand,
+		SourceAddress:        &r.SourceAddress,
 		AllowedKeyTypes:      r.AllowedKeyTypes,
 		Lifetime:             durationpb.New(r.Lifetime),
 		HostDefaultTtl:       durationpb.New(r.HostDefaultTtl),

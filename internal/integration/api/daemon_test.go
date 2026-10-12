@@ -242,8 +242,7 @@ func TestCreateSession(t *testing.T) {
 			UserDefaultTtl: ca.UserDefaultTtl,
 			UserMaxTtl:     ca.UserMaxTtl,
 			// The key of the session is made by the server, so every type is let in.
-			UserCriticalOptions: []byte(`{}`),
-			AllowedKeyTypes:     []nokkuv1.CertificateKeyType{1, 2, 3},
+			AllowedKeyTypes: []nokkuv1.CertificateKeyType{1, 2, 3},
 		})
 		if err != nil {
 			return err

@@ -57,10 +57,9 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 		INSERT INTO sso_providers (workspace_id, provider_id) VALUES ($1, 'idp');
 		INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci');
 		INSERT INTO ssh_cas (workspace_id, name, private_key, public_key, not_before, not_after, key_type, key_bits,
-			lifetime, user_default_ttl, user_max_ttl, user_critical_options,
-			host_default_ttl, host_max_ttl, allowed_key_types)
+			lifetime, user_default_ttl, user_max_ttl, host_default_ttl, host_max_ttl, allowed_key_types)
 		VALUES ($1, 'ca', 'key', 'pub', NOW(), NOW() + INTERVAL '1 day', 3, 256,
-			'1 day', '1 hour', '1 hour', '{}', '1 hour', '1 hour', '{3}');
+			'1 day', '1 hour', '1 hour', '1 hour', '1 hour', '{3}');
 		WITH t AS (
 			INSERT INTO join_tokens (id, workspace_id, kind, token_hash) VALUES (uuidv7(), $1, 1, 'hash') RETURNING id
 		)
