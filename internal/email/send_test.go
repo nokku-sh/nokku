@@ -277,7 +277,8 @@ func TestSendTemplate_MessageAndData(t *testing.T) {
 	if msg.Subject != "New sign-in from Web browser" {
 		t.Errorf("subject = %q", msg.Subject)
 	}
-	if !strings.Contains(msg.Text, "203.0.113.7") || !strings.Contains(msg.Text, "https://app.nokku.sh/profile/security") {
+	if !strings.Contains(msg.Text, "203.0.113.7") ||
+		!strings.Contains(msg.Text, "https://app.nokku.sh/profile/security") {
 		t.Error("text part missing the IP address or the profile URL")
 	}
 }
