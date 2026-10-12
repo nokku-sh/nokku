@@ -223,7 +223,8 @@ CREATE TABLE ssh_cas (
   lifetime INTERVAL NOT NULL, -- of the next key, a rollover reads it
   user_default_ttl INTERVAL NOT NULL,
   user_max_ttl INTERVAL NOT NULL,
-  user_critical_options JSONB NOT NULL,
+  force_command TEXT NOT NULL DEFAULT '', -- runs instead of what the user asks for
+  source_address TEXT NOT NULL DEFAULT '', -- addresses and CIDRs a login may come from, comma separated
   host_default_ttl INTERVAL NOT NULL,
   host_max_ttl INTERVAL NOT NULL,
   allowed_key_types INTEGER[] NOT NULL,

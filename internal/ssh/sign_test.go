@@ -40,9 +40,6 @@ func TestSignCertificate_Errors(t *testing.T) {
 		nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA,
 	}
 
-	badOpts := newTestCA(t)
-	badOpts.UserCriticalOptions = []byte("::: not yaml")
-
 	tests := []struct {
 		name    string
 		ca      *db.SSHCA
@@ -52,7 +49,6 @@ func TestSignCertificate_Errors(t *testing.T) {
 		{"invalid CA key", badCA, clientKey, "CA signer"},
 		{"invalid public key", ca, "not-a-key", "public key"},
 		{"disallowed key type", rsaOnly, clientKey, "not allowed"},
-		{"bad critical options", badOpts, clientKey, "critical options"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -148,11 +144,36 @@ func TestGetKeyType(t *testing.T) {
 	}
 }
 
-func TestUserPermissions_BadInput(t *testing.T) {
+func TestUserPermissions_Restrictions(t *testing.T) {
 	ca := newTestCA(t)
-	ca.UserCriticalOptions = []byte("::: not yaml")
-	if _, err := userPermissions(ca); err == nil {
-		t.Error("expected error for invalid critical options")
+	if got := userPermissions(ca).CriticalOptions; len(got) != 0 {
+		t.Errorf("a CA without restrictions wrote %v", got)
+	}
+
+	ca.ForceCommand, ca.SourceAddress = "/usr/local/bin/backup", "10.0.0.0/8,192.0.2.7"
+	want := map[string]string{"force-command": "/usr/local/bin/backup", "source-address": "10.0.0.0/8,192.0.2.7"}
+	if got := userPermissions(ca).CriticalOptions; !maps.Equal(got, want) {
+		t.Errorf("critical options = %v, want %v", got, want)
+	}
+}
+
+// sshd and nokkud split the list on commas and trim nothing, so it is stored the way they read it.
+func TestSourceAddresses(t *testing.T) {
+	for in, want := range map[string]string{
+		"":                            "",
+		" , ":                         "",
+		"10.0.0.0/8, 192.168.1.10":    "10.0.0.0/8,192.168.1.10",
+		" 2001:db8::/32 ,2001:db8::1": "2001:db8::/32,2001:db8::1",
+	} {
+		got, err := SourceAddresses(in)
+		if err != nil || got != want {
+			t.Errorf("SourceAddresses(%q) = %q, %v, want %q", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"office", "10.0.0.0/33", "10.0.0.1 10.0.0.2"} {
+		if _, err := SourceAddresses(in); err == nil {
+			t.Errorf("SourceAddresses(%q) took a list no server can read", in)
+		}
 	}
 }
 

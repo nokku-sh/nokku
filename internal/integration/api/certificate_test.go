@@ -177,3 +177,42 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 	assert.WithinDuration(t, time.Now().Add(time.Hour), validUntil(long), time.Minute,
 		"a token that never expires gets the hour, the cap follows the token and not the account")
 }
+
+// A CA stores its source addresses the way a server reads them, and refuses a list no server can read.
+func TestCARestrictions(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	admin := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	))
+
+	created, err := admin.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
+		Name:          new(uniq("restricted")),
+		KeyType:       nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519.Enum(),
+		ForceCommand:  new(" /usr/local/bin/backup "),
+		SourceAddress: new("10.0.0.0/8, 192.0.2.7"),
+	})
+	require.NoError(t, err)
+	ca := created.GetCertificateAuthority()
+	assert.Equal(t, "/usr/local/bin/backup", ca.GetForceCommand())
+	assert.Equal(t, "10.0.0.0/8,192.0.2.7", ca.GetSourceAddress())
+
+	_, err = admin.UpdateCertificateAuthority(t.Context(), &nokkuv1.UpdateCertificateAuthorityRequest{
+		Id: ca.Id, SourceAddress: new("the office"),
+	})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
+
+	// An update that names neither keeps both, an empty one takes the restriction away.
+	renamed, err := admin.UpdateCertificateAuthority(t.Context(), &nokkuv1.UpdateCertificateAuthorityRequest{
+		Id: ca.Id, Name: new(uniq("renamed")),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "10.0.0.0/8,192.0.2.7", renamed.GetCertificateAuthority().GetSourceAddress())
+	cleared, err := admin.UpdateCertificateAuthority(t.Context(), &nokkuv1.UpdateCertificateAuthorityRequest{
+		Id: ca.Id, SourceAddress: new(""),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, cleared.GetCertificateAuthority().GetSourceAddress())
+	assert.Equal(t, "/usr/local/bin/backup", cleared.GetCertificateAuthority().GetForceCommand())
+}

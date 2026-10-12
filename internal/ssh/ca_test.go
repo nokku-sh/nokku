@@ -23,15 +23,14 @@ func newTestCA(t *testing.T) *db.SSHCA {
 		t.Fatalf("NewCA failed: %v", err)
 	}
 	return &db.SSHCA{
-		PrivateKey:          info.PrivateKey,
-		PublicKey:           info.PublicKey,
-		KeyType:             info.KeyType,
-		UserDefaultTtl:      24 * time.Hour,
-		UserMaxTtl:          168 * time.Hour,
-		HostDefaultTtl:      2160 * time.Hour,
-		HostMaxTtl:          4320 * time.Hour,
-		AllowedKeyTypes:     []nokkuv1.CertificateKeyType{1, 2, 3},
-		UserCriticalOptions: []byte(`{}`),
+		PrivateKey:      info.PrivateKey,
+		PublicKey:       info.PublicKey,
+		KeyType:         info.KeyType,
+		UserDefaultTtl:  24 * time.Hour,
+		UserMaxTtl:      168 * time.Hour,
+		HostDefaultTtl:  2160 * time.Hour,
+		HostMaxTtl:      4320 * time.Hour,
+		AllowedKeyTypes: []nokkuv1.CertificateKeyType{1, 2, 3},
 	}
 }
 

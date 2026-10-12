@@ -186,7 +186,8 @@ type SSHCA struct {
 	Lifetime             time.Duration              `json:"lifetime"`
 	UserDefaultTtl       time.Duration              `json:"userDefaultTtl"`
 	UserMaxTtl           time.Duration              `json:"userMaxTtl"`
-	UserCriticalOptions  []byte                     `json:"userCriticalOptions"`
+	ForceCommand         string                     `json:"forceCommand"`
+	SourceAddress        string                     `json:"sourceAddress"`
 	HostDefaultTtl       time.Duration              `json:"hostDefaultTtl"`
 	HostMaxTtl           time.Duration              `json:"hostMaxTtl"`
 	AllowedKeyTypes      []nokku.CertificateKeyType `json:"allowedKeyTypes"`

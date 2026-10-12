@@ -70,15 +70,6 @@
 		save();
 	}
 
-	function setOption(key: string, value: string | undefined) {
-		if (!model) return;
-		const next = { ...model.userCriticalOptions };
-		if (value === undefined || (value === '' && key !== 'verify-required')) delete next[key];
-		else next[key] = value;
-		model.userCriticalOptions = next;
-		save();
-	}
-
 	function askRollover() {
 		if (!entity) return;
 		void confirm({
@@ -315,9 +306,9 @@
 						<Input
 							id="ca-force-command"
 							class="font-mono"
-							value={model.userCriticalOptions['force-command'] ?? ''}
+							bind:value={model.forceCommand}
 							disabled={!can.edit}
-							oninput={(e) => setOption('force-command', e.currentTarget.value)}
+							oninput={save}
 							placeholder="/usr/local/bin/backup"
 						/>
 						<Field.Description>Runs this instead of whatever the user asks for.</Field.Description>
@@ -327,24 +318,14 @@
 						<Input
 							id="ca-source-address"
 							class="font-mono"
-							value={model.userCriticalOptions['source-address'] ?? ''}
+							bind:value={model.sourceAddress}
 							disabled={!can.edit}
-							oninput={(e) => setOption('source-address', e.currentTarget.value)}
+							onchange={save}
 							placeholder="10.0.0.0/8, 192.168.1.10"
 						/>
-						<Field.Description>Comma separated CIDRs. Leave empty to allow any.</Field.Description>
-					</Field.Field>
-					<Field.Field orientation="horizontal">
-						<Field.Content>
-							<Field.Label for="ca-verify">Require PIN or biometrics</Field.Label>
-							<Field.Description>For FIDO security keys, not just a touch.</Field.Description>
-						</Field.Content>
-						<Switch
-							id="ca-verify"
-							checked={model.userCriticalOptions['verify-required'] !== undefined}
-							disabled={!can.edit}
-							onCheckedChange={(v) => setOption('verify-required', v ? '' : undefined)}
-						/>
+						<Field.Description>
+							Addresses and CIDRs, separated by commas. Leave empty to allow any.
+						</Field.Description>
 					</Field.Field>
 				</Field.Group>
 			</Section>
