@@ -10,10 +10,12 @@ runs:
       shell: bash
       run: echo "GOFLAGS=-tags=integration" >> "$GITHUB_ENV"
 
-    - name: Install the clients the nokkud interop tests drive
+    # ssh and rsync are what the nokkud interop tests drive. libssl-dev is for the
+    # cgo TPM simulator in the tests, the home runners do not ship it.
+    - name: Install test dependencies
       if: runner.os == 'Linux'
       shell: bash
-      run: sudo apt-get update && sudo apt-get install -y openssh-client rsync
+      run: sudo apt-get update && sudo apt-get install -y openssh-client rsync libssl-dev
 
     # The TPM simulator in the tests is cgo and needs OpenSSL headers, which
     # macOS only has through Homebrew.
