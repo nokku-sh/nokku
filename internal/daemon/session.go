@@ -95,7 +95,6 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 		Username:      cfg.Username,
 		Signer:        signer,
 		CAKey:         caKey,
-		SessionID:     cfg.SessionID,
 	})
 	if err != nil {
 		p.UnregisterRelay(relayID)

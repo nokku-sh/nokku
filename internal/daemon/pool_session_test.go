@@ -184,7 +184,7 @@ func TestPool_StartSession_EndsWithContext(t *testing.T) {
 	}
 }
 
-// A full web session over a real in-process SSH server: env, pty, stdin echo, resize and Close.
+// A full web session over a real in-process SSH server: the cert, pty, stdin echo, resize and Close.
 func TestPool_StartSession(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -193,13 +193,17 @@ func TestPool_StartSession(t *testing.T) {
 	s := startTestSession(t, p, srv, "web-1")
 
 	deadline := time.After(2 * time.Second)
-	for srv.Env("NOKKU_SESSION_ID") != "web-1" {
+	for !srv.ShellStarted() {
 		select {
 		case <-deadline:
-			t.Fatalf("session env never arrived, got %q", srv.Env("NOKKU_SESSION_ID"))
+			t.Fatal("shell request never arrived")
 		default:
 		}
 		time.Sleep(time.Millisecond)
+	}
+	// The daemon reads the recording id from the key id, so the session id has to travel there.
+	if got := srv.KeyID(); got != "nokku:web:session:web-1" {
+		t.Errorf("certificate key id = %q, want nokku:web:session:web-1", got)
 	}
 	if _, cols, rows := srv.Pty(); cols != 80 || rows != 24 {
 		t.Errorf("pty size = %dx%d, want 80x24", cols, rows)
