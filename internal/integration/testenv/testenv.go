@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,12 +26,32 @@ const (
 
 	// VaultToken is the root token of the server Vault starts.
 	VaultToken = "root"
+
+	startAttempts = 4
 )
+
+// run starts a container, and starts another when the host port of the first was taken. Docker picks that port
+// without asking, and a rootless one cannot even see what the host has bound. The test binaries of the other
+// packages open sockets at the same time, so now and then it picks one of theirs.
+func run(
+	ctx context.Context,
+	image string,
+	opts ...testcontainers.ContainerCustomizer,
+) (*testcontainers.DockerContainer, error) {
+	for attempt := 1; ; attempt++ {
+		c, err := testcontainers.Run(ctx, image, opts...)
+		if err == nil || attempt == startAttempts || !strings.Contains(err.Error(), "address already in use") {
+			return c, err
+		}
+		// Run hands the container back even when it did not come up.
+		_ = testcontainers.TerminateContainer(c)
+	}
+}
 
 // Postgres starts an empty server and points the PG* environment at it. Call it from TestMain, run stop after.
 func Postgres() (stop func()) {
 	ctx := context.Background()
-	c, err := testcontainers.Run(ctx, postgresImage,
+	c, err := run(ctx, postgresImage,
 		testcontainers.WithEnv(map[string]string{
 			"POSTGRES_USER":     "postgres",
 			"POSTGRES_PASSWORD": "postgres",
@@ -45,7 +66,7 @@ func Postgres() (stop func()) {
 			wait.ForListeningPort("5432/tcp"),
 		),
 	)
-	// Run hands the container back even when it did not come up.
+	// The container comes back even when it did not come up.
 	stop = func() { _ = testcontainers.TerminateContainer(c) }
 	if err == nil {
 		err = pointEnvAt(ctx, c)
@@ -85,7 +106,7 @@ func pointEnvAt(ctx context.Context, c *testcontainers.DockerContainer) error {
 // Keycloak starts a dev server for the test and returns its root URL. The admin is admin with the password admin.
 func Keycloak(t *testing.T) string {
 	t.Helper()
-	c, err := testcontainers.Run(t.Context(), keycloakImage,
+	c, err := run(t.Context(), keycloakImage,
 		testcontainers.WithCmd("start-dev"),
 		testcontainers.WithEnv(map[string]string{
 			"KEYCLOAK_ADMIN":          "admin",
@@ -106,7 +127,7 @@ func Keycloak(t *testing.T) string {
 // Vault starts a dev server and returns its host and port. It serves TLS, nokku only talks https to Vault.
 func Vault(t *testing.T) string {
 	t.Helper()
-	c, err := testcontainers.Run(t.Context(), vaultImage,
+	c, err := run(t.Context(), vaultImage,
 		testcontainers.WithCmd("server", "-dev", "-dev-tls"),
 		testcontainers.WithEnv(map[string]string{"VAULT_DEV_ROOT_TOKEN_ID": VaultToken}),
 		testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
