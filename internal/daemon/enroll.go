@@ -78,7 +78,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 	// An ephemeral box that comes back under its name takes over from the one that went away. Before the
 	// quota, since the old one frees what the new one takes.
 	wanted, named := namegen.FromHostname(in.ReqMetadata["hostname"])
-	if token.Ephemeral && named {
+	if token.RetireAfter != nil && named {
 		if err := replaceOffline(ctx, conn, token.ID, wanted); err != nil {
 			return nil, err
 		}
@@ -150,7 +150,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 				return err
 			}
 			cfg := db.ResolveDaemonConfig(config)
-			cfg.Ephemeral = &token.Ephemeral
+			cfg.Ephemeral = new(token.RetireAfter != nil)
 			out = &Enrolled{
 				DaemonID: created.ID,
 				Name:     created.Name,

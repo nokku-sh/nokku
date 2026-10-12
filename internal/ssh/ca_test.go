@@ -31,7 +31,6 @@ func newTestCA(t *testing.T) *db.SSHCA {
 		HostDefaultTtl:      2160 * time.Hour,
 		HostMaxTtl:          4320 * time.Hour,
 		AllowedKeyTypes:     []nokkuv1.CertificateKeyType{1, 2, 3},
-		UserExtensions:      []byte(`{"permit-pty":""}`),
 		UserCriticalOptions: []byte(`{}`),
 	}
 }
@@ -99,6 +98,9 @@ func TestNewCA(t *testing.T) {
 	if info.KeyType != nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519 {
 		t.Errorf("expected ED25519 default, got %v", info.KeyType)
 	}
+	if info.Lifetime != 365*24*time.Hour || !info.NotAfter.Equal(info.NotBefore.Add(info.Lifetime)) {
+		t.Errorf("no lifetime should mean a year, got %v until %v", info.Lifetime, info.NotAfter)
+	}
 }
 
 func TestGenerateKeyClampsBits(t *testing.T) {
@@ -119,18 +121,5 @@ func TestGenerateKeyClampsBits(t *testing.T) {
 	}
 	if kp.Bits != 256 {
 		t.Errorf("expected ECDSA bits clamped to 256, got %d", kp.Bits)
-	}
-}
-
-func TestCAExpiry(t *testing.T) {
-	now := time.Now()
-	if got := CAExpiry(now, 8760*time.Hour); !got.Equal(now.Add(8760 * time.Hour)) {
-		t.Errorf("valid lifetime should pass through, got %v", got)
-	}
-	if got := CAExpiry(now, time.Hour); !got.Equal(now.AddDate(1, 0, 0)) {
-		t.Errorf("too-short lifetime should default to 1y, got %v", got)
-	}
-	if got := CAExpiry(now, 200000*time.Hour); !got.Equal(now.AddDate(1, 0, 0)) {
-		t.Errorf("too-long lifetime should default to 1y, got %v", got)
 	}
 }

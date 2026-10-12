@@ -21,7 +21,7 @@
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
-	import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt';
+	import { timestampDate } from '@bufbuild/protobuf/wkt';
 	import {
 		ChevronDown,
 		Copy,
@@ -66,23 +66,18 @@
 	const online = $derived(!!linkedDaemon?.online);
 	const accounts = $derived(entity?.accounts ?? []);
 	const withAccess = $derived(new Set(accounts.flatMap((p) => grantsOf(p).map((g) => g.id))).size);
-	const lastSyncAt = $derived.by(() => {
-		const at = new Date(entity?.metadata?.['last_manual_sync'] ?? '');
-		return Number.isNaN(at.getTime()) ? undefined : at;
-	});
-	const lastSynced = $derived(
-		lastSyncAt ? formatTs(timestampFromDate(lastSyncAt), 'relative-short') : ''
-	);
+	const lastSynced = $derived(formatTs(entity?.lastSyncAt, 'relative-short'));
 	// The server only learns a new CA key from nk sync.
 	const caRotated = $derived.by(() => {
 		const rotatedAt = (caList.find((c) => c.id === entity?.caId) ?? caList.find((c) => c.isDefault))
 			?.notBefore;
-		return !!lastSyncAt && !!rotatedAt && timestampDate(rotatedAt) > lastSyncAt;
+		const syncedAt = entity?.lastSyncAt;
+		return !!syncedAt && !!rotatedAt && timestampDate(rotatedAt) > timestampDate(syncedAt);
 	});
 	const syncCommand = $derived(`nk sync ${model?.name ?? '<name>'}`);
 	const systemInfo = $derived(
 		Object.entries(entity?.metadata ?? {})
-			.filter(([key]) => key !== 'last_manual_sync' && key !== 'tags')
+			.filter(([key]) => key !== 'tags')
 			.map(([key, value]) => ({ label: key.replace(/[-_]/g, ' '), value, mono: true }))
 	);
 

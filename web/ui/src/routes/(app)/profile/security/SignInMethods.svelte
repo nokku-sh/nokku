@@ -2,6 +2,7 @@
 	import { auth } from '#lib/api/auth.svelte.js';
 	import { credentials } from '#lib/api/credential.svelte.js';
 	import { registerPasskey } from '#lib/api/passkey.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import { OIDCIcon } from '#lib/assets/index.js';
 	import Section from '#lib/components/sheets/Section.svelte';
 	import { Badge } from '#lib/components/ext/badge/index.js';
@@ -23,10 +24,11 @@
 	const remove = credentials.remove();
 	const rename = credentials.rename();
 	const options = auth.options();
+	const me = user.self();
 
 	const passkeys = $derived((all.data ?? []).filter((c) => c.type === 'passkey'));
 	const linked = $derived((all.data ?? []).filter((c) => c.type === 'oidc'));
-	const scim = $derived((all.data ?? []).some((c) => c.type === 'scim'));
+	const scim = $derived(!!me.data?.scimManaged);
 
 	// With email links on, a lost passkey is not a lockout. Otherwise the last method stays.
 	const magicLink = $derived(options.data?.magicLink ?? false);

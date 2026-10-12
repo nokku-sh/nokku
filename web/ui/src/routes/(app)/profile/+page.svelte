@@ -32,8 +32,10 @@
 	const deleteAccount = user.deleteAccount();
 	const requestEmailChange = user.requestEmailChange();
 	const creds = credentials.all();
-	// An identity provider owns the address of the accounts it signs in.
-	const managed = $derived((creds.data ?? []).some((c) => c.type === 'oidc' || c.type === 'scim'));
+	// An identity provider owns the address of the accounts it signs in or provisions.
+	const managed = $derived(
+		!!me.data?.scimManaged || (creds.data ?? []).some((c) => c.type === 'oidc')
+	);
 	const isOwner = $derived(me.data?.role === WorkspaceRole.OWNER);
 
 	let emailOpen = $state(false);

@@ -50,7 +50,7 @@ func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	require.False(t, before.GetActive())
 	billing, err := sut.GetBilling(ctx, &nokkuv1.GetBillingRequest{})
 	require.NoError(t, err)
-	require.False(t, billing.GetFeatures()[entitlement.FeatureAuditStreaming], "Community has no streaming")
+	require.False(t, billing.GetFeatures()[entitlement.FeatureSCIM], "Community has no SCIM")
 
 	_, err = sut.ActivateLicense(ctx, &nokkuv1.ActivateLicenseRequest{Key: &key})
 	require.NoError(t, err)
@@ -59,10 +59,10 @@ func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, after.GetActive(), "the key must apply without a restart")
 	assert.Equal(t, entitlement.PlanEnterprise, after.GetPlan())
-	// The reported bug: a self-hosted instance with a valid Enterprise license must see streaming.
+	// The reported bug: a self-hosted instance with a valid Enterprise license must see what the plan adds.
 	billing, err = sut.GetBilling(ctx, &nokkuv1.GetBillingRequest{})
 	require.NoError(t, err)
-	assert.True(t, billing.GetFeatures()[entitlement.FeatureAuditStreaming])
+	assert.True(t, billing.GetFeatures()[entitlement.FeatureSCIM])
 
 	restarted, err := entitlement.New(ctx, cfg.Conn, pubHex, modeSelfHosted)
 	require.NoError(t, err)

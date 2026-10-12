@@ -255,43 +255,6 @@ func (q *Queries) ListUnclaimedWorkspaces(ctx context.Context, cutoff time.Time)
 	return items, nil
 }
 
-const listWorkspaceAuditWebhooks = `-- name: ListWorkspaceAuditWebhooks :many
-SELECT
-  id,
-  (settings ->> 'audit_webhook_url')::text AS webhook_url,
-  (settings ->> 'audit_webhook_secret')::text AS webhook_secret
-FROM workspaces
-WHERE
-  coalesce(settings ->> 'audit_webhook_url', '') <> ''
-`
-
-type ListWorkspaceAuditWebhooksRow struct {
-	ID            string `json:"id"`
-	WebhookURL    string `json:"webhookUrl"`
-	WebhookSecret string `json:"webhookSecret"`
-}
-
-// Cross-tenant read, must run as nokku_system.
-func (q *Queries) ListWorkspaceAuditWebhooks(ctx context.Context) ([]*ListWorkspaceAuditWebhooksRow, error) {
-	rows, err := q.db.Query(ctx, listWorkspaceAuditWebhooks)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*ListWorkspaceAuditWebhooksRow
-	for rows.Next() {
-		var i ListWorkspaceAuditWebhooksRow
-		if err := rows.Scan(&i.ID, &i.WebhookURL, &i.WebhookSecret); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const updateWorkspace = `-- name: UpdateWorkspace :one
 UPDATE workspaces
 SET

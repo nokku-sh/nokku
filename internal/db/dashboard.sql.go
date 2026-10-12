@@ -166,7 +166,7 @@ func (q *Queries) ListOpenRecordings(ctx context.Context, seenAfter time.Time) (
 
 const listSoonestCAs = `-- name: ListSoonestCAs :many
 SELECT
-  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 FROM
   ssh_cas
 WHERE
@@ -205,7 +205,6 @@ func (q *Queries) ListSoonestCAs(ctx context.Context) ([]*SSHCA, error) {
 			&i.Lifetime,
 			&i.UserDefaultTtl,
 			&i.UserMaxTtl,
-			&i.UserExtensions,
 			&i.UserCriticalOptions,
 			&i.HostDefaultTtl,
 			&i.HostMaxTtl,

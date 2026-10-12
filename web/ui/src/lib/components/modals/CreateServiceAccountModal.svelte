@@ -42,7 +42,7 @@
 			token = tok.secret;
 			createdId = id;
 		} catch {
-			sheet.show(id, 'tokens');
+			await sheet.show(id, 'tokens');
 		}
 		model = newDraft(ServiceAccountSchema, { role: WorkspaceRole.VIEWER });
 		tokenLabel = '';

@@ -112,10 +112,6 @@ func inHold(endedAt time.Time) bool {
 	return time.Since(endedAt) < holdDays*24*time.Hour
 }
 
-func (s *Service) Has(ctx context.Context, workspaceID, feature string) bool {
-	return s.Resolve(ctx, workspaceID).Has(feature)
-}
-
 // RetentionDays honors the hold and errors instead of falling back, so a failed lookup never shortens what is kept.
 func (s *Service) RetentionDays(ctx context.Context, workspaceID string) (int64, error) {
 	_, keep, err := s.lookup(ctx, workspaceID)

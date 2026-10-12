@@ -48,16 +48,11 @@ func seedCA(t *testing.T, conn *db.Connection, workspaceID string, age time.Dura
 	info, err := ssh.NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0, caLifetime)
 	require.NoError(t, err)
 	notBefore := time.Now().Add(-age)
+	info.Name = "ca-" + notBefore.Format(time.RFC3339Nano)
+	info.NotBefore, info.NotAfter = notBefore, notBefore.Add(caLifetime)
 	var ca *db.SSHCA
 	require.NoError(t, conn.TenantTx(pinned(t, workspaceID), func(q *db.Queries) (err error) {
-		ca, err = q.CreateCA(t.Context(), &db.CreateCAParams{
-			Name:       "ca-" + notBefore.Format(time.RFC3339Nano),
-			PrivateKey: info.PrivateKey,
-			PublicKey:  info.PublicKey,
-			NotBefore:  notBefore,
-			NotAfter:   notBefore.Add(caLifetime),
-			Lifetime:   caLifetime,
-		})
+		ca, err = q.CreateCA(t.Context(), info)
 		return err
 	}))
 	return ca

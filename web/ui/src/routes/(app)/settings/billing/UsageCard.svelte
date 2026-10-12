@@ -30,7 +30,6 @@
 		{ key: 'enforce_sso', label: 'Enforced SSO', unlocks: 'Pro' },
 		{ key: 'audit_export', label: 'Audit log export', unlocks: 'Pro' },
 		{ key: 'scim', label: 'SCIM provisioning', unlocks: 'Enterprise' },
-		{ key: 'audit_streaming', label: 'Audit log streaming', unlocks: 'Enterprise' },
 		{ key: 'external_kms', label: 'External KMS', unlocks: 'Enterprise' }
 	];
 </script>

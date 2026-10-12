@@ -6,7 +6,6 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
-	import * as Item from '#lib/components/ui/item/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
@@ -31,7 +30,6 @@
 		PenLine,
 		Settings2,
 		Shield,
-		ShieldCheck,
 		Star
 	} from '@lucide/svelte';
 	import DangerZone from './DangerZone.svelte';
@@ -56,31 +54,6 @@
 	const keyTypes = enumToArray(CertificateKeyType);
 	let signOpen = $state(false);
 
-	const extensions = [
-		{ id: 'permit-pty', title: 'Interactive shell', description: 'Open a terminal (PTY).' },
-		{
-			id: 'permit-port-forwarding',
-			title: 'Port forwarding',
-			description: 'Tunnel ports with -L and -D.'
-		},
-		{
-			id: 'permit-agent-forwarding',
-			title: 'Agent forwarding',
-			description: 'Use the local ssh-agent on the server.'
-		},
-		{ id: 'permit-X11-forwarding', title: 'X11 forwarding', description: 'Run GUI apps remotely.' },
-		{
-			id: 'permit-user-rc',
-			title: 'Run ~/.ssh/rc',
-			description: 'Execute the user rc file on login.'
-		},
-		{
-			id: 'no-touch-required',
-			title: 'Skip security key touch',
-			description: 'FIDO keys sign without a tap.'
-		}
-	];
-
 	const lifetimes: {
 		key: 'userDefaultTtl' | 'userMaxTtl' | 'hostDefaultTtl' | 'hostMaxTtl';
 		label: string;
@@ -94,15 +67,6 @@
 	function setLifetime(key: (typeof lifetimes)[number]['key'] | 'lifetime', value: Duration) {
 		if (!model) return;
 		model[key] = value;
-		save();
-	}
-
-	function toggleExtension(id: string, on: boolean) {
-		if (!model) return;
-		const next = { ...model.userExtensions };
-		if (on) next[id] = '';
-		else delete next[id];
-		model.userExtensions = next;
 		save();
 	}
 
@@ -342,27 +306,6 @@
 				<Field.Description>
 					Short user certificates are the safest. nk renews them on its own before each login.
 				</Field.Description>
-			</Section>
-
-			<Section title="What user certificates allow" icon={ShieldCheck}>
-				<Item.Group class="divide-y rounded-lg border">
-					{#each extensions as ext (ext.id)}
-						<Item.Root size="sm" class="rounded-none">
-							<Item.Content>
-								<Item.Title><label for={`ext-${ext.id}`}>{ext.title}</label></Item.Title>
-								<Item.Description>{ext.description}</Item.Description>
-							</Item.Content>
-							<Item.Actions>
-								<Switch
-									id={`ext-${ext.id}`}
-									checked={model.userExtensions[ext.id] !== undefined}
-									disabled={!can.edit}
-									onCheckedChange={(v) => toggleExtension(ext.id, v)}
-								/>
-							</Item.Actions>
-						</Item.Root>
-					{/each}
-				</Item.Group>
 			</Section>
 
 			<Section title="Restrictions" icon={Ban}>

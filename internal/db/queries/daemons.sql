@@ -85,7 +85,8 @@ UPDATE daemons
 SET
   status = COALESCE(sqlc.narg('status'), status),
   config = COALESCE(sqlc.narg('config'), config),
-  metadata = COALESCE(sqlc.narg('metadata'), metadata)
+  metadata = COALESCE(sqlc.narg('metadata'), metadata),
+  updated_at = NOW()
 WHERE
   id = @daemon_id
 RETURNING

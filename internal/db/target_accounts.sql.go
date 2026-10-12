@@ -315,7 +315,7 @@ ORDER BY
 
 type ListSubjectUsernamesForTargetsParams struct {
 	TargetIds []string `json:"targetIds"`
-	SubjectID *string  `json:"subjectId"`
+	SubjectID string   `json:"subjectId"`
 }
 
 type ListSubjectUsernamesForTargetsRow struct {

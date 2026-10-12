@@ -19,7 +19,7 @@ VALUES
     $1,
     $2,
     $3,
-    COALESCE($4, '{}'::TEXT[])
+    COALESCE($4::TEXT[], '{}')
   )
 RETURNING
   id
@@ -29,7 +29,7 @@ type CreateServiceAccountParams struct {
 	Name        string              `json:"name"`
 	Description *string             `json:"description"`
 	Role        nokku.WorkspaceRole `json:"role"`
-	Tags        interface{}         `json:"tags"`
+	Tags        []string            `json:"tags"`
 }
 
 func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (string, error) {
@@ -170,7 +170,8 @@ SET
     OR $3 = 0 THEN role
     ELSE $3
   END,
-  tags = COALESCE($4, tags)
+  tags = COALESCE($4, tags),
+  updated_at = NOW()
 WHERE
   id = $5
 RETURNING

@@ -34,18 +34,12 @@ export function createModalState<T>(defaultValue: T = {} as T) {
 function plainClone<Desc extends DescMessage>(schema: Desc, entity: MessageShape<Desc>) {
 	const message = create(schema, $state.snapshot(entity) as MessageInitShape<Desc>);
 	const clone = structuredClone($state.snapshot(message)) as Record<string, unknown>;
-	// Explicit presence fields keep their defaults on the prototype, which structuredClone drops. Copy them over.
-	for (const field of schema.fields) {
-		const value = (message as Record<string, unknown>)[field.localName];
-		if (clone[field.localName] === undefined && value !== undefined) {
-			clone[field.localName] = structuredClone(value);
-		}
-	}
 	clone.$typeName = schema.typeName;
 	return clone as MessageShape<Desc>;
 }
 
-// newDraft is the blank model of a create form.
+// newDraft is the blank model of a create form. What init does not name stays undefined, so a form names every
+// field it reads.
 export function newDraft<Desc extends DescMessage>(schema: Desc, init?: MessageInitShape<Desc>) {
 	return plainClone(schema, create(schema, init));
 }

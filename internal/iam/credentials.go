@@ -2,6 +2,7 @@ package iam
 
 import (
 	"context"
+	"slices"
 
 	"github.com/nokku-sh/nokku/internal/actor"
 	"github.com/nokku-sh/nokku/internal/db"
@@ -34,21 +35,10 @@ func (s *Service) DeleteCredential(ctx context.Context, id string) error {
 		if err != nil {
 			return err
 		}
-		remaining := 0
-		found := false
-		for _, c := range creds {
-			if c.ID == id {
-				found = true
-				continue
-			}
-			if c.Type != string(MethodSCIM) {
-				remaining++
-			}
-		}
-		if !found {
+		if !slices.ContainsFunc(creds, func(c *db.Credential) bool { return c.ID == id }) {
 			return ErrNotFound
 		}
-		if remaining == 0 && !s.MagicLinkEnabled() {
+		if len(creds) == 1 && !s.MagicLinkEnabled() {
 			return ErrLastCredential
 		}
 		return q.DeleteCredential(ctx, &db.DeleteCredentialParams{UserID: userID, ID: id})

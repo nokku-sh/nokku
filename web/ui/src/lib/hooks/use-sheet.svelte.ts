@@ -37,9 +37,15 @@ export function useSheet() {
 		set tab(value: string) {
 			void goto(urlWith({ tab: value }), { replace: true, reset: false });
 		},
+		// From a create form the sheet takes the form's place in one navigation. The form awaits it, so its own
+		// close finds `new` gone and does not navigate back to a URL without the id.
 		show(entityId: string, entityTab?: string) {
-			pushed = true;
-			void goto(urlWith({ id: entityId, tab: entityTab }), { reset: false });
+			const fromCreate = page.url.searchParams.has('new');
+			pushed = !fromCreate;
+			return goto(urlWith({ id: entityId, tab: entityTab, new: undefined }), {
+				replace: fromCreate,
+				reset: false
+			});
 		},
 		close() {
 			if (!id) return;

@@ -6,7 +6,7 @@ VALUES
     @name,
     @description,
     @role,
-    COALESCE(@tags, '{}'::TEXT[])
+    COALESCE(sqlc.narg('tags')::TEXT[], '{}')
   )
 RETURNING
   id;
@@ -57,7 +57,8 @@ SET
     OR @role = 0 THEN role
     ELSE @role
   END,
-  tags = COALESCE(sqlc.narg('tags'), tags)
+  tags = COALESCE(sqlc.narg('tags'), tags),
+  updated_at = NOW()
 WHERE
   id = @service_account_id
 RETURNING

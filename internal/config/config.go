@@ -169,10 +169,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Entitlements)
-	if err != nil {
-		return nil, err
-	}
+	cfg.Audit = audit.New(ctx, cfg.Conn, cfg.Entitlements)
 	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Storage, cfg.Entitlements, cfg.Audit)
 	go daemon.RetireLoop(ctx, cfg.Conn, cfg.Audit.Record)
 

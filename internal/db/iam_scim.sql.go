@@ -9,46 +9,11 @@ import (
 	"context"
 )
 
-const deleteStaleUserSCIMCredentials = `-- name: DeleteStaleUserSCIMCredentials :exec
-DELETE FROM credentials
-WHERE
-  user_id = $1
-  AND type = 'scim'
-  AND subject <> $2
-`
-
-type DeleteStaleUserSCIMCredentialsParams struct {
-	UserID  string `json:"userId"`
-	Subject string `json:"subject"`
-}
-
-// Run before UpsertCredential so one account never carries two links.
-func (q *Queries) DeleteStaleUserSCIMCredentials(ctx context.Context, arg *DeleteStaleUserSCIMCredentialsParams) error {
-	_, err := q.db.Exec(ctx, deleteStaleUserSCIMCredentials, arg.UserID, arg.Subject)
-	return err
-}
-
-const deleteUserSCIMCredentials = `-- name: DeleteUserSCIMCredentials :exec
-DELETE FROM credentials
-WHERE
-  user_id = $1
-  AND type = 'scim'
-`
-
-func (q *Queries) DeleteUserSCIMCredentials(ctx context.Context, userID string) error {
-	_, err := q.db.Exec(ctx, deleteUserSCIMCredentials, userID)
-	return err
-}
-
 const listSCIMUsers = `-- name: ListSCIMUsers :many
 SELECT
-  u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.created_at, u.updated_at,
-  COALESCE(c.subject, '')::TEXT AS external_id
+  id, workspace_id, email, name, picture, role, active, scim_external_id, created_at, updated_at
 FROM
   users u
-  LEFT JOIN credentials c ON c.workspace_id = u.workspace_id
-  AND c.user_id = u.id
-  AND c.type = 'scim'
 WHERE
   (
     $1::UUID IS NULL
@@ -68,31 +33,26 @@ type ListSCIMUsersParams struct {
 	Email  *string `json:"email"`
 }
 
-type ListSCIMUsersRow struct {
-	User       User   `json:"user"`
-	ExternalID string `json:"externalId"`
-}
-
-func (q *Queries) ListSCIMUsers(ctx context.Context, arg *ListSCIMUsersParams) ([]*ListSCIMUsersRow, error) {
+func (q *Queries) ListSCIMUsers(ctx context.Context, arg *ListSCIMUsersParams) ([]*User, error) {
 	rows, err := q.db.Query(ctx, listSCIMUsers, arg.UserID, arg.Email)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*ListSCIMUsersRow
+	var items []*User
 	for rows.Next() {
-		var i ListSCIMUsersRow
+		var i User
 		if err := rows.Scan(
-			&i.User.ID,
-			&i.User.WorkspaceID,
-			&i.User.Email,
-			&i.User.Name,
-			&i.User.Picture,
-			&i.User.Role,
-			&i.User.Active,
-			&i.User.CreatedAt,
-			&i.User.UpdatedAt,
-			&i.ExternalID,
+			&i.ID,
+			&i.WorkspaceID,
+			&i.Email,
+			&i.Name,
+			&i.Picture,
+			&i.Role,
+			&i.Active,
+			&i.ScimExternalID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -102,4 +62,24 @@ func (q *Queries) ListSCIMUsers(ctx context.Context, arg *ListSCIMUsersParams) (
 		return nil, err
 	}
 	return items, nil
+}
+
+const setUserSCIMExternalID = `-- name: SetUserSCIMExternalID :exec
+UPDATE users
+SET
+  scim_external_id = $1,
+  updated_at = NOW()
+WHERE
+  id = $2
+`
+
+type SetUserSCIMExternalIDParams struct {
+	ExternalID *string `json:"externalId"`
+	ID         string  `json:"id"`
+}
+
+// NULL takes the link away. An id another account holds trips the unique constraint.
+func (q *Queries) SetUserSCIMExternalID(ctx context.Context, arg *SetUserSCIMExternalIDParams) error {
+	_, err := q.db.Exec(ctx, setUserSCIMExternalID, arg.ExternalID, arg.ID)
+	return err
 }

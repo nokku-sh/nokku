@@ -1,4 +1,5 @@
 -- name: CreateCA :one
+-- Every setting comes from the caller, ssh.NewCA fills in what a new CA starts with.
 INSERT INTO
   ssh_cas (
     name,
@@ -12,7 +13,6 @@ INSERT INTO
     lifetime,
     user_default_ttl,
     user_max_ttl,
-    user_extensions,
     user_critical_options,
     host_default_ttl,
     host_max_ttl,
@@ -26,16 +26,15 @@ VALUES
     @public_key,
     @not_before,
     @not_after,
-    COALESCE(sqlc.narg('key_type'), 3),
+    @key_type,
     @key_bits,
-    COALESCE(sqlc.narg('lifetime'), '8760 hours'::interval),
-    COALESCE(sqlc.narg('user_default_ttl'), '120 hours'::interval),
-    COALESCE(sqlc.narg('user_max_ttl'), '168 hours'::interval),
-    COALESCE(sqlc.narg('user_extensions'), '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}'::jsonb),
-    COALESCE(sqlc.narg('user_critical_options'), '{}'::jsonb),
-    COALESCE(sqlc.narg('host_default_ttl'), '2160 hours'::interval),
-    COALESCE(sqlc.narg('host_max_ttl'), '4320 hours'::interval),
-    COALESCE(sqlc.narg('allowed_key_types'), ARRAY[1, 2, 3])
+    @lifetime,
+    @user_default_ttl,
+    @user_max_ttl,
+    @user_critical_options,
+    @host_default_ttl,
+    @host_max_ttl,
+    @allowed_key_types
   )
 RETURNING
   *;
@@ -109,11 +108,11 @@ SET
   lifetime = COALESCE(sqlc.narg('lifetime'), lifetime),
   user_default_ttl = COALESCE(sqlc.narg('user_default_ttl'), user_default_ttl),
   user_max_ttl = COALESCE(sqlc.narg('user_max_ttl'), user_max_ttl),
-  user_extensions = COALESCE(sqlc.narg('user_extensions'), user_extensions),
   user_critical_options = COALESCE(sqlc.narg('user_critical_options'), user_critical_options),
   host_default_ttl = COALESCE(sqlc.narg('host_default_ttl'), host_default_ttl),
   host_max_ttl = COALESCE(sqlc.narg('host_max_ttl'), host_max_ttl),
-  allowed_key_types = COALESCE(sqlc.narg('allowed_key_types'), allowed_key_types)
+  allowed_key_types = COALESCE(sqlc.narg('allowed_key_types'), allowed_key_types),
+  updated_at = NOW()
 WHERE
   id = @ca_id
 RETURNING
@@ -136,7 +135,8 @@ SET
   not_before = @not_before,
   not_after = @not_after,
   key_type = @key_type,
-  key_bits = @key_bits
+  key_bits = @key_bits,
+  updated_at = NOW()
 WHERE
   id = @ca_id
 RETURNING
@@ -146,7 +146,8 @@ RETURNING
 -- One statement, so the partial unique index never sees two defaults.
 UPDATE ssh_cas
 SET
-  is_default = (id = @ca_id)
+  is_default = (id = @ca_id),
+  updated_at = NOW()
 WHERE
   id = @ca_id
   OR is_default;

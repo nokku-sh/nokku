@@ -2,8 +2,7 @@
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import ExportMenu from '#lib/components/audit/ExportMenu.svelte';
 	import { page } from '$app/state';
-	import { user } from '#lib/api/user.svelte.js';
-	import { util, workspace } from '#lib/api/workspaces.svelte.js';
+	import { util } from '#lib/api/workspaces.svelte.js';
 	import ActivitySheet from '#lib/components/sheets/ActivitySheet.svelte';
 	import { DataTable, TableToolbar, createAppColumnHelper } from '#lib/components/tables/index.js';
 	import { TextCell, TimeCell } from '#lib/components/tables/cells/index.js';
@@ -14,7 +13,7 @@
 	import { usePagination } from '#lib/hooks/index.js';
 	import { auditUTC } from '#lib/store.svelte.js';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import { Archive, FileClock, Radio, Target } from '@lucide/svelte';
+	import { Archive, FileClock, Target } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import ActorCell from './ActorCell.svelte';
 	import ActorFilter from './ActorFilter.svelte';
@@ -31,8 +30,6 @@
 
 	let selected = $state<EventLog>();
 
-	const ws = workspace.get();
-	const can = user.can();
 	const pager = usePagination();
 	const search = new Debounced(() => page.url.searchParams.get('q') ?? '', 300);
 	const range = $derived(currentRange(auditUTC.current));
@@ -53,7 +50,6 @@
 
 	const logs = util.getLogs(() => ({ ...pager.args, filter }));
 	const target = $derived(page.url.searchParams.get('target'));
-	const streaming = $derived(!!ws.data?.settings?.auditWebhookUrl);
 
 	const activeView = $derived.by(() => {
 		const active = ['q', 'area', 'outcome', 'kind', 'actor', 'target'].filter((p) =>
@@ -102,13 +98,6 @@
 		<Badge variant="outline">
 			<Archive data-icon="inline-start" />
 			Kept {logs.data.retentionDays} days
-		</Badge>
-	{/if}
-	<!-- Other roles never learn the destination, so they can't tell either way. -->
-	{#if can.admin}
-		<Badge variant={streaming ? 'success' : 'outline'} href="/settings/audit">
-			<Radio data-icon="inline-start" />
-			{streaming ? 'Streaming to SIEM' : 'Not streaming'}
 		</Badge>
 	{/if}
 	<ExportMenu {filter} />

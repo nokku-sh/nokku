@@ -140,10 +140,7 @@ func caRow(t testing.TB, priv ed25519.PrivateKey) *db.SSHCA {
 		PublicKey:      nokkussh.MarshalKey(signer.PublicKey()),
 		UserDefaultTtl: time.Hour,
 		UserMaxTtl:     24 * time.Hour,
-		UserExtensions: []byte(
-			`{"permit-pty":"","permit-port-forwarding":"","permit-agent-forwarding":""}`,
-		),
-		IsActive: true,
+		IsActive:       true,
 	}
 }
 

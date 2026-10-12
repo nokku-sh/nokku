@@ -29,10 +29,9 @@ func (m *mockSender) Send(_ context.Context, msg message) error {
 
 func newTestService(sender sender) *Service {
 	return &Service{
-		sender:   sender,
-		cache:    cache.NewMemory(0),
-		From:     "noreply@system.nokku.sh",
-		Cooldown: time.Hour,
+		sender: sender,
+		cache:  cache.NewMemory(0),
+		From:   "noreply@system.nokku.sh",
 	}
 }
 

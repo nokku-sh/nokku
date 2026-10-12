@@ -198,6 +198,9 @@ calls `SyncDaemon`.
 - Schema changes go straight into `internal/db/migrations/001_base.sql`
   while there is no release. No new migration files.
 - Plan gating lives only in `internal/entitlement`.
+- A setting has one default, in Go, in the package that owns it (`ssh.NewCA`,
+  `db.DefaultDaemonConfig`). Never repeat it as a column `DEFAULT` or as a
+  `COALESCE` in a query, those are for ids, timestamps and empty values.
 - Prices are stated only on the docs pricing page
   (`../docs/src/pages/pricing.astro`). Never in code, UI copy, emails,
   READMEs, or other docs pages.
@@ -225,3 +228,7 @@ calls `SyncDaemon`.
   lifetime, since nothing is signed without the grant. The backend never
   pushes to manual hosts.
 - Tokens and secrets never appear on argv or in URLs.
+- Every user certificate permits the same things (`userExtensions` in
+  `internal/ssh/sign.go`). What a session may do is the host's call: the
+  daemon config where nokkud runs, `sshd_config` on a manual host. A CA holds
+  a key, lifetimes and restrictions, never a session switch.

@@ -22,6 +22,8 @@ import (
 var ErrCooldown = errors.New("email cooldown active")
 
 const (
+	// cooldown is the wait between two mails of the same kind to one person.
+	cooldown = 15 * time.Minute
 	// cooldownEntries bounds the cooldown store, one entry per user and template.
 	cooldownEntries = 10_000
 	emailConfirm    = "email-confirm"
@@ -34,8 +36,7 @@ type Service struct {
 	cache  *cache.Memory
 	appURL string
 
-	From     string        `env:"NOKKU_EMAIL_SENDER"`
-	Cooldown time.Duration `env:"NOKKU_EMAIL_COOLDOWN" envDefault:"15m"`
+	From string `env:"NOKKU_EMAIL_SENDER"`
 
 	SMTPHost     string `env:"NOKKU_SMTP_HOST"`
 	SMTPPort     int    `env:"NOKKU_SMTP_PORT"     envDefault:"587"`
@@ -214,7 +215,7 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 	}
 
 	key := cooldownKey(req.userID, req.template)
-	claimed, err := s.cache.SetNX(ctx, key, nil, s.Cooldown)
+	claimed, err := s.cache.SetNX(ctx, key, nil, cooldown)
 	// A full store must not hold back a reset or an alert, signups can fill it from outside.
 	if err != nil {
 		slog.Warn("email cooldown not recorded, sending anyway", "error", err)

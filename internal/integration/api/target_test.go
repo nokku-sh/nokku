@@ -68,7 +68,7 @@ func TestSyncTargetUsers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"10.0.0.2:22"}, got.GetTarget().GetEndpoints(), "endpoints replaced")
 	assert.Equal(t, hostKey, got.GetTarget().GetHostPublicKey(), "host key pinned")
-	assert.Contains(t, got.GetTarget().GetMetadata(), "last_manual_sync", "manual sync stamped")
+	assert.NotNil(t, got.GetTarget().GetLastSyncAt(), "manual sync stamped")
 
 	usernames := func() []string {
 		res, err := principals.ListTargetAccounts(t.Context(), &nokkuv1.ListTargetAccountsRequest{

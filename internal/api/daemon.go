@@ -176,7 +176,7 @@ func grantedAccounts(ctx context.Context, q *db.Queries, daemonID, subject strin
 	}
 	rows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
 		TargetIds: []string{target.ID},
-		SubjectID: &subject,
+		SubjectID: subject,
 	})
 	if err != nil {
 		return nil, err

@@ -179,6 +179,31 @@ func TestStateVersionBumpsOnAccessChanges(t *testing.T) {
 	}
 }
 
+// One transaction bumps once, however many rows it touches. A team with thousands of grants is one statement.
+func TestStateVersionBumpsOncePerTransaction(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+
+	before := stateVersion(t, c, f.ws)
+	asOwner(t, c, f, func(q *db.Queries) error {
+		if err := q.RemoveTeamMember(t.Context(), &db.RemoveTeamMemberParams{TeamID: f.team, UserID: f.u}); err != nil {
+			return err
+		}
+		// Both grants of the fixture go with it.
+		return q.DeleteTargetAccount(t.Context(), f.account)
+	})
+	if after := stateVersion(t, c, f.ws); after != before+1 {
+		t.Fatalf("three removals in one transaction: version %d -> %d, want one bump", before, after)
+	}
+
+	asOwner(t, c, f, func(q *db.Queries) error {
+		return q.SetUserActive(t.Context(), &db.SetUserActiveParams{ID: f.u, Active: false})
+	})
+	if after := stateVersion(t, c, f.ws); after != before+2 {
+		t.Fatalf("the next transaction: version %d, want %d", after, before+2)
+	}
+}
+
 // A deactivated account must leave every daemon's map at once, or a cert it holds works until it expires.
 func TestDeactivatedUserLosesAccess(t *testing.T) {
 	c := testConnection(t)
@@ -248,6 +273,139 @@ func TestGrantRejectsForeignTeam(t *testing.T) {
 		a.account, a.ws, b.team)
 	if err == nil {
 		t.Fatal("granted a team from another workspace")
+	}
+}
+
+// The code reads the target of a daemon as one row.
+func TestDaemonServesOneTarget(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+
+	_, err := c.sysPool.Exec(t.Context(),
+		`INSERT INTO targets (workspace_id, daemon_id, name) VALUES ($1, $2, 'second')`, f.ws, f.daemon)
+	if err == nil {
+		t.Fatal("a daemon got a second target")
+	}
+}
+
+func TestRecordingRejectsForeignDaemon(t *testing.T) {
+	c := testConnection(t)
+	a := newStateFixture(t, c)
+	b := newStateFixture(t, c)
+
+	_, err := c.sysPool.Exec(t.Context(), `
+		INSERT INTO recordings (workspace_id, daemon_id, daemon_name, username, key) VALUES ($1, $2, 'd', 'root', 'k')`,
+		a.ws, b.daemon)
+	if err == nil {
+		t.Fatal("filed a recording under a daemon of another workspace")
+	}
+}
+
+// Who it was stays with the recording. The account may be gone by the time someone looks.
+func TestRecordingKeepsTheSubjectsName(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	id := uuid.NewV7().String()
+	asOwner(t, c, f, func(q *db.Queries) error {
+		_, err := q.CreateRecording(t.Context(), &db.CreateRecordingParams{
+			ID: id, DaemonID: f.daemon, Username: "deploy", SubjectID: &f.u, Key: crypto.EncryptedBytes("k"),
+		})
+		if err != nil {
+			return err
+		}
+		return q.DeleteUser(t.Context(), f.u)
+	})
+
+	var name string
+	err := c.sysPool.QueryRow(t.Context(), `SELECT subject_name FROM recordings WHERE id = $1`, id).Scan(&name)
+	if err != nil {
+		t.Fatalf("read the recording: %v", err)
+	}
+	if want := f.u + "@test"; name != want {
+		t.Fatalf("subject name = %q, want %q", name, want)
+	}
+}
+
+// Three checks tie the subject column to the kind. They also have to keep a token to one subject, and scim to none.
+func TestAccessTokenTakesTheSubjectOfItsKind(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	var sa string
+	err := c.sysPool.QueryRow(t.Context(),
+		`INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci') RETURNING id`, f.ws).Scan(&sa)
+	if err != nil {
+		t.Fatalf("service account: %v", err)
+	}
+	insert := func(kind string, user, serviceAccount, daemon *string) error {
+		_, err := c.sysPool.Exec(t.Context(), `
+			INSERT INTO access_tokens (token_hash, workspace_id, kind, method, user_id, service_account_id, daemon_id)
+			VALUES (uuidv7()::TEXT, $1, $2, 'test', $3, $4, $5)`,
+			f.ws, kind, user, serviceAccount, daemon)
+		return err
+	}
+
+	for name, tok := range map[string]struct {
+		kind                         string
+		user, serviceAccount, daemon *string
+	}{
+		"a user and a service account":   {"user", &f.u, &sa, nil},
+		"a daemon and a service account": {"daemon", nil, &sa, &f.daemon},
+		"a cli token of nobody":          {"cli", nil, nil, nil},
+		"a scim token of a user":         {"scim", &f.u, nil, nil},
+		"a scim token of a daemon":       {"scim", nil, nil, &f.daemon},
+		"a user token of a daemon":       {"user", nil, nil, &f.daemon},
+	} {
+		if err := insert(tok.kind, tok.user, tok.serviceAccount, tok.daemon); err == nil {
+			t.Errorf("stored %s", name)
+		}
+	}
+	for name, tok := range map[string]struct {
+		kind                         string
+		user, serviceAccount, daemon *string
+	}{
+		"user":            {"user", &f.u, nil, nil},
+		"cli":             {"cli", &f.u, nil, nil},
+		"service account": {"service_account", nil, &sa, nil},
+		"daemon":          {"daemon", nil, nil, &f.daemon},
+		"scim":            {"scim", nil, nil, nil},
+	} {
+		if err := insert(tok.kind, tok.user, tok.serviceAccount, tok.daemon); err != nil {
+			t.Errorf("a %s token: %v", name, err)
+		}
+	}
+}
+
+// The session of a deleted daemon stays for the REJECTED answer. A host that is gone never asks, so it expires.
+func TestDeletedDaemonsTokenExpires(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	_, err := c.sysPool.Exec(t.Context(), `
+		INSERT INTO access_tokens (token_hash, workspace_id, kind, method, daemon_id)
+		VALUES ($1::TEXT, $2, 'daemon', 'device', $1::UUID)`, f.daemon, f.ws)
+	if err != nil {
+		t.Fatalf("daemon session: %v", err)
+	}
+	// A certificate lives a year at most, so the host is told for as long as one could still open it.
+	expires := func() (never, afterAYear bool) {
+		t.Helper()
+		err := c.sysPool.QueryRow(t.Context(), `
+			SELECT expires_at IS NULL, COALESCE(expires_at > NOW() + INTERVAL '365 days', FALSE)
+			FROM access_tokens WHERE token_hash = $1`, f.daemon).Scan(&never, &afterAYear)
+		if err != nil {
+			t.Fatalf("read the session: %v", err)
+		}
+		return never, afterAYear
+	}
+	if never, _ := expires(); !never {
+		t.Fatal("the session of a live daemon expires")
+	}
+
+	asOwner(t, c, f, func(q *db.Queries) error {
+		_, err := q.DeleteDaemon(t.Context(), f.daemon)
+		return err
+	})
+	if never, afterAYear := expires(); never || !afterAYear {
+		t.Fatalf("the session of a deleted daemon: never expires %v, outlives a certificate %v", never, afterAYear)
 	}
 }
 

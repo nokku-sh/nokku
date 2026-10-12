@@ -22,13 +22,7 @@ func Rollover(
 	keyBits int32,
 	revokePrevious bool,
 ) (*db.SSHCA, error) {
-	// Older CAs have no stored lifetime.
-	lifetime := ca.Lifetime
-	if lifetime <= 0 {
-		lifetime = ca.NotAfter.Sub(ca.NotBefore)
-	}
-
-	next, err := NewCA(keyType, keyBits, lifetime)
+	next, err := NewCA(keyType, keyBits, ca.Lifetime)
 	if err != nil {
 		return nil, err
 	}

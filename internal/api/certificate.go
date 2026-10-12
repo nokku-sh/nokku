@@ -39,45 +39,29 @@ func (s *certificateService) CreateCertificateAuthority(
 		return nil, errInternal
 	}
 
-	userExtensions, err := db.ValidateExtensions(req.GetUserExtensions())
-	if err != nil {
-		return nil, newError(connect.CodeInvalidArgument, "invalid extensions")
-	}
-	userCriticalOptions, err := db.ValidateCriticalOptions(req.GetUserCriticalOptions())
-	if err != nil {
+	if ca.UserCriticalOptions, err = db.ValidateCriticalOptions(req.GetUserCriticalOptions()); err != nil {
 		return nil, newError(connect.CodeInvalidArgument, "invalid critical options")
 	}
-
-	params := &db.CreateCAParams{
-		Name:                req.GetName(),
-		Description:         req.Description,
-		PrivateKey:          ca.PrivateKey,
-		PublicKey:           ca.PublicKey,
-		NotBefore:           ca.NotBefore,
-		NotAfter:            ca.NotAfter,
-		KeyType:             ca.KeyType,
-		KeyBits:             ca.KeyBits,
-		UserExtensions:      userExtensions,
-		UserCriticalOptions: userCriticalOptions,
-		Lifetime:            req.GetLifetime().AsDuration(),
-		AllowedKeyTypes:     req.GetAllowedKeyTypes(),
+	ca.Name, ca.Description = req.GetName(), req.Description
+	if len(req.GetAllowedKeyTypes()) > 0 {
+		ca.AllowedKeyTypes = req.GetAllowedKeyTypes()
 	}
 	if req.GetUserDefaultTtl() != nil {
-		params.UserDefaultTtl = req.GetUserDefaultTtl().AsDuration()
+		ca.UserDefaultTtl = req.GetUserDefaultTtl().AsDuration()
 	}
 	if req.GetUserMaxTtl() != nil {
-		params.UserMaxTtl = req.GetUserMaxTtl().AsDuration()
+		ca.UserMaxTtl = req.GetUserMaxTtl().AsDuration()
 	}
 	if req.GetHostDefaultTtl() != nil {
-		params.HostDefaultTtl = req.GetHostDefaultTtl().AsDuration()
+		ca.HostDefaultTtl = req.GetHostDefaultTtl().AsDuration()
 	}
 	if req.GetHostMaxTtl() != nil {
-		params.HostMaxTtl = req.GetHostMaxTtl().AsDuration()
+		ca.HostMaxTtl = req.GetHostMaxTtl().AsDuration()
 	}
 
 	var result *db.SSHCA
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if result, err = q.CreateCA(ctx, params); err != nil {
+		if result, err = q.CreateCA(ctx, ca); err != nil {
 			return err
 		}
 		if !req.GetIsDefault() {
@@ -126,10 +110,6 @@ func (s *certificateService) UpdateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.UpdateCertificateAuthorityRequest,
 ) (*nokkuv1.UpdateCertificateAuthorityResponse, error) {
-	userExtensions, err := db.ValidateExtensions(req.GetUserExtensions())
-	if err != nil {
-		return nil, newError(connect.CodeInvalidArgument, "invalid extensions")
-	}
 	userCriticalOptions, err := db.ValidateCriticalOptions(req.GetUserCriticalOptions())
 	if err != nil {
 		return nil, newError(connect.CodeInvalidArgument, "invalid critical options")
@@ -140,7 +120,6 @@ func (s *certificateService) UpdateCertificateAuthority(
 		Name:                req.Name,
 		Description:         req.Description,
 		IsActive:            req.IsActive,
-		UserExtensions:      userExtensions,
 		UserCriticalOptions: userCriticalOptions,
 		AllowedKeyTypes:     req.GetAllowedKeyTypes(),
 		Lifetime:            optDuration(req.GetLifetime()),
@@ -229,7 +208,7 @@ func (s *certificateService) SignSSHCertificate(
 		// The grant comes first, so a member without one learns nothing about the server.
 		accounts, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
 			TargetIds: []string{target.ID},
-			SubjectID: &caller.ID,
+			SubjectID: caller.ID,
 		})
 		if err != nil {
 			return err

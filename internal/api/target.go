@@ -292,22 +292,14 @@ func (s *targetService) SyncTargetUsers(
 			return err
 		}
 
-		if err := q.TouchTargetManualSync(ctx, req.GetTargetId()); err != nil {
+		if err := q.ReportManualSync(ctx, &db.ReportManualSyncParams{
+			TargetID:      req.GetTargetId(),
+			Endpoints:     req.GetEndpoints(),
+			HostPublicKey: trimmed(req.HostPublicKey),
+		}); err != nil {
 			return err
 		}
-
-		params := &db.UpdateTargetParams{TargetID: req.GetTargetId()}
-		if len(req.GetEndpoints()) > 0 {
-			params.Endpoints = req.GetEndpoints()
-		}
-		if req.GetHostPublicKey() != "" {
-			params.HostPublicKey = trimmed(req.HostPublicKey)
-		}
-		if params.Endpoints == nil && params.HostPublicKey == nil {
-			return nil
-		}
-		_, err := q.UpdateTarget(ctx, params)
-		return err
+		return q.TouchTargetSync(ctx, req.GetTargetId())
 	}); err != nil {
 		return nil, err
 	}
@@ -357,7 +349,7 @@ func (s *targetService) GetSubjectAccess(
 		usernamesByTarget := make(map[string][]string)
 		uRows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
 			TargetIds: targetIDs,
-			SubjectID: new(req.GetSubjectId()),
+			SubjectID: req.GetSubjectId(),
 		})
 		if err != nil {
 			return err
@@ -470,7 +462,7 @@ func (s *targetService) GetMyAccess(
 		usernamesByTarget := make(map[string][]string)
 		uRows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
 			TargetIds: targetIDs,
-			SubjectID: &p.ID,
+			SubjectID: p.ID,
 		})
 		if err != nil {
 			return err

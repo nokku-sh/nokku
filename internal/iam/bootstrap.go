@@ -90,10 +90,8 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 	if err != nil {
 		return "", err
 	}
-	for _, c := range creds {
-		if c.Type == string(MethodPasskey) || c.Type == string(MethodOIDC) {
-			return "", nil
-		}
+	if len(creds) > 0 {
+		return "", nil
 	}
 	return s.IssueBootstrapLink(ctx, owner)
 }

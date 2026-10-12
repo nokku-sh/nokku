@@ -27,7 +27,6 @@ INSERT INTO
     lifetime,
     user_default_ttl,
     user_max_ttl,
-    user_extensions,
     user_critical_options,
     host_default_ttl,
     host_max_ttl,
@@ -41,40 +40,39 @@ VALUES
     $4,
     $5,
     $6,
-    COALESCE($7, 3),
+    $7,
     $8,
-    COALESCE($9, '8760 hours'::interval),
-    COALESCE($10, '120 hours'::interval),
-    COALESCE($11, '168 hours'::interval),
-    COALESCE($12, '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}'::jsonb),
-    COALESCE($13, '{}'::jsonb),
-    COALESCE($14, '2160 hours'::interval),
-    COALESCE($15, '4320 hours'::interval),
-    COALESCE($16, ARRAY[1, 2, 3])
+    $9,
+    $10,
+    $11,
+    $12,
+    $13,
+    $14,
+    $15
   )
 RETURNING
-  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 `
 
 type CreateCAParams struct {
-	Name                string                `json:"name"`
-	Description         *string               `json:"description"`
-	PrivateKey          crypto.EncryptedBytes `json:"privateKey"`
-	PublicKey           string                `json:"publicKey"`
-	NotBefore           time.Time             `json:"notBefore"`
-	NotAfter            time.Time             `json:"notAfter"`
-	KeyType             interface{}           `json:"keyType"`
-	KeyBits             int32                 `json:"keyBits"`
-	Lifetime            interface{}           `json:"lifetime"`
-	UserDefaultTtl      interface{}           `json:"userDefaultTtl"`
-	UserMaxTtl          interface{}           `json:"userMaxTtl"`
-	UserExtensions      interface{}           `json:"userExtensions"`
-	UserCriticalOptions interface{}           `json:"userCriticalOptions"`
-	HostDefaultTtl      interface{}           `json:"hostDefaultTtl"`
-	HostMaxTtl          interface{}           `json:"hostMaxTtl"`
-	AllowedKeyTypes     interface{}           `json:"allowedKeyTypes"`
+	Name                string                     `json:"name"`
+	Description         *string                    `json:"description"`
+	PrivateKey          crypto.EncryptedBytes      `json:"privateKey"`
+	PublicKey           string                     `json:"publicKey"`
+	NotBefore           time.Time                  `json:"notBefore"`
+	NotAfter            time.Time                  `json:"notAfter"`
+	KeyType             nokku.CertificateKeyType   `json:"keyType"`
+	KeyBits             int32                      `json:"keyBits"`
+	Lifetime            time.Duration              `json:"lifetime"`
+	UserDefaultTtl      time.Duration              `json:"userDefaultTtl"`
+	UserMaxTtl          time.Duration              `json:"userMaxTtl"`
+	UserCriticalOptions []byte                     `json:"userCriticalOptions"`
+	HostDefaultTtl      time.Duration              `json:"hostDefaultTtl"`
+	HostMaxTtl          time.Duration              `json:"hostMaxTtl"`
+	AllowedKeyTypes     []nokku.CertificateKeyType `json:"allowedKeyTypes"`
 }
 
+// Every setting comes from the caller, ssh.NewCA fills in what a new CA starts with.
 func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, createCA,
 		arg.Name,
@@ -88,7 +86,6 @@ func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*SSHCA, er
 		arg.Lifetime,
 		arg.UserDefaultTtl,
 		arg.UserMaxTtl,
-		arg.UserExtensions,
 		arg.UserCriticalOptions,
 		arg.HostDefaultTtl,
 		arg.HostMaxTtl,
@@ -113,7 +110,6 @@ func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*SSHCA, er
 		&i.Lifetime,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
-		&i.UserExtensions,
 		&i.UserCriticalOptions,
 		&i.HostDefaultTtl,
 		&i.HostMaxTtl,
@@ -129,7 +125,7 @@ DELETE FROM ssh_cas
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 `
 
 func (q *Queries) DeleteCA(ctx context.Context, caID string) (*SSHCA, error) {
@@ -153,7 +149,6 @@ func (q *Queries) DeleteCA(ctx context.Context, caID string) (*SSHCA, error) {
 		&i.Lifetime,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
-		&i.UserExtensions,
 		&i.UserCriticalOptions,
 		&i.HostDefaultTtl,
 		&i.HostMaxTtl,
@@ -166,7 +161,7 @@ func (q *Queries) DeleteCA(ctx context.Context, caID string) (*SSHCA, error) {
 
 const getCA = `-- name: GetCA :one
 SELECT
-  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 FROM
   ssh_cas
 WHERE
@@ -194,7 +189,6 @@ func (q *Queries) GetCA(ctx context.Context, caID string) (*SSHCA, error) {
 		&i.Lifetime,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
-		&i.UserExtensions,
 		&i.UserCriticalOptions,
 		&i.HostDefaultTtl,
 		&i.HostMaxTtl,
@@ -207,7 +201,7 @@ func (q *Queries) GetCA(ctx context.Context, caID string) (*SSHCA, error) {
 
 const getCAByDaemonID = `-- name: GetCAByDaemonID :one
 SELECT
-  ca.id, ca.workspace_id, ca.name, ca.description, ca.private_key, ca.public_key, ca.previous_public_key, ca.previous_trusted_until, ca.not_before, ca.not_after, ca.is_active, ca.is_default, ca.key_type, ca.key_bits, ca.lifetime, ca.user_default_ttl, ca.user_max_ttl, ca.user_extensions, ca.user_critical_options, ca.host_default_ttl, ca.host_max_ttl, ca.allowed_key_types, ca.created_at, ca.updated_at
+  ca.id, ca.workspace_id, ca.name, ca.description, ca.private_key, ca.public_key, ca.previous_public_key, ca.previous_trusted_until, ca.not_before, ca.not_after, ca.is_active, ca.is_default, ca.key_type, ca.key_bits, ca.lifetime, ca.user_default_ttl, ca.user_max_ttl, ca.user_critical_options, ca.host_default_ttl, ca.host_max_ttl, ca.allowed_key_types, ca.created_at, ca.updated_at
 FROM
   ssh_cas ca
   JOIN targets t ON t.ca_id = ca.id
@@ -236,7 +230,6 @@ func (q *Queries) GetCAByDaemonID(ctx context.Context, daemonID *string) (*SSHCA
 		&i.Lifetime,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
-		&i.UserExtensions,
 		&i.UserCriticalOptions,
 		&i.HostDefaultTtl,
 		&i.HostMaxTtl,
@@ -249,7 +242,7 @@ func (q *Queries) GetCAByDaemonID(ctx context.Context, daemonID *string) (*SSHCA
 
 const getCAForUpdate = `-- name: GetCAForUpdate :one
 SELECT
-  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 FROM
   ssh_cas
 WHERE
@@ -278,7 +271,6 @@ func (q *Queries) GetCAForUpdate(ctx context.Context, caID string) (*SSHCA, erro
 		&i.Lifetime,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
-		&i.UserExtensions,
 		&i.UserCriticalOptions,
 		&i.HostDefaultTtl,
 		&i.HostMaxTtl,
@@ -370,7 +362,7 @@ func (q *Queries) GetDaemonCAKeys(ctx context.Context, daemonID *string) (*GetDa
 
 const getExpiringCAForUpdate = `-- name: GetExpiringCAForUpdate :one
 SELECT
-  ca.id, ca.workspace_id, ca.name, ca.description, ca.private_key, ca.public_key, ca.previous_public_key, ca.previous_trusted_until, ca.not_before, ca.not_after, ca.is_active, ca.is_default, ca.key_type, ca.key_bits, ca.lifetime, ca.user_default_ttl, ca.user_max_ttl, ca.user_extensions, ca.user_critical_options, ca.host_default_ttl, ca.host_max_ttl, ca.allowed_key_types, ca.created_at, ca.updated_at
+  ca.id, ca.workspace_id, ca.name, ca.description, ca.private_key, ca.public_key, ca.previous_public_key, ca.previous_trusted_until, ca.not_before, ca.not_after, ca.is_active, ca.is_default, ca.key_type, ca.key_bits, ca.lifetime, ca.user_default_ttl, ca.user_max_ttl, ca.user_critical_options, ca.host_default_ttl, ca.host_max_ttl, ca.allowed_key_types, ca.created_at, ca.updated_at
 FROM
   ssh_cas ca
 WHERE
@@ -416,7 +408,6 @@ func (q *Queries) GetExpiringCAForUpdate(ctx context.Context, skipIds []string) 
 		&i.Lifetime,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
-		&i.UserExtensions,
 		&i.UserCriticalOptions,
 		&i.HostDefaultTtl,
 		&i.HostMaxTtl,
@@ -429,7 +420,7 @@ func (q *Queries) GetExpiringCAForUpdate(ctx context.Context, skipIds []string) 
 
 const listCAs = `-- name: ListCAs :many
 SELECT
-  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 FROM
   ssh_cas
 ORDER BY
@@ -463,7 +454,6 @@ func (q *Queries) ListCAs(ctx context.Context) ([]*SSHCA, error) {
 			&i.Lifetime,
 			&i.UserDefaultTtl,
 			&i.UserMaxTtl,
-			&i.UserExtensions,
 			&i.UserCriticalOptions,
 			&i.HostDefaultTtl,
 			&i.HostMaxTtl,
@@ -497,11 +487,12 @@ SET
   not_before = $4,
   not_after = $5,
   key_type = $6,
-  key_bits = $7
+  key_bits = $7,
+  updated_at = NOW()
 WHERE
   id = $8
 RETURNING
-  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 `
 
 type ReplaceCAParams struct {
@@ -546,7 +537,6 @@ func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*SSHCA, 
 		&i.Lifetime,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
-		&i.UserExtensions,
 		&i.UserCriticalOptions,
 		&i.HostDefaultTtl,
 		&i.HostMaxTtl,
@@ -560,7 +550,8 @@ func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*SSHCA, 
 const setDefaultCA = `-- name: SetDefaultCA :exec
 UPDATE ssh_cas
 SET
-  is_default = (id = $1)
+  is_default = (id = $1),
+  updated_at = NOW()
 WHERE
   id = $1
   OR is_default
@@ -581,15 +572,15 @@ SET
   lifetime = COALESCE($4, lifetime),
   user_default_ttl = COALESCE($5, user_default_ttl),
   user_max_ttl = COALESCE($6, user_max_ttl),
-  user_extensions = COALESCE($7, user_extensions),
-  user_critical_options = COALESCE($8, user_critical_options),
-  host_default_ttl = COALESCE($9, host_default_ttl),
-  host_max_ttl = COALESCE($10, host_max_ttl),
-  allowed_key_types = COALESCE($11, allowed_key_types)
+  user_critical_options = COALESCE($7, user_critical_options),
+  host_default_ttl = COALESCE($8, host_default_ttl),
+  host_max_ttl = COALESCE($9, host_max_ttl),
+  allowed_key_types = COALESCE($10, allowed_key_types),
+  updated_at = NOW()
 WHERE
-  id = $12
+  id = $11
 RETURNING
-  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_extensions, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
+  id, workspace_id, name, description, private_key, public_key, previous_public_key, previous_trusted_until, not_before, not_after, is_active, is_default, key_type, key_bits, lifetime, user_default_ttl, user_max_ttl, user_critical_options, host_default_ttl, host_max_ttl, allowed_key_types, created_at, updated_at
 `
 
 type UpdateCAParams struct {
@@ -599,7 +590,6 @@ type UpdateCAParams struct {
 	Lifetime            *time.Duration             `json:"lifetime"`
 	UserDefaultTtl      *time.Duration             `json:"userDefaultTtl"`
 	UserMaxTtl          *time.Duration             `json:"userMaxTtl"`
-	UserExtensions      []byte                     `json:"userExtensions"`
 	UserCriticalOptions []byte                     `json:"userCriticalOptions"`
 	HostDefaultTtl      *time.Duration             `json:"hostDefaultTtl"`
 	HostMaxTtl          *time.Duration             `json:"hostMaxTtl"`
@@ -615,7 +605,6 @@ func (q *Queries) UpdateCA(ctx context.Context, arg *UpdateCAParams) (*SSHCA, er
 		arg.Lifetime,
 		arg.UserDefaultTtl,
 		arg.UserMaxTtl,
-		arg.UserExtensions,
 		arg.UserCriticalOptions,
 		arg.HostDefaultTtl,
 		arg.HostMaxTtl,
@@ -641,7 +630,6 @@ func (q *Queries) UpdateCA(ctx context.Context, arg *UpdateCAParams) (*SSHCA, er
 		&i.Lifetime,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
-		&i.UserExtensions,
 		&i.UserCriticalOptions,
 		&i.HostDefaultTtl,
 		&i.HostMaxTtl,

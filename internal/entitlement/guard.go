@@ -82,11 +82,7 @@ func conditionalFeature(procedure string, msg any) (string, bool) {
 	if !ok || procedure != nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure {
 		return "", false
 	}
-	settings := req.GetSettings()
-	if settings.GetAuditWebhookUrl() != "" || settings.GetAuditWebhookSecret() != "" {
-		return FeatureAuditStreaming, true
-	}
-	if settings.GetEnforceSso() {
+	if req.GetSettings().GetEnforceSso() {
 		return FeatureEnforceSSO, true
 	}
 	return "", false

@@ -14,13 +14,19 @@ import (
 
 const createRecording = `-- name: CreateRecording :one
 INSERT INTO
-  recordings (id, daemon_id, daemon_name, username, subject_id, principal, key, started_at)
+  recordings (id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, started_at)
 SELECT
   $1,
   d.id,
   d.name,
   $2,
   $3,
+  -- Subject ids are unique across kinds, so one of the two has it.
+  COALESCE(
+    (SELECT u.email FROM users u WHERE u.id = $3),
+    (SELECT sa.name FROM service_accounts sa WHERE sa.id = $3),
+    ''
+  ),
   $4,
   $5,
   CASE
@@ -32,7 +38,7 @@ FROM
 WHERE
   d.id = $7
 RETURNING
-  id, workspace_id, daemon_id, daemon_name, username, subject_id, principal, key, started_at, ended_at, size_bytes, complete, created_at
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, started_at, ended_at, size_bytes, complete, created_at
 `
 
 type CreateRecordingParams struct {
@@ -64,6 +70,7 @@ func (q *Queries) CreateRecording(ctx context.Context, arg *CreateRecordingParam
 		&i.DaemonName,
 		&i.Username,
 		&i.SubjectID,
+		&i.SubjectName,
 		&i.Principal,
 		&i.Key,
 		&i.StartedAt,
@@ -128,7 +135,7 @@ func (q *Queries) DeleteRecordingsBefore(ctx context.Context, arg *DeleteRecordi
 
 const getRecording = `-- name: GetRecording :one
 SELECT
-  id, workspace_id, daemon_id, daemon_name, username, subject_id, principal, key, started_at, ended_at, size_bytes, complete, created_at
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, started_at, ended_at, size_bytes, complete, created_at
 FROM
   recordings
 WHERE
@@ -145,6 +152,7 @@ func (q *Queries) GetRecording(ctx context.Context, id string) (*Recording, erro
 		&i.DaemonName,
 		&i.Username,
 		&i.SubjectID,
+		&i.SubjectName,
 		&i.Principal,
 		&i.Key,
 		&i.StartedAt,
@@ -252,7 +260,7 @@ WITH
       $4
   )
 SELECT
-  r.id, r.workspace_id, r.daemon_id, r.daemon_name, r.username, r.subject_id, r.principal, r.key, r.started_at, r.ended_at, r.size_bytes, r.complete, r.created_at,
+  r.id, r.workspace_id, r.daemon_id, r.daemon_name, r.username, r.subject_id, r.subject_name, r.principal, r.key, r.started_at, r.ended_at, r.size_bytes, r.complete, r.created_at,
   (
     SELECT
       COUNT(*)
@@ -302,6 +310,7 @@ func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams)
 			&i.Recording.DaemonName,
 			&i.Recording.Username,
 			&i.Recording.SubjectID,
+			&i.Recording.SubjectName,
 			&i.Recording.Principal,
 			&i.Recording.Key,
 			&i.Recording.StartedAt,
@@ -323,7 +332,7 @@ func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams)
 
 const oldestRecordings = `-- name: OldestRecordings :many
 SELECT
-  id, workspace_id, daemon_id, daemon_name, username, subject_id, principal, key, started_at, ended_at, size_bytes, complete, created_at
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, started_at, ended_at, size_bytes, complete, created_at
 FROM
   recordings
 ORDER BY
@@ -348,6 +357,7 @@ func (q *Queries) OldestRecordings(ctx context.Context, limit *int32) ([]*Record
 			&i.DaemonName,
 			&i.Username,
 			&i.SubjectID,
+			&i.SubjectName,
 			&i.Principal,
 			&i.Key,
 			&i.StartedAt,
@@ -375,7 +385,7 @@ SET
 WHERE
   id = $3
 RETURNING
-  id, workspace_id, daemon_id, daemon_name, username, subject_id, principal, key, started_at, ended_at, size_bytes, complete, created_at
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, started_at, ended_at, size_bytes, complete, created_at
 `
 
 type SetRecordingCompleteParams struct {
@@ -394,6 +404,7 @@ func (q *Queries) SetRecordingComplete(ctx context.Context, arg *SetRecordingCom
 		&i.DaemonName,
 		&i.Username,
 		&i.SubjectID,
+		&i.SubjectName,
 		&i.Principal,
 		&i.Key,
 		&i.StartedAt,

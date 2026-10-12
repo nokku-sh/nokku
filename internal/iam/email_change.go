@@ -37,13 +37,16 @@ func (s *Service) RequestEmailChange(
 	if err = emailverify.Verify(ctx, newEmail, s.strict); err != nil {
 		return "", "", ErrEmailRejected
 	}
+	if u.ScimExternalID != nil {
+		return "", "", ErrManagedAccount
+	}
 	err = s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		creds, err := q.ListUserCredentials(ctx, u.ID)
 		if err != nil {
 			return err
 		}
 		for _, c := range creds {
-			if c.Type == string(MethodOIDC) || c.Type == string(MethodSCIM) {
+			if c.Type == string(MethodOIDC) {
 				return ErrManagedAccount
 			}
 		}

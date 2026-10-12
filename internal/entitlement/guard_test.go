@@ -29,7 +29,7 @@ func wiredFeatures() map[string]bool {
 
 // conditionalFeatures is kept in sync by hand, the golden test fails when it drifts from the switch.
 func conditionalFeatures() []string {
-	return []string{FeatureEnforceSSO, FeatureAuditStreaming}
+	return []string{FeatureEnforceSSO}
 }
 
 // featuresFreeInAllPlans need no gate. Making one paid means wiring it in the guard in the same change.
@@ -80,19 +80,6 @@ func TestConditionalFeature(t *testing.T) {
 	ssoRelax := &nokkuv1.UpdateWorkspaceRequest{
 		Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(false)},
 	}
-
-	streamingOn := &nokkuv1.UpdateWorkspaceRequest{
-		Settings: &nokkuv1.WorkspaceSettings{
-			AuditWebhookUrl: new("https://hooks.example.com/nokku"),
-		},
-	}
-	streamingSecretOnly := &nokkuv1.UpdateWorkspaceRequest{
-		Settings: &nokkuv1.WorkspaceSettings{AuditWebhookSecret: new("s3cret")},
-	}
-	streamingOff := &nokkuv1.UpdateWorkspaceRequest{
-		Name:     new("renamed"),
-		Settings: &nokkuv1.WorkspaceSettings{AuditWebhookUrl: new("")},
-	}
 	workspacePlain := &nokkuv1.UpdateWorkspaceRequest{
 		Name:     new("renamed"),
 		Settings: &nokkuv1.WorkspaceSettings{},
@@ -121,25 +108,6 @@ func TestConditionalFeature(t *testing.T) {
 			name:      "other procedures are not conditionally gated",
 			procedure: "/nokku.v1.WorkspaceService/GetWorkspace",
 			msg:       ssoEnforce,
-		},
-		{
-			name:      "configuring audit streaming is gated",
-			procedure: "/nokku.v1.WorkspaceService/UpdateWorkspace",
-			msg:       streamingOn,
-			wantFeat:  FeatureAuditStreaming,
-			wantGated: true,
-		},
-		{
-			name:      "setting only the streaming secret is gated",
-			procedure: "/nokku.v1.WorkspaceService/UpdateWorkspace",
-			msg:       streamingSecretOnly,
-			wantFeat:  FeatureAuditStreaming,
-			wantGated: true,
-		},
-		{
-			name:      "clearing audit streaming is never gated",
-			procedure: "/nokku.v1.WorkspaceService/UpdateWorkspace",
-			msg:       streamingOff,
 		},
 		{
 			name:      "other workspace updates are not gated",
@@ -175,25 +143,6 @@ func TestGuard_DeniesAFeatureThePlanLacks(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
 	assert.ErrorContains(t, err, "audit log export is not available on the Community plan")
-}
-
-func TestGuard_DeniesAuditStreamingOnCommunity(t *testing.T) {
-	sut := selfHosted(t)
-	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws1"})
-
-	req := &nokkuv1.UpdateWorkspaceRequest{
-		Settings: &nokkuv1.WorkspaceSettings{AuditWebhookUrl: new("https://hooks.example.com")},
-	}
-	err := sut.checkFeature(ctx, nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, req)
-	require.Error(t, err)
-	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
-	require.ErrorContains(t, err, "audit log streaming")
-
-	// Clearing the destination stays possible on any plan.
-	cleared := &nokkuv1.UpdateWorkspaceRequest{
-		Settings: &nokkuv1.WorkspaceSettings{AuditWebhookUrl: new("")},
-	}
-	assert.NoError(t, sut.checkFeature(ctx, nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, cleared))
 }
 
 func TestGuard_AllowsPaidPlanAndUnpinnedContext(t *testing.T) {

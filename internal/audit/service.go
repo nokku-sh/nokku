@@ -17,26 +17,12 @@ const (
 type Service struct {
 	conn         *db.Connection
 	entitlements *entitlement.Service
-	sinks        []sink
 }
 
-func New(
-	ctx context.Context,
-	conn *db.Connection,
-	entitlements *entitlement.Service,
-) (*Service, error) {
-	webhooks, err := newWebhookSink(ctx, conn, entitlements)
-	if err != nil {
-		return nil, err
-	}
-	s := &Service{
-		conn:         conn,
-		entitlements: entitlements,
-		sinks:        []sink{newPostgresSink(conn), webhooks},
-	}
-
+func New(ctx context.Context, conn *db.Connection, entitlements *entitlement.Service) *Service {
+	s := &Service{conn: conn, entitlements: entitlements}
 	go s.runBackgroundJobs(ctx)
-	return s, nil
+	return s
 }
 
 func (s *Service) runBackgroundJobs(ctx context.Context) {

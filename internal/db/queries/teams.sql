@@ -2,7 +2,7 @@
 INSERT INTO
   teams (name, description, tags)
 VALUES
-  (@name, @description, COALESCE(@tags, '{}'::TEXT[]))
+  (@name, @description, COALESCE(sqlc.narg('tags')::TEXT[], '{}'))
 RETURNING
   *;
 
@@ -42,7 +42,8 @@ UPDATE teams
 SET
   name = COALESCE(sqlc.narg('name'), name),
   description = COALESCE(sqlc.narg('description'), description),
-  tags = COALESCE(sqlc.narg('tags'), tags)
+  tags = COALESCE(sqlc.narg('tags'), tags),
+  updated_at = NOW()
 WHERE
   id = @team_id
 RETURNING

@@ -1,34 +1,3 @@
-<script lang="ts" module>
-	import {
-		CertificateAuthoritySchema,
-		CertificateKeyType
-	} from '#lib/gen/nokku/v1/certificates_pb.js';
-	import { secToD } from '#lib/utils.js';
-	import type { MessageInitShape } from '@bufbuild/protobuf';
-
-	function defaultCADraft(): MessageInitShape<typeof CertificateAuthoritySchema> {
-		return {
-			name: '',
-			description: '',
-			keyType: CertificateKeyType.ED25519,
-			keyBits: 0,
-			isDefault: false,
-			lifetime: secToD(365 * 24 * 3600),
-			userDefaultTtl: secToD(5 * 24 * 3600),
-			userMaxTtl: secToD(7 * 24 * 3600),
-			hostDefaultTtl: secToD(90 * 24 * 3600),
-			hostMaxTtl: secToD(180 * 24 * 3600),
-			allowedKeyTypes: [
-				CertificateKeyType.RSA,
-				CertificateKeyType.ECDSA,
-				CertificateKeyType.ED25519
-			],
-			userExtensions: { 'permit-pty': '', 'permit-user-rc': '' },
-			userCriticalOptions: {}
-		};
-	}
-</script>
-
 <script lang="ts">
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
 	import { ca as caApi } from '#lib/api/certificates.svelte.js';
@@ -39,7 +8,10 @@
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
-	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
+	import {
+		CertificateAuthoritySchema,
+		CertificateKeyType
+	} from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { newDraft, useSheet } from '#lib/hooks/index.js';
 	import { ChevronDown, Shield } from '@lucide/svelte';
 
@@ -48,7 +20,17 @@
 	const sheet = useSheet();
 	const createCA = caApi.create();
 
-	let model = $state(newDraft(CertificateAuthoritySchema, defaultCADraft()));
+	// Only the key is chosen here. The lifetimes are the server's, so the two never drift.
+	// A draft leaves what it is not given undefined, so every field the form reads is named.
+	const blank = () =>
+		newDraft(CertificateAuthoritySchema, {
+			name: '',
+			description: '',
+			keyType: CertificateKeyType.ED25519,
+			keyBits: 0,
+			isDefault: false
+		});
+	let model = $state(blank());
 	let advanced = $state(false);
 
 	const algorithms = [
@@ -75,14 +57,14 @@
 	};
 
 	function reset() {
-		model = newDraft(CertificateAuthoritySchema, defaultCADraft());
+		model = blank();
 		advanced = false;
 	}
 
 	async function onSubmit() {
 		const res = await createCA.mutateAsync({ ...model });
 		reset();
-		if (res.certificateAuthority) sheet.show(res.certificateAuthority.id);
+		if (res.certificateAuthority) await sheet.show(res.certificateAuthority.id);
 	}
 </script>
 
@@ -123,10 +105,10 @@
 			class="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm"
 		>
 			<span class="flex flex-col">
-				<span class="font-medium">Key and lifetimes</span>
+				<span class="font-medium">Key</span>
 				<span class="text-xs text-muted-foreground">
-					{algorithms.find((a) => a.value === model.keyType)?.label}. The defaults suit most teams
-					and can be changed later.
+					{algorithms.find((a) => a.value === model.keyType)?.label}. Lifetimes start from the
+					defaults, change them on the CA afterwards.
 				</span>
 			</span>
 			<ChevronDown
@@ -178,28 +160,6 @@
 						</ToggleGroup.Root>
 					</Field.Field>
 				{/if}
-				<Field.Field>
-					<Field.Label>The CA expires after</Field.Label>
-					<DurationInput bind:value={model.lifetime} />
-				</Field.Field>
-				<div class="grid grid-cols-2 gap-4">
-					<Field.Field>
-						<Field.Label>User certs by default</Field.Label>
-						<DurationInput bind:value={model.userDefaultTtl} />
-					</Field.Field>
-					<Field.Field>
-						<Field.Label>At most</Field.Label>
-						<DurationInput bind:value={model.userMaxTtl} />
-					</Field.Field>
-					<Field.Field>
-						<Field.Label>Host certs by default</Field.Label>
-						<DurationInput bind:value={model.hostDefaultTtl} />
-					</Field.Field>
-					<Field.Field>
-						<Field.Label>At most</Field.Label>
-						<DurationInput bind:value={model.hostMaxTtl} />
-					</Field.Field>
-				</div>
 			</Field.Group>
 		</Collapsible.Content>
 	</Collapsible.Root>

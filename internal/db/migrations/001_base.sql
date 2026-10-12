@@ -1,8 +1,8 @@
-CREATE OR REPLACE FUNCTION current_workspace_id () RETURNS UUID AS $$
+CREATE FUNCTION current_workspace_id () RETURNS UUID AS $$
   SELECT NULLIF(current_setting('nokku.workspace_id', TRUE), '')::UUID
 $$ LANGUAGE sql STABLE;
 
-CREATE TABLE IF NOT EXISTS workspaces (
+CREATE TABLE workspaces (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   slug TEXT NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'),
   name TEXT NOT NULL,
@@ -13,12 +13,12 @@ CREATE TABLE IF NOT EXISTS workspaces (
 );
 
 -- Bumped by triggers whenever what a daemon enforces changes. No RLS
-CREATE TABLE IF NOT EXISTS workspace_state (
+CREATE TABLE workspace_state (
   workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
   version BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS workspace_subscriptions (
+CREATE TABLE workspace_subscriptions (
   workspace_id UUID PRIMARY KEY DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   source TEXT NOT NULL DEFAULT '', -- stripe, manual, ...
   plan TEXT NOT NULL DEFAULT '', -- community, pro, enterprise
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS workspace_subscriptions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   email TEXT NOT NULL CHECK (email = lower(email)),
@@ -40,21 +40,23 @@ CREATE TABLE IF NOT EXISTS users (
   picture TEXT,
   role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 5), -- 1=member, 2=viewer, 3=editor, 4=admin, 5=owner
   active BOOLEAN NOT NULL DEFAULT TRUE,
+  scim_external_id TEXT, -- the identity provider's id for an account SCIM provisions
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, email),
-  UNIQUE (workspace_id, id)
+  UNIQUE (workspace_id, id),
+  UNIQUE (workspace_id, scim_external_id)
 );
 
 CREATE UNIQUE INDEX idx_users_owner ON users (workspace_id)
 WHERE
   role = 5;
 
-CREATE TABLE IF NOT EXISTS credentials (
+CREATE TABLE credentials (
   id TEXT PRIMARY KEY, -- webauthn credential id or uuidv7
   workspace_id UUID NOT NULL DEFAULT current_workspace_id (),
   user_id UUID NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('passkey', 'oidc', 'scim')),
+  type TEXT NOT NULL CHECK (type IN ('passkey', 'oidc')),
   provider TEXT NOT NULL DEFAULT '', -- the sso provider id for oidc
   subject TEXT NOT NULL DEFAULT '', -- the external identity
   data BYTEA NOT NULL DEFAULT '',
@@ -72,7 +74,7 @@ WHERE
 
 CREATE INDEX idx_credentials_user ON credentials (user_id, type);
 
-CREATE TABLE IF NOT EXISTS one_time_tokens (
+CREATE TABLE one_time_tokens (
   token_hash TEXT PRIMARY KEY,
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   user_id UUID,
@@ -89,7 +91,7 @@ CREATE INDEX idx_one_time_tokens_expiry ON one_time_tokens (expires_at);
 
 CREATE INDEX idx_one_time_tokens_user ON one_time_tokens (user_id, purpose);
 
-CREATE TABLE IF NOT EXISTS known_devices (
+CREATE TABLE known_devices (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   user_id UUID NOT NULL,
@@ -106,7 +108,7 @@ CREATE TABLE IF NOT EXISTS known_devices (
 
 CREATE INDEX idx_known_devices_expiry ON known_devices (expires_at);
 
-CREATE TABLE IF NOT EXISTS sso_providers (
+CREATE TABLE sso_providers (
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   provider_id TEXT NOT NULL CHECK (provider_id ~ '^[a-z0-9-]{1,64}$'),
   name TEXT NOT NULL DEFAULT '',
@@ -117,7 +119,7 @@ CREATE TABLE IF NOT EXISTS sso_providers (
   PRIMARY KEY (workspace_id, provider_id)
 );
 
-CREATE TABLE IF NOT EXISTS service_accounts (
+CREATE TABLE service_accounts (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL, -- e.g. "github-actions-deploy", "ansible-prod"
@@ -132,7 +134,7 @@ CREATE TABLE IF NOT EXISTS service_accounts (
 );
 
 -- Everything that authenticates a call. Every row is a credential, what only remembers a device is in known_devices.
-CREATE TABLE IF NOT EXISTS access_tokens (
+CREATE TABLE access_tokens (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   token_hash TEXT NOT NULL UNIQUE,
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
@@ -147,13 +149,12 @@ CREATE TABLE IF NOT EXISTS access_tokens (
   label TEXT NOT NULL DEFAULT '', -- the name the new sign-in mail gives a terminal, or the key's label
   ip TEXT NOT NULL DEFAULT '', -- of the request that created the token
   user_agent TEXT NOT NULL DEFAULT '', -- of the request that created the token
-  expires_at TIMESTAMPTZ, -- NULL never expires (daemons re-auth via DPoP proofs)
+  expires_at TIMESTAMPTZ, -- NULL never expires (daemons re-auth via DPoP proofs, until expire_daemon_token)
   last_seen_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, service_account_id) REFERENCES service_accounts (workspace_id, id) ON DELETE CASCADE,
-  CHECK (num_nonnulls (user_id, service_account_id, daemon_id) <= 1),
-  CHECK ((kind = 'scim') = (num_nonnulls (user_id, service_account_id, daemon_id) = 0)),
+  -- A kind is one value, so these three also keep it to one subject, and to none for scim.
   CHECK ((kind IN ('user', 'cli')) = (user_id IS NOT NULL)),
   CHECK ((kind = 'daemon') = (daemon_id IS NOT NULL)),
   CHECK ((kind = 'service_account') = (service_account_id IS NOT NULL))
@@ -168,7 +169,7 @@ WHERE
   expires_at IS NOT NULL;
 
 -- The account remembers when any of its tokens was last used, so a list of accounts needs no join.
-CREATE OR REPLACE FUNCTION note_service_account_used () RETURNS TRIGGER AS $$
+CREATE FUNCTION note_service_account_used () RETURNS TRIGGER AS $$
 BEGIN
   UPDATE service_accounts
   SET last_used_at = GREATEST(last_used_at, NEW.last_seen_at)
@@ -182,7 +183,7 @@ AFTER
 UPDATE OF last_seen_at ON access_tokens FOR EACH ROW WHEN (NEW.service_account_id IS NOT NULL)
 EXECUTE FUNCTION note_service_account_used ();
 
-CREATE TABLE IF NOT EXISTS teams (
+CREATE TABLE teams (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -193,7 +194,7 @@ CREATE TABLE IF NOT EXISTS teams (
   UNIQUE (workspace_id, id)
 );
 
-CREATE TABLE IF NOT EXISTS team_members (
+CREATE TABLE team_members (
   workspace_id UUID NOT NULL DEFAULT current_workspace_id (),
   user_id UUID NOT NULL,
   team_id UUID NOT NULL,
@@ -203,7 +204,7 @@ CREATE TABLE IF NOT EXISTS team_members (
   FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS ssh_cas (
+CREATE TABLE ssh_cas (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -216,16 +217,16 @@ CREATE TABLE IF NOT EXISTS ssh_cas (
   not_after TIMESTAMPTZ NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   is_default BOOLEAN NOT NULL DEFAULT FALSE,
-  key_type INTEGER NOT NULL DEFAULT 3, -- 1=rsa, 2=ecdsa, 3=ed25519
+  key_type INTEGER NOT NULL, -- 1=rsa, 2=ecdsa, 3=ed25519
   key_bits INTEGER NOT NULL,
-  lifetime INTERVAL NOT NULL DEFAULT '8760 hours',
-  user_default_ttl INTERVAL NOT NULL DEFAULT '120 hours',
-  user_max_ttl INTERVAL NOT NULL DEFAULT '168 hours',
-  user_extensions JSONB DEFAULT '{"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": ""}',
-  user_critical_options JSONB DEFAULT '{}',
-  host_default_ttl INTERVAL NOT NULL DEFAULT '168 hours',
-  host_max_ttl INTERVAL NOT NULL DEFAULT '720 hours',
-  allowed_key_types INTEGER[] DEFAULT ARRAY[1, 2, 3],
+  -- The settings below have no defaults here. ssh.NewCA holds the one set a new CA starts with.
+  lifetime INTERVAL NOT NULL, -- of the next key, a rollover reads it
+  user_default_ttl INTERVAL NOT NULL,
+  user_max_ttl INTERVAL NOT NULL,
+  user_critical_options JSONB NOT NULL,
+  host_default_ttl INTERVAL NOT NULL,
+  host_max_ttl INTERVAL NOT NULL,
+  allowed_key_types INTEGER[] NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name),
@@ -236,7 +237,7 @@ CREATE TABLE IF NOT EXISTS ssh_cas (
 );
 
 -- Enroll tokens bring daemons in, invite tokens bring people in. The plaintext is "<id>_<secret>".
-CREATE TABLE IF NOT EXISTS join_tokens (
+CREATE TABLE join_tokens (
   id UUID PRIMARY KEY,
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   kind INTEGER NOT NULL CHECK (kind IN (1, 2)), -- 1=enroll, 2=invite
@@ -249,8 +250,7 @@ CREATE TABLE IF NOT EXISTS join_tokens (
   ca_id UUID, -- enroll only, NULL is the workspace default
   role INTEGER CHECK (role BETWEEN 1 AND 4), -- invite only, like users.role, never the owner
   tags TEXT[] NOT NULL DEFAULT '{}', -- enroll only
-  ephemeral BOOLEAN NOT NULL DEFAULT FALSE, -- enroll only
-  retire_after INTERVAL,
+  retire_after INTERVAL, -- enroll only, set on an ephemeral token
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_used_at TIMESTAMPTZ,
   UNIQUE (workspace_id, id),
@@ -261,14 +261,13 @@ CREATE TABLE IF NOT EXISTS join_tokens (
       NOT auto_approve
       AND ca_id IS NULL
       AND tags = '{}'
-      AND NOT ephemeral
+      AND retire_after IS NULL
     )
   ),
-  CHECK ((retire_after IS NULL) = (NOT ephemeral)),
   CHECK ((kind = 2) = (role IS NOT NULL))
 );
 
-CREATE TABLE IF NOT EXISTS daemons (
+CREATE TABLE daemons (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -294,7 +293,7 @@ CREATE TABLE IF NOT EXISTS daemons (
 WITH
   (fillfactor = 50);
 
-CREATE TABLE IF NOT EXISTS targets (
+CREATE TABLE targets (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   ca_id UUID,
@@ -305,6 +304,7 @@ CREATE TABLE IF NOT EXISTS targets (
   host_public_key TEXT,
   tags TEXT[] NOT NULL DEFAULT '{}',
   metadata JSONB NOT NULL DEFAULT '{}',
+  last_sync_at TIMESTAMPTZ, -- when a host without a daemon last ran nk sync
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name),
@@ -314,11 +314,11 @@ CREATE TABLE IF NOT EXISTS targets (
 );
 
 -- A local account on a target, like root or deploy. Grants hang off it.
-CREATE TABLE IF NOT EXISTS target_accounts (
+CREATE TABLE target_accounts (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   target_id UUID NOT NULL,
-  username TEXT NOT NULL DEFAULT 'root', -- e.g. "root", "ubuntu", "ec2-user"
+  username TEXT NOT NULL, -- e.g. "root", "ubuntu", "ec2-user"
   -- When the host first reported it. NULL is an account an admin or a token added that the host has not shown yet.
   seen_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -328,8 +328,7 @@ CREATE TABLE IF NOT EXISTS target_accounts (
 );
 
 -- Exactly one subject column is set. Every reference is workspace-scoped and cascades, so no grant is left behind.
-CREATE TABLE IF NOT EXISTS grants (
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
+CREATE TABLE grants (
   account_id UUID NOT NULL,
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   user_id UUID,
@@ -348,13 +347,12 @@ CREATE TABLE IF NOT EXISTS grants (
   FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, service_account_id) REFERENCES service_accounts (workspace_id, id) ON DELETE CASCADE,
-  UNIQUE NULLS NOT DISTINCT (account_id, user_id, team_id, service_account_id),
+  PRIMARY KEY (account_id, subject_id),
   CHECK (num_nonnulls (user_id, team_id, service_account_id) = 1)
 );
 
 -- The grants an enroll token seeds on every target it makes. Same shape as grants, keyed by token and username.
-CREATE TABLE IF NOT EXISTS join_token_grants (
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
+CREATE TABLE join_token_grants (
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   token_id UUID NOT NULL,
   username TEXT NOT NULL,
@@ -374,29 +372,31 @@ CREATE TABLE IF NOT EXISTS join_token_grants (
   FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, service_account_id) REFERENCES service_accounts (workspace_id, id) ON DELETE CASCADE,
-  UNIQUE NULLS NOT DISTINCT (token_id, username, user_id, team_id, service_account_id),
+  PRIMARY KEY (token_id, username, subject_id),
   CHECK (num_nonnulls (user_id, team_id, service_account_id) = 1)
 );
 
-CREATE TABLE IF NOT EXISTS recordings (
+CREATE TABLE recordings (
   id UUID PRIMARY KEY DEFAULT uuidv7(), -- the session id
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  daemon_id UUID REFERENCES daemons (id) ON DELETE SET NULL,
+  daemon_id UUID,
   daemon_name TEXT NOT NULL, -- as it was when the session ran
   username TEXT NOT NULL,
   -- Who was logged in, parsed out of the principal the host matched. NULL from a daemon that did not say.
   subject_id UUID,
+  subject_name TEXT NOT NULL DEFAULT '', -- its email, or the name of a service account, when the session ran
   principal TEXT NOT NULL DEFAULT '',
   key BYTEA NOT NULL, -- encrypts this recording's frames, stored encrypted
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   ended_at TIMESTAMPTZ,
   size_bytes BIGINT NOT NULL DEFAULT 0,
   complete BOOLEAN NOT NULL DEFAULT FALSE, -- False when upload stream ended abruptly
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  FOREIGN KEY (workspace_id, daemon_id) REFERENCES daemons (workspace_id, id) ON DELETE SET NULL (daemon_id)
 );
 
 -- The one keyset that encrypts everything at rest. rotated_at is when it last got a new primary key.
-CREATE TABLE IF NOT EXISTS keysets (
+CREATE TABLE keysets (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   data BYTEA NOT NULL,
   rotated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -404,14 +404,14 @@ CREATE TABLE IF NOT EXISTS keysets (
 );
 
 -- License key activated in the UI (singleton)
-CREATE TABLE IF NOT EXISTS instance_license (
+CREATE TABLE instance_license (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   key TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- The CA of NOKKU_TLS=internal (singleton)
-CREATE TABLE IF NOT EXISTS web_ca (
+CREATE TABLE web_ca (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   private_key BYTEA NOT NULL,
   certificate BYTEA NOT NULL,
@@ -420,36 +420,25 @@ CREATE TABLE IF NOT EXISTS web_ca (
 
 -- Indexes --------------------------------------------------------------------
 -- A search or a tag filter reads the rows of one workspace and filters them. An index on the name or the tags
--- of every workspace is never picked for that, so there is none.
-CREATE INDEX idx_service_accounts_workspace_id ON service_accounts (workspace_id);
-
-CREATE INDEX idx_daemons_workspace_id ON daemons (workspace_id);
-
-CREATE INDEX idx_teams_workspace_id ON teams (workspace_id);
+-- of every workspace is never picked for that, so there is none. The rows of one workspace are found through its
+-- UNIQUE (workspace_id, id), which also returns them in id order.
 
 -- SCIM expects displayName to resolve to one group per workspace (RFC 7643), or member updates hit the wrong team.
 CREATE UNIQUE INDEX idx_teams_workspace_name ON teams (workspace_id, name);
 
 CREATE INDEX idx_team_members_team_id ON team_members (team_id);
 
-CREATE INDEX idx_ssh_cas_workspace_id ON ssh_cas (workspace_id);
-
 -- One default per workspace. SetDefaultCA moves it in one statement.
 CREATE UNIQUE INDEX idx_ssh_cas_default ON ssh_cas (workspace_id)
 WHERE
   is_default = TRUE;
 
-CREATE INDEX idx_targets_workspace_id ON targets (workspace_id);
-
 CREATE INDEX idx_targets_ca_id ON targets (ca_id);
 
-CREATE INDEX idx_targets_daemon_id ON targets (daemon_id);
+-- A daemon serves one target, a manual target has none.
+CREATE UNIQUE INDEX idx_targets_daemon_id ON targets (daemon_id);
 
 CREATE INDEX idx_join_tokens_workspace ON join_tokens (workspace_id, kind);
-
-CREATE INDEX idx_target_accounts_workspace_id ON target_accounts (workspace_id);
-
-CREATE INDEX idx_target_accounts_target_id ON target_accounts (target_id);
 
 CREATE INDEX idx_grants_subject ON grants (subject_id);
 
@@ -465,7 +454,7 @@ CREATE INDEX idx_recordings_daemon ON recordings (daemon_id, started_at DESC);
 
 -- Triggers -------------------------------------------------------------------
 -- Any change to what a daemon enforces bumps the workspace version and notifies on commit.
-CREATE OR REPLACE FUNCTION create_workspace_state () RETURNS TRIGGER AS $$
+CREATE FUNCTION create_workspace_state () RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO workspace_state (workspace_id) VALUES (NEW.id);
   RETURN NULL;
@@ -479,7 +468,7 @@ CREATE TRIGGER create_workspace_state
 AFTER INSERT ON workspaces FOR EACH ROW
 EXECUTE FUNCTION create_workspace_state ();
 
-CREATE OR REPLACE FUNCTION bump_state_version () RETURNS TRIGGER AS $$
+CREATE FUNCTION bump_state_version () RETURNS TRIGGER AS $$
 DECLARE
   ws UUID;
 BEGIN
@@ -488,8 +477,13 @@ BEGIN
   ELSE
     ws := NEW.workspace_id;
   END IF;
+  -- Once per transaction. A team with thousands of grants would otherwise rewrite the row for each of them.
+  IF current_setting('nokku.bumped', TRUE) = ws::TEXT THEN
+    RETURN NULL;
+  END IF;
   UPDATE workspace_state SET version = version + 1 WHERE workspace_id = ws;
   PERFORM pg_notify('nokku_state', ws::TEXT);
+  PERFORM set_config('nokku.bumped', ws::TEXT, TRUE);
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
@@ -552,8 +546,23 @@ AFTER
 UPDATE OF active ON users FOR EACH ROW WHEN (OLD.active IS DISTINCT FROM NEW.active)
 EXECUTE FUNCTION bump_state_version ();
 
+-- A deleted daemon's token stays for the REJECTED answer of its next sync. A host that is gone never asks, so the
+-- token expires a day after the longest certificate that host could still trust.
+CREATE FUNCTION expire_daemon_token () RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE access_tokens
+  SET expires_at = NOW() + INTERVAL '366 days'
+  WHERE subject_id = OLD.id AND kind = 'daemon';
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER expire_daemon_token
+AFTER DELETE ON daemons FOR EACH ROW
+EXECUTE FUNCTION expire_daemon_token ();
+
 -- Console hints. A change is announced on commit as "<workspace id>:<table>", once per transaction, with no data.
-CREATE OR REPLACE FUNCTION notify_change () RETURNS TRIGGER AS $$
+CREATE FUNCTION notify_change () RETURNS TRIGGER AS $$
 DECLARE
   r JSONB;
 BEGIN
@@ -567,11 +576,6 @@ BEGIN
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-
--- Stamps that move on a timer or with every use. An update that moves nothing else is no change anyone waits for.
-CREATE OR REPLACE FUNCTION without_stamps (r JSONB) RETURNS JSONB AS $$
-  SELECT (r - ARRAY['last_seen_at', 'last_used_at']) #- '{metadata,last_manual_sync}'
-$$ LANGUAGE sql IMMUTABLE;
 
 -- Sign-ins are left out, no list shows them to others. Keys and SCIM tokens are, see the triggers after the loop.
 DO $$
@@ -600,10 +604,11 @@ BEGIN
          FOR EACH ROW EXECUTE FUNCTION notify_change ()',
       t
     );
-    -- Every column but the stamps is named, so an update that only stamps never builds the two rows as JSON.
+    -- Stamps move on a timer or with every use, nobody waits for them. Every other column is named, so a
+    -- statement that only stamps does not fire this. One that names a stamp and another column does.
     EXECUTE format(
       'CREATE TRIGGER notify_change_update AFTER UPDATE OF %s ON %I
-         FOR EACH ROW WHEN (without_stamps (to_jsonb(OLD)) IS DISTINCT FROM without_stamps (to_jsonb(NEW)))
+         FOR EACH ROW WHEN (OLD IS DISTINCT FROM NEW)
          EXECUTE FUNCTION notify_change ()',
       (
         SELECT
@@ -615,7 +620,7 @@ BEGIN
           AND attnum > 0
           AND NOT attisdropped
           AND attgenerated = ''
-          AND attname NOT IN ('last_seen_at', 'last_used_at')
+          AND attname NOT IN ('last_seen_at', 'last_used_at', 'last_sync_at')
       ),
       t
     );
@@ -747,10 +752,10 @@ ALTER TABLE web_ca ENABLE ROW LEVEL SECURITY;
 ALTER TABLE web_ca FORCE ROW LEVEL SECURITY;
 
 -- Audit schema ---------------------------------------------------------------
-CREATE SCHEMA IF NOT EXISTS audit;
+CREATE SCHEMA audit;
 
 -- One row per thing that happened. workspace_id has no foreign key, the log outlives a deleted workspace.
-CREATE TABLE IF NOT EXISTS audit.audit_logs (
+CREATE TABLE audit.audit_logs (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   workspace_id UUID NOT NULL,
@@ -765,12 +770,12 @@ CREATE TABLE IF NOT EXISTS audit.audit_logs (
   details JSONB NOT NULL DEFAULT '{}'
 );
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_workspace_time ON audit.audit_logs (workspace_id, timestamp DESC);
+CREATE INDEX idx_audit_logs_workspace_time ON audit.audit_logs (workspace_id, timestamp DESC);
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit.audit_logs (workspace_id, actor_id, timestamp DESC);
+CREATE INDEX idx_audit_logs_actor ON audit.audit_logs (workspace_id, actor_id, timestamp DESC);
 
 -- For the retention delete. Rows arrive in time order, so a block range index stays tiny.
-CREATE INDEX IF NOT EXISTS idx_audit_logs_time ON audit.audit_logs USING brin (timestamp);
+CREATE INDEX idx_audit_logs_time ON audit.audit_logs USING brin (timestamp);
 
 CREATE POLICY tenant_isolation ON audit.audit_logs FOR
 SELECT
@@ -797,7 +802,7 @@ ALTER TABLE audit.audit_logs FORCE ROW LEVEL SECURITY;
 
 -- Audit immutability ---------------------------------------------------------
 -- No role holds UPDATE, and this trigger refuses a DELETE unless the transaction opts in, as the retention job does.
-CREATE OR REPLACE FUNCTION audit.audit_logs_immutable () RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION audit.audit_logs_immutable () RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP = 'UPDATE' THEN
     RAISE EXCEPTION 'audit.audit_logs is append-only, update denied';

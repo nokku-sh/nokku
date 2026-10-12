@@ -11,7 +11,6 @@ INSERT INTO
     ca_id,
     role,
     tags,
-    ephemeral,
     retire_after
   )
 VALUES
@@ -25,8 +24,7 @@ VALUES
     @auto_approve,
     sqlc.narg('ca_id'),
     sqlc.narg('role'),
-    COALESCE(@tags, '{}'::TEXT[]),
-    @ephemeral,
+    COALESCE(sqlc.narg('tags')::TEXT[], '{}'),
     sqlc.narg('retire_after')
   )
 RETURNING

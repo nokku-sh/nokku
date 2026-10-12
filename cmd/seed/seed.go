@@ -130,15 +130,8 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 		if err != nil {
 			return err
 		}
-		row, err := q.CreateCA(ctx, &db.CreateCAParams{
-			Name:       fresh() + " CA",
-			PrivateKey: ca.PrivateKey,
-			PublicKey:  ca.PublicKey,
-			NotBefore:  ca.NotBefore,
-			NotAfter:   ca.NotAfter,
-			KeyType:    ca.KeyType,
-			KeyBits:    ca.KeyBits,
-		})
+		ca.Name = fresh() + " CA"
+		row, err := q.CreateCA(ctx, ca)
 		if err != nil {
 			return fmt.Errorf("certificate authority: %w", err)
 		}

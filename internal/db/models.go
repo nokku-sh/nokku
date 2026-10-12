@@ -75,14 +75,13 @@ type Daemon struct {
 }
 
 type Grant struct {
-	ID               string    `json:"id"`
 	AccountID        string    `json:"accountId"`
 	WorkspaceID      string    `json:"workspaceId"`
 	UserID           *string   `json:"userId"`
 	TeamID           *string   `json:"teamId"`
 	ServiceAccountID *string   `json:"serviceAccountId"`
 	SubjectKind      *string   `json:"subjectKind"`
-	SubjectID        *string   `json:"subjectId"`
+	SubjectID        string    `json:"subjectId"`
 	CreatedAt        time.Time `json:"createdAt"`
 }
 
@@ -105,14 +104,12 @@ type JoinToken struct {
 	CaID        *string              `json:"caId"`
 	Role        *nokku.WorkspaceRole `json:"role"`
 	Tags        []string             `json:"tags"`
-	Ephemeral   bool                 `json:"ephemeral"`
 	RetireAfter *time.Duration       `json:"retireAfter"`
 	CreatedAt   time.Time            `json:"createdAt"`
 	LastUsedAt  *time.Time           `json:"lastUsedAt"`
 }
 
 type JoinTokenGrant struct {
-	ID               string    `json:"id"`
 	WorkspaceID      string    `json:"workspaceId"`
 	TokenID          string    `json:"tokenId"`
 	Username         string    `json:"username"`
@@ -120,7 +117,7 @@ type JoinTokenGrant struct {
 	TeamID           *string   `json:"teamId"`
 	ServiceAccountID *string   `json:"serviceAccountId"`
 	SubjectKind      *string   `json:"subjectKind"`
-	SubjectID        *string   `json:"subjectId"`
+	SubjectID        string    `json:"subjectId"`
 	CreatedAt        time.Time `json:"createdAt"`
 }
 
@@ -161,6 +158,7 @@ type Recording struct {
 	DaemonName  string                `json:"daemonName"`
 	Username    string                `json:"username"`
 	SubjectID   *string               `json:"subjectId"`
+	SubjectName string                `json:"subjectName"`
 	Principal   string                `json:"principal"`
 	Key         crypto.EncryptedBytes `json:"key"`
 	StartedAt   time.Time             `json:"startedAt"`
@@ -188,7 +186,6 @@ type SSHCA struct {
 	Lifetime             time.Duration              `json:"lifetime"`
 	UserDefaultTtl       time.Duration              `json:"userDefaultTtl"`
 	UserMaxTtl           time.Duration              `json:"userMaxTtl"`
-	UserExtensions       []byte                     `json:"userExtensions"`
 	UserCriticalOptions  []byte                     `json:"userCriticalOptions"`
 	HostDefaultTtl       time.Duration              `json:"hostDefaultTtl"`
 	HostMaxTtl           time.Duration              `json:"hostMaxTtl"`
@@ -220,18 +217,19 @@ type SsoProvider struct {
 }
 
 type Target struct {
-	ID            string    `json:"id"`
-	WorkspaceID   string    `json:"workspaceId"`
-	CaID          *string   `json:"caId"`
-	DaemonID      *string   `json:"daemonId"`
-	Name          string    `json:"name"`
-	Description   *string   `json:"description"`
-	Endpoints     []string  `json:"endpoints"`
-	HostPublicKey *string   `json:"hostPublicKey"`
-	Tags          []string  `json:"tags"`
-	Metadata      []byte    `json:"metadata"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
+	ID            string     `json:"id"`
+	WorkspaceID   string     `json:"workspaceId"`
+	CaID          *string    `json:"caId"`
+	DaemonID      *string    `json:"daemonId"`
+	Name          string     `json:"name"`
+	Description   *string    `json:"description"`
+	Endpoints     []string   `json:"endpoints"`
+	HostPublicKey *string    `json:"hostPublicKey"`
+	Tags          []string   `json:"tags"`
+	Metadata      []byte     `json:"metadata"`
+	LastSyncAt    *time.Time `json:"lastSyncAt"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
 }
 
 type TargetAccount struct {
@@ -261,15 +259,16 @@ type TeamMember struct {
 }
 
 type User struct {
-	ID          string              `json:"id"`
-	WorkspaceID string              `json:"workspaceId"`
-	Email       string              `json:"email"`
-	Name        string              `json:"name"`
-	Picture     *string             `json:"picture"`
-	Role        nokku.WorkspaceRole `json:"role"`
-	Active      bool                `json:"active"`
-	CreatedAt   time.Time           `json:"createdAt"`
-	UpdatedAt   time.Time           `json:"updatedAt"`
+	ID             string              `json:"id"`
+	WorkspaceID    string              `json:"workspaceId"`
+	Email          string              `json:"email"`
+	Name           string              `json:"name"`
+	Picture        *string             `json:"picture"`
+	Role           nokku.WorkspaceRole `json:"role"`
+	Active         bool                `json:"active"`
+	ScimExternalID *string             `json:"scimExternalId"`
+	CreatedAt      time.Time           `json:"createdAt"`
+	UpdatedAt      time.Time           `json:"updatedAt"`
 }
 
 type WebCA struct {
