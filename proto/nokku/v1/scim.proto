@@ -1,0 +1,51 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+
+// A token creates accounts and switches them off, so only the owner issues
+// or revokes one.
+service SCIMService {
+  rpc CreateSCIMToken(CreateSCIMTokenRequest) returns (CreateSCIMTokenResponse) {
+    option (access) = {role: WORKSPACE_ROLE_OWNER};
+  }
+  rpc ListSCIMTokens(ListSCIMTokensRequest) returns (ListSCIMTokensResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc DeleteSCIMToken(DeleteSCIMTokenRequest) returns (DeleteSCIMTokenResponse) {
+    option (access) = {role: WORKSPACE_ROLE_OWNER};
+  }
+}
+
+message SCIMToken {
+  string id = 1;
+  string label = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_used_at = 4;
+}
+
+message CreateSCIMTokenRequest {
+  string label = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+}
+message CreateSCIMTokenResponse {
+  string token = 1; // token is the bearer secret, shown once at creation.
+  SCIMToken entry = 2;
+  string base_url = 3;
+}
+
+message ListSCIMTokensRequest {}
+message ListSCIMTokensResponse {
+  repeated SCIMToken tokens = 1;
+}
+
+message DeleteSCIMTokenRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message DeleteSCIMTokenResponse {}

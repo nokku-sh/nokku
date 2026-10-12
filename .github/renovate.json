@@ -1,4 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["local>nokku-sh/.github"]
+  "extends": ["local>nokku-sh/.github"],
+  "packageRules": [
+    {
+      "description": "The shared preset matches web/** from a repo root, here the frontends sit one level down",
+      "matchFileNames": ["core/web/**"],
+      "semanticCommitType": "fix"
+    }
+  ]
 }

@@ -1,7 +1,7 @@
 version: "2"
 
 run:
-  # The integration tree only builds with its tag.
+  # core/internal/integration only builds with its tag.
   build-tags:
     - integration
 
@@ -41,10 +41,11 @@ linters:
     - exptostd
     - fatcontext
     - funcorder
-    # - funlen
+    - funlen
     - gocheckcompilerdirectives
     - gochecksumtype
-    # - gocognit
+    - gocognit
+    - goconst
     - gocritic
     - godoclint
     - godot
@@ -62,8 +63,9 @@ linters:
     - modernize
     - musttag
     - nakedret
+    - nestif
     - nilnesserr
-    - noctx
+    - nilnil
     - noctx
     - nolintlint
     - nosprintfhostport
@@ -87,8 +89,8 @@ linters:
 
   settings:
     cyclop:
-      max-complexity: 40
-      package-average: 15.0
+      max-complexity: 30
+      package-average: 10.0
 
     depguard:
       rules:
@@ -130,11 +132,11 @@ linters:
       struct-method: false
 
     funlen:
-      lines: 100
+      lines: 120
       statements: 50
 
     gocognit:
-      min-complexity: 35
+      min-complexity: 40
 
     gocritic:
       settings:
@@ -155,10 +157,15 @@ linters:
       enable-all: true
       disable:
         - fieldalignment
-        - shadow
+      settings:
+        shadow:
+          strict: true
 
     nakedret:
       max-func-lines: 0
+
+    nestif:
+      min-complexity: 8
 
     nolintlint:
       allow-no-explanation: [funlen, gocognit, golines]
@@ -216,3 +223,15 @@ linters:
           - cyclop
           - gocognit
           - funlen
+      # The server is not on the strict rules yet, shadow alone is 340 findings.
+      - path: '^core/'
+        linters:
+          - funlen
+          - gocognit
+          - goconst
+          - nilnil
+      - path: '^core/'
+        text: '^shadow:'
+        linters: [govet]
+      - path: '^core/internal/recording/term\.go'
+        linters: [cyclop]

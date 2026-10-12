@@ -1,8 +1,21 @@
-# The input is the protos module at the version go.mod pins, see taskfile gen.
 version: v2
 clean: true
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/nokku-sh/nokku/gen
+  disable:
+    - file_option: go_package
+      module: buf.build/bufbuild/protovalidate
 plugins:
-  - local: protoc-gen-es
-    out: web/ui/src/lib/gen
-    opt: target=ts
-    include_imports: true
+  - protoc_builtin: go
+    out: gen
+    opt: paths=source_relative
+  - local: protoc-gen-connect-go
+    out: gen
+    opt:
+      - paths=source_relative
+      - simple
+inputs:
+  - directory: proto

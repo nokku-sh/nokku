@@ -1,0 +1,135 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+
+service AccountService {
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse) {
+    option (access) = {self: true};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {
+    option (access) = {self: true};
+  }
+  // Starts an email change. The address stays the old one until the link
+  // sent to the new address is used with AuthService.ConfirmEmailChange.
+  // Refused for accounts an identity provider manages.
+  rpc RequestEmailChange(RequestEmailChangeRequest) returns (RequestEmailChangeResponse) {
+    option (access) = {self: true};
+  }
+  rpc ListCredentials(ListCredentialsRequest) returns (ListCredentialsResponse) {
+    option (access) = {self: true};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc RenameCredential(RenameCredentialRequest) returns (RenameCredentialResponse) {
+    option (access) = {self: true};
+  }
+  // Removes a passkey or a linked identity. The last way in stays.
+  rpc RemoveCredential(RemoveCredentialRequest) returns (RemoveCredentialResponse) {
+    option (access) = {self: true};
+  }
+  rpc ListAccountSessions(ListAccountSessionsRequest) returns (ListAccountSessionsResponse) {
+    option (access) = {self: true};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc RemoveSession(RemoveSessionRequest) returns (RemoveSessionResponse) {
+    option (access) = {self: true};
+  }
+  // Refused for the owner, ownership moves first.
+  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse) {
+    option (access) = {self: true};
+  }
+}
+
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  string picture = 4;
+  WorkspaceRole role = 5;
+  bool active = 6;
+  // The address an email change is waiting on, empty when none is pending.
+  string pending_email = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  // An identity provider provisions the account over SCIM and owns its
+  // address.
+  bool scim_managed = 10;
+}
+
+message AccountCredential {
+  string id = 1;
+  // passkey, oidc
+  string type = 2;
+  string provider = 3;
+  string subject = 4;
+  string label = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp last_used_at = 7;
+}
+
+message AccountSession {
+  // The token id, what RemoveSession takes.
+  string id = 1;
+  string kind = 2;
+  string method = 3;
+  string binding = 4;
+  string user_agent = 5;
+  string ip = 6;
+  bool current = 7;
+  google.protobuf.Timestamp expires_at = 8;
+  google.protobuf.Timestamp last_seen_at = 9;
+}
+
+message GetAccountRequest {}
+message GetAccountResponse {
+  User user = 1;
+}
+
+message UpdateAccountRequest {
+  string name = 1 [(buf.validate.field).string.max_len = 256];
+  string picture = 2;
+}
+message UpdateAccountResponse {
+  User user = 1;
+}
+
+message RequestEmailChangeRequest {
+  string new_email = 1 [(buf.validate.field).string.email = true];
+}
+message RequestEmailChangeResponse {}
+
+message ListCredentialsRequest {}
+message ListCredentialsResponse {
+  repeated AccountCredential credentials = 1;
+}
+
+message RenameCredentialRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+  string label = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+}
+message RenameCredentialResponse {}
+
+message RemoveCredentialRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message RemoveCredentialResponse {}
+
+message ListAccountSessionsRequest {}
+message ListAccountSessionsResponse {
+  repeated AccountSession sessions = 1;
+}
+
+message RemoveSessionRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message RemoveSessionResponse {}
+
+message DeleteAccountRequest {}
+message DeleteAccountResponse {}

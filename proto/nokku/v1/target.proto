@@ -1,0 +1,289 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+import "nokku/v1/account.proto";
+import "nokku/v1/certificates.proto";
+import "nokku/v1/daemon.proto";
+import "nokku/v1/join_token.proto";
+import "nokku/v1/service_account.proto";
+import "nokku/v1/target_account.proto";
+
+service TargetService {
+  rpc GetTarget(GetTargetRequest) returns (GetTargetResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ListTargets(ListTargetsRequest) returns (ListTargetsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc CreateTarget(CreateTargetRequest) returns (CreateTargetResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  rpc UpdateTarget(UpdateTargetRequest) returns (UpdateTargetResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  rpc DeleteTarget(DeleteTargetRequest) returns (DeleteTargetResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  // A member may only ask for itself. Viewers ask for anyone and also get the accounts.
+  rpc GetSubjectAccess(GetSubjectAccessRequest) returns (GetSubjectAccessResponse) {
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc GetMyAccess(GetMyAccessRequest) returns (GetMyAccessResponse) {
+    option (access) = {self: true};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc GetTargetFilters(GetTargetFiltersRequest) returns (GetTargetFiltersResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc GetTargetPrincipals(GetTargetPrincipalsRequest) returns (GetTargetPrincipalsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc SyncTargetUsers(SyncTargetUsersRequest) returns (SyncTargetUsersResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  // GetAccessGraph rolls every grant up to subject, login account and target
+  // tag, so a workspace of any size draws as one overview.
+  rpc GetAccessGraph(GetAccessGraphRequest) returns (GetAccessGraphResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // ListAccessGraphTargets is the drill-down into one tag of the graph.
+  rpc ListAccessGraphTargets(ListAccessGraphTargetsRequest) returns (ListAccessGraphTargetsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message GetTargetPrincipalsRequest {
+  string target_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+message GetTargetPrincipalsResponse {
+  repeated AccountPrincipals principals = 1;
+}
+
+message SyncTargetUsersRequest {
+  string target_id = 1 [(buf.validate.field).string.uuid = true];
+  string host_public_key = 2;
+  repeated string usernames = 3 [(buf.validate.field).repeated = {
+    max_items: 200
+    items: {
+      string: {max_len: 256}
+    }
+  }];
+  repeated string endpoints = 4 [(buf.validate.field).repeated = {
+    max_items: 16
+    items: {
+      string: {max_len: 255}
+    }
+  }];
+}
+
+message SyncTargetUsersResponse {}
+
+message Target {
+  string id = 1;
+  string ca_id = 2;
+  string daemon_id = 3;
+  string name = 4;
+  string description = 5;
+  string host_public_key = 6; // pinned SSH host public key (manual mode)
+  repeated string tags = 7;
+  repeated string endpoints = 8;
+  repeated string usernames = 9;
+  repeated TargetAccount accounts = 10;
+  map<string, string> metadata = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  // When a host without a daemon last ran nk sync. Unset with a daemon, that
+  // one has last_seen_at.
+  google.protobuf.Timestamp last_sync_at = 14;
+}
+
+message GetTargetRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message GetTargetResponse {
+  Target target = 1;
+}
+
+message CreateTargetRequest {
+  string ca_id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string = {
+    max_len: 256
+    pattern: "^$|^[a-zA-Z0-9][a-zA-Z0-9-_]*$"
+  }]; // can be empty
+  string description = 3 [(buf.validate.field).string.max_len = 1000];
+  string host_public_key = 4;
+  repeated string endpoints = 5;
+  repeated string tags = 6;
+  // Seeded once with the target, like the grants of an enroll token. Edits
+  // in the web app win from then on.
+  repeated JoinTokenGrant grants = 7 [(buf.validate.field).repeated.max_items = 32];
+}
+message CreateTargetResponse {
+  Target target = 1;
+}
+
+message UpdateTargetRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string ca_id = 2 [(buf.validate.field).string.uuid = true];
+  string name = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9-_]*$"
+  }];
+  string description = 4 [(buf.validate.field).string.max_len = 1000];
+  string host_public_key = 5;
+  // Endpoints and tags are replaced as sent. Leaving one out clears it.
+  repeated string endpoints = 6;
+  repeated string tags = 7;
+}
+message UpdateTargetResponse {
+  Target target = 1;
+}
+
+message DeleteTargetRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message DeleteTargetResponse {}
+
+message ListTargetsRequest {
+  int32 limit = 1 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 2 [(buf.validate.field).int32.gte = 0];
+  string query = 3;
+  string daemon_id = 4;
+  string ca_id = 5;
+  repeated string accounts = 6;
+  repeated string tags = 7;
+}
+message ListTargetsResponse {
+  repeated Target targets = 1;
+  int32 total = 2;
+}
+
+message GetSubjectAccessRequest {
+  string subject_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message GetSubjectAccessResponse {
+  repeated Target targets = 1;
+  repeated Daemon daemons = 2;
+  repeated CertificateAuthority certificate_authorities = 3;
+}
+
+message GetMyAccessRequest {}
+
+message GetMyAccessResponse {
+  oneof subject {
+    User user = 1;
+    ServiceAccount service_account = 2;
+  }
+  repeated Target targets = 3;
+  repeated CertificateAuthority certificate_authorities = 4;
+}
+
+message GetTargetFiltersRequest {}
+message GetTargetFiltersResponse {
+  repeated string tags = 1;
+  repeated string accounts = 2;
+}
+
+// AccessGraphFilter narrows the graph to the grants that match every set
+// field. Unset fields match everything.
+message AccessGraphFilter {
+  // A user, team or service account. A user also matches the grants their
+  // teams hold.
+  string subject_id = 1 [(buf.validate.field).string.uuid = true];
+  string target_id = 2 [(buf.validate.field).string.uuid = true];
+  string username = 3 [(buf.validate.field).string.max_len = 32];
+  // Set but empty means untagged targets.
+  string tag = 4 [(buf.validate.field).string.max_len = 256];
+}
+
+message GetAccessGraphRequest {
+  AccessGraphFilter filter = 1;
+}
+
+// Every count is a number of distinct targets with a matching grant.
+message GetAccessGraphResponse {
+  // The subjects holding a matching grant, plus the filter's own subject.
+  repeated AccessGraphSubject subjects = 1;
+  repeated AccessGraphAccount accounts = 2;
+  // Every tag in the workspace, matched or not.
+  repeated AccessGraphTag tags = 3;
+  repeated AccessGraphGrant grants = 4;
+  repeated AccessGraphReach reach = 5;
+  int32 targets = 6;
+}
+
+message AccessGraphSubject {
+  string id = 1;
+  SubjectKind kind = 2;
+  string name = 3;
+  string email = 4; // users only
+  int32 member_count = 5; // teams only
+  // Targets this subject holds a grant on itself, team grants not included.
+  int32 targets = 6;
+}
+
+message AccessGraphAccount {
+  string username = 1;
+  int32 targets = 2;
+}
+
+// A target with several tags counts under each of them.
+message AccessGraphTag {
+  string tag = 1; // empty is the untagged bucket
+  int32 targets = 2;
+  int32 total = 3; // all targets with the tag, granted or not
+}
+
+// AccessGraphGrant is the edge from a subject to a login account.
+message AccessGraphGrant {
+  string subject_id = 1;
+  string username = 2;
+  int32 targets = 3;
+}
+
+// AccessGraphReach is the edge from a login account to a tag.
+message AccessGraphReach {
+  string username = 1;
+  string tag = 2;
+  int32 targets = 3;
+}
+
+message ListAccessGraphTargetsRequest {
+  AccessGraphFilter filter = 1;
+  // Empty lists the untagged targets.
+  string tag = 2 [(buf.validate.field).string.max_len = 256];
+  int32 limit = 3 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 4 [(buf.validate.field).int32.gte = 0];
+}
+
+// Matched targets come first.
+message ListAccessGraphTargetsResponse {
+  repeated AccessGraphTarget targets = 1;
+  int32 total = 2;
+}
+
+message AccessGraphTarget {
+  string id = 1;
+  string name = 2;
+  // Whether a grant matching the filter exists on it.
+  bool matched = 3;
+}

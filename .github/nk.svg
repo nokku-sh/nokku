@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="42.741608mm"
+   height="68.549942mm"
+   viewBox="0 0 42.741608 68.549942"
+   version="1.1"
+   id="svg1"
+   xml:space="preserve"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+     id="defs1"><linearGradient
+       id="linearGradient2"><stop
+         style="stop-color:#000000;stop-opacity:1;"
+         offset="0"
+         id="stop2" /><stop
+         style="stop-color:#000000;stop-opacity:0;"
+         offset="1"
+         id="stop3" /></linearGradient><linearGradient
+       xlink:href="#linearGradient2"
+       id="linearGradient3"
+       x1="133.95197"
+       y1="126.90494"
+       x2="176.69357"
+       y2="126.90494"
+       gradientUnits="userSpaceOnUse" /></defs><g
+     id="layer1"
+     transform="translate(-115.048,-114.22503)"><g
+       id="layer1-5"
+       transform="translate(-18.903971,21.595062)"><ellipse
+         style="fill:#bbbbbb;fill-opacity:1;stroke:none;stroke-width:0.166881;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:272.126;stroke-opacity:1;paint-order:stroke fill markers"
+         id="ellipse1"
+         cx="111.75856"
+         cy="126.90494"
+         rx="12.145411"
+         ry="12.248339" /><path
+         id="path3"
+         style="fill:url(#linearGradient3);fill-opacity:1;stroke:#15d1aa;stroke-width:16.9333;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:272.126;stroke-opacity:1;paint-order:stroke fill markers"
+         d="m 142.41862,152.71326 25.80831,-25.80832 m -25.80831,-25.80832 25.80831,25.80832" /><ellipse
+         style="fill:#bbbbbb;fill-opacity:1;stroke:none;stroke-width:0.166881;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:272.126;stroke-opacity:1;paint-order:stroke fill markers"
+         id="ellipse3"
+         cx="77.419739"
+         cy="126.90494"
+         rx="12.145411"
+         ry="12.248339" /></g></g></svg>

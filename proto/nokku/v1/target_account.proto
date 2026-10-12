@@ -1,0 +1,125 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+
+// A target account is a local account on a target, like root or deploy. A
+// grant lets a subject log in as it. The certificate principal a login
+// carries is built from the subject, the target and the account.
+service TargetAccountService {
+  rpc ListTargetAccounts(ListTargetAccountsRequest) returns (ListTargetAccountsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc AddTargetAccount(AddTargetAccountRequest) returns (AddTargetAccountResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  rpc RemoveTargetAccount(RemoveTargetAccountRequest) returns (RemoveTargetAccountResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  rpc AddSubjects(AddSubjectsRequest) returns (AddSubjectsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  rpc RemoveSubjects(RemoveSubjectsRequest) returns (RemoveSubjectsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  rpc RevokeAllAccess(RevokeAllAccessRequest) returns (RevokeAllAccessResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+}
+
+// SubjectKind is who a grant is for.
+enum SubjectKind {
+  SUBJECT_KIND_UNSPECIFIED = 0;
+  SUBJECT_KIND_USER = 1;
+  SUBJECT_KIND_TEAM = 2;
+  SUBJECT_KIND_SERVICE_ACCOUNT = 3;
+}
+
+message TargetAccount {
+  string id = 1;
+  string target_id = 2;
+  string username = 3;
+  repeated string user_ids = 4;
+  repeated string team_ids = 5;
+  repeated string service_account_ids = 6;
+  google.protobuf.Timestamp created_at = 7;
+  // When the host first reported the account. Unset means the host has not
+  // reported it, so grants on it open nothing until it exists there.
+  google.protobuf.Timestamp seen_at = 8;
+}
+
+message ListTargetAccountsRequest {
+  string target_id = 1 [(buf.validate.field).string.uuid = true];
+  int32 limit = 2 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 3 [(buf.validate.field).int32.gte = 0];
+  string query = 4;
+}
+message ListTargetAccountsResponse {
+  repeated TargetAccount accounts = 1;
+  int32 total = 2;
+}
+
+message AddSubjectsRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  repeated string subject_ids = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 50
+    items: {
+      string: {uuid: true}
+    }
+  }];
+  SubjectKind kind = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+message AddSubjectsResponse {}
+
+message RemoveSubjectsRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  repeated string subject_ids = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 50
+    items: {
+      string: {uuid: true}
+    }
+  }];
+  SubjectKind kind = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+message RemoveSubjectsResponse {}
+
+message RevokeAllAccessRequest {
+  string subject_id = 1 [(buf.validate.field).string.uuid = true];
+  SubjectKind kind = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+message RevokeAllAccessResponse {}
+
+message AddTargetAccountRequest {
+  string target_id = 1 [(buf.validate.field).string.uuid = true];
+  string username = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+    pattern: "^[A-Za-z_][A-Za-z0-9._-]*\\$?$"
+  }];
+}
+message AddTargetAccountResponse {
+  TargetAccount account = 1;
+}
+
+message RemoveTargetAccountRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message RemoveTargetAccountResponse {}

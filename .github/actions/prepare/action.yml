@@ -6,24 +6,44 @@ runs:
   steps:
     # RUN_TESTS adds the integration tag. A rootless Docker runner sets TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE itself.
     - name: Include the integration tests
-      if: env.RUN_TESTS == 'true'
+      if: env.RUN_TESTS == 'true' && runner.os == 'Linux'
       shell: bash
       run: echo "GOFLAGS=-tags=integration" >> "$GITHUB_ENV"
 
-    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+    - name: Install the clients the nokkud interop tests drive
+      if: runner.os == 'Linux'
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y openssh-client rsync
+
+    # The TPM simulator in the tests is cgo and needs OpenSSL headers, which
+    # macOS only has through Homebrew.
+    - name: Point cgo at Homebrew OpenSSL
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        prefix="$(brew --prefix openssl@3)"
+        echo "CGO_CFLAGS=-I$prefix/include" >> "$GITHUB_ENV"
+        echo "CGO_LDFLAGS=-L$prefix/lib" >> "$GITHUB_ENV"
+
+    # Only the server embeds the frontends, and it only builds for Linux.
+    - if: runner.os == 'Linux'
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
       with:
         node-version: lts/*
 
-    - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+    - if: runner.os == 'Linux'
+      uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
       with:
         version: latest
 
     - name: Build frontend
+      if: runner.os == 'Linux'
       shell: bash
-      working-directory: web/ui
+      working-directory: core/web/ui
       run: pnpm install && pnpm build
 
     - name: Build email templates
+      if: runner.os == 'Linux'
       shell: bash
-      working-directory: web/email
+      working-directory: core/web/email
       run: pnpm install && pnpm export

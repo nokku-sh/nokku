@@ -1,0 +1,167 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+import "nokku/v1/account.proto";
+import "nokku/v1/daemon.proto";
+import "nokku/v1/service_account.proto";
+
+service UtilService {
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse) {
+    option (access) = {public: true};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Who runs this server, for legal links and support contacts. Public, the
+  // login pages need it too.
+  rpc GetInstanceInfo(GetInstanceInfoRequest) returns (GetInstanceInfoResponse) {
+    option (access) = {public: true};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc Whoami(WhoamiRequest) returns (WhoamiResponse) {
+    option (access) = {self: true};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
+    option (access) = {self: true};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ListAuditLogs(ListAuditLogsRequest) returns (ListAuditLogsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ExportAuditLogs(ExportAuditLogsRequest) returns (ExportAuditLogsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+  }
+  // The caller's own events.
+  rpc ListMyActivity(ListMyActivityRequest) returns (ListMyActivityResponse) {
+    option (access) = {self: true};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message GetVersionRequest {}
+message GetVersionResponse {
+  string version = 1;
+}
+
+message GetInstanceInfoRequest {}
+// Empty fields are not configured. Self-hosted servers usually leave the
+// operator fields empty.
+message GetInstanceInfoResponse {
+  string operator_name = 1;
+  string support_email = 2;
+  string website_url = 3;
+  string terms_url = 4;
+  string privacy_url = 5;
+  string imprint_url = 6;
+  // self_hosted or saas
+  string mode = 7;
+  // Whether this host offers workspace signup, true only on the hosted
+  // service's root host.
+  bool signup = 8;
+  // Pin of the private CA the server's certificate comes from, in the form
+  // nk --pin and NOKKUD_API_PIN take. Empty when every machine trusts the
+  // certificate already.
+  string ca_pin = 9;
+}
+
+message WhoamiRequest {}
+message WhoamiResponse {
+  string kind = 1;
+  string subject_id = 2;
+  User user = 3;
+  ServiceAccount service_account = 4;
+  Daemon daemon = 5;
+}
+
+message Role {
+  WorkspaceRole role = 1;
+  string description = 2;
+}
+message ListRolesRequest {}
+message ListRolesResponse {
+  repeated Role roles = 1;
+}
+
+message EventLog {
+  string id = 1;
+  string actor_id = 2;
+  string actor_kind = 3;
+  string actor_name = 4;
+  string action = 5;
+  string target = 6;
+  bool ok = 7;
+  string ip = 8;
+  string user_agent = 9;
+  google.protobuf.Struct details = 10;
+  google.protobuf.Timestamp timestamp = 11;
+}
+
+// AuditOutcome FAILED matches every failed call, DENIED only the ones an auth
+// or permission check stopped.
+enum AuditOutcome {
+  AUDIT_OUTCOME_UNSPECIFIED = 0;
+  AUDIT_OUTCOME_SUCCEEDED = 1;
+  AUDIT_OUTCOME_FAILED = 2;
+  AUDIT_OUTCOME_DENIED = 3;
+}
+
+// AuditLogFilter is shared by listing and export, so an export always matches
+// what the list shows.
+message AuditLogFilter {
+  string search = 1;
+  repeated string actor_ids = 2 [(buf.validate.field).repeated.items.string.uuid = true];
+  repeated string actor_kinds = 3;
+  // Exact action names, a trailing * matches by prefix, e.g. "Delete*".
+  repeated string actions = 4;
+  string target = 5;
+  AuditOutcome outcome = 6 [(buf.validate.field).enum = {defined_only: true}];
+  google.protobuf.Timestamp start_date = 7;
+  google.protobuf.Timestamp end_date = 8;
+}
+
+message ListAuditLogsRequest {
+  int32 limit = 1 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 2 [(buf.validate.field).int32.gte = 0];
+  AuditLogFilter filter = 3;
+}
+message ListAuditLogsResponse {
+  repeated EventLog logs = 1;
+  int32 total = 2;
+  // How long the workspace's plan keeps events.
+  int32 retention_days = 3;
+}
+
+message ExportAuditLogsRequest {
+  enum Format {
+    FORMAT_UNSPECIFIED = 0;
+    FORMAT_CSV = 1;
+    FORMAT_JSON = 2;
+  }
+  Format format = 1 [(buf.validate.field).enum = {defined_only: true}];
+  AuditLogFilter filter = 2;
+}
+message ExportAuditLogsResponse {
+  bytes data = 1;
+  string filename = 2;
+  string content_type = 3;
+}
+
+message ListMyActivityRequest {
+  int32 limit = 1 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 2 [(buf.validate.field).int32.gte = 0];
+}
+message ListMyActivityResponse {
+  repeated EventLog logs = 1;
+  int32 total = 2;
+}

@@ -1,0 +1,72 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+
+// A provider signs people into this workspace and may create accounts, so
+// only the owner changes one.
+service SSOService {
+  rpc ListSSOProviders(ListSSOProvidersRequest) returns (ListSSOProvidersResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Creates or replaces the provider with that id.
+  rpc PutSSOProvider(PutSSOProviderRequest) returns (PutSSOProviderResponse) {
+    option (access) = {role: WORKSPACE_ROLE_OWNER};
+  }
+  // Also unlinks every identity the provider vouched for.
+  rpc DeleteSSOProvider(DeleteSSOProviderRequest) returns (DeleteSSOProviderResponse) {
+    option (access) = {role: WORKSPACE_ROLE_OWNER};
+  }
+}
+
+message SSOProvider {
+  string provider_id = 1;
+  string name = 2;
+  bool enabled = 3;
+  string issuer_url = 4;
+  string client_id = 5;
+  repeated string scopes = 6;
+  // Create an account on first sign-in.
+  bool jit_provisioning = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message ListSSOProvidersRequest {}
+message ListSSOProvidersResponse {
+  repeated SSOProvider providers = 1;
+}
+
+message PutSSOProviderRequest {
+  string provider_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-z0-9-]+$"
+  }];
+  string name = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  bool enabled = 3;
+  string issuer_url = 4 [(buf.validate.field).string.uri = true];
+  string client_id = 5 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 1000
+  }];
+  // Empty keeps the stored secret.
+  string client_secret = 6 [(buf.validate.field).string.max_len = 1000];
+  repeated string scopes = 7;
+  bool jit_provisioning = 8;
+}
+message PutSSOProviderResponse {
+  SSOProvider provider = 1;
+}
+
+message DeleteSSOProviderRequest {
+  string provider_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message DeleteSSOProviderResponse {}

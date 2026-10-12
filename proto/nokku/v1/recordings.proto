@@ -1,0 +1,98 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+
+service RecordingService {
+  rpc GetRecording(GetRecordingRequest) returns (stream GetRecordingResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ListRecordings(ListRecordingsRequest) returns (ListRecordingsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc DeleteRecording(DeleteRecordingRequest) returns (DeleteRecordingResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+}
+
+message Recording {
+  string id = 1;
+  // Empty once the daemon is deleted, the recording stays.
+  string daemon_id = 2;
+  string username = 3;
+  int64 size_bytes = 4;
+  bool complete = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp ended_at = 7;
+  // The daemon's name when the session ran.
+  string daemon_name = 8;
+  // Who was logged in: the subject of the certificate principal the host
+  // matched. Empty for a recording from a daemon that did not say.
+  string subject_id = 9;
+  string principal = 10;
+  // The subject's email, or the name of a service account, when the session
+  // ran. It stays when the account is deleted.
+  string subject_name = 11;
+}
+
+message UploadRecordingRequest {
+  oneof msg {
+    RecordingMeta meta = 1;
+    bytes chunk = 2;
+    RecordingFinal final = 3;
+  }
+}
+
+message RecordingMeta {
+  string recording_id = 1 [(buf.validate.field).string.uuid = true];
+  string username = 2 [(buf.validate.field).string.max_len = 32];
+  // When the session began, for a recording that is uploaded after it. Unset
+  // or in the future means now.
+  google.protobuf.Timestamp started_at = 3;
+  // The certificate principal the host matched at login, as the backend built
+  // it. Empty from a daemon that predates the field.
+  string principal = 4 [(buf.validate.field).string.max_len = 160];
+}
+
+message RecordingFinal {}
+
+message UploadRecordingResponse {
+  string recording_id = 1;
+  int64 size_bytes = 2;
+}
+
+message ListRecordingsRequest {
+  string daemon_id = 1 [(buf.validate.field).string.uuid = true];
+  int32 limit = 2 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 3 [(buf.validate.field).int32.gte = 0];
+  string username = 4;
+  string subject_id = 5 [(buf.validate.field).string.uuid = true];
+}
+message ListRecordingsResponse {
+  repeated Recording recordings = 1;
+  int32 total = 2;
+  int64 total_bytes = 3;
+}
+
+message GetRecordingRequest {
+  string recording_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message GetRecordingResponse {
+  oneof msg {
+    RecordingMeta meta = 1;
+    bytes chunk = 2;
+  }
+}
+
+message DeleteRecordingRequest {
+  string recording_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message DeleteRecordingResponse {}

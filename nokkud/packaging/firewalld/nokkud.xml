@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>Nokku SSH Daemon</short>
+  <description>Decentralized, certificate-authenticated SSH server (nokkud), listening on TCP port 4022.</description>
+  <port protocol="tcp" port="4022"/>
+</service>

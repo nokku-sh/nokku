@@ -1,151 +1,49 @@
 version: "3"
 
-env:
-  IMAGE: ghcr.io/nokku-sh/nokku
+includes:
+  core:
+    taskfile: ./core
+    dir: ./core
+  nokkud:
+    taskfile: ./nokkud
+    dir: ./nokkud
+  nk:
+    taskfile: ./nk
+    dir: ./nk
 
 tasks:
-  dev:
-    output: prefixed
-    desc: Run backend and frontend concurrently, the app is on the backend's port
-    deps:
-      - task: backend
-        vars: { UI_DEV: "http://localhost:5173" }
-      - frontend
-
-  backend:
-    desc: Run backend
-    env:
-      NOKKU_UI_DEV: "{{.UI_DEV}}"
+  gen:
+    desc: Regenerate everything that comes from proto/ and the SQL queries
     cmds:
-      - go run {{ if .NOKKU_LICENSE_PUBLIC_KEY }}-ldflags="-X github.com/nokku-sh/nokku/internal/config.licensePublicKey={{ .NOKKU_LICENSE_PUBLIC_KEY }}"{{ end }} ./cmd/nokku
-
-  frontend:
-    desc: Run frontend
-    cmds:
-      - pnpm run dev
-    dir: web/ui
-
-  email:
-    desc: Run email
-    cmds:
-      - pnpm run dev
-    dir: web/email
+      - buf generate
+      - task: core:gen
 
   update:
     desc: Update dependencies
     cmds:
+      - cd proto && buf dep update
       - go get -u ./...
-      - cd web/ui && pnpm update --latest
-      - cd web/email && pnpm update --latest
-
-  gen:
-    desc: Generate sqlc and the web client from the pinned protos
-    cmds:
-      - buf generate "$(go list -m -f '{{"{{.Dir}}"}}' github.com/nokku-sh/protos)/nokku"
-      - sqlc generate
-
-  build:
-    desc: Build binary
-    deps: [build:ui]
-    cmds:
-      - go build -ldflags="-s -w{{ if .NOKKU_LICENSE_PUBLIC_KEY }} -X github.com/nokku-sh/nokku/internal/config.licensePublicKey={{ .NOKKU_LICENSE_PUBLIC_KEY }}{{ end }}" -trimpath -o bin/nokku ./cmd/nokku
-
-  build:ui:
-    desc: Build frontends
-    dir: web/ui
-    cmds:
-      - pnpm install; pnpm build
-      - touch build/.gitkeep
-
-  build:email:
-    desc: Build email templates, HTML into out/ and the plain text part into out/text/
-    dir: web/email
-    cmds:
-      - pnpm install; pnpm export
-      - touch out/.gitkeep
+      - go mod tidy
+      - task: core:update
 
   test:
-    desc: Run the unit tests
+    desc: Run the unit tests of every app
     cmds:
       - go test -race -count=1 -cover ./...
 
-  test:integration:
-    desc: Run the integration tests, they start Postgres, Keycloak and Vault in Docker
-    cmds:
-      - go test -tags integration -race -count=1 -cover -coverpkg=./internal/... ./internal/integration/...
-
   lint:
-    desc: Run go vet & lint
-    ignore_error: true
+    desc: Run go vet & lint on the whole repo
     cmds:
       - go mod tidy
-      # CI has no go.work, an unpushed protos change fails here first
-      - GOWORK=off go build ./...
+      - cd proto && buf format -d --exit-code && buf lint
       - go fmt ./...
-      # The tag keeps internal/integration compiling, its tests run in test:integration
+      # The tag keeps core/internal/integration compiling, its tests run in core:test:integration
       - go vet -tags integration ./...
       - govulncheck ./...
       - go test -race -count=1 -cover ./...
       - golangci-lint run --fix
-      - cd web/ui; pnpm fmt; pnpm lint
-
-  debug:
-    desc: Run profiler
-    cmds:
-      - go tool pprof -http=:8081 http://127.0.0.1:3000/debug/pprof/profile\?seconds\=10
 
   snapshot:
-    desc: Build snapshot
+    desc: Build a snapshot of every binary, package and image
     cmds:
       - goreleaser --snapshot --clean --skip=validate,sign,sbom,archive
-      - docker tag goreleaser.ko.local:latest $IMAGE:nightly
-      - grype $IMAGE:nightly
-
-  snapshot:push:
-    desc: Build and push snapshot to registry
-    deps: [snapshot]
-    cmds:
-      - docker push $IMAGE:nightly
-
-  migrate:new:
-    desc: Create a new migration file (pass a name, e.g. "add_users_last_login")
-    cmds:
-      - tern new {{.CLI_ARGS}} --migrations internal/db/migrations
-
-  migrate:status:
-    desc: Show applied migrations
-    cmds:
-      - tern status --migrations internal/db/migrations
-
-  seed:
-    desc: Fill the dev database with fake data, flags go after --
-    cmds:
-      - go run ./cmd/seed {{.CLI_ARGS}}
-
-  migrate:up:
-    desc: Apply pending migrations (dev only; production auto-migrates on boot)
-    cmds:
-      - tern migrate --migrations internal/db/migrations
-
-  migrate:down:
-    desc: Revert last migration
-    cmds:
-      - tern migrate --migrations internal/db/migrations --destination -1
-
-  migrate:dump:
-    desc: Dump the current schema from a migrated database (for squashing)
-    cmds:
-      - |
-        pg_dump --schema-only --no-owner --no-privileges --no-comments \
-        --no-security-labels --no-publications --no-subscriptions \
-        --no-tablespaces -h 127.0.0.1 -p 5432 -U postgres \
-        -d nokku > new-001_base.sql
-      - |
-        echo "Dumped to new-001_base.sql. To squash, prepend the role creation \
-        block and append the grants section from the current 001_base.sql, \
-        strip pg_dump's schema_version bookkeeping table and \\restrict lines, \
-        replace internal/db/migrations/001_base.sql with the result, \
-        and delete the old migrations. A database that is ahead needs \
-        UPDATE schema_version SET version = 1."
-    env:
-      PGPASSWORD: "{{ .PGPASSWORD }}"

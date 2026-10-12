@@ -1,0 +1,129 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+import "nokku/v1/account.proto";
+
+service TeamService {
+  rpc GetTeam(GetTeamRequest) returns (GetTeamResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ListTeams(ListTeamsRequest) returns (ListTeamsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc CreateTeam(CreateTeamRequest) returns (CreateTeamResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  rpc UpdateTeam(UpdateTeamRequest) returns (UpdateTeamResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  rpc DeleteTeam(DeleteTeamRequest) returns (DeleteTeamResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  rpc AddTeamMember(AddTeamMemberRequest) returns (AddTeamMemberResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  rpc RemoveTeamMember(RemoveTeamMemberRequest) returns (RemoveTeamMemberResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  rpc ListTeamMembers(ListTeamMembersRequest) returns (ListTeamMembersResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ListTeamsForUser(ListTeamsForUserRequest) returns (ListTeamsForUserResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message Team {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string tags = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  int32 member_count = 7;
+}
+
+message GetTeamRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message GetTeamResponse {
+  Team team = 1;
+}
+
+message CreateTeamRequest {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string description = 2 [(buf.validate.field).string.max_len = 1000];
+  repeated string tags = 3;
+}
+message CreateTeamResponse {
+  Team team = 1;
+}
+
+message UpdateTeamRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string description = 3 [(buf.validate.field).string.max_len = 1000];
+  repeated string tags = 4;
+}
+message UpdateTeamResponse {
+  Team team = 1;
+}
+
+message DeleteTeamRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message DeleteTeamResponse {}
+
+message ListTeamsRequest {
+  int32 limit = 1 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 2 [(buf.validate.field).int32.gte = 0];
+  string query = 3;
+  repeated string tags = 4;
+}
+message ListTeamsResponse {
+  repeated Team teams = 1;
+  int32 total = 2;
+}
+
+message AddTeamMemberRequest {
+  string team_id = 1 [(buf.validate.field).string.uuid = true];
+  string user_id = 2 [(buf.validate.field).string.uuid = true];
+}
+message AddTeamMemberResponse {}
+
+message RemoveTeamMemberRequest {
+  string team_id = 1 [(buf.validate.field).string.uuid = true];
+  string user_id = 2 [(buf.validate.field).string.uuid = true];
+}
+message RemoveTeamMemberResponse {}
+
+message ListTeamMembersRequest {
+  string team_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message ListTeamMembersResponse {
+  repeated User members = 1;
+}
+
+message ListTeamsForUserRequest {
+  string user_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message ListTeamsForUserResponse {
+  repeated Team teams = 1;
+}

@@ -1,0 +1,80 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "nokku/v1/access.proto";
+import "nokku/v1/account.proto";
+
+// Every call runs in the workspace the request's host names. There is no
+// password: a user signs in with a passkey, a mailed link, or the
+// workspace's OIDC provider.
+service AuthService {
+  // Mails a sign-in link to a user of this workspace. Always answers OK, so
+  // it never tells whether an address exists.
+  rpc RequestMagicLink(RequestMagicLinkRequest) returns (RequestMagicLinkResponse) {
+    option (access) = {public: true};
+  }
+  // Spends the token from a sign-in or signup link and signs this browser in.
+  rpc ConsumeMagicLink(ConsumeMagicLinkRequest) returns (ConsumeMagicLinkResponse) {
+    option (access) = {public: true};
+  }
+  // Public so a stale session can still clear its cookie.
+  rpc Logout(LogoutRequest) returns (LogoutResponse) {
+    option (access) = {public: true};
+  }
+  // What the login page may offer in this workspace.
+  rpc GetLoginOptions(GetLoginOptionsRequest) returns (GetLoginOptionsResponse) {
+    option (access) = {public: true};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Takes the token mailed to the new address and switches the account to it.
+  rpc ConfirmEmailChange(ConfirmEmailChangeRequest) returns (ConfirmEmailChangeResponse) {
+    option (access) = {public: true};
+  }
+  // Takes the token mailed to the old address. Drops a pending change, or
+  // puts the old address back when the change already happened.
+  rpc CancelEmailChange(CancelEmailChangeRequest) returns (CancelEmailChangeResponse) {
+    option (access) = {public: true};
+  }
+}
+
+message RequestMagicLinkRequest {
+  string email = 1 [(buf.validate.field).string.email = true];
+}
+message RequestMagicLinkResponse {}
+
+message ConsumeMagicLinkRequest {
+  string token = 1 [(buf.validate.field).string.min_len = 1];
+}
+message ConsumeMagicLinkResponse {
+  User user = 1;
+}
+
+message LogoutRequest {}
+message LogoutResponse {}
+
+message GetLoginOptionsRequest {}
+message GetLoginOptionsResponse {
+  string workspace_name = 1;
+  // Mail is configured and SSO is not enforced.
+  bool magic_link = 2;
+  // SSO is not enforced.
+  bool passkey = 3;
+  repeated SSOProviderInfo providers = 4;
+}
+
+message SSOProviderInfo {
+  string provider_id = 1;
+  string name = 2;
+}
+
+message ConfirmEmailChangeRequest {
+  string token = 1 [(buf.validate.field).string.min_len = 1];
+}
+message ConfirmEmailChangeResponse {}
+
+message CancelEmailChangeRequest {
+  string token = 1 [(buf.validate.field).string.min_len = 1];
+}
+message CancelEmailChangeResponse {}

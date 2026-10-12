@@ -1,0 +1,190 @@
+//go:build integration
+
+package daemon_test
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+	"uuid"
+
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+
+	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/crypto"
+	"github.com/nokku-sh/nokku/core/internal/daemon"
+	"github.com/nokku-sh/nokku/core/internal/db"
+)
+
+// fixture is a connection plus a context pinned to a fresh workspace, like the tenant middleware pins a request.
+type fixture struct {
+	conn *db.Connection
+	ctx  context.Context
+}
+
+// enrollToken mints an enroll token in a fresh workspace. tweak adjusts the token row.
+func enrollToken(t *testing.T, tweak func(*db.CreateJoinTokenParams)) (fixture, string) {
+	t.Helper()
+	// The connection lives as long as its context, so it gets the test's.
+	ctx := t.Context()
+	conn, err := db.NewConnection(ctx)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+
+	var plaintext string
+	workspaceID := uuid.NewV7().String()
+	pinned := actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID})
+	err = conn.TenantTx(pinned, func(q *db.Queries) error {
+		if _, err := q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
+			ID: workspaceID, Slug: uuid.NewV7().String(), Name: "ws", Settings: &nokkuv1.WorkspaceSettings{},
+		}); err != nil {
+			return err
+		}
+		params := &db.CreateJoinTokenParams{
+			ID:   uuid.NewV7().String(),
+			Kind: nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL,
+		}
+		token := crypto.NewToken(params.ID)
+		params.TokenHash = token.Hash
+		plaintext = token.Plaintext
+		if tweak != nil {
+			tweak(params)
+		}
+		_, err = q.CreateJoinToken(ctx, params)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed token: %v", err)
+	}
+	return fixture{conn: conn, ctx: pinned}, plaintext
+}
+
+func enroll(t *testing.T, f fixture, in daemon.EnrollInput) (*daemon.Enrolled, error) {
+	t.Helper()
+	if in.Binding == "" {
+		in.Binding = uuid.NewV7().String()
+	}
+	return daemon.Enroll(f.ctx, f.conn, in)
+}
+
+// Parallel enrollments of one machine, as a retrying installer produces, must converge on one daemon.
+func TestEnrollSameKeyConcurrently(t *testing.T) {
+	f, token := enrollToken(t, nil)
+	in := daemon.EnrollInput{Token: token, Binding: uuid.NewV7().String()}
+
+	const n = 8
+	ids := make([]string, n)
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Go(func() {
+			out, err := daemon.Enroll(f.ctx, f.conn, in)
+			errs[i] = err
+			if out != nil {
+				ids[i] = out.DaemonID
+			}
+		})
+	}
+	wg.Wait()
+
+	for i := range n {
+		if errs[i] != nil {
+			t.Fatalf("enroll %d: %v", i, errs[i])
+		}
+		if ids[i] != ids[0] {
+			t.Fatalf("enroll %d got daemon %s, want %s", i, ids[i], ids[0])
+		}
+	}
+}
+
+// A known machine re-enrolls without consulting the quota, a new one does.
+func TestEnrollQuotaOnlyForNewMachines(t *testing.T) {
+	f, token := enrollToken(t, nil)
+	full := errors.New("at cap")
+	calls := 0
+	in := daemon.EnrollInput{
+		Token:   token,
+		Binding: uuid.NewV7().String(),
+		CanCreate: func(context.Context, string) error {
+			calls++
+			return nil
+		},
+	}
+	if _, err := enroll(t, f, in); err != nil {
+		t.Fatalf("first enroll: %v", err)
+	}
+
+	in.CanCreate = func(context.Context, string) error { return full }
+	if _, err := enroll(t, f, in); err != nil {
+		t.Fatalf("re-enroll at cap: %v", err)
+	}
+
+	in.Binding = ""
+	if _, err := enroll(t, f, in); !errors.Is(err, full) {
+		t.Fatalf("new machine at cap: err = %v, want the quota error", err)
+	}
+	if calls != 1 {
+		t.Fatalf("quota consulted %d times on the first enroll, want 1", calls)
+	}
+}
+
+// Only new daemons spend uses, so a one-use token lets its machine re-enroll but turns the next one away.
+func TestEnrollMaxUses(t *testing.T) {
+	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) {
+		p.MaxUses = new(int32(1))
+	})
+	first := daemon.EnrollInput{Token: token, Binding: uuid.NewV7().String()}
+	if _, err := enroll(t, f, first); err != nil {
+		t.Fatalf("first enroll: %v", err)
+	}
+	if _, err := enroll(t, f, first); err != nil {
+		t.Fatalf("re-enroll with a spent token: %v", err)
+	}
+	if _, err := enroll(t, f, daemon.EnrollInput{Token: token}); !errors.Is(err, daemon.ErrEnrollToken) {
+		t.Fatalf("second machine: err = %v, want ErrEnrollToken", err)
+	}
+}
+
+func TestEnrollExpiredToken(t *testing.T) {
+	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) {
+		p.ExpiresAt = new(time.Now().Add(-time.Minute))
+	})
+	if _, err := enroll(t, f, daemon.EnrollInput{Token: token}); !errors.Is(err, daemon.ErrEnrollToken) {
+		t.Fatalf("err = %v, want ErrEnrollToken", err)
+	}
+}
+
+func TestEnrollAutoApprove(t *testing.T) {
+	f, pending := enrollToken(t, nil)
+	out, err := enroll(t, f, daemon.EnrollInput{Token: pending})
+	if err != nil || out.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING {
+		t.Fatalf("plain token: status %v, err %v, want pending", out.Status, err)
+	}
+
+	f, approved := enrollToken(t, func(p *db.CreateJoinTokenParams) { p.AutoApprove = true })
+	out, err = enroll(t, f, daemon.EnrollInput{Token: approved})
+	if err != nil || out.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+		t.Fatalf("auto-approve token: status %v, err %v, want accepted", out.Status, err)
+	}
+}
+
+func TestEnrollRejectsBadToken(t *testing.T) {
+	f, token := enrollToken(t, nil)
+	quota := false
+	_, err := enroll(t, f, daemon.EnrollInput{
+		Token: token + "x",
+		CanCreate: func(context.Context, string) error {
+			quota = true
+			return nil
+		},
+	})
+	if !errors.Is(err, daemon.ErrEnrollToken) {
+		t.Fatalf("err = %v, want ErrEnrollToken", err)
+	}
+	if quota {
+		t.Fatal("quota checked before the token verified")
+	}
+}

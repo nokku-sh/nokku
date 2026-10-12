@@ -2,9 +2,16 @@ version: 2
 project_name: nokku
 report_sizes: true
 
+before:
+  hooks:
+    - go mod download
+    - go mod verify
+
 builds:
-  - binary: "{{ .ProjectName }}"
-    main: ./cmd/nokku
+  - &build
+    id: nokku
+    main: ./core/cmd/nokku
+    binary: nokku
     env: [CGO_ENABLED=0]
     flags:
       - -trimpath
@@ -14,16 +21,57 @@ builds:
       - -X github.com/mizuchilabs/kata/buildinfo.Version={{ .Version }}
       - -X github.com/mizuchilabs/kata/buildinfo.Commit={{ .Commit }}
       - -X github.com/mizuchilabs/kata/buildinfo.Date={{ .CommitDate }}
-      - -X github.com/nokku-sh/nokku/internal/config.licensePublicKey={{ .Env.NOKKU_LICENSE_PUBLIC_KEY }}
+      - -X github.com/nokku-sh/nokku/core/internal/config.licensePublicKey={{ .Env.NOKKU_LICENSE_PUBLIC_KEY }}
     goos:
       - linux
     goarch:
       - amd64
       - arm64
 
+  - &client
+    <<: *build
+    id: nokkud
+    main: ./nokkud
+    binary: nokkud
+    ldflags:
+      - -s -w
+      - -X github.com/mizuchilabs/kata/buildinfo.Version={{ .Version }}
+      - -X github.com/mizuchilabs/kata/buildinfo.Commit={{ .Commit }}
+      - -X github.com/mizuchilabs/kata/buildinfo.Date={{ .CommitDate }}
+    goarch:
+      - amd64
+      - arm64
+      - riscv64
+
+  - <<: *client
+    id: nk
+    main: ./nk
+    binary: nk
+    goos:
+      - linux
+      - windows
+
+  # The Secure Enclave bridge is Swift linked through cgo, so the darwin
+  # binaries only build on a Mac.
+  - <<: *client
+    id: nk-darwin
+    main: ./nk
+    binary: nk
+    env: [CGO_ENABLED=1]
+    tags: [enclave]
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    hooks:
+      pre: ./nk/internal/enclave/build.sh
+    skip: '{{ ne .Runtime.Goos "darwin" }}'
+
 kos:
-  - repositories: [ghcr.io/nokku-sh/nokku]
-    main: ./cmd/nokku
+  - build: nokku
+    repositories: [ghcr.io/nokku-sh/nokku]
+    main: ./core/cmd/nokku
     bare: true
     preserve_import_paths: false
     sbom: spdx
@@ -34,6 +82,25 @@ kos:
     platforms:
       - linux/amd64
       - linux/arm64
+
+dockers_v2:
+  - ids: [nokkud]
+    images: [ghcr.io/nokku-sh/nokkud]
+    dockerfile: nokkud/Dockerfile
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.title: nokkud
+      org.opencontainers.image.description: "The Nokku daemon, for containers you want to SSH into"
+      org.opencontainers.image.source: "https://github.com/nokku-sh/nokku"
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.created: "{{ .Date }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.licenses: "Apache-2.0"
 
 signs:
   - cmd: cosign
@@ -56,10 +123,10 @@ docker_signs:
 sboms:
   - cmd: syft
     documents:
-      - "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}.sbom.json"
+      - "{{ .Binary }}_{{ .Os }}_{{ .Arch }}.sbom.json"
     args:
       - "$artifact"
-      - "--source-name={{ .ProjectName }}"
+      - "--source-name={{ .Binary }}"
       - "--source-version={{ .Version }}"
       - "--select-catalogers=-file"
       - "--output"
@@ -67,11 +134,67 @@ sboms:
     artifacts: binary
 
 archives:
-  - formats: [binary]
-    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+  - id: binaries
+    ids: [nokku, nk, nk-darwin]
+    formats: [binary]
+    name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
+
+  - id: nokkud
+    ids: [nokkud]
+    formats: [tar.gz]
+    name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - src: nokkud/packaging/systemd/nokkud.service
+        dst: nokkud.service
+      - src: nokkud/packaging/openrc/nokkud.openrc
+        dst: nokkud.openrc # needs to be renamed for OpenRC
+      - src: nokkud/packaging/ufw/nokkud
+        dst: nokkud.ufw
+      - src: nokkud/packaging/firewalld/nokkud.xml
+        dst: nokkud.firewalld.xml
+      - src: nokkud/packaging/install.sh
+        dst: install.sh
+      - src: nokkud/packaging/scripts/postinstall.sh
+        dst: postinstall.sh
+
+nfpms:
+  - &package
+    id: nk
+    ids: [nk]
+    package_name: nk
+    vendor: "MizuchiLabs"
+    homepage: "https://github.com/nokku-sh/nokku/tree/main/nk"
+    description: "Nokku SSH companion"
+    maintainer: "Nokku <support@mizuchi.dev>"
+    license: Apache-2.0
+    bindir: /usr/bin
+    formats:
+      - apk
+      - deb
+      - rpm
+
+  - <<: *package
+    id: nokkud
+    ids: [nokkud]
+    package_name: nokkud
+    homepage: "https://github.com/nokku-sh/nokku/tree/main/nokkud"
+    description: "Nokku Daemon - SSH certificate management daemon"
+    scripts:
+      postinstall: nokkud/packaging/scripts/postinstall.sh
+      preremove: nokkud/packaging/scripts/preremove.sh
+      postremove: nokkud/packaging/scripts/postremove.sh
+    contents:
+      - src: nokkud/packaging/systemd/nokkud.service
+        dst: /usr/share/nokkud/systemd/nokkud.service
+      - src: nokkud/packaging/openrc/nokkud.openrc
+        dst: /usr/share/nokkud/openrc/nokkud.openrc
+      - src: nokkud/packaging/ufw/nokkud
+        dst: /usr/share/nokkud/ufw/nokkud
+      - src: nokkud/packaging/firewalld/nokkud.xml
+        dst: /usr/share/nokkud/firewalld/nokkud.xml
 
 checksum:
-  name_template: "{{ .ProjectName }}_checksums.txt"
+  name_template: "checksums.txt"
 
 source:
   enabled: true

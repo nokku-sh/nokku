@@ -1,0 +1,271 @@
+package iam
+
+import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/cryptosigner"
+
+	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/cache"
+	"github.com/nokku-sh/nokku/core/internal/db"
+)
+
+func TestRequestCredential(t *testing.T) {
+	tests := []struct {
+		name          string
+		authorization string
+		want          string
+	}{
+		{"bearer", "Bearer tok", "tok"},
+		{"dpop", "DPoP tok", "tok"},
+		{"dpop lowercase", "dpop tok", "tok"},
+		{"other scheme", "Basic tok", ""},
+		{"empty", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			header := http.Header{}
+			if tt.authorization != "" {
+				header.Set("Authorization", tt.authorization)
+			}
+			if got := requestCredential(header); got != tt.want {
+				t.Fatalf("requestCredential() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("cookie", func(t *testing.T) {
+		header := http.Header{}
+		header.Add("Cookie", sessionCookieName+"=cookietok")
+		if got := requestCredential(header); got != "cookietok" {
+			t.Fatalf("requestCredential() = %q, want cookietok", got)
+		}
+	})
+}
+
+func newTestVerifier(t *testing.T, now func() time.Time) *DPoPVerifier {
+	t.Helper()
+	return &DPoPVerifier{
+		secret:     []byte("test-secret"),
+		replay:     cache.NewMemory(100),
+		anonReplay: cache.NewMemory(2),
+		now:        now,
+	}
+}
+
+// signProof produces a client-style DPoP proof with an ES256 key.
+func signProof(
+	t *testing.T,
+	key *ecdsa.PrivateKey,
+	htu, ath, nonce string,
+	now time.Time,
+) string {
+	t.Helper()
+	claims := map[string]any{
+		"htm": http.MethodPost,
+		"htu": htu,
+		"iat": now.Unix(),
+		"jti": rand.Text(),
+	}
+	if nonce != "" {
+		claims["nonce"] = nonce
+	}
+	if ath != "" {
+		claims["ath"] = ath
+	}
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatalf("marshal claims: %v", err)
+	}
+	opts := (&jose.SignerOptions{}).WithType("dpop+jwt")
+	opts.EmbedJWK = true
+	signer, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.ES256, Key: cryptosigner.Opaque(key)},
+		opts,
+	)
+	if err != nil {
+		t.Fatalf("new signer: %v", err)
+	}
+	jws, err := signer.Sign(payload)
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	compact, err := jws.CompactSerialize()
+	if err != nil {
+		t.Fatalf("serialize: %v", err)
+	}
+	return compact
+}
+
+func TestVerifySessionProof(t *testing.T) {
+	const (
+		procedure = "/nokku.v1.UserService/Whoami"
+		token     = "session-token"
+		binding   = "test-jkt"
+	)
+	now := time.Unix(1_800_000_000, 0)
+	svc := &Service{}
+	svc.DPoP = newTestVerifier(t, func() time.Time { return now })
+	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws", BaseURL: "https://nokku.example.com"})
+	htu := "https://nokku.example.com" + procedure
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	t.Run("valid bound proof", func(t *testing.T) {
+		proof := signProof(t, key, htu, DPoPATH(token), svc.DPoP.CurrentNonce(), now)
+		header := http.Header{}
+		header.Set("Authorization", "DPoP "+token)
+		header.Set("DPoP", proof)
+		err := svc.verifySessionProof(ctx, header, procedure, token, binding)
+		// The fixture binding cannot match. Anything but a binding mismatch means the proof itself failed.
+		if err == nil {
+			t.Fatal("expected a jkt mismatch for the fixture binding")
+		}
+		if !strings.Contains(err.Error(), "jkt mismatch") {
+			t.Fatalf("verifySessionProof() = %v, want a jkt mismatch", err)
+		}
+	})
+
+	t.Run("proof bound to the session key passes verification", func(t *testing.T) {
+		jwk := &jose.JSONWebKey{Key: &key.PublicKey}
+		tp, err := jwk.Thumbprint(crypto.SHA256)
+		if err != nil {
+			t.Fatalf("thumbprint: %v", err)
+		}
+		realBinding := base64.RawURLEncoding.EncodeToString(tp)
+
+		proof := signProof(t, key, htu, DPoPATH(token), svc.DPoP.CurrentNonce(), now)
+		header := http.Header{}
+		header.Set("DPoP", proof)
+		if err := svc.verifySessionProof(ctx, header, procedure, token, realBinding); err != nil {
+			t.Fatalf("verifySessionProof() = %v, want nil", err)
+		}
+	})
+
+	t.Run("missing proof is ErrDPoPRequired", func(t *testing.T) {
+		header := http.Header{}
+		header.Set("Authorization", "DPoP "+token)
+		err := svc.verifySessionProof(ctx, header, procedure, token, binding)
+		if err == nil || !errors.Is(err, ErrDPoPRequired) {
+			t.Fatalf("verifySessionProof() = %v, want ErrDPoPRequired", err)
+		}
+	})
+
+	t.Run("stale nonce maps to ErrDPoPNonce", func(t *testing.T) {
+		proof := signProof(t, key, htu, DPoPATH(token), "stale-nonce", now)
+		header := http.Header{}
+		header.Set("DPoP", proof)
+		err := svc.verifySessionProof(ctx, header, procedure, token, binding)
+		if err == nil || !strings.Contains(err.Error(), "dpop nonce required") {
+			t.Fatalf("verifySessionProof() = %v, want ErrDPoPNonce", err)
+		}
+	})
+}
+
+func TestSameHTU(t *testing.T) {
+	const want = "https://nokku.example.com/nokku.v1.TargetService/GetMyAccess"
+	tests := []struct {
+		name  string
+		claim string
+		same  bool
+	}{
+		{"exact", want, true},
+		{"host case and default port", "https://NOKKU.example.com:443/nokku.v1.TargetService/GetMyAccess", true},
+		{"query and fragment do not count", want + "?x=1#y", true},
+		{
+			"doubled slash from a base with a trailing slash",
+			"https://nokku.example.com//nokku.v1.TargetService/GetMyAccess",
+			true,
+		},
+		{"other procedure", "https://nokku.example.com/nokku.v1.TargetService/ListTargets", false},
+		{"path case", "https://nokku.example.com/nokku.v1.targetservice/getmyaccess", false},
+		{"encoded slash", "https://nokku.example.com/nokku.v1.TargetService%2FGetMyAccess", false},
+		{"other host", "https://evil.example.com/nokku.v1.TargetService/GetMyAccess", false},
+		{"other port", "https://nokku.example.com:8443/nokku.v1.TargetService/GetMyAccess", false},
+		{"other scheme", "http://nokku.example.com/nokku.v1.TargetService/GetMyAccess", false},
+		{"not a url", "::", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sameHTU(tt.claim, want); got != tt.same {
+				t.Fatalf("sameHTU(%q) = %v, want %v", tt.claim, got, tt.same)
+			}
+		})
+	}
+}
+
+func TestAdvertiseDPoPNonce(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	svc := &Service{}
+	svc.DPoP = newTestVerifier(t, func() time.Time { return now })
+	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws", BaseURL: "https://acme.nokku.example"})
+
+	t.Run("sets nonce and the workspace url", func(t *testing.T) {
+		header := http.Header{}
+		svc.AdvertiseDPoPNonce(ctx, header)
+		if header.Get("DPoP-Nonce") != svc.DPoP.CurrentNonce() {
+			t.Error("AdvertiseDPoPNonce did not set the DPoP-Nonce header")
+		}
+		if header.Get(deviceURLHeader) != "https://acme.nokku.example" {
+			t.Error("AdvertiseDPoPNonce did not set the canonical URL header")
+		}
+	})
+}
+
+// Anonymous callers can fill the device grant store, so replay markers must not live there.
+func TestDPoPReplayStoreIsNotShared(t *testing.T) {
+	// New only keeps the connection, nothing here reaches the database.
+	svc, err := New(t.Context(), Deps{Conn: &db.Connection{}, Secret: []byte("test-secret")})
+	if err != nil {
+		t.Fatalf("build iam service: %v", err)
+	}
+	if svc.DPoP.replay == svc.Device.grants {
+		t.Fatal("DPoP replay markers share the store anonymous callers write to")
+	}
+}
+
+// Anyone can send a proof without an access token, a flood must not get signed-in callers refused.
+func TestDPoPAnonymousProofsCannotFillTheSessionStore(t *testing.T) {
+	const htu = "https://nokku.example.com/x"
+	now := time.Unix(1_800_000_000, 0)
+	v := newTestVerifier(t, func() time.Time { return now })
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	verify := func(token string) error {
+		ath := ""
+		if token != "" {
+			ath = DPoPATH(token)
+		}
+		proof := signProof(t, key, htu, ath, v.CurrentNonce(), now)
+		_, err := v.Verify(t.Context(), proof, token, http.MethodPost, htu)
+		return err
+	}
+
+	for range 2 {
+		if err := verify(""); err != nil {
+			t.Fatalf("anonymous proof: %v", err)
+		}
+	}
+	if err := verify(""); err == nil {
+		t.Fatal("anonymous proof accepted with a full anonymous store")
+	}
+	if err := verify("session-token"); err != nil {
+		t.Fatalf("session proof refused after an anonymous flood: %v", err)
+	}
+}

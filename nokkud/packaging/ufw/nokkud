@@ -1,0 +1,4 @@
+[nokkud]
+title=Nokku SSH Daemon
+description=Decentralized, certificate-authenticated SSH server (nokkud)
+ports=4022/tcp

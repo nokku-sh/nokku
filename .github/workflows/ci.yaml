@@ -17,6 +17,71 @@ jobs:
   ci:
     uses: nokku-sh/.github/.github/workflows/go-ci.yaml@main
 
+  proto:
+    name: Proto
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+
+      - name: Format and lint
+        working-directory: proto
+        run: |
+          buf format -d --exit-code
+          buf lint
+
+      - name: Generated Go code is up to date
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
+          buf generate
+          git diff --exit-code -- gen
+
+  # The Secure Enclave bridge is Swift linked through cgo and only builds on
+  # a Mac. Runners are VMs without an enclave, so the tests drive the bridge
+  # with a software key.
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+
+      - uses: ./.github/actions/prepare
+
+      - name: Build the Secure Enclave bridge
+        run: ./nk/internal/enclave/build.sh
+
+      - name: Test
+        run: |
+          CGO_ENABLED=1 go test -race -count=1 -v -tags enclave ./nk/internal/enclave/
+          CGO_ENABLED=1 go test -race -count=1 -tags enclave ./nk/...
+
+      - name: Build
+        run: |
+          for arch in arm64 amd64; do
+            CGO_ENABLED=1 GOARCH="$arch" go build -tags enclave -ldflags="-s -w" -o "bin/nk_darwin_$arch" ./nk
+          done
+
+      - name: Doctor
+        run: NK_SECURE_ENCLAVE=1 ./bin/nk_darwin_arm64 doctor || true
+
   # Runs on main only, a pull request must never overwrite the nightly image.
   nightly:
     needs: ci

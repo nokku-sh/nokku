@@ -1,0 +1,123 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+
+// Join tokens bring things in: an enroll token a daemon, an invite token a
+// person. They are redeemed and counted, they never authenticate a call.
+service JoinTokenService {
+  rpc CreateJoinToken(CreateJoinTokenRequest) returns (CreateJoinTokenResponse) {
+    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+  }
+  rpc ListJoinTokens(ListJoinTokensRequest) returns (ListJoinTokensResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc DeleteJoinToken(DeleteJoinTokenRequest) returns (DeleteJoinTokenResponse) {
+    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+  }
+}
+
+enum JoinTokenKind {
+  JOIN_TOKEN_KIND_UNSPECIFIED = 0;
+  JOIN_TOKEN_KIND_ENROLL = 1;
+  JOIN_TOKEN_KIND_INVITE = 2;
+}
+
+message JoinToken {
+  string id = 1;
+  JoinTokenKind kind = 2;
+  string label = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  int32 max_uses = 5;
+  int32 uses = 6;
+  bool auto_approve = 7;
+  string ca_id = 8;
+  WorkspaceRole role = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp last_used_at = 11;
+  // Enroll tokens only. Copied onto the target once, when the daemon is
+  // created. Edits in the web app win from then on.
+  repeated string tags = 12;
+  repeated JoinTokenGrant grants = 13;
+  // An ephemeral daemon is deleted retire_after after it was last seen, and
+  // deletes itself when stopped. A new one of the same name and token
+  // replaces one that is offline.
+  bool ephemeral = 14;
+  google.protobuf.Duration retire_after = 15;
+}
+
+// Who may log in as one Linux account on every target the token enrolls.
+message JoinTokenGrant {
+  string username = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+    pattern: "^[A-Za-z_][A-Za-z0-9._-]*\\$?$"
+  }];
+  repeated string user_ids = 2 [(buf.validate.field).repeated = {
+    max_items: 50
+    items: {
+      string: {uuid: true}
+    }
+  }];
+  repeated string team_ids = 3 [(buf.validate.field).repeated = {
+    max_items: 50
+    items: {
+      string: {uuid: true}
+    }
+  }];
+  repeated string service_account_ids = 4 [(buf.validate.field).repeated = {
+    max_items: 50
+    items: {
+      string: {uuid: true}
+    }
+  }];
+}
+
+message CreateJoinTokenRequest {
+  JoinTokenKind kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string label = 2 [(buf.validate.field).string.max_len = 100];
+  google.protobuf.Duration ttl = 3 [(buf.validate.field).duration.gt = {seconds: 0}];
+  int32 max_uses = 4 [(buf.validate.field).int32.gt = 0];
+  bool auto_approve = 5;
+  string ca_id = 6 [(buf.validate.field).string.uuid = true];
+  // Invite tokens only. Unset is the member.
+  WorkspaceRole role = 7 [(buf.validate.field).enum.defined_only = true];
+  // Enroll tokens only.
+  repeated string tags = 8 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {max_len: 64}
+    }
+  }];
+  repeated JoinTokenGrant grants = 9 [(buf.validate.field).repeated.max_items = 32];
+  bool ephemeral = 10;
+  // Requires ephemeral. Unset is 15 minutes.
+  google.protobuf.Duration retire_after = 11 [(buf.validate.field).duration = {
+    gte: {seconds: 60}
+    lte: {seconds: 604800}
+  }];
+}
+message CreateJoinTokenResponse {
+  JoinToken token = 1;
+  string secret = 2;
+}
+
+message ListJoinTokensRequest {
+  JoinTokenKind kind = 1 [(buf.validate.field).enum.defined_only = true];
+}
+message ListJoinTokensResponse {
+  repeated JoinToken tokens = 1;
+}
+
+message DeleteJoinTokenRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message DeleteJoinTokenResponse {}

@@ -1,0 +1,15 @@
+#!/sbin/openrc-run
+
+name="nokkud"
+description="Nokku Daemon"
+command="/usr/bin/nokkud"
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background=true
+# The log carries the audit events, it must not be discarded.
+output_log="/var/log/nokkud.log"
+error_log="/var/log/nokkud.log"
+
+depend() {
+    need net
+    after firewall
+}

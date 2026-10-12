@@ -1,0 +1,131 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema:
+      - "internal/db/migrations"
+    queries: "internal/db/queries"
+    gen:
+      go:
+        package: "db"
+        out: "internal/db"
+        sql_package: "pgx/v5"
+        initialisms: ["id", "url", "api"]
+        json_tags_case_style: "camel"
+        emit_json_tags: true # Adds JSON tags to generated structs
+        emit_prepared_queries: true
+        emit_pointers_for_null_types: true # Pointers for null types
+        emit_result_struct_pointers: true # More efficient for large result sets
+        emit_params_struct_pointers: true # More efficient parameter passing
+        rename:
+          ssh_ca: "SSHCA"
+          web_ca: "WebCA"
+        overrides:
+          # UUID overrides
+          - db_type: "uuid"
+            go_type: "string"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              type: "string"
+              pointer: true
+
+          # Date/Time overrides
+          - db_type: "date"
+            go_type: "time.Time"
+          - db_type: "date"
+            nullable: true
+            go_type:
+              type: "time.Time"
+              pointer: true
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              type: "time.Time"
+              pointer: true
+
+          # Interval overrides
+          - db_type: "pg_catalog.interval"
+            go_type: "time.Duration"
+          - db_type: "pg_catalog.interval"
+            nullable: true
+            go_type:
+              type: "time.Duration"
+              pointer: true
+
+          # Enum overrides
+          - column: "ssh_cas.key_type"
+            go_type:
+              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
+              type: "CertificateKeyType"
+          - column: "ssh_cas.allowed_key_types"
+            go_type:
+              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
+              type: "CertificateKeyType"
+              slice: true
+          - column: "daemons.status"
+            go_type:
+              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
+              type: "DaemonStatus"
+          - column: "join_tokens.kind"
+            go_type:
+              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
+              type: "JoinTokenKind"
+          - column: "users.role"
+            go_type:
+              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
+              type: "WorkspaceRole"
+          - column: "service_accounts.role"
+            go_type:
+              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
+              type: "WorkspaceRole"
+          - column: "join_tokens.role"
+            go_type:
+              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
+              type: "WorkspaceRole"
+              pointer: true
+
+          # JSON overrides
+          - column: "daemons.config"
+            go_type:
+              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
+              type: "DaemonConfig"
+              pointer: true
+          - column: "workspaces.settings"
+            go_type:
+              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
+              type: "WorkspaceSettings"
+              pointer: true
+
+          # Hash (one-way) overrides
+          - column: "access_tokens.token_hash"
+            go_type:
+              import: "github.com/nokku-sh/nokku/core/internal/crypto"
+              type: "HashedToken"
+          - column: "one_time_tokens.token_hash"
+            go_type:
+              import: "github.com/nokku-sh/nokku/core/internal/crypto"
+              type: "HashedToken"
+          - column: "join_tokens.token_hash"
+            go_type:
+              import: "github.com/nokku-sh/nokku/core/internal/crypto"
+              type: "HashedToken"
+
+          # Encrypt (reversible) overrides
+          - column: "ssh_cas.private_key"
+            go_type:
+              import: "github.com/nokku-sh/nokku/core/internal/crypto"
+              type: "EncryptedBytes"
+          - column: "sso_providers.config"
+            go_type:
+              import: "github.com/nokku-sh/nokku/core/internal/crypto"
+              type: "EncryptedBytes"
+          - column: "recordings.key"
+            go_type:
+              import: "github.com/nokku-sh/nokku/core/internal/crypto"
+              type: "EncryptedBytes"
+          - column: "web_ca.private_key"
+            go_type:
+              import: "github.com/nokku-sh/nokku/core/internal/crypto"
+              type: "EncryptedBytes"
