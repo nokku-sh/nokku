@@ -51,7 +51,7 @@ func TestRenderTemplates(t *testing.T) {
 				IPAddress:  "203.0.113.7",
 			},
 			contains: []string{
-				"New sign-in recorded.",
+				"New sign-in from",
 				"https://app.nokku.sh/profile/security",
 				"Web browser",
 				"203.0.113.7",
@@ -95,7 +95,7 @@ func TestRenderTemplates(t *testing.T) {
 			}
 
 			for _, want := range tt.contains {
-				if !strings.Contains(body, want) {
+				if !strings.Contains(body.html, want) {
 					t.Errorf("render(%q) does not contain %q", tt.name, want)
 				}
 			}
@@ -116,12 +116,12 @@ func TestRenderOperatorFooter(t *testing.T) {
 			t.Fatalf("render: %v", err)
 		}
 		for _, want := range []string{"this Nokku server", "tell your administrator"} {
-			if !strings.Contains(body, want) {
+			if !strings.Contains(body.html, want) {
 				t.Errorf("footer does not contain %q", want)
 			}
 		}
 		for _, unwanted := range []string{"Imprint", "Privacy", "mailto:", "©"} {
-			if strings.Contains(body, unwanted) {
+			if strings.Contains(body.html, unwanted) {
 				t.Errorf("footer without operator contains %q", unwanted)
 			}
 		}
@@ -140,11 +140,11 @@ func TestRenderOperatorFooter(t *testing.T) {
 			t.Fatalf("render: %v", err)
 		}
 		for _, want := range []string{"Acme GmbH", "Street 1, Vienna", "mailto:help@acme.test", "https://acme.test/imprint"} {
-			if !strings.Contains(body, want) {
+			if !strings.Contains(body.html, want) {
 				t.Errorf("footer does not contain %q", want)
 			}
 		}
-		if strings.Contains(body, ">Terms<") {
+		if strings.Contains(body.html, ">Terms<") {
 			t.Error("footer shows a Terms link without a terms URL")
 		}
 	})

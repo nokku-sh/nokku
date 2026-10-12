@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
+	htmltemplate "html/template"
+	"io"
 	"log/slog"
 	"net/textproto"
 	"strings"
+	texttemplate "text/template"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -191,7 +193,7 @@ func (s *Service) SendNewLoginEmail(
 	return s.sendTemplate(ctx, sendRequest{
 		userID:   userID,
 		to:       email,
-		subject:  "New sign-in to your account",
+		subject:  "New sign-in from " + deviceName,
 		template: "new-login",
 		data: newLoginTemplateData{
 			Operator:   s.Operator,
@@ -199,7 +201,7 @@ func (s *Service) SendNewLoginEmail(
 			DeviceID:   deviceID,
 			DeviceName: deviceName,
 			IPAddress:  ip,
-			EventTime:  time.Now().UTC().Format(time.RFC1123),
+			EventTime:  time.Now().UTC().Format("2 Jan 2006, 15:04 UTC"),
 		},
 	})
 }
@@ -209,7 +211,7 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 	if req.userID == "" {
 		return errors.New("email user id is required")
 	}
-	html, err := render(req.template, req.data)
+	body, err := render(req.template, req.data)
 	if err != nil {
 		return err
 	}
@@ -227,7 +229,8 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 		From:    "Nokku <" + s.From + ">",
 		To:      req.to,
 		Subject: req.subject,
-		HTML:    html,
+		Text:    body.text,
+		HTML:    body.html,
 	})
 	if err != nil {
 		_ = s.cache.Delete(context.WithoutCancel(ctx), key)
@@ -239,22 +242,44 @@ func cooldownKey(userID, template string) string {
 	return "email_cooldown:" + userID + ":" + template
 }
 
-func render(name string, data any) (string, error) {
-	templatePath := fmt.Sprintf("email/out/%s.html", name)
-	content, err := web.EmailFS.ReadFile(templatePath)
-	if err != nil {
-		return "", fmt.Errorf("template %s not found: %w", name, err)
-	}
+type body struct {
+	text string
+	html string
+}
 
-	tmpl, err := template.New(name).Option("missingkey=error").Parse(string(content))
+// render fills both exports of a template. The text part goes through text/template, html escaping would break its URLs.
+func render(name string, data any) (body, error) {
+	html, err := renderFile(fmt.Sprintf("email/out/%s.html", name), data, func(src string) (executor, error) {
+		return htmltemplate.New(name).Option("missingkey=error").Parse(src)
+	})
 	if err != nil {
-		return "", fmt.Errorf("failed to parse template %s: %w", name, err)
+		return body{}, err
 	}
+	text, err := renderFile(fmt.Sprintf("email/out/text/%s.txt", name), data, func(src string) (executor, error) {
+		return texttemplate.New(name).Option("missingkey=error").Parse(src)
+	})
+	if err != nil {
+		return body{}, err
+	}
+	return body{text: text, html: html}, nil
+}
 
+type executor interface {
+	Execute(w io.Writer, data any) error
+}
+
+func renderFile(path string, data any, parse func(string) (executor, error)) (string, error) {
+	content, err := web.EmailFS.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("template %s not found: %w", path, err)
+	}
+	tmpl, err := parse(string(content))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template %s: %w", path, err)
+	}
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute template %s: %w", name, err)
+		return "", fmt.Errorf("failed to execute template %s: %w", path, err)
 	}
-
 	return buf.String(), nil
 }

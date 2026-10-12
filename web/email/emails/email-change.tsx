@@ -11,7 +11,7 @@ export default function EmailChange() {
       <Heading className="m-0 mt-3 text-[30px] font-bold leading-9 tracking-[-0.6px] text-ink">
         Your email address is being changed.
       </Heading>
-      <Text className="m-0 mt-4 text-base leading-7 text-muted">
+      <Text className="m-0 mt-4 text-base leading-7 text-ink">
         Someone signed in to your account and asked to change its email address. The change
         happens once the new address is confirmed.
       </Text>
@@ -19,12 +19,12 @@ export default function EmailChange() {
         <Text className="m-0 text-xs font-bold uppercase tracking-[1.2px] text-muted">
           New address
         </Text>
-        <Text className="m-0 mt-4 text-sm leading-6 text-ink">{CONSTANTS.NEW_EMAIL}</Text>
+        <Text className="m-0 mt-2 text-sm leading-6 text-ink">{CONSTANTS.NEW_EMAIL}</Text>
       </Section>
-      <Text className="m-0 text-base leading-7 text-muted">
-        If this was you, there is nothing to do here. If it was not, cancel the change. This also
-        works after the change went through: it puts this address back and signs the account out
-        everywhere. Change your password afterwards.
+      <Text className="m-0 text-base leading-7 text-ink">
+        If this was you, there is nothing to do. If it was not, cancel the change. That also works
+        after the change went through: it puts this address back and signs the account out
+        everywhere. Check your passkeys and signed-in devices afterwards.
       </Text>
       <Section className="my-7">
         <Button

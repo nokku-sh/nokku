@@ -11,7 +11,7 @@ export default function SignupLink() {
       <Heading className="m-0 mt-3 text-[30px] font-bold leading-9 tracking-[-0.6px] text-ink">
         Join {CONSTANTS.WORKSPACE}.
       </Heading>
-      <Text className="m-0 mt-4 text-base leading-7 text-muted">
+      <Text className="m-0 mt-4 text-base leading-7 text-ink">
         Hi {CONSTANTS.USER_NAME}, this link creates your account and signs you in. You can add a
         passkey afterwards so you never need a link again.
       </Text>
@@ -25,7 +25,7 @@ export default function SignupLink() {
       </Section>
       <Section className="rounded-xl border border-line bg-cloud px-5 py-4">
         <Text className="m-0 text-sm font-bold text-ink">
-          Link expires in {CONSTANTS.EXPIRATION}
+          The link expires in {CONSTANTS.EXPIRATION}
         </Text>
         <Text className="m-0 mt-1 text-sm leading-6 text-muted">
           If you were not expecting this, ignore it. No account is created until the link is used.

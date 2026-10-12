@@ -58,7 +58,7 @@ tasks:
       - touch build/.gitkeep
 
   build:email:
-    desc: Build email templates
+    desc: Build email templates, HTML into out/ and the plain text part into out/text/
     dir: web/email
     cmds:
       - pnpm install; pnpm export

@@ -12,7 +12,7 @@ export default function ProductUpdate() {
       <Heading className="m-0 mt-3 text-[30px] font-bold leading-9 tracking-[-0.6px] text-ink">
         Automated certificate rotation is here.
       </Heading>
-      <Text className="m-0 mt-4 text-base leading-7 text-muted">
+      <Text className="m-0 mt-4 text-base leading-7 text-ink">
         Short-lived certificates are the core of Nokku, but rotating them by hand across
         hundreds of hosts is exactly the busywork you built this system to avoid. Starting today,
         the control plane handles the full rotation lifecycle for you.
