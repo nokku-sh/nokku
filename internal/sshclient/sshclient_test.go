@@ -17,7 +17,6 @@ func testConfig(t *testing.T, srv *sshtest.Server) Config {
 		Username:      "user",
 		Signer:        srv.UserSigner(t, srv.UserPrincipal, "user"),
 		CAKey:         srv.CAKey(),
-		SessionID:     "web-123",
 	}
 }
 
@@ -39,15 +38,15 @@ func waitForShell(t *testing.T, srv *sshtest.Server) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if srv.Env("NOKKU_SESSION_ID") != "" {
+		if srv.ShellStarted() {
 			return
 		}
 		time.Sleep(time.Millisecond)
 	}
-	t.Fatal("session env never reached the server")
+	t.Fatal("shell request never reached the server")
 }
 
-// The full dial: host verification against the CA, env before pty, the pty size, echo and window-change.
+// The full dial: host verification against the CA, the pty size, echo and window-change.
 func TestDialTerminal_HappyPath(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	term := dialForTest(t, srv, testConfig(t, srv))
@@ -55,9 +54,6 @@ func TestDialTerminal_HappyPath(t *testing.T) {
 
 	waitForShell(t, srv)
 
-	if got := srv.Env("NOKKU_SESSION_ID"); got != "web-123" {
-		t.Errorf("NOKKU_SESSION_ID = %q, want web-123", got)
-	}
 	if got := srv.ConnUser(); got != "user" {
 		t.Errorf("connection user = %q, want user", got)
 	}

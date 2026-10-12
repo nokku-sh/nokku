@@ -20,7 +20,6 @@ const (
 	chunkSize     = 32 * 1024
 	// Matches the daemon's sshd, which answers keepalive@openssh.com.
 	keepaliveInterval = 30 * time.Second
-	sessionEnvVar     = "NOKKU_SESSION_ID"
 )
 
 // Config HostPrincipal is the daemon's target id.
@@ -29,7 +28,6 @@ type Config struct {
 	Username      string
 	Signer        ssh.Signer
 	CAKey         ssh.PublicKey
-	SessionID     string
 	Width         uint32
 	Height        uint32
 }
@@ -129,11 +127,7 @@ func dial(conn net.Conn, cfg Config) (*Terminal, error) {
 		return fail("open session channel", err)
 	}
 
-	// env before pty-req: the daemon's recorder starts on pty-req and reads the session id from the environment.
-	env := struct{ Name, Value string }{sessionEnvVar, cfg.SessionID}
-	if _, err = ch.SendRequest("env", true, ssh.Marshal(env)); err != nil {
-		return fail("env request", err)
-	}
+	// The daemon labels the recording with the session id from the certificate's key id, so no env is sent.
 	pty := struct {
 		Term     string
 		Columns  uint32

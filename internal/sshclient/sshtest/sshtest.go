@@ -27,7 +27,8 @@ type Server struct {
 	HostPrincipal string
 
 	mu            sync.Mutex
-	env           map[string]string
+	keyID         string
+	shellStarted  bool
 	ptyTerm       string
 	ptyCols       uint32
 	ptyRows       uint32
@@ -93,7 +94,6 @@ func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
 	s := &Server{
 		UserPrincipal: userPrincipal,
 		HostPrincipal: hostPrincipal,
-		env:           make(map[string]string),
 		ca:            caSigner,
 		caPriv:        caPriv,
 		hostKey:       hostSigner,
@@ -182,10 +182,18 @@ func (s *Server) UserSigner(t testing.TB, subject, username string) ssh.Signer {
 	return signer
 }
 
-func (s *Server) Env(name string) string {
+// KeyID is the key id of the certificate the last login presented.
+func (s *Server) KeyID() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.env[name]
+	return s.keyID
+}
+
+// ShellStarted reports whether a session asked for its shell.
+func (s *Server) ShellStarted() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.shellStarted
 }
 
 func (s *Server) Pty() (term string, cols, rows uint32) {
@@ -254,6 +262,7 @@ func (s *Server) handle(c net.Conn) {
 			}
 			s.mu.Lock()
 			s.connUser = conn.User()
+			s.keyID = cert.KeyId
 			s.mu.Unlock()
 			return &ssh.Permissions{
 				Extensions: map[string]string{"nokku-principal": s.UserPrincipal},
@@ -298,16 +307,6 @@ func (s *Server) handleSession(newCh ssh.NewChannel) {
 	}
 	for req := range reqs {
 		switch req.Type {
-		case "env":
-			var e struct{ Name, Value string }
-			if ssh.Unmarshal(req.Payload, &e) != nil {
-				_ = req.Reply(false, nil)
-				continue
-			}
-			s.mu.Lock()
-			s.env[e.Name] = e.Value
-			s.mu.Unlock()
-			_ = req.Reply(true, nil)
 		case "pty-req":
 			var p struct {
 				Term     string
@@ -326,6 +325,9 @@ func (s *Server) handleSession(newCh ssh.NewChannel) {
 			s.mu.Unlock()
 			_ = req.Reply(true, nil)
 		case "shell":
+			s.mu.Lock()
+			s.shellStarted = true
+			s.mu.Unlock()
 			_ = req.Reply(true, nil)
 			go echo(ch)
 		case "window-change":

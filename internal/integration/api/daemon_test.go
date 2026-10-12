@@ -363,7 +363,7 @@ func TestCreateSession(t *testing.T) {
 	}
 	require.NoError(t, err, "shell output never arrived")
 	assert.Equal(t, "root", sshd.ConnUser(), "sshd saw the requested OS user")
-	assert.Equal(t, sessionID, sshd.Env("NOKKU_SESSION_ID"), "session env reached sshd")
+	assert.Equal(t, "nokku:web:session:"+sessionID, sshd.KeyID(), "the session id travels in the certificate")
 	assert.Len(t, cfg.Pool.ListSessions(enrolled.GetId()), 1)
 
 	_, res, err := websocket.Dial(t.Context(), srv.URL+"/terminal/ws?session_id="+sessionID,
