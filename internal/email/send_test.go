@@ -274,6 +274,29 @@ func TestSendTemplate_MessageAndData(t *testing.T) {
 	if !strings.Contains(msg.HTML, "https://app.nokku.sh/profile/security") {
 		t.Error("body missing profile URL")
 	}
+	if msg.Subject != "New sign-in from Web browser" {
+		t.Errorf("subject = %q", msg.Subject)
+	}
+	if !strings.Contains(msg.Text, "203.0.113.7") || !strings.Contains(msg.Text, "https://app.nokku.sh/profile/security") {
+		t.Error("text part missing the IP address or the profile URL")
+	}
+}
+
+// The text part is not html escaped, so a link with several query parameters stays clickable.
+func TestSendTemplate_TextPartKeepsURLs(t *testing.T) {
+	sender := &mockSender{}
+	svc := newTestService(sender)
+	link := "https://app.nokku.sh/email-change?cancel=1&token=t"
+	if err := svc.SendEmailChangeNotice(t.Context(), "user-1", "a@b.io", "new@b.io", link, "7 days"); err != nil {
+		t.Fatal(err)
+	}
+	msg := sender.sent[0]
+	if !strings.Contains(msg.Text, link) {
+		t.Errorf("text part does not contain %q", link)
+	}
+	if !strings.Contains(msg.HTML, "cancel=1&amp;token=t") {
+		t.Error("html part is not escaped")
+	}
 }
 
 // Concurrent sends for the same user and template must deliver exactly once.

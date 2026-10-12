@@ -11,7 +11,7 @@ export default function EmailConfirm() {
       <Heading className="m-0 mt-3 text-[30px] font-bold leading-9 tracking-[-0.6px] text-ink">
         Confirm your new email address.
       </Heading>
-      <Text className="m-0 mt-4 text-base leading-7 text-muted">
+      <Text className="m-0 mt-4 text-base leading-7 text-ink">
         You asked to use this address for your Nokku account. The account switches to it once you
         confirm, and you sign in with it from then on.
       </Text>
@@ -25,7 +25,7 @@ export default function EmailConfirm() {
       </Section>
       <Section className="rounded-xl border border-line bg-cloud px-5 py-4">
         <Text className="m-0 text-sm font-bold text-ink">
-          Link expires in {CONSTANTS.EXPIRATION}
+          The link expires in {CONSTANTS.EXPIRATION}
         </Text>
         <Text className="m-0 mt-1 text-sm leading-6 text-muted">
           If you did not ask for this, ignore this email. Nothing changes without the link.

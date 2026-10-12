@@ -57,7 +57,8 @@ func (s *smtpSender) Send(ctx context.Context, msg message) error {
 		return fmt.Errorf("to address: %w", err)
 	}
 	m.Subject(msg.Subject)
-	m.SetBodyString(mail.TypeTextHTML, msg.HTML)
+	m.SetBodyString(mail.TypeTextPlain, msg.Text)
+	m.AddAlternativeString(mail.TypeTextHTML, msg.HTML)
 	if err := s.client.DialAndSendWithContext(ctx, m); err != nil {
 		return fmt.Errorf("smtp send: %w", err)
 	}

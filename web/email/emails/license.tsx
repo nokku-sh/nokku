@@ -5,14 +5,14 @@ import BaseLayout from "../layouts/BaseLayout";
 /** Sent by the license worker (a separate repo), which embeds out/license.html. Re-export and copy it over. */
 export default function LicenseKey() {
   return (
-    <BaseLayout preview="Your Nokku Enterprise license key is ready.">
+    <BaseLayout type="license" preview="Your Nokku Enterprise license key is ready.">
       <Text className="m-0 text-xs font-bold uppercase tracking-[1.4px] text-brand">
         Enterprise license
       </Text>
       <Heading className="m-0 mt-3 text-[30px] font-bold leading-9 tracking-[-0.6px] text-ink">
         Your license key
       </Heading>
-      <Text className="m-0 mt-4 text-base leading-7 text-muted">
+      <Text className="m-0 mt-4 text-base leading-7 text-ink">
         Thanks for your purchase! Your Nokku Enterprise license for{" "}
         <strong className="text-ink">{CONSTANTS.CUSTOMER_EMAIL}</strong> unlocks unlimited quotas,
         SSO enforcement and 365-day audit retention on any self-hosted instance.

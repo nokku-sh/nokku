@@ -6,6 +6,7 @@ type message struct {
 	From    string
 	To      string
 	Subject string
+	Text    string
 	HTML    string
 }
 

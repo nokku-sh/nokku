@@ -9,8 +9,8 @@ export default function MagicLink() {
       <Heading className="m-0 mt-3 text-[30px] font-bold leading-9 tracking-[-0.6px] text-ink">
         Here is your sign-in link.
       </Heading>
-      <Text className="m-0 mt-4 text-base leading-7 text-muted">
-        Open it in the browser you want to use. It works once and only for a short while.
+      <Text className="m-0 mt-4 text-base leading-7 text-ink">
+        Open it in the browser you want to stay signed in on.
       </Text>
       <Section className="my-7">
         <Button
@@ -22,10 +22,10 @@ export default function MagicLink() {
       </Section>
       <Section className="rounded-xl border border-line bg-cloud px-5 py-4">
         <Text className="m-0 text-sm font-bold text-ink">
-          Link expires in {CONSTANTS.EXPIRATION}
+          The link works once and expires in {CONSTANTS.EXPIRATION}
         </Text>
         <Text className="m-0 mt-1 text-sm leading-6 text-muted">
-          If you did not ask to sign in, ignore this email. Nobody can use the link without it.
+          If you did not ask to sign in, ignore this email. Nobody gets in without the link.
         </Text>
       </Section>
     </BaseLayout>

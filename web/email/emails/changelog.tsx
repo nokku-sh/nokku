@@ -12,7 +12,7 @@ export default function Changelog() {
       <Heading className="m-0 mt-3 text-[30px] font-bold leading-9 tracking-[-0.6px] text-ink">
         What's new in Nokku 0.14
       </Heading>
-      <Text className="m-0 mt-4 text-base leading-7 text-muted">
+      <Text className="m-0 mt-4 text-base leading-7 text-ink">
         This release focuses on enterprise readiness: a dry-run for policy changes, a leaner policy
         pipeline, and a handful of fixes that make day-to-day access management quieter.
       </Text>
