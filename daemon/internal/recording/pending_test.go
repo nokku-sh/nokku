@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -113,17 +114,20 @@ func TestUploadPending(t *testing.T) {
 	is.Equal(1, opens)
 }
 
-// The answer keeps its code on the way out, the retry loop reads it to wait longer.
-func TestUploadPendingReportsAFullWorkspace(t *testing.T) {
-	dir := newRecordsDir(t)
+// answeringCore is a core whose upload handler answers the nth call with what answer returns.
+func answeringCore(t *testing.T, answer func(call int) error) nokkuv1connect.DaemonControlServiceClient {
+	t.Helper()
+	var calls atomic.Int32
 	handler := connect.NewClientStreamHandlerSimple(
 		nokkuv1connect.DaemonControlServiceUploadRecordingProcedure,
 		func(_ context.Context, stream *connect.ClientStream[nokkuv1.UploadRecordingRequest]) (*nokkuv1.UploadRecordingResponse, error) {
 			stream.Receive()
-			return nil, connect.NewError(
-				connect.CodeResourceExhausted,
-				errors.New("the recording storage of this workspace is full"),
-			)
+			if err := answer(int(calls.Add(1))); err != nil {
+				return nil, err
+			}
+			for stream.Receive() {
+			}
+			return &nokkuv1.UploadRecordingResponse{}, nil
 		},
 		connect.WithSchema(
 			nokkuv1.File_nokku_v1_daemon_proto.Services().
@@ -142,20 +146,61 @@ func TestUploadPendingReportsAFullWorkspace(t *testing.T) {
 		srv.CloseClientConnections()
 		srv.Close()
 	})
-	client := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL)
+	return nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL)
+}
 
+// pendingRecording leaves one recording on disk whose live upload failed.
+func pendingRecording(t *testing.T, dir string) string {
+	t.Helper()
 	recordOnce(t, &resultSink{err: errors.New("core down"), done: make(chan struct{})})
+	var path string
 	require.Eventually(t, func() bool {
 		m, _ := filepath.Glob(filepath.Join(dir, "*"+castSuffix))
 		if len(m) != 1 {
 			return false
 		}
-		_, busy := active.Load(m[0])
+		path = m[0]
+		_, busy := active.Load(path)
 		return !busy
 	}, time.Second, 10*time.Millisecond)
+	return path
+}
+
+// The answer keeps its code on the way out, the retry loop reads it to wait longer.
+func TestUploadPendingReportsAFullWorkspace(t *testing.T) {
+	dir := newRecordsDir(t)
+	client := answeringCore(t, func(int) error {
+		return connect.NewError(
+			connect.CodeResourceExhausted,
+			errors.New("the recording storage of this workspace is full"),
+		)
+	})
+	pendingRecording(t, dir)
 
 	err := UploadPending(t.Context(), client)
 	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err), "got %v", err)
 	left, _ := filepath.Glob(filepath.Join(dir, "*"+castSuffix))
 	assert.Len(t, left, 1, "a refused recording must stay on disk")
+}
+
+// A file the core keeps failing on stays for the next round and does not hold up the one behind it.
+func TestUploadPendingGoesOnAfterAFailedFile(t *testing.T) {
+	dir := newRecordsDir(t)
+	client := answeringCore(t, func(call int) error {
+		if call == 1 {
+			return connect.NewError(connect.CodeInternal, errors.New("something went wrong"))
+		}
+		return nil
+	})
+	first := pendingRecording(t, dir)
+	data, err := os.ReadFile(first)
+	require.NoError(t, err)
+	// Sorts behind the timestamp names, so it is the second upload.
+	second := filepath.Join(dir, "zz"+castSuffix)
+	require.NoError(t, os.WriteFile(second, data, 0o600))
+
+	err = UploadPending(t.Context(), client)
+	assert.Equal(t, connect.CodeInternal, connect.CodeOf(err), "the failed file is reported, got %v", err)
+	left, _ := filepath.Glob(filepath.Join(dir, "*"+castSuffix))
+	assert.Equal(t, []string{first}, left, "the failed file stays, the one behind it is uploaded")
 }

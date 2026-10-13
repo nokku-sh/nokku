@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -35,29 +36,45 @@ func removeUploaded(path string) {
 	}
 }
 
-// UploadPending stops at the first failure, the next call retries.
+// roundOverCodes are about the core or this daemon, the next file would get the same answer.
+var roundOverCodes = []connect.Code{
+	connect.CodeUnavailable,
+	connect.CodeResourceExhausted,
+	connect.CodeCanceled,
+	connect.CodeDeadlineExceeded,
+	connect.CodeUnauthenticated,
+	connect.CodePermissionDenied,
+}
+
+// UploadPending tries every pending file and returns what failed, the next call retries those. A file the core
+// keeps refusing must not hold up the ones behind it, so only an answer that is not about the file ends the round.
 func UploadPending(ctx context.Context, client nokkuv1connect.DaemonControlServiceClient) error {
 	// Filenames start with the timestamp, so Glob's order is oldest first.
 	matches, err := filepath.Glob(filepath.Join(paths.RecordsDir(), "*"+castSuffix))
 	if err != nil {
 		return err
 	}
+	var failed error
 	for _, path := range matches {
 		if _, busy := active.Load(path); busy {
 			continue
 		}
 		err = uploadFile(ctx, client, path)
-		if connect.CodeOf(err) == connect.CodeInvalidArgument {
+		switch code := connect.CodeOf(err); {
+		case err == nil:
+		case code == connect.CodeInvalidArgument:
 			// Already finalized, or a file the core will never take.
 			slog.Warn("recording not accepted by the core, not retrying", "path", path, "error", err)
-			err = nil
-		}
-		if err != nil {
-			return fmt.Errorf("upload %s: %w", filepath.Base(path), err)
+		case slices.Contains(roundOverCodes, code):
+			// First, the retry loop reads the code of this one.
+			return errors.Join(fmt.Errorf("upload %s: %w", filepath.Base(path), err), failed)
+		default:
+			failed = errors.Join(failed, fmt.Errorf("upload %s: %w", filepath.Base(path), err))
+			continue
 		}
 		removeUploaded(path)
 	}
-	return nil
+	return failed
 }
 
 func uploadFile(ctx context.Context, client nokkuv1connect.DaemonControlServiceClient, path string) error {
