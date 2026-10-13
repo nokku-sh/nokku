@@ -140,6 +140,35 @@ func TestSCIMUserLifecycle(t *testing.T) {
 	assert.Nil(t, after.ScimExternalID, "the IdP link survived deprovisioning")
 }
 
+// Authentik sends the username as userName and the address in emails.
+func TestSCIMUserEmailComesFromEmails(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	c := e.scim(t, o)
+	email := "alice@" + testDomain()
+	body := scimUser("alice", "ak-1")
+	body["emails"] = []any{
+		map[string]any{"value": "other@" + testDomain(), "type": "other"},
+		map[string]any{"value": email, "type": "other", "primary": true},
+	}
+
+	var created scimResource
+	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Users", body, &created))
+	assert.Equal(t, email, created.UserName)
+	require.NotNil(t, e.userByEmail(t, o.ws, email))
+
+	var replaced scimResource
+	require.Equal(
+		t,
+		http.StatusOK,
+		c.do(http.MethodPut, "/Users/"+created.ID, body, &replaced),
+		"username-only userName",
+	)
+
+	delete(body, "emails")
+	assert.Equal(t, http.StatusBadRequest, c.do(http.MethodPost, "/Users", body, nil), "no address anywhere")
+}
+
 // The IdP link is no way to sign in. The account cannot list or drop it, and its address stays the IdP's.
 func TestSCIMLinkIsNoCredential(t *testing.T) {
 	e := newTestEnv(t)

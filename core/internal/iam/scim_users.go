@@ -1,10 +1,12 @@
 package iam
 
 // SCIM Users are the workspace's users: id is the user id, userName the email, externalId is on the row.
+// Inbound, the primary emails entry wins over userName. Authentik sends a plain username there.
 
 import (
 	"context"
 	"net/http"
+	"strings"
 	"uuid"
 
 	scim "github.com/elimity-com/scim"
@@ -23,9 +25,9 @@ type scimUserHandler struct {
 }
 
 func (h scimUserHandler) Create(r *http.Request, attrs scim.ResourceAttributes) (scim.Resource, error) {
-	email := normalizeEmail(scimAttrString(attrs["userName"]))
+	email := scimEmail(attrs)
 	if email == "" {
-		return scim.Resource{}, scimerrors.ScimErrorBadRequest("userName must be an email address")
+		return scim.Resource{}, scimerrors.ScimErrorBadRequest("emails or userName must hold an email address")
 	}
 	u, err := h.svc.scimProvisionUser(
 		r.Context(),
@@ -68,8 +70,8 @@ func (h scimUserHandler) Replace(r *http.Request, id string, attrs scim.Resource
 	if err != nil {
 		return scim.Resource{}, err
 	}
-	if requested := normalizeEmail(scimAttrString(attrs["userName"])); requested != "" && requested != u.Email {
-		// userName is the login email and SCIM never renames it.
+	if requested := scimEmail(attrs); requested != "" && requested != u.Email {
+		// The email is the login and SCIM never renames it.
 		return scim.Resource{}, scimerrors.ScimErrorMutability
 	}
 	var name *string
@@ -226,16 +228,34 @@ func userResource(u *db.User) scim.Resource {
 	return out
 }
 
+func scimEmail(attrs scim.ResourceAttributes) string {
+	for _, v := range []any{attrs["emails"], attrs["userName"]} {
+		if email := normalizeEmail(scimEmailValue(v)); strings.Contains(email, "@") {
+			return email
+		}
+	}
+	return ""
+}
+
+// scimEmailValue takes the primary entry of a list, or the first one when none is marked.
 func scimEmailValue(v any) string {
 	switch emails := v.(type) {
 	case []any:
-		if len(emails) == 0 {
-			return ""
+		first := ""
+		for _, e := range emails {
+			m, ok := e.(map[string]any)
+			if !ok {
+				m = map[string]any{"value": e}
+			}
+			s := scimAttrString(m["value"])
+			if scimAttrBool(m["primary"], false) && s != "" {
+				return s
+			}
+			if first == "" {
+				first = s
+			}
 		}
-		if m, ok := emails[0].(map[string]any); ok {
-			return scimAttrString(m["value"])
-		}
-		return scimAttrString(emails[0])
+		return first
 	case map[string]any:
 		return scimAttrString(emails["value"])
 	default:
