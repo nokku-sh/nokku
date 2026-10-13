@@ -64,6 +64,11 @@ WHERE
   user_id = @user_id
   AND id = @id;
 
+-- name: DeleteUserCredentials :exec
+DELETE FROM credentials
+WHERE
+  user_id = @user_id;
+
 -- name: DeleteCredentialsByProvider :execrows
 DELETE FROM credentials
 WHERE

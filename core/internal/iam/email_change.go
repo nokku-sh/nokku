@@ -124,7 +124,7 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 	return nil
 }
 
-// CancelEmailChange also undoes a finished change, and then signs the account out everywhere.
+// CancelEmailChange also undoes a finished change, and then leaves no session, credential or pending link behind.
 func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 	var u *db.User
 	reverted := false
@@ -151,6 +151,13 @@ func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 			return mapUserError(err)
 		}
 		reverted = true
+		// Whoever made the change may hold a revert or sign-in link of their own.
+		if err := q.DeleteAllUserTokens(ctx, &u.ID); err != nil {
+			return err
+		}
+		if err := q.DeleteUserCredentials(ctx, u.ID); err != nil {
+			return err
+		}
 		_, err = q.DeleteSubjectTokens(ctx, u.ID)
 		return err
 	})

@@ -222,9 +222,17 @@ func TestEmailChange(t *testing.T) {
 	assert.Empty(t, e.svc.PendingEmail(ctx, u.ID))
 	require.ErrorIs(t, e.svc.ConfirmEmailChange(ctx, confirm), iam.ErrInvalidToken, "second confirm")
 
-	// The old inbox undoes the change and signs everyone out.
+	// The old inbox undoes the change and signs everyone out. A passkey added meanwhile may be the intruder's.
 	_, session := e.session(t, o.ws, u, actor.KindUser)
+	e.putCredential(t, o.ws, db.UpsertCredentialParams{
+		ID: "pk-" + u.ID, UserID: u.ID, Type: string(iam.MethodPasskey), Subject: "pk-" + u.ID, Data: []byte{},
+	})
+	// Whoever sits at the new address asks for one more change and holds a revert link to it.
+	_, flipBack, err := e.svc.RequestEmailChange(ctx, got, "third@"+testDomain())
+	require.NoError(t, err)
 	require.NoError(t, e.svc.CancelEmailChange(ctx, cancel))
+	assert.Zero(t, e.passkeys(t, o.ws, u.ID), "a passkey survived the revert")
+	require.ErrorIs(t, e.svc.CancelEmailChange(ctx, flipBack), iam.ErrInvalidToken, "the revert was undone")
 	got = e.userByEmail(t, o.ws, oldEmail)
 	require.NotNil(t, got)
 	assert.Equal(t, u.ID, got.ID)
@@ -241,8 +249,12 @@ func TestEmailChangeCancelBeforeConfirm(t *testing.T) {
 	confirm, cancel, err := e.svc.RequestEmailChange(ctx, u, "new@"+testDomain())
 	require.NoError(t, err)
 	_, session := e.session(t, o.ws, u, actor.KindUser)
+	e.putCredential(t, o.ws, db.UpsertCredentialParams{
+		ID: "pk-" + u.ID, UserID: u.ID, Type: string(iam.MethodPasskey), Subject: "pk-" + u.ID, Data: []byte{},
+	})
 
 	require.NoError(t, e.svc.CancelEmailChange(ctx, cancel))
+	assert.Equal(t, 1, e.passkeys(t, o.ws, u.ID), "cancel of a pending change dropped a passkey")
 	require.ErrorIs(t, e.svc.ConfirmEmailChange(ctx, confirm), iam.ErrInvalidToken, "confirm after cancel")
 	require.NotNil(t, e.userByEmail(t, o.ws, u.Email), "cancel changed the address")
 	// Nothing changed yet, so nobody is signed out.

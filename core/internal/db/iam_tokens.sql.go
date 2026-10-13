@@ -89,6 +89,17 @@ func (q *Queries) ConsumeToken(ctx context.Context, arg *ConsumeTokenParams) (st
 	return user_id, err
 }
 
+const deleteAllUserTokens = `-- name: DeleteAllUserTokens :exec
+DELETE FROM one_time_tokens
+WHERE
+  user_id = $1
+`
+
+func (q *Queries) DeleteAllUserTokens(ctx context.Context, userID *string) error {
+	_, err := q.db.Exec(ctx, deleteAllUserTokens, userID)
+	return err
+}
+
 const deleteExpiredTokens = `-- name: DeleteExpiredTokens :execrows
 DELETE FROM one_time_tokens
 WHERE

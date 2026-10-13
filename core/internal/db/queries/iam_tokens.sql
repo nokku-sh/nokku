@@ -49,6 +49,11 @@ WHERE
   user_id = @user_id
   AND purpose = @purpose;
 
+-- name: DeleteAllUserTokens :exec
+DELETE FROM one_time_tokens
+WHERE
+  user_id = @user_id;
+
 -- name: GetPendingTokenEmail :one
 SELECT
   email::TEXT AS email

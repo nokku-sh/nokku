@@ -46,6 +46,17 @@ func (q *Queries) DeleteCredentialsByProvider(ctx context.Context, arg *DeleteCr
 	return result.RowsAffected(), nil
 }
 
+const deleteUserCredentials = `-- name: DeleteUserCredentials :exec
+DELETE FROM credentials
+WHERE
+  user_id = $1
+`
+
+func (q *Queries) DeleteUserCredentials(ctx context.Context, userID string) error {
+	_, err := q.db.Exec(ctx, deleteUserCredentials, userID)
+	return err
+}
+
 const findCredentialBySubject = `-- name: FindCredentialBySubject :one
 SELECT
   id, workspace_id, user_id, type, provider, subject, data, label, last_used_at, created_at, updated_at
