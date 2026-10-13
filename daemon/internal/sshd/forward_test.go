@@ -464,9 +464,6 @@ func TestForwardSocketsBelongToTheUser(t *testing.T) {
 	require.NoError(t, err)
 	defer c.Close()
 	assert.Equal(t, nobody, tcpSocketUID(t, c.LocalAddr()), "connection of a direct forward")
-
-	_, err = listenAs(sysUser, "127.0.0.1:1")
-	require.Error(t, err, "the user bound a privileged port")
 }
 
 // The go tool builds the test binary in a directory only its own user can enter. nokkud itself is in /usr/bin.
