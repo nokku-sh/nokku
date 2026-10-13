@@ -47,10 +47,11 @@ func (s *authService) GetLoginOptions(
 		return nil, err
 	}
 	out := &nokkuv1.GetLoginOptionsResponse{
-		WorkspaceName: &ws.Name,
-		MagicLink:     new(!enforced && s.cfg.IAM.MagicLinkEnabled()),
-		Passkey:       new(!enforced),
-		Providers:     []*nokkuv1.SSOProviderInfo{},
+		WorkspaceName:   &ws.Name,
+		MagicLink:       new(!enforced && s.cfg.IAM.MagicLinkEnabled()),
+		Passkey:         new(!enforced),
+		EmailConfigured: new(s.cfg.IAM.MagicLinkEnabled()),
+		Providers:       []*nokkuv1.SSOProviderInfo{},
 	}
 	for _, p := range providers {
 		if p.Enabled {

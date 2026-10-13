@@ -49,6 +49,8 @@ message GetLoginOptionsResponse {
   bool magic_link = 2;
   bool passkey = 3;
   repeated SSOProviderInfo providers = 4;
+  // Mail goes out at all. magic_link is off while single sign-on is required, this is not.
+  bool email_configured = 5;
 }
 
 message SSOProviderInfo {

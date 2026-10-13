@@ -27,7 +27,9 @@
 	const providersOnly = $derived(
 		!!options.data && !options.data.magicLink && !options.data.passkey
 	);
-	const showMagicLink = $derived(options.data?.magicLink || ownerRecovery);
+	const showMagicLink = $derived(
+		options.data?.magicLink || (ownerRecovery && options.data?.emailConfigured)
+	);
 	const showPasskey = $derived(options.data?.passkey || ownerRecovery);
 
 	function submit(e: SubmitEvent) {
@@ -142,6 +144,12 @@
 					{p.name || p.providerId}
 				</Button>
 			{/each}
+			{#if ownerRecovery && !options.data?.emailConfigured}
+				<p class="text-center text-sm text-muted-foreground">
+					This server sends no email. Without a passkey, run <code>nokku admin-link</code> on the server
+					for a sign-in link.
+				</p>
+			{/if}
 			{#if providersOnly && !ownerRecovery}
 				<Button variant="link" size="sm" onclick={() => (ownerRecovery = true)}>
 					Workspace owner? Sign in without the provider

@@ -47,6 +47,7 @@ func TestMagicLinkSignIn(t *testing.T) {
 	options, err := auth.GetLoginOptions(t.Context(), &nokkuv1.GetLoginOptionsRequest{})
 	require.NoError(t, err)
 	assert.False(t, options.GetMagicLink(), "no mail, no links on the login page")
+	assert.False(t, options.GetEmailConfigured())
 	assert.True(t, options.GetPasskey())
 	name, err := workspaceName(wsCtx(t, cfg), cfg.Conn)
 	require.NoError(t, err)

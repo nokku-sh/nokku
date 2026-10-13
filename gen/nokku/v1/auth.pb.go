@@ -304,8 +304,10 @@ type GetLoginOptionsResponse struct {
 	MagicLink     *bool                  `protobuf:"varint,2,opt,name=magic_link,json=magicLink" json:"magic_link,omitempty"`
 	Passkey       *bool                  `protobuf:"varint,3,opt,name=passkey" json:"passkey,omitempty"`
 	Providers     []*SSOProviderInfo     `protobuf:"bytes,4,rep,name=providers" json:"providers,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Mail goes out at all. magic_link is off while single sign-on is required, this is not.
+	EmailConfigured *bool `protobuf:"varint,5,opt,name=email_configured,json=emailConfigured" json:"email_configured,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GetLoginOptionsResponse) Reset() {
@@ -364,6 +366,13 @@ func (x *GetLoginOptionsResponse) GetProviders() []*SSOProviderInfo {
 		return x.Providers
 	}
 	return nil
+}
+
+func (x *GetLoginOptionsResponse) GetEmailConfigured() bool {
+	if x != nil && x.EmailConfigured != nil {
+		return *x.EmailConfigured
+	}
+	return false
 }
 
 type SSOProviderInfo struct {
@@ -592,13 +601,14 @@ const file_nokku_v1_auth_proto_rawDesc = "" +
 	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\"\x0f\n" +
 	"\rLogoutRequest\"\x10\n" +
 	"\x0eLogoutResponse\"\x18\n" +
-	"\x16GetLoginOptionsRequest\"\xb2\x01\n" +
+	"\x16GetLoginOptionsRequest\"\xdd\x01\n" +
 	"\x17GetLoginOptionsResponse\x12%\n" +
 	"\x0eworkspace_name\x18\x01 \x01(\tR\rworkspaceName\x12\x1d\n" +
 	"\n" +
 	"magic_link\x18\x02 \x01(\bR\tmagicLink\x12\x18\n" +
 	"\apasskey\x18\x03 \x01(\bR\apasskey\x127\n" +
-	"\tproviders\x18\x04 \x03(\v2\x19.nokku.v1.SSOProviderInfoR\tproviders\"F\n" +
+	"\tproviders\x18\x04 \x03(\v2\x19.nokku.v1.SSOProviderInfoR\tproviders\x12)\n" +
+	"\x10email_configured\x18\x05 \x01(\bR\x0femailConfigured\"F\n" +
 	"\x0fSSOProviderInfo\x12\x1f\n" +
 	"\vprovider_id\x18\x01 \x01(\tR\n" +
 	"providerId\x12\x12\n" +
