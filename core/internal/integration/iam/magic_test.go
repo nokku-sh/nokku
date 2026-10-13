@@ -263,3 +263,80 @@ func TestLastCredentialStays(t *testing.T) {
 	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "passkey:c"), iam.ErrNotFound, "deleted another user's passkey")
 	_ = actor.KindUser
 }
+
+// The environment names the issuer and the client. Whether the provider is on and who it lets in is the admin's.
+func TestBootstrapKeepsWhatTheAdminSet(t *testing.T) {
+	e := newTestEnv(t)
+	ws := e.workspace(t)
+	ctx := anon(t.Context(), ws)
+	t.Setenv("MICROSOFT_CLIENT_ID", "client")
+	t.Setenv("MICROSOFT_CLIENT_SECRET", "s3cret")
+	t.Setenv("MICROSOFT_TENANT_ID", "tenant-a")
+
+	_, err := e.svc.Bootstrap(t.Context(), ws)
+	require.NoError(t, err)
+	seeded, err := e.svc.GetSSOProvider(ctx, "microsoft")
+	require.NoError(t, err)
+	assert.True(t, seeded.Enabled && seeded.OIDC.JITProvisioning, "a fresh provider starts on")
+
+	seeded.Enabled, seeded.OIDC.JITProvisioning = false, false
+	_, err = e.svc.PutSSOProvider(ctx, *seeded)
+	require.NoError(t, err)
+	e.putCredential(t, ws, db.UpsertCredentialParams{
+		ID: "ms-sub", UserID: e.user(t, ws, "dev@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER).ID,
+		Type: string(iam.MethodOIDC), Provider: "microsoft", Subject: "sub", Data: []byte{},
+	})
+
+	_, err = e.svc.Bootstrap(t.Context(), ws)
+	require.NoError(t, err)
+	again, err := e.svc.GetSSOProvider(ctx, "microsoft")
+	require.NoError(t, err)
+	assert.False(t, again.Enabled, "the boot switched the provider back on")
+	assert.False(t, again.OIDC.JITProvisioning, "the boot switched JIT back on")
+	assert.NotNil(t, e.oidcCredential(t, ws, "microsoft", "sub"), "the same issuer dropped its identities")
+
+	t.Setenv("MICROSOFT_TENANT_ID", "tenant-b")
+	_, err = e.svc.Bootstrap(t.Context(), ws)
+	require.NoError(t, err)
+	moved, err := e.svc.GetSSOProvider(ctx, "microsoft")
+	require.NoError(t, err)
+	assert.Contains(t, moved.OIDC.IssuerURL, "tenant-b")
+	assert.Nil(t, e.oidcCredential(t, ws, "microsoft", "sub"), "an identity of the old tenant survived")
+}
+
+// sub is only unique per issuer. The identities go in the same step as the issuer, or a failure in between keeps them.
+func TestNewIssuerUnlinksIdentities(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	ctx := anon(t.Context(), o.ws)
+	p := iam.SSOProvider{
+		ProviderID: "corp", Name: "Corp", Enabled: true,
+		OIDC: iam.OIDCProvider{IssuerURL: "https://old.example", ClientID: "nokku", ClientSecret: "s3cret"},
+	}
+	_, err := e.svc.PutSSOProvider(ctx, p)
+	require.NoError(t, err)
+	member := e.user(t, o.ws, "dev@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	e.putCredential(t, o.ws, db.UpsertCredentialParams{
+		ID:       "corp-sub",
+		UserID:   member.ID,
+		Type:     string(iam.MethodOIDC),
+		Provider: "corp",
+		Subject:  "sub",
+		Data:     []byte{},
+	})
+
+	p.Name, p.OIDC.ClientSecret = "Corp SSO", ""
+	_, err = e.svc.PutSSOProvider(ctx, p)
+	require.NoError(t, err)
+	require.NotNil(t, e.oidcCredential(t, o.ws, "corp", "sub"), "an edit of the same issuer unlinked")
+
+	p.OIDC.IssuerURL = "https://new.example"
+	_, err = e.svc.PutSSOProvider(ctx, p)
+	require.ErrorIs(t, err, iam.ErrSecretRequired)
+	require.NotNil(t, e.oidcCredential(t, o.ws, "corp", "sub"), "a refused change unlinked")
+
+	p.OIDC.ClientSecret = "n3w"
+	_, err = e.svc.PutSSOProvider(ctx, p)
+	require.NoError(t, err)
+	assert.Nil(t, e.oidcCredential(t, o.ws, "corp", "sub"), "an identity of the old issuer survived")
+}

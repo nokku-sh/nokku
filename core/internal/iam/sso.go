@@ -78,17 +78,27 @@ func (s *Service) PutSSOProvider(ctx context.Context, p SSOProvider) (*SSOProvid
 }
 
 func putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvider) (*SSOProvider, error) {
-	if p.OIDC.ClientSecret == "" {
-		row, err := q.GetSSOProvider(ctx, p.ProviderID)
-		if err == nil {
-			if prev, err := ssoProviderFromRow(row); err == nil {
-				// The secret goes to the issuer's token endpoint, so a new issuer must not inherit it.
-				if prev.OIDC.IssuerURL != p.OIDC.IssuerURL {
-					return nil, ErrSecretRequired
-				}
-				p.OIDC.ClientSecret = prev.OIDC.ClientSecret
-			}
-		} else if !errors.Is(err, pgx.ErrNoRows) {
+	var prev *SSOProvider
+	row, err := q.GetSSOProvider(ctx, p.ProviderID)
+	switch {
+	case err == nil:
+		prev, _ = ssoProviderFromRow(row)
+	case !errors.Is(err, pgx.ErrNoRows):
+		return nil, err
+	}
+	issuerChanged := prev != nil && prev.OIDC.IssuerURL != p.OIDC.IssuerURL
+	if p.OIDC.ClientSecret == "" && prev != nil {
+		// The secret goes to the issuer's token endpoint, so a new issuer must not inherit it.
+		if issuerChanged {
+			return nil, ErrSecretRequired
+		}
+		p.OIDC.ClientSecret = prev.OIDC.ClientSecret
+	}
+	if issuerChanged {
+		// sub is only unique per issuer, so the identities the old one vouched for are stale.
+		if _, err := q.DeleteCredentialsByProvider(ctx, &db.DeleteCredentialsByProviderParams{
+			Type: string(MethodOIDC), Provider: p.ProviderID,
+		}); err != nil {
 			return nil, err
 		}
 	}
@@ -96,7 +106,7 @@ func putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvider) (*SSOProv
 	if err != nil {
 		return nil, err
 	}
-	row, err := q.UpsertSSOProvider(ctx, &db.UpsertSSOProviderParams{
+	row, err = q.UpsertSSOProvider(ctx, &db.UpsertSSOProviderParams{
 		ProviderID: p.ProviderID,
 		Name:       p.Name,
 		Enabled:    p.Enabled,

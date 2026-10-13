@@ -44,10 +44,3 @@ func (s *Service) DeleteCredential(ctx context.Context, id string) error {
 		return q.DeleteCredential(ctx, &db.DeleteCredentialParams{UserID: userID, ID: id})
 	})
 }
-
-func (s *Service) PurgeProviderIdentities(ctx context.Context, provider string) (int64, error) {
-	return s.conn.Tenant().DeleteCredentialsByProvider(ctx, &db.DeleteCredentialsByProviderParams{
-		Type:     string(MethodOIDC),
-		Provider: provider,
-	})
-}

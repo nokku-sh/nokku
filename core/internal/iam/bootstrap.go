@@ -33,7 +33,7 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 	ctx = actor.WithWorkspace(ctx, ws)
 
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
-		if _, err := s.PutSSOProvider(ctx, SSOProvider{
+		if err := s.seedProvider(ctx, SSOProvider{
 			ProviderID: "google",
 			Name:       "Google",
 			Enabled:    true,
@@ -53,7 +53,7 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 		if tenant == "" || tenant == "common" || tenant == "organizations" || tenant == "consumers" {
 			return "", errors.New("iam: MICROSOFT_TENANT_ID must be a tenant id")
 		}
-		if _, err := s.PutSSOProvider(ctx, SSOProvider{
+		if err := s.seedProvider(ctx, SSOProvider{
 			ProviderID: "microsoft",
 			Name:       "Microsoft",
 			Enabled:    true,
@@ -94,6 +94,22 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 		return "", nil
 	}
 	return s.IssueBootstrapLink(ctx, owner)
+}
+
+// seedProvider writes the issuer and client of the environment. What an admin set on a stored provider stays.
+func (s *Service) seedProvider(ctx context.Context, p SSOProvider) error {
+	prev, err := s.GetSSOProvider(ctx, p.ProviderID)
+	switch {
+	case err == nil:
+		prev.OIDC.IssuerURL = p.OIDC.IssuerURL
+		prev.OIDC.ClientID = p.OIDC.ClientID
+		prev.OIDC.ClientSecret = p.OIDC.ClientSecret
+		p = *prev
+	case !errors.Is(err, ErrNotFound):
+		return err
+	}
+	_, err = s.PutSSOProvider(ctx, p)
+	return err
 }
 
 // AdminLink issues a 24 hour sign-in link for the owner, the way back in when every passkey is gone.

@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/url"
 
 	"connectrpc.com/connect"
@@ -44,11 +43,6 @@ func (s *ssoService) PutSSOProvider(
 			return nil, newError(connect.CodeInvalidArgument, "the issuer URL has to start with https://")
 		}
 	}
-	// sub values are only unique per issuer, so a new issuer makes the old identity mappings stale.
-	issuerChanged := false
-	if prev, err := s.cfg.IAM.GetSSOProvider(ctx, req.GetProviderId()); err == nil {
-		issuerChanged = prev.OIDC.IssuerURL != req.GetIssuerUrl()
-	}
 	stored, err := s.cfg.IAM.PutSSOProvider(ctx, iam.SSOProvider{
 		ProviderID: req.GetProviderId(),
 		Name:       req.GetName(),
@@ -66,12 +60,6 @@ func (s *ssoService) PutSSOProvider(
 	}
 	if err != nil {
 		return nil, err
-	}
-	if issuerChanged {
-		// Don't fail the saved update, but be loud: stale identities stay valid until this is retried.
-		if _, err := s.cfg.IAM.PurgeProviderIdentities(ctx, req.GetProviderId()); err != nil {
-			slog.Error("purging identities after issuer change failed", "error", err, "provider", req.GetProviderId())
-		}
 	}
 	return &nokkuv1.PutSSOProviderResponse{Provider: providerToProto(stored)}, nil
 }
