@@ -1,6 +1,6 @@
 # Nokku web UI
 
-The control plane UI for Nokku. SvelteKit 3 and Svelte 5 with shadcn-svelte components and Tailwind CSS 4. The production build is embedded into the Go binary by `../web/embed.go`, so the backend serves it with no separate deployment.
+The control plane UI for Nokku. SvelteKit 3 and Svelte 5 with shadcn-svelte components and Tailwind CSS 4. The production build is embedded into the Go binary by `../embed.go`, so the backend serves it with no separate deployment.
 
 ## Commands
 
@@ -17,7 +17,7 @@ The dev server needs a backend. Run `task core:dev` from the repo root, it start
 
 ## Generated code
 
-`src/lib/gen` holds the generated API client for the Nokku protos. Never edit it by hand. Regenerate with `task gen` from the repo root, which runs buf against `proto/`.
+`src/lib/gen` holds the generated API client for the Nokku API. Never edit it by hand. Regenerate with `task gen` from the repo root, which runs buf against `proto/`.
 
 ## UI conventions
 
@@ -52,4 +52,4 @@ The look is terminal-native: compliance paper in light mode, a console at night 
 
 Sentence case everywhere. No trailing period on page descriptions. Use the domain verb when there is one (Invite, Enroll, Sign, Add target), otherwise Create. Machine values like IDs, hostnames, principals and fingerprints are set in mono.
 
-See the repo root `AGENTS.md` for project conventions.
+[CONTRIBUTING.md](../../../CONTRIBUTING.md) in the repo root has the setup and the project conventions.

@@ -244,8 +244,8 @@
 						<CopyText value={syncCommand} mono class="text-sm" />
 					</div>
 					<p class="text-xs text-muted-foreground">
-						Run it on the host. It installs the CA key and the principal files under
-						/etc/ssh/nokku_principals, checks sshd and reloads it.
+						Run it on your own machine. It connects to the host as root, installs the CA key and the
+						principals files under /etc/ssh/nokku_principals, checks sshd and reloads it.
 					</p>
 				</Section>
 			{/if}

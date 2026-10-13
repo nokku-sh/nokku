@@ -3,7 +3,7 @@
 #
 # Caddy gets the certificate for it from Let's Encrypt (expose ports 80/443).
 {$SITE_ADDRESS} {
-	# The backend serves the SPA over HTTP/1.1 and Connect/gRPC over
+	# The core serves the SPA over HTTP/1.1 and Connect/gRPC over
 	# unencrypted HTTP/2 (h2c), so advertise both to the upstream.
 	# WebSockets (/terminal/ws) are proxied transparently.
 	reverse_proxy nokku:3000 {

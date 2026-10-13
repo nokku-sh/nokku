@@ -59,7 +59,7 @@ There is no password. Until the owner has a passkey, every start prints a fresh 
 
 All three options need the same three things:
 
-- **PostgreSQL.** The core creates and updates its tables on start.
+- **PostgreSQL 18 or newer.** The core creates and updates its tables on start.
 - **`NOKKU_SECRET`.** At least 32 characters. It protects the CA keys at rest.
 - **`NOKKU_BASE_URL`.** The public host name, like `nokku.example.com`, with the port when it is not 443. No scheme, the core is always reached over https. It ends up in links, cookies and passkeys, so pick it before you invite anyone. Passkeys are bound to the name, so it has to be a name and not an IP address, and renaming it later means everyone registers a new passkey.
 

@@ -1,4 +1,4 @@
-# Minimal deployment for Nokku: just the backend and Postgres.
+# Minimal deployment for Nokku: just the core and Postgres.
 #
 #   cp .env.prod.example .env   # fill in your values
 #   docker compose -f compose.min.yml up -d

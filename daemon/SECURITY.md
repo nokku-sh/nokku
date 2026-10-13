@@ -70,7 +70,7 @@ System `sshd` on port 22 is never touched. It is your way back in if Nokku misbe
 ### Recordings on the server
 
 - Recordings are written unredacted to `/var/lib/nokkud/recordings/` and uploaded to the core. The daemon does no redaction of its own.
-- The core scrubs credential patterns after the upload completes. That is best effort. A failed scrub leaves the upload as it is and raises a `recording.scrub_failed` audit event. It is not retried.
+- The core scrubs credential patterns after the upload completes. That is best effort. A failed scrub leaves the upload as it is and raises a `RecordingScrubFailed` audit event. It is not retried.
 - Anyone with access to the recordings directory, or to the core's storage, can read what was on the terminal.
 
 ### Account limits
@@ -79,7 +79,7 @@ Sessions never go through PAM. A granted user runs with their own OS privileges 
 
 ### Releases
 
-- Releases are built with GoReleaser. Each one publishes `checksums.txt`, a cosign signature bundle for it (`checksums.txt.sigstore.json`) and a CycloneDX SBOM per archive.
+- Releases are built with GoReleaser. Each one publishes `checksums.txt`, a cosign signature bundle for it (`checksums.txt.sigstore.json`) and a CycloneDX SBOM per binary.
 - `install.sh` checks the SHA-256 of the tarball against the manifest. It verifies the manifest with cosign when cosign is available, and stops on a mismatch.
 - You can check the manifest by hand with `cosign verify-blob`, against the bundle and the GitHub Actions OIDC issuer.
 - The deb, rpm and apk packages come from the Cloudsmith repository. The package manager checks them against the repository key.
@@ -110,7 +110,7 @@ Sessions never go through PAM. A granted user runs with their own OS privileges 
 - **Only modern algorithms are offered.** Key exchange, MACs and client key signatures are limited to the set OpenSSH ships by default. SHA-1 key exchange, `hmac-sha1-96`, `ssh-rsa` signatures and DSA keys are refused.
 - **Remote forwards are loopback-only by default**, like OpenSSH's `GatewayPorts=no`. An authorized user cannot expose services on the server's external interfaces. Direct forwards (outbound `-L`) are written to the audit log with their destination.
 - **Forwards are made by the daemon, as root.** It dials direct forwards and binds remote ones itself. Firewall rules that match on the user (nftables `meta skuid`, the iptables `owner` match) see the daemon and not the session's user.
-- **Channels are capped per connection.** Sessions, port forwards and agent forwards count against `MaxChannels` for the life of each channel. The listener of a remote forward takes a slot as well, for as long as it is open. One authorized connection cannot exhaust the daemon's file descriptors or goroutines.
+- **Channels are capped per connection.** Sessions, port forwards and agent forwards count against one fixed cap for the life of each channel. The listener of a remote forward takes a slot as well, for as long as it is open. One authorized connection cannot exhaust the daemon's file descriptors or goroutines.
 - **Relayed connections carry the user's address.** A connection through the core's relay is served in process, not over loopback. Audit events, `SSH_CLIENT` and `source-address` certificate options see the address the core reported for the user.
 - **The daemon is not sandboxed.** Sessions are its children and would inherit any systemd, AppArmor or SELinux confinement, which would stop a root session from doing normal admin work. Like in OpenSSH, the user boundary isolates sessions. Every connection lives in the daemon process, so a restart or package upgrade ends live sessions.
 

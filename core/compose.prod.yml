@@ -4,7 +4,7 @@
 #   docker compose -f compose.prod.yml up -d
 #
 # Services:
-#   nokku     - the backend (your image, defaults to ghcr.io/nokku-sh/nokku)
+#   nokku     - the core (NOKKU_IMAGE, defaults to ghcr.io/nokku-sh/nokku)
 #   postgres  - persistent database
 #   caddy     - TLS-terminating reverse proxy
 name: nokku

@@ -17,12 +17,12 @@ one pull request.
 - Go 1.x (see `go.mod`)
 - [Task](https://taskfile.dev)
 - [`golangci-lint`](https://golangci-lint.run), [`govulncheck`](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck)
-- [`buf`](https://buf.build), for changes in `proto/`
+- [`buf`](https://buf.build) with the `protoc-gen-go`, `protoc-gen-connect-go` and `protoc-gen-es` plugins, for changes in `proto/`
 - [GoReleaser](https://goreleaser.com) (snapshots/releases only)
 
 The core ships backend and frontends together, so it needs a bit more:
 
-- PostgreSQL (16+), `docker compose -f compose.dev.yml up -d` in `core/` brings up a dev instance
+- PostgreSQL 18 or newer, `docker compose -f compose.dev.yml up -d` in `core/` brings up a dev instance
 - Docker, for the integration tests
 - Node.js + `pnpm` (frontends)
 - [`sqlc`](https://sqlc.dev) (codegen)
@@ -123,8 +123,9 @@ with `sqlc`.
 
 ## Releases
 
-All binaries share one version. Releases are cut via GoReleaser on version
-tags. To preview a local build without publishing:
+All binaries share one version. Releases are built with GoReleaser by the
+release workflow, which is started by hand. To preview a local build without
+publishing:
 
 ```bash
 task snapshot

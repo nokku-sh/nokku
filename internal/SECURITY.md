@@ -37,13 +37,15 @@ The following are in scope for security reports:
 - `dpop`: DPoP proof signing, claims, and the embedded JWK.
 - `dpopclient`: the DPoP interceptors, nonce and canonical-URL learning, the
   retry on a stale nonce, and the TLS 1.3 HTTP/2 transport.
+- `trust`: fetching the CA a server advertises, the pin check, and the
+  verification that follows.
 - `id`: the machine fingerprint and how it hides the raw machine ID.
 - `tpm`: TPM-backed and software-fallback signing identities, key wrapping,
   the persisted state format, and identity change detection.
 
 ### Out of scope
 
-- The Nokku backend, `nokkud`, and `nk` themselves (each has its own
+- The Nokku core, `nokkud`, and `nk` themselves (each has its own
   policy), except where the issue is in how they call these packages.
 - Access to the TPM device by a process on the same machine. The README's
   trust model covers why the identity has no auth value.

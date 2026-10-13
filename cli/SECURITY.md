@@ -28,13 +28,13 @@ Only the latest release gets security fixes. Older releases are not patched, so 
 
 ### In scope
 
-- The `nk` binary: the browser sign-in, service account tokens, requesting SSH certificates, the OpenSSH `ProxyCommand` and issuing X.509 certificates
+- The `nk` binary: the browser sign-in, service account tokens, requesting SSH certificates and the OpenSSH `ProxyCommand`
 - The local state it writes under `~/.config/nk/`:
   - `config.json` and `cache.json`
   - `ssh-signer.json`, the SSH signing identity, and `signer.json`, the DPoP signing identity
   - `agent.sock`, the local agent socket `ssh` uses for signing
   - `ssh_config`, `known_hosts` and `nokku.pub`
-  - `certs/` and any certificate it issued
+  - `certs/`, the SSH certificates the core signed
 
 ### Out of scope
 
@@ -45,7 +45,7 @@ Only the latest release gets security fixes. Older releases are not patched, so 
 
 ## Using nk securely
 
-`nk` runs on your workstation. It holds your sign-in tokens, manages your SSH key and asks the core for signed SSH and X.509 certificates.
+`nk` runs on your workstation. It holds your sign-in tokens, manages your SSH key and asks the core for signed SSH certificates.
 
 ### How nk protects your key
 
