@@ -21,7 +21,7 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/recording"
 )
 
-// Marks control-plane certificates for a web terminal. Keep in sync with the backend's mintSessionCert.
+// Marks control-plane certificates for a web terminal. Keep in sync with the core's mintSessionCert.
 const webSessionKeyIDPrefix = "nokku:web:session:"
 
 const maxClientEnv = 64

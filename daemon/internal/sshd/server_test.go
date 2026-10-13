@@ -44,7 +44,7 @@ func userCert(t *testing.T, ca testCA, principals ...string) ssh.AuthMethod {
 	return userCertOpts(t, ca, nil, principals...)
 }
 
-// The backend's default cert template. The daemon enforces permit-*, so tests grant them explicitly.
+// The core's default cert template. The daemon enforces permit-*, so tests grant them explicitly.
 var defaultExtensions = map[string]string{
 	"permit-pty":              "",
 	"permit-user-rc":          "",

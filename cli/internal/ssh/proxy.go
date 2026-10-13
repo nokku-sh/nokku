@@ -1,4 +1,3 @@
-// Package ssh manages the SSH identity, certificates, and proxy plumbing for nk.
 package ssh
 
 import (
@@ -15,12 +14,9 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-// RelayDialer opens a relayed connection to a daemon target through the
-// backend.
 type RelayDialer func(ctx context.Context, target *state.Target) (io.ReadWriteCloser, error)
 
-// relayHeadStart is how long direct dials run alone before the relay joins
-// the race. A reachable endpoint answers well within it.
+// Direct dials run alone this long before the relay joins. A reachable endpoint answers well within it.
 const relayHeadStart = 300 * time.Millisecond
 
 type dialResult struct {
@@ -28,10 +24,7 @@ type dialResult struct {
 	err  error
 }
 
-// Proxy pipes an ssh ProxyCommand connection to the target. All endpoints are
-// dialed at once and a daemon target races the relay against them, so an
-// unreachable private address never delays the connection. forceRelay skips
-// the direct dials.
+// Proxy dials all endpoints at once and races the relay for a daemon target, so a dead private address never delays.
 func Proxy(ctx context.Context, target *state.Target, port string, relay RelayDialer, forceRelay bool) error {
 	if forceRelay && target.Manual() {
 		return fmt.Errorf("%s has no daemon, so it cannot be reached through the relay", target.Name)
@@ -40,8 +33,7 @@ func Proxy(ctx context.Context, target *state.Target, port string, relay RelayDi
 		return fmt.Errorf("%s has no address, run nk sync on it again", target.Name)
 	}
 
-	// Direct dials stop once a winner is picked. The relay gets ctx itself,
-	// its stream lives as long as ctx does.
+	// Direct dials stop once a winner is picked. The relay's stream lives as long as ctx does.
 	dialCtx, stopDials := context.WithCancel(ctx)
 	defer stopDials()
 	results := make(chan dialResult)

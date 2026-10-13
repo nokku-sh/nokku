@@ -5,7 +5,7 @@ import { activeSessionID } from '#lib/store.svelte.js';
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error';
 
-// The backend closes with this when the shell ended on its own (exit, Ctrl+D).
+// The server closes with this when the shell ended on its own (exit, Ctrl+D).
 const SHELL_EXITED = 4000;
 
 let sessions = new SvelteMap<string, TerminalSession>();

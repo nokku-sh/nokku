@@ -15,12 +15,10 @@ import (
 	"github.com/nokku-sh/nokku/internal/tpm"
 )
 
-// sshSalt namespaces the SSH identity. Salt registry: internal/README.md.
+// Salt registry: internal/README.md.
 const sshSalt = "nokku-cli-ssh"
 
-// newSSHSigner loads or creates the machine's SSH identity: in the TPM or the
-// Secure Enclave when one is usable, otherwise a software key wrapped to this
-// machine.
+// TPM or Secure Enclave when one is usable, otherwise a software key wrapped to this machine.
 func newSSHSigner(requireTPM bool) (tpm.Signer, error) {
 	return tpm.NewSigner(tpm.SignerOptions{
 		Salt:       []byte(sshSalt),
@@ -31,8 +29,7 @@ func newSSHSigner(requireTPM bool) (tpm.Signer, error) {
 	})
 }
 
-// SetupKey ensures the SSH identity exists and its public key is on disk. A
-// changed identity invalidates the cached certificates.
+// SetupKey drops the cached certificates when the identity changed.
 func SetupKey(requireTPM bool) error {
 	signer, err := newSSHSigner(requireTPM)
 	if err != nil {
@@ -60,8 +57,7 @@ func SetupKey(requireTPM bool) error {
 	return nil
 }
 
-// authorizedKeyLine uses the hostname as comment, so an operator can tell
-// where a key came from.
+// The hostname is the comment, so an operator can tell where a key came from.
 func authorizedKeyLine(key []byte) []byte {
 	hostname, err := os.Hostname()
 	if err != nil {

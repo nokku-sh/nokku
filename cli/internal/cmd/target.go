@@ -142,8 +142,7 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-// probe reads the host. It stops when the host key changed, or when a grant
-// names an account the host does not have.
+// probe stops when the host key changed, or when a grant names an account the host does not have.
 func probe(
 	ctx context.Context,
 	dest remote,
@@ -189,8 +188,7 @@ func checkHostKey(pinned, seen, host string, accept bool) error {
 	return nil
 }
 
-// printPlan shows a dry run. A new target has no principals before it exists,
-// so a file that a grant will fill names its subjects as they were typed.
+// A new target has no principals yet, so a file a grant will fill names its subjects as typed.
 func printPlan(plan manual.Plan, seeds []client.Grant) {
 	fmt.Println("Dry run, nothing was written. This sync would write:")
 	for _, f := range plan.Files {
@@ -287,8 +285,7 @@ func rmCMD() *cli.Command {
 	}
 }
 
-// targetDelete cleans the host first, so a target never disappears from
-// Nokku while its server still trusts the CA.
+// The host is cleaned first, so a target never disappears from Nokku while its server still trusts the CA.
 func targetDelete(ctx context.Context, cmd *cli.Command) error {
 	host, err := rootHost(cmd)
 	if err != nil {
@@ -336,7 +333,6 @@ func targetDelete(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-// rootHost reads the host argument, which may be written as root@host.
 func rootHost(cmd *cli.Command) (string, error) {
 	arg := cmd.Args().First()
 	if arg == "" {
@@ -352,9 +348,7 @@ func rootHost(cmd *cli.Command) (string, error) {
 	return host, nil
 }
 
-// findRemoteTarget also looks behind an alias from the operator's ssh config.
-// A target stores the real address, so the alias alone would never match and
-// every sync would add the server again.
+// A target stores the real address, so an ssh alias alone never matches and each sync would add it again.
 func findRemoteTarget(ctx context.Context, s *state.State, dest remote) (*state.Target, error) {
 	target, err := findTarget(s, dest.host)
 	if target != nil || err != nil {
@@ -363,7 +357,6 @@ func findRemoteTarget(ctx context.Context, s *state.State, dest remote) (*state.
 	return findTarget(s, dest.resolve(ctx).host)
 }
 
-// findTarget looks for an existing manual target by name or endpoint.
 func findTarget(s *state.State, host string) (*state.Target, error) {
 	var matches []*state.Target
 	for i := range s.Targets {
@@ -384,9 +377,7 @@ func findTarget(s *state.State, host string) (*state.Target, error) {
 	return matches[0], nil
 }
 
-// newTarget prepares a target for a server Nokku does not know yet. It is
-// created on the backend only once the host key is read. Its CA comes from
-// the backend, the local state only knows the CAs of existing targets.
+// Created on the core only once the host key is read. The local state only knows the CAs of existing targets.
 func newTarget(
 	ctx context.Context,
 	c *client.Client,
@@ -401,8 +392,7 @@ func newTarget(
 	if err != nil {
 		return nil, nil, err
 	}
-	// Users dial the endpoint directly, so store the real address behind an
-	// alias from the operator's ssh config.
+	// Users dial the endpoint directly, so store the real address behind an ssh config alias.
 	addr := dest.resolve(ctx)
 	endpoint := addr.host
 	if addr.port != "" && addr.port != "22" {
@@ -415,9 +405,7 @@ func newTarget(
 	}, &ca, nil
 }
 
-// resolveCA picks the named CA, else the default, else the only one. An id
-// wins, then an exact name, then a name that matches without its case. Names
-// are not unique on the backend, so a name that fits several CAs is refused.
+// An id wins, then an exact name, then one that matches without case. A name that fits several CAs is refused.
 func resolveCA(cas []state.CA, ref string) (state.CA, error) {
 	if ref == "" {
 		if i := slices.IndexFunc(cas, func(ca state.CA) bool { return ca.Default }); i >= 0 {
@@ -473,8 +461,7 @@ func endpointRemote(ep, port string) remote {
 	return r
 }
 
-// remote runs commands as root with the system ssh, so the operator's own
-// keys, agent, and config apply.
+// Runs as root with the system ssh, so the operator's own keys, agent and config apply.
 type remote struct {
 	host string
 	port string
@@ -495,8 +482,7 @@ func (r remote) portArgs() []string {
 	return []string{"-p", r.port}
 }
 
-// resolve asks ssh which host and port an alias from the operator's ssh
-// config points at, without connecting.
+// Asks ssh where an alias from the operator's config points, without connecting.
 func (r remote) resolve(ctx context.Context) remote {
 	//nolint:gosec // argv, not a shell, and -- ends the options
 	out, err := exec.CommandContext(ctx, "ssh", append(r.portArgs(), "-G", "--", r.host)...).Output()

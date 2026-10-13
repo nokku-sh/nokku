@@ -1767,7 +1767,7 @@ func (x *DaemonSession) GetUserId() string {
 type RelayOpen struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	RelayId *string                `protobuf:"bytes,1,opt,name=relay_id,json=relayId" json:"relay_id,omitempty"`
-	// The user's address as the backend saw it. The daemon's sshd reports it as
+	// The user's address as the core saw it. The daemon's sshd reports it as
 	// the remote address of the relayed connection.
 	ClientAddr    *string `protobuf:"bytes,2,opt,name=client_addr,json=clientAddr" json:"client_addr,omitempty"`
 	unknownFields protoimpl.UnknownFields

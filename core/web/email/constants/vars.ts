@@ -13,7 +13,7 @@ export const CONFIG = {
   UNSUBSCRIBE_URL: "https://nokku.sh/unsubscribe",
 } as const;
 
-/** The variables the Go backend injects, one per field of the structs in internal/email/template_data.go. */
+/** The variables the server injects, one per field of the structs in internal/email/template_data.go. */
 export const CONSTANTS = {
   USER_NAME: "{{ .UserName }}",
   EXPIRATION: "{{ .Expiration }}",
@@ -29,7 +29,7 @@ export const CONSTANTS = {
   DEVICE_NAME: "{{ .DeviceName }}",
   DEVICE_ID: "{{ .DeviceID }}",
 
-  // Filled by the backend from NOKKU_OPERATOR_*. The bare names are for {{ if }} checks, the _VALUE ones for output.
+  // Filled by the server from NOKKU_OPERATOR_*. The bare names are for {{ if }} checks, the _VALUE ones for output.
   OPERATOR: {
     NAME: ".Operator.Name",
     NAME_VALUE: "{{ .Operator.Name }}",

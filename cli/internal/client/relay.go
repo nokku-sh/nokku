@@ -13,16 +13,13 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-// relayStream adapts the relay's bidi stream to [io.ReadWriteCloser]. Read
-// and Write each have exactly one caller (the ProxyCommand pipes).
+// Read and Write each have exactly one caller, the ProxyCommand pipes.
 type relayStream struct {
 	stream  *connect.BidiStreamForClientSimple[nokkuv1.RelayRequest, nokkuv1.RelayResponse]
 	pending []byte
 }
 
-// Relay opens a relayed connection to the target's daemon. The returned
-// stream carries the raw bytes between the local ssh client and the daemon's
-// sshd.
+// Relay carries the raw bytes between the local ssh and the daemon's sshd.
 func (c *Client) Relay(ctx context.Context, target *state.Target) (io.ReadWriteCloser, error) {
 	if target.DaemonID == "" {
 		return nil, fmt.Errorf("target %s is not backed by a daemon", target.Name)
@@ -96,8 +93,7 @@ func (r *relayStream) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// CloseWrite half-closes the send side. The sshd side keeps streaming until
-// it closes the session.
+// Half-closes the send side. The sshd side keeps streaming until it closes the session.
 func (r *relayStream) CloseWrite() error {
 	return r.stream.CloseRequest()
 }

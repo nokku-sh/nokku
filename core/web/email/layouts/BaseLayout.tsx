@@ -15,7 +15,7 @@ import { CONFIG, CONSTANTS } from "../constants/vars";
 interface BaseEmailLayoutProps {
   children: React.ReactNode;
   preview: string;
-  // "instance" mails come from any Nokku server, so the backend fills in whoever runs it.
+  // "instance" mails come from any Nokku server, so the server fills in whoever runs it.
   type: "license" | "marketing" | "instance";
 }
 

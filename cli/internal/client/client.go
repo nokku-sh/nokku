@@ -1,4 +1,3 @@
-// Package client manages the connection to the Nokku backend.
 package client
 
 import (
@@ -31,7 +30,7 @@ const (
 	dialTimeout = 3 * time.Second
 )
 
-// signerSalt namespaces the CLI's DPoP key. Salt registry: internal/README.md.
+// Salt registry: internal/README.md.
 const signerSalt = "nokku-cli"
 
 type Client struct {
@@ -70,8 +69,7 @@ func New(s *state.State) (*Client, error) {
 	return c, c.dial()
 }
 
-// dial builds the HTTP client and the service clients on it. It runs again
-// when the CA the API is trusted through changed.
+// Runs again when the CA the API is trusted through changed.
 func (c *Client) dial() error {
 	s := c.State
 	roots, err := trust.Pool([]byte(s.APICA))
@@ -102,9 +100,7 @@ func (c *Client) dial() error {
 	return nil
 }
 
-// Sync refreshes the access snapshot and regenerates the ssh files. When
-// interactive is false, a missing or rejected session is an error instead of
-// a browser login.
+// Sync without interactive takes a missing or rejected session as an error instead of a browser login.
 func (c *Client) Sync(ctx context.Context, interactive bool) error {
 	if err := c.pinServer(ctx); err != nil {
 		return err
@@ -127,8 +123,7 @@ func (c *Client) Sync(ctx context.Context, interactive bool) error {
 	return c.sync(ctx, false)
 }
 
-// SyncOrCache is Sync with a fallback to the cached snapshot, so ssh keeps
-// working while the backend is down or the session has run out.
+// SyncOrCache falls back to the cached snapshot, so ssh keeps working while the core is down.
 func (c *Client) SyncOrCache(ctx context.Context, interactive bool) error {
 	err := c.Sync(ctx, interactive)
 	if err == nil {
@@ -166,8 +161,7 @@ func (c *Client) sync(ctx context.Context, interactive bool) error {
 	return ssh.WriteConfigs(c.State)
 }
 
-// Logout revokes the device session on the backend. Best effort, the local
-// state goes either way.
+// Logout is best effort, the local state goes either way.
 func (c *Client) Logout(ctx context.Context) {
 	if c.State.IsServiceAccount() || c.State.SessionToken == "" {
 		return
@@ -175,14 +169,11 @@ func (c *Client) Logout(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, syncTimeout)
 	defer cancel()
 	if _, err := c.auth.Logout(ctx, &nokkuv1.LogoutRequest{}); err != nil {
-		slog.Debug("revoke session on the backend", "err", err)
+		slog.Debug("revoke session on the core", "err", err)
 	}
 }
 
-// EnsureCert makes sure a fresh certificate for target is on disk, see
-// ssh.CertFresh. The backend signs it for this one server, with the accounts
-// granted there. When signing fails the one on disk stays, so ssh keeps
-// working offline for as long as it is valid.
+// EnsureCert keeps the certificate on disk when signing fails, so ssh works offline while it is valid.
 func (c *Client) EnsureCert(ctx context.Context, target state.Target, ca state.CA) error {
 	if ssh.CertFresh(target, ca) {
 		return nil
@@ -211,13 +202,12 @@ func (c *Client) EnsureCert(ctx context.Context, target state.Target, ca state.C
 
 	signed := []byte(res.GetSignedCertificate())
 	if err = ssh.CheckCert(signed, ca.PublicKey, 0); err != nil {
-		return fmt.Errorf("backend returned an unusable certificate: %w", err)
+		return fmt.Errorf("core returned an unusable certificate: %w", err)
 	}
 	return fsutil.WriteFile(paths.SSHCertificate(target.ID), signed, 0o600)
 }
 
-// TargetPrincipals returns the certificate principals allowed per account on
-// a manual target. The backend builds them, sshd compares them as they are.
+// TargetPrincipals come from the core as they are, sshd compares them as whole strings.
 func (c *Client) TargetPrincipals(ctx context.Context, t *state.Target) (map[string][]string, error) {
 	res, err := c.targets.GetTargetPrincipals(ctx, &nokkuv1.GetTargetPrincipalsRequest{
 		TargetId: new(t.ID),
@@ -232,8 +222,7 @@ func (c *Client) TargetPrincipals(ctx context.Context, t *state.Target) (map[str
 	return grants, nil
 }
 
-// ReportTarget reports a manual target's accounts, host key, and endpoints,
-// which also stamps its last sync.
+// ReportTarget also stamps the target's last sync.
 func (c *Client) ReportTarget(ctx context.Context, t *state.Target, accounts []string, hostKey string) error {
 	_, err := c.targets.SyncTargetUsers(ctx, &nokkuv1.SyncTargetUsersRequest{
 		TargetId:      new(t.ID),
@@ -244,8 +233,7 @@ func (c *Client) ReportTarget(ctx context.Context, t *state.Target, accounts []s
 	return err
 }
 
-// CreateTarget registers a manual target. An empty name asks the server to
-// generate one. The grants are seeded with it, once.
+// CreateTarget with an empty name asks the server to generate one. The grants are seeded with it, once.
 func (c *Client) CreateTarget(
 	ctx context.Context,
 	t *state.Target,
@@ -283,8 +271,7 @@ func (c *Client) DeleteTarget(ctx context.Context, t *state.Target) error {
 	return err
 }
 
-// ListSSHCAs returns the active SSH CAs. The access sync only carries the CAs
-// of targets the subject can reach, so a new target has to look here.
+// ListSSHCAs is for a new target, the access sync only carries the CAs of targets the subject can reach.
 func (c *Client) ListSSHCAs(ctx context.Context) ([]state.CA, error) {
 	res, err := c.certs.ListCertificateAuthorities(ctx, &nokkuv1.ListCertificateAuthoritiesRequest{})
 	if err != nil {

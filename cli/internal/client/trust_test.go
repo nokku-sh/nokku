@@ -17,7 +17,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/trust"
 )
 
-// privateServer is a backend whose certificate no system root knows. It
+// privateServer is a core whose certificate no system root knows. It
 // advertises that certificate as its CA.
 func privateServer(t *testing.T) *httptest.Server {
 	t.Helper()

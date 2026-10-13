@@ -16,7 +16,7 @@ import (
 )
 
 // captureTargetService records the requests and answers a create with the
-// target the backend would have made.
+// target the core would have made.
 type captureTargetService struct {
 	nokkuv1connect.UnimplementedTargetServiceHandler
 

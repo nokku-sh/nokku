@@ -1,6 +1,6 @@
 apiVersion: v2
 name: nokku
-description: Helm chart for deploying the Nokku backend on Kubernetes
+description: Helm chart for deploying the Nokku core on Kubernetes
 icon: https://static.mizuchi.dev/nokku-black.png
 
 type: application

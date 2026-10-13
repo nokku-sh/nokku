@@ -12,8 +12,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
-// lookupLimit is the most the backend lists at once. The query narrows a
-// lookup to the entries that contain the name, so this is plenty.
+// The most the core lists at once. The query narrows a lookup by name, so this is plenty.
 const lookupLimit = 100
 
 // Grant is who may log in as one account of a new manual target.
@@ -26,10 +25,7 @@ type Grant struct {
 	ServiceAccounts []string
 }
 
-// ResolveGrants reads every --grant of nk sync, written as
-// account=subject,subject, and looks the subjects up. A subject is me, an
-// email, team:<name>, or sa:<name>. An id in place of an email or a name is
-// taken as it is, which also tells teams of one name apart.
+// ResolveGrants takes me, an email, team:<name> or sa:<name>. An id is taken as it is, so same-named teams work.
 func (c *Client) ResolveGrants(ctx context.Context, specs []string) ([]Grant, error) {
 	seed, err := parseGrants(specs)
 	if err != nil {
@@ -158,8 +154,7 @@ func (c *Client) serviceAccountID(ctx context.Context, name string) (string, err
 	return oneID(ids, "service account", name)
 }
 
-// oneID refuses a name that fits nothing or several. Team names are not
-// unique on the backend.
+// oneID refuses a name that fits nothing or several. Team names are not unique on the core.
 func oneID(ids []string, kind, name string) (string, error) {
 	switch len(ids) {
 	case 0:

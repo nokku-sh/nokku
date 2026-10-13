@@ -41,8 +41,7 @@ func keeps(ca, pin string) bool {
 	return slices.ContainsFunc(certs, func(cert *x509.Certificate) bool { return trust.Pin(cert) == want })
 }
 
-// confirmServer asks whether to trust the CA the server advertises, the way
-// ssh asks about a host key. cause is the verification that failed.
+// Asks the way ssh asks about a host key. cause is the verification that failed.
 func (c *Client) confirmServer(ctx context.Context, interactive bool, cause error) error {
 	api := c.State.APIURL
 	if !interactive || !term.IsTerminal(int(os.Stdin.Fd())) {
@@ -82,8 +81,7 @@ func (c *Client) confirmServer(ctx context.Context, interactive bool, cause erro
 	return err
 }
 
-// keepCA checks the advertised CA against pin, stores it, and reconnects
-// with it.
+// keepCA checks the advertised CA against pin, stores it, and reconnects with it.
 func (c *Client) keepCA(ctx context.Context, pin string) error {
 	api := c.State.APIURL
 	ca, err := trust.Bootstrap(ctx, api, pin)
@@ -114,10 +112,7 @@ func systemTrusts(ctx context.Context, api string) bool {
 	return !trust.Untrusted(err)
 }
 
-// offerInstall asks whether the CA goes into the system trust store too. The
-// sign-in runs in the browser, and a passkey does not work on a page with a
-// certificate warning. It asks once, when the CA is first kept, and reports
-// whether the CA went in.
+// The browser sign-in needs the CA, a passkey does not work behind a certificate warning. Asked once.
 func offerInstall(api string, ca []byte) bool {
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		return false
@@ -141,8 +136,7 @@ func offerInstall(api string, ca []byte) bool {
 		return false
 	}
 	fmt.Printf("%s Installed. Restart the browser if it still warns.\n", ui.Green("✔"))
-	// Some browsers keep a certificate database of their own, which only
-	// certutil can write.
+	// Some browsers keep a certificate database of their own, which only certutil can write.
 	if _, err = truststore.NewNSSTrust(); err != nil && !errors.Is(err, truststore.ErrTrustNotSupported) {
 		fmt.Println("certutil is not installed, so only the system trust store has the CA. " +
 			"Most browsers read it. " + manual)
@@ -150,9 +144,7 @@ func offerInstall(api string, ca []byte) bool {
 	return true
 }
 
-// OfferRemoval asks at sign-out whether the CA that nk installed for the
-// browser goes too. After the sign-out nk has no certificate left to remove
-// it with, so this is the one moment to ask.
+// OfferRemoval asks at sign-out, after it nk has no certificate left to remove the CA with.
 func OfferRemoval(s *state.State) {
 	if !s.APICAInstalled {
 		return

@@ -54,7 +54,7 @@ func TestRecorderRemovesConfirmedUpload(t *testing.T) {
 
 func TestRecorderKeepsFailedUploadPending(t *testing.T) {
 	dir := newRecordsDir(t)
-	recordOnce(t, &resultSink{err: errors.New("backend down"), done: make(chan struct{})})
+	recordOnce(t, &resultSink{err: errors.New("core down"), done: make(chan struct{})})
 
 	// Wait until the recorder let go of the file, then it must be pending.
 	require.Eventually(t, func() bool {
@@ -73,7 +73,7 @@ func TestUploadPending(t *testing.T) {
 	must := require.New(t)
 	ts := newTestServer(t)
 
-	recordOnce(t, &resultSink{err: errors.New("backend down"), done: make(chan struct{})})
+	recordOnce(t, &resultSink{err: errors.New("core down"), done: make(chan struct{})})
 	require.Eventually(t, func() bool {
 		m, _ := filepath.Glob(filepath.Join(dir, "*"+castSuffix))
 		if len(m) != 1 {
@@ -144,7 +144,7 @@ func TestUploadPendingReportsAFullWorkspace(t *testing.T) {
 	})
 	client := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL)
 
-	recordOnce(t, &resultSink{err: errors.New("backend down"), done: make(chan struct{})})
+	recordOnce(t, &resultSink{err: errors.New("core down"), done: make(chan struct{})})
 	require.Eventually(t, func() bool {
 		m, _ := filepath.Glob(filepath.Join(dir, "*"+castSuffix))
 		if len(m) != 1 {

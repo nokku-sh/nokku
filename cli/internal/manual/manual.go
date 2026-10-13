@@ -1,7 +1,4 @@
-// Package manual renders what a manual sync runs on a daemonless host: one
-// probe that gathers the host's state and one script that writes the trusted
-// CA key, the sshd drop-in, and a principals file per local account. It does
-// no I/O, which keeps both testable.
+// Package manual renders the probe and the script of a manual sync. It does no I/O, which keeps both testable.
 package manual
 
 import (
@@ -11,15 +8,14 @@ import (
 	"strings"
 )
 
-// Host layout shared with the daemon and the web UI.
+// The web UI names these paths too, see TargetSheet.svelte.
 const (
 	caPath        = "/etc/ssh/nokku_ca.pub"
 	principalsDir = "/etc/ssh/nokku_principals"
 	dropInDir     = "/etc/ssh/sshd_config.d"
 	dropInPath    = dropInDir + "/60-nokku.conf"
 
-	// maxLocalAccounts caps what one sync reports, so a pathological passwd
-	// file cannot flood the backend. Matches nokkud sysutil.maxReportedUsers.
+	// A huge passwd file cannot flood the core. Matches nokkud sysutil.maxReportedUsers.
 	maxLocalAccounts = 200
 )
 
@@ -29,12 +25,10 @@ const (
 	sectionPrincipals = "#nk principals"
 )
 
-// requireRoot stops a script early with a clear message. Writing /etc/ssh
-// needs root, and a manual target is managed by its root operator.
+// Writing /etc/ssh needs root, so the script stops early with a clear message.
 const requireRoot = `[ "$(id -u)" = 0 ] || { echo "nk must connect as root" >&2; exit 1; }` + "\n"
 
-// ProbeCommand gathers the local accounts, the host key (ed25519 first), and
-// the existing principals files in one ssh round trip.
+// ProbeCommand gathers the accounts, the host key (ed25519 first) and the principals files in one ssh round trip.
 const ProbeCommand = requireRoot +
 	`echo '` + sectionPasswd + `'
 getent passwd 2>/dev/null || cat /etc/passwd
@@ -49,14 +43,12 @@ for f in ` + principalsDir + `/*; do
 done
 `
 
-// Host is what the probe found on a host.
 type Host struct {
 	Accounts   []string
 	HostKey    string
 	Principals []string
 }
 
-// ParseProbe reads the output of ProbeCommand.
 func ParseProbe(out string) (Host, error) {
 	sections := map[string][]string{}
 	var current string
@@ -84,8 +76,7 @@ func ParseProbe(out string) (Host, error) {
 	return h, nil
 }
 
-// localAccounts keeps the accounts a human may log in as: uid 0 or at least
-// 1000, a real login shell, and a name that is safe as a file name.
+// Accounts a human may log in as: uid 0 or at least 1000, a real login shell, a name safe as a file name.
 func localAccounts(passwd []string) []string {
 	var accounts []string
 	for _, line := range passwd {
@@ -119,8 +110,7 @@ func safeName(name string) bool {
 	})
 }
 
-// renderPrincipals renders the certificate principals allowed to log in as one
-// account. An empty file denies certificate login for it.
+// An empty file denies certificate login for the account.
 func renderPrincipals(ids []string) string {
 	ids = slices.DeleteFunc(slices.Clone(ids), func(id string) bool { return id == "" })
 	slices.Sort(ids)

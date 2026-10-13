@@ -81,7 +81,7 @@ func TestAgentSSHDInterop(t *testing.T) {
 	sshPub, err := cryptossh.NewPublicKey(key.Public())
 	require.NoError(t, err, "public key")
 
-	// Sign the TPM public key with a throwaway CA, like the backend does.
+	// Sign the TPM public key with a throwaway CA, like the core does.
 	_, caPriv, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	caSigner, err := cryptossh.NewSignerFromKey(caPriv)
@@ -208,7 +208,7 @@ func TestAgentSSHDInteropSoftwareKey(t *testing.T) {
 	pub, _, _, _, err := cryptossh.ParseAuthorizedKey(pubLine)
 	require.NoError(t, err, "parse public key")
 
-	// Sign the software public key with a throwaway CA, like the backend does.
+	// Sign the software public key with a throwaway CA, like the core does.
 	_, caPriv, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	caSigner, err := cryptossh.NewSignerFromKey(caPriv)

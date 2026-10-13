@@ -19,11 +19,10 @@ import (
 	"github.com/nokku-sh/nokku/internal/dpopclient"
 )
 
-// maxDeviceResponse caps what nk reads from a device flow endpoint. A real
-// answer is a few hundred bytes.
+// A real device flow answer is a few hundred bytes.
 const maxDeviceResponse = 64 << 10
 
-// deviceAuth is the RFC 8628 device authorization response.
+// RFC 8628 device authorization response.
 type deviceAuth struct {
 	DeviceCode              string `json:"device_code"`
 	UserCode                string `json:"user_code"`
@@ -32,11 +31,7 @@ type deviceAuth struct {
 	Interval                int    `json:"interval"`
 }
 
-// ensureSession guarantees a usable session before a request. Service
-// accounts use their injected API key, non-interactive callers fail fast
-// instead of blocking on a browser. The persisted expiry is trusted locally,
-// so a server-side rejection only surfaces later as CodeUnauthenticated,
-// which Sync turns into one re-login.
+// The stored expiry is trusted locally. A rejection shows up later as CodeUnauthenticated and Sync logs in again.
 func (c *Client) ensureSession(ctx context.Context, interactive bool) error {
 	if c.State.IsServiceAccount() {
 		return nil
@@ -53,9 +48,7 @@ func (c *Client) ensureSession(ctx context.Context, interactive bool) error {
 func (c *Client) deviceLogin(ctx context.Context) error {
 	slog.Debug("starting device flow", "api", c.State.APIURL)
 
-	// Bootstrap the nonce and canonical URL up front, so the first approved
-	// poll already carries a valid proof. Best effort, a failure only costs
-	// one rejected poll.
+	// Fetch the nonce and canonical URL up front, so the first approved poll carries a valid proof. Best effort.
 	if c.dpop != nil {
 		if nonce, serverURL, err := dpopclient.FetchNonce(ctx, c.httpc, c.State.APIURL); err == nil {
 			c.dpop.Learn(nonce, serverURL)
@@ -106,8 +99,7 @@ func (c *Client) beginDeviceAuth(ctx context.Context) (deviceAuth, error) {
 	if strings.ContainsFunc(d.UserCode+d.VerificationURI, unicode.IsControl) {
 		return d, errors.New("device authorization: the response has control characters")
 	}
-	// The link goes to the OS opener, which also launches files and custom
-	// schemes.
+	// The link goes to the OS opener, which also launches files and custom schemes.
 	u, err := url.Parse(d.VerificationURI)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") {
 		return d, errors.New("device authorization: the sign-in link is not a web address")
@@ -169,9 +161,7 @@ func (c *Client) pollDeviceToken(
 			nonceRetried = true
 			continue
 		case "invalid_dpop_proof":
-			// The configured API URL can differ from the canonical URL proofs bind to, so
-			// learn the real one and retry once. After that it is the proof itself, and
-			// the server refuses one whose timestamp is more than a minute off.
+			// The configured URL can differ from the canonical one proofs bind to, so learn it and retry once.
 			if bootstrapped || c.dpop == nil {
 				return "", 0, errors.New(
 					"sign-in failed, Nokku rejected this machine's proof. " +
@@ -186,8 +176,7 @@ func (c *Client) pollDeviceToken(
 			c.dpop.Learn(nonce, serverURL)
 			continue
 		case "slow_down":
-			// RFC 8628 section 3.5. The server counts violations per grant and its required
-			// interval keeps growing, so this must be honored.
+			// RFC 8628 section 3.5. The server counts violations per grant and its interval keeps growing.
 			wait += 5 * time.Second
 			ticker.Reset(wait)
 		case "access_denied":
@@ -209,9 +198,7 @@ func (c *Client) pollDeviceToken(
 	}
 }
 
-// postForm POSTs an x-www-form-urlencoded body with a DPoP proof. The proof
-// binds to the canonical API URL the server advertises, which can differ from
-// the configured one the request goes to.
+// The proof binds to the canonical API URL the server advertises, not the configured one the request goes to.
 func (c *Client) postForm(
 	ctx context.Context,
 	path string,
@@ -241,8 +228,7 @@ func (c *Client) postForm(
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// Learn before the status check, the rejection carries the nonce the
-	// retry needs.
+	// Learn before the status check, the rejection carries the nonce the retry needs.
 	if c.dpop != nil {
 		c.dpop.LearnHeaders(resp.Header)
 	}

@@ -36,7 +36,7 @@ type Principal struct {
 	Username  string
 }
 
-// ParseLoginPrincipal is for the backend only. The ids are UUIDs, so "@" or ":" in a username cannot shift the split.
+// ParseLoginPrincipal is for the core only. The ids are UUIDs, so "@" or ":" in a username cannot shift the split.
 func ParseLoginPrincipal(s string) (Principal, bool) {
 	subject, rest, ok := strings.Cut(s, "@")
 	if !ok {

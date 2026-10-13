@@ -144,7 +144,7 @@ func caRow(t testing.TB, priv ed25519.PrivateKey) *db.SSHCA {
 	}
 }
 
-// UserSigner is a certificate for subject to log in as username, the way the backend signs one.
+// UserSigner is a certificate for subject to log in as username, the way the core signs one.
 func (s *Server) UserSigner(t testing.TB, subject, username string) ssh.Signer {
 	t.Helper()
 	_, priv, err := ed25519.GenerateKey(crand.Reader)

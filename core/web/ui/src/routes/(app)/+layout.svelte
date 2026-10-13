@@ -70,7 +70,7 @@
 	// These lay out their own full-width canvas.
 	const fullBleed = $derived(page.url.pathname === '/sessions');
 
-	// The nav hides what the role cannot use, this covers a typed address. The backend refuses the calls either way.
+	// The nav hides what the role cannot use, this covers a typed address. The server refuses the calls either way.
 	$effect(() => {
 		if (me.data && !canVisit(page.url.pathname, me.data.role)) {
 			void goto('/', { replace: true });

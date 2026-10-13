@@ -7,7 +7,6 @@ import (
 	"connectrpc.com/connect"
 )
 
-// bearerAuth attaches the service-account API key and the client User-Agent.
 type bearerAuth struct {
 	token string
 	ua    string

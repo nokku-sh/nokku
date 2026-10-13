@@ -23,9 +23,9 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-// fakeBackend implements the two connect services the CLI syncs against:
+// fakeCore implements the two connect services the CLI syncs against:
 // GetMyAccess for the snapshot and SignSSHCertificate for issuance.
-type fakeBackend struct {
+type fakeCore struct {
 	nokkuv1connect.UnimplementedTargetServiceHandler
 	nokkuv1connect.UnimplementedCertificateServiceHandler
 
@@ -35,14 +35,14 @@ type fakeBackend struct {
 	sign      func(t *testing.T, req *nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error)
 }
 
-func (f *fakeBackend) GetMyAccess(
+func (f *fakeCore) GetMyAccess(
 	context.Context,
 	*nokkuv1.GetMyAccessRequest,
 ) (*nokkuv1.GetMyAccessResponse, error) {
 	return f.access, f.accessErr
 }
 
-func (f *fakeBackend) SignSSHCertificate(
+func (f *fakeCore) SignSSHCertificate(
 	_ context.Context,
 	req *nokkuv1.SignSSHCertificateRequest,
 ) (*nokkuv1.SignSSHCertificateResponse, error) {
@@ -53,7 +53,7 @@ func (f *fakeBackend) SignSSHCertificate(
 }
 
 // fakeCA signs test SSH certificates and exposes its public key in
-// authorized_keys form, like the backend CAs do.
+// authorized_keys form, like the core CAs do.
 type fakeCA struct {
 	signer cryptossh.Signer
 	pubKey string
@@ -108,12 +108,12 @@ func setTestDirs(t *testing.T) {
 	require.NoError(t, paths.EnsureDirs())
 }
 
-func newSyncTestClient(t *testing.T, backend *fakeBackend) *Client {
+func newSyncTestClient(t *testing.T, core *fakeCore) *Client {
 	t.Helper()
-	backend.test = t
+	core.test = t
 	mux := http.NewServeMux()
-	targetPath, targetHandler := nokkuv1connect.NewTargetServiceHandler(backend)
-	certPath, certHandler := nokkuv1connect.NewCertificateServiceHandler(backend)
+	targetPath, targetHandler := nokkuv1connect.NewTargetServiceHandler(core)
+	certPath, certHandler := nokkuv1connect.NewCertificateServiceHandler(core)
 	mux.Handle(targetPath, targetHandler)
 	mux.Handle(certPath, certHandler)
 	srv := httptest.NewServer(mux)
@@ -147,8 +147,8 @@ func accessResponse(caPubKey string) *nokkuv1.GetMyAccessResponse {
 func TestSyncCommitsAccessSnapshot(t *testing.T) {
 	setTestDirs(t)
 	ca := newFakeCA(t)
-	backend := &fakeBackend{access: accessResponse(ca.pubKey)}
-	c := newSyncTestClient(t, backend)
+	core := &fakeCore{access: accessResponse(ca.pubKey)}
+	c := newSyncTestClient(t, core)
 
 	c.State.FailedAt = time.Now()
 	require.NoError(t, c.Sync(t.Context(), false))
@@ -171,10 +171,10 @@ func TestSyncCommitsAccessSnapshot(t *testing.T) {
 
 func TestSyncUnauthenticatedNonInteractive(t *testing.T) {
 	setTestDirs(t)
-	backend := &fakeBackend{
+	core := &fakeCore{
 		accessErr: connect.NewError(connect.CodeUnauthenticated, assert.AnError),
 	}
-	c := newSyncTestClient(t, backend)
+	c := newSyncTestClient(t, core)
 
 	err := c.Sync(t.Context(), false)
 	require.Error(t, err)
@@ -194,7 +194,7 @@ func TestSyncOrCacheFallsBackToCache(t *testing.T) {
 	c.certs = nokkuv1connect.NewCertificateServiceClient(&http.Client{}, st.APIURL)
 	c.targets = nokkuv1connect.NewTargetServiceClient(&http.Client{}, st.APIURL)
 	err := c.SyncOrCache(t.Context(), false)
-	require.NoError(t, err, "unreachable backend must fall back to cached data")
+	require.NoError(t, err, "unreachable core must fall back to cached data")
 	assert.True(t, st.HasCachedData())
 	assert.True(t, state.Load().SyncFailedWithin(time.Minute),
 		"the outage must be on disk, the next ssh is another process")
@@ -254,7 +254,7 @@ func TestEnsureCertSignsAndWritesCert(t *testing.T) {
 	ca := newFakeCA(t)
 	require.NoError(t, ssh.SetupKey(false))
 
-	backend := &fakeBackend{
+	core := &fakeCore{
 		sign: func(t *testing.T, req *nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error) {
 			assert.Equal(t, targetID, req.GetTargetId(), "a certificate is asked for one server")
 			return &nokkuv1.SignSSHCertificateResponse{
@@ -263,7 +263,7 @@ func TestEnsureCertSignsAndWritesCert(t *testing.T) {
 			}, nil
 		},
 	}
-	c := newSyncTestClient(t, backend)
+	c := newSyncTestClient(t, core)
 
 	err := c.EnsureCert(t.Context(), state.Target{ID: targetID}, state.CA{ID: caID, PublicKey: ca.pubKey})
 	require.NoError(t, err)
@@ -276,7 +276,7 @@ func TestEnsureCertSignsAndWritesCert(t *testing.T) {
 }
 
 // A certificate past half of its life is renewed while it still works, so a
-// backend outage never finds it about to expire. When signing fails the old
+// core outage never finds it about to expire. When signing fails the old
 // one stays.
 func TestEnsureCertRenewsPastHalfLife(t *testing.T) {
 	setTestDirs(t)
@@ -295,14 +295,14 @@ func TestEnsureCertRenewsPastHalfLife(t *testing.T) {
 	authority := state.CA{ID: caID, PublicKey: ca.pubKey}
 	require.True(t, ssh.CertValid(target, authority, 0))
 
-	backend := &fakeBackend{}
-	c := newSyncTestClient(t, backend)
-	require.Error(t, c.EnsureCert(t.Context(), target, authority), "the backend refused to sign")
+	core := &fakeCore{}
+	c := newSyncTestClient(t, core)
+	require.Error(t, c.EnsureCert(t.Context(), target, authority), "the core refused to sign")
 	kept, err := os.ReadFile(certPath)
 	require.NoError(t, err)
 	assert.Equal(t, aging, string(kept), "a failed renewal must leave the working certificate")
 
-	backend.sign = func(t *testing.T, _ *nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error) {
+	core.sign = func(t *testing.T, _ *nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error) {
 		return &nokkuv1.SignSSHCertificateResponse{
 			SignedCertificate: new(ca.signCert(t, pub, 3*time.Hour)),
 		}, nil

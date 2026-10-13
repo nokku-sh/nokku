@@ -25,19 +25,19 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
 
-// fakeBackend refuses to sign host certificates, like a backend whose CA was deactivated.
-type fakeBackend struct {
+// fakeCore refuses to sign host certificates, like a core whose CA was deactivated.
+type fakeCore struct {
 	nokkuv1connect.UnimplementedDaemonControlServiceHandler
 
 	ca    string
 	signs atomic.Int32
-	// pending answers like a backend that has not approved the daemon.
+	// pending answers like a core that has not approved the daemon.
 	pending atomic.Bool
 	// enrolled holds the last enroll request.
 	enrolled atomic.Pointer[nokkuv1.EnrollDaemonRequest]
 }
 
-func (b *fakeBackend) EnrollDaemon(
+func (b *fakeCore) EnrollDaemon(
 	_ context.Context,
 	req *nokkuv1.EnrollDaemonRequest,
 ) (*nokkuv1.EnrollDaemonResponse, error) {
@@ -51,7 +51,7 @@ func (b *fakeBackend) EnrollDaemon(
 	}, nil
 }
 
-func (b *fakeBackend) SyncDaemon(
+func (b *fakeCore) SyncDaemon(
 	context.Context,
 	*nokkuv1.SyncDaemonRequest,
 ) (*nokkuv1.SyncDaemonResponse, error) {
@@ -68,7 +68,7 @@ func (b *fakeBackend) SyncDaemon(
 	}, nil
 }
 
-func (b *fakeBackend) SignHostCertificate(
+func (b *fakeCore) SignHostCertificate(
 	context.Context,
 	*nokkuv1.SignHostCertificateRequest,
 ) (*nokkuv1.SignHostCertificateResponse, error) {
@@ -85,13 +85,13 @@ func newTestCAKey(t *testing.T) string {
 	return string(ssh.MarshalAuthorizedKey(key))
 }
 
-func newSyncClient(t *testing.T, backend *fakeBackend) *Client {
+func newSyncClient(t *testing.T, core *fakeCore) *Client {
 	t.Helper()
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
 	require.NoError(t, paths.Verify())
 
 	mux := http.NewServeMux()
-	mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(backend))
+	mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(core))
 	api := httptest.NewServer(mux)
 	t.Cleanup(api.Close)
 
@@ -125,15 +125,15 @@ func newSyncClient(t *testing.T, backend *fakeBackend) *Client {
 func TestSyncAppliesStateWithoutHostCert(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
-	backend := &fakeBackend{ca: newTestCAKey(t)}
-	c := newSyncClient(t, backend)
+	core := &fakeCore{ca: newTestCAKey(t)}
+	c := newSyncClient(t, core)
 
 	must.NoError(c.syncDaemon(t.Context()), "a sync must not fail on the host certificate")
 	is.Equal([]string{"subject-1"}, c.cache.CertPrincipals("deploy"), "the grant did not land")
 	active, _ := c.cache.CAs()
-	is.Equal(backend.ca, active, "the CA did not land")
+	is.Equal(core.ca, active, "the CA did not land")
 	is.EqualValues(7, c.cache.GetStateVersion())
-	is.Zero(backend.signs.Load(), "the sync signed a host certificate itself")
+	is.Zero(core.signs.Load(), "the sync signed a host certificate itself")
 
 	select {
 	case <-c.renew:
@@ -156,18 +156,18 @@ func TestSyncAppliesStateWithoutHostCert(t *testing.T) {
 	loaded := state.NewCache()
 	must.NoError(loaded.Load())
 	active, _ = loaded.CAs()
-	is.Equal(backend.ca, active)
+	is.Equal(core.ca, active)
 	is.Equal([]string{"subject-1"}, loaded.CertPrincipals("deploy"))
 }
 
 // An approval that is taken back must not leave the host serving what it synced while approved.
 func TestSyncPendingDropsTrust(t *testing.T) {
-	backend := &fakeBackend{ca: newTestCAKey(t)}
-	c := newSyncClient(t, backend)
+	core := &fakeCore{ca: newTestCAKey(t)}
+	c := newSyncClient(t, core)
 	require.NoError(t, c.syncDaemon(t.Context()))
 	require.NotEmpty(t, c.cache.CertPrincipals("deploy"))
 
-	backend.pending.Store(true)
+	core.pending.Store(true)
 	require.NoError(t, c.syncDaemon(t.Context()))
 	assert.Empty(t, c.cache.CertPrincipals("deploy"), "a pending daemon still honors its old grants")
 	active, _ := c.cache.CAs()
@@ -178,15 +178,15 @@ func TestSyncPendingDropsTrust(t *testing.T) {
 	assert.Empty(t, loaded.CertPrincipals("deploy"), "the old grants are still on disk")
 }
 
-// The backend names the daemon after the host when a person named it, so enroll has to say what it is called.
+// The core names the daemon after the host when a person named it, so enroll has to say what it is called.
 func TestEnrollReportsTheHost(t *testing.T) {
-	backend := &fakeBackend{ca: newTestCAKey(t)}
-	c := newSyncClient(t, backend)
+	core := &fakeCore{ca: newTestCAKey(t)}
+	c := newSyncClient(t, core)
 
 	require.NoError(t, c.enroll(t.Context(), "token"))
 
-	req := backend.enrolled.Load()
-	require.NotNil(t, req, "no enroll call reached the backend")
+	req := core.enrolled.Load()
+	require.NotNil(t, req, "no enroll call reached the core")
 	hostname, _ := os.Hostname()
 	assert.Equal(t, hostname, req.GetMetadata()["hostname"])
 	assert.Equal(t, "daemon-1", c.config.DaemonID)

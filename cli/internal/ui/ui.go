@@ -18,8 +18,7 @@ var colorEnabled = func() bool {
 	return term.IsTerminal(int(os.Stdout.Fd()))
 }()
 
-// color wraps s in an SGR code when colors are enabled. The code must exclude
-// the leading ESC[ and trailing m.
+// code is the SGR code without the leading ESC[ and the trailing m.
 func color(code, s string) string {
 	if !colorEnabled {
 		return s
@@ -33,8 +32,7 @@ func Red(s string) string    { return color("31", s) }
 func Green(s string) string  { return color("32", s) }
 func Yellow(s string) string { return color("33", s) }
 
-// Plain drops control characters except newlines from text nk did not write,
-// like a server's error message, so it cannot send escape sequences.
+// Plain is for text nk did not write, like a server's error message, so it cannot send escape sequences.
 func Plain(s string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) && r != '\n' {

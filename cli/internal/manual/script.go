@@ -11,9 +11,7 @@ const (
 	verifyMarker = "#nk verified"
 )
 
-// reloadSSHD prints reloadMarker when sshd took the reload. systemd calls the
-// unit sshd on RHEL and ssh on Debian, the pid file covers hosts without
-// systemd.
+// systemd calls the unit sshd on RHEL and ssh on Debian, the pid file covers hosts without systemd.
 const reloadSSHD = `if systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null ||
   { [ -f /run/sshd.pid ] && kill -HUP "$(cat /run/sshd.pid)"; } ||
   { [ -f /var/run/sshd.pid ] && kill -HUP "$(cat /var/run/sshd.pid)"; }; then
@@ -21,8 +19,7 @@ const reloadSSHD = `if systemctl reload sshd 2>/dev/null || systemctl reload ssh
 fi
 `
 
-// RemoveScript undoes a manual sync. The drop-in goes first and comes back
-// when sshd rejects the config without it, so a failed run changes nothing.
+// RemoveScript puts the drop-in back when sshd rejects the config without it, so a failed run changes nothing.
 const RemoveScript = "set -e\n" + requireRoot +
 	`if [ -f ` + dropInPath + ` ]; then
   mv -f ` + dropInPath + ` ` + dropInPath + `.nokku-bak
@@ -44,23 +41,19 @@ if [ -d ` + principalsDir + ` ]; then
 fi
 ` + reloadSSHD
 
-// File is one file a manual sync writes. Every file is 0644, which is what
-// sshd wants for all of them.
+// File is always 0644, which is what sshd wants for all of them.
 type File struct {
 	Path    string `json:"path"`
 	Content string `json:"content"`
 }
 
-// Plan is everything one sync changes on a host.
 type Plan struct {
 	Files []File
 	// Stale are principals files whose account no longer exists.
 	Stale []string
 }
 
-// NewPlan renders the CA key, the drop-in, and one principals file per local
-// account. An account without grants still gets an empty file, so a revoked
-// grant denies by default.
+// NewPlan gives an account without grants an empty file, so a revoked grant denies by default.
 func NewPlan(caKey string, grants map[string][]string, h Host) Plan {
 	p := Plan{Files: []File{
 		{Path: caPath, Content: strings.TrimSpace(caKey) + "\n"},
@@ -80,9 +73,7 @@ func NewPlan(caKey string, grants map[string][]string, h Host) Plan {
 	return p
 }
 
-// Script writes the plan idempotently. It refuses a host whose sshd config is
-// already broken, rolls every file back when sshd rejects the result, and
-// only then removes stale files and reloads sshd.
+// Script refuses a host whose sshd config is broken, rolls back when sshd rejects the result, then reloads.
 func (p Plan) Script() string {
 	var b strings.Builder
 	b.WriteString("set -e\n" + requireRoot)
@@ -124,8 +115,7 @@ func (p Plan) Script() string {
 
 	b.WriteString(reloadSSHD)
 
-	// A reload does not prove sshd read the drop-in. A config without the
-	// Include line, or one that sets these options first, ignores it.
+	// A reload does not prove sshd read the drop-in. A config without the Include line ignores it.
 	fmt.Fprintf(&b, "nk_cfg=$(sshd -T 2>/dev/null || true)\n")
 	fmt.Fprintf(&b, "if echo \"$nk_cfg\" | grep -qi %s && echo \"$nk_cfg\" | grep -qi %s; then\n",
 		q("^trustedusercakeys "+caPath), q("^authorizedprincipalsfile "+principalsDir+"/%u"))
@@ -133,13 +123,11 @@ func (p Plan) Script() string {
 	return b.String()
 }
 
-// Result is what the write script reported.
 type Result struct {
 	Reloaded bool
 	Verified bool
 }
 
-// ParseResult reads the markers the script prints.
 func ParseResult(out string) Result {
 	return Result{
 		Reloaded: strings.Contains(out, reloadMarker),

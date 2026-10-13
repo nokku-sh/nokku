@@ -42,7 +42,7 @@ const (
 // signerSalt namespaces the daemon's DPoP key. Salt registry: internal/README.md.
 const signerSalt = "nokku-daemon"
 
-var errDaemonRejected = errors.New("daemon rejected by backend")
+var errDaemonRejected = errors.New("daemon rejected by core")
 
 type Client struct {
 	cache  *state.Cache
@@ -112,7 +112,7 @@ func (c *Client) enroll(ctx context.Context, token string) error {
 		return fmt.Errorf("enroll: %w", err)
 	}
 	if res.GetTargetId() == "" || res.GetId() == "" || res.GetAccessToken() == "" {
-		return errors.New("enroll: backend returned an incomplete enrollment")
+		return errors.New("enroll: core returned an incomplete enrollment")
 	}
 	// A re-enrollment may move the host to another Nokku, so nothing the old one trusted may survive.
 	c.cache.Clear()
@@ -188,7 +188,7 @@ func (c *Client) Run(ctx context.Context, srv *sshd.Server, sshAddr netip.AddrPo
 		// A rejected stream may carry a fresh DPoP nonce for the next dial.
 		c.dpop.LearnFromError(err)
 
-		// Connect returns before the backend answers, so only a stream that stayed up proves it was reachable.
+		// Connect returns before the core answers, so only a stream that stayed up proves it was reachable.
 		if time.Since(start) > 2*heartbeatInterval {
 			b.Reset()
 			warned = false

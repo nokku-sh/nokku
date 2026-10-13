@@ -14,7 +14,7 @@ import (
 
 const sessionTTL = 8 * time.Hour
 
-// A test seam, so the relay can be driven without a backend.
+// A test seam, so the relay can be driven without a core.
 type relayStream interface {
 	Send(*nokkuv1.DaemonRelayRequest) error
 	Receive() (*nokkuv1.DaemonRelayResponse, error)
@@ -36,7 +36,7 @@ func (c *Client) runRelay(ctx context.Context, req *nokkuv1.RelayOpen) {
 	defer cancel()
 	stream, err := c.ctl.DaemonRelay(ctx)
 	if err == nil {
-		// Ready must be the first message, the backend resolves its pending relay on it.
+		// Ready must be the first message, the core resolves its pending relay on it.
 		err = stream.Send(&nokkuv1.DaemonRelayRequest{
 			Msg: &nokkuv1.DaemonRelayRequest_Ready{Ready: &nokkuv1.DaemonRelayReady{RelayId: req.RelayId}},
 		})
@@ -118,7 +118,7 @@ func (c *relayConn) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Close skips the Closed frame while a Write is stuck on a dead backend. The cancel unblocks that Write.
+// Close skips the Closed frame while a Write is stuck on a dead core. The cancel unblocks that Write.
 func (c *relayConn) Close() error {
 	if c.sendMu.TryLock() {
 		if !c.closed {

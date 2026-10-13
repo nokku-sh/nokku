@@ -1,4 +1,3 @@
-// Package cmd defines the nk command tree.
 package cmd
 
 import (
@@ -22,13 +21,11 @@ import (
 	"github.com/nokku-sh/nokku/internal/trust"
 )
 
-// saPrefix marks service-account tokens. Unlike device sessions they
-// authenticate with a plain Bearer header, without DPoP binding.
+// Service account tokens use a plain Bearer header, without DPoP binding.
 const saPrefix = "nk_sa_"
 
 var jsonFlag = &cli.BoolFlag{Name: "json", Usage: "Output machine-readable JSON"}
 
-// Root is the nk command with its global flags and every subcommand.
 func Root() *cli.Command {
 	return &cli.Command{
 		EnableShellCompletion: true,
@@ -90,7 +87,6 @@ func Root() *cli.Command {
 	}
 }
 
-// loadState loads the persisted state and applies the global flags.
 func loadState(cmd *cli.Command) (*state.State, error) {
 	s := state.Load()
 	s.Token = os.Getenv("NK_TOKEN")
@@ -122,8 +118,7 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 	return s, nil
 }
 
-// plainHTTP reports whether api would carry the session or a service account
-// token over the network in the clear. This machine itself is fine.
+// Plain http would carry the session or a token in the clear. This machine itself is fine.
 func plainHTTP(api string) bool {
 	u, err := url.Parse(api)
 	if err != nil || u.Scheme != "http" {
@@ -133,9 +128,7 @@ func plainHTTP(api string) bool {
 	return u.Hostname() != "localhost" && (ip == nil || !ip.IsLoopback())
 }
 
-// connect syncs access just in time, signing in through the browser when
-// needed, and falls back to the cached snapshot when the backend is
-// unreachable.
+// Signs in through the browser when needed and falls back to the cached snapshot when the core is unreachable.
 func connect(ctx context.Context, cmd *cli.Command) (*client.Client, error) {
 	s, err := loadState(cmd)
 	if err != nil {
@@ -151,7 +144,6 @@ func connect(ctx context.Context, cmd *cli.Command) (*client.Client, error) {
 	return c, nil
 }
 
-// warnf prints a highlighted warning to stderr.
 func warnf(format string, args ...any) {
 	fmt.Fprintln(os.Stderr, ui.Yellow("warning: "+fmt.Sprintf(format, args...)))
 }

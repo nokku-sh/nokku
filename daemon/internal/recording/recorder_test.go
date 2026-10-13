@@ -270,7 +270,7 @@ func TestNilRecorderIsNoOp(t *testing.T) {
 	iface.RecordResize(80, 24)
 }
 
-// slowSink blocks in Close until released, like an upload stream waiting on the backend.
+// slowSink blocks in Close until released, like an upload stream waiting on the core.
 type slowSink struct {
 	release chan struct{}
 	done    chan struct{}

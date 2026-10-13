@@ -50,7 +50,7 @@
 	const updateRole = users.updateRole();
 	const setActive = users.setActive();
 
-	// The owner and you are never in a bulk delete, the backend refuses both.
+	// The owner and you are never in a bulk delete, the server refuses both.
 	const bulkActions: BulkAction<User>[] = [
 		{
 			label: 'Delete',

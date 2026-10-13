@@ -94,7 +94,7 @@ func TestUploaderStreamsPlaintext(t *testing.T) {
 	is.NotNil(msgs[2].GetFinal())
 }
 
-// Write still reports success after a backend error, so the local file keeps the data.
+// Write still reports success after a core error, so the local file keeps the data.
 func TestUploaderKeepsLocalOnFailure(t *testing.T) {
 	ts := newTestServer(t)
 	is := assert.New(t)

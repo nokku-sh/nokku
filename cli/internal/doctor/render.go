@@ -29,7 +29,6 @@ func color(status Status) func(string) string {
 	}
 }
 
-// Print writes the report to w as text.
 func Print(w io.Writer, r Report) {
 	for _, f := range r.Fixes {
 		fmt.Fprintf(w, "  %s %s\n", ui.Green("✔"), f)

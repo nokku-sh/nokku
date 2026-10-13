@@ -29,9 +29,7 @@ const (
 
 var errSignOnly = errors.New("the nk agent only signs with the Nokku identity")
 
-// EnsureAgent makes sure a background nk agent serves the SSH identity on
-// paths.AgentSocket. One shared agent outlives every ssh session, so parallel
-// sessions never lose their signer when another one ends.
+// EnsureAgent starts one shared agent that outlives every ssh session, so parallel sessions never lose their signer.
 func EnsureAgent(ctx context.Context, requireTPM bool) error {
 	if agentAlive(ctx) {
 		return nil
@@ -66,8 +64,7 @@ func EnsureAgent(ctx context.Context, requireTPM bool) error {
 	return errors.New("the nk agent did not start, run nk doctor")
 }
 
-// agentEnv is the environment without the service account token. The agent
-// never talks to the backend and outlives the command that started it.
+// Without the service account token, the agent never talks to the core and outlives its command.
 func agentEnv() []string {
 	return slices.DeleteFunc(os.Environ(), func(kv string) bool {
 		key, _, _ := strings.Cut(kv, "=")
@@ -75,8 +72,7 @@ func agentEnv() []string {
 	})
 }
 
-// RunAgent serves the SSH identity until ctx ends or the agent sits idle. It
-// returns at once when another agent already serves the socket.
+// RunAgent returns at once when another agent already serves the socket.
 func RunAgent(ctx context.Context, requireTPM bool) error {
 	if agentAlive(ctx) {
 		return nil
@@ -113,8 +109,7 @@ func RunAgent(ctx context.Context, requireTPM bool) error {
 	}
 }
 
-// identity reloads the signer whenever nk wrote a new public key, so a
-// recreated identity never needs an agent restart.
+// Reloads the signer when nk wrote a new public key, so a recreated identity needs no agent restart.
 type identity struct {
 	requireTPM bool
 	pub        []byte
@@ -163,8 +158,7 @@ func agentAlive(ctx context.Context) bool {
 	return true
 }
 
-// StopAgent asks a running agent to exit. Best effort, an agent that does not
-// answer exits on its own once idle.
+// StopAgent is best effort, an agent that does not answer exits on its own once idle.
 func StopAgent(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
@@ -176,8 +170,7 @@ func StopAgent(ctx context.Context) {
 	_, _ = agent.NewClient(conn).Extension(shutdownExtension, nil)
 }
 
-// signOnly serves the identity for signing and nothing else, so ssh-add
-// cannot load other keys into nk's agent, remove its key, or lock it.
+// Signing only, so ssh-add cannot load other keys into nk's agent, remove its key, or lock it.
 type signOnly struct {
 	agent.ExtendedAgent
 

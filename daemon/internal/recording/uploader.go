@@ -55,7 +55,7 @@ func NewUploader(
 	return u
 }
 
-// Write always reports success, so the local recording never fails because of the backend.
+// Write always reports success, so the local recording never fails because of the core.
 func (u *Uploader) Write(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
@@ -76,7 +76,7 @@ func (u *Uploader) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Close reports whether the backend has all of it. Safe after a failure or twice.
+// Close reports whether the core has all of it. Safe after a failure or twice.
 func (u *Uploader) Close() error { return u.close() }
 
 func (u *Uploader) finish() error {
@@ -122,7 +122,7 @@ func (u *Uploader) sendLoop(ctx context.Context) {
 		if err := stream.Send(&nokkuv1.UploadRecordingRequest{
 			Msg: &nokkuv1.UploadRecordingRequest_Chunk{Chunk: chunk},
 		}); err != nil {
-			// A failed send only says the stream ended. The backend's answer says why, like a full workspace.
+			// A failed send only says the stream ended. The core's answer says why, like a full workspace.
 			if _, answer := stream.CloseAndReceive(); answer != nil {
 				err = answer
 			}
@@ -167,7 +167,7 @@ func (u *Uploader) open(ctx context.Context) (
 	return stream, nil
 }
 
-// The stream is left open, the backend marks the recording truncated.
+// The stream is left open, the core marks the recording truncated.
 func (u *Uploader) fail(where string, err error) {
 	u.mu.Lock()
 	defer u.mu.Unlock()

@@ -48,8 +48,8 @@ func UploadPending(ctx context.Context, client nokkuv1connect.DaemonControlServi
 		}
 		err = uploadFile(ctx, client, path)
 		if connect.CodeOf(err) == connect.CodeInvalidArgument {
-			// Already finalized, or a file the backend will never take.
-			slog.Warn("recording not accepted by the backend, not retrying", "path", path, "error", err)
+			// Already finalized, or a file the core will never take.
+			slog.Warn("recording not accepted by the core, not retrying", "path", path, "error", err)
 			err = nil
 		}
 		if err != nil {
@@ -83,7 +83,7 @@ func uploadFile(ctx context.Context, client nokkuv1connect.DaemonControlServiceC
 		return nil
 	}
 	meta := &nokkuv1.RecordingMeta{RecordingId: &hdr.SessionID, Username: &hdr.User, Principal: &hdr.Principal}
-	// The session is over, so the backend is told when it began.
+	// The session is over, so the core is told when it began.
 	if hdr.Timestamp > 0 {
 		meta.StartedAt = timestamppb.New(time.Unix(hdr.Timestamp, 0))
 	}

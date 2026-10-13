@@ -17,16 +17,13 @@ import (
 )
 
 const (
-	// proxyFreshFor is how long nk proxy trusts the cached access snapshot.
+	// How long nk proxy trusts the cached access snapshot.
 	proxyFreshFor = time.Minute
-	// syncRetryAfter is how long nk under ssh leaves the backend alone after a
-	// sync or a renewal failed. Without it every connection of an outage waits
-	// for the timeout first.
+	// After a failed sync nk under ssh leaves the core alone this long, or every connection waits for the timeout.
 	syncRetryAfter = 30 * time.Second
 )
 
-// proxyCMD is the ProxyCommand in the generated ssh_config. ssh runs it, users
-// do not.
+// ssh runs this as the ProxyCommand of the generated ssh_config, users do not.
 func proxyCMD() *cli.Command {
 	return &cli.Command{
 		Name:      "proxy",
@@ -45,15 +42,13 @@ func proxyCMD() *cli.Command {
 			if err != nil {
 				return err
 			}
-			// Built on first use, so a fresh snapshot with a valid cert never
-			// touches the TPM or the backend.
-			backend := sync.OnceValues(func() (*client.Client, error) { return client.New(s) })
+			// Built on first use, so a fresh snapshot with a valid cert never touches the TPM or the core.
+			core := sync.OnceValues(func() (*client.Client, error) { return client.New(s) })
 
-			// The daemon enforces revocation itself, so a young snapshot only
-			// delays new grants, and fan-out over many hosts syncs once.
+			// The daemon enforces revocation, so a young snapshot only delays new grants and a fan-out syncs once.
 			stale := time.Since(s.SyncedAt) > proxyFreshFor && !s.SyncFailedWithin(syncRetryAfter)
 			if stale || s.TargetByID(id) == nil {
-				c, cerr := backend()
+				c, cerr := core()
 				if cerr != nil {
 					return cerr
 				}
@@ -71,11 +66,9 @@ func proxyCMD() *cli.Command {
 				return fmt.Errorf("the certificate authority of %s is missing, run nk login", target.Name)
 			}
 
-			// nk prepare renewed the certificate before ssh read it. Signing
-			// here only happens when that failed, or this sync brought a new CA
-			// or an account granted after the certificate was signed.
+			// Only when nk prepare failed, or this sync brought a new CA or a newly granted account.
 			if !ssh.CertValid(*target, *ca, 0) {
-				c, cerr := backend()
+				c, cerr := core()
 				if cerr == nil {
 					cerr = c.EnsureCert(ctx, *target, *ca)
 				}
@@ -85,7 +78,7 @@ func proxyCMD() *cli.Command {
 				warnf("certificate for %s renewed, if ssh fails run it again", target.Name)
 			} else if !ssh.CertCovers(*target) {
 				// The old certificate still works for the accounts it names.
-				if c, cerr := backend(); cerr == nil && c.EnsureCert(ctx, *target, *ca) == nil {
+				if c, cerr := core(); cerr == nil && c.EnsureCert(ctx, *target, *ca) == nil {
 					warnf("certificate for %s renewed for a new account, if ssh fails run it again", target.Name)
 				}
 			}
@@ -93,7 +86,7 @@ func proxyCMD() *cli.Command {
 				return err
 			}
 			relay := func(ctx context.Context, t *state.Target) (io.ReadWriteCloser, error) {
-				c, cerr := backend()
+				c, cerr := core()
 				if cerr != nil {
 					return nil, cerr
 				}
@@ -104,9 +97,7 @@ func proxyCMD() *cli.Command {
 	}
 }
 
-// prepareCMD is the Match exec hook in the generated ssh_config. ssh runs it
-// before it reads CertificateFile, so a missing or expiring certificate is
-// renewed in time for this connection.
+// ssh runs this Match exec hook before it reads CertificateFile, so the certificate is renewed in time.
 func prepareCMD() *cli.Command {
 	return &cli.Command{
 		Name:      "prepare",
@@ -136,8 +127,7 @@ func renewCert(ctx context.Context, cmd *cli.Command) error {
 	if ca == nil || ssh.CertFresh(*target, *ca) {
 		return nil
 	}
-	// A certificate that still works is not worth a timeout while the
-	// backend is down.
+	// A certificate that still works is not worth a timeout while the core is down.
 	if ssh.CertValid(*target, *ca, 0) && s.SyncFailedWithin(syncRetryAfter) {
 		return nil
 	}

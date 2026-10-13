@@ -100,10 +100,10 @@ func TestRelayConnWriteAndClose(t *testing.T) {
 	is := assert.New(t)
 	conn, stream := newTestRelayConn(t)
 
-	n, err := conn.Write([]byte("hello backend"))
+	n, err := conn.Write([]byte("hello core"))
 	require.NoError(t, err)
-	is.Equal(len("hello backend"), n)
-	is.Equal([]byte("hello backend"), (<-stream.sent).GetData())
+	is.Equal(len("hello core"), n)
+	is.Equal([]byte("hello core"), (<-stream.sent).GetData())
 
 	require.NoError(t, conn.Close())
 	require.NoError(t, conn.Close(), "closing twice")
@@ -173,7 +173,7 @@ func (u *userEnd) Write(p []byte) (int, error) {
 	}
 }
 
-// Close tells the daemon the user is gone, as the backend does.
+// Close tells the daemon the user is gone, as the core does.
 func (u *userEnd) Close() error {
 	select {
 	case u.stream.recv <- &nokkuv1.DaemonRelayResponse{
@@ -192,7 +192,7 @@ func (u *userEnd) SetWriteDeadline(time.Time) error { return nil }
 
 func TestRelayServesSSH(t *testing.T) {
 	must := require.New(t)
-	c := newSyncClient(t, &fakeBackend{})
+	c := newSyncClient(t, &fakeCore{})
 	cur, err := user.Current()
 	must.NoError(err)
 

@@ -11,7 +11,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
-// Proxies close a stream idle for 60s, and the backend drops one silent for 2 minutes.
+// Proxies close a stream idle for 60s, and the core drops one silent for 2 minutes.
 const heartbeatInterval = 30 * time.Second
 
 type controlStream = connect.BidiStreamForClientSimple[nokkuv1.ConnectRequest, nokkuv1.ConnectResponse]

@@ -18,7 +18,7 @@ const (
 	maxAge        = 30 * 24 * time.Hour
 )
 
-// Uploaded recordings are gone already, so whatever this removes never reached the backend.
+// Uploaded recordings are gone already, so whatever this removes never reached the core.
 func enforceRetention() error {
 	recordsDir := paths.RecordsDir()
 	entries, err := os.ReadDir(recordsDir)

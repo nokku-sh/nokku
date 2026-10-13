@@ -36,7 +36,7 @@ const (
 
 var errBusy = errors.New("too many unauthenticated connections")
 
-// Policy is the backend-controlled part of the config. It applies to new sessions without a restart.
+// Policy is the core-controlled part of the config. It applies to new sessions without a restart.
 type Policy struct {
 	Record               bool
 	AllowForwarding      bool
@@ -45,7 +45,7 @@ type Policy struct {
 	GatewayPorts bool
 }
 
-// DefaultPolicy also fills any field the backend leaves unset.
+// DefaultPolicy also fills any field the core leaves unset.
 var DefaultPolicy = Policy{Record: true, AllowForwarding: true, AllowAgentForwarding: true}
 
 // RecordingSink gets a ctx that outlives the session teardown.
@@ -198,7 +198,7 @@ func (s *Server) Serve(ctx context.Context, l net.Listener) {
 	}
 }
 
-// ServeConn takes no pre-auth slot, the backend already authenticated the user. The connection cap still counts.
+// ServeConn takes no pre-auth slot, the core already authenticated the user. The connection cap still counts.
 func (s *Server) ServeConn(nc net.Conn) {
 	select {
 	case s.conns <- struct{}{}:

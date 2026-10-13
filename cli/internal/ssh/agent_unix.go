@@ -30,8 +30,7 @@ func (l lockedListener) Close() error {
 
 func listenAgent(ctx context.Context) (net.Listener, error) {
 	path := paths.AgentSocket()
-	// One agent owns the socket. Without the lock two agents starting at once
-	// both treat it as stale, and the loser unlinks the winner's on exit.
+	// Without the lock two agents starting at once both treat the socket as stale, and the loser unlinks the winner's.
 	lock, err := os.OpenFile(path+".lock", os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
@@ -65,8 +64,7 @@ func dialAgent(ctx context.Context) (net.Conn, error) {
 	return d.DialContext(ctx, "unix", paths.AgentSocket())
 }
 
-// detach starts the agent in its own session, so the SIGHUP ssh sends its
-// ProxyCommand on exit never reaches it.
+// Its own session, so the SIGHUP ssh sends its ProxyCommand on exit never reaches the agent.
 func detach(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 }

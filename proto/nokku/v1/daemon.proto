@@ -273,7 +273,7 @@ message DaemonSession {
 
 message RelayOpen {
   string relay_id = 1;
-  // The user's address as the backend saw it. The daemon's sshd reports it as
+  // The user's address as the core saw it. The daemon's sshd reports it as
   // the remote address of the relayed connection.
   string client_addr = 2;
 }

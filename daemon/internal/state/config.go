@@ -8,7 +8,7 @@ import (
 
 const DefaultAPIURL = "https://app.nokku.sh"
 
-// Config is the persisted enrollment state. The backend-synced daemon config lives in [Cache].
+// Config is the persisted enrollment state. The core-synced daemon config lives in [Cache].
 type Config struct {
 	TargetID string `json:"target_id,omitempty"`
 	DaemonID string `json:"daemon_id,omitempty"`

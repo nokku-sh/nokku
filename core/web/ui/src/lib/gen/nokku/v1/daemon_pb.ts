@@ -746,7 +746,7 @@ export type RelayOpen = Message<"nokku.v1.RelayOpen"> & {
   relayId: string;
 
   /**
-   * The user's address as the backend saw it. The daemon's sshd reports it as
+   * The user's address as the core saw it. The daemon's sshd reports it as
    * the remote address of the relayed connection.
    *
    * @generated from field: string client_addr = 2;

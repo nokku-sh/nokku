@@ -1,4 +1,3 @@
-// Package state holds the persisted session and the offline access snapshot.
 package state
 
 import (
@@ -30,14 +29,12 @@ type CA struct {
 	Default   bool   `json:"default,omitzero"`
 	// RotatedAt is when the current key was issued.
 	RotatedAt time.Time `json:"rotated_at,omitzero"`
-	// PreviousPublicKey is the key before the last rollover. Its certificates
-	// stay trusted until PreviousTrustedUntil.
+	// The key before the last rollover. Its certificates stay trusted until PreviousTrustedUntil.
 	PreviousPublicKey    string    `json:"previous_public_key,omitempty"`
 	PreviousTrustedUntil time.Time `json:"previous_trusted_until,omitzero"`
 }
 
-// TrustedKeys returns the current key and, while it is still trusted, the one
-// it replaced.
+// TrustedKeys returns the current key and, while it is still trusted, the one it replaced.
 func (ca CA) TrustedKeys() []string {
 	keys := []string{strings.TrimSpace(ca.PublicKey)}
 	if prev := strings.TrimSpace(ca.PreviousPublicKey); prev != "" && time.Now().Before(ca.PreviousTrustedUntil) {
@@ -62,8 +59,7 @@ type Target struct {
 // Manual reports whether the target has no daemon and is synced by hand.
 func (t Target) Manual() bool { return t.DaemonID == "" }
 
-// NeedsSync reports whether the server of a manual target has not seen the
-// current key of ca yet. Certificates signed by that key are rejected there.
+// NeedsSync means the server of a manual target has not seen ca's current key yet and rejects its certificates.
 func (t Target) NeedsSync(ca *CA) bool {
 	return t.Manual() && ca != nil && ca.RotatedAt.After(t.LastManualSync())
 }
@@ -74,24 +70,20 @@ func (t Target) LastManualSync() time.Time {
 	return ts
 }
 
-// Config is persisted in config.json. A session belongs to the API that issued
-// it, so both live together.
+// Config lives in config.json. A session belongs to the API that issued it, so both are kept together.
 type Config struct {
 	APIURL string `json:"api_url,omitempty"`
-	// APICA is the PEM of the private CA the API is trusted through, empty
-	// when the system roots know its certificate.
+	// PEM of the private CA the API is trusted through, empty when the system roots know its certificate.
 	APICA string `json:"api_ca,omitempty"`
-	// APICAInstalled is set once nk put that CA into the system trust store,
-	// so the sign-out knows there is something to take out again.
+	// Set once nk put that CA into the system trust store, so the sign-out knows to offer taking it out.
 	APICAInstalled   bool      `json:"api_ca_installed,omitzero"`
 	SessionToken     string    `json:"session_token,omitempty"`
 	SessionExpiresAt time.Time `json:"session_expires_at,omitzero"`
 }
 
-// Cache is the last access snapshot, persisted in cache.json for offline use.
+// Cache is the last access snapshot, kept in cache.json for offline use.
 type Cache struct {
-	// Server is the API this snapshot came from. One written before this
-	// field existed has none.
+	// The API this snapshot came from. One written before this field existed has none.
 	Server   string    `json:"server,omitempty"`
 	SyncedAt time.Time `json:"synced_at,omitzero"`
 	// FailedAt is when a sync or a renewal last failed. A sync clears it.
@@ -102,14 +94,12 @@ type Cache struct {
 	Targets        []Target        `json:"targets,omitempty"`
 }
 
-// State is the in-memory session. Everything outside Config and Cache comes
-// from flags and is never written to disk.
+// State is in memory. Everything outside Config and Cache comes from flags and is never written to disk.
 type State struct {
 	Config
 	Cache
 
-	// Token is a service account token. It is read from NK_TOKEN only, never
-	// argv, so it stays out of shell history and the process list.
+	// Read from NK_TOKEN only, never argv, so it stays out of shell history and the process list.
 	Token      string
 	TTL        time.Duration
 	RequireTPM bool
@@ -129,8 +119,7 @@ func Load() *State {
 	return s
 }
 
-// LoadCache replaces the in-memory snapshot with the one on disk. A snapshot
-// of another server is never used.
+// LoadCache never uses a snapshot of another server.
 func (s *State) LoadCache() error {
 	s.Cache = Cache{}
 	if err := fsutil.LoadJSON(paths.CacheFile(), &s.Cache); err != nil {
@@ -152,22 +141,18 @@ func (s *State) Save() error {
 	return nil
 }
 
-// MarkSyncFailed notes that a sync or a renewal failed just now, because the
-// backend was out of reach or the session ran out. nk under ssh then leaves
-// it alone for a while, so that costs one attempt and not one per connection.
+// MarkSyncFailed makes nk under ssh leave the core alone for a while, so an outage costs one attempt in total.
 func (s *State) MarkSyncFailed() {
 	s.FailedAt = time.Now()
 	if err := fsutil.SaveJSON(paths.CacheFile(), s.Cache, 0o600); err != nil {
-		slog.Debug("failed to note the backend outage", "err", err)
+		slog.Debug("failed to note the core outage", "err", err)
 	}
 }
 
-// SyncFailedWithin reports whether a sync or a renewal failed within d.
 func (s *State) SyncFailedWithin(d time.Duration) bool {
 	return time.Since(s.FailedAt) < d
 }
 
-// IsServiceAccount reports whether a service account token is in use.
 func (s *State) IsServiceAccount() bool { return s.Token != "" }
 
 func (s *State) SessionValid() bool {

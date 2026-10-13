@@ -328,7 +328,7 @@ func (r *Recorder) closeLocked() {
 		active.Delete(r.path)
 		return
 	}
-	// The sink's Close waits for the backend, so it runs off the session path and never holds the client.
+	// The sink's Close waits for the core, so it runs off the session path and never holds the client.
 	go func() {
 		defer active.Delete(r.path)
 		if err := r.sink.Close(); err != nil {

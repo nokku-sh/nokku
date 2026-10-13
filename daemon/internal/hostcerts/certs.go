@@ -17,7 +17,7 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 )
 
-// Renewing at half the validity keeps the host verifiable through a backend outage of that length.
+// Renewing at half the validity keeps the host verifiable through a core outage of that length.
 const renewFraction = 0.5
 
 // SignFunc signs the host public key. Key and certificate are in authorized_keys form.

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The link comes from the backend, so it must reach the opener as one
+// The link comes from the core, so it must reach the opener as one
 // argument and never pass through a shell.
 func TestOpenBrowserPassesTheLinkAsOneArgument(t *testing.T) {
 	dir := t.TempDir()

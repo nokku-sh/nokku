@@ -8,7 +8,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// openBrowser asks the shell to open url, which starts the default browser.
 func openBrowser(_ context.Context, url string) error {
 	ptr, err := windows.UTF16PtrFromString(url)
 	if err != nil {

@@ -9,9 +9,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
-// FromAccess maps the backend access snapshot. IDs end up in file paths and
-// generated ssh files, so anything that is not a UUID is dropped here, once.
-// Names end up on the terminal, so they lose their control characters here.
+// FromAccess drops ids that are no UUID, they end up in file paths and ssh files. Names lose their control characters.
 func FromAccess(res *nokkuv1.GetMyAccessResponse) Cache {
 	var c Cache
 	switch subject := res.GetSubject().(type) {
@@ -33,7 +31,6 @@ func FromAccess(res *nokkuv1.GetMyAccessResponse) Cache {
 	return c
 }
 
-// SSHCAs maps the CAs of a backend answer.
 func SSHCAs(cas []*nokkuv1.CertificateAuthority) []CA {
 	var out []CA
 	for _, ca := range cas {
@@ -72,8 +69,7 @@ func MapTarget(t *nokkuv1.Target) Target {
 	}
 }
 
-// plain drops control characters, which would start an escape sequence once
-// the value is printed.
+// Control characters would start an escape sequence once the value is printed.
 func plain(s string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
@@ -94,7 +90,7 @@ func validIDs(ids ...string) bool {
 	for _, id := range ids {
 		// Only the canonical form, which is safe as a path segment and ssh token.
 		if u, err := uuid.Parse(id); err != nil || u.String() != id {
-			slog.Warn("ignoring backend entry with an invalid id", "id", id)
+			slog.Warn("ignoring core entry with an invalid id", "id", id)
 			return false
 		}
 	}

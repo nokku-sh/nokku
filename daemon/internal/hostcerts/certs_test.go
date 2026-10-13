@@ -268,7 +268,7 @@ func TestRenewHostCertsSignFailure(t *testing.T) {
 	calls := 0
 	sign := func(_ context.Context, _ []byte) (string, error) {
 		calls++
-		return "", errors.New("backend refused")
+		return "", errors.New("core refused")
 	}
 
 	caKey := string(ssh.MarshalAuthorizedKey(newTestCA(t).pub))
@@ -323,7 +323,7 @@ func TestRenewHostCertsFollowsCA(t *testing.T) {
 	must.NoError(err, "renew under the same CA")
 	is.False(renewed, "a valid certificate was rewritten")
 
-	// The backend still signs with the old key, so the certificate is refused and the one on disk stays.
+	// The core still signs with the old key, so the certificate is refused and the one on disk stays.
 	renewed, err = RenewHostCerts(context.Background(), "target-1", nextKey, sign)
 	must.Error(err, "a certificate from another CA than the trusted one was stored")
 	is.False(renewed)

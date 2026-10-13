@@ -17,7 +17,6 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-// ParseCert parses an SSH certificate in authorized_keys format.
 func ParseCert(data []byte) (*ssh.Certificate, error) {
 	pub, _, _, _, err := ssh.ParseAuthorizedKey(data)
 	if err != nil {
@@ -30,13 +29,11 @@ func ParseCert(data []byte) (*ssh.Certificate, error) {
 	return cert, nil
 }
 
-// CertWindow returns when cert becomes valid and when it expires.
 func CertWindow(cert *ssh.Certificate) (after, before time.Time) {
 	return unixTime(cert.ValidAfter), unixTime(cert.ValidBefore)
 }
 
-// CheckCert verifies that data is a certificate signed by caKey that is valid
-// now and stays valid for at least margin.
+// CheckCert wants a certificate signed by caKey, valid now and for at least margin.
 func CheckCert(data []byte, caKey string, margin time.Duration) error {
 	cert, err := ParseCert(data)
 	if err != nil {
@@ -56,17 +53,12 @@ func CheckCert(data []byte, caKey string, margin time.Duration) error {
 	return nil
 }
 
-// CertValid reports whether the cached certificate for target passes
-// CheckCert against ca, the CA of that target.
 func CertValid(target state.Target, ca state.CA, margin time.Duration) bool {
 	data, err := os.ReadFile(paths.SSHCertificate(target.ID))
 	return err == nil && CheckCert(data, ca.PublicKey, margin) == nil
 }
 
-// CertFresh reports whether the cached certificate for target is valid,
-// names every account granted there, and is still in the first half of its
-// life. It is renewed from there on, so a backend outage finds an active user
-// with at least half a lifetime left.
+// CertFresh ends at half the certificate's life, so a core outage finds an active user with half a lifetime left.
 func CertFresh(target state.Target, ca state.CA) bool {
 	data, err := os.ReadFile(paths.SSHCertificate(target.ID))
 	if err != nil {
@@ -80,9 +72,7 @@ func CertFresh(target state.Target, ca state.CA) bool {
 	return CheckCert(data, ca.PublicKey, before.Sub(after)/2) == nil
 }
 
-// CertCovers reports whether the cached certificate names every account
-// granted on target. One signed before a grant does not, and the server
-// refuses that account until the certificate is renewed.
+// CertCovers is false for a certificate signed before a grant, the server refuses that account until renewal.
 func CertCovers(target state.Target) bool {
 	data, err := os.ReadFile(paths.SSHCertificate(target.ID))
 	if err != nil {
@@ -92,8 +82,7 @@ func CertCovers(target state.Target) bool {
 	return err == nil && covers(cert, target.Usernames)
 }
 
-// covers relies on one thing about the principals the backend signs: each
-// ends with ":" and the account it is for.
+// Relies on one thing about the principals the core signs: each ends with ":" and its account.
 func covers(cert *ssh.Certificate, accounts []string) bool {
 	for _, account := range accounts {
 		if !slices.ContainsFunc(cert.ValidPrincipals, func(p string) bool {
@@ -109,7 +98,6 @@ func unixTime(t uint64) time.Time {
 	return time.Unix(int64(min(t, math.MaxInt64)), 0)
 }
 
-// CleanupCerts removes certificate files for targets not in keep.
 func CleanupCerts(keep []state.Target) error {
 	files, err := paths.SSHCertificates()
 	if err != nil {

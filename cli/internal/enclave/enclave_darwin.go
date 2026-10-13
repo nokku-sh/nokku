@@ -23,8 +23,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/tpm"
 )
 
-// envEnable opts in to new enclave keys. Remove it once the enclave path has
-// run on real hardware.
+// Opts in to new enclave keys. Remove once the enclave path has run on real hardware.
 const envEnable = "NK_SECURE_ENCLAVE"
 
 var enabled = os.Getenv(envEnable) == "1"
@@ -37,7 +36,7 @@ type backend struct {
 	software bool
 }
 
-// New returns the Secure Enclave backend, nil when this Mac has no enclave.
+// New returns nil when this Mac has no enclave.
 func New() tpm.Enclave {
 	if !Available() {
 		return nil
@@ -45,7 +44,6 @@ func New() tpm.Enclave {
 	return backend{create: enabled}
 }
 
-// Available reports whether this Mac has a usable Secure Enclave.
 func Available() bool { return C.nk_enclave_available() == 1 }
 
 // Enabled reports whether new identities are created in the enclave.
@@ -92,8 +90,7 @@ func (b backend) flag() C.int {
 	return 0
 }
 
-// key signs with the private half behind blob, which never leaves the
-// enclave.
+// The private half behind blob never leaves the enclave.
 type key struct {
 	backend
 

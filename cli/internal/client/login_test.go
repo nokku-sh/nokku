@@ -246,7 +246,7 @@ func TestDeviceFlowTwoConsecutiveLogins(t *testing.T) {
 }
 
 // The link is handed to the OS opener, which also launches files and custom
-// schemes. A backend must only be able to send a web page.
+// schemes. A core must only be able to send a web page.
 func TestDeviceFlowRejectsNonWebLink(t *testing.T) {
 	f, srv := newFakeDeviceFlow(t)
 	f.baseURL = "file:///etc/passwd"

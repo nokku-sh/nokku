@@ -13,7 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 )
 
-// Cache backs SSH access decisions when the backend is unreachable.
+// Cache backs SSH access decisions when the core is unreachable.
 type Cache struct {
 	mu   sync.RWMutex
 	data cacheJSON

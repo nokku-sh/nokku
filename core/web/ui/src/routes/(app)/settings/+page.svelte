@@ -52,7 +52,7 @@
 	const update = workspace.update();
 	const remove = workspace.delete();
 
-	// Settings are left out on purpose, the backend keeps what isn't sent.
+	// Settings are left out on purpose, the server keeps what isn't sent.
 	const autoSave = useAutoSave(() =>
 		update.mutateAsync({ name: model?.name, description: model?.description })
 	);

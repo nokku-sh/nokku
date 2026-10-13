@@ -34,8 +34,7 @@ func listCMD() *cli.Command {
 				return nil
 			}
 
-			// The name ssh knows a server by carries a prefix when the bare
-			// one is taken.
+			// The name ssh knows a server by carries a prefix when the bare one is taken.
 			aliases := ssh.HostAliases(s)
 			for _, t := range s.Targets {
 				users := ui.Dim("no accounts")
@@ -51,7 +50,6 @@ func listCMD() *cli.Command {
 	}
 }
 
-// manualNote shows how fresh a daemonless target's access is.
 func manualNote(t state.Target, ca *state.CA) string {
 	if !t.Manual() {
 		return ""

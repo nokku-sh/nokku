@@ -177,14 +177,14 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	return err
 }
 
-// unenroll deletes the daemon from the backend and wipes the local state. It has to fit in a container's
+// unenroll deletes the daemon from the core and wipes the local state. It has to fit in a container's
 // stop grace period, and the local state goes regardless, or a broken identity could never be reset.
 func unenroll(ctx context.Context, cl *client.Client) {
 	defer paths.Cleanup()
 	ctx, cancel := context.WithTimeout(ctx, unenrollTimeout)
 	defer cancel()
 	if err := cl.Unenroll(ctx); err != nil {
-		slog.Warn("delete daemon from backend failed, local state removed", "error", err)
+		slog.Warn("delete daemon from core failed, local state removed", "error", err)
 	}
 }
 
@@ -208,7 +208,7 @@ func enroll(ctx context.Context, cmd *cli.Command) error {
 }
 
 // enrollHost builds the client, enrolling first when a token is given. The pin of a private CA is fetched
-// before, so the enroll call already trusts the backend.
+// before, so the enroll call already trusts the core.
 func enrollHost(
 	ctx context.Context,
 	cmd *cli.Command,
@@ -250,7 +250,7 @@ func reset(ctx context.Context, cmd *cli.Command) error {
 	}
 	cl, err := newDaemonClient(ctx, cmd, "", cache, cfg)
 	if err != nil {
-		slog.Warn("delete daemon from backend failed, local state removed", "error", err)
+		slog.Warn("delete daemon from core failed, local state removed", "error", err)
 		paths.Cleanup()
 		return nil
 	}

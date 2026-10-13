@@ -1,4 +1,3 @@
-// Package doctor checks the local nk setup and repairs what it safely can.
 package doctor
 
 import (
@@ -132,8 +131,7 @@ func checkAccount(ctx context.Context, r *Report, s *state.State) {
 	}
 }
 
-// reachable reports whether the backend answers a plain HTTP request within a
-// short timeout. It is a diagnostic signal only.
+// Diagnostic only, a plain HTTP request with a short timeout.
 func reachable(ctx context.Context, s *state.State) bool {
 	roots, err := trust.Pool([]byte(s.APICA))
 	if err != nil {
@@ -189,8 +187,7 @@ func checkSSH(r *Report, s *state.State) {
 		}
 	}
 
-	// One certificate per server, fetched on its first ssh. Only the servers
-	// that have one get a line.
+	// One certificate per server, fetched on its first ssh. Only servers that have one get a line.
 	certs := 0
 	for _, t := range s.Targets {
 		data, err := os.ReadFile(paths.SSHCertificate(t.ID))
@@ -233,8 +230,7 @@ func repair(s *state.State) []string {
 		fixed = append(fixed, "added the Nokku include to ~/.ssh/config")
 	}
 
-	// Without a synced snapshot the target list is empty for reasons unrelated
-	// to the certificates on disk, so never prune from it.
+	// Without a synced snapshot the target list is empty for unrelated reasons, so never prune from it.
 	if s.HasCachedData() {
 		certs, _ := paths.SSHCertificates()
 		if err := ssh.CleanupCerts(s.Targets); err == nil {
