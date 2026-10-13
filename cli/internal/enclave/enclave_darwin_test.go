@@ -75,7 +75,7 @@ func TestSignerOverBridge(t *testing.T) {
 
 	s2, err := tpm.NewSigner(opts)
 	require.NoError(t, err)
-	assert.Equal(t, string(s1.PEM()), string(s2.PEM()), "the identity changed after reopening")
+	assert.Equal(t, s1.Public(), s2.Public(), "the identity changed after reopening")
 }
 
 // TestEnclaveOnThisMachine reports what the hardware does. It only fails when

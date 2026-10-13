@@ -4,7 +4,6 @@ package id
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/exec"
 	"strings"
@@ -24,5 +23,5 @@ func machineID() (string, error) {
 	if err == nil && len(cmd) > 0 {
 		return strings.TrimSpace(string(cmd)), nil
 	}
-	return "", errors.New("could not find BSD machine-id")
+	return "", nil
 }

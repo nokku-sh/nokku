@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/google/go-tpm/tpm2/transport"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // fakeEnclave stands in for a hardware enclave: software keys, with the
@@ -59,49 +61,29 @@ func noTPM() (transport.TPMCloser, error) { return nil, errors.New("no tpm in th
 
 func enclaveOpts(t *testing.T, enclave Enclave) SignerOptions {
 	t.Helper()
-	return SignerOptions{
-		Salt:      []byte("test-signer"),
-		StatePath: t.TempDir() + "/signer.json",
-		OpenTPM:   noTPM,
-		Enclave:   enclave,
-	}
+	opts := testOpts(t, noTPM)
+	opts.Enclave = enclave
+	return opts
 }
 
 func TestEnclaveSigner(t *testing.T) {
 	opts := enclaveOpts(t, &fakeEnclave{})
 
 	s1, err := NewSigner(opts)
-	if err != nil {
-		t.Fatalf("NewSigner: %v", err)
-	}
-	if s1.Method() != MethodEnclave {
-		t.Fatalf("Method() = %q, want %q", s1.Method(), MethodEnclave)
-	}
-	if got := IdentityMethod(opts.StatePath); got != MethodEnclave {
-		t.Fatalf("IdentityMethod() = %q, want %q", got, MethodEnclave)
-	}
-	pub := s1.Public().(*ecdsa.PublicKey)
+	require.NoError(t, err)
+	require.Equal(t, MethodEnclave, s1.Method())
+	assert.Equal(t, MethodEnclave, IdentityMethod(opts.StatePath))
+	pub := ecdsaPub(t, s1)
 
 	digest := sha256.Sum256([]byte("hello nokku"))
 	sig, err := s1.Sign(rand.Reader, digest[:], crypto.SHA256)
-	if err != nil {
-		t.Fatalf("Sign: %v", err)
-	}
-	if !ecdsa.VerifyASN1(pub, digest[:], sig) {
-		t.Fatal("signature verification failed")
-	}
+	require.NoError(t, err)
+	assert.True(t, ecdsa.VerifyASN1(pub, digest[:], sig), "signature verification failed")
 
 	// The blob in the state file must reopen as the same key.
 	s2, err := NewSigner(opts)
-	if err != nil {
-		t.Fatalf("reopen: %v", err)
-	}
-	if !pub.Equal(s2.Public()) {
-		t.Fatal("public key changed after reopening")
-	}
-	if string(s1.PEM()) != string(s2.PEM()) {
-		t.Fatal("PEM changed after reopening")
-	}
+	require.NoError(t, err)
+	assert.True(t, pub.Equal(s2.Public()), "public key changed after reopening")
 }
 
 // TestEnclavePreferredOrder verifies a usable TPM wins over the enclave.
@@ -110,13 +92,9 @@ func TestEnclavePreferredOrder(t *testing.T) {
 	opts.OpenTPM = simOpen(t)
 
 	s, err := NewSigner(opts)
-	if err != nil {
-		t.Fatalf("NewSigner: %v", err)
-	}
-	defer func() { _ = s.Close() }()
-	if s.Method() != MethodTPM {
-		t.Fatalf("Method() = %q, want %q", s.Method(), MethodTPM)
-	}
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+	assert.Equal(t, MethodTPM, s.Method())
 }
 
 // TestEnclaveBlobRejected verifies a blob the enclave no longer opens fails
@@ -125,57 +103,39 @@ func TestEnclaveBlobRejected(t *testing.T) {
 	opts := enclaveOpts(t, &fakeEnclave{})
 
 	s, err := NewSigner(opts)
-	if err != nil {
-		t.Fatalf("NewSigner: %v", err)
-	}
-	oldPEM := string(s.PEM())
+	require.NoError(t, err)
+	oldPEM := pemOf(t, s)
 
 	st, err := loadState(opts.StatePath)
-	if err != nil {
-		t.Fatalf("loadState: %v", err)
-	}
+	require.NoError(t, err)
 	st.Data = []byte("a blob from another machine")
-	if err = saveState(opts.StatePath, st); err != nil {
-		t.Fatalf("saveState: %v", err)
-	}
+	require.NoError(t, saveState(opts.StatePath, st))
 
-	if _, err = NewSigner(opts); !errors.Is(err, ErrIdentityChanged) {
-		t.Fatalf("NewSigner strict = %v, want ErrIdentityChanged", err)
-	}
+	_, err = NewSigner(opts)
+	require.ErrorIs(t, err, ErrIdentityChanged)
 
 	opts.Recreate = true
 	s2, err := NewSigner(opts)
-	if err != nil {
-		t.Fatalf("NewSigner recover: %v", err)
-	}
-	if string(s2.PEM()) == oldPEM {
-		t.Fatal("the recreated identity kept the old public key")
-	}
+	require.NoError(t, err)
+	assert.NotEqual(t, oldPEM, pemOf(t, s2), "the recreated identity kept the old public key")
 	st2, err := loadState(opts.StatePath)
-	if err != nil {
-		t.Fatalf("reload state: %v", err)
-	}
-	if st2.Method != MethodEnclave || st2.PubKey != string(s2.PEM()) {
-		t.Fatal("recreated identity was not persisted")
-	}
+	require.NoError(t, err)
+	assert.Equal(t, MethodEnclave, st2.Method)
+	assert.Equal(t, pemOf(t, s2), st2.PubKey, "recreated identity was not persisted")
 }
 
 // TestEnclaveStateWithoutBackend verifies an enclave identity is never
 // replaced just because this build has no enclave.
 func TestEnclaveStateWithoutBackend(t *testing.T) {
 	opts := enclaveOpts(t, &fakeEnclave{})
-	if _, err := NewSigner(opts); err != nil {
-		t.Fatalf("NewSigner: %v", err)
-	}
+	_, err := NewSigner(opts)
+	require.NoError(t, err)
 
 	opts.Enclave = nil
 	opts.Recreate = true
-	if _, err := NewSigner(opts); err == nil {
-		t.Fatal("NewSigner without a backend succeeded, want error")
-	}
-	if got := IdentityMethod(opts.StatePath); got != MethodEnclave {
-		t.Fatalf("state method = %q, want it left at %q", got, MethodEnclave)
-	}
+	_, err = NewSigner(opts)
+	require.Error(t, err, "NewSigner without a backend succeeded")
+	assert.Equal(t, MethodEnclave, IdentityMethod(opts.StatePath), "the state was replaced")
 }
 
 // TestEnclaveFallsBackToSoft verifies an enclave that cannot create a working
@@ -187,23 +147,15 @@ func TestEnclaveFallsBackToSoft(t *testing.T) {
 	}
 	for name, enclave := range broken {
 		t.Run(name, func(t *testing.T) {
-			opts := enclaveOpts(t, enclave)
-			s, err := NewSigner(opts)
-			if err != nil {
-				t.Fatalf("NewSigner: %v", err)
-			}
-			if s.Method() != MethodSoft {
-				t.Fatalf("Method() = %q, want %q", s.Method(), MethodSoft)
-			}
+			s, err := NewSigner(enclaveOpts(t, enclave))
+			require.NoError(t, err)
+			assert.Equal(t, MethodSoft, s.Method())
 
 			strict := enclaveOpts(t, enclave)
 			strict.RequireTPM = true
-			if _, err = NewSigner(strict); err == nil {
-				t.Fatal("NewSigner with RequireTPM succeeded, want error")
-			}
-			if got := IdentityMethod(strict.StatePath); got != "" {
-				t.Fatalf("a failed strict open persisted method %q", got)
-			}
+			_, err = NewSigner(strict)
+			require.Error(t, err, "NewSigner with RequireTPM succeeded")
+			assert.Empty(t, IdentityMethod(strict.StatePath), "a failed strict open persisted a method")
 		})
 	}
 }

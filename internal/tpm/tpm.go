@@ -28,20 +28,14 @@ func Available() error {
 	return dev.Close()
 }
 
-// eccSignTemplate returns the deterministic ECC P-256 signing template. The
-// key derives from the owner seed and this template, so the same public key
-// returns on every boot with nothing stored, and the private key only ever
-// exists inside the TPM. The salt sits in the unique field, the part of the
-// template the spec reserves for telling primaries apart.
-//
-// No auth value and no PCR policy, so any process that can open the TPM
-// device can use the identity. Control device access instead.
+// The key derives from the owner seed and this template, so it returns on every boot with nothing stored.
 func eccSignTemplate(salt []byte) tpm2.TPMTPublic {
-	// Hashed so a salt of any length fits a P-256 coordinate.
+	// The spec reserves the unique field for telling primaries apart. Hashed so any salt fits a P-256 coordinate.
 	unique := sha256.Sum256(salt)
 	return tpm2.TPMTPublic{
 		Type:    tpm2.TPMAlgECC,
 		NameAlg: tpm2.TPMAlgSHA256,
+		// No auth value and no PCR policy, whoever can open the TPM device can use the key.
 		ObjectAttributes: tpm2.TPMAObject{
 			FixedTPM:            true,
 			FixedParent:         true,
@@ -73,9 +67,7 @@ func eccSignTemplate(salt []byte) tpm2.TPMTPublic {
 	}
 }
 
-// createPrimary creates the deterministic ECC P-256 primary key for salt.
-// Nothing is persisted: the same salt on the same TPM reproduces the same
-// key pair until the TPM's owner seed changes (TPM clear or replacement).
+// The same salt on the same TPM gives the same key until the owner seed changes (TPM clear or replacement).
 func createPrimary(
 	r transport.TPM,
 	salt []byte,
@@ -96,8 +88,7 @@ func createPrimary(
 	return rsp.ObjectHandle, rsp.Name, pub, nil
 }
 
-// signECDSA signs a SHA-256 digest with the loaded key and returns the
-// DER-encoded signature.
+// signECDSA returns a DER-encoded signature over a SHA-256 digest.
 func signECDSA(r transport.TPM, hnd tpm2.TPMHandle, name tpm2.TPM2BName, digest []byte) ([]byte, error) {
 	rsp, err := tpm2.Sign{
 		KeyHandle: tpm2.AuthHandle{
@@ -106,9 +97,7 @@ func signECDSA(r transport.TPM, hnd tpm2.TPMHandle, name tpm2.TPM2BName, digest 
 			Auth:   tpm2.PasswordAuth(nil),
 		},
 		Digest: tpm2.TPM2BDigest{Buffer: digest},
-		// InScheme stays NULL, the key template pins the ECDSA scheme. The
-		// validation ticket must be explicit, a zero ticket has Tag=0, which
-		// the TPM rejects as an invalid structure tag.
+		// InScheme stays NULL, the template pins ECDSA. A zero ticket has Tag=0, which the TPM rejects.
 		Validation: tpm2.TPMTTKHashCheck{
 			Tag:       tpm2.TPMSTHashCheck,
 			Hierarchy: tpm2.TPMRHNull,
@@ -147,9 +136,7 @@ func publicToECDSA(pub tpm2.TPM2BPublic) (*ecdsa.PublicKey, error) {
 	curve := elliptic.P256()
 	size := (curve.Params().BitSize + 7) / 8
 
-	// TPM coordinates are big-endian with leading zero bytes stripped.
-	// SEC 1 uncompressed form is 0x04 || X || Y with each coordinate
-	// padded to the curve size.
+	// TPM coordinates come with leading zeros stripped, SEC 1 wants 0x04 || X || Y padded to the curve size.
 	pad := func(b []byte) ([]byte, error) {
 		if len(b) > size {
 			return nil, errors.New("coordinate longer than curve size")

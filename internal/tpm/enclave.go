@@ -1,7 +1,6 @@
 package tpm
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
@@ -26,19 +25,13 @@ type Enclave interface {
 // enclaveSigner is an enclave-resident ECDSA P-256 [Signer].
 type enclaveSigner struct {
 	crypto.Signer
-
-	pem []byte
 }
 
 func (s *enclaveSigner) Method() string { return MethodEnclave }
 
-func (s *enclaveSigner) PEM() []byte { return bytes.Clone(s.pem) }
-
 func (s *enclaveSigner) Close() error { return nil }
 
-// openEnclave loads the enclave key from st. A blob the enclave no longer
-// opens (another machine, a reset enclave) fails with ErrIdentityChanged, or
-// is replaced when SignerOptions.Recreate is set.
+// A blob the enclave no longer opens (another machine, a reset enclave) is a changed identity.
 func openEnclave(opts SignerOptions, st *state) (Signer, error) {
 	if opts.Enclave == nil {
 		return nil, errors.New("tpm: the identity lives in a hardware enclave this build cannot use")
@@ -54,18 +47,10 @@ func openEnclave(opts SignerOptions, st *state) (Signer, error) {
 		slog.Warn("tpm: enclave key cannot be opened, creating a new key", "error", err)
 		return createEnclave(opts)
 	}
-	// The PEM comes from the key itself, so an edited state file cannot
-	// make the signer report another identity.
-	pubPEM, err := pemEncodePublicKey(key.Public())
-	if err != nil {
-		return nil, err
-	}
-	return &enclaveSigner{Signer: key, pem: pubPEM}, nil
+	return &enclaveSigner{Signer: key}, nil
 }
 
-// createEnclave makes a new enclave key and persists its blob. The key must
-// sign a test digest first, so a half-working enclave falls back to another
-// method instead of becoming an identity that cannot log in.
+// The new key signs a test digest first, so a half-working enclave never becomes an identity that cannot log in.
 func createEnclave(opts SignerOptions) (Signer, error) {
 	blob, err := opts.Enclave.Create()
 	if err != nil {
@@ -97,5 +82,5 @@ func createEnclave(opts SignerOptions) (Signer, error) {
 	if err = saveState(opts.StatePath, st); err != nil {
 		return nil, err
 	}
-	return &enclaveSigner{Signer: key, pem: pubPEM}, nil
+	return &enclaveSigner{Signer: key}, nil
 }

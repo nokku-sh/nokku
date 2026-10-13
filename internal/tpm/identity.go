@@ -46,8 +46,6 @@ type Signer interface {
 	// Method reports the signing method, MethodTPM, MethodEnclave or
 	// MethodSoft.
 	Method() string
-	// PEM returns the PKIX PEM encoding of the public key.
-	PEM() []byte
 }
 
 // SignerOptions configures [NewSigner].
@@ -65,11 +63,13 @@ type SignerOptions struct {
 	// means the machine has none.
 	Enclave Enclave
 	// Recreate replaces the key and its state when the persisted identity no
-	// longer matches the machine, instead of failing with
-	// [ErrIdentityChanged]. Interactive callers set it so a re-image does not
-	// brick them, and must then invalidate anything derived from the old
-	// public key, such as certificates. Leave it unset where the identity is
-	// bound to a server-side registration.
+	// longer matches the machine or its state no longer parses, instead of
+	// failing with [ErrIdentityChanged]. Interactive callers set it so a
+	// re-image does not brick them, and must then invalidate anything derived
+	// from the old public key, such as certificates. Leave it unset where the
+	// identity is bound to a server-side registration. An identity in a TPM
+	// that does not open, or of a method this build does not know, is never
+	// replaced: the first is often transient and the second may be newer.
 	Recreate bool
 	// OpenTPM opens the TPM transport, defaulting to the platform device.
 	// Tests inject a simulator. The signer owns the returned closer.
@@ -80,6 +80,7 @@ type SignerOptions struct {
 // one is usable, then an enclave key, otherwise a machine-wrapped software
 // key (an error when RequireTPM is set). The method is persisted, so an
 // existing software identity is never silently upgraded to hardware later.
+// Concurrent calls for one state path, from any process, run one at a time.
 func NewSigner(opts SignerOptions) (Signer, error) {
 	if len(opts.Salt) == 0 {
 		return nil, errors.New("tpm: salt is required")
@@ -88,8 +89,20 @@ func NewSigner(opts SignerOptions) (Signer, error) {
 		return nil, errors.New("tpm: state path is required")
 	}
 
+	unlock, err := lockState(opts.StatePath)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+
 	st, err := loadState(opts.StatePath)
-	if err != nil && !errors.Is(err, errNoState) {
+	switch {
+	case errors.Is(err, errNoState):
+	case errors.Is(err, errBadState) && opts.Recreate:
+		slog.Warn("tpm: signer state is unreadable, creating a new identity", "error", err)
+	case errors.Is(err, errBadState):
+		return nil, fmt.Errorf("%w: %w, re-enroll to create a new key", ErrIdentityChanged, err)
+	case err != nil:
 		return nil, err
 	}
 
@@ -107,7 +120,10 @@ func NewSigner(opts SignerOptions) (Signer, error) {
 			}
 			return openSoft(opts, st)
 		default:
-			return nil, fmt.Errorf("tpm: unknown signer method %q", st.Method)
+			return nil, fmt.Errorf(
+				"tpm: unknown signer method %q, the identity may come from a newer build",
+				st.Method,
+			)
 		}
 	}
 
@@ -146,14 +162,15 @@ func IdentityMethod(statePath string) string {
 	return st.Method
 }
 
-// openTPMIdentity opens the TPM device and derives the signing key for
-// opts.Salt, verifying it against the persisted public half when st exists.
 func openTPMIdentity(opts SignerOptions, st *state) (Signer, error) {
 	open := opts.OpenTPM
 	if open == nil {
 		open = openTPMDevice
 	}
 	dev, err := open()
+	if err != nil && st != nil {
+		return nil, fmt.Errorf("tpm: the identity lives in a TPM that cannot be opened: %w", err)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -163,8 +180,7 @@ func openTPMIdentity(opts SignerOptions, st *state) (Signer, error) {
 		return nil, err
 	}
 
-	// The persisted public half detects a TPM clear or replacement: the
-	// derived key changes even though nothing was stored.
+	// The persisted public half detects a TPM clear or replacement, the derived key changes with nothing stored.
 	if st != nil && st.PubKey != "" && st.PubKey != string(s.pem) {
 		if !opts.Recreate {
 			_ = s.Close()

@@ -12,13 +12,10 @@ import (
 	"github.com/google/go-tpm/tpm2/transport"
 )
 
-// tpmSigner is a TPM-resident ECDSA P-256 [Signer].
-//
-// The key is a deterministic primary key. Reopening it with the same salt
-// yields the same key pair until the TPM's owner seed changes (TPM clear or
-// replacement). The private key never leaves the TPM.
+// tpmSigner signs with a deterministic primary key that never leaves the TPM.
 type tpmSigner struct {
 	dev  transport.TPMCloser
+	salt []byte
 	hnd  tpm2.TPMHandle
 	name tpm2.TPM2BName
 	pub  *ecdsa.PublicKey
@@ -26,8 +23,7 @@ type tpmSigner struct {
 	mu   sync.Mutex
 }
 
-// newTPMSigner creates the primary key for salt on dev. On success the signer
-// owns dev and Close releases it.
+// On success the signer owns dev and Close releases it.
 func newTPMSigner(dev transport.TPMCloser, salt []byte) (*tpmSigner, error) {
 	hnd, name, pub, err := createPrimary(dev, salt)
 	if err != nil {
@@ -38,7 +34,7 @@ func newTPMSigner(dev transport.TPMCloser, salt []byte) (*tpmSigner, error) {
 		_, _ = tpm2.FlushContext{FlushHandle: hnd}.Execute(dev)
 		return nil, err
 	}
-	return &tpmSigner{dev: dev, hnd: hnd, name: name, pub: pub, pem: pubPEM}, nil
+	return &tpmSigner{dev: dev, salt: salt, hnd: hnd, name: name, pub: pub, pem: pubPEM}, nil
 }
 
 func (s *tpmSigner) Public() crypto.PublicKey { return s.pub }
@@ -50,12 +46,33 @@ func (s *tpmSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	sig, err := signECDSA(s.dev, s.hnd, s.name, digest)
+	if err == nil {
+		return sig, nil
+	}
+	// A TPM reset, such as a resume from hibernate, drops the handle. The key is derived, so it comes back.
+	if rerr := s.reload(); rerr != nil {
+		return nil, errors.Join(err, rerr)
+	}
 	return signECDSA(s.dev, s.hnd, s.name, digest)
 }
 
-func (s *tpmSigner) Method() string { return MethodTPM }
+// reload derives the key again and refuses one that is not the key the signer started with.
+func (s *tpmSigner) reload() error {
+	_, _ = tpm2.FlushContext{FlushHandle: s.hnd}.Execute(s.dev)
+	hnd, name, pub, err := createPrimary(s.dev, s.salt)
+	if err != nil {
+		return err
+	}
+	if !pub.Equal(s.pub) {
+		_, _ = tpm2.FlushContext{FlushHandle: hnd}.Execute(s.dev)
+		return fmt.Errorf("%w: the TPM key changed while in use", ErrIdentityChanged)
+	}
+	s.hnd, s.name = hnd, name
+	return nil
+}
 
-func (s *tpmSigner) PEM() []byte { return append([]byte(nil), s.pem...) }
+func (s *tpmSigner) Method() string { return MethodTPM }
 
 // Close flushes the key handle and closes the TPM transport.
 func (s *tpmSigner) Close() error {

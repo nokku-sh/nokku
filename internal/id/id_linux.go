@@ -3,7 +3,6 @@
 package id
 
 import (
-	"errors"
 	"os"
 	"strings"
 )
@@ -18,13 +17,13 @@ func machineID() (string, error) {
 		if err != nil {
 			continue
 		}
-		// Blank placeholders are rejected by the shared caller.
+		// A placeholder in one source does not rule out a real ID in the next.
 		id := strings.ToLower(strings.TrimSpace(string(data)))
-		if id == "" {
+		if isBlankMachineID(id) {
 			continue
 		}
 		return id, nil
 	}
 
-	return "", errors.New("machine-id not found")
+	return "", nil
 }

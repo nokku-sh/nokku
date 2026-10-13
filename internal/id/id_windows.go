@@ -3,8 +3,6 @@
 package id
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 
 	"golang.org/x/sys/windows/registry"
@@ -17,16 +15,13 @@ func machineID() (string, error) {
 		registry.QUERY_VALUE|registry.WOW64_64KEY,
 	)
 	if err != nil {
-		return "", err
+		return "", nil
 	}
 	defer k.Close()
 
 	guid, _, err := k.GetStringValue("MachineGuid")
-	if err != nil {
-		return "", fmt.Errorf("MachineGuid not found: %w", err)
-	}
-	if guid == "" {
-		return "", errors.New("machine guid empty")
+	if err != nil || guid == "" {
+		return "", nil
 	}
 
 	return strings.ToLower(guid), nil

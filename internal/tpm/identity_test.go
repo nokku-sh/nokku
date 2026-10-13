@@ -5,11 +5,24 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
-	"errors"
+	"os"
+	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/google/go-tpm/tpm2/transport"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func testOpts(t *testing.T, open func() (transport.TPMCloser, error)) SignerOptions {
+	t.Helper()
+	return SignerOptions{
+		Salt:      []byte("test-signer"),
+		StatePath: filepath.Join(t.TempDir(), "signer.json"),
+		OpenTPM:   open,
+	}
+}
 
 func newTestSigner(
 	t *testing.T,
@@ -17,51 +30,47 @@ func newTestSigner(
 	mutate func(*SignerOptions),
 ) Signer {
 	t.Helper()
-	opts := SignerOptions{
-		Salt:      []byte("test-signer"),
-		StatePath: t.TempDir() + "/signer.json",
-		OpenTPM:   open,
-	}
+	opts := testOpts(t, open)
 	if mutate != nil {
 		mutate(&opts)
 	}
 	s, err := NewSigner(opts)
-	if err != nil {
-		t.Fatalf("NewSigner: %v", err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = s.Close() })
 	return s
+}
+
+func pemOf(t *testing.T, s Signer) string {
+	t.Helper()
+	pubPEM, err := pemEncodePublicKey(s.Public())
+	require.NoError(t, err)
+	return string(pubPEM)
+}
+
+func ecdsaPub(t *testing.T, s Signer) *ecdsa.PublicKey {
+	t.Helper()
+	pub, ok := s.Public().(*ecdsa.PublicKey)
+	require.True(t, ok, "Public() is %T, want *ecdsa.PublicKey", s.Public())
+	return pub
 }
 
 func TestSignerTPM(t *testing.T) {
 	open := simOpen(t)
 
 	s1 := newTestSigner(t, open, nil)
-	pub1 := s1.Public()
-	if s1.Method() != MethodTPM {
-		t.Fatalf("Method() = %q, want %q", s1.Method(), MethodTPM)
-	}
-	if pem := s1.PEM(); len(pem) == 0 {
-		t.Fatal("PEM() is empty")
-	}
+	pub1 := ecdsaPub(t, s1)
+	assert.Equal(t, MethodTPM, s1.Method())
 
 	// The primary key is derived deterministically from the TPM seed, so a
 	// fresh signer must produce the same public key (nothing persisted but
 	// the public half).
 	s2 := newTestSigner(t, open, nil)
-	if !pub1.(*ecdsa.PublicKey).Equal(s2.Public().(*ecdsa.PublicKey)) {
-		t.Fatal("TPM public key is not deterministic across restarts")
-	}
+	assert.True(t, pub1.Equal(s2.Public()), "TPM public key is not deterministic across restarts")
 
-	data := []byte("hello nokku")
-	digest := sha256.Sum256(data)
+	digest := sha256.Sum256([]byte("hello nokku"))
 	sig, err := s1.Sign(rand.Reader, digest[:], crypto.SHA256)
-	if err != nil {
-		t.Fatalf("Sign: %v", err)
-	}
-	if !ecdsa.VerifyASN1(pub1.(*ecdsa.PublicKey), digest[:], sig) {
-		t.Fatal("signature verification failed")
-	}
+	require.NoError(t, err)
+	assert.True(t, ecdsa.VerifyASN1(pub1, digest[:], sig), "signature verification failed")
 }
 
 // TestSignerSaltIsolation verifies distinct salts yield distinct identities
@@ -71,160 +80,200 @@ func TestSignerSaltIsolation(t *testing.T) {
 
 	a := newTestSigner(t, open, func(o *SignerOptions) { o.Salt = []byte("nokku-daemon") })
 	b := newTestSigner(t, open, func(o *SignerOptions) { o.Salt = []byte("nokku-cli") })
-	if a.Public().(*ecdsa.PublicKey).Equal(b.Public().(*ecdsa.PublicKey)) {
-		t.Fatal("distinct salts must derive distinct identities")
-	}
+	assert.False(t, ecdsaPub(t, a).Equal(b.Public()), "distinct salts must derive distinct identities")
 }
 
 // TestSignerIdentityChanged verifies a persisted public key that no longer
 // matches the machine fails with ErrIdentityChanged, unless Recreate is set.
 func TestSignerIdentityChanged(t *testing.T) {
-	open := simOpen(t)
-	dir := t.TempDir() + "/signer.json"
+	opts := testOpts(t, simOpen(t))
 
-	newOpts := func(recreate bool) SignerOptions {
-		return SignerOptions{
-			Salt:      []byte("test-signer"),
-			StatePath: dir,
-			Recreate:  recreate,
-			OpenTPM:   open,
-		}
-	}
-
-	s, err := NewSigner(newOpts(false))
-	if err != nil {
-		t.Fatalf("NewSigner: %v", err)
-	}
-	if err = s.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
-	}
+	s, err := NewSigner(opts)
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
 
 	// Simulate a machine identity change: the persisted public half no
 	// longer matches the derived key.
-	st, err := loadState(dir)
-	if err != nil {
-		t.Fatalf("loadState: %v", err)
-	}
+	st, err := loadState(opts.StatePath)
+	require.NoError(t, err)
 	st.PubKey = "-----BEGIN PUBLIC KEY-----\nCHANGED\n-----END PUBLIC KEY-----\n"
-	if err = saveState(dir, st); err != nil {
-		t.Fatalf("saveState: %v", err)
-	}
+	require.NoError(t, saveState(opts.StatePath, st))
 
-	if _, err = NewSigner(newOpts(false)); !errors.Is(err, ErrIdentityChanged) {
-		t.Fatalf("NewSigner strict = %v, want ErrIdentityChanged", err)
-	}
+	_, err = NewSigner(opts)
+	require.ErrorIs(t, err, ErrIdentityChanged)
 
 	// With Recreate the signer replaces the key and persists it.
-	s2, err := NewSigner(newOpts(true))
-	if err != nil {
-		t.Fatalf("NewSigner recover: %v", err)
-	}
-	defer func() { _ = s2.Close() }()
+	opts.Recreate = true
+	s2, err := NewSigner(opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s2.Close() })
 
-	st2, err := loadState(dir)
-	if err != nil {
-		t.Fatalf("reload state: %v", err)
-	}
-	if st2.PubKey != string(s2.PEM()) {
-		t.Fatal("recovered identity was not persisted")
-	}
+	st2, err := loadState(opts.StatePath)
+	require.NoError(t, err)
+	assert.Equal(t, pemOf(t, s2), st2.PubKey, "recovered identity was not persisted")
 }
 
 func TestSignerRequiresSaltAndPath(t *testing.T) {
-	if _, err := NewSigner(SignerOptions{StatePath: t.TempDir() + "/signer.json"}); err == nil {
-		t.Fatal("NewSigner without salt succeeded, want error")
-	}
-	if _, err := NewSigner(SignerOptions{Salt: []byte("s")}); err == nil {
-		t.Fatal("NewSigner without state path succeeded, want error")
-	}
+	_, err := NewSigner(SignerOptions{StatePath: filepath.Join(t.TempDir(), "signer.json")})
+	require.Error(t, err, "NewSigner without salt succeeded")
+	_, err = NewSigner(SignerOptions{Salt: []byte("s")})
+	require.Error(t, err, "NewSigner without state path succeeded")
 }
 
 func TestSoftSignerRoundTrip(t *testing.T) {
-	dir := t.TempDir() + "/signer.json"
+	opts := SignerOptions{StatePath: filepath.Join(t.TempDir(), "signer.json")}
 
-	s1, err := openSoft(SignerOptions{
-		StatePath: dir,
-	}, nil)
-	if err != nil {
-		t.Fatalf("create signer: %v", err)
-	}
-	pub1 := s1.Public()
+	s1, err := openSoft(opts, nil)
+	require.NoError(t, err)
+	pub1 := ecdsaPub(t, s1)
 
-	data := []byte("hello nokku")
-	digest := sha256.Sum256(data)
+	digest := sha256.Sum256([]byte("hello nokku"))
 	sig, err := s1.Sign(rand.Reader, digest[:], crypto.SHA256)
-	if err != nil {
-		t.Fatalf("sign: %v", err)
-	}
-	if !ecdsa.VerifyASN1(pub1.(*ecdsa.PublicKey), digest[:], sig) {
-		t.Fatal("signature verification failed")
-	}
-	if s1.Method() != MethodSoft {
-		t.Fatalf("Method() = %q, want %q", s1.Method(), MethodSoft)
-	}
-	if err = s1.Close(); err != nil {
-		t.Fatalf("close: %v", err)
-	}
+	require.NoError(t, err)
+	assert.True(t, ecdsa.VerifyASN1(pub1, digest[:], sig), "signature verification failed")
+	assert.Equal(t, MethodSoft, s1.Method())
+	require.NoError(t, s1.Close())
 
 	// Reloading from disk must yield the same key.
-	st, err := loadState(dir)
-	if err != nil {
-		t.Fatalf("load state: %v", err)
-	}
-	if st == nil {
-		t.Fatal("no state written")
-	}
-	s2, err := openSoft(SignerOptions{
-		StatePath: dir,
-	}, st)
-	if err != nil {
-		t.Fatalf("reload signer: %v", err)
-	}
-	defer func() { _ = s2.Close() }()
-	if !pub1.(*ecdsa.PublicKey).Equal(s2.Public().(*ecdsa.PublicKey)) {
-		t.Fatal("public key changed after reload")
-	}
+	st, err := loadState(opts.StatePath)
+	require.NoError(t, err)
+	s2, err := openSoft(opts, st)
+	require.NoError(t, err)
+	assert.True(t, pub1.Equal(s2.Public()), "public key changed after reload")
 }
 
 // TestSoftSignerWrongMachine verifies a changed machine identity fails
 // strictly, or is replaced when Recreate is set.
 func TestSoftSignerWrongMachine(t *testing.T) {
-	dir := t.TempDir() + "/signer.json"
-	opts := SignerOptions{
-		StatePath: dir,
-	}
+	opts := SignerOptions{StatePath: filepath.Join(t.TempDir(), "signer.json")}
 
 	s, err := openSoft(opts, nil)
-	if err != nil {
-		t.Fatalf("create signer: %v", err)
-	}
-	_ = s.Close()
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
 
-	st, err := loadState(dir)
-	if err != nil {
-		t.Fatalf("load state: %v", err)
-	}
-	if _, err = rand.Read(st.Salt); err != nil {
-		t.Fatalf("corrupt salt: %v", err)
-	}
+	st, err := loadState(opts.StatePath)
+	require.NoError(t, err)
+	_, err = rand.Read(st.Salt)
+	require.NoError(t, err)
 
-	if _, err = openSoft(opts, st); !errors.Is(err, ErrIdentityChanged) {
-		t.Fatalf("openSoft strict = %v, want ErrIdentityChanged", err)
-	}
+	_, err = openSoft(opts, st)
+	require.ErrorIs(t, err, ErrIdentityChanged)
 
 	opts.Recreate = true
 	s2, err := openSoft(opts, st)
-	if err != nil {
-		t.Fatalf("openSoft recover: %v", err)
-	}
-	defer func() { _ = s2.Close() }()
+	require.NoError(t, err)
 
 	// The replacement key must be persisted.
-	st2, err := loadState(dir)
-	if err != nil {
-		t.Fatalf("reload state: %v", err)
+	st2, err := loadState(opts.StatePath)
+	require.NoError(t, err)
+	assert.Equal(t, pemOf(t, s2), st2.PubKey, "recovered key was not persisted")
+}
+
+// A state that lost part of its key is a changed identity. Where the key is registered, a silent new one
+// would only be rejected later.
+func TestSoftSignerIncompleteState(t *testing.T) {
+	for name, damage := range map[string]func(*state){
+		"no salt":     func(st *state) { st.Salt = nil },
+		"no nonce":    func(st *state) { st.Nonce = nil },
+		"no data":     func(st *state) { st.Data = nil },
+		"short nonce": func(st *state) { st.Nonce = st.Nonce[:5] },
+	} {
+		t.Run(name, func(t *testing.T) {
+			opts := testOpts(t, noTPM)
+			s, err := NewSigner(opts)
+			require.NoError(t, err)
+			require.Equal(t, MethodSoft, s.Method())
+
+			st, err := loadState(opts.StatePath)
+			require.NoError(t, err)
+			damage(st)
+			require.NoError(t, saveState(opts.StatePath, st))
+
+			_, err = NewSigner(opts)
+			require.ErrorIs(t, err, ErrIdentityChanged)
+			kept, err := loadState(opts.StatePath)
+			require.NoError(t, err)
+			assert.Equal(t, st, kept, "a strict open replaced the state")
+
+			opts.Recreate = true
+			s2, err := NewSigner(opts)
+			require.NoError(t, err)
+			assert.NotEqual(t, pemOf(t, s), pemOf(t, s2))
+		})
 	}
-	if st2.PubKey != string(s2.PEM()) {
-		t.Fatal("recovered key was not persisted")
+}
+
+func TestSignerUnreadableState(t *testing.T) {
+	for name, content := range map[string]string{
+		"empty":     "",
+		"truncated": `{"method":"so`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			opts := testOpts(t, noTPM)
+			require.NoError(t, os.WriteFile(opts.StatePath, []byte(content), 0o600))
+
+			_, err := NewSigner(opts)
+			require.ErrorIs(t, err, ErrIdentityChanged, "the caller cannot tell it has to re-enroll")
+			kept, err := os.ReadFile(opts.StatePath)
+			require.NoError(t, err)
+			assert.Equal(t, content, string(kept), "a strict open replaced the state")
+
+			opts.Recreate = true
+			s, err := NewSigner(opts)
+			require.NoError(t, err)
+			assert.Equal(t, MethodSoft, s.Method())
+			assert.Equal(t, MethodSoft, IdentityMethod(opts.StatePath))
+		})
 	}
+}
+
+// Recreate is for an identity that is gone. These two may still be there.
+func TestSignerKeepsAnIdentityItCannotOpen(t *testing.T) {
+	for name, st := range map[string]*state{
+		"a TPM that does not open":  {Method: MethodTPM, PubKey: "pem"},
+		"a method of a newer build": {Method: "quantum", PubKey: "pem"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			opts := testOpts(t, noTPM)
+			opts.Recreate = true
+			require.NoError(t, saveState(opts.StatePath, st))
+
+			_, err := NewSigner(opts)
+			require.Error(t, err)
+			require.NotErrorIs(t, err, ErrIdentityChanged)
+			kept, err := loadState(opts.StatePath)
+			require.NoError(t, err)
+			assert.Equal(t, st, kept)
+		})
+	}
+}
+
+// Software keys are random, so two callers that both find no state must not each make their own.
+func TestSignerConcurrentCreation(t *testing.T) {
+	opts := testOpts(t, noTPM)
+	pems := make([]string, 8)
+	var wg sync.WaitGroup
+	for i := range pems {
+		wg.Go(func() {
+			s, err := NewSigner(opts)
+			if assert.NoError(t, err) {
+				pems[i] = pemOf(t, s)
+			}
+		})
+	}
+	wg.Wait()
+
+	st, err := loadState(opts.StatePath)
+	require.NoError(t, err)
+	for _, got := range pems {
+		assert.Equal(t, st.PubKey, got, "a caller holds a key that is not the one on disk")
+	}
+}
+
+func TestSaveStateIsPrivate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "signer.json")
+	require.NoError(t, saveState(path, &state{Method: MethodSoft}))
+	fi, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm())
 }

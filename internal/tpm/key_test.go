@@ -1,15 +1,18 @@
 package tpm
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
+	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 )
@@ -37,34 +40,26 @@ func simOpen(t *testing.T) func() (transport.TPMCloser, error) {
 	return func() (transport.TPMCloser, error) { return sharedTPM{sim}, nil }
 }
 
+func testKey(t *testing.T, sim transport.TPM, salt string) *tpmSigner {
+	t.Helper()
+	k, err := newTPMSigner(sharedTPM{sim}, []byte(salt))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = k.Close() })
+	return k
+}
+
 func TestKeySign(t *testing.T) {
-	sim := openSimulator(t)
-
-	k, err := newTPMSigner(sharedTPM{sim}, []byte("test-key"))
-	if err != nil {
-		t.Fatalf("newTPMSigner: %v", err)
-	}
-	defer func() { _ = k.Close() }()
-
-	pub, ok := k.Public().(*ecdsa.PublicKey)
-	if !ok {
-		t.Fatalf("Public() is %T, want *ecdsa.PublicKey", k.Public())
-	}
+	k := testKey(t, openSimulator(t), "test-key")
 
 	digest := sha256.Sum256([]byte("hello nokku"))
 	sig, err := k.Sign(rand.Reader, digest[:], crypto.SHA256)
-	if err != nil {
-		t.Fatalf("Sign: %v", err)
-	}
-	if !ecdsa.VerifyASN1(pub, digest[:], sig) {
-		t.Fatal("signature verification failed")
-	}
+	require.NoError(t, err)
+	assert.True(t, ecdsa.VerifyASN1(k.pub, digest[:], sig), "signature verification failed")
 
 	// The key template pins SHA-256: other hashes must be rejected rather
 	// than producing a signature under the wrong scheme.
-	if _, err = k.Sign(rand.Reader, digest[:], crypto.SHA384); err == nil {
-		t.Fatal("Sign with SHA-384 succeeded, want rejection")
-	}
+	_, err = k.Sign(rand.Reader, digest[:], crypto.SHA384)
+	require.Error(t, err, "Sign with SHA-384 succeeded")
 }
 
 // TestKeyDeterministic verifies the same salt on the same TPM reproduces the
@@ -72,24 +67,9 @@ func TestKeySign(t *testing.T) {
 func TestKeyDeterministic(t *testing.T) {
 	sim := openSimulator(t)
 
-	salt := []byte("test-key")
-	k1, err := newTPMSigner(sharedTPM{sim}, salt)
-	if err != nil {
-		t.Fatalf("newTPMSigner: %v", err)
-	}
-	defer func() { _ = k1.Close() }()
-
-	k2, err := newTPMSigner(sharedTPM{sim}, salt)
-	if err != nil {
-		t.Fatalf("recreate key: %v", err)
-	}
-	defer func() { _ = k2.Close() }()
-
-	ec1 := k1.Public().(*ecdsa.PublicKey)
-	ec2 := k2.Public().(*ecdsa.PublicKey)
-	if !ec1.Equal(ec2) {
-		t.Fatal("public key is not deterministic across reopenings")
-	}
+	k1 := testKey(t, sim, "test-key")
+	k2 := testKey(t, sim, "test-key")
+	assert.True(t, k1.pub.Equal(k2.pub), "public key is not deterministic across reopenings")
 }
 
 // TestKeySaltIsolation verifies distinct salts derive distinct key pairs, so
@@ -97,54 +77,54 @@ func TestKeyDeterministic(t *testing.T) {
 func TestKeySaltIsolation(t *testing.T) {
 	sim := openSimulator(t)
 
-	k1, err := newTPMSigner(sharedTPM{sim}, []byte("nokku-daemon"))
-	if err != nil {
-		t.Fatalf("newTPMSigner(daemon): %v", err)
-	}
-	defer func() { _ = k1.Close() }()
-
-	k2, err := newTPMSigner(sharedTPM{sim}, []byte("nokku-cli"))
-	if err != nil {
-		t.Fatalf("newTPMSigner(cli): %v", err)
-	}
-	defer func() { _ = k2.Close() }()
-
-	p1 := k1.Public().(*ecdsa.PublicKey)
-	p2 := k2.Public().(*ecdsa.PublicKey)
-	if p1.Equal(p2) {
-		t.Fatal("distinct salts must derive distinct key pairs")
-	}
+	k1 := testKey(t, sim, "nokku-daemon")
+	k2 := testKey(t, sim, "nokku-cli")
+	assert.False(t, k1.pub.Equal(k2.pub), "distinct salts must derive distinct key pairs")
 }
 
 // TestKeySSHSigner verifies the TPM key works as an SSH host key signer via
 // x/crypto/ssh's [crypto.Signer] support.
 func TestKeySSHSigner(t *testing.T) {
-	sim := openSimulator(t)
-
-	k, err := newTPMSigner(sharedTPM{sim}, []byte("nokku-host"))
-	if err != nil {
-		t.Fatalf("newTPMSigner: %v", err)
-	}
-	defer func() { _ = k.Close() }()
+	k := testKey(t, openSimulator(t), "nokku-host")
 
 	sshSigner, err := ssh.NewSignerFromSigner(k)
-	if err != nil {
-		t.Fatalf("ssh signer: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Sign a handshake blob. The signature must verify against the key.
 	blob := []byte("SSH handshake transcript")
 	sig, err := sshSigner.Sign(rand.Reader, blob)
-	if err != nil {
-		t.Fatalf("ssh sign: %v", err)
-	}
-	if err = sshSigner.PublicKey().Verify(blob, sig); err != nil {
-		t.Fatalf("ssh verify: %v", err)
-	}
+	require.NoError(t, err)
+	require.NoError(t, sshSigner.PublicKey().Verify(blob, sig))
 
 	// The public key must marshal into authorized_keys format.
-	text := bytes.TrimSpace(ssh.MarshalAuthorizedKey(sshSigner.PublicKey()))
-	if !bytes.HasPrefix(text, []byte("ecdsa-sha2-nistp256 ")) {
-		t.Fatalf("authorized key is %q, want ecdsa-sha2-nistp256", text)
-	}
+	text := string(ssh.MarshalAuthorizedKey(sshSigner.PublicKey()))
+	assert.True(t, strings.HasPrefix(text, "ecdsa-sha2-nistp256 "), "authorized key is %q", text)
+}
+
+// A TPM reset drops the handle of a long-lived signer. The key is derived, so the signer gets it back.
+func TestKeySignRecoversALostHandle(t *testing.T) {
+	sim := openSimulator(t)
+	k := testKey(t, sim, "test-key")
+
+	_, err := tpm2.FlushContext{FlushHandle: k.hnd}.Execute(sim)
+	require.NoError(t, err)
+
+	digest := sha256.Sum256([]byte("hello nokku"))
+	sig, err := k.Sign(rand.Reader, digest[:], crypto.SHA256)
+	require.NoError(t, err)
+	assert.True(t, ecdsa.VerifyASN1(k.pub, digest[:], sig))
+}
+
+// After a TPM clear the same salt derives another key. Signing with it would present an unregistered identity.
+func TestKeySignRefusesAnotherKeyAfterReload(t *testing.T) {
+	sim := openSimulator(t)
+	k := testKey(t, sim, "test-key")
+
+	_, err := tpm2.FlushContext{FlushHandle: k.hnd}.Execute(sim)
+	require.NoError(t, err)
+	k.salt = []byte("the seed changed")
+
+	digest := sha256.Sum256([]byte("hello nokku"))
+	_, err = k.Sign(rand.Reader, digest[:], crypto.SHA256)
+	require.ErrorIs(t, err, ErrIdentityChanged)
 }
