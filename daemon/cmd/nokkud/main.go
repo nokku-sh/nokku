@@ -48,12 +48,19 @@ SSH certificates. The host sshd on port 22 is never touched.`,
 				Name:   "sftp-server",
 				Usage:  "Serve the SFTP protocol over stdin/stdout (spawned by the embedded SSH server)",
 				Hidden: true,
-				Action: func(_ context.Context, cmd *cli.Command) error {
-					if cmd.Args().Len() != 0 {
-						return errors.New("usage: nokkud sftp-server")
-					}
-					return sshd.ServeSFTP()
-				},
+				Action: helper,
+			},
+			{
+				Name:   "forward",
+				Usage:  "Open the socket of a port forward as the session user (spawned by the embedded SSH server)",
+				Hidden: true,
+				Action: helper,
+			},
+			{
+				Name:   "signal",
+				Usage:  "Signal a session's process as the session user (spawned by the embedded SSH server)",
+				Hidden: true,
+				Action: helper,
 			},
 			{
 				Name:  "enroll",
@@ -114,6 +121,10 @@ enrolled yet, which is how a container joins. Once enrolled, the variable is ign
 		fmt.Fprintf(os.Stderr, "%s: %v\n", cmd.Name, err)
 		os.Exit(1)
 	}
+}
+
+func helper(ctx context.Context, cmd *cli.Command) error {
+	return sshd.RunHelper(ctx, cmd.Name, cmd.Args().Slice())
 }
 
 // errNotEnrolled exits with EX_CONFIG, which the unit file does not restart.

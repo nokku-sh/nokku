@@ -86,3 +86,27 @@ func TestServerForceCommandSubsystem(t *testing.T) {
 	must.Error(err, "subsystem unexpectedly allowed with force-command")
 	must.ErrorContains(err, "failed")
 }
+
+// Like sshd, the client cannot signal a forced command.
+func TestServerForceCommandRefusesSignal(t *testing.T) {
+	must := require.New(t)
+	ca := newTestCA(t)
+	addr, closeFn := startTestServer(t, ca)
+	defer closeFn()
+
+	auth := userCertOpts(t, ca, func(c *ssh.Certificate) {
+		c.CriticalOptions = map[string]string{"force-command": "sleep 30"}
+	}, testPrincipal)
+	client, err := dial(t, addr, currentUser(t), auth)
+	must.NoError(err)
+	defer client.Close()
+
+	sess, err := client.NewSession()
+	must.NoError(err)
+	defer sess.Close()
+	must.NoError(sess.Start(""))
+
+	ok, err := sess.SendRequest("signal", true, ssh.Marshal(struct{ Signal string }{"TERM"}))
+	must.NoError(err)
+	must.False(ok, "a forced command took a signal from the client")
+}

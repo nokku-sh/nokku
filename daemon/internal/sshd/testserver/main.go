@@ -26,12 +26,9 @@ func main() {
 	allowNonRoot := flag.Bool("allow-nonroot", false, "run as non-root, sessions restricted to this account")
 	flag.Parse()
 
-	// The embedded server re-execs this entrypoint as the target user for SFTP sessions.
-	if flag.Arg(0) == "sftp-server" {
-		if flag.NArg() != 1 {
-			fail("usage: testserver sftp-server")
-		}
-		if err := sshd.ServeSFTP(); err != nil {
+	// The embedded server re-execs this entrypoint as the target user for its helpers.
+	if flag.NArg() > 0 {
+		if err := sshd.RunHelper(context.Background(), flag.Arg(0), flag.Args()[1:]); err != nil {
 			fail(err.Error())
 		}
 		return

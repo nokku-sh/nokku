@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/pkg/sftp"
@@ -22,33 +23,19 @@ import (
 )
 
 func init() {
-	sftpServerCmd = func(home string) (*exec.Cmd, error) {
-		cmd := exec.Command(os.Args[0], "-test.run=TestSFTPHelperProcess", "--", "sftp-server")
-		cmd.Env = append(os.Environ(), "GO_WANT_SFTP_HELPER_PROCESS=1", "HOME="+home)
-		return cmd, nil
+	helperArgv = func(name string, args ...string) ([]string, error) {
+		return append([]string{os.Args[0], "-test.run=^TestHelperProcess$", "--", name}, args...), nil
 	}
 }
 
-// Not a test: the binary re-entered as the sftp-server, see the sftpServerCmd override in init.
-func TestSFTPHelperProcess(t *testing.T) {
-	if os.Getenv("GO_WANT_SFTP_HELPER_PROCESS") != "1" {
+// Not a test: the binary re-entered as a helper, see the helperArgv override in init.
+func TestHelperProcess(t *testing.T) {
+	i := slices.Index(os.Args, "--")
+	if i < 0 || i+1 >= len(os.Args) {
 		return
 	}
-	t.Log("sftp-server helper")
-	args := os.Args
-	for len(args) > 0 {
-		if args[0] == "--" {
-			args = args[1:]
-			break
-		}
-		args = args[1:]
-	}
-	if len(args) != 1 || args[0] != "sftp-server" {
-		fmt.Fprintln(os.Stderr, "bad helper args:", args)
-		os.Exit(2)
-	}
-	if err := ServeSFTP(); err != nil {
-		fmt.Fprintln(os.Stderr, "sftp-server:", err)
+	if err := RunHelper(t.Context(), os.Args[i+1], os.Args[i+2:]); err != nil {
+		fmt.Fprintln(os.Stderr, "helper:", err)
 		os.Exit(1)
 	}
 	os.Exit(0)
@@ -373,4 +360,26 @@ func userCertFile(t *testing.T, ca testCA) string {
 
 func isTestBinary() bool {
 	return filepath.Base(os.Args[0]) == "sshd.test"
+}
+
+// Like under sshd, a lock shell stops SFTP too. The subsystem must not start beside the shell.
+func TestServerSFTPRefusedByLockShell(t *testing.T) {
+	ca := newTestCA(t)
+	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) {
+		lookup := s.lookupAccount
+		s.lookupAccount = func(name string) (*account, error) {
+			account, err := lookup(name)
+			if err == nil {
+				account.Shell = "/bin/false"
+			}
+			return account, err
+		}
+	})
+	defer closeFn()
+	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
+	require.NoError(t, err, "dial")
+	defer client.Close()
+
+	_, err = sftp.NewClient(client)
+	require.Error(t, err, "sftp got past a lock shell")
 }

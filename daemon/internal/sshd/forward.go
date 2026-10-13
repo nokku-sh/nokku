@@ -1,14 +1,12 @@
 package sshd
 
 import (
-	"context"
 	"io"
 	"log/slog"
 	"net"
 	"net/netip"
 	"strconv"
 	"sync"
-	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -85,8 +83,7 @@ func (s *Server) serveDirectTCPIP(st *connState, newCh ssh.NewChannel) {
 	}
 
 	dest := net.JoinHostPort(d.DestAddr, strconv.FormatUint(uint64(d.DestPort), 10))
-	dialer := net.Dialer{Timeout: 5 * time.Second}
-	dconn, err := dialer.DialContext(context.Background(), "tcp", dest)
+	dconn, err := dialAs(st.user, dest)
 	if err != nil {
 		slog.Debug("direct-tcpip dial failed", "addr", dest, "error", err)
 		_ = newCh.Reject(ssh.ConnectionFailed, err.Error())
@@ -126,7 +123,7 @@ func (s *Server) tcpipForward(st *connState, payload []byte) (bool, []byte) {
 	if !s.forwardingAllowed(st.conn) || ssh.Unmarshal(payload, &f) != nil || f.BindPort > 65535 {
 		return false, nil
 	}
-	// Like OpenSSH, only root may bind a privileged port. The daemon runs as root, so it checks by hand.
+	// Like OpenSSH, only root may bind a privileged port, whatever the kernel would let the user do.
 	if f.BindPort != 0 && f.BindPort < 1024 && st.user.UID != 0 {
 		return false, nil
 	}
@@ -136,8 +133,7 @@ func (s *Server) tcpipForward(st *connState, payload []byte) (bool, []byte) {
 	if st.forwards == nil || st.forwards[forwardKey(f)] != nil || !st.acquireChannel() {
 		return false, nil
 	}
-	var lc net.ListenConfig
-	ln, err := lc.Listen(context.Background(), "tcp", forwardAddr(f, s.policy.Load().GatewayPorts))
+	ln, err := listenAs(st.user, forwardAddr(f, s.policy.Load().GatewayPorts))
 	if err != nil {
 		st.releaseChannel()
 		return false, nil

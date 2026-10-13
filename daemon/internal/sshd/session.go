@@ -21,10 +21,13 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/recording"
 )
 
-// Marks control-plane certificates for a web terminal. Keep in sync with the core's mintSessionCert.
-const webSessionKeyIDPrefix = "nokku:web:session:"
-
-const maxClientEnv = 64
+const (
+	// Marks control-plane certificates for a web terminal. Keep in sync with the core's mintSessionCert.
+	webSessionKeyIDPrefix = "nokku:web:session:"
+	maxClientEnv          = 64
+	// Each queued signal costs a helper process once the command starts.
+	maxPendingSignals = 8
+)
 
 type session struct {
 	ssh.Channel
@@ -46,6 +49,7 @@ type session struct {
 	// What the client asked for when a force-command replaced it.
 	originalCmd string
 	handled     bool
+	subsystem   bool
 
 	sessionID string
 
@@ -65,8 +69,8 @@ type session struct {
 	proc     *os.Process
 	wantKill bool
 
-	// Signals that arrived before the command started, flushed by setProc. Guarded by procMu.
-	pendingSignals []os.Signal
+	// Names of the signals that arrived before the command started, flushed by setProc. Guarded by procMu.
+	pendingSignals []string
 }
 
 // Recorder methods swallow their errors, so a failing recording never disturbs the stream.
@@ -240,6 +244,7 @@ func (sess *session) acceptSubsystem(req *ssh.Request) bool {
 	ok := !sess.handled && sess.forceCommand() == "" &&
 		ssh.Unmarshal(req.Payload, &r) == nil && r.Name == "sftp"
 	sess.handled = sess.handled || ok
+	sess.subsystem = ok
 	_ = req.Reply(ok, nil)
 	if ok {
 		ev := sess.event(eventSubsystem)
@@ -308,37 +313,41 @@ func (sess *session) windowChange(req *ssh.Request) {
 
 func (sess *session) signal(req *ssh.Request) {
 	var sg struct{ Signal string }
-	if ssh.Unmarshal(req.Payload, &sg) != nil {
+	// Like sshd, a forced command or a subsystem takes no signals from the client.
+	if sess.forceCommand() != "" || sess.subsystem || ssh.Unmarshal(req.Payload, &sg) != nil {
 		_ = req.Reply(false, nil)
 		return
 	}
-	sig, ok := signalByName(sg.Signal)
-	if !ok {
+	if _, ok := signalByName(sg.Signal); !ok {
 		_ = req.Reply(false, nil)
 		return
 	}
 	sess.procMu.Lock()
-	defer sess.procMu.Unlock()
-	if p := sess.proc; p != nil {
-		_ = p.Signal(sig)
-	} else {
-		sess.pendingSignals = append(sess.pendingSignals, sig)
+	p := sess.proc
+	if p == nil && len(sess.pendingSignals) < maxPendingSignals {
+		sess.pendingSignals = append(sess.pendingSignals, sg.Signal)
+	}
+	sess.procMu.Unlock()
+	if p != nil {
+		sess.signalProc(p.Pid, sg.Signal)
 	}
 	_ = req.Reply(true, nil)
 }
 
 func (sess *session) setProc(p *os.Process) {
 	sess.procMu.Lock()
-	defer sess.procMu.Unlock()
 	if sess.wantKill {
+		sess.procMu.Unlock()
 		_ = p.Kill()
 		return
 	}
 	sess.proc = p
-	for _, sig := range sess.pendingSignals {
-		_ = p.Signal(sig)
-	}
+	pending := sess.pendingSignals
 	sess.pendingSignals = nil
+	sess.procMu.Unlock()
+	for _, name := range pending {
+		sess.signalProc(p.Pid, name)
+	}
 }
 
 func (sess *session) killProc() {
@@ -360,6 +369,11 @@ func (sess *session) exit(code int) {
 
 // Like OpenSSH: exit-status normally, exit-signal when killed by a signal, so clients surface 128+signal.
 func (sess *session) exitProcess(st *os.ProcessState) {
+	// The pid is reaped and may be reused, so no later signal goes to it.
+	sess.procMu.Lock()
+	sess.proc = nil
+	sess.procMu.Unlock()
+
 	name, code, signaled := processSignal(st)
 	if !signaled {
 		status := 1

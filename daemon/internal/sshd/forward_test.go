@@ -2,10 +2,14 @@ package sshd
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -423,4 +427,61 @@ func TestTCPIPForwardAfterClose(t *testing.T) {
 	st.close()
 	ok, _ := srv.tcpipForward(st, ssh.Marshal(tcpipForwardData{BindAddr: "127.0.0.1", BindPort: 0}))
 	assert.False(t, ok)
+}
+
+func TestDialAsReportsTheDialError(t *testing.T) {
+	sysUser, err := lookupAccount(currentUser(t))
+	require.NoError(t, err)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	closed := ln.Addr().String()
+	require.NoError(t, ln.Close())
+
+	_, err = dialAs(sysUser, closed)
+	require.ErrorContains(t, err, "connection refused", "the client is told why a forward failed")
+
+	// A cut address could name another host than the one in the audit log.
+	_, err = dialAs(sysUser, strings.Repeat("a", maxForwardAddr+1))
+	require.ErrorContains(t, err, "too long")
+}
+
+// The point of the helper: to the kernel a forward is the user's socket, not the daemon's.
+func TestForwardSocketsBelongToTheUser(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("test must run as root")
+	}
+	const nobody = 65534
+	sysUser := &account{Name: "nobody", UID: nobody, GID: nobody, Home: "/"}
+
+	ln, err := listenAs(sysUser, "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+	assert.Equal(t, nobody, tcpSocketUID(t, ln.Addr()), "listener of a remote forward")
+
+	c, err := dialAs(sysUser, ln.Addr().String())
+	require.NoError(t, err)
+	defer c.Close()
+	assert.Equal(t, nobody, tcpSocketUID(t, c.LocalAddr()), "connection of a direct forward")
+
+	_, err = listenAs(sysUser, "127.0.0.1:1")
+	require.Error(t, err, "the user bound a privileged port")
+}
+
+// The uid column of /proc/net/tcp is the owner a firewall matches on.
+func tcpSocketUID(t *testing.T, local net.Addr) int {
+	t.Helper()
+	ap := addrPort(local)
+	want := fmt.Sprintf("%08X:%04X", binary.LittleEndian.Uint32(ap.Addr().AsSlice()), ap.Port())
+	data, err := os.ReadFile("/proc/net/tcp")
+	require.NoError(t, err)
+	for line := range strings.SplitSeq(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) > 7 && fields[1] == want {
+			uid, convErr := strconv.Atoi(fields[7])
+			require.NoError(t, convErr)
+			return uid
+		}
+	}
+	t.Fatalf("no socket on %s in /proc/net/tcp", local)
+	return 0
 }
