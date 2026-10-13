@@ -1,0 +1,27 @@
+nokku.
+
+Email change
+
+
+Confirm your new email address.
+
+You asked to use this address for your Nokku account. The account switches to it once you confirm, and you sign in with it from then on.
+
+Confirm this address {{ .LinkURL }}
+
+The link expires in {{ .Expiration }}
+
+If you did not ask for this, ignore this email. Nothing changes without the link.
+
+This is a security email about your account on {{ if .Operator.Name }}{{ .Operator.Name }}{{ else }}this Nokku server{{ end }}. If you did not do this, {{ if .Operator.SupportEmail }}contact {{ .Operator.SupportEmail }}{{ else }}tell your administrator{{ end }}.
+
+{{ if or .Operator.WebsiteURL .Operator.PrivacyURL .Operator.TermsURL .Operator.ImprintURL }}
+
+{{ if .Operator.WebsiteURL }}Website {{ .Operator.WebsiteURL }}{{ end }}{{ if .Operator.PrivacyURL }}Privacy {{ .Operator.PrivacyURL }}{{ end }}{{ if .Operator.TermsURL }}Terms {{ .Operator.TermsURL }}{{ end }}{{ if .Operator.ImprintURL }}Imprint {{ .Operator.ImprintURL }}{{ end }}
+
+{{ end }}{{ if .Operator.Name }}
+
+© {{ year }} {{ .Operator.Name }}{{ if .Operator.Address }}
+{{ .Operator.Address }}{{ end }}
+
+{{ end }}

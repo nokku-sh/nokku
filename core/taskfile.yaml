@@ -21,17 +21,10 @@ tasks:
     cmds:
       - pnpm run dev
 
-  email:
-    desc: Run email
-    dir: web/email
-    cmds:
-      - pnpm run dev
-
   update:
     desc: Update frontend dependencies, Go modules are updated from the repo root
     cmds:
       - cd web/ui && pnpm update --latest
-      - cd web/email && pnpm update --latest
 
   gen:
     desc: Generate sqlc and the web client from ../proto
@@ -51,13 +44,6 @@ tasks:
     cmds:
       - pnpm install; pnpm build
       - touch build/.gitkeep
-
-  build:email:
-    desc: Build email templates, HTML into out/ and the plain text part into out/text/
-    dir: web/email
-    cmds:
-      - pnpm install; pnpm export
-      - touch out/.gitkeep
 
   test:
     desc: Run the unit tests

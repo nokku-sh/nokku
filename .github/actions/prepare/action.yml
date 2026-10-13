@@ -44,8 +44,3 @@ runs:
       working-directory: core/web/ui
       run: pnpm install && pnpm build
 
-    - name: Build email templates
-      if: runner.os == 'Linux'
-      shell: bash
-      working-directory: core/web/email
-      run: pnpm install && pnpm export

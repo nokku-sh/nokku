@@ -110,8 +110,7 @@ go test ./...                 # unit tests, no services needed
 task core:test:integration    # needs Docker
 ```
 
-Unit tests live next to the code and never open a connection. The core's
-email tests read the built templates, run `task core:build:email` once. Tests
+Unit tests live next to the code and never open a connection. Tests
 that need PostgreSQL, Keycloak or Vault live in `core/internal/integration`
 behind the `integration` build tag and start their own containers, so nothing
 has to run on your machine first. The TPM tests in `internal/tpm` run against

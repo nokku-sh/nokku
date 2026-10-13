@@ -3,6 +3,7 @@ package email
 import (
 	"bytes"
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	htmltemplate "html/template"
@@ -16,9 +17,12 @@ import (
 	"github.com/caarlos0/env/v11"
 
 	"github.com/nokku-sh/nokku/core/internal/cache"
-
-	"github.com/nokku-sh/nokku/core/web"
 )
+
+// The templates are edited by hand, an .html and a .txt per mail.
+//
+//go:embed templates
+var templates embed.FS
 
 // ErrCooldown means the same kind of mail went to this person a moment ago.
 var ErrCooldown = errors.New("email cooldown active")
@@ -242,21 +246,24 @@ func cooldownKey(userID, template string) string {
 	return "email_cooldown:" + userID + ":" + template
 }
 
+// A year typed into the footer would be wrong every January.
+var templateFuncs = map[string]any{"year": func() int { return time.Now().Year() }}
+
 type body struct {
 	text string
 	html string
 }
 
-// render fills both exports of a template. The text part goes through text/template, html escaping would break its URLs.
+// render fills both parts of a template. The text part goes through text/template, html escaping would break its URLs.
 func render(name string, data any) (body, error) {
-	html, err := renderFile(fmt.Sprintf("email/out/%s.html", name), data, func(src string) (executor, error) {
-		return htmltemplate.New(name).Option("missingkey=error").Parse(src)
+	html, err := renderFile("templates/"+name+".html", data, func(src string) (executor, error) {
+		return htmltemplate.New(name).Funcs(templateFuncs).Option("missingkey=error").Parse(src)
 	})
 	if err != nil {
 		return body{}, err
 	}
-	text, err := renderFile(fmt.Sprintf("email/out/text/%s.txt", name), data, func(src string) (executor, error) {
-		return texttemplate.New(name).Option("missingkey=error").Parse(src)
+	text, err := renderFile("templates/"+name+".txt", data, func(src string) (executor, error) {
+		return texttemplate.New(name).Funcs(templateFuncs).Option("missingkey=error").Parse(src)
 	})
 	if err != nil {
 		return body{}, err
@@ -269,7 +276,7 @@ type executor interface {
 }
 
 func renderFile(path string, data any, parse func(string) (executor, error)) (string, error) {
-	content, err := web.EmailFS.ReadFile(path)
+	content, err := templates.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("template %s not found: %w", path, err)
 	}

@@ -1,0 +1,31 @@
+nokku.
+
+Security notice
+
+
+Your email address is being changed.
+
+Someone signed in to your account and asked to change its email address. The change happens once the new address is confirmed.
+
+New address
+
+{{ .NewEmail }}
+
+If this was you, there is nothing to do. If it was not, cancel the change. That also works after the change went through: it puts this address back and signs the account out everywhere. Check your passkeys and signed-in devices afterwards.
+
+This wasn't me, cancel the change {{ .CancelURL }}
+
+The link works for {{ .Expiration }}.
+
+This is a security email about your account on {{ if .Operator.Name }}{{ .Operator.Name }}{{ else }}this Nokku server{{ end }}. If you did not do this, {{ if .Operator.SupportEmail }}contact {{ .Operator.SupportEmail }}{{ else }}tell your administrator{{ end }}.
+
+{{ if or .Operator.WebsiteURL .Operator.PrivacyURL .Operator.TermsURL .Operator.ImprintURL }}
+
+{{ if .Operator.WebsiteURL }}Website {{ .Operator.WebsiteURL }}{{ end }}{{ if .Operator.PrivacyURL }}Privacy {{ .Operator.PrivacyURL }}{{ end }}{{ if .Operator.TermsURL }}Terms {{ .Operator.TermsURL }}{{ end }}{{ if .Operator.ImprintURL }}Imprint {{ .Operator.ImprintURL }}{{ end }}
+
+{{ end }}{{ if .Operator.Name }}
+
+© {{ year }} {{ .Operator.Name }}{{ if .Operator.Address }}
+{{ .Operator.Address }}{{ end }}
+
+{{ end }}

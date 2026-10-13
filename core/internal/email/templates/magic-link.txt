@@ -1,0 +1,27 @@
+nokku.
+
+Sign in
+
+
+Here is your sign-in link.
+
+Open it in the browser you want to stay signed in on.
+
+Sign in {{ .LinkURL }}
+
+The link works once and expires in {{ .Expiration }}
+
+If you did not ask to sign in, ignore this email. Nobody gets in without the link.
+
+This is a security email about your account on {{ if .Operator.Name }}{{ .Operator.Name }}{{ else }}this Nokku server{{ end }}. If you did not do this, {{ if .Operator.SupportEmail }}contact {{ .Operator.SupportEmail }}{{ else }}tell your administrator{{ end }}.
+
+{{ if or .Operator.WebsiteURL .Operator.PrivacyURL .Operator.TermsURL .Operator.ImprintURL }}
+
+{{ if .Operator.WebsiteURL }}Website {{ .Operator.WebsiteURL }}{{ end }}{{ if .Operator.PrivacyURL }}Privacy {{ .Operator.PrivacyURL }}{{ end }}{{ if .Operator.TermsURL }}Terms {{ .Operator.TermsURL }}{{ end }}{{ if .Operator.ImprintURL }}Imprint {{ .Operator.ImprintURL }}{{ end }}
+
+{{ end }}{{ if .Operator.Name }}
+
+© {{ year }} {{ .Operator.Name }}{{ if .Operator.Address }}
+{{ .Operator.Address }}{{ end }}
+
+{{ end }}

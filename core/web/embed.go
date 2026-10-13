@@ -1,4 +1,4 @@
-// Package web embeds the built UI and email templates. A committed .gitkeep lets the Go build work without node.
+// Package web embeds the built UI. A committed .gitkeep lets the Go build work without node.
 package web
 
 import (
@@ -21,9 +21,6 @@ import (
 	"github.com/vearutop/statigz"
 	"github.com/vearutop/statigz/brotli"
 )
-
-//go:embed all:email/out
-var EmailFS embed.FS
 
 //go:embed all:ui/build
 var staticFS embed.FS

@@ -1,0 +1,27 @@
+nokku.
+
+You are invited
+
+
+Join {{ .Workspace }}.
+
+Hi {{ .UserName }}, this link creates your account and signs you in. You can add a passkey afterwards so you never need a link again.
+
+Create my account {{ .LinkURL }}
+
+The link expires in {{ .Expiration }}
+
+If you were not expecting this, ignore it. No account is created until the link is used.
+
+This is a security email about your account on {{ if .Operator.Name }}{{ .Operator.Name }}{{ else }}this Nokku server{{ end }}. If you did not do this, {{ if .Operator.SupportEmail }}contact {{ .Operator.SupportEmail }}{{ else }}tell your administrator{{ end }}.
+
+{{ if or .Operator.WebsiteURL .Operator.PrivacyURL .Operator.TermsURL .Operator.ImprintURL }}
+
+{{ if .Operator.WebsiteURL }}Website {{ .Operator.WebsiteURL }}{{ end }}{{ if .Operator.PrivacyURL }}Privacy {{ .Operator.PrivacyURL }}{{ end }}{{ if .Operator.TermsURL }}Terms {{ .Operator.TermsURL }}{{ end }}{{ if .Operator.ImprintURL }}Imprint {{ .Operator.ImprintURL }}{{ end }}
+
+{{ end }}{{ if .Operator.Name }}
+
+© {{ year }} {{ .Operator.Name }}{{ if .Operator.Address }}
+{{ .Operator.Address }}{{ end }}
+
+{{ end }}
