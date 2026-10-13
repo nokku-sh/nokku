@@ -26,7 +26,7 @@ var allowedAlgs = []jose.SignatureAlgorithm{
 const (
 	dpopNonceTTL = 5 * time.Minute
 	dpopMaxSkew  = time.Minute
-	// A marker lives 11 minutes, so this is room for about 150 proofs a second.
+	// A marker lives three minutes, so this is room for about 550 proofs a second.
 	dpopReplayEntries     = 100_000
 	dpopAnonReplayEntries = 10_000
 )
@@ -60,10 +60,10 @@ func (v *DPoPVerifier) nonceValid(nonce string) bool {
 		subtle.ConstantTimeCompare([]byte(nonce), []byte(v.nonceFor(bucket-1))) == 1
 }
 
-// Verify returns the proof key's thumbprint (jkt) for the caller to compare.
+// Verify returns the proof key's thumbprint (jkt). A binding has to match it before the jti takes room in the store.
 func (v *DPoPVerifier) Verify(
 	ctx context.Context,
-	proofJWT, accessToken, htm, htu string,
+	proofJWT, accessToken, htm, htu, binding string,
 ) (string, error) {
 	sig, err := jose.ParseSigned(proofJWT, allowedAlgs)
 	if err != nil {
@@ -121,21 +121,26 @@ func (v *DPoPVerifier) Verify(
 		}
 	}
 
-	// Remember the jti as long as its proof could still be accepted. Hashed so a long jti cannot bloat the store.
+	tp, err := jwk.Thumbprint(crypto.SHA256)
+	if err != nil {
+		return "", fmt.Errorf("%w: thumbprint: %w", errInvalidProof, err)
+	}
+	jkt := base64.RawURLEncoding.EncodeToString(tp)
+	if binding != "" && jkt != binding {
+		return "", errBindingMismatch
+	}
+
+	// Hashed so a long jti cannot bloat the store.
 	jti := sha256.Sum256([]byte(c.JTI))
-	added, err := replay.SetNX(ctx, string(jti[:]), nil, 2*dpopNonceTTL+dpopMaxSkew)
+	// The iat check takes a proof for 2*dpopMaxSkew at most. The third is slack for a wall clock that steps back.
+	added, err := replay.SetNX(ctx, string(jti[:]), nil, 3*dpopMaxSkew)
 	if err != nil {
 		return "", fmt.Errorf("%w: replay store: %w", errInvalidProof, err)
 	}
 	if !added {
 		return "", errReplay
 	}
-
-	tp, err := jwk.Thumbprint(crypto.SHA256)
-	if err != nil {
-		return "", fmt.Errorf("%w: thumbprint: %w", errInvalidProof, err)
-	}
-	return base64.RawURLEncoding.EncodeToString(tp), nil
+	return jkt, nil
 }
 
 func (v *DPoPVerifier) verifySession(
@@ -145,14 +150,8 @@ func (v *DPoPVerifier) verifySession(
 	if binding == "" {
 		return fmt.Errorf("%w: session is not DPoP-bound", errInvalidProof)
 	}
-	jkt, err := v.Verify(ctx, proofJWT, accessToken, htm, htu)
-	if err != nil {
-		return err
-	}
-	if jkt != binding {
-		return errBindingMismatch
-	}
-	return nil
+	_, err := v.Verify(ctx, proofJWT, accessToken, htm, htu, binding)
+	return err
 }
 
 type dpopClaims struct {

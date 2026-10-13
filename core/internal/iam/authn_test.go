@@ -253,7 +253,7 @@ func TestDPoPAnonymousProofsCannotFillTheSessionStore(t *testing.T) {
 			ath = DPoPATH(token)
 		}
 		proof := signProof(t, key, htu, ath, v.CurrentNonce(), now)
-		_, err := v.Verify(t.Context(), proof, token, http.MethodPost, htu)
+		_, err := v.Verify(t.Context(), proof, token, http.MethodPost, htu, "")
 		return err
 	}
 
@@ -267,5 +267,39 @@ func TestDPoPAnonymousProofsCannotFillTheSessionStore(t *testing.T) {
 	}
 	if err := verify("session-token"); err != nil {
 		t.Fatalf("session proof refused after an anonymous flood: %v", err)
+	}
+}
+
+// A valid token with someone else's key must not take room in the store every bound session shares.
+func TestDPoPWrongKeyLeavesNoMarker(t *testing.T) {
+	const htu, token = "https://nokku.example.com/x", "session-token"
+	now := time.Unix(1_800_000_000, 0)
+	v := newTestVerifier(t, func() time.Time { return now })
+	v.replay = cache.NewMemory(1)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	tp, err := (&jose.JSONWebKey{Key: &key.PublicKey}).Thumbprint(crypto.SHA256)
+	if err != nil {
+		t.Fatalf("thumbprint: %v", err)
+	}
+	binding := base64.RawURLEncoding.EncodeToString(tp)
+	proof := func() string { return signProof(t, key, htu, DPoPATH(token), v.CurrentNonce(), now) }
+
+	verify := func(proof, binding string) error {
+		_, err := v.Verify(t.Context(), proof, token, http.MethodPost, htu, binding)
+		return err
+	}
+
+	if err := verify(proof(), "another-key"); !errors.Is(err, errBindingMismatch) {
+		t.Fatalf("Verify() = %v, want a binding mismatch", err)
+	}
+	once := proof()
+	if err := verify(once, binding); err != nil {
+		t.Fatalf("the wrong key filled the store: %v", err)
+	}
+	if err := verify(once, binding); !errors.Is(err, errReplay) {
+		t.Fatalf("replayed proof = %v, want errReplay", err)
 	}
 }

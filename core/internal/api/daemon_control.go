@@ -380,6 +380,7 @@ func (s *daemonControlService) enrollBinding(ctx context.Context, ci connect.Cal
 		"",
 		http.MethodPost,
 		ws.BaseURL+nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure,
+		"",
 	)
 	if err != nil {
 		if errors.Is(err, iam.ErrDPoPNonce) {

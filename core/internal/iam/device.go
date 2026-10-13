@@ -274,7 +274,7 @@ func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string
 	if proof == "" {
 		return "", ErrDPoPNonce
 	}
-	return h.svc.DPoP.Verify(ctx, proof, "", r.Method, baseURL(ctx)+r.URL.Path)
+	return h.svc.DPoP.Verify(ctx, proof, "", r.Method, baseURL(ctx)+r.URL.Path, "")
 }
 
 // pollTrack reports a too-fast poll. The interval grows per slow_down, a cache failure allows the poll.
