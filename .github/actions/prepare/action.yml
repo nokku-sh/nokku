@@ -41,6 +41,6 @@ runs:
     - name: Build frontend
       if: runner.os == 'Linux'
       shell: bash
-      working-directory: core/web/ui
+      working-directory: core/web
       run: pnpm install && pnpm build
 

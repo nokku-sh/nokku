@@ -6,7 +6,7 @@ so nothing drifts.
 
 - `nokku/v1/` holds the `.proto` files. Proto package `nokku.v1`.
 - `../gen/` is the generated Go and connect code.
-- `../core/web/ui/src/lib/gen` is the TypeScript client of the web UI.
+- `../core/web/src/lib/gen` is the TypeScript client of the web UI.
 
 Never edit the generated files by hand.
 

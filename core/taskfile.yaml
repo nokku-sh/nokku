@@ -17,14 +17,14 @@ tasks:
 
   frontend:
     desc: Run frontend
-    dir: web/ui
+    dir: web
     cmds:
       - pnpm run dev
 
   update:
     desc: Update frontend dependencies, Go modules are updated from the repo root
     cmds:
-      - cd web/ui && pnpm update --latest
+      - cd web && pnpm update --latest
 
   gen:
     desc: Generate sqlc and the web client from ../proto
@@ -40,7 +40,7 @@ tasks:
 
   build:ui:
     desc: Build frontends
-    dir: web/ui
+    dir: web
     cmds:
       - pnpm install; pnpm build
       - touch build/.gitkeep
@@ -66,7 +66,7 @@ tasks:
       - govulncheck ./...
       - go test -race -count=1 -cover ./...
       - golangci-lint run --fix
-      - cd web/ui; pnpm fmt; pnpm lint
+      - cd web; pnpm fmt; pnpm lint
 
   debug:
     desc: Run profiler

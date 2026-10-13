@@ -22,11 +22,11 @@ import (
 	"github.com/vearutop/statigz/brotli"
 )
 
-//go:embed all:ui/build
+//go:embed all:build
 var staticFS embed.FS
 
 // Where the UI sits inside staticFS.
-const uiRoot = "ui/build"
+const uiRoot = "build"
 
 // Handler serves the embedded SPA, or what the Vite dev server hands out. The browser only talks to this server.
 func Handler() http.Handler {
@@ -67,7 +67,7 @@ func devProxy(target string) http.Handler {
 			r.SetXForwarded()
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
-			http.Error(w, "No Vite at "+target+", run pnpm dev in web/ui. "+err.Error(), http.StatusBadGateway)
+			http.Error(w, "No Vite at "+target+", run pnpm dev in web. "+err.Error(), http.StatusBadGateway)
 		},
 	}
 }

@@ -64,7 +64,7 @@ match the dev PostgreSQL. Then run backend and frontend together:
 task dev
 ```
 
-This runs the backend (`go run ./cmd/nokku`) and the `web/ui` frontend via
+This runs the backend (`go run ./cmd/nokku`) and the `web` frontend via
 Vite. Open `http://localhost:3000`, the backend's address. The backend takes
 the UI from Vite (the `backend` task sets `NOKKU_DEV_UI` for it), so edits
 show up at once, and links, cookies and passkeys use the same address a real
@@ -86,7 +86,7 @@ task gen
 ```
 
 From the `.proto` files in `proto/` this writes the Go API code in `gen/`
-and the web client in `core/web/ui/src/lib/gen`. It also runs `sqlc generate`
+and the web client in `core/web/src/lib/gen`. It also runs `sqlc generate`
 for the core. Re-run after changing a `.proto` file or SQL, and commit the
 result with the change.
 

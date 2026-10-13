@@ -1,6 +1,6 @@
 # Nokku web UI
 
-The control plane UI for Nokku. SvelteKit 3 and Svelte 5 with shadcn-svelte components and Tailwind CSS 4. The production build is embedded into the Go binary by `../embed.go`, so the backend serves it with no separate deployment.
+The control plane UI for Nokku. SvelteKit 3 and Svelte 5 with shadcn-svelte components and Tailwind CSS 4. The production build is embedded into the Go binary by `embed.go`, so the backend serves it with no separate deployment.
 
 ## Commands
 
