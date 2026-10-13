@@ -66,6 +66,7 @@ export const areas: Area[] = [
 			'DeleteJoinToken',
 			'UserCreated',
 			'UserDeleted',
+			'UserActivated',
 			'UserDeactivated'
 		]
 	},
@@ -177,6 +178,7 @@ const labels: Record<string, string> = {
 	EmailChanged: 'Email changed',
 	UserCreated: 'Account created',
 	UserDeleted: 'Account deleted',
+	UserActivated: 'Account activated',
 	UserDeactivated: 'Account deactivated',
 	RelayOpen: 'Relay opened',
 	RelayClose: 'Relay closed',

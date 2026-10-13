@@ -78,6 +78,10 @@ var (
 		connect.CodeFailedPrecondition,
 		errors.New("this workspace requires single sign-on"),
 	)
+	errSeatLimit = connect.NewError(
+		connect.CodeResourceExhausted,
+		errors.New("this workspace has no seats left"),
+	)
 	errNoWorkspace = connect.NewError(
 		connect.CodeNotFound,
 		errors.New("no such workspace"),

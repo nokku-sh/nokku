@@ -85,6 +85,23 @@ func (s *Service) DeleteSelf(ctx context.Context) error {
 	return nil
 }
 
+// SetUserActive takes a seat when it switches an account back on, like a join does.
+func (s *Service) SetUserActive(ctx context.Context, q *db.Queries, userID string, active bool) (*db.User, error) {
+	u, err := q.GetUser(ctx, userID)
+	if err != nil || u.Active == active {
+		return u, err
+	}
+	if active {
+		if err := s.checkSeat(ctx, q); err != nil {
+			return nil, err
+		}
+	}
+	if err := q.SetUserActive(ctx, &db.SetUserActiveParams{ID: userID, Active: active}); err != nil {
+		return nil, err
+	}
+	return q.GetUser(ctx, userID)
+}
+
 // RevokeUser ends every session of a user, for a deactivation.
 func (s *Service) RevokeUser(ctx context.Context, userID string) (int64, error) {
 	n, err := s.revokeSubject(ctx, userID)

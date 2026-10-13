@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/email"
+	"github.com/nokku-sh/nokku/core/internal/iam"
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 )
 
@@ -190,11 +192,12 @@ func (s *workspaceService) SetUserActive(
 		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
 			return err
 		}
-		return q.SetUserActive(
-			ctx,
-			&db.SetUserActiveParams{ID: req.GetUserId(), Active: req.GetActive()},
-		)
+		_, err := s.cfg.IAM.SetUserActive(ctx, q, req.GetUserId(), req.GetActive())
+		return err
 	}); err != nil {
+		if errors.Is(err, iam.ErrSeatLimit) {
+			return nil, errSeatLimit
+		}
 		return nil, err
 	}
 	if !req.GetActive() {

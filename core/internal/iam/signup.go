@@ -86,17 +86,9 @@ func (s *Service) createUser(
 		}
 		p.Role = cmp.Or(deref(tok.Role), p.Role)
 	}
-	if s.canJoin != nil && p.Role != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER {
-		if _, err := q.GetWorkspaceForUpdate(ctx); err != nil {
+	if p.Role != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER {
+		if err := s.checkSeat(ctx, q); err != nil {
 			return nil, err
-		}
-		ws := actor.WorkspaceIDFromContext(ctx)
-		used, err := q.CountActiveUsers(ctx, ws)
-		if err != nil {
-			return nil, err
-		}
-		if err := s.canJoin(ctx, ws, used); err != nil {
-			return nil, errors.Join(ErrSeatLimit, err)
 		}
 	}
 	u, err := q.CreateUserWithID(ctx, &p)
@@ -104,6 +96,25 @@ func (s *Service) createUser(
 		return nil, mapUserError(err)
 	}
 	return u, nil
+}
+
+// checkSeat locks the workspace row, so two callers never both take the last seat.
+func (s *Service) checkSeat(ctx context.Context, q *db.Queries) error {
+	if s.canJoin == nil {
+		return nil
+	}
+	if _, err := q.GetWorkspaceForUpdate(ctx); err != nil {
+		return err
+	}
+	ws := actor.WorkspaceIDFromContext(ctx)
+	used, err := q.CountActiveUsers(ctx, ws)
+	if err != nil {
+		return err
+	}
+	if err := s.canJoin(ctx, ws, used); err != nil {
+		return errors.Join(ErrSeatLimit, err)
+	}
+	return nil
 }
 
 // CreateOwner makes the first user of a fresh workspace. The seat cap does not apply, there is nobody to count yet.

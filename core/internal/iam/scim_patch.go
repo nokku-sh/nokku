@@ -1,6 +1,8 @@
 package iam
 
 import (
+	"cmp"
+
 	scim "github.com/elimity-com/scim"
 	scimerrors "github.com/elimity-com/scim/errors"
 	filter "github.com/scim2/filter-parser/v2"
@@ -24,7 +26,12 @@ func eachScimOp(
 			}
 			continue
 		}
-		if err := apply(op.Op, op.Path.AttributePath.AttributeName, op.Path.ValueExpression, op.Value); err != nil {
+		// A sub-attribute gets the shape a path-less op gives it, so the handlers read one form.
+		value := op.Value
+		if sub := cmp.Or(op.Path.SubAttributeName(), op.Path.AttributePath.SubAttributeName()); sub != "" {
+			value = map[string]any{sub: value}
+		}
+		if err := apply(op.Op, op.Path.AttributePath.AttributeName, op.Path.ValueExpression, value); err != nil {
 			return err
 		}
 	}

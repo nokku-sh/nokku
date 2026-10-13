@@ -85,7 +85,7 @@ func (s *authService) ConsumeMagicLink(
 	case errors.Is(err, iam.ErrSSORequired):
 		return nil, errSSORequired
 	case errors.Is(err, iam.ErrSeatLimit):
-		return nil, newError(connect.CodeResourceExhausted, "this workspace has no seats left")
+		return nil, errSeatLimit
 	case errors.Is(err, iam.ErrEmailTaken):
 		return nil, newError(connect.CodeAlreadyExists, "an account with this email already exists, sign in instead")
 	case err != nil:

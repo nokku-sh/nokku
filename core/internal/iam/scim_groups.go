@@ -107,22 +107,7 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 			}
 		}
 		// The PUT representation is authoritative for members.
-		next := scimMemberRefs(attrs["members"])
-		current, err := q.ListTeamMembers(ctx, id)
-		if err != nil {
-			return err
-		}
-		for _, m := range current {
-			if !slices.Contains(next, m.User.ID) {
-				if err := q.RemoveTeamMember(
-					ctx,
-					&db.RemoveTeamMemberParams{TeamID: id, UserID: m.User.ID},
-				); err != nil {
-					return err
-				}
-			}
-		}
-		if err := addTeamMembers(ctx, q, id, next); err != nil {
+		if err := setTeamMembers(ctx, q, id, scimMemberRefs(attrs["members"])); err != nil {
 			return err
 		}
 		res, err = groupResource(ctx, q, h.ws, team)
@@ -160,8 +145,14 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 			case "members":
 				changed = true
 				ids := scimMemberRefs(value)
-				if opName != "remove" {
+				switch {
+				case opName == "replace" && expr == nil:
+					return setTeamMembers(ctx, q, id, ids)
+				case opName != "remove":
 					return addTeamMembers(ctx, q, id, ids)
+				case value == nil && expr == nil:
+					// A bare remove takes every value (RFC 7644 3.5.2.2).
+					return setTeamMembers(ctx, q, id, nil)
 				}
 				if len(ids) == 0 {
 					// Okta puts the id in the path filter: members[value eq "id"].
@@ -182,6 +173,25 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 		return err
 	})
 	return res, err
+}
+
+// setTeamMembers makes userIDs the whole membership.
+func setTeamMembers(ctx context.Context, q *db.Queries, teamID string, userIDs []string) error {
+	current, err := q.ListTeamMembers(ctx, teamID)
+	if err != nil {
+		return err
+	}
+	for _, m := range current {
+		if i := slices.Index(userIDs, m.User.ID); i >= 0 {
+			// Already in, the full list of a sync would look every one of them up again.
+			userIDs = slices.Delete(userIDs, i, i+1)
+			continue
+		}
+		if err := q.RemoveTeamMember(ctx, &db.RemoveTeamMemberParams{TeamID: teamID, UserID: m.User.ID}); err != nil {
+			return err
+		}
+	}
+	return addTeamMembers(ctx, q, teamID, userIDs)
 }
 
 // addTeamMembers skips non-members, a group never widens the workspace.

@@ -69,8 +69,12 @@ func (f *SCIMFlow) serverFor(ws actor.Workspace) (scim.Server, error) {
 	}
 	s, err := scim.NewServer(
 		&scim.ServerArgs{
-			ServiceProviderConfig: &scim.ServiceProviderConfig{},
-			ResourceTypes:         scimResourceTypes(f.svc, ws),
+			ServiceProviderConfig: &scim.ServiceProviderConfig{
+				MaxResults:       100,
+				SupportFiltering: true,
+				SupportPatch:     true,
+			},
+			ResourceTypes: scimResourceTypes(f.svc, ws),
 		},
 		scim.WithBaseURL(ws.BaseURL+scimMountPath),
 	)
@@ -89,21 +93,18 @@ func (s *Service) scimProvisionUser(
 	externalID string,
 ) (*db.User, error) {
 	var u *db.User
-	var created bool
+	var created, flipped bool
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		u, err = q.GetUserByEmail(ctx, email)
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
 			u, err = s.createUser(ctx, q, db.CreateUserWithIDParams{Email: email, Name: name}, "")
-			if errors.Is(err, ErrSeatLimit) {
-				return scimerrors.ScimError{Status: http.StatusForbidden, Detail: err.Error()}
-			}
 			if err != nil {
 				return err
 			}
 			created = true
 			if !active {
-				if u, err = setUserActive(ctx, q, u.ID, false); err != nil {
+				if u, err = s.SetUserActive(ctx, q, u.ID, false); err != nil {
 					return err
 				}
 			}
@@ -115,19 +116,23 @@ func (s *Service) scimProvisionUser(
 					return err
 				}
 			}
-			if u, err = setUserActive(ctx, q, u.ID, active); err != nil {
+			if u, err = s.SetUserActive(ctx, q, u.ID, active); err != nil {
 				return err
 			}
+			flipped = true
 		}
 		return linkSCIM(ctx, q, u.ID, externalID)
 	})
 	if err != nil {
-		return nil, mapUserError(err)
+		return nil, scimUserError(mapUserError(err))
 	}
 	if created {
 		s.record(ctx, event{
 			Action: actionUserCreated, Kind: actor.KindUser, Method: MethodSCIM, UserID: u.ID, Email: u.Email,
 		})
+	}
+	if flipped {
+		s.recordActive(ctx, u)
 	}
 	if !u.Active {
 		if _, err := s.revokeSubject(ctx, u.ID); err != nil {
@@ -137,11 +142,23 @@ func (s *Service) scimProvisionUser(
 	return u, nil
 }
 
-func setUserActive(ctx context.Context, q *db.Queries, userID string, active bool) (*db.User, error) {
-	if err := q.SetUserActive(ctx, &db.SetUserActiveParams{ID: userID, Active: active}); err != nil {
-		return nil, err
+// scimUserError maps what the IdP's admin can act on. The seat detail is shown as is.
+func scimUserError(err error) error {
+	switch {
+	case errors.Is(err, ErrSeatLimit):
+		return scimerrors.ScimError{Status: http.StatusForbidden, Detail: err.Error()}
+	case errors.Is(err, ErrEmailTaken):
+		return scimerrors.ScimErrorUniqueness
 	}
-	return q.GetUser(ctx, userID)
+	return err
+}
+
+func (s *Service) recordActive(ctx context.Context, u *db.User) {
+	a := actionUserDeactivated
+	if u.Active {
+		a = actionUserActivated
+	}
+	s.record(ctx, event{Action: a, Kind: actor.KindUser, Method: MethodSCIM, UserID: u.ID, Email: u.Email})
 }
 
 // linkSCIM stores the identity provider's id on the account. A new id replaces the old one, IdP migrations change it.
@@ -156,7 +173,7 @@ func linkSCIM(ctx context.Context, q *db.Queries, userID, externalID string) err
 	return err
 }
 
-// keepOwner refuses to switch off or remove the owner. Nobody else can hand the workspace on.
+// keepOwner refuses to switch off, remove or rename the owner. Nobody else can hand the workspace on.
 func keepOwner(ctx context.Context, q *db.Queries, userID string) error {
 	owner, err := q.GetOwner(ctx)
 	if err != nil {
@@ -165,7 +182,7 @@ func keepOwner(ctx context.Context, q *db.Queries, userID string) error {
 	if owner.ID == userID {
 		return scimerrors.ScimError{
 			Status: http.StatusConflict,
-			Detail: "the workspace owner cannot be deactivated or deprovisioned, transfer ownership first",
+			Detail: "the workspace owner cannot be deactivated, deprovisioned or renamed, transfer ownership first",
 		}
 	}
 	return nil
@@ -173,25 +190,27 @@ func keepOwner(ctx context.Context, q *db.Queries, userID string) error {
 
 // scimDeprovisionUser deactivates the account and drops its IdP link. The data survives for a re-assignment.
 func (s *Service) scimDeprovisionUser(ctx context.Context, u *db.User) error {
-	err := s.conn.TenantTx(ctx, func(q *db.Queries) error {
+	var after *db.User
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if err := keepOwner(ctx, q, u.ID); err != nil {
 			return err
 		}
-		if _, err := setUserActive(ctx, q, u.ID, false); err != nil {
+		if after, err = s.SetUserActive(ctx, q, u.ID, false); err != nil {
 			return err
 		}
 		if err := q.SetUserSCIMExternalID(ctx, &db.SetUserSCIMExternalIDParams{ID: u.ID}); err != nil {
 			return err
 		}
-		_, err := q.DeleteSubjectTokens(ctx, u.ID)
+		_, err = q.DeleteSubjectTokens(ctx, u.ID)
 		return err
 	})
 	if err != nil {
 		return err
 	}
-	s.record(ctx, event{
-		Action: actionUserDeactivated, Kind: actor.KindUser, Method: MethodSCIM, UserID: u.ID, Email: u.Email,
-	})
+	// IdPs switch an account off with PATCH and delete it later, which is one deactivation.
+	if after.Active != u.Active {
+		s.recordActive(ctx, after)
+	}
 	return nil
 }
 

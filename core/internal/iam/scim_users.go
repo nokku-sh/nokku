@@ -2,9 +2,11 @@ package iam
 
 // SCIM Users are the workspace's users: id is the user id, userName the email, externalId is on the row.
 // Inbound, the primary emails entry wins over userName. Authentik sends a plain username there.
+// The IdP owns the address of the accounts it linked, so a changed one renames the login. Never the owner's.
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"strings"
 	"uuid"
@@ -70,10 +72,6 @@ func (h scimUserHandler) Replace(r *http.Request, id string, attrs scim.Resource
 	if err != nil {
 		return scim.Resource{}, err
 	}
-	if requested := scimEmail(attrs); requested != "" && requested != u.Email {
-		// The email is the login and SCIM never renames it.
-		return scim.Resource{}, scimerrors.ScimErrorMutability
-	}
 	var name *string
 	if n := scimDisplayName(attrs["displayName"], attrs["name"]); n != "" {
 		name = &n
@@ -82,7 +80,7 @@ func (h scimUserHandler) Replace(r *http.Request, id string, attrs scim.Resource
 	if a, ok := attrs["active"].(bool); ok {
 		active = &a
 	}
-	return h.apply(r.Context(), id, name, active, scimAttrString(attrs["externalId"]))
+	return h.apply(r.Context(), u, scimEmail(attrs), name, active, scimAttrString(attrs["externalId"]))
 }
 
 func (h scimUserHandler) Delete(r *http.Request, id string) error {
@@ -100,25 +98,28 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 	}
 	var name *string
 	var active *bool
-	externalID := ""
+	email, externalID := "", ""
 	changed := false
-	err = eachScimOp(operations, func(opName, attr string, _ filter.Expression, value any) error {
+	// Entra sends the name one part per operation.
+	nameParts := map[string]any{}
+	err = eachScimOp(operations, func(opName, attr string, expr filter.Expression, value any) error {
 		switch attr {
+		case "emails":
+			// userName is left out here. Where it is no address, the two would rename the login back and forth.
+			if s := scimPatchedLogin(opName, expr, value); s != "" {
+				email = s
+				changed = true
+			}
 		case "active":
 			// Remove resets to the attribute default (RFC 7644 3.5.2.2).
 			active = new(opName != "remove" && scimAttrBool(value, true))
 			changed = true
-		case "displayName", "name":
-			n := ""
-			if opName != "remove" {
-				n = scimDisplayName(value, value)
-			}
-			name = &n
+		case "displayName":
+			name = new(scimAttrString(value))
 			changed = true
-		case "emails":
-			if s := scimEmailValue(value); s != "" && normalizeEmail(s) != u.Email {
-				return scimerrors.ScimErrorMutability
-			}
+		case "name":
+			parts, _ := value.(map[string]any)
+			maps.Copy(nameParts, parts)
 		case "externalId":
 			if opName != "remove" {
 				externalID = scimAttrString(value)
@@ -130,11 +131,18 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 	if err != nil {
 		return scim.Resource{}, err
 	}
+	// One name is stored, so half of one changes nothing. displayName wins over the parts.
+	whole := scimAttrString(nameParts["formatted"]) != "" ||
+		(scimAttrString(nameParts["givenName"]) != "" && scimAttrString(nameParts["familyName"]) != "")
+	if name == nil && whole {
+		name = new(scimDisplayName(nil, nameParts))
+		changed = true
+	}
 	if !changed {
 		// RFC 7644 3.5.2 wants no content for a no-op, which the library renders from an empty resource.
 		return scim.Resource{}, nil
 	}
-	return h.apply(r.Context(), id, name, active, externalID)
+	return h.apply(r.Context(), u, email, name, active, externalID)
 }
 
 // user answers 404 for anything the workspace does not hold.
@@ -152,16 +160,36 @@ func (h scimUserHandler) user(ctx context.Context, id string) (*db.User, error) 
 	return rows[0], nil
 }
 
+// apply takes "" for an email the request did not carry.
 func (h scimUserHandler) apply(
 	ctx context.Context,
-	id string,
+	before *db.User,
+	email string,
 	name *string,
 	active *bool,
 	externalID string,
 ) (scim.Resource, error) {
+	id := before.ID
+	// An account the IdP never linked keeps its address, and the request that links it does not rename yet.
+	rename := email != "" && email != before.Email && before.ScimExternalID != nil
 	err := h.svc.conn.TenantTx(ctx, func(q *db.Queries) error {
-		if active != nil && !*active {
+		if rename || (active != nil && !*active) {
 			if err := keepOwner(ctx, q, id); err != nil {
+				return err
+			}
+		}
+		// First, it locks the workspace row and every other path takes that before a user row.
+		if active != nil {
+			if _, err := h.svc.SetUserActive(ctx, q, id, *active); err != nil {
+				return err
+			}
+		}
+		if rename {
+			if _, err := q.SetUserEmail(ctx, &db.SetUserEmailParams{ID: id, Email: email}); err != nil {
+				return mapUserError(err)
+			}
+			// A link mailed to the old address must not outlive it.
+			if err := q.DeleteAllUserTokens(ctx, &id); err != nil {
 				return err
 			}
 		}
@@ -170,15 +198,10 @@ func (h scimUserHandler) apply(
 				return err
 			}
 		}
-		if active != nil {
-			if _, err := setUserActive(ctx, q, id, *active); err != nil {
-				return err
-			}
-		}
 		return linkSCIM(ctx, q, id, externalID)
 	})
 	if err != nil {
-		return scim.Resource{}, err
+		return scim.Resource{}, scimUserError(err)
 	}
 	if active != nil && !*active {
 		if _, err := h.svc.revokeSubject(ctx, id); err != nil {
@@ -188,6 +211,14 @@ func (h scimUserHandler) apply(
 	u, err := h.user(ctx, id)
 	if err != nil {
 		return scim.Resource{}, err
+	}
+	if u.Active != before.Active {
+		h.svc.recordActive(ctx, u)
+	}
+	if rename {
+		h.svc.record(ctx, event{
+			Action: actionEmailChanged, Kind: actor.KindUser, Method: MethodSCIM, UserID: u.ID, Email: u.Email,
+		})
 	}
 	return userResource(u), nil
 }
@@ -232,6 +263,40 @@ func scimEmail(attrs scim.ResourceAttributes) string {
 	for _, v := range []any{attrs["emails"], attrs["userName"]} {
 		if email := normalizeEmail(scimEmailValue(v)); strings.Contains(email, "@") {
 			return email
+		}
+	}
+	return ""
+}
+
+// scimPatchedLogin picks the login address out of a PATCH on emails, "" for a removal or a second address.
+func scimPatchedLogin(opName string, expr filter.Expression, value any) string {
+	if opName == "remove" {
+		return ""
+	}
+	// A path filter names one entry. The one userResource reports is type eq "work" or primary eq true.
+	byFilter := expr != nil
+	if byFilter {
+		ae, ok := expr.(*filter.AttributeExpression)
+		if !ok || ae.Operator != filter.EQ {
+			return ""
+		}
+		attr := ae.AttributePath.AttributeName
+		if (!strings.EqualFold(attr, "type") || ae.CompareValue != "work") &&
+			(!strings.EqualFold(attr, "primary") || ae.CompareValue != true) {
+			return ""
+		}
+	}
+	entries, ok := value.([]any)
+	if !ok {
+		entries = []any{value}
+	}
+	for _, e := range entries {
+		m, _ := e.(map[string]any)
+		if !byFilter && !scimAttrBool(m["primary"], false) && m["type"] != "work" {
+			continue
+		}
+		if s := normalizeEmail(scimAttrString(m["value"])); strings.Contains(s, "@") {
+			return s
 		}
 	}
 	return ""

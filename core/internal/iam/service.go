@@ -37,6 +37,7 @@ type action string
 const (
 	actionUserCreated     action = "UserCreated"
 	actionUserDeleted     action = "UserDeleted"
+	actionUserActivated   action = "UserActivated"
 	actionUserDeactivated action = "UserDeactivated"
 	actionLoginSucceeded  action = "Login"
 	actionLoginDenied     action = "LoginDenied"
